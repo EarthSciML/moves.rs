@@ -5,3 +5,6 @@
 
 # Apptainer build cache / scratch
 .apptainer-cache/
+
+# Rust build artifacts
+/target/
