@@ -1,0 +1,247 @@
+Bootstrap: docker
+From: ubuntu:24.04
+
+# canonical-moves.sif — the reference MOVES environment for the
+# moves.rs migration. Phase 0 deliverable. Pinned by SHA256 in
+# characterization/canonical-image.lock; downstream beads reference
+# the SIF by hash.
+#
+# Driven entirely by files/versions.env (copied to /opt/moves-bin/
+# during %files). To override versions for a build, edit versions.env
+# directly OR use build-sif.sh, which writes a temp build context.
+#
+# Runtime: SIF is read-only. Bind mounts required at runtime:
+#   /var/lib/mysql              <- writable scratch (datadir)
+#   /var/run/mysqld             <- writable scratch (socket + pidfile)
+#   /opt/moves/MOVESTemporary   <- writable scratch
+#   /opt/moves/WorkerFolder     <- writable scratch
+# See characterization/apptainer/README.md for full layout + examples.
+
+%files
+    files/my.cnf              /etc/mysql/mariadb.conf.d/99-moves.cnf
+    files/init-mariadb.sh     /opt/moves-bin/init-mariadb.sh
+    files/start-mariadb-bg.sh /opt/moves-bin/start-mariadb-bg.sh
+    files/versions.env        /opt/moves-bin/versions.env
+
+%post
+    set -eux
+
+    export DEBIAN_FRONTEND=noninteractive
+    export TZ=UTC
+    ln -sf /usr/share/zoneinfo/UTC /etc/localtime
+    echo "UTC" > /etc/timezone
+
+    # versions.env is the single source of truth (copied in via %files,
+    # also kept inside the SIF for runtime introspection).
+    . /opt/moves-bin/versions.env
+
+    if [ "${MOVES_COMMIT:-}" = "REPLACE_WITH_PINNED_COMMIT_SHA" ] || [ -z "${MOVES_COMMIT:-}" ]; then
+        echo "FATAL: MOVES_COMMIT must be replaced in files/versions.env before building." >&2
+        exit 1
+    fi
+    if [ "${MOVESDB_SHA256:-}" = "REPLACE_WITH_MOVESDB_SHA256" ] || [ -z "${MOVESDB_SHA256:-}" ]; then
+        echo "FATAL: MOVESDB_SHA256 must be replaced in files/versions.env before building." >&2
+        exit 1
+    fi
+
+    # ----- Base packages -----
+    apt-get update
+    apt-get install -y --no-install-recommends \
+        ca-certificates curl wget gnupg \
+        git ant unzip xz-utils tzdata locales \
+        build-essential pkg-config \
+        sysvinit-utils
+
+    locale-gen en_US.UTF-8
+
+    # ----- MariaDB 11.4 from the official repo -----
+    curl -fsSL https://r.mariadb.com/downloads/mariadb_repo_setup -o /tmp/mariadb_repo_setup
+    chmod +x /tmp/mariadb_repo_setup
+    /tmp/mariadb_repo_setup --mariadb-server-version="mariadb-${MARIADB_SERIES}" --skip-maxscale
+    rm /tmp/mariadb_repo_setup
+    apt-get update
+    apt-get install -y --no-install-recommends mariadb-server mariadb-client
+
+    # ----- Eclipse Temurin JDK 17 -----
+    install -d -m 0755 /etc/apt/keyrings
+    curl -fsSL https://packages.adoptium.net/artifactory/api/gpg/key/public \
+        | gpg --dearmor -o /etc/apt/keyrings/adoptium.gpg
+    echo "deb [signed-by=/etc/apt/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb noble main" \
+        > /etc/apt/sources.list.d/adoptium.list
+    apt-get update
+    apt-get install -y --no-install-recommends "${JDK_PACKAGE}"
+
+    # ----- Go (version from versions.env: $GO_VERSION) -----
+    cd /tmp
+    wget -q "${GO_DOWNLOAD_URL}"
+    if [ -n "${GO_SHA256:-}" ]; then
+        echo "${GO_SHA256}  ${GO_TARBALL}" | sha256sum -c -
+    fi
+    tar -C /usr/local -xzf "${GO_TARBALL}"
+    rm "${GO_TARBALL}"
+
+    # ----- MOVES source -----
+    git clone "${MOVES_REPO_URL}" /opt/moves
+    cd /opt/moves
+    git checkout "${MOVES_COMMIT}"
+    git rev-parse HEAD > /opt/moves/.canonical-commit
+
+    # ----- Initialize MariaDB and load the default DB -----
+    install -d -o mysql -g mysql -m 0750 /var/lib/mysql
+    install -d -o mysql -g mysql -m 0755 /var/run/mysqld
+
+    # MariaDB 11.4 doesn't accept --initialize-insecure (that's MySQL).
+    # The canonical bootstrap is mariadb-install-db, which writes the
+    # system tables to the empty datadir.
+    mariadb-install-db --user=mysql --datadir=/var/lib/mysql --skip-test-db
+
+    /usr/sbin/mariadbd \
+        --user=mysql \
+        --datadir=/var/lib/mysql \
+        --socket=/var/run/mysqld/mysqld.sock \
+        --pid-file=/var/run/mysqld/mariadbd.pid \
+        --skip-networking &
+    MARIADB_PID=$!
+
+    # Wait for socket
+    for i in $(seq 1 90); do
+        if mariadb --socket=/var/run/mysqld/mysqld.sock -uroot -e "SELECT 1" >/dev/null 2>&1; then
+            break
+        fi
+        sleep 1
+    done
+
+    # MOVES expects a 'moves'/'moves' default account.
+    mariadb --socket=/var/run/mysqld/mysqld.sock -uroot <<'SQL'
+CREATE USER IF NOT EXISTS 'moves'@'localhost' IDENTIFIED BY 'moves';
+CREATE USER IF NOT EXISTS 'moves'@'127.0.0.1' IDENTIFIED BY 'moves';
+GRANT ALL PRIVILEGES ON *.* TO 'moves'@'localhost' WITH GRANT OPTION;
+GRANT ALL PRIVILEGES ON *.* TO 'moves'@'127.0.0.1' WITH GRANT OPTION;
+FLUSH PRIVILEGES;
+SQL
+
+    # ----- Default database -----
+    # Three supply paths, in priority order:
+    #   1. Staged at /opt/seed/movesdb by build-sif.sh (host-provided seed,
+    #      either an already-unzipped tree or a zip we still need to extract)
+    #   2. database/Setup/movesdb20241112.zip in the MOVES source clone
+    #   3. MOVESDB_URL points at a hosted ZIP
+    cd /tmp
+    DUMP_DIR=
+    SEED_ZIP=$(find /opt/seed/movesdb -maxdepth 1 -name 'movesdb*.zip' -type f 2>/dev/null | head -1 || true)
+    if [ -d /opt/seed/movesdb ] && [ -n "$SEED_ZIP" ]; then
+        echo "[build] Verifying staged ${MOVESDB_FILENAME} SHA256 ..."
+        echo "${MOVESDB_SHA256}  ${SEED_ZIP}" | sha256sum -c - || {
+            echo "FATAL: staged movesdb SHA256 mismatch" >&2; exit 1; }
+        mkdir -p /tmp/movesdb-unpacked
+        cd /tmp/movesdb-unpacked
+        unzip -q "$SEED_ZIP"
+        DUMP_DIR=/tmp/movesdb-unpacked
+    elif [ -d /opt/seed/movesdb ] && [ -n "$(ls -A /opt/seed/movesdb 2>/dev/null)" ]; then
+        # Pre-unzipped tree from the host
+        DUMP_DIR=/opt/seed/movesdb
+    elif [ -f "/opt/moves/database/Setup/${MOVESDB_FILENAME}" ]; then
+        echo "[build] Verifying ${MOVESDB_FILENAME} SHA256 ..."
+        echo "${MOVESDB_SHA256}  /opt/moves/database/Setup/${MOVESDB_FILENAME}" \
+            | sha256sum -c - || {
+                echo "FATAL: movesdb SHA256 mismatch" >&2; exit 1; }
+        mkdir -p /tmp/movesdb-unpacked
+        cd /tmp/movesdb-unpacked
+        unzip -q "/opt/moves/database/Setup/${MOVESDB_FILENAME}"
+        DUMP_DIR=/tmp/movesdb-unpacked
+    elif [ -n "${MOVESDB_URL}" ]; then
+        wget -q -O /tmp/movesdb.zip "${MOVESDB_URL}"
+        echo "${MOVESDB_SHA256}  /tmp/movesdb.zip" | sha256sum -c - || {
+            echo "FATAL: movesdb SHA256 mismatch" >&2; exit 1; }
+        mkdir -p /tmp/movesdb-unpacked
+        cd /tmp/movesdb-unpacked
+        unzip -q /tmp/movesdb.zip
+        rm /tmp/movesdb.zip
+        DUMP_DIR=/tmp/movesdb-unpacked
+    else
+        echo "FATAL: no movesdb source — stage at /opt/seed/movesdb via build-sif.sh, ship in MOVES tree, or set MOVESDB_URL." >&2
+        kill $MARIADB_PID 2>/dev/null || true
+        exit 1
+    fi
+
+    # The zip typically contains a single .sql dump named after the
+    # release (e.g. movesdb20241112.sql). Find it and load.
+    DUMP_SQL=$(find "$DUMP_DIR" -maxdepth 2 -name 'movesdb*.sql' -type f | head -1)
+    test -n "$DUMP_SQL" || {
+        echo "FATAL: no movesdb*.sql dump found under $DUMP_DIR" >&2
+        kill $MARIADB_PID 2>/dev/null || true
+        exit 1
+    }
+
+    DUMP_DB_NAME="${MOVESDB_FILENAME%.zip}"
+    mariadb --socket=/var/run/mysqld/mysqld.sock -uroot \
+        -e "CREATE DATABASE \`${DUMP_DB_NAME}\` CHARACTER SET utf8 COLLATE utf8_general_ci;"
+    mariadb --socket=/var/run/mysqld/mysqld.sock -uroot "${DUMP_DB_NAME}" < "$DUMP_SQL"
+
+    # Stop MariaDB cleanly so the seed dir is consistent.
+    mariadb-admin --socket=/var/run/mysqld/mysqld.sock -uroot shutdown
+    wait $MARIADB_PID 2>/dev/null || true
+
+    # Move data to read-only seed location; runtime bind-mount will be
+    # populated from this on first invocation.
+    mkdir -p /var/lib/mysql-seed
+    cp -a /var/lib/mysql/. /var/lib/mysql-seed/
+    rm -rf /var/lib/mysql
+    install -d -m 0755 /var/lib/mysql
+
+    # Clean unpacked dump artifacts (the data is now in mysql-seed).
+    rm -rf /tmp/movesdb-unpacked
+
+    # ----- Compile MOVES -----
+    cd /opt/moves
+    if [ -f build.xml ]; then
+        # 'compile' target is in MOVES's standard build.xml. We don't run
+        # 'crun' here (that requires MariaDB to be running at runtime);
+        # we just precompile classes so runtime startup is faster.
+        ant compile
+    else
+        echo "WARN: /opt/moves/build.xml missing — MOVES will need to be built at runtime." >&2
+    fi
+
+    # ----- Permissions -----
+    chmod +x /opt/moves-bin/*.sh
+
+    # ----- Cleanup -----
+    apt-get clean
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+%environment
+    export MOVES_HOME=/opt/moves
+    export PATH=/usr/local/go/bin:/opt/moves-bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    export JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-amd64
+    export GOPATH=/tmp/go
+    export TZ=UTC
+    export LC_ALL=C.UTF-8
+
+%runscript
+    exec /opt/moves-bin/init-mariadb.sh "$@"
+
+%test
+    set -e
+    # %test runs in a fresh shell without %post's vars; source the
+    # baked-in versions.env to get the pins.
+    . /opt/moves-bin/versions.env
+    test -f /opt/moves/.canonical-commit
+    test -d /var/lib/mysql-seed
+    test -x /opt/moves-bin/init-mariadb.sh
+    test -x /opt/moves-bin/start-mariadb-bg.sh
+    test -f /etc/mysql/mariadb.conf.d/99-moves.cnf
+    /usr/sbin/mariadbd --version | grep -q "${MARIADB_SERIES}" \
+        || { echo "MariaDB version mismatch"; exit 1; }
+    java -version 2>&1 | grep -q '17\.' \
+        || { echo "JDK 17 missing"; exit 1; }
+    /usr/local/go/bin/go version | grep -q "go${GO_VERSION}" \
+        || { echo "Go ${GO_VERSION} missing"; exit 1; }
+    ant -version | grep -qi 'apache ant' \
+        || { echo "ant missing"; exit 1; }
+
+%labels
+    Maintainer earthcity moves.rs
+    org.opencontainers.image.title canonical-moves
+    org.opencontainers.image.description "Canonical MOVES reference image (Phase 0 deliverable)"
+    org.opencontainers.image.source https://github.com/EarthSciML/moves.rs

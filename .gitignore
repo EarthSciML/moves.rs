@@ -1,0 +1,7 @@
+# Apptainer SIF — built by characterization/apptainer/build-sif.sh.
+# The SIF itself is large (~5 GB) and content-addressed; only the
+# lockfile (characterization/canonical-image.lock) is committed.
+*.sif
+
+# Apptainer build cache / scratch
+.apptainer-cache/
