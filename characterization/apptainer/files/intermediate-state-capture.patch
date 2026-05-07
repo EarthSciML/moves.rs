@@ -1,0 +1,39 @@
+diff --git a/gov/epa/otaq/moves/master/framework/Generator.java b/gov/epa/otaq/moves/master/framework/Generator.java
+index d702264..28f4654 100644
+--- a/gov/epa/otaq/moves/master/framework/Generator.java
++++ b/gov/epa/otaq/moves/master/framework/Generator.java
+@@ -25,7 +25,7 @@ import gov.epa.otaq.moves.utils.FileUtil;
+ **/
+ public abstract class Generator implements MasterLoopable {
+ 	// True to retain temporary files and directories used when running the external generator
+-	static final boolean KEEP_EXTERNAL_GENERATOR_FILES = false;
++	static final boolean KEEP_EXTERNAL_GENERATOR_FILES = true;
+ 	
+ 	/** The EmissionProcess that this Generator applies to **/
+ 	EmissionProcess targetProcess;
+diff --git a/gov/epa/otaq/moves/master/framework/OutputProcessor.java b/gov/epa/otaq/moves/master/framework/OutputProcessor.java
+index 87b47c8..11e136f 100644
+--- a/gov/epa/otaq/moves/master/framework/OutputProcessor.java
++++ b/gov/epa/otaq/moves/master/framework/OutputProcessor.java
+@@ -25,7 +25,7 @@ import org.apache.commons.lang.math.NumberUtils;
+ **/
+ public class OutputProcessor {
+ 	// true to retain bundles from workers
+-	static final boolean keepDebugData = false;
++	static final boolean keepDebugData = true;
+ 
+ 	/** File containing the table data that was output by a worker **/
+ 	static final String OUTPUT_TABLE_FILE_NAME = "Output.tbl";
+diff --git a/gov/epa/otaq/moves/worker/framework/RemoteEmissionsCalculator.java b/gov/epa/otaq/moves/worker/framework/RemoteEmissionsCalculator.java
+index 7edd3bc..e544cc1 100644
+--- a/gov/epa/otaq/moves/worker/framework/RemoteEmissionsCalculator.java
++++ b/gov/epa/otaq/moves/worker/framework/RemoteEmissionsCalculator.java
+@@ -110,7 +110,7 @@ public class RemoteEmissionsCalculator extends MOVESThread {
+ 	public static long shutdownIncrementMillis = 2L*60L*1000L;
+ 
+ 	/** Control cleanup of Nonroad and other other temporary files, true to keep the files **/
+-	boolean isTest = false;
++	boolean isTest = true;
+ 
+ 	/**
+ 	 * This is set to true during idle conditions and set to false otherwise.

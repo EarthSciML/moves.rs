@@ -1,0 +1,116 @@
+Bootstrap: localimage
+From: canonical-moves.sif
+
+# moves-fixture.sif — patched MOVES for fixture runs. Phase 0 Task 3
+# deliverable. Bootstraps from canonical-moves.sif and applies
+# files/intermediate-state-capture.patch to flip three MOVES flags so
+# that intermediate state survives the run:
+#
+#   gov/epa/otaq/moves/master/framework/Generator.java
+#       KEEP_EXTERNAL_GENERATOR_FILES = true
+#   gov/epa/otaq/moves/master/framework/OutputProcessor.java
+#       keepDebugData                 = true
+#   gov/epa/otaq/moves/worker/framework/RemoteEmissionsCalculator.java
+#       isTest                        = true
+#
+# With these set, MOVESTemporary/ scratch tables, WorkerFolder/WorkerTempXX/
+# bundles, and external-generator outputs persist after the run instead of
+# being deleted on cleanup. This is the source data the characterization
+# fixture-capture step (mo-kbjl) snapshots.
+#
+# The patch is the only material change vs canonical-moves.sif; everything
+# else (Ubuntu base, MariaDB 11.4, JDK 17, Go 1.21, MOVES source at
+# the pinned commit, default DB at /var/lib/mysql-seed) is inherited
+# from the parent SIF unchanged.
+#
+# Pinned by SHA256 in characterization/fixture-image.lock; built by
+# characterization/apptainer/build-fixture-sif.sh after canonical-moves.sif
+# exists.
+
+%files
+    files/intermediate-state-capture.patch /opt/moves-bin/intermediate-state-capture.patch
+
+%post
+    set -eux
+
+    cd /opt/moves
+
+    # Refuse to apply twice. The marker is also a useful runtime introspection
+    # signal — a fixture SIF will have this file, a canonical SIF won't.
+    if [ -f /opt/moves/.intermediate-state-capture.applied ]; then
+        echo "FATAL: patch already applied — building moves-fixture.sif from a fixture SIF would double-patch." >&2
+        exit 1
+    fi
+
+    # Apply via git apply against the in-tree clone (canonical-moves.sif
+    # cloned MOVES with full history at /opt/moves). git apply --check
+    # gates the actual apply so a context drift fails loudly rather than
+    # producing a corrupted source tree.
+    git apply --check /opt/moves-bin/intermediate-state-capture.patch
+    git apply        /opt/moves-bin/intermediate-state-capture.patch
+
+    # Verify each flag landed at true. Belt-and-suspenders: git apply
+    # already exited non-zero on bad context, but a future patch refactor
+    # could split context such that one hunk lands and another doesn't —
+    # this catches that. -F = fixed-string match (no regex), avoids
+    # tab/whitespace escaping issues in the MOVES source.
+    grep -qF 'static final boolean KEEP_EXTERNAL_GENERATOR_FILES = true;' \
+        gov/epa/otaq/moves/master/framework/Generator.java
+    grep -qF 'static final boolean keepDebugData = true;' \
+        gov/epa/otaq/moves/master/framework/OutputProcessor.java
+    grep -qF 'boolean isTest = true;' \
+        gov/epa/otaq/moves/worker/framework/RemoteEmissionsCalculator.java
+
+    # Mark the source tree so the %test stanza and runtime tooling can
+    # tell a fixture SIF from a canonical SIF without re-grepping.
+    cp /opt/moves-bin/intermediate-state-capture.patch \
+       /opt/moves/.intermediate-state-capture.applied
+    date -u +%Y-%m-%dT%H:%M:%SZ > /opt/moves/.fixture-build-date
+
+    # Recompile MOVES from the patched sources. compileall = clean +
+    # compile, which guarantees no stale .class files from the parent
+    # SIF's compile pass remain.
+    if [ -f build.xml ]; then
+        ant compileall
+    else
+        echo "FATAL: /opt/moves/build.xml missing — cannot rebuild patched MOVES." >&2
+        exit 1
+    fi
+
+%environment
+    # Inherits MOVES_HOME, PATH, JAVA_HOME, GOPATH, TZ, LC_ALL from the
+    # parent canonical-moves SIF. MOVES_FIXTURE_MODE is the only
+    # fixture-specific signal — runners can branch on it if needed.
+    export MOVES_FIXTURE_MODE=1
+
+%runscript
+    exec /opt/moves-bin/init-mariadb.sh "$@"
+
+%test
+    set -e
+    # Patch marker exists.
+    test -f /opt/moves/.intermediate-state-capture.applied
+    test -f /opt/moves/.fixture-build-date
+
+    # All three flags are at their patched values.
+    grep -qF 'static final boolean KEEP_EXTERNAL_GENERATOR_FILES = true;' \
+        /opt/moves/gov/epa/otaq/moves/master/framework/Generator.java
+    grep -qF 'static final boolean keepDebugData = true;' \
+        /opt/moves/gov/epa/otaq/moves/master/framework/OutputProcessor.java
+    grep -qF 'boolean isTest = true;' \
+        /opt/moves/gov/epa/otaq/moves/worker/framework/RemoteEmissionsCalculator.java
+
+    # Compiled .class files exist for each patched source file. (ant
+    # compileall would have failed loudly above, but a missing .class
+    # here would be a packaging accident worth catching.) MOVES's javac
+    # has no destdir, so classes land alongside their .java siblings.
+    test -f /opt/moves/gov/epa/otaq/moves/master/framework/Generator.class
+    test -f /opt/moves/gov/epa/otaq/moves/master/framework/OutputProcessor.class
+    test -f /opt/moves/gov/epa/otaq/moves/worker/framework/RemoteEmissionsCalculator.class
+
+%labels
+    Maintainer earthcity moves.rs
+    org.opencontainers.image.title moves-fixture
+    org.opencontainers.image.description "MOVES patched for intermediate-state capture (Phase 0 Task 3)"
+    org.opencontainers.image.source https://github.com/EarthSciML/moves.rs
+    org.opencontainers.image.base canonical-moves.sif

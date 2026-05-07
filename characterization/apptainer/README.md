@@ -15,17 +15,44 @@ Apptainer instead.
 ```
 characterization/
 ├── apptainer/
-│   ├── canonical-moves.def       # Apptainer build recipe
+│   ├── canonical-moves.def       # Apptainer build recipe (canonical)
+│   ├── moves-fixture.def         # Apptainer build recipe (canonical + patch)
 │   ├── README.md                 # this file
-│   ├── build-sif.sh              # build wrapper; writes lockfile
+│   ├── build-sif.sh              # canonical build wrapper; writes lockfile
+│   ├── build-fixture-sif.sh      # fixture build wrapper; writes lockfile
 │   ├── run-moves.sh              # runtime wrapper with bind mounts
 │   └── files/
 │       ├── versions.env          # pinned versions (sourced by both)
 │       ├── my.cnf                # MOVES-tuned MariaDB config
 │       ├── init-mariadb.sh       # first-run seed-data copy
-│       └── start-mariadb-bg.sh   # user-mode MariaDB launcher
-└── canonical-image.lock          # SHA256 of the built SIF
+│       ├── start-mariadb-bg.sh   # user-mode MariaDB launcher
+│       └── intermediate-state-capture.patch  # Phase 0 Task 3 flag flips
+├── canonical-image.lock          # SHA256 of canonical-moves.sif
+└── fixture-image.lock            # SHA256 of moves-fixture.sif
 ```
+
+## Two SIFs: canonical and fixture
+
+The recipe builds **two** SIFs that share most of their content:
+
+| SIF | Built by | Contents | Used by |
+|-----|----------|----------|---------|
+| `canonical-moves.sif` | `build-sif.sh` | Pinned MOVES, untouched | reference oracle, identity for downstream snapshot pins |
+| `moves-fixture.sif` | `build-fixture-sif.sh` | `canonical-moves.sif` + `intermediate-state-capture.patch`, recompiled | fixture runs that need MOVESTemporary/, WorkerFolder/WorkerTempXX/, and external-generator outputs to persist |
+
+The fixture SIF bootstraps from canonical-moves.sif (`Bootstrap: localimage`)
+so the parent's MariaDB seed, JDK, Go, and MOVES clone are inherited
+unchanged — only the three patched Java fields and their recompiled
+`.class` files differ. This keeps the canonical SHA stable across
+fixture-tooling churn.
+
+The patch flips three flags so MOVES's normal cleanup paths skip:
+
+| File | Field | Default | Patched |
+|------|-------|---------|---------|
+| `gov/epa/otaq/moves/master/framework/Generator.java` | `KEEP_EXTERNAL_GENERATOR_FILES` | `false` | `true` |
+| `gov/epa/otaq/moves/master/framework/OutputProcessor.java` | `keepDebugData` | `false` | `true` |
+| `gov/epa/otaq/moves/worker/framework/RemoteEmissionsCalculator.java` | `isTest` | `false` | `true` |
 
 ## Inside the SIF
 
@@ -152,6 +179,25 @@ Expected build time on a modern HPC compute node: 30–60 minutes,
 dominated by the default-DB load (~10 minutes for ~390 MB SQL dump
 extracted from the 30 MB ZIP) and `ant compile` (~5 minutes).
 
+## Building the fixture SIF
+
+Once `canonical-moves.sif` exists, build the fixture variant on top:
+
+```sh
+cd characterization/apptainer
+./build-fixture-sif.sh
+```
+
+This bootstraps from `./canonical-moves.sif`, applies
+`files/intermediate-state-capture.patch`, runs `ant compileall` over
+the patched source, and writes the resulting SIF SHA256 into
+`../fixture-image.lock`. Override `PARENT_SIF=<path>` to point at a
+canonical SIF in a non-default location.
+
+Expected build time: 5–10 minutes (mostly `ant compileall`). The
+default DB and apt installs are inherited unchanged from
+`canonical-moves.sif`, so no re-fetch.
+
 ## Validating the SIF
 
 The bead's published validation command (HPC compute node, fakeroot):
@@ -191,6 +237,38 @@ apptainer exec --bind /scratch/$USER/moves-canonical/mariadb-data:/var/lib/mysql
 ```
 
 You should see `movesdb20241112` plus the per-run output database.
+
+## Validating moves-fixture.sif
+
+Same `run-moves.sh` wrapper, pointed at the fixture SIF:
+
+```sh
+SIF=./moves-fixture.sif ./run-moves.sh --fakeroot \
+    --runspec testdata/SampleRunSpec.xml
+```
+
+After the run, the bind-mounted scratch should retain the
+intermediate captures the patches enable:
+
+```sh
+ls /scratch/$USER/moves-canonical/MOVESTemporary/
+ls /scratch/$USER/moves-canonical/WorkerFolder/
+# Expect: WorkerTemp00/, WorkerTemp01/, … with bundle artifacts
+# Expect: MOVESTemporary populated with debug tables
+```
+
+A clean canonical-moves run leaves these directories empty (or
+missing the per-bundle subfolders) once cleanup runs; the fixture
+run leaves them populated. That difference is the acceptance signal
+for Phase 0 Task 3.
+
+A quick introspection check that the SIF was built from a patched
+source tree:
+
+```sh
+apptainer exec ./moves-fixture.sif test -f /opt/moves/.intermediate-state-capture.applied
+apptainer exec ./moves-fixture.sif cat /opt/moves/.fixture-build-date
+```
 
 ## Why Apptainer (not Docker)
 
