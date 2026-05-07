@@ -1,0 +1,38 @@
+diff --git a/NONROAD/NR08a/SOURCE/grwfac.f b/NONROAD/NR08a/SOURCE/grwfac.f
+index 1a5582a..e2c51d3 100644
+--- a/NONROAD/NR08a/SOURCE/grwfac.f
++++ b/NONROAD/NR08a/SOURCE/grwfac.f
+@@ -78,6 +78,11 @@ c
+       real*4      upperboundindchange ! year-to-year change in indicator value at the upper end of the range of indicators
+       real*4      tmpbaseyearind
+ c
++c   --- dbgemit (Phase 5 baseline) call counter + ctx buffer; SAVE
++c       semantics provided by -fno-automatic ---
++      integer*4      dbg_call
++      character*128  dbg_ctx
++c
+ c------------------------------------------------------------------------
+ c  Entry point:
+ c------------------------------------------------------------------------
+@@ -277,5 +282,21 @@ c   Return point:
+ c-----------------------------------------------------------------------
+ c
+  9999  continue
++c
++c   --- emit growth factor for Phase 5 baseline (success path only).
++c       baseyearind / growthyearind are emitted alongside so the
++c       parser can reproduce the factor calculation independently ---
++       if( ierr .EQ. ISUCES ) then
++           dbg_call = dbg_call + 1
++           write(dbg_ctx,'(a,i0,a,a,a,a,a,i0,a,i0)')
++     &           'call=', dbg_call,
++     &           ',fips=', infips,
++     &           ',ind=', indcod,
++     &           ',ibasyr=', ibasyr,
++     &           ',igyear=', igyear
++           call dbgrs('GRWFAC', dbg_ctx, 'factor', factor)
++           call dbgrs('GRWFAC', dbg_ctx, 'baseyearind', baseyearind)
++           call dbgrs('GRWFAC', dbg_ctx, 'growthyearind', growthyearind)
++       endif
+        return
+        end

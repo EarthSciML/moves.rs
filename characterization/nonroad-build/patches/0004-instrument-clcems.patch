@@ -1,0 +1,41 @@
+diff --git a/NONROAD/NR08a/SOURCE/clcems.f b/NONROAD/NR08a/SOURCE/clcems.f
+index f81bbd3..38fc645 100644
+--- a/NONROAD/NR08a/SOURCE/clcems.f
++++ b/NONROAD/NR08a/SOURCE/clcems.f
+@@ -142,6 +142,11 @@ c
+       logical      lskip
+       real*4       tpltmp2
+ c
++c   --- dbgemit (Phase 5 baseline) call counter + ctx buffer; SAVE
++c       semantics provided by -fno-automatic ---
++      integer*4      dbg_call
++      character*128  dbg_ctx
++c
+ c-----------------------------------------------------------------------
+ c    Entry point:
+ c-----------------------------------------------------------------------
+@@ -341,6 +346,24 @@ c
+       end do  ! jday
+ c
+       ierr = ISUCES
++c
++c   --- emit emissions arrays for Phase 5 baseline (success path).
++c       emsday / emsbmy are the per-pollutant accumulated emissions
++c       this routine just produced. dage / hpval / pop / mfrac /
++c       afac give the parser enough context to disaggregate ---
++      dbg_call = dbg_call + 1
++      write(dbg_ctx,'(a,i0,a,i0,a,i0,a,i0,a,i0)')
++     &      'call=', dbg_call,
++     &      ',idxyr=', idxyr,
++     &      ',idxtec=', idxtec,
++     &      ',idxtch=', idxtch,
++     &      ',iact=', iact
++      call dbgr1('CLCEMS', dbg_ctx, 'emsday', MXPOL, emsday)
++      call dbgr1('CLCEMS', dbg_ctx, 'emsbmy', MXPOL, emsbmy)
++      call dbgrs('CLCEMS', dbg_ctx, 'pop',   pop)
++      call dbgrs('CLCEMS', dbg_ctx, 'mfrac', mfrac)
++      call dbgrs('CLCEMS', dbg_ctx, 'afac',  afac)
++      call dbgrs('CLCEMS', dbg_ctx, 'dage',  dage)
+       goto 9999
+ c
+ c-----------------------------------------------------------------------

@@ -1,0 +1,37 @@
+diff --git a/NONROAD/NR08a/SOURCE/agedist.f b/NONROAD/NR08a/SOURCE/agedist.f
+index e98f7cc..a78bbd5 100644
+--- a/NONROAD/NR08a/SOURCE/agedist.f
++++ b/NONROAD/NR08a/SOURCE/agedist.f
+@@ -100,6 +100,11 @@ c
+       real*4    grwthfc        ! growth factor between previous year and current growth year
+       real*4    frcsum         ! sum of new model-year fractions
+ c
++c   --- dbgemit (Phase 5 baseline) call counter + ctx buffer; SAVE
++c       semantics provided by -fno-automatic ---
++      integer*4      dbg_call
++      character*128  dbg_ctx
++c
+ c---------------------------------------------------------------------
+ c  Entry point:
+ c---------------------------------------------------------------------
+@@ -172,6 +177,20 @@ c
+ c   --- set error code to sucess and return ---
+ c
+       ierr = ISUCES
++c
++c   --- emit grown age distribution for Phase 5 baseline. mdyrfrc is
++c       the per-age-year fraction array (size MXAGYR), grown forward
++c       to igrwthyr. Context tags FIPS, indicator code, base-year and
++c       growth-year so the parser can rejoin against caller state ---
++      dbg_call = dbg_call + 1
++      write(dbg_ctx,'(a,i0,a,a,a,a,a,i0,a,i0)')
++     &      'call=', dbg_call,
++     &      ',fips=', infips,
++     &      ',ind=', indcod,
++     &      ',ibasyr=', ibaspopyr,
++     &      ',igyear=', igrwthyr
++      call dbgr1('AGEDIST', dbg_ctx, 'mdyrfrc', MXAGYR, mdyrfrc)
++      call dbgrs('AGEDIST', dbg_ctx, 'baspop', baspop)
+       goto 9999
+ c
+ c---------------------------------------------------------------------

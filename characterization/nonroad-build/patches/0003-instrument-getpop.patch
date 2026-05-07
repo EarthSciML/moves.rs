@@ -1,0 +1,41 @@
+diff --git a/NONROAD/NR08a/SOURCE/getpop.f b/NONROAD/NR08a/SOURCE/getpop.f
+index 4019058..af82f9d 100644
+--- a/NONROAD/NR08a/SOURCE/getpop.f
++++ b/NONROAD/NR08a/SOURCE/getpop.f
+@@ -75,6 +75,11 @@ c
+       real*4              hpmin, hpmax, valtmp, usetmp, lasthp, hpavg
+       logical*4           lupper
+ c
++c   --- dbgemit (Phase 5 baseline) call counter + ctx buffer; SAVE
++c       semantics provided by -fno-automatic ---
++      integer*4      dbg_call
++      character*128  dbg_ctx
++c
+ c-----------------------------------------------------------------------
+ c   Entry point:
+ c-----------------------------------------------------------------------
+@@ -281,5 +286,24 @@ c   Return point:
+ c-----------------------------------------------------------------------
+ c
+  9999 continue
++c
++c   --- emit population arrays for Phase 5 baseline (success and
++c       end-of-file paths only; both leave npoprc rows of valid data
++c       in the populated arrays). popeqp / avghpc / usehrs / ipopyr
++c       are COMMON-block arrays; emit the first npoprc entries only ---
++      if( ierr .EQ. ISUCES .OR. ierr .EQ. IEOF ) then
++          dbg_call = dbg_call + 1
++          write(dbg_ctx,'(a,i0,a,a,a,i0,a,i0)')
++     &          'call=', dbg_call,
++     &          ',scc=', asccod,
++     &          ',iyrin=', iyrin,
++     &          ',npoprc=', npoprc
++          if( npoprc .GT. 0 ) then
++              call dbgr1('GETPOP', dbg_ctx, 'popeqp', npoprc, popeqp)
++              call dbgr1('GETPOP', dbg_ctx, 'avghpc', npoprc, avghpc)
++              call dbgr1('GETPOP', dbg_ctx, 'usehrs', npoprc, usehrs)
++              call dbgi1('GETPOP', dbg_ctx, 'ipopyr', npoprc, ipopyr)
++          endif
++      endif
+       return
+       end
