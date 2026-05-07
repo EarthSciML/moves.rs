@@ -88,6 +88,32 @@ The full set of options, including `--workdir`, `--output-dir`,
 `--keep-captures`, and `--skip-run`, is documented at the head of
 `run-fixture.sh`.
 
+## Producing the full Phase 0 fixture suite
+
+Phase 0 Task 5/6 (bead `mo-n2yg`) ships 33 RunSpec XML fixtures under
+`characterization/fixtures/`. To populate the matching snapshots end-to-end:
+
+```sh
+# Once, on an HPC compute node with Apptainer + fakeroot:
+characterization/apptainer/build-sif.sh           # canonical-moves.sif
+characterization/apptainer/build-fixture-sif.sh   # moves-fixture.sif
+
+# Then run the whole suite (default skips the three scale-* fixtures
+# that require additional supporting input databases — see
+# characterization/fixtures/README.md):
+characterization/run-all-fixtures.sh --fakeroot --keep-going
+```
+
+Each fixture writes to `characterization/snapshots/<fixture-name>/`. The
+runner is idempotent: re-running with the same SIF SHA + RunSpec bytes
+produces byte-identical snapshot files (the determinism contract above
+applies suite-wide, not just per-fixture).
+
+A typical suite takes roughly N × 5–10 minutes wall-clock plus the
+one-time SIF build. Reserve a few CPU-hours for a full pass and treat the
+output as a content-addressed regression baseline pinned by the SIF lock
+file.
+
 ## Inspecting a snapshot
 
 ```sh
