@@ -21,6 +21,8 @@ characterization/
 │   ├── build-sif.sh              # canonical build wrapper; writes lockfile
 │   ├── build-fixture-sif.sh      # fixture build wrapper; writes lockfile
 │   ├── run-moves.sh              # runtime wrapper with bind mounts
+│   ├── run-fixture.sh            # fixture-capture orchestrator (Phase 0 Task 4)
+│   ├── dump-databases.sh         # in-SIF MariaDB dumper (bind-mounted by run-fixture.sh)
 │   └── files/
 │       ├── versions.env          # pinned versions (sourced by both)
 │       ├── my.cnf                # MOVES-tuned MariaDB config
@@ -28,7 +30,9 @@ characterization/
 │       ├── start-mariadb-bg.sh   # user-mode MariaDB launcher
 │       └── intermediate-state-capture.patch  # Phase 0 Task 3 flag flips
 ├── canonical-image.lock          # SHA256 of canonical-moves.sif
-└── fixture-image.lock            # SHA256 of moves-fixture.sif
+├── fixture-image.lock            # SHA256 of moves-fixture.sif
+└── snapshots/                    # fixture snapshots (Phase 0 Task 4 output)
+    └── <fixture-name>/           # one per RunSpec
 ```
 
 ## Two SIFs: canonical and fixture
@@ -268,6 +272,23 @@ source tree:
 ```sh
 apptainer exec ./moves-fixture.sif test -f /opt/moves/.intermediate-state-capture.applied
 apptainer exec ./moves-fixture.sif cat /opt/moves/.fixture-build-date
+```
+
+## Capturing a fixture snapshot
+
+End-to-end fixture capture is wrapped by `run-fixture.sh`. It runs
+patched MOVES against a RunSpec, dumps every non-system MariaDB
+database to TSV, copies `MOVESTemporary/` and `WorkerFolder/` out of
+the bind-mounted scratch, and invokes `moves-fixture-capture` to
+produce a deterministic snapshot at
+`characterization/snapshots/<fixture-name>/`. See
+[`../snapshots/README.md`](../snapshots/README.md) for the snapshot
+layout, determinism contract, and inspection commands.
+
+```sh
+characterization/apptainer/run-fixture.sh \
+    --fakeroot \
+    --runspec /opt/moves/testdata/SampleRunSpec.xml
 ```
 
 ## Why Apptainer (not Docker)
