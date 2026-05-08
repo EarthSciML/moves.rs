@@ -127,7 +127,16 @@ MOVES_TEMP="${WORKDIR}/MOVESTemporary"
 WORKER_DIR="${WORKDIR}/WorkerFolder"
 CAPTURES_DIR="${WORKDIR}/captures"
 
-mkdir -p "${WORKDIR}" "${MARIADB_DATA}" "${MARIADB_SOCK_DIR}" "${MOVES_TEMP}" "${WORKER_DIR}"
+# Phase 0 Task 8 (mo-d7or): JVM class-load logs land here so the
+# moves-fixture-capture trace builder can pick them up alongside the
+# worker.sql files. Materialized inside MOVESTemporary so the existing
+# bind-mount layout carries it into the container at
+# /opt/moves/MOVESTemporary/instrumentation/, and so the existing
+# captures-step copy of MOVESTemporary into captures/moves-temporary/
+# carries it back out without further wiring.
+INSTRUMENTATION_DIR="${MOVES_TEMP}/instrumentation"
+
+mkdir -p "${WORKDIR}" "${MARIADB_DATA}" "${MARIADB_SOCK_DIR}" "${MOVES_TEMP}" "${WORKER_DIR}" "${INSTRUMENTATION_DIR}"
 
 echo "[run-fixture] fixture_name = ${FIXTURE_NAME}"
 echo "[run-fixture] workdir      = ${WORKDIR}"
@@ -140,12 +149,24 @@ if [ "${SKIP_RUN}" = "0" ]; then
     FAKEROOT_ARGS=()
     [ "${USE_FAKEROOT}" = "1" ] && FAKEROOT_ARGS=( -f )
 
+    # Phase 0 Task 8 (mo-d7or): tell every JVM under this run to log
+    # class-load events into a per-PID file under MOVESTemporary/
+    # instrumentation/. The %p substitution gives each forked JVM its
+    # own filename so ant's own loads don't overwrite the MOVES JVM's.
+    # `class+load=info` is the unified-logging tag for the load event;
+    # output lines look like
+    #   [0.123s][info][class,load] gov.epa.otaq.moves.master...
+    # which moves-fixture-capture's trace builder filters down to the
+    # `gov.epa.otaq.moves.*` package.
+    FIXTURE_JAVA_TOOL_OPTIONS="-Xlog:class+load=info:file=/opt/moves/MOVESTemporary/instrumentation/class-load-%p.log"
+
     SIF="${SIF}" \
     WORKDIR="${WORKDIR}" \
     MARIADB_DATA="${MARIADB_DATA}" \
     MARIADB_SOCK_DIR="${MARIADB_SOCK_DIR}" \
     MOVES_TEMP="${MOVES_TEMP}" \
     WORKER_DIR="${WORKER_DIR}" \
+    JAVA_TOOL_OPTIONS="${FIXTURE_JAVA_TOOL_OPTIONS}" \
         "${HERE}/run-moves.sh" "${FAKEROOT_ARGS[@]}" --runspec "${RUNSPEC}"
 else
     echo "[run-fixture] step 1/3 — skipped (--skip-run)"

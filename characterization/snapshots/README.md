@@ -13,6 +13,7 @@ characterization/snapshots/
 └── <fixture-name>/                 (one per RunSpec)
     ├── manifest.json               aggregate hash, table list
     ├── provenance.json             SIF SHA + RunSpec SHA + fixture name
+    ├── execution-trace.json        Java classes / SQL files / Go calcs touched
     └── tables/
         ├── db__movesoutput__movesactivityoutput.parquet
         ├── db__movesoutput__movesactivityoutput.meta.json
@@ -35,6 +36,66 @@ The `manifest.json` and `tables/` layout is the canonical
 | `runspec_sha256` | sha256 over the RunSpec file's bytes |
 | `snapshot_aggregate_sha256` | manifest's aggregate hash, mirrored for cross-reference |
 | `output_database` / `scale_input_database` | parsed from the RunSpec |
+
+## Execution trace (`execution-trace.json`)
+
+Phase 0 Task 8 (bead `mo-d7or`) deliverable. Where the snapshot answers
+"what numbers did MOVES produce?", the execution trace answers "which
+pieces of MOVES were exercised producing them?" — making the snapshot
+the regression baseline AND a coverage/migration-ordering input for
+Phase 1 (Task 9).
+
+The trace is assembled post-run by `moves-fixture-capture` from the
+same captures directory the snapshot is built from:
+
+| Source | Contributes |
+|--------|-------------|
+| `worker-folder/<bundle>/worker.sql` | Java classes (FQN scan), SQL macro paths, Go-calc references, statement count |
+| `worker-folder/<bundle>/*.go.input` / `*.go.output` / `*.go.txt` | Go calculator names from filename markers |
+| `moves-temporary/instrumentation/class-load-*.log` | Java classes loaded by the JVM (filtered to `gov.epa.otaq.moves.*`) |
+
+Top-level fields:
+
+| Field | Description |
+|-------|-------------|
+| `trace_version` | `moves-fixture-capture/v1`. Bumped on incompatible schema changes. |
+| `fixture_name` / `sif_sha256` / `runspec_sha256` | Mirrored from provenance for self-contained reading. |
+| `java_classes` | `[{name, kind}]` sorted by `name`. `kind` is one of `calculator`, `generator`, `framework`, `worker`, `master`, `common`, `utils`, `other` based on the package path. |
+| `sql_files` | `[{path, consumed_by}]` sorted by `path`. `consumed_by` lists worker bundle ids that referenced the file. |
+| `go_calculators` | `[{name, invoked_in}]` sorted by `name`. |
+| `worker_bundles` | `[{id, java_classes, sql_files, go_calculators, statement_count}]` sorted by `id`. |
+| `sources` | `{worker_sql_files, class_load_log_files}` — count of inputs consumed. |
+
+Determinism: every list is sorted, the captures walk is sorted, and the
+JSON is pretty-printed with a trailing newline. Two runs with the same
+captures directory produce a byte-identical `execution-trace.json`.
+
+The JVM class-load log is populated by
+`characterization/apptainer/run-fixture.sh`, which sets
+`JAVA_TOOL_OPTIONS=-Xlog:class+load=info:file=/opt/moves/MOVESTemporary/instrumentation/class-load-%p.log`
+before invoking MOVES. Every JVM that runs (ant + the forked MOVES JVM)
+writes a per-PID `class-load-<pid>.log` into the bind-mounted
+instrumentation directory. The trace builder filters those down to the
+`gov.epa.otaq.moves.*` package space. Class-load events approximate
+"this code was reached" for coverage purposes — JVMs load classes
+lazily on first reference, so a class in the trace is one that the
+fixture's execution path touched.
+
+Inspect the trace:
+
+```sh
+# Top-level summary:
+jq '{fixture_name, classes: (.java_classes | length), sql_files: (.sql_files | length), go: (.go_calculators | length)}' \
+    characterization/snapshots/<fixture>/execution-trace.json
+
+# Calculators only:
+jq '.java_classes | map(select(.kind == "calculator"))' \
+    characterization/snapshots/<fixture>/execution-trace.json
+
+# Which SQL macros did this fixture touch?
+jq '.sql_files[].path' \
+    characterization/snapshots/<fixture>/execution-trace.json
+```
 
 ## Determinism contract
 

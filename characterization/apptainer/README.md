@@ -291,6 +291,19 @@ characterization/apptainer/run-fixture.sh \
     --runspec /opt/moves/testdata/SampleRunSpec.xml
 ```
 
+`run-fixture.sh` also enables Phase 0 Task 8 (mo-d7or) class-load
+instrumentation: it sets
+`JAVA_TOOL_OPTIONS=-Xlog:class+load=info:file=/opt/moves/MOVESTemporary/instrumentation/class-load-%p.log`
+in the apptainer-exec environment so every JVM in the run writes a
+per-PID class-load log into a bind-mounted `instrumentation/`
+directory. `moves-fixture-capture` reads those logs (filtering to the
+`gov.epa.otaq.moves.*` package) plus each `worker.sql` to assemble
+`execution-trace.json` alongside `manifest.json`. No source patch to
+MOVES is required for the trace — `JAVA_TOOL_OPTIONS` is the JVM-spec
+env knob, honored by every JVM unconditionally, and `worker.sql`
+provides the SQL-file and Java-class signal "for free" via the
+keepDebugData=true patch from Phase 0 Task 3.
+
 ## Why Apptainer (not Docker)
 
 The HPC system this work runs on doesn't have a Docker daemon, but

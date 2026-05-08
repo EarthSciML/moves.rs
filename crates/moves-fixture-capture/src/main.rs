@@ -25,7 +25,8 @@ use std::process::ExitCode;
 use clap::Parser;
 
 use moves_fixture_capture::{
-    build_snapshot, provenance, write_provenance, BuildOptions, Provenance, RunSpec,
+    build_execution_trace, build_snapshot, provenance, write_execution_trace, write_provenance,
+    BuildOptions, Provenance, RunSpec, TraceInputs,
 };
 
 #[derive(Debug, Parser)]
@@ -120,16 +121,30 @@ fn run() -> moves_fixture_capture::Result<()> {
         .unwrap_or_else(|| runspec.fixture_name.clone());
 
     let prov = Provenance::new(
-        fixture_name,
-        sif_sha,
+        fixture_name.clone(),
+        sif_sha.clone(),
         args.sif_lockfile.to_string_lossy().into_owned(),
         args.runspec.to_string_lossy().into_owned(),
-        runspec_sha256,
+        runspec_sha256.clone(),
         aggregate_sha,
         runspec.output_database.clone(),
         runspec.scale_input_database.clone(),
     );
     write_provenance(&args.output_dir, &prov)?;
+
+    // Phase 0 Task 8 (mo-d7or): per-fixture execution trace assembled
+    // from worker.sql + JVM class-load logs in the captures dir. Sibling
+    // of provenance.json. Emitted unconditionally — an empty captures
+    // dir produces an empty (but valid) trace, so consumers can rely on
+    // the file existing.
+    let trace_inputs = TraceInputs {
+        captures_dir: &args.captures_dir,
+        fixture_name: &fixture_name,
+        sif_sha256: &sif_sha,
+        runspec_sha256: &runspec_sha256,
+    };
+    let trace = build_execution_trace(&trace_inputs)?;
+    write_execution_trace(&args.output_dir, &trace)?;
 
     eprintln!(
         "[moves-fixture-capture] wrote snapshot to {}",
@@ -138,5 +153,12 @@ fn run() -> moves_fixture_capture::Result<()> {
     eprintln!("  tables: {}", snapshot.len());
     eprintln!("  aggregate_sha256: {}", prov.snapshot_aggregate_sha256);
     eprintln!("  sif_sha256:       {}", prov.sif_sha256);
+    eprintln!(
+        "  trace: {} java classes, {} sql files, {} go calcs across {} bundles",
+        trace.java_classes.len(),
+        trace.sql_files.len(),
+        trace.go_calculators.len(),
+        trace.worker_bundles.len()
+    );
     Ok(())
 }

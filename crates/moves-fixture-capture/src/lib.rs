@@ -29,9 +29,14 @@ pub mod error;
 pub mod provenance;
 pub mod runspec;
 pub mod tabular;
+pub mod trace;
 pub mod tree;
 
 pub use capture::{build_snapshot, BuildOptions};
 pub use error::{Error, Result};
 pub use provenance::{write_provenance, Provenance};
 pub use runspec::RunSpec;
+pub use trace::{
+    build_execution_trace, write_execution_trace, ExecutionTrace, GoCalculator, JavaClass, SqlFile,
+    TraceInputs, TraceSources, WorkerBundle,
+};

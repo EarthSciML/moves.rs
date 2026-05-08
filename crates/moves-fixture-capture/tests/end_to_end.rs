@@ -208,6 +208,138 @@ fn cli_excludes_default_db_from_snapshot() {
 }
 
 #[test]
+fn cli_emits_execution_trace_alongside_snapshot() {
+    // Phase 0 Task 8 (mo-d7or): the CLI must produce execution-trace.json
+    // next to provenance.json. Populate a captures dir with a worker.sql
+    // that names a calculator + an SQL file, plus a JVM class-load log
+    // under moves-temporary/instrumentation/, and verify the resulting
+    // trace lists each.
+    let captures = tempdir().unwrap();
+    populate_captures(captures.path());
+
+    // worker.sql in WorkerTemp00 (replacing the bare Output.tbl-only
+    // bundle the canonical population creates).
+    fs::write(
+        captures
+            .path()
+            .join("worker-folder/WorkerTemp00/worker.sql"),
+        b"-- @@@ Calculator: gov.epa.otaq.moves.master.calculator.CriteriaRunningCalculator\n\
+          -- @@@ source: database/CalculatorSQL/CriteriaRunningCalculator.sql\n\
+          SELECT 1;\n",
+    )
+    .unwrap();
+    // A Go calculator artifact dropped into the same bundle.
+    fs::write(
+        captures
+            .path()
+            .join("worker-folder/WorkerTemp00/BaseRateCalculator.go.input"),
+        b"go-calc input\n",
+    )
+    .unwrap();
+    // JVM class-load log under moves-temporary/instrumentation/.
+    let instr_dir = captures.path().join("moves-temporary/instrumentation");
+    fs::create_dir_all(&instr_dir).unwrap();
+    fs::write(
+        instr_dir.join("class-load-12345.log"),
+        b"[0.001s][info][class,load] java.lang.Object source: shared\n\
+          [0.123s][info][class,load] gov.epa.otaq.moves.master.framework.Generator source: file:/opt/moves/...\n",
+    )
+    .unwrap();
+
+    let scratch = tempdir().unwrap();
+    let runspec = scratch.path().join("SampleRunSpec.xml");
+    fs::write(&runspec, RUNSPEC_BODY).unwrap();
+    let lock = scratch.path().join("fixture-image.lock");
+    fs::write(&lock, FIXTURE_LOCK).unwrap();
+    let out = tempdir().unwrap();
+
+    run_cli(captures.path(), &runspec, &lock, out.path());
+
+    let trace_bytes = fs::read(out.path().join("execution-trace.json")).unwrap();
+    let trace: serde_json::Value = serde_json::from_slice(&trace_bytes).unwrap();
+
+    assert_eq!(trace["fixture_name"], "samplerunspec");
+    assert_eq!(
+        trace["sif_sha256"],
+        "ffeeddccbbaa99887766554433221100ffeeddccbbaa99887766554433221100"
+    );
+    assert_eq!(trace["trace_version"], "moves-fixture-capture/v1");
+
+    // Java classes from both worker.sql and the JVM log, sorted.
+    let class_names: Vec<&str> = trace["java_classes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        class_names,
+        vec![
+            "gov.epa.otaq.moves.master.calculator.CriteriaRunningCalculator",
+            "gov.epa.otaq.moves.master.framework.Generator",
+        ]
+    );
+
+    // SQL file from worker.sql attributed to WorkerTemp00.
+    let sql_files = trace["sql_files"].as_array().unwrap();
+    assert_eq!(sql_files.len(), 1);
+    assert_eq!(
+        sql_files[0]["path"],
+        "database/CalculatorSQL/CriteriaRunningCalculator.sql"
+    );
+    let consumers: Vec<&str> = sql_files[0]["consumed_by"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s.as_str().unwrap())
+        .collect();
+    assert_eq!(consumers, vec!["WorkerTemp00"]);
+
+    // Go calc detected from the BaseRateCalculator.go.input filename.
+    let go = trace["go_calculators"].as_array().unwrap();
+    assert_eq!(go.len(), 1);
+    assert_eq!(go[0]["name"], "BaseRateCalculator");
+
+    // Source counts.
+    assert_eq!(trace["sources"]["worker_sql_files"], 1);
+    assert_eq!(trace["sources"]["class_load_log_files"], 1);
+
+    // The trace file must be byte-stable across re-runs of the same
+    // captures (same determinism contract as snapshot + provenance).
+    let out2 = tempdir().unwrap();
+    run_cli(captures.path(), &runspec, &lock, out2.path());
+    let trace_bytes2 = fs::read(out2.path().join("execution-trace.json")).unwrap();
+    assert_eq!(trace_bytes, trace_bytes2);
+}
+
+#[test]
+fn cli_emits_empty_but_valid_trace_when_no_worker_or_instrumentation() {
+    // A capture dir with only databases (no worker bundles, no
+    // instrumentation log) must still produce a syntactically valid
+    // trace — an empty trace, but parseable. Phase 1 consumers can rely
+    // on the file existing.
+    let captures = tempdir().unwrap();
+    populate_captures(captures.path());
+
+    let scratch = tempdir().unwrap();
+    let runspec = scratch.path().join("SampleRunSpec.xml");
+    fs::write(&runspec, RUNSPEC_BODY).unwrap();
+    let lock = scratch.path().join("fixture-image.lock");
+    fs::write(&lock, FIXTURE_LOCK).unwrap();
+    let out = tempdir().unwrap();
+
+    run_cli(captures.path(), &runspec, &lock, out.path());
+
+    let trace_bytes = fs::read(out.path().join("execution-trace.json")).unwrap();
+    let trace: serde_json::Value = serde_json::from_slice(&trace_bytes).unwrap();
+    assert!(trace["java_classes"].as_array().unwrap().is_empty());
+    assert!(trace["sql_files"].as_array().unwrap().is_empty());
+    // The fixture identity fields must still be populated.
+    assert_eq!(trace["fixture_name"], "samplerunspec");
+    assert_eq!(trace["sources"]["worker_sql_files"], 0);
+}
+
+#[test]
 fn cli_handles_pending_first_build_lockfile() {
     // A lockfile that hasn't been refreshed by build-fixture-sif.sh should
     // not abort the capture — the snapshot is still valid, it just records

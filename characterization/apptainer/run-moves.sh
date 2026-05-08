@@ -20,6 +20,10 @@
 #   MARIADB_SOCK_DIR      Override socket-dir bind path
 #   MOVES_TEMP            Override MOVESTemporary bind path
 #   WORKER_DIR            Override WorkerFolder bind path
+#   JAVA_TOOL_OPTIONS     If set on the host, propagated into the container so
+#                         every JVM (ant, the forked MOVES JVM) honors it.
+#                         Used by run-fixture.sh for Phase 0 Task 8 (mo-d7or)
+#                         class-load instrumentation; harmless when unset.
 
 set -euo pipefail
 
@@ -77,12 +81,23 @@ else
     START_CMD="/opt/moves-bin/start-mariadb-bg.sh"
 fi
 
+# Propagate JAVA_TOOL_OPTIONS into the container if the caller set it.
+# Apptainer scrubs the host environment by default; an explicit --env
+# is required for opt-in passthrough. JAVA_TOOL_OPTIONS is the JVM-spec
+# env knob honored by every JVM unconditionally, so anything we set
+# here is picked up by ant and the forked MOVES JVM both.
+EXTRA_ENV_ARGS=()
+if [ -n "${JAVA_TOOL_OPTIONS:-}" ]; then
+    EXTRA_ENV_ARGS+=( --env "JAVA_TOOL_OPTIONS=${JAVA_TOOL_OPTIONS}" )
+fi
+
 ANT_ARGS_QUOTED="$(printf '%q ' "${ANT_ARGS[@]}")"
 RUNSPEC_QUOTED="$(printf '%q' "${RUNSPEC}")"
 
 apptainer exec \
     "${FAKEROOT_FLAG[@]}" \
     "${BINDS[@]}" \
+    "${EXTRA_ENV_ARGS[@]}" \
     "${SIF}" \
     bash -c "
         set -eu
