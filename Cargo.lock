@@ -916,6 +916,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "moves-nonroad"
+version = "0.1.0"
+dependencies = [
+ "thiserror",
+]
+
+[[package]]
 name = "moves-snapshot"
 version = "0.1.0"
 dependencies = [

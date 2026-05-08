@@ -1,5 +1,9 @@
 [workspace]
-members = ["crates/moves-snapshot", "crates/moves-fixture-capture"]
+members = [
+    "crates/moves-fixture-capture",
+    "crates/moves-nonroad",
+    "crates/moves-snapshot",
+]
 resolver = "2"
 
 [workspace.package]
