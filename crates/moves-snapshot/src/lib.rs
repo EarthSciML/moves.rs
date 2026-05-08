@@ -29,10 +29,12 @@ pub mod format;
 pub mod manifest;
 pub mod snapshot;
 pub mod table;
+pub mod tolerance;
 
-pub use diff::{diff_snapshots, Diff, DiffOptions, RowDiff, SchemaDiff, TableChange};
+pub use diff::{diff_snapshots, Diff, DiffOptions, DiffSummary, RowDiff, SchemaDiff, TableChange};
 pub use error::{Error, Result};
 pub use format::{ColumnKind, ColumnSpec, FLOAT_DECIMALS, FORMAT_VERSION};
 pub use manifest::{compute_aggregate_hash, sha256_hex, Manifest, ManifestEntry, TableMetadata};
 pub use snapshot::Snapshot;
 pub use table::{NormalizedColumn, Table, TableBuilder, Value};
+pub use tolerance::{ToleranceConfig, ToleranceError};

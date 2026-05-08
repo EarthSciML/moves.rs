@@ -15,9 +15,7 @@ use arrow::record_batch::RecordBatch;
 
 use crate::error::{Error, Result};
 use crate::format::{ColumnSpec, FORMAT_VERSION, PARQUET_CREATED_BY};
-use crate::manifest::{
-    compute_aggregate_hash, sha256_hex, Manifest, ManifestEntry, TableMetadata,
-};
+use crate::manifest::{compute_aggregate_hash, sha256_hex, Manifest, ManifestEntry, TableMetadata};
 use crate::table::Table;
 
 const TABLES_SUBDIR: &str = "tables";
@@ -331,11 +329,10 @@ fn serialize_json<T: serde::Serialize>(value: &T, path: &Path) -> Result<Vec<u8>
 }
 
 fn serialize_json_inmem<T: serde::Serialize>(value: &T) -> Result<Vec<u8>> {
-    let mut bytes =
-        serde_json::to_vec_pretty(value).map_err(|source| Error::Json {
-            path: std::path::PathBuf::from("<in-memory>"),
-            source,
-        })?;
+    let mut bytes = serde_json::to_vec_pretty(value).map_err(|source| Error::Json {
+        path: std::path::PathBuf::from("<in-memory>"),
+        source,
+    })?;
     bytes.push(b'\n');
     Ok(bytes)
 }
@@ -379,13 +376,10 @@ mod tests {
             .unwrap();
         let table_a = tb_a.build().unwrap();
 
-        let mut tb_b = TableBuilder::new(
-            "beta",
-            [("k".to_string(), ColumnKind::Utf8)],
-        )
-        .unwrap()
-        .with_natural_key(["k"])
-        .unwrap();
+        let mut tb_b = TableBuilder::new("beta", [("k".to_string(), ColumnKind::Utf8)])
+            .unwrap()
+            .with_natural_key(["k"])
+            .unwrap();
         tb_b.push_row([Value::Utf8("z".into())]).unwrap();
         tb_b.push_row([Value::Utf8("a".into())]).unwrap();
         let table_b = tb_b.build().unwrap();
@@ -420,7 +414,13 @@ mod tests {
         s.write(dir1.path()).unwrap();
         s.write(dir2.path()).unwrap();
 
-        for rel in ["manifest.json", "tables/alpha.parquet", "tables/alpha.meta.json", "tables/beta.parquet", "tables/beta.meta.json"] {
+        for rel in [
+            "manifest.json",
+            "tables/alpha.parquet",
+            "tables/alpha.meta.json",
+            "tables/beta.parquet",
+            "tables/beta.meta.json",
+        ] {
             let a = fs::read(dir1.path().join(rel)).unwrap();
             let b = fs::read(dir2.path().join(rel)).unwrap();
             assert_eq!(a, b, "file {rel} differs across writes");
@@ -436,7 +436,13 @@ mod tests {
         let s2 = Snapshot::load(dir1.path()).unwrap();
         s2.write(dir2.path()).unwrap();
 
-        for rel in ["manifest.json", "tables/alpha.parquet", "tables/alpha.meta.json", "tables/beta.parquet", "tables/beta.meta.json"] {
+        for rel in [
+            "manifest.json",
+            "tables/alpha.parquet",
+            "tables/alpha.meta.json",
+            "tables/beta.parquet",
+            "tables/beta.meta.json",
+        ] {
             let a = fs::read(dir1.path().join(rel)).unwrap();
             let b = fs::read(dir2.path().join(rel)).unwrap();
             assert_eq!(a, b, "round-trip differs at {rel}");

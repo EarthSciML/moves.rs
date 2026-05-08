@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::format::{ColumnSpec, FORMAT_VERSION, FLOAT_DECIMALS};
+use crate::format::{ColumnSpec, FLOAT_DECIMALS, FORMAT_VERSION};
 
 /// Top-level manifest written as `manifest.json`. Lists every table in
 /// lexicographic order with its content hash, plus an aggregate hash that

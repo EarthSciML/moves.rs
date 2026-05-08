@@ -14,6 +14,8 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 
+use serde::Serialize;
+
 use crate::format::{parse_fixed_decimal, ColumnKind, ColumnSpec};
 use crate::snapshot::Snapshot;
 use crate::table::Table;
@@ -50,7 +52,7 @@ impl DiffOptions {
 }
 
 /// Top-level diff result. A snapshot is unchanged iff [`Diff::is_empty`].
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct Diff {
     /// Tables present in `rhs` but not `lhs`, lexicographically sorted.
     pub tables_added: Vec<String>,
@@ -67,10 +69,47 @@ impl Diff {
             && self.tables_removed.is_empty()
             && self.table_changes.iter().all(|t| t.is_empty())
     }
+
+    /// Aggregate counts. Useful for CI summaries and human-readable output.
+    pub fn summary(&self) -> DiffSummary {
+        let mut s = DiffSummary {
+            tables_added: self.tables_added.len(),
+            tables_removed: self.tables_removed.len(),
+            tables_changed: self.table_changes.len(),
+            schema_diffs: 0,
+            rows_added: 0,
+            rows_removed: 0,
+            cells_changed: 0,
+        };
+        for tc in &self.table_changes {
+            s.schema_diffs += tc.schema_diffs.len();
+            for rd in &tc.row_diffs {
+                match rd {
+                    RowDiff::Added { .. } => s.rows_added += 1,
+                    RowDiff::Removed { .. } => s.rows_removed += 1,
+                    RowDiff::Cell { .. } => s.cells_changed += 1,
+                }
+            }
+        }
+        s
+    }
+}
+
+/// Aggregate counts derived from a [`Diff`]. Stable order — designed to be
+/// JSON-serialized as part of CI output.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct DiffSummary {
+    pub tables_added: usize,
+    pub tables_removed: usize,
+    pub tables_changed: usize,
+    pub schema_diffs: usize,
+    pub rows_added: usize,
+    pub rows_removed: usize,
+    pub cells_changed: usize,
 }
 
 /// Per-table diff with both schema- and row-level changes.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct TableChange {
     pub table: String,
     pub schema_diffs: Vec<SchemaDiff>,
@@ -84,7 +123,8 @@ impl TableChange {
 }
 
 /// Schema-level disagreement between two same-named tables.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum SchemaDiff {
     ColumnAdded(ColumnSpec),
     ColumnRemoved(ColumnSpec),
@@ -103,7 +143,8 @@ pub enum SchemaDiff {
 ///
 /// `key` carries the stringified natural-key cells that identify the row
 /// (or the row index, formatted, when the table has no natural key).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum RowDiff {
     Added {
         key: Vec<String>,
@@ -188,7 +229,11 @@ fn compute_schema_diffs(lhs: &Table, rhs: &Table) -> Vec<SchemaDiff> {
         rhs.schema().iter().map(|c| (c.name.as_str(), c)).collect();
 
     // Iterate by union of names, sorted, so the diff is stable.
-    let names: BTreeSet<&str> = lhs_by_name.keys().chain(rhs_by_name.keys()).copied().collect();
+    let names: BTreeSet<&str> = lhs_by_name
+        .keys()
+        .chain(rhs_by_name.keys())
+        .copied()
+        .collect();
     for name in names {
         match (lhs_by_name.get(name), rhs_by_name.get(name)) {
             (Some(l), Some(r)) if l.kind != r.kind => {
@@ -229,12 +274,10 @@ fn diff_rows_keyed(
     opts: &DiffOptions,
 ) -> Vec<RowDiff> {
     let mut out = Vec::new();
-    let lhs_keys: Vec<Vec<Option<String>>> = (0..lhs.row_count())
-        .map(|i| key_cells(lhs, i))
-        .collect();
-    let rhs_keys: Vec<Vec<Option<String>>> = (0..rhs.row_count())
-        .map(|i| key_cells(rhs, i))
-        .collect();
+    let lhs_keys: Vec<Vec<Option<String>>> =
+        (0..lhs.row_count()).map(|i| key_cells(lhs, i)).collect();
+    let rhs_keys: Vec<Vec<Option<String>>> =
+        (0..rhs.row_count()).map(|i| key_cells(rhs, i)).collect();
 
     let mut i = 0usize;
     let mut j = 0usize;
@@ -428,7 +471,8 @@ mod tests {
         .with_natural_key(["id"])
         .unwrap();
         for (id, v) in rows {
-            tb.push_row([Value::Int64(*id), Value::Float64(*v)]).unwrap();
+            tb.push_row([Value::Int64(*id), Value::Float64(*v)])
+                .unwrap();
         }
         tb.build().unwrap()
     }
@@ -437,8 +481,10 @@ mod tests {
     fn no_diff_when_equal() {
         let mut s1 = Snapshot::new();
         let mut s2 = Snapshot::new();
-        s1.add_table(build_simple("t", &[(1, 1.0), (2, 2.0)])).unwrap();
-        s2.add_table(build_simple("t", &[(1, 1.0), (2, 2.0)])).unwrap();
+        s1.add_table(build_simple("t", &[(1, 1.0), (2, 2.0)]))
+            .unwrap();
+        s2.add_table(build_simple("t", &[(1, 1.0), (2, 2.0)]))
+            .unwrap();
         let diff = diff_snapshots(&s1, &s2, &DiffOptions::default());
         assert!(diff.is_empty(), "{:?}", diff);
     }
@@ -488,8 +534,10 @@ mod tests {
     fn detects_cell_changes() {
         let mut s1 = Snapshot::new();
         let mut s2 = Snapshot::new();
-        s1.add_table(build_simple("t", &[(1, 1.0), (2, 2.0)])).unwrap();
-        s2.add_table(build_simple("t", &[(1, 1.5), (2, 2.0)])).unwrap();
+        s1.add_table(build_simple("t", &[(1, 1.0), (2, 2.0)]))
+            .unwrap();
+        s2.add_table(build_simple("t", &[(1, 1.5), (2, 2.0)]))
+            .unwrap();
         let diff = diff_snapshots(&s1, &s2, &DiffOptions::default());
         let row_diffs = &diff.table_changes[0].row_diffs;
         assert_eq!(row_diffs.len(), 1);
@@ -558,7 +606,8 @@ mod tests {
         .unwrap()
         .with_natural_key(["a"])
         .unwrap();
-        tb2.push_row([Value::Int64(1), Value::Utf8("x".into())]).unwrap();
+        tb2.push_row([Value::Int64(1), Value::Utf8("x".into())])
+            .unwrap();
         let t2 = tb2.build().unwrap();
 
         let mut s1 = Snapshot::new();

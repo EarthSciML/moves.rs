@@ -66,7 +66,8 @@ fn fixture_catalog_parses_and_is_unique() {
             .map(|s| s.to_ascii_lowercase())
             .unwrap_or_default();
         assert_eq!(
-            runspec.fixture_name, stem_lower,
+            runspec.fixture_name,
+            stem_lower,
             "fixture name should round-trip to lowercased filename stem for {}",
             path.display()
         );

@@ -62,9 +62,7 @@ pub enum Error {
     #[error("snapshot at {path}: manifest is missing")]
     ManifestMissing { path: PathBuf },
 
-    #[error(
-        "snapshot at {path}: format_version {actual:?} not supported (expected {expected:?})"
-    )]
+    #[error("snapshot at {path}: format_version {actual:?} not supported (expected {expected:?})")]
     UnsupportedFormatVersion {
         path: PathBuf,
         actual: String,

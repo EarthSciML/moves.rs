@@ -76,7 +76,9 @@ impl NormalizedColumn {
             NormalizedColumn::Int64(v) => v[i].map(|n| n.to_string()),
             NormalizedColumn::Float64String(v) => v[i].clone(),
             NormalizedColumn::Utf8(v) => v[i].clone(),
-            NormalizedColumn::Boolean(v) => v[i].map(|b| if b { "true" } else { "false" }.to_string()),
+            NormalizedColumn::Boolean(v) => {
+                v[i].map(|b| if b { "true" } else { "false" }.to_string())
+            }
         }
     }
 }
@@ -436,18 +438,21 @@ fn arrow_to_column(table: &str, spec: &ColumnSpec, array: &dyn Array) -> Result<
     };
     match spec.kind {
         ColumnKind::Int64 => {
-            let arr = array
-                .as_any()
-                .downcast_ref::<Int64Array>()
-                .ok_or_else(|| Error::ColumnTypeMismatch {
+            let arr = array.as_any().downcast_ref::<Int64Array>().ok_or_else(|| {
+                Error::ColumnTypeMismatch {
                     table: table.to_string(),
                     column: spec.name.clone(),
                     declared: ColumnKind::Int64.as_str().to_string(),
                     actual: format!("{:?}", array.data_type()),
-                })?;
+                }
+            })?;
             let mut v = Vec::with_capacity(n);
             for i in 0..n {
-                v.push(if arr.is_null(i) { None } else { Some(arr.value(i)) });
+                v.push(if arr.is_null(i) {
+                    None
+                } else {
+                    Some(arr.value(i))
+                });
             }
             Ok(NormalizedColumn::Int64(v))
         }
@@ -503,7 +508,11 @@ fn arrow_to_column(table: &str, spec: &ColumnSpec, array: &dyn Array) -> Result<
                 })?;
             let mut v = Vec::with_capacity(n);
             for i in 0..n {
-                v.push(if arr.is_null(i) { None } else { Some(arr.value(i)) });
+                v.push(if arr.is_null(i) {
+                    None
+                } else {
+                    Some(arr.value(i))
+                });
             }
             Ok(NormalizedColumn::Boolean(v))
         }

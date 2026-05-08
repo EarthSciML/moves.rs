@@ -134,8 +134,35 @@ duckdb -c "SELECT * FROM read_parquet(
 
 ## Comparing snapshots
 
-Use the `moves-snapshot::diff_snapshots` API from a downstream tool
-(Phase 0 Task 7 will ship a CLI diff harness). For quick checks:
+The `moves-snapshot diff` CLI (Phase 0 Task 7, bead `mo-obyw`) ships in the
+workspace as a binary in the `moves-snapshot` crate. Build with
+`cargo build --release` and use:
+
+```sh
+# Strict byte-identity check. Exit 0 = match, 1 = drift, 2 = error.
+target/release/moves-snapshot diff \
+    characterization/snapshots/samplerunspec/ \
+    /tmp/fresh/samplerunspec/
+
+# Per-(table, column) tolerance, JSON output for CI / jq.
+target/release/moves-snapshot diff \
+    characterization/snapshots/samplerunspec/ \
+    /tmp/fresh/samplerunspec/ \
+    --tolerance characterization/tolerance.toml \
+    --format json | jq '.summary'
+```
+
+The TOML tolerance config (see `characterization/tolerance.toml` and the
+crate-level docs in `crates/moves-snapshot/src/tolerance.rs`) lets you
+absorb harmless numerical artifacts on a per-column basis without losing
+the regression-detection signal on every other column.
+
+The `.github/workflows/fixture-suite-weekly.yml` workflow exercises this
+diff against the pinned canonical-MOVES SIF on a weekly cron, so any
+upstream drift (or determinism break) fires within a week even when
+nobody is actively touching the repo.
+
+For quick out-of-band checks:
 
 ```sh
 # Different fixture-image SHA → different snapshots → audit which.

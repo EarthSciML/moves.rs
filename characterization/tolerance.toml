@@ -1,0 +1,29 @@
+# Default tolerance config for `moves-snapshot diff`.
+#
+# Phase 0 starts strict: byte-identical snapshot bytes are the contract.
+# `default_float_tolerance = 0.0` means every float column must match
+# bit-for-bit (after the fixed-decimal canonicalization done by the
+# snapshot writer). We expect zero drift between two runs against the
+# same SIF SHA — anything else is a determinism break.
+#
+# Per-table overrides come into play in later phases when the Rust port
+# (Phase 3+) starts producing the same numbers via different code paths.
+# At that point we'll relax tolerances for columns whose canonical
+# implementation is known to introduce harmless numerical artifacts
+# (e.g. summation order across calculator threads).
+#
+# Format reminder (see crates/moves-snapshot/src/tolerance.rs):
+#
+#   [tables."<table-name>"]
+#   <column-name> = <absolute tolerance>
+
+default_float_tolerance = 0.0
+
+# Example shape — uncomment and edit as Phase 3 lands. The table name is
+# the one the snapshot writer uses, with `db__<database>__<table>` for
+# database tables and `moves_temporary__<table>` /
+# `worker_folder__<dir>__<table>` for the on-disk artifacts.
+#
+# [tables."db__movesoutput__movesoutput"]
+# emissionQuant = 1e-9
+# emissionRate  = 1e-9

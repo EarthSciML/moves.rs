@@ -1,0 +1,140 @@
+# Weekly fixture-suite regression check.
+#
+# Runs every Monday morning UTC against the pinned canonical-MOVES SIF
+# (characterization/fixture-image.lock). Re-runs the fixture suite and
+# diffs each produced snapshot against the committed baseline under
+# characterization/snapshots/. Any drift signals one of:
+#
+#   1. Upstream MOVES changed (new EPA release, patched JAR, default-DB
+#      schema bump). The diff tells us which tables / cells moved.
+#   2. Determinism contract broken (timestamp leaked into output, sort
+#      order shifted, parquet writer settings drifted). Treat as a bug.
+#   3. Build host divergence (gfortran flags, MariaDB version, Apptainer
+#      version). Investigate before pinning a new SIF SHA.
+#
+# Why a self-hosted runner: the canonical-MOVES SIF is ~5GB, requires
+# Apptainer + --fakeroot, and a fresh build takes 1–2 hours. Each
+# fixture takes 5–10 minutes; the full suite runs for a few CPU-hours.
+# GitHub-hosted runners cannot accommodate this — neither the disk nor
+# the Apptainer prerequisite is available.
+#
+# Self-hosted runner labels expected:
+#   self-hosted    — opt-in to organization runners
+#   apptainer      — Apptainer (or Singularity in Apptainer-compat mode)
+#                    available on PATH
+#   fakeroot       — kernel + apptainer.conf permit `apptainer build
+#                    --fakeroot`
+#
+# When self-hosted infrastructure isn't yet wired up, the workflow runs
+# (manually via workflow_dispatch) and reports a skip. The schedule trigger
+# is harmless until a runner with these labels comes online.
+
+name: fixture-suite-weekly
+
+on:
+  schedule:
+    # 06:00 UTC every Monday — quiet hour for North-American operators.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      include_pattern:
+        description: "Glob fed to run-all-fixtures.sh --include (default: all)"
+        required: false
+        default: ""
+      tolerance_config:
+        description: "Path to TOML tolerance config (relative to repo root)"
+        required: false
+        default: "characterization/tolerance.toml"
+
+# Cancel a running suite if a fresh schedule fires before it finishes.
+concurrency:
+  group: fixture-suite-weekly
+  cancel-in-progress: false
+
+jobs:
+  fixture-suite:
+    name: fixture-suite (self-hosted apptainer)
+    # Requires Apptainer + fakeroot. The job is skipped — *not* failed —
+    # when no matching runner is online so a missing self-hosted runner
+    # doesn't manufacture a phantom regression alert.
+    runs-on: [self-hosted, apptainer, fakeroot]
+    timeout-minutes: 600
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry, target/
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build moves-snapshot CLI
+        run: cargo build --release --workspace --bin moves-snapshot
+
+      - name: Build canonical and fixture SIFs (cache-first)
+        # build-sif.sh / build-fixture-sif.sh are no-ops if the lockfile
+        # already points at a built image.
+        run: |
+          characterization/apptainer/build-sif.sh
+          characterization/apptainer/build-fixture-sif.sh
+
+      - name: Run the fixture suite
+        env:
+          INCLUDE: ${{ github.event.inputs.include_pattern }}
+        run: |
+          mkdir -p artifacts/snapshots-fresh
+          INCLUDE_ARG=""
+          if [ -n "${INCLUDE:-}" ]; then INCLUDE_ARG="--include ${INCLUDE}"; fi
+          characterization/run-all-fixtures.sh \
+              --fakeroot \
+              --keep-going \
+              --output-root artifacts/snapshots-fresh \
+              ${INCLUDE_ARG}
+
+      - name: Diff each fresh snapshot against the committed baseline
+        env:
+          TOLERANCE: ${{ github.event.inputs.tolerance_config || 'characterization/tolerance.toml' }}
+        run: |
+          set -u
+          mkdir -p artifacts/diffs
+          BIN="$(pwd)/target/release/moves-snapshot"
+          TOL_FLAG=""
+          if [ -n "${TOLERANCE}" ] && [ -f "${TOLERANCE}" ]; then
+              TOL_FLAG="--tolerance ${TOLERANCE}"
+          fi
+
+          # Track exit codes so a single drifted fixture doesn't mask
+          # other drifted fixtures.
+          drift=0
+          for fresh in artifacts/snapshots-fresh/*/; do
+              name="$(basename "${fresh}")"
+              baseline="characterization/snapshots/${name}"
+              if [ ! -d "${baseline}" ]; then
+                  echo "::warning::no committed baseline for ${name} — skipping"
+                  continue
+              fi
+              echo "::group::diff ${name}"
+              if ! "${BIN}" diff "${baseline}" "${fresh}" \
+                      --format json ${TOL_FLAG} \
+                      > "artifacts/diffs/${name}.json"; then
+                  drift=1
+                  echo "::error::snapshot drift in ${name}"
+                  "${BIN}" diff "${baseline}" "${fresh}" \
+                      --format text ${TOL_FLAG} || true
+              fi
+              echo "::endgroup::"
+          done
+          exit "${drift}"
+
+      - name: Upload diff artifacts (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fixture-diffs
+          path: |
+            artifacts/diffs/*.json
+            artifacts/snapshots-fresh/*/manifest.json
+            artifacts/snapshots-fresh/*/provenance.json
+          if-no-files-found: warn
+          retention-days: 30
