@@ -36,5 +36,11 @@
 //!
 //! Task 100 implemented:
 //! - [`fips`] — static state FIPS-code table (`in1fip.f`–`in5fip.f`)
+//!
+//! Task 102 implemented:
+//! - [`strutil`] — string and miscellaneous helpers
+//!   (`strlen.f`, `strmin.f`, `lftjst.f`, `rgtjst.f`, `low2up.f`,
+//!   `chrsrt.f`, `wadeeq.f`, `cnthpcat.f`).
 
 pub mod fips;
+pub mod strutil;
