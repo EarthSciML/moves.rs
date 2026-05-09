@@ -31,7 +31,41 @@
 //! - `growth` — `.GRW` growth factor parser (`rdgrow.f`)
 //! - `gxr` — `.GXR` growth extrapolation parser (`rdgxrf.f`)
 //! - `seasonal` — `.DAT` seasonal and `.DAY` day-of-year parsers (`rdseas.f`, `rdday.f`)
+//!
+//! Task 97 parsers implemented:
+//! - `activity` — activity file (`rdact.f`)
+//! - `deterioration` — deterioration factors (`rddetr.f`)
+//! - `spillage` — spillage / permeation factors (`rdspil.f`)
+//! - `sulfur` — `/PM BASE SULFUR/` packet (`rdsulf.f`)
+//! - `region_def` — region definitions (`rdrgndf.f`)
+//! - `scrappage` — scrappage curve (`rdscrp.f`)
+//! - `stage2` — `/STAGE II/` packet (`rdstg2.f`)
+//! - `alt_scrap` — alternate scrappage curves (`rdalt.f`)
+//! - `bsfc` — BSFC dispatcher stub (`rdbsfc.f`)
+//! - `efls` — emission-factor-files dispatcher (`rdefls.f`)
+//! - `fips` — county FIPS data (`rdfips.f`)
+//! - `indicator` — spatial indicator records (`rdind.f`)
+//! - `options` — `/OPTIONS/` packet (`rdnropt.f`)
+//! - `period` — `/PERIOD/` packet (`rdnrper.f`)
+//! - `region` — `/REGION/` packet (`rdnrreg.f`)
+//! - `source_cat` — `/SOURCE CATEGORY/` packet (`rdnrsrc.f`)
 
+pub mod activity;
+pub mod alt_scrap;
+pub mod bsfc;
+pub mod deterioration;
+pub mod efls;
+pub mod fips;
 pub mod growth;
 pub mod gxr;
+pub mod indicator;
+pub mod options;
+pub mod period;
+pub mod region;
+pub mod region_def;
+pub mod scrappage;
 pub mod seasonal;
+pub mod source_cat;
+pub mod spillage;
+pub mod stage2;
+pub mod sulfur;

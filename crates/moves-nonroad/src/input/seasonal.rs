@@ -61,41 +61,56 @@ pub fn read_dat<R: BufRead>(reader: R, n_equipment: usize) -> Result<Array2<f64>
     let mut lines = reader.lines();
     let mut line_num = 0;
 
-    // Read header
-    let header_line = lines
-        .next()
-        .ok_or_else(|| Error::Parse {
-            file: PathBuf::from(".DAT"),
-            line: 0,
-            message: "empty seasonal file".to_string(),
-        })?
-        .map_err(|e| Error::Io {
-            path: PathBuf::from(".DAT"),
-            source: e,
-        })?;
+    // Read header (skip blank and comment lines)
+    let header_line = loop {
+        line_num += 1;
+        let line = lines
+            .next()
+            .ok_or_else(|| Error::Parse {
+                file: PathBuf::from(".DAT"),
+                line: line_num,
+                message: "empty seasonal file".to_string(),
+            })?
+            .map_err(|e| Error::Io {
+                path: PathBuf::from(".DAT"),
+                source: e,
+            })?;
+        let trimmed = line.trim();
+        if !trimmed.is_empty() && !trimmed.starts_with('#') {
+            break line;
+        }
+    };
 
-    let file_n_equipment: usize = header_line.split_whitespace().next().ok_or_else(|| Error::Parse {
-        file: PathBuf::from(".DAT"),
-        line: 1,
-        message: "invalid header: expected equipment count".to_string(),
-    })?.parse().map_err(|_| Error::Parse {
-        file: PathBuf::from(".DAT"),
-        line: 1,
-        message: format!("invalid equipment count: {}", header_line),
-    })?;
+    let file_n_equipment: usize = match header_line.split_whitespace().next() {
+        Some(tok) => match tok.parse::<usize>() {
+            Ok(v) => v,
+            Err(_) => {
+                return Err(Error::Parse {
+                    file: PathBuf::from(".DAT"),
+                    line: line_num,
+                    message: format!("invalid equipment count: {}", header_line),
+                });
+            }
+        },
+        None => {
+            return Err(Error::Parse {
+                file: PathBuf::from(".DAT"),
+                line: line_num,
+                message: "invalid header: expected equipment count".to_string(),
+            });
+        }
+    };
 
     if file_n_equipment != n_equipment {
         return Err(Error::Parse {
             file: PathBuf::from(".DAT"),
-            line: 1,
+            line: line_num,
             message: format!(
                 "equipment count mismatch: file has {}, expected {}",
                 file_n_equipment, n_equipment
             ),
         });
     }
-
-    line_num = 1;
 
     // Read seasonal factor records
     for line_result in lines {
@@ -122,11 +137,16 @@ pub fn read_dat<R: BufRead>(reader: R, n_equipment: usize) -> Result<Array2<f64>
             });
         }
 
-        let equipment_idx: usize = parts[0].parse().map_err(|_| Error::Parse {
-            file: PathBuf::from(".DAT"),
-            line: line_num,
-            message: format!("invalid equipment index: {}", parts[0]),
-        })? - 1; // Convert from 1-based to 0-based
+        let equipment_idx: usize = match parts[0].parse::<usize>() {
+            Ok(v) => v - 1,
+            Err(_) => {
+                return Err(Error::Parse {
+                    file: PathBuf::from(".DAT"),
+                    line: line_num,
+                    message: format!("invalid equipment index: {}", parts[0]),
+                });
+            }
+        };
 
         if equipment_idx >= n_equipment {
             return Err(Error::Parse {
@@ -144,11 +164,16 @@ pub fn read_dat<R: BufRead>(reader: R, n_equipment: usize) -> Result<Array2<f64>
             if month_idx >= 12 {
                 break;
             }
-            let factor: f64 = val_str.parse().map_err(|_| Error::Parse {
-                file: PathBuf::from(".DAT"),
-                line: line_num,
-                message: format!("invalid seasonal factor: {}", val_str),
-            })?;
+            let factor: f64 = match val_str.parse::<f64>() {
+                Ok(v) => v,
+                Err(_) => {
+                    return Err(Error::Parse {
+                        file: PathBuf::from(".DAT"),
+                        line: line_num,
+                        message: format!("invalid seasonal factor: {}", val_str),
+                    });
+                }
+            };
             seasonal[[equipment_idx, month_idx]] = factor;
         }
     }
@@ -164,18 +189,25 @@ pub fn read_dat_records<R: BufRead>(reader: R) -> Result<Vec<SeasonalRecord>> {
     let mut lines = reader.lines();
     let mut line_num = 0;
 
-    // Skip header
-    let _header = lines
-        .next()
-        .ok_or_else(|| Error::Parse {
-            file: PathBuf::from(".DAT"),
-            line: 0,
-            message: "empty seasonal file".to_string(),
-        })?
-        .map_err(|e| Error::Io {
-            path: PathBuf::from(".DAT"),
-            source: e,
-        })?;
+    // Skip header (first non-blank, non-comment line)
+    loop {
+        line_num += 1;
+        let line = lines
+            .next()
+            .ok_or_else(|| Error::Parse {
+                file: PathBuf::from(".DAT"),
+                line: line_num,
+                message: "empty seasonal file".to_string(),
+            })?
+            .map_err(|e| Error::Io {
+                path: PathBuf::from(".DAT"),
+                source: e,
+            })?;
+        let trimmed = line.trim();
+        if !trimmed.is_empty() && !trimmed.starts_with('#') {
+            break;
+        }
+    }
 
     line_num = 1;
 
@@ -197,11 +229,10 @@ pub fn read_dat_records<R: BufRead>(reader: R) -> Result<Vec<SeasonalRecord>> {
             continue; // Skip malformed lines
         }
 
-        let equipment_idx: usize = parts[0].parse().map_err(|_| Error::Parse {
-            file: PathBuf::from(".DAT"),
-            line: line_num,
-            message: format!("invalid equipment index: {}", parts[0]),
-        })? - 1; // Convert from 1-based to 0-based
+        let equipment_idx: usize = match parts[0].parse::<usize>() {
+            Ok(v) => v - 1,
+            Err(_) => continue,
+        };
 
         let mut monthly_factors = [1.0; 12];
         for (month_idx, val_str) in parts[1..].iter().enumerate() {
