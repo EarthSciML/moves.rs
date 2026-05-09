@@ -27,7 +27,11 @@
 //!
 //! # Status
 //!
-//! Phase 5 skeleton — no code yet. Sub-modules
-//! (e.g. `input::pop`, `input::alo`) get added in their respective
-//! tasks; each carries rustdoc that names the Fortran source it
-//! ports.
+//! Task 95 parsers implemented:
+//! - `growth` — `.GRW` growth factor parser (`rdgrow.f`)
+//! - `gxr` — `.GXR` growth extrapolation parser (`rdgxrf.f`)
+//! - `seasonal` — `.DAT` seasonal and `.DAY` day-of-year parsers (`rdseas.f`, `rdday.f`)
+
+pub mod growth;
+pub mod gxr;
+pub mod seasonal;
