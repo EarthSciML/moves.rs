@@ -27,6 +27,10 @@
 //!
 //! # Status
 //!
+//! Task 94 parsers implemented:
+//! - `population` — `.POP` population parser (`rdpop.f`)
+//! - `allocation` — `.ALO` allocation cross-reference parser (`rdalo.f`)
+//!
 //! Task 95 parsers implemented:
 //! - `growth` — `.GRW` growth factor parser (`rdgrow.f`)
 //! - `gxr` — `.GXR` growth extrapolation parser (`rdgxrf.f`)
@@ -51,6 +55,7 @@
 //! - `source_cat` — `/SOURCE CATEGORY/` packet (`rdnrsrc.f`)
 
 pub mod activity;
+pub mod allocation;
 pub mod alt_scrap;
 pub mod bsfc;
 pub mod deterioration;
@@ -61,6 +66,7 @@ pub mod gxr;
 pub mod indicator;
 pub mod options;
 pub mod period;
+pub mod population;
 pub mod region;
 pub mod region_def;
 pub mod scrappage;
