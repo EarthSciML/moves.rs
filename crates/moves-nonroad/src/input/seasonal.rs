@@ -197,11 +197,10 @@ pub fn read_dat_records<R: BufRead>(reader: R) -> Result<Vec<SeasonalRecord>> {
             continue; // Skip malformed lines
         }
 
-        let equipment_idx: usize = parts[0].parse().map_err(|_| Error::Parse {
-            file: PathBuf::from(".DAT"),
-            line: line_num,
-            message: format!("invalid equipment index: {}", parts[0]),
-        })? - 1; // Convert from 1-based to 0-based
+        let equipment_idx: usize = match parts[0].parse::<usize>() {
+            Ok(v) => v - 1,
+            Err(_) => continue,
+        };
 
         let mut monthly_factors = [1.0; 12];
         for (month_idx, val_str) in parts[1..].iter().enumerate() {

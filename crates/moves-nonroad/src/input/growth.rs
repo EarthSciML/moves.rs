@@ -26,7 +26,6 @@
 //! This module ports `rdgrow.f` (382 lines) from the NONROAD2008a
 //! source tree.
 
-use crate::common::PopulationState;
 use crate::{Error, Result};
 use ndarray::Array2;
 use std::io::BufRead;
@@ -115,23 +114,38 @@ pub fn read_grw<R: BufRead>(reader: R) -> Result<Array2<f64>> {
             continue; // Skip malformed lines
         }
 
-        let county_idx: usize = parts[0].parse().map_err(|_| Error::Parse {
-            file: PathBuf::from(".GRW"),
-            line: line_num,
-            message: format!("invalid county index: {}", parts[0]),
-        })? - 1; // Convert from 1-based to 0-based
+        let county_idx: usize = match parts[0].parse::<usize>() {
+            Ok(v) => v - 1,
+            Err(_) => {
+                return Err(Error::Parse {
+                    file: PathBuf::from(".GRW"),
+                    line: line_num,
+                    message: format!("invalid county index: {}", parts[0]),
+                });
+            }
+        };
 
-        let equipment_idx: usize = parts[1].parse().map_err(|_| Error::Parse {
-            file: PathBuf::from(".GRW"),
-            line: line_num,
-            message: format!("invalid equipment index: {}", parts[1]),
-        })? - 1; // Convert from 1-based to 0-based
+        let equipment_idx: usize = match parts[1].parse::<usize>() {
+            Ok(v) => v - 1,
+            Err(_) => {
+                return Err(Error::Parse {
+                    file: PathBuf::from(".GRW"),
+                    line: line_num,
+                    message: format!("invalid equipment index: {}", parts[1]),
+                });
+            }
+        };
 
-        let growth_factor: f64 = parts[2].parse().map_err(|_| Error::Parse {
-            file: PathBuf::from(".GRW"),
-            line: line_num,
-            message: format!("invalid growth factor: {}", parts[2]),
-        })?;
+        let growth_factor: f64 = match parts[2].parse::<f64>() {
+            Ok(v) => v,
+            Err(_) => {
+                return Err(Error::Parse {
+                    file: PathBuf::from(".GRW"),
+                    line: line_num,
+                    message: format!("invalid growth factor: {}", parts[2]),
+                });
+            }
+        };
 
         if county_idx >= n_counties || equipment_idx >= n_equipment {
             return Err(Error::Parse {
@@ -195,23 +209,17 @@ pub fn read_grw_records<R: BufRead>(reader: R) -> Result<Vec<GrowthRecord>> {
             continue; // Skip malformed lines
         }
 
-        let county_idx: usize = parts[0].parse().map_err(|_| Error::Parse {
-            file: PathBuf::from(".GRW"),
-            line: line_num,
-            message: format!("invalid county index: {}", parts[0]),
-        })? - 1; // Convert from 1-based to 0-based
+        let county_idx: usize = match parts[0].parse::<usize>() {
+            Ok(v) => v - 1,
+            Err(_) => continue,
+        };
 
-        let equipment_idx: usize = parts[1].parse().map_err(|_| Error::Parse {
-            file: PathBuf::from(".GRW"),
-            line: line_num,
-            message: format!("invalid equipment index: {}", parts[1]),
-        })? - 1; // Convert from 1-based to 0-based
+        let equipment_idx: usize = match parts[1].parse::<usize>() {
+            Ok(v) => v - 1,
+            Err(_) => continue,
+        };
 
-        let growth_factor: f64 = parts[2].parse().map_err(|_| Error::Parse {
-            file: PathBuf::from(".GRW"),
-            line: line_num,
-            message: format!("invalid growth factor: {}", parts[2]),
-        })?;
+        let growth_factor: f64 = parts[2].parse().unwrap_or(1.0);
 
         records.push(GrowthRecord {
             county_idx,
