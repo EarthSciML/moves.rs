@@ -64,6 +64,29 @@ pub enum Error {
         /// The non-finite [`f64`] that violated the invariant.
         value: f64,
     },
+
+    /// A spatial-allocation indicator value was required but not
+    /// present in the loaded `.IND` records.
+    ///
+    /// Mirrors the `IEOF` branch of `getind.f` (NONROAD source),
+    /// which the allocation routines (`alocty.f`, `alosta.f`,
+    /// `alosub.f`) surface as a fatal "Could not find any spatial
+    /// indicator data" message.
+    #[error(
+        "spatial-allocation indicator {code:?} missing for FIPS {fips:?}, \
+         subregion {subregion:?}, year {year}"
+    )]
+    IndicatorMissing {
+        /// 3-character indicator code (e.g. `POP`, `HHS`).
+        code: String,
+        /// 5-character FIPS code being looked up.
+        fips: String,
+        /// 5-character subregion code (blanks for state/county-level
+        /// lookups).
+        subregion: String,
+        /// Episode year supplied to the lookup.
+        year: i32,
+    },
 }
 
 /// Crate-local [`Result`] alias.
