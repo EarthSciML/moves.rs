@@ -40,13 +40,19 @@
 //! Rust port and the Windows-compiled Fortran reference. See
 //! Tasks 115 (validation) and 116 (triage).
 
+pub mod agedist;
 pub mod growth;
+pub mod modyr;
 pub mod pop;
 pub mod retrofit;
 pub mod scrappage;
 
+pub use agedist::{age_distribution, AgeDistributionResult};
 pub use growth::{
-    growth_factor, select_for_indicator, GrowthFactorWarning, GrowthIndicatorRecord,
+    growth_factor, select_for_indicator, GrowthFactor, GrowthFactorWarning, GrowthIndicatorRecord,
+};
+pub use modyr::{
+    model_year, ActivityUnits, AgeAdjustmentTable, ModelYearOutput, ScrappageTime,
 };
 pub use pop::{select_for_scc, SelectedPopulation};
 pub use retrofit::{
