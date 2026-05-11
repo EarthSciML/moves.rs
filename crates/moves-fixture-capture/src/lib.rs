@@ -25,6 +25,7 @@
 //!   normalization comes from the database dumps.
 
 pub mod capture;
+pub mod coverage;
 pub mod error;
 pub mod provenance;
 pub mod runspec;
@@ -33,6 +34,10 @@ pub mod trace;
 pub mod tree;
 
 pub use capture::{build_snapshot, BuildOptions};
+pub use coverage::{
+    build_coverage_map, read_traces_dir, write_coverage_map, CoverageMap, FixtureSummary, HotPath,
+    ItemCoverage, JavaClassCoverage, COVERAGE_FILE, COVERAGE_VERSION, HOT_PATHS_LIMIT,
+};
 pub use error::{Error, Result};
 pub use provenance::{write_provenance, Provenance};
 pub use runspec::RunSpec;

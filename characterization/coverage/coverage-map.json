@@ -1,0 +1,10 @@
+{
+  "coverage_version": "moves-coverage/v1",
+  "total_fixtures": 0,
+  "total_statement_weight": 0,
+  "fixtures": [],
+  "java_classes": [],
+  "sql_files": [],
+  "go_calculators": [],
+  "hot_paths": []
+}
