@@ -64,6 +64,26 @@ pub enum Error {
         /// The non-finite [`f64`] that violated the invariant.
         value: f64,
     },
+
+    /// A spatial-allocation indicator value was not found for the
+    /// requested geography. Mirrors the `IEOF` return from `getind.f`
+    /// that the allocation routines (`alocty.f`, `alosta.f`,
+    /// `alosub.f`) treat as fatal (`7002` error path).
+    #[error(
+        "no spatial-indicator data for code={code:?} fips={fips:?} \
+         subcounty={subcounty:?} year={year}"
+    )]
+    IndicatorMissing {
+        /// 3-character allocation indicator code (e.g. `"POP"`).
+        code: String,
+        /// 5-character FIPS code being looked up.
+        fips: String,
+        /// Subcounty identifier (empty string for state- and
+        /// national-level lookups).
+        subcounty: String,
+        /// Evaluation year passed to the lookup.
+        year: i32,
+    },
 }
 
 /// Crate-local [`Result`] alias.

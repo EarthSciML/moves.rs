@@ -25,6 +25,7 @@
 //! Ports `rdind.f` (355 lines).
 
 use crate::{Error, Result};
+use std::collections::HashMap;
 use std::io::BufRead;
 use std::path::PathBuf;
 
@@ -118,6 +119,128 @@ pub fn sort_indicators(records: &mut [IndicatorRecord]) {
     records.sort_by(|a, b| a.sort_key().cmp(&b.sort_key()));
 }
 
+/// Fast lookup over a set of [`IndicatorRecord`]s, replacing the
+/// streaming-file search in `getind.f`.
+///
+/// Built once from the parsed indicator records (typically from
+/// [`read_ind`] concatenated across every active indicator file),
+/// then queried per allocation operation. Records are grouped by
+/// `(code, fips, subcounty)`; within each group the year/value
+/// pairs are kept in ascending year order.
+///
+/// # Year-selection rule (from `getind.f`)
+///
+/// [`IndicatorTable::lookup`] picks a value from the matching group
+/// using the same priority as the Fortran routine:
+///
+/// 1. The latest record whose year is `<= year_target` (closest
+///    earlier year wins).
+/// 2. Otherwise, the earliest record whose year is `> year_target`.
+/// 3. Otherwise (no records match `code`/`fips`/`subcounty`),
+///    `None`.
+///
+/// The 2005 EPA revision removed year interpolation; the lookup
+/// returns the closest-earlier value verbatim (`getind.f` :138).
+///
+/// # Key normalization
+///
+/// `code` and `subcounty` are upper-cased and `fips` is left as-is
+/// (the parser already keeps them in the canonical form). Lookups
+/// are case-insensitive on `code` and `subcounty`; callers may
+/// pass either form.
+#[derive(Debug, Default, Clone)]
+pub struct IndicatorTable {
+    /// `(code, fips, subcounty)` → year-ascending `(year, value)` pairs.
+    by_region: HashMap<(String, String, String), Vec<(i32, f32)>>,
+}
+
+impl IndicatorTable {
+    /// Build a lookup table from a sequence of records.
+    ///
+    /// Records whose `year` field does not parse as an integer are
+    /// skipped — production indicator files store 4-digit years, so
+    /// this is defensive against malformed inputs that the streaming
+    /// Fortran reader would have surfaced via its own format-error
+    /// path.
+    pub fn new<I: IntoIterator<Item = IndicatorRecord>>(records: I) -> Self {
+        let mut table = Self::default();
+        for record in records {
+            let Ok(year) = record.year.trim().parse::<i32>() else {
+                continue;
+            };
+            let key = Self::normalize_key(&record.code, &record.fips, &record.subcounty);
+            table
+                .by_region
+                .entry(key)
+                .or_default()
+                .push((year, record.value as f32));
+        }
+        for years in table.by_region.values_mut() {
+            years.sort_by_key(|(year, _)| *year);
+        }
+        table
+    }
+
+    /// Number of distinct `(code, fips, subcounty)` groups.
+    pub fn group_count(&self) -> usize {
+        self.by_region.len()
+    }
+
+    /// Whether any record exists for `(code, fips, subcounty)`.
+    pub fn has_region(&self, code: &str, fips: &str, subcounty: &str) -> bool {
+        let key = Self::normalize_key(code, fips, subcounty);
+        self.by_region.contains_key(&key)
+    }
+
+    /// Look up the indicator value for `code` at `(fips, subcounty)`
+    /// for `year_target`, applying the year-selection rule
+    /// documented on [`IndicatorTable`].
+    ///
+    /// Returns `None` only when no record exists for the
+    /// `(code, fips, subcounty)` triple. If a triple has any
+    /// records at all, this method always returns `Some(_)` — the
+    /// selection rule guarantees a hit either at or after the
+    /// target year.
+    pub fn lookup(&self, code: &str, fips: &str, subcounty: &str, year_target: i32) -> Option<f32> {
+        let key = Self::normalize_key(code, fips, subcounty);
+        let years = self.by_region.get(&key)?;
+        select_year(years, year_target)
+    }
+
+    fn normalize_key(code: &str, fips: &str, subcounty: &str) -> (String, String, String) {
+        (
+            code.to_ascii_uppercase(),
+            fips.to_string(),
+            subcounty.to_ascii_uppercase(),
+        )
+    }
+}
+
+/// Year-selection helper used by [`IndicatorTable::lookup`]; exposed
+/// for direct unit-testing.
+///
+/// `years` must already be sorted ascending by year (the table
+/// invariant).
+fn select_year(years: &[(i32, f32)], year_target: i32) -> Option<f32> {
+    let mut latest_le: Option<(i32, f32)> = None;
+    let mut earliest_gt: Option<(i32, f32)> = None;
+    for (year, value) in years {
+        if *year <= year_target {
+            // Sorted ascending → keep overwriting; final survivor is
+            // the closest earlier year.
+            latest_le = Some((*year, *value));
+        } else if earliest_gt.is_none() {
+            earliest_gt = Some((*year, *value));
+            // No need to keep scanning — subsequent entries are
+            // further from the target.
+            break;
+        }
+    }
+    latest_le
+        .map(|(_, v)| v)
+        .or_else(|| earliest_gt.map(|(_, v)| v))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -170,5 +293,102 @@ POP 17031 00000 2020
 ";
         let err = read_ind(input.as_bytes()).unwrap_err();
         assert!(matches!(err, Error::Parse { .. }));
+    }
+
+    fn rec(code: &str, fips: &str, sub: &str, year: &str, value: f64) -> IndicatorRecord {
+        IndicatorRecord {
+            code: code.to_string(),
+            fips: fips.to_string(),
+            subcounty: sub.to_string(),
+            year: year.to_string(),
+            value,
+        }
+    }
+
+    #[test]
+    fn select_year_picks_closest_earlier() {
+        let years = vec![(2000, 1.0), (2010, 2.0), (2020, 3.0)];
+        assert_eq!(select_year(&years, 2015), Some(2.0));
+        assert_eq!(select_year(&years, 2010), Some(2.0));
+        assert_eq!(select_year(&years, 2020), Some(3.0));
+        assert_eq!(select_year(&years, 2030), Some(3.0));
+    }
+
+    #[test]
+    fn select_year_falls_back_to_earliest_later() {
+        let years = vec![(2010, 1.5), (2020, 2.5)];
+        assert_eq!(select_year(&years, 2005), Some(1.5));
+        assert_eq!(select_year(&years, 1999), Some(1.5));
+    }
+
+    #[test]
+    fn select_year_returns_none_for_empty() {
+        let years: Vec<(i32, f32)> = Vec::new();
+        assert_eq!(select_year(&years, 2020), None);
+    }
+
+    #[test]
+    fn indicator_table_groups_by_region() {
+        let records = vec![
+            rec("POP", "17000", "", "2010", 100.0),
+            rec("POP", "17000", "", "2020", 110.0),
+            rec("POP", "17031", "", "2020", 50.0),
+            rec("EMP", "17000", "", "2020", 80.0),
+        ];
+        let table = IndicatorTable::new(records);
+        assert_eq!(table.group_count(), 3);
+        assert!(table.has_region("POP", "17000", ""));
+        assert!(table.has_region("pop", "17000", ""));
+        assert!(!table.has_region("POP", "06000", ""));
+    }
+
+    #[test]
+    fn indicator_table_lookup_applies_year_rule() {
+        let records = vec![
+            rec("POP", "17000", "", "2010", 1.0),
+            rec("POP", "17000", "", "2020", 2.0),
+        ];
+        let table = IndicatorTable::new(records);
+        assert_eq!(table.lookup("POP", "17000", "", 2015), Some(1.0));
+        assert_eq!(table.lookup("POP", "17000", "", 2020), Some(2.0));
+        assert_eq!(table.lookup("POP", "17000", "", 2025), Some(2.0));
+        assert_eq!(table.lookup("POP", "17000", "", 2005), Some(1.0));
+        assert_eq!(table.lookup("POP", "17000", "", 1900), Some(1.0));
+    }
+
+    #[test]
+    fn indicator_table_lookup_missing_region_returns_none() {
+        let records = vec![rec("POP", "17000", "", "2020", 1.0)];
+        let table = IndicatorTable::new(records);
+        assert_eq!(table.lookup("POP", "06000", "", 2020), None);
+        assert_eq!(table.lookup("EMP", "17000", "", 2020), None);
+    }
+
+    #[test]
+    fn indicator_table_lookup_is_case_insensitive_on_code_and_subcounty() {
+        let records = vec![rec("pop", "17031", "abc", "2020", 9.0)];
+        let table = IndicatorTable::new(records);
+        assert_eq!(table.lookup("POP", "17031", "ABC", 2020), Some(9.0));
+        assert_eq!(table.lookup("pop", "17031", "abc", 2020), Some(9.0));
+    }
+
+    #[test]
+    fn indicator_table_skips_records_with_malformed_year() {
+        let records = vec![
+            rec("POP", "17000", "", "20XX", 1.0),
+            rec("POP", "17000", "", "2020", 2.0),
+        ];
+        let table = IndicatorTable::new(records);
+        assert_eq!(table.lookup("POP", "17000", "", 2030), Some(2.0));
+    }
+
+    #[test]
+    fn indicator_table_lookup_returns_f32() {
+        // Indicator values are REAL*4 in the Fortran source; the
+        // table stores f32 even though the parsed records carry f64.
+        let records = vec![rec("POP", "17000", "", "2020", 0.123_456_789_f64)];
+        let table = IndicatorTable::new(records);
+        let v = table.lookup("POP", "17000", "", 2020).unwrap();
+        assert_eq!(v, 0.123_456_789_f64 as f32);
     }
 }
