@@ -43,7 +43,10 @@ Phase 0 Task 8 (bead `mo-d7or`) deliverable. Where the snapshot answers
 "what numbers did MOVES produce?", the execution trace answers "which
 pieces of MOVES were exercised producing them?" — making the snapshot
 the regression baseline AND a coverage/migration-ordering input for
-Phase 1 (Task 9).
+Phase 1 Task 9 (bead `mo-55l0`). The per-fixture traces here are rolled
+up into a suite-wide coverage map at `characterization/coverage/` by
+the `moves-coverage` CLI — see that directory's `README.md` for the
+schema and `jq` recipes.
 
 The trace is assembled post-run by `moves-fixture-capture` from the
 same captures directory the snapshot is built from:
