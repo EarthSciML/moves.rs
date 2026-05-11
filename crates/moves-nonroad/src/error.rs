@@ -64,6 +64,27 @@ pub enum Error {
         /// The non-finite [`f64`] that violated the invariant.
         value: f64,
     },
+
+    /// A spatial-indicator lookup found no data for the requested
+    /// `(code, fips, subregion, year)` tuple.
+    ///
+    /// Mirrors the `IEOF` return path in `getind.f` (`NONROAD/NR08a/SOURCE/getind.f` :96, :106, :128).
+    /// The allocation routines treat a missing indicator as a hard
+    /// error because the apportionment ratio is undefined without it.
+    #[error(
+        "indicator data not found: code={code:?} fips={fips:?} subregion={subregion:?} year={year}"
+    )]
+    IndicatorNotFound {
+        /// 3-character allocation code (e.g. `POP`, `HHS`).
+        code: String,
+        /// 5-character FIPS code being looked up.
+        fips: String,
+        /// Subregion key (blank for state/county scope, populated for
+        /// subcounty scope). Trimmed of trailing whitespace.
+        subregion: String,
+        /// Evaluation year passed to the lookup.
+        year: i32,
+    },
 }
 
 /// Crate-local [`Result`] alias.
