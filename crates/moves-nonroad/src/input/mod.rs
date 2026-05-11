@@ -64,6 +64,10 @@
 //! - `period` — `/PERIOD/` packet (`rdnrper.f`)
 //! - `region` — `/REGION/` packet (`rdnrreg.f`)
 //! - `source_cat` — `/SOURCE CATEGORY/` packet (`rdnrsrc.f`)
+//!
+//! Task 98 parsers implemented:
+//! - `retrofit` — retrofit input (`rdrtrft.f`) plus the four
+//!   validators (`vldrtrft{recs,hp,scc,tchtyp}.f`)
 
 pub mod activity;
 pub mod alo;
@@ -84,6 +88,7 @@ pub mod period;
 pub mod pop;
 pub mod region;
 pub mod region_def;
+pub mod retrofit;
 pub mod scrappage;
 pub mod seasonal;
 pub mod source_cat;
