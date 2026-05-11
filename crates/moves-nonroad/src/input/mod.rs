@@ -36,6 +36,16 @@
 //! - `gxr` — `.GXR` growth extrapolation parser (`rdgxrf.f`)
 //! - `seasonal` — `.DAT` seasonal and `.DAY` day-of-year parsers (`rdseas.f`, `rdday.f`)
 //!
+//! Task 96 parsers implemented:
+//! - `emfc` — exhaust emission factor `.EMF` parser (`rdemfc.f`,
+//!   also serves the BSFC dispatcher)
+//! - `evemfc` — evap emission factor `.EMF` parser (`rdevemfc.f`)
+//! - `tech` — `/TECH FRAC/` packet (`rdtech.f`)
+//! - `tech_moves` — `/MOVES TECH FRAC/` packet (`rdtech_moves.f`)
+//! - `evtech` — `/EVAP TECH FRAC/` packet (`rdevtech.f`)
+//! - `evtech_moves` — `/MOVES EVAP TECH FRAC/` packet
+//!   (`rdevtech_moves.f`)
+//!
 //! Task 97 parsers implemented:
 //! - `activity` — activity file (`rdact.f`)
 //! - `deterioration` — deterioration factors (`rddetr.f`)
@@ -45,7 +55,8 @@
 //! - `scrappage` — scrappage curve (`rdscrp.f`)
 //! - `stage2` — `/STAGE II/` packet (`rdstg2.f`)
 //! - `alt_scrap` — alternate scrappage curves (`rdalt.f`)
-//! - `bsfc` — BSFC dispatcher stub (`rdbsfc.f`)
+//! - `bsfc` — BSFC dispatcher, wired to `emfc::read_bsfc`
+//!   (`rdbsfc.f`)
 //! - `efls` — emission-factor-files dispatcher (`rdefls.f`)
 //! - `fips` — county FIPS data (`rdfips.f`)
 //! - `indicator` — spatial indicator records (`rdind.f`)
@@ -60,6 +71,10 @@ pub mod alt_scrap;
 pub mod bsfc;
 pub mod deterioration;
 pub mod efls;
+pub mod emfc;
+pub mod evemfc;
+pub mod evtech;
+pub mod evtech_moves;
 pub mod fips;
 pub mod growth;
 pub mod gxr;
@@ -75,3 +90,5 @@ pub mod source_cat;
 pub mod spillage;
 pub mod stage2;
 pub mod sulfur;
+pub mod tech;
+pub mod tech_moves;
