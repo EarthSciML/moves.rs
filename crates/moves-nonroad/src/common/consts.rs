@@ -85,6 +85,58 @@ pub const MXDTFC: usize = 120;
 /// Original Fortran parameter: `MXPOP = 1000` in `nonrdprm.inc`.
 pub const MXPOP: usize = 1_000;
 
+/// Maximum scrappage-curve bins (per curve).
+///
+/// Original Fortran parameter: `MXSCRP = 197` in `nonrdeqp.inc`.
+pub const MXSCRP: usize = 197;
+
+/// Maximum retrofit records loaded per run.
+///
+/// Original Fortran parameter: `MXRTRFT = 500` in `nonrdrtrft.inc`.
+pub const MXRTRFT: usize = 500;
+
+/// Number of pollutants that are valid in retrofit records.
+///
+/// Original Fortran parameter: `NRTRFTPLLTNT = 4` in `nonrdrtrft.inc`.
+/// The four allowed pollutants are HC, CO, NOx, PM.
+pub const NRTRFTPLLTNT: usize = 4;
+
+/// Index of total HC in pollutant arrays.
+///
+/// Original Fortran parameter: `IDXTHC = 1` in `nonrdprm.inc`.
+/// Preserved as a 1-based Fortran index for cross-reference; Rust
+/// callers offset to 0-based as needed.
+pub const IDXTHC: usize = 1;
+
+/// Index of CO in pollutant arrays.
+///
+/// Original Fortran parameter: `IDXCO = 2` in `nonrdprm.inc`.
+pub const IDXCO: usize = 2;
+
+/// Index of NOx in pollutant arrays.
+///
+/// Original Fortran parameter: `IDXNOX = 3` in `nonrdprm.inc`.
+pub const IDXNOX: usize = 3;
+
+/// Index of CO2 in pollutant arrays.
+///
+/// Original Fortran parameter: `IDXCO2 = 4` in `nonrdprm.inc`.
+pub const IDXCO2: usize = 4;
+
+/// Index of PM in pollutant arrays.
+///
+/// Original Fortran parameter: `IDXPM = 6` in `nonrdprm.inc`.
+/// Note that the PM index skips `5` — that slot holds another
+/// pollutant that does not participate in retrofit records.
+pub const IDXPM: usize = 6;
+
+/// Minimum non-zero growth indicator value.
+///
+/// Original Fortran constant: `MINGRWIND = 0.0001` in `nonrdprm.inc`.
+/// Used by `grwfac` to avoid divide-by-zero when the base-year
+/// indicator is exactly zero.
+pub const MINGRWIND: f32 = 0.0001;
+
 // ============================================================================
 // Chemical and conversion constants from nonrdprm.inc
 // ============================================================================
