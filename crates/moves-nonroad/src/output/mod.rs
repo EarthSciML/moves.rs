@@ -37,10 +37,16 @@
 //! Task 100 implemented:
 //! - [`fips`] — static state FIPS-code table (`in1fip.f`–`in5fip.f`)
 //!
+//! Task 101 implemented (partial — see [`find`] module docs for the
+//! list of routines deferred until their backing input parsers land):
+//! - [`find`] — lookup helpers (`fndchr.f`, `fndasc.f`, `fndhpc.f`,
+//!   `fndscrp.f`, `fndreg.f`, `fnddet.f`, `fndact.f`, `fndrfm.f`)
+//!
 //! Task 102 implemented:
 //! - [`strutil`] — string and miscellaneous helpers
 //!   (`strlen.f`, `strmin.f`, `lftjst.f`, `rgtjst.f`, `low2up.f`,
 //!   `chrsrt.f`, `wadeeq.f`, `cnthpcat.f`).
 
+pub mod find;
 pub mod fips;
 pub mod strutil;
