@@ -31,6 +31,10 @@
 //!
 //! # Status
 //!
-//! Phase 5 skeleton — no code yet. Sub-modules get added in their
-//! respective tasks; each carries rustdoc that names the Fortran
-//! source it ports.
+//! Sub-modules get added in their respective tasks; each carries
+//! rustdoc that names the Fortran source it ports.
+//!
+//! Task 100 implemented:
+//! - [`fips`] — static state FIPS-code table (`in1fip.f`–`in5fip.f`)
+
+pub mod fips;
