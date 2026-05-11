@@ -59,6 +59,19 @@ pub const MXHPC: usize = 18;
 /// Original Fortran parameter: `MXAGYR = 51` in `nonrdprm.inc`.
 pub const MXAGYR: usize = 51;
 
+/// Maximum age-bin count for the `/AGE ADJUSTMENT/` curve.
+///
+/// Original Fortran parameter: `MXUSE = 51` in `nonrdact.inc`.
+/// Used by [`crate::population::modyr`] when sizing the
+/// `agebin`/`agepct` tables. Equal to [`MXAGYR`] but kept distinct
+/// to mirror the Fortran source.
+pub const MXUSE: usize = 51;
+
+/// Maximum number of alternate age-vs-activity curves.
+///
+/// Original Fortran parameter: `MXAGE = 10` in `nonrdact.inc`.
+pub const MXAGE: usize = 10;
+
 /// Maximum days in a year.
 ///
 /// Original Fortran parameter: `MXDAYS = 365` in `nonrdprm.inc`.
