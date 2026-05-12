@@ -58,9 +58,13 @@
 
 pub mod prcnat;
 pub mod prcus;
+pub mod state;
 
 pub use prcnat::{process_national_record, NationalContext};
 pub use prcus::{process_us_total_record, UsTotalContext};
+pub use state::{
+    process_state_from_national_record, process_state_to_county_record, StateCallbacks,
+};
 
 use crate::common::consts::MXPOL;
 use crate::emissions::exhaust::{ActivityUnit, FuelKind};
