@@ -84,6 +84,34 @@ pub enum Error {
         /// Evaluation year passed to the lookup.
         year: i32,
     },
+
+    /// A retrofit record specified an absolute number of units
+    /// retrofitted (`annual_frac_or_count > 1.0`) that exceeds the
+    /// engine population available for the current model iteration.
+    /// Mirrors the `7000` error path in `clcrtrft.f` (:171, :273).
+    #[error(
+        "retrofit {retrofit_id} ({pollutant}) requests {n_units_requested} units \
+         but only {n_units_existing} engines exist \
+         (scc={scc:?} hp_avg={hp_avg} model_year={model_year} tech_type={tech_type:?})"
+    )]
+    RetrofitNUnitsExceedPopulation {
+        /// Retrofit ID from `rtrftid`.
+        retrofit_id: i32,
+        /// Pollutant whose accumulator triggered the check.
+        pollutant: String,
+        /// 10-character SCC of the iteration that hit the error.
+        scc: String,
+        /// HP-average of the iteration.
+        hp_avg: f32,
+        /// Model year of the iteration.
+        model_year: i32,
+        /// Tech type of the iteration.
+        tech_type: String,
+        /// Units requested (the offending product `frac * pop`).
+        n_units_requested: f32,
+        /// Engines available for this iteration (`pop`).
+        n_units_existing: f32,
+    },
 }
 
 /// Crate-local [`Result`] alias.

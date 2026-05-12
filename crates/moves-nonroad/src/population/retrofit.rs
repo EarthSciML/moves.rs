@@ -145,6 +145,39 @@ impl RetrofitPollutant {
             Self::Pm => IDXPM as i32,
         }
     }
+
+    /// Inverse of [`pollutant_index`](Self::pollutant_index): map a
+    /// stored `rtrftplltntidx` value back to the typed enum. Returns
+    /// `None` for any index that doesn't correspond to one of the
+    /// four retrofit pollutants.
+    pub fn from_pollutant_index(idx: i32) -> Option<Self> {
+        if idx == IDXTHC as i32 {
+            Some(Self::Hc)
+        } else if idx == IDXCO as i32 {
+            Some(Self::Co)
+        } else if idx == IDXNOX as i32 {
+            Some(Self::Nox)
+        } else if idx == IDXPM as i32 {
+            Some(Self::Pm)
+        } else {
+            None
+        }
+    }
+
+    /// 0-based slot in the `rtrftplltnt` array (HC=0, CO=1, NOX=2,
+    /// PM=3) — the dense position used by per-retrofit accumulator
+    /// arrays sized to [`NRTRFTPLLTNT`](crate::common::consts::NRTRFTPLLTNT).
+    ///
+    /// Equivalent to `rtrftplltntidx`'s 1..4 value in the Fortran
+    /// source, less one for Rust's 0-based indexing.
+    pub fn slot(self) -> usize {
+        match self {
+            Self::Hc => 0,
+            Self::Co => 1,
+            Self::Nox => 2,
+            Self::Pm => 3,
+        }
+    }
 }
 
 /// Retrofit runtime state — `initrtrft.f` initializer output.
