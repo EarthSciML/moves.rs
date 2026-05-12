@@ -224,22 +224,10 @@ pub fn growth_factor(
         None
     };
 
-    let base_indicator = interpolate_indicator(
-        records,
-        ibeg,
-        iend,
-        base_year,
-        lower_change,
-        upper_change,
-    );
-    let growth_indicator = interpolate_indicator(
-        records,
-        ibeg,
-        iend,
-        growth_year,
-        lower_change,
-        upper_change,
-    );
+    let base_indicator =
+        interpolate_indicator(records, ibeg, iend, base_year, lower_change, upper_change);
+    let growth_indicator =
+        interpolate_indicator(records, ibeg, iend, growth_year, lower_change, upper_change);
 
     // --- if both indicators are zero, default growth factor of zero (grwfac.f :224) ---
     if base_indicator == 0.0 && growth_indicator == 0.0 {
@@ -268,8 +256,8 @@ pub fn growth_factor(
         base_indicator
     };
 
-    let factor = (growth_indicator - effective_base)
-        / (effective_base * (growth_year - base_year) as f32);
+    let factor =
+        (growth_indicator - effective_base) / (effective_base * (growth_year - base_year) as f32);
 
     Ok(GrowthFactor {
         factor,
@@ -292,13 +280,11 @@ fn interpolate_indicator(
 ) -> f32 {
     if year < records[ibeg].year {
         // extrapolate backward (grwfac.f :160–164)
-        let slope =
-            lower_change.expect("lower_change is Some when year < records[ibeg].year");
+        let slope = lower_change.expect("lower_change is Some when year < records[ibeg].year");
         (records[ibeg].value + slope * (year - records[ibeg].year) as f32).max(0.0)
     } else if year > records[iend].year {
         // extrapolate forward (grwfac.f :165–169)
-        let slope =
-            upper_change.expect("upper_change is Some when year > records[iend].year");
+        let slope = upper_change.expect("upper_change is Some when year > records[iend].year");
         (records[iend].value + slope * (year - records[iend].year) as f32).max(0.0)
     } else if year == records[iend].year {
         // matched last (grwfac.f :170–172)
@@ -359,7 +345,10 @@ mod tests {
 
     #[test]
     fn equal_years_yields_zero_factor() {
-        let records = vec![rec("POP", "06000", 2010, 100.0), rec("POP", "06000", 2020, 120.0)];
+        let records = vec![
+            rec("POP", "06000", 2010, 100.0),
+            rec("POP", "06000", 2020, 120.0),
+        ];
         let r = growth_factor(&refs(&records), 2015, 2015, "06000").unwrap();
         assert_eq!(r.factor, 0.0);
         assert!(r.warning.is_none());
@@ -369,7 +358,10 @@ mod tests {
     fn interpolation_within_range() {
         // Base 2010 -> 100; growth 2020 -> 120. Target base=2010, growth=2020.
         // factor = (120 - 100) / (100 * (2020 - 2010)) = 0.02 per year.
-        let records = vec![rec("POP", "06000", 2010, 100.0), rec("POP", "06000", 2020, 120.0)];
+        let records = vec![
+            rec("POP", "06000", 2010, 100.0),
+            rec("POP", "06000", 2020, 120.0),
+        ];
         let r = growth_factor(&refs(&records), 2010, 2020, "06000").unwrap();
         assert!((r.factor - 0.02).abs() < 1e-6);
         assert_eq!(r.base_indicator, 100.0);
@@ -379,7 +371,10 @@ mod tests {
     #[test]
     fn interpolation_between_years() {
         // Linear between 2010=100 and 2020=120 → 2015 = 110.
-        let records = vec![rec("POP", "06000", 2010, 100.0), rec("POP", "06000", 2020, 120.0)];
+        let records = vec![
+            rec("POP", "06000", 2010, 100.0),
+            rec("POP", "06000", 2020, 120.0),
+        ];
         let r = growth_factor(&refs(&records), 2015, 2020, "06000").unwrap();
         assert!((r.base_indicator - 110.0).abs() < 1e-4);
         assert_eq!(r.growth_indicator, 120.0);
@@ -434,7 +429,10 @@ mod tests {
     fn forward_extrapolation_clamps_at_zero() {
         // Linear extrapolation 2010→2020: 100→50 (slope -5/yr).
         // base=2020 → 50; growth=2030 → 0 (clamped, not -5).
-        let records = vec![rec("POP", "06000", 2010, 100.0), rec("POP", "06000", 2020, 50.0)];
+        let records = vec![
+            rec("POP", "06000", 2010, 100.0),
+            rec("POP", "06000", 2020, 50.0),
+        ];
         let r = growth_factor(&refs(&records), 2020, 2030, "06000").unwrap();
         assert_eq!(r.base_indicator, 50.0);
         assert_eq!(r.growth_indicator, 0.0); // clamped via max(0., ...)
@@ -444,7 +442,10 @@ mod tests {
     fn backward_extrapolation_clamps_at_zero() {
         // 2010→2020: 100→150, slope +5/yr → backward to 1980 gives -50,
         // clamped to 0.
-        let records = vec![rec("POP", "06000", 2010, 100.0), rec("POP", "06000", 2020, 150.0)];
+        let records = vec![
+            rec("POP", "06000", 2010, 100.0),
+            rec("POP", "06000", 2020, 150.0),
+        ];
         let r = growth_factor(&refs(&records), 1980, 2010, "06000").unwrap();
         assert_eq!(r.base_indicator, 0.0); // clamped
         assert_eq!(r.growth_indicator, 100.0);
@@ -454,7 +455,10 @@ mod tests {
 
     #[test]
     fn missing_fips_data_errors() {
-        let records = vec![rec("POP", "06000", 2010, 100.0), rec("POP", "06000", 2020, 120.0)];
+        let records = vec![
+            rec("POP", "06000", 2010, 100.0),
+            rec("POP", "06000", 2020, 120.0),
+        ];
         let err = growth_factor(&refs(&records), 2010, 2020, "17031").unwrap_err();
         match err {
             Error::Config(msg) => assert!(msg.contains("17031")),
@@ -474,7 +478,10 @@ mod tests {
 
     #[test]
     fn both_indicators_zero_yields_zero_factor() {
-        let records = vec![rec("POP", "06000", 2010, 0.0), rec("POP", "06000", 2020, 0.0)];
+        let records = vec![
+            rec("POP", "06000", 2010, 0.0),
+            rec("POP", "06000", 2020, 0.0),
+        ];
         let r = growth_factor(&refs(&records), 2010, 2020, "06000").unwrap();
         assert_eq!(r.factor, 0.0);
         assert!(r.warning.is_none());
@@ -482,7 +489,10 @@ mod tests {
 
     #[test]
     fn zero_base_indicator_produces_warning() {
-        let records = vec![rec("POP", "06000", 2010, 0.0), rec("POP", "06000", 2020, 50.0)];
+        let records = vec![
+            rec("POP", "06000", 2010, 0.0),
+            rec("POP", "06000", 2020, 50.0),
+        ];
         let r = growth_factor(&refs(&records), 2010, 2020, "06000").unwrap();
         assert!(r.warning.is_some());
         let w = r.warning.unwrap();
@@ -495,7 +505,10 @@ mod tests {
 
     #[test]
     fn matched_last_year_returns_endpoint_value() {
-        let records = vec![rec("POP", "06000", 2010, 100.0), rec("POP", "06000", 2020, 200.0)];
+        let records = vec![
+            rec("POP", "06000", 2010, 100.0),
+            rec("POP", "06000", 2020, 200.0),
+        ];
         let r = growth_factor(&refs(&records), 2010, 2020, "06000").unwrap();
         assert_eq!(r.growth_indicator, 200.0);
     }

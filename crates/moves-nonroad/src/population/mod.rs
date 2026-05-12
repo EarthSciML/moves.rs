@@ -51,13 +51,10 @@ pub use agedist::{age_distribution, AgeDistributionResult};
 pub use growth::{
     growth_factor, select_for_indicator, GrowthFactor, GrowthFactorWarning, GrowthIndicatorRecord,
 };
-pub use modyr::{
-    model_year, ActivityUnits, AgeAdjustmentTable, ModelYearOutput, ScrappageTime,
-};
+pub use modyr::{model_year, ActivityUnits, AgeAdjustmentTable, ModelYearOutput, ScrappageTime};
 pub use pop::{select_for_scc, SelectedPopulation};
 pub use retrofit::{
     compare_retrofits, engine_overlap, init_retrofit_state, sort_retrofits, swap_retrofits,
-    Comparison, RetrofitPollutant, RetrofitRecord, RetrofitState, RTRFTSCC_ALL,
-    RTRFTTECHTYPE_ALL,
+    Comparison, RetrofitPollutant, RetrofitRecord, RetrofitState, RTRFTSCC_ALL, RTRFTTECHTYPE_ALL,
 };
 pub use scrappage::{select_scrappage, AlternateCurves, ScrappageCurve};

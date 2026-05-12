@@ -235,8 +235,7 @@ mod tests {
         let scrap = zero_scrap();
         // grwfac(base=2025, growth=2020) returns factor=0.1
         // baspop = max(0, baspop * (1 + (2020-2025) * 0.1)) = baspop * 0.5
-        let res = age_distribution(100.0, &mdyrfrc, 2025, 2020, &scrap, const_growth(0.1))
-            .unwrap();
+        let res = age_distribution(100.0, &mdyrfrc, 2025, 2020, &scrap, const_growth(0.1)).unwrap();
         assert!((res.base_population - 50.0).abs() < 1e-4);
         assert_eq!(res.mdyrfrc, mdyrfrc);
     }
@@ -247,8 +246,7 @@ mod tests {
         let scrap = zero_scrap();
         // Large positive grwthfc with negative delta yields negative product → clamped.
         // baspop * (1 + (-10) * 0.5) = baspop * -4 → max(0, ...) = 0.
-        let res = age_distribution(100.0, &mdyrfrc, 2030, 2020, &scrap, const_growth(0.5))
-            .unwrap();
+        let res = age_distribution(100.0, &mdyrfrc, 2030, 2020, &scrap, const_growth(0.5)).unwrap();
         assert_eq!(res.base_population, 0.0);
     }
 
@@ -258,8 +256,7 @@ mod tests {
         let scrap = zero_scrap();
         // baspop tiny → clamped to MINGRWIND first.
         let tiny = MINGRWIND / 10.0;
-        let res = age_distribution(tiny, &mdyrfrc, 2025, 2020, &scrap, const_growth(0.1))
-            .unwrap();
+        let res = age_distribution(tiny, &mdyrfrc, 2025, 2020, &scrap, const_growth(0.1)).unwrap();
         // base_population is bumped to MINGRWIND, then scaled by (1 - 0.5) = 0.5.
         let expected = MINGRWIND * (1.0 + (2020.0 - 2025.0) * 0.1);
         assert!((res.base_population - expected.max(0.0)).abs() < 1e-9);
@@ -271,8 +268,7 @@ mod tests {
         let scrap = zero_scrap();
         let tiny = MINGRWIND / 10.0;
         // Zero factor → no clamp → baspop unchanged from initial small value.
-        let res = age_distribution(tiny, &mdyrfrc, 2025, 2020, &scrap, const_growth(0.0))
-            .unwrap();
+        let res = age_distribution(tiny, &mdyrfrc, 2025, 2020, &scrap, const_growth(0.0)).unwrap();
         assert_eq!(res.base_population, tiny);
     }
 
@@ -289,8 +285,8 @@ mod tests {
         // frcsum = 1.0; mdyrfrc[0] = totpopfrc - frcsum = 1.10 - 1.0 = 0.10.
         let mdyrfrc = init_mdyrfrc(&[0.5, 0.5]);
         let scrap = zero_scrap();
-        let res = age_distribution(100.0, &mdyrfrc, 2020, 2021, &scrap, const_growth(0.10))
-            .unwrap();
+        let res =
+            age_distribution(100.0, &mdyrfrc, 2020, 2021, &scrap, const_growth(0.10)).unwrap();
         assert_eq!(res.base_population, 100.0);
         assert!((res.mdyrfrc[0] - 0.10).abs() < 1e-6);
         assert!((res.mdyrfrc[1] - 0.50).abs() < 1e-6);
@@ -305,8 +301,8 @@ mod tests {
         // mdyrfrc[0] = 0 - frcsum (which is non-negative); may be negative.
         let mdyrfrc = init_mdyrfrc(&[0.5, 0.5]);
         let scrap = zero_scrap();
-        let res = age_distribution(100.0, &mdyrfrc, 2020, 2021, &scrap, const_growth(-2.0))
-            .unwrap();
+        let res =
+            age_distribution(100.0, &mdyrfrc, 2020, 2021, &scrap, const_growth(-2.0)).unwrap();
         // After the shift: mdyrfrc[1] = tmpfrc[0] = 0.5, mdyrfrc[2] = tmpfrc[1] = 0.5,
         // frcsum = 1.0. mdyrfrc[0] = 0 - 1.0 = -1.0 (Fortran does not clamp the
         // youngest-age slot).
@@ -325,8 +321,7 @@ mod tests {
         }
         // grwthfc 0, totpop=100, totpopfrc=1.0.
         // After shift+scrap, all higher ages are zero; mdyrfrc[0] = 1.0 - 0 = 1.0.
-        let res = age_distribution(100.0, &mdyrfrc, 2020, 2021, &scrap, const_growth(0.0))
-            .unwrap();
+        let res = age_distribution(100.0, &mdyrfrc, 2020, 2021, &scrap, const_growth(0.0)).unwrap();
         assert!((res.mdyrfrc[0] - 1.0).abs() < 1e-6);
         for v in &res.mdyrfrc[1..] {
             assert_eq!(*v, 0.0);
@@ -406,8 +401,7 @@ mod tests {
         // baspop is below MINGRWIND. With non-zero factor → clamp totpop to MINGRWIND
         // before multiplying. Without clamp, the next iteration would never recover.
         let tiny = MINGRWIND / 100.0;
-        let res = age_distribution(tiny, &mdyrfrc, 2020, 2021, &scrap, const_growth(0.10))
-            .unwrap();
+        let res = age_distribution(tiny, &mdyrfrc, 2020, 2021, &scrap, const_growth(0.10)).unwrap();
         // totpop = max(MINGRWIND, tiny) = MINGRWIND; then * 1.10.
         // totpopfrc = (MINGRWIND * 1.10) / tiny -- a large ratio (~110000).
         let expected_totpop = MINGRWIND * 1.10;

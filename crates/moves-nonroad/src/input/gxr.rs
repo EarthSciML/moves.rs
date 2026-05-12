@@ -47,9 +47,7 @@ pub struct GrowthExtrapolationRecord {
 /// Parse a `.GXR` file and return growth extrapolation factors.
 ///
 /// Returns a 3D array indexed by [county][equipment][year].
-pub fn read_gxr<R: BufRead>(
-    reader: R,
-) -> Result<Array3<f64>> {
+pub fn read_gxr<R: BufRead>(reader: R) -> Result<Array3<f64>> {
     let mut lines = reader.lines();
     let mut line_num = 0;
 
@@ -78,10 +76,7 @@ pub fn read_gxr<R: BufRead>(
         return Err(Error::Parse {
             file: PathBuf::from(".GXR"),
             line: 1,
-            message: format!(
-                "invalid header: expected 3 values, got {}",
-                parts.len()
-            ),
+            message: format!("invalid header: expected 3 values, got {}", parts.len()),
         });
     }
 
@@ -276,8 +271,7 @@ pub fn get_gxr_factor(
     equipment_idx: usize,
     year_idx: usize,
 ) -> f64 {
-    *gxr
-        .get([county_idx, equipment_idx, year_idx])
+    *gxr.get([county_idx, equipment_idx, year_idx])
         .unwrap_or(&1.0)
 }
 

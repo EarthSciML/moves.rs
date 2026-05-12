@@ -16,8 +16,8 @@
 
 pub mod consts;
 
-use std::path::PathBuf;
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 /// Top-level container for all NONROAD execution state.
 ///
@@ -35,34 +35,34 @@ use std::collections::HashMap;
 pub struct NonroadContext {
     /// User options from `.opt` file
     pub options: UserOptions,
-    
+
     /// Emission factor tables
     pub emissions: EmissionsState,
-    
+
     /// Population, growth, and age data
     pub population: PopulationState,
-    
+
     /// Allocation records
     pub allocation: AllocationState,
-    
+
     /// Growth factor data
     pub growth: GrowthState,
-    
+
     /// Seasonal and day-specific data
     pub seasonal: SeasonalState,
-    
+
     /// Technology tables
     pub technology: TechnologyState,
-    
+
     /// Equipment and SCC definitions
     pub equipment: EquipmentState,
-    
+
     /// Geography and FIPS tables
     pub geography: GeographyState,
-    
+
     /// Retrofit data
     pub retrofit: RetrofitState,
-    
+
     /// Runtime state (updated during execution)
     pub current_year: i16,
     pub current_month: u8,
@@ -70,10 +70,10 @@ pub struct NonroadContext {
     pub current_scc: i32,
     pub current_equipment_idx: usize,
     pub current_fips: i32,
-    
+
     /// Output accumulators
     pub emission_outputs: Vec<EmissionOutput>,
-    
+
     /// Warning messages
     pub warning_messages: Vec<WarningMessage>,
 }
@@ -97,11 +97,11 @@ pub struct UserOptions {
     pub emf_file: Option<PathBuf>,
     pub tch_file: Option<PathBuf>,
     pub rtrft_file: Option<PathBuf>,
-    
+
     /// Output configuration
     pub output_dir: Option<PathBuf>,
     pub output_format: OutputFormat,
-    
+
     /// Run parameters
     pub start_year: Option<i16>,
     pub end_year: Option<i16>,
@@ -109,19 +109,19 @@ pub struct UserOptions {
     pub end_month: Option<u8>,
     pub start_day: Option<u8>,
     pub end_day: Option<u8>,
-    
+
     /// Geographic scope
     pub geography_level: GeographyLevel,
     pub state_codes: Vec<i32>,
     pub county_codes: Vec<i32>,
-    
+
     /// Pollutant selection
     pub active_pollutants: Vec<i32>,
-    
+
     /// Control strategy flags
     pub retrofit_enabled: bool,
     pub moves_mode: bool,
-    
+
     /// Diagnostic flags
     pub debug_output: bool,
     pub verbose: bool,
@@ -152,13 +152,13 @@ pub enum GeographyLevel {
 pub struct EmissionsState {
     /// Exhaust emission factors
     pub exhaust_factors: HashMap<SccKey, ExhaustFactorTable>,
-    
+
     /// Evaporative emission factors
     pub evaporative_factors: HashMap<SccKey, EvapFactorTable>,
-    
+
     /// Deterioration factors
     pub deterioration_factors: HashMap<SccKey, DetFactorTable>,
-    
+
     /// Unit conversion factors
     pub unit_conversions: UnitConversionTable,
 }
@@ -201,19 +201,19 @@ pub struct UnitConversionTable {
 pub struct PopulationState {
     /// Population records
     pub populations: Vec<PopulationRecord>,
-    
+
     /// Age distributions
     pub age_distributions: HashMap<AgeKey, Vec<f64>>,
-    
+
     /// Growth factors
     pub growth_factors: HashMap<GrowthKey, Vec<f64>>,
-    
+
     /// Base year populations
     pub base_populations: HashMap<BasePopKey, f64>,
-    
+
     /// Scrappage rates
     pub scrappage_rates: Vec<f64>,
-    
+
     /// Retrofit population adjustments
     pub retrofit_adjustments: Vec<RetrofitPopAdjustment>,
 }
@@ -270,13 +270,13 @@ pub struct RetrofitPopAdjustment {
 pub struct AllocationState {
     /// County allocation factors
     pub county_allocations: Vec<CountyAllocation>,
-    
+
     /// State-to-county allocation factors
     pub state_to_county: Vec<StateCountyAllocation>,
-    
+
     /// Subcounty allocation factors
     pub subcounty_allocations: Vec<SubcountyAllocation>,
-    
+
     /// Zone mappings
     pub zone_mappings: HashMap<i32, Vec<ZoneRecord>>,
 }
@@ -317,10 +317,10 @@ pub struct ZoneRecord {
 pub struct GrowthState {
     /// Growth factor tables by year
     pub growth_table: Vec<GrowthRecord>,
-    
+
     /// Growth adjustment factors
     pub adjustment_factors: Vec<GrowthAdjustment>,
-    
+
     /// Year indices
     pub year_indices: Vec<i16>,
 }
@@ -349,13 +349,13 @@ pub struct GrowthAdjustment {
 pub struct SeasonalState {
     /// Seasonal factors by month
     pub monthly_factors: Vec<MonthlyFactor>,
-    
+
     /// Day-specific adjustments
     pub day_adjustments: Vec<DayAdjustment>,
-    
+
     /// Day-of-year fractions
     pub day_fractions: [f64; 365],
-    
+
     /// Month-to-day mappings
     pub month_days: [i32; 12],
 }
@@ -391,10 +391,10 @@ pub struct DayAdjustment {
 pub struct TechnologyState {
     /// Exhaust technology tables
     pub exhaust_technologies: Vec<TechnologyRecord>,
-    
+
     /// Evaporative technology tables
     pub evaporative_technologies: Vec<EvapTechnologyRecord>,
-    
+
     /// Technology mappings by SCC
     pub scc_technology_map: HashMap<i32, Vec<TechMapping>>,
 }
@@ -450,13 +450,13 @@ pub struct TechMapping {
 pub struct EquipmentState {
     /// Equipment category definitions
     pub equipment_categories: Vec<EquipmentCategory>,
-    
+
     /// SCC definitions
     pub scc_definitions: Vec<SccDefinition>,
-    
+
     /// SCC to equipment mappings
     pub scc_to_equipment: HashMap<i32, Vec<EquipmentMapping>>,
-    
+
     /// Horsepower categories
     pub hp_categories: Vec<HpCategory>,
 }
@@ -510,16 +510,16 @@ pub struct HpCategory {
 pub struct GeographyState {
     /// FIPS code tables
     pub fips_tables: FipsTables,
-    
+
     /// State definitions
     pub states: Vec<StateDefinition>,
-    
+
     /// County definitions
     pub counties: Vec<CountyDefinition>,
-    
+
     /// Subcounty definitions
     pub subcounties: Vec<SubcountyDefinition>,
-    
+
     /// Geographic allocation tables
     pub geo_allocations: Vec<GeoAllocation>,
 }
@@ -529,13 +529,13 @@ pub struct GeographyState {
 pub struct FipsTables {
     /// FIPS → state mapping
     pub fips_to_state: HashMap<i32, i32>,
-    
+
     /// State → FIPS list
     pub state_to_fips: HashMap<i32, Vec<i32>>,
-    
+
     /// State codes
     pub state_codes: Vec<i32>,
-    
+
     /// County codes
     pub county_codes: Vec<i32>,
 }
@@ -581,13 +581,13 @@ pub struct GeoAllocation {
 pub struct RetrofitState {
     /// Retrofit records
     pub retrofits: Vec<RetrofitRecord>,
-    
+
     /// Retrofit technology mappings
     pub retrofit_tech_map: HashMap<i32, RetrofitTechMapping>,
-    
+
     /// Retrofit effectiveness tables
     pub effectiveness: Vec<RetrofitEffectiveness>,
-    
+
     /// Validation flags
     pub validation_errors: Vec<RetrofitValidationError>,
 }

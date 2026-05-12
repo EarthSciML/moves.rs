@@ -187,12 +187,7 @@ pub fn init_retrofit_state() -> RetrofitState {
 /// Returns negative if `records[a] < records[b]`, zero if equal,
 /// positive if greater, under the requested [`Comparison`] mode.
 /// Panics if `a` or `b` is out of bounds.
-pub fn compare_retrofits(
-    records: &[RetrofitRecord],
-    mode: Comparison,
-    a: usize,
-    b: usize,
-) -> i32 {
+pub fn compare_retrofits(records: &[RetrofitRecord], mode: Comparison, a: usize, b: usize) -> i32 {
     let ra = &records[a];
     let rb = &records[b];
     match mode {
@@ -256,12 +251,7 @@ pub fn swap_retrofits(records: &mut [RetrofitRecord], a: usize, b: usize) {
 /// Fortran code produces on equal-key records (which matters when
 /// the secondary criterion in [`Comparison::IdPollutantRecord`] is
 /// the record number — equal keys keep their input order).
-pub fn sort_retrofits(
-    records: &mut [RetrofitRecord],
-    mode: Comparison,
-    start: usize,
-    stop: usize,
-) {
+pub fn sort_retrofits(records: &mut [RetrofitRecord], mode: Comparison, start: usize, stop: usize) {
     if stop <= start {
         return;
     }
@@ -406,10 +396,22 @@ mod tests {
 
     #[test]
     fn pollutant_lookup_and_indices() {
-        assert_eq!(RetrofitPollutant::for_name("HC"), Some(RetrofitPollutant::Hc));
-        assert_eq!(RetrofitPollutant::for_name("Co"), Some(RetrofitPollutant::Co));
-        assert_eq!(RetrofitPollutant::for_name("nox"), Some(RetrofitPollutant::Nox));
-        assert_eq!(RetrofitPollutant::for_name("PM "), Some(RetrofitPollutant::Pm));
+        assert_eq!(
+            RetrofitPollutant::for_name("HC"),
+            Some(RetrofitPollutant::Hc)
+        );
+        assert_eq!(
+            RetrofitPollutant::for_name("Co"),
+            Some(RetrofitPollutant::Co)
+        );
+        assert_eq!(
+            RetrofitPollutant::for_name("nox"),
+            Some(RetrofitPollutant::Nox)
+        );
+        assert_eq!(
+            RetrofitPollutant::for_name("PM "),
+            Some(RetrofitPollutant::Pm)
+        );
         assert_eq!(RetrofitPollutant::for_name("CH4"), None);
         // pollutant indices match the Fortran IDXTHC/CO/NOX/PM mapping
         assert_eq!(RetrofitPollutant::Hc.pollutant_index(), 1);
@@ -421,30 +423,57 @@ mod tests {
     #[test]
     fn compare_id_pollutant_record_ordering() {
         let recs = vec![rec(1, 2, 5), rec(1, 2, 5)];
-        assert_eq!(compare_retrofits(&recs, Comparison::IdPollutantRecord, 0, 1), 0);
+        assert_eq!(
+            compare_retrofits(&recs, Comparison::IdPollutantRecord, 0, 1),
+            0
+        );
 
         let recs = vec![rec(1, 2, 5), rec(2, 1, 0)];
-        assert_eq!(compare_retrofits(&recs, Comparison::IdPollutantRecord, 0, 1), -1);
-        assert_eq!(compare_retrofits(&recs, Comparison::IdPollutantRecord, 1, 0), 1);
+        assert_eq!(
+            compare_retrofits(&recs, Comparison::IdPollutantRecord, 0, 1),
+            -1
+        );
+        assert_eq!(
+            compare_retrofits(&recs, Comparison::IdPollutantRecord, 1, 0),
+            1
+        );
 
         let recs = vec![rec(1, 1, 0), rec(1, 2, 0)];
-        assert_eq!(compare_retrofits(&recs, Comparison::IdPollutantRecord, 0, 1), -1);
+        assert_eq!(
+            compare_retrofits(&recs, Comparison::IdPollutantRecord, 0, 1),
+            -1
+        );
 
         let recs = vec![rec(1, 1, 3), rec(1, 1, 5)];
-        assert_eq!(compare_retrofits(&recs, Comparison::IdPollutantRecord, 0, 1), -1);
+        assert_eq!(
+            compare_retrofits(&recs, Comparison::IdPollutantRecord, 0, 1),
+            -1
+        );
     }
 
     #[test]
     fn compare_modelyear_maxhp() {
         let recs = vec![rec_my(2010, 50.0), rec_my(2010, 50.0)];
-        assert_eq!(compare_retrofits(&recs, Comparison::ModelYearMaxHp, 0, 1), 0);
+        assert_eq!(
+            compare_retrofits(&recs, Comparison::ModelYearMaxHp, 0, 1),
+            0
+        );
 
         let recs = vec![rec_my(2005, 100.0), rec_my(2010, 50.0)];
-        assert_eq!(compare_retrofits(&recs, Comparison::ModelYearMaxHp, 0, 1), -1);
+        assert_eq!(
+            compare_retrofits(&recs, Comparison::ModelYearMaxHp, 0, 1),
+            -1
+        );
 
         let recs = vec![rec_my(2010, 25.0), rec_my(2010, 75.0)];
-        assert_eq!(compare_retrofits(&recs, Comparison::ModelYearMaxHp, 0, 1), -1);
-        assert_eq!(compare_retrofits(&recs, Comparison::ModelYearMaxHp, 1, 0), 1);
+        assert_eq!(
+            compare_retrofits(&recs, Comparison::ModelYearMaxHp, 0, 1),
+            -1
+        );
+        assert_eq!(
+            compare_retrofits(&recs, Comparison::ModelYearMaxHp, 1, 0),
+            1
+        );
     }
 
     #[test]
@@ -473,18 +502,25 @@ mod tests {
 
     #[test]
     fn sort_orders_by_id_pollutant_record() {
-        let mut recs = vec![
-            rec(2, 1, 0),
-            rec(1, 2, 3),
-            rec(1, 1, 1),
-            rec(1, 1, 0),
-        ];
+        let mut recs = vec![rec(2, 1, 0), rec(1, 2, 3), rec(1, 1, 1), rec(1, 1, 0)];
         let stop = recs.len() - 1;
         sort_retrofits(&mut recs, Comparison::IdPollutantRecord, 0, stop);
-        assert_eq!((recs[0].id, recs[0].pollutant_idx, recs[0].record_index), (1, 1, 0));
-        assert_eq!((recs[1].id, recs[1].pollutant_idx, recs[1].record_index), (1, 1, 1));
-        assert_eq!((recs[2].id, recs[2].pollutant_idx, recs[2].record_index), (1, 2, 3));
-        assert_eq!((recs[3].id, recs[3].pollutant_idx, recs[3].record_index), (2, 1, 0));
+        assert_eq!(
+            (recs[0].id, recs[0].pollutant_idx, recs[0].record_index),
+            (1, 1, 0)
+        );
+        assert_eq!(
+            (recs[1].id, recs[1].pollutant_idx, recs[1].record_index),
+            (1, 1, 1)
+        );
+        assert_eq!(
+            (recs[2].id, recs[2].pollutant_idx, recs[2].record_index),
+            (1, 2, 3)
+        );
+        assert_eq!(
+            (recs[3].id, recs[3].pollutant_idx, recs[3].record_index),
+            (2, 1, 0)
+        );
     }
 
     #[test]

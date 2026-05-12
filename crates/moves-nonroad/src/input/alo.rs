@@ -122,16 +122,12 @@ pub fn read_alo<R: BufRead>(reader: R) -> Result<Vec<AllocationRecord>> {
             });
         }
 
-        let coefficients =
-            parse_coefficient_fields(&coef_line, coef_line_num, &path)?;
+        let coefficients = parse_coefficient_fields(&coef_line, coef_line_num, &path)?;
         if coefficients.is_empty() {
             return Err(Error::Parse {
                 file: path,
                 line: coef_line_num,
-                message: format!(
-                    "no coefficients for SCC {scc}: line {:?}",
-                    coef_line
-                ),
+                message: format!("no coefficients for SCC {scc}: line {:?}", coef_line),
             });
         }
 
@@ -209,11 +205,7 @@ pub fn unique_indicator_codes(records: &[AllocationRecord]) -> Vec<String> {
     seen
 }
 
-fn parse_coefficient_fields(
-    line: &str,
-    line_num: usize,
-    path: &PathBuf,
-) -> Result<Vec<f32>> {
+fn parse_coefficient_fields(line: &str, line_num: usize, path: &PathBuf) -> Result<Vec<f32>> {
     let mut coefficients = Vec::with_capacity(MAX_COEF);
     for slot in 0..MAX_COEF {
         let start = 11 + slot * 10;

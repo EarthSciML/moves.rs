@@ -235,12 +235,7 @@ where
     parse_required_f32(&value, "value", line, path)
 }
 
-fn parse_required_f32(
-    raw: &str,
-    name: &str,
-    line: usize,
-    path: &std::path::Path,
-) -> Result<f32> {
+fn parse_required_f32(raw: &str, name: &str, line: usize, path: &std::path::Path) -> Result<f32> {
     raw.trim().parse().map_err(|_| Error::Parse {
         file: path.to_path_buf(),
         line,

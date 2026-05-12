@@ -110,8 +110,9 @@ pub fn read_alt<R: BufRead>(reader: R) -> Result<AlternateScrappage> {
                         return Err(Error::Parse {
                             file: path.clone(),
                             line: line_num,
-                            message: "alternate-scrappage bins must be monotonically non-decreasing"
-                                .to_string(),
+                            message:
+                                "alternate-scrappage bins must be monotonically non-decreasing"
+                                    .to_string(),
                         });
                     }
                 }

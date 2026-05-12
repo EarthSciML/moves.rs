@@ -121,7 +121,10 @@ pub fn read_region<R: BufRead>(reader: R) -> Result<RegionConfig> {
         return Err(Error::Parse {
             file: path,
             line: level_line,
-            message: format!("region level {:?} requires at least one region", level_value),
+            message: format!(
+                "region level {:?} requires at least one region",
+                level_value
+            ),
         });
     }
 

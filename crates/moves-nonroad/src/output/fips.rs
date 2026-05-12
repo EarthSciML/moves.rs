@@ -42,63 +42,222 @@ pub struct StateEntry {
 /// Islands).
 pub static STATES: [StateEntry; NSTATE] = [
     // in1fip.f — entries 1..=14
-    StateEntry { code: "01000", name: "Alabama" },
-    StateEntry { code: "02000", name: "Alaska" },
-    StateEntry { code: "04000", name: "Arizona" },
-    StateEntry { code: "05000", name: "Arkansas" },
-    StateEntry { code: "06000", name: "California" },
-    StateEntry { code: "08000", name: "Colorado" },
-    StateEntry { code: "09000", name: "Connecticut" },
-    StateEntry { code: "10000", name: "Delaware" },
-    StateEntry { code: "11000", name: "Wash DC" },
-    StateEntry { code: "12000", name: "Florida" },
-    StateEntry { code: "13000", name: "Georgia" },
-    StateEntry { code: "15000", name: "Hawaii" },
-    StateEntry { code: "16000", name: "Idaho" },
-    StateEntry { code: "17000", name: "Illinois" },
+    StateEntry {
+        code: "01000",
+        name: "Alabama",
+    },
+    StateEntry {
+        code: "02000",
+        name: "Alaska",
+    },
+    StateEntry {
+        code: "04000",
+        name: "Arizona",
+    },
+    StateEntry {
+        code: "05000",
+        name: "Arkansas",
+    },
+    StateEntry {
+        code: "06000",
+        name: "California",
+    },
+    StateEntry {
+        code: "08000",
+        name: "Colorado",
+    },
+    StateEntry {
+        code: "09000",
+        name: "Connecticut",
+    },
+    StateEntry {
+        code: "10000",
+        name: "Delaware",
+    },
+    StateEntry {
+        code: "11000",
+        name: "Wash DC",
+    },
+    StateEntry {
+        code: "12000",
+        name: "Florida",
+    },
+    StateEntry {
+        code: "13000",
+        name: "Georgia",
+    },
+    StateEntry {
+        code: "15000",
+        name: "Hawaii",
+    },
+    StateEntry {
+        code: "16000",
+        name: "Idaho",
+    },
+    StateEntry {
+        code: "17000",
+        name: "Illinois",
+    },
     // in2fip.f — entries 15..=24
-    StateEntry { code: "18000", name: "Indiana" },
-    StateEntry { code: "19000", name: "Iowa" },
-    StateEntry { code: "20000", name: "Kansas" },
-    StateEntry { code: "21000", name: "Kentucky" },
-    StateEntry { code: "22000", name: "Louisiana" },
-    StateEntry { code: "23000", name: "Maine" },
-    StateEntry { code: "24000", name: "Maryland" },
-    StateEntry { code: "25000", name: "Massachusetts" },
-    StateEntry { code: "26000", name: "Michigan" },
-    StateEntry { code: "27000", name: "Minnesota" },
+    StateEntry {
+        code: "18000",
+        name: "Indiana",
+    },
+    StateEntry {
+        code: "19000",
+        name: "Iowa",
+    },
+    StateEntry {
+        code: "20000",
+        name: "Kansas",
+    },
+    StateEntry {
+        code: "21000",
+        name: "Kentucky",
+    },
+    StateEntry {
+        code: "22000",
+        name: "Louisiana",
+    },
+    StateEntry {
+        code: "23000",
+        name: "Maine",
+    },
+    StateEntry {
+        code: "24000",
+        name: "Maryland",
+    },
+    StateEntry {
+        code: "25000",
+        name: "Massachusetts",
+    },
+    StateEntry {
+        code: "26000",
+        name: "Michigan",
+    },
+    StateEntry {
+        code: "27000",
+        name: "Minnesota",
+    },
     // in3fip.f — entries 25..=35
-    StateEntry { code: "28000", name: "Mississippi" },
-    StateEntry { code: "29000", name: "Missouri" },
-    StateEntry { code: "30000", name: "Montana" },
-    StateEntry { code: "31000", name: "Nebraska" },
-    StateEntry { code: "32000", name: "Nevada" },
-    StateEntry { code: "33000", name: "New Hampshire" },
-    StateEntry { code: "34000", name: "New Jersey" },
-    StateEntry { code: "35000", name: "New Mexico" },
-    StateEntry { code: "36000", name: "New York" },
-    StateEntry { code: "37000", name: "North Carolina" },
-    StateEntry { code: "38000", name: "North Dakota" },
+    StateEntry {
+        code: "28000",
+        name: "Mississippi",
+    },
+    StateEntry {
+        code: "29000",
+        name: "Missouri",
+    },
+    StateEntry {
+        code: "30000",
+        name: "Montana",
+    },
+    StateEntry {
+        code: "31000",
+        name: "Nebraska",
+    },
+    StateEntry {
+        code: "32000",
+        name: "Nevada",
+    },
+    StateEntry {
+        code: "33000",
+        name: "New Hampshire",
+    },
+    StateEntry {
+        code: "34000",
+        name: "New Jersey",
+    },
+    StateEntry {
+        code: "35000",
+        name: "New Mexico",
+    },
+    StateEntry {
+        code: "36000",
+        name: "New York",
+    },
+    StateEntry {
+        code: "37000",
+        name: "North Carolina",
+    },
+    StateEntry {
+        code: "38000",
+        name: "North Dakota",
+    },
     // in4fip.f — entries 36..=44
-    StateEntry { code: "39000", name: "Ohio" },
-    StateEntry { code: "40000", name: "Oklahoma" },
-    StateEntry { code: "41000", name: "Oregon" },
-    StateEntry { code: "42000", name: "Pennsylvania" },
-    StateEntry { code: "44000", name: "Rhode Island" },
-    StateEntry { code: "45000", name: "South Carolina" },
-    StateEntry { code: "46000", name: "South Dakota" },
-    StateEntry { code: "47000", name: "Tennessee" },
-    StateEntry { code: "48000", name: "Texas" },
+    StateEntry {
+        code: "39000",
+        name: "Ohio",
+    },
+    StateEntry {
+        code: "40000",
+        name: "Oklahoma",
+    },
+    StateEntry {
+        code: "41000",
+        name: "Oregon",
+    },
+    StateEntry {
+        code: "42000",
+        name: "Pennsylvania",
+    },
+    StateEntry {
+        code: "44000",
+        name: "Rhode Island",
+    },
+    StateEntry {
+        code: "45000",
+        name: "South Carolina",
+    },
+    StateEntry {
+        code: "46000",
+        name: "South Dakota",
+    },
+    StateEntry {
+        code: "47000",
+        name: "Tennessee",
+    },
+    StateEntry {
+        code: "48000",
+        name: "Texas",
+    },
     // in5fip.f — entries 45..=53
-    StateEntry { code: "49000", name: "Utah" },
-    StateEntry { code: "50000", name: "Vermont" },
-    StateEntry { code: "51000", name: "Virginia" },
-    StateEntry { code: "53000", name: "Washington" },
-    StateEntry { code: "54000", name: "West Virginia" },
-    StateEntry { code: "55000", name: "Wisconsin" },
-    StateEntry { code: "56000", name: "Wyoming" },
-    StateEntry { code: "72000", name: "Puerto Rico" },
-    StateEntry { code: "78000", name: "US Virgin Islands" },
+    StateEntry {
+        code: "49000",
+        name: "Utah",
+    },
+    StateEntry {
+        code: "50000",
+        name: "Vermont",
+    },
+    StateEntry {
+        code: "51000",
+        name: "Virginia",
+    },
+    StateEntry {
+        code: "53000",
+        name: "Washington",
+    },
+    StateEntry {
+        code: "54000",
+        name: "West Virginia",
+    },
+    StateEntry {
+        code: "55000",
+        name: "Wisconsin",
+    },
+    StateEntry {
+        code: "56000",
+        name: "Wyoming",
+    },
+    StateEntry {
+        code: "72000",
+        name: "Puerto Rico",
+    },
+    StateEntry {
+        code: "78000",
+        name: "US Virgin Islands",
+    },
 ];
 
 /// Look up a state by its 5-character FIPS state code.
@@ -134,9 +293,7 @@ pub fn lookup_by_state_prefix(fips: &str) -> Option<&'static StateEntry> {
 /// `"Wash DC"` and `"US Virgin Islands"` are preserved from the
 /// original Fortran arrays.
 pub fn lookup_by_name(name: &str) -> Option<&'static StateEntry> {
-    STATES
-        .iter()
-        .find(|s| s.name.eq_ignore_ascii_case(name))
+    STATES.iter().find(|s| s.name.eq_ignore_ascii_case(name))
 }
 
 #[cfg(test)]
@@ -165,7 +322,11 @@ mod tests {
     fn every_code_is_5_chars_ending_000() {
         for s in &STATES {
             assert_eq!(s.code.len(), 5, "code {:?} is not 5 chars", s.code);
-            assert!(s.code.ends_with("000"), "code {:?} lacks 000 county suffix", s.code);
+            assert!(
+                s.code.ends_with("000"),
+                "code {:?} lacks 000 county suffix",
+                s.code
+            );
             assert!(
                 s.code.chars().all(|c| c.is_ascii_digit()),
                 "code {:?} has non-digit",

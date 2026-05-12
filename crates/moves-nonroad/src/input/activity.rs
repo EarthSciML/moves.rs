@@ -183,7 +183,8 @@ pub fn read_act<R: BufRead>(reader: R) -> Result<ActivityFile> {
                         });
                     }
                 }
-                out.age_adjustment.push(AgeAdjustmentRecord { bin, percents });
+                out.age_adjustment
+                    .push(AgeAdjustmentRecord { bin, percents });
             }
         }
     }

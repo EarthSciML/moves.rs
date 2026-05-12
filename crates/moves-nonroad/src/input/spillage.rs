@@ -150,10 +150,7 @@ pub fn read_spil<R: BufRead>(reader: R) -> Result<Vec<SpillageRecord>> {
             return Err(Error::Parse {
                 file: path.clone(),
                 line: line_num,
-                message: format!(
-                    "expected 30 fields in /EMSFAC/ record, got {}",
-                    parts.len()
-                ),
+                message: format!("expected 30 fields in /EMSFAC/ record, got {}", parts.len()),
             });
         }
         let mode = match parts[1].to_ascii_uppercase().as_str() {

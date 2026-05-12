@@ -93,7 +93,11 @@ pub fn select_for_scc(
             continue;
         }
 
-        let region = format!("{:<5}{:<5}", record.fips, record.subregion.to_ascii_uppercase());
+        let region = format!(
+            "{:<5}{:<5}",
+            record.fips,
+            record.subregion.to_ascii_uppercase()
+        );
         let hp_int = (record.hp_avg).round() as i32;
 
         let same_group = group_region.as_deref() == Some(region.as_str())

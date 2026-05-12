@@ -194,13 +194,7 @@ fn column(line: &str, start_1based: usize, end_1based: usize) -> &str {
     &line[start..end]
 }
 
-fn parse_int(
-    field: &str,
-    name: &str,
-    line: &str,
-    line_num: usize,
-    path: &PathBuf,
-) -> Result<i32> {
+fn parse_int(field: &str, name: &str, line: &str, line_num: usize, path: &PathBuf) -> Result<i32> {
     field.trim().parse::<i32>().map_err(|_| Error::Parse {
         file: path.clone(),
         line: line_num,
@@ -208,13 +202,7 @@ fn parse_int(
     })
 }
 
-fn parse_f5(
-    field: &str,
-    name: &str,
-    line: &str,
-    line_num: usize,
-    path: &PathBuf,
-) -> Result<f32> {
+fn parse_f5(field: &str, name: &str, line: &str, line_num: usize, path: &PathBuf) -> Result<f32> {
     let trimmed = field.trim();
     if trimmed.is_empty() {
         return Err(Error::Parse {
@@ -233,16 +221,8 @@ fn parse_f5(
 /// Parse the population value field. The Fortran code (`getpop.f`
 /// :201–209) strips spaces and commas from columns 108–122 before
 /// reading the result as a number.
-fn parse_pop_value(
-    field: &str,
-    line: &str,
-    line_num: usize,
-    path: &PathBuf,
-) -> Result<f64> {
-    let cleaned: String = field
-        .chars()
-        .filter(|c| *c != ' ' && *c != ',')
-        .collect();
+fn parse_pop_value(field: &str, line: &str, line_num: usize, path: &PathBuf) -> Result<f64> {
+    let cleaned: String = field.chars().filter(|c| *c != ' ' && *c != ',').collect();
     if cleaned.is_empty() {
         return Err(Error::Parse {
             file: path.clone(),
@@ -306,8 +286,16 @@ mod tests {
     #[test]
     fn reads_single_population_record() {
         let line = build_pop_line(
-            "06000", "00000", "2020", "2270002003", "0", "25", "11", "500",
-            "PERS_TRUC", "1000",
+            "06000",
+            "00000",
+            "2020",
+            "2270002003",
+            "0",
+            "25",
+            "11",
+            "500",
+            "PERS_TRUC",
+            "1000",
         );
         let input = format!("/POPULATION/\n{line}\n/END/\n");
 
@@ -329,8 +317,16 @@ mod tests {
     #[test]
     fn defaults_hp_avg_when_blank() {
         let line = build_pop_line(
-            "17031", "00000", "2020", "2270002003", "25", "75", "", "100",
-            "FOO", "5,000",
+            "17031",
+            "00000",
+            "2020",
+            "2270002003",
+            "25",
+            "75",
+            "",
+            "100",
+            "FOO",
+            "5,000",
         );
         let input = format!("/POPULATION/\n{line}\n/END/\n");
 
@@ -343,8 +339,16 @@ mod tests {
     #[test]
     fn skips_lines_before_population_marker() {
         let line = build_pop_line(
-            "06000", "00000", "2020", "2270002003", "0", "25", "", "100",
-            "X", "1",
+            "06000",
+            "00000",
+            "2020",
+            "2270002003",
+            "0",
+            "25",
+            "",
+            "100",
+            "X",
+            "1",
         );
         let input = format!("# header\nignored garbage\n/POPULATION/\n{line}\n/END/\n");
 
@@ -355,8 +359,16 @@ mod tests {
     #[test]
     fn errors_when_population_marker_missing() {
         let line = build_pop_line(
-            "06000", "00000", "2020", "2270002003", "0", "25", "", "100",
-            "X", "1",
+            "06000",
+            "00000",
+            "2020",
+            "2270002003",
+            "0",
+            "25",
+            "",
+            "100",
+            "X",
+            "1",
         );
         let input = format!("{line}\n");
 
@@ -372,8 +384,16 @@ mod tests {
     #[test]
     fn errors_when_end_marker_missing() {
         let line = build_pop_line(
-            "06000", "00000", "2020", "2270002003", "0", "25", "", "100",
-            "X", "1",
+            "06000",
+            "00000",
+            "2020",
+            "2270002003",
+            "0",
+            "25",
+            "",
+            "100",
+            "X",
+            "1",
         );
         let input = format!("/POPULATION/\n{line}\n");
 
@@ -389,8 +409,16 @@ mod tests {
     #[test]
     fn errors_on_invalid_year() {
         let line = build_pop_line(
-            "06000", "00000", "abcd", "2270002003", "0", "25", "", "100",
-            "X", "1",
+            "06000",
+            "00000",
+            "abcd",
+            "2270002003",
+            "0",
+            "25",
+            "",
+            "100",
+            "X",
+            "1",
         );
         let input = format!("/POPULATION/\n{line}\n/END/\n");
 
@@ -407,8 +435,16 @@ mod tests {
     #[test]
     fn parses_population_with_commas() {
         let line = build_pop_line(
-            "06000", "00000", "2020", "2270002003", "25", "75", "50", "100",
-            "X", "1,234,567",
+            "06000",
+            "00000",
+            "2020",
+            "2270002003",
+            "25",
+            "75",
+            "50",
+            "100",
+            "X",
+            "1,234,567",
         );
         let input = format!("/POPULATION/\n{line}\n/END/\n");
 
@@ -426,8 +462,16 @@ mod tests {
     #[test]
     fn keyword_match_is_case_insensitive() {
         let line = build_pop_line(
-            "06000", "00000", "2020", "2270002003", "0", "25", "", "100",
-            "X", "1",
+            "06000",
+            "00000",
+            "2020",
+            "2270002003",
+            "0",
+            "25",
+            "",
+            "100",
+            "X",
+            "1",
         );
         let input = format!("/Population/\n{line}\n/end/\n");
 

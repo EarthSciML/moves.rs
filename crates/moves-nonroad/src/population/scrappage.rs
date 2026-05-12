@@ -126,10 +126,22 @@ mod tests {
 
     fn default_curve() -> Vec<ScrappagePoint> {
         vec![
-            ScrappagePoint { bin: 25.0, percent: 10.0 },
-            ScrappagePoint { bin: 50.0, percent: 40.0 },
-            ScrappagePoint { bin: 75.0, percent: 75.0 },
-            ScrappagePoint { bin: 100.0, percent: 100.0 },
+            ScrappagePoint {
+                bin: 25.0,
+                percent: 10.0,
+            },
+            ScrappagePoint {
+                bin: 50.0,
+                percent: 40.0,
+            },
+            ScrappagePoint {
+                bin: 75.0,
+                percent: 75.0,
+            },
+            ScrappagePoint {
+                bin: 100.0,
+                percent: 100.0,
+            },
         ]
     }
 
@@ -137,10 +149,22 @@ mod tests {
         AlternateScrappage {
             names: vec!["EARLY".to_string(), "LATE".to_string()],
             rows: vec![
-                AlternateScrappageRow { bin: 25.0, percents: vec![20.0, 5.0] },
-                AlternateScrappageRow { bin: 50.0, percents: vec![60.0, 25.0] },
-                AlternateScrappageRow { bin: 75.0, percents: vec![90.0, 60.0] },
-                AlternateScrappageRow { bin: 100.0, percents: vec![100.0, 100.0] },
+                AlternateScrappageRow {
+                    bin: 25.0,
+                    percents: vec![20.0, 5.0],
+                },
+                AlternateScrappageRow {
+                    bin: 50.0,
+                    percents: vec![60.0, 25.0],
+                },
+                AlternateScrappageRow {
+                    bin: 75.0,
+                    percents: vec![90.0, 60.0],
+                },
+                AlternateScrappageRow {
+                    bin: 100.0,
+                    percents: vec![100.0, 100.0],
+                },
             ],
         }
     }
