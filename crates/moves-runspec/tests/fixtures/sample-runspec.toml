@@ -1,0 +1,150 @@
+# Hand-authored TOML mirror of `characterization/fixtures/sample-runspec.xml`.
+#
+# This file demonstrates the recommended human-authored RunSpec layout.
+# Round-trip through `moves_runspec::{from_toml_str, to_xml_string,
+# from_xml_str, to_toml_string}` must produce a model-identical value to
+# the canonical XML fixture; see `tests/round_trip.rs`.
+
+description = ""
+
+[run]
+scale = "macro"
+pm_size = 0
+
+[[geo]]
+type = "county"
+key = 26161
+description = "MICHIGAN - Washtenaw County"
+
+[time]
+years = [2001]
+months = [6]
+days = [0]
+begin_hour = 6
+end_hour = 6
+
+[[onroad]]
+fuel_id = 1
+fuel = "Gasoline"
+source_type_id = 21
+source_type = "Passenger Car"
+
+[[road_type]]
+id = 4
+name = "Urban Restricted Access"
+
+# 10 pollutant/process associations — three energy-consumption pollutants
+# (93 Fossil, 92 Petroleum, 91 Total) × extended-idle/running/start exhaust,
+# plus Total Energy × Well-to-Pump.
+[[pollutant_process]]
+pollutant_id = 93
+pollutant = "Fossil Fuel Energy Consumption"
+process_id = 90
+process = "Extended Idle Exhaust"
+
+[[pollutant_process]]
+pollutant_id = 93
+pollutant = "Fossil Fuel Energy Consumption"
+process_id = 1
+process = "Running Exhaust"
+
+[[pollutant_process]]
+pollutant_id = 93
+pollutant = "Fossil Fuel Energy Consumption"
+process_id = 2
+process = "Start Exhaust"
+
+[[pollutant_process]]
+pollutant_id = 92
+pollutant = "Petroleum Energy Consumption"
+process_id = 90
+process = "Extended Idle Exhaust"
+
+[[pollutant_process]]
+pollutant_id = 92
+pollutant = "Petroleum Energy Consumption"
+process_id = 1
+process = "Running Exhaust"
+
+[[pollutant_process]]
+pollutant_id = 92
+pollutant = "Petroleum Energy Consumption"
+process_id = 2
+process = "Start Exhaust"
+
+[[pollutant_process]]
+pollutant_id = 91
+pollutant = "Total Energy Consumption"
+process_id = 90
+process = "Extended Idle Exhaust"
+
+[[pollutant_process]]
+pollutant_id = 91
+pollutant = "Total Energy Consumption"
+process_id = 1
+process = "Running Exhaust"
+
+[[pollutant_process]]
+pollutant_id = 91
+pollutant = "Total Energy Consumption"
+process_id = 2
+process = "Start Exhaust"
+
+[[pollutant_process]]
+pollutant_id = 91
+pollutant = "Total Energy Consumption"
+process_id = 99
+process = "Well-to-Pump"
+
+[input_db]
+server = ""
+database = ""
+description = ""
+
+[uncertainty]
+enabled = false
+runs_per_simulation = 0
+simulations = 0
+
+[output]
+detail = "county"
+timestep = "hour"
+vmt_data = false
+
+[output.db]
+server = ""
+database = "JUnitTestOutput"
+description = ""
+
+[output.scale_input_db]
+server = ""
+database = ""
+description = ""
+
+[output.breakdown]
+model_year = true
+fuel_type = true
+emission_process = true
+distinguish_particulates = true
+onroad_offroad = true
+road_type = true
+source_use_type = false
+moves_vehicle_type = false
+onroad_scc = true
+offroad_scc = false
+estimate_uncertainty = false
+segment = false
+hp_class = false
+
+[output.factors.time]
+enabled = true
+units = "seconds"
+
+[output.factors.distance]
+enabled = true
+units = "miles"
+
+[output.factors.mass]
+enabled = true
+units = "grams"
+energy_units = "million-btu"

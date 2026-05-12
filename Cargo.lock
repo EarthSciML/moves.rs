@@ -980,6 +980,12 @@ dependencies = [
 [[package]]
 name = "moves-runspec"
 version = "0.1.0"
+dependencies = [
+ "quick-xml",
+ "serde",
+ "thiserror",
+ "toml",
+]
 
 [[package]]
 name = "moves-snapshot"
