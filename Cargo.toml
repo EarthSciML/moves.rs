@@ -25,6 +25,7 @@ arrow = "55"
 bytes = "1"
 clap = { version = "4", features = ["derive"] }
 parquet = "55"
+phf = { version = "0.11", features = ["macros"] }
 quick-xml = { version = "0.36", features = ["serialize"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

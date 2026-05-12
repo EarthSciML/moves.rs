@@ -9,3 +9,8 @@ description = "MOVES data plane: schema-aware DataFrameStore and lookup tables (
 
 [lib]
 path = "src/lib.rs"
+
+[dependencies]
+phf = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
