@@ -179,6 +179,14 @@ pub const DENLPG: f64 = 4.507;
 /// Original Fortran constant: `DENDSL = 7.044` in `nonrdprm.inc`.
 pub const DENDSL: f64 = 7.044;
 
+/// Maximum tank volume (gallons) for spillage calculations.
+///
+/// Original Fortran constant: `TNKMAX = 1000.0` in `nonrdact.inc`. The
+/// per-tech spillage tank volume is capped at this value when the
+/// allocation-record unit indicator is `GAL/HP` (Fortran
+/// `tank(i) = MIN(volspl(idxref)*hpval, TNKMAX)`).
+pub const TNKMAX: f32 = 1000.0;
+
 /// Gallons per cubic foot.
 ///
 /// Original Fortran constant: `GALPERCF = 7.481` in `nonrdprm.inc`.

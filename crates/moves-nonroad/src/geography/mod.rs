@@ -24,10 +24,12 @@
 //!
 //! # Status
 //!
+//! - Task 109 ([`county`], [`subcounty`]) — ported. County and
+//!   subcounty processing live in dedicated submodules and share
+//!   types/helpers via a private [`common`] submodule.
 //! - Task 111 ([`prcnat`], [`prcus`]) — ported. National and US-total
 //!   processing.
-//! - Tasks 109 and 110 — pending; their submodules will sit beside
-//!   these.
+//! - Task 110 — pending; its submodule will sit beside these.
 //!
 //! # Design overview
 //!
@@ -56,15 +58,20 @@
 //! module's job is the geographic loop and the cross-module wiring,
 //! not the inner math.
 
+mod common;
+pub mod county;
 pub mod prcnat;
 pub mod prcus;
 pub mod state;
+pub mod subcounty;
 
+pub use county::process_county;
 pub use prcnat::{process_national_record, NationalContext};
 pub use prcus::{process_us_total_record, UsTotalContext};
 pub use state::{
     process_state_from_national_record, process_state_to_county_record, StateCallbacks,
 };
+pub use subcounty::process_subcounty;
 
 use crate::common::consts::MXPOL;
 use crate::emissions::exhaust::{ActivityUnit, FuelKind};

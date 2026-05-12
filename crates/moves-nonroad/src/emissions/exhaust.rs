@@ -439,7 +439,10 @@ pub struct AdjustmentTable {
 }
 
 impl AdjustmentTable {
-    fn new(n_days: usize) -> Self {
+    /// Construct an all-ones table with `n_days` Julian days per
+    /// pollutant. The factor `1.0` is the multiplicative identity
+    /// that the per-correction passes layer on top of.
+    pub fn new(n_days: usize) -> Self {
         Self {
             data: vec![1.0; MXPOL * n_days],
             n_days,
