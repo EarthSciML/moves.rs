@@ -287,3 +287,122 @@ pub const ATMSTD: f64 = 1.0;
 /// Original Fortran constant: `RGAS = 0.08206` in `nonrdprm.inc`.
 /// Used in vapor pressure and diurnal emission calculations.
 pub const RGAS: f64 = 0.08206;
+
+// ============================================================================
+// Sentinels, conversion factors, and per-fuel coefficients used by
+// the Task 106 exhaust calculator (clcems / emfclc / emsadj / unitcf).
+// ============================================================================
+
+/// Real-valued "missing" sentinel.
+///
+/// Original Fortran constant: `RMISS = -9.0` in `nonrdprm.inc`. The
+/// Fortran source uses this for "no emission factor found" — the
+/// Rust port propagates it through the exhaust calculator's
+/// `emsday`/`emsbmy` arrays for fidelity.
+pub const RMISS: f32 = -9.0;
+
+/// Grams-to-tons conversion (short tons).
+///
+/// Original Fortran constant: `CVTTON = 1.102311E-06` in
+/// `nonrdprm.inc`. Used by [`crate::emissions::exhaust`] when
+/// folding daily emission tallies into the [`f32`] output array.
+pub const CVTTON: f32 = 1.102311e-06;
+
+/// Carbon mass fraction for gasoline.
+///
+/// Original Fortran constant: `CMFGAS = 0.87` in `nonrdprm.inc`.
+/// Used by the CO2 branch of `clcems.f`.
+pub const CMFGAS: f32 = 0.87;
+
+/// Carbon mass fraction for CNG.
+///
+/// Original Fortran constant: `CMFCNG = 0.717` in `nonrdprm.inc`.
+pub const CMFCNG: f32 = 0.717;
+
+/// Carbon mass fraction for LPG.
+///
+/// Original Fortran constant: `CMFLPG = 0.817` in `nonrdprm.inc`.
+pub const CMFLPG: f32 = 0.817;
+
+/// Carbon mass fraction for diesel.
+///
+/// Original Fortran constant: `CMFDSL = 0.87` in `nonrdprm.inc`.
+pub const CMFDSL: f32 = 0.87;
+
+/// Baseline sulfur weight content for 2-stroke gasoline (fraction).
+///
+/// Original Fortran constant: `SWTGS2 = 0.0339` in `nonrdprm.inc`.
+pub const SWTGS2: f32 = 0.0339;
+
+/// Baseline sulfur weight content for 4-stroke gasoline (fraction).
+///
+/// Original Fortran constant: `SWTGS4 = 0.0339` in `nonrdprm.inc`.
+pub const SWTGS4: f32 = 0.0339;
+
+/// Baseline sulfur weight content for LPG (fraction).
+///
+/// Original Fortran constant: `SWTLPG = 0.008` in `nonrdprm.inc`.
+pub const SWTLPG: f32 = 0.008;
+
+/// Baseline sulfur weight content for CNG (fraction).
+///
+/// Original Fortran constant: `SWTCNG = 0.008` in `nonrdprm.inc`.
+pub const SWTCNG: f32 = 0.008;
+
+/// Baseline sulfur weight content for diesel (fraction).
+///
+/// Original Fortran constant: `SWTDSL = 0.33` in `nonrdprm.inc`.
+pub const SWTDSL: f32 = 0.33;
+
+/// Fraction of 2-stroke gasoline sulfur that becomes PM.
+///
+/// Original Fortran constant: `SFCGS2 = 0.03` in `nonrdprm.inc`.
+pub const SFCGS2: f32 = 0.03;
+
+/// Fraction of 4-stroke gasoline sulfur that becomes PM.
+///
+/// Original Fortran constant: `SFCGS4 = 0.03` in `nonrdprm.inc`.
+pub const SFCGS4: f32 = 0.03;
+
+/// Fraction of LPG sulfur that becomes PM.
+///
+/// Original Fortran constant: `SFCLPG = 0.03` in `nonrdprm.inc`.
+pub const SFCLPG: f32 = 0.03;
+
+/// Fraction of CNG sulfur that becomes PM.
+///
+/// Original Fortran constant: `SFCCNG = 0.03` in `nonrdprm.inc`.
+pub const SFCCNG: f32 = 0.03;
+
+/// Fraction of diesel sulfur that becomes PM.
+///
+/// Original Fortran constant: `SFCDSL = 0.02247` in `nonrdprm.inc`.
+pub const SFCDSL: f32 = 0.02247;
+
+/// Altitude correction factor for 2-stroke gasoline.
+///
+/// Original Fortran constant: `ALTGS2 = 1.0` in `nonrdprm.inc`. The
+/// `1.0` value makes this a no-op in production, but the Rust port
+/// keeps it as a named constant so a future data update only needs
+/// to change one place.
+pub const ALTGS2: f32 = 1.0;
+
+/// Altitude correction factor for 4-stroke gasoline.
+///
+/// Original Fortran constant: `ALTGS4 = 1.0` in `nonrdprm.inc`.
+pub const ALTGS4: f32 = 1.0;
+
+/// Altitude correction factor for LPG.
+///
+/// Original Fortran constant: `ALTLPG = 1.0` in `nonrdprm.inc`.
+pub const ALTLPG: f32 = 1.0;
+
+/// Altitude correction factor for CNG.
+///
+/// Original Fortran constant: `ALTCNG = 1.0` in `nonrdprm.inc`.
+pub const ALTCNG: f32 = 1.0;
+
+/// Altitude correction factor for diesel.
+///
+/// Original Fortran constant: `ALTDSL = 1.0` in `nonrdprm.inc`.
+pub const ALTDSL: f32 = 1.0;
