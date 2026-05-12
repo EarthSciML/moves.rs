@@ -29,9 +29,11 @@
 pub mod calculator;
 mod error;
 pub mod master_loop;
+pub mod registry;
 
 pub use calculator::{
     Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, Generator,
 };
 pub use error::{Error, Result};
 pub use master_loop::{Granularity, MasterLoopContext, MasterLoopable, MasterLoopableSubscription};
+pub use registry::{CalculatorFactory, CalculatorRegistry, GeneratorFactory, ModuleFactory};

@@ -14,4 +14,8 @@ path = "src/lib.rs"
 [dependencies]
 moves-calculator-info = { path = "../moves-calculator-info" }
 moves-data = { path = "../moves-data" }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

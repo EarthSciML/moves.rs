@@ -975,6 +975,8 @@ version = "0.1.0"
 dependencies = [
  "moves-calculator-info",
  "moves-data",
+ "serde_json",
+ "tempfile",
  "thiserror",
 ]
 
