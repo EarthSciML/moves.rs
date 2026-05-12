@@ -46,7 +46,7 @@ pub struct GrowthExtrapolationRecord {
 
 /// Parse a `.GXR` file and return growth extrapolation factors.
 ///
-/// Returns a 3D array indexed by [county][equipment][year].
+/// Returns a 3D array indexed by `[county][equipment][year]`.
 pub fn read_gxr<R: BufRead>(reader: R) -> Result<Array3<f64>> {
     let mut lines = reader.lines();
     let mut line_num = 0;
@@ -216,7 +216,6 @@ pub fn read_gxr_records<R: BufRead>(reader: R) -> Result<Vec<GrowthExtrapolation
 
     // Read growth extrapolation records
     for line_result in lines {
-        line_num += 1;
         let line = line_result.map_err(|e| Error::Io {
             path: PathBuf::from(".GXR"),
             source: e,
@@ -261,7 +260,7 @@ pub fn read_gxr_records<R: BufRead>(reader: R) -> Result<Vec<GrowthExtrapolation
 /// Get growth extrapolation factor for a specific county, equipment, and year.
 ///
 /// # Arguments
-/// * `gxr` - 3D array of growth factors [county][equipment][year]
+/// * `gxr` - 3D array of growth factors `[county][equipment][year]`
 /// * `county_idx` - 0-based county index
 /// * `equipment_idx` - 0-based equipment index
 /// * `year_idx` - 0-based year index

@@ -48,7 +48,7 @@
 
 use crate::{Error, Result};
 use std::io::BufRead;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// One parsed population record from a `.POP` file.
 #[derive(Debug, Clone, PartialEq)]
@@ -137,7 +137,7 @@ pub fn read_pop<R: BufRead>(reader: R) -> Result<Vec<PopulationRecord>> {
     Ok(records)
 }
 
-fn parse_pop_line(line: &str, line_num: usize, path: &PathBuf) -> Result<PopulationRecord> {
+fn parse_pop_line(line: &str, line_num: usize, path: &Path) -> Result<PopulationRecord> {
     let fips = column(line, 1, 5).trim().to_string();
     let subregion = column(line, 7, 11).trim().to_string();
     let year = parse_int(column(line, 13, 16), "year", line, line_num, path)?;
@@ -194,25 +194,25 @@ fn column(line: &str, start_1based: usize, end_1based: usize) -> &str {
     &line[start..end]
 }
 
-fn parse_int(field: &str, name: &str, line: &str, line_num: usize, path: &PathBuf) -> Result<i32> {
+fn parse_int(field: &str, name: &str, line: &str, line_num: usize, path: &Path) -> Result<i32> {
     field.trim().parse::<i32>().map_err(|_| Error::Parse {
-        file: path.clone(),
+        file: path.to_path_buf(),
         line: line_num,
         message: format!("invalid {name} value {:?}: line {:?}", field, line),
     })
 }
 
-fn parse_f5(field: &str, name: &str, line: &str, line_num: usize, path: &PathBuf) -> Result<f32> {
+fn parse_f5(field: &str, name: &str, line: &str, line_num: usize, path: &Path) -> Result<f32> {
     let trimmed = field.trim();
     if trimmed.is_empty() {
         return Err(Error::Parse {
-            file: path.clone(),
+            file: path.to_path_buf(),
             line: line_num,
             message: format!("empty {name} field on line {:?}", line),
         });
     }
     trimmed.parse::<f32>().map_err(|_| Error::Parse {
-        file: path.clone(),
+        file: path.to_path_buf(),
         line: line_num,
         message: format!("invalid {name} value {:?}: line {:?}", field, line),
     })
@@ -221,17 +221,17 @@ fn parse_f5(field: &str, name: &str, line: &str, line_num: usize, path: &PathBuf
 /// Parse the population value field. The Fortran code (`getpop.f`
 /// :201–209) strips spaces and commas from columns 108–122 before
 /// reading the result as a number.
-fn parse_pop_value(field: &str, line: &str, line_num: usize, path: &PathBuf) -> Result<f64> {
+fn parse_pop_value(field: &str, line: &str, line_num: usize, path: &Path) -> Result<f64> {
     let cleaned: String = field.chars().filter(|c| *c != ' ' && *c != ',').collect();
     if cleaned.is_empty() {
         return Err(Error::Parse {
-            file: path.clone(),
+            file: path.to_path_buf(),
             line: line_num,
             message: format!("empty population field on line {:?}", line),
         });
     }
     cleaned.parse::<f64>().map_err(|_| Error::Parse {
-        file: path.clone(),
+        file: path.to_path_buf(),
         line: line_num,
         message: format!("invalid population value {:?}: line {:?}", field, line),
     })
@@ -241,6 +241,7 @@ fn parse_pop_value(field: &str, line: &str, line_num: usize, path: &PathBuf) -> 
 mod tests {
     use super::*;
 
+    #[allow(clippy::too_many_arguments)]
     fn build_pop_line(
         fips: &str,
         sub: &str,

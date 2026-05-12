@@ -173,7 +173,7 @@ pub struct SccKey {
 /// Exhaust emission factor table
 #[derive(Debug, Clone)]
 pub struct ExhaustFactorTable {
-    /// [equipment_idx][pollutant_idx][age_idx][operating_mode]
+    /// `[equipment_idx][pollutant_idx][age_idx][operating_mode]`
     pub rates: Vec<Vec<Vec<Vec<f64>>>>,
 }
 

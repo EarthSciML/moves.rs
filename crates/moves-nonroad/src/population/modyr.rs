@@ -112,7 +112,7 @@ pub struct AgeAdjustmentTable {
     /// left-justified. Length `<= MXAGE`. `rdact.f` :240–243 trims
     /// + upper-cases when loading.
     pub names: Vec<String>,
-    /// Bin boundaries. Length [`MXUSE`]; `rdact.f` :217–222
+    /// Bin boundaries. Length `MXUSE`; `rdact.f` :217–222
     /// pre-initializes every slot to `2.5` before reading the file,
     /// so unloaded tails are `2.5` (not zero / not garbage).
     pub bins: Vec<f32>,
@@ -184,6 +184,7 @@ pub struct ModelYearOutput {
 /// (`pcts.len() != bins.len()` or a row is too short for the
 /// matched curve index) or if the scrappage callback returns
 /// arrays of the wrong length.
+#[allow(clippy::too_many_arguments)]
 pub fn model_year<F>(
     strhrs: f32,
     acthrs: f32,
@@ -307,8 +308,8 @@ where
     // --- deterioration-age loop (modyr.f :196–204) ---
     let mut detage: Vec<f32> = Vec::with_capacity(nyrlif);
     let mut accum: f32 = 0.0;
-    for i in 0..nyrlif {
-        accum += actadj[i] * eload;
+    for &a in &actadj {
+        accum += a * eload;
         let v = if accum > 0.0 {
             accum / uselif_used
         } else {

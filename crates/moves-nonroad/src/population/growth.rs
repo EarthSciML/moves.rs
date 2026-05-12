@@ -319,7 +319,7 @@ mod tests {
         }
     }
 
-    fn refs<'a>(v: &'a [GrowthIndicatorRecord]) -> Vec<&'a GrowthIndicatorRecord> {
+    fn refs(v: &[GrowthIndicatorRecord]) -> Vec<&GrowthIndicatorRecord> {
         v.iter().collect()
     }
 

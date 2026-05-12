@@ -49,10 +49,9 @@ pub fn read_alt<R: BufRead>(reader: R) -> Result<AlternateScrappage> {
     let mut out = AlternateScrappage::default();
     let path = PathBuf::from(".ALT");
     let mut state = AltState::None;
-    let mut line_num = 0;
 
-    for line_result in reader.lines() {
-        line_num += 1;
+    for (idx, line_result) in reader.lines().enumerate() {
+        let line_num = idx + 1;
         let line = line_result.map_err(|e| Error::Io {
             path: path.clone(),
             source: e,

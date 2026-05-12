@@ -38,7 +38,7 @@
 //! Units keywords are `G/HR`, `G/HP-HR`, `G/GALLON`, `G/TANK`,
 //! `G/DAY`, `G/START`, `MULT` (see `nonrdefc.inc`).
 //!
-//! For pollutant `CRA` (crankcase HC, [`Pollutant::Crankcase`]),
+//! For pollutant `CRA` (crankcase HC, `PollutantIndex::Crankcase`),
 //! units must be `MULT` — mirrors the check at `rdemfc.f` :173.
 //!
 //! # Fortran source

@@ -36,10 +36,9 @@ pub fn read_scrp<R: BufRead>(reader: R) -> Result<Vec<ScrappagePoint>> {
     let mut points = Vec::new();
     let path = PathBuf::from(".SCR");
     let mut in_packet = false;
-    let mut line_num = 0;
 
-    for line_result in reader.lines() {
-        line_num += 1;
+    for (idx, line_result) in reader.lines().enumerate() {
+        let line_num = idx + 1;
         let line = line_result.map_err(|e| Error::Io {
             path: path.clone(),
             source: e,

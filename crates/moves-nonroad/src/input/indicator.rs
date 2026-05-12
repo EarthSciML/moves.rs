@@ -65,10 +65,9 @@ pub fn read_ind<R: BufRead>(reader: R) -> Result<Vec<IndicatorRecord>> {
     let path = PathBuf::from(".IND");
     let mut out = Vec::new();
     let mut in_packet = false;
-    let mut line_num = 0;
 
-    for line_result in reader.lines() {
-        line_num += 1;
+    for (idx, line_result) in reader.lines().enumerate() {
+        let line_num = idx + 1;
         let line = line_result.map_err(|e| Error::Io {
             path: path.clone(),
             source: e,
@@ -121,7 +120,7 @@ pub fn read_ind<R: BufRead>(reader: R) -> Result<Vec<IndicatorRecord>> {
 /// Sort indicator records by `(code, fips, subcounty, year)`,
 /// matching the Fortran `chrsrt` ordering on the concatenated key.
 pub fn sort_indicators(records: &mut [IndicatorRecord]) {
-    records.sort_by(|a, b| a.sort_key().cmp(&b.sort_key()));
+    records.sort_by_key(|r| r.sort_key());
 }
 
 /// Fast lookup over a set of [`IndicatorRecord`]s, replacing the

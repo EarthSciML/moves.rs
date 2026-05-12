@@ -80,7 +80,7 @@
 //! string-utility cluster will re-export it once it lands.
 
 use std::io::BufRead;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::common::consts::MXRTRFT;
 use crate::population::retrofit::{
@@ -688,7 +688,7 @@ struct ParsedFields {
     id: i32,
 }
 
-fn parse_record(line: &str, line_num: usize, path: &PathBuf) -> Result<ParsedFields> {
+fn parse_record(line: &str, line_num: usize, path: &Path) -> Result<ParsedFields> {
     let ryst = parse_i32(line, 1, 4, "Retrofit Year Start", line_num, path)?;
     let ryen = parse_i32(line, 6, 9, "Retrofit Year End", line_num, path)?;
     let myst = parse_i32(line, 11, 14, "Model Year Start", line_num, path)?;
@@ -723,11 +723,11 @@ fn parse_i32(
     end: usize,
     field: &str,
     line_num: usize,
-    path: &PathBuf,
+    path: &Path,
 ) -> Result<i32> {
     let raw = column(line, start, end);
     raw.trim().parse::<i32>().map_err(|_| Error::Parse {
-        file: path.clone(),
+        file: path.to_path_buf(),
         line: line_num,
         message: format!("invalid {field}: {raw:?}"),
     })
@@ -739,7 +739,7 @@ fn parse_f32(
     end: usize,
     field: &str,
     line_num: usize,
-    path: &PathBuf,
+    path: &Path,
 ) -> Result<f32> {
     let raw = column(line, start, end);
     let trimmed = raw.trim();
@@ -748,7 +748,7 @@ fn parse_f32(
         return Ok(0.0);
     }
     trimmed.parse::<f32>().map_err(|_| Error::Parse {
-        file: path.clone(),
+        file: path.to_path_buf(),
         line: line_num,
         message: format!("invalid {field}: {raw:?}"),
     })
@@ -774,9 +774,9 @@ fn is_keyword(line: &str, keyword: &str) -> bool {
         .unwrap_or(false)
 }
 
-fn parse_err(path: &PathBuf, line: usize, message: String) -> Error {
+fn parse_err(path: &Path, line: usize, message: String) -> Error {
     Error::Parse {
-        file: path.clone(),
+        file: path.to_path_buf(),
         line,
         message,
     }
@@ -787,7 +787,7 @@ fn validate_year(
     name: &str,
     range: &std::ops::RangeInclusive<i32>,
     line_num: usize,
-    path: &PathBuf,
+    path: &Path,
 ) -> Result<()> {
     if !range.contains(&year) {
         return Err(parse_err(
@@ -918,6 +918,7 @@ mod tests {
 
     /// Build a single retrofit record line at exact column positions
     /// matching `rdrtrft.f`.
+    #[allow(clippy::too_many_arguments)]
     fn line(
         ryst: i32,
         ryen: i32,
@@ -1364,6 +1365,7 @@ mod tests {
 
     // ---- recordset validation ----
 
+    #[allow(clippy::too_many_arguments)]
     fn rec(
         idx: usize,
         id: i32,

@@ -41,7 +41,6 @@ use crate::{Error, Result};
 use ndarray::Array2;
 use std::io::BufRead;
 use std::path::PathBuf;
-use std::str::FromStr;
 
 /// Seasonal factor record for one equipment category.
 #[derive(Debug, Clone)]
@@ -54,7 +53,7 @@ pub struct SeasonalRecord {
 
 /// Parse a `.DAT` file and return seasonal factors.
 ///
-/// Returns a 2D array indexed by [equipment][month] where month is
+/// Returns a 2D array indexed by `[equipment][month]` where month is
 /// 0-based (0 = January).
 pub fn read_dat<R: BufRead>(reader: R, n_equipment: usize) -> Result<Array2<f64>> {
     let mut seasonal = Array2::from_elem((n_equipment, 12), 1.0);
@@ -209,11 +208,8 @@ pub fn read_dat_records<R: BufRead>(reader: R) -> Result<Vec<SeasonalRecord>> {
         }
     }
 
-    line_num = 1;
-
     // Read seasonal factor records
     for line_result in lines {
-        line_num += 1;
         let line = line_result.map_err(|e| Error::Io {
             path: PathBuf::from(".DAT"),
             source: e,
@@ -257,10 +253,9 @@ pub fn read_dat_records<R: BufRead>(reader: R) -> Result<Vec<SeasonalRecord>> {
 /// If fewer than 365 values are present, remaining days default to 1.0.
 pub fn read_day<R: BufRead>(reader: R) -> Result<Vec<f64>> {
     let mut factors = Vec::with_capacity(365);
-    let mut line_num = 0;
 
-    for line_result in reader.lines() {
-        line_num += 1;
+    for (idx, line_result) in reader.lines().enumerate() {
+        let line_num = idx + 1;
         let line = line_result.map_err(|e| Error::Io {
             path: PathBuf::from(".DAY"),
             source: e,
@@ -296,7 +291,7 @@ pub fn read_day<R: BufRead>(reader: R) -> Result<Vec<f64>> {
 /// Get seasonal factor for a specific equipment and month.
 ///
 /// # Arguments
-/// * `seasonal` - 2D array of seasonal factors [equipment][month]
+/// * `seasonal` - 2D array of seasonal factors `[equipment][month]`
 /// * `equipment_idx` - 0-based equipment index
 /// * `month` - 0-based month index (0 = January)
 pub fn get_seasonal_factor(seasonal: &Array2<f64>, equipment_idx: usize, month: usize) -> f64 {

@@ -315,10 +315,8 @@ pub fn sort_retrofits(records: &mut [RetrofitRecord], mode: Comparison, start: u
             sort_retrofits(records, mode, start, r - 1);
         }
         sort_retrofits(records, mode, r + 1, stop);
-    } else if stop - start == 1 {
-        if compare_retrofits(records, mode, start, stop) > 0 {
-            swap_retrofits(records, stop, start);
-        }
+    } else if stop - start == 1 && compare_retrofits(records, mode, start, stop) > 0 {
+        swap_retrofits(records, stop, start);
     }
 }
 

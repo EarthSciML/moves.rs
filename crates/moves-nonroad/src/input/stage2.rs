@@ -61,9 +61,8 @@ pub fn read_stg2<R: BufRead>(reader: R) -> Result<Stage2Factor> {
             // The Fortran source reads format `(20x,F7.0)` from the same line.
             // Take the first numeric token after the keyword.
             let after = trimmed
-                .splitn(2, |c: char| c.is_ascii_whitespace())
-                .nth(1)
-                .map(str::trim)
+                .split_once(|c: char| c.is_ascii_whitespace())
+                .map(|(_, rest)| rest.trim())
                 .unwrap_or("");
             for tok in after.split_whitespace() {
                 if let Ok(v) = tok.parse::<f32>() {

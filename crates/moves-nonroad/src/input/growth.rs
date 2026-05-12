@@ -45,7 +45,7 @@ pub struct GrowthRecord {
 /// Parse a `.GRW` file and return growth factors.
 ///
 /// This function reads the growth factor file and returns a 2D array
-/// indexed by [county][equipment]. The array is sized based on the
+/// indexed by `[county][equipment]`. The array is sized based on the
 /// dimensions found in the file header.
 pub fn read_grw<R: BufRead>(reader: R) -> Result<Array2<f64>> {
     let mut lines = reader.lines();
@@ -205,7 +205,6 @@ pub fn read_grw_records<R: BufRead>(reader: R) -> Result<Vec<GrowthRecord>> {
 
     // Read growth factor records
     for line_result in lines {
-        line_num += 1;
         let line = line_result.map_err(|e| Error::Io {
             path: PathBuf::from(".GRW"),
             source: e,
