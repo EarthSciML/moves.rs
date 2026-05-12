@@ -21,6 +21,7 @@ The repository is a Cargo workspace. Each crate has a focused responsibility:
 | `moves-nonroad` | Pure-Rust port of NONROAD2008a (Phase 5). |
 | `moves-cli` | Command-line entry point (`moves` binary). |
 | `moves-calculator-info` | Phase 1 chain-reconstruction tool (build-time, not runtime). |
+| `moves-sql-macros` | SQL macro expander + section-marker preprocessor (Task 22, doc tool, not runtime). |
 | `moves-fixture-capture`, `moves-snapshot` | Phase 0 fixture-capture + canonical snapshot format. |
 
 Add new crates under `crates/` and register them in the root

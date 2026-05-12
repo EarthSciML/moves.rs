@@ -1,0 +1,33 @@
+enabled_sections = [
+  "Create Remote Tables for Extracted Data",
+  "Extract Data",
+  "Cleanup",
+  "Inventory",
+]
+
+[replacements]
+"##context.year##" = "2030"
+
+[[data_sets]]
+prefix = ""
+sql_id = "select sourceTypeID from RunSpecSourceType"
+columns = ["sourceTypeID"]
+rows = [["21"], ["31"]]
+
+[[csv_sets]]
+sql_id = "select distinct fuelTypeID"
+column_name = "fuelTypeID"
+values = ["1", "2", "9"]
+max_length = 5000
+should_add_quotes = false
+use_default_value_in_data = false
+default_value = "0"
+
+[[csv_sets]]
+sql_id = "select hourID"
+column_name = "hourID"
+values = ["7", "8", "9", "10"]
+max_length = 5000
+should_add_quotes = false
+use_default_value_in_data = false
+default_value = "0"
