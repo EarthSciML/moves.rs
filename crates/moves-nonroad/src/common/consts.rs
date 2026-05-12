@@ -287,3 +287,42 @@ pub const ATMSTD: f64 = 1.0;
 /// Original Fortran constant: `RGAS = 0.08206` in `nonrdprm.inc`.
 /// Used in vapor pressure and diurnal emission calculations.
 pub const RGAS: f64 = 0.08206;
+
+/// Sentinel for "missing-value" floats.
+///
+/// Original Fortran parameter: `RMISS = -9.0` in `nonrdprm.inc`. The
+/// evaporative-factor code (`evemfclc.f`) writes this into emission-factor
+/// slots whose tech-type fraction is non-zero but no record has yet been
+/// found; the calculator (`clcevems.f`) interprets `< 0` factor values
+/// as "data missing" and switches to a zero-emission branch.
+pub const RMISS: f32 = -9.0;
+
+/// Minimum diurnal temperature (degrees Fahrenheit).
+///
+/// Original Fortran parameter: `DIUMIN = 40.0` in `nonrdprm.inc`. The
+/// diurnal branch of `clcevems.f` clamps both `tmin` and `tmax` to
+/// `DIUMIN` and bypasses the calculation entirely when `tmax <= DIUMIN`
+/// (added 2005-08-17 to suppress the tiny negative-VapGen artefact
+/// triggered by floating-point drift at 40 °F).
+pub const DIUMIN: f32 = 40.0;
+
+/// Grams-to-short-tons conversion factor.
+///
+/// Original Fortran constant: `CVTTON = 1.102311E-06` in `nonrdprm.inc`.
+/// All emission outputs in `clcems.f` / `clcevems.f` / `clcrtrft.f`
+/// scale from grams to short tons via this factor.
+pub const CVTTON: f32 = 1.102311e-6;
+
+/// Gasoline-pump spillage factor (grams per refueling event).
+///
+/// Original Fortran parameter: `PMPFAC = 3.6` in `nonrdefc.inc`. Used
+/// by the spillage branch of `clcevems.f` (`IDXSPL`) when the refueling
+/// mode is `PUMP` and a `SPILLAGE` EF file was supplied.
+pub const PMPFAC: f32 = 3.6;
+
+/// Portable-container spillage factor (grams per refueling event).
+///
+/// Original Fortran parameter: `CNTFAC = 17.0` in `nonrdefc.inc`. The
+/// container counterpart to [`PMPFAC`]; used when refueling mode is
+/// `CONTAINER`.
+pub const CNTFAC: f32 = 17.0;

@@ -1,32 +1,10 @@
-//! Exhaust, evaporative, and retrofit-emission calculation.
+//! Retrofit-emission calculation (Task 108).
 //!
-//! Cluster 4 of the seven functional groups (see
-//! `ARCHITECTURE.md` § 2.4).
-//!
-//! # Fortran source files this module ports
-//!
-//! | File | Lines | Role |
-//! |---|---|---|
-//! | `clcems.f`    | 360 | Exhaust emissions (Task 106) |
-//! | `emfclc.f`    | 314 | Exhaust EF lookup |
-//! | `emsadj.f`    | 343 | Emissions adjustments |
-//! | `unitcf.f`    |  80 | Unit conversion factors |
-//! | `intadj.f`    | 141 | Integer-adjusted EF lookup |
-//! | `clcevems.f`  | 721 | Evaporative emissions (Task 107) |
-//! | `evemfclc.f`  | 370 | Evaporative EF lookup |
-//! | `clcrtrft.f`  | 309 | Retrofit emissions (Task 108) |
-//!
-//! Plus the retrofit validators (`vldrtrftrecs.f`,
-//! `vldrtrfthp.f`, `vldrtrftscc.f`, `vldrtrfttchtyp.f`).
-//!
-//! `clcevems.f` is the largest single file in NONROAD (721 lines);
-//! `clcems.f` is the most numerically sensitive.
-//!
-//! # Status
-//!
-//! Task 108 (`clcrtrft.f`) is implemented as
-//! [`calculate_retrofit_reduction`]. Tasks 106 (exhaust) and 107
-//! (evaporative) are still skeleton-only.
+//! Ports `clcrtrft.f` (309 lines) and the four retrofit validators
+//! (`vldrtrftrecs.f`, `vldrtrfthp.f`, `vldrtrftscc.f`,
+//! `vldrtrfttchtyp.f`). The validators run upstream in the input
+//! parser; the calculator below consumes the filtered records they
+//! produced.
 
 use crate::common::consts::NRTRFTPLLTNT;
 use crate::population::retrofit::{RetrofitPollutant, RetrofitRecord};
