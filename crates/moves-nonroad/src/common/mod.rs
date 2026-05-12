@@ -15,6 +15,7 @@
 //! See `DESIGN.md` for the full type architecture.
 
 pub mod consts;
+pub mod eqpcod;
 
 use std::collections::HashMap;
 use std::path::PathBuf;

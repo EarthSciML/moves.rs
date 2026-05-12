@@ -26,8 +26,10 @@ pub mod driver;
 pub mod emissions;
 pub mod error;
 pub mod geography;
+pub mod init;
 pub mod input;
 pub mod output;
 pub mod population;
+pub mod util;
 
 pub use error::{Error, Result};

@@ -22,7 +22,12 @@
 //!
 //! # Fortran source
 //!
-//! Ports `rdind.f` (355 lines).
+//! Ports `rdind.f` (355 lines). [`IndicatorTable`] additionally
+//! replaces `getind.f` (313 lines): the Fortran routine performs a
+//! streaming-file search with rewinds against the sorted scratch
+//! file; the Rust port collapses it to an in-memory hash lookup that
+//! preserves the year-selection rule documented on [`IndicatorTable`]
+//! (Task 99).
 
 use crate::{Error, Result};
 use std::collections::HashMap;
