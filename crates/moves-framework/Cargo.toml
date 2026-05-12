@@ -5,7 +5,12 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
+publish = false
 description = "MOVES execution runtime: ExecutionRunSpec, MasterLoop, scheduler (Phase 2 skeleton)."
 
 [lib]
 path = "src/lib.rs"
+
+[dependencies]
+moves-calculator-info = { path = "../moves-calculator-info" }
+thiserror = { workspace = true }

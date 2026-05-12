@@ -972,6 +972,10 @@ dependencies = [
 [[package]]
 name = "moves-framework"
 version = "0.1.0"
+dependencies = [
+ "moves-calculator-info",
+ "thiserror",
+]
 
 [[package]]
 name = "moves-nonroad"
