@@ -35,6 +35,7 @@
 //! | `fnddet.f`  | [`find_deterioration`]     | [`input::deterioration::DeteriorationRecord`](crate::input::deterioration::DeteriorationRecord) |
 //! | `fndact.f`  | [`find_activity`]          | [`input::activity::ActivityRecord`](crate::input::activity::ActivityRecord) |
 //! | `fndrfm.f`  | [`find_refueling_mode`]    | [`input::spillage::SpillageRecord`](crate::input::spillage::SpillageRecord) |
+//! | `fndevefc.f`| [`find_evap_emission_factor`] | [`input::evemfc::EvapEmissionFactorRecord`](crate::input::evemfc::EvapEmissionFactorRecord) |
 //!
 //! # What's deferred
 //!
@@ -44,7 +45,6 @@
 //! | Routine | Blocking task | Reason |
 //! |---|---|---|
 //! | `fndefc.f`    | Task 96 (`rdemfc.f` `.EMF` parser)            | Needs the EMF record type |
-//! | `fndevefc.f`  | Task 96 (`rdevemfc.f` `.EVEMF` parser)        | Needs the evap EF record type |
 //! | `fndtch.f`    | Task 96 (`rdtech.f` `.TCH` parser)            | Needs the tech-fraction record type |
 //! | `fndevtch.f`  | Task 96 (`rdevtech.f` `.EVTCH` parser)        | Needs the evap tech-fraction record type |
 //! | `fndrtrft.f`  | Task 98 (`rdrtrft.f` retrofit parser)         | Needs the retrofit record type and filter arrays |
@@ -86,6 +86,7 @@
 
 use crate::input::activity::ActivityRecord;
 use crate::input::deterioration::DeteriorationRecord;
+use crate::input::evemfc::EvapEmissionFactorRecord;
 use crate::input::region_def::RegionDefinitions;
 use crate::input::scrappage::ScrappagePoint;
 use crate::input::spillage::{RangeIndicator, SpillageRecord};
@@ -466,6 +467,109 @@ pub fn find_refueling_mode(
         }
     }
     best
+}
+
+// ---------------------------------------------------------------------------
+// fndevefc — evap emission-factor lookup
+// ---------------------------------------------------------------------------
+
+/// Find the evaporative emission-factor record matching SCC + HP +
+/// tech-type for the given model year.
+///
+/// Ports `fndevefc.f`. The Fortran algorithm walks the records
+/// linearly and tracks four scalars for the running "best match":
+///
+/// * `iasc` — SCC hierarchy index of the current best (0 = exact match,
+///   1 = 7-digit global, 2 = 4-digit global; smaller is more specific);
+/// * `idfhpc` — HP-range half-width of the current best (smaller is more
+///   tightly centred on the input HP);
+/// * `tecmatch` — exact tech code or [`TECH_DEFAULT`] of the current
+///   best (exact beats default);
+/// * `idfyr` — `year - record.year` of the current best (smaller is
+///   closer to the input year, with the year-greater-than-input case
+///   rejected up front).
+///
+/// Precedence (highest first): most specific SCC, most specific HP,
+/// most specific tech type, highest year not exceeding the input.
+/// Records with negative factors are skipped; records whose
+/// `[hp_min, hp_max]` does not include `hp` are skipped.
+///
+/// Returns the 0-based index of the best matching record, or `None`
+/// when no record satisfies all three filters. The Fortran sentinel
+/// `0` corresponds to `None`.
+pub fn find_evap_emission_factor(
+    scc: &str,
+    tech: &str,
+    hp: f32,
+    year: i32,
+    records: &[EvapEmissionFactorRecord],
+) -> Option<usize> {
+    let globals = [scc.to_string(), scc_global_7(scc), scc_global_4(scc)];
+    let tech_upper = tech.to_ascii_uppercase();
+    let mut best: Option<usize> = None;
+    let mut best_iasc: usize = usize::MAX;
+    let mut best_idfhpc: i32 = i32::MAX;
+    let mut best_tech: String = String::new();
+    let mut best_idfyr: i32 = i32::MAX;
+
+    for (i, rec) in records.iter().enumerate() {
+        if rec.factor < 0.0 {
+            continue;
+        }
+        let rec_tech_upper = rec.tech_type.to_ascii_uppercase();
+        if rec_tech_upper != tech_upper && rec_tech_upper != TECH_DEFAULT {
+            continue;
+        }
+        if hp < rec.hp_min || hp > rec.hp_max {
+            continue;
+        }
+        let Some(idxasc) = globals.iter().position(|g| g == &rec.scc) else {
+            continue;
+        };
+        if year < rec.year {
+            // Record's year is later than the input — skip without
+            // adjusting bookkeeping (the Fortran source updates the
+            // `iemyr` COMMON here; the Rust port omits that side
+            // effect — callers that need a "next allowable year"
+            // hint can compute it externally).
+            continue;
+        }
+
+        let lo = (hp - rec.hp_min) as i32;
+        let hi = (rec.hp_max - hp) as i32;
+        let idiff = lo.max(hi);
+
+        if idxasc < best_iasc {
+            best = Some(i);
+            best_iasc = idxasc;
+            best_idfhpc = idiff;
+            best_tech = rec_tech_upper.clone();
+            best_idfyr = year - rec.year;
+        } else if idxasc == best_iasc {
+            if idfhpc_better(idiff, best_idfhpc) {
+                best = Some(i);
+                best_idfhpc = idiff;
+                best_tech = rec_tech_upper.clone();
+                best_idfyr = year - rec.year;
+            } else if idiff == best_idfhpc {
+                let rec_specific = rec_tech_upper != TECH_DEFAULT;
+                let cur_default = best_tech == TECH_DEFAULT;
+                if rec_specific && cur_default {
+                    best = Some(i);
+                    best_tech = rec_tech_upper.clone();
+                    best_idfyr = year - rec.year;
+                } else if rec_tech_upper == best_tech && best_idfyr > (year - rec.year) {
+                    best = Some(i);
+                    best_idfyr = year - rec.year;
+                }
+            }
+        }
+    }
+    best
+}
+
+fn idfhpc_better(idiff: i32, best: i32) -> bool {
+    idiff < best
 }
 
 #[cfg(test)]
@@ -945,5 +1049,124 @@ mod tests {
         // Short input gets padded out to 10 chars.
         assert_eq!(scc_global_7("226"), "2260000000");
         assert_eq!(scc_global_4("22"), "2200000000");
+    }
+
+    // ---- find_evap_emission_factor ----
+
+    use crate::input::evemfc::{EvapEmissionFactorRecord, EvapEmissionUnits};
+
+    fn evap_rec(
+        scc: &str,
+        tech: &str,
+        hp_min: f32,
+        hp_max: f32,
+        year: i32,
+        factor: f32,
+    ) -> EvapEmissionFactorRecord {
+        EvapEmissionFactorRecord {
+            scc: scc.to_string(),
+            tech_type: tech.to_string(),
+            hp_min,
+            hp_max,
+            year,
+            units: EvapEmissionUnits::Multiplier,
+            factor,
+        }
+    }
+
+    #[test]
+    fn evefc_returns_none_for_empty_records() {
+        let res = find_evap_emission_factor("2270002003", "E1", 50.0, 2020, &[]);
+        assert_eq!(res, None);
+    }
+
+    #[test]
+    fn evefc_picks_exact_tech_over_default() {
+        let recs = vec![
+            evap_rec("2270002003", "ALL", 0.0, 100.0, 2020, 0.10),
+            evap_rec("2270002003", "E1", 0.0, 100.0, 2020, 0.42),
+        ];
+        let idx = find_evap_emission_factor("2270002003", "E1", 50.0, 2020, &recs).unwrap();
+        assert_eq!(recs[idx].factor, 0.42);
+    }
+
+    #[test]
+    fn evefc_falls_back_to_default_tech_when_exact_missing() {
+        let recs = vec![evap_rec("2270002003", "ALL", 0.0, 100.0, 2020, 0.10)];
+        let idx = find_evap_emission_factor("2270002003", "E9", 50.0, 2020, &recs).unwrap();
+        assert_eq!(recs[idx].factor, 0.10);
+    }
+
+    #[test]
+    fn evefc_skips_records_with_negative_factor() {
+        let recs = vec![
+            evap_rec("2270002003", "ALL", 0.0, 100.0, 2020, -1.0),
+            evap_rec("2270002003", "ALL", 0.0, 100.0, 2019, 0.10),
+        ];
+        let idx = find_evap_emission_factor("2270002003", "E1", 50.0, 2020, &recs).unwrap();
+        assert_eq!(recs[idx].factor, 0.10);
+    }
+
+    #[test]
+    fn evefc_skips_records_for_later_years() {
+        let recs = vec![
+            evap_rec("2270002003", "ALL", 0.0, 100.0, 2019, 0.10),
+            evap_rec("2270002003", "ALL", 0.0, 100.0, 2025, 0.20),
+        ];
+        // Looking up year 2020: 2025 record should be skipped.
+        let idx = find_evap_emission_factor("2270002003", "E1", 50.0, 2020, &recs).unwrap();
+        assert_eq!(recs[idx].factor, 0.10);
+    }
+
+    #[test]
+    fn evefc_prefers_higher_year_not_exceeding_input() {
+        let recs = vec![
+            evap_rec("2270002003", "ALL", 0.0, 100.0, 2010, 0.10),
+            evap_rec("2270002003", "ALL", 0.0, 100.0, 2015, 0.20),
+            evap_rec("2270002003", "ALL", 0.0, 100.0, 2018, 0.30),
+        ];
+        let idx = find_evap_emission_factor("2270002003", "E1", 50.0, 2020, &recs).unwrap();
+        assert_eq!(recs[idx].factor, 0.30);
+    }
+
+    #[test]
+    fn evefc_filters_by_hp_range() {
+        let recs = vec![
+            evap_rec("2270002003", "ALL", 100.0, 200.0, 2020, 0.10),
+            evap_rec("2270002003", "ALL", 0.0, 100.0, 2020, 0.42),
+        ];
+        let idx = find_evap_emission_factor("2270002003", "E1", 50.0, 2020, &recs).unwrap();
+        assert_eq!(recs[idx].factor, 0.42);
+    }
+
+    #[test]
+    fn evefc_prefers_exact_scc_over_7digit_global() {
+        let recs = vec![
+            evap_rec("2270002000", "ALL", 0.0, 100.0, 2020, 0.10),
+            evap_rec("2270002003", "ALL", 0.0, 100.0, 2020, 0.42),
+        ];
+        let idx = find_evap_emission_factor("2270002003", "E1", 50.0, 2020, &recs).unwrap();
+        assert_eq!(recs[idx].factor, 0.42);
+    }
+
+    #[test]
+    fn evefc_prefers_7digit_over_4digit_global() {
+        let recs = vec![
+            evap_rec("2270000000", "ALL", 0.0, 100.0, 2020, 0.10),
+            evap_rec("2270002000", "ALL", 0.0, 100.0, 2020, 0.42),
+        ];
+        let idx = find_evap_emission_factor("2270002003", "E1", 50.0, 2020, &recs).unwrap();
+        assert_eq!(recs[idx].factor, 0.42);
+    }
+
+    #[test]
+    fn evefc_prefers_tighter_hp_range_on_tied_scc() {
+        let recs = vec![
+            evap_rec("2270002003", "ALL", 0.0, 100.0, 2020, 0.10),
+            // Tighter HP centered on 50: 40..60 → idiff = max(50-40, 60-50) = 10
+            evap_rec("2270002003", "ALL", 40.0, 60.0, 2020, 0.42),
+        ];
+        let idx = find_evap_emission_factor("2270002003", "E1", 50.0, 2020, &recs).unwrap();
+        assert_eq!(recs[idx].factor, 0.42);
     }
 }

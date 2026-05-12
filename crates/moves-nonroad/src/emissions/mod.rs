@@ -26,18 +26,23 @@
 //!
 //! - [`exhaust`]: Task 106 — exhaust emissions calculator (`clcems`,
 //!   `emfclc`, `emsadj`, `unitcf`).
+//! - [`evaporative`]: Task 107 — evaporative emissions calculator
+//!   (`clcevems`, `evemfclc`).
 //! - [`retrofit`]: Task 108 — retrofit-emission reductions
 //!   (`clcrtrft` and validators).
-//!
-//! Task 107 (evaporative) is still skeleton-only and will land in a
-//! sibling submodule.
 //!
 //! The submodules' public surface is re-exported here so callers
 //! can `use crate::emissions::*` without picking a submodule.
 
+pub mod evaporative;
 pub mod exhaust;
 pub mod retrofit;
 
+pub use evaporative::{
+    calculate_evaporative_emissions, calculate_evaporative_factors, EthanolBlend,
+    EvapEmissionsCalcContext, EvapEmissionsOutcome, EvapEmissionsWarning, EvapFactorsCalcContext,
+    EvapFactorsForSpecies, EvapFactorsOutcome, FuelType, RefuelingContext,
+};
 pub use exhaust::{
     apply_deterioration, calculate_emission_adjustments, calculate_exhaust_emissions,
     compute_emission_factor_for_tech, unit_conversion_factor, AdjustmentInputs, DayRange,

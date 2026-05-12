@@ -290,22 +290,36 @@ pub const RGAS: f64 = 0.08206;
 
 // ============================================================================
 // Sentinels, conversion factors, and per-fuel coefficients used by
-// the Task 106 exhaust calculator (clcems / emfclc / emsadj / unitcf).
+// the Task 106 exhaust calculator (clcems / emfclc / emsadj / unitcf)
+// and the Task 107 evaporative calculator (clcevems / evemfclc).
 // ============================================================================
 
 /// Real-valued "missing" sentinel.
 ///
 /// Original Fortran constant: `RMISS = -9.0` in `nonrdprm.inc`. The
-/// Fortran source uses this for "no emission factor found" — the
-/// Rust port propagates it through the exhaust calculator's
-/// `emsday`/`emsbmy` arrays for fidelity.
+/// Fortran source uses this for "no emission factor found": the
+/// exhaust calculator (`clcems.f`) propagates it through
+/// `emsday`/`emsbmy` for fidelity, and the evaporative-factor code
+/// (`evemfclc.f`) writes it into slots whose tech-type fraction is
+/// non-zero but no record has yet been found — the evap calculator
+/// (`clcevems.f`) then interprets `< 0` factor values as "data
+/// missing" and switches to a zero-emission branch.
 pub const RMISS: f32 = -9.0;
 
-/// Grams-to-tons conversion (short tons).
+/// Minimum diurnal temperature (degrees Fahrenheit).
 ///
-/// Original Fortran constant: `CVTTON = 1.102311E-06` in
-/// `nonrdprm.inc`. Used by [`crate::emissions::exhaust`] when
-/// folding daily emission tallies into the [`f32`] output array.
+/// Original Fortran parameter: `DIUMIN = 40.0` in `nonrdprm.inc`. The
+/// diurnal branch of `clcevems.f` clamps both `tmin` and `tmax` to
+/// `DIUMIN` and bypasses the calculation entirely when `tmax <= DIUMIN`
+/// (added 2005-08-17 to suppress the tiny negative-VapGen artefact
+/// triggered by floating-point drift at 40 °F).
+pub const DIUMIN: f32 = 40.0;
+
+/// Grams-to-short-tons conversion factor.
+///
+/// Original Fortran constant: `CVTTON = 1.102311E-06` in `nonrdprm.inc`.
+/// All emission outputs in `clcems.f` / `clcevems.f` / `clcrtrft.f`
+/// scale from grams to short tons via this factor.
 pub const CVTTON: f32 = 1.102311e-06;
 
 /// Carbon mass fraction for gasoline.
@@ -406,3 +420,17 @@ pub const ALTCNG: f32 = 1.0;
 ///
 /// Original Fortran constant: `ALTDSL = 1.0` in `nonrdprm.inc`.
 pub const ALTDSL: f32 = 1.0;
+
+/// Gasoline-pump spillage factor (grams per refueling event).
+///
+/// Original Fortran parameter: `PMPFAC = 3.6` in `nonrdefc.inc`. Used
+/// by the spillage branch of `clcevems.f` (`IDXSPL`) when the refueling
+/// mode is `PUMP` and a `SPILLAGE` EF file was supplied.
+pub const PMPFAC: f32 = 3.6;
+
+/// Portable-container spillage factor (grams per refueling event).
+///
+/// Original Fortran parameter: `CNTFAC = 17.0` in `nonrdefc.inc`. The
+/// container counterpart to [`PMPFAC`]; used when refueling mode is
+/// `CONTAINER`.
+pub const CNTFAC: f32 = 17.0;

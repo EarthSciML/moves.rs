@@ -2,8 +2,10 @@
 //!
 //! Ports `clcrtrft.f` (309 lines) and the retrofit validators
 //! (`vldrtrftrecs.f`, `vldrtrfthp.f`, `vldrtrftscc.f`,
-//! `vldrtrfttchtyp.f`). The Fortran source loops over a filtered
-//! set of [`RetrofitRecord`]s for the current
+//! `vldrtrfttchtyp.f`). The validators run upstream in the input
+//! parser; the calculator below consumes the filtered records they
+//! produced. The Fortran source loops over a filtered set of
+//! [`RetrofitRecord`]s for the current
 //! `(SCC, HP, model_year, tech_type)` iteration, accumulates a
 //! per-retrofit fraction-retrofitted, and writes per-pollutant
 //! reduction fractions into the persistent `rtrftplltntrdfrc`
