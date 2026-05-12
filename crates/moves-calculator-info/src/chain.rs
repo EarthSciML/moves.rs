@@ -504,10 +504,7 @@ fn fill_chained_downstream(
     }
 }
 
-fn transitive_closure(
-    start: &str,
-    chains_in: &BTreeMap<String, BTreeSet<String>>,
-) -> Vec<String> {
+fn transitive_closure(start: &str, chains_in: &BTreeMap<String, BTreeSet<String>>) -> Vec<String> {
     let mut visited: BTreeSet<String> = BTreeSet::new();
     let mut queue: Vec<String> = chains_in
         .get(start)
