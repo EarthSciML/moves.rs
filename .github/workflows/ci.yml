@@ -1,6 +1,7 @@
 # Fast Rust workspace CI — runs on every push and pull request.
 #
-# Scope: build, unit + integration tests, rustfmt, clippy. The slow
+# Scope: build, unit + integration tests, rustfmt, clippy, rustdoc, and
+# cargo-deny (advisories + license + bans + source). The slow
 # fixture-snapshot regression (against a pinned canonical-MOVES SIF) lives in
 # .github/workflows/fixture-suite-weekly.yml because it requires Apptainer +
 # a self-hosted runner and is not appropriate for the per-push gate.
@@ -52,3 +53,15 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
         run: cargo doc --workspace --no-deps
+
+  deny:
+    name: cargo deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: cargo deny check
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+          log-level: warn

@@ -924,6 +924,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "moves-calculators"
+version = "0.1.0"
+
+[[package]]
+name = "moves-cli"
+version = "0.1.0"
+
+[[package]]
+name = "moves-data"
+version = "0.1.0"
+
+[[package]]
 name = "moves-fixture-capture"
 version = "0.1.0"
 dependencies = [
@@ -938,6 +950,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "moves-framework"
+version = "0.1.0"
+
+[[package]]
 name = "moves-nonroad"
 version = "0.1.0"
 dependencies = [
@@ -945,6 +961,10 @@ dependencies = [
  "tempfile",
  "thiserror",
 ]
+
+[[package]]
+name = "moves-runspec"
+version = "0.1.0"
 
 [[package]]
 name = "moves-snapshot"

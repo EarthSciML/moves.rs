@@ -48,8 +48,8 @@
 //! | `fndtch.f`    | Task 96 (`rdtech.f` `.TCH` parser)            | Needs the tech-fraction record type |
 //! | `fndevtch.f`  | Task 96 (`rdevtech.f` `.EVTCH` parser)        | Needs the evap tech-fraction record type |
 //! | `fndrtrft.f`  | Task 98 (`rdrtrft.f` retrofit parser)         | Needs the retrofit record type and filter arrays |
-//! | `fndgxf.f`    | Task 95 follow-up (`rdgxrf.f` cross-reference) | Current [`input::gxr`] parses a different `.GXR` layout (factor grid) than the cross-reference array (FIPS × SCC × HP × tech × indicator) that `fndgxf` queries |
-//! | `fndtpm.f`    | Task 95 follow-up (`.DAT` temporal profiles)   | Current [`input::seasonal::SeasonalRecord`] stores monthly factors per equipment, not the `(SCC, subregion, monthly-profile-code, daily-profile-code)` lookup table fndtpm walks |
+//! | `fndgxf.f`    | Task 95 follow-up (`rdgxrf.f` cross-reference) | Current [`crate::input::gxr`] parses a different `.GXR` layout (factor grid) than the cross-reference array (FIPS × SCC × HP × tech × indicator) that `fndgxf` queries |
+//! | `fndtpm.f`    | Task 95 follow-up (`.DAT` temporal profiles)   | Current [`crate::input::seasonal::SeasonalRecord`] stores monthly factors per equipment, not the `(SCC, subregion, monthly-profile-code, daily-profile-code)` lookup table fndtpm walks |
 //!
 //! `fndkey.f` searches a *file* (Fortran unit number) for a keyword
 //! by reading lines. This has no Rust equivalent in this design:
