@@ -162,6 +162,23 @@ pub const MINGRWIND: f32 = 0.0001;
 /// Used in fuel-related emission calculations.
 pub const DENGAS: f64 = 6.237;
 
+/// Compressed natural gas density (lbs/gal).
+///
+/// Original Fortran constant: `DENCNG = 0.0061` in `nonrdprm.inc`.
+/// (12/18/01 fix: the source comment notes this was previously
+/// `0.0517` lb/cu-ft and was converted to lb/gal.)
+pub const DENCNG: f64 = 0.0061;
+
+/// Liquefied petroleum gas density (lbs/gal).
+///
+/// Original Fortran constant: `DENLPG = 4.507` in `nonrdprm.inc`.
+pub const DENLPG: f64 = 4.507;
+
+/// Diesel density (lbs/gal).
+///
+/// Original Fortran constant: `DENDSL = 7.044` in `nonrdprm.inc`.
+pub const DENDSL: f64 = 7.044;
+
 /// Gallons per cubic foot.
 ///
 /// Original Fortran constant: `GALPERCF = 7.481` in `nonrdprm.inc`.
