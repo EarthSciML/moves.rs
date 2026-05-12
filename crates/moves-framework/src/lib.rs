@@ -11,18 +11,27 @@
 //!
 //! * Task 15 — `ExecutionRunSpec`
 //! * Task 16 — Location iterator
-//! * Task 17 — MasterLoop subscription model (this commit)
+//! * Task 17 — MasterLoop subscription model
+//! * Task 18 — Calculator and Generator base traits (this commit)
 //! * Task 19 — `CalculatorRegistry`
 //! * Task 20 — MasterLoop core iteration
+//! * Task 23 — `ExecutionDatabaseSchema` and `CalculatorContext`
 //! * Task 50 — `DataFrameStore` (shared with `moves-data`)
 //!
 //! # Phase 2 status
 //!
-//! Task 17 lands: [`MasterLoopable`], [`MasterLoopableSubscription`], and
-//! the [`Granularity`] re-export. The rest is still skeleton.
+//! Task 18 lands: the [`Calculator`] and [`Generator`] traits, the
+//! [`CalculatorSubscription`] declaration record, and skeleton
+//! [`CalculatorContext`] / [`CalculatorOutput`] placeholder types that
+//! Task 23 / Task 50 will widen. Task 17 (subscription ordering) is in
+//! place; the rest is still skeleton.
 
+pub mod calculator;
 mod error;
 pub mod master_loop;
 
+pub use calculator::{
+    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, Generator,
+};
 pub use error::{Error, Result};
 pub use master_loop::{Granularity, MasterLoopContext, MasterLoopable, MasterLoopableSubscription};

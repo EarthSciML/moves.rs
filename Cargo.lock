@@ -974,6 +974,7 @@ name = "moves-framework"
 version = "0.1.0"
 dependencies = [
  "moves-calculator-info",
+ "moves-data",
  "thiserror",
 ]
 

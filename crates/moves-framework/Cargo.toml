@@ -13,4 +13,5 @@ path = "src/lib.rs"
 
 [dependencies]
 moves-calculator-info = { path = "../moves-calculator-info" }
+moves-data = { path = "../moves-data" }
 thiserror = { workspace = true }
