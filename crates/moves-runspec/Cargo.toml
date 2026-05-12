@@ -9,3 +9,7 @@ description = "MOVES RunSpec parser, serializer, and TOML/XML converters (Phase 
 
 [lib]
 path = "src/lib.rs"
+
+[dependencies]
+quick-xml = { workspace = true }
+thiserror = { workspace = true }

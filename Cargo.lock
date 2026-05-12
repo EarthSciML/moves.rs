@@ -965,6 +965,10 @@ dependencies = [
 [[package]]
 name = "moves-runspec"
 version = "0.1.0"
+dependencies = [
+ "quick-xml",
+ "thiserror",
+]
 
 [[package]]
 name = "moves-snapshot"
