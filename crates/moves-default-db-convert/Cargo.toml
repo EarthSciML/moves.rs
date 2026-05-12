@@ -1,0 +1,29 @@
+[package]
+name = "moves-default-db-convert"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+description = "Convert a MOVES default-DB TSV dump into the versioned Parquet layout consumed by the lazy-loading reader (Phase 4 Task 80)."
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "moves-default-db-convert"
+path = "src/main.rs"
+
+[dependencies]
+arrow = { workspace = true }
+clap = { workspace = true }
+parquet = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+bytes = { workspace = true }
+tempfile = { workspace = true }

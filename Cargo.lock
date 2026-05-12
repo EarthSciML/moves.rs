@@ -936,6 +936,21 @@ name = "moves-data"
 version = "0.1.0"
 
 [[package]]
+name = "moves-default-db-convert"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "bytes",
+ "clap",
+ "parquet",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
 name = "moves-fixture-capture"
 version = "0.1.0"
 dependencies = [
