@@ -912,6 +912,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "moves-calculator-info"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
 name = "moves-fixture-capture"
 version = "0.1.0"
 dependencies = [

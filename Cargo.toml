@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/moves-calculator-info",
     "crates/moves-fixture-capture",
     "crates/moves-nonroad",
     "crates/moves-snapshot",
