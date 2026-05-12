@@ -378,6 +378,163 @@ fn cli_runs_end_to_end() {
     assert_eq!(manifest.tables[0].row_count, 2);
 }
 
+/// Validate binary runs against a freshly-converted tree and reports no
+/// errors. Exercises the Task 81 deliverable end-to-end via the CLI:
+/// convert -> validate -> exit 0.
+#[test]
+fn validate_cli_passes_on_clean_round_trip() {
+    let dir = tempfile::tempdir().unwrap();
+    let tsv_dir = dir.path().join("dump");
+    let out_dir = dir.path().join("out");
+    let plan_path = dir.path().join("tables.json");
+
+    write(
+        &plan_path,
+        br#"{
+            "schema_version": "moves-default-db-schema/v1",
+            "moves_commit": "deadbeef",
+            "sources": {},
+            "table_count": 1,
+            "tables": [{
+                "name": "Year",
+                "primary_key": ["yearID"],
+                "columns": [
+                    {"name": "yearID", "type": "smallint"},
+                    {"name": "isBaseYear", "type": "char"}
+                ],
+                "indexes": [],
+                "estimated_rows_upper_bound": 100,
+                "size_bucket": "small",
+                "filter_columns": [],
+                "partition": {"strategy": "monolithic", "rationale": ""}
+            }]
+        }"#,
+    );
+    write(
+        &tsv_dir.join("Year.schema.tsv"),
+        b"yearID\tsmallint\tPRI\nisBaseYear\tchar\t\n",
+    );
+    write(&tsv_dir.join("Year.tsv"), b"1990\tY\n2000\tN\n");
+
+    // Convert first.
+    let convert_bin = env!("CARGO_BIN_EXE_moves-default-db-convert");
+    let out = Command::new(convert_bin)
+        .args([
+            "--tsv-dir",
+            tsv_dir.to_str().unwrap(),
+            "--plan",
+            plan_path.to_str().unwrap(),
+            "--output",
+            out_dir.to_str().unwrap(),
+            "--moves-db-version",
+            "movesdb20241112",
+            "--generated-at-utc",
+            "1970-01-01T00:00:00Z",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "convert failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    // Then validate. Must report clean.
+    let validate_bin = env!("CARGO_BIN_EXE_moves-default-db-validate");
+    let out = Command::new(validate_bin)
+        .args([
+            "--output-root",
+            out_dir.to_str().unwrap(),
+            "--tsv-dir",
+            tsv_dir.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        out.status.success(),
+        "validate failed: stdout={stdout}, stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        stdout.contains("clean: all checks passed"),
+        "stdout: {stdout}"
+    );
+}
+
+/// Validate binary detects manifest drift (a partition file's bytes
+/// changed after the manifest was written). Exit code must be 1.
+#[test]
+fn validate_cli_detects_corrupted_parquet() {
+    let dir = tempfile::tempdir().unwrap();
+    let tsv_dir = dir.path().join("dump");
+    let out_dir = dir.path().join("out");
+    let plan_path = dir.path().join("tables.json");
+
+    write(
+        &plan_path,
+        br#"{
+            "schema_version": "moves-default-db-schema/v1",
+            "moves_commit": "deadbeef",
+            "sources": {},
+            "table_count": 1,
+            "tables": [{
+                "name": "Year",
+                "primary_key": ["yearID"],
+                "columns": [{"name": "yearID", "type": "smallint"}],
+                "indexes": [],
+                "estimated_rows_upper_bound": 100,
+                "size_bucket": "small",
+                "filter_columns": [],
+                "partition": {"strategy": "monolithic", "rationale": ""}
+            }]
+        }"#,
+    );
+    write(&tsv_dir.join("Year.schema.tsv"), b"yearID\tsmallint\tPRI\n");
+    write(&tsv_dir.join("Year.tsv"), b"1990\n2000\n");
+
+    let convert_bin = env!("CARGO_BIN_EXE_moves-default-db-convert");
+    Command::new(convert_bin)
+        .args([
+            "--tsv-dir",
+            tsv_dir.to_str().unwrap(),
+            "--plan",
+            plan_path.to_str().unwrap(),
+            "--output",
+            out_dir.to_str().unwrap(),
+            "--moves-db-version",
+            "movesdb20241112",
+            "--generated-at-utc",
+            "1970-01-01T00:00:00Z",
+        ])
+        .output()
+        .unwrap();
+
+    // Tamper: append a byte. The footer is at the end; the SHA mismatches
+    // and the Parquet reader may also reject.
+    let pq = out_dir.join("Year.parquet");
+    let mut bytes = std::fs::read(&pq).unwrap();
+    bytes.push(0x00);
+    std::fs::write(&pq, &bytes).unwrap();
+
+    let validate_bin = env!("CARGO_BIN_EXE_moves-default-db-validate");
+    let out = Command::new(validate_bin)
+        .args([
+            "--output-root",
+            out_dir.to_str().unwrap(),
+            "--tsv-dir",
+            tsv_dir.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1), "expected validation failure");
+    let stdout = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        stdout.contains("manifest_drift") || stdout.contains("sha256 drift"),
+        "stdout: {stdout}"
+    );
+}
+
 fn repo_root() -> std::path::PathBuf {
     // Tests run with CARGO_MANIFEST_DIR set to the crate dir; the workspace
     // root is its grandparent (../..).

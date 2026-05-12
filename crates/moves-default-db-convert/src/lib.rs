@@ -29,8 +29,10 @@ pub mod partition;
 pub mod plan;
 pub mod tsv;
 pub mod types;
+pub mod validate;
 
 pub use convert::{convert, ConvertOptions, ConvertReport};
 pub use error::{Error, Result};
 pub use manifest::{Manifest, TableManifest, MANIFEST_FILENAME};
 pub use plan::{PartitionPlan, PartitionStrategy, TableEntry};
+pub use validate::{validate, ValidateOptions, ValidationReport, ValidationSummary};

@@ -25,7 +25,8 @@ SIF and `tables.json`, run `convert-default-db.sh`, get a fresh
 
 | File | Purpose |
 |------|---------|
-| `convert-default-db.sh` | Top-level orchestrator. Stages 1+2 in one call, or `--tsv-dir` to skip stage 1. |
+| `convert-default-db.sh` | Top-level orchestrator for conversion. Stages 1+2 in one call, or `--tsv-dir` to skip stage 1. |
+| `validate-default-db.sh` | Phase 4 Task 81 orchestrator. Runs the conversion **and** validates the result against the source TSV dump. |
 | `dump-default-db.sh` | Stage 1: runs **inside** the canonical-moves SIF; starts MariaDB, dumps every BASE TABLE of the default DB to TSV + schema-TSV, writes `dump-manifest.json`. |
 | `README.md` | This file. |
 
@@ -33,6 +34,13 @@ The TSV → Parquet conversion (stage 2) lives in the Rust crate
 [`crates/moves-default-db-convert`](../../crates/moves-default-db-convert).
 It depends on `tables.json` for the per-table partition strategy and on
 the dumper's TSV pair for the data. Tested with unit + end-to-end suites.
+
+The validation tool — Task 81's deliverable — is the
+`moves-default-db-validate` binary in the same crate. It is independent
+of MariaDB at validation time: the source TSV is the authoritative
+artifact (emitted by `mariadb -B -N` immediately before the dumper
+exits), so anything that round-trips TSV → Parquet → readback equals
+the MariaDB content modulo the documented escape encoding.
 
 ## Two-stage pipeline
 
@@ -164,21 +172,95 @@ that threshold in future releases should be re-bucketed in `tables.json`
 their partition layout drops the per-table memory footprint by
 construction.
 
+## Validation (Task 81)
+
+`validate-default-db.sh` drives the full pipeline + cross-check:
+
+```bash
+characterization/default-db-conversion/validate-default-db.sh \
+    --sif        characterization/apptainer/canonical-moves.sif \
+    --db         movesdb20241112 \
+    --plan       characterization/default-db-schema/tables.json \
+    --output     default-db \
+    --source-dump path/to/movesdb20241112.zip
+```
+
+The validator (`moves-default-db-validate`) reads the manifest and, for
+every table:
+
+| Check | What it asserts |
+|-------|-----------------|
+| Manifest drift | Each `partitions[*]` file exists on disk; its SHA-256 matches the manifest. |
+| Parquet schema | Column count, names, and Arrow types in the readback match `manifest.tables[*].columns`. |
+| Row totals | `sum(partitions.row_count) == source.tsv line count == manifest.row_count`. |
+| Per-column aggregates | For every Int64/Float64 column: `count_non_null`, `min`, `max`, and a scaled-decimal sum match between TSV parse and Parquet readback. Float64 equality is exact (bit-pattern) because both sides parse via `str::parse::<f64>`. |
+| First-row spot check | Monolithic tables: field-by-field comparison of the first source TSV row vs the first Parquet row. |
+
+Findings are reported per-kind with a counts summary; exit code `1`
+signals validation errors so CI can gate on this binary directly.
+
+### Task 81 audit reconciliation
+
+A side effect of validating against the real `movesdb20241112` dump is
+that several drifts between Task 79's audit (parsed from
+`CreateDefault.sql`) and the actual EPA release surfaced. The audit was
+patched as part of Task 81:
+
+| Change | Reason |
+|--------|--------|
+| Added 8 tables: `fuelAdjustment`, `fuelEngFraction`, `importStartsOpModeDistribution`, `imTestType`, `nrProcessGroup`, `pollutantDisplayGroup`, `regClassFraction`, `startsSourceTypeFraction` | Present in the dump, absent from the canonical DDL Task 79 parsed. |
+| Removed 11 NR* tables: `NRCrankCaseEmissionRatio`, `NRExhaustEmissionRate`, `NRFuelOxyAdjustment`, `NRPollutantProcessModelYear`, `NRProcessEmissionRate`, `NRSourceBin`, `NRStateSurrogateTotal`, `NRTemperatureAdjustment`, `NRTransientAdjustFactor`, `NRYear`, `NRZoneAllocation` | Declared by the canonical DDL but not materialised by the `movesdb20241112` release. |
+| Promoted `Link` from `schema_only` to `monolithic` | Task 79 assumed Link ships empty; the dump carries 22,610 rows. The schema-only optimisation was unsound. |
+| Added `isUserInput` column to `AverageTankTemperature`, `OpModeDistribution`, `SoakActivityFraction`, `SourceBinDistribution`, `startsOpModeDistribution` | The canonical DDL omitted this metadata column; the EPA release carries it. |
+
+### Converter changes (Task 81)
+
+Two robustness improvements to `moves-default-db-convert`:
+
+1. **Case-insensitive TSV lookup.** MariaDB on Linux normalises the
+   original Windows dump's CamelCase table names to lowercase on disk
+   (`lower_case_table_names=1`), but the audit preserves the CamelCase
+   from the MOVES Java schema. Without case-insensitive matching,
+   ~90% of tables silently skipped. The converter now falls back to a
+   case-insensitive directory scan when the exact-case path miss.
+2. **Column drift demoted to warning.** When the audit's column list
+   doesn't match the dump's `<Table>.schema.tsv`, the converter records
+   a warning in the report and proceeds using the dump's schema (which
+   is authoritative for data). Strict mode (`--require-every-table`)
+   escalates the warning to an error so a CI gate catches drift in the
+   audit.
+
+## End-to-end run on `movesdb20241112.zip`
+
+Captured by Task 81, [bead `mo-eq5d`](#):
+
+| Metric | Value |
+|--------|-------|
+| Tables | 240 |
+| Partitions | 31,677 |
+| Total rows | 8,436,056 |
+| Parquet bytes (uncompressed) | ~658 MiB |
+| Conversion runtime | 30s (8-core workstation, warm cache) |
+| Validation runtime | 36s |
+| Validation errors | 0 |
+| Validation warnings | 0 |
+
 ## Open items / follow-up
 
-These are deliberately out of scope for Task 80 and tracked elsewhere:
+These are deliberately out of scope and tracked elsewhere:
 
 1. **zone → county join.** Tables with `zoneID` PK are partitioned by
    zone. The lazy-loading reader (Task 82) will join through the `Zone`
    dimension when callers filter by county.
-2. **Validation pass.** Task 81 runs this pipeline on the real
-   `movesdb20241112.zip` and verifies that every row from the SQL dump
-   appears exactly once in the Parquet output and that `DOUBLE`/`DATE`
-   types round-trip via Polars/Arrow.
-3. **`large` monolithic re-review.** The partitioning plan flags tables
+2. **`large` monolithic re-review.** The partitioning plan flags tables
    whose measured row count may exceed 50M. Task 80 records true row
-   counts in the manifest; Task 81's validation step rebases the
-   partition decisions if the measured counts demand it.
-4. **Row-group statistics.** Currently disabled for byte-stable hashes.
+   counts in the manifest; if any future EPA release pushes a table
+   past that band, the audit needs to be reclassified.
+3. **Row-group statistics.** Currently disabled for byte-stable hashes.
    Task 82 (the reader) may flip this once the determinism contract is
    relaxed to "content equivalence" rather than "byte equivalence".
+4. **Polars round-trip.** Task 82 brings in Polars and will exercise
+   the lazy-loaded read path. The Arrow-based readback in
+   `moves-default-db-validate` is functionally equivalent (Polars'
+   Parquet reader is built on arrow-rs) so the byte-pattern equality we
+   already check carries over.

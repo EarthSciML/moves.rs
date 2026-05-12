@@ -5,7 +5,7 @@
     "CreateDefault.sql": "04cb9dd7501389bdfe5935181fed09e39dd2d7e2d5647caabcbb2782566f57d7",
     "CreateNRDefault.sql": "8492586cc094bcae1d628643fcfb1651c9142f141754cfc41d281953d0a613cf"
   },
-  "table_count": 243,
+  "table_count": 240,
   "tables": [
     {
       "name": "ActivityType",
@@ -419,6 +419,10 @@
         {
           "name": "averageTankTemperatureCV",
           "type": "float"
+        },
+        {
+          "name": "isUserInput",
+          "type": "char(1)"
         }
       ],
       "indexes": [],
@@ -2520,6 +2524,100 @@
       "partition": {
         "strategy": "monolithic",
         "rationale": "small band \u2014 single Parquet file is cheapest"
+      }
+    },
+    {
+      "name": "fuelAdjustment",
+      "primary_key": [
+        "polProcessID",
+        "fuelMYGroupID",
+        "sourceTypeID",
+        "fuelFormulationID"
+      ],
+      "columns": [
+        {
+          "name": "polProcessID",
+          "type": "int"
+        },
+        {
+          "name": "fuelMYGroupID",
+          "type": "int"
+        },
+        {
+          "name": "sourceTypeID",
+          "type": "smallint"
+        },
+        {
+          "name": "fuelFormulationID",
+          "type": "int"
+        },
+        {
+          "name": "fuelAdjustment",
+          "type": "float"
+        },
+        {
+          "name": "fuelAdjustmentCV",
+          "type": "float"
+        },
+        {
+          "name": "fuelAdjustmentGPA",
+          "type": "float"
+        },
+        {
+          "name": "fuelAdjustmentGPACV",
+          "type": "float"
+        }
+      ],
+      "indexes": [],
+      "estimated_rows_upper_bound": 50,
+      "size_bucket": "tiny",
+      "filter_columns": [
+        "polprocessid",
+        "fuelmygroupid",
+        "sourcetypeid",
+        "fuelformulationid"
+      ],
+      "partition": {
+        "strategy": "monolithic",
+        "rationale": "added by Task 81 \u2014 present in movesdb20241112 dump, absent from Task 79 audit"
+      }
+    },
+    {
+      "name": "fuelEngFraction",
+      "primary_key": [
+        "sourceTypeModelYearID",
+        "fuelTypeID",
+        "engTechID"
+      ],
+      "columns": [
+        {
+          "name": "sourceTypeModelYearID",
+          "type": "int"
+        },
+        {
+          "name": "fuelTypeID",
+          "type": "smallint"
+        },
+        {
+          "name": "engTechID",
+          "type": "smallint"
+        },
+        {
+          "name": "fuelEngFraction",
+          "type": "float"
+        }
+      ],
+      "indexes": [],
+      "estimated_rows_upper_bound": 50,
+      "size_bucket": "tiny",
+      "filter_columns": [
+        "sourcetypemodelyearid",
+        "fueltypeid",
+        "engtechid"
+      ],
+      "partition": {
+        "strategy": "monolithic",
+        "rationale": "added by Task 81 \u2014 present in movesdb20241112 dump, absent from Task 79 audit"
       }
     },
     {
@@ -4673,6 +4771,64 @@
       }
     },
     {
+      "name": "importStartsOpModeDistribution",
+      "primary_key": [
+        "sourceTypeID",
+        "hourDayID",
+        "linkID",
+        "polProcessID",
+        "opModeID"
+      ],
+      "columns": [
+        {
+          "name": "sourceTypeID",
+          "type": "smallint"
+        },
+        {
+          "name": "hourDayID",
+          "type": "smallint"
+        },
+        {
+          "name": "linkID",
+          "type": "int"
+        },
+        {
+          "name": "polProcessID",
+          "type": "int"
+        },
+        {
+          "name": "opModeID",
+          "type": "smallint"
+        },
+        {
+          "name": "opModeFraction",
+          "type": "float"
+        },
+        {
+          "name": "opModeFractionCV",
+          "type": "float"
+        },
+        {
+          "name": "isUserInput",
+          "type": "char"
+        }
+      ],
+      "indexes": [],
+      "estimated_rows_upper_bound": 50,
+      "size_bucket": "tiny",
+      "filter_columns": [
+        "sourcetypeid",
+        "hourdayid",
+        "linkid",
+        "polprocessid",
+        "opmodeid"
+      ],
+      "partition": {
+        "strategy": "monolithic",
+        "rationale": "added by Task 81 \u2014 present in movesdb20241112 dump, absent from Task 79 audit"
+      }
+    },
+    {
       "name": "IMTestStandards",
       "primary_key": [
         "testStandardsID"
@@ -4700,6 +4856,36 @@
       "partition": {
         "strategy": "monolithic",
         "rationale": "tiny band \u2014 single Parquet file is cheapest"
+      }
+    },
+    {
+      "name": "imTestType",
+      "primary_key": [
+        "testTypeID"
+      ],
+      "columns": [
+        {
+          "name": "testTypeID",
+          "type": "smallint"
+        },
+        {
+          "name": "testTypeDesc",
+          "type": "char"
+        },
+        {
+          "name": "shortName",
+          "type": "varchar"
+        }
+      ],
+      "indexes": [],
+      "estimated_rows_upper_bound": 50,
+      "size_bucket": "tiny",
+      "filter_columns": [
+        "testtypeid"
+      ],
+      "partition": {
+        "strategy": "monolithic",
+        "rationale": "added by Task 81 \u2014 present in movesdb20241112 dump, absent from Task 79 audit"
       }
     },
     {
@@ -4837,8 +5023,8 @@
           ]
         }
       ],
-      "estimated_rows_upper_bound": 0,
-      "size_bucket": "empty",
+      "estimated_rows_upper_bound": 50000,
+      "size_bucket": "small",
       "filter_columns": [
         "linkid",
         "countyid",
@@ -4846,8 +5032,8 @@
         "roadtypeid"
       ],
       "partition": {
-        "strategy": "schema_only",
-        "rationale": "ships empty in default DB; populated at run time"
+        "strategy": "monolithic",
+        "rationale": "Task 81 found 22,610 rows in movesdb20241112; the Task 79 schema_only classification was based on the assumption that Link ships empty, which the actual default DB contradicts."
       }
     },
     {
@@ -5972,77 +6158,6 @@
       }
     },
     {
-      "name": "NRCrankCaseEmissionRatio",
-      "primary_key": [
-        "sourceTypeID",
-        "polProcessID",
-        "sourceBinID"
-      ],
-      "columns": [
-        {
-          "name": "sourceTypeID",
-          "type": "smallint(6)"
-        },
-        {
-          "name": "polProcessID",
-          "type": "int"
-        },
-        {
-          "name": "sourceBinID",
-          "type": "bigint(20)"
-        },
-        {
-          "name": "NRProcessMeanBaseRate",
-          "type": "float"
-        },
-        {
-          "name": "NRProcessMeanBaseRateCV",
-          "type": "float"
-        },
-        {
-          "name": "dataSourceId",
-          "type": "smallint(6)"
-        }
-      ],
-      "indexes": [
-        {
-          "unique": true,
-          "columns": [
-            "sourceTypeID",
-            "polProcessID",
-            "sourceBinID"
-          ]
-        },
-        {
-          "unique": false,
-          "columns": [
-            "sourceTypeID",
-            "polProcessID",
-            "sourceBinID"
-          ]
-        },
-        {
-          "unique": false,
-          "columns": [
-            "sourceTypeID",
-            "polProcessID",
-            "sourceBinID"
-          ]
-        }
-      ],
-      "estimated_rows_upper_bound": 156000,
-      "size_bucket": "medium",
-      "filter_columns": [
-        "sourcetypeid",
-        "polprocessid",
-        "sourcebinid"
-      ],
-      "partition": {
-        "strategy": "monolithic",
-        "rationale": "medium band \u2014 single Parquet file is cheapest"
-      }
-    },
-    {
       "name": "nrDayAllocation",
       "primary_key": [
         "scc",
@@ -6411,108 +6526,6 @@
       "partition": {
         "strategy": "model_year",
         "rationale": "huge band keyed by modelYearID"
-      }
-    },
-    {
-      "name": "NRExhaustEmissionRate",
-      "primary_key": [
-        "sourceTypeID",
-        "polProcessID",
-        "sourceBinID"
-      ],
-      "columns": [
-        {
-          "name": "sourceTypeID",
-          "type": "smallint(6)"
-        },
-        {
-          "name": "polProcessID",
-          "type": "int"
-        },
-        {
-          "name": "sourceBinID",
-          "type": "bigint(20)"
-        },
-        {
-          "name": "NRProcessMeanBaseRate",
-          "type": "float"
-        },
-        {
-          "name": "NRProcessMeanBaseRateCV",
-          "type": "float"
-        },
-        {
-          "name": "dataSourceId",
-          "type": "smallint(6)"
-        }
-      ],
-      "indexes": [
-        {
-          "unique": true,
-          "columns": [
-            "sourceTypeID",
-            "polProcessID",
-            "sourceBinID"
-          ]
-        }
-      ],
-      "estimated_rows_upper_bound": 156000,
-      "size_bucket": "medium",
-      "filter_columns": [
-        "sourcetypeid",
-        "polprocessid",
-        "sourcebinid"
-      ],
-      "partition": {
-        "strategy": "monolithic",
-        "rationale": "medium band \u2014 single Parquet file is cheapest"
-      }
-    },
-    {
-      "name": "NRFuelOxyAdjustment",
-      "primary_key": [
-        "strokes",
-        "polProcessID",
-        "fuelTypeID"
-      ],
-      "columns": [
-        {
-          "name": "strokes",
-          "type": "tinyint(4)"
-        },
-        {
-          "name": "polProcessID",
-          "type": "int"
-        },
-        {
-          "name": "fuelTypeID",
-          "type": "smallint(6)"
-        },
-        {
-          "name": "NRFuelOxyAdjust",
-          "type": "float"
-        }
-      ],
-      "indexes": [
-        {
-          "unique": true,
-          "columns": [
-            "strokes",
-            "polProcessID",
-            "fuelTypeID"
-          ]
-        }
-      ],
-      "estimated_rows_upper_bound": 1800,
-      "size_bucket": "small",
-      "filter_columns": [
-        "strokes",
-        "polprocessid",
-        "fueltypeid"
-      ],
-      "partition": {
-        "strategy": "monolithic",
-        "rationale": "small band \u2014 single Parquet file is cheapest"
       }
     },
     {
@@ -7346,98 +7359,29 @@
       }
     },
     {
-      "name": "NRPollutantProcessModelYear",
+      "name": "nrProcessGroup",
       "primary_key": [
-        "polProcessID",
-        "modelYearID"
+        "processGroupID"
       ],
       "columns": [
         {
-          "name": "polProcessID",
-          "type": "int"
+          "name": "processGroupID",
+          "type": "smallint"
         },
         {
-          "name": "modelYearID",
-          "type": "smallint(6)"
-        },
-        {
-          "name": "modelYearGroupID",
-          "type": "int(11)"
+          "name": "processGroupDesc",
+          "type": "char"
         }
       ],
-      "indexes": [
-        {
-          "unique": true,
-          "columns": [
-            "polProcessID",
-            "modelYearID"
-          ]
-        }
-      ],
-      "estimated_rows_upper_bound": 8520,
-      "size_bucket": "small",
+      "indexes": [],
+      "estimated_rows_upper_bound": 50,
+      "size_bucket": "tiny",
       "filter_columns": [
-        "polprocessid",
-        "modelyearid"
+        "processgroupid"
       ],
       "partition": {
         "strategy": "monolithic",
-        "rationale": "small band \u2014 single Parquet file is cheapest"
-      }
-    },
-    {
-      "name": "NRProcessEmissionRate",
-      "primary_key": [
-        "sourceTypeID",
-        "polProcessID",
-        "sourceBinID"
-      ],
-      "columns": [
-        {
-          "name": "sourceTypeID",
-          "type": "smallint(6)"
-        },
-        {
-          "name": "polProcessID",
-          "type": "int"
-        },
-        {
-          "name": "sourceBinID",
-          "type": "bigint(20)"
-        },
-        {
-          "name": "NRProcessMeanBaseRate",
-          "type": "float"
-        },
-        {
-          "name": "NRProcessMeanBaseRateCV",
-          "type": "float"
-        },
-        {
-          "name": "dataSourceId",
-          "type": "smallint(6)"
-        }
-      ],
-      "indexes": [
-        {
-          "unique": true,
-          "columns": [
-            "sourceTypeID",
-            "polProcessID",
-            "sourceBinID"
-          ]
-        }
-      ],
-      "estimated_rows_upper_bound": 156000,
-      "size_bucket": "medium",
-      "filter_columns": [
-        "sourcetypeid",
-        "polprocessid",
-        "sourcebinid"
-      ],
-      "partition": {
-        "strategy": "monolithic",
-        "rationale": "medium band \u2014 single Parquet file is cheapest"
+        "rationale": "added by Task 81 \u2014 present in movesdb20241112 dump, absent from Task 79 audit"
       }
     },
     {
@@ -7668,56 +7612,6 @@
       }
     },
     {
-      "name": "NRSourceBin",
-      "primary_key": [
-        "sourceBinID"
-      ],
-      "columns": [
-        {
-          "name": "sourceBinID",
-          "type": "bigint(20)"
-        },
-        {
-          "name": "fuelTypeID",
-          "type": "smallint(6)"
-        },
-        {
-          "name": "engTechID",
-          "type": "smallint(6)"
-        },
-        {
-          "name": "modelYearGroupID",
-          "type": "smallint(5)"
-        },
-        {
-          "name": "engSizeID",
-          "type": "smallint(6)"
-        }
-      ],
-      "indexes": [
-        {
-          "unique": false,
-          "columns": [
-            "fuelTypeID",
-            "engTechID",
-            "engSizeID"
-          ]
-        }
-      ],
-      "estimated_rows_upper_bound": 100,
-      "size_bucket": "small",
-      "filter_columns": [
-        "sourcebinid",
-        "fueltypeid",
-        "engtechid",
-        "engsizeid"
-      ],
-      "partition": {
-        "strategy": "monolithic",
-        "rationale": "small band \u2014 single Parquet file is cheapest"
-      }
-    },
-    {
       "name": "nrSourceUseType",
       "primary_key": [
         "sourceTypeID"
@@ -7915,50 +7809,6 @@
       }
     },
     {
-      "name": "NRStateSurrogateTotal",
-      "primary_key": [
-        "surrogateID",
-        "stateID"
-      ],
-      "columns": [
-        {
-          "name": "surrogateID",
-          "type": "smallint(6)"
-        },
-        {
-          "name": "stateID",
-          "type": "smallint(6)"
-        },
-        {
-          "name": "surrogateQuant",
-          "type": "float"
-        },
-        {
-          "name": "surrogateYearID",
-          "type": "smallint(6)"
-        }
-      ],
-      "indexes": [
-        {
-          "unique": true,
-          "columns": [
-            "surrogateID",
-            "stateID"
-          ]
-        }
-      ],
-      "estimated_rows_upper_bound": 2550,
-      "size_bucket": "small",
-      "filter_columns": [
-        "surrogateid",
-        "stateid"
-      ],
-      "partition": {
-        "strategy": "monolithic",
-        "rationale": "small band \u2014 single Parquet file is cheapest"
-      }
-    },
-    {
       "name": "nrSulfurAdjustment",
       "primary_key": [
         "fuelTypeID",
@@ -8040,118 +7890,6 @@
       }
     },
     {
-      "name": "NRTemperatureAdjustment",
-      "primary_key": [
-        "strokes",
-        "polProcessID",
-        "fuelTypeID"
-      ],
-      "columns": [
-        {
-          "name": "strokes",
-          "type": "tinyint(4)"
-        },
-        {
-          "name": "polProcessID",
-          "type": "int"
-        },
-        {
-          "name": "fuelTypeID",
-          "type": "smallint(6)"
-        },
-        {
-          "name": "NRTemperatureAdjustGT75",
-          "type": "float"
-        },
-        {
-          "name": "NRTemperatureAdjustLT75",
-          "type": "float"
-        }
-      ],
-      "indexes": [
-        {
-          "unique": true,
-          "columns": [
-            "strokes",
-            "polProcessID",
-            "fuelTypeID"
-          ]
-        }
-      ],
-      "estimated_rows_upper_bound": 1800,
-      "size_bucket": "small",
-      "filter_columns": [
-        "strokes",
-        "polprocessid",
-        "fueltypeid"
-      ],
-      "partition": {
-        "strategy": "monolithic",
-        "rationale": "small band \u2014 single Parquet file is cheapest"
-      }
-    },
-    {
-      "name": "NRTransientAdjustFactor",
-      "primary_key": [
-        "NREquipTypeID",
-        "NRHPRangeBinID",
-        "polProcessID",
-        "fuelTypeID",
-        "engTechID"
-      ],
-      "columns": [
-        {
-          "name": "NREquipTypeID",
-          "type": "smallint(6)"
-        },
-        {
-          "name": "NRHPRangeBinID",
-          "type": "smallint(6)"
-        },
-        {
-          "name": "polProcessID",
-          "type": "int"
-        },
-        {
-          "name": "fuelTypeID",
-          "type": "smallint(6)"
-        },
-        {
-          "name": "engTechID",
-          "type": "smallint(6)"
-        },
-        {
-          "name": "NRTransientAdjustFactor",
-          "type": "float"
-        }
-      ],
-      "indexes": [
-        {
-          "unique": true,
-          "columns": [
-            "NREquipTypeID",
-            "NRHPRangeBinID",
-            "polProcessID",
-            "fuelTypeID",
-            "engTechID"
-          ]
-        }
-      ],
-      "estimated_rows_upper_bound": 16200000,
-      "size_bucket": "large",
-      "filter_columns": [
-        "nrequiptypeid",
-        "nrhprangebinid",
-        "polprocessid",
-        "fueltypeid",
-        "engtechid"
-      ],
-      "partition": {
-        "strategy": "monolithic",
-        "rationale": "no temporal or geographic partition columns; load whole"
-      }
-    },
-    {
       "name": "nrUSMonthAllocation",
       "primary_key": [
         "SCC",
@@ -8183,91 +7921,6 @@
         "scc",
         "stateid",
         "monthid"
-      ],
-      "partition": {
-        "strategy": "county",
-        "rationale": "large band with county/zone but no year"
-      }
-    },
-    {
-      "name": "NRYear",
-      "primary_key": [
-        "yearID"
-      ],
-      "columns": [
-        {
-          "name": "yearID",
-          "type": "smallint"
-        },
-        {
-          "name": "isBaseYear",
-          "type": "char(1)"
-        },
-        {
-          "name": "fuelYearID",
-          "type": "smallint"
-        }
-      ],
-      "indexes": [
-        {
-          "unique": false,
-          "columns": [
-            "isBaseYear"
-          ]
-        }
-      ],
-      "estimated_rows_upper_bound": 71,
-      "size_bucket": "tiny",
-      "filter_columns": [
-        "yearid",
-        "isbaseyear"
-      ],
-      "partition": {
-        "strategy": "monolithic",
-        "rationale": "tiny band \u2014 single Parquet file is cheapest"
-      }
-    },
-    {
-      "name": "NRZoneAllocation",
-      "primary_key": [
-        "surrogateID",
-        "stateID",
-        "zoneID"
-      ],
-      "columns": [
-        {
-          "name": "surrogateID",
-          "type": "smallint(6)"
-        },
-        {
-          "name": "stateID",
-          "type": "smallint(6)"
-        },
-        {
-          "name": "zoneID",
-          "type": "int(11)"
-        },
-        {
-          "name": "surrogateQuant",
-          "type": "float"
-        }
-      ],
-      "indexes": [
-        {
-          "unique": true,
-          "columns": [
-            "surrogateID",
-            "stateID",
-            "zoneID"
-          ]
-        }
-      ],
-      "estimated_rows_upper_bound": 8223750,
-      "size_bucket": "large",
-      "filter_columns": [
-        "surrogateid",
-        "stateid",
-        "zoneid"
       ],
       "partition": {
         "strategy": "county",
@@ -8528,6 +8181,10 @@
         {
           "name": "opModeFractionCV",
           "type": "float"
+        },
+        {
+          "name": "isUserInput",
+          "type": "char(1)"
         }
       ],
       "indexes": [
@@ -8931,6 +8588,36 @@
       }
     },
     {
+      "name": "pollutantDisplayGroup",
+      "primary_key": [
+        "pollutantDisplayGroupID"
+      ],
+      "columns": [
+        {
+          "name": "pollutantDisplayGroupID",
+          "type": "smallint"
+        },
+        {
+          "name": "pollutantDisplayGroupName",
+          "type": "char"
+        },
+        {
+          "name": "disPlayAsGroup",
+          "type": "char"
+        }
+      ],
+      "indexes": [],
+      "estimated_rows_upper_bound": 60,
+      "size_bucket": "tiny",
+      "filter_columns": [
+        "pollutantdisplaygroupid"
+      ],
+      "partition": {
+        "strategy": "monolithic",
+        "rationale": "added by Task 81 \u2014 present in movesdb20241112 dump, absent from Task 79 audit"
+      }
+    },
+    {
       "name": "PollutantProcessAssoc",
       "primary_key": [
         "polProcessID"
@@ -9326,6 +9013,50 @@
       "partition": {
         "strategy": "monolithic",
         "rationale": "tiny band \u2014 single Parquet file is cheapest"
+      }
+    },
+    {
+      "name": "regClassFraction",
+      "primary_key": [
+        "sourceTypeModelYearID",
+        "fuelTypeID",
+        "engTechID",
+        "regClassID"
+      ],
+      "columns": [
+        {
+          "name": "sourceTypeModelYearID",
+          "type": "int"
+        },
+        {
+          "name": "fuelTypeID",
+          "type": "smallint"
+        },
+        {
+          "name": "engTechID",
+          "type": "smallint"
+        },
+        {
+          "name": "regClassID",
+          "type": "smallint"
+        },
+        {
+          "name": "regClassFraction",
+          "type": "float"
+        }
+      ],
+      "indexes": [],
+      "estimated_rows_upper_bound": 50,
+      "size_bucket": "tiny",
+      "filter_columns": [
+        "sourcetypemodelyearid",
+        "fueltypeid",
+        "engtechid",
+        "regclassid"
+      ],
+      "partition": {
+        "strategy": "monolithic",
+        "rationale": "added by Task 81 \u2014 present in movesdb20241112 dump, absent from Task 79 audit"
       }
     },
     {
@@ -10420,6 +10151,10 @@
         {
           "name": "soakActivityFractionCV",
           "type": "float"
+        },
+        {
+          "name": "isUserInput",
+          "type": "char(1)"
         }
       ],
       "indexes": [],
@@ -10573,6 +10308,10 @@
         {
           "name": "sourceBinActivityFractionCV",
           "type": "float"
+        },
+        {
+          "name": "isUserInput",
+          "type": "char(1)"
         }
       ],
       "indexes": [
@@ -11624,6 +11363,10 @@
         {
           "name": "opModeFraction",
           "type": "double"
+        },
+        {
+          "name": "isUserInput",
+          "type": "char(1)"
         }
       ],
       "indexes": [
@@ -11810,6 +11553,32 @@
       "partition": {
         "strategy": "monolithic",
         "rationale": "small band \u2014 single Parquet file is cheapest"
+      }
+    },
+    {
+      "name": "startsSourceTypeFraction",
+      "primary_key": [
+        "sourceTypeID"
+      ],
+      "columns": [
+        {
+          "name": "sourceTypeID",
+          "type": "smallint"
+        },
+        {
+          "name": "allocationFraction",
+          "type": "double"
+        }
+      ],
+      "indexes": [],
+      "estimated_rows_upper_bound": 50,
+      "size_bucket": "tiny",
+      "filter_columns": [
+        "sourcetypeid"
+      ],
+      "partition": {
+        "strategy": "monolithic",
+        "rationale": "added by Task 81 \u2014 present in movesdb20241112 dump, absent from Task 79 audit"
       }
     },
     {

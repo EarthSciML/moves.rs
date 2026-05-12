@@ -101,7 +101,7 @@ pub fn convert(opts: &ConvertOptions) -> Result<(Manifest, ConvertReport)> {
     let mut report = ConvertReport::default();
 
     for table in &plan.tables {
-        match convert_table(table, opts)? {
+        match convert_table(table, opts, &mut report)? {
             ConvertTableOutcome::Written(entry) => {
                 report.tables_written += 1;
                 report.partitions_written += entry.partitions.len();
@@ -140,7 +140,11 @@ enum ConvertTableOutcome {
     Skipped(String),
 }
 
-fn convert_table(table: &TableEntry, opts: &ConvertOptions) -> Result<ConvertTableOutcome> {
+fn convert_table(
+    table: &TableEntry,
+    opts: &ConvertOptions,
+    report: &mut ConvertReport,
+) -> Result<ConvertTableOutcome> {
     let strategy = table.partition.strategy;
     let spec = resolve(table)?;
 
@@ -151,23 +155,34 @@ fn convert_table(table: &TableEntry, opts: &ConvertOptions) -> Result<ConvertTab
         _ => {
             // All other strategies need the TSV pair. Missing TSV means the
             // dumper skipped this table — surface vs. silently omit per
-            // ConvertOptions.require_every_table.
-            let tsv_path = opts.tsv_dir.join(format!("{}.tsv", table.name));
-            let schema_path = opts.tsv_dir.join(format!("{}.schema.tsv", table.name));
-            if !schema_path.exists() {
-                return Ok(ConvertTableOutcome::Skipped(format!(
-                    "schema TSV not found at {}",
-                    schema_path.display()
-                )));
-            }
+            // ConvertOptions.require_every_table. Lookup is case-insensitive
+            // because the MariaDB on Linux normalizes the original Windows
+            // dump's CamelCase table names to lowercase on disk, while the
+            // audit (`tables.json`) preserves the canonical CamelCase from
+            // the MOVES Java schema.
+            let schema_path =
+                match find_tsv_case_insensitive(&opts.tsv_dir, &table.name, ".schema.tsv")? {
+                    Some(p) => p,
+                    None => {
+                        return Ok(ConvertTableOutcome::Skipped(format!(
+                            "schema TSV not found for table '{}' in {}",
+                            table.name,
+                            opts.tsv_dir.display()
+                        )));
+                    }
+                };
             let columns = read_schema_tsv(&schema_path)?;
-            cross_check_columns(table, &columns)?;
-            if !tsv_path.exists() {
-                return Ok(ConvertTableOutcome::Skipped(format!(
-                    "row TSV not found at {}",
-                    tsv_path.display()
-                )));
-            }
+            check_columns_drift(table, &columns, opts, report)?;
+            let tsv_path = match find_tsv_case_insensitive(&opts.tsv_dir, &table.name, ".tsv")? {
+                Some(p) => p,
+                None => {
+                    return Ok(ConvertTableOutcome::Skipped(format!(
+                        "row TSV not found for table '{}' in {}",
+                        table.name,
+                        opts.tsv_dir.display()
+                    )));
+                }
+            };
             let rows = read_all_rows(&tsv_path, &columns)?;
             let source_count = rows.len() as u64;
             let entry = write_partitioned(table, &columns, &spec, rows, opts)?;
@@ -177,10 +192,65 @@ fn convert_table(table: &TableEntry, opts: &ConvertOptions) -> Result<ConvertTab
     }
 }
 
+/// Public re-export of the case-insensitive TSV lookup used internally
+/// by [`convert`]. Sibling modules — notably `validate` — need the same
+/// lookup semantics so a validation run sees the same TSV files the
+/// conversion did. Kept as a thin wrapper so the private helper can
+/// evolve without breaking external callers.
+pub fn find_tsv_case_insensitive_pub(
+    dir: &Path,
+    table_name: &str,
+    suffix: &str,
+) -> Result<Option<PathBuf>> {
+    find_tsv_case_insensitive(dir, table_name, suffix)
+}
+
+/// Locate `<table_name><suffix>` under `dir` with a case-insensitive match
+/// on the file stem. The dumper's filenames track MariaDB's on-disk case
+/// (which lower-cases the original Windows dump's names), while the audit
+/// uses CamelCase. Without this, ~90% of tables get silently skipped.
+///
+/// Returns `Ok(None)` if no matching file exists — including the case
+/// where `dir` itself is missing (a wholly-absent TSV directory means no
+/// table can be found, which is treated as a soft miss).
+fn find_tsv_case_insensitive(
+    dir: &Path,
+    table_name: &str,
+    suffix: &str,
+) -> Result<Option<PathBuf>> {
+    let target = format!("{}{}", table_name, suffix);
+    let exact = dir.join(&target);
+    if exact.exists() {
+        return Ok(Some(exact));
+    }
+    let entries = match std::fs::read_dir(dir) {
+        Ok(it) => it,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(source) => {
+            return Err(Error::Io {
+                path: dir.to_path_buf(),
+                source,
+            })
+        }
+    };
+    for entry in entries {
+        let entry = entry.map_err(|source| Error::Io {
+            path: dir.to_path_buf(),
+            source,
+        })?;
+        if let Some(name) = entry.file_name().to_str() {
+            if name.eq_ignore_ascii_case(&target) {
+                return Ok(Some(entry.path()));
+            }
+        }
+    }
+    Ok(None)
+}
+
 fn write_schema_only(table: &TableEntry, opts: &ConvertOptions) -> Result<TableManifest> {
-    let schema_path = opts.tsv_dir.join(format!("{}.schema.tsv", table.name));
-    let columns = if schema_path.exists() {
-        read_schema_tsv(&schema_path)?
+    let schema_path = find_tsv_case_insensitive(&opts.tsv_dir, &table.name, ".schema.tsv")?;
+    let columns = if let Some(p) = &schema_path {
+        read_schema_tsv(p)?
     } else {
         // Fall back to the audit's columns when the dumper didn't ship
         // anything (the table was empty in MariaDB and a future toolchain
@@ -188,10 +258,10 @@ fn write_schema_only(table: &TableEntry, opts: &ConvertOptions) -> Result<TableM
         // these schema-only tables since they ship empty in the default DB.
         synthesize_columns(table)
     };
-    let row_tsv = opts.tsv_dir.join(format!("{}.tsv", table.name));
+    let row_tsv = find_tsv_case_insensitive(&opts.tsv_dir, &table.name, ".tsv")?;
     let mut row_count: u64 = 0;
-    if row_tsv.exists() {
-        row_count = count_rows(&row_tsv)?;
+    if let Some(p) = &row_tsv {
+        row_count = count_rows(p)?;
     }
 
     let sidecar_path = format!("{}.schema.json", table.name);
@@ -260,17 +330,36 @@ fn synthesize_columns(table: &TableEntry) -> Vec<SchemaColumn> {
         .collect()
 }
 
-fn cross_check_columns(table: &TableEntry, columns: &[SchemaColumn]) -> Result<()> {
+/// Compare the audit's column list against the dump's schema and either
+/// warn or error on drift, based on `opts.require_every_table`.
+///
+/// Drift is real and expected: Task 79's audit parses the canonical MOVES
+/// DDL (`CreateDefault.sql`), while the actual `movesdb20241112.zip` ships
+/// with extra metadata columns (e.g. `isUserInput`) added in later
+/// releases. The dump's schema is authoritative for what we actually write
+/// to Parquet; the audit's column list is informational. In strict mode
+/// (`--require-every-table`) we still escalate drift to an error so a
+/// regenerated audit catches the drift in CI.
+fn check_columns_drift(
+    table: &TableEntry,
+    columns: &[SchemaColumn],
+    opts: &ConvertOptions,
+    report: &mut ConvertReport,
+) -> Result<()> {
     if table.columns.is_empty() {
         return Ok(());
     }
     if table.columns.len() != columns.len() {
-        return Err(Error::Plan(format!(
+        let msg = format!(
             "table '{}': audit lists {} columns, dump schema has {}",
             table.name,
             table.columns.len(),
             columns.len()
-        )));
+        );
+        if opts.require_every_table {
+            return Err(Error::Plan(msg));
+        }
+        report.warnings.push(msg);
     }
     Ok(())
 }
@@ -708,6 +797,88 @@ mod tests {
         assert_eq!(manifest.tables[0].row_count, 3);
         assert_eq!(report.warnings.len(), 1);
         assert!(report.warnings[0].contains("Link"));
+    }
+
+    #[test]
+    fn column_drift_warns_in_lenient_mode_errors_in_strict() {
+        // The audit's column list is from the canonical DDL; the actual
+        // dump may have additional columns. Lenient mode warns and writes
+        // using the dump's schema; strict mode errors so a CI audit catches
+        // the drift.
+        let dir = tempdir().unwrap();
+        let tsv_dir = dir.path().join("dump");
+        let out_dir = dir.path().join("out");
+        let plan_path = dir.path().join("tables.json");
+
+        write_file(&plan_path, &minimal_plan(None));
+        // Audit lists 2 columns; dump emits 3 (extra `isUserInput`).
+        write_file(
+            &tsv_dir.join("Year.schema.tsv"),
+            b"yearID\tsmallint\tPRI\nisBaseYear\tchar\t\nisUserInput\tchar\t\n",
+        );
+        write_file(&tsv_dir.join("Year.tsv"), b"2020\tY\tN\n");
+
+        let lenient = ConvertOptions {
+            tsv_dir: tsv_dir.clone(),
+            plan_path: plan_path.clone(),
+            output_root: out_dir.clone(),
+            moves_db_version: "movesdb20241112".into(),
+            generated_at_utc: Some("1970-01-01T00:00:00Z".into()),
+            require_every_table: false,
+        };
+        let (_, report) = convert(&lenient).unwrap();
+        assert_eq!(report.tables_written, 1);
+        assert!(
+            report
+                .warnings
+                .iter()
+                .any(|w| w.contains("audit lists 2") && w.contains("dump schema has 3")),
+            "expected drift warning, got: {:?}",
+            report.warnings
+        );
+
+        let strict = ConvertOptions {
+            require_every_table: true,
+            ..lenient
+        };
+        let err = convert(&strict).unwrap_err();
+        match err {
+            Error::Plan(msg) => assert!(msg.contains("audit lists 2")),
+            other => panic!("expected Error::Plan, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn case_insensitive_tsv_lookup_picks_lowercased_dump() {
+        // The dump from a MariaDB-on-Linux load of a Windows-originated dump
+        // emits lower-cased filenames (e.g. `year.tsv` / `year.schema.tsv`)
+        // while the audit names the table `Year`. The converter must match.
+        let dir = tempdir().unwrap();
+        let tsv_dir = dir.path().join("dump");
+        let out_dir = dir.path().join("out");
+        let plan_path = dir.path().join("tables.json");
+
+        write_file(&plan_path, &minimal_plan(None));
+        // Note the lower-case filenames here.
+        write_file(
+            &tsv_dir.join("year.schema.tsv"),
+            b"yearID\tsmallint\tPRI\nisBaseYear\tchar\t\n",
+        );
+        write_file(&tsv_dir.join("year.tsv"), b"2020\tY\n");
+
+        let opts = ConvertOptions {
+            tsv_dir,
+            plan_path,
+            output_root: out_dir.clone(),
+            moves_db_version: "movesdb20241112".into(),
+            generated_at_utc: Some("1970-01-01T00:00:00Z".into()),
+            require_every_table: true,
+        };
+        let (manifest, report) = convert(&opts).unwrap();
+        assert_eq!(report.tables_written, 1);
+        // Output uses the audit's canonical CamelCase.
+        assert_eq!(manifest.tables[0].name, "Year");
+        assert!(out_dir.join("Year.parquet").exists());
     }
 
     #[test]
