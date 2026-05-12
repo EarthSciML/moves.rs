@@ -1,8 +1,13 @@
 [workspace]
 members = [
     "crates/moves-calculator-info",
+    "crates/moves-calculators",
+    "crates/moves-cli",
+    "crates/moves-data",
     "crates/moves-fixture-capture",
+    "crates/moves-framework",
     "crates/moves-nonroad",
+    "crates/moves-runspec",
     "crates/moves-snapshot",
 ]
 resolver = "2"
