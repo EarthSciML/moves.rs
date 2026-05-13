@@ -14,19 +14,28 @@
 //! * Task 17 — MasterLoop subscription model
 //! * Task 18 — Calculator and Generator base traits
 //! * Task 19 — `CalculatorRegistry`
-//! * Task 20 — MasterLoop core iteration
-//! * Task 23 — `ExecutionDatabaseSchema` and `CalculatorContext` (this commit)
+//! * Task 20 — MasterLoop core iteration (this commit)
+//! * Task 21 — Granularity-based loop notification (refines Task 20 dispatch)
+//! * Task 23 — `ExecutionDatabaseSchema` and `CalculatorContext`
 //! * Task 50 — `DataFrameStore` (shared with `moves-data`)
 //!
 //! # Phase 2 status
 //!
-//! Tasks 17, 18, and 23 are in place:
+//! Tasks 17, 18, 19, 20, and 23 are in place:
 //!
 //! * Task 17 — [`MasterLoopableSubscription`] ordering matches Java exactly.
 //! * Task 18 — [`Calculator`] / [`Generator`] traits plus
 //!   [`CalculatorSubscription`].
-//! * Task 23 — [`CalculatorContext`] widened to own [`ExecutionTables`],
-//!   [`ScratchNamespace`], and an [`IterationPosition`] triple; the
+//! * Task 19 — [`CalculatorRegistry`] for chain-DAG factory bindings,
+//!   RunSpec filtering, and topological ordering.
+//! * Task 20 — [`MasterLoop`] iteration engine walking
+//!   `iteration → process → state → county → zone → link → year → month →
+//!   day → hour`, with forward/cleanup dispatch around the Task 23
+//!   [`IterationPosition`] triple. The basic priority-ordered walk is
+//!   live; Task 21 will refine it with the `hasLoopables` short-circuit
+//!   and try-finally cleanup semantics from `notifyLoopablesOfLoopChange`.
+//! * Task 23 — [`CalculatorContext`] owns [`ExecutionTables`],
+//!   [`ScratchNamespace`], and the [`IterationPosition`] triple; the
 //!   [`ExecutionDatabaseSchema`] registry defines which tables may appear
 //!   in the execution database.
 //!
@@ -47,5 +56,7 @@ pub use execution_db::{
     ExecutionDatabaseSchema, ExecutionLocation, ExecutionTableSpec, ExecutionTables, ExecutionTime,
     IterationPosition, ScratchNamespace, TableSource,
 };
-pub use master_loop::{Granularity, MasterLoopContext, MasterLoopable, MasterLoopableSubscription};
+pub use master_loop::{
+    Granularity, MasterLoop, MasterLoopContext, MasterLoopable, MasterLoopableSubscription,
+};
 pub use registry::{CalculatorFactory, CalculatorRegistry, GeneratorFactory, ModuleFactory};
