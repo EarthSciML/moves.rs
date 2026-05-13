@@ -1,0 +1,23 @@
+[package]
+name = "moves-data-default"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+description = "Lazy-loading reader over the converted MOVES default-DB Parquet layout (Phase 4 Task 82)."
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+moves-default-db-convert = { path = "../moves-default-db-convert" }
+polars = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+moves-default-db-convert = { path = "../moves-default-db-convert" }
+tempfile = { workspace = true }

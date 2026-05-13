@@ -4,6 +4,7 @@ members = [
     "crates/moves-calculators",
     "crates/moves-cli",
     "crates/moves-data",
+    "crates/moves-data-default",
     "crates/moves-default-db-convert",
     "crates/moves-fixture-capture",
     "crates/moves-framework",
@@ -26,6 +27,7 @@ bytes = "1"
 clap = { version = "4", features = ["derive"] }
 parquet = "55"
 phf = { version = "0.11", features = ["macros"] }
+polars = { version = "0.53", default-features = false, features = ["lazy", "parquet"] }
 quick-xml = { version = "0.36", features = ["serialize"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
