@@ -268,16 +268,20 @@ energy_units = "million-btu"  # XML "Million BTU"
 
 ## Caveats and intentional non-goals
 
-* **Byte-identical XML round-trip is not a Task 13 promise.** The XML
-  formatter emits self-closing tags where possible and preserves
-  attribute *content* but not necessarily attribute order, whitespace,
-  or `<![CDATA[...]]>` wrapping. Task 12 hardens the XML side; the
-  Task 13 contract is model-equivalence.
+* **The XML serializer is byte-stable but not source-identical.** Task 12
+  hardened the XML side: the serializer emits the canonical Java-style
+  layout (tab indentation, CDATA-wrapped non-empty `<description>`,
+  explicit open+close tags for empty containers), so `serialize → parse
+  → serialize` is byte-identical. It is *not* a goal to reproduce the
+  source file byte-for-byte — fixtures with different indentation
+  conventions (e.g. the NONROAD set's tab+spaces in
+  `<outputemissionsbreakdownselection>`) all converge on the canonical
+  form after the first round-trip.
 * **Empty containers serialize as omitted in TOML, present in XML.**
   TOML omits empty `[[geo]]`/`[[onroad]]`/etc. arrays entirely; the
   XML emits empty wrapper elements (`<geographicselections></...>`)
-  because that's what canonical MOVES does and Task 12 will need them
-  for byte-stable re-serialization.
+  because that's what canonical MOVES does and what Task 12 needs for
+  byte-stable re-serialization.
 * **Pollutant/process names are user input today.** They round-trip
   through both formats but aren't validated against the MOVES
   defaultdb until Task 14 lands. Mistyping `pollutant = "CO"` on a

@@ -4,9 +4,10 @@
 //!
 //! * **TOML** — the recommended, hand-authored format (Task 13). Short
 //!   table names, named-enum values, supports comments.
-//! * **XML** — the legacy MOVES `.mrs` / `.xml` format kept for
-//!   compatibility with the characterization fixtures (Task 12 will
-//!   extend the XML coverage to the full 23-file Java source set).
+//! * **XML** — the legacy MOVES `.mrs` / `.xml` format. The serializer
+//!   emits the canonical Java-style layout produced by
+//!   `gov.epa.otaq.moves.master.runspec.RunSpecXML.save`, so
+//!   `serialize → parse → serialize` is byte-stable.
 //!
 //! Conversion is always model-mediated, so XML↔TOML round-trips through
 //! a single [`RunSpec`] value are isomorphic by construction. See
@@ -59,9 +60,10 @@ pub fn from_xml_str(input: &str) -> Result<RunSpec> {
 
 /// Serialize a [`RunSpec`] back to an XML string.
 ///
-/// The output is reparseable into a model-equivalent value. Byte-identical
-/// re-serialization (whitespace, CDATA wrapping, attribute order) is a
-/// non-goal here — Task 12 will harden that contract.
+/// The output is in the canonical Java-style format (tab indentation,
+/// CDATA-wrapped non-empty `<description>`, the same element order MOVES
+/// itself writes). Serialization is idempotent: feeding the output back
+/// through [`from_xml_str`] and re-serializing yields byte-identical XML.
 pub fn to_xml_string(spec: &RunSpec) -> Result<String> {
     xml_format::to_string(spec)
 }

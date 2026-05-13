@@ -1,16 +1,20 @@
 //! XML (de)serialization of [`RunSpec`].
 //!
 //! Maps the canonical model to/from the legacy MOVES `.mrs` / `.xml`
-//! format. The element ordering here matches what canonical MOVES emits;
-//! the existing characterization fixtures all conform to this layout.
+//! format. The element ordering matches what canonical MOVES emits;
+//! all the characterization fixtures under `characterization/fixtures/`
+//! conform to this layout.
 //!
-//! This module is deliberately narrow: it covers what Task 13 needs
-//! (round-trip through the in-memory model) and what every fixture
-//! under `characterization/fixtures/` requires. Task 12 (RunSpec XML
-//! parser) extends the coverage to the full 23-file Java source set —
-//! validation, GUI-specific elements, and byte-identical re-serialization.
+//! The parser is permissive about whitespace and attribute order; the
+//! serializer always emits the canonical Java-style format from
+//! `gov.epa.otaq.moves.master.runspec.RunSpecXML.save`: tab indentation,
+//! one element per line, CDATA-wrapped non-empty `<description>`, explicit
+//! open+close tags for empty container elements, and the same element
+//! order MOVES itself writes. That makes serialize → parse → serialize
+//! byte-stable: a model round-tripped once produces XML that, when fed
+//! back through the parser and re-serialized, is byte-identical.
 
-use serde::{Deserialize, Serialize};
+use std::fmt::Write as _;
 
 use crate::error::{Error, Result};
 use crate::model::*;
@@ -21,11 +25,430 @@ pub fn parse(xml: &str) -> Result<RunSpec> {
 }
 
 pub fn to_string(spec: &RunSpec) -> Result<String> {
-    let raw = XmlRunSpec::from_model(spec);
     let mut out = String::new();
-    quick_xml::se::to_writer(&mut out, &raw)?;
+    write_runspec(&mut out, spec).map_err(Error::from_fmt)?;
     Ok(out)
 }
+
+// --- Canonical writer ----------------------------------------------------
+
+fn write_runspec(out: &mut String, spec: &RunSpec) -> std::fmt::Result {
+    match &spec.version {
+        Some(v) => writeln!(out, "<runspec version=\"{}\">", escape_attr(v))?,
+        None => writeln!(out, "<runspec>")?,
+    }
+
+    write_description(out, spec.description.as_deref())?;
+    write_models(out, &spec.models)?;
+    writeln!(out, "\t<modelscale value=\"{}\"/>", spec.scale.xml_value())?;
+    if let Some(d) = spec.domain {
+        writeln!(out, "\t<modeldomain value=\"{}\"/>", d.xml_value())?;
+    }
+    write_geographic_selections(out, &spec.geographic_selections)?;
+    write_timespan(out, &spec.timespan)?;
+    write_onroad_selections(out, &spec.onroad_vehicle_selections)?;
+    write_offroad_selections(out, &spec.offroad_vehicle_selections)?;
+    write_offroad_sccs(out, &spec.offroad_vehicle_sccs)?;
+    write_road_types(out, &spec.road_types)?;
+    write_pollutant_process_associations(out, &spec.pollutant_process_associations)?;
+    write_database_selections(out, &spec.database_selections)?;
+    write_internal_control_strategies(out, &spec.internal_control_strategies)?;
+    write_database_ref(out, "inputdatabase", &spec.input_database)?;
+    write_uncertainty(out, &spec.uncertainty)?;
+    writeln!(
+        out,
+        "\t<geographicoutputdetail description=\"{}\"/>",
+        spec.geographic_output_detail.xml_value()
+    )?;
+    write_output_breakdown(out, &spec.output_breakdown)?;
+    write_database_ref(out, "outputdatabase", &spec.output_database)?;
+    writeln!(
+        out,
+        "\t<outputtimestep value=\"{}\"/>",
+        spec.output_timestep.xml_value()
+    )?;
+    writeln!(
+        out,
+        "\t<outputvmtdata value=\"{}\"/>",
+        bool_xml(spec.output_vmt_data)
+    )?;
+    write_nonroad_output_flags(out, &spec.output_nonroad)?;
+    write_database_ref(out, "scaleinputdatabase", &spec.scale_input_database)?;
+    writeln!(out, "\t<pmsize value=\"{}\"/>", spec.pm_size)?;
+    write_output_factors(out, &spec.output_factors)?;
+    writeln!(out, "</runspec>")
+}
+
+fn write_description(out: &mut String, desc: Option<&str>) -> std::fmt::Result {
+    match desc {
+        Some(text) if !text.is_empty() => {
+            writeln!(out, "\t<description><![CDATA[{text}]]></description>")
+        }
+        _ => writeln!(out, "\t<description></description>"),
+    }
+}
+
+fn write_models(out: &mut String, models: &[Model]) -> std::fmt::Result {
+    if models.is_empty() {
+        return Ok(());
+    }
+    writeln!(out, "\t<models>")?;
+    for m in models {
+        let v = match m {
+            Model::Onroad => "ONROAD",
+            Model::Nonroad => "NONROAD",
+        };
+        writeln!(out, "\t\t<model value=\"{v}\"/>")?;
+    }
+    writeln!(out, "\t</models>")
+}
+
+fn write_geographic_selections(
+    out: &mut String,
+    items: &[GeographicSelection],
+) -> std::fmt::Result {
+    if items.is_empty() {
+        writeln!(out, "\t<geographicselections>")?;
+        writeln!(out, "\t</geographicselections>")?;
+        return Ok(());
+    }
+    writeln!(out, "\t<geographicselections>")?;
+    for sel in items {
+        writeln!(
+            out,
+            "\t\t<geographicselection type=\"{}\" key=\"{}\" description=\"{}\"/>",
+            sel.kind.xml_value(),
+            sel.key,
+            escape_attr(&sel.description),
+        )?;
+    }
+    writeln!(out, "\t</geographicselections>")
+}
+
+fn write_timespan(out: &mut String, ts: &Timespan) -> std::fmt::Result {
+    writeln!(out, "\t<timespan>")?;
+    for y in &ts.years {
+        writeln!(out, "\t\t<year key=\"{y}\"/>")?;
+    }
+    for m in &ts.months {
+        writeln!(out, "\t\t<month key=\"{m}\"/>")?;
+    }
+    for d in &ts.days {
+        writeln!(out, "\t\t<day key=\"{d}\"/>")?;
+    }
+    if let Some(h) = ts.begin_hour {
+        writeln!(out, "\t\t<beginhour key=\"{h}\"/>")?;
+    }
+    if let Some(h) = ts.end_hour {
+        writeln!(out, "\t\t<endhour key=\"{h}\"/>")?;
+    }
+    if let Some(a) = &ts.aggregate_by {
+        writeln!(out, "\t\t<aggregateBy key=\"{}\"/>", escape_attr(a))?;
+    }
+    writeln!(out, "\t</timespan>")
+}
+
+fn write_onroad_selections(out: &mut String, items: &[OnroadVehicleSelection]) -> std::fmt::Result {
+    if items.is_empty() {
+        writeln!(out, "\t<onroadvehicleselections>")?;
+        writeln!(out, "\t</onroadvehicleselections>")?;
+        return Ok(());
+    }
+    writeln!(out, "\t<onroadvehicleselections>")?;
+    for v in items {
+        writeln!(
+            out,
+            "\t\t<onroadvehicleselection fueltypeid=\"{}\" fueltypedesc=\"{}\" sourcetypeid=\"{}\" sourcetypename=\"{}\"/>",
+            v.fuel_type_id,
+            escape_attr(&v.fuel_type_name),
+            v.source_type_id,
+            escape_attr(&v.source_type_name),
+        )?;
+    }
+    writeln!(out, "\t</onroadvehicleselections>")
+}
+
+fn write_offroad_selections(
+    out: &mut String,
+    items: &[OffroadVehicleSelection],
+) -> std::fmt::Result {
+    if items.is_empty() {
+        writeln!(out, "\t<offroadvehicleselections>")?;
+        writeln!(out, "\t</offroadvehicleselections>")?;
+        return Ok(());
+    }
+    writeln!(out, "\t<offroadvehicleselections>")?;
+    for v in items {
+        writeln!(
+            out,
+            "\t\t<offroadvehicleselection fueltypeid=\"{}\" fueltypedesc=\"{}\" sectorid=\"{}\" sectorname=\"{}\"/>",
+            v.fuel_type_id,
+            escape_attr(&v.fuel_type_name),
+            v.sector_id,
+            escape_attr(&v.sector_name),
+        )?;
+    }
+    writeln!(out, "\t</offroadvehicleselections>")
+}
+
+fn write_offroad_sccs(out: &mut String, items: &[OffroadVehicleScc]) -> std::fmt::Result {
+    if items.is_empty() {
+        writeln!(out, "\t<offroadvehiclesccs>")?;
+        writeln!(out, "\t</offroadvehiclesccs>")?;
+        return Ok(());
+    }
+    writeln!(out, "\t<offroadvehiclesccs>")?;
+    for s in items {
+        match &s.description {
+            Some(d) => writeln!(
+                out,
+                "\t\t<offroadvehiclescc scc=\"{}\" description=\"{}\"/>",
+                escape_attr(&s.scc),
+                escape_attr(d),
+            )?,
+            None => writeln!(
+                out,
+                "\t\t<offroadvehiclescc scc=\"{}\"/>",
+                escape_attr(&s.scc),
+            )?,
+        }
+    }
+    writeln!(out, "\t</offroadvehiclesccs>")
+}
+
+fn write_road_types(out: &mut String, items: &[RoadType]) -> std::fmt::Result {
+    if items.is_empty() {
+        writeln!(out, "\t<roadtypes>")?;
+        writeln!(out, "\t</roadtypes>")?;
+        return Ok(());
+    }
+    writeln!(out, "\t<roadtypes>")?;
+    for r in items {
+        match &r.model_combination {
+            Some(mc) => writeln!(
+                out,
+                "\t\t<roadtype roadtypeid=\"{}\" roadtypename=\"{}\" modelCombination=\"{}\"/>",
+                r.road_type_id,
+                escape_attr(&r.road_type_name),
+                escape_attr(mc),
+            )?,
+            None => writeln!(
+                out,
+                "\t\t<roadtype roadtypeid=\"{}\" roadtypename=\"{}\"/>",
+                r.road_type_id,
+                escape_attr(&r.road_type_name),
+            )?,
+        }
+    }
+    writeln!(out, "\t</roadtypes>")
+}
+
+fn write_pollutant_process_associations(
+    out: &mut String,
+    items: &[PollutantProcessAssociation],
+) -> std::fmt::Result {
+    if items.is_empty() {
+        writeln!(out, "\t<pollutantprocessassociations>")?;
+        writeln!(out, "\t</pollutantprocessassociations>")?;
+        return Ok(());
+    }
+    writeln!(out, "\t<pollutantprocessassociations>")?;
+    for ppa in items {
+        writeln!(
+            out,
+            "\t\t<pollutantprocessassociation pollutantkey=\"{}\" pollutantname=\"{}\" processkey=\"{}\" processname=\"{}\"/>",
+            ppa.pollutant_id,
+            escape_attr(&ppa.pollutant_name),
+            ppa.process_id,
+            escape_attr(&ppa.process_name),
+        )?;
+    }
+    writeln!(out, "\t</pollutantprocessassociations>")
+}
+
+fn write_database_selections(out: &mut String, items: &[DatabaseSelection]) -> std::fmt::Result {
+    if items.is_empty() {
+        writeln!(out, "\t<databaseselections>")?;
+        writeln!(out, "\t</databaseselections>")?;
+        return Ok(());
+    }
+    writeln!(out, "\t<databaseselections>")?;
+    for _ in items {
+        writeln!(out, "\t\t<databaseselection/>")?;
+    }
+    writeln!(out, "\t</databaseselections>")
+}
+
+fn write_internal_control_strategies(
+    out: &mut String,
+    items: &[InternalControlStrategy],
+) -> std::fmt::Result {
+    if items.is_empty() {
+        writeln!(out, "\t<internalcontrolstrategies>")?;
+        writeln!(out, "\t</internalcontrolstrategies>")?;
+        return Ok(());
+    }
+    writeln!(out, "\t<internalcontrolstrategies>")?;
+    for _ in items {
+        writeln!(out, "\t\t<internalcontrolstrategy/>")?;
+    }
+    writeln!(out, "\t</internalcontrolstrategies>")
+}
+
+fn write_database_ref(out: &mut String, tag: &str, db: &DatabaseRef) -> std::fmt::Result {
+    writeln!(
+        out,
+        "\t<{tag} servername=\"{}\" databasename=\"{}\" description=\"{}\"/>",
+        escape_attr(&db.server),
+        escape_attr(&db.database),
+        escape_attr(&db.description),
+    )
+}
+
+fn write_uncertainty(out: &mut String, u: &UncertaintyParameters) -> std::fmt::Result {
+    writeln!(
+        out,
+        "\t<uncertaintyparameters uncertaintymodeenabled=\"{}\" numberofrunspersimulation=\"{}\" numberofsimulations=\"{}\"/>",
+        bool_xml(u.enabled),
+        u.runs_per_simulation,
+        u.simulations,
+    )
+}
+
+fn write_output_breakdown(out: &mut String, b: &OutputBreakdown) -> std::fmt::Result {
+    writeln!(out, "\t<outputemissionsbreakdownselection>")?;
+    writeln!(
+        out,
+        "\t\t<modelyear selected=\"{}\"/>",
+        bool_xml(b.model_year)
+    )?;
+    writeln!(
+        out,
+        "\t\t<fueltype selected=\"{}\"/>",
+        bool_xml(b.fuel_type)
+    )?;
+    writeln!(
+        out,
+        "\t\t<emissionprocess selected=\"{}\"/>",
+        bool_xml(b.emission_process)
+    )?;
+    writeln!(
+        out,
+        "\t\t<distinguishparticulates selected=\"{}\"/>",
+        bool_xml(b.distinguish_particulates)
+    )?;
+    writeln!(
+        out,
+        "\t\t<onroadoffroad selected=\"{}\"/>",
+        bool_xml(b.onroad_offroad)
+    )?;
+    writeln!(
+        out,
+        "\t\t<roadtype selected=\"{}\"/>",
+        bool_xml(b.road_type)
+    )?;
+    writeln!(
+        out,
+        "\t\t<sourceusetype selected=\"{}\"/>",
+        bool_xml(b.source_use_type)
+    )?;
+    writeln!(
+        out,
+        "\t\t<movesvehicletype selected=\"{}\"/>",
+        bool_xml(b.moves_vehicle_type)
+    )?;
+    writeln!(
+        out,
+        "\t\t<onroadscc selected=\"{}\"/>",
+        bool_xml(b.onroad_scc)
+    )?;
+    writeln!(
+        out,
+        "\t\t<offroadscc selected=\"{}\"/>",
+        bool_xml(b.offroad_scc)
+    )?;
+    writeln!(
+        out,
+        "\t\t<estimateuncertainty selected=\"{}\"/>",
+        bool_xml(b.estimate_uncertainty)
+    )?;
+    writeln!(out, "\t\t<segment selected=\"{}\"/>", bool_xml(b.segment))?;
+    writeln!(out, "\t\t<hpclass selected=\"{}\"/>", bool_xml(b.hp_class))?;
+    writeln!(out, "\t</outputemissionsbreakdownselection>")
+}
+
+fn write_nonroad_output_flags(out: &mut String, f: &NonroadOutputFlags) -> std::fmt::Result {
+    if let Some(v) = f.sho {
+        writeln!(out, "\t<outputsho value=\"{}\"/>", bool_xml(v))?;
+    }
+    if let Some(v) = f.sh {
+        writeln!(out, "\t<outputsh value=\"{}\"/>", bool_xml(v))?;
+    }
+    if let Some(v) = f.shp {
+        writeln!(out, "\t<outputshp value=\"{}\"/>", bool_xml(v))?;
+    }
+    if let Some(v) = f.shidling {
+        writeln!(out, "\t<outputshidling value=\"{}\"/>", bool_xml(v))?;
+    }
+    if let Some(v) = f.starts {
+        writeln!(out, "\t<outputstarts value=\"{}\"/>", bool_xml(v))?;
+    }
+    if let Some(v) = f.population {
+        writeln!(out, "\t<outputpopulation value=\"{}\"/>", bool_xml(v))?;
+    }
+    Ok(())
+}
+
+fn write_output_factors(out: &mut String, f: &OutputFactors) -> std::fmt::Result {
+    writeln!(out, "\t<outputfactors>")?;
+    writeln!(
+        out,
+        "\t\t<timefactors selected=\"{}\" units=\"{}\"/>",
+        bool_xml(f.time.enabled),
+        f.time.units.xml_value(),
+    )?;
+    writeln!(
+        out,
+        "\t\t<distancefactors selected=\"{}\" units=\"{}\"/>",
+        bool_xml(f.distance.enabled),
+        f.distance.units.xml_value(),
+    )?;
+    writeln!(
+        out,
+        "\t\t<massfactors selected=\"{}\" units=\"{}\" energyunits=\"{}\"/>",
+        bool_xml(f.mass.enabled),
+        f.mass.units.xml_value(),
+        f.mass.energy_units.xml_value(),
+    )?;
+    writeln!(out, "\t</outputfactors>")
+}
+
+fn bool_xml(b: bool) -> &'static str {
+    if b {
+        "true"
+    } else {
+        "false"
+    }
+}
+
+fn escape_attr(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&apos;"),
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
+// --- Parser shadow types -------------------------------------------------
+
+use serde::{Deserialize, Serialize};
 
 /// Root `<runspec>` element. Field order matches canonical MOVES output.
 #[derive(Debug, Serialize, Deserialize)]
@@ -370,7 +793,7 @@ struct XmlMassFactor {
     energy_units: String,
 }
 
-// -- Conversion to/from the canonical model -------------------------------
+// -- Conversion from the canonical model ----------------------------------
 
 impl XmlRunSpec {
     fn into_model(self) -> Result<RunSpec> {
@@ -632,256 +1055,5 @@ impl XmlRunSpec {
             pm_size: self.pmsize.value,
             output_factors,
         })
-    }
-
-    fn from_model(spec: &RunSpec) -> Self {
-        let models = if spec.models.is_empty() {
-            None
-        } else {
-            Some(XmlModels {
-                items: spec
-                    .models
-                    .iter()
-                    .map(|m| XmlValueStr {
-                        value: match m {
-                            Model::Onroad => "ONROAD",
-                            Model::Nonroad => "NONROAD",
-                        }
-                        .to_string(),
-                    })
-                    .collect(),
-            })
-        };
-
-        XmlRunSpec {
-            version: spec.version.clone(),
-            description: XmlDescription {
-                text: spec.description.clone(),
-            },
-            models,
-            modelscale: XmlValueStr {
-                value: spec.scale.xml_value().to_string(),
-            },
-            modeldomain: spec.domain.map(|d| XmlValueStr {
-                value: d.xml_value().to_string(),
-            }),
-            geographicselections: XmlGeoSelections {
-                items: spec
-                    .geographic_selections
-                    .iter()
-                    .map(|g| XmlGeoSelection {
-                        kind: g.kind.xml_value().to_string(),
-                        key: g.key,
-                        description: g.description.clone(),
-                    })
-                    .collect(),
-            },
-            timespan: XmlTimespan {
-                years: spec
-                    .timespan
-                    .years
-                    .iter()
-                    .map(|&k| XmlKeyU32 { key: k })
-                    .collect(),
-                months: spec
-                    .timespan
-                    .months
-                    .iter()
-                    .map(|&k| XmlKeyU32 { key: k })
-                    .collect(),
-                days: spec
-                    .timespan
-                    .days
-                    .iter()
-                    .map(|&k| XmlKeyU32 { key: k })
-                    .collect(),
-                begin_hour: spec.timespan.begin_hour.map(|k| XmlKeyU32 { key: k }),
-                end_hour: spec.timespan.end_hour.map(|k| XmlKeyU32 { key: k }),
-                aggregate_by: spec
-                    .timespan
-                    .aggregate_by
-                    .clone()
-                    .map(|k| XmlKeyStr { key: k }),
-            },
-            onroadvehicleselections: XmlOnroadVehicleSelections {
-                items: spec
-                    .onroad_vehicle_selections
-                    .iter()
-                    .map(|o| XmlOnroadVehicleSelection {
-                        fuel_type_id: o.fuel_type_id,
-                        fuel_type_name: o.fuel_type_name.clone(),
-                        source_type_id: o.source_type_id,
-                        source_type_name: o.source_type_name.clone(),
-                    })
-                    .collect(),
-            },
-            offroadvehicleselections: XmlOffroadVehicleSelections {
-                items: spec
-                    .offroad_vehicle_selections
-                    .iter()
-                    .map(|o| XmlOffroadVehicleSelection {
-                        fuel_type_id: o.fuel_type_id,
-                        fuel_type_name: o.fuel_type_name.clone(),
-                        sector_id: o.sector_id,
-                        sector_name: o.sector_name.clone(),
-                    })
-                    .collect(),
-            },
-            offroadvehiclesccs: XmlOffroadVehicleSccs {
-                items: spec
-                    .offroad_vehicle_sccs
-                    .iter()
-                    .map(|s| XmlOffroadVehicleScc {
-                        scc: s.scc.clone(),
-                        description: s.description.clone(),
-                    })
-                    .collect(),
-            },
-            roadtypes: XmlRoadTypes {
-                items: spec
-                    .road_types
-                    .iter()
-                    .map(|r| XmlRoadType {
-                        road_type_id: r.road_type_id,
-                        road_type_name: r.road_type_name.clone(),
-                        model_combination: r.model_combination.clone(),
-                    })
-                    .collect(),
-            },
-            pollutantprocessassociations: XmlPollutantProcessAssociations {
-                items: spec
-                    .pollutant_process_associations
-                    .iter()
-                    .map(|p| XmlPollutantProcessAssociation {
-                        pollutant_id: p.pollutant_id,
-                        pollutant_name: p.pollutant_name.clone(),
-                        process_id: p.process_id,
-                        process_name: p.process_name.clone(),
-                    })
-                    .collect(),
-            },
-            databaseselections: XmlDatabaseSelections {
-                items: spec
-                    .database_selections
-                    .iter()
-                    .map(|_| XmlDatabaseSelection {})
-                    .collect(),
-            },
-            internalcontrolstrategies: XmlInternalControlStrategies {
-                items: spec
-                    .internal_control_strategies
-                    .iter()
-                    .map(|_| XmlInternalControlStrategy {})
-                    .collect(),
-            },
-            inputdatabase: XmlDatabaseRef {
-                servername: spec.input_database.server.clone(),
-                databasename: spec.input_database.database.clone(),
-                description: spec.input_database.description.clone(),
-            },
-            uncertaintyparameters: XmlUncertaintyParameters {
-                enabled: spec.uncertainty.enabled,
-                runs_per_simulation: spec.uncertainty.runs_per_simulation,
-                simulations: spec.uncertainty.simulations,
-            },
-            geographicoutputdetail: XmlGeographicOutputDetail {
-                description: spec.geographic_output_detail.xml_value().to_string(),
-            },
-            outputemissionsbreakdownselection: XmlOutputBreakdown {
-                modelyear: XmlSelected {
-                    selected: spec.output_breakdown.model_year,
-                },
-                fueltype: XmlSelected {
-                    selected: spec.output_breakdown.fuel_type,
-                },
-                emissionprocess: XmlSelected {
-                    selected: spec.output_breakdown.emission_process,
-                },
-                distinguishparticulates: XmlSelected {
-                    selected: spec.output_breakdown.distinguish_particulates,
-                },
-                onroadoffroad: XmlSelected {
-                    selected: spec.output_breakdown.onroad_offroad,
-                },
-                roadtype: XmlSelected {
-                    selected: spec.output_breakdown.road_type,
-                },
-                sourceusetype: XmlSelected {
-                    selected: spec.output_breakdown.source_use_type,
-                },
-                movesvehicletype: XmlSelected {
-                    selected: spec.output_breakdown.moves_vehicle_type,
-                },
-                onroadscc: XmlSelected {
-                    selected: spec.output_breakdown.onroad_scc,
-                },
-                offroadscc: XmlSelected {
-                    selected: spec.output_breakdown.offroad_scc,
-                },
-                estimateuncertainty: XmlSelected {
-                    selected: spec.output_breakdown.estimate_uncertainty,
-                },
-                segment: XmlSelected {
-                    selected: spec.output_breakdown.segment,
-                },
-                hpclass: XmlSelected {
-                    selected: spec.output_breakdown.hp_class,
-                },
-            },
-            outputdatabase: XmlDatabaseRef {
-                servername: spec.output_database.server.clone(),
-                databasename: spec.output_database.database.clone(),
-                description: spec.output_database.description.clone(),
-            },
-            outputtimestep: XmlValueStr {
-                value: spec.output_timestep.xml_value().to_string(),
-            },
-            outputvmtdata: XmlValueBool {
-                value: spec.output_vmt_data,
-            },
-            outputsho: spec.output_nonroad.sho.map(|value| XmlValueBool { value }),
-            outputsh: spec.output_nonroad.sh.map(|value| XmlValueBool { value }),
-            outputshp: spec.output_nonroad.shp.map(|value| XmlValueBool { value }),
-            outputshidling: spec
-                .output_nonroad
-                .shidling
-                .map(|value| XmlValueBool { value }),
-            outputstarts: spec
-                .output_nonroad
-                .starts
-                .map(|value| XmlValueBool { value }),
-            outputpopulation: spec
-                .output_nonroad
-                .population
-                .map(|value| XmlValueBool { value }),
-            scaleinputdatabase: XmlDatabaseRef {
-                servername: spec.scale_input_database.server.clone(),
-                databasename: spec.scale_input_database.database.clone(),
-                description: spec.scale_input_database.description.clone(),
-            },
-            pmsize: XmlValueU32 {
-                value: spec.pm_size,
-            },
-            outputfactors: XmlOutputFactors {
-                timefactors: XmlTimeFactor {
-                    selected: spec.output_factors.time.enabled,
-                    units: spec.output_factors.time.units.xml_value().to_string(),
-                },
-                distancefactors: XmlDistanceFactor {
-                    selected: spec.output_factors.distance.enabled,
-                    units: spec.output_factors.distance.units.xml_value().to_string(),
-                },
-                massfactors: XmlMassFactor {
-                    selected: spec.output_factors.mass.enabled,
-                    units: spec.output_factors.mass.units.xml_value().to_string(),
-                    energy_units: spec
-                        .output_factors
-                        .mass
-                        .energy_units
-                        .xml_value()
-                        .to_string(),
-                },
-            },
-        }
     }
 }
