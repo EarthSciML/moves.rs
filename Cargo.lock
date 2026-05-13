@@ -1828,6 +1828,7 @@ dependencies = [
  "bytes",
  "moves-calculator-info",
  "moves-data",
+ "moves-runspec",
  "parquet",
  "serde_json",
  "tempfile",

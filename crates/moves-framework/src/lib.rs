@@ -17,6 +17,7 @@
 //! * Task 20 — MasterLoop core iteration (this commit)
 //! * Task 21 — Granularity-based loop notification (refines Task 20 dispatch)
 //! * Task 23 — `ExecutionDatabaseSchema` and `CalculatorContext`
+//! * Task 25 — Output aggregation planning (this commit)
 //! * Task 26 — `OutputProcessor` (Phase 2 skeleton, this commit via Task 89)
 //! * Task 50 — `DataFrameStore` (shared with `moves-data`)
 //! * Task 89 — Unified Parquet output writer (this commit)
@@ -51,6 +52,7 @@
 //! Storage internals for [`ExecutionTables`] / [`ScratchNamespace`] stay
 //! placeholder until Task 50 lands the concrete `DataFrameStore`.
 
+pub mod aggregation;
 pub mod calculator;
 mod error;
 pub mod execution_db;
@@ -58,6 +60,10 @@ pub mod master_loop;
 pub mod output_processor;
 pub mod registry;
 
+pub use aggregation::{
+    activity_aggregation, base_rate_aggregation, emission_aggregation, AggregationColumn,
+    AggregationInputs, AggregationPlan, AggregationTable, TemporalScaling,
+};
 pub use calculator::{
     Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, Generator,
 };
