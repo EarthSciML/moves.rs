@@ -1817,6 +1817,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "moves-import-lev"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "bytes",
+ "parquet",
+ "sha2",
+ "tempfile",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "moves-nonroad"
 version = "0.1.0"
 dependencies = [

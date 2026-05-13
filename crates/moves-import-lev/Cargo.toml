@@ -1,0 +1,22 @@
+[package]
+name = "moves-import-lev"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+description = "MOVES LEV/NLEV alternative-rate input importer (Phase 4 Task 87)."
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+arrow = { workspace = true }
+parquet = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+bytes = { workspace = true }
+tempfile = { workspace = true }
