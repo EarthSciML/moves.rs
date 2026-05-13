@@ -17,6 +17,7 @@
 //! * Task 20 — MasterLoop core iteration (this commit)
 //! * Task 21 — Granularity-based loop notification (refines Task 20 dispatch)
 //! * Task 23 — `ExecutionDatabaseSchema` and `CalculatorContext`
+//! * Task 24 — `InputDataManager` (this commit)
 //! * Task 25 — Output aggregation planning (this commit)
 //! * Task 26 — `OutputProcessor` (Phase 2 skeleton, this commit via Task 89)
 //! * Task 50 — `DataFrameStore` (shared with `moves-data`)
@@ -24,7 +25,7 @@
 //!
 //! # Phase 2 status
 //!
-//! Tasks 17, 18, 19, 20, 21, 23, and 89 are in place:
+//! Tasks 17, 18, 19, 20, 21, 23, 24, and 89 are in place:
 //!
 //! * Task 17 — [`MasterLoopableSubscription`] ordering matches Java exactly.
 //! * Task 18 — [`Calculator`] / [`Generator`] traits plus
@@ -43,6 +44,11 @@
 //!   [`ScratchNamespace`], and the [`IterationPosition`] triple; the
 //!   [`ExecutionDatabaseSchema`] registry defines which tables may appear
 //!   in the execution database.
+//! * Task 24 — [`InputDataManager`] ports the default-DB-to-execution-DB
+//!   filter logic: [`RunSpecFilters`] projects RunSpec selections,
+//!   [`WhereClauseBuilder`] emits structured per-dimension predicates,
+//!   and [`InputDataManager::plan`] walks the
+//!   [`default_tables`] registry to produce a [`MergePlan`].
 //! * Task 89 — [`OutputProcessor`], the strongly-typed Parquet writer for
 //!   the three output tables defined by [`moves_data::output_schema`].
 //!   Phase 3 calculators feed it [`moves_data::EmissionRecord`] /
@@ -50,12 +56,15 @@
 //!   accept Polars `DataFrame`s once Task 50 lands the data plane.
 //!
 //! Storage internals for [`ExecutionTables`] / [`ScratchNamespace`] stay
-//! placeholder until Task 50 lands the concrete `DataFrameStore`.
+//! placeholder until Task 50 lands the concrete `DataFrameStore`. The
+//! [`InputDataManager`] plan is consumed by that data plane to populate
+//! [`ExecutionTables`] from Parquet snapshots.
 
 pub mod aggregation;
 pub mod calculator;
 mod error;
 pub mod execution_db;
+pub mod input_data_manager;
 pub mod master_loop;
 pub mod output_processor;
 pub mod registry;
@@ -71,6 +80,10 @@ pub use error::{Error, Result};
 pub use execution_db::{
     ExecutionDatabaseSchema, ExecutionLocation, ExecutionTableSpec, ExecutionTables, ExecutionTime,
     IterationPosition, ScratchNamespace, TableSource,
+};
+pub use input_data_manager::{
+    default_tables, InputDataManager, MergePlan, MergeTableSpec, RunSpecFilters, TableMergePlan,
+    WhereClause, WhereClauseBuilder,
 };
 pub use master_loop::{
     Granularity, MasterLoop, MasterLoopContext, MasterLoopable, MasterLoopableSubscription,
