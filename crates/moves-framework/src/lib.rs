@@ -12,22 +12,30 @@
 //! * Task 15 — `ExecutionRunSpec`
 //! * Task 16 — Location iterator
 //! * Task 17 — MasterLoop subscription model
-//! * Task 18 — Calculator and Generator base traits (this commit)
+//! * Task 18 — Calculator and Generator base traits
 //! * Task 19 — `CalculatorRegistry`
 //! * Task 20 — MasterLoop core iteration
-//! * Task 23 — `ExecutionDatabaseSchema` and `CalculatorContext`
+//! * Task 23 — `ExecutionDatabaseSchema` and `CalculatorContext` (this commit)
 //! * Task 50 — `DataFrameStore` (shared with `moves-data`)
 //!
 //! # Phase 2 status
 //!
-//! Task 18 lands: the [`Calculator`] and [`Generator`] traits, the
-//! [`CalculatorSubscription`] declaration record, and skeleton
-//! [`CalculatorContext`] / [`CalculatorOutput`] placeholder types that
-//! Task 23 / Task 50 will widen. Task 17 (subscription ordering) is in
-//! place; the rest is still skeleton.
+//! Tasks 17, 18, and 23 are in place:
+//!
+//! * Task 17 — [`MasterLoopableSubscription`] ordering matches Java exactly.
+//! * Task 18 — [`Calculator`] / [`Generator`] traits plus
+//!   [`CalculatorSubscription`].
+//! * Task 23 — [`CalculatorContext`] widened to own [`ExecutionTables`],
+//!   [`ScratchNamespace`], and an [`IterationPosition`] triple; the
+//!   [`ExecutionDatabaseSchema`] registry defines which tables may appear
+//!   in the execution database.
+//!
+//! Storage internals for [`ExecutionTables`] / [`ScratchNamespace`] stay
+//! placeholder until Task 50 lands the concrete `DataFrameStore`.
 
 pub mod calculator;
 mod error;
+pub mod execution_db;
 pub mod master_loop;
 pub mod registry;
 
@@ -35,5 +43,9 @@ pub use calculator::{
     Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, Generator,
 };
 pub use error::{Error, Result};
+pub use execution_db::{
+    ExecutionDatabaseSchema, ExecutionLocation, ExecutionTableSpec, ExecutionTables, ExecutionTime,
+    IterationPosition, ScratchNamespace, TableSource,
+};
 pub use master_loop::{Granularity, MasterLoopContext, MasterLoopable, MasterLoopableSubscription};
 pub use registry::{CalculatorFactory, CalculatorRegistry, GeneratorFactory, ModuleFactory};

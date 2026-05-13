@@ -49,55 +49,99 @@
 //! calculator authors only need to think about "given this context, produce
 //! this output" — the dispatch plumbing stays inside the framework.
 //!
-//! # Skeleton types
+//! # Context shape
 //!
-//! [`CalculatorContext`] and [`CalculatorOutput`] are deliberately empty
-//! placeholder structs in this commit:
+//! [`CalculatorContext`] is the runtime view of a calculator's inputs —
+//! per-run filtered default-DB tables ([`ExecutionTables`]), inter-calculator
+//! scratch ([`ScratchNamespace`]), and the master loop's current
+//! [`IterationPosition`] (process, location, time). The component types
+//! live in [`crate::execution_db`]; this module re-binds them onto the
+//! trait signatures.
 //!
-//! * [`CalculatorContext`] is the runtime view of a calculator's inputs —
-//!   per-run filtered default-DB tables, scratch namespace, current
-//!   iteration/location/time triple. Task 23
-//!   (`ExecutionDatabaseSchema and CalculatorContext`, blocked by this task)
-//!   fills it in.
-//! * [`CalculatorOutput`] is the per-invocation result type. Task 50
-//!   (`DataFrameStore`) replaces it with a Polars `DataFrame` once the data
-//!   plane lands.
-//!
-//! Sealing the trait signatures around named placeholder types lets Phase 3
-//! calculators start porting against a stable API today; widening the
-//! placeholders later does not break implementors.
+//! [`CalculatorOutput`] is the per-invocation result type. **Phase 2
+//! skeleton.** Task 50 (`DataFrameStore`) replaces it with a Polars
+//! `DataFrame` once the data plane lands. Sealing the trait signature
+//! around the named placeholder type lets Phase 3 calculators start
+//! porting against a stable API today; widening the placeholder later
+//! does not break implementors.
 
 use moves_calculator_info::{Granularity, Priority};
 use moves_data::{PollutantProcessAssociation, ProcessId};
 
 use crate::error::Error;
+use crate::execution_db::{ExecutionTables, IterationPosition, ScratchNamespace};
 
-/// Runtime view of a calculator's inputs and scratch space.
+/// Runtime view of a calculator's inputs and scratch space — the in-memory
+/// equivalent of MOVES's MariaDB execution database.
 ///
-/// **Phase 2 skeleton.** Empty in this commit so [`Calculator::execute`]
-/// and [`Generator::execute`] can fix their signatures. Task 23
-/// (`ExecutionDatabaseSchema and CalculatorContext`) populates this struct
-/// with:
+/// Owns the three pieces Task 23 specifies:
 ///
-/// * The per-run filtered default-DB tables, loaded once per run.
-/// * A scratch namespace for inter-calculator hand-offs.
-/// * The current iteration / location / time triple.
+/// * [`tables`](Self::tables) — per-run filtered default-DB tables,
+///   loaded once per run (slow tier).
+/// * [`scratch`](Self::scratch) — name-keyed inter-calculator scratch
+///   space (fast tier).
+/// * [`position`](Self::position) — the current MasterLoop iteration /
+///   location / time triple.
 ///
-/// Widening this struct is non-breaking for implementors that only read
-/// from `ctx` — calculators don't construct [`CalculatorContext`] themselves;
-/// Task 19's registry does.
+/// Calculators don't construct [`CalculatorContext`] themselves; Task 19's
+/// registry materialises a fresh one on each
+/// [`MasterLoopable::execute_at_granularity`](crate::MasterLoopable::execute_at_granularity)
+/// callback and passes it by reference to [`Calculator::execute`] /
+/// [`Generator::execute`].
+///
+/// The slow / scratch tiers are storage-shape placeholders today; Task 50
+/// (`DataFrameStore`) replaces their internals. The position triple is
+/// concrete: Phase 3 authors can read `ctx.position().location.county_id`,
+/// `ctx.position().time.hour`, etc. immediately.
 #[derive(Debug, Default)]
 pub struct CalculatorContext {
-    // Task 23 expands this struct.
-    _private: (),
+    tables: ExecutionTables,
+    scratch: ScratchNamespace,
+    position: IterationPosition,
 }
 
 impl CalculatorContext {
-    /// Construct an empty context. Used by tests and by Task 19's registry
-    /// stub until [`CalculatorContext`] grows real fields.
+    /// Construct an empty context with start-of-run position. Used by
+    /// tests and by Task 19's registry stub until full per-run
+    /// materialisation lands.
     #[must_use]
     pub fn new() -> Self {
-        Self { _private: () }
+        Self::default()
+    }
+
+    /// Construct a context with the given position, leaving tables and
+    /// scratch empty. Convenient for tests that exercise position-aware
+    /// logic without touching the data plane.
+    #[must_use]
+    pub fn with_position(position: IterationPosition) -> Self {
+        Self {
+            tables: ExecutionTables::empty(),
+            scratch: ScratchNamespace::empty(),
+            position,
+        }
+    }
+
+    /// Per-run filtered default-DB tables. Calculators read from this in
+    /// their [`Calculator::execute`] body, indexing by the canonical
+    /// table names declared in [`Calculator::input_tables`].
+    #[must_use]
+    pub fn tables(&self) -> &ExecutionTables {
+        &self.tables
+    }
+
+    /// Inter-calculator scratch namespace. Generators write here in their
+    /// [`Generator::execute`] body; downstream calculators read.
+    #[must_use]
+    pub fn scratch(&self) -> &ScratchNamespace {
+        &self.scratch
+    }
+
+    /// Current MasterLoop iteration / location / time triple. Concrete in
+    /// this commit (placeholder data plane notwithstanding) — Phase 3
+    /// calculators can read e.g. `ctx.position().time.hour` directly.
+    #[must_use]
+    pub fn position(&self) -> &IterationPosition {
+        &self.position
     }
 }
 
@@ -439,5 +483,42 @@ mod tests {
         assert_eq!(procs, vec![ProcessId(1), ProcessId(2)]);
         assert_eq!(calc.upstream().len(), 1);
         assert_eq!(calc.input_tables().len(), 2);
+    }
+
+    #[test]
+    fn context_default_position_is_start_of_run() {
+        // The default-constructed context puts the master loop at the
+        // pre-iteration state — no process, no location, no time.
+        let ctx = CalculatorContext::new();
+        let pos = ctx.position();
+        assert_eq!(pos.iteration, 0);
+        assert!(pos.process_id.is_none());
+        assert!(pos.location.county_id.is_none());
+        assert!(pos.time.year.is_none());
+    }
+
+    #[test]
+    fn context_with_position_carries_through_execute() {
+        // Calculators reach the position through `ctx.position()`. Build a
+        // context at HOUR granularity and verify a Calculator body can
+        // read each component from the accessor chain.
+        use crate::execution_db::{ExecutionLocation, ExecutionTime, IterationPosition};
+        let pos = IterationPosition {
+            iteration: 0,
+            process_id: Some(ProcessId(1)),
+            location: ExecutionLocation::link(40, 40_001, 400_011, 4_000_111),
+            time: ExecutionTime::hour(2020, 7, 5, 8),
+        };
+        let ctx = CalculatorContext::with_position(pos);
+        let calc = DummyCalculator;
+        // Calculator body doesn't read the context — just verify it can
+        // be called with the populated context.
+        let _out = calc.execute(&ctx).expect("execute ok");
+        // And verify the position is readable through the public accessor
+        // (matches what Phase 3 calculator bodies will do).
+        assert_eq!(ctx.position().process_id, Some(ProcessId(1)));
+        assert_eq!(ctx.position().location.state_id, Some(40));
+        assert_eq!(ctx.position().location.link_id, Some(4_000_111));
+        assert_eq!(ctx.position().time.hour, Some(8));
     }
 }
