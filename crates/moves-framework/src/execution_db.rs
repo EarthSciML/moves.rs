@@ -58,7 +58,14 @@ use moves_data::ProcessId;
 ///
 /// Task 16 (`ExecutionLocationProducer`) will introduce the iterator that
 /// emits a sequence of populated values; this type is the per-step record.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+///
+/// `Ord`/`PartialOrd`/`Hash` derive in declaration order
+/// (state, county, zone, link). That matches Java's `compareTo` and is the
+/// contract `BTreeSet<ExecutionLocation>` relies on — e.g. Task 15's
+/// `ExecutionRunSpec::execution_locations` set, which holds the full
+/// sweep of link-granularity targets the MasterLoop visits and projects
+/// out the per-component sets used by the filter tables.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct ExecutionLocation {
     /// `State.stateID` of the state currently iterating. `None` outside
     /// STATE-or-finer granularity scopes.
