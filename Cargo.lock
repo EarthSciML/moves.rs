@@ -1824,8 +1824,11 @@ dependencies = [
 name = "moves-framework"
 version = "0.1.0"
 dependencies = [
+ "arrow",
+ "bytes",
  "moves-calculator-info",
  "moves-data",
+ "parquet",
  "serde_json",
  "tempfile",
  "thiserror 1.0.69",
