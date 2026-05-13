@@ -1853,6 +1853,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "moves-nonroad-import"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "bytes",
+ "parquet",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "moves-runspec"
 version = "0.1.0"
 dependencies = [

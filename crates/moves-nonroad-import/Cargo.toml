@@ -1,0 +1,24 @@
+[package]
+name = "moves-nonroad-import"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+description = "Nonroad input-database importer: user-supplied CSV templates → Parquet matching the Nonroad default-DB schema (Phase 4 Task 85)."
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+arrow = { workspace = true }
+parquet = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+bytes = { workspace = true }
+tempfile = { workspace = true }
