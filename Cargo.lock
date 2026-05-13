@@ -973,8 +973,12 @@ dependencies = [
 name = "moves-framework"
 version = "0.1.0"
 dependencies = [
+ "arrow",
+ "bytes",
  "moves-calculator-info",
  "moves-data",
+ "parquet",
+ "tempfile",
  "thiserror",
 ]
 

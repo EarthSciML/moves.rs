@@ -31,6 +31,7 @@
 //! default DB at startup; any drift is a deliberate cutover.
 
 pub mod error;
+pub mod output_schema;
 pub mod pollutant;
 pub mod pollutant_process;
 pub mod process;
@@ -38,6 +39,10 @@ pub mod road_type;
 pub mod source_type;
 
 pub use error::{Error, Result};
+pub use output_schema::{
+    ActivityRecord, EmissionRecord, MovesRunRecord, OutputColumn, OutputColumnType, OutputTable,
+    MOVES_ACTIVITY_OUTPUT_COLUMNS, MOVES_OUTPUT_COLUMNS, MOVES_RUN_COLUMNS,
+};
 pub use pollutant::{Pollutant, PollutantId};
 pub use pollutant_process::{PolProcessId, PollutantProcessAssociation};
 pub use process::{EmissionProcess, ProcessId};
