@@ -1844,6 +1844,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "moves-importer-pdb"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "bytes",
+ "csv",
+ "parquet",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "moves-nonroad"
 version = "0.1.0"
 dependencies = [
