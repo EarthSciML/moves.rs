@@ -24,9 +24,13 @@
 //!
 //! # Status
 //!
-//! - Task 109 ([`county`], [`subcounty`]) — ported. County and
-//!   subcounty processing live in dedicated submodules and share
-//!   types/helpers via a private [`common`] submodule.
+//! - Task 109 ([`county`], [`subcounty`]) — ported, then merged by
+//!   Task 112: `prccty.f` and `prcsub.f` now share the single
+//!   parameterised [`process_geography`] routine (in the private
+//!   `process` submodule). The [`county`] and [`subcounty`]
+//!   submodules hold thin wrappers that pick a [`ProcessLevel`];
+//!   both still share types/helpers via the private `common`
+//!   submodule.
 //! - Task 111 ([`prcnat`], [`prcus`]) — ported. National and US-total
 //!   processing.
 //! - Task 110 — pending; its submodule will sit beside these.
@@ -62,12 +66,14 @@ mod common;
 pub mod county;
 pub mod prcnat;
 pub mod prcus;
+mod process;
 pub mod state;
 pub mod subcounty;
 
 pub use county::process_county;
 pub use prcnat::{process_national_record, NationalContext};
 pub use prcus::{process_us_total_record, UsTotalContext};
+pub use process::{process_geography, ProcessLevel};
 pub use state::{
     process_state_from_national_record, process_state_to_county_record, StateCallbacks,
 };
