@@ -1,0 +1,25 @@
+[package]
+name = "moves-importer"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+description = "Shared importer framework for County/Project/Nonroad input databases (Phase 4 Tasks 83-87)."
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+arrow = { workspace = true }
+csv = { workspace = true }
+moves-data-default = { path = "../moves-data-default" }
+parquet = { workspace = true }
+polars = { workspace = true }
+serde = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
