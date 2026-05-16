@@ -1817,6 +1817,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "moves-importer"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "csv",
+ "moves-data-default",
+ "parquet",
+ "polars",
+ "serde",
+ "sha2",
+ "tempfile",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "moves-importer-county"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "bytes",
+ "moves-default-db-convert",
+ "moves-importer",
+ "parquet",
+ "tempfile",
+]
+
+[[package]]
 name = "moves-nonroad"
 version = "0.1.0"
 dependencies = [
