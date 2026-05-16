@@ -21,7 +21,7 @@
 //!
 //! # Phase 2 status
 //!
-//! Tasks 17, 18, 19, 20, and 23 are in place:
+//! Tasks 17, 18, 19, 20, 21, and 23 are in place:
 //!
 //! * Task 17 — [`MasterLoopableSubscription`] ordering matches Java exactly.
 //! * Task 18 — [`Calculator`] / [`Generator`] traits plus
@@ -31,9 +31,11 @@
 //! * Task 20 — [`MasterLoop`] iteration engine walking
 //!   `iteration → process → state → county → zone → link → year → month →
 //!   day → hour`, with forward/cleanup dispatch around the Task 23
-//!   [`IterationPosition`] triple. The basic priority-ordered walk is
-//!   live; Task 21 will refine it with the `hasLoopables` short-circuit
-//!   and try-finally cleanup semantics from `notifyLoopablesOfLoopChange`.
+//!   [`IterationPosition`] triple.
+//! * Task 21 — `notifyLoopablesOfLoopChange` / `hasLoopables` dispatch:
+//!   priority-ordered notification at each level (live since Task 20),
+//!   plus the `hasLoopables` short-circuit that descends the time nest
+//!   only as deep as the finest registered subscription.
 //! * Task 23 — [`CalculatorContext`] owns [`ExecutionTables`],
 //!   [`ScratchNamespace`], and the [`IterationPosition`] triple; the
 //!   [`ExecutionDatabaseSchema`] registry defines which tables may appear
