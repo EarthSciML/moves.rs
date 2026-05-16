@@ -50,7 +50,10 @@ The structure plays well with Polars / DuckDB / pandas:
 import polars as pl
 df = pl.scan_parquet("<output-root>/MOVESOutput/**/*.parquet",
                      hive_partitioning=True)
-df.filter(pl.col("yearID") == 2020).group_by("pollutantID").sum().collect()
+(df.filter(pl.col("yearID") == 2020)
+   .group_by("pollutantID")
+   .agg(pl.col("emissionQuant").sum())
+   .collect())
 ```
 
 ```sql
@@ -65,15 +68,20 @@ Both readers push the `yearID` / `monthID` predicates into the
 partition layout — only the matching partition files are opened.
 
 ```python
-import pyarrow.dataset as ds
-dataset = ds.dataset("<output-root>/MOVESOutput", format="parquet",
-                     partitioning="hive")
-table = dataset.to_table(filter=(ds.field("yearID") == 2020))
+import glob
+import pandas as pd
+
+# pandas — recursive read; yearID/monthID are in the row data, so no
+# hive-partition handling is needed.
+files = glob.glob("<output-root>/MOVESOutput/**/*.parquet", recursive=True)
+df = pd.concat((pd.read_parquet(f) for f in files), ignore_index=True)
+df[df["yearID"] == 2020].groupby("pollutantID")["emissionQuant"].sum()
 ```
 
-Task 90 ships full downstream examples (NEI rollups, county inventories,
-rates-mode CSV exports). This page documents the underlying schema; the
-examples cover the typical analyses.
+[`downstream-tools.md`](downstream-tools.md) ships full downstream
+examples (NEI rollups, county inventories, rates-mode CSV exports) and
+loader recipes for pandas, R, Polars, DuckDB, and Spark. This page
+documents the underlying schema; that page covers the typical analyses.
 
 ## Schema
 
