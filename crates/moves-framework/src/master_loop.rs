@@ -18,8 +18,10 @@
 //!   [`MasterLoopContext::position`].
 //!
 //! Task 21 (`notifyLoopablesOfLoopChange` / `hasLoopables`) refines the
-//! dispatch inside [`MasterLoop::run`] with the level short-circuit and
-//! the try-finally cleanup semantics.
+//! dispatch inside [`MasterLoop::run`] with the `hasLoopables`
+//! short-circuit: the `year → month → day → hour` nest descends only as
+//! deep as the finest registered subscription, so a run whose
+//! subscribers all sit above the time nest skips it entirely.
 //!
 //! # Ordering invariants
 //!
@@ -214,9 +216,11 @@ impl Ord for MasterLoopableSubscription {
 /// (cleanup pass, [`MasterLoopable::clean_data_loop`]). `MatchFinest`
 /// subscriptions pin to the deepest level in play (`HOUR` for inventory
 /// runs) and fire after the `HOUR` subscriptions on each `HOUR`
-/// iteration. The Java engine optimises this with a `hasLoopables`
-/// short-circuit (skipping a level when nothing subscribes); Task 21
-/// adds that optimisation here.
+/// iteration. The `hasLoopables` short-circuit (Task 21) trims the
+/// time nest to the finest granularity anyone subscribes at: a run
+/// whose subscribers all sit at `PROCESS` never enters the
+/// `year → month → day → hour` nest at all. See the private
+/// `MasterLoop::time_nest_depth` for the depth decision.
 ///
 /// # Inputs and per-level views
 ///
@@ -237,9 +241,14 @@ impl Ord for MasterLoopableSubscription {
 /// # Error handling
 ///
 /// If any subscription returns [`Err`], `run` returns immediately with
-/// that error and does not run remaining cleanup passes. Task 21 will
-/// refine this to mirror Java's try-finally pattern so cleanup runs even
-/// when a forward pass errored.
+/// that error and runs no further notifications — including the paired
+/// cleanup passes for levels already entered. This matches Java:
+/// `MasterLoop.threadIterationGo` puts no `try`/`finally` around the
+/// loop body, so a loopable exception propagates uncaught and the
+/// cleanup notifications below it never fire. The Rust port needs no
+/// cleanup-on-error safety net of its own — per-iteration scratch state
+/// lives in [`crate::CalculatorContext`] `DataFrame`s that drop when the
+/// erroring `run` unwinds.
 #[derive(Debug)]
 pub struct MasterLoop {
     /// Number of top-level iterations. Defaults to `1`. `0` causes
@@ -310,6 +319,12 @@ impl MasterLoop {
     pub fn run(&self) -> Result<(), Error> {
         let location_groups = group_locations(&self.locations);
         let time_groups = group_times(&self.times);
+        // `hasLoopables` short-circuit (Task 21): probe the subscription
+        // set once up front so `run_times` can skip every time level
+        // below the finest subscriber. Subscriptions are fixed for the
+        // life of a `run` (it borrows `&self`), so a single probe is
+        // exact for every process and location.
+        let depth = self.time_nest_depth();
         let mut ctx = MasterLoopContext::default();
 
         for iter_idx in 0..self.iterations {
@@ -320,17 +335,24 @@ impl MasterLoop {
                 ctx.position.location = ExecutionLocation::none();
                 ctx.position.time = ExecutionTime::none();
                 self.notify_at(Granularity::Process, &mut ctx)?;
-                self.run_locations(&location_groups, &time_groups, &mut ctx)?;
+                self.run_locations(&location_groups, &time_groups, depth, &mut ctx)?;
                 self.cleanup_at(Granularity::Process, &mut ctx)?;
             }
         }
         Ok(())
     }
 
+    /// Walk the `state → county → zone → link` location nest, firing
+    /// each level's subscribers and descending into `run_times` at the
+    /// innermost `link`. `depth` is forwarded untouched to `run_times`;
+    /// the location nest itself is never short-circuited, matching Java's
+    /// `loopThroughProcess`, which always iterates every execution
+    /// location.
     fn run_locations(
         &self,
         location_groups: &LocationGroups,
         time_groups: &TimeGroups,
+        depth: TimeNestDepth,
         ctx: &mut MasterLoopContext,
     ) -> Result<(), Error> {
         for (&state_id, counties) in location_groups {
@@ -351,7 +373,7 @@ impl MasterLoop {
                         ctx.position.location =
                             ExecutionLocation::link(state_id, county_id, zone_id, link_id);
                         self.notify_at(Granularity::Link, ctx)?;
-                        self.run_times(time_groups, ctx)?;
+                        self.run_times(time_groups, depth, ctx)?;
                         self.cleanup_at(Granularity::Link, ctx)?;
                     }
                     self.cleanup_at(Granularity::Zone, ctx)?;
@@ -363,40 +385,63 @@ impl MasterLoop {
         Ok(())
     }
 
+    /// Forward + cleanup walk of the `year → month → day → hour` time
+    /// nest, gated by the `hasLoopables` short-circuit.
+    ///
+    /// `depth` (from `time_nest_depth`) caps how far the nest descends —
+    /// a level runs only when some subscriber fires there or finer. This
+    /// ports the `mustLoopOver*` guards in `MasterLoop.loopThroughTime`:
+    /// Java wraps each `for` in `if (mustLoopOver…)`, the port wraps each
+    /// in `if depth >= …`. A level's cleanup notification sits inside
+    /// that level's guard, so a skipped level fires neither its forward
+    /// nor its cleanup pass — matching Java, where
+    /// `notifyLoopablesOfLoopChange(…, true)` is itself inside the
+    /// `if (mustLoopOver…)` block.
     fn run_times(
         &self,
         time_groups: &TimeGroups,
+        depth: TimeNestDepth,
         ctx: &mut MasterLoopContext,
     ) -> Result<(), Error> {
+        if depth == TimeNestDepth::Skip {
+            return Ok(());
+        }
         for (&year, months) in time_groups {
             ctx.position.time = ExecutionTime::year(year);
             self.notify_at(Granularity::Year, ctx)?;
-            for (&month, days) in months {
-                ctx.position.time = ExecutionTime {
-                    year: Some(year),
-                    month: Some(month),
-                    day_id: None,
-                    hour: None,
-                };
-                self.notify_at(Granularity::Month, ctx)?;
-                for (&day_id, hours) in days {
+            if depth >= TimeNestDepth::Month {
+                for (&month, days) in months {
                     ctx.position.time = ExecutionTime {
                         year: Some(year),
                         month: Some(month),
-                        day_id: Some(day_id),
+                        day_id: None,
                         hour: None,
                     };
-                    self.notify_at(Granularity::Day, ctx)?;
-                    for &hour in hours {
-                        ctx.position.time = ExecutionTime::hour(year, month, day_id, hour);
-                        self.notify_at(Granularity::Hour, ctx)?;
-                        self.notify_at(Granularity::MatchFinest, ctx)?;
-                        self.cleanup_at(Granularity::MatchFinest, ctx)?;
-                        self.cleanup_at(Granularity::Hour, ctx)?;
+                    self.notify_at(Granularity::Month, ctx)?;
+                    if depth >= TimeNestDepth::Day {
+                        for (&day_id, hours) in days {
+                            ctx.position.time = ExecutionTime {
+                                year: Some(year),
+                                month: Some(month),
+                                day_id: Some(day_id),
+                                hour: None,
+                            };
+                            self.notify_at(Granularity::Day, ctx)?;
+                            if depth >= TimeNestDepth::Hour {
+                                for &hour in hours {
+                                    ctx.position.time =
+                                        ExecutionTime::hour(year, month, day_id, hour);
+                                    self.notify_at(Granularity::Hour, ctx)?;
+                                    self.notify_at(Granularity::MatchFinest, ctx)?;
+                                    self.cleanup_at(Granularity::MatchFinest, ctx)?;
+                                    self.cleanup_at(Granularity::Hour, ctx)?;
+                                }
+                            }
+                            self.cleanup_at(Granularity::Day, ctx)?;
+                        }
                     }
-                    self.cleanup_at(Granularity::Day, ctx)?;
+                    self.cleanup_at(Granularity::Month, ctx)?;
                 }
-                self.cleanup_at(Granularity::Month, ctx)?;
             }
             self.cleanup_at(Granularity::Year, ctx)?;
         }
@@ -442,6 +487,79 @@ impl MasterLoop {
         }
         Ok(())
     }
+
+    /// Port of `MasterLoop.hasLoopables`: whether any registered
+    /// subscription fires at exactly `granularity`.
+    ///
+    /// Java keys subscriptions by `EmissionProcess` in a `TreeMap` and
+    /// answers per process; this port keeps one global subscription list
+    /// — a subscriber that cares about a single process filters on
+    /// `ctx.position.process_id` itself — so the answer is
+    /// process-independent. Java walks its per-process `TreeSet`,
+    /// skipping coarser entries and stopping at the first granularity
+    /// `>=` the target; an exact-match scan is equivalent here because
+    /// `subscribe` keeps `subscriptions` sorted and `time_nest_depth`
+    /// needs only the yes/no answer.
+    fn has_loopables(&self, granularity: Granularity) -> bool {
+        self.subscriptions
+            .iter()
+            .any(|sub| sub.granularity == granularity)
+    }
+
+    /// Decide how deep `run` drives the time nest, porting the
+    /// `mustLoopOver*` cascade in `MasterLoop.loopThroughProcess`: the
+    /// finest granularity anyone subscribes to sets the depth, and every
+    /// coarser time level above it is implied.
+    ///
+    /// Java probes `hasLoopables(HOUR / DAY / MONTH / YEAR)`. This port
+    /// also folds `MATCH_FINEST` into the `HOUR` probe. Java can leave it
+    /// out because its `notifyLoopablesOfLoopChange` never dispatches a
+    /// `MATCH_FINEST` subscription (it nulls them out); this port *does*
+    /// dispatch them — Task 20 fires them at the `HOUR` level, right
+    /// after the `HOUR` subscribers — so the `HOUR` loop must stay alive
+    /// whenever a `MATCH_FINEST` subscription exists, or it would
+    /// silently never fire.
+    fn time_nest_depth(&self) -> TimeNestDepth {
+        if self.has_loopables(Granularity::Hour) || self.has_loopables(Granularity::MatchFinest) {
+            TimeNestDepth::Hour
+        } else if self.has_loopables(Granularity::Day) {
+            TimeNestDepth::Day
+        } else if self.has_loopables(Granularity::Month) {
+            TimeNestDepth::Month
+        } else if self.has_loopables(Granularity::Year) {
+            TimeNestDepth::Year
+        } else {
+            TimeNestDepth::Skip
+        }
+    }
+}
+
+/// How deep the `year → month → day → hour` time nest descends on a
+/// `MasterLoop::run`, chosen by `MasterLoop::time_nest_depth` from a
+/// coarse-to-fine `hasLoopables` probe.
+///
+/// Ports the `mustLoopOverYears / Months / Days / Hours` boolean cascade
+/// in `MasterLoop.loopThroughProcess`. Those four Java booleans always
+/// form a prefix — `hours ⇒ days ⇒ months ⇒ years` — so one
+/// coarse-to-fine level captures them and makes the invalid mixes (say,
+/// "days but not months") unrepresentable.
+///
+/// Variants are declared coarse-to-fine, so the derived `Ord` turns a
+/// level test into a plain `depth >= TimeNestDepth::Month` comparison.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum TimeNestDepth {
+    /// No `YEAR` / `MONTH` / `DAY` / `HOUR` subscriber: the whole time
+    /// nest is skipped and `run_times` returns immediately.
+    Skip,
+    /// Iterate `year` only.
+    Year,
+    /// Iterate `year` then `month`.
+    Month,
+    /// Iterate `year`, `month`, then `day`.
+    Day,
+    /// Iterate the full `year → month → day → hour` nest. Also chosen
+    /// when only a `MATCH_FINEST` subscriber is registered.
+    Hour,
 }
 
 /// `state_id → county_id → zone_id → [link_id]` nest produced by
@@ -1410,5 +1528,145 @@ mod tests {
     fn group_times_handles_empty_input() {
         let g = group_times(&[]);
         assert!(g.is_empty());
+    }
+
+    // ---- hasLoopables short-circuit (Task 21) --------------------------
+
+    #[test]
+    fn has_loopables_reports_exact_granularity_membership() {
+        let mut ml = MasterLoop::new();
+        ml.subscribe(MasterLoopableSubscription::new(
+            Granularity::Day,
+            10,
+            dummy(),
+        ));
+        // Exact match only — neither coarser, finer, nor the MatchFinest
+        // sentinel counts as a Day subscriber.
+        assert!(ml.has_loopables(Granularity::Day));
+        assert!(!ml.has_loopables(Granularity::Hour));
+        assert!(!ml.has_loopables(Granularity::Month));
+        assert!(!ml.has_loopables(Granularity::Year));
+        assert!(!ml.has_loopables(Granularity::MatchFinest));
+        assert!(!ml.has_loopables(Granularity::Process));
+    }
+
+    #[test]
+    fn time_nest_depth_tracks_the_finest_time_subscription() {
+        // No subscriptions at all → the whole time nest is skipped.
+        assert_eq!(MasterLoop::new().time_nest_depth(), TimeNestDepth::Skip);
+
+        // Each finer subscription deepens the nest; coarser ones already
+        // registered never shrink it back.
+        let mut ml = MasterLoop::new();
+        ml.subscribe(MasterLoopableSubscription::new(
+            Granularity::Year,
+            10,
+            dummy(),
+        ));
+        assert_eq!(ml.time_nest_depth(), TimeNestDepth::Year);
+        ml.subscribe(MasterLoopableSubscription::new(
+            Granularity::Month,
+            10,
+            dummy(),
+        ));
+        assert_eq!(ml.time_nest_depth(), TimeNestDepth::Month);
+        ml.subscribe(MasterLoopableSubscription::new(
+            Granularity::Day,
+            10,
+            dummy(),
+        ));
+        assert_eq!(ml.time_nest_depth(), TimeNestDepth::Day);
+        ml.subscribe(MasterLoopableSubscription::new(
+            Granularity::Hour,
+            10,
+            dummy(),
+        ));
+        assert_eq!(ml.time_nest_depth(), TimeNestDepth::Hour);
+    }
+
+    #[test]
+    fn time_nest_depth_skips_when_only_process_or_location_subscribers() {
+        // PROCESS / STATE / COUNTY / ZONE / LINK are not time
+        // granularities; none of them should pull the time nest open.
+        let mut ml = MasterLoop::new();
+        for g in [
+            Granularity::Process,
+            Granularity::State,
+            Granularity::County,
+            Granularity::Zone,
+            Granularity::Link,
+        ] {
+            ml.subscribe(MasterLoopableSubscription::new(g, 10, dummy()));
+        }
+        assert_eq!(ml.time_nest_depth(), TimeNestDepth::Skip);
+    }
+
+    #[test]
+    fn time_nest_depth_treats_match_finest_as_hour_depth() {
+        // A MatchFinest subscriber fires at the HOUR level in this port
+        // (Java never dispatches it), so it must keep the full time nest
+        // alive even with no real HOUR subscriber.
+        let mut ml = MasterLoop::new();
+        ml.subscribe(MasterLoopableSubscription::new(
+            Granularity::MatchFinest,
+            10,
+            dummy(),
+        ));
+        assert_eq!(ml.time_nest_depth(), TimeNestDepth::Hour);
+    }
+
+    #[test]
+    fn match_finest_only_subscription_still_fires() {
+        // No real-granularity subscriber, only MatchFinest. The
+        // short-circuit must still open the HOUR loop so the subscriber
+        // is dispatched — otherwise a registered subscription would
+        // silently never fire.
+        let log = shared_log();
+        let mf = RecordingLoopable::new("mf", log.clone());
+        let mut ml = MasterLoop::new();
+        ml.processes.push(ProcessId(1));
+        ml.locations.push(loc(1, 1, 1, 1));
+        ml.times.push(et(2020, 1, 5, 8));
+        ml.subscribe(MasterLoopableSubscription::new(
+            Granularity::MatchFinest,
+            10,
+            mf,
+        ));
+        ml.run().unwrap();
+        let calls = snapshot(&log);
+        let fwd: Vec<_> = calls.iter().filter(|c| !c.is_clean_up).collect();
+        assert_eq!(fwd.len(), 1, "the lone MatchFinest subscriber fires once");
+        assert_eq!(fwd[0].granularity, Some(Granularity::MatchFinest));
+        assert_eq!(fwd[0].time, ExecutionTime::hour(2020, 1, 5, 8));
+    }
+
+    #[test]
+    fn day_subscription_fires_under_short_circuit() {
+        // DAY is the finest subscription → depth Day; the hour loop is
+        // short-circuited away. Two days under one month fire the DAY
+        // subscriber twice, each with the hour component still None.
+        let log = shared_log();
+        let day_sub = RecordingLoopable::new("day", log.clone());
+        let mut ml = MasterLoop::new();
+        ml.processes.push(ProcessId(1));
+        ml.locations.push(loc(1, 1, 1, 1));
+        ml.times.push(et(2020, 3, 5, 8));
+        ml.times.push(et(2020, 3, 6, 8));
+        ml.subscribe(MasterLoopableSubscription::new(
+            Granularity::Day,
+            10,
+            day_sub,
+        ));
+        ml.run().unwrap();
+        let calls = snapshot(&log);
+        let fwd: Vec<_> = calls.iter().filter(|c| !c.is_clean_up).collect();
+        assert_eq!(fwd.len(), 2, "two days → two DAY forward calls");
+        assert_eq!(fwd[0].time.day_id, Some(5));
+        assert_eq!(fwd[1].time.day_id, Some(6));
+        assert!(
+            fwd[0].time.hour.is_none(),
+            "hour loop short-circuited — no hour component at the DAY level"
+        );
+        assert!(fwd[1].time.hour.is_none());
     }
 }
