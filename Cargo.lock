@@ -1736,6 +1736,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "moves-avft"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "bytes",
+ "clap",
+ "csv",
+ "parquet",
+ "serde",
+ "tempfile",
+ "thiserror 1.0.69",
+ "toml",
+]
+
+[[package]]
 name = "moves-calculator-info"
 version = "0.1.0"
 dependencies = [

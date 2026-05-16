@@ -1,0 +1,29 @@
+[package]
+name = "moves-avft"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+description = "AVFT (Alternative Vehicle Fuel Technology) input importer and AVFT Tool equivalent (Phase 4 Task 86)."
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "moves-avft"
+path = "src/bin/moves-avft.rs"
+
+[dependencies]
+arrow = { workspace = true }
+clap = { workspace = true }
+csv = "1"
+parquet = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+toml = { workspace = true }
+
+[dev-dependencies]
+bytes = { workspace = true }
+tempfile = { workspace = true }

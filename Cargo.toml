@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/moves-avft",
     "crates/moves-calculator-info",
     "crates/moves-calculators",
     "crates/moves-cli",
