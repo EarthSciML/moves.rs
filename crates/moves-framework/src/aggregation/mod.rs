@@ -1,10 +1,17 @@
 //! Output aggregation: column-shape planning, plan-driven row roll-up,
-//! and the partitioned-Parquet output writer.
+//! the partitioned-Parquet output writer, and the NONROAD-specific
+//! post-processing summaries.
 
+pub mod nonroad_postprocess;
 pub mod output_aggregate;
 pub mod output_processor;
 pub mod plan;
 
+pub use nonroad_postprocess::{
+    emission_factors, inventory, mass_units_to_grams, population_by_sector_and_scc,
+    EmissionFactorReport, EmissionFactorRow, InventoryReport, InventoryRow, NrSccLookup,
+    PopulationRow,
+};
 pub use output_aggregate::{
     aggregate_activity, aggregate_emissions, TemporalScalingFactors, UnitScaling,
 };
