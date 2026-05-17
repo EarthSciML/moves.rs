@@ -101,11 +101,36 @@ actual values, and absolute/relative differences; `to_json()`
 serialises it for a CI artifact, and its `Display` form is the
 human-readable triage view.
 
-## Known divergences
+## Task 116 triage — known divergences
 
-Empty for now — Task 116 populates this table as triage finds
-pollutant/equipment classes that fall outside the budget.
+Task 116 (`mo-490cm`, NONROAD numerical-divergence triage) consumes
+this gate. Its empirical pass — diffing each fixture's port output
+against the gfortran reference — is **gated on the reference corpus**
+described above (the Apptainer-built baseline) and on Task 117 wiring
+`run_simulation`. Until then, Task 116's actionable scope is the
+*corpus-independent* audit: comparing the four instrumented modules
+against the pinned NONROAD2008a Fortran source (`getpop.f`,
+`agedist.f`, `grwfac.f`, `clcems.f`) for divergences determinable
+from source alone.
 
-| Phase | Label | Context | Tolerance | Reason |
-|-------|-------|---------|-----------|--------|
-| ...   | ...   | ...     | ...       | ...    |
+### Resolved by the corpus-independent audit
+
+| Phase  | Label    | Finding |
+|--------|----------|---------|
+| GETPOP | `popeqp` | The port carried equipment population as `f64`; `getpop.f` :211 reads the population field into `valtmp`, a `real*4`. Any population with more than ~7 significant digits would diverge from the reference under the `1e-9` budget, and every emission scaled by it with it. **Fixed** — `population` is now `f32` in `PopulationRecord`, `SelectedPopulation`, and the harness `popeqp` adapter. |
+
+### Documented divergences (deliberate)
+
+| Phase  | Label    | Context | Budget | Reason |
+|--------|----------|---------|--------|--------|
+| GRWFAC | `factor` | base-year indicator interpolates to exactly `0` | none — `Inf` vs finite | `grwfac.f` :244 divides by the un-clamped `baseyearind`, so the Fortran factor is `growthyearind / 0` → `±Inf` (and infinite emissions downstream via `agedist.f` :132). The port divides by the `MINGRWIND` clamp the Fortran's own warning text promises — `grwfac.f` :233's `tmpbaseyearind`, computed but never wired into the formula. Realistic growth-indicator data does not interpolate to exactly zero, so this path is not expected to be exercised by the ten Phase 0 fixtures; if a future capture shows it, the divergence engine needs a known-divergence allowlist (it does not have one today). |
+
+### Pending — needs the reference corpus
+
+| Phase  | Label             | Risk |
+|--------|-------------------|------|
+| CLCEMS | `emsday` `emsbmy` | `clcems.f` :186 computes deterioration as `dage ** bdetcf` (a `real*4` power) and the day-adjustment table uses `EXP`. The port matches the *precision* — `f32::powf`, `f32::exp` throughout `emissions::exhaust` — but Rust's `libm` and gfortran's `powf`/`expf` may differ in the last bit, and `emsday`/`emsbmy` accumulate over the day loop. Whether accumulated last-bit error pushes any fixture past the `1e-9` budget can only be settled once the gfortran corpus exists. The constants in `tolerance.rs` are the knob if a per-pollutant widen proves necessary. |
+
+The `AGEDIST` phase was audited and is faithful — `f32` throughout,
+Fortran evaluation order preserved, left-to-right `frcsum`
+accumulation matching `agedist.f` :139–144 — so it has no entry.

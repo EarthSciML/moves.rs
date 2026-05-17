@@ -72,8 +72,11 @@ pub struct PopulationRecord {
     pub usage: f32,
     /// Technology/distribution code (10 chars, left-justified).
     pub tech_code: String,
-    /// Equipment population.
-    pub population: f64,
+    /// Equipment population. `getpop.f` :211 reads this field into
+    /// `valtmp`, a `real*4`; the port keeps it `f32` so the value
+    /// carries exactly the single-precision rounding the Fortran
+    /// reference does (Task 116 numerical-fidelity triage, `mo-490cm`).
+    pub population: f32,
 }
 
 /// Parse a `.POP` file into a vector of [`PopulationRecord`].
@@ -219,9 +222,13 @@ fn parse_f5(field: &str, name: &str, line: &str, line_num: usize, path: &Path) -
 }
 
 /// Parse the population value field. The Fortran code (`getpop.f`
-/// :201–209) strips spaces and commas from columns 108–122 before
-/// reading the result as a number.
-fn parse_pop_value(field: &str, line: &str, line_num: usize, path: &Path) -> Result<f64> {
+/// :201–209) strips spaces and commas from columns 108–122, then
+/// `getpop.f` :211 reads the result into `valtmp` — a `real*4`. The
+/// port parses straight to `f32` so the value carries exactly the
+/// single-precision rounding the Fortran reference does; an `f64`
+/// parse would retain digits the reference cannot hold and diverge
+/// under the Task 115 fidelity budget (`mo-490cm`).
+fn parse_pop_value(field: &str, line: &str, line_num: usize, path: &Path) -> Result<f32> {
     let cleaned: String = field.chars().filter(|c| *c != ' ' && *c != ',').collect();
     if cleaned.is_empty() {
         return Err(Error::Parse {
@@ -230,7 +237,7 @@ fn parse_pop_value(field: &str, line: &str, line_num: usize, path: &Path) -> Res
             message: format!("empty population field on line {:?}", line),
         });
     }
-    cleaned.parse::<f64>().map_err(|_| Error::Parse {
+    cleaned.parse::<f32>().map_err(|_| Error::Parse {
         file: path.to_path_buf(),
         line: line_num,
         message: format!("invalid population value {:?}: line {:?}", field, line),
@@ -451,6 +458,33 @@ mod tests {
 
         let records = read_pop(input.as_bytes()).unwrap();
         assert_eq!(records[0].population, 1_234_567.0);
+    }
+
+    #[test]
+    fn population_carries_real4_precision() {
+        // 16_777_217 = 2^24 + 1 is the smallest integer that `real*4`
+        // cannot represent exactly; it rounds to 16_777_216. `getpop.f`
+        // :211 reads the population into `valtmp` (`real*4`), so the
+        // port must round the same way. An `f64` parse would keep the
+        // exact 16_777_217 and diverge from the Fortran reference
+        // (Task 116, `mo-490cm`).
+        let line = build_pop_line(
+            "06000",
+            "00000",
+            "2020",
+            "2270002003",
+            "0",
+            "25",
+            "",
+            "100",
+            "X",
+            "16777217",
+        );
+        let input = format!("/POPULATION/\n{line}\n/END/\n");
+
+        let records = read_pop(input.as_bytes()).unwrap();
+        assert_eq!(records[0].population, 16_777_216.0_f32);
+        assert_eq!(records[0].population, 16_777_217.0_f64 as f32);
     }
 
     #[test]

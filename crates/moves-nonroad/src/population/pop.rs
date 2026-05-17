@@ -64,8 +64,9 @@ pub struct SelectedPopulation {
     /// Technology/distribution code (10 chars, left-justified,
     /// upper-cased per `getpop.f` :141).
     pub tech_code: String,
-    /// Equipment population.
-    pub population: f64,
+    /// Equipment population. `f32` to match `getpop.f`'s `real*4`
+    /// `popeqp` — see `PopulationRecord::population` (Task 116).
+    pub population: f32,
 }
 
 /// Select population records for `scc` and `target_year` from a
@@ -159,7 +160,7 @@ fn slot_from(r: &PopulationRecord) -> SelectedPopulation {
 mod tests {
     use super::*;
 
-    fn rec(scc: &str, fips: &str, sub: &str, hp: f32, year: i32, pop: f64) -> PopulationRecord {
+    fn rec(scc: &str, fips: &str, sub: &str, hp: f32, year: i32, pop: f32) -> PopulationRecord {
         PopulationRecord {
             fips: fips.to_string(),
             subregion: sub.to_string(),

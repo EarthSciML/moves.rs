@@ -90,7 +90,7 @@ pub fn getpop_records(ctx: &Context, pops: &[SelectedPopulation]) -> Vec<Referen
             Phase::Getpop,
             ctx.clone(),
             "popeqp",
-            pops.iter().map(|p| p.population).collect(),
+            pops.iter().map(|p| p.population as f64).collect(),
         ),
         ReferenceRecord::new(
             Phase::Getpop,
