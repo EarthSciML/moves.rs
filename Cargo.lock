@@ -1765,6 +1765,11 @@ dependencies = [
 [[package]]
 name = "moves-calculators"
 version = "0.1.0"
+dependencies = [
+ "moves-calculator-info",
+ "moves-data",
+ "moves-framework",
+]
 
 [[package]]
 name = "moves-cli"
