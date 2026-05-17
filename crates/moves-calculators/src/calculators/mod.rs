@@ -13,3 +13,4 @@ pub mod activitycalculator;
 pub mod baseratecalculator;
 pub mod distance_calculator;
 pub mod nrhcspeciation;
+pub mod so2_calculator;
