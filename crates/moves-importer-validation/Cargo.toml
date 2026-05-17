@@ -1,0 +1,28 @@
+[package]
+name = "moves-importer-validation"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+description = "Importer validation suite — characterization tests comparing Rust importer Parquet output against canonical-MOVES MariaDB tables (Phase 4 Task 88)."
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+arrow = { workspace = true }
+bytes = { workspace = true }
+moves-snapshot = { path = "../moves-snapshot" }
+parquet = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+moves-avft = { path = "../moves-avft" }
+moves-import-lev = { path = "../moves-import-lev" }
+moves-importer = { path = "../moves-importer" }
+moves-importer-county = { path = "../moves-importer-county" }
+moves-importer-pdb = { path = "../moves-importer-pdb" }
+moves-nonroad-import = { path = "../moves-nonroad-import" }
+tempfile = { workspace = true }

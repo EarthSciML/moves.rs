@@ -1,0 +1,6 @@
+# Representative LEV alternative-rate input for the importer validation suite.
+sourceBinID,polProcessID,opModeID,ageGroupID,meanBaseRate,meanBaseRateCV,meanBaseRateIM,meanBaseRateIMCV,dataSourceId
+1000123456789,101,1,1,0.012500,0.05,0.014000,0.05,1
+1000123456789,101,1,2,0.018000,0.05,0.020000,0.05,1
+1000123456789,101,11,1,0.005000,,,,
+2000000000001,201,1,1,0,,,,99

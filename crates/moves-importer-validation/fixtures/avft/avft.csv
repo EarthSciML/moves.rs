@@ -1,0 +1,4 @@
+sourceTypeID,modelYearID,fuelTypeID,engTechID,fuelEngFraction
+21,2020,1,1,0.95
+21,2020,2,1,0.05
+31,2020,1,1,1.0

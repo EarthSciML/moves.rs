@@ -1,0 +1,5 @@
+linkID,countyID,zoneID,roadTypeID,linkLength,linkVolume,linkAvgSpeed,linkDescription,linkAvgGrade
+1,26161,261610,4,0.50,1200,55.0,I-94 EB segment,0.0
+2,26161,261610,4,0.50,1150,52.0,I-94 WB segment,0.0
+3,26161,261610,5,0.25,640,30.0,Washtenaw Ave,1.2
+4,26161,261610,3,1.10,210,45.0,Rural connector,-0.8

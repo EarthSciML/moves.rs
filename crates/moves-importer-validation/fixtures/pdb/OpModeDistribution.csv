@@ -1,0 +1,5 @@
+sourceTypeID,hourDayID,linkID,polProcessID,opModeID,opModeFraction
+21,205,1,101,0,0.10
+21,205,1,101,1,0.20
+21,205,1,101,11,0.30
+21,205,1,101,12,0.40

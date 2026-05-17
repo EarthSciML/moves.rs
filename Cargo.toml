@@ -13,6 +13,7 @@ members = [
     "crates/moves-importer",
     "crates/moves-importer-county",
     "crates/moves-importer-pdb",
+    "crates/moves-importer-validation",
     "crates/moves-nonroad",
     "crates/moves-nonroad-import",
     "crates/moves-runspec",

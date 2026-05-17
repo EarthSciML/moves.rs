@@ -1889,6 +1889,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "moves-importer-validation"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "bytes",
+ "moves-avft",
+ "moves-import-lev",
+ "moves-importer",
+ "moves-importer-county",
+ "moves-importer-pdb",
+ "moves-nonroad-import",
+ "moves-snapshot",
+ "parquet",
+ "tempfile",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "moves-nonroad"
 version = "0.1.0"
 dependencies = [

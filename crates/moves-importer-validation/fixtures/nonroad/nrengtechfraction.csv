@@ -1,0 +1,6 @@
+sourceTypeID,modelYearID,processID,engTechID,NREngTechFraction
+1,2020,1,10,0.6
+1,2020,1,20,0.4
+1,2020,2,10,1.0
+2,2020,1,10,0.5
+2,2020,1,20,0.5
