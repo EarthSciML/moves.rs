@@ -6,4 +6,5 @@
 //! lives in its own submodule and implements [`moves_framework::Generator`].
 
 pub mod baserategenerator;
+pub mod evap_op_mode_distribution;
 pub mod rates_op_mode_distribution;
