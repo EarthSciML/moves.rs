@@ -9,6 +9,7 @@ pub mod avg_speed_op_mode_distribution;
 pub mod baserategenerator;
 pub mod evap_op_mode_distribution;
 pub mod fueleffectsgenerator;
+pub mod link_op_mode_distribution;
 pub mod meteorology;
 pub mod operating_mode_distribution;
 pub mod rates_op_mode_distribution;
