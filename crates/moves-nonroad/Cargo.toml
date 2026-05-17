@@ -20,3 +20,9 @@ ndarray = "0.15"
 
 [dev-dependencies]
 tempfile = { workspace = true }
+# Task 115 numerical-fidelity harness (tests/nonroad_fidelity.rs) emits
+# its divergence report as JSON for the Task 116 triage handoff and the
+# fixture-suite CI artifact. Dev-only — the runtime library and its
+# wasm32 build are untouched (ARCHITECTURE.md § 4.4).
+serde = { workspace = true }
+serde_json = { workspace = true }
