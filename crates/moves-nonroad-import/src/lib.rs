@@ -1,10 +1,10 @@
 //! `moves-nonroad-import` — Phase 4 Task 85.
 //!
 //! Convert user-supplied Nonroad-input CSV templates into the same
-//! Parquet layout the default-DB converter ([`moves_default_db_convert`])
+//! Parquet layout the default-DB converter (`moves-default-db-convert`)
 //! produces. The two crates serve distinct sources (canonical default DB
 //! vs. user override) but share the same downstream consumer
-//! ([`moves_data_default`]) and the same determinism contract.
+//! (`moves-data-default`) and the same determinism contract.
 //!
 //! ## Pipeline
 //!

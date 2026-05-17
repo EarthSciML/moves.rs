@@ -13,7 +13,7 @@
 //!    DataFrame values.
 //!
 //! Together with the current MasterLoop position (iteration/location/time)
-//! these three pieces form the [`CalculatorContext`] every calculator and
+//! these three pieces form the [`crate::CalculatorContext`] every calculator and
 //! generator sees in its [`execute`](crate::Calculator::execute) call.
 //!
 //! The [`ExecutionDatabaseSchema`] type describes *which* tables may appear
@@ -28,7 +28,7 @@
 //! The actual DataFrame containers ([`ExecutionTables`], [`ScratchNamespace`])
 //! remain shape-only structs in this commit. Task 50 (`DataFrameStore`)
 //! lands the concrete Polars-backed storage; calculators committed to the
-//! [`CalculatorContext::tables`] / [`CalculatorContext::scratch`] accessor
+//! [`crate::CalculatorContext::tables`] / [`crate::CalculatorContext::scratch`] accessor
 //! shape today will not have to rewrite when the data plane materialises.
 //!
 //! Fixing the *position* types ([`IterationPosition`], [`ExecutionLocation`],
@@ -195,7 +195,7 @@ impl ExecutionTime {
 /// Inventory mode runs use one iteration; rate-mode and some chained
 /// calculator configurations use multiple.
 ///
-/// `process_id` is the [`crate::ProcessId`] currently active. The master
+/// `process_id` is the [`moves_data::ProcessId`] currently active. The master
 /// loop iterates one process at a time, so this is always concrete once
 /// past PROCESS-bucket dispatch.
 ///
@@ -239,7 +239,7 @@ impl IterationPosition {
 ///
 /// **Phase 2 skeleton.** Task 50 (`DataFrameStore`) replaces this with a
 /// concrete keyed DataFrame store. Calculators committed to the
-/// [`CalculatorContext::tables`] accessor shape today will not need to
+/// [`crate::CalculatorContext::tables`] accessor shape today will not need to
 /// change when the data plane materialises.
 ///
 /// The slow tier is "loaded once per run" — a calculator firing at any
