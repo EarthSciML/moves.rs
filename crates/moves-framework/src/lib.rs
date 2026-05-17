@@ -18,13 +18,13 @@
 //! * Task 21 — Granularity-based loop notification (refines Task 20 dispatch)
 //! * Task 23 — `ExecutionDatabaseSchema` and `CalculatorContext`
 //! * Task 25 — Output aggregation planning (this commit)
-//! * Task 26 — `OutputProcessor` (Phase 2 skeleton, this commit via Task 89)
+//! * Task 26 — `OutputProcessor` plan-driven output aggregation (this commit)
 //! * Task 50 — `DataFrameStore` (shared with `moves-data`)
 //! * Task 89 — Unified Parquet output writer (this commit)
 //!
 //! # Phase 2 status
 //!
-//! Tasks 17, 18, 19, 20, 21, 23, and 89 are in place:
+//! Tasks 17, 18, 19, 20, 21, 23, 25, 26, and 89 are in place:
 //!
 //! * Task 17 — [`MasterLoopableSubscription`] ordering matches Java exactly.
 //! * Task 18 — [`Calculator`] / [`Generator`] traits plus
@@ -43,11 +43,18 @@
 //!   [`ScratchNamespace`], and the [`IterationPosition`] triple; the
 //!   [`ExecutionDatabaseSchema`] registry defines which tables may appear
 //!   in the execution database.
+//! * Task 25 — [`emission_aggregation`] / [`activity_aggregation`] /
+//!   [`base_rate_aggregation`] derive the column-shape [`AggregationPlan`]
+//!   (group-by keys, collapsed columns, `SUM` metric) from a RunSpec.
+//! * Task 26 — [`aggregate_emissions`] / [`aggregate_activity`] apply an
+//!   [`AggregationPlan`] to a record batch (group-by + `SUM` + temporal
+//!   rescaling); [`OutputProcessor::write_aggregated_emissions`] composes
+//!   the roll-up with the Task 89 writer.
 //! * Task 89 — [`OutputProcessor`], the strongly-typed Parquet writer for
 //!   the three output tables defined by [`moves_data::output_schema`].
 //!   Phase 3 calculators feed it [`moves_data::EmissionRecord`] /
-//!   [`moves_data::ActivityRecord`] batches; Task 26 widens the API to
-//!   accept Polars `DataFrame`s once Task 50 lands the data plane.
+//!   [`moves_data::ActivityRecord`] batches; Task 26 ([`output_aggregate`])
+//!   rolls those batches up through an [`AggregationPlan`] first.
 //!
 //! Storage internals for [`ExecutionTables`] / [`ScratchNamespace`] stay
 //! placeholder until Task 50 lands the concrete `DataFrameStore`.
@@ -57,6 +64,7 @@ pub mod calculator;
 mod error;
 pub mod execution_db;
 pub mod master_loop;
+pub mod output_aggregate;
 pub mod output_processor;
 pub mod registry;
 
@@ -74,6 +82,9 @@ pub use execution_db::{
 };
 pub use master_loop::{
     Granularity, MasterLoop, MasterLoopContext, MasterLoopable, MasterLoopableSubscription,
+};
+pub use output_aggregate::{
+    aggregate_activity, aggregate_emissions, TemporalScalingFactors, UnitScaling,
 };
 pub use output_processor::{OutputProcessor, NULL_PARTITION, PARQUET_CREATED_BY};
 pub use registry::{CalculatorFactory, CalculatorRegistry, GeneratorFactory, ModuleFactory};

@@ -62,4 +62,12 @@ pub enum Error {
     /// out of sync with the record-batch builder.
     #[error("output schema mismatch: unknown column '{0}'")]
     OutputSchemaMismatch(String),
+
+    /// An [`AggregationPlan`](crate::AggregationPlan) handed to the output
+    /// aggregator does not match the table being rolled up: wrong target
+    /// table, an unexpected `SUM`-column shape, or a group-by key that
+    /// names a column absent from the output schema. The message names the
+    /// specific inconsistency.
+    #[error("aggregation plan mismatch: {0}")]
+    AggregationPlanMismatch(String),
 }

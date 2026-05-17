@@ -73,7 +73,9 @@ use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression;
 use parquet::file::properties::{EnabledStatistics, WriterProperties, WriterVersion};
 
+use crate::aggregation::AggregationPlan;
 use crate::error::{Error, Result};
+use crate::output_aggregate::{aggregate_activity, aggregate_emissions, TemporalScalingFactors};
 
 /// Identifier stamped into the parquet footer's `created_by` field.
 /// Hardcoded to keep parquet bytes byte-identical across builds.
@@ -102,9 +104,15 @@ type PartitionKey = (Option<i16>, Option<i16>);
 /// `(yearID, monthID)` *overwrite* the partition file; the caller is
 /// responsible for batching rows from one partition into a single call.
 ///
+/// [`write_aggregated_emissions`](Self::write_aggregated_emissions) /
+/// [`write_aggregated_activity`](Self::write_aggregated_activity) apply a
+/// Task 25 [`AggregationPlan`] — group-by, `SUM`, temporal rescaling —
+/// before writing; that roll-up step is the Task 26 port of
+/// `OutputProcessor.java`.
+///
 /// **Phase 2 skeleton.** The strongly-typed row API will be widened to
 /// accept Polars `DataFrame`s once Task 50 lands; calculator wiring (Task
-/// 26 `OutputProcessor`, Task 27 `MOVESEngine`) is a follow-up.
+/// 27 `MOVESEngine`) is a follow-up.
 #[derive(Debug, Clone)]
 pub struct OutputProcessor {
     output_root: PathBuf,
@@ -194,6 +202,54 @@ impl OutputProcessor {
             written.push(path);
         }
         Ok(written)
+    }
+
+    /// Aggregate `records` with an emission [`AggregationPlan`] and write
+    /// the rolled-up partitions.
+    ///
+    /// This is the Task 26 entry point: it composes
+    /// [`aggregate_emissions`] — the group-by + `SUM` roll-up ported from
+    /// `OutputProcessor.java` — with [`write_emissions`](Self::write_emissions),
+    /// the Task 89 Parquet writer. `factors` supplies the per-row temporal
+    /// rescaling; pass [`UnitScaling`](crate::UnitScaling) when the plan
+    /// carries no temporal scaling.
+    ///
+    /// Returns the partition file paths written, exactly as
+    /// [`write_emissions`](Self::write_emissions) does.
+    ///
+    /// # Errors
+    ///
+    /// Surfaces [`Error::AggregationPlanMismatch`] from
+    /// [`aggregate_emissions`] and any I/O / Parquet error from the writer.
+    pub fn write_aggregated_emissions(
+        &self,
+        plan: &AggregationPlan,
+        records: &[EmissionRecord],
+        factors: &impl TemporalScalingFactors,
+    ) -> Result<Vec<PathBuf>> {
+        let aggregated = aggregate_emissions(plan, records, factors)?;
+        self.write_emissions(&aggregated)
+    }
+
+    /// Aggregate `records` with an activity [`AggregationPlan`] and write
+    /// the rolled-up partitions.
+    ///
+    /// The activity-table counterpart of
+    /// [`write_aggregated_emissions`](Self::write_aggregated_emissions); see
+    /// it for the composition and `factors` semantics.
+    ///
+    /// # Errors
+    ///
+    /// Surfaces [`Error::AggregationPlanMismatch`] from
+    /// [`aggregate_activity`] and any I/O / Parquet error from the writer.
+    pub fn write_aggregated_activity(
+        &self,
+        plan: &AggregationPlan,
+        records: &[ActivityRecord],
+        factors: &impl TemporalScalingFactors,
+    ) -> Result<Vec<PathBuf>> {
+        let aggregated = aggregate_activity(plan, records, factors)?;
+        self.write_activity(&aggregated)
     }
 
     fn write_run_metadata(&self, run: &MovesRunRecord) -> Result<()> {
@@ -790,6 +846,131 @@ mod tests {
         let row = activity(Some(2020), Some(1), 1.0);
         let batch = activity_record_batch(MOVES_ACTIVITY_OUTPUT_COLUMNS, &[&row]).unwrap();
         assert_eq!(batch.num_columns(), MOVES_ACTIVITY_OUTPUT_COLUMNS.len());
+    }
+
+    /// `AggregationInputs` for a Year + Nation run — the maximally-collapsing
+    /// configuration, so the roll-up half is easy to read back off disk.
+    fn year_nation_inputs<'a>(
+        models: &'a [moves_runspec::model::Model],
+        breakdown: &'a moves_runspec::model::OutputBreakdown,
+    ) -> crate::aggregation::AggregationInputs<'a> {
+        use moves_runspec::model::{GeographicOutputDetail, ModelScale, OutputTimestep};
+        crate::aggregation::AggregationInputs {
+            timestep: OutputTimestep::Year,
+            geographic_output_detail: GeographicOutputDetail::Nation,
+            scale: ModelScale::Macro,
+            domain: None,
+            models,
+            breakdown,
+            output_population: false,
+            reg_class_id: false,
+            fuel_sub_type: false,
+            eng_tech_id: false,
+            sector: false,
+        }
+    }
+
+    #[test]
+    fn write_aggregated_emissions_rolls_up_then_writes_partition() {
+        use crate::aggregation::emission_aggregation;
+        use crate::output_aggregate::UnitScaling;
+        use moves_runspec::model::{Model, OutputBreakdown};
+
+        let dir = tempdir().unwrap();
+        let proc = OutputProcessor::new(dir.path(), &fixture_run()).unwrap();
+
+        let breakdown = OutputBreakdown::default();
+        let plan = emission_aggregation(&year_nation_inputs(&[Model::Onroad], &breakdown));
+
+        // Three rows across two months — Year aggregation collapses month
+        // and geography, so all three roll into one row.
+        let rows = vec![
+            emission(Some(2020), Some(1), 1.0),
+            emission(Some(2020), Some(1), 2.0),
+            emission(Some(2020), Some(7), 4.0),
+        ];
+        let written = proc
+            .write_aggregated_emissions(&plan, &rows, &UnitScaling)
+            .unwrap();
+        assert_eq!(written.len(), 1, "all rows roll into one partition");
+
+        // monthID collapsed to NULL → the __NULL__ partition directory.
+        let expected = dir
+            .path()
+            .join("MOVESOutput/yearID=2020/monthID=__NULL__/part.parquet");
+        assert_eq!(written[0], expected);
+
+        let batch = read_parquet(&expected);
+        assert_eq!(batch.num_rows(), 1);
+        let quant = batch
+            .column(batch.schema().index_of("emissionQuant").unwrap())
+            .as_any()
+            .downcast_ref::<arrow::array::Float64Array>()
+            .unwrap();
+        assert_eq!(quant.value(0), 7.0, "1.0 + 2.0 + 4.0");
+        // monthID is null in the rolled-up row.
+        assert!(
+            batch
+                .column(batch.schema().index_of("monthID").unwrap())
+                .is_null(0),
+            "monthID collapses to NULL under Year aggregation"
+        );
+    }
+
+    #[test]
+    fn write_aggregated_activity_rolls_up_then_writes_partition() {
+        use crate::aggregation::activity_aggregation;
+        use crate::output_aggregate::UnitScaling;
+        use moves_runspec::model::{Model, OutputBreakdown};
+
+        let dir = tempdir().unwrap();
+        let proc = OutputProcessor::new(dir.path(), &fixture_run()).unwrap();
+
+        let breakdown = OutputBreakdown::default();
+        let plan = activity_aggregation(&year_nation_inputs(&[Model::Onroad], &breakdown));
+
+        let rows = vec![
+            activity(Some(2020), Some(1), 100.0),
+            activity(Some(2020), Some(2), 200.0),
+        ];
+        let written = proc
+            .write_aggregated_activity(&plan, &rows, &UnitScaling)
+            .unwrap();
+        assert_eq!(written.len(), 1);
+
+        let expected = dir
+            .path()
+            .join("MOVESActivityOutput/yearID=2020/monthID=__NULL__/part.parquet");
+        assert_eq!(written[0], expected);
+
+        let batch = read_parquet(&expected);
+        assert_eq!(batch.num_rows(), 1);
+        let activity_col = batch
+            .column(batch.schema().index_of("activity").unwrap())
+            .as_any()
+            .downcast_ref::<arrow::array::Float64Array>()
+            .unwrap();
+        assert_eq!(activity_col.value(0), 300.0);
+    }
+
+    #[test]
+    fn write_aggregated_emissions_rejects_activity_plan() {
+        use crate::aggregation::activity_aggregation;
+        use crate::output_aggregate::UnitScaling;
+        use moves_runspec::model::{Model, OutputBreakdown};
+
+        let dir = tempdir().unwrap();
+        let proc = OutputProcessor::new(dir.path(), &fixture_run()).unwrap();
+        let breakdown = OutputBreakdown::default();
+        let activity_plan = activity_aggregation(&year_nation_inputs(&[Model::Onroad], &breakdown));
+
+        let err = proc
+            .write_aggregated_emissions(&activity_plan, &[], &UnitScaling)
+            .unwrap_err();
+        assert!(
+            matches!(err, Error::AggregationPlanMismatch(_)),
+            "got {err:?}"
+        );
     }
 
     // Use locally to assert against schema length in `new_writes_moves_run_parquet`
