@@ -456,26 +456,48 @@ its loaded inputs (so unit tests can build a "just enough" context).
 
 ## 7. Integration with the moves-rs orchestrator (Task 117)
 
-The Phase 2 orchestrator calls `moves-nonroad` directly:
+The Phase 2 orchestrator calls `moves-nonroad` directly — the
+`simulation` module is the integration layer:
 
 ```rust
 let outputs: NonroadOutputs = moves_nonroad::run_simulation(
-    &options,    // parsed from `.opt`-equivalent struct
-    &inputs,     // pre-loaded population, allocation, etc.
+    &options,        // NonroadOptions — the in-memory `.opt` file
+    &inputs,         // NonroadInputs — pre-loaded population groups
+    &mut geography,  // GeographyExecutor — the geography-routine seam
 )?;
 ```
 
-`run_simulation` builds a `NonroadContext`, runs the driver loop,
+`run_simulation` walks `nonroad.f`'s two-level driver loop (the outer
+`getpop` SCC-group loop and the inner record loop, on top of the
+Task 113 planner), dispatches every planned record to `geography`,
 and returns a `NonroadOutputs` that the orchestrator merges into the
 Phase 4 unified Parquet output. No subprocess, no scratch files, no
 MariaDB ingestion step.
 
+**Signature note.** The call takes a third argument beyond the
+`(&options, &inputs)` sketched in earlier drafts of this section: the
+`GeographyExecutor`. NONROAD's six geography routines take four
+different callback-trait families, each populated from loaded
+emission-factor / technology / activity / growth / retrofit tables;
+assembling those callback contexts is substantial enough to be its
+own increment (the `geography` module flagged it as deferred). The
+`GeographyExecutor` trait is the seam between the driver loop (Task
+117, landed) and that numerical evaluation (a following increment):
+`run_simulation` drives the loop and calls `GeographyExecutor::execute`
+per dispatch. `PlanRecordingExecutor` is the reference implementation
+— it records the dispatch plan and evaluates nothing, which makes the
+driver loop fully exercised today and is also the shape of the
+recording executor the numerical-fidelity harness (Tasks 115/116)
+uses for port-side instrumentation.
+
 The CLI binary (`src/main.rs`) is a thin wrapper for backwards
-compatibility with the `nonroad.exe`-style invocation: it reads
-inputs from disk, calls `run_simulation`, and writes the legacy
-text output format. It exists for parity testing against the
-Windows-compiled reference (Task 115) and is not part of the
-runtime path used by the moves-rs orchestrator.
+compatibility with the `nonroad.exe`-style invocation: it will read
+inputs from disk, call `run_simulation`, and write the legacy text
+output format, for parity testing against the Windows-compiled
+reference (Task 115). The disk-side option-file orchestration and the
+production `GeographyExecutor` are the remaining wrapper work; the
+binary is not part of the runtime path used by the moves-rs
+orchestrator.
 
 ---
 

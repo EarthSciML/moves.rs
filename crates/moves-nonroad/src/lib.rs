@@ -20,12 +20,17 @@
 //! (module structure plus shared types — [`Error`], [`Result`],
 //! [`common::NonroadContext`]).
 //!
-//! `run_simulation` — the single in-process entry point — is wired up
-//! by the Task 117 integration step, once the geography callback
-//! context and the Task 114 output writers are in place. Task 113
-//! lands the [`driver`] loop logic (the day/month/scrappage helpers
-//! and the `nonroad.f` record-loop planner) that the integration
-//! step builds on.
+//! [`run_simulation`] — the single in-process entry point — is the
+//! Task 117 integration step ([`simulation`]). It ports `nonroad.f`'s
+//! two-level driver loop (the outer `getpop` SCC-group loop and the
+//! inner record loop) on top of the Task 113 record-loop planner, and
+//! defines the [`NonroadOptions`] / [`NonroadInputs`] /
+//! [`NonroadOutputs`] integration types that replace the Java↔Fortran
+//! bridge's `.opt`-file generation, input-file generation, and MariaDB
+//! ingestion. The six geography routines are reached through the
+//! [`simulation::GeographyExecutor`] seam; the production executor
+//! that builds their callback contexts from loaded reference data is a
+//! following increment (see the [`simulation`] module docs).
 
 pub mod allocation;
 pub mod common;
@@ -37,6 +42,8 @@ pub mod init;
 pub mod input;
 pub mod output;
 pub mod population;
+pub mod simulation;
 pub mod util;
 
 pub use error::{Error, Result};
+pub use simulation::{run_simulation, NonroadInputs, NonroadOptions, NonroadOutputs};
