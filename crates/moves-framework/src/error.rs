@@ -70,4 +70,11 @@ pub enum Error {
     /// specific inconsistency.
     #[error("aggregation plan mismatch: {0}")]
     AggregationPlanMismatch(String),
+
+    /// The bounded-concurrency executor (Task 27) could not build its
+    /// `rayon::ThreadPool` — typically a zero thread count or an OS-level
+    /// thread-spawn failure. `message` carries the underlying
+    /// `rayon::ThreadPoolBuildError` text.
+    #[error("failed to build the bounded-concurrency thread pool: {0}")]
+    ThreadPool(String),
 }

@@ -1830,7 +1830,9 @@ dependencies = [
  "moves-data",
  "moves-runspec",
  "parquet",
+ "rayon",
  "serde_json",
+ "sha2",
  "tempfile",
  "thiserror 1.0.69",
 ]
