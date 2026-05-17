@@ -1769,6 +1769,19 @@ version = "0.1.0"
 [[package]]
 name = "moves-cli"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "moves-calculator-info",
+ "moves-data-default",
+ "moves-framework",
+ "moves-importer",
+ "moves-importer-county",
+ "moves-runspec",
+ "parquet",
+ "serde_json",
+ "tempfile",
+]
 
 [[package]]
 name = "moves-data"

@@ -5,7 +5,8 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
-description = "MOVES command-line entry point (Phase 2 skeleton)."
+publish = false
+description = "MOVES command-line entry point — the `moves` binary (Phase 2 Task 28)."
 
 [lib]
 path = "src/lib.rs"
@@ -13,3 +14,18 @@ path = "src/lib.rs"
 [[bin]]
 name = "moves"
 path = "src/main.rs"
+
+[dependencies]
+moves-calculator-info = { path = "../moves-calculator-info" }
+moves-data-default = { path = "../moves-data-default" }
+moves-framework = { path = "../moves-framework" }
+moves-importer = { path = "../moves-importer" }
+moves-importer-county = { path = "../moves-importer-county" }
+moves-runspec = { path = "../moves-runspec" }
+anyhow = { workspace = true }
+clap = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+parquet = { workspace = true }
+tempfile = { workspace = true }
