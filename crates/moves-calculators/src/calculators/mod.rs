@@ -10,5 +10,6 @@
 //! area list.
 
 pub mod activitycalculator;
+pub mod baseratecalculator;
 pub mod distance_calculator;
 pub mod nrhcspeciation;
