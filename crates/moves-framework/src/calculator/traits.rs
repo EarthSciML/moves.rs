@@ -55,7 +55,7 @@
 //! per-run filtered default-DB tables ([`ExecutionTables`]), inter-calculator
 //! scratch ([`ScratchNamespace`]), and the master loop's current
 //! [`IterationPosition`] (process, location, time). The component types
-//! live in [`crate::execution_db`]; this module re-binds them onto the
+//! live in [`crate::execution::execution_db`]; this module re-binds them onto the
 //! trait signatures.
 //!
 //! [`CalculatorOutput`] is the per-invocation result type. **Phase 2
@@ -69,7 +69,7 @@ use moves_calculator_info::{Granularity, Priority};
 use moves_data::{PollutantProcessAssociation, ProcessId};
 
 use crate::error::Error;
-use crate::execution_db::{ExecutionTables, IterationPosition, ScratchNamespace};
+use crate::execution::execution_db::{ExecutionTables, IterationPosition, ScratchNamespace};
 
 /// Runtime view of a calculator's inputs and scratch space — the in-memory
 /// equivalent of MOVES's MariaDB execution database.
@@ -502,7 +502,7 @@ mod tests {
         // Calculators reach the position through `ctx.position()`. Build a
         // context at HOUR granularity and verify a Calculator body can
         // read each component from the accessor chain.
-        use crate::execution_db::{ExecutionLocation, ExecutionTime, IterationPosition};
+        use crate::execution::execution_db::{ExecutionLocation, ExecutionTime, IterationPosition};
         let pos = IterationPosition {
             iteration: 0,
             process_id: Some(ProcessId(1)),

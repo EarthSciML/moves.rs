@@ -69,7 +69,7 @@
 //! * Task 89 — [`OutputProcessor`], the strongly-typed Parquet writer for
 //!   the three output tables defined by [`moves_data::output_schema`].
 //!   Phase 3 calculators feed it [`moves_data::EmissionRecord`] /
-//!   [`moves_data::ActivityRecord`] batches; Task 26 ([`output_aggregate`])
+//!   [`moves_data::ActivityRecord`] batches; Task 26 ([`aggregate_emissions`])
 //!   rolls those batches up through an [`AggregationPlan`] first.
 //!
 //! Storage internals for [`ExecutionTables`] / [`ScratchNamespace`] stay
@@ -77,44 +77,18 @@
 //! [`InputDataManager`] plan is consumed by that data plane to populate
 //! [`ExecutionTables`] from Parquet snapshots.
 
+mod error;
+
 pub mod aggregation;
 pub mod calculator;
-mod error;
-pub mod execution_db;
-pub mod execution_location_producer;
-pub mod execution_runspec;
-pub mod input_data_manager;
-pub mod master_loop;
-pub mod output_aggregate;
-pub mod output_processor;
-pub mod registry;
+pub mod execution;
+pub mod input;
+pub mod masterloop;
 
-pub use aggregation::{
-    activity_aggregation, base_rate_aggregation, emission_aggregation, AggregationColumn,
-    AggregationInputs, AggregationPlan, AggregationTable, TemporalScaling,
-};
-pub use calculator::{
-    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, Generator,
-};
 pub use error::{Error, Result};
-pub use execution_db::{
-    ExecutionDatabaseSchema, ExecutionLocation, ExecutionTableSpec, ExecutionTables, ExecutionTime,
-    IterationPosition, ScratchNamespace, TableSource,
-};
-pub use execution_location_producer::{
-    CountyRow, ExecutionLocationProducer, GeographyTables, LinkRow, RoadTypeFilter,
-    NONROAD_ROAD_TYPE_ID,
-};
-pub use execution_runspec::{ExecutionRunSpec, ModelCombination};
-pub use input_data_manager::{
-    default_tables, InputDataManager, MergePlan, MergeTableSpec, RunSpecFilters, TableMergePlan,
-    WhereClause, WhereClauseBuilder,
-};
-pub use master_loop::{
-    Granularity, MasterLoop, MasterLoopContext, MasterLoopable, MasterLoopableSubscription,
-};
-pub use output_aggregate::{
-    aggregate_activity, aggregate_emissions, TemporalScalingFactors, UnitScaling,
-};
-pub use output_processor::{OutputProcessor, NULL_PARTITION, PARQUET_CREATED_BY};
-pub use registry::{CalculatorFactory, CalculatorRegistry, GeneratorFactory, ModuleFactory};
+
+pub use aggregation::*;
+pub use calculator::*;
+pub use execution::*;
+pub use input::*;
+pub use masterloop::*;

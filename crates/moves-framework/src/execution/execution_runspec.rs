@@ -71,8 +71,8 @@ use moves_runspec::{
     PollutantProcessAssociation as RunSpecPollutantProcess, RunSpec,
 };
 
-use crate::execution_db::ExecutionLocation;
-use crate::execution_location_producer::{ExecutionLocationProducer, GeographyTables};
+use super::execution_db::ExecutionLocation;
+use super::execution_location_producer::{ExecutionLocationProducer, GeographyTables};
 
 /// Which engine combination drives the current run.
 ///
@@ -1045,7 +1045,7 @@ const REFUELING_NEEDS: &[(&str, &str, &str, &str)] = &[
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::execution_location_producer::{CountyRow, LinkRow};
+    use crate::execution::execution_location_producer::{CountyRow, LinkRow};
     use moves_runspec::{
         GeoKind, GeographicSelection, Model, OnroadVehicleSelection,
         PollutantProcessAssociation as RsppA, RoadType, Timespan,

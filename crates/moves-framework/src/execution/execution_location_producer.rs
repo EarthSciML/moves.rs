@@ -85,7 +85,7 @@ use std::collections::BTreeSet;
 
 use moves_runspec::{GeoKind, GeographicSelection};
 
-use crate::execution_db::ExecutionLocation;
+use super::execution_db::ExecutionLocation;
 
 /// The `roadTypeID` of the NONROAD pseudo road type.
 ///

@@ -73,9 +73,10 @@ use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression;
 use parquet::file::properties::{EnabledStatistics, WriterProperties, WriterVersion};
 
-use crate::aggregation::AggregationPlan;
+use crate::aggregation::{
+    aggregate_activity, aggregate_emissions, AggregationPlan, TemporalScalingFactors,
+};
 use crate::error::{Error, Result};
-use crate::output_aggregate::{aggregate_activity, aggregate_emissions, TemporalScalingFactors};
 
 /// Identifier stamped into the parquet footer's `created_by` field.
 /// Hardcoded to keep parquet bytes byte-identical across builds.
@@ -873,7 +874,7 @@ mod tests {
     #[test]
     fn write_aggregated_emissions_rolls_up_then_writes_partition() {
         use crate::aggregation::emission_aggregation;
-        use crate::output_aggregate::UnitScaling;
+        use crate::aggregation::UnitScaling;
         use moves_runspec::model::{Model, OutputBreakdown};
 
         let dir = tempdir().unwrap();
@@ -920,7 +921,7 @@ mod tests {
     #[test]
     fn write_aggregated_activity_rolls_up_then_writes_partition() {
         use crate::aggregation::activity_aggregation;
-        use crate::output_aggregate::UnitScaling;
+        use crate::aggregation::UnitScaling;
         use moves_runspec::model::{Model, OutputBreakdown};
 
         let dir = tempdir().unwrap();
@@ -956,7 +957,7 @@ mod tests {
     #[test]
     fn write_aggregated_emissions_rejects_activity_plan() {
         use crate::aggregation::activity_aggregation;
-        use crate::output_aggregate::UnitScaling;
+        use crate::aggregation::UnitScaling;
         use moves_runspec::model::{Model, OutputBreakdown};
 
         let dir = tempdir().unwrap();
