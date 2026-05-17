@@ -16,16 +16,15 @@
 //! # Phase 3 status
 //!
 //! The crate is filled in module by module by the Phase 3 implementation
-//! tasks. The [`generators`] module hosts the generator ports; calculator
-//! ports land alongside them as Phase 3 progresses.
+//! tasks, grouped into two areas: the [`generators`] module hosts the
+//! generator ports (Tasks 29–43) and the [`calculators`] module hosts the
+//! calculator ports (Tasks 45–88). Each port adds its module under the
+//! relevant area and registers it with a single `pub mod` line in that
+//! area's `mod.rs`, never in this file — so the crate root stays a stable,
+//! merge-conflict-free area list as Phase 3 grows.
 
+pub mod calculators;
 pub mod error;
 pub mod generators;
-pub mod tank_fuel_generator;
 
 pub use error::{Error, Result};
-pub use tank_fuel_generator::{
-    calculate_average_tank_gasoline, AverageTankGasolineRow, FuelFormulationRow, FuelSubtypeRow,
-    FuelSupplyRow, FuelTypeRow, MonthOfAnyYearRow, RegionCountyRow, TankFuelGenerator,
-    TankFuelInputs, YearRow, ZoneMonthHourRow, ZoneRow,
-};
