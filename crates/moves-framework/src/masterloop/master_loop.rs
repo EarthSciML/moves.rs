@@ -47,7 +47,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::error::Error;
-use crate::execution_db::{ExecutionLocation, ExecutionTime, IterationPosition};
+use crate::execution::execution_db::{ExecutionLocation, ExecutionTime, IterationPosition};
 
 pub use moves_calculator_info::Granularity;
 

@@ -71,7 +71,7 @@ use moves_runspec::{
     PollutantProcessAssociation as RunSpecPollutantProcess, RunSpec,
 };
 
-use crate::execution_db::ExecutionLocation;
+use super::execution_db::ExecutionLocation;
 
 /// Which engine combination drives the current run.
 ///

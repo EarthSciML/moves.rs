@@ -15,7 +15,7 @@
 //!   batch of strongly-typed [`EmissionRecord`] / [`ActivityRecord`] rows:
 //!   groups by the plan's keys, sums the metric, and emits the rolled-up
 //!   rows.
-//! * **Task 89** ([`crate::output_processor`]) — writes the rolled-up rows
+//! * **Task 89** ([`OutputProcessor`](crate::OutputProcessor)) — writes the rolled-up rows
 //!   to partitioned Parquet.
 //!
 //! [`OutputProcessor`](crate::OutputProcessor) ties the last two together
