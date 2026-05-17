@@ -1,16 +1,25 @@
-//! `moves-calculators` — onroad emission calculators ported from Java.
+//! `moves-calculators` — onroad emission calculators and generators ported
+//! from Java and Go.
 //!
 //! Hosts the ~70 calculator implementations under
-//! `gov/epa/otaq/moves/master/implementation/ghg/` and related packages.
-//! Each calculator declares the `(pollutant, process)` pairs it produces and
-//! the granularity at which it subscribes to the master loop; `moves-framework`
+//! `gov/epa/otaq/moves/master/implementation/ghg/` and related packages,
+//! plus the generators that run ahead of them in the master loop. Each
+//! module declares the `(pollutant, process)` pairs it produces and the
+//! granularity at which it subscribes to the master loop; `moves-framework`
 //! drives them according to the chain reconstructed in Phase 1
 //! (Task 10, `moves-calculator-info`).
 //!
 //! See `moves-rust-migration-plan.md`:
 //!
-//! * Phase 3 — Tasks 30–88 cover the individual calculator ports.
+//! * Phase 3 — Tasks 29–43 cover the generators, Tasks 45–88 the calculators.
 //!
 //! # Phase 3 status
 //!
-//! Skeleton crate. Implementation tasks land per-calculator across Phase 3.
+//! The crate is filled in module by module by the Phase 3 implementation
+//! tasks. The [`generators`] module hosts the generator ports; calculator
+//! ports land alongside them as Phase 3 progresses.
+
+pub mod error;
+pub mod generators;
+
+pub use error::{Error, Result};
