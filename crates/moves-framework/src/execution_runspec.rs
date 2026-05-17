@@ -72,6 +72,7 @@ use moves_runspec::{
 };
 
 use crate::execution_db::ExecutionLocation;
+use crate::execution_location_producer::{ExecutionLocationProducer, GeographyTables};
 
 /// Which engine combination drives the current run.
 ///
@@ -542,6 +543,68 @@ impl ExecutionRunSpec {
         }
     }
 
+    /// The effective road types for the run — port of
+    /// `ExecutionRunSpec.getRoadTypes()`.
+    ///
+    /// Normally this is just the RunSpec's `road_types`. The one exception
+    /// is Off-Network Idle: when the run selects the Off-Network road type
+    /// (`roadTypeID` 1) *and* the Running Exhaust process (`processID` 1)
+    /// and is not Project domain, MOVES must iterate every onroad road
+    /// type to compute ONI correctly, so the method returns the full
+    /// onroad set — the five [`moves_data::RoadType`] entries, which are
+    /// exactly the default-DB `roadtype` rows flagged `isAffectedByOnroad`
+    /// that Java's `getAllRoadTypes()` query returns.
+    ///
+    /// Returned as road-type ids: the sole consumer,
+    /// [`ExecutionLocationProducer`], needs ids alone.
+    #[must_use]
+    pub fn execution_road_types(&self) -> BTreeSet<u32> {
+        let selected: BTreeSet<u32> = self
+            .run_spec
+            .road_types
+            .iter()
+            .map(|rt| rt.road_type_id)
+            .collect();
+        let contains_off_network = selected.contains(&1);
+        let contains_running = self.target_processes.contains(&ProcessId(1));
+        let is_project_domain = self.run_spec.domain == Some(ModelDomain::Project);
+        if contains_off_network && contains_running && !is_project_domain {
+            moves_data::RoadType::all()
+                .map(|rt| u32::from(rt.id.0))
+                .collect()
+        } else {
+            selected
+        }
+    }
+
+    /// Expand the run's geographic selections into `execution_locations`,
+    /// then re-derive the `states` / `counties` / `zones` / `links`
+    /// projections.
+    ///
+    /// Ports the `ExecutionLocationProducer` invocation in
+    /// `ExecutionRunSpec.initializeBeforeExecutionDatabase`: build an
+    /// [`ExecutionLocationProducer`] from the RunSpec's geographic
+    /// selections and [`execution_road_types`](Self::execution_road_types),
+    /// run it against `geography`, store the result in
+    /// `execution_locations`, then call
+    /// [`extract_location_details_from_execution_locations`](Self::extract_location_details_from_execution_locations).
+    ///
+    /// `geography` is the run's `Link` ⋈ `County` data. Phase 2 callers
+    /// build a [`GeographyTables`] from fixtures; Task 50's data plane
+    /// builds it from the `Link` / `County` Parquet snapshots. The
+    /// custom-domain (`genericCounty`) path is not wired — the RunSpec
+    /// model does not carry that field yet (a Task 12 follow-up) — so the
+    /// producer is always built with no custom-domain county.
+    pub fn build_execution_locations(&mut self, geography: &GeographyTables) {
+        let producer = ExecutionLocationProducer::new(
+            self.run_spec.geographic_selections.clone(),
+            self.execution_road_types(),
+            None,
+        );
+        self.execution_locations = producer.build_execution_locations(geography);
+        self.extract_location_details_from_execution_locations();
+    }
+
     // ---- Forwarding getters ------------------------------------------------
 
     /// `targetRunSpec.geographicOutputDetail`.
@@ -982,8 +1045,10 @@ const REFUELING_NEEDS: &[(&str, &str, &str, &str)] = &[
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::execution_location_producer::{CountyRow, LinkRow};
     use moves_runspec::{
-        Model, OnroadVehicleSelection, PollutantProcessAssociation as RsppA, RoadType, Timespan,
+        GeoKind, GeographicSelection, Model, OnroadVehicleSelection,
+        PollutantProcessAssociation as RsppA, RoadType, Timespan,
     };
 
     /// Build a RunSpec with just the fields the tests below touch. Fields
@@ -1505,5 +1570,138 @@ mod tests {
         assert_eq!(assocs.len(), 1);
         assert_eq!(assocs[0].pollutant_name, "Total Energy Consumption");
         assert_eq!(assocs[0].process_name, "Running Exhaust");
+    }
+
+    // ---- Task 16: road types + location iterator ---------------------------
+
+    /// Build a [`RoadType`] selection with just the id set.
+    fn road_type(id: u32) -> RoadType {
+        RoadType {
+            road_type_id: id,
+            road_type_name: String::new(),
+            model_combination: None,
+        }
+    }
+
+    #[test]
+    fn execution_road_types_returns_runspec_selection() {
+        // No Off-Network road type, so no Off-Network-Idle expansion: the
+        // method returns exactly the RunSpec's road types.
+        let spec = build_run_spec(|s| {
+            s.road_types = vec![road_type(2), road_type(4)];
+        });
+        let er = ExecutionRunSpec::new(spec);
+        assert_eq!(er.execution_road_types(), BTreeSet::from([2, 4]));
+    }
+
+    #[test]
+    fn execution_road_types_expands_for_off_network_idle() {
+        // Off-Network road type (1) + Running Exhaust process (1), not
+        // Project domain: every onroad road type (1–5) is required.
+        let spec = build_run_spec(|s| {
+            s.road_types = vec![road_type(1)];
+            s.pollutant_process_associations = vec![RsppA {
+                pollutant_id: 91,
+                pollutant_name: "Total Energy Consumption".into(),
+                process_id: 1,
+                process_name: "Running Exhaust".into(),
+            }];
+        });
+        let er = ExecutionRunSpec::new(spec);
+        assert_eq!(er.execution_road_types(), BTreeSet::from([1, 2, 3, 4, 5]));
+    }
+
+    #[test]
+    fn execution_road_types_no_expansion_on_project_domain() {
+        // Project domain does not calculate ONI, so even with Off-Network
+        // + Running selected the road-type set is left as-is.
+        let spec = build_run_spec(|s| {
+            s.domain = Some(ModelDomain::Project);
+            s.road_types = vec![road_type(1)];
+            s.pollutant_process_associations = vec![RsppA {
+                pollutant_id: 91,
+                pollutant_name: "Total Energy Consumption".into(),
+                process_id: 1,
+                process_name: "Running Exhaust".into(),
+            }];
+        });
+        let er = ExecutionRunSpec::new(spec);
+        assert_eq!(er.execution_road_types(), BTreeSet::from([1]));
+    }
+
+    #[test]
+    fn execution_road_types_no_expansion_without_running_process() {
+        // Off-Network road type selected but no Running Exhaust process:
+        // ONI is not triggered, so no expansion.
+        let spec = build_run_spec(|s| {
+            s.road_types = vec![road_type(1)];
+            s.pollutant_process_associations = vec![RsppA {
+                pollutant_id: 2,
+                pollutant_name: "Carbon Monoxide (CO)".into(),
+                process_id: 2,
+                process_name: "Start Exhaust".into(),
+            }];
+        });
+        let er = ExecutionRunSpec::new(spec);
+        assert_eq!(er.execution_road_types(), BTreeSet::from([1]));
+    }
+
+    #[test]
+    fn build_execution_locations_populates_locations_and_projections() {
+        // A county selection over a two-link county: the producer fills
+        // `execution_locations` and the run re-derives the per-component
+        // geographic sets.
+        let spec = build_run_spec(|s| {
+            s.geographic_selections = vec![GeographicSelection {
+                kind: GeoKind::County,
+                key: 24001,
+                description: String::new(),
+            }];
+            s.road_types = vec![road_type(2), road_type(3)];
+        });
+        let mut er = ExecutionRunSpec::new(spec);
+        let geo = GeographyTables::new(
+            vec![
+                LinkRow {
+                    state_id: 24,
+                    county_id: 24001,
+                    zone_id: 240010,
+                    link_id: 2400100,
+                    road_type_id: 2,
+                },
+                LinkRow {
+                    state_id: 24,
+                    county_id: 24001,
+                    zone_id: 240011,
+                    link_id: 2400110,
+                    road_type_id: 3,
+                },
+                // A link in a different county — excluded by the selection.
+                LinkRow {
+                    state_id: 51,
+                    county_id: 51001,
+                    zone_id: 510010,
+                    link_id: 5100100,
+                    road_type_id: 2,
+                },
+            ],
+            vec![CountyRow {
+                state_id: 24,
+                county_id: 24001,
+            }],
+        );
+        er.build_execution_locations(&geo);
+        assert_eq!(
+            er.execution_locations.iter().copied().collect::<Vec<_>>(),
+            vec![
+                ExecutionLocation::link(24, 24001, 240010, 2400100),
+                ExecutionLocation::link(24, 24001, 240011, 2400110),
+            ]
+        );
+        // `extract_location_details_from_execution_locations` ran.
+        assert_eq!(er.states, BTreeSet::from([24]));
+        assert_eq!(er.counties, BTreeSet::from([24001]));
+        assert_eq!(er.zones, BTreeSet::from([240010, 240011]));
+        assert_eq!(er.links, BTreeSet::from([2400100, 2400110]));
     }
 }

@@ -10,7 +10,7 @@
 //! See `moves-rust-migration-plan.md`:
 //!
 //! * Task 15 — `ExecutionRunSpec` (this commit)
-//! * Task 16 — Location iterator
+//! * Task 16 — Location iterator (this commit)
 //! * Task 17 — MasterLoop subscription model
 //! * Task 18 — Calculator and Generator base traits
 //! * Task 19 — `CalculatorRegistry`
@@ -25,13 +25,18 @@
 //!
 //! # Phase 2 status
 //!
-//! Tasks 15, 17, 18, 19, 20, 21, 23, 24, 25, 26, and 89 are in place:
+//! Tasks 15, 16, 17, 18, 19, 20, 21, 23, 24, 25, 26, and 89 are in place:
 //!
 //! * Task 15 — [`ExecutionRunSpec`] derives the run-time view of a
 //!   [`moves_runspec::RunSpec`]: target pollutants / processes, timespan
 //!   sets, vehicle selections, and the refueling-process dependency
 //!   closure. Database-dependent state (locations, fuel years, regions)
 //!   stays empty until Tasks 16 / 24 populate it.
+//! * Task 16 — [`ExecutionLocationProducer`] expands a RunSpec's
+//!   geographic selections into the sorted [`ExecutionLocation`] set the
+//!   MasterLoop iterates; [`ExecutionRunSpec::build_execution_locations`]
+//!   drives it from a [`GeographyTables`] value and re-derives the
+//!   `states` / `counties` / `zones` / `links` projections.
 //! * Task 17 — [`MasterLoopableSubscription`] ordering matches Java exactly.
 //! * Task 18 — [`Calculator`] / [`Generator`] traits plus
 //!   [`CalculatorSubscription`].
@@ -76,6 +81,7 @@ pub mod aggregation;
 pub mod calculator;
 mod error;
 pub mod execution_db;
+pub mod execution_location_producer;
 pub mod execution_runspec;
 pub mod input_data_manager;
 pub mod master_loop;
@@ -94,6 +100,10 @@ pub use error::{Error, Result};
 pub use execution_db::{
     ExecutionDatabaseSchema, ExecutionLocation, ExecutionTableSpec, ExecutionTables, ExecutionTime,
     IterationPosition, ScratchNamespace, TableSource,
+};
+pub use execution_location_producer::{
+    CountyRow, ExecutionLocationProducer, GeographyTables, LinkRow, RoadTypeFilter,
+    NONROAD_ROAD_TYPE_ID,
 };
 pub use execution_runspec::{ExecutionRunSpec, ModelCombination};
 pub use input_data_manager::{
