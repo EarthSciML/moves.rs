@@ -9,5 +9,6 @@
 //! single `pub mod` line here, keeping the crate root (`lib.rs`) a stable
 //! area list.
 
+pub mod baseratecalculator;
 pub mod distance_calculator;
 pub mod nrhcspeciation;
