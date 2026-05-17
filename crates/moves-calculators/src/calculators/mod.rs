@@ -7,5 +7,6 @@
 //! calculator lives in its own submodule and implements
 //! [`moves_framework::Calculator`]; a port registers its module with a
 //! single `pub mod` line here, keeping the crate root (`lib.rs`) a stable
-//! area list. No calculators are ported yet — the first lands with
-//! Task 45 (`BaseRateCalculator`).
+//! area list.
+
+pub mod nrhcspeciation;
