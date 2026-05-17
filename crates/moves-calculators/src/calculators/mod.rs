@@ -16,4 +16,5 @@ pub mod distance_calculator;
 pub mod evaporative_permeation_calculator;
 pub mod nrairtoxics;
 pub mod nrhcspeciation;
+pub mod pmexhaust;
 pub mod so2_calculator;
