@@ -10,6 +10,7 @@ pub mod baserategenerator;
 pub mod evap_op_mode_distribution;
 pub mod fueleffectsgenerator;
 pub mod meteorology;
+pub mod operating_mode_distribution;
 pub mod rates_op_mode_distribution;
 pub mod source_bin_distribution_generator;
 pub mod start_operating_mode_distribution;
