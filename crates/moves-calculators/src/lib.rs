@@ -16,10 +16,12 @@
 //! # Phase 3 status
 //!
 //! The crate is filled in module by module by the Phase 3 implementation
-//! tasks. The [`generators`] module hosts the generator ports; calculator
-//! ports land alongside them as Phase 3 progresses.
+//! tasks. The [`meteorology`] and [`generators`] modules host the generator
+//! ports landed so far; calculator ports land alongside them as Phase 3
+//! progresses.
 
 pub mod error;
 pub mod generators;
+pub mod meteorology;
 
 pub use error::{Error, Result};
