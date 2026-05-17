@@ -6,5 +6,6 @@
 //! lives in its own submodule and implements [`moves_framework::Generator`].
 
 pub mod baserategenerator;
+pub mod meteorology;
 pub mod rates_op_mode_distribution;
 pub mod tank_fuel_generator;
