@@ -1769,6 +1769,11 @@ dependencies = [
  "moves-calculator-info",
  "moves-data",
  "moves-framework",
+ "moves-runspec",
+ "moves-snapshot",
+ "serde",
+ "serde_json",
+ "tempfile",
  "thiserror 1.0.69",
 ]
 

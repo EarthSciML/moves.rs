@@ -16,3 +16,16 @@ moves-calculator-info = { path = "../moves-calculator-info" }
 moves-data = { path = "../moves-data" }
 moves-framework = { path = "../moves-framework" }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+# Task 44 generator integration-validation harness (tests/generator_integration.rs).
+# `moves-runspec` parses the Phase 0 fixture RunSpecs; `moves-snapshot` is the
+# canonical-capture format the harness diffs generator output against;
+# `serde`/`serde_json` serialise the validation report for the CI artifact;
+# `tempfile` backs the machinery tests. Dev-only — the runtime library is
+# untouched.
+moves-runspec = { path = "../moves-runspec" }
+moves-snapshot = { path = "../moves-snapshot" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tempfile = { workspace = true }

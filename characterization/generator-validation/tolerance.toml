@@ -1,0 +1,39 @@
+# Tolerance budget — generator integration-validation gate (Task 44, mo-zstr).
+#
+# Per-(table, column) absolute tolerances the canonical-capture diff applies.
+# Format: crates/moves-snapshot/src/tolerance.rs. Harness:
+# crates/moves-calculators/tests/generator_validation/. Two cells are equal
+# when |canonical - produced| <= tolerance.
+#
+# Table keys are the generator OUTPUT-table names (Generator::output_tables),
+# NOT canonical-MOVES database paths — the harness diffs under the stable
+# scratch name (compare::compare_table re-stamps the canonical table to it).
+
+# Strict by default: every Float64 column must match the canonical capture to
+# within 1e-9 absolute unless a row below widens it. A divergence past this
+# bound is a port bug to fix before Phase 3's calculators proceed.
+default_float_tolerance = 1e-9
+
+# --- Expected divergences -------------------------------------------------
+#
+# MeteorologyGenerator (migration plan Task 41) computes specificHumidity and
+# molWaterFraction through fahrenheit_to_kelvin, which uses the exact ratio
+# 5.0/9.0. Canonical MOVES' MeteorologyGenerator.doHeatIndex SQL uses the
+# literal (5/9): MariaDB evaluates that as decimal division, rounded to
+# div_precision_increment places, before promotion to double — a value a few
+# parts in 1e5 off the exact ratio. The gap propagates (amplified through the
+# saturation-vapour-pressure chain) into both columns. The port comment at
+# crates/moves-calculators/src/generators/meteorology.rs::fahrenheit_to_kelvin
+# explicitly defers the call to this budget.
+#
+# heatIndex does NOT pass through the conversion (it reads the dry-bulb
+# temperature directly), so it keeps the strict 1e-9 default.
+#
+# These two values are PRE-CALIBRATION placeholders: they are wide enough to
+# absorb the 5/9 artifact and nothing else, but the gate is dormant until the
+# Phase 0 compute-node run lands the canonical snapshots, and the first
+# capture is what calibrates them to the tightest bound the artifact needs.
+# Treat any divergence beyond them, once active, as a real bug.
+[tables."ZoneMonthHour"]
+specificHumidity = 1e-4
+molWaterFraction = 1e-6
