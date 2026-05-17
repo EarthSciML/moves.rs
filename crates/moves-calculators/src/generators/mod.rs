@@ -13,6 +13,7 @@ pub mod meteorology;
 pub mod operating_mode_distribution;
 pub mod rates_op_mode_distribution;
 pub mod source_bin_distribution_generator;
+pub mod sourcetypephysics;
 pub mod start_operating_mode_distribution;
 pub mod tank_fuel_generator;
 pub mod tank_temperature_generator;
