@@ -21,5 +21,11 @@
 
 pub mod error;
 pub mod generators;
+pub mod tank_fuel_generator;
 
 pub use error::{Error, Result};
+pub use tank_fuel_generator::{
+    calculate_average_tank_gasoline, AverageTankGasolineRow, FuelFormulationRow, FuelSubtypeRow,
+    FuelSupplyRow, FuelTypeRow, MonthOfAnyYearRow, RegionCountyRow, TankFuelGenerator,
+    TankFuelInputs, YearRow, ZoneMonthHourRow, ZoneRow,
+};
