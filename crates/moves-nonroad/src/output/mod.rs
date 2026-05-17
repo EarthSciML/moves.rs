@@ -8,17 +8,31 @@
 //!
 //! # I/O policy
 //!
-//! Per `ARCHITECTURE.md` § 4.3, writers accept
-//! [`std::io::Write`] rather than Fortran-style integer unit
-//! numbers. The Rust port emits two output formats:
+//! Per `ARCHITECTURE.md` § 4.3, writers accept [`std::io::Write`]
+//! rather than Fortran-style integer unit numbers, and return
+//! [`std::io::Result`] — the orchestrating layer owns the output
+//! paths and maps a failure to [`crate::Error::Io`].
 //!
-//! * the original NONROAD text format for backwards compatibility
-//!   with downstream tools (Task 114), and
-//! * Apache Parquet, sharing the unified Phase 4 output schema
-//!   defined by Task 89 (Task 114).
+//! # The two output formats
 //!
-//! Writers are independent implementations against the same
-//! `Write` interface; the caller chooses which format(s) to emit.
+//! The migration plan (Task 114) calls for two output encodings:
+//!
+//! * the original NONROAD text format, for backwards compatibility
+//!   with downstream tools — ported by the [`writers`], [`message`]
+//!   and [`si_report`] modules; and
+//! * Apache Parquet on the unified Phase 4 output schema
+//!   (`moves-data`'s `output_schema`, Task 89).
+//!
+//! The structured record types ([`writers::OutputRecord`],
+//! [`writers::ByModelYearRecord`], [`writers::AmsCountyEmissions`],
+//! [`si_report::SiReport`]) are the format-neutral seam between the
+//! two: the text writers consume them directly, and the Parquet
+//! encoding consumes the same records once the cross-crate wiring
+//! lands in the Task 117 NONROAD–MOVES integration step — the point
+//! at which the plan places the onroad/nonroad output-schema
+//! convergence. Keeping `moves-nonroad` free of the `parquet`
+//! dependency preserves the WASM-compatibility posture of
+//! `ARCHITECTURE.md` § 4.4.
 //!
 //! # Roadmap
 //!
@@ -46,7 +60,28 @@
 //! - [`strutil`] — string and miscellaneous helpers
 //!   (`strlen.f`, `strmin.f`, `lftjst.f`, `rgtjst.f`, `low2up.f`,
 //!   `chrsrt.f`, `wadeeq.f`, `cnthpcat.f`).
+//!
+//! Task 114 implemented (the legacy-text output writers):
+//! - [`fortran_fmt`] — Fortran `Ew.d`/`Fw.d`/`Iw`/`Aw` edit-
+//!   descriptor formatting and the column-positioned
+//!   [`FortranLine`](fortran_fmt::FortranLine) shared by the writers;
+//! - [`writers`] — the `.OUT` data file and the by-model-year files
+//!   (`wrthdr.f`, `wrtdat.f`, `hdrbmy.f`, `wrtbmy.f`) and the EPS2
+//!   AMS workfile (`wrtams.f`);
+//! - [`message`] — the message-file echo writers (`wrtmsg.f`,
+//!   `wrtsum.f`);
+//! - [`si_report`] — the SI-report accumulator and writer
+//!   (`sitot.f`, `wrtsi.f`);
+//! - [`validate`] — the SCC validator (`chkasc.f`), the warning
+//!   tally (`chkwrn.f`), and the file-close routine (`clsnon.f`);
+//! - [`statics`] — the `BLOCK DATA` static tables (`blknon.f`).
 
 pub mod find;
 pub mod fips;
+pub mod fortran_fmt;
+pub mod message;
+pub mod si_report;
+pub mod statics;
 pub mod strutil;
+pub mod validate;
+pub mod writers;
