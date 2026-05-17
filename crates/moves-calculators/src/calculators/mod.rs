@@ -11,6 +11,7 @@
 
 pub mod activitycalculator;
 pub mod baseratecalculator;
+pub mod ch4n2o_running_start;
 pub mod distance_calculator;
 pub mod nrairtoxics;
 pub mod nrhcspeciation;
