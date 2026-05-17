@@ -12,4 +12,5 @@
 pub mod activitycalculator;
 pub mod baseratecalculator;
 pub mod distance_calculator;
+pub mod nrairtoxics;
 pub mod nrhcspeciation;
