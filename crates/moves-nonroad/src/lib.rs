@@ -15,10 +15,17 @@
 //!
 //! # Phase 5 status
 //!
-//! This is the Phase 5 Task 91 skeleton: module structure plus
-//! shared types ([`Error`], [`Result`], [`common::NonroadContext`]).
-//! The implementation tasks (92–118) populate the modules.
-//! `run_simulation` is not yet wired up; it will land in Task 113.
+//! This crate is being filled in module by module by the Phase 5
+//! implementation tasks (92–118), on top of the Task 91 skeleton
+//! (module structure plus shared types — [`Error`], [`Result`],
+//! [`common::NonroadContext`]).
+//!
+//! `run_simulation` — the single in-process entry point — is wired up
+//! by the Task 117 integration step, once the geography callback
+//! context and the Task 114 output writers are in place. Task 113
+//! lands the [`driver`] loop logic (the day/month/scrappage helpers
+//! and the `nonroad.f` record-loop planner) that the integration
+//! step builds on.
 
 pub mod allocation;
 pub mod common;

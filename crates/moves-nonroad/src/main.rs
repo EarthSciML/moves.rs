@@ -1,17 +1,19 @@
 //! Native CLI entry point for `moves-nonroad`.
 //!
 //! Phase 5 skeleton — the binary currently prints a banner and exits.
-//! Task 113 wires this up to [`moves_nonroad::driver`] for the
-//! `nonroad.exe`-equivalent invocation used by Task 115's
-//! characterization tests.
+//! The `nonroad.exe`-equivalent invocation it will host is wired up
+//! by the Task 117 integration step, once the Task 114 output writers
+//! and the geography callback context are in place. Task 113 landed
+//! the [`moves_nonroad::driver`] loop logic that invocation builds on.
 //!
 //! The library (see [`moves_nonroad`]) is the WASM-compatible
 //! surface; this binary is a native-only thin wrapper.
 
 fn main() {
     eprintln!(
-        "moves-nonroad: Phase 5 skeleton (Task 91). The driver loop \
-         is not yet wired up; see crates/moves-nonroad/ARCHITECTURE.md \
-         for the porting roadmap."
+        "moves-nonroad: Phase 5 in progress. The driver loop logic is \
+         ported (Task 113), but the end-to-end run is not yet wired up \
+         — that is the Task 117 integration step. See \
+         crates/moves-nonroad/ARCHITECTURE.md for the porting roadmap."
     );
 }
