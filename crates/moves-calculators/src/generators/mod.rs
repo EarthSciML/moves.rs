@@ -7,6 +7,7 @@
 
 pub mod avg_speed_op_mode_distribution;
 pub mod baserategenerator;
+pub mod evap_op_mode_distribution;
 pub mod meteorology;
 pub mod rates_op_mode_distribution;
 pub mod source_bin_distribution_generator;
