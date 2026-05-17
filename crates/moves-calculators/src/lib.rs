@@ -22,10 +22,20 @@
 pub mod error;
 pub mod generators;
 pub mod tank_fuel_generator;
+pub mod tank_temperature_generator;
 
 pub use error::{Error, Result};
 pub use tank_fuel_generator::{
     calculate_average_tank_gasoline, AverageTankGasolineRow, FuelFormulationRow, FuelSubtypeRow,
     FuelSupplyRow, FuelTypeRow, MonthOfAnyYearRow, RegionCountyRow, TankFuelGenerator,
     TankFuelInputs, YearRow, ZoneMonthHourRow, ZoneRow,
+};
+// `tank_temperature_generator` defines its own `ZoneMonthHourRow` — a distinct
+// type, it carries `hour_id` — so it is not re-exported here: the crate-root
+// `ZoneMonthHourRow` is `tank_fuel_generator`'s. Reach the other via its module.
+pub use tank_temperature_generator::{
+    calculate_cold_soak_tank_temperature, generate_tank_temperatures, AverageTankTemperatureRow,
+    ColdSoakInitialHourFractionRow, ColdSoakTankTemperatureRow, HourDayRow, SampleVehicleDayRow,
+    SampleVehicleTripRow, SoakActivityFractionRow, SourceTypeModelYearGroupRow,
+    TankTemperatureGenerator, TankTemperatureInputs, TankTemperatureOutput, TankTemperatureRiseRow,
 };
