@@ -7,3 +7,4 @@
 
 pub mod baserategenerator;
 pub mod rates_op_mode_distribution;
+pub mod sourcetypephysics;
