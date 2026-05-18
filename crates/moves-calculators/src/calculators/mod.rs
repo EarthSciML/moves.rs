@@ -22,6 +22,7 @@ pub mod distance_calculator;
 pub mod evaporative_permeation_calculator;
 pub mod hcspeciation;
 pub mod liquid_leaking_calculator;
+pub mod multiday_tank_vapor_venting_calculator;
 pub mod nh3;
 pub mod nitrogen_oxide;
 pub mod nrairtoxics;
