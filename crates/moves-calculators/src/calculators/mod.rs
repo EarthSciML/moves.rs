@@ -26,3 +26,4 @@ pub mod nrhcspeciation;
 pub mod pmexhaust;
 pub mod refueling_loss_calculator;
 pub mod so2_calculator;
+pub mod sulfate_pm_calculator;
