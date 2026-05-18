@@ -23,6 +23,7 @@ pub mod liquid_leaking_calculator;
 pub mod nh3;
 pub mod nrairtoxics;
 pub mod nrhcspeciation;
+pub mod pm10;
 pub mod pmexhaust;
 pub mod refueling_loss_calculator;
 pub mod so2_calculator;
