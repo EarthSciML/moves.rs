@@ -11,6 +11,7 @@
 
 pub mod activitycalculator;
 pub mod baseratecalculator;
+pub mod basicbraketirepm;
 pub mod basicstartpm;
 pub mod ch4n2o_running_start;
 pub mod co2ae_running_start_extended_idle;
