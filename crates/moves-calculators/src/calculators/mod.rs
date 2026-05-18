@@ -22,4 +22,5 @@ pub mod liquid_leaking_calculator;
 pub mod nrairtoxics;
 pub mod nrhcspeciation;
 pub mod pmexhaust;
+pub mod refueling_loss_calculator;
 pub mod so2_calculator;
