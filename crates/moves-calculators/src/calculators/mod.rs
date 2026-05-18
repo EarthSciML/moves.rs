@@ -16,6 +16,7 @@ pub mod basicstartpm;
 pub mod ch4n2o_running_start;
 pub mod co2ae_running_start_extended_idle;
 pub mod crankcase_emission;
+pub mod criteria_running_calculator;
 pub mod criteria_start_calculator;
 pub mod distance_calculator;
 pub mod evaporative_permeation_calculator;
