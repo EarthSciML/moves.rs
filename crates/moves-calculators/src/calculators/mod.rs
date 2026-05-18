@@ -10,6 +10,7 @@
 //! area list.
 
 pub mod activitycalculator;
+pub mod airtoxics;
 pub mod baseratecalculator;
 pub mod basicbraketirepm;
 pub mod basicstartpm;
