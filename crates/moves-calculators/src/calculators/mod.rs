@@ -13,6 +13,7 @@ pub mod activitycalculator;
 pub mod baseratecalculator;
 pub mod basicstartpm;
 pub mod ch4n2o_running_start;
+pub mod crankcase_emission;
 pub mod distance_calculator;
 pub mod evaporative_permeation_calculator;
 pub mod nrairtoxics;
