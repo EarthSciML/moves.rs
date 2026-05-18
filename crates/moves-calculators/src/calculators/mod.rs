@@ -14,6 +14,7 @@ pub mod baseratecalculator;
 pub mod basicstartpm;
 pub mod ch4n2o_running_start;
 pub mod crankcase_emission;
+pub mod criteria_start_calculator;
 pub mod distance_calculator;
 pub mod evaporative_permeation_calculator;
 pub mod liquid_leaking_calculator;
