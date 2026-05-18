@@ -13,6 +13,7 @@ pub mod activitycalculator;
 pub mod baseratecalculator;
 pub mod basicstartpm;
 pub mod ch4n2o_running_start;
+pub mod co2ae_running_start_extended_idle;
 pub mod crankcase_emission;
 pub mod criteria_start_calculator;
 pub mod distance_calculator;
