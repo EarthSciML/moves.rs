@@ -33,4 +33,5 @@ pub mod refueling_loss_calculator;
 pub mod so2_calculator;
 pub mod sulfate_pm_calculator;
 pub mod tank_vapor_venting_calculator;
+pub mod togspeciation;
 pub mod welltopump;
