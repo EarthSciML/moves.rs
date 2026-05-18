@@ -20,6 +20,7 @@ pub mod criteria_running_calculator;
 pub mod criteria_start_calculator;
 pub mod distance_calculator;
 pub mod evaporative_permeation_calculator;
+pub mod hcspeciation;
 pub mod liquid_leaking_calculator;
 pub mod nh3;
 pub mod nitrogen_oxide;
