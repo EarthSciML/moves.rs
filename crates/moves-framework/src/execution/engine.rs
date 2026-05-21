@@ -63,6 +63,7 @@ use crate::aggregation::OutputProcessor;
 use crate::calculator::{
     Calculator, CalculatorContext, CalculatorRegistry, CalculatorSubscription, Generator,
 };
+use crate::control_strategy::{ControlStrategyRegistry, InternalControlStrategy};
 use crate::error::Result;
 use crate::masterloop::{
     MasterLoop, MasterLoopContext, MasterLoopable, MasterLoopableSubscription,
@@ -154,6 +155,11 @@ pub struct EngineOutcome {
     /// `/proc/self/status` (`VmHWM`). `None` on non-Linux hosts or when
     /// `/proc` is unavailable.
     pub peak_rss_kib: Option<u64>,
+
+    /// Names of all control strategies that were instantiated and driven
+    /// through `pre_run → per-iteration → post_run` for this run, in
+    /// registration order. Empty when no strategies are registered.
+    pub strategies_applied: Vec<String>,
 }
 
 impl EngineOutcome {
@@ -239,8 +245,30 @@ impl MasterLoopable for CalculatorMasterLoopable {
     }
 }
 
+/// Adapter bridging an [`InternalControlStrategy`] onto the [`MasterLoopable`]
+/// trait. One adapter is created per [`StrategySubscription`]; the underlying
+/// strategy instance is shared across all adapters (and across chunks) via
+/// `Arc`. Each adapter carries the [`ProcessId`] its subscription targets and
+/// no-ops when the loop is iterating a different process.
+#[derive(Debug)]
+struct StrategyMasterLoopable {
+    strategy: Arc<dyn InternalControlStrategy>,
+    gate_process: ProcessId,
+}
+
+impl MasterLoopable for StrategyMasterLoopable {
+    fn execute_at_granularity(&self, context: &MasterLoopContext) -> Result<()> {
+        if context.position.process_id != Some(self.gate_process) {
+            return Ok(());
+        }
+        let ctx = CalculatorContext::with_position(context.position);
+        self.strategy.execute(&ctx)
+    }
+}
+
 /// The MOVES execution engine — owns a run's [`ExecutionRunSpec`], its
-/// [`CalculatorRegistry`], and the [`EngineConfig`], and drives the run.
+/// [`CalculatorRegistry`], its [`ControlStrategyRegistry`], and the
+/// [`EngineConfig`], and drives the run.
 ///
 /// See the [module docs](self) for the pipeline and Phase 2 caveats.
 #[derive(Debug)]
@@ -249,6 +277,8 @@ pub struct MOVESEngine {
     execution: ExecutionRunSpec,
     /// Calculator-graph DAG plus factory bindings (Task 19).
     registry: CalculatorRegistry,
+    /// Control-strategy factories (Task 119). Empty by default.
+    strategy_registry: ControlStrategyRegistry,
     /// Output directory and parallelism tuning.
     config: EngineConfig,
 }
@@ -258,14 +288,25 @@ impl MOVESEngine {
     ///
     /// The `registry` carries the calculator-graph DAG and whatever Phase 3
     /// factory bindings have been registered; `config` supplies the output
-    /// directory and parallelism limit.
+    /// directory and parallelism limit. Control strategies default to none;
+    /// use [`with_strategy_registry`](Self::with_strategy_registry) to attach
+    /// strategies.
     #[must_use]
     pub fn new(run_spec: RunSpec, registry: CalculatorRegistry, config: EngineConfig) -> Self {
         Self {
             execution: ExecutionRunSpec::new(run_spec),
             registry,
+            strategy_registry: ControlStrategyRegistry::new(),
             config,
         }
+    }
+
+    /// Attach a [`ControlStrategyRegistry`] to this engine. Strategies are
+    /// instantiated and driven through `pre_run → per-iteration → post_run`
+    /// on the next call to [`run`](Self::run).
+    pub fn with_strategy_registry(mut self, sr: ControlStrategyRegistry) -> Self {
+        self.strategy_registry = sr;
+        self
     }
 
     /// The runtime view of the RunSpec.
@@ -357,6 +398,21 @@ impl MOVESEngine {
         let locations: Vec<_> = self.execution.execution_locations.iter().copied().collect();
         let times = build_times(&self.execution);
 
+        // Instantiate control strategies and run their pre_run hooks before
+        // the master loop starts. pre_run runs single-threaded here.
+        let strategies: Vec<Arc<dyn InternalControlStrategy>> = self
+            .strategy_registry
+            .instantiate_all()
+            .into_iter()
+            .map(Arc::from)
+            .collect();
+        let strategies_applied: Vec<String> =
+            strategies.iter().map(|s| s.name().to_string()).collect();
+        let pre_run_ctx = CalculatorContext::new();
+        for s in &strategies {
+            s.pre_run(&pre_run_ctx)?;
+        }
+
         let executor = BoundedExecutor::new(self.config.max_parallel_chunks)?;
         let registry = &self.registry;
         // Per-chunk wall times collected from within the parallel closure.
@@ -374,6 +430,22 @@ impl MOVESEngine {
             master.processes = processes.clone();
             master.locations = locations.clone();
             master.times = times.clone();
+            // Subscribe control strategies at INTERNAL_CONTROL_STRATEGY priority
+            // (fires before generators and emission calculators). The same Arc
+            // instance is shared across all chunks; execute() must be thread-safe.
+            for strategy in &strategies {
+                for sub in strategy.subscriptions() {
+                    let adapter = Arc::new(StrategyMasterLoopable {
+                        strategy: Arc::clone(strategy),
+                        gate_process: sub.process_id,
+                    });
+                    master.subscribe(MasterLoopableSubscription::new(
+                        sub.granularity,
+                        sub.priority(),
+                        adapter,
+                    ));
+                }
+            }
             for name in chunk.modules() {
                 let Some(instance) = instantiate(registry, name) else {
                     continue;
@@ -405,6 +477,12 @@ impl MOVESEngine {
             }
             Ok(())
         })?;
+
+        // post_run hooks run single-threaded after all chunks complete.
+        let post_run_ctx = CalculatorContext::new();
+        for s in &strategies {
+            s.post_run(&post_run_ctx)?;
+        }
         let execution_time = t_exec_start.elapsed();
         let chunk_wall_times: Vec<Duration> = chunk_slot
             .lock()
@@ -451,6 +529,7 @@ impl MOVESEngine {
             execution_time,
             chunk_wall_times,
             peak_rss_kib,
+            strategies_applied,
         })
     }
 
@@ -612,6 +691,7 @@ pub fn run_record_path(output_root: &Path) -> PathBuf {
 mod tests {
     use super::*;
     use crate::calculator::CalculatorOutput;
+    use crate::control_strategy::{ControlStrategyRegistry, InternalControlStrategy, StrategySubscription};
     use moves_calculator_info::{build_dag, parse_calculator_info_str, Granularity, Priority};
     use moves_runspec::model::{ModelScale, PollutantProcessAssociation, Timespan};
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -1033,5 +1113,162 @@ mod tests {
     fn run_record_path_helper_matches_the_output_layout() {
         let root = Path::new("/runs/output");
         assert_eq!(run_record_path(root), root.join("MOVESRun.parquet"));
+    }
+
+    // ---- Control-strategy integration ------------------------------------
+    //
+    // Each test uses its own static counters and strategy type so the
+    // parallel test runner cannot race on shared state — the same pattern
+    // the calculator tests above use for ENGINE_RUN_CALC / PARTITION_RUN_CALC.
+
+    // --- strategies_applied test ---
+    #[derive(Debug)]
+    struct NamedStrategy;
+    impl InternalControlStrategy for NamedStrategy {
+        fn name(&self) -> &'static str {
+            "NamedStrategy"
+        }
+    }
+    fn named_strategy_factory() -> Box<dyn InternalControlStrategy> {
+        Box::new(NamedStrategy)
+    }
+
+    #[test]
+    fn run_with_no_strategies_reports_empty_strategies_applied() {
+        let dir = tempdir().unwrap();
+        let engine = MOVESEngine::new(sample_runspec(), single_calc_registry(), config(dir.path()));
+        let outcome = engine.run().unwrap();
+        assert!(outcome.strategies_applied.is_empty());
+    }
+
+    #[test]
+    fn run_with_strategy_reports_name_in_strategies_applied() {
+        let dir = tempdir().unwrap();
+        let mut sr = ControlStrategyRegistry::new();
+        sr.register(named_strategy_factory);
+        let engine = MOVESEngine::new(sample_runspec(), single_calc_registry(), config(dir.path()))
+            .with_strategy_registry(sr);
+        let outcome = engine.run().unwrap();
+        assert_eq!(outcome.strategies_applied, vec!["NamedStrategy"]);
+    }
+
+    // --- pre_run / post_run fire once ---
+    static LIFECYCLE_PRE: AtomicUsize = AtomicUsize::new(0);
+    static LIFECYCLE_POST: AtomicUsize = AtomicUsize::new(0);
+
+    #[derive(Debug)]
+    struct LifecycleStrategy;
+    impl InternalControlStrategy for LifecycleStrategy {
+        fn name(&self) -> &'static str {
+            "LifecycleStrategy"
+        }
+        fn pre_run(&self, _ctx: &CalculatorContext) -> Result<()> {
+            LIFECYCLE_PRE.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        }
+        fn post_run(&self, _ctx: &CalculatorContext) -> Result<()> {
+            LIFECYCLE_POST.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        }
+    }
+    fn lifecycle_strategy_factory() -> Box<dyn InternalControlStrategy> {
+        Box::new(LifecycleStrategy)
+    }
+
+    #[test]
+    fn strategy_pre_and_post_run_fire_once() {
+        LIFECYCLE_PRE.store(0, Ordering::SeqCst);
+        LIFECYCLE_POST.store(0, Ordering::SeqCst);
+        let dir = tempdir().unwrap();
+        let mut sr = ControlStrategyRegistry::new();
+        sr.register(lifecycle_strategy_factory);
+        let engine = MOVESEngine::new(sample_runspec(), single_calc_registry(), config(dir.path()))
+            .with_strategy_registry(sr);
+        engine.run().unwrap();
+        assert_eq!(LIFECYCLE_PRE.load(Ordering::SeqCst), 1);
+        assert_eq!(LIFECYCLE_POST.load(Ordering::SeqCst), 1);
+    }
+
+    // --- execute fires per-process-iteration ---
+    static EXEC_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+    #[derive(Debug)]
+    struct ExecCountStrategy;
+
+    static EXEC_COUNT_SUBS: &[StrategySubscription] = &[StrategySubscription {
+        process_id: ProcessId(1),
+        granularity: Granularity::Process,
+        priority_offset: 0,
+    }];
+
+    impl InternalControlStrategy for ExecCountStrategy {
+        fn name(&self) -> &'static str {
+            "ExecCountStrategy"
+        }
+        fn subscriptions(&self) -> &[StrategySubscription] {
+            EXEC_COUNT_SUBS
+        }
+        fn execute(&self, _ctx: &CalculatorContext) -> Result<()> {
+            EXEC_COUNT.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        }
+    }
+    fn exec_count_factory() -> Box<dyn InternalControlStrategy> {
+        Box::new(ExecCountStrategy)
+    }
+
+    #[test]
+    fn strategy_execute_fires_per_process_iteration() {
+        EXEC_COUNT.store(0, Ordering::SeqCst);
+        let dir = tempdir().unwrap();
+        let mut sr = ControlStrategyRegistry::new();
+        sr.register(exec_count_factory);
+        // sample_runspec selects one process (Running Exhaust, id 1). The
+        // single_calc_registry produces one chunk, so ExecCountStrategy.execute
+        // fires once: one process × one chunk.
+        let engine = MOVESEngine::new(sample_runspec(), single_calc_registry(), config(dir.path()))
+            .with_strategy_registry(sr);
+        engine.run().unwrap();
+        assert_eq!(EXEC_COUNT.load(Ordering::SeqCst), 1);
+    }
+
+    // --- adapter gate test ---
+    static GATE_CTR: AtomicUsize = AtomicUsize::new(0);
+
+    #[derive(Debug)]
+    struct GatedStrategy;
+    impl InternalControlStrategy for GatedStrategy {
+        fn name(&self) -> &'static str {
+            "GatedStrategy"
+        }
+        fn execute(&self, _ctx: &CalculatorContext) -> Result<()> {
+            GATE_CTR.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn strategy_adapter_gates_on_process_id() {
+        // Direct unit-test of StrategyMasterLoopable: fires for the matching
+        // process and no-ops for others.
+        GATE_CTR.store(0, Ordering::SeqCst);
+        let strategy: Arc<dyn InternalControlStrategy> = Arc::new(GatedStrategy);
+        let adapter = StrategyMasterLoopable {
+            strategy: Arc::clone(&strategy),
+            gate_process: ProcessId(1),
+        };
+        let mut ctx = MasterLoopContext::default();
+        // Matching process fires.
+        ctx.position.process_id = Some(ProcessId(1));
+        adapter.execute_at_granularity(&ctx).unwrap();
+        assert_eq!(GATE_CTR.load(Ordering::SeqCst), 1);
+        // Different process: gated out.
+        ctx.position.process_id = Some(ProcessId(2));
+        adapter.execute_at_granularity(&ctx).unwrap();
+        assert_eq!(GATE_CTR.load(Ordering::SeqCst), 1);
+        // No process set: gated out.
+        ctx.position.process_id = None;
+        adapter.execute_at_granularity(&ctx).unwrap();
+        assert_eq!(GATE_CTR.load(Ordering::SeqCst), 1);
     }
 }

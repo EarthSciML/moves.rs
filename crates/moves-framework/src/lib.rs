@@ -91,6 +91,7 @@ mod error;
 
 pub mod aggregation;
 pub mod calculator;
+pub mod control_strategy;
 pub mod execution;
 pub mod input;
 pub mod masterloop;
@@ -99,6 +100,9 @@ pub use error::{Error, Result};
 
 pub use aggregation::*;
 pub use calculator::*;
+pub use control_strategy::{
+    ControlStrategyFactory, ControlStrategyRegistry, InternalControlStrategy, StrategySubscription,
+};
 pub use execution::*;
 pub use input::*;
 pub use masterloop::*;
