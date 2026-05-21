@@ -64,7 +64,7 @@ differ — but every byte of *information* is preserved.
 | `[[road_type]]` | `<roadtype>`                 | Array of tables. |
 | `[[pollutant_process]]` | `<pollutantprocessassociation>` | Array of tables. |
 | `[[database_selection]]` | `<databaseselection>` | Empty in current fixtures. |
-| `[[internal_control_strategy]]` | `<internalcontrolstrategy>` | Empty in current fixtures. |
+| `[[internal_control_strategy]]` | `<internalcontrolstrategy>` | Presence signals a strategy is selected. See `docs/control-strategies.md` for per-strategy input files. |
 | `[input_db]`    | `<inputdatabase>`            | |
 | `[uncertainty]` | `<uncertaintyparameters>`    | |
 | `[output]`      | bag of `<output*>` elements  | See below. |
