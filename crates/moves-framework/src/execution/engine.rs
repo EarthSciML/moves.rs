@@ -47,7 +47,8 @@
 //! `state → county → zone → link` nest immediately.
 
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use moves_data::output_schema::{MovesRunRecord, OutputTable};
 use moves_data::{PollutantId, ProcessId};
@@ -103,6 +104,11 @@ impl EngineConfig {
 
 /// Summary of one [`MOVESEngine::run`] — what was planned, what executed,
 /// and where the output landed.
+///
+/// The timing fields (`wall_time`, `planning_time`, `execution_time`) are
+/// zero-valued until Task 75 wires them in, but are present from that task
+/// onward so downstream tooling (the `moves run` summary, perf tests) can
+/// read them without touching the engine innards.
 #[derive(Debug, Clone)]
 pub struct EngineOutcome {
     /// Number of MasterLoop iterations performed (one unless the RunSpec
@@ -126,6 +132,28 @@ pub struct EngineOutcome {
     pub output_root: PathBuf,
     /// Path of the `MOVESRun.parquet` metadata file.
     pub run_record_path: PathBuf,
+
+    // --- Task 75: performance baseline fields ---
+
+    /// Total wall time from the start of [`MOVESEngine::run`] to the return
+    /// of the finalisation step, including output-file I/O.
+    pub wall_time: Duration,
+    /// Time spent planning (topological sort + chunking) before the
+    /// executor starts.
+    pub planning_time: Duration,
+    /// Time spent running all MasterLoops through the [`BoundedExecutor`].
+    /// Parallel chunks overlap, so this is wall time from executor dispatch
+    /// to executor return — not the sum of per-chunk times.
+    pub execution_time: Duration,
+    /// Wall time for each calculator chain (chunk), in the same order as
+    /// [`chunks`](Self::chunks). Each entry is the wall time for that chunk's
+    /// `MasterLoop::run` call — measured within the parallel closure, so
+    /// entries from concurrent chunks overlap in real time.
+    pub chunk_wall_times: Vec<Duration>,
+    /// Peak resident-set size in KiB at the end of the run, read from
+    /// `/proc/self/status` (`VmHWM`). `None` on non-Linux hosts or when
+    /// `/proc` is unavailable.
+    pub peak_rss_kib: Option<u64>,
 }
 
 impl EngineOutcome {
@@ -313,9 +341,13 @@ impl MOVESEngine {
     ///   [`crate::Error::Parquet`] — writing `MOVESRun.parquet` failed.
     /// * Any error a calculator's `execute` surfaces during the run.
     pub fn run(&self) -> Result<EngineOutcome> {
+        let t_start = Instant::now();
+
+        let t_plan_start = Instant::now();
         let modules_planned = self.planned_modules()?;
         let module_refs: Vec<&str> = modules_planned.iter().map(String::as_str).collect();
         let chunks = chunk_chains(&self.registry, &module_refs)?;
+        let planning_time = t_plan_start.elapsed();
 
         // Shared, immutable per-run iteration plan handed to every chunk's
         // MasterLoop. `locations` is empty until Task 16 / the data plane
@@ -327,7 +359,16 @@ impl MOVESEngine {
 
         let executor = BoundedExecutor::new(self.config.max_parallel_chunks)?;
         let registry = &self.registry;
+        // Per-chunk wall times collected from within the parallel closure.
+        // Indexed to match the `chunks` slice order: `chunk_slot[i]` holds
+        // the timing for `chunks[i]`. Using a `Mutex<Vec<Option<...>>>` lets
+        // parallel closures write their slot without contending on others.
+        let chunk_slot: Arc<Mutex<Vec<Option<Duration>>>> =
+            Arc::new(Mutex::new(vec![None; chunks.len()]));
+        let chunk_slot_ref = Arc::clone(&chunk_slot);
+        let t_exec_start = Instant::now();
         executor.execute(&chunks, |chunk| {
+            let t_chunk = Instant::now();
             let mut master = MasterLoop::new();
             master.iterations = iterations;
             master.processes = processes.clone();
@@ -352,8 +393,23 @@ impl MOVESEngine {
                     ));
                 }
             }
-            master.run()
+            master.run()?;
+            let elapsed = t_chunk.elapsed();
+            // Find the slot that corresponds to this chunk by pointer identity.
+            // Safe: `chunk` is a reference into the `chunks` slice that was
+            // passed to `execute`, so `ptr::eq` finds the exact element.
+            if let Ok(mut slots) = chunk_slot_ref.lock() {
+                if let Some(idx) = chunks.iter().position(|c| std::ptr::eq(c, chunk)) {
+                    slots[idx] = Some(elapsed);
+                }
+            }
+            Ok(())
         })?;
+        let execution_time = t_exec_start.elapsed();
+        let chunk_wall_times: Vec<Duration> = chunk_slot
+            .lock()
+            .map(|slots| slots.iter().map(|opt| opt.unwrap_or_default()).collect())
+            .unwrap_or_else(|_| vec![Duration::ZERO; chunks.len()]);
 
         // Partition the plan into executed (had a factory) and not-yet-ported.
         let mut modules_executed = Vec::new();
@@ -378,6 +434,9 @@ impl MOVESEngine {
                 None,
             ));
 
+        let wall_time = t_start.elapsed();
+        let peak_rss_kib = read_peak_rss_kib();
+
         Ok(EngineOutcome {
             iterations,
             modules_planned,
@@ -387,6 +446,11 @@ impl MOVESEngine {
             max_parallel_chunks: executor.limit(),
             output_root: self.config.output_root.clone(),
             run_record_path,
+            wall_time,
+            planning_time,
+            execution_time,
+            chunk_wall_times,
+            peak_rss_kib,
         })
     }
 
@@ -504,6 +568,23 @@ fn models_label(models: &[Model]) -> String {
         })
         .collect::<Vec<_>>()
         .join(",")
+}
+
+/// Peak resident-set size in KiB, read from `/proc/self/status` (`VmHWM`).
+///
+/// `VmHWM` is a monotonic high-water mark: it reports the largest RSS the
+/// process has ever had, not the current value, so it is safe to call at
+/// the end of a run and still captures the peak from within the run.
+/// Returns `None` on non-Linux hosts or when `/proc` is unavailable.
+fn read_peak_rss_kib() -> Option<u64> {
+    let status = std::fs::read_to_string("/proc/self/status").ok()?;
+    status.lines().find_map(|line| {
+        line.strip_prefix("VmHWM:")?
+            .split_whitespace()
+            .next()?
+            .parse()
+            .ok()
+    })
 }
 
 /// Hex SHA-256 of the canonical run inputs — the JSON serialization of the

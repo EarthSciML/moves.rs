@@ -147,12 +147,21 @@ fn cmd_run(opts: RunOptions) -> anyhow::Result<ExitCode> {
     println!("  executed         : {}", outcome.modules_executed.len());
     if !outcome.modules_unimplemented.is_empty() {
         println!(
-            "  not yet ported   : {} module(s) — Phase 2: no calculators ported yet",
+            "  not yet ported   : {} module(s)",
             outcome.modules_unimplemented.len()
         );
     }
     println!("  iterations       : {}", outcome.iterations);
     println!("  max parallelism  : {}", outcome.max_parallel_chunks);
+    println!(
+        "  wall time        : {:.1} ms  (plan {:.1} ms, exec {:.1} ms)",
+        outcome.wall_time.as_secs_f64() * 1000.0,
+        outcome.planning_time.as_secs_f64() * 1000.0,
+        outcome.execution_time.as_secs_f64() * 1000.0,
+    );
+    if let Some(rss) = outcome.peak_rss_kib {
+        println!("  peak RSS         : {:.1} MiB", rss as f64 / 1024.0);
+    }
     println!("  output directory : {}", outcome.output_root.display());
     println!("  run record       : {}", outcome.run_record_path.display());
     Ok(ExitCode::SUCCESS)
