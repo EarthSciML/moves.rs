@@ -38,11 +38,12 @@ Default-DB Parquet files are mmapped or memory-resident for fast reuse across ch
 | 5 — NONROAD port (full Rust rewrite) | 91–118 | 28 |
 | 6 — Control strategies | 119–125 | 7 |
 | 7 — Integration, hardening, release | 126–140 | 15 |
-| **Total** | **140 tasks** | **~128 weeks (~30 months for one engineer)** |
+| 8 — Data-plane wiring and v0.2.0 release | 141–149 | 10 |
+| **Total** | **149 tasks** | **~138 weeks (~32 months for one engineer)** |
 
 A team of two to three engineers with effective parallelization across phases 2/4, 3/5, and 3/6 can collapse this to roughly 15–18 calendar months. Phase 0 is the critical path — it must be completed before the other phases begin meaningful work. Phase 5 (NONROAD) has internal dependencies but is otherwise independent of the onroad work and can run in parallel.
 
-(Note: phase task numbers are non-contiguous because the Phase 5 expansion required adding tasks; the total count is 128 weeks of effort across 140 numbered task slots.)
+(Note: phase task numbers are non-contiguous because the Phase 5 expansion required adding tasks; the total count is 128 weeks of effort across 149 numbered task slots.)
 
 ---
 
@@ -698,6 +699,200 @@ Reserved for post-release: fixing reported issues, prioritizing user-requested f
 ### Task 140: v0.2 planning
 
 Plan v0.2.0 scope based on v0.1 feedback. Likely candidates: incorporating the next EPA MOVES release, expanding RunSpec coverage to less-common configurations, performance optimization passes informed by real-world workloads.
+
+---
+
+## Phase 8 — Data-plane wiring and v0.2.0 release
+
+The single largest gap in v0.1.0 is functional: `moves run` parses RunSpecs and plans
+calculator graphs but does not yet produce emission rows. All Phase 4 infrastructure
+(Parquet conversion, lazy reader, importers, output schema) is complete; the missing
+piece is wiring the default-DB reader into the live calculator context that the Phase 2
+orchestrator constructs before dispatching each chain. This phase closes that gap,
+activates the regression gate, ships Scale-mode support, and tags v0.2.0 as the first
+release that produces real emission output.
+
+Tasks 141–148 may be parallelised across two engineers; Task 149 (the release) is
+serial and depends on 141–148. Tasks 141 and 142 are the critical path; 143–148 may
+begin once 141 is complete.
+
+### Task 141: Data-plane wiring — default-scale onroad
+
+Wire `moves-data-default` into the `CalculatorContext` that the Phase 2 orchestrator
+constructs before dispatching each onroad calculator chain. Concretely:
+
+1. Extend `CalculatorContext` with a `DefaultDbHandle` field carrying a reference to
+   the lazy `DefaultDb` reader; the orchestrator opens the reader once per run and
+   shares it across chains.
+2. For each of the ~70 onroad calculators, identify the specific tables it needs
+   (documented in Phase 1's coverage map and in the original SQL files kept as
+   reference). Replace any stub/empty-DataFrame fallbacks with real lazy-loaded reads.
+3. Verify that predicate pushdown is working: a single-county, single-hour run should
+   read only the relevant county and time partitions, not the full table.
+4. Pass condition: `moves run --runspec SampleRunSpec.xml` produces a non-empty
+   `MOVESOutput.parquet` with emission values. The canonical-diff gate need not pass at
+   this point — any output that isn't empty and doesn't crash is success for Task 141.
+
+**Two to three weeks.** This is the heaviest lift: 70 calculators each need their
+default-DB reads audited and wired in.
+
+### Task 142: Data-plane wiring — NONROAD
+
+Extend the data-plane wiring to the NONROAD path. The NONROAD orchestrator already
+calls `moves_nonroad::run_simulation(opts, inputs)`; this task populates `inputs`
+from the Parquet-backed nonroad default tables (population, allocation, growth,
+emission rates, meteorology, retrofit tables).
+
+1. Extend `NonroadInputs` to carry lazy-frame references (or pre-materialized
+   DataFrames for the tables small enough to hold in memory) sourced from the
+   nonroad Parquet layout from Task 80.
+2. Replace stub inputs in the nonroad orchestrator with real reads.
+3. Pass condition: an `nr-commercial-nation` fixture run produces non-empty nonroad
+   emission output.
+
+**One week.**
+
+### Task 143: Activate canonical regression gate and triage divergences
+
+With Tasks 141–142 producing real output, supply canonical MOVES snapshots to
+`REGRESSION_SNAPSHOTS_DIR` and activate the diff gate in
+`crates/moves-cli/tests/full_suite_regression.rs`.
+
+1. Capture fresh canonical snapshots for all 34 non-scale fixtures against the
+   pinned canonical-MOVES container (the snapshots were not committed in v0.1 to
+   avoid large binary blobs; generate them from the CI workflow).
+2. Run `cargo test` with the gate active. Triage every out-of-tolerance difference:
+   - Wiring bug (wrong table, wrong predicate, wrong join key) → fix in Tasks 141–142
+   - Known float-precision difference (Polars SUM order vs MariaDB) → document in
+     `docs/known-divergences.md` and widen the relevant column's tolerance in
+     `characterization/tolerance.toml`
+3. Pass condition: all 34 fixtures pass the gate. Widen tolerances only where the
+   divergence is demonstrably precision-only (not a behavioral difference). Any
+   behavioral difference that cannot be resolved in this phase is filed as a bead and
+   documented as a known limitation.
+
+**One to two weeks.**
+
+### Task 144: County Scale and Project Scale data-plane wiring
+
+The three `scale-*` fixtures (`scale-county`, `scale-project`, `scale-rates`) were
+excluded from v0.1's regression suite because the CDB/PDB Parquet was not wired into
+the calculator context.
+
+1. Extend the orchestrator to load CDB/PDB Parquet into the `CalculatorContext` when
+   `<scale>County</scale>` or `<scale>Project</scale>` is set in the RunSpec. The
+   Phase 4 importers already produce the Parquet; the orchestrator just needs to prefer
+   it over the default-DB tables for the tables the user has customised.
+2. Author characterization snapshots for the three scale fixtures using canonical MOVES.
+3. Add all three to the active regression suite.
+4. Pass condition: `scale-county`, `scale-project`, and `scale-rates` all pass the
+   canonical diff gate.
+
+**Two weeks.**
+
+### Task 145: WASM GitHub Pages deployment
+
+The v0.1 CHANGELOG noted "a hosted demo URL will be added in a future release once CI
+publishes the WASM artifacts to GitHub Pages."
+
+1. Add a GitHub Actions workflow (`deploy-wasm-demo.yml`) that builds `moves-wasm`
+   with `wasm-pack --target web`, packages the demo assets, and pushes to the `gh-pages`
+   branch on each push to `main`. Gate the push behind a CI success check so broken
+   WASM builds don't clobber a live demo.
+2. Configure the repository's GitHub Pages to serve from `gh-pages`.
+3. Update README.md and the `browser-demo` section of `docs/user-guide.md` with the
+   live URL.
+
+**Two to three days.**
+
+### Task 146: Performance characterization — real emission run
+
+The v0.1 CHANGELOG's performance table shows framework-overhead baselines only.
+Once Tasks 141–143 produce real emission output, measure end-to-end wall time:
+
+1. Run the `SampleRunSpec.xml` fixture (single county, single hour, gasoline cars)
+   against a pinned canonical MOVES install on the same hardware. Record wall time,
+   peak RSS.
+2. Run the same fixture through `moves run`. Record wall time, peak RSS at
+   `--max-parallel-chunks 1` and at the physical-core count.
+3. Run a wider fixture (multi-county, full day) for both runtimes.
+4. Document results in `docs/benchmark-report.md`, replacing the placeholder
+   "projected improvement" text with measured numbers. Note the specific bottlenecks
+   eliminated (MariaDB I/O, filesystem bundle handoff) and the corresponding speedup
+   attribution.
+
+The v0.1 design target was ≥10× wall-time improvement over canonical MOVES on the
+single-county fixture. This task measures whether that target was achieved and, if not,
+identifies the remaining bottleneck for a follow-on optimization pass.
+
+**Three to five days.**
+
+### Task 147: EPA MOVES annual update
+
+Incorporate the next EPA MOVES default-database release (expected annually) as the
+first real exercise of the Task 137 upstream-tracking workflow:
+
+1. Run `scripts/upstream-update.sh` against the new EPA release ZIP. Inspect the
+   diff report: new tables, renamed columns, changed row counts.
+2. For any schema changes that affect Rust code (new calculator inputs, changed column
+   types): update the relevant calculator(s), add characterization coverage if a new
+   emission process is present, document any behavioral changes.
+3. Regenerate the Parquet default-DB artifact. Publish it as a versioned GitHub
+   Release attachment alongside the binary release (same pattern as v0.1.0).
+4. Re-run the full regression suite against a canonical-MOVES install pinned to the
+   new default DB. Update `characterization/tolerance.toml` if new divergence
+   categories appear.
+5. Version-tag the new default DB artifact and update the `docs/upstream-tracking.md`
+   "most recent update" section.
+
+Effort scales with EPA release scope: a minor update (rates only, no schema change)
+is one to two days; a major update with new calculators may be one to two weeks. The
+Task 137 automation reduces the mechanical steps; the remaining effort is in auditing
+behavioral changes.
+
+**One week (best estimate; actual depends on EPA release scope).**
+
+### Task 148: RunSpec coverage expansion
+
+Expand the characterization fixture set to cover configurations exercised by early
+community adopters but not tested in v0.1:
+
+1. **Multi-county runs.** A RunSpec spanning 5–10 counties exercises the
+   county-partitioned Parquet reads and the parallel-chunk executor under realistic
+   parallelism. Author one fixture; capture canonical snapshot.
+2. **Multi-fuel-type runs.** A single RunSpec with gasoline, diesel, CNG, and BEV
+   source types in the same run. Tests the AVFT and LEV calculator paths together.
+3. **Rates mode.** A `<ratesMode>Rates</ratesMode>` RunSpec. The rates-mode output
+   schema differs from inventory mode; characterize it.
+4. **Extended time span.** A full-year (12-month) run at county scale. Exercises the
+   monthly-partition chunking logic and peak-memory behavior at realistic scope.
+5. **Error handling: invalid RunSpec.** Verify that common user mistakes (missing
+   required element, out-of-range year, referencing a pollutant not in the default DB)
+   produce clear, actionable error messages rather than panics or cryptic internal
+   errors.
+
+Target: 8–10 new fixtures added to the regression suite.
+
+**Two weeks.**
+
+### Task 149: v0.2.0 release
+
+Tag v0.2.0. Release notes must document:
+
+- Phase 4 data-plane completion: `moves run` now produces real emission rows.
+- Activated regression gate: all 34 non-scale fixtures pass the canonical diff gate;
+  known divergences are documented in `docs/known-divergences.md`.
+- Scale mode: County Scale and Project Scale runs are now fully supported and
+  regression-tested.
+- Hosted WASM demo URL (from Task 145).
+- Performance numbers from Task 146 (the first real-output benchmark).
+- Updated default-DB artifact if EPA released a new version (Task 147).
+- New RunSpec coverage from Task 148.
+- Regulatory caveat: unchanged from v0.1 — this port is not for regulatory use.
+
+Announce to the same research and policy communities as v0.1.0.
+
+**One to two days.**
 
 ---
 
