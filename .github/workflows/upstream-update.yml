@@ -1,0 +1,415 @@
+# Upstream MOVES update workflow.
+#
+# Triggered manually (workflow_dispatch) when EPA publishes a new MOVES
+# release.  Automates the mechanical detection steps and opens a PR with
+# all required file changes so the maintainer can review before merging.
+#
+# What this workflow does:
+#   1. Shallow-clone MOVES source at the new commit and regenerate
+#      characterization/default-db-schema/tables.json via audit-schema.py.
+#   2. Diff the new tables.json against the committed baseline with
+#      diff-schema.py and fail loudly if schema has changed.
+#   3. Update characterization/apptainer/files/versions.env with the
+#      new MOVES commit and movesdb version pins.
+#   4. Build the canonical-moves SIF with the new pins and update
+#      characterization/canonical-image.lock.
+#   5. Run the default-DB conversion pipeline to regenerate the Parquet
+#      tree and validate it.
+#   6. Run the full characterization fixture suite and diff every snapshot
+#      against the committed baseline.
+#   7. Commit all changed files (versions.env, canonical-image.lock,
+#      tables.json, snapshot baselines) to a branch and open a PR.
+#
+# The PR description includes the full schema diff and a fixture-drift
+# summary so the reviewer has everything in one place.
+#
+# Inputs:
+#   moves_commit   — 40-hex SHA of the new EPA_MOVES_Model commit to pin.
+#   movesdb_label  — Label for the new default DB (e.g. movesdb20251023).
+#   movesdb_sha256 — SHA256 of the new movesdb*.zip.
+#   movesdb_url    — HTTPS URL to download the movesdb zip (optional;
+#                    must be accessible from the runner).
+#
+# Requirements:
+#   * Self-hosted runner with labels: self-hosted, apptainer, fakeroot
+#   * gfortran label is NOT required for this workflow (NONROAD fidelity is
+#     run by fixture-suite-weekly.yml separately).
+#   * The runner must have git, python3, cargo (stable Rust), and gh CLI.
+#   * GITHUB_TOKEN must have contents:write and pull-requests:write.
+
+name: upstream-update
+
+on:
+  workflow_dispatch:
+    inputs:
+      moves_commit:
+        description: "New EPA_MOVES_Model commit SHA (40 hex chars)"
+        required: true
+      movesdb_label:
+        description: "New default-DB label, e.g. movesdb20251023"
+        required: true
+        default: "movesdb20241112"
+      movesdb_sha256:
+        description: "SHA256 of the new movesdb*.zip"
+        required: true
+      movesdb_url:
+        description: "HTTPS URL to download the new movesdb*.zip (optional)"
+        required: false
+        default: ""
+
+concurrency:
+  group: upstream-update
+  cancel-in-progress: false
+
+jobs:
+  upstream-update:
+    name: Upstream MOVES update (${{ github.event.inputs.movesdb_label }})
+    runs-on: [self-hosted, apptainer, fakeroot]
+    permissions:
+      contents: write
+      pull-requests: write
+
+    env:
+      MOVES_COMMIT: ${{ github.event.inputs.moves_commit }}
+      MOVESDB_LABEL: ${{ github.event.inputs.movesdb_label }}
+      MOVESDB_SHA256: ${{ github.event.inputs.movesdb_sha256 }}
+      MOVESDB_URL: ${{ github.event.inputs.movesdb_url }}
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate inputs
+        run: |
+          echo "${MOVES_COMMIT}" | grep -Eq '^[0-9a-fA-F]{40}$' || {
+              echo "::error::moves_commit must be a 40-hex-char SHA"
+              exit 1
+          }
+          echo "${MOVESDB_LABEL}" | grep -Eq '^movesdb[0-9]{8}$' || {
+              echo "::warning::movesdb_label '${MOVESDB_LABEL}' does not match expected pattern movesdbYYYYMMDD"
+          }
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry, target/
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: upstream-update
+
+      # ── Stage 1: fetch MOVES source ───────────────────────────────────────
+      - name: Shallow-clone MOVES source at new commit
+        run: |
+          . characterization/apptainer/files/versions.env
+          mkdir -p /tmp/moves-upstream-src
+          git -C /tmp/moves-upstream-src init
+          git -C /tmp/moves-upstream-src remote add origin "${MOVES_REPO_URL}"
+          git -C /tmp/moves-upstream-src fetch --depth 1 origin "${MOVES_COMMIT}"
+          git -C /tmp/moves-upstream-src checkout FETCH_HEAD
+          echo "[upstream] MOVES source ready at commit: $(git -C /tmp/moves-upstream-src rev-parse HEAD)"
+
+      # ── Stage 2: regenerate schema audit ─────────────────────────────────
+      - name: Regenerate tables.json from new DDL
+        run: |
+          python3 characterization/default-db-schema/audit-schema.py \
+              --default-sql    /tmp/moves-upstream-src/database/CreateDefault.sql \
+              --nr-default-sql /tmp/moves-upstream-src/database/CreateNRDefault.sql \
+              --moves-commit   "${MOVES_COMMIT}" \
+              --output         /tmp/tables-new.json
+          echo "[upstream] new table count: $(python3 -c "
+          import json
+          d = json.load(open('/tmp/tables-new.json'))
+          print(d['table_count'])
+          ")"
+
+      # ── Stage 3: schema diff ──────────────────────────────────────────────
+      - name: Diff schema against current tables.json
+        id: schema_diff
+        run: |
+          set +e
+          python3 characterization/default-db-schema/diff-schema.py \
+              characterization/default-db-schema/tables.json \
+              /tmp/tables-new.json \
+              --format json \
+              --output /tmp/schema-diff.json
+          SCHEMA_DIFF_RC=$?
+          set -e
+
+          python3 characterization/default-db-schema/diff-schema.py \
+              characterization/default-db-schema/tables.json \
+              /tmp/tables-new.json \
+              --format text || true
+
+          if [ "${SCHEMA_DIFF_RC}" = "0" ]; then
+              echo "schema_changed=false" >> "${GITHUB_OUTPUT}"
+              echo "[upstream] Schema unchanged."
+          else
+              echo "schema_changed=true" >> "${GITHUB_OUTPUT}"
+              echo "::warning::Schema drift detected — tables.json will be updated in the PR."
+          fi
+
+      # ── Stage 4: acquire movesdb zip ─────────────────────────────────────
+      - name: Acquire movesdb zip
+        run: |
+          MOVESDB_ZIP="/tmp/${MOVESDB_LABEL}.zip"
+          if [ -n "${MOVESDB_URL}" ]; then
+              echo "[upstream] Downloading ${MOVESDB_URL}"
+              curl -fsSL -o "${MOVESDB_ZIP}" "${MOVESDB_URL}"
+          else
+              # Check if the MOVES source tree already bundles the zip
+              # at the conventional path database/Setup/<label>.zip.
+              BUNDLED="/tmp/moves-upstream-src/database/Setup/${MOVESDB_LABEL}.zip"
+              if [ -f "${BUNDLED}" ]; then
+                  echo "[upstream] Using bundled zip at ${BUNDLED}"
+                  cp "${BUNDLED}" "${MOVESDB_ZIP}"
+              else
+                  echo "::error::movesdb zip not available: no --movesdb_url and no bundled zip at ${BUNDLED}"
+                  exit 1
+              fi
+          fi
+          ACTUAL_SHA="$(sha256sum "${MOVESDB_ZIP}" | awk '{print $1}')"
+          if [ "${ACTUAL_SHA}" != "${MOVESDB_SHA256}" ]; then
+              echo "::error::movesdb SHA256 mismatch:"
+              echo "::error::  expected: ${MOVESDB_SHA256}"
+              echo "::error::  actual:   ${ACTUAL_SHA}"
+              exit 1
+          fi
+          echo "MOVESDB_ZIP=${MOVESDB_ZIP}" >> "${GITHUB_ENV}"
+          echo "[upstream] movesdb verified: ${ACTUAL_SHA}"
+
+      # ── Stage 5: update versions.env ─────────────────────────────────────
+      - name: Update versions.env
+        run: |
+          ENV_FILE="characterization/apptainer/files/versions.env"
+          sed -i \
+              -e "s|^MOVES_COMMIT=.*|MOVES_COMMIT=\"${MOVES_COMMIT}\"|" \
+              -e "s|^MOVESDB_FILENAME=.*|MOVESDB_FILENAME=\"${MOVESDB_LABEL}.zip\"|" \
+              -e "s|^MOVESDB_SHA256=.*|MOVESDB_SHA256=\"${MOVESDB_SHA256}\"|" \
+              "${ENV_FILE}"
+          echo "[upstream] Updated ${ENV_FILE}"
+          git diff "${ENV_FILE}"
+
+      # ── Stage 6: apply new tables.json ───────────────────────────────────
+      - name: Update tables.json (if schema changed)
+        if: steps.schema_diff.outputs.schema_changed == 'true'
+        run: |
+          cp /tmp/tables-new.json characterization/default-db-schema/tables.json
+          echo "[upstream] tables.json updated"
+          echo "::notice::tables.json updated — review partitioning-plan.md for new/changed tables"
+
+      # ── Stage 7: rebuild SIF ─────────────────────────────────────────────
+      - name: Rebuild canonical-moves SIF
+        run: |
+          MOVES_COMMIT="${MOVES_COMMIT}" \
+          MOVESDB_SHA256="${MOVESDB_SHA256}" \
+          MOVESDB_LOCAL_PATH="${MOVESDB_ZIP}" \
+              characterization/apptainer/build-sif.sh
+          echo "[upstream] SIF rebuilt: $(cat characterization/canonical-image.lock | grep '^sif_sha256' | cut -d'=' -f2 | tr -d ' ')"
+
+      # ── Stage 8: convert default-DB to Parquet ───────────────────────────
+      - name: Convert default-DB to Parquet
+        run: |
+          characterization/default-db-conversion/convert-default-db.sh \
+              --sif        characterization/apptainer/canonical-moves.sif \
+              --db         "${MOVESDB_LABEL}" \
+              --db-version "${MOVESDB_LABEL}" \
+              --plan       characterization/default-db-schema/tables.json \
+              --output     /tmp/upstream-parquet \
+              --source-dump "${MOVESDB_ZIP}" \
+              --strict
+
+      # ── Stage 9: validate Parquet tree ───────────────────────────────────
+      - name: Validate Parquet tree
+        run: |
+          cargo build --release --locked -q --bin moves-default-db-validate
+          ./target/release/moves-default-db-validate \
+              --output-root "/tmp/upstream-parquet/${MOVESDB_LABEL}" \
+              --tsv-dir     "/tmp/upstream-parquet/${MOVESDB_LABEL}/_tsv"
+
+      # ── Stage 10: build fixture SIF ──────────────────────────────────────
+      - name: Build moves-fixture SIF (cache-first)
+        run: characterization/apptainer/build-fixture-sif.sh
+
+      # ── Stage 11: run characterization fixture suite ──────────────────────
+      - name: Run full characterization fixture suite
+        run: |
+          mkdir -p /tmp/upstream-snapshots
+          characterization/run-all-fixtures.sh \
+              --sif         characterization/apptainer/moves-fixture.sif \
+              --output-root /tmp/upstream-snapshots \
+              --keep-going
+
+      # ── Stage 12: diff snapshots ──────────────────────────────────────────
+      - name: Diff snapshots against committed baseline
+        id: snapshot_diff
+        run: |
+          cargo build --release --locked -q --bin moves-snapshot
+
+          TOLERANCE="characterization/tolerance.toml"
+          TOL_FLAG=""
+          [ -f "${TOLERANCE}" ] && TOL_FLAG="--tolerance ${TOLERANCE}"
+
+          mkdir -p artifacts/snapshot-diffs
+
+          drift=0
+          unchanged=0
+          drifted_fixtures=()
+
+          for fresh in /tmp/upstream-snapshots/*/; do
+              name="$(basename "${fresh}")"
+              baseline="characterization/snapshots/${name}"
+              if [ ! -d "${baseline}" ]; then
+                  echo "::warning::no committed baseline for ${name} — new fixture?"
+                  continue
+              fi
+              if ./target/release/moves-snapshot diff \
+                      "${baseline}" "${fresh}" \
+                      --format json ${TOL_FLAG} \
+                      > "artifacts/snapshot-diffs/${name}.json"; then
+                  unchanged=$((unchanged + 1))
+              else
+                  drift=1
+                  drifted_fixtures+=("${name}")
+                  echo "::warning::snapshot drift in ${name}"
+                  ./target/release/moves-snapshot diff \
+                      "${baseline}" "${fresh}" \
+                      --format text ${TOL_FLAG} || true
+              fi
+          done
+
+          echo "snapshot_drift=${drift}" >> "${GITHUB_OUTPUT}"
+          echo "unchanged_count=${unchanged}" >> "${GITHUB_OUTPUT}"
+          echo "drifted_list=${drifted_fixtures[*]:-}" >> "${GITHUB_OUTPUT}"
+
+          # Copy drifted snapshots into the repo tree for the PR commit.
+          if [ "${drift}" = "1" ]; then
+              for name in "${drifted_fixtures[@]}"; do
+                  echo "[upstream] Copying updated snapshot: ${name}"
+                  cp -r "/tmp/upstream-snapshots/${name}/." \
+                        "characterization/snapshots/${name}/"
+              done
+              echo "::notice::Snapshot baselines updated for ${#drifted_fixtures[@]} fixture(s)"
+          fi
+
+      # ── Stage 13: cargo tests ─────────────────────────────────────────────
+      - name: cargo test --workspace
+        run: cargo test --workspace --all-targets
+
+      # ── Stage 14: create PR branch and open PR ────────────────────────────
+      - name: Upload diff artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: upstream-update-artifacts
+          path: |
+            artifacts/snapshot-diffs/*.json
+            /tmp/schema-diff.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Create PR branch and open PR
+        run: |
+          BRANCH="upstream/${MOVESDB_LABEL}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "${BRANCH}"
+
+          # Stage all changed tracked files.
+          git add \
+              characterization/apptainer/files/versions.env \
+              characterization/canonical-image.lock \
+              characterization/default-db-schema/tables.json \
+              characterization/snapshots/ \
+              || true
+
+          # Check if there's anything to commit.
+          if git diff --cached --quiet; then
+              echo "[upstream] No file changes — nothing to commit."
+              echo "::notice::All files unchanged — no PR needed."
+              exit 0
+          fi
+
+          SCHEMA_CHANGED="${{ steps.schema_diff.outputs.schema_changed }}"
+          SNAP_DRIFT="${{ steps.snapshot_diff.outputs.snapshot_drift }}"
+          UNCHANGED="${{ steps.snapshot_diff.outputs.unchanged_count }}"
+          DRIFTED="${{ steps.snapshot_diff.outputs.drifted_list }}"
+
+          # Build schema diff excerpt for the PR body.
+          SCHEMA_EXCERPT=""
+          if [ -f /tmp/schema-diff.json ]; then
+              SCHEMA_EXCERPT="$(python3 -c "
+          import json, sys
+          d = json.load(open('/tmp/schema-diff.json'))
+          lines = []
+          if d['tables_added']:
+              lines.append('Tables added: ' + ', '.join(d['tables_added']))
+          if d['tables_removed']:
+              lines.append('Tables removed: ' + ', '.join(d['tables_removed']))
+          for t in d['tables_changed']:
+              parts = []
+              if t.get('columns_added'):    parts.append(str(len(t['columns_added'])) + ' col(s) added')
+              if t.get('columns_removed'):  parts.append(str(len(t['columns_removed'])) + ' col(s) removed')
+              if t.get('columns_changed'):  parts.append(str(len(t['columns_changed'])) + ' type change(s)')
+              if t.get('pk_change'):        parts.append('PK changed')
+              if t.get('partition_change'): parts.append('partition strategy changed')
+              lines.append(t['table'] + ': ' + ', '.join(parts))
+          print('\n'.join(lines) if lines else 'No schema changes.')
+          ")"
+          fi
+
+          git commit -m "upstream: incorporate ${MOVESDB_LABEL} (commit ${MOVES_COMMIT:0:12})
+
+          Automated upstream MOVES update triggered by workflow_dispatch.
+
+          - MOVES commit: ${MOVES_COMMIT}
+          - Default DB:   ${MOVESDB_LABEL}
+          - Schema changed: ${SCHEMA_CHANGED}
+          - Snapshot drift: $([ "${SNAP_DRIFT}" = "1" ] && echo "yes — ${DRIFTED}" || echo "no")
+          - Fixtures unchanged: ${UNCHANGED}
+
+          Co-Authored-By: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
+
+          git push origin "${BRANCH}"
+
+          gh pr create \
+              --base main \
+              --head "${BRANCH}" \
+              --title "upstream: incorporate ${MOVESDB_LABEL}" \
+              --body "$(cat <<BODY
+          ## Upstream MOVES update: ${MOVESDB_LABEL}
+
+          Automated update triggered by \`upstream-update\` workflow.
+
+          | Field | Value |
+          |-------|-------|
+          | MOVES commit | \`${MOVES_COMMIT}\` |
+          | Default DB   | \`${MOVESDB_LABEL}\` |
+          | Schema changed | ${SCHEMA_CHANGED} |
+          | Snapshot drift | $([ "${SNAP_DRIFT}" = "1" ] && echo "yes" || echo "no") |
+          | Fixtures unchanged | ${UNCHANGED} |
+
+          ## Schema changes
+
+          \`\`\`
+          ${SCHEMA_EXCERPT}
+          \`\`\`
+
+          ## Snapshot drift
+
+          $([ "${SNAP_DRIFT}" = "1" ] && echo "Fixtures with drift: ${DRIFTED}" || echo "None — all ${UNCHANGED} fixture(s) match baseline.")
+
+          ## Review checklist
+
+          - [ ] Review \`characterization/apptainer/files/versions.env\` version pins.
+          - [ ] If schema changed: review \`characterization/default-db-schema/tables.json\` and \`partitioning-plan.md\`.
+          - [ ] If schema changed: search \`crates/\` for Rust readers of changed tables.
+          - [ ] Review snapshot diffs in the \`upstream-update-artifacts\` artifact.
+          - [ ] Update \`docs/known-divergences.md\` if any new divergences are expected.
+          - [ ] Bump crate versions and update \`CHANGELOG.md\`.
+          - [ ] After merge: trigger \`package-default-db\` workflow on the new release tag.
+
+          See [docs/upstream-tracking.md](../../blob/main/docs/upstream-tracking.md) for the full procedure.
+          BODY
+          )"
