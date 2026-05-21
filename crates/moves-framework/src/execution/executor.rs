@@ -61,6 +61,8 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::{Condvar, Mutex};
 
 use crate::calculator::CalculatorRegistry;
+// `Error` is used explicitly only in the non-WASM rayon path.
+#[cfg_attr(target_arch = "wasm32", allow(unused_imports))]
 use crate::error::{Error, Result};
 
 // ---------------------------------------------------------------------------
@@ -286,17 +288,23 @@ fn resolve_parallelism(requested: usize) -> usize {
 /// Runs independent [`Chunk`]s concurrently up to a fixed parallelism
 /// limit.
 ///
-/// Owns a [`rayon::ThreadPool`] sized by `--max-parallel-chunks` and a
-/// [`Semaphore`] of matching permit count. [`execute`](Self::execute)
-/// dispatches every chunk onto the pool; each chunk acquires a permit
-/// before running its body and releases it after, so at most `limit`
-/// chunks — and at most `limit` chunk working sets — are ever live.
+/// On native targets, owns a [`rayon::ThreadPool`] sized by
+/// `--max-parallel-chunks`. On `wasm32-unknown-unknown`, chunks are always
+/// run sequentially (the WASM target has no threading until Task 134 enables
+/// the threads proposal), so `max_parallel_chunks` defaults to 1 and the
+/// semaphore still bounds peak memory by sequencing chunks.
+///
+/// [`execute`](Self::execute) dispatches every chunk; each chunk acquires a
+/// [`Semaphore`] permit before running its body and releases it after, so at
+/// most `limit` chunk working sets are ever live.
 ///
 /// The executor is reusable: a single [`BoundedExecutor`] can serve many
 /// [`execute`](Self::execute) calls, each with its own chunk set.
 #[derive(Debug)]
 pub struct BoundedExecutor {
     /// Worker pool. Sized to [`limit`](Self::limit) threads.
+    /// Absent on `wasm32-unknown-unknown` — chunks run sequentially there.
+    #[cfg(not(target_arch = "wasm32"))]
     pool: rayon::ThreadPool,
     /// Resolved parallelism limit — the pool's thread count and the
     /// per-`execute` semaphore's permit count.
@@ -307,22 +315,30 @@ impl BoundedExecutor {
     /// Build an executor capped at `max_parallel_chunks` concurrent chunks.
     ///
     /// `max_parallel_chunks == 0` selects the host's available parallelism
-    /// (number of hardware threads). Any positive value is used verbatim,
-    /// so callers tuning for a memory-constrained environment can force a
-    /// low limit regardless of core count.
+    /// (number of hardware threads, or 1 on `wasm32`). Any positive value is
+    /// used verbatim, so callers tuning for a memory-constrained environment
+    /// can force a low limit regardless of core count.
     ///
     /// # Errors
     ///
     /// Returns [`Error::ThreadPool`] if `rayon` cannot build the pool —
     /// for example when the OS refuses to spawn the worker threads.
+    /// Never fails on `wasm32` (no pool is created).
     pub fn new(max_parallel_chunks: usize) -> Result<Self> {
         let limit = resolve_parallelism(max_parallel_chunks);
+
+        #[cfg(not(target_arch = "wasm32"))]
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(limit)
             .thread_name(|index| format!("moves-chunk-{index}"))
             .build()
             .map_err(|err| Error::ThreadPool(err.to_string()))?;
-        Ok(Self { pool, limit })
+
+        Ok(Self {
+            #[cfg(not(target_arch = "wasm32"))]
+            pool,
+            limit,
+        })
     }
 
     /// The resolved parallelism limit — the maximum number of chunks (and
@@ -335,17 +351,18 @@ impl BoundedExecutor {
     /// Run every chunk in `chunks` through `run_chunk`, with at most
     /// [`limit`](Self::limit) running concurrently.
     ///
-    /// Each chunk is dispatched onto the pool; the chunk body acquires a
-    /// [`Semaphore`] permit, runs `run_chunk`, then releases the permit on
-    /// return (or on panic, via the guard's `Drop`). The call blocks until
-    /// every chunk has finished.
+    /// On native: each chunk is dispatched onto the rayon pool; the chunk
+    /// body acquires a [`Semaphore`] permit, runs `run_chunk`, then releases
+    /// the permit on return (or on panic, via the guard's `Drop`). The call
+    /// blocks until every chunk has finished.
+    ///
+    /// On `wasm32`: chunks run sequentially in the calling thread, each still
+    /// gated by the semaphore so the memory-bound guarantee is preserved.
     ///
     /// # Errors
     ///
-    /// If one or more chunk bodies return [`Err`], the first error (in an
-    /// unspecified order — chunks run concurrently) is returned after all
-    /// chunks complete. The executor never cancels in-flight chunks: a
-    /// `rayon` scope runs every spawned task to completion.
+    /// If one or more chunk bodies return [`Err`], the first error is returned
+    /// after all chunks complete. On `wasm32` the first error stops execution.
     pub fn execute<F>(&self, chunks: &[Chunk], run_chunk: F) -> Result<()>
     where
         F: Fn(&Chunk) -> Result<()> + Sync,
@@ -353,7 +370,14 @@ impl BoundedExecutor {
         if chunks.is_empty() {
             return Ok(());
         }
+        self.execute_impl(chunks, &run_chunk)
+    }
 
+    #[cfg(not(target_arch = "wasm32"))]
+    fn execute_impl<F>(&self, chunks: &[Chunk], run_chunk: &F) -> Result<()>
+    where
+        F: Fn(&Chunk) -> Result<()> + Sync,
+    {
         let permits = Semaphore::new(self.limit);
         let errors: Mutex<Vec<Error>> = Mutex::new(Vec::new());
 
@@ -361,7 +385,6 @@ impl BoundedExecutor {
             for chunk in chunks {
                 let permits = &permits;
                 let errors = &errors;
-                let run_chunk = &run_chunk;
                 scope.spawn(move |_| {
                     // Hold a permit for the whole body: the working set the
                     // chunk allocates inside `run_chunk` stays bounded by
@@ -386,6 +409,25 @@ impl BoundedExecutor {
             Some(err) => Err(err),
             None => Ok(()),
         }
+    }
+
+    /// Sequential fallback for `wasm32-unknown-unknown`.
+    ///
+    /// WASM has no threads (until Task 134 enables the threads proposal), so
+    /// chunks run one at a time in the calling thread. The semaphore still
+    /// gates each chunk, preserving the memory-bound guarantee that at most
+    /// `limit` chunk working sets are ever resident.
+    #[cfg(target_arch = "wasm32")]
+    fn execute_impl<F>(&self, chunks: &[Chunk], run_chunk: &F) -> Result<()>
+    where
+        F: Fn(&Chunk) -> Result<()>,
+    {
+        let permits = Semaphore::new(self.limit);
+        for chunk in chunks {
+            let _permit = permits.acquire();
+            run_chunk(chunk)?;
+        }
+        Ok(())
     }
 }
 

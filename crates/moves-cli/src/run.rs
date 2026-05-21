@@ -69,6 +69,7 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
             .file_name()
             .map(|name| name.to_string_lossy().into_owned()),
         run_date_time: opts.run_date_time.clone(),
+        collect_output_in_memory: false,
     };
     let engine = MOVESEngine::new(run_spec, registry, config);
     let outcome = engine.run().context("MOVES engine run failed")?;

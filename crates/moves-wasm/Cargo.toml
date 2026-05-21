@@ -1,0 +1,30 @@
+[package]
+name = "moves-wasm"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+description = "WebAssembly entry point for the MOVES Rust port — Task 132 (onroad)."
+
+# cdylib: the browser-loadable .wasm module.
+# lib: native unit tests (compiled without wasm-bindgen glue).
+[lib]
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[dependencies]
+moves-calculator-info = { path = "../moves-calculator-info" }
+moves-calculators = { path = "../moves-calculators" }
+moves-framework = { path = "../moves-framework" }
+moves-runspec = { path = "../moves-runspec" }
+js-sys = { workspace = true }
+serde_json = { workspace = true }
+wasm-bindgen = { workspace = true }
+
+# parquet without C-compiled codecs so the WASM build does not require clang.
+parquet = { version = "55", default-features = false, features = ["arrow", "base64"] }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"

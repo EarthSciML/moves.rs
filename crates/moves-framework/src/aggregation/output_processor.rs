@@ -60,7 +60,7 @@
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use arrow::array::{
     ArrayRef, Float64Builder, Int16Builder, Int32Builder, RecordBatch, StringBuilder,
@@ -92,11 +92,11 @@ type PartitionKey = (Option<i16>, Option<i16>);
 
 /// Writes the three MOVES output tables to a per-run output directory.
 ///
-/// Construct with [`OutputProcessor::new`]; this creates the root
-/// directory and immediately writes `MOVESRun.parquet`. Subsequent
-/// [`write_emissions`](Self::write_emissions) /
-/// [`write_activity`](Self::write_activity) calls land partition files
-/// under `MOVESOutput/` and `MOVESActivityOutput/`.
+/// Construct with [`OutputProcessor::new`] (filesystem) or
+/// [`OutputProcessor::new_memory`] (collect bytes in-process, used by the
+/// WASM build). Subsequent [`write_emissions`](Self::write_emissions) /
+/// [`write_activity`](Self::write_activity) calls land partition files under
+/// `MOVESOutput/` and `MOVESActivityOutput/`.
 ///
 /// The processor is stateless between calls — it owns no buffered rows.
 /// Phase 3 calculators can call the partition writers multiple times if
@@ -117,6 +117,9 @@ type PartitionKey = (Option<i16>, Option<i16>);
 #[derive(Debug, Clone)]
 pub struct OutputProcessor {
     output_root: PathBuf,
+    /// When `Some`, parquet bytes are collected in memory instead of being
+    /// written to `output_root`. Used by the WASM build (Task 132).
+    memory: Option<Arc<Mutex<Vec<(PathBuf, Vec<u8>)>>>>,
 }
 
 impl OutputProcessor {
@@ -132,9 +135,41 @@ impl OutputProcessor {
             path: output_root.clone(),
             source,
         })?;
-        let proc = Self { output_root };
+        let proc = Self {
+            output_root,
+            memory: None,
+        };
         proc.write_run_metadata(run)?;
         Ok(proc)
+    }
+
+    /// Create an in-memory output processor that collects parquet bytes
+    /// instead of writing to the filesystem.
+    ///
+    /// Call [`take_memory_files`](Self::take_memory_files) to retrieve the
+    /// collected `(relative-path, bytes)` pairs after writing. Intended for
+    /// the `wasm32-unknown-unknown` target (Task 132) where no real filesystem
+    /// is available.
+    pub fn new_memory(run: &MovesRunRecord) -> Result<Self> {
+        let proc = Self {
+            output_root: PathBuf::from(""),
+            memory: Some(Arc::new(Mutex::new(Vec::new()))),
+        };
+        proc.write_run_metadata(run)?;
+        Ok(proc)
+    }
+
+    /// Drain the in-memory file collection and return all `(path, bytes)` pairs.
+    ///
+    /// Returns `None` if the processor was created with [`new`](Self::new)
+    /// (filesystem mode). Paths are relative to the logical output root.
+    ///
+    /// [`new`]: Self::new
+    pub fn take_memory_files(&self) -> Option<Vec<(PathBuf, Vec<u8>)>> {
+        self.memory.as_ref().map(|arc| {
+            let mut guard = arc.lock().expect("output memory mutex poisoned");
+            std::mem::replace(&mut *guard, Vec::new())
+        })
     }
 
     /// Root directory the processor writes into.
@@ -175,13 +210,11 @@ impl OutputProcessor {
         let groups = group_by_year_month(records, |r| (r.year_id, r.month_id));
         let mut written = Vec::with_capacity(groups.len());
         for ((year, month), rows) in groups {
-            let path =
-                self.output_root
-                    .join(Self::partition_path(OutputTable::Emissions, year, month));
+            let rel = Self::partition_path(OutputTable::Emissions, year, month);
             let columns = OutputTable::Emissions.columns();
             let batch = emission_record_batch(columns, &rows)?;
-            write_record_batch_atomic(&path, columns, &batch)?;
-            written.push(path);
+            let abs = self.store_parquet(&rel, columns, &batch)?;
+            written.push(abs);
         }
         Ok(written)
     }
@@ -194,13 +227,11 @@ impl OutputProcessor {
         let groups = group_by_year_month(records, |r| (r.year_id, r.month_id));
         let mut written = Vec::with_capacity(groups.len());
         for ((year, month), rows) in groups {
-            let path =
-                self.output_root
-                    .join(Self::partition_path(OutputTable::Activity, year, month));
+            let rel = Self::partition_path(OutputTable::Activity, year, month);
             let columns = OutputTable::Activity.columns();
             let batch = activity_record_batch(columns, &rows)?;
-            write_record_batch_atomic(&path, columns, &batch)?;
-            written.push(path);
+            let abs = self.store_parquet(&rel, columns, &batch)?;
+            written.push(abs);
         }
         Ok(written)
     }
@@ -254,12 +285,40 @@ impl OutputProcessor {
     }
 
     fn write_run_metadata(&self, run: &MovesRunRecord) -> Result<()> {
-        let path = self
-            .output_root
-            .join(Self::partition_path(OutputTable::Run, None, None));
+        let rel = Self::partition_path(OutputTable::Run, None, None);
         let columns = OutputTable::Run.columns();
         let batch = moves_run_record_batch(columns, std::slice::from_ref(run))?;
-        write_record_batch_atomic(&path, columns, &batch)
+        self.store_parquet(&rel, columns, &batch)?;
+        Ok(())
+    }
+
+    /// Write one parquet file to the appropriate backend.
+    ///
+    /// In filesystem mode: `output_root.join(rel)` is written atomically.
+    /// In memory mode: `(rel, bytes)` is pushed to the collection buffer.
+    ///
+    /// Returns the absolute path used (filesystem mode) or `rel` unchanged
+    /// (memory mode — no real path exists).
+    fn store_parquet(
+        &self,
+        rel: &Path,
+        columns: &[OutputColumn],
+        batch: &RecordBatch,
+    ) -> Result<PathBuf> {
+        let bytes = encode_parquet(columns, batch)?;
+        match &self.memory {
+            None => {
+                let abs = self.output_root.join(rel);
+                write_bytes_atomic(&abs, &bytes)?;
+                Ok(abs)
+            }
+            Some(buf) => {
+                buf.lock()
+                    .expect("output memory mutex poisoned")
+                    .push((rel.to_path_buf(), bytes));
+                Ok(rel.to_path_buf())
+            }
+        }
     }
 }
 
@@ -505,20 +564,16 @@ fn encode_parquet(columns: &[OutputColumn], batch: &RecordBatch) -> Result<Vec<u
     Ok(buf)
 }
 
-fn write_record_batch_atomic(
-    path: &Path,
-    columns: &[OutputColumn],
-    batch: &RecordBatch,
-) -> Result<()> {
+/// Write pre-encoded bytes to `path` via an atomic tmp-then-rename.
+fn write_bytes_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|source| Error::Io {
             path: parent.to_path_buf(),
             source,
         })?;
     }
-    let bytes = encode_parquet(columns, batch)?;
     let tmp = with_extension_suffix(path, ".tmp");
-    std::fs::write(&tmp, &bytes).map_err(|source| Error::Io {
+    std::fs::write(&tmp, bytes).map_err(|source| Error::Io {
         path: tmp.clone(),
         source,
     })?;

@@ -74,10 +74,15 @@ use crate::masterloop::{
 #[derive(Debug, Clone)]
 pub struct EngineConfig {
     /// Directory the [`OutputProcessor`] writes into. Created if absent.
+    /// Ignored when [`collect_output_in_memory`](Self::collect_output_in_memory)
+    /// is `true`.
     pub output_root: PathBuf,
     /// Maximum number of calculator chains run concurrently — the
     /// `--max-parallel-chunks` lever. `0` selects the host's available
     /// parallelism. See [`crate::execution::executor`] for the memory model.
+    ///
+    /// The WASM build (Task 132) defaults this to 1 because `wasm32-unknown-unknown`
+    /// has no threads until Task 134 enables the threads proposal.
     pub max_parallel_chunks: usize,
     /// RunSpec file name recorded in the `MOVESRun` metadata row. `None`
     /// leaves the column null (e.g. a RunSpec built in memory).
@@ -87,6 +92,11 @@ pub struct EngineConfig {
     /// reproducible and its `MOVESRun.parquet` is byte-stable for the
     /// snapshot-determinism contract. `None` leaves the column null.
     pub run_date_time: Option<String>,
+    /// When `true`, output Parquet bytes are collected in memory and returned
+    /// in [`EngineOutcome::output_bytes`] rather than written to
+    /// [`output_root`](Self::output_root). Used by the `wasm32` build (Task 132)
+    /// where no real filesystem is available.
+    pub collect_output_in_memory: bool,
 }
 
 impl EngineConfig {
@@ -99,6 +109,7 @@ impl EngineConfig {
             max_parallel_chunks: 0,
             run_spec_file_name: None,
             run_date_time: None,
+            collect_output_in_memory: false,
         }
     }
 }
@@ -160,6 +171,13 @@ pub struct EngineOutcome {
     /// through `pre_run → per-iteration → post_run` for this run, in
     /// registration order. Empty when no strategies are registered.
     pub strategies_applied: Vec<String>,
+
+    /// Output Parquet files collected in memory, populated when
+    /// [`EngineConfig::collect_output_in_memory`] was `true`.
+    /// Each entry is `(relative-path, bytes)` in the same layout that
+    /// [`OutputProcessor`] would write to disk. Empty when filesystem
+    /// output was used instead.
+    pub output_bytes: Vec<(PathBuf, Vec<u8>)>,
 }
 
 impl EngineOutcome {
@@ -502,10 +520,16 @@ impl MOVESEngine {
 
         // Finalize: write the MOVESRun metadata row.
         let run_record = self.build_run_record();
-        OutputProcessor::new(&self.config.output_root, &run_record)?;
-        let run_record_path = self
-            .config
-            .output_root
+        let (proc, output_bytes) = if self.config.collect_output_in_memory {
+            let p = OutputProcessor::new_memory(&run_record)?;
+            let bytes = p.take_memory_files().unwrap_or_default();
+            (p, bytes)
+        } else {
+            let p = OutputProcessor::new(&self.config.output_root, &run_record)?;
+            (p, Vec::new())
+        };
+        let run_record_path = proc
+            .output_root()
             .join(OutputProcessor::partition_path(
                 OutputTable::Run,
                 None,
@@ -530,6 +554,7 @@ impl MOVESEngine {
             chunk_wall_times,
             peak_rss_kib,
             strategies_applied,
+            output_bytes,
         })
     }
 
