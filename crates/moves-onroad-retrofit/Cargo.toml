@@ -1,0 +1,17 @@
+[package]
+name = "moves-onroad-retrofit"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+description = "OnRoadRetrofit internal control strategy — retrofit emission-reduction programs for on-road vehicles (Phase 6 Task 122)."
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+moves-framework = { path = "../moves-framework" }
+serde = { workspace = true }
+thiserror = { workspace = true }

@@ -1960,6 +1960,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "moves-onroad-retrofit"
+version = "0.1.0"
+dependencies = [
+ "moves-framework",
+ "serde",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "moves-rate-of-progress"
 version = "0.1.0"
 dependencies = [
