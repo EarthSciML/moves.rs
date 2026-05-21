@@ -1960,6 +1960,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "moves-nonroad-retrofit"
+version = "0.1.0"
+dependencies = [
+ "moves-framework",
+ "moves-nonroad",
+]
+
+[[package]]
 name = "moves-onroad-retrofit"
 version = "0.1.0"
 dependencies = [
