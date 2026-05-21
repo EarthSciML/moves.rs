@@ -1,0 +1,25 @@
+# Tolerance budget — calculator integration-validation gate (Task 73, mo-fvuf).
+#
+# Per-(table, column) absolute tolerances the canonical-capture diff applies.
+# Format: crates/moves-snapshot/src/tolerance.rs. Harness:
+# crates/moves-calculators/tests/calculator_validation/. Two cells are equal
+# when |canonical - produced| <= tolerance.
+#
+# Table keys are the canonical-MOVES database table paths as the snapshot
+# writer records them (e.g. db__movesoutput__movesoutput), NOT Rust struct
+# names.
+
+# Strict by default: every Float64 column must match the canonical capture
+# to within 1e-9 absolute unless a row below widens it. A divergence past
+# this bound is a port bug to fix before Phase 3 proceeds.
+default_float_tolerance = 1e-9
+
+# --- Expected divergences -------------------------------------------------
+#
+# None recorded yet. This section will grow as the canonical-capture diff
+# activates and characterises known numerical artifacts.
+#
+# Template (uncomment and fill in when a real divergence is documented):
+#
+# [tables."db__movesoutput__movesoutput"]
+# emissionQuant = 1e-9   # artifact: <description of source>
