@@ -2061,6 +2061,7 @@ dependencies = [
  "moves-calculator-info",
  "moves-calculators",
  "moves-framework",
+ "moves-nonroad",
  "moves-runspec",
  "parquet",
  "serde_json",

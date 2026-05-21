@@ -6,7 +6,7 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 publish = false
-description = "WebAssembly entry point for the MOVES Rust port — Task 132 (onroad)."
+description = "WebAssembly entry point for the MOVES Rust port — Tasks 132 (onroad) and 133 (NONROAD)."
 
 # cdylib: the browser-loadable .wasm module.
 # lib: native unit tests (compiled without wasm-bindgen glue).
@@ -18,6 +18,7 @@ path = "src/lib.rs"
 moves-calculator-info = { path = "../moves-calculator-info" }
 moves-calculators = { path = "../moves-calculators" }
 moves-framework = { path = "../moves-framework" }
+moves-nonroad = { path = "../moves-nonroad" }
 moves-runspec = { path = "../moves-runspec" }
 js-sys = { workspace = true }
 serde_json = { workspace = true }
