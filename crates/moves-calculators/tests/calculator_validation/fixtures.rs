@@ -5,7 +5,14 @@
 //! exercise the Phase 3 calculators this harness validates; the other
 //! ten are `nr-*.xml` NONROAD fixtures owned by the Task 115 gate.
 //!
-//! This module enumerates the 23 onroad fixtures, locates them under
+//! Task 74 (`mo-wkjj`) adds three more onroad fixtures that cover the
+//! four calculators the original 23 hot-path fixtures left uncovered:
+//! `process-nox-speciation` (NOCalculator, NO2Calculator),
+//! `process-extended-idle` (CO2AERunningStartExtendedIdleCalculator),
+//! and `chain-nonhaptog` (TogSpeciationCalculator). The full catalogue
+//! is now 26 onroad fixtures.
+//!
+//! This module enumerates the 26 onroad fixtures, locates them under
 //! the repository's `characterization/` tree, and parses each RunSpec
 //! through [`moves_runspec`] so the harness can name the model scale,
 //! domain, year, and — crucially for [`super::coverage`] — the
@@ -18,9 +25,14 @@ use moves_runspec::{from_xml_str, Model, ModelDomain, ModelScale};
 
 use super::repo_root;
 
-/// The 23 Phase 0 onroad fixture names — the file stems of the
-/// non-`nr-*` RunSpec XMLs in `characterization/fixtures/`.
+/// The 26 onroad fixture names — the file stems of the non-`nr-*`
+/// RunSpec XMLs in `characterization/fixtures/`.
+///
+/// The original 23 Phase 0 hot-path fixtures are listed first; the
+/// three Task 74 (`mo-wkjj`) fixtures that cover the previously
+/// uncovered calculators follow.
 pub const ONROAD_FIXTURE_NAMES: &[&str] = &[
+    // Phase 0 hot-path fixtures (23)
     "sample-runspec",
     "expand-day",
     "expand-month",
@@ -44,6 +56,10 @@ pub const ONROAD_FIXTURE_NAMES: &[&str] = &[
     "scale-county",
     "scale-project",
     "scale-rates",
+    // Task 74 fixtures — cover the four previously uncovered calculators (3)
+    "process-nox-speciation",   // NOCalculator (32,1), NO2Calculator (33,1)
+    "process-extended-idle",    // CO2AERunningStartExtendedIdleCalculator (90,90)
+    "chain-nonhaptog",          // TogSpeciationCalculator (88,1)
 ];
 
 /// The Phase 0 fixture directory: `characterization/fixtures/`.
@@ -185,12 +201,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_catalogue_has_23_unique_names() {
-        assert_eq!(ONROAD_FIXTURE_NAMES.len(), 23);
+    fn the_catalogue_has_26_unique_names() {
+        assert_eq!(ONROAD_FIXTURE_NAMES.len(), 26);
         let mut sorted = ONROAD_FIXTURE_NAMES.to_vec();
         sorted.sort_unstable();
         sorted.dedup();
-        assert_eq!(sorted.len(), 23, "fixture names must be unique");
+        assert_eq!(sorted.len(), 26, "fixture names must be unique");
     }
 
     #[test]
@@ -213,8 +229,8 @@ mod tests {
 
     #[test]
     fn loaded_fixtures_expose_parsed_run_dimensions() {
-        let fixtures = load_all_fixtures().expect("the 23 onroad fixtures must load");
-        assert_eq!(fixtures.len(), 23);
+        let fixtures = load_all_fixtures().expect("the 26 onroad fixtures must load");
+        assert_eq!(fixtures.len(), 26);
 
         for fixture in &fixtures {
             assert!(fixture.is_onroad, "{} is not ONROAD", fixture.name);
@@ -240,7 +256,7 @@ mod tests {
 
     #[test]
     fn ppa_ids_are_sorted_and_deduplicated() {
-        let fixtures = load_all_fixtures().expect("the 23 onroad fixtures must load");
+        let fixtures = load_all_fixtures().expect("the 26 onroad fixtures must load");
         for fixture in &fixtures {
             let mut sorted = fixture.ppa_ids.clone();
             sorted.sort_unstable();

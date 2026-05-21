@@ -1,7 +1,7 @@
 # calculator-validation — calculator integration-validation gate
 
-This directory documents the Phase 3 Task 73 (`mo-fvuf`) calculator
-integration-validation gate: the harness that runs the Phase 0 onroad
+This directory documents the Phase 3 Tasks 73+74 (`mo-fvuf`, `mo-wkjj`)
+calculator integration-validation gate: the harness that runs the onroad
 fixtures through the Rust calculators (Tasks 45–72) and diffs each
 calculator's output against the canonical-MOVES captures, within an
 explicit tolerance budget.
@@ -13,8 +13,8 @@ crates/moves-calculators/tests/
 ├── calculator_integration.rs       # the harness — runs under `cargo test`
 └── calculator_validation/
     ├── mod.rs                      # harness overview + the snapshots-dir hook
-    ├── fixtures.rs                 # the 23 Phase 0 onroad RunSpec fixtures
-    ├── calculators.rs              # the 38 Phase 3 calculator implementations
+    ├── fixtures.rs                 # the 26 onroad RunSpec fixtures
+    ├── calculators.rs              # the 37 Phase 3 calculator implementations
     ├── coverage.rs                 # the fixture × calculator coverage matrix
     └── compare.rs                  # diff produced tables vs canonical snapshots
 ```
@@ -22,14 +22,32 @@ crates/moves-calculators/tests/
 It runs on every `cargo test` (the fast `.github/workflows/ci.yml`
 gate) — no Apptainer, no MOVES runtime required.
 
-## Scope: onroad hot-path
+## Scope: all onroad calculators
 
-Tasks 45–72 port the MOVES onroad **emission calculators** for the
-hot-path processes. Phase 0 ships 33 fixtures; the ten `nr-*.xml`
-NONROAD fixtures drive a separate calculation path (the `moves-nonroad`
-Fortran port) and are covered by the Task 115 NONROAD numerical-fidelity
-gate (`../nonroad-fidelity/`). This gate scopes to the **23 onroad
-fixtures** and the **38 calculators** from Tasks 45–72.
+Tasks 45–72 port the MOVES onroad **emission calculators**. Phase 0
+ships 33 fixtures; the ten `nr-*.xml` NONROAD fixtures drive a separate
+calculation path (the `moves-nonroad` Fortran port) and are covered by
+the Task 115 NONROAD numerical-fidelity gate (`../nonroad-fidelity/`).
+
+This gate uses **26 onroad fixtures** to cover all **37 calculators**
+from Tasks 45–72:
+
+- **23 Phase 0 hot-path fixtures** — the original Task 73 set, covering
+  the primary onroad emission processes and their typical pollutant
+  selections.
+- **3 Task 74 fixtures** — added to close the four-calculator gap the
+  hot-path fixtures left open:
+
+| Fixture | Covers |
+|---------|--------|
+| `process-nox-speciation` | `NOCalculator` (pollutant 32), `NO2Calculator` (pollutant 33) |
+| `process-extended-idle` | `CO2AERunningStartExtendedIdleCalculator` (process 90) |
+| `chain-nonhaptog` | `TogSpeciationCalculator` (pollutant 88) |
+
+The gap existed because those calculators register for *output* or
+*derived* pollutant IDs (speciation products, NOx fractions, Atmospheric
+CO2 for Extended Idle) that the hot-path fixtures do not select — they
+select the upstream input pollutants instead.
 
 ## The coverage matrix
 
@@ -69,11 +87,13 @@ widened here with a comment explaining the source.
   calculator catalogue, the coverage-matrix derivation, and the
   snapshot-diff engine are exercised end to end on real fixtures and
   synthetic snapshots (the co-located module tests).
-- **Fixture + calculator catalogues** — all 23 onroad fixtures are
-  confirmed present and well-formed; all 38 calculators are confirmed
+- **Fixture + calculator catalogues** — all 26 onroad fixtures are
+  confirmed present and well-formed; all 37 calculators are confirmed
   registered with unique names.
-- **Coverage matrix** — confirmed to reach every fixture. Print it
-  with `cargo test -p moves-calculators --test calculator_integration
+- **Coverage matrix** — every calculator is covered by at least one
+  fixture (the `coverage_matrix_every_calculator_covered` test enforces
+  this with an empty `KNOWN_UNCOVERED` list). Print the matrix with
+  `cargo test -p moves-calculators --test calculator_integration
   -- --nocapture` (the `harness_status` test renders it).
 
 ## What is gated, and how to activate it
@@ -107,8 +127,9 @@ CALCULATOR_VALIDATION_SNAPSHOTS=/path/to/snapshots \
 
 - **Phase 0 Tasks 4–6** supply the fixture RunSpecs and (pending) the
   canonical snapshots this gate diffs against.
-- **Tasks 45–72** are the 38 calculators under validation.
-- **Task 73** (this bead, `mo-fvuf`) builds the gate; the data plane
-  and Phase 0 compute-node run supply its two inputs.
-- **Task 74** extends coverage to the full fixture suite including
-  non-hot-path calculators.
+- **Tasks 45–72** are the 37 calculators under validation.
+- **Task 73** (`mo-fvuf`) builds the gate harness over the 23 hot-path
+  fixtures; the data plane and Phase 0 compute-node run supply its two
+  live inputs.
+- **Task 74** (`mo-wkjj`) extends the fixture suite to 26 fixtures,
+  achieving full calculator coverage (no KNOWN_UNCOVERED entries).

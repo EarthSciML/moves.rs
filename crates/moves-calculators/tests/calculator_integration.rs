@@ -1,4 +1,4 @@
-//! Calculator integration-validation harness — Task 73 (`mo-fvuf`).
+//! Calculator integration-validation harness — Tasks 73+74 (`mo-fvuf`, `mo-wkjj`).
 //!
 //! This integration test is the entry point of the calculator
 //! integration-validation gate. The harness machinery lives in the
@@ -8,14 +8,20 @@
 //!
 //! The tests below, in order:
 //!
-//! 1. pin the 23 Phase 0 onroad fixtures and confirm each parses;
-//! 2. pin the 37 Phase 3 hot-path calculators (Tasks 45–72);
+//! 1. pin the 26 onroad fixtures and confirm each parses;
+//! 2. pin the 37 Phase 3 calculators (Tasks 45–72);
 //! 3. confirm the coverage matrix reaches every fixture;
-//! 4. confirm the diff engine catches a perturbed calculator value;
-//! 5. confirm the tolerance budget parses (no expected divergences yet);
-//! 6. validate against canonical snapshots when present — dormant
+//! 4. confirm every calculator is covered by at least one fixture;
+//! 5. confirm the diff engine catches a perturbed calculator value;
+//! 6. confirm the tolerance budget parses (no expected divergences yet);
+//! 7. validate against canonical snapshots when present — dormant
 //!    until the Phase 0 compute-node run populates them;
-//! 7. print a harness-status banner.
+//! 8. print a harness-status banner.
+//!
+//! Task 73 built the harness over 23 hot-path fixtures with 4 known-uncovered
+//! calculators. Task 74 adds 3 fixtures (process-nox-speciation,
+//! process-extended-idle, chain-nonhaptog) that close the gap — all 37
+//! calculators are now covered by at least one fixture.
 //!
 //! See `tests/calculator_validation/mod.rs` for what runs today versus
 //! what is gated behind the Phase 0 snapshot capture and the data
@@ -48,10 +54,10 @@ fn make_table(name: &str, rows: &[(i64, f64)]) -> Table {
 }
 
 #[test]
-fn all_23_onroad_fixtures_present_and_parse() {
+fn all_26_onroad_fixtures_present_and_parse() {
     let loaded = fixtures::load_all_fixtures()
-        .unwrap_or_else(|e| panic!("the 23 Phase 0 onroad fixtures must load: {e}"));
-    assert_eq!(loaded.len(), 23, "expected 23 onroad fixtures");
+        .unwrap_or_else(|e| panic!("the 26 onroad fixtures must load: {e}"));
+    assert_eq!(loaded.len(), 26, "expected 26 onroad fixtures (23 hot-path + 3 Task 74)");
 
     for fixture in &loaded {
         assert!(
@@ -96,7 +102,7 @@ fn all_37_calculators_registered() {
 #[test]
 fn coverage_matrix_reaches_every_fixture() {
     let loaded_fixtures =
-        fixtures::load_all_fixtures().expect("the 23 onroad fixtures must load");
+        fixtures::load_all_fixtures().expect("the 26 onroad fixtures must load");
     let calcs = calculators::all_calculators();
     let matrix = CoverageMatrix::build(&loaded_fixtures, &calcs);
 
@@ -109,31 +115,20 @@ fn coverage_matrix_reaches_every_fixture() {
 
 #[test]
 fn coverage_matrix_every_calculator_covered() {
-    // Calculators whose (pollutant, process) registrations are not exercised
-    // by any of the 23 Phase 0 onroad hot-path fixtures.
+    // Task 74 (`mo-wkjj`) added three fixtures that cover the four calculators
+    // the original 23 hot-path fixtures left uncovered:
     //
-    // These are known gaps — they register for pollutant IDs (speciation
-    // products, NOx fractions, CO2AE process 90) that the current fixture
-    // set does not cover by (pollutant, process) pair:
+    //   process-nox-speciation  → NOCalculator (32,1), NO2Calculator (33,1)
+    //   process-extended-idle   → CO2AERunningStartExtendedIdleCalculator (90,90)
+    //   chain-nonhaptog         → TogSpeciationCalculator (88,1)
     //
-    //   TOGSpeciationCalculator     — registers for TOG-speciation product
-    //                                 pollutant IDs (1000+, 88, …); fixtures
-    //                                 use the input TOG pollutant 86.
-    //   NOCalculator / NO2Calculator — registers for NOx fractional pollutants
-    //                                 not present in the fixture PPAs.
-    //   CO2AERunningStartExtended…  — registers for process 90 (Extended Idle),
-    //                                 which no Phase 0 fixture selects.
-    //
-    // Remove an entry from this list when a fixture is added that covers it.
-    const KNOWN_UNCOVERED: &[&str] = &[
-        "CO2AERunningStartExtendedIdleCalculator",
-        "NOCalculator",
-        "NO2Calculator",
-        "TOGSpeciationCalculator",
-    ];
+    // All 37 calculators are now covered. KNOWN_UNCOVERED is intentionally
+    // empty — any regression (a calculator whose registrations no longer
+    // overlap any fixture PPA) will cause this test to fail.
+    const KNOWN_UNCOVERED: &[&str] = &[];
 
     let loaded_fixtures =
-        fixtures::load_all_fixtures().expect("the 23 onroad fixtures must load");
+        fixtures::load_all_fixtures().expect("the 26 onroad fixtures must load");
     let calcs = calculators::all_calculators();
     let matrix = CoverageMatrix::build(&loaded_fixtures, &calcs);
 
@@ -157,28 +152,12 @@ fn coverage_matrix_every_calculator_covered() {
 
     assert!(
         unexpected.is_empty(),
-        "{} calculator(s) unexpectedly not covered by any fixture:\n  {}\n\
-         If this is intentional, add them to KNOWN_UNCOVERED in this test \
-         with an explanation. Otherwise verify registrations match fixture PPAs.",
+        "{} calculator(s) not covered by any fixture:\n  {}\n\
+         Add a fixture whose PPA set overlaps the calculator's registrations, \
+         or add the calculator to KNOWN_UNCOVERED with an explanation.",
         unexpected.len(),
         unexpected.join("\n  ")
     );
-
-    // Print a note if any known-uncovered calculator has gained coverage so
-    // the KNOWN_UNCOVERED list can be kept tidy.
-    let now_covered: Vec<&str> = KNOWN_UNCOVERED
-        .iter()
-        .copied()
-        .filter(|&name| !uncovered.contains(&name))
-        .collect();
-    if !now_covered.is_empty() {
-        println!(
-            "NOTE: {} formerly-uncovered calculator(s) are now covered — \
-             remove from KNOWN_UNCOVERED:\n  {}",
-            now_covered.len(),
-            now_covered.join("\n  ")
-        );
-    }
 }
 
 #[test]
@@ -223,7 +202,7 @@ fn tolerance_budget_parses() {
 fn canonical_snapshots_dormant_or_validate() {
     let snapshots = snapshots_root();
     let loaded_fixtures =
-        fixtures::load_all_fixtures().expect("the 23 onroad fixtures must load");
+        fixtures::load_all_fixtures().expect("the 26 onroad fixtures must load");
 
     let mut dormant_count = 0usize;
     let mut validated_count = 0usize;
@@ -267,7 +246,7 @@ fn canonical_snapshots_dormant_or_validate() {
 fn harness_status() {
     let snapshots = snapshots_root();
     let loaded_fixtures =
-        fixtures::load_all_fixtures().expect("the 23 onroad fixtures must load");
+        fixtures::load_all_fixtures().expect("the 26 onroad fixtures must load");
     let calcs = calculators::all_calculators();
     let matrix = CoverageMatrix::build(&loaded_fixtures, &calcs);
 
@@ -276,10 +255,22 @@ fn harness_status() {
         .filter(|f| compare::canonical_snapshot_present(&snapshots, &f.name))
         .count();
 
+    let uncovered_count = matrix
+        .calculator_names()
+        .iter()
+        .enumerate()
+        .filter(|&(ci, _)| {
+            !loaded_fixtures.iter().enumerate().any(|(fi, _)| {
+                matrix.cell(fi, ci).kind.is_exercised_or_chained()
+            })
+        })
+        .count();
+
     println!();
-    println!("=== Calculator integration-validation harness (Task 73) ===");
-    println!("  Fixtures    : {}", loaded_fixtures.len());
+    println!("=== Calculator integration-validation harness (Tasks 73+74) ===");
+    println!("  Fixtures    : {} (23 hot-path + 3 full-coverage)", loaded_fixtures.len());
     println!("  Calculators : {}", calcs.len());
+    println!("  Uncovered   : {uncovered_count} (target: 0)");
     println!(
         "  Snapshots   : {}/{} populated ({}={})",
         populated_snapshots,
@@ -289,7 +280,7 @@ fn harness_status() {
     );
     println!();
     println!("{}", matrix.render());
-    println!("  Status: machinery validated; canonical-capture diff dormant until");
+    println!("  Status: all 37 calculators covered; canonical-capture diff dormant until");
     println!("          Phase 0 compute-node run + data plane (see README).");
-    println!("===========================================================");
+    println!("================================================================");
 }
