@@ -17,10 +17,11 @@ use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
 
-use arrow::array::{ArrayRef, Float64Builder, Int64Builder};
+use arrow::array::{ArrayRef, Float64Array, Float64Builder, Int64Array, Int64Builder};
 use arrow::datatypes::{DataType, Field, Schema as ArrowSchema, SchemaRef};
 use arrow::record_batch::RecordBatch;
 use parquet::arrow::ArrowWriter;
+use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::basic::Compression;
 use parquet::file::properties::{EnabledStatistics, WriterProperties, WriterVersion};
 
@@ -133,6 +134,91 @@ fn with_tmp_suffix(path: &Path) -> std::path::PathBuf {
     s.into()
 }
 
+/// Read an [`AvftTable`] back from a Parquet file on disk.
+///
+/// Complements [`write_parquet`]. Columns are matched by name and
+/// narrowed from the stored `Int64`/`Float64` types back to the
+/// `i32`/`f64` values [`crate::model::AvftRecord`] carries.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Io`] if the file cannot be opened, or
+/// [`crate::Error::Parquet`] / [`crate::Error::Arrow`] if the content
+/// is not valid AVFT Parquet.
+pub fn read_parquet(path: impl AsRef<Path>) -> crate::error::Result<AvftTable> {
+    let path = path.as_ref();
+    let file = File::open(path).map_err(|e| crate::error::Error::io(path, e))?;
+    read_chunk_reader(file)
+}
+
+fn read_chunk_reader<R>(reader: R) -> crate::error::Result<AvftTable>
+where
+    R: parquet::file::reader::ChunkReader + 'static,
+{
+    let builder = ParquetRecordBatchReaderBuilder::try_new(reader)?;
+    let record_reader = builder.build()?;
+
+    let mut table = AvftTable::new();
+    for batch_result in record_reader {
+        let batch = batch_result?;
+        let st = col_i64(&batch, "sourceTypeID")?;
+        let my = col_i64(&batch, "modelYearID")?;
+        let fuel = col_i64(&batch, "fuelTypeID")?;
+        let eng = col_i64(&batch, "engTechID")?;
+        let frac = col_f64(&batch, "fuelEngFraction")?;
+        for i in 0..batch.num_rows() {
+            table.insert(crate::model::AvftRecord::new(
+                st.value(i) as i32,
+                my.value(i) as i32,
+                fuel.value(i) as i32,
+                eng.value(i) as i32,
+                frac.value(i),
+            ));
+        }
+    }
+    Ok(table)
+}
+
+fn col_i64<'a>(
+    batch: &'a RecordBatch,
+    name: &str,
+) -> std::result::Result<&'a Int64Array, arrow::error::ArrowError> {
+    batch
+        .column_by_name(name)
+        .ok_or_else(|| {
+            arrow::error::ArrowError::InvalidArgumentError(format!(
+                "AVFT Parquet missing column '{name}'"
+            ))
+        })?
+        .as_any()
+        .downcast_ref::<Int64Array>()
+        .ok_or_else(|| {
+            arrow::error::ArrowError::InvalidArgumentError(format!(
+                "AVFT Parquet column '{name}' is not Int64"
+            ))
+        })
+}
+
+fn col_f64<'a>(
+    batch: &'a RecordBatch,
+    name: &str,
+) -> std::result::Result<&'a Float64Array, arrow::error::ArrowError> {
+    batch
+        .column_by_name(name)
+        .ok_or_else(|| {
+            arrow::error::ArrowError::InvalidArgumentError(format!(
+                "AVFT Parquet missing column '{name}'"
+            ))
+        })?
+        .as_any()
+        .downcast_ref::<Float64Array>()
+        .ok_or_else(|| {
+            arrow::error::ArrowError::InvalidArgumentError(format!(
+                "AVFT Parquet column '{name}' is not Float64"
+            ))
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -195,5 +281,26 @@ mod tests {
         let bytes = encode_parquet(&AvftTable::new()).unwrap();
         let reader = SerializedFileReader::new(bytes::Bytes::from(bytes)).unwrap();
         assert_eq!(reader.metadata().file_metadata().num_rows(), 0);
+    }
+
+    #[test]
+    fn read_parquet_round_trips_sample_table() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("avft.parquet");
+        let original = sample_table();
+        write_parquet(&original, &path).unwrap();
+        let loaded = read_parquet(&path).unwrap();
+        let orig_rows: Vec<_> = original.iter().collect();
+        let loaded_rows: Vec<_> = loaded.iter().collect();
+        assert_eq!(orig_rows, loaded_rows, "round-trip must reproduce identical rows");
+    }
+
+    #[test]
+    fn read_parquet_round_trips_empty_table() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("empty.parquet");
+        write_parquet(&AvftTable::new(), &path).unwrap();
+        let loaded = read_parquet(&path).unwrap();
+        assert!(loaded.is_empty());
     }
 }

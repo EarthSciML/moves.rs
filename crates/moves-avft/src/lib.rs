@@ -59,6 +59,7 @@
 //!
 //! [`AVFTToolSpec`]: https://github.com/USEPA/EPA_MOVES_Model/blob/master/gov/epa/otaq/moves/master/gui/avfttool/AVFTToolSpec.java
 
+pub mod control_strategy;
 pub mod csv_io;
 pub mod error;
 pub mod import;
@@ -67,6 +68,7 @@ pub mod parquet_io;
 pub mod spec;
 pub mod tool;
 
+pub use control_strategy::AvftControlStrategy;
 pub use error::{Error, Result};
 pub use model::{AvftRecord, AvftTable, EngTechId, FuelTypeId, ModelYearId, SourceTypeId};
 pub use spec::{

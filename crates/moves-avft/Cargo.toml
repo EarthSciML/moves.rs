@@ -6,7 +6,7 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 publish = false
-description = "AVFT (Alternative Vehicle Fuel Technology) input importer and AVFT Tool equivalent (Phase 4 Task 86)."
+description = "AVFT (Alternative Vehicle Fuel Technology) input importer, AVFT Tool equivalent, and AVFT control strategy (Phase 4 Task 86 / Phase 6 Task 120)."
 
 [lib]
 path = "src/lib.rs"
@@ -19,6 +19,7 @@ path = "src/bin/moves-avft.rs"
 arrow = { workspace = true }
 clap = { workspace = true }
 csv = "1"
+moves-framework = { path = "../moves-framework" }
 parquet = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }

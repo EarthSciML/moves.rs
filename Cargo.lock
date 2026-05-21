@@ -1743,6 +1743,7 @@ dependencies = [
  "bytes",
  "clap",
  "csv",
+ "moves-framework",
  "parquet",
  "serde",
  "tempfile",
