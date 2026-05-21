@@ -1,0 +1,117 @@
+# Package the default-DB Parquet tree and upload it to a GitHub Release.
+#
+# Triggered manually (workflow_dispatch). Requires a self-hosted runner
+# with Apptainer + fakeroot (the same labels used by fixture-suite-weekly).
+#
+# The workflow:
+#   1. Checks out the tag specified by the `tag` input.
+#   2. Builds the `moves-default-db-convert` and `moves-default-db-validate`
+#      binaries at that tag.
+#   3. Builds the canonical-MOVES SIF (cache-first, same as fixture-suite).
+#   4. Dumps the default database from the canonical SIF via
+#      `dump-default-db.sh` (Stage 1 — requires Apptainer + fakeroot).
+#   5. Converts the TSV dump to the Parquet layout via
+#      `moves-default-db-convert` (Stage 2 — pure Rust, no Apptainer).
+#   6. Validates the Parquet tree via `moves-default-db-validate`.
+#   7. Compresses the Parquet tree to `default-db-<db_version>.tar.gz`.
+#   8. Uploads the archive to the GitHub Release for `tag`.
+#
+# Inputs:
+#   tag         — the release tag to attach the artifact to (e.g. v0.1.0).
+#   db_version  — the MOVES DB version label (e.g. movesdb20241112). This
+#                 must match the version embedded in the canonical SIF
+#                 referenced by characterization/canonical-image.lock.
+#
+# The resulting archive is named `default-db-<db_version>.tar.gz` and is
+# uploaded to the release with `gh release upload --clobber` so re-running
+# the workflow is safe if the first attempt was interrupted.
+
+name: package-default-db
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to attach the artifact to (e.g. v0.1.0)"
+        required: true
+      db_version:
+        description: "MOVES DB version (e.g. movesdb20241112)"
+        required: true
+        default: "movesdb20241112"
+
+concurrency:
+  group: package-default-db-${{ github.event.inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    name: Package default-DB (${{ github.event.inputs.db_version }}) for ${{ github.event.inputs.tag }}
+    runs-on: [self-hosted, apptainer, fakeroot]
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry, target/
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: package-default-db
+
+      - name: Build converter and validator
+        run: >
+          cargo build --release --locked
+          --bin moves-default-db-convert
+          --bin moves-default-db-validate
+
+      - name: Build canonical-MOVES SIF (cache-first)
+        # build-sif.sh is a no-op if the lockfile already points at a
+        # built SIF image, so this step is fast on repeated runs.
+        run: characterization/apptainer/build-sif.sh
+
+      # convert-default-db.sh runs Stage 1 (dump inside the SIF) and
+      # Stage 2 (TSV → Parquet via moves-default-db-convert) in one call.
+      # It writes the Parquet tree to default-db/<db_version>/ and keeps
+      # the intermediate TSV dump in default-db/<db_version>/_tsv/ for the
+      # subsequent validation step.
+      - name: Run dump + convert pipeline
+        env:
+          DB_VERSION: ${{ github.event.inputs.db_version }}
+        run: |
+          characterization/default-db-conversion/convert-default-db.sh \
+            --sif        characterization/apptainer/canonical-moves.sif \
+            --db         "${DB_VERSION}" \
+            --db-version "${DB_VERSION}" \
+            --plan       characterization/default-db-schema/tables.json \
+            --output     default-db
+
+      - name: Validate Parquet tree against source TSVs
+        env:
+          DB_VERSION: ${{ github.event.inputs.db_version }}
+        run: |
+          ./target/release/moves-default-db-validate \
+            --output-root "default-db/${DB_VERSION}" \
+            --tsv-dir     "default-db/${DB_VERSION}/_tsv"
+
+      - name: Compress Parquet tree
+        env:
+          DB_VERSION: ${{ github.event.inputs.db_version }}
+        run: |
+          ARCHIVE="default-db-${DB_VERSION}.tar.gz"
+          tar -czf "${ARCHIVE}" -C default-db "${DB_VERSION}"
+          echo "ARCHIVE=${ARCHIVE}" >> "${GITHUB_ENV}"
+          du -sh "${ARCHIVE}"
+          sha256sum "${ARCHIVE}"
+
+      - name: Upload to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ github.event.inputs.tag }}" \
+            "${ARCHIVE}" \
+            --clobber

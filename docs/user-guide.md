@@ -26,15 +26,17 @@ RunSpec format, importing custom input databases, and reading the output.
 ### Pre-built binaries
 
 Pre-built binaries for Linux (x86_64, aarch64), macOS (x86_64, aarch64), and
-Windows (x86_64) will be available on the GitHub Releases page once release
-packaging is complete (migration-plan Task 131). Each release provides:
+Windows (x86_64) are available on the
+[GitHub Releases page](https://github.com/EarthSciML/moves.rs/releases).
+Each release provides:
 
 * `moves` — the main MOVES binary.
 * `moves-default-db-convert` — converts an EPA MOVES default-DB MariaDB dump
   to the Parquet layout `moves.rs` expects.
 
-Download the archive for your platform, extract, and place the binaries
-somewhere on your `PATH`.
+Download the archive for your platform (`moves-<version>-<target>.tar.gz` on
+Linux/macOS, `.zip` on Windows), extract, and place the binaries somewhere on
+your `PATH`.
 
 ### Build from source
 
@@ -249,11 +251,13 @@ the MariaDB dependency entirely.
 
 ### Obtaining the default database
 
-The converted default-DB Parquet tree will be distributed as a separate
-downloadable artifact alongside the binary releases. Download it and note its
-path.
+The converted default-DB Parquet tree is distributed as a separate downloadable
+artifact alongside the binary releases. On the
+[GitHub Releases page](https://github.com/EarthSciML/moves.rs/releases),
+download `default-db-<db-version>.tar.gz`, extract it, and note the path to
+the extracted `<db-version>/` directory.
 
-For development or if you have a canonical MOVES installation:
+To generate the Parquet tree yourself from a canonical MOVES installation:
 
 1. Run the dump script inside the MOVES Apptainer image:
 

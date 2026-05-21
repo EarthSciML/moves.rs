@@ -1,0 +1,194 @@
+# Cross-platform binary release workflow.
+#
+# Triggered on semver tags (v*.*.*). Builds `moves` and
+# `moves-default-db-convert` for five platforms, archives each platform's
+# binaries, and creates a GitHub Release with all archives attached.
+#
+# Platforms:
+#   x86_64-unknown-linux-musl   — fully-static Linux x86_64 (musl)
+#   aarch64-unknown-linux-musl  — fully-static Linux aarch64 (musl, via cross)
+#   x86_64-apple-darwin         — macOS Intel (macos-13 runner)
+#   aarch64-apple-darwin        — macOS Apple Silicon (macos-latest runner)
+#   x86_64-pc-windows-msvc      — Windows x86_64
+#
+# Binaries in each archive:
+#   moves / moves.exe                         — main MOVES CLI
+#   moves-default-db-convert / *.exe          — default-DB conversion tool
+#
+# The default-DB Parquet artifact (separate download) is produced by the
+# package-default-db workflow and uploaded to this same release.
+#
+# Build reproducibility: `cargo build --locked` pins every dependency to
+# the committed Cargo.lock, so the same tag always produces the same binary
+# (modulo toolchain updates — pin the channel in rust-toolchain.toml if
+# bit-exact reproducibility across toolchain versions is required).
+
+name: release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            use_cross: false
+
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            use_cross: true
+
+          - target: x86_64-apple-darwin
+            os: macos-13
+            use_cross: false
+
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            use_cross: false
+
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            use_cross: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo registry, target/
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.target }}
+
+      # musl-tools provides the musl-gcc cross-compiler needed for the musl
+      # C runtime stub; pure-Rust crates don't need it, but the linker
+      # expects it when the musl target is selected.
+      - name: Install musl-tools (x86_64-unknown-linux-musl)
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: sudo apt-get install -y --no-install-recommends musl-tools
+
+      # cross provides a Docker-based cross-compilation environment for
+      # targets that cannot be built natively on the runner.
+      - name: Install cross (aarch64-unknown-linux-musl)
+        if: matrix.use_cross
+        uses: taiki-e/install-action@cross
+
+      - name: Build binaries (native)
+        if: '!matrix.use_cross'
+        run: >
+          cargo build --release --locked
+          --target ${{ matrix.target }}
+          --bin moves
+          --bin moves-default-db-convert
+
+      - name: Build binaries (cross)
+        if: matrix.use_cross
+        run: >
+          cross build --release --locked
+          --target ${{ matrix.target }}
+          --bin moves
+          --bin moves-default-db-convert
+
+      # Archive name: moves-<tag>-<target>.tar.gz  (Unix)
+      #               moves-<tag>-<target>.zip       (Windows)
+      - name: Package archive (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          TARGET="${{ matrix.target }}"
+          ARCHIVE="moves-${TAG}-${TARGET}.tar.gz"
+          mkdir staging
+          cp "target/${TARGET}/release/moves"                     staging/
+          cp "target/${TARGET}/release/moves-default-db-convert"  staging/
+          tar -czf "${ARCHIVE}" -C staging .
+          echo "ARCHIVE=${ARCHIVE}" >> "${GITHUB_ENV}"
+
+      - name: Package archive (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $TAG    = "${env:GITHUB_REF_NAME}"
+          $TARGET = "${{ matrix.target }}"
+          $ARCHIVE = "moves-${TAG}-${TARGET}.zip"
+          New-Item -ItemType Directory staging | Out-Null
+          Copy-Item "target\${TARGET}\release\moves.exe"                    staging\
+          Copy-Item "target\${TARGET}\release\moves-default-db-convert.exe" staging\
+          Compress-Archive -Path staging\* -DestinationPath $ARCHIVE
+          "ARCHIVE=${ARCHIVE}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Upload archive artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: ${{ env.ARCHIVE }}
+          # Artifacts are only needed until the release job picks them up.
+          retention-days: 1
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+          merge-multiple: true
+
+      - name: List archives
+        run: ls -lh dist/
+
+      - name: Create release and upload archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+
+          gh release create "${TAG}" \
+            --title "moves.rs ${TAG}" \
+            --notes "$(cat <<'NOTES'
+          ## Binary release
+
+          Each archive contains two binaries:
+          - `moves` / `moves.exe` — the main MOVES command-line tool
+          - `moves-default-db-convert` / `moves-default-db-convert.exe` — converts an EPA MOVES default-DB MariaDB dump to the Parquet layout `moves.rs` expects
+
+          Download the archive for your platform, extract, and place the binaries somewhere on your `PATH`.
+
+          ## Default database (separate download)
+
+          Running `moves` requires a converted default-DB Parquet tree. The pre-converted tree for the current canonical MOVES default database is uploaded as `default-db-*.tar.gz` once it has been generated. Download it and point `--default-db` at the extracted directory.
+
+          To generate the Parquet tree yourself from a canonical MOVES installation, see [`characterization/default-db-conversion/README.md`](https://github.com/EarthSciML/moves.rs/blob/main/characterization/default-db-conversion/README.md).
+
+          ## Build from source
+
+          ```bash
+          git clone https://github.com/EarthSciML/moves.rs
+          cd moves.rs
+          cargo build --release --locked
+          ```
+          NOTES
+          )" \
+            dist/*.tar.gz dist/*.zip

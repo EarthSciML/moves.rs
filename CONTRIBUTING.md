@@ -123,6 +123,27 @@ A separate workflow (`.github/workflows/fixture-suite-weekly.yml`) runs the
 canonical-MOVES fixture-snapshot regression weekly on a self-hosted runner;
 that gate is too slow for per-push and lives outside the per-push CI.
 
+## Releasing
+
+Releases are triggered by pushing a semver tag (`v<MAJOR>.<MINOR>.<PATCH>`):
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+`.github/workflows/release.yml` then builds `moves` and
+`moves-default-db-convert` for all five target platforms, packages each
+platform's binaries into an archive, and creates a GitHub Release with all
+archives attached.
+
+After the binary release is live, generate and upload the default-DB Parquet
+artifact via the `package-default-db` workflow (Actions → Package default-DB →
+Run workflow). This requires a self-hosted runner with Apptainer and fakeroot
+(the same runner used by the weekly fixture suite). It runs the full dump +
+convert + validate pipeline against the canonical-MOVES SIF and uploads the
+resulting `default-db-<db-version>.tar.gz` to the release.
+
 ## Commits and PRs
 
 * Prefix commit subjects with the conventional type (`feat:`, `fix:`,
