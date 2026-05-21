@@ -12,6 +12,23 @@
 #   3. Build host divergence (gfortran flags, MariaDB version, Apptainer
 #      version). Investigate before pinning a new SIF SHA.
 #
+# Two separate jobs run in this workflow (both on the same self-hosted runner):
+#
+#   fixture-suite   — canonical-MOVES snapshot regression for all 34
+#                     characterization fixtures. Fails on any snapshot drift
+#                     beyond tolerance/tolerance.toml.
+#
+#   nonroad-fidelity — NONROAD numerical-fidelity check. Builds the
+#                      locally-fixed gfortran NONROAD binary (phase0-02
+#                      flag set) from the pinned MOVES commit, runs each
+#                      nr-*.xml fixture through it with NRDBG_FILE set to
+#                      capture intermediate state, then runs
+#                      `cargo test -p moves-nonroad --test nonroad_fidelity`
+#                      with NONROAD_FIDELITY_REFERENCE set. Fails if any
+#                      divergence between the Rust port and the gfortran
+#                      reference exceeds the tolerance budget declared in
+#                      crates/moves-nonroad/tests/fidelity/tolerance.rs.
+#
 # Why a self-hosted runner: the canonical-MOVES SIF is ~5GB, requires
 # Apptainer + --fakeroot, and a fresh build takes 1–2 hours. Each
 # fixture takes 5–10 minutes; the full suite runs for a few CPU-hours.
@@ -24,6 +41,7 @@
 #                    available on PATH
 #   fakeroot       — kernel + apptainer.conf permit `apptainer build
 #                    --fakeroot`
+#   gfortran       — gfortran available on PATH (nonroad-fidelity only)
 #
 # When self-hosted infrastructure isn't yet wired up, the workflow runs
 # (manually via workflow_dispatch) and reports a skip. The schedule trigger
@@ -45,6 +63,10 @@ on:
         description: "Path to TOML tolerance config (relative to repo root)"
         required: false
         default: "characterization/tolerance.toml"
+      skip_nonroad_fidelity:
+        description: "Set to 'true' to skip the NONROAD fidelity job"
+        required: false
+        default: "false"
 
 # Cancel a running suite if a fresh schedule fires before it finishes.
 concurrency:
@@ -138,3 +160,165 @@ jobs:
             artifacts/snapshots-fresh/*/provenance.json
           if-no-files-found: warn
           retention-days: 30
+
+  # ── NONROAD numerical-fidelity job ────────────────────────────────────────
+  #
+  # Builds the locally-fixed gfortran NONROAD binary (the "phase0-02"
+  # flag set from characterization/nonroad-build/flags.env), runs each
+  # NONROAD fixture through the canonical-MOVES SIF with NRDBG_FILE set
+  # to capture intermediate state (population, age distribution, growth,
+  # emissions), then exercises the Rust port's fidelity harness against
+  # those captures.
+  #
+  # The job needs gfortran for the instrumented NONROAD build, so it
+  # carries the extra `gfortran` label. If a runner without gfortran picks
+  # up the job it will fail the prerequisite check clearly rather than
+  # silently skipping.
+  #
+  # When to expect failures:
+  #   * A new divergence between the Rust port and gfortran reference that
+  #     exceeds the tolerance budget in tolerance.rs — file a bug.
+  #   * A gfortran version change on the runner host that shifts numerical
+  #     results — pin the gfortran version on the runner or widen tolerance
+  #     for that label with documentation.
+  #   * The MOVES source drifted at the pinned commit (almost impossible
+  #     with pinned SHAs, but validate if gfortran build fails).
+  nonroad-fidelity:
+    name: NONROAD fidelity (gfortran reference)
+    runs-on: [self-hosted, apptainer, fakeroot, gfortran]
+    timeout-minutes: 240
+    if: ${{ github.event.inputs.skip_nonroad_fidelity != 'true' }}
+    # The canonical SIF must be built before NONROAD can run.
+    needs: fixture-suite
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry, target/
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: nonroad-fidelity
+
+      # The gfortran label on the runner guarantees gfortran is on PATH.
+      # This step verifies the version so it appears in the log for
+      # debugging flag-regression issues.
+      - name: Verify gfortran availability
+        run: gfortran --version
+
+      # Shallow-clone the MOVES source at the pinned commit so build.sh
+      # can compile the instrumented NONROAD binary on the host.
+      # We use fetch-by-SHA (depth=1 of the specific commit) which avoids
+      # downloading full history while still landing exactly the right tree.
+      - name: Clone MOVES source at pinned commit
+        run: |
+          . characterization/apptainer/files/versions.env
+          mkdir -p /tmp/moves-nonroad-src
+          git -C /tmp/moves-nonroad-src init
+          git -C /tmp/moves-nonroad-src remote add origin "${MOVES_REPO_URL}"
+          git -C /tmp/moves-nonroad-src fetch --depth 1 origin "${MOVES_COMMIT}"
+          git -C /tmp/moves-nonroad-src checkout FETCH_HEAD
+          echo "[nonroad-fidelity] MOVES commit: $(git -C /tmp/moves-nonroad-src rev-parse HEAD)"
+
+      # Build the instrumented NONROAD binary.
+      # characterization/nonroad-build/build.sh applies the four dbgemit
+      # patches and compiles with the pinned flag set from flags.env.
+      # The resulting binary writes TSV captures when NRDBG_FILE is set.
+      - name: Build instrumented NONROAD binary (phase0-02 flags)
+        run: |
+          characterization/nonroad-build/build.sh /tmp/moves-nonroad-src
+          BINARY="/tmp/moves-nonroad-src/NONROAD/NR08a/NONROAD.exe"
+          echo "NONROAD_EXE=${BINARY}" >> "${GITHUB_ENV}"
+          echo "[nonroad-fidelity] built: $(sha256sum "${BINARY}")"
+
+      # Run each nr-*.xml fixture through the canonical-MOVES SIF with:
+      #   * the instrumented host binary bind-mounted over the SIF binary
+      #   * NRDBG_FILE pointed at a bind-mounted output directory
+      # Each fixture produces a TSV under artifacts/nonroad-fidelity-ref/.
+      # The step runs --keep-going (continues after single-fixture failures)
+      # so the artifact upload always produces a useful partial result.
+      - name: Generate NONROAD gfortran reference captures
+        run: |
+          set -u
+          SIF="characterization/apptainer/canonical-moves.sif"
+          FIXTURES_DIR="characterization/fixtures"
+          OUT_DIR="$(pwd)/artifacts/nonroad-fidelity-ref"
+          mkdir -p "${OUT_DIR}"
+
+          fail=0
+          for fixture in "${FIXTURES_DIR}"/nr-*.xml; do
+              name="$(basename "${fixture}" .xml)"
+              WORKDIR="/scratch/${USER}/moves-nonroad-cap/${name}"
+              NRDBG_DIR="${WORKDIR}/nrdbg-out"
+              mkdir -p "${WORKDIR}/mariadb-data" \
+                       "${WORKDIR}/run-mysqld" \
+                       "${WORKDIR}/MOVESTemporary" \
+                       "${WORKDIR}/WorkerFolder" \
+                       "${NRDBG_DIR}"
+
+              echo "::group::NONROAD capture ${name}"
+
+              # Run the fixture through the SIF with:
+              #   1. Instrumented NONROAD.exe bind-mounted over the SIF's binary
+              #   2. NRDBG_DIR bind-mounted to /tmp/nrdbg-out inside the container
+              #   3. NRDBG_FILE=/tmp/nrdbg-out/<name>.tsv so the Fortran
+              #      writes the capture into our host-side directory
+              #   4. The fixture XML bind-mounted to testdata/ inside MOVES
+              apptainer exec --fakeroot \
+                  --bind "${WORKDIR}/mariadb-data:/var/lib/mysql" \
+                  --bind "${WORKDIR}/run-mysqld:/var/run/mysqld" \
+                  --bind "${WORKDIR}/MOVESTemporary:/opt/moves/MOVESTemporary" \
+                  --bind "${WORKDIR}/WorkerFolder:/opt/moves/WorkerFolder" \
+                  --bind "${NONROAD_EXE}:/opt/moves/NONROAD/NR08a/NONROAD.exe" \
+                  --bind "${NRDBG_DIR}:/tmp/nrdbg-out" \
+                  --bind "$(realpath "${fixture}"):/opt/moves/testdata/${name}.xml" \
+                  --env "NRDBG_FILE=/tmp/nrdbg-out/${name}.tsv" \
+                  "${SIF}" \
+                  bash -c "
+                      set -eu
+                      /opt/moves-bin/init-mariadb.sh
+                      service mariadb start
+                      for i in \$(seq 1 60); do
+                          [ -S /var/run/mysqld/mysqld.sock ] && break
+                          sleep 1
+                      done
+                      cd /opt/moves
+                      ant crun -Drunspec=testdata/${name}.xml
+                      service mariadb stop || true
+                  " || {
+                  echo "::warning::NONROAD run failed for ${name}"
+                  fail=1
+              }
+
+              # Copy the capture to the shared output dir.
+              TSV="${NRDBG_DIR}/${name}.tsv"
+              if [ -f "${TSV}" ]; then
+                  cp "${TSV}" "${OUT_DIR}/${name}.tsv"
+                  echo "[nonroad-fidelity] captured $(wc -l < "${OUT_DIR}/${name}.tsv") lines for ${name}"
+              else
+                  echo "::warning::no capture produced for ${name} (NRDBG_FILE not written)"
+              fi
+              echo "::endgroup::"
+          done
+          exit "${fail}"
+
+      # Run the NONROAD fidelity harness against the gfortran captures.
+      # NONROAD_FIDELITY_REFERENCE triggers the live reference-vs-port diff
+      # in crates/moves-nonroad/tests/fidelity/reference.rs.
+      # Any divergence that exceeds the tolerance budget in tolerance.rs
+      # fails the test and fails this CI step.
+      - name: Run NONROAD fidelity harness (port vs. gfortran)
+        run: |
+          NONROAD_FIDELITY_REFERENCE="$(pwd)/artifacts/nonroad-fidelity-ref" \
+              cargo test -p moves-nonroad --test nonroad_fidelity -- --nocapture
+
+      - name: Upload NONROAD fidelity artifacts (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nonroad-fidelity-captures
+          path: artifacts/nonroad-fidelity-ref/*.tsv
+          if-no-files-found: warn
+          retention-days: 14

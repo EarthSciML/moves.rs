@@ -1,10 +1,30 @@
 # Fast Rust workspace CI — runs on every push and pull request.
 #
-# Scope: build, unit + integration tests, rustfmt, clippy, rustdoc, and
-# cargo-deny (advisories + license + bans + source). The slow
-# fixture-snapshot regression (against a pinned canonical-MOVES SIF) lives in
-# .github/workflows/fixture-suite-weekly.yml because it requires Apptainer +
-# a self-hosted runner and is not appropriate for the per-push gate.
+# Scope:
+#   * Cross-platform build + test matrix (Linux, macOS, Windows) — every
+#     `cargo test --workspace` run includes the characterization-fixture
+#     integration suite (full_suite_regression), the concurrency-correctness
+#     sweep (N=1/4/NCPU), the NONROAD fidelity harness, and cargo-deny.
+#   * WASM build gate — verifies that `moves-wasm` compiles for
+#     `wasm32-unknown-unknown` and that the fixture subset embedded in
+#     `moves-wasm`'s native unit tests passes on the host (catching
+#     native-vs-WASM divergence at the logic level before the browser build
+#     is exercised).
+#
+# What lives here vs. in the weekly workflow:
+#   * HERE (per-push, pure Rust, GitHub-hosted): build/test on all platforms,
+#     small-fixture characterization subset (full_suite_regression native
+#     tests), concurrency N-sweep, NONROAD fidelity machinery, WASM build.
+#   * WEEKLY (fixture-suite-weekly.yml, self-hosted, Apptainer): full
+#     characterization suite against the pinned canonical-MOVES SIF + NONROAD
+#     gfortran reference captures. Requires Apptainer + fakeroot + a local
+#     MOVES build — not viable on GitHub-hosted runners.
+#
+# The `full_suite_regression` and `concurrency_correctness` tests run on
+# every push without any external deps: they exercise the Rust port end-to-end
+# over all 34 characterization fixtures (no MOVES SIF needed). When
+# `REGRESSION_SNAPSHOTS_DIR` is set (weekly only), those same tests also diff
+# against the canonical-MOVES snapshot baseline.
 
 name: ci
 
@@ -24,35 +44,122 @@ env:
 
 jobs:
   test:
-    name: cargo test
-    runs-on: ubuntu-latest
+    name: cargo test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt, clippy
+          # rustfmt + clippy only run on Linux (the matrix entry that also
+          # carries those steps). macOS/Windows only build and test.
+          components: ${{ matrix.os == 'ubuntu-latest' && 'rustfmt, clippy' || '' }}
 
       - name: Cache cargo registry, target/
         uses: Swatinem/rust-cache@v2
+        with:
+          key: test-${{ matrix.os }}
 
+      # ── Lints (Linux only — one canonical lint pass is enough) ───────────
       - name: cargo fmt --check
+        if: matrix.os == 'ubuntu-latest'
         run: cargo fmt --all -- --check
 
       - name: cargo clippy
+        if: matrix.os == 'ubuntu-latest'
         run: cargo clippy --workspace --all-targets -- -D warnings
 
+      # ── Build + test (all platforms) ─────────────────────────────────────
       - name: cargo build
         run: cargo build --workspace --all-targets
 
+      # cargo test --workspace exercises:
+      #   * unit + integration tests in every crate
+      #   * crates/moves-cli/tests/full_suite_regression.rs — runs all 34
+      #     characterization fixtures (onroad + NONROAD) through the Rust port
+      #     and asserts no panics, non-empty plans, and (when
+      #     REGRESSION_SNAPSHOTS_DIR is set) snapshot-diff within tolerance.
+      #     This is the "small-fixture characterization subset on PRs" gate.
+      #   * crates/moves-cli/tests/concurrency_correctness.rs — runs every
+      #     onroad fixture at N=1, N=4, and N=NCPU and asserts byte-identical
+      #     output (catches concurrency regressions).
+      #   * crates/moves-cli/tests/concurrency_tuning.rs — sweeps N and
+      #     checks that throughput does not degrade + RSS stays bounded.
+      #   * crates/moves-nonroad/tests/nonroad_fidelity.rs — NONROAD
+      #     numerical-fidelity harness (machinery + live port output).
+      #     When NONROAD_FIDELITY_REFERENCE is set (weekly self-hosted),
+      #     this also diffs against the gfortran reference captures.
       - name: cargo test
         run: cargo test --workspace --all-targets
 
+      # ── Docs (Linux only) ────────────────────────────────────────────────
       - name: cargo doc (warnings deny)
+        if: matrix.os == 'ubuntu-latest'
         env:
           RUSTDOCFLAGS: -D warnings
         run: cargo doc --workspace --no-deps
+
+  # ── WASM build gate ────────────────────────────────────────────────────────
+  #
+  # Builds `moves-wasm` for `wasm32-unknown-unknown` and runs its native unit
+  # tests on the host. This catches:
+  #
+  #   1. Compilation failures on the WASM target (type errors, missing
+  #      `std`/`alloc` items, C-compiled dependency pulled in accidentally).
+  #
+  #   2. Logic divergence between native and WASM builds at the pure-Rust
+  #      level — the embedded-fixture tests in `moves-wasm::tests` run on
+  #      the host and exercise the same logic the WASM module exposes to
+  #      the browser, so a passing native test suite is a necessary (though
+  #      not sufficient) condition for a correct WASM build.
+  #
+  # `cargo test -p moves-wasm` (native) runs the tests under `#[cfg(test)]`
+  # in lib.rs without wasm-bindgen glue. `cargo build --target
+  # wasm32-unknown-unknown` then compiles the cdylib for the browser target.
+  # Full in-browser `wasm-bindgen-test` runs are left to the developer
+  # environment (requires a headless browser + wasm-pack) because
+  # GitHub-hosted runners do not have a stable headless-browser setup for
+  # WASM test execution.
+  wasm-build:
+    name: WASM build (wasm32-unknown-unknown)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain + wasm32 target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo registry, target/
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: wasm
+
+      # Run the moves-wasm native tests first — these cover the fixture
+      # subset (sample-runspec.xml onroad + NONROAD driver loop) and catch
+      # logic bugs without needing a browser.
+      - name: cargo test -p moves-wasm (native, fixture subset)
+        run: cargo test -p moves-wasm
+
+      # Compile the cdylib for the browser target. Excludes the whole
+      # workspace (many crates have no wasm32 target) and targets only
+      # moves-wasm, which already has WASM-safe dependency overrides
+      # (parquet without C codecs, etc.).
+      - name: cargo build --target wasm32-unknown-unknown -p moves-wasm
+        run: >
+          cargo build
+          --target wasm32-unknown-unknown
+          -p moves-wasm
 
   deny:
     name: cargo deny
