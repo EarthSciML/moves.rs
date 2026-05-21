@@ -27,5 +27,6 @@ clap = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]
+moves-snapshot = { path = "../moves-snapshot" }
 parquet = { workspace = true }
 tempfile = { workspace = true }

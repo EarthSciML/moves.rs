@@ -2,9 +2,12 @@
 //!
 //! The headline test — `run_sample_runspec_walks_the_graph` — is the Phase 2
 //! closing smoke test: load `characterization/fixtures/sample-runspec.xml`,
-//! walk the real calculator graph (no calculators ported yet, so every
-//! module reports unimplemented), and confirm the engine still produces an
-//! empty-but-correctly-shaped `MOVESRun.parquet`.
+//! walk the real calculator graph, and confirm the engine produces a
+//! correctly-shaped `MOVESRun.parquet`.
+//!
+//! Phase 7 note: all 33 fixtures still report 0 modules executed because the
+//! data plane (`CalculatorContext` row storage) is not yet wired in. The
+//! full-suite regression pass lives in `tests/full_suite_regression.rs`.
 //!
 //! The remaining tests exercise the `convert-runspec` and `import-cdb`
 //! subcommands through the same library entry points the `moves` binary
@@ -86,8 +89,10 @@ fn run_sample_runspec_walks_the_graph_and_writes_shaped_output() {
     );
     assert!(outcome.chunk_count() >= 1);
 
-    // Phase 2: no calculators are ported, so every planned module is
-    // unimplemented and nothing executes.
+    // Phase 7 (pre-data-plane): every planned module is unimplemented
+    // because calculator execute() methods return CalculatorOutput::empty()
+    // until the data plane is wired in. This remains the expected state
+    // until Phase 4 DataFrameStore lands.
     assert!(outcome.modules_executed.is_empty());
     assert_eq!(outcome.modules_unimplemented, outcome.modules_planned);
     assert!(!outcome.is_fully_implemented());

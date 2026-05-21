@@ -1790,6 +1790,7 @@ dependencies = [
  "moves-importer",
  "moves-importer-county",
  "moves-runspec",
+ "moves-snapshot",
  "parquet",
  "serde_json",
  "tempfile",
