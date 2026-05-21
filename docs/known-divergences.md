@@ -2,7 +2,7 @@
 
 This document is the "known divergences" record required by Phase 7 Task 126.
 It describes the regression methodology for the full-suite pass and catalogues
-the current state of the port against the 33-fixture characterization suite.
+the current state of the port against the 34-fixture characterization suite.
 
 ---
 
@@ -10,14 +10,15 @@ the current state of the port against the 33-fixture characterization suite.
 
 ### The fixture suite
 
-`characterization/fixtures/` holds 36 RunSpec XML files. The full-suite pass
-covers 33 of them — the 3 `scale-*` fixtures (County-Scale, Project-Scale,
+`characterization/fixtures/` holds 37 RunSpec XML files. The full-suite pass
+covers 34 of them — the 3 `scale-*` fixtures (County-Scale, Project-Scale,
 Rates) require additional input databases not present in the default test
 environment and are excluded.
 
 | Set | Count | Pattern |
 |-----|-------|---------|
 | Onroad (default-scale) | 23 | `chain-*`, `expand-*`, `process-*`, `sample-runspec` |
+| Mixed onroad + NONROAD | 1 | `mixed-onroad-nonroad` |
 | NONROAD | 10 | `nr-*` |
 | Excluded (need extra input DB) | 3 | `scale-county`, `scale-project`, `scale-rates` |
 
@@ -54,7 +55,7 @@ budget file grows per-column overrides with explanatory comments.
 ## 2. Phase 7 baseline — all fixtures run without error
 
 Recorded on 2026-05-21 against the `polecat/mo-uj3ke` branch (Phase 7 entry).
-All 33 fixtures complete without error. All plan > 0 modules. All execute 0
+All 34 fixtures complete without error. All plan > 0 modules. All execute 0
 modules (expected — see §3).
 
 ```
@@ -68,6 +69,7 @@ expand-day                                       44        0       44
 expand-fueltype-diesel                           44        0       44
 expand-month                                     44        0       44
 expand-sourcetype                                44        0       44
+mixed-onroad-nonroad                             44        0       44
 nr-agriculture-state                             18        0       18
 nr-airport-support-county                        18        0       18
 nr-commercial-nation                             18        0       18
@@ -94,7 +96,7 @@ process-refueling                                44        0       44
 process-tirewear                                 40        0       40
 sample-runspec                                   44        0       44
 ------------------------------------------------------------------------
-33 fixtures
+34 fixtures
 ```
 
 **What "0 executed" means:** The calculator `execute()` methods return

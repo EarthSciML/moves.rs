@@ -43,9 +43,10 @@ fn fixture_catalog_parses_and_is_unique() {
         entries.len()
     );
     assert!(
-        entries.len() <= 36,
-        "fixture catalogue is above Phase 0 Task 5/6 ceiling of 36: got {} \
-         (Task 74 added 3 fixtures beyond the original 33; ceiling updated in Task 78)",
+        entries.len() <= 37,
+        "fixture catalogue is above Phase 0 Task 5/6 ceiling of 37: got {} \
+         (Task 74 added 3 fixtures beyond the original 33; ceiling updated in Task 78; \
+          Task 127 added mixed-onroad-nonroad; ceiling updated to 37)",
         entries.len()
     );
 

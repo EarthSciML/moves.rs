@@ -1,6 +1,6 @@
 //! Full-suite regression pass — Phase 7 Task 126 (`mo-uj3ke`).
 //!
-//! Runs **all 33 characterization fixtures** (23 onroad + 10 NONROAD; the 3
+//! Runs **all 34 characterization fixtures** (24 onroad + 10 NONROAD; the 3
 //! `scale-*` fixtures that require additional input databases are excluded by
 //! default) through the complete Rust port and verifies:
 //!
@@ -20,7 +20,7 @@
 //!
 //! # Current state (Phase 7 entry)
 //!
-//! All 33 fixtures report 0 modules executed and all planned modules
+//! All 34 fixtures report 0 modules executed and all planned modules
 //! unimplemented. This is expected: calculator `execute()` methods return
 //! `CalculatorOutput::empty()` until the data plane is wired in. The test
 //! still exercises RunSpec parsing, DAG filtering, engine orchestration, and
@@ -82,8 +82,8 @@ fn snapshots_root() -> PathBuf {
 
 /// All non-`scale-*` fixture XML paths in sorted order.
 ///
-/// 36 total fixtures; 3 `scale-*` excluded (require additional input
-/// databases). Result: 23 onroad + 10 NONROAD = 33 fixtures.
+/// 37 total fixtures; 3 `scale-*` excluded (require additional input
+/// databases). Result: 24 onroad (including mixed-onroad-nonroad) + 10 NONROAD = 34 fixtures.
 fn all_fixtures() -> Vec<PathBuf> {
     let dir = fixtures_dir();
     let mut paths: Vec<PathBuf> = std::fs::read_dir(&dir)
@@ -121,10 +121,10 @@ fn tolerance_opts() -> DiffOptions {
 
 // ── fixture catalogue ─────────────────────────────────────────────────────────
 
-/// The fixture catalogue must contain exactly 33 non-scale fixtures.
+/// The fixture catalogue must contain exactly 34 non-scale fixtures.
 ///
-/// 36 total in `characterization/fixtures/`:
-/// - 23 onroad (non-`nr-`, non-`scale-`)
+/// 37 total in `characterization/fixtures/`:
+/// - 24 onroad/mixed (non-`nr-`, non-`scale-`): 23 default-scale + `mixed-onroad-nonroad`
 /// - 10 NONROAD (`nr-*.xml`)
 /// - 3 `scale-*.xml` (excluded — require additional input databases)
 #[test]
@@ -132,8 +132,8 @@ fn fixture_catalogue_size() {
     let fixtures = all_fixtures();
     assert_eq!(
         fixtures.len(),
-        33,
-        "expected 33 non-scale fixtures (23 onroad + 10 NONROAD), \
+        34,
+        "expected 34 non-scale fixtures (24 onroad/mixed + 10 NONROAD), \
          found {}. Update this test if the catalogue changes.",
         fixtures.len()
     );
@@ -148,8 +148,8 @@ fn fixture_catalogue_size() {
         .count();
 
     assert_eq!(
-        onroad_count, 23,
-        "expected 23 onroad fixtures, found {onroad_count}"
+        onroad_count, 24,
+        "expected 24 onroad/mixed fixtures, found {onroad_count}"
     );
     assert_eq!(
         nonroad_count, 10,
@@ -162,7 +162,7 @@ fn fixture_catalogue_size() {
 /// Every fixture must complete without error and produce a non-empty module plan.
 ///
 /// Prints a regression table matching `docs/known-divergences.md`.
-/// All 33 fixtures are expected to report 0 modules executed in Phase 7
+/// All 34 fixtures are expected to report 0 modules executed in Phase 7
 /// (pre-data-plane), which is the known baseline this test pins.
 #[test]
 fn all_fixtures_run_without_error() {

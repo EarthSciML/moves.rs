@@ -198,6 +198,8 @@ per_fixture_round_trip! {
     fixture_chain_nonhaptog => "chain-nonhaptog.xml",
     fixture_process_extended_idle => "process-extended-idle.xml",
     fixture_process_nox_speciation => "process-nox-speciation.xml",
+    // Task 127 fixture — mixed onroad + NONROAD dual-model run:
+    fixture_mixed_onroad_nonroad => "mixed-onroad-nonroad.xml",
 }
 
 #[test]
@@ -213,9 +215,9 @@ fn every_fixture_is_covered_by_a_per_fixture_test() {
         }
     }
     assert_eq!(
-        found, 36,
-        "expected 36 XML fixtures; bump the per_fixture_round_trip! macro when adding one \
-         (33 Phase 0 + 3 Task 74)"
+        found, 37,
+        "expected 37 XML fixtures; bump the per_fixture_round_trip! macro when adding one \
+         (33 Phase 0 + 3 Task 74 + 1 Task 127)"
     );
 }
 
