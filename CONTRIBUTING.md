@@ -8,6 +8,10 @@ conventions and CI gates the port follows. If you are picking up a task,
 read the linked plan section first — it specifies which Java/Fortran
 sources you are porting and what the acceptance criteria are.
 
+**Resolving upstream MOVES source files:** see
+[`docs/migration-guide.md`](docs/migration-guide.md) §1 — use
+`scripts/resolve_moves_src.sh`; never `bfs /` or `find /`.
+
 ## Workspace layout
 
 The repository is a Cargo workspace. Each crate has a focused responsibility:
