@@ -16,8 +16,9 @@ RunSpec format, importing custom input databases, and reading the output.
 5. [Importing input databases (CDB / PDB)](#importing-input-databases-cdb--pdb)
 6. [Output format](#output-format)
 7. [Downstream tools](#downstream-tools)
-8. [Tuning `--max-parallel-chunks`](#tuning---max-parallel-chunks)
-9. [Command reference](#command-reference)
+8. [Browser (WebAssembly)](#browser-webassembly)
+9. [Tuning `--max-parallel-chunks`](#tuning---max-parallel-chunks)
+10. [Command reference](#command-reference)
 
 ---
 
@@ -437,6 +438,64 @@ for:
 * **R (arrow + dplyr)** — `open_dataset` + `collect`
 * **Apache Spark (PySpark)** — `recursiveFileLookup`
 
+---
+
+## Browser (WebAssembly)
+
+`moves.rs` compiles to WebAssembly and runs entirely in the browser — no
+server-side computation required.
+
+### Try the demo
+
+Build and serve the included browser demo:
+
+```bash
+# Build the WASM package (requires wasm-pack: cargo install wasm-pack)
+wasm-pack build --target web crates/moves-wasm
+
+# Serve the demo directory
+python3 -m http.server 8080 --directory crates/moves-wasm
+
+# Open http://localhost:8080/demo/ in your browser
+```
+
+The demo lets you:
+
+* Upload a **RunSpec XML** file and run the onroad simulation — outputs land
+  as downloadable Parquet files.
+* Upload a **NONROAD `.POP`** population file and run the NONROAD simulation —
+  outputs show run counters.
+
+See [`crates/moves-wasm/demo/README.md`](../crates/moves-wasm/demo/README.md)
+for step-by-step instructions.
+
+### Embed in your own app
+
+The WASM module exposes two functions callable from JavaScript:
+
+```js
+import init, { run_simulation, run_nonroad_simulation }
+    from "./moves_wasm.js";
+
+await init();
+
+// Onroad: returns { "MOVESRun.parquet": Uint8Array, … }
+const result = run_simulation(runspecXml, 0);
+
+// NONROAD: returns { completion_message: "…", counters: { … } }
+const nonroadResult = run_nonroad_simulation(optionsJson, popBytes);
+```
+
+For the full API reference, bundler integration, OPFS persistence, and
+deployment checklist, see **[`docs/wasm-embedding.md`](wasm-embedding.md)**.
+
+### Multi-threaded WASM
+
+A second build variant uses rayon-backed Web Workers for parallel execution
+within the browser.  It requires a nightly Rust toolchain and cross-origin
+isolation headers (`COEP`/`COOP`) on the serving page.  See
+**[`docs/wasm-threading.md`](wasm-threading.md)** for details.
+
 It also provides three complete worked analyses:
 
 1. **NEI submission summary** — county × SCC × pollutant annual totals
@@ -623,3 +682,6 @@ behavioral divergences from canonical MOVES.
 * [`concurrency-tuning.md`](concurrency-tuning.md) — `--max-parallel-chunks` measurement and recommendations
 * [`known-divergences.md`](known-divergences.md) — documented differences from canonical MOVES
 * [`../moves-rust-migration-plan.md`](../moves-rust-migration-plan.md) — development roadmap
+* [`wasm-embedding.md`](wasm-embedding.md) — embedding the WASM module in third-party tools
+* [`wasm-threading.md`](wasm-threading.md) — multi-thread WASM build and COEP/COOP headers
+* [`../crates/moves-wasm/demo/README.md`](../crates/moves-wasm/demo/README.md) — browser demo build instructions

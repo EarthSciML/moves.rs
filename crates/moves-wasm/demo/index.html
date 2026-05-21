@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>moves.rs — Browser Demo</title>
+<style>
+  body { font-family: monospace; max-width: 800px; margin: 2rem auto; padding: 0 1rem; background: #111; color: #eee; }
+  h1 { color: #7af; }
+  h2 { color: #adf; border-bottom: 1px solid #444; padding-bottom: 0.25rem; }
+  label { display: block; margin-top: 0.75rem; color: #bbb; }
+  input[type="file"], input[type="number"], input[type="text"] {
+    background: #222; border: 1px solid #555; color: #eee; padding: 0.3rem 0.5rem;
+    width: 100%; box-sizing: border-box; margin-top: 0.25rem;
+  }
+  button {
+    margin-top: 1rem; padding: 0.5rem 1.5rem; background: #25f; color: #fff;
+    border: none; cursor: pointer; font-family: monospace; font-size: 1rem;
+  }
+  button:disabled { background: #555; cursor: not-allowed; }
+  #log {
+    margin-top: 1rem; background: #181818; border: 1px solid #444;
+    padding: 0.5rem; height: 180px; overflow-y: auto; font-size: 0.85rem;
+    white-space: pre-wrap; color: #aaa;
+  }
+  .download-link { display: block; color: #7f7; margin: 0.25rem 0; }
+  .download-link:hover { color: #afa; }
+  .counters { background: #1a1a1a; border: 1px solid #444; padding: 0.5rem; margin-top: 0.5rem; font-size: 0.9rem; }
+  .counters dt { color: #aaa; }
+  .counters dd { color: #eee; margin-left: 1.5rem; }
+  .note { color: #888; font-size: 0.8rem; margin-top: 0.4rem; }
+  section { margin-bottom: 2.5rem; }
+  .status-ok { color: #7f7; } .status-err { color: #f77; }
+</style>
+</head>
+<body>
+<h1>moves.rs — WebAssembly Demo</h1>
+<p>
+  Runs the <a href="https://github.com/EarthSciML/moves.rs" style="color:#7af">moves.rs</a>
+  port of EPA MOVES entirely in the browser — no server, no install.
+  Outputs are returned as downloadable Parquet files.
+</p>
+<p class="note">
+  Build the WASM package first: <code>wasm-pack build --target web crates/moves-wasm</code>
+  then serve this directory and open <code>index.html</code>.
+  See <a href="README.md" style="color:#7af">demo/README.md</a> for full instructions.
+</p>
+
+<!-- ------------------------------------------------------------------ -->
+<section id="onroad-section">
+  <h2>Onroad simulation</h2>
+  <p>
+    Upload a RunSpec XML file.  The engine runs the onroad emission
+    calculator chain and returns one or more Parquet output files matching
+    the canonical MOVES output schema.
+  </p>
+  <label>
+    RunSpec XML
+    <input type="file" id="runspec-file" accept=".xml">
+  </label>
+  <label>
+    Max parallel chunks (0 = auto; &gt;1 requires multi-thread build)
+    <input type="number" id="max-parallel-chunks" value="0" min="0" max="128" style="width:6rem">
+  </label>
+  <button id="run-onroad-btn" disabled>Run onroad</button>
+  <p class="note">Select a RunSpec XML file to enable the button.</p>
+
+  <div id="onroad-log-wrapper">
+    <div id="onroad-log" style="display:none">
+      <strong>Log</strong>
+      <div id="onroad-log-content" class="log" style="background:#181818;border:1px solid #444;padding:0.5rem;height:150px;overflow-y:auto;font-size:0.85rem;white-space:pre-wrap;color:#aaa;margin-top:0.25rem;"></div>
+    </div>
+  </div>
+
+  <div id="onroad-results" style="margin-top:1rem;display:none">
+    <strong>Output files</strong>
+    <div id="onroad-file-list"></div>
+  </div>
+</section>
+
+<!-- ------------------------------------------------------------------ -->
+<section id="nonroad-section">
+  <h2>NONROAD simulation</h2>
+  <p>
+    Upload a NONROAD population (<code>.POP</code>) file and configure
+    run options.  The simulation exercises the full driver loop and returns
+    run counters.
+  </p>
+  <label>
+    Population file (.POP)
+    <input type="file" id="pop-file">
+  </label>
+  <label>
+    Episode year
+    <input type="number" id="episode-year" value="2020" min="1990" max="2099" style="width:6rem">
+  </label>
+  <label>
+    Region level
+    <select id="region-level" style="background:#222;border:1px solid #555;color:#eee;padding:0.3rem;margin-top:0.25rem">
+      <option value="COUNTY">COUNTY</option>
+      <option value="STATE">STATE</option>
+      <option value="50STATE">50STATE</option>
+      <option value="SUBCOUNTY">SUBCOUNTY</option>
+      <option value="US TOTAL">US TOTAL</option>
+    </select>
+  </label>
+  <label>
+    Selected counties (5-char FIPS, comma-separated; blank = all)
+    <input type="text" id="selected-counties" placeholder="e.g. 06037,06038">
+  </label>
+  <button id="run-nonroad-btn" disabled>Run NONROAD</button>
+  <p class="note">Select a .POP population file to enable the button.</p>
+
+  <div id="nonroad-log-wrapper">
+    <div id="nonroad-log" style="display:none">
+      <strong>Log</strong>
+      <div id="nonroad-log-content" class="log" style="background:#181818;border:1px solid #444;padding:0.5rem;height:150px;overflow-y:auto;font-size:0.85rem;white-space:pre-wrap;color:#aaa;margin-top:0.25rem;"></div>
+    </div>
+  </div>
+
+  <div id="nonroad-results" style="margin-top:1rem;display:none">
+    <strong>Completion</strong>
+    <div id="nonroad-completion" style="margin-top:0.25rem"></div>
+    <strong style="margin-top:0.75rem;display:block">Counters</strong>
+    <dl id="nonroad-counters" class="counters"></dl>
+  </div>
+</section>
+
+<script>
+// -----------------------------------------------------------------------
+// Shared worker setup
+// -----------------------------------------------------------------------
+let onroadWorker = null;
+let nonroadWorker = null;
+
+function makeWorker(logEl) {
+    // worker.js is in the same directory as index.html
+    const w = new Worker(new URL("worker.js", import.meta.url), { type: "module" });
+    w.onerror = (e) => appendLog(logEl, `Worker error: ${e.message}`);
+    return w;
+}
+
+function appendLog(logEl, msg) {
+    const content = logEl.querySelector(".log") ?? logEl;
+    content.textContent += msg + "\n";
+    content.scrollTop = content.scrollHeight;
+}
+
+// -----------------------------------------------------------------------
+// Onroad
+// -----------------------------------------------------------------------
+const runspecInput   = document.getElementById("runspec-file");
+const runOnroadBtn   = document.getElementById("run-onroad-btn");
+const maxChunksInput = document.getElementById("max-parallel-chunks");
+const onroadLogEl    = document.getElementById("onroad-log");
+const onroadLogContent = document.getElementById("onroad-log-content");
+const onroadResults  = document.getElementById("onroad-results");
+const onroadFileList = document.getElementById("onroad-file-list");
+
+runspecInput.addEventListener("change", () => {
+    runOnroadBtn.disabled = !runspecInput.files.length;
+});
+
+runOnroadBtn.addEventListener("click", async () => {
+    const file = runspecInput.files[0];
+    if (!file) return;
+
+    runOnroadBtn.disabled = true;
+    onroadLogEl.style.display = "block";
+    onroadResults.style.display = "none";
+    onroadLogContent.textContent = "";
+    onroadFileList.innerHTML = "";
+
+    const runspecXml = await file.text();
+    const maxParallelChunks = parseInt(maxChunksInput.value, 10) || 0;
+
+    appendLog(onroadLogContent, `RunSpec: ${file.name} (${file.size} bytes)`);
+
+    onroadWorker = makeWorker(onroadLogEl);
+    onroadWorker.onmessage = (e) => {
+        const msg = e.data;
+        if (msg.type === "log") {
+            appendLog(onroadLogContent, msg.message);
+        } else if (msg.type === "result" && msg.mode === "onroad") {
+            appendLog(onroadLogContent, `Done — ${msg.files.length} output file(s).`);
+            onroadResults.style.display = "block";
+            for (const { name, bytes } of msg.files) {
+                const blob = new Blob([bytes], { type: "application/octet-stream" });
+                const url  = URL.createObjectURL(blob);
+                const a    = document.createElement("a");
+                a.href  = url;
+                a.download = name.replace(/\//g, "_");
+                a.textContent = `⬇ ${name} (${bytes.byteLength.toLocaleString()} bytes)`;
+                a.className = "download-link";
+                onroadFileList.appendChild(a);
+            }
+            runOnroadBtn.disabled = false;
+        } else if (msg.type === "error") {
+            appendLog(onroadLogContent, `ERROR: ${msg.message}`);
+            runOnroadBtn.disabled = false;
+        }
+    };
+    onroadWorker.postMessage({ type: "onroad", runspecXml, maxParallelChunks });
+});
+
+// -----------------------------------------------------------------------
+// NONROAD
+// -----------------------------------------------------------------------
+const popInput          = document.getElementById("pop-file");
+const runNonroadBtn     = document.getElementById("run-nonroad-btn");
+const episodeYearInput  = document.getElementById("episode-year");
+const regionLevelSel    = document.getElementById("region-level");
+const countiesInput     = document.getElementById("selected-counties");
+const nonroadLogEl      = document.getElementById("nonroad-log");
+const nonroadLogContent = document.getElementById("nonroad-log-content");
+const nonroadResults    = document.getElementById("nonroad-results");
+const nonroadCompletion = document.getElementById("nonroad-completion");
+const nonroadCounters   = document.getElementById("nonroad-counters");
+
+popInput.addEventListener("change", () => {
+    runNonroadBtn.disabled = !popInput.files.length;
+});
+
+runNonroadBtn.addEventListener("click", async () => {
+    const file = popInput.files[0];
+    if (!file) return;
+
+    runNonroadBtn.disabled = true;
+    nonroadLogEl.style.display = "block";
+    nonroadResults.style.display = "none";
+    nonroadLogContent.textContent = "";
+    nonroadCompletion.textContent = "";
+    nonroadCounters.innerHTML = "";
+
+    appendLog(nonroadLogContent, `Population file: ${file.name} (${file.size} bytes)`);
+
+    const popBytes = new Uint8Array(await file.arrayBuffer());
+
+    const countiesRaw = countiesInput.value.trim();
+    const selectedCounties = countiesRaw
+        ? countiesRaw.split(",").map(s => s.trim()).filter(Boolean)
+        : [];
+
+    const optionsJson = JSON.stringify({
+        episode_year:       parseInt(episodeYearInput.value, 10),
+        region_level:       regionLevelSel.value,
+        selected_counties:  selectedCounties,
+    });
+
+    appendLog(nonroadLogContent, `Options: ${optionsJson}`);
+
+    nonroadWorker = makeWorker(nonroadLogEl);
+    nonroadWorker.onmessage = (e) => {
+        const msg = e.data;
+        if (msg.type === "log") {
+            appendLog(nonroadLogContent, msg.message);
+        } else if (msg.type === "result" && msg.mode === "nonroad") {
+            appendLog(nonroadLogContent, `Done.`);
+            nonroadResults.style.display = "block";
+
+            const ok = msg.completion_message.startsWith("Successful");
+            nonroadCompletion.innerHTML =
+                `<span class="${ok ? "status-ok" : "status-err"}">${msg.completion_message}</span>`;
+
+            for (const [key, val] of Object.entries(msg.counters ?? {})) {
+                const dt = document.createElement("dt");
+                const dd = document.createElement("dd");
+                dt.textContent = key;
+                dd.textContent = val;
+                nonroadCounters.appendChild(dt);
+                nonroadCounters.appendChild(dd);
+            }
+            runNonroadBtn.disabled = false;
+        } else if (msg.type === "error") {
+            appendLog(nonroadLogContent, `ERROR: ${msg.message}`);
+            runNonroadBtn.disabled = false;
+        }
+    };
+    nonroadWorker.postMessage({ type: "nonroad", optionsJson, popBytes });
+});
+</script>
+</body>
+</html>
