@@ -90,6 +90,9 @@ pub const NULL_PARTITION: &str = "__NULL__";
 /// with a NULL value in the corresponding column.
 type PartitionKey = (Option<i16>, Option<i16>);
 
+/// In-memory file collection for WASM builds: `(relative-path, bytes)` pairs.
+type MemoryFiles = Vec<(PathBuf, Vec<u8>)>;
+
 /// Writes the three MOVES output tables to a per-run output directory.
 ///
 /// Construct with [`OutputProcessor::new`] (filesystem) or
@@ -119,7 +122,7 @@ pub struct OutputProcessor {
     output_root: PathBuf,
     /// When `Some`, parquet bytes are collected in memory instead of being
     /// written to `output_root`. Used by the WASM build (Task 132).
-    memory: Option<Arc<Mutex<Vec<(PathBuf, Vec<u8>)>>>>,
+    memory: Option<Arc<Mutex<MemoryFiles>>>,
 }
 
 impl OutputProcessor {
@@ -165,10 +168,10 @@ impl OutputProcessor {
     /// (filesystem mode). Paths are relative to the logical output root.
     ///
     /// [`new`]: Self::new
-    pub fn take_memory_files(&self) -> Option<Vec<(PathBuf, Vec<u8>)>> {
+    pub fn take_memory_files(&self) -> Option<MemoryFiles> {
         self.memory.as_ref().map(|arc| {
             let mut guard = arc.lock().expect("output memory mutex poisoned");
-            std::mem::replace(&mut *guard, Vec::new())
+            std::mem::take(&mut *guard)
         })
     }
 

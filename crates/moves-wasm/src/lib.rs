@@ -6,15 +6,40 @@
 //! The module is compiled with `--target wasm32-unknown-unknown` and loaded
 //! via a standard ES module or Webpack bundle.
 //!
-//! # Concurrency note (Tasks 132–133)
+//! # Concurrency (Task 134)
 //!
-//! `wasm32-unknown-unknown` has no threads until Task 134 enables the
-//! threads proposal (SharedArrayBuffer + cross-origin isolation). The
-//! [`BoundedExecutor`](moves_framework::BoundedExecutor) therefore
-//! defaults `max_parallel_chunks` to 1 here — chunks run sequentially,
-//! which still bounds peak memory by sequencing chunk working sets rather
-//! than running them concurrently. Task 134 will re-enable
-//! `max_parallel_chunks > 1` once rayon's Web Worker pool is wired up.
+//! Two concurrency levels are supported:
+//!
+//! ## Single-threaded (default build)
+//!
+//! Compile normally — no special flags required. Pass `max_parallel_chunks: 1`
+//! (or 0 for auto, which resolves to 1 in this mode). Chunks run sequentially
+//! in the calling thread, bounding peak memory by never keeping more than one
+//! chunk working set resident. Works on any browser without COEP/COOP headers.
+//!
+//! ## Multi-threaded (`wasm-threads` feature)
+//!
+//! Requires the `wasm-threads` Cargo feature and the WASM atomics target
+//! features:
+//!
+//! ```text
+//! RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals" \
+//!   cargo build --target wasm32-unknown-unknown --features wasm-threads
+//! ```
+//!
+//! The page (or the hosting Worker) must be served with cross-origin isolation
+//! headers so the browser provides `SharedArrayBuffer`:
+//!
+//! ```text
+//! Cross-Origin-Opener-Policy: same-origin
+//! Cross-Origin-Embedder-Policy: require-corp
+//! ```
+//!
+//! Call `init_thread_pool(n)` from JavaScript before the first simulation.
+//! Simulation functions must then be called **from a Web Worker context** —
+//! browsers disallow `atomic.wait` on the main thread, which rayon uses for
+//! synchronisation. See `docs/wasm-threading.md` for a complete deployment
+//! example.
 //!
 //! # I/O model
 //!
@@ -22,10 +47,9 @@
 //! strings / `Uint8Array` values (file upload or OPFS reads in the caller);
 //! output is returned as a JavaScript object. Onroad output maps relative
 //! file paths to `Uint8Array` Parquet bytes; NONROAD output is a JSON-shaped
-//! object with counters and a completion message (emission rows will be
-//! populated once the production `GeographyExecutor` is wired into WASM).
+//! object with counters and a completion message.
 //!
-//! # Usage (JavaScript — onroad)
+//! # Usage (JavaScript — single-threaded onroad)
 //!
 //! ```js
 //! import init, { run_simulation } from "./moves_wasm.js";
@@ -35,12 +59,25 @@
 //! // RunSpec as an XML string (loaded from a file picker or OPFS).
 //! const runspecXml = await file.text();
 //!
-//! // Run. Returns { "MOVESRun.parquet": Uint8Array, ... }
-//! const result = run_simulation(runspecXml);
+//! // Run (max_parallel_chunks=0 means auto, resolves to 1 in single-threaded build).
+//! // Returns { "MOVESRun.parquet": Uint8Array, ... }
+//! const result = run_simulation(runspecXml, 0);
 //!
 //! for (const [path, bytes] of Object.entries(result)) {
 //!   console.log(path, bytes.byteLength, "bytes");
 //! }
+//! ```
+//!
+//! # Usage (JavaScript — multi-threaded onroad, wasm-threads build)
+//!
+//! ```js
+//! import init, { init_thread_pool, run_simulation } from "./moves_wasm.js";
+//!
+//! await init();
+//! await init_thread_pool(navigator.hardwareConcurrency);
+//!
+//! // Must be called from a Web Worker — see docs/wasm-threading.md.
+//! const result = run_simulation(runspecXml, navigator.hardwareConcurrency);
 //! ```
 //!
 //! # Usage (JavaScript — NONROAD)
@@ -57,11 +94,11 @@
 //! const popBytes = new Uint8Array(await popFile.arrayBuffer());
 //!
 //! // Returns { completion_message: "…", counters: { scc_groups_planned: …, … } }
-//! const result = run_nonroad_simulation(options, popBytes);
+//! const result = run_nonroad_simulation(options, popBytes, 0);
 //! console.log(result.completion_message);
 //! ```
 //!
-//! See `moves-rust-migration-plan.md` Tasks 132–133.
+//! See `moves-rust-migration-plan.md` Tasks 132–134 and `docs/wasm-threading.md`.
 
 // Pull in the onroad calculator and generator implementations so they are
 // compiled into the WASM module. Registration with the engine registry is
@@ -82,20 +119,26 @@ use moves_nonroad::{
 use moves_runspec::from_xml_str;
 use wasm_bindgen::prelude::*;
 
+/// Initialize the rayon Web Worker thread pool.
+///
+/// Call this from JavaScript **once**, before the first simulation, passing
+/// the desired worker count (typically `navigator.hardwareConcurrency`).
+/// The function returns a `Promise` that resolves when all workers are ready.
+///
+/// Only available in the `wasm-threads` feature build. Requires the page to
+/// be served with cross-origin isolation headers — see `docs/wasm-threading.md`.
+///
+/// ```js
+/// import init, { init_thread_pool, run_simulation } from "./moves_wasm.js";
+/// await init();
+/// await init_thread_pool(navigator.hardwareConcurrency);
+/// ```
+#[cfg(feature = "wasm-threads")]
+pub use wasm_bindgen_rayon::init_thread_pool;
+
 /// The Phase 1 calculator-chain DAG, embedded at compile time.
 const EMBEDDED_CALCULATOR_DAG: &str =
     include_str!("../../../characterization/calculator-chains/calculator-dag.json");
-
-/// Default parallelism cap for the WASM build.
-///
-/// `wasm32-unknown-unknown` is single-threaded until Task 134 enables the
-/// threads proposal, so the bounded executor runs at most one chunk at a
-/// time. The semaphore still bounds peak memory — with limit 1, no two
-/// chunk working sets are ever co-resident.
-///
-/// Task 134 will replace this constant with a runtime-settable option
-/// backed by `navigator.hardwareConcurrency`.
-const WASM_MAX_PARALLEL_CHUNKS: usize = 1;
 
 /// Run a MOVES onroad simulation in the browser.
 ///
@@ -104,6 +147,14 @@ const WASM_MAX_PARALLEL_CHUNKS: usize = 1;
 /// * `runspec_xml` — RunSpec document as an XML string. The caller
 ///   typically reads this from a file picker (`<input type="file">`) or
 ///   from OPFS via `FileSystemFileHandle.getFile().text()`.
+///
+/// * `max_parallel_chunks` — Maximum number of independent calculator chains
+///   that may run concurrently. Pass `0` to let the engine choose (resolves
+///   to 1 in a single-threaded build; to the global rayon thread count in a
+///   `wasm-threads` build after `init_thread_pool` has been called).
+///   Pass `1` to force sequential execution regardless of build flags.
+///   Values > 1 require the `wasm-threads` build **and** a Web Worker calling
+///   context — see `docs/wasm-threading.md`.
 ///
 /// # Returns
 ///
@@ -127,7 +178,7 @@ const WASM_MAX_PARALLEL_CHUNKS: usize = 1;
 /// Returns a JavaScript `Error` if the RunSpec cannot be parsed or if the
 /// engine encounters a fatal error during planning or execution.
 #[wasm_bindgen]
-pub fn run_simulation(runspec_xml: &str) -> Result<JsValue, JsValue> {
+pub fn run_simulation(runspec_xml: &str, max_parallel_chunks: u32) -> Result<JsValue, JsValue> {
     let run_spec =
         from_xml_str(runspec_xml).map_err(|e| JsValue::from_str(&format!("RunSpec parse error: {e}")))?;
 
@@ -136,7 +187,7 @@ pub fn run_simulation(runspec_xml: &str) -> Result<JsValue, JsValue> {
 
     let config = EngineConfig {
         output_root: std::path::PathBuf::from(""),
-        max_parallel_chunks: WASM_MAX_PARALLEL_CHUNKS,
+        max_parallel_chunks: max_parallel_chunks as usize,
         run_spec_file_name: None,
         run_date_time: None,
         collect_output_in_memory: true,
@@ -423,6 +474,7 @@ mod tests {
 
     /// Build a 130-char fixed-width `.POP` record, matching the column layout
     /// in `rdpop.f` / `getpop.f`. Right-justifies HP fields and population.
+    #[allow(clippy::too_many_arguments)]
     fn build_pop_record(
         fips: &str,
         sub: &str,

@@ -61,8 +61,8 @@ impl AvftControlStrategy {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::ToolSpec`] if `spec` fails validation, or
-    /// [`Error::ToolFailure`] if the tool cannot produce a valid output
+    /// Returns [`crate::error::Error::ToolSpec`] if `spec` fails validation, or
+    /// [`crate::error::Error::ToolFailure`] if the tool cannot produce a valid output
     /// for any enabled source type.
     pub fn from_tool_inputs(
         spec: &ToolSpec,

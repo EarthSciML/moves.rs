@@ -14,6 +14,18 @@ description = "WebAssembly entry point for the MOVES Rust port — Tasks 132 (on
 crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
+# wasm-threads: enable rayon-backed Web Worker threading (Task 134).
+#
+# Requires a nightly Rust toolchain + atomics target features:
+#   RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals" \
+#   cargo +nightly build -Z build-std=std,panic_abort \
+#     --target wasm32-unknown-unknown --features wasm-threads
+#
+# The page must be served with COEP/COOP cross-origin isolation headers
+# so the browser exposes SharedArrayBuffer. See docs/wasm-threading.md.
+[features]
+wasm-threads = ["dep:wasm-bindgen-rayon"]
+
 [dependencies]
 moves-calculator-info = { path = "../moves-calculator-info" }
 moves-calculators = { path = "../moves-calculators" }
@@ -23,6 +35,7 @@ moves-runspec = { path = "../moves-runspec" }
 js-sys = { workspace = true }
 serde_json = { workspace = true }
 wasm-bindgen = { workspace = true }
+wasm-bindgen-rayon = { workspace = true, optional = true }
 
 # parquet without C-compiled codecs so the WASM build does not require clang.
 parquet = { version = "55", default-features = false, features = ["arrow", "base64"] }

@@ -68,6 +68,7 @@ pub struct CoverageMatrix {
     cells: Vec<Vec<CoverageCell>>,
 }
 
+#[allow(dead_code)]
 impl CoverageMatrix {
     /// Build the matrix from the fixture and calculator catalogues.
     pub fn build(fixtures: &[OnroadFixture], calculators: &[Box<dyn Calculator>]) -> Self {

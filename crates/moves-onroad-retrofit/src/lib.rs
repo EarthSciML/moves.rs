@@ -52,7 +52,7 @@
 //!
 //! The write of computed adjustment factors into `emissionRateAdjustment` is
 //! deferred to Task 50 (`DataFrameStore`). See
-//! [`control_strategy::OnRoadRetrofitStrategy::pre_run`] for the TODO
+//! [`control_strategy::OnRoadRetrofitStrategy`]'s `pre_run` implementation for the TODO
 //! comment.
 
 pub mod control_strategy;

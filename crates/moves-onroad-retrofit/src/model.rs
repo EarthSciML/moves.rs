@@ -229,6 +229,7 @@ impl FromIterator<RetrofitRecord> for RetrofitTable {
 mod tests {
     use super::*;
 
+    #[allow(clippy::too_many_arguments)]
     fn make_record(
         source_type: i32,
         start_my: i32,

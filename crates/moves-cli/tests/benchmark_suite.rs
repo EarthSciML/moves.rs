@@ -381,7 +381,7 @@ fn benchmark_all_workload_categories() {
                 println!("  [SKIPPED] Fixture {kind}.xml not found.\n");
             }
             Some(path) => {
-                print_fixture_group_detail(kind, &[path.clone()], &mut failures);
+                print_fixture_group_detail(kind, std::slice::from_ref(&path), &mut failures);
                 print_n_sweep(kind, &[path], ncpu, &mut failures);
             }
         }

@@ -9,7 +9,7 @@
 //! specific percentage reductions in pollutant output from specific vehicle
 //! classes.
 //!
-//! Each [`RopRecord`] carries a `reductionFraction` in `[0.0, 1.0]`:
+//! Each [`crate::model::RopRecord`] carries a `reductionFraction` in `[0.0, 1.0]`:
 //!
 //! * `0.0` — no change
 //! * `0.25` — 25% reduction (downstream emission rate × 0.75)

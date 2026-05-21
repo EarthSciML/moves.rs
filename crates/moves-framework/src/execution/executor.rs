@@ -61,8 +61,6 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::{Condvar, Mutex};
 
 use crate::calculator::CalculatorRegistry;
-// `Error` is used explicitly only in the non-WASM rayon path.
-#[cfg_attr(target_arch = "wasm32", allow(unused_imports))]
 use crate::error::{Error, Result};
 
 // ---------------------------------------------------------------------------
@@ -272,27 +270,42 @@ pub fn chunk_chains(registry: &CalculatorRegistry, names: &[&str]) -> Result<Vec
 // BoundedExecutor — the rayon pool + semaphore.
 // ---------------------------------------------------------------------------
 
-/// Resolve a requested parallelism limit to a concrete positive thread
-/// count. `0` means "let the runtime choose" and maps to the number of
-/// available hardware threads (falling back to `1` if that probe fails).
+/// Resolve a requested parallelism limit to a concrete positive thread count.
+///
+/// `0` means "let the runtime choose". On native the probe is
+/// `std::thread::available_parallelism`. On `wasm32`, the initialized global
+/// rayon thread count is used instead (set by `init_thread_pool` in
+/// JavaScript; falls back to 1 if it was not called).
 fn resolve_parallelism(requested: usize) -> usize {
     if requested > 0 {
-        requested
-    } else {
+        return requested;
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
         std::thread::available_parallelism()
             .map(|n| n.get())
             .unwrap_or(1)
     }
+    #[cfg(target_arch = "wasm32")]
+    {
+        // rayon::current_num_threads() returns the global pool thread count.
+        // Before init_thread_pool is called the pool is single-threaded (1).
+        rayon::current_num_threads().max(1)
+    }
 }
 
-/// Runs independent [`Chunk`]s concurrently up to a fixed parallelism
-/// limit.
+/// Runs independent [`Chunk`]s concurrently up to a fixed parallelism limit.
 ///
 /// On native targets, owns a [`rayon::ThreadPool`] sized by
-/// `--max-parallel-chunks`. On `wasm32-unknown-unknown`, chunks are always
-/// run sequentially (the WASM target has no threading until Task 134 enables
-/// the threads proposal), so `max_parallel_chunks` defaults to 1 and the
-/// semaphore still bounds peak memory by sequencing chunks.
+/// `--max-parallel-chunks`.
+///
+/// On `wasm32-unknown-unknown`, chunks are dispatched to rayon's global
+/// thread pool, which is backed by Web Workers when JavaScript calls
+/// `init_thread_pool(n)` before invoking any simulation function (Task 134,
+/// `wasm-threads` feature). When `init_thread_pool` has not been called (or
+/// the binary was compiled without `+atomics`), the global pool is
+/// single-threaded and chunks run sequentially. Either way the
+/// [`Semaphore`] bounds the number of live chunk working sets.
 ///
 /// [`execute`](Self::execute) dispatches every chunk; each chunk acquires a
 /// [`Semaphore`] permit before running its body and releases it after, so at
@@ -303,7 +316,7 @@ fn resolve_parallelism(requested: usize) -> usize {
 #[derive(Debug)]
 pub struct BoundedExecutor {
     /// Worker pool. Sized to [`limit`](Self::limit) threads.
-    /// Absent on `wasm32-unknown-unknown` — chunks run sequentially there.
+    /// Absent on `wasm32-unknown-unknown` — the global rayon pool is used there.
     #[cfg(not(target_arch = "wasm32"))]
     pool: rayon::ThreadPool,
     /// Resolved parallelism limit — the pool's thread count and the
@@ -351,18 +364,27 @@ impl BoundedExecutor {
     /// Run every chunk in `chunks` through `run_chunk`, with at most
     /// [`limit`](Self::limit) running concurrently.
     ///
-    /// On native: each chunk is dispatched onto the rayon pool; the chunk
-    /// body acquires a [`Semaphore`] permit, runs `run_chunk`, then releases
-    /// the permit on return (or on panic, via the guard's `Drop`). The call
+    /// Each chunk acquires a [`Semaphore`] permit before running its body and
+    /// releases the permit after (including on panic, via the guard's `Drop`),
+    /// so at most `limit` chunk working sets are ever live.
+    ///
+    /// On native: chunks are dispatched onto the owned rayon pool and the call
     /// blocks until every chunk has finished.
     ///
-    /// On `wasm32`: chunks run sequentially in the calling thread, each still
-    /// gated by the semaphore so the memory-bound guarantee is preserved.
+    /// On `wasm32` with `limit == 1` (or rayon single-threaded): chunks run
+    /// sequentially in the calling thread.
+    ///
+    /// On `wasm32` with `limit > 1` and a multi-threaded rayon global pool
+    /// (initialized by `init_thread_pool` in JavaScript): chunks are
+    /// dispatched to Web Workers via `rayon::scope`. **The caller must be
+    /// running in a Web Worker context** — browsers disallow `atomic.wait` on
+    /// the main thread, which rayon uses for synchronisation.
     ///
     /// # Errors
     ///
     /// If one or more chunk bodies return [`Err`], the first error is returned
-    /// after all chunks complete. On `wasm32` the first error stops execution.
+    /// after all chunks complete. In sequential mode the first error stops
+    /// execution immediately.
     pub fn execute<F>(&self, chunks: &[Chunk], run_chunk: F) -> Result<()>
     where
         F: Fn(&Chunk) -> Result<()> + Sync,
@@ -411,23 +433,57 @@ impl BoundedExecutor {
         }
     }
 
-    /// Sequential fallback for `wasm32-unknown-unknown`.
-    ///
-    /// WASM has no threads (until Task 134 enables the threads proposal), so
-    /// chunks run one at a time in the calling thread. The semaphore still
-    /// gates each chunk, preserving the memory-bound guarantee that at most
-    /// `limit` chunk working sets are ever resident.
+    /// `wasm32` execution: sequential when `limit == 1` (or rayon is
+    /// single-threaded), parallel via rayon's global Web Worker pool when
+    /// `limit > 1` (requires `init_thread_pool` in JS + `+atomics` build).
     #[cfg(target_arch = "wasm32")]
     fn execute_impl<F>(&self, chunks: &[Chunk], run_chunk: &F) -> Result<()>
     where
-        F: Fn(&Chunk) -> Result<()>,
+        F: Fn(&Chunk) -> Result<()> + Sync,
     {
-        let permits = Semaphore::new(self.limit);
-        for chunk in chunks {
-            let _permit = permits.acquire();
-            run_chunk(chunk)?;
+        // Sequential path: one chunk at a time. Safe on any WASM context —
+        // the semaphore never needs to block because chunks are serialised.
+        if self.limit <= 1 {
+            let permits = Semaphore::new(self.limit);
+            for chunk in chunks {
+                let _permit = permits.acquire();
+                run_chunk(chunk)?;
+            }
+            return Ok(());
         }
-        Ok(())
+
+        // Parallel path: dispatch to rayon's global pool, which is backed by
+        // Web Workers when JavaScript called init_thread_pool(n) before
+        // invoking this simulation. Requires a Web Worker calling context
+        // (atomic.wait is forbidden on the browser main thread).
+        let permits = Semaphore::new(self.limit);
+        let errors: Mutex<Vec<Error>> = Mutex::new(Vec::new());
+
+        rayon::scope(|scope| {
+            for chunk in chunks {
+                let permits = &permits;
+                let errors = &errors;
+                scope.spawn(move |_| {
+                    let _permit = permits.acquire();
+                    if let Err(err) = run_chunk(chunk) {
+                        errors
+                            .lock()
+                            .expect("executor error-collection mutex poisoned")
+                            .push(err);
+                    }
+                });
+            }
+        });
+
+        match errors
+            .into_inner()
+            .expect("executor error-collection mutex poisoned")
+            .into_iter()
+            .next()
+        {
+            Some(err) => Err(err),
+            None => Ok(()),
+        }
     }
 }
 

@@ -23,7 +23,7 @@
 //! Per-iteration subscriptions are not needed because the retrofit records are
 //! indexed by model year and retrofit year and do not vary across counties or
 //! months within a single run. The framework's post-`pre_run` table
-//! invalidation is signalled via [`modified_tables`].
+//! invalidation is signalled via `modified_tables`.
 //!
 //! # Data-plane status (Task 50)
 //!

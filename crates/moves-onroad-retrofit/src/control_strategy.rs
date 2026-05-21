@@ -85,6 +85,7 @@ mod tests {
     use super::*;
     use crate::model::RetrofitRecord;
 
+    #[allow(clippy::too_many_arguments)]
     fn make_record(
         source_type: i32,
         start_my: i32,

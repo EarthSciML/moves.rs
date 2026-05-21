@@ -14,6 +14,7 @@ use moves_onroad_retrofit::{OnRoadRetrofitStrategy, RetrofitRecord, RetrofitTabl
 // Helpers
 // ---------------------------------------------------------------------------
 
+#[allow(clippy::too_many_arguments)]
 fn rec(
     source_type: i32,
     start_my: i32,

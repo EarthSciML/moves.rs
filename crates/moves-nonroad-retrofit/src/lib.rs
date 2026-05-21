@@ -20,7 +20,7 @@
 //! - Annual fraction retrofitted OR count retrofitted
 //! - Retrofit effectiveness (0.0–1.0)
 //!
-//! This crate wraps those records as an [`InternalControlStrategy`] so the
+//! This crate wraps those records as a [`moves_framework::InternalControlStrategy`] so the
 //! framework can discover and drive the strategy through its lifecycle hooks.
 //! The actual per-SCC reduction computation stays in
 //! [`moves_nonroad::emissions::retrofit`]; this crate provides the framework
