@@ -1,7 +1,9 @@
-//! The Phase 3 calculator catalogue (Tasks 45–72).
+//! The Phase 3 calculator catalogue (Tasks 45–72 + 78 closing checkpoint).
 //!
-//! Tasks 45–72 of the migration plan port the MOVES onroad hot-path
-//! emission calculators. They land **38** `Calculator` implementations:
+//! Tasks 45–72 port the MOVES onroad hot-path emission calculators (37
+//! implementations). Task 78 adds `DummyCalculator` (the no-op placeholder
+//! from `CalculatorInfo.txt`) to satisfy the "every module is represented"
+//! completeness criterion, bringing the total to **38**:
 //!
 //! | Task | Calculator(s) |
 //! |------|---------------|
@@ -33,6 +35,7 @@
 //! | 70 | `TogSpeciationCalculator` |
 //! | 71 | `ActivityCalculator` |
 //! | 72 | `DistanceCalculator` |
+//! | 78 | `DummyCalculator` |
 //!
 //! [`all_calculators`] instantiates all 38 as boxed trait objects.
 //! The harness reads `name()` and `registrations()` straight off those
@@ -56,6 +59,7 @@ use moves_calculators::calculators::{
     criteria_running_calculator::CriteriaRunningCalculator,
     criteria_start_calculator::CriteriaStartCalculator,
     distance_calculator::DistanceCalculator,
+    dummy::DummyCalculator,
     evaporative_permeation_calculator::EvaporativePermeationCalculator,
     hcspeciation::HcSpeciationCalculator,
     liquid_leaking_calculator::LiquidLeakingCalculator,
@@ -79,8 +83,8 @@ use moves_calculators::calculators::{
     },
 };
 
-/// The number of calculators the Phase 3 plan lands (Tasks 45–72).
-pub const CALCULATOR_COUNT: usize = 37;
+/// The number of calculators the Phase 3 plan lands (Tasks 45–72 + 78).
+pub const CALCULATOR_COUNT: usize = 38;
 
 /// Construct every Phase 3 hot-path calculator as a boxed trait object.
 ///
@@ -154,6 +158,8 @@ pub fn all_calculators() -> Vec<Box<dyn Calculator>> {
         Box::new(ActivityCalculator),
         // Task 72
         Box::new(DistanceCalculator::new()),
+        // Task 78 — DummyCalculator (no-op completeness entry)
+        Box::new(DummyCalculator),
     ]
 }
 

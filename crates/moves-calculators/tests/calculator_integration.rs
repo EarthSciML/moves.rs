@@ -20,8 +20,9 @@
 //!
 //! Task 73 built the harness over 23 hot-path fixtures with 4 known-uncovered
 //! calculators. Task 74 adds 3 fixtures (process-nox-speciation,
-//! process-extended-idle, chain-nonhaptog) that close the gap — all 37
-//! calculators are now covered by at least one fixture.
+//! process-extended-idle, chain-nonhaptog) that close the gap. Task 78 adds
+//! DummyCalculator (no-op, zero registrations) — all 38 calculators are now
+//! in the catalogue; 37 carry registrations covered by fixtures.
 //!
 //! See `tests/calculator_validation/mod.rs` for what runs today versus
 //! what is gated behind the Phase 0 snapshot capture and the data
@@ -79,7 +80,7 @@ fn all_26_onroad_fixtures_present_and_parse() {
 }
 
 #[test]
-fn all_37_calculators_registered() {
+fn all_38_calculators_registered() {
     let registered = calculators::all_calculators();
     assert_eq!(
         registered.len(),
@@ -122,10 +123,11 @@ fn coverage_matrix_every_calculator_covered() {
     //   process-extended-idle   → CO2AERunningStartExtendedIdleCalculator (90,90)
     //   chain-nonhaptog         → TogSpeciationCalculator (88,1)
     //
-    // All 37 calculators are now covered. KNOWN_UNCOVERED is intentionally
-    // empty — any regression (a calculator whose registrations no longer
-    // overlap any fixture PPA) will cause this test to fail.
-    const KNOWN_UNCOVERED: &[&str] = &[];
+    // Task 78 adds DummyCalculator with empty registrations — it has no
+    // (pollutant, process) pairs and can never appear as "covered" in the
+    // fixture matrix. It is listed in KNOWN_UNCOVERED as an intentional
+    // exception; the Java original also produced no output.
+    const KNOWN_UNCOVERED: &[&str] = &["DummyCalculator"];
 
     let loaded_fixtures =
         fixtures::load_all_fixtures().expect("the 26 onroad fixtures must load");
@@ -280,7 +282,7 @@ fn harness_status() {
     );
     println!();
     println!("{}", matrix.render());
-    println!("  Status: all 37 calculators covered; canonical-capture diff dormant until");
-    println!("          Phase 0 compute-node run + data plane (see README).");
+    println!("  Status: 38 calculators (37 with registrations + DummyCalculator no-op);");
+    println!("          canonical-capture diff dormant until Phase 0 compute-node run + data plane.");
     println!("================================================================");
 }

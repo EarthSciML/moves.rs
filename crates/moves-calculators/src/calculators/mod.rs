@@ -13,6 +13,7 @@ pub mod activitycalculator;
 pub mod airtoxics;
 pub mod airtoxicsdistance;
 pub mod baseratecalculator;
+pub mod dummy;
 pub mod basicbraketirepm;
 pub mod basicstartpm;
 pub mod ch4n2o_running_start;

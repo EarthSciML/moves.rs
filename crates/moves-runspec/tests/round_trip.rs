@@ -194,6 +194,10 @@ per_fixture_round_trip! {
     fixture_scale_county => "scale-county.xml",
     fixture_scale_project => "scale-project.xml",
     fixture_scale_rates => "scale-rates.xml",
+    // Task 74 fixtures — added to close the 4-calculator coverage gap:
+    fixture_chain_nonhaptog => "chain-nonhaptog.xml",
+    fixture_process_extended_idle => "process-extended-idle.xml",
+    fixture_process_nox_speciation => "process-nox-speciation.xml",
 }
 
 #[test]
@@ -209,8 +213,9 @@ fn every_fixture_is_covered_by_a_per_fixture_test() {
         }
     }
     assert_eq!(
-        found, 33,
-        "expected 33 XML fixtures; bump the per_fixture_round_trip! macro when adding one"
+        found, 36,
+        "expected 36 XML fixtures; bump the per_fixture_round_trip! macro when adding one \
+         (33 Phase 0 + 3 Task 74)"
     );
 }
 
