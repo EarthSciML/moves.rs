@@ -3,3 +3,4 @@ issue-prefix: mo
 dolt.auto-start: false
 gc.endpoint_origin: inherited_city
 gc.endpoint_status: verified
+export.auto: false
