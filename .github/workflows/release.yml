@@ -159,16 +159,32 @@ jobs:
       - name: List archives
         run: ls -lh dist/
 
+      - name: Extract release notes from CHANGELOG.md
+        id: changelog
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          # Extract the section for this tag from CHANGELOG.md.
+          # Section starts at "## vX.Y.Z" and ends just before the next "## ".
+          awk "/^## ${TAG} /,/^## [^${TAG}]/" CHANGELOG.md \
+            | head -n -1 \
+            > /tmp/release-notes.md
+          # If the tag section isn't found, fall back to the top of the file.
+          if [ ! -s /tmp/release-notes.md ]; then
+            head -n 80 CHANGELOG.md > /tmp/release-notes.md
+          fi
+
       - name: Create release and upload archives
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${GITHUB_REF_NAME}"
 
-          gh release create "${TAG}" \
-            --title "moves.rs ${TAG}" \
-            --notes "$(cat <<'NOTES'
-          ## Binary release
+          # Append binary-download instructions after the changelog notes.
+          cat >> /tmp/release-notes.md <<'FOOTER'
+
+          ---
+
+          ## Binary downloads
 
           Each archive contains two binaries:
           - `moves` / `moves.exe` — the main MOVES command-line tool
@@ -178,7 +194,7 @@ jobs:
 
           ## Default database (separate download)
 
-          Running `moves` requires a converted default-DB Parquet tree. The pre-converted tree for the current canonical MOVES default database is uploaded as `default-db-*.tar.gz` once it has been generated. Download it and point `--default-db` at the extracted directory.
+          Running `moves` requires a converted default-DB Parquet tree.  The pre-converted tree for the current canonical MOVES default database is uploaded as `default-db-*.tar.gz` once it has been generated.  Download it and point `--default-db` at the extracted directory.
 
           To generate the Parquet tree yourself from a canonical MOVES installation, see [`characterization/default-db-conversion/README.md`](https://github.com/EarthSciML/moves.rs/blob/main/characterization/default-db-conversion/README.md).
 
@@ -189,6 +205,9 @@ jobs:
           cd moves.rs
           cargo build --release --locked
           ```
-          NOTES
-          )" \
+          FOOTER
+
+          gh release create "${TAG}" \
+            --title "moves.rs ${TAG}" \
+            --notes-file /tmp/release-notes.md \
             dist/*.tar.gz dist/*.zip
