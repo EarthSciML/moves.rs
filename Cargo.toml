@@ -4,6 +4,7 @@ members = [
     "crates/moves-calculator-info",
     "crates/moves-calculators",
     "crates/moves-cli",
+    "crates/moves-control-strategy-validation",
     "crates/moves-data",
     "crates/moves-data-default",
     "crates/moves-default-db-convert",

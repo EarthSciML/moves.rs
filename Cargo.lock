@@ -1796,6 +1796,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "moves-control-strategy-validation"
+version = "0.1.0"
+dependencies = [
+ "moves-avft",
+ "moves-framework",
+ "moves-nonroad",
+ "moves-nonroad-retrofit",
+ "moves-onroad-retrofit",
+ "moves-rate-of-progress",
+]
+
+[[package]]
 name = "moves-data"
 version = "0.1.0"
 dependencies = [

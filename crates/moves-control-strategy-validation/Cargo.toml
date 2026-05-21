@@ -1,0 +1,20 @@
+[package]
+name = "moves-control-strategy-validation"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+description = "Control-strategy validation fixtures and cross-strategy interaction tests (Phase 6 Task 124)."
+
+[lib]
+path = "src/lib.rs"
+
+[dev-dependencies]
+moves-avft = { path = "../moves-avft" }
+moves-framework = { path = "../moves-framework" }
+moves-nonroad = { path = "../moves-nonroad" }
+moves-nonroad-retrofit = { path = "../moves-nonroad-retrofit" }
+moves-onroad-retrofit = { path = "../moves-onroad-retrofit" }
+moves-rate-of-progress = { path = "../moves-rate-of-progress" }
