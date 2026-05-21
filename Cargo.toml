@@ -16,6 +16,7 @@ members = [
     "crates/moves-importer-validation",
     "crates/moves-nonroad",
     "crates/moves-nonroad-import",
+    "crates/moves-rate-of-progress",
     "crates/moves-runspec",
     "crates/moves-snapshot",
     "crates/moves-sql-macros",
