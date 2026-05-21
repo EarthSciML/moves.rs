@@ -84,6 +84,21 @@ See [crates/moves-wasm/demo/README.md](crates/moves-wasm/demo/README.md) and
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Code conventions, CI gates, how to contribute |
 | [CHANGELOG.md](CHANGELOG.md) | Release history |
 
+## Community and feedback
+
+**Bug reports and feature requests:** open an issue on
+[GitHub Issues](https://github.com/EarthSciML/moves.rs/issues). Issue templates
+are available for bug reports, feature requests, and numerical-divergence
+reports. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contribution guide.
+
+**Security vulnerabilities:** see [SECURITY.md](SECURITY.md) — do not open a
+public issue.
+
+**Questions and discussion:** use
+[GitHub Discussions](https://github.com/EarthSciML/moves.rs/discussions) for
+open-ended questions about RunSpec configuration, output interpretation, or
+research use cases.
+
 ## Regulatory caveat
 
 > This port is **not approved for regulatory use**. Do not use it for SIP
