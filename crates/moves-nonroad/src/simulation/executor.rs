@@ -263,6 +263,166 @@ impl GeographyExecutor for PlanRecordingExecutor {
     }
 }
 
+/// Production [`GeographyExecutor`] that routes each [`DispatchContext`] to
+/// the matching NONROAD geography routine by assembling the four callback
+/// traits (`GeographyCallbacks`, `StateCallbacks`, `UsTotalCallbacks`,
+/// `NationalCallbacks`) from loaded reference-data tables.
+///
+/// # Callback-surface audit (T1 / mo-5w1lc)
+///
+/// Every method listed below appears on one or more of the four callback
+/// traits. For each method: (a) the reference-data table it reads, and
+/// (b) the already-ported `population::` / `emissions::` function it
+/// should forward to. Methods whose backing data is not yet loadable are
+/// marked **⚠ NOT YET LOADABLE**.
+///
+/// ## FIPS / region selection
+///
+/// | Method | Fortran | Backing table | Math module | Status |
+/// |--------|---------|---------------|-------------|--------|
+/// | `find_fips` | `fndchr(fipin, 5, fipcod, NCNTY)` | County FIPS list (`fipcod(NCNTY)`) from `RunRegions::selected_counties` | — (index scan) | **available** |
+/// | `tally_county_record` | `nctyrc(idxfip) += 1` | In-memory counter array (`nctyrc`) on the executor | — | **no loading needed** |
+/// | `find_subcounty` | `prcsub.f` :246–258, `reglst(idxreg)(6:10)` | Region list (`reglst`) in `NonroadInputs::regions.region_list` | — | **available** |
+///
+/// ## Technology fractions
+///
+/// | Method | Fortran | Backing table | Math module | Status |
+/// |--------|---------|---------------|-------------|--------|
+/// | `find_exhaust_tech` | `fndtch(asccod, hpval, year)` | Exhaust tech-type fractions (`tchfrc`, `tectyp`) from NR\*.EF emission-factor files | — (table lookup) | **⚠ NOT YET LOADABLE** — tech-fraction loader not ported |
+/// | `find_evap_tech` | `fndevtch(asccod, hpval, year)` | Evap tech-type fractions (`evtchfrc`, `evtectyp`) from NR\*.EF files | — (table lookup) | **⚠ NOT YET LOADABLE** |
+///
+/// ## Activity records
+///
+/// | Method | Fortran | Backing table | Math module | Status |
+/// |--------|---------|---------------|-------------|--------|
+/// | `find_activity` | `fndact(asccod, fipin, hpval)` | Activity records (`actlev`, `faclod`, `iactun`, `actage`, `starts`) from NR\*.ACT files | — | **⚠ NOT YET LOADABLE** — activity-file loader not ported |
+/// | `activity_record` | reads `actlev(idxact)`, `faclod(idxact)`, `iactun(idxact)`, `actage(idxact)`, `starts(idxact)` | Same NR\*.ACT records as `find_activity` | — | **⚠ NOT YET LOADABLE** |
+///
+/// ## Growth cross-reference and growth factors
+///
+/// | Method | Fortran | Backing table | Math module | Status |
+/// |--------|---------|---------------|-------------|--------|
+/// | `find_growth_xref` | `fndgxf(fipin, asccod, hpval)` | Growth cross-reference table (`gxfdat`) from NR\*.GRW indicator files | — | **⚠ NOT YET LOADABLE** — growth xref loader not ported |
+/// | `load_growth` | `getgrw(indcod)` | Growth-factor stream from NR\*.GRW files | `population::growth::select_for_indicator` | **ported** |
+/// | `growth_factor` | `grwfac(year1, year2, fips, indcod)` | Loaded growth records (above) | `population::growth::growth_factor` | **ported** |
+///
+/// ## Model-year and age distribution
+///
+/// | Method | Fortran | Backing table | Math module | Status |
+/// |--------|---------|---------------|-------------|--------|
+/// | `model_year` / `model_year_and_agedist` | `modyr(…)` | Scrappage curves (`population::scrappage`) | `population::modyr::model_year` | **ported** |
+/// | `age_distribution` | `agedist(…)` | Grown model-year fractions from `modyr` output | `population::agedist::age_distribution` | **ported** |
+///
+/// ## Retrofit records
+///
+/// | Method | Fortran | Backing table | Math module | Status |
+/// |--------|---------|---------------|-------------|--------|
+/// | `filter_retrofits` / `filter_retrofits_by_scc_hp` / `_year` / `_tech` | `fndrtrft(fltrtyp, …)` | Retrofit records (`population::retrofit::RetrofitRecord`) from NR\*.RFT files | `population::retrofit::sort_retrofits` / `compare_retrofits` | **ported** (records must be loaded) |
+/// | `surviving_retrofits` | `rtrftfltr3(*)` read after type-3 filter | Same retrofit records | — | **ported** |
+/// | `calculate_retrofit` | `clcrtrft(…)` | Retrofit records + per-pollutant reduction fractions | `emissions::retrofit::calculate_retrofit_reduction` | **ported** |
+///
+/// ## Temporal factors
+///
+/// | Method | Fortran | Backing table | Math module | Status |
+/// |--------|---------|---------------|-------------|--------|
+/// | `day_month_factors` / `day_month_factor` | `daymthf(asccod, fipin, daymthfac, mthf, dayf, ndays)` | Day/month factor table from NR\*.TMF temporal-fraction files | — (table lookup) | **⚠ NOT YET LOADABLE** — temporal-factor file loader not ported |
+/// | `emission_adjustments` | `emsadj(adjems, asccod, fipin, daymthfac)` | Emission-factor files for the adjustment table lookup | `emissions::exhaust::calculate_emission_adjustments` | **math ported**; requires loaded EF tables (**⚠ NOT YET LOADABLE**) |
+///
+/// ## Exhaust and evaporative emission factors
+///
+/// | Method | Fortran | Backing table | Math module | Status |
+/// |--------|---------|---------------|-------------|--------|
+/// | `compute_exhaust_factors` | `emfclc(…)` | Emission-factor records from NR\*.EMF files | `emissions::exhaust::compute_emission_factor_for_tech` | **math ported**; EF file loader **⚠ NOT YET LOADABLE** |
+/// | `compute_evap_factors` | `evemfclc(…)` | Evap emission-factor records from NR\*.EMF files | `emissions::evaporative::calculate_evaporative_factors` | **math ported**; evap EF loader **⚠ NOT YET LOADABLE** |
+///
+/// ## Emission calculators
+///
+/// | Method | Fortran | Backing table | Math module | Status |
+/// |--------|---------|---------------|-------------|--------|
+/// | `compute_exhaust_iteration` / `calculate_exhaust` | `clcems(…)` | EF table (above) + activity records | `emissions::exhaust::calculate_exhaust_emissions` | **ported** (depends on unloaded EF + activity tables) |
+/// | `compute_evap_iteration` / `calculate_evap` | `clcevems(…)` | Evap EF table + refueling/spillage data | `emissions::evaporative::calculate_evaporative_emissions` | **ported** (depends on unloaded evap EF + spillage tables) |
+///
+/// ## Refueling / spillage
+///
+/// | Method | Fortran | Backing table | Math module | Status |
+/// |--------|---------|---------------|-------------|--------|
+/// | `find_refueling` | `fndrfm(asccod, hpval, tech)` | Refueling/spillage-mode table (`modspl`, `volspl`, etc.) from NR\*.SPL files | — | **⚠ NOT YET LOADABLE** — spillage-file loader not ported |
+///
+/// ## Allocation (subcounty and national)
+///
+/// | Method | Fortran | Backing table | Math module | Status |
+/// |--------|---------|---------------|-------------|--------|
+/// | `find_allocation` (subcounty) | `fndasc(asccod, ascalo, nalorc)` | Subcounty allocation coefficients from NR\*.SCO files | — | **⚠ NOT YET LOADABLE** |
+/// | `allocate_subcounty` | `alosub(…)` | Same NR\*.SCO records | — (pure computation) | **⚠ NOT YET PORTED** |
+/// | `find_allocation` (national) | `fndasc` national path | National-to-state allocation coefficients from NR\*.ALO files | — | **⚠ NOT YET LOADABLE** |
+/// | `allocate_to_states` | `alosta(…)` | Same NR\*.ALO records | — (pure computation) | **⚠ NOT YET PORTED** |
+///
+/// # Summary: what blocks production execution
+///
+/// The following reference-data loaders must be ported before
+/// `ProductionExecutor` can produce non-skipped results:
+///
+/// 1. **NR\*.EF** — exhaust and evap tech-type fractions (`fndtch`,
+///    `fndevtch`) and emission-factor records (`emfclc`, `evemfclc`,
+///    `emsadj`).
+/// 2. **NR\*.ACT** — activity records (`fndact`, `activity_record`).
+/// 3. **NR\*.GRW** — growth cross-reference table (`fndgxf`).
+/// 4. **NR\*.TMF** — temporal day/month factor table (`daymthf`).
+/// 5. **NR\*.SPL** — refueling/spillage-mode records (`fndrfm`).
+/// 6. **NR\*.SCO** — subcounty allocation coefficients.
+/// 7. **NR\*.ALO** — national-to-state allocation coefficients.
+/// 8. **`alosub` / `alosta` ports** — allocation math (pure computation,
+///    no new files, but not yet ported).
+///
+/// All `population::` and `emissions::` math modules referenced above
+/// are already ported and available.
+#[derive(Debug, Default)]
+pub struct ProductionExecutor {
+    /// Exhaust tech-type fractions from NR*.EF files. **⚠ NOT YET LOADABLE.**
+    pub exhaust_tech_fractions: Vec<u8>,
+    /// Evap tech-type fractions from NR*.EF files. **⚠ NOT YET LOADABLE.**
+    pub evap_tech_fractions: Vec<u8>,
+    /// Emission-factor records from NR*.EMF files. **⚠ NOT YET LOADABLE.**
+    pub emission_factors: Vec<u8>,
+    /// Activity records from NR*.ACT files. **⚠ NOT YET LOADABLE.**
+    pub activity_records: Vec<u8>,
+    /// Growth cross-reference and growth-factor stream from NR*.GRW files.
+    /// **⚠ NOT YET LOADABLE.**
+    pub growth_xref: Vec<u8>,
+    /// Day/month temporal factors from NR*.TMF files. **⚠ NOT YET LOADABLE.**
+    pub temporal_factors: Vec<u8>,
+    /// Refueling/spillage-mode records from NR*.SPL files. **⚠ NOT YET LOADABLE.**
+    pub spillage_records: Vec<u8>,
+    /// National-to-state allocation coefficients from NR*.ALO files.
+    /// **⚠ NOT YET LOADABLE.**
+    pub national_allocation: Vec<u8>,
+    /// Subcounty allocation coefficients from NR*.SCO files. **⚠ NOT YET LOADABLE.**
+    pub subcounty_allocation: Vec<u8>,
+    /// Retrofit records from NR*.RFT files (population::retrofit::RetrofitRecord).
+    pub retrofit_records: Vec<crate::population::RetrofitRecord>,
+}
+
+impl ProductionExecutor {
+    /// Create a `ProductionExecutor` with no reference data loaded.
+    ///
+    /// All reference-data fields are empty; every dispatch returns
+    /// [`GeographyExecution::skipped`] until the loaders are implemented
+    /// (see the struct-level doc for the complete list of missing loaders).
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl GeographyExecutor for ProductionExecutor {
+    fn execute(
+        &mut self,
+        _ctx: &DispatchContext<'_>,
+        _options: &NonroadOptions,
+    ) -> Result<GeographyExecution> {
+        Ok(GeographyExecution::skipped())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
