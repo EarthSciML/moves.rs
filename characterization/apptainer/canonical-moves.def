@@ -22,6 +22,7 @@ From: ubuntu:24.04
     files/init-mariadb.sh     /opt/moves-bin/init-mariadb.sh
     files/start-mariadb-bg.sh /opt/moves-bin/start-mariadb-bg.sh
     files/versions.env        /opt/moves-bin/versions.env
+    nonroad-build             /build-context/nonroad-build
 
 %post
     set -eux
@@ -50,6 +51,7 @@ From: ubuntu:24.04
         ca-certificates curl wget gnupg \
         git ant unzip xz-utils tzdata locales \
         build-essential pkg-config \
+        gfortran patch \
         sysvinit-utils
 
     locale-gen en_US.UTF-8
@@ -85,6 +87,14 @@ From: ubuntu:24.04
     cd /opt/moves
     git checkout "${MOVES_COMMIT}"
     git rev-parse HEAD > /opt/moves/.canonical-commit
+
+    # ----- NONROAD Fortran build -----
+    # build.sh applies the instrumentation patches, compiles with the pinned
+    # gfortran flag set, and emits sha256/size to stdout. We capture the SHA256
+    # into a provenance file so downstream tooling can verify the baked binary.
+    /build-context/nonroad-build/build.sh /opt/moves
+    sha256sum /opt/moves/NONROAD/NR08a/NONROAD.exe | awk '{print $1}' \
+        > /opt/moves/.nonroad-binary-sha256
 
     # ----- Initialize MariaDB and load the default DB -----
     install -d -o mysql -g mysql -m 0750 /var/lib/mysql
@@ -227,6 +237,8 @@ SQL
     # baked-in versions.env to get the pins.
     . /opt/moves-bin/versions.env
     test -f /opt/moves/.canonical-commit
+    test -f /opt/moves/NONROAD/NR08a/NONROAD.exe
+    test -f /opt/moves/.nonroad-binary-sha256
     test -d /var/lib/mysql-seed
     test -x /opt/moves-bin/init-mariadb.sh
     test -x /opt/moves-bin/start-mariadb-bg.sh

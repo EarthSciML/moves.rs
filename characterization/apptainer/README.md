@@ -67,12 +67,34 @@ The patch flips three flags so MOVES's normal cleanup paths skip:
 | JDK | Eclipse Temurin 17 | Adoptium APT repo |
 | Go | 1.21.13 | go.dev tarball |
 | ant | distribution package | Ubuntu apt |
+| gfortran | distribution package | Ubuntu apt |
 | MOVES | pinned commit (see `files/versions.env`) | `github.com/USEPA/EPA_MOVES_Model` |
 | MOVES default DB | `movesdb20241112` (pinned by SHA256) | `database/Setup/` in the source, or `MOVESDB_URL` |
+| NONROAD.exe | built from MOVES source | `characterization/nonroad-build/build.sh` |
 
-The MOVES sources land at `/opt/moves`. The MariaDB seed data lands at
-`/var/lib/mysql-seed` (read-only) and is copied into the writable
-`/var/lib/mysql` bind-mount on first run.
+The MOVES sources land at `/opt/moves`. The NONROAD binary is compiled
+during the SIF build and placed at `/opt/moves/NONROAD/NR08a/NONROAD.exe`
+with its SHA256 recorded in `/opt/moves/.nonroad-binary-sha256` for
+provenance. The MariaDB seed data lands at `/var/lib/mysql-seed`
+(read-only) and is copied into the writable `/var/lib/mysql` bind-mount
+on first run.
+
+### NONROAD binary provenance
+
+The `%post` build step runs `characterization/nonroad-build/build.sh
+/opt/moves`, which applies the Phase 5 instrumentation patches and
+compiles with the pinned gfortran flag set from `nonroad-build/flags.env`
+(see that file for the rationale for each flag). The resulting binary's
+SHA256 is written to `/opt/moves/.nonroad-binary-sha256` at build time.
+
+To verify the binary inside a built SIF:
+
+```sh
+apptainer exec canonical-moves.sif file /opt/moves/NONROAD/NR08a/NONROAD.exe
+# → ELF 64-bit LSB executable, x86-64 ...
+
+apptainer exec canonical-moves.sif cat /opt/moves/.nonroad-binary-sha256
+```
 
 ## Bind-mount layout (runtime)
 

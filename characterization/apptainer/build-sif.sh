@@ -94,6 +94,7 @@ cp "${HERE}/files/my.cnf" \
    "${HERE}/files/init-mariadb.sh" \
    "${HERE}/files/start-mariadb-bg.sh" \
    "${CTX}/files/"
+cp -a "${ROOT}/nonroad-build" "${CTX}/nonroad-build"
 
 # Write the merged versions.env into the temp context.
 cat > "${CTX}/files/versions.env" <<EOF

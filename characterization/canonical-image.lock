@@ -8,6 +8,12 @@
 # the values below are placeholders that get overwritten on the first
 # successful build on an HPC compute node. Do not commit a build of
 # this file with placeholder values; do not edit it by hand.
+#
+# NOTE: As of this commit, the %post now compiles NONROAD/NR08a from
+# source via characterization/nonroad-build/build.sh and records the
+# binary SHA256 in /opt/moves/.nonroad-binary-sha256. Any SIF built
+# before this change does not contain the instrumented NONROAD.exe and
+# must be rebuilt.
 
 sif_path           = "characterization/apptainer/canonical-moves.sif"
 sif_sha256         = "PENDING_FIRST_BUILD"
