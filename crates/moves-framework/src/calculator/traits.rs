@@ -121,12 +121,31 @@ impl CalculatorContext {
         }
     }
 
+    /// Construct a context with pre-populated tables and start-of-run
+    /// position. Convenient for tests that seed the slow tier before
+    /// exercising a calculator body.
+    #[must_use]
+    pub fn with_tables(tables: ExecutionTables) -> Self {
+        Self {
+            tables,
+            scratch: ScratchNamespace::empty(),
+            position: IterationPosition::default(),
+        }
+    }
+
     /// Per-run filtered default-DB tables. Calculators read from this in
     /// their [`Calculator::execute`] body, indexing by the canonical
     /// table names declared in [`Calculator::input_tables`].
     #[must_use]
     pub fn tables(&self) -> &ExecutionTables {
         &self.tables
+    }
+
+    /// Mutable access to the slow-tier tables. Task 24 (`InputDataManager`)
+    /// uses this to populate the store at run start; calculators themselves
+    /// should not mutate the slow tier.
+    pub fn tables_mut(&mut self) -> &mut ExecutionTables {
+        &mut self.tables
     }
 
     /// Inter-calculator scratch namespace. Generators write here in their
