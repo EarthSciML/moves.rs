@@ -51,7 +51,7 @@ From: ubuntu:24.04
         ca-certificates curl wget gnupg \
         git ant unzip xz-utils tzdata locales \
         build-essential pkg-config \
-        gfortran patch \
+        gfortran patch file \
         sysvinit-utils
 
     locale-gen en_US.UTF-8
@@ -100,17 +100,26 @@ From: ubuntu:24.04
     install -d -o mysql -g mysql -m 0750 /var/lib/mysql
     install -d -o mysql -g mysql -m 0755 /var/run/mysqld
 
-    # MariaDB 11.4 doesn't accept --initialize-insecure (that's MySQL).
-    # The canonical bootstrap is mariadb-install-db, which writes the
-    # system tables to the empty datadir.
-    mariadb-install-db --user=mysql --datadir=/var/lib/mysql --skip-test-db
+    # apt package postinst already runs mariadb-install-db; only bootstrap
+    # if the system tables are absent (edge case: empty datadir overlay).
+    [ -d /var/lib/mysql/mysql ] || \
+        mariadb-install-db --user=root --datadir=/var/lib/mysql --skip-test-db
 
+    # Use --user=root so mariadbd doesn't setuid(mysql) under fakeroot;
+    # fakeroot's setuid interception is known to cause instability with
+    # long-running MariaDB imports. --innodb-buffer-pool-size=256M keeps
+    # the build-time footprint small; the installed my.cnf lifts it to 2G
+    # at runtime. Extended net timeouts survive slow I/O under fakeroot.
     /usr/sbin/mariadbd \
-        --user=mysql \
+        --user=root \
         --datadir=/var/lib/mysql \
         --socket=/var/run/mysqld/mysqld.sock \
         --pid-file=/var/run/mysqld/mariadbd.pid \
-        --skip-networking &
+        --skip-networking \
+        --innodb-buffer-pool-size=256M \
+        --net-read-timeout=7200 \
+        --net-write-timeout=7200 \
+        --myisam-sort-buffer-size=64M &
     MARIADB_PID=$!
 
     # Wait for socket
@@ -145,7 +154,7 @@ SQL
             echo "FATAL: staged movesdb SHA256 mismatch" >&2; exit 1; }
         mkdir -p /tmp/movesdb-unpacked
         cd /tmp/movesdb-unpacked
-        unzip -q "$SEED_ZIP"
+        unzip -qo "$SEED_ZIP"
         DUMP_DIR=/tmp/movesdb-unpacked
     elif [ -d /opt/seed/movesdb ] && [ -n "$(ls -A /opt/seed/movesdb 2>/dev/null)" ]; then
         # Pre-unzipped tree from the host
@@ -157,7 +166,7 @@ SQL
                 echo "FATAL: movesdb SHA256 mismatch" >&2; exit 1; }
         mkdir -p /tmp/movesdb-unpacked
         cd /tmp/movesdb-unpacked
-        unzip -q "/opt/moves/database/Setup/${MOVESDB_FILENAME}"
+        unzip -qo "/opt/moves/database/Setup/${MOVESDB_FILENAME}"
         DUMP_DIR=/tmp/movesdb-unpacked
     elif [ -n "${MOVESDB_URL}" ]; then
         wget -q -O /tmp/movesdb.zip "${MOVESDB_URL}"
@@ -165,7 +174,7 @@ SQL
             echo "FATAL: movesdb SHA256 mismatch" >&2; exit 1; }
         mkdir -p /tmp/movesdb-unpacked
         cd /tmp/movesdb-unpacked
-        unzip -q /tmp/movesdb.zip
+        unzip -qo /tmp/movesdb.zip
         rm /tmp/movesdb.zip
         DUMP_DIR=/tmp/movesdb-unpacked
     else
@@ -185,7 +194,7 @@ SQL
 
     DUMP_DB_NAME="${MOVESDB_FILENAME%.zip}"
     mariadb --socket=/var/run/mysqld/mysqld.sock -uroot \
-        -e "CREATE DATABASE \`${DUMP_DB_NAME}\` CHARACTER SET utf8 COLLATE utf8_general_ci;"
+        -e "CREATE DATABASE IF NOT EXISTS \`${DUMP_DB_NAME}\` CHARACTER SET utf8 COLLATE utf8_general_ci;"
     mariadb --socket=/var/run/mysqld/mysqld.sock -uroot "${DUMP_DB_NAME}" < "$DUMP_SQL"
 
     # Stop MariaDB cleanly so the seed dir is consistent.
@@ -218,7 +227,7 @@ SQL
 
     # ----- Cleanup -----
     apt-get clean
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* 2>/dev/null || true
 
 %environment
     export MOVES_HOME=/opt/moves
@@ -233,9 +242,11 @@ SQL
 
 %test
     set -e
-    # %test runs in a fresh shell without %post's vars; source the
-    # baked-in versions.env to get the pins.
+    # %test runs in a fresh shell without %post's vars or %environment
+    # PATH. Re-establish the runtime PATH here so java/go/ant resolve.
     . /opt/moves-bin/versions.env
+    export JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-amd64
+    export PATH=${JAVA_HOME}/bin:/usr/local/go/bin:/opt/moves-bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     test -f /opt/moves/.canonical-commit
     test -f /opt/moves/NONROAD/NR08a/NONROAD.exe
     test -f /opt/moves/.nonroad-binary-sha256
