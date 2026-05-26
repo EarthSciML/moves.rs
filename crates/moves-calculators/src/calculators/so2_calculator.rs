@@ -141,7 +141,7 @@ use std::collections::HashMap;
 use moves_data::{PollutantId, PollutantProcessAssociation, ProcessId};
 use moves_framework::{
     Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription,
-    DataFrameStoreTyped, Error, IntoDataFrame, TableRow,
+    DataFrameStoreTyped, Error, TableRow,
 };
 use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
 
@@ -1176,16 +1176,14 @@ type FuelEffectRatioIndex = HashMap<(i32, i32, i32, i32, i32, i32, i32), f64>;
 
 /// Read all SO2 input tables from `ctx.tables()`.
 ///
-/// Applies position filters matching the SQL `##context.X##` macros when
-/// `ctx.position()` carries concrete values: `year` on the `Year` table,
-/// `process_id` on `PollutantProcessAssoc`, and `county_id` / `year` /
-/// `process_id` on the `MOVESWorkerOutput` energy rows.
+/// Position filtering uses [`crate::wiring::position_filter`] to extract the
+/// three `##context.X##` SQL macro values — `year`, `process_id`, and
+/// `county_id` — from the current master-loop position, then applies them as
+/// predicates on the `Year`, `PollutantProcessAssoc`, and `MOVESWorkerOutput`
+/// tables.
 fn build_inputs(ctx: &CalculatorContext) -> Result<So2Inputs, Error> {
     let tables = ctx.tables();
-    let pos = ctx.position();
-    let pos_year = pos.time.year.map(i32::from);
-    let pos_process = pos.process_id.map(|p| i32::from(p.0));
-    let pos_county = pos.location.county_id.map(|c| c as i32);
+    let filter = crate::wiring::position_filter(ctx);
     Ok(So2Inputs {
         fuel_supply: tables.iter_typed::<FuelSupplyRow>("FuelSupply")?,
         fuel_formulation: tables.iter_typed::<FuelFormulationRow>("FuelFormulation")?,
@@ -1197,7 +1195,7 @@ fn build_inputs(ctx: &CalculatorContext) -> Result<So2Inputs, Error> {
             .collect(),
         year: {
             let rows = tables.iter_typed::<YearRow>("Year")?;
-            match pos_year {
+            match filter.year {
                 Some(y) => rows.into_iter().filter(|r| r.year_id == y).collect(),
                 None => rows,
             }
@@ -1206,7 +1204,7 @@ fn build_inputs(ctx: &CalculatorContext) -> Result<So2Inputs, Error> {
             .iter_typed::<SulfateEmissionRateRow>("SulfateEmissionRate")?,
         pollutant_process_assoc: {
             let rows = tables.iter_typed::<PollutantProcessRow>("PollutantProcessAssoc")?;
-            match pos_process {
+            match filter.process_id {
                 Some(p) => rows.into_iter().filter(|r| r.process_id == p).collect(),
                 None => rows,
             }
@@ -1221,11 +1219,7 @@ fn build_inputs(ctx: &CalculatorContext) -> Result<So2Inputs, Error> {
         energy: {
             let rows = tables.iter_typed::<EnergyRow>("MOVESWorkerOutput")?;
             rows.into_iter()
-                .filter(|r| {
-                    pos_county.map_or(true, |c| r.county_id == c)
-                        && pos_year.map_or(true, |y| r.year_id == y)
-                        && pos_process.map_or(true, |p| r.process_id == p)
-                })
+                .filter(|r| filter.matches(r.year_id, r.county_id, r.process_id))
                 .collect()
         },
     })
@@ -1234,10 +1228,7 @@ fn build_inputs(ctx: &CalculatorContext) -> Result<So2Inputs, Error> {
 /// Convert SO2 emission rows to a [`CalculatorOutput`] carrying the
 /// `MOVESWorkerOutput` `DataFrame`.
 fn write_rows(rows: Vec<So2EmissionRow>) -> Result<CalculatorOutput, Error> {
-    let df = rows
-        .into_dataframe()
-        .map_err(|e| Error::Polars(e.to_string()))?;
-    Ok(CalculatorOutput::with_dataframe(df))
+    crate::wiring::emit_rows(rows)
 }
 
 /// The MOVES sulfur dioxide calculator.
