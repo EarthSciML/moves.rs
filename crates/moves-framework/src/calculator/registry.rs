@@ -458,7 +458,7 @@ mod tests {
         }
         fn execute(
             &self,
-            _ctx: &crate::calculator::CalculatorContext,
+            _ctx: &mut crate::calculator::CalculatorContext,
         ) -> std::result::Result<crate::calculator::CalculatorOutput, Error> {
             Ok(crate::calculator::CalculatorOutput::empty())
         }

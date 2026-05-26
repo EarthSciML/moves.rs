@@ -38,7 +38,7 @@
 
 use moves_data::ProcessId;
 
-use crate::data::InMemoryStore;
+use crate::data::{DataFrameStore, InMemoryStore};
 
 /// `(state, county, zone, link)` quadruple identifying the current spatial
 /// location in the master loop. Rust equivalent of `ExecutionLocation.java`.
@@ -291,6 +291,19 @@ impl ScratchNamespace {
     #[must_use]
     pub fn empty() -> Self {
         Self::default()
+    }
+
+    /// Insert `df` under `name`, replacing any existing entry.
+    /// Called by generators in their [`crate::Generator::execute`] body.
+    pub fn insert(&mut self, name: impl Into<String>, df: polars::prelude::DataFrame) {
+        self.store.insert(name, df);
+    }
+
+    /// Return a mutable reference to the DataFrame stored under `name`, or
+    /// `None` if absent. Uses `Arc::make_mut` so the caller gets exclusive
+    /// ownership without copying when the Arc has a single owner.
+    pub fn get_mut(&mut self, name: &str) -> Option<&mut polars::prelude::DataFrame> {
+        self.store.get_mut(name)
     }
 }
 

@@ -50,6 +50,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+
 use moves_data::output_schema::{MovesRunRecord, OutputTable};
 use moves_data::{PollutantId, ProcessId};
 use moves_runspec::model::Model;
@@ -217,7 +218,11 @@ impl ModuleInstance {
     /// Run the module against `ctx`. The [`crate::CalculatorOutput`] is
     /// discarded — Task 50's data plane wires it into the scratch
     /// namespace; Phase 2 calculators return an empty output anyway.
-    fn execute(&self, ctx: &CalculatorContext) -> Result<()> {
+    ///
+    /// Accepts `&mut CalculatorContext` so generators can write to
+    /// `ctx.scratch_mut()`. Calculators receive a shared `&CalculatorContext`
+    /// via the automatic coercion from `&mut`.
+    fn execute(&self, ctx: &mut CalculatorContext) -> Result<()> {
         match self {
             ModuleInstance::Calculator(c) => c.execute(ctx).map(|_| ()),
             ModuleInstance::Generator(g) => g.execute(ctx).map(|_| ()),
@@ -232,15 +237,19 @@ impl ModuleInstance {
 /// deliberately do not inherit [`MasterLoopable`], because a calculator's
 /// `execute` needs a [`CalculatorContext`] that the master-loop callback
 /// does not carry. The adapter closes that gap — on each loop callback it
-/// materialises a fresh [`CalculatorContext`] from the loop's
-/// [`IterationPosition`](crate::IterationPosition) and invokes the module.
+/// updates the shared per-chunk [`CalculatorContext`] position and invokes
+/// the module.
+///
+/// All adapters within the same chunk share one `Arc<Mutex<CalculatorContext>>`,
+/// so generator writes to `ctx.scratch_mut()` are visible to downstream
+/// calculators in the same chunk (which execute later in the sorted
+/// subscription order). Different chunks hold different `Arc`s, giving
+/// per-chunk scratch isolation.
 ///
 /// One adapter is created per [`CalculatorSubscription`]; the underlying
 /// module instance is shared between them through the `Arc`. Each adapter
 /// carries the [`ProcessId`] its subscription targets and no-ops when the
-/// loop is iterating a different process — the master loop fires every
-/// subscription at a matching granularity regardless of process, so the
-/// per-process gate has to live here.
+/// loop is iterating a different process.
 #[derive(Debug)]
 struct CalculatorMasterLoopable {
     /// The shared calculator / generator instance.
@@ -248,6 +257,9 @@ struct CalculatorMasterLoopable {
     /// Process the originating subscription is registered for. The adapter
     /// fires only while the loop iterates this process.
     gate_process: ProcessId,
+    /// Per-chunk shared context. All adapters within one chunk share the
+    /// same `Arc`; adapters in different chunks hold different `Arc`s.
+    ctx: Arc<Mutex<CalculatorContext>>,
 }
 
 impl MasterLoopable for CalculatorMasterLoopable {
@@ -258,8 +270,9 @@ impl MasterLoopable for CalculatorMasterLoopable {
         if context.position.process_id != Some(self.gate_process) {
             return Ok(());
         }
-        let ctx = CalculatorContext::with_position(context.position);
-        self.module.execute(&ctx)
+        let mut ctx = self.ctx.lock().expect("CalculatorContext mutex poisoned");
+        ctx.set_position(context.position);
+        self.module.execute(&mut ctx)
     }
 }
 
@@ -464,17 +477,24 @@ impl MOVESEngine {
                     ));
                 }
             }
+            // One CalculatorContext per chunk: generators write scratch here,
+            // calculators in the same chunk read it. Different chunks get
+            // different Arcs, providing per-chunk scratch isolation.
+            let chunk_ctx: Arc<Mutex<CalculatorContext>> =
+                Arc::new(Mutex::new(CalculatorContext::new()));
             for name in chunk.modules() {
                 let Some(instance) = instantiate(registry, name) else {
                     continue;
                 };
                 let module = Arc::new(instance);
                 // One MasterLoop subscription per declared calculator
-                // subscription, all sharing the single module instance.
+                // subscription, all sharing the single module instance and
+                // the chunk's CalculatorContext.
                 for sub in module.subscriptions() {
                     let adapter = Arc::new(CalculatorMasterLoopable {
                         module: Arc::clone(&module),
                         gate_process: sub.process_id,
+                        ctx: Arc::clone(&chunk_ctx),
                     });
                     master.subscribe(MasterLoopableSubscription::new(
                         sub.granularity,
@@ -766,7 +786,7 @@ mod tests {
         fn subscriptions(&self) -> &[CalculatorSubscription] {
             &self.subs
         }
-        fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput> {
+        fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput> {
             self.runs.fetch_add(1, Ordering::SeqCst);
             Ok(CalculatorOutput::empty())
         }
@@ -1086,6 +1106,10 @@ mod tests {
 
     // ---- Adapter -----------------------------------------------------------
 
+    fn stub_chunk_ctx() -> Arc<Mutex<CalculatorContext>> {
+        Arc::new(Mutex::new(CalculatorContext::new()))
+    }
+
     #[test]
     fn adapter_runs_the_module_only_for_its_gated_process() {
         ADAPTER_GATE_CALC.store(0, Ordering::SeqCst);
@@ -1097,6 +1121,7 @@ mod tests {
         let adapter = CalculatorMasterLoopable {
             module: Arc::new(ModuleInstance::Calculator(Box::new(calc))),
             gate_process: ProcessId(1),
+            ctx: stub_chunk_ctx(),
         };
 
         let mut ctx = MasterLoopContext::default();
@@ -1127,6 +1152,7 @@ mod tests {
         let adapter = CalculatorMasterLoopable {
             module: Arc::new(ModuleInstance::Generator(Box::new(generator))),
             gate_process: ProcessId(1),
+            ctx: stub_chunk_ctx(),
         };
         let mut ctx = MasterLoopContext::default();
         ctx.position.process_id = Some(ProcessId(1));
@@ -1295,5 +1321,347 @@ mod tests {
         ctx.position.process_id = None;
         adapter.execute_at_granularity(&ctx).unwrap();
         assert_eq!(GATE_CTR.load(Ordering::SeqCst), 1);
+    }
+
+    // ---- chunk_* tests: per-chunk scratch isolation and visibility ----------
+    //
+    // These tests verify:
+    // 1. Generators write scratch; downstream calculators in the same chunk
+    //    can read it (topo-order visibility).
+    // 2. Separate chunks have disjoint scratch namespaces (isolation).
+    //
+    // Each test uses its own static AtomicBool flags and named `fn` factories
+    // so the parallel test runner never races on shared state.
+
+    use std::sync::atomic::AtomicBool;
+
+    /// Generator that writes a one-row DataFrame under a fixed scratch key.
+    #[derive(Debug)]
+    struct ScratchWriterGen {
+        name: &'static str,
+        subs: Vec<CalculatorSubscription>,
+        key: &'static str,
+    }
+
+    impl Generator for ScratchWriterGen {
+        fn name(&self) -> &'static str {
+            self.name
+        }
+        fn subscriptions(&self) -> &[CalculatorSubscription] {
+            &self.subs
+        }
+        fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput> {
+            use polars::prelude::{DataFrame, NamedFrom, Series};
+            let s = Series::new("val".into(), [1i32]);
+            let df = DataFrame::new(1, vec![s.into()]).unwrap();
+            ctx.scratch_mut().insert(self.key, df);
+            Ok(CalculatorOutput::empty())
+        }
+    }
+
+    /// Calculator that records whether `key` is present in the chunk scratch.
+    #[derive(Debug)]
+    struct ScratchCheckCalc {
+        name: &'static str,
+        subs: Vec<CalculatorSubscription>,
+        key: &'static str,
+        found: &'static AtomicBool,
+    }
+
+    impl Calculator for ScratchCheckCalc {
+        fn name(&self) -> &'static str {
+            self.name
+        }
+        fn subscriptions(&self) -> &[CalculatorSubscription] {
+            &self.subs
+        }
+        fn registrations(&self) -> &[moves_data::PollutantProcessAssociation] {
+            &[]
+        }
+        fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput> {
+            use crate::data::DataFrameStore;
+            self.found.store(
+                ctx.scratch().store.get(self.key).is_some(),
+                Ordering::SeqCst,
+            );
+            Ok(CalculatorOutput::empty())
+        }
+    }
+
+    fn gen_process_subs() -> Vec<CalculatorSubscription> {
+        vec![CalculatorSubscription::new(
+            ProcessId(1),
+            Granularity::Process,
+            Priority::parse("GENERATOR").unwrap(),
+        )]
+    }
+
+    fn calc_process_subs() -> Vec<CalculatorSubscription> {
+        vec![CalculatorSubscription::new(
+            ProcessId(1),
+            Granularity::Process,
+            Priority::parse("EMISSION_CALCULATOR").unwrap(),
+        )]
+    }
+
+    /// Build a single-chain registry: writer (generator) → checker (calculator).
+    fn single_scratch_registry(writer: &'static str, checker: &'static str) -> CalculatorRegistry {
+        let info_str = "Registration\tCO\t2\tRunning Exhaust\t1\t".to_string()
+            + checker
+            + "\nSubscribe\t"
+            + checker
+            + "\tRunning Exhaust\t1\tPROCESS\tEMISSION_CALCULATOR\nSubscribe\t"
+            + writer
+            + "\tRunning Exhaust\t1\tPROCESS\tGENERATOR\nChain\t"
+            + checker
+            + "\t"
+            + writer
+            + "\n";
+        let info = parse_calculator_info_str(&info_str, Path::new("test")).unwrap();
+        CalculatorRegistry::new(build_dag(&info, &[]).unwrap())
+    }
+
+    /// Build a two-chain registry: two independent (writer → checker) chains.
+    fn two_chain_registry(
+        writer_a: &'static str,
+        checker_a: &'static str,
+        writer_b: &'static str,
+        checker_b: &'static str,
+    ) -> CalculatorRegistry {
+        let info_str = "Registration\tCO\t2\tRunning Exhaust\t1\t".to_string()
+            + checker_a
+            + "\nRegistration\tCO\t2\tRunning Exhaust\t1\t"
+            + checker_b
+            + "\nSubscribe\t"
+            + checker_a
+            + "\tRunning Exhaust\t1\tPROCESS\tEMISSION_CALCULATOR\nSubscribe\t"
+            + writer_a
+            + "\tRunning Exhaust\t1\tPROCESS\tGENERATOR\nChain\t"
+            + checker_a
+            + "\t"
+            + writer_a
+            + "\nSubscribe\t"
+            + checker_b
+            + "\tRunning Exhaust\t1\tPROCESS\tEMISSION_CALCULATOR\nSubscribe\t"
+            + writer_b
+            + "\tRunning Exhaust\t1\tPROCESS\tGENERATOR\nChain\t"
+            + checker_b
+            + "\t"
+            + writer_b
+            + "\n";
+        let info = parse_calculator_info_str(&info_str, Path::new("test")).unwrap();
+        CalculatorRegistry::new(build_dag(&info, &[]).unwrap())
+    }
+
+    // -- chunk_scratch_visible_within_chunk_topo_order ----------------------
+
+    static VISIBLE_FOUND: AtomicBool = AtomicBool::new(false);
+
+    fn visible_writer_factory() -> Box<dyn Generator> {
+        Box::new(ScratchWriterGen {
+            name: "VisibleWriter",
+            subs: gen_process_subs(),
+            key: "visible_key",
+        })
+    }
+    fn visible_checker_factory() -> Box<dyn Calculator> {
+        Box::new(ScratchCheckCalc {
+            name: "VisibleChecker",
+            subs: calc_process_subs(),
+            key: "visible_key",
+            found: &VISIBLE_FOUND,
+        })
+    }
+
+    #[test]
+    fn chunk_scratch_visible_within_chunk_topo_order() {
+        // GENERATOR priority fires before EMISSION_CALCULATOR. The calculator
+        // must find the key the generator wrote in the same chunk context.
+        VISIBLE_FOUND.store(false, Ordering::SeqCst);
+        let dir = tempdir().unwrap();
+        let mut registry = single_scratch_registry("VisibleWriter", "VisibleChecker");
+        registry
+            .register_generator("VisibleWriter", visible_writer_factory)
+            .unwrap();
+        registry
+            .register_calculator("VisibleChecker", visible_checker_factory)
+            .unwrap();
+        let engine = MOVESEngine::new(sample_runspec(), registry, config(dir.path()));
+        engine.run().unwrap();
+        assert!(
+            VISIBLE_FOUND.load(Ordering::SeqCst),
+            "calculator must find the key written by its preceding generator"
+        );
+    }
+
+    // -- generator_write_then_calculator_read_same_chunk_roundtrips ---------
+
+    static ROUNDTRIP_FOUND: AtomicBool = AtomicBool::new(false);
+
+    fn roundtrip_writer_factory() -> Box<dyn Generator> {
+        Box::new(ScratchWriterGen {
+            name: "RoundtripWriter",
+            subs: gen_process_subs(),
+            key: "roundtrip_key",
+        })
+    }
+    fn roundtrip_checker_factory() -> Box<dyn Calculator> {
+        Box::new(ScratchCheckCalc {
+            name: "RoundtripChecker",
+            subs: calc_process_subs(),
+            key: "roundtrip_key",
+            found: &ROUNDTRIP_FOUND,
+        })
+    }
+
+    #[test]
+    fn generator_write_then_calculator_read_same_chunk_roundtrips() {
+        // End-to-end roundtrip: generator inserts a DataFrame, calculator reads it.
+        ROUNDTRIP_FOUND.store(false, Ordering::SeqCst);
+        let dir = tempdir().unwrap();
+        let mut registry = single_scratch_registry("RoundtripWriter", "RoundtripChecker");
+        registry
+            .register_generator("RoundtripWriter", roundtrip_writer_factory)
+            .unwrap();
+        registry
+            .register_calculator("RoundtripChecker", roundtrip_checker_factory)
+            .unwrap();
+        let engine = MOVESEngine::new(sample_runspec(), registry, config(dir.path()));
+        engine.run().unwrap();
+        assert!(
+            ROUNDTRIP_FOUND.load(Ordering::SeqCst),
+            "calculator must read back the DataFrame the generator wrote"
+        );
+    }
+
+    // -- chunk_scratch_is_isolated_across_chunks ----------------------------
+
+    static ISO_A_SAW_B: AtomicBool = AtomicBool::new(false);
+    static ISO_B_SAW_A: AtomicBool = AtomicBool::new(false);
+
+    fn iso_writer_a_factory() -> Box<dyn Generator> {
+        Box::new(ScratchWriterGen {
+            name: "IsoWriterA",
+            subs: gen_process_subs(),
+            key: "from_a",
+        })
+    }
+    fn iso_writer_b_factory() -> Box<dyn Generator> {
+        Box::new(ScratchWriterGen {
+            name: "IsoWriterB",
+            subs: gen_process_subs(),
+            key: "from_b",
+        })
+    }
+    fn iso_checker_a_factory() -> Box<dyn Calculator> {
+        Box::new(ScratchCheckCalc {
+            name: "IsoCheckerA",
+            subs: calc_process_subs(),
+            key: "from_b", // looks for chunk B's key — must NOT find it
+            found: &ISO_A_SAW_B,
+        })
+    }
+    fn iso_checker_b_factory() -> Box<dyn Calculator> {
+        Box::new(ScratchCheckCalc {
+            name: "IsoCheckerB",
+            subs: calc_process_subs(),
+            key: "from_a", // looks for chunk A's key — must NOT find it
+            found: &ISO_B_SAW_A,
+        })
+    }
+
+    fn iso_registry() -> CalculatorRegistry {
+        let mut reg =
+            two_chain_registry("IsoWriterA", "IsoCheckerA", "IsoWriterB", "IsoCheckerB");
+        reg.register_generator("IsoWriterA", iso_writer_a_factory).unwrap();
+        reg.register_generator("IsoWriterB", iso_writer_b_factory).unwrap();
+        reg.register_calculator("IsoCheckerA", iso_checker_a_factory).unwrap();
+        reg.register_calculator("IsoCheckerB", iso_checker_b_factory).unwrap();
+        reg
+    }
+
+    #[test]
+    fn chunk_scratch_is_isolated_across_chunks() {
+        // Two independent chains run sequentially. Each checker looks for the
+        // other chain's scratch key — isolated contexts must prevent leakage.
+        ISO_A_SAW_B.store(false, Ordering::SeqCst);
+        ISO_B_SAW_A.store(false, Ordering::SeqCst);
+        let dir = tempdir().unwrap();
+        let mut cfg = config(dir.path());
+        cfg.max_parallel_chunks = 1;
+        let engine = MOVESEngine::new(sample_runspec(), iso_registry(), cfg);
+        engine.run().unwrap();
+        assert!(
+            !ISO_A_SAW_B.load(Ordering::SeqCst),
+            "chunk A's checker must not observe chunk B's scratch key"
+        );
+        assert!(
+            !ISO_B_SAW_A.load(Ordering::SeqCst),
+            "chunk B's checker must not observe chunk A's scratch key"
+        );
+    }
+
+    // -- concurrent_chunks_do_not_observe_each_others_scratch ---------------
+
+    static CONC_A_SAW_B: AtomicBool = AtomicBool::new(false);
+    static CONC_B_SAW_A: AtomicBool = AtomicBool::new(false);
+
+    fn conc_writer_a_factory() -> Box<dyn Generator> {
+        Box::new(ScratchWriterGen {
+            name: "ConcWriterA",
+            subs: gen_process_subs(),
+            key: "conc_from_a",
+        })
+    }
+    fn conc_writer_b_factory() -> Box<dyn Generator> {
+        Box::new(ScratchWriterGen {
+            name: "ConcWriterB",
+            subs: gen_process_subs(),
+            key: "conc_from_b",
+        })
+    }
+    fn conc_checker_a_factory() -> Box<dyn Calculator> {
+        Box::new(ScratchCheckCalc {
+            name: "ConcCheckerA",
+            subs: calc_process_subs(),
+            key: "conc_from_b",
+            found: &CONC_A_SAW_B,
+        })
+    }
+    fn conc_checker_b_factory() -> Box<dyn Calculator> {
+        Box::new(ScratchCheckCalc {
+            name: "ConcCheckerB",
+            subs: calc_process_subs(),
+            key: "conc_from_a",
+            found: &CONC_B_SAW_A,
+        })
+    }
+
+    #[test]
+    fn concurrent_chunks_do_not_observe_each_others_scratch() {
+        // Two independent chains, parallel execution. Each chunk's
+        // CalculatorContext is a separate Arc<Mutex<…>> so concurrent
+        // execution cannot cause cross-chunk scratch leakage.
+        CONC_A_SAW_B.store(false, Ordering::SeqCst);
+        CONC_B_SAW_A.store(false, Ordering::SeqCst);
+        let dir = tempdir().unwrap();
+        let mut cfg = config(dir.path());
+        cfg.max_parallel_chunks = 2;
+        let mut reg =
+            two_chain_registry("ConcWriterA", "ConcCheckerA", "ConcWriterB", "ConcCheckerB");
+        reg.register_generator("ConcWriterA", conc_writer_a_factory).unwrap();
+        reg.register_generator("ConcWriterB", conc_writer_b_factory).unwrap();
+        reg.register_calculator("ConcCheckerA", conc_checker_a_factory).unwrap();
+        reg.register_calculator("ConcCheckerB", conc_checker_b_factory).unwrap();
+        let engine = MOVESEngine::new(sample_runspec(), reg, cfg);
+        engine.run().unwrap();
+        assert!(
+            !CONC_A_SAW_B.load(Ordering::SeqCst),
+            "concurrent chunk A must not observe chunk B's scratch"
+        );
+        assert!(
+            !CONC_B_SAW_A.load(Ordering::SeqCst),
+            "concurrent chunk B must not observe chunk A's scratch"
+        );
     }
 }
