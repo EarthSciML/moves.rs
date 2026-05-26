@@ -193,7 +193,7 @@ impl Generator for BaseRateGenerator {
         OUTPUT_TABLES
     }
 
-    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
+    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
         // Shell pending the Task 50 data plane — see the module docs. The
         // numerical core is `BaseRateGenerator::run`; once `ScratchNamespace`
         // and `ExecutionTables` carry real rows, this body materialises a
@@ -239,9 +239,9 @@ mod tests {
     #[test]
     fn execute_is_a_shell_until_the_data_plane_lands() {
         let generator = BaseRateGenerator;
-        let ctx = CalculatorContext::new();
+        let mut ctx = CalculatorContext::new();
         // The shell must not error — the registry may still call it.
-        assert!(generator.execute(&ctx).is_ok());
+        assert!(generator.execute(&mut ctx).is_ok());
     }
 
     #[test]

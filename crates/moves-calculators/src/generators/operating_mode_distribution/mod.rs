@@ -204,7 +204,7 @@ impl Generator for OperatingModeDistributionGenerator {
     /// lands, `execute` will project an [`OmdgInputs`] from `ctx.tables()`,
     /// run [`op_mode_distribution`], cross-join the result with `Link` on
     /// `roadTypeID`, and store the link-keyed `OpModeDistribution` rows.
-    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
+    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
         Ok(CalculatorOutput::empty())
     }
 }
@@ -238,8 +238,8 @@ mod tests {
         // execute is a documented placeholder until Task 50; it must still
         // honour the trait contract and return Ok.
         let generator = OperatingModeDistributionGenerator::new();
-        let ctx = CalculatorContext::new();
-        assert!(generator.execute(&ctx).is_ok());
+        let mut ctx = CalculatorContext::new();
+        assert!(generator.execute(&mut ctx).is_ok());
     }
 
     #[test]
