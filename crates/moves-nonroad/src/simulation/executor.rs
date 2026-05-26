@@ -50,15 +50,17 @@ use crate::geography::common::{
     ProcessOutcome, RefuelingData, RetrofitFilter, RunOptions as CountyRunOptions, SumType,
     TechLookup,
 };
+use crate::geography::prcnat::{NationalCallbacks, StateAllocationOutcome};
 use crate::geography::prcus::{
     DayMonthFactor, EvapCallInputs, EvapResult, EvapTechLookup, ExhaustCallInputs, ExhaustResult,
-    ExhaustTechLookup, ModelYearOutput as PrcusModelYearOutput, RetrofitResult,
+    ExhaustTechLookup, ModelYearOutput as PrcusModelYearOutput, RetrofitResult, UsTotalCallbacks,
 };
 use crate::geography::state::{CountyInput, StateContext};
 use crate::geography::{
-    process_county, process_state_from_national_record, process_state_to_county_record,
-    process_subcounty, ActivityLookup, ByModelYearOutput, EquipmentRecord, GeographyOutput,
-    RunOptions as StateRunOptions, StateCallbacks, StateOutput,
+    process_county, process_national_record, process_state_from_national_record,
+    process_state_to_county_record, process_subcounty, process_us_total_record, ActivityLookup,
+    ByModelYearOutput, EquipmentRecord, GeographyOutput, NationalContext, RunOptions as StateRunOptions,
+    StateCallbacks, StateDescriptor, StateOutput, UsTotalContext,
 };
 use crate::geography::subcounty::SubcountyRecordIndex;
 use crate::population::retrofit::RetrofitRecord;
@@ -372,6 +374,18 @@ pub struct ActivityTableEntry {
     pub age_code: String,
 }
 
+/// National-to-state allocation entry for [`ProductionExecutor`].
+///
+/// Identifies an SCC for which national-to-state allocation data is
+/// available. [`NationalAdapter::allocate_to_states`] distributes
+/// population uniformly across selected states without state-level
+/// records as a placeholder until NR*.ALO loaders are ported.
+#[derive(Debug, Clone, Default)]
+pub struct NationalAllocationEntry {
+    /// 10-character SCC code.
+    pub scc: String,
+}
+
 // =============================================================================
 // ProductionExecutor
 // =============================================================================
@@ -530,9 +544,15 @@ pub struct ProductionExecutor {
     pub temporal_factors: Vec<u8>,
     /// Refueling/spillage-mode records from NR\*.SPL files. **⚠ NOT YET LOADABLE.**
     pub spillage_records: Vec<u8>,
-    /// National-to-state allocation coefficients from NR\*.ALO files.
-    /// **⚠ NOT YET LOADABLE.**
-    pub national_allocation: Vec<u8>,
+    /// National-to-state allocation entries keyed by SCC. An entry
+    /// for a given SCC makes [`NationalAdapter::find_allocation`]
+    /// succeed; the actual per-state distribution uses a uniform
+    /// placeholder until NR\*.ALO loaders are ported.
+    pub national_allocation: Vec<NationalAllocationEntry>,
+    /// State descriptors for national dispatch. Parallel to the
+    /// `statcd`/`lstacd`/`lstlev` Fortran arrays; required to build
+    /// [`NationalContext::states`].
+    pub state_descriptors: Vec<StateDescriptor>,
     /// Subcounty allocation coefficients from NR\*.SCO files. **⚠ NOT YET LOADABLE.**
     pub subcounty_allocation: Vec<u8>,
     /// Retrofit records from NR\*.RFT files (`population::retrofit::RetrofitRecord`).
@@ -660,18 +680,30 @@ impl ProductionExecutor {
 
     fn execute_national(
         &mut self,
-        _ctx: &DispatchContext<'_>,
-        _options: &NonroadOptions,
+        ctx: &DispatchContext<'_>,
+        options: &NonroadOptions,
     ) -> Result<GeographyExecution> {
-        Ok(GeographyExecution::skipped())
+        if self.state_descriptors.is_empty() {
+            return Ok(GeographyExecution::skipped());
+        }
+        let hp_levels = self.hp_levels;
+        let states: Vec<StateDescriptor> = self.state_descriptors.clone();
+        let national_ctx = build_national_context(ctx, options, &hp_levels, &states);
+        let mut adapter = NationalAdapter::new(self);
+        let output = process_national_record(&national_ctx, &mut adapter)?;
+        Ok(geography_output_to_execution(output))
     }
 
     fn execute_us_total(
         &mut self,
-        _ctx: &DispatchContext<'_>,
-        _options: &NonroadOptions,
+        ctx: &DispatchContext<'_>,
+        options: &NonroadOptions,
     ) -> Result<GeographyExecution> {
-        Ok(GeographyExecution::skipped())
+        let hp_levels = self.hp_levels;
+        let us_total_ctx = build_us_total_context(ctx, options, &hp_levels);
+        let mut adapter = UsTotalAdapter::new(self);
+        let output = process_us_total_record(&us_total_ctx, &mut adapter)?;
+        Ok(geography_output_to_execution(output))
     }
 }
 
@@ -1340,6 +1372,541 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
 }
 
 // =============================================================================
+// NationalAdapter — implements NationalCallbacks for ProductionExecutor
+// =============================================================================
+
+/// Adapter that implements [`NationalCallbacks`] by borrowing reference
+/// tables from a [`ProductionExecutor`].
+///
+/// Created per-call in [`ProductionExecutor::execute_national`]; dropped
+/// when the geography routine returns.
+struct NationalAdapter<'a> {
+    executor: &'a mut ProductionExecutor,
+    retrofit_survivors: Vec<usize>,
+}
+
+impl<'a> NationalAdapter<'a> {
+    fn new(executor: &'a mut ProductionExecutor) -> Self {
+        Self {
+            executor,
+            retrofit_survivors: Vec::new(),
+        }
+    }
+}
+
+impl<'a> NationalCallbacks for NationalAdapter<'a> {
+    fn find_allocation(&mut self, scc: &str) -> Option<()> {
+        if self.executor.national_allocation.iter().any(|e| e.scc == scc) {
+            Some(())
+        } else {
+            None
+        }
+    }
+
+    fn allocate_to_states(
+        &mut self,
+        _scc: &str,
+        states: &[StateDescriptor],
+        national_population: f32,
+        _growth: f32,
+    ) -> Result<StateAllocationOutcome> {
+        let eligible_count = states
+            .iter()
+            .filter(|s| s.selected && !s.has_state_records)
+            .count();
+        let per_state = if eligible_count > 0 {
+            national_population / eligible_count as f32
+        } else {
+            0.0
+        };
+        let mut populations = vec![0.0_f32; states.len()];
+        for (i, state) in states.iter().enumerate() {
+            if state.selected && !state.has_state_records {
+                populations[i] = per_state;
+            }
+        }
+        let used = populations.iter().any(|&p| p > 0.0);
+        Ok(StateAllocationOutcome {
+            populations,
+            growth: vec![1.0; states.len()],
+            used,
+        })
+    }
+
+    fn find_exhaust_tech(
+        &mut self,
+        scc: &str,
+        hp_avg: f32,
+        _year: i32,
+    ) -> Option<ExhaustTechLookup> {
+        let entry = self
+            .executor
+            .exhaust_tech_entries
+            .iter()
+            .find(|e| e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max)?;
+        Some(ExhaustTechLookup {
+            tech_names: entry.tech_names.clone(),
+            fractions: entry.tech_fractions.clone(),
+        })
+    }
+
+    fn find_evap_tech(&mut self, scc: &str, hp_avg: f32, _year: i32) -> Option<EvapTechLookup> {
+        let entry = self
+            .executor
+            .evap_tech_entries
+            .iter()
+            .find(|e| e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max)?;
+        Some(EvapTechLookup {
+            tech_names: entry.tech_names.clone(),
+            fractions: entry.tech_fractions.clone(),
+        })
+    }
+
+    fn find_growth_xref(&mut self, fips: &str, scc: &str, hp_avg: f32) -> Option<i32> {
+        let idx = self
+            .executor
+            .growth_xref_entries
+            .iter()
+            .position(|e| e.fips == fips && e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max)?;
+        Some(idx as i32)
+    }
+
+    fn find_activity(&mut self, scc: &str, fips: &str, _hp_avg: f32) -> Option<ActivityLookup> {
+        let entry = self
+            .executor
+            .activity_entries
+            .iter()
+            .find(|e| e.scc == scc && (e.fips.is_empty() || e.fips == fips))?;
+        let units = match entry.activity_unit {
+            ActivityUnit::HoursPerYear => ExhaustActivityUnit::HoursPerYear,
+            ActivityUnit::HoursPerDay => ExhaustActivityUnit::HoursPerDay,
+            ActivityUnit::GallonsPerYear => ExhaustActivityUnit::GallonsPerYear,
+            ActivityUnit::GallonsPerDay => ExhaustActivityUnit::GallonsPerDay,
+        };
+        Some(ActivityLookup {
+            load_factor: entry.load_factor,
+            units,
+            activity_level: entry.activity_level,
+            starts_value: entry.starts,
+            age_curve_id: entry.age_code.clone(),
+        })
+    }
+
+    fn day_month_factor(&mut self, _scc: &str, _fips: &str) -> DayMonthFactor {
+        DayMonthFactor {
+            day_month_fac: vec![0.0; crate::common::consts::MXDAYS],
+            mthf: 1.0,
+            dayf: 1.0,
+            n_days: 1,
+        }
+    }
+
+    fn growth_factor(&mut self, year1: i32, year2: i32, fips: &str, indcod: i32) -> Result<f32> {
+        let indicator = self
+            .executor
+            .growth_xref_entries
+            .get(indcod as usize)
+            .map(|e| e.indicator.clone())
+            .ok_or_else(|| {
+                Error::Config(format!(
+                    "NationalAdapter: growth_xref index {indcod} out of range"
+                ))
+            })?;
+        let selected: Vec<GrowthIndicatorRecord> =
+            select_for_indicator(&self.executor.growth_records, &indicator)
+                .into_iter()
+                .cloned()
+                .collect();
+        if selected.is_empty() {
+            return Ok(0.0);
+        }
+        let refs: Vec<&GrowthIndicatorRecord> = selected.iter().collect();
+        growth_factor(&refs, year1, year2, fips).map(|gf| gf.factor)
+    }
+
+    fn model_year(
+        &mut self,
+        eq: &EquipmentRecord,
+        activity: &ActivityLookup,
+        pop_growth_factor: f32,
+    ) -> Result<PrcusModelYearOutput> {
+        let units = match activity.units {
+            ExhaustActivityUnit::HoursPerYear => ActivityUnits::HoursPerYear,
+            ExhaustActivityUnit::HoursPerDay => ActivityUnits::HoursPerDay,
+            ExhaustActivityUnit::GallonsPerYear => ActivityUnits::GallonsPerYear,
+            ExhaustActivityUnit::GallonsPerDay => ActivityUnits::GallonsPerDay,
+        };
+        let curve = self.executor.scrappage_curve.clone();
+        let use_hours = eq.use_hours;
+        let load_factor = activity.load_factor;
+        let modyr_out = model_year(
+            activity.starts_value,
+            activity.activity_level,
+            units,
+            load_factor,
+            use_hours,
+            &self.executor.age_adjustment_table,
+            &activity.age_curve_id,
+            move |acttmp| scrptime(use_hours, load_factor, acttmp, pop_growth_factor, &curve),
+        )?;
+        Ok(PrcusModelYearOutput {
+            yryrfrcscrp: modyr_out.yryrfrcscrp,
+            modfrc: modyr_out.modfrc,
+            stradj: modyr_out.stradj,
+            actadj: modyr_out.actadj,
+            detage: modyr_out.detage,
+            nyrlif: modyr_out.nyrlif,
+        })
+    }
+
+    fn age_distribution(
+        &mut self,
+        base_pop: f32,
+        modfrc: &[f32],
+        base_year: i32,
+        growth_year: i32,
+        yryrfrcscrp: &[f32],
+        fips: &str,
+        indcod: i32,
+    ) -> Result<f32> {
+        let indicator = self
+            .executor
+            .growth_xref_entries
+            .get(indcod as usize)
+            .map(|e| e.indicator.clone())
+            .ok_or_else(|| {
+                Error::Config(format!(
+                    "NationalAdapter: growth_xref index {indcod} out of range"
+                ))
+            })?;
+        let selected: Vec<GrowthIndicatorRecord> =
+            select_for_indicator(&self.executor.growth_records, &indicator)
+                .into_iter()
+                .cloned()
+                .collect();
+        let result = age_distribution(
+            base_pop,
+            modfrc,
+            base_year,
+            growth_year,
+            yryrfrcscrp,
+            |y1, y2| {
+                let refs: Vec<&GrowthIndicatorRecord> = selected.iter().collect();
+                growth_factor(&refs, y1, y2, fips)
+            },
+        )?;
+        Ok(result.base_population)
+    }
+
+    fn filter_retrofits_by_scc_hp(&mut self, scc: &str, hp_avg: f32) -> Result<()> {
+        self.retrofit_survivors = self
+            .executor
+            .retrofit_records
+            .iter()
+            .enumerate()
+            .filter(|(_, r)| {
+                (r.scc == scc || r.scc == crate::population::RTRFTSCC_ALL)
+                    && r.hp_min < hp_avg
+                    && hp_avg <= r.hp_max
+            })
+            .map(|(i, _)| i)
+            .collect();
+        Ok(())
+    }
+
+    fn filter_retrofits_by_year(&mut self, year: i32) -> Result<()> {
+        self.retrofit_survivors.retain(|&i| {
+            let r = &self.executor.retrofit_records[i];
+            r.year_model_start <= year && year <= r.year_model_end
+        });
+        Ok(())
+    }
+
+    fn filter_retrofits_by_tech(&mut self, tech: &str) -> Result<()> {
+        self.retrofit_survivors.retain(|&i| {
+            let r = &self.executor.retrofit_records[i];
+            r.tech_type.trim() == tech.trim()
+                || r.tech_type.trim() == crate::population::RTRFTTECHTYPE_ALL
+        });
+        Ok(())
+    }
+
+    fn calculate_retrofit(
+        &mut self,
+        _pop: f32,
+        _scc: &str,
+        _hp_avg: f32,
+        _model_year: i32,
+        _tech: &str,
+    ) -> Result<RetrofitResult> {
+        Ok(RetrofitResult::default())
+    }
+
+    fn calculate_exhaust(&mut self, _inputs: &ExhaustCallInputs<'_>) -> Result<ExhaustResult> {
+        todo!(
+            "NationalAdapter::calculate_exhaust: wire to calculate_exhaust_emissions \
+             once NR*.EMF tables are loaded"
+        )
+    }
+
+    fn calculate_evap(&mut self, _inputs: &EvapCallInputs<'_>) -> Result<EvapResult> {
+        todo!(
+            "NationalAdapter::calculate_evap: wire to calculate_evaporative_emissions \
+             once NR*.EMF evap tables are loaded"
+        )
+    }
+}
+
+// =============================================================================
+// UsTotalAdapter — implements UsTotalCallbacks for ProductionExecutor
+// =============================================================================
+
+/// Adapter that implements [`UsTotalCallbacks`] by borrowing reference
+/// tables from a [`ProductionExecutor`].
+///
+/// Created per-call in [`ProductionExecutor::execute_us_total`]; dropped
+/// when the geography routine returns. Method bodies are identical to
+/// [`StateAdapter`] — the two traits have the same surface.
+struct UsTotalAdapter<'a> {
+    executor: &'a mut ProductionExecutor,
+    retrofit_survivors: Vec<usize>,
+}
+
+impl<'a> UsTotalAdapter<'a> {
+    fn new(executor: &'a mut ProductionExecutor) -> Self {
+        Self {
+            executor,
+            retrofit_survivors: Vec::new(),
+        }
+    }
+}
+
+impl<'a> UsTotalCallbacks for UsTotalAdapter<'a> {
+    fn find_exhaust_tech(
+        &mut self,
+        scc: &str,
+        hp_avg: f32,
+        _year: i32,
+    ) -> Option<ExhaustTechLookup> {
+        let entry = self
+            .executor
+            .exhaust_tech_entries
+            .iter()
+            .find(|e| e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max)?;
+        Some(ExhaustTechLookup {
+            tech_names: entry.tech_names.clone(),
+            fractions: entry.tech_fractions.clone(),
+        })
+    }
+
+    fn find_evap_tech(&mut self, scc: &str, hp_avg: f32, _year: i32) -> Option<EvapTechLookup> {
+        let entry = self
+            .executor
+            .evap_tech_entries
+            .iter()
+            .find(|e| e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max)?;
+        Some(EvapTechLookup {
+            tech_names: entry.tech_names.clone(),
+            fractions: entry.tech_fractions.clone(),
+        })
+    }
+
+    fn find_growth_xref(&mut self, fips: &str, scc: &str, hp_avg: f32) -> Option<i32> {
+        let idx = self
+            .executor
+            .growth_xref_entries
+            .iter()
+            .position(|e| e.fips == fips && e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max)?;
+        Some(idx as i32)
+    }
+
+    fn find_activity(&mut self, scc: &str, fips: &str, _hp_avg: f32) -> Option<ActivityLookup> {
+        let entry = self
+            .executor
+            .activity_entries
+            .iter()
+            .find(|e| e.scc == scc && (e.fips.is_empty() || e.fips == fips))?;
+        let units = match entry.activity_unit {
+            ActivityUnit::HoursPerYear => ExhaustActivityUnit::HoursPerYear,
+            ActivityUnit::HoursPerDay => ExhaustActivityUnit::HoursPerDay,
+            ActivityUnit::GallonsPerYear => ExhaustActivityUnit::GallonsPerYear,
+            ActivityUnit::GallonsPerDay => ExhaustActivityUnit::GallonsPerDay,
+        };
+        Some(ActivityLookup {
+            load_factor: entry.load_factor,
+            units,
+            activity_level: entry.activity_level,
+            starts_value: entry.starts,
+            age_curve_id: entry.age_code.clone(),
+        })
+    }
+
+    fn day_month_factor(&mut self, _scc: &str, _fips: &str) -> DayMonthFactor {
+        DayMonthFactor {
+            day_month_fac: vec![0.0; crate::common::consts::MXDAYS],
+            mthf: 1.0,
+            dayf: 1.0,
+            n_days: 1,
+        }
+    }
+
+    fn growth_factor(&mut self, year1: i32, year2: i32, fips: &str, indcod: i32) -> Result<f32> {
+        let indicator = self
+            .executor
+            .growth_xref_entries
+            .get(indcod as usize)
+            .map(|e| e.indicator.clone())
+            .ok_or_else(|| {
+                Error::Config(format!(
+                    "UsTotalAdapter: growth_xref index {indcod} out of range"
+                ))
+            })?;
+        let selected: Vec<GrowthIndicatorRecord> =
+            select_for_indicator(&self.executor.growth_records, &indicator)
+                .into_iter()
+                .cloned()
+                .collect();
+        if selected.is_empty() {
+            return Ok(0.0);
+        }
+        let refs: Vec<&GrowthIndicatorRecord> = selected.iter().collect();
+        growth_factor(&refs, year1, year2, fips).map(|gf| gf.factor)
+    }
+
+    fn model_year(
+        &mut self,
+        eq: &EquipmentRecord,
+        activity: &ActivityLookup,
+        pop_growth_factor: f32,
+    ) -> Result<PrcusModelYearOutput> {
+        let units = match activity.units {
+            ExhaustActivityUnit::HoursPerYear => ActivityUnits::HoursPerYear,
+            ExhaustActivityUnit::HoursPerDay => ActivityUnits::HoursPerDay,
+            ExhaustActivityUnit::GallonsPerYear => ActivityUnits::GallonsPerYear,
+            ExhaustActivityUnit::GallonsPerDay => ActivityUnits::GallonsPerDay,
+        };
+        let curve = self.executor.scrappage_curve.clone();
+        let use_hours = eq.use_hours;
+        let load_factor = activity.load_factor;
+        let modyr_out = model_year(
+            activity.starts_value,
+            activity.activity_level,
+            units,
+            load_factor,
+            use_hours,
+            &self.executor.age_adjustment_table,
+            &activity.age_curve_id,
+            move |acttmp| scrptime(use_hours, load_factor, acttmp, pop_growth_factor, &curve),
+        )?;
+        Ok(PrcusModelYearOutput {
+            yryrfrcscrp: modyr_out.yryrfrcscrp,
+            modfrc: modyr_out.modfrc,
+            stradj: modyr_out.stradj,
+            actadj: modyr_out.actadj,
+            detage: modyr_out.detage,
+            nyrlif: modyr_out.nyrlif,
+        })
+    }
+
+    fn age_distribution(
+        &mut self,
+        base_pop: f32,
+        modfrc: &[f32],
+        base_year: i32,
+        growth_year: i32,
+        yryrfrcscrp: &[f32],
+        fips: &str,
+        indcod: i32,
+    ) -> Result<f32> {
+        let indicator = self
+            .executor
+            .growth_xref_entries
+            .get(indcod as usize)
+            .map(|e| e.indicator.clone())
+            .ok_or_else(|| {
+                Error::Config(format!(
+                    "UsTotalAdapter: growth_xref index {indcod} out of range"
+                ))
+            })?;
+        let selected: Vec<GrowthIndicatorRecord> =
+            select_for_indicator(&self.executor.growth_records, &indicator)
+                .into_iter()
+                .cloned()
+                .collect();
+        let result = age_distribution(
+            base_pop,
+            modfrc,
+            base_year,
+            growth_year,
+            yryrfrcscrp,
+            |y1, y2| {
+                let refs: Vec<&GrowthIndicatorRecord> = selected.iter().collect();
+                growth_factor(&refs, y1, y2, fips)
+            },
+        )?;
+        Ok(result.base_population)
+    }
+
+    fn filter_retrofits_by_scc_hp(&mut self, scc: &str, hp_avg: f32) -> Result<()> {
+        self.retrofit_survivors = self
+            .executor
+            .retrofit_records
+            .iter()
+            .enumerate()
+            .filter(|(_, r)| {
+                (r.scc == scc || r.scc == crate::population::RTRFTSCC_ALL)
+                    && r.hp_min < hp_avg
+                    && hp_avg <= r.hp_max
+            })
+            .map(|(i, _)| i)
+            .collect();
+        Ok(())
+    }
+
+    fn filter_retrofits_by_year(&mut self, year: i32) -> Result<()> {
+        self.retrofit_survivors.retain(|&i| {
+            let r = &self.executor.retrofit_records[i];
+            r.year_model_start <= year && year <= r.year_model_end
+        });
+        Ok(())
+    }
+
+    fn filter_retrofits_by_tech(&mut self, tech: &str) -> Result<()> {
+        self.retrofit_survivors.retain(|&i| {
+            let r = &self.executor.retrofit_records[i];
+            r.tech_type.trim() == tech.trim()
+                || r.tech_type.trim() == crate::population::RTRFTTECHTYPE_ALL
+        });
+        Ok(())
+    }
+
+    fn calculate_retrofit(
+        &mut self,
+        _pop: f32,
+        _scc: &str,
+        _hp_avg: f32,
+        _model_year: i32,
+        _tech: &str,
+    ) -> Result<RetrofitResult> {
+        Ok(RetrofitResult::default())
+    }
+
+    fn calculate_exhaust(&mut self, _inputs: &ExhaustCallInputs<'_>) -> Result<ExhaustResult> {
+        todo!(
+            "UsTotalAdapter::calculate_exhaust: wire to calculate_exhaust_emissions \
+             once NR*.EMF tables are loaded"
+        )
+    }
+
+    fn calculate_evap(&mut self, _inputs: &EvapCallInputs<'_>) -> Result<EvapResult> {
+        todo!(
+            "UsTotalAdapter::calculate_evap: wire to calculate_evaporative_emissions \
+             once NR*.EMF evap tables are loaded"
+        )
+    }
+}
+
+// =============================================================================
 // Helpers
 // =============================================================================
 
@@ -1411,6 +1978,86 @@ fn process_outcome_to_execution(outcome: ProcessOutcome) -> GeographyExecution {
         rows,
         warnings,
         national_record_count: 0,
+    }
+}
+
+/// Build a [`NationalContext`] from a dispatch context, run options, and state list.
+fn build_national_context<'a>(
+    ctx: &'a DispatchContext<'_>,
+    options: &NonroadOptions,
+    hp_levels: &'a [f32],
+    states: &'a [StateDescriptor],
+) -> NationalContext<'a> {
+    let run_options = StateRunOptions {
+        episode_year: options.episode_year,
+        growth_year: options.growth_year,
+        tech_year: options.tech_year,
+        fuel: ctx.fuel.unwrap_or(FuelKind::Gasoline4Stroke),
+        total_mode: options.total_mode,
+        daily_output: options.daily_output,
+        emit_bmy: options.emit_bmy_exhaust,
+        emit_bmy_evap: options.emit_bmy_evap,
+        emit_si: options.emit_si,
+        growth_loaded: options.growth_loaded,
+        retrofit_loaded: options.retrofit_loaded,
+        spillage_loaded: options.spillage_loaded,
+    };
+    let equipment = EquipmentRecord {
+        hp_range_min: 0.0,
+        hp_range_max: ctx.record.hp_avg * 2.0,
+        hp_avg: ctx.record.hp_avg,
+        population: ctx.record.population,
+        pop_year: ctx.record.pop_year,
+        use_hours: 1000.0,
+        discharge_code: 0,
+        starts_hours: 1.0,
+    };
+    NationalContext {
+        equipment,
+        run_options,
+        scc: ctx.scc,
+        hp_levels,
+        states,
+        state_index: 0,
+        growth_hint: ctx.growth.unwrap_or(-9.0),
+    }
+}
+
+/// Build a [`UsTotalContext`] from a dispatch context and run options.
+fn build_us_total_context<'a>(
+    ctx: &'a DispatchContext<'_>,
+    options: &NonroadOptions,
+    hp_levels: &'a [f32],
+) -> UsTotalContext<'a> {
+    let run_options = StateRunOptions {
+        episode_year: options.episode_year,
+        growth_year: options.growth_year,
+        tech_year: options.tech_year,
+        fuel: ctx.fuel.unwrap_or(FuelKind::Gasoline4Stroke),
+        total_mode: options.total_mode,
+        daily_output: options.daily_output,
+        emit_bmy: options.emit_bmy_exhaust,
+        emit_bmy_evap: options.emit_bmy_evap,
+        emit_si: options.emit_si,
+        growth_loaded: options.growth_loaded,
+        retrofit_loaded: options.retrofit_loaded,
+        spillage_loaded: options.spillage_loaded,
+    };
+    let equipment = EquipmentRecord {
+        hp_range_min: 0.0,
+        hp_range_max: ctx.record.hp_avg * 2.0,
+        hp_avg: ctx.record.hp_avg,
+        population: ctx.record.population,
+        pop_year: ctx.record.pop_year,
+        use_hours: 1000.0,
+        discharge_code: 0,
+        starts_hours: 1.0,
+    };
+    UsTotalContext {
+        equipment,
+        run_options,
+        scc: ctx.scc,
+        hp_levels,
     }
 }
 
@@ -1872,6 +2519,249 @@ mod production {
         assert!(!result.skipped, "expected non-skipped execution");
         assert_eq!(result.rows.len(), 1, "expected exactly one row for state");
         assert_eq!(result.rows[0].fips, "06000");
+    }
+
+    /// (e) National dispatch with one state and one allocation entry →
+    /// one `SimEmissionRow` at the state FIPS.
+    ///
+    /// `state_index = 0` (national record) triggers `alosta`; the
+    /// uniform-allocation stub gives state "06000" the full population.
+    /// Zero tech fractions bypass the emission iteration; one `StateOutput`
+    /// is still emitted per selected state.
+    #[test]
+    fn national_minimal_ref_returns_one_row() {
+        let mut exec = ProductionExecutor {
+            national_allocation: vec![NationalAllocationEntry { scc: "2270001010".into() }],
+            state_descriptors: vec![StateDescriptor {
+                fips: "06000".into(),
+                selected: true,
+                has_state_records: false,
+            }],
+            exhaust_tech_entries: vec![ExhaustTechEntry {
+                scc: "2270001010".into(),
+                hp_min: 0.0,
+                hp_max: 100.0,
+                tech_names: vec!["T1".into()],
+                tech_fractions: vec![0.0],
+            }],
+            evap_tech_entries: vec![EvapTechEntry {
+                scc: "2270001010".into(),
+                hp_min: 0.0,
+                hp_max: 100.0,
+                tech_names: vec!["EV1".into()],
+                tech_fractions: vec![0.0],
+            }],
+            growth_xref_entries: vec![GrowthXrefEntry {
+                fips: "06000".into(),
+                scc: "2270001010".into(),
+                hp_min: 0.0,
+                hp_max: 100.0,
+                indicator: "GDP".into(),
+            }],
+            growth_records: vec![],
+            activity_entries: vec![ActivityTableEntry {
+                scc: "2270001010".into(),
+                fips: "".into(),
+                starts: 0.0,
+                activity_level: 100.0,
+                activity_unit: ActivityUnit::HoursPerYear,
+                load_factor: 0.5,
+                age_code: "DEFAULT".into(),
+            }],
+            scrappage_curve: vec![
+                ScrappagePoint { bin: 0.0, percent: 0.0 },
+                ScrappagePoint { bin: 100.0, percent: 100.0 },
+            ],
+            age_adjustment_table: AgeAdjustmentTable::default(),
+            hp_levels: default_hp_levels(),
+            ..ProductionExecutor::default()
+        };
+
+        let opts = test_opts();
+        let record = DriverRecord {
+            region_code: "00000".into(),
+            hp_avg: 25.0,
+            population: 100.0,
+            pop_year: 2020,
+        };
+        let ctx = DispatchContext {
+            dispatch: Dispatch::National,
+            scc: "2270001010",
+            fuel: Some(FuelKind::Diesel),
+            record: &record,
+            growth: None,
+        };
+
+        let result = exec.execute(&ctx, &opts).unwrap();
+        assert!(!result.skipped, "expected non-skipped execution");
+        assert_eq!(result.rows.len(), 1, "expected one row for the one selected state");
+        assert_eq!(result.rows[0].fips, "06000");
+    }
+
+    /// (f) US-total dispatch with a minimal reference table →
+    /// one `SimEmissionRow` at FIPS `"00000"`.
+    ///
+    /// Zero tech fractions bypass the emission iteration; one `StateOutput`
+    /// for `"00000"` is still emitted.
+    #[test]
+    fn us_total_minimal_ref_returns_one_row() {
+        let mut exec = ProductionExecutor {
+            exhaust_tech_entries: vec![ExhaustTechEntry {
+                scc: "2270001010".into(),
+                hp_min: 0.0,
+                hp_max: 100.0,
+                tech_names: vec!["T1".into()],
+                tech_fractions: vec![0.0],
+            }],
+            evap_tech_entries: vec![EvapTechEntry {
+                scc: "2270001010".into(),
+                hp_min: 0.0,
+                hp_max: 100.0,
+                tech_names: vec!["EV1".into()],
+                tech_fractions: vec![0.0],
+            }],
+            growth_xref_entries: vec![GrowthXrefEntry {
+                fips: "00000".into(),
+                scc: "2270001010".into(),
+                hp_min: 0.0,
+                hp_max: 100.0,
+                indicator: "GDP".into(),
+            }],
+            growth_records: vec![],
+            activity_entries: vec![ActivityTableEntry {
+                scc: "2270001010".into(),
+                fips: "".into(),
+                starts: 0.0,
+                activity_level: 100.0,
+                activity_unit: ActivityUnit::HoursPerYear,
+                load_factor: 0.5,
+                age_code: "DEFAULT".into(),
+            }],
+            scrappage_curve: vec![
+                ScrappagePoint { bin: 0.0, percent: 0.0 },
+                ScrappagePoint { bin: 100.0, percent: 100.0 },
+            ],
+            age_adjustment_table: AgeAdjustmentTable::default(),
+            hp_levels: default_hp_levels(),
+            ..ProductionExecutor::default()
+        };
+
+        let opts = test_opts();
+        let record = DriverRecord {
+            region_code: "00000".into(),
+            hp_avg: 25.0,
+            population: 100.0,
+            pop_year: 2020,
+        };
+        let ctx = DispatchContext {
+            dispatch: Dispatch::UsTotal,
+            scc: "2270001010",
+            fuel: Some(FuelKind::Diesel),
+            record: &record,
+            growth: None,
+        };
+
+        let result = exec.execute(&ctx, &opts).unwrap();
+        assert!(!result.skipped, "expected non-skipped execution");
+        assert_eq!(result.rows.len(), 1, "expected exactly one row for US total");
+        assert_eq!(result.rows[0].fips, "00000");
+    }
+
+    /// (g) National dispatch with no allocation entry for the SCC →
+    /// `AllocationNotFound` error.
+    #[test]
+    fn national_allocation_not_found() {
+        let mut exec = ProductionExecutor {
+            state_descriptors: vec![StateDescriptor {
+                fips: "06000".into(),
+                selected: true,
+                has_state_records: false,
+            }],
+            exhaust_tech_entries: vec![ExhaustTechEntry {
+                scc: "2270001010".into(),
+                hp_min: 0.0,
+                hp_max: 100.0,
+                tech_names: vec!["T1".into()],
+                tech_fractions: vec![0.0],
+            }],
+            evap_tech_entries: vec![EvapTechEntry {
+                scc: "2270001010".into(),
+                hp_min: 0.0,
+                hp_max: 100.0,
+                tech_names: vec!["EV1".into()],
+                tech_fractions: vec![0.0],
+            }],
+            hp_levels: default_hp_levels(),
+            ..ProductionExecutor::default()
+        };
+
+        let opts = test_opts();
+        let record = DriverRecord {
+            region_code: "00000".into(),
+            hp_avg: 25.0,
+            population: 100.0,
+            pop_year: 2020,
+        };
+        let ctx = DispatchContext {
+            dispatch: Dispatch::National,
+            scc: "2270001010",
+            fuel: Some(FuelKind::Diesel),
+            record: &record,
+            growth: None,
+        };
+
+        let err = exec.execute(&ctx, &opts).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("AllocationNotFound") || msg.contains("allocation"),
+            "expected AllocationNotFound error, got: {msg}"
+        );
+    }
+
+    /// (h) US-total dispatch with `growth_loaded = false` →
+    /// `GrowthFileMissing` error.
+    #[test]
+    fn us_total_growth_file_missing() {
+        let mut exec = ProductionExecutor {
+            exhaust_tech_entries: vec![ExhaustTechEntry {
+                scc: "2270001010".into(),
+                hp_min: 0.0,
+                hp_max: 100.0,
+                tech_names: vec!["T1".into()],
+                tech_fractions: vec![0.0],
+            }],
+            evap_tech_entries: vec![EvapTechEntry {
+                scc: "2270001010".into(),
+                hp_min: 0.0,
+                hp_max: 100.0,
+                tech_names: vec!["EV1".into()],
+                tech_fractions: vec![0.0],
+            }],
+            hp_levels: default_hp_levels(),
+            ..ProductionExecutor::default()
+        };
+
+        let opts = NonroadOptions::new(RegionLevel::County, 2020); // growth_loaded = false
+        let record = DriverRecord {
+            region_code: "00000".into(),
+            hp_avg: 25.0,
+            population: 100.0,
+            pop_year: 2020,
+        };
+        let ctx = DispatchContext {
+            dispatch: Dispatch::UsTotal,
+            scc: "2270001010",
+            fuel: Some(FuelKind::Diesel),
+            record: &record,
+            growth: None,
+        };
+
+        let err = exec.execute(&ctx, &opts).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("GROWTH") || msg.contains("growth"),
+            "expected GrowthFileMissing error, got: {msg}"
+        );
     }
 
     /// (b) Minimal reference (one FIPS, one exhaust tech with zero fraction,
