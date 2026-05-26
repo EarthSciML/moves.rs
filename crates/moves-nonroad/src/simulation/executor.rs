@@ -408,18 +408,87 @@ impl ProductionExecutor {
     /// All reference-data fields are empty; every dispatch returns
     /// [`GeographyExecution::skipped`] until the loaders are implemented
     /// (see the struct-level doc for the complete list of missing loaders).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use moves_nonroad::simulation::ProductionExecutor;
+    ///
+    /// let executor = ProductionExecutor::new();
+    /// assert!(executor.exhaust_tech_fractions.is_empty());
+    /// assert!(executor.retrofit_records.is_empty());
+    /// ```
     pub fn new() -> Self {
         Self::default()
+    }
+
+    fn execute_county(
+        &mut self,
+        _ctx: &DispatchContext<'_>,
+        _options: &NonroadOptions,
+    ) -> Result<GeographyExecution> {
+        Ok(GeographyExecution::skipped())
+    }
+
+    fn execute_subcounty(
+        &mut self,
+        _ctx: &DispatchContext<'_>,
+        _options: &NonroadOptions,
+    ) -> Result<GeographyExecution> {
+        Ok(GeographyExecution::skipped())
+    }
+
+    fn execute_state_to_county(
+        &mut self,
+        _ctx: &DispatchContext<'_>,
+        _options: &NonroadOptions,
+    ) -> Result<GeographyExecution> {
+        Ok(GeographyExecution::skipped())
+    }
+
+    fn execute_state_from_national(
+        &mut self,
+        _ctx: &DispatchContext<'_>,
+        _options: &NonroadOptions,
+    ) -> Result<GeographyExecution> {
+        Ok(GeographyExecution::skipped())
+    }
+
+    fn execute_national(
+        &mut self,
+        _ctx: &DispatchContext<'_>,
+        _options: &NonroadOptions,
+    ) -> Result<GeographyExecution> {
+        Ok(GeographyExecution::skipped())
+    }
+
+    fn execute_us_total(
+        &mut self,
+        _ctx: &DispatchContext<'_>,
+        _options: &NonroadOptions,
+    ) -> Result<GeographyExecution> {
+        Ok(GeographyExecution::skipped())
     }
 }
 
 impl GeographyExecutor for ProductionExecutor {
     fn execute(
         &mut self,
-        _ctx: &DispatchContext<'_>,
-        _options: &NonroadOptions,
+        ctx: &DispatchContext<'_>,
+        options: &NonroadOptions,
     ) -> Result<GeographyExecution> {
-        Ok(GeographyExecution::skipped())
+        let result = match ctx.dispatch {
+            Dispatch::County => self.execute_county(ctx, options)?,
+            Dispatch::Subcounty => self.execute_subcounty(ctx, options)?,
+            Dispatch::StateToCounty => self.execute_state_to_county(ctx, options)?,
+            Dispatch::StateFromNational => self.execute_state_from_national(ctx, options)?,
+            Dispatch::National => self.execute_national(ctx, options)?,
+            Dispatch::UsTotal => self.execute_us_total(ctx, options)?,
+        };
+        if !result.skipped {
+            todo!("non-skipped execution paths are not yet implemented");
+        }
+        Ok(result)
     }
 }
 
@@ -511,6 +580,26 @@ mod tests {
         assert_eq!(exec.dispatches_to(Dispatch::County).len(), 2);
         assert_eq!(exec.dispatches_to(Dispatch::Subcounty).len(), 1);
         assert_eq!(exec.dispatches_to(Dispatch::National).len(), 0);
+    }
+
+    #[test]
+    fn production_executor_skips_all_dispatch_variants() {
+        let mut exec = ProductionExecutor::new();
+        let opts = NonroadOptions::new(RegionLevel::County, 2020);
+        let record = rec("06037");
+        for dispatch in [
+            Dispatch::County,
+            Dispatch::Subcounty,
+            Dispatch::StateToCounty,
+            Dispatch::StateFromNational,
+            Dispatch::National,
+            Dispatch::UsTotal,
+        ] {
+            let c = ctx(dispatch, "2270001010", &record);
+            let result = exec.execute(&c, &opts).unwrap();
+            assert!(result.skipped, "{dispatch:?} should be skipped");
+            assert!(result.rows.is_empty());
+        }
     }
 
     #[test]
