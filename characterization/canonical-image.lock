@@ -7,8 +7,8 @@
 # Regenerate by running characterization/apptainer/build-sif.sh.
 
 sif_path           = "characterization/apptainer/canonical-moves.sif"
-sif_sha256         = "c47d5d9d6febcbc206d466633d68d4b43cbcdc2d2e6ebd552119ab4d3237b744"
-sif_bytes          = 1101058048
+sif_sha256         = "1fa69d34114e95d26d57c414a896c98efeecfe4e729ee2b7e701e79e19baccd8"
+sif_bytes          = 1101062144
 
 # Source pins
 moves_repo_url     = "https://github.com/USEPA/EPA_MOVES_Model.git"
@@ -24,6 +24,6 @@ jdk_package        = "temurin-17-jdk"
 go_version         = "1.21.13"
 
 # Build provenance
-built_at_utc       = "2026-05-26T13:04:14Z"
+built_at_utc       = "2026-05-26T13:13:17Z"
 built_on_host      = "ccc0232.campuscluster.illinois.edu"
 apptainer_version  = "1.4.5-3.el9"
