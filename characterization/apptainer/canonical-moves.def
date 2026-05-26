@@ -72,6 +72,12 @@ From: ubuntu:24.04
         > /etc/apt/sources.list.d/adoptium.list
     apt-get update
     apt-get install -y --no-install-recommends "${JDK_PACKAGE}"
+    # ant depends on default-jre-headless (OpenJDK 21), which update-alternatives
+    # may prefer over Temurin 17. Pin the 'java' alternative to Temurin 17 so
+    # the %test and runtime both see the correct version.
+    TEMURIN_JAVA="/usr/lib/jvm/temurin-17-jdk-amd64/bin/java"
+    update-alternatives --install /usr/bin/java java "${TEMURIN_JAVA}" 1099 || true
+    update-alternatives --set java "${TEMURIN_JAVA}" || true
 
     # ----- Go (version from versions.env: $GO_VERSION) -----
     cd /tmp
@@ -250,11 +256,8 @@ SQL
 
 %environment
     export MOVES_HOME=/opt/moves
-    export PATH=/usr/local/go/bin:/opt/moves-bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-    # The 'ant' apt package on Ubuntu 24.04 depends on default-jdk which is
-    # OpenJDK 21. ant compile therefore produces class file version 65 (Java 21).
-    # JAVA_HOME must point to Java 21 so the forked JVM can load those classes.
-    export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+    export JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-amd64
+    export PATH=${JAVA_HOME}/bin:/usr/local/go/bin:/opt/moves-bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     export GOPATH=/tmp/go
     export TZ=UTC
     export LC_ALL=C.UTF-8
@@ -278,8 +281,8 @@ SQL
     test -f /etc/mysql/mariadb.conf.d/99-moves.cnf
     /usr/sbin/mariadbd --version | grep -q "${MARIADB_SERIES}" \
         || { echo "MariaDB version mismatch"; exit 1; }
-    java -version 2>&1 | grep -q '17\.' \
-        || { echo "JDK 17 missing"; exit 1; }
+    "${JAVA_HOME}/bin/java" -version 2>&1 | grep -q '17\.' \
+        || { echo "JDK 17 missing at JAVA_HOME=${JAVA_HOME}"; exit 1; }
     /usr/local/go/bin/go version | grep -q "go${GO_VERSION}" \
         || { echo "Go ${GO_VERSION} missing"; exit 1; }
     ant -version | grep -qi 'apache ant' \
