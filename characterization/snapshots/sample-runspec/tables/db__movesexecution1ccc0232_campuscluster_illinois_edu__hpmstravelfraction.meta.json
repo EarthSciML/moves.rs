@@ -1,0 +1,25 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__hpmstravelfraction",
+  "schema": [
+    {
+      "name": "yearID",
+      "kind": "int64"
+    },
+    {
+      "name": "HPMSVTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "fraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "yearID",
+    "HPMSVTypeID"
+  ],
+  "row_count": 5,
+  "float_decimals": 12,
+  "content_sha256": "e1cb2f1d8e4af0cf630bdbd157c74f965bfa03661bcec57ca3c20390888b93bd"
+}

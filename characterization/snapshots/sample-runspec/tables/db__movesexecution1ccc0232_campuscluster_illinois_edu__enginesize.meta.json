@@ -1,0 +1,20 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__enginesize",
+  "schema": [
+    {
+      "name": "engSizeID",
+      "kind": "int64"
+    },
+    {
+      "name": "engSizeName",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "engSizeID"
+  ],
+  "row_count": 33,
+  "float_decimals": 12,
+  "content_sha256": "efc843679b2726194156dadce604806daece4827f294c1f98dde126b452126a9"
+}

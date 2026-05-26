@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "sample-runspec",
+  "sif_sha256": "70ea5b8378b278af50e8c44ab011066c59019faed8d141adf4ec6f2045f1e5fd",
+  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-5ohba/characterization/fixture-image.lock",
+  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-5ohba/characterization/fixtures/sample-runspec.xml",
+  "runspec_sha256": "cbca08c628d92c580674edb2611cfac545aa2e92d162cf232bd0658750a9f305",
+  "snapshot_aggregate_sha256": "f2eb3501d467a23850a25bb57115f3e31abf8bd1224a39d3ab85170ec52094b3",
+  "output_database": "JUnitTestOutput",
+  "scale_input_database": null
+}

@@ -1,0 +1,26 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__runspecnonroadmodelyearage",
+  "schema": [
+    {
+      "name": "yearID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "yearID",
+    "modelYearID",
+    "ageID"
+  ],
+  "row_count": 51,
+  "float_decimals": 12,
+  "content_sha256": "a74948050b6785c4779eb050a61f1f8e8656873c7f534bfe9b337ae6fe5c12ac"
+}

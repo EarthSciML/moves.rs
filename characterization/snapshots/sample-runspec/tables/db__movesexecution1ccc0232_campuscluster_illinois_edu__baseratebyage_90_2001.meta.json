@@ -1,0 +1,109 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__baseratebyage_90_2001",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "roadTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "avgSpeedBinID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "pollutantID",
+      "kind": "int64"
+    },
+    {
+      "name": "processID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "regClassID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeID",
+      "kind": "int64"
+    },
+    {
+      "name": "meanBaseRate",
+      "kind": "float64"
+    },
+    {
+      "name": "meanBaseRateIM",
+      "kind": "float64"
+    },
+    {
+      "name": "emissionRate",
+      "kind": "float64"
+    },
+    {
+      "name": "emissionRateIM",
+      "kind": "float64"
+    },
+    {
+      "name": "meanBaseRateACAdj",
+      "kind": "float64"
+    },
+    {
+      "name": "meanBaseRateIMACAdj",
+      "kind": "float64"
+    },
+    {
+      "name": "emissionRateACAdj",
+      "kind": "float64"
+    },
+    {
+      "name": "emissionRateIMACAdj",
+      "kind": "float64"
+    },
+    {
+      "name": "opModeFraction",
+      "kind": "float64"
+    },
+    {
+      "name": "opModeFractionRate",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "roadTypeID",
+    "avgSpeedBinID",
+    "hourDayID",
+    "polProcessID",
+    "modelYearID",
+    "fuelTypeID",
+    "ageGroupID",
+    "regClassID",
+    "opModeID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "e6575a8c00cc85fc9069f9f2ccaec336cd7e1a1a2ec1e7ff34a0f1906d931470"
+}

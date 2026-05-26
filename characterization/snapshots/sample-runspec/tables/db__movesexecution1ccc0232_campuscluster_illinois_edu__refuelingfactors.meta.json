@@ -1,0 +1,72 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__refuelingfactors",
+  "schema": [
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "defaultFormulationID",
+      "kind": "int64"
+    },
+    {
+      "name": "vaporTermA",
+      "kind": "float64"
+    },
+    {
+      "name": "vaporTermB",
+      "kind": "float64"
+    },
+    {
+      "name": "vaporTermC",
+      "kind": "float64"
+    },
+    {
+      "name": "vaporTermD",
+      "kind": "float64"
+    },
+    {
+      "name": "vaporTermE",
+      "kind": "float64"
+    },
+    {
+      "name": "vaporTermF",
+      "kind": "float64"
+    },
+    {
+      "name": "vaporLowTLimit",
+      "kind": "float64"
+    },
+    {
+      "name": "vaporHighTLimit",
+      "kind": "float64"
+    },
+    {
+      "name": "tankTDiffLimit",
+      "kind": "float64"
+    },
+    {
+      "name": "minimumRefuelingVaporLoss",
+      "kind": "float64"
+    },
+    {
+      "name": "refuelingSpillRate",
+      "kind": "float64"
+    },
+    {
+      "name": "refuelingSpillRateCV",
+      "kind": "float64"
+    },
+    {
+      "name": "displacedVaporRateCV",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "fuelTypeID"
+  ],
+  "row_count": 4,
+  "float_decimals": 12,
+  "content_sha256": "a484412d4e8429282b9e8f3166d25a5fa0ec63eefdf900497dce1750989e441c"
+}

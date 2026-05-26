@@ -1,0 +1,24 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__dayofanyweek",
+  "schema": [
+    {
+      "name": "dayID",
+      "kind": "int64"
+    },
+    {
+      "name": "dayName",
+      "kind": "utf8"
+    },
+    {
+      "name": "noOfRealDays",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "dayID"
+  ],
+  "row_count": 1,
+  "float_decimals": 12,
+  "content_sha256": "b8c187a682309c3493d99dd9276f8af3887bf77966f51ef41a3d229fac5fb1df"
+}
