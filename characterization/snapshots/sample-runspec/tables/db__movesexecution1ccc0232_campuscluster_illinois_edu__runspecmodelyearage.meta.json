@@ -1,0 +1,26 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__runspecmodelyearage",
+  "schema": [
+    {
+      "name": "yearID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "yearID",
+    "modelYearID",
+    "ageID"
+  ],
+  "row_count": 41,
+  "float_decimals": 12,
+  "content_sha256": "295527b5bd39cd0c0f5189edae7e7a71936bd04cc7b736c02df638c7f72d41c0"
+}

@@ -1,0 +1,39 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__fuelsupply",
+  "schema": [
+    {
+      "name": "fuelRegionID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelFormulationID",
+      "kind": "int64"
+    },
+    {
+      "name": "marketShare",
+      "kind": "float64"
+    },
+    {
+      "name": "marketShareCV",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "fuelRegionID",
+    "fuelYearID",
+    "monthGroupID",
+    "fuelFormulationID"
+  ],
+  "row_count": 6,
+  "float_decimals": 12,
+  "content_sha256": "546ce20120869418c4422c30925a8be8c5f76726cc4164ff4d99f855f7e67ca6"
+}

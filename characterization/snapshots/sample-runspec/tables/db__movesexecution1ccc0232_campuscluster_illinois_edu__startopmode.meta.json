@@ -1,0 +1,22 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__startopmode",
+  "schema": [
+    {
+      "name": "vehID",
+      "kind": "int64"
+    },
+    {
+      "name": "tripID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 8605,
+  "float_decimals": 12,
+  "content_sha256": "b9c4aee6309aeeef778dcddd385a2be48636bc4099867d9f0353ec6c6ce3178d"
+}

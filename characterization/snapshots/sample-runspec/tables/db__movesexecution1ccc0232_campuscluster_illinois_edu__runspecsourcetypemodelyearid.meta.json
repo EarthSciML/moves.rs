@@ -1,0 +1,16 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__runspecsourcetypemodelyearid",
+  "schema": [
+    {
+      "name": "sourceTypeModelYearID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeModelYearID"
+  ],
+  "row_count": 41,
+  "float_decimals": 12,
+  "content_sha256": "4371ae8a67e5fe974b0146ccf5bc834eb9dc5bf39f613b1e9f6d713ff9bdd38a"
+}
