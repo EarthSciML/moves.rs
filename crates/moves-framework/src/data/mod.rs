@@ -23,10 +23,12 @@
 //!   `fn() -> polars::Schema`.
 
 pub mod conversions;
+pub mod parquet_io;
 pub mod schema_registry;
 pub mod store;
 
 pub use conversions::{DataFrameStoreTyped, IntoDataFrame, TableRow};
+pub use parquet_io::DataFrameStoreParquet;
 pub use schema_registry::{schema_registry, KNOWN_CALCULATOR_INPUT_TABLES};
 pub use store::InMemoryStore;
 

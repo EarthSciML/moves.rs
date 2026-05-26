@@ -105,8 +105,8 @@ pub use control_strategy::{
     ControlStrategyFactory, ControlStrategyRegistry, InternalControlStrategy, StrategySubscription,
 };
 pub use data::{
-    schema_registry, DataFrameStore, DataFrameStoreTyped, InMemoryStore, IntoDataFrame,
-    TableHandle, TableRow, TableSchema, KNOWN_CALCULATOR_INPUT_TABLES,
+    schema_registry, DataFrameStore, DataFrameStoreParquet, DataFrameStoreTyped, InMemoryStore,
+    IntoDataFrame, TableHandle, TableRow, TableSchema, KNOWN_CALCULATOR_INPUT_TABLES,
 };
 pub use execution::*;
 pub use input::*;
