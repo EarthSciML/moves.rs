@@ -59,7 +59,12 @@
 use std::collections::BTreeSet;
 
 use moves_data::PolProcessId;
+use moves_data_default::{DefaultDb, Error as DefaultDbError, TableFilter};
 use moves_runspec::{GeoKind, RunSpec};
+use polars::prelude::{col, lit, Expr, LazyFrame, NamedFrom, Series};
+
+use crate::data::{DataFrameStore, InMemoryStore};
+use crate::error::{Error, Result};
 
 // ---------------------------------------------------------------------------
 // RunSpec projection — one struct holding every dimension the builders use.
@@ -867,6 +872,42 @@ impl MergePlan {
 pub struct InputDataManager;
 
 impl InputDataManager {
+    /// Materialise the per-run slow-tier store from a [`MergePlan`] and a
+    /// [`DefaultDb`] Parquet snapshot.
+    ///
+    /// For each [`TableMergePlan`] in `plan`:
+    ///
+    /// 1. Calls [`DefaultDb::scan`] with an empty [`TableFilter`] to get a
+    ///    [`LazyFrame`] over the table's Parquet files.
+    /// 2. Lowers the [`WhereClause`] predicates into a Polars `filter`
+    ///    expression chain applied to the frame.
+    /// 3. Collects the filtered frame and inserts the resulting
+    ///    [`polars::prelude::DataFrame`] into an [`InMemoryStore`] keyed by
+    ///    the canonical table name.
+    ///
+    /// Tables that are schema-only or absent from the snapshot are skipped
+    /// silently — they are either populated at runtime (schema-only) or not
+    /// present in this snapshot version.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Polars`] if Polars fails to collect a frame.
+    pub fn execute(plan: &MergePlan, db: &DefaultDb) -> Result<InMemoryStore> {
+        let mut store = InMemoryStore::new();
+        for table_plan in &plan.tables {
+            let lf = match db.scan(table_plan.table_name, &TableFilter::new()) {
+                Ok(lf) => lf,
+                Err(DefaultDbError::SchemaOnly { .. }) => continue,
+                Err(DefaultDbError::UnknownTable(_)) => continue,
+                Err(e) => return Err(Error::Polars(e.to_string())),
+            };
+            let lf = apply_where_clauses(lf, &table_plan.clauses);
+            let df = lf.collect().map_err(|e| Error::Polars(e.to_string()))?;
+            store.insert(table_plan.table_name, df);
+        }
+        Ok(store)
+    }
+
     /// Build a [`MergePlan`] over the given table registry.
     ///
     /// Walks each [`MergeTableSpec`] and, for every `*_column: Some(name)`
@@ -1423,6 +1464,54 @@ pub fn default_tables() -> Vec<MergeTableSpec> {
 }
 
 // ---------------------------------------------------------------------------
+// WhereClause → Polars Expr lowering (Task 50 data plane).
+// ---------------------------------------------------------------------------
+
+/// Apply a slice of [`WhereClause`] predicates to a [`LazyFrame`] as Polars
+/// `filter` expressions. Each clause becomes one `.filter(expr)` call;
+/// multiple clauses are AND-chained by folding.
+fn apply_where_clauses(lf: LazyFrame, clauses: &[WhereClause]) -> LazyFrame {
+    clauses
+        .iter()
+        .fold(lf, |lf, clause| lf.filter(where_clause_to_expr(clause)))
+}
+
+/// Lower one [`WhereClause`] value into a Polars [`Expr`].
+///
+/// * [`WhereClause::InList`] — `col IN (values)` via `is_in(lit(Series))`.
+/// * [`WhereClause::ModelYearRanges`] — `OR` chain of overlapping ranges
+///   `(col <= year AND col >= year-40)`.
+/// * [`WhereClause::PolProcessIds`] — `col < 0 OR col IN (ids)`.
+fn where_clause_to_expr(clause: &WhereClause) -> Expr {
+    match clause {
+        WhereClause::InList { column, values } => {
+            let s = Series::new(column.as_str().into(), values.as_slice());
+            col(column.as_str()).is_in(lit(s), false)
+        }
+        WhereClause::ModelYearRanges { column, years } => {
+            if years.is_empty() {
+                return lit(true);
+            }
+            years.iter().fold(lit(false), |acc, &y| {
+                let y64 = i64::from(y);
+                acc.or(col(column.as_str())
+                    .lt_eq(lit(y64))
+                    .and(col(column.as_str()).gt_eq(lit(y64 - 40))))
+            })
+        }
+        WhereClause::PolProcessIds { column, ids } => {
+            let negative = col(column.as_str()).lt(lit(0i64));
+            if ids.is_empty() {
+                negative
+            } else {
+                let s = Series::new(column.as_str().into(), ids.as_slice());
+                negative.or(col(column.as_str()).is_in(lit(s), false))
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests — covers the 26 asserts in InputDataManagerTest plus structural
 // checks for the registry and the projection.
 // ---------------------------------------------------------------------------
@@ -1831,5 +1920,167 @@ mod tests {
     #[test]
     fn input_data_manager_is_default_constructible() {
         let _m = InputDataManager;
+    }
+
+    // ---- InputDataManager::execute (Task 50 data plane) --------------------
+
+    mod execute_fixture {
+        use std::path::Path;
+        use std::sync::Arc;
+
+        use arrow::array::{Int32Array, Int64Array, RecordBatch};
+        use arrow::datatypes::{DataType, Field, Schema as ArrowSchema};
+        use moves_data_default::{
+            manifest::{PartitionManifest, TableManifest, MANIFEST_FILENAME},
+            DefaultDb, Manifest,
+        };
+        use parquet::arrow::ArrowWriter;
+
+        pub struct TestDb {
+            pub _dir: tempfile::TempDir,
+            pub db: DefaultDb,
+        }
+
+        pub fn write_year_value_parquet(path: &Path, year_ids: &[i64], values: &[i32]) {
+            let schema = Arc::new(ArrowSchema::new(vec![
+                Field::new("yearID", DataType::Int64, false),
+                Field::new("value", DataType::Int32, false),
+            ]));
+            let batch = RecordBatch::try_new(
+                Arc::clone(&schema),
+                vec![
+                    Arc::new(Int64Array::from(year_ids.to_vec())) as Arc<dyn arrow::array::Array>,
+                    Arc::new(Int32Array::from(values.to_vec())) as Arc<dyn arrow::array::Array>,
+                ],
+            )
+            .unwrap();
+            let file = std::fs::File::create(path).unwrap();
+            let mut writer = ArrowWriter::try_new(file, Arc::clone(&schema), None).unwrap();
+            writer.write(&batch).unwrap();
+            writer.close().unwrap();
+        }
+
+        pub fn build(include_schema_only: bool) -> TestDb {
+            let dir = tempfile::TempDir::new().unwrap();
+            let root = dir.path();
+
+            let parquet_rel = "TestTable.parquet";
+            write_year_value_parquet(&root.join(parquet_rel), &[2020, 2021], &[10, 20]);
+
+            let mut manifest = Manifest::new(
+                "test".into(),
+                "deadbeef".into(),
+                "0".repeat(64),
+                "1970-01-01T00:00:00Z".into(),
+            );
+            manifest.push(TableManifest {
+                name: "TestTable".into(),
+                partition_strategy: "monolithic".into(),
+                partition_columns: vec![],
+                row_count: 2,
+                columns: vec![],
+                primary_key: vec![],
+                partitions: vec![PartitionManifest {
+                    path: parquet_rel.into(),
+                    values: vec![],
+                    row_count: 2,
+                    sha256: "0".repeat(64),
+                    bytes: 0,
+                }],
+                schema_only_path: None,
+            });
+
+            if include_schema_only {
+                manifest.push(TableManifest {
+                    name: "SchemaOnlyTable".into(),
+                    partition_strategy: "schema_only".into(),
+                    partition_columns: vec![],
+                    row_count: 0,
+                    columns: vec![],
+                    primary_key: vec![],
+                    partitions: vec![],
+                    schema_only_path: Some("SchemaOnlyTable.schema.json".into()),
+                });
+            }
+
+            std::fs::write(
+                root.join(MANIFEST_FILENAME),
+                manifest.to_pretty_json().unwrap(),
+            )
+            .unwrap();
+
+            let db = DefaultDb::open(root).unwrap();
+            TestDb { _dir: dir, db }
+        }
+    }
+
+    #[test]
+    fn execute_loads_unfiltered_table_in_full() {
+        let fixture = execute_fixture::build(false);
+        let plan = MergePlan {
+            tables: vec![TableMergePlan {
+                table_name: "TestTable",
+                clauses: vec![],
+            }],
+        };
+        let store = InputDataManager::execute(&plan, &fixture.db).unwrap();
+        let df = store.get("TestTable").expect("table must be in store");
+        assert_eq!(df.height(), 2, "all 2 rows must be present");
+    }
+
+    #[test]
+    fn execute_applies_year_predicate_pushdown() {
+        let fixture = execute_fixture::build(false);
+        let plan = MergePlan {
+            tables: vec![TableMergePlan {
+                table_name: "TestTable",
+                clauses: vec![WhereClause::InList {
+                    column: "yearID".into(),
+                    values: vec![2020_i64],
+                }],
+            }],
+        };
+        let store = InputDataManager::execute(&plan, &fixture.db).unwrap();
+        let df = store.get("TestTable").expect("table must be in store");
+        assert_eq!(df.height(), 1, "only year=2020 row must survive");
+    }
+
+    #[test]
+    fn execute_produces_store_keyed_by_canonical_name() {
+        let fixture = execute_fixture::build(false);
+        let plan = MergePlan {
+            tables: vec![TableMergePlan {
+                table_name: "TestTable",
+                clauses: vec![],
+            }],
+        };
+        let store = InputDataManager::execute(&plan, &fixture.db).unwrap();
+        assert!(
+            store.contains("TestTable"),
+            "store must be keyed by the canonical table name"
+        );
+    }
+
+    #[test]
+    fn execute_skips_schema_only_tables() {
+        let fixture = execute_fixture::build(true);
+        let plan = MergePlan {
+            tables: vec![
+                TableMergePlan {
+                    table_name: "TestTable",
+                    clauses: vec![],
+                },
+                TableMergePlan {
+                    table_name: "SchemaOnlyTable",
+                    clauses: vec![],
+                },
+            ],
+        };
+        let store = InputDataManager::execute(&plan, &fixture.db).unwrap();
+        assert!(store.contains("TestTable"), "data table must be present");
+        assert!(
+            !store.contains("SchemaOnlyTable"),
+            "schema-only table must be silently skipped"
+        );
     }
 }

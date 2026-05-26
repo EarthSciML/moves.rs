@@ -42,7 +42,7 @@ csv = "1.3"
 js-sys = "0.3"
 parquet = "55"
 phf = { version = "0.11", features = ["macros"] }
-polars = { version = "0.53", default-features = false, features = ["lazy", "parquet"] }
+polars = { version = "0.53", default-features = false, features = ["lazy", "parquet", "is_in"] }
 quick-xml = { version = "0.36", features = ["serialize"] }
 rayon = "1"
 serde = { version = "1", features = ["derive"] }

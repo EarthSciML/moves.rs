@@ -1882,6 +1882,7 @@ dependencies = [
  "bytes",
  "moves-calculator-info",
  "moves-data",
+ "moves-data-default",
  "moves-runspec",
  "parquet",
  "polars",
