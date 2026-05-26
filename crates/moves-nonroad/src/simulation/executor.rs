@@ -47,8 +47,8 @@ use crate::emissions::exhaust::{ActivityUnit as ExhaustActivityUnit, FuelKind};
 use crate::geography::common::{
     ActivityRecord, ActivityUnit, BmyKind, EmissionsIterationResult, EvapFactorsLookup,
     ExhaustFactorsLookup, GeographyCallbacks, ModelYearAgedistResult, PopulationRecord,
-    ProcessOutcome, RefuelingData, RetrofitFilter, RunOptions as CountyRunOptions, SumType,
-    TechLookup,
+    ProcessOutcome, ProcessOutput, RefuelingData, RetrofitFilter, RunOptions as CountyRunOptions,
+    SumType, TechLookup,
 };
 use crate::geography::prcnat::{NationalCallbacks, StateAllocationOutcome};
 use crate::geography::prcus::{
@@ -59,8 +59,8 @@ use crate::geography::state::{CountyInput, StateContext};
 use crate::geography::{
     process_county, process_national_record, process_state_from_national_record,
     process_state_to_county_record, process_subcounty, process_us_total_record, ActivityLookup,
-    ByModelYearOutput, EquipmentRecord, GeographyOutput, NationalContext, RunOptions as StateRunOptions,
-    StateCallbacks, StateDescriptor, StateOutput, UsTotalContext,
+    EquipmentRecord, GeographyOutput, NationalContext, RunOptions as StateRunOptions,
+    StateCallbacks, StateDescriptor, UsTotalContext,
 };
 use crate::geography::subcounty::SubcountyRecordIndex;
 use crate::population::retrofit::RetrofitRecord;
@@ -1937,20 +1937,122 @@ fn build_run_options(
     }
 }
 
+/// Flatten a [`ProcessOutput`] from `process_county` / `process_subcounty`
+/// into a flat `Vec<SimEmissionRow>`.
+///
+/// Each [`DatRecord`] becomes a `wrtdat`-shaped row with `model_year=None`,
+/// `tech_type=None`, and the caller-supplied `channel`. Each [`BmyRecord`]
+/// becomes a `wrtbmy`-shaped row with `model_year` and `tech_type` set and
+/// channel derived from [`BmyKind`]. Missing-data (`RMISS`-filled) emission
+/// values are copied as-is, preserving the sentinel.
+///
+/// The `_scc` argument is accepted for API symmetry with the call site but
+/// is not used internally — each record already carries its own SCC.
+fn process_output_to_rows(
+    out: &ProcessOutput,
+    _scc: &str,
+    channel: EmissionChannel,
+) -> Vec<SimEmissionRow> {
+    let mut rows = Vec::new();
+    for dat in &out.dat_records {
+        rows.push(SimEmissionRow {
+            fips: dat.fips.clone(),
+            subcounty: dat.subcounty.clone(),
+            scc: dat.scc.clone(),
+            hp_level: dat.hp_level,
+            model_year: None,
+            tech_type: None,
+            channel,
+            population: dat.population_total,
+            activity: dat.activity_total,
+            fuel_consumption: dat.fuel_consumption,
+            emissions: dat.emissions.clone(),
+        });
+    }
+    for bmy in &out.bmy_records {
+        let bmy_channel = match bmy.kind {
+            BmyKind::Exhaust => EmissionChannel::Exhaust,
+            BmyKind::Evaporative => EmissionChannel::Evaporative,
+        };
+        rows.push(SimEmissionRow {
+            fips: bmy.fips.clone(),
+            subcounty: bmy.subcounty.clone(),
+            scc: bmy.scc.clone(),
+            hp_level: bmy.hp_level,
+            model_year: Some(bmy.model_year),
+            tech_type: Some(bmy.tech_name.clone()),
+            channel: bmy_channel,
+            population: bmy.population,
+            activity: bmy.activity,
+            fuel_consumption: bmy.fuel,
+            emissions: bmy.emissions.clone(),
+        });
+    }
+    rows
+}
+
+/// Flatten a [`GeographyOutput`] from the state/national/US-total routines
+/// into a flat `Vec<SimEmissionRow>`.
+///
+/// Each [`StateOutput`] becomes a `wrtdat`-shaped row (`model_year=None`,
+/// `tech_type=None`, channel always [`EmissionChannel::Exhaust`]). Each
+/// [`ByModelYearOutput`] becomes a `wrtbmy`-shaped row with `model_year`
+/// and `tech_type` set and channel derived from the `channel` byte (`1` →
+/// exhaust, any other → evaporative). Missing-data (`RMISS`-filled) values
+/// are copied as-is.
+///
+/// The `_scc` argument is accepted for API symmetry but is not used
+/// internally — each record already carries its own SCC.
+fn geography_output_to_rows(out: &GeographyOutput, _scc: &str) -> Vec<SimEmissionRow> {
+    let mut rows = Vec::new();
+    for st in &out.state_outputs {
+        rows.push(SimEmissionRow {
+            fips: st.fips.clone(),
+            subcounty: st.subcounty.clone(),
+            scc: st.scc.clone(),
+            hp_level: st.hp_level,
+            model_year: None,
+            tech_type: None,
+            channel: EmissionChannel::Exhaust,
+            population: st.population,
+            activity: st.activity,
+            fuel_consumption: st.fuel_consumption,
+            emissions: st.emissions_day.clone(),
+        });
+    }
+    for bmy in &out.bmy_outputs {
+        let bmy_channel = if bmy.channel == 1 {
+            EmissionChannel::Exhaust
+        } else {
+            EmissionChannel::Evaporative
+        };
+        rows.push(SimEmissionRow {
+            fips: bmy.fips.clone(),
+            subcounty: bmy.subcounty.clone(),
+            scc: bmy.scc.clone(),
+            hp_level: bmy.hp_level,
+            model_year: Some(bmy.model_year),
+            tech_type: Some(bmy.tech_type.clone()),
+            channel: bmy_channel,
+            population: bmy.population,
+            activity: bmy.activity,
+            fuel_consumption: bmy.fuel_consumption,
+            emissions: bmy.emissions.clone(),
+        });
+    }
+    rows
+}
+
 /// Map a [`ProcessOutcome`] from `process_county` / `process_subcounty`
 /// onto the uniform [`GeographyExecution`] shape.
 ///
 /// `Skipped` outcomes produce an empty (no rows) execution with
-/// `skipped = true`. `Success` outcomes convert each [`DatRecord`] and
-/// [`BmyRecord`] in the output into a [`SimEmissionRow`].
+/// `skipped = true`. `Success` outcomes delegate row conversion to
+/// [`process_output_to_rows`].
 fn process_outcome_to_execution(outcome: ProcessOutcome) -> GeographyExecution {
     let skipped = outcome.is_skipped();
     let output = outcome.into_output();
-    let warnings: Vec<String> = output
-        .warnings
-        .into_iter()
-        .map(|w| w.message)
-        .collect();
+    let warnings: Vec<String> = output.warnings.iter().map(|w| w.message.clone()).collect();
 
     if skipped {
         return GeographyExecution {
@@ -1961,18 +2063,7 @@ fn process_outcome_to_execution(outcome: ProcessOutcome) -> GeographyExecution {
         };
     }
 
-    let mut rows = Vec::new();
-
-    // dat_records → one SimEmissionRow each (exhaust channel, no model year).
-    for dat in &output.dat_records {
-        rows.push(dat_to_row(dat));
-    }
-
-    // bmy_records → one SimEmissionRow each (model year + tech type set).
-    for bmy in &output.bmy_records {
-        rows.push(bmy_to_row(bmy));
-    }
-
+    let rows = process_output_to_rows(&output, "", EmissionChannel::Exhaust);
     GeographyExecution {
         skipped: false,
         rows,
@@ -2103,96 +2194,18 @@ fn build_state_context<'a>(
 /// Convert a [`GeographyOutput`] from the state routines into the
 /// uniform [`GeographyExecution`] shape.
 ///
-/// `state_outputs` become one [`SimEmissionRow`] each; `bmy_outputs`
-/// become one row each with `model_year`/`tech_type` set. If no rows
-/// result (missing-tech early-out), the execution is marked skipped.
+/// Warnings are extracted before delegating row conversion to
+/// [`geography_output_to_rows`]. If no rows result (missing-tech
+/// early-out), the execution is marked skipped.
 fn geography_output_to_execution(output: GeographyOutput) -> GeographyExecution {
     let warnings: Vec<String> = output.warnings.iter().map(|w| format!("{w:?}")).collect();
-    let mut rows: Vec<SimEmissionRow> = Vec::new();
-    for st in &output.state_outputs {
-        rows.push(state_output_to_row(st));
-    }
-    for bmy in &output.bmy_outputs {
-        rows.push(bmy_output_to_row(bmy));
-    }
+    let rows = geography_output_to_rows(&output, "");
     let skipped = rows.is_empty();
     GeographyExecution {
         skipped,
         rows,
         warnings,
         national_record_count: output.national_record_count,
-    }
-}
-
-fn state_output_to_row(st: &StateOutput) -> SimEmissionRow {
-    SimEmissionRow {
-        fips: st.fips.clone(),
-        subcounty: st.subcounty.clone(),
-        scc: st.scc.clone(),
-        hp_level: st.hp_level,
-        model_year: None,
-        tech_type: None,
-        channel: EmissionChannel::Exhaust,
-        population: st.population,
-        activity: st.activity,
-        fuel_consumption: st.fuel_consumption,
-        emissions: st.emissions_day.clone(),
-    }
-}
-
-fn bmy_output_to_row(bmy: &ByModelYearOutput) -> SimEmissionRow {
-    SimEmissionRow {
-        fips: bmy.fips.clone(),
-        subcounty: bmy.subcounty.clone(),
-        scc: bmy.scc.clone(),
-        hp_level: bmy.hp_level,
-        model_year: Some(bmy.model_year),
-        tech_type: Some(bmy.tech_type.clone()),
-        channel: if bmy.channel == 1 {
-            EmissionChannel::Exhaust
-        } else {
-            EmissionChannel::Evaporative
-        },
-        population: bmy.population,
-        activity: bmy.activity,
-        fuel_consumption: bmy.fuel_consumption,
-        emissions: bmy.emissions.clone(),
-    }
-}
-
-fn dat_to_row(dat: &crate::geography::common::DatRecord) -> SimEmissionRow {
-    SimEmissionRow {
-        fips: dat.fips.clone(),
-        subcounty: dat.subcounty.clone(),
-        scc: dat.scc.clone(),
-        hp_level: dat.hp_level,
-        model_year: None,
-        tech_type: None,
-        channel: EmissionChannel::Exhaust,
-        population: dat.population_total,
-        activity: dat.activity_total,
-        fuel_consumption: dat.fuel_consumption,
-        emissions: dat.emissions.clone(),
-    }
-}
-
-fn bmy_to_row(bmy: &crate::geography::common::BmyRecord) -> SimEmissionRow {
-    let channel = match bmy.kind {
-        BmyKind::Exhaust => EmissionChannel::Exhaust,
-        BmyKind::Evaporative => EmissionChannel::Evaporative,
-    };
-    SimEmissionRow {
-        fips: bmy.fips.clone(),
-        subcounty: bmy.subcounty.clone(),
-        scc: bmy.scc.clone(),
-        hp_level: bmy.hp_level,
-        model_year: Some(bmy.model_year),
-        tech_type: Some(bmy.tech_name.clone()),
-        channel,
-        population: bmy.population,
-        activity: bmy.activity,
-        fuel_consumption: bmy.fuel,
-        emissions: bmy.emissions.clone(),
     }
 }
 
@@ -2325,6 +2338,152 @@ mod tests {
             .execute(&ctx(Dispatch::County, "a", &record), &opts)
             .unwrap();
         assert_eq!(concrete.len(), 1);
+    }
+
+    /// `process_output_to_rows` maps one DatRecord → wrtdat-shaped row
+    /// and one BmyRecord → wrtbmy-shaped row. Field copies (FIPS, SCC,
+    /// HP, channel) are verified for both. RMISS sentinel in emissions
+    /// is preserved as-is.
+    #[test]
+    fn process_output_to_rows_dat_and_bmy() {
+        use crate::geography::common::{BmyRecord, DatRecord};
+        use crate::common::consts::RMISS;
+
+        let dat = DatRecord {
+            fips: "06037".to_string(),
+            subcounty: String::new(),
+            scc: "2270001010".to_string(),
+            hp_level: 25.0,
+            population_total: 100.0,
+            activity_total: 500.0,
+            fuel_consumption: 10.0,
+            load_factor: 0.5,
+            hp_avg: 25.0,
+            frac_retrofitted: 0.0,
+            units_retrofitted: 0.0,
+            emissions: vec![1.0, RMISS],
+        };
+        let bmy = BmyRecord {
+            fips: "06037".to_string(),
+            subcounty: String::new(),
+            scc: "2270001010".to_string(),
+            hp_level: 25.0,
+            tech_name: "T1".to_string(),
+            model_year: 2010,
+            population: 50.0,
+            emissions: vec![0.5, 1.0],
+            fuel: 5.0,
+            activity: 250.0,
+            load_factor: 0.5,
+            hp_avg: 25.0,
+            frac_retrofitted: 0.0,
+            units_retrofitted: 0.0,
+            kind: BmyKind::Exhaust,
+        };
+        let out = ProcessOutput {
+            fips: "06037".to_string(),
+            dat_records: vec![dat],
+            bmy_records: vec![bmy],
+            ..ProcessOutput::default()
+        };
+
+        let rows = process_output_to_rows(&out, "2270001010", EmissionChannel::Exhaust);
+
+        assert_eq!(rows.len(), 2, "one dat row + one bmy row");
+
+        let dat_row = &rows[0];
+        assert_eq!(dat_row.fips, "06037");
+        assert_eq!(dat_row.scc, "2270001010");
+        assert_eq!(dat_row.hp_level, 25.0);
+        assert_eq!(dat_row.channel, EmissionChannel::Exhaust);
+        assert!(dat_row.model_year.is_none(), "dat row has no model year");
+        assert!(dat_row.tech_type.is_none(), "dat row has no tech type");
+        assert_eq!(dat_row.emissions[1], RMISS, "RMISS sentinel preserved");
+
+        let bmy_row = &rows[1];
+        assert_eq!(bmy_row.fips, "06037");
+        assert_eq!(bmy_row.scc, "2270001010");
+        assert_eq!(bmy_row.hp_level, 25.0);
+        assert_eq!(bmy_row.channel, EmissionChannel::Exhaust);
+        assert_eq!(bmy_row.model_year, Some(2010));
+        assert_eq!(bmy_row.tech_type.as_deref(), Some("T1"));
+    }
+
+    /// `geography_output_to_rows` maps one StateOutput → wrtdat-shaped
+    /// row and one ByModelYearOutput → wrtbmy-shaped row. Warnings on
+    /// the GeographyOutput are preserved in `GeographyExecution::warnings`
+    /// after the execution wrapper collects them.
+    #[test]
+    fn geography_output_to_rows_state_and_bmy_with_warning() {
+        use crate::geography::{ByModelYearOutput, GeographyOutput, GeographyWarning, StateOutput};
+
+        let st = StateOutput {
+            fips: "06000".to_string(),
+            subcounty: "     ".to_string(),
+            scc: "2270001010".to_string(),
+            hp_level: 25.0,
+            population: 100.0,
+            activity: 500.0,
+            fuel_consumption: 10.0,
+            load_factor: 0.5,
+            hp_avg: 25.0,
+            frac_retrofitted: 0.0,
+            units_retrofitted: 0.0,
+            emissions_day: vec![1.0, 2.0],
+            missing: false,
+        };
+        let bmy = ByModelYearOutput {
+            fips: "06000".to_string(),
+            subcounty: "     ".to_string(),
+            scc: "2270001010".to_string(),
+            hp_level: 25.0,
+            tech_type: "T1".to_string(),
+            model_year: 2010,
+            population: 50.0,
+            emissions: vec![0.5, 1.0],
+            fuel_consumption: 5.0,
+            activity: 250.0,
+            load_factor: 0.5,
+            hp_avg: 25.0,
+            frac_retrofitted: 0.0,
+            units_retrofitted: 0.0,
+            channel: 1,
+        };
+        let warning = GeographyWarning::MissingExhaustTech {
+            scc: "2270001010".to_string(),
+            hp_avg: 25.0,
+            year: 2020,
+        };
+        let geo_out = GeographyOutput {
+            state_outputs: vec![st],
+            bmy_outputs: vec![bmy],
+            warnings: vec![warning],
+            ..GeographyOutput::default()
+        };
+
+        let rows = geography_output_to_rows(&geo_out, "2270001010");
+
+        assert_eq!(rows.len(), 2, "one state row + one bmy row");
+
+        let st_row = &rows[0];
+        assert_eq!(st_row.fips, "06000");
+        assert_eq!(st_row.scc, "2270001010");
+        assert_eq!(st_row.hp_level, 25.0);
+        assert_eq!(st_row.channel, EmissionChannel::Exhaust);
+        assert!(st_row.model_year.is_none());
+        assert!(st_row.tech_type.is_none());
+
+        let bmy_row = &rows[1];
+        assert_eq!(bmy_row.fips, "06000");
+        assert_eq!(bmy_row.scc, "2270001010");
+        assert_eq!(bmy_row.channel, EmissionChannel::Exhaust);
+        assert_eq!(bmy_row.model_year, Some(2010));
+        assert_eq!(bmy_row.tech_type.as_deref(), Some("T1"));
+
+        // Warnings survive through geography_output_to_execution.
+        let exec = geography_output_to_execution(geo_out);
+        assert_eq!(exec.rows.len(), 2);
+        assert!(!exec.warnings.is_empty(), "warnings must be preserved");
     }
 }
 
