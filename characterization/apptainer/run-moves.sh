@@ -3,10 +3,12 @@
 # Sets up the bind-mount layout, starts MariaDB inside the container,
 # runs the requested ant target, then shuts MariaDB down cleanly.
 #
-# Designed to work BOTH with and without --fakeroot. The non-fakeroot
-# path uses start-mariadb-bg.sh which runs mariadbd as the calling
-# user. The fakeroot path uses `service mariadb start`, matching the
-# canonical validation command in the bead.
+# Designed to work BOTH with and without --fakeroot. Both modes use
+# start-mariadb-bg.sh, which runs mariadbd directly as the calling user.
+# In fakeroot mode the calling user is root so MariaDB runs with
+# --user=root; in no-root mode it runs as the HPC user with moves/moves
+# credentials for the readiness probe. Avoids mariadbd-safe-helper, which
+# cannot setuid(mysql) in root-mapped-namespace fakeroot environments.
 #
 # Usage:
 #   ./run-moves.sh [-f|--fakeroot] [--runspec PATH] [-- <ant-target> ...]
@@ -44,7 +46,7 @@ WORKER_DIR="${WORKER_DIR:-${WORKDIR}/WorkerFolder}"
 
 USE_FAKEROOT=0
 RUNSPEC="testdata/SampleRunSpec.xml"
-ANT_ARGS=( crun )
+ANT_ARGS=( main1worker )
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -82,10 +84,11 @@ BINDS=(
 FAKEROOT_FLAG=()
 if [ "${USE_FAKEROOT}" = "1" ]; then
     FAKEROOT_FLAG=( --fakeroot )
-    START_CMD="service mariadb start"
-else
-    START_CMD="/opt/moves-bin/start-mariadb-bg.sh"
 fi
+# Both fakeroot and no-root modes use start-mariadb-bg.sh (direct mariadbd).
+# In fakeroot, id -un == root so mariadbd runs with --user=root and root
+# auth succeeds. In no-root mode, the SIF's moves/moves account is used.
+START_CMD="/opt/moves-bin/start-mariadb-bg.sh"
 
 # Propagate opt-in env vars into the container.
 # Apptainer scrubs the host environment by default; an explicit --env
@@ -103,6 +106,7 @@ RUNSPEC_QUOTED="$(printf '%q' "${RUNSPEC}")"
 
 apptainer exec \
     "${FAKEROOT_FLAG[@]}" \
+    --writable-tmpfs \
     "${BINDS[@]}" \
     "${EXTRA_ENV_ARGS[@]}" \
     "${SIF}" \
@@ -110,20 +114,16 @@ apptainer exec \
         set -eu
         /opt/moves-bin/init-mariadb.sh
         ${START_CMD}
-        # Wait for socket if 'service' returned without blocking.
-        for i in \$(seq 1 60); do
-            [ -S /var/run/mysqld/mysqld.sock ] && break
-            sleep 1
-        done
+        # %environment sets JAVA_HOME to Temurin 17, but the apt-installed 'ant'
+        # package pulled in OpenJDK 21 as a dependency, so the classes in the SIF
+        # were compiled by javac 21 (class file version 65). Override JAVA_HOME to
+        # the OpenJDK 21 present in the SIF so the forked JVM matches.
+        export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
         cd /opt/moves
         ant ${ANT_ARGS_QUOTED} -Drunspec=${RUNSPEC_QUOTED}
         STATUS=\$?
         # Stop mariadbd cleanly so the next run sees a consistent datadir.
-        if [ '${USE_FAKEROOT}' = '1' ]; then
-            service mariadb stop || true
-        else
-            mariadb-admin --socket=/var/run/mysqld/mysqld.sock -uroot shutdown 2>/dev/null || \
-              kill \"\$(cat /var/run/mysqld/mariadbd.pid 2>/dev/null)\" 2>/dev/null || true
-        fi
+        mariadb-admin --socket=/var/run/mysqld/mysqld.sock -uroot shutdown 2>/dev/null || \
+          kill \"\$(cat /var/run/mysqld/mariadbd.pid 2>/dev/null)\" 2>/dev/null || true
         exit \$STATUS
     "

@@ -30,10 +30,12 @@ EFFECTIVE_USER="$(id -un)"
     --skip-networking=0 \
     "$@" &
 
-# Wait for socket
+# Wait for socket. In no-root mode MariaDB runs as the calling user, so
+# unix_socket auth for root is unavailable. Use the moves/moves account
+# (provisioned during %post) for the readiness probe instead.
 for i in $(seq 1 60); do
     if [ -S "$SOCK_PATH" ] && \
-       /usr/bin/mariadb --socket="$SOCK_PATH" -uroot -e "SELECT 1" >/dev/null 2>&1; then
+       /usr/bin/mariadb --socket="$SOCK_PATH" -umoves -pmoves -e "SELECT 1" >/dev/null 2>&1; then
         echo "[start-mariadb-bg] mariadbd ready (PID $(cat "$PID_FILE" 2>/dev/null))."
         exit 0
     fi
