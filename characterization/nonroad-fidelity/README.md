@@ -103,10 +103,86 @@ NONROAD_FIDELITY_REFERENCE=characterization/nonroad-fidelity/baselines \
     cargo test -p moves-nonroad --test nonroad_fidelity
 ```
 
-When the variable is set, the harness loads and structurally
-validates every `<fixture>.tsv` it finds. The reference-vs-port diff
+When the variable is set, the harness loads `MANIFEST.toml` from the
+baseline directory, verifies each TSV's SHA256 against the manifest,
+then structurally validates every record. The reference-vs-port diff
 itself (`divergence::compare_runs`) activates with no further harness
 change once Task 117 lands the port side.
+
+## Regenerate the corpus
+
+Run `generate-corpus.sh` when the baselines are missing or after
+bumping `MOVES_COMMIT` in `characterization/apptainer/files/versions.env`:
+
+```sh
+# Prerequisite: moves-fixture.sif at the default path or via $SIF.
+cd characterization/nonroad-fidelity
+./generate-corpus.sh            # idempotent; skips fixtures whose SHA matches
+```
+
+Common options:
+
+```sh
+FORCE=1 ./generate-corpus.sh                  # force-regenerate all ten
+SIF=/path/to/custom.sif ./generate-corpus.sh  # use a specific SIF
+./generate-corpus.sh --dry-run                # print commands without running
+```
+
+The script writes each fixture's TSV to `baselines/<fixture>.tsv` and
+records SHA256, line count, and elapsed time in `baselines/corpus.sha`.
+
+### MANIFEST.toml contract
+
+The fidelity harness reads `MANIFEST.toml` from the baseline directory —
+not `corpus.sha`. Create it alongside the TSVs after running
+`generate-corpus.sh`:
+
+```toml
+sif_sha256 = "<SHA256 from canonical-image.lock>"  # optional provenance
+
+[[fixtures]]
+name = "nr-construction-state"
+path = "nr-construction-state.tsv"
+sha256 = "<TSV SHA256 from corpus.sha>"
+bytes = 12345                                       # byte count of the TSV
+rows = 678                                          # line count from corpus.sha
+wall_seconds = 42                                   # optional, from corpus.sha
+
+# ... one [[fixtures]] entry per fixture (ten total)
+```
+
+The harness validates each `sha256` against the file on disk before
+parsing. A stale TSV that no longer matches its recorded hash fails
+loudly at load time rather than silently producing wrong divergence
+results.
+
+### Cutover rule
+
+Bumping `MOVES_COMMIT` in `characterization/apptainer/files/versions.env`
+changes the pinned NONROAD binary and invalidates the existing baselines.
+After bumping, re-run the full T2 → T4 chain:
+
+1. **T2** — Rebuild the SIF: `characterization/apptainer/build-sif.sh`.
+   Update `canonical-image.lock` with the new SIF SHA256.
+2. **T3** — Regenerate the corpus: `./generate-corpus.sh` (this step).
+   Update `sif_sha256` in `MANIFEST.toml` and refresh every fixture entry.
+3. **T4** — Verify the fidelity gate passes against the new baselines:
+   ```sh
+   NONROAD_FIDELITY_REFERENCE=characterization/nonroad-fidelity/baselines \
+       cargo test -p moves-nonroad --test nonroad_fidelity
+   ```
+
+Baselines captured against a prior `MOVES_COMMIT` must not be mixed with
+runs from the current commit — the instrumented binary changes and the
+TSV records will no longer be comparable.
+
+### Relationship to Task 117
+
+Task 117 (`run_simulation` port-side `dbgemit` instrumentation) supplies
+the other half of the diff. Once Task 117 is merged, the
+`divergence::compare_runs` path activates automatically — no harness
+change is needed. The adapter contract (`tests/fidelity/adapter.rs`) is
+the interface the port instrumentation builds to.
 
 ## Handoff to Task 116
 

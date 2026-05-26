@@ -160,6 +160,11 @@ representative one-county fixture: ~5–20 MB. Larger fixtures
 (multi-county or annual) can produce hundreds of MB — keep them on
 scratch, not in the repo.
 
+The corpus-generation workflow — running `generate-corpus.sh` to
+capture all ten Phase 0 fixtures, the `MANIFEST.toml` contract the
+fidelity harness reads, and the `MOVES_COMMIT` cutover rule — is
+documented in the sibling: `characterization/nonroad-fidelity/README.md`.
+
 ## Validation gate
 
 This bead's bead description requires:

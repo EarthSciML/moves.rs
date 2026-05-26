@@ -17,9 +17,14 @@
 //!    supplied via `NONROAD_FIDELITY_REFERENCE`;
 //! 7. print a harness-status banner.
 //!
-//! See `tests/fidelity/mod.rs` for what runs today versus what is
-//! gated behind Task 117 (`run_simulation` wiring) and the
-//! Apptainer-built gfortran reference.
+//! See `tests/fidelity/mod.rs` for the full what-runs-today breakdown.
+//! Reference corpus contract: `MANIFEST.toml` in the baseline directory
+//! (one `[[fixtures]]` entry per fixture — name, path, sha256, bytes,
+//! rows, optional wall_seconds and sif_sha256). Activate by setting
+//! `NONROAD_FIDELITY_REFERENCE` to the baseline directory (e.g.
+//! `characterization/nonroad-fidelity/baselines`). Regeneration
+//! instructions and the MOVES_COMMIT cutover rule:
+//! `characterization/nonroad-fidelity/README.md`.
 
 mod fidelity;
 
