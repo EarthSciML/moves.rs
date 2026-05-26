@@ -26,6 +26,9 @@
 //! executor evolve independently.
 
 use crate::driver::{DriverRecord, RunRegions};
+use crate::geography::common::ActivityUnit;
+use crate::population::retrofit::RetrofitRecord;
+use crate::population::{AgeAdjustmentTable, GrowthIndicatorRecord, ScrappageCurve};
 
 /// One SCC group's worth of population records, in file order.
 ///
@@ -116,6 +119,166 @@ impl NonroadInputs {
     pub fn is_empty(&self) -> bool {
         self.scc_groups.is_empty()
     }
+}
+
+// =============================================================================
+// Reference-data entry types and ReferenceData bundle
+// =============================================================================
+
+/// One exhaust-tech-type entry for [`ProductionExecutor`] (Fortran `fndtch`).
+///
+/// Linear-scan key: `scc` + HP range `[hp_min, hp_max]`. The
+/// `tech_year` field is not currently used in the lookup — the caller
+/// resolves the year via `min(model_year, options.tech_year)` before
+/// dispatching, so any single entry covers all years until a finer
+/// loader is ported.
+#[derive(Debug, Clone, Default)]
+pub struct ExhaustTechEntry {
+    /// 10-character SCC code.
+    pub scc: String,
+    /// Lower bound of the HP range (inclusive).
+    pub hp_min: f32,
+    /// Upper bound of the HP range (inclusive).
+    pub hp_max: f32,
+    /// Per-tech-slot names (`tectyp(idxtch, 1..n)`).
+    pub tech_names: Vec<String>,
+    /// Per-tech-slot fractions (`tchfrc(idxtch, 1..n)`). Must be the
+    /// same length as `tech_names`.
+    pub tech_fractions: Vec<f32>,
+}
+
+/// One evap-tech-type entry for [`ProductionExecutor`] (Fortran `fndevtch`).
+///
+/// Same key and lookup semantics as [`ExhaustTechEntry`].
+#[derive(Debug, Clone, Default)]
+pub struct EvapTechEntry {
+    /// 10-character SCC code.
+    pub scc: String,
+    /// Lower bound of the HP range (inclusive).
+    pub hp_min: f32,
+    /// Upper bound of the HP range (inclusive).
+    pub hp_max: f32,
+    /// Per-evap-tech-slot names (`evtecnam(idxtch, 1..n)`).
+    pub tech_names: Vec<String>,
+    /// Per-evap-tech-slot fractions (`evtchfrc(idxtch, 1..n)`).
+    pub tech_fractions: Vec<f32>,
+}
+
+/// Growth cross-reference entry for [`ProductionExecutor`] (Fortran `fndgxf`).
+///
+/// Maps `(fips, scc, hp range)` → growth indicator code.
+#[derive(Debug, Clone, Default)]
+pub struct GrowthXrefEntry {
+    /// 5-character county FIPS (`fipin`).
+    pub fips: String,
+    /// 10-character SCC code (`asccod`).
+    pub scc: String,
+    /// Lower bound of the HP range (inclusive).
+    pub hp_min: f32,
+    /// Upper bound of the HP range (inclusive).
+    pub hp_max: f32,
+    /// 4-character growth indicator code (`indcod`).
+    pub indicator: String,
+}
+
+/// Activity lookup entry for [`ProductionExecutor`] (Fortran `fndact`).
+///
+/// Key: `(scc, fips)`. The HP is not matched in the linear scan —
+/// the Fortran `fndact` searches by SCC and FIPS only, then returns
+/// the first matching activity record.
+#[derive(Debug, Clone)]
+pub struct ActivityTableEntry {
+    /// 10-character SCC code.
+    pub scc: String,
+    /// 5-character county FIPS, or empty to match any FIPS.
+    pub fips: String,
+    /// Starts per period (`starts(idxact)`).
+    pub starts: f32,
+    /// Activity level (`actlev(idxact)`).
+    pub activity_level: f32,
+    /// Activity-units indicator (`iactun(idxact)`).
+    pub activity_unit: ActivityUnit,
+    /// Load factor (`faclod(idxact)`).
+    pub load_factor: f32,
+    /// Age-curve code (`actage(idxact)`).
+    pub age_code: String,
+}
+
+/// National-to-state allocation entry for [`ProductionExecutor`].
+///
+/// Identifies an SCC for which national-to-state allocation data is
+/// available. [`NationalAdapter::find_allocation`] succeeds when an
+/// entry for the SCC exists; the actual per-state distribution uses a
+/// uniform placeholder until NR*.ALO loaders are ported.
+#[derive(Debug, Clone, Default)]
+pub struct NationalAllocationEntry {
+    /// 10-character SCC code.
+    pub scc: String,
+}
+
+/// Reference tables loaded once per run by the orchestrator.
+///
+/// Aggregates every reference table [`ProductionExecutor`] needs to
+/// evaluate the six NONROAD geography routines. Built once by the
+/// orchestrator from the parsed input files and passed by reference to
+/// [`ProductionExecutor::new`].
+///
+/// # Fortran COMMON-block sources
+///
+/// Each field name maps to one or more Fortran COMMON blocks or
+/// parallel arrays from the NONROAD source. Fields marked
+/// **⚠ NOT YET LOADABLE** have no ported loader; their `Vec<u8>`
+/// placeholder signals intent without blocking compilation.
+#[derive(Debug, Clone, Default)]
+pub struct ReferenceData {
+    /// Exhaust tech-type fractions and names — one entry per
+    /// `(SCC, HP range)` bucket. Fortran: `TCHFRC`, `TECTYP` from
+    /// NR*.EF emission-factor files (`rdtech.f`).
+    pub exhaust_tech_entries: Vec<ExhaustTechEntry>,
+    /// Evap tech-type fractions and names — same structure as
+    /// [`exhaust_tech_entries`](Self::exhaust_tech_entries). Fortran:
+    /// `EVTCHFRC`, `EVTECTYP` from NR*.EF files (`rdevtech.f`).
+    pub evap_tech_entries: Vec<EvapTechEntry>,
+    /// Emission-factor records from NR*.EMF files. Fortran: emission-
+    /// factor arrays `EMFAC`, `EMIYR` from `rdemfac.f`.
+    /// **⚠ NOT YET LOADABLE.**
+    pub emission_factors: Vec<u8>,
+    /// Activity lookup entries — one per `(SCC, FIPS)` bucket. Fortran:
+    /// `ACTLEV`, `FACLOD`, `IACTUN`, `ACTAGE`, `STARTS` from NR*.ACT
+    /// files (`rdact.f`).
+    pub activity_entries: Vec<ActivityTableEntry>,
+    /// Growth cross-reference entries — one per `(FIPS, SCC, HP range)`.
+    /// Fortran: `GXFDAT` table from NR*.GRW indicator files (`rdgrow.f`).
+    pub growth_xref_entries: Vec<GrowthXrefEntry>,
+    /// Growth indicator records for every indicator code referenced in
+    /// [`growth_xref_entries`](Self::growth_xref_entries). Fortran:
+    /// growth-factor arrays `GRWFAC`, `GRWFIP` from NR*.GRW files
+    /// (`rdgrow.f`).
+    pub growth_records: Vec<GrowthIndicatorRecord>,
+    /// Scrappage curve (`getscrp`-resolved). Fortran: `SCRPFRC` array
+    /// from NR*.POP scrappage data.
+    pub scrappage_curve: ScrappageCurve,
+    /// Alternate age-adjustment table. Fortran: `AGEADJ` from the
+    /// `/AGE ADJUSTMENT/` packet in NR*.ACT files (`rdact.f`). Defaults
+    /// to an empty table (DEFAULT curve only).
+    pub age_adjustment_table: AgeAdjustmentTable,
+    /// Day/month temporal factors from NR*.TMF files. Fortran:
+    /// `DAYMTHFAC`, `MTHF`, `DAYF`, `NDAYS` from `rdtmfac.f`.
+    /// **⚠ NOT YET LOADABLE.**
+    pub temporal_factors: Vec<u8>,
+    /// Refueling/spillage-mode records from NR*.SPL files. Fortran:
+    /// `MODSPL`, `VOLSPL`, `VOLRFL` from `rdspl.f`.
+    /// **⚠ NOT YET LOADABLE.**
+    pub spillage_records: Vec<u8>,
+    /// National-to-state allocation entries keyed by SCC. Fortran:
+    /// `ALOSTA` allocation data from NR*.ALO files (`rdalo.f`).
+    pub national_allocation: Vec<NationalAllocationEntry>,
+    /// Subcounty allocation coefficients from NR*.SCO files. Fortran:
+    /// `ALOSUB` from `rdsco.f`. **⚠ NOT YET LOADABLE.**
+    pub subcounty_allocation: Vec<u8>,
+    /// Retrofit records from NR*.RFT files. Fortran: `RTRFTDAT` from
+    /// `rdrft.f` (`population::retrofit::RetrofitRecord`).
+    pub retrofit_records: Vec<RetrofitRecord>,
 }
 
 #[cfg(test)]

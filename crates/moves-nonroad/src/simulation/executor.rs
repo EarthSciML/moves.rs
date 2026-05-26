@@ -66,11 +66,12 @@ use crate::geography::subcounty::SubcountyRecordIndex;
 use crate::population::retrofit::RetrofitRecord;
 use crate::population::{
     age_distribution, growth_factor, model_year, select_for_indicator, ActivityUnits,
-    AgeAdjustmentTable, GrowthIndicatorRecord, ScrappageCurve,
+    GrowthIndicatorRecord,
 };
 use crate::driver::scrptime;
 use crate::{Error, Result};
 
+use super::inputs::ReferenceData;
 use super::options::NonroadOptions;
 use super::outputs::{EmissionChannel, SimEmissionRow};
 
@@ -291,100 +292,9 @@ impl GeographyExecutor for PlanRecordingExecutor {
     }
 }
 
-// =============================================================================
-// Reference data entry types for CountyAdapter lookups
-// =============================================================================
-
-/// One exhaust-tech-type entry for [`CountyAdapter`] (Fortran `fndtch`).
-///
-/// Linear-scan key: `scc` + HP range `[hp_min, hp_max]`. The
-/// `tech_year` field is not currently used in the lookup — the caller
-/// resolves the year via `min(model_year, options.tech_year)` before
-/// dispatching, so any single entry covers all years until a finer
-/// loader is ported.
-#[derive(Debug, Clone, Default)]
-pub struct ExhaustTechEntry {
-    /// 10-character SCC code.
-    pub scc: String,
-    /// Lower bound of the HP range (inclusive).
-    pub hp_min: f32,
-    /// Upper bound of the HP range (inclusive).
-    pub hp_max: f32,
-    /// Per-tech-slot names (`tectyp(idxtch, 1..n)`).
-    pub tech_names: Vec<String>,
-    /// Per-tech-slot fractions (`tchfrc(idxtch, 1..n)`). Must be the
-    /// same length as `tech_names`.
-    pub tech_fractions: Vec<f32>,
-}
-
-/// One evap-tech-type entry for [`CountyAdapter`] (Fortran `fndevtch`).
-///
-/// Same key and lookup semantics as [`ExhaustTechEntry`].
-#[derive(Debug, Clone, Default)]
-pub struct EvapTechEntry {
-    /// 10-character SCC code.
-    pub scc: String,
-    /// Lower bound of the HP range (inclusive).
-    pub hp_min: f32,
-    /// Upper bound of the HP range (inclusive).
-    pub hp_max: f32,
-    /// Per-evap-tech-slot names (`evtecnam(idxtch, 1..n)`).
-    pub tech_names: Vec<String>,
-    /// Per-evap-tech-slot fractions (`evtchfrc(idxtch, 1..n)`).
-    pub tech_fractions: Vec<f32>,
-}
-
-/// Growth cross-reference entry for [`CountyAdapter`] (Fortran `fndgxf`).
-///
-/// Maps `(fips, scc, hp range)` → growth indicator code.
-#[derive(Debug, Clone, Default)]
-pub struct GrowthXrefEntry {
-    /// 5-character county FIPS (`fipin`).
-    pub fips: String,
-    /// 10-character SCC code (`asccod`).
-    pub scc: String,
-    /// Lower bound of the HP range (inclusive).
-    pub hp_min: f32,
-    /// Upper bound of the HP range (inclusive).
-    pub hp_max: f32,
-    /// 4-character growth indicator code (`indcod`).
-    pub indicator: String,
-}
-
-/// Activity lookup entry for [`CountyAdapter`] (Fortran `fndact`).
-///
-/// Key: `(scc, fips)`. The HP is not matched in the linear scan —
-/// the Fortran `fndact` searches by SCC and FIPS only, then returns
-/// the first matching activity record.
-#[derive(Debug, Clone)]
-pub struct ActivityTableEntry {
-    /// 10-character SCC code.
-    pub scc: String,
-    /// 5-character county FIPS, or empty to match any FIPS.
-    pub fips: String,
-    /// Starts per period (`starts(idxact)`).
-    pub starts: f32,
-    /// Activity level (`actlev(idxact)`).
-    pub activity_level: f32,
-    /// Activity-units indicator (`iactun(idxact)`).
-    pub activity_unit: ActivityUnit,
-    /// Load factor (`faclod(idxact)`).
-    pub load_factor: f32,
-    /// Age-curve code (`actage(idxact)`).
-    pub age_code: String,
-}
-
-/// National-to-state allocation entry for [`ProductionExecutor`].
-///
-/// Identifies an SCC for which national-to-state allocation data is
-/// available. [`NationalAdapter::allocate_to_states`] distributes
-/// population uniformly across selected states without state-level
-/// records as a placeholder until NR*.ALO loaders are ported.
-#[derive(Debug, Clone, Default)]
-pub struct NationalAllocationEntry {
-    /// 10-character SCC code.
-    pub scc: String,
-}
+// (Entry types ExhaustTechEntry, EvapTechEntry, GrowthXrefEntry,
+//  ActivityTableEntry, NationalAllocationEntry are defined in
+//  super::inputs and re-imported above.)
 
 // =============================================================================
 // ProductionExecutor
@@ -507,77 +417,46 @@ pub struct ProductionExecutor {
     /// [`CountyAdapter::find_fips`] to map a region-code to its slot
     /// index.
     pub county_fips: Vec<String>,
-    /// Exhaust tech-type fractions and names — one entry per
-    /// `(SCC, HP range)` bucket. Replaces the parallel `tchfrc` /
-    /// `tectyp` arrays from NR\*.EF files.
-    pub exhaust_tech_entries: Vec<ExhaustTechEntry>,
-    /// Evap tech-type fractions and names — same structure as
-    /// [`exhaust_tech_entries`](Self::exhaust_tech_entries).
-    pub evap_tech_entries: Vec<EvapTechEntry>,
-    /// Emission-factor records from NR\*.EMF files. **⚠ NOT YET LOADABLE.**
-    pub emission_factors: Vec<u8>,
-    /// Activity lookup entries — one per `(SCC, FIPS)` bucket.
-    /// Replaces the parallel `actlev` / `faclod` / `iactun` / `actage`
-    /// / `starts` arrays from NR\*.ACT files.
-    pub activity_entries: Vec<ActivityTableEntry>,
-    /// Growth cross-reference entries — one per `(FIPS, SCC, HP range)`.
-    /// Replaces the `gxfdat` table from NR\*.GRW files.
-    pub growth_xref_entries: Vec<GrowthXrefEntry>,
-    /// Growth indicator records loaded for every indicator used in
-    /// [`growth_xref_entries`](Self::growth_xref_entries). Used by
-    /// [`CountyAdapter::model_year_and_agedist`] via
-    /// [`select_for_indicator`] + [`growth_factor`].
-    pub growth_records: Vec<GrowthIndicatorRecord>,
-    /// Scrappage curve for [`CountyAdapter::model_year_and_agedist`].
-    /// Passed as the `getscrp`-resolved curve to [`scrptime`].
-    pub scrappage_curve: ScrappageCurve,
-    /// Alternate age-adjustment table for [`model_year`]. Defaults to
-    /// an empty table (DEFAULT curve only).
-    pub age_adjustment_table: AgeAdjustmentTable,
     /// HP-category midpoints (`hpclev(1..MXHPC)`) used by the
     /// `hp_level_lookup` call in [`process_county`] /
     /// [`process_subcounty`]. Defaults to all-zeros (every HP record
     /// resolves to `9999.0`); set to the standard NONROAD values for
     /// production runs.
     pub hp_levels: [f32; MXHPC],
-    /// Day/month temporal factors from NR\*.TMF files. **⚠ NOT YET LOADABLE.**
-    pub temporal_factors: Vec<u8>,
-    /// Refueling/spillage-mode records from NR\*.SPL files. **⚠ NOT YET LOADABLE.**
-    pub spillage_records: Vec<u8>,
-    /// National-to-state allocation entries keyed by SCC. An entry
-    /// for a given SCC makes [`NationalAdapter::find_allocation`]
-    /// succeed; the actual per-state distribution uses a uniform
-    /// placeholder until NR\*.ALO loaders are ported.
-    pub national_allocation: Vec<NationalAllocationEntry>,
     /// State descriptors for national dispatch. Parallel to the
     /// `statcd`/`lstacd`/`lstlev` Fortran arrays; required to build
     /// [`NationalContext::states`].
     pub state_descriptors: Vec<StateDescriptor>,
-    /// Subcounty allocation coefficients from NR\*.SCO files. **⚠ NOT YET LOADABLE.**
-    pub subcounty_allocation: Vec<u8>,
-    /// Retrofit records from NR\*.RFT files (`population::retrofit::RetrofitRecord`).
-    pub retrofit_records: Vec<RetrofitRecord>,
+    /// Reference tables loaded from input files — tech fractions,
+    /// activity records, growth data, allocation, retrofit, and
+    /// temporal factors. Built once per run by the orchestrator and
+    /// passed to [`ProductionExecutor::new`].
+    pub reference: ReferenceData,
 }
 
 impl ProductionExecutor {
-    /// Create a `ProductionExecutor` with no reference data loaded.
+    /// Create a `ProductionExecutor` from a pre-loaded [`ReferenceData`] bundle.
     ///
-    /// All reference-data fields are empty; every county / subcounty
-    /// dispatch returns [`GeographyExecution::skipped`] (FIPS not
-    /// found) until [`county_fips`](Self::county_fips) and the other
-    /// typed fields are populated.
+    /// All other fields (`county_fips`, `hp_levels`, `state_descriptors`)
+    /// default to empty; every county / subcounty dispatch returns
+    /// [`GeographyExecution::skipped`] (FIPS not found) until
+    /// `county_fips` and the other fields are populated after construction.
     ///
     /// # Examples
     ///
     /// ```
-    /// use moves_nonroad::simulation::ProductionExecutor;
+    /// use moves_nonroad::simulation::{ProductionExecutor, ReferenceData};
     ///
-    /// let executor = ProductionExecutor::new();
-    /// assert!(executor.exhaust_tech_entries.is_empty());
-    /// assert!(executor.retrofit_records.is_empty());
+    /// let ref_data = ReferenceData::default();
+    /// let executor = ProductionExecutor::new(&ref_data);
+    /// assert!(executor.reference.exhaust_tech_entries.is_empty());
+    /// assert!(executor.reference.retrofit_records.is_empty());
     /// ```
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(ref_data: &ReferenceData) -> Self {
+        Self {
+            reference: ref_data.clone(),
+            ..Self::default()
+        }
     }
 
     fn execute_county(
@@ -773,6 +652,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
     fn find_exhaust_tech(&self, scc: &str, hp_avg: f32, _year: i32) -> Option<TechLookup> {
         let entry = self
             .executor
+            .reference
             .exhaust_tech_entries
             .iter()
             .find(|e| e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max)?;
@@ -786,6 +666,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
     fn find_evap_tech(&self, scc: &str, hp_avg: f32, _year: i32) -> Option<TechLookup> {
         let entry = self
             .executor
+            .reference
             .evap_tech_entries
             .iter()
             .find(|e| e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max)?;
@@ -805,6 +686,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
 
     fn find_growth_xref(&self, fips: &str, scc: &str, hp_avg: f32) -> Option<usize> {
         self.executor
+            .reference
             .growth_xref_entries
             .iter()
             .position(|e| e.fips == fips && e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max)
@@ -814,13 +696,14 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
 
     fn find_activity(&self, scc: &str, fips: &str, _hp_avg: f32) -> Option<usize> {
         self.executor
+            .reference
             .activity_entries
             .iter()
             .position(|e| e.scc == scc && (e.fips.is_empty() || e.fips == fips))
     }
 
     fn activity_record(&self, activity_index: usize) -> ActivityRecord {
-        let entry = match self.executor.activity_entries.get(activity_index) {
+        let entry = match self.executor.reference.activity_entries.get(activity_index) {
             Some(e) => e,
             None => {
                 return ActivityRecord {
@@ -856,6 +739,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
                 // Initialise: keep records whose SCC and HP range match.
                 self.retrofit_survivors = self
                     .executor
+                    .reference
                     .retrofit_records
                     .iter()
                     .enumerate()
@@ -870,14 +754,14 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             RetrofitFilter::ModelYear => {
                 // Narrow: keep records whose model-year span contains model_year.
                 self.retrofit_survivors.retain(|&i| {
-                    let r = &self.executor.retrofit_records[i];
+                    let r = &self.executor.reference.retrofit_records[i];
                     r.year_model_start <= model_year && model_year <= r.year_model_end
                 });
             }
             RetrofitFilter::TechType => {
                 // Narrow: keep records whose tech type matches.
                 self.retrofit_survivors.retain(|&i| {
-                    let r = &self.executor.retrofit_records[i];
+                    let r = &self.executor.reference.retrofit_records[i];
                     r.tech_type.trim() == tech_name.trim()
                         || r.tech_type.trim() == crate::population::RTRFTTECHTYPE_ALL
                 });
@@ -889,7 +773,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
     fn surviving_retrofits(&self) -> Vec<&RetrofitRecord> {
         self.retrofit_survivors
             .iter()
-            .map(|&i| &self.executor.retrofit_records[i])
+            .map(|&i| &self.executor.reference.retrofit_records[i])
             .collect()
     }
 
@@ -932,6 +816,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         // 1. Growth indicator from cross-reference.
         let indicator = self
             .executor
+            .reference
             .growth_xref_entries
             .get(growth_index)
             .map(|e| e.indicator.clone())
@@ -944,7 +829,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         // 2. Select growth records for this indicator (clone to avoid
         //    borrow-checker conflict with the scrptime closure below).
         let selected: Vec<GrowthIndicatorRecord> =
-            select_for_indicator(&self.executor.growth_records, &indicator)
+            select_for_indicator(&self.executor.reference.growth_records, &indicator)
                 .into_iter()
                 .cloned()
                 .collect();
@@ -952,6 +837,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         // 3. Activity entry.
         let act = self
             .executor
+            .reference
             .activity_entries
             .get(activity_index)
             .ok_or_else(|| {
@@ -970,7 +856,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         };
 
         // 5. Clone scrappage curve so the closure can capture it by move.
-        let curve = self.executor.scrappage_curve.clone();
+        let curve = self.executor.reference.scrappage_curve.clone();
         let use_hours = record.use_hours;
         let load_factor = act.load_factor;
         let pop_growth_factor = self.ctx_growth.unwrap_or(0.0);
@@ -982,7 +868,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             units,
             load_factor,
             use_hours,
-            &self.executor.age_adjustment_table,
+            &self.executor.reference.age_adjustment_table,
             &act.age_code,
             move |acttmp| {
                 scrptime(use_hours, load_factor, acttmp, pop_growth_factor, &curve)
@@ -1145,6 +1031,7 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
     ) -> Option<ExhaustTechLookup> {
         let entry = self
             .executor
+            .reference
             .exhaust_tech_entries
             .iter()
             .find(|e| e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max)?;
@@ -1162,6 +1049,7 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
     ) -> Option<EvapTechLookup> {
         let entry = self
             .executor
+            .reference
             .evap_tech_entries
             .iter()
             .find(|e| e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max)?;
@@ -1174,6 +1062,7 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
     fn find_growth_xref(&mut self, fips: &str, scc: &str, hp_avg: f32) -> Option<i32> {
         let idx = self
             .executor
+            .reference
             .growth_xref_entries
             .iter()
             .position(|e| e.fips == fips && e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max)?;
@@ -1183,6 +1072,7 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
     fn find_activity(&mut self, scc: &str, fips: &str, _hp_avg: f32) -> Option<ActivityLookup> {
         let entry = self
             .executor
+            .reference
             .activity_entries
             .iter()
             .find(|e| e.scc == scc && (e.fips.is_empty() || e.fips == fips))?;
@@ -1214,6 +1104,7 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
     fn growth_factor(&mut self, year1: i32, year2: i32, fips: &str, indcod: i32) -> Result<f32> {
         let indicator = self
             .executor
+            .reference
             .growth_xref_entries
             .get(indcod as usize)
             .map(|e| e.indicator.clone())
@@ -1223,7 +1114,7 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
                 ))
             })?;
         let selected: Vec<GrowthIndicatorRecord> =
-            select_for_indicator(&self.executor.growth_records, &indicator)
+            select_for_indicator(&self.executor.reference.growth_records, &indicator)
                 .into_iter()
                 .cloned()
                 .collect();
@@ -1248,7 +1139,7 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
             ExhaustActivityUnit::GallonsPerYear => ActivityUnits::GallonsPerYear,
             ExhaustActivityUnit::GallonsPerDay => ActivityUnits::GallonsPerDay,
         };
-        let curve = self.executor.scrappage_curve.clone();
+        let curve = self.executor.reference.scrappage_curve.clone();
         let use_hours = eq.use_hours;
         let load_factor = activity.load_factor;
         let modyr_out = model_year(
@@ -1257,7 +1148,7 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
             units,
             load_factor,
             use_hours,
-            &self.executor.age_adjustment_table,
+            &self.executor.reference.age_adjustment_table,
             &activity.age_curve_id,
             move |acttmp| scrptime(use_hours, load_factor, acttmp, pop_growth_factor, &curve),
         )?;
@@ -1283,6 +1174,7 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
     ) -> Result<f32> {
         let indicator = self
             .executor
+            .reference
             .growth_xref_entries
             .get(indcod as usize)
             .map(|e| e.indicator.clone())
@@ -1292,7 +1184,7 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
                 ))
             })?;
         let selected: Vec<GrowthIndicatorRecord> =
-            select_for_indicator(&self.executor.growth_records, &indicator)
+            select_for_indicator(&self.executor.reference.growth_records, &indicator)
                 .into_iter()
                 .cloned()
                 .collect();
@@ -1313,6 +1205,7 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
     fn filter_retrofits_by_scc_hp(&mut self, scc: &str, hp_avg: f32) -> Result<()> {
         self.retrofit_survivors = self
             .executor
+            .reference
             .retrofit_records
             .iter()
             .enumerate()
@@ -1328,7 +1221,7 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
 
     fn filter_retrofits_by_year(&mut self, year: i32) -> Result<()> {
         self.retrofit_survivors.retain(|&i| {
-            let r = &self.executor.retrofit_records[i];
+            let r = &self.executor.reference.retrofit_records[i];
             r.year_model_start <= year && year <= r.year_model_end
         });
         Ok(())
@@ -1336,7 +1229,7 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
 
     fn filter_retrofits_by_tech(&mut self, tech: &str) -> Result<()> {
         self.retrofit_survivors.retain(|&i| {
-            let r = &self.executor.retrofit_records[i];
+            let r = &self.executor.reference.retrofit_records[i];
             r.tech_type.trim() == tech.trim()
                 || r.tech_type.trim() == crate::population::RTRFTTECHTYPE_ALL
         });
@@ -1396,7 +1289,7 @@ impl<'a> NationalAdapter<'a> {
 
 impl<'a> NationalCallbacks for NationalAdapter<'a> {
     fn find_allocation(&mut self, scc: &str) -> Option<()> {
-        if self.executor.national_allocation.iter().any(|e| e.scc == scc) {
+        if self.executor.reference.national_allocation.iter().any(|e| e.scc == scc) {
             Some(())
         } else {
             None
@@ -1441,6 +1334,7 @@ impl<'a> NationalCallbacks for NationalAdapter<'a> {
     ) -> Option<ExhaustTechLookup> {
         let entry = self
             .executor
+            .reference
             .exhaust_tech_entries
             .iter()
             .find(|e| e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max)?;
@@ -1453,6 +1347,7 @@ impl<'a> NationalCallbacks for NationalAdapter<'a> {
     fn find_evap_tech(&mut self, scc: &str, hp_avg: f32, _year: i32) -> Option<EvapTechLookup> {
         let entry = self
             .executor
+            .reference
             .evap_tech_entries
             .iter()
             .find(|e| e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max)?;
@@ -1465,6 +1360,7 @@ impl<'a> NationalCallbacks for NationalAdapter<'a> {
     fn find_growth_xref(&mut self, fips: &str, scc: &str, hp_avg: f32) -> Option<i32> {
         let idx = self
             .executor
+            .reference
             .growth_xref_entries
             .iter()
             .position(|e| e.fips == fips && e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max)?;
@@ -1474,6 +1370,7 @@ impl<'a> NationalCallbacks for NationalAdapter<'a> {
     fn find_activity(&mut self, scc: &str, fips: &str, _hp_avg: f32) -> Option<ActivityLookup> {
         let entry = self
             .executor
+            .reference
             .activity_entries
             .iter()
             .find(|e| e.scc == scc && (e.fips.is_empty() || e.fips == fips))?;
@@ -1504,6 +1401,7 @@ impl<'a> NationalCallbacks for NationalAdapter<'a> {
     fn growth_factor(&mut self, year1: i32, year2: i32, fips: &str, indcod: i32) -> Result<f32> {
         let indicator = self
             .executor
+            .reference
             .growth_xref_entries
             .get(indcod as usize)
             .map(|e| e.indicator.clone())
@@ -1513,7 +1411,7 @@ impl<'a> NationalCallbacks for NationalAdapter<'a> {
                 ))
             })?;
         let selected: Vec<GrowthIndicatorRecord> =
-            select_for_indicator(&self.executor.growth_records, &indicator)
+            select_for_indicator(&self.executor.reference.growth_records, &indicator)
                 .into_iter()
                 .cloned()
                 .collect();
@@ -1536,7 +1434,7 @@ impl<'a> NationalCallbacks for NationalAdapter<'a> {
             ExhaustActivityUnit::GallonsPerYear => ActivityUnits::GallonsPerYear,
             ExhaustActivityUnit::GallonsPerDay => ActivityUnits::GallonsPerDay,
         };
-        let curve = self.executor.scrappage_curve.clone();
+        let curve = self.executor.reference.scrappage_curve.clone();
         let use_hours = eq.use_hours;
         let load_factor = activity.load_factor;
         let modyr_out = model_year(
@@ -1545,7 +1443,7 @@ impl<'a> NationalCallbacks for NationalAdapter<'a> {
             units,
             load_factor,
             use_hours,
-            &self.executor.age_adjustment_table,
+            &self.executor.reference.age_adjustment_table,
             &activity.age_curve_id,
             move |acttmp| scrptime(use_hours, load_factor, acttmp, pop_growth_factor, &curve),
         )?;
@@ -1571,6 +1469,7 @@ impl<'a> NationalCallbacks for NationalAdapter<'a> {
     ) -> Result<f32> {
         let indicator = self
             .executor
+            .reference
             .growth_xref_entries
             .get(indcod as usize)
             .map(|e| e.indicator.clone())
@@ -1580,7 +1479,7 @@ impl<'a> NationalCallbacks for NationalAdapter<'a> {
                 ))
             })?;
         let selected: Vec<GrowthIndicatorRecord> =
-            select_for_indicator(&self.executor.growth_records, &indicator)
+            select_for_indicator(&self.executor.reference.growth_records, &indicator)
                 .into_iter()
                 .cloned()
                 .collect();
@@ -1601,6 +1500,7 @@ impl<'a> NationalCallbacks for NationalAdapter<'a> {
     fn filter_retrofits_by_scc_hp(&mut self, scc: &str, hp_avg: f32) -> Result<()> {
         self.retrofit_survivors = self
             .executor
+            .reference
             .retrofit_records
             .iter()
             .enumerate()
@@ -1616,7 +1516,7 @@ impl<'a> NationalCallbacks for NationalAdapter<'a> {
 
     fn filter_retrofits_by_year(&mut self, year: i32) -> Result<()> {
         self.retrofit_survivors.retain(|&i| {
-            let r = &self.executor.retrofit_records[i];
+            let r = &self.executor.reference.retrofit_records[i];
             r.year_model_start <= year && year <= r.year_model_end
         });
         Ok(())
@@ -1624,7 +1524,7 @@ impl<'a> NationalCallbacks for NationalAdapter<'a> {
 
     fn filter_retrofits_by_tech(&mut self, tech: &str) -> Result<()> {
         self.retrofit_survivors.retain(|&i| {
-            let r = &self.executor.retrofit_records[i];
+            let r = &self.executor.reference.retrofit_records[i];
             r.tech_type.trim() == tech.trim()
                 || r.tech_type.trim() == crate::population::RTRFTTECHTYPE_ALL
         });
@@ -1690,6 +1590,7 @@ impl<'a> UsTotalCallbacks for UsTotalAdapter<'a> {
     ) -> Option<ExhaustTechLookup> {
         let entry = self
             .executor
+            .reference
             .exhaust_tech_entries
             .iter()
             .find(|e| e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max)?;
@@ -1702,6 +1603,7 @@ impl<'a> UsTotalCallbacks for UsTotalAdapter<'a> {
     fn find_evap_tech(&mut self, scc: &str, hp_avg: f32, _year: i32) -> Option<EvapTechLookup> {
         let entry = self
             .executor
+            .reference
             .evap_tech_entries
             .iter()
             .find(|e| e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max)?;
@@ -1714,6 +1616,7 @@ impl<'a> UsTotalCallbacks for UsTotalAdapter<'a> {
     fn find_growth_xref(&mut self, fips: &str, scc: &str, hp_avg: f32) -> Option<i32> {
         let idx = self
             .executor
+            .reference
             .growth_xref_entries
             .iter()
             .position(|e| e.fips == fips && e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max)?;
@@ -1723,6 +1626,7 @@ impl<'a> UsTotalCallbacks for UsTotalAdapter<'a> {
     fn find_activity(&mut self, scc: &str, fips: &str, _hp_avg: f32) -> Option<ActivityLookup> {
         let entry = self
             .executor
+            .reference
             .activity_entries
             .iter()
             .find(|e| e.scc == scc && (e.fips.is_empty() || e.fips == fips))?;
@@ -1753,6 +1657,7 @@ impl<'a> UsTotalCallbacks for UsTotalAdapter<'a> {
     fn growth_factor(&mut self, year1: i32, year2: i32, fips: &str, indcod: i32) -> Result<f32> {
         let indicator = self
             .executor
+            .reference
             .growth_xref_entries
             .get(indcod as usize)
             .map(|e| e.indicator.clone())
@@ -1762,7 +1667,7 @@ impl<'a> UsTotalCallbacks for UsTotalAdapter<'a> {
                 ))
             })?;
         let selected: Vec<GrowthIndicatorRecord> =
-            select_for_indicator(&self.executor.growth_records, &indicator)
+            select_for_indicator(&self.executor.reference.growth_records, &indicator)
                 .into_iter()
                 .cloned()
                 .collect();
@@ -1785,7 +1690,7 @@ impl<'a> UsTotalCallbacks for UsTotalAdapter<'a> {
             ExhaustActivityUnit::GallonsPerYear => ActivityUnits::GallonsPerYear,
             ExhaustActivityUnit::GallonsPerDay => ActivityUnits::GallonsPerDay,
         };
-        let curve = self.executor.scrappage_curve.clone();
+        let curve = self.executor.reference.scrappage_curve.clone();
         let use_hours = eq.use_hours;
         let load_factor = activity.load_factor;
         let modyr_out = model_year(
@@ -1794,7 +1699,7 @@ impl<'a> UsTotalCallbacks for UsTotalAdapter<'a> {
             units,
             load_factor,
             use_hours,
-            &self.executor.age_adjustment_table,
+            &self.executor.reference.age_adjustment_table,
             &activity.age_curve_id,
             move |acttmp| scrptime(use_hours, load_factor, acttmp, pop_growth_factor, &curve),
         )?;
@@ -1820,6 +1725,7 @@ impl<'a> UsTotalCallbacks for UsTotalAdapter<'a> {
     ) -> Result<f32> {
         let indicator = self
             .executor
+            .reference
             .growth_xref_entries
             .get(indcod as usize)
             .map(|e| e.indicator.clone())
@@ -1829,7 +1735,7 @@ impl<'a> UsTotalCallbacks for UsTotalAdapter<'a> {
                 ))
             })?;
         let selected: Vec<GrowthIndicatorRecord> =
-            select_for_indicator(&self.executor.growth_records, &indicator)
+            select_for_indicator(&self.executor.reference.growth_records, &indicator)
                 .into_iter()
                 .cloned()
                 .collect();
@@ -1850,6 +1756,7 @@ impl<'a> UsTotalCallbacks for UsTotalAdapter<'a> {
     fn filter_retrofits_by_scc_hp(&mut self, scc: &str, hp_avg: f32) -> Result<()> {
         self.retrofit_survivors = self
             .executor
+            .reference
             .retrofit_records
             .iter()
             .enumerate()
@@ -1865,7 +1772,7 @@ impl<'a> UsTotalCallbacks for UsTotalAdapter<'a> {
 
     fn filter_retrofits_by_year(&mut self, year: i32) -> Result<()> {
         self.retrofit_survivors.retain(|&i| {
-            let r = &self.executor.retrofit_records[i];
+            let r = &self.executor.reference.retrofit_records[i];
             r.year_model_start <= year && year <= r.year_model_end
         });
         Ok(())
@@ -1873,7 +1780,7 @@ impl<'a> UsTotalCallbacks for UsTotalAdapter<'a> {
 
     fn filter_retrofits_by_tech(&mut self, tech: &str) -> Result<()> {
         self.retrofit_survivors.retain(|&i| {
-            let r = &self.executor.retrofit_records[i];
+            let r = &self.executor.reference.retrofit_records[i];
             r.tech_type.trim() == tech.trim()
                 || r.tech_type.trim() == crate::population::RTRFTTECHTYPE_ALL
         });
@@ -2308,7 +2215,7 @@ mod tests {
         // With an empty ProductionExecutor (no county_fips, no tables),
         // county/subcounty dispatch returns FIPS-not-found (Skipped),
         // and the other variants still return the placeholder Skipped.
-        let mut exec = ProductionExecutor::new();
+        let mut exec = ProductionExecutor::new(&ReferenceData::default());
         let opts = NonroadOptions::new(RegionLevel::County, 2020);
         let record = rec("06037");
         for dispatch in [
@@ -2495,6 +2402,10 @@ mod production {
     use crate::emissions::exhaust::FuelKind;
     use crate::input::scrappage::ScrappagePoint;
     use crate::population::AgeAdjustmentTable;
+    use super::super::inputs::{
+        ActivityTableEntry, EvapTechEntry, ExhaustTechEntry, GrowthXrefEntry,
+        NationalAllocationEntry,
+    };
 
     fn default_hp_levels() -> [f32; MXHPC] {
         let vs: [f32; MXHPC] = [
@@ -2524,7 +2435,7 @@ mod production {
     /// (a) Empty reference tables → county FIPS not found → `Skipped`.
     #[test]
     fn county_empty_ref_returns_skipped() {
-        let mut exec = ProductionExecutor::new();
+        let mut exec = ProductionExecutor::new(&ReferenceData::default());
         let opts = test_opts();
         let record = test_record();
         let ctx = DispatchContext {
@@ -2539,6 +2450,89 @@ mod production {
         assert!(result.rows.is_empty());
     }
 
+    /// (b) Minimal reference (one FIPS, one exhaust tech with zero fraction,
+    /// one evap tech with zero fraction, one growth xref, one activity
+    /// entry, zero retrofits) → non-skipped, exactly one `SimEmissionRow`.
+    ///
+    /// Zero tech fractions cause the per-tech-type loop body to be
+    /// skipped (`if tchfrc <= 0.0 { continue }`), so
+    /// `compute_exhaust_iteration` and `compute_evap_iteration` are
+    /// never called — no need for the emission-factor tables.
+    /// `compute_exhaust_factors` / `compute_evap_factors` IS called and
+    /// returns `ExhaustFactorsLookup::default()` / `EvapFactorsLookup::default()`.
+    /// The model-year loop accumulates population fractions into `poptot`,
+    /// and `wrtdat` emits one `DatRecord` → one `SimEmissionRow`.
+    #[test]
+    fn county_minimal_ref_returns_one_row() {
+        let mut exec = ProductionExecutor {
+            county_fips: vec!["06037".into()],
+            hp_levels: default_hp_levels(),
+            reference: ReferenceData {
+                exhaust_tech_entries: vec![ExhaustTechEntry {
+                    scc: "2270001010".into(),
+                    hp_min: 0.0,
+                    hp_max: 100.0,
+                    tech_names: vec!["T1".into()],
+                    tech_fractions: vec![0.0],
+                }],
+                evap_tech_entries: vec![EvapTechEntry {
+                    scc: "2270001010".into(),
+                    hp_min: 0.0,
+                    hp_max: 100.0,
+                    tech_names: vec!["EV1".into()],
+                    tech_fractions: vec![0.0],
+                }],
+                growth_xref_entries: vec![GrowthXrefEntry {
+                    fips: "06037".into(),
+                    scc: "2270001010".into(),
+                    hp_min: 0.0,
+                    hp_max: 100.0,
+                    indicator: "GDP".into(),
+                }],
+                // growth_records empty: growth_year == episode_year == pop_year
+                // (2020), so age_distribution never calls growth_factor.
+                growth_records: vec![],
+                activity_entries: vec![ActivityTableEntry {
+                    scc: "2270001010".into(),
+                    fips: "06037".into(),
+                    starts: 0.0,
+                    activity_level: 100.0,
+                    activity_unit: ActivityUnit::HoursPerYear,
+                    load_factor: 0.5,
+                    age_code: "DEFAULT".into(),
+                }],
+                scrappage_curve: vec![
+                    ScrappagePoint { bin: 0.0, percent: 0.0 },
+                    ScrappagePoint { bin: 100.0, percent: 100.0 },
+                ],
+                age_adjustment_table: AgeAdjustmentTable::default(),
+                ..ReferenceData::default()
+            },
+            ..ProductionExecutor::default()
+        };
+
+        let opts = test_opts();
+        let record = test_record();
+        let ctx = DispatchContext {
+            dispatch: Dispatch::County,
+            scc: "2270001010",
+            fuel: Some(FuelKind::Diesel),
+            record: &record,
+            growth: None,
+        };
+
+        let result = exec.execute(&ctx, &opts).unwrap();
+        assert!(!result.skipped, "expected non-skipped execution");
+        assert_eq!(result.rows.len(), 1, "expected exactly one SimEmissionRow");
+
+        let row = &result.rows[0];
+        assert_eq!(row.fips, "06037");
+        assert_eq!(row.scc, "2270001010");
+        assert!(row.model_year.is_none(), "dat_record row has no model year");
+        assert!(row.tech_type.is_none(), "dat_record row has no tech type");
+        assert_eq!(row.channel, EmissionChannel::Exhaust);
+    }
+
     /// (c) StateToCounty dispatch with two counties in the state →
     /// two `SimEmissionRow`s (one per county).
     ///
@@ -2550,43 +2544,46 @@ mod production {
     fn state_to_county_minimal_ref_returns_two_rows() {
         let mut exec = ProductionExecutor {
             county_fips: vec!["06037".into(), "06059".into()],
-            exhaust_tech_entries: vec![ExhaustTechEntry {
-                scc: "2270001010".into(),
-                hp_min: 0.0,
-                hp_max: 100.0,
-                tech_names: vec!["T1".into()],
-                tech_fractions: vec![0.0],
-            }],
-            evap_tech_entries: vec![EvapTechEntry {
-                scc: "2270001010".into(),
-                hp_min: 0.0,
-                hp_max: 100.0,
-                tech_names: vec!["EV1".into()],
-                tech_fractions: vec![0.0],
-            }],
-            growth_xref_entries: vec![GrowthXrefEntry {
-                fips: "06000".into(),
-                scc: "2270001010".into(),
-                hp_min: 0.0,
-                hp_max: 100.0,
-                indicator: "GDP".into(),
-            }],
-            growth_records: vec![],
-            activity_entries: vec![ActivityTableEntry {
-                scc: "2270001010".into(),
-                fips: "06000".into(),
-                starts: 0.0,
-                activity_level: 100.0,
-                activity_unit: ActivityUnit::HoursPerYear,
-                load_factor: 0.5,
-                age_code: "DEFAULT".into(),
-            }],
-            scrappage_curve: vec![
-                ScrappagePoint { bin: 0.0, percent: 0.0 },
-                ScrappagePoint { bin: 100.0, percent: 100.0 },
-            ],
-            age_adjustment_table: AgeAdjustmentTable::default(),
             hp_levels: default_hp_levels(),
+            reference: ReferenceData {
+                exhaust_tech_entries: vec![ExhaustTechEntry {
+                    scc: "2270001010".into(),
+                    hp_min: 0.0,
+                    hp_max: 100.0,
+                    tech_names: vec!["T1".into()],
+                    tech_fractions: vec![0.0],
+                }],
+                evap_tech_entries: vec![EvapTechEntry {
+                    scc: "2270001010".into(),
+                    hp_min: 0.0,
+                    hp_max: 100.0,
+                    tech_names: vec!["EV1".into()],
+                    tech_fractions: vec![0.0],
+                }],
+                growth_xref_entries: vec![GrowthXrefEntry {
+                    fips: "06000".into(),
+                    scc: "2270001010".into(),
+                    hp_min: 0.0,
+                    hp_max: 100.0,
+                    indicator: "GDP".into(),
+                }],
+                growth_records: vec![],
+                activity_entries: vec![ActivityTableEntry {
+                    scc: "2270001010".into(),
+                    fips: "06000".into(),
+                    starts: 0.0,
+                    activity_level: 100.0,
+                    activity_unit: ActivityUnit::HoursPerYear,
+                    load_factor: 0.5,
+                    age_code: "DEFAULT".into(),
+                }],
+                scrappage_curve: vec![
+                    ScrappagePoint { bin: 0.0, percent: 0.0 },
+                    ScrappagePoint { bin: 100.0, percent: 100.0 },
+                ],
+                age_adjustment_table: AgeAdjustmentTable::default(),
+                ..ReferenceData::default()
+            },
             ..ProductionExecutor::default()
         };
 
@@ -2619,43 +2616,46 @@ mod production {
     #[test]
     fn state_from_national_minimal_ref_returns_one_row() {
         let mut exec = ProductionExecutor {
-            exhaust_tech_entries: vec![ExhaustTechEntry {
-                scc: "2270001010".into(),
-                hp_min: 0.0,
-                hp_max: 100.0,
-                tech_names: vec!["T1".into()],
-                tech_fractions: vec![0.0],
-            }],
-            evap_tech_entries: vec![EvapTechEntry {
-                scc: "2270001010".into(),
-                hp_min: 0.0,
-                hp_max: 100.0,
-                tech_names: vec!["EV1".into()],
-                tech_fractions: vec![0.0],
-            }],
-            growth_xref_entries: vec![GrowthXrefEntry {
-                fips: "06000".into(),
-                scc: "2270001010".into(),
-                hp_min: 0.0,
-                hp_max: 100.0,
-                indicator: "GDP".into(),
-            }],
-            growth_records: vec![],
-            activity_entries: vec![ActivityTableEntry {
-                scc: "2270001010".into(),
-                fips: "06000".into(),
-                starts: 0.0,
-                activity_level: 100.0,
-                activity_unit: ActivityUnit::HoursPerYear,
-                load_factor: 0.5,
-                age_code: "DEFAULT".into(),
-            }],
-            scrappage_curve: vec![
-                ScrappagePoint { bin: 0.0, percent: 0.0 },
-                ScrappagePoint { bin: 100.0, percent: 100.0 },
-            ],
-            age_adjustment_table: AgeAdjustmentTable::default(),
             hp_levels: default_hp_levels(),
+            reference: ReferenceData {
+                exhaust_tech_entries: vec![ExhaustTechEntry {
+                    scc: "2270001010".into(),
+                    hp_min: 0.0,
+                    hp_max: 100.0,
+                    tech_names: vec!["T1".into()],
+                    tech_fractions: vec![0.0],
+                }],
+                evap_tech_entries: vec![EvapTechEntry {
+                    scc: "2270001010".into(),
+                    hp_min: 0.0,
+                    hp_max: 100.0,
+                    tech_names: vec!["EV1".into()],
+                    tech_fractions: vec![0.0],
+                }],
+                growth_xref_entries: vec![GrowthXrefEntry {
+                    fips: "06000".into(),
+                    scc: "2270001010".into(),
+                    hp_min: 0.0,
+                    hp_max: 100.0,
+                    indicator: "GDP".into(),
+                }],
+                growth_records: vec![],
+                activity_entries: vec![ActivityTableEntry {
+                    scc: "2270001010".into(),
+                    fips: "06000".into(),
+                    starts: 0.0,
+                    activity_level: 100.0,
+                    activity_unit: ActivityUnit::HoursPerYear,
+                    load_factor: 0.5,
+                    age_code: "DEFAULT".into(),
+                }],
+                scrappage_curve: vec![
+                    ScrappagePoint { bin: 0.0, percent: 0.0 },
+                    ScrappagePoint { bin: 100.0, percent: 100.0 },
+                ],
+                age_adjustment_table: AgeAdjustmentTable::default(),
+                ..ReferenceData::default()
+            },
             ..ProductionExecutor::default()
         };
 
@@ -2690,49 +2690,52 @@ mod production {
     #[test]
     fn national_minimal_ref_returns_one_row() {
         let mut exec = ProductionExecutor {
-            national_allocation: vec![NationalAllocationEntry { scc: "2270001010".into() }],
             state_descriptors: vec![StateDescriptor {
                 fips: "06000".into(),
                 selected: true,
                 has_state_records: false,
             }],
-            exhaust_tech_entries: vec![ExhaustTechEntry {
-                scc: "2270001010".into(),
-                hp_min: 0.0,
-                hp_max: 100.0,
-                tech_names: vec!["T1".into()],
-                tech_fractions: vec![0.0],
-            }],
-            evap_tech_entries: vec![EvapTechEntry {
-                scc: "2270001010".into(),
-                hp_min: 0.0,
-                hp_max: 100.0,
-                tech_names: vec!["EV1".into()],
-                tech_fractions: vec![0.0],
-            }],
-            growth_xref_entries: vec![GrowthXrefEntry {
-                fips: "06000".into(),
-                scc: "2270001010".into(),
-                hp_min: 0.0,
-                hp_max: 100.0,
-                indicator: "GDP".into(),
-            }],
-            growth_records: vec![],
-            activity_entries: vec![ActivityTableEntry {
-                scc: "2270001010".into(),
-                fips: "".into(),
-                starts: 0.0,
-                activity_level: 100.0,
-                activity_unit: ActivityUnit::HoursPerYear,
-                load_factor: 0.5,
-                age_code: "DEFAULT".into(),
-            }],
-            scrappage_curve: vec![
-                ScrappagePoint { bin: 0.0, percent: 0.0 },
-                ScrappagePoint { bin: 100.0, percent: 100.0 },
-            ],
-            age_adjustment_table: AgeAdjustmentTable::default(),
             hp_levels: default_hp_levels(),
+            reference: ReferenceData {
+                national_allocation: vec![NationalAllocationEntry { scc: "2270001010".into() }],
+                exhaust_tech_entries: vec![ExhaustTechEntry {
+                    scc: "2270001010".into(),
+                    hp_min: 0.0,
+                    hp_max: 100.0,
+                    tech_names: vec!["T1".into()],
+                    tech_fractions: vec![0.0],
+                }],
+                evap_tech_entries: vec![EvapTechEntry {
+                    scc: "2270001010".into(),
+                    hp_min: 0.0,
+                    hp_max: 100.0,
+                    tech_names: vec!["EV1".into()],
+                    tech_fractions: vec![0.0],
+                }],
+                growth_xref_entries: vec![GrowthXrefEntry {
+                    fips: "06000".into(),
+                    scc: "2270001010".into(),
+                    hp_min: 0.0,
+                    hp_max: 100.0,
+                    indicator: "GDP".into(),
+                }],
+                growth_records: vec![],
+                activity_entries: vec![ActivityTableEntry {
+                    scc: "2270001010".into(),
+                    fips: "".into(),
+                    starts: 0.0,
+                    activity_level: 100.0,
+                    activity_unit: ActivityUnit::HoursPerYear,
+                    load_factor: 0.5,
+                    age_code: "DEFAULT".into(),
+                }],
+                scrappage_curve: vec![
+                    ScrappagePoint { bin: 0.0, percent: 0.0 },
+                    ScrappagePoint { bin: 100.0, percent: 100.0 },
+                ],
+                age_adjustment_table: AgeAdjustmentTable::default(),
+                ..ReferenceData::default()
+            },
             ..ProductionExecutor::default()
         };
 
@@ -2765,43 +2768,46 @@ mod production {
     #[test]
     fn us_total_minimal_ref_returns_one_row() {
         let mut exec = ProductionExecutor {
-            exhaust_tech_entries: vec![ExhaustTechEntry {
-                scc: "2270001010".into(),
-                hp_min: 0.0,
-                hp_max: 100.0,
-                tech_names: vec!["T1".into()],
-                tech_fractions: vec![0.0],
-            }],
-            evap_tech_entries: vec![EvapTechEntry {
-                scc: "2270001010".into(),
-                hp_min: 0.0,
-                hp_max: 100.0,
-                tech_names: vec!["EV1".into()],
-                tech_fractions: vec![0.0],
-            }],
-            growth_xref_entries: vec![GrowthXrefEntry {
-                fips: "00000".into(),
-                scc: "2270001010".into(),
-                hp_min: 0.0,
-                hp_max: 100.0,
-                indicator: "GDP".into(),
-            }],
-            growth_records: vec![],
-            activity_entries: vec![ActivityTableEntry {
-                scc: "2270001010".into(),
-                fips: "".into(),
-                starts: 0.0,
-                activity_level: 100.0,
-                activity_unit: ActivityUnit::HoursPerYear,
-                load_factor: 0.5,
-                age_code: "DEFAULT".into(),
-            }],
-            scrappage_curve: vec![
-                ScrappagePoint { bin: 0.0, percent: 0.0 },
-                ScrappagePoint { bin: 100.0, percent: 100.0 },
-            ],
-            age_adjustment_table: AgeAdjustmentTable::default(),
             hp_levels: default_hp_levels(),
+            reference: ReferenceData {
+                exhaust_tech_entries: vec![ExhaustTechEntry {
+                    scc: "2270001010".into(),
+                    hp_min: 0.0,
+                    hp_max: 100.0,
+                    tech_names: vec!["T1".into()],
+                    tech_fractions: vec![0.0],
+                }],
+                evap_tech_entries: vec![EvapTechEntry {
+                    scc: "2270001010".into(),
+                    hp_min: 0.0,
+                    hp_max: 100.0,
+                    tech_names: vec!["EV1".into()],
+                    tech_fractions: vec![0.0],
+                }],
+                growth_xref_entries: vec![GrowthXrefEntry {
+                    fips: "00000".into(),
+                    scc: "2270001010".into(),
+                    hp_min: 0.0,
+                    hp_max: 100.0,
+                    indicator: "GDP".into(),
+                }],
+                growth_records: vec![],
+                activity_entries: vec![ActivityTableEntry {
+                    scc: "2270001010".into(),
+                    fips: "".into(),
+                    starts: 0.0,
+                    activity_level: 100.0,
+                    activity_unit: ActivityUnit::HoursPerYear,
+                    load_factor: 0.5,
+                    age_code: "DEFAULT".into(),
+                }],
+                scrappage_curve: vec![
+                    ScrappagePoint { bin: 0.0, percent: 0.0 },
+                    ScrappagePoint { bin: 100.0, percent: 100.0 },
+                ],
+                age_adjustment_table: AgeAdjustmentTable::default(),
+                ..ReferenceData::default()
+            },
             ..ProductionExecutor::default()
         };
 
@@ -2836,21 +2842,24 @@ mod production {
                 selected: true,
                 has_state_records: false,
             }],
-            exhaust_tech_entries: vec![ExhaustTechEntry {
-                scc: "2270001010".into(),
-                hp_min: 0.0,
-                hp_max: 100.0,
-                tech_names: vec!["T1".into()],
-                tech_fractions: vec![0.0],
-            }],
-            evap_tech_entries: vec![EvapTechEntry {
-                scc: "2270001010".into(),
-                hp_min: 0.0,
-                hp_max: 100.0,
-                tech_names: vec!["EV1".into()],
-                tech_fractions: vec![0.0],
-            }],
             hp_levels: default_hp_levels(),
+            reference: ReferenceData {
+                exhaust_tech_entries: vec![ExhaustTechEntry {
+                    scc: "2270001010".into(),
+                    hp_min: 0.0,
+                    hp_max: 100.0,
+                    tech_names: vec!["T1".into()],
+                    tech_fractions: vec![0.0],
+                }],
+                evap_tech_entries: vec![EvapTechEntry {
+                    scc: "2270001010".into(),
+                    hp_min: 0.0,
+                    hp_max: 100.0,
+                    tech_names: vec!["EV1".into()],
+                    tech_fractions: vec![0.0],
+                }],
+                ..ReferenceData::default()
+            },
             ..ProductionExecutor::default()
         };
 
@@ -2882,21 +2891,24 @@ mod production {
     #[test]
     fn us_total_growth_file_missing() {
         let mut exec = ProductionExecutor {
-            exhaust_tech_entries: vec![ExhaustTechEntry {
-                scc: "2270001010".into(),
-                hp_min: 0.0,
-                hp_max: 100.0,
-                tech_names: vec!["T1".into()],
-                tech_fractions: vec![0.0],
-            }],
-            evap_tech_entries: vec![EvapTechEntry {
-                scc: "2270001010".into(),
-                hp_min: 0.0,
-                hp_max: 100.0,
-                tech_names: vec!["EV1".into()],
-                tech_fractions: vec![0.0],
-            }],
             hp_levels: default_hp_levels(),
+            reference: ReferenceData {
+                exhaust_tech_entries: vec![ExhaustTechEntry {
+                    scc: "2270001010".into(),
+                    hp_min: 0.0,
+                    hp_max: 100.0,
+                    tech_names: vec!["T1".into()],
+                    tech_fractions: vec![0.0],
+                }],
+                evap_tech_entries: vec![EvapTechEntry {
+                    scc: "2270001010".into(),
+                    hp_min: 0.0,
+                    hp_max: 100.0,
+                    tech_names: vec!["EV1".into()],
+                    tech_fractions: vec![0.0],
+                }],
+                ..ReferenceData::default()
+            },
             ..ProductionExecutor::default()
         };
 
@@ -2921,85 +2933,5 @@ mod production {
             msg.contains("GROWTH") || msg.contains("growth"),
             "expected GrowthFileMissing error, got: {msg}"
         );
-    }
-
-    /// (b) Minimal reference (one FIPS, one exhaust tech with zero fraction,
-    /// one evap tech with zero fraction, one growth xref, one activity
-    /// entry, zero retrofits) → non-skipped, exactly one `SimEmissionRow`.
-    ///
-    /// Zero tech fractions cause the per-tech-type loop body to be
-    /// skipped (`if tchfrc <= 0.0 { continue }`), so
-    /// `compute_exhaust_iteration` and `compute_evap_iteration` are
-    /// never called — no need for the emission-factor tables.
-    /// `compute_exhaust_factors` / `compute_evap_factors` IS called and
-    /// returns `ExhaustFactorsLookup::default()` / `EvapFactorsLookup::default()`.
-    /// The model-year loop accumulates population fractions into `poptot`,
-    /// and `wrtdat` emits one `DatRecord` → one `SimEmissionRow`.
-    #[test]
-    fn county_minimal_ref_returns_one_row() {
-        let mut exec = ProductionExecutor {
-            county_fips: vec!["06037".into()],
-            exhaust_tech_entries: vec![ExhaustTechEntry {
-                scc: "2270001010".into(),
-                hp_min: 0.0,
-                hp_max: 100.0,
-                tech_names: vec!["T1".into()],
-                tech_fractions: vec![0.0],
-            }],
-            evap_tech_entries: vec![EvapTechEntry {
-                scc: "2270001010".into(),
-                hp_min: 0.0,
-                hp_max: 100.0,
-                tech_names: vec!["EV1".into()],
-                tech_fractions: vec![0.0],
-            }],
-            growth_xref_entries: vec![GrowthXrefEntry {
-                fips: "06037".into(),
-                scc: "2270001010".into(),
-                hp_min: 0.0,
-                hp_max: 100.0,
-                indicator: "GDP".into(),
-            }],
-            // growth_records empty: growth_year == episode_year == pop_year
-            // (2020), so age_distribution never calls growth_factor.
-            growth_records: vec![],
-            activity_entries: vec![ActivityTableEntry {
-                scc: "2270001010".into(),
-                fips: "06037".into(),
-                starts: 0.0,
-                activity_level: 100.0,
-                activity_unit: ActivityUnit::HoursPerYear,
-                load_factor: 0.5,
-                age_code: "DEFAULT".into(),
-            }],
-            scrappage_curve: vec![
-                ScrappagePoint { bin: 0.0, percent: 0.0 },
-                ScrappagePoint { bin: 100.0, percent: 100.0 },
-            ],
-            age_adjustment_table: AgeAdjustmentTable::default(),
-            hp_levels: default_hp_levels(),
-            ..ProductionExecutor::default()
-        };
-
-        let opts = test_opts();
-        let record = test_record();
-        let ctx = DispatchContext {
-            dispatch: Dispatch::County,
-            scc: "2270001010",
-            fuel: Some(FuelKind::Diesel),
-            record: &record,
-            growth: None,
-        };
-
-        let result = exec.execute(&ctx, &opts).unwrap();
-        assert!(!result.skipped, "expected non-skipped execution");
-        assert_eq!(result.rows.len(), 1, "expected exactly one SimEmissionRow");
-
-        let row = &result.rows[0];
-        assert_eq!(row.fips, "06037");
-        assert_eq!(row.scc, "2270001010");
-        assert!(row.model_year.is_none(), "dat_record row has no model year");
-        assert!(row.tech_type.is_none(), "dat_record row has no tech type");
-        assert_eq!(row.channel, EmissionChannel::Exhaust);
     }
 }
