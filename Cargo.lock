@@ -1884,6 +1884,7 @@ dependencies = [
  "moves-data",
  "moves-runspec",
  "parquet",
+ "polars",
  "rayon",
  "serde_json",
  "sha2",

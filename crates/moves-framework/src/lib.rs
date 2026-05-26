@@ -92,6 +92,7 @@ mod error;
 pub mod aggregation;
 pub mod calculator;
 pub mod control_strategy;
+pub mod data;
 pub mod execution;
 pub mod input;
 pub mod masterloop;
@@ -103,6 +104,7 @@ pub use calculator::*;
 pub use control_strategy::{
     ControlStrategyFactory, ControlStrategyRegistry, InternalControlStrategy, StrategySubscription,
 };
+pub use data::{DataFrameStore, InMemoryStore, TableHandle, TableSchema};
 pub use execution::*;
 pub use input::*;
 pub use masterloop::*;

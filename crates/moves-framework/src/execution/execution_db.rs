@@ -38,6 +38,8 @@
 
 use moves_data::ProcessId;
 
+use crate::data::InMemoryStore;
+
 /// `(state, county, zone, link)` quadruple identifying the current spatial
 /// location in the master loop. Rust equivalent of `ExecutionLocation.java`.
 ///
@@ -244,53 +246,51 @@ impl IterationPosition {
 
 /// Per-run filtered default-DB tables, loaded once at run start.
 ///
-/// **Phase 2 skeleton.** Task 50 (`DataFrameStore`) replaces this with a
-/// concrete keyed DataFrame store. Calculators committed to the
-/// [`crate::CalculatorContext::tables`] accessor shape today will not need to
-/// change when the data plane materialises.
+/// Backed by an [`InMemoryStore`] keyed by canonical table name. Task 24
+/// (`InputDataManager`) populates the store from Parquet snapshots at run
+/// start; calculators then read from it via [`crate::DataFrameStore::get`]
+/// throughout the run.
 ///
 /// The slow tier is "loaded once per run" — a calculator firing at any
-/// granularity reads the same table contents throughout the run. Filtering
-/// happens at load time via [`ExecutionDatabaseSchema`] + RunSpec
-/// selections; calculators do not re-filter on every call.
+/// granularity reads the same table contents. Filtering happens at load time
+/// via [`ExecutionDatabaseSchema`] + RunSpec selections; calculators do not
+/// re-filter on every call.
+///
+/// Schema validation against [`ExecutionDatabaseSchema`] is deferred to T3.
 #[derive(Debug, Default)]
 pub struct ExecutionTables {
-    // Task 50 lands the DataFrame-keyed map.
-    _private: (),
+    /// Name-keyed DataFrame store for the slow (default-DB) tier.
+    pub store: InMemoryStore,
 }
 
 impl ExecutionTables {
-    /// Construct an empty tables container. Used by tests and by the
-    /// Task 19 registry stub until the data plane lands.
+    /// Construct an empty tables container.
     #[must_use]
     pub fn empty() -> Self {
-        Self { _private: () }
+        Self::default()
     }
 }
 
 /// Inter-calculator scratch namespace.
 ///
-/// **Phase 2 skeleton.** Task 50 (`DataFrameStore`) replaces the placeholder
-/// with a concrete name-keyed DataFrame store with appropriate interior
-/// mutability so generators can write and downstream calculators can read.
+/// Backed by an [`InMemoryStore`] keyed by table name. Each generator writes
+/// one or more named tables (declared in [`crate::Generator::output_tables`]);
+/// downstream calculators read them via [`crate::DataFrameStore::get`].
 ///
-/// The scratch tier is "rapidly-changing per-bundle" data: each generator
-/// fires at its registered granularity, writes one or more named tables
-/// (declared in [`crate::Generator::output_tables`]), and the downstream
-/// calculator's [`crate::Calculator::input_tables`] declaration names them
-/// to drive dependency analysis.
+/// The scratch tier is "rapidly-changing per-bundle": its contents are
+/// replaced on each generator fire. The registry (Task 19) manages the
+/// per-iteration lifecycle; this struct is the storage container.
 #[derive(Debug, Default)]
 pub struct ScratchNamespace {
-    // Task 50 lands the DataFrame-keyed map with interior mutability.
-    _private: (),
+    /// Name-keyed DataFrame store for the scratch (inter-calculator) tier.
+    pub store: InMemoryStore,
 }
 
 impl ScratchNamespace {
-    /// Construct an empty scratch namespace. Used by tests and by the
-    /// Task 19 registry stub until the data plane lands.
+    /// Construct an empty scratch namespace.
     #[must_use]
     pub fn empty() -> Self {
-        Self { _private: () }
+        Self::default()
     }
 }
 

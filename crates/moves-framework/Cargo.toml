@@ -16,6 +16,7 @@ arrow = { workspace = true }
 moves-calculator-info = { path = "../moves-calculator-info" }
 moves-data = { path = "../moves-data" }
 moves-runspec = { path = "../moves-runspec" }
+polars = { workspace = true }
 rayon = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
