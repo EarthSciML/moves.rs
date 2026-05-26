@@ -1,0 +1,25 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__zoneroadtype",
+  "schema": [
+    {
+      "name": "zoneID",
+      "kind": "int64"
+    },
+    {
+      "name": "roadTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "SHOAllocFactor",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "zoneID",
+    "roadTypeID"
+  ],
+  "row_count": 12,
+  "float_decimals": 12,
+  "content_sha256": "6f76d0ffe4b3dc24eed109845de8b701724c573382557a4da5214b2e7d3a94ec"
+}

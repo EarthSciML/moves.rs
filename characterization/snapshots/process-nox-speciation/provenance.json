@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "process-nox-speciation",
+  "sif_sha256": "70ea5b8378b278af50e8c44ab011066c59019faed8d141adf4ec6f2045f1e5fd",
+  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixture-image.lock",
+  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixtures/process-nox-speciation.xml",
+  "runspec_sha256": "7652cc22844e418f12897a07de9ff6535200a5e5c10c586d06d41344db008453",
+  "snapshot_aggregate_sha256": "aa9e516cf516304d7f9e8ae413d22d3fc96e1cff5a2a2837742bfbab016c8b26",
+  "output_database": "out_process_nox_speciation",
+  "scale_input_database": null
+}

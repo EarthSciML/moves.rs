@@ -1,0 +1,24 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__out_nr_recreational_county__translate_regclass",
+  "schema": [
+    {
+      "name": "regClassID",
+      "kind": "int64"
+    },
+    {
+      "name": "regClassName",
+      "kind": "utf8"
+    },
+    {
+      "name": "regClassDesc",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "regClassID"
+  ],
+  "row_count": 9,
+  "float_decimals": 12,
+  "content_sha256": "456b52cb6ce5bafaa215dcc6eceb2b8e55851badd7c09c5627449b0f3bc60f82"
+}

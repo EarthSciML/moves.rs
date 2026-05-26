@@ -1,0 +1,49 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__evefficiency",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "regClassID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "beginModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "endModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "batteryEfficiency",
+      "kind": "float64"
+    },
+    {
+      "name": "chargingEfficiency",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID",
+    "sourceTypeID",
+    "regClassID",
+    "ageGroupID",
+    "beginModelYearID",
+    "endModelYearID"
+  ],
+  "row_count": 7,
+  "float_decimals": 12,
+  "content_sha256": "002ca38adf94638ae6d48e7d3d155d18b311f80c76bf4c343825657817917ee8"
+}

@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "nr-construction-state",
+  "sif_sha256": "70ea5b8378b278af50e8c44ab011066c59019faed8d141adf4ec6f2045f1e5fd",
+  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixture-image.lock",
+  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixtures/nr-construction-state.xml",
+  "runspec_sha256": "6d40d69fde9f3e55c65e359241fdc6449cf168d155c1d1ed089e613bcf9c6fbf",
+  "snapshot_aggregate_sha256": "f18473b33af7c4776ef8cad6dd0fa64437231d871dabff45753b57747576908a",
+  "output_database": "out_nr_construction_state",
+  "scale_input_database": null
+}

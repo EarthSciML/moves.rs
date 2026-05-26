@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "chain-nonhaptog",
+  "sif_sha256": "70ea5b8378b278af50e8c44ab011066c59019faed8d141adf4ec6f2045f1e5fd",
+  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixture-image.lock",
+  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixtures/chain-nonhaptog.xml",
+  "runspec_sha256": "05e3ecd7350b16c6e061050a02178be9d9d05adbd35302c61e67140a50f4df65",
+  "snapshot_aggregate_sha256": "ed6652461cd803bafc73b2ac724e567371b38d71719aa864dfce34b50fc6be64",
+  "output_database": "out_chain_nonhaptog",
+  "scale_input_database": null
+}

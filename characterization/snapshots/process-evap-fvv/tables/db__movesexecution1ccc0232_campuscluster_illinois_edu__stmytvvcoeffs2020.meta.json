@@ -1,0 +1,55 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__stmytvvcoeffs2020",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "backPurgeFactor",
+      "kind": "float64"
+    },
+    {
+      "name": "averageCanisterCapacity",
+      "kind": "float64"
+    },
+    {
+      "name": "leakFraction",
+      "kind": "float64"
+    },
+    {
+      "name": "leakFractionIM",
+      "kind": "float64"
+    },
+    {
+      "name": "tankSize",
+      "kind": "float64"
+    },
+    {
+      "name": "tankFillFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "modelYearID",
+    "fuelTypeID",
+    "polProcessID"
+  ],
+  "row_count": 125,
+  "float_decimals": 12,
+  "content_sha256": "2451ed50ef79d2f9c0d6fce07b1264c03e617a4658345033508ebbc90cc9477f"
+}

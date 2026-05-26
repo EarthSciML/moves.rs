@@ -1,0 +1,495 @@
+{
+  "trace_version": "moves-fixture-capture/v1",
+  "fixture_name": "nr-recreational-county",
+  "sif_sha256": "70ea5b8378b278af50e8c44ab011066c59019faed8d141adf4ec6f2045f1e5fd",
+  "runspec_sha256": "a79f8f0d67a4964b24d6dce351c326d66dcf46a4809f741da2df102bf48a6b31",
+  "java_classes": [
+    {
+      "name": "gov.epa.otaq.moves.common.BundleManifest$MasterFragment",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.Configuration",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.DatabaseSelection",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.DatabaseUtilities",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.DistributedIDBroker",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.DistributedWorkFileName",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.DistributedWorkFileState",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.FileTimeUtility",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.FileUtilities",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.InstanceCounter",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.LogHandler",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.LogMessageCategory",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.Logger",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.MOVESDatabaseType",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.MOVESThread",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.Model",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.ModelDomain",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.ModelScale",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.Models",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.Models$ModelCombination",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.OffRoadVehicleSelection",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.OnRoadVehicleSelection",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.OutputEmissionsBreakdownSelection",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.PasswordChecker",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.PerformanceProfiler",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.PermutationCreator$IDimension",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.PowerManagement",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.SQLRunner",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.SQLRunner$Query",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.StringComparatorIgnoreCase",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.StringUtilities",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.TemporaryFileManager",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.TimeSpan",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.TimeSpan$Day",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.TimeSpan$Hour",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.TimeSpan$Month",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.TreeMapIgnoreCase",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.TreeSetIgnoreCase",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.WildCardFileNameFilter",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.commandline.MOVESCommandLine",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.AggregationSQLGenerator",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.BundleUtilities",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.DatabaseConnectionManager",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.DatabaseConnectionManager$InternalConnectionPool",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.DefaultDataMaker",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.EmissionCalculator",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.EmissionCalculatorInboundUnbundler",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.EmissionCalculatorOutboundBundler",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.EmissionCalculatorRegistration",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.EmissionProcess",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.ExecutionLocationProducer",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.ExecutionRunSpec",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.ExecutionRunSpec$1",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.ExtractedDataCache",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.HeartbeatDetectionThread",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.HeartbeatDetectionThread$ObservedFileStamp",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.InputDataManager",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.InputDataManager$1NRTableToCopy",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.InputDataManager$1TableToCopy",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.InputDataManager$MergeConnectionInformation",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.InputDataManager$MergeSession",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.InputDataManager$MergedTable",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.InterconnectionTracker",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.MOVESAPI",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.MOVESAPI$1",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.MOVESEngine",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.MOVESEngine$1",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.MOVESEngine$CompletedListener",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.MOVESEngine$MOVESEngineCompletionChecker",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.MOVESEngine$TimeEstimator",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.MOVESEngineListener",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.MOVESInstantiator",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.MOVESInstantiator$1",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.MasterLoop",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.MasterLoopContext",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.MasterLoopable",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.MasterLoopableThread",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.ModelYearMapper",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.OutputProcessor",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.Pollutant",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.PollutantDisplayGroup",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.PollutantProcessAssociation",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.PollutantProcessLoader",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.SQLMacroExpander",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.SQLMacroExpander$ValueSet",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.SchemaInspector",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.SystemConfiguration",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.UncertaintyParameters",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.gui.AdvancedPerformanceFeatures",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.gui.CreateInputDatabase",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.gui.Description",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.gui.GeneralOutput",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.gui.MOVESNavigation",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.gui.MOVESWindow",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.gui.MacroscaleGeographicBounds",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.gui.OffRoadVehicleEquipment",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.gui.OnRoadVehicleEquipment",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.gui.OutputEmissionsBreakdown",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.gui.PollutantsAndProcesses",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.gui.RoadTypeScreen",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.gui.RunSpecEditor",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.gui.Scale",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.gui.TimeSpans",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.TOGSpeciationCalculator",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.runspec.DistanceMeasurementSystem",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.runspec.EnergyMeasurementSystem",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.runspec.GeographicOutputDetailLevel",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.runspec.GeographicSelection",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.runspec.GeographicSelectionType",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.runspec.MassMeasurementSystem",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.runspec.OutputFactors",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.runspec.OutputTimeStep",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.runspec.RunSpec",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.runspec.RunSpecXML",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.runspec.RunSpecXML$XMLErrorHandler",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.runspec.TimeMeasurementSystem",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.worker.framework.RemoteEmissionsCalculator",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.worker.framework.WorkerConfiguration",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.worker.framework.WorkerHeartbeatThread",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.worker.gui.WorkerGUI",
+      "kind": "worker"
+    }
+  ],
+  "sql_files": [],
+  "go_calculators": [],
+  "worker_bundles": [],
+  "sources": {
+    "worker_sql_files": 0,
+    "class_load_log_files": 2
+  }
+}

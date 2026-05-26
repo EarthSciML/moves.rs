@@ -1,0 +1,34 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__tempairtoxicsavoc",
+  "schema": [
+    {
+      "name": "fuelFormulationID",
+      "kind": "int64"
+    },
+    {
+      "name": "processID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "relATEmissionsVOC",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "f339e35d9daeab46923c3f7f722dd041e7ce6c9c26c1c6c76a9d74f41ce7d9e4"
+}

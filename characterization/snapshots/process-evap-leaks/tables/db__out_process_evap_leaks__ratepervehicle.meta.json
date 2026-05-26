@@ -1,0 +1,78 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__out_process_evap_leaks__ratepervehicle",
+  "schema": [
+    {
+      "name": "MOVESScenarioID",
+      "kind": "utf8"
+    },
+    {
+      "name": "MOVESRunID",
+      "kind": "int64"
+    },
+    {
+      "name": "yearID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "dayID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourID",
+      "kind": "int64"
+    },
+    {
+      "name": "zoneID",
+      "kind": "int64"
+    },
+    {
+      "name": "pollutantID",
+      "kind": "int64"
+    },
+    {
+      "name": "processID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "regClassID",
+      "kind": "int64"
+    },
+    {
+      "name": "SCC",
+      "kind": "utf8"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "temperature",
+      "kind": "float64"
+    },
+    {
+      "name": "relHumidity",
+      "kind": "float64"
+    },
+    {
+      "name": "ratePerVehicle",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "dc3df6bb4c5c060d9f1f1bd16bc465770c35609aa25943422651229d54ada7a0"
+}

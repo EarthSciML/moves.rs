@@ -734,6 +734,6 @@
   "worker_bundles": [],
   "sources": {
     "worker_sql_files": 0,
-    "class_load_log_files": 2
+    "class_load_log_files": 4
   }
 }

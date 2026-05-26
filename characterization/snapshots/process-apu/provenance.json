@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "process-apu",
+  "sif_sha256": "70ea5b8378b278af50e8c44ab011066c59019faed8d141adf4ec6f2045f1e5fd",
+  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixture-image.lock",
+  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixtures/process-apu.xml",
+  "runspec_sha256": "4f84b5e154ed2f218c1e2d799655e6a84129cd70557c594a65335d8493d58c8b",
+  "snapshot_aggregate_sha256": "0b752651752e9c3c249e1589e8a0f5ce9aa3b8871e8e05dab7ca90ae4f86d15d",
+  "output_database": "out_process_apu",
+  "scale_input_database": null
+}

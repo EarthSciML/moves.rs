@@ -1,0 +1,25 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__surrogateregionactivitytotal",
+  "schema": [
+    {
+      "name": "stateID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "actFractTotal",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "stateID",
+    "fuelYearID"
+  ],
+  "row_count": 53,
+  "float_decimals": 12,
+  "content_sha256": "4ceda3598efa1de3a55034cf487df21a8e74cc76db0df7efa4b844434f4c6f03"
+}

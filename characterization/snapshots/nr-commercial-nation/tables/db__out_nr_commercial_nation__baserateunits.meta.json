@@ -1,0 +1,38 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__out_nr_commercial_nation__baserateunits",
+  "schema": [
+    {
+      "name": "MOVESRunID",
+      "kind": "int64"
+    },
+    {
+      "name": "pollutantID",
+      "kind": "int64"
+    },
+    {
+      "name": "processID",
+      "kind": "int64"
+    },
+    {
+      "name": "meanBaseRateUnitsNumerator",
+      "kind": "utf8"
+    },
+    {
+      "name": "meanBaseRateUnitsDenominator",
+      "kind": "utf8"
+    },
+    {
+      "name": "emissionBaseRateUnitsNumerator",
+      "kind": "utf8"
+    },
+    {
+      "name": "emissionBaseRateUnitsDenominator",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 4,
+  "float_decimals": 12,
+  "content_sha256": "d56dd227628e91d626ed5a8d2e8d9acf2030f050ba9fe5ba402d19823cb2fd7a"
+}

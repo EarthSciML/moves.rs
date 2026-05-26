@@ -1,0 +1,21 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__opmodepolprocassoc",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID",
+    "opModeID"
+  ],
+  "row_count": 25,
+  "float_decimals": 12,
+  "content_sha256": "3243e1f5b56f5e6b8fe2de305d3d13b7e4e792956e5a1f1a683a17e9bdd772af"
+}

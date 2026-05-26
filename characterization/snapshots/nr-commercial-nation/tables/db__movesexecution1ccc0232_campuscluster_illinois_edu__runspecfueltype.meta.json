@@ -1,0 +1,14 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__runspecfueltype",
+  "schema": [
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 2,
+  "float_decimals": 12,
+  "content_sha256": "246611ed08bef11de247e55b679b97652d89931de13e71adb1baf7a3648b19dc"
+}

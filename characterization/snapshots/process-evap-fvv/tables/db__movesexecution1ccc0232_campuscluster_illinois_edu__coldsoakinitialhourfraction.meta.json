@@ -1,0 +1,44 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__coldsoakinitialhourfraction",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "zoneID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "initialHourDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "coldSoakInitialHourFraction",
+      "kind": "float64"
+    },
+    {
+      "name": "isUserInput",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "zoneID",
+    "monthID",
+    "hourDayID",
+    "initialHourDayID"
+  ],
+  "row_count": 534,
+  "float_decimals": 12,
+  "content_sha256": "93abb471f466a8ed95d915cc661939b5dda6b345fcc2903157b86785b1c6f32a"
+}

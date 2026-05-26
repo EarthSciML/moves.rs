@@ -1,0 +1,28 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__state",
+  "schema": [
+    {
+      "name": "stateID",
+      "kind": "int64"
+    },
+    {
+      "name": "stateName",
+      "kind": "utf8"
+    },
+    {
+      "name": "stateAbbr",
+      "kind": "utf8"
+    },
+    {
+      "name": "idleRegionID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "stateID"
+  ],
+  "row_count": 53,
+  "float_decimals": 12,
+  "content_sha256": "51c18c0b2fcf12dd14579481aedb45a5e7de4c4488ea6e595d2e1124fb3ebc17"
+}

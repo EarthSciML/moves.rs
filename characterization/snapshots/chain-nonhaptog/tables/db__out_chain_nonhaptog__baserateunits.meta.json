@@ -1,0 +1,38 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__out_chain_nonhaptog__baserateunits",
+  "schema": [
+    {
+      "name": "MOVESRunID",
+      "kind": "int64"
+    },
+    {
+      "name": "pollutantID",
+      "kind": "int64"
+    },
+    {
+      "name": "processID",
+      "kind": "int64"
+    },
+    {
+      "name": "meanBaseRateUnitsNumerator",
+      "kind": "utf8"
+    },
+    {
+      "name": "meanBaseRateUnitsDenominator",
+      "kind": "utf8"
+    },
+    {
+      "name": "emissionBaseRateUnitsNumerator",
+      "kind": "utf8"
+    },
+    {
+      "name": "emissionBaseRateUnitsDenominator",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 1,
+  "float_decimals": 12,
+  "content_sha256": "3f6e5ce0a9f87d44ef560b0e420568ed7ca588bc768ce1ad73751206d0e77a7a"
+}

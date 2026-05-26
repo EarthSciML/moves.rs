@@ -1,0 +1,35 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__avgspeeddistribution",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "roadTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "avgSpeedBinID",
+      "kind": "int64"
+    },
+    {
+      "name": "avgSpeedFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "roadTypeID",
+    "hourDayID",
+    "avgSpeedBinID"
+  ],
+  "row_count": 64,
+  "float_decimals": 12,
+  "content_sha256": "6cc157b8e290225f0e6048bacdc467b66d4eee8b1526418960dda0862ada5969"
+}

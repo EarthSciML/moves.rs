@@ -1,0 +1,35 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__nrstatesurrogate",
+  "schema": [
+    {
+      "name": "surrogateID",
+      "kind": "int64"
+    },
+    {
+      "name": "stateID",
+      "kind": "int64"
+    },
+    {
+      "name": "countyID",
+      "kind": "int64"
+    },
+    {
+      "name": "surrogatequant",
+      "kind": "float64"
+    },
+    {
+      "name": "surrogateYearID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "surrogateID",
+    "stateID",
+    "countyID",
+    "surrogateYearID"
+  ],
+  "row_count": 62821,
+  "float_decimals": 12,
+  "content_sha256": "9f558590eb91d1ac91b12be547e1f4910c1b32e9fdfc82fc94efc0bb5a2cfa87"
+}

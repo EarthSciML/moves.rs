@@ -1,0 +1,24 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__out_chain_nonhaptog__translate_county",
+  "schema": [
+    {
+      "name": "countyID",
+      "kind": "int64"
+    },
+    {
+      "name": "stateID",
+      "kind": "int64"
+    },
+    {
+      "name": "countyName",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "countyID"
+  ],
+  "row_count": 1,
+  "float_decimals": 12,
+  "content_sha256": "e141eae9deb18955513b41404b55fef25fc989243cf64b0e1b98638b834fbb72"
+}

@@ -1,0 +1,20 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__out_nr_lawn_garden_county__translate_sector",
+  "schema": [
+    {
+      "name": "sectorID",
+      "kind": "int64"
+    },
+    {
+      "name": "sectorName",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "sectorID"
+  ],
+  "row_count": 13,
+  "float_decimals": 12,
+  "content_sha256": "049ff74de00f8943feedff7ce7f0d5eedff3a60d89b7b82788036abf1446b0a5"
+}

@@ -1,0 +1,35 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__annualvmtbyageroadway",
+  "schema": [
+    {
+      "name": "yearID",
+      "kind": "int64"
+    },
+    {
+      "name": "roadTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageID",
+      "kind": "int64"
+    },
+    {
+      "name": "VMT",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "yearID",
+    "roadTypeID",
+    "sourceTypeID",
+    "ageID"
+  ],
+  "row_count": 1025,
+  "float_decimals": 12,
+  "content_sha256": "99ecdc9fcb9b504528710f9660e93b33852bf1ebffcd6cfa3661d97e5def23a7"
+}

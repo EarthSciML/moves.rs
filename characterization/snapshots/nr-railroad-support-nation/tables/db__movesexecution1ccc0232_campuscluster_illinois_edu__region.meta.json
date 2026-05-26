@@ -1,0 +1,40 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__region",
+  "schema": [
+    {
+      "name": "regionID",
+      "kind": "int64"
+    },
+    {
+      "name": "VV",
+      "kind": "int64"
+    },
+    {
+      "name": "WW",
+      "kind": "int64"
+    },
+    {
+      "name": "XX",
+      "kind": "int64"
+    },
+    {
+      "name": "YY",
+      "kind": "int64"
+    },
+    {
+      "name": "ZZ",
+      "kind": "int64"
+    },
+    {
+      "name": "description",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "regionID"
+  ],
+  "row_count": 1,
+  "float_decimals": 12,
+  "content_sha256": "af9845a27116901beba9761e7aa9f66f4e15d4401f8897d04dc66acaef96a207"
+}

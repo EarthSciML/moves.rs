@@ -1,0 +1,22 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__soaktime",
+  "schema": [
+    {
+      "name": "vehID",
+      "kind": "int64"
+    },
+    {
+      "name": "tripID",
+      "kind": "int64"
+    },
+    {
+      "name": "soakTime",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 31738,
+  "float_decimals": 12,
+  "content_sha256": "b4c792bfb1476d8d7fbc978764e82276e27e33cfad1c6d937b605206c9fd2b9b"
+}

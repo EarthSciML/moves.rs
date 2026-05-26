@@ -1,0 +1,25 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__nrscrappagecurve",
+  "schema": [
+    {
+      "name": "NREquipTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "fractionLifeused",
+      "kind": "float64"
+    },
+    {
+      "name": "percentageScrapped",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "NREquipTypeID",
+    "fractionLifeused"
+  ],
+  "row_count": 197,
+  "float_decimals": 12,
+  "content_sha256": "d85d6bf0b072c4a060b1c82719e9a20bbd232ee78c10ef58daa32d57af786ca6"
+}

@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "process-tirewear",
+  "sif_sha256": "70ea5b8378b278af50e8c44ab011066c59019faed8d141adf4ec6f2045f1e5fd",
+  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixture-image.lock",
+  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixtures/process-tirewear.xml",
+  "runspec_sha256": "77be1222b2a0e70ad52a135cb64a9d6b1c398a9db87401247c43808e763697c9",
+  "snapshot_aggregate_sha256": "7c2413a72918566b44a679243b85fcadd70af8ac43c54940e472b37e74abc9b2",
+  "output_database": "out_process_tirewear",
+  "scale_input_database": null
+}

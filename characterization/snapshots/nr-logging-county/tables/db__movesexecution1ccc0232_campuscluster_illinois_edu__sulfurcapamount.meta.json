@@ -1,0 +1,20 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__sulfurcapamount",
+  "schema": [
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "sulfurCap",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "fuelTypeID"
+  ],
+  "row_count": 1,
+  "float_decimals": 12,
+  "content_sha256": "b5fe6db9d576eeab2b72215a77428f8223bf3508203d90fb9a0c21581cb30521"
+}

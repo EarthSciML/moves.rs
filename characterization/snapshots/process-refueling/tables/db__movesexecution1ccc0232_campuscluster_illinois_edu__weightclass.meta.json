@@ -1,0 +1,24 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__weightclass",
+  "schema": [
+    {
+      "name": "weightClassID",
+      "kind": "int64"
+    },
+    {
+      "name": "weightClassName",
+      "kind": "utf8"
+    },
+    {
+      "name": "midpointWeight",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "weightClassID"
+  ],
+  "row_count": 28,
+  "float_decimals": 12,
+  "content_sha256": "efbf015ce7f0f5bf4278dd7728709c626525b359cc925e6a0cccacd4e5f5f4d3"
+}

@@ -1,0 +1,44 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__emissionprocess",
+  "schema": [
+    {
+      "name": "processID",
+      "kind": "int64"
+    },
+    {
+      "name": "processName",
+      "kind": "utf8"
+    },
+    {
+      "name": "SCCProcID",
+      "kind": "utf8"
+    },
+    {
+      "name": "occursOnRealRoads",
+      "kind": "utf8"
+    },
+    {
+      "name": "shortName",
+      "kind": "utf8"
+    },
+    {
+      "name": "processDisplayGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "isAffectedByOnroad",
+      "kind": "int64"
+    },
+    {
+      "name": "isAffectedByNonroad",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "processID"
+  ],
+  "row_count": 4,
+  "float_decimals": 12,
+  "content_sha256": "d462b471aff1a646003e461f3a3168fd35fead51d0def0dadeba159f305529d3"
+}

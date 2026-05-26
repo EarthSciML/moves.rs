@@ -1,0 +1,130 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__tempsulfurcalcs3",
+  "schema": [
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "baseFuelFormulationID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelFormulationID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "pollutantID",
+      "kind": "int64"
+    },
+    {
+      "name": "processID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageID",
+      "kind": "int64"
+    },
+    {
+      "name": "m6emitterID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "sulfurCoeff",
+      "kind": "float64"
+    },
+    {
+      "name": "sulfurLevel",
+      "kind": "float64"
+    },
+    {
+      "name": "sulfurBasis",
+      "kind": "float64"
+    },
+    {
+      "name": "ratioNoSulfur",
+      "kind": "float64"
+    },
+    {
+      "name": "sulfurGPAMax",
+      "kind": "float64"
+    },
+    {
+      "name": "sulfurIRFactor",
+      "kind": "float64"
+    },
+    {
+      "name": "sulfShortTarget",
+      "kind": "float64"
+    },
+    {
+      "name": "sulfShort30",
+      "kind": "float64"
+    },
+    {
+      "name": "SulfShortAdj",
+      "kind": "float64"
+    },
+    {
+      "name": "sulfAdj2",
+      "kind": "float64"
+    },
+    {
+      "name": "SulfIRR",
+      "kind": "float64"
+    },
+    {
+      "name": "sulfurLongCoeff",
+      "kind": "float64"
+    },
+    {
+      "name": "sulfMax",
+      "kind": "float64"
+    },
+    {
+      "name": "sulfAdj3",
+      "kind": "float64"
+    },
+    {
+      "name": "sulfGPA1",
+      "kind": "float64"
+    },
+    {
+      "name": "ssulfGPA",
+      "kind": "float64"
+    },
+    {
+      "name": "sulfGPA",
+      "kind": "float64"
+    },
+    {
+      "name": "GPASulfadj",
+      "kind": "float64"
+    },
+    {
+      "name": "minSulfAdjust",
+      "kind": "float64"
+    },
+    {
+      "name": "lowSulfurCoeff",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 80,
+  "float_decimals": 12,
+  "content_sha256": "9f0cdebc9b77fb2769539a84c4c2335a0c3c85b8ed357af8a00d709d42feb543"
+}

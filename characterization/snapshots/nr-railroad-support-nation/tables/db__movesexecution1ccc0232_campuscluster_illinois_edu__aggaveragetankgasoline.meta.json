@@ -1,0 +1,30 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__aggaveragetankgasoline",
+  "schema": [
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "ETOHVolume",
+      "kind": "float64"
+    },
+    {
+      "name": "RVP",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "09f0e44c114049e9ee73f786d45194cb61d56c28ba36852e4f9193c2a6e59504"
+}

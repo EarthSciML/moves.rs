@@ -1,0 +1,110 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__out_process_evap_leaks__unitconvertafter",
+  "schema": [
+    {
+      "name": "MOVESRunID",
+      "kind": "int64"
+    },
+    {
+      "name": "iterationID",
+      "kind": "int64"
+    },
+    {
+      "name": "yearID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "dayID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourID",
+      "kind": "int64"
+    },
+    {
+      "name": "stateID",
+      "kind": "int64"
+    },
+    {
+      "name": "countyID",
+      "kind": "int64"
+    },
+    {
+      "name": "zoneID",
+      "kind": "int64"
+    },
+    {
+      "name": "linkID",
+      "kind": "int64"
+    },
+    {
+      "name": "pollutantID",
+      "kind": "int64"
+    },
+    {
+      "name": "processID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "regClassID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelSubTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "roadTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "SCC",
+      "kind": "utf8"
+    },
+    {
+      "name": "engTechID",
+      "kind": "int64"
+    },
+    {
+      "name": "sectorID",
+      "kind": "int64"
+    },
+    {
+      "name": "hpID",
+      "kind": "int64"
+    },
+    {
+      "name": "emissionQuant",
+      "kind": "float64"
+    },
+    {
+      "name": "emissionQuantMean",
+      "kind": "float64"
+    },
+    {
+      "name": "emissionQuantSigma",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 128,
+  "float_decimals": 12,
+  "content_sha256": "7031b63a0a26b52e75b4837bf11c40c5381ed679b9b623bda7448b93e94b8678"
+}

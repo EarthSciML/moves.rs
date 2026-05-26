@@ -1,0 +1,47 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__fueladjustment",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelMYGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelFormulationID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelAdjustment",
+      "kind": "float64"
+    },
+    {
+      "name": "fuelAdjustmentCV",
+      "kind": "float64"
+    },
+    {
+      "name": "fuelAdjustmentGPA",
+      "kind": "float64"
+    },
+    {
+      "name": "fuelAdjustmentGPACV",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID",
+    "fuelMYGroupID",
+    "sourceTypeID",
+    "fuelFormulationID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "f65e07e1ad796cb321623cbca7291ae40afd32429d9659d1060afe262fe99de5"
+}

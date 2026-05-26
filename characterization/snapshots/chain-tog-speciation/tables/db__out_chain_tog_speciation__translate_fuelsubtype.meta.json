@@ -1,0 +1,24 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__out_chain_tog_speciation__translate_fuelsubtype",
+  "schema": [
+    {
+      "name": "fuelSubtypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelSubtypeName",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "fuelSubtypeID"
+  ],
+  "row_count": 17,
+  "float_decimals": 12,
+  "content_sha256": "87f80f747cee9c27263433d9523e269ec79492a28826100aeeb915073b9822a3"
+}

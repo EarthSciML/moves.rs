@@ -1,0 +1,26 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__ttgominutes",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "oMinutes",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 48,
+  "float_decimals": 12,
+  "content_sha256": "182d3e4e6c8cbf4a651290dfbc3d6339d10ae779d1c7d9e5711d99b2e587a92e"
+}

@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "process-airtoxics",
+  "sif_sha256": "70ea5b8378b278af50e8c44ab011066c59019faed8d141adf4ec6f2045f1e5fd",
+  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixture-image.lock",
+  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixtures/process-airtoxics.xml",
+  "runspec_sha256": "195730d91cb042e0c7f45873fa4ebbcc1e08addea4e20c00c29694b267a93e7a",
+  "snapshot_aggregate_sha256": "72bc217e17097ff6bae355de16b4c5c7ded01ea54d3b8455641bd4a87433d14c",
+  "output_database": "out_process_airtoxics",
+  "scale_input_database": null
+}

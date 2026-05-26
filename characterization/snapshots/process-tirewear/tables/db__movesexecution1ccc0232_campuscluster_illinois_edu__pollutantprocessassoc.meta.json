@@ -1,0 +1,56 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__pollutantprocessassoc",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "processID",
+      "kind": "int64"
+    },
+    {
+      "name": "pollutantID",
+      "kind": "int64"
+    },
+    {
+      "name": "isAffectedByExhaustIM",
+      "kind": "utf8"
+    },
+    {
+      "name": "isAffectedByEvapIM",
+      "kind": "utf8"
+    },
+    {
+      "name": "chainedto1",
+      "kind": "int64"
+    },
+    {
+      "name": "chainedto2",
+      "kind": "int64"
+    },
+    {
+      "name": "isAffectedByOnroad",
+      "kind": "int64"
+    },
+    {
+      "name": "isAffectedByNonroad",
+      "kind": "int64"
+    },
+    {
+      "name": "nrChainedTo1",
+      "kind": "int64"
+    },
+    {
+      "name": "nrChainedTo2",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID"
+  ],
+  "row_count": 2,
+  "float_decimals": 12,
+  "content_sha256": "1c0ab9760a7eccc720a8111e72c4f82b0542a365bd07a1dc20d01840d1bf64b8"
+}

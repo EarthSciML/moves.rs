@@ -1,0 +1,26 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__aggnrfuelsupply",
+  "schema": [
+    {
+      "name": "fuelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelFormulationID",
+      "kind": "int64"
+    },
+    {
+      "name": "haveFract",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 45,
+  "float_decimals": 12,
+  "content_sha256": "cbb0c37f893533721cad5604ec0454bf78aef46f0733fb898c3c2a7c8a48c4c6"
+}

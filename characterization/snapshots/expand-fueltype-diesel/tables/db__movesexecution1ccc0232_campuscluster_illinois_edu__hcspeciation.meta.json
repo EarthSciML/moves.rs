@@ -1,0 +1,48 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__hcspeciation",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelSubtypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "regClassID",
+      "kind": "int64"
+    },
+    {
+      "name": "beginModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "endModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "speciationConstant",
+      "kind": "float64"
+    },
+    {
+      "name": "oxySpeciation",
+      "kind": "float64"
+    },
+    {
+      "name": "dataSourceID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID",
+    "fuelSubtypeID",
+    "regClassID",
+    "beginModelYearID",
+    "endModelYearID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "0e0e26c25a43dda6d1779f716621a7ea1a3787f17cee0e21a48b97b2d807c22b"
+}

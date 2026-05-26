@@ -1,0 +1,26 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__startopmodedistribution",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 9,
+  "float_decimals": 12,
+  "content_sha256": "ab0f03520e0a6d14e657ed4c0461c337a695977026573f8e84b53770cc8df0f6"
+}
