@@ -52,7 +52,7 @@
 //! # Context shape
 //!
 //! [`CalculatorContext`] is the runtime view of a calculator's inputs —
-//! per-run filtered default-DB tables ([`ExecutionTables`]), inter-calculator
+//! per-run filtered default-DB tables ([`crate::data::InMemoryStore`]), inter-calculator
 //! scratch ([`ScratchNamespace`]), and the master loop's current
 //! [`IterationPosition`] (process, location, time). The component types
 //! live in [`crate::execution::execution_db`]; this module re-binds them onto the
@@ -65,11 +65,14 @@
 //! porting against a stable API today; widening the placeholder later
 //! does not break implementors.
 
+use std::sync::Arc;
+
 use moves_calculator_info::{Granularity, Priority};
 use moves_data::{PollutantProcessAssociation, ProcessId};
 
+use crate::data::InMemoryStore;
 use crate::error::Error;
-use crate::execution::execution_db::{ExecutionTables, IterationPosition, ScratchNamespace};
+use crate::execution::execution_db::{IterationPosition, ScratchNamespace};
 
 /// Runtime view of a calculator's inputs and scratch space — the in-memory
 /// equivalent of MOVES's MariaDB execution database.
@@ -95,15 +98,19 @@ use crate::execution::execution_db::{ExecutionTables, IterationPosition, Scratch
 /// `ctx.position().time.hour`, etc. immediately.
 #[derive(Debug, Default)]
 pub struct CalculatorContext {
-    tables: ExecutionTables,
+    /// Shared, read-only slow-tier tables loaded once per run by
+    /// `InputDataManager`. The `Arc` allows all chunks in a run to share
+    /// the same loaded store without copying.
+    slow: Arc<InMemoryStore>,
+    /// Per-chunk scratch namespace. Generators write here; downstream
+    /// calculators in the same chunk read. Each chunk owns an independent
+    /// `ScratchNamespace` so there is no cross-chunk scratch leakage.
     scratch: ScratchNamespace,
     position: IterationPosition,
 }
 
 impl CalculatorContext {
-    /// Construct an empty context with start-of-run position. Used by
-    /// tests and by Task 19's registry stub until full per-run
-    /// materialisation lands.
+    /// Construct an empty context with start-of-run position.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
@@ -115,37 +122,44 @@ impl CalculatorContext {
     #[must_use]
     pub fn with_position(position: IterationPosition) -> Self {
         Self {
-            tables: ExecutionTables::empty(),
+            slow: Arc::default(),
             scratch: ScratchNamespace::empty(),
             position,
         }
     }
 
-    /// Construct a context with pre-populated tables and start-of-run
-    /// position. Convenient for tests that seed the slow tier before
-    /// exercising a calculator body.
+    /// Construct a context with pre-populated slow-tier store and
+    /// start-of-run position. Convenient for tests that seed the slow
+    /// tier before exercising a calculator body.
     #[must_use]
-    pub fn with_tables(tables: ExecutionTables) -> Self {
+    pub fn with_tables(store: InMemoryStore) -> Self {
         Self {
-            tables,
+            slow: Arc::new(store),
             scratch: ScratchNamespace::empty(),
             position: IterationPosition::default(),
         }
     }
 
     /// Construct a context with the given position and pre-populated
-    /// slow-tier tables. Used by [`MOVESEngine::run`] adapters to wire the
-    /// run-level [`InMemoryStore`](crate::InMemoryStore) into each
-    /// calculator invocation.
+    /// slow-tier store.
     #[must_use]
-    pub fn with_position_and_tables(
-        position: IterationPosition,
-        tables: ExecutionTables,
-    ) -> Self {
+    pub fn with_position_and_tables(position: IterationPosition, store: InMemoryStore) -> Self {
         Self {
-            tables,
+            slow: Arc::new(store),
             scratch: ScratchNamespace::empty(),
             position,
+        }
+    }
+
+    /// Construct a context sharing an existing slow-tier `Arc<InMemoryStore>`.
+    /// Used by the engine to give each chunk access to the run-level slow
+    /// store without cloning the data.
+    #[must_use]
+    pub fn with_slow(slow: Arc<InMemoryStore>) -> Self {
+        Self {
+            slow,
+            scratch: ScratchNamespace::empty(),
+            position: IterationPosition::default(),
         }
     }
 
@@ -153,30 +167,40 @@ impl CalculatorContext {
     /// their [`Calculator::execute`] body, indexing by the canonical
     /// table names declared in [`Calculator::input_tables`].
     #[must_use]
-    pub fn tables(&self) -> &ExecutionTables {
-        &self.tables
+    pub fn tables(&self) -> &InMemoryStore {
+        &self.slow
     }
 
-    /// Mutable access to the slow-tier tables. Task 24 (`InputDataManager`)
-    /// uses this to populate the store at run start; calculators themselves
-    /// should not mutate the slow tier.
-    pub fn tables_mut(&mut self) -> &mut ExecutionTables {
-        &mut self.tables
+    /// Mutable access to the slow-tier store. Uses `Arc::make_mut` so the
+    /// store is cloned only when the `Arc` has multiple owners.
+    pub fn tables_mut(&mut self) -> &mut InMemoryStore {
+        Arc::make_mut(&mut self.slow)
     }
 
-    /// Inter-calculator scratch namespace. Generators write here in their
-    /// [`Generator::execute`] body; downstream calculators read.
+    /// Inter-calculator scratch namespace. Calculators read from here.
     #[must_use]
     pub fn scratch(&self) -> &ScratchNamespace {
         &self.scratch
     }
 
-    /// Current MasterLoop iteration / location / time triple. Concrete in
-    /// this commit (placeholder data plane notwithstanding) — Phase 3
-    /// calculators can read e.g. `ctx.position().time.hour` directly.
+    /// Mutable scratch namespace. Generators write here in their
+    /// [`Generator::execute`] body; downstream calculators in the same
+    /// chunk read via [`scratch`](Self::scratch).
+    pub fn scratch_mut(&mut self) -> &mut ScratchNamespace {
+        &mut self.scratch
+    }
+
+    /// Current MasterLoop iteration / location / time triple.
     #[must_use]
     pub fn position(&self) -> &IterationPosition {
         &self.position
+    }
+
+    /// Update the iteration position. Called by the engine adapter before
+    /// each module invocation so the context reflects the loop's current
+    /// position without replacing the shared slow tier or scratch.
+    pub fn set_position(&mut self, position: IterationPosition) {
+        self.position = position;
     }
 }
 
@@ -337,7 +361,11 @@ pub trait Generator: Send + Sync + std::fmt::Debug {
     /// granularity. The returned [`CalculatorOutput`] is stored under the
     /// generator's [`output_tables`](Self::output_tables) names by the
     /// registry (Task 19).
-    fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error>;
+    ///
+    /// Receives `&mut CalculatorContext` so the generator can write to
+    /// [`CalculatorContext::scratch_mut`]. The mutable borrow is
+    /// exclusive within the chunk's sequential execution — no aliasing.
+    fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error>;
 }
 
 #[cfg(test)]
@@ -395,7 +423,7 @@ mod tests {
         fn output_tables(&self) -> &[&'static str] {
             DUMMY_GEN_OUTPUTS
         }
-        fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
+        fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
             Ok(CalculatorOutput::empty())
         }
     }
@@ -421,8 +449,8 @@ mod tests {
         assert!(gen.upstream().is_empty());
         assert!(gen.input_tables().is_empty());
         assert_eq!(gen.output_tables(), &["sourceBinDistribution"]);
-        let ctx = CalculatorContext::new();
-        let _out: CalculatorOutput = gen.execute(&ctx).expect("execute ok");
+        let mut ctx = CalculatorContext::new();
+        let _out: CalculatorOutput = gen.execute(&mut ctx).expect("execute ok");
     }
 
     #[test]

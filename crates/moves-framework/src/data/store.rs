@@ -27,6 +27,13 @@ impl InMemoryStore {
     pub fn new() -> Self {
         Self::default()
     }
+
+    /// Return a mutable reference to the DataFrame stored under `name`, or
+    /// `None` if absent. Uses `Arc::make_mut` to ensure exclusive ownership;
+    /// if the Arc has multiple owners the value is cloned first.
+    pub fn get_mut(&mut self, name: &str) -> Option<&mut DataFrame> {
+        self.map.get_mut(name).map(Arc::make_mut)
+    }
 }
 
 impl DataFrameStore for InMemoryStore {
@@ -52,8 +59,7 @@ mod tests {
     use polars::prelude::*;
 
     use super::*;
-    use crate::execution::execution_db::ExecutionTables;
-    use crate::CalculatorContext;
+    use crate::{data::DataFrameStore, CalculatorContext};
 
     fn one_col_df(name: &str) -> DataFrame {
         let s = Series::new(name.into(), [1i32, 2, 3]);
@@ -88,12 +94,9 @@ mod tests {
 
     #[test]
     fn store_can_be_held_inside_calculator_context() {
-        let mut tables = ExecutionTables::empty();
-        tables.store.insert("sourceUseTypePopulation", one_col_df("col"));
-        let ctx = CalculatorContext::with_tables(tables);
-        assert!(ctx
-            .tables()
-            .store
-            .contains("sourceUseTypePopulation"));
+        let mut store = InMemoryStore::new();
+        store.insert("sourceUseTypePopulation", one_col_df("col"));
+        let ctx = CalculatorContext::with_tables(store);
+        assert!(ctx.tables().contains("sourceUseTypePopulation"));
     }
 }
