@@ -109,8 +109,10 @@ use std::sync::OnceLock;
 use moves_calculator_info::{Granularity, Priority};
 use moves_data::{PollutantProcessAssociation, ProcessId};
 use moves_framework::{
-    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, Error,
+    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription,
+    DataFrameStoreTyped, Error, IntoDataFrame, TableRow,
 };
+use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
 
 use super::common::{
     finalize_with_im, merge_im_coverage, weight_by_source_bin, AgeCategoryRow,
@@ -589,14 +591,171 @@ impl Calculator for Nh3RunningCalculator {
         INPUT_TABLES
     }
 
-    /// Phase 2 skeleton — returns an empty [`CalculatorOutput`].
-    ///
-    /// [`CalculatorContext`] cannot yet surface the input tables or accept the
-    /// emission-table output — its row storage lands with the Task 50
-    /// `DataFrameStore`. The computation itself is ported and tested in
-    /// [`Nh3RunningCalculator::calculate`]; see the [module documentation](self).
-    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
-        Ok(CalculatorOutput::empty())
+    /// Read input tables from `ctx.tables()`, build a [`RunningContext`] from
+    /// `ctx.position()`, run [`calculate`](Self::calculate), and return the
+    /// emission rows as a `MOVESWorkerOutput` DataFrame.
+    fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
+        let pos = ctx.position();
+        let run_ctx = RunningContext {
+            year_id: pos.time.year.unwrap_or(0) as i32,
+            state_id: pos.location.state_id.unwrap_or(0) as i32,
+            county_id: pos.location.county_id.unwrap_or(0) as i32,
+            link_id: pos.location.link_id.unwrap_or(0) as i32,
+        };
+        let tables = ctx.tables();
+        let inputs = RunningInputs {
+            sho: tables.iter_typed::<ShoRow>("SHO")?,
+            link: tables.iter_typed::<LinkRow>("Link")?,
+            runspec_months: tables
+                .iter_typed::<RunSpecMonthRow>("RunSpecMonth")?
+                .into_iter()
+                .map(|r| r.month_id)
+                .collect(),
+            emission_rate_by_age: tables
+                .iter_typed::<super::common::EmissionRateByAgeRow>("EmissionRateByAge")?,
+            age_category: tables
+                .iter_typed::<super::common::AgeCategoryRow>("AgeCategory")?,
+            source_type_model_year: tables
+                .iter_typed::<super::common::SourceTypeModelYearRow>("SourceTypeModelYear")?,
+            source_bin_distribution: tables
+                .iter_typed::<super::common::SourceBinDistributionRow>("SourceBinDistribution")?,
+            source_bin: tables
+                .iter_typed::<super::common::SourceBinRow>("SourceBin")?,
+            op_mode_distribution: tables
+                .iter_typed::<super::common::OpModeDistributionRow>("OpModeDistribution")?,
+            hour_day: tables
+                .iter_typed::<super::common::HourDayRow>("HourDay")?,
+            pollutant_process_assoc: tables
+                .iter_typed::<super::common::PollutantProcessAssocRow>("PollutantProcessAssoc")?,
+            pollutant_process_mapped_model_year: tables
+                .iter_typed::<super::common::PollutantProcessMappedModelYearRow>(
+                    "PollutantProcessMappedModelYear",
+                )?,
+            im_factor: tables
+                .iter_typed::<super::common::ImFactorRow>("IMFactor")?,
+            im_coverage: tables
+                .iter_typed::<super::common::ImCoverageRow>("IMCoverage")?,
+        };
+        crate::wiring::emit_rows(Self::calculate(&inputs, &run_ctx))
+    }
+}
+
+// ===========================================================================
+// TableRow implementations specific to the running calculator.
+// ===========================================================================
+
+fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -> Error {
+    Error::RowExtraction {
+        table: table.into(),
+        row,
+        column: column.into(),
+        message: msg,
+    }
+}
+
+/// One `RunSpecMonth` row — a single `monthID` value.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct RunSpecMonthRow {
+    pub month_id: i32,
+}
+
+impl TableRow for RunSpecMonthRow {
+    fn table_name() -> &'static str { "RunSpecMonth" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([("monthID".into(), DataType::Int32)])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("monthID".into(), rows.iter().map(|r| r.month_id).collect::<Vec<i32>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "RunSpecMonth";
+        let col = "monthID";
+        let mo = df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))?;
+        (0..df.height()).map(|i| Ok(RunSpecMonthRow {
+            month_id: mo.get(i).ok_or_else(|| row_err(t, i, col, "null value".into()))?,
+        })).collect()
+    }
+}
+
+impl TableRow for ShoRow {
+    fn table_name() -> &'static str { "SHO" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("hourDayID".into(), DataType::Int32),
+            ("monthID".into(), DataType::Int32),
+            ("yearID".into(), DataType::Int32),
+            ("ageID".into(), DataType::Int32),
+            ("sourceTypeID".into(), DataType::Int32),
+            ("SHO".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("hourDayID".into(), rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>()).into(),
+            Series::new("monthID".into(), rows.iter().map(|r| r.month_id).collect::<Vec<i32>>()).into(),
+            Series::new("yearID".into(), rows.iter().map(|r| r.year_id).collect::<Vec<i32>>()).into(),
+            Series::new("ageID".into(), rows.iter().map(|r| r.age_id).collect::<Vec<i32>>()).into(),
+            Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
+            Series::new("SHO".into(), rows.iter().map(|r| r.sho).collect::<Vec<f64>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "SHO";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let hd = get_i32("hourDayID")?; let mo = get_i32("monthID")?; let yr = get_i32("yearID")?;
+        let ag = get_i32("ageID")?; let st = get_i32("sourceTypeID")?;
+        let sh = df.column("SHO").map_err(|e| row_err(t, 0, "SHO", e.to_string()))?.f64().map_err(|e| row_err(t, 0, "SHO", e.to_string()))?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(ShoRow {
+                hour_day_id: hd.get(i).ok_or_else(|| null("hourDayID"))?,
+                month_id: mo.get(i).ok_or_else(|| null("monthID"))?,
+                year_id: yr.get(i).ok_or_else(|| null("yearID"))?,
+                age_id: ag.get(i).ok_or_else(|| null("ageID"))?,
+                source_type_id: st.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                sho: sh.get(i).ok_or_else(|| null("SHO"))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for LinkRow {
+    fn table_name() -> &'static str { "Link" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("linkID".into(), DataType::Int32),
+            ("zoneID".into(), DataType::Int32),
+            ("roadTypeID".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("linkID".into(), rows.iter().map(|r| r.link_id).collect::<Vec<i32>>()).into(),
+            Series::new("zoneID".into(), rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>()).into(),
+            Series::new("roadTypeID".into(), rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "Link";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let lk = get_i32("linkID")?; let zo = get_i32("zoneID")?; let rt = get_i32("roadTypeID")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(LinkRow {
+                link_id: lk.get(i).ok_or_else(|| null("linkID"))?,
+                zone_id: zo.get(i).ok_or_else(|| null("zoneID"))?,
+                road_type_id: rt.get(i).ok_or_else(|| null("roadTypeID"))?,
+            })
+        }).collect()
     }
 }
 
@@ -815,10 +974,39 @@ mod tests {
     }
 
     #[test]
-    fn execute_is_a_shell_until_the_data_plane_lands() {
-        let calc = Nh3RunningCalculator::new();
-        let ctx = CalculatorContext::new();
-        assert!(calc.execute(&ctx).is_ok());
+    fn execute_dispatches_running_exhaust() {
+        use moves_framework::{DataFrameStore, ExecutionLocation, ExecutionTime, IterationPosition};
+        let inputs = minimal_inputs();
+        let mut store = moves_framework::InMemoryStore::default();
+        // Use raw insert to bypass registry schema validation for tables
+        // (SHO, Link, SourceBin) whose registry schemas differ from this
+        // calculator's column projections.
+        store.insert("SHO", ShoRow::into_dataframe(inputs.sho).unwrap());
+        store.insert("Link", LinkRow::into_dataframe(inputs.link).unwrap());
+        store.insert("RunSpecMonth", RunSpecMonthRow::into_dataframe(
+            inputs.runspec_months.iter().map(|&m| RunSpecMonthRow { month_id: m }).collect()
+        ).unwrap());
+        store.insert("EmissionRateByAge", EmissionRateByAgeRow::into_dataframe(inputs.emission_rate_by_age).unwrap());
+        store.insert("AgeCategory", AgeCategoryRow::into_dataframe(inputs.age_category).unwrap());
+        store.insert("SourceTypeModelYear", SourceTypeModelYearRow::into_dataframe(inputs.source_type_model_year).unwrap());
+        store.insert("SourceBinDistribution", SourceBinDistributionRow::into_dataframe(inputs.source_bin_distribution).unwrap());
+        store.insert("SourceBin", SourceBinRow::into_dataframe(inputs.source_bin).unwrap());
+        store.insert("OpModeDistribution", OpModeDistributionRow::into_dataframe(inputs.op_mode_distribution).unwrap());
+        store.insert("HourDay", HourDayRow::into_dataframe(inputs.hour_day).unwrap());
+        store.insert("PollutantProcessAssoc", PollutantProcessAssocRow::into_dataframe(inputs.pollutant_process_assoc).unwrap());
+        store.insert("PollutantProcessMappedModelYear", PollutantProcessMappedModelYearRow::into_dataframe(inputs.pollutant_process_mapped_model_year).unwrap());
+        store.insert("IMFactor", ImFactorRow::into_dataframe(inputs.im_factor).unwrap());
+        store.insert("IMCoverage", ImCoverageRow::into_dataframe(inputs.im_coverage).unwrap());
+
+        let position = IterationPosition {
+            process_id: Some(ProcessId(RUNNING_EXHAUST_PROCESS_ID)),
+            location: ExecutionLocation::link(26, 26_161, 261_610, 5001),
+            time: ExecutionTime::year(2020),
+            ..Default::default()
+        };
+        let ctx = CalculatorContext::with_position_and_tables(position, store);
+        let out = Nh3RunningCalculator::new().execute(&ctx).expect("execute ok");
+        assert!(out.dataframe().unwrap().height() > 0);
     }
 
     #[test]
