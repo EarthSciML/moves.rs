@@ -62,7 +62,7 @@
 //! module's job is the geographic loop and the cross-module wiring,
 //! not the inner math.
 
-mod common;
+pub mod common;
 pub mod county;
 pub mod prcnat;
 pub mod prcus;
