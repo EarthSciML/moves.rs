@@ -85,24 +85,25 @@
 //! single-county, so the join is trivially satisfied and the port carries
 //! `countyID` straight from the energy row, matching `SO2Calculator`.
 //!
-//! # Data plane (Task 50)
+//! # Execute wiring (bucket-A)
 //!
-//! [`Calculator::execute`] receives a [`CalculatorContext`] whose execution
-//! tables and scratch namespace are Phase 2 placeholders until the
-//! `DataFrameStore` lands (migration-plan Task 50), so `execute` cannot yet
-//! read `MOVESWorkerOutput` nor write the well-to-pump rows back. The numeric
-//! algorithm is fully ported and unit-tested on
-//! [`calculate`](Ch4N2oWtpCalculator::calculate); `execute` is a documented
-//! shell returning an empty [`CalculatorOutput`].
+//! [`Calculator::execute`] reads the seven input tables from `ctx.tables()`
+//! via [`DataFrameStoreTyped::iter_typed`] and extracts `target_year` from
+//! `ctx.position().time.year`, then delegates to `calculate` and emits the
+//! rows as a `MOVESWorkerOutput` `DataFrame` via [`crate::wiring::emit_rows`].
 
 use std::collections::BTreeMap;
 
 use moves_data::PollutantProcessAssociation;
 use moves_framework::{
-    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, Error,
+    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription,
+    DataFrameStoreTyped, Error,
 };
 
-use super::common::{build_wtp_factor_by_fuel_type, month_group_index, WorkerOutputRow, WtpInputs};
+use super::common::{
+    build_wtp_factor_by_fuel_type, month_group_index, FuelFormulationRow, FuelSubTypeRow,
+    FuelSupplyRow, GreetWellToPumpRow, MonthGroupRow, WorkerOutputRow, WtpInputs, YearRow,
+};
 
 /// Stable module name — matches the Java class and the `CH4N2OWTPCalculator`
 /// entry in the calculator-chain DAG (`calculator-dag.json`).
@@ -232,6 +233,25 @@ impl Ch4N2oWtpCalculator {
     }
 }
 
+/// Read all CH4/N2O WTP input tables from `ctx.tables()`.
+///
+/// Extracts `target_year` from `ctx.position().time.year` (0 when no year is
+/// set), which the GREET interpolation needs to bracket the target run year.
+fn build_inputs(ctx: &CalculatorContext) -> Result<WtpInputs, Error> {
+    let tables = ctx.tables();
+    let target_year = ctx.position().time.year.map_or(0, i32::from);
+    Ok(WtpInputs {
+        greet: tables.iter_typed::<GreetWellToPumpRow>("GREETWellToPump")?,
+        fuel_supply: tables.iter_typed::<FuelSupplyRow>("FuelSupply")?,
+        fuel_formulation: tables.iter_typed::<FuelFormulationRow>("FuelFormulation")?,
+        fuel_sub_type: tables.iter_typed::<FuelSubTypeRow>("FuelSubtype")?,
+        year: tables.iter_typed::<YearRow>("Year")?,
+        month_of_any_year: tables.iter_typed::<MonthGroupRow>("MonthOfAnyYear")?,
+        worker_output: tables.iter_typed::<WorkerOutputRow>("MOVESWorkerOutput")?,
+        target_year,
+    })
+}
+
 /// `CH4N2OWTPCalculator` is a chained calculator — `subscribes_directly: false`
 /// in `calculator-dag.json` — so it declares no MasterLoop subscription.
 static NO_SUBSCRIPTIONS: &[CalculatorSubscription] = &[];
@@ -274,14 +294,12 @@ impl Calculator for Ch4N2oWtpCalculator {
         INPUT_TABLES
     }
 
-    /// Phase 2 skeleton — returns an empty [`CalculatorOutput`].
-    ///
-    /// [`CalculatorContext`] cannot yet surface the input tables or accept the
-    /// `MOVESWorkerOutput` rows — that lands with the Task 50 `DataFrameStore`.
-    /// The computation is ported and tested in
-    /// [`Ch4N2oWtpCalculator::calculate`].
-    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
-        Ok(CalculatorOutput::empty())
+    /// Read input tables from `ctx`, run the CH4/N2O WTP algorithm, and return
+    /// the emission rows as a `MOVESWorkerOutput` `DataFrame`.
+    fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
+        let inputs = build_inputs(ctx)?;
+        let rows = self.calculate(&inputs);
+        crate::wiring::emit_rows(rows)
     }
 }
 
@@ -490,9 +508,30 @@ mod tests {
     }
 
     #[test]
-    fn execute_is_a_shell_until_the_data_plane_lands() {
-        let ctx = CalculatorContext::new();
-        assert!(Ch4N2oWtpCalculator.execute(&ctx).is_ok());
+    fn execute_wires_through_data_plane() {
+        use moves_framework::{DataFrameStore, ExecutionTime, IterationPosition, TableRow};
+        let inputs = minimal_inputs();
+        let mut store = moves_framework::InMemoryStore::new();
+        store.insert("GREETWellToPump", GreetWellToPumpRow::into_dataframe(inputs.greet).unwrap());
+        store.insert("FuelSupply", FuelSupplyRow::into_dataframe(inputs.fuel_supply).unwrap());
+        store.insert("FuelFormulation", FuelFormulationRow::into_dataframe(inputs.fuel_formulation).unwrap());
+        store.insert("FuelSubtype", FuelSubTypeRow::into_dataframe(inputs.fuel_sub_type).unwrap());
+        store.insert("Year", YearRow::into_dataframe(inputs.year).unwrap());
+        store.insert("MonthOfAnyYear", MonthGroupRow::into_dataframe(inputs.month_of_any_year).unwrap());
+        store.insert("MOVESWorkerOutput", WorkerOutputRow::into_dataframe(inputs.worker_output).unwrap());
+        let pos = IterationPosition {
+            time: ExecutionTime::year(2020),
+            ..Default::default()
+        };
+        let ctx = CalculatorContext::with_position_and_tables(pos, store);
+        let out = Ch4N2oWtpCalculator.execute(&ctx).expect("execute ok");
+        let df = out.dataframe().expect("output should contain a DataFrame");
+        // One energy record fans out to CH4 (5) and N2O (6).
+        assert_eq!(df.height(), 2, "minimal inputs produce CH4 and N2O rows");
+        for i in 0..2 {
+            let quant = df.column("emissionQuant").unwrap().f64().unwrap().get(i).unwrap();
+            assert!(quant > 0.0, "emissionQuant at row {i} must be non-zero: {quant}");
+        }
     }
 
     #[test]

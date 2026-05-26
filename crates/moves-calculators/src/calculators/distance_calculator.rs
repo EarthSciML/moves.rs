@@ -773,6 +773,22 @@ impl TableRow for DistanceActivityRow {
     }
 }
 
+/// Read all Distance input tables from `ctx.tables()`.
+fn build_inputs(ctx: &CalculatorContext) -> Result<DistanceInputs, Error> {
+    let tables = ctx.tables();
+    Ok(DistanceInputs {
+        sho: tables.iter_typed::<ShoRow>("SHO")?,
+        source_bin: tables.iter_typed::<SourceBinRow>("SourceBin")?,
+        source_bin_distribution: tables
+            .iter_typed::<SourceBinDistributionRow>("SourceBinDistribution")?,
+        source_type_model_year: tables
+            .iter_typed::<SourceTypeModelYearRow>("SourceTypeModelYear")?,
+        hour_day: tables.iter_typed::<HourDayRow>("HourDay")?,
+        link: tables.iter_typed::<LinkRow>("Link")?,
+        county: tables.iter_typed::<CountyRow>("County")?,
+    })
+}
+
 /// The MOVES distance calculator.
 ///
 /// A small value type: it owns no per-run state — only its master-loop
@@ -1006,27 +1022,10 @@ impl Calculator for DistanceCalculator {
         INPUT_TABLES
     }
 
-    /// Read the seven input tables from `ctx.tables()`, run
-    /// [`DistanceCalculator::calculate`], and wrap the result in a
-    /// [`CalculatorOutput`] carrying the activity `DataFrame`.
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
-        let tables = ctx.tables();
-        let inputs = DistanceInputs {
-            sho: tables.iter_typed::<ShoRow>("SHO")?,
-            source_bin: tables.iter_typed::<SourceBinRow>("SourceBin")?,
-            source_bin_distribution: tables
-                .iter_typed::<SourceBinDistributionRow>("SourceBinDistribution")?,
-            source_type_model_year: tables
-                .iter_typed::<SourceTypeModelYearRow>("SourceTypeModelYear")?,
-            hour_day: tables.iter_typed::<HourDayRow>("HourDay")?,
-            link: tables.iter_typed::<LinkRow>("Link")?,
-            county: tables.iter_typed::<CountyRow>("County")?,
-        };
+        let inputs = build_inputs(ctx)?;
         let rows = self.calculate(&inputs);
-        let df = rows
-            .into_dataframe()
-            .map_err(|e| Error::Polars(e.to_string()))?;
-        Ok(CalculatorOutput::with_dataframe(df))
+        crate::wiring::emit_rows(rows)
     }
 }
 
@@ -1394,7 +1393,7 @@ mod tests {
     }
 
     #[test]
-    fn execute_returns_dataframe_for_minimal_seeded_context() {
+    fn execute_wires_through_data_plane() {
         use moves_framework::DataFrameStore;
         let calc = DistanceCalculator::new();
         let mut store = moves_framework::InMemoryStore::new();
@@ -1414,6 +1413,7 @@ mod tests {
         let df = out.dataframe().expect("output should contain a DataFrame");
         assert_eq!(df.height(), 1, "minimal inputs produce exactly one output row");
         let activity = df.column("activity").unwrap().f64().unwrap().get(0).unwrap();
+        assert!(activity > 0.0, "activity {activity} must be non-zero");
         assert!((activity - 100.0).abs() < 1e-9, "activity {activity} != 100.0");
     }
 
