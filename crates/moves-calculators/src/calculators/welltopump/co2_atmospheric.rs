@@ -368,14 +368,10 @@ impl Calculator for Co2AtmosphericWtpCalculator {
         INPUT_TABLES
     }
 
-    /// Phase 2 skeleton — returns an empty [`CalculatorOutput`].
-    ///
-    /// [`CalculatorContext`] cannot yet surface the input tables or accept the
-    /// `MOVESWorkerOutput` rows — that lands with the Task 50 `DataFrameStore`.
-    /// The computation is ported and tested in
-    /// [`Co2AtmosphericWtpCalculator::calculate`].
-    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
-        Ok(CalculatorOutput::empty())
+    fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
+        let inputs = super::common::build_wtp_inputs(ctx)?;
+        let rows = self.calculate(&inputs);
+        crate::wiring::emit_rows(rows)
     }
 }
 
@@ -643,9 +639,31 @@ mod tests {
     }
 
     #[test]
-    fn execute_is_a_shell_until_the_data_plane_lands() {
-        let ctx = CalculatorContext::new();
-        assert!(Co2AtmosphericWtpCalculator.execute(&ctx).is_ok());
+    fn execute_wires_through_data_plane() {
+        use moves_framework::{DataFrameStore, ExecutionTime, InMemoryStore, IterationPosition, TableRow};
+        use crate::calculators::welltopump::common::{
+            FuelFormulationRow, FuelSubTypeRow, FuelSupplyRow, GreetWellToPumpRow, MonthGroupRow,
+            WorkerOutputRow, YearRow,
+        };
+        let inputs = minimal_inputs();
+        let mut store = InMemoryStore::new();
+        store.insert("GREETWellToPump", GreetWellToPumpRow::into_dataframe(inputs.greet).unwrap());
+        store.insert("FuelSupply", FuelSupplyRow::into_dataframe(inputs.fuel_supply).unwrap());
+        store.insert("FuelFormulation", FuelFormulationRow::into_dataframe(inputs.fuel_formulation).unwrap());
+        store.insert("FuelSubtype", FuelSubTypeRow::into_dataframe(inputs.fuel_sub_type).unwrap());
+        store.insert("Year", YearRow::into_dataframe(inputs.year).unwrap());
+        store.insert("MonthOfAnyYear", MonthGroupRow::into_dataframe(inputs.month_of_any_year).unwrap());
+        store.insert("MOVESWorkerOutput", WorkerOutputRow::into_dataframe(inputs.worker_output).unwrap());
+        let pos = IterationPosition {
+            time: ExecutionTime::year(2020),
+            ..IterationPosition::default()
+        };
+        let ctx = CalculatorContext::with_position_and_tables(pos, store);
+        let out = Co2AtmosphericWtpCalculator.execute(&ctx).expect("execute ok");
+        let df = out.dataframe().expect("output should contain a DataFrame");
+        assert!(df.height() > 0, "expected at least one output row");
+        let quant = df.column("emissionQuant").unwrap().f64().unwrap().get(0).unwrap();
+        assert!((quant - 1_000.0).abs() < 1e-6, "emissionQuant {quant} != 1000.0");
     }
 
     #[test]
