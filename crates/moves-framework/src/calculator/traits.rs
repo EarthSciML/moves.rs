@@ -149,6 +149,7 @@ impl CalculatorContext {
         }
     }
 
+
     /// Per-run filtered default-DB tables. Calculators read from this in
     /// their [`Calculator::execute`] body, indexing by the canonical
     /// table names declared in [`Calculator::input_tables`].
