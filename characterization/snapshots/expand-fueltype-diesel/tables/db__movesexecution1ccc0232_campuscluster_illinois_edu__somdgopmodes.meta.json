@@ -1,0 +1,16 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__somdgopmodes",
+  "schema": [
+    {
+      "name": "opModeID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "opModeID"
+  ],
+  "row_count": 7,
+  "float_decimals": 12,
+  "content_sha256": "c3a511557a6f5070a953f8e6cf7bc9b044ced8d2a17f5e13f814cbe2b9d478a0"
+}

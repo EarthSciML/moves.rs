@@ -1,0 +1,24 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__out_nr_pleasure_craft_state__translate_county",
+  "schema": [
+    {
+      "name": "countyID",
+      "kind": "int64"
+    },
+    {
+      "name": "stateID",
+      "kind": "int64"
+    },
+    {
+      "name": "countyName",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "countyID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "a39501d22f2de4fd10f1da51e8e60b15aa5ba0e9db4c5c732ff46d23ee671540"
+}

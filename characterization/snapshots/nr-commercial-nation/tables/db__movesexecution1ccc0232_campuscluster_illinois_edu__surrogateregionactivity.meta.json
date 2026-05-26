@@ -1,0 +1,25 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__surrogateregionactivity",
+  "schema": [
+    {
+      "name": "fuelRegionID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "actFract",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "fuelRegionID",
+    "fuelYearID"
+  ],
+  "row_count": 21,
+  "float_decimals": 12,
+  "content_sha256": "5e63fc50c61d0c7112d9d3fdf2474f19de8fc71ceb95c33a0ec3214062d27db4"
+}

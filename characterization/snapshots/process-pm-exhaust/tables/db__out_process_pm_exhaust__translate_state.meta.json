@@ -1,0 +1,24 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__out_process_pm_exhaust__translate_state",
+  "schema": [
+    {
+      "name": "stateID",
+      "kind": "int64"
+    },
+    {
+      "name": "stateName",
+      "kind": "utf8"
+    },
+    {
+      "name": "stateAbbr",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "stateID"
+  ],
+  "row_count": 53,
+  "float_decimals": 12,
+  "content_sha256": "a5d3b9fdfa47380b6f99aebad99af40e5a730b9129dd15760ea1b755c8eb77ec"
+}

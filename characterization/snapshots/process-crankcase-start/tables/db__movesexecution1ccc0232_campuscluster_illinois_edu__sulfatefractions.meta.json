@@ -1,0 +1,56 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__sulfatefractions",
+  "schema": [
+    {
+      "name": "processID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "minModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "maxModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "SulfatenonECPMFraction",
+      "kind": "float64"
+    },
+    {
+      "name": "H2OnonECPMFraction",
+      "kind": "float64"
+    },
+    {
+      "name": "BaseFuelSulfurLevel",
+      "kind": "float64"
+    },
+    {
+      "name": "BaseFuelSulfateFraction",
+      "kind": "float64"
+    },
+    {
+      "name": "DataSourceId",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "processID",
+    "fuelTypeID",
+    "sourceTypeID",
+    "minModelYearID",
+    "maxModelYearID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "c5974c003a3f3833dbde7c356c3dfb785c76a9c3be2001c307a6eebdbc2d6ad7"
+}

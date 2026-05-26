@@ -1,0 +1,59 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__starttempadjustment",
+  "schema": [
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeID",
+      "kind": "int64"
+    },
+    {
+      "name": "tempAdjustTermA",
+      "kind": "float64"
+    },
+    {
+      "name": "tempAdjustTermACV",
+      "kind": "float64"
+    },
+    {
+      "name": "tempAdjustTermB",
+      "kind": "float64"
+    },
+    {
+      "name": "tempAdjustTermBCV",
+      "kind": "float64"
+    },
+    {
+      "name": "tempAdjustTermC",
+      "kind": "float64"
+    },
+    {
+      "name": "tempAdjustTermCCV",
+      "kind": "float64"
+    },
+    {
+      "name": "startTempEquationType",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "fuelTypeID",
+    "polProcessID",
+    "modelYearGroupID",
+    "opModeID"
+  ],
+  "row_count": 4296,
+  "float_decimals": 12,
+  "content_sha256": "ac039accfe99012f7761edec059836b41acc0a1de9ed556952249886f11afa0c"
+}

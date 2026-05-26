@@ -1,0 +1,20 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__out_nr_pleasure_craft_state__translate_roadtype",
+  "schema": [
+    {
+      "name": "roadTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "roadTypeName",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "roadTypeID"
+  ],
+  "row_count": 6,
+  "float_decimals": 12,
+  "content_sha256": "61d480bf7aa719661e14bad538f4dd13c0d0e8566bad4a8afe42cecd88dd6cba"
+}

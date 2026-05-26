@@ -1,0 +1,54 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__generalfuelratioexpression",
+  "schema": [
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "minModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "maxModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "minAgeID",
+      "kind": "int64"
+    },
+    {
+      "name": "maxAgeID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelEffectRatioExpression",
+      "kind": "utf8"
+    },
+    {
+      "name": "fuelEffectRatioGPAExpression",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "fuelTypeID",
+    "polProcessID",
+    "minModelYearID",
+    "maxModelYearID",
+    "minAgeID",
+    "maxAgeID",
+    "sourceTypeID"
+  ],
+  "row_count": 270,
+  "float_decimals": 12,
+  "content_sha256": "8beb32ce71179079960b623450a0f851e4a46fce9b69e35aebcac7aa6e6d5756"
+}

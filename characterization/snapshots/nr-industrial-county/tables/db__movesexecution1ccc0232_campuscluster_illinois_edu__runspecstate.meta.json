@@ -1,0 +1,16 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__runspecstate",
+  "schema": [
+    {
+      "name": "stateID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "stateID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "97f26c9f0852811c60f47f5cd0cf2b4c2e56055b8e87cefbade80673ae8a0879"
+}

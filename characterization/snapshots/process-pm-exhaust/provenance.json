@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "process-pm-exhaust",
+  "sif_sha256": "70ea5b8378b278af50e8c44ab011066c59019faed8d141adf4ec6f2045f1e5fd",
+  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixture-image.lock",
+  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixtures/process-pm-exhaust.xml",
+  "runspec_sha256": "876295c54b0b32ba9ee8a8c8a808bc248cf2855d69ef19ec90ad240f80be165f",
+  "snapshot_aggregate_sha256": "1791db4554892592d582c874c389d2657b2ff3792ebe5096159a20ece3bc3cb5",
+  "output_database": "out_process_pm_exhaust",
+  "scale_input_database": null
+}

@@ -1,0 +1,24 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__temperatureprofileid",
+  "schema": [
+    {
+      "name": "temperatureProfileID",
+      "kind": "int64"
+    },
+    {
+      "name": "zoneID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "temperatureProfileID"
+  ],
+  "row_count": 3,
+  "float_decimals": 12,
+  "content_sha256": "a9c0237058918501a5180b19cbd178b33e48f38d5b78c314a4349a040d5e8610"
+}

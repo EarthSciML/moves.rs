@@ -1,0 +1,24 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__driveschedule",
+  "schema": [
+    {
+      "name": "driveScheduleID",
+      "kind": "int64"
+    },
+    {
+      "name": "averageSpeed",
+      "kind": "float64"
+    },
+    {
+      "name": "driveScheduleName",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "driveScheduleID"
+  ],
+  "row_count": 49,
+  "float_decimals": 12,
+  "content_sha256": "5b517b33d82d134e9abb7a98ff8c64fbff7181e104a9e00a4d8b7147679b4518"
+}

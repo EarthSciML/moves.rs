@@ -1,0 +1,48 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__pollutant",
+  "schema": [
+    {
+      "name": "pollutantID",
+      "kind": "int64"
+    },
+    {
+      "name": "pollutantName",
+      "kind": "utf8"
+    },
+    {
+      "name": "energyOrMass",
+      "kind": "utf8"
+    },
+    {
+      "name": "globalWarmingPotential",
+      "kind": "int64"
+    },
+    {
+      "name": "NEIPollutantCode",
+      "kind": "utf8"
+    },
+    {
+      "name": "pollutantDisplayGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "shortName",
+      "kind": "utf8"
+    },
+    {
+      "name": "isAffectedByOnroad",
+      "kind": "int64"
+    },
+    {
+      "name": "isAffectedByNonroad",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "pollutantID"
+  ],
+  "row_count": 3,
+  "float_decimals": 12,
+  "content_sha256": "dc1a5fc5063dcb05c044ad1f06d2b16fda1da3a4ce742127f82efda86a2bd84a"
+}

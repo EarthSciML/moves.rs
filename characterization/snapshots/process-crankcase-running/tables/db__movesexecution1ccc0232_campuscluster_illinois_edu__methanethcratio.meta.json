@@ -1,0 +1,44 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__methanethcratio",
+  "schema": [
+    {
+      "name": "processID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelSubtypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "regClassID",
+      "kind": "int64"
+    },
+    {
+      "name": "beginModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "endModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "CH4THCRatio",
+      "kind": "float64"
+    },
+    {
+      "name": "dataSourceID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "processID",
+    "fuelSubtypeID",
+    "regClassID",
+    "beginModelYearID",
+    "endModelYearID"
+  ],
+  "row_count": 140,
+  "float_decimals": 12,
+  "content_sha256": "81f3722010455e745b84d1de59b6842d9f5ec9aedcde50bcf92a58c8e7b5b66d"
+}

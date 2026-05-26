@@ -1,0 +1,30 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__samplevehiclesoakingday",
+  "schema": [
+    {
+      "name": "soakDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "dayID",
+      "kind": "int64"
+    },
+    {
+      "name": "F",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "soakDayID",
+    "sourceTypeID",
+    "dayID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "607f2e90dc5bfc4f8d6c78ecfb0e7c752b20f28a8e55d9232f1f307748aac81b"
+}

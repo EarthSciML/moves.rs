@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "expand-fueltype-diesel",
+  "sif_sha256": "70ea5b8378b278af50e8c44ab011066c59019faed8d141adf4ec6f2045f1e5fd",
+  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixture-image.lock",
+  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixtures/expand-fueltype-diesel.xml",
+  "runspec_sha256": "1dd7eee18889e5a53020df6eda01b6694c50ada2062c652ab2593d45a2d47924",
+  "snapshot_aggregate_sha256": "4c3050c125f7d1e91e15b5e03b9322806429add57ff86f161b421d70a91fa559",
+  "output_database": "out_expand_fueltype_diesel",
+  "scale_input_database": null
+}

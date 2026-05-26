@@ -1,0 +1,39 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__fleetavgadjustment",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "beginModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "endModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "fleetAvgGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "evMultiplier",
+      "kind": "float64"
+    },
+    {
+      "name": "adjustmentCap",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID",
+    "beginModelYearID",
+    "endModelYearID",
+    "fleetAvgGroupID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "2bef0a949475fb2b137ee82db180d70f5547169d10c44b1915e4cd1bcbb20117"
+}

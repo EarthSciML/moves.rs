@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "process-refueling",
+  "sif_sha256": "70ea5b8378b278af50e8c44ab011066c59019faed8d141adf4ec6f2045f1e5fd",
+  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixture-image.lock",
+  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixtures/process-refueling.xml",
+  "runspec_sha256": "51e6b18071410066a9fed94bb5288bcf079d2a7ecfa8b0f9b8277ee505ecfd31",
+  "snapshot_aggregate_sha256": "b4cbbe8bd4dff680de189ff6a243a78949c4800cd528d219c7e2cd713d42118a",
+  "output_database": "out_process_refueling",
+  "scale_input_database": null
+}

@@ -1,0 +1,38 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__shpbyagehour",
+  "schema": [
+    {
+      "name": "yearID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "dayID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourID",
+      "kind": "int64"
+    },
+    {
+      "name": "SHP",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 1968,
+  "float_decimals": 12,
+  "content_sha256": "77d0e3a88af16a6a3f50bf8aaf5960262aba36d5a4ef930222b8fbcbd3820110"
+}

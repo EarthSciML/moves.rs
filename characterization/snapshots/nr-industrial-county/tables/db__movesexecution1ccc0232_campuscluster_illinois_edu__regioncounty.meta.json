@@ -1,0 +1,31 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__regioncounty",
+  "schema": [
+    {
+      "name": "regionID",
+      "kind": "int64"
+    },
+    {
+      "name": "countyID",
+      "kind": "int64"
+    },
+    {
+      "name": "regionCodeID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelYearID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "regionID",
+    "countyID",
+    "regionCodeID",
+    "fuelYearID"
+  ],
+  "row_count": 6464,
+  "float_decimals": 12,
+  "content_sha256": "6ebdf2e3d3ed81682834a382e0b6a42a680f3902df0afc1449c4bdef87fc2506"
+}

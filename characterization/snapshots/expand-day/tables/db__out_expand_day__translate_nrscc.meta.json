@@ -1,0 +1,20 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__out_expand_day__translate_nrscc",
+  "schema": [
+    {
+      "name": "scc",
+      "kind": "utf8"
+    },
+    {
+      "name": "sccName",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "scc"
+  ],
+  "row_count": 214,
+  "float_decimals": 12,
+  "content_sha256": "5d49a1a66c6cc0e1dc282ff1bde72f8ffa3c4fdcaf54c21ab5b9a4b5c65b2ff6"
+}

@@ -1,0 +1,74 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesworker1ccc0232_campuscluster_illinois_edu__ethanolweightedtvgtemp",
+  "schema": [
+    {
+      "name": "hourDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourID",
+      "kind": "int64"
+    },
+    {
+      "name": "dayID",
+      "kind": "int64"
+    },
+    {
+      "name": "initialHourDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "ethanolWeightedTVG",
+      "kind": "float64"
+    },
+    {
+      "name": "backPurgeFactor",
+      "kind": "float64"
+    },
+    {
+      "name": "averageCanisterCapacity",
+      "kind": "float64"
+    },
+    {
+      "name": "leakFraction",
+      "kind": "float64"
+    },
+    {
+      "name": "leakFractionIM",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "hourDayID",
+    "initialHourDayID",
+    "monthID",
+    "sourceTypeID",
+    "fuelTypeID",
+    "modelYearID",
+    "polProcessID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "cf2967606a6d87f1ada243e313fad116b61b9352580278e03de3e26bca5a3318"
+}

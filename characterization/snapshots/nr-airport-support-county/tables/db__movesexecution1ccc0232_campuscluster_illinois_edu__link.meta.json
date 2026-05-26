@@ -1,0 +1,48 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__link",
+  "schema": [
+    {
+      "name": "linkID",
+      "kind": "int64"
+    },
+    {
+      "name": "countyID",
+      "kind": "int64"
+    },
+    {
+      "name": "zoneID",
+      "kind": "int64"
+    },
+    {
+      "name": "roadTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "linkLength",
+      "kind": "float64"
+    },
+    {
+      "name": "linkVolume",
+      "kind": "float64"
+    },
+    {
+      "name": "linkAvgSpeed",
+      "kind": "float64"
+    },
+    {
+      "name": "linkDescription",
+      "kind": "utf8"
+    },
+    {
+      "name": "linkAvgGrade",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "linkID"
+  ],
+  "row_count": 22610,
+  "float_decimals": 12,
+  "content_sha256": "ee9ffcc38874f16ec1979a748cf7f7df52c1307270e7547ad63d5c09f3578fb5"
+}

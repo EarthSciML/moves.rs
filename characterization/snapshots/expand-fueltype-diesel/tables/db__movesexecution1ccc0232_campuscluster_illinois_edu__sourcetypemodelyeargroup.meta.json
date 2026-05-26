@@ -1,0 +1,25 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__sourcetypemodelyeargroup",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "tankTemperatureGroupID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "modelYearGroupID"
+  ],
+  "row_count": 74,
+  "float_decimals": 12,
+  "content_sha256": "a2e302e2672a1f118ecfdf3eb3cf15503c9dda4c9b05a05ebba2a39e83250dc3"
+}

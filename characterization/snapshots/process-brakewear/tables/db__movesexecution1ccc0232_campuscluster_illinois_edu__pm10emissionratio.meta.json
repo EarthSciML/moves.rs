@@ -1,0 +1,44 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__pm10emissionratio",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "PM10PM25Ratio",
+      "kind": "float64"
+    },
+    {
+      "name": "PM10PM25RatioCV",
+      "kind": "float64"
+    },
+    {
+      "name": "minModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "maxModelYearID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID",
+    "sourceTypeID",
+    "fuelTypeID",
+    "minModelYearID",
+    "maxModelYearID"
+  ],
+  "row_count": 8,
+  "float_decimals": 12,
+  "content_sha256": "bd1fa82e1a8738b11d2b2c2afefd4d190b2610c7c18bd2de7b2e53b59662b0fa"
+}

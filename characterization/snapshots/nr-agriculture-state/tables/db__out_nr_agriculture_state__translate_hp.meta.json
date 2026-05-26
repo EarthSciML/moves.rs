@@ -1,0 +1,20 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__out_nr_agriculture_state__translate_hp",
+  "schema": [
+    {
+      "name": "hpID",
+      "kind": "int64"
+    },
+    {
+      "name": "hpName",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "hpID"
+  ],
+  "row_count": 18,
+  "float_decimals": 12,
+  "content_sha256": "06abd0f1dec1a9b9107d4be8780237f1c51f9c1abad7c49920dea1fb04999c9b"
+}

@@ -1,0 +1,60 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__fuelsubtype",
+  "schema": [
+    {
+      "name": "fuelSubtypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelSubtypeDesc",
+      "kind": "utf8"
+    },
+    {
+      "name": "fuelSubtypePetroleumFraction",
+      "kind": "float64"
+    },
+    {
+      "name": "fuelSubtypePetroleumFractionCV",
+      "kind": "float64"
+    },
+    {
+      "name": "fuelSubtypeFossilFraction",
+      "kind": "float64"
+    },
+    {
+      "name": "fuelSubtypeFossilFractionCV",
+      "kind": "float64"
+    },
+    {
+      "name": "carbonContent",
+      "kind": "float64"
+    },
+    {
+      "name": "oxidationFraction",
+      "kind": "float64"
+    },
+    {
+      "name": "carbonContentCV",
+      "kind": "float64"
+    },
+    {
+      "name": "oxidationFractionCV",
+      "kind": "float64"
+    },
+    {
+      "name": "energyContent",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "fuelSubtypeID"
+  ],
+  "row_count": 15,
+  "float_decimals": 12,
+  "content_sha256": "d7bfb17797c50064e20c5ecd5833691c221b50c9368b5f3dbd1b622222cbea40"
+}

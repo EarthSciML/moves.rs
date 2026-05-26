@@ -1,0 +1,24 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__out_process_crankcase_extidle__translate_engtech",
+  "schema": [
+    {
+      "name": "engTechID",
+      "kind": "int64"
+    },
+    {
+      "name": "engTechName",
+      "kind": "utf8"
+    },
+    {
+      "name": "engTechDesc",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "engTechID"
+  ],
+  "row_count": 129,
+  "float_decimals": 12,
+  "content_sha256": "4dc9c248e5960fcba11e54f75d9db58cfb40430d8eb63d2391776c7f377d9a96"
+}

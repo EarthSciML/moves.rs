@@ -1,0 +1,35 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__regclassfractionofstmy2020",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "regClassID",
+      "kind": "int64"
+    },
+    {
+      "name": "regClassFractionOfSourceTypeModelYearFuel",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "modelYearID",
+    "fuelTypeID",
+    "regClassID"
+  ],
+  "row_count": 125,
+  "float_decimals": 12,
+  "content_sha256": "711e8e8ed51d45096873e2b28c76631478430937344c881cf6c62d17c630e23b"
+}

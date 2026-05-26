@@ -1,0 +1,24 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__out_nr_airport_support_county__translate_county",
+  "schema": [
+    {
+      "name": "countyID",
+      "kind": "int64"
+    },
+    {
+      "name": "stateID",
+      "kind": "int64"
+    },
+    {
+      "name": "countyName",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "countyID"
+  ],
+  "row_count": 1,
+  "float_decimals": 12,
+  "content_sha256": "c29d6ed44bb37d121df5e1492371a5cb183a5f25f3902dcf0ca3dd09ae25cc1f"
+}

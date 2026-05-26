@@ -1,0 +1,20 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__out_process_airtoxics__translate_fueltype",
+  "schema": [
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeName",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "fuelTypeID"
+  ],
+  "row_count": 8,
+  "float_decimals": 12,
+  "content_sha256": "0055c57c7d609bcef8d2d0f1271e08b3b5752f863945f7c934e1611c76801940"
+}

@@ -1,0 +1,16 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__runspecpollutantprocess",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID"
+  ],
+  "row_count": 2,
+  "float_decimals": 12,
+  "content_sha256": "40b3b62575bddeb1bfe083e645b17d39b490a084130a54a717fef6f2e925cfef"
+}

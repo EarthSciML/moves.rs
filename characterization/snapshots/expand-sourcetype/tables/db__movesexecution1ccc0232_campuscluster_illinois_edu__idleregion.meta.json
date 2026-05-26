@@ -1,0 +1,20 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__idleregion",
+  "schema": [
+    {
+      "name": "idleRegionID",
+      "kind": "int64"
+    },
+    {
+      "name": "idleRegionDescription",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "idleRegionID"
+  ],
+  "row_count": 5,
+  "float_decimals": 12,
+  "content_sha256": "b06c2dc236268f3aba521d17faa99703e922b0602f5939cf681225cd71d5410b"
+}

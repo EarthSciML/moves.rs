@@ -1,0 +1,40 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__fuelusagefraction",
+  "schema": [
+    {
+      "name": "countyID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceBinFuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelSupplyFuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "usageFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "countyID",
+    "fuelYearID",
+    "modelYearGroupID",
+    "sourceBinFuelTypeID",
+    "fuelSupplyFuelTypeID"
+  ],
+  "row_count": 53,
+  "float_decimals": 12,
+  "content_sha256": "e843bceeb75bad6aa4437edb350bed010b08ee470728975b64d7c021b7a18d48"
+}

@@ -1,0 +1,38 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__hcpermeationcoeff",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "etohThreshID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelMYGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelAdjustment",
+      "kind": "float64"
+    },
+    {
+      "name": "fuelAdjustmentGPA",
+      "kind": "float64"
+    },
+    {
+      "name": "dataSourceID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID",
+    "etohThreshID",
+    "fuelMYGroupID"
+  ],
+  "row_count": 120,
+  "float_decimals": 12,
+  "content_sha256": "c2cfd99548996a21cdf872825cd11354fa9a8aa2ba9e97186307dbc6cf19c5de"
+}

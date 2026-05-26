@@ -1,0 +1,22 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__samplevehicleday",
+  "schema": [
+    {
+      "name": "vehID",
+      "kind": "int64"
+    },
+    {
+      "name": "dayID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 2286,
+  "float_decimals": 12,
+  "content_sha256": "26c13c994a222f190ea836a88f77ea6759b53a4a5770581a28833fcee55fb367"
+}

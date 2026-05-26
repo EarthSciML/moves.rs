@@ -1,0 +1,45 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__monthgrouphour",
+  "schema": [
+    {
+      "name": "monthGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourID",
+      "kind": "int64"
+    },
+    {
+      "name": "ACActivityTermA",
+      "kind": "float64"
+    },
+    {
+      "name": "ACActivityTermACV",
+      "kind": "float64"
+    },
+    {
+      "name": "ACActivityTermB",
+      "kind": "float64"
+    },
+    {
+      "name": "ACActivityTermBCV",
+      "kind": "float64"
+    },
+    {
+      "name": "ACActivityTermC",
+      "kind": "float64"
+    },
+    {
+      "name": "ACActivityTermCCV",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "monthGroupID",
+    "hourID"
+  ],
+  "row_count": 4,
+  "float_decimals": 12,
+  "content_sha256": "4ea2a1bea69315cdc9d36ba429ee095b27b922ad47a53faf622139a41ee22c43"
+}

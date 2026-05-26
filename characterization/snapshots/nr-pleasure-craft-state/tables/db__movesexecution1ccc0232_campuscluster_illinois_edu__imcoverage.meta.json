@@ -1,0 +1,62 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__imcoverage",
+  "schema": [
+    {
+      "name": "stateID",
+      "kind": "int64"
+    },
+    {
+      "name": "countyID",
+      "kind": "int64"
+    },
+    {
+      "name": "yearID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "IMProgramID",
+      "kind": "int64"
+    },
+    {
+      "name": "inspectFreq",
+      "kind": "int64"
+    },
+    {
+      "name": "testStandardsID",
+      "kind": "int64"
+    },
+    {
+      "name": "begModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "endModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "useIMyn",
+      "kind": "utf8"
+    },
+    {
+      "name": "complianceFactor",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "e8dc99e9d530809cad2ebd1b8e6225923c4d9596bd8b6e08307d101d9965a47e"
+}

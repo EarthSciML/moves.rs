@@ -1,0 +1,49 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__sulfurmodelcoeff",
+  "schema": [
+    {
+      "name": "processID",
+      "kind": "int64"
+    },
+    {
+      "name": "pollutantID",
+      "kind": "int64"
+    },
+    {
+      "name": "M6emitterID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelMYGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "sulfurFunctionID",
+      "kind": "int64"
+    },
+    {
+      "name": "sulfurCoeff",
+      "kind": "float64"
+    },
+    {
+      "name": "lowSulfurCoeff",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "processID",
+    "pollutantID",
+    "M6emitterID",
+    "sourceTypeID",
+    "fuelMYGroupID",
+    "sulfurFunctionID"
+  ],
+  "row_count": 1170,
+  "float_decimals": 12,
+  "content_sha256": "259fbe7a85d352d11c9adeb74cbc9c7d86687a8fb0f57a668f4d01e08c3e1c91"
+}

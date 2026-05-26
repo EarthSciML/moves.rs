@@ -1,0 +1,24 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__out_expand_sourcetype__translate_pollutant",
+  "schema": [
+    {
+      "name": "pollutantID",
+      "kind": "int64"
+    },
+    {
+      "name": "pollutantName",
+      "kind": "utf8"
+    },
+    {
+      "name": "pollutantShortName",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "pollutantID"
+  ],
+  "row_count": 115,
+  "float_decimals": 12,
+  "content_sha256": "49db8b0831fc851aa4aadb810ebf86a97ae250e36b61413ca6a37affed950906"
+}

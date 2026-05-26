@@ -1,0 +1,24 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__out_process_evap_permeation__translate_activitytype",
+  "schema": [
+    {
+      "name": "activityTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "activityTypeName",
+      "kind": "utf8"
+    },
+    {
+      "name": "activityTypeDesc",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "activityTypeID"
+  ],
+  "row_count": 14,
+  "float_decimals": 12,
+  "content_sha256": "fd60ce595356b8f74aa079343d2a0eb9728608c0948a505882770c668f4bc0be"
+}

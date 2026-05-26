@@ -1,0 +1,24 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__complexmodelparametername",
+  "schema": [
+    {
+      "name": "cmpID",
+      "kind": "int64"
+    },
+    {
+      "name": "cmpName",
+      "kind": "utf8"
+    },
+    {
+      "name": "cmpExpression",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "cmpID"
+  ],
+  "row_count": 64,
+  "float_decimals": 12,
+  "content_sha256": "95350bcb065b144c47b8b77291e9bbc71443eec775ce1bda73fae937c46221a2"
+}

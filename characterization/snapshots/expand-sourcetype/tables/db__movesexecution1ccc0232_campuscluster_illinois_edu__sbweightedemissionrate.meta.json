@@ -1,0 +1,65 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__sbweightedemissionrate",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "regClassID",
+      "kind": "int64"
+    },
+    {
+      "name": "meanBaseRate",
+      "kind": "float64"
+    },
+    {
+      "name": "meanBaseRateIM",
+      "kind": "float64"
+    },
+    {
+      "name": "meanBaseRateACAdj",
+      "kind": "float64"
+    },
+    {
+      "name": "meanBaseRateIMACAdj",
+      "kind": "float64"
+    },
+    {
+      "name": "sumSBD",
+      "kind": "float64"
+    },
+    {
+      "name": "sumSBDRaw",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "polProcessID",
+    "opModeID",
+    "modelYearID",
+    "fuelTypeID",
+    "regClassID"
+  ],
+  "row_count": 191,
+  "float_decimals": 12,
+  "content_sha256": "77f565e364c7daab069ae566a5df8f85185900e13990f4f8d44b7284721a9a98"
+}

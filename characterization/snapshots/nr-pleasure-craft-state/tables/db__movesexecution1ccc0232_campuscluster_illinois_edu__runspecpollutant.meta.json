@@ -1,0 +1,16 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__runspecpollutant",
+  "schema": [
+    {
+      "name": "pollutantID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "pollutantID"
+  ],
+  "row_count": 5,
+  "float_decimals": 12,
+  "content_sha256": "7517d8c0050c28461943f511de70e9d6d00dd8933663110e0ac4eb428429a465"
+}

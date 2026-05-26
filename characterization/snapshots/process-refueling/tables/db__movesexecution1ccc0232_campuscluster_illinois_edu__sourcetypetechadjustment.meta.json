@@ -1,0 +1,30 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__sourcetypetechadjustment",
+  "schema": [
+    {
+      "name": "processID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "refuelingTechAdjustment",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "processID",
+    "sourceTypeID",
+    "modelYearID"
+  ],
+  "row_count": 111,
+  "float_decimals": 12,
+  "content_sha256": "bf2e352b3150b7b6d392ab954121556c20f156a36fa4e0dac38ecff15d62c303"
+}

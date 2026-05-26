@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "nr-commercial-nation",
+  "sif_sha256": "70ea5b8378b278af50e8c44ab011066c59019faed8d141adf4ec6f2045f1e5fd",
+  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixture-image.lock",
+  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixtures/nr-commercial-nation.xml",
+  "runspec_sha256": "adf6a99b6abe5a7ed473e5cb90d32f8414d7fe5f0279a06911c70bf0a73e6c9a",
+  "snapshot_aggregate_sha256": "e4fd61083eefbdc83b7732336b236d230fc3153edf9f146d26b43e947672880e",
+  "output_database": "out_nr_commercial_nation",
+  "scale_input_database": null
+}

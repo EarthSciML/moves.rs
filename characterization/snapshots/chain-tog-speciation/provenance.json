@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "chain-tog-speciation",
+  "sif_sha256": "70ea5b8378b278af50e8c44ab011066c59019faed8d141adf4ec6f2045f1e5fd",
+  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixture-image.lock",
+  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixtures/chain-tog-speciation.xml",
+  "runspec_sha256": "483c2fcc7f8f25bdb4bcd15dd31af43bfa64018b7d020ea5d4be3d1e729d4606",
+  "snapshot_aggregate_sha256": "72fdccdf3014f79ec4e212a80f742225646210da3b537f6dca40a76f321e801e",
+  "output_database": "out_chain_tog_speciation",
+  "scale_input_database": null
+}

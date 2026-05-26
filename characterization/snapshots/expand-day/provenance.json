@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "expand-day",
+  "sif_sha256": "70ea5b8378b278af50e8c44ab011066c59019faed8d141adf4ec6f2045f1e5fd",
+  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixture-image.lock",
+  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixtures/expand-day.xml",
+  "runspec_sha256": "2be728442f94403a2a2be658c0d91072afd635f2fa0d3d74d797dd002dbf2805",
+  "snapshot_aggregate_sha256": "477930492ae08e77667253ab7d006402e6592902b393eee1062fdc72ff2cc1e9",
+  "output_database": "out_expand_day",
+  "scale_input_database": null
+}

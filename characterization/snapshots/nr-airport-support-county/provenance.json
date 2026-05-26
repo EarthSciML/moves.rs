@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "nr-airport-support-county",
+  "sif_sha256": "70ea5b8378b278af50e8c44ab011066c59019faed8d141adf4ec6f2045f1e5fd",
+  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixture-image.lock",
+  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixtures/nr-airport-support-county.xml",
+  "runspec_sha256": "979c0c8ee0027a3e2cab97c79efa4fa4fa56ffd830efe10e5752fca9e763b03e",
+  "snapshot_aggregate_sha256": "d9796c554efa62edd27261054cd0c29d0cc4862fefb2cff4fbc2bde167e9e6e6",
+  "output_database": "out_nr_airport_support_county",
+  "scale_input_database": null
+}

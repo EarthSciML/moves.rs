@@ -1,0 +1,40 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__noxhumidityadjust",
+  "schema": [
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "humidityNOxEq",
+      "kind": "utf8"
+    },
+    {
+      "name": "humidityTermA",
+      "kind": "float64"
+    },
+    {
+      "name": "humidityTermB",
+      "kind": "float64"
+    },
+    {
+      "name": "humidityLowBound",
+      "kind": "float64"
+    },
+    {
+      "name": "humidityUpBound",
+      "kind": "float64"
+    },
+    {
+      "name": "humidityUnits",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "fuelTypeID"
+  ],
+  "row_count": 4,
+  "float_decimals": 12,
+  "content_sha256": "e49390b87951e2e3abea1de88178aa99f8d1f89068206a424d30bddfdd8a5236"
+}

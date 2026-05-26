@@ -1,0 +1,20 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__out_nr_railroad_support_nation__translate_day",
+  "schema": [
+    {
+      "name": "dayID",
+      "kind": "int64"
+    },
+    {
+      "name": "dayName",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "dayID"
+  ],
+  "row_count": 2,
+  "float_decimals": 12,
+  "content_sha256": "265b6bf915f4b927ca25231087f8d1e388c8af73afd9c8b6b5ba0cdc8cb97f91"
+}

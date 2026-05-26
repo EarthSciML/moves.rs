@@ -1,0 +1,16 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__runspecprocess",
+  "schema": [
+    {
+      "name": "processID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "processID"
+  ],
+  "row_count": 5,
+  "float_decimals": 12,
+  "content_sha256": "8707dfd7a22c8839f584db8b491ecd0012542e59c2171c25347941cbe2451630"
+}

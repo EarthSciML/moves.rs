@@ -1,0 +1,49 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__county",
+  "schema": [
+    {
+      "name": "countyID",
+      "kind": "int64"
+    },
+    {
+      "name": "stateID",
+      "kind": "int64"
+    },
+    {
+      "name": "countyName",
+      "kind": "utf8"
+    },
+    {
+      "name": "altitude",
+      "kind": "utf8"
+    },
+    {
+      "name": "GPAFract",
+      "kind": "float64"
+    },
+    {
+      "name": "barometricPressure",
+      "kind": "float64"
+    },
+    {
+      "name": "barometricPressureCV",
+      "kind": "float64"
+    },
+    {
+      "name": "countyTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "msa",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "countyID",
+    "stateID"
+  ],
+  "row_count": 53,
+  "float_decimals": 12,
+  "content_sha256": "2a96d6f0fd884e183c6c9a703129ff3a596a629e8f8064f3e6df1179fa8f0f8f"
+}

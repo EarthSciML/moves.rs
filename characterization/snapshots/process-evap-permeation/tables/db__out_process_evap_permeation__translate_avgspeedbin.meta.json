@@ -1,0 +1,24 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__out_process_evap_permeation__translate_avgspeedbin",
+  "schema": [
+    {
+      "name": "avgSpeedBinID",
+      "kind": "int64"
+    },
+    {
+      "name": "avgSpeedBinName",
+      "kind": "utf8"
+    },
+    {
+      "name": "avgBinSpeed",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "avgSpeedBinID"
+  ],
+  "row_count": 16,
+  "float_decimals": 12,
+  "content_sha256": "fa61164f8f72583ab30b198e955ccdf0b176404ce72aad3e828bdc3deac31dea"
+}

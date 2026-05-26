@@ -1,0 +1,18 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__tempvehandttg",
+  "schema": [
+    {
+      "name": "vehID",
+      "kind": "int64"
+    },
+    {
+      "name": "tankTemperatureGroupID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 2336,
+  "float_decimals": 12,
+  "content_sha256": "24b699dc2206a5c2a5fd43f430c03012f6196a1eb3ad13e5300e47866226fb8a"
+}
