@@ -195,7 +195,26 @@ SQL
     DUMP_DB_NAME="${MOVESDB_FILENAME%.zip}"
     mariadb --socket=/var/run/mysqld/mysqld.sock -uroot \
         -e "CREATE DATABASE IF NOT EXISTS \`${DUMP_DB_NAME}\` CHARACTER SET utf8 COLLATE utf8_general_ci;"
-    mariadb --socket=/var/run/mysqld/mysqld.sock -uroot "${DUMP_DB_NAME}" < "$DUMP_SQL"
+    # Insert USE statements after every UNLOCK TABLES to preserve database
+    # context across any connection reset that may occur during ENABLE KEYS
+    # on large MyISAM tables (e.g. fuelusagefraction, imcoverage).
+    PROCESSED_DUMP=$(mktemp /tmp/movesdb-proc-XXXXXX.sql)
+    sed "/^UNLOCK TABLES;$/a USE \`${DUMP_DB_NAME}\`;" \
+        "$DUMP_SQL" > "$PROCESSED_DUMP"
+    mariadb --socket=/var/run/mysqld/mysqld.sock -uroot "${DUMP_DB_NAME}" \
+        < "$PROCESSED_DUMP"
+    rm -f "$PROCESSED_DUMP"
+    # Verify import: expect at least 100 tables in the database.
+    TABLE_COUNT=$(mariadb --socket=/var/run/mysqld/mysqld.sock -uroot \
+        --batch --skip-column-names \
+        -e "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='${DUMP_DB_NAME}';" \
+        2>/dev/null || echo 0)
+    [ "${TABLE_COUNT:-0}" -gt 100 ] || {
+        echo "FATAL: movesdb import incomplete — ${TABLE_COUNT} tables found (expected >100)" >&2
+        kill $MARIADB_PID 2>/dev/null || true
+        exit 1
+    }
+    echo "[build] movesdb import verified: ${TABLE_COUNT} tables"
 
     # Stop MariaDB cleanly so the seed dir is consistent.
     mariadb-admin --socket=/var/run/mysqld/mysqld.sock -uroot shutdown
