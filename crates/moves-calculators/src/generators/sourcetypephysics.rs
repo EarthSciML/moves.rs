@@ -530,7 +530,7 @@ impl Generator for SourceTypePhysics {
     /// `ctx.tables()`, applies
     /// [`correct_table`](SourceUseTypePhysicsMapping::correct_table) to the
     /// scratch `RatesOpModeDistribution`, and stores the result.
-    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
+    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         Ok(CalculatorOutput::empty())
     }
 }

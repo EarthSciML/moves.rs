@@ -1778,7 +1778,7 @@ impl Generator for TankTemperatureGenerator {
         OUTPUT_TABLES
     }
 
-    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
+    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         // The data plane (Task 50 `DataFrameStore`) is not yet materialised,
         // so `ctx.tables()` / `ctx.scratch()` are placeholders. The ported
         // computation lives in `generate_tank_temperatures`; once Task 50

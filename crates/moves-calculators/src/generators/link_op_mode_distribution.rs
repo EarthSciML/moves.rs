@@ -813,7 +813,7 @@ impl Generator for LinkOperatingModeDistributionGenerator {
     /// `DataFrameStore` lands, `execute` will project a
     /// [`LinkDriveScheduleInputs`] from `ctx.tables()` for the link in
     /// `ctx.position()` and store the rows.
-    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
+    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         Ok(CalculatorOutput::empty())
     }
 }

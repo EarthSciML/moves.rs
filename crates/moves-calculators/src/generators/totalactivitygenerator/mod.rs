@@ -387,7 +387,7 @@ impl Generator for TotalActivityGenerator {
     /// the activity-table output — its row storage lands with the Task 50
     /// `DataFrameStore`. The computation itself is ported and tested in
     /// [`TotalActivityGenerator::run`]; see the [module documentation](self).
-    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
+    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         Ok(CalculatorOutput::empty())
     }
 }

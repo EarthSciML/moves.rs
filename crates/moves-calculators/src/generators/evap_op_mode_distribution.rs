@@ -589,7 +589,7 @@ impl Generator for EvaporativeEmissionsOperatingModeDistributionGenerator {
     /// will project an [`EvapOpModeContext`] from `ctx.position()` and an
     /// [`EvapOpModeInputs`] from `ctx.tables()`, call [`op_mode_distribution`],
     /// and `INSERT IGNORE` the rows into the scratch `OpModeDistribution`.
-    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
+    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         Ok(CalculatorOutput::empty())
     }
 }

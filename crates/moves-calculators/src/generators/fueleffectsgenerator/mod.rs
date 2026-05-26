@@ -131,7 +131,7 @@ impl Generator for FuelEffectsGenerator {
         OUTPUT_TABLES
     }
 
-    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
+    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         // Shell pending the Task 50 data plane — see the module docs. The
         // numerical core is `do_general_fuel_ratio`; once `ExecutionTables`
         // and `ScratchNamespace` carry real rows, this body materialises a

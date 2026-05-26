@@ -193,7 +193,7 @@ impl Generator for BaseRateGenerator {
         OUTPUT_TABLES
     }
 
-    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
+    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         // Shell pending the Task 50 data plane — see the module docs. The
         // numerical core is `BaseRateGenerator::run`; once `ScratchNamespace`
         // and `ExecutionTables` carry real rows, this body materialises a

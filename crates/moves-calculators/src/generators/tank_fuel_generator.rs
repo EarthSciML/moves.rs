@@ -806,7 +806,7 @@ impl Generator for TankFuelGenerator {
         OUTPUT_TABLES
     }
 
-    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
+    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         // The data plane (Task 50 `DataFrameStore`) is not yet materialised,
         // so `ctx.tables()` / `ctx.scratch()` are placeholders. The ported
         // computation lives in `calculate_average_tank_gasoline`; once Task 50
