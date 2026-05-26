@@ -43,14 +43,23 @@
 //! shape of such an instrumenting executor.
 
 use crate::driver::{Dispatch, DriverRecord};
-use crate::emissions::exhaust::FuelKind;
+use crate::emissions::exhaust::{ActivityUnit as ExhaustActivityUnit, FuelKind};
 use crate::geography::common::{
     ActivityRecord, ActivityUnit, BmyKind, EmissionsIterationResult, EvapFactorsLookup,
     ExhaustFactorsLookup, GeographyCallbacks, ModelYearAgedistResult, PopulationRecord,
     ProcessOutcome, RefuelingData, RetrofitFilter, RunOptions as CountyRunOptions, SumType,
     TechLookup,
 };
-use crate::geography::{process_county, process_subcounty};
+use crate::geography::prcus::{
+    DayMonthFactor, EvapCallInputs, EvapResult, EvapTechLookup, ExhaustCallInputs, ExhaustResult,
+    ExhaustTechLookup, ModelYearOutput as PrcusModelYearOutput, RetrofitResult,
+};
+use crate::geography::state::{CountyInput, StateContext};
+use crate::geography::{
+    process_county, process_state_from_national_record, process_state_to_county_record,
+    process_subcounty, ActivityLookup, ByModelYearOutput, EquipmentRecord, GeographyOutput,
+    RunOptions as StateRunOptions, StateCallbacks, StateOutput,
+};
 use crate::geography::subcounty::SubcountyRecordIndex;
 use crate::population::retrofit::RetrofitRecord;
 use crate::population::{
@@ -608,18 +617,45 @@ impl ProductionExecutor {
 
     fn execute_state_to_county(
         &mut self,
-        _ctx: &DispatchContext<'_>,
-        _options: &NonroadOptions,
+        ctx: &DispatchContext<'_>,
+        options: &NonroadOptions,
     ) -> Result<GeographyExecution> {
-        Ok(GeographyExecution::skipped())
+        let hp_levels = self.hp_levels;
+        let state_ctx = build_state_context(ctx, options, &hp_levels);
+
+        // Build county list by filtering county_fips to those whose
+        // 2-char state prefix matches the state FIPS in region_code.
+        let state_prefix = ctx.record.region_code.get(..2).unwrap_or("");
+        let counties: Vec<CountyInput> = self
+            .county_fips
+            .iter()
+            .filter(|fips| fips.get(..2).unwrap_or("") == state_prefix)
+            .map(|fips| CountyInput {
+                fips: fips.clone(),
+                selected: true,
+                population: 1.0,
+            })
+            .collect();
+
+        if counties.is_empty() {
+            return Ok(GeographyExecution::skipped());
+        }
+
+        let mut adapter = StateAdapter::new(self);
+        let output = process_state_to_county_record(&state_ctx, &counties, &mut adapter)?;
+        Ok(geography_output_to_execution(output))
     }
 
     fn execute_state_from_national(
         &mut self,
-        _ctx: &DispatchContext<'_>,
-        _options: &NonroadOptions,
+        ctx: &DispatchContext<'_>,
+        options: &NonroadOptions,
     ) -> Result<GeographyExecution> {
-        Ok(GeographyExecution::skipped())
+        let hp_levels = self.hp_levels;
+        let state_ctx = build_state_context(ctx, options, &hp_levels);
+        let mut adapter = StateAdapter::new(self);
+        let output = process_state_from_national_record(&state_ctx, &mut adapter)?;
+        Ok(geography_output_to_execution(output))
     }
 
     fn execute_national(
@@ -1043,6 +1079,267 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
 }
 
 // =============================================================================
+// StateAdapter — implements StateCallbacks for ProductionExecutor
+// =============================================================================
+
+/// Adapter that implements [`StateCallbacks`] by borrowing reference
+/// tables from a [`ProductionExecutor`].
+///
+/// Created per-call in [`ProductionExecutor::execute_state_to_county`] /
+/// `execute_state_from_national`; dropped when the geography routine
+/// returns.
+struct StateAdapter<'a> {
+    executor: &'a mut ProductionExecutor,
+    /// Indices of currently-surviving retrofit records — narrowed
+    /// progressively by the three `filter_retrofits_by_*` methods.
+    retrofit_survivors: Vec<usize>,
+}
+
+impl<'a> StateAdapter<'a> {
+    fn new(executor: &'a mut ProductionExecutor) -> Self {
+        Self {
+            executor,
+            retrofit_survivors: Vec::new(),
+        }
+    }
+}
+
+impl<'a> StateCallbacks for StateAdapter<'a> {
+    fn find_exhaust_tech(
+        &mut self,
+        scc: &str,
+        hp_avg: f32,
+        _year: i32,
+    ) -> Option<ExhaustTechLookup> {
+        let entry = self
+            .executor
+            .exhaust_tech_entries
+            .iter()
+            .find(|e| e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max)?;
+        Some(ExhaustTechLookup {
+            tech_names: entry.tech_names.clone(),
+            fractions: entry.tech_fractions.clone(),
+        })
+    }
+
+    fn find_evap_tech(
+        &mut self,
+        scc: &str,
+        hp_avg: f32,
+        _year: i32,
+    ) -> Option<EvapTechLookup> {
+        let entry = self
+            .executor
+            .evap_tech_entries
+            .iter()
+            .find(|e| e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max)?;
+        Some(EvapTechLookup {
+            tech_names: entry.tech_names.clone(),
+            fractions: entry.tech_fractions.clone(),
+        })
+    }
+
+    fn find_growth_xref(&mut self, fips: &str, scc: &str, hp_avg: f32) -> Option<i32> {
+        let idx = self
+            .executor
+            .growth_xref_entries
+            .iter()
+            .position(|e| e.fips == fips && e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max)?;
+        Some(idx as i32)
+    }
+
+    fn find_activity(&mut self, scc: &str, fips: &str, _hp_avg: f32) -> Option<ActivityLookup> {
+        let entry = self
+            .executor
+            .activity_entries
+            .iter()
+            .find(|e| e.scc == scc && (e.fips.is_empty() || e.fips == fips))?;
+        // Convert geography::common::ActivityUnit → emissions::exhaust::ActivityUnit.
+        let units = match entry.activity_unit {
+            ActivityUnit::HoursPerYear => ExhaustActivityUnit::HoursPerYear,
+            ActivityUnit::HoursPerDay => ExhaustActivityUnit::HoursPerDay,
+            ActivityUnit::GallonsPerYear => ExhaustActivityUnit::GallonsPerYear,
+            ActivityUnit::GallonsPerDay => ExhaustActivityUnit::GallonsPerDay,
+        };
+        Some(ActivityLookup {
+            load_factor: entry.load_factor,
+            units,
+            activity_level: entry.activity_level,
+            starts_value: entry.starts,
+            age_curve_id: entry.age_code.clone(),
+        })
+    }
+
+    fn day_month_factor(&mut self, _scc: &str, _fips: &str) -> DayMonthFactor {
+        DayMonthFactor {
+            day_month_fac: vec![0.0; crate::common::consts::MXDAYS],
+            mthf: 1.0,
+            dayf: 1.0,
+            n_days: 1,
+        }
+    }
+
+    fn growth_factor(&mut self, year1: i32, year2: i32, fips: &str, indcod: i32) -> Result<f32> {
+        let indicator = self
+            .executor
+            .growth_xref_entries
+            .get(indcod as usize)
+            .map(|e| e.indicator.clone())
+            .ok_or_else(|| {
+                Error::Config(format!(
+                    "StateAdapter: growth_xref index {indcod} out of range"
+                ))
+            })?;
+        let selected: Vec<GrowthIndicatorRecord> =
+            select_for_indicator(&self.executor.growth_records, &indicator)
+                .into_iter()
+                .cloned()
+                .collect();
+        if selected.is_empty() {
+            // No growth data loaded; return zero (no growth).
+            return Ok(0.0);
+        }
+        let refs: Vec<&GrowthIndicatorRecord> = selected.iter().collect();
+        growth_factor(&refs, year1, year2, fips).map(|gf| gf.factor)
+    }
+
+    fn model_year(
+        &mut self,
+        eq: &EquipmentRecord,
+        activity: &ActivityLookup,
+        pop_growth_factor: f32,
+    ) -> Result<PrcusModelYearOutput> {
+        // Convert emissions::exhaust::ActivityUnit → population::modyr::ActivityUnits.
+        let units = match activity.units {
+            ExhaustActivityUnit::HoursPerYear => ActivityUnits::HoursPerYear,
+            ExhaustActivityUnit::HoursPerDay => ActivityUnits::HoursPerDay,
+            ExhaustActivityUnit::GallonsPerYear => ActivityUnits::GallonsPerYear,
+            ExhaustActivityUnit::GallonsPerDay => ActivityUnits::GallonsPerDay,
+        };
+        let curve = self.executor.scrappage_curve.clone();
+        let use_hours = eq.use_hours;
+        let load_factor = activity.load_factor;
+        let modyr_out = model_year(
+            activity.starts_value,
+            activity.activity_level,
+            units,
+            load_factor,
+            use_hours,
+            &self.executor.age_adjustment_table,
+            &activity.age_curve_id,
+            move |acttmp| scrptime(use_hours, load_factor, acttmp, pop_growth_factor, &curve),
+        )?;
+        Ok(PrcusModelYearOutput {
+            yryrfrcscrp: modyr_out.yryrfrcscrp,
+            modfrc: modyr_out.modfrc,
+            stradj: modyr_out.stradj,
+            actadj: modyr_out.actadj,
+            detage: modyr_out.detage,
+            nyrlif: modyr_out.nyrlif,
+        })
+    }
+
+    fn age_distribution(
+        &mut self,
+        base_pop: f32,
+        modfrc: &[f32],
+        base_year: i32,
+        growth_year: i32,
+        yryrfrcscrp: &[f32],
+        fips: &str,
+        indcod: i32,
+    ) -> Result<f32> {
+        let indicator = self
+            .executor
+            .growth_xref_entries
+            .get(indcod as usize)
+            .map(|e| e.indicator.clone())
+            .ok_or_else(|| {
+                Error::Config(format!(
+                    "StateAdapter: growth_xref index {indcod} out of range"
+                ))
+            })?;
+        let selected: Vec<GrowthIndicatorRecord> =
+            select_for_indicator(&self.executor.growth_records, &indicator)
+                .into_iter()
+                .cloned()
+                .collect();
+        let result = age_distribution(
+            base_pop,
+            modfrc,
+            base_year,
+            growth_year,
+            yryrfrcscrp,
+            |y1, y2| {
+                let refs: Vec<&GrowthIndicatorRecord> = selected.iter().collect();
+                growth_factor(&refs, y1, y2, fips)
+            },
+        )?;
+        Ok(result.base_population)
+    }
+
+    fn filter_retrofits_by_scc_hp(&mut self, scc: &str, hp_avg: f32) -> Result<()> {
+        self.retrofit_survivors = self
+            .executor
+            .retrofit_records
+            .iter()
+            .enumerate()
+            .filter(|(_, r)| {
+                (r.scc == scc || r.scc == crate::population::RTRFTSCC_ALL)
+                    && r.hp_min < hp_avg
+                    && hp_avg <= r.hp_max
+            })
+            .map(|(i, _)| i)
+            .collect();
+        Ok(())
+    }
+
+    fn filter_retrofits_by_year(&mut self, year: i32) -> Result<()> {
+        self.retrofit_survivors.retain(|&i| {
+            let r = &self.executor.retrofit_records[i];
+            r.year_model_start <= year && year <= r.year_model_end
+        });
+        Ok(())
+    }
+
+    fn filter_retrofits_by_tech(&mut self, tech: &str) -> Result<()> {
+        self.retrofit_survivors.retain(|&i| {
+            let r = &self.executor.retrofit_records[i];
+            r.tech_type.trim() == tech.trim()
+                || r.tech_type.trim() == crate::population::RTRFTTECHTYPE_ALL
+        });
+        Ok(())
+    }
+
+    fn calculate_retrofit(
+        &mut self,
+        _pop: f32,
+        _scc: &str,
+        _hp_avg: f32,
+        _model_year: i32,
+        _tech: &str,
+    ) -> Result<RetrofitResult> {
+        Ok(RetrofitResult::default())
+    }
+
+    fn calculate_exhaust(&mut self, _inputs: &ExhaustCallInputs<'_>) -> Result<ExhaustResult> {
+        // Emission-factor tables not yet loaded; return zero-emission result.
+        // Only reached when tech_fraction > 0; tests use zero fractions.
+        todo!(
+            "StateAdapter::calculate_exhaust: wire to calculate_exhaust_emissions \
+             once NR*.EMF tables are loaded"
+        )
+    }
+
+    fn calculate_evap(&mut self, _inputs: &EvapCallInputs<'_>) -> Result<EvapResult> {
+        todo!(
+            "StateAdapter::calculate_evap: wire to calculate_evaporative_emissions \
+             once NR*.EMF evap tables are loaded"
+        )
+    }
+}
+
+// =============================================================================
 // Helpers
 // =============================================================================
 
@@ -1114,6 +1411,105 @@ fn process_outcome_to_execution(outcome: ProcessOutcome) -> GeographyExecution {
         rows,
         warnings,
         national_record_count: 0,
+    }
+}
+
+/// Build a [`StateContext`] from a dispatch context and run options.
+fn build_state_context<'a>(
+    ctx: &'a DispatchContext<'_>,
+    options: &NonroadOptions,
+    hp_levels: &'a [f32],
+) -> StateContext<'a> {
+    let run_options = StateRunOptions {
+        episode_year: options.episode_year,
+        growth_year: options.growth_year,
+        tech_year: options.tech_year,
+        fuel: ctx.fuel.unwrap_or(FuelKind::Gasoline4Stroke),
+        total_mode: options.total_mode,
+        daily_output: options.daily_output,
+        emit_bmy: options.emit_bmy_exhaust,
+        emit_bmy_evap: options.emit_bmy_evap,
+        emit_si: options.emit_si,
+        growth_loaded: options.growth_loaded,
+        retrofit_loaded: options.retrofit_loaded,
+        spillage_loaded: options.spillage_loaded,
+    };
+    let equipment = EquipmentRecord {
+        hp_range_min: 0.0,
+        hp_range_max: ctx.record.hp_avg * 2.0,
+        hp_avg: ctx.record.hp_avg,
+        population: ctx.record.population,
+        pop_year: ctx.record.pop_year,
+        use_hours: 1000.0,
+        discharge_code: 0,
+        starts_hours: 1.0,
+    };
+    StateContext {
+        equipment,
+        run_options,
+        scc: ctx.scc,
+        state_fips: &ctx.record.region_code,
+        hp_levels,
+    }
+}
+
+/// Convert a [`GeographyOutput`] from the state routines into the
+/// uniform [`GeographyExecution`] shape.
+///
+/// `state_outputs` become one [`SimEmissionRow`] each; `bmy_outputs`
+/// become one row each with `model_year`/`tech_type` set. If no rows
+/// result (missing-tech early-out), the execution is marked skipped.
+fn geography_output_to_execution(output: GeographyOutput) -> GeographyExecution {
+    let warnings: Vec<String> = output.warnings.iter().map(|w| format!("{w:?}")).collect();
+    let mut rows: Vec<SimEmissionRow> = Vec::new();
+    for st in &output.state_outputs {
+        rows.push(state_output_to_row(st));
+    }
+    for bmy in &output.bmy_outputs {
+        rows.push(bmy_output_to_row(bmy));
+    }
+    let skipped = rows.is_empty();
+    GeographyExecution {
+        skipped,
+        rows,
+        warnings,
+        national_record_count: output.national_record_count,
+    }
+}
+
+fn state_output_to_row(st: &StateOutput) -> SimEmissionRow {
+    SimEmissionRow {
+        fips: st.fips.clone(),
+        subcounty: st.subcounty.clone(),
+        scc: st.scc.clone(),
+        hp_level: st.hp_level,
+        model_year: None,
+        tech_type: None,
+        channel: EmissionChannel::Exhaust,
+        population: st.population,
+        activity: st.activity,
+        fuel_consumption: st.fuel_consumption,
+        emissions: st.emissions_day.clone(),
+    }
+}
+
+fn bmy_output_to_row(bmy: &ByModelYearOutput) -> SimEmissionRow {
+    SimEmissionRow {
+        fips: bmy.fips.clone(),
+        subcounty: bmy.subcounty.clone(),
+        scc: bmy.scc.clone(),
+        hp_level: bmy.hp_level,
+        model_year: Some(bmy.model_year),
+        tech_type: Some(bmy.tech_type.clone()),
+        channel: if bmy.channel == 1 {
+            EmissionChannel::Exhaust
+        } else {
+            EmissionChannel::Evaporative
+        },
+        population: bmy.population,
+        activity: bmy.activity,
+        fuel_consumption: bmy.fuel_consumption,
+        emissions: bmy.emissions.clone(),
     }
 }
 
@@ -1335,6 +1731,147 @@ mod production {
         let result = exec.execute(&ctx, &opts).unwrap();
         assert!(result.skipped, "FIPS-not-found must yield skipped=true");
         assert!(result.rows.is_empty());
+    }
+
+    /// (c) StateToCounty dispatch with two counties in the state →
+    /// two `SimEmissionRow`s (one per county).
+    ///
+    /// Zero tech fractions skip the exhaust/evap iteration so EF
+    /// tables are not required. The model-year loop still accumulates
+    /// `poptot`, and `process_state_to_county_record` allocates one
+    /// `StateOutput` per selected county.
+    #[test]
+    fn state_to_county_minimal_ref_returns_two_rows() {
+        let mut exec = ProductionExecutor {
+            county_fips: vec!["06037".into(), "06059".into()],
+            exhaust_tech_entries: vec![ExhaustTechEntry {
+                scc: "2270001010".into(),
+                hp_min: 0.0,
+                hp_max: 100.0,
+                tech_names: vec!["T1".into()],
+                tech_fractions: vec![0.0],
+            }],
+            evap_tech_entries: vec![EvapTechEntry {
+                scc: "2270001010".into(),
+                hp_min: 0.0,
+                hp_max: 100.0,
+                tech_names: vec!["EV1".into()],
+                tech_fractions: vec![0.0],
+            }],
+            growth_xref_entries: vec![GrowthXrefEntry {
+                fips: "06000".into(),
+                scc: "2270001010".into(),
+                hp_min: 0.0,
+                hp_max: 100.0,
+                indicator: "GDP".into(),
+            }],
+            growth_records: vec![],
+            activity_entries: vec![ActivityTableEntry {
+                scc: "2270001010".into(),
+                fips: "06000".into(),
+                starts: 0.0,
+                activity_level: 100.0,
+                activity_unit: ActivityUnit::HoursPerYear,
+                load_factor: 0.5,
+                age_code: "DEFAULT".into(),
+            }],
+            scrappage_curve: vec![
+                ScrappagePoint { bin: 0.0, percent: 0.0 },
+                ScrappagePoint { bin: 100.0, percent: 100.0 },
+            ],
+            age_adjustment_table: AgeAdjustmentTable::default(),
+            hp_levels: default_hp_levels(),
+            ..ProductionExecutor::default()
+        };
+
+        let opts = test_opts();
+        let record = DriverRecord {
+            region_code: "06000".into(),
+            hp_avg: 25.0,
+            population: 100.0,
+            pop_year: 2020,
+        };
+        let ctx = DispatchContext {
+            dispatch: Dispatch::StateToCounty,
+            scc: "2270001010",
+            fuel: Some(FuelKind::Diesel),
+            record: &record,
+            growth: None,
+        };
+
+        let result = exec.execute(&ctx, &opts).unwrap();
+        assert!(!result.skipped, "expected non-skipped execution");
+        assert_eq!(result.rows.len(), 2, "expected one row per county");
+        let fips_set: std::collections::HashSet<_> =
+            result.rows.iter().map(|r| r.fips.as_str()).collect();
+        assert!(fips_set.contains("06037"));
+        assert!(fips_set.contains("06059"));
+    }
+
+    /// (d) StateFromNational dispatch with a state-level record →
+    /// exactly one `SimEmissionRow` at the state FIPS.
+    #[test]
+    fn state_from_national_minimal_ref_returns_one_row() {
+        let mut exec = ProductionExecutor {
+            exhaust_tech_entries: vec![ExhaustTechEntry {
+                scc: "2270001010".into(),
+                hp_min: 0.0,
+                hp_max: 100.0,
+                tech_names: vec!["T1".into()],
+                tech_fractions: vec![0.0],
+            }],
+            evap_tech_entries: vec![EvapTechEntry {
+                scc: "2270001010".into(),
+                hp_min: 0.0,
+                hp_max: 100.0,
+                tech_names: vec!["EV1".into()],
+                tech_fractions: vec![0.0],
+            }],
+            growth_xref_entries: vec![GrowthXrefEntry {
+                fips: "06000".into(),
+                scc: "2270001010".into(),
+                hp_min: 0.0,
+                hp_max: 100.0,
+                indicator: "GDP".into(),
+            }],
+            growth_records: vec![],
+            activity_entries: vec![ActivityTableEntry {
+                scc: "2270001010".into(),
+                fips: "06000".into(),
+                starts: 0.0,
+                activity_level: 100.0,
+                activity_unit: ActivityUnit::HoursPerYear,
+                load_factor: 0.5,
+                age_code: "DEFAULT".into(),
+            }],
+            scrappage_curve: vec![
+                ScrappagePoint { bin: 0.0, percent: 0.0 },
+                ScrappagePoint { bin: 100.0, percent: 100.0 },
+            ],
+            age_adjustment_table: AgeAdjustmentTable::default(),
+            hp_levels: default_hp_levels(),
+            ..ProductionExecutor::default()
+        };
+
+        let opts = test_opts();
+        let record = DriverRecord {
+            region_code: "06000".into(),
+            hp_avg: 25.0,
+            population: 100.0,
+            pop_year: 2020,
+        };
+        let ctx = DispatchContext {
+            dispatch: Dispatch::StateFromNational,
+            scc: "2270001010",
+            fuel: Some(FuelKind::Diesel),
+            record: &record,
+            growth: None,
+        };
+
+        let result = exec.execute(&ctx, &opts).unwrap();
+        assert!(!result.skipped, "expected non-skipped execution");
+        assert_eq!(result.rows.len(), 1, "expected exactly one row for state");
+        assert_eq!(result.rows[0].fips, "06000");
     }
 
     /// (b) Minimal reference (one FIPS, one exhaust tech with zero fraction,
