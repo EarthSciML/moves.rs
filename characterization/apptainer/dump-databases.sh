@@ -30,6 +30,14 @@ set -euo pipefail
 START_MARIADB="${START_MARIADB:-/opt/moves-bin/start-mariadb-bg.sh}"
 CAPTURES_DIR="${CAPTURES_DIR:-/captures}"
 
+# Derive the MOVES default-DB name from the SIF's versions.env (e.g.
+# "movesdb20241112" from MOVESDB_FILENAME="movesdb20241112.zip").  This
+# database is read-only during a run and is pinned by the SIF SHA, so
+# dumping it would bloat the captures without adding regression signal.
+MOVESDB_FILENAME=""
+[ -f /opt/moves-bin/versions.env ] && . /opt/moves-bin/versions.env
+MOVES_DEFAULT_DB="${MOVESDB_FILENAME%.zip}"
+
 mkdir -p "${CAPTURES_DIR}/databases"
 
 # Start MariaDB.
@@ -42,8 +50,9 @@ for _ in $(seq 1 60); do
 done
 
 mq() {
-    # Quiet, batch-mode, no-headers query against the running server.
-    mariadb -B -N -uroot "$@"
+    # Quiet, batch-mode, no-headers query. Uses the moves application account
+    # because root@localhost requires unix_socket auth (only works as OS root).
+    mariadb -B -N -umoves -pmoves "$@"
 }
 
 # Discover non-system databases.
@@ -59,6 +68,13 @@ mq -e "
 " | while IFS= read -r DB; do
     [ -n "$DB" ] || continue
 
+    # Skip the MOVES default (seed) database — it is read-only during a run
+    # and is already pinned by the SIF SHA in fixture-image.lock.
+    if [ -n "${MOVES_DEFAULT_DB}" ] && [ "${DB}" = "${MOVES_DEFAULT_DB}" ]; then
+        echo "[dump-databases] skipping read-only seed database ${DB}"
+        continue
+    fi
+
     echo "[dump-databases] dumping ${DB}"
     mkdir -p "${CAPTURES_DIR}/databases/${DB}"
 
@@ -71,6 +87,16 @@ mq -e "
 
     for T in $TABLES; do
         [ -n "$T" ] || continue
+
+        # Skip MOVES run-metadata tables whose content varies between runs:
+        # runDateTime/minutesDuration in movesrun, random workerID in
+        # bundletracking/movesworkersused, embedded timestamps in
+        # moveserror/moveseventlog. Emission-result tables are unaffected.
+        case "$T" in
+            bundletracking|moveserror|moveseventlog|movesrun|movesworkersused)
+                echo "[dump-databases] skipping non-deterministic table ${DB}.${T}"
+                continue ;;
+        esac
 
         # Schema sidecar: NAME\tDATA_TYPE\tCOLUMN_KEY (ordinal order).
         mq -e "
@@ -111,6 +137,6 @@ mq -e "
 done
 
 # Stop MariaDB cleanly.
-mariadb-admin --socket=/var/run/mysqld/mysqld.sock -uroot shutdown 2>/dev/null \
+mariadb-admin --socket=/var/run/mysqld/mysqld.sock -umoves -pmoves shutdown 2>/dev/null \
     || kill "$(cat /var/run/mysqld/mariadbd.pid 2>/dev/null)" 2>/dev/null \
     || true
