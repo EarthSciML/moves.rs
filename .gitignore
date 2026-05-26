@@ -21,3 +21,6 @@
 
 # Gas City
 !.beads/identity.toml
+
+# Beads / Dolt files (added by bd init)
+.beads/proxieddb/

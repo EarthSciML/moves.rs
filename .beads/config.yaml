@@ -4,3 +4,5 @@ dolt.auto-start: false
 gc.endpoint_origin: inherited_city
 gc.endpoint_status: verified
 export.auto: false
+
+sync.remote: "git+ssh://git@github.com/EarthSciML/moves.rs"
