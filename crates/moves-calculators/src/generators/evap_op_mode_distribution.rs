@@ -589,7 +589,7 @@ impl Generator for EvaporativeEmissionsOperatingModeDistributionGenerator {
     /// will project an [`EvapOpModeContext`] from `ctx.position()` and an
     /// [`EvapOpModeInputs`] from `ctx.tables()`, call [`op_mode_distribution`],
     /// and `INSERT IGNORE` the rows into the scratch `OpModeDistribution`.
-    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
+    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
         Ok(CalculatorOutput::empty())
     }
 }
@@ -1087,8 +1087,8 @@ mod tests {
         // execute is a documented placeholder until Task 50; it must still
         // honour the trait contract and return Ok.
         let generator = EvaporativeEmissionsOperatingModeDistributionGenerator::new();
-        let context = CalculatorContext::new();
-        assert!(generator.execute(&context).is_ok());
+        let mut context = CalculatorContext::new();
+        assert!(generator.execute(&mut context).is_ok());
     }
 
     #[test]

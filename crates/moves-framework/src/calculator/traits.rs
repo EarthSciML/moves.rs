@@ -67,6 +67,7 @@
 
 use moves_calculator_info::{Granularity, Priority};
 use moves_data::{PollutantProcessAssociation, ProcessId};
+use polars::prelude::DataFrame;
 
 use crate::error::Error;
 use crate::execution::execution_db::{ExecutionTables, IterationPosition, ScratchNamespace};
@@ -166,22 +167,41 @@ impl CalculatorContext {
 
 /// Value returned by [`Calculator::execute`] / [`Generator::execute`].
 ///
-/// **Phase 2 skeleton.** Task 50 (`DataFrameStore`) replaces this with a
-/// Polars `DataFrame`. Fixing the placeholder type here lets Phase 3
-/// calculators commit to a result type that the registry can store, even
-/// before the data plane has materialised.
+/// Wraps an optional Polars [`DataFrame`]: calculators that produce activity
+/// output fill it with [`CalculatorOutput::with_dataframe`]; generators or
+/// calculators that write only to scratch return [`CalculatorOutput::empty`].
 #[derive(Debug, Default)]
 pub struct CalculatorOutput {
-    // Task 50 replaces with a real DataFrame.
-    _private: (),
+    dataframe: Option<DataFrame>,
 }
 
 impl CalculatorOutput {
-    /// Construct an empty output. Stand-in until [`CalculatorOutput`] wraps
-    /// a real Polars `DataFrame` (Task 50).
+    /// Construct an output carrying no DataFrame — for calculators that write
+    /// only to scratch or produce no direct output.
     #[must_use]
     pub fn empty() -> Self {
-        Self { _private: () }
+        Self { dataframe: None }
+    }
+
+    /// Construct an output wrapping `df` — for calculators that return a
+    /// result table (e.g. `MOVESWorkerActivityOutput`).
+    #[must_use]
+    pub fn with_dataframe(df: DataFrame) -> Self {
+        Self {
+            dataframe: Some(df),
+        }
+    }
+
+    /// Borrow the contained DataFrame, if any.
+    #[must_use]
+    pub fn dataframe(&self) -> Option<&DataFrame> {
+        self.dataframe.as_ref()
+    }
+
+    /// Consume `self` and return the owned DataFrame, if any.
+    #[must_use]
+    pub fn into_dataframe(self) -> Option<DataFrame> {
+        self.dataframe
     }
 }
 
