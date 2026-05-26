@@ -24,6 +24,12 @@
 #                         every JVM (ant, the forked MOVES JVM) honors it.
 #                         Used by run-fixture.sh for Phase 0 Task 8 (mo-d7or)
 #                         class-load instrumentation; harmless when unset.
+#   NRDBG_FILE            If set, propagated into the container so the
+#                         instrumented NONROAD.exe writes its intermediate-state
+#                         TSV to that path (container-side). Set by
+#                         generate-corpus.sh (nonroad-fidelity/) to the
+#                         /opt/moves/MOVESTemporary/<fixture>.tsv path that is
+#                         bind-mounted back to the host scratch directory.
 
 set -euo pipefail
 
@@ -81,14 +87,15 @@ else
     START_CMD="/opt/moves-bin/start-mariadb-bg.sh"
 fi
 
-# Propagate JAVA_TOOL_OPTIONS into the container if the caller set it.
+# Propagate opt-in env vars into the container.
 # Apptainer scrubs the host environment by default; an explicit --env
-# is required for opt-in passthrough. JAVA_TOOL_OPTIONS is the JVM-spec
-# env knob honored by every JVM unconditionally, so anything we set
-# here is picked up by ant and the forked MOVES JVM both.
+# is required for passthrough.
 EXTRA_ENV_ARGS=()
 if [ -n "${JAVA_TOOL_OPTIONS:-}" ]; then
     EXTRA_ENV_ARGS+=( --env "JAVA_TOOL_OPTIONS=${JAVA_TOOL_OPTIONS}" )
+fi
+if [ -n "${NRDBG_FILE:-}" ]; then
+    EXTRA_ENV_ARGS+=( --env "NRDBG_FILE=${NRDBG_FILE}" )
 fi
 
 ANT_ARGS_QUOTED="$(printf '%q ' "${ANT_ARGS[@]}")"

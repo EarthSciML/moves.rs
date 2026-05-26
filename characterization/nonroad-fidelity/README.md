@@ -70,11 +70,27 @@ constants in `tolerance.rs` are the knobs Task 116 turns.
 The end-to-end gfortran-reference diff needs two inputs the
 repository does not hold yet:
 
-1. **A captured gfortran baseline per fixture.** Build the
-   instrumented NONROAD (`../nonroad-build/`), then run it inside the
-   canonical-MOVES Apptainer SIF with `NRDBG_FILE` set, once per
-   fixture. Collect the resulting TSVs into one directory, named
-   `<fixture>.tsv` (e.g. `nr-construction-state.tsv`).
+1. **A captured gfortran baseline per fixture.** Use
+   `generate-corpus.sh` (this directory) to run all ten fixtures
+   through the instrumented NONROAD inside `moves-fixture.sif` and
+   collect the resulting TSVs into `baselines/`:
+
+   ```sh
+   # Prerequisites: moves-fixture.sif built and on PATH or via $SIF.
+   cd characterization/nonroad-fidelity
+   ./generate-corpus.sh            # runs all ten fixtures, writes baselines/
+   ```
+
+   The script is idempotent — re-running skips fixtures whose TSV
+   already exists and matches the recorded SHA in `baselines/corpus.sha`.
+   Set `FORCE=1` to regenerate unconditionally. Use `--dry-run` to
+   preview the ten `apptainer exec` command lines without executing.
+
+   `NRDBG_FILE` is passed through `apptainer exec --env` into the
+   container so the instrumented `NONROAD.exe` writes its
+   intermediate-state TSV to `/opt/moves/MOVESTemporary/<fixture>.tsv`
+   (bind-mounted from the host scratch directory).
+
 2. **The Rust port's own intermediate-state capture**, produced once
    Task 117 wires up `run_simulation` with port-side instrumentation
    that emits the same labels. `tests/fidelity/adapter.rs` is the
@@ -83,7 +99,7 @@ repository does not hold yet:
 Point the harness at the baseline directory with:
 
 ```sh
-NONROAD_FIDELITY_REFERENCE=/path/to/baselines \
+NONROAD_FIDELITY_REFERENCE=characterization/nonroad-fidelity/baselines \
     cargo test -p moves-nonroad --test nonroad_fidelity
 ```
 
