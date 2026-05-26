@@ -351,7 +351,7 @@ impl Generator for MeteorologyGenerator {
         OUTPUT_TABLES
     }
 
-    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
+    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
         // The numeric port (`compute_zone_month_hour`, `resolve_county_meteorology`)
         // is complete, but the `ZoneMonthHour` / `Zone` / `County` tables it
         // iterates do not materialise until the Task 50 data plane lands —
@@ -636,8 +636,8 @@ mod tests {
     fn generator_execute_is_ok() {
         // Phase 2/3 skeleton: execute returns an empty output until the
         // data plane lands. Smoke-test that it is callable and Ok.
-        let ctx = CalculatorContext::new();
-        assert!(MeteorologyGenerator.execute(&ctx).is_ok());
+        let mut ctx = CalculatorContext::new();
+        assert!(MeteorologyGenerator.execute(&mut ctx).is_ok());
     }
 
     #[test]

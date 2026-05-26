@@ -564,7 +564,7 @@ impl Generator for AverageSpeedOperatingModeDistributionGenerator {
     /// [`project_op_mode_fractions`] and [`assign_tirewear_op_mode`]; once
     /// the `DataFrameStore` lands, `execute` will project the input views
     /// from `ctx.tables()`, dispatch on RunSpec domain, and store the rows.
-    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
+    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
         Ok(CalculatorOutput::empty())
     }
 }
@@ -947,8 +947,8 @@ mod tests {
         // execute is a documented placeholder until Task 50; it must still
         // honour the trait contract and return Ok.
         let gen = AverageSpeedOperatingModeDistributionGenerator::new();
-        let ctx = CalculatorContext::new();
-        assert!(gen.execute(&ctx).is_ok());
+        let mut ctx = CalculatorContext::new();
+        assert!(gen.execute(&mut ctx).is_ok());
     }
 
     #[test]

@@ -1788,6 +1788,7 @@ dependencies = [
  "moves-framework",
  "moves-runspec",
  "moves-snapshot",
+ "polars",
  "serde",
  "serde_json",
  "tempfile",

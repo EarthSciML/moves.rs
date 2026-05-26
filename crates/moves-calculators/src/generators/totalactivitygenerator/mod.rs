@@ -387,7 +387,7 @@ impl Generator for TotalActivityGenerator {
     /// the activity-table output — its row storage lands with the Task 50
     /// `DataFrameStore`. The computation itself is ported and tested in
     /// [`TotalActivityGenerator::run`]; see the [module documentation](self).
-    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
+    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
         Ok(CalculatorOutput::empty())
     }
 }
@@ -570,8 +570,8 @@ mod tests {
     #[test]
     fn execute_is_a_shell_until_the_data_plane_lands() {
         let gen = TotalActivityGenerator;
-        let ctx = CalculatorContext::new();
-        assert!(gen.execute(&ctx).is_ok());
+        let mut ctx = CalculatorContext::new();
+        assert!(gen.execute(&mut ctx).is_ok());
     }
 
     #[test]

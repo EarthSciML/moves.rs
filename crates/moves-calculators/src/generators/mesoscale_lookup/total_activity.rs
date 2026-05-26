@@ -633,7 +633,7 @@ impl Generator for MesoscaleLookupTotalActivityGenerator {
     /// apportionment kernels; once the `DataFrameStore` lands, `execute`
     /// projects the input view from `ctx.tables()`, runs the pipeline for
     /// `ctx.position().time.year`, and writes the activity tables.
-    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
+    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
         Ok(CalculatorOutput::empty())
     }
 }
@@ -1045,8 +1045,8 @@ mod tests {
     #[test]
     fn generator_execute_returns_placeholder_until_data_plane() {
         let gen = MesoscaleLookupTotalActivityGenerator::new();
-        let ctx = CalculatorContext::new();
-        assert!(gen.execute(&ctx).is_ok());
+        let mut ctx = CalculatorContext::new();
+        assert!(gen.execute(&mut ctx).is_ok());
     }
 
     #[test]
