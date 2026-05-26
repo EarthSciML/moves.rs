@@ -188,8 +188,10 @@ use std::collections::HashMap;
 
 use moves_data::{PollutantId, PollutantProcessAssociation, ProcessId};
 use moves_framework::{
-    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, Error,
+    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription,
+    DataFrameStoreTyped, Error, TableRow,
 };
+use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
 
 /// Stable module name of the NonPM variant — matches the Java class and the
 /// `CrankcaseEmissionCalculatorNonPM` entry in `calculator-dag.json`.
@@ -335,6 +337,235 @@ impl MovesWorkerOutputRow {
             self.model_year_id,
             self.road_type_id,
         ]
+    }
+}
+
+// ===========================================================================
+// TableRow implementations — typed DataFrame ↔ row round-trips for every
+// table `CrankcaseEmissionCalculator` reads and writes.
+// ===========================================================================
+
+fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -> Error {
+    Error::RowExtraction {
+        table: table.into(),
+        row,
+        column: column.into(),
+        message: msg,
+    }
+}
+
+impl TableRow for CrankcaseEmissionRatioRow {
+    fn table_name() -> &'static str {
+        "CrankcaseEmissionRatio"
+    }
+
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("polProcessID".into(), DataType::Int32),
+            ("minModelYearID".into(), DataType::Int32),
+            ("maxModelYearID".into(), DataType::Int32),
+            ("sourceTypeID".into(), DataType::Int32),
+            ("regClassID".into(), DataType::Int32),
+            ("fuelTypeID".into(), DataType::Int32),
+            ("crankcaseRatio".into(), DataType::Float64),
+        ])
+    }
+
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new("polProcessID".into(), rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>()).into(),
+                Series::new("minModelYearID".into(), rows.iter().map(|r| r.min_model_year_id).collect::<Vec<i32>>()).into(),
+                Series::new("maxModelYearID".into(), rows.iter().map(|r| r.max_model_year_id).collect::<Vec<i32>>()).into(),
+                Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
+                Series::new("regClassID".into(), rows.iter().map(|r| r.reg_class_id).collect::<Vec<i32>>()).into(),
+                Series::new("fuelTypeID".into(), rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>()).into(),
+                Series::new("crankcaseRatio".into(), rows.iter().map(|r| r.crankcase_ratio).collect::<Vec<f64>>()).into(),
+            ],
+        )
+    }
+
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "CrankcaseEmissionRatio";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let pol_proc = get_i32("polProcessID")?;
+        let min_my = get_i32("minModelYearID")?;
+        let max_my = get_i32("maxModelYearID")?;
+        let src_type = get_i32("sourceTypeID")?;
+        let reg_class = get_i32("regClassID")?;
+        let fuel_type = get_i32("fuelTypeID")?;
+        let ratio = get_f64("crankcaseRatio")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(CrankcaseEmissionRatioRow {
+                pol_process_id: pol_proc.get(i).ok_or_else(|| null("polProcessID"))?,
+                min_model_year_id: min_my.get(i).ok_or_else(|| null("minModelYearID"))?,
+                max_model_year_id: max_my.get(i).ok_or_else(|| null("maxModelYearID"))?,
+                source_type_id: src_type.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                reg_class_id: reg_class.get(i).ok_or_else(|| null("regClassID"))?,
+                fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
+                crankcase_ratio: ratio.get(i).ok_or_else(|| null("crankcaseRatio"))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for CrankcasePollutantProcessAssocRow {
+    fn table_name() -> &'static str {
+        "CrankcasePollutantProcessAssoc"
+    }
+
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("polProcessID".into(), DataType::Int32),
+            ("processID".into(), DataType::Int32),
+            ("pollutantID".into(), DataType::Int32),
+        ])
+    }
+
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new("polProcessID".into(), rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>()).into(),
+                Series::new("processID".into(), rows.iter().map(|r| r.process_id).collect::<Vec<i32>>()).into(),
+                Series::new("pollutantID".into(), rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>()).into(),
+            ],
+        )
+    }
+
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "CrankcasePollutantProcessAssoc";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let pol_proc = get_i32("polProcessID")?;
+        let process = get_i32("processID")?;
+        let pollutant = get_i32("pollutantID")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(CrankcasePollutantProcessAssocRow {
+                pol_process_id: pol_proc.get(i).ok_or_else(|| null("polProcessID"))?,
+                process_id: process.get(i).ok_or_else(|| null("processID"))?,
+                pollutant_id: pollutant.get(i).ok_or_else(|| null("pollutantID"))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for MovesWorkerOutputRow {
+    fn table_name() -> &'static str {
+        "MOVESWorkerOutput"
+    }
+
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("yearID".into(), DataType::Int32),
+            ("monthID".into(), DataType::Int32),
+            ("dayID".into(), DataType::Int32),
+            ("hourID".into(), DataType::Int32),
+            ("stateID".into(), DataType::Int32),
+            ("countyID".into(), DataType::Int32),
+            ("zoneID".into(), DataType::Int32),
+            ("linkID".into(), DataType::Int32),
+            ("pollutantID".into(), DataType::Int32),
+            ("processID".into(), DataType::Int32),
+            ("sourceTypeID".into(), DataType::Int32),
+            ("regClassID".into(), DataType::Int32),
+            ("fuelTypeID".into(), DataType::Int32),
+            ("modelYearID".into(), DataType::Int32),
+            ("roadTypeID".into(), DataType::Int32),
+            ("emissionQuant".into(), DataType::Float64),
+            ("emissionRate".into(), DataType::Float64),
+        ])
+    }
+
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new("yearID".into(), rows.iter().map(|r| r.year_id).collect::<Vec<i32>>()).into(),
+                Series::new("monthID".into(), rows.iter().map(|r| r.month_id).collect::<Vec<i32>>()).into(),
+                Series::new("dayID".into(), rows.iter().map(|r| r.day_id).collect::<Vec<i32>>()).into(),
+                Series::new("hourID".into(), rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>()).into(),
+                Series::new("stateID".into(), rows.iter().map(|r| r.state_id).collect::<Vec<i32>>()).into(),
+                Series::new("countyID".into(), rows.iter().map(|r| r.county_id).collect::<Vec<i32>>()).into(),
+                Series::new("zoneID".into(), rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>()).into(),
+                Series::new("linkID".into(), rows.iter().map(|r| r.link_id).collect::<Vec<i32>>()).into(),
+                Series::new("pollutantID".into(), rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>()).into(),
+                Series::new("processID".into(), rows.iter().map(|r| r.process_id).collect::<Vec<i32>>()).into(),
+                Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
+                Series::new("regClassID".into(), rows.iter().map(|r| r.reg_class_id).collect::<Vec<i32>>()).into(),
+                Series::new("fuelTypeID".into(), rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>()).into(),
+                Series::new("modelYearID".into(), rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>()).into(),
+                Series::new("roadTypeID".into(), rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>()).into(),
+                Series::new("emissionQuant".into(), rows.iter().map(|r| r.emission_quant).collect::<Vec<f64>>()).into(),
+                Series::new("emissionRate".into(), rows.iter().map(|r| r.emission_rate).collect::<Vec<f64>>()).into(),
+            ],
+        )
+    }
+
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "MOVESWorkerOutput";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let year = get_i32("yearID")?;
+        let month = get_i32("monthID")?;
+        let day = get_i32("dayID")?;
+        let hour = get_i32("hourID")?;
+        let state = get_i32("stateID")?;
+        let county = get_i32("countyID")?;
+        let zone = get_i32("zoneID")?;
+        let link = get_i32("linkID")?;
+        let pollutant = get_i32("pollutantID")?;
+        let process = get_i32("processID")?;
+        let src_type = get_i32("sourceTypeID")?;
+        let reg_class = get_i32("regClassID")?;
+        let fuel_type = get_i32("fuelTypeID")?;
+        let model_year = get_i32("modelYearID")?;
+        let road_type = get_i32("roadTypeID")?;
+        let emission_quant = get_f64("emissionQuant")?;
+        let emission_rate = get_f64("emissionRate")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(MovesWorkerOutputRow {
+                year_id: year.get(i).ok_or_else(|| null("yearID"))?,
+                month_id: month.get(i).ok_or_else(|| null("monthID"))?,
+                day_id: day.get(i).ok_or_else(|| null("dayID"))?,
+                hour_id: hour.get(i).ok_or_else(|| null("hourID"))?,
+                state_id: state.get(i).ok_or_else(|| null("stateID"))?,
+                county_id: county.get(i).ok_or_else(|| null("countyID"))?,
+                zone_id: zone.get(i).ok_or_else(|| null("zoneID"))?,
+                link_id: link.get(i).ok_or_else(|| null("linkID"))?,
+                pollutant_id: pollutant.get(i).ok_or_else(|| null("pollutantID"))?,
+                process_id: process.get(i).ok_or_else(|| null("processID"))?,
+                source_type_id: src_type.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                reg_class_id: reg_class.get(i).ok_or_else(|| null("regClassID"))?,
+                fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
+                model_year_id: model_year.get(i).ok_or_else(|| null("modelYearID"))?,
+                road_type_id: road_type.get(i).ok_or_else(|| null("roadTypeID"))?,
+                emission_quant: emission_quant.get(i).ok_or_else(|| null("emissionQuant"))?,
+                emission_rate: emission_rate.get(i).ok_or_else(|| null("emissionRate"))?,
+            })
+        }).collect()
     }
 }
 
@@ -663,15 +894,16 @@ impl Calculator for CrankcaseEmissionCalculatorNonPM {
         INPUT_TABLES
     }
 
-    /// Phase 2 skeleton — returns an empty [`CalculatorOutput`].
-    ///
-    /// [`CalculatorContext`] cannot yet surface the input tables or accept the
-    /// `MOVESWorkerOutput` rows — its row storage lands with the Task 50
-    /// `DataFrameStore`. The computation itself is ported and tested in
-    /// [`CrankcaseEmissionCalculator::calculate`]; see the [module
-    /// documentation](self).
-    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
-        Ok(CalculatorOutput::empty())
+    fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
+        let tables = ctx.tables();
+        let inputs = CrankcaseInputs {
+            crankcase_emission_ratio: tables
+                .iter_typed::<CrankcaseEmissionRatioRow>("CrankcaseEmissionRatio")?,
+            crankcase_pollutant_process_assoc: tables
+                .iter_typed::<CrankcasePollutantProcessAssocRow>("CrankcasePollutantProcessAssoc")?,
+            worker_output: tables.iter_typed::<MovesWorkerOutputRow>("MOVESWorkerOutput")?,
+        };
+        crate::wiring::emit_rows(self.calculate(&inputs))
     }
 }
 
@@ -732,11 +964,16 @@ impl Calculator for CrankcaseEmissionCalculatorPM {
         INPUT_TABLES
     }
 
-    /// Phase 2 skeleton — returns an empty [`CalculatorOutput`]. See
-    /// [`CrankcaseEmissionCalculatorNonPM::execute`] and the [module
-    /// documentation](self).
-    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
-        Ok(CalculatorOutput::empty())
+    fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
+        let tables = ctx.tables();
+        let inputs = CrankcaseInputs {
+            crankcase_emission_ratio: tables
+                .iter_typed::<CrankcaseEmissionRatioRow>("CrankcaseEmissionRatio")?,
+            crankcase_pollutant_process_assoc: tables
+                .iter_typed::<CrankcasePollutantProcessAssocRow>("CrankcasePollutantProcessAssoc")?,
+            worker_output: tables.iter_typed::<MovesWorkerOutputRow>("MOVESWorkerOutput")?,
+        };
+        crate::wiring::emit_rows(self.calculate(&inputs))
     }
 }
 
@@ -1204,10 +1441,71 @@ mod tests {
     }
 
     #[test]
-    fn execute_is_a_shell_until_the_data_plane_lands() {
-        let ctx = CalculatorContext::new();
-        assert!(CrankcaseEmissionCalculatorNonPM.execute(&ctx).is_ok());
-        assert!(CrankcaseEmissionCalculatorPM.execute(&ctx).is_ok());
+    fn nonpm_execute_returns_nonempty_dataframe_for_minimal_inputs() {
+        use moves_framework::DataFrameStore;
+        let inputs = minimal_inputs();
+        let mut store = moves_framework::InMemoryStore::new();
+        store.insert(
+            "CrankcaseEmissionRatio",
+            CrankcaseEmissionRatioRow::into_dataframe(inputs.crankcase_emission_ratio).unwrap(),
+        );
+        store.insert(
+            "CrankcasePollutantProcessAssoc",
+            CrankcasePollutantProcessAssocRow::into_dataframe(
+                inputs.crankcase_pollutant_process_assoc,
+            )
+            .unwrap(),
+        );
+        store.insert(
+            "MOVESWorkerOutput",
+            MovesWorkerOutputRow::into_dataframe(inputs.worker_output).unwrap(),
+        );
+        let ctx = CalculatorContext::with_tables(store);
+        let out = CrankcaseEmissionCalculatorNonPM
+            .execute(&ctx)
+            .expect("execute ok");
+        let df = out.dataframe().expect("output should contain a DataFrame");
+        assert!(df.height() > 0, "nonpm execute must return at least one row");
+    }
+
+    #[test]
+    fn pm_execute_returns_nonempty_dataframe_with_sulfate_relabel() {
+        use moves_framework::DataFrameStore;
+        let mut inputs = minimal_inputs();
+        inputs.worker_output[0].pollutant_id = SULFATE_PARTICULATE_POLLUTANT;
+        inputs.crankcase_pollutant_process_assoc[0] = CrankcasePollutantProcessAssocRow {
+            pol_process_id: polproc(SULFATE_PARTICULATE_POLLUTANT, 15),
+            process_id: 15,
+            pollutant_id: SULFATE_PARTICULATE_POLLUTANT,
+        };
+        inputs.crankcase_emission_ratio[0].pol_process_id =
+            polproc(SULFATE_PARTICULATE_POLLUTANT, 15);
+        let mut store = moves_framework::InMemoryStore::new();
+        store.insert(
+            "CrankcaseEmissionRatio",
+            CrankcaseEmissionRatioRow::into_dataframe(inputs.crankcase_emission_ratio).unwrap(),
+        );
+        store.insert(
+            "CrankcasePollutantProcessAssoc",
+            CrankcasePollutantProcessAssocRow::into_dataframe(
+                inputs.crankcase_pollutant_process_assoc,
+            )
+            .unwrap(),
+        );
+        store.insert(
+            "MOVESWorkerOutput",
+            MovesWorkerOutputRow::into_dataframe(inputs.worker_output).unwrap(),
+        );
+        let ctx = CalculatorContext::with_tables(store);
+        let out = CrankcaseEmissionCalculatorPM
+            .execute(&ctx)
+            .expect("execute ok");
+        let df = out.dataframe().expect("output should contain a DataFrame");
+        // PM variant: pollutant-115 crankcase row + pollutant-105 relabel.
+        assert!(
+            df.height() >= 2,
+            "pm execute must return at least two rows (115 + 105 relabel)"
+        );
     }
 
     #[test]
