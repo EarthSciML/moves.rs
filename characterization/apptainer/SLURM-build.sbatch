@@ -47,8 +47,10 @@ if [[ -f "${MOVESDB_STAGED}" ]]; then
     export MOVESDB_LOCAL_PATH="${MOVESDB_STAGED}"
 fi
 
-# Resolve the repo root so this script works regardless of cwd.
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve the repo root. SLURM copies the batch script to a tmp path, so
+# BASH_SOURCE[0] is unreliable; use SLURM_SUBMIT_DIR (the directory where
+# sbatch was invoked, which must be characterization/apptainer/).
+SCRIPT_DIR="${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 
 echo "[SLURM-build] Host:            $(hostname)"
 echo "[SLURM-build] APPTAINER_TMPDIR: ${APPTAINER_TMPDIR}"
