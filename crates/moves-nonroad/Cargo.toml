@@ -26,3 +26,5 @@ tempfile = { workspace = true }
 # wasm32 build are untouched (ARCHITECTURE.md § 4.4).
 serde = { workspace = true }
 serde_json = { workspace = true }
+sha2 = { workspace = true }
+toml = { workspace = true }

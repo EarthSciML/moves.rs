@@ -30,6 +30,7 @@ use fidelity::divergence::compare_runs;
 use fidelity::fixtures;
 use fidelity::reference::{parse_reference, Context, Phase};
 use fidelity::tolerance;
+use sha2::{Digest, Sha256};
 
 use moves_nonroad::common::consts::MXAGYR;
 use moves_nonroad::population::{
@@ -234,37 +235,76 @@ fn reference_corpus_validates_when_present() {
         return;
     };
 
-    let fixtures = fixtures::load_all_fixtures().expect("fixtures must load");
-    let mut found = 0;
-    for fixture in &fixtures {
-        let path = dir.join(fixture.reference_filename());
-        if !path.exists() {
-            eprintln!("  {}: no baseline at {}", fixture.name, path.display());
-            continue;
-        }
-        found += 1;
+    // Load and validate MANIFEST.toml.
+    let manifest_path = fidelity::manifest_path(&dir);
+    let manifest_text = std::fs::read_to_string(&manifest_path).unwrap_or_else(|e| {
+        panic!(
+            "cannot read MANIFEST.toml at {}: {e}",
+            manifest_path.display()
+        )
+    });
+    let manifest: fidelity::CorpusManifest = toml::from_str(&manifest_text).unwrap_or_else(|e| {
+        panic!(
+            "MANIFEST.toml at {} is invalid TOML: {e}",
+            manifest_path.display()
+        )
+    });
 
-        let file = std::fs::File::open(&path)
-            .unwrap_or_else(|e| panic!("cannot open {}: {e}", path.display()));
-        let records = parse_reference(BufReader::new(file))
-            .unwrap_or_else(|e| panic!("{} is not a valid dbgemit capture: {e}", path.display()));
+    // Assert the manifest names exactly the ten FIXTURE_NAMES.
+    let mut manifest_names: Vec<&str> =
+        manifest.fixtures.iter().map(|e| e.name.as_str()).collect();
+    manifest_names.sort_unstable();
+    let mut expected_names = fixtures::FIXTURE_NAMES.to_vec();
+    expected_names.sort_unstable();
+    assert_eq!(
+        manifest_names, expected_names,
+        "MANIFEST.toml must list exactly the ten FIXTURE_NAMES"
+    );
+
+    // For each fixture in the manifest: verify SHA256, parse TSV, check phases.
+    let mut validated = 0;
+    for entry in &manifest.fixtures {
+        let tsv_path = dir.join(&entry.path);
+        let tsv_bytes = std::fs::read(&tsv_path)
+            .unwrap_or_else(|e| panic!("cannot read {}: {e}", tsv_path.display()));
+
+        // Verify the TSV's SHA256 matches the manifest.
+        let hash = Sha256::digest(&tsv_bytes);
+        let actual_sha256: String = hash.iter().map(|b| format!("{b:02x}")).collect();
+        assert_eq!(
+            actual_sha256, entry.sha256,
+            "{}: SHA256 mismatch — manifest records {}, file hashes to {}",
+            entry.name, entry.sha256, actual_sha256
+        );
+
+        // Parse and structurally validate the TSV.
+        let records = parse_reference(BufReader::new(tsv_bytes.as_slice()))
+            .unwrap_or_else(|e| panic!("{}: {e}", tsv_path.display()));
         assert!(
             !records.is_empty(),
             "{} parsed to zero records",
-            path.display()
+            tsv_path.display()
         );
 
+        // Assert at least one record per Phase.
         for phase in Phase::all() {
             let n = records.iter().filter(|r| r.phase == phase).count();
-            eprintln!("  {} · {phase}: {n} record(s)", fixture.name);
+            assert!(
+                n > 0,
+                "{}: no records for phase {phase}",
+                entry.name
+            );
+            eprintln!("  {} · {phase}: {n} record(s)", entry.name);
         }
+
+        validated += 1;
     }
 
-    assert!(
-        found > 0,
-        "{} is set ({}) but holds no <fixture>.tsv baseline",
-        fidelity::REFERENCE_DIR_ENV,
-        dir.display()
+    let total = fixtures::FIXTURE_NAMES.len();
+    eprintln!("{validated}/{total} fixtures validated");
+    assert_eq!(
+        validated, total,
+        "expected all {total} fixtures to validate, got {validated}"
     );
 }
 

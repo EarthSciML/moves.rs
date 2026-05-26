@@ -191,4 +191,27 @@ mod tests {
         };
         assert_eq!(fixture.reference_filename(), "nr-construction-state.tsv");
     }
+
+    /// Verify that `FIXTURE_NAMES` exactly matches the fixture names listed in
+    /// `characterization/nonroad-fidelity/FIXTURES`, line for line and in the
+    /// same order. Fails at compile-fail granularity when the two lists drift.
+    #[test]
+    fn verify_fixture_names_match_corpus_manifest() {
+        let fixtures_file = repo_root()
+            .join("characterization")
+            .join("nonroad-fidelity")
+            .join("FIXTURES");
+        let content = std::fs::read_to_string(&fixtures_file)
+            .unwrap_or_else(|e| panic!("cannot read {}: {e}", fixtures_file.display()));
+        let from_file: Vec<&str> = content
+            .lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty() && !l.starts_with('#'))
+            .collect();
+        assert_eq!(
+            from_file,
+            FIXTURE_NAMES.to_vec(),
+            "FIXTURE_NAMES in fixtures.rs must match characterization/nonroad-fidelity/FIXTURES line-for-line"
+        );
+    }
 }

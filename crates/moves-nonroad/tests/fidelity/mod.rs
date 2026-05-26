@@ -52,7 +52,7 @@
 //! (`mo-490cm`) consumes its [`divergence::DivergenceReport`] to
 //! triage divergences; Task 117 supplies the port side of the diff.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub mod adapter;
 pub mod divergence;
@@ -74,4 +74,39 @@ pub fn reference_dir() -> Option<PathBuf> {
     std::env::var_os(REFERENCE_DIR_ENV)
         .map(PathBuf::from)
         .filter(|p| !p.as_os_str().is_empty())
+}
+
+/// Path to `MANIFEST.toml` within `dir`.
+pub fn manifest_path(dir: &Path) -> PathBuf {
+    dir.join("MANIFEST.toml")
+}
+
+/// One fixture entry in the corpus manifest.
+#[derive(Debug, serde::Deserialize)]
+#[allow(dead_code)]
+pub struct ManifestEntry {
+    /// Fixture name (e.g. `nr-construction-state`), must match a `FIXTURE_NAMES` entry.
+    pub name: String,
+    /// Relative path to the TSV within the baseline directory.
+    pub path: String,
+    /// Lowercase hex SHA256 of the TSV file bytes.
+    pub sha256: String,
+    /// Byte count of the TSV file.
+    pub bytes: u64,
+    /// Row count (non-comment lines) in the TSV file.
+    pub rows: u64,
+    /// Capture wall time in seconds (optional provenance field).
+    #[serde(default)]
+    pub wall_seconds: Option<u64>,
+}
+
+/// The corpus manifest (`MANIFEST.toml`) produced by `generate-corpus.sh`.
+#[derive(Debug, serde::Deserialize)]
+#[allow(dead_code)]
+pub struct CorpusManifest {
+    /// SHA256 of the SIF used to generate the corpus (optional provenance).
+    #[serde(default)]
+    pub sif_sha256: Option<String>,
+    /// One entry per fixture, in any order.
+    pub fixtures: Vec<ManifestEntry>,
 }
