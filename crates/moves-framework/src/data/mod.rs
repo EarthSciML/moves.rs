@@ -15,9 +15,19 @@
 //!   testing without touching calling code.
 //! * [`InMemoryStore`] — the concrete `BTreeMap`-backed implementation used by
 //!   [`crate::ExecutionTables`] and [`crate::ScratchNamespace`].
+//! * [`conversions::TableRow`] — trait for typed row structs that can
+//!   round-trip through a `DataFrameStore`.
+//! * [`DataFrameStoreTyped`] — blanket extension adding `insert_typed` and
+//!   `iter_typed` to every `DataFrameStore`.
+//! * [`schema_registry::schema_registry`] — static map of table name →
+//!   `fn() -> polars::Schema`.
 
+pub mod conversions;
+pub mod schema_registry;
 pub mod store;
 
+pub use conversions::{DataFrameStoreTyped, IntoDataFrame, TableRow};
+pub use schema_registry::{schema_registry, KNOWN_CALCULATOR_INPUT_TABLES};
 pub use store::InMemoryStore;
 
 use std::sync::Arc;

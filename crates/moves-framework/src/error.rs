@@ -77,4 +77,39 @@ pub enum Error {
     /// `rayon::ThreadPoolBuildError` text.
     #[error("failed to build the bounded-concurrency thread pool: {0}")]
     ThreadPool(String),
+
+    /// `DataFrameStore::insert_typed` was called for a table whose schema
+    /// is registered, but the row type's declared schema does not match the
+    /// registry schema. `expected` lists the registry column names in order;
+    /// `actual` lists the row type's declared column names.
+    #[error(
+        "schema mismatch for table '{table}': \
+         expected columns {expected:?} but row type declares {actual:?}"
+    )]
+    SchemaMismatch {
+        /// Canonical table name.
+        table: String,
+        /// Column names from the registry schema.
+        expected: Vec<String>,
+        /// Column names from the row type's `polars_schema()`.
+        actual: Vec<String>,
+    },
+
+    /// A DataFrame column could not be cast to the expected type, or a value
+    /// was `null` where the row type requires a non-null value.
+    #[error("failed to extract row {row} from '{table}' column '{column}': {message}")]
+    RowExtraction {
+        /// Canonical table name.
+        table: String,
+        /// Zero-based row index.
+        row: usize,
+        /// Column where extraction failed.
+        column: String,
+        /// Human-readable description of the failure.
+        message: String,
+    },
+
+    /// A Polars operation failed.
+    #[error("polars: {0}")]
+    Polars(String),
 }
