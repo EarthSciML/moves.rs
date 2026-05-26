@@ -142,7 +142,8 @@ use std::collections::HashMap;
 
 use moves_data::{PollutantId, PollutantProcessAssociation, ProcessId};
 use moves_framework::{
-    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, Error,
+    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription,
+    DataFrameStoreTyped, Error, TableRow,
 };
 
 /// Stable module name — matches the Java class and the `SO2Calculator` entry
@@ -470,6 +471,68 @@ struct FuelCalc2 {
 /// `generalFuelRatio` `UPDATE` joins on — `(fuelTypeID, sourceTypeID, monthID,
 /// pollutantID, processID, modelYearID, yearID)` → `fuelEffectRatio`.
 type FuelEffectRatioIndex = HashMap<(i32, i32, i32, i32, i32, i32, i32), f64>;
+
+// ===========================================================================
+// Data-plane helpers — canonical bucket-A wiring pattern (pilot).
+// ===========================================================================
+
+/// Read all SO2 input tables from `ctx.tables()`.
+///
+/// Position filtering uses [`crate::wiring::position_filter`] to extract the
+/// three `##context.X##` SQL macro values — `year`, `process_id`, and
+/// `county_id` — from the current master-loop position, then applies them as
+/// predicates on the `Year`, `PollutantProcessAssoc`, and `MOVESWorkerOutput`
+/// tables.
+fn build_inputs(ctx: &CalculatorContext) -> Result<So2Inputs, Error> {
+    let tables = ctx.tables();
+    let filter = crate::wiring::position_filter(ctx);
+    Ok(So2Inputs {
+        fuel_supply: tables.iter_typed::<FuelSupplyRow>("FuelSupply")?,
+        fuel_formulation: tables.iter_typed::<FuelFormulationRow>("FuelFormulation")?,
+        fuel_sub_type: tables.iter_typed::<FuelSubTypeRow>("FuelSubType")?,
+        fuel_type: tables
+            .iter_typed::<FuelTypeIdRow>("FuelType")?
+            .into_iter()
+            .map(|r| r.fuel_type_id)
+            .collect(),
+        year: {
+            let rows = tables.iter_typed::<YearRow>("Year")?;
+            match filter.year {
+                Some(y) => rows.into_iter().filter(|r| r.year_id == y).collect(),
+                None => rows,
+            }
+        },
+        sulfate_emission_rate: tables
+            .iter_typed::<SulfateEmissionRateRow>("SulfateEmissionRate")?,
+        pollutant_process_assoc: {
+            let rows = tables.iter_typed::<PollutantProcessRow>("PollutantProcessAssoc")?;
+            match filter.process_id {
+                Some(p) => rows.into_iter().filter(|r| r.process_id == p).collect(),
+                None => rows,
+            }
+        },
+        run_spec_model_year: tables
+            .iter_typed::<RunSpecModelYearIdRow>("RunSpecModelYear")?
+            .into_iter()
+            .map(|r| r.model_year_id)
+            .collect(),
+        month_of_any_year: tables.iter_typed::<MonthGroupRow>("MonthOfAnyYear")?,
+        general_fuel_ratio: tables.iter_typed::<GeneralFuelRatioRow>("GeneralFuelRatio")?,
+        energy: {
+            let rows = tables.iter_typed::<EnergyRow>("MOVESWorkerOutput")?;
+            rows.into_iter()
+                .filter(|r| filter.matches(r.year_id, r.county_id, r.process_id))
+                .collect()
+        },
+    })
+}
+
+/// Convert SO2 emission rows to a [`CalculatorOutput`] carrying the
+/// `MOVESWorkerOutput` `DataFrame`.
+fn write_rows(rows: Vec<So2EmissionRow>) -> Result<CalculatorOutput, Error> {
+    crate::wiring::emit_rows(rows)
+}
+
 
 /// The MOVES sulfur dioxide calculator.
 ///
