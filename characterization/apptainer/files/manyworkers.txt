@@ -1,0 +1,11 @@
+sharedDistributedFolderPath = WorkerFolder/sharedwork
+workFolderPath = WorkerFolder/worker-temp
+workerDatabaseName = *
+computerIDPath =
+workerServerName = localhost
+concurrentStatements = 1
+nonroadApplicationPath = NONROAD/NR08a/NONROAD.exe
+nonroadWorkingFolderPath = NONROAD/NR08a
+calculatorApplicationPath = calc/externalcalculatorgo64.exe
+mysqlUserName = moves
+mysqlPassword = 744ff5134053c418265b626f5d7035e3dff3d50c609c548f6f63

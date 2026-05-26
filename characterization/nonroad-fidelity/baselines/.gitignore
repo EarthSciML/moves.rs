@@ -1,0 +1,2 @@
+# TSV baselines are large and stored on scratch; only MANIFEST.toml and corpus.sha are in-repo.
+*.tsv

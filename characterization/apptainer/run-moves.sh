@@ -22,6 +22,7 @@
 #   MARIADB_SOCK_DIR      Override socket-dir bind path
 #   MOVES_TEMP            Override MOVESTemporary bind path
 #   WORKER_DIR            Override WorkerFolder bind path
+#   NONROAD_TEMP          Override NonroadTemporaryData bind path
 #   JAVA_TOOL_OPTIONS     If set on the host, propagated into the container so
 #                         every JVM (ant, the forked MOVES JVM) honors it.
 #                         Used by run-fixture.sh for Phase 0 Task 8 (mo-d7or)
@@ -43,6 +44,7 @@ MARIADB_DATA="${MARIADB_DATA:-${WORKDIR}/mariadb-data}"
 MARIADB_SOCK_DIR="${MARIADB_SOCK_DIR:-${WORKDIR}/run-mysqld}"
 MOVES_TEMP="${MOVES_TEMP:-${WORKDIR}/MOVESTemporary}"
 WORKER_DIR="${WORKER_DIR:-${WORKDIR}/WorkerFolder}"
+NONROAD_TEMP="${NONROAD_TEMP:-${WORKDIR}/NonroadTemporaryData}"
 
 USE_FAKEROOT=0
 RUNSPEC="testdata/SampleRunSpec.xml"
@@ -70,7 +72,14 @@ if [ ! -f "${SIF}" ]; then
     exit 2
 fi
 
-mkdir -p "${MARIADB_DATA}" "${MARIADB_SOCK_DIR}" "${MOVES_TEMP}" "${WORKER_DIR}"
+mkdir -p "${MARIADB_DATA}" "${MARIADB_SOCK_DIR}" "${MOVES_TEMP}" "${WORKER_DIR}" "${NONROAD_TEMP}" \
+         "${WORKER_DIR}/sharedwork" "${WORKER_DIR}/worker-temp"
+
+# Copy config overrides to workdir so MOVES can write to them (MOVES rejects read-only configs).
+MANYWORKERS_CONF="${WORKDIR}/manyworkers.txt"
+MAKETODO_CONF="${WORKDIR}/maketodo.txt"
+cp "${HERE}/files/manyworkers.txt" "${MANYWORKERS_CONF}"
+cp "${HERE}/files/maketodo.txt" "${MAKETODO_CONF}"
 
 # Apptainer bind args. The SIF stores the seed DB at /var/lib/mysql-seed
 # (read-only); init-mariadb.sh copies it into /var/lib/mysql on first run.
@@ -82,6 +91,9 @@ BINDS=(
     --bind "${MARIADB_SOCK_DIR}:/var/run/mysqld"
     --bind "${MOVES_TEMP}:/opt/moves/MOVESTemporary"
     --bind "${WORKER_DIR}:/opt/moves/WorkerFolder"
+    --bind "${NONROAD_TEMP}:/opt/moves/NonroadTemporaryData"
+    --bind "${MANYWORKERS_CONF}:/opt/moves/manyworkers.txt"
+    --bind "${MAKETODO_CONF}:/opt/moves/maketodo.txt"
     --bind "${HERE}/files/start-mariadb-bg.sh:/opt/moves-bin/start-mariadb-bg.sh:ro"
 )
 
