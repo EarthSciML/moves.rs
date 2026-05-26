@@ -60,7 +60,7 @@ From: ubuntu:24.04
     curl -fsSL https://r.mariadb.com/downloads/mariadb_repo_setup -o /tmp/mariadb_repo_setup
     chmod +x /tmp/mariadb_repo_setup
     /tmp/mariadb_repo_setup --mariadb-server-version="mariadb-${MARIADB_SERIES}" --skip-maxscale
-    rm /tmp/mariadb_repo_setup
+    rm -f /tmp/mariadb_repo_setup
     apt-get update
     apt-get install -y --no-install-recommends mariadb-server mariadb-client
 
