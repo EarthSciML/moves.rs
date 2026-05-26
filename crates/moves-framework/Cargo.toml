@@ -15,6 +15,7 @@ path = "src/lib.rs"
 arrow = { workspace = true }
 moves-calculator-info = { path = "../moves-calculator-info" }
 moves-data = { path = "../moves-data" }
+moves-data-default = { path = "../moves-data-default" }
 moves-runspec = { path = "../moves-runspec" }
 polars = { workspace = true }
 rayon = { workspace = true }

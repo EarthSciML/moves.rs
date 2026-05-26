@@ -73,6 +73,7 @@ use moves_runspec::{
 
 use super::execution_db::ExecutionLocation;
 use super::execution_location_producer::{ExecutionLocationProducer, GeographyTables};
+use crate::data::InMemoryStore;
 
 /// Which engine combination drives the current run.
 ///
@@ -246,6 +247,13 @@ pub struct ExecutionRunSpec {
     /// tables for inspection. Set by retrofit handling in
     /// [`initialize_before_iteration`](Self::initialize_before_iteration).
     pub should_keep_worker_databases: bool,
+
+    /// Per-run filtered default-DB tables loaded by
+    /// [`InputDataManager::execute`](crate::InputDataManager) at run start.
+    /// Populated by [`MOVESEngine::run`](crate::MOVESEngine) before chunk
+    /// dispatch; empty until then. Calculators consume via
+    /// `ctx.tables().store`.
+    pub slow_tier_store: InMemoryStore,
 }
 
 impl ExecutionRunSpec {
@@ -296,6 +304,7 @@ impl ExecutionRunSpec {
             classes_not_to_execute: BTreeSet::new(),
             classes_to_save_data: BTreeSet::new(),
             should_keep_worker_databases: false,
+            slow_tier_store: InMemoryStore::new(),
         };
         spec.populate_pollutant_processes();
         spec.populate_timespan();

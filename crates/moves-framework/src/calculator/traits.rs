@@ -133,6 +133,22 @@ impl CalculatorContext {
         }
     }
 
+    /// Construct a context with the given position and pre-populated
+    /// slow-tier tables. Used by [`MOVESEngine::run`] adapters to wire the
+    /// run-level [`InMemoryStore`](crate::InMemoryStore) into each
+    /// calculator invocation.
+    #[must_use]
+    pub fn with_position_and_tables(
+        position: IterationPosition,
+        tables: ExecutionTables,
+    ) -> Self {
+        Self {
+            tables,
+            scratch: ScratchNamespace::empty(),
+            position,
+        }
+    }
+
     /// Per-run filtered default-DB tables. Calculators read from this in
     /// their [`Calculator::execute`] body, indexing by the canonical
     /// table names declared in [`Calculator::input_tables`].
