@@ -813,7 +813,7 @@ impl Generator for LinkOperatingModeDistributionGenerator {
     /// `DataFrameStore` lands, `execute` will project a
     /// [`LinkDriveScheduleInputs`] from `ctx.tables()` for the link in
     /// `ctx.position()` and store the rows.
-    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
+    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
         Ok(CalculatorOutput::empty())
     }
 }
@@ -1384,8 +1384,8 @@ mod tests {
         // execute is a documented placeholder until Task 50; it must still
         // honour the trait contract and return Ok.
         let gen = LinkOperatingModeDistributionGenerator::new();
-        let ctx = CalculatorContext::new();
-        assert!(gen.execute(&ctx).is_ok());
+        let mut ctx = CalculatorContext::new();
+        assert!(gen.execute(&mut ctx).is_ok());
     }
 
     #[test]

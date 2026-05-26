@@ -402,7 +402,7 @@ impl Generator for StartOperatingModeDistributionGenerator {
         OUTPUT_TABLES
     }
 
-    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
+    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
         // Steps 100–300 are ported as the pure functions above; step 400 is a
         // multi-table copy into `OpModeDistribution` / `RatesOpModeDistribution`.
         // Both need `SampleVehicleTrip` and the execution tables, which the
@@ -735,9 +735,9 @@ mod tests {
     fn generator_execute_is_ok() {
         // Phase 2/3 skeleton: execute returns an empty output until the data
         // plane lands. Smoke-test that it is callable and Ok.
-        let ctx = CalculatorContext::new();
+        let mut ctx = CalculatorContext::new();
         assert!(StartOperatingModeDistributionGenerator
-            .execute(&ctx)
+            .execute(&mut ctx)
             .is_ok());
     }
 
