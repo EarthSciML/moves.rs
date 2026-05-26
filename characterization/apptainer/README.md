@@ -226,30 +226,22 @@ default DB and apt installs are inherited unchanged from
 
 ## Validating the SIF
 
-The bead's published validation command (HPC compute node, fakeroot):
-
-```sh
-apptainer exec --fakeroot \
-    --bind /scratch/$USER/moves-canonical/mariadb-data:/var/lib/mysql \
-    --bind /scratch/$USER/moves-canonical/run-mysqld:/var/run/mysqld \
-    --bind /scratch/$USER/moves-canonical/MOVESTemporary:/opt/moves/MOVESTemporary \
-    --bind /scratch/$USER/moves-canonical/WorkerFolder:/opt/moves/WorkerFolder \
-    canonical-moves.sif \
-    bash -c "/opt/moves-bin/init-mariadb.sh && service mariadb start && \
-             cd /opt/moves && ant crun -Drunspec=testdata/SampleRunSpec.xml"
-```
-
-Or, equivalently, via the wrapper:
+The canonical validation command via the wrapper (HPC compute node):
 
 ```sh
 ./run-moves.sh --fakeroot --runspec testdata/SampleRunSpec.xml
 ```
 
-In no-root mode:
+In no-root mode (after SIF rebuild with the fixed `start-mariadb-bg.sh`):
 
 ```sh
 ./run-moves.sh --runspec testdata/SampleRunSpec.xml
 ```
+
+Both modes use `start-mariadb-bg.sh` (direct mariadbd, no `service mariadb
+start`) and run `ant main1worker`. The `--fakeroot` flag uses root-mapped
+namespace so mariadbd starts as root; no-root mode uses the `moves`/`moves`
+account for the readiness probe.
 
 Verify output landed at `/scratch/$USER/moves-canonical/...`. The
 sample RunSpec writes its output database into MariaDB; query it via:

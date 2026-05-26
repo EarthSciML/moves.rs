@@ -232,7 +232,10 @@ SQL
 %environment
     export MOVES_HOME=/opt/moves
     export PATH=/usr/local/go/bin:/opt/moves-bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-    export JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-amd64
+    # The 'ant' apt package on Ubuntu 24.04 depends on default-jdk which is
+    # OpenJDK 21. ant compile therefore produces class file version 65 (Java 21).
+    # JAVA_HOME must point to Java 21 so the forked JVM can load those classes.
+    export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
     export GOPATH=/tmp/go
     export TZ=UTC
     export LC_ALL=C.UTF-8
