@@ -74,11 +74,15 @@ mkdir -p "${MARIADB_DATA}" "${MARIADB_SOCK_DIR}" "${MOVES_TEMP}" "${WORKER_DIR}"
 
 # Apptainer bind args. The SIF stores the seed DB at /var/lib/mysql-seed
 # (read-only); init-mariadb.sh copies it into /var/lib/mysql on first run.
+# files/start-mariadb-bg.sh is the authoritative source for this script and
+# is bind-mounted read-only over the SIF's baked-in copy so changes take
+# effect without rebuilding the SIF.
 BINDS=(
     --bind "${MARIADB_DATA}:/var/lib/mysql"
     --bind "${MARIADB_SOCK_DIR}:/var/run/mysqld"
     --bind "${MOVES_TEMP}:/opt/moves/MOVESTemporary"
     --bind "${WORKER_DIR}:/opt/moves/WorkerFolder"
+    --bind "${HERE}/files/start-mariadb-bg.sh:/opt/moves-bin/start-mariadb-bg.sh:ro"
 )
 
 FAKEROOT_FLAG=()
@@ -123,7 +127,7 @@ apptainer exec \
         ant ${ANT_ARGS_QUOTED} -Drunspec=${RUNSPEC_QUOTED}
         STATUS=\$?
         # Stop mariadbd cleanly so the next run sees a consistent datadir.
-        mariadb-admin --socket=/var/run/mysqld/mysqld.sock -uroot shutdown 2>/dev/null || \
+        mariadb-admin --socket=/var/run/mysqld/mysqld.sock -umoves -pmoves shutdown 2>/dev/null || \
           kill \"\$(cat /var/run/mysqld/mariadbd.pid 2>/dev/null)\" 2>/dev/null || true
         exit \$STATUS
     "

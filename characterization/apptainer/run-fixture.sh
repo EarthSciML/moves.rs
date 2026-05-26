@@ -186,14 +186,15 @@ else
     START_MARIADB="/opt/moves-bin/start-mariadb-bg.sh"
 fi
 
-# Bind-mount layout for the dump pass. The dump script lives next to this
-# script on the host and is bind-mounted read-only into the container so
-# we don't need to rebuild the SIF when it changes.
+# Bind-mount layout for the dump pass. The dump script and start-mariadb-bg.sh
+# live next to this script on the host and are bind-mounted read-only into
+# the container so we don't need to rebuild the SIF when they change.
 BINDS=(
     --bind "${MARIADB_DATA}:/var/lib/mysql"
     --bind "${MARIADB_SOCK_DIR}:/var/run/mysqld"
     --bind "${CAPTURES_DIR}:/captures"
     --bind "${HERE}/dump-databases.sh:/opt/fixture-tools/dump-databases.sh:ro"
+    --bind "${HERE}/files/start-mariadb-bg.sh:/opt/moves-bin/start-mariadb-bg.sh:ro"
 )
 
 apptainer exec \
