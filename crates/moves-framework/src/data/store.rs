@@ -52,7 +52,6 @@ mod tests {
     use polars::prelude::*;
 
     use super::*;
-    use crate::execution::execution_db::ExecutionTables;
     use crate::CalculatorContext;
 
     fn one_col_df(name: &str) -> DataFrame {
@@ -88,9 +87,9 @@ mod tests {
 
     #[test]
     fn store_can_be_held_inside_calculator_context() {
-        let mut tables = ExecutionTables::empty();
-        tables.store.insert("sourceUseTypePopulation", one_col_df("col"));
-        let ctx = CalculatorContext::with_tables(tables);
+        let mut store = InMemoryStore::new();
+        store.insert("sourceUseTypePopulation", one_col_df("col"));
+        let ctx = CalculatorContext::with_tables(store);
         assert!(ctx
             .tables()
             .store

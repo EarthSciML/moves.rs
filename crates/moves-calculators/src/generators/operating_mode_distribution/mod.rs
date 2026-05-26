@@ -204,7 +204,7 @@ impl Generator for OperatingModeDistributionGenerator {
     /// lands, `execute` will project an [`OmdgInputs`] from `ctx.tables()`,
     /// run [`op_mode_distribution`], cross-join the result with `Link` on
     /// `roadTypeID`, and store the link-keyed `OpModeDistribution` rows.
-    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
+    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         Ok(CalculatorOutput::empty())
     }
 }

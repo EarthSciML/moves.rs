@@ -402,7 +402,7 @@ impl Generator for StartOperatingModeDistributionGenerator {
         OUTPUT_TABLES
     }
 
-    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
+    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         // Steps 100–300 are ported as the pure functions above; step 400 is a
         // multi-table copy into `OpModeDistribution` / `RatesOpModeDistribution`.
         // Both need `SampleVehicleTrip` and the execution tables, which the

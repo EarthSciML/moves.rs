@@ -749,7 +749,7 @@ impl Generator for MesoscaleLookupOperatingModeDistributionGenerator {
     /// [`OpModeDistributionInputs`] from `ctx.tables()`, runs the
     /// pipeline, and writes each row onto the links whose `linkID % 100`
     /// equals its `avgSpeedBinID`.
-    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
+    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         Ok(CalculatorOutput::empty())
     }
 }

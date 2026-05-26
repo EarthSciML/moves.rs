@@ -36,9 +36,12 @@
 //! the current county/zone/link/hour from `ctx.position()` immediately —
 //! none of those values depend on the deferred data plane.
 
-use moves_data::ProcessId;
+use std::sync::Arc;
 
-use crate::data::InMemoryStore;
+use moves_data::ProcessId;
+use polars::prelude::DataFrame;
+
+use crate::data::{DataFrameStore, InMemoryStore};
 
 /// `(state, county, zone, link)` quadruple identifying the current spatial
 /// location in the master loop. Rust equivalent of `ExecutionLocation.java`.
@@ -271,6 +274,24 @@ impl ExecutionTables {
     }
 }
 
+impl DataFrameStore for ExecutionTables {
+    fn get(&self, name: &str) -> Option<Arc<DataFrame>> {
+        self.store.get(name)
+    }
+
+    fn insert(&mut self, name: impl Into<String>, df: DataFrame) {
+        self.store.insert(name, df);
+    }
+
+    fn contains(&self, name: &str) -> bool {
+        self.store.contains(name)
+    }
+
+    fn names(&self) -> Vec<&str> {
+        self.store.names()
+    }
+}
+
 /// Inter-calculator scratch namespace.
 ///
 /// Backed by an [`InMemoryStore`] keyed by table name. Each generator writes
@@ -291,6 +312,24 @@ impl ScratchNamespace {
     #[must_use]
     pub fn empty() -> Self {
         Self::default()
+    }
+}
+
+impl DataFrameStore for ScratchNamespace {
+    fn get(&self, name: &str) -> Option<Arc<DataFrame>> {
+        self.store.get(name)
+    }
+
+    fn insert(&mut self, name: impl Into<String>, df: DataFrame) {
+        self.store.insert(name, df);
+    }
+
+    fn contains(&self, name: &str) -> bool {
+        self.store.contains(name)
+    }
+
+    fn names(&self) -> Vec<&str> {
+        self.store.names()
     }
 }
 

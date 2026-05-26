@@ -69,6 +69,7 @@ use moves_calculator_info::{Granularity, Priority};
 use moves_data::{PollutantProcessAssociation, ProcessId};
 use polars::prelude::DataFrame;
 
+use crate::data::InMemoryStore;
 use crate::error::Error;
 use crate::execution::execution_db::{ExecutionTables, IterationPosition, ScratchNamespace};
 
@@ -126,25 +127,21 @@ impl CalculatorContext {
     /// position. Convenient for tests that seed the slow tier before
     /// exercising a calculator body.
     #[must_use]
-    pub fn with_tables(tables: ExecutionTables) -> Self {
+    pub fn with_tables(store: InMemoryStore) -> Self {
         Self {
-            tables,
+            tables: ExecutionTables { store },
             scratch: ScratchNamespace::empty(),
             position: IterationPosition::default(),
         }
     }
 
-    /// Construct a context with the given position and pre-populated
-    /// slow-tier tables. Used by [`MOVESEngine::run`] adapters to wire the
-    /// run-level [`InMemoryStore`](crate::InMemoryStore) into each
-    /// calculator invocation.
+    /// Construct a context with a given position and pre-populated tables.
+    /// Convenient for tests that exercise position-aware calculator logic
+    /// with a seeded data store.
     #[must_use]
-    pub fn with_position_and_tables(
-        position: IterationPosition,
-        tables: ExecutionTables,
-    ) -> Self {
+    pub fn with_position_and_tables(position: IterationPosition, store: InMemoryStore) -> Self {
         Self {
-            tables,
+            tables: ExecutionTables { store },
             scratch: ScratchNamespace::empty(),
             position,
         }

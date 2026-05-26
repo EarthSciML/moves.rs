@@ -856,7 +856,7 @@ impl Generator for SourceBinDistributionGenerator {
     /// lands with the Task 50 `DataFrameStore`. The distribution math itself
     /// is ported and tested in this module's pure functions; see the
     /// [module documentation](self).
-    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
+    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         Ok(CalculatorOutput::empty())
     }
 }
