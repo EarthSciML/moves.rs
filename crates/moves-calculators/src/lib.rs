@@ -26,5 +26,6 @@
 pub mod calculators;
 pub mod error;
 pub mod generators;
+pub(crate) mod wiring;
 
 pub use error::{Error, Result};
