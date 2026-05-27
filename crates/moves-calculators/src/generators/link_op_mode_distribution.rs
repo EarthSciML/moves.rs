@@ -98,24 +98,22 @@
 //!
 //! # Data plane (Task 50)
 //!
-//! [`Generator::execute`] receives a [`CalculatorContext`] whose
-//! `ExecutionTables` / `ScratchNamespace` are Phase-2 placeholders until the
-//! `DataFrameStore` lands (migration-plan Task 50), so `execute` cannot yet
-//! read the input tables nor write `OpModeDistribution`. The numerically
-//! faithful algorithm is fully ported and unit-tested in the free functions
-//! and in
-//! [`op_mode_distribution`](LinkOperatingModeDistributionGenerator::op_mode_distribution);
-//! once the data plane exists, `execute` projects a [`LinkDriveScheduleInputs`]
-//! out of `ctx.tables()` for the current link and stores the result in the
-//! scratch namespace.
+//! [`Generator::execute`] reads the eight input tables from `ctx.tables()`,
+//! builds a [`LinkDriveScheduleInputs`] view for the link in
+//! `ctx.position()`, calls
+//! [`op_mode_distribution`](LinkOperatingModeDistributionGenerator::op_mode_distribution),
+//! and writes the resulting rows to the scratch-namespace `OpModeDistribution`
+//! table via [`crate::wiring::write_scratch_table`].
 
 use std::collections::{HashMap, HashSet};
 
 use moves_calculator_info::{Granularity, Priority};
 use moves_data::{PolProcessId, ProcessId, SourceTypeId};
 use moves_framework::{
-    CalculatorContext, CalculatorOutput, CalculatorSubscription, Error, Generator,
+    CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStoreTyped, Error,
+    Generator, TableRow,
 };
+use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
 
 /// Running Exhaust — process id 1. One of the two processes the Java
 /// `subscribeToMe` registers for.
@@ -629,6 +627,693 @@ pub fn default_idle_drive_schedule() -> Vec<DriveScheduleSecond> {
         .collect()
 }
 
+fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -> Error {
+    Error::RowExtraction {
+        table: table.into(),
+        row,
+        column: column.into(),
+        message: msg,
+    }
+}
+
+impl TableRow for DriveScheduleSecond {
+    fn table_name() -> &'static str {
+        "driveScheduleSecondLink"
+    }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("secondID".into(), DataType::Int32),
+            ("speed".into(), DataType::Float64),
+            ("grade".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "secondID".into(),
+                    rows.iter().map(|r| r.second_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "speed".into(),
+                    rows.iter().map(|r| r.speed).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "grade".into(),
+                    rows.iter().map(|r| r.grade).collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "driveScheduleSecondLink";
+        let second_id_col = df
+            .column("secondID")
+            .map_err(|e| row_err(t, 0, "secondID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "secondID", e.to_string()))?;
+        let speed_col = df
+            .column("speed")
+            .map_err(|e| row_err(t, 0, "speed", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "speed", e.to_string()))?;
+        let grade_col = df
+            .column("grade")
+            .map_err(|e| row_err(t, 0, "grade", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "grade", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(DriveScheduleSecond {
+                    second_id: second_id_col.get(i).ok_or_else(|| null("secondID"))? as i16,
+                    speed: speed_col.get(i).ok_or_else(|| null("speed"))?,
+                    grade: grade_col.get(i).ok_or_else(|| null("grade"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for SourceTypePhysics {
+    fn table_name() -> &'static str {
+        "sourceUseTypePhysicsMapping"
+    }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("realSourceTypeID".into(), DataType::Int32),
+            ("tempSourceTypeID".into(), DataType::Int32),
+            ("rollingTermA".into(), DataType::Float64),
+            ("rotatingTermB".into(), DataType::Float64),
+            ("dragTermC".into(), DataType::Float64),
+            ("sourceMass".into(), DataType::Float64),
+            ("fixedMassFactor".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "realSourceTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.real_source_type_id.0 as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "tempSourceTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.temp_source_type_id.0 as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "rollingTermA".into(),
+                    rows.iter().map(|r| r.rolling_term_a).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "rotatingTermB".into(),
+                    rows.iter().map(|r| r.rotating_term_b).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "dragTermC".into(),
+                    rows.iter().map(|r| r.drag_term_c).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceMass".into(),
+                    rows.iter().map(|r| r.source_mass).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "fixedMassFactor".into(),
+                    rows.iter().map(|r| r.fixed_mass_factor).collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "sourceUseTypePhysicsMapping";
+        let real_source_type_id_col = df
+            .column("realSourceTypeID")
+            .map_err(|e| row_err(t, 0, "realSourceTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "realSourceTypeID", e.to_string()))?;
+        let temp_source_type_id_col = df
+            .column("tempSourceTypeID")
+            .map_err(|e| row_err(t, 0, "tempSourceTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "tempSourceTypeID", e.to_string()))?;
+        let rolling_term_a_col = df
+            .column("rollingTermA")
+            .map_err(|e| row_err(t, 0, "rollingTermA", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "rollingTermA", e.to_string()))?;
+        let rotating_term_b_col = df
+            .column("rotatingTermB")
+            .map_err(|e| row_err(t, 0, "rotatingTermB", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "rotatingTermB", e.to_string()))?;
+        let drag_term_c_col = df
+            .column("dragTermC")
+            .map_err(|e| row_err(t, 0, "dragTermC", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "dragTermC", e.to_string()))?;
+        let source_mass_col = df
+            .column("sourceMass")
+            .map_err(|e| row_err(t, 0, "sourceMass", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "sourceMass", e.to_string()))?;
+        let fixed_mass_factor_col = df
+            .column("fixedMassFactor")
+            .map_err(|e| row_err(t, 0, "fixedMassFactor", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "fixedMassFactor", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(SourceTypePhysics {
+                    real_source_type_id: SourceTypeId(
+                        real_source_type_id_col
+                            .get(i)
+                            .ok_or_else(|| null("realSourceTypeID"))? as u16,
+                    ),
+                    temp_source_type_id: SourceTypeId(
+                        temp_source_type_id_col
+                            .get(i)
+                            .ok_or_else(|| null("tempSourceTypeID"))? as u16,
+                    ),
+                    rolling_term_a: rolling_term_a_col
+                        .get(i)
+                        .ok_or_else(|| null("rollingTermA"))?,
+                    rotating_term_b: rotating_term_b_col
+                        .get(i)
+                        .ok_or_else(|| null("rotatingTermB"))?,
+                    drag_term_c: drag_term_c_col
+                        .get(i)
+                        .ok_or_else(|| null("dragTermC"))?,
+                    source_mass: source_mass_col
+                        .get(i)
+                        .ok_or_else(|| null("sourceMass"))?,
+                    fixed_mass_factor: fixed_mass_factor_col
+                        .get(i)
+                        .ok_or_else(|| null("fixedMassFactor"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for OperatingModeBracket {
+    fn table_name() -> &'static str {
+        "operatingMode"
+    }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("opModeID".into(), DataType::Int32),
+            ("VSPLower".into(), DataType::Float64),
+            ("VSPUpper".into(), DataType::Float64),
+            ("speedLower".into(), DataType::Float64),
+            ("speedUpper".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "opModeID".into(),
+                    rows.iter().map(|r| r.op_mode_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "VSPLower".into(),
+                    rows.iter().map(|r| r.vsp_lower).collect::<Vec<Option<f64>>>(),
+                )
+                .into(),
+                Series::new(
+                    "VSPUpper".into(),
+                    rows.iter().map(|r| r.vsp_upper).collect::<Vec<Option<f64>>>(),
+                )
+                .into(),
+                Series::new(
+                    "speedLower".into(),
+                    rows.iter().map(|r| r.speed_lower).collect::<Vec<Option<f64>>>(),
+                )
+                .into(),
+                Series::new(
+                    "speedUpper".into(),
+                    rows.iter().map(|r| r.speed_upper).collect::<Vec<Option<f64>>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "operatingMode";
+        let op_mode_id_col = df
+            .column("opModeID")
+            .map_err(|e| row_err(t, 0, "opModeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "opModeID", e.to_string()))?;
+        let vsp_lower_col = df
+            .column("VSPLower")
+            .map_err(|e| row_err(t, 0, "VSPLower", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "VSPLower", e.to_string()))?;
+        let vsp_upper_col = df
+            .column("VSPUpper")
+            .map_err(|e| row_err(t, 0, "VSPUpper", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "VSPUpper", e.to_string()))?;
+        let speed_lower_col = df
+            .column("speedLower")
+            .map_err(|e| row_err(t, 0, "speedLower", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "speedLower", e.to_string()))?;
+        let speed_upper_col = df
+            .column("speedUpper")
+            .map_err(|e| row_err(t, 0, "speedUpper", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "speedUpper", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(OperatingModeBracket {
+                    op_mode_id: op_mode_id_col.get(i).ok_or_else(|| null("opModeID"))? as i16,
+                    vsp_lower: vsp_lower_col.get(i),
+                    vsp_upper: vsp_upper_col.get(i),
+                    speed_lower: speed_lower_col.get(i),
+                    speed_upper: speed_upper_col.get(i),
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for OpModePolProcAssoc {
+    fn table_name() -> &'static str {
+        "opModePolProcAssoc"
+    }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("polProcessID".into(), DataType::Int32),
+            ("opModeID".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "polProcessID".into(),
+                    rows.iter()
+                        .map(|r| r.pol_process_id.0 as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "opModeID".into(),
+                    rows.iter().map(|r| r.op_mode_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "opModePolProcAssoc";
+        let pol_process_id_col = df
+            .column("polProcessID")
+            .map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?;
+        let op_mode_id_col = df
+            .column("opModeID")
+            .map_err(|e| row_err(t, 0, "opModeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "opModeID", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(OpModePolProcAssoc {
+                    pol_process_id: PolProcessId(
+                        pol_process_id_col
+                            .get(i)
+                            .ok_or_else(|| null("polProcessID"))? as u32,
+                    ),
+                    op_mode_id: op_mode_id_col.get(i).ok_or_else(|| null("opModeID"))? as i16,
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for OpModeDistributionRow {
+    fn table_name() -> &'static str {
+        "OpModeDistribution"
+    }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("sourceTypeID".into(), DataType::Int32),
+            ("hourDayID".into(), DataType::Int32),
+            ("linkID".into(), DataType::Int32),
+            ("polProcessID".into(), DataType::Int32),
+            ("opModeID".into(), DataType::Int32),
+            ("opModeFraction".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.source_type_id.0 as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hourDayID".into(),
+                    rows.iter().map(|r| r.hour_day_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "linkID".into(),
+                    rows.iter().map(|r| r.link_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "polProcessID".into(),
+                    rows.iter()
+                        .map(|r| r.pol_process_id.0 as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "opModeID".into(),
+                    rows.iter().map(|r| r.op_mode_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "opModeFraction".into(),
+                    rows.iter().map(|r| r.op_mode_fraction).collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "OpModeDistribution";
+        let source_type_id_col = df
+            .column("sourceTypeID")
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?;
+        let hour_day_id_col = df
+            .column("hourDayID")
+            .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?;
+        let link_id_col = df
+            .column("linkID")
+            .map_err(|e| row_err(t, 0, "linkID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "linkID", e.to_string()))?;
+        let pol_process_id_col = df
+            .column("polProcessID")
+            .map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?;
+        let op_mode_id_col = df
+            .column("opModeID")
+            .map_err(|e| row_err(t, 0, "opModeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "opModeID", e.to_string()))?;
+        let op_mode_fraction_col = df
+            .column("opModeFraction")
+            .map_err(|e| row_err(t, 0, "opModeFraction", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "opModeFraction", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(OpModeDistributionRow {
+                    source_type_id: SourceTypeId(
+                        source_type_id_col
+                            .get(i)
+                            .ok_or_else(|| null("sourceTypeID"))? as u16,
+                    ),
+                    hour_day_id: hour_day_id_col.get(i).ok_or_else(|| null("hourDayID"))? as i16,
+                    link_id: link_id_col.get(i).ok_or_else(|| null("linkID"))?,
+                    pol_process_id: PolProcessId(
+                        pol_process_id_col
+                            .get(i)
+                            .ok_or_else(|| null("polProcessID"))? as u32,
+                    ),
+                    op_mode_id: op_mode_id_col.get(i).ok_or_else(|| null("opModeID"))? as i16,
+                    op_mode_fraction: op_mode_fraction_col
+                        .get(i)
+                        .ok_or_else(|| null("opModeFraction"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+/// A `link` row — the per-link attributes the drive-schedule path reads.
+struct LinkRow {
+    /// `linkID` — the link's identifier.
+    link_id: i32,
+    /// `linkAvgSpeed` — average speed of the link (mph); `None` when
+    /// the column is SQL `NULL`.
+    link_avg_speed: Option<f64>,
+}
+
+impl TableRow for LinkRow {
+    fn table_name() -> &'static str {
+        "link"
+    }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("linkID".into(), DataType::Int32),
+            ("linkAvgSpeed".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "linkID".into(),
+                    rows.iter().map(|r| r.link_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "linkAvgSpeed".into(),
+                    rows.iter().map(|r| r.link_avg_speed).collect::<Vec<Option<f64>>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "link";
+        let link_id_col = df
+            .column("linkID")
+            .map_err(|e| row_err(t, 0, "linkID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "linkID", e.to_string()))?;
+        let link_avg_speed_col = df
+            .column("linkAvgSpeed")
+            .map_err(|e| row_err(t, 0, "linkAvgSpeed", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "linkAvgSpeed", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(LinkRow {
+                    link_id: link_id_col.get(i).ok_or_else(|| null("linkID"))?,
+                    link_avg_speed: link_avg_speed_col.get(i),
+                })
+            })
+            .collect()
+    }
+}
+
+/// A `runSpecSourceType` row — one source type the RunSpec selected.
+struct RunSpecSourceTypeRow {
+    source_type_id: i32,
+}
+
+impl TableRow for RunSpecSourceTypeRow {
+    fn table_name() -> &'static str {
+        "runSpecSourceType"
+    }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([("sourceTypeID".into(), DataType::Int32)])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![Series::new(
+                "sourceTypeID".into(),
+                rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+            )
+            .into()],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "runSpecSourceType";
+        let col = df
+            .column("sourceTypeID")
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(RunSpecSourceTypeRow {
+                    source_type_id: col.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+/// A `runSpecHourDay` row — one hour/day combination the RunSpec selected.
+struct RunSpecHourDayRow {
+    hour_day_id: i32,
+}
+
+impl TableRow for RunSpecHourDayRow {
+    fn table_name() -> &'static str {
+        "runSpecHourDay"
+    }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([("hourDayID".into(), DataType::Int32)])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![Series::new(
+                "hourDayID".into(),
+                rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+            )
+            .into()],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "runSpecHourDay";
+        let col = df
+            .column("hourDayID")
+            .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(RunSpecHourDayRow {
+                    hour_day_id: col.get(i).ok_or_else(|| null("hourDayID"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+/// A minimal `opModeDistribution` input row — only the columns needed to
+/// build the `tempExistingOpMode` snapshot and the `hasRunningOpModeDistribution`
+/// flag.
+struct ExistingOpModeRow {
+    source_type_id: i32,
+    link_id: i32,
+    pol_process_id: i32,
+}
+
+impl TableRow for ExistingOpModeRow {
+    fn table_name() -> &'static str {
+        "opModeDistribution"
+    }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("sourceTypeID".into(), DataType::Int32),
+            ("linkID".into(), DataType::Int32),
+            ("polProcessID".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "linkID".into(),
+                    rows.iter().map(|r| r.link_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "polProcessID".into(),
+                    rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "opModeDistribution";
+        let source_type_id_col = df
+            .column("sourceTypeID")
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?;
+        let link_id_col = df
+            .column("linkID")
+            .map_err(|e| row_err(t, 0, "linkID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "linkID", e.to_string()))?;
+        let pol_process_id_col = df
+            .column("polProcessID")
+            .map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(ExistingOpModeRow {
+                    source_type_id: source_type_id_col
+                        .get(i)
+                        .ok_or_else(|| null("sourceTypeID"))?,
+                    link_id: link_id_col.get(i).ok_or_else(|| null("linkID"))?,
+                    pol_process_id: pol_process_id_col
+                        .get(i)
+                        .ok_or_else(|| null("polProcessID"))?,
+                })
+            })
+            .collect()
+    }
+}
+
 /// The projected per-link inputs the drive-schedule path of
 /// `calculateOpModeFractions` reads.
 ///
@@ -802,19 +1487,84 @@ impl Generator for LinkOperatingModeDistributionGenerator {
         OUTPUT_TABLES
     }
 
-    /// Run the generator for the current master-loop iteration.
-    ///
-    /// **Data plane pending (Task 50).** [`CalculatorContext`] exposes only
-    /// placeholder `ExecutionTables` / `ScratchNamespace` today, so this
-    /// body cannot read the [`input_tables`](Generator::input_tables) nor
-    /// write `OpModeDistribution`. The numerically faithful algorithm is
-    /// fully ported and tested in
-    /// [`op_mode_distribution`](Self::op_mode_distribution); once the
-    /// `DataFrameStore` lands, `execute` will project a
-    /// [`LinkDriveScheduleInputs`] from `ctx.tables()` for the link in
-    /// `ctx.position()` and store the rows.
-    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
-        Ok(CalculatorOutput::empty())
+    fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
+        // Extract link_id from the iteration position.
+        let link_id_u32 = ctx.position().location.link_id.ok_or_else(|| {
+            Error::Polars("no link_id in iteration position".into())
+        })?;
+        let link_id = link_id_u32 as i32;
+
+        // Read all input tables.
+        let drive_schedule: Vec<DriveScheduleSecond> =
+            ctx.tables().iter_typed("driveScheduleSecondLink")?;
+        let link_rows: Vec<LinkRow> = ctx.tables().iter_typed("link")?;
+        let operating_mode: Vec<OperatingModeBracket> =
+            ctx.tables().iter_typed("operatingMode")?;
+        let physics: Vec<SourceTypePhysics> =
+            ctx.tables().iter_typed("sourceUseTypePhysicsMapping")?;
+        let run_spec_source_type_rows: Vec<RunSpecSourceTypeRow> =
+            ctx.tables().iter_typed("runSpecSourceType")?;
+        let op_mode_pol_proc_assoc: Vec<OpModePolProcAssoc> =
+            ctx.tables().iter_typed("opModePolProcAssoc")?;
+        let run_spec_hour_day_rows: Vec<RunSpecHourDayRow> =
+            ctx.tables().iter_typed("runSpecHourDay")?;
+        let existing_rows: Vec<ExistingOpModeRow> =
+            ctx.tables().iter_typed("opModeDistribution")?;
+
+        // Derive `linkAvgSpeed` for this link from the `link` table.
+        let link_avg_speed = link_rows
+            .iter()
+            .find(|r| r.link_id == link_id)
+            .and_then(|r| r.link_avg_speed);
+
+        // Build `tempExistingOpMode` snapshot and `hasRunningOpModeDistribution`
+        // flag from the input `opModeDistribution` rows for this link.
+        // A running-process distribution is one whose `polProcessID % 100 == 1`.
+        let mut existing_op_mode_keys: HashSet<(SourceTypeId, PolProcessId, i32)> =
+            HashSet::new();
+        let mut has_running_op_mode_distribution = false;
+        for row in &existing_rows {
+            if row.link_id == link_id {
+                existing_op_mode_keys.insert((
+                    SourceTypeId(row.source_type_id as u16),
+                    PolProcessId(row.pol_process_id as u32),
+                    link_id,
+                ));
+                if row.pol_process_id % 100 == 1 {
+                    has_running_op_mode_distribution = true;
+                }
+            }
+        }
+
+        let run_spec_source_type: Vec<SourceTypeId> = run_spec_source_type_rows
+            .iter()
+            .map(|r| SourceTypeId(r.source_type_id as u16))
+            .collect();
+        let run_spec_hour_day: Vec<i16> = run_spec_hour_day_rows
+            .iter()
+            .map(|r| r.hour_day_id as i16)
+            .collect();
+
+        // Filter drive schedule to the current link.
+        let link_drive_schedule: Vec<DriveScheduleSecond> = drive_schedule
+            .into_iter()
+            .filter(|_| true) // drive_schedule rows are already link-scoped by the registry
+            .collect();
+
+        let inputs = LinkDriveScheduleInputs {
+            link_id,
+            drive_schedule: &link_drive_schedule,
+            link_avg_speed,
+            has_running_op_mode_distribution,
+            operating_mode: &operating_mode,
+            physics: &physics,
+            run_spec_source_type: &run_spec_source_type,
+            op_mode_pol_proc_assoc: &op_mode_pol_proc_assoc,
+            run_spec_hour_day: &run_spec_hour_day,
+            existing_op_mode_keys: &existing_op_mode_keys,
+        };
+        let rows = self.op_mode_distribution(&inputs);
+        crate::wiring::write_scratch_table(ctx, OUTPUT_TABLES[0], rows)
     }
 }
 
@@ -1380,12 +2130,117 @@ mod tests {
     }
 
     #[test]
-    fn generator_execute_returns_placeholder_until_data_plane() {
-        // execute is a documented placeholder until Task 50; it must still
-        // honour the trait contract and return Ok.
+    fn execute_writes_op_mode_distribution_to_scratch() {
+        use moves_framework::{
+            DataFrameStore, DataFrameStoreTyped, ExecutionLocation, ExecutionTime, InMemoryStore,
+            IterationPosition,
+        };
+
+        const LINK_ID: i32 = 7;
+
+        // Build a two-second drive schedule: second 1 idle (speed=0),
+        // second 2 moving (speed=30 mph).  With the bracket [13, None, None]
+        // second 2 → op mode 13; second 1 → stopped 501, folded to idle 1.
+        let schedule = vec![
+            DriveScheduleSecond { second_id: 1, speed: 0.0, grade: 0.0 },
+            DriveScheduleSecond { second_id: 2, speed: 30.0, grade: 0.0 },
+        ];
+        // One physics row: realSourceTypeID=21, tempSourceTypeID=21.
+        let physics_row = SourceTypePhysics {
+            real_source_type_id: SourceTypeId(21),
+            temp_source_type_id: SourceTypeId(21),
+            rolling_term_a: 1.0,
+            rotating_term_b: 0.0,
+            drag_term_c: 0.0,
+            source_mass: 10.0,
+            fixed_mass_factor: 2.0,
+        };
+        // One bracket covering all VSP/speed — op mode 13.
+        let bracket = OperatingModeBracket {
+            op_mode_id: 13,
+            vsp_lower: None,
+            vsp_upper: None,
+            speed_lower: None,
+            speed_upper: None,
+        };
+        // Associations for op modes 501 and 13 with polProcessID 101.
+        let assoc_501 = OpModePolProcAssoc { pol_process_id: PolProcessId(101), op_mode_id: 501 };
+        let assoc_13 = OpModePolProcAssoc { pol_process_id: PolProcessId(101), op_mode_id: 13 };
+        // One link row.
+        let link_row = LinkRow { link_id: LINK_ID, link_avg_speed: None };
+
+        let mut store = InMemoryStore::default();
+        store.insert(
+            "driveScheduleSecondLink",
+            DriveScheduleSecond::into_dataframe(schedule).unwrap(),
+        );
+        store.insert(
+            "sourceUseTypePhysicsMapping",
+            SourceTypePhysics::into_dataframe(vec![physics_row]).unwrap(),
+        );
+        store.insert(
+            "operatingMode",
+            OperatingModeBracket::into_dataframe(vec![bracket]).unwrap(),
+        );
+        store.insert(
+            "opModePolProcAssoc",
+            OpModePolProcAssoc::into_dataframe(vec![assoc_501, assoc_13]).unwrap(),
+        );
+        store.insert(
+            "runSpecSourceType",
+            RunSpecSourceTypeRow::into_dataframe(vec![RunSpecSourceTypeRow { source_type_id: 21 }])
+                .unwrap(),
+        );
+        store.insert(
+            "runSpecHourDay",
+            RunSpecHourDayRow::into_dataframe(vec![RunSpecHourDayRow { hour_day_id: 51 }])
+                .unwrap(),
+        );
+        store.insert(
+            "link",
+            LinkRow::into_dataframe(vec![link_row]).unwrap(),
+        );
+        // No pre-existing opModeDistribution rows.
+        store.insert(
+            "opModeDistribution",
+            ExistingOpModeRow::into_dataframe(vec![]).unwrap(),
+        );
+
+        let position = IterationPosition {
+            iteration: 0,
+            process_id: Some(ProcessId(1)),
+            location: ExecutionLocation::link(1, 1, 1, LINK_ID as u32),
+            time: ExecutionTime {
+                year: Some(2020),
+                month: Some(7),
+                day_id: None,
+                hour: None,
+            },
+        };
+
         let gen = LinkOperatingModeDistributionGenerator::new();
-        let mut ctx = CalculatorContext::new();
-        assert!(gen.execute(&mut ctx).is_ok());
+        let mut ctx = CalculatorContext::with_position_and_tables(position, store);
+        gen.execute(&mut ctx).unwrap();
+
+        let out: Vec<OpModeDistributionRow> = ctx
+            .scratch()
+            .store
+            .iter_typed("OpModeDistribution")
+            .unwrap();
+
+        // Second 1 (idle/stopped-501) folds to op mode 1; second 2 → op mode 13.
+        // Each is crossed with one hour/day, so 2 rows total.
+        assert_eq!(out.len(), 2, "expected two OpModeDistribution rows");
+        let modes: HashSet<i16> = out.iter().map(|r| r.op_mode_id).collect();
+        assert_eq!(modes, HashSet::from([1, 13]));
+        let total: f64 = out.iter().map(|r| r.op_mode_fraction).sum();
+        assert!((total - 1.0).abs() < 1e-12, "fractions must sum to 1.0, got {total}");
+        for r in &out {
+            assert_eq!(r.link_id, LINK_ID);
+            assert_eq!(r.hour_day_id, 51);
+            assert_eq!(r.source_type_id, SourceTypeId(21));
+            assert_eq!(r.pol_process_id, PolProcessId(101));
+        }
     }
 
     #[test]

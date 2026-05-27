@@ -77,8 +77,10 @@ use std::collections::{HashMap, HashSet};
 
 use moves_data::SourceTypeId;
 use moves_framework::{
-    CalculatorContext, CalculatorOutput, CalculatorSubscription, Error, Generator,
+    CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStoreTyped, Error,
+    Generator, TableRow,
 };
+use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Series};
 
 /// `polProcessID` of brakewear — `SourceTypePhysics` special-cases it (the
 /// Go "Change source types for brakewear" rule).
@@ -460,6 +462,221 @@ impl SourceUseTypePhysicsMapping {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Data-plane helpers (Task 50)
+// ---------------------------------------------------------------------------
+
+/// Build a typed [`Error::RowExtraction`] for a column extraction failure —
+/// matches the pattern used by every other data-plane generator.
+fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -> Error {
+    Error::RowExtraction {
+        table: table.into(),
+        row,
+        column: column.into(),
+        message: msg,
+    }
+}
+
+impl TableRow for SourceUseTypePhysicsMappingDetail {
+    fn table_name() -> &'static str {
+        "sourceUseTypePhysicsMapping"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("realSourceTypeID".into(), DataType::Int32),
+            ("tempSourceTypeID".into(), DataType::Int32),
+            ("opModeIDOffset".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "realSourceTypeID".into(),
+                    rows.iter().map(|r| r.real_source_type_id.0 as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "tempSourceTypeID".into(),
+                    rows.iter().map(|r| r.temp_source_type_id.0 as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "opModeIDOffset".into(),
+                    rows.iter().map(|r| r.op_mode_id_offset).collect::<Vec<i32>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "sourceUseTypePhysicsMapping";
+        let real_col = df
+            .column("realSourceTypeID")
+            .map_err(|e| row_err(t, 0, "realSourceTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "realSourceTypeID", e.to_string()))?;
+        let temp_col = df
+            .column("tempSourceTypeID")
+            .map_err(|e| row_err(t, 0, "tempSourceTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "tempSourceTypeID", e.to_string()))?;
+        let offset_col = df
+            .column("opModeIDOffset")
+            .map_err(|e| row_err(t, 0, "opModeIDOffset", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "opModeIDOffset", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(SourceUseTypePhysicsMappingDetail {
+                    real_source_type_id: SourceTypeId(
+                        real_col.get(i).ok_or_else(|| null("realSourceTypeID"))? as u16,
+                    ),
+                    temp_source_type_id: SourceTypeId(
+                        temp_col.get(i).ok_or_else(|| null("tempSourceTypeID"))? as u16,
+                    ),
+                    op_mode_id_offset: offset_col
+                        .get(i)
+                        .ok_or_else(|| null("opModeIDOffset"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for OpModeDistributionRow {
+    fn table_name() -> &'static str {
+        "RatesOpModeDistribution"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("sourceTypeID".into(), DataType::Int32),
+            ("roadTypeID".into(), DataType::Int32),
+            ("avgSpeedBinID".into(), DataType::Int32),
+            ("hourDayID".into(), DataType::Int32),
+            ("polProcessID".into(), DataType::Int32),
+            ("opModeID".into(), DataType::Int32),
+            ("opModeFraction".into(), DataType::Float64),
+            ("opModeFractionCV".into(), DataType::Float64),
+            ("avgBinSpeed".into(), DataType::Float64),
+            ("avgSpeedFraction".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id.0 as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "roadTypeID".into(),
+                    rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "avgSpeedBinID".into(),
+                    rows.iter().map(|r| r.avg_speed_bin_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hourDayID".into(),
+                    rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "polProcessID".into(),
+                    rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "opModeID".into(),
+                    rows.iter().map(|r| r.op_mode_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "opModeFraction".into(),
+                    rows.iter().map(|r| r.op_mode_fraction).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "opModeFractionCV".into(),
+                    rows.iter().map(|r| r.op_mode_fraction_cv).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "avgBinSpeed".into(),
+                    rows.iter().map(|r| r.avg_bin_speed).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "avgSpeedFraction".into(),
+                    rows.iter().map(|r| r.avg_speed_fraction).collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "RatesOpModeDistribution";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .f64()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let source_type_id = get_i32("sourceTypeID")?;
+        let road_type_id = get_i32("roadTypeID")?;
+        let avg_speed_bin_id = get_i32("avgSpeedBinID")?;
+        let hour_day_id = get_i32("hourDayID")?;
+        let pol_process_id = get_i32("polProcessID")?;
+        let op_mode_id = get_i32("opModeID")?;
+        let op_mode_fraction = get_f64("opModeFraction")?;
+        let op_mode_fraction_cv = get_f64("opModeFractionCV")?;
+        let avg_bin_speed = get_f64("avgBinSpeed")?;
+        let avg_speed_fraction = get_f64("avgSpeedFraction")?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(OpModeDistributionRow {
+                    source_type_id: SourceTypeId(
+                        source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))? as u16,
+                    ),
+                    road_type_id: road_type_id.get(i).ok_or_else(|| null("roadTypeID"))?,
+                    avg_speed_bin_id: avg_speed_bin_id
+                        .get(i)
+                        .ok_or_else(|| null("avgSpeedBinID"))?,
+                    hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))?,
+                    pol_process_id: pol_process_id.get(i).ok_or_else(|| null("polProcessID"))?,
+                    op_mode_id: op_mode_id.get(i).ok_or_else(|| null("opModeID"))?,
+                    op_mode_fraction: op_mode_fraction
+                        .get(i)
+                        .ok_or_else(|| null("opModeFraction"))?,
+                    op_mode_fraction_cv: op_mode_fraction_cv
+                        .get(i)
+                        .ok_or_else(|| null("opModeFractionCV"))?,
+                    avg_bin_speed: avg_bin_speed.get(i).ok_or_else(|| null("avgBinSpeed"))?,
+                    avg_speed_fraction: avg_speed_fraction
+                        .get(i)
+                        .ok_or_else(|| null("avgSpeedFraction"))?,
+                })
+            })
+            .collect()
+    }
+}
+
 /// Master-loop subscriptions of [`SourceTypePhysics`] — none; see
 /// [`Generator::subscriptions`] on the impl below.
 static NO_SUBSCRIPTIONS: &[CalculatorSubscription] = &[];
@@ -520,18 +737,20 @@ impl Generator for SourceTypePhysics {
 
     /// Run the correction for the current master-loop iteration.
     ///
-    /// **Data plane pending (Task 50).** [`CalculatorContext`] exposes only
-    /// placeholder `ExecutionTables` / `ScratchNamespace` today, so this
-    /// body cannot read `sourceUseTypePhysicsMapping` /
-    /// `RatesOpModeDistribution` nor write the corrected table back. The
-    /// faithful algorithm is ported and tested on
-    /// [`SourceUseTypePhysicsMapping`]; once the `DataFrameStore` lands,
-    /// `execute` builds a [`SourceUseTypePhysicsMapping`] from
-    /// `ctx.tables()`, applies
-    /// [`correct_table`](SourceUseTypePhysicsMapping::correct_table) to the
-    /// scratch `RatesOpModeDistribution`, and stores the result.
-    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
-        Ok(CalculatorOutput::empty())
+    /// Reads `sourceUseTypePhysicsMapping` and `RatesOpModeDistribution` from
+    /// `ctx.tables()`, builds a [`SourceUseTypePhysicsMapping`], applies
+    /// [`correct_table`](SourceUseTypePhysicsMapping::correct_table), and
+    /// writes the corrected `RatesOpModeDistribution` to scratch.
+    fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
+        let mapping_details: Vec<SourceUseTypePhysicsMappingDetail> =
+            ctx.tables().iter_typed("sourceUseTypePhysicsMapping")?;
+        let mapping = SourceUseTypePhysicsMapping::build(mapping_details);
+
+        let input_rows: Vec<OpModeDistributionRow> =
+            ctx.tables().iter_typed("RatesOpModeDistribution")?;
+        let corrected = mapping.correct_table(input_rows);
+
+        crate::wiring::write_scratch_table(ctx, OUTPUT_TABLES[0], corrected)
     }
 }
 
@@ -912,12 +1131,123 @@ mod tests {
     }
 
     #[test]
-    fn generator_execute_returns_placeholder_until_data_plane() {
-        // execute is a documented placeholder until Task 50; it must still
-        // honour the trait contract and return Ok.
+    fn execute_writes_corrected_rates_op_mode_distribution_to_scratch() {
+        use moves_framework::{DataFrameStore, DataFrameStoreTyped, InMemoryStore, IterationPosition};
+
+        // mapping: real=20, temp=120, offset=1000.
+        let mapping_rows = vec![SourceUseTypePhysicsMappingDetail {
+            real_source_type_id: SourceTypeId(20),
+            temp_source_type_id: SourceTypeId(120),
+            op_mode_id_offset: 1000,
+        }];
+
+        // Two input rows:
+        //   (a) temp source type 120, normal op mode 7, running exhaust -> rule 4:
+        //       becomes (source=20, op_mode=1007).
+        //   (b) temp source type 120, negative polProcessID -> rule 1: dropped.
+        let input_rows = vec![
+            OpModeDistributionRow {
+                source_type_id: SourceTypeId(120),
+                road_type_id: 5,
+                avg_speed_bin_id: 16,
+                hour_day_id: 51,
+                pol_process_id: 101, // running exhaust (mod 100 == 1)
+                op_mode_id: 7,
+                op_mode_fraction: 0.4,
+                op_mode_fraction_cv: 0.0,
+                avg_bin_speed: 32.5,
+                avg_speed_fraction: 0.6,
+            },
+            OpModeDistributionRow {
+                source_type_id: SourceTypeId(120),
+                road_type_id: 5,
+                avg_speed_bin_id: 16,
+                hour_day_id: 51,
+                pol_process_id: -1, // wildcard: dropped by rule 1
+                op_mode_id: 5,
+                op_mode_fraction: 0.3,
+                op_mode_fraction_cv: 0.0,
+                avg_bin_speed: 32.5,
+                avg_speed_fraction: 0.6,
+            },
+        ];
+
+        let mut store = InMemoryStore::default();
+        store.insert(
+            "sourceUseTypePhysicsMapping",
+            SourceUseTypePhysicsMappingDetail::into_dataframe(mapping_rows).unwrap(),
+        );
+        store.insert(
+            "RatesOpModeDistribution",
+            OpModeDistributionRow::into_dataframe(input_rows).unwrap(),
+        );
+
+        let position = IterationPosition {
+            iteration: 0,
+            process_id: None,
+            location: moves_framework::ExecutionLocation::none(),
+            time: moves_framework::ExecutionTime::none(),
+        };
         let generator = SourceTypePhysics::new();
-        let mut ctx = CalculatorContext::new();
-        assert!(generator.execute(&mut ctx).is_ok());
+        let mut ctx = CalculatorContext::with_position_and_tables(position, store);
+        generator.execute(&mut ctx).expect("execute succeeds");
+
+        let out: Vec<OpModeDistributionRow> = ctx
+            .scratch()
+            .store
+            .iter_typed("RatesOpModeDistribution")
+            .expect("RatesOpModeDistribution written to scratch");
+
+        // Only the running-exhaust row survives; it is rewritten by rule 4.
+        assert_eq!(out.len(), 1, "dropped row excluded, kept row rewritten");
+        assert_eq!(out[0].source_type_id, SourceTypeId(20));
+        assert_eq!(out[0].op_mode_id, 1007);
+        // Carry-through columns are unchanged.
+        assert_eq!(out[0].road_type_id, 5);
+        assert!((out[0].op_mode_fraction - 0.4).abs() < 1e-12);
+    }
+
+    #[test]
+    fn execute_empty_mapping_passes_through_non_negative_rows() {
+        use moves_framework::{DataFrameStore, DataFrameStoreTyped, InMemoryStore, IterationPosition};
+
+        let input_rows = vec![OpModeDistributionRow {
+            source_type_id: SourceTypeId(55),
+            road_type_id: 2,
+            avg_speed_bin_id: 3,
+            hour_day_id: 10,
+            pol_process_id: 101,
+            op_mode_id: 8,
+            op_mode_fraction: 1.0,
+            op_mode_fraction_cv: 0.0,
+            avg_bin_speed: 55.0,
+            avg_speed_fraction: 1.0,
+        }];
+
+        let mut store = InMemoryStore::default();
+        // Empty mapping table.
+        store.insert(
+            "sourceUseTypePhysicsMapping",
+            SourceUseTypePhysicsMappingDetail::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "RatesOpModeDistribution",
+            OpModeDistributionRow::into_dataframe(input_rows.clone()).unwrap(),
+        );
+
+        let position = IterationPosition::default();
+        let generator = SourceTypePhysics::new();
+        let mut ctx = CalculatorContext::with_position_and_tables(position, store);
+        generator.execute(&mut ctx).expect("execute succeeds");
+
+        let out: Vec<OpModeDistributionRow> = ctx
+            .scratch()
+            .store
+            .iter_typed("RatesOpModeDistribution")
+            .expect("RatesOpModeDistribution written to scratch");
+
+        // Empty mapping -> rule 7 keeps every row unchanged.
+        assert_eq!(out, input_rows);
     }
 
     #[test]

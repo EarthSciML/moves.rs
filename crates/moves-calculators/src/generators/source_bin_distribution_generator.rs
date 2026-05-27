@@ -2167,6 +2167,7 @@ mod tests {
         // Integration test: wire all input tables into a CalculatorContext,
         // execute the generator, and confirm SourceBin + SourceBinDistribution
         // appear in scratch with the expected content.
+        use moves_data::ProcessId;
         use moves_framework::{DataFrameStore, InMemoryStore};
         use moves_framework::execution::execution_db::{ExecutionLocation, ExecutionTime, IterationPosition};
 

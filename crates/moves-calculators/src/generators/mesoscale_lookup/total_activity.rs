@@ -78,8 +78,10 @@ use std::collections::BTreeMap;
 use moves_calculator_info::{Granularity, Priority};
 use moves_data::ProcessId;
 use moves_framework::{
-    CalculatorContext, CalculatorOutput, CalculatorSubscription, Error, Generator,
+    CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStoreTyped, Error,
+    Generator, IntoDataFrame, TableRow,
 };
+use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Series};
 
 /// Running Exhaust — process id 1.
 const RUNNING_EXHAUST: ProcessId = ProcessId(1);
@@ -534,6 +536,1189 @@ pub fn link_distance(source_hours: f64, average_speed: f64) -> f64 {
     source_hours * average_speed
 }
 
+// ── Data-plane helpers ───────────────────────────────────────────────────────
+
+/// Build a typed row-extraction error for `from_dataframe` impls.
+fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -> Error {
+    Error::RowExtraction {
+        table: table.into(),
+        row,
+        column: column.into(),
+        message: msg,
+    }
+}
+
+// ── Input TableRow impls ─────────────────────────────────────────────────────
+
+impl TableRow for YearRow {
+    fn table_name() -> &'static str {
+        "year"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("yearID".into(), DataType::Int32),
+            ("isBaseYear".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "yearID".into(),
+                    rows.iter().map(|r| r.year_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "isBaseYear".into(),
+                    rows.iter()
+                        .map(|r| if r.is_base_year { 1i32 } else { 0 })
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "year";
+        let year_id_col = df
+            .column("yearID")
+            .map_err(|e| row_err(t, 0, "yearID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "yearID", e.to_string()))?;
+        let is_base_year_col = df
+            .column("isBaseYear")
+            .map_err(|e| row_err(t, 0, "isBaseYear", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "isBaseYear", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(YearRow {
+                    year_id: year_id_col.get(i).ok_or_else(|| null("yearID"))? as i16,
+                    is_base_year: is_base_year_col.get(i).ok_or_else(|| null("isBaseYear"))? != 0,
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for SourceTypeYearRow {
+    fn table_name() -> &'static str {
+        "sourceTypeYear"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("yearID".into(), DataType::Int32),
+            ("sourceTypeID".into(), DataType::Int32),
+            ("sourceTypePopulation".into(), DataType::Float64),
+            ("salesGrowthFactor".into(), DataType::Float64),
+            ("migrationRate".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "yearID".into(),
+                    rows.iter().map(|r| r.year_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.source_type_id as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypePopulation".into(),
+                    rows.iter()
+                        .map(|r| r.source_type_population)
+                        .collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "salesGrowthFactor".into(),
+                    rows.iter()
+                        .map(|r| r.sales_growth_factor)
+                        .collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "migrationRate".into(),
+                    rows.iter().map(|r| r.migration_rate).collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "sourceTypeYear";
+        let year_id_col = df
+            .column("yearID")
+            .map_err(|e| row_err(t, 0, "yearID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "yearID", e.to_string()))?;
+        let source_type_id_col = df
+            .column("sourceTypeID")
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?;
+        let source_type_population_col = df
+            .column("sourceTypePopulation")
+            .map_err(|e| row_err(t, 0, "sourceTypePopulation", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "sourceTypePopulation", e.to_string()))?;
+        let sales_growth_factor_col = df
+            .column("salesGrowthFactor")
+            .map_err(|e| row_err(t, 0, "salesGrowthFactor", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "salesGrowthFactor", e.to_string()))?;
+        let migration_rate_col = df
+            .column("migrationRate")
+            .map_err(|e| row_err(t, 0, "migrationRate", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "migrationRate", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(SourceTypeYearRow {
+                    year_id: year_id_col.get(i).ok_or_else(|| null("yearID"))? as i16,
+                    source_type_id: source_type_id_col
+                        .get(i)
+                        .ok_or_else(|| null("sourceTypeID"))? as i16,
+                    source_type_population: source_type_population_col
+                        .get(i)
+                        .ok_or_else(|| null("sourceTypePopulation"))?,
+                    sales_growth_factor: sales_growth_factor_col
+                        .get(i)
+                        .ok_or_else(|| null("salesGrowthFactor"))?,
+                    migration_rate: migration_rate_col
+                        .get(i)
+                        .ok_or_else(|| null("migrationRate"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for SourceTypeAgeDistributionRow {
+    fn table_name() -> &'static str {
+        "sourceTypeAgeDistribution"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("sourceTypeID".into(), DataType::Int32),
+            ("yearID".into(), DataType::Int32),
+            ("ageID".into(), DataType::Int32),
+            ("ageFraction".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.source_type_id as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "yearID".into(),
+                    rows.iter().map(|r| r.year_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "ageID".into(),
+                    rows.iter().map(|r| r.age_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "ageFraction".into(),
+                    rows.iter().map(|r| r.age_fraction).collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "sourceTypeAgeDistribution";
+        let source_type_id_col = df
+            .column("sourceTypeID")
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?;
+        let year_id_col = df
+            .column("yearID")
+            .map_err(|e| row_err(t, 0, "yearID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "yearID", e.to_string()))?;
+        let age_id_col = df
+            .column("ageID")
+            .map_err(|e| row_err(t, 0, "ageID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "ageID", e.to_string()))?;
+        let age_fraction_col = df
+            .column("ageFraction")
+            .map_err(|e| row_err(t, 0, "ageFraction", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "ageFraction", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(SourceTypeAgeDistributionRow {
+                    source_type_id: source_type_id_col
+                        .get(i)
+                        .ok_or_else(|| null("sourceTypeID"))? as i16,
+                    year_id: year_id_col.get(i).ok_or_else(|| null("yearID"))? as i16,
+                    age_id: age_id_col.get(i).ok_or_else(|| null("ageID"))? as i16,
+                    age_fraction: age_fraction_col
+                        .get(i)
+                        .ok_or_else(|| null("ageFraction"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for SourceTypeAgeRow {
+    fn table_name() -> &'static str {
+        "sourceTypeAge"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("sourceTypeID".into(), DataType::Int32),
+            ("ageID".into(), DataType::Int32),
+            ("survivalRate".into(), DataType::Float64),
+            ("relativeMAR".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.source_type_id as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "ageID".into(),
+                    rows.iter().map(|r| r.age_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "survivalRate".into(),
+                    rows.iter().map(|r| r.survival_rate).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "relativeMAR".into(),
+                    rows.iter().map(|r| r.relative_mar).collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "sourceTypeAge";
+        let source_type_id_col = df
+            .column("sourceTypeID")
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?;
+        let age_id_col = df
+            .column("ageID")
+            .map_err(|e| row_err(t, 0, "ageID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "ageID", e.to_string()))?;
+        let survival_rate_col = df
+            .column("survivalRate")
+            .map_err(|e| row_err(t, 0, "survivalRate", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "survivalRate", e.to_string()))?;
+        let relative_mar_col = df
+            .column("relativeMAR")
+            .map_err(|e| row_err(t, 0, "relativeMAR", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "relativeMAR", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(SourceTypeAgeRow {
+                    source_type_id: source_type_id_col
+                        .get(i)
+                        .ok_or_else(|| null("sourceTypeID"))? as i16,
+                    age_id: age_id_col.get(i).ok_or_else(|| null("ageID"))? as i16,
+                    survival_rate: survival_rate_col
+                        .get(i)
+                        .ok_or_else(|| null("survivalRate"))?,
+                    relative_mar: relative_mar_col
+                        .get(i)
+                        .ok_or_else(|| null("relativeMAR"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for SourceUseTypeRow {
+    fn table_name() -> &'static str {
+        "sourceUseType"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("sourceTypeID".into(), DataType::Int32),
+            ("HPMSVTypeID".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.source_type_id as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "HPMSVTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.hpms_v_type_id as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "sourceUseType";
+        let source_type_id_col = df
+            .column("sourceTypeID")
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?;
+        let hpms_v_type_id_col = df
+            .column("HPMSVTypeID")
+            .map_err(|e| row_err(t, 0, "HPMSVTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "HPMSVTypeID", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(SourceUseTypeRow {
+                    source_type_id: source_type_id_col
+                        .get(i)
+                        .ok_or_else(|| null("sourceTypeID"))? as i16,
+                    hpms_v_type_id: hpms_v_type_id_col
+                        .get(i)
+                        .ok_or_else(|| null("HPMSVTypeID"))? as i16,
+                })
+            })
+            .collect()
+    }
+}
+
+// ── Auxiliary input row types (local to execute wiring) ───────────────────────
+
+/// One `monthVMTFraction` row — per `(sourceType, month)` share of annual VMT.
+struct MonthVmtFractionRow {
+    source_type_id: i16,
+    month_id: i16,
+    month_vmt_fraction: f64,
+}
+
+impl TableRow for MonthVmtFractionRow {
+    fn table_name() -> &'static str {
+        "monthVMTFraction"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("sourceTypeID".into(), DataType::Int32),
+            ("monthID".into(), DataType::Int32),
+            ("monthVMTFraction".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.source_type_id as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.month_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "monthVMTFraction".into(),
+                    rows.iter()
+                        .map(|r| r.month_vmt_fraction)
+                        .collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "monthVMTFraction";
+        let source_type_id_col = df
+            .column("sourceTypeID")
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?;
+        let month_id_col = df
+            .column("monthID")
+            .map_err(|e| row_err(t, 0, "monthID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "monthID", e.to_string()))?;
+        let month_vmt_fraction_col = df
+            .column("monthVMTFraction")
+            .map_err(|e| row_err(t, 0, "monthVMTFraction", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "monthVMTFraction", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(MonthVmtFractionRow {
+                    source_type_id: source_type_id_col
+                        .get(i)
+                        .ok_or_else(|| null("sourceTypeID"))? as i16,
+                    month_id: month_id_col.get(i).ok_or_else(|| null("monthID"))? as i16,
+                    month_vmt_fraction: month_vmt_fraction_col
+                        .get(i)
+                        .ok_or_else(|| null("monthVMTFraction"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+/// One `dayVMTFraction` row — per `(sourceType, month, roadType, day)` share.
+struct DayVmtFractionRow {
+    source_type_id: i16,
+    month_id: i16,
+    road_type_id: i16,
+    day_id: i16,
+    day_vmt_fraction: f64,
+}
+
+impl TableRow for DayVmtFractionRow {
+    fn table_name() -> &'static str {
+        "dayVMTFraction"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("sourceTypeID".into(), DataType::Int32),
+            ("monthID".into(), DataType::Int32),
+            ("roadTypeID".into(), DataType::Int32),
+            ("dayID".into(), DataType::Int32),
+            ("dayVMTFraction".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.source_type_id as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.month_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "roadTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.road_type_id as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "dayID".into(),
+                    rows.iter().map(|r| r.day_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "dayVMTFraction".into(),
+                    rows.iter()
+                        .map(|r| r.day_vmt_fraction)
+                        .collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "dayVMTFraction";
+        let source_type_id_col = df
+            .column("sourceTypeID")
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?;
+        let month_id_col = df
+            .column("monthID")
+            .map_err(|e| row_err(t, 0, "monthID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "monthID", e.to_string()))?;
+        let road_type_id_col = df
+            .column("roadTypeID")
+            .map_err(|e| row_err(t, 0, "roadTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "roadTypeID", e.to_string()))?;
+        let day_id_col = df
+            .column("dayID")
+            .map_err(|e| row_err(t, 0, "dayID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "dayID", e.to_string()))?;
+        let day_vmt_fraction_col = df
+            .column("dayVMTFraction")
+            .map_err(|e| row_err(t, 0, "dayVMTFraction", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "dayVMTFraction", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(DayVmtFractionRow {
+                    source_type_id: source_type_id_col
+                        .get(i)
+                        .ok_or_else(|| null("sourceTypeID"))? as i16,
+                    month_id: month_id_col.get(i).ok_or_else(|| null("monthID"))? as i16,
+                    road_type_id: road_type_id_col
+                        .get(i)
+                        .ok_or_else(|| null("roadTypeID"))? as i16,
+                    day_id: day_id_col.get(i).ok_or_else(|| null("dayID"))? as i16,
+                    day_vmt_fraction: day_vmt_fraction_col
+                        .get(i)
+                        .ok_or_else(|| null("dayVMTFraction"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+/// One `hourVMTFraction` row — per `(sourceType, roadType, day, hour)` share.
+struct HourVmtFractionRow {
+    source_type_id: i16,
+    road_type_id: i16,
+    day_id: i16,
+    hour_id: i16,
+    hour_vmt_fraction: f64,
+}
+
+impl TableRow for HourVmtFractionRow {
+    fn table_name() -> &'static str {
+        "hourVMTFraction"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("sourceTypeID".into(), DataType::Int32),
+            ("roadTypeID".into(), DataType::Int32),
+            ("dayID".into(), DataType::Int32),
+            ("hourID".into(), DataType::Int32),
+            ("hourVMTFraction".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.source_type_id as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "roadTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.road_type_id as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "dayID".into(),
+                    rows.iter().map(|r| r.day_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hourID".into(),
+                    rows.iter()
+                        .map(|r| r.hour_id as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hourVMTFraction".into(),
+                    rows.iter()
+                        .map(|r| r.hour_vmt_fraction)
+                        .collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "hourVMTFraction";
+        let source_type_id_col = df
+            .column("sourceTypeID")
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?;
+        let road_type_id_col = df
+            .column("roadTypeID")
+            .map_err(|e| row_err(t, 0, "roadTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "roadTypeID", e.to_string()))?;
+        let day_id_col = df
+            .column("dayID")
+            .map_err(|e| row_err(t, 0, "dayID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "dayID", e.to_string()))?;
+        let hour_id_col = df
+            .column("hourID")
+            .map_err(|e| row_err(t, 0, "hourID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "hourID", e.to_string()))?;
+        let hour_vmt_fraction_col = df
+            .column("hourVMTFraction")
+            .map_err(|e| row_err(t, 0, "hourVMTFraction", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "hourVMTFraction", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(HourVmtFractionRow {
+                    source_type_id: source_type_id_col
+                        .get(i)
+                        .ok_or_else(|| null("sourceTypeID"))? as i16,
+                    road_type_id: road_type_id_col
+                        .get(i)
+                        .ok_or_else(|| null("roadTypeID"))? as i16,
+                    day_id: day_id_col.get(i).ok_or_else(|| null("dayID"))? as i16,
+                    hour_id: hour_id_col.get(i).ok_or_else(|| null("hourID"))? as i16,
+                    hour_vmt_fraction: hour_vmt_fraction_col
+                        .get(i)
+                        .ok_or_else(|| null("hourVMTFraction"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+/// One `link` row — a modelled road link.
+struct LinkRow {
+    link_id: i32,
+    road_type_id: i16,
+}
+
+impl TableRow for LinkRow {
+    fn table_name() -> &'static str {
+        "link"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("linkID".into(), DataType::Int32),
+            ("roadTypeID".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "linkID".into(),
+                    rows.iter().map(|r| r.link_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "roadTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.road_type_id as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "link";
+        let link_id_col = df
+            .column("linkID")
+            .map_err(|e| row_err(t, 0, "linkID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "linkID", e.to_string()))?;
+        let road_type_id_col = df
+            .column("roadTypeID")
+            .map_err(|e| row_err(t, 0, "roadTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "roadTypeID", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(LinkRow {
+                    link_id: link_id_col.get(i).ok_or_else(|| null("linkID"))?,
+                    road_type_id: road_type_id_col
+                        .get(i)
+                        .ok_or_else(|| null("roadTypeID"))? as i16,
+                })
+            })
+            .collect()
+    }
+}
+
+/// One `linkAverageSpeed` row — average speed on a link (mph).
+struct LinkAverageSpeedRow {
+    link_id: i32,
+    average_speed: f64,
+}
+
+impl TableRow for LinkAverageSpeedRow {
+    fn table_name() -> &'static str {
+        "linkAverageSpeed"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("linkID".into(), DataType::Int32),
+            ("averageSpeed".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "linkID".into(),
+                    rows.iter().map(|r| r.link_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "averageSpeed".into(),
+                    rows.iter().map(|r| r.average_speed).collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "linkAverageSpeed";
+        let link_id_col = df
+            .column("linkID")
+            .map_err(|e| row_err(t, 0, "linkID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "linkID", e.to_string()))?;
+        let average_speed_col = df
+            .column("averageSpeed")
+            .map_err(|e| row_err(t, 0, "averageSpeed", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "averageSpeed", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(LinkAverageSpeedRow {
+                    link_id: link_id_col.get(i).ok_or_else(|| null("linkID"))?,
+                    average_speed: average_speed_col
+                        .get(i)
+                        .ok_or_else(|| null("averageSpeed"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+/// One `hourDay` row — packed `(hour, day)` catalogue entry.
+struct HourDayRow {
+    hour_day_id: i32,
+    day_id: i16,
+    hour_id: i16,
+}
+
+impl TableRow for HourDayRow {
+    fn table_name() -> &'static str {
+        "hourDay"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("hourDayID".into(), DataType::Int32),
+            ("dayID".into(), DataType::Int32),
+            ("hourID".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "hourDayID".into(),
+                    rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "dayID".into(),
+                    rows.iter().map(|r| r.day_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hourID".into(),
+                    rows.iter()
+                        .map(|r| r.hour_id as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "hourDay";
+        let hour_day_id_col = df
+            .column("hourDayID")
+            .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?;
+        let day_id_col = df
+            .column("dayID")
+            .map_err(|e| row_err(t, 0, "dayID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "dayID", e.to_string()))?;
+        let hour_id_col = df
+            .column("hourID")
+            .map_err(|e| row_err(t, 0, "hourID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "hourID", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(HourDayRow {
+                    hour_day_id: hour_day_id_col.get(i).ok_or_else(|| null("hourDayID"))?,
+                    day_id: day_id_col.get(i).ok_or_else(|| null("dayID"))? as i16,
+                    hour_id: hour_id_col.get(i).ok_or_else(|| null("hourID"))? as i16,
+                })
+            })
+            .collect()
+    }
+}
+
+// ── Output row types ──────────────────────────────────────────────────────────
+
+/// One `SHO` output row — source-hours-operating allocated to a link and hour.
+///
+/// The mesoscale-lookup version uses `SHO = VMT` (the travel fraction, already
+/// a proportional quantity); `distance = SHO × averageSpeed`.
+pub struct ShoOutputRow {
+    /// `hourDayID`.
+    pub hour_day_id: i32,
+    /// `monthID`.
+    pub month_id: i16,
+    /// `yearID`.
+    pub year_id: i16,
+    /// `ageID`.
+    pub age_id: i16,
+    /// `linkID`.
+    pub link_id: i32,
+    /// `sourceTypeID`.
+    pub source_type_id: i16,
+    /// `SHO` — source-hours operating (equals VMT for mesoscale lookup).
+    pub sho: f64,
+    /// `distance` — `SHO × averageSpeed`.
+    pub distance: f64,
+}
+
+impl TableRow for ShoOutputRow {
+    fn table_name() -> &'static str {
+        "SHO"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("hourDayID".into(), DataType::Int32),
+            ("monthID".into(), DataType::Int32),
+            ("yearID".into(), DataType::Int32),
+            ("ageID".into(), DataType::Int32),
+            ("linkID".into(), DataType::Int32),
+            ("sourceTypeID".into(), DataType::Int32),
+            ("SHO".into(), DataType::Float64),
+            ("distance".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "hourDayID".into(),
+                    rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.month_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "yearID".into(),
+                    rows.iter().map(|r| r.year_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "ageID".into(),
+                    rows.iter().map(|r| r.age_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "linkID".into(),
+                    rows.iter().map(|r| r.link_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.source_type_id as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "SHO".into(),
+                    rows.iter().map(|r| r.sho).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "distance".into(),
+                    rows.iter().map(|r| r.distance).collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "SHO";
+        let hour_day_id_col = df
+            .column("hourDayID")
+            .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?;
+        let month_id_col = df
+            .column("monthID")
+            .map_err(|e| row_err(t, 0, "monthID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "monthID", e.to_string()))?;
+        let year_id_col = df
+            .column("yearID")
+            .map_err(|e| row_err(t, 0, "yearID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "yearID", e.to_string()))?;
+        let age_id_col = df
+            .column("ageID")
+            .map_err(|e| row_err(t, 0, "ageID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "ageID", e.to_string()))?;
+        let link_id_col = df
+            .column("linkID")
+            .map_err(|e| row_err(t, 0, "linkID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "linkID", e.to_string()))?;
+        let source_type_id_col = df
+            .column("sourceTypeID")
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?;
+        let sho_col = df
+            .column("SHO")
+            .map_err(|e| row_err(t, 0, "SHO", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "SHO", e.to_string()))?;
+        let distance_col = df
+            .column("distance")
+            .map_err(|e| row_err(t, 0, "distance", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "distance", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(ShoOutputRow {
+                    hour_day_id: hour_day_id_col.get(i).ok_or_else(|| null("hourDayID"))?,
+                    month_id: month_id_col.get(i).ok_or_else(|| null("monthID"))? as i16,
+                    year_id: year_id_col.get(i).ok_or_else(|| null("yearID"))? as i16,
+                    age_id: age_id_col.get(i).ok_or_else(|| null("ageID"))? as i16,
+                    link_id: link_id_col.get(i).ok_or_else(|| null("linkID"))?,
+                    source_type_id: source_type_id_col
+                        .get(i)
+                        .ok_or_else(|| null("sourceTypeID"))? as i16,
+                    sho: sho_col.get(i).ok_or_else(|| null("SHO"))?,
+                    distance: distance_col.get(i).ok_or_else(|| null("distance"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+/// One `SourceHours` output row — total source-hours allocated to a link and hour.
+///
+/// For mesoscale-lookup runs `sourceHours = SHO` (the proportional identity).
+pub struct SourceHoursOutputRow {
+    /// `hourDayID`.
+    pub hour_day_id: i32,
+    /// `monthID`.
+    pub month_id: i16,
+    /// `yearID`.
+    pub year_id: i16,
+    /// `ageID`.
+    pub age_id: i16,
+    /// `linkID`.
+    pub link_id: i32,
+    /// `sourceTypeID`.
+    pub source_type_id: i16,
+    /// `sourceHours`.
+    pub source_hours: f64,
+}
+
+impl TableRow for SourceHoursOutputRow {
+    fn table_name() -> &'static str {
+        "SourceHours"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("hourDayID".into(), DataType::Int32),
+            ("monthID".into(), DataType::Int32),
+            ("yearID".into(), DataType::Int32),
+            ("ageID".into(), DataType::Int32),
+            ("linkID".into(), DataType::Int32),
+            ("sourceTypeID".into(), DataType::Int32),
+            ("sourceHours".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "hourDayID".into(),
+                    rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.month_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "yearID".into(),
+                    rows.iter().map(|r| r.year_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "ageID".into(),
+                    rows.iter().map(|r| r.age_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "linkID".into(),
+                    rows.iter().map(|r| r.link_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.source_type_id as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceHours".into(),
+                    rows.iter().map(|r| r.source_hours).collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "SourceHours";
+        let hour_day_id_col = df
+            .column("hourDayID")
+            .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?;
+        let month_id_col = df
+            .column("monthID")
+            .map_err(|e| row_err(t, 0, "monthID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "monthID", e.to_string()))?;
+        let year_id_col = df
+            .column("yearID")
+            .map_err(|e| row_err(t, 0, "yearID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "yearID", e.to_string()))?;
+        let age_id_col = df
+            .column("ageID")
+            .map_err(|e| row_err(t, 0, "ageID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "ageID", e.to_string()))?;
+        let link_id_col = df
+            .column("linkID")
+            .map_err(|e| row_err(t, 0, "linkID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "linkID", e.to_string()))?;
+        let source_type_id_col = df
+            .column("sourceTypeID")
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?;
+        let source_hours_col = df
+            .column("sourceHours")
+            .map_err(|e| row_err(t, 0, "sourceHours", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "sourceHours", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(SourceHoursOutputRow {
+                    hour_day_id: hour_day_id_col.get(i).ok_or_else(|| null("hourDayID"))?,
+                    month_id: month_id_col.get(i).ok_or_else(|| null("monthID"))? as i16,
+                    year_id: year_id_col.get(i).ok_or_else(|| null("yearID"))? as i16,
+                    age_id: age_id_col.get(i).ok_or_else(|| null("ageID"))? as i16,
+                    link_id: link_id_col.get(i).ok_or_else(|| null("linkID"))?,
+                    source_type_id: source_type_id_col
+                        .get(i)
+                        .ok_or_else(|| null("sourceTypeID"))? as i16,
+                    source_hours: source_hours_col
+                        .get(i)
+                        .ok_or_else(|| null("sourceHours"))?,
+                })
+            })
+            .collect()
+    }
+}
+
 /// Default-database tables the generator reads. Names are the canonical
 /// MOVES table names; the registry maps them onto Parquet snapshots.
 static INPUT_TABLES: &[&str] = &[
@@ -625,15 +1810,180 @@ impl Generator for MesoscaleLookupTotalActivityGenerator {
 
     /// Run the generator for the current master-loop iteration.
     ///
-    /// **Data plane pending (Task 50).** [`CalculatorContext`] exposes
-    /// only placeholder `ExecutionTables` / `ScratchNamespace` today, so
-    /// this body cannot read the [`input_tables`](Generator::input_tables)
-    /// nor write `SHO` / `SourceHours`. The numerically faithful algorithm
-    /// is fully ported and tested in [`total_activity_basis`] and the
-    /// apportionment kernels; once the `DataFrameStore` lands, `execute`
-    /// projects the input view from `ctx.tables()`, runs the pipeline for
-    /// `ctx.position().time.year`, and writes the activity tables.
-    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
+    /// Reads the input tables from `ctx.tables()`, runs the Tag-0…Tag-9
+    /// pipeline for the current analysis year, and writes the `SHO` and
+    /// `SourceHours` activity tables to `ctx.scratch()`.
+    ///
+    /// For mesoscale-lookup runs `SHO = VMT` (the travel fraction) and
+    /// `sourceHours = SHO`; `distance = SHO × averageSpeed`.  Apportionment
+    /// to months/days/hours uses `monthVMTFraction × dayVMTFraction ×
+    /// hourVMTFraction / 1` (weeks-in-month defaults to 1 because
+    /// `monthOfAnyYear` is not in the generator's input table set).  Links
+    /// are iterated uniformly; each link's road type drives the day/hour
+    /// fraction lookup.
+    fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
+        // ── position ──────────────────────────────────────────────────────────
+        let year_id = ctx
+            .position()
+            .time
+            .year
+            .ok_or_else(|| Error::Polars("no year in iteration position".into()))? as i16;
+
+        // ── read input tables ─────────────────────────────────────────────────
+        let years: Vec<YearRow> = ctx.tables().iter_typed("year")?;
+        let source_type_years: Vec<SourceTypeYearRow> =
+            ctx.tables().iter_typed("sourceTypeYear")?;
+        let age_distribution: Vec<SourceTypeAgeDistributionRow> =
+            ctx.tables().iter_typed("sourceTypeAgeDistribution")?;
+        let source_type_ages: Vec<SourceTypeAgeRow> = ctx.tables().iter_typed("sourceTypeAge")?;
+        let source_use_types: Vec<SourceUseTypeRow> = ctx.tables().iter_typed("sourceUseType")?;
+        let month_vmt_fractions: Vec<MonthVmtFractionRow> =
+            ctx.tables().iter_typed("monthVMTFraction")?;
+        let day_vmt_fractions: Vec<DayVmtFractionRow> =
+            ctx.tables().iter_typed("dayVMTFraction")?;
+        let hour_vmt_fractions: Vec<HourVmtFractionRow> =
+            ctx.tables().iter_typed("hourVMTFraction")?;
+        let links: Vec<LinkRow> = ctx.tables().iter_typed("link")?;
+        let link_avg_speeds: Vec<LinkAverageSpeedRow> =
+            ctx.tables().iter_typed("linkAverageSpeed")?;
+        let hour_days: Vec<HourDayRow> = ctx.tables().iter_typed("hourDay")?;
+
+        // ── Tag-0…Tag-3: travel fractions ─────────────────────────────────────
+        let travel_fracs =
+            match total_activity_basis(year_id, &years, &source_type_years, &age_distribution, &source_type_ages, &source_use_types) {
+                Some(v) => v,
+                None => {
+                    // No qualifying base year — write empty tables and return.
+                    let empty_sho: Vec<ShoOutputRow> = Vec::new();
+                    crate::wiring::write_scratch_table(ctx, OUTPUT_TABLES[0], empty_sho)?;
+                    let empty_sh: Vec<SourceHoursOutputRow> = Vec::new();
+                    let df = empty_sh
+                        .into_dataframe()
+                        .map_err(|e| Error::Polars(e.to_string()))?;
+                    ctx.scratch_mut().insert(OUTPUT_TABLES[1], df);
+                    return Ok(CalculatorOutput::empty());
+                }
+            };
+
+        // ── lookup maps ───────────────────────────────────────────────────────
+        // (sourceTypeID, monthID) -> monthVMTFraction
+        let month_frac: BTreeMap<(i16, i16), f64> = month_vmt_fractions
+            .iter()
+            .map(|r| ((r.source_type_id, r.month_id), r.month_vmt_fraction))
+            .collect();
+        // (sourceTypeID, monthID, roadTypeID, dayID) -> dayVMTFraction
+        let day_frac: BTreeMap<(i16, i16, i16, i16), f64> = day_vmt_fractions
+            .iter()
+            .map(|r| {
+                (
+                    (r.source_type_id, r.month_id, r.road_type_id, r.day_id),
+                    r.day_vmt_fraction,
+                )
+            })
+            .collect();
+        // (sourceTypeID, roadTypeID, dayID, hourID) -> hourVMTFraction
+        let hour_frac: BTreeMap<(i16, i16, i16, i16), f64> = hour_vmt_fractions
+            .iter()
+            .map(|r| {
+                (
+                    (r.source_type_id, r.road_type_id, r.day_id, r.hour_id),
+                    r.hour_vmt_fraction,
+                )
+            })
+            .collect();
+        // linkID -> averageSpeed
+        let avg_speed: BTreeMap<i32, f64> = link_avg_speeds
+            .iter()
+            .map(|r| (r.link_id, r.average_speed))
+            .collect();
+        // hourDayID -> (dayID, hourID)
+        let _hour_day_map: BTreeMap<i32, (i16, i16)> = hour_days
+            .iter()
+            .map(|r| (r.hour_day_id, (r.day_id, r.hour_id)))
+            .collect();
+        // collect distinct (monthID, dayID, hourID, hourDayID) combinations
+        let mut month_day_hour_hd: Vec<(i16, i16, i16, i32)> = {
+            // monthIDs from month_vmt_fractions; dayID/hourID/hourDayID from hourDay
+            let months: std::collections::BTreeSet<i16> =
+                month_vmt_fractions.iter().map(|r| r.month_id).collect();
+            hour_days
+                .iter()
+                .flat_map(|hd| {
+                    months
+                        .iter()
+                        .map(move |&m| (m, hd.day_id, hd.hour_id, hd.hour_day_id))
+                })
+                .collect()
+        };
+        month_day_hour_hd.sort_unstable();
+        month_day_hour_hd.dedup();
+
+        // ── Tag-5…Tag-7/Tag-9: apportion and build output rows ────────────────
+        // weeks_in_month defaults to 1 (Java WeeksInMonthHelper fallback for
+        // unknown months, since MonthOfAnyYear is not in INPUT_TABLES).
+        let weeks_in_month = 1.0_f64;
+
+        let mut sho_rows: Vec<ShoOutputRow> = Vec::new();
+        let mut source_hours_rows: Vec<SourceHoursOutputRow> = Vec::new();
+
+        for link in &links {
+            let speed = avg_speed.get(&link.link_id).copied().unwrap_or(0.0);
+            let road_type_id = link.road_type_id;
+
+            for tf in &travel_fracs {
+                let source_type_id = tf.source_type_id;
+                let age_id = tf.age_id;
+
+                for &(month_id, day_id, hour_id, hour_day_id) in &month_day_hour_hd {
+                    let m_frac = month_frac
+                        .get(&(source_type_id, month_id))
+                        .copied()
+                        .unwrap_or(0.0);
+                    let d_frac = day_frac
+                        .get(&(source_type_id, month_id, road_type_id, day_id))
+                        .copied()
+                        .unwrap_or(0.0);
+                    let h_frac = hour_frac
+                        .get(&(source_type_id, road_type_id, day_id, hour_id))
+                        .copied()
+                        .unwrap_or(0.0);
+
+                    // Tag-5/6: apportion travel fraction to this hour.
+                    let sho =
+                        apportion_to_hour(tf.fraction, m_frac, d_frac, h_frac, weeks_in_month);
+                    // Tag-9: distance = SHO × averageSpeed.
+                    let distance = link_distance(sho, speed);
+
+                    sho_rows.push(ShoOutputRow {
+                        hour_day_id,
+                        month_id,
+                        year_id,
+                        age_id,
+                        link_id: link.link_id,
+                        source_type_id,
+                        sho,
+                        distance,
+                    });
+                    // SourceHours = SHO (mesoscale-lookup identity).
+                    source_hours_rows.push(SourceHoursOutputRow {
+                        hour_day_id,
+                        month_id,
+                        year_id,
+                        age_id,
+                        link_id: link.link_id,
+                        source_type_id,
+                        source_hours: sho,
+                    });
+                }
+            }
+        }
+
+        // ── write scratch tables ──────────────────────────────────────────────
+        crate::wiring::write_scratch_table(ctx, OUTPUT_TABLES[0], sho_rows)?;
+        let sh_df = source_hours_rows
+            .into_dataframe()
+            .map_err(|e| Error::Polars(e.to_string()))?;
+        ctx.scratch_mut().insert(OUTPUT_TABLES[1], sh_df);
         Ok(CalculatorOutput::empty())
     }
 }
@@ -1043,15 +2393,206 @@ mod tests {
     }
 
     #[test]
-    fn generator_execute_returns_placeholder_until_data_plane() {
+    fn generator_execute_errors_without_year_in_position() {
+        // execute() requires a year in the iteration position; an empty
+        // context (no year set) should return an error, not panic.
         let gen = MesoscaleLookupTotalActivityGenerator::new();
         let mut ctx = CalculatorContext::new();
-        assert!(gen.execute(&mut ctx).is_ok());
+        assert!(gen.execute(&mut ctx).is_err());
     }
 
     #[test]
     fn generator_is_object_safe() {
         let gen: Box<dyn Generator> = Box::new(MesoscaleLookupTotalActivityGenerator::new());
         assert_eq!(gen.name(), "MesoscaleLookupTotalActivityGenerator");
+    }
+
+    #[test]
+    fn execute_writes_sho_and_source_hours_to_scratch() {
+        use moves_framework::{
+            DataFrameStore, DataFrameStoreTyped, ExecutionTime, InMemoryStore, IterationPosition,
+        };
+
+        // One source type, one age, one base year.
+        let year_id: i16 = 2020;
+
+        let mut store = InMemoryStore::default();
+
+        // year table — 2020 is the base year.
+        store.insert(
+            "year",
+            YearRow::into_dataframe(vec![YearRow {
+                year_id,
+                is_base_year: true,
+            }])
+            .unwrap(),
+        );
+
+        // sourceTypeYear — source type 21, population 1000.
+        store.insert(
+            "sourceTypeYear",
+            SourceTypeYearRow::into_dataframe(vec![SourceTypeYearRow {
+                year_id,
+                source_type_id: 21,
+                source_type_population: 1000.0,
+                sales_growth_factor: 1.0,
+                migration_rate: 1.0,
+            }])
+            .unwrap(),
+        );
+
+        // sourceTypeAgeDistribution — 100% in age 0.
+        store.insert(
+            "sourceTypeAgeDistribution",
+            SourceTypeAgeDistributionRow::into_dataframe(vec![SourceTypeAgeDistributionRow {
+                year_id,
+                source_type_id: 21,
+                age_id: 0,
+                age_fraction: 1.0,
+            }])
+            .unwrap(),
+        );
+
+        // sourceTypeAge — relativeMAR = 1.
+        store.insert(
+            "sourceTypeAge",
+            SourceTypeAgeRow::into_dataframe(vec![SourceTypeAgeRow {
+                source_type_id: 21,
+                age_id: 0,
+                survival_rate: 1.0,
+                relative_mar: 1.0,
+            }])
+            .unwrap(),
+        );
+
+        // sourceUseType — source type 21 maps to HPMS type 10.
+        store.insert(
+            "sourceUseType",
+            SourceUseTypeRow::into_dataframe(vec![SourceUseTypeRow {
+                source_type_id: 21,
+                hpms_v_type_id: 10,
+            }])
+            .unwrap(),
+        );
+
+        // monthVMTFraction — month 1 gets all the VMT.
+        store.insert(
+            "monthVMTFraction",
+            MonthVmtFractionRow::into_dataframe(vec![MonthVmtFractionRow {
+                source_type_id: 21,
+                month_id: 1,
+                month_vmt_fraction: 1.0,
+            }])
+            .unwrap(),
+        );
+
+        // dayVMTFraction — road type 2, day 5 gets all the VMT.
+        store.insert(
+            "dayVMTFraction",
+            DayVmtFractionRow::into_dataframe(vec![DayVmtFractionRow {
+                source_type_id: 21,
+                month_id: 1,
+                road_type_id: 2,
+                day_id: 5,
+                day_vmt_fraction: 1.0,
+            }])
+            .unwrap(),
+        );
+
+        // hourVMTFraction — road type 2, day 5, hour 8 gets all the VMT.
+        store.insert(
+            "hourVMTFraction",
+            HourVmtFractionRow::into_dataframe(vec![HourVmtFractionRow {
+                source_type_id: 21,
+                road_type_id: 2,
+                day_id: 5,
+                hour_id: 8,
+                hour_vmt_fraction: 1.0,
+            }])
+            .unwrap(),
+        );
+
+        // link — one link on road type 2.
+        store.insert(
+            "link",
+            LinkRow::into_dataframe(vec![LinkRow {
+                link_id: 101,
+                road_type_id: 2,
+            }])
+            .unwrap(),
+        );
+
+        // linkAverageSpeed — link 101 average speed 55 mph.
+        store.insert(
+            "linkAverageSpeed",
+            LinkAverageSpeedRow::into_dataframe(vec![LinkAverageSpeedRow {
+                link_id: 101,
+                average_speed: 55.0,
+            }])
+            .unwrap(),
+        );
+
+        // hourDay — hour 8, day 5 → hourDayID = 85.
+        store.insert(
+            "hourDay",
+            HourDayRow::into_dataframe(vec![HourDayRow {
+                hour_day_id: 85,
+                day_id: 5,
+                hour_id: 8,
+            }])
+            .unwrap(),
+        );
+
+        // roadType — not consumed by execute directly, but declared in INPUT_TABLES.
+        // Leave absent; iter_typed will return an empty vec for missing tables.
+
+        let position = IterationPosition {
+            iteration: 0,
+            process_id: None,
+            location: moves_framework::ExecutionLocation::none(),
+            time: ExecutionTime {
+                year: Some(year_id as u16),
+                month: None,
+                day_id: None,
+                hour: None,
+            },
+        };
+
+        let gen = MesoscaleLookupTotalActivityGenerator::new();
+        let mut ctx = CalculatorContext::with_position_and_tables(position, store);
+        gen.execute(&mut ctx).unwrap();
+
+        // ── verify SHO table ──────────────────────────────────────────────────
+        // travel fraction = 1.0 (single cell, all HPMS type's travel).
+        // SHO = 1.0 × 1.0 × 1.0 × 1.0 / 1.0 = 1.0.
+        // distance = 1.0 × 55.0 = 55.0.
+        let sho_out: Vec<ShoOutputRow> = ctx
+            .scratch()
+            .store
+            .iter_typed("SHO")
+            .unwrap();
+        assert_eq!(sho_out.len(), 1, "SHO table should have one row");
+        let sho_row = &sho_out[0];
+        assert_eq!(sho_row.source_type_id, 21);
+        assert_eq!(sho_row.age_id, 0);
+        assert_eq!(sho_row.link_id, 101);
+        assert_eq!(sho_row.year_id, year_id);
+        assert_eq!(sho_row.month_id, 1);
+        assert_eq!(sho_row.hour_day_id, 85);
+        assert!((sho_row.sho - 1.0).abs() < 1e-12, "SHO = fraction × fracs / weeks");
+        assert!((sho_row.distance - 55.0).abs() < 1e-12, "distance = SHO × avgSpeed");
+
+        // ── verify SourceHours table ──────────────────────────────────────────
+        // sourceHours = SHO (mesoscale-lookup identity).
+        let sh_out: Vec<SourceHoursOutputRow> = ctx
+            .scratch()
+            .store
+            .iter_typed("SourceHours")
+            .unwrap();
+        assert_eq!(sh_out.len(), 1, "SourceHours table should have one row");
+        let sh_row = &sh_out[0];
+        assert_eq!(sh_row.source_type_id, 21);
+        assert_eq!(sh_row.link_id, 101);
+        assert!((sh_row.source_hours - 1.0).abs() < 1e-12, "sourceHours = SHO");
     }
 }

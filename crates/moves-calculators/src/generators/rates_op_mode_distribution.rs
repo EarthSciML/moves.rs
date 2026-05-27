@@ -99,10 +99,14 @@
 use std::collections::HashSet;
 
 use moves_calculator_info::{Granularity, Priority};
-use moves_data::{PolProcessId, PollutantProcessAssociation, ProcessId, RoadTypeId, SourceTypeId};
-use moves_framework::{
-    CalculatorContext, CalculatorOutput, CalculatorSubscription, Error, Generator,
+use moves_data::{
+    PolProcessId, PollutantId, PollutantProcessAssociation, ProcessId, RoadTypeId, SourceTypeId,
 };
+use moves_framework::{
+    CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStoreTyped, Error,
+    Generator, TableRow,
+};
+use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Series};
 
 /// Running Exhaust — process id 1. Subscribed to (outside Project domain)
 /// but produces no rows from this module; see the module docs.
@@ -226,6 +230,465 @@ pub struct OpModeFractionInputs<'a> {
     /// Java uses `SELECT DISTINCT`; the primary-key de-duplication here
     /// has the same effect).
     pub hotelling_op_modes: &'a [i16],
+}
+
+// ============================================================================
+// Data-plane helpers — `row_err`, `TableRow` impls for input and output rows
+// ============================================================================
+
+fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -> Error {
+    Error::RowExtraction {
+        table: table.into(),
+        row,
+        column: column.into(),
+        message: msg,
+    }
+}
+
+/// Local wrapper for `pollutantProcessAssoc` rows.
+///
+/// The foreign type `PollutantProcessAssociation` (in `moves_data`) cannot
+/// implement `TableRow` directly (orphan rule), so this private wrapper
+/// carries the same two columns the Java steps read.
+struct RatesPollutantProcessAssocRow {
+    pollutant_id: u16,
+    process_id: u16,
+}
+
+impl TableRow for RatesPollutantProcessAssocRow {
+    fn table_name() -> &'static str {
+        "pollutantProcessAssoc"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("pollutantID".into(), DataType::Int32),
+            ("processID".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "pollutantID".into(),
+                    rows.iter().map(|r| r.pollutant_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "processID".into(),
+                    rows.iter().map(|r| r.process_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "pollutantProcessAssoc";
+        let pollutant_id_col = df
+            .column("pollutantID")
+            .map_err(|e| row_err(t, 0, "pollutantID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "pollutantID", e.to_string()))?;
+        let process_id_col = df
+            .column("processID")
+            .map_err(|e| row_err(t, 0, "processID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "processID", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(RatesPollutantProcessAssocRow {
+                    pollutant_id: pollutant_id_col
+                        .get(i)
+                        .ok_or_else(|| null("pollutantID"))? as u16,
+                    process_id: process_id_col
+                        .get(i)
+                        .ok_or_else(|| null("processID"))? as u16,
+                })
+            })
+            .collect()
+    }
+}
+
+/// Local wrapper for `sourceTypePolProcess` rows.
+///
+/// Reads only `sourceTypeID` and `polProcessID`; the reg-class / MY-group
+/// flag columns (present in the full table) are not needed by this generator.
+struct RatesSourceTypePolProcessRow {
+    source_type_id: u16,
+    pol_process_id: u32,
+}
+
+impl TableRow for RatesSourceTypePolProcessRow {
+    fn table_name() -> &'static str {
+        "sourceTypePolProcess"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("sourceTypeID".into(), DataType::Int32),
+            ("polProcessID".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "polProcessID".into(),
+                    rows.iter().map(|r| r.pol_process_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "sourceTypePolProcess";
+        let source_type_id_col = df
+            .column("sourceTypeID")
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?;
+        let pol_process_id_col = df
+            .column("polProcessID")
+            .map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(RatesSourceTypePolProcessRow {
+                    source_type_id: source_type_id_col
+                        .get(i)
+                        .ok_or_else(|| null("sourceTypeID"))? as u16,
+                    pol_process_id: pol_process_id_col
+                        .get(i)
+                        .ok_or_else(|| null("polProcessID"))? as u32,
+                })
+            })
+            .collect()
+    }
+}
+
+/// Local wrapper for `opModePolProcAssoc` rows.
+struct RatesOpModePolProcAssocRow {
+    pol_process_id: u32,
+    op_mode_id: i16,
+}
+
+impl TableRow for RatesOpModePolProcAssocRow {
+    fn table_name() -> &'static str {
+        "opModePolProcAssoc"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("polProcessID".into(), DataType::Int32),
+            ("opModeID".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "polProcessID".into(),
+                    rows.iter().map(|r| r.pol_process_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "opModeID".into(),
+                    rows.iter().map(|r| r.op_mode_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "opModePolProcAssoc";
+        let pol_process_id_col = df
+            .column("polProcessID")
+            .map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?;
+        let op_mode_id_col = df
+            .column("opModeID")
+            .map_err(|e| row_err(t, 0, "opModeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "opModeID", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(RatesOpModePolProcAssocRow {
+                    pol_process_id: pol_process_id_col
+                        .get(i)
+                        .ok_or_else(|| null("polProcessID"))? as u32,
+                    op_mode_id: op_mode_id_col
+                        .get(i)
+                        .ok_or_else(|| null("opModeID"))? as i16,
+                })
+            })
+            .collect()
+    }
+}
+
+/// Local wrapper for `runSpecHourDay` rows (single-column: `hourDayID`).
+struct RatesRunSpecHourDayRow {
+    hour_day_id: i16,
+}
+
+impl TableRow for RatesRunSpecHourDayRow {
+    fn table_name() -> &'static str {
+        "runSpecHourDay"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([("hourDayID".into(), DataType::Int32)])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![Series::new(
+                "hourDayID".into(),
+                rows.iter().map(|r| r.hour_day_id as i32).collect::<Vec<i32>>(),
+            )
+            .into()],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "runSpecHourDay";
+        let hour_day_id_col = df
+            .column("hourDayID")
+            .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(RatesRunSpecHourDayRow {
+                    hour_day_id: hour_day_id_col
+                        .get(i)
+                        .ok_or_else(|| null("hourDayID"))? as i16,
+                })
+            })
+            .collect()
+    }
+}
+
+/// Local wrapper for `runSpecSourceType` rows (single-column: `sourceTypeID`).
+struct RatesRunSpecSourceTypeRow {
+    source_type_id: u16,
+}
+
+impl TableRow for RatesRunSpecSourceTypeRow {
+    fn table_name() -> &'static str {
+        "runSpecSourceType"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([("sourceTypeID".into(), DataType::Int32)])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![Series::new(
+                "sourceTypeID".into(),
+                rows.iter().map(|r| r.source_type_id as i32).collect::<Vec<i32>>(),
+            )
+            .into()],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "runSpecSourceType";
+        let source_type_id_col = df
+            .column("sourceTypeID")
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(RatesRunSpecSourceTypeRow {
+                    source_type_id: source_type_id_col
+                        .get(i)
+                        .ok_or_else(|| null("sourceTypeID"))? as u16,
+                })
+            })
+            .collect()
+    }
+}
+
+/// Local wrapper for `hotellingActivityDistribution` rows.
+///
+/// Reads only `opModeID`; the fraction, model-year-range and fuel columns
+/// are not needed by this generator (it only needs the set of hotelling
+/// operating modes).
+struct RatesHotellingActivityDistributionRow {
+    op_mode_id: i16,
+}
+
+impl TableRow for RatesHotellingActivityDistributionRow {
+    fn table_name() -> &'static str {
+        "hotellingActivityDistribution"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([("opModeID".into(), DataType::Int32)])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![Series::new(
+                "opModeID".into(),
+                rows.iter().map(|r| r.op_mode_id as i32).collect::<Vec<i32>>(),
+            )
+            .into()],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "hotellingActivityDistribution";
+        let op_mode_id_col = df
+            .column("opModeID")
+            .map_err(|e| row_err(t, 0, "opModeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "opModeID", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(RatesHotellingActivityDistributionRow {
+                    op_mode_id: op_mode_id_col
+                        .get(i)
+                        .ok_or_else(|| null("opModeID"))? as i16,
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for RatesOpModeDistributionRow {
+    fn table_name() -> &'static str {
+        "RatesOpModeDistribution"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("sourceTypeID".into(), DataType::Int32),
+            ("roadTypeID".into(), DataType::Int32),
+            ("avgSpeedBinID".into(), DataType::Int32),
+            ("avgBinSpeed".into(), DataType::Float64),
+            ("polProcessID".into(), DataType::Int32),
+            ("hourDayID".into(), DataType::Int32),
+            ("opModeID".into(), DataType::Int32),
+            ("opModeFraction".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id.0 as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "roadTypeID".into(),
+                    rows.iter().map(|r| r.road_type_id.0 as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "avgSpeedBinID".into(),
+                    rows.iter().map(|r| r.avg_speed_bin_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "avgBinSpeed".into(),
+                    rows.iter().map(|r| r.avg_bin_speed).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "polProcessID".into(),
+                    rows.iter().map(|r| r.pol_process_id.0 as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hourDayID".into(),
+                    rows.iter().map(|r| r.hour_day_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "opModeID".into(),
+                    rows.iter().map(|r| r.op_mode_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "opModeFraction".into(),
+                    rows.iter().map(|r| r.op_mode_fraction).collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "RatesOpModeDistribution";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .f64()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let source_type_id = get_i32("sourceTypeID")?;
+        let road_type_id = get_i32("roadTypeID")?;
+        let avg_speed_bin_id = get_i32("avgSpeedBinID")?;
+        let avg_bin_speed = get_f64("avgBinSpeed")?;
+        let pol_process_id = get_i32("polProcessID")?;
+        let hour_day_id = get_i32("hourDayID")?;
+        let op_mode_id = get_i32("opModeID")?;
+        let op_mode_fraction = get_f64("opModeFraction")?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(RatesOpModeDistributionRow {
+                    source_type_id: SourceTypeId(
+                        source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))? as u16,
+                    ),
+                    road_type_id: RoadTypeId(
+                        road_type_id.get(i).ok_or_else(|| null("roadTypeID"))? as u16,
+                    ),
+                    avg_speed_bin_id: avg_speed_bin_id
+                        .get(i)
+                        .ok_or_else(|| null("avgSpeedBinID"))? as i16,
+                    avg_bin_speed: avg_bin_speed
+                        .get(i)
+                        .ok_or_else(|| null("avgBinSpeed"))?,
+                    pol_process_id: PolProcessId(
+                        pol_process_id.get(i).ok_or_else(|| null("polProcessID"))? as u32,
+                    ),
+                    hour_day_id: hour_day_id
+                        .get(i)
+                        .ok_or_else(|| null("hourDayID"))? as i16,
+                    op_mode_id: op_mode_id
+                        .get(i)
+                        .ok_or_else(|| null("opModeID"))? as i16,
+                    op_mode_fraction: op_mode_fraction
+                        .get(i)
+                        .ok_or_else(|| null("opModeFraction"))?,
+                })
+            })
+            .collect()
+    }
 }
 
 /// Build a hotelling `RatesOpModeDistribution` row — the shared row shape
@@ -517,17 +980,70 @@ impl Generator for RatesOperatingModeDistributionGenerator {
 
     /// Run the generator for the current master-loop iteration.
     ///
-    /// **Data plane pending (Task 50).** [`CalculatorContext`] exposes only
-    /// placeholder `ExecutionTables` / `ScratchNamespace` today, so this
-    /// body cannot read the [`input_tables`](Generator::input_tables) nor
-    /// write `RatesOpModeDistribution`. The numerically faithful algorithm
-    /// is fully ported and tested in [`extended_idle_op_mode_fractions`]
-    /// and [`auxiliary_power_op_mode_fractions`]; once the `DataFrameStore`
-    /// lands, `execute` will project an [`OpModeFractionInputs`] from
-    /// `ctx.tables()`, dispatch on `ctx.position().process_id` via
-    /// [`op_mode_fractions`](Self::op_mode_fractions), and store the rows.
-    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
-        Ok(CalculatorOutput::empty())
+    /// Reads the six input tables from `ctx.tables()`, builds an
+    /// [`OpModeFractionInputs`] view, dispatches through
+    /// [`op_mode_fractions`](Self::op_mode_fractions) on
+    /// `ctx.position().process_id`, and writes the result to
+    /// `ctx.scratch()` under `"RatesOpModeDistribution"`.
+    fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
+        let process_id = ctx.position().process_id.ok_or_else(|| {
+            Error::Polars("no process_id in iteration position".into())
+        })?;
+
+        // Read the six input tables.
+        let ppa_raw: Vec<RatesPollutantProcessAssocRow> =
+            ctx.tables().iter_typed("pollutantProcessAssoc")?;
+        let stpp_raw: Vec<RatesSourceTypePolProcessRow> =
+            ctx.tables().iter_typed("sourceTypePolProcess")?;
+        let omppa_raw: Vec<RatesOpModePolProcAssocRow> =
+            ctx.tables().iter_typed("opModePolProcAssoc")?;
+        let hour_day_raw: Vec<RatesRunSpecHourDayRow> =
+            ctx.tables().iter_typed("runSpecHourDay")?;
+        let source_type_raw: Vec<RatesRunSpecSourceTypeRow> =
+            ctx.tables().iter_typed("runSpecSourceType")?;
+        let hotelling_raw: Vec<RatesHotellingActivityDistributionRow> =
+            ctx.tables().iter_typed("hotellingActivityDistribution")?;
+
+        // Convert wrapper rows to the algorithm's input types.
+        let pollutant_process_assoc: Vec<PollutantProcessAssociation> = ppa_raw
+            .iter()
+            .map(|r| PollutantProcessAssociation {
+                pollutant_id: PollutantId(r.pollutant_id),
+                process_id: ProcessId(r.process_id),
+            })
+            .collect();
+        let source_type_pol_process: Vec<SourceTypePolProcess> = stpp_raw
+            .iter()
+            .map(|r| SourceTypePolProcess {
+                source_type_id: SourceTypeId(r.source_type_id),
+                pol_process_id: PolProcessId(r.pol_process_id),
+            })
+            .collect();
+        let op_mode_pol_proc_assoc: Vec<OpModePolProcAssoc> = omppa_raw
+            .iter()
+            .map(|r| OpModePolProcAssoc {
+                pol_process_id: PolProcessId(r.pol_process_id),
+                op_mode_id: r.op_mode_id,
+            })
+            .collect();
+        let run_spec_hour_day: Vec<i16> =
+            hour_day_raw.iter().map(|r| r.hour_day_id).collect();
+        let run_spec_source_type: Vec<SourceTypeId> =
+            source_type_raw.iter().map(|r| SourceTypeId(r.source_type_id)).collect();
+        let hotelling_op_modes: Vec<i16> =
+            hotelling_raw.iter().map(|r| r.op_mode_id).collect();
+
+        let inputs = OpModeFractionInputs {
+            pollutant_process_assoc: &pollutant_process_assoc,
+            source_type_pol_process: &source_type_pol_process,
+            op_mode_pol_proc_assoc: &op_mode_pol_proc_assoc,
+            run_spec_hour_day: &run_spec_hour_day,
+            run_spec_source_type: &run_spec_source_type,
+            hotelling_op_modes: &hotelling_op_modes,
+        };
+
+        let rows = self.op_mode_fractions(process_id, &inputs);
+        crate::wiring::write_scratch_table(ctx, OUTPUT_TABLES[0], rows)
     }
 }
 
@@ -823,12 +1339,99 @@ mod tests {
     }
 
     #[test]
-    fn generator_execute_returns_placeholder_until_data_plane() {
-        // execute is a documented placeholder until Task 50; it must still
-        // honour the trait contract and return Ok.
+    fn execute_writes_rates_op_mode_distribution_to_scratch() {
+        use moves_framework::{
+            DataFrameStore, DataFrameStoreTyped, ExecutionLocation, ExecutionTime, InMemoryStore,
+            IterationPosition,
+        };
+
+        // One process-90 (Extended Idle) polProcess modeled for source type 62,
+        // with op-mode 201 in opModePolProcAssoc and one hour/day (51).
+        let pp = polproc(91, 90);
+
+        let mut store = InMemoryStore::default();
+
+        // pollutantProcessAssoc
+        store.insert(
+            "pollutantProcessAssoc",
+            RatesPollutantProcessAssocRow::into_dataframe(vec![
+                RatesPollutantProcessAssocRow { pollutant_id: 91, process_id: 90 },
+            ])
+            .unwrap(),
+        );
+        // sourceTypePolProcess
+        store.insert(
+            "sourceTypePolProcess",
+            RatesSourceTypePolProcessRow::into_dataframe(vec![
+                RatesSourceTypePolProcessRow {
+                    source_type_id: 62,
+                    pol_process_id: pp.0,
+                },
+            ])
+            .unwrap(),
+        );
+        // opModePolProcAssoc
+        store.insert(
+            "opModePolProcAssoc",
+            RatesOpModePolProcAssocRow::into_dataframe(vec![
+                RatesOpModePolProcAssocRow { pol_process_id: pp.0, op_mode_id: 201 },
+            ])
+            .unwrap(),
+        );
+        // runSpecHourDay
+        store.insert(
+            "runSpecHourDay",
+            RatesRunSpecHourDayRow::into_dataframe(vec![
+                RatesRunSpecHourDayRow { hour_day_id: 51 },
+            ])
+            .unwrap(),
+        );
+        // runSpecSourceType: source type 62 is selected.
+        store.insert(
+            "runSpecSourceType",
+            RatesRunSpecSourceTypeRow::into_dataframe(vec![
+                RatesRunSpecSourceTypeRow { source_type_id: 62 },
+            ])
+            .unwrap(),
+        );
+        // hotellingActivityDistribution: empty (not used by process 90).
+        store.insert(
+            "hotellingActivityDistribution",
+            RatesHotellingActivityDistributionRow::into_dataframe(vec![]).unwrap(),
+        );
+
+        let position = IterationPosition {
+            iteration: 0,
+            process_id: Some(ProcessId(90)),
+            location: ExecutionLocation::link(1, 1, 1, 1),
+            time: ExecutionTime { year: Some(2020), month: None, day_id: None, hour: None },
+        };
+
         let gen = RatesOperatingModeDistributionGenerator::new();
-        let mut ctx = CalculatorContext::new();
-        assert!(gen.execute(&mut ctx).is_ok());
+        let mut ctx = CalculatorContext::with_position_and_tables(position, store);
+        gen.execute(&mut ctx).unwrap();
+
+        let out: Vec<RatesOpModeDistributionRow> = ctx
+            .scratch()
+            .store
+            .iter_typed("RatesOpModeDistribution")
+            .unwrap();
+
+        // Extended idle (process 90): SQL 1 emits op-mode 201 for hour-day 51;
+        // SQL 2 emits op-mode 200 (the guarantee). INSERT IGNORE de-duplication
+        // leaves two distinct rows.
+        assert_eq!(out.len(), 2, "expected op-mode 200 and 201 rows");
+        for r in &out {
+            assert_eq!(r.source_type_id, SourceTypeId(62));
+            assert_eq!(r.road_type_id, RoadTypeId(1));
+            assert_eq!(r.avg_speed_bin_id, 0);
+            assert_eq!(r.avg_bin_speed, 0.0);
+            assert_eq!(r.pol_process_id, pp);
+            assert_eq!(r.hour_day_id, 51);
+            assert_eq!(r.op_mode_fraction, 1.0);
+        }
+        let op_modes: HashSet<i16> = out.iter().map(|r| r.op_mode_id).collect();
+        assert_eq!(op_modes, HashSet::from([200, 201]));
     }
 
     #[test]
