@@ -1,14 +1,22 @@
-//! Shared wiring helpers for bucket-A/B/C calculator `execute` bodies.
+//! Shared wiring helpers for calculator and generator `execute` bodies.
 //!
 //! Every bucket-A calculator follows the same three-step shape:
 //!
 //! ```text
-//! 1. build_inputs(ctx)   — read tables, apply position filters
-//! 2. kernel(&inputs)     — run the calculator algorithm
-//! 3. emit_rows(rows)     — convert output rows to CalculatorOutput
+//! 1. build_inputs(ctx)        — read tables, apply position filters
+//! 2. kernel(&inputs)          — run the calculator algorithm
+//! 3. emit_rows(rows)          — convert output rows to CalculatorOutput
 //! ```
 //!
-//! This module provides the non-calculator-specific glue for steps 1 and 3:
+//! Every generator follows a parallel shape:
+//!
+//! ```text
+//! 1. build_inputs(ctx)        — read tables from ctx.tables()
+//! 2. kernel(&inputs)          — run the generator algorithm
+//! 3. write_scratch_table(ctx) — write output rows to ctx.scratch()
+//! ```
+//!
+//! This module provides the non-calculator-specific glue:
 //!
 //! * [`position_filter`] — extract the master-loop position as a set of
 //!   optional `i32` column predicates.
@@ -16,9 +24,11 @@
 //!   against the extracted filters.
 //! * [`emit_rows`] — convert any `IntoDataFrame` row vector into a
 //!   [`CalculatorOutput`] wrapping a `MOVESWorkerOutput` `DataFrame`.
+//! * [`write_scratch_table`] — convert a row vector to a `DataFrame` and
+//!   store it in the scratch namespace.
 //!
-//! All three are `pub(crate)` — they are implementation detail shared across
-//! calculators, not part of the public API.
+//! All helpers are `pub(crate)` — they are implementation detail shared across
+//! calculators and generators, not part of the public API.
 
 use moves_framework::{CalculatorContext, CalculatorOutput, Error, IntoDataFrame, TableRow};
 
@@ -86,4 +96,31 @@ pub(crate) fn emit_rows<T: TableRow>(rows: Vec<T>) -> Result<CalculatorOutput, E
         .into_dataframe()
         .map_err(|e| Error::Polars(e.to_string()))?;
     Ok(CalculatorOutput::with_dataframe(df))
+}
+
+/// Write `rows` to the scratch namespace under `name` and return an empty
+/// [`CalculatorOutput`].
+///
+/// The generator-side counterpart of [`emit_rows`]: every generator ends its
+/// `execute` body the same way — convert the output row vector to a Polars
+/// `DataFrame` and store it in the scratch namespace for downstream calculators.
+/// This helper folds that boilerplate so the per-generator `execute` reads
+/// "build inputs → run kernel → write scratch table" with no repeated conversion
+/// code.
+///
+/// `T` is the caller's output-row type; it must implement [`TableRow`], which
+/// gives `Vec<T>` the [`IntoDataFrame`] blanket impl used to build the
+/// `DataFrame`. The write goes through [`crate::CalculatorContext::scratch_mut`]
+/// raw insert, bypassing schema-registry validation — the scratch tier is
+/// ephemeral and columns need not match the default-DB table shape.
+pub(crate) fn write_scratch_table<T: TableRow>(
+    ctx: &mut CalculatorContext,
+    name: &str,
+    rows: Vec<T>,
+) -> Result<CalculatorOutput, Error> {
+    let df = rows
+        .into_dataframe()
+        .map_err(|e| Error::Polars(e.to_string()))?;
+    ctx.scratch_mut().insert(name, df);
+    Ok(CalculatorOutput::empty())
 }

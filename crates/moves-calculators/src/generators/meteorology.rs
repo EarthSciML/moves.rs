@@ -33,13 +33,16 @@
 //! once filled — so the Java `isFirst` flag is purely a once-per-run
 //! optimisation, not a correctness requirement.
 
+use std::collections::HashMap;
 use std::sync::OnceLock;
 
 use moves_calculator_info::{Granularity, Priority};
 use moves_data::ProcessId;
 use moves_framework::{
-    CalculatorContext, CalculatorOutput, CalculatorSubscription, Error, Generator,
+    CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStoreTyped, Error,
+    Generator, TableRow,
 };
+use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
 
 /// Inches of mercury → kilopascals. The Java multiplies barometric
 /// pressure (stored in inHg) by this in every pressure expression.
@@ -309,6 +312,320 @@ static INPUT_TABLES: &[&str] = &["ZoneMonthHour", "Zone", "County"];
 /// place with `heatIndex`, `specificHumidity`, and `molWaterFraction`.
 static OUTPUT_TABLES: &[&str] = &["ZoneMonthHour"];
 
+// ---- Input row types -------------------------------------------------------
+
+fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -> Error {
+    Error::RowExtraction { table: table.into(), row, column: column.into(), message: msg }
+}
+
+/// One `ZoneMonthHour` row read by [`MeteorologyGenerator`] — temperature and
+/// relative humidity for a `(zone, month, hour)` cell.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MeteorologyZoneMonthHourRow {
+    /// `zoneID` — the zone.
+    pub zone_id: i32,
+    /// `monthID` — calendar month.
+    pub month_id: i32,
+    /// `hourID` — hour of day.
+    pub hour_id: i32,
+    /// `temperature` — dry-bulb temperature, °F.
+    pub temperature_f: f64,
+    /// `relHumidity` — relative humidity, percent.
+    pub rel_humidity: f64,
+}
+
+impl TableRow for MeteorologyZoneMonthHourRow {
+    fn table_name() -> &'static str { "ZoneMonthHour" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("zoneID".into(), DataType::Int32),
+            ("monthID".into(), DataType::Int32),
+            ("hourID".into(), DataType::Int32),
+            ("temperature".into(), DataType::Float64),
+            ("relHumidity".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("zoneID".into(), rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>()).into(),
+            Series::new("monthID".into(), rows.iter().map(|r| r.month_id).collect::<Vec<i32>>()).into(),
+            Series::new("hourID".into(), rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>()).into(),
+            Series::new("temperature".into(), rows.iter().map(|r| r.temperature_f).collect::<Vec<f64>>()).into(),
+            Series::new("relHumidity".into(), rows.iter().map(|r| r.rel_humidity).collect::<Vec<f64>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "ZoneMonthHour";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let zone_id = get_i32("zoneID")?;
+        let month_id = get_i32("monthID")?;
+        let hour_id = get_i32("hourID")?;
+        let temperature = get_f64("temperature")?;
+        let rel_humidity = get_f64("relHumidity")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(MeteorologyZoneMonthHourRow {
+                zone_id: zone_id.get(i).ok_or_else(|| null("zoneID"))?,
+                month_id: month_id.get(i).ok_or_else(|| null("monthID"))?,
+                hour_id: hour_id.get(i).ok_or_else(|| null("hourID"))?,
+                temperature_f: temperature.get(i).ok_or_else(|| null("temperature"))?,
+                rel_humidity: rel_humidity.get(i).ok_or_else(|| null("relHumidity"))?,
+            })
+        }).collect()
+    }
+}
+
+/// One `Zone` row read by [`MeteorologyGenerator`] — the zone→county mapping.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MeteorologyZoneRow {
+    /// `zoneID` — the zone primary key.
+    pub zone_id: i32,
+    /// `countyID` — the county the zone belongs to.
+    pub county_id: i32,
+}
+
+impl TableRow for MeteorologyZoneRow {
+    fn table_name() -> &'static str { "Zone" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("zoneID".into(), DataType::Int32),
+            ("countyID".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("zoneID".into(), rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>()).into(),
+            Series::new("countyID".into(), rows.iter().map(|r| r.county_id).collect::<Vec<i32>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "Zone";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let zone_id = get_i32("zoneID")?;
+        let county_id = get_i32("countyID")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(MeteorologyZoneRow {
+                zone_id: zone_id.get(i).ok_or_else(|| null("zoneID"))?,
+                county_id: county_id.get(i).ok_or_else(|| null("countyID"))?,
+            })
+        }).collect()
+    }
+}
+
+/// One `County` row read by [`MeteorologyGenerator`] — the barometric pressure
+/// and altitude class. Both fields are nullable in the MOVES default DB;
+/// [`resolve_county_meteorology`] fills in defaults for `NULL` values.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MeteorologyCountyRow {
+    /// `countyID` — the county primary key.
+    pub county_id: i32,
+    /// `barometricPressure` — nullable `DOUBLE`, inches of mercury. `None`
+    /// when the DB row has `NULL` or a non-positive value.
+    pub barometric_pressure: Option<f64>,
+    /// `altitude` — nullable `CHAR(1)`: `'H'` high / `'L'` low. `None` when
+    /// the DB row has `NULL` or a character outside `('H','L')`.
+    pub altitude: Option<char>,
+}
+
+impl TableRow for MeteorologyCountyRow {
+    fn table_name() -> &'static str { "County" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("countyID".into(), DataType::Int32),
+            ("barometricPressure".into(), DataType::Float64),
+            ("altitude".into(), DataType::String),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("countyID".into(), rows.iter().map(|r| r.county_id).collect::<Vec<i32>>()).into(),
+            Series::new("barometricPressure".into(), rows.iter().map(|r| r.barometric_pressure).collect::<Vec<Option<f64>>>()).into(),
+            Series::new("altitude".into(), rows.iter().map(|r| r.altitude.map(|c| c.to_string())).collect::<Vec<Option<String>>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "County";
+        let county_id_col = df.column("countyID")
+            .map_err(|e| row_err(t, 0, "countyID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "countyID", e.to_string()))?;
+        let baro_col = df.column("barometricPressure")
+            .map_err(|e| row_err(t, 0, "barometricPressure", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "barometricPressure", e.to_string()))?;
+        let alt_col = df.column("altitude")
+            .map_err(|e| row_err(t, 0, "altitude", e.to_string()))?
+            .str()
+            .map_err(|e| row_err(t, 0, "altitude", e.to_string()))?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(MeteorologyCountyRow {
+                county_id: county_id_col.get(i).ok_or_else(|| null("countyID"))?,
+                barometric_pressure: baro_col.get(i),
+                altitude: alt_col.get(i).and_then(|s| s.chars().next()),
+            })
+        }).collect()
+    }
+}
+
+/// Inputs to [`MeteorologyGenerator::execute`] — the three default-DB tables
+/// the generator reads.
+#[derive(Debug, Clone, Default)]
+pub struct MeteorologyInputs {
+    /// `ZoneMonthHour` rows — one per `(zone, month, hour)` cell.
+    pub zone_month_hour: Vec<MeteorologyZoneMonthHourRow>,
+    /// `Zone` rows — the zone→county mapping.
+    pub zone: Vec<MeteorologyZoneRow>,
+    /// `County` rows — barometric pressure and altitude class.
+    pub county: Vec<MeteorologyCountyRow>,
+}
+
+// ---- Output row type -------------------------------------------------------
+
+/// One `ZoneMonthHour` row written to scratch by [`MeteorologyGenerator`] —
+/// the original temperature/humidity inputs plus the three computed meteorology
+/// columns.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MeteorologyOutputRow {
+    /// `zoneID` — the zone.
+    pub zone_id: i32,
+    /// `monthID` — calendar month.
+    pub month_id: i32,
+    /// `hourID` — hour of day.
+    pub hour_id: i32,
+    /// `temperature` — dry-bulb temperature, °F (pass-through from input).
+    pub temperature_f: f64,
+    /// `relHumidity` — relative humidity, percent (pass-through from input).
+    pub rel_humidity: f64,
+    /// `heatIndex` — apparent temperature, °F.
+    pub heat_index: f64,
+    /// `specificHumidity` — g H2O / kg dry air.
+    pub specific_humidity: f64,
+    /// `molWaterFraction` — mol H2O / mol ambient air.
+    pub mol_water_fraction: f64,
+}
+
+impl TableRow for MeteorologyOutputRow {
+    fn table_name() -> &'static str { "ZoneMonthHour" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("zoneID".into(), DataType::Int32),
+            ("monthID".into(), DataType::Int32),
+            ("hourID".into(), DataType::Int32),
+            ("temperature".into(), DataType::Float64),
+            ("relHumidity".into(), DataType::Float64),
+            ("heatIndex".into(), DataType::Float64),
+            ("specificHumidity".into(), DataType::Float64),
+            ("molWaterFraction".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("zoneID".into(), rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>()).into(),
+            Series::new("monthID".into(), rows.iter().map(|r| r.month_id).collect::<Vec<i32>>()).into(),
+            Series::new("hourID".into(), rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>()).into(),
+            Series::new("temperature".into(), rows.iter().map(|r| r.temperature_f).collect::<Vec<f64>>()).into(),
+            Series::new("relHumidity".into(), rows.iter().map(|r| r.rel_humidity).collect::<Vec<f64>>()).into(),
+            Series::new("heatIndex".into(), rows.iter().map(|r| r.heat_index).collect::<Vec<f64>>()).into(),
+            Series::new("specificHumidity".into(), rows.iter().map(|r| r.specific_humidity).collect::<Vec<f64>>()).into(),
+            Series::new("molWaterFraction".into(), rows.iter().map(|r| r.mol_water_fraction).collect::<Vec<f64>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "ZoneMonthHour";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let zone_id = get_i32("zoneID")?;
+        let month_id = get_i32("monthID")?;
+        let hour_id = get_i32("hourID")?;
+        let temperature = get_f64("temperature")?;
+        let rel_humidity = get_f64("relHumidity")?;
+        let heat_index = get_f64("heatIndex")?;
+        let specific_humidity = get_f64("specificHumidity")?;
+        let mol_water_fraction = get_f64("molWaterFraction")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(MeteorologyOutputRow {
+                zone_id: zone_id.get(i).ok_or_else(|| null("zoneID"))?,
+                month_id: month_id.get(i).ok_or_else(|| null("monthID"))?,
+                hour_id: hour_id.get(i).ok_or_else(|| null("hourID"))?,
+                temperature_f: temperature.get(i).ok_or_else(|| null("temperature"))?,
+                rel_humidity: rel_humidity.get(i).ok_or_else(|| null("relHumidity"))?,
+                heat_index: heat_index.get(i).ok_or_else(|| null("heatIndex"))?,
+                specific_humidity: specific_humidity.get(i).ok_or_else(|| null("specificHumidity"))?,
+                mol_water_fraction: mol_water_fraction.get(i).ok_or_else(|| null("molWaterFraction"))?,
+            })
+        }).collect()
+    }
+}
+
+// ---- Kernel ----------------------------------------------------------------
+
+/// Drive the `doHeatIndex` pass over the input tables.
+///
+/// For each `ZoneMonthHour` row, joins to `Zone` → `County` to look up the
+/// county's barometric pressure and altitude, applies
+/// [`resolve_county_meteorology`] to fill defaults, then calls
+/// [`compute_zone_month_hour`] to produce the three output columns.
+///
+/// Rows with no matching `Zone` or `County` entry are silently dropped —
+/// the same behaviour as the Java's inner-join SQL.
+pub fn build_meteorology_table(inputs: &MeteorologyInputs) -> Vec<MeteorologyOutputRow> {
+    let zone_to_county: HashMap<i32, i32> = inputs.zone.iter()
+        .map(|z| (z.zone_id, z.county_id))
+        .collect();
+    let county_map: HashMap<i32, &MeteorologyCountyRow> = inputs.county.iter()
+        .map(|c| (c.county_id, c))
+        .collect();
+
+    let mut rows = Vec::with_capacity(inputs.zone_month_hour.len());
+    for zmh in &inputs.zone_month_hour {
+        let Some(&county_id) = zone_to_county.get(&zmh.zone_id) else { continue; };
+        let Some(&county) = county_map.get(&county_id) else { continue; };
+
+        let altitude = county.altitude.and_then(|c| match c {
+            'H' => Some(Altitude::High),
+            'L' => Some(Altitude::Low),
+            _ => None,
+        });
+        let resolved = resolve_county_meteorology(county.barometric_pressure, altitude);
+
+        let out = compute_zone_month_hour(ZoneMonthHourInputs {
+            temperature_f: zmh.temperature_f,
+            rel_humidity: zmh.rel_humidity,
+            barometric_pressure_inhg: resolved.barometric_pressure_inhg,
+        });
+
+        rows.push(MeteorologyOutputRow {
+            zone_id: zmh.zone_id,
+            month_id: zmh.month_id,
+            hour_id: zmh.hour_id,
+            temperature_f: zmh.temperature_f,
+            rel_humidity: zmh.rel_humidity,
+            heat_index: out.heat_index,
+            specific_humidity: out.specific_humidity,
+            mol_water_fraction: out.mol_water_fraction,
+        });
+    }
+    rows
+}
+
 /// MOVES `MeteorologyGenerator` (migration plan Task 41).
 ///
 /// Builds the meteorology fields of `ZoneMonthHour`. Holds no per-run
@@ -351,14 +668,14 @@ impl Generator for MeteorologyGenerator {
         OUTPUT_TABLES
     }
 
-    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
-        // The numeric port (`compute_zone_month_hour`, `resolve_county_meteorology`)
-        // is complete, but the `ZoneMonthHour` / `Zone` / `County` tables it
-        // iterates do not materialise until the Task 50 data plane lands —
-        // `CalculatorContext` exposes no row storage yet. Until then the
-        // generator contributes no rows, matching every other Phase 2/3
-        // module (Task 28's empty-output smoke test).
-        Ok(CalculatorOutput::empty())
+    fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
+        let inputs = MeteorologyInputs {
+            zone_month_hour: ctx.tables().iter_typed("ZoneMonthHour")?,
+            zone: ctx.tables().iter_typed("Zone")?,
+            county: ctx.tables().iter_typed("County")?,
+        };
+        let rows = build_meteorology_table(&inputs);
+        crate::wiring::write_scratch_table(ctx, OUTPUT_TABLES[0], rows)
     }
 }
 
@@ -633,11 +950,137 @@ mod tests {
     }
 
     #[test]
-    fn generator_execute_is_ok() {
-        // Phase 2/3 skeleton: execute returns an empty output until the
-        // data plane lands. Smoke-test that it is callable and Ok.
-        let mut ctx = CalculatorContext::new();
-        assert!(MeteorologyGenerator.execute(&mut ctx).is_ok());
+    fn execute_writes_computed_meteorology_to_scratch() {
+        // Integration test: execute reads ZoneMonthHour/Zone/County from
+        // ctx.tables(), runs the doHeatIndex kernel, and writes the augmented
+        // ZoneMonthHour table to ctx.scratch(). Read it back and assert the
+        // kernel's direct output matches.
+        use moves_framework::{DataFrameStore, InMemoryStore};
+
+        let zone_id = 261_610_i32;
+        let county_id = 26_161_i32;
+        let month_id = 7_i32;
+        let hour_id = 8_i32;
+        let temperature_f = 88.0_f64;
+        let rel_humidity = 65.0_f64;
+        let barometric_pressure = Some(29.92_f64);
+        let altitude = Some("L".to_string());
+
+        let mut store = InMemoryStore::new();
+
+        store.insert(
+            "ZoneMonthHour",
+            MeteorologyZoneMonthHourRow::into_dataframe(vec![MeteorologyZoneMonthHourRow {
+                zone_id,
+                month_id,
+                hour_id,
+                temperature_f,
+                rel_humidity,
+            }]).unwrap(),
+        );
+        store.insert(
+            "Zone",
+            MeteorologyZoneRow::into_dataframe(vec![MeteorologyZoneRow {
+                zone_id,
+                county_id,
+            }]).unwrap(),
+        );
+        store.insert(
+            "County",
+            MeteorologyCountyRow::into_dataframe(vec![MeteorologyCountyRow {
+                county_id,
+                barometric_pressure,
+                altitude: altitude.as_ref().and_then(|s| s.chars().next()),
+            }]).unwrap(),
+        );
+
+        let mut ctx = CalculatorContext::with_tables(store);
+        let out = MeteorologyGenerator.execute(&mut ctx).expect("execute ok");
+        // Generator writes to scratch, not the main output.
+        assert!(out.dataframe().is_none());
+
+        // Read the scratch table back as typed rows.
+        let rows: Vec<MeteorologyOutputRow> = ctx
+            .scratch()
+            .store
+            .iter_typed("ZoneMonthHour")
+            .expect("ZoneMonthHour in scratch");
+        assert_eq!(rows.len(), 1);
+
+        // Compare against what the kernel functions compute directly.
+        let expected_county = resolve_county_meteorology(Some(29.92), Some(Altitude::Low));
+        let expected = compute_zone_month_hour(ZoneMonthHourInputs {
+            temperature_f,
+            rel_humidity,
+            barometric_pressure_inhg: expected_county.barometric_pressure_inhg,
+        });
+
+        let row = rows[0];
+        assert_eq!(row.zone_id, zone_id);
+        assert_eq!(row.month_id, month_id);
+        assert_eq!(row.hour_id, hour_id);
+        assert_eq!(row.temperature_f, temperature_f);
+        assert_eq!(row.rel_humidity, rel_humidity);
+        assert_eq!(row.heat_index, expected.heat_index);
+        assert_eq!(row.specific_humidity, expected.specific_humidity);
+        assert_eq!(row.mol_water_fraction, expected.mol_water_fraction);
+    }
+
+    #[test]
+    fn execute_drops_zmh_rows_with_no_zone_match() {
+        // ZoneMonthHour rows whose zoneID has no Zone entry are silently dropped.
+        use moves_framework::{DataFrameStore, InMemoryStore};
+        let mut store = InMemoryStore::new();
+        store.insert(
+            "ZoneMonthHour",
+            MeteorologyZoneMonthHourRow::into_dataframe(vec![MeteorologyZoneMonthHourRow {
+                zone_id: 99_999,
+                month_id: 1,
+                hour_id: 1,
+                temperature_f: 55.0,
+                rel_humidity: 50.0,
+            }]).unwrap(),
+        );
+        // Zone table maps a different zone; County maps that county.
+        store.insert("Zone", MeteorologyZoneRow::into_dataframe(vec![MeteorologyZoneRow { zone_id: 1, county_id: 1 }]).unwrap());
+        store.insert(
+            "County",
+            MeteorologyCountyRow::into_dataframe(vec![MeteorologyCountyRow { county_id: 1, barometric_pressure: None, altitude: None }]).unwrap(),
+        );
+        let mut ctx = CalculatorContext::with_tables(store);
+        MeteorologyGenerator.execute(&mut ctx).expect("execute ok");
+        let rows: Vec<MeteorologyOutputRow> = ctx.scratch().store.iter_typed("ZoneMonthHour").expect("scratch table present");
+        assert!(rows.is_empty(), "rows with no zone match must be dropped");
+    }
+
+    #[test]
+    fn execute_applies_county_default_fill_for_null_pressure_and_altitude() {
+        // When County has NULL barometricPressure and NULL altitude, the
+        // default fill gives 28.94 inHg / Low — verify the output uses it.
+        use moves_framework::{DataFrameStore, InMemoryStore};
+        let mut store = InMemoryStore::new();
+        store.insert(
+            "ZoneMonthHour",
+            MeteorologyZoneMonthHourRow::into_dataframe(vec![MeteorologyZoneMonthHourRow {
+                zone_id: 1, month_id: 1, hour_id: 1, temperature_f: 55.0, rel_humidity: 50.0,
+            }]).unwrap(),
+        );
+        store.insert("Zone", MeteorologyZoneRow::into_dataframe(vec![MeteorologyZoneRow { zone_id: 1, county_id: 1 }]).unwrap());
+        store.insert(
+            "County",
+            MeteorologyCountyRow::into_dataframe(vec![MeteorologyCountyRow {
+                county_id: 1, barometric_pressure: None, altitude: None,
+            }]).unwrap(),
+        );
+        let mut ctx = CalculatorContext::with_tables(store);
+        MeteorologyGenerator.execute(&mut ctx).expect("execute ok");
+        let rows: Vec<MeteorologyOutputRow> = ctx.scratch().store.iter_typed("ZoneMonthHour").expect("scratch table present");
+        assert_eq!(rows.len(), 1);
+        // 55 °F is below the 78 °F threshold so heat_index == temperature.
+        assert_eq!(rows[0].heat_index, 55.0);
+        // specific_humidity and mol_water_fraction must be positive.
+        assert!(rows[0].specific_humidity > 0.0);
+        assert!(rows[0].mol_water_fraction > 0.0);
     }
 
     #[test]
