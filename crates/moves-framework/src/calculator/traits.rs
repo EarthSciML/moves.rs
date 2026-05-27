@@ -68,6 +68,7 @@
 use moves_calculator_info::{Granularity, Priority};
 use moves_data::{PollutantProcessAssociation, ProcessId};
 
+use crate::data_plane::InMemoryStore;
 use crate::error::Error;
 use crate::execution::execution_db::{ExecutionTables, IterationPosition, ScratchNamespace};
 
@@ -121,6 +122,32 @@ impl CalculatorContext {
         }
     }
 
+    /// Construct a context backed by the given [`InMemoryStore`].
+    ///
+    /// Used by calculator `execute` tests that populate the store with
+    /// typed tables and then call `execute` against the resulting context.
+    #[must_use]
+    pub fn with_tables(store: InMemoryStore) -> Self {
+        Self {
+            tables: ExecutionTables::with_store(store),
+            scratch: ScratchNamespace::empty(),
+            position: IterationPosition::default(),
+        }
+    }
+
+    /// Construct a context with the given position and table store.
+    ///
+    /// Used by calculator `execute` tests that need both position-aware
+    /// logic and typed table data.
+    #[must_use]
+    pub fn with_position_and_tables(position: IterationPosition, store: InMemoryStore) -> Self {
+        Self {
+            tables: ExecutionTables::with_store(store),
+            scratch: ScratchNamespace::empty(),
+            position,
+        }
+    }
+
     /// Per-run filtered default-DB tables. Calculators read from this in
     /// their [`Calculator::execute`] body, indexing by the canonical
     /// table names declared in [`Calculator::input_tables`].
@@ -147,22 +174,38 @@ impl CalculatorContext {
 
 /// Value returned by [`Calculator::execute`] / [`Generator::execute`].
 ///
-/// **Phase 2 skeleton.** Task 50 (`DataFrameStore`) replaces this with a
-/// Polars `DataFrame`. Fixing the placeholder type here lets Phase 3
-/// calculators commit to a result type that the registry can store, even
-/// before the data plane has materialised.
+/// Wraps an optional emission `DataFrame`. [`empty()`](Self::empty) is valid
+/// for Phase 2 shells that haven't been wired to the data plane yet;
+/// [`with_dataframe`](Self::with_dataframe) is used by calculators that
+/// have been wired.
 #[derive(Debug, Default)]
 pub struct CalculatorOutput {
-    // Task 50 replaces with a real DataFrame.
-    _private: (),
+    df: Option<polars::prelude::DataFrame>,
 }
 
 impl CalculatorOutput {
-    /// Construct an empty output. Stand-in until [`CalculatorOutput`] wraps
-    /// a real Polars `DataFrame` (Task 50).
+    /// Construct an empty output (no emission rows).
     #[must_use]
     pub fn empty() -> Self {
-        Self { _private: () }
+        Self { df: None }
+    }
+
+    /// Construct an output carrying an emission `DataFrame`.
+    #[must_use]
+    pub fn with_dataframe(df: polars::prelude::DataFrame) -> Self {
+        Self { df: Some(df) }
+    }
+
+    /// Return a reference to the contained `DataFrame`, or `None` if empty.
+    #[must_use]
+    pub fn dataframe(&self) -> Option<&polars::prelude::DataFrame> {
+        self.df.as_ref()
+    }
+
+    /// Consume the output and return the contained `DataFrame`, or `None`.
+    #[must_use]
+    pub fn into_dataframe(self) -> Option<polars::prelude::DataFrame> {
+        self.df
     }
 }
 

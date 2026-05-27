@@ -121,7 +121,9 @@ use moves_calculator_info::{Granularity, Priority};
 use moves_data::{PollutantId, PollutantProcessAssociation, ProcessId};
 use moves_framework::{
     Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, Error,
+    TableRow,
 };
+use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
 
 /// Stable module name — matches the Java class and the
 /// `EvaporativePermeationCalculator` entry in the calculator-chain DAG
@@ -608,6 +610,1057 @@ impl PermeationEmissionRow {
             self.model_year_id,
             self.fuel_type_id,
         ]
+    }
+}
+
+// ===========================================================================
+// TableRow implementations — serialise/deserialise input and output row
+// types via the Polars DataFrame store.
+// ===========================================================================
+
+fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -> Error {
+    Error::RowExtraction {
+        table: table.into(),
+        row,
+        column: column.into(),
+        message: msg,
+    }
+}
+
+/// One `RunSpecSourceType` row — a sourceTypeID the run processes.
+/// Used by `execute` to populate `EvaporativePermeationInputs::run_spec_source_type`.
+#[derive(Debug, Clone, Copy)]
+struct RunSpecSourceTypeRow {
+    source_type_id: i32,
+}
+impl TableRow for RunSpecSourceTypeRow {
+    fn table_name() -> &'static str { "RunSpecSourceType" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([("sourceTypeID".into(), DataType::Int32)])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "RunSpecSourceType";
+        let st = df.column("sourceTypeID").map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?.i32().map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?;
+        (0..df.height()).map(|i| {
+            Ok(RunSpecSourceTypeRow {
+                source_type_id: st.get(i).ok_or_else(|| row_err(t, i, "sourceTypeID", "null value".into()))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for AgeCategoryRow {
+    fn table_name() -> &'static str { "AgeCategory" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("ageID".into(), DataType::Int32),
+            ("ageGroupID".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("ageID".into(), rows.iter().map(|r| r.age_id).collect::<Vec<i32>>()).into(),
+            Series::new("ageGroupID".into(), rows.iter().map(|r| r.age_group_id).collect::<Vec<i32>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "AgeCategory";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let age = get_i32("ageID")?;
+        let ag = get_i32("ageGroupID")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(AgeCategoryRow {
+                age_id: age.get(i).ok_or_else(|| null("ageID"))?,
+                age_group_id: ag.get(i).ok_or_else(|| null("ageGroupID"))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for AverageTankTemperatureRow {
+    fn table_name() -> &'static str { "AverageTankTemperature" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("tankTemperatureGroupID".into(), DataType::Int32),
+            ("zoneID".into(), DataType::Int32),
+            ("monthID".into(), DataType::Int32),
+            ("hourDayID".into(), DataType::Int32),
+            ("opModeID".into(), DataType::Int32),
+            ("averageTankTemperature".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("tankTemperatureGroupID".into(), rows.iter().map(|r| r.tank_temperature_group_id).collect::<Vec<i32>>()).into(),
+            Series::new("zoneID".into(), rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>()).into(),
+            Series::new("monthID".into(), rows.iter().map(|r| r.month_id).collect::<Vec<i32>>()).into(),
+            Series::new("hourDayID".into(), rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>()).into(),
+            Series::new("opModeID".into(), rows.iter().map(|r| r.op_mode_id).collect::<Vec<i32>>()).into(),
+            Series::new("averageTankTemperature".into(), rows.iter().map(|r| r.average_tank_temperature).collect::<Vec<f64>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "AverageTankTemperature";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let ttg = get_i32("tankTemperatureGroupID")?;
+        let zo = get_i32("zoneID")?;
+        let mo = get_i32("monthID")?;
+        let hd = get_i32("hourDayID")?;
+        let om = get_i32("opModeID")?;
+        let att = df.column("averageTankTemperature").map_err(|e| row_err(t, 0, "averageTankTemperature", e.to_string()))?.f64().map_err(|e| row_err(t, 0, "averageTankTemperature", e.to_string()))?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(AverageTankTemperatureRow {
+                tank_temperature_group_id: ttg.get(i).ok_or_else(|| null("tankTemperatureGroupID"))?,
+                zone_id: zo.get(i).ok_or_else(|| null("zoneID"))?,
+                month_id: mo.get(i).ok_or_else(|| null("monthID"))?,
+                hour_day_id: hd.get(i).ok_or_else(|| null("hourDayID"))?,
+                op_mode_id: om.get(i).ok_or_else(|| null("opModeID"))?,
+                average_tank_temperature: att.get(i).ok_or_else(|| null("averageTankTemperature"))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for CountyRow {
+    fn table_name() -> &'static str { "County" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("countyID".into(), DataType::Int32),
+            ("stateID".into(), DataType::Int32),
+            ("GPAFract".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("countyID".into(), rows.iter().map(|r| r.county_id).collect::<Vec<i32>>()).into(),
+            Series::new("stateID".into(), rows.iter().map(|r| r.state_id).collect::<Vec<i32>>()).into(),
+            Series::new("GPAFract".into(), rows.iter().map(|r| r.gpa_fract).collect::<Vec<f64>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "County";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let co = get_i32("countyID")?;
+        let st = get_i32("stateID")?;
+        let gpa = df.column("GPAFract").map_err(|e| row_err(t, 0, "GPAFract", e.to_string()))?.f64().map_err(|e| row_err(t, 0, "GPAFract", e.to_string()))?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(CountyRow {
+                county_id: co.get(i).ok_or_else(|| null("countyID"))?,
+                state_id: st.get(i).ok_or_else(|| null("stateID"))?,
+                gpa_fract: gpa.get(i).ok_or_else(|| null("GPAFract"))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for EmissionRateByAgeRow {
+    fn table_name() -> &'static str { "EmissionRateByAge" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("sourceBinID".into(), DataType::Int64),
+            ("polProcessID".into(), DataType::Int32),
+            ("ageGroupID".into(), DataType::Int32),
+            ("meanBaseRate".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("sourceBinID".into(), rows.iter().map(|r| r.source_bin_id).collect::<Vec<i64>>()).into(),
+            Series::new("polProcessID".into(), rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>()).into(),
+            Series::new("ageGroupID".into(), rows.iter().map(|r| r.age_group_id).collect::<Vec<i32>>()).into(),
+            Series::new("meanBaseRate".into(), rows.iter().map(|r| r.mean_base_rate).collect::<Vec<f64>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "EmissionRateByAge";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let sb = df.column("sourceBinID").map_err(|e| row_err(t, 0, "sourceBinID", e.to_string()))?.i64().map_err(|e| row_err(t, 0, "sourceBinID", e.to_string()))?;
+        let pp = get_i32("polProcessID")?;
+        let ag = get_i32("ageGroupID")?;
+        let mbr = df.column("meanBaseRate").map_err(|e| row_err(t, 0, "meanBaseRate", e.to_string()))?.f64().map_err(|e| row_err(t, 0, "meanBaseRate", e.to_string()))?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(EmissionRateByAgeRow {
+                source_bin_id: sb.get(i).ok_or_else(|| null("sourceBinID"))?,
+                pol_process_id: pp.get(i).ok_or_else(|| null("polProcessID"))?,
+                age_group_id: ag.get(i).ok_or_else(|| null("ageGroupID"))?,
+                mean_base_rate: mbr.get(i).ok_or_else(|| null("meanBaseRate"))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for EtohBinRow {
+    fn table_name() -> &'static str { "ETOHBin" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("etohThreshID".into(), DataType::Int32),
+            ("etohThreshLow".into(), DataType::Float64),
+            ("etohThreshHigh".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("etohThreshID".into(), rows.iter().map(|r| r.etoh_thresh_id).collect::<Vec<i32>>()).into(),
+            Series::new("etohThreshLow".into(), rows.iter().map(|r| r.etoh_thresh_low).collect::<Vec<f64>>()).into(),
+            Series::new("etohThreshHigh".into(), rows.iter().map(|r| r.etoh_thresh_high).collect::<Vec<f64>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "ETOHBin";
+        let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let id = df.column("etohThreshID").map_err(|e| row_err(t, 0, "etohThreshID", e.to_string()))?.i32().map_err(|e| row_err(t, 0, "etohThreshID", e.to_string()))?;
+        let lo = get_f64("etohThreshLow")?;
+        let hi = get_f64("etohThreshHigh")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(EtohBinRow {
+                etoh_thresh_id: id.get(i).ok_or_else(|| null("etohThreshID"))?,
+                etoh_thresh_low: lo.get(i).ok_or_else(|| null("etohThreshLow"))?,
+                etoh_thresh_high: hi.get(i).ok_or_else(|| null("etohThreshHigh"))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for FuelFormulationRow {
+    fn table_name() -> &'static str { "FuelFormulation" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("fuelFormulationID".into(), DataType::Int32),
+            ("fuelSubtypeID".into(), DataType::Int32),
+            ("ETOHVolume".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("fuelFormulationID".into(), rows.iter().map(|r| r.fuel_formulation_id).collect::<Vec<i32>>()).into(),
+            Series::new("fuelSubtypeID".into(), rows.iter().map(|r| r.fuel_subtype_id).collect::<Vec<i32>>()).into(),
+            Series::new("ETOHVolume".into(), rows.iter().map(|r| r.etoh_volume.unwrap_or(0.0)).collect::<Vec<f64>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "FuelFormulation";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let ff = get_i32("fuelFormulationID")?;
+        let fs = get_i32("fuelSubtypeID")?;
+        let ev = df.column("ETOHVolume").map_err(|e| row_err(t, 0, "ETOHVolume", e.to_string()))?.f64().map_err(|e| row_err(t, 0, "ETOHVolume", e.to_string()))?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(FuelFormulationRow {
+                fuel_formulation_id: ff.get(i).ok_or_else(|| null("fuelFormulationID"))?,
+                fuel_subtype_id: fs.get(i).ok_or_else(|| null("fuelSubtypeID"))?,
+                etoh_volume: ev.get(i),
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for FuelSubtypeRow {
+    fn table_name() -> &'static str { "FuelSubtype" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("fuelSubtypeID".into(), DataType::Int32),
+            ("fuelTypeID".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("fuelSubtypeID".into(), rows.iter().map(|r| r.fuel_subtype_id).collect::<Vec<i32>>()).into(),
+            Series::new("fuelTypeID".into(), rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "FuelSubtype";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let fst = get_i32("fuelSubtypeID")?;
+        let ft = get_i32("fuelTypeID")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(FuelSubtypeRow {
+                fuel_subtype_id: fst.get(i).ok_or_else(|| null("fuelSubtypeID"))?,
+                fuel_type_id: ft.get(i).ok_or_else(|| null("fuelTypeID"))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for FuelSupplyRow {
+    fn table_name() -> &'static str { "FuelSupply" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("fuelYearID".into(), DataType::Int32),
+            ("monthGroupID".into(), DataType::Int32),
+            ("fuelFormulationID".into(), DataType::Int32),
+            ("marketShare".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("fuelYearID".into(), rows.iter().map(|r| r.fuel_year_id).collect::<Vec<i32>>()).into(),
+            Series::new("monthGroupID".into(), rows.iter().map(|r| r.month_group_id).collect::<Vec<i32>>()).into(),
+            Series::new("fuelFormulationID".into(), rows.iter().map(|r| r.fuel_formulation_id).collect::<Vec<i32>>()).into(),
+            Series::new("marketShare".into(), rows.iter().map(|r| r.market_share).collect::<Vec<f64>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "FuelSupply";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let fy = get_i32("fuelYearID")?;
+        let mg = get_i32("monthGroupID")?;
+        let ff = get_i32("fuelFormulationID")?;
+        let ms = df.column("marketShare").map_err(|e| row_err(t, 0, "marketShare", e.to_string()))?.f64().map_err(|e| row_err(t, 0, "marketShare", e.to_string()))?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(FuelSupplyRow {
+                fuel_year_id: fy.get(i).ok_or_else(|| null("fuelYearID"))?,
+                month_group_id: mg.get(i).ok_or_else(|| null("monthGroupID"))?,
+                fuel_formulation_id: ff.get(i).ok_or_else(|| null("fuelFormulationID"))?,
+                market_share: ms.get(i).ok_or_else(|| null("marketShare"))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for HcPermeationCoeffRow {
+    fn table_name() -> &'static str { "HCPermeationCoeff" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("polProcessID".into(), DataType::Int32),
+            ("etohThreshID".into(), DataType::Int32),
+            ("fuelMYGroupID".into(), DataType::Int32),
+            ("fuelAdjustment".into(), DataType::Float64),
+            ("fuelAdjustmentGPA".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("polProcessID".into(), rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>()).into(),
+            Series::new("etohThreshID".into(), rows.iter().map(|r| r.etoh_thresh_id).collect::<Vec<i32>>()).into(),
+            Series::new("fuelMYGroupID".into(), rows.iter().map(|r| r.fuel_my_group_id).collect::<Vec<i32>>()).into(),
+            Series::new("fuelAdjustment".into(), rows.iter().map(|r| r.fuel_adjustment).collect::<Vec<f64>>()).into(),
+            Series::new("fuelAdjustmentGPA".into(), rows.iter().map(|r| r.fuel_adjustment_gpa).collect::<Vec<f64>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "HCPermeationCoeff";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let pp = get_i32("polProcessID")?;
+        let et = get_i32("etohThreshID")?;
+        let mg = get_i32("fuelMYGroupID")?;
+        let fa = get_f64("fuelAdjustment")?;
+        let fg = get_f64("fuelAdjustmentGPA")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(HcPermeationCoeffRow {
+                pol_process_id: pp.get(i).ok_or_else(|| null("polProcessID"))?,
+                etoh_thresh_id: et.get(i).ok_or_else(|| null("etohThreshID"))?,
+                fuel_my_group_id: mg.get(i).ok_or_else(|| null("fuelMYGroupID"))?,
+                fuel_adjustment: fa.get(i).ok_or_else(|| null("fuelAdjustment"))?,
+                fuel_adjustment_gpa: fg.get(i).ok_or_else(|| null("fuelAdjustmentGPA"))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for HourDayRow {
+    fn table_name() -> &'static str { "HourDay" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("hourDayID".into(), DataType::Int32),
+            ("dayID".into(), DataType::Int32),
+            ("hourID".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("hourDayID".into(), rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>()).into(),
+            Series::new("dayID".into(), rows.iter().map(|r| r.day_id).collect::<Vec<i32>>()).into(),
+            Series::new("hourID".into(), rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "HourDay";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let hd = get_i32("hourDayID")?;
+        let day = get_i32("dayID")?;
+        let hr = get_i32("hourID")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(HourDayRow {
+                hour_day_id: hd.get(i).ok_or_else(|| null("hourDayID"))?,
+                day_id: day.get(i).ok_or_else(|| null("dayID"))?,
+                hour_id: hr.get(i).ok_or_else(|| null("hourID"))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for LinkRow {
+    fn table_name() -> &'static str { "Link" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("linkID".into(), DataType::Int32),
+            ("countyID".into(), DataType::Int32),
+            ("zoneID".into(), DataType::Int32),
+            ("roadTypeID".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("linkID".into(), rows.iter().map(|r| r.link_id).collect::<Vec<i32>>()).into(),
+            Series::new("countyID".into(), rows.iter().map(|r| r.county_id).collect::<Vec<i32>>()).into(),
+            Series::new("zoneID".into(), rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>()).into(),
+            Series::new("roadTypeID".into(), rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "Link";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let lk = get_i32("linkID")?;
+        let co = get_i32("countyID")?;
+        let zo = get_i32("zoneID")?;
+        let rt = get_i32("roadTypeID")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(LinkRow {
+                link_id: lk.get(i).ok_or_else(|| null("linkID"))?,
+                county_id: co.get(i).ok_or_else(|| null("countyID"))?,
+                zone_id: zo.get(i).ok_or_else(|| null("zoneID"))?,
+                road_type_id: rt.get(i).ok_or_else(|| null("roadTypeID"))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for ModelYearRow {
+    fn table_name() -> &'static str { "ModelYear" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([("modelYearID".into(), DataType::Int32)])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("modelYearID".into(), rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "ModelYear";
+        let my = df.column("modelYearID").map_err(|e| row_err(t, 0, "modelYearID", e.to_string()))?.i32().map_err(|e| row_err(t, 0, "modelYearID", e.to_string()))?;
+        (0..df.height()).map(|i| {
+            Ok(ModelYearRow {
+                model_year_id: my.get(i).ok_or_else(|| row_err(t, i, "modelYearID", "null value".into()))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for OpModeDistributionRow {
+    fn table_name() -> &'static str { "OpModeDistribution" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("sourceTypeID".into(), DataType::Int32),
+            ("hourDayID".into(), DataType::Int32),
+            ("linkID".into(), DataType::Int32),
+            ("polProcessID".into(), DataType::Int32),
+            ("opModeID".into(), DataType::Int32),
+            ("opModeFraction".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
+            Series::new("hourDayID".into(), rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>()).into(),
+            Series::new("linkID".into(), rows.iter().map(|r| r.link_id).collect::<Vec<i32>>()).into(),
+            Series::new("polProcessID".into(), rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>()).into(),
+            Series::new("opModeID".into(), rows.iter().map(|r| r.op_mode_id).collect::<Vec<i32>>()).into(),
+            Series::new("opModeFraction".into(), rows.iter().map(|r| r.op_mode_fraction).collect::<Vec<f64>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "OpModeDistribution";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let st = get_i32("sourceTypeID")?;
+        let hd = get_i32("hourDayID")?;
+        let lk = get_i32("linkID")?;
+        let pp = get_i32("polProcessID")?;
+        let om = get_i32("opModeID")?;
+        let omf = df.column("opModeFraction").map_err(|e| row_err(t, 0, "opModeFraction", e.to_string()))?.f64().map_err(|e| row_err(t, 0, "opModeFraction", e.to_string()))?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(OpModeDistributionRow {
+                source_type_id: st.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                hour_day_id: hd.get(i).ok_or_else(|| null("hourDayID"))?,
+                link_id: lk.get(i).ok_or_else(|| null("linkID"))?,
+                pol_process_id: pp.get(i).ok_or_else(|| null("polProcessID"))?,
+                op_mode_id: om.get(i).ok_or_else(|| null("opModeID"))?,
+                op_mode_fraction: omf.get(i).ok_or_else(|| null("opModeFraction"))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for PollutantProcessAssocRow {
+    fn table_name() -> &'static str { "PollutantProcessAssoc" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("polProcessID".into(), DataType::Int32),
+            ("processID".into(), DataType::Int32),
+            ("pollutantID".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("polProcessID".into(), rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>()).into(),
+            Series::new("processID".into(), rows.iter().map(|r| r.process_id).collect::<Vec<i32>>()).into(),
+            Series::new("pollutantID".into(), rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "PollutantProcessAssoc";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let pp = get_i32("polProcessID")?;
+        let proc = get_i32("processID")?;
+        let pol = get_i32("pollutantID")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(PollutantProcessAssocRow {
+                pol_process_id: pp.get(i).ok_or_else(|| null("polProcessID"))?,
+                process_id: proc.get(i).ok_or_else(|| null("processID"))?,
+                pollutant_id: pol.get(i).ok_or_else(|| null("pollutantID"))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for PollutantProcessMappedModelYearRow {
+    fn table_name() -> &'static str { "PollutantProcessMappedModelYear" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("polProcessID".into(), DataType::Int32),
+            ("modelYearID".into(), DataType::Int32),
+            ("fuelMYGroupID".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("polProcessID".into(), rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>()).into(),
+            Series::new("modelYearID".into(), rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>()).into(),
+            Series::new("fuelMYGroupID".into(), rows.iter().map(|r| r.fuel_my_group_id).collect::<Vec<i32>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "PollutantProcessMappedModelYear";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let pp = get_i32("polProcessID")?;
+        let my = get_i32("modelYearID")?;
+        let mg = get_i32("fuelMYGroupID")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(PollutantProcessMappedModelYearRow {
+                pol_process_id: pp.get(i).ok_or_else(|| null("polProcessID"))?,
+                model_year_id: my.get(i).ok_or_else(|| null("modelYearID"))?,
+                fuel_my_group_id: mg.get(i).ok_or_else(|| null("fuelMYGroupID"))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for PollutantProcessModelYearRow {
+    fn table_name() -> &'static str { "PollutantProcessModelYear" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("polProcessID".into(), DataType::Int32),
+            ("modelYearID".into(), DataType::Int32),
+            ("modelYearGroupID".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("polProcessID".into(), rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>()).into(),
+            Series::new("modelYearID".into(), rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>()).into(),
+            Series::new("modelYearGroupID".into(), rows.iter().map(|r| r.model_year_group_id).collect::<Vec<i32>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "PollutantProcessModelYear";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let pp = get_i32("polProcessID")?;
+        let my = get_i32("modelYearID")?;
+        let mg = get_i32("modelYearGroupID")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(PollutantProcessModelYearRow {
+                pol_process_id: pp.get(i).ok_or_else(|| null("polProcessID"))?,
+                model_year_id: my.get(i).ok_or_else(|| null("modelYearID"))?,
+                model_year_group_id: mg.get(i).ok_or_else(|| null("modelYearGroupID"))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for RegClassSourceTypeFractionRow {
+    fn table_name() -> &'static str { "RegClassSourceTypeFraction" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("fuelTypeID".into(), DataType::Int32),
+            ("modelYearID".into(), DataType::Int32),
+            ("sourceTypeID".into(), DataType::Int32),
+            ("regClassID".into(), DataType::Int32),
+            ("regClassFraction".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("fuelTypeID".into(), rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>()).into(),
+            Series::new("modelYearID".into(), rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>()).into(),
+            Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
+            Series::new("regClassID".into(), rows.iter().map(|r| r.reg_class_id).collect::<Vec<i32>>()).into(),
+            Series::new("regClassFraction".into(), rows.iter().map(|r| r.reg_class_fraction).collect::<Vec<f64>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "RegClassSourceTypeFraction";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let ft = get_i32("fuelTypeID")?;
+        let my = get_i32("modelYearID")?;
+        let st = get_i32("sourceTypeID")?;
+        let rc = get_i32("regClassID")?;
+        let rf = df.column("regClassFraction").map_err(|e| row_err(t, 0, "regClassFraction", e.to_string()))?.f64().map_err(|e| row_err(t, 0, "regClassFraction", e.to_string()))?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(RegClassSourceTypeFractionRow {
+                fuel_type_id: ft.get(i).ok_or_else(|| null("fuelTypeID"))?,
+                model_year_id: my.get(i).ok_or_else(|| null("modelYearID"))?,
+                source_type_id: st.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                reg_class_id: rc.get(i).ok_or_else(|| null("regClassID"))?,
+                reg_class_fraction: rf.get(i).ok_or_else(|| null("regClassFraction"))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for SourceBinRow {
+    fn table_name() -> &'static str { "SourceBin" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("sourceBinID".into(), DataType::Int64),
+            ("fuelTypeID".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("sourceBinID".into(), rows.iter().map(|r| r.source_bin_id).collect::<Vec<i64>>()).into(),
+            Series::new("fuelTypeID".into(), rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "SourceBin";
+        let sb = df.column("sourceBinID").map_err(|e| row_err(t, 0, "sourceBinID", e.to_string()))?.i64().map_err(|e| row_err(t, 0, "sourceBinID", e.to_string()))?;
+        let ft = df.column("fuelTypeID").map_err(|e| row_err(t, 0, "fuelTypeID", e.to_string()))?.i32().map_err(|e| row_err(t, 0, "fuelTypeID", e.to_string()))?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(SourceBinRow {
+                source_bin_id: sb.get(i).ok_or_else(|| null("sourceBinID"))?,
+                fuel_type_id: ft.get(i).ok_or_else(|| null("fuelTypeID"))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for SourceBinDistributionRow {
+    fn table_name() -> &'static str { "SourceBinDistribution" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("sourceTypeModelYearID".into(), DataType::Int32),
+            ("polProcessID".into(), DataType::Int32),
+            ("sourceBinID".into(), DataType::Int64),
+            ("sourceBinActivityFraction".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("sourceTypeModelYearID".into(), rows.iter().map(|r| r.source_type_model_year_id).collect::<Vec<i32>>()).into(),
+            Series::new("polProcessID".into(), rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>()).into(),
+            Series::new("sourceBinID".into(), rows.iter().map(|r| r.source_bin_id).collect::<Vec<i64>>()).into(),
+            Series::new("sourceBinActivityFraction".into(), rows.iter().map(|r| r.source_bin_activity_fraction).collect::<Vec<f64>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "SourceBinDistribution";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let stmy = get_i32("sourceTypeModelYearID")?;
+        let pp = get_i32("polProcessID")?;
+        let sb = df.column("sourceBinID").map_err(|e| row_err(t, 0, "sourceBinID", e.to_string()))?.i64().map_err(|e| row_err(t, 0, "sourceBinID", e.to_string()))?;
+        let sbaf = df.column("sourceBinActivityFraction").map_err(|e| row_err(t, 0, "sourceBinActivityFraction", e.to_string()))?.f64().map_err(|e| row_err(t, 0, "sourceBinActivityFraction", e.to_string()))?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(SourceBinDistributionRow {
+                source_type_model_year_id: stmy.get(i).ok_or_else(|| null("sourceTypeModelYearID"))?,
+                pol_process_id: pp.get(i).ok_or_else(|| null("polProcessID"))?,
+                source_bin_id: sb.get(i).ok_or_else(|| null("sourceBinID"))?,
+                source_bin_activity_fraction: sbaf.get(i).ok_or_else(|| null("sourceBinActivityFraction"))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for SourceHoursRow {
+    fn table_name() -> &'static str { "SourceHours" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("hourDayID".into(), DataType::Int32),
+            ("monthID".into(), DataType::Int32),
+            ("yearID".into(), DataType::Int32),
+            ("ageID".into(), DataType::Int32),
+            ("linkID".into(), DataType::Int32),
+            ("sourceTypeID".into(), DataType::Int32),
+            ("sourceHours".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("hourDayID".into(), rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>()).into(),
+            Series::new("monthID".into(), rows.iter().map(|r| r.month_id).collect::<Vec<i32>>()).into(),
+            Series::new("yearID".into(), rows.iter().map(|r| r.year_id).collect::<Vec<i32>>()).into(),
+            Series::new("ageID".into(), rows.iter().map(|r| r.age_id).collect::<Vec<i32>>()).into(),
+            Series::new("linkID".into(), rows.iter().map(|r| r.link_id).collect::<Vec<i32>>()).into(),
+            Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
+            Series::new("sourceHours".into(), rows.iter().map(|r| r.source_hours).collect::<Vec<f64>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "SourceHours";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let hd = get_i32("hourDayID")?;
+        let mo = get_i32("monthID")?;
+        let yr = get_i32("yearID")?;
+        let age = get_i32("ageID")?;
+        let lk = get_i32("linkID")?;
+        let st = get_i32("sourceTypeID")?;
+        let sh = df.column("sourceHours").map_err(|e| row_err(t, 0, "sourceHours", e.to_string()))?.f64().map_err(|e| row_err(t, 0, "sourceHours", e.to_string()))?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(SourceHoursRow {
+                hour_day_id: hd.get(i).ok_or_else(|| null("hourDayID"))?,
+                month_id: mo.get(i).ok_or_else(|| null("monthID"))?,
+                year_id: yr.get(i).ok_or_else(|| null("yearID"))?,
+                age_id: age.get(i).ok_or_else(|| null("ageID"))?,
+                link_id: lk.get(i).ok_or_else(|| null("linkID"))?,
+                source_type_id: st.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                source_hours: sh.get(i).ok_or_else(|| null("sourceHours"))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for SourceTypeModelYearRow {
+    fn table_name() -> &'static str { "SourceTypeModelYear" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("sourceTypeModelYearID".into(), DataType::Int32),
+            ("modelYearID".into(), DataType::Int32),
+            ("sourceTypeID".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("sourceTypeModelYearID".into(), rows.iter().map(|r| r.source_type_model_year_id).collect::<Vec<i32>>()).into(),
+            Series::new("modelYearID".into(), rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>()).into(),
+            Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "SourceTypeModelYear";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let stmy = get_i32("sourceTypeModelYearID")?;
+        let my = get_i32("modelYearID")?;
+        let st = get_i32("sourceTypeID")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(SourceTypeModelYearRow {
+                source_type_model_year_id: stmy.get(i).ok_or_else(|| null("sourceTypeModelYearID"))?,
+                model_year_id: my.get(i).ok_or_else(|| null("modelYearID"))?,
+                source_type_id: st.get(i).ok_or_else(|| null("sourceTypeID"))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for SourceTypeModelYearGroupRow {
+    fn table_name() -> &'static str { "SourceTypeModelYearGroup" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("sourceTypeID".into(), DataType::Int32),
+            ("modelYearGroupID".into(), DataType::Int32),
+            ("tankTemperatureGroupID".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
+            Series::new("modelYearGroupID".into(), rows.iter().map(|r| r.model_year_group_id).collect::<Vec<i32>>()).into(),
+            Series::new("tankTemperatureGroupID".into(), rows.iter().map(|r| r.tank_temperature_group_id).collect::<Vec<i32>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "SourceTypeModelYearGroup";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let st = get_i32("sourceTypeID")?;
+        let mg = get_i32("modelYearGroupID")?;
+        let ttg = get_i32("tankTemperatureGroupID")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(SourceTypeModelYearGroupRow {
+                source_type_id: st.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                model_year_group_id: mg.get(i).ok_or_else(|| null("modelYearGroupID"))?,
+                tank_temperature_group_id: ttg.get(i).ok_or_else(|| null("tankTemperatureGroupID"))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for TemperatureAdjustmentRow {
+    fn table_name() -> &'static str { "TemperatureAdjustment" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("polProcessID".into(), DataType::Int32),
+            ("fuelTypeID".into(), DataType::Int32),
+            ("minModelYearID".into(), DataType::Int32),
+            ("maxModelYearID".into(), DataType::Int32),
+            ("tempAdjustTermA".into(), DataType::Float64),
+            ("tempAdjustTermB".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("polProcessID".into(), rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>()).into(),
+            Series::new("fuelTypeID".into(), rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>()).into(),
+            Series::new("minModelYearID".into(), rows.iter().map(|r| r.min_model_year_id).collect::<Vec<i32>>()).into(),
+            Series::new("maxModelYearID".into(), rows.iter().map(|r| r.max_model_year_id).collect::<Vec<i32>>()).into(),
+            Series::new("tempAdjustTermA".into(), rows.iter().map(|r| r.temp_adjust_term_a).collect::<Vec<f64>>()).into(),
+            Series::new("tempAdjustTermB".into(), rows.iter().map(|r| r.temp_adjust_term_b).collect::<Vec<f64>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "TemperatureAdjustment";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let pp = get_i32("polProcessID")?;
+        let ft = get_i32("fuelTypeID")?;
+        let min_my = get_i32("minModelYearID")?;
+        let max_my = get_i32("maxModelYearID")?;
+        let ta = get_f64("tempAdjustTermA")?;
+        let tb = get_f64("tempAdjustTermB")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(TemperatureAdjustmentRow {
+                pol_process_id: pp.get(i).ok_or_else(|| null("polProcessID"))?,
+                fuel_type_id: ft.get(i).ok_or_else(|| null("fuelTypeID"))?,
+                min_model_year_id: min_my.get(i).ok_or_else(|| null("minModelYearID"))?,
+                max_model_year_id: max_my.get(i).ok_or_else(|| null("maxModelYearID"))?,
+                temp_adjust_term_a: ta.get(i).ok_or_else(|| null("tempAdjustTermA"))?,
+                temp_adjust_term_b: tb.get(i).ok_or_else(|| null("tempAdjustTermB"))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for YearRow {
+    fn table_name() -> &'static str { "Year" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("yearID".into(), DataType::Int32),
+            ("fuelYearID".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("yearID".into(), rows.iter().map(|r| r.year_id).collect::<Vec<i32>>()).into(),
+            Series::new("fuelYearID".into(), rows.iter().map(|r| r.fuel_year_id).collect::<Vec<i32>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "Year";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let yr = get_i32("yearID")?;
+        let fy = get_i32("fuelYearID")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(YearRow {
+                year_id: yr.get(i).ok_or_else(|| null("yearID"))?,
+                fuel_year_id: fy.get(i).ok_or_else(|| null("fuelYearID"))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for PermeationEmissionRow {
+    fn table_name() -> &'static str { "MOVESWorkerOutput" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("stateID".into(), DataType::Int32),
+            ("countyID".into(), DataType::Int32),
+            ("zoneID".into(), DataType::Int32),
+            ("linkID".into(), DataType::Int32),
+            ("roadTypeID".into(), DataType::Int32),
+            ("yearID".into(), DataType::Int32),
+            ("monthID".into(), DataType::Int32),
+            ("dayID".into(), DataType::Int32),
+            ("hourID".into(), DataType::Int32),
+            ("pollutantID".into(), DataType::Int32),
+            ("processID".into(), DataType::Int32),
+            ("sourceTypeID".into(), DataType::Int32),
+            ("regClassID".into(), DataType::Int32),
+            ("modelYearID".into(), DataType::Int32),
+            ("fuelTypeID".into(), DataType::Int32),
+            ("emissionQuant".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("stateID".into(), rows.iter().map(|r| r.state_id).collect::<Vec<i32>>()).into(),
+            Series::new("countyID".into(), rows.iter().map(|r| r.county_id).collect::<Vec<i32>>()).into(),
+            Series::new("zoneID".into(), rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>()).into(),
+            Series::new("linkID".into(), rows.iter().map(|r| r.link_id).collect::<Vec<i32>>()).into(),
+            Series::new("roadTypeID".into(), rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>()).into(),
+            Series::new("yearID".into(), rows.iter().map(|r| r.year_id).collect::<Vec<i32>>()).into(),
+            Series::new("monthID".into(), rows.iter().map(|r| r.month_id).collect::<Vec<i32>>()).into(),
+            Series::new("dayID".into(), rows.iter().map(|r| r.day_id).collect::<Vec<i32>>()).into(),
+            Series::new("hourID".into(), rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>()).into(),
+            Series::new("pollutantID".into(), rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>()).into(),
+            Series::new("processID".into(), rows.iter().map(|r| r.process_id).collect::<Vec<i32>>()).into(),
+            Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
+            Series::new("regClassID".into(), rows.iter().map(|r| r.reg_class_id).collect::<Vec<i32>>()).into(),
+            Series::new("modelYearID".into(), rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>()).into(),
+            Series::new("fuelTypeID".into(), rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>()).into(),
+            Series::new("emissionQuant".into(), rows.iter().map(|r| r.emission_quant).collect::<Vec<f64>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "MOVESWorkerOutput";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let st = get_i32("stateID")?;
+        let co = get_i32("countyID")?;
+        let zo = get_i32("zoneID")?;
+        let lk = get_i32("linkID")?;
+        let rt = get_i32("roadTypeID")?;
+        let yr = get_i32("yearID")?;
+        let mo = get_i32("monthID")?;
+        let day = get_i32("dayID")?;
+        let hr = get_i32("hourID")?;
+        let pol = get_i32("pollutantID")?;
+        let proc = get_i32("processID")?;
+        let sty = get_i32("sourceTypeID")?;
+        let rc = get_i32("regClassID")?;
+        let my = get_i32("modelYearID")?;
+        let ft = get_i32("fuelTypeID")?;
+        let eq = df.column("emissionQuant").map_err(|e| row_err(t, 0, "emissionQuant", e.to_string()))?.f64().map_err(|e| row_err(t, 0, "emissionQuant", e.to_string()))?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(PermeationEmissionRow {
+                state_id: st.get(i).ok_or_else(|| null("stateID"))?,
+                county_id: co.get(i).ok_or_else(|| null("countyID"))?,
+                zone_id: zo.get(i).ok_or_else(|| null("zoneID"))?,
+                link_id: lk.get(i).ok_or_else(|| null("linkID"))?,
+                road_type_id: rt.get(i).ok_or_else(|| null("roadTypeID"))?,
+                year_id: yr.get(i).ok_or_else(|| null("yearID"))?,
+                month_id: mo.get(i).ok_or_else(|| null("monthID"))?,
+                day_id: day.get(i).ok_or_else(|| null("dayID"))?,
+                hour_id: hr.get(i).ok_or_else(|| null("hourID"))?,
+                pollutant_id: pol.get(i).ok_or_else(|| null("pollutantID"))?,
+                process_id: proc.get(i).ok_or_else(|| null("processID"))?,
+                source_type_id: sty.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                reg_class_id: rc.get(i).ok_or_else(|| null("regClassID"))?,
+                model_year_id: my.get(i).ok_or_else(|| null("modelYearID"))?,
+                fuel_type_id: ft.get(i).ok_or_else(|| null("fuelTypeID"))?,
+                emission_quant: eq.get(i).ok_or_else(|| null("emissionQuant"))?,
+            })
+        }).collect()
     }
 }
 
@@ -1514,15 +2567,48 @@ impl Calculator for EvaporativePermeationCalculator {
         INPUT_TABLES
     }
 
-    /// Phase 2 skeleton — returns an empty [`CalculatorOutput`].
-    ///
-    /// [`CalculatorContext`] cannot yet surface the input tables or accept
-    /// the worker-output rows — its row storage lands with the Task 50
-    /// `DataFrameStore`. The computation itself is ported and tested in
-    /// [`EvaporativePermeationCalculator::calculate`]; see the
-    /// [module documentation](self).
-    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
-        Ok(CalculatorOutput::empty())
+    fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
+        let tables = ctx.tables();
+        let pos = ctx.position();
+        let year = pos.time.year.map(|y| y as i32).unwrap_or(0);
+        let zone_id = pos.location.zone_id.map(|z| z as i32).unwrap_or(0);
+        let reg_class_rows =
+            tables.iter_typed::<RegClassSourceTypeFractionRow>("RegClassSourceTypeFraction")?;
+        let with_reg_class = !reg_class_rows.is_empty();
+        let run_context = RunContext { year, zone_id, with_reg_class };
+        let run_spec_source_type: Vec<i32> = tables
+            .iter_typed::<RunSpecSourceTypeRow>("RunSpecSourceType")?
+            .into_iter()
+            .map(|r| r.source_type_id)
+            .collect();
+        let inputs = EvaporativePermeationInputs {
+            age_category: tables.iter_typed::<AgeCategoryRow>("AgeCategory")?,
+            average_tank_temperature: tables.iter_typed::<AverageTankTemperatureRow>("AverageTankTemperature")?,
+            county: tables.iter_typed::<CountyRow>("County")?,
+            emission_rate_by_age: tables.iter_typed::<EmissionRateByAgeRow>("EmissionRateByAge")?,
+            etoh_bin: tables.iter_typed::<EtohBinRow>("ETOHBin")?,
+            fuel_formulation: tables.iter_typed::<FuelFormulationRow>("FuelFormulation")?,
+            fuel_subtype: tables.iter_typed::<FuelSubtypeRow>("FuelSubtype")?,
+            fuel_supply: tables.iter_typed::<FuelSupplyRow>("FuelSupply")?,
+            hc_permeation_coeff: tables.iter_typed::<HcPermeationCoeffRow>("HCPermeationCoeff")?,
+            hour_day: tables.iter_typed::<HourDayRow>("HourDay")?,
+            link: tables.iter_typed::<LinkRow>("Link")?,
+            model_year: tables.iter_typed::<ModelYearRow>("ModelYear")?,
+            op_mode_distribution: tables.iter_typed::<OpModeDistributionRow>("OpModeDistribution")?,
+            pollutant_process_assoc: tables.iter_typed::<PollutantProcessAssocRow>("PollutantProcessAssoc")?,
+            pollutant_process_mapped_model_year: tables.iter_typed::<PollutantProcessMappedModelYearRow>("PollutantProcessMappedModelYear")?,
+            pollutant_process_model_year: tables.iter_typed::<PollutantProcessModelYearRow>("PollutantProcessModelYear")?,
+            reg_class_source_type_fraction: reg_class_rows,
+            run_spec_source_type,
+            source_bin: tables.iter_typed::<SourceBinRow>("SourceBin")?,
+            source_bin_distribution: tables.iter_typed::<SourceBinDistributionRow>("SourceBinDistribution")?,
+            source_hours: tables.iter_typed::<SourceHoursRow>("SourceHours")?,
+            source_type_model_year: tables.iter_typed::<SourceTypeModelYearRow>("SourceTypeModelYear")?,
+            source_type_model_year_group: tables.iter_typed::<SourceTypeModelYearGroupRow>("SourceTypeModelYearGroup")?,
+            temperature_adjustment: tables.iter_typed::<TemperatureAdjustmentRow>("TemperatureAdjustment")?,
+            year: tables.iter_typed::<YearRow>("Year")?,
+        };
+        crate::wiring::emit_rows(self.calculate(&inputs, &run_context))
     }
 }
 
@@ -2070,10 +3156,50 @@ mod tests {
     }
 
     #[test]
-    fn execute_is_a_shell_until_the_data_plane_lands() {
+    fn execute_returns_nonempty_dataframe_for_minimal_inputs() {
+        use moves_framework::{DataFrameStore, InMemoryStore};
+        use moves_framework::execution::execution_db::{ExecutionLocation, ExecutionTime, IterationPosition};
+        let inputs = minimal_inputs();
+        let mut store = InMemoryStore::new();
+        store.insert("AgeCategory", AgeCategoryRow::into_dataframe(inputs.age_category.clone()).unwrap());
+        store.insert("AverageTankTemperature", AverageTankTemperatureRow::into_dataframe(inputs.average_tank_temperature.clone()).unwrap());
+        store.insert("County", CountyRow::into_dataframe(inputs.county.clone()).unwrap());
+        store.insert("EmissionRateByAge", EmissionRateByAgeRow::into_dataframe(inputs.emission_rate_by_age.clone()).unwrap());
+        store.insert("ETOHBin", EtohBinRow::into_dataframe(inputs.etoh_bin.clone()).unwrap());
+        store.insert("FuelFormulation", FuelFormulationRow::into_dataframe(inputs.fuel_formulation.clone()).unwrap());
+        store.insert("FuelSubtype", FuelSubtypeRow::into_dataframe(inputs.fuel_subtype.clone()).unwrap());
+        store.insert("FuelSupply", FuelSupplyRow::into_dataframe(inputs.fuel_supply.clone()).unwrap());
+        store.insert("HCPermeationCoeff", HcPermeationCoeffRow::into_dataframe(inputs.hc_permeation_coeff.clone()).unwrap());
+        store.insert("HourDay", HourDayRow::into_dataframe(inputs.hour_day.clone()).unwrap());
+        store.insert("Link", LinkRow::into_dataframe(inputs.link.clone()).unwrap());
+        store.insert("ModelYear", ModelYearRow::into_dataframe(inputs.model_year.clone()).unwrap());
+        store.insert("OpModeDistribution", OpModeDistributionRow::into_dataframe(inputs.op_mode_distribution.clone()).unwrap());
+        store.insert("PollutantProcessAssoc", PollutantProcessAssocRow::into_dataframe(inputs.pollutant_process_assoc.clone()).unwrap());
+        store.insert("PollutantProcessMappedModelYear", PollutantProcessMappedModelYearRow::into_dataframe(inputs.pollutant_process_mapped_model_year.clone()).unwrap());
+        store.insert("PollutantProcessModelYear", PollutantProcessModelYearRow::into_dataframe(inputs.pollutant_process_model_year.clone()).unwrap());
+        store.insert("RegClassSourceTypeFraction", RegClassSourceTypeFractionRow::into_dataframe(inputs.reg_class_source_type_fraction.clone()).unwrap());
+        store.insert("RunSpecSourceType", RunSpecSourceTypeRow::into_dataframe(
+            inputs.run_spec_source_type.iter().map(|&id| RunSpecSourceTypeRow { source_type_id: id }).collect()
+        ).unwrap());
+        store.insert("SourceBin", SourceBinRow::into_dataframe(inputs.source_bin.clone()).unwrap());
+        store.insert("SourceBinDistribution", SourceBinDistributionRow::into_dataframe(inputs.source_bin_distribution.clone()).unwrap());
+        store.insert("SourceHours", SourceHoursRow::into_dataframe(inputs.source_hours.clone()).unwrap());
+        store.insert("SourceTypeModelYear", SourceTypeModelYearRow::into_dataframe(inputs.source_type_model_year.clone()).unwrap());
+        store.insert("SourceTypeModelYearGroup", SourceTypeModelYearGroupRow::into_dataframe(inputs.source_type_model_year_group.clone()).unwrap());
+        store.insert("TemperatureAdjustment", TemperatureAdjustmentRow::into_dataframe(inputs.temperature_adjustment.clone()).unwrap());
+        store.insert("Year", YearRow::into_dataframe(inputs.year.clone()).unwrap());
+        // Position: year=2020, zone=90, matches run_context() in minimal_inputs
+        let position = IterationPosition {
+            iteration: 0,
+            process_id: None,
+            location: ExecutionLocation::link(26, 26_161, 90, 5001),
+            time: ExecutionTime::year(2020),
+        };
+        let ctx = CalculatorContext::with_position_and_tables(position, store);
         let calc = EvaporativePermeationCalculator::new();
-        let ctx = CalculatorContext::new();
-        assert!(calc.execute(&ctx).is_ok());
+        let out = calc.execute(&ctx).expect("execute ok");
+        let df = out.dataframe().expect("output should contain a DataFrame");
+        assert!(df.height() > 0, "execute must return at least one output row");
     }
 
     #[test]
