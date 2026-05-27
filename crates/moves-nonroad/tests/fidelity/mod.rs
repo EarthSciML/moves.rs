@@ -17,9 +17,9 @@
 //! The harness tests themselves live in the sibling integration
 //! test `tests/nonroad_fidelity.rs`.
 //!
-//! # What runs today, and what is gated
+//! # What runs today
 //!
-//! Three things the harness does *now*, on every `cargo test`:
+//! Four things the harness does on every `cargo test`:
 //!
 //! 1. **Validates its own machinery** — the parser, the tolerance
 //!    rules, and the divergence engine are exercised end to end on
@@ -30,27 +30,22 @@
 //!    the machinery composes with genuine port output.
 //! 3. **Pins the fixture catalogue** — it confirms all ten Phase 0
 //!    NONROAD fixtures are present and well-formed.
+//! 4. **Runs the end-to-end diff** (when `NONROAD_FIDELITY_REFERENCE`
+//!    is set) — loads and structurally validates the gfortran baseline
+//!    corpus, then runs each fixture through
+//!    `run_simulation` with
+//!    `ProductionExecutor` wrapped in [`adapter::InstrumentingExecutor`]
+//!    to capture the port-side records, and reports a
+//!    [`divergence::DivergenceReport`] per fixture.
 //!
-//! One thing is **gated** behind infrastructure that does not exist
-//! in the repository yet: the end-to-end *gfortran-reference diff*.
-//! It needs two inputs —
+//! Note: until fixture-data file loaders (NR*.ACT, NR*.GRW, …) are
+//! ported, the port-side capture runs over an empty input bundle, so
+//! the diff shows all reference records "missing from port" — the
+//! report is printed but not asserted.  The full numerical comparison
+//! activates as loaders land and `NonroadInputs` is populated.
 //!
-//! - a captured `dbgemit` baseline per fixture, produced by running
-//!   the instrumented gfortran NONROAD (`characterization/nonroad-build/`)
-//!   inside the canonical-MOVES Apptainer SIF; and
-//! - the Rust port's own intermediate-state capture, produced once
-//!   Task 117 wires up `run_simulation` with port-side instrumentation.
-//!
-//! When a baseline directory is supplied via the
-//! [`REFERENCE_DIR_ENV`] environment variable, the harness loads and
-//! structurally validates it. The actual reference-vs-port diff
-//! activates with no further harness change once Task 117 lands —
-//! [`adapter`] is the contract the port instrumentation builds to,
-//! and [`divergence::compare_runs`] is the diff.
-//!
-//! This split is deliberate: Task 115 builds the *gate*; Task 116
-//! (`mo-490cm`) consumes its [`divergence::DivergenceReport`] to
-//! triage divergences; Task 117 supplies the port side of the diff.
+//! Task 116 (`mo-490cm`) consumes the [`divergence::DivergenceReport`]
+//! to triage divergences.
 
 use std::path::{Path, PathBuf};
 

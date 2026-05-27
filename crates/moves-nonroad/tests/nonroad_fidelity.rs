@@ -30,7 +30,7 @@ mod fidelity;
 
 use std::io::BufReader;
 
-use fidelity::adapter;
+use fidelity::adapter::{self, InstrumentingExecutor};
 use fidelity::divergence::compare_runs;
 use fidelity::fixtures;
 use fidelity::reference::{parse_reference, Context, Phase};
@@ -38,9 +38,12 @@ use fidelity::tolerance;
 use sha2::{Digest, Sha256};
 
 use moves_nonroad::common::consts::MXAGYR;
+use moves_nonroad::driver::RegionLevel;
 use moves_nonroad::population::{
     age_distribution, growth_factor, AgeDistributionResult, GrowthFactor, GrowthIndicatorRecord,
 };
+use moves_nonroad::simulation::{NonroadInputs, ProductionExecutor, ReferenceData};
+use moves_nonroad::{run_simulation, NonroadOptions};
 
 /// Run `age_distribution` for a fixed, well-understood case: 100
 /// head of equipment, one year forward, 10 % growth, zero
@@ -61,6 +64,23 @@ fn known_agedist() -> AgeDistributionResult {
         })
     })
     .expect("age_distribution must succeed for a well-formed input")
+}
+
+/// Build [`NonroadOptions`] for a fixture by name.
+///
+/// Loads the fixture XML to extract `geography_level` and `year`, then
+/// maps them to a [`RegionLevel`] and constructs options. Returns `None`
+/// when the fixture cannot be loaded or its required fields are absent.
+fn fixture_options_for_entry(name: &str) -> Option<NonroadOptions> {
+    let fixture = fixtures::load_fixture(name).ok()?;
+    let year = fixture.year?;
+    let region_level = match fixture.geography_level.as_deref()? {
+        "STATE" => RegionLevel::State,
+        "COUNTY" => RegionLevel::County,
+        "NATION" => RegionLevel::Nation,
+        _ => return None,
+    };
+    Some(NonroadOptions::new(region_level, year))
 }
 
 #[test]
@@ -300,6 +320,26 @@ fn reference_corpus_validates_when_present() {
                 entry.name
             );
             eprintln!("  {} · {phase}: {n} record(s)", entry.name);
+        }
+
+        // Port-side capture: run the fixture through ProductionExecutor
+        // wrapped in InstrumentingExecutor and compare against the
+        // reference corpus. Skip gracefully when the fixture XML is
+        // missing or its options cannot be built.
+        if let Some(options) = fixture_options_for_entry(&entry.name) {
+            let ref_data = ReferenceData::default();
+            let prod = ProductionExecutor::new(&ref_data);
+            let mut instr = InstrumentingExecutor::new(prod);
+            let inputs = NonroadInputs::new();
+            match run_simulation(&options, &inputs, &mut instr) {
+                Ok(_) => {
+                    let report = compare_runs(&entry.name, &records, &instr.captured);
+                    eprintln!("  {} · port-vs-reference: {}", entry.name, report.summary());
+                }
+                Err(e) => {
+                    eprintln!("  {} · port run skipped: {e}", entry.name);
+                }
+            }
         }
 
         validated += 1;
