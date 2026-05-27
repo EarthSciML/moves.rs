@@ -145,8 +145,8 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use moves_data::{PollutantId, PollutantProcessAssociation, ProcessId};
 use moves_framework::{
-    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription,
-    DataFrameStoreTyped, Error, IntoDataFrame, TableRow,
+    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStoreTyped,
+    Error, IntoDataFrame, TableRow,
 };
 use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
 
@@ -1014,12 +1014,40 @@ impl TableRow for AtRatioRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("pollutantID".into(), rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>()).into(),
-                Series::new("processID".into(), rows.iter().map(|r| r.process_id).collect::<Vec<i32>>()).into(),
-                Series::new("engTechID".into(), rows.iter().map(|r| r.eng_tech_id).collect::<Vec<i32>>()).into(),
-                Series::new("fuelSubtypeID".into(), rows.iter().map(|r| r.fuel_sub_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("nrHPCategory".into(), rows.iter().map(|r| r.nr_hp_category as i32).collect::<Vec<i32>>()).into(),
-                Series::new("atRatio".into(), rows.iter().map(|r| r.at_ratio).collect::<Vec<f64>>()).into(),
+                Series::new(
+                    "pollutantID".into(),
+                    rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "processID".into(),
+                    rows.iter().map(|r| r.process_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "engTechID".into(),
+                    rows.iter().map(|r| r.eng_tech_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelSubtypeID".into(),
+                    rows.iter()
+                        .map(|r| r.fuel_sub_type_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "nrHPCategory".into(),
+                    rows.iter()
+                        .map(|r| r.nr_hp_category as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "atRatio".into(),
+                    rows.iter().map(|r| r.at_ratio).collect::<Vec<f64>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -1027,12 +1055,16 @@ impl TableRow for AtRatioRow {
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "nrATRatio";
         let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .f64()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let pollutant = get_i32("pollutantID")?;
         let process = get_i32("processID")?;
@@ -1040,17 +1072,19 @@ impl TableRow for AtRatioRow {
         let fuel_sub = get_i32("fuelSubtypeID")?;
         let hp_cat = get_i32("nrHPCategory")?;
         let ratio = get_f64("atRatio")?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(AtRatioRow {
-                pollutant_id: pollutant.get(i).ok_or_else(|| null("pollutantID"))?,
-                process_id: process.get(i).ok_or_else(|| null("processID"))?,
-                eng_tech_id: eng_tech.get(i).ok_or_else(|| null("engTechID"))?,
-                fuel_sub_type_id: fuel_sub.get(i).ok_or_else(|| null("fuelSubtypeID"))?,
-                nr_hp_category: hp_cat.get(i).ok_or_else(|| null("nrHPCategory"))? as u8,
-                at_ratio: ratio.get(i).ok_or_else(|| null("atRatio"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(AtRatioRow {
+                    pollutant_id: pollutant.get(i).ok_or_else(|| null("pollutantID"))?,
+                    process_id: process.get(i).ok_or_else(|| null("processID"))?,
+                    eng_tech_id: eng_tech.get(i).ok_or_else(|| null("engTechID"))?,
+                    fuel_sub_type_id: fuel_sub.get(i).ok_or_else(|| null("fuelSubtypeID"))?,
+                    nr_hp_category: hp_cat.get(i).ok_or_else(|| null("nrHPCategory"))? as u8,
+                    at_ratio: ratio.get(i).ok_or_else(|| null("atRatio"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -1075,12 +1109,38 @@ impl TableRow for ProcFuelEngHpRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("pollutantID".into(), rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>()).into(),
-                Series::new("processID".into(), rows.iter().map(|r| r.process_id).collect::<Vec<i32>>()).into(),
-                Series::new("fuelTypeID".into(), rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("engTechID".into(), rows.iter().map(|r| r.eng_tech_id).collect::<Vec<i32>>()).into(),
-                Series::new("nrHPCategory".into(), rows.iter().map(|r| r.nr_hp_category as i32).collect::<Vec<i32>>()).into(),
-                Series::new("ratio".into(), rows.iter().map(|r| r.ratio).collect::<Vec<f64>>()).into(),
+                Series::new(
+                    "pollutantID".into(),
+                    rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "processID".into(),
+                    rows.iter().map(|r| r.process_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelTypeID".into(),
+                    rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "engTechID".into(),
+                    rows.iter().map(|r| r.eng_tech_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "nrHPCategory".into(),
+                    rows.iter()
+                        .map(|r| r.nr_hp_category as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "ratio".into(),
+                    rows.iter().map(|r| r.ratio).collect::<Vec<f64>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -1088,12 +1148,16 @@ impl TableRow for ProcFuelEngHpRow {
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "nrPAHGasRatio";
         let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .f64()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let pollutant = get_i32("pollutantID")?;
         let process = get_i32("processID")?;
@@ -1101,17 +1165,19 @@ impl TableRow for ProcFuelEngHpRow {
         let eng_tech = get_i32("engTechID")?;
         let hp_cat = get_i32("nrHPCategory")?;
         let ratio = get_f64("ratio")?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(ProcFuelEngHpRow {
-                pollutant_id: pollutant.get(i).ok_or_else(|| null("pollutantID"))?,
-                process_id: process.get(i).ok_or_else(|| null("processID"))?,
-                fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
-                eng_tech_id: eng_tech.get(i).ok_or_else(|| null("engTechID"))?,
-                nr_hp_category: hp_cat.get(i).ok_or_else(|| null("nrHPCategory"))? as u8,
-                ratio: ratio.get(i).ok_or_else(|| null("ratio"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(ProcFuelEngHpRow {
+                    pollutant_id: pollutant.get(i).ok_or_else(|| null("pollutantID"))?,
+                    process_id: process.get(i).ok_or_else(|| null("processID"))?,
+                    fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
+                    eng_tech_id: eng_tech.get(i).ok_or_else(|| null("engTechID"))?,
+                    nr_hp_category: hp_cat.get(i).ok_or_else(|| null("nrHPCategory"))? as u8,
+                    ratio: ratio.get(i).ok_or_else(|| null("ratio"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -1134,22 +1200,30 @@ impl TableRow for NrIntegratedSpeciesRow {
         let n = rows.len();
         DataFrame::new(
             n,
-            vec![
-                Series::new("pollutantID".into(), rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>()).into(),
-            ],
+            vec![Series::new(
+                "pollutantID".into(),
+                rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>(),
+            )
+            .into()],
         )
     }
 
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "nrIntegratedSpecies";
-        let pollutant = df.column("pollutantID")
+        let pollutant = df
+            .column("pollutantID")
             .map_err(|e| row_err(t, 0, "pollutantID", e.to_string()))?
-            .i32().map_err(|e| row_err(t, 0, "pollutantID", e.to_string()))?;
-        (0..df.height()).map(|i| {
-            Ok(NrIntegratedSpeciesRow {
-                pollutant_id: pollutant.get(i).ok_or_else(|| row_err(t, i, "pollutantID", "null value".into()))?,
+            .i32()
+            .map_err(|e| row_err(t, 0, "pollutantID", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                Ok(NrIntegratedSpeciesRow {
+                    pollutant_id: pollutant
+                        .get(i)
+                        .ok_or_else(|| row_err(t, i, "pollutantID", "null value".into()))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -1176,8 +1250,20 @@ impl TableRow for FuelFormulationRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("fuelFormulationID".into(), rows.iter().map(|r| r.fuel_formulation_id).collect::<Vec<i32>>()).into(),
-                Series::new("fuelSubTypeID".into(), rows.iter().map(|r| r.fuel_sub_type_id).collect::<Vec<i32>>()).into(),
+                Series::new(
+                    "fuelFormulationID".into(),
+                    rows.iter()
+                        .map(|r| r.fuel_formulation_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelSubTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.fuel_sub_type_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -1185,18 +1271,22 @@ impl TableRow for FuelFormulationRow {
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "FuelFormulation";
         let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let form = get_i32("fuelFormulationID")?;
         let sub = get_i32("fuelSubTypeID")?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(FuelFormulationRow {
-                fuel_formulation_id: form.get(i).ok_or_else(|| null("fuelFormulationID"))?,
-                fuel_sub_type_id: sub.get(i).ok_or_else(|| null("fuelSubTypeID"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(FuelFormulationRow {
+                    fuel_formulation_id: form.get(i).ok_or_else(|| null("fuelFormulationID"))?,
+                    fuel_sub_type_id: sub.get(i).ok_or_else(|| null("fuelSubTypeID"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -1226,9 +1316,21 @@ impl TableRow for NrHpCategoryRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("hpID".into(), rows.iter().map(|r| r.hp_id).collect::<Vec<i32>>()).into(),
-                Series::new("engTechID".into(), rows.iter().map(|r| r.eng_tech_id).collect::<Vec<i32>>()).into(),
-                Series::new("nrHPCategory".into(), rows.iter().map(|r| r.nr_hp_category).collect::<Vec<i32>>()).into(),
+                Series::new(
+                    "hpID".into(),
+                    rows.iter().map(|r| r.hp_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "engTechID".into(),
+                    rows.iter().map(|r| r.eng_tech_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "nrHPCategory".into(),
+                    rows.iter().map(|r| r.nr_hp_category).collect::<Vec<i32>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -1236,20 +1338,24 @@ impl TableRow for NrHpCategoryRow {
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "NRHPCategory";
         let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let hp = get_i32("hpID")?;
         let eng = get_i32("engTechID")?;
         let cat = get_i32("nrHPCategory")?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(NrHpCategoryRow {
-                hp_id: hp.get(i).ok_or_else(|| null("hpID"))?,
-                eng_tech_id: eng.get(i).ok_or_else(|| null("engTechID"))?,
-                nr_hp_category: cat.get(i).ok_or_else(|| null("nrHPCategory"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(NrHpCategoryRow {
+                    hp_id: hp.get(i).ok_or_else(|| null("hpID"))?,
+                    eng_tech_id: eng.get(i).ok_or_else(|| null("engTechID"))?,
+                    nr_hp_category: cat.get(i).ok_or_else(|| null("nrHPCategory"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -1271,22 +1377,30 @@ impl TableRow for NrNeededPolProcessRow {
         let n = rows.len();
         DataFrame::new(
             n,
-            vec![
-                Series::new("polProcessID".into(), rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>()).into(),
-            ],
+            vec![Series::new(
+                "polProcessID".into(),
+                rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>(),
+            )
+            .into()],
         )
     }
 
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "NeededPolProcessIDs";
-        let ppid = df.column("polProcessID")
+        let ppid = df
+            .column("polProcessID")
             .map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?
-            .i32().map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?;
-        (0..df.height()).map(|i| {
-            Ok(NrNeededPolProcessRow {
-                pol_process_id: ppid.get(i).ok_or_else(|| row_err(t, i, "polProcessID", "null value".into()))?,
+            .i32()
+            .map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                Ok(NrNeededPolProcessRow {
+                    pol_process_id: ppid
+                        .get(i)
+                        .ok_or_else(|| row_err(t, i, "polProcessID", "null value".into()))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -1348,24 +1462,96 @@ impl TableRow for NrAirToxicsMwoRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("yearID".into(), rows.iter().map(|r| r.year_id).collect::<Vec<i32>>()).into(),
-                Series::new("monthID".into(), rows.iter().map(|r| r.month_id).collect::<Vec<i32>>()).into(),
-                Series::new("dayID".into(), rows.iter().map(|r| r.day_id).collect::<Vec<i32>>()).into(),
-                Series::new("hourID".into(), rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>()).into(),
-                Series::new("stateID".into(), rows.iter().map(|r| r.state_id).collect::<Vec<i32>>()).into(),
-                Series::new("countyID".into(), rows.iter().map(|r| r.county_id).collect::<Vec<i32>>()).into(),
-                Series::new("zoneID".into(), rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>()).into(),
-                Series::new("linkID".into(), rows.iter().map(|r| r.link_id).collect::<Vec<i32>>()).into(),
-                Series::new("pollutantID".into(), rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>()).into(),
-                Series::new("processID".into(), rows.iter().map(|r| r.process_id).collect::<Vec<i32>>()).into(),
-                Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("fuelTypeID".into(), rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("engTechID".into(), rows.iter().map(|r| r.eng_tech_id).collect::<Vec<i32>>()).into(),
-                Series::new("hpID".into(), rows.iter().map(|r| r.hp_id).collect::<Vec<i32>>()).into(),
-                Series::new("modelYearID".into(), rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>()).into(),
-                Series::new("roadTypeID".into(), rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("emissionQuant".into(), rows.iter().map(|r| r.emission_quant).collect::<Vec<f64>>()).into(),
-                Series::new("emissionRate".into(), rows.iter().map(|r| r.emission_rate).collect::<Vec<f64>>()).into(),
+                Series::new(
+                    "yearID".into(),
+                    rows.iter().map(|r| r.year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "dayID".into(),
+                    rows.iter().map(|r| r.day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hourID".into(),
+                    rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "stateID".into(),
+                    rows.iter().map(|r| r.state_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "countyID".into(),
+                    rows.iter().map(|r| r.county_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "zoneID".into(),
+                    rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "linkID".into(),
+                    rows.iter().map(|r| r.link_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "pollutantID".into(),
+                    rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "processID".into(),
+                    rows.iter().map(|r| r.process_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelTypeID".into(),
+                    rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "engTechID".into(),
+                    rows.iter().map(|r| r.eng_tech_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hpID".into(),
+                    rows.iter().map(|r| r.hp_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "modelYearID".into(),
+                    rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "roadTypeID".into(),
+                    rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "emissionQuant".into(),
+                    rows.iter().map(|r| r.emission_quant).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "emissionRate".into(),
+                    rows.iter().map(|r| r.emission_rate).collect::<Vec<f64>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -1373,12 +1559,16 @@ impl TableRow for NrAirToxicsMwoRow {
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "MOVESWorkerOutput";
         let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .f64()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let year = get_i32("yearID")?;
         let month = get_i32("monthID")?;
@@ -1398,29 +1588,31 @@ impl TableRow for NrAirToxicsMwoRow {
         let road_type = get_i32("roadTypeID")?;
         let emission_quant = get_f64("emissionQuant")?;
         let emission_rate = get_f64("emissionRate")?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(NrAirToxicsMwoRow {
-                year_id: year.get(i).ok_or_else(|| null("yearID"))?,
-                month_id: month.get(i).ok_or_else(|| null("monthID"))?,
-                day_id: day.get(i).ok_or_else(|| null("dayID"))?,
-                hour_id: hour.get(i).ok_or_else(|| null("hourID"))?,
-                state_id: state.get(i).ok_or_else(|| null("stateID"))?,
-                county_id: county.get(i).ok_or_else(|| null("countyID"))?,
-                zone_id: zone.get(i).ok_or_else(|| null("zoneID"))?,
-                link_id: link.get(i).ok_or_else(|| null("linkID"))?,
-                pollutant_id: pollutant.get(i).ok_or_else(|| null("pollutantID"))?,
-                process_id: process.get(i).ok_or_else(|| null("processID"))?,
-                source_type_id: src_type.get(i).ok_or_else(|| null("sourceTypeID"))?,
-                fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
-                eng_tech_id: eng_tech.get(i).ok_or_else(|| null("engTechID"))?,
-                hp_id: hp.get(i).ok_or_else(|| null("hpID"))?,
-                model_year_id: model_year.get(i).ok_or_else(|| null("modelYearID"))?,
-                road_type_id: road_type.get(i).ok_or_else(|| null("roadTypeID"))?,
-                emission_quant: emission_quant.get(i).ok_or_else(|| null("emissionQuant"))?,
-                emission_rate: emission_rate.get(i).ok_or_else(|| null("emissionRate"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(NrAirToxicsMwoRow {
+                    year_id: year.get(i).ok_or_else(|| null("yearID"))?,
+                    month_id: month.get(i).ok_or_else(|| null("monthID"))?,
+                    day_id: day.get(i).ok_or_else(|| null("dayID"))?,
+                    hour_id: hour.get(i).ok_or_else(|| null("hourID"))?,
+                    state_id: state.get(i).ok_or_else(|| null("stateID"))?,
+                    county_id: county.get(i).ok_or_else(|| null("countyID"))?,
+                    zone_id: zone.get(i).ok_or_else(|| null("zoneID"))?,
+                    link_id: link.get(i).ok_or_else(|| null("linkID"))?,
+                    pollutant_id: pollutant.get(i).ok_or_else(|| null("pollutantID"))?,
+                    process_id: process.get(i).ok_or_else(|| null("processID"))?,
+                    source_type_id: src_type.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                    fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
+                    eng_tech_id: eng_tech.get(i).ok_or_else(|| null("engTechID"))?,
+                    hp_id: hp.get(i).ok_or_else(|| null("hpID"))?,
+                    model_year_id: model_year.get(i).ok_or_else(|| null("modelYearID"))?,
+                    road_type_id: road_type.get(i).ok_or_else(|| null("roadTypeID"))?,
+                    emission_quant: emission_quant.get(i).ok_or_else(|| null("emissionQuant"))?,
+                    emission_rate: emission_rate.get(i).ok_or_else(|| null("emissionRate"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -2356,10 +2548,26 @@ mod tests {
         let out = calc.execute(&ctx).expect("execute ok");
         let df = out.dataframe().expect("output should contain a DataFrame");
         // nrPAHGasRatio fires: VOC 87 * 0.5 → pollutant 20.
-        assert_eq!(df.height(), 1, "expected 1 output row from nrPAHGasRatio path");
-        let eq = df.column("emissionQuant").unwrap().f64().unwrap().get(0).unwrap();
+        assert_eq!(
+            df.height(),
+            1,
+            "expected 1 output row from nrPAHGasRatio path"
+        );
+        let eq = df
+            .column("emissionQuant")
+            .unwrap()
+            .f64()
+            .unwrap()
+            .get(0)
+            .unwrap();
         assert!((eq - 50.0).abs() < 1e-9, "emissionQuant {eq} != 50.0");
-        let pol = df.column("pollutantID").unwrap().i32().unwrap().get(0).unwrap();
+        let pol = df
+            .column("pollutantID")
+            .unwrap()
+            .i32()
+            .unwrap()
+            .get(0)
+            .unwrap();
         assert_eq!(pol, 20);
     }
 

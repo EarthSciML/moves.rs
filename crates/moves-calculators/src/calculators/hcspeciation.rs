@@ -932,12 +932,40 @@ impl TableRow for HcFuelFormulationRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("fuelFormulationID".into(), rows.iter().map(|r| r.fuel_formulation_id).collect::<Vec<i32>>()).into(),
-                Series::new("MTBEVolume".into(), rows.iter().map(|r| r.mtbe_volume).collect::<Vec<f64>>()).into(),
-                Series::new("ETBEVolume".into(), rows.iter().map(|r| r.etbe_volume).collect::<Vec<f64>>()).into(),
-                Series::new("TAMEVolume".into(), rows.iter().map(|r| r.tame_volume).collect::<Vec<f64>>()).into(),
-                Series::new("ETOHVolume".into(), rows.iter().map(|r| r.etoh_volume).collect::<Vec<f64>>()).into(),
-                Series::new("volToWtPercentOxy".into(), rows.iter().map(|r| r.vol_to_wt_percent_oxy).collect::<Vec<f64>>()).into(),
+                Series::new(
+                    "fuelFormulationID".into(),
+                    rows.iter()
+                        .map(|r| r.fuel_formulation_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "MTBEVolume".into(),
+                    rows.iter().map(|r| r.mtbe_volume).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "ETBEVolume".into(),
+                    rows.iter().map(|r| r.etbe_volume).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "TAMEVolume".into(),
+                    rows.iter().map(|r| r.tame_volume).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "ETOHVolume".into(),
+                    rows.iter().map(|r| r.etoh_volume).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "volToWtPercentOxy".into(),
+                    rows.iter()
+                        .map(|r| r.vol_to_wt_percent_oxy)
+                        .collect::<Vec<f64>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -945,12 +973,16 @@ impl TableRow for HcFuelFormulationRow {
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "FuelFormulation";
         let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .f64()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let ff_id = get_i32("fuelFormulationID")?;
         let mtbe = get_f64("MTBEVolume")?;
@@ -958,17 +990,21 @@ impl TableRow for HcFuelFormulationRow {
         let tame = get_f64("TAMEVolume")?;
         let etoh = get_f64("ETOHVolume")?;
         let vol_to_wt = get_f64("volToWtPercentOxy")?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(HcFuelFormulationRow {
-                fuel_formulation_id: ff_id.get(i).ok_or_else(|| null("fuelFormulationID"))?,
-                mtbe_volume: mtbe.get(i).ok_or_else(|| null("MTBEVolume"))?,
-                etbe_volume: etbe.get(i).ok_or_else(|| null("ETBEVolume"))?,
-                tame_volume: tame.get(i).ok_or_else(|| null("TAMEVolume"))?,
-                etoh_volume: etoh.get(i).ok_or_else(|| null("ETOHVolume"))?,
-                vol_to_wt_percent_oxy: vol_to_wt.get(i).ok_or_else(|| null("volToWtPercentOxy"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(HcFuelFormulationRow {
+                    fuel_formulation_id: ff_id.get(i).ok_or_else(|| null("fuelFormulationID"))?,
+                    mtbe_volume: mtbe.get(i).ok_or_else(|| null("MTBEVolume"))?,
+                    etbe_volume: etbe.get(i).ok_or_else(|| null("ETBEVolume"))?,
+                    tame_volume: tame.get(i).ok_or_else(|| null("TAMEVolume"))?,
+                    etoh_volume: etoh.get(i).ok_or_else(|| null("ETOHVolume"))?,
+                    vol_to_wt_percent_oxy: vol_to_wt
+                        .get(i)
+                        .ok_or_else(|| null("volToWtPercentOxy"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -1033,25 +1069,105 @@ impl TableRow for ThcWorkerRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("yearID".into(), rows.iter().map(|r| r.year_id).collect::<Vec<i32>>()).into(),
-                Series::new("monthID".into(), rows.iter().map(|r| r.month_id).collect::<Vec<i32>>()).into(),
-                Series::new("dayID".into(), rows.iter().map(|r| r.day_id).collect::<Vec<i32>>()).into(),
-                Series::new("hourID".into(), rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>()).into(),
-                Series::new("stateID".into(), rows.iter().map(|r| r.state_id).collect::<Vec<i32>>()).into(),
-                Series::new("countyID".into(), rows.iter().map(|r| r.county_id).collect::<Vec<i32>>()).into(),
-                Series::new("zoneID".into(), rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>()).into(),
-                Series::new("linkID".into(), rows.iter().map(|r| r.link_id).collect::<Vec<i32>>()).into(),
-                Series::new("pollutantID".into(), rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>()).into(),
-                Series::new("processID".into(), rows.iter().map(|r| r.process_id).collect::<Vec<i32>>()).into(),
-                Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("regClassID".into(), rows.iter().map(|r| r.reg_class_id).collect::<Vec<i32>>()).into(),
-                Series::new("fuelTypeID".into(), rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("modelYearID".into(), rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>()).into(),
-                Series::new("roadTypeID".into(), rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("fuelSubTypeID".into(), rows.iter().map(|r| r.fuel_sub_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("fuelFormulationID".into(), rows.iter().map(|r| r.fuel_formulation_id).collect::<Vec<i32>>()).into(),
-                Series::new("emissionQuant".into(), rows.iter().map(|r| r.emission_quant).collect::<Vec<f64>>()).into(),
-                Series::new("emissionRate".into(), rows.iter().map(|r| r.emission_rate).collect::<Vec<f64>>()).into(),
+                Series::new(
+                    "yearID".into(),
+                    rows.iter().map(|r| r.year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "dayID".into(),
+                    rows.iter().map(|r| r.day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hourID".into(),
+                    rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "stateID".into(),
+                    rows.iter().map(|r| r.state_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "countyID".into(),
+                    rows.iter().map(|r| r.county_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "zoneID".into(),
+                    rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "linkID".into(),
+                    rows.iter().map(|r| r.link_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "pollutantID".into(),
+                    rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "processID".into(),
+                    rows.iter().map(|r| r.process_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "regClassID".into(),
+                    rows.iter().map(|r| r.reg_class_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelTypeID".into(),
+                    rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "modelYearID".into(),
+                    rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "roadTypeID".into(),
+                    rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelSubTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.fuel_sub_type_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelFormulationID".into(),
+                    rows.iter()
+                        .map(|r| r.fuel_formulation_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "emissionQuant".into(),
+                    rows.iter().map(|r| r.emission_quant).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "emissionRate".into(),
+                    rows.iter().map(|r| r.emission_rate).collect::<Vec<f64>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -1059,12 +1175,16 @@ impl TableRow for ThcWorkerRow {
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "MOVESWorkerOutput";
         let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .f64()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let year = get_i32("yearID")?;
         let month = get_i32("monthID")?;
@@ -1085,30 +1205,34 @@ impl TableRow for ThcWorkerRow {
         let fuel_formulation = get_i32("fuelFormulationID")?;
         let emission_quant = get_f64("emissionQuant")?;
         let emission_rate = get_f64("emissionRate")?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(ThcWorkerRow {
-                year_id: year.get(i).ok_or_else(|| null("yearID"))?,
-                month_id: month.get(i).ok_or_else(|| null("monthID"))?,
-                day_id: day.get(i).ok_or_else(|| null("dayID"))?,
-                hour_id: hour.get(i).ok_or_else(|| null("hourID"))?,
-                state_id: state.get(i).ok_or_else(|| null("stateID"))?,
-                county_id: county.get(i).ok_or_else(|| null("countyID"))?,
-                zone_id: zone.get(i).ok_or_else(|| null("zoneID"))?,
-                link_id: link.get(i).ok_or_else(|| null("linkID"))?,
-                pollutant_id: pollutant.get(i).ok_or_else(|| null("pollutantID"))?,
-                process_id: process.get(i).ok_or_else(|| null("processID"))?,
-                source_type_id: src_type.get(i).ok_or_else(|| null("sourceTypeID"))?,
-                reg_class_id: reg_class.get(i).ok_or_else(|| null("regClassID"))?,
-                fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
-                model_year_id: model_year.get(i).ok_or_else(|| null("modelYearID"))?,
-                road_type_id: road_type.get(i).ok_or_else(|| null("roadTypeID"))?,
-                fuel_sub_type_id: fuel_sub_type.get(i).ok_or_else(|| null("fuelSubTypeID"))?,
-                fuel_formulation_id: fuel_formulation.get(i).ok_or_else(|| null("fuelFormulationID"))?,
-                emission_quant: emission_quant.get(i).ok_or_else(|| null("emissionQuant"))?,
-                emission_rate: emission_rate.get(i).ok_or_else(|| null("emissionRate"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(ThcWorkerRow {
+                    year_id: year.get(i).ok_or_else(|| null("yearID"))?,
+                    month_id: month.get(i).ok_or_else(|| null("monthID"))?,
+                    day_id: day.get(i).ok_or_else(|| null("dayID"))?,
+                    hour_id: hour.get(i).ok_or_else(|| null("hourID"))?,
+                    state_id: state.get(i).ok_or_else(|| null("stateID"))?,
+                    county_id: county.get(i).ok_or_else(|| null("countyID"))?,
+                    zone_id: zone.get(i).ok_or_else(|| null("zoneID"))?,
+                    link_id: link.get(i).ok_or_else(|| null("linkID"))?,
+                    pollutant_id: pollutant.get(i).ok_or_else(|| null("pollutantID"))?,
+                    process_id: process.get(i).ok_or_else(|| null("processID"))?,
+                    source_type_id: src_type.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                    reg_class_id: reg_class.get(i).ok_or_else(|| null("regClassID"))?,
+                    fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
+                    model_year_id: model_year.get(i).ok_or_else(|| null("modelYearID"))?,
+                    road_type_id: road_type.get(i).ok_or_else(|| null("roadTypeID"))?,
+                    fuel_sub_type_id: fuel_sub_type.get(i).ok_or_else(|| null("fuelSubTypeID"))?,
+                    fuel_formulation_id: fuel_formulation
+                        .get(i)
+                        .ok_or_else(|| null("fuelFormulationID"))?,
+                    emission_quant: emission_quant.get(i).ok_or_else(|| null("emissionQuant"))?,
+                    emission_rate: emission_rate.get(i).ok_or_else(|| null("emissionRate"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -1133,12 +1257,42 @@ impl TableRow for MethaneThcRatioRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("processID".into(), rows.iter().map(|r| r.process_id).collect::<Vec<i32>>()).into(),
-                Series::new("fuelSubtypeID".into(), rows.iter().map(|r| r.fuel_sub_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("regClassID".into(), rows.iter().map(|r| r.reg_class_id).collect::<Vec<i32>>()).into(),
-                Series::new("beginModelYearID".into(), rows.iter().map(|r| r.begin_model_year_id).collect::<Vec<i32>>()).into(),
-                Series::new("endModelYearID".into(), rows.iter().map(|r| r.end_model_year_id).collect::<Vec<i32>>()).into(),
-                Series::new("CH4THCRatio".into(), rows.iter().map(|r| r.ch4_thc_ratio).collect::<Vec<f64>>()).into(),
+                Series::new(
+                    "processID".into(),
+                    rows.iter().map(|r| r.process_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelSubtypeID".into(),
+                    rows.iter()
+                        .map(|r| r.fuel_sub_type_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "regClassID".into(),
+                    rows.iter().map(|r| r.reg_class_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "beginModelYearID".into(),
+                    rows.iter()
+                        .map(|r| r.begin_model_year_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "endModelYearID".into(),
+                    rows.iter()
+                        .map(|r| r.end_model_year_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "CH4THCRatio".into(),
+                    rows.iter().map(|r| r.ch4_thc_ratio).collect::<Vec<f64>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -1146,12 +1300,16 @@ impl TableRow for MethaneThcRatioRow {
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "methaneTHCRatio";
         let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .f64()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let process = get_i32("processID")?;
         let fuel_sub = get_i32("fuelSubtypeID")?;
@@ -1159,17 +1317,19 @@ impl TableRow for MethaneThcRatioRow {
         let begin_my = get_i32("beginModelYearID")?;
         let end_my = get_i32("endModelYearID")?;
         let ratio = get_f64("CH4THCRatio")?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(MethaneThcRatioRow {
-                process_id: process.get(i).ok_or_else(|| null("processID"))?,
-                fuel_sub_type_id: fuel_sub.get(i).ok_or_else(|| null("fuelSubtypeID"))?,
-                reg_class_id: reg_class.get(i).ok_or_else(|| null("regClassID"))?,
-                begin_model_year_id: begin_my.get(i).ok_or_else(|| null("beginModelYearID"))?,
-                end_model_year_id: end_my.get(i).ok_or_else(|| null("endModelYearID"))?,
-                ch4_thc_ratio: ratio.get(i).ok_or_else(|| null("CH4THCRatio"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(MethaneThcRatioRow {
+                    process_id: process.get(i).ok_or_else(|| null("processID"))?,
+                    fuel_sub_type_id: fuel_sub.get(i).ok_or_else(|| null("fuelSubtypeID"))?,
+                    reg_class_id: reg_class.get(i).ok_or_else(|| null("regClassID"))?,
+                    begin_model_year_id: begin_my.get(i).ok_or_else(|| null("beginModelYearID"))?,
+                    end_model_year_id: end_my.get(i).ok_or_else(|| null("endModelYearID"))?,
+                    ch4_thc_ratio: ratio.get(i).ok_or_else(|| null("CH4THCRatio"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -1195,13 +1355,49 @@ impl TableRow for HcSpeciationRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("polProcessID".into(), rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>()).into(),
-                Series::new("fuelSubtypeID".into(), rows.iter().map(|r| r.fuel_sub_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("regClassID".into(), rows.iter().map(|r| r.reg_class_id).collect::<Vec<i32>>()).into(),
-                Series::new("beginModelYearID".into(), rows.iter().map(|r| r.begin_model_year_id).collect::<Vec<i32>>()).into(),
-                Series::new("endModelYearID".into(), rows.iter().map(|r| r.end_model_year_id).collect::<Vec<i32>>()).into(),
-                Series::new("speciationConstant".into(), rows.iter().map(|r| r.speciation_constant).collect::<Vec<f64>>()).into(),
-                Series::new("oxySpeciation".into(), rows.iter().map(|r| r.oxy_speciation).collect::<Vec<f64>>()).into(),
+                Series::new(
+                    "polProcessID".into(),
+                    rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelSubtypeID".into(),
+                    rows.iter()
+                        .map(|r| r.fuel_sub_type_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "regClassID".into(),
+                    rows.iter().map(|r| r.reg_class_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "beginModelYearID".into(),
+                    rows.iter()
+                        .map(|r| r.begin_model_year_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "endModelYearID".into(),
+                    rows.iter()
+                        .map(|r| r.end_model_year_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "speciationConstant".into(),
+                    rows.iter()
+                        .map(|r| r.speciation_constant)
+                        .collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "oxySpeciation".into(),
+                    rows.iter().map(|r| r.oxy_speciation).collect::<Vec<f64>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -1209,12 +1405,16 @@ impl TableRow for HcSpeciationRow {
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "HCSpeciation";
         let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .f64()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let pol_proc = get_i32("polProcessID")?;
         let fuel_sub = get_i32("fuelSubtypeID")?;
@@ -1223,18 +1423,22 @@ impl TableRow for HcSpeciationRow {
         let end_my = get_i32("endModelYearID")?;
         let spec_const = get_f64("speciationConstant")?;
         let oxy_spec = get_f64("oxySpeciation")?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(HcSpeciationRow {
-                pol_process_id: pol_proc.get(i).ok_or_else(|| null("polProcessID"))?,
-                fuel_sub_type_id: fuel_sub.get(i).ok_or_else(|| null("fuelSubtypeID"))?,
-                reg_class_id: reg_class.get(i).ok_or_else(|| null("regClassID"))?,
-                begin_model_year_id: begin_my.get(i).ok_or_else(|| null("beginModelYearID"))?,
-                end_model_year_id: end_my.get(i).ok_or_else(|| null("endModelYearID"))?,
-                speciation_constant: spec_const.get(i).ok_or_else(|| null("speciationConstant"))?,
-                oxy_speciation: oxy_spec.get(i).ok_or_else(|| null("oxySpeciation"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(HcSpeciationRow {
+                    pol_process_id: pol_proc.get(i).ok_or_else(|| null("polProcessID"))?,
+                    fuel_sub_type_id: fuel_sub.get(i).ok_or_else(|| null("fuelSubtypeID"))?,
+                    reg_class_id: reg_class.get(i).ok_or_else(|| null("regClassID"))?,
+                    begin_model_year_id: begin_my.get(i).ok_or_else(|| null("beginModelYearID"))?,
+                    end_model_year_id: end_my.get(i).ok_or_else(|| null("endModelYearID"))?,
+                    speciation_constant: spec_const
+                        .get(i)
+                        .ok_or_else(|| null("speciationConstant"))?,
+                    oxy_speciation: oxy_spec.get(i).ok_or_else(|| null("oxySpeciation"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -1322,14 +1526,20 @@ impl Calculator for HcSpeciationCalculator {
         let fuel_formulations = tables
             .iter_typed::<HcFuelFormulationRow>("FuelFormulation")?
             .into_iter()
-            .map(|r| (r.fuel_formulation_id, FuelFormulation {
-                mtbe_volume: r.mtbe_volume,
-                etbe_volume: r.etbe_volume,
-                tame_volume: r.tame_volume,
-                etoh_volume: r.etoh_volume,
-                vol_to_wt_percent_oxy: r.vol_to_wt_percent_oxy,
-            }));
-        let needed_pol_process_ids = REGISTRATIONS.iter()
+            .map(|r| {
+                (
+                    r.fuel_formulation_id,
+                    FuelFormulation {
+                        mtbe_volume: r.mtbe_volume,
+                        etbe_volume: r.etbe_volume,
+                        tame_volume: r.tame_volume,
+                        etoh_volume: r.etoh_volume,
+                        vol_to_wt_percent_oxy: r.vol_to_wt_percent_oxy,
+                    },
+                )
+            });
+        let needed_pol_process_ids = REGISTRATIONS
+            .iter()
             .map(|r| i32::from(r.pollutant_id.0) * 100 + i32::from(r.process_id.0));
         let worker_tables = OnroadWorkerTables::new(fuel_formulations, needed_pol_process_ids);
 
@@ -2105,8 +2315,14 @@ mod tests {
         // reg_class 0, model_year 2005, methane ratio 0.25.
         // Expected: methane=2.0, NMHC=6.0, NMOG=4.5, TOG=6.5, VOC=3.0.
         let worker_rows = vec![ThcWorkerRow {
-            year_id: 2020, month_id: 7, day_id: 5, hour_id: 8,
-            state_id: 26, county_id: 26_161, zone_id: 261_610, link_id: 2_616_101,
+            year_id: 2020,
+            month_id: 7,
+            day_id: 5,
+            hour_id: 8,
+            state_id: 26,
+            county_id: 26_161,
+            zone_id: 261_610,
+            link_id: 2_616_101,
             pollutant_id: THC_POLLUTANT_ID,
             process_id: 1,
             source_type_id: 21,
@@ -2120,46 +2336,89 @@ mod tests {
             emission_rate: 4.0,
         }];
         let methane_rows = vec![MethaneThcRatioRow {
-            process_id: 1, fuel_sub_type_id: 20, reg_class_id: 0,
-            begin_model_year_id: 2000, end_model_year_id: 2010, ch4_thc_ratio: 0.25,
+            process_id: 1,
+            fuel_sub_type_id: 20,
+            reg_class_id: 0,
+            begin_model_year_id: 2000,
+            end_model_year_id: 2010,
+            ch4_thc_ratio: 0.25,
         }];
         let hc_rows = vec![
             HcSpeciationRow {
                 pol_process_id: NMOG_POLLUTANT_ID * 100 + 1,
-                fuel_sub_type_id: 20, reg_class_id: 0,
-                begin_model_year_id: 2000, end_model_year_id: 2010,
-                speciation_constant: 0.25, oxy_speciation: 0.25,
+                fuel_sub_type_id: 20,
+                reg_class_id: 0,
+                begin_model_year_id: 2000,
+                end_model_year_id: 2010,
+                speciation_constant: 0.25,
+                oxy_speciation: 0.25,
             },
             HcSpeciationRow {
                 pol_process_id: VOC_POLLUTANT_ID * 100 + 1,
-                fuel_sub_type_id: 20, reg_class_id: 0,
-                begin_model_year_id: 2000, end_model_year_id: 2010,
-                speciation_constant: 0.5, oxy_speciation: 0.0,
+                fuel_sub_type_id: 20,
+                reg_class_id: 0,
+                begin_model_year_id: 2000,
+                end_model_year_id: 2010,
+                speciation_constant: 0.5,
+                oxy_speciation: 0.0,
             },
         ];
         let ff_rows = vec![HcFuelFormulationRow {
             fuel_formulation_id: 100,
-            mtbe_volume: 2.0, etbe_volume: 0.0, tame_volume: 0.0, etoh_volume: 2.0,
+            mtbe_volume: 2.0,
+            etbe_volume: 0.0,
+            tame_volume: 0.0,
+            etoh_volume: 2.0,
             vol_to_wt_percent_oxy: 0.5,
         }];
         let mut store = moves_framework::InMemoryStore::new();
-        store.insert("MOVESWorkerOutput", ThcWorkerRow::into_dataframe(worker_rows).unwrap());
-        store.insert("methaneTHCRatio", MethaneThcRatioRow::into_dataframe(methane_rows).unwrap());
-        store.insert("HCSpeciation", HcSpeciationRow::into_dataframe(hc_rows).unwrap());
-        store.insert("FuelFormulation", HcFuelFormulationRow::into_dataframe(ff_rows).unwrap());
+        store.insert(
+            "MOVESWorkerOutput",
+            ThcWorkerRow::into_dataframe(worker_rows).unwrap(),
+        );
+        store.insert(
+            "methaneTHCRatio",
+            MethaneThcRatioRow::into_dataframe(methane_rows).unwrap(),
+        );
+        store.insert(
+            "HCSpeciation",
+            HcSpeciationRow::into_dataframe(hc_rows).unwrap(),
+        );
+        store.insert(
+            "FuelFormulation",
+            HcFuelFormulationRow::into_dataframe(ff_rows).unwrap(),
+        );
         let ctx = CalculatorContext::with_tables(store);
-        let out = HcSpeciationCalculator::new().execute(&ctx).expect("execute ok");
+        let out = HcSpeciationCalculator::new()
+            .execute(&ctx)
+            .expect("execute ok");
         let df = out.dataframe().expect("output should contain a DataFrame");
         // 5 speciated species: methane(5), NMHC(79), NMOG(80), TOG(86), VOC(87)
         assert_eq!(df.height(), 5, "one THC row should yield 5 speciated rows");
-        let pollutants: Vec<i32> = df.column("pollutantID").unwrap().i32().unwrap()
-            .into_iter().map(|v| v.unwrap()).collect();
-        let quants: Vec<f64> = df.column("emissionQuant").unwrap().f64().unwrap()
-            .into_iter().map(|v| v.unwrap()).collect();
+        let pollutants: Vec<i32> = df
+            .column("pollutantID")
+            .unwrap()
+            .i32()
+            .unwrap()
+            .into_iter()
+            .map(|v| v.unwrap())
+            .collect();
+        let quants: Vec<f64> = df
+            .column("emissionQuant")
+            .unwrap()
+            .f64()
+            .unwrap()
+            .into_iter()
+            .map(|v| v.unwrap())
+            .collect();
         // Find each species and check its value.
         let find = |pid: i32| -> f64 {
-            pollutants.iter().zip(quants.iter())
-                .find(|(&p, _)| p == pid).map(|(_, &q)| q).unwrap()
+            pollutants
+                .iter()
+                .zip(quants.iter())
+                .find(|(&p, _)| p == pid)
+                .map(|(_, &q)| q)
+                .unwrap()
         };
         assert!((find(METHANE_POLLUTANT_ID) - 2.0).abs() < 1e-9, "methane");
         assert!((find(NMHC_POLLUTANT_ID) - 6.0).abs() < 1e-9, "NMHC");
