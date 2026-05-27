@@ -140,6 +140,62 @@ pub struct NonroadOutputs {
     pub national_record_count: i32,
 }
 
+/// Column-oriented store trait — Phase 4 unified-schema stand-in for
+/// `moves_framework::DataFrameStore` (test-only; `moves-nonroad` carries
+/// no polars / arrow dependency). The orchestrator crate owns the real
+/// write path; this trait exists so the field-copy logic can be exercised
+/// without adding a cross-crate dependency.
+///
+/// One call per row per column; the concrete mock appends to per-column
+/// `Vec`s so the test can assert positional equality.
+#[cfg(test)]
+pub trait TestStore {
+    /// Append a string value to the named column.
+    fn push_str_col(&mut self, col: &str, val: String);
+    /// Append an `f32` value to the named column.
+    fn push_f32_col(&mut self, col: &str, val: f32);
+    /// Append an optional `i32` value to the named column.
+    fn push_opt_i32_col(&mut self, col: &str, val: Option<i32>);
+    /// Append an optional string value to the named column.
+    fn push_opt_str_col(&mut self, col: &str, val: Option<String>);
+}
+
+/// Field-copy from a [`SimEmissionRow`] onto the Phase 4 unified-schema
+/// columns of a test store.
+///
+/// Column names match the Phase 4 unified Parquet schema (`moves-data`
+/// Task 89): `fips`, `subcounty`, `scc`, `hp_level`, `model_year`,
+/// `tech_type`, `channel`, `population`, `activity`, `fuel_consumption`,
+/// and `emissions_N` for each pollutant index `N` in `0..MXPOL`.
+///
+/// The production write path lives in the orchestrator crate and uses the
+/// real `DataFrameStore` from `moves-framework`; this method is the
+/// reference specification of the field → column mapping.
+#[cfg(test)]
+impl SimEmissionRow {
+    pub fn write_to_store_columns(&self, store: &mut dyn TestStore) {
+        store.push_str_col("fips", self.fips.clone());
+        store.push_str_col("subcounty", self.subcounty.clone());
+        store.push_str_col("scc", self.scc.clone());
+        store.push_f32_col("hp_level", self.hp_level);
+        store.push_opt_i32_col("model_year", self.model_year);
+        store.push_opt_str_col("tech_type", self.tech_type.clone());
+        store.push_str_col(
+            "channel",
+            match self.channel {
+                EmissionChannel::Exhaust => "exhaust".to_string(),
+                EmissionChannel::Evaporative => "evaporative".to_string(),
+            },
+        );
+        store.push_f32_col("population", self.population);
+        store.push_f32_col("activity", self.activity);
+        store.push_f32_col("fuel_consumption", self.fuel_consumption);
+        for (i, &e) in self.emissions.iter().enumerate() {
+            store.push_f32_col(&format!("emissions_{i}"), e);
+        }
+    }
+}
+
 impl NonroadOutputs {
     /// Fold one geography-routine execution into the run output:
     /// append its rows and warnings and add its national-record count.
@@ -163,6 +219,38 @@ impl NonroadOutputs {
 mod tests {
     use super::*;
     use crate::common::consts::MXPOL;
+    use std::collections::HashMap;
+
+    /// Concrete [`TestStore`] for unit tests — appends values to
+    /// per-column `Vec`s keyed by column name.
+    #[derive(Default)]
+    struct MockStore {
+        str_cols: HashMap<String, Vec<String>>,
+        f32_cols: HashMap<String, Vec<f32>>,
+        opt_i32_cols: HashMap<String, Vec<Option<i32>>>,
+        opt_str_cols: HashMap<String, Vec<Option<String>>>,
+    }
+
+    impl TestStore for MockStore {
+        fn push_str_col(&mut self, col: &str, val: String) {
+            self.str_cols.entry(col.to_string()).or_default().push(val);
+        }
+        fn push_f32_col(&mut self, col: &str, val: f32) {
+            self.f32_cols.entry(col.to_string()).or_default().push(val);
+        }
+        fn push_opt_i32_col(&mut self, col: &str, val: Option<i32>) {
+            self.opt_i32_cols
+                .entry(col.to_string())
+                .or_default()
+                .push(val);
+        }
+        fn push_opt_str_col(&mut self, col: &str, val: Option<String>) {
+            self.opt_str_cols
+                .entry(col.to_string())
+                .or_default()
+                .push(val);
+        }
+    }
 
     fn row(fips: &str, channel: EmissionChannel) -> SimEmissionRow {
         SimEmissionRow {
@@ -228,5 +316,74 @@ mod tests {
         assert!(out.completion_message.is_empty());
         assert_eq!(out.counters, RunCounters::default());
         assert_eq!(out.national_record_count, 0);
+    }
+
+    #[test]
+    fn write_to_store_columns_maps_every_field() {
+        let mut emissions = vec![0.0_f32; MXPOL];
+        emissions[0] = 1.5;
+        emissions[5] = 2.7;
+        let sample = SimEmissionRow {
+            fips: "06037".to_string(),
+            subcounty: "12345".to_string(),
+            scc: "2270001010".to_string(),
+            hp_level: 75.0,
+            model_year: Some(2019),
+            tech_type: Some("T1".to_string()),
+            channel: EmissionChannel::Evaporative,
+            population: 42.0,
+            activity: 99.5,
+            fuel_consumption: 11.1,
+            emissions,
+        };
+
+        let mut store = MockStore::default();
+        sample.write_to_store_columns(&mut store);
+
+        assert_eq!(store.str_cols["fips"][0], "06037");
+        assert_eq!(store.str_cols["subcounty"][0], "12345");
+        assert_eq!(store.str_cols["scc"][0], "2270001010");
+        assert!((store.f32_cols["hp_level"][0] - 75.0).abs() < f32::EPSILON);
+        assert_eq!(store.opt_i32_cols["model_year"][0], Some(2019));
+        assert_eq!(
+            store.opt_str_cols["tech_type"][0],
+            Some("T1".to_string())
+        );
+        assert_eq!(store.str_cols["channel"][0], "evaporative");
+        assert!((store.f32_cols["population"][0] - 42.0).abs() < f32::EPSILON);
+        assert!((store.f32_cols["activity"][0] - 99.5).abs() < f32::EPSILON);
+        assert!((store.f32_cols["fuel_consumption"][0] - 11.1).abs() < f32::EPSILON);
+        assert!((store.f32_cols["emissions_0"][0] - 1.5).abs() < f32::EPSILON);
+        assert!((store.f32_cols["emissions_5"][0] - 2.7).abs() < f32::EPSILON);
+        for i in 0..MXPOL {
+            assert!(
+                store.f32_cols.contains_key(&format!("emissions_{i}")),
+                "missing column emissions_{i}"
+            );
+        }
+    }
+
+    #[test]
+    fn write_to_store_columns_handles_none_optional_fields() {
+        let sample = SimEmissionRow {
+            fips: "00000".to_string(),
+            subcounty: "     ".to_string(),
+            scc: "2270001010".to_string(),
+            hp_level: 50.0,
+            model_year: None,
+            tech_type: None,
+            channel: EmissionChannel::Exhaust,
+            population: 100.0,
+            activity: 200.0,
+            fuel_consumption: 30.0,
+            emissions: vec![0.0; MXPOL],
+        };
+
+        let mut store = MockStore::default();
+        sample.write_to_store_columns(&mut store);
+
+        assert_eq!(store.opt_i32_cols["model_year"][0], None);
+        assert_eq!(store.opt_str_cols["tech_type"][0], None);
+        assert_eq!(store.str_cols["channel"][0], "exhaust");
     }
 }
