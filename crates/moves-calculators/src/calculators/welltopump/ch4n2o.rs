@@ -278,23 +278,21 @@ impl Calculator for Ch4N2oWtpCalculator {
         INPUT_TABLES
     }
 
-    /// Phase 2 skeleton — returns an empty [`CalculatorOutput`].
-    ///
-    /// [`CalculatorContext`] cannot yet surface the input tables or accept the
-    /// `MOVESWorkerOutput` rows — that lands with the Task 50 `DataFrameStore`.
-    /// The computation is ported and tested in
-    /// [`Ch4N2oWtpCalculator::calculate`].
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let tables = ctx.tables();
+        let year: Vec<YearRow> = tables.iter_typed("Year")?;
+        let target_year = ctx.position().time.year
+            .map(i32::from)
+            .unwrap_or_else(|| year.first().map(|y| y.year_id).unwrap_or(0));
         let inputs = WtpInputs {
             greet: tables.iter_typed::<GreetWellToPumpRow>("GREETWellToPump")?,
             fuel_supply: tables.iter_typed::<FuelSupplyRow>("FuelSupply")?,
             fuel_formulation: tables.iter_typed::<FuelFormulationRow>("FuelFormulation")?,
             fuel_sub_type: tables.iter_typed::<FuelSubTypeRow>("FuelSubtype")?,
-            year: tables.iter_typed::<YearRow>("Year")?,
+            year,
             month_of_any_year: tables.iter_typed::<MonthGroupRow>("MonthOfAnyYear")?,
             worker_output: tables.iter_typed::<WorkerOutputRow>("MOVESWorkerOutput")?,
-            target_year: ctx.position().time.year.map(|y| i32::from(y)).unwrap_or(0),
+            target_year,
         };
         let rows = self.calculate(&inputs);
         crate::wiring::emit_rows(rows)
