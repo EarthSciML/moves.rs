@@ -268,7 +268,7 @@ pub fn build_dag(
         let java_path = java_subscriptions
             .iter()
             .find(|s| &s.calculator == name && !s.java_path.as_os_str().is_empty())
-            .map(|s| s.java_path.to_string_lossy().into_owned());
+            .map(|s| s.java_path.to_string_lossy().replace('\\', "/"));
         let kind = ModuleKind::from_name(name);
         modules.push(ModuleEntry {
             name: name.clone(),
