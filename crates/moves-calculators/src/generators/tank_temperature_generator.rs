@@ -596,12 +596,16 @@ impl TableRow for SampleVehicleTripRow {
                 .into(),
                 Series::new(
                     "priorTripID".into(),
-                    rows.iter().map(|r| r.prior_trip_id).collect::<Vec<Option<i32>>>(),
+                    rows.iter()
+                        .map(|r| r.prior_trip_id)
+                        .collect::<Vec<Option<i32>>>(),
                 )
                 .into(),
                 Series::new(
                     "keyOnTime".into(),
-                    rows.iter().map(|r| r.key_on_time).collect::<Vec<Option<i32>>>(),
+                    rows.iter()
+                        .map(|r| r.key_on_time)
+                        .collect::<Vec<Option<i32>>>(),
                 )
                 .into(),
                 Series::new(
@@ -811,10 +815,7 @@ impl TableRow for TankTemperatureGroupRow {
         "TankTemperatureGroup"
     }
     fn polars_schema() -> polars::prelude::Schema {
-        polars::prelude::Schema::from_iter([(
-            "tankTemperatureGroupID".into(),
-            DataType::Int32,
-        )])
+        polars::prelude::Schema::from_iter([("tankTemperatureGroupID".into(), DataType::Int32)])
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
@@ -2834,15 +2835,16 @@ impl Generator for TankTemperatureGenerator {
 
     fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
         // Extract zone_id from the iteration position (ZONE granularity).
-        let zone_id = ctx.position().location.zone_id.ok_or_else(|| {
-            Error::Polars("no zone_id in iteration position".into())
-        })? as i32;
+        let zone_id = ctx
+            .position()
+            .location
+            .zone_id
+            .ok_or_else(|| Error::Polars("no zone_id in iteration position".into()))?
+            as i32;
 
         // Read all input tables.
-        let zone_month_hour: Vec<ZoneMonthHourRow> =
-            ctx.tables().iter_typed("ZoneMonthHour")?;
-        let hour_day: Vec<HourDayRow> =
-            ctx.tables().iter_typed("HourDay")?;
+        let zone_month_hour: Vec<ZoneMonthHourRow> = ctx.tables().iter_typed("ZoneMonthHour")?;
+        let hour_day: Vec<HourDayRow> = ctx.tables().iter_typed("HourDay")?;
         let sample_vehicle_day: Vec<SampleVehicleDayRow> =
             ctx.tables().iter_typed("SampleVehicleDay")?;
         let sample_vehicle_trip: Vec<SampleVehicleTripRow> =
@@ -2853,8 +2855,7 @@ impl Generator for TankTemperatureGenerator {
             ctx.tables().iter_typed("TankTemperatureRise")?;
         let tank_temperature_group_raw: Vec<TankTemperatureGroupRow> =
             ctx.tables().iter_typed("TankTemperatureGroup")?;
-        let runspec_month_raw: Vec<RunSpecMonthRow> =
-            ctx.tables().iter_typed("RunSpecMonth")?;
+        let runspec_month_raw: Vec<RunSpecMonthRow> = ctx.tables().iter_typed("RunSpecMonth")?;
         let runspec_hour_day_raw: Vec<RunSpecHourDayRow> =
             ctx.tables().iter_typed("RunSpecHourDay")?;
 
@@ -2869,10 +2870,7 @@ impl Generator for TankTemperatureGenerator {
                 .into_iter()
                 .map(|r| r.tank_temperature_group_id)
                 .collect(),
-            runspec_month_ids: runspec_month_raw
-                .into_iter()
-                .map(|r| r.month_id)
-                .collect(),
+            runspec_month_ids: runspec_month_raw.into_iter().map(|r| r.month_id).collect(),
             runspec_hour_day_ids: runspec_hour_day_raw
                 .into_iter()
                 .map(|r| r.hour_day_id)
@@ -2887,21 +2885,9 @@ impl Generator for TankTemperatureGenerator {
         let out = generate_tank_temperatures(&inputs, zone_id);
 
         // Write the four output tables into the scratch namespace.
-        crate::wiring::write_scratch_table(
-            ctx,
-            OUTPUT_TABLES[0],
-            out.cold_soak_tank_temperature,
-        )?;
-        crate::wiring::write_scratch_table(
-            ctx,
-            OUTPUT_TABLES[1],
-            out.average_tank_temperature,
-        )?;
-        crate::wiring::write_scratch_table(
-            ctx,
-            OUTPUT_TABLES[2],
-            out.soak_activity_fraction,
-        )?;
+        crate::wiring::write_scratch_table(ctx, OUTPUT_TABLES[0], out.cold_soak_tank_temperature)?;
+        crate::wiring::write_scratch_table(ctx, OUTPUT_TABLES[1], out.average_tank_temperature)?;
+        crate::wiring::write_scratch_table(ctx, OUTPUT_TABLES[2], out.soak_activity_fraction)?;
         crate::wiring::write_scratch_table(
             ctx,
             OUTPUT_TABLES[3],

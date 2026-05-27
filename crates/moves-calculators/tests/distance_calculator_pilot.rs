@@ -11,8 +11,8 @@
 //! `activity = 100.0` (distance 100 × fuel-type-activity fraction 1.0).
 
 use moves_calculators::calculators::distance_calculator::{
-    CountyRow, DistanceCalculator, HourDayRow, LinkRow, SourceBinDistributionRow, SourceBinRow,
-    SourceTypeModelYearRow, ShoRow,
+    CountyRow, DistanceCalculator, HourDayRow, LinkRow, ShoRow, SourceBinDistributionRow,
+    SourceBinRow, SourceTypeModelYearRow,
 };
 use moves_framework::{Calculator, CalculatorContext, DataFrameStore, InMemoryStore, TableRow};
 
@@ -91,7 +91,10 @@ fn build_store() -> InMemoryStore {
         day_id: DAY_ID,
         hour_id: HOUR_ID,
     }];
-    store.insert("HourDay", HourDayRow::into_dataframe(hour_day_rows).unwrap());
+    store.insert(
+        "HourDay",
+        HourDayRow::into_dataframe(hour_day_rows).unwrap(),
+    );
 
     // One SourceBin row.
     let source_bin_rows = vec![SourceBinRow {
@@ -137,9 +140,7 @@ fn execute_with_five_row_sho_produces_one_output_row() {
     let calc = DistanceCalculator::new();
     let ctx = CalculatorContext::with_tables(build_store());
     let out = calc.execute(&ctx).expect("execute should succeed");
-    let df = out
-        .dataframe()
-        .expect("output must contain a DataFrame");
+    let df = out.dataframe().expect("output must contain a DataFrame");
     assert_eq!(
         df.height(),
         1,

@@ -65,7 +65,7 @@ use moves_calculators::calculators::{
     liquid_leaking_calculator::LiquidLeakingCalculator,
     multiday_tank_vapor_venting_calculator::MultidayTankVaporVentingCalculator,
     nh3::{running::Nh3RunningCalculator, start::Nh3StartCalculator},
-    nitrogen_oxide::{NOCalculator, NO2Calculator},
+    nitrogen_oxide::{NO2Calculator, NOCalculator},
     nrairtoxics::NrAirToxicsCalculator,
     nrhcspeciation::NrHcSpeciationCalculator,
     pm10::{PM10BrakeTireCalculator, PM10EmissionCalculator},
@@ -76,10 +76,8 @@ use moves_calculators::calculators::{
     tank_vapor_venting_calculator::TankVaporVentingCalculator,
     togspeciation::TogSpeciationCalculator,
     welltopump::{
-        ch4n2o::Ch4N2oWtpCalculator,
-        co2_atmospheric::Co2AtmosphericWtpCalculator,
-        co2_equivalent::Co2EquivalentWtpCalculator,
-        total_energy::WellToPumpProcessor,
+        ch4n2o::Ch4N2oWtpCalculator, co2_atmospheric::Co2AtmosphericWtpCalculator,
+        co2_equivalent::Co2EquivalentWtpCalculator, total_energy::WellToPumpProcessor,
     },
 };
 

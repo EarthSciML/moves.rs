@@ -345,10 +345,7 @@ mod tests {
         assert_eq!(store.str_cols["scc"][0], "2270001010");
         assert!((store.f32_cols["hp_level"][0] - 75.0).abs() < f32::EPSILON);
         assert_eq!(store.opt_i32_cols["model_year"][0], Some(2019));
-        assert_eq!(
-            store.opt_str_cols["tech_type"][0],
-            Some("T1".to_string())
-        );
+        assert_eq!(store.opt_str_cols["tech_type"][0], Some("T1".to_string()));
         assert_eq!(store.str_cols["channel"][0], "evaporative");
         assert!((store.f32_cols["population"][0] - 42.0).abs() < f32::EPSILON);
         assert!((store.f32_cols["activity"][0] - 99.5).abs() < f32::EPSILON);

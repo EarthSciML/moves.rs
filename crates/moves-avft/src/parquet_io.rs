@@ -20,8 +20,8 @@ use std::sync::Arc;
 use arrow::array::{ArrayRef, Float64Array, Float64Builder, Int64Array, Int64Builder};
 use arrow::datatypes::{DataType, Field, Schema as ArrowSchema, SchemaRef};
 use arrow::record_batch::RecordBatch;
-use parquet::arrow::ArrowWriter;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression;
 use parquet::file::properties::{EnabledStatistics, WriterProperties, WriterVersion};
 
@@ -292,7 +292,10 @@ mod tests {
         let loaded = read_parquet(&path).unwrap();
         let orig_rows: Vec<_> = original.iter().collect();
         let loaded_rows: Vec<_> = loaded.iter().collect();
-        assert_eq!(orig_rows, loaded_rows, "round-trip must reproduce identical rows");
+        assert_eq!(
+            orig_rows, loaded_rows,
+            "round-trip must reproduce identical rows"
+        );
     }
 
     #[test]

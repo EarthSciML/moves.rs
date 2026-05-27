@@ -437,12 +437,12 @@ impl Calculator for ActivityCalculator {
 
 #[cfg(test)]
 mod tests {
-    use moves_framework::TableRow;
     use super::inputs::{
         HourDayRow, LinkRow, RegClassSourceTypeFractionRow, RunSpecSourceFuelTypeRow,
         SampleVehiclePopulationRow, SourceHoursRow, SourceTypeModelYearRow, StartsRow,
     };
     use super::*;
+    use moves_framework::TableRow;
 
     fn context() -> IterationContext {
         IterationContext {
@@ -547,39 +547,104 @@ mod tests {
 
     #[test]
     fn execute_returns_nonempty_dataframe_for_minimal_inputs() {
-        use moves_framework::{DataFrameStore, InMemoryStore};
-        use moves_framework::execution::execution_db::{ExecutionLocation, ExecutionTime, IterationPosition};
         use inputs::{
-            HourDayRow, LinkRow, RegClassSourceTypeFractionRow, RunSpecSourceFuelTypeRow,
-            SampleVehiclePopulationRow, SourceHoursRow, SourceTypeModelYearRow, StartsRow,
-            FuelUsageFractionRow, HotellingActivityDistributionRow, HotellingHoursRow,
-            LinkSourceTypeHourRow, OffNetworkLinkRow, RoadTypeDistributionRow,
-            RunSpecSourceTypeRow, ShpRow, ShoRow, SourceTypeAgeDistributionRow,
-            SourceTypeAgePopulationRow, SourceUseTypeRow, ZoneRoadTypeRow,
+            FuelUsageFractionRow, HotellingActivityDistributionRow, HotellingHoursRow, HourDayRow,
+            LinkRow, LinkSourceTypeHourRow, OffNetworkLinkRow, RegClassSourceTypeFractionRow,
+            RoadTypeDistributionRow, RunSpecSourceFuelTypeRow, RunSpecSourceTypeRow,
+            SampleVehiclePopulationRow, ShoRow, ShpRow, SourceHoursRow,
+            SourceTypeAgeDistributionRow, SourceTypeAgePopulationRow, SourceTypeModelYearRow,
+            SourceUseTypeRow, StartsRow, ZoneRoadTypeRow,
         };
+        use moves_framework::execution::execution_db::{
+            ExecutionLocation, ExecutionTime, IterationPosition,
+        };
+        use moves_framework::{DataFrameStore, InMemoryStore};
         let wb = whole_bin_inputs();
         let mut store = InMemoryStore::new();
-        store.insert("SourceHours", SourceHoursRow::into_dataframe(wb.source_hours.clone()).unwrap());
+        store.insert(
+            "SourceHours",
+            SourceHoursRow::into_dataframe(wb.source_hours.clone()).unwrap(),
+        );
         store.insert("SHO", ShoRow::into_dataframe(wb.sho.clone()).unwrap());
         store.insert("SHP", ShpRow::into_dataframe(wb.shp.clone()).unwrap());
-        store.insert("Starts", StartsRow::into_dataframe(wb.starts.clone()).unwrap());
-        store.insert("hotellingHours", HotellingHoursRow::into_dataframe(wb.hotelling_hours.clone()).unwrap());
-        store.insert("HourDay", HourDayRow::into_dataframe(wb.hour_day.clone()).unwrap());
+        store.insert(
+            "Starts",
+            StartsRow::into_dataframe(wb.starts.clone()).unwrap(),
+        );
+        store.insert(
+            "hotellingHours",
+            HotellingHoursRow::into_dataframe(wb.hotelling_hours.clone()).unwrap(),
+        );
+        store.insert(
+            "HourDay",
+            HourDayRow::into_dataframe(wb.hour_day.clone()).unwrap(),
+        );
         store.insert("link", LinkRow::into_dataframe(wb.link.clone()).unwrap());
-        store.insert("RegClassSourceTypeFraction", RegClassSourceTypeFractionRow::into_dataframe(wb.reg_class_source_type_fraction.clone()).unwrap());
-        store.insert("hotellingActivityDistribution", HotellingActivityDistributionRow::into_dataframe(wb.hotelling_activity_distribution.clone()).unwrap());
-        store.insert("sampleVehiclePopulation", SampleVehiclePopulationRow::into_dataframe(wb.sample_vehicle_population.clone()).unwrap());
-        store.insert("fuelUsageFraction", FuelUsageFractionRow::into_dataframe(wb.fuel_usage_fraction.clone()).unwrap());
-        store.insert("sourceTypeModelYear", SourceTypeModelYearRow::into_dataframe(wb.source_type_model_year.clone()).unwrap());
-        store.insert("runSpecSourceFuelType", RunSpecSourceFuelTypeRow::into_dataframe(wb.run_spec_source_fuel_type.clone()).unwrap());
-        store.insert("sourceUseType", SourceUseTypeRow::into_dataframe(wb.source_use_type.clone()).unwrap());
-        store.insert("roadTypeDistribution", RoadTypeDistributionRow::into_dataframe(wb.road_type_distribution.clone()).unwrap());
-        store.insert("zoneRoadType", ZoneRoadTypeRow::into_dataframe(wb.zone_road_type.clone()).unwrap());
-        store.insert("sourceTypeAgePopulation", SourceTypeAgePopulationRow::into_dataframe(wb.source_type_age_population.clone()).unwrap());
-        store.insert("runSpecSourceType", RunSpecSourceTypeRow::into_dataframe(wb.run_spec_source_type.clone()).unwrap());
-        store.insert("offNetworkLink", OffNetworkLinkRow::into_dataframe(wb.off_network_link.clone()).unwrap());
-        store.insert("linkSourceTypeHour", LinkSourceTypeHourRow::into_dataframe(wb.link_source_type_hour.clone()).unwrap());
-        store.insert("sourceTypeAgeDistribution", SourceTypeAgeDistributionRow::into_dataframe(wb.source_type_age_distribution.clone()).unwrap());
+        store.insert(
+            "RegClassSourceTypeFraction",
+            RegClassSourceTypeFractionRow::into_dataframe(
+                wb.reg_class_source_type_fraction.clone(),
+            )
+            .unwrap(),
+        );
+        store.insert(
+            "hotellingActivityDistribution",
+            HotellingActivityDistributionRow::into_dataframe(
+                wb.hotelling_activity_distribution.clone(),
+            )
+            .unwrap(),
+        );
+        store.insert(
+            "sampleVehiclePopulation",
+            SampleVehiclePopulationRow::into_dataframe(wb.sample_vehicle_population.clone())
+                .unwrap(),
+        );
+        store.insert(
+            "fuelUsageFraction",
+            FuelUsageFractionRow::into_dataframe(wb.fuel_usage_fraction.clone()).unwrap(),
+        );
+        store.insert(
+            "sourceTypeModelYear",
+            SourceTypeModelYearRow::into_dataframe(wb.source_type_model_year.clone()).unwrap(),
+        );
+        store.insert(
+            "runSpecSourceFuelType",
+            RunSpecSourceFuelTypeRow::into_dataframe(wb.run_spec_source_fuel_type.clone()).unwrap(),
+        );
+        store.insert(
+            "sourceUseType",
+            SourceUseTypeRow::into_dataframe(wb.source_use_type.clone()).unwrap(),
+        );
+        store.insert(
+            "roadTypeDistribution",
+            RoadTypeDistributionRow::into_dataframe(wb.road_type_distribution.clone()).unwrap(),
+        );
+        store.insert(
+            "zoneRoadType",
+            ZoneRoadTypeRow::into_dataframe(wb.zone_road_type.clone()).unwrap(),
+        );
+        store.insert(
+            "sourceTypeAgePopulation",
+            SourceTypeAgePopulationRow::into_dataframe(wb.source_type_age_population.clone())
+                .unwrap(),
+        );
+        store.insert(
+            "runSpecSourceType",
+            RunSpecSourceTypeRow::into_dataframe(wb.run_spec_source_type.clone()).unwrap(),
+        );
+        store.insert(
+            "offNetworkLink",
+            OffNetworkLinkRow::into_dataframe(wb.off_network_link.clone()).unwrap(),
+        );
+        store.insert(
+            "linkSourceTypeHour",
+            LinkSourceTypeHourRow::into_dataframe(wb.link_source_type_hour.clone()).unwrap(),
+        );
+        store.insert(
+            "sourceTypeAgeDistribution",
+            SourceTypeAgeDistributionRow::into_dataframe(wb.source_type_age_distribution.clone())
+                .unwrap(),
+        );
 
         let position = IterationPosition {
             iteration: 0,
@@ -591,7 +656,10 @@ mod tests {
         let calc = ActivityCalculator;
         let out = calc.execute(&ctx).expect("execute ok");
         assert!(out.dataframe().is_some(), "expected non-empty DataFrame");
-        assert!(out.dataframe().unwrap().height() > 0, "expected at least one row");
+        assert!(
+            out.dataframe().unwrap().height() > 0,
+            "expected at least one row"
+        );
     }
 
     #[test]

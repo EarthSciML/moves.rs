@@ -92,8 +92,7 @@ fn all_fixtures() -> Vec<PathBuf> {
         .map(|e| e.path())
         .filter(|p| {
             let name = p.file_name().and_then(|n| n.to_str()).unwrap_or_default();
-            p.extension().and_then(|x| x.to_str()) == Some("xml")
-                && !name.starts_with("scale-")
+            p.extension().and_then(|x| x.to_str()) == Some("xml") && !name.starts_with("scale-")
         })
         .collect();
     paths.sort();

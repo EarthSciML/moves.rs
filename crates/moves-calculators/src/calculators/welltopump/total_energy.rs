@@ -293,7 +293,10 @@ impl Calculator for WellToPumpProcessor {
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let tables = ctx.tables();
         let year: Vec<YearRow> = tables.iter_typed("Year")?;
-        let target_year = ctx.position().time.year
+        let target_year = ctx
+            .position()
+            .time
+            .year
             .map(i32::from)
             .unwrap_or_else(|| year.first().map(|y| y.year_id).unwrap_or(0));
         let inputs = WtpInputs {
@@ -512,13 +515,31 @@ mod tests {
         use moves_framework::{DataFrameStore, InMemoryStore, TableRow};
         let inputs = minimal_inputs();
         let mut store = InMemoryStore::new();
-        store.insert("GREETWellToPump", GreetWellToPumpRow::into_dataframe(inputs.greet).unwrap());
-        store.insert("FuelSupply", FuelSupplyRow::into_dataframe(inputs.fuel_supply).unwrap());
-        store.insert("FuelFormulation", FuelFormulationRow::into_dataframe(inputs.fuel_formulation).unwrap());
-        store.insert("FuelSubtype", FuelSubTypeRow::into_dataframe(inputs.fuel_sub_type).unwrap());
+        store.insert(
+            "GREETWellToPump",
+            GreetWellToPumpRow::into_dataframe(inputs.greet).unwrap(),
+        );
+        store.insert(
+            "FuelSupply",
+            FuelSupplyRow::into_dataframe(inputs.fuel_supply).unwrap(),
+        );
+        store.insert(
+            "FuelFormulation",
+            FuelFormulationRow::into_dataframe(inputs.fuel_formulation).unwrap(),
+        );
+        store.insert(
+            "FuelSubtype",
+            FuelSubTypeRow::into_dataframe(inputs.fuel_sub_type).unwrap(),
+        );
         store.insert("Year", YearRow::into_dataframe(inputs.year).unwrap());
-        store.insert("MonthOfAnyYear", MonthGroupRow::into_dataframe(inputs.month_of_any_year).unwrap());
-        store.insert("MOVESWorkerOutput", WorkerOutputRow::into_dataframe(inputs.worker_output).unwrap());
+        store.insert(
+            "MonthOfAnyYear",
+            MonthGroupRow::into_dataframe(inputs.month_of_any_year).unwrap(),
+        );
+        store.insert(
+            "MOVESWorkerOutput",
+            WorkerOutputRow::into_dataframe(inputs.worker_output).unwrap(),
+        );
         let ctx = CalculatorContext::with_tables(store);
         let out = WellToPumpProcessor.execute(&ctx).expect("execute ok");
         let df = out.dataframe().expect("output should contain a DataFrame");

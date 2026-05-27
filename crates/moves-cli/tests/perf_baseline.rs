@@ -58,10 +58,7 @@ fn onroad_fixtures() -> Vec<PathBuf> {
         .filter_map(|e| e.ok())
         .map(|e| e.path())
         .filter(|p| {
-            let name = p
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or_default();
+            let name = p.file_name().and_then(|n| n.to_str()).unwrap_or_default();
             p.extension().and_then(|x| x.to_str()) == Some("xml")
                 && !name.starts_with("nr-")
                 && !name.starts_with("scale-")
@@ -121,10 +118,7 @@ fn perf_baseline_all_onroad_fixtures() {
     let mut failures: Vec<String> = Vec::new();
 
     for fixture in &fixtures {
-        let name = fixture
-            .file_stem()
-            .and_then(|n| n.to_str())
-            .unwrap_or("?");
+        let name = fixture.file_stem().and_then(|n| n.to_str()).unwrap_or("?");
 
         let out_dir = tempdir().expect("tempdir");
         let opts = RunOptions {
@@ -142,7 +136,14 @@ fn perf_baseline_all_onroad_fixtures() {
                 let exec_ms = outcome.execution_time.as_secs_f64() * 1000.0;
                 let rss_mib = outcome.peak_rss_kib.map(|k| k as f64 / 1024.0);
 
-                print_table_row(name, wall_ms, plan_ms, exec_ms, outcome.chunk_count(), rss_mib);
+                print_table_row(
+                    name,
+                    wall_ms,
+                    plan_ms,
+                    exec_ms,
+                    outcome.chunk_count(),
+                    rss_mib,
+                );
 
                 total_wall += outcome.wall_time;
                 total_plan += outcome.planning_time;

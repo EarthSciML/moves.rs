@@ -654,7 +654,9 @@ impl TableRow for DriveScheduleSecond {
             vec![
                 Series::new(
                     "secondID".into(),
-                    rows.iter().map(|r| r.second_id as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.second_id as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -756,7 +758,9 @@ impl TableRow for SourceTypePhysics {
                 .into(),
                 Series::new(
                     "fixedMassFactor".into(),
-                    rows.iter().map(|r| r.fixed_mass_factor).collect::<Vec<f64>>(),
+                    rows.iter()
+                        .map(|r| r.fixed_mass_factor)
+                        .collect::<Vec<f64>>(),
                 )
                 .into(),
             ],
@@ -806,12 +810,14 @@ impl TableRow for SourceTypePhysics {
                     real_source_type_id: SourceTypeId(
                         real_source_type_id_col
                             .get(i)
-                            .ok_or_else(|| null("realSourceTypeID"))? as u16,
+                            .ok_or_else(|| null("realSourceTypeID"))?
+                            as u16,
                     ),
                     temp_source_type_id: SourceTypeId(
                         temp_source_type_id_col
                             .get(i)
-                            .ok_or_else(|| null("tempSourceTypeID"))? as u16,
+                            .ok_or_else(|| null("tempSourceTypeID"))?
+                            as u16,
                     ),
                     rolling_term_a: rolling_term_a_col
                         .get(i)
@@ -819,12 +825,8 @@ impl TableRow for SourceTypePhysics {
                     rotating_term_b: rotating_term_b_col
                         .get(i)
                         .ok_or_else(|| null("rotatingTermB"))?,
-                    drag_term_c: drag_term_c_col
-                        .get(i)
-                        .ok_or_else(|| null("dragTermC"))?,
-                    source_mass: source_mass_col
-                        .get(i)
-                        .ok_or_else(|| null("sourceMass"))?,
+                    drag_term_c: drag_term_c_col.get(i).ok_or_else(|| null("dragTermC"))?,
+                    source_mass: source_mass_col.get(i).ok_or_else(|| null("sourceMass"))?,
                     fixed_mass_factor: fixed_mass_factor_col
                         .get(i)
                         .ok_or_else(|| null("fixedMassFactor"))?,
@@ -854,27 +856,37 @@ impl TableRow for OperatingModeBracket {
             vec![
                 Series::new(
                     "opModeID".into(),
-                    rows.iter().map(|r| r.op_mode_id as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.op_mode_id as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
                     "VSPLower".into(),
-                    rows.iter().map(|r| r.vsp_lower).collect::<Vec<Option<f64>>>(),
+                    rows.iter()
+                        .map(|r| r.vsp_lower)
+                        .collect::<Vec<Option<f64>>>(),
                 )
                 .into(),
                 Series::new(
                     "VSPUpper".into(),
-                    rows.iter().map(|r| r.vsp_upper).collect::<Vec<Option<f64>>>(),
+                    rows.iter()
+                        .map(|r| r.vsp_upper)
+                        .collect::<Vec<Option<f64>>>(),
                 )
                 .into(),
                 Series::new(
                     "speedLower".into(),
-                    rows.iter().map(|r| r.speed_lower).collect::<Vec<Option<f64>>>(),
+                    rows.iter()
+                        .map(|r| r.speed_lower)
+                        .collect::<Vec<Option<f64>>>(),
                 )
                 .into(),
                 Series::new(
                     "speedUpper".into(),
-                    rows.iter().map(|r| r.speed_upper).collect::<Vec<Option<f64>>>(),
+                    rows.iter()
+                        .map(|r| r.speed_upper)
+                        .collect::<Vec<Option<f64>>>(),
                 )
                 .into(),
             ],
@@ -946,7 +958,9 @@ impl TableRow for OpModePolProcAssoc {
                 .into(),
                 Series::new(
                     "opModeID".into(),
-                    rows.iter().map(|r| r.op_mode_id as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.op_mode_id as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
             ],
@@ -1008,7 +1022,9 @@ impl TableRow for OpModeDistributionRow {
                 .into(),
                 Series::new(
                     "hourDayID".into(),
-                    rows.iter().map(|r| r.hour_day_id as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.hour_day_id as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -1025,12 +1041,16 @@ impl TableRow for OpModeDistributionRow {
                 .into(),
                 Series::new(
                     "opModeID".into(),
-                    rows.iter().map(|r| r.op_mode_id as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.op_mode_id as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
                     "opModeFraction".into(),
-                    rows.iter().map(|r| r.op_mode_fraction).collect::<Vec<f64>>(),
+                    rows.iter()
+                        .map(|r| r.op_mode_fraction)
+                        .collect::<Vec<f64>>(),
                 )
                 .into(),
             ],
@@ -1125,7 +1145,9 @@ impl TableRow for LinkRow {
                 .into(),
                 Series::new(
                     "linkAvgSpeed".into(),
-                    rows.iter().map(|r| r.link_avg_speed).collect::<Vec<Option<f64>>>(),
+                    rows.iter()
+                        .map(|r| r.link_avg_speed)
+                        .collect::<Vec<Option<f64>>>(),
                 )
                 .into(),
             ],
@@ -1489,17 +1511,18 @@ impl Generator for LinkOperatingModeDistributionGenerator {
 
     fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
         // Extract link_id from the iteration position.
-        let link_id_u32 = ctx.position().location.link_id.ok_or_else(|| {
-            Error::Polars("no link_id in iteration position".into())
-        })?;
+        let link_id_u32 = ctx
+            .position()
+            .location
+            .link_id
+            .ok_or_else(|| Error::Polars("no link_id in iteration position".into()))?;
         let link_id = link_id_u32 as i32;
 
         // Read all input tables.
         let drive_schedule: Vec<DriveScheduleSecond> =
             ctx.tables().iter_typed("driveScheduleSecondLink")?;
         let link_rows: Vec<LinkRow> = ctx.tables().iter_typed("link")?;
-        let operating_mode: Vec<OperatingModeBracket> =
-            ctx.tables().iter_typed("operatingMode")?;
+        let operating_mode: Vec<OperatingModeBracket> = ctx.tables().iter_typed("operatingMode")?;
         let physics: Vec<SourceTypePhysics> =
             ctx.tables().iter_typed("sourceUseTypePhysicsMapping")?;
         let run_spec_source_type_rows: Vec<RunSpecSourceTypeRow> =
@@ -1520,8 +1543,7 @@ impl Generator for LinkOperatingModeDistributionGenerator {
         // Build `tempExistingOpMode` snapshot and `hasRunningOpModeDistribution`
         // flag from the input `opModeDistribution` rows for this link.
         // A running-process distribution is one whose `polProcessID % 100 == 1`.
-        let mut existing_op_mode_keys: HashSet<(SourceTypeId, PolProcessId, i32)> =
-            HashSet::new();
+        let mut existing_op_mode_keys: HashSet<(SourceTypeId, PolProcessId, i32)> = HashSet::new();
         let mut has_running_op_mode_distribution = false;
         for row in &existing_rows {
             if row.link_id == link_id {
@@ -2142,8 +2164,16 @@ mod tests {
         // second 2 moving (speed=30 mph).  With the bracket [13, None, None]
         // second 2 → op mode 13; second 1 → stopped 501, folded to idle 1.
         let schedule = vec![
-            DriveScheduleSecond { second_id: 1, speed: 0.0, grade: 0.0 },
-            DriveScheduleSecond { second_id: 2, speed: 30.0, grade: 0.0 },
+            DriveScheduleSecond {
+                second_id: 1,
+                speed: 0.0,
+                grade: 0.0,
+            },
+            DriveScheduleSecond {
+                second_id: 2,
+                speed: 30.0,
+                grade: 0.0,
+            },
         ];
         // One physics row: realSourceTypeID=21, tempSourceTypeID=21.
         let physics_row = SourceTypePhysics {
@@ -2164,10 +2194,19 @@ mod tests {
             speed_upper: None,
         };
         // Associations for op modes 501 and 13 with polProcessID 101.
-        let assoc_501 = OpModePolProcAssoc { pol_process_id: PolProcessId(101), op_mode_id: 501 };
-        let assoc_13 = OpModePolProcAssoc { pol_process_id: PolProcessId(101), op_mode_id: 13 };
+        let assoc_501 = OpModePolProcAssoc {
+            pol_process_id: PolProcessId(101),
+            op_mode_id: 501,
+        };
+        let assoc_13 = OpModePolProcAssoc {
+            pol_process_id: PolProcessId(101),
+            op_mode_id: 13,
+        };
         // One link row.
-        let link_row = LinkRow { link_id: LINK_ID, link_avg_speed: None };
+        let link_row = LinkRow {
+            link_id: LINK_ID,
+            link_avg_speed: None,
+        };
 
         let mut store = InMemoryStore::default();
         store.insert(
@@ -2193,13 +2232,9 @@ mod tests {
         );
         store.insert(
             "runSpecHourDay",
-            RunSpecHourDayRow::into_dataframe(vec![RunSpecHourDayRow { hour_day_id: 51 }])
-                .unwrap(),
+            RunSpecHourDayRow::into_dataframe(vec![RunSpecHourDayRow { hour_day_id: 51 }]).unwrap(),
         );
-        store.insert(
-            "link",
-            LinkRow::into_dataframe(vec![link_row]).unwrap(),
-        );
+        store.insert("link", LinkRow::into_dataframe(vec![link_row]).unwrap());
         // No pre-existing opModeDistribution rows.
         store.insert(
             "opModeDistribution",
@@ -2234,7 +2269,10 @@ mod tests {
         let modes: HashSet<i16> = out.iter().map(|r| r.op_mode_id).collect();
         assert_eq!(modes, HashSet::from([1, 13]));
         let total: f64 = out.iter().map(|r| r.op_mode_fraction).sum();
-        assert!((total - 1.0).abs() < 1e-12, "fractions must sum to 1.0, got {total}");
+        assert!(
+            (total - 1.0).abs() < 1e-12,
+            "fractions must sum to 1.0, got {total}"
+        );
         for r in &out {
             assert_eq!(r.link_id, LINK_ID);
             assert_eq!(r.hour_day_id, 51);

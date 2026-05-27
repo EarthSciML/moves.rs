@@ -33,8 +33,8 @@
 
 use polars::prelude::{DataFrame, PolarsResult, Schema};
 
-use crate::data::DataFrameStore;
 use crate::data::schema_registry::schema_registry;
+use crate::data::DataFrameStore;
 use crate::error::{Error, Result};
 
 /// Contract for typed row structs that can round-trip through a
@@ -107,14 +107,10 @@ pub trait DataFrameStoreTyped: DataFrameStore {
         if let Some(schema_fn) = registry.get(name) {
             let reg_schema = schema_fn();
             if reg_schema.len() > 0 {
-                let expected: Vec<String> = reg_schema
-                    .iter()
-                    .map(|(col, _)| col.to_string())
-                    .collect();
-                let actual: Vec<String> = row_schema
-                    .iter()
-                    .map(|(col, _)| col.to_string())
-                    .collect();
+                let expected: Vec<String> =
+                    reg_schema.iter().map(|(col, _)| col.to_string()).collect();
+                let actual: Vec<String> =
+                    row_schema.iter().map(|(col, _)| col.to_string()).collect();
                 if expected != actual {
                     return Err(Error::SchemaMismatch {
                         table: name.to_string(),
@@ -134,9 +130,9 @@ pub trait DataFrameStoreTyped: DataFrameStore {
     ///
     /// Returns an error if no table named `name` exists in the store.
     fn iter_typed<R: TableRow>(&self, name: &str) -> Result<Vec<R>> {
-        let arc_df = self.get(name).ok_or_else(|| Error::Polars(format!(
-            "table '{name}' not found in store"
-        )))?;
+        let arc_df = self
+            .get(name)
+            .ok_or_else(|| Error::Polars(format!("table '{name}' not found in store")))?;
         R::from_dataframe(&arc_df)
     }
 }

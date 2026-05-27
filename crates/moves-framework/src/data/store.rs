@@ -72,7 +72,9 @@ mod tests {
         let df = one_col_df("sourceUseTypePopulation");
         let shape = df.shape();
         store.insert("sourceUseTypePopulation", df);
-        let got = store.get("sourceUseTypePopulation").expect("should be present");
+        let got = store
+            .get("sourceUseTypePopulation")
+            .expect("should be present");
         assert_eq!(got.shape(), shape);
     }
 

@@ -96,8 +96,8 @@ use std::collections::HashMap;
 use moves_calculator_info::{Granularity, Priority};
 use moves_data::{PollutantProcessAssociation, ProcessId};
 use moves_framework::{
-    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription,
-    DataFrameStoreTyped, Error, IntoDataFrame, TableRow,
+    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStoreTyped,
+    Error, IntoDataFrame, TableRow,
 };
 use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
 
@@ -351,13 +351,41 @@ impl TableRow for ShoRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("hourDayID".into(), rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>()).into(),
-                Series::new("monthID".into(), rows.iter().map(|r| r.month_id).collect::<Vec<i32>>()).into(),
-                Series::new("yearID".into(), rows.iter().map(|r| r.year_id).collect::<Vec<i32>>()).into(),
-                Series::new("ageID".into(), rows.iter().map(|r| r.age_id).collect::<Vec<i32>>()).into(),
-                Series::new("linkID".into(), rows.iter().map(|r| r.link_id).collect::<Vec<i32>>()).into(),
-                Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("distance".into(), rows.iter().map(|r| r.distance).collect::<Vec<f64>>()).into(),
+                Series::new(
+                    "hourDayID".into(),
+                    rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "yearID".into(),
+                    rows.iter().map(|r| r.year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "ageID".into(),
+                    rows.iter().map(|r| r.age_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "linkID".into(),
+                    rows.iter().map(|r| r.link_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "distance".into(),
+                    rows.iter().map(|r| r.distance).collect::<Vec<f64>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -365,12 +393,16 @@ impl TableRow for ShoRow {
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "SHO";
         let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .f64()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let hour_day = get_i32("hourDayID")?;
         let month = get_i32("monthID")?;
@@ -379,18 +411,20 @@ impl TableRow for ShoRow {
         let link = get_i32("linkID")?;
         let src_type = get_i32("sourceTypeID")?;
         let dist = get_f64("distance")?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(ShoRow {
-                hour_day_id: hour_day.get(i).ok_or_else(|| null("hourDayID"))?,
-                month_id: month.get(i).ok_or_else(|| null("monthID"))?,
-                year_id: year.get(i).ok_or_else(|| null("yearID"))?,
-                age_id: age.get(i).ok_or_else(|| null("ageID"))?,
-                link_id: link.get(i).ok_or_else(|| null("linkID"))?,
-                source_type_id: src_type.get(i).ok_or_else(|| null("sourceTypeID"))?,
-                distance: dist.get(i).ok_or_else(|| null("distance"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(ShoRow {
+                    hour_day_id: hour_day.get(i).ok_or_else(|| null("hourDayID"))?,
+                    month_id: month.get(i).ok_or_else(|| null("monthID"))?,
+                    year_id: year.get(i).ok_or_else(|| null("yearID"))?,
+                    age_id: age.get(i).ok_or_else(|| null("ageID"))?,
+                    link_id: link.get(i).ok_or_else(|| null("linkID"))?,
+                    source_type_id: src_type.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                    distance: dist.get(i).ok_or_else(|| null("distance"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -412,9 +446,21 @@ impl TableRow for SourceBinRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("sourceBinID".into(), rows.iter().map(|r| r.source_bin_id).collect::<Vec<i64>>()).into(),
-                Series::new("regClassID".into(), rows.iter().map(|r| r.reg_class_id).collect::<Vec<i32>>()).into(),
-                Series::new("fuelTypeID".into(), rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>()).into(),
+                Series::new(
+                    "sourceBinID".into(),
+                    rows.iter().map(|r| r.source_bin_id).collect::<Vec<i64>>(),
+                )
+                .into(),
+                Series::new(
+                    "regClassID".into(),
+                    rows.iter().map(|r| r.reg_class_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelTypeID".into(),
+                    rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -422,24 +468,30 @@ impl TableRow for SourceBinRow {
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "SourceBin";
         let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let get_i64 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .i64().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i64()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let src_bin = get_i64("sourceBinID")?;
         let reg_class = get_i32("regClassID")?;
         let fuel_type = get_i32("fuelTypeID")?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(SourceBinRow {
-                source_bin_id: src_bin.get(i).ok_or_else(|| null("sourceBinID"))?,
-                reg_class_id: reg_class.get(i).ok_or_else(|| null("regClassID"))?,
-                fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(SourceBinRow {
+                    source_bin_id: src_bin.get(i).ok_or_else(|| null("sourceBinID"))?,
+                    reg_class_id: reg_class.get(i).ok_or_else(|| null("regClassID"))?,
+                    fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -462,10 +514,30 @@ impl TableRow for SourceBinDistributionRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("sourceTypeModelYearID".into(), rows.iter().map(|r| r.source_type_model_year_id).collect::<Vec<i32>>()).into(),
-                Series::new("polProcessID".into(), rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>()).into(),
-                Series::new("sourceBinID".into(), rows.iter().map(|r| r.source_bin_id).collect::<Vec<i64>>()).into(),
-                Series::new("sourceBinActivityFraction".into(), rows.iter().map(|r| r.source_bin_activity_fraction).collect::<Vec<f64>>()).into(),
+                Series::new(
+                    "sourceTypeModelYearID".into(),
+                    rows.iter()
+                        .map(|r| r.source_type_model_year_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "polProcessID".into(),
+                    rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceBinID".into(),
+                    rows.iter().map(|r| r.source_bin_id).collect::<Vec<i64>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceBinActivityFraction".into(),
+                    rows.iter()
+                        .map(|r| r.source_bin_activity_fraction)
+                        .collect::<Vec<f64>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -473,30 +545,42 @@ impl TableRow for SourceBinDistributionRow {
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "SourceBinDistribution";
         let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let get_i64 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .i64().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i64()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .f64()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let stmy = get_i32("sourceTypeModelYearID")?;
         let pol_proc = get_i32("polProcessID")?;
         let src_bin = get_i64("sourceBinID")?;
         let frac = get_f64("sourceBinActivityFraction")?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(SourceBinDistributionRow {
-                source_type_model_year_id: stmy.get(i).ok_or_else(|| null("sourceTypeModelYearID"))?,
-                pol_process_id: pol_proc.get(i).ok_or_else(|| null("polProcessID"))?,
-                source_bin_id: src_bin.get(i).ok_or_else(|| null("sourceBinID"))?,
-                source_bin_activity_fraction: frac.get(i).ok_or_else(|| null("sourceBinActivityFraction"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(SourceBinDistributionRow {
+                    source_type_model_year_id: stmy
+                        .get(i)
+                        .ok_or_else(|| null("sourceTypeModelYearID"))?,
+                    pol_process_id: pol_proc.get(i).ok_or_else(|| null("polProcessID"))?,
+                    source_bin_id: src_bin.get(i).ok_or_else(|| null("sourceBinID"))?,
+                    source_bin_activity_fraction: frac
+                        .get(i)
+                        .ok_or_else(|| null("sourceBinActivityFraction"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -518,9 +602,23 @@ impl TableRow for SourceTypeModelYearRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("sourceTypeModelYearID".into(), rows.iter().map(|r| r.source_type_model_year_id).collect::<Vec<i32>>()).into(),
-                Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("modelYearID".into(), rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>()).into(),
+                Series::new(
+                    "sourceTypeModelYearID".into(),
+                    rows.iter()
+                        .map(|r| r.source_type_model_year_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "modelYearID".into(),
+                    rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -528,20 +626,26 @@ impl TableRow for SourceTypeModelYearRow {
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "SourceTypeModelYear";
         let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let stmy = get_i32("sourceTypeModelYearID")?;
         let src_type = get_i32("sourceTypeID")?;
         let model_year = get_i32("modelYearID")?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(SourceTypeModelYearRow {
-                source_type_model_year_id: stmy.get(i).ok_or_else(|| null("sourceTypeModelYearID"))?,
-                source_type_id: src_type.get(i).ok_or_else(|| null("sourceTypeID"))?,
-                model_year_id: model_year.get(i).ok_or_else(|| null("modelYearID"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(SourceTypeModelYearRow {
+                    source_type_model_year_id: stmy
+                        .get(i)
+                        .ok_or_else(|| null("sourceTypeModelYearID"))?,
+                    source_type_id: src_type.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                    model_year_id: model_year.get(i).ok_or_else(|| null("modelYearID"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -563,9 +667,21 @@ impl TableRow for HourDayRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("hourDayID".into(), rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>()).into(),
-                Series::new("dayID".into(), rows.iter().map(|r| r.day_id).collect::<Vec<i32>>()).into(),
-                Series::new("hourID".into(), rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>()).into(),
+                Series::new(
+                    "hourDayID".into(),
+                    rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "dayID".into(),
+                    rows.iter().map(|r| r.day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hourID".into(),
+                    rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -573,20 +689,24 @@ impl TableRow for HourDayRow {
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "HourDay";
         let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let hour_day = get_i32("hourDayID")?;
         let day = get_i32("dayID")?;
         let hour = get_i32("hourID")?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(HourDayRow {
-                hour_day_id: hour_day.get(i).ok_or_else(|| null("hourDayID"))?,
-                day_id: day.get(i).ok_or_else(|| null("dayID"))?,
-                hour_id: hour.get(i).ok_or_else(|| null("hourID"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(HourDayRow {
+                    hour_day_id: hour_day.get(i).ok_or_else(|| null("hourDayID"))?,
+                    day_id: day.get(i).ok_or_else(|| null("dayID"))?,
+                    hour_id: hour.get(i).ok_or_else(|| null("hourID"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -609,10 +729,26 @@ impl TableRow for LinkRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("linkID".into(), rows.iter().map(|r| r.link_id).collect::<Vec<i32>>()).into(),
-                Series::new("countyID".into(), rows.iter().map(|r| r.county_id).collect::<Vec<i32>>()).into(),
-                Series::new("zoneID".into(), rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>()).into(),
-                Series::new("roadTypeID".into(), rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>()).into(),
+                Series::new(
+                    "linkID".into(),
+                    rows.iter().map(|r| r.link_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "countyID".into(),
+                    rows.iter().map(|r| r.county_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "zoneID".into(),
+                    rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "roadTypeID".into(),
+                    rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -620,22 +756,26 @@ impl TableRow for LinkRow {
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "Link";
         let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let link = get_i32("linkID")?;
         let county = get_i32("countyID")?;
         let zone = get_i32("zoneID")?;
         let road_type = get_i32("roadTypeID")?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(LinkRow {
-                link_id: link.get(i).ok_or_else(|| null("linkID"))?,
-                county_id: county.get(i).ok_or_else(|| null("countyID"))?,
-                zone_id: zone.get(i).ok_or_else(|| null("zoneID"))?,
-                road_type_id: road_type.get(i).ok_or_else(|| null("roadTypeID"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(LinkRow {
+                    link_id: link.get(i).ok_or_else(|| null("linkID"))?,
+                    county_id: county.get(i).ok_or_else(|| null("countyID"))?,
+                    zone_id: zone.get(i).ok_or_else(|| null("zoneID"))?,
+                    road_type_id: road_type.get(i).ok_or_else(|| null("roadTypeID"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -656,8 +796,16 @@ impl TableRow for CountyRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("countyID".into(), rows.iter().map(|r| r.county_id).collect::<Vec<i32>>()).into(),
-                Series::new("stateID".into(), rows.iter().map(|r| r.state_id).collect::<Vec<i32>>()).into(),
+                Series::new(
+                    "countyID".into(),
+                    rows.iter().map(|r| r.county_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "stateID".into(),
+                    rows.iter().map(|r| r.state_id).collect::<Vec<i32>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -665,18 +813,22 @@ impl TableRow for CountyRow {
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "County";
         let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let county = get_i32("countyID")?;
         let state = get_i32("stateID")?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(CountyRow {
-                county_id: county.get(i).ok_or_else(|| null("countyID"))?,
-                state_id: state.get(i).ok_or_else(|| null("stateID"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(CountyRow {
+                    county_id: county.get(i).ok_or_else(|| null("countyID"))?,
+                    state_id: state.get(i).ok_or_else(|| null("stateID"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -709,20 +861,76 @@ impl TableRow for DistanceActivityRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("yearID".into(), rows.iter().map(|r| r.year_id).collect::<Vec<i32>>()).into(),
-                Series::new("monthID".into(), rows.iter().map(|r| r.month_id).collect::<Vec<i32>>()).into(),
-                Series::new("dayID".into(), rows.iter().map(|r| r.day_id).collect::<Vec<i32>>()).into(),
-                Series::new("hourID".into(), rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>()).into(),
-                Series::new("stateID".into(), rows.iter().map(|r| r.state_id).collect::<Vec<i32>>()).into(),
-                Series::new("countyID".into(), rows.iter().map(|r| r.county_id).collect::<Vec<i32>>()).into(),
-                Series::new("zoneID".into(), rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>()).into(),
-                Series::new("linkID".into(), rows.iter().map(|r| r.link_id).collect::<Vec<i32>>()).into(),
-                Series::new("regClassID".into(), rows.iter().map(|r| r.reg_class_id).collect::<Vec<i32>>()).into(),
-                Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("fuelTypeID".into(), rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("modelYearID".into(), rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>()).into(),
-                Series::new("roadTypeID".into(), rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("activity".into(), rows.iter().map(|r| r.activity).collect::<Vec<f64>>()).into(),
+                Series::new(
+                    "yearID".into(),
+                    rows.iter().map(|r| r.year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "dayID".into(),
+                    rows.iter().map(|r| r.day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hourID".into(),
+                    rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "stateID".into(),
+                    rows.iter().map(|r| r.state_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "countyID".into(),
+                    rows.iter().map(|r| r.county_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "zoneID".into(),
+                    rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "linkID".into(),
+                    rows.iter().map(|r| r.link_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "regClassID".into(),
+                    rows.iter().map(|r| r.reg_class_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelTypeID".into(),
+                    rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "modelYearID".into(),
+                    rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "roadTypeID".into(),
+                    rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "activity".into(),
+                    rows.iter().map(|r| r.activity).collect::<Vec<f64>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -730,12 +938,16 @@ impl TableRow for DistanceActivityRow {
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "MOVESWorkerActivityOutput";
         let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .f64()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let year = get_i32("yearID")?;
         let month = get_i32("monthID")?;
@@ -751,25 +963,27 @@ impl TableRow for DistanceActivityRow {
         let model_year = get_i32("modelYearID")?;
         let road_type = get_i32("roadTypeID")?;
         let activity = get_f64("activity")?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(DistanceActivityRow {
-                year_id: year.get(i).ok_or_else(|| null("yearID"))?,
-                month_id: month.get(i).ok_or_else(|| null("monthID"))?,
-                day_id: day.get(i).ok_or_else(|| null("dayID"))?,
-                hour_id: hour.get(i).ok_or_else(|| null("hourID"))?,
-                state_id: state.get(i).ok_or_else(|| null("stateID"))?,
-                county_id: county.get(i).ok_or_else(|| null("countyID"))?,
-                zone_id: zone.get(i).ok_or_else(|| null("zoneID"))?,
-                link_id: link.get(i).ok_or_else(|| null("linkID"))?,
-                reg_class_id: reg_class.get(i).ok_or_else(|| null("regClassID"))?,
-                source_type_id: src_type.get(i).ok_or_else(|| null("sourceTypeID"))?,
-                fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
-                model_year_id: model_year.get(i).ok_or_else(|| null("modelYearID"))?,
-                road_type_id: road_type.get(i).ok_or_else(|| null("roadTypeID"))?,
-                activity: activity.get(i).ok_or_else(|| null("activity"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(DistanceActivityRow {
+                    year_id: year.get(i).ok_or_else(|| null("yearID"))?,
+                    month_id: month.get(i).ok_or_else(|| null("monthID"))?,
+                    day_id: day.get(i).ok_or_else(|| null("dayID"))?,
+                    hour_id: hour.get(i).ok_or_else(|| null("hourID"))?,
+                    state_id: state.get(i).ok_or_else(|| null("stateID"))?,
+                    county_id: county.get(i).ok_or_else(|| null("countyID"))?,
+                    zone_id: zone.get(i).ok_or_else(|| null("zoneID"))?,
+                    link_id: link.get(i).ok_or_else(|| null("linkID"))?,
+                    reg_class_id: reg_class.get(i).ok_or_else(|| null("regClassID"))?,
+                    source_type_id: src_type.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                    fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
+                    model_year_id: model_year.get(i).ok_or_else(|| null("modelYearID"))?,
+                    road_type_id: road_type.get(i).ok_or_else(|| null("roadTypeID"))?,
+                    activity: activity.get(i).ok_or_else(|| null("activity"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -1403,18 +1617,43 @@ mod tests {
         // tables whose registry schema has more columns than the row struct
         // (SourceBin, County).
         store.insert("SHO", ShoRow::into_dataframe(inputs.sho).unwrap());
-        store.insert("SourceBin", SourceBinRow::into_dataframe(inputs.source_bin).unwrap());
-        store.insert("SourceBinDistribution", SourceBinDistributionRow::into_dataframe(inputs.source_bin_distribution).unwrap());
-        store.insert("SourceTypeModelYear", SourceTypeModelYearRow::into_dataframe(inputs.source_type_model_year).unwrap());
-        store.insert("HourDay", HourDayRow::into_dataframe(inputs.hour_day).unwrap());
+        store.insert(
+            "SourceBin",
+            SourceBinRow::into_dataframe(inputs.source_bin).unwrap(),
+        );
+        store.insert(
+            "SourceBinDistribution",
+            SourceBinDistributionRow::into_dataframe(inputs.source_bin_distribution).unwrap(),
+        );
+        store.insert(
+            "SourceTypeModelYear",
+            SourceTypeModelYearRow::into_dataframe(inputs.source_type_model_year).unwrap(),
+        );
+        store.insert(
+            "HourDay",
+            HourDayRow::into_dataframe(inputs.hour_day).unwrap(),
+        );
         store.insert("Link", LinkRow::into_dataframe(inputs.link).unwrap());
         store.insert("County", CountyRow::into_dataframe(inputs.county).unwrap());
         let ctx = CalculatorContext::with_tables(store);
         let out = calc.execute(&ctx).expect("execute ok");
         let df = out.dataframe().expect("output should contain a DataFrame");
-        assert_eq!(df.height(), 1, "minimal inputs produce exactly one output row");
-        let activity = df.column("activity").unwrap().f64().unwrap().get(0).unwrap();
-        assert!((activity - 100.0).abs() < 1e-9, "activity {activity} != 100.0");
+        assert_eq!(
+            df.height(),
+            1,
+            "minimal inputs produce exactly one output row"
+        );
+        let activity = df
+            .column("activity")
+            .unwrap()
+            .f64()
+            .unwrap()
+            .get(0)
+            .unwrap();
+        assert!(
+            (activity - 100.0).abs() < 1e-9,
+            "activity {activity} != 100.0"
+        );
     }
 
     #[test]

@@ -276,8 +276,7 @@ fn reference_corpus_validates_when_present() {
     });
 
     // Assert the manifest names exactly the ten FIXTURE_NAMES.
-    let mut manifest_names: Vec<&str> =
-        manifest.fixtures.iter().map(|e| e.name.as_str()).collect();
+    let mut manifest_names: Vec<&str> = manifest.fixtures.iter().map(|e| e.name.as_str()).collect();
     manifest_names.sort_unstable();
     let mut expected_names = fixtures::FIXTURE_NAMES.to_vec();
     expected_names.sort_unstable();
@@ -314,11 +313,7 @@ fn reference_corpus_validates_when_present() {
         // Assert at least one record per Phase.
         for phase in Phase::all() {
             let n = records.iter().filter(|r| r.phase == phase).count();
-            assert!(
-                n > 0,
-                "{}: no records for phase {phase}",
-                entry.name
-            );
+            assert!(n > 0, "{}: no records for phase {phase}", entry.name);
             eprintln!("  {} · {phase}: {n} record(s)", entry.name);
         }
 

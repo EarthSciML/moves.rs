@@ -362,7 +362,12 @@ static OUTPUT_TABLES: &[&str] = &["OpModeDistribution", "RatesOpModeDistribution
 // ---- row_err ----------------------------------------------------------------
 
 fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -> Error {
-    Error::RowExtraction { table: table.into(), row, column: column.into(), message: msg }
+    Error::RowExtraction {
+        table: table.into(),
+        row,
+        column: column.into(),
+        message: msg,
+    }
 }
 
 // ---- Input row types --------------------------------------------------------
@@ -389,7 +394,9 @@ pub struct SampleVehicleTripRow {
 }
 
 impl TableRow for SampleVehicleTripRow {
-    fn table_name() -> &'static str { "SampleVehicleTrip" }
+    fn table_name() -> &'static str {
+        "SampleVehicleTrip"
+    }
     fn polars_schema() -> Schema {
         Schema::from_iter([
             ("vehID".into(), DataType::Int32),
@@ -403,20 +410,56 @@ impl TableRow for SampleVehicleTripRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
-        DataFrame::new(n, vec![
-            Series::new("vehID".into(), rows.iter().map(|r| r.veh_id).collect::<Vec<i32>>()).into(),
-            Series::new("dayID".into(), rows.iter().map(|r| r.day_id).collect::<Vec<i32>>()).into(),
-            Series::new("tripID".into(), rows.iter().map(|r| r.trip_id).collect::<Vec<i32>>()).into(),
-            Series::new("hourID".into(), rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>()).into(),
-            Series::new("priorTripID".into(), rows.iter().map(|r| r.prior_trip_id).collect::<Vec<Option<i32>>>()).into(),
-            Series::new("keyOnTime".into(), rows.iter().map(|r| r.key_on_time).collect::<Vec<i32>>()).into(),
-            Series::new("keyOffTime".into(), rows.iter().map(|r| r.key_off_time).collect::<Vec<i32>>()).into(),
-        ])
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "vehID".into(),
+                    rows.iter().map(|r| r.veh_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "dayID".into(),
+                    rows.iter().map(|r| r.day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "tripID".into(),
+                    rows.iter().map(|r| r.trip_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hourID".into(),
+                    rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "priorTripID".into(),
+                    rows.iter()
+                        .map(|r| r.prior_trip_id)
+                        .collect::<Vec<Option<i32>>>(),
+                )
+                .into(),
+                Series::new(
+                    "keyOnTime".into(),
+                    rows.iter().map(|r| r.key_on_time).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "keyOffTime".into(),
+                    rows.iter().map(|r| r.key_off_time).collect::<Vec<i32>>(),
+                )
+                .into(),
+            ],
+        )
     }
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "SampleVehicleTrip";
         let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let veh_id = get_i32("vehID")?;
         let day_id = get_i32("dayID")?;
@@ -425,18 +468,20 @@ impl TableRow for SampleVehicleTripRow {
         let prior_trip_id = get_i32("priorTripID")?;
         let key_on_time = get_i32("keyOnTime")?;
         let key_off_time = get_i32("keyOffTime")?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(SampleVehicleTripRow {
-                veh_id: veh_id.get(i).ok_or_else(|| null("vehID"))?,
-                day_id: day_id.get(i).ok_or_else(|| null("dayID"))?,
-                trip_id: trip_id.get(i).ok_or_else(|| null("tripID"))?,
-                hour_id: hour_id.get(i).ok_or_else(|| null("hourID"))?,
-                prior_trip_id: prior_trip_id.get(i),
-                key_on_time: key_on_time.get(i).ok_or_else(|| null("keyOnTime"))?,
-                key_off_time: key_off_time.get(i).ok_or_else(|| null("keyOffTime"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(SampleVehicleTripRow {
+                    veh_id: veh_id.get(i).ok_or_else(|| null("vehID"))?,
+                    day_id: day_id.get(i).ok_or_else(|| null("dayID"))?,
+                    trip_id: trip_id.get(i).ok_or_else(|| null("tripID"))?,
+                    hour_id: hour_id.get(i).ok_or_else(|| null("hourID"))?,
+                    prior_trip_id: prior_trip_id.get(i),
+                    key_on_time: key_on_time.get(i).ok_or_else(|| null("keyOnTime"))?,
+                    key_off_time: key_off_time.get(i).ok_or_else(|| null("keyOffTime"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -452,7 +497,9 @@ pub struct SampleVehicleDayRow {
 }
 
 impl TableRow for SampleVehicleDayRow {
-    fn table_name() -> &'static str { "SampleVehicleDay" }
+    fn table_name() -> &'static str {
+        "SampleVehicleDay"
+    }
     fn polars_schema() -> Schema {
         Schema::from_iter([
             ("vehID".into(), DataType::Int32),
@@ -462,28 +509,48 @@ impl TableRow for SampleVehicleDayRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
-        DataFrame::new(n, vec![
-            Series::new("vehID".into(), rows.iter().map(|r| r.veh_id).collect::<Vec<i32>>()).into(),
-            Series::new("dayID".into(), rows.iter().map(|r| r.day_id).collect::<Vec<i32>>()).into(),
-            Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
-        ])
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "vehID".into(),
+                    rows.iter().map(|r| r.veh_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "dayID".into(),
+                    rows.iter().map(|r| r.day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+            ],
+        )
     }
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "SampleVehicleDay";
         let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let veh_id = get_i32("vehID")?;
         let day_id = get_i32("dayID")?;
         let source_type_id = get_i32("sourceTypeID")?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(SampleVehicleDayRow {
-                veh_id: veh_id.get(i).ok_or_else(|| null("vehID"))?,
-                day_id: day_id.get(i).ok_or_else(|| null("dayID"))?,
-                source_type_id: source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(SampleVehicleDayRow {
+                    veh_id: veh_id.get(i).ok_or_else(|| null("vehID"))?,
+                    day_id: day_id.get(i).ok_or_else(|| null("dayID"))?,
+                    source_type_id: source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -500,7 +567,9 @@ pub struct OperatingModeRow {
 }
 
 impl TableRow for OperatingModeRow {
-    fn table_name() -> &'static str { "OperatingMode" }
+    fn table_name() -> &'static str {
+        "OperatingMode"
+    }
     fn polars_schema() -> Schema {
         Schema::from_iter([
             ("opModeID".into(), DataType::Int32),
@@ -510,25 +579,58 @@ impl TableRow for OperatingModeRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
-        DataFrame::new(n, vec![
-            Series::new("opModeID".into(), rows.iter().map(|r| r.op_mode_id).collect::<Vec<i32>>()).into(),
-            Series::new("minSoakTime".into(), rows.iter().map(|r| r.min_soak_time).collect::<Vec<Option<i32>>>()).into(),
-            Series::new("maxSoakTime".into(), rows.iter().map(|r| r.max_soak_time).collect::<Vec<Option<i32>>>()).into(),
-        ])
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "opModeID".into(),
+                    rows.iter().map(|r| r.op_mode_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "minSoakTime".into(),
+                    rows.iter()
+                        .map(|r| r.min_soak_time)
+                        .collect::<Vec<Option<i32>>>(),
+                )
+                .into(),
+                Series::new(
+                    "maxSoakTime".into(),
+                    rows.iter()
+                        .map(|r| r.max_soak_time)
+                        .collect::<Vec<Option<i32>>>(),
+                )
+                .into(),
+            ],
+        )
     }
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "OperatingMode";
-        let op_mode_id = df.column("opModeID").map_err(|e| row_err(t, 0, "opModeID", e.to_string()))?.i32().map_err(|e| row_err(t, 0, "opModeID", e.to_string()))?;
-        let min_soak = df.column("minSoakTime").map_err(|e| row_err(t, 0, "minSoakTime", e.to_string()))?.i32().map_err(|e| row_err(t, 0, "minSoakTime", e.to_string()))?;
-        let max_soak = df.column("maxSoakTime").map_err(|e| row_err(t, 0, "maxSoakTime", e.to_string()))?.i32().map_err(|e| row_err(t, 0, "maxSoakTime", e.to_string()))?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(OperatingModeRow {
-                op_mode_id: op_mode_id.get(i).ok_or_else(|| null("opModeID"))?,
-                min_soak_time: min_soak.get(i),
-                max_soak_time: max_soak.get(i),
+        let op_mode_id = df
+            .column("opModeID")
+            .map_err(|e| row_err(t, 0, "opModeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "opModeID", e.to_string()))?;
+        let min_soak = df
+            .column("minSoakTime")
+            .map_err(|e| row_err(t, 0, "minSoakTime", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "minSoakTime", e.to_string()))?;
+        let max_soak = df
+            .column("maxSoakTime")
+            .map_err(|e| row_err(t, 0, "maxSoakTime", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "maxSoakTime", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(OperatingModeRow {
+                    op_mode_id: op_mode_id.get(i).ok_or_else(|| null("opModeID"))?,
+                    min_soak_time: min_soak.get(i),
+                    max_soak_time: max_soak.get(i),
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -555,7 +657,9 @@ pub struct StartOpModeDistributionRow {
 }
 
 impl TableRow for StartOpModeDistributionRow {
-    fn table_name() -> &'static str { "OpModeDistribution" }
+    fn table_name() -> &'static str {
+        "OpModeDistribution"
+    }
     fn polars_schema() -> Schema {
         Schema::from_iter([
             ("sourceTypeID".into(), DataType::Int32),
@@ -566,31 +670,63 @@ impl TableRow for StartOpModeDistributionRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
-        DataFrame::new(n, vec![
-            Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
-            Series::new("hourDayID".into(), rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>()).into(),
-            Series::new("opModeID".into(), rows.iter().map(|r| r.op_mode_id).collect::<Vec<i32>>()).into(),
-            Series::new("opModeFraction".into(), rows.iter().map(|r| r.op_mode_fraction).collect::<Vec<f64>>()).into(),
-        ])
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hourDayID".into(),
+                    rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "opModeID".into(),
+                    rows.iter().map(|r| r.op_mode_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "opModeFraction".into(),
+                    rows.iter()
+                        .map(|r| r.op_mode_fraction)
+                        .collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
     }
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "OpModeDistribution";
         let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let source_type_id = get_i32("sourceTypeID")?;
         let hour_day_id = get_i32("hourDayID")?;
         let op_mode_id = get_i32("opModeID")?;
-        let op_mode_fraction = df.column("opModeFraction").map_err(|e| row_err(t, 0, "opModeFraction", e.to_string()))?.f64().map_err(|e| row_err(t, 0, "opModeFraction", e.to_string()))?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(StartOpModeDistributionRow {
-                source_type_id: source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))?,
-                hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))?,
-                op_mode_id: op_mode_id.get(i).ok_or_else(|| null("opModeID"))?,
-                op_mode_fraction: op_mode_fraction.get(i).ok_or_else(|| null("opModeFraction"))?,
+        let op_mode_fraction = df
+            .column("opModeFraction")
+            .map_err(|e| row_err(t, 0, "opModeFraction", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "opModeFraction", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(StartOpModeDistributionRow {
+                    source_type_id: source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                    hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))?,
+                    op_mode_id: op_mode_id.get(i).ok_or_else(|| null("opModeID"))?,
+                    op_mode_fraction: op_mode_fraction
+                        .get(i)
+                        .ok_or_else(|| null("opModeFraction"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -614,7 +750,9 @@ pub struct RatesOpModeDistributionRow {
 }
 
 impl TableRow for RatesOpModeDistributionRow {
-    fn table_name() -> &'static str { "RatesOpModeDistribution" }
+    fn table_name() -> &'static str {
+        "RatesOpModeDistribution"
+    }
     fn polars_schema() -> Schema {
         Schema::from_iter([
             ("sourceTypeID".into(), DataType::Int32),
@@ -625,31 +763,63 @@ impl TableRow for RatesOpModeDistributionRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
-        DataFrame::new(n, vec![
-            Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
-            Series::new("hourDayID".into(), rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>()).into(),
-            Series::new("opModeID".into(), rows.iter().map(|r| r.op_mode_id).collect::<Vec<i32>>()).into(),
-            Series::new("opModeFraction".into(), rows.iter().map(|r| r.op_mode_fraction).collect::<Vec<f64>>()).into(),
-        ])
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hourDayID".into(),
+                    rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "opModeID".into(),
+                    rows.iter().map(|r| r.op_mode_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "opModeFraction".into(),
+                    rows.iter()
+                        .map(|r| r.op_mode_fraction)
+                        .collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
     }
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "RatesOpModeDistribution";
         let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let source_type_id = get_i32("sourceTypeID")?;
         let hour_day_id = get_i32("hourDayID")?;
         let op_mode_id = get_i32("opModeID")?;
-        let op_mode_fraction = df.column("opModeFraction").map_err(|e| row_err(t, 0, "opModeFraction", e.to_string()))?.f64().map_err(|e| row_err(t, 0, "opModeFraction", e.to_string()))?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(RatesOpModeDistributionRow {
-                source_type_id: source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))?,
-                hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))?,
-                op_mode_id: op_mode_id.get(i).ok_or_else(|| null("opModeID"))?,
-                op_mode_fraction: op_mode_fraction.get(i).ok_or_else(|| null("opModeFraction"))?,
+        let op_mode_fraction = df
+            .column("opModeFraction")
+            .map_err(|e| row_err(t, 0, "opModeFraction", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "opModeFraction", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(RatesOpModeDistributionRow {
+                    source_type_id: source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                    hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))?,
+                    op_mode_id: op_mode_id.get(i).ok_or_else(|| null("opModeID"))?,
+                    op_mode_fraction: op_mode_fraction
+                        .get(i)
+                        .ok_or_else(|| null("opModeFraction"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -684,7 +854,10 @@ pub struct StartOpModeInputs {
 /// Returns `(op_mode_rows, rates_rows)`.
 pub fn build_start_op_mode_distribution(
     inputs: &StartOpModeInputs,
-) -> (Vec<StartOpModeDistributionRow>, Vec<RatesOpModeDistributionRow>) {
+) -> (
+    Vec<StartOpModeDistributionRow>,
+    Vec<RatesOpModeDistributionRow>,
+) {
     // Index SampleVehicleDay: (vehID, dayID) -> sourceTypeID.
     let veh_day_to_source_type: std::collections::HashMap<(i32, i32), i32> = inputs
         .vehicle_days
@@ -722,11 +895,18 @@ pub fn build_start_op_mode_distribution(
 
     for trip in &inputs.trips {
         // Only process trips with a prior trip (INNER JOIN on priorTripID).
-        let Some(prior_trip_id) = trip.prior_trip_id else { continue; };
-        let Some(&prior_key_off) = trip_key_off.get(&(trip.veh_id, trip.day_id, prior_trip_id)) else { continue; };
+        let Some(prior_trip_id) = trip.prior_trip_id else {
+            continue;
+        };
+        let Some(&prior_key_off) = trip_key_off.get(&(trip.veh_id, trip.day_id, prior_trip_id))
+        else {
+            continue;
+        };
 
         // Look up sourceTypeID from SampleVehicleDay.
-        let Some(&source_type_id) = veh_day_to_source_type.get(&(trip.veh_id, trip.day_id)) else { continue; };
+        let Some(&source_type_id) = veh_day_to_source_type.get(&(trip.veh_id, trip.day_id)) else {
+            continue;
+        };
 
         // Compute soak time and classify into op mode(s).
         let soak = soak_time(trip.key_on_time, prior_key_off);
@@ -740,7 +920,9 @@ pub fn build_start_op_mode_distribution(
 
         // And one count for each matching op mode (canonically exactly one).
         for mode_id in &matched_modes {
-            *counts.entry((source_type_id, hd_id, *mode_id as i32)).or_insert(0) += 1;
+            *counts
+                .entry((source_type_id, hd_id, *mode_id as i32))
+                .or_insert(0) += 1;
         }
     }
 
@@ -752,8 +934,12 @@ pub fn build_start_op_mode_distribution(
     let cells: std::collections::BTreeSet<(i32, i32)> = totals.keys().copied().collect();
 
     for (source_type_id, hour_day_id_val) in &cells {
-        let total = *totals.get(&(*source_type_id, *hour_day_id_val)).unwrap_or(&0);
-        if total == 0 { continue; }
+        let total = *totals
+            .get(&(*source_type_id, *hour_day_id_val))
+            .unwrap_or(&0);
+        if total == 0 {
+            continue;
+        }
 
         // Emit the op-mode-100 "All Starts" row for RatesOpModeDistribution.
         rates_rows.push(RatesOpModeDistributionRow {
@@ -1215,7 +1401,8 @@ mod tests {
                     key_on_time: 540,
                     key_off_time: 620,
                 },
-            ]).unwrap(),
+            ])
+            .unwrap(),
         );
         store.insert(
             "SampleVehicleDay",
@@ -1223,7 +1410,8 @@ mod tests {
                 veh_id: 1,
                 day_id: 5,
                 source_type_id: 21,
-            }]).unwrap(),
+            }])
+            .unwrap(),
         );
         store.insert(
             "OperatingMode",
@@ -1238,7 +1426,8 @@ mod tests {
                     min_soak_time: Some(60),
                     max_soak_time: None,
                 },
-            ]).unwrap(),
+            ])
+            .unwrap(),
         );
 
         let mut ctx = CalculatorContext::with_tables(store);
@@ -1269,11 +1458,17 @@ mod tests {
             .expect("RatesOpModeDistribution in scratch");
         // Expect: op-mode 100 (All Starts, fraction 1.0) + op-mode 102 (fraction 1.0).
         assert_eq!(romd.len(), 2, "rates: All-Starts row + per-mode row");
-        let all_starts = romd.iter().find(|r| r.op_mode_id == 100).expect("op-mode 100 present");
+        let all_starts = romd
+            .iter()
+            .find(|r| r.op_mode_id == 100)
+            .expect("op-mode 100 present");
         assert_eq!(all_starts.source_type_id, 21);
         assert_eq!(all_starts.hour_day_id, 95);
         assert!((all_starts.op_mode_fraction - 1.0).abs() < 1e-12);
-        let mode_102 = romd.iter().find(|r| r.op_mode_id == 102).expect("op-mode 102 present");
+        let mode_102 = romd
+            .iter()
+            .find(|r| r.op_mode_id == 102)
+            .expect("op-mode 102 present");
         assert!((mode_102.op_mode_fraction - 1.0).abs() < 1e-12);
     }
 
@@ -1294,30 +1489,45 @@ mod tests {
                 prior_trip_id: None,
                 key_on_time: 400,
                 key_off_time: 480,
-            }]).unwrap(),
+            }])
+            .unwrap(),
         );
         store.insert(
             "SampleVehicleDay",
             SampleVehicleDayRow::into_dataframe(vec![SampleVehicleDayRow {
-                veh_id: 1, day_id: 5, source_type_id: 21,
-            }]).unwrap(),
+                veh_id: 1,
+                day_id: 5,
+                source_type_id: 21,
+            }])
+            .unwrap(),
         );
         store.insert(
             "OperatingMode",
             OperatingModeRow::into_dataframe(vec![OperatingModeRow {
-                op_mode_id: 101, min_soak_time: None, max_soak_time: Some(60),
-            }]).unwrap(),
+                op_mode_id: 101,
+                min_soak_time: None,
+                max_soak_time: Some(60),
+            }])
+            .unwrap(),
         );
 
         let mut ctx = CalculatorContext::with_tables(store);
-        StartOperatingModeDistributionGenerator.execute(&mut ctx).expect("execute ok");
+        StartOperatingModeDistributionGenerator
+            .execute(&mut ctx)
+            .expect("execute ok");
 
         let omd: Vec<StartOpModeDistributionRow> = ctx
-            .scratch().store.iter_typed("OpModeDistribution").expect("table present");
+            .scratch()
+            .store
+            .iter_typed("OpModeDistribution")
+            .expect("table present");
         assert!(omd.is_empty(), "no prior-trip → no output rows");
 
         let romd: Vec<RatesOpModeDistributionRow> = ctx
-            .scratch().store.iter_typed("RatesOpModeDistribution").expect("table present");
+            .scratch()
+            .store
+            .iter_typed("RatesOpModeDistribution")
+            .expect("table present");
         assert!(romd.is_empty(), "no prior-trip → no rates rows");
     }
 
@@ -1332,41 +1542,88 @@ mod tests {
             "SampleVehicleTrip",
             SampleVehicleTripRow::into_dataframe(vec![
                 // trip 1: no prior (anchor trip)
-                SampleVehicleTripRow { veh_id: 1, day_id: 5, trip_id: 1, hour_id: 8, prior_trip_id: None, key_on_time: 0, key_off_time: 30 },
+                SampleVehicleTripRow {
+                    veh_id: 1,
+                    day_id: 5,
+                    trip_id: 1,
+                    hour_id: 8,
+                    prior_trip_id: None,
+                    key_on_time: 0,
+                    key_off_time: 30,
+                },
                 // trip 2: soak = 540 - 30 = 510 → [360,∞) which is NOT in these modes; but we use simpler modes:
                 // Let's set soak = 540 - 30 = 510. With mode 101 = (-∞,60) and 102 = [60,∞), it goes to 102.
-                SampleVehicleTripRow { veh_id: 1, day_id: 5, trip_id: 2, hour_id: 9, prior_trip_id: Some(1), key_on_time: 540, key_off_time: 600 },
+                SampleVehicleTripRow {
+                    veh_id: 1,
+                    day_id: 5,
+                    trip_id: 2,
+                    hour_id: 9,
+                    prior_trip_id: Some(1),
+                    key_on_time: 540,
+                    key_off_time: 600,
+                },
                 // trip 3: soak = 601 - 600 = 1 → mode 101 (-∞,60).
-                SampleVehicleTripRow { veh_id: 1, day_id: 5, trip_id: 3, hour_id: 10, prior_trip_id: Some(2), key_on_time: 601, key_off_time: 660 },
-            ]).unwrap(),
+                SampleVehicleTripRow {
+                    veh_id: 1,
+                    day_id: 5,
+                    trip_id: 3,
+                    hour_id: 10,
+                    prior_trip_id: Some(2),
+                    key_on_time: 601,
+                    key_off_time: 660,
+                },
+            ])
+            .unwrap(),
         );
         store.insert(
             "SampleVehicleDay",
             SampleVehicleDayRow::into_dataframe(vec![SampleVehicleDayRow {
-                veh_id: 1, day_id: 5, source_type_id: 21,
-            }]).unwrap(),
+                veh_id: 1,
+                day_id: 5,
+                source_type_id: 21,
+            }])
+            .unwrap(),
         );
         store.insert(
             "OperatingMode",
             OperatingModeRow::into_dataframe(vec![
-                OperatingModeRow { op_mode_id: 101, min_soak_time: None, max_soak_time: Some(60) },
-                OperatingModeRow { op_mode_id: 102, min_soak_time: Some(60), max_soak_time: None },
-            ]).unwrap(),
+                OperatingModeRow {
+                    op_mode_id: 101,
+                    min_soak_time: None,
+                    max_soak_time: Some(60),
+                },
+                OperatingModeRow {
+                    op_mode_id: 102,
+                    min_soak_time: Some(60),
+                    max_soak_time: None,
+                },
+            ])
+            .unwrap(),
         );
 
         let mut ctx = CalculatorContext::with_tables(store);
-        StartOperatingModeDistributionGenerator.execute(&mut ctx).expect("execute ok");
+        StartOperatingModeDistributionGenerator
+            .execute(&mut ctx)
+            .expect("execute ok");
 
         let omd: Vec<StartOpModeDistributionRow> = ctx
-            .scratch().store.iter_typed("OpModeDistribution").expect("table present");
+            .scratch()
+            .store
+            .iter_typed("OpModeDistribution")
+            .expect("table present");
         // Two starts across two different (hour_day, op_mode) cells — different hourIDs,
         // so two distinct hourDayIDs: 9*10+5=95 and 10*10+5=105.
         assert_eq!(omd.len(), 2, "one mode per distinct (hourDay, opMode) cell");
         for row in &omd {
             assert_eq!(row.source_type_id, 21);
             // Each cell has exactly 1 start of 1 total → fraction 1.0.
-            assert!((row.op_mode_fraction - 1.0).abs() < 1e-12,
-                "fraction for op_mode {} hourDay {}: {}", row.op_mode_id, row.hour_day_id, row.op_mode_fraction);
+            assert!(
+                (row.op_mode_fraction - 1.0).abs() < 1e-12,
+                "fraction for op_mode {} hourDay {}: {}",
+                row.op_mode_id,
+                row.hour_day_id,
+                row.op_mode_fraction
+            );
         }
     }
 
@@ -1376,9 +1633,18 @@ mod tests {
         // Empty tables cause iter_typed to fail, so we seed minimal tables.
         use moves_framework::{DataFrameStore, InMemoryStore};
         let mut store = InMemoryStore::new();
-        store.insert("SampleVehicleTrip", SampleVehicleTripRow::into_dataframe(vec![]).unwrap());
-        store.insert("SampleVehicleDay", SampleVehicleDayRow::into_dataframe(vec![]).unwrap());
-        store.insert("OperatingMode", OperatingModeRow::into_dataframe(vec![]).unwrap());
+        store.insert(
+            "SampleVehicleTrip",
+            SampleVehicleTripRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "SampleVehicleDay",
+            SampleVehicleDayRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "OperatingMode",
+            OperatingModeRow::into_dataframe(vec![]).unwrap(),
+        );
         let mut ctx = CalculatorContext::with_tables(store);
         assert!(StartOperatingModeDistributionGenerator
             .execute(&mut ctx)

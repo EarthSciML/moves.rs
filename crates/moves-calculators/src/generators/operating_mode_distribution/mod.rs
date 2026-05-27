@@ -204,18 +204,15 @@ impl Generator for OperatingModeDistributionGenerator {
     /// rows, and writes them to the scratch namespace.
     fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
         // -- Read all input tables --
-        let drive_schedule: Vec<DriveScheduleRow> =
-            ctx.tables().iter_typed("DriveSchedule")?;
+        let drive_schedule: Vec<DriveScheduleRow> = ctx.tables().iter_typed("DriveSchedule")?;
         let drive_schedule_assoc: Vec<DriveScheduleAssocRow> =
             ctx.tables().iter_typed("DriveScheduleAssoc")?;
         let drive_schedule_second: Vec<DriveScheduleSecondRow> =
             ctx.tables().iter_typed("DriveScheduleSecond")?;
-        let avg_speed_bin: Vec<AvgSpeedBinRow> =
-            ctx.tables().iter_typed("AvgSpeedBin")?;
+        let avg_speed_bin: Vec<AvgSpeedBinRow> = ctx.tables().iter_typed("AvgSpeedBin")?;
         let avg_speed_distribution: Vec<AvgSpeedDistributionRow> =
             ctx.tables().iter_typed("AvgSpeedDistribution")?;
-        let operating_mode: Vec<OperatingModeRow> =
-            ctx.tables().iter_typed("OperatingMode")?;
+        let operating_mode: Vec<OperatingModeRow> = ctx.tables().iter_typed("OperatingMode")?;
         let op_mode_pol_proc_assoc: Vec<OpModePolProcAssocRow> =
             ctx.tables().iter_typed("OpModePolProcAssoc")?;
         let physics_mapping: Vec<PhysicsMappingRow> =
@@ -228,19 +225,24 @@ impl Generator for OperatingModeDistributionGenerator {
             ctx.tables().iter_typed("RunSpecSourceType")?;
         let run_spec_road_type_rows: Vec<OmdgRunSpecRoadTypeRow> =
             ctx.tables().iter_typed("RunSpecRoadType")?;
-        let run_spec_hour_day_rows: Vec<OmdgHourDayRow> =
-            ctx.tables().iter_typed("HourDay")?;
+        let run_spec_hour_day_rows: Vec<OmdgHourDayRow> = ctx.tables().iter_typed("HourDay")?;
 
         // Link table for the cross-join step.
         let link_rows: Vec<OmdgLinkRow> = ctx.tables().iter_typed("Link")?;
 
         // -- Convert RunSpec wrapper rows to plain id slices --
-        let run_spec_source_type: Vec<SourceTypeId> =
-            run_spec_source_type_rows.iter().map(|r| SourceTypeId(r.source_type_id as u16)).collect();
-        let run_spec_road_type: Vec<RoadTypeId> =
-            run_spec_road_type_rows.iter().map(|r| RoadTypeId(r.road_type_id as u16)).collect();
-        let run_spec_hour_day: Vec<i16> =
-            run_spec_hour_day_rows.iter().map(|r| r.hour_day_id as i16).collect();
+        let run_spec_source_type: Vec<SourceTypeId> = run_spec_source_type_rows
+            .iter()
+            .map(|r| SourceTypeId(r.source_type_id as u16))
+            .collect();
+        let run_spec_road_type: Vec<RoadTypeId> = run_spec_road_type_rows
+            .iter()
+            .map(|r| RoadTypeId(r.road_type_id as u16))
+            .collect();
+        let run_spec_hour_day: Vec<i16> = run_spec_hour_day_rows
+            .iter()
+            .map(|r| r.hour_day_id as i16)
+            .collect();
 
         // -- Build OmdgInputs and run the kernel --
         let omdg_inputs = OmdgInputs {
@@ -290,7 +292,12 @@ impl Generator for OperatingModeDistributionGenerator {
 
 /// Build a [`Error::RowExtraction`] for a missing/bad cell in this module.
 fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -> Error {
-    Error::RowExtraction { table: table.into(), row, column: column.into(), message: msg }
+    Error::RowExtraction {
+        table: table.into(),
+        row,
+        column: column.into(),
+        message: msg,
+    }
 }
 
 /// One `RunSpecSourceType` row — a source type the RunSpec selects.
@@ -301,28 +308,38 @@ pub struct OmdgRunSpecSourceTypeRow {
 }
 
 impl TableRow for OmdgRunSpecSourceTypeRow {
-    fn table_name() -> &'static str { "RunSpecSourceType" }
+    fn table_name() -> &'static str {
+        "RunSpecSourceType"
+    }
     fn polars_schema() -> Schema {
         Schema::from_iter([("sourceTypeID".into(), DataType::Int32)])
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
-        DataFrame::new(n, vec![
-            Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
-        ])
+        DataFrame::new(
+            n,
+            vec![Series::new(
+                "sourceTypeID".into(),
+                rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+            )
+            .into()],
+        )
     }
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "RunSpecSourceType";
-        let source_type_id = df.column("sourceTypeID")
+        let source_type_id = df
+            .column("sourceTypeID")
             .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(OmdgRunSpecSourceTypeRow {
-                source_type_id: source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(OmdgRunSpecSourceTypeRow {
+                    source_type_id: source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -334,28 +351,38 @@ pub struct OmdgRunSpecRoadTypeRow {
 }
 
 impl TableRow for OmdgRunSpecRoadTypeRow {
-    fn table_name() -> &'static str { "RunSpecRoadType" }
+    fn table_name() -> &'static str {
+        "RunSpecRoadType"
+    }
     fn polars_schema() -> Schema {
         Schema::from_iter([("roadTypeID".into(), DataType::Int32)])
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
-        DataFrame::new(n, vec![
-            Series::new("roadTypeID".into(), rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>()).into(),
-        ])
+        DataFrame::new(
+            n,
+            vec![Series::new(
+                "roadTypeID".into(),
+                rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>(),
+            )
+            .into()],
+        )
     }
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "RunSpecRoadType";
-        let road_type_id = df.column("roadTypeID")
+        let road_type_id = df
+            .column("roadTypeID")
             .map_err(|e| row_err(t, 0, "roadTypeID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "roadTypeID", e.to_string()))?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(OmdgRunSpecRoadTypeRow {
-                road_type_id: road_type_id.get(i).ok_or_else(|| null("roadTypeID"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(OmdgRunSpecRoadTypeRow {
+                    road_type_id: road_type_id.get(i).ok_or_else(|| null("roadTypeID"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -368,28 +395,38 @@ pub struct OmdgHourDayRow {
 }
 
 impl TableRow for OmdgHourDayRow {
-    fn table_name() -> &'static str { "HourDay" }
+    fn table_name() -> &'static str {
+        "HourDay"
+    }
     fn polars_schema() -> Schema {
         Schema::from_iter([("hourDayID".into(), DataType::Int32)])
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
-        DataFrame::new(n, vec![
-            Series::new("hourDayID".into(), rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>()).into(),
-        ])
+        DataFrame::new(
+            n,
+            vec![Series::new(
+                "hourDayID".into(),
+                rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+            )
+            .into()],
+        )
     }
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "HourDay";
-        let hour_day_id = df.column("hourDayID")
+        let hour_day_id = df
+            .column("hourDayID")
             .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(OmdgHourDayRow {
-                hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(OmdgHourDayRow {
+                    hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -403,7 +440,9 @@ pub struct OmdgLinkRow {
 }
 
 impl TableRow for OmdgLinkRow {
-    fn table_name() -> &'static str { "Link" }
+    fn table_name() -> &'static str {
+        "Link"
+    }
     fn polars_schema() -> Schema {
         Schema::from_iter([
             ("linkID".into(), DataType::Int32),
@@ -412,28 +451,43 @@ impl TableRow for OmdgLinkRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
-        DataFrame::new(n, vec![
-            Series::new("linkID".into(), rows.iter().map(|r| r.link_id).collect::<Vec<i32>>()).into(),
-            Series::new("roadTypeID".into(), rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>()).into(),
-        ])
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "linkID".into(),
+                    rows.iter().map(|r| r.link_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "roadTypeID".into(),
+                    rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+            ],
+        )
     }
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "Link";
-        let link_id = df.column("linkID")
+        let link_id = df
+            .column("linkID")
             .map_err(|e| row_err(t, 0, "linkID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "linkID", e.to_string()))?;
-        let road_type_id = df.column("roadTypeID")
+        let road_type_id = df
+            .column("roadTypeID")
             .map_err(|e| row_err(t, 0, "roadTypeID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "roadTypeID", e.to_string()))?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(OmdgLinkRow {
-                link_id: link_id.get(i).ok_or_else(|| null("linkID"))?,
-                road_type_id: road_type_id.get(i).ok_or_else(|| null("roadTypeID"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(OmdgLinkRow {
+                    link_id: link_id.get(i).ok_or_else(|| null("linkID"))?,
+                    road_type_id: road_type_id.get(i).ok_or_else(|| null("roadTypeID"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -461,7 +515,9 @@ pub struct OpModeDistributionRow {
 }
 
 impl TableRow for OpModeDistributionRow {
-    fn table_name() -> &'static str { "OpModeDistribution" }
+    fn table_name() -> &'static str {
+        "OpModeDistribution"
+    }
     fn polars_schema() -> Schema {
         Schema::from_iter([
             ("sourceTypeID".into(), DataType::Int32),
@@ -475,58 +531,118 @@ impl TableRow for OpModeDistributionRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
-        DataFrame::new(n, vec![
-            Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id.0 as i32).collect::<Vec<i32>>()).into(),
-            Series::new("roadTypeID".into(), rows.iter().map(|r| r.road_type_id.0 as i32).collect::<Vec<i32>>()).into(),
-            Series::new("linkID".into(), rows.iter().map(|r| r.link_id).collect::<Vec<i32>>()).into(),
-            Series::new("hourDayID".into(), rows.iter().map(|r| r.hour_day_id as i32).collect::<Vec<i32>>()).into(),
-            Series::new("polProcessID".into(), rows.iter().map(|r| r.pol_process_id.0 as i32).collect::<Vec<i32>>()).into(),
-            Series::new("opModeID".into(), rows.iter().map(|r| r.op_mode_id as i32).collect::<Vec<i32>>()).into(),
-            Series::new("opModeFraction".into(), rows.iter().map(|r| r.op_mode_fraction).collect::<Vec<f64>>()).into(),
-        ])
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.source_type_id.0 as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "roadTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.road_type_id.0 as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "linkID".into(),
+                    rows.iter().map(|r| r.link_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hourDayID".into(),
+                    rows.iter()
+                        .map(|r| r.hour_day_id as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "polProcessID".into(),
+                    rows.iter()
+                        .map(|r| r.pol_process_id.0 as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "opModeID".into(),
+                    rows.iter()
+                        .map(|r| r.op_mode_id as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "opModeFraction".into(),
+                    rows.iter()
+                        .map(|r| r.op_mode_fraction)
+                        .collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
     }
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "OpModeDistribution";
-        let source_type_id = df.column("sourceTypeID")
+        let source_type_id = df
+            .column("sourceTypeID")
             .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?;
-        let road_type_id = df.column("roadTypeID")
+        let road_type_id = df
+            .column("roadTypeID")
             .map_err(|e| row_err(t, 0, "roadTypeID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "roadTypeID", e.to_string()))?;
-        let link_id = df.column("linkID")
+        let link_id = df
+            .column("linkID")
             .map_err(|e| row_err(t, 0, "linkID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "linkID", e.to_string()))?;
-        let hour_day_id = df.column("hourDayID")
+        let hour_day_id = df
+            .column("hourDayID")
             .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?;
-        let pol_process_id = df.column("polProcessID")
+        let pol_process_id = df
+            .column("polProcessID")
             .map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?;
-        let op_mode_id = df.column("opModeID")
+        let op_mode_id = df
+            .column("opModeID")
             .map_err(|e| row_err(t, 0, "opModeID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "opModeID", e.to_string()))?;
-        let op_mode_fraction = df.column("opModeFraction")
+        let op_mode_fraction = df
+            .column("opModeFraction")
             .map_err(|e| row_err(t, 0, "opModeFraction", e.to_string()))?
             .f64()
             .map_err(|e| row_err(t, 0, "opModeFraction", e.to_string()))?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(OpModeDistributionRow {
-                source_type_id: SourceTypeId(source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))? as u16),
-                road_type_id: RoadTypeId(road_type_id.get(i).ok_or_else(|| null("roadTypeID"))? as u16),
-                link_id: link_id.get(i).ok_or_else(|| null("linkID"))?,
-                hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))? as i16,
-                pol_process_id: PolProcessId(pol_process_id.get(i).ok_or_else(|| null("polProcessID"))? as u32),
-                op_mode_id: op_mode_id.get(i).ok_or_else(|| null("opModeID"))? as i16,
-                op_mode_fraction: op_mode_fraction.get(i).ok_or_else(|| null("opModeFraction"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(OpModeDistributionRow {
+                    source_type_id: SourceTypeId(
+                        source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))? as u16,
+                    ),
+                    road_type_id: RoadTypeId(
+                        road_type_id.get(i).ok_or_else(|| null("roadTypeID"))? as u16,
+                    ),
+                    link_id: link_id.get(i).ok_or_else(|| null("linkID"))?,
+                    hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))? as i16,
+                    pol_process_id: PolProcessId(
+                        pol_process_id.get(i).ok_or_else(|| null("polProcessID"))? as u32,
+                    ),
+                    op_mode_id: op_mode_id.get(i).ok_or_else(|| null("opModeID"))? as i16,
+                    op_mode_fraction: op_mode_fraction
+                        .get(i)
+                        .ok_or_else(|| null("opModeFraction"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -572,12 +688,12 @@ mod tests {
     /// Populate an `InMemoryStore` with the minimum tables needed for the
     /// two-cycle scenario used in pipeline tests, plus RunSpec and Link tables.
     fn minimal_execute_store() -> moves_framework::InMemoryStore {
-        use moves_framework::{DataFrameStore, InMemoryStore};
         use super::inputs::{
-            AvgSpeedBinRow, AvgSpeedDistributionRow, DriveScheduleAssocRow,
-            DriveScheduleRow, DriveScheduleSecondRow, OpModePolProcAssocRow,
-            OperatingModeRow, PhysicsMappingRow, PolProcessRepresentedRow,
+            AvgSpeedBinRow, AvgSpeedDistributionRow, DriveScheduleAssocRow, DriveScheduleRow,
+            DriveScheduleSecondRow, OpModePolProcAssocRow, OperatingModeRow, PhysicsMappingRow,
+            PolProcessRepresentedRow,
         };
+        use moves_framework::{DataFrameStore, InMemoryStore};
 
         const SOURCE_TYPE: SourceTypeId = SourceTypeId(21);
         const ROAD_TYPE: RoadTypeId = RoadTypeId(5);
@@ -588,49 +704,116 @@ mod tests {
         let mut store = InMemoryStore::new();
 
         // DriveSchedule: two cycles
-        store.insert("DriveSchedule", DriveScheduleRow::into_dataframe(vec![
-            DriveScheduleRow { drive_schedule_id: 1, average_speed: 10.0 },
-            DriveScheduleRow { drive_schedule_id: 2, average_speed: 30.0 },
-        ]).unwrap());
+        store.insert(
+            "DriveSchedule",
+            DriveScheduleRow::into_dataframe(vec![
+                DriveScheduleRow {
+                    drive_schedule_id: 1,
+                    average_speed: 10.0,
+                },
+                DriveScheduleRow {
+                    drive_schedule_id: 2,
+                    average_speed: 30.0,
+                },
+            ])
+            .unwrap(),
+        );
 
         // DriveScheduleAssoc
-        store.insert("DriveScheduleAssoc", DriveScheduleAssocRow::into_dataframe(vec![
-            DriveScheduleAssocRow { source_type_id: SOURCE_TYPE, road_type_id: ROAD_TYPE, drive_schedule_id: 1, is_ramp: false },
-            DriveScheduleAssocRow { source_type_id: SOURCE_TYPE, road_type_id: ROAD_TYPE, drive_schedule_id: 2, is_ramp: false },
-        ]).unwrap());
+        store.insert(
+            "DriveScheduleAssoc",
+            DriveScheduleAssocRow::into_dataframe(vec![
+                DriveScheduleAssocRow {
+                    source_type_id: SOURCE_TYPE,
+                    road_type_id: ROAD_TYPE,
+                    drive_schedule_id: 1,
+                    is_ramp: false,
+                },
+                DriveScheduleAssocRow {
+                    source_type_id: SOURCE_TYPE,
+                    road_type_id: ROAD_TYPE,
+                    drive_schedule_id: 2,
+                    is_ramp: false,
+                },
+            ])
+            .unwrap(),
+        );
 
         // DriveScheduleSecond: idle cycle (ds1) and 30-mph cycle (ds2)
         let mut seconds = Vec::new();
         for s in 0i16..=3 {
-            seconds.push(DriveScheduleSecondRow { drive_schedule_id: 1, second: s, speed: 0.0 });
-            seconds.push(DriveScheduleSecondRow { drive_schedule_id: 2, second: s, speed: 30.0 });
+            seconds.push(DriveScheduleSecondRow {
+                drive_schedule_id: 1,
+                second: s,
+                speed: 0.0,
+            });
+            seconds.push(DriveScheduleSecondRow {
+                drive_schedule_id: 2,
+                second: s,
+                speed: 30.0,
+            });
         }
-        store.insert("DriveScheduleSecond", DriveScheduleSecondRow::into_dataframe(seconds).unwrap());
+        store.insert(
+            "DriveScheduleSecond",
+            DriveScheduleSecondRow::into_dataframe(seconds).unwrap(),
+        );
 
         // AvgSpeedBin: one bin at 20 mph
-        store.insert("AvgSpeedBin", AvgSpeedBinRow::into_dataframe(vec![
-            AvgSpeedBinRow { avg_speed_bin_id: 1, avg_bin_speed: 20.0 },
-        ]).unwrap());
+        store.insert(
+            "AvgSpeedBin",
+            AvgSpeedBinRow::into_dataframe(vec![AvgSpeedBinRow {
+                avg_speed_bin_id: 1,
+                avg_bin_speed: 20.0,
+            }])
+            .unwrap(),
+        );
 
         // AvgSpeedDistribution: all weight on bin 1
-        store.insert("AvgSpeedDistribution", AvgSpeedDistributionRow::into_dataframe(vec![
-            AvgSpeedDistributionRow { source_type_id: SOURCE_TYPE, road_type_id: ROAD_TYPE, hour_day_id: HOUR_DAY as i16, avg_speed_bin_id: 1, avg_speed_fraction: 1.0 },
-        ]).unwrap());
+        store.insert(
+            "AvgSpeedDistribution",
+            AvgSpeedDistributionRow::into_dataframe(vec![AvgSpeedDistributionRow {
+                source_type_id: SOURCE_TYPE,
+                road_type_id: ROAD_TYPE,
+                hour_day_id: HOUR_DAY as i16,
+                avg_speed_bin_id: 1,
+                avg_speed_fraction: 1.0,
+            }])
+            .unwrap(),
+        );
 
         // OperatingMode: idle (1) is a special case; mode 30 catches VSP=0, speed>=1
-        store.insert("OperatingMode", OperatingModeRow::into_dataframe(vec![
-            OperatingModeRow { op_mode_id: 30, vsp_lower: Some(-100.0), vsp_upper: Some(100.0), speed_lower: None, speed_upper: None },
-        ]).unwrap());
+        store.insert(
+            "OperatingMode",
+            OperatingModeRow::into_dataframe(vec![OperatingModeRow {
+                op_mode_id: 30,
+                vsp_lower: Some(-100.0),
+                vsp_upper: Some(100.0),
+                speed_lower: None,
+                speed_upper: None,
+            }])
+            .unwrap(),
+        );
 
         // OpModePolProcAssoc: idle and mode 30 for POL_PROCESS
-        store.insert("OpModePolProcAssoc", OpModePolProcAssocRow::into_dataframe(vec![
-            OpModePolProcAssocRow { pol_process_id: POL_PROCESS, op_mode_id: 1 },
-            OpModePolProcAssocRow { pol_process_id: POL_PROCESS, op_mode_id: 30 },
-        ]).unwrap());
+        store.insert(
+            "OpModePolProcAssoc",
+            OpModePolProcAssocRow::into_dataframe(vec![
+                OpModePolProcAssocRow {
+                    pol_process_id: POL_PROCESS,
+                    op_mode_id: 1,
+                },
+                OpModePolProcAssocRow {
+                    pol_process_id: POL_PROCESS,
+                    op_mode_id: 30,
+                },
+            ])
+            .unwrap(),
+        );
 
         // sourceUseTypePhysicsMapping: identity mapping, flat physics
-        store.insert("sourceUseTypePhysicsMapping", PhysicsMappingRow::into_dataframe(vec![
-            PhysicsMappingRow {
+        store.insert(
+            "sourceUseTypePhysicsMapping",
+            PhysicsMappingRow::into_dataframe(vec![PhysicsMappingRow {
                 real_source_type_id: SOURCE_TYPE,
                 temp_source_type_id: SOURCE_TYPE,
                 rolling_term_a: 0.0,
@@ -638,31 +821,52 @@ mod tests {
                 drag_term_c: 0.0,
                 source_mass: 1000.0,
                 fixed_mass_factor: 1.0,
-            },
-        ]).unwrap());
+            }])
+            .unwrap(),
+        );
 
         // OMDGPolProcessRepresented: empty (no represented pol/processes)
-        store.insert("OMDGPolProcessRepresented", PolProcessRepresentedRow::into_dataframe(vec![]).unwrap());
+        store.insert(
+            "OMDGPolProcessRepresented",
+            PolProcessRepresentedRow::into_dataframe(vec![]).unwrap(),
+        );
 
         // RunSpecSourceType
-        store.insert("RunSpecSourceType", OmdgRunSpecSourceTypeRow::into_dataframe(vec![
-            OmdgRunSpecSourceTypeRow { source_type_id: SOURCE_TYPE.0 as i32 },
-        ]).unwrap());
+        store.insert(
+            "RunSpecSourceType",
+            OmdgRunSpecSourceTypeRow::into_dataframe(vec![OmdgRunSpecSourceTypeRow {
+                source_type_id: SOURCE_TYPE.0 as i32,
+            }])
+            .unwrap(),
+        );
 
         // RunSpecRoadType
-        store.insert("RunSpecRoadType", OmdgRunSpecRoadTypeRow::into_dataframe(vec![
-            OmdgRunSpecRoadTypeRow { road_type_id: ROAD_TYPE.0 as i32 },
-        ]).unwrap());
+        store.insert(
+            "RunSpecRoadType",
+            OmdgRunSpecRoadTypeRow::into_dataframe(vec![OmdgRunSpecRoadTypeRow {
+                road_type_id: ROAD_TYPE.0 as i32,
+            }])
+            .unwrap(),
+        );
 
         // HourDay: one hour/day id
-        store.insert("HourDay", OmdgHourDayRow::into_dataframe(vec![
-            OmdgHourDayRow { hour_day_id: HOUR_DAY },
-        ]).unwrap());
+        store.insert(
+            "HourDay",
+            OmdgHourDayRow::into_dataframe(vec![OmdgHourDayRow {
+                hour_day_id: HOUR_DAY,
+            }])
+            .unwrap(),
+        );
 
         // Link: one link on road type 5
-        store.insert("Link", OmdgLinkRow::into_dataframe(vec![
-            OmdgLinkRow { link_id: LINK_ID, road_type_id: ROAD_TYPE.0 as i32 },
-        ]).unwrap());
+        store.insert(
+            "Link",
+            OmdgLinkRow::into_dataframe(vec![OmdgLinkRow {
+                link_id: LINK_ID,
+                road_type_id: ROAD_TYPE.0 as i32,
+            }])
+            .unwrap(),
+        );
 
         store
     }
@@ -701,7 +905,10 @@ mod tests {
         // One row for idle (op mode 1) and one for mode 30, each fraction 0.5.
         let idle_row = rows.iter().find(|r| r.op_mode_id == 1).expect("idle row");
         assert!((idle_row.op_mode_fraction - 0.5).abs() < 1e-12);
-        let mode30_row = rows.iter().find(|r| r.op_mode_id == 30).expect("mode 30 row");
+        let mode30_row = rows
+            .iter()
+            .find(|r| r.op_mode_id == 30)
+            .expect("mode 30 row");
         assert!((mode30_row.op_mode_fraction - 0.5).abs() < 1e-12);
     }
 

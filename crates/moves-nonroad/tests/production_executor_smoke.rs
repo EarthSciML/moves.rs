@@ -10,6 +10,8 @@
 //! - `outputs.counters.dispatch_calls` matches the expected count per test.
 //! - No test relies on `RMISS` sentinels (negative tests are separate).
 
+use moves_nonroad::common::consts::MXHPC;
+use moves_nonroad::simulation::run_simulation;
 use moves_nonroad::{
     driver::{DriverRecord, RegionLevel, RunRegions},
     geography::{common::ActivityUnit, StateDescriptor},
@@ -20,8 +22,6 @@ use moves_nonroad::{
         NationalAllocationEntry, NonroadInputs, NonroadOptions, ProductionExecutor, ReferenceData,
     },
 };
-use moves_nonroad::simulation::run_simulation;
-use moves_nonroad::common::consts::MXHPC;
 
 // =============================================================================
 // Shared setup helpers
@@ -29,17 +29,26 @@ use moves_nonroad::common::consts::MXHPC;
 
 fn default_hp_levels() -> [f32; MXHPC] {
     let vs: [f32; MXHPC] = [
-        3.0, 6.0, 11.0, 16.0, 25.0, 40.0, 50.0, 75.0, 100.0, 175.0, 300.0, 600.0, 750.0,
-        1000.0, 1200.0, 1500.0, 1800.0, 2000.0,
+        3.0, 6.0, 11.0, 16.0, 25.0, 40.0, 50.0, 75.0, 100.0, 175.0, 300.0, 600.0, 750.0, 1000.0,
+        1200.0, 1500.0, 1800.0, 2000.0,
     ];
     vs
 }
 
 fn make_scrappage_curve() -> Vec<ScrappagePoint> {
     vec![
-        ScrappagePoint { bin: 0.0, percent: 0.0 },
-        ScrappagePoint { bin: 1.0, percent: 50.0 },
-        ScrappagePoint { bin: 2.0, percent: 100.0 },
+        ScrappagePoint {
+            bin: 0.0,
+            percent: 0.0,
+        },
+        ScrappagePoint {
+            bin: 1.0,
+            percent: 50.0,
+        },
+        ScrappagePoint {
+            bin: 2.0,
+            percent: 100.0,
+        },
     ]
 }
 
@@ -261,8 +270,8 @@ fn county_one_scc_produces_nonzero_emissions() {
     let mut opts = NonroadOptions::new(RegionLevel::County, 2020);
     opts.growth_loaded = true;
 
-    let outputs = run_simulation(&opts, &inputs, &mut executor)
-        .expect("run_simulation must succeed");
+    let outputs =
+        run_simulation(&opts, &inputs, &mut executor).expect("run_simulation must succeed");
 
     assert!(
         outputs.rows.len() >= 1,
@@ -316,8 +325,8 @@ fn state_to_county_dispatch_produces_county_rows() {
     let mut opts = NonroadOptions::new(RegionLevel::County, 2020);
     opts.growth_loaded = true;
 
-    let outputs = run_simulation(&opts, &inputs, &mut executor)
-        .expect("state_to_county run must succeed");
+    let outputs =
+        run_simulation(&opts, &inputs, &mut executor).expect("state_to_county run must succeed");
 
     assert_eq!(
         outputs.counters.dispatch_calls, 1,
@@ -325,15 +334,18 @@ fn state_to_county_dispatch_produces_county_rows() {
     );
     assert_eq!(outputs.counters.geography_skips, 0, "no geography skips");
     assert_eq!(
-        outputs.rows.len(), 2,
+        outputs.rows.len(),
+        2,
         "one row per county with state prefix 06"
     );
-    let fips: std::collections::HashSet<_> =
-        outputs.rows.iter().map(|r| r.fips.as_str()).collect();
+    let fips: std::collections::HashSet<_> = outputs.rows.iter().map(|r| r.fips.as_str()).collect();
     assert!(fips.contains("06037"), "row for county 06037");
     assert!(fips.contains("06059"), "row for county 06059");
     assert!(
-        outputs.rows.iter().all(|r| r.emissions.iter().all(|&e| e.is_finite())),
+        outputs
+            .rows
+            .iter()
+            .all(|r| r.emissions.iter().all(|&e| e.is_finite())),
         "all emissions must be finite"
     );
 }
@@ -415,8 +427,7 @@ fn national_dispatch_allocates_population_to_state() {
     let mut opts = NonroadOptions::new(RegionLevel::Nation, 2020);
     opts.growth_loaded = true;
 
-    let outputs = run_simulation(&opts, &inputs, &mut executor)
-        .expect("national run must succeed");
+    let outputs = run_simulation(&opts, &inputs, &mut executor).expect("national run must succeed");
 
     assert_eq!(
         outputs.counters.dispatch_calls, 1,
@@ -424,7 +435,8 @@ fn national_dispatch_allocates_population_to_state() {
     );
     assert_eq!(outputs.counters.geography_skips, 0, "no geography skips");
     assert_eq!(
-        outputs.rows.len(), 1,
+        outputs.rows.len(),
+        1,
         "one row for the single allocated state"
     );
     assert_eq!(
@@ -461,8 +473,7 @@ fn us_total_dispatch_produces_us_total_row() {
     let mut opts = NonroadOptions::new(RegionLevel::UsTotal, 2020);
     opts.growth_loaded = true;
 
-    let outputs = run_simulation(&opts, &inputs, &mut executor)
-        .expect("us_total run must succeed");
+    let outputs = run_simulation(&opts, &inputs, &mut executor).expect("us_total run must succeed");
 
     assert_eq!(
         outputs.counters.dispatch_calls, 1,
@@ -470,10 +481,7 @@ fn us_total_dispatch_produces_us_total_row() {
     );
     assert_eq!(outputs.counters.geography_skips, 0, "no geography skips");
     assert_eq!(outputs.rows.len(), 1, "one US-total row");
-    assert_eq!(
-        outputs.rows[0].fips, "00000",
-        "US-total row at FIPS 00000"
-    );
+    assert_eq!(outputs.rows[0].fips, "00000", "US-total row at FIPS 00000");
     assert!(
         outputs.rows[0].emissions.iter().all(|&e| e.is_finite()),
         "all emissions must be finite"
@@ -519,8 +527,8 @@ fn subcounty_region_list_routes_to_county_and_subcounty_dispatch() {
 
     let opts = NonroadOptions::new(RegionLevel::Subcounty, 2020);
 
-    let outputs = run_simulation(&opts, &inputs, &mut executor)
-        .expect("subcounty routing must succeed");
+    let outputs =
+        run_simulation(&opts, &inputs, &mut executor).expect("subcounty routing must succeed");
 
     assert_eq!(
         outputs.counters.dispatch_calls, 2,

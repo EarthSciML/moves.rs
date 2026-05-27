@@ -272,12 +272,16 @@ impl TableRow for RatesPollutantProcessAssocRow {
             vec![
                 Series::new(
                     "pollutantID".into(),
-                    rows.iter().map(|r| r.pollutant_id as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.pollutant_id as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
                     "processID".into(),
-                    rows.iter().map(|r| r.process_id as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.process_id as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
             ],
@@ -299,12 +303,9 @@ impl TableRow for RatesPollutantProcessAssocRow {
             .map(|i| {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
                 Ok(RatesPollutantProcessAssocRow {
-                    pollutant_id: pollutant_id_col
-                        .get(i)
-                        .ok_or_else(|| null("pollutantID"))? as u16,
-                    process_id: process_id_col
-                        .get(i)
-                        .ok_or_else(|| null("processID"))? as u16,
+                    pollutant_id: pollutant_id_col.get(i).ok_or_else(|| null("pollutantID"))?
+                        as u16,
+                    process_id: process_id_col.get(i).ok_or_else(|| null("processID"))? as u16,
                 })
             })
             .collect()
@@ -337,12 +338,16 @@ impl TableRow for RatesSourceTypePolProcessRow {
             vec![
                 Series::new(
                     "sourceTypeID".into(),
-                    rows.iter().map(|r| r.source_type_id as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.source_type_id as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
                     "polProcessID".into(),
-                    rows.iter().map(|r| r.pol_process_id as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.pol_process_id as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
             ],
@@ -366,10 +371,12 @@ impl TableRow for RatesSourceTypePolProcessRow {
                 Ok(RatesSourceTypePolProcessRow {
                     source_type_id: source_type_id_col
                         .get(i)
-                        .ok_or_else(|| null("sourceTypeID"))? as u16,
+                        .ok_or_else(|| null("sourceTypeID"))?
+                        as u16,
                     pol_process_id: pol_process_id_col
                         .get(i)
-                        .ok_or_else(|| null("polProcessID"))? as u32,
+                        .ok_or_else(|| null("polProcessID"))?
+                        as u32,
                 })
             })
             .collect()
@@ -399,12 +406,16 @@ impl TableRow for RatesOpModePolProcAssocRow {
             vec![
                 Series::new(
                     "polProcessID".into(),
-                    rows.iter().map(|r| r.pol_process_id as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.pol_process_id as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
                     "opModeID".into(),
-                    rows.iter().map(|r| r.op_mode_id as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.op_mode_id as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
             ],
@@ -428,10 +439,9 @@ impl TableRow for RatesOpModePolProcAssocRow {
                 Ok(RatesOpModePolProcAssocRow {
                     pol_process_id: pol_process_id_col
                         .get(i)
-                        .ok_or_else(|| null("polProcessID"))? as u32,
-                    op_mode_id: op_mode_id_col
-                        .get(i)
-                        .ok_or_else(|| null("opModeID"))? as i16,
+                        .ok_or_else(|| null("polProcessID"))?
+                        as u32,
+                    op_mode_id: op_mode_id_col.get(i).ok_or_else(|| null("opModeID"))? as i16,
                 })
             })
             .collect()
@@ -456,7 +466,9 @@ impl TableRow for RatesRunSpecHourDayRow {
             n,
             vec![Series::new(
                 "hourDayID".into(),
-                rows.iter().map(|r| r.hour_day_id as i32).collect::<Vec<i32>>(),
+                rows.iter()
+                    .map(|r| r.hour_day_id as i32)
+                    .collect::<Vec<i32>>(),
             )
             .into()],
         )
@@ -472,9 +484,7 @@ impl TableRow for RatesRunSpecHourDayRow {
             .map(|i| {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
                 Ok(RatesRunSpecHourDayRow {
-                    hour_day_id: hour_day_id_col
-                        .get(i)
-                        .ok_or_else(|| null("hourDayID"))? as i16,
+                    hour_day_id: hour_day_id_col.get(i).ok_or_else(|| null("hourDayID"))? as i16,
                 })
             })
             .collect()
@@ -499,7 +509,9 @@ impl TableRow for RatesRunSpecSourceTypeRow {
             n,
             vec![Series::new(
                 "sourceTypeID".into(),
-                rows.iter().map(|r| r.source_type_id as i32).collect::<Vec<i32>>(),
+                rows.iter()
+                    .map(|r| r.source_type_id as i32)
+                    .collect::<Vec<i32>>(),
             )
             .into()],
         )
@@ -517,7 +529,8 @@ impl TableRow for RatesRunSpecSourceTypeRow {
                 Ok(RatesRunSpecSourceTypeRow {
                     source_type_id: source_type_id_col
                         .get(i)
-                        .ok_or_else(|| null("sourceTypeID"))? as u16,
+                        .ok_or_else(|| null("sourceTypeID"))?
+                        as u16,
                 })
             })
             .collect()
@@ -546,7 +559,9 @@ impl TableRow for RatesHotellingActivityDistributionRow {
             n,
             vec![Series::new(
                 "opModeID".into(),
-                rows.iter().map(|r| r.op_mode_id as i32).collect::<Vec<i32>>(),
+                rows.iter()
+                    .map(|r| r.op_mode_id as i32)
+                    .collect::<Vec<i32>>(),
             )
             .into()],
         )
@@ -562,9 +577,7 @@ impl TableRow for RatesHotellingActivityDistributionRow {
             .map(|i| {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
                 Ok(RatesHotellingActivityDistributionRow {
-                    op_mode_id: op_mode_id_col
-                        .get(i)
-                        .ok_or_else(|| null("opModeID"))? as i16,
+                    op_mode_id: op_mode_id_col.get(i).ok_or_else(|| null("opModeID"))? as i16,
                 })
             })
             .collect()
@@ -594,17 +607,23 @@ impl TableRow for RatesOpModeDistributionRow {
             vec![
                 Series::new(
                     "sourceTypeID".into(),
-                    rows.iter().map(|r| r.source_type_id.0 as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.source_type_id.0 as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
                     "roadTypeID".into(),
-                    rows.iter().map(|r| r.road_type_id.0 as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.road_type_id.0 as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
                     "avgSpeedBinID".into(),
-                    rows.iter().map(|r| r.avg_speed_bin_id as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.avg_speed_bin_id as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -614,22 +633,30 @@ impl TableRow for RatesOpModeDistributionRow {
                 .into(),
                 Series::new(
                     "polProcessID".into(),
-                    rows.iter().map(|r| r.pol_process_id.0 as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.pol_process_id.0 as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
                     "hourDayID".into(),
-                    rows.iter().map(|r| r.hour_day_id as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.hour_day_id as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
                     "opModeID".into(),
-                    rows.iter().map(|r| r.op_mode_id as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.op_mode_id as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
                     "opModeFraction".into(),
-                    rows.iter().map(|r| r.op_mode_fraction).collect::<Vec<f64>>(),
+                    rows.iter()
+                        .map(|r| r.op_mode_fraction)
+                        .collect::<Vec<f64>>(),
                 )
                 .into(),
             ],
@@ -669,19 +696,14 @@ impl TableRow for RatesOpModeDistributionRow {
                     ),
                     avg_speed_bin_id: avg_speed_bin_id
                         .get(i)
-                        .ok_or_else(|| null("avgSpeedBinID"))? as i16,
-                    avg_bin_speed: avg_bin_speed
-                        .get(i)
-                        .ok_or_else(|| null("avgBinSpeed"))?,
+                        .ok_or_else(|| null("avgSpeedBinID"))?
+                        as i16,
+                    avg_bin_speed: avg_bin_speed.get(i).ok_or_else(|| null("avgBinSpeed"))?,
                     pol_process_id: PolProcessId(
                         pol_process_id.get(i).ok_or_else(|| null("polProcessID"))? as u32,
                     ),
-                    hour_day_id: hour_day_id
-                        .get(i)
-                        .ok_or_else(|| null("hourDayID"))? as i16,
-                    op_mode_id: op_mode_id
-                        .get(i)
-                        .ok_or_else(|| null("opModeID"))? as i16,
+                    hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))? as i16,
+                    op_mode_id: op_mode_id.get(i).ok_or_else(|| null("opModeID"))? as i16,
                     op_mode_fraction: op_mode_fraction
                         .get(i)
                         .ok_or_else(|| null("opModeFraction"))?,
@@ -986,9 +1008,10 @@ impl Generator for RatesOperatingModeDistributionGenerator {
     /// `ctx.position().process_id`, and writes the result to
     /// `ctx.scratch()` under `"RatesOpModeDistribution"`.
     fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
-        let process_id = ctx.position().process_id.ok_or_else(|| {
-            Error::Polars("no process_id in iteration position".into())
-        })?;
+        let process_id = ctx
+            .position()
+            .process_id
+            .ok_or_else(|| Error::Polars("no process_id in iteration position".into()))?;
 
         // Read the six input tables.
         let ppa_raw: Vec<RatesPollutantProcessAssocRow> =
@@ -1026,12 +1049,12 @@ impl Generator for RatesOperatingModeDistributionGenerator {
                 op_mode_id: r.op_mode_id,
             })
             .collect();
-        let run_spec_hour_day: Vec<i16> =
-            hour_day_raw.iter().map(|r| r.hour_day_id).collect();
-        let run_spec_source_type: Vec<SourceTypeId> =
-            source_type_raw.iter().map(|r| SourceTypeId(r.source_type_id)).collect();
-        let hotelling_op_modes: Vec<i16> =
-            hotelling_raw.iter().map(|r| r.op_mode_id).collect();
+        let run_spec_hour_day: Vec<i16> = hour_day_raw.iter().map(|r| r.hour_day_id).collect();
+        let run_spec_source_type: Vec<SourceTypeId> = source_type_raw
+            .iter()
+            .map(|r| SourceTypeId(r.source_type_id))
+            .collect();
+        let hotelling_op_modes: Vec<i16> = hotelling_raw.iter().map(|r| r.op_mode_id).collect();
 
         let inputs = OpModeFractionInputs {
             pollutant_process_assoc: &pollutant_process_assoc,
@@ -1354,44 +1377,44 @@ mod tests {
         // pollutantProcessAssoc
         store.insert(
             "pollutantProcessAssoc",
-            RatesPollutantProcessAssocRow::into_dataframe(vec![
-                RatesPollutantProcessAssocRow { pollutant_id: 91, process_id: 90 },
-            ])
+            RatesPollutantProcessAssocRow::into_dataframe(vec![RatesPollutantProcessAssocRow {
+                pollutant_id: 91,
+                process_id: 90,
+            }])
             .unwrap(),
         );
         // sourceTypePolProcess
         store.insert(
             "sourceTypePolProcess",
-            RatesSourceTypePolProcessRow::into_dataframe(vec![
-                RatesSourceTypePolProcessRow {
-                    source_type_id: 62,
-                    pol_process_id: pp.0,
-                },
-            ])
+            RatesSourceTypePolProcessRow::into_dataframe(vec![RatesSourceTypePolProcessRow {
+                source_type_id: 62,
+                pol_process_id: pp.0,
+            }])
             .unwrap(),
         );
         // opModePolProcAssoc
         store.insert(
             "opModePolProcAssoc",
-            RatesOpModePolProcAssocRow::into_dataframe(vec![
-                RatesOpModePolProcAssocRow { pol_process_id: pp.0, op_mode_id: 201 },
-            ])
+            RatesOpModePolProcAssocRow::into_dataframe(vec![RatesOpModePolProcAssocRow {
+                pol_process_id: pp.0,
+                op_mode_id: 201,
+            }])
             .unwrap(),
         );
         // runSpecHourDay
         store.insert(
             "runSpecHourDay",
-            RatesRunSpecHourDayRow::into_dataframe(vec![
-                RatesRunSpecHourDayRow { hour_day_id: 51 },
-            ])
+            RatesRunSpecHourDayRow::into_dataframe(vec![RatesRunSpecHourDayRow {
+                hour_day_id: 51,
+            }])
             .unwrap(),
         );
         // runSpecSourceType: source type 62 is selected.
         store.insert(
             "runSpecSourceType",
-            RatesRunSpecSourceTypeRow::into_dataframe(vec![
-                RatesRunSpecSourceTypeRow { source_type_id: 62 },
-            ])
+            RatesRunSpecSourceTypeRow::into_dataframe(vec![RatesRunSpecSourceTypeRow {
+                source_type_id: 62,
+            }])
             .unwrap(),
         );
         // hotellingActivityDistribution: empty (not used by process 90).
@@ -1404,7 +1427,12 @@ mod tests {
             iteration: 0,
             process_id: Some(ProcessId(90)),
             location: ExecutionLocation::link(1, 1, 1, 1),
-            time: ExecutionTime { year: Some(2020), month: None, day_id: None, hour: None },
+            time: ExecutionTime {
+                year: Some(2020),
+                month: None,
+                day_id: None,
+                hour: None,
+            },
         };
 
         let gen = RatesOperatingModeDistributionGenerator::new();

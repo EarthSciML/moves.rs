@@ -63,14 +63,62 @@ struct ScaleCase {
 
 fn scale_cases() -> Vec<ScaleCase> {
     vec![
-        ScaleCase { pollutant: 3, source_type: 11, reg_class: 10, model_year: 2022, expected_scale: 1.0 - 0.25 },
-        ScaleCase { pollutant: 3, source_type: 11, reg_class: 10, model_year: 2023, expected_scale: 1.0 - 0.30 },
-        ScaleCase { pollutant: 3, source_type: 21, reg_class: 10, model_year: 2022, expected_scale: 1.0 - 0.15 },
-        ScaleCase { pollutant: 3, source_type: 21, reg_class: 10, model_year: 2023, expected_scale: 1.0 - 0.20 },
-        ScaleCase { pollutant: 2, source_type: 11, reg_class: 10, model_year: 2022, expected_scale: 1.0 - 0.40 },
-        ScaleCase { pollutant: 2, source_type: 21, reg_class: 10, model_year: 2022, expected_scale: 1.0 - 0.10 },
-        ScaleCase { pollutant: 1, source_type: 11, reg_class: 20, model_year: 2022, expected_scale: 1.0 - 0.50 },
-        ScaleCase { pollutant: 2, source_type: 52, reg_class: 41, model_year: 2021, expected_scale: 1.0 - 0.35 },
+        ScaleCase {
+            pollutant: 3,
+            source_type: 11,
+            reg_class: 10,
+            model_year: 2022,
+            expected_scale: 1.0 - 0.25,
+        },
+        ScaleCase {
+            pollutant: 3,
+            source_type: 11,
+            reg_class: 10,
+            model_year: 2023,
+            expected_scale: 1.0 - 0.30,
+        },
+        ScaleCase {
+            pollutant: 3,
+            source_type: 21,
+            reg_class: 10,
+            model_year: 2022,
+            expected_scale: 1.0 - 0.15,
+        },
+        ScaleCase {
+            pollutant: 3,
+            source_type: 21,
+            reg_class: 10,
+            model_year: 2023,
+            expected_scale: 1.0 - 0.20,
+        },
+        ScaleCase {
+            pollutant: 2,
+            source_type: 11,
+            reg_class: 10,
+            model_year: 2022,
+            expected_scale: 1.0 - 0.40,
+        },
+        ScaleCase {
+            pollutant: 2,
+            source_type: 21,
+            reg_class: 10,
+            model_year: 2022,
+            expected_scale: 1.0 - 0.10,
+        },
+        ScaleCase {
+            pollutant: 1,
+            source_type: 11,
+            reg_class: 20,
+            model_year: 2022,
+            expected_scale: 1.0 - 0.50,
+        },
+        ScaleCase {
+            pollutant: 2,
+            source_type: 52,
+            reg_class: 41,
+            model_year: 2021,
+            expected_scale: 1.0 - 0.35,
+        },
     ]
 }
 
@@ -102,7 +150,12 @@ fn emission_scale_factors_match_canonical_formula() {
 fn scale_factor_is_one_for_absent_key() {
     let t = load_fixture();
     // Pollutant 99 is not in the fixture — expect no change (factor 1.0).
-    let key = RopKey { pollutant_id: 99, source_type_id: 11, reg_class_id: 10, model_year_id: 2022 };
+    let key = RopKey {
+        pollutant_id: 99,
+        source_type_id: 11,
+        reg_class_id: 10,
+        model_year_id: 2022,
+    };
     assert!((t.scale_factor(&key) - 1.0).abs() < 1e-14);
 }
 
@@ -110,7 +163,12 @@ fn scale_factor_is_one_for_absent_key() {
 fn scale_factor_is_one_for_absent_model_year() {
     let t = load_fixture();
     // Model year 2000 is not in the fixture for any row.
-    let key = RopKey { pollutant_id: 3, source_type_id: 11, reg_class_id: 10, model_year_id: 2000 };
+    let key = RopKey {
+        pollutant_id: 3,
+        source_type_id: 11,
+        reg_class_id: 10,
+        model_year_id: 2000,
+    };
     assert!((t.scale_factor(&key) - 1.0).abs() < 1e-14);
 }
 
@@ -118,7 +176,12 @@ fn scale_factor_is_one_for_absent_model_year() {
 #[test]
 fn half_reduction_produces_half_scale_factor() {
     let t = load_fixture();
-    let key = RopKey { pollutant_id: 1, source_type_id: 11, reg_class_id: 20, model_year_id: 2022 };
+    let key = RopKey {
+        pollutant_id: 1,
+        source_type_id: 11,
+        reg_class_id: 20,
+        model_year_id: 2022,
+    };
     assert!((t.scale_factor(&key) - 0.5).abs() < 1e-14);
 }
 

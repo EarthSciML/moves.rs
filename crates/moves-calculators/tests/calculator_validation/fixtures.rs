@@ -57,9 +57,9 @@ pub const ONROAD_FIXTURE_NAMES: &[&str] = &[
     "scale-project",
     "scale-rates",
     // Task 74 fixtures — cover the four previously uncovered calculators (3)
-    "process-nox-speciation",   // NOCalculator (32,1), NO2Calculator (33,1)
-    "process-extended-idle",    // CO2AERunningStartExtendedIdleCalculator (90,90)
-    "chain-nonhaptog",          // TogSpeciationCalculator (88,1)
+    "process-nox-speciation", // NOCalculator (32,1), NO2Calculator (33,1)
+    "process-extended-idle",  // CO2AERunningStartExtendedIdleCalculator (90,90)
+    "chain-nonhaptog",        // TogSpeciationCalculator (88,1)
 ];
 
 /// The Phase 0 fixture directory: `characterization/fixtures/`.

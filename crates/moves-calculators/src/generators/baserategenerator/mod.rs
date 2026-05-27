@@ -56,8 +56,8 @@ use std::sync::OnceLock;
 use moves_calculator_info::{Granularity, Priority};
 use moves_data::ProcessId;
 use moves_framework::{
-    CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStore, DataFrameStoreTyped,
-    Error, Generator, InMemoryStore, IntoDataFrame, TableRow,
+    CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStore,
+    DataFrameStoreTyped, Error, Generator, InMemoryStore, IntoDataFrame, TableRow,
 };
 use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
 
@@ -282,8 +282,10 @@ impl Generator for BaseRateGenerator {
             .map_err(|e| Error::Polars(e.to_string()))?;
 
         ctx.scratch_mut().insert("BaseRate", base_rate_df);
-        ctx.scratch_mut().insert("BaseRateByAge", base_rate_by_age_df);
-        ctx.scratch_mut().insert("DrivingIdleFraction", driving_idle_df);
+        ctx.scratch_mut()
+            .insert("BaseRateByAge", base_rate_by_age_df);
+        ctx.scratch_mut()
+            .insert("DrivingIdleFraction", driving_idle_df);
 
         Ok(CalculatorOutput::empty())
     }
@@ -575,9 +577,7 @@ impl TableRow for DriveScheduleRow {
                 .into(),
                 Series::new(
                     "averageSpeed".into(),
-                    rows.iter()
-                        .map(|r| r.average_speed)
-                        .collect::<Vec<f64>>(),
+                    rows.iter().map(|r| r.average_speed).collect::<Vec<f64>>(),
                 )
                 .into(),
             ],
@@ -634,9 +634,7 @@ impl TableRow for AvgSpeedDistributionRow {
             vec![
                 Series::new(
                     "sourceTypeID".into(),
-                    rows.iter()
-                        .map(|r| r.source_type_id)
-                        .collect::<Vec<i32>>(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -730,9 +728,7 @@ impl TableRow for SbWeightedDistanceRow {
             vec![
                 Series::new(
                     "sourceTypeID".into(),
-                    rows.iter()
-                        .map(|r| r.source_type_id)
-                        .collect::<Vec<i32>>(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -744,16 +740,12 @@ impl TableRow for SbWeightedDistanceRow {
                 .into(),
                 Series::new(
                     "polProcessID".into(),
-                    rows.iter()
-                        .map(|r| r.pol_process_id)
-                        .collect::<Vec<i32>>(),
+                    rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
                     "modelYearID".into(),
-                    rows.iter()
-                        .map(|r| r.model_year_id)
-                        .collect::<Vec<i32>>(),
+                    rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -768,9 +760,7 @@ impl TableRow for SbWeightedDistanceRow {
                 .into(),
                 Series::new(
                     "meanBaseRate".into(),
-                    rows.iter()
-                        .map(|r| r.mean_base_rate)
-                        .collect::<Vec<f64>>(),
+                    rows.iter().map(|r| r.mean_base_rate).collect::<Vec<f64>>(),
                 )
                 .into(),
                 Series::new(
@@ -877,9 +867,7 @@ impl TableRow for OpModePolProcRow {
             vec![
                 Series::new(
                     "polProcessID".into(),
-                    rows.iter()
-                        .map(|r| r.pol_process_id)
-                        .collect::<Vec<i32>>(),
+                    rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -933,9 +921,7 @@ impl TableRow for DriveScheduleAssocRow {
             vec![
                 Series::new(
                     "sourceTypeID".into(),
-                    rows.iter()
-                        .map(|r| r.source_type_id)
-                        .collect::<Vec<i32>>(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -1004,9 +990,7 @@ impl TableRow for RatesOpModeDistributionRow {
             vec![
                 Series::new(
                     "sourceTypeID".into(),
-                    rows.iter()
-                        .map(|r| r.source_type_id)
-                        .collect::<Vec<i32>>(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -1028,9 +1012,7 @@ impl TableRow for RatesOpModeDistributionRow {
                 .into(),
                 Series::new(
                     "polProcessID".into(),
-                    rows.iter()
-                        .map(|r| r.pol_process_id)
-                        .collect::<Vec<i32>>(),
+                    rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -1047,9 +1029,7 @@ impl TableRow for RatesOpModeDistributionRow {
                 .into(),
                 Series::new(
                     "avgBinSpeed".into(),
-                    rows.iter()
-                        .map(|r| r.avg_bin_speed)
-                        .collect::<Vec<f64>>(),
+                    rows.iter().map(|r| r.avg_bin_speed).collect::<Vec<f64>>(),
                 )
                 .into(),
                 Series::new(
@@ -1244,16 +1224,12 @@ impl TableRow for SourceUseTypePhysicsMappingDetail {
                 .into(),
                 Series::new(
                     "rollingTermA".into(),
-                    rows.iter()
-                        .map(|r| r.rolling_term_a)
-                        .collect::<Vec<f64>>(),
+                    rows.iter().map(|r| r.rolling_term_a).collect::<Vec<f64>>(),
                 )
                 .into(),
                 Series::new(
                     "rotatingTermB".into(),
-                    rows.iter()
-                        .map(|r| r.rotating_term_b)
-                        .collect::<Vec<f64>>(),
+                    rows.iter().map(|r| r.rotating_term_b).collect::<Vec<f64>>(),
                 )
                 .into(),
                 Series::new(
@@ -1353,16 +1329,12 @@ impl TableRow for SbWeightedRateDetail {
             vec![
                 Series::new(
                     "sourceTypeID".into(),
-                    rows.iter()
-                        .map(|r| r.source_type_id)
-                        .collect::<Vec<i32>>(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
                     "polProcessID".into(),
-                    rows.iter()
-                        .map(|r| r.pol_process_id)
-                        .collect::<Vec<i32>>(),
+                    rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -1372,9 +1344,7 @@ impl TableRow for SbWeightedRateDetail {
                 .into(),
                 Series::new(
                     "modelYearID".into(),
-                    rows.iter()
-                        .map(|r| r.model_year_id)
-                        .collect::<Vec<i32>>(),
+                    rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -1404,9 +1374,7 @@ impl TableRow for SbWeightedRateDetail {
                 .into(),
                 Series::new(
                     "meanBaseRate".into(),
-                    rows.iter()
-                        .map(|r| r.mean_base_rate)
-                        .collect::<Vec<f64>>(),
+                    rows.iter().map(|r| r.mean_base_rate).collect::<Vec<f64>>(),
                 )
                 .into(),
                 Series::new(
@@ -1476,9 +1444,7 @@ impl TableRow for SbWeightedRateDetail {
                     sum_sbd_raw: sbdr.get(i).ok_or_else(|| null("sumSBDRaw"))?,
                     mean_base_rate: mbr.get(i).ok_or_else(|| null("meanBaseRate"))?,
                     mean_base_rate_im: mbri.get(i).ok_or_else(|| null("meanBaseRateIM"))?,
-                    mean_base_rate_ac_adj: mbra
-                        .get(i)
-                        .ok_or_else(|| null("meanBaseRateACAdj"))?,
+                    mean_base_rate_ac_adj: mbra.get(i).ok_or_else(|| null("meanBaseRateACAdj"))?,
                     mean_base_rate_im_ac_adj: mbria
                         .get(i)
                         .ok_or_else(|| null("meanBaseRateIMACAdj"))?,
@@ -1600,9 +1566,7 @@ impl TableRow for BaseRateOutputRecord {
             vec![
                 Series::new(
                     "sourceTypeID".into(),
-                    rows.iter()
-                        .map(|r| r.source_type_id)
-                        .collect::<Vec<i32>>(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -1624,9 +1588,7 @@ impl TableRow for BaseRateOutputRecord {
                 .into(),
                 Series::new(
                     "polProcessID".into(),
-                    rows.iter()
-                        .map(|r| r.pol_process_id)
-                        .collect::<Vec<i32>>(),
+                    rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -1641,9 +1603,7 @@ impl TableRow for BaseRateOutputRecord {
                 .into(),
                 Series::new(
                     "modelYearID".into(),
-                    rows.iter()
-                        .map(|r| r.model_year_id)
-                        .collect::<Vec<i32>>(),
+                    rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -1668,9 +1628,7 @@ impl TableRow for BaseRateOutputRecord {
                 .into(),
                 Series::new(
                     "meanBaseRate".into(),
-                    rows.iter()
-                        .map(|r| r.mean_base_rate)
-                        .collect::<Vec<f64>>(),
+                    rows.iter().map(|r| r.mean_base_rate).collect::<Vec<f64>>(),
                 )
                 .into(),
                 Series::new(
@@ -1696,9 +1654,7 @@ impl TableRow for BaseRateOutputRecord {
                 .into(),
                 Series::new(
                     "emissionRate".into(),
-                    rows.iter()
-                        .map(|r| r.emission_rate)
-                        .collect::<Vec<f64>>(),
+                    rows.iter().map(|r| r.emission_rate).collect::<Vec<f64>>(),
                 )
                 .into(),
                 Series::new(
@@ -1794,24 +1750,18 @@ impl TableRow for BaseRateOutputRecord {
                     op_mode_id: op.get(i).ok_or_else(|| null("opModeID"))?,
                     mean_base_rate: mbr.get(i).ok_or_else(|| null("meanBaseRate"))?,
                     mean_base_rate_im: mbri.get(i).ok_or_else(|| null("meanBaseRateIM"))?,
-                    mean_base_rate_ac_adj: mbra
-                        .get(i)
-                        .ok_or_else(|| null("meanBaseRateACAdj"))?,
+                    mean_base_rate_ac_adj: mbra.get(i).ok_or_else(|| null("meanBaseRateACAdj"))?,
                     mean_base_rate_im_ac_adj: mbria
                         .get(i)
                         .ok_or_else(|| null("meanBaseRateIMACAdj"))?,
                     emission_rate: er.get(i).ok_or_else(|| null("emissionRate"))?,
                     emission_rate_im: eri.get(i).ok_or_else(|| null("emissionRateIM"))?,
-                    emission_rate_ac_adj: era
-                        .get(i)
-                        .ok_or_else(|| null("emissionRateACAdj"))?,
+                    emission_rate_ac_adj: era.get(i).ok_or_else(|| null("emissionRateACAdj"))?,
                     emission_rate_im_ac_adj: eria
                         .get(i)
                         .ok_or_else(|| null("emissionRateIMACAdj"))?,
                     op_mode_fraction: omf.get(i).ok_or_else(|| null("opModeFraction"))?,
-                    op_mode_fraction_rate: omfr
-                        .get(i)
-                        .ok_or_else(|| null("opModeFractionRate"))?,
+                    op_mode_fraction_rate: omfr.get(i).ok_or_else(|| null("opModeFractionRate"))?,
                 })
             })
             .collect()
@@ -1855,9 +1805,7 @@ impl TableRow for DrivingIdleFractionRow {
                 .into(),
                 Series::new(
                     "sourceTypeID".into(),
-                    rows.iter()
-                        .map(|r| r.source_type_id)
-                        .collect::<Vec<i32>>(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -1898,9 +1846,7 @@ impl TableRow for DrivingIdleFractionRow {
                     year_id: yr.get(i).ok_or_else(|| null("yearID"))?,
                     road_type_id: road.get(i).ok_or_else(|| null("roadTypeID"))?,
                     source_type_id: src.get(i).ok_or_else(|| null("sourceTypeID"))?,
-                    driving_idle_fraction: dif
-                        .get(i)
-                        .ok_or_else(|| null("drivingIdleFraction"))?,
+                    driving_idle_fraction: dif.get(i).ok_or_else(|| null("drivingIdleFraction"))?,
                 })
             })
             .collect()
@@ -1990,8 +1936,7 @@ mod tests {
         // runSpecHourDay — one entry.
         store.insert(
             "runSpecHourDay",
-            RunSpecHourDayRow::into_dataframe(vec![RunSpecHourDayRow { hour_day_id: 85 }])
-                .unwrap(),
+            RunSpecHourDayRow::into_dataframe(vec![RunSpecHourDayRow { hour_day_id: 85 }]).unwrap(),
         );
 
         // runSpecSourceType — one entry.

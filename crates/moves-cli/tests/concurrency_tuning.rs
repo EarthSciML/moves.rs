@@ -57,10 +57,7 @@ fn onroad_fixtures() -> Vec<PathBuf> {
         .filter_map(|e| e.ok())
         .map(|e| e.path())
         .filter(|p| {
-            let name = p
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or_default();
+            let name = p.file_name().and_then(|n| n.to_str()).unwrap_or_default();
             p.extension().and_then(|x| x.to_str()) == Some("xml")
                 && !name.starts_with("nr-")
                 && !name.starts_with("scale-")
@@ -107,7 +104,12 @@ fn run_all_fixtures(fixtures: &[PathBuf], max_parallel_chunks: usize) -> (f64, O
             calculator_dag: None,
             run_date_time: None,
         })
-        .unwrap_or_else(|e| panic!("fixture {} failed at N={max_parallel_chunks}: {e}", fixture.display()));
+        .unwrap_or_else(|e| {
+            panic!(
+                "fixture {} failed at N={max_parallel_chunks}: {e}",
+                fixture.display()
+            )
+        });
     }
     let wall_ms = t_start.elapsed().as_secs_f64() * 1000.0;
     let rss_mib = read_peak_rss_mib();
@@ -259,7 +261,8 @@ fn all_parallelism_levels_run_the_airtoxics_fixture() {
             "N={n}: wall_time must be positive"
         );
         assert_eq!(
-            outcome.max_parallel_chunks, n.max(1),
+            outcome.max_parallel_chunks,
+            n.max(1),
             "N={n}: resolved parallelism must match"
         );
     }

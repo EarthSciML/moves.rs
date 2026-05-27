@@ -47,7 +47,10 @@ impl CoverageKind {
     /// `true` when the calculator is exercised by this fixture
     /// (directly or via chain parent).
     pub fn is_exercised_or_chained(&self) -> bool {
-        matches!(self, CoverageKind::Exercised { .. } | CoverageKind::ChainedOnly)
+        matches!(
+            self,
+            CoverageKind::Exercised { .. } | CoverageKind::ChainedOnly
+        )
     }
 }
 
@@ -80,22 +83,21 @@ impl CoverageMatrix {
         let cells: Vec<Vec<CoverageCell>> = fixtures
             .iter()
             .map(|fixture| {
-                let fixture_ppas: BTreeSet<(u32, u32)> =
-                    fixture.ppa_ids.iter().copied().collect();
+                let fixture_ppas: BTreeSet<(u32, u32)> = fixture.ppa_ids.iter().copied().collect();
                 calc_ppa_sets
                     .iter()
                     .map(|calc_ppas| {
                         let kind = if calc_ppas.is_empty() {
                             CoverageKind::ChainedOnly
                         } else {
-                            let shared: Vec<(u32, u32)> = calc_ppas
-                                .intersection(&fixture_ppas)
-                                .copied()
-                                .collect();
+                            let shared: Vec<(u32, u32)> =
+                                calc_ppas.intersection(&fixture_ppas).copied().collect();
                             if shared.is_empty() {
                                 CoverageKind::NotExercised
                             } else {
-                                CoverageKind::Exercised { shared_pairs: shared }
+                                CoverageKind::Exercised {
+                                    shared_pairs: shared,
+                                }
                             }
                         };
                         CoverageCell { kind }
@@ -144,10 +146,9 @@ impl CoverageMatrix {
     /// `true` when every fixture has at least one exercised or
     /// chained-only calculator.
     pub fn every_fixture_has_coverage(&self) -> bool {
-        self.cells.iter().all(|row| {
-            row.iter()
-                .any(|cell| cell.kind.is_exercised_or_chained())
-        })
+        self.cells
+            .iter()
+            .all(|row| row.iter().any(|cell| cell.kind.is_exercised_or_chained()))
     }
 
     /// `true` when every calculator is exercised by at least one fixture,
@@ -317,14 +318,9 @@ mod tests {
 
     #[test]
     fn every_fixture_has_coverage_works() {
-        let fixtures = vec![
-            make_fixture("f1", &[(1, 1)]),
-            make_fixture("f2", &[(2, 2)]),
-        ];
-        let calcs: Vec<Box<dyn Calculator>> = vec![
-            stub("CalcA", &[(1, 1)]),
-            stub("CalcB", &[(2, 2)]),
-        ];
+        let fixtures = vec![make_fixture("f1", &[(1, 1)]), make_fixture("f2", &[(2, 2)])];
+        let calcs: Vec<Box<dyn Calculator>> =
+            vec![stub("CalcA", &[(1, 1)]), stub("CalcB", &[(2, 2)])];
         let matrix = CoverageMatrix::build(&fixtures, &calcs);
         assert!(matrix.every_fixture_has_coverage());
     }
@@ -335,6 +331,9 @@ mod tests {
         let calcs: Vec<Box<dyn Calculator>> = vec![stub("CalcA", &[(1, 1)])];
         let matrix = CoverageMatrix::build(&fixtures, &calcs);
         let rendered = matrix.render();
-        assert!(rendered.contains('E'), "should contain 'E' for exercised cell");
+        assert!(
+            rendered.contains('E'),
+            "should contain 'E' for exercised cell"
+        );
     }
 }

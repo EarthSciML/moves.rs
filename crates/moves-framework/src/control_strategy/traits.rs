@@ -234,10 +234,8 @@ mod tests {
 
     #[test]
     fn strategy_can_be_trait_object() {
-        let strategies: Vec<Box<dyn InternalControlStrategy>> = vec![
-            Box::new(NoOpStrategy),
-            Box::new(FullStrategy),
-        ];
+        let strategies: Vec<Box<dyn InternalControlStrategy>> =
+            vec![Box::new(NoOpStrategy), Box::new(FullStrategy)];
         assert_eq!(strategies[0].name(), "NoOpStrategy");
         assert_eq!(strategies[1].name(), "FullStrategy");
     }

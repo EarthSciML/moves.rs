@@ -48,7 +48,10 @@ fn single_program_factor_matches_canonical_formula() {
         .collect();
     let expected = 1.0 - 0.25 * 0.80; // 0.80
     let actual = programs.combined_factor(11, 2010, 3, 1, 2025);
-    assert!((actual - expected).abs() < 1e-12, "single program: expected {expected}, got {actual}");
+    assert!(
+        (actual - expected).abs() < 1e-12,
+        "single program: expected {expected}, got {actual}"
+    );
 }
 
 #[test]
@@ -57,7 +60,10 @@ fn full_fleet_retrofit_full_effectiveness_is_zero() {
         .into_iter()
         .collect();
     let actual = programs.combined_factor(11, 2010, 3, 1, 2025);
-    assert!(actual.abs() < 1e-12, "complete elimination: expected 0.0, got {actual}");
+    assert!(
+        actual.abs() < 1e-12,
+        "complete elimination: expected 0.0, got {actual}"
+    );
 }
 
 #[test]
@@ -66,7 +72,10 @@ fn zero_fraction_retrofitted_means_no_adjustment() {
         .into_iter()
         .collect();
     let actual = programs.combined_factor(11, 2010, 3, 1, 2025);
-    assert!((actual - 1.0).abs() < 1e-12, "zero fraction: no adjustment, expected 1.0");
+    assert!(
+        (actual - 1.0).abs() < 1e-12,
+        "zero fraction: no adjustment, expected 1.0"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -125,7 +134,10 @@ fn future_retrofit_year_not_yet_applied() {
         .collect();
     // Analysis year 2025 < retrofitYear 2030 → program not yet active.
     let actual = programs.combined_factor(11, 2010, 3, 1, 2025);
-    assert!((actual - 1.0).abs() < 1e-12, "future program not yet applied");
+    assert!(
+        (actual - 1.0).abs() < 1e-12,
+        "future program not yet applied"
+    );
 }
 
 #[test]
@@ -148,7 +160,10 @@ fn model_year_below_range_excluded() {
         .into_iter()
         .collect();
     let actual = programs.combined_factor(11, 2004, 3, 1, 2025);
-    assert!((actual - 1.0).abs() < 1e-12, "model year 2004 < startModelYear 2005");
+    assert!(
+        (actual - 1.0).abs() < 1e-12,
+        "model year 2004 < startModelYear 2005"
+    );
 }
 
 #[test]
@@ -157,7 +172,10 @@ fn model_year_above_range_excluded() {
         .into_iter()
         .collect();
     let actual = programs.combined_factor(11, 2016, 3, 1, 2025);
-    assert!((actual - 1.0).abs() < 1e-12, "model year 2016 > endModelYear 2015");
+    assert!(
+        (actual - 1.0).abs() < 1e-12,
+        "model year 2016 > endModelYear 2015"
+    );
 }
 
 #[test]
@@ -216,7 +234,9 @@ fn strategy_lifecycle_with_fixture_programs() {
 fn strategy_modified_tables_contains_emission_rate_adjustment() {
     let strategy = OnRoadRetrofitStrategy::new(RetrofitTable::new());
     assert!(
-        strategy.modified_tables().contains(&"emissionRateAdjustment"),
+        strategy
+            .modified_tables()
+            .contains(&"emissionRateAdjustment"),
         "OnRoadRetrofit must declare emissionRateAdjustment"
     );
 }

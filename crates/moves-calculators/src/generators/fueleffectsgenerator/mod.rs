@@ -141,17 +141,19 @@ impl Generator for FuelEffectsGenerator {
             ctx.tables().iter_typed("generalFuelRatioExpression")?;
         let expressions: Vec<GeneralFuelRatioExpression> = expr_rows
             .into_iter()
-            .map(|r| GeneralFuelRatioExpression::new(
-                r.fuel_type_id,
-                r.pol_process_id,
-                r.min_model_year_id,
-                r.max_model_year_id,
-                r.min_age_id,
-                r.max_age_id,
-                r.source_type_id,
-                r.fuel_effect_ratio_expression,
-                r.fuel_effect_ratio_gpa_expression,
-            ))
+            .map(|r| {
+                GeneralFuelRatioExpression::new(
+                    r.fuel_type_id,
+                    r.pol_process_id,
+                    r.min_model_year_id,
+                    r.max_model_year_id,
+                    r.min_age_id,
+                    r.max_age_id,
+                    r.source_type_id,
+                    r.fuel_effect_ratio_expression,
+                    r.fuel_effect_ratio_gpa_expression,
+                )
+            })
             .collect();
 
         // Read `FuelSubtype` to map fuelSubtypeID → fuelTypeID.
@@ -177,10 +179,10 @@ impl Generator for FuelEffectsGenerator {
         // FuelFormulation: a formulation's fuelTypeID determines its bucket.
         let fs_rows: Vec<FuelSupplyRow> = ctx.tables().iter_typed("FuelSupply")?;
         // Build a fast lookup: fuelFormulationID → fuelTypeID.
-        let formulation_to_type: std::collections::HashMap<i32, i32> =
-            formulations_by_fuel_type.iter().flat_map(|(&ft, ffs)| {
-                ffs.iter().map(move |ff| (ff.fuel_formulation_id, ft))
-            }).collect();
+        let formulation_to_type: std::collections::HashMap<i32, i32> = formulations_by_fuel_type
+            .iter()
+            .flat_map(|(&ft, ffs)| ffs.iter().map(move |ff| (ff.fuel_formulation_id, ft)))
+            .collect();
         let mut supplied_by_fuel_type: BTreeMap<i32, BTreeSet<i32>> = BTreeMap::new();
         for r in fs_rows {
             if let Some(&fuel_type_id) = formulation_to_type.get(&r.fuel_formulation_id) {
@@ -199,8 +201,10 @@ impl Generator for FuelEffectsGenerator {
         };
         let rows = do_general_fuel_ratio(&inputs)
             .map_err(|e| Error::Polars(format!("FuelEffectsGenerator expression error: {e}")))?;
-        let output_rows: Vec<GeneralFuelRatioOutputRow> =
-            rows.into_iter().map(GeneralFuelRatioOutputRow::from).collect();
+        let output_rows: Vec<GeneralFuelRatioOutputRow> = rows
+            .into_iter()
+            .map(GeneralFuelRatioOutputRow::from)
+            .collect();
         crate::wiring::write_scratch_table(ctx, OUTPUT_TABLES[0], output_rows)
     }
 }
@@ -269,12 +273,16 @@ impl TableRow for GeneralFuelRatioExpressionRow {
                 .into(),
                 Series::new(
                     "minModelYearID".into(),
-                    rows.iter().map(|r| r.min_model_year_id).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.min_model_year_id)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
                     "maxModelYearID".into(),
-                    rows.iter().map(|r| r.max_model_year_id).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.max_model_year_id)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -360,9 +368,7 @@ impl TableRow for GeneralFuelRatioExpressionRow {
             .map(|i| {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
                 Ok(GeneralFuelRatioExpressionRow {
-                    fuel_type_id: fuel_type_id_col
-                        .get(i)
-                        .ok_or_else(|| null("fuelTypeID"))?,
+                    fuel_type_id: fuel_type_id_col.get(i).ok_or_else(|| null("fuelTypeID"))?,
                     pol_process_id: pol_process_id_col
                         .get(i)
                         .ok_or_else(|| null("polProcessID"))?,
@@ -484,7 +490,9 @@ impl TableRow for FuelFormulationRow {
             vec![
                 Series::new(
                     "fuelFormulationID".into(),
-                    rows.iter().map(|r| r.fuel_formulation_id).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.fuel_formulation_id)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -499,42 +507,58 @@ impl TableRow for FuelFormulationRow {
                 .into(),
                 Series::new(
                     "sulfurLevel".into(),
-                    rows.iter().map(|r| r.sulfur_level as f64).collect::<Vec<f64>>(),
+                    rows.iter()
+                        .map(|r| r.sulfur_level as f64)
+                        .collect::<Vec<f64>>(),
                 )
                 .into(),
                 Series::new(
                     "ETOHVolume".into(),
-                    rows.iter().map(|r| r.etoh_volume as f64).collect::<Vec<f64>>(),
+                    rows.iter()
+                        .map(|r| r.etoh_volume as f64)
+                        .collect::<Vec<f64>>(),
                 )
                 .into(),
                 Series::new(
                     "MTBEVolume".into(),
-                    rows.iter().map(|r| r.mtbe_volume as f64).collect::<Vec<f64>>(),
+                    rows.iter()
+                        .map(|r| r.mtbe_volume as f64)
+                        .collect::<Vec<f64>>(),
                 )
                 .into(),
                 Series::new(
                     "ETBEVolume".into(),
-                    rows.iter().map(|r| r.etbe_volume as f64).collect::<Vec<f64>>(),
+                    rows.iter()
+                        .map(|r| r.etbe_volume as f64)
+                        .collect::<Vec<f64>>(),
                 )
                 .into(),
                 Series::new(
                     "TAMEVolume".into(),
-                    rows.iter().map(|r| r.tame_volume as f64).collect::<Vec<f64>>(),
+                    rows.iter()
+                        .map(|r| r.tame_volume as f64)
+                        .collect::<Vec<f64>>(),
                 )
                 .into(),
                 Series::new(
                     "aromaticContent".into(),
-                    rows.iter().map(|r| r.aromatic_content as f64).collect::<Vec<f64>>(),
+                    rows.iter()
+                        .map(|r| r.aromatic_content as f64)
+                        .collect::<Vec<f64>>(),
                 )
                 .into(),
                 Series::new(
                     "olefinContent".into(),
-                    rows.iter().map(|r| r.olefin_content as f64).collect::<Vec<f64>>(),
+                    rows.iter()
+                        .map(|r| r.olefin_content as f64)
+                        .collect::<Vec<f64>>(),
                 )
                 .into(),
                 Series::new(
                     "benzeneContent".into(),
-                    rows.iter().map(|r| r.benzene_content as f64).collect::<Vec<f64>>(),
+                    rows.iter()
+                        .map(|r| r.benzene_content as f64)
+                        .collect::<Vec<f64>>(),
                 )
                 .into(),
                 Series::new(
@@ -549,22 +573,30 @@ impl TableRow for FuelFormulationRow {
                 .into(),
                 Series::new(
                     "volToWtPercentOxy".into(),
-                    rows.iter().map(|r| r.vol_to_wt_percent_oxy as f64).collect::<Vec<f64>>(),
+                    rows.iter()
+                        .map(|r| r.vol_to_wt_percent_oxy as f64)
+                        .collect::<Vec<f64>>(),
                 )
                 .into(),
                 Series::new(
                     "BioDieselEsterVolume".into(),
-                    rows.iter().map(|r| r.bio_diesel_ester_volume as f64).collect::<Vec<f64>>(),
+                    rows.iter()
+                        .map(|r| r.bio_diesel_ester_volume as f64)
+                        .collect::<Vec<f64>>(),
                 )
                 .into(),
                 Series::new(
                     "CetaneIndex".into(),
-                    rows.iter().map(|r| r.cetane_index as f64).collect::<Vec<f64>>(),
+                    rows.iter()
+                        .map(|r| r.cetane_index as f64)
+                        .collect::<Vec<f64>>(),
                 )
                 .into(),
                 Series::new(
                     "PAHContent".into(),
-                    rows.iter().map(|r| r.pah_content as f64).collect::<Vec<f64>>(),
+                    rows.iter()
+                        .map(|r| r.pah_content as f64)
+                        .collect::<Vec<f64>>(),
                 )
                 .into(),
                 Series::new(
@@ -628,34 +660,37 @@ impl TableRow for FuelFormulationRow {
                         .get(i)
                         .ok_or_else(|| null("fuelSubtypeID"))?,
                     rvp: rvp_col.get(i).ok_or_else(|| null("RVP"))? as f32,
-                    sulfur_level: sulfur_level_col.get(i).ok_or_else(|| null("sulfurLevel"))? as f32,
+                    sulfur_level: sulfur_level_col.get(i).ok_or_else(|| null("sulfurLevel"))?
+                        as f32,
                     etoh_volume: etoh_volume_col.get(i).ok_or_else(|| null("ETOHVolume"))? as f32,
                     mtbe_volume: mtbe_volume_col.get(i).ok_or_else(|| null("MTBEVolume"))? as f32,
                     etbe_volume: etbe_volume_col.get(i).ok_or_else(|| null("ETBEVolume"))? as f32,
                     tame_volume: tame_volume_col.get(i).ok_or_else(|| null("TAMEVolume"))? as f32,
                     aromatic_content: aromatic_content_col
                         .get(i)
-                        .ok_or_else(|| null("aromaticContent"))? as f32,
+                        .ok_or_else(|| null("aromaticContent"))?
+                        as f32,
                     olefin_content: olefin_content_col
                         .get(i)
-                        .ok_or_else(|| null("olefinContent"))? as f32,
+                        .ok_or_else(|| null("olefinContent"))?
+                        as f32,
                     benzene_content: benzene_content_col
                         .get(i)
-                        .ok_or_else(|| null("benzeneContent"))? as f32,
+                        .ok_or_else(|| null("benzeneContent"))?
+                        as f32,
                     e200: e200_col.get(i).ok_or_else(|| null("e200"))? as f32,
                     e300: e300_col.get(i).ok_or_else(|| null("e300"))? as f32,
                     vol_to_wt_percent_oxy: vol_to_wt_percent_oxy_col
                         .get(i)
-                        .ok_or_else(|| null("volToWtPercentOxy"))? as f32,
+                        .ok_or_else(|| null("volToWtPercentOxy"))?
+                        as f32,
                     bio_diesel_ester_volume: bio_diesel_ester_volume_col
                         .get(i)
-                        .ok_or_else(|| null("BioDieselEsterVolume"))? as f32,
-                    cetane_index: cetane_index_col
-                        .get(i)
-                        .ok_or_else(|| null("CetaneIndex"))? as f32,
-                    pah_content: pah_content_col
-                        .get(i)
-                        .ok_or_else(|| null("PAHContent"))? as f32,
+                        .ok_or_else(|| null("BioDieselEsterVolume"))?
+                        as f32,
+                    cetane_index: cetane_index_col.get(i).ok_or_else(|| null("CetaneIndex"))?
+                        as f32,
+                    pah_content: pah_content_col.get(i).ok_or_else(|| null("PAHContent"))? as f32,
                     t50: t50_col.get(i).ok_or_else(|| null("T50"))? as f32,
                     t90: t90_col.get(i).ok_or_else(|| null("T90"))? as f32,
                 })
@@ -720,9 +755,7 @@ impl TableRow for FuelSubtypeRow {
                     fuel_subtype_id: fuel_subtype_id_col
                         .get(i)
                         .ok_or_else(|| null("fuelSubtypeID"))?,
-                    fuel_type_id: fuel_type_id_col
-                        .get(i)
-                        .ok_or_else(|| null("fuelTypeID"))?,
+                    fuel_type_id: fuel_type_id_col.get(i).ok_or_else(|| null("fuelTypeID"))?,
                 })
             })
             .collect()
@@ -757,36 +790,18 @@ impl TableRow for FuelSupplyRow {
         DataFrame::new(
             n,
             vec![
-                Series::new(
-                    "fuelRegionID".into(),
-                    vec![0i32; n],
-                )
-                .into(),
-                Series::new(
-                    "fuelYearID".into(),
-                    vec![0i32; n],
-                )
-                .into(),
-                Series::new(
-                    "monthGroupID".into(),
-                    vec![0i32; n],
-                )
-                .into(),
+                Series::new("fuelRegionID".into(), vec![0i32; n]).into(),
+                Series::new("fuelYearID".into(), vec![0i32; n]).into(),
+                Series::new("monthGroupID".into(), vec![0i32; n]).into(),
                 Series::new(
                     "fuelFormulationID".into(),
-                    rows.iter().map(|r| r.fuel_formulation_id).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.fuel_formulation_id)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
-                Series::new(
-                    "marketShare".into(),
-                    vec![1.0f64; n],
-                )
-                .into(),
-                Series::new(
-                    "marketShareCV".into(),
-                    vec![0.0f64; n],
-                )
-                .into(),
+                Series::new("marketShare".into(), vec![1.0f64; n]).into(),
+                Series::new("marketShareCV".into(), vec![0.0f64; n]).into(),
             ],
         )
     }
@@ -882,7 +897,9 @@ impl TableRow for GeneralFuelRatioOutputRow {
                 .into(),
                 Series::new(
                     "fuelFormulationID".into(),
-                    rows.iter().map(|r| r.fuel_formulation_id).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.fuel_formulation_id)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -902,12 +919,16 @@ impl TableRow for GeneralFuelRatioOutputRow {
                 .into(),
                 Series::new(
                     "minModelYearID".into(),
-                    rows.iter().map(|r| r.min_model_year_id).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.min_model_year_id)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
                     "maxModelYearID".into(),
-                    rows.iter().map(|r| r.max_model_year_id).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.max_model_year_id)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -927,12 +948,16 @@ impl TableRow for GeneralFuelRatioOutputRow {
                 .into(),
                 Series::new(
                     "fuelEffectRatio".into(),
-                    rows.iter().map(|r| r.fuel_effect_ratio).collect::<Vec<f64>>(),
+                    rows.iter()
+                        .map(|r| r.fuel_effect_ratio)
+                        .collect::<Vec<f64>>(),
                 )
                 .into(),
                 Series::new(
                     "fuelEffectRatioGPA".into(),
-                    rows.iter().map(|r| r.fuel_effect_ratio_gpa).collect::<Vec<f64>>(),
+                    rows.iter()
+                        .map(|r| r.fuel_effect_ratio_gpa)
+                        .collect::<Vec<f64>>(),
                 )
                 .into(),
             ],
@@ -972,21 +997,15 @@ impl TableRow for GeneralFuelRatioOutputRow {
             .map(|i| {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
                 Ok(GeneralFuelRatioOutputRow {
-                    fuel_type_id: fuel_type_id_col
-                        .get(i)
-                        .ok_or_else(|| null("fuelTypeID"))?,
+                    fuel_type_id: fuel_type_id_col.get(i).ok_or_else(|| null("fuelTypeID"))?,
                     fuel_formulation_id: fuel_formulation_id_col
                         .get(i)
                         .ok_or_else(|| null("fuelFormulationID"))?,
                     pol_process_id: pol_process_id_col
                         .get(i)
                         .ok_or_else(|| null("polProcessID"))?,
-                    pollutant_id: pollutant_id_col
-                        .get(i)
-                        .ok_or_else(|| null("pollutantID"))?,
-                    process_id: process_id_col
-                        .get(i)
-                        .ok_or_else(|| null("processID"))?,
+                    pollutant_id: pollutant_id_col.get(i).ok_or_else(|| null("pollutantID"))?,
+                    process_id: process_id_col.get(i).ok_or_else(|| null("processID"))?,
                     min_model_year_id: min_model_year_id_col
                         .get(i)
                         .ok_or_else(|| null("minModelYearID"))?,
@@ -1141,11 +1160,8 @@ mod tests {
         let mut ctx = CalculatorContext::with_position_and_tables(position, store);
         generator.execute(&mut ctx).unwrap();
 
-        let out: Vec<GeneralFuelRatioOutputRow> = ctx
-            .scratch()
-            .store
-            .iter_typed("generalFuelRatio")
-            .unwrap();
+        let out: Vec<GeneralFuelRatioOutputRow> =
+            ctx.scratch().store.iter_typed("generalFuelRatio").unwrap();
         assert_eq!(out.len(), 1, "expected one generalFuelRatio row");
         let row = &out[0];
         assert_eq!(row.fuel_type_id, 1);
@@ -1208,10 +1224,7 @@ mod tests {
             .unwrap(),
         );
         // No FuelSupply rows.
-        store.insert(
-            "FuelSupply",
-            FuelSupplyRow::into_dataframe(vec![]).unwrap(),
-        );
+        store.insert("FuelSupply", FuelSupplyRow::into_dataframe(vec![]).unwrap());
 
         let position = IterationPosition {
             iteration: 0,
@@ -1228,11 +1241,8 @@ mod tests {
         let mut ctx = CalculatorContext::with_position_and_tables(position, store);
         generator.execute(&mut ctx).unwrap();
 
-        let out: Vec<GeneralFuelRatioOutputRow> = ctx
-            .scratch()
-            .store
-            .iter_typed("generalFuelRatio")
-            .unwrap();
+        let out: Vec<GeneralFuelRatioOutputRow> =
+            ctx.scratch().store.iter_typed("generalFuelRatio").unwrap();
         assert!(out.is_empty(), "no supply → no output rows");
     }
 }

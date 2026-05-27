@@ -220,11 +220,18 @@ pub struct OmdgInputs<'a> {
 
 /// Build a [`Error::RowExtraction`] for a missing/bad cell.
 fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -> Error {
-    Error::RowExtraction { table: table.into(), row, column: column.into(), message: msg }
+    Error::RowExtraction {
+        table: table.into(),
+        row,
+        column: column.into(),
+        message: msg,
+    }
 }
 
 impl TableRow for DriveScheduleRow {
-    fn table_name() -> &'static str { "DriveSchedule" }
+    fn table_name() -> &'static str {
+        "DriveSchedule"
+    }
     fn polars_schema() -> Schema {
         Schema::from_iter([
             ("driveScheduleID".into(), DataType::Int32),
@@ -233,33 +240,55 @@ impl TableRow for DriveScheduleRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
-        DataFrame::new(n, vec![
-            Series::new("driveScheduleID".into(), rows.iter().map(|r| r.drive_schedule_id as i32).collect::<Vec<i32>>()).into(),
-            Series::new("averageSpeed".into(), rows.iter().map(|r| r.average_speed).collect::<Vec<f64>>()).into(),
-        ])
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "driveScheduleID".into(),
+                    rows.iter()
+                        .map(|r| r.drive_schedule_id as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "averageSpeed".into(),
+                    rows.iter().map(|r| r.average_speed).collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
     }
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "DriveSchedule";
-        let drive_schedule_id = df.column("driveScheduleID")
+        let drive_schedule_id = df
+            .column("driveScheduleID")
             .map_err(|e| row_err(t, 0, "driveScheduleID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "driveScheduleID", e.to_string()))?;
-        let average_speed = df.column("averageSpeed")
+        let average_speed = df
+            .column("averageSpeed")
             .map_err(|e| row_err(t, 0, "averageSpeed", e.to_string()))?
             .f64()
             .map_err(|e| row_err(t, 0, "averageSpeed", e.to_string()))?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(DriveScheduleRow {
-                drive_schedule_id: drive_schedule_id.get(i).ok_or_else(|| null("driveScheduleID"))? as i16,
-                average_speed: average_speed.get(i).ok_or_else(|| null("averageSpeed"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(DriveScheduleRow {
+                    drive_schedule_id: drive_schedule_id
+                        .get(i)
+                        .ok_or_else(|| null("driveScheduleID"))?
+                        as i16,
+                    average_speed: average_speed.get(i).ok_or_else(|| null("averageSpeed"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
 impl TableRow for DriveScheduleAssocRow {
-    fn table_name() -> &'static str { "DriveScheduleAssoc" }
+    fn table_name() -> &'static str {
+        "DriveScheduleAssoc"
+    }
     fn polars_schema() -> Schema {
         Schema::from_iter([
             ("sourceTypeID".into(), DataType::Int32),
@@ -270,45 +299,85 @@ impl TableRow for DriveScheduleAssocRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
-        DataFrame::new(n, vec![
-            Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id.0 as i32).collect::<Vec<i32>>()).into(),
-            Series::new("roadTypeID".into(), rows.iter().map(|r| r.road_type_id.0 as i32).collect::<Vec<i32>>()).into(),
-            Series::new("driveScheduleID".into(), rows.iter().map(|r| r.drive_schedule_id as i32).collect::<Vec<i32>>()).into(),
-            Series::new("isRamp".into(), rows.iter().map(|r| r.is_ramp).collect::<Vec<bool>>()).into(),
-        ])
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.source_type_id.0 as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "roadTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.road_type_id.0 as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "driveScheduleID".into(),
+                    rows.iter()
+                        .map(|r| r.drive_schedule_id as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "isRamp".into(),
+                    rows.iter().map(|r| r.is_ramp).collect::<Vec<bool>>(),
+                )
+                .into(),
+            ],
+        )
     }
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "DriveScheduleAssoc";
-        let source_type_id = df.column("sourceTypeID")
+        let source_type_id = df
+            .column("sourceTypeID")
             .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?;
-        let road_type_id = df.column("roadTypeID")
+        let road_type_id = df
+            .column("roadTypeID")
             .map_err(|e| row_err(t, 0, "roadTypeID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "roadTypeID", e.to_string()))?;
-        let drive_schedule_id = df.column("driveScheduleID")
+        let drive_schedule_id = df
+            .column("driveScheduleID")
             .map_err(|e| row_err(t, 0, "driveScheduleID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "driveScheduleID", e.to_string()))?;
-        let is_ramp = df.column("isRamp")
+        let is_ramp = df
+            .column("isRamp")
             .map_err(|e| row_err(t, 0, "isRamp", e.to_string()))?
             .bool()
             .map_err(|e| row_err(t, 0, "isRamp", e.to_string()))?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(DriveScheduleAssocRow {
-                source_type_id: SourceTypeId(source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))? as u16),
-                road_type_id: RoadTypeId(road_type_id.get(i).ok_or_else(|| null("roadTypeID"))? as u16),
-                drive_schedule_id: drive_schedule_id.get(i).ok_or_else(|| null("driveScheduleID"))? as i16,
-                is_ramp: is_ramp.get(i).ok_or_else(|| null("isRamp"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(DriveScheduleAssocRow {
+                    source_type_id: SourceTypeId(
+                        source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))? as u16,
+                    ),
+                    road_type_id: RoadTypeId(
+                        road_type_id.get(i).ok_or_else(|| null("roadTypeID"))? as u16,
+                    ),
+                    drive_schedule_id: drive_schedule_id
+                        .get(i)
+                        .ok_or_else(|| null("driveScheduleID"))?
+                        as i16,
+                    is_ramp: is_ramp.get(i).ok_or_else(|| null("isRamp"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
 impl TableRow for DriveScheduleSecondRow {
-    fn table_name() -> &'static str { "DriveScheduleSecond" }
+    fn table_name() -> &'static str {
+        "DriveScheduleSecond"
+    }
     fn polars_schema() -> Schema {
         Schema::from_iter([
             ("driveScheduleID".into(), DataType::Int32),
@@ -318,39 +387,66 @@ impl TableRow for DriveScheduleSecondRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
-        DataFrame::new(n, vec![
-            Series::new("driveScheduleID".into(), rows.iter().map(|r| r.drive_schedule_id as i32).collect::<Vec<i32>>()).into(),
-            Series::new("second".into(), rows.iter().map(|r| r.second as i32).collect::<Vec<i32>>()).into(),
-            Series::new("speed".into(), rows.iter().map(|r| r.speed).collect::<Vec<f64>>()).into(),
-        ])
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "driveScheduleID".into(),
+                    rows.iter()
+                        .map(|r| r.drive_schedule_id as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "second".into(),
+                    rows.iter().map(|r| r.second as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "speed".into(),
+                    rows.iter().map(|r| r.speed).collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
     }
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "DriveScheduleSecond";
-        let drive_schedule_id = df.column("driveScheduleID")
+        let drive_schedule_id = df
+            .column("driveScheduleID")
             .map_err(|e| row_err(t, 0, "driveScheduleID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "driveScheduleID", e.to_string()))?;
-        let second = df.column("second")
+        let second = df
+            .column("second")
             .map_err(|e| row_err(t, 0, "second", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "second", e.to_string()))?;
-        let speed = df.column("speed")
+        let speed = df
+            .column("speed")
             .map_err(|e| row_err(t, 0, "speed", e.to_string()))?
             .f64()
             .map_err(|e| row_err(t, 0, "speed", e.to_string()))?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(DriveScheduleSecondRow {
-                drive_schedule_id: drive_schedule_id.get(i).ok_or_else(|| null("driveScheduleID"))? as i16,
-                second: second.get(i).ok_or_else(|| null("second"))? as i16,
-                speed: speed.get(i).ok_or_else(|| null("speed"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(DriveScheduleSecondRow {
+                    drive_schedule_id: drive_schedule_id
+                        .get(i)
+                        .ok_or_else(|| null("driveScheduleID"))?
+                        as i16,
+                    second: second.get(i).ok_or_else(|| null("second"))? as i16,
+                    speed: speed.get(i).ok_or_else(|| null("speed"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
 impl TableRow for AvgSpeedBinRow {
-    fn table_name() -> &'static str { "AvgSpeedBin" }
+    fn table_name() -> &'static str {
+        "AvgSpeedBin"
+    }
     fn polars_schema() -> Schema {
         Schema::from_iter([
             ("avgSpeedBinID".into(), DataType::Int32),
@@ -359,33 +455,55 @@ impl TableRow for AvgSpeedBinRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
-        DataFrame::new(n, vec![
-            Series::new("avgSpeedBinID".into(), rows.iter().map(|r| r.avg_speed_bin_id as i32).collect::<Vec<i32>>()).into(),
-            Series::new("avgBinSpeed".into(), rows.iter().map(|r| r.avg_bin_speed).collect::<Vec<f64>>()).into(),
-        ])
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "avgSpeedBinID".into(),
+                    rows.iter()
+                        .map(|r| r.avg_speed_bin_id as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "avgBinSpeed".into(),
+                    rows.iter().map(|r| r.avg_bin_speed).collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
     }
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "AvgSpeedBin";
-        let avg_speed_bin_id = df.column("avgSpeedBinID")
+        let avg_speed_bin_id = df
+            .column("avgSpeedBinID")
             .map_err(|e| row_err(t, 0, "avgSpeedBinID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "avgSpeedBinID", e.to_string()))?;
-        let avg_bin_speed = df.column("avgBinSpeed")
+        let avg_bin_speed = df
+            .column("avgBinSpeed")
             .map_err(|e| row_err(t, 0, "avgBinSpeed", e.to_string()))?
             .f64()
             .map_err(|e| row_err(t, 0, "avgBinSpeed", e.to_string()))?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(AvgSpeedBinRow {
-                avg_speed_bin_id: avg_speed_bin_id.get(i).ok_or_else(|| null("avgSpeedBinID"))? as i16,
-                avg_bin_speed: avg_bin_speed.get(i).ok_or_else(|| null("avgBinSpeed"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(AvgSpeedBinRow {
+                    avg_speed_bin_id: avg_speed_bin_id
+                        .get(i)
+                        .ok_or_else(|| null("avgSpeedBinID"))?
+                        as i16,
+                    avg_bin_speed: avg_bin_speed.get(i).ok_or_else(|| null("avgBinSpeed"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
 impl TableRow for AvgSpeedDistributionRow {
-    fn table_name() -> &'static str { "AvgSpeedDistribution" }
+    fn table_name() -> &'static str {
+        "AvgSpeedDistribution"
+    }
     fn polars_schema() -> Schema {
         Schema::from_iter([
             ("sourceTypeID".into(), DataType::Int32),
@@ -397,51 +515,102 @@ impl TableRow for AvgSpeedDistributionRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
-        DataFrame::new(n, vec![
-            Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id.0 as i32).collect::<Vec<i32>>()).into(),
-            Series::new("roadTypeID".into(), rows.iter().map(|r| r.road_type_id.0 as i32).collect::<Vec<i32>>()).into(),
-            Series::new("hourDayID".into(), rows.iter().map(|r| r.hour_day_id as i32).collect::<Vec<i32>>()).into(),
-            Series::new("avgSpeedBinID".into(), rows.iter().map(|r| r.avg_speed_bin_id as i32).collect::<Vec<i32>>()).into(),
-            Series::new("avgSpeedFraction".into(), rows.iter().map(|r| r.avg_speed_fraction).collect::<Vec<f64>>()).into(),
-        ])
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.source_type_id.0 as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "roadTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.road_type_id.0 as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hourDayID".into(),
+                    rows.iter()
+                        .map(|r| r.hour_day_id as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "avgSpeedBinID".into(),
+                    rows.iter()
+                        .map(|r| r.avg_speed_bin_id as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "avgSpeedFraction".into(),
+                    rows.iter()
+                        .map(|r| r.avg_speed_fraction)
+                        .collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
     }
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "AvgSpeedDistribution";
-        let source_type_id = df.column("sourceTypeID")
+        let source_type_id = df
+            .column("sourceTypeID")
             .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?;
-        let road_type_id = df.column("roadTypeID")
+        let road_type_id = df
+            .column("roadTypeID")
             .map_err(|e| row_err(t, 0, "roadTypeID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "roadTypeID", e.to_string()))?;
-        let hour_day_id = df.column("hourDayID")
+        let hour_day_id = df
+            .column("hourDayID")
             .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?;
-        let avg_speed_bin_id = df.column("avgSpeedBinID")
+        let avg_speed_bin_id = df
+            .column("avgSpeedBinID")
             .map_err(|e| row_err(t, 0, "avgSpeedBinID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "avgSpeedBinID", e.to_string()))?;
-        let avg_speed_fraction = df.column("avgSpeedFraction")
+        let avg_speed_fraction = df
+            .column("avgSpeedFraction")
             .map_err(|e| row_err(t, 0, "avgSpeedFraction", e.to_string()))?
             .f64()
             .map_err(|e| row_err(t, 0, "avgSpeedFraction", e.to_string()))?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(AvgSpeedDistributionRow {
-                source_type_id: SourceTypeId(source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))? as u16),
-                road_type_id: RoadTypeId(road_type_id.get(i).ok_or_else(|| null("roadTypeID"))? as u16),
-                hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))? as i16,
-                avg_speed_bin_id: avg_speed_bin_id.get(i).ok_or_else(|| null("avgSpeedBinID"))? as i16,
-                avg_speed_fraction: avg_speed_fraction.get(i).ok_or_else(|| null("avgSpeedFraction"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(AvgSpeedDistributionRow {
+                    source_type_id: SourceTypeId(
+                        source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))? as u16,
+                    ),
+                    road_type_id: RoadTypeId(
+                        road_type_id.get(i).ok_or_else(|| null("roadTypeID"))? as u16,
+                    ),
+                    hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))? as i16,
+                    avg_speed_bin_id: avg_speed_bin_id
+                        .get(i)
+                        .ok_or_else(|| null("avgSpeedBinID"))?
+                        as i16,
+                    avg_speed_fraction: avg_speed_fraction
+                        .get(i)
+                        .ok_or_else(|| null("avgSpeedFraction"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
 impl TableRow for OperatingModeRow {
-    fn table_name() -> &'static str { "OperatingMode" }
+    fn table_name() -> &'static str {
+        "OperatingMode"
+    }
     fn polars_schema() -> Schema {
         Schema::from_iter([
             ("opModeID".into(), DataType::Int32),
@@ -453,51 +622,93 @@ impl TableRow for OperatingModeRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
-        DataFrame::new(n, vec![
-            Series::new("opModeID".into(), rows.iter().map(|r| r.op_mode_id as i32).collect::<Vec<i32>>()).into(),
-            Series::new("VSPLower".into(), rows.iter().map(|r| r.vsp_lower).collect::<Vec<Option<f64>>>()).into(),
-            Series::new("VSPUpper".into(), rows.iter().map(|r| r.vsp_upper).collect::<Vec<Option<f64>>>()).into(),
-            Series::new("speedLower".into(), rows.iter().map(|r| r.speed_lower).collect::<Vec<Option<f64>>>()).into(),
-            Series::new("speedUpper".into(), rows.iter().map(|r| r.speed_upper).collect::<Vec<Option<f64>>>()).into(),
-        ])
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "opModeID".into(),
+                    rows.iter()
+                        .map(|r| r.op_mode_id as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "VSPLower".into(),
+                    rows.iter()
+                        .map(|r| r.vsp_lower)
+                        .collect::<Vec<Option<f64>>>(),
+                )
+                .into(),
+                Series::new(
+                    "VSPUpper".into(),
+                    rows.iter()
+                        .map(|r| r.vsp_upper)
+                        .collect::<Vec<Option<f64>>>(),
+                )
+                .into(),
+                Series::new(
+                    "speedLower".into(),
+                    rows.iter()
+                        .map(|r| r.speed_lower)
+                        .collect::<Vec<Option<f64>>>(),
+                )
+                .into(),
+                Series::new(
+                    "speedUpper".into(),
+                    rows.iter()
+                        .map(|r| r.speed_upper)
+                        .collect::<Vec<Option<f64>>>(),
+                )
+                .into(),
+            ],
+        )
     }
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "OperatingMode";
-        let op_mode_id = df.column("opModeID")
+        let op_mode_id = df
+            .column("opModeID")
             .map_err(|e| row_err(t, 0, "opModeID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "opModeID", e.to_string()))?;
-        let vsp_lower = df.column("VSPLower")
+        let vsp_lower = df
+            .column("VSPLower")
             .map_err(|e| row_err(t, 0, "VSPLower", e.to_string()))?
             .f64()
             .map_err(|e| row_err(t, 0, "VSPLower", e.to_string()))?;
-        let vsp_upper = df.column("VSPUpper")
+        let vsp_upper = df
+            .column("VSPUpper")
             .map_err(|e| row_err(t, 0, "VSPUpper", e.to_string()))?
             .f64()
             .map_err(|e| row_err(t, 0, "VSPUpper", e.to_string()))?;
-        let speed_lower = df.column("speedLower")
+        let speed_lower = df
+            .column("speedLower")
             .map_err(|e| row_err(t, 0, "speedLower", e.to_string()))?
             .f64()
             .map_err(|e| row_err(t, 0, "speedLower", e.to_string()))?;
-        let speed_upper = df.column("speedUpper")
+        let speed_upper = df
+            .column("speedUpper")
             .map_err(|e| row_err(t, 0, "speedUpper", e.to_string()))?
             .f64()
             .map_err(|e| row_err(t, 0, "speedUpper", e.to_string()))?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(OperatingModeRow {
-                op_mode_id: op_mode_id.get(i).ok_or_else(|| null("opModeID"))? as i16,
-                vsp_lower: vsp_lower.get(i),
-                vsp_upper: vsp_upper.get(i),
-                speed_lower: speed_lower.get(i),
-                speed_upper: speed_upper.get(i),
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(OperatingModeRow {
+                    op_mode_id: op_mode_id.get(i).ok_or_else(|| null("opModeID"))? as i16,
+                    vsp_lower: vsp_lower.get(i),
+                    vsp_upper: vsp_upper.get(i),
+                    speed_lower: speed_lower.get(i),
+                    speed_upper: speed_upper.get(i),
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
 impl TableRow for OpModePolProcAssocRow {
-    fn table_name() -> &'static str { "OpModePolProcAssoc" }
+    fn table_name() -> &'static str {
+        "OpModePolProcAssoc"
+    }
     fn polars_schema() -> Schema {
         Schema::from_iter([
             ("polProcessID".into(), DataType::Int32),
@@ -506,33 +717,56 @@ impl TableRow for OpModePolProcAssocRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
-        DataFrame::new(n, vec![
-            Series::new("polProcessID".into(), rows.iter().map(|r| r.pol_process_id.0 as i32).collect::<Vec<i32>>()).into(),
-            Series::new("opModeID".into(), rows.iter().map(|r| r.op_mode_id as i32).collect::<Vec<i32>>()).into(),
-        ])
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "polProcessID".into(),
+                    rows.iter()
+                        .map(|r| r.pol_process_id.0 as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "opModeID".into(),
+                    rows.iter()
+                        .map(|r| r.op_mode_id as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+            ],
+        )
     }
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "OpModePolProcAssoc";
-        let pol_process_id = df.column("polProcessID")
+        let pol_process_id = df
+            .column("polProcessID")
             .map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?;
-        let op_mode_id = df.column("opModeID")
+        let op_mode_id = df
+            .column("opModeID")
             .map_err(|e| row_err(t, 0, "opModeID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "opModeID", e.to_string()))?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(OpModePolProcAssocRow {
-                pol_process_id: PolProcessId(pol_process_id.get(i).ok_or_else(|| null("polProcessID"))? as u32),
-                op_mode_id: op_mode_id.get(i).ok_or_else(|| null("opModeID"))? as i16,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(OpModePolProcAssocRow {
+                    pol_process_id: PolProcessId(
+                        pol_process_id.get(i).ok_or_else(|| null("polProcessID"))? as u32,
+                    ),
+                    op_mode_id: op_mode_id.get(i).ok_or_else(|| null("opModeID"))? as i16,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
 impl TableRow for PhysicsMappingRow {
-    fn table_name() -> &'static str { "sourceUseTypePhysicsMapping" }
+    fn table_name() -> &'static str {
+        "sourceUseTypePhysicsMapping"
+    }
     fn polars_schema() -> Schema {
         Schema::from_iter([
             ("realSourceTypeID".into(), DataType::Int32),
@@ -546,63 +780,125 @@ impl TableRow for PhysicsMappingRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
-        DataFrame::new(n, vec![
-            Series::new("realSourceTypeID".into(), rows.iter().map(|r| r.real_source_type_id.0 as i32).collect::<Vec<i32>>()).into(),
-            Series::new("tempSourceTypeID".into(), rows.iter().map(|r| r.temp_source_type_id.0 as i32).collect::<Vec<i32>>()).into(),
-            Series::new("rollingTermA".into(), rows.iter().map(|r| r.rolling_term_a).collect::<Vec<f64>>()).into(),
-            Series::new("rotatingTermB".into(), rows.iter().map(|r| r.rotating_term_b).collect::<Vec<f64>>()).into(),
-            Series::new("dragTermC".into(), rows.iter().map(|r| r.drag_term_c).collect::<Vec<f64>>()).into(),
-            Series::new("sourceMass".into(), rows.iter().map(|r| r.source_mass).collect::<Vec<f64>>()).into(),
-            Series::new("fixedMassFactor".into(), rows.iter().map(|r| r.fixed_mass_factor).collect::<Vec<f64>>()).into(),
-        ])
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "realSourceTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.real_source_type_id.0 as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "tempSourceTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.temp_source_type_id.0 as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "rollingTermA".into(),
+                    rows.iter().map(|r| r.rolling_term_a).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "rotatingTermB".into(),
+                    rows.iter().map(|r| r.rotating_term_b).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "dragTermC".into(),
+                    rows.iter().map(|r| r.drag_term_c).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceMass".into(),
+                    rows.iter().map(|r| r.source_mass).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "fixedMassFactor".into(),
+                    rows.iter()
+                        .map(|r| r.fixed_mass_factor)
+                        .collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
     }
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "sourceUseTypePhysicsMapping";
-        let real_source_type_id = df.column("realSourceTypeID")
+        let real_source_type_id = df
+            .column("realSourceTypeID")
             .map_err(|e| row_err(t, 0, "realSourceTypeID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "realSourceTypeID", e.to_string()))?;
-        let temp_source_type_id = df.column("tempSourceTypeID")
+        let temp_source_type_id = df
+            .column("tempSourceTypeID")
             .map_err(|e| row_err(t, 0, "tempSourceTypeID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "tempSourceTypeID", e.to_string()))?;
-        let rolling_term_a = df.column("rollingTermA")
+        let rolling_term_a = df
+            .column("rollingTermA")
             .map_err(|e| row_err(t, 0, "rollingTermA", e.to_string()))?
             .f64()
             .map_err(|e| row_err(t, 0, "rollingTermA", e.to_string()))?;
-        let rotating_term_b = df.column("rotatingTermB")
+        let rotating_term_b = df
+            .column("rotatingTermB")
             .map_err(|e| row_err(t, 0, "rotatingTermB", e.to_string()))?
             .f64()
             .map_err(|e| row_err(t, 0, "rotatingTermB", e.to_string()))?;
-        let drag_term_c = df.column("dragTermC")
+        let drag_term_c = df
+            .column("dragTermC")
             .map_err(|e| row_err(t, 0, "dragTermC", e.to_string()))?
             .f64()
             .map_err(|e| row_err(t, 0, "dragTermC", e.to_string()))?;
-        let source_mass = df.column("sourceMass")
+        let source_mass = df
+            .column("sourceMass")
             .map_err(|e| row_err(t, 0, "sourceMass", e.to_string()))?
             .f64()
             .map_err(|e| row_err(t, 0, "sourceMass", e.to_string()))?;
-        let fixed_mass_factor = df.column("fixedMassFactor")
+        let fixed_mass_factor = df
+            .column("fixedMassFactor")
             .map_err(|e| row_err(t, 0, "fixedMassFactor", e.to_string()))?
             .f64()
             .map_err(|e| row_err(t, 0, "fixedMassFactor", e.to_string()))?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(PhysicsMappingRow {
-                real_source_type_id: SourceTypeId(real_source_type_id.get(i).ok_or_else(|| null("realSourceTypeID"))? as u16),
-                temp_source_type_id: SourceTypeId(temp_source_type_id.get(i).ok_or_else(|| null("tempSourceTypeID"))? as u16),
-                rolling_term_a: rolling_term_a.get(i).ok_or_else(|| null("rollingTermA"))?,
-                rotating_term_b: rotating_term_b.get(i).ok_or_else(|| null("rotatingTermB"))?,
-                drag_term_c: drag_term_c.get(i).ok_or_else(|| null("dragTermC"))?,
-                source_mass: source_mass.get(i).ok_or_else(|| null("sourceMass"))?,
-                fixed_mass_factor: fixed_mass_factor.get(i).ok_or_else(|| null("fixedMassFactor"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(PhysicsMappingRow {
+                    real_source_type_id: SourceTypeId(
+                        real_source_type_id
+                            .get(i)
+                            .ok_or_else(|| null("realSourceTypeID"))?
+                            as u16,
+                    ),
+                    temp_source_type_id: SourceTypeId(
+                        temp_source_type_id
+                            .get(i)
+                            .ok_or_else(|| null("tempSourceTypeID"))?
+                            as u16,
+                    ),
+                    rolling_term_a: rolling_term_a.get(i).ok_or_else(|| null("rollingTermA"))?,
+                    rotating_term_b: rotating_term_b
+                        .get(i)
+                        .ok_or_else(|| null("rotatingTermB"))?,
+                    drag_term_c: drag_term_c.get(i).ok_or_else(|| null("dragTermC"))?,
+                    source_mass: source_mass.get(i).ok_or_else(|| null("sourceMass"))?,
+                    fixed_mass_factor: fixed_mass_factor
+                        .get(i)
+                        .ok_or_else(|| null("fixedMassFactor"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
 impl TableRow for PolProcessRepresentedRow {
-    fn table_name() -> &'static str { "OMDGPolProcessRepresented" }
+    fn table_name() -> &'static str {
+        "OMDGPolProcessRepresented"
+    }
     fn polars_schema() -> Schema {
         Schema::from_iter([
             ("polProcessID".into(), DataType::Int32),
@@ -611,27 +907,53 @@ impl TableRow for PolProcessRepresentedRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
-        DataFrame::new(n, vec![
-            Series::new("polProcessID".into(), rows.iter().map(|r| r.pol_process_id.0 as i32).collect::<Vec<i32>>()).into(),
-            Series::new("representingPolProcessID".into(), rows.iter().map(|r| r.representing_pol_process_id.0 as i32).collect::<Vec<i32>>()).into(),
-        ])
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "polProcessID".into(),
+                    rows.iter()
+                        .map(|r| r.pol_process_id.0 as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "representingPolProcessID".into(),
+                    rows.iter()
+                        .map(|r| r.representing_pol_process_id.0 as i32)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+            ],
+        )
     }
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "OMDGPolProcessRepresented";
-        let pol_process_id = df.column("polProcessID")
+        let pol_process_id = df
+            .column("polProcessID")
             .map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?;
-        let representing_pol_process_id = df.column("representingPolProcessID")
+        let representing_pol_process_id = df
+            .column("representingPolProcessID")
             .map_err(|e| row_err(t, 0, "representingPolProcessID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "representingPolProcessID", e.to_string()))?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(PolProcessRepresentedRow {
-                pol_process_id: PolProcessId(pol_process_id.get(i).ok_or_else(|| null("polProcessID"))? as u32),
-                representing_pol_process_id: PolProcessId(representing_pol_process_id.get(i).ok_or_else(|| null("representingPolProcessID"))? as u32),
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(PolProcessRepresentedRow {
+                    pol_process_id: PolProcessId(
+                        pol_process_id.get(i).ok_or_else(|| null("polProcessID"))? as u32,
+                    ),
+                    representing_pol_process_id: PolProcessId(
+                        representing_pol_process_id
+                            .get(i)
+                            .ok_or_else(|| null("representingPolProcessID"))?
+                            as u32,
+                    ),
+                })
             })
-        }).collect()
+            .collect()
     }
 }

@@ -187,7 +187,10 @@ fn avft_csv_round_trip() {
     for rec in t.to_vec() {
         let key = rec.key();
         let original = t.get(&key).expect("key must exist in original");
-        let recovered = back.table.get(&key).expect("key must exist after round-trip");
+        let recovered = back
+            .table
+            .get(&key)
+            .expect("key must exist after round-trip");
         assert!(
             (recovered - original).abs() < 1e-14,
             "fraction diverged at key ({},{},{},{}): expected {original}, got {recovered}",

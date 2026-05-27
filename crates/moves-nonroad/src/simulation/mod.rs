@@ -75,8 +75,8 @@ pub use executor::{
     ProductionExecutor, RecordedDispatch,
 };
 pub use inputs::{
-    ActivityTableEntry, EvapTechEntry, ExhaustTechEntry, GrowthXrefEntry,
-    NationalAllocationEntry, NonroadInputs, ReferenceData, SccGroup,
+    ActivityTableEntry, EvapTechEntry, ExhaustTechEntry, GrowthXrefEntry, NationalAllocationEntry,
+    NonroadInputs, ReferenceData, SccGroup,
 };
 pub use options::{NonroadOptions, MAX_YEAR, MIN_YEAR};
 pub use outputs::{EmissionChannel, NonroadOutputs, RunCounters, SimEmissionRow};

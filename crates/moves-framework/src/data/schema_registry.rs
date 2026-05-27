@@ -828,9 +828,7 @@ mod tests {
                         year_id: year.get(i).ok_or_else(|| null("yearID"))?,
                         age_id: age.get(i).ok_or_else(|| null("ageID"))?,
                         link_id: link.get(i).ok_or_else(|| null("linkID"))?,
-                        source_type_id: src_type
-                            .get(i)
-                            .ok_or_else(|| null("sourceTypeID"))?,
+                        source_type_id: src_type.get(i).ok_or_else(|| null("sourceTypeID"))?,
                         distance: dist.get(i).ok_or_else(|| null("distance"))?,
                     })
                 })
@@ -902,9 +900,7 @@ mod tests {
         store
             .insert_typed(rows.clone())
             .expect("insert_typed should succeed");
-        let recovered: Vec<ShoRow> = store
-            .iter_typed("SHO")
-            .expect("iter_typed should succeed");
+        let recovered: Vec<ShoRow> = store.iter_typed("SHO").expect("iter_typed should succeed");
 
         assert_eq!(recovered, rows);
     }

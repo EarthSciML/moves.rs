@@ -199,9 +199,11 @@ fn rop_and_onroad_retrofit_compound_multiplicatively() {
     // model year 2010.  Two independent strategies affect this combination.
 
     // ROP reduces NOx by 25% → scale factor = 0.75.
-    let rop_table: RopTable = [moves_rate_of_progress::RopRecord::new(3, 11, 10, 2010, 0.25)]
-        .into_iter()
-        .collect();
+    let rop_table: RopTable = [moves_rate_of_progress::RopRecord::new(
+        3, 11, 10, 2010, 0.25,
+    )]
+    .into_iter()
+    .collect();
     let rop_scale = rop_table.scale_factor(&RopKey {
         pollutant_id: 3,
         source_type_id: 11,
@@ -224,7 +226,10 @@ fn rop_and_onroad_retrofit_compound_multiplicatively() {
     .into_iter()
     .collect();
     let retrofit_factor = retrofit_programs.combined_factor(11, 2010, 3, 1, 2025);
-    assert!((retrofit_factor - 0.60).abs() < 1e-12, "Retrofit factor = 0.60");
+    assert!(
+        (retrofit_factor - 0.60).abs() < 1e-12,
+        "Retrofit factor = 0.60"
+    );
 
     // Combined (Java order: ROP first, then OnRoadRetrofit).
     // base_rate × 0.75 × 0.60 = base_rate × 0.45

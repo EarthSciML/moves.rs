@@ -31,8 +31,8 @@
 
 mod calculator_validation;
 
-use moves_snapshot::{ColumnKind, TableBuilder, Value};
 use moves_snapshot::table::Table;
+use moves_snapshot::{ColumnKind, TableBuilder, Value};
 
 use calculator_validation::coverage::CoverageMatrix;
 use calculator_validation::{calculators, compare, fixtures, snapshots_root, SNAPSHOTS_DIR_ENV};
@@ -49,7 +49,9 @@ fn make_table(name: &str, rows: &[(i64, f64)]) -> Table {
     .with_natural_key(["id"])
     .unwrap();
     for &(id, value) in rows {
-        builder.push_row([Value::Int64(id), Value::Float64(value)]).unwrap();
+        builder
+            .push_row([Value::Int64(id), Value::Float64(value)])
+            .unwrap();
     }
     builder.build().unwrap()
 }
@@ -58,7 +60,11 @@ fn make_table(name: &str, rows: &[(i64, f64)]) -> Table {
 fn all_26_onroad_fixtures_present_and_parse() {
     let loaded = fixtures::load_all_fixtures()
         .unwrap_or_else(|e| panic!("the 26 onroad fixtures must load: {e}"));
-    assert_eq!(loaded.len(), 26, "expected 26 onroad fixtures (23 hot-path + 3 Task 74)");
+    assert_eq!(
+        loaded.len(),
+        26,
+        "expected 26 onroad fixtures (23 hot-path + 3 Task 74)"
+    );
 
     for fixture in &loaded {
         assert!(
@@ -102,8 +108,7 @@ fn all_38_calculators_registered() {
 
 #[test]
 fn coverage_matrix_reaches_every_fixture() {
-    let loaded_fixtures =
-        fixtures::load_all_fixtures().expect("the 26 onroad fixtures must load");
+    let loaded_fixtures = fixtures::load_all_fixtures().expect("the 26 onroad fixtures must load");
     let calcs = calculators::all_calculators();
     let matrix = CoverageMatrix::build(&loaded_fixtures, &calcs);
 
@@ -129,8 +134,7 @@ fn coverage_matrix_every_calculator_covered() {
     // exception; the Java original also produced no output.
     const KNOWN_UNCOVERED: &[&str] = &["DummyCalculator"];
 
-    let loaded_fixtures =
-        fixtures::load_all_fixtures().expect("the 26 onroad fixtures must load");
+    let loaded_fixtures = fixtures::load_all_fixtures().expect("the 26 onroad fixtures must load");
     let calcs = calculators::all_calculators();
     let matrix = CoverageMatrix::build(&loaded_fixtures, &calcs);
 
@@ -139,9 +143,10 @@ fn coverage_matrix_every_calculator_covered() {
         .iter()
         .enumerate()
         .filter(|&(ci, _)| {
-            !loaded_fixtures.iter().enumerate().any(|(fi, _)| {
-                matrix.cell(fi, ci).kind.is_exercised_or_chained()
-            })
+            !loaded_fixtures
+                .iter()
+                .enumerate()
+                .any(|(fi, _)| matrix.cell(fi, ci).kind.is_exercised_or_chained())
         })
         .map(|(_, name)| name.as_str())
         .collect();
@@ -168,8 +173,8 @@ fn diff_engine_detects_perturbed_value() {
     let perturbed = make_table("MOVESOutput", &[(1, 10.0), (2, 99.9)]);
 
     let opts = compare::tolerance_options().expect("tolerance.toml must parse");
-    let diff = compare::compare_table(&perturbed, &canonical, &opts)
-        .expect("compare_table must not fail");
+    let diff =
+        compare::compare_table(&perturbed, &canonical, &opts).expect("compare_table must not fail");
 
     assert_eq!(
         diff.summary().cells_changed,
@@ -184,8 +189,8 @@ fn diff_engine_passes_identical_tables() {
     let produced = make_table("MOVESOutput", &[(1, 10.0), (2, 20.0)]);
 
     let opts = compare::tolerance_options().expect("tolerance.toml must parse");
-    let diff = compare::compare_table(&produced, &canonical, &opts)
-        .expect("compare_table must not fail");
+    let diff =
+        compare::compare_table(&produced, &canonical, &opts).expect("compare_table must not fail");
 
     assert!(diff.is_empty(), "identical tables must produce no diff");
 }
@@ -203,8 +208,7 @@ fn tolerance_budget_parses() {
 #[test]
 fn canonical_snapshots_dormant_or_validate() {
     let snapshots = snapshots_root();
-    let loaded_fixtures =
-        fixtures::load_all_fixtures().expect("the 26 onroad fixtures must load");
+    let loaded_fixtures = fixtures::load_all_fixtures().expect("the 26 onroad fixtures must load");
 
     let mut dormant_count = 0usize;
     let mut validated_count = 0usize;
@@ -247,8 +251,7 @@ fn canonical_snapshots_dormant_or_validate() {
 #[test]
 fn harness_status() {
     let snapshots = snapshots_root();
-    let loaded_fixtures =
-        fixtures::load_all_fixtures().expect("the 26 onroad fixtures must load");
+    let loaded_fixtures = fixtures::load_all_fixtures().expect("the 26 onroad fixtures must load");
     let calcs = calculators::all_calculators();
     let matrix = CoverageMatrix::build(&loaded_fixtures, &calcs);
 
@@ -262,15 +265,19 @@ fn harness_status() {
         .iter()
         .enumerate()
         .filter(|&(ci, _)| {
-            !loaded_fixtures.iter().enumerate().any(|(fi, _)| {
-                matrix.cell(fi, ci).kind.is_exercised_or_chained()
-            })
+            !loaded_fixtures
+                .iter()
+                .enumerate()
+                .any(|(fi, _)| matrix.cell(fi, ci).kind.is_exercised_or_chained())
         })
         .count();
 
     println!();
     println!("=== Calculator integration-validation harness (Tasks 73+74) ===");
-    println!("  Fixtures    : {} (23 hot-path + 3 full-coverage)", loaded_fixtures.len());
+    println!(
+        "  Fixtures    : {} (23 hot-path + 3 full-coverage)",
+        loaded_fixtures.len()
+    );
     println!("  Calculators : {}", calcs.len());
     println!("  Uncovered   : {uncovered_count} (target: 0)");
     println!(
@@ -283,6 +290,8 @@ fn harness_status() {
     println!();
     println!("{}", matrix.render());
     println!("  Status: 38 calculators (37 with registrations + DummyCalculator no-op);");
-    println!("          canonical-capture diff dormant until Phase 0 compute-node run + data plane.");
+    println!(
+        "          canonical-capture diff dormant until Phase 0 compute-node run + data plane."
+    );
     println!("================================================================");
 }

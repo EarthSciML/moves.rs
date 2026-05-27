@@ -784,7 +784,9 @@ impl TableRow for FuelSupplyRow {
                 .into(),
                 Series::new(
                     "fuelFormulationID".into(),
-                    rows.iter().map(|r| r.fuel_formulation_id).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.fuel_formulation_id)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -829,18 +831,14 @@ impl TableRow for FuelSupplyRow {
                     fuel_region_id: fuel_region_id_col
                         .get(i)
                         .ok_or_else(|| null("fuelRegionID"))?,
-                    fuel_year_id: fuel_year_id_col
-                        .get(i)
-                        .ok_or_else(|| null("fuelYearID"))?,
+                    fuel_year_id: fuel_year_id_col.get(i).ok_or_else(|| null("fuelYearID"))?,
                     month_group_id: month_group_id_col
                         .get(i)
                         .ok_or_else(|| null("monthGroupID"))?,
                     fuel_formulation_id: fuel_formulation_id_col
                         .get(i)
                         .ok_or_else(|| null("fuelFormulationID"))?,
-                    market_share: market_share_col
-                        .get(i)
-                        .ok_or_else(|| null("marketShare"))?,
+                    market_share: market_share_col.get(i).ok_or_else(|| null("marketShare"))?,
                 })
             })
             .collect()
@@ -868,7 +866,9 @@ impl TableRow for FuelFormulationRow {
             vec![
                 Series::new(
                     "fuelFormulationID".into(),
-                    rows.iter().map(|r| r.fuel_formulation_id).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.fuel_formulation_id)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -978,9 +978,7 @@ impl TableRow for FuelSubtypeRow {
                     fuel_subtype_id: fuel_subtype_id_col
                         .get(i)
                         .ok_or_else(|| null("fuelSubtypeID"))?,
-                    fuel_type_id: fuel_type_id_col
-                        .get(i)
-                        .ok_or_else(|| null("fuelTypeID"))?,
+                    fuel_type_id: fuel_type_id_col.get(i).ok_or_else(|| null("fuelTypeID"))?,
                 })
             })
             .collect()
@@ -1035,9 +1033,7 @@ impl TableRow for FuelTypeRow {
             .map(|i| {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
                 Ok(FuelTypeRow {
-                    fuel_type_id: fuel_type_id_col
-                        .get(i)
-                        .ok_or_else(|| null("fuelTypeID"))?,
+                    fuel_type_id: fuel_type_id_col.get(i).ok_or_else(|| null("fuelTypeID"))?,
                     subject_to_evap_calculations: subject_col
                         .get(i)
                         .ok_or_else(|| null("subjectToEvapCalculations"))?,
@@ -1094,9 +1090,7 @@ impl TableRow for YearRow {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
                 Ok(YearRow {
                     year_id: year_id_col.get(i).ok_or_else(|| null("yearID"))?,
-                    fuel_year_id: fuel_year_id_col
-                        .get(i)
-                        .ok_or_else(|| null("fuelYearID"))?,
+                    fuel_year_id: fuel_year_id_col.get(i).ok_or_else(|| null("fuelYearID"))?,
                 })
             })
             .collect()
@@ -1272,9 +1266,7 @@ impl TableRow for ZoneMonthHourRow {
                 Ok(ZoneMonthHourRow {
                     zone_id: zone_id_col.get(i).ok_or_else(|| null("zoneID"))?,
                     month_id: month_id_col.get(i).ok_or_else(|| null("monthID"))?,
-                    temperature: temperature_col
-                        .get(i)
-                        .ok_or_else(|| null("temperature"))?,
+                    temperature: temperature_col.get(i).ok_or_else(|| null("temperature"))?,
                 })
             })
             .collect()
@@ -1354,9 +1346,7 @@ impl TableRow for RegionCountyRow {
                     region_code_id: region_code_id_col
                         .get(i)
                         .ok_or_else(|| null("regionCodeID"))?,
-                    fuel_year_id: fuel_year_id_col
-                        .get(i)
-                        .ok_or_else(|| null("fuelYearID"))?,
+                    fuel_year_id: fuel_year_id_col.get(i).ok_or_else(|| null("fuelYearID"))?,
                 })
             })
             .collect()
@@ -1678,9 +1668,11 @@ impl Generator for TankFuelGenerator {
 
     fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
         let pos = ctx.position();
-        let county_id = pos.location.county_id.ok_or_else(|| {
-            Error::Polars("no county_id in iteration position".into())
-        })? as i32;
+        let county_id = pos
+            .location
+            .county_id
+            .ok_or_else(|| Error::Polars("no county_id in iteration position".into()))?
+            as i32;
         let calendar_year = pos
             .time
             .year

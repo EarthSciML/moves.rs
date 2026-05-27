@@ -107,10 +107,7 @@ impl InternalControlStrategy for AvftControlStrategy {
         &["AVFT"]
     }
 
-    fn pre_run(
-        &self,
-        _ctx: &CalculatorContext,
-    ) -> std::result::Result<(), moves_framework::Error> {
+    fn pre_run(&self, _ctx: &CalculatorContext) -> std::result::Result<(), moves_framework::Error> {
         // TODO(Task 50 / DataFrameStore): write `self.completed` into the
         // execution database as the `AVFT` table once `ExecutionTables`
         // exposes a mutable write API. The `modified_tables` declaration
@@ -182,10 +179,7 @@ mod tests {
     #[test]
     fn from_tool_inputs_produces_complete_table() {
         // Single source type, single model year, defaults fully cover the gap.
-        let default_t = small_table(&[
-            (11, 2020, 1, 1, 0.8),
-            (11, 2020, 2, 1, 0.2),
-        ]);
+        let default_t = small_table(&[(11, 2020, 1, 1, 0.8), (11, 2020, 2, 1, 0.2)]);
         let user_t = small_table(&[]);
         let known = AvftTable::new();
         let spec = minimal_spec(11);
@@ -194,7 +188,10 @@ mod tests {
             .expect("tool must succeed with valid inputs");
 
         let rows = strategy.completed_table().to_vec();
-        assert!(!rows.is_empty(), "completed table must have rows for source type 11");
+        assert!(
+            !rows.is_empty(),
+            "completed table must have rows for source type 11"
+        );
         assert_eq!(rows[0].source_type_id, 11);
     }
 

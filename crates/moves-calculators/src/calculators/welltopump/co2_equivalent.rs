@@ -149,7 +149,9 @@ pub struct PollutantGwpRow {
 }
 
 impl TableRow for PollutantGwpRow {
-    fn table_name() -> &'static str { "Pollutant" }
+    fn table_name() -> &'static str {
+        "Pollutant"
+    }
     fn polars_schema() -> Schema {
         Schema::from_iter([
             ("pollutantID".into(), DataType::Int32),
@@ -158,25 +160,45 @@ impl TableRow for PollutantGwpRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
-        DataFrame::new(n, vec![
-            Series::new("pollutantID".into(), rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>()).into(),
-            Series::new("globalWarmingPotential".into(), rows.iter().map(|r| r.global_warming_potential).collect::<Vec<i32>>()).into(),
-        ])
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "pollutantID".into(),
+                    rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "globalWarmingPotential".into(),
+                    rows.iter()
+                        .map(|r| r.global_warming_potential)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+            ],
+        )
     }
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "Pollutant";
         let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let po = get_i32("pollutantID")?;
         let gw = get_i32("globalWarmingPotential")?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(PollutantGwpRow {
-                pollutant_id: po.get(i).ok_or_else(|| null("pollutantID"))?,
-                global_warming_potential: gw.get(i).ok_or_else(|| null("globalWarmingPotential"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(PollutantGwpRow {
+                    pollutant_id: po.get(i).ok_or_else(|| null("pollutantID"))?,
+                    global_warming_potential: gw
+                        .get(i)
+                        .ok_or_else(|| null("globalWarmingPotential"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -562,10 +584,18 @@ mod tests {
         use moves_framework::{DataFrameStore, InMemoryStore, TableRow};
         let inputs = minimal_inputs();
         let mut store = InMemoryStore::new();
-        store.insert("MOVESWorkerOutput", WorkerOutputRow::into_dataframe(inputs.worker_output).unwrap());
-        store.insert("Pollutant", PollutantGwpRow::into_dataframe(inputs.pollutant_gwp).unwrap());
+        store.insert(
+            "MOVESWorkerOutput",
+            WorkerOutputRow::into_dataframe(inputs.worker_output).unwrap(),
+        );
+        store.insert(
+            "Pollutant",
+            PollutantGwpRow::into_dataframe(inputs.pollutant_gwp).unwrap(),
+        );
         let ctx = CalculatorContext::with_tables(store);
-        let out = Co2EquivalentWtpCalculator.execute(&ctx).expect("execute ok");
+        let out = Co2EquivalentWtpCalculator
+            .execute(&ctx)
+            .expect("execute ok");
         let df = out.dataframe().expect("output should contain a DataFrame");
         assert!(df.height() > 0, "minimal inputs produce at least one row");
     }

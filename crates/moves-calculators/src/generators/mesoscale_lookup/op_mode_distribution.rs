@@ -689,17 +689,23 @@ impl TableRow for DriveScheduleAssoc {
             vec![
                 Series::new(
                     "sourceTypeID".into(),
-                    rows.iter().map(|r| r.source_type_id.0 as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.source_type_id.0 as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
                     "roadTypeID".into(),
-                    rows.iter().map(|r| r.road_type_id.0 as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.road_type_id.0 as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
                     "driveScheduleID".into(),
-                    rows.iter().map(|r| r.drive_schedule_id as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.drive_schedule_id as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
             ],
@@ -727,14 +733,17 @@ impl TableRow for DriveScheduleAssoc {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
                 Ok(DriveScheduleAssoc {
                     source_type_id: SourceTypeId(
-                        source_type_id_col.get(i).ok_or_else(|| null("sourceTypeID"))? as u16,
+                        source_type_id_col
+                            .get(i)
+                            .ok_or_else(|| null("sourceTypeID"))? as u16,
                     ),
                     road_type_id: RoadTypeId(
                         road_type_id_col.get(i).ok_or_else(|| null("roadTypeID"))? as u16,
                     ),
                     drive_schedule_id: drive_schedule_id_col
                         .get(i)
-                        .ok_or_else(|| null("driveScheduleID"))? as i16,
+                        .ok_or_else(|| null("driveScheduleID"))?
+                        as i16,
                 })
             })
             .collect()
@@ -758,7 +767,9 @@ impl TableRow for DriveSchedule {
             vec![
                 Series::new(
                     "driveScheduleID".into(),
-                    rows.iter().map(|r| r.drive_schedule_id as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.drive_schedule_id as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -787,7 +798,8 @@ impl TableRow for DriveSchedule {
                 Ok(DriveSchedule {
                     drive_schedule_id: drive_schedule_id_col
                         .get(i)
-                        .ok_or_else(|| null("driveScheduleID"))? as i16,
+                        .ok_or_else(|| null("driveScheduleID"))?
+                        as i16,
                     average_speed: average_speed_col
                         .get(i)
                         .ok_or_else(|| null("averageSpeed"))?,
@@ -814,7 +826,9 @@ impl TableRow for AvgSpeedBin {
             vec![
                 Series::new(
                     "avgSpeedBinID".into(),
-                    rows.iter().map(|r| r.avg_speed_bin_id as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.avg_speed_bin_id as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -843,7 +857,8 @@ impl TableRow for AvgSpeedBin {
                 Ok(AvgSpeedBin {
                     avg_speed_bin_id: avg_speed_bin_id_col
                         .get(i)
-                        .ok_or_else(|| null("avgSpeedBinID"))? as i16,
+                        .ok_or_else(|| null("avgSpeedBinID"))?
+                        as i16,
                     avg_bin_speed: avg_bin_speed_col
                         .get(i)
                         .ok_or_else(|| null("avgBinSpeed"))?,
@@ -871,7 +886,9 @@ impl TableRow for DriveScheduleSecond {
             vec![
                 Series::new(
                     "driveScheduleID".into(),
-                    rows.iter().map(|r| r.drive_schedule_id as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.drive_schedule_id as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -910,7 +927,8 @@ impl TableRow for DriveScheduleSecond {
                 Ok(DriveScheduleSecond {
                     drive_schedule_id: drive_schedule_id_col
                         .get(i)
-                        .ok_or_else(|| null("driveScheduleID"))? as i16,
+                        .ok_or_else(|| null("driveScheduleID"))?
+                        as i16,
                     second: second_col.get(i).ok_or_else(|| null("second"))? as i16,
                     speed: speed_col.get(i).ok_or_else(|| null("speed"))?,
                 })
@@ -940,7 +958,9 @@ impl TableRow for SourceTypePhysics {
             vec![
                 Series::new(
                     "sourceTypeID".into(),
-                    rows.iter().map(|r| r.source_type_id.0 as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.source_type_id.0 as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -965,7 +985,9 @@ impl TableRow for SourceTypePhysics {
                 .into(),
                 Series::new(
                     "fixedMassFactor".into(),
-                    rows.iter().map(|r| r.fixed_mass_factor).collect::<Vec<f64>>(),
+                    rows.iter()
+                        .map(|r| r.fixed_mass_factor)
+                        .collect::<Vec<f64>>(),
                 )
                 .into(),
             ],
@@ -1008,7 +1030,9 @@ impl TableRow for SourceTypePhysics {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
                 Ok(SourceTypePhysics {
                     source_type_id: SourceTypeId(
-                        source_type_id_col.get(i).ok_or_else(|| null("sourceTypeID"))? as u16,
+                        source_type_id_col
+                            .get(i)
+                            .ok_or_else(|| null("sourceTypeID"))? as u16,
                     ),
                     rolling_term_a: rolling_term_a_col
                         .get(i)
@@ -1047,27 +1071,37 @@ impl TableRow for OperatingModeBin {
             vec![
                 Series::new(
                     "opModeID".into(),
-                    rows.iter().map(|r| r.op_mode_id as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.op_mode_id as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
                     "VSPLower".into(),
-                    rows.iter().map(|r| r.vsp_lower).collect::<Vec<Option<f64>>>(),
+                    rows.iter()
+                        .map(|r| r.vsp_lower)
+                        .collect::<Vec<Option<f64>>>(),
                 )
                 .into(),
                 Series::new(
                     "VSPUpper".into(),
-                    rows.iter().map(|r| r.vsp_upper).collect::<Vec<Option<f64>>>(),
+                    rows.iter()
+                        .map(|r| r.vsp_upper)
+                        .collect::<Vec<Option<f64>>>(),
                 )
                 .into(),
                 Series::new(
                     "speedLower".into(),
-                    rows.iter().map(|r| r.speed_lower).collect::<Vec<Option<f64>>>(),
+                    rows.iter()
+                        .map(|r| r.speed_lower)
+                        .collect::<Vec<Option<f64>>>(),
                 )
                 .into(),
                 Series::new(
                     "speedUpper".into(),
-                    rows.iter().map(|r| r.speed_upper).collect::<Vec<Option<f64>>>(),
+                    rows.iter()
+                        .map(|r| r.speed_upper)
+                        .collect::<Vec<Option<f64>>>(),
                 )
                 .into(),
             ],
@@ -1133,12 +1167,16 @@ impl TableRow for OpModePolProcAssoc {
             vec![
                 Series::new(
                     "polProcessID".into(),
-                    rows.iter().map(|r| r.pol_process_id.0 as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.pol_process_id.0 as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
                     "opModeID".into(),
-                    rows.iter().map(|r| r.op_mode_id as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.op_mode_id as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
             ],
@@ -1161,7 +1199,9 @@ impl TableRow for OpModePolProcAssoc {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
                 Ok(OpModePolProcAssoc {
                     pol_process_id: PolProcessId(
-                        pol_process_id_col.get(i).ok_or_else(|| null("polProcessID"))? as u32,
+                        pol_process_id_col
+                            .get(i)
+                            .ok_or_else(|| null("polProcessID"))? as u32,
                     ),
                     op_mode_id: op_mode_id_col.get(i).ok_or_else(|| null("opModeID"))? as i16,
                 })
@@ -1189,7 +1229,9 @@ impl TableRow for RunSpecHourDayRow {
             n,
             vec![Series::new(
                 "hourDayID".into(),
-                rows.iter().map(|r| r.hour_day_id as i32).collect::<Vec<i32>>(),
+                rows.iter()
+                    .map(|r| r.hour_day_id as i32)
+                    .collect::<Vec<i32>>(),
             )
             .into()],
         )
@@ -1205,9 +1247,7 @@ impl TableRow for RunSpecHourDayRow {
             .map(|i| {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
                 Ok(RunSpecHourDayRow {
-                    hour_day_id: hour_day_id_col
-                        .get(i)
-                        .ok_or_else(|| null("hourDayID"))? as i16,
+                    hour_day_id: hour_day_id_col.get(i).ok_or_else(|| null("hourDayID"))? as i16,
                 })
             })
             .collect()
@@ -1236,37 +1276,51 @@ impl TableRow for OpModeDistributionRow {
             vec![
                 Series::new(
                     "sourceTypeID".into(),
-                    rows.iter().map(|r| r.source_type_id.0 as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.source_type_id.0 as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
                     "roadTypeID".into(),
-                    rows.iter().map(|r| r.road_type_id.0 as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.road_type_id.0 as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
                     "avgSpeedBinID".into(),
-                    rows.iter().map(|r| r.avg_speed_bin_id as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.avg_speed_bin_id as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
                     "hourDayID".into(),
-                    rows.iter().map(|r| r.hour_day_id as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.hour_day_id as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
                     "opModeID".into(),
-                    rows.iter().map(|r| r.op_mode_id as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.op_mode_id as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
                     "polProcessID".into(),
-                    rows.iter().map(|r| r.pol_process_id.0 as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.pol_process_id.0 as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
                     "opModeFraction".into(),
-                    rows.iter().map(|r| r.op_mode_fraction).collect::<Vec<f64>>(),
+                    rows.iter()
+                        .map(|r| r.op_mode_fraction)
+                        .collect::<Vec<f64>>(),
                 )
                 .into(),
             ],
@@ -1314,18 +1368,23 @@ impl TableRow for OpModeDistributionRow {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
                 Ok(OpModeDistributionRow {
                     source_type_id: SourceTypeId(
-                        source_type_id_col.get(i).ok_or_else(|| null("sourceTypeID"))? as u16,
+                        source_type_id_col
+                            .get(i)
+                            .ok_or_else(|| null("sourceTypeID"))? as u16,
                     ),
                     road_type_id: RoadTypeId(
                         road_type_id_col.get(i).ok_or_else(|| null("roadTypeID"))? as u16,
                     ),
                     avg_speed_bin_id: avg_speed_bin_id_col
                         .get(i)
-                        .ok_or_else(|| null("avgSpeedBinID"))? as i16,
+                        .ok_or_else(|| null("avgSpeedBinID"))?
+                        as i16,
                     hour_day_id: hour_day_id_col.get(i).ok_or_else(|| null("hourDayID"))? as i16,
                     op_mode_id: op_mode_id_col.get(i).ok_or_else(|| null("opModeID"))? as i16,
                     pol_process_id: PolProcessId(
-                        pol_process_id_col.get(i).ok_or_else(|| null("polProcessID"))? as u32,
+                        pol_process_id_col
+                            .get(i)
+                            .ok_or_else(|| null("polProcessID"))? as u32,
                     ),
                     op_mode_fraction: op_mode_fraction_col
                         .get(i)
@@ -1856,8 +1915,7 @@ mod tests {
             }])
             .unwrap(),
         );
-        let mut secs: Vec<DriveScheduleSecond> =
-            schedule_seconds(1, &[10.0, 10.0, 10.0, 10.0]);
+        let mut secs: Vec<DriveScheduleSecond> = schedule_seconds(1, &[10.0, 10.0, 10.0, 10.0]);
         secs.extend(schedule_seconds(2, &[30.0, 30.0, 30.0, 30.0]));
         store.insert(
             "driveScheduleSecond",
@@ -1888,8 +1946,7 @@ mod tests {
         );
         store.insert(
             "runSpecHourDay",
-            RunSpecHourDayRow::into_dataframe(vec![RunSpecHourDayRow { hour_day_id: 51 }])
-                .unwrap(),
+            RunSpecHourDayRow::into_dataframe(vec![RunSpecHourDayRow { hour_day_id: 51 }]).unwrap(),
         );
 
         let position = IterationPosition {
@@ -1910,7 +1967,11 @@ mod tests {
             .unwrap();
         // Both schedules spend 100% in op mode 23 → weighted fraction = 1.0.
         // One hour/day (51), so one output row.
-        assert_eq!(out.len(), 1, "expected one row per (sourceType, roadType, bin, hourDay, opMode, polProcess)");
+        assert_eq!(
+            out.len(),
+            1,
+            "expected one row per (sourceType, roadType, bin, hourDay, opMode, polProcess)"
+        );
         assert_eq!(out[0].source_type_id, SourceTypeId(21));
         assert_eq!(out[0].road_type_id, RoadTypeId(5));
         assert_eq!(out[0].avg_speed_bin_id, 20);

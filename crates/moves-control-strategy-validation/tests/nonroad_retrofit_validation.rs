@@ -127,9 +127,10 @@ fn post_run_succeeds() {
 
 #[test]
 fn strategy_is_trait_object_safe() {
-    let strategy: Box<dyn InternalControlStrategy> = Box::new(NonRoadRetrofitStrategy::new(vec![
-        make_record(1, "ALL", "ALL", 0.5, 0.6),
-    ]));
+    let strategy: Box<dyn InternalControlStrategy> =
+        Box::new(NonRoadRetrofitStrategy::new(vec![make_record(
+            1, "ALL", "ALL", 0.5, 0.6,
+        )]));
     assert_eq!(strategy.name(), "NonRoadRetrofitStrategy");
 }
 

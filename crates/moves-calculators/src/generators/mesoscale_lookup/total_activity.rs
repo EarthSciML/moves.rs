@@ -690,7 +690,8 @@ impl TableRow for SourceTypeYearRow {
                     year_id: year_id_col.get(i).ok_or_else(|| null("yearID"))? as i16,
                     source_type_id: source_type_id_col
                         .get(i)
-                        .ok_or_else(|| null("sourceTypeID"))? as i16,
+                        .ok_or_else(|| null("sourceTypeID"))?
+                        as i16,
                     source_type_population: source_type_population_col
                         .get(i)
                         .ok_or_else(|| null("sourceTypePopulation"))?,
@@ -776,12 +777,11 @@ impl TableRow for SourceTypeAgeDistributionRow {
                 Ok(SourceTypeAgeDistributionRow {
                     source_type_id: source_type_id_col
                         .get(i)
-                        .ok_or_else(|| null("sourceTypeID"))? as i16,
+                        .ok_or_else(|| null("sourceTypeID"))?
+                        as i16,
                     year_id: year_id_col.get(i).ok_or_else(|| null("yearID"))? as i16,
                     age_id: age_id_col.get(i).ok_or_else(|| null("ageID"))? as i16,
-                    age_fraction: age_fraction_col
-                        .get(i)
-                        .ok_or_else(|| null("ageFraction"))?,
+                    age_fraction: age_fraction_col.get(i).ok_or_else(|| null("ageFraction"))?,
                 })
             })
             .collect()
@@ -858,14 +858,13 @@ impl TableRow for SourceTypeAgeRow {
                 Ok(SourceTypeAgeRow {
                     source_type_id: source_type_id_col
                         .get(i)
-                        .ok_or_else(|| null("sourceTypeID"))? as i16,
+                        .ok_or_else(|| null("sourceTypeID"))?
+                        as i16,
                     age_id: age_id_col.get(i).ok_or_else(|| null("ageID"))? as i16,
                     survival_rate: survival_rate_col
                         .get(i)
                         .ok_or_else(|| null("survivalRate"))?,
-                    relative_mar: relative_mar_col
-                        .get(i)
-                        .ok_or_else(|| null("relativeMAR"))?,
+                    relative_mar: relative_mar_col.get(i).ok_or_else(|| null("relativeMAR"))?,
                 })
             })
             .collect()
@@ -922,10 +921,12 @@ impl TableRow for SourceUseTypeRow {
                 Ok(SourceUseTypeRow {
                     source_type_id: source_type_id_col
                         .get(i)
-                        .ok_or_else(|| null("sourceTypeID"))? as i16,
+                        .ok_or_else(|| null("sourceTypeID"))?
+                        as i16,
                     hpms_v_type_id: hpms_v_type_id_col
                         .get(i)
-                        .ok_or_else(|| null("HPMSVTypeID"))? as i16,
+                        .ok_or_else(|| null("HPMSVTypeID"))?
+                        as i16,
                 })
             })
             .collect()
@@ -1002,7 +1003,8 @@ impl TableRow for MonthVmtFractionRow {
                 Ok(MonthVmtFractionRow {
                     source_type_id: source_type_id_col
                         .get(i)
-                        .ok_or_else(|| null("sourceTypeID"))? as i16,
+                        .ok_or_else(|| null("sourceTypeID"))?
+                        as i16,
                     month_id: month_id_col.get(i).ok_or_else(|| null("monthID"))? as i16,
                     month_vmt_fraction: month_vmt_fraction_col
                         .get(i)
@@ -1107,11 +1109,10 @@ impl TableRow for DayVmtFractionRow {
                 Ok(DayVmtFractionRow {
                     source_type_id: source_type_id_col
                         .get(i)
-                        .ok_or_else(|| null("sourceTypeID"))? as i16,
+                        .ok_or_else(|| null("sourceTypeID"))?
+                        as i16,
                     month_id: month_id_col.get(i).ok_or_else(|| null("monthID"))? as i16,
-                    road_type_id: road_type_id_col
-                        .get(i)
-                        .ok_or_else(|| null("roadTypeID"))? as i16,
+                    road_type_id: road_type_id_col.get(i).ok_or_else(|| null("roadTypeID"))? as i16,
                     day_id: day_id_col.get(i).ok_or_else(|| null("dayID"))? as i16,
                     day_vmt_fraction: day_vmt_fraction_col
                         .get(i)
@@ -1170,9 +1171,7 @@ impl TableRow for HourVmtFractionRow {
                 .into(),
                 Series::new(
                     "hourID".into(),
-                    rows.iter()
-                        .map(|r| r.hour_id as i32)
-                        .collect::<Vec<i32>>(),
+                    rows.iter().map(|r| r.hour_id as i32).collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -1218,10 +1217,9 @@ impl TableRow for HourVmtFractionRow {
                 Ok(HourVmtFractionRow {
                     source_type_id: source_type_id_col
                         .get(i)
-                        .ok_or_else(|| null("sourceTypeID"))? as i16,
-                    road_type_id: road_type_id_col
-                        .get(i)
-                        .ok_or_else(|| null("roadTypeID"))? as i16,
+                        .ok_or_else(|| null("sourceTypeID"))?
+                        as i16,
+                    road_type_id: road_type_id_col.get(i).ok_or_else(|| null("roadTypeID"))? as i16,
                     day_id: day_id_col.get(i).ok_or_else(|| null("dayID"))? as i16,
                     hour_id: hour_id_col.get(i).ok_or_else(|| null("hourID"))? as i16,
                     hour_vmt_fraction: hour_vmt_fraction_col
@@ -1286,9 +1284,7 @@ impl TableRow for LinkRow {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
                 Ok(LinkRow {
                     link_id: link_id_col.get(i).ok_or_else(|| null("linkID"))?,
-                    road_type_id: road_type_id_col
-                        .get(i)
-                        .ok_or_else(|| null("roadTypeID"))? as i16,
+                    road_type_id: road_type_id_col.get(i).ok_or_else(|| null("roadTypeID"))? as i16,
                 })
             })
             .collect()
@@ -1390,9 +1386,7 @@ impl TableRow for HourDayRow {
                 .into(),
                 Series::new(
                     "hourID".into(),
-                    rows.iter()
-                        .map(|r| r.hour_id as i32)
-                        .collect::<Vec<i32>>(),
+                    rows.iter().map(|r| r.hour_id as i32).collect::<Vec<i32>>(),
                 )
                 .into(),
             ],
@@ -1572,7 +1566,8 @@ impl TableRow for ShoOutputRow {
                     link_id: link_id_col.get(i).ok_or_else(|| null("linkID"))?,
                     source_type_id: source_type_id_col
                         .get(i)
-                        .ok_or_else(|| null("sourceTypeID"))? as i16,
+                        .ok_or_else(|| null("sourceTypeID"))?
+                        as i16,
                     sho: sho_col.get(i).ok_or_else(|| null("SHO"))?,
                     distance: distance_col.get(i).ok_or_else(|| null("distance"))?,
                 })
@@ -1709,10 +1704,9 @@ impl TableRow for SourceHoursOutputRow {
                     link_id: link_id_col.get(i).ok_or_else(|| null("linkID"))?,
                     source_type_id: source_type_id_col
                         .get(i)
-                        .ok_or_else(|| null("sourceTypeID"))? as i16,
-                    source_hours: source_hours_col
-                        .get(i)
-                        .ok_or_else(|| null("sourceHours"))?,
+                        .ok_or_else(|| null("sourceTypeID"))?
+                        as i16,
+                    source_hours: source_hours_col.get(i).ok_or_else(|| null("sourceHours"))?,
                 })
             })
             .collect()
@@ -1827,7 +1821,8 @@ impl Generator for MesoscaleLookupTotalActivityGenerator {
             .position()
             .time
             .year
-            .ok_or_else(|| Error::Polars("no year in iteration position".into()))? as i16;
+            .ok_or_else(|| Error::Polars("no year in iteration position".into()))?
+            as i16;
 
         // ── read input tables ─────────────────────────────────────────────────
         let years: Vec<YearRow> = ctx.tables().iter_typed("year")?;
@@ -1849,21 +1844,27 @@ impl Generator for MesoscaleLookupTotalActivityGenerator {
         let hour_days: Vec<HourDayRow> = ctx.tables().iter_typed("hourDay")?;
 
         // ── Tag-0…Tag-3: travel fractions ─────────────────────────────────────
-        let travel_fracs =
-            match total_activity_basis(year_id, &years, &source_type_years, &age_distribution, &source_type_ages, &source_use_types) {
-                Some(v) => v,
-                None => {
-                    // No qualifying base year — write empty tables and return.
-                    let empty_sho: Vec<ShoOutputRow> = Vec::new();
-                    crate::wiring::write_scratch_table(ctx, OUTPUT_TABLES[0], empty_sho)?;
-                    let empty_sh: Vec<SourceHoursOutputRow> = Vec::new();
-                    let df = empty_sh
-                        .into_dataframe()
-                        .map_err(|e| Error::Polars(e.to_string()))?;
-                    ctx.scratch_mut().insert(OUTPUT_TABLES[1], df);
-                    return Ok(CalculatorOutput::empty());
-                }
-            };
+        let travel_fracs = match total_activity_basis(
+            year_id,
+            &years,
+            &source_type_years,
+            &age_distribution,
+            &source_type_ages,
+            &source_use_types,
+        ) {
+            Some(v) => v,
+            None => {
+                // No qualifying base year — write empty tables and return.
+                let empty_sho: Vec<ShoOutputRow> = Vec::new();
+                crate::wiring::write_scratch_table(ctx, OUTPUT_TABLES[0], empty_sho)?;
+                let empty_sh: Vec<SourceHoursOutputRow> = Vec::new();
+                let df = empty_sh
+                    .into_dataframe()
+                    .map_err(|e| Error::Polars(e.to_string()))?;
+                ctx.scratch_mut().insert(OUTPUT_TABLES[1], df);
+                return Ok(CalculatorOutput::empty());
+            }
+        };
 
         // ── lookup maps ───────────────────────────────────────────────────────
         // (sourceTypeID, monthID) -> monthVMTFraction
@@ -2566,11 +2567,7 @@ mod tests {
         // travel fraction = 1.0 (single cell, all HPMS type's travel).
         // SHO = 1.0 × 1.0 × 1.0 × 1.0 / 1.0 = 1.0.
         // distance = 1.0 × 55.0 = 55.0.
-        let sho_out: Vec<ShoOutputRow> = ctx
-            .scratch()
-            .store
-            .iter_typed("SHO")
-            .unwrap();
+        let sho_out: Vec<ShoOutputRow> = ctx.scratch().store.iter_typed("SHO").unwrap();
         assert_eq!(sho_out.len(), 1, "SHO table should have one row");
         let sho_row = &sho_out[0];
         assert_eq!(sho_row.source_type_id, 21);
@@ -2579,20 +2576,26 @@ mod tests {
         assert_eq!(sho_row.year_id, year_id);
         assert_eq!(sho_row.month_id, 1);
         assert_eq!(sho_row.hour_day_id, 85);
-        assert!((sho_row.sho - 1.0).abs() < 1e-12, "SHO = fraction × fracs / weeks");
-        assert!((sho_row.distance - 55.0).abs() < 1e-12, "distance = SHO × avgSpeed");
+        assert!(
+            (sho_row.sho - 1.0).abs() < 1e-12,
+            "SHO = fraction × fracs / weeks"
+        );
+        assert!(
+            (sho_row.distance - 55.0).abs() < 1e-12,
+            "distance = SHO × avgSpeed"
+        );
 
         // ── verify SourceHours table ──────────────────────────────────────────
         // sourceHours = SHO (mesoscale-lookup identity).
-        let sh_out: Vec<SourceHoursOutputRow> = ctx
-            .scratch()
-            .store
-            .iter_typed("SourceHours")
-            .unwrap();
+        let sh_out: Vec<SourceHoursOutputRow> =
+            ctx.scratch().store.iter_typed("SourceHours").unwrap();
         assert_eq!(sh_out.len(), 1, "SourceHours table should have one row");
         let sh_row = &sh_out[0];
         assert_eq!(sh_row.source_type_id, 21);
         assert_eq!(sh_row.link_id, 101);
-        assert!((sh_row.source_hours - 1.0).abs() < 1e-12, "sourceHours = SHO");
+        assert!(
+            (sh_row.source_hours - 1.0).abs() < 1e-12,
+            "sourceHours = SHO"
+        );
     }
 }

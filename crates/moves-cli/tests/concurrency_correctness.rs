@@ -54,10 +54,7 @@ fn onroad_fixtures() -> Vec<PathBuf> {
         .filter_map(|e| e.ok())
         .map(|e| e.path())
         .filter(|p| {
-            let name = p
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or_default();
+            let name = p.file_name().and_then(|n| n.to_str()).unwrap_or_default();
             p.extension().and_then(|x| x.to_str()) == Some("xml")
                 && !name.starts_with("nr-")
                 && !name.starts_with("scale-")
@@ -85,8 +82,13 @@ fn run_fixture_bytes(fixture: &Path, max_parallel_chunks: usize) -> Vec<u8> {
         // parallelism variants; the engine does not stamp the wall clock.
         run_date_time: Some("2026-01-01T00:00:00".to_string()),
     };
-    let outcome = run_simulation(&opts)
-        .unwrap_or_else(|e| panic!("run {} (parallel={}): {e}", fixture.display(), max_parallel_chunks));
+    let outcome = run_simulation(&opts).unwrap_or_else(|e| {
+        panic!(
+            "run {} (parallel={}): {e}",
+            fixture.display(),
+            max_parallel_chunks
+        )
+    });
     read_bytes(&outcome.run_record_path)
 }
 
@@ -115,10 +117,7 @@ fn outputs_are_byte_identical_across_parallelism_settings() {
     let mut failures: Vec<String> = Vec::new();
 
     for fixture in &fixtures {
-        let name = fixture
-            .file_stem()
-            .and_then(|n| n.to_str())
-            .unwrap_or("?");
+        let name = fixture.file_stem().and_then(|n| n.to_str()).unwrap_or("?");
 
         // Run at each parallelism setting and collect bytes.
         let runs: Vec<(usize, &str, Vec<u8>)> = settings
@@ -181,7 +180,8 @@ fn all_parallelism_settings_complete_without_error() {
             "MOVESRun.parquet missing at parallel={limit}"
         );
         assert_eq!(
-            outcome.max_parallel_chunks, limit.max(1),
+            outcome.max_parallel_chunks,
+            limit.max(1),
             "resolved parallelism mismatch at parallel={limit}"
         );
     }

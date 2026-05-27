@@ -77,10 +77,7 @@ impl InternalControlStrategy for RateOfProgressControlStrategy {
         &["ratepollutantprocessmodelyeargroup", "sourceTypeModelYear"]
     }
 
-    fn pre_run(
-        &self,
-        _ctx: &CalculatorContext,
-    ) -> std::result::Result<(), moves_framework::Error> {
+    fn pre_run(&self, _ctx: &CalculatorContext) -> std::result::Result<(), moves_framework::Error> {
         // TODO(Task 50 / DataFrameStore): iterate `self.table` and apply
         // `record.emission_scale_factor()` to every matching row in the
         // execution-DB emission-rate tables once `ExecutionTables` exposes a

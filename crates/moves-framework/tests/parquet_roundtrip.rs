@@ -200,15 +200,9 @@ fn vec_round_trips_element_for_element() {
     store2.read_parquet("SHO", &buf).expect("read_parquet");
 
     // iter_typed: DataFrame → Vec<ShoRow>
-    let recovered: Vec<ShoRow> = store2
-        .iter_typed("SHO")
-        .expect("iter_typed");
+    let recovered: Vec<ShoRow> = store2.iter_typed("SHO").expect("iter_typed");
 
-    assert_eq!(
-        recovered.len(),
-        rows.len(),
-        "row count must be preserved"
-    );
+    assert_eq!(recovered.len(), rows.len(), "row count must be preserved");
     for (i, (got, want)) in recovered.iter().zip(rows.iter()).enumerate() {
         assert_eq!(got, want, "row {i} must round-trip identically");
     }

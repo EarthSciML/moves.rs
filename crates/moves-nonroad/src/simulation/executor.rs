@@ -35,11 +35,12 @@
 //!   numerical-fidelity harness (Tasks 115/116) needs for capturing
 //!   port-side intermediate state.
 
-use crate::driver::{Dispatch, DriverRecord};
 use crate::common::consts::{MXAGYR, MXPOL, MXTECH, SWTCNG, SWTDSL, SWTGS2, SWTGS4, SWTLPG};
+use crate::driver::scrptime;
+use crate::driver::{Dispatch, DriverRecord};
 use crate::emissions::exhaust::{
-    ActivityUnit as ExhaustActivityUnit, DayRange, EmissionUnitCode, ExhaustCalcInputs, FuelKind,
-    PollutantFilter, calculate_exhaust_emissions,
+    calculate_exhaust_emissions, ActivityUnit as ExhaustActivityUnit, DayRange, EmissionUnitCode,
+    ExhaustCalcInputs, FuelKind, PollutantFilter,
 };
 use crate::geography::common::fuel_density;
 use crate::geography::common::{
@@ -54,19 +55,18 @@ use crate::geography::prcus::{
     ExhaustTechLookup, ModelYearOutput as PrcusModelYearOutput, RetrofitResult, UsTotalCallbacks,
 };
 use crate::geography::state::{CountyInput, StateContext};
+use crate::geography::subcounty::SubcountyRecordIndex;
 use crate::geography::{
     process_county, process_national_record, process_state_from_national_record,
     process_state_to_county_record, process_subcounty, process_us_total_record, ActivityLookup,
     EquipmentRecord, GeographyOutput, NationalContext, RunOptions as StateRunOptions,
     StateCallbacks, StateDescriptor, UsTotalContext,
 };
-use crate::geography::subcounty::SubcountyRecordIndex;
 use crate::population::retrofit::RetrofitRecord;
 use crate::population::{
     age_distribution, growth_factor, model_year, select_for_indicator, ActivityUnits,
     GrowthIndicatorRecord,
 };
-use crate::driver::scrptime;
 use crate::{Error, Result};
 
 use super::inputs::ReferenceData;
@@ -687,7 +687,9 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             .reference
             .growth_xref_entries
             .iter()
-            .position(|e| e.fips == fips && e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max)
+            .position(|e| {
+                e.fips == fips && e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max
+            })
     }
 
     // ---- Activity records -----------------------------------------------
@@ -868,9 +870,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             use_hours,
             &self.executor.reference.age_adjustment_table,
             &act.age_code,
-            move |acttmp| {
-                scrptime(use_hours, load_factor, acttmp, pop_growth_factor, &curve)
-            },
+            move |acttmp| scrptime(use_hours, load_factor, acttmp, pop_growth_factor, &curve),
         )?;
 
         // 7. age_distribution → uses growth records for forward/backward growth.
@@ -1070,8 +1070,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             sulfur_alternate: None,
         };
 
-        let outputs =
-            calculate_exhaust_emissions(&mut calc_inputs, &PollutantFilter::empty());
+        let outputs = calculate_exhaust_emissions(&mut calc_inputs, &PollutantFilter::empty());
 
         Ok(EmissionsIterationResult {
             emsday_delta: outputs.emissions_day,
@@ -1154,12 +1153,7 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
         })
     }
 
-    fn find_evap_tech(
-        &mut self,
-        scc: &str,
-        hp_avg: f32,
-        _year: i32,
-    ) -> Option<EvapTechLookup> {
+    fn find_evap_tech(&mut self, scc: &str, hp_avg: f32, _year: i32) -> Option<EvapTechLookup> {
         let entry = self
             .executor
             .reference
@@ -1178,7 +1172,9 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
             .reference
             .growth_xref_entries
             .iter()
-            .position(|e| e.fips == fips && e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max)?;
+            .position(|e| {
+                e.fips == fips && e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max
+            })?;
         Some(idx as i32)
     }
 
@@ -1402,7 +1398,13 @@ impl<'a> NationalAdapter<'a> {
 
 impl<'a> NationalCallbacks for NationalAdapter<'a> {
     fn find_allocation(&mut self, scc: &str) -> Option<()> {
-        if self.executor.reference.national_allocation.iter().any(|e| e.scc == scc) {
+        if self
+            .executor
+            .reference
+            .national_allocation
+            .iter()
+            .any(|e| e.scc == scc)
+        {
             Some(())
         } else {
             None
@@ -1476,7 +1478,9 @@ impl<'a> NationalCallbacks for NationalAdapter<'a> {
             .reference
             .growth_xref_entries
             .iter()
-            .position(|e| e.fips == fips && e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max)?;
+            .position(|e| {
+                e.fips == fips && e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max
+            })?;
         Some(idx as i32)
     }
 
@@ -1732,7 +1736,9 @@ impl<'a> UsTotalCallbacks for UsTotalAdapter<'a> {
             .reference
             .growth_xref_entries
             .iter()
-            .position(|e| e.fips == fips && e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max)?;
+            .position(|e| {
+                e.fips == fips && e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max
+            })?;
         Some(idx as i32)
     }
 
@@ -2366,8 +2372,8 @@ mod tests {
     /// is preserved as-is.
     #[test]
     fn process_output_to_rows_dat_and_bmy() {
-        use crate::geography::common::{BmyRecord, DatRecord};
         use crate::common::consts::RMISS;
+        use crate::geography::common::{BmyRecord, DatRecord};
 
         let dat = DatRecord {
             fips: "06037".to_string(),
@@ -2510,15 +2516,15 @@ mod tests {
 /// Acceptance tests for [`ProductionExecutor`]'s county dispatch path.
 #[cfg(test)]
 mod production {
+    use super::super::inputs::{
+        ActivityTableEntry, EvapTechEntry, ExhaustTechEntry, GrowthXrefEntry,
+        NationalAllocationEntry,
+    };
     use super::*;
     use crate::driver::RegionLevel;
     use crate::emissions::exhaust::FuelKind;
     use crate::input::scrappage::ScrappagePoint;
     use crate::population::AgeAdjustmentTable;
-    use super::super::inputs::{
-        ActivityTableEntry, EvapTechEntry, ExhaustTechEntry, GrowthXrefEntry,
-        NationalAllocationEntry,
-    };
 
     fn default_hp_levels() -> [f32; MXHPC] {
         let vs: [f32; MXHPC] = [
@@ -2616,8 +2622,14 @@ mod production {
                     age_code: "DEFAULT".into(),
                 }],
                 scrappage_curve: vec![
-                    ScrappagePoint { bin: 0.0, percent: 0.0 },
-                    ScrappagePoint { bin: 100.0, percent: 100.0 },
+                    ScrappagePoint {
+                        bin: 0.0,
+                        percent: 0.0,
+                    },
+                    ScrappagePoint {
+                        bin: 100.0,
+                        percent: 100.0,
+                    },
                 ],
                 age_adjustment_table: AgeAdjustmentTable::default(),
                 ..ReferenceData::default()
@@ -2693,8 +2705,14 @@ mod production {
                     age_code: "DEFAULT".into(),
                 }],
                 scrappage_curve: vec![
-                    ScrappagePoint { bin: 0.0, percent: 0.0 },
-                    ScrappagePoint { bin: 100.0, percent: 100.0 },
+                    ScrappagePoint {
+                        bin: 0.0,
+                        percent: 0.0,
+                    },
+                    ScrappagePoint {
+                        bin: 100.0,
+                        percent: 100.0,
+                    },
                 ],
                 age_adjustment_table: AgeAdjustmentTable::default(),
                 ..ReferenceData::default()
@@ -2766,8 +2784,14 @@ mod production {
                     age_code: "DEFAULT".into(),
                 }],
                 scrappage_curve: vec![
-                    ScrappagePoint { bin: 0.0, percent: 0.0 },
-                    ScrappagePoint { bin: 100.0, percent: 100.0 },
+                    ScrappagePoint {
+                        bin: 0.0,
+                        percent: 0.0,
+                    },
+                    ScrappagePoint {
+                        bin: 100.0,
+                        percent: 100.0,
+                    },
                 ],
                 age_adjustment_table: AgeAdjustmentTable::default(),
                 ..ReferenceData::default()
@@ -2813,7 +2837,9 @@ mod production {
             }],
             hp_levels: default_hp_levels(),
             reference: ReferenceData {
-                national_allocation: vec![NationalAllocationEntry { scc: "2270001010".into() }],
+                national_allocation: vec![NationalAllocationEntry {
+                    scc: "2270001010".into(),
+                }],
                 exhaust_tech_entries: vec![ExhaustTechEntry {
                     scc: "2270001010".into(),
                     hp_min: 0.0,
@@ -2847,8 +2873,14 @@ mod production {
                     age_code: "DEFAULT".into(),
                 }],
                 scrappage_curve: vec![
-                    ScrappagePoint { bin: 0.0, percent: 0.0 },
-                    ScrappagePoint { bin: 100.0, percent: 100.0 },
+                    ScrappagePoint {
+                        bin: 0.0,
+                        percent: 0.0,
+                    },
+                    ScrappagePoint {
+                        bin: 100.0,
+                        percent: 100.0,
+                    },
                 ],
                 age_adjustment_table: AgeAdjustmentTable::default(),
                 ..ReferenceData::default()
@@ -2873,7 +2905,11 @@ mod production {
 
         let result = exec.execute(&ctx, &opts).unwrap();
         assert!(!result.skipped, "expected non-skipped execution");
-        assert_eq!(result.rows.len(), 1, "expected one row for the one selected state");
+        assert_eq!(
+            result.rows.len(),
+            1,
+            "expected one row for the one selected state"
+        );
         assert_eq!(result.rows[0].fips, "06000");
     }
 
@@ -2920,8 +2956,14 @@ mod production {
                     age_code: "DEFAULT".into(),
                 }],
                 scrappage_curve: vec![
-                    ScrappagePoint { bin: 0.0, percent: 0.0 },
-                    ScrappagePoint { bin: 100.0, percent: 100.0 },
+                    ScrappagePoint {
+                        bin: 0.0,
+                        percent: 0.0,
+                    },
+                    ScrappagePoint {
+                        bin: 100.0,
+                        percent: 100.0,
+                    },
                 ],
                 age_adjustment_table: AgeAdjustmentTable::default(),
                 ..ReferenceData::default()
@@ -2946,7 +2988,11 @@ mod production {
 
         let result = exec.execute(&ctx, &opts).unwrap();
         assert!(!result.skipped, "expected non-skipped execution");
-        assert_eq!(result.rows.len(), 1, "expected exactly one row for US total");
+        assert_eq!(
+            result.rows.len(),
+            1,
+            "expected exactly one row for US total"
+        );
         assert_eq!(result.rows[0].fips, "00000");
     }
 

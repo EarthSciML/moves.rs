@@ -81,9 +81,7 @@ fn scale_inputs_dir() -> Option<PathBuf> {
 /// All default-scale onroad fixtures (exclude `nr-*`, `scale-*`, `mixed-*`).
 fn default_scale_fixtures() -> Vec<PathBuf> {
     collect_fixtures(|name| {
-        !name.starts_with("nr-")
-            && !name.starts_with("scale-")
-            && !name.starts_with("mixed-")
+        !name.starts_with("nr-") && !name.starts_with("scale-") && !name.starts_with("mixed-")
     })
 }
 
@@ -100,7 +98,11 @@ fn mixed_fixtures() -> Vec<PathBuf> {
 /// Scale fixtures — only exist when the inputs directory is available.
 fn scale_fixtures(kind: &str) -> Option<PathBuf> {
     let path = fixtures_dir().join(format!("{kind}.xml"));
-    if path.is_file() { Some(path) } else { None }
+    if path.is_file() {
+        Some(path)
+    } else {
+        None
+    }
 }
 
 fn collect_fixtures(predicate: impl Fn(&str) -> bool) -> Vec<PathBuf> {
@@ -219,12 +221,7 @@ fn parallelism_levels(ncpu: usize) -> Vec<usize> {
 }
 
 /// Print the N-sweep summary table for a workload group.
-fn print_n_sweep(
-    label: &str,
-    fixtures: &[PathBuf],
-    ncpu: usize,
-    failures: &mut Vec<String>,
-) {
+fn print_n_sweep(label: &str, fixtures: &[PathBuf], ncpu: usize, failures: &mut Vec<String>) {
     if fixtures.is_empty() {
         return;
     }
@@ -339,7 +336,10 @@ fn benchmark_all_workload_categories() {
     // ── 1. Default-scale national (onroad) ─────────────────────────────────
     {
         let fixtures = default_scale_fixtures();
-        println!("\n\n## 1. Default-Scale National (onroad, {} fixtures)\n", fixtures.len());
+        println!(
+            "\n\n## 1. Default-Scale National (onroad, {} fixtures)\n",
+            fixtures.len()
+        );
         print_fixture_group_detail("default-scale", &fixtures, &mut failures);
         print_n_sweep("Default-Scale", &fixtures, ncpu, &mut failures);
     }
@@ -355,16 +355,22 @@ fn benchmark_all_workload_categories() {
     // ── 3. Mixed onroad + NONROAD ─────────────────────────────────────────
     {
         let fixtures = mixed_fixtures();
-        println!("\n\n## 3. Mixed Onroad + NONROAD ({} fixture(s))\n", fixtures.len());
+        println!(
+            "\n\n## 3. Mixed Onroad + NONROAD ({} fixture(s))\n",
+            fixtures.len()
+        );
         print_fixture_group_detail("mixed", &fixtures, &mut failures);
         print_n_sweep("Mixed Onroad+NONROAD", &fixtures, ncpu, &mut failures);
     }
 
     // ── 4–6. Scale fixtures (need external inputs) ────────────────────────
     let scale_kinds = [
-        ("scale-county", "4. County-Scale (single county, single year)"),
+        (
+            "scale-county",
+            "4. County-Scale (single county, single year)",
+        ),
         ("scale-project", "5. Project-Scale"),
-        ("scale-rates",  "6. Rates-Mode"),
+        ("scale-rates", "6. Rates-Mode"),
     ];
 
     for (kind, section) in &scale_kinds {
@@ -403,7 +409,7 @@ fn benchmark_all_workload_categories() {
 fn benchmark_smoke_test_one_per_category() {
     let fixtures_dir = fixtures_dir();
     let candidates = [
-        fixtures_dir.join("process-airtoxics.xml"),    // default-scale
+        fixtures_dir.join("process-airtoxics.xml"), // default-scale
         fixtures_dir.join("nr-commercial-nation.xml"), // nonroad
         fixtures_dir.join("mixed-onroad-nonroad.xml"), // mixed
     ];
@@ -415,19 +421,15 @@ fn benchmark_smoke_test_one_per_category() {
         }
         match run_fixture(path, 1) {
             Ok(r) => {
-                assert!(
-                    r.wall_ms > 0.0,
-                    "{}: wall_ms must be positive",
-                    r.name
-                );
-                assert!(
-                    r.chunks > 0,
-                    "{}: must plan at least one chunk",
-                    r.name
-                );
+                assert!(r.wall_ms > 0.0, "{}: wall_ms must be positive", r.name);
+                assert!(r.chunks > 0, "{}: must plan at least one chunk", r.name);
             }
             Err(e) => failures.push(e),
         }
     }
-    assert!(failures.is_empty(), "smoke failures:\n  {}", failures.join("\n  "));
+    assert!(
+        failures.is_empty(),
+        "smoke failures:\n  {}",
+        failures.join("\n  ")
+    );
 }

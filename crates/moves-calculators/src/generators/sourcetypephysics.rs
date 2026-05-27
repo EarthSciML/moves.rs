@@ -495,17 +495,23 @@ impl TableRow for SourceUseTypePhysicsMappingDetail {
             vec![
                 Series::new(
                     "realSourceTypeID".into(),
-                    rows.iter().map(|r| r.real_source_type_id.0 as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.real_source_type_id.0 as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
                     "tempSourceTypeID".into(),
-                    rows.iter().map(|r| r.temp_source_type_id.0 as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.temp_source_type_id.0 as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
                     "opModeIDOffset".into(),
-                    rows.iter().map(|r| r.op_mode_id_offset).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.op_mode_id_offset)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
             ],
@@ -538,9 +544,7 @@ impl TableRow for SourceUseTypePhysicsMappingDetail {
                     temp_source_type_id: SourceTypeId(
                         temp_col.get(i).ok_or_else(|| null("tempSourceTypeID"))? as u16,
                     ),
-                    op_mode_id_offset: offset_col
-                        .get(i)
-                        .ok_or_else(|| null("opModeIDOffset"))?,
+                    op_mode_id_offset: offset_col.get(i).ok_or_else(|| null("opModeIDOffset"))?,
                 })
             })
             .collect()
@@ -572,7 +576,9 @@ impl TableRow for OpModeDistributionRow {
             vec![
                 Series::new(
                     "sourceTypeID".into(),
-                    rows.iter().map(|r| r.source_type_id.0 as i32).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.source_type_id.0 as i32)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -582,7 +588,9 @@ impl TableRow for OpModeDistributionRow {
                 .into(),
                 Series::new(
                     "avgSpeedBinID".into(),
-                    rows.iter().map(|r| r.avg_speed_bin_id).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.avg_speed_bin_id)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -602,12 +610,16 @@ impl TableRow for OpModeDistributionRow {
                 .into(),
                 Series::new(
                     "opModeFraction".into(),
-                    rows.iter().map(|r| r.op_mode_fraction).collect::<Vec<f64>>(),
+                    rows.iter()
+                        .map(|r| r.op_mode_fraction)
+                        .collect::<Vec<f64>>(),
                 )
                 .into(),
                 Series::new(
                     "opModeFractionCV".into(),
-                    rows.iter().map(|r| r.op_mode_fraction_cv).collect::<Vec<f64>>(),
+                    rows.iter()
+                        .map(|r| r.op_mode_fraction_cv)
+                        .collect::<Vec<f64>>(),
                 )
                 .into(),
                 Series::new(
@@ -617,7 +629,9 @@ impl TableRow for OpModeDistributionRow {
                 .into(),
                 Series::new(
                     "avgSpeedFraction".into(),
-                    rows.iter().map(|r| r.avg_speed_fraction).collect::<Vec<f64>>(),
+                    rows.iter()
+                        .map(|r| r.avg_speed_fraction)
+                        .collect::<Vec<f64>>(),
                 )
                 .into(),
             ],
@@ -1132,7 +1146,9 @@ mod tests {
 
     #[test]
     fn execute_writes_corrected_rates_op_mode_distribution_to_scratch() {
-        use moves_framework::{DataFrameStore, DataFrameStoreTyped, InMemoryStore, IterationPosition};
+        use moves_framework::{
+            DataFrameStore, DataFrameStoreTyped, InMemoryStore, IterationPosition,
+        };
 
         // mapping: real=20, temp=120, offset=1000.
         let mapping_rows = vec![SourceUseTypePhysicsMappingDetail {
@@ -1209,7 +1225,9 @@ mod tests {
 
     #[test]
     fn execute_empty_mapping_passes_through_non_negative_rows() {
-        use moves_framework::{DataFrameStore, DataFrameStoreTyped, InMemoryStore, IterationPosition};
+        use moves_framework::{
+            DataFrameStore, DataFrameStoreTyped, InMemoryStore, IterationPosition,
+        };
 
         let input_rows = vec![OpModeDistributionRow {
             source_type_id: SourceTypeId(55),

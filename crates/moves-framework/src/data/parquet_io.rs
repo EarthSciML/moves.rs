@@ -42,9 +42,9 @@ pub trait DataFrameStoreParquet: DataFrameStore {
     /// Returns [`Error::Polars`] when `name` is absent from the store or when
     /// the Parquet encoder fails.
     fn write_parquet<W: Write>(&self, name: &str, dest: W) -> Result<()> {
-        let arc_df = self.get(name).ok_or_else(|| {
-            Error::Polars(format!("table '{name}' not found in store"))
-        })?;
+        let arc_df = self
+            .get(name)
+            .ok_or_else(|| Error::Polars(format!("table '{name}' not found in store")))?;
         let mut df = arc_df.as_ref().clone();
         ParquetWriter::new(dest)
             .with_compression(ParquetCompression::Uncompressed)

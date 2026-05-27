@@ -108,8 +108,7 @@ impl RopTable {
     /// Insert a record. If the key already exists the new fraction replaces it
     /// (last-write-wins; callers surface duplicate-key warnings separately).
     pub fn insert(&mut self, record: RopRecord) {
-        self.records
-            .insert(record.key(), record.reduction_fraction);
+        self.records.insert(record.key(), record.reduction_fraction);
     }
 
     /// Look up the reduction fraction for the given key, if any.
@@ -141,10 +140,7 @@ impl RopTable {
     /// Look up the emission scale factor (`1.0 - reductionFraction`) for the
     /// given key. Returns `1.0` (no change) when no entry is found.
     pub fn scale_factor(&self, key: &RopKey) -> f64 {
-        self.records
-            .get(key)
-            .map(|&r| 1.0 - r)
-            .unwrap_or(1.0)
+        self.records.get(key).map(|&r| 1.0 - r).unwrap_or(1.0)
     }
 
     /// Set of distinct `sourceTypeID`s present (ascending order).

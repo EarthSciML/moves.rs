@@ -156,11 +156,18 @@ impl BaseRateCalculatorOutput {
 }
 
 fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -> Error {
-    Error::RowExtraction { table: table.to_string(), row, column: column.to_string(), message: msg }
+    Error::RowExtraction {
+        table: table.to_string(),
+        row,
+        column: column.to_string(),
+        message: msg,
+    }
 }
 
 impl TableRow for EmissionOutputRow {
-    fn table_name() -> &'static str { "MOVESWorkerOutput" }
+    fn table_name() -> &'static str {
+        "MOVESWorkerOutput"
+    }
     fn polars_schema() -> Schema {
         Schema::from_iter([
             ("yearID".into(), DataType::Int32),
@@ -190,39 +197,160 @@ impl TableRow for EmissionOutputRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
-        DataFrame::new(n, vec![
-            Series::new("yearID".into(), rows.iter().map(|r| r.key.year_id).collect::<Vec<i32>>()).into(),
-            Series::new("monthID".into(), rows.iter().map(|r| r.key.month_id).collect::<Vec<i32>>()).into(),
-            Series::new("dayID".into(), rows.iter().map(|r| r.key.day_id).collect::<Vec<i32>>()).into(),
-            Series::new("hourID".into(), rows.iter().map(|r| r.key.hour_id).collect::<Vec<i32>>()).into(),
-            Series::new("stateID".into(), rows.iter().map(|r| r.key.state_id).collect::<Vec<i32>>()).into(),
-            Series::new("countyID".into(), rows.iter().map(|r| r.key.county_id).collect::<Vec<i32>>()).into(),
-            Series::new("zoneID".into(), rows.iter().map(|r| r.key.zone_id).collect::<Vec<i32>>()).into(),
-            Series::new("linkID".into(), rows.iter().map(|r| r.key.link_id).collect::<Vec<i32>>()).into(),
-            Series::new("roadTypeID".into(), rows.iter().map(|r| r.key.road_type_id).collect::<Vec<i32>>()).into(),
-            Series::new("sourceTypeID".into(), rows.iter().map(|r| r.key.source_type_id).collect::<Vec<i32>>()).into(),
-            Series::new("regClassID".into(), rows.iter().map(|r| r.key.reg_class_id).collect::<Vec<i32>>()).into(),
-            Series::new("fuelTypeID".into(), rows.iter().map(|r| r.key.fuel_type_id).collect::<Vec<i32>>()).into(),
-            Series::new("modelYearID".into(), rows.iter().map(|r| r.key.model_year_id).collect::<Vec<i32>>()).into(),
-            Series::new("avgSpeedBinID".into(), rows.iter().map(|r| r.key.avg_speed_bin_id).collect::<Vec<i32>>()).into(),
-            Series::new("pollutantID".into(), rows.iter().map(|r| r.key.pollutant_id).collect::<Vec<i32>>()).into(),
-            Series::new("processID".into(), rows.iter().map(|r| r.key.process_id).collect::<Vec<i32>>()).into(),
-            Series::new("polProcessID".into(), rows.iter().map(|r| r.key.pol_process_id).collect::<Vec<i32>>()).into(),
-            Series::new("hourDayID".into(), rows.iter().map(|r| r.key.hour_day_id).collect::<Vec<i32>>()).into(),
-            Series::new("ageID".into(), rows.iter().map(|r| r.key.age_id).collect::<Vec<i32>>()).into(),
-            Series::new("fuelSubTypeID".into(), rows.iter().map(|r| r.fuel_sub_type_id).collect::<Vec<i32>>()).into(),
-            Series::new("fuelFormulationID".into(), rows.iter().map(|r| r.fuel_formulation_id).collect::<Vec<i32>>()).into(),
-            Series::new("emissionQuant".into(), rows.iter().map(|r| r.emission_quant).collect::<Vec<f64>>()).into(),
-            Series::new("emissionRate".into(), rows.iter().map(|r| r.emission_rate).collect::<Vec<f64>>()).into(),
-        ])
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "yearID".into(),
+                    rows.iter().map(|r| r.key.year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.key.month_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "dayID".into(),
+                    rows.iter().map(|r| r.key.day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hourID".into(),
+                    rows.iter().map(|r| r.key.hour_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "stateID".into(),
+                    rows.iter().map(|r| r.key.state_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "countyID".into(),
+                    rows.iter().map(|r| r.key.county_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "zoneID".into(),
+                    rows.iter().map(|r| r.key.zone_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "linkID".into(),
+                    rows.iter().map(|r| r.key.link_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "roadTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.key.road_type_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.key.source_type_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "regClassID".into(),
+                    rows.iter()
+                        .map(|r| r.key.reg_class_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.key.fuel_type_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "modelYearID".into(),
+                    rows.iter()
+                        .map(|r| r.key.model_year_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "avgSpeedBinID".into(),
+                    rows.iter()
+                        .map(|r| r.key.avg_speed_bin_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "pollutantID".into(),
+                    rows.iter()
+                        .map(|r| r.key.pollutant_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "processID".into(),
+                    rows.iter().map(|r| r.key.process_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "polProcessID".into(),
+                    rows.iter()
+                        .map(|r| r.key.pol_process_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hourDayID".into(),
+                    rows.iter().map(|r| r.key.hour_day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "ageID".into(),
+                    rows.iter().map(|r| r.key.age_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelSubTypeID".into(),
+                    rows.iter()
+                        .map(|r| r.fuel_sub_type_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelFormulationID".into(),
+                    rows.iter()
+                        .map(|r| r.fuel_formulation_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "emissionQuant".into(),
+                    rows.iter().map(|r| r.emission_quant).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "emissionRate".into(),
+                    rows.iter().map(|r| r.emission_rate).collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
     }
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "MOVESWorkerOutput";
         let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .f64()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let year_id = get_i32("yearID")?;
         let month_id = get_i32("monthID")?;
@@ -247,36 +375,48 @@ impl TableRow for EmissionOutputRow {
         let fuel_formulation_id = get_i32("fuelFormulationID")?;
         let emission_quant = get_f64("emissionQuant")?;
         let emission_rate = get_f64("emissionRate")?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(EmissionOutputRow {
-                key: BlockKey {
-                    year_id: year_id.get(i).ok_or_else(|| null("yearID"))?,
-                    month_id: month_id.get(i).ok_or_else(|| null("monthID"))?,
-                    day_id: day_id.get(i).ok_or_else(|| null("dayID"))?,
-                    hour_id: hour_id.get(i).ok_or_else(|| null("hourID"))?,
-                    state_id: state_id.get(i).ok_or_else(|| null("stateID"))?,
-                    county_id: county_id.get(i).ok_or_else(|| null("countyID"))?,
-                    zone_id: zone_id.get(i).ok_or_else(|| null("zoneID"))?,
-                    link_id: link_id.get(i).ok_or_else(|| null("linkID"))?,
-                    road_type_id: road_type_id.get(i).ok_or_else(|| null("roadTypeID"))?,
-                    source_type_id: source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))?,
-                    reg_class_id: reg_class_id.get(i).ok_or_else(|| null("regClassID"))?,
-                    fuel_type_id: fuel_type_id.get(i).ok_or_else(|| null("fuelTypeID"))?,
-                    model_year_id: model_year_id.get(i).ok_or_else(|| null("modelYearID"))?,
-                    avg_speed_bin_id: avg_speed_bin_id.get(i).ok_or_else(|| null("avgSpeedBinID"))?,
-                    pollutant_id: pollutant_id.get(i).ok_or_else(|| null("pollutantID"))?,
-                    process_id: process_id.get(i).ok_or_else(|| null("processID"))?,
-                    pol_process_id: pol_process_id.get(i).ok_or_else(|| null("polProcessID"))?,
-                    hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))?,
-                    age_id: age_id.get(i).ok_or_else(|| null("ageID"))?,
-                },
-                fuel_sub_type_id: fuel_sub_type_id.get(i).ok_or_else(|| null("fuelSubTypeID"))?,
-                fuel_formulation_id: fuel_formulation_id.get(i).ok_or_else(|| null("fuelFormulationID"))?,
-                emission_quant: emission_quant.get(i).ok_or_else(|| null("emissionQuant"))?,
-                emission_rate: emission_rate.get(i).ok_or_else(|| null("emissionRate"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(EmissionOutputRow {
+                    key: BlockKey {
+                        year_id: year_id.get(i).ok_or_else(|| null("yearID"))?,
+                        month_id: month_id.get(i).ok_or_else(|| null("monthID"))?,
+                        day_id: day_id.get(i).ok_or_else(|| null("dayID"))?,
+                        hour_id: hour_id.get(i).ok_or_else(|| null("hourID"))?,
+                        state_id: state_id.get(i).ok_or_else(|| null("stateID"))?,
+                        county_id: county_id.get(i).ok_or_else(|| null("countyID"))?,
+                        zone_id: zone_id.get(i).ok_or_else(|| null("zoneID"))?,
+                        link_id: link_id.get(i).ok_or_else(|| null("linkID"))?,
+                        road_type_id: road_type_id.get(i).ok_or_else(|| null("roadTypeID"))?,
+                        source_type_id: source_type_id
+                            .get(i)
+                            .ok_or_else(|| null("sourceTypeID"))?,
+                        reg_class_id: reg_class_id.get(i).ok_or_else(|| null("regClassID"))?,
+                        fuel_type_id: fuel_type_id.get(i).ok_or_else(|| null("fuelTypeID"))?,
+                        model_year_id: model_year_id.get(i).ok_or_else(|| null("modelYearID"))?,
+                        avg_speed_bin_id: avg_speed_bin_id
+                            .get(i)
+                            .ok_or_else(|| null("avgSpeedBinID"))?,
+                        pollutant_id: pollutant_id.get(i).ok_or_else(|| null("pollutantID"))?,
+                        process_id: process_id.get(i).ok_or_else(|| null("processID"))?,
+                        pol_process_id: pol_process_id
+                            .get(i)
+                            .ok_or_else(|| null("polProcessID"))?,
+                        hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))?,
+                        age_id: age_id.get(i).ok_or_else(|| null("ageID"))?,
+                    },
+                    fuel_sub_type_id: fuel_sub_type_id
+                        .get(i)
+                        .ok_or_else(|| null("fuelSubTypeID"))?,
+                    fuel_formulation_id: fuel_formulation_id
+                        .get(i)
+                        .ok_or_else(|| null("fuelFormulationID"))?,
+                    emission_quant: emission_quant.get(i).ok_or_else(|| null("emissionQuant"))?,
+                    emission_rate: emission_rate.get(i).ok_or_else(|| null("emissionRate"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -468,11 +608,14 @@ impl Calculator for BaseRateCalculator {
         let inputs = BaseRateCalculatorInputs {
             base_rate_by_age: tables.iter_typed("BaseRateByAge")?,
             base_rate: tables.iter_typed("BaseRate")?,
-            extended_idle_emission_rate_fraction: tables.iter_typed("ExtendedIdleEmissionRateFraction")?,
+            extended_idle_emission_rate_fraction: tables
+                .iter_typed("ExtendedIdleEmissionRateFraction")?,
             apu_emission_rate_fraction: tables.iter_typed("apuEmissionRateFraction")?,
-            shorepower_emission_rate_fraction: tables.iter_typed("ShorepowerEmissionRateFraction")?,
+            shorepower_emission_rate_fraction: tables
+                .iter_typed("ShorepowerEmissionRateFraction")?,
             zone_month_hour: tables.iter_typed("ZoneMonthHour")?,
-            pollutant_process_mapped_model_year: tables.iter_typed("PollutantProcessMappedModelYear")?,
+            pollutant_process_mapped_model_year: tables
+                .iter_typed("PollutantProcessMappedModelYear")?,
             start_temp_adjustment: tables.iter_typed("StartTempAdjustment")?,
             county: tables.iter_typed("County")?,
             general_fuel_ratio: tables.iter_typed("GeneralFuelRatio")?,
@@ -569,11 +712,11 @@ mod tests {
 
     #[test]
     fn execute_returns_nonempty_dataframe_for_minimal_inputs() {
-        use moves_framework::{DataFrameStore, InMemoryStore};
-        use moves_framework::execution::execution_db::{ExecutionLocation, ExecutionTime, IterationPosition};
-        use setup::{
-            AgeCategoryRow, BaseRateRow, FuelFormulationRow, FuelSupplyRow, FuelTypeRow,
+        use moves_framework::execution::execution_db::{
+            ExecutionLocation, ExecutionTime, IterationPosition,
         };
+        use moves_framework::{DataFrameStore, InMemoryStore};
+        use setup::{AgeCategoryRow, BaseRateRow, FuelFormulationRow, FuelSupplyRow, FuelTypeRow};
         let base_rate_row = BaseRateRow {
             source_type_id: 21,
             road_type_id: 4,
@@ -610,34 +753,109 @@ mod tests {
             fuel_sub_type_id: 10,
         };
         let fuel_type = FuelTypeRow { fuel_type_id: 1 };
-        let age_category = AgeCategoryRow { age_id: 2, age_group_id: 1 };
+        let age_category = AgeCategoryRow {
+            age_id: 2,
+            age_group_id: 1,
+        };
 
         let mut store = InMemoryStore::new();
-        store.insert("BaseRateByAge", BaseRateRow::into_dataframe(vec![]).unwrap());
-        store.insert("BaseRate", BaseRateRow::into_dataframe(vec![base_rate_row]).unwrap());
-        store.insert("ExtendedIdleEmissionRateFraction", setup::ModelYearFuelFractionRow::into_dataframe(vec![]).unwrap());
-        store.insert("apuEmissionRateFraction", setup::ModelYearFuelFractionRow::into_dataframe(vec![]).unwrap());
-        store.insert("ShorepowerEmissionRateFraction", setup::ModelYearFuelFractionRow::into_dataframe(vec![]).unwrap());
-        store.insert("ZoneMonthHour", setup::ZoneMonthHourRow::into_dataframe(vec![]).unwrap());
-        store.insert("PollutantProcessMappedModelYear", setup::PollutantProcessMappedModelYearRow::into_dataframe(vec![]).unwrap());
-        store.insert("StartTempAdjustment", setup::StartTempAdjustmentRow::into_dataframe(vec![]).unwrap());
+        store.insert(
+            "BaseRateByAge",
+            BaseRateRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "BaseRate",
+            BaseRateRow::into_dataframe(vec![base_rate_row]).unwrap(),
+        );
+        store.insert(
+            "ExtendedIdleEmissionRateFraction",
+            setup::ModelYearFuelFractionRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "apuEmissionRateFraction",
+            setup::ModelYearFuelFractionRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "ShorepowerEmissionRateFraction",
+            setup::ModelYearFuelFractionRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "ZoneMonthHour",
+            setup::ZoneMonthHourRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "PollutantProcessMappedModelYear",
+            setup::PollutantProcessMappedModelYearRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "StartTempAdjustment",
+            setup::StartTempAdjustmentRow::into_dataframe(vec![]).unwrap(),
+        );
         store.insert("County", setup::CountyRow::into_dataframe(vec![]).unwrap());
-        store.insert("GeneralFuelRatio", setup::GeneralFuelRatioRow::into_dataframe(vec![]).unwrap());
-        store.insert("criteriaRatio", setup::CriteriaRatioRow::into_dataframe(vec![]).unwrap());
-        store.insert("altCriteriaRatio", setup::CriteriaRatioRow::into_dataframe(vec![]).unwrap());
-        store.insert("TemperatureAdjustment", setup::TemperatureAdjustmentRow::into_dataframe(vec![]).unwrap());
-        store.insert("NOxHumidityAdjust", setup::NoxHumidityAdjustRow::into_dataframe(vec![]).unwrap());
-        store.insert("zoneACFactor", setup::ZoneAcFactorRow::into_dataframe(vec![]).unwrap());
-        store.insert("IMFactor", setup::ImFactorRow::into_dataframe(vec![]).unwrap());
-        store.insert("IMCoverage", setup::ImCoverageRow::into_dataframe(vec![]).unwrap());
-        store.insert("EmissionRateAdjustment", setup::EmissionRateAdjustmentRow::into_dataframe(vec![]).unwrap());
-        store.insert("EVEfficiency", setup::EvEfficiencyRow::into_dataframe(vec![]).unwrap());
-        store.insert("universalActivity", setup::UniversalActivityRow::into_dataframe(vec![]).unwrap());
-        store.insert("smfrSBDSummary", setup::SmfrSbdSummaryRow::into_dataframe(vec![]).unwrap());
-        store.insert("AgeCategory", AgeCategoryRow::into_dataframe(vec![age_category]).unwrap());
-        store.insert("FuelType", FuelTypeRow::into_dataframe(vec![fuel_type]).unwrap());
-        store.insert("FuelFormulation", FuelFormulationRow::into_dataframe(vec![fuel_formulation]).unwrap());
-        store.insert("FuelSupply", FuelSupplyRow::into_dataframe(vec![fuel_supply]).unwrap());
+        store.insert(
+            "GeneralFuelRatio",
+            setup::GeneralFuelRatioRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "criteriaRatio",
+            setup::CriteriaRatioRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "altCriteriaRatio",
+            setup::CriteriaRatioRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "TemperatureAdjustment",
+            setup::TemperatureAdjustmentRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "NOxHumidityAdjust",
+            setup::NoxHumidityAdjustRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "zoneACFactor",
+            setup::ZoneAcFactorRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "IMFactor",
+            setup::ImFactorRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "IMCoverage",
+            setup::ImCoverageRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "EmissionRateAdjustment",
+            setup::EmissionRateAdjustmentRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "EVEfficiency",
+            setup::EvEfficiencyRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "universalActivity",
+            setup::UniversalActivityRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "smfrSBDSummary",
+            setup::SmfrSbdSummaryRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "AgeCategory",
+            AgeCategoryRow::into_dataframe(vec![age_category]).unwrap(),
+        );
+        store.insert(
+            "FuelType",
+            FuelTypeRow::into_dataframe(vec![fuel_type]).unwrap(),
+        );
+        store.insert(
+            "FuelFormulation",
+            FuelFormulationRow::into_dataframe(vec![fuel_formulation]).unwrap(),
+        );
+        store.insert(
+            "FuelSupply",
+            FuelSupplyRow::into_dataframe(vec![fuel_supply]).unwrap(),
+        );
 
         let position = IterationPosition {
             iteration: 0,
@@ -649,7 +867,10 @@ mod tests {
         let calc = BaseRateCalculator;
         let out = calc.execute(&ctx).expect("execute ok");
         assert!(out.dataframe().is_some(), "expected non-empty DataFrame");
-        assert!(out.dataframe().unwrap().height() > 0, "expected at least one row");
+        assert!(
+            out.dataframe().unwrap().height() > 0,
+            "expected at least one row"
+        );
     }
 
     #[test]

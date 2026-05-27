@@ -50,7 +50,6 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-
 use moves_data::output_schema::{MovesRunRecord, OutputTable};
 use moves_data::{PollutantId, ProcessId};
 use moves_runspec::model::Model;
@@ -147,7 +146,6 @@ pub struct EngineOutcome {
     pub run_record_path: PathBuf,
 
     // --- Task 75: performance baseline fields ---
-
     /// Total wall time from the start of [`MOVESEngine::run`] to the return
     /// of the finalisation step, including output-file I/O.
     pub wall_time: Duration,
@@ -548,13 +546,11 @@ impl MOVESEngine {
             let p = OutputProcessor::new(&self.config.output_root, &run_record)?;
             (p, Vec::new())
         };
-        let run_record_path = proc
-            .output_root()
-            .join(OutputProcessor::partition_path(
-                OutputTable::Run,
-                None,
-                None,
-            ));
+        let run_record_path = proc.output_root().join(OutputProcessor::partition_path(
+            OutputTable::Run,
+            None,
+            None,
+        ));
 
         let wall_time = t_start.elapsed();
         let peak_rss_kib = read_peak_rss_kib();
@@ -736,7 +732,9 @@ pub fn run_record_path(output_root: &Path) -> PathBuf {
 mod tests {
     use super::*;
     use crate::calculator::CalculatorOutput;
-    use crate::control_strategy::{ControlStrategyRegistry, InternalControlStrategy, StrategySubscription};
+    use crate::control_strategy::{
+        ControlStrategyRegistry, InternalControlStrategy, StrategySubscription,
+    };
     use moves_calculator_info::{build_dag, parse_calculator_info_str, Granularity, Priority};
     use moves_runspec::model::{ModelScale, PollutantProcessAssociation, Timespan};
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -1571,12 +1569,15 @@ mod tests {
     }
 
     fn iso_registry() -> CalculatorRegistry {
-        let mut reg =
-            two_chain_registry("IsoWriterA", "IsoCheckerA", "IsoWriterB", "IsoCheckerB");
-        reg.register_generator("IsoWriterA", iso_writer_a_factory).unwrap();
-        reg.register_generator("IsoWriterB", iso_writer_b_factory).unwrap();
-        reg.register_calculator("IsoCheckerA", iso_checker_a_factory).unwrap();
-        reg.register_calculator("IsoCheckerB", iso_checker_b_factory).unwrap();
+        let mut reg = two_chain_registry("IsoWriterA", "IsoCheckerA", "IsoWriterB", "IsoCheckerB");
+        reg.register_generator("IsoWriterA", iso_writer_a_factory)
+            .unwrap();
+        reg.register_generator("IsoWriterB", iso_writer_b_factory)
+            .unwrap();
+        reg.register_calculator("IsoCheckerA", iso_checker_a_factory)
+            .unwrap();
+        reg.register_calculator("IsoCheckerB", iso_checker_b_factory)
+            .unwrap();
         reg
     }
 
@@ -1649,10 +1650,14 @@ mod tests {
         cfg.max_parallel_chunks = 2;
         let mut reg =
             two_chain_registry("ConcWriterA", "ConcCheckerA", "ConcWriterB", "ConcCheckerB");
-        reg.register_generator("ConcWriterA", conc_writer_a_factory).unwrap();
-        reg.register_generator("ConcWriterB", conc_writer_b_factory).unwrap();
-        reg.register_calculator("ConcCheckerA", conc_checker_a_factory).unwrap();
-        reg.register_calculator("ConcCheckerB", conc_checker_b_factory).unwrap();
+        reg.register_generator("ConcWriterA", conc_writer_a_factory)
+            .unwrap();
+        reg.register_generator("ConcWriterB", conc_writer_b_factory)
+            .unwrap();
+        reg.register_calculator("ConcCheckerA", conc_checker_a_factory)
+            .unwrap();
+        reg.register_calculator("ConcCheckerB", conc_checker_b_factory)
+            .unwrap();
         let engine = MOVESEngine::new(sample_runspec(), reg, cfg);
         engine.run().unwrap();
         assert!(

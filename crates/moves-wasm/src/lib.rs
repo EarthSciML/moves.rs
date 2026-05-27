@@ -179,11 +179,11 @@ const EMBEDDED_CALCULATOR_DAG: &str =
 /// engine encounters a fatal error during planning or execution.
 #[wasm_bindgen]
 pub fn run_simulation(runspec_xml: &str, max_parallel_chunks: u32) -> Result<JsValue, JsValue> {
-    let run_spec =
-        from_xml_str(runspec_xml).map_err(|e| JsValue::from_str(&format!("RunSpec parse error: {e}")))?;
+    let run_spec = from_xml_str(runspec_xml)
+        .map_err(|e| JsValue::from_str(&format!("RunSpec parse error: {e}")))?;
 
-    let registry = build_registry()
-        .map_err(|e| JsValue::from_str(&format!("Registry build error: {e}")))?;
+    let registry =
+        build_registry().map_err(|e| JsValue::from_str(&format!("Registry build error: {e}")))?;
 
     let config = EngineConfig {
         output_root: std::path::PathBuf::from(""),
@@ -283,7 +283,8 @@ pub fn run_nonroad_simulation(options_json: &str, pop_bytes: &[u8]) -> Result<Js
 
     let episode_year = v["episode_year"]
         .as_i64()
-        .ok_or_else(|| JsValue::from_str("options.episode_year is required"))? as i32;
+        .ok_or_else(|| JsValue::from_str("options.episode_year is required"))?
+        as i32;
     let growth_year = v["growth_year"].as_i64().unwrap_or(episode_year as i64) as i32;
     let tech_year = v["tech_year"].as_i64().unwrap_or(episode_year as i64) as i32;
 
@@ -333,19 +334,31 @@ pub fn run_nonroad_simulation(options_json: &str, pop_bytes: &[u8]) -> Result<Js
 
     let counters_obj = js_sys::Object::new();
     let c = &outputs.counters;
-    js_set_num(&counters_obj, "scc_groups_planned", c.scc_groups_planned as f64)?;
-    js_set_num(&counters_obj, "scc_groups_skipped", c.scc_groups_skipped as f64)?;
+    js_set_num(
+        &counters_obj,
+        "scc_groups_planned",
+        c.scc_groups_planned as f64,
+    )?;
+    js_set_num(
+        &counters_obj,
+        "scc_groups_skipped",
+        c.scc_groups_skipped as f64,
+    )?;
     js_set_num(&counters_obj, "records_visited", c.records_visited as f64)?;
-    js_set_num(&counters_obj, "records_not_selected", c.records_not_selected as f64)?;
-    js_set_num(&counters_obj, "records_no_dispatch", c.records_no_dispatch as f64)?;
+    js_set_num(
+        &counters_obj,
+        "records_not_selected",
+        c.records_not_selected as f64,
+    )?;
+    js_set_num(
+        &counters_obj,
+        "records_no_dispatch",
+        c.records_no_dispatch as f64,
+    )?;
     js_set_num(&counters_obj, "dispatch_calls", c.dispatch_calls as f64)?;
     js_set_num(&counters_obj, "geography_skips", c.geography_skips as f64)?;
-    js_sys::Reflect::set(
-        &result,
-        &JsValue::from_str("counters"),
-        &counters_obj,
-    )
-    .map_err(|_| JsValue::from_str("failed to set counters"))?;
+    js_sys::Reflect::set(&result, &JsValue::from_str("counters"), &counters_obj)
+        .map_err(|_| JsValue::from_str("failed to set counters"))?;
 
     Ok(result.into())
 }
@@ -448,9 +461,7 @@ mod tests {
         use moves_framework::{EngineConfig, MOVESEngine};
         use moves_runspec::from_xml_str;
 
-        let runspec_xml = include_str!(
-            "../../../characterization/fixtures/sample-runspec.xml"
-        );
+        let runspec_xml = include_str!("../../../characterization/fixtures/sample-runspec.xml");
         let run_spec = from_xml_str(runspec_xml).expect("sample RunSpec must parse");
         let registry = build_registry().expect("registry must build");
         let config = EngineConfig {
@@ -467,7 +478,10 @@ mod tests {
             "expected at least one output file"
         );
         assert!(
-            outcome.output_bytes.iter().any(|(p, _)| p.to_str() == Some("MOVESRun.parquet")),
+            outcome
+                .output_bytes
+                .iter()
+                .any(|(p, _)| p.to_str() == Some("MOVESRun.parquet")),
             "expected MOVESRun.parquet in output"
         );
     }
@@ -533,10 +547,7 @@ mod tests {
             vec![],
         );
         let mut executor = PlanRecordingExecutor::new();
-        let opts = NonroadOptions::new(
-            RegionLevel::from_reglvl("COUNTY").unwrap(),
-            2020,
-        );
+        let opts = NonroadOptions::new(RegionLevel::from_reglvl("COUNTY").unwrap(), 2020);
         let out = nonroad_run_simulation(&opts, &inputs, &mut executor).unwrap();
         assert!(out.completion_message.starts_with("Successful completion"));
         assert_eq!(out.counters.scc_groups_planned, 0);
@@ -545,16 +556,37 @@ mod tests {
 
     #[test]
     fn run_nonroad_simulation_with_pop_records() {
-        let rec1 = build_pop_record("06037", "00000", "2020", "2270001010",
-            "25", "50", "", "1", "", "100");
-        let rec2 = build_pop_record("06038", "00000", "2020", "2270001010",
-            "25", "50", "", "1", "", "200");
+        let rec1 = build_pop_record(
+            "06037",
+            "00000",
+            "2020",
+            "2270001010",
+            "25",
+            "50",
+            "",
+            "1",
+            "",
+            "100",
+        );
+        let rec2 = build_pop_record(
+            "06038",
+            "00000",
+            "2020",
+            "2270001010",
+            "25",
+            "50",
+            "",
+            "1",
+            "",
+            "200",
+        );
         let pop_data = make_pop_file(&[rec1, rec2]);
 
         let pop_records = read_pop(std::io::Cursor::new(pop_data.as_slice())).unwrap();
         assert_eq!(pop_records.len(), 2);
 
-        let inputs = nonroad_inputs_from_pop(pop_records, vec!["06037".to_string(), "06038".to_string()]);
+        let inputs =
+            nonroad_inputs_from_pop(pop_records, vec!["06037".to_string(), "06038".to_string()]);
         assert_eq!(inputs.group_count(), 1, "both records share SCC 2270001010");
         assert_eq!(inputs.record_count(), 2);
 
@@ -570,12 +602,42 @@ mod tests {
 
     #[test]
     fn nonroad_inputs_from_pop_groups_by_scc() {
-        let rec_a = build_pop_record("06037", "00000", "2020", "2270001010",
-            "25", "50", "", "1", "", "100");
-        let rec_b = build_pop_record("06037", "00000", "2020", "2265001010",
-            "10", "25", "", "1", "", "50");
-        let rec_c = build_pop_record("06038", "00000", "2020", "2270001010",
-            "25", "50", "", "1", "", "150");
+        let rec_a = build_pop_record(
+            "06037",
+            "00000",
+            "2020",
+            "2270001010",
+            "25",
+            "50",
+            "",
+            "1",
+            "",
+            "100",
+        );
+        let rec_b = build_pop_record(
+            "06037",
+            "00000",
+            "2020",
+            "2265001010",
+            "10",
+            "25",
+            "",
+            "1",
+            "",
+            "50",
+        );
+        let rec_c = build_pop_record(
+            "06038",
+            "00000",
+            "2020",
+            "2270001010",
+            "25",
+            "50",
+            "",
+            "1",
+            "",
+            "150",
+        );
         let pop_data = make_pop_file(&[rec_a, rec_b, rec_c]);
 
         let pop_records = read_pop(std::io::Cursor::new(pop_data.as_slice())).unwrap();

@@ -206,7 +206,9 @@ mod tests {
         .with_natural_key(["id"])
         .unwrap();
         for &(id, value) in rows {
-            builder.push_row([Value::Int64(id), Value::Float64(value)]).unwrap();
+            builder
+                .push_row([Value::Int64(id), Value::Float64(value)])
+                .unwrap();
         }
         builder.build().unwrap()
     }
@@ -275,8 +277,10 @@ mod tests {
     #[test]
     fn resolve_canonical_table_ambiguous_is_none() {
         let mut snap = Snapshot::new();
-        snap.add_table(table("a__movesoutput", &[(1, 1.0)])).unwrap();
-        snap.add_table(table("b__movesoutput", &[(2, 2.0)])).unwrap();
+        snap.add_table(table("a__movesoutput", &[(1, 1.0)]))
+            .unwrap();
+        snap.add_table(table("b__movesoutput", &[(2, 2.0)]))
+            .unwrap();
         assert!(resolve_canonical_table(&snap, "MOVESOutput").is_none());
     }
 
