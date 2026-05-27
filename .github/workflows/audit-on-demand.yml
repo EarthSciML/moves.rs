@@ -1,0 +1,124 @@
+# On-demand audit workflow: runs the comparison harness and optionally
+# commits results back to the branch.
+#
+# Compares canonical MOVES output (from committed snapshots under
+# characterization/snapshots/) against moves.rs for a set of fixtures,
+# then emits a Markdown report under characterization/audit-results/<timestamp>/.
+#
+# Prerequisites on the self-hosted runner:
+#   * Apptainer + fakeroot — required for canonical MOVES runs when a
+#     snapshot is absent or --refresh-canonical is passed to the script.
+#   * characterization/apptainer/moves-fixture.sif — the SIF pinned in
+#     characterization/fixture-image.lock must exist on the runner's local
+#     disk. Build it once with characterization/apptainer/build-fixture-sif.sh.
+#     For the default fixture set, all snapshots are already committed to the
+#     repo, so the SIF is only needed if you add new fixtures or refresh
+#     canonical baselines. The script fails with a clear error if the SIF is
+#     absent and a canonical run is required.
+#
+# Authentication for commit_results=true:
+#   The workflow uses the built-in GITHUB_TOKEN (contents: write) to push the
+#   committed audit results back to the triggering branch. No deploy key or
+#   GitHub App is required. If your repository policy restricts GITHUB_TOKEN
+#   write access for workflow runs, set commit_results=false and retrieve
+#   results from the uploaded artifact instead.
+#
+# Self-hosted runner labels expected:
+#   self-hosted    — opt-in to organisation runners
+#   apptainer      — Apptainer available on PATH (SIF runs)
+#   fakeroot       — kernel + apptainer.conf permit `apptainer build --fakeroot`
+
+name: audit-on-demand
+
+on:
+  workflow_dispatch:
+    inputs:
+      fixtures:
+        description: >
+          Comma-separated fixture names to audit. Each name is matched
+          case-insensitively against characterization/fixtures/*.xml.
+          Default: the six typical-scenarios fixtures.
+        required: false
+        default: "SampleRunSpec,expand-counties,expand-day,mixed-onroad-nonroad,nr-agriculture-state,nr-commercial-nation"
+      commit_results:
+        description: >
+          Commit the audit report back to the triggering branch.
+          Set to 'false' to retrieve results from the uploaded artifact only.
+        required: false
+        default: "true"
+
+# Do not cancel a running audit — it is expensive and produces partial
+# results; cancelling wastes the CPU-hours already spent.
+concurrency:
+  group: audit-on-demand
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    name: audit (self-hosted apptainer)
+    runs-on: [self-hosted, apptainer, fakeroot]
+    # Each fixture: ~5 min moves.rs + comparison. Six fixtures with canonical
+    # snapshot reuse runs in ~30 min. 480 min covers full canonical re-runs.
+    timeout-minutes: 480
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry, target/
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build moves-cli and compare-canonical
+        # Builds two binaries used by run-comparison.sh:
+        #   target/release/moves        — runs a RunSpec through moves.rs
+        #   target/release/compare-canonical — emits per-pollutant Markdown + JSON
+        # The script runs its own cargo build, but having a dedicated step here
+        # surfaces compile errors early and integrates with rust-cache for speed.
+        run: cargo build --release -p moves-cli -p moves-snapshot
+
+      - name: Run audit comparison
+        id: audit
+        run: |
+          TIMESTAMP="$(date -u +%Y%m%d-%H%M%S)"
+          OUTPUT_DIR="characterization/audit-results/${TIMESTAMP}"
+          echo "output_dir=${OUTPUT_DIR}" >> "${GITHUB_OUTPUT}"
+          echo "timestamp=${TIMESTAMP}" >> "${GITHUB_OUTPUT}"
+          ./characterization/audit/run-comparison.sh \
+              --fixtures "${{ inputs.fixtures }}" \
+              --output-dir "${OUTPUT_DIR}"
+
+      - name: Commit and push audit results
+        # Skip this step when commit_results is not 'true', or when the audit
+        # step was skipped/failed (if: success() is implied by the default).
+        if: ${{ inputs.commit_results == 'true' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add characterization/audit-results/
+          # Guard: only commit when the audit actually produced new files.
+          if git diff --cached --quiet; then
+            echo "No new audit results to commit."
+          else
+            FIXTURES="${{ inputs.fixtures }}"
+            TIMESTAMP="${{ steps.audit.outputs.timestamp }}"
+            git commit -m "audit(on-demand): ${TIMESTAMP} — ${FIXTURES}"
+            git push origin HEAD
+          fi
+
+      - name: Upload audit results as artifact
+        # Always upload so results are accessible even when commit is skipped
+        # or the push fails, and as a permanent record for PRs.
+        # Scoped to the current run's output dir to avoid re-uploading all
+        # historical audit-results on every trigger.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-results-${{ steps.audit.outputs.timestamp || 'run' }}
+          path: ${{ steps.audit.outputs.output_dir || 'characterization/audit-results' }}
+          if-no-files-found: warn
+          retention-days: 30
