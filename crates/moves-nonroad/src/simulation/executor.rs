@@ -43,7 +43,12 @@
 //! shape of such an instrumenting executor.
 
 use crate::driver::{Dispatch, DriverRecord};
-use crate::emissions::exhaust::{ActivityUnit as ExhaustActivityUnit, FuelKind};
+use crate::common::consts::{MXAGYR, MXPOL, MXTECH, SWTCNG, SWTDSL, SWTGS2, SWTGS4, SWTLPG};
+use crate::emissions::exhaust::{
+    ActivityUnit as ExhaustActivityUnit, DayRange, EmissionUnitCode, ExhaustCalcInputs, FuelKind,
+    PollutantFilter, calculate_exhaust_emissions,
+};
+use crate::geography::common::fuel_density;
 use crate::geography::common::{
     ActivityRecord, ActivityUnit, BmyKind, EmissionsIterationResult, EvapFactorsLookup,
     ExhaustFactorsLookup, GeographyCallbacks, ModelYearAgedistResult, PopulationRecord,
@@ -909,18 +914,40 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
 
     fn compute_exhaust_factors(
         &mut self,
-        _scc: &str,
-        _tech_names: &[String],
+        scc: &str,
+        tech_names: &[String],
         _tech_fractions: &[f32],
         _model_year: i32,
         _year_index: usize,
         _record_index: usize,
     ) -> Result<ExhaustFactorsLookup> {
-        // Emission-factor files not yet loaded → return an empty
-        // (all-zero) table. The tech loop in run_exhaust_block skips
-        // entries whose tchfrc <= 0, so zero-fraction tech entries
-        // never reach calculate_exhaust_emissions.
-        Ok(ExhaustFactorsLookup::default())
+        // Look up per-tech BSFC from the reference entry for this SCC.
+        // Emission-factor files are not yet loadable, so all EF arrays
+        // stay zero; CO2 and SOx are rewritten from BSFC by
+        // calculate_exhaust_emissions regardless of the EF values.
+        let n_tech = tech_names.len().max(1);
+        let bsfc_per_tech: Vec<f32> = self
+            .executor
+            .reference
+            .exhaust_tech_entries
+            .iter()
+            .find(|e| e.scc == scc)
+            .map(|e| e.bsfc.clone())
+            .unwrap_or_else(|| vec![0.0; n_tech]);
+        let mut bsfc = vec![0.0_f32; MXAGYR * n_tech];
+        for y in 0..MXAGYR {
+            for (t, &v) in bsfc_per_tech.iter().enumerate().take(n_tech) {
+                bsfc[y * n_tech + t] = v;
+            }
+        }
+        Ok(ExhaustFactorsLookup {
+            emission_factors: vec![0.0; MXAGYR * MXPOL * MXTECH],
+            bsfc,
+            unit_codes: vec![EmissionUnitCode::GramsPerHpHour; MXPOL * MXTECH],
+            adetcf: vec![0.0; MXPOL * MXTECH],
+            bdetcf: vec![0.0; MXPOL * MXTECH],
+            detcap: vec![0.0; MXPOL * MXTECH],
+        })
     }
 
     fn compute_evap_factors(
@@ -940,31 +967,124 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
     #[allow(clippy::too_many_arguments)]
     fn compute_exhaust_iteration(
         &mut self,
-        _record: &PopulationRecord<'_>,
-        _options: &CountyRunOptions,
-        _factors: &ExhaustFactorsLookup,
-        _adjustments: &AdjustmentTable,
-        _scc_tech_index: usize,
-        _tech_index: usize,
-        _year_index: usize,
-        _equipment_age: f32,
-        _tech_fraction: f32,
-        _temporal_adjustment: f32,
-        _starts_adjustment: f32,
-        _model_year_fraction: f32,
-        _activity_adjustment: f32,
-        _population: f32,
-        _n_days: i32,
-        _activity_index: usize,
+        record: &PopulationRecord<'_>,
+        options: &CountyRunOptions,
+        factors: &ExhaustFactorsLookup,
+        adjustments: &AdjustmentTable,
+        scc_tech_index: usize,
+        tech_index: usize,
+        year_index: usize,
+        equipment_age: f32,
+        tech_fraction: f32,
+        temporal_adjustment: f32,
+        starts_adjustment: f32,
+        model_year_fraction: f32,
+        activity_adjustment: f32,
+        population: f32,
+        n_days: i32,
+        activity_index: usize,
     ) -> Result<EmissionsIterationResult> {
-        // Full forwarding to calculate_exhaust_emissions requires the
-        // emission-factor tables (not yet loaded). This path is only
-        // reached when tech_fraction > 0; production runs with zero
-        // fractions never enter here.
-        todo!(
-            "compute_exhaust_iteration: wire to calculate_exhaust_emissions \
-             once NR*.EMF tables are loaded"
-        )
+        // Look up load factor and activity unit from the activity entry.
+        // The entry was already validated by model_year_and_agedist, so
+        // unwrap_or is a safe fallback.
+        let (load_factor, activity_unit_geo) = self
+            .executor
+            .reference
+            .activity_entries
+            .get(activity_index)
+            .map(|e| (e.load_factor, e.activity_unit))
+            .unwrap_or((0.5, ActivityUnit::HoursPerYear));
+
+        let activity_unit = match activity_unit_geo {
+            ActivityUnit::HoursPerYear => ExhaustActivityUnit::HoursPerYear,
+            ActivityUnit::HoursPerDay => ExhaustActivityUnit::HoursPerDay,
+            ActivityUnit::GallonsPerYear => ExhaustActivityUnit::GallonsPerYear,
+            ActivityUnit::GallonsPerDay => ExhaustActivityUnit::GallonsPerDay,
+        };
+
+        // Extract scalar BSFC for this (year, tech) from the lookup table.
+        let n_tech = if factors.bsfc.is_empty() {
+            1
+        } else {
+            factors.bsfc.len() / MXAGYR
+        };
+        let bsfc = factors
+            .bsfc
+            .get(year_index * n_tech + tech_index)
+            .copied()
+            .unwrap_or(0.0);
+
+        // Build tech-fractions table indexed [scc_tech_index * MXTECH + tech_index].
+        let entry_fracs: &[f32] = self
+            .executor
+            .reference
+            .exhaust_tech_entries
+            .iter()
+            .find(|e| e.scc == record.scc)
+            .map(|e| e.tech_fractions.as_slice())
+            .unwrap_or(&[]);
+        let table_len = (scc_tech_index + 1) * MXTECH;
+        let mut tech_fracs = vec![0.0_f32; table_len];
+        for (i, &frac) in entry_fracs.iter().enumerate() {
+            let cell = scc_tech_index * MXTECH + i;
+            if cell < table_len {
+                tech_fracs[cell] = frac;
+            }
+        }
+
+        let retrofit_reduction = vec![0.0_f32; MXPOL];
+        let mut emission_factors = factors.emission_factors.clone();
+        let sox_conversion = [SWTGS2, SWTGS4, SWTDSL, SWTLPG, SWTCNG];
+        let sox_base = [SWTGS2, SWTGS4, SWTDSL, SWTLPG, SWTCNG];
+
+        let mut calc_inputs = ExhaustCalcInputs {
+            year_index,
+            tech_index,
+            scc_tech_index,
+            equipment_age,
+            detcap: &factors.detcap,
+            adetcf: &factors.adetcf,
+            bdetcf: &factors.bdetcf,
+            unit_codes: &factors.unit_codes,
+            tech_fraction,
+            hp_avg: record.hp_avg,
+            fuel_density: fuel_density(options.fuel),
+            bsfc,
+            activity_index,
+            load_factor,
+            activity_unit,
+            daily_adjustments: adjustments,
+            adjustment_time: temporal_adjustment,
+            day_range: DayRange {
+                begin_day: 1,
+                end_day: 1,
+                winter_skip_begin: 0,
+                winter_skip_end: 0,
+                winter_skip: false,
+            },
+            emission_factors: &mut emission_factors,
+            starts_adjustment,
+            temporal_adjustment,
+            population,
+            model_year_fraction,
+            n_days,
+            activity_adjustment,
+            tech_fractions_table: &tech_fracs,
+            retrofit_reduction: &retrofit_reduction,
+            fuel: options.fuel,
+            sox_conversion,
+            sox_base,
+            sulfur_alternate: None,
+        };
+
+        let outputs =
+            calculate_exhaust_emissions(&mut calc_inputs, &PollutantFilter::empty());
+
+        Ok(EmissionsIterationResult {
+            emsday_delta: outputs.emissions_day,
+            emsbmy: outputs.emissions_by_model_year,
+            fulbmy: 0.0,
+        })
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -2474,6 +2594,7 @@ mod production {
                     hp_max: 100.0,
                     tech_names: vec!["T1".into()],
                     tech_fractions: vec![0.0],
+                    bsfc: vec![],
                 }],
                 evap_tech_entries: vec![EvapTechEntry {
                     scc: "2270001010".into(),
@@ -2552,6 +2673,7 @@ mod production {
                     hp_max: 100.0,
                     tech_names: vec!["T1".into()],
                     tech_fractions: vec![0.0],
+                    bsfc: vec![],
                 }],
                 evap_tech_entries: vec![EvapTechEntry {
                     scc: "2270001010".into(),
@@ -2624,6 +2746,7 @@ mod production {
                     hp_max: 100.0,
                     tech_names: vec!["T1".into()],
                     tech_fractions: vec![0.0],
+                    bsfc: vec![],
                 }],
                 evap_tech_entries: vec![EvapTechEntry {
                     scc: "2270001010".into(),
@@ -2704,6 +2827,7 @@ mod production {
                     hp_max: 100.0,
                     tech_names: vec!["T1".into()],
                     tech_fractions: vec![0.0],
+                    bsfc: vec![],
                 }],
                 evap_tech_entries: vec![EvapTechEntry {
                     scc: "2270001010".into(),
@@ -2776,6 +2900,7 @@ mod production {
                     hp_max: 100.0,
                     tech_names: vec!["T1".into()],
                     tech_fractions: vec![0.0],
+                    bsfc: vec![],
                 }],
                 evap_tech_entries: vec![EvapTechEntry {
                     scc: "2270001010".into(),
@@ -2850,6 +2975,7 @@ mod production {
                     hp_max: 100.0,
                     tech_names: vec!["T1".into()],
                     tech_fractions: vec![0.0],
+                    bsfc: vec![],
                 }],
                 evap_tech_entries: vec![EvapTechEntry {
                     scc: "2270001010".into(),
@@ -2899,6 +3025,7 @@ mod production {
                     hp_max: 100.0,
                     tech_names: vec!["T1".into()],
                     tech_fractions: vec![0.0],
+                    bsfc: vec![],
                 }],
                 evap_tech_entries: vec![EvapTechEntry {
                     scc: "2270001010".into(),

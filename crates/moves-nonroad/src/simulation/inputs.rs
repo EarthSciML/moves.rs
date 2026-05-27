@@ -145,6 +145,10 @@ pub struct ExhaustTechEntry {
     /// Per-tech-slot fractions (`tchfrc(idxtch, 1..n)`). Must be the
     /// same length as `tech_names`.
     pub tech_fractions: Vec<f32>,
+    /// BSFC (brake-specific fuel consumption) in lb/HP-hr per tech slot.
+    /// Used by `compute_exhaust_factors` to populate the BSFC array for
+    /// CO2 and SOx calculations. Must be the same length as `tech_names`.
+    pub bsfc: Vec<f32>,
 }
 
 /// One evap-tech-type entry for [`ProductionExecutor`] (Fortran `fndevtch`).
