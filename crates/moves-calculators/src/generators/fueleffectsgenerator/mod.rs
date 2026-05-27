@@ -38,7 +38,7 @@
 //! `generalFuelRatioExpression`, `FuelFormulation`, `FuelSubtype`, and
 //! `FuelSupply` from the context, assembles a [`GeneralFuelRatioInputs`],
 //! calls the kernel, and writes the resulting rows to the scratch
-//! `generalFuelRatio` table via [`crate::wiring::write_scratch_table`].
+//! `generalFuelRatio` table via `crate::wiring::write_scratch_table`.
 //!
 //! [`execute`]: Generator::execute
 

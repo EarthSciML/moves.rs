@@ -15,8 +15,8 @@
 //! [`run_simulation`](super::run_simulation) *is* that executor — it
 //! walks the planner's [`DriverStep`](crate::driver::DriverStep)s and
 //! invokes a geography routine for each [`Dispatch`]. But the six
-//! routines ([`process_county`](crate::geography::process_county),
-//! [`process_national_record`](crate::geography::process_national_record),
+//! routines ([`process_county`],
+//! [`process_national_record`],
 //! …) are not uniform: they take four different callback traits, each
 //! of which must be populated from the loaded emission-factor,
 //! technology, activity, growth, and retrofit tables. Assembling those
@@ -165,7 +165,7 @@ pub trait GeographyExecutor {
     ///
     /// # Errors
     ///
-    /// Propagates any [`Error`](crate::Error) the geography routine
+    /// Propagates any [`Error`] the geography routine
     /// raises — a non-finite emission accumulator, a missing
     /// allocation coefficient, an exhausted retrofit population, …. An
     /// error aborts the whole run: NONROAD has no per-record error
@@ -323,21 +323,21 @@ impl GeographyExecutor for PlanRecordingExecutor {
 ///
 /// | Method | Fortran | Backing table | Math module | Status |
 /// |--------|---------|---------------|-------------|--------|
-/// | `find_exhaust_tech` | `fndtch(asccod, hpval, year)` | Exhaust tech-type fractions (`tchfrc`, `tectyp`) from NR\*.EF emission-factor files | — (table lookup) | **available** via [`exhaust_tech_entries`](Self::exhaust_tech_entries) |
-/// | `find_evap_tech` | `fndevtch(asccod, hpval, year)` | Evap tech-type fractions (`evtchfrc`, `evtectyp`) from NR\*.EF files | — (table lookup) | **available** via [`evap_tech_entries`](Self::evap_tech_entries) |
+/// | `find_exhaust_tech` | `fndtch(asccod, hpval, year)` | Exhaust tech-type fractions (`tchfrc`, `tectyp`) from NR\*.EF emission-factor files | — (table lookup) | **available** via [`exhaust_tech_entries`](ReferenceData::exhaust_tech_entries) |
+/// | `find_evap_tech` | `fndevtch(asccod, hpval, year)` | Evap tech-type fractions (`evtchfrc`, `evtectyp`) from NR\*.EF files | — (table lookup) | **available** via [`evap_tech_entries`](ReferenceData::evap_tech_entries) |
 ///
 /// ## Activity records
 ///
 /// | Method | Fortran | Backing table | Math module | Status |
 /// |--------|---------|---------------|-------------|--------|
-/// | `find_activity` | `fndact(asccod, fipin, hpval)` | Activity records (`actlev`, `faclod`, `iactun`, `actage`, `starts`) from NR\*.ACT files | — | **available** via [`activity_entries`](Self::activity_entries) |
+/// | `find_activity` | `fndact(asccod, fipin, hpval)` | Activity records (`actlev`, `faclod`, `iactun`, `actage`, `starts`) from NR\*.ACT files | — | **available** via [`activity_entries`](ReferenceData::activity_entries) |
 /// | `activity_record` | reads `actlev(idxact)`, `faclod(idxact)`, `iactun(idxact)`, `actage(idxact)`, `starts(idxact)` | Same NR\*.ACT records as `find_activity` | — | **available** |
 ///
 /// ## Growth cross-reference and growth factors
 ///
 /// | Method | Fortran | Backing table | Math module | Status |
 /// |--------|---------|---------------|-------------|--------|
-/// | `find_growth_xref` | `fndgxf(fipin, asccod, hpval)` | Growth cross-reference table (`gxfdat`) from NR\*.GRW indicator files | — | **available** via [`growth_xref_entries`](Self::growth_xref_entries) |
+/// | `find_growth_xref` | `fndgxf(fipin, asccod, hpval)` | Growth cross-reference table (`gxfdat`) from NR\*.GRW indicator files | — | **available** via [`growth_xref_entries`](ReferenceData::growth_xref_entries) |
 /// | `load_growth` | `getgrw(indcod)` | Growth-factor stream from NR\*.GRW files | `population::growth::select_for_indicator` | **ported** |
 /// | `growth_factor` | `grwfac(year1, year2, fips, indcod)` | Loaded growth records (above) | `population::growth::growth_factor` | **ported** |
 ///
@@ -412,7 +412,7 @@ impl GeographyExecutor for PlanRecordingExecutor {
 #[derive(Debug, Default)]
 pub struct ProductionExecutor {
     /// County FIPS codes in the run (`fipcod(NCNTY)`). Used by
-    /// [`CountyAdapter::find_fips`] to map a region-code to its slot
+    /// `CountyAdapter::find_fips` to map a region-code to its slot
     /// index.
     pub county_fips: Vec<String>,
     /// HP-category midpoints (`hpclev(1..MXHPC)`) used by the

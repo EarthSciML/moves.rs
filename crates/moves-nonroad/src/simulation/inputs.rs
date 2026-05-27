@@ -125,7 +125,7 @@ impl NonroadInputs {
 // Reference-data entry types and ReferenceData bundle
 // =============================================================================
 
-/// One exhaust-tech-type entry for [`ProductionExecutor`] (Fortran `fndtch`).
+/// One exhaust-tech-type entry for [`ProductionExecutor`](super::executor::ProductionExecutor) (Fortran `fndtch`).
 ///
 /// Linear-scan key: `scc` + HP range `[hp_min, hp_max]`. The
 /// `tech_year` field is not currently used in the lookup — the caller
@@ -151,7 +151,7 @@ pub struct ExhaustTechEntry {
     pub bsfc: Vec<f32>,
 }
 
-/// One evap-tech-type entry for [`ProductionExecutor`] (Fortran `fndevtch`).
+/// One evap-tech-type entry for [`ProductionExecutor`](super::executor::ProductionExecutor) (Fortran `fndevtch`).
 ///
 /// Same key and lookup semantics as [`ExhaustTechEntry`].
 #[derive(Debug, Clone, Default)]
@@ -168,7 +168,7 @@ pub struct EvapTechEntry {
     pub tech_fractions: Vec<f32>,
 }
 
-/// Growth cross-reference entry for [`ProductionExecutor`] (Fortran `fndgxf`).
+/// Growth cross-reference entry for [`ProductionExecutor`](super::executor::ProductionExecutor) (Fortran `fndgxf`).
 ///
 /// Maps `(fips, scc, hp range)` → growth indicator code.
 #[derive(Debug, Clone, Default)]
@@ -185,7 +185,7 @@ pub struct GrowthXrefEntry {
     pub indicator: String,
 }
 
-/// Activity lookup entry for [`ProductionExecutor`] (Fortran `fndact`).
+/// Activity lookup entry for [`ProductionExecutor`](super::executor::ProductionExecutor) (Fortran `fndact`).
 ///
 /// Key: `(scc, fips)`. The HP is not matched in the linear scan —
 /// the Fortran `fndact` searches by SCC and FIPS only, then returns
@@ -208,10 +208,10 @@ pub struct ActivityTableEntry {
     pub age_code: String,
 }
 
-/// National-to-state allocation entry for [`ProductionExecutor`].
+/// National-to-state allocation entry for [`ProductionExecutor`](super::executor::ProductionExecutor).
 ///
 /// Identifies an SCC for which national-to-state allocation data is
-/// available. [`NationalAdapter::find_allocation`] succeeds when an
+/// available. `NationalAdapter::find_allocation` succeeds when an
 /// entry for the SCC exists; the actual per-state distribution uses a
 /// uniform placeholder until NR*.ALO loaders are ported.
 #[derive(Debug, Clone, Default)]
@@ -222,10 +222,10 @@ pub struct NationalAllocationEntry {
 
 /// Reference tables loaded once per run by the orchestrator.
 ///
-/// Aggregates every reference table [`ProductionExecutor`] needs to
+/// Aggregates every reference table [`ProductionExecutor`](super::executor::ProductionExecutor) needs to
 /// evaluate the six NONROAD geography routines. Built once by the
 /// orchestrator from the parsed input files and passed by reference to
-/// [`ProductionExecutor::new`].
+/// [`ProductionExecutor::new`](super::executor::ProductionExecutor::new).
 ///
 /// # Fortran COMMON-block sources
 ///

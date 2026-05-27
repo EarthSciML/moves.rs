@@ -127,11 +127,11 @@
 //!
 //! # Execute wiring (pilot — bucket-A canonical shape)
 //!
-//! [`SO2Calculator::execute`] is the bucket-A wiring pilot. [`build_inputs`]
+//! [`SO2Calculator::execute`] is the bucket-A wiring pilot. `build_inputs`
 //! reads each input-table row vector from `ctx.tables()` via
 //! [`DataFrameStoreTyped::iter_typed`], applying position filters that mirror
 //! the SQL `##context.X##` macros when `ctx.position()` carries a concrete
-//! process, county, or year. [`write_rows`] converts the resulting
+//! process, county, or year. `write_rows` converts the resulting
 //! `Vec<So2EmissionRow>` to a `DataFrame` and wraps it in a
 //! [`CalculatorOutput`]. Every other bucket-A calculator mirrors this shape
 //! exactly.

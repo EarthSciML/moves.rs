@@ -6,7 +6,7 @@
 //! call; the fn is a zero-capture function pointer, suitable for a static map.
 //!
 //! Tables whose column layout is not yet catalogued have an empty `Schema`.
-//! [`DataFrameStoreTyped::insert_typed`] skips validation for those entries.
+//! [`DataFrameStoreTyped::insert_typed`](super::DataFrameStoreTyped::insert_typed) skips validation for those entries.
 //!
 //! # Naming convention
 //!

@@ -41,7 +41,7 @@ use crate::error::{Error, Result};
 /// [`DataFrameStore`].
 ///
 /// Implementors live in `moves-calculators` (one per calculator's `*Row`
-/// type); the test in [`crate::data::schema_registry`] provides a minimal
+/// type); the test in `crate::data::schema_registry` provides a minimal
 /// in-framework example.
 pub trait TableRow: Sized {
     /// Canonical table name matching the schema registry key and the

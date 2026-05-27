@@ -103,7 +103,7 @@
 //! `ctx.position()`, calls
 //! [`op_mode_distribution`](LinkOperatingModeDistributionGenerator::op_mode_distribution),
 //! and writes the resulting rows to the scratch-namespace `OpModeDistribution`
-//! table via [`crate::wiring::write_scratch_table`].
+//! table via `crate::wiring::write_scratch_table`.
 
 use std::collections::{HashMap, HashSet};
 
