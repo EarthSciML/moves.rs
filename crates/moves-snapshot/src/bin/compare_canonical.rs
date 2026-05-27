@@ -152,13 +152,22 @@ fn read_canonical(dir: &Path) -> Result<BTreeMap<i64, f64>, Box<dyn std::error::
         }
     };
 
-    let table_name = "db__movesoutput__movesoutput";
-    let table = match snap.table(table_name) {
+    // The output DB name varies per fixture (e.g. `db__out_expand_counties`,
+    // `db__junittestoutput`). Find the table by its suffix rather than its
+    // full name.  Primary suffix first; fall back to activity-output tables
+    // for fixtures that only produce `movesactivityoutput`.
+    let table_name = snap
+        .table_names()
+        .find(|n| n.ends_with("__movesoutput"))
+        .map(str::to_string)
+        .or_else(|| {
+            snap.table_names()
+                .find(|n| n.ends_with("__movesactivityoutput"))
+                .map(str::to_string)
+        });
+    let table = match table_name.as_deref().and_then(|name| snap.table(name)) {
         Some(t) => t,
-        None => {
-            // Table absent — empty run or pre-Phase-3 snapshot.
-            return Ok(sums);
-        }
+        None => return Ok(sums),
     };
 
     let pid_idx = match table.column_index("pollutantID") {
