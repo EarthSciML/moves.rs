@@ -41,7 +41,7 @@ use moves_snapshot::Snapshot;
     version
 )]
 struct Args {
-    /// Canonical fixture snapshot directory (from characterization/snapshots/<fixture>).
+    /// Canonical fixture snapshot directory (from `characterization/snapshots/<fixture>`).
     #[arg(long, value_name = "DIR")]
     canonical: PathBuf,
 
