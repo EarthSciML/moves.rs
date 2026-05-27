@@ -62,14 +62,22 @@
 
 pub mod error;
 pub mod filter;
+// manifest/scan/typed all depend on moves-default-db-convert (parquet/zstd-sys)
+// or on polars-lazy — both have native C deps that refuse to compile for
+// wasm32-unknown-unknown.
+#[cfg(not(target_arch = "wasm32"))]
 pub mod manifest;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod scan;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod typed;
 
 pub use error::{Error, Result};
 pub use filter::{PartitionPredicate, PartitionValue, TableFilter};
+#[cfg(not(target_arch = "wasm32"))]
 pub use manifest::{
     find_table, load as load_manifest, ColumnManifest, Manifest, PartitionManifest,
     SchemaOnlySidecar, TableManifest, EXPECTED_SCHEMA_VERSION, MANIFEST_FILENAME,
 };
+#[cfg(not(target_arch = "wasm32"))]
 pub use scan::DefaultDb;

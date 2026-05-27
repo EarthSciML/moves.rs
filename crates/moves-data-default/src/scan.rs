@@ -179,6 +179,10 @@ fn select_partitions<'a>(
 /// "no match" case is normal (e.g., year=1900 against a default DB that
 /// stops at 1999) and the caller shouldn't have to handle it as an
 /// error.
+///
+/// The wasm32 target has no filesystem access; this path is unreachable
+/// in the browser build and exists only to satisfy the type-checker.
+#[cfg(not(target_arch = "wasm32"))]
 fn scan_partitions(root: &Path, partitions: &[&PartitionManifest]) -> Result<LazyFrame> {
     if partitions.is_empty() {
         return empty_frame();
@@ -198,6 +202,11 @@ fn scan_partitions(root: &Path, partitions: &[&PartitionManifest]) -> Result<Laz
         .map(|p| LazyFrame::scan_parquet(p, ScanArgsParquet::default()))
         .collect::<polars::error::PolarsResult<Vec<_>>>()?;
     Ok(concat(lfs, UnionArgs::default())?)
+}
+
+#[cfg(target_arch = "wasm32")]
+fn scan_partitions(_root: &Path, _partitions: &[&PartitionManifest]) -> Result<LazyFrame> {
+    unreachable!("filesystem scan_parquet is not available in the wasm32 build")
 }
 
 /// Build an empty [`LazyFrame`]. Used when partition pruning eliminated

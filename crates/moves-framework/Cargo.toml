@@ -17,19 +17,22 @@ moves-calculator-info = { path = "../moves-calculator-info" }
 moves-data = { path = "../moves-data" }
 moves-data-default = { path = "../moves-data-default" }
 moves-runspec = { path = "../moves-runspec" }
-polars = { workspace = true }
 rayon = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
 thiserror = { workspace = true }
 
-# parquet is target-conditional: native gets full codec support; WASM gets
+# polars/parquet activates new_streaming → polars-stream → polars-io/file_cache
+# → tokio/net → mio, which refuses to compile for wasm32-unknown-unknown.
+# parquet is also target-conditional: native gets full codec support; WASM gets
 # only the pure-Rust arrow layer (no C-compiled zstd/snappy/brotli/lz4).
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 parquet = { workspace = true }
+polars = { workspace = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 parquet = { version = "55", default-features = false, features = ["arrow", "base64"] }
+polars = { version = "0.53", default-features = false }  # polars-core only — no lazy/parquet → no mio
 
 [dev-dependencies]
 bytes = { workspace = true }
