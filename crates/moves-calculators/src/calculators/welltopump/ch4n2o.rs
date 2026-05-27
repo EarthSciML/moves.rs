@@ -99,10 +99,14 @@ use std::collections::BTreeMap;
 
 use moves_data::PollutantProcessAssociation;
 use moves_framework::{
-    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, Error,
+    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStoreTyped,
+    Error,
 };
 
-use super::common::{build_wtp_factor_by_fuel_type, month_group_index, WorkerOutputRow, WtpInputs};
+use super::common::{
+    build_wtp_factor_by_fuel_type, month_group_index, FuelFormulationRow, FuelSubTypeRow,
+    FuelSupplyRow, GreetWellToPumpRow, MonthGroupRow, WorkerOutputRow, WtpInputs, YearRow,
+};
 
 /// Stable module name — matches the Java class and the `CH4N2OWTPCalculator`
 /// entry in the calculator-chain DAG (`calculator-dag.json`).
@@ -280,8 +284,20 @@ impl Calculator for Ch4N2oWtpCalculator {
     /// `MOVESWorkerOutput` rows — that lands with the Task 50 `DataFrameStore`.
     /// The computation is ported and tested in
     /// [`Ch4N2oWtpCalculator::calculate`].
-    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
-        Ok(CalculatorOutput::empty())
+    fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
+        let tables = ctx.tables();
+        let inputs = WtpInputs {
+            greet: tables.iter_typed::<GreetWellToPumpRow>("GREETWellToPump")?,
+            fuel_supply: tables.iter_typed::<FuelSupplyRow>("FuelSupply")?,
+            fuel_formulation: tables.iter_typed::<FuelFormulationRow>("FuelFormulation")?,
+            fuel_sub_type: tables.iter_typed::<FuelSubTypeRow>("FuelSubtype")?,
+            year: tables.iter_typed::<YearRow>("Year")?,
+            month_of_any_year: tables.iter_typed::<MonthGroupRow>("MonthOfAnyYear")?,
+            worker_output: tables.iter_typed::<WorkerOutputRow>("MOVESWorkerOutput")?,
+            target_year: ctx.position().time.year.map(|y| i32::from(y)).unwrap_or(0),
+        };
+        let rows = self.calculate(&inputs);
+        crate::wiring::emit_rows(rows)
     }
 }
 
@@ -490,9 +506,21 @@ mod tests {
     }
 
     #[test]
-    fn execute_is_a_shell_until_the_data_plane_lands() {
-        let ctx = CalculatorContext::new();
-        assert!(Ch4N2oWtpCalculator.execute(&ctx).is_ok());
+    fn execute_returns_nonempty_dataframe_for_minimal_inputs() {
+        use moves_framework::{DataFrameStore, InMemoryStore, TableRow};
+        let inputs = minimal_inputs();
+        let mut store = InMemoryStore::new();
+        store.insert("GREETWellToPump", GreetWellToPumpRow::into_dataframe(inputs.greet).unwrap());
+        store.insert("FuelSupply", FuelSupplyRow::into_dataframe(inputs.fuel_supply).unwrap());
+        store.insert("FuelFormulation", FuelFormulationRow::into_dataframe(inputs.fuel_formulation).unwrap());
+        store.insert("FuelSubtype", FuelSubTypeRow::into_dataframe(inputs.fuel_sub_type).unwrap());
+        store.insert("Year", YearRow::into_dataframe(inputs.year).unwrap());
+        store.insert("MonthOfAnyYear", MonthGroupRow::into_dataframe(inputs.month_of_any_year).unwrap());
+        store.insert("MOVESWorkerOutput", WorkerOutputRow::into_dataframe(inputs.worker_output).unwrap());
+        let ctx = CalculatorContext::with_tables(store);
+        let out = Ch4N2oWtpCalculator.execute(&ctx).expect("execute ok");
+        let df = out.dataframe().expect("output should contain a DataFrame");
+        assert!(df.height() > 0, "minimal inputs produce at least one row");
     }
 
     #[test]

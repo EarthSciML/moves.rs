@@ -102,10 +102,21 @@ use std::collections::{BTreeMap, HashMap};
 
 use moves_data::PollutantProcessAssociation;
 use moves_framework::{
-    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, Error,
+    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStoreTyped,
+    Error, TableRow,
 };
+use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
 
 use super::common::WorkerOutputRow;
+
+fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -> Error {
+    Error::RowExtraction {
+        table: table.into(),
+        row,
+        column: column.into(),
+        message: msg,
+    }
+}
 
 /// Stable module name — matches the Java class (misspelling and all) and the
 /// `CO2EqivalentWTPCalculator` entry in the chain DAG (`calculator-dag.json`).
@@ -135,6 +146,38 @@ pub struct PollutantGwpRow {
     pub pollutant_id: i32,
     /// `globalWarmingPotential` — the `SMALLINT` climate-impact multiplier.
     pub global_warming_potential: i32,
+}
+
+impl TableRow for PollutantGwpRow {
+    fn table_name() -> &'static str { "Pollutant" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("pollutantID".into(), DataType::Int32),
+            ("globalWarmingPotential".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("pollutantID".into(), rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>()).into(),
+            Series::new("globalWarmingPotential".into(), rows.iter().map(|r| r.global_warming_potential).collect::<Vec<i32>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "Pollutant";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let po = get_i32("pollutantID")?;
+        let gw = get_i32("globalWarmingPotential")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(PollutantGwpRow {
+                pollutant_id: po.get(i).ok_or_else(|| null("pollutantID"))?,
+                global_warming_potential: gw.get(i).ok_or_else(|| null("globalWarmingPotential"))?,
+            })
+        }).collect()
+    }
 }
 
 /// Inputs to [`Co2EquivalentWtpCalculator::calculate`] — the tables the SQL's
@@ -310,8 +353,14 @@ impl Calculator for Co2EquivalentWtpCalculator {
     /// `MOVESWorkerOutput` rows — that lands with the Task 50 `DataFrameStore`.
     /// The computation is ported and tested in
     /// [`Co2EquivalentWtpCalculator::calculate`].
-    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
-        Ok(CalculatorOutput::empty())
+    fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
+        let tables = ctx.tables();
+        let inputs = Co2EquivalentWtpInputs {
+            worker_output: tables.iter_typed::<WorkerOutputRow>("MOVESWorkerOutput")?,
+            pollutant_gwp: tables.iter_typed::<PollutantGwpRow>("Pollutant")?,
+        };
+        let rows = self.calculate(&inputs);
+        crate::wiring::emit_rows(rows)
     }
 }
 
@@ -509,9 +558,16 @@ mod tests {
     }
 
     #[test]
-    fn execute_is_a_shell_until_the_data_plane_lands() {
-        let ctx = CalculatorContext::new();
-        assert!(Co2EquivalentWtpCalculator.execute(&ctx).is_ok());
+    fn execute_returns_nonempty_dataframe_for_minimal_inputs() {
+        use moves_framework::{DataFrameStore, InMemoryStore, TableRow};
+        let inputs = minimal_inputs();
+        let mut store = InMemoryStore::new();
+        store.insert("MOVESWorkerOutput", WorkerOutputRow::into_dataframe(inputs.worker_output).unwrap());
+        store.insert("Pollutant", PollutantGwpRow::into_dataframe(inputs.pollutant_gwp).unwrap());
+        let ctx = CalculatorContext::with_tables(store);
+        let out = Co2EquivalentWtpCalculator.execute(&ctx).expect("execute ok");
+        let df = out.dataframe().expect("output should contain a DataFrame");
+        assert!(df.height() > 0, "minimal inputs produce at least one row");
     }
 
     #[test]
