@@ -79,8 +79,10 @@
 
 use moves_data::PollutantProcessAssociation;
 use moves_framework::{
-    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, Error,
+    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStoreTyped,
+    Error, TableRow,
 };
+use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
 
 /// Stable module name in the calculator-chain DAG — matches the Java class.
 const CALCULATOR_NAME: &str = "PMTotalExhaustCalculator";
@@ -254,6 +256,101 @@ impl PmTotalExhaustCalculator {
     }
 }
 
+fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -> moves_framework::Error {
+    moves_framework::Error::RowExtraction { table: table.into(), row, column: column.into(), message: msg }
+}
+
+impl TableRow for PmWorkerRow {
+    fn table_name() -> &'static str { "MOVESWorkerOutput" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("yearID".into(), DataType::Int32),
+            ("monthID".into(), DataType::Int32),
+            ("dayID".into(), DataType::Int32),
+            ("hourID".into(), DataType::Int32),
+            ("stateID".into(), DataType::Int32),
+            ("countyID".into(), DataType::Int32),
+            ("zoneID".into(), DataType::Int32),
+            ("linkID".into(), DataType::Int32),
+            ("pollutantID".into(), DataType::Int32),
+            ("processID".into(), DataType::Int32),
+            ("sourceTypeID".into(), DataType::Int32),
+            ("fuelTypeID".into(), DataType::Int32),
+            ("modelYearID".into(), DataType::Int32),
+            ("roadTypeID".into(), DataType::Int32),
+            ("SCC".into(), DataType::String),
+            ("emissionQuant".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("yearID".into(), rows.iter().map(|r| r.year_id).collect::<Vec<i32>>()).into(),
+            Series::new("monthID".into(), rows.iter().map(|r| r.month_id).collect::<Vec<i32>>()).into(),
+            Series::new("dayID".into(), rows.iter().map(|r| r.day_id).collect::<Vec<i32>>()).into(),
+            Series::new("hourID".into(), rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>()).into(),
+            Series::new("stateID".into(), rows.iter().map(|r| r.state_id).collect::<Vec<i32>>()).into(),
+            Series::new("countyID".into(), rows.iter().map(|r| r.county_id).collect::<Vec<i32>>()).into(),
+            Series::new("zoneID".into(), rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>()).into(),
+            Series::new("linkID".into(), rows.iter().map(|r| r.link_id).collect::<Vec<i32>>()).into(),
+            Series::new("pollutantID".into(), rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>()).into(),
+            Series::new("processID".into(), rows.iter().map(|r| r.process_id).collect::<Vec<i32>>()).into(),
+            Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
+            Series::new("fuelTypeID".into(), rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>()).into(),
+            Series::new("modelYearID".into(), rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>()).into(),
+            Series::new("roadTypeID".into(), rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>()).into(),
+            Series::new("SCC".into(), rows.iter().map(|r| r.scc.clone()).collect::<Vec<Option<String>>>()).into(),
+            Series::new("emissionQuant".into(), rows.iter().map(|r| r.emission_quant).collect::<Vec<f64>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "MOVESWorkerOutput";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let year_id = get_i32("yearID")?;
+        let month_id = get_i32("monthID")?;
+        let day_id = get_i32("dayID")?;
+        let hour_id = get_i32("hourID")?;
+        let state_id = get_i32("stateID")?;
+        let county_id = get_i32("countyID")?;
+        let zone_id = get_i32("zoneID")?;
+        let link_id = get_i32("linkID")?;
+        let pollutant_id = get_i32("pollutantID")?;
+        let process_id = get_i32("processID")?;
+        let source_type_id = get_i32("sourceTypeID")?;
+        let fuel_type_id = get_i32("fuelTypeID")?;
+        let model_year_id = get_i32("modelYearID")?;
+        let road_type_id = get_i32("roadTypeID")?;
+        let scc_ca = df.column("SCC").map_err(|e| row_err(t, 0, "SCC", e.to_string()))?.str().map_err(|e| row_err(t, 0, "SCC", e.to_string()))?;
+        let emission_quant = get_f64("emissionQuant")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(PmWorkerRow {
+                year_id: year_id.get(i).ok_or_else(|| null("yearID"))?,
+                month_id: month_id.get(i).ok_or_else(|| null("monthID"))?,
+                day_id: day_id.get(i).ok_or_else(|| null("dayID"))?,
+                hour_id: hour_id.get(i).ok_or_else(|| null("hourID"))?,
+                state_id: state_id.get(i).ok_or_else(|| null("stateID"))?,
+                county_id: county_id.get(i).ok_or_else(|| null("countyID"))?,
+                zone_id: zone_id.get(i).ok_or_else(|| null("zoneID"))?,
+                link_id: link_id.get(i).ok_or_else(|| null("linkID"))?,
+                pollutant_id: pollutant_id.get(i).ok_or_else(|| null("pollutantID"))?,
+                process_id: process_id.get(i).ok_or_else(|| null("processID"))?,
+                source_type_id: source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                fuel_type_id: fuel_type_id.get(i).ok_or_else(|| null("fuelTypeID"))?,
+                model_year_id: model_year_id.get(i).ok_or_else(|| null("modelYearID"))?,
+                road_type_id: road_type_id.get(i).ok_or_else(|| null("roadTypeID"))?,
+                scc: scc_ca.get(i).map(|s| s.to_string()),
+                emission_quant: emission_quant.get(i).ok_or_else(|| null("emissionQuant"))?,
+            })
+        }).collect()
+    }
+}
+
 /// `PMTotalExhaustCalculator` carries no master-loop subscription: it is a
 /// chained calculator. See [`Calculator::subscriptions`].
 static NO_SUBSCRIPTIONS: &[CalculatorSubscription] = &[];
@@ -301,13 +398,10 @@ impl Calculator for PmTotalExhaustCalculator {
         &[]
     }
 
-    /// Shell pending the Task 50 data plane — see the module docs. The
-    /// faithful re-label is [`PmTotalExhaustCalculator::run`]; once
-    /// `ExecutionTables` carries real rows, this body reads the worker-output
-    /// rows from `_ctx`, calls `run` with the RunSpec-implied
-    /// [`TotalSelection`], and appends the result.
-    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
-        Ok(CalculatorOutput::empty())
+    fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
+        let rows: Vec<PmWorkerRow> = ctx.tables().iter_typed("MOVESWorkerOutput")?;
+        let out_rows = self.run(&rows, TotalSelection::both());
+        crate::wiring::emit_rows(out_rows)
     }
 }
 
@@ -359,10 +453,25 @@ mod tests {
     }
 
     #[test]
-    fn execute_is_a_shell_until_the_data_plane_lands() {
+    fn execute_returns_nonempty_dataframe_for_minimal_inputs() {
+        use moves_framework::{DataFrameStore, InMemoryStore};
+        use moves_framework::execution::execution_db::{ExecutionLocation, ExecutionTime, IterationPosition};
+
+        // One PM2.5 component row (ec = 112) — relabelled to 110 by PM25Total.
+        let input = vec![row(112, 2.0)];
+        let mut store = InMemoryStore::new();
+        store.insert("MOVESWorkerOutput", PmWorkerRow::into_dataframe(input).unwrap());
+        let position = IterationPosition {
+            iteration: 0,
+            process_id: None,
+            location: ExecutionLocation::link(26, 26_161, 261_610, 2_616_101),
+            time: ExecutionTime::year(2020),
+        };
+        let ctx = CalculatorContext::with_position_and_tables(position, store);
         let calc = PmTotalExhaustCalculator::new();
-        let ctx = CalculatorContext::new();
-        assert!(calc.execute(&ctx).is_ok());
+        let out = calc.execute(&ctx).expect("execute ok");
+        assert!(out.dataframe().is_some(), "expected non-empty DataFrame");
+        assert!(out.dataframe().unwrap().height() > 0, "expected at least one row");
     }
 
     #[test]
