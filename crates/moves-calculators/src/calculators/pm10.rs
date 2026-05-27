@@ -135,8 +135,10 @@ use std::collections::HashMap;
 
 use moves_data::{PollutantId, PollutantProcessAssociation, ProcessId};
 use moves_framework::{
-    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, Error,
+    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStoreTyped,
+    Error, TableRow,
 };
+use polars::prelude::*;
 
 /// Stable module name of the exhaust PM10 calculator — matches the Java class
 /// and the `PM10EmissionCalculator` entry in `calculator-dag.json`.
@@ -302,6 +304,260 @@ pub struct Pm10Inputs {
     /// `PM10PollutantProcessAssoc` rows — the legal `(PM10 pollutant, process)`
     /// pairs, resolving each to its ratio-keying `polProcessID`.
     pub pm10_pollutant_process_assoc: Vec<Pm10PollutantProcessAssocRow>,
+}
+
+// ===========================================================================
+// DataFrame ↔ row-struct conversions — `TableRow` implementations and the
+// `build_inputs` constructor that reads them from `CalculatorContext`.
+// ===========================================================================
+
+fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -> Error {
+    Error::RowExtraction {
+        table: table.to_owned(),
+        row,
+        column: column.to_owned(),
+        message: msg,
+    }
+}
+
+impl TableRow for MovesWorkerOutputRow {
+    fn table_name() -> &'static str {
+        "MOVESWorkerOutput"
+    }
+
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("yearID".into(), DataType::Int32),
+            ("monthID".into(), DataType::Int32),
+            ("dayID".into(), DataType::Int32),
+            ("hourID".into(), DataType::Int32),
+            ("stateID".into(), DataType::Int32),
+            ("countyID".into(), DataType::Int32),
+            ("zoneID".into(), DataType::Int32),
+            ("linkID".into(), DataType::Int32),
+            ("pollutantID".into(), DataType::Int32),
+            ("processID".into(), DataType::Int32),
+            ("sourceTypeID".into(), DataType::Int32),
+            ("regClassID".into(), DataType::Int32),
+            ("fuelTypeID".into(), DataType::Int32),
+            ("modelYearID".into(), DataType::Int32),
+            ("roadTypeID".into(), DataType::Int32),
+            ("emissionQuant".into(), DataType::Float64),
+            ("emissionRate".into(), DataType::Float64),
+        ])
+    }
+
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new("yearID".into(), rows.iter().map(|r| r.year_id).collect::<Vec<i32>>()).into(),
+                Series::new("monthID".into(), rows.iter().map(|r| r.month_id).collect::<Vec<i32>>()).into(),
+                Series::new("dayID".into(), rows.iter().map(|r| r.day_id).collect::<Vec<i32>>()).into(),
+                Series::new("hourID".into(), rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>()).into(),
+                Series::new("stateID".into(), rows.iter().map(|r| r.state_id).collect::<Vec<i32>>()).into(),
+                Series::new("countyID".into(), rows.iter().map(|r| r.county_id).collect::<Vec<i32>>()).into(),
+                Series::new("zoneID".into(), rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>()).into(),
+                Series::new("linkID".into(), rows.iter().map(|r| r.link_id).collect::<Vec<i32>>()).into(),
+                Series::new("pollutantID".into(), rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>()).into(),
+                Series::new("processID".into(), rows.iter().map(|r| r.process_id).collect::<Vec<i32>>()).into(),
+                Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
+                Series::new("regClassID".into(), rows.iter().map(|r| r.reg_class_id).collect::<Vec<i32>>()).into(),
+                Series::new("fuelTypeID".into(), rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>()).into(),
+                Series::new("modelYearID".into(), rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>()).into(),
+                Series::new("roadTypeID".into(), rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>()).into(),
+                Series::new("emissionQuant".into(), rows.iter().map(|r| r.emission_quant).collect::<Vec<f64>>()).into(),
+                Series::new("emissionRate".into(), rows.iter().map(|r| r.emission_rate).collect::<Vec<f64>>()).into(),
+            ],
+        )
+    }
+
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "MOVESWorkerOutput";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .f64()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let year = get_i32("yearID")?;
+        let month = get_i32("monthID")?;
+        let day = get_i32("dayID")?;
+        let hour = get_i32("hourID")?;
+        let state = get_i32("stateID")?;
+        let county = get_i32("countyID")?;
+        let zone = get_i32("zoneID")?;
+        let link = get_i32("linkID")?;
+        let pollutant = get_i32("pollutantID")?;
+        let process = get_i32("processID")?;
+        let src_type = get_i32("sourceTypeID")?;
+        let reg_class = get_i32("regClassID")?;
+        let fuel_type = get_i32("fuelTypeID")?;
+        let model_year = get_i32("modelYearID")?;
+        let road_type = get_i32("roadTypeID")?;
+        let emission_quant = get_f64("emissionQuant")?;
+        let emission_rate = get_f64("emissionRate")?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(MovesWorkerOutputRow {
+                    year_id: year.get(i).ok_or_else(|| null("yearID"))?,
+                    month_id: month.get(i).ok_or_else(|| null("monthID"))?,
+                    day_id: day.get(i).ok_or_else(|| null("dayID"))?,
+                    hour_id: hour.get(i).ok_or_else(|| null("hourID"))?,
+                    state_id: state.get(i).ok_or_else(|| null("stateID"))?,
+                    county_id: county.get(i).ok_or_else(|| null("countyID"))?,
+                    zone_id: zone.get(i).ok_or_else(|| null("zoneID"))?,
+                    link_id: link.get(i).ok_or_else(|| null("linkID"))?,
+                    pollutant_id: pollutant.get(i).ok_or_else(|| null("pollutantID"))?,
+                    process_id: process.get(i).ok_or_else(|| null("processID"))?,
+                    source_type_id: src_type.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                    reg_class_id: reg_class.get(i).ok_or_else(|| null("regClassID"))?,
+                    fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
+                    model_year_id: model_year.get(i).ok_or_else(|| null("modelYearID"))?,
+                    road_type_id: road_type.get(i).ok_or_else(|| null("roadTypeID"))?,
+                    emission_quant: emission_quant.get(i).ok_or_else(|| null("emissionQuant"))?,
+                    emission_rate: emission_rate.get(i).ok_or_else(|| null("emissionRate"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for Pm10EmissionRatioRow {
+    fn table_name() -> &'static str {
+        "PM10EmissionRatio"
+    }
+
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("polProcessID".into(), DataType::Int32),
+            ("sourceTypeID".into(), DataType::Int32),
+            ("fuelTypeID".into(), DataType::Int32),
+            ("minModelYearID".into(), DataType::Int32),
+            ("maxModelYearID".into(), DataType::Int32),
+            ("PM10PM25Ratio".into(), DataType::Float64),
+        ])
+    }
+
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new("polProcessID".into(), rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>()).into(),
+                Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
+                Series::new("fuelTypeID".into(), rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>()).into(),
+                Series::new("minModelYearID".into(), rows.iter().map(|r| r.min_model_year_id).collect::<Vec<i32>>()).into(),
+                Series::new("maxModelYearID".into(), rows.iter().map(|r| r.max_model_year_id).collect::<Vec<i32>>()).into(),
+                Series::new("PM10PM25Ratio".into(), rows.iter().map(|r| r.pm10_pm25_ratio).collect::<Vec<f64>>()).into(),
+            ],
+        )
+    }
+
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "PM10EmissionRatio";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let pol_process = get_i32("polProcessID")?;
+        let src_type = get_i32("sourceTypeID")?;
+        let fuel_type = get_i32("fuelTypeID")?;
+        let min_my = get_i32("minModelYearID")?;
+        let max_my = get_i32("maxModelYearID")?;
+        let ratio = df
+            .column("PM10PM25Ratio")
+            .map_err(|e| row_err(t, 0, "PM10PM25Ratio", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "PM10PM25Ratio", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(Pm10EmissionRatioRow {
+                    pol_process_id: pol_process.get(i).ok_or_else(|| null("polProcessID"))?,
+                    source_type_id: src_type.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                    fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
+                    min_model_year_id: min_my.get(i).ok_or_else(|| null("minModelYearID"))?,
+                    max_model_year_id: max_my.get(i).ok_or_else(|| null("maxModelYearID"))?,
+                    pm10_pm25_ratio: ratio.get(i).ok_or_else(|| null("PM10PM25Ratio"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for Pm10PollutantProcessAssocRow {
+    fn table_name() -> &'static str {
+        "PollutantProcessAssoc"
+    }
+
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("polProcessID".into(), DataType::Int32),
+            ("processID".into(), DataType::Int32),
+            ("pollutantID".into(), DataType::Int32),
+        ])
+    }
+
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new("polProcessID".into(), rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>()).into(),
+                Series::new("processID".into(), rows.iter().map(|r| r.process_id).collect::<Vec<i32>>()).into(),
+                Series::new("pollutantID".into(), rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>()).into(),
+            ],
+        )
+    }
+
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "PollutantProcessAssoc";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let pol_process = get_i32("polProcessID")?;
+        let process = get_i32("processID")?;
+        let pollutant = get_i32("pollutantID")?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(Pm10PollutantProcessAssocRow {
+                    pol_process_id: pol_process.get(i).ok_or_else(|| null("polProcessID"))?,
+                    process_id: process.get(i).ok_or_else(|| null("processID"))?,
+                    pollutant_id: pollutant.get(i).ok_or_else(|| null("pollutantID"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+/// Read all PM10 calculator input tables from `ctx.tables()`.
+fn build_inputs(ctx: &CalculatorContext) -> Result<Pm10Inputs, Error> {
+    let tables = ctx.tables();
+    let filter = crate::wiring::position_filter(ctx);
+    Ok(Pm10Inputs {
+        worker_output: tables
+            .iter_typed::<MovesWorkerOutputRow>("MOVESWorkerOutput")?
+            .into_iter()
+            .filter(|r| filter.matches(r.year_id, r.county_id, r.process_id))
+            .collect(),
+        pm10_emission_ratio: tables.iter_typed("PM10EmissionRatio")?,
+        pm10_pollutant_process_assoc: tables.iter_typed("PollutantProcessAssoc")?,
+    })
 }
 
 /// One active `(source PM2.5 pollutant, output PM10 pollutant)` mapping — one
@@ -540,14 +796,10 @@ impl Calculator for PM10EmissionCalculator {
         INPUT_TABLES
     }
 
-    /// Phase 2 skeleton — returns an empty [`CalculatorOutput`].
-    ///
-    /// [`CalculatorContext`] cannot yet surface the input tables or accept the
-    /// `MOVESWorkerOutput` rows — its row storage lands with the Task 50
-    /// `DataFrameStore`. The computation itself is ported and tested in
-    /// [`PM10EmissionCalculator::calculate`]; see the [module documentation](self).
-    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
-        Ok(CalculatorOutput::empty())
+    fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
+        let inputs = build_inputs(ctx)?;
+        let rows = self.calculate(&inputs);
+        crate::wiring::emit_rows(rows)
     }
 }
 
@@ -654,14 +906,10 @@ impl Calculator for PM10BrakeTireCalculator {
         INPUT_TABLES
     }
 
-    /// Phase 2 skeleton — returns an empty [`CalculatorOutput`].
-    ///
-    /// See [`PM10EmissionCalculator::execute`] — the brake/tire variant has
-    /// the identical Phase 2 shell, delegating to
-    /// [`PM10BrakeTireCalculator::calculate`] once the Task 50 data plane
-    /// lands.
-    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
-        Ok(CalculatorOutput::empty())
+    fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
+        let inputs = build_inputs(ctx)?;
+        let rows = self.calculate(&inputs);
+        crate::wiring::emit_rows(rows)
     }
 }
 
@@ -1069,10 +1317,53 @@ mod tests {
     }
 
     #[test]
-    fn execute_is_a_shell_until_the_data_plane_lands() {
-        let ctx = CalculatorContext::new();
-        assert!(PM10EmissionCalculator::new().execute(&ctx).is_ok());
-        assert!(PM10BrakeTireCalculator::new().execute(&ctx).is_ok());
+    fn execute_wires_through_data_plane() {
+        use moves_framework::DataFrameStore;
+        // Seed store with the emission_scales_total_pm25_into_total_pm10 scenario:
+        // one Total PM2.5 (110) worker row, one PM10EmissionRatio (ratio 1.5),
+        // one PollutantProcessAssoc mapping (100, process 1) → polProcessID 10001.
+        let worker = worker_row(TOTAL_PM25_POLLUTANT_ID, 1);
+        let ratio = ratio_row(10_001, 1.5);
+        let ppa = ppa_row(1, TOTAL_PM10_POLLUTANT_ID);
+
+        let mut store = moves_framework::InMemoryStore::new();
+        store.insert("MOVESWorkerOutput", MovesWorkerOutputRow::into_dataframe(vec![worker]).unwrap());
+        store.insert("PM10EmissionRatio", Pm10EmissionRatioRow::into_dataframe(vec![ratio]).unwrap());
+        store.insert("PollutantProcessAssoc", Pm10PollutantProcessAssocRow::into_dataframe(vec![ppa]).unwrap());
+
+        let ctx = CalculatorContext::with_tables(store);
+        let out = PM10EmissionCalculator::new().execute(&ctx).expect("execute ok");
+        let df = out.dataframe().expect("output should contain a DataFrame");
+        assert_eq!(df.height(), 1, "one PM2.5 source row produces one PM10 row");
+        let quant = df.column("emissionQuant").unwrap().f64().unwrap().get(0).unwrap();
+        let rate = df.column("emissionRate").unwrap().f64().unwrap().get(0).unwrap();
+        assert!((quant - 300.0).abs() < 1e-9, "emissionQuant {quant} != 300.0");
+        assert!((rate - 7.5).abs() < 1e-9, "emissionRate {rate} != 7.5");
+    }
+
+    #[test]
+    fn brake_tire_execute_wires_through_data_plane() {
+        use moves_framework::DataFrameStore;
+        // Seed store with the brake_tire_scales_brakewear_and_tirewear_pm25 scenario.
+        let workers = vec![
+            worker_row(BRAKEWEAR_PM25_POLLUTANT_ID, 9),
+            worker_row(TIREWEAR_PM25_POLLUTANT_ID, 10),
+        ];
+        let ratios = vec![ratio_row(10_609, 1.5), ratio_row(10_710, 3.0)];
+        let ppas = vec![
+            ppa_row(9, BRAKEWEAR_PM10_POLLUTANT_ID),
+            ppa_row(10, TIREWEAR_PM10_POLLUTANT_ID),
+        ];
+
+        let mut store = moves_framework::InMemoryStore::new();
+        store.insert("MOVESWorkerOutput", MovesWorkerOutputRow::into_dataframe(workers).unwrap());
+        store.insert("PM10EmissionRatio", Pm10EmissionRatioRow::into_dataframe(ratios).unwrap());
+        store.insert("PollutantProcessAssoc", Pm10PollutantProcessAssocRow::into_dataframe(ppas).unwrap());
+
+        let ctx = CalculatorContext::with_tables(store);
+        let out = PM10BrakeTireCalculator::new().execute(&ctx).expect("execute ok");
+        let df = out.dataframe().expect("output should contain a DataFrame");
+        assert_eq!(df.height(), 2, "two PM2.5 source rows produce two PM10 rows");
     }
 
     #[test]
