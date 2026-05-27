@@ -23,11 +23,15 @@
 //!   `fn() -> polars::Schema`.
 
 pub mod conversions;
+// parquet_io uses polars ParquetReader/Writer which require the polars `parquet`
+// feature — excluded on wasm32 to break the polars-stream → tokio/net → mio chain.
+#[cfg(not(target_arch = "wasm32"))]
 pub mod parquet_io;
 pub mod schema_registry;
 pub mod store;
 
 pub use conversions::{DataFrameStoreTyped, IntoDataFrame, TableRow};
+#[cfg(not(target_arch = "wasm32"))]
 pub use parquet_io::DataFrameStoreParquet;
 pub use schema_registry::{schema_registry, KNOWN_CALCULATOR_INPUT_TABLES};
 pub use store::InMemoryStore;

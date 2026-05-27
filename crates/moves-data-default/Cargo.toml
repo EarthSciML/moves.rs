@@ -12,11 +12,18 @@ description = "Lazy-loading reader over the converted MOVES default-DB Parquet l
 path = "src/lib.rs"
 
 [dependencies]
-moves-default-db-convert = { path = "../moves-default-db-convert" }
-polars = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
+
+# moves-default-db-convert and polars/parquet have native C deps (zstd-sys, etc.)
+# that refuse to compile for wasm32-unknown-unknown.  Gate both to native-only.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+moves-default-db-convert = { path = "../moves-default-db-convert" }
+polars = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+polars = { version = "0.53", default-features = false }  # polars-core only — no lazy/parquet → no mio
 
 [dev-dependencies]
 moves-default-db-convert = { path = "../moves-default-db-convert" }

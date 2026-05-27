@@ -15,8 +15,16 @@ path = "src/lib.rs"
 moves-calculator-info = { path = "../moves-calculator-info" }
 moves-data = { path = "../moves-data" }
 moves-framework = { path = "../moves-framework" }
-polars = { workspace = true }
 thiserror = { workspace = true }
+
+# polars/parquet activates new_streaming → polars-stream → polars-io/file_cache
+# → tokio/net → mio, which refuses to compile for wasm32-unknown-unknown.
+# Exclude the parquet feature on that target to break the chain.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+polars = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+polars = { version = "0.53", default-features = false }  # polars-core only — no lazy/parquet → no mio
 
 [dev-dependencies]
 # Task 44 generator integration-validation harness (tests/generator_integration.rs).

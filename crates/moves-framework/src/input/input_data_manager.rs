@@ -59,11 +59,18 @@
 use std::collections::BTreeSet;
 
 use moves_data::PolProcessId;
-use moves_data_default::{DefaultDb, Error as DefaultDbError, TableFilter};
 use moves_runspec::{GeoKind, RunSpec};
+// DefaultDb/TableFilter/LazyFrame/col/lit/Expr — require polars-lazy or
+// moves-default-db-convert, both of which have native C deps (mio, zstd-sys)
+// that refuse to compile for wasm32-unknown-unknown.
+#[cfg(not(target_arch = "wasm32"))]
+use moves_data_default::{DefaultDb, Error as DefaultDbError, TableFilter};
+#[cfg(not(target_arch = "wasm32"))]
 use polars::prelude::{col, lit, Expr, LazyFrame, NamedFrom, Series};
 
+#[cfg(not(target_arch = "wasm32"))]
 use crate::data::{DataFrameStore, InMemoryStore};
+#[cfg(not(target_arch = "wasm32"))]
 use crate::error::{Error, Result};
 
 // ---------------------------------------------------------------------------
@@ -892,6 +899,7 @@ impl InputDataManager {
     /// # Errors
     ///
     /// Returns [`crate::Error::Polars`] if Polars fails to collect a frame.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn execute(plan: &MergePlan, db: &DefaultDb) -> Result<InMemoryStore> {
         let mut store = InMemoryStore::new();
         for table_plan in &plan.tables {
@@ -1470,6 +1478,7 @@ pub fn default_tables() -> Vec<MergeTableSpec> {
 /// Apply a slice of [`WhereClause`] predicates to a [`LazyFrame`] as Polars
 /// `filter` expressions. Each clause becomes one `.filter(expr)` call;
 /// multiple clauses are AND-chained by folding.
+#[cfg(not(target_arch = "wasm32"))]
 fn apply_where_clauses(lf: LazyFrame, clauses: &[WhereClause]) -> LazyFrame {
     clauses
         .iter()
@@ -1482,6 +1491,7 @@ fn apply_where_clauses(lf: LazyFrame, clauses: &[WhereClause]) -> LazyFrame {
 /// * [`WhereClause::ModelYearRanges`] — `OR` chain of overlapping ranges
 ///   `(col <= year AND col >= year-40)`.
 /// * [`WhereClause::PolProcessIds`] — `col < 0 OR col IN (ids)`.
+#[cfg(not(target_arch = "wasm32"))]
 fn where_clause_to_expr(clause: &WhereClause) -> Expr {
     match clause {
         WhereClause::InList { column, values } => {
