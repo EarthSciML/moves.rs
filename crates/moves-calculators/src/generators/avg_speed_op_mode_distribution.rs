@@ -97,10 +97,14 @@ use std::cmp::Ordering;
 use std::collections::HashSet;
 
 use moves_calculator_info::{Granularity, Priority};
-use moves_data::{PolProcessId, PollutantProcessAssociation, ProcessId, RoadTypeId, SourceTypeId};
-use moves_framework::{
-    CalculatorContext, CalculatorOutput, CalculatorSubscription, Error, Generator,
+use moves_data::{
+    PolProcessId, PollutantId, PollutantProcessAssociation, ProcessId, RoadTypeId, SourceTypeId,
 };
+use moves_framework::{
+    CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStoreTyped, Error,
+    Generator, TableRow,
+};
+use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
 
 /// Tirewear — process id 10. The only process this generator handles;
 /// `executeLoop` errors out for any other process.
@@ -472,6 +476,348 @@ pub fn project_op_mode_fractions(inputs: &ProjectInputs<'_>) -> Vec<RatesOpModeD
     insert_ignore(rows)
 }
 
+// ============================================================================
+// Data-plane wiring (Task 50)
+// ============================================================================
+
+/// Build a [`Error::RowExtraction`] for a missing/bad cell in an input table.
+fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -> Error {
+    Error::RowExtraction { table: table.into(), row, column: column.into(), message: msg }
+}
+
+// ---- TableRow for input tables ----
+
+/// A row projected from `avgSpeedBin` for this generator's use.
+impl TableRow for AvgSpeedBin {
+    fn table_name() -> &'static str { "avgSpeedBin" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("avgSpeedBinID".into(), DataType::Int32),
+            ("avgBinSpeed".into(), DataType::Float64),
+            ("opModeIDTirewear".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("avgSpeedBinID".into(), rows.iter().map(|r| r.avg_speed_bin_id as i32).collect::<Vec<i32>>()).into(),
+            Series::new("avgBinSpeed".into(), rows.iter().map(|r| r.avg_bin_speed).collect::<Vec<f64>>()).into(),
+            Series::new("opModeIDTirewear".into(), rows.iter().map(|r| r.op_mode_id_tirewear.map(|v| v as i32)).collect::<Vec<Option<i32>>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "avgSpeedBin";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let avg_speed_bin_id = get_i32("avgSpeedBinID")?;
+        let avg_bin_speed = get_f64("avgBinSpeed")?;
+        let op_mode_id_tirewear = get_i32("opModeIDTirewear")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(AvgSpeedBin {
+                avg_speed_bin_id: avg_speed_bin_id.get(i).ok_or_else(|| null("avgSpeedBinID"))? as i16,
+                avg_bin_speed: avg_bin_speed.get(i).ok_or_else(|| null("avgBinSpeed"))?,
+                op_mode_id_tirewear: op_mode_id_tirewear.get(i).map(|v| v as i16),
+            })
+        }).collect()
+    }
+}
+
+/// A row projected from `operatingMode` for this generator's use.
+impl TableRow for OperatingMode {
+    fn table_name() -> &'static str { "operatingMode" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("opModeID".into(), DataType::Int32),
+            ("opModeName".into(), DataType::String),
+            ("speedLower".into(), DataType::Float64),
+            ("speedUpper".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("opModeID".into(), rows.iter().map(|r| r.op_mode_id as i32).collect::<Vec<i32>>()).into(),
+            Series::new("opModeName".into(), rows.iter().map(|r| r.op_mode_name.clone()).collect::<Vec<String>>()).into(),
+            Series::new("speedLower".into(), rows.iter().map(|r| r.speed_lower).collect::<Vec<Option<f64>>>()).into(),
+            Series::new("speedUpper".into(), rows.iter().map(|r| r.speed_upper).collect::<Vec<Option<f64>>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "operatingMode";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let op_mode_id = get_i32("opModeID")?;
+        let op_mode_name_col = df.column("opModeName")
+            .map_err(|e| row_err(t, 0, "opModeName", e.to_string()))?
+            .str()
+            .map_err(|e| row_err(t, 0, "opModeName", e.to_string()))?;
+        let speed_lower = get_f64("speedLower")?;
+        let speed_upper = get_f64("speedUpper")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(OperatingMode {
+                op_mode_id: op_mode_id.get(i).ok_or_else(|| null("opModeID"))? as i16,
+                op_mode_name: op_mode_name_col.get(i).ok_or_else(|| null("opModeName"))?.to_owned(),
+                speed_lower: speed_lower.get(i),
+                speed_upper: speed_upper.get(i),
+            })
+        }).collect()
+    }
+}
+
+/// A row projected from `link` for this generator's use.
+impl TableRow for Link {
+    fn table_name() -> &'static str { "link" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("roadTypeID".into(), DataType::Int32),
+            ("linkAvgSpeed".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("roadTypeID".into(), rows.iter().map(|r| r.road_type_id.0 as i32).collect::<Vec<i32>>()).into(),
+            Series::new("linkAvgSpeed".into(), rows.iter().map(|r| r.link_avg_speed).collect::<Vec<f64>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "link";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let road_type_id = get_i32("roadTypeID")?;
+        let link_avg_speed = get_f64("linkAvgSpeed")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(Link {
+                road_type_id: RoadTypeId(road_type_id.get(i).ok_or_else(|| null("roadTypeID"))? as u16),
+                link_avg_speed: link_avg_speed.get(i).ok_or_else(|| null("linkAvgSpeed"))?,
+            })
+        }).collect()
+    }
+}
+
+/// A wrapper row for `runSpecSourceType` — one source type selected by the
+/// RunSpec.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RunSpecSourceTypeRow {
+    /// `sourceTypeID`.
+    pub source_type_id: i32,
+}
+
+impl TableRow for RunSpecSourceTypeRow {
+    fn table_name() -> &'static str { "runSpecSourceType" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([("sourceTypeID".into(), DataType::Int32)])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "runSpecSourceType";
+        let source_type_id = df.column("sourceTypeID")
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(RunSpecSourceTypeRow {
+                source_type_id: source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))?,
+            })
+        }).collect()
+    }
+}
+
+/// A wrapper row for `runSpecRoadType` — one road type selected by the RunSpec.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RunSpecRoadTypeRow {
+    /// `roadTypeID`.
+    pub road_type_id: i32,
+}
+
+impl TableRow for RunSpecRoadTypeRow {
+    fn table_name() -> &'static str { "runSpecRoadType" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([("roadTypeID".into(), DataType::Int32)])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("roadTypeID".into(), rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "runSpecRoadType";
+        let road_type_id = df.column("roadTypeID")
+            .map_err(|e| row_err(t, 0, "roadTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "roadTypeID", e.to_string()))?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(RunSpecRoadTypeRow {
+                road_type_id: road_type_id.get(i).ok_or_else(|| null("roadTypeID"))?,
+            })
+        }).collect()
+    }
+}
+
+/// A wrapper row for `runSpecHourDay` — one hour/day combination selected by
+/// the RunSpec.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RunSpecHourDayRow {
+    /// `hourDayID`.
+    pub hour_day_id: i32,
+}
+
+impl TableRow for RunSpecHourDayRow {
+    fn table_name() -> &'static str { "runSpecHourDay" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([("hourDayID".into(), DataType::Int32)])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("hourDayID".into(), rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "runSpecHourDay";
+        let hour_day_id = df.column("hourDayID")
+            .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(RunSpecHourDayRow {
+                hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))?,
+            })
+        }).collect()
+    }
+}
+
+/// A wrapper row for `pollutantProcessAssoc` — projects `(pollutantID,
+/// processID)` from the `PollutantProcessAssoc` default-DB table.
+///
+/// The foreign type [`PollutantProcessAssociation`] cannot implement
+/// [`TableRow`] directly (it lives in `moves_data`), so this local wrapper
+/// carries the same semantics with the columns the rates-first path needs.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AvgSpeedPollutantProcessAssocRow {
+    /// `pollutantID`.
+    pub pollutant_id: i32,
+    /// `processID`.
+    pub process_id: i32,
+}
+
+impl TableRow for AvgSpeedPollutantProcessAssocRow {
+    fn table_name() -> &'static str { "pollutantProcessAssoc" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("pollutantID".into(), DataType::Int32),
+            ("processID".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("pollutantID".into(), rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>()).into(),
+            Series::new("processID".into(), rows.iter().map(|r| r.process_id).collect::<Vec<i32>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "pollutantProcessAssoc";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let pollutant_id = get_i32("pollutantID")?;
+        let process_id = get_i32("processID")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(AvgSpeedPollutantProcessAssocRow {
+                pollutant_id: pollutant_id.get(i).ok_or_else(|| null("pollutantID"))?,
+                process_id: process_id.get(i).ok_or_else(|| null("processID"))?,
+            })
+        }).collect()
+    }
+}
+
+// ---- TableRow for output table ----
+
+impl TableRow for RatesOpModeDistributionRow {
+    fn table_name() -> &'static str { "RatesOpModeDistribution" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("sourceTypeID".into(), DataType::Int32),
+            ("roadTypeID".into(), DataType::Int32),
+            ("avgSpeedBinID".into(), DataType::Int32),
+            ("hourDayID".into(), DataType::Int32),
+            ("polProcessID".into(), DataType::Int32),
+            ("opModeID".into(), DataType::Int32),
+            ("opModeFraction".into(), DataType::Float64),
+            ("avgBinSpeed".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id.0 as i32).collect::<Vec<i32>>()).into(),
+            Series::new("roadTypeID".into(), rows.iter().map(|r| r.road_type_id.0 as i32).collect::<Vec<i32>>()).into(),
+            Series::new("avgSpeedBinID".into(), rows.iter().map(|r| r.avg_speed_bin_id as i32).collect::<Vec<i32>>()).into(),
+            Series::new("hourDayID".into(), rows.iter().map(|r| r.hour_day_id as i32).collect::<Vec<i32>>()).into(),
+            Series::new("polProcessID".into(), rows.iter().map(|r| r.pol_process_id.0 as i32).collect::<Vec<i32>>()).into(),
+            Series::new("opModeID".into(), rows.iter().map(|r| r.op_mode_id as i32).collect::<Vec<i32>>()).into(),
+            Series::new("opModeFraction".into(), rows.iter().map(|r| r.op_mode_fraction).collect::<Vec<f64>>()).into(),
+            Series::new("avgBinSpeed".into(), rows.iter().map(|r| r.avg_bin_speed).collect::<Vec<f64>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "RatesOpModeDistribution";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let source_type_id = get_i32("sourceTypeID")?;
+        let road_type_id = get_i32("roadTypeID")?;
+        let avg_speed_bin_id = get_i32("avgSpeedBinID")?;
+        let hour_day_id = get_i32("hourDayID")?;
+        let pol_process_id = get_i32("polProcessID")?;
+        let op_mode_id = get_i32("opModeID")?;
+        let op_mode_fraction = get_f64("opModeFraction")?;
+        let avg_bin_speed = get_f64("avgBinSpeed")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(RatesOpModeDistributionRow {
+                source_type_id: SourceTypeId(source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))? as u16),
+                road_type_id: RoadTypeId(road_type_id.get(i).ok_or_else(|| null("roadTypeID"))? as u16),
+                avg_speed_bin_id: avg_speed_bin_id.get(i).ok_or_else(|| null("avgSpeedBinID"))? as i16,
+                hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))? as i16,
+                pol_process_id: PolProcessId(pol_process_id.get(i).ok_or_else(|| null("polProcessID"))? as u32),
+                op_mode_id: op_mode_id.get(i).ok_or_else(|| null("opModeID"))? as i16,
+                op_mode_fraction: op_mode_fraction.get(i).ok_or_else(|| null("opModeFraction"))?,
+                avg_bin_speed: avg_bin_speed.get(i).ok_or_else(|| null("avgBinSpeed"))?,
+            })
+        }).collect()
+    }
+}
+
 /// `RatesOpModeDistribution` generator for average-speed-driven tire-wear
 /// operating-mode distributions.
 ///
@@ -556,16 +902,91 @@ impl Generator for AverageSpeedOperatingModeDistributionGenerator {
 
     /// Run the generator for the current master-loop iteration.
     ///
-    /// **Data plane pending (Task 50).** [`CalculatorContext`] exposes only
-    /// placeholder `ExecutionTables` / `ScratchNamespace` today, so this
-    /// body cannot read the [`input_tables`](Generator::input_tables) nor
-    /// write `RatesOpModeDistribution`. The numerically faithful algorithm
-    /// is fully ported and tested in [`rates_first_op_mode_fractions`],
-    /// [`project_op_mode_fractions`] and [`assign_tirewear_op_mode`]; once
-    /// the `DataFrameStore` lands, `execute` will project the input views
-    /// from `ctx.tables()`, dispatch on RunSpec domain, and store the rows.
-    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
-        Ok(CalculatorOutput::empty())
+    /// Dispatches on the RunSpec domain derived from `ctx.position()`:
+    ///
+    /// * **Project domain** (`link_id` is `Some`) → reads `link`,
+    ///   `runSpecSourceType`, `runSpecHourDay` and `operatingMode` from
+    ///   `ctx.tables()`, calls [`project_op_mode_fractions`].
+    /// * **Non-Project domain** (`link_id` is `None`) → reads `avgSpeedBin`,
+    ///   `runSpecSourceType`, `runSpecRoadType`, `runSpecHourDay` and
+    ///   `pollutantProcessAssoc` from `ctx.tables()`, calls
+    ///   [`rates_first_op_mode_fractions`].
+    ///
+    /// The result is written to `ctx.scratch()` under `"RatesOpModeDistribution"`.
+    fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
+        let rows = if ctx.position().location.link_id.is_some() {
+            // Project domain — one link, assign tirewear op-mode from link speed.
+            let link_rows: Vec<Link> = ctx.tables().iter_typed("link")?;
+            let source_type_rows: Vec<RunSpecSourceTypeRow> =
+                ctx.tables().iter_typed("runSpecSourceType")?;
+            let hour_day_rows: Vec<RunSpecHourDayRow> =
+                ctx.tables().iter_typed("runSpecHourDay")?;
+            let operating_mode_rows: Vec<OperatingMode> =
+                ctx.tables().iter_typed("operatingMode")?;
+
+            // The project link table contains only the single current link.
+            // If it is empty, produce no rows (defensive).
+            let Some(&link) = link_rows.first() else {
+                return crate::wiring::write_scratch_table(
+                    ctx,
+                    OUTPUT_TABLES[0],
+                    Vec::<RatesOpModeDistributionRow>::new(),
+                );
+            };
+
+            let run_spec_source_type: Vec<SourceTypeId> =
+                source_type_rows.iter().map(|r| SourceTypeId(r.source_type_id as u16)).collect();
+            let run_spec_hour_day: Vec<i16> =
+                hour_day_rows.iter().map(|r| r.hour_day_id as i16).collect();
+
+            let inputs = ProjectInputs {
+                link,
+                run_spec_source_type: &run_spec_source_type,
+                run_spec_hour_day: &run_spec_hour_day,
+                operating_modes: &operating_mode_rows,
+            };
+            project_op_mode_fractions(&inputs)
+        } else {
+            // Non-Project (rates-first) domain — cross-join all speed bins.
+            let avg_speed_bin_rows: Vec<AvgSpeedBin> =
+                ctx.tables().iter_typed("avgSpeedBin")?;
+            let source_type_rows: Vec<RunSpecSourceTypeRow> =
+                ctx.tables().iter_typed("runSpecSourceType")?;
+            let road_type_rows: Vec<RunSpecRoadTypeRow> =
+                ctx.tables().iter_typed("runSpecRoadType")?;
+            let hour_day_rows: Vec<RunSpecHourDayRow> =
+                ctx.tables().iter_typed("runSpecHourDay")?;
+            let ppa_rows: Vec<AvgSpeedPollutantProcessAssocRow> =
+                ctx.tables().iter_typed("pollutantProcessAssoc")?;
+
+            let run_spec_source_type: Vec<SourceTypeId> =
+                source_type_rows.iter().map(|r| SourceTypeId(r.source_type_id as u16)).collect();
+            let run_spec_road_type: Vec<RoadTypeId> =
+                road_type_rows.iter().map(|r| RoadTypeId(r.road_type_id as u16)).collect();
+            let run_spec_hour_day: Vec<i16> =
+                hour_day_rows.iter().map(|r| r.hour_day_id as i16).collect();
+            // Convert wrapper rows back to PollutantProcessAssociation.
+            let pollutant_process_assoc: Vec<PollutantProcessAssociation> = ppa_rows
+                .iter()
+                .filter_map(|r| {
+                    PollutantProcessAssociation::find_by_ids(
+                        PollutantId(r.pollutant_id as u16),
+                        ProcessId(r.process_id as u16),
+                    )
+                })
+                .collect();
+
+            let inputs = RatesFirstInputs {
+                avg_speed_bins: &avg_speed_bin_rows,
+                run_spec_source_type: &run_spec_source_type,
+                run_spec_road_type: &run_spec_road_type,
+                run_spec_hour_day: &run_spec_hour_day,
+                pollutant_process_assoc: &pollutant_process_assoc,
+            };
+            rates_first_op_mode_fractions(&inputs)
+        };
+
+        crate::wiring::write_scratch_table(ctx, OUTPUT_TABLES[0], rows)
     }
 }
 
@@ -942,13 +1363,192 @@ mod tests {
         assert_eq!(subs[0].priority.display(), "GENERATOR");
     }
 
+    // ── execute() integration tests ─────────────────────────────────────
+
+    /// Build an `InMemoryStore` populated with the rates-first (non-Project)
+    /// input tables required by `execute`.
+    fn rates_first_store() -> moves_framework::InMemoryStore {
+        use moves_framework::{DataFrameStore, InMemoryStore};
+
+        let mut store = InMemoryStore::new();
+
+        // avgSpeedBin: two bins — bin 1 at 2.0 mph (op mode 401), bin 2 at
+        // 8.0 mph (op mode 402).
+        store.insert(
+            "avgSpeedBin",
+            AvgSpeedBin::into_dataframe(vec![
+                AvgSpeedBin { avg_speed_bin_id: 1, avg_bin_speed: 2.0, op_mode_id_tirewear: Some(401) },
+                AvgSpeedBin { avg_speed_bin_id: 2, avg_bin_speed: 8.0, op_mode_id_tirewear: Some(402) },
+            ]).unwrap(),
+        );
+        // runSpecSourceType: one source type.
+        store.insert(
+            "runSpecSourceType",
+            RunSpecSourceTypeRow::into_dataframe(vec![
+                RunSpecSourceTypeRow { source_type_id: 21 },
+            ]).unwrap(),
+        );
+        // runSpecRoadType: one road type.
+        store.insert(
+            "runSpecRoadType",
+            RunSpecRoadTypeRow::into_dataframe(vec![
+                RunSpecRoadTypeRow { road_type_id: 2 },
+            ]).unwrap(),
+        );
+        // runSpecHourDay: one hour/day.
+        store.insert(
+            "runSpecHourDay",
+            RunSpecHourDayRow::into_dataframe(vec![
+                RunSpecHourDayRow { hour_day_id: 51 },
+            ]).unwrap(),
+        );
+        // pollutantProcessAssoc: tire-wear pol-process (pollutant 117, process 10).
+        store.insert(
+            "pollutantProcessAssoc",
+            AvgSpeedPollutantProcessAssocRow::into_dataframe(vec![
+                AvgSpeedPollutantProcessAssocRow { pollutant_id: 117, process_id: 10 },
+            ]).unwrap(),
+        );
+        store
+    }
+
     #[test]
-    fn generator_execute_returns_placeholder_until_data_plane() {
-        // execute is a documented placeholder until Task 50; it must still
-        // honour the trait contract and return Ok.
+    fn execute_rates_first_writes_expected_rows_to_scratch() {
+        use moves_framework::{DataFrameStoreTyped, IterationPosition};
+
+        let store = rates_first_store();
+        // Non-project position: no link_id.
+        let pos = IterationPosition::default();
+        let mut ctx = CalculatorContext::with_position_and_tables(pos, store);
+
         let gen = AverageSpeedOperatingModeDistributionGenerator::new();
-        let mut ctx = CalculatorContext::new();
-        assert!(gen.execute(&mut ctx).is_ok());
+        let out = gen.execute(&mut ctx).expect("execute ok");
+        // Generator writes to scratch, not the main output DataFrame.
+        assert!(out.dataframe().is_none());
+
+        let rows: Vec<RatesOpModeDistributionRow> = ctx
+            .scratch()
+            .store
+            .iter_typed("RatesOpModeDistribution")
+            .expect("RatesOpModeDistribution in scratch");
+        // 2 bins × 1 source type × 1 road type × 1 hour/day = 2 rows.
+        assert_eq!(rows.len(), 2);
+
+        // All rows carry the tirewear pol-process and fraction = 1.
+        for r in &rows {
+            assert_eq!(r.pol_process_id, TIREWEAR_POL_PROCESS);
+            assert_eq!(r.op_mode_fraction, 1.0);
+        }
+
+        // Each row is keyed by its bin's speed and op mode.
+        let row1 = rows.iter().find(|r| r.avg_speed_bin_id == 1).unwrap();
+        assert_eq!(row1.op_mode_id, 401);
+        assert_eq!(row1.avg_bin_speed, 2.0);
+        assert_eq!(row1.source_type_id, SourceTypeId(21));
+        assert_eq!(row1.road_type_id, RoadTypeId(2));
+        assert_eq!(row1.hour_day_id, 51);
+
+        let row2 = rows.iter().find(|r| r.avg_speed_bin_id == 2).unwrap();
+        assert_eq!(row2.op_mode_id, 402);
+        assert_eq!(row2.avg_bin_speed, 8.0);
+    }
+
+    #[test]
+    fn execute_rates_first_empty_when_tirewear_not_in_ppa() {
+        use moves_framework::{DataFrameStore, DataFrameStoreTyped, IterationPosition};
+
+        let mut store = rates_first_store();
+        // Replace pollutantProcessAssoc with one that has no tire-wear entry.
+        store.insert(
+            "pollutantProcessAssoc",
+            AvgSpeedPollutantProcessAssocRow::into_dataframe(vec![
+                AvgSpeedPollutantProcessAssocRow { pollutant_id: 2, process_id: 1 },
+            ]).unwrap(),
+        );
+
+        let pos = IterationPosition::default();
+        let mut ctx = CalculatorContext::with_position_and_tables(pos, store);
+
+        let gen = AverageSpeedOperatingModeDistributionGenerator::new();
+        gen.execute(&mut ctx).expect("execute ok");
+
+        let rows: Vec<RatesOpModeDistributionRow> = ctx
+            .scratch()
+            .store
+            .iter_typed("RatesOpModeDistribution")
+            .expect("RatesOpModeDistribution in scratch");
+        assert!(rows.is_empty(), "no tire-wear rows when ppa lacks 11710");
+    }
+
+    #[test]
+    fn execute_project_writes_expected_rows_to_scratch() {
+        use moves_framework::{DataFrameStore, DataFrameStoreTyped, InMemoryStore, IterationPosition};
+        use moves_framework::ExecutionLocation;
+
+        let mut store = InMemoryStore::new();
+
+        // link: 5.0 mph on road type 5.
+        store.insert(
+            "link",
+            Link::into_dataframe(vec![
+                Link { road_type_id: RoadTypeId(5), link_avg_speed: 5.0 },
+            ]).unwrap(),
+        );
+        // runSpecSourceType: two source types.
+        store.insert(
+            "runSpecSourceType",
+            RunSpecSourceTypeRow::into_dataframe(vec![
+                RunSpecSourceTypeRow { source_type_id: 21 },
+                RunSpecSourceTypeRow { source_type_id: 31 },
+            ]).unwrap(),
+        );
+        // runSpecHourDay: one hour/day.
+        store.insert(
+            "runSpecHourDay",
+            RunSpecHourDayRow::into_dataframe(vec![
+                RunSpecHourDayRow { hour_day_id: 51 },
+            ]).unwrap(),
+        );
+        // operatingMode: realistic tirewear modes.
+        store.insert(
+            "operatingMode",
+            OperatingMode::into_dataframe(vec![
+                OperatingMode { op_mode_id: 401, op_mode_name: "Tirewear 0-2.5 mph".to_owned(), speed_lower: Some(0.1), speed_upper: Some(2.5) },
+                OperatingMode { op_mode_id: 402, op_mode_name: "Tirewear 2.5-7.5 mph".to_owned(), speed_lower: Some(2.5), speed_upper: Some(7.5) },
+                OperatingMode { op_mode_id: 403, op_mode_name: "Tirewear 7.5+ mph".to_owned(), speed_lower: Some(7.5), speed_upper: None },
+            ]).unwrap(),
+        );
+
+        // Project domain position: link_id is Some.
+        let pos = IterationPosition {
+            iteration: 0,
+            process_id: None,
+            location: ExecutionLocation::link(40, 40_001, 400_011, 1),
+            time: moves_framework::ExecutionTime::none(),
+        };
+        let mut ctx = CalculatorContext::with_position_and_tables(pos, store);
+
+        let gen = AverageSpeedOperatingModeDistributionGenerator::new();
+        let out = gen.execute(&mut ctx).expect("execute ok");
+        assert!(out.dataframe().is_none());
+
+        let rows: Vec<RatesOpModeDistributionRow> = ctx
+            .scratch()
+            .store
+            .iter_typed("RatesOpModeDistribution")
+            .expect("RatesOpModeDistribution in scratch");
+        // 2 source types × 1 hour/day = 2 rows.
+        assert_eq!(rows.len(), 2);
+
+        for r in &rows {
+            assert_eq!(r.pol_process_id, TIREWEAR_POL_PROCESS);
+            assert_eq!(r.road_type_id, RoadTypeId(5));
+            assert_eq!(r.avg_speed_bin_id, 0);
+            assert_eq!(r.avg_bin_speed, 5.0);
+            assert_eq!(r.op_mode_fraction, 1.0);
+            // 5.0 mph → tirewear range [2.5, 7.5) → op mode 402.
+            assert_eq!(r.op_mode_id, 402);
+        }
     }
 
     #[test]
