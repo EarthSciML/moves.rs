@@ -73,8 +73,10 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use moves_calculator_info::{Granularity, Priority};
 use moves_data::ProcessId;
 use moves_framework::{
-    CalculatorContext, CalculatorOutput, CalculatorSubscription, Error, Generator,
+    CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStoreTyped, Error,
+    Generator, TableRow,
 };
+use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Series};
 
 /// Tank-temperature smoothing coefficient — the `1.4` multiplier applied to
 /// the running temperature-delta sum in TTG-1b and TTG-4b.
@@ -325,6 +327,1058 @@ pub struct TankTemperatureOutput {
     pub soak_activity_fraction: Vec<SoakActivityFractionRow>,
     /// `ColdSoakInitialHourFraction` (TTG-7).
     pub cold_soak_initial_hour_fraction: Vec<ColdSoakInitialHourFractionRow>,
+}
+
+// =============================================================================
+//   Row extraction helper
+// =============================================================================
+
+fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -> Error {
+    Error::RowExtraction {
+        table: table.into(),
+        row,
+        column: column.into(),
+        message: msg,
+    }
+}
+
+// =============================================================================
+//   TableRow impls — input tables
+// =============================================================================
+
+impl TableRow for ZoneMonthHourRow {
+    fn table_name() -> &'static str {
+        "ZoneMonthHour"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("zoneID".into(), DataType::Int32),
+            ("monthID".into(), DataType::Int32),
+            ("hourID".into(), DataType::Int32),
+            ("temperature".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "zoneID".into(),
+                    rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hourID".into(),
+                    rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "temperature".into(),
+                    rows.iter().map(|r| r.temperature).collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "ZoneMonthHour";
+        let zone_id_col = df
+            .column("zoneID")
+            .map_err(|e| row_err(t, 0, "zoneID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "zoneID", e.to_string()))?;
+        let month_id_col = df
+            .column("monthID")
+            .map_err(|e| row_err(t, 0, "monthID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "monthID", e.to_string()))?;
+        let hour_id_col = df
+            .column("hourID")
+            .map_err(|e| row_err(t, 0, "hourID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "hourID", e.to_string()))?;
+        let temperature_col = df
+            .column("temperature")
+            .map_err(|e| row_err(t, 0, "temperature", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "temperature", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(ZoneMonthHourRow {
+                    zone_id: zone_id_col.get(i).ok_or_else(|| null("zoneID"))?,
+                    month_id: month_id_col.get(i).ok_or_else(|| null("monthID"))?,
+                    hour_id: hour_id_col.get(i).ok_or_else(|| null("hourID"))?,
+                    temperature: temperature_col.get(i).ok_or_else(|| null("temperature"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for HourDayRow {
+    fn table_name() -> &'static str {
+        "HourDay"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("hourDayID".into(), DataType::Int32),
+            ("hourID".into(), DataType::Int32),
+            ("dayID".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "hourDayID".into(),
+                    rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hourID".into(),
+                    rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "dayID".into(),
+                    rows.iter().map(|r| r.day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "HourDay";
+        let hour_day_id_col = df
+            .column("hourDayID")
+            .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?;
+        let hour_id_col = df
+            .column("hourID")
+            .map_err(|e| row_err(t, 0, "hourID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "hourID", e.to_string()))?;
+        let day_id_col = df
+            .column("dayID")
+            .map_err(|e| row_err(t, 0, "dayID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "dayID", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(HourDayRow {
+                    hour_day_id: hour_day_id_col.get(i).ok_or_else(|| null("hourDayID"))?,
+                    hour_id: hour_id_col.get(i).ok_or_else(|| null("hourID"))?,
+                    day_id: day_id_col.get(i).ok_or_else(|| null("dayID"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for SampleVehicleDayRow {
+    fn table_name() -> &'static str {
+        "SampleVehicleDay"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("vehID".into(), DataType::Int32),
+            ("sourceTypeID".into(), DataType::Int32),
+            ("dayID".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "vehID".into(),
+                    rows.iter().map(|r| r.veh_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "dayID".into(),
+                    rows.iter().map(|r| r.day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "SampleVehicleDay";
+        let veh_id_col = df
+            .column("vehID")
+            .map_err(|e| row_err(t, 0, "vehID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "vehID", e.to_string()))?;
+        let source_type_id_col = df
+            .column("sourceTypeID")
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?;
+        let day_id_col = df
+            .column("dayID")
+            .map_err(|e| row_err(t, 0, "dayID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "dayID", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(SampleVehicleDayRow {
+                    veh_id: veh_id_col.get(i).ok_or_else(|| null("vehID"))?,
+                    source_type_id: source_type_id_col
+                        .get(i)
+                        .ok_or_else(|| null("sourceTypeID"))?,
+                    day_id: day_id_col.get(i).ok_or_else(|| null("dayID"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+/// `SampleVehicleTrip` encodes `priorTripID` and `keyOnTime` as nullable
+/// `Int32` columns — `NULL` corresponds to `None` in the typed row.
+impl TableRow for SampleVehicleTripRow {
+    fn table_name() -> &'static str {
+        "SampleVehicleTrip"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("vehID".into(), DataType::Int32),
+            ("dayID".into(), DataType::Int32),
+            ("tripID".into(), DataType::Int32),
+            ("hourID".into(), DataType::Int32),
+            ("priorTripID".into(), DataType::Int32),
+            ("keyOnTime".into(), DataType::Int32),
+            ("keyOffTime".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "vehID".into(),
+                    rows.iter().map(|r| r.veh_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "dayID".into(),
+                    rows.iter().map(|r| r.day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "tripID".into(),
+                    rows.iter().map(|r| r.trip_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hourID".into(),
+                    rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "priorTripID".into(),
+                    rows.iter().map(|r| r.prior_trip_id).collect::<Vec<Option<i32>>>(),
+                )
+                .into(),
+                Series::new(
+                    "keyOnTime".into(),
+                    rows.iter().map(|r| r.key_on_time).collect::<Vec<Option<i32>>>(),
+                )
+                .into(),
+                Series::new(
+                    "keyOffTime".into(),
+                    rows.iter().map(|r| r.key_off_time).collect::<Vec<i32>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "SampleVehicleTrip";
+        let veh_id_col = df
+            .column("vehID")
+            .map_err(|e| row_err(t, 0, "vehID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "vehID", e.to_string()))?;
+        let day_id_col = df
+            .column("dayID")
+            .map_err(|e| row_err(t, 0, "dayID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "dayID", e.to_string()))?;
+        let trip_id_col = df
+            .column("tripID")
+            .map_err(|e| row_err(t, 0, "tripID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "tripID", e.to_string()))?;
+        let hour_id_col = df
+            .column("hourID")
+            .map_err(|e| row_err(t, 0, "hourID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "hourID", e.to_string()))?;
+        let prior_trip_id_col = df
+            .column("priorTripID")
+            .map_err(|e| row_err(t, 0, "priorTripID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "priorTripID", e.to_string()))?;
+        let key_on_time_col = df
+            .column("keyOnTime")
+            .map_err(|e| row_err(t, 0, "keyOnTime", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "keyOnTime", e.to_string()))?;
+        let key_off_time_col = df
+            .column("keyOffTime")
+            .map_err(|e| row_err(t, 0, "keyOffTime", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "keyOffTime", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(SampleVehicleTripRow {
+                    veh_id: veh_id_col.get(i).ok_or_else(|| null("vehID"))?,
+                    day_id: day_id_col.get(i).ok_or_else(|| null("dayID"))?,
+                    trip_id: trip_id_col.get(i).ok_or_else(|| null("tripID"))?,
+                    hour_id: hour_id_col.get(i).ok_or_else(|| null("hourID"))?,
+                    // priorTripID and keyOnTime are nullable — None maps to SQL NULL.
+                    prior_trip_id: prior_trip_id_col.get(i),
+                    key_on_time: key_on_time_col.get(i),
+                    key_off_time: key_off_time_col.get(i).ok_or_else(|| null("keyOffTime"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for SourceTypeModelYearGroupRow {
+    fn table_name() -> &'static str {
+        "SourceTypeModelYearGroup"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("sourceTypeID".into(), DataType::Int32),
+            ("tankTemperatureGroupID".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "tankTemperatureGroupID".into(),
+                    rows.iter()
+                        .map(|r| r.tank_temperature_group_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "SourceTypeModelYearGroup";
+        let source_type_id_col = df
+            .column("sourceTypeID")
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?;
+        let ttg_col = df
+            .column("tankTemperatureGroupID")
+            .map_err(|e| row_err(t, 0, "tankTemperatureGroupID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "tankTemperatureGroupID", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(SourceTypeModelYearGroupRow {
+                    source_type_id: source_type_id_col
+                        .get(i)
+                        .ok_or_else(|| null("sourceTypeID"))?,
+                    tank_temperature_group_id: ttg_col
+                        .get(i)
+                        .ok_or_else(|| null("tankTemperatureGroupID"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for TankTemperatureRiseRow {
+    fn table_name() -> &'static str {
+        "TankTemperatureRise"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("tankTemperatureGroupID".into(), DataType::Int32),
+            ("tankTemperatureRiseTermA".into(), DataType::Float64),
+            ("tankTemperatureRiseTermB".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "tankTemperatureGroupID".into(),
+                    rows.iter()
+                        .map(|r| r.tank_temperature_group_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "tankTemperatureRiseTermA".into(),
+                    rows.iter()
+                        .map(|r| r.tank_temperature_rise_term_a)
+                        .collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "tankTemperatureRiseTermB".into(),
+                    rows.iter()
+                        .map(|r| r.tank_temperature_rise_term_b)
+                        .collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "TankTemperatureRise";
+        let ttg_col = df
+            .column("tankTemperatureGroupID")
+            .map_err(|e| row_err(t, 0, "tankTemperatureGroupID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "tankTemperatureGroupID", e.to_string()))?;
+        let term_a_col = df
+            .column("tankTemperatureRiseTermA")
+            .map_err(|e| row_err(t, 0, "tankTemperatureRiseTermA", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "tankTemperatureRiseTermA", e.to_string()))?;
+        let term_b_col = df
+            .column("tankTemperatureRiseTermB")
+            .map_err(|e| row_err(t, 0, "tankTemperatureRiseTermB", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "tankTemperatureRiseTermB", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(TankTemperatureRiseRow {
+                    tank_temperature_group_id: ttg_col
+                        .get(i)
+                        .ok_or_else(|| null("tankTemperatureGroupID"))?,
+                    tank_temperature_rise_term_a: term_a_col
+                        .get(i)
+                        .ok_or_else(|| null("tankTemperatureRiseTermA"))?,
+                    tank_temperature_rise_term_b: term_b_col
+                        .get(i)
+                        .ok_or_else(|| null("tankTemperatureRiseTermB"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+/// Single-column table: just the `tankTemperatureGroupID` values.
+struct TankTemperatureGroupRow {
+    tank_temperature_group_id: i32,
+}
+
+impl TableRow for TankTemperatureGroupRow {
+    fn table_name() -> &'static str {
+        "TankTemperatureGroup"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([(
+            "tankTemperatureGroupID".into(),
+            DataType::Int32,
+        )])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![Series::new(
+                "tankTemperatureGroupID".into(),
+                rows.iter()
+                    .map(|r| r.tank_temperature_group_id)
+                    .collect::<Vec<i32>>(),
+            )
+            .into()],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "TankTemperatureGroup";
+        let ttg_col = df
+            .column("tankTemperatureGroupID")
+            .map_err(|e| row_err(t, 0, "tankTemperatureGroupID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "tankTemperatureGroupID", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(TankTemperatureGroupRow {
+                    tank_temperature_group_id: ttg_col
+                        .get(i)
+                        .ok_or_else(|| null("tankTemperatureGroupID"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+/// Single-column table: just the `monthID` values selected by the RunSpec.
+struct RunSpecMonthRow {
+    month_id: i32,
+}
+
+impl TableRow for RunSpecMonthRow {
+    fn table_name() -> &'static str {
+        "RunSpecMonth"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([("monthID".into(), DataType::Int32)])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![Series::new(
+                "monthID".into(),
+                rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
+            )
+            .into()],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "RunSpecMonth";
+        let month_id_col = df
+            .column("monthID")
+            .map_err(|e| row_err(t, 0, "monthID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "monthID", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(RunSpecMonthRow {
+                    month_id: month_id_col.get(i).ok_or_else(|| null("monthID"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+/// Single-column table: just the `hourDayID` values selected by the RunSpec.
+struct RunSpecHourDayRow {
+    hour_day_id: i32,
+}
+
+impl TableRow for RunSpecHourDayRow {
+    fn table_name() -> &'static str {
+        "RunSpecHourDay"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([("hourDayID".into(), DataType::Int32)])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![Series::new(
+                "hourDayID".into(),
+                rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+            )
+            .into()],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "RunSpecHourDay";
+        let hour_day_id_col = df
+            .column("hourDayID")
+            .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(RunSpecHourDayRow {
+                    hour_day_id: hour_day_id_col.get(i).ok_or_else(|| null("hourDayID"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+// =============================================================================
+//   TableRow impls — output tables
+// =============================================================================
+
+impl TableRow for ColdSoakTankTemperatureRow {
+    fn table_name() -> &'static str {
+        "ColdSoakTankTemperature"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("zoneID".into(), DataType::Int32),
+            ("monthID".into(), DataType::Int32),
+            ("hourID".into(), DataType::Int32),
+            ("coldSoakTankTemperature".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "zoneID".into(),
+                    rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hourID".into(),
+                    rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "coldSoakTankTemperature".into(),
+                    rows.iter()
+                        .map(|r| r.cold_soak_tank_temperature)
+                        .collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "ColdSoakTankTemperature";
+        let zone_id_col = df
+            .column("zoneID")
+            .map_err(|e| row_err(t, 0, "zoneID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "zoneID", e.to_string()))?;
+        let month_id_col = df
+            .column("monthID")
+            .map_err(|e| row_err(t, 0, "monthID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "monthID", e.to_string()))?;
+        let hour_id_col = df
+            .column("hourID")
+            .map_err(|e| row_err(t, 0, "hourID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "hourID", e.to_string()))?;
+        let cstt_col = df
+            .column("coldSoakTankTemperature")
+            .map_err(|e| row_err(t, 0, "coldSoakTankTemperature", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "coldSoakTankTemperature", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(ColdSoakTankTemperatureRow {
+                    zone_id: zone_id_col.get(i).ok_or_else(|| null("zoneID"))?,
+                    month_id: month_id_col.get(i).ok_or_else(|| null("monthID"))?,
+                    hour_id: hour_id_col.get(i).ok_or_else(|| null("hourID"))?,
+                    cold_soak_tank_temperature: cstt_col
+                        .get(i)
+                        .ok_or_else(|| null("coldSoakTankTemperature"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for AverageTankTemperatureRow {
+    fn table_name() -> &'static str {
+        "AverageTankTemperature"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("zoneID".into(), DataType::Int32),
+            ("monthID".into(), DataType::Int32),
+            ("hourDayID".into(), DataType::Int32),
+            ("tankTemperatureGroupID".into(), DataType::Int32),
+            ("opModeID".into(), DataType::Int32),
+            ("averageTankTemperature".into(), DataType::Float64),
+            ("isUserInput".into(), DataType::Boolean),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "zoneID".into(),
+                    rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hourDayID".into(),
+                    rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "tankTemperatureGroupID".into(),
+                    rows.iter()
+                        .map(|r| r.tank_temperature_group_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "opModeID".into(),
+                    rows.iter().map(|r| r.op_mode_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "averageTankTemperature".into(),
+                    rows.iter()
+                        .map(|r| r.average_tank_temperature)
+                        .collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "isUserInput".into(),
+                    rows.iter().map(|r| r.is_user_input).collect::<Vec<bool>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "AverageTankTemperature";
+        let zone_id_col = df
+            .column("zoneID")
+            .map_err(|e| row_err(t, 0, "zoneID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "zoneID", e.to_string()))?;
+        let month_id_col = df
+            .column("monthID")
+            .map_err(|e| row_err(t, 0, "monthID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "monthID", e.to_string()))?;
+        let hour_day_id_col = df
+            .column("hourDayID")
+            .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?;
+        let ttg_col = df
+            .column("tankTemperatureGroupID")
+            .map_err(|e| row_err(t, 0, "tankTemperatureGroupID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "tankTemperatureGroupID", e.to_string()))?;
+        let op_mode_id_col = df
+            .column("opModeID")
+            .map_err(|e| row_err(t, 0, "opModeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "opModeID", e.to_string()))?;
+        let att_col = df
+            .column("averageTankTemperature")
+            .map_err(|e| row_err(t, 0, "averageTankTemperature", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "averageTankTemperature", e.to_string()))?;
+        let is_user_input_col = df
+            .column("isUserInput")
+            .map_err(|e| row_err(t, 0, "isUserInput", e.to_string()))?
+            .bool()
+            .map_err(|e| row_err(t, 0, "isUserInput", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(AverageTankTemperatureRow {
+                    zone_id: zone_id_col.get(i).ok_or_else(|| null("zoneID"))?,
+                    month_id: month_id_col.get(i).ok_or_else(|| null("monthID"))?,
+                    hour_day_id: hour_day_id_col.get(i).ok_or_else(|| null("hourDayID"))?,
+                    tank_temperature_group_id: ttg_col
+                        .get(i)
+                        .ok_or_else(|| null("tankTemperatureGroupID"))?,
+                    op_mode_id: op_mode_id_col.get(i).ok_or_else(|| null("opModeID"))?,
+                    average_tank_temperature: att_col
+                        .get(i)
+                        .ok_or_else(|| null("averageTankTemperature"))?,
+                    is_user_input: is_user_input_col
+                        .get(i)
+                        .ok_or_else(|| null("isUserInput"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for SoakActivityFractionRow {
+    fn table_name() -> &'static str {
+        "SoakActivityFraction"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("sourceTypeID".into(), DataType::Int32),
+            ("zoneID".into(), DataType::Int32),
+            ("monthID".into(), DataType::Int32),
+            ("hourDayID".into(), DataType::Int32),
+            ("opModeID".into(), DataType::Int32),
+            ("soakActivityFraction".into(), DataType::Float64),
+            ("isUserInput".into(), DataType::Boolean),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "zoneID".into(),
+                    rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hourDayID".into(),
+                    rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "opModeID".into(),
+                    rows.iter().map(|r| r.op_mode_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "soakActivityFraction".into(),
+                    rows.iter()
+                        .map(|r| r.soak_activity_fraction)
+                        .collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "isUserInput".into(),
+                    rows.iter().map(|r| r.is_user_input).collect::<Vec<bool>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "SoakActivityFraction";
+        let source_type_id_col = df
+            .column("sourceTypeID")
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?;
+        let zone_id_col = df
+            .column("zoneID")
+            .map_err(|e| row_err(t, 0, "zoneID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "zoneID", e.to_string()))?;
+        let month_id_col = df
+            .column("monthID")
+            .map_err(|e| row_err(t, 0, "monthID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "monthID", e.to_string()))?;
+        let hour_day_id_col = df
+            .column("hourDayID")
+            .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?;
+        let op_mode_id_col = df
+            .column("opModeID")
+            .map_err(|e| row_err(t, 0, "opModeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "opModeID", e.to_string()))?;
+        let saf_col = df
+            .column("soakActivityFraction")
+            .map_err(|e| row_err(t, 0, "soakActivityFraction", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "soakActivityFraction", e.to_string()))?;
+        let is_user_input_col = df
+            .column("isUserInput")
+            .map_err(|e| row_err(t, 0, "isUserInput", e.to_string()))?
+            .bool()
+            .map_err(|e| row_err(t, 0, "isUserInput", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(SoakActivityFractionRow {
+                    source_type_id: source_type_id_col
+                        .get(i)
+                        .ok_or_else(|| null("sourceTypeID"))?,
+                    zone_id: zone_id_col.get(i).ok_or_else(|| null("zoneID"))?,
+                    month_id: month_id_col.get(i).ok_or_else(|| null("monthID"))?,
+                    hour_day_id: hour_day_id_col.get(i).ok_or_else(|| null("hourDayID"))?,
+                    op_mode_id: op_mode_id_col.get(i).ok_or_else(|| null("opModeID"))?,
+                    soak_activity_fraction: saf_col
+                        .get(i)
+                        .ok_or_else(|| null("soakActivityFraction"))?,
+                    is_user_input: is_user_input_col
+                        .get(i)
+                        .ok_or_else(|| null("isUserInput"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for ColdSoakInitialHourFractionRow {
+    fn table_name() -> &'static str {
+        "ColdSoakInitialHourFraction"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("sourceTypeID".into(), DataType::Int32),
+            ("zoneID".into(), DataType::Int32),
+            ("monthID".into(), DataType::Int32),
+            ("hourDayID".into(), DataType::Int32),
+            ("initialHourDayID".into(), DataType::Int32),
+            ("coldSoakInitialHourFraction".into(), DataType::Float64),
+            ("isUserInput".into(), DataType::Boolean),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "zoneID".into(),
+                    rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hourDayID".into(),
+                    rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "initialHourDayID".into(),
+                    rows.iter()
+                        .map(|r| r.initial_hour_day_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "coldSoakInitialHourFraction".into(),
+                    rows.iter()
+                        .map(|r| r.cold_soak_initial_hour_fraction)
+                        .collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "isUserInput".into(),
+                    rows.iter().map(|r| r.is_user_input).collect::<Vec<bool>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "ColdSoakInitialHourFraction";
+        let source_type_id_col = df
+            .column("sourceTypeID")
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?;
+        let zone_id_col = df
+            .column("zoneID")
+            .map_err(|e| row_err(t, 0, "zoneID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "zoneID", e.to_string()))?;
+        let month_id_col = df
+            .column("monthID")
+            .map_err(|e| row_err(t, 0, "monthID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "monthID", e.to_string()))?;
+        let hour_day_id_col = df
+            .column("hourDayID")
+            .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?;
+        let initial_hour_day_id_col = df
+            .column("initialHourDayID")
+            .map_err(|e| row_err(t, 0, "initialHourDayID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "initialHourDayID", e.to_string()))?;
+        let csihf_col = df
+            .column("coldSoakInitialHourFraction")
+            .map_err(|e| row_err(t, 0, "coldSoakInitialHourFraction", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "coldSoakInitialHourFraction", e.to_string()))?;
+        let is_user_input_col = df
+            .column("isUserInput")
+            .map_err(|e| row_err(t, 0, "isUserInput", e.to_string()))?
+            .bool()
+            .map_err(|e| row_err(t, 0, "isUserInput", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(ColdSoakInitialHourFractionRow {
+                    source_type_id: source_type_id_col
+                        .get(i)
+                        .ok_or_else(|| null("sourceTypeID"))?,
+                    zone_id: zone_id_col.get(i).ok_or_else(|| null("zoneID"))?,
+                    month_id: month_id_col.get(i).ok_or_else(|| null("monthID"))?,
+                    hour_day_id: hour_day_id_col.get(i).ok_or_else(|| null("hourDayID"))?,
+                    initial_hour_day_id: initial_hour_day_id_col
+                        .get(i)
+                        .ok_or_else(|| null("initialHourDayID"))?,
+                    cold_soak_initial_hour_fraction: csihf_col
+                        .get(i)
+                        .ok_or_else(|| null("coldSoakInitialHourFraction"))?,
+                    is_user_input: is_user_input_col
+                        .get(i)
+                        .ok_or_else(|| null("isUserInput"))?,
+                })
+            })
+            .collect()
+    }
 }
 
 // =============================================================================
@@ -1778,13 +2832,81 @@ impl Generator for TankTemperatureGenerator {
         OUTPUT_TABLES
     }
 
-    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
-        // The data plane (Task 50 `DataFrameStore`) is not yet materialised,
-        // so `ctx.tables()` / `ctx.scratch()` are placeholders. The ported
-        // computation lives in `generate_tank_temperatures`; once Task 50
-        // lands, this body will read the input tables from `ctx`, call it per
-        // zone, and write the four output tables into `ctx.scratch()`.
-        Ok(CalculatorOutput::empty())
+    fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
+        // Extract zone_id from the iteration position (ZONE granularity).
+        let zone_id = ctx.position().location.zone_id.ok_or_else(|| {
+            Error::Polars("no zone_id in iteration position".into())
+        })? as i32;
+
+        // Read all input tables.
+        let zone_month_hour: Vec<ZoneMonthHourRow> =
+            ctx.tables().iter_typed("ZoneMonthHour")?;
+        let hour_day: Vec<HourDayRow> =
+            ctx.tables().iter_typed("HourDay")?;
+        let sample_vehicle_day: Vec<SampleVehicleDayRow> =
+            ctx.tables().iter_typed("SampleVehicleDay")?;
+        let sample_vehicle_trip: Vec<SampleVehicleTripRow> =
+            ctx.tables().iter_typed("SampleVehicleTrip")?;
+        let source_type_model_year_group: Vec<SourceTypeModelYearGroupRow> =
+            ctx.tables().iter_typed("SourceTypeModelYearGroup")?;
+        let tank_temperature_rise: Vec<TankTemperatureRiseRow> =
+            ctx.tables().iter_typed("TankTemperatureRise")?;
+        let tank_temperature_group_raw: Vec<TankTemperatureGroupRow> =
+            ctx.tables().iter_typed("TankTemperatureGroup")?;
+        let runspec_month_raw: Vec<RunSpecMonthRow> =
+            ctx.tables().iter_typed("RunSpecMonth")?;
+        let runspec_hour_day_raw: Vec<RunSpecHourDayRow> =
+            ctx.tables().iter_typed("RunSpecHourDay")?;
+
+        let inputs = TankTemperatureInputs {
+            zone_month_hour,
+            hour_day,
+            sample_vehicle_day,
+            sample_vehicle_trip,
+            source_type_model_year_group,
+            tank_temperature_rise,
+            tank_temperature_group_ids: tank_temperature_group_raw
+                .into_iter()
+                .map(|r| r.tank_temperature_group_id)
+                .collect(),
+            runspec_month_ids: runspec_month_raw
+                .into_iter()
+                .map(|r| r.month_id)
+                .collect(),
+            runspec_hour_day_ids: runspec_hour_day_raw
+                .into_iter()
+                .map(|r| r.hour_day_id)
+                .collect(),
+            // User-input override tables are empty by default; the registry
+            // would supply them when available.
+            prior_average_tank_temperature: Vec::new(),
+            prior_soak_activity_fraction: Vec::new(),
+            prior_cold_soak_initial_hour_fraction: Vec::new(),
+        };
+
+        let out = generate_tank_temperatures(&inputs, zone_id);
+
+        // Write the four output tables into the scratch namespace.
+        crate::wiring::write_scratch_table(
+            ctx,
+            OUTPUT_TABLES[0],
+            out.cold_soak_tank_temperature,
+        )?;
+        crate::wiring::write_scratch_table(
+            ctx,
+            OUTPUT_TABLES[1],
+            out.average_tank_temperature,
+        )?;
+        crate::wiring::write_scratch_table(
+            ctx,
+            OUTPUT_TABLES[2],
+            out.soak_activity_fraction,
+        )?;
+        crate::wiring::write_scratch_table(
+            ctx,
+            OUTPUT_TABLES[3],
+            out.cold_soak_initial_hour_fraction,
+        )
     }
 }
 
@@ -2674,11 +3796,182 @@ mod tests {
     }
 
     #[test]
-    fn generator_execute_returns_empty_until_data_plane() {
-        // The Task 50 data plane is not yet wired; `execute` is a stand-in.
+    fn execute_writes_four_scratch_tables() {
+        use moves_framework::{
+            DataFrameStore, DataFrameStoreTyped, ExecutionLocation, ExecutionTime, InMemoryStore,
+            IterationPosition,
+        };
+
+        const ZONE: u32 = 90_001;
+        const ZONE_I32: i32 = 90_001;
+
+        // Build a minimal but complete set of input tables. A constant-75 °F
+        // ambient with one vehicle making one trip is enough to produce rows in
+        // all four output tables.
+        let mut store = InMemoryStore::default();
+
+        // ZoneMonthHour — 24 hours at 75 °F for zone 90_001, month 1.
+        let zmh_rows: Vec<ZoneMonthHourRow> = (1..=24)
+            .map(|hour_id| ZoneMonthHourRow {
+                zone_id: ZONE_I32,
+                month_id: 1,
+                hour_id,
+                temperature: 75.0,
+            })
+            .collect();
+        store.insert(
+            "ZoneMonthHour",
+            ZoneMonthHourRow::into_dataframe(zmh_rows).unwrap(),
+        );
+
+        // HourDay — 24 hour-days for day 5.
+        let hd_rows: Vec<HourDayRow> = (1..=24)
+            .map(|hour_id| HourDayRow {
+                hour_day_id: hour_id * 10 + 5,
+                hour_id,
+                day_id: 5,
+            })
+            .collect();
+        let all_hour_day_ids: Vec<i32> = hd_rows.iter().map(|hd| hd.hour_day_id).collect();
+        store.insert("HourDay", HourDayRow::into_dataframe(hd_rows).unwrap());
+
+        // SampleVehicleDay — one vehicle, source type 10, day 5.
+        store.insert(
+            "SampleVehicleDay",
+            SampleVehicleDayRow::into_dataframe(vec![SampleVehicleDayRow {
+                veh_id: 1,
+                source_type_id: 10,
+                day_id: 5,
+            }])
+            .unwrap(),
+        );
+
+        // SampleVehicleTrip — one trip in hour 2.
+        store.insert(
+            "SampleVehicleTrip",
+            SampleVehicleTripRow::into_dataframe(vec![SampleVehicleTripRow {
+                veh_id: 1,
+                day_id: 5,
+                trip_id: 1,
+                hour_id: 2,
+                prior_trip_id: None,
+                key_on_time: Some(65),
+                key_off_time: 90,
+            }])
+            .unwrap(),
+        );
+
+        // SourceTypeModelYearGroup — source 10 → group 3.
+        store.insert(
+            "SourceTypeModelYearGroup",
+            SourceTypeModelYearGroupRow::into_dataframe(vec![SourceTypeModelYearGroupRow {
+                source_type_id: 10,
+                tank_temperature_group_id: 3,
+            }])
+            .unwrap(),
+        );
+
+        // TankTemperatureRise — group 3 coefficients.
+        store.insert(
+            "TankTemperatureRise",
+            TankTemperatureRiseRow::into_dataframe(vec![TankTemperatureRiseRow {
+                tank_temperature_group_id: 3,
+                tank_temperature_rise_term_a: 50.0,
+                tank_temperature_rise_term_b: 0.0,
+            }])
+            .unwrap(),
+        );
+
+        // TankTemperatureGroup — just group 3.
+        store.insert(
+            "TankTemperatureGroup",
+            TankTemperatureGroupRow::into_dataframe(vec![TankTemperatureGroupRow {
+                tank_temperature_group_id: 3,
+            }])
+            .unwrap(),
+        );
+
+        // RunSpecMonth — month 1.
+        store.insert(
+            "RunSpecMonth",
+            RunSpecMonthRow::into_dataframe(vec![RunSpecMonthRow { month_id: 1 }]).unwrap(),
+        );
+
+        // RunSpecHourDay — all 24 hour-days for day 5.
+        store.insert(
+            "RunSpecHourDay",
+            RunSpecHourDayRow::into_dataframe(
+                all_hour_day_ids
+                    .iter()
+                    .map(|&hour_day_id| RunSpecHourDayRow { hour_day_id })
+                    .collect(),
+            )
+            .unwrap(),
+        );
+
+        let position = IterationPosition {
+            iteration: 0,
+            process_id: Some(ProcessId(11)),
+            location: ExecutionLocation::link(1, 1, ZONE, 1),
+            time: ExecutionTime {
+                year: Some(2020),
+                month: Some(1),
+                day_id: None,
+                hour: None,
+            },
+        };
+
         let generator = TankTemperatureGenerator::new();
-        let mut ctx = CalculatorContext::new();
-        generator.execute(&mut ctx).expect("execute is infallible");
+        let mut ctx = CalculatorContext::with_position_and_tables(position, store);
+        generator.execute(&mut ctx).unwrap();
+
+        // ColdSoakTankTemperature: one row per hour for month 1, 24 rows.
+        let cstt: Vec<ColdSoakTankTemperatureRow> = ctx
+            .scratch()
+            .store
+            .iter_typed("ColdSoakTankTemperature")
+            .unwrap();
+        assert_eq!(cstt.len(), 24, "ColdSoakTankTemperature: one row per hour");
+        for row in &cstt {
+            assert_eq!(row.zone_id, ZONE_I32);
+            assert!(
+                (row.cold_soak_tank_temperature - 75.0).abs() < 1e-9,
+                "constant ambient → constant cold-soak temp"
+            );
+        }
+
+        // AverageTankTemperature: must be non-empty (TTG-5 produced rows).
+        let att: Vec<AverageTankTemperatureRow> = ctx
+            .scratch()
+            .store
+            .iter_typed("AverageTankTemperature")
+            .unwrap();
+        assert!(!att.is_empty(), "AverageTankTemperature must be non-empty");
+
+        // SoakActivityFraction: must be non-empty (TTG-6 produced rows).
+        let saf: Vec<SoakActivityFractionRow> = ctx
+            .scratch()
+            .store
+            .iter_typed("SoakActivityFraction")
+            .unwrap();
+        assert!(!saf.is_empty(), "SoakActivityFraction must be non-empty");
+        for row in &saf {
+            assert_eq!(row.zone_id, ZONE_I32);
+        }
+
+        // ColdSoakInitialHourFraction: must be non-empty (TTG-7 produced rows).
+        let csihf: Vec<ColdSoakInitialHourFractionRow> = ctx
+            .scratch()
+            .store
+            .iter_typed("ColdSoakInitialHourFraction")
+            .unwrap();
+        assert!(
+            !csihf.is_empty(),
+            "ColdSoakInitialHourFraction must be non-empty"
+        );
+        for row in &csihf {
+            assert_eq!(row.zone_id, ZONE_I32);
+        }
     }
 
     #[test]
