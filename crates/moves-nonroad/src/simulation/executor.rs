@@ -1,6 +1,6 @@
 //! The geography-execution seam: the boundary between the *driver
-//! loop* (this task) and the *numerical evaluation* of NONROAD's six
-//! geography routines.
+//! loop* and the *numerical evaluation* of NONROAD's six geography
+//! routines.
 //!
 //! # Why a seam
 //!
@@ -20,27 +20,20 @@
 //! …) are not uniform: they take four different callback traits, each
 //! of which must be populated from the loaded emission-factor,
 //! technology, activity, growth, and retrofit tables. Assembling those
-//! callback contexts is itself substantial — the `geography` module
-//! flagged it as deferred work — so the driver loop talks to the
-//! routines through one narrow trait, [`GeographyExecutor`], rather
-//! than wiring all four callback families inline.
+//! callback contexts behind one narrow trait, [`GeographyExecutor`],
+//! keeps the driver loop decoupled from the callback-context assembly.
 //!
-//! This keeps the deliverables cleanly separable:
+//! This module provides two executors:
 //!
-//! - **This task** owns the driver loop, the [`GeographyExecutor`]
-//!   contract, the [`DispatchContext`] / [`GeographyExecution`] data
-//!   shapes, and a reference executor ([`PlanRecordingExecutor`]).
-//! - **A following increment** owns the production
-//!   [`GeographyExecutor`] that builds the callback contexts from
-//!   [`NonroadInputs`](super::NonroadInputs) reference data and calls
-//!   the real routines.
-//!
-//! The same seam is the **instrumentation hook** the NONROAD
-//! numerical-fidelity harness needs (Tasks 115/116): an executor that
-//! records its [`DispatchContext`] inputs and [`GeographyExecution`]
-//! outputs captures the port-side intermediate state to diff against
-//! the gfortran reference. [`PlanRecordingExecutor`] is the minimal
-//! shape of such an instrumenting executor.
+//! - **[`ProductionExecutor`]** — assembles the four callback traits
+//!   ([`GeographyCallbacks`], [`StateCallbacks`], [`UsTotalCallbacks`],
+//!   [`NationalCallbacks`]) from loaded reference-data tables and calls
+//!   the real geography routines.
+//! - **[`PlanRecordingExecutor`]** — records each dispatch and returns
+//!   empty output; makes the driver loop exercisable without any
+//!   reference data. It is also the minimal shape the NONROAD
+//!   numerical-fidelity harness (Tasks 115/116) needs for capturing
+//!   port-side intermediate state.
 
 use crate::driver::{Dispatch, DriverRecord};
 use crate::common::consts::{MXAGYR, MXPOL, MXTECH, SWTCNG, SWTDSL, SWTGS2, SWTGS4, SWTLPG};

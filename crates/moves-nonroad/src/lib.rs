@@ -28,9 +28,32 @@
 //! [`NonroadOutputs`] integration types that replace the Java↔Fortran
 //! bridge's `.opt`-file generation, input-file generation, and MariaDB
 //! ingestion. The six geography routines are reached through the
-//! [`simulation::GeographyExecutor`] seam; the production executor
-//! that builds their callback contexts from loaded reference data is a
-//! following increment (see the [`simulation`] module docs).
+//! [`simulation::GeographyExecutor`] seam;
+//! [`simulation::ProductionExecutor`] implements that seam by
+//! assembling the four callback traits from loaded reference-data
+//! tables and calling the real geography routines (see the
+//! [`simulation`] module docs).
+//!
+//! # Using `ProductionExecutor` for a production run
+//!
+//! Pass a [`simulation::ProductionExecutor`] to [`run_simulation`] for
+//! a numerical run with loaded reference data:
+//!
+//! ```
+//! use moves_nonroad::driver::RegionLevel;
+//! use moves_nonroad::simulation::{
+//!     run_simulation, NonroadInputs, NonroadOptions, ProductionExecutor, ReferenceData,
+//! };
+//!
+//! let ref_data = ReferenceData::default();
+//! let options = NonroadOptions::new(RegionLevel::County, 2020);
+//! let inputs = NonroadInputs::new();
+//! let mut executor = ProductionExecutor::new(&ref_data);
+//!
+//! let outputs = run_simulation(&options, &inputs, &mut executor).unwrap();
+//! assert!(outputs.rows.is_empty());
+//! assert!(outputs.completion_message.starts_with("Successful completion"));
+//! ```
 
 pub mod allocation;
 pub mod common;

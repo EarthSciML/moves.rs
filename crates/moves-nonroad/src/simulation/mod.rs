@@ -45,11 +45,10 @@
 //! [`GeographyExecutor`] seam — see the [`executor`] module docs for
 //! why the driver loop and the routines' numerical evaluation are kept
 //! separable. [`PlanRecordingExecutor`] is the reference executor: it
-//! records the dispatch plan and evaluates nothing, which makes
-//! [`run_simulation`] a complete, exercised driver loop today and
-//! leaves the production [`GeographyExecutor`] (which builds the
-//! routines' callback contexts from loaded reference data) as a
-//! cleanly-bounded following increment.
+//! records the dispatch plan and evaluates nothing. [`ProductionExecutor`]
+//! is the production executor: it assembles the four callback traits
+//! from loaded reference-data tables and calls the real geography
+//! routines.
 //!
 //! # Signature note
 //!

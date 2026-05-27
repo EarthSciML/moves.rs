@@ -61,6 +61,15 @@
 //! [`crate::emissions`] and [`crate::population`] modules. This
 //! module's job is the geographic loop and the cross-module wiring,
 //! not the inner math.
+//!
+//! # Callback traits and their adapters
+//!
+//! The geography routines take four callback traits:
+//! [`common::GeographyCallbacks`], [`StateCallbacks`],
+//! [`prcus::UsTotalCallbacks`], and [`prcnat::NationalCallbacks`].
+//! For production runs all four are realised by adapter types in
+//! [`crate::simulation::executor`] that borrow reference-data tables
+//! from a [`crate::simulation::ProductionExecutor`].
 
 pub mod common;
 pub mod county;
