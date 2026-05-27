@@ -9,9 +9,9 @@
     },
     {
       "name": "db__junittestoutput__baserateunits",
-      "row_count": 6,
-      "content_sha256": "d9435ac57b25684d774851df8eef5faed1bd508258ea3963eeeb9caf1ec2ad8a",
-      "metadata_sha256": "550b32edc06e3d6697e2f2c9fd126f8af75420458dce39b9e43ff1b100244953"
+      "row_count": 3,
+      "content_sha256": "0551f3ba0ff68667488d29c2db99be195e4018a52126230051f783fa54ff286e",
+      "metadata_sha256": "1c35646f6971b9c1f58067a139ebac39053b3e02724291791f9d74b1216f0fdc"
     },
     {
       "name": "db__junittestoutput__finalaggafter",
@@ -39,9 +39,9 @@
     },
     {
       "name": "db__junittestoutput__movestablesused",
-      "row_count": 290,
-      "content_sha256": "6b4aba3ebb32e9ba5453dfc8e27b42be47defa16075115b9866f7f81555675a6",
-      "metadata_sha256": "eac395e92280ba68906f3f0a687ed61d0c569bf5e6d7d356d6622a112fda9366"
+      "row_count": 145,
+      "content_sha256": "fcd74ec1e9fab53665c3694a81cda0f7afd1d2394185d6e81aea96ed282b393e",
+      "metadata_sha256": "3ece77f0eaf1e6f69b4b7afad7226cc6c88a74c341e85ad3622e24672abde143"
     },
     {
       "name": "db__junittestoutput__rateperdistance",
@@ -2216,5 +2216,5 @@
       "metadata_sha256": "9da6d4524302cefae9b53097c082c6b6d9978d62666b4cfc885cdbc01a50346f"
     }
   ],
-  "aggregate_sha256": "7ce402978800b2bfbab2b1649232988d5c76207e624a5ae65ac87838a14ea71a"
+  "aggregate_sha256": "f2eb3501d467a23850a25bb57115f3e31abf8bd1224a39d3ab85170ec52094b3"
 }
