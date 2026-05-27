@@ -1,0 +1,6 @@
+# Snapshot fixture files: enforce LF line endings so SHA-256 hashes are
+# consistent across platforms (Windows git core.autocrlf=true would otherwise
+# convert LF→CRLF on checkout, changing the hash of .meta.json files).
+*.meta.json     text eol=lf
+manifest.json   text eol=lf
+*.parquet       binary
