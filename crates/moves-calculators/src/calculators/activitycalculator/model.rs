@@ -8,6 +8,13 @@
 //! As in [`super::inputs`], every identifier is an [`i32`] and every quantity
 //! an [`f64`].
 
+use moves_framework::{data::TableRow, Error as MfError};
+use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
+
+fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -> MfError {
+    MfError::RowExtraction { table: table.to_string(), row, column: column.to_string(), message: msg }
+}
+
 /// One row inserted into `##ActivityTable##` (`MOVESWorkerActivityOutput`) —
 /// the activity record the calculator emits for one
 /// `(activity type, location, time, source-bin)` combination.
@@ -66,6 +73,93 @@ pub struct ActivityRow {
     /// table value and the fuel-fraction / regulatory-class / op-mode
     /// weightings that split it across the source bin.
     pub activity: f64,
+}
+
+impl TableRow for ActivityRow {
+    fn table_name() -> &'static str { "MOVESWorkerActivityOutput" }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("yearID".into(), DataType::Int32),
+            ("monthID".into(), DataType::Int32),
+            ("dayID".into(), DataType::Int32),
+            ("hourID".into(), DataType::Int32),
+            ("stateID".into(), DataType::Int32),
+            ("countyID".into(), DataType::Int32),
+            ("zoneID".into(), DataType::Int32),
+            ("linkID".into(), DataType::Int32),
+            ("sourceTypeID".into(), DataType::Int32),
+            ("regClassID".into(), DataType::Int32),
+            ("fuelTypeID".into(), DataType::Int32),
+            ("modelYearID".into(), DataType::Int32),
+            ("roadTypeID".into(), DataType::Int32),
+            ("activityTypeID".into(), DataType::Int32),
+            ("activity".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(n, vec![
+            Series::new("yearID".into(), rows.iter().map(|r| r.year_id).collect::<Vec<i32>>()).into(),
+            Series::new("monthID".into(), rows.iter().map(|r| r.month_id).collect::<Vec<i32>>()).into(),
+            Series::new("dayID".into(), rows.iter().map(|r| r.day_id).collect::<Vec<i32>>()).into(),
+            Series::new("hourID".into(), rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>()).into(),
+            Series::new("stateID".into(), rows.iter().map(|r| r.state_id).collect::<Vec<i32>>()).into(),
+            Series::new("countyID".into(), rows.iter().map(|r| r.county_id).collect::<Vec<i32>>()).into(),
+            Series::new("zoneID".into(), rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>()).into(),
+            Series::new("linkID".into(), rows.iter().map(|r| r.link_id).collect::<Vec<i32>>()).into(),
+            Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
+            Series::new("regClassID".into(), rows.iter().map(|r| r.reg_class_id).collect::<Vec<i32>>()).into(),
+            Series::new("fuelTypeID".into(), rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>()).into(),
+            Series::new("modelYearID".into(), rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>()).into(),
+            Series::new("roadTypeID".into(), rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>()).into(),
+            Series::new("activityTypeID".into(), rows.iter().map(|r| r.activity_type_id).collect::<Vec<i32>>()).into(),
+            Series::new("activity".into(), rows.iter().map(|r| r.activity).collect::<Vec<f64>>()).into(),
+        ])
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "MOVESWorkerActivityOutput";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?.f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let year_id = get_i32("yearID")?;
+        let month_id = get_i32("monthID")?;
+        let day_id = get_i32("dayID")?;
+        let hour_id = get_i32("hourID")?;
+        let state_id = get_i32("stateID")?;
+        let county_id = get_i32("countyID")?;
+        let zone_id = get_i32("zoneID")?;
+        let link_id = get_i32("linkID")?;
+        let source_type_id = get_i32("sourceTypeID")?;
+        let reg_class_id = get_i32("regClassID")?;
+        let fuel_type_id = get_i32("fuelTypeID")?;
+        let model_year_id = get_i32("modelYearID")?;
+        let road_type_id = get_i32("roadTypeID")?;
+        let activity_type_id = get_i32("activityTypeID")?;
+        let activity = get_f64("activity")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(ActivityRow {
+                year_id: year_id.get(i).ok_or_else(|| null("yearID"))?,
+                month_id: month_id.get(i).ok_or_else(|| null("monthID"))?,
+                day_id: day_id.get(i).ok_or_else(|| null("dayID"))?,
+                hour_id: hour_id.get(i).ok_or_else(|| null("hourID"))?,
+                state_id: state_id.get(i).ok_or_else(|| null("stateID"))?,
+                county_id: county_id.get(i).ok_or_else(|| null("countyID"))?,
+                zone_id: zone_id.get(i).ok_or_else(|| null("zoneID"))?,
+                link_id: link_id.get(i).ok_or_else(|| null("linkID"))?,
+                source_type_id: source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                reg_class_id: reg_class_id.get(i).ok_or_else(|| null("regClassID"))?,
+                fuel_type_id: fuel_type_id.get(i).ok_or_else(|| null("fuelTypeID"))?,
+                model_year_id: model_year_id.get(i).ok_or_else(|| null("modelYearID"))?,
+                road_type_id: road_type_id.get(i).ok_or_else(|| null("roadTypeID"))?,
+                activity_type_id: activity_type_id.get(i).ok_or_else(|| null("activityTypeID"))?,
+                activity: activity.get(i).ok_or_else(|| null("activity"))?,
+            })
+        }).collect()
+    }
 }
 
 /// One `sourceTypeFuelFraction` row — the share of a
