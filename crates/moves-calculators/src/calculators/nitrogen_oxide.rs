@@ -147,8 +147,8 @@ use std::collections::HashMap;
 
 use moves_data::{PollutantId, PollutantProcessAssociation, ProcessId};
 use moves_framework::{
-    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription,
-    DataFrameStoreTyped, Error, TableRow,
+    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStoreTyped,
+    Error, TableRow,
 };
 use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
 
@@ -434,23 +434,91 @@ impl TableRow for MovesWorkerOutputRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("yearID".into(), rows.iter().map(|r| r.year_id).collect::<Vec<i32>>()).into(),
-                Series::new("monthID".into(), rows.iter().map(|r| r.month_id).collect::<Vec<i32>>()).into(),
-                Series::new("dayID".into(), rows.iter().map(|r| r.day_id).collect::<Vec<i32>>()).into(),
-                Series::new("hourID".into(), rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>()).into(),
-                Series::new("stateID".into(), rows.iter().map(|r| r.state_id).collect::<Vec<i32>>()).into(),
-                Series::new("countyID".into(), rows.iter().map(|r| r.county_id).collect::<Vec<i32>>()).into(),
-                Series::new("zoneID".into(), rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>()).into(),
-                Series::new("linkID".into(), rows.iter().map(|r| r.link_id).collect::<Vec<i32>>()).into(),
-                Series::new("pollutantID".into(), rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>()).into(),
-                Series::new("processID".into(), rows.iter().map(|r| r.process_id).collect::<Vec<i32>>()).into(),
-                Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("regClassID".into(), rows.iter().map(|r| r.reg_class_id).collect::<Vec<i32>>()).into(),
-                Series::new("fuelTypeID".into(), rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("modelYearID".into(), rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>()).into(),
-                Series::new("roadTypeID".into(), rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("emissionQuant".into(), rows.iter().map(|r| r.emission_quant).collect::<Vec<f64>>()).into(),
-                Series::new("emissionRate".into(), rows.iter().map(|r| r.emission_rate).collect::<Vec<f64>>()).into(),
+                Series::new(
+                    "yearID".into(),
+                    rows.iter().map(|r| r.year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "dayID".into(),
+                    rows.iter().map(|r| r.day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hourID".into(),
+                    rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "stateID".into(),
+                    rows.iter().map(|r| r.state_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "countyID".into(),
+                    rows.iter().map(|r| r.county_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "zoneID".into(),
+                    rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "linkID".into(),
+                    rows.iter().map(|r| r.link_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "pollutantID".into(),
+                    rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "processID".into(),
+                    rows.iter().map(|r| r.process_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "regClassID".into(),
+                    rows.iter().map(|r| r.reg_class_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelTypeID".into(),
+                    rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "modelYearID".into(),
+                    rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "roadTypeID".into(),
+                    rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "emissionQuant".into(),
+                    rows.iter().map(|r| r.emission_quant).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "emissionRate".into(),
+                    rows.iter().map(|r| r.emission_rate).collect::<Vec<f64>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -533,11 +601,33 @@ impl TableRow for NoNo2RatioRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("polProcessID".into(), rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>()).into(),
-                Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("fuelTypeID".into(), rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("modelYearGroupID".into(), rows.iter().map(|r| r.model_year_group_id).collect::<Vec<i32>>()).into(),
-                Series::new("NOxRatio".into(), rows.iter().map(|r| r.nox_ratio).collect::<Vec<f64>>()).into(),
+                Series::new(
+                    "polProcessID".into(),
+                    rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelTypeID".into(),
+                    rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "modelYearGroupID".into(),
+                    rows.iter()
+                        .map(|r| r.model_year_group_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "NOxRatio".into(),
+                    rows.iter().map(|r| r.nox_ratio).collect::<Vec<f64>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -594,9 +684,21 @@ impl TableRow for PollutantProcessAssocRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("polProcessID".into(), rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>()).into(),
-                Series::new("processID".into(), rows.iter().map(|r| r.process_id).collect::<Vec<i32>>()).into(),
-                Series::new("pollutantID".into(), rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>()).into(),
+                Series::new(
+                    "polProcessID".into(),
+                    rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "processID".into(),
+                    rows.iter().map(|r| r.process_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "pollutantID".into(),
+                    rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -643,9 +745,23 @@ impl TableRow for PollutantProcessModelYearRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("polProcessID".into(), rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>()).into(),
-                Series::new("modelYearID".into(), rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>()).into(),
-                Series::new("modelYearGroupID".into(), rows.iter().map(|r| r.model_year_group_id).collect::<Vec<i32>>()).into(),
+                Series::new(
+                    "polProcessID".into(),
+                    rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "modelYearID".into(),
+                    rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "modelYearGroupID".into(),
+                    rows.iter()
+                        .map(|r| r.model_year_group_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -1452,23 +1568,49 @@ mod tests {
         use polars::prelude::{DataFrame, NamedFrom, Series};
         let inputs = minimal_inputs();
         let mut store = moves_framework::InMemoryStore::new();
-        store.insert("NONO2Ratio", NoNo2RatioRow::into_dataframe(inputs.no_no2_ratio).unwrap());
-        store.insert("PollutantProcessAssoc", PollutantProcessAssocRow::into_dataframe(inputs.pollutant_process_assoc).unwrap());
-        store.insert("PollutantProcessMappedModelYear", PollutantProcessModelYearRow::into_dataframe(inputs.pollutant_process_model_year).unwrap());
+        store.insert(
+            "NONO2Ratio",
+            NoNo2RatioRow::into_dataframe(inputs.no_no2_ratio).unwrap(),
+        );
+        store.insert(
+            "PollutantProcessAssoc",
+            PollutantProcessAssocRow::into_dataframe(inputs.pollutant_process_assoc).unwrap(),
+        );
+        store.insert(
+            "PollutantProcessMappedModelYear",
+            PollutantProcessModelYearRow::into_dataframe(inputs.pollutant_process_model_year)
+                .unwrap(),
+        );
         store.insert(
             "SourceUseType",
             DataFrame::new(
                 inputs.source_use_type.len(),
                 vec![Series::new("sourceTypeID".into(), inputs.source_use_type).into()],
-            ).unwrap(),
+            )
+            .unwrap(),
         );
-        store.insert("MOVESWorkerOutput", MovesWorkerOutputRow::into_dataframe(inputs.worker_output).unwrap());
+        store.insert(
+            "MOVESWorkerOutput",
+            MovesWorkerOutputRow::into_dataframe(inputs.worker_output).unwrap(),
+        );
         let ctx = CalculatorContext::with_tables(store);
         let out = NO2Calculator::new().execute(&ctx).expect("execute ok");
         let df = out.dataframe().expect("output should contain a DataFrame");
         assert_eq!(df.height(), 1, "minimal NO2 inputs produce exactly one row");
-        let quant = df.column("emissionQuant").unwrap().f64().unwrap().get(0).unwrap();
-        let rate = df.column("emissionRate").unwrap().f64().unwrap().get(0).unwrap();
+        let quant = df
+            .column("emissionQuant")
+            .unwrap()
+            .f64()
+            .unwrap()
+            .get(0)
+            .unwrap();
+        let rate = df
+            .column("emissionRate")
+            .unwrap()
+            .f64()
+            .unwrap()
+            .get(0)
+            .unwrap();
         // 0.25 × 200.0 = 50.0 and 0.25 × 8.0 = 2.0
         assert!((quant - 50.0).abs() < 1e-9, "emissionQuant {quant} != 50.0");
         assert!((rate - 2.0).abs() < 1e-9, "emissionRate {rate} != 2.0");
@@ -1500,25 +1642,54 @@ mod tests {
             worker_output: vec![nox_row()],
         };
         let mut store = moves_framework::InMemoryStore::new();
-        store.insert("NONO2Ratio", NoNo2RatioRow::into_dataframe(no_inputs.no_no2_ratio).unwrap());
-        store.insert("PollutantProcessAssoc", PollutantProcessAssocRow::into_dataframe(no_inputs.pollutant_process_assoc).unwrap());
-        store.insert("PollutantProcessMappedModelYear", PollutantProcessModelYearRow::into_dataframe(no_inputs.pollutant_process_model_year).unwrap());
+        store.insert(
+            "NONO2Ratio",
+            NoNo2RatioRow::into_dataframe(no_inputs.no_no2_ratio).unwrap(),
+        );
+        store.insert(
+            "PollutantProcessAssoc",
+            PollutantProcessAssocRow::into_dataframe(no_inputs.pollutant_process_assoc).unwrap(),
+        );
+        store.insert(
+            "PollutantProcessMappedModelYear",
+            PollutantProcessModelYearRow::into_dataframe(no_inputs.pollutant_process_model_year)
+                .unwrap(),
+        );
         store.insert(
             "SourceUseType",
             DataFrame::new(
                 no_inputs.source_use_type.len(),
                 vec![Series::new("sourceTypeID".into(), no_inputs.source_use_type).into()],
-            ).unwrap(),
+            )
+            .unwrap(),
         );
-        store.insert("MOVESWorkerOutput", MovesWorkerOutputRow::into_dataframe(no_inputs.worker_output).unwrap());
+        store.insert(
+            "MOVESWorkerOutput",
+            MovesWorkerOutputRow::into_dataframe(no_inputs.worker_output).unwrap(),
+        );
         let ctx = CalculatorContext::with_tables(store);
         let out = NOCalculator::new().execute(&ctx).expect("execute ok");
         let df = out.dataframe().expect("output should contain a DataFrame");
         assert_eq!(df.height(), 1, "NO inputs produce exactly one row");
-        let quant = df.column("emissionQuant").unwrap().f64().unwrap().get(0).unwrap();
-        let rate = df.column("emissionRate").unwrap().f64().unwrap().get(0).unwrap();
+        let quant = df
+            .column("emissionQuant")
+            .unwrap()
+            .f64()
+            .unwrap()
+            .get(0)
+            .unwrap();
+        let rate = df
+            .column("emissionRate")
+            .unwrap()
+            .f64()
+            .unwrap()
+            .get(0)
+            .unwrap();
         // 0.7 × 200.0 = 140.0 and 0.7 × 8.0 = 5.6
-        assert!((quant - 140.0).abs() < 1e-9, "emissionQuant {quant} != 140.0");
+        assert!(
+            (quant - 140.0).abs() < 1e-9,
+            "emissionQuant {quant} != 140.0"
+        );
         assert!((rate - 5.6).abs() < 1e-9, "emissionRate {rate} != 5.6");
     }
 

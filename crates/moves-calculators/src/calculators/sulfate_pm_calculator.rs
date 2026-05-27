@@ -1254,9 +1254,7 @@ impl TableRow for PollutantProcessAssocRow {
             .map(|i| {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
                 Ok(PollutantProcessAssocRow {
-                    pol_process_id: pol_process
-                        .get(i)
-                        .ok_or_else(|| null("polProcessID"))?,
+                    pol_process_id: pol_process.get(i).ok_or_else(|| null("polProcessID"))?,
                     process_id: process.get(i).ok_or_else(|| null("processID"))?,
                     pollutant_id: pollutant.get(i).ok_or_else(|| null("pollutantID"))?,
                 })
@@ -1578,9 +1576,7 @@ impl TableRow for SulfateFractionsRow {
                     sulfate_non_ec_pm_fraction: sulfate
                         .get(i)
                         .ok_or_else(|| null("SulfatenonECPMFraction"))?,
-                    h2o_non_ec_pm_fraction: h2o
-                        .get(i)
-                        .ok_or_else(|| null("H2ONonECPMFraction"))?,
+                    h2o_non_ec_pm_fraction: h2o.get(i).ok_or_else(|| null("H2ONonECPMFraction"))?,
                     base_fuel_sulfate_fraction: base_sulfate
                         .get(i)
                         .ok_or_else(|| null("BaseFuelSulfateFraction"))?,
@@ -1706,7 +1702,9 @@ impl TableRow for GeneralFuelRatioRow {
                 .into(),
                 Series::new(
                     "fuelEffectRatio".into(),
-                    rows.iter().map(|r| r.fuel_effect_ratio).collect::<Vec<f64>>(),
+                    rows.iter()
+                        .map(|r| r.fuel_effect_ratio)
+                        .collect::<Vec<f64>>(),
                 )
                 .into(),
             ],
@@ -1962,9 +1960,7 @@ impl TableRow for PmSpeciationRow {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
                 Ok(PmSpeciationRow {
                     process_id: process.get(i).ok_or_else(|| null("processID"))?,
-                    input_pollutant_id: input_pol
-                        .get(i)
-                        .ok_or_else(|| null("inputPollutantID"))?,
+                    input_pollutant_id: input_pol.get(i).ok_or_else(|| null("inputPollutantID"))?,
                     source_type_id: source_type.get(i).ok_or_else(|| null("sourceTypeID"))?,
                     fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
                     min_model_year_id: min_my.get(i).ok_or_else(|| null("minModelYearID"))?,
@@ -2152,9 +2148,7 @@ impl TableRow for EmissionRow {
                     fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
                     model_year_id: model_year.get(i).ok_or_else(|| null("modelYearID"))?,
                     road_type_id: road_type.get(i).ok_or_else(|| null("roadTypeID"))?,
-                    emission_quant: emission_quant
-                        .get(i)
-                        .ok_or_else(|| null("emissionQuant"))?,
+                    emission_quant: emission_quant.get(i).ok_or_else(|| null("emissionQuant"))?,
                     emission_rate: emission_rate.get(i).ok_or_else(|| null("emissionRate"))?,
                 })
             })
@@ -2790,40 +2784,96 @@ mod tests {
         use moves_framework::DataFrameStore;
         let inputs = minimal_inputs();
         let mut store = moves_framework::InMemoryStore::new();
-        store.insert("FuelSupply", FuelSupplyRow::into_dataframe(inputs.fuel_supply).unwrap());
-        store.insert("FuelFormulation", FuelFormulationRow::into_dataframe(inputs.fuel_formulation).unwrap());
-        store.insert("FuelSubtype", FuelSubtypeRow::into_dataframe(inputs.fuel_subtype).unwrap());
-        store.insert("sulfateFractions", SulfateFractionsRow::into_dataframe(inputs.sulfate_fractions).unwrap());
-        store.insert("MonthOfAnyYear", MonthGroupRow::into_dataframe(inputs.month_of_any_year).unwrap());
+        store.insert(
+            "FuelSupply",
+            FuelSupplyRow::into_dataframe(inputs.fuel_supply).unwrap(),
+        );
+        store.insert(
+            "FuelFormulation",
+            FuelFormulationRow::into_dataframe(inputs.fuel_formulation).unwrap(),
+        );
+        store.insert(
+            "FuelSubtype",
+            FuelSubtypeRow::into_dataframe(inputs.fuel_subtype).unwrap(),
+        );
+        store.insert(
+            "sulfateFractions",
+            SulfateFractionsRow::into_dataframe(inputs.sulfate_fractions).unwrap(),
+        );
+        store.insert(
+            "MonthOfAnyYear",
+            MonthGroupRow::into_dataframe(inputs.month_of_any_year).unwrap(),
+        );
         store.insert(
             "RunSpecModelYear",
             RunSpecModelYearRow::into_dataframe(
-                inputs.run_spec_model_years.iter().map(|&y| RunSpecModelYearRow { model_year_id: y }).collect(),
-            ).unwrap(),
+                inputs
+                    .run_spec_model_years
+                    .iter()
+                    .map(|&y| RunSpecModelYearRow { model_year_id: y })
+                    .collect(),
+            )
+            .unwrap(),
         );
-        store.insert("generalFuelRatio", GeneralFuelRatioRow::into_dataframe(inputs.general_fuel_ratio).unwrap());
-        store.insert("crankcaseEmissionRatio", CrankcaseSplitRow::into_dataframe(inputs.crankcase_split).unwrap());
-        store.insert("PMSpeciation", PmSpeciationRow::into_dataframe(inputs.pm_speciation).unwrap());
-        store.insert("MOVESWorkerOutput", EmissionRow::into_dataframe(inputs.worker_output).unwrap());
+        store.insert(
+            "generalFuelRatio",
+            GeneralFuelRatioRow::into_dataframe(inputs.general_fuel_ratio).unwrap(),
+        );
+        store.insert(
+            "crankcaseEmissionRatio",
+            CrankcaseSplitRow::into_dataframe(inputs.crankcase_split).unwrap(),
+        );
+        store.insert(
+            "PMSpeciation",
+            PmSpeciationRow::into_dataframe(inputs.pm_speciation).unwrap(),
+        );
+        store.insert(
+            "MOVESWorkerOutput",
+            EmissionRow::into_dataframe(inputs.worker_output).unwrap(),
+        );
         store.insert(
             "PollutantProcessAssoc",
             PollutantProcessAssocRow::into_dataframe(vec![
-                PollutantProcessAssocRow { pol_process_id: TOM_POLLUTANT * 100 + 1, pollutant_id: TOM_POLLUTANT, process_id: 1 },
-                PollutantProcessAssocRow { pol_process_id: NON_EC_NON_SO4_NON_OM_POLLUTANT * 100 + 1, pollutant_id: NON_EC_NON_SO4_NON_OM_POLLUTANT, process_id: 1 },
-            ]).unwrap(),
+                PollutantProcessAssocRow {
+                    pol_process_id: TOM_POLLUTANT * 100 + 1,
+                    pollutant_id: TOM_POLLUTANT,
+                    process_id: 1,
+                },
+                PollutantProcessAssocRow {
+                    pol_process_id: NON_EC_NON_SO4_NON_OM_POLLUTANT * 100 + 1,
+                    pollutant_id: NON_EC_NON_SO4_NON_OM_POLLUTANT,
+                    process_id: 1,
+                },
+            ])
+            .unwrap(),
         );
         let ctx = CalculatorContext::with_tables(store);
         let out = SulfatePMCalculator.execute(&ctx).expect("execute ok");
         let df = out.dataframe().expect("output should contain a DataFrame");
-        assert_eq!(df.height(), 7, "minimal inputs produce exactly seven species rows");
+        assert_eq!(
+            df.height(),
+            7,
+            "minimal inputs produce exactly seven species rows"
+        );
         let sulfate_quant = df
-            .column("emissionQuant").unwrap()
-            .f64().unwrap()
+            .column("emissionQuant")
+            .unwrap()
+            .f64()
+            .unwrap()
             .iter()
             .zip(df.column("pollutantID").unwrap().i32().unwrap().iter())
-            .find_map(|(q, p)| if p == Some(SULFATE_POLLUTANT) { q } else { None })
+            .find_map(|(q, p)| {
+                if p == Some(SULFATE_POLLUTANT) {
+                    q
+                } else {
+                    None
+                }
+            })
             .expect("sulfate row present");
-        assert!((sulfate_quant - 240.0).abs() < 1e-9, "sulfate emissionQuant {sulfate_quant} != 240.0");
+        assert!(
+            (sulfate_quant - 240.0).abs() < 1e-9,
+            "sulfate emissionQuant {sulfate_quant} != 240.0"
+        );
     }
 
     #[test]

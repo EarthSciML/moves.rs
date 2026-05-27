@@ -522,9 +522,23 @@ impl TableRow for IntegratedSpeciesRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("mechanismID".into(), rows.iter().map(|r| r.mechanism_id).collect::<Vec<i32>>()).into(),
-                Series::new("integratedSpeciesSetID".into(), rows.iter().map(|r| r.integrated_species_set_id).collect::<Vec<i32>>()).into(),
-                Series::new("pollutantID".into(), rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>()).into(),
+                Series::new(
+                    "mechanismID".into(),
+                    rows.iter().map(|r| r.mechanism_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "integratedSpeciesSetID".into(),
+                    rows.iter()
+                        .map(|r| r.integrated_species_set_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "pollutantID".into(),
+                    rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -532,20 +546,26 @@ impl TableRow for IntegratedSpeciesRow {
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "integratedSpeciesSet";
         let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let mechanism = get_i32("mechanismID")?;
         let set_id = get_i32("integratedSpeciesSetID")?;
         let pollutant = get_i32("pollutantID")?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(IntegratedSpeciesRow {
-                mechanism_id: mechanism.get(i).ok_or_else(|| null("mechanismID"))?,
-                integrated_species_set_id: set_id.get(i).ok_or_else(|| null("integratedSpeciesSetID"))?,
-                pollutant_id: pollutant.get(i).ok_or_else(|| null("pollutantID"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(IntegratedSpeciesRow {
+                    mechanism_id: mechanism.get(i).ok_or_else(|| null("mechanismID"))?,
+                    integrated_species_set_id: set_id
+                        .get(i)
+                        .ok_or_else(|| null("integratedSpeciesSetID"))?,
+                    pollutant_id: pollutant.get(i).ok_or_else(|| null("pollutantID"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -587,29 +607,121 @@ impl TableRow for WorkerOutputRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("MOVESRunID".into(), rows.iter().map(|r| r.moves_run_id).collect::<Vec<i32>>()).into(),
-                Series::new("iterationID".into(), rows.iter().map(|r| r.iteration_id).collect::<Vec<i32>>()).into(),
-                Series::new("yearID".into(), rows.iter().map(|r| r.year_id).collect::<Vec<i32>>()).into(),
-                Series::new("monthID".into(), rows.iter().map(|r| r.month_id).collect::<Vec<i32>>()).into(),
-                Series::new("dayID".into(), rows.iter().map(|r| r.day_id).collect::<Vec<i32>>()).into(),
-                Series::new("hourID".into(), rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>()).into(),
-                Series::new("stateID".into(), rows.iter().map(|r| r.state_id).collect::<Vec<i32>>()).into(),
-                Series::new("countyID".into(), rows.iter().map(|r| r.county_id).collect::<Vec<i32>>()).into(),
-                Series::new("zoneID".into(), rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>()).into(),
-                Series::new("linkID".into(), rows.iter().map(|r| r.link_id).collect::<Vec<i32>>()).into(),
-                Series::new("pollutantID".into(), rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>()).into(),
-                Series::new("processID".into(), rows.iter().map(|r| r.process_id).collect::<Vec<i32>>()).into(),
-                Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("regClassID".into(), rows.iter().map(|r| r.reg_class_id).collect::<Vec<i32>>()).into(),
-                Series::new("fuelTypeID".into(), rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("modelYearID".into(), rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>()).into(),
-                Series::new("roadTypeID".into(), rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("SCC".into(), rows.iter().map(|r| r.scc.clone()).collect::<Vec<String>>()).into(),
-                Series::new("engTechID".into(), rows.iter().map(|r| r.eng_tech_id).collect::<Vec<i32>>()).into(),
-                Series::new("sectorID".into(), rows.iter().map(|r| r.sector_id).collect::<Vec<i32>>()).into(),
-                Series::new("hpID".into(), rows.iter().map(|r| r.hp_id).collect::<Vec<i32>>()).into(),
-                Series::new("emissionQuant".into(), rows.iter().map(|r| r.emission_quant).collect::<Vec<f64>>()).into(),
-                Series::new("emissionRate".into(), rows.iter().map(|r| r.emission_rate).collect::<Vec<f64>>()).into(),
+                Series::new(
+                    "MOVESRunID".into(),
+                    rows.iter().map(|r| r.moves_run_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "iterationID".into(),
+                    rows.iter().map(|r| r.iteration_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "yearID".into(),
+                    rows.iter().map(|r| r.year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "dayID".into(),
+                    rows.iter().map(|r| r.day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hourID".into(),
+                    rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "stateID".into(),
+                    rows.iter().map(|r| r.state_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "countyID".into(),
+                    rows.iter().map(|r| r.county_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "zoneID".into(),
+                    rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "linkID".into(),
+                    rows.iter().map(|r| r.link_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "pollutantID".into(),
+                    rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "processID".into(),
+                    rows.iter().map(|r| r.process_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "regClassID".into(),
+                    rows.iter().map(|r| r.reg_class_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelTypeID".into(),
+                    rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "modelYearID".into(),
+                    rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "roadTypeID".into(),
+                    rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "SCC".into(),
+                    rows.iter().map(|r| r.scc.clone()).collect::<Vec<String>>(),
+                )
+                .into(),
+                Series::new(
+                    "engTechID".into(),
+                    rows.iter().map(|r| r.eng_tech_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sectorID".into(),
+                    rows.iter().map(|r| r.sector_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hpID".into(),
+                    rows.iter().map(|r| r.hp_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "emissionQuant".into(),
+                    rows.iter().map(|r| r.emission_quant).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "emissionRate".into(),
+                    rows.iter().map(|r| r.emission_rate).collect::<Vec<f64>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -617,12 +729,16 @@ impl TableRow for WorkerOutputRow {
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "MOVESWorkerOutput";
         let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .f64()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
         let moves_run = get_i32("MOVESRunID")?;
         let iteration = get_i32("iterationID")?;
@@ -641,40 +757,49 @@ impl TableRow for WorkerOutputRow {
         let fuel_type = get_i32("fuelTypeID")?;
         let model_year = get_i32("modelYearID")?;
         let road_type = get_i32("roadTypeID")?;
-        let scc_ca = df.column("SCC").map_err(|e| row_err(t, 0, "SCC", e.to_string()))?.str().map_err(|e| row_err(t, 0, "SCC", e.to_string()))?;
+        let scc_ca = df
+            .column("SCC")
+            .map_err(|e| row_err(t, 0, "SCC", e.to_string()))?
+            .str()
+            .map_err(|e| row_err(t, 0, "SCC", e.to_string()))?;
         let eng_tech = get_i32("engTechID")?;
         let sector = get_i32("sectorID")?;
         let hp = get_i32("hpID")?;
         let emission_quant = get_f64("emissionQuant")?;
         let emission_rate = get_f64("emissionRate")?;
-        (0..df.height()).map(|i| {
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            Ok(WorkerOutputRow {
-                moves_run_id: moves_run.get(i).ok_or_else(|| null("MOVESRunID"))?,
-                iteration_id: iteration.get(i).ok_or_else(|| null("iterationID"))?,
-                year_id: year.get(i).ok_or_else(|| null("yearID"))?,
-                month_id: month.get(i).ok_or_else(|| null("monthID"))?,
-                day_id: day.get(i).ok_or_else(|| null("dayID"))?,
-                hour_id: hour.get(i).ok_or_else(|| null("hourID"))?,
-                state_id: state.get(i).ok_or_else(|| null("stateID"))?,
-                county_id: county.get(i).ok_or_else(|| null("countyID"))?,
-                zone_id: zone.get(i).ok_or_else(|| null("zoneID"))?,
-                link_id: link.get(i).ok_or_else(|| null("linkID"))?,
-                pollutant_id: pollutant.get(i).ok_or_else(|| null("pollutantID"))?,
-                process_id: process.get(i).ok_or_else(|| null("processID"))?,
-                source_type_id: src_type.get(i).ok_or_else(|| null("sourceTypeID"))?,
-                reg_class_id: reg_class.get(i).ok_or_else(|| null("regClassID"))?,
-                fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
-                model_year_id: model_year.get(i).ok_or_else(|| null("modelYearID"))?,
-                road_type_id: road_type.get(i).ok_or_else(|| null("roadTypeID"))?,
-                scc: scc_ca.get(i).map(|s| s.to_string()).ok_or_else(|| null("SCC"))?,
-                eng_tech_id: eng_tech.get(i).ok_or_else(|| null("engTechID"))?,
-                sector_id: sector.get(i).ok_or_else(|| null("sectorID"))?,
-                hp_id: hp.get(i).ok_or_else(|| null("hpID"))?,
-                emission_quant: emission_quant.get(i).ok_or_else(|| null("emissionQuant"))?,
-                emission_rate: emission_rate.get(i).ok_or_else(|| null("emissionRate"))?,
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(WorkerOutputRow {
+                    moves_run_id: moves_run.get(i).ok_or_else(|| null("MOVESRunID"))?,
+                    iteration_id: iteration.get(i).ok_or_else(|| null("iterationID"))?,
+                    year_id: year.get(i).ok_or_else(|| null("yearID"))?,
+                    month_id: month.get(i).ok_or_else(|| null("monthID"))?,
+                    day_id: day.get(i).ok_or_else(|| null("dayID"))?,
+                    hour_id: hour.get(i).ok_or_else(|| null("hourID"))?,
+                    state_id: state.get(i).ok_or_else(|| null("stateID"))?,
+                    county_id: county.get(i).ok_or_else(|| null("countyID"))?,
+                    zone_id: zone.get(i).ok_or_else(|| null("zoneID"))?,
+                    link_id: link.get(i).ok_or_else(|| null("linkID"))?,
+                    pollutant_id: pollutant.get(i).ok_or_else(|| null("pollutantID"))?,
+                    process_id: process.get(i).ok_or_else(|| null("processID"))?,
+                    source_type_id: src_type.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                    reg_class_id: reg_class.get(i).ok_or_else(|| null("regClassID"))?,
+                    fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
+                    model_year_id: model_year.get(i).ok_or_else(|| null("modelYearID"))?,
+                    road_type_id: road_type.get(i).ok_or_else(|| null("roadTypeID"))?,
+                    scc: scc_ca
+                        .get(i)
+                        .map(|s| s.to_string())
+                        .ok_or_else(|| null("SCC"))?,
+                    eng_tech_id: eng_tech.get(i).ok_or_else(|| null("engTechID"))?,
+                    sector_id: sector.get(i).ok_or_else(|| null("sectorID"))?,
+                    hp_id: hp.get(i).ok_or_else(|| null("hpID"))?,
+                    emission_quant: emission_quant.get(i).ok_or_else(|| null("emissionQuant"))?,
+                    emission_rate: emission_rate.get(i).ok_or_else(|| null("emissionRate"))?,
+                })
             })
-        }).collect()
+            .collect()
     }
 }
 
@@ -1355,10 +1480,7 @@ mod tests {
         use moves_framework::DataFrameStore;
         // One NMOG (80) row and one integrated species (ALD2=1001) in mechanism 1,
         // set 1. NonHAPTOG = 100 - 20 = 80.
-        let worker_rows = vec![
-            raw(NMOG_POLLUTANT_ID, 100.0, 10.0),
-            raw(1001, 20.0, 2.0),
-        ];
+        let worker_rows = vec![raw(NMOG_POLLUTANT_ID, 100.0, 10.0), raw(1001, 20.0, 2.0)];
         let iss_rows = vec![iss(1, 1, 1001)];
         let mut store = moves_framework::InMemoryStore::new();
         store.insert(
@@ -1372,12 +1494,34 @@ mod tests {
         let ctx = CalculatorContext::with_tables(store);
         let out = TogSpeciationCalculator.execute(&ctx).expect("execute ok");
         let df = out.dataframe().expect("output should contain a DataFrame");
-        assert_eq!(df.height(), 1, "minimal inputs produce exactly one NonHAPTOG row");
-        let quant = df.column("emissionQuant").unwrap().f64().unwrap().get(0).unwrap();
-        let rate = df.column("emissionRate").unwrap().f64().unwrap().get(0).unwrap();
+        assert_eq!(
+            df.height(),
+            1,
+            "minimal inputs produce exactly one NonHAPTOG row"
+        );
+        let quant = df
+            .column("emissionQuant")
+            .unwrap()
+            .f64()
+            .unwrap()
+            .get(0)
+            .unwrap();
+        let rate = df
+            .column("emissionRate")
+            .unwrap()
+            .f64()
+            .unwrap()
+            .get(0)
+            .unwrap();
         assert!((quant - 80.0).abs() < 1e-9, "emissionQuant {quant} != 80.0");
         assert!((rate - 8.0).abs() < 1e-9, "emissionRate {rate} != 8.0");
-        let pollutant = df.column("pollutantID").unwrap().i32().unwrap().get(0).unwrap();
+        let pollutant = df
+            .column("pollutantID")
+            .unwrap()
+            .i32()
+            .unwrap()
+            .get(0)
+            .unwrap();
         assert_eq!(pollutant, NONHAP_TOG_POLLUTANT_ID);
     }
 
