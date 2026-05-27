@@ -5,6 +5,21 @@ Task 4 (`mo-kbjl`). One sub-directory per fixture; each is the
 deterministic, content-addressed regression baseline that every other
 phase verifies against.
 
+## Acceptance status
+
+T7 (`mo-o785i`) ran the full 34-fixture suite on 2026-05-26 with result
+**34/34 succeeded, 0 failed**. The three `scale-*` fixtures were skipped
+(require an additional input DB; see `characterization/fixtures/README.md`).
+T8 (`mo-zt8nk`) triage found no failed fixtures requiring re-run or
+documentation.
+
+| Fixture | Status | Notes |
+|---------|--------|-------|
+| All 34 non-scale fixtures | OK | Populated; see sub-directories |
+| scale-county | skipped | Requires additional input DB |
+| scale-project | skipped | Requires additional input DB |
+| scale-rates | skipped | Requires additional input DB |
+
 ## Layout
 
 ```
