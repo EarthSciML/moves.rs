@@ -130,7 +130,8 @@ use std::collections::HashMap;
 
 use moves_data::{PollutantId, PollutantProcessAssociation, ProcessId};
 use moves_framework::{
-    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, Error, TableRow,
+    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription,
+    DataFrameStoreTyped, Error, TableRow,
 };
 use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
 

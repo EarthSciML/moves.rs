@@ -271,6 +271,24 @@ impl ExecutionTables {
     }
 }
 
+impl DataFrameStore for ExecutionTables {
+    fn get(&self, name: &str) -> Option<std::sync::Arc<polars::prelude::DataFrame>> {
+        self.store.get(name)
+    }
+
+    fn insert(&mut self, name: impl Into<String>, df: polars::prelude::DataFrame) {
+        self.store.insert(name, df);
+    }
+
+    fn contains(&self, name: &str) -> bool {
+        self.store.contains(name)
+    }
+
+    fn names(&self) -> Vec<&str> {
+        self.store.names()
+    }
+}
+
 /// Inter-calculator scratch namespace.
 ///
 /// Backed by an [`InMemoryStore`] keyed by table name. Each generator writes
