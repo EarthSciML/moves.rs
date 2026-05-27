@@ -101,13 +101,6 @@ jobs:
       - name: cargo test
         run: cargo test --workspace --all-targets
 
-      # ── Docs (Linux only) ────────────────────────────────────────────────
-      - name: cargo doc (warnings deny)
-        if: matrix.os == 'ubuntu-latest'
-        env:
-          RUSTDOCFLAGS: -D warnings
-        run: cargo doc --workspace --no-deps
-
   # ── WASM build gate ────────────────────────────────────────────────────────
   #
   # Builds `moves-wasm` for `wasm32-unknown-unknown` and runs its native unit
@@ -160,6 +153,35 @@ jobs:
           cargo build
           --target wasm32-unknown-unknown
           -p moves-wasm
+
+  docs:
+    name: cargo doc
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry, target/
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: docs
+
+      - name: cargo doc (warnings deny)
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --workspace --no-deps
+
+      - name: Copy docs index
+        if: github.ref == 'refs/heads/main'
+        run: cp static/docs-index.html target/doc/index.html
+
+      - name: Upload docs artifact
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: target/doc
 
   deny:
     name: cargo deny
