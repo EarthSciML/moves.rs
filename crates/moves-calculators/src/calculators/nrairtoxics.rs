@@ -146,7 +146,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use moves_data::{PollutantId, PollutantProcessAssociation, ProcessId};
 use moves_framework::{
     Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStoreTyped,
-    Error, IntoDataFrame, TableRow,
+    Error, TableRow,
 };
 use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
 

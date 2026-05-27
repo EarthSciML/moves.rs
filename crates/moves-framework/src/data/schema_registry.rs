@@ -610,7 +610,8 @@ fn stub_schema() -> Schema {
 
 // ── Registry ─────────────────────────────────────────────────────────────────
 
-static REGISTRY: OnceLock<HashMap<&'static str, fn() -> Schema>> = OnceLock::new();
+type SchemaRegistry = HashMap<&'static str, fn() -> Schema>;
+static REGISTRY: OnceLock<SchemaRegistry> = OnceLock::new();
 
 /// Return the static schema registry.
 ///

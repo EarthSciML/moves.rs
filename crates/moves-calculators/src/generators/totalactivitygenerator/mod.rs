@@ -3193,7 +3193,7 @@ impl Generator for TotalActivityGenerator {
         let has_hotelling = ctx
             .tables()
             .get("hotellingHoursPerDay")
-            .map_or(false, |df| df.height() > 0);
+            .is_some_and(|df| df.height() > 0);
 
         let inputs = TotalActivityInputs {
             analysis_year,

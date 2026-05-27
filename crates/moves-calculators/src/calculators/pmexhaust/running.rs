@@ -2895,7 +2895,7 @@ impl Calculator for BasicRunningPmEmissionCalculator {
         let tables = ctx.tables();
         let pos = ctx.position();
         let run_ctx = RunContext {
-            year: pos.time.year.map(|y| i32::from(y)).unwrap_or(0),
+            year: pos.time.year.map(i32::from).unwrap_or(0),
             state_id: pos.location.state_id.map(|s| s as i32).unwrap_or(0),
             county_id: pos.location.county_id.map(|c| c as i32).unwrap_or(0),
             zone_id: pos.location.zone_id.map(|z| z as i32).unwrap_or(0),

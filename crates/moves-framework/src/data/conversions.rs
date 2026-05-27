@@ -106,7 +106,7 @@ pub trait DataFrameStoreTyped: DataFrameStore {
         let registry = schema_registry();
         if let Some(schema_fn) = registry.get(name) {
             let reg_schema = schema_fn();
-            if reg_schema.len() > 0 {
+            if !reg_schema.is_empty() {
                 let expected: Vec<String> =
                     reg_schema.iter().map(|(col, _)| col.to_string()).collect();
                 let actual: Vec<String> =

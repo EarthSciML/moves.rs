@@ -274,7 +274,7 @@ fn county_one_scc_produces_nonzero_emissions() {
         run_simulation(&opts, &inputs, &mut executor).expect("run_simulation must succeed");
 
     assert!(
-        outputs.rows.len() >= 1,
+        !outputs.rows.is_empty(),
         "expected at least one emission row, got {}",
         outputs.rows.len()
     );
