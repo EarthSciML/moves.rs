@@ -571,3 +571,127 @@ pub struct TotalActivityInputs {
     /// computes new rows only for source types absent from it.
     pub starts_per_vehicle: Vec<StartsPerVehicleRow>,
 }
+
+// ===========================================================================
+// TableRow impls — read allocation input tables from the slow store.
+// ===========================================================================
+
+use moves_framework::{Error, TableRow};
+use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
+
+fn row_err_in(table: &'static str, row: usize, col: &'static str, msg: String) -> Error {
+    Error::RowExtraction {
+        table: table.into(),
+        row,
+        column: col.into(),
+        message: msg,
+    }
+}
+
+impl TableRow for RunSpecHourDayRow {
+    fn table_name() -> &'static str {
+        "RunSpecHourDay"
+    }
+
+    fn polars_schema() -> Schema {
+        Schema::from_iter([("hourDayID".into(), DataType::Int32)])
+    }
+
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        DataFrame::new(
+            rows.len(),
+            vec![Series::new(
+                "hourDayID".into(),
+                rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+            )
+            .into()],
+        )
+    }
+
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "RunSpecHourDay";
+        let ids = df
+            .column("hourDayID")
+            .map_err(|e| row_err_in(t, 0, "hourDayID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err_in(t, 0, "hourDayID", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                Ok(Self {
+                    hour_day_id: ids
+                        .get(i)
+                        .ok_or_else(|| row_err_in(t, i, "hourDayID", "null value".into()))?,
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for LinkRow {
+    fn table_name() -> &'static str {
+        "Link"
+    }
+
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("linkID".into(), DataType::Int32),
+            ("countyID".into(), DataType::Int32),
+            ("zoneID".into(), DataType::Int32),
+            ("roadTypeID".into(), DataType::Int32),
+        ])
+    }
+
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "linkID".into(),
+                    rows.iter().map(|r| r.link_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "countyID".into(),
+                    rows.iter().map(|r| r.county_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "zoneID".into(),
+                    rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "roadTypeID".into(),
+                    rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "Link";
+        let get = |col: &'static str| {
+            df.column(col)
+                .map_err(|e| row_err_in(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err_in(t, 0, col, e.to_string()))
+        };
+        let link_id = get("linkID")?;
+        let county_id = get("countyID")?;
+        let zone_id = get("zoneID")?;
+        let road_type_id = get("roadTypeID")?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col| row_err_in(t, i, col, "null value".into());
+                Ok(Self {
+                    link_id: link_id.get(i).ok_or_else(|| null("linkID"))?,
+                    county_id: county_id.get(i).ok_or_else(|| null("countyID"))?,
+                    zone_id: zone_id.get(i).ok_or_else(|| null("zoneID"))?,
+                    road_type_id: road_type_id.get(i).ok_or_else(|| null("roadTypeID"))?,
+                })
+            })
+            .collect()
+    }
+}

@@ -1611,7 +1611,8 @@ impl TableRow for inputs::ZoneRoadTypeRow {
         let zone_id = get_i32("zoneID")?;
         let road_type_id = get_i32("roadTypeID")?;
         let sho_alloc_factor = get_f64("SHOAllocFactor")?;
-        let shp_alloc_factor = get_f64("SHPAllocFactor")?;
+        // SHPAllocFactor absent in snapshots captured without hotelling — default to 0.0.
+        let shp_opt = df.column("SHPAllocFactor").ok().and_then(|s| s.f64().ok());
         (0..df.height())
             .map(|i| {
                 let null = |col: &'static str| row_err(T, i, col, "null value".into());
@@ -1621,9 +1622,7 @@ impl TableRow for inputs::ZoneRoadTypeRow {
                     sho_alloc_factor: sho_alloc_factor
                         .get(i)
                         .ok_or_else(|| null("SHOAllocFactor"))?,
-                    shp_alloc_factor: shp_alloc_factor
-                        .get(i)
-                        .ok_or_else(|| null("SHPAllocFactor"))?,
+                    shp_alloc_factor: shp_opt.as_ref().and_then(|ca| ca.get(i)).unwrap_or(0.0),
                 })
             })
             .collect()
@@ -1749,7 +1748,7 @@ impl TableRow for inputs::SampleVehicleTripRow {
             ("vehID".into(), DataType::Int32),
             ("dayID".into(), DataType::Int32),
             ("hourID".into(), DataType::Int32),
-            ("hasKeyOnTime".into(), DataType::Boolean),
+            ("keyOnTime".into(), DataType::Int32),
         ])
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
@@ -1773,10 +1772,10 @@ impl TableRow for inputs::SampleVehicleTripRow {
                 )
                 .into(),
                 Series::new(
-                    "hasKeyOnTime".into(),
+                    "keyOnTime".into(),
                     rows.iter()
-                        .map(|r| r.has_key_on_time)
-                        .collect::<Vec<bool>>(),
+                        .map(|r| if r.has_key_on_time { Some(1i32) } else { None })
+                        .collect::<Vec<Option<i32>>>(),
                 )
                 .into(),
             ],
@@ -1793,11 +1792,7 @@ impl TableRow for inputs::SampleVehicleTripRow {
         let veh_id = get_i32("vehID")?;
         let day_id = get_i32("dayID")?;
         let hour_id = get_i32("hourID")?;
-        let has_key_on_time = df
-            .column("hasKeyOnTime")
-            .map_err(|e| row_err(T, 0, "hasKeyOnTime", e.to_string()))?
-            .bool()
-            .map_err(|e| row_err(T, 0, "hasKeyOnTime", e.to_string()))?;
+        let key_on_time = get_i32("keyOnTime")?;
         (0..df.height())
             .map(|i| {
                 let null = |col: &'static str| row_err(T, i, col, "null value".into());
@@ -1805,7 +1800,7 @@ impl TableRow for inputs::SampleVehicleTripRow {
                     veh_id: veh_id.get(i).ok_or_else(|| null("vehID"))?,
                     day_id: day_id.get(i).ok_or_else(|| null("dayID"))?,
                     hour_id: hour_id.get(i).ok_or_else(|| null("hourID"))?,
-                    has_key_on_time: has_key_on_time.get(i).ok_or_else(|| null("hasKeyOnTime"))?,
+                    has_key_on_time: key_on_time.get(i).is_some(),
                 })
             })
             .collect()

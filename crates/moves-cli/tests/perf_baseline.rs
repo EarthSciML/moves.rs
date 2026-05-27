@@ -127,6 +127,7 @@ fn perf_baseline_all_onroad_fixtures() {
             max_parallel_chunks: 1,
             calculator_dag: None,
             run_date_time: None,
+            snapshot: None,
         };
 
         match run_simulation(&opts) {
@@ -197,6 +198,7 @@ fn single_fixture_timing_fields_are_populated() {
         max_parallel_chunks: 0,
         calculator_dag: None,
         run_date_time: None,
+        snapshot: None,
     })
     .expect("run must succeed");
 

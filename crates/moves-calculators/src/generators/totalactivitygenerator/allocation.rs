@@ -27,6 +27,9 @@
 
 use std::collections::BTreeMap;
 
+use moves_framework::{Error, TableRow};
+use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
+
 use super::inputs::{
     CountyRow, DrivingIdleFractionRow, HourDayRow, LinkRow, RunSpecHourDayRow,
     SampleVehiclePopulationRow, StateRow, TotalIdleFractionRow, ZoneRoadTypeRow, ZoneRow,
@@ -34,6 +37,15 @@ use super::inputs::{
 use super::model::{
     AverageSpeedRow, IdleHoursByAgeHourRow, ShoByAgeRoadwayHourRow, ShpByAgeHourRow,
 };
+
+fn row_err_alloc(table: &'static str, row: usize, col: &'static str, msg: String) -> Error {
+    Error::RowExtraction {
+        table: table.into(),
+        row,
+        column: col.into(),
+        message: msg,
+    }
+}
 
 /// MOVES `roadTypeID` for the off-network road type — parking lots, driveways,
 /// and the like. Off-network "source hours operating" is the off-network
@@ -537,6 +549,187 @@ pub fn calculate_distance(
             ShoRow { distance, ..*s }
         })
         .collect()
+}
+
+// ===========================================================================
+// TableRow impls — write/read allocation tables via the slow store.
+// ===========================================================================
+
+impl TableRow for ZoneRoadTypeLinkRow {
+    fn table_name() -> &'static str {
+        "ZoneRoadTypeLinkTemp"
+    }
+
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("roadTypeID".into(), DataType::Int32),
+            ("linkID".into(), DataType::Int32),
+            ("SHOAllocFactor".into(), DataType::Float64),
+        ])
+    }
+
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "roadTypeID".into(),
+                    rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "linkID".into(),
+                    rows.iter().map(|r| r.link_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "SHOAllocFactor".into(),
+                    rows.iter()
+                        .map(|r| r.sho_alloc_factor)
+                        .collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "ZoneRoadTypeLinkTemp";
+        let road_type_id = df
+            .column("roadTypeID")
+            .map_err(|e| row_err_alloc(t, 0, "roadTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err_alloc(t, 0, "roadTypeID", e.to_string()))?;
+        let link_id = df
+            .column("linkID")
+            .map_err(|e| row_err_alloc(t, 0, "linkID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err_alloc(t, 0, "linkID", e.to_string()))?;
+        let alloc_factor = df
+            .column("SHOAllocFactor")
+            .map_err(|e| row_err_alloc(t, 0, "SHOAllocFactor", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err_alloc(t, 0, "SHOAllocFactor", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col| row_err_alloc(t, i, col, "null value".into());
+                Ok(Self {
+                    road_type_id: road_type_id.get(i).ok_or_else(|| null("roadTypeID"))?,
+                    link_id: link_id.get(i).ok_or_else(|| null("linkID"))?,
+                    sho_alloc_factor: alloc_factor.get(i).ok_or_else(|| null("SHOAllocFactor"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for ShoRow {
+    fn table_name() -> &'static str {
+        "SHO"
+    }
+
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("hourDayID".into(), DataType::Int32),
+            ("monthID".into(), DataType::Int32),
+            ("yearID".into(), DataType::Int32),
+            ("ageID".into(), DataType::Int32),
+            ("linkID".into(), DataType::Int32),
+            ("sourceTypeID".into(), DataType::Int32),
+            ("SHO".into(), DataType::Float64),
+            ("distance".into(), DataType::Float64),
+        ])
+    }
+
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "hourDayID".into(),
+                    rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "yearID".into(),
+                    rows.iter().map(|r| r.year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "ageID".into(),
+                    rows.iter().map(|r| r.age_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "linkID".into(),
+                    rows.iter().map(|r| r.link_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "SHO".into(),
+                    rows.iter().map(|r| r.sho).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "distance".into(),
+                    rows.iter().map(|r| r.distance).collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "SHO";
+        let get_i32 = |col: &'static str| {
+            df.column(col)
+                .map_err(|e| row_err_alloc(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err_alloc(t, 0, col, e.to_string()))
+        };
+        let get_f64 = |col: &'static str| {
+            df.column(col)
+                .map_err(|e| row_err_alloc(t, 0, col, e.to_string()))?
+                .f64()
+                .map_err(|e| row_err_alloc(t, 0, col, e.to_string()))
+        };
+        let hour_day_id = get_i32("hourDayID")?;
+        let month_id = get_i32("monthID")?;
+        let year_id = get_i32("yearID")?;
+        let age_id = get_i32("ageID")?;
+        let link_id = get_i32("linkID")?;
+        let source_type_id = get_i32("sourceTypeID")?;
+        let sho = get_f64("SHO")?;
+        let distance = get_f64("distance")?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col| row_err_alloc(t, i, col, "null value".into());
+                Ok(Self {
+                    hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))?,
+                    month_id: month_id.get(i).ok_or_else(|| null("monthID"))?,
+                    year_id: year_id.get(i).ok_or_else(|| null("yearID"))?,
+                    age_id: age_id.get(i).ok_or_else(|| null("ageID"))?,
+                    link_id: link_id.get(i).ok_or_else(|| null("linkID"))?,
+                    source_type_id: source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                    sho: sho.get(i).ok_or_else(|| null("SHO"))?,
+                    // NULL distance is the pre-computation state; default to 0.0.
+                    distance: distance.get(i).unwrap_or(0.0),
+                })
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]

@@ -185,6 +185,7 @@ fn all_fixtures_run_without_error() {
             max_parallel_chunks: 1,
             calculator_dag: None,
             run_date_time: Some("2026-05-21T00:00:00".to_string()),
+            snapshot: None,
         });
 
         match result {
@@ -238,6 +239,7 @@ fn nonroad_fixtures_plan_modules() {
             max_parallel_chunks: 1,
             calculator_dag: None,
             run_date_time: Some("2026-05-21T00:00:00".to_string()),
+            snapshot: None,
         })
         .unwrap_or_else(|e| panic!("{name}: {e}"));
         assert!(
@@ -305,6 +307,7 @@ fn canonical_snapshot_diff() {
             max_parallel_chunks: 1,
             calculator_dag: None,
             run_date_time: Some("2026-05-21T00:00:00".to_string()),
+            snapshot: None,
         })
         .unwrap_or_else(|e| panic!("{name}: run error — {e}"));
 

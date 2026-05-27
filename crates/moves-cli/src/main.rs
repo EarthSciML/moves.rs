@@ -65,6 +65,12 @@ enum Command {
         /// default, which keeps the run's output byte-stable.
         #[arg(long, value_name = "ISO8601")]
         run_date_time: Option<String>,
+
+        /// Path to a canonical MOVES snapshot directory whose
+        /// `tables/db__movesexecution*.parquet` files supply the
+        /// execution-database slow tier for all calculators.
+        #[arg(long, value_name = "DIR")]
+        snapshot: Option<PathBuf>,
     },
 
     /// Import County-database (CDB) input CSV files into Parquet.
@@ -114,12 +120,14 @@ fn dispatch(command: Command) -> anyhow::Result<ExitCode> {
             max_parallel_chunks,
             calculator_dag,
             run_date_time,
+            snapshot,
         } => cmd_run(RunOptions {
             runspec,
             output,
             max_parallel_chunks,
             calculator_dag,
             run_date_time,
+            snapshot,
         }),
         Command::ImportCdb {
             input,

@@ -50,16 +50,19 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use moves_data::output_schema::{MovesRunRecord, OutputTable};
+use crate::data::InMemoryStore;
+
+use moves_data::output_schema::{EmissionRecord, MovesRunRecord, OutputTable};
 use moves_data::{PollutantId, ProcessId};
 use moves_runspec::model::Model;
 use moves_runspec::RunSpec;
+use polars::prelude::DataFrame;
 use sha2::{Digest, Sha256};
 
 use super::execution_db::ExecutionTime;
 use super::execution_runspec::ExecutionRunSpec;
 use super::executor::{chunk_chains, BoundedExecutor, Chunk};
-use crate::aggregation::OutputProcessor;
+use crate::aggregation::{emission_aggregation, AggregationInputs, OutputProcessor, UnitScaling};
 use crate::calculator::{
     Calculator, CalculatorContext, CalculatorRegistry, CalculatorSubscription, Generator,
 };
@@ -213,17 +216,19 @@ impl ModuleInstance {
         }
     }
 
-    /// Run the module against `ctx`. The [`crate::CalculatorOutput`] is
-    /// discarded — Task 50's data plane wires it into the scratch
-    /// namespace; Phase 2 calculators return an empty output anyway.
+    /// Run the module against `ctx`. Returns the calculator's emission
+    /// DataFrame if any, or `None` for generators and empty outputs.
     ///
     /// Accepts `&mut CalculatorContext` so generators can write to
     /// `ctx.scratch_mut()`. Calculators receive a shared `&CalculatorContext`
     /// via the automatic coercion from `&mut`.
-    fn execute(&self, ctx: &mut CalculatorContext) -> Result<()> {
+    fn execute(&self, ctx: &mut CalculatorContext) -> Result<Option<DataFrame>> {
         match self {
-            ModuleInstance::Calculator(c) => c.execute(ctx).map(|_| ()),
-            ModuleInstance::Generator(g) => g.execute(ctx).map(|_| ()),
+            ModuleInstance::Calculator(c) => Ok(c.execute(ctx)?.into_dataframe()),
+            ModuleInstance::Generator(g) => {
+                g.execute(ctx)?;
+                Ok(None)
+            }
         }
     }
 }
@@ -258,6 +263,9 @@ struct CalculatorMasterLoopable {
     /// Per-chunk shared context. All adapters within one chunk share the
     /// same `Arc`; adapters in different chunks hold different `Arc`s.
     ctx: Arc<Mutex<CalculatorContext>>,
+    /// Cross-chunk accumulator: emission DataFrames from every calculator
+    /// invocation are pushed here for post-run aggregation.
+    output_acc: Arc<Mutex<Vec<DataFrame>>>,
 }
 
 impl MasterLoopable for CalculatorMasterLoopable {
@@ -270,7 +278,17 @@ impl MasterLoopable for CalculatorMasterLoopable {
         }
         let mut ctx = self.ctx.lock().expect("CalculatorContext mutex poisoned");
         ctx.set_position(context.position);
-        self.module.execute(&mut ctx)
+        if let Some(df) = self.module.execute(&mut ctx)? {
+            // Only accumulate emission output (has pollutantID); skip activity
+            // output (e.g. MOVESWorkerActivityOutput from DistanceCalculator).
+            if df.height() > 0 && df.column("pollutantID").is_ok() {
+                self.output_acc
+                    .lock()
+                    .expect("output accumulator poisoned")
+                    .push(df);
+            }
+        }
+        Ok(())
     }
 }
 
@@ -310,6 +328,10 @@ pub struct MOVESEngine {
     strategy_registry: ControlStrategyRegistry,
     /// Output directory and parallelism tuning.
     config: EngineConfig,
+    /// Pre-loaded execution-database tables shared across all chunk contexts.
+    /// Populated by [`with_slow_store`](Self::with_slow_store); empty by
+    /// default (calculators receive an empty slow tier).
+    slow_store: Arc<InMemoryStore>,
 }
 
 impl MOVESEngine {
@@ -327,7 +349,22 @@ impl MOVESEngine {
             registry,
             strategy_registry: ControlStrategyRegistry::new(),
             config,
+            slow_store: Arc::new(InMemoryStore::new()),
         }
+    }
+
+    /// Pre-load execution-database tables into every chunk's
+    /// [`CalculatorContext`] slow tier.
+    ///
+    /// Call this after [`new`](Self::new) and before [`run`](Self::run) to
+    /// give calculators access to the filtered default-DB / execution-DB
+    /// tables they read via `ctx.tables()`. Without this call the slow tier
+    /// is empty and any `iter_typed` call in a calculator will return a
+    /// "table not found" error.
+    #[must_use]
+    pub fn with_slow_store(mut self, store: InMemoryStore) -> Self {
+        self.slow_store = Arc::new(store);
+        self
     }
 
     /// Attach a [`ControlStrategyRegistry`] to this engine. Strategies are
@@ -444,6 +481,7 @@ impl MOVESEngine {
 
         let executor = BoundedExecutor::new(self.config.max_parallel_chunks)?;
         let registry = &self.registry;
+        let chunk_slow = Arc::clone(&self.slow_store);
         // Per-chunk wall times collected from within the parallel closure.
         // Indexed to match the `chunks` slice order: `chunk_slot[i]` holds
         // the timing for `chunks[i]`. Using a `Mutex<Vec<Option<...>>>` lets
@@ -451,6 +489,10 @@ impl MOVESEngine {
         let chunk_slot: Arc<Mutex<Vec<Option<Duration>>>> =
             Arc::new(Mutex::new(vec![None; chunks.len()]));
         let chunk_slot_ref = Arc::clone(&chunk_slot);
+        // Emission DataFrames accumulated across all chunks for post-run
+        // aggregation and writing to MOVESOutput/.
+        let output_acc: Arc<Mutex<Vec<DataFrame>>> = Arc::new(Mutex::new(Vec::new()));
+        let output_acc_ref = Arc::clone(&output_acc);
         let t_exec_start = Instant::now();
         executor.execute(&chunks, |chunk| {
             let t_chunk = Instant::now();
@@ -478,8 +520,11 @@ impl MOVESEngine {
             // One CalculatorContext per chunk: generators write scratch here,
             // calculators in the same chunk read it. Different chunks get
             // different Arcs, providing per-chunk scratch isolation.
-            let chunk_ctx: Arc<Mutex<CalculatorContext>> =
-                Arc::new(Mutex::new(CalculatorContext::new()));
+            // The slow tier (execution-DB tables) is shared read-only across
+            // all chunks via the same Arc.
+            let chunk_ctx: Arc<Mutex<CalculatorContext>> = Arc::new(Mutex::new(
+                CalculatorContext::with_slow(Arc::clone(&chunk_slow)),
+            ));
             for name in chunk.modules() {
                 let Some(instance) = instantiate(registry, name) else {
                     continue;
@@ -493,6 +538,7 @@ impl MOVESEngine {
                         module: Arc::clone(&module),
                         gate_process: sub.process_id,
                         ctx: Arc::clone(&chunk_ctx),
+                        output_acc: Arc::clone(&output_acc_ref),
                     });
                     master.subscribe(MasterLoopableSubscription::new(
                         sub.granularity,
@@ -536,14 +582,31 @@ impl MOVESEngine {
             }
         }
 
-        // Finalize: write the MOVESRun metadata row.
+        // Finalize: write the MOVESRun metadata row and any accumulated
+        // emission output.
+        let raw_frames = std::mem::take(&mut *output_acc.lock().expect("output_acc poisoned"));
         let run_record = self.build_run_record();
+        let emission_records =
+            worker_output_frames_to_emission_records(&raw_frames, &run_record.run_hash);
+
         let (proc, output_bytes) = if self.config.collect_output_in_memory {
             let p = OutputProcessor::new_memory(&run_record)?;
+            if !emission_records.is_empty() {
+                let run_spec = &self.execution.run_spec;
+                let agg_inputs = aggregation_inputs_from_run_spec(run_spec);
+                let plan = emission_aggregation(&agg_inputs);
+                p.write_aggregated_emissions(&plan, &emission_records, &UnitScaling)?;
+            }
             let bytes = p.take_memory_files().unwrap_or_default();
             (p, bytes)
         } else {
             let p = OutputProcessor::new(&self.config.output_root, &run_record)?;
+            if !emission_records.is_empty() {
+                let run_spec = &self.execution.run_spec;
+                let agg_inputs = aggregation_inputs_from_run_spec(run_spec);
+                let plan = emission_aggregation(&agg_inputs);
+                p.write_aggregated_emissions(&plan, &emission_records, &UnitScaling)?;
+            }
             (p, Vec::new())
         };
         let run_record_path = proc.output_root().join(OutputProcessor::partition_path(
@@ -715,6 +778,106 @@ fn run_hash(run_spec: &RunSpec) -> String {
         serde_json::to_vec(run_spec).expect("RunSpec is plain data and always serializes to JSON");
     let digest = Sha256::digest(&json);
     digest.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+/// Build an [`AggregationInputs`] from a [`RunSpec`].
+fn aggregation_inputs_from_run_spec(run_spec: &RunSpec) -> AggregationInputs<'_> {
+    AggregationInputs {
+        timestep: run_spec.output_timestep,
+        geographic_output_detail: run_spec.geographic_output_detail,
+        scale: run_spec.scale,
+        domain: run_spec.domain,
+        models: &run_spec.models,
+        breakdown: &run_spec.output_breakdown,
+        output_population: false,
+        reg_class_id: false,
+        fuel_sub_type: false,
+        eng_tech_id: false,
+        sector: false,
+    }
+}
+
+/// Convert a slice of raw `MOVESWorkerOutput` DataFrames to [`EmissionRecord`]
+/// rows for the [`OutputProcessor`].
+///
+/// Each DataFrame column is read by name; missing columns yield `None` for
+/// that field. All produced records carry `moves_run_id = 1` and the supplied
+/// `run_hash`.
+fn worker_output_frames_to_emission_records(
+    frames: &[DataFrame],
+    run_hash: &str,
+) -> Vec<EmissionRecord> {
+    let mut records = Vec::new();
+    for df in frames {
+        let col_i16 = |name: &str| -> Vec<Option<i16>> {
+            df.column(name)
+                .ok()
+                .and_then(|s| s.i32().ok())
+                .map(|ca| ca.into_iter().map(|v| v.map(|x| x as i16)).collect())
+                .unwrap_or_else(|| vec![None; df.height()])
+        };
+        let col_i32 = |name: &str| -> Vec<Option<i32>> {
+            df.column(name)
+                .ok()
+                .and_then(|s| s.i32().ok())
+                .map(|ca| ca.into_iter().collect())
+                .unwrap_or_else(|| vec![None; df.height()])
+        };
+        let col_f64 = |name: &str| -> Vec<Option<f64>> {
+            df.column(name)
+                .ok()
+                .and_then(|s| s.f64().ok())
+                .map(|ca| ca.into_iter().collect())
+                .unwrap_or_else(|| vec![None; df.height()])
+        };
+
+        let year_id = col_i16("yearID");
+        let month_id = col_i16("monthID");
+        let day_id = col_i16("dayID");
+        let hour_id = col_i16("hourID");
+        let state_id = col_i16("stateID");
+        let county_id = col_i32("countyID");
+        let zone_id = col_i32("zoneID");
+        let link_id = col_i32("linkID");
+        let pollutant_id = col_i16("pollutantID");
+        let process_id = col_i16("processID");
+        let source_type_id = col_i16("sourceTypeID");
+        let model_year_id = col_i16("modelYearID");
+        let fuel_type_id = col_i16("fuelTypeID");
+        let road_type_id = col_i16("roadTypeID");
+        let emission_quant = col_f64("emissionQuant");
+
+        for i in 0..df.height() {
+            records.push(EmissionRecord {
+                moves_run_id: 1,
+                iteration_id: None,
+                year_id: year_id[i],
+                month_id: month_id[i],
+                day_id: day_id[i],
+                hour_id: hour_id[i],
+                state_id: state_id[i],
+                county_id: county_id[i],
+                zone_id: zone_id[i],
+                link_id: link_id[i],
+                pollutant_id: pollutant_id[i],
+                process_id: process_id[i],
+                source_type_id: source_type_id[i],
+                reg_class_id: None,
+                fuel_type_id: fuel_type_id[i],
+                fuel_sub_type_id: None,
+                model_year_id: model_year_id[i],
+                road_type_id: road_type_id[i],
+                scc: None,
+                eng_tech_id: None,
+                sector_id: None,
+                hp_id: None,
+                emission_quant: emission_quant[i],
+                emission_rate: None,
+                run_hash: run_hash.to_string(),
+            });
+        }
+    }
+    records
 }
 
 /// Path of the `MOVESRun.parquet` file under an output root — exposed so a
@@ -1120,6 +1283,7 @@ mod tests {
             module: Arc::new(ModuleInstance::Calculator(Box::new(calc))),
             gate_process: ProcessId(1),
             ctx: stub_chunk_ctx(),
+            output_acc: Arc::new(Mutex::new(Vec::new())),
         };
 
         let mut ctx = MasterLoopContext::default();
@@ -1151,6 +1315,7 @@ mod tests {
             module: Arc::new(ModuleInstance::Generator(Box::new(generator))),
             gate_process: ProcessId(1),
             ctx: stub_chunk_ctx(),
+            output_acc: Arc::new(Mutex::new(Vec::new())),
         };
         let mut ctx = MasterLoopContext::default();
         ctx.position.process_id = Some(ProcessId(1));

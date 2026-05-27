@@ -103,6 +103,7 @@ fn run_all_fixtures(fixtures: &[PathBuf], max_parallel_chunks: usize) -> (f64, O
             max_parallel_chunks,
             calculator_dag: None,
             run_date_time: None,
+            snapshot: None,
         })
         .unwrap_or_else(|e| {
             panic!(
@@ -253,6 +254,7 @@ fn all_parallelism_levels_run_the_airtoxics_fixture() {
             max_parallel_chunks: n,
             calculator_dag: None,
             run_date_time: None,
+            snapshot: None,
         })
         .unwrap_or_else(|e| panic!("airtoxics at N={n}: {e}"));
 

@@ -468,20 +468,24 @@ impl TableRow for SampleVehicleTripRow {
         let prior_trip_id = get_i32("priorTripID")?;
         let key_on_time = get_i32("keyOnTime")?;
         let key_off_time = get_i32("keyOffTime")?;
-        (0..df.height())
-            .map(|i| {
-                let null = |col: &'static str| row_err(t, i, col, "null value".into());
-                Ok(SampleVehicleTripRow {
-                    veh_id: veh_id.get(i).ok_or_else(|| null("vehID"))?,
-                    day_id: day_id.get(i).ok_or_else(|| null("dayID"))?,
-                    trip_id: trip_id.get(i).ok_or_else(|| null("tripID"))?,
-                    hour_id: hour_id.get(i).ok_or_else(|| null("hourID"))?,
-                    prior_trip_id: prior_trip_id.get(i),
-                    key_on_time: key_on_time.get(i).ok_or_else(|| null("keyOnTime"))?,
-                    key_off_time: key_off_time.get(i).ok_or_else(|| null("keyOffTime"))?,
-                })
-            })
-            .collect()
+        // Rows with NULL keyOnTime are marker trips — skip them (Java filter).
+        let mut rows = Vec::with_capacity(df.height());
+        for i in 0..df.height() {
+            let Some(kot) = key_on_time.get(i) else {
+                continue;
+            };
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            rows.push(SampleVehicleTripRow {
+                veh_id: veh_id.get(i).ok_or_else(|| null("vehID"))?,
+                day_id: day_id.get(i).ok_or_else(|| null("dayID"))?,
+                trip_id: trip_id.get(i).ok_or_else(|| null("tripID"))?,
+                hour_id: hour_id.get(i).ok_or_else(|| null("hourID"))?,
+                prior_trip_id: prior_trip_id.get(i),
+                key_on_time: kot,
+                key_off_time: key_off_time.get(i).ok_or_else(|| null("keyOffTime"))?,
+            });
+        }
+        Ok(rows)
     }
 }
 

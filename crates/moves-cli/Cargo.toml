@@ -17,6 +17,7 @@ path = "src/main.rs"
 
 [dependencies]
 moves-calculator-info = { path = "../moves-calculator-info" }
+moves-calculators = { path = "../moves-calculators" }
 moves-data-default = { path = "../moves-data-default" }
 moves-framework = { path = "../moves-framework" }
 moves-importer = { path = "../moves-importer" }
@@ -24,6 +25,7 @@ moves-importer-county = { path = "../moves-importer-county" }
 moves-runspec = { path = "../moves-runspec" }
 anyhow = { workspace = true }
 clap = { workspace = true }
+polars = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]

@@ -38,7 +38,16 @@ impl InMemoryStore {
 
 impl DataFrameStore for InMemoryStore {
     fn get(&self, name: &str) -> Option<Arc<DataFrame>> {
-        self.map.get(name).cloned()
+        if let Some(df) = self.map.get(name) {
+            return Some(df.clone());
+        }
+        // Case-insensitive fallback: snapshot-loaded tables use all-lowercase
+        // keys while calculator code uses the original mixed-case Java names.
+        let lower = name.to_ascii_lowercase();
+        self.map
+            .iter()
+            .find(|(k, _)| k.to_ascii_lowercase() == lower)
+            .map(|(_, v)| v.clone())
     }
 
     fn insert(&mut self, name: impl Into<String>, df: DataFrame) {
@@ -46,7 +55,11 @@ impl DataFrameStore for InMemoryStore {
     }
 
     fn contains(&self, name: &str) -> bool {
-        self.map.contains_key(name)
+        if self.map.contains_key(name) {
+            return true;
+        }
+        let lower = name.to_ascii_lowercase();
+        self.map.keys().any(|k| k.to_ascii_lowercase() == lower)
     }
 
     fn names(&self) -> Vec<&str> {

@@ -163,6 +163,7 @@ fn run_fixture(path: &Path, max_parallel_chunks: usize) -> Result<FixtureResult,
         max_parallel_chunks,
         calculator_dag: None,
         run_date_time: None,
+        snapshot: None,
     };
     let outcome = run_simulation(&opts).map_err(|e| format!("{name}: {e}"))?;
     let rss_after = read_peak_rss_mib();

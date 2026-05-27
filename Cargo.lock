@@ -1802,6 +1802,7 @@ dependencies = [
  "anyhow",
  "clap",
  "moves-calculator-info",
+ "moves-calculators",
  "moves-data-default",
  "moves-framework",
  "moves-importer",
@@ -1809,6 +1810,7 @@ dependencies = [
  "moves-runspec",
  "moves-snapshot",
  "parquet",
+ "polars",
  "serde_json",
  "tempfile",
 ]

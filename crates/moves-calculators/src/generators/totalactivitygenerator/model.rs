@@ -341,3 +341,100 @@ pub struct TotalActivityOutput {
     /// `SHPByAgeHour` — source hours parked.
     pub shp_by_age_hour: Vec<ShpByAgeHourRow>,
 }
+
+// ===========================================================================
+// TableRow impl for AverageSpeedRow.
+// ===========================================================================
+
+use moves_framework::{Error, TableRow};
+use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
+
+fn row_err_model(table: &'static str, row: usize, col: &'static str, msg: String) -> Error {
+    Error::RowExtraction {
+        table: table.into(),
+        row,
+        column: col.into(),
+        message: msg,
+    }
+}
+
+impl TableRow for AverageSpeedRow {
+    fn table_name() -> &'static str {
+        "AverageSpeed"
+    }
+
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("roadTypeID".into(), DataType::Int32),
+            ("sourceTypeID".into(), DataType::Int32),
+            ("dayID".into(), DataType::Int32),
+            ("hourID".into(), DataType::Int32),
+            ("averageSpeed".into(), DataType::Float64),
+        ])
+    }
+
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "roadTypeID".into(),
+                    rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "dayID".into(),
+                    rows.iter().map(|r| r.day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hourID".into(),
+                    rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "averageSpeed".into(),
+                    rows.iter().map(|r| r.average_speed).collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "AverageSpeed";
+        let get_i32 = |col: &'static str| {
+            df.column(col)
+                .map_err(|e| row_err_model(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err_model(t, 0, col, e.to_string()))
+        };
+        let road_type_id = get_i32("roadTypeID")?;
+        let source_type_id = get_i32("sourceTypeID")?;
+        let day_id = get_i32("dayID")?;
+        let hour_id = get_i32("hourID")?;
+        let avg_speed = df
+            .column("averageSpeed")
+            .map_err(|e| row_err_model(t, 0, "averageSpeed", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err_model(t, 0, "averageSpeed", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col| row_err_model(t, i, col, "null value".into());
+                Ok(Self {
+                    road_type_id: road_type_id.get(i).ok_or_else(|| null("roadTypeID"))?,
+                    source_type_id: source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                    day_id: day_id.get(i).ok_or_else(|| null("dayID"))?,
+                    hour_id: hour_id.get(i).ok_or_else(|| null("hourID"))?,
+                    average_speed: avg_speed.get(i).ok_or_else(|| null("averageSpeed"))?,
+                })
+            })
+            .collect()
+    }
+}

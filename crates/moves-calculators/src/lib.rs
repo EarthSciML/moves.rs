@@ -29,3 +29,124 @@ pub mod generators;
 pub(crate) mod wiring;
 
 pub use error::{Error, Result};
+
+/// Register every wired calculator and generator factory with `registry`.
+///
+/// Call this after constructing a [`moves_framework::CalculatorRegistry`] from
+/// the DAG to make all ported implementations available for execution.
+///
+/// # Errors
+///
+/// Returns [`moves_framework::Error::UnknownModule`] if a calculator's DAG name
+/// does not appear in the registry's DAG (i.e., the DAG and the crate are out
+/// of sync).
+pub fn register_all(
+    registry: &mut moves_framework::CalculatorRegistry,
+) -> std::result::Result<(), moves_framework::Error> {
+    use calculators::activitycalculator;
+    use calculators::ch4n2o_running_start;
+    use calculators::co2ae_running_start_extended_idle;
+    use calculators::criteria_running_calculator;
+    use calculators::criteria_start_calculator;
+    use calculators::distance_calculator;
+    use calculators::evaporative_permeation_calculator;
+    use calculators::liquid_leaking_calculator;
+    use calculators::nh3;
+    use calculators::refueling_loss_calculator;
+    use calculators::so2_calculator;
+    use calculators::sulfate_pm_calculator;
+    use calculators::tank_vapor_venting_calculator;
+    use calculators::togspeciation;
+    use calculators::welltopump;
+    use generators::meteorology;
+    use generators::source_bin_distribution_generator;
+    use generators::start_operating_mode_distribution;
+    use generators::totalactivitygenerator;
+
+    registry.register_calculator(
+        activitycalculator::ActivityCalculator::NAME,
+        activitycalculator::factory,
+    )?;
+    registry.register_calculator(
+        ch4n2o_running_start::Ch4N2oRunningStartCalculator::NAME,
+        ch4n2o_running_start::factory,
+    )?;
+    registry.register_calculator(
+        co2ae_running_start_extended_idle::CO2AERunningStartExtendedIdleCalculator::NAME,
+        co2ae_running_start_extended_idle::factory,
+    )?;
+    registry.register_calculator(
+        criteria_running_calculator::CriteriaRunningCalculator::NAME,
+        criteria_running_calculator::factory,
+    )?;
+    registry.register_calculator(
+        criteria_start_calculator::CriteriaStartCalculator::NAME,
+        criteria_start_calculator::factory,
+    )?;
+    registry.register_calculator(
+        distance_calculator::DistanceCalculator::NAME,
+        distance_calculator::factory,
+    )?;
+    registry.register_calculator(
+        evaporative_permeation_calculator::EvaporativePermeationCalculator::NAME,
+        evaporative_permeation_calculator::factory,
+    )?;
+    registry.register_calculator(
+        liquid_leaking_calculator::LiquidLeakingCalculator::NAME,
+        liquid_leaking_calculator::factory,
+    )?;
+    registry.register_calculator(
+        nh3::running::Nh3RunningCalculator::NAME,
+        nh3::running::factory,
+    )?;
+    registry.register_calculator(nh3::start::Nh3StartCalculator::NAME, nh3::start::factory)?;
+    registry.register_calculator(
+        refueling_loss_calculator::RefuelingLossCalculator::NAME,
+        refueling_loss_calculator::factory,
+    )?;
+    registry.register_calculator(so2_calculator::SO2Calculator::NAME, so2_calculator::factory)?;
+    registry.register_calculator(
+        sulfate_pm_calculator::SulfatePMCalculator::NAME,
+        sulfate_pm_calculator::factory,
+    )?;
+    registry.register_calculator(
+        tank_vapor_venting_calculator::TankVaporVentingCalculator::NAME,
+        tank_vapor_venting_calculator::factory,
+    )?;
+    registry.register_calculator(
+        togspeciation::TogSpeciationCalculator::NAME,
+        togspeciation::factory,
+    )?;
+    registry.register_calculator(
+        welltopump::ch4n2o::Ch4N2oWtpCalculator::NAME,
+        welltopump::ch4n2o::factory,
+    )?;
+    registry.register_calculator(
+        welltopump::co2_atmospheric::Co2AtmosphericWtpCalculator::NAME,
+        welltopump::co2_atmospheric::factory,
+    )?;
+    registry.register_calculator(
+        welltopump::co2_equivalent::Co2EquivalentWtpCalculator::NAME,
+        welltopump::co2_equivalent::factory,
+    )?;
+    registry.register_calculator(
+        welltopump::total_energy::WellToPumpProcessor::NAME,
+        welltopump::total_energy::factory,
+    )?;
+
+    registry.register_generator("MeteorologyGenerator", meteorology::factory)?;
+    registry.register_generator(
+        source_bin_distribution_generator::SourceBinDistributionGenerator::NAME,
+        source_bin_distribution_generator::factory,
+    )?;
+    registry.register_generator(
+        "StartOperatingModeDistributionGenerator",
+        start_operating_mode_distribution::factory,
+    )?;
+    registry.register_generator(
+        totalactivitygenerator::TotalActivityGenerator::NAME,
+        totalactivitygenerator::factory,
+    )?;
+
+    Ok(())
+}
