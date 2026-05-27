@@ -132,8 +132,10 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use moves_data::{PollutantId, PollutantProcessAssociation, ProcessId};
 use moves_framework::{
-    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, Error,
+    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStoreTyped,
+    Error, TableRow,
 };
+use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
 
 /// THC — total hydrocarbons, pollutant 1. The ordinary input pollutant: its
 /// fuel blocks speciate into methane, NMHC, NMOG, TOG and VOC.
@@ -883,6 +885,359 @@ static REGISTRATIONS: [PollutantProcessAssociation; 40] = [
     reg(87, 91),
 ];
 
+fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -> Error {
+    Error::RowExtraction {
+        table: table.into(),
+        row,
+        column: column.into(),
+        message: msg,
+    }
+}
+
+/// One `FuelFormulation` row — the oxygenate fields the speciation formula reads.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct HcFuelFormulationRow {
+    /// `fuelFormulationID`.
+    pub fuel_formulation_id: i32,
+    /// `MTBEVolume`.
+    pub mtbe_volume: f64,
+    /// `ETBEVolume`.
+    pub etbe_volume: f64,
+    /// `TAMEVolume`.
+    pub tame_volume: f64,
+    /// `ETOHVolume`.
+    pub etoh_volume: f64,
+    /// `volToWtPercentOxy`.
+    pub vol_to_wt_percent_oxy: f64,
+}
+
+impl TableRow for HcFuelFormulationRow {
+    fn table_name() -> &'static str {
+        "FuelFormulation"
+    }
+
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("fuelFormulationID".into(), DataType::Int32),
+            ("MTBEVolume".into(), DataType::Float64),
+            ("ETBEVolume".into(), DataType::Float64),
+            ("TAMEVolume".into(), DataType::Float64),
+            ("ETOHVolume".into(), DataType::Float64),
+            ("volToWtPercentOxy".into(), DataType::Float64),
+        ])
+    }
+
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new("fuelFormulationID".into(), rows.iter().map(|r| r.fuel_formulation_id).collect::<Vec<i32>>()).into(),
+                Series::new("MTBEVolume".into(), rows.iter().map(|r| r.mtbe_volume).collect::<Vec<f64>>()).into(),
+                Series::new("ETBEVolume".into(), rows.iter().map(|r| r.etbe_volume).collect::<Vec<f64>>()).into(),
+                Series::new("TAMEVolume".into(), rows.iter().map(|r| r.tame_volume).collect::<Vec<f64>>()).into(),
+                Series::new("ETOHVolume".into(), rows.iter().map(|r| r.etoh_volume).collect::<Vec<f64>>()).into(),
+                Series::new("volToWtPercentOxy".into(), rows.iter().map(|r| r.vol_to_wt_percent_oxy).collect::<Vec<f64>>()).into(),
+            ],
+        )
+    }
+
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "FuelFormulation";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let ff_id = get_i32("fuelFormulationID")?;
+        let mtbe = get_f64("MTBEVolume")?;
+        let etbe = get_f64("ETBEVolume")?;
+        let tame = get_f64("TAMEVolume")?;
+        let etoh = get_f64("ETOHVolume")?;
+        let vol_to_wt = get_f64("volToWtPercentOxy")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(HcFuelFormulationRow {
+                fuel_formulation_id: ff_id.get(i).ok_or_else(|| null("fuelFormulationID"))?,
+                mtbe_volume: mtbe.get(i).ok_or_else(|| null("MTBEVolume"))?,
+                etbe_volume: etbe.get(i).ok_or_else(|| null("ETBEVolume"))?,
+                tame_volume: tame.get(i).ok_or_else(|| null("TAMEVolume"))?,
+                etoh_volume: etoh.get(i).ok_or_else(|| null("ETOHVolume"))?,
+                vol_to_wt_percent_oxy: vol_to_wt.get(i).ok_or_else(|| null("volToWtPercentOxy"))?,
+            })
+        }).collect()
+    }
+}
+
+/// One `MOVESWorkerOutput` input or output row for the HC speciation calculator.
+///
+/// Carries the dimensional context needed to reconstruct the output alongside
+/// the fuel-block key and emission values the algorithm reads.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ThcWorkerRow {
+    pub year_id: i32,
+    pub month_id: i32,
+    pub day_id: i32,
+    pub hour_id: i32,
+    pub state_id: i32,
+    pub county_id: i32,
+    pub zone_id: i32,
+    pub link_id: i32,
+    pub pollutant_id: i32,
+    pub process_id: i32,
+    pub source_type_id: i32,
+    pub reg_class_id: i32,
+    pub fuel_type_id: i32,
+    pub model_year_id: i32,
+    pub road_type_id: i32,
+    pub fuel_sub_type_id: i32,
+    pub fuel_formulation_id: i32,
+    pub emission_quant: f64,
+    pub emission_rate: f64,
+}
+
+impl TableRow for ThcWorkerRow {
+    fn table_name() -> &'static str {
+        "MOVESWorkerOutput"
+    }
+
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("yearID".into(), DataType::Int32),
+            ("monthID".into(), DataType::Int32),
+            ("dayID".into(), DataType::Int32),
+            ("hourID".into(), DataType::Int32),
+            ("stateID".into(), DataType::Int32),
+            ("countyID".into(), DataType::Int32),
+            ("zoneID".into(), DataType::Int32),
+            ("linkID".into(), DataType::Int32),
+            ("pollutantID".into(), DataType::Int32),
+            ("processID".into(), DataType::Int32),
+            ("sourceTypeID".into(), DataType::Int32),
+            ("regClassID".into(), DataType::Int32),
+            ("fuelTypeID".into(), DataType::Int32),
+            ("modelYearID".into(), DataType::Int32),
+            ("roadTypeID".into(), DataType::Int32),
+            ("fuelSubTypeID".into(), DataType::Int32),
+            ("fuelFormulationID".into(), DataType::Int32),
+            ("emissionQuant".into(), DataType::Float64),
+            ("emissionRate".into(), DataType::Float64),
+        ])
+    }
+
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new("yearID".into(), rows.iter().map(|r| r.year_id).collect::<Vec<i32>>()).into(),
+                Series::new("monthID".into(), rows.iter().map(|r| r.month_id).collect::<Vec<i32>>()).into(),
+                Series::new("dayID".into(), rows.iter().map(|r| r.day_id).collect::<Vec<i32>>()).into(),
+                Series::new("hourID".into(), rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>()).into(),
+                Series::new("stateID".into(), rows.iter().map(|r| r.state_id).collect::<Vec<i32>>()).into(),
+                Series::new("countyID".into(), rows.iter().map(|r| r.county_id).collect::<Vec<i32>>()).into(),
+                Series::new("zoneID".into(), rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>()).into(),
+                Series::new("linkID".into(), rows.iter().map(|r| r.link_id).collect::<Vec<i32>>()).into(),
+                Series::new("pollutantID".into(), rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>()).into(),
+                Series::new("processID".into(), rows.iter().map(|r| r.process_id).collect::<Vec<i32>>()).into(),
+                Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
+                Series::new("regClassID".into(), rows.iter().map(|r| r.reg_class_id).collect::<Vec<i32>>()).into(),
+                Series::new("fuelTypeID".into(), rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>()).into(),
+                Series::new("modelYearID".into(), rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>()).into(),
+                Series::new("roadTypeID".into(), rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>()).into(),
+                Series::new("fuelSubTypeID".into(), rows.iter().map(|r| r.fuel_sub_type_id).collect::<Vec<i32>>()).into(),
+                Series::new("fuelFormulationID".into(), rows.iter().map(|r| r.fuel_formulation_id).collect::<Vec<i32>>()).into(),
+                Series::new("emissionQuant".into(), rows.iter().map(|r| r.emission_quant).collect::<Vec<f64>>()).into(),
+                Series::new("emissionRate".into(), rows.iter().map(|r| r.emission_rate).collect::<Vec<f64>>()).into(),
+            ],
+        )
+    }
+
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "MOVESWorkerOutput";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let year = get_i32("yearID")?;
+        let month = get_i32("monthID")?;
+        let day = get_i32("dayID")?;
+        let hour = get_i32("hourID")?;
+        let state = get_i32("stateID")?;
+        let county = get_i32("countyID")?;
+        let zone = get_i32("zoneID")?;
+        let link = get_i32("linkID")?;
+        let pollutant = get_i32("pollutantID")?;
+        let process = get_i32("processID")?;
+        let src_type = get_i32("sourceTypeID")?;
+        let reg_class = get_i32("regClassID")?;
+        let fuel_type = get_i32("fuelTypeID")?;
+        let model_year = get_i32("modelYearID")?;
+        let road_type = get_i32("roadTypeID")?;
+        let fuel_sub_type = get_i32("fuelSubTypeID")?;
+        let fuel_formulation = get_i32("fuelFormulationID")?;
+        let emission_quant = get_f64("emissionQuant")?;
+        let emission_rate = get_f64("emissionRate")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(ThcWorkerRow {
+                year_id: year.get(i).ok_or_else(|| null("yearID"))?,
+                month_id: month.get(i).ok_or_else(|| null("monthID"))?,
+                day_id: day.get(i).ok_or_else(|| null("dayID"))?,
+                hour_id: hour.get(i).ok_or_else(|| null("hourID"))?,
+                state_id: state.get(i).ok_or_else(|| null("stateID"))?,
+                county_id: county.get(i).ok_or_else(|| null("countyID"))?,
+                zone_id: zone.get(i).ok_or_else(|| null("zoneID"))?,
+                link_id: link.get(i).ok_or_else(|| null("linkID"))?,
+                pollutant_id: pollutant.get(i).ok_or_else(|| null("pollutantID"))?,
+                process_id: process.get(i).ok_or_else(|| null("processID"))?,
+                source_type_id: src_type.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                reg_class_id: reg_class.get(i).ok_or_else(|| null("regClassID"))?,
+                fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
+                model_year_id: model_year.get(i).ok_or_else(|| null("modelYearID"))?,
+                road_type_id: road_type.get(i).ok_or_else(|| null("roadTypeID"))?,
+                fuel_sub_type_id: fuel_sub_type.get(i).ok_or_else(|| null("fuelSubTypeID"))?,
+                fuel_formulation_id: fuel_formulation.get(i).ok_or_else(|| null("fuelFormulationID"))?,
+                emission_quant: emission_quant.get(i).ok_or_else(|| null("emissionQuant"))?,
+                emission_rate: emission_rate.get(i).ok_or_else(|| null("emissionRate"))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for MethaneThcRatioRow {
+    fn table_name() -> &'static str {
+        "methaneTHCRatio"
+    }
+
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("processID".into(), DataType::Int32),
+            ("fuelSubtypeID".into(), DataType::Int32),
+            ("regClassID".into(), DataType::Int32),
+            ("beginModelYearID".into(), DataType::Int32),
+            ("endModelYearID".into(), DataType::Int32),
+            ("CH4THCRatio".into(), DataType::Float64),
+        ])
+    }
+
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new("processID".into(), rows.iter().map(|r| r.process_id).collect::<Vec<i32>>()).into(),
+                Series::new("fuelSubtypeID".into(), rows.iter().map(|r| r.fuel_sub_type_id).collect::<Vec<i32>>()).into(),
+                Series::new("regClassID".into(), rows.iter().map(|r| r.reg_class_id).collect::<Vec<i32>>()).into(),
+                Series::new("beginModelYearID".into(), rows.iter().map(|r| r.begin_model_year_id).collect::<Vec<i32>>()).into(),
+                Series::new("endModelYearID".into(), rows.iter().map(|r| r.end_model_year_id).collect::<Vec<i32>>()).into(),
+                Series::new("CH4THCRatio".into(), rows.iter().map(|r| r.ch4_thc_ratio).collect::<Vec<f64>>()).into(),
+            ],
+        )
+    }
+
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "methaneTHCRatio";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let process = get_i32("processID")?;
+        let fuel_sub = get_i32("fuelSubtypeID")?;
+        let reg_class = get_i32("regClassID")?;
+        let begin_my = get_i32("beginModelYearID")?;
+        let end_my = get_i32("endModelYearID")?;
+        let ratio = get_f64("CH4THCRatio")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(MethaneThcRatioRow {
+                process_id: process.get(i).ok_or_else(|| null("processID"))?,
+                fuel_sub_type_id: fuel_sub.get(i).ok_or_else(|| null("fuelSubtypeID"))?,
+                reg_class_id: reg_class.get(i).ok_or_else(|| null("regClassID"))?,
+                begin_model_year_id: begin_my.get(i).ok_or_else(|| null("beginModelYearID"))?,
+                end_model_year_id: end_my.get(i).ok_or_else(|| null("endModelYearID"))?,
+                ch4_thc_ratio: ratio.get(i).ok_or_else(|| null("CH4THCRatio"))?,
+            })
+        }).collect()
+    }
+}
+
+impl TableRow for HcSpeciationRow {
+    fn table_name() -> &'static str {
+        "HCSpeciation"
+    }
+
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("polProcessID".into(), DataType::Int32),
+            ("fuelSubtypeID".into(), DataType::Int32),
+            ("regClassID".into(), DataType::Int32),
+            ("beginModelYearID".into(), DataType::Int32),
+            ("endModelYearID".into(), DataType::Int32),
+            ("speciationConstant".into(), DataType::Float64),
+            ("oxySpeciation".into(), DataType::Float64),
+        ])
+    }
+
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new("polProcessID".into(), rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>()).into(),
+                Series::new("fuelSubtypeID".into(), rows.iter().map(|r| r.fuel_sub_type_id).collect::<Vec<i32>>()).into(),
+                Series::new("regClassID".into(), rows.iter().map(|r| r.reg_class_id).collect::<Vec<i32>>()).into(),
+                Series::new("beginModelYearID".into(), rows.iter().map(|r| r.begin_model_year_id).collect::<Vec<i32>>()).into(),
+                Series::new("endModelYearID".into(), rows.iter().map(|r| r.end_model_year_id).collect::<Vec<i32>>()).into(),
+                Series::new("speciationConstant".into(), rows.iter().map(|r| r.speciation_constant).collect::<Vec<f64>>()).into(),
+                Series::new("oxySpeciation".into(), rows.iter().map(|r| r.oxy_speciation).collect::<Vec<f64>>()).into(),
+            ],
+        )
+    }
+
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "HCSpeciation";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col).map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .f64().map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let pol_proc = get_i32("polProcessID")?;
+        let fuel_sub = get_i32("fuelSubtypeID")?;
+        let reg_class = get_i32("regClassID")?;
+        let begin_my = get_i32("beginModelYearID")?;
+        let end_my = get_i32("endModelYearID")?;
+        let spec_const = get_f64("speciationConstant")?;
+        let oxy_spec = get_f64("oxySpeciation")?;
+        (0..df.height()).map(|i| {
+            let null = |col: &'static str| row_err(t, i, col, "null value".into());
+            Ok(HcSpeciationRow {
+                pol_process_id: pol_proc.get(i).ok_or_else(|| null("polProcessID"))?,
+                fuel_sub_type_id: fuel_sub.get(i).ok_or_else(|| null("fuelSubtypeID"))?,
+                reg_class_id: reg_class.get(i).ok_or_else(|| null("regClassID"))?,
+                begin_model_year_id: begin_my.get(i).ok_or_else(|| null("beginModelYearID"))?,
+                end_model_year_id: end_my.get(i).ok_or_else(|| null("endModelYearID"))?,
+                speciation_constant: spec_const.get(i).ok_or_else(|| null("speciationConstant"))?,
+                oxy_speciation: oxy_spec.get(i).ok_or_else(|| null("oxySpeciation"))?,
+            })
+        }).collect()
+    }
+}
+
 /// `HCSpeciationCalculator` declares no master-loop subscription of its own;
 /// see the [`Calculator::subscriptions`] impl.
 static NO_SUBSCRIPTIONS: &[CalculatorSubscription] = &[];
@@ -956,19 +1311,61 @@ impl Calculator for HcSpeciationCalculator {
         INPUT_TABLES
     }
 
-    /// Run the calculator for the current master-loop iteration.
-    ///
-    /// **Data plane pending (Task 50).** [`CalculatorContext`] exposes only
-    /// placeholder `ExecutionTables` / `ScratchNamespace` today, so this body
-    /// cannot read the `methaneTHCRatio` / `HCSpeciation` tables nor the
-    /// upstream THC / `altTHC` fuel blocks, nor write the speciated blocks
-    /// back. The faithful algorithm is ported and tested on [`HcSpeciation`];
-    /// once the `DataFrameStore` lands, `execute` builds an [`HcSpeciation`]
-    /// from `ctx.tables()`, reads the [`FuelBlock`]s, applies
-    /// [`speciate_block`](HcSpeciation::speciate_block), and stores the
-    /// resulting [`SpeciatedFuelBlock`]s.
-    fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
-        Ok(CalculatorOutput::empty())
+    fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
+        let tables = ctx.tables();
+
+        let speciation = HcSpeciation::build(
+            tables.iter_typed::<MethaneThcRatioRow>("methaneTHCRatio")?,
+            tables.iter_typed::<HcSpeciationRow>("HCSpeciation")?,
+        );
+
+        let fuel_formulations = tables
+            .iter_typed::<HcFuelFormulationRow>("FuelFormulation")?
+            .into_iter()
+            .map(|r| (r.fuel_formulation_id, FuelFormulation {
+                mtbe_volume: r.mtbe_volume,
+                etbe_volume: r.etbe_volume,
+                tame_volume: r.tame_volume,
+                etoh_volume: r.etoh_volume,
+                vol_to_wt_percent_oxy: r.vol_to_wt_percent_oxy,
+            }));
+        let needed_pol_process_ids = REGISTRATIONS.iter()
+            .map(|r| i32::from(r.pollutant_id.0) * 100 + i32::from(r.process_id.0));
+        let worker_tables = OnroadWorkerTables::new(fuel_formulations, needed_pol_process_ids);
+
+        let thc_rows: Vec<ThcWorkerRow> = tables.iter_typed("MOVESWorkerOutput")?;
+        let mut output: Vec<ThcWorkerRow> = Vec::new();
+        for row in &thc_rows {
+            let block = FuelBlock {
+                key: FuelBlockKey {
+                    pollutant_id: row.pollutant_id,
+                    process_id: row.process_id,
+                    fuel_type_id: row.fuel_type_id,
+                    reg_class_id: row.reg_class_id,
+                    model_year_id: row.model_year_id,
+                },
+                emissions: vec![Emission {
+                    fuel_sub_type_id: row.fuel_sub_type_id,
+                    fuel_formulation_id: row.fuel_formulation_id,
+                    emission_quant: row.emission_quant,
+                    emission_rate: row.emission_rate,
+                }],
+            };
+            for speciated in speciation.speciate_block(&block, &worker_tables) {
+                for em in &speciated.emissions {
+                    output.push(ThcWorkerRow {
+                        pollutant_id: speciated.pollutant_id,
+                        fuel_sub_type_id: em.fuel_sub_type_id,
+                        fuel_formulation_id: em.fuel_formulation_id,
+                        emission_quant: em.emission_quant,
+                        emission_rate: em.emission_rate,
+                        ..*row
+                    });
+                }
+            }
+        }
+
+        crate::wiring::emit_rows(output)
     }
 }
 
@@ -1702,12 +2099,76 @@ mod tests {
     }
 
     #[test]
-    fn calculator_execute_returns_placeholder_until_data_plane() {
-        // execute is a documented placeholder until Task 50; it must still
-        // honour the trait contract and return Ok.
-        let calc = HcSpeciationCalculator::new();
-        let ctx = CalculatorContext::new();
-        assert!(calc.execute(&ctx).is_ok());
+    fn execute_wires_through_data_plane() {
+        use moves_framework::DataFrameStore;
+        // Fixture from fixture(): process 1, subtype 20, formulation 100,
+        // reg_class 0, model_year 2005, methane ratio 0.25.
+        // Expected: methane=2.0, NMHC=6.0, NMOG=4.5, TOG=6.5, VOC=3.0.
+        let worker_rows = vec![ThcWorkerRow {
+            year_id: 2020, month_id: 7, day_id: 5, hour_id: 8,
+            state_id: 26, county_id: 26_161, zone_id: 261_610, link_id: 2_616_101,
+            pollutant_id: THC_POLLUTANT_ID,
+            process_id: 1,
+            source_type_id: 21,
+            reg_class_id: 0,
+            fuel_type_id: 1,
+            model_year_id: 2005,
+            road_type_id: 4,
+            fuel_sub_type_id: 20,
+            fuel_formulation_id: 100,
+            emission_quant: 8.0,
+            emission_rate: 4.0,
+        }];
+        let methane_rows = vec![MethaneThcRatioRow {
+            process_id: 1, fuel_sub_type_id: 20, reg_class_id: 0,
+            begin_model_year_id: 2000, end_model_year_id: 2010, ch4_thc_ratio: 0.25,
+        }];
+        let hc_rows = vec![
+            HcSpeciationRow {
+                pol_process_id: NMOG_POLLUTANT_ID * 100 + 1,
+                fuel_sub_type_id: 20, reg_class_id: 0,
+                begin_model_year_id: 2000, end_model_year_id: 2010,
+                speciation_constant: 0.25, oxy_speciation: 0.25,
+            },
+            HcSpeciationRow {
+                pol_process_id: VOC_POLLUTANT_ID * 100 + 1,
+                fuel_sub_type_id: 20, reg_class_id: 0,
+                begin_model_year_id: 2000, end_model_year_id: 2010,
+                speciation_constant: 0.5, oxy_speciation: 0.0,
+            },
+        ];
+        let ff_rows = vec![HcFuelFormulationRow {
+            fuel_formulation_id: 100,
+            mtbe_volume: 2.0, etbe_volume: 0.0, tame_volume: 0.0, etoh_volume: 2.0,
+            vol_to_wt_percent_oxy: 0.5,
+        }];
+        let mut store = moves_framework::InMemoryStore::new();
+        store.insert("MOVESWorkerOutput", ThcWorkerRow::into_dataframe(worker_rows).unwrap());
+        store.insert("methaneTHCRatio", MethaneThcRatioRow::into_dataframe(methane_rows).unwrap());
+        store.insert("HCSpeciation", HcSpeciationRow::into_dataframe(hc_rows).unwrap());
+        store.insert("FuelFormulation", HcFuelFormulationRow::into_dataframe(ff_rows).unwrap());
+        let ctx = CalculatorContext::with_tables(store);
+        let out = HcSpeciationCalculator::new().execute(&ctx).expect("execute ok");
+        let df = out.dataframe().expect("output should contain a DataFrame");
+        // 5 speciated species: methane(5), NMHC(79), NMOG(80), TOG(86), VOC(87)
+        assert_eq!(df.height(), 5, "one THC row should yield 5 speciated rows");
+        let pollutants: Vec<i32> = df.column("pollutantID").unwrap().i32().unwrap()
+            .into_iter().map(|v| v.unwrap()).collect();
+        let quants: Vec<f64> = df.column("emissionQuant").unwrap().f64().unwrap()
+            .into_iter().map(|v| v.unwrap()).collect();
+        // Find each species and check its value.
+        let find = |pid: i32| -> f64 {
+            pollutants.iter().zip(quants.iter())
+                .find(|(&p, _)| p == pid).map(|(_, &q)| q).unwrap()
+        };
+        assert!((find(METHANE_POLLUTANT_ID) - 2.0).abs() < 1e-9, "methane");
+        assert!((find(NMHC_POLLUTANT_ID) - 6.0).abs() < 1e-9, "NMHC");
+        // factor = 0.25 + 0.25*0.5*4.0 = 0.75; NMOG = 6.0 * 0.75 = 4.5
+        assert!((find(NMOG_POLLUTANT_ID) - 4.5).abs() < 1e-9, "NMOG");
+        // TOG = NMOG + methane = 4.5 + 2.0 = 6.5
+        assert!((find(TOG_POLLUTANT_ID) - 6.5).abs() < 1e-9, "TOG");
+        // factor = 0.5; VOC = 6.0 * 0.5 = 3.0
+        assert!((find(VOC_POLLUTANT_ID) - 3.0).abs() < 1e-9, "VOC");
     }
 
     #[test]
