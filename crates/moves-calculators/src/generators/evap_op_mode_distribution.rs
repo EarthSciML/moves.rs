@@ -328,8 +328,13 @@ pub struct FractionOfOperatingRow {
 ///
 /// Faithful details of the MySQL `SELECT`:
 ///
-/// * `sourceHours` is filtered to the context's `(link, month, year)` and
-///   to `sourceHours > 0` (`WHERE sourceHours > 0`); a `NULL` or
+/// * `sourceHours` and `SHO` are filtered to `(link, month+1, year)` — both
+///   tables are written by activity generators for the NEXT month relative to
+///   the evap-OpMode iteration context, matching the Java behavior where
+///   `##context.monthID##` in the sourceHours SQL resolves to the already-
+///   prepared next-month data. Canonical snapshots confirm: a month=7 run
+///   has sourceHours/SHO rows with monthID=8.
+/// * `sourceHours > 0` (`WHERE sourceHours > 0`); a `NULL` or
 ///   non-positive `sourceHours` is dropped, exactly as `> 0` would.
 /// * `SHO` joins on `(hourDayID, ageID, sourceTypeID)` within the context.
 ///   The Java `LEFT JOIN` means an unmatched `sourceHours` row contributes
@@ -347,12 +352,17 @@ pub fn fraction_of_operating(
     ctx: &EvapOpModeContext,
     inputs: &EvapOpModeInputs<'_>,
 ) -> Vec<FractionOfOperatingRow> {
+    // sourceHours and SHO are written for MONTH+1 (same convention as SAF).
+    let next_month = if ctx.month_id == 12 {
+        1
+    } else {
+        ctx.month_id + 1
+    };
     // `LEFT JOIN sho`: `monthID`/`yearID`/`linkID` are pinned to the
     // context, so the live join key is `(hourDayID, ageID, sourceTypeID)`.
     let mut sho_lookup: HashMap<(i16, i16, SourceTypeId), f64> = HashMap::new();
     for row in inputs.sho {
-        if row.link_id == ctx.link_id && row.month_id == ctx.month_id && row.year_id == ctx.year_id
-        {
+        if row.link_id == ctx.link_id && row.month_id == next_month && row.year_id == ctx.year_id {
             sho_lookup.insert((row.hour_day_id, row.age_id, row.source_type_id), row.sho);
         }
     }
@@ -363,7 +373,7 @@ pub fn fraction_of_operating(
     let mut groups: BTreeMap<(i16, SourceTypeId), (f64, f64)> = BTreeMap::new();
     for sh in inputs.source_hours {
         if sh.link_id == ctx.link_id
-            && sh.month_id == ctx.month_id
+            && sh.month_id == next_month
             && sh.year_id == ctx.year_id
             && sh.source_hours > 0.0
         {
@@ -1246,12 +1256,6 @@ impl Generator for EvaporativeEmissionsOperatingModeDistributionGenerator {
             pollutant_process_assoc: &pollutant_process_assoc,
         };
         let rows = op_mode_distribution(&context, &inputs);
-        eprintln!(
-            "[EvapOpModeGen] process={} month={} -> {} OpModeDistribution rows",
-            context.process_id.0,
-            context.month_id,
-            rows.len()
-        );
         // Write to the slow store (not scratch) so that downstream calculators
         // can find the table via ctx.tables(), which they already use for all
         // other input tables. The slow store is per-chunk after Arc::make_mut
@@ -1292,27 +1296,33 @@ mod tests {
         }
     }
 
-    /// `sourceHours` row at the fixed `(link, month, year)`.
+    /// `sourceHours` row at the fixed `(link, month+1, year)`.
+    ///
+    /// Activity generators write sourceHours for the NEXT month (MONTH+1),
+    /// so `fraction_of_operating` filters on `month_id = ctx.month_id + 1`.
     fn sh(hour_day: i16, source_type: u16, age: i16, source_hours: f64) -> SourceHoursRow {
         SourceHoursRow {
             hour_day_id: hour_day,
             source_type_id: SourceTypeId(source_type),
             age_id: age,
             link_id: LINK,
-            month_id: MONTH,
+            month_id: MONTH + 1,
             year_id: YEAR,
             source_hours,
         }
     }
 
-    /// `SHO` row at the fixed `(link, month, year)`.
+    /// `SHO` row at the fixed `(link, month+1, year)`.
+    ///
+    /// Activity generators write SHO for the NEXT month (MONTH+1),
+    /// so `fraction_of_operating` filters on `month_id = ctx.month_id + 1`.
     fn sho(hour_day: i16, source_type: u16, age: i16, sho: f64) -> ShoRow {
         ShoRow {
             hour_day_id: hour_day,
             source_type_id: SourceTypeId(source_type),
             age_id: age,
             link_id: LINK,
-            month_id: MONTH,
+            month_id: MONTH + 1,
             year_id: YEAR,
             sho,
         }
