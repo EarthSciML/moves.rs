@@ -1,7 +1,7 @@
 {
   "trace_version": "moves-fixture-capture/v1",
   "fixture_name": "expand-fueltype-diesel",
-  "sif_sha256": "70ea5b8378b278af50e8c44ab011066c59019faed8d141adf4ec6f2045f1e5fd",
+  "sif_sha256": "597f1f3e0aef5d23027589ee509207d13486d5c89056906bf323a889f0e02311",
   "runspec_sha256": "1dd7eee18889e5a53020df6eda01b6694c50ada2062c652ab2593d45a2d47924",
   "java_classes": [
     {
