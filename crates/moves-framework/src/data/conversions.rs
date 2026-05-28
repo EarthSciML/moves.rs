@@ -33,7 +33,7 @@
 
 use std::collections::HashMap;
 
-use polars::prelude::{DataFrame, DataType, IntoLazy, PolarsResult, Schema};
+use polars::prelude::{Column, DataFrame, DataType, IntoLazy, PolarsResult, Schema, Series};
 
 use crate::data::schema_registry::schema_registry;
 use crate::data::DataFrameStore;
@@ -131,6 +131,12 @@ pub trait DataFrameStoreTyped: DataFrameStore {
     /// Retrieve the DataFrame for `name` and deserialise it as `Vec<R>`.
     ///
     /// Returns an error if no table named `name` exists in the store.
+    ///
+    /// When the stored table has all-lowercase MySQL column names or DECIMAL
+    /// columns stored as strings (as snapshot-loaded tables do), this method
+    /// normalises to `R::polars_schema()` before deserialising.  The
+    /// normalisation builds a new `DataFrame` from per-column `Arc` clones
+    /// — no Arrow buffer data is copied even for wide tables.
     fn iter_typed<R: TableRow>(&self, name: &str) -> Result<Vec<R>> {
         let arc_df = self
             .get(name)
@@ -149,13 +155,13 @@ pub trait DataFrameStoreTyped: DataFrameStore {
             .map(|(col, dtype)| (col.to_string(), dtype.clone()))
             .collect();
 
-        let mut renames: Vec<(String, String)> = Vec::new();
+        let mut needs_rename = false;
         let mut casts: Vec<(String, DataType)> = Vec::new();
         for actual in arc_df.get_column_names() {
             let lower = actual.to_ascii_lowercase();
             if let Some(canonical) = lower_to_canonical.get(&lower) {
                 if actual.as_str() != canonical.as_str() {
-                    renames.push((actual.to_string(), canonical.clone()));
+                    needs_rename = true;
                 }
                 let actual_dtype = arc_df
                     .column(actual.as_str())
@@ -169,47 +175,103 @@ pub trait DataFrameStoreTyped: DataFrameStore {
             }
         }
 
-        if renames.is_empty() && casts.is_empty() {
+        if !needs_rename && casts.is_empty() {
             return R::from_dataframe(&arc_df);
         }
 
-        // Rename case-mismatched columns in-place, then cast type-mismatched ones.
-        let mut df = (*arc_df).clone();
-        for (old, new) in &renames {
-            df.rename(old, new.as_str().into())
-                .map_err(|e| Error::Polars(e.to_string()))?;
+        // Build a normalised DataFrame by cheaply cloning individual columns
+        // (Column::clone() is an Arc refcount bump; rename clones only column
+        // metadata, not the underlying Arrow buffers).  This replaces the old
+        // `(*arc_df).clone()` which copied every Arrow buffer in the table.
+        let height = arc_df.height();
+        let new_cols: Vec<Column> = expected_schema
+            .iter()
+            .filter_map(|(canonical, _)| {
+                let lower = canonical.to_ascii_lowercase();
+                let actual = arc_df
+                    .columns()
+                    .iter()
+                    .find(|c| c.name().to_ascii_lowercase() == lower)?;
+                let mut col = actual.clone(); // O(1): Arc refcount increment
+                if col.name() != canonical.as_str() {
+                    col.rename(canonical.as_str().into()); // cheap: clones column metadata
+                }
+                Some(col)
+            })
+            .collect();
+
+        if casts.is_empty() {
+            let df = DataFrame::new(height, new_cols).map_err(|e| Error::Polars(e.to_string()))?;
+            return R::from_dataframe(&df);
         }
-        if !casts.is_empty() {
-            // Pre-compute actual dtypes before df is moved into lazy().
-            let actual_dtypes: Vec<DataType> = casts
+
+        // Apply type casts (e.g. String→Boolean, String→Float64) with lazy.
+        let actual_dtypes: Vec<DataType> = {
+            // Build a temporary map from the new_cols we're about to consume.
+            let tmp: HashMap<String, DataType> = new_cols
                 .iter()
-                .map(|(col_name, _)| {
-                    df.column(col_name.as_str())
-                        .map(|s| s.dtype().clone())
-                        .unwrap_or(DataType::Null)
-                })
+                .map(|c| (c.name().to_string(), c.dtype().clone()))
                 .collect();
-            let mut lazy = df.lazy();
-            for ((col_name, expected_dtype), actual_dtype) in casts.iter().zip(&actual_dtypes) {
-                // MySQL stores BOOLEAN as "Y"/"N" or "1"/"0" strings; Polars
-                // cannot cast String → Boolean directly.
-                let expr = if *expected_dtype == DataType::Boolean
-                    && *actual_dtype == DataType::String
-                {
-                    polars::prelude::col(col_name.as_str())
-                        .eq(polars::prelude::lit("Y"))
-                        .or(polars::prelude::col(col_name.as_str()).eq(polars::prelude::lit("1")))
-                        .alias(col_name.as_str())
-                } else {
-                    polars::prelude::col(col_name.as_str())
-                        .cast(expected_dtype.clone())
-                        .alias(col_name.as_str())
-                };
-                lazy = lazy.with_column(expr);
-            }
-            df = lazy.collect().map_err(|e| Error::Polars(e.to_string()))?;
+            casts
+                .iter()
+                .map(|(col_name, _)| tmp.get(col_name).cloned().unwrap_or(DataType::Null))
+                .collect()
+        };
+        let mut lazy = DataFrame::new(height, new_cols)
+            .map_err(|e| Error::Polars(e.to_string()))?
+            .lazy();
+        for ((col_name, expected_dtype), actual_dtype) in casts.iter().zip(&actual_dtypes) {
+            // MySQL stores BOOLEAN as "Y"/"N" or "1"/"0" strings; Polars
+            // cannot cast String → Boolean directly.
+            let expr = if *expected_dtype == DataType::Boolean && *actual_dtype == DataType::String
+            {
+                polars::prelude::col(col_name.as_str())
+                    .eq(polars::prelude::lit("Y"))
+                    .or(polars::prelude::col(col_name.as_str()).eq(polars::prelude::lit("1")))
+                    .alias(col_name.as_str())
+            } else {
+                polars::prelude::col(col_name.as_str())
+                    .cast(expected_dtype.clone())
+                    .alias(col_name.as_str())
+            };
+            lazy = lazy.with_column(expr);
         }
+        let df = lazy.collect().map_err(|e| Error::Polars(e.to_string()))?;
         R::from_dataframe(&df)
+    }
+
+    /// Return raw column arrays for `columns` from the table named `name`,
+    /// with case-insensitive column lookup.
+    ///
+    /// Each returned [`polars::prelude::Series`] is an Arc-backed view of the
+    /// underlying Arrow column — no row data is copied.  Use this as a
+    /// building block for hot paths that need direct index-based access to
+    /// column data without the heap allocation that [`iter_typed`] incurs for
+    /// `Vec<R>`.
+    ///
+    /// Columns are returned in the order requested.  Returns an error if the
+    /// table or any of the requested columns is not found.
+    fn column_views(&self, name: &str, columns: &[&str]) -> Result<Vec<Series>> {
+        let arc_df = self
+            .get(name)
+            .ok_or_else(|| Error::Polars(format!("table '{name}' not found in store")))?;
+        columns
+            .iter()
+            .map(|&want| {
+                let lower = want.to_ascii_lowercase();
+                let col = arc_df
+                    .columns()
+                    .iter()
+                    .find(|c| c.name().to_ascii_lowercase() == lower)
+                    .ok_or_else(|| {
+                        Error::Polars(format!("column '{want}' not found in table '{name}'"))
+                    })?;
+                // Clone the Series behind the Column (Arc refcount bump — O(1)).
+                col.as_series()
+                    .cloned()
+                    .ok_or_else(|| Error::Polars(format!("column '{want}' is not a Series")))
+            })
+            .collect()
     }
 }
 

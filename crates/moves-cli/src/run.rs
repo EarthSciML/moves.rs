@@ -15,21 +15,19 @@
 //! out of the box. A caller can still point at a different DAG with
 //! `--calculator-dag` (e.g. to test against a regenerated graph).
 
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use moves_calculator_info::CalculatorDag;
-use moves_calculators::generators::totalactivitygenerator::allocation::{
-    self as sho_alloc, ShoRow,
-};
 use moves_calculators::generators::totalactivitygenerator::inputs::{
     HourDayRow, LinkRow as ShoLinkRow,
 };
 use moves_calculators::generators::totalactivitygenerator::model::AverageSpeedRow;
 use moves_framework::{
     CalculatorRegistry, CountyRow, DataFrameStore, DataFrameStoreParquet, DataFrameStoreTyped,
-    EngineConfig, EngineOutcome, GeographyTables, InMemoryStore, LinkRow, MOVESEngine, TableRow,
+    EngineConfig, EngineOutcome, GeographyTables, InMemoryStore, LinkRow, MOVESEngine,
 };
 
 use crate::load_run_spec;
@@ -149,44 +147,134 @@ fn load_execution_db(snapshot_dir: &Path) -> Result<InMemoryStore> {
 
 /// Compute `SHO.distance = SHO * averageSpeed` from snapshot tables and write
 /// back, so downstream calculators find non-null distances in the slow store.
+///
+/// The implementation avoids materialising `Vec<ShoRow>` for the full SHO
+/// table (which can exceed 1 M rows).  Instead it:
+///   1. Reads only the four columns needed for distance arithmetic into owned
+///      `Vec<i32>` / `Vec<f64>` buffers, then releases the `Arc<DataFrame>`.
+///   2. Uses [`DataFrameStoreTyped::iter_typed`] for the small lookup tables
+///      (Link, AverageSpeed, HourDay), which are typically <1000 rows.
+///   3. Computes a `Vec<f64>` distance column and writes it back in-place via
+///      [`InMemoryStore::get_mut`], which avoids cloning the Arrow buffers
+///      because the outer `Arc<DataFrame>` refcount is 1 at that point.
 fn populate_sho_distances(store: &mut InMemoryStore) -> Result<()> {
+    use polars::prelude::{DataType, NamedFrom, Series};
+
     if !store.contains("SHO") {
         return Ok(());
     }
-    let sho_rows: Vec<ShoRow> = store
-        .iter_typed("SHO")
-        .context("reading SHO from snapshot")?;
-    // If distances are already non-zero, nothing to do.
-    if sho_rows.iter().any(|r| r.distance != 0.0) {
+
+    // --- Phase 1: read SHO column data ---
+    // We extract only the columns needed for the computation and collect them
+    // into owned Vecs so the Arc<DataFrame> borrow is released before we need
+    // &mut InMemoryStore below.
+    let (link_ids, hour_day_ids, source_type_ids, sho_vals, n) = {
+        let sho_arc = store
+            .get("SHO")
+            .context("SHO not in store after contains check")?;
+        let df = &*sho_arc;
+
+        // Case-insensitive column finder for snapshot tables (all-lowercase MySQL names).
+        let find_col = |want: &str| -> Result<polars::prelude::Column> {
+            let lower = want.to_ascii_lowercase();
+            df.columns()
+                .iter()
+                .find(|c| c.name().to_ascii_lowercase() == lower)
+                .cloned()
+                .with_context(|| format!("SHO column '{want}' not found"))
+        };
+
+        // Early exit: if any distance is already non-zero, skip.
+        let dist_nonzero = find_col("distance")
+            .ok()
+            .and_then(|c| c.f64().ok().cloned())
+            .map_or(false, |ca| {
+                ca.into_iter().any(|v| v.map_or(false, |d| d != 0.0))
+            });
+        if dist_nonzero {
+            return Ok(());
+        }
+
+        // Cast helper: accepts Int32 or Int64 snapshot columns.
+        let to_i32_vec = |col: polars::prelude::Column| -> Result<Vec<i32>> {
+            let casted = if *col.dtype() == DataType::Int64 {
+                col.cast(&DataType::Int32)
+                    .map_err(|e| anyhow::anyhow!("{e}"))?
+            } else {
+                col
+            };
+            Ok(casted
+                .i32()
+                .map_err(|e| anyhow::anyhow!("{e}"))?
+                .into_no_null_iter()
+                .collect())
+        };
+
+        let link_ids = to_i32_vec(find_col("linkID")?)?;
+        let hour_day_ids = to_i32_vec(find_col("hourDayID")?)?;
+        let source_type_ids = to_i32_vec(find_col("sourceTypeID")?)?;
+        let sho_vals: Vec<f64> = find_col("SHO")?
+            .f64()
+            .map_err(|e| anyhow::anyhow!("SHO column is not f64: {e}"))?
+            .into_no_null_iter()
+            .collect();
+        let n = df.height();
+        (link_ids, hour_day_ids, source_type_ids, sho_vals, n)
+    }; // sho_arc is dropped; Arc<DataFrame> refcount returns to 1
+
+    // --- Phase 2: build lookup tables from small reference tables ---
+    if !store.contains("Link") || !store.contains("AverageSpeed") || !store.contains("HourDay") {
         return Ok(());
     }
-    let link: Vec<ShoLinkRow> = if store.contains("Link") {
-        store
-            .iter_typed("Link")
-            .context("reading Link from snapshot")?
-    } else {
-        return Ok(());
-    };
-    let average_speed: Vec<AverageSpeedRow> = if store.contains("AverageSpeed") {
-        store
-            .iter_typed("AverageSpeed")
-            .context("reading AverageSpeed from snapshot")?
-    } else {
-        return Ok(());
-    };
-    let hour_day: Vec<HourDayRow> = if store.contains("HourDay") {
-        store
-            .iter_typed("HourDay")
-            .context("reading HourDay from snapshot")?
-    } else {
-        return Ok(());
-    };
-    let with_distance = sho_alloc::calculate_distance(&sho_rows, &link, &average_speed, &hour_day);
-    if with_distance.is_empty() {
+    let link: Vec<ShoLinkRow> = store
+        .iter_typed("Link")
+        .context("reading Link from snapshot")?;
+    let average_speed: Vec<AverageSpeedRow> = store
+        .iter_typed("AverageSpeed")
+        .context("reading AverageSpeed from snapshot")?;
+    let hour_day: Vec<HourDayRow> = store
+        .iter_typed("HourDay")
+        .context("reading HourDay from snapshot")?;
+
+    let road_type_of: BTreeMap<i32, i32> =
+        link.iter().map(|l| (l.link_id, l.road_type_id)).collect();
+    let day_hour_of: BTreeMap<i32, (i32, i32)> = hour_day
+        .iter()
+        .map(|hd| (hd.hour_day_id, (hd.day_id, hd.hour_id)))
+        .collect();
+    let speed_of: BTreeMap<(i32, i32, i32, i32), f64> = average_speed
+        .iter()
+        .map(|a| {
+            (
+                (a.road_type_id, a.source_type_id, a.day_id, a.hour_id),
+                a.average_speed,
+            )
+        })
+        .collect();
+
+    // --- Phase 3: compute distance column (same formula as calculate_distance) ---
+    let distances: Vec<f64> = (0..n)
+        .map(|i| {
+            (|| {
+                let &road_type_id = road_type_of.get(&link_ids[i])?;
+                let &(day_id, hour_id) = day_hour_of.get(&hour_day_ids[i])?;
+                let &speed = speed_of.get(&(road_type_id, source_type_ids[i], day_id, hour_id))?;
+                Some(sho_vals[i] * speed)
+            })()
+            .unwrap_or(0.0)
+        })
+        .collect();
+
+    if distances.iter().all(|&d| d == 0.0) {
         return Ok(());
     }
-    let df = ShoRow::into_dataframe(with_distance).context("serialising SHO with distances")?;
-    store.insert("SHO", df);
+
+    // --- Phase 4: update distance column in-place ---
+    // Arc<DataFrame> refcount is 1 (sho_arc was dropped); no DataFrame clone occurs.
+    let sho_mut = store.get_mut("SHO").expect("SHO was present above");
+    sho_mut
+        .with_column(Series::new("distance".into(), distances).into())
+        .map_err(|e| anyhow::anyhow!("replacing SHO.distance: {e}"))?;
     Ok(())
 }
 
@@ -301,7 +389,126 @@ fn load_registry(path: Option<&Path>, with_calculators: bool) -> Result<Calculat
 
 #[cfg(test)]
 mod tests {
+    use moves_calculators::generators::totalactivitygenerator::allocation::ShoRow;
+    use moves_calculators::generators::totalactivitygenerator::inputs::{
+        HourDayRow as TagHourDayRow, LinkRow as TagLinkRow,
+    };
+    use moves_calculators::generators::totalactivitygenerator::model::AverageSpeedRow as TagAvgSpeedRow;
+    use moves_framework::TableRow;
+    use polars::prelude::NamedFrom;
+
     use super::*;
+
+    fn make_sho_store() -> InMemoryStore {
+        let sho_rows = vec![
+            ShoRow {
+                hour_day_id: 85,
+                month_id: 1,
+                year_id: 2020,
+                age_id: 0,
+                link_id: 1001,
+                source_type_id: 21,
+                sho: 10.0,
+                distance: 0.0,
+            },
+            ShoRow {
+                hour_day_id: 85,
+                month_id: 1,
+                year_id: 2020,
+                age_id: 0,
+                link_id: 1000,
+                source_type_id: 21,
+                sho: 5.0,
+                distance: 0.0,
+            },
+        ];
+        let link_rows = vec![
+            TagLinkRow {
+                link_id: 1001,
+                zone_id: 100,
+                road_type_id: 2,
+                county_id: 9,
+            },
+            TagLinkRow {
+                link_id: 1000,
+                zone_id: 100,
+                road_type_id: 1,
+                county_id: 9,
+            },
+        ];
+        let avg_speed_rows = vec![TagAvgSpeedRow {
+            road_type_id: 2,
+            source_type_id: 21,
+            day_id: 5,
+            hour_id: 8,
+            average_speed: 55.0,
+        }];
+        let hour_day_rows = vec![TagHourDayRow {
+            hour_day_id: 85,
+            hour_id: 8,
+            day_id: 5,
+        }];
+        let mut store = InMemoryStore::new();
+        store.insert("SHO", ShoRow::into_dataframe(sho_rows).unwrap());
+        store.insert("Link", TagLinkRow::into_dataframe(link_rows).unwrap());
+        store.insert(
+            "AverageSpeed",
+            TagAvgSpeedRow::into_dataframe(avg_speed_rows).unwrap(),
+        );
+        store.insert(
+            "HourDay",
+            TagHourDayRow::into_dataframe(hour_day_rows).unwrap(),
+        );
+        store
+    }
+
+    #[test]
+    fn populate_sho_distances_matches_calculate_distance() {
+        let mut store = make_sho_store();
+        populate_sho_distances(&mut store).expect("populate_sho_distances failed");
+
+        let sho_df = store.get("SHO").expect("SHO table missing");
+        let dist = sho_df.column("distance").unwrap().f64().unwrap();
+        // link 1001 (road 2): 10.0 * 55.0 = 550.0
+        assert!(
+            (dist.get(0).unwrap() - 550.0).abs() < 1e-9,
+            "dist[0]={}",
+            dist.get(0).unwrap()
+        );
+        // link 1000 (road 1, off-network): no AverageSpeed → 0.0
+        assert_eq!(dist.get(1).unwrap(), 0.0);
+    }
+
+    #[test]
+    fn populate_sho_distances_skips_when_already_set() {
+        let mut store = make_sho_store();
+        // Pre-populate distance on the first row.
+        {
+            let sho_mut = store.get_mut("SHO").unwrap();
+            sho_mut
+                .with_column(
+                    polars::prelude::Series::new("distance".into(), vec![999.0f64, 0.0]).into(),
+                )
+                .unwrap();
+        }
+        populate_sho_distances(&mut store).expect("populate_sho_distances failed");
+        // Distance should be unchanged because at least one was non-zero.
+        let dist = store
+            .get("SHO")
+            .unwrap()
+            .column("distance")
+            .unwrap()
+            .f64()
+            .unwrap()
+            .clone();
+        assert!((dist.get(0).unwrap() - 999.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn populate_sho_distances_noop_when_no_sho() {
+        let mut store = InMemoryStore::new();
+        populate_sho_distances(&mut store).expect("should be noop");
+    }
 
     #[test]
     fn embedded_dag_parses_into_a_registry() {

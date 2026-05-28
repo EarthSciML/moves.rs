@@ -106,4 +106,58 @@ mod tests {
         let ctx = CalculatorContext::with_tables(store);
         assert!(ctx.tables().contains("sourceUseTypePopulation"));
     }
+
+    #[test]
+    fn column_views_returns_arc_backed_series_without_deep_copy() {
+        use crate::data::DataFrameStoreTyped;
+
+        let mut store = InMemoryStore::new();
+        let df = DataFrame::new(
+            3,
+            vec![
+                Series::new("a".into(), [1i32, 2, 3]).into(),
+                Series::new("b".into(), [4i32, 5, 6]).into(),
+                Series::new("c".into(), [7i32, 8, 9]).into(),
+            ],
+        )
+        .unwrap();
+        store.insert("t", df);
+
+        let views = store
+            .column_views("t", &["a", "c"])
+            .expect("column_views failed");
+        assert_eq!(views.len(), 2);
+        assert_eq!(views[0].name().as_str(), "a");
+        assert_eq!(views[1].name().as_str(), "c");
+        let a = views[0].i32().unwrap();
+        assert_eq!(a.get(0), Some(1));
+        assert_eq!(a.get(2), Some(3));
+    }
+
+    #[test]
+    fn column_views_case_insensitive_lookup() {
+        use crate::data::DataFrameStoreTyped;
+
+        let mut store = InMemoryStore::new();
+        let df =
+            DataFrame::new(2, vec![Series::new("hourDayID".into(), [85i32, 86]).into()]).unwrap();
+        store.insert("SHO", df);
+
+        // Request with lowercase; should find the mixed-case column.
+        let views = store
+            .column_views("SHO", &["hourdayid"])
+            .expect("column_views failed");
+        assert_eq!(views.len(), 1);
+        assert_eq!(views[0].i32().unwrap().get(0), Some(85));
+    }
+
+    #[test]
+    fn column_views_missing_column_returns_error() {
+        use crate::data::DataFrameStoreTyped;
+
+        let mut store = InMemoryStore::new();
+        store.insert("t", one_col_df("x"));
+        let err = store.column_views("t", &["y"]).unwrap_err();
+        assert!(err.to_string().contains("'y'"), "got: {err}");
+    }
 }
