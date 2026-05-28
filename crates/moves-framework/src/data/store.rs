@@ -32,34 +32,26 @@ impl InMemoryStore {
     /// `None` if absent. Uses `Arc::make_mut` to ensure exclusive ownership;
     /// if the Arc has multiple owners the value is cloned first.
     pub fn get_mut(&mut self, name: &str) -> Option<&mut DataFrame> {
-        self.map.get_mut(name).map(Arc::make_mut)
+        let lower = name.to_ascii_lowercase();
+        self.map.get_mut(lower.as_str()).map(Arc::make_mut)
     }
 }
 
 impl DataFrameStore for InMemoryStore {
     fn get(&self, name: &str) -> Option<Arc<DataFrame>> {
-        if let Some(df) = self.map.get(name) {
-            return Some(df.clone());
-        }
-        // Case-insensitive fallback: snapshot-loaded tables use all-lowercase
-        // keys while calculator code uses the original mixed-case Java names.
         let lower = name.to_ascii_lowercase();
-        self.map
-            .iter()
-            .find(|(k, _)| k.to_ascii_lowercase() == lower)
-            .map(|(_, v)| v.clone())
+        self.map.get(lower.as_str()).cloned()
     }
 
     fn insert(&mut self, name: impl Into<String>, df: DataFrame) {
-        self.map.insert(name.into(), Arc::new(df));
+        let mut key = name.into();
+        key.make_ascii_lowercase();
+        self.map.insert(key, Arc::new(df));
     }
 
     fn contains(&self, name: &str) -> bool {
-        if self.map.contains_key(name) {
-            return true;
-        }
         let lower = name.to_ascii_lowercase();
-        self.map.keys().any(|k| k.to_ascii_lowercase() == lower)
+        self.map.contains_key(lower.as_str())
     }
 
     fn names(&self) -> Vec<&str> {
