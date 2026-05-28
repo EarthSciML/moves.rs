@@ -222,6 +222,120 @@ pub fn aggregate_activity(
 }
 
 // ---------------------------------------------------------------------------
+// Streaming accumulator
+// ---------------------------------------------------------------------------
+
+/// Owned running aggregate for one group inside [`StreamingEmissionAgg`].
+#[derive(Debug)]
+struct OwnedAccum {
+    rep: EmissionRecord,
+    sum: f64,
+    saw_value: bool,
+}
+
+/// Streaming in-process emission aggregator.
+#[derive(Debug)]
+///
+/// Maintains running group-by sums keyed by the [`AggregationPlan`]'s group
+/// keys. Records are folded in as they are produced by calculator callbacks,
+/// so peak memory is bounded by `N_distinct_groups × per-record-size` rather
+/// than `N_raw_rows × per-record-size`.
+///
+/// Construct with [`StreamingEmissionAgg::new`], fold batches in with
+/// [`extend`](Self::extend), and call [`finalize`](Self::finalize) once all
+/// records have been pushed to obtain the aggregated rows in group-key sort
+/// order — identical to the output of [`aggregate_emissions`] for the same
+/// input plan and records.
+pub struct StreamingEmissionAgg {
+    keys: Vec<&'static str>,
+    scaling: TemporalScaling,
+    groups: BTreeMap<Vec<KeyValue>, OwnedAccum>,
+}
+
+impl StreamingEmissionAgg {
+    /// Create a streaming accumulator from an emission [`AggregationPlan`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::AggregationPlanMismatch`] if `plan` does not target
+    /// [`AggregationTable::Emission`] or does not `SUM` exactly `emissionQuant`.
+    pub fn new(plan: AggregationPlan) -> Result<Self> {
+        if plan.table != AggregationTable::Emission {
+            return Err(Error::AggregationPlanMismatch(format!(
+                "StreamingEmissionAgg requires an Emission plan, got {:?}",
+                plan.table
+            )));
+        }
+        let scaling = plan_sum_scaling(&plan, "emissionQuant")?;
+        let keys = plan.group_by();
+        Ok(Self {
+            keys,
+            scaling,
+            groups: BTreeMap::new(),
+        })
+    }
+
+    /// Returns `true` when no records have been accumulated yet.
+    pub fn is_empty(&self) -> bool {
+        self.groups.is_empty()
+    }
+
+    /// Fold a batch of emission records into the running aggregate.
+    ///
+    /// Each record is classified into its group key and its `emissionQuant`
+    /// is added to the group's running sum (with the plan's temporal scaling
+    /// applied). The first record seen for a group becomes its representative
+    /// (source of key-column values for [`finalize`](Self::finalize)).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::AggregationPlanMismatch`] if a group-by column name
+    /// in the plan is not a recognised `MOVESOutput` column. In practice
+    /// this cannot happen when the plan is built from a valid RunSpec.
+    pub fn extend(
+        &mut self,
+        records: &[EmissionRecord],
+        factors: &impl TemporalScalingFactors,
+    ) -> Result<()> {
+        for rec in records {
+            let mut key = Vec::with_capacity(self.keys.len());
+            for &col in &self.keys {
+                key.push(emission_key_value(rec, col)?);
+            }
+            let factor = row_factor(self.scaling, factors, rec.year_id, rec.month_id, rec.day_id);
+            let entry = self.groups.entry(key).or_insert_with(|| OwnedAccum {
+                rep: rec.clone(),
+                sum: 0.0,
+                saw_value: false,
+            });
+            if let Some(value) = rec.emission_quant {
+                entry.sum += value * factor;
+                entry.saw_value = true;
+            }
+        }
+        Ok(())
+    }
+
+    /// Consume the accumulator and return the finalized aggregated rows in
+    /// group-key sort order, matching the output of [`aggregate_emissions`]
+    /// for the same plan and records.
+    pub fn finalize(self) -> Vec<EmissionRecord> {
+        let StreamingEmissionAgg {
+            keys,
+            groups,
+            scaling: _,
+        } = self;
+        groups
+            .into_values()
+            .map(|a| {
+                let metric = a.saw_value.then_some(a.sum);
+                build_emission_output(&keys, &a.rep, metric)
+            })
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Internals
 // ---------------------------------------------------------------------------
 
@@ -900,5 +1014,113 @@ mod tests {
             matches!(err, Error::AggregationPlanMismatch(_)),
             "got {err:?}"
         );
+    }
+
+    // ---- StreamingEmissionAgg tests ----------------------------------------
+
+    fn year_nation_plan() -> AggregationPlan {
+        let b = breakdown_all_false();
+        emission_aggregation(&inputs(
+            OutputTimestep::Year,
+            GeographicOutputDetail::Nation,
+            &[Model::Onroad],
+            &b,
+        ))
+    }
+
+    #[test]
+    fn streaming_agg_empty_finalize_is_empty() {
+        let agg = StreamingEmissionAgg::new(year_nation_plan()).unwrap();
+        assert!(agg.is_empty());
+        assert!(agg.finalize().is_empty());
+    }
+
+    #[test]
+    fn streaming_agg_matches_batch_aggregate_emissions() {
+        // Streaming accumulator must produce the same rolled-up rows as the
+        // batch `aggregate_emissions` function for the same input records.
+        let b = breakdown_all_false();
+        let plan = emission_aggregation(&inputs(
+            OutputTimestep::Year,
+            GeographicOutputDetail::Nation,
+            &[Model::Onroad],
+            &b,
+        ));
+        let rows = vec![
+            emission(2, 1, Some(1.0)),
+            emission(2, 7, Some(2.0)),
+            emission(3, 1, Some(4.0)),
+        ];
+
+        let batch = aggregate_emissions(&plan, &rows, &UnitScaling).unwrap();
+
+        let stream_plan = emission_aggregation(&inputs(
+            OutputTimestep::Year,
+            GeographicOutputDetail::Nation,
+            &[Model::Onroad],
+            &b,
+        ));
+        let mut agg = StreamingEmissionAgg::new(stream_plan).unwrap();
+        agg.extend(&rows, &UnitScaling).unwrap();
+        let stream = agg.finalize();
+
+        assert_eq!(batch, stream, "streaming and batch results must match");
+    }
+
+    #[test]
+    fn streaming_agg_incremental_extend_matches_single_extend() {
+        // Multiple extend calls produce the same result as one big extend.
+        let b = breakdown_all_false();
+        let rows = vec![
+            emission(2, 1, Some(1.0)),
+            emission(2, 1, Some(2.0)),
+            emission(3, 7, Some(4.0)),
+        ];
+
+        let make_plan = || {
+            emission_aggregation(&inputs(
+                OutputTimestep::Month,
+                GeographicOutputDetail::Nation,
+                &[Model::Onroad],
+                &b,
+            ))
+        };
+
+        let mut single = StreamingEmissionAgg::new(make_plan()).unwrap();
+        single.extend(&rows, &UnitScaling).unwrap();
+        let single_out = single.finalize();
+
+        let mut incremental = StreamingEmissionAgg::new(make_plan()).unwrap();
+        for row in &rows {
+            incremental
+                .extend(std::slice::from_ref(row), &UnitScaling)
+                .unwrap();
+        }
+        let incremental_out = incremental.finalize();
+
+        assert_eq!(single_out, incremental_out);
+    }
+
+    #[test]
+    fn streaming_agg_all_null_metric_yields_null() {
+        let mut agg = StreamingEmissionAgg::new(year_nation_plan()).unwrap();
+        agg.extend(&[emission(2, 1, None), emission(2, 7, None)], &UnitScaling)
+            .unwrap();
+        let out = agg.finalize();
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].emission_quant, None);
+    }
+
+    #[test]
+    fn streaming_agg_rejects_non_emission_plan() {
+        let b = breakdown_all_false();
+        let activity_plan = crate::aggregation::activity_aggregation(&inputs(
+            OutputTimestep::Year,
+            GeographicOutputDetail::Nation,
+            &[Model::Onroad],
+            &b,
+        ));
+        let err = StreamingEmissionAgg::new(activity_plan).unwrap_err();
+        assert!(matches!(err, Error::AggregationPlanMismatch(_)));
     }
 }

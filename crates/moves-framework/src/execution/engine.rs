@@ -62,7 +62,9 @@ use sha2::{Digest, Sha256};
 use super::execution_db::ExecutionTime;
 use super::execution_runspec::ExecutionRunSpec;
 use super::executor::{chunk_chains, BoundedExecutor, Chunk};
-use crate::aggregation::{emission_aggregation, AggregationInputs, OutputProcessor, UnitScaling};
+use crate::aggregation::{
+    emission_aggregation, AggregationInputs, OutputProcessor, StreamingEmissionAgg, UnitScaling,
+};
 use crate::calculator::{
     Calculator, CalculatorContext, CalculatorRegistry, CalculatorSubscription, Generator,
 };
@@ -263,10 +265,10 @@ struct CalculatorMasterLoopable {
     /// Per-chunk shared context. All adapters within one chunk share the
     /// same `Arc`; adapters in different chunks hold different `Arc`s.
     ctx: Arc<Mutex<CalculatorContext>>,
-    /// Cross-chunk accumulator: emission rows from every calculator invocation
-    /// are streamed here immediately after conversion, keeping peak DataFrame
-    /// memory bounded to one frame at a time per chunk.
-    output_acc: Arc<Mutex<Vec<EmissionRecord>>>,
+    /// Cross-chunk streaming aggregator: emission rows are folded into running
+    /// group-by sums as they are produced, so peak memory is bounded by the
+    /// number of distinct aggregation groups rather than the raw row count.
+    streaming_agg: Arc<Mutex<StreamingEmissionAgg>>,
     /// Run hash stamped into every accumulated [`EmissionRecord`].
     run_hash: Arc<str>,
 }
@@ -292,10 +294,10 @@ impl MasterLoopable for CalculatorMasterLoopable {
                 let records = frame_to_emission_records(&df, &self.run_hash);
                 // DataFrame is freed here before the accumulator lock is taken.
                 drop(df);
-                self.output_acc
+                self.streaming_agg
                     .lock()
                     .expect("output accumulator poisoned")
-                    .extend(records);
+                    .extend(&records, &UnitScaling)?;
             }
         }
         Ok(())
@@ -497,6 +499,16 @@ impl MOVESEngine {
         let run_record = self.build_run_record();
         let run_hash_str: Arc<str> = run_record.run_hash.clone().into();
 
+        // Build the emission aggregation plan upfront so the streaming
+        // accumulator can fold records directly into running group-by sums
+        // during execution rather than buffering raw rows until run end.
+        // Peak memory is bounded by N_distinct_groups, not N_raw_rows.
+        let agg_inputs = aggregation_inputs_from_run_spec(&self.execution.run_spec);
+        let emission_plan = emission_aggregation(&agg_inputs);
+        let streaming_agg: Arc<Mutex<StreamingEmissionAgg>> =
+            Arc::new(Mutex::new(StreamingEmissionAgg::new(emission_plan)?));
+        let streaming_agg_ref = Arc::clone(&streaming_agg);
+
         let executor = BoundedExecutor::new(self.config.max_parallel_chunks)?;
         let registry = &self.registry;
         let chunk_slow = Arc::clone(&self.slow_store);
@@ -507,11 +519,6 @@ impl MOVESEngine {
         let chunk_slot: Arc<Mutex<Vec<Option<Duration>>>> =
             Arc::new(Mutex::new(vec![None; chunks.len()]));
         let chunk_slot_ref = Arc::clone(&chunk_slot);
-        // Emission records accumulated across all chunks. Conversion from the
-        // calculator's output DataFrame happens inline in each adapter callback,
-        // so no DataFrame survives past the calculator invocation that produced it.
-        let output_acc: Arc<Mutex<Vec<EmissionRecord>>> = Arc::new(Mutex::new(Vec::new()));
-        let output_acc_ref = Arc::clone(&output_acc);
         let t_exec_start = Instant::now();
         executor.execute(&chunks, |chunk| {
             let t_chunk = Instant::now();
@@ -557,7 +564,7 @@ impl MOVESEngine {
                         module: Arc::clone(&module),
                         gate_process: sub.process_id,
                         ctx: Arc::clone(&chunk_ctx),
-                        output_acc: Arc::clone(&output_acc_ref),
+                        streaming_agg: Arc::clone(&streaming_agg_ref),
                         run_hash: Arc::clone(&run_hash_str),
                     });
                     master.subscribe(MasterLoopableSubscription::new(
@@ -602,29 +609,27 @@ impl MOVESEngine {
             }
         }
 
-        // Finalize: write the MOVESRun metadata row and any accumulated
-        // emission output. Records were already converted inline by each
-        // CalculatorMasterLoopable — no DataFrame buffering remains.
-        let emission_records =
-            std::mem::take(&mut *output_acc.lock().expect("output_acc poisoned"));
+        // Finalize: drain the streaming aggregator (aggregation was applied
+        // inline during execution) and write the rolled-up emission rows.
+        // Drop the local ref clone first so Arc::try_unwrap sees count == 1.
+        drop(streaming_agg_ref);
+        let aggregated_records = Arc::try_unwrap(streaming_agg)
+            .expect("streaming_agg still has owners after executor finished")
+            .into_inner()
+            .expect("streaming_agg mutex poisoned")
+            .finalize();
 
         let (proc, output_bytes) = if self.config.collect_output_in_memory {
             let p = OutputProcessor::new_memory(&run_record)?;
-            if !emission_records.is_empty() {
-                let run_spec = &self.execution.run_spec;
-                let agg_inputs = aggregation_inputs_from_run_spec(run_spec);
-                let plan = emission_aggregation(&agg_inputs);
-                p.write_aggregated_emissions(&plan, &emission_records, &UnitScaling)?;
+            if !aggregated_records.is_empty() {
+                p.write_emissions(&aggregated_records)?;
             }
             let bytes = p.take_memory_files().unwrap_or_default();
             (p, bytes)
         } else {
             let p = OutputProcessor::new(&self.config.output_root, &run_record)?;
-            if !emission_records.is_empty() {
-                let run_spec = &self.execution.run_spec;
-                let agg_inputs = aggregation_inputs_from_run_spec(run_spec);
-                let plan = emission_aggregation(&agg_inputs);
-                p.write_aggregated_emissions(&plan, &emission_records, &UnitScaling)?;
+            if !aggregated_records.is_empty() {
+                p.write_emissions(&aggregated_records)?;
             }
             (p, Vec::new())
         };
@@ -1283,6 +1288,30 @@ mod tests {
         Arc::new(Mutex::new(CalculatorContext::new()))
     }
 
+    fn stub_streaming_agg() -> Arc<Mutex<crate::aggregation::StreamingEmissionAgg>> {
+        use crate::aggregation::{emission_aggregation, AggregationInputs, StreamingEmissionAgg};
+        use moves_runspec::model::{
+            GeographicOutputDetail, Model, ModelScale, OutputBreakdown, OutputTimestep,
+        };
+        let models = vec![Model::Onroad];
+        let breakdown = OutputBreakdown::default();
+        let agg_inputs = AggregationInputs {
+            timestep: OutputTimestep::Hour,
+            geographic_output_detail: GeographicOutputDetail::County,
+            scale: ModelScale::Inventory,
+            domain: None,
+            models: &models,
+            breakdown: &breakdown,
+            output_population: false,
+            reg_class_id: false,
+            fuel_sub_type: false,
+            eng_tech_id: false,
+            sector: false,
+        };
+        let plan = emission_aggregation(&agg_inputs);
+        Arc::new(Mutex::new(StreamingEmissionAgg::new(plan).unwrap()))
+    }
+
     #[test]
     fn adapter_runs_the_module_only_for_its_gated_process() {
         ADAPTER_GATE_CALC.store(0, Ordering::SeqCst);
@@ -1295,7 +1324,7 @@ mod tests {
             module: Arc::new(ModuleInstance::Calculator(Box::new(calc))),
             gate_process: ProcessId(1),
             ctx: stub_chunk_ctx(),
-            output_acc: Arc::new(Mutex::new(Vec::new())),
+            streaming_agg: stub_streaming_agg(),
             run_hash: Arc::from("test"),
         };
 
@@ -1328,7 +1357,7 @@ mod tests {
             module: Arc::new(ModuleInstance::Generator(Box::new(generator))),
             gate_process: ProcessId(1),
             ctx: stub_chunk_ctx(),
-            output_acc: Arc::new(Mutex::new(Vec::new())),
+            streaming_agg: stub_streaming_agg(),
             run_hash: Arc::from("test"),
         };
         let mut ctx = MasterLoopContext::default();
@@ -1846,6 +1875,121 @@ mod tests {
         assert!(
             !CONC_B_SAW_A.load(Ordering::SeqCst),
             "concurrent chunk B must not observe chunk A's scratch"
+        );
+    }
+
+    // ---- Streaming aggregation regression ----------------------------------
+    //
+    // Verifies that a calculator producing emission DataFrames has its rows
+    // folded into the streaming aggregator and written to Parquet correctly.
+    // Raw row accumulation is replaced by streaming aggregation, so peak
+    // in-memory residency is bounded by N_distinct_groups × record_size.
+
+    static EMITTING_RUNS: AtomicUsize = AtomicUsize::new(0);
+
+    /// Calculator that returns a tiny emission DataFrame (two rows, same
+    /// pollutant/year/month/day/hour) on every invocation. Used to verify
+    /// the streaming aggregation path end-to-end.
+    #[derive(Debug)]
+    struct EmittingCalc {
+        subs: Vec<CalculatorSubscription>,
+    }
+
+    impl Calculator for EmittingCalc {
+        fn name(&self) -> &'static str {
+            "EmittingCalc"
+        }
+        fn subscriptions(&self) -> &[CalculatorSubscription] {
+            &self.subs
+        }
+        fn registrations(&self) -> &[moves_data::PollutantProcessAssociation] {
+            &[]
+        }
+        fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput> {
+            EMITTING_RUNS.fetch_add(1, Ordering::SeqCst);
+            use polars::prelude::{DataFrame, NamedFrom, Series};
+            // Emit two rows for pollutant 2 (CO), emissionQuant 1.0 and 2.0.
+            // Both rows share identical key columns so they roll into one
+            // aggregated row with emissionQuant = 3.0.
+            let df = DataFrame::new(
+                2,
+                vec![
+                    Series::new("pollutantID".into(), [2i32, 2i32]).into(),
+                    Series::new("yearID".into(), [2020i32, 2020i32]).into(),
+                    Series::new("monthID".into(), [7i32, 7i32]).into(),
+                    Series::new("dayID".into(), [5i32, 5i32]).into(),
+                    Series::new("hourID".into(), [8i32, 8i32]).into(),
+                    Series::new("processID".into(), [1i32, 1i32]).into(),
+                    Series::new("emissionQuant".into(), [1.0f64, 2.0f64]).into(),
+                ],
+            )
+            .unwrap();
+            Ok(CalculatorOutput::with_dataframe(df))
+        }
+    }
+
+    fn emitting_registry() -> CalculatorRegistry {
+        let info = parse_calculator_info_str(
+            "Registration\tCO\t2\tRunning Exhaust\t1\tEmittingCalc\n\
+             Subscribe\tEmittingCalc\tRunning Exhaust\t1\tPROCESS\tEMISSION_CALCULATOR\n",
+            Path::new("test"),
+        )
+        .unwrap();
+        CalculatorRegistry::new(build_dag(&info, &[]).unwrap())
+    }
+
+    fn emitting_calc_factory() -> Box<dyn Calculator> {
+        Box::new(EmittingCalc {
+            subs: process_subs(),
+        })
+    }
+
+    #[test]
+    fn streaming_agg_folds_emission_rows_and_writes_parquet() {
+        EMITTING_RUNS.store(0, Ordering::SeqCst);
+        let dir = tempdir().unwrap();
+        let mut registry = emitting_registry();
+        registry
+            .register_calculator("EmittingCalc", emitting_calc_factory)
+            .unwrap();
+        let engine = MOVESEngine::new(sample_runspec(), registry, config(dir.path()));
+        engine.run().unwrap();
+
+        // The calculator fired once (one process × one PROCESS-granularity sub).
+        assert_eq!(EMITTING_RUNS.load(Ordering::SeqCst), 1);
+
+        // The emission Parquet must exist under MOVESOutput/.
+        // sample_runspec is Hour timestep (years=[2020], months=[7], days=[5],
+        // hours=[8]), so the partition is yearID=2020/monthID=7.
+        let partition = dir
+            .path()
+            .join("MOVESOutput/yearID=2020/monthID=7/part.parquet");
+        assert!(partition.exists(), "emission partition must be written");
+
+        // Read it back and check row count and summed emissionQuant.
+        use bytes::Bytes;
+        use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+        let raw = std::fs::read(&partition).unwrap();
+        let mut reader = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(raw))
+            .unwrap()
+            .build()
+            .unwrap();
+        let batch = reader.next().unwrap().unwrap();
+
+        // Hour + County aggregation: all dimensions kept, so each raw row
+        // may map to a distinct group. Two rows with the same keys (same
+        // pollutant/year/month/day/hour) should aggregate into one row with
+        // emissionQuant = 1.0 + 2.0 = 3.0.
+        let quant_idx = batch.schema().index_of("emissionQuant").unwrap();
+        let quant_col = batch
+            .column(quant_idx)
+            .as_any()
+            .downcast_ref::<arrow::array::Float64Array>()
+            .unwrap();
+        let total: f64 = (0..quant_col.len()).map(|i| quant_col.value(i)).sum();
+        assert!(
+            (total - 3.0).abs() < 1e-9,
+            "expected emissionQuant sum 3.0, got {total}"
         );
     }
 }
