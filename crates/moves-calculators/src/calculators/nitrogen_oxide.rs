@@ -1184,6 +1184,18 @@ impl Calculator for NO2Calculator {
     }
 }
 
+/// Construct the NO/HONO calculator as a boxed trait object.
+#[must_use]
+pub fn no_factory() -> Box<dyn Calculator> {
+    Box::new(NOCalculator::new())
+}
+
+/// Construct the NO2 calculator as a boxed trait object.
+#[must_use]
+pub fn no2_factory() -> Box<dyn Calculator> {
+    Box::new(NO2Calculator::new())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

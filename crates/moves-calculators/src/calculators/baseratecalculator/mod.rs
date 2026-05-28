@@ -464,6 +464,9 @@ fn process_pass(
 }
 
 impl BaseRateCalculator {
+    /// Stable module name — matches the Go source and the chain-DAG entry.
+    pub const NAME: &'static str = CALCULATOR_NAME;
+
     /// Run the calculator over a fully materialised set of input tables.
     ///
     /// Ports `StartCalculating` / `doCalculationPipeline`. The Go processes
@@ -643,6 +646,13 @@ impl Calculator for BaseRateCalculator {
         let rows = output.rows();
         crate::wiring::emit_rows(rows)
     }
+}
+
+/// Construct the calculator as a boxed trait object — matches the engine's
+/// calculator-factory signature so the registry can register it.
+#[must_use]
+pub fn factory() -> Box<dyn Calculator> {
+    Box::new(BaseRateCalculator)
 }
 
 #[cfg(test)]

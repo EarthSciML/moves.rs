@@ -45,16 +45,19 @@ pub fn register_all(
 ) -> std::result::Result<(), moves_framework::Error> {
     use calculators::activitycalculator;
     use calculators::airtoxics;
+    use calculators::baseratecalculator;
     use calculators::basicbraketirepm;
     use calculators::basicstartpm;
     use calculators::ch4n2o_running_start;
     use calculators::co2ae_running_start_extended_idle;
+    use calculators::crankcase_emission;
     use calculators::criteria_running_calculator;
     use calculators::criteria_start_calculator;
     use calculators::distance_calculator;
     use calculators::evaporative_permeation_calculator;
     use calculators::liquid_leaking_calculator;
     use calculators::nh3;
+    use calculators::nitrogen_oxide;
     use calculators::nrairtoxics;
     use calculators::pm10;
     use calculators::pmexhaust;
@@ -75,6 +78,28 @@ pub fn register_all(
         activitycalculator::factory,
     )?;
     registry.register_calculator(airtoxics::AirToxicsCalculator::NAME, airtoxics::factory)?;
+    registry.register_calculator(
+        baseratecalculator::BaseRateCalculator::NAME,
+        baseratecalculator::factory,
+    )?;
+    registry.register_calculator(
+        crankcase_emission::CrankcaseEmissionCalculatorNonPM::NAME,
+        crankcase_emission::nonpm_factory,
+    )?;
+    // multiday_tank_vapor_venting_calculator is intentionally not registered:
+    // it has no DAG entry — "MultidayTankVaporVentingCalculator" is not in
+    // calculator-dag.json. The live TankVaporVentingCalculator DAG entry and
+    // its (THC × process 12) registration belong to tank_vapor_venting_calculator
+    // (already registered above). The multiday module is the algorithm body a
+    // future runtime would dispatch to via USE_MULTIDAY_DIURNALS.
+    registry.register_calculator(
+        nitrogen_oxide::NOCalculator::NAME,
+        nitrogen_oxide::no_factory,
+    )?;
+    registry.register_calculator(
+        nitrogen_oxide::NO2Calculator::NAME,
+        nitrogen_oxide::no2_factory,
+    )?;
     registry.register_calculator(
         ch4n2o_running_start::Ch4N2oRunningStartCalculator::NAME,
         ch4n2o_running_start::factory,
