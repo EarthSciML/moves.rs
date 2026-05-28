@@ -1,7 +1,7 @@
 {
   "trace_version": "moves-fixture-capture/v1",
   "fixture_name": "expand-month",
-  "sif_sha256": "70ea5b8378b278af50e8c44ab011066c59019faed8d141adf4ec6f2045f1e5fd",
+  "sif_sha256": "597f1f3e0aef5d23027589ee509207d13486d5c89056906bf323a889f0e02311",
   "runspec_sha256": "8944004570c8ce45307c9e7c9996006d4a282050241ddc635813ca9a5b6ebc4d",
   "java_classes": [
     {
