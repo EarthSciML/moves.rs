@@ -9,18 +9,18 @@
 # (which itself requires canonical-moves.sif from build-sif.sh).
 
 sif_path           = "characterization/apptainer/moves-fixture.sif"
-sif_sha256         = "93d8792b8430363e631e30548ca194b9f36f11145fe8fe3d5876edb95a83d33b"
+sif_sha256         = "f8d7ae76464c5e273dcc675bb91b3062fa1f41c87907e9403fe8c1cbe5482a59"
 sif_bytes          = 1101045760
 
 # Parent SIF (the canonical reference this layer was built from)
 parent_sif_path    = "characterization/apptainer/canonical-moves.sif"
-parent_sif_sha256  = "c47d5d9d6febcbc206d466633d68d4b43cbcdc2d2e6ebd552119ab4d3237b744"
+parent_sif_sha256  = "1fa69d34114e95d26d57c414a896c98efeecfe4e729ee2b7e701e79e19baccd8"
 
 # Patch applied
 patch_path         = "characterization/apptainer/files/intermediate-state-capture.patch"
 patch_sha256       = "a13858dacb3c890f18c4979a9fa58697cb86092afc354c299697f75513c5d7b7"
 
 # Build provenance
-built_at_utc       = "2026-05-27T03:44:01Z"
+built_at_utc       = "2026-05-28T06:26:21Z"
 built_on_host      = "ccc0232.campuscluster.illinois.edu"
 apptainer_version  = "1.4.5-3.el9"

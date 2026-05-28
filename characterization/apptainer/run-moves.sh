@@ -85,6 +85,15 @@ BINDS=(
     --bind "${HERE}/files/start-mariadb-bg.sh:/opt/moves-bin/start-mariadb-bg.sh:ro"
 )
 
+# Bind the runspec's parent directory if the path is absolute. On this HPC
+# cluster, /scratch.local is not in Apptainer's default bind paths, so
+# worktree paths under /scratch.local are invisible inside the container
+# without an explicit bind.
+if [[ "${RUNSPEC}" == /* ]]; then
+    RUNSPEC_PARENT="$(dirname "${RUNSPEC}")"
+    BINDS+=( --bind "${RUNSPEC_PARENT}:${RUNSPEC_PARENT}:ro" )
+fi
+
 FAKEROOT_FLAG=()
 if [ "${USE_FAKEROOT}" = "1" ]; then
     FAKEROOT_FLAG=( --fakeroot )
