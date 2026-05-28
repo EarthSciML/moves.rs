@@ -32,6 +32,11 @@
 #                         generate-corpus.sh (nonroad-fidelity/) to the
 #                         /opt/moves/MOVESTemporary/<fixture>.tsv path that is
 #                         bind-mounted back to the host scratch directory.
+#   NONROAD_EXE           If set, bind-mounts this host path as the canonical
+#                         /opt/moves/NONROAD/NR08a/NONROAD.exe inside the
+#                         container, overriding the SIF's built-in binary.
+#                         Used by generate-corpus.sh to inject the gfortran-
+#                         instrumented binary without rebuilding the SIF.
 
 set -euo pipefail
 
@@ -77,13 +82,76 @@ mkdir -p "${MARIADB_DATA}" "${MARIADB_SOCK_DIR}" "${MOVES_TEMP}" "${WORKER_DIR}"
 # files/start-mariadb-bg.sh is the authoritative source for this script and
 # is bind-mounted read-only over the SIF's baked-in copy so changes take
 # effect without rebuilding the SIF.
+# Create a custom manyworkers.txt that redirects the worker folder to
+# MOVESTemporary (bind-mounted from host), keeping bundle extraction off tmpfs.
+# Custom manyworkers.txt: worker folder on host filesystem (avoids tmpfs space issues).
+MANYWORKERS_CFG="${MOVES_TEMP}/manyworkers.txt"
+mkdir -p "${MOVES_TEMP}/manyworkers/workerfolder"
+cat > "${MANYWORKERS_CFG}" <<'EOF'
+sharedDistributedFolderPath = sharedwork
+workFolderPath = MOVESTemporary/manyworkers/workerfolder
+workerDatabaseName = *
+computerIDPath =
+workerServerName = localhost
+concurrentStatements = 1
+nonroadApplicationPath = NONROAD/NR08a/nonroad.exe
+nonroadWorkingFolderPath = NONROAD/NR08a
+calculatorApplicationPath = calc/externalcalculatorgo64.exe
+mysqlUserName = moves
+mysqlPassword = 744ff5134053c418265b626f5d7035e3dff3d50c609c548f6f63
+EOF
+
+# nonroad.exe shim: MOVES worker looks for lowercase "nonroad.exe" but the SIF
+# binary is "NONROAD.exe". Bind a wrapper script as the lowercase name so the
+# bundle copies it and the worker can execute it (the wrapper calls NONROAD.exe
+# via its absolute SIF path).
+NONROAD_SHIM="${HERE}/files/nonroad_shim.sh"
+if [ ! -f "${NONROAD_SHIM}" ]; then
+    NONROAD_SHIM="/tmp/nonroad_shim_${$}.sh"
+    cat > "${NONROAD_SHIM}" << 'SHIMEOF'
+#!/bin/bash
+exec /opt/moves/NONROAD/NR08a/NONROAD.exe "$@"
+SHIMEOF
+    chmod +x "${NONROAD_SHIM}"
+fi
+
+# Custom maketodo.txt: lower-case nonroadExePath so the bundle copies
+# the shim as "nonroad.exe" and the worker can find it.
+MAKETODO_CFG="${MOVES_TEMP}/maketodo.txt"
+cat > "${MAKETODO_CFG}" <<'EOF'
+defaultServerName = localhost
+defaultDatabaseName = movesdb20241112
+executionServerName = localhost
+executionDatabaseName = *
+outputServerName = localhost
+outputDatabaseName = MOVESOutput
+nonroadExePath = NONROAD/NR08a/nonroad.exe
+generatorExePath = generators/externalgenerator64.exe
+sharedDistributedFolderPath = sharedwork
+computerIDPath = MOVESComputerID.txt
+masterFolderPath = .
+saveTODOPath = SaveTODO
+mysqlUserName = moves
+mysqlPassword = 744ff5134053c418265b626f5d7035e3dff3d50c609c548f6f63
+EOF
+
 BINDS=(
     --bind "${MARIADB_DATA}:/var/lib/mysql"
     --bind "${MARIADB_SOCK_DIR}:/var/run/mysqld"
     --bind "${MOVES_TEMP}:/opt/moves/MOVESTemporary"
     --bind "${WORKER_DIR}:/opt/moves/WorkerFolder"
+    --bind "${MANYWORKERS_CFG}:/opt/moves/manyworkers.txt:ro"
+    --bind "${MAKETODO_CFG}:/opt/moves/maketodo.txt"
+    --bind "${NONROAD_SHIM}:/opt/moves/NONROAD/NR08a/nonroad.exe:ro"
     --bind "${HERE}/files/start-mariadb-bg.sh:/opt/moves-bin/start-mariadb-bg.sh:ro"
 )
+if [ -n "${NONROAD_EXE:-}" ]; then
+    if [ ! -f "${NONROAD_EXE}" ]; then
+        echo "FATAL: NONROAD_EXE=${NONROAD_EXE} not found." >&2
+        exit 2
+    fi
+    BINDS+=(--bind "${NONROAD_EXE}:/opt/moves/NONROAD/NR08a/NONROAD.exe:ro")
+fi
 
 # Bind the runspec's parent directory if the path is absolute. On this HPC
 # cluster, /scratch.local is not in Apptainer's default bind paths, so

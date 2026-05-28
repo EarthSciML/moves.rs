@@ -1,0 +1,8 @@
+# Generated TSV baselines — large files produced by generate-corpus.sh.
+# Not committed; regenerate with:
+#   cd characterization/nonroad-fidelity && ./generate-corpus.sh
+*.tsv
+corpus.sha
+
+# Keep the manifest (small, pins the corpus by SHA256).
+!MANIFEST.toml

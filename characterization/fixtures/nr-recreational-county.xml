@@ -11,7 +11,7 @@
 	<timespan>
 		<year key="2020"/>
 		<month key="7"/>
-		<day key="5"/>
+		<day id="5"/>
 		<beginhour key="6"/>
 		<endhour key="6"/>
 	</timespan>
@@ -23,13 +23,14 @@
 	<offroadvehiclesccs>
 	</offroadvehiclesccs>
 	<roadtypes>
+		<roadtype roadtypeid="100" roadtypename="Nonroad"/>
 	</roadtypes>
 	<pollutantprocessassociations>
-		<pollutantprocessassociation pollutantkey="1" pollutantname="Total Gaseous Hydrocarbons" processkey="40" processname="Nonroad"/>
-		<pollutantprocessassociation pollutantkey="2" pollutantname="Carbon Monoxide (CO)" processkey="40" processname="Nonroad"/>
-		<pollutantprocessassociation pollutantkey="3" pollutantname="Oxides of Nitrogen (NOx)" processkey="40" processname="Nonroad"/>
-		<pollutantprocessassociation pollutantkey="31" pollutantname="Sulfur Dioxide (SO2)" processkey="40" processname="Nonroad"/>
-		<pollutantprocessassociation pollutantkey="100" pollutantname="Primary Exhaust PM10  - Total" processkey="40" processname="Nonroad"/>
+		<pollutantprocessassociation pollutantkey="1" pollutantname="Total Gaseous Hydrocarbons" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="2" pollutantname="Carbon Monoxide (CO)" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="3" pollutantname="Oxides of Nitrogen (NOx)" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="31" pollutantname="Sulfur Dioxide (SO2)" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="100" pollutantname="Primary Exhaust PM10  - Total" processkey="1" processname="Running Exhaust"/>
 	</pollutantprocessassociations>
 	<databaseselections>
 	</databaseselections>

@@ -1,0 +1,29 @@
+diff --git a/NONROAD/NR08a/SOURCE/rdnrsrc.f b/NONROAD/NR08a/SOURCE/rdnrsrc.f
+--- a/NONROAD/NR08a/SOURCE/rdnrsrc.f
++++ b/NONROAD/NR08a/SOURCE/rdnrsrc.f
+@@ -130,6 +130,25 @@
+ c
+  222  continue
+       ierr = ISUCES
++c
++c  --- MOVES 3 generates an empty /SOURCE CATEGORY/ packet to mean
++c      'process all SCCs'. NONROAD 2008a treats a present-but-empty
++c      packet as 'none selected' (the missing-packet code path sets
++c      lascal=TRUE, but the found-but-empty path does not). Detect
++c      this case and default to all-categories to match MOVES behavior.
++c
++      if( .NOT. lascal ) then
++          lmatch = .FALSE.
++          do 302 i=1,NEQNAM
++              if( lascat(i) ) lmatch = .TRUE.
++  302     continue
++          if( .NOT. lmatch ) then
++              lascal = .TRUE.
++              do 303 i=1,NEQNAM
++                  lascat(i) = .TRUE.
++  303         continue
++          endif
++      endif
+       goto 9999
+ c
+ c-----------------------------------------------------------------------
