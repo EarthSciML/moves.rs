@@ -4066,6 +4066,7 @@ impl Calculator for TankVaporVentingCalculator {
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let tables = ctx.tables();
         let pos = ctx.position();
+        let filter = crate::wiring::position_filter(ctx);
         // Prefer the fuelUsageFraction-remapped distribution from scratch (written
         // by SourceBinDistributionGenerator) over the raw slow-tier table.
         let fuel_usage_table = {
@@ -4101,8 +4102,14 @@ impl Calculator for TankVaporVentingCalculator {
             month_of_any_year: tables.iter_typed::<MonthOfAnyYearRow>("MonthOfAnyYear")?,
             op_mode_distribution: tables
                 .iter_typed::<OpModeDistributionRow>("OpModeDistribution")?,
-            pollutant_process_assoc: tables
-                .iter_typed::<PollutantProcessAssocRow>("PollutantProcessAssoc")?,
+            pollutant_process_assoc: {
+                let rows =
+                    tables.iter_typed::<PollutantProcessAssocRow>("PollutantProcessAssoc")?;
+                match filter.process_id {
+                    Some(p) => rows.into_iter().filter(|r| r.process_id == p).collect(),
+                    None => rows,
+                }
+            },
             pollutant_process_model_year: tables
                 .iter_typed::<PollutantProcessModelYearRow>("PollutantProcessModelYear")?,
             run_spec_hour_day: tables
@@ -4136,7 +4143,13 @@ impl Calculator for TankVaporVentingCalculator {
                 .iter_typed::<SourceTypeModelYearRow>("SourceTypeModelYear")?,
             tank_vapor_gen_coeffs: tables
                 .iter_typed::<TankVaporGenCoeffsRow>("TankVaporGenCoeffs")?,
-            year: tables.iter_typed::<YearRow>("Year")?,
+            year: {
+                let rows = tables.iter_typed::<YearRow>("Year")?;
+                match filter.year {
+                    Some(y) => rows.into_iter().filter(|r| r.year_id == y).collect(),
+                    None => rows,
+                }
+            },
             zone: tables.iter_typed::<ZoneRow>("Zone")?,
         };
         let rows = self.calculate(&inputs, &run_ctx);

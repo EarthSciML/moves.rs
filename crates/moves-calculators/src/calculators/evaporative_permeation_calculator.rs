@@ -3401,6 +3401,7 @@ impl Calculator for EvaporativePermeationCalculator {
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let tables = ctx.tables();
         let pos = ctx.position();
+        let filter = crate::wiring::position_filter(ctx);
         let year = pos.time.year.map(|y| y as i32).unwrap_or(0);
         let zone_id = pos.location.zone_id.map(|z| z as i32).unwrap_or(0);
         // The SourceBinDistributionGenerator runs before this calculator and writes
@@ -3444,8 +3445,14 @@ impl Calculator for EvaporativePermeationCalculator {
             model_year: tables.iter_typed::<ModelYearRow>("ModelYear")?,
             op_mode_distribution: tables
                 .iter_typed::<OpModeDistributionRow>("OpModeDistribution")?,
-            pollutant_process_assoc: tables
-                .iter_typed::<PollutantProcessAssocRow>("PollutantProcessAssoc")?,
+            pollutant_process_assoc: {
+                let rows =
+                    tables.iter_typed::<PollutantProcessAssocRow>("PollutantProcessAssoc")?;
+                match filter.process_id {
+                    Some(p) => rows.into_iter().filter(|r| r.process_id == p).collect(),
+                    None => rows,
+                }
+            },
             pollutant_process_mapped_model_year: tables
                 .iter_typed::<PollutantProcessMappedModelYearRow>(
                     "PollutantProcessMappedModelYear",
@@ -3472,7 +3479,13 @@ impl Calculator for EvaporativePermeationCalculator {
                 .iter_typed::<SourceTypeModelYearGroupRow>("SourceTypeModelYearGroup")?,
             temperature_adjustment: tables
                 .iter_typed::<TemperatureAdjustmentRow>("TemperatureAdjustment")?,
-            year: tables.iter_typed::<YearRow>("Year")?,
+            year: {
+                let rows = tables.iter_typed::<YearRow>("Year")?;
+                match filter.year {
+                    Some(y) => rows.into_iter().filter(|r| r.year_id == y).collect(),
+                    None => rows,
+                }
+            },
         };
         crate::wiring::emit_rows(self.calculate(&inputs, &run_context))
     }

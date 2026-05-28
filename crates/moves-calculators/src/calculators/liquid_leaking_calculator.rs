@@ -2580,6 +2580,7 @@ impl Calculator for LiquidLeakingCalculator {
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let tables = ctx.tables();
         let pos = ctx.position();
+        let filter = crate::wiring::position_filter(ctx);
         // Prefer the fuelUsageFraction-remapped distribution from scratch (written
         // by SourceBinDistributionGenerator) over the raw slow-tier table.
         let fuel_usage_table = {
@@ -2601,8 +2602,14 @@ impl Calculator for LiquidLeakingCalculator {
                 .iter_typed::<PollutantProcessMappedModelYearRow>(
                     "PollutantProcessMappedModelYear",
                 )?,
-            pollutant_process_assoc: tables
-                .iter_typed::<PollutantProcessAssocRow>("PollutantProcessAssoc")?,
+            pollutant_process_assoc: {
+                let rows =
+                    tables.iter_typed::<PollutantProcessAssocRow>("PollutantProcessAssoc")?;
+                match filter.process_id {
+                    Some(p) => rows.into_iter().filter(|r| r.process_id == p).collect(),
+                    None => rows,
+                }
+            },
             im_factor: tables.iter_typed::<ImFactorRow>("IMFactor")?,
             age_category: tables.iter_typed::<AgeCategoryRow>("AgeCategory")?,
             im_coverage: tables.iter_typed::<ImCoverageRow>("IMCoverage")?,
