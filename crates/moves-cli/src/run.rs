@@ -190,23 +190,16 @@ fn populate_sho_distances(store: &mut InMemoryStore) -> Result<()> {
     Ok(())
 }
 
-/// Cast an integer column to i32, accepting both Int32 and Int64 sources.
-fn col_as_i32(df: &polars::prelude::DataFrame, name: &str) -> Result<Vec<Option<i32>>> {
-    use polars::prelude::DataType;
-    let s = df
-        .column(name)
-        .with_context(|| format!("{name} not found"))?;
-    let casted = if *s.dtype() == DataType::Int64 {
-        s.cast(&DataType::Int32)
-            .with_context(|| format!("{name}: cast i64→i32 failed"))?
-    } else {
-        s.clone()
-    };
-    Ok(casted
-        .i32()
-        .with_context(|| format!("{name} not i32"))?
-        .into_iter()
-        .collect())
+/// Cast a DataFrame column to Int32, returning the Column for row-wise access.
+///
+/// Accepts Int32 (identity cast) and Int64 (narrowing cast). Returning the
+/// Column instead of a Vec lets callers use `col.i32()?.get(i)` without
+/// materialising an intermediate allocation.
+fn cast_to_i32(df: &polars::prelude::DataFrame, name: &str) -> Result<polars::prelude::Column> {
+    df.column(name)
+        .with_context(|| format!("{name} not found"))?
+        .cast(&polars::prelude::DataType::Int32)
+        .with_context(|| format!("{name}: cast to i32 failed"))
 }
 
 /// Build a [`GeographyTables`] by joining the `Link` and `County` DataFrames
@@ -214,30 +207,41 @@ fn col_as_i32(df: &polars::prelude::DataFrame, name: &str) -> Result<Vec<Option<
 fn load_geography_from_store(store: &InMemoryStore) -> Result<GeographyTables> {
     let links: Vec<LinkRow> = if let Some(arc_df) = store.get("link") {
         let df = &*arc_df;
-        let link_id = col_as_i32(df, "linkID")?;
-        let county_id = col_as_i32(df, "countyID")?;
-        let zone_id = col_as_i32(df, "zoneID")?;
-        let road_type_id = col_as_i32(df, "roadTypeID")?;
-        // Load county stateID for join
+        // Cast all four columns once; iterate row-wise to avoid 4 intermediate Vecs.
+        let link_id_s = cast_to_i32(df, "linkID")?;
+        let county_id_s = cast_to_i32(df, "countyID")?;
+        let zone_id_s = cast_to_i32(df, "zoneID")?;
+        let road_type_id_s = cast_to_i32(df, "roadTypeID")?;
+        let link_ids = link_id_s.i32().context("linkID not i32 after cast")?;
+        let county_ids = county_id_s.i32().context("countyID not i32 after cast")?;
+        let zone_ids = zone_id_s.i32().context("zoneID not i32 after cast")?;
+        let road_type_ids = road_type_id_s
+            .i32()
+            .context("roadTypeID not i32 after cast")?;
         let county_state: std::collections::HashMap<i32, i32> =
             if let Some(arc_county) = store.get("county") {
                 let cdf = &*arc_county;
-                let cids = col_as_i32(cdf, "countyID").ok();
-                let sids = col_as_i32(cdf, "stateID").ok();
-                cids.iter()
-                    .zip(sids.iter())
-                    .flat_map(|(c, s)| c.iter().zip(s.iter()))
-                    .filter_map(|(c, s)| Some(((*c)?, (*s)?)))
-                    .collect()
+                let cid_s = cast_to_i32(cdf, "countyID").ok();
+                let sid_s = cast_to_i32(cdf, "stateID").ok();
+                match (cid_s, sid_s) {
+                    (Some(cs), Some(ss)) => {
+                        let cids = cs.i32().unwrap();
+                        let sids = ss.i32().unwrap();
+                        (0..cdf.height())
+                            .filter_map(|i| Some((cids.get(i)?, sids.get(i)?)))
+                            .collect()
+                    }
+                    _ => Default::default(),
+                }
             } else {
                 Default::default()
             };
         (0..df.height())
             .filter_map(|i| {
-                let link_id = link_id[i]? as u32;
-                let county_id = county_id[i]? as u32;
-                let zone_id = zone_id[i]? as u32;
-                let road_type_id = road_type_id[i]? as u32;
+                let link_id = link_ids.get(i)? as u32;
+                let county_id = county_ids.get(i)? as u32;
+                let zone_id = zone_ids.get(i)? as u32;
+                let road_type_id = road_type_ids.get(i)? as u32;
                 let state_id = *county_state.get(&(county_id as i32))? as u32;
                 Some(LinkRow {
                     state_id,
@@ -254,19 +258,21 @@ fn load_geography_from_store(store: &InMemoryStore) -> Result<GeographyTables> {
 
     let counties: Vec<CountyRow> = if let Some(arc_df) = store.get("county") {
         let df = &*arc_df;
-        let county_ids = col_as_i32(df, "countyID").ok();
-        let state_ids = col_as_i32(df, "stateID").ok();
-        match (county_ids, state_ids) {
-            (Some(cids), Some(sids)) => cids
-                .into_iter()
-                .zip(sids)
-                .filter_map(|(c, s)| {
-                    Some(CountyRow {
-                        state_id: s? as u32,
-                        county_id: c? as u32,
+        let cid_s = cast_to_i32(df, "countyID").ok();
+        let sid_s = cast_to_i32(df, "stateID").ok();
+        match (cid_s, sid_s) {
+            (Some(cs), Some(ss)) => {
+                let cids = cs.i32().unwrap();
+                let sids = ss.i32().unwrap();
+                (0..df.height())
+                    .filter_map(|i| {
+                        Some(CountyRow {
+                            state_id: sids.get(i)? as u32,
+                            county_id: cids.get(i)? as u32,
+                        })
                     })
-                })
-                .collect(),
+                    .collect()
+            }
             _ => Vec::new(),
         }
     } else {
