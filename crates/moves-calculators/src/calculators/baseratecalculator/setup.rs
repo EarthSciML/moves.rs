@@ -229,8 +229,8 @@ pub struct TemperatureAdjustmentRow {
     pub term_a: f64,
     /// Term `B`.
     pub term_b: f64,
-    /// Term `C`.
-    pub term_c: f64,
+    /// Term `C` — nullable in MOVES; `None` (SQL NULL) coalesces to `0.0`.
+    pub term_c: Option<f64>,
 }
 
 /// One `NOxHumidityAdjust` row, keyed by fuel type.
@@ -242,8 +242,8 @@ pub struct NoxHumidityAdjustRow {
     pub humidity_nox_eq: String,
     /// Term `A`.
     pub humidity_term_a: f64,
-    /// Term `B`.
-    pub humidity_term_b: f64,
+    /// Term `B` — nullable in MOVES; `None` (SQL NULL) coalesces to `0.0`.
+    pub humidity_term_b: Option<f64>,
     /// Lower bound on the humidity input.
     pub humidity_low_bound: f64,
     /// Upper bound on the humidity input.
@@ -320,8 +320,10 @@ pub struct EmissionRateAdjustmentRow {
     pub reg_class_id: i32,
     /// Fuel type id.
     pub fuel_type_id: i32,
-    /// Model year id.
-    pub model_year_id: i32,
+    /// First model year the row applies to (inclusive).
+    pub begin_model_year_id: i32,
+    /// Last model year the row applies to (inclusive).
+    pub end_model_year_id: i32,
     /// Emission rate adjustment factor.
     pub emission_rate_adjustment: f64,
 }
@@ -1423,7 +1425,7 @@ impl TableRow for TemperatureAdjustmentRow {
                 .into(),
                 Series::new(
                     "tempAdjustTermC".into(),
-                    rows.iter().map(|r| r.term_c).collect::<Vec<f64>>(),
+                    rows.iter().map(|r| r.term_c).collect::<Vec<Option<f64>>>(),
                 )
                 .into(),
             ],
@@ -1466,7 +1468,7 @@ impl TableRow for TemperatureAdjustmentRow {
                         .ok_or_else(|| null("maxModelYearID"))?,
                     term_a: term_a.get(i).ok_or_else(|| null("tempAdjustTermA"))?,
                     term_b: term_b.get(i).ok_or_else(|| null("tempAdjustTermB"))?,
-                    term_c: term_c.get(i).ok_or_else(|| null("tempAdjustTermC"))?,
+                    term_c: term_c.get(i), // nullable: SQL NULL coalesces to 0.0
                 })
             })
             .collect()
@@ -1512,7 +1514,9 @@ impl TableRow for NoxHumidityAdjustRow {
                 .into(),
                 Series::new(
                     "humidityTermB".into(),
-                    rows.iter().map(|r| r.humidity_term_b).collect::<Vec<f64>>(),
+                    rows.iter()
+                        .map(|r| r.humidity_term_b)
+                        .collect::<Vec<Option<f64>>>(),
                 )
                 .into(),
                 Series::new(
@@ -1578,9 +1582,7 @@ impl TableRow for NoxHumidityAdjustRow {
                     humidity_term_a: humidity_term_a
                         .get(i)
                         .ok_or_else(|| null("humidityTermA"))?,
-                    humidity_term_b: humidity_term_b
-                        .get(i)
-                        .ok_or_else(|| null("humidityTermB"))?,
+                    humidity_term_b: humidity_term_b.get(i), // nullable: None coalesces to 0.0
                     humidity_low_bound: humidity_low_bound
                         .get(i)
                         .ok_or_else(|| null("humidityLowBound"))?,
@@ -1911,7 +1913,8 @@ impl TableRow for EmissionRateAdjustmentRow {
             ("sourceTypeID".into(), DataType::Int32),
             ("regClassID".into(), DataType::Int32),
             ("fuelTypeID".into(), DataType::Int32),
-            ("modelYearID".into(), DataType::Int32),
+            ("beginModelYearID".into(), DataType::Int32),
+            ("endModelYearID".into(), DataType::Int32),
             ("emissionRateAdjustment".into(), DataType::Float64),
         ])
     }
@@ -1941,8 +1944,17 @@ impl TableRow for EmissionRateAdjustmentRow {
                 )
                 .into(),
                 Series::new(
-                    "modelYearID".into(),
-                    rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>(),
+                    "beginModelYearID".into(),
+                    rows.iter()
+                        .map(|r| r.begin_model_year_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "endModelYearID".into(),
+                    rows.iter()
+                        .map(|r| r.end_model_year_id)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -1973,7 +1985,8 @@ impl TableRow for EmissionRateAdjustmentRow {
         let source_type_id = get_i32("sourceTypeID")?;
         let reg_class_id = get_i32("regClassID")?;
         let fuel_type_id = get_i32("fuelTypeID")?;
-        let model_year_id = get_i32("modelYearID")?;
+        let begin_model_year_id = get_i32("beginModelYearID")?;
+        let end_model_year_id = get_i32("endModelYearID")?;
         let emission_rate_adjustment = get_f64("emissionRateAdjustment")?;
         (0..df.height())
             .map(|i| {
@@ -1983,7 +1996,12 @@ impl TableRow for EmissionRateAdjustmentRow {
                     source_type_id: source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))?,
                     reg_class_id: reg_class_id.get(i).ok_or_else(|| null("regClassID"))?,
                     fuel_type_id: fuel_type_id.get(i).ok_or_else(|| null("fuelTypeID"))?,
-                    model_year_id: model_year_id.get(i).ok_or_else(|| null("modelYearID"))?,
+                    begin_model_year_id: begin_model_year_id
+                        .get(i)
+                        .ok_or_else(|| null("beginModelYearID"))?,
+                    end_model_year_id: end_model_year_id
+                        .get(i)
+                        .ok_or_else(|| null("endModelYearID"))?,
                     emission_rate_adjustment: emission_rate_adjustment
                         .get(i)
                         .ok_or_else(|| null("emissionRateAdjustment"))?,
@@ -1998,12 +2016,17 @@ impl TableRow for EvEfficiencyRow {
         "EVEfficiency"
     }
     fn polars_schema() -> Schema {
+        // DB schema: polProcessID, sourceTypeID, regClassID, ageGroupID,
+        // beginModelYearID, endModelYearID, batteryEfficiency, chargingEfficiency.
+        // ageGroupID maps to fuel_type_id and beginModelYearID to model_year_id
+        // as a placeholder; the ev_efficiency flag defaults to false so the
+        // look-up is never applied in standard runs.
         Schema::from_iter([
             ("polProcessID".into(), DataType::Int32),
             ("sourceTypeID".into(), DataType::Int32),
             ("regClassID".into(), DataType::Int32),
-            ("fuelTypeID".into(), DataType::Int32),
-            ("modelYearID".into(), DataType::Int32),
+            ("ageGroupID".into(), DataType::Int32),
+            ("beginModelYearID".into(), DataType::Int32),
             ("batteryEfficiency".into(), DataType::Float64),
             ("chargingEfficiency".into(), DataType::Float64),
         ])
@@ -2029,12 +2052,12 @@ impl TableRow for EvEfficiencyRow {
                 )
                 .into(),
                 Series::new(
-                    "fuelTypeID".into(),
+                    "ageGroupID".into(),
                     rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
-                    "modelYearID".into(),
+                    "beginModelYearID".into(),
                     rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>(),
                 )
                 .into(),
@@ -2072,8 +2095,8 @@ impl TableRow for EvEfficiencyRow {
         let pol_process_id = get_i32("polProcessID")?;
         let source_type_id = get_i32("sourceTypeID")?;
         let reg_class_id = get_i32("regClassID")?;
-        let fuel_type_id = get_i32("fuelTypeID")?;
-        let model_year_id = get_i32("modelYearID")?;
+        let age_group_id = get_i32("ageGroupID")?; // stored as fuel_type_id placeholder
+        let begin_model_year_id = get_i32("beginModelYearID")?; // stored as model_year_id
         let battery_efficiency = get_f64("batteryEfficiency")?;
         let charging_efficiency = get_f64("chargingEfficiency")?;
         (0..df.height())
@@ -2083,8 +2106,10 @@ impl TableRow for EvEfficiencyRow {
                     pol_process_id: pol_process_id.get(i).ok_or_else(|| null("polProcessID"))?,
                     source_type_id: source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))?,
                     reg_class_id: reg_class_id.get(i).ok_or_else(|| null("regClassID"))?,
-                    fuel_type_id: fuel_type_id.get(i).ok_or_else(|| null("fuelTypeID"))?,
-                    model_year_id: model_year_id.get(i).ok_or_else(|| null("modelYearID"))?,
+                    fuel_type_id: age_group_id.get(i).ok_or_else(|| null("ageGroupID"))?,
+                    model_year_id: begin_model_year_id
+                        .get(i)
+                        .ok_or_else(|| null("beginModelYearID"))?,
                     battery_efficiency: battery_efficiency
                         .get(i)
                         .ok_or_else(|| null("batteryEfficiency"))?,
@@ -2802,7 +2827,7 @@ impl PreparedTables {
                     TemperatureAdjustmentDetail {
                         term_a: row.term_a,
                         term_b: row.term_b,
-                        term_c: row.term_c,
+                        term_c: row.term_c.unwrap_or(0.0),
                     },
                 );
             }
@@ -2814,7 +2839,7 @@ impl PreparedTables {
                 NoxHumidityAdjustDetail {
                     humidity_nox_eq: row.humidity_nox_eq.clone(),
                     humidity_term_a: row.humidity_term_a,
-                    humidity_term_b: row.humidity_term_b,
+                    humidity_term_b: row.humidity_term_b.unwrap_or(0.0),
                     humidity_low_bound: row.humidity_low_bound,
                     humidity_up_bound: row.humidity_up_bound,
                     humidity_units: row.humidity_units.clone(),
@@ -2897,16 +2922,18 @@ impl PreparedTables {
         }
 
         for row in &inputs.emission_rate_adjustment {
-            prepared.emission_rate_adjustment.insert(
-                PolProcSourceRegFuelMyKey {
-                    pol_process_id: row.pol_process_id,
-                    source_type_id: row.source_type_id,
-                    reg_class_id: row.reg_class_id,
-                    fuel_type_id: row.fuel_type_id,
-                    model_year_id: row.model_year_id,
-                },
-                row.emission_rate_adjustment,
-            );
+            for model_year_id in row.begin_model_year_id..=row.end_model_year_id {
+                prepared.emission_rate_adjustment.insert(
+                    PolProcSourceRegFuelMyKey {
+                        pol_process_id: row.pol_process_id,
+                        source_type_id: row.source_type_id,
+                        reg_class_id: row.reg_class_id,
+                        fuel_type_id: row.fuel_type_id,
+                        model_year_id,
+                    },
+                    row.emission_rate_adjustment,
+                );
+            }
         }
 
         for row in &inputs.ev_efficiency {
@@ -2988,7 +3015,7 @@ mod tests {
                 max_model_year_id: 1953,
                 term_a: 1.0,
                 term_b: 2.0,
-                term_c: 3.0,
+                term_c: Some(3.0),
             }],
             ..BaseRateCalculatorInputs::default()
         };

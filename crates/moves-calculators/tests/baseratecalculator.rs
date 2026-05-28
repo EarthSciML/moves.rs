@@ -403,7 +403,8 @@ fn emission_rate_adjustment_scales_mean_and_emission_rate() {
             source_type_id: 21,
             reg_class_id: 10,
             fuel_type_id: 1,
-            model_year_id: 2018,
+            begin_model_year_id: 2018,
+            end_model_year_id: 2018,
             emission_rate_adjustment: 0.5,
         }],
         ..BaseRateCalculatorInputs::default()
@@ -465,7 +466,7 @@ fn temperature_adjustment_applies_the_standard_quadratic_term() {
             max_model_year_id: 2018,
             term_a: 0.5,
             term_b: 0.0,
-            term_c: 0.0,
+            term_c: Some(0.0),
         }],
         ..BaseRateCalculatorInputs::default()
     };

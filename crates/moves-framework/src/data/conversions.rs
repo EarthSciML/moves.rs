@@ -233,6 +233,18 @@ pub trait DataFrameStoreTyped: DataFrameStore {
         R::from_dataframe(&df)
     }
 
+    /// Like [`iter_typed`], but returns an empty `Vec` if the table is not
+    /// present in the store instead of an error. Use for tables that the
+    /// MOVES execution DB may not create for all RunSpec configurations (e.g.
+    /// `ExtendedIdleEmissionRateFraction` for process 90, which is absent from
+    /// snapshots that don't include that process).
+    fn iter_typed_or_empty<R: TableRow>(&self, name: &str) -> Result<Vec<R>> {
+        if self.get(name).is_none() {
+            return Ok(Vec::new());
+        }
+        self.iter_typed(name)
+    }
+
     /// Return raw column arrays for `columns` from the table named `name`,
     /// with case-insensitive column lookup.
     ///

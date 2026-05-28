@@ -308,24 +308,28 @@ pub struct PollutantProcessAssocRow {
     pub process_id: i32,
 }
 
-/// One `oneCountyYearGeneralFuelRatio` row — the fuel-effect multiplier the
-/// SQL builds in `Section Extract Data` and applies to the worker output.
+/// One `generalFuelRatio` row — the fuel-effect multiplier written by the
+/// `FuelEffectsGenerator` and applied to the worker output. Uses the
+/// range-based schema from the generator and the default DB table (no
+/// per-month/year expansion).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GeneralFuelRatioRow {
     /// `fuelTypeID`.
     pub fuel_type_id: i32,
     /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `monthID`.
-    pub month_id: i32,
     /// `pollutantID`.
     pub pollutant_id: i32,
     /// `processID`.
     pub process_id: i32,
-    /// `modelYearID`.
-    pub model_year_id: i32,
-    /// `yearID`.
-    pub year_id: i32,
+    /// `minModelYearID` — inclusive lower bound of the applicable model years.
+    pub min_model_year_id: i32,
+    /// `maxModelYearID` — inclusive upper bound of the applicable model years.
+    pub max_model_year_id: i32,
+    /// `minAgeID` — inclusive lower bound of the applicable vehicle ages.
+    pub min_age_id: i32,
+    /// `maxAgeID` — inclusive upper bound of the applicable vehicle ages.
+    pub max_age_id: i32,
     /// `fuelEffectRatio` — the multiplier applied to `emissionQuant`.
     pub fuel_effect_ratio: f64,
 }
@@ -525,18 +529,6 @@ struct AdjustedKey {
     fuel_type_id: i32,
     model_year_id: i32,
     pol_process_id: i32,
-}
-
-/// Join key of the `oneCountyYearGeneralFuelRatio` fuel-effect lookup.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-struct GeneralFuelRatioKey {
-    fuel_type_id: i32,
-    source_type_id: i32,
-    month_id: i32,
-    pollutant_id: i32,
-    process_id: i32,
-    model_year_id: i32,
-    year_id: i32,
 }
 
 // ===========================================================================
@@ -944,25 +936,6 @@ fn to_worker_output(
         .iter()
         .map(|ppa| (ppa.pol_process_id, ppa))
         .collect();
-    let fuel_ratio_by: HashMap<GeneralFuelRatioKey, f64> = inputs
-        .general_fuel_ratio
-        .iter()
-        .map(|gfr| {
-            (
-                GeneralFuelRatioKey {
-                    fuel_type_id: gfr.fuel_type_id,
-                    source_type_id: gfr.source_type_id,
-                    month_id: gfr.month_id,
-                    pollutant_id: gfr.pollutant_id,
-                    process_id: gfr.process_id,
-                    model_year_id: gfr.model_year_id,
-                    year_id: gfr.year_id,
-                },
-                gfr.fuel_effect_ratio,
-            )
-        })
-        .collect();
-
     let mut out = Vec::new();
     for aer in adjusted {
         let Some(ppa) = ppa_by.get(&aer.pol_process_id) else {
@@ -985,16 +958,18 @@ fn to_worker_output(
             road_type_id: constants.road_type_id,
             emission_quant: aer.emission_quant,
         };
-        if let Some(&ratio) = fuel_ratio_by.get(&GeneralFuelRatioKey {
-            fuel_type_id: row.fuel_type_id,
-            source_type_id: row.source_type_id,
-            month_id: row.month_id,
-            pollutant_id: row.pollutant_id,
-            process_id: row.process_id,
-            model_year_id: row.model_year_id,
-            year_id: row.year_id,
+        let age = row.year_id - row.model_year_id;
+        if let Some(gfr) = inputs.general_fuel_ratio.iter().find(|gfr| {
+            gfr.fuel_type_id == row.fuel_type_id
+                && gfr.source_type_id == row.source_type_id
+                && gfr.pollutant_id == row.pollutant_id
+                && gfr.process_id == row.process_id
+                && gfr.min_model_year_id <= row.model_year_id
+                && gfr.max_model_year_id >= row.model_year_id
+                && gfr.min_age_id <= age
+                && gfr.max_age_id >= age
         }) {
-            row.emission_quant *= ratio;
+            row.emission_quant *= gfr.fuel_effect_ratio;
         }
         out.push(row);
     }
@@ -2050,11 +2025,12 @@ impl TableRow for GeneralFuelRatioRow {
         Schema::from_iter([
             ("fuelTypeID".into(), DataType::Int32),
             ("sourceTypeID".into(), DataType::Int32),
-            ("monthID".into(), DataType::Int32),
             ("pollutantID".into(), DataType::Int32),
             ("processID".into(), DataType::Int32),
-            ("modelYearID".into(), DataType::Int32),
-            ("yearID".into(), DataType::Int32),
+            ("minModelYearID".into(), DataType::Int32),
+            ("maxModelYearID".into(), DataType::Int32),
+            ("minAgeID".into(), DataType::Int32),
+            ("maxAgeID".into(), DataType::Int32),
             ("fuelEffectRatio".into(), DataType::Float64),
         ])
     }
@@ -2074,11 +2050,6 @@ impl TableRow for GeneralFuelRatioRow {
                 )
                 .into(),
                 Series::new(
-                    "monthID".into(),
-                    rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
-                )
-                .into(),
-                Series::new(
                     "pollutantID".into(),
                     rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>(),
                 )
@@ -2089,13 +2060,27 @@ impl TableRow for GeneralFuelRatioRow {
                 )
                 .into(),
                 Series::new(
-                    "modelYearID".into(),
-                    rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>(),
+                    "minModelYearID".into(),
+                    rows.iter()
+                        .map(|r| r.min_model_year_id)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
-                    "yearID".into(),
-                    rows.iter().map(|r| r.year_id).collect::<Vec<i32>>(),
+                    "maxModelYearID".into(),
+                    rows.iter()
+                        .map(|r| r.max_model_year_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "minAgeID".into(),
+                    rows.iter().map(|r| r.min_age_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "maxAgeID".into(),
+                    rows.iter().map(|r| r.max_age_id).collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -2124,11 +2109,12 @@ impl TableRow for GeneralFuelRatioRow {
         };
         let fuel_type_id = get_i32("fuelTypeID")?;
         let source_type_id = get_i32("sourceTypeID")?;
-        let month_id = get_i32("monthID")?;
         let pollutant_id = get_i32("pollutantID")?;
         let process_id = get_i32("processID")?;
-        let model_year_id = get_i32("modelYearID")?;
-        let year_id = get_i32("yearID")?;
+        let min_model_year_id = get_i32("minModelYearID")?;
+        let max_model_year_id = get_i32("maxModelYearID")?;
+        let min_age_id = get_i32("minAgeID")?;
+        let max_age_id = get_i32("maxAgeID")?;
         let fuel_effect_ratio = get_f64("fuelEffectRatio")?;
         (0..df.height())
             .map(|i| {
@@ -2136,11 +2122,16 @@ impl TableRow for GeneralFuelRatioRow {
                 Ok(GeneralFuelRatioRow {
                     fuel_type_id: fuel_type_id.get(i).ok_or_else(|| null("fuelTypeID"))?,
                     source_type_id: source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))?,
-                    month_id: month_id.get(i).ok_or_else(|| null("monthID"))?,
                     pollutant_id: pollutant_id.get(i).ok_or_else(|| null("pollutantID"))?,
                     process_id: process_id.get(i).ok_or_else(|| null("processID"))?,
-                    model_year_id: model_year_id.get(i).ok_or_else(|| null("modelYearID"))?,
-                    year_id: year_id.get(i).ok_or_else(|| null("yearID"))?,
+                    min_model_year_id: min_model_year_id
+                        .get(i)
+                        .ok_or_else(|| null("minModelYearID"))?,
+                    max_model_year_id: max_model_year_id
+                        .get(i)
+                        .ok_or_else(|| null("maxModelYearID"))?,
+                    min_age_id: min_age_id.get(i).ok_or_else(|| null("minAgeID"))?,
+                    max_age_id: max_age_id.get(i).ok_or_else(|| null("maxAgeID"))?,
                     fuel_effect_ratio: fuel_effect_ratio
                         .get(i)
                         .ok_or_else(|| null("fuelEffectRatio"))?,
@@ -2813,14 +2804,16 @@ mod tests {
     #[test]
     fn fuel_effect_ratio_scales_the_worker_output() {
         let (mut inputs, constants) = single_flow_inputs();
+        // single_flow_inputs: year=2020, model_year=2020, age=0, fuel=1, source=21
         inputs.general_fuel_ratio.push(GeneralFuelRatioRow {
             fuel_type_id: 1,
             source_type_id: 21,
-            month_id: 7,
             pollutant_id: i32::from(NON_EC_PM_POLLUTANT_ID),
             process_id: i32::from(START_EXHAUST_PROCESS_ID),
-            model_year_id: 2020,
-            year_id: 2020,
+            min_model_year_id: 1960,
+            max_model_year_id: 2060,
+            min_age_id: 0,
+            max_age_id: 30,
             fuel_effect_ratio: 1.5,
         });
         let out = BasicStartPmEmissionCalculator::run(&inputs, &constants);

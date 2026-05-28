@@ -323,26 +323,27 @@ pub struct MonthGroupRow {
 /// general fuel-effect multiplier the SQL's "Extract Data" section
 /// pre-aggregates.
 ///
-/// The seven id columns are the join key the SQL's `UPDATE` matches on; the
-/// pre-aggregated table is keyed by them, so each cell carries at most one
-/// ratio. Only the residue pollutant 120 carries fuel-effect rows, so only the
-/// residue is affected.
+/// Matches by `(fuelTypeID, sourceTypeID, pollutantID, processID)` plus
+/// model-year and age ranges. Only the residue pollutant 120 carries
+/// fuel-effect rows, so only the residue is affected.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GeneralFuelRatioRow {
     /// `fuelTypeID`.
     pub fuel_type_id: i32,
     /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `monthID`.
-    pub month_id: i32,
     /// `pollutantID` — always 120 (NonECNonSO4PM) in this extract.
     pub pollutant_id: i32,
     /// `processID`.
     pub process_id: i32,
-    /// `modelYearID`.
-    pub model_year_id: i32,
-    /// `yearID`.
-    pub year_id: i32,
+    /// `minModelYearID` — inclusive lower bound of the applicable model years.
+    pub min_model_year_id: i32,
+    /// `maxModelYearID` — inclusive upper bound of the applicable model years.
+    pub max_model_year_id: i32,
+    /// `minAgeID` — inclusive lower bound of the applicable vehicle ages.
+    pub min_age_id: i32,
+    /// `maxAgeID` — inclusive upper bound of the applicable vehicle ages.
+    pub max_age_id: i32,
     /// `fuelEffectRatio` — the multiplier applied to the residue emission.
     pub fuel_effect_ratio: f64,
 }
@@ -568,12 +569,6 @@ struct SulfateFractionCell {
 /// monthID, modelYearID)`.
 type SulfateFractionKey = (i32, i32, i32, i32, i32);
 
-/// The pre-aggregated general fuel-effect ratios indexed by the seven id
-/// columns the SQL's general-fuel-ratio `UPDATE` joins on — `(fuelTypeID,
-/// sourceTypeID, monthID, pollutantID, processID, modelYearID, yearID)` →
-/// `fuelEffectRatio`.
-type FuelEffectRatioIndex = HashMap<(i32, i32, i32, i32, i32, i32, i32), f64>;
-
 /// The MOVES PM2.5 speciation calculator.
 ///
 /// A zero-sized value type: it owns no per-run state, exactly as the
@@ -651,21 +646,21 @@ impl SulfatePMCalculator {
         // --- apply the general fuel-effect ratio ---------------------------
         // A multi-table UPDATE: only the residue (120) carries ratio rows, so
         // only the residue is rescaled; a row with no matching ratio is left
-        // unchanged.
-        let fuel_ratio = index_fuel_ratio(&inputs.general_fuel_ratio);
+        // unchanged. Match by exact ids and model-year/age ranges.
         for row in &mut spm_output {
-            let key = (
-                row.fuel_type_id,
-                row.source_type_id,
-                row.month_id,
-                row.pollutant_id,
-                row.process_id,
-                row.model_year_id,
-                row.year_id,
-            );
-            if let Some(&ratio) = fuel_ratio.get(&key) {
-                row.emission_quant *= ratio;
-                row.emission_rate *= ratio;
+            let age = row.year_id - row.model_year_id;
+            if let Some(gfr) = inputs.general_fuel_ratio.iter().find(|gfr| {
+                gfr.fuel_type_id == row.fuel_type_id
+                    && gfr.source_type_id == row.source_type_id
+                    && gfr.pollutant_id == row.pollutant_id
+                    && gfr.process_id == row.process_id
+                    && gfr.min_model_year_id <= row.model_year_id
+                    && gfr.max_model_year_id >= row.model_year_id
+                    && gfr.min_age_id <= age
+                    && gfr.max_age_id >= age
+            }) {
+                row.emission_quant *= gfr.fuel_effect_ratio;
+                row.emission_rate *= gfr.fuel_effect_ratio;
             }
         }
 
@@ -875,25 +870,6 @@ fn compute_sulfate_fractions(
 
 /// Index the pre-aggregated general fuel-effect ratios by the seven id columns
 /// the SQL's `UPDATE` joins on.
-fn index_fuel_ratio(rows: &[GeneralFuelRatioRow]) -> FuelEffectRatioIndex {
-    rows.iter()
-        .map(|g| {
-            (
-                (
-                    g.fuel_type_id,
-                    g.source_type_id,
-                    g.month_id,
-                    g.pollutant_id,
-                    g.process_id,
-                    g.model_year_id,
-                    g.year_id,
-                ),
-                g.fuel_effect_ratio,
-            )
-        })
-        .collect()
-}
-
 /// Index the crankcase split fractions by `(pollutantID, fuelTypeID,
 /// sourceTypeID, regClassID)` — the SQL's crankcase-split join key. The
 /// model-year window is left on each row; a cell may carry several rows (the
@@ -1651,11 +1627,12 @@ impl TableRow for GeneralFuelRatioRow {
         Schema::from_iter([
             ("fuelTypeID".into(), DataType::Int32),
             ("sourceTypeID".into(), DataType::Int32),
-            ("monthID".into(), DataType::Int32),
             ("pollutantID".into(), DataType::Int32),
             ("processID".into(), DataType::Int32),
-            ("modelYearID".into(), DataType::Int32),
-            ("yearID".into(), DataType::Int32),
+            ("minModelYearID".into(), DataType::Int32),
+            ("maxModelYearID".into(), DataType::Int32),
+            ("minAgeID".into(), DataType::Int32),
+            ("maxAgeID".into(), DataType::Int32),
             ("fuelEffectRatio".into(), DataType::Float64),
         ])
     }
@@ -1676,11 +1653,6 @@ impl TableRow for GeneralFuelRatioRow {
                 )
                 .into(),
                 Series::new(
-                    "monthID".into(),
-                    rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
-                )
-                .into(),
-                Series::new(
                     "pollutantID".into(),
                     rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>(),
                 )
@@ -1691,13 +1663,27 @@ impl TableRow for GeneralFuelRatioRow {
                 )
                 .into(),
                 Series::new(
-                    "modelYearID".into(),
-                    rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>(),
+                    "minModelYearID".into(),
+                    rows.iter()
+                        .map(|r| r.min_model_year_id)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
-                    "yearID".into(),
-                    rows.iter().map(|r| r.year_id).collect::<Vec<i32>>(),
+                    "maxModelYearID".into(),
+                    rows.iter()
+                        .map(|r| r.max_model_year_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "minAgeID".into(),
+                    rows.iter().map(|r| r.min_age_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "maxAgeID".into(),
+                    rows.iter().map(|r| r.max_age_id).collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -1721,11 +1707,12 @@ impl TableRow for GeneralFuelRatioRow {
         };
         let fuel_type = get_i32("fuelTypeID")?;
         let source_type = get_i32("sourceTypeID")?;
-        let month = get_i32("monthID")?;
         let pollutant = get_i32("pollutantID")?;
         let process = get_i32("processID")?;
-        let model_year = get_i32("modelYearID")?;
-        let year = get_i32("yearID")?;
+        let min_model_year = get_i32("minModelYearID")?;
+        let max_model_year = get_i32("maxModelYearID")?;
+        let min_age = get_i32("minAgeID")?;
+        let max_age = get_i32("maxAgeID")?;
         let ratio = df
             .column("fuelEffectRatio")
             .map_err(|e| row_err(t, 0, "fuelEffectRatio", e.to_string()))?
@@ -1737,11 +1724,16 @@ impl TableRow for GeneralFuelRatioRow {
                 Ok(GeneralFuelRatioRow {
                     fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
                     source_type_id: source_type.get(i).ok_or_else(|| null("sourceTypeID"))?,
-                    month_id: month.get(i).ok_or_else(|| null("monthID"))?,
                     pollutant_id: pollutant.get(i).ok_or_else(|| null("pollutantID"))?,
                     process_id: process.get(i).ok_or_else(|| null("processID"))?,
-                    model_year_id: model_year.get(i).ok_or_else(|| null("modelYearID"))?,
-                    year_id: year.get(i).ok_or_else(|| null("yearID"))?,
+                    min_model_year_id: min_model_year
+                        .get(i)
+                        .ok_or_else(|| null("minModelYearID"))?,
+                    max_model_year_id: max_model_year
+                        .get(i)
+                        .ok_or_else(|| null("maxModelYearID"))?,
+                    min_age_id: min_age.get(i).ok_or_else(|| null("minAgeID"))?,
+                    max_age_id: max_age.get(i).ok_or_else(|| null("maxAgeID"))?,
                     fuel_effect_ratio: ratio.get(i).ok_or_else(|| null("fuelEffectRatio"))?,
                 })
             })
@@ -2514,15 +2506,17 @@ mod tests {
         // A ratio of 2 for pollutant 120 doubles the residue: 120 → 1500, so
         // 118 re-sum = 240 + 60 + 1500 = 1800, 111 = 1500×0.3 = 450,
         // 124 = 1500×0.7 = 1050. Sulfate (115) and water (119) are untouched.
+        // base_row: year=2020, model_year=2018, age=2, fuel=2, source=21.
         let mut inputs = minimal_inputs();
         inputs.general_fuel_ratio = vec![GeneralFuelRatioRow {
             fuel_type_id: 2,
             source_type_id: 21,
-            month_id: 1,
             pollutant_id: NON_EC_NON_SO4_PM_POLLUTANT,
             process_id: 1,
-            model_year_id: 2018,
-            year_id: 2020,
+            min_model_year_id: 2000,
+            max_model_year_id: 2025,
+            min_age_id: 0,
+            max_age_id: 30,
             fuel_effect_ratio: 2.0,
         }];
         let rows = SulfatePMCalculator.calculate(&inputs);
@@ -2545,13 +2539,14 @@ mod tests {
         // apply — the SQL UPDATE leaves the unmatched row untouched.
         let mut inputs = minimal_inputs();
         inputs.general_fuel_ratio = vec![GeneralFuelRatioRow {
-            fuel_type_id: 99,
+            fuel_type_id: 99, // mismatches base_row fuel_type_id 2
             source_type_id: 21,
-            month_id: 1,
             pollutant_id: NON_EC_NON_SO4_PM_POLLUTANT,
             process_id: 1,
-            model_year_id: 2018,
-            year_id: 2020,
+            min_model_year_id: 2000,
+            max_model_year_id: 2025,
+            min_age_id: 0,
+            max_age_id: 30,
             fuel_effect_ratio: 2.0,
         }];
         let rows = SulfatePMCalculator.calculate(&inputs);

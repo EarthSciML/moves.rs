@@ -51,7 +51,7 @@ pub mod aggregate;
 pub mod model;
 pub mod setup;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::OnceLock;
 
 use moves_calculator_info::{Granularity, Priority};
@@ -100,6 +100,8 @@ static INPUT_TABLES: &[&str] = &[
     "FuelType",
     "FuelFormulation",
     "FuelSupply",
+    "FuelSubtype",
+    "MonthOfAnyYear",
 ];
 
 /// One flattened output record — a [`BlockKey`] paired with one fuel
@@ -612,10 +614,10 @@ impl Calculator for BaseRateCalculator {
             base_rate_by_age: tables.iter_typed("BaseRateByAge")?,
             base_rate: tables.iter_typed("BaseRate")?,
             extended_idle_emission_rate_fraction: tables
-                .iter_typed("ExtendedIdleEmissionRateFraction")?,
-            apu_emission_rate_fraction: tables.iter_typed("apuEmissionRateFraction")?,
+                .iter_typed_or_empty("ExtendedIdleEmissionRateFraction")?,
+            apu_emission_rate_fraction: tables.iter_typed_or_empty("apuEmissionRateFraction")?,
             shorepower_emission_rate_fraction: tables
-                .iter_typed("ShorepowerEmissionRateFraction")?,
+                .iter_typed_or_empty("ShorepowerEmissionRateFraction")?,
             zone_month_hour: tables.iter_typed("ZoneMonthHour")?,
             pollutant_process_mapped_model_year: tables
                 .iter_typed("PollutantProcessMappedModelYear")?,
@@ -626,13 +628,13 @@ impl Calculator for BaseRateCalculator {
             alt_criteria_ratio: tables.iter_typed("altCriteriaRatio")?,
             temperature_adjustment: tables.iter_typed("TemperatureAdjustment")?,
             nox_humidity_adjust: tables.iter_typed("NOxHumidityAdjust")?,
-            zone_ac_factor: tables.iter_typed("zoneACFactor")?,
+            zone_ac_factor: tables.iter_typed_or_empty("zoneACFactor")?,
             im_factor: tables.iter_typed("IMFactor")?,
             im_coverage: tables.iter_typed("IMCoverage")?,
             emission_rate_adjustment: tables.iter_typed("EmissionRateAdjustment")?,
             ev_efficiency: tables.iter_typed("EVEfficiency")?,
-            universal_activity: tables.iter_typed("universalActivity")?,
-            smfr_sbd_summary: tables.iter_typed("smfrSBDSummary")?,
+            universal_activity: tables.iter_typed_or_empty("universalActivity")?,
+            smfr_sbd_summary: tables.iter_typed_or_empty("smfrSBDSummary")?,
             age_category: tables.iter_typed("AgeCategory")?,
             fuel_types: tables
                 .iter_typed::<setup::FuelTypeRow>("FuelType")?
@@ -640,7 +642,7 @@ impl Calculator for BaseRateCalculator {
                 .map(|r| r.fuel_type_id)
                 .collect(),
             fuel_formulations: tables.iter_typed("FuelFormulation")?,
-            fuel_supply: tables.iter_typed("FuelSupply")?,
+            fuel_supply: build_fuel_supply(tables, &constants)?,
         };
         let output = BaseRateCalculator::run(&inputs, &constants, &ModuleFlags::default());
         let rows = output.rows();
@@ -653,6 +655,328 @@ impl Calculator for BaseRateCalculator {
 #[must_use]
 pub fn factory() -> Box<dyn Calculator> {
     Box::new(BaseRateCalculator)
+}
+
+// =============================================================================
+// FuelSupply join helpers — read the raw DB schema and join with FuelFormulation,
+// FuelSubtype, and MonthOfAnyYear to produce the FuelSupplyRow the calculator
+// expects. The Java extract step did this join; the snapshot stores the raw tables.
+// =============================================================================
+
+/// One raw `FuelSupply` row — the actual DB schema (no countyID, no monthID).
+struct RawFuelSupplyRow {
+    fuel_region_id: i32,
+    fuel_year_id: i32,
+    month_group_id: i32,
+    fuel_formulation_id: i32,
+    market_share: f64,
+}
+
+impl TableRow for RawFuelSupplyRow {
+    fn table_name() -> &'static str {
+        "FuelSupply"
+    }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("fuelRegionID".into(), DataType::Int32),
+            ("fuelYearID".into(), DataType::Int32),
+            ("monthGroupID".into(), DataType::Int32),
+            ("fuelFormulationID".into(), DataType::Int32),
+            ("marketShare".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "fuelRegionID".into(),
+                    rows.iter().map(|r| r.fuel_region_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelYearID".into(),
+                    rows.iter().map(|r| r.fuel_year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "monthGroupID".into(),
+                    rows.iter().map(|r| r.month_group_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelFormulationID".into(),
+                    rows.iter()
+                        .map(|r| r.fuel_formulation_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "marketShare".into(),
+                    rows.iter().map(|r| r.market_share).collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "FuelSupply";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| moves_framework::Error::RowExtraction {
+                    table: t.into(),
+                    row: 0,
+                    column: col.into(),
+                    message: e.to_string(),
+                })?
+                .i32()
+                .map_err(|e| moves_framework::Error::RowExtraction {
+                    table: t.into(),
+                    row: 0,
+                    column: col.into(),
+                    message: e.to_string(),
+                })
+        };
+        let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| moves_framework::Error::RowExtraction {
+                    table: t.into(),
+                    row: 0,
+                    column: col.into(),
+                    message: e.to_string(),
+                })?
+                .f64()
+                .map_err(|e| moves_framework::Error::RowExtraction {
+                    table: t.into(),
+                    row: 0,
+                    column: col.into(),
+                    message: e.to_string(),
+                })
+        };
+        let fuel_region_id = get_i32("fuelRegionID")?;
+        let fuel_year_id = get_i32("fuelYearID")?;
+        let month_group_id = get_i32("monthGroupID")?;
+        let fuel_formulation_id = get_i32("fuelFormulationID")?;
+        let market_share = get_f64("marketShare")?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| moves_framework::Error::RowExtraction {
+                    table: t.into(),
+                    row: i,
+                    column: col.into(),
+                    message: "null value".into(),
+                };
+                Ok(RawFuelSupplyRow {
+                    fuel_region_id: fuel_region_id.get(i).ok_or_else(|| null("fuelRegionID"))?,
+                    fuel_year_id: fuel_year_id.get(i).ok_or_else(|| null("fuelYearID"))?,
+                    month_group_id: month_group_id.get(i).ok_or_else(|| null("monthGroupID"))?,
+                    fuel_formulation_id: fuel_formulation_id
+                        .get(i)
+                        .ok_or_else(|| null("fuelFormulationID"))?,
+                    market_share: market_share.get(i).ok_or_else(|| null("marketShare"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+/// One `FuelSubtype` row — only the two columns needed for the join.
+struct LocalFuelSubtypeRow {
+    fuel_subtype_id: i32,
+    fuel_type_id: i32,
+}
+
+impl TableRow for LocalFuelSubtypeRow {
+    fn table_name() -> &'static str {
+        "FuelSubtype"
+    }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("fuelSubtypeID".into(), DataType::Int32),
+            ("fuelTypeID".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "fuelSubtypeID".into(),
+                    rows.iter().map(|r| r.fuel_subtype_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelTypeID".into(),
+                    rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "FuelSubtype";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| moves_framework::Error::RowExtraction {
+                    table: t.into(),
+                    row: 0,
+                    column: col.into(),
+                    message: e.to_string(),
+                })?
+                .i32()
+                .map_err(|e| moves_framework::Error::RowExtraction {
+                    table: t.into(),
+                    row: 0,
+                    column: col.into(),
+                    message: e.to_string(),
+                })
+        };
+        let fuel_subtype_id = get_i32("fuelSubtypeID")?;
+        let fuel_type_id = get_i32("fuelTypeID")?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| moves_framework::Error::RowExtraction {
+                    table: t.into(),
+                    row: i,
+                    column: col.into(),
+                    message: "null value".into(),
+                };
+                Ok(LocalFuelSubtypeRow {
+                    fuel_subtype_id: fuel_subtype_id
+                        .get(i)
+                        .ok_or_else(|| null("fuelSubtypeID"))?,
+                    fuel_type_id: fuel_type_id.get(i).ok_or_else(|| null("fuelTypeID"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+/// One `MonthOfAnyYear` row — `monthGroupID → monthID` mapping.
+struct LocalMonthGroupRow {
+    month_group_id: i32,
+    month_id: i32,
+}
+
+impl TableRow for LocalMonthGroupRow {
+    fn table_name() -> &'static str {
+        "MonthOfAnyYear"
+    }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("monthGroupID".into(), DataType::Int32),
+            ("monthID".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "monthGroupID".into(),
+                    rows.iter().map(|r| r.month_group_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "MonthOfAnyYear";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| moves_framework::Error::RowExtraction {
+                    table: t.into(),
+                    row: 0,
+                    column: col.into(),
+                    message: e.to_string(),
+                })?
+                .i32()
+                .map_err(|e| moves_framework::Error::RowExtraction {
+                    table: t.into(),
+                    row: 0,
+                    column: col.into(),
+                    message: e.to_string(),
+                })
+        };
+        let month_group_id = get_i32("monthGroupID")?;
+        let month_id = get_i32("monthID")?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| moves_framework::Error::RowExtraction {
+                    table: t.into(),
+                    row: i,
+                    column: col.into(),
+                    message: "null value".into(),
+                };
+                Ok(LocalMonthGroupRow {
+                    month_group_id: month_group_id.get(i).ok_or_else(|| null("monthGroupID"))?,
+                    month_id: month_id.get(i).ok_or_else(|| null("monthID"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+/// Build the `FuelSupplyRow` list by joining raw DB tables.
+///
+/// The Java extract step joined `FuelSupply` with `FuelFormulation`,
+/// `FuelSubtype`, county/region, and month mappings to produce a denormalized
+/// view with `countyID`, `yearID`, `monthID`, `fuelTypeID`, and
+/// `fuelSubTypeID`. This function reproduces that join from the snapshot tables.
+fn build_fuel_supply(
+    tables: &moves_framework::InMemoryStore,
+    constants: &RunConstants,
+) -> moves_framework::Result<Vec<setup::FuelSupplyRow>> {
+    use setup::FuelFormulationRow;
+    use setup::FuelSupplyRow;
+
+    let raw: Vec<RawFuelSupplyRow> = tables.iter_typed("FuelSupply")?;
+    let ff: Vec<FuelFormulationRow> = tables.iter_typed("FuelFormulation")?;
+    let fs: Vec<LocalFuelSubtypeRow> = tables.iter_typed_or_empty("FuelSubtype")?;
+    let mg: Vec<LocalMonthGroupRow> = tables.iter_typed_or_empty("MonthOfAnyYear")?;
+
+    let formulation_to_subtype: HashMap<i32, i32> = ff
+        .iter()
+        .map(|r| (r.fuel_formulation_id, r.fuel_sub_type_id))
+        .collect();
+    let subtype_to_type: HashMap<i32, i32> = fs
+        .iter()
+        .map(|r| (r.fuel_subtype_id, r.fuel_type_id))
+        .collect();
+    let group_to_month: HashMap<i32, i32> =
+        mg.iter().map(|r| (r.month_group_id, r.month_id)).collect();
+
+    let rows = raw
+        .iter()
+        .filter_map(|r| {
+            let fuel_sub_type_id = formulation_to_subtype
+                .get(&r.fuel_formulation_id)
+                .copied()?;
+            let fuel_type_id = subtype_to_type.get(&fuel_sub_type_id).copied()?;
+            let month_id = group_to_month
+                .get(&r.month_group_id)
+                .copied()
+                .unwrap_or(r.month_group_id);
+            Some(FuelSupplyRow {
+                county_id: constants.county_id,
+                year_id: r.fuel_year_id,
+                month_id,
+                fuel_type_id,
+                fuel_sub_type_id,
+                fuel_formulation_id: r.fuel_formulation_id,
+                market_share: r.market_share,
+            })
+        })
+        .collect();
+    Ok(rows)
 }
 
 #[cfg(test)]
@@ -726,7 +1050,7 @@ mod tests {
             ExecutionLocation, ExecutionTime, IterationPosition,
         };
         use moves_framework::{DataFrameStore, InMemoryStore};
-        use setup::{AgeCategoryRow, BaseRateRow, FuelFormulationRow, FuelSupplyRow, FuelTypeRow};
+        use setup::{AgeCategoryRow, BaseRateRow, FuelFormulationRow, FuelTypeRow};
         let base_rate_row = BaseRateRow {
             source_type_id: 21,
             road_type_id: 4,
@@ -749,12 +1073,11 @@ mod tests {
             op_mode_fraction: 1.0,
             op_mode_fraction_rate: 1.0,
         };
-        let fuel_supply = FuelSupplyRow {
-            county_id: 26_161,
-            year_id: 2020,
-            month_id: 7,
-            fuel_type_id: 1,
-            fuel_sub_type_id: 10,
+        // Raw DB schema for FuelSupply (joined in build_fuel_supply).
+        let raw_fuel_supply = RawFuelSupplyRow {
+            fuel_region_id: 270000000, // placeholder region
+            fuel_year_id: 2020,
+            month_group_id: 7,
             fuel_formulation_id: 100,
             market_share: 1.0,
         };
@@ -864,7 +1187,23 @@ mod tests {
         );
         store.insert(
             "FuelSupply",
-            FuelSupplyRow::into_dataframe(vec![fuel_supply]).unwrap(),
+            RawFuelSupplyRow::into_dataframe(vec![raw_fuel_supply]).unwrap(),
+        );
+        store.insert(
+            "FuelSubtype",
+            LocalFuelSubtypeRow::into_dataframe(vec![LocalFuelSubtypeRow {
+                fuel_subtype_id: 10,
+                fuel_type_id: 1,
+            }])
+            .unwrap(),
+        );
+        store.insert(
+            "MonthOfAnyYear",
+            LocalMonthGroupRow::into_dataframe(vec![LocalMonthGroupRow {
+                month_group_id: 7,
+                month_id: 7,
+            }])
+            .unwrap(),
         );
 
         let position = IterationPosition {
