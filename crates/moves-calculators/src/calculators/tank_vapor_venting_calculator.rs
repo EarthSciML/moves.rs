@@ -4878,7 +4878,7 @@ mod tests {
     ///   uhTVV  = cumTVV − 0.0 = 0.0019069977465899486 (no prior hour)
     ///   hTVV   = 1.0 × uhTVV  = 0.0019069977465899486 (CSIF frac=1.0)
     ///   wMBR   = 0.935510 × hTVV   = 0.0017840154619123626
-    ///   emit   = wMBR × 24.1821 × 1.0 = 0.04314124030151094
+    ///   emit   = wMBR × 24.1821 × 1.0 / 2.0 = 0.02157062015075547
     #[test]
     fn calculate_snapshot_golden_sourcetype21_modelyear2010_august_hour17() {
         let ctx = RunContext {
@@ -4941,6 +4941,10 @@ mod tests {
             fuel_type: vec![FuelTypeRow {
                 fuel_type_id: 1,
                 subject_to_evap_calculations: true,
+            }],
+            day_of_any_week: vec![DayOfAnyWeekRow {
+                day_id: 2,
+                no_of_real_days: 2.0,
             }],
             hour_day: vec![
                 HourDayRow {
@@ -5048,7 +5052,7 @@ mod tests {
         assert_eq!(r.fuel_type_id, 1);
         assert_eq!(r.model_year_id, 2010);
         assert_eq!(r.road_type_id, 4);
-        assert_quant(r.emission_quant, 0.043_141_240_301_510_94);
+        assert_quant(r.emission_quant, 0.021_570_620_150_755_47);
     }
 
     #[test]

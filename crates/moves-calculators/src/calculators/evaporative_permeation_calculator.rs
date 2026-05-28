@@ -4234,8 +4234,8 @@ mod tests {
     ///   PC-2b wTA          = 0.758539524… × 1.0             = 0.758539524…
     ///   PC-3  wFA          = 1.0 × 2.1383                   = 2.1383
     ///   PC-4  adjRate      = 0.009542202 × 2.1383           = 0.020404090…
-    ///   PC-5  adjQuant     = 0.020404090… × 24.1821         = 0.493413757…
-    ///   PC-6  emitQuant    = 0.758539524… × 0.493413757…    = 0.374273837…
+    ///   PC-5  adjQuant     = 0.020404090… × 24.1821 / 2.0   = 0.246706878…
+    ///   PC-6  emitQuant    = 0.758539524… × 0.246706878…    = 0.187136918…
     #[test]
     fn calculate_snapshot_golden_sourcetype21_modelyear2010_august_hourday72() {
         let ctx = RunContext {
@@ -4293,6 +4293,10 @@ mod tests {
                 fuel_my_group_id: 20_102_060,
                 fuel_adjustment: 2.1383,
                 fuel_adjustment_gpa: 2.1383,
+            }],
+            day_of_any_week: vec![DayOfAnyWeekRow {
+                day_id: 2,
+                no_of_real_days: 2.0,
             }],
             hour_day: vec![HourDayRow {
                 hour_day_id: 72,
@@ -4399,7 +4403,7 @@ mod tests {
         assert_eq!(r.reg_class_id, 20);
         assert_eq!(r.model_year_id, 2010);
         assert_eq!(r.fuel_type_id, 1);
-        assert_quant(r.emission_quant, 0.374_273_837_400_543_3);
+        assert_quant(r.emission_quant, 0.187_136_918_700_271_65);
     }
 
     #[test]

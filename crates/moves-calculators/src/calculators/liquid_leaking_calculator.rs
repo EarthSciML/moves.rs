@@ -3305,7 +3305,7 @@ mod tests {
     ///
     /// Hand-derived chain (LL-8 → LL-9, no I/M):
     ///   LL-8 wMBR        = 0.935510 × 0.048               = 0.04490448
-    ///   LL-9 emitQuant   = 0.04490448 × 24.1821 × 1.0     = 1.085884625808
+    ///   LL-9 emitQuant   = 0.04490448 × 24.1821 × 1.0 / 2.0 = 0.542942312904
     #[test]
     fn calculate_snapshot_golden_sourcetype21_modelyear2010_august_hourday72() {
         let inputs = LiquidLeakingInputs {
@@ -3386,6 +3386,10 @@ mod tests {
                 op_mode_id: 150,
                 op_mode_fraction: 1.0,
             }],
+            day_of_any_week: vec![DayOfAnyWeekRow {
+                day_id: 2,
+                no_of_real_days: 2.0,
+            }],
             hour_day: vec![HourDayRow {
                 hour_day_id: 72,
                 day_id: 2,
@@ -3414,7 +3418,7 @@ mod tests {
         assert_eq!(r.fuel_type_id, 1);
         assert_eq!(r.model_year_id, 2010);
         assert_eq!(r.road_type_id, 4);
-        assert_close(r.emission_quant, 1.085_884_625_808);
+        assert_close(r.emission_quant, 0.542_942_312_904);
     }
 
     #[test]
