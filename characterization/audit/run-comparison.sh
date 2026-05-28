@@ -158,8 +158,9 @@ for FIXTURE in "${FIXTURE_LIST[@]}"; do
     printf '[run-moves.rs] %s ...\n' "${FIXTURE_NAME}" >&2
     T0=$(now_ms)
     "${MOVES_BIN}" run \
-        --runspec "${FIXTURE_XML}" \
-        --output  "${MOVES_RS_OUT}"
+        --runspec  "${FIXTURE_XML}" \
+        --output   "${MOVES_RS_OUT}" \
+        --snapshot "${SNAPSHOT_DIR}"
     T1=$(now_ms)
     MOVES_RS_WALL=$(elapsed_s $((T1 - T0)))
     printf '[done-moves.rs] %s  wall=%s s\n' "${FIXTURE_NAME}" "${MOVES_RS_WALL}" >&2
