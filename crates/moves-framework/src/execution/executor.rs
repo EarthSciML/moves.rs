@@ -23,20 +23,23 @@
 //!   acquires a permit for the whole span in which it allocates and holds
 //!   its working set. With `N` permits, at most `N` chunk working sets are
 //!   ever live, which is what bounds peak memory.
-//! * [`BoundedExecutor`] — owns a [`rayon::ThreadPool`] sized by
-//!   `--max-parallel-chunks` and dispatches chunks onto it, each gated by
-//!   the semaphore. `N` chunks run concurrently; the rest queue.
+//! * [`BoundedExecutor`] — builds a [`rayon::ThreadPool`] per
+//!   [`execute`](BoundedExecutor::execute) call, sized to
+//!   `min(--max-parallel-chunks, chunks.len())`, and dispatches chunks onto
+//!   it, each gated by the semaphore. `N` chunks run concurrently; the rest
+//!   queue. Capping to `chunks.len()` avoids idle threads spinning in the
+//!   steal-loop when the chunk count is smaller than the hardware limit.
 //!
 //! # Why both a pool *and* a semaphore
 //!
-//! The `rayon::ThreadPool` is sized to the parallelism limit, so the pool
-//! alone already caps how many chunks *execute* at once. The [`Semaphore`]
-//! is not redundant: it is acquired immediately before a chunk allocates
-//! its working set and released only after that set is dropped, so the
-//! "at most `N` working sets resident" guarantee is tied to the data
+//! The `rayon::ThreadPool` is sized to the effective parallelism limit, so
+//! the pool alone already caps how many chunks *execute* at once. The
+//! [`Semaphore`] is not redundant: it is acquired immediately before a chunk
+//! allocates its working set and released only after that set is dropped, so
+//! the "at most `N` working sets resident" guarantee is tied to the data
 //! lifecycle rather than to pool-thread scheduling internals. It also keeps
 //! the bound correct if a caller later hands work to a larger shared pool.
-//! Both the pool and the semaphore are sized to the same limit.
+//! Both the pool and the semaphore are sized to the same effective limit.
 //!
 //! # Memory model, restated
 //!
@@ -315,12 +318,10 @@ fn resolve_parallelism(requested: usize) -> usize {
 /// [`execute`](Self::execute) calls, each with its own chunk set.
 #[derive(Debug)]
 pub struct BoundedExecutor {
-    /// Worker pool. Sized to [`limit`](Self::limit) threads.
-    /// Absent on `wasm32-unknown-unknown` — the global rayon pool is used there.
-    #[cfg(not(target_arch = "wasm32"))]
-    pool: rayon::ThreadPool,
-    /// Resolved parallelism limit — the pool's thread count and the
-    /// per-`execute` semaphore's permit count.
+    /// Resolved parallelism limit — the maximum number of chunks that may run
+    /// concurrently.  The per-`execute` pool is built lazily (capped to
+    /// `min(limit, chunks.len())` so idle threads never spin when the chunk
+    /// set is smaller than the hardware parallelism).
     limit: usize,
 }
 
@@ -334,24 +335,12 @@ impl BoundedExecutor {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::ThreadPool`] if `rayon` cannot build the pool —
-    /// for example when the OS refuses to spawn the worker threads.
+    /// Returns [`Error::ThreadPool`] if `rayon` cannot build the per-`execute`
+    /// pool — for example when the OS refuses to spawn the worker threads.
     /// Never fails on `wasm32` (no pool is created).
     pub fn new(max_parallel_chunks: usize) -> Result<Self> {
         let limit = resolve_parallelism(max_parallel_chunks);
-
-        #[cfg(not(target_arch = "wasm32"))]
-        let pool = rayon::ThreadPoolBuilder::new()
-            .num_threads(limit)
-            .thread_name(|index| format!("moves-chunk-{index}"))
-            .build()
-            .map_err(|err| Error::ThreadPool(err.to_string()))?;
-
-        Ok(Self {
-            #[cfg(not(target_arch = "wasm32"))]
-            pool,
-            limit,
-        })
+        Ok(Self { limit })
     }
 
     /// The resolved parallelism limit — the maximum number of chunks (and
@@ -400,10 +389,18 @@ impl BoundedExecutor {
     where
         F: Fn(&Chunk) -> Result<()> + Sync,
     {
-        let permits = Semaphore::new(self.limit);
+        // Cap the pool to chunks.len() so idle workers never spin in the
+        // steal-loop when the chunk set is smaller than the hardware limit.
+        let effective = self.limit.min(chunks.len());
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(effective)
+            .thread_name(|index| format!("moves-chunk-{index}"))
+            .build()
+            .map_err(|err| Error::ThreadPool(err.to_string()))?;
+        let permits = Semaphore::new(effective);
         let errors: Mutex<Vec<Error>> = Mutex::new(Vec::new());
 
-        self.pool.scope(|scope| {
+        pool.scope(|scope| {
             for chunk in chunks {
                 let permits = &permits;
                 let errors = &errors;
