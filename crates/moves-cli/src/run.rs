@@ -212,8 +212,10 @@ fn populate_sho_distances(store: &mut InMemoryStore) -> Result<()> {
         let hour_day_ids = to_i32_vec(find_col("hourDayID")?)?;
         let source_type_ids = to_i32_vec(find_col("sourceTypeID")?)?;
         let sho_vals: Vec<f64> = find_col("SHO")?
+            .cast(&DataType::Float64)
+            .map_err(|e| anyhow::anyhow!("SHO column: cast to f64 failed: {e}"))?
             .f64()
-            .map_err(|e| anyhow::anyhow!("SHO column is not f64: {e}"))?
+            .map_err(|e| anyhow::anyhow!("SHO column is not f64 after cast: {e}"))?
             .into_no_null_iter()
             .collect();
         let n = df.height();
@@ -506,6 +508,33 @@ mod tests {
     fn populate_sho_distances_noop_when_no_sho() {
         let mut store = InMemoryStore::new();
         populate_sho_distances(&mut store).expect("should be noop");
+    }
+
+    #[test]
+    fn populate_sho_distances_handles_str_sho_column() {
+        // Regression: snapshots from canonical MOVES sometimes serialize the
+        // SHO column as Utf8/String rather than Float64. Verify the cast path
+        // handles this without error and produces correct distances.
+        let mut store = make_sho_store();
+        {
+            let df = store.get_mut("SHO").unwrap();
+            let sho_as_str = df
+                .column("SHO")
+                .unwrap()
+                .cast(&polars::prelude::DataType::String)
+                .unwrap();
+            df.with_column(sho_as_str).unwrap();
+        }
+        populate_sho_distances(&mut store).expect("populate_sho_distances failed on str SHO");
+
+        let sho_df = store.get("SHO").expect("SHO table missing");
+        let dist = sho_df.column("distance").unwrap().f64().unwrap();
+        assert!(
+            (dist.get(0).unwrap() - 550.0).abs() < 1e-9,
+            "dist[0]={}",
+            dist.get(0).unwrap()
+        );
+        assert_eq!(dist.get(1).unwrap(), 0.0);
     }
 
     #[test]
