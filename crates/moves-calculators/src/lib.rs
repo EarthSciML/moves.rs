@@ -55,10 +55,12 @@ pub fn register_all(
     use calculators::criteria_start_calculator;
     use calculators::distance_calculator;
     use calculators::evaporative_permeation_calculator;
+    use calculators::hcspeciation;
     use calculators::liquid_leaking_calculator;
     use calculators::nh3;
     use calculators::nitrogen_oxide;
     use calculators::nrairtoxics;
+    use calculators::nrhcspeciation;
     use calculators::pm10;
     use calculators::pmexhaust;
     use calculators::refueling_loss_calculator;
@@ -99,6 +101,14 @@ pub fn register_all(
     registry.register_calculator(
         nitrogen_oxide::NO2Calculator::NAME,
         nitrogen_oxide::no2_factory,
+    )?;
+    registry.register_calculator(
+        hcspeciation::HcSpeciationCalculator::NAME,
+        hcspeciation::factory,
+    )?;
+    registry.register_calculator(
+        nrhcspeciation::NrHcSpeciationCalculator::NAME,
+        nrhcspeciation::factory,
     )?;
     registry.register_calculator(
         ch4n2o_running_start::Ch4N2oRunningStartCalculator::NAME,
