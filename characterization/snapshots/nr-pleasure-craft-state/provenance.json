@@ -1,11 +1,11 @@
 {
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "nr-pleasure-craft-state",
-  "sif_sha256": "70ea5b8378b278af50e8c44ab011066c59019faed8d141adf4ec6f2045f1e5fd",
-  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixture-image.lock",
-  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixtures/nr-pleasure-craft-state.xml",
-  "runspec_sha256": "31b1993e37ea0a25d406c845c1507c73637465cd162f6fe76cdf3e72000e4e4d",
-  "snapshot_aggregate_sha256": "a191beed48ae5b2d08ae25bbf76641b6852512216c2e288326a4339d894f8c5e",
+  "sif_sha256": "597f1f3e0aef5d23027589ee509207d13486d5c89056906bf323a889f0e02311",
+  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/mo-wwc.3/characterization/fixture-image.lock",
+  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/mo-wwc.3/characterization/fixtures/nr-pleasure-craft-state.xml",
+  "runspec_sha256": "9947307909288136d4ea824c524794809e8e69bbf1790ae31f624f6281e28771",
+  "snapshot_aggregate_sha256": "1b3536fc022b56e068c8ac24145165d970f0288885d938cf53318c47202fcc93",
   "output_database": "out_nr_pleasure_craft_state",
   "scale_input_database": null
 }
