@@ -1,11 +1,11 @@
 {
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "nr-railroad-support-nation",
-  "sif_sha256": "70ea5b8378b278af50e8c44ab011066c59019faed8d141adf4ec6f2045f1e5fd",
-  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixture-image.lock",
-  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixtures/nr-railroad-support-nation.xml",
-  "runspec_sha256": "9b9f27621ba88ce306126b813b3884299bb4b9ce9fbe0533d2e71306a9838dde",
-  "snapshot_aggregate_sha256": "7a78439ba3c898a34a3307c9a25f60cd35776d105656d35386162ed088e0457f",
+  "sif_sha256": "597f1f3e0aef5d23027589ee509207d13486d5c89056906bf323a889f0e02311",
+  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/mo-wwc.3/characterization/fixture-image.lock",
+  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/mo-wwc.3/characterization/fixtures/nr-railroad-support-nation.xml",
+  "runspec_sha256": "7592d266cba9a6ef2bdce28b06dd386f74d22f044e36bbce377dc9d3a3c9637f",
+  "snapshot_aggregate_sha256": "b55ca39d785bd7fd1e95e424719e47271ac89453024456e19c05e15264e98868",
   "output_database": "out_nr_railroad_support_nation",
   "scale_input_database": null
 }
