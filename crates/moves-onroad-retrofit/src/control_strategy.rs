@@ -34,7 +34,7 @@
 //! / `DataFrameStore`). The `modified_tables` declaration already signals the
 //! engine which table will be modified.
 
-use moves_framework::{CalculatorContext, InternalControlStrategy};
+use moves_framework::{InMemoryStore, InternalControlStrategy};
 
 use crate::model::RetrofitTable;
 
@@ -67,15 +67,16 @@ impl InternalControlStrategy for OnRoadRetrofitStrategy {
         &["emissionRateAdjustment"]
     }
 
-    fn pre_run(&self, _ctx: &CalculatorContext) -> std::result::Result<(), moves_framework::Error> {
-        // TODO(Task 50 / DataFrameStore): once `ExecutionTables` exposes a
-        // mutable write API, iterate over every (sourceType, modelYear,
-        // pollutant, process) combination present in the execution database,
-        // call `self.programs.combined_factor(...)` for the run's analysis
-        // year, and write the resulting adjustment factors into the
-        // `emissionRateAdjustment` table. The `modified_tables` declaration
-        // above already signals the engine to invalidate and reload that table
-        // after this hook returns.
+    fn pre_run(
+        &self,
+        _tables: &mut InMemoryStore,
+    ) -> std::result::Result<(), moves_framework::Error> {
+        // TODO: compute combined adjustment factors from `self.programs` and
+        // write them into `_tables` as `"emissionRateAdjustment"`. Requires
+        // iterating `(sourceType, modelYear, pollutant, process)` combinations
+        // present in the execution database and calling
+        // `self.programs.combined_factor(...)` for the run's analysis year.
+        // Deferred to a follow-on bead; `modified_tables` already signals the engine.
         Ok(())
     }
 }
@@ -84,6 +85,7 @@ impl InternalControlStrategy for OnRoadRetrofitStrategy {
 mod tests {
     use super::*;
     use crate::model::RetrofitRecord;
+    use moves_framework::InMemoryStore;
 
     #[allow(clippy::too_many_arguments)]
     fn make_record(
@@ -126,8 +128,8 @@ mod tests {
     #[test]
     fn pre_run_succeeds_with_empty_context() {
         let s = OnRoadRetrofitStrategy::new(RetrofitTable::new());
-        let ctx = CalculatorContext::new();
-        s.pre_run(&ctx).expect("pre_run must not fail");
+        let mut store = InMemoryStore::new();
+        s.pre_run(&mut store).expect("pre_run must not fail");
     }
 
     #[test]
@@ -136,8 +138,8 @@ mod tests {
             .into_iter()
             .collect();
         let s = OnRoadRetrofitStrategy::new(programs);
-        let ctx = CalculatorContext::new();
-        s.pre_run(&ctx).expect("pre_run must not fail");
+        let mut store = InMemoryStore::new();
+        s.pre_run(&mut store).expect("pre_run must not fail");
     }
 
     #[test]

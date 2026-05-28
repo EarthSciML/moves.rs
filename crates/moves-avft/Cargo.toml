@@ -21,6 +21,7 @@ clap = { workspace = true }
 csv = "1"
 moves-framework = { path = "../moves-framework" }
 parquet = { workspace = true }
+polars = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }

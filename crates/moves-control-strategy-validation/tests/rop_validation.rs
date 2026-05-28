@@ -5,7 +5,7 @@
 
 use std::path::Path;
 
-use moves_framework::{CalculatorContext, InternalControlStrategy};
+use moves_framework::{CalculatorContext, InMemoryStore, InternalControlStrategy};
 use moves_rate_of_progress::{
     csv_io as rop_csv,
     model::{RopKey, RopTable},
@@ -218,8 +218,9 @@ fn csv_round_trip_preserves_all_rows() {
 fn strategy_lifecycle_with_fixture_data() {
     let t = load_fixture();
     let strategy = RateOfProgressControlStrategy::new(t);
+    let mut store = InMemoryStore::new();
+    strategy.pre_run(&mut store).expect("pre_run must succeed");
     let ctx = CalculatorContext::new();
-    strategy.pre_run(&ctx).expect("pre_run must succeed");
     strategy.post_run(&ctx).expect("post_run must succeed");
 }
 
@@ -246,7 +247,7 @@ fn strategy_is_trait_object_safe_with_fixture() {
     let t = load_fixture();
     let strategy: Box<dyn InternalControlStrategy> =
         Box::new(RateOfProgressControlStrategy::new(t));
-    let ctx = CalculatorContext::new();
-    strategy.pre_run(&ctx).expect("pre_run ok");
+    let mut store = InMemoryStore::new();
+    strategy.pre_run(&mut store).expect("pre_run ok");
     assert_eq!(strategy.name(), "RateOfProgressControlStrategy");
 }

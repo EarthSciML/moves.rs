@@ -68,6 +68,7 @@ impl ControlStrategyRegistry {
 mod tests {
     use super::*;
     use crate::calculator::CalculatorContext;
+    use crate::data::InMemoryStore;
 
     #[derive(Debug)]
     struct AlphaStrategy;
@@ -120,8 +121,9 @@ mod tests {
         let mut r = ControlStrategyRegistry::new();
         r.register(|| Box::new(AlphaStrategy));
         let strategies = r.instantiate_all();
+        let mut store = InMemoryStore::new();
+        strategies[0].pre_run(&mut store).expect("pre_run ok");
         let ctx = CalculatorContext::new();
-        strategies[0].pre_run(&ctx).expect("pre_run ok");
         strategies[0].post_run(&ctx).expect("post_run ok");
     }
 }

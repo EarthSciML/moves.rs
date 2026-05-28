@@ -23,18 +23,15 @@
 //! [`input_tables`](crate::Calculator::input_tables) declarations against it
 //! to catch typos at startup.
 //!
-//! # Storage placeholders
+//! # Storage
 //!
-//! The actual DataFrame containers ([`ExecutionTables`], [`ScratchNamespace`])
-//! remain shape-only structs in this commit. Task 50 (`DataFrameStore`)
-//! lands the concrete Polars-backed storage; calculators committed to the
-//! [`crate::CalculatorContext::tables`] / [`crate::CalculatorContext::scratch`] accessor
-//! shape today will not have to rewrite when the data plane materialises.
-//!
-//! Fixing the *position* types ([`IterationPosition`], [`ExecutionLocation`],
-//! [`ExecutionTime`]) concretely means Phase 3 calculator authors can read
-//! the current county/zone/link/hour from `ctx.position()` immediately —
-//! none of those values depend on the deferred data plane.
+//! [`ExecutionTables`] and [`ScratchNamespace`] are both backed by
+//! [`crate::InMemoryStore`] and wired through [`crate::CalculatorContext`].
+//! Task 50 (`DataFrameStore`) landed the concrete Polars-backed storage;
+//! Phase 3 calculators read from `ctx.tables()` and write scratch via
+//! `ctx.scratch_mut()`. The position types ([`IterationPosition`],
+//! [`ExecutionLocation`], [`ExecutionTime`]) let calculators read the
+//! current county/zone/link/hour from `ctx.position()`.
 
 use moves_data::ProcessId;
 
@@ -255,8 +252,6 @@ impl IterationPosition {
 /// granularity reads the same table contents. Filtering happens at load time
 /// via [`ExecutionDatabaseSchema`] + RunSpec selections; calculators do not
 /// re-filter on every call.
-///
-/// Schema validation against [`ExecutionDatabaseSchema`] is deferred to T3.
 #[derive(Debug, Default)]
 pub struct ExecutionTables {
     /// Name-keyed DataFrame store for the slow (default-DB) tier.

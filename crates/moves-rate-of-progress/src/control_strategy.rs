@@ -34,7 +34,7 @@
 //! already signals the engine which tables will be modified, so the hook-up
 //! is a single `TODO` line once the data plane lands.
 
-use moves_framework::{CalculatorContext, InternalControlStrategy};
+use moves_framework::{InMemoryStore, InternalControlStrategy};
 
 use crate::model::RopTable;
 
@@ -77,13 +77,14 @@ impl InternalControlStrategy for RateOfProgressControlStrategy {
         &["ratepollutantprocessmodelyeargroup", "sourceTypeModelYear"]
     }
 
-    fn pre_run(&self, _ctx: &CalculatorContext) -> std::result::Result<(), moves_framework::Error> {
-        // TODO(Task 50 / DataFrameStore): iterate `self.table` and apply
-        // `record.emission_scale_factor()` to every matching row in the
-        // execution-DB emission-rate tables once `ExecutionTables` exposes a
-        // mutable write API. The `modified_tables` declaration above already
-        // signals the engine to invalidate and reload those tables after this
-        // hook returns.
+    fn pre_run(
+        &self,
+        _tables: &mut InMemoryStore,
+    ) -> std::result::Result<(), moves_framework::Error> {
+        // TODO: apply `self.table` reductions to the emission-rate tables in
+        // `_tables`. Requires reading the target rate tables, joining against
+        // `RopRecord` fields, and writing scaled rows back. Deferred to a
+        // follow-on bead; `modified_tables` already signals the engine.
         Ok(())
     }
 }
@@ -92,6 +93,7 @@ impl InternalControlStrategy for RateOfProgressControlStrategy {
 mod tests {
     use super::*;
     use crate::model::RopRecord;
+    use moves_framework::{CalculatorContext, InMemoryStore};
 
     fn small_table(records: &[(i32, i32, i32, i32, f64)]) -> RopTable {
         records
@@ -118,8 +120,8 @@ mod tests {
     #[test]
     fn pre_run_succeeds_with_empty_table() {
         let s = RateOfProgressControlStrategy::new(RopTable::new());
-        let ctx = CalculatorContext::new();
-        s.pre_run(&ctx).expect("pre_run must not fail");
+        let mut store = InMemoryStore::new();
+        s.pre_run(&mut store).expect("pre_run must not fail");
     }
 
     #[test]
@@ -130,8 +132,8 @@ mod tests {
             (1, 11, 20, 2018, 0.50),
         ]);
         let s = RateOfProgressControlStrategy::new(t);
-        let ctx = CalculatorContext::new();
-        s.pre_run(&ctx).expect("pre_run must not fail");
+        let mut store = InMemoryStore::new();
+        s.pre_run(&mut store).expect("pre_run must not fail");
     }
 
     #[test]

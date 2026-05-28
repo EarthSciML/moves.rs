@@ -6,7 +6,7 @@
 //! `moves_nonroad::emissions::retrofit::calculate_retrofit_reduction`; this
 //! strategy is the framework adapter that holds the records.
 
-use moves_framework::{CalculatorContext, InternalControlStrategy};
+use moves_framework::{CalculatorContext, InMemoryStore, InternalControlStrategy};
 use moves_nonroad::population::retrofit::RetrofitRecord;
 use moves_nonroad_retrofit::NonRoadRetrofitStrategy;
 
@@ -114,8 +114,8 @@ fn pre_run_succeeds_with_multiple_records() {
         make_record(4, "2270003010", "2ST", 0.2, 0.9),
     ];
     let strategy = NonRoadRetrofitStrategy::new(recs);
-    let ctx = CalculatorContext::new();
-    strategy.pre_run(&ctx).expect("pre_run must succeed");
+    let mut store = InMemoryStore::new();
+    strategy.pre_run(&mut store).expect("pre_run must succeed");
 }
 
 #[test]

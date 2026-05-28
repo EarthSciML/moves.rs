@@ -93,10 +93,9 @@ use crate::execution::execution_db::{IterationPosition, ScratchNamespace};
 /// callback and passes it by reference to [`Calculator::execute`] /
 /// [`Generator::execute`].
 ///
-/// The slow / scratch tiers are storage-shape placeholders today; Task 50
-/// (`DataFrameStore`) replaces their internals. The position triple is
-/// concrete: Phase 3 authors can read `ctx.position().location.county_id`,
-/// `ctx.position().time.hour`, etc. immediately.
+/// The slow and scratch tiers are backed by [`InMemoryStore`] (Task 50). Phase 3
+/// authors read `ctx.tables()`, write scratch via `ctx.scratch_mut()`, and
+/// read `ctx.position().location.county_id`, `ctx.position().time.hour`, etc.
 #[derive(Debug, Default)]
 pub struct CalculatorContext {
     /// Shared, read-only slow-tier tables loaded once per run by
@@ -209,7 +208,8 @@ impl CalculatorContext {
 ///
 /// Wraps an optional Polars [`DataFrame`]: calculators that produce activity
 /// output fill it with [`CalculatorOutput::with_dataframe`]; generators or
-/// calculators that write only to scratch return [`CalculatorOutput::empty`].
+/// calculators that write only to scratch (or produce no direct output)
+/// return [`CalculatorOutput::empty`].
 #[derive(Debug, Default)]
 pub struct CalculatorOutput {
     dataframe: Option<DataFrame>,

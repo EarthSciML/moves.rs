@@ -32,7 +32,7 @@
 //! (Task 50 / `DataFrameStore`). The `modified_tables` declaration already
 //! signals the engine which tables will be modified.
 
-use moves_framework::{CalculatorContext, InternalControlStrategy};
+use moves_framework::{InMemoryStore, InternalControlStrategy};
 use moves_nonroad::population::retrofit::RetrofitRecord;
 
 /// NonRoadRetrofit internal control strategy.
@@ -76,15 +76,12 @@ impl InternalControlStrategy for NonRoadRetrofitStrategy {
         &[]
     }
 
-    fn pre_run(&self, _ctx: &CalculatorContext) -> std::result::Result<(), moves_framework::Error> {
-        // TODO(Task 50 / DataFrameStore): once `ExecutionTables` exposes a
-        // mutable write API, pre-compute per-(SCC, HP, modelYear, techType)
-        // reduction fractions by calling
-        // `moves_nonroad::emissions::retrofit::calculate_retrofit_reduction`
-        // for each combination present in the execution database and caching
-        // the results for consumption by the geography loop. For now the
-        // records are stored on `self` and retrieved by the nonroad driver
-        // via `records()`.
+    fn pre_run(
+        &self,
+        _tables: &mut InMemoryStore,
+    ) -> std::result::Result<(), moves_framework::Error> {
+        // Retrofit records are accessed via `records()` by the nonroad
+        // geography loop directly — no execution-database write needed here.
         Ok(())
     }
 }
@@ -92,6 +89,7 @@ impl InternalControlStrategy for NonRoadRetrofitStrategy {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use moves_framework::InMemoryStore;
 
     fn make_record(id: i32) -> RetrofitRecord {
         RetrofitRecord {
@@ -127,15 +125,15 @@ mod tests {
     #[test]
     fn pre_run_succeeds_with_empty_records() {
         let s = NonRoadRetrofitStrategy::new(vec![]);
-        let ctx = CalculatorContext::new();
-        s.pre_run(&ctx).expect("pre_run must not fail");
+        let mut store = InMemoryStore::new();
+        s.pre_run(&mut store).expect("pre_run must not fail");
     }
 
     #[test]
     fn pre_run_succeeds_with_populated_records() {
         let s = NonRoadRetrofitStrategy::new(vec![make_record(1), make_record(2)]);
-        let ctx = CalculatorContext::new();
-        s.pre_run(&ctx).expect("pre_run must not fail");
+        let mut store = InMemoryStore::new();
+        s.pre_run(&mut store).expect("pre_run must not fail");
     }
 
     #[test]

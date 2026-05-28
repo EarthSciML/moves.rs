@@ -39,6 +39,7 @@ use moves_calculator_info::{Granularity, Priority};
 use moves_data::ProcessId;
 
 use crate::calculator::CalculatorContext;
+use crate::data::InMemoryStore;
 use crate::error::Error;
 
 /// One master-loop subscription declared by a control strategy.
@@ -123,12 +124,15 @@ pub trait InternalControlStrategy: Send + Sync + std::fmt::Debug {
     /// Called once before the master loop begins.
     ///
     /// Use this for global input-table transformations that apply for the
-    /// entire run — for example, the AVFT strategy applies fleet-composition
-    /// changes to the `AVFT` table here. The context position is at the
-    /// pre-iteration default (no process, no location, no time).
+    /// entire run — for example, the AVFT strategy writes its completed
+    /// fleet-composition table into `tables` as `"AVFT"` here so downstream
+    /// calculators see the user-specified fractions instead of the defaults.
+    ///
+    /// `tables` is the mutable slow-tier execution database. Write to it via
+    /// [`InMemoryStore::insert`] or the [`crate::DataFrameStoreTyped`] helpers.
     ///
     /// Default: no-op.
-    fn pre_run(&self, _ctx: &CalculatorContext) -> Result<(), Error> {
+    fn pre_run(&self, _tables: &mut InMemoryStore) -> Result<(), Error> {
         Ok(())
     }
 
@@ -173,8 +177,9 @@ mod tests {
         assert_eq!(s.name(), "NoOpStrategy");
         assert!(s.subscriptions().is_empty());
         assert!(s.modified_tables().is_empty());
+        let mut store = InMemoryStore::new();
+        s.pre_run(&mut store).expect("pre_run ok");
         let ctx = CalculatorContext::new();
-        s.pre_run(&ctx).expect("pre_run ok");
         s.execute(&ctx).expect("execute ok");
         s.post_run(&ctx).expect("post_run ok");
     }

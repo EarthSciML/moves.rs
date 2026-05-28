@@ -459,7 +459,7 @@ impl MOVESEngine {
     /// * [`crate::Error::Io`] / [`crate::Error::Arrow`] /
     ///   [`crate::Error::Parquet`] — writing `MOVESRun.parquet` failed.
     /// * Any error a calculator's `execute` surfaces during the run.
-    pub fn run(&self) -> Result<EngineOutcome> {
+    pub fn run(&mut self) -> Result<EngineOutcome> {
         let t_start = Instant::now();
 
         let t_plan_start = Instant::now();
@@ -486,9 +486,8 @@ impl MOVESEngine {
             .collect();
         let strategies_applied: Vec<String> =
             strategies.iter().map(|s| s.name().to_string()).collect();
-        let pre_run_ctx = CalculatorContext::new();
         for s in &strategies {
-            s.pre_run(&pre_run_ctx)?;
+            s.pre_run(Arc::make_mut(&mut self.slow_store))?;
         }
 
         // Pre-build the run record — it depends only on the immutable RunSpec
@@ -915,6 +914,7 @@ mod tests {
     use crate::control_strategy::{
         ControlStrategyRegistry, InternalControlStrategy, StrategySubscription,
     };
+    use crate::data::InMemoryStore;
     use moves_calculator_info::{build_dag, parse_calculator_info_str, Granularity, Priority};
     use moves_runspec::model::{ModelScale, PollutantProcessAssociation, Timespan};
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -1125,7 +1125,8 @@ mod tests {
     #[test]
     fn run_writes_the_moves_run_metadata_file() {
         let dir = tempdir().unwrap();
-        let engine = MOVESEngine::new(sample_runspec(), single_calc_registry(), config(dir.path()));
+        let mut engine =
+            MOVESEngine::new(sample_runspec(), single_calc_registry(), config(dir.path()));
         let outcome = engine.run().unwrap();
         assert_eq!(outcome.run_record_path, dir.path().join("MOVESRun.parquet"));
         assert!(outcome.run_record_path.is_file());
@@ -1135,7 +1136,8 @@ mod tests {
     #[test]
     fn run_marks_every_module_unimplemented_without_factories() {
         let dir = tempdir().unwrap();
-        let engine = MOVESEngine::new(sample_runspec(), single_calc_registry(), config(dir.path()));
+        let mut engine =
+            MOVESEngine::new(sample_runspec(), single_calc_registry(), config(dir.path()));
         let outcome = engine.run().unwrap();
         assert_eq!(
             outcome.modules_planned,
@@ -1158,7 +1160,7 @@ mod tests {
         registry
             .register_calculator("BaseRateCalculator", partition_factory)
             .unwrap();
-        let engine = MOVESEngine::new(sample_runspec(), registry, config(dir.path()));
+        let mut engine = MOVESEngine::new(sample_runspec(), registry, config(dir.path()));
         let outcome = engine.run().unwrap();
         assert_eq!(
             outcome.modules_executed,
@@ -1178,7 +1180,7 @@ mod tests {
         registry
             .register_calculator("BaseRateCalculator", base_rate_factory)
             .unwrap();
-        let engine = MOVESEngine::new(sample_runspec(), registry, config(dir.path()));
+        let mut engine = MOVESEngine::new(sample_runspec(), registry, config(dir.path()));
         engine.run().unwrap();
         // One iteration × one process × one PROCESS-granularity subscription.
         assert_eq!(ENGINE_RUN_CALC.load(Ordering::SeqCst), 1);
@@ -1189,11 +1191,11 @@ mod tests {
         let dir = tempdir().unwrap();
         let mut cfg = config(dir.path());
         cfg.max_parallel_chunks = 3;
-        let engine = MOVESEngine::new(sample_runspec(), single_calc_registry(), cfg);
+        let mut engine = MOVESEngine::new(sample_runspec(), single_calc_registry(), cfg);
         assert_eq!(engine.run().unwrap().max_parallel_chunks, 3);
 
         let dir2 = tempdir().unwrap();
-        let engine2 = MOVESEngine::new(
+        let mut engine2 = MOVESEngine::new(
             sample_runspec(),
             single_calc_registry(),
             config(dir2.path()),
@@ -1209,7 +1211,7 @@ mod tests {
         let mut spec = sample_runspec();
         spec.uncertainty.enabled = true;
         spec.uncertainty.simulations = 4;
-        let engine = MOVESEngine::new(spec, single_calc_registry(), config(dir.path()));
+        let mut engine = MOVESEngine::new(spec, single_calc_registry(), config(dir.path()));
         assert_eq!(engine.run().unwrap().iterations, 4);
     }
 
@@ -1393,7 +1395,8 @@ mod tests {
     #[test]
     fn run_with_no_strategies_reports_empty_strategies_applied() {
         let dir = tempdir().unwrap();
-        let engine = MOVESEngine::new(sample_runspec(), single_calc_registry(), config(dir.path()));
+        let mut engine =
+            MOVESEngine::new(sample_runspec(), single_calc_registry(), config(dir.path()));
         let outcome = engine.run().unwrap();
         assert!(outcome.strategies_applied.is_empty());
     }
@@ -1403,8 +1406,9 @@ mod tests {
         let dir = tempdir().unwrap();
         let mut sr = ControlStrategyRegistry::new();
         sr.register(named_strategy_factory);
-        let engine = MOVESEngine::new(sample_runspec(), single_calc_registry(), config(dir.path()))
-            .with_strategy_registry(sr);
+        let mut engine =
+            MOVESEngine::new(sample_runspec(), single_calc_registry(), config(dir.path()))
+                .with_strategy_registry(sr);
         let outcome = engine.run().unwrap();
         assert_eq!(outcome.strategies_applied, vec!["NamedStrategy"]);
     }
@@ -1419,7 +1423,7 @@ mod tests {
         fn name(&self) -> &'static str {
             "LifecycleStrategy"
         }
-        fn pre_run(&self, _ctx: &CalculatorContext) -> Result<()> {
+        fn pre_run(&self, _tables: &mut InMemoryStore) -> Result<()> {
             LIFECYCLE_PRE.fetch_add(1, Ordering::SeqCst);
             Ok(())
         }
@@ -1439,8 +1443,9 @@ mod tests {
         let dir = tempdir().unwrap();
         let mut sr = ControlStrategyRegistry::new();
         sr.register(lifecycle_strategy_factory);
-        let engine = MOVESEngine::new(sample_runspec(), single_calc_registry(), config(dir.path()))
-            .with_strategy_registry(sr);
+        let mut engine =
+            MOVESEngine::new(sample_runspec(), single_calc_registry(), config(dir.path()))
+                .with_strategy_registry(sr);
         engine.run().unwrap();
         assert_eq!(LIFECYCLE_PRE.load(Ordering::SeqCst), 1);
         assert_eq!(LIFECYCLE_POST.load(Ordering::SeqCst), 1);
@@ -1483,8 +1488,9 @@ mod tests {
         // sample_runspec selects one process (Running Exhaust, id 1). The
         // single_calc_registry produces one chunk, so ExecCountStrategy.execute
         // fires once: one process × one chunk.
-        let engine = MOVESEngine::new(sample_runspec(), single_calc_registry(), config(dir.path()))
-            .with_strategy_registry(sr);
+        let mut engine =
+            MOVESEngine::new(sample_runspec(), single_calc_registry(), config(dir.path()))
+                .with_strategy_registry(sr);
         engine.run().unwrap();
         assert_eq!(EXEC_COUNT.load(Ordering::SeqCst), 1);
     }
@@ -1692,7 +1698,7 @@ mod tests {
         registry
             .register_calculator("VisibleChecker", visible_checker_factory)
             .unwrap();
-        let engine = MOVESEngine::new(sample_runspec(), registry, config(dir.path()));
+        let mut engine = MOVESEngine::new(sample_runspec(), registry, config(dir.path()));
         engine.run().unwrap();
         assert!(
             VISIBLE_FOUND.load(Ordering::SeqCst),
@@ -1732,7 +1738,7 @@ mod tests {
         registry
             .register_calculator("RoundtripChecker", roundtrip_checker_factory)
             .unwrap();
-        let engine = MOVESEngine::new(sample_runspec(), registry, config(dir.path()));
+        let mut engine = MOVESEngine::new(sample_runspec(), registry, config(dir.path()));
         engine.run().unwrap();
         assert!(
             ROUNDTRIP_FOUND.load(Ordering::SeqCst),
@@ -1798,7 +1804,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let mut cfg = config(dir.path());
         cfg.max_parallel_chunks = 1;
-        let engine = MOVESEngine::new(sample_runspec(), iso_registry(), cfg);
+        let mut engine = MOVESEngine::new(sample_runspec(), iso_registry(), cfg);
         engine.run().unwrap();
         assert!(
             !ISO_A_SAW_B.load(Ordering::SeqCst),
@@ -1866,7 +1872,7 @@ mod tests {
             .unwrap();
         reg.register_calculator("ConcCheckerB", conc_checker_b_factory)
             .unwrap();
-        let engine = MOVESEngine::new(sample_runspec(), reg, cfg);
+        let mut engine = MOVESEngine::new(sample_runspec(), reg, cfg);
         engine.run().unwrap();
         assert!(
             !CONC_A_SAW_B.load(Ordering::SeqCst),
@@ -1952,7 +1958,7 @@ mod tests {
         registry
             .register_calculator("EmittingCalc", emitting_calc_factory)
             .unwrap();
-        let engine = MOVESEngine::new(sample_runspec(), registry, config(dir.path()));
+        let mut engine = MOVESEngine::new(sample_runspec(), registry, config(dir.path()));
         engine.run().unwrap();
 
         // The calculator fired once (one process × one PROCESS-granularity sub).

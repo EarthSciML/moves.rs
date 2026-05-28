@@ -24,20 +24,132 @@
 //!   [`crate::parquet_io::read_parquet`]). Use this when the AVFT CLI has
 //!   been run separately and its Parquet output is available.
 //!
-//! # Data-plane status (Task 50)
+//! # Data plane
 //!
-//! The actual write of the completed table into the execution database is
-//! deferred until `moves-framework`'s `ExecutionTables` gains a mutable
-//! write API (Task 50 / `DataFrameStore`). The `modified_tables` declaration
-//! already signals the engine which table will be replaced, so the hook-up
-//! is a single `TODO` line once the data plane lands.
+//! [`pre_run`](AvftControlStrategy::pre_run) serialises the completed table
+//! via [`TableRow`] and inserts it into the slow-tier
+//! [`moves_framework::InMemoryStore`] under `"AVFT"`. All downstream
+//! calculators that read from `ctx.tables()` will see the user-specified
+//! fractions for the entire run.
 
-use moves_framework::{CalculatorContext, InternalControlStrategy};
+use moves_framework::{
+    DataFrameStore, InMemoryStore, InternalControlStrategy, IntoDataFrame, TableRow,
+};
+use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
 
 use crate::error::Result;
-use crate::model::AvftTable;
+use crate::model::{AvftRecord, AvftTable};
 use crate::spec::ToolSpec;
 use crate::tool::{run as run_tool, ToolInputs};
+
+impl TableRow for AvftRecord {
+    fn table_name() -> &'static str {
+        "AVFT"
+    }
+
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("sourceTypeID".into(), DataType::Int32),
+            ("modelYearID".into(), DataType::Int32),
+            ("fuelTypeID".into(), DataType::Int32),
+            ("engTechID".into(), DataType::Int32),
+            ("fuelEngFraction".into(), DataType::Float64),
+        ])
+    }
+
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "modelYearID".into(),
+                    rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelTypeID".into(),
+                    rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "engTechID".into(),
+                    rows.iter().map(|r| r.eng_tech_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelEngFraction".into(),
+                    rows.iter()
+                        .map(|r| r.fuel_eng_fraction)
+                        .collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| moves_framework::Error::RowExtraction {
+                    table: "AVFT".into(),
+                    row: 0,
+                    column: col.into(),
+                    message: e.to_string(),
+                })?
+                .i32()
+                .map_err(|e| moves_framework::Error::RowExtraction {
+                    table: "AVFT".into(),
+                    row: 0,
+                    column: col.into(),
+                    message: e.to_string(),
+                })
+        };
+        let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| moves_framework::Error::RowExtraction {
+                    table: "AVFT".into(),
+                    row: 0,
+                    column: col.into(),
+                    message: e.to_string(),
+                })?
+                .f64()
+                .map_err(|e| moves_framework::Error::RowExtraction {
+                    table: "AVFT".into(),
+                    row: 0,
+                    column: col.into(),
+                    message: e.to_string(),
+                })
+        };
+        let src_type = get_i32("sourceTypeID")?;
+        let model_year = get_i32("modelYearID")?;
+        let fuel_type = get_i32("fuelTypeID")?;
+        let eng_tech = get_i32("engTechID")?;
+        let fraction = get_f64("fuelEngFraction")?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| moves_framework::Error::RowExtraction {
+                    table: "AVFT".into(),
+                    row: i,
+                    column: col.into(),
+                    message: "null value".into(),
+                };
+                Ok(AvftRecord::new(
+                    src_type.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                    model_year.get(i).ok_or_else(|| null("modelYearID"))?,
+                    fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
+                    eng_tech.get(i).ok_or_else(|| null("engTechID"))?,
+                    fraction.get(i).ok_or_else(|| null("fuelEngFraction"))?,
+                ))
+            })
+            .collect()
+    }
+}
 
 /// AVFT (Alternative Vehicle Fuel Technology) internal control strategy.
 ///
@@ -107,12 +219,15 @@ impl InternalControlStrategy for AvftControlStrategy {
         &["AVFT"]
     }
 
-    fn pre_run(&self, _ctx: &CalculatorContext) -> std::result::Result<(), moves_framework::Error> {
-        // TODO(Task 50 / DataFrameStore): write `self.completed` into the
-        // execution database as the `AVFT` table once `ExecutionTables`
-        // exposes a mutable write API. The `modified_tables` declaration
-        // above already signals the engine to invalidate and reload `AVFT`
-        // after this hook returns.
+    fn pre_run(
+        &self,
+        tables: &mut InMemoryStore,
+    ) -> std::result::Result<(), moves_framework::Error> {
+        let rows = self.completed.to_vec();
+        let df = rows
+            .into_dataframe()
+            .map_err(|e| moves_framework::Error::Polars(e.to_string()))?;
+        tables.insert("AVFT", df);
         Ok(())
     }
 }
@@ -122,6 +237,7 @@ mod tests {
     use super::*;
     use crate::model::AvftRecord;
     use crate::spec::{GapFillingMethod, MethodEntry, ProjectionMethod, ToolSpec};
+    use moves_framework::{DataFrameStore, InMemoryStore};
 
     fn small_table(records: &[(i32, i32, i32, i32, f64)]) -> AvftTable {
         records
@@ -170,10 +286,28 @@ mod tests {
     }
 
     #[test]
-    fn pre_run_succeeds_with_empty_context() {
+    fn pre_run_writes_avft_table_into_store() {
+        let table = small_table(&[(11, 2020, 1, 1, 0.6), (11, 2020, 2, 1, 0.4)]);
+        let strategy = AvftControlStrategy::from_completed(table);
+        let mut store = InMemoryStore::new();
+        strategy.pre_run(&mut store).expect("pre_run must not fail");
+        let df = store
+            .get("AVFT")
+            .expect("AVFT must be present after pre_run");
+        assert_eq!(df.height(), 2, "AVFT must have 2 rows");
+    }
+
+    #[test]
+    fn pre_run_succeeds_with_empty_table() {
         let strategy = AvftControlStrategy::from_completed(AvftTable::new());
-        let ctx = CalculatorContext::new();
-        strategy.pre_run(&ctx).expect("pre_run must not fail");
+        let mut store = InMemoryStore::new();
+        strategy
+            .pre_run(&mut store)
+            .expect("pre_run must not fail with empty table");
+        let df = store
+            .get("AVFT")
+            .expect("AVFT must be present even when empty");
+        assert_eq!(df.height(), 0);
     }
 
     #[test]

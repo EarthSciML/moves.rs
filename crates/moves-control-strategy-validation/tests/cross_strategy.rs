@@ -24,7 +24,9 @@
 //! All four strategies can be registered simultaneously without conflict.
 
 use moves_avft::{model::AvftTable, AvftControlStrategy};
-use moves_framework::{CalculatorContext, ControlStrategyRegistry, InternalControlStrategy};
+use moves_framework::{
+    CalculatorContext, ControlStrategyRegistry, InMemoryStore, InternalControlStrategy,
+};
 use moves_nonroad::population::retrofit::RetrofitRecord as NonRoadRecord;
 use moves_nonroad_retrofit::NonRoadRetrofitStrategy;
 use moves_onroad_retrofit::{OnRoadRetrofitStrategy, RetrofitRecord, RetrofitTable};
@@ -79,9 +81,9 @@ fn registry_runs_pre_run_for_all_strategies() {
     registry.register(nonroad_retrofit_factory);
 
     let strategies = registry.instantiate_all();
-    let ctx = CalculatorContext::new();
+    let mut store = InMemoryStore::new();
     for s in &strategies {
-        s.pre_run(&ctx)
+        s.pre_run(&mut store)
             .unwrap_or_else(|e| panic!("{} pre_run failed: {e}", s.name()));
     }
 }
@@ -339,11 +341,12 @@ fn full_lifecycle_four_strategies_active_simultaneously() {
         Box::new(NonRoadRetrofitStrategy::new(nonroad_recs)),
     ];
 
-    let ctx = CalculatorContext::new();
+    let mut store = InMemoryStore::new();
     for s in &strategies {
-        s.pre_run(&ctx)
+        s.pre_run(&mut store)
             .unwrap_or_else(|e| panic!("{} pre_run failed: {e}", s.name()));
     }
+    let ctx = CalculatorContext::new();
     for s in &strategies {
         s.post_run(&ctx)
             .unwrap_or_else(|e| panic!("{} post_run failed: {e}", s.name()));

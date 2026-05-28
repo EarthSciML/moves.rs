@@ -78,18 +78,13 @@
 //! integer/integer literal divisions in the SQL, so the MariaDB
 //! `div_precision_increment` rounding gotcha does not arise.
 //!
-//! # Data plane (Task 50)
+//! # Data plane
 //!
-//! [`Calculator::execute`] receives a [`CalculatorContext`] whose
-//! `ExecutionTables` / `ScratchNamespace` are Phase 2 placeholders until the
-//! `DataFrameStore` lands (migration-plan Task 50), so `execute` cannot yet
-//! read the input tables nor emit `MOVESWorkerActivityOutput`. The numeric
-//! algorithm is fully ported and unit-tested on
-//! [`calculate`](DistanceCalculator::calculate); `execute` is a documented
-//! shell returning an empty [`CalculatorOutput`]. Once the data plane
-//! exists, `execute` materialises a [`DistanceInputs`] from `ctx.tables()`,
-//! calls [`calculate`](DistanceCalculator::calculate), and writes the rows
-//! to the activity output.
+//! [`Calculator::execute`] reads all seven input tables from `ctx.tables()`,
+//! calls [`calculate`](DistanceCalculator::calculate), and wraps the resulting
+//! row vec in a [`CalculatorOutput`] DataFrame. The `SCC` column noted in the
+//! Java `doExecute` wrapper is a pass-through dimension not needed by the
+//! algorithm and is omitted from `DistanceActivityRow`.
 
 use std::collections::HashMap;
 
@@ -225,9 +220,8 @@ pub struct CountyRow {
 /// Inputs to [`DistanceCalculator::calculate`] — the extracted tables the
 /// SQL's "Extract Data" section produces, as plain row vectors.
 ///
-/// A future Task 50 (`DataFrameStore`) wiring populates this from the
-/// per-run filtered execution database; until then it is the explicit
-/// data-plane contract the unit tests build directly.
+/// [`Calculator::execute`] populates this from the per-run filtered
+/// execution database via `ctx.tables()`; unit tests build it directly.
 #[derive(Debug, Clone, Default)]
 pub struct DistanceInputs {
     /// `SourceBin` rows.
@@ -1028,8 +1022,8 @@ impl DistanceCalculator {
     ///
     /// [`calculate`](Self::calculate) applies the same exclusion at row
     /// grain (it drops `SHO` rows on off-network links); this predicate is
-    /// the master-loop context-filter form the Task 50 `execute` wiring uses
-    /// to avoid invoking the calculator for off-network contexts at all.
+    /// the master-loop context-filter used to avoid invoking the calculator
+    /// for off-network contexts at all.
     #[must_use]
     pub fn processes_road_type(road_type_id: i32) -> bool {
         road_type_id != OFF_NETWORK_ROAD_TYPE_ID

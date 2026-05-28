@@ -193,7 +193,7 @@ pub fn run_simulation(runspec_xml: &str, max_parallel_chunks: u32) -> Result<JsV
         collect_output_in_memory: true,
     };
 
-    let engine = MOVESEngine::new(run_spec, registry, config);
+    let mut engine = MOVESEngine::new(run_spec, registry, config);
     let outcome = engine
         .run()
         .map_err(|e| JsValue::from_str(&format!("Engine error: {e}")))?;
@@ -471,7 +471,7 @@ mod tests {
             run_date_time: None,
             collect_output_in_memory: true,
         };
-        let engine = MOVESEngine::new(run_spec, registry, config);
+        let mut engine = MOVESEngine::new(run_spec, registry, config);
         let outcome = engine.run().expect("engine must run");
         assert!(
             !outcome.output_bytes.is_empty(),

@@ -26,7 +26,7 @@
 //!
 //! # Phase 2 status
 //!
-//! Tasks 15, 16, 17, 18, 19, 20, 21, 23, 24, 25, 26, 27, and 89 are in place:
+//! Tasks 15, 16, 17, 18, 19, 20, 21, 23, 24, 25, 26, 27, 50, and 89 are in place:
 //!
 //! * Task 15 — [`ExecutionRunSpec`] derives the run-time view of a
 //!   [`moves_runspec::RunSpec`]: target pollutants / processes, timespan
@@ -76,16 +76,19 @@
 //!   and finalises the [`OutputProcessor`]. Peak memory scales linearly
 //!   with the parallelism limit; see [`crate::execution::executor`] for the
 //!   memory model.
+//! * Task 50 — [`DataFrameStore`] trait + [`InMemoryStore`] implementation
+//!   back [`ExecutionTables`] and [`ScratchNamespace`]; both tiers are wired
+//!   through [`CalculatorContext`]. [`InternalControlStrategy::pre_run`]
+//!   receives `&mut InMemoryStore` so strategies can write to the slow tier
+//!   before the master loop begins. [`DistanceCalculator::execute`] is the
+//!   pilot that reads all seven input tables and emits a distance activity
+//!   `DataFrame` end-to-end. [`AvftControlStrategy::pre_run`] writes the
+//!   completed AVFT fleet-composition table into the slow tier.
 //! * Task 89 — [`OutputProcessor`], the strongly-typed Parquet writer for
 //!   the three output tables defined by [`moves_data::output_schema`].
 //!   Phase 3 calculators feed it [`moves_data::EmissionRecord`] /
 //!   [`moves_data::ActivityRecord`] batches; Task 26 ([`aggregate_emissions`])
 //!   rolls those batches up through an [`AggregationPlan`] first.
-//!
-//! Storage internals for [`ExecutionTables`] / [`ScratchNamespace`] stay
-//! placeholder until Task 50 lands the concrete `DataFrameStore`. The
-//! [`InputDataManager`] plan is consumed by that data plane to populate
-//! [`ExecutionTables`] from Parquet snapshots.
 
 mod error;
 

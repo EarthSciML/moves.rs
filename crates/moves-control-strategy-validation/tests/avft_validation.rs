@@ -18,7 +18,7 @@ use moves_avft::{
     spec::{GapFillingMethod, MethodEntry, ProjectionMethod, ToolSpec},
     AvftControlStrategy,
 };
-use moves_framework::{CalculatorContext, InternalControlStrategy};
+use moves_framework::{CalculatorContext, InMemoryStore, InternalControlStrategy};
 
 static USER_AVFT: &str = include_str!("fixtures/avft_fixture.csv");
 static DEFAULT_AVFT: &str = include_str!("fixtures/avft_default.csv");
@@ -140,8 +140,9 @@ fn from_tool_inputs_covers_all_source_types_in_spec() {
 #[test]
 fn strategy_lifecycle_from_completed() {
     let strategy = AvftControlStrategy::from_completed(load_user_table());
+    let mut store = InMemoryStore::new();
+    strategy.pre_run(&mut store).expect("pre_run must succeed");
     let ctx = CalculatorContext::new();
-    strategy.pre_run(&ctx).expect("pre_run must succeed");
     strategy.post_run(&ctx).expect("post_run must succeed");
 }
 
@@ -168,8 +169,8 @@ fn strategy_is_trait_object_safe_from_completed() {
     let strategy: Box<dyn InternalControlStrategy> =
         Box::new(AvftControlStrategy::from_completed(load_user_table()));
     assert_eq!(strategy.name(), "AvftControlStrategy");
-    let ctx = CalculatorContext::new();
-    strategy.pre_run(&ctx).expect("pre_run ok");
+    let mut store = InMemoryStore::new();
+    strategy.pre_run(&mut store).expect("pre_run ok");
 }
 
 // ---------------------------------------------------------------------------

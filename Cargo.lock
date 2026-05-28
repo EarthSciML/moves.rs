@@ -1761,6 +1761,7 @@ dependencies = [
  "csv",
  "moves-framework",
  "parquet",
+ "polars",
  "serde",
  "tempfile",
  "thiserror 1.0.69",

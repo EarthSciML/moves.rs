@@ -7,7 +7,7 @@
 //! `[p.startModelYear, p.endModelYear]`. Source: `OnRoadRetrofit.java` in
 //! `internalcontrolstrategies/onroadretrofit/`.
 
-use moves_framework::{CalculatorContext, InternalControlStrategy};
+use moves_framework::{CalculatorContext, InMemoryStore, InternalControlStrategy};
 use moves_onroad_retrofit::{OnRoadRetrofitStrategy, RetrofitRecord, RetrofitTable};
 
 // ---------------------------------------------------------------------------
@@ -225,8 +225,9 @@ fn strategy_lifecycle_with_fixture_programs() {
     .into_iter()
     .collect();
     let strategy = OnRoadRetrofitStrategy::new(programs);
+    let mut store = InMemoryStore::new();
+    strategy.pre_run(&mut store).expect("pre_run must succeed");
     let ctx = CalculatorContext::new();
-    strategy.pre_run(&ctx).expect("pre_run must succeed");
     strategy.post_run(&ctx).expect("post_run must succeed");
 }
 
