@@ -113,6 +113,8 @@ pub enum ValidationStatus {
     Matched,
     /// Produced and canonical tables diverge beyond tolerance.
     Diverged,
+    /// Produced and canonical tables have different row counts (join-cardinality bug).
+    RowCountMismatch { canonical: usize, produced: usize },
 }
 
 /// One `(fixture, calculator, output_table)` validation result.
@@ -165,6 +167,21 @@ pub fn validate_table(
             ..base
         });
     };
+
+    let canonical_rows = canonical.row_count();
+    let produced_rows = produced.row_count();
+    if canonical_rows != produced_rows {
+        return Ok(TableValidation {
+            canonical_table: Some(canonical.name().to_string()),
+            status: ValidationStatus::RowCountMismatch {
+                canonical: canonical_rows,
+                produced: produced_rows,
+            },
+            diff: None,
+            summary: None,
+            ..base
+        });
+    }
 
     let diff = compare_table(produced, canonical, opts)?;
     let summary = diff.summary();
@@ -331,6 +348,38 @@ mod tests {
         .unwrap();
         assert_eq!(diverged.status, ValidationStatus::Diverged);
         assert_eq!(diverged.summary.unwrap().cells_changed, 1);
+    }
+
+    #[test]
+    fn validate_table_row_count_mismatch() {
+        let root = tempfile::tempdir().unwrap();
+        let fixture_dir = root.path().join("process-brakewear");
+        let mut canonical = Snapshot::new();
+        canonical
+            .add_table(table("MOVESOutput", &[(1, 70.0), (2, 71.0)]))
+            .unwrap();
+        canonical.write(&fixture_dir).unwrap();
+
+        let produced = table("MOVESOutput", &[(1, 70.0)]);
+        let result = validate_table(
+            root.path(),
+            "process-brakewear",
+            "BaseRateCalculator",
+            &produced,
+            &strict(),
+        )
+        .unwrap();
+        assert!(
+            matches!(
+                result.status,
+                ValidationStatus::RowCountMismatch {
+                    canonical: 2,
+                    produced: 1
+                }
+            ),
+            "expected RowCountMismatch, got {:?}",
+            result.status
+        );
     }
 
     #[test]

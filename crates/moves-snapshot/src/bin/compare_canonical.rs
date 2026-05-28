@@ -102,6 +102,9 @@ struct FixtureResult {
     speedup: Option<f64>,
     canonical_peak_mb: Option<f64>,
     moves_rs_peak_mb: Option<f64>,
+    canonical_row_count: usize,
+    moves_rs_row_count: usize,
+    row_count_ratio: f64,
     pollutant_count: usize,
     max_abs_delta: f64,
     max_pct_diff: f64,
@@ -122,10 +125,16 @@ fn main() -> ExitCode {
 }
 
 fn run(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
-    let canonical = read_canonical(&args.canonical)?;
-    let moves_rs = read_moves_rs(&args.moves_rs)?;
+    let (canonical, canonical_row_count) = read_canonical(&args.canonical)?;
+    let (moves_rs, moves_rs_row_count) = read_moves_rs(&args.moves_rs)?;
 
-    let result = build_result(args, canonical, moves_rs);
+    let result = build_result(
+        args,
+        canonical,
+        canonical_row_count,
+        moves_rs,
+        moves_rs_row_count,
+    );
 
     let stdout = io::stdout();
     let mut out = stdout.lock();
@@ -143,12 +152,12 @@ fn run(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
 
 // ── Reading canonical snapshot ────────────────────────────────────────────────
 
-/// `pollutantID → emissionQuant sum` from the canonical snapshot.
-fn read_canonical(dir: &Path) -> Result<BTreeMap<i64, f64>, Box<dyn std::error::Error>> {
+/// `pollutantID → emissionQuant sum` and total row count from the canonical snapshot.
+fn read_canonical(dir: &Path) -> Result<(BTreeMap<i64, f64>, usize), Box<dyn std::error::Error>> {
     let mut sums: BTreeMap<i64, f64> = BTreeMap::new();
 
     if !dir.exists() {
-        return Ok(sums);
+        return Ok((sums, 0));
     }
 
     let snap = match Snapshot::load(dir) {
@@ -158,7 +167,7 @@ fn read_canonical(dir: &Path) -> Result<BTreeMap<i64, f64>, Box<dyn std::error::
                 "warning: could not load canonical snapshot at {}: {e}",
                 dir.display()
             );
-            return Ok(sums);
+            return Ok((sums, 0));
         }
     };
 
@@ -177,16 +186,18 @@ fn read_canonical(dir: &Path) -> Result<BTreeMap<i64, f64>, Box<dyn std::error::
         });
     let table = match table_name.as_deref().and_then(|name| snap.table(name)) {
         Some(t) => t,
-        None => return Ok(sums),
+        None => return Ok((sums, 0)),
     };
+
+    let row_count = table.row_count();
 
     let pid_idx = match table.column_index("pollutantID") {
         Some(i) => i,
-        None => return Ok(sums),
+        None => return Ok((sums, row_count)),
     };
     let eq_idx = match table.column_index("emissionQuant") {
         Some(i) => i,
-        None => return Ok(sums),
+        None => return Ok((sums, row_count)),
     };
 
     let cols = table.columns();
@@ -194,7 +205,7 @@ fn read_canonical(dir: &Path) -> Result<BTreeMap<i64, f64>, Box<dyn std::error::
     let eq_col = &cols[eq_idx];
 
     use moves_snapshot::NormalizedColumn;
-    for row in 0..table.row_count() {
+    for row in 0..row_count {
         let pid = match pid_col {
             NormalizedColumn::Int64(v) => match v[row] {
                 Some(n) => n,
@@ -218,26 +229,29 @@ fn read_canonical(dir: &Path) -> Result<BTreeMap<i64, f64>, Box<dyn std::error::
         }
     }
 
-    Ok(sums)
+    Ok((sums, row_count))
 }
 
 // ── Reading moves.rs output ───────────────────────────────────────────────────
 
-/// `pollutantID → emissionQuant sum` from the moves.rs MOVESOutput Parquet tree.
-fn read_moves_rs(output_dir: &Path) -> Result<BTreeMap<i64, f64>, Box<dyn std::error::Error>> {
+/// `pollutantID → emissionQuant sum` and total row count from the moves.rs MOVESOutput Parquet tree.
+fn read_moves_rs(
+    output_dir: &Path,
+) -> Result<(BTreeMap<i64, f64>, usize), Box<dyn std::error::Error>> {
     let mut sums: BTreeMap<i64, f64> = BTreeMap::new();
 
     let moves_output_dir = output_dir.join("MOVESOutput");
     if !moves_output_dir.exists() {
-        return Ok(sums);
+        return Ok((sums, 0));
     }
 
     let parquet_files = collect_parquet_files(&moves_output_dir);
+    let mut total_rows: usize = 0;
     for path in &parquet_files {
-        accumulate_parquet_file(path, &mut sums)?;
+        total_rows += accumulate_parquet_file(path, &mut sums)?;
     }
 
-    Ok(sums)
+    Ok((sums, total_rows))
 }
 
 fn collect_parquet_files(dir: &Path) -> Vec<PathBuf> {
@@ -259,13 +273,15 @@ fn collect_parquet_files(dir: &Path) -> Vec<PathBuf> {
 fn accumulate_parquet_file(
     path: &Path,
     sums: &mut BTreeMap<i64, f64>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<usize, Box<dyn std::error::Error>> {
     let file = File::open(path)?;
     let reader = ParquetRecordBatchReaderBuilder::try_new(file)?.build()?;
 
+    let mut total_rows: usize = 0;
     for batch in reader {
         let batch = batch?;
         let schema = batch.schema();
+        total_rows += batch.num_rows();
 
         let pid_idx = match schema.index_of("pollutantID") {
             Ok(i) => i,
@@ -300,7 +316,7 @@ fn accumulate_parquet_file(
         }
     }
 
-    Ok(())
+    Ok(total_rows)
 }
 
 // ── Building the result ───────────────────────────────────────────────────────
@@ -308,7 +324,9 @@ fn accumulate_parquet_file(
 fn build_result(
     args: &Args,
     canonical: BTreeMap<i64, f64>,
+    canonical_row_count: usize,
     moves_rs: BTreeMap<i64, f64>,
+    moves_rs_row_count: usize,
 ) -> FixtureResult {
     // Union of all pollutant IDs from both sources.
     let mut all_ids: std::collections::BTreeSet<i64> = BTreeSet::new();
@@ -348,6 +366,12 @@ fn build_result(
         _ => None,
     };
 
+    let row_count_ratio = if canonical_row_count > 0 {
+        moves_rs_row_count as f64 / canonical_row_count as f64
+    } else {
+        0.0
+    };
+
     FixtureResult {
         fixture: args.fixture.clone(),
         canonical_wall_secs: args.canonical_wall,
@@ -355,6 +379,9 @@ fn build_result(
         speedup,
         canonical_peak_mb: args.canonical_peak_mb,
         moves_rs_peak_mb: args.moves_rs_peak_mb,
+        canonical_row_count,
+        moves_rs_row_count,
+        row_count_ratio,
         pollutant_count: rows.len(),
         max_abs_delta,
         max_pct_diff,
@@ -398,6 +425,11 @@ fn render_text(out: &mut impl Write, r: &FixtureResult) -> Result<(), Box<dyn st
     writeln!(
         out,
         "Canonical peak: {can_peak} | moves.rs peak: {mrs_peak}"
+    )?;
+    writeln!(
+        out,
+        "Canonical rows: {} | moves.rs rows: {} | Row ratio: {:.2}",
+        r.canonical_row_count, r.moves_rs_row_count, r.row_count_ratio,
     )?;
     writeln!(out)?;
 

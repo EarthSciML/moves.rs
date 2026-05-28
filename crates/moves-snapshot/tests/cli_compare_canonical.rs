@@ -129,6 +129,18 @@ fn canonical_data_json_output_has_correct_fields() {
     assert_eq!(v["fixture"], "json-test");
     assert_eq!(v["pollutant_count"], 1);
     assert!((v["speedup"].as_f64().unwrap() - 5.0).abs() < 1e-9);
+    assert_eq!(
+        v["canonical_row_count"], 1,
+        "canonical_row_count missing or wrong"
+    );
+    assert_eq!(
+        v["moves_rs_row_count"], 0,
+        "moves_rs_row_count missing or wrong"
+    );
+    assert!(
+        v["row_count_ratio"].as_f64().unwrap().abs() < 1e-9,
+        "row_count_ratio should be 0 when no moves.rs output"
+    );
 
     let row = &v["rows"][0];
     assert_eq!(row["pollutant_id"], 1);
@@ -169,4 +181,8 @@ fn timing_columns_populated_in_text_output() {
         "moves.rs wall time missing: {stdout}"
     );
     assert!(stdout.contains("20.0"), "speedup 20.0× missing: {stdout}");
+    assert!(
+        stdout.contains("Canonical rows:"),
+        "row count line missing: {stdout}"
+    );
 }

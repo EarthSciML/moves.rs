@@ -218,11 +218,11 @@ REPORT="${OUTPUT_DIR}/audit-report.md"
 {
     printf '# moves.rs Audit Report — %s\n\n' "${TIMESTAMP}"
     printf '## Summary\n\n'
-    printf '| Fixture | Pollutants compared | Max abs delta | Max pct diff | Canonical wall (s) | moves.rs wall (s) | Speedup | moves.rs peak mem (MiB) |\n'
-    printf '|---|---|---|---|---|---|---|---|\n'
+    printf '| Fixture | Canonical rows | moves.rs rows | Row ratio | Pollutants compared | Max abs delta | Max pct diff | Canonical wall (s) | moves.rs wall (s) | Speedup | moves.rs peak mem (MiB) |\n'
+    printf '|---|---|---|---|---|---|---|---|---|---|---|\n'
     for jf in "${JSON_FILES[@]}"; do
         jq -r \
-            '"| \(.fixture) | \(.pollutant_count) | \(.max_abs_delta | . * 1e6 | round | . / 1e6) | \(.max_pct_diff * 100 | . * 10 | round | . / 10)% | \(.canonical_wall_secs // "N/A") | \(.moves_rs_wall_secs // "N/A") | \(.speedup // "N/A") | \(.moves_rs_peak_mb // "N/A") |"' \
+            '"| \(.fixture) | \(.canonical_row_count) | \(.moves_rs_row_count) | \(.row_count_ratio | . * 100 | round | . / 100) | \(.pollutant_count) | \(.max_abs_delta | . * 1e6 | round | . / 1e6) | \(.max_pct_diff * 100 | . * 10 | round | . / 10)% | \(.canonical_wall_secs // "N/A") | \(.moves_rs_wall_secs // "N/A") | \(.speedup // "N/A") | \(.moves_rs_peak_mb // "N/A") |"' \
             "${jf}"
     done
     printf '\n'
