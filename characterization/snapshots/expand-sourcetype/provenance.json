@@ -1,11 +1,11 @@
 {
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "expand-sourcetype",
-  "sif_sha256": "70ea5b8378b278af50e8c44ab011066c59019faed8d141adf4ec6f2045f1e5fd",
-  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixture-image.lock",
-  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixtures/expand-sourcetype.xml",
+  "sif_sha256": "597f1f3e0aef5d23027589ee509207d13486d5c89056906bf323a889f0e02311",
+  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.capable/worktrees/mo-wwc.2/characterization/fixture-image.lock",
+  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.capable/worktrees/mo-wwc.2/characterization/fixtures/expand-sourcetype.xml",
   "runspec_sha256": "52221cee9f9ff593d23573a84421131479765d3187921a244c080708206376cb",
-  "snapshot_aggregate_sha256": "b8cde5bc49134b40015213e686cdbffaafbcd5bd59f29943876a9794b62ce2ff",
+  "snapshot_aggregate_sha256": "080560fbc6e00816a56121c8f792b09c847e9d69a844c23f932262236d33a02c",
   "output_database": "out_expand_sourcetype",
   "scale_input_database": null
 }
