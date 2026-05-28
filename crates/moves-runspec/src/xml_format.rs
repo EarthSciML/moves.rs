@@ -552,7 +552,7 @@ struct XmlTimespan {
     #[serde(rename = "month", default, skip_serializing_if = "Vec::is_empty")]
     months: Vec<XmlKeyU32>,
     #[serde(rename = "day", default, skip_serializing_if = "Vec::is_empty")]
-    days: Vec<XmlKeyU32>,
+    days: Vec<XmlDayEntry>,
     #[serde(rename = "beginhour", default, skip_serializing_if = "Option::is_none")]
     begin_hour: Option<XmlKeyU32>,
     #[serde(rename = "endhour", default, skip_serializing_if = "Option::is_none")]
@@ -563,6 +563,15 @@ struct XmlTimespan {
         skip_serializing_if = "Option::is_none"
     )]
     aggregate_by: Option<XmlKeyStr>,
+}
+
+/// `<day>` element — accepts `@key` (MOVES 4 / canonical) or `@id` (MOVES 5).
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct XmlDayEntry {
+    #[serde(rename = "@key", default, skip_serializing_if = "Option::is_none")]
+    key: Option<u32>,
+    #[serde(rename = "@id", default, skip_serializing_if = "Option::is_none")]
+    id: Option<u32>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -852,7 +861,16 @@ impl XmlRunSpec {
         let timespan = Timespan {
             years: self.timespan.years.into_iter().map(|x| x.key).collect(),
             months: self.timespan.months.into_iter().map(|x| x.key).collect(),
-            days: self.timespan.days.into_iter().map(|x| x.key).collect(),
+            days: self
+                .timespan
+                .days
+                .into_iter()
+                .map(|x| {
+                    x.key.or(x.id).ok_or(Error::MissingField {
+                        field: "timespan.day @key or @id",
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?,
             begin_hour: self.timespan.begin_hour.map(|x| x.key),
             end_hour: self.timespan.end_hour.map(|x| x.key),
             aggregate_by: self.timespan.aggregate_by.map(|x| x.key),

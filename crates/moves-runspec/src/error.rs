@@ -16,6 +16,9 @@ pub enum Error {
 
     #[error("invalid enum value for {field}: {value:?}")]
     InvalidEnumValue { field: &'static str, value: String },
+
+    #[error("xml: missing field {field}")]
+    MissingField { field: &'static str },
 }
 
 impl Error {
