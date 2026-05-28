@@ -1,0 +1,72 @@
+# Regression gate: fail PRs that push max_pct_diff beyond threshold.
+#
+# Runs the audit comparison (moves.rs vs committed canonical snapshots) for
+# the typical-scenarios fixture set, then gates on AUDIT_MAX_PCT_DIFF.
+# Triggers only on PRs that touch the core calculation or framework crates,
+# where a numerical regression is most likely.
+#
+# No Apptainer or SIF required: all typical-scenarios fixtures have committed
+# snapshots under characterization/snapshots/, so run-comparison.sh skips the
+# canonical MOVES re-run and uses the stored baseline.
+#
+# AUDIT_MAX_PCT_DIFF controls the failure threshold (default: 0.10 = 10%).
+# To tighten the gate, lower this value in the env block below.
+
+name: audit-regression-gate
+
+on:
+  pull_request:
+    paths:
+      - 'crates/moves-calculators/**'
+      - 'crates/moves-framework/**'
+
+concurrency:
+  group: audit-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  AUDIT_MAX_PCT_DIFF: "0.10"
+
+jobs:
+  regression-gate:
+    name: audit regression gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry, target/
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: audit-gate
+
+      - name: Build moves-cli and compare-canonical
+        run: cargo build --release -p moves-cli -p moves-snapshot
+
+      - name: Run audit comparison (snapshot reuse — no Apptainer needed)
+        id: comparison
+        run: |
+          TIMESTAMP="$(date -u +%Y%m%dT%H%M%S)"
+          OUTPUT_DIR="characterization/audit-results/${TIMESTAMP}"
+          echo "output_dir=${OUTPUT_DIR}" >> "${GITHUB_OUTPUT}"
+          ./characterization/audit/run-comparison.sh \
+              --output-dir "${OUTPUT_DIR}"
+
+      - name: Regression gate
+        run: |
+          ./characterization/audit/regression_gate.sh \
+              --output-dir "${{ steps.comparison.outputs.output_dir }}"
+
+      - name: Upload audit results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-results-${{ github.run_id }}
+          path: ${{ steps.comparison.outputs.output_dir || 'characterization/audit-results' }}
+          if-no-files-found: warn
+          retention-days: 14
