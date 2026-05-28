@@ -20,26 +20,36 @@ mkdir -p "$SOCK_DIR"
 # Run as the calling user (override mysql:mysql since we lack fakeroot).
 EFFECTIVE_USER="$(id -un)"
 
-# Wait for port 3306 to be free before starting mariadbd.
-# Other MOVES/mariadbd instances on this host share port 3306 (Apptainer uses
-# the host network namespace). Starting mariadbd while 3306 is taken wastes
-# memory (InnoDB buffer pool allocation) and may trigger the SLURM OOM killer.
-# Poll cheaply instead and only start mariadbd once the port is clear.
-MAX_WAIT=1200  # 20 minutes total
-wait_secs=0
-while [ "$wait_secs" -lt "$MAX_WAIT" ]; do
-    # TCP check: succeed (port busy) → wait; fail (port free) → proceed.
-    if ! bash -c 'exec 3<>/dev/tcp/127.0.0.1/3306' 2>/dev/null; then
-        break
-    fi
-    [ "$wait_secs" -eq 0 ] && echo "[start-mariadb-bg] port 3306 busy, waiting for it to clear..." >&2
-    sleep 5
-    wait_secs=$((wait_secs + 5))
-done
+# When MARIADB_SKIP_NETWORKING=1, skip TCP binding entirely. The dump step
+# sets this so it doesn't race with other MOVES runs on port 3306. The
+# mariadb dump client connects via socket, so TCP is not needed for dumps.
+SKIP_NET_ARGS=()
+if [ "${MARIADB_SKIP_NETWORKING:-0}" = "1" ]; then
+    SKIP_NET_ARGS=( --skip-networking )
+else
+    SKIP_NET_ARGS=( --bind-address=127.0.0.1 --skip-networking=0 )
 
-if [ "$wait_secs" -ge "$MAX_WAIT" ]; then
-    echo "[start-mariadb-bg] port 3306 still busy after ${MAX_WAIT}s, giving up." >&2
-    exit 1
+    # Wait for port 3306 to be free before starting mariadbd.
+    # Other MOVES/mariadbd instances on this host share port 3306 (Apptainer uses
+    # the host network namespace). Starting mariadbd while 3306 is taken wastes
+    # memory (InnoDB buffer pool allocation) and may trigger the SLURM OOM killer.
+    # Poll cheaply instead and only start mariadbd once the port is clear.
+    MAX_WAIT=1200  # 20 minutes total
+    wait_secs=0
+    while [ "$wait_secs" -lt "$MAX_WAIT" ]; do
+        # TCP check: succeed (port busy) → wait; fail (port free) → proceed.
+        if ! bash -c 'exec 3<>/dev/tcp/127.0.0.1/3306' 2>/dev/null; then
+            break
+        fi
+        [ "$wait_secs" -eq 0 ] && echo "[start-mariadb-bg] port 3306 busy, waiting for it to clear..." >&2
+        sleep 5
+        wait_secs=$((wait_secs + 5))
+    done
+
+    if [ "$wait_secs" -ge "$MAX_WAIT" ]; then
+        echo "[start-mariadb-bg] port 3306 still busy after ${MAX_WAIT}s, giving up." >&2
+        exit 1
+    fi
 fi
 
 # Start mariadbd. If it fails to bind (another process beat us to port 3306),
@@ -51,8 +61,7 @@ for start_attempt in 1 2; do
         --socket="$SOCK_PATH" \
         --pid-file="$PID_FILE" \
         --log-error="$LOG_FILE" \
-        --bind-address=127.0.0.1 \
-        --skip-networking=0 \
+        "${SKIP_NET_ARGS[@]}" \
         "$@" &
     MARIADBD_BG_PID=$!
 

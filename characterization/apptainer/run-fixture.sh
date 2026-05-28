@@ -241,6 +241,7 @@ apptainer exec \
     "${BINDS[@]}" \
     --env "START_MARIADB=${START_MARIADB}" \
     --env "CAPTURES_DIR=/captures" \
+    --env "MARIADB_SKIP_NETWORKING=1" \
     "${SIF}" \
     bash /opt/fixture-tools/dump-databases.sh
 
