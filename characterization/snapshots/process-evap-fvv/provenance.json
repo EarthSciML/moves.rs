@@ -1,9 +1,9 @@
 {
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "process-evap-fvv",
-  "sif_sha256": "70ea5b8378b278af50e8c44ab011066c59019faed8d141adf4ec6f2045f1e5fd",
-  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixture-image.lock",
-  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixtures/process-evap-fvv.xml",
+  "sif_sha256": "f8d7ae76464c5e273dcc675bb91b3062fa1f41c87907e9403fe8c1cbe5482a59",
+  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.slit/worktrees/mo-wwc.5/characterization/fixture-image.lock",
+  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.slit/worktrees/mo-wwc.5/characterization/fixtures/process-evap-fvv.xml",
   "runspec_sha256": "75c0e6efaa29af3e6551d38a791e2b7ce9eb10f5cff587a154ec51959dd6dcbf",
   "snapshot_aggregate_sha256": "1c935e12b4ce5d1ba471f4f2a1b7c55203cbd2b3f5ae4dbc13532ae2c907d37b",
   "output_database": "out_process_evap_fvv",
