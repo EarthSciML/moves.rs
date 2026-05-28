@@ -653,13 +653,13 @@ impl TableRow for RunSpecSourceTypeRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
+        let mut source_type_id = Vec::with_capacity(n);
+        for r in &rows {
+            source_type_id.push(r.source_type_id);
+        }
         DataFrame::new(
             n,
-            vec![Series::new(
-                "sourceTypeID".into(),
-                rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
-            )
-            .into()],
+            vec![Series::new("sourceTypeID".into(), source_type_id).into()],
         )
     }
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
@@ -693,19 +693,16 @@ impl TableRow for AgeCategoryRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
+        let (mut age_id, mut age_group_id) = (Vec::with_capacity(n), Vec::with_capacity(n));
+        for r in &rows {
+            age_id.push(r.age_id);
+            age_group_id.push(r.age_group_id);
+        }
         DataFrame::new(
             n,
             vec![
-                Series::new(
-                    "ageID".into(),
-                    rows.iter().map(|r| r.age_id).collect::<Vec<i32>>(),
-                )
-                .into(),
-                Series::new(
-                    "ageGroupID".into(),
-                    rows.iter().map(|r| r.age_group_id).collect::<Vec<i32>>(),
-                )
-                .into(),
+                Series::new("ageID".into(), age_id).into(),
+                Series::new("ageGroupID".into(), age_group_id).into(),
             ],
         )
     }
@@ -747,43 +744,33 @@ impl TableRow for AverageTankTemperatureRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
+        let (mut tank_temperature_group_id, mut zone_id, mut month_id) = (
+            Vec::with_capacity(n),
+            Vec::with_capacity(n),
+            Vec::with_capacity(n),
+        );
+        let (mut hour_day_id, mut op_mode_id, mut average_tank_temperature) = (
+            Vec::with_capacity(n),
+            Vec::with_capacity(n),
+            Vec::with_capacity(n),
+        );
+        for r in &rows {
+            tank_temperature_group_id.push(r.tank_temperature_group_id);
+            zone_id.push(r.zone_id);
+            month_id.push(r.month_id);
+            hour_day_id.push(r.hour_day_id);
+            op_mode_id.push(r.op_mode_id);
+            average_tank_temperature.push(r.average_tank_temperature);
+        }
         DataFrame::new(
             n,
             vec![
-                Series::new(
-                    "tankTemperatureGroupID".into(),
-                    rows.iter()
-                        .map(|r| r.tank_temperature_group_id)
-                        .collect::<Vec<i32>>(),
-                )
-                .into(),
-                Series::new(
-                    "zoneID".into(),
-                    rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>(),
-                )
-                .into(),
-                Series::new(
-                    "monthID".into(),
-                    rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
-                )
-                .into(),
-                Series::new(
-                    "hourDayID".into(),
-                    rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
-                )
-                .into(),
-                Series::new(
-                    "opModeID".into(),
-                    rows.iter().map(|r| r.op_mode_id).collect::<Vec<i32>>(),
-                )
-                .into(),
-                Series::new(
-                    "averageTankTemperature".into(),
-                    rows.iter()
-                        .map(|r| r.average_tank_temperature)
-                        .collect::<Vec<f64>>(),
-                )
-                .into(),
+                Series::new("tankTemperatureGroupID".into(), tank_temperature_group_id).into(),
+                Series::new("zoneID".into(), zone_id).into(),
+                Series::new("monthID".into(), month_id).into(),
+                Series::new("hourDayID".into(), hour_day_id).into(),
+                Series::new("opModeID".into(), op_mode_id).into(),
+                Series::new("averageTankTemperature".into(), average_tank_temperature).into(),
             ],
         )
     }
@@ -838,24 +825,22 @@ impl TableRow for CountyRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
+        let (mut county_id, mut state_id, mut gpa_fract) = (
+            Vec::with_capacity(n),
+            Vec::with_capacity(n),
+            Vec::with_capacity(n),
+        );
+        for r in &rows {
+            county_id.push(r.county_id);
+            state_id.push(r.state_id);
+            gpa_fract.push(r.gpa_fract);
+        }
         DataFrame::new(
             n,
             vec![
-                Series::new(
-                    "countyID".into(),
-                    rows.iter().map(|r| r.county_id).collect::<Vec<i32>>(),
-                )
-                .into(),
-                Series::new(
-                    "stateID".into(),
-                    rows.iter().map(|r| r.state_id).collect::<Vec<i32>>(),
-                )
-                .into(),
-                Series::new(
-                    "GPAFract".into(),
-                    rows.iter().map(|r| r.gpa_fract).collect::<Vec<f64>>(),
-                )
-                .into(),
+                Series::new("countyID".into(), county_id).into(),
+                Series::new("stateID".into(), state_id).into(),
+                Series::new("GPAFract".into(), gpa_fract).into(),
             ],
         )
     }
@@ -901,29 +886,25 @@ impl TableRow for EmissionRateByAgeRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
+        let (mut source_bin_id, mut pol_process_id, mut age_group_id, mut mean_base_rate) = (
+            Vec::with_capacity(n),
+            Vec::with_capacity(n),
+            Vec::with_capacity(n),
+            Vec::with_capacity(n),
+        );
+        for r in &rows {
+            source_bin_id.push(r.source_bin_id);
+            pol_process_id.push(r.pol_process_id);
+            age_group_id.push(r.age_group_id);
+            mean_base_rate.push(r.mean_base_rate);
+        }
         DataFrame::new(
             n,
             vec![
-                Series::new(
-                    "sourceBinID".into(),
-                    rows.iter().map(|r| r.source_bin_id).collect::<Vec<i64>>(),
-                )
-                .into(),
-                Series::new(
-                    "polProcessID".into(),
-                    rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>(),
-                )
-                .into(),
-                Series::new(
-                    "ageGroupID".into(),
-                    rows.iter().map(|r| r.age_group_id).collect::<Vec<i32>>(),
-                )
-                .into(),
-                Series::new(
-                    "meanBaseRate".into(),
-                    rows.iter().map(|r| r.mean_base_rate).collect::<Vec<f64>>(),
-                )
-                .into(),
+                Series::new("sourceBinID".into(), source_bin_id).into(),
+                Series::new("polProcessID".into(), pol_process_id).into(),
+                Series::new("ageGroupID".into(), age_group_id).into(),
+                Series::new("meanBaseRate".into(), mean_base_rate).into(),
             ],
         )
     }
@@ -974,26 +955,22 @@ impl TableRow for EtohBinRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
+        let (mut etoh_thresh_id, mut etoh_thresh_low, mut etoh_thresh_high) = (
+            Vec::with_capacity(n),
+            Vec::with_capacity(n),
+            Vec::with_capacity(n),
+        );
+        for r in &rows {
+            etoh_thresh_id.push(r.etoh_thresh_id);
+            etoh_thresh_low.push(r.etoh_thresh_low);
+            etoh_thresh_high.push(r.etoh_thresh_high);
+        }
         DataFrame::new(
             n,
             vec![
-                Series::new(
-                    "etohThreshID".into(),
-                    rows.iter().map(|r| r.etoh_thresh_id).collect::<Vec<i32>>(),
-                )
-                .into(),
-                Series::new(
-                    "etohThreshLow".into(),
-                    rows.iter().map(|r| r.etoh_thresh_low).collect::<Vec<f64>>(),
-                )
-                .into(),
-                Series::new(
-                    "etohThreshHigh".into(),
-                    rows.iter()
-                        .map(|r| r.etoh_thresh_high)
-                        .collect::<Vec<f64>>(),
-                )
-                .into(),
+                Series::new("etohThreshID".into(), etoh_thresh_id).into(),
+                Series::new("etohThreshLow".into(), etoh_thresh_low).into(),
+                Series::new("etohThreshHigh".into(), etoh_thresh_high).into(),
             ],
         )
     }
@@ -1038,28 +1015,22 @@ impl TableRow for FuelFormulationRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
+        let (mut fuel_formulation_id, mut fuel_subtype_id, mut etoh_volume) = (
+            Vec::with_capacity(n),
+            Vec::with_capacity(n),
+            Vec::with_capacity(n),
+        );
+        for r in &rows {
+            fuel_formulation_id.push(r.fuel_formulation_id);
+            fuel_subtype_id.push(r.fuel_subtype_id);
+            etoh_volume.push(r.etoh_volume.unwrap_or(0.0));
+        }
         DataFrame::new(
             n,
             vec![
-                Series::new(
-                    "fuelFormulationID".into(),
-                    rows.iter()
-                        .map(|r| r.fuel_formulation_id)
-                        .collect::<Vec<i32>>(),
-                )
-                .into(),
-                Series::new(
-                    "fuelSubtypeID".into(),
-                    rows.iter().map(|r| r.fuel_subtype_id).collect::<Vec<i32>>(),
-                )
-                .into(),
-                Series::new(
-                    "ETOHVolume".into(),
-                    rows.iter()
-                        .map(|r| r.etoh_volume.unwrap_or(0.0))
-                        .collect::<Vec<f64>>(),
-                )
-                .into(),
+                Series::new("fuelFormulationID".into(), fuel_formulation_id).into(),
+                Series::new("fuelSubtypeID".into(), fuel_subtype_id).into(),
+                Series::new("ETOHVolume".into(), etoh_volume).into(),
             ],
         )
     }
@@ -1103,19 +1074,17 @@ impl TableRow for FuelSubtypeRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
+        let (mut fuel_subtype_id, mut fuel_type_id) =
+            (Vec::with_capacity(n), Vec::with_capacity(n));
+        for r in &rows {
+            fuel_subtype_id.push(r.fuel_subtype_id);
+            fuel_type_id.push(r.fuel_type_id);
+        }
         DataFrame::new(
             n,
             vec![
-                Series::new(
-                    "fuelSubtypeID".into(),
-                    rows.iter().map(|r| r.fuel_subtype_id).collect::<Vec<i32>>(),
-                )
-                .into(),
-                Series::new(
-                    "fuelTypeID".into(),
-                    rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>(),
-                )
-                .into(),
+                Series::new("fuelSubtypeID".into(), fuel_subtype_id).into(),
+                Series::new("fuelTypeID".into(), fuel_type_id).into(),
             ],
         )
     }
@@ -1155,31 +1124,25 @@ impl TableRow for FuelSupplyRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
+        let (mut fuel_year_id, mut month_group_id, mut fuel_formulation_id, mut market_share) = (
+            Vec::with_capacity(n),
+            Vec::with_capacity(n),
+            Vec::with_capacity(n),
+            Vec::with_capacity(n),
+        );
+        for r in &rows {
+            fuel_year_id.push(r.fuel_year_id);
+            month_group_id.push(r.month_group_id);
+            fuel_formulation_id.push(r.fuel_formulation_id);
+            market_share.push(r.market_share);
+        }
         DataFrame::new(
             n,
             vec![
-                Series::new(
-                    "fuelYearID".into(),
-                    rows.iter().map(|r| r.fuel_year_id).collect::<Vec<i32>>(),
-                )
-                .into(),
-                Series::new(
-                    "monthGroupID".into(),
-                    rows.iter().map(|r| r.month_group_id).collect::<Vec<i32>>(),
-                )
-                .into(),
-                Series::new(
-                    "fuelFormulationID".into(),
-                    rows.iter()
-                        .map(|r| r.fuel_formulation_id)
-                        .collect::<Vec<i32>>(),
-                )
-                .into(),
-                Series::new(
-                    "marketShare".into(),
-                    rows.iter().map(|r| r.market_share).collect::<Vec<f64>>(),
-                )
-                .into(),
+                Series::new("fuelYearID".into(), fuel_year_id).into(),
+                Series::new("monthGroupID".into(), month_group_id).into(),
+                Series::new("fuelFormulationID".into(), fuel_formulation_id).into(),
+                Series::new("marketShare".into(), market_share).into(),
             ],
         )
     }
@@ -1228,38 +1191,28 @@ impl TableRow for HcPermeationCoeffRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
+        let (mut pol_process_id, mut etoh_thresh_id, mut fuel_my_group_id) = (
+            Vec::with_capacity(n),
+            Vec::with_capacity(n),
+            Vec::with_capacity(n),
+        );
+        let (mut fuel_adjustment, mut fuel_adjustment_gpa) =
+            (Vec::with_capacity(n), Vec::with_capacity(n));
+        for r in &rows {
+            pol_process_id.push(r.pol_process_id);
+            etoh_thresh_id.push(r.etoh_thresh_id);
+            fuel_my_group_id.push(r.fuel_my_group_id);
+            fuel_adjustment.push(r.fuel_adjustment);
+            fuel_adjustment_gpa.push(r.fuel_adjustment_gpa);
+        }
         DataFrame::new(
             n,
             vec![
-                Series::new(
-                    "polProcessID".into(),
-                    rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>(),
-                )
-                .into(),
-                Series::new(
-                    "etohThreshID".into(),
-                    rows.iter().map(|r| r.etoh_thresh_id).collect::<Vec<i32>>(),
-                )
-                .into(),
-                Series::new(
-                    "fuelMYGroupID".into(),
-                    rows.iter()
-                        .map(|r| r.fuel_my_group_id)
-                        .collect::<Vec<i32>>(),
-                )
-                .into(),
-                Series::new(
-                    "fuelAdjustment".into(),
-                    rows.iter().map(|r| r.fuel_adjustment).collect::<Vec<f64>>(),
-                )
-                .into(),
-                Series::new(
-                    "fuelAdjustmentGPA".into(),
-                    rows.iter()
-                        .map(|r| r.fuel_adjustment_gpa)
-                        .collect::<Vec<f64>>(),
-                )
-                .into(),
+                Series::new("polProcessID".into(), pol_process_id).into(),
+                Series::new("etohThreshID".into(), etoh_thresh_id).into(),
+                Series::new("fuelMYGroupID".into(), fuel_my_group_id).into(),
+                Series::new("fuelAdjustment".into(), fuel_adjustment).into(),
+                Series::new("fuelAdjustmentGPA".into(), fuel_adjustment_gpa).into(),
             ],
         )
     }
@@ -2781,7 +2734,9 @@ fn source_bin_weighted_permeation_rate(
 fn temperature_adjust_by_op_mode(
     inputs: &EvaporativePermeationInputs,
 ) -> Vec<TemperatureAdjustByOpMode> {
-    let mut out = Vec::new();
+    let mut out = Vec::with_capacity(
+        inputs.average_tank_temperature.len() * inputs.temperature_adjustment.len(),
+    );
     for att in &inputs.average_tank_temperature {
         for ta in &inputs.temperature_adjustment {
             let adjust = ta.temp_adjust_term_a
@@ -3056,7 +3011,7 @@ fn fuel_adjusted_emission_rate(
             .push(wfa);
     }
 
-    let mut out = Vec::new();
+    let mut out = Vec::with_capacity(sb_weighted.len());
     for sbwpr in sb_weighted {
         let Some(matches) = weighted_fuel_index.get(&(
             sbwpr.pol_process_id,
@@ -3119,7 +3074,7 @@ fn fuel_adjusted_emission_quant(
         .map(|d| (d.day_id, d.no_of_real_days))
         .collect();
 
-    let mut out = Vec::new();
+    let mut out = Vec::with_capacity(inputs.source_hours.len());
     for sh in &inputs.source_hours {
         // INNER JOIN FuelAdjustedEmissionRate ON (yearID,
         //   modelYearID = yearID − ageID, sourceTypeID).
@@ -3228,7 +3183,7 @@ fn assemble_emission_output(
         .map(|c| (c.county_id, c.state_id))
         .collect();
 
-    let mut out = Vec::new();
+    let mut out = Vec::with_capacity(fuel_adjusted_quant.len());
     for faeq in fuel_adjusted_quant {
         // INNER JOIN WeightedTemperatureAdjust on the seven-column key.
         let Some(temps) = temp_index.get(&(
