@@ -52,9 +52,7 @@
 //! | SQL step | SQL working table | This port |
 //! |----------|-------------------|-----------|
 //! | CSEC 1-a | `IMCoverageMergedUngrouped` | `im_coverage_merged` |
-//! | CSEC 2-a | `CountyFuelAdjustment` | `county_fuel_adjustment` |
-//! | CSEC 2-b | `CountyFuelAdjustmentWithFuelType` | `county_fuel_adjustment_with_fuel_type` |
-//! | CSEC 2-b | `FuelSupplyAdjustment` | `fuel_supply_adjustment` |
+//! | CSEC 2-a/b | `FuelSupplyAdjustment` | `fuel_supply_adjustment` |
 //! | CSEC-3 | `METStartAdjustment` | `met_start_adjustment` |
 //! | CSEC-4 | `EmissionRatesWithIMAndTemp` | `emission_rates_with_im_and_temp` |
 //! | CSEC-5 | `METSourceBinEmissionRates` | `met_source_bin_emission_rates` |
@@ -63,14 +61,14 @@
 //! | CSEC-8 | `Starts2` | `build_starts2` |
 //! | CSEC-8 | `MOVESWorkerOutput` | `assemble_emission_output` |
 //!
-//! Every join in the SQL is an `INNER JOIN` except the `CountyFuelAdjustment`
-//! `LEFT OUTER JOIN criteriaRatio` (CSEC 2-a) — a row with no match keeps a
-//! fuel adjustment of `1.0`. The port reproduces inner joins with map lookups
-//! that skip on a miss, and the left join with a lookup that falls back to
-//! the no-match value. CSEC 2-a also cartesian-joins `County`,
-//! `PollutantProcessAssoc`, `FuelFormulation` and `SourceTypeModelYear`, and
-//! CSEC-3 cartesian-joins `ZoneMonthHour`; the port writes those as nested
-//! loops.
+//! Every join in the SQL is an `INNER JOIN` except the CSEC 2-a
+//! `LEFT OUTER JOIN criteriaRatio` — a row with no match keeps a fuel
+//! adjustment of `1.0`. The port reproduces inner joins with map lookups that
+//! skip on a miss, and the left join with a lookup that falls back to the
+//! no-match value. CSEC 2-a cartesian-joins `County`, `PollutantProcessAssoc`,
+//! `FuelFormulation` and `SourceTypeModelYear`; the port streams this product
+//! without materialising it (see `fuel_supply_adjustment`), and CSEC-3
+//! cartesian-joins `ZoneMonthHour` as nested loops.
 //!
 //! # Start temperature equation
 //!
@@ -2455,31 +2453,6 @@ struct ImCoverageMerged {
     im_adjust_fract: f64,
 }
 
-/// CSEC 2-a — `CountyFuelAdjustment`: the GPA-blended fuel adjustment per
-/// `(polProcess, modelYear, sourceType, fuelFormulation)`.
-#[derive(Debug, Clone, Copy, PartialEq)]
-struct CountyFuelAdjustment {
-    fuel_region_id: i32,
-    pol_process_id: i32,
-    model_year_id: i32,
-    source_type_id: i32,
-    fuel_formulation_id: i32,
-    fuel_adjustment: f64,
-}
-
-/// CSEC 2-b — `CountyFuelAdjustmentWithFuelType`: [`CountyFuelAdjustment`]
-/// with the fuel formulation resolved to a fuel type.
-#[derive(Debug, Clone, Copy, PartialEq)]
-struct CountyFuelAdjustmentWithFuelType {
-    fuel_region_id: i32,
-    pol_process_id: i32,
-    model_year_id: i32,
-    source_type_id: i32,
-    fuel_formulation_id: i32,
-    fuel_type_id: i32,
-    fuel_adjustment: f64,
-}
-
 /// CSEC 2-b — `FuelSupplyAdjustment`: the market-share-weighted fuel
 /// adjustment per `(year, month, polProcess, modelYear, sourceType,
 /// fuelType)`.
@@ -2710,20 +2683,36 @@ fn im_coverage_merged(inputs: &CriteriaStartInputs, ctx: &RunContext) -> Vec<ImC
         .collect()
 }
 
-/// CSEC 2-a — `CountyFuelAdjustment`.
+/// CSEC 2-a/b — `FuelSupplyAdjustment`.
 ///
-/// The cartesian product `County × PollutantProcessAssoc × FuelFormulation ×
-/// SourceTypeModelYear`, left-joined to `criteriaRatio` on `(polProcessID,
-/// fuelFormulationID, sourceTypeID, modelYearID)`. The fuel adjustment is
-/// `ifnull(ratio, 1) + GPAFract × (ifnull(ratioGPA, 1) − ifnull(ratio, 1))`;
-/// with no `criteriaRatio` match it collapses to `1.0`.
-fn county_fuel_adjustment(
+/// Fuses CSEC 2-a (`CountyFuelAdjustment`) and CSEC 2-b
+/// (`CountyFuelAdjustmentWithFuelType`, `FuelSupplyAdjustment`) into a single
+/// streaming pass that never materialises the cartesian product.
+///
+/// The SQL CSEC 2-a cartesian-joins `County × PollutantProcessAssoc ×
+/// FuelFormulation × SourceTypeModelYear` (786 × 2158 × 533 ≈ 904 M rows on
+/// a real runspec) with a left join to `criteriaRatio`. CSEC 2-b immediately
+/// inner-joins each row to `FuelFormulation ⋈ FuelSubtype` to resolve the
+/// fuel type, then aggregates `Σ(fuelAdjustment × marketShare)` against
+/// `FuelSupply` grouped by `(year, month, polProcess, modelYear, sourceType,
+/// fuelType)`.
+///
+/// This implementation streams the cartesian product as nested loops without
+/// pushing any intermediate row into a `Vec`. For each `FuelFormulation` the
+/// fuel-type lookup and the matching `FuelSupply` rows are resolved once
+/// (before the inner `SourceTypeModelYear` loop), so formulations that have
+/// no fuel-type mapping or no supply entry are skipped cheaply.  The only
+/// collection that grows is the `totals` accumulator, which is bounded by the
+/// number of distinct aggregation keys — orders of magnitude smaller than the
+/// cartesian product.
+fn fuel_supply_adjustment(
     inputs: &CriteriaStartInputs,
     ctx: &RunContext,
-) -> Vec<CountyFuelAdjustment> {
+) -> Vec<FuelSupplyAdjustment> {
     let pol_process_ids: HashSet<i32> = ctx.pol_process_ids.iter().copied().collect();
-    // criteriaRatio indexed for the LEFT JOIN — a key may carry several rows,
-    // and the join emits one output row per match.
+
+    // criteriaRatio indexed for the CSEC 2-a LEFT JOIN — one key may carry
+    // several rows; the join emits one output row per match.
     let mut cr_by_key: HashMap<(i32, i32, i32, i32), Vec<&CriteriaRatioRow>> = HashMap::new();
     for cr in &inputs.criteria_ratio {
         cr_by_key
@@ -2737,105 +2726,21 @@ fn county_fuel_adjustment(
             .push(cr);
     }
 
-    let mut out: Vec<CountyFuelAdjustment> = Vec::new();
-    for county in &inputs.county {
-        for ppa in &inputs.pollutant_process_assoc {
-            // CSEC 2-a `WHERE ppa.polProcessID IN (##pollutantProcessIDs##)`.
-            if !pol_process_ids.contains(&ppa.pol_process_id) {
-                continue;
-            }
-            for ff in &inputs.fuel_formulation {
-                for stmy in &inputs.source_type_model_year {
-                    let matches = cr_by_key.get(&(
-                        ppa.pol_process_id,
-                        ff.fuel_formulation_id,
-                        stmy.source_type_id,
-                        stmy.model_year_id,
-                    ));
-                    let mut emit = |fuel_adjustment: f64| {
-                        out.push(CountyFuelAdjustment {
-                            fuel_region_id: ctx.fuel_region_id,
-                            pol_process_id: ppa.pol_process_id,
-                            model_year_id: stmy.model_year_id,
-                            source_type_id: stmy.source_type_id,
-                            fuel_formulation_id: ff.fuel_formulation_id,
-                            fuel_adjustment,
-                        });
-                    };
-                    match matches {
-                        // LEFT JOIN miss — ifnull(NULL, 1) gives 1.0.
-                        None => emit(1.0),
-                        Some(crs) => {
-                            for cr in crs {
-                                emit(cr.ratio + county.gpa_fract * (cr.ratio_gpa - cr.ratio));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    out
-}
-
-/// CSEC 2-b — `CountyFuelAdjustmentWithFuelType`.
-///
-/// Resolves each [`CountyFuelAdjustment`] row's fuel formulation to a fuel
-/// type via `FuelFormulation ⋈ FuelSubtype`.
-fn county_fuel_adjustment_with_fuel_type(
-    inputs: &CriteriaStartInputs,
-    county_fuel: &[CountyFuelAdjustment],
-) -> Vec<CountyFuelAdjustmentWithFuelType> {
-    // fuelFormulationID → fuelSubtypeID; fuelFormulationID is the unique key.
+    // fuelFormulationID → fuelSubtypeID (CSEC 2-b INNER JOIN FuelFormulation).
     let subtype_of_formulation: HashMap<i32, i32> = inputs
         .fuel_formulation
         .iter()
         .map(|ff| (ff.fuel_formulation_id, ff.fuel_subtype_id))
         .collect();
-    // fuelSubtypeID → fuelTypeID; fuelSubtypeID is the unique key.
+    // fuelSubtypeID → fuelTypeID (CSEC 2-b INNER JOIN FuelSubtype).
     let fuel_type_of_subtype: HashMap<i32, i32> = inputs
         .fuel_subtype
         .iter()
         .map(|fst| (fst.fuel_subtype_id, fst.fuel_type_id))
         .collect();
 
-    let mut out: Vec<CountyFuelAdjustmentWithFuelType> = Vec::new();
-    for cfa in county_fuel {
-        // INNER JOIN FuelFormulation USING (fuelFormulationID).
-        let Some(&subtype_id) = subtype_of_formulation.get(&cfa.fuel_formulation_id) else {
-            continue;
-        };
-        // INNER JOIN FuelSubtype USING (fuelSubtypeID).
-        let Some(&fuel_type_id) = fuel_type_of_subtype.get(&subtype_id) else {
-            continue;
-        };
-        out.push(CountyFuelAdjustmentWithFuelType {
-            fuel_region_id: cfa.fuel_region_id,
-            pol_process_id: cfa.pol_process_id,
-            model_year_id: cfa.model_year_id,
-            source_type_id: cfa.source_type_id,
-            fuel_formulation_id: cfa.fuel_formulation_id,
-            fuel_type_id,
-            fuel_adjustment: cfa.fuel_adjustment,
-        });
-    }
-    out
-}
-
-/// CSEC 2-b — `FuelSupplyAdjustment`.
-///
-/// `fuelAdjustment = Σ(fuelAdjustment × marketShare)`, summed over the
-/// `CountyFuelAdjustmentWithFuelType × Year × MonthOfAnyYear ⋈ FuelSupply`
-/// join and grouped by `(year, month, polProcess, modelYear, sourceType,
-/// fuelType)`. `Year` and `MonthOfAnyYear` are extract-filtered to the run's
-/// single year and month.
-fn fuel_supply_adjustment(
-    inputs: &CriteriaStartInputs,
-    ctx: &RunContext,
-    county_fuel_ft: &[CountyFuelAdjustmentWithFuelType],
-) -> Vec<FuelSupplyAdjustment> {
-    // FuelSupply keyed by its `(fuelRegionID, fuelYearID, monthGroupID,
-    // fuelFormulationID)` primary key.
+    // FuelSupply keyed by (fuelRegionID, fuelYearID, monthGroupID,
+    // fuelFormulationID) for the CSEC 2-b INNER JOIN.
     let fs_by_key: HashMap<(i32, i32, i32, i32), &FuelSupplyRow> = inputs
         .fuel_supply
         .iter()
@@ -2855,29 +2760,76 @@ fn fuel_supply_adjustment(
     // GROUP BY (yearID, monthID, polProcessID, modelYearID, sourceTypeID,
     // fuelTypeID).
     let mut totals: HashMap<[i32; 6], f64> = HashMap::new();
-    for cfa in county_fuel_ft {
-        for year in &inputs.year {
-            for may in &inputs.month_of_any_year {
-                // INNER JOIN FuelSupply ON (fuelRegionID, fuelYearID,
-                // monthGroupID, fuelFormulationID).
-                let Some(fs) = fs_by_key.get(&(
-                    cfa.fuel_region_id,
-                    year.fuel_year_id,
-                    may.month_group_id,
-                    cfa.fuel_formulation_id,
-                )) else {
+
+    for county in &inputs.county {
+        for ppa in &inputs.pollutant_process_assoc {
+            // CSEC 2-a `WHERE ppa.polProcessID IN (##pollutantProcessIDs##)`.
+            if !pol_process_ids.contains(&ppa.pol_process_id) {
+                continue;
+            }
+            for ff in &inputs.fuel_formulation {
+                // Resolve fuel type once per formulation; skip all
+                // SourceTypeModelYear iterations if either lookup fails.
+                let Some(&subtype_id) = subtype_of_formulation.get(&ff.fuel_formulation_id) else {
                     continue;
                 };
-                *totals
-                    .entry([
-                        year.year_id,
-                        may.month_id,
-                        cfa.pol_process_id,
-                        cfa.model_year_id,
-                        cfa.source_type_id,
-                        cfa.fuel_type_id,
-                    ])
-                    .or_default() += cfa.fuel_adjustment * fs.market_share;
+                let Some(&fuel_type_id) = fuel_type_of_subtype.get(&subtype_id) else {
+                    continue;
+                };
+
+                // Collect (year_id, month_id, market_share) triples for this
+                // formulation once — reused for every SourceTypeModelYear row.
+                let mut supply_weights: Vec<(i32, i32, f64)> = Vec::new();
+                for year in &inputs.year {
+                    for may in &inputs.month_of_any_year {
+                        if let Some(fs) = fs_by_key.get(&(
+                            ctx.fuel_region_id,
+                            year.fuel_year_id,
+                            may.month_group_id,
+                            ff.fuel_formulation_id,
+                        )) {
+                            supply_weights.push((year.year_id, may.month_id, fs.market_share));
+                        }
+                    }
+                }
+
+                if supply_weights.is_empty() {
+                    continue;
+                }
+
+                for stmy in &inputs.source_type_model_year {
+                    let matches = cr_by_key.get(&(
+                        ppa.pol_process_id,
+                        ff.fuel_formulation_id,
+                        stmy.source_type_id,
+                        stmy.model_year_id,
+                    ));
+
+                    let mut accumulate = |fuel_adjustment: f64| {
+                        for &(year_id, month_id, market_share) in &supply_weights {
+                            *totals
+                                .entry([
+                                    year_id,
+                                    month_id,
+                                    ppa.pol_process_id,
+                                    stmy.model_year_id,
+                                    stmy.source_type_id,
+                                    fuel_type_id,
+                                ])
+                                .or_default() += fuel_adjustment * market_share;
+                        }
+                    };
+
+                    match matches {
+                        // LEFT JOIN miss — ifnull(NULL, 1) gives 1.0.
+                        None => accumulate(1.0),
+                        Some(crs) => {
+                            for cr in crs {
+                                accumulate(cr.ratio + county.gpa_fract * (cr.ratio_gpa - cr.ratio));
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -3484,9 +3436,7 @@ impl CriteriaStartCalculator {
         ctx: &RunContext,
     ) -> Vec<CriteriaStartEmissionRow> {
         let im_merged = im_coverage_merged(inputs, ctx);
-        let county_fuel = county_fuel_adjustment(inputs, ctx);
-        let county_fuel_ft = county_fuel_adjustment_with_fuel_type(inputs, &county_fuel);
-        let fuel_supply_adj = fuel_supply_adjustment(inputs, ctx, &county_fuel_ft);
+        let fuel_supply_adj = fuel_supply_adjustment(inputs, ctx);
         let met_start = met_start_adjustment(inputs);
         let emission_rates = emission_rates_with_im_and_temp(inputs, ctx, &met_start);
         let met_source_bin = met_source_bin_emission_rates(inputs, &emission_rates);
