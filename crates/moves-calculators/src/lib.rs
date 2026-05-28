@@ -45,7 +45,6 @@ pub fn register_all(
 ) -> std::result::Result<(), moves_framework::Error> {
     use calculators::activitycalculator;
     use calculators::airtoxics;
-    use calculators::airtoxicsdistance;
     use calculators::ch4n2o_running_start;
     use calculators::co2ae_running_start_extended_idle;
     use calculators::criteria_running_calculator;
@@ -71,10 +70,6 @@ pub fn register_all(
         activitycalculator::factory,
     )?;
     registry.register_calculator(airtoxics::AirToxicsCalculator::NAME, airtoxics::factory)?;
-    registry.register_calculator(
-        airtoxicsdistance::AirToxicsDistanceCalculator::NAME,
-        airtoxicsdistance::factory,
-    )?;
     registry.register_calculator(
         ch4n2o_running_start::Ch4N2oRunningStartCalculator::NAME,
         ch4n2o_running_start::factory,
