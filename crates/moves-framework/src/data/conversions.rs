@@ -33,7 +33,7 @@
 
 use std::collections::HashMap;
 
-use polars::prelude::{Column, DataFrame, DataType, IntoLazy, PolarsResult, Schema, Series};
+use polars::prelude::{Column, DataFrame, DataType, IntoSeries, PolarsResult, Schema, Series};
 
 use crate::data::schema_registry::schema_registry;
 use crate::data::DataFrameStore;
@@ -205,38 +205,31 @@ pub trait DataFrameStoreTyped: DataFrameStore {
             return R::from_dataframe(&df);
         }
 
-        // Apply type casts (e.g. String→Boolean, String→Float64) with lazy.
-        let actual_dtypes: Vec<DataType> = {
-            // Build a temporary map from the new_cols we're about to consume.
-            let tmp: HashMap<String, DataType> = new_cols
-                .iter()
-                .map(|c| (c.name().to_string(), c.dtype().clone()))
-                .collect();
-            casts
-                .iter()
-                .map(|(col_name, _)| tmp.get(col_name).cloned().unwrap_or(DataType::Null))
-                .collect()
-        };
-        let mut lazy = DataFrame::new(height, new_cols)
-            .map_err(|e| Error::Polars(e.to_string()))?
-            .lazy();
-        for ((col_name, expected_dtype), actual_dtype) in casts.iter().zip(&actual_dtypes) {
-            // MySQL stores BOOLEAN as "Y"/"N" or "1"/"0" strings; Polars
-            // cannot cast String → Boolean directly.
-            let expr = if *expected_dtype == DataType::Boolean && *actual_dtype == DataType::String
-            {
-                polars::prelude::col(col_name.as_str())
-                    .eq(polars::prelude::lit("Y"))
-                    .or(polars::prelude::col(col_name.as_str()).eq(polars::prelude::lit("1")))
-                    .alias(col_name.as_str())
-            } else {
-                polars::prelude::col(col_name.as_str())
-                    .cast(expected_dtype.clone())
-                    .alias(col_name.as_str())
-            };
-            lazy = lazy.with_column(expr);
+        // Apply type casts (e.g. String→Boolean, String→Float64) with eager ops.
+        let mut df = DataFrame::new(height, new_cols).map_err(|e| Error::Polars(e.to_string()))?;
+        for (col_name, expected_dtype) in &casts {
+            let col = df
+                .column(col_name.as_str())
+                .map_err(|e| Error::Polars(e.to_string()))?
+                .clone();
+            let actual_dtype = col.dtype().clone();
+            let new_col =
+                if *expected_dtype == DataType::Boolean && actual_dtype == DataType::String {
+                    // MySQL stores BOOLEAN as "Y"/"N" or "1"/"0" strings; Polars
+                    // cannot cast String → Boolean directly.
+                    let ca = col.str().map_err(|e| Error::Polars(e.to_string()))?;
+                    let bool_ca: polars::prelude::BooleanChunked = ca
+                        .iter()
+                        .map(|opt_s| opt_s.map(|s| s == "Y" || s == "1"))
+                        .collect();
+                    Column::from(bool_ca.with_name(col_name.as_str().into()).into_series())
+                } else {
+                    col.cast(expected_dtype)
+                        .map_err(|e| Error::Polars(e.to_string()))?
+                };
+            df.with_column(new_col)
+                .map_err(|e| Error::Polars(e.to_string()))?;
         }
-        let df = lazy.collect().map_err(|e| Error::Polars(e.to_string()))?;
         R::from_dataframe(&df)
     }
 
