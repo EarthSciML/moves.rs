@@ -263,9 +263,12 @@ struct CalculatorMasterLoopable {
     /// Per-chunk shared context. All adapters within one chunk share the
     /// same `Arc`; adapters in different chunks hold different `Arc`s.
     ctx: Arc<Mutex<CalculatorContext>>,
-    /// Cross-chunk accumulator: emission DataFrames from every calculator
-    /// invocation are pushed here for post-run aggregation.
-    output_acc: Arc<Mutex<Vec<DataFrame>>>,
+    /// Cross-chunk accumulator: emission rows from every calculator invocation
+    /// are streamed here immediately after conversion, keeping peak DataFrame
+    /// memory bounded to one frame at a time per chunk.
+    output_acc: Arc<Mutex<Vec<EmissionRecord>>>,
+    /// Run hash stamped into every accumulated [`EmissionRecord`].
+    run_hash: Arc<str>,
 }
 
 impl MasterLoopable for CalculatorMasterLoopable {
@@ -276,16 +279,23 @@ impl MasterLoopable for CalculatorMasterLoopable {
         if context.position.process_id != Some(self.gate_process) {
             return Ok(());
         }
-        let mut ctx = self.ctx.lock().expect("CalculatorContext mutex poisoned");
-        ctx.set_position(context.position);
-        if let Some(df) = self.module.execute(&mut ctx)? {
+        let df = {
+            let mut ctx = self.ctx.lock().expect("CalculatorContext mutex poisoned");
+            ctx.set_position(context.position);
+            self.module.execute(&mut ctx)?
+            // ctx lock released here — conversion and accumulator write happen outside
+        };
+        if let Some(df) = df {
             // Only accumulate emission output (has pollutantID); skip activity
             // output (e.g. MOVESWorkerActivityOutput from DistanceCalculator).
             if df.height() > 0 && df.column("pollutantID").is_ok() {
+                let records = frame_to_emission_records(&df, &self.run_hash);
+                // DataFrame is freed here before the accumulator lock is taken.
+                drop(df);
                 self.output_acc
                     .lock()
                     .expect("output accumulator poisoned")
-                    .push(df);
+                    .extend(records);
             }
         }
         Ok(())
@@ -479,6 +489,14 @@ impl MOVESEngine {
             s.pre_run(&pre_run_ctx)?;
         }
 
+        // Pre-build the run record — it depends only on the immutable RunSpec
+        // and EngineConfig, so it is safe to construct before the executor runs.
+        // The run_hash is also handed to each CalculatorMasterLoopable so that
+        // DataFrames can be converted to EmissionRecords inline (and freed)
+        // rather than buffered for a post-run bulk conversion.
+        let run_record = self.build_run_record();
+        let run_hash_str: Arc<str> = run_record.run_hash.clone().into();
+
         let executor = BoundedExecutor::new(self.config.max_parallel_chunks)?;
         let registry = &self.registry;
         let chunk_slow = Arc::clone(&self.slow_store);
@@ -489,9 +507,10 @@ impl MOVESEngine {
         let chunk_slot: Arc<Mutex<Vec<Option<Duration>>>> =
             Arc::new(Mutex::new(vec![None; chunks.len()]));
         let chunk_slot_ref = Arc::clone(&chunk_slot);
-        // Emission DataFrames accumulated across all chunks for post-run
-        // aggregation and writing to MOVESOutput/.
-        let output_acc: Arc<Mutex<Vec<DataFrame>>> = Arc::new(Mutex::new(Vec::new()));
+        // Emission records accumulated across all chunks. Conversion from the
+        // calculator's output DataFrame happens inline in each adapter callback,
+        // so no DataFrame survives past the calculator invocation that produced it.
+        let output_acc: Arc<Mutex<Vec<EmissionRecord>>> = Arc::new(Mutex::new(Vec::new()));
         let output_acc_ref = Arc::clone(&output_acc);
         let t_exec_start = Instant::now();
         executor.execute(&chunks, |chunk| {
@@ -539,6 +558,7 @@ impl MOVESEngine {
                         gate_process: sub.process_id,
                         ctx: Arc::clone(&chunk_ctx),
                         output_acc: Arc::clone(&output_acc_ref),
+                        run_hash: Arc::clone(&run_hash_str),
                     });
                     master.subscribe(MasterLoopableSubscription::new(
                         sub.granularity,
@@ -583,11 +603,10 @@ impl MOVESEngine {
         }
 
         // Finalize: write the MOVESRun metadata row and any accumulated
-        // emission output.
-        let raw_frames = std::mem::take(&mut *output_acc.lock().expect("output_acc poisoned"));
-        let run_record = self.build_run_record();
+        // emission output. Records were already converted inline by each
+        // CalculatorMasterLoopable — no DataFrame buffering remains.
         let emission_records =
-            worker_output_frames_to_emission_records(&raw_frames, &run_record.run_hash);
+            std::mem::take(&mut *output_acc.lock().expect("output_acc poisoned"));
 
         let (proc, output_bytes) = if self.config.collect_output_in_memory {
             let p = OutputProcessor::new_memory(&run_record)?;
@@ -797,87 +816,80 @@ fn aggregation_inputs_from_run_spec(run_spec: &RunSpec) -> AggregationInputs<'_>
     }
 }
 
-/// Convert a slice of raw `MOVESWorkerOutput` DataFrames to [`EmissionRecord`]
-/// rows for the [`OutputProcessor`].
+/// Convert one raw `MOVESWorkerOutput` [`DataFrame`] to [`EmissionRecord`] rows.
 ///
 /// Each DataFrame column is read by name; missing columns yield `None` for
 /// that field. All produced records carry `moves_run_id = 1` and the supplied
-/// `run_hash`.
-fn worker_output_frames_to_emission_records(
-    frames: &[DataFrame],
-    run_hash: &str,
-) -> Vec<EmissionRecord> {
-    let mut records = Vec::new();
-    for df in frames {
-        let col_i16 = |name: &str| -> Vec<Option<i16>> {
-            df.column(name)
-                .ok()
-                .and_then(|s| s.i32().ok())
-                .map(|ca| ca.into_iter().map(|v| v.map(|x| x as i16)).collect())
-                .unwrap_or_else(|| vec![None; df.height()])
-        };
-        let col_i32 = |name: &str| -> Vec<Option<i32>> {
-            df.column(name)
-                .ok()
-                .and_then(|s| s.i32().ok())
-                .map(|ca| ca.into_iter().collect())
-                .unwrap_or_else(|| vec![None; df.height()])
-        };
-        let col_f64 = |name: &str| -> Vec<Option<f64>> {
-            df.column(name)
-                .ok()
-                .and_then(|s| s.f64().ok())
-                .map(|ca| ca.into_iter().collect())
-                .unwrap_or_else(|| vec![None; df.height()])
-        };
+/// `run_hash`. Called inline from [`CalculatorMasterLoopable::execute_at_granularity`]
+/// so the DataFrame can be freed immediately after conversion.
+fn frame_to_emission_records(df: &DataFrame, run_hash: &str) -> Vec<EmissionRecord> {
+    let col_i16 = |name: &str| -> Vec<Option<i16>> {
+        df.column(name)
+            .ok()
+            .and_then(|s| s.i32().ok())
+            .map(|ca| ca.into_iter().map(|v| v.map(|x| x as i16)).collect())
+            .unwrap_or_else(|| vec![None; df.height()])
+    };
+    let col_i32 = |name: &str| -> Vec<Option<i32>> {
+        df.column(name)
+            .ok()
+            .and_then(|s| s.i32().ok())
+            .map(|ca| ca.into_iter().collect())
+            .unwrap_or_else(|| vec![None; df.height()])
+    };
+    let col_f64 = |name: &str| -> Vec<Option<f64>> {
+        df.column(name)
+            .ok()
+            .and_then(|s| s.f64().ok())
+            .map(|ca| ca.into_iter().collect())
+            .unwrap_or_else(|| vec![None; df.height()])
+    };
 
-        let year_id = col_i16("yearID");
-        let month_id = col_i16("monthID");
-        let day_id = col_i16("dayID");
-        let hour_id = col_i16("hourID");
-        let state_id = col_i16("stateID");
-        let county_id = col_i32("countyID");
-        let zone_id = col_i32("zoneID");
-        let link_id = col_i32("linkID");
-        let pollutant_id = col_i16("pollutantID");
-        let process_id = col_i16("processID");
-        let source_type_id = col_i16("sourceTypeID");
-        let model_year_id = col_i16("modelYearID");
-        let fuel_type_id = col_i16("fuelTypeID");
-        let road_type_id = col_i16("roadTypeID");
-        let emission_quant = col_f64("emissionQuant");
+    let year_id = col_i16("yearID");
+    let month_id = col_i16("monthID");
+    let day_id = col_i16("dayID");
+    let hour_id = col_i16("hourID");
+    let state_id = col_i16("stateID");
+    let county_id = col_i32("countyID");
+    let zone_id = col_i32("zoneID");
+    let link_id = col_i32("linkID");
+    let pollutant_id = col_i16("pollutantID");
+    let process_id = col_i16("processID");
+    let source_type_id = col_i16("sourceTypeID");
+    let model_year_id = col_i16("modelYearID");
+    let fuel_type_id = col_i16("fuelTypeID");
+    let road_type_id = col_i16("roadTypeID");
+    let emission_quant = col_f64("emissionQuant");
 
-        for i in 0..df.height() {
-            records.push(EmissionRecord {
-                moves_run_id: 1,
-                iteration_id: None,
-                year_id: year_id[i],
-                month_id: month_id[i],
-                day_id: day_id[i],
-                hour_id: hour_id[i],
-                state_id: state_id[i],
-                county_id: county_id[i],
-                zone_id: zone_id[i],
-                link_id: link_id[i],
-                pollutant_id: pollutant_id[i],
-                process_id: process_id[i],
-                source_type_id: source_type_id[i],
-                reg_class_id: None,
-                fuel_type_id: fuel_type_id[i],
-                fuel_sub_type_id: None,
-                model_year_id: model_year_id[i],
-                road_type_id: road_type_id[i],
-                scc: None,
-                eng_tech_id: None,
-                sector_id: None,
-                hp_id: None,
-                emission_quant: emission_quant[i],
-                emission_rate: None,
-                run_hash: run_hash.to_string(),
-            });
-        }
-    }
-    records
+    (0..df.height())
+        .map(|i| EmissionRecord {
+            moves_run_id: 1,
+            iteration_id: None,
+            year_id: year_id[i],
+            month_id: month_id[i],
+            day_id: day_id[i],
+            hour_id: hour_id[i],
+            state_id: state_id[i],
+            county_id: county_id[i],
+            zone_id: zone_id[i],
+            link_id: link_id[i],
+            pollutant_id: pollutant_id[i],
+            process_id: process_id[i],
+            source_type_id: source_type_id[i],
+            reg_class_id: None,
+            fuel_type_id: fuel_type_id[i],
+            fuel_sub_type_id: None,
+            model_year_id: model_year_id[i],
+            road_type_id: road_type_id[i],
+            scc: None,
+            eng_tech_id: None,
+            sector_id: None,
+            hp_id: None,
+            emission_quant: emission_quant[i],
+            emission_rate: None,
+            run_hash: run_hash.to_string(),
+        })
+        .collect()
 }
 
 /// Path of the `MOVESRun.parquet` file under an output root — exposed so a
@@ -1284,6 +1296,7 @@ mod tests {
             gate_process: ProcessId(1),
             ctx: stub_chunk_ctx(),
             output_acc: Arc::new(Mutex::new(Vec::new())),
+            run_hash: Arc::from("test"),
         };
 
         let mut ctx = MasterLoopContext::default();
@@ -1316,6 +1329,7 @@ mod tests {
             gate_process: ProcessId(1),
             ctx: stub_chunk_ctx(),
             output_acc: Arc::new(Mutex::new(Vec::new())),
+            run_hash: Arc::from("test"),
         };
         let mut ctx = MasterLoopContext::default();
         ctx.position.process_id = Some(ProcessId(1));
