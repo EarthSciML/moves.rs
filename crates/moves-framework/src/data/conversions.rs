@@ -213,6 +213,9 @@ pub trait DataFrameStoreTyped: DataFrameStore {
                 .map_err(|e| Error::Polars(e.to_string()))?
                 .clone();
             let actual_dtype = col.dtype().clone();
+            if actual_dtype == *expected_dtype {
+                continue;
+            }
             let new_col =
                 if *expected_dtype == DataType::Boolean && actual_dtype == DataType::String {
                     // MySQL stores BOOLEAN as "Y"/"N" or "1"/"0" strings; Polars
