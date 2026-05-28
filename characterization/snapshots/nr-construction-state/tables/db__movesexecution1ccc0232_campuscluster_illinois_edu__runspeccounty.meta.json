@@ -10,7 +10,7 @@
   "natural_key": [
     "countyID"
   ],
-  "row_count": 0,
+  "row_count": 1,
   "float_decimals": 12,
-  "content_sha256": "8658b8ec434977932f233895493cada1e7d675399f2ff20c497631b45c0f6fbf"
+  "content_sha256": "08facbf935ba68b4512d1bb07444107f762f7bf4210b638fba3bc6bedcd4007b"
 }
