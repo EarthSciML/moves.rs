@@ -1,7 +1,7 @@
 {
   "trace_version": "moves-fixture-capture/v1",
   "fixture_name": "nr-airport-support-county",
-  "sif_sha256": "70ea5b8378b278af50e8c44ab011066c59019faed8d141adf4ec6f2045f1e5fd",
+  "sif_sha256": "597f1f3e0aef5d23027589ee509207d13486d5c89056906bf323a889f0e02311",
   "runspec_sha256": "979c0c8ee0027a3e2cab97c79efa4fa4fa56ffd830efe10e5752fca9e763b03e",
   "java_classes": [
     {
@@ -490,6 +490,6 @@
   "worker_bundles": [],
   "sources": {
     "worker_sql_files": 0,
-    "class_load_log_files": 2
+    "class_load_log_files": 4
   }
 }
