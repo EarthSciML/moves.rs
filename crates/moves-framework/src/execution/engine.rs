@@ -827,69 +827,49 @@ fn aggregation_inputs_from_run_spec(run_spec: &RunSpec) -> AggregationInputs<'_>
 /// `run_hash`. Called inline from [`CalculatorMasterLoopable::execute_at_granularity`]
 /// so the DataFrame can be freed immediately after conversion.
 fn frame_to_emission_records(df: &DataFrame, run_hash: &str) -> Vec<EmissionRecord> {
-    let col_i16 = |name: &str| -> Vec<Option<i16>> {
-        df.column(name)
-            .ok()
-            .and_then(|s| s.i32().ok())
-            .map(|ca| ca.into_iter().map(|v| v.map(|x| x as i16)).collect())
-            .unwrap_or_else(|| vec![None; df.height()])
-    };
-    let col_i32 = |name: &str| -> Vec<Option<i32>> {
-        df.column(name)
-            .ok()
-            .and_then(|s| s.i32().ok())
-            .map(|ca| ca.into_iter().collect())
-            .unwrap_or_else(|| vec![None; df.height()])
-    };
-    let col_f64 = |name: &str| -> Vec<Option<f64>> {
-        df.column(name)
-            .ok()
-            .and_then(|s| s.f64().ok())
-            .map(|ca| ca.into_iter().collect())
-            .unwrap_or_else(|| vec![None; df.height()])
-    };
-
-    let year_id = col_i16("yearID");
-    let month_id = col_i16("monthID");
-    let day_id = col_i16("dayID");
-    let hour_id = col_i16("hourID");
-    let state_id = col_i16("stateID");
-    let county_id = col_i32("countyID");
-    let zone_id = col_i32("zoneID");
-    let link_id = col_i32("linkID");
-    let pollutant_id = col_i16("pollutantID");
-    let process_id = col_i16("processID");
-    let source_type_id = col_i16("sourceTypeID");
-    let model_year_id = col_i16("modelYearID");
-    let fuel_type_id = col_i16("fuelTypeID");
-    let road_type_id = col_i16("roadTypeID");
-    let emission_quant = col_f64("emissionQuant");
+    // Resolve column handles once per frame — O(columns) cost, no per-row Vec.
+    // Missing or wrong-type columns become None; .get(i) does lazy per-element access.
+    let year_ca = df.column("yearID").ok().and_then(|s| s.i32().ok());
+    let month_ca = df.column("monthID").ok().and_then(|s| s.i32().ok());
+    let day_ca = df.column("dayID").ok().and_then(|s| s.i32().ok());
+    let hour_ca = df.column("hourID").ok().and_then(|s| s.i32().ok());
+    let state_ca = df.column("stateID").ok().and_then(|s| s.i32().ok());
+    let county_ca = df.column("countyID").ok().and_then(|s| s.i32().ok());
+    let zone_ca = df.column("zoneID").ok().and_then(|s| s.i32().ok());
+    let link_ca = df.column("linkID").ok().and_then(|s| s.i32().ok());
+    let pollutant_ca = df.column("pollutantID").ok().and_then(|s| s.i32().ok());
+    let process_ca = df.column("processID").ok().and_then(|s| s.i32().ok());
+    let source_type_ca = df.column("sourceTypeID").ok().and_then(|s| s.i32().ok());
+    let model_year_ca = df.column("modelYearID").ok().and_then(|s| s.i32().ok());
+    let fuel_type_ca = df.column("fuelTypeID").ok().and_then(|s| s.i32().ok());
+    let road_type_ca = df.column("roadTypeID").ok().and_then(|s| s.i32().ok());
+    let emission_ca = df.column("emissionQuant").ok().and_then(|s| s.f64().ok());
 
     (0..df.height())
         .map(|i| EmissionRecord {
             moves_run_id: 1,
             iteration_id: None,
-            year_id: year_id[i],
-            month_id: month_id[i],
-            day_id: day_id[i],
-            hour_id: hour_id[i],
-            state_id: state_id[i],
-            county_id: county_id[i],
-            zone_id: zone_id[i],
-            link_id: link_id[i],
-            pollutant_id: pollutant_id[i],
-            process_id: process_id[i],
-            source_type_id: source_type_id[i],
+            year_id: year_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+            month_id: month_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+            day_id: day_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+            hour_id: hour_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+            state_id: state_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+            county_id: county_ca.and_then(|c| c.get(i)),
+            zone_id: zone_ca.and_then(|c| c.get(i)),
+            link_id: link_ca.and_then(|c| c.get(i)),
+            pollutant_id: pollutant_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+            process_id: process_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+            source_type_id: source_type_ca.and_then(|c| c.get(i)).map(|v| v as i16),
             reg_class_id: None,
-            fuel_type_id: fuel_type_id[i],
+            fuel_type_id: fuel_type_ca.and_then(|c| c.get(i)).map(|v| v as i16),
             fuel_sub_type_id: None,
-            model_year_id: model_year_id[i],
-            road_type_id: road_type_id[i],
+            model_year_id: model_year_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+            road_type_id: road_type_ca.and_then(|c| c.get(i)).map(|v| v as i16),
             scc: None,
             eng_tech_id: None,
             sector_id: None,
             hp_id: None,
-            emission_quant: emission_quant[i],
+            emission_quant: emission_ca.and_then(|c| c.get(i)),
             emission_rate: None,
             run_hash: run_hash.to_string(),
         })
