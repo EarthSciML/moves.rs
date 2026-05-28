@@ -37,4 +37,5 @@ polars = { version = "0.53", default-features = false }  # polars-core only — 
 [dev-dependencies]
 bytes = { workspace = true }
 moves-calculator-info = { path = "../moves-calculator-info" }
+moves-snapshot = { path = "../moves-snapshot" }
 tempfile = { workspace = true }

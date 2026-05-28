@@ -1,0 +1,195 @@
+//! Read the Arrow-IPC execution-DB bundle written by `moves-snapshot`.
+//!
+//! See `moves-snapshot::bundle` for the format specification.  This module
+//! only implements the reader side; the writer lives in `moves-snapshot` so
+//! the `moves-framework` crate does not need to depend on Polars at write
+//! time.
+
+use std::io::Cursor;
+use std::path::Path;
+
+use polars::prelude::{IpcReader, SerReader};
+
+use crate::data::store::InMemoryStore;
+use crate::data::DataFrameStore;
+use crate::error::{Error, Result};
+
+const MAGIC: &[u8; 8] = b"MXDB\x00\x00\x00\x01";
+
+/// Read the execution-DB bundle at `path` and return a populated
+/// [`InMemoryStore`].
+///
+/// Table names in the bundle are full snapshot names (e.g.
+/// `db__movesexecution1ccc0232_campuscluster_illinois_edu__activitytype`).
+/// Each table is stored in the returned store under its *short name*: the
+/// last `__`-separated segment, lower-cased (e.g. `activitytype`). This
+/// matches the key convention used by the per-file Parquet loader in
+/// `moves-cli`.
+pub fn read_execution_bundle(path: &Path) -> Result<InMemoryStore> {
+    let bytes = std::fs::read(path).map_err(|source| Error::Io {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    parse_bundle(&bytes, path)
+}
+
+fn parse_bundle(src: &[u8], path: &Path) -> Result<InMemoryStore> {
+    if src.len() < 12 {
+        return Err(Error::InvalidBundle(format!(
+            "{}: too short ({} bytes)",
+            path.display(),
+            src.len()
+        )));
+    }
+    if &src[0..8] != MAGIC {
+        return Err(Error::InvalidBundle(format!(
+            "{}: unrecognised magic bytes",
+            path.display()
+        )));
+    }
+    let count = u32::from_le_bytes([src[8], src[9], src[10], src[11]]) as usize;
+
+    // Parse TOC.
+    let mut cursor = 12usize;
+    let mut toc: Vec<(String, u64, u64)> = Vec::with_capacity(count);
+    for i in 0..count {
+        if cursor + 2 > src.len() {
+            return Err(Error::InvalidBundle(format!(
+                "{}: TOC entry {i} name_len field truncated",
+                path.display()
+            )));
+        }
+        let name_len = u16::from_le_bytes([src[cursor], src[cursor + 1]]) as usize;
+        cursor += 2;
+        if cursor + name_len + 16 > src.len() {
+            return Err(Error::InvalidBundle(format!(
+                "{}: TOC entry {i} truncated",
+                path.display()
+            )));
+        }
+        let name = std::str::from_utf8(&src[cursor..cursor + name_len]).map_err(|_| {
+            Error::InvalidBundle(format!(
+                "{}: TOC entry {i} has invalid UTF-8 table name",
+                path.display()
+            ))
+        })?;
+        let name = name.to_string();
+        cursor += name_len;
+        let offset = u64::from_le_bytes(src[cursor..cursor + 8].try_into().unwrap());
+        let length = u64::from_le_bytes(src[cursor + 8..cursor + 16].try_into().unwrap());
+        cursor += 16;
+        toc.push((name, offset, length));
+    }
+
+    // Decode tables.
+    let mut store = InMemoryStore::new();
+    for (full_name, offset, length) in toc {
+        let start = offset as usize;
+        let end = start.checked_add(length as usize).ok_or_else(|| {
+            Error::InvalidBundle(format!(
+                "{}: overflow in data range for {full_name:?}",
+                path.display()
+            ))
+        })?;
+        if end > src.len() {
+            return Err(Error::InvalidBundle(format!(
+                "{}: data for {full_name:?} extends beyond bundle end",
+                path.display()
+            )));
+        }
+        let ipc_bytes = &src[start..end];
+        let df = IpcReader::new(Cursor::new(ipc_bytes))
+            .set_rechunk(true)
+            .finish()
+            .map_err(|e| Error::Polars(e.to_string()))?;
+
+        let short_name = full_name
+            .rsplit("__")
+            .next()
+            .unwrap_or(&full_name)
+            .to_ascii_lowercase();
+        store.insert(short_name, df);
+    }
+    Ok(store)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use moves_snapshot::bundle::build_bundle_bytes;
+    use moves_snapshot::format::ColumnKind;
+    use moves_snapshot::table::{TableBuilder, Value};
+    use tempfile::tempdir;
+
+    fn ipc_for_table(name: &str, rows: usize) -> Vec<u8> {
+        let mut tb = TableBuilder::new(
+            name,
+            [
+                ("id".to_string(), ColumnKind::Int64),
+                ("label".to_string(), ColumnKind::Utf8),
+            ],
+        )
+        .unwrap()
+        .with_natural_key(["id"])
+        .unwrap();
+        for i in 0..rows as i64 {
+            tb.push_row([Value::Int64(i), Value::Utf8(format!("row{i}"))])
+                .unwrap();
+        }
+        let table = tb.build().unwrap();
+        let (schema, batch) = table.to_record_batch().unwrap();
+        let mut buf = Vec::new();
+        let mut w = arrow::ipc::writer::FileWriter::try_new(&mut buf, &schema).unwrap();
+        w.write(&batch).unwrap();
+        w.finish().unwrap();
+        buf
+    }
+
+    #[test]
+    fn round_trip_single_table() {
+        let ipc = ipc_for_table("db__movesexecution1__activitytype", 3);
+        let bundle = build_bundle_bytes([("db__movesexecution1__activitytype", ipc.as_slice())]);
+
+        let dir = tempdir().unwrap();
+        let bundle_path = dir.path().join("exec.bundle");
+        std::fs::write(&bundle_path, &bundle).unwrap();
+
+        let store = read_execution_bundle(&bundle_path).unwrap();
+        let df = store.get("activitytype").expect("short name lookup");
+        assert_eq!(df.height(), 3);
+        assert_eq!(df.width(), 2);
+    }
+
+    #[test]
+    fn short_name_extraction() {
+        let long = "db__movesexecution1ccc0232_campuscluster_illinois_edu__samplevehicletrip";
+        let short: String = long
+            .rsplit("__")
+            .next()
+            .unwrap_or(long)
+            .to_ascii_lowercase();
+        assert_eq!(short, "samplevehicletrip");
+    }
+
+    #[test]
+    fn bad_magic_is_rejected() {
+        let mut buf = vec![0u8; 20];
+        buf[0..4].copy_from_slice(b"XXXX");
+        let dir = tempdir().unwrap();
+        let p = dir.path().join("bad.bundle");
+        std::fs::write(&p, &buf).unwrap();
+        let err = read_execution_bundle(&p).unwrap_err();
+        assert!(matches!(err, Error::InvalidBundle(_)));
+    }
+
+    #[test]
+    fn empty_bundle_returns_empty_store() {
+        // Build a valid bundle with count=0.
+        let buf = build_bundle_bytes(std::iter::empty::<(&str, &[u8])>());
+        let dir = tempdir().unwrap();
+        let p = dir.path().join("empty.bundle");
+        std::fs::write(&p, &buf).unwrap();
+        let store = read_execution_bundle(&p).unwrap();
+        assert!(store.names().is_empty());
+    }
+}

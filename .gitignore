@@ -24,3 +24,7 @@
 
 # Default output directory for moves run
 moves-output/
+
+# Execution-DB Arrow-IPC bundle (derived from committed Parquet files).
+# Generate with: moves-snapshot bundle-update <snapshot-dir...>
+execution-db.bundle

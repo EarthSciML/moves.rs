@@ -27,8 +27,9 @@ use moves_calculators::generators::totalactivitygenerator::inputs::{
 };
 use moves_calculators::generators::totalactivitygenerator::model::AverageSpeedRow;
 use moves_framework::{
-    CalculatorRegistry, CountyRow, DataFrameStore, DataFrameStoreParquet, DataFrameStoreTyped,
-    EngineConfig, EngineOutcome, GeographyTables, InMemoryStore, LinkRow, MOVESEngine,
+    read_execution_bundle, CalculatorRegistry, CountyRow, DataFrameStore, DataFrameStoreParquet,
+    DataFrameStoreTyped, EngineConfig, EngineOutcome, GeographyTables, InMemoryStore, LinkRow,
+    MOVESEngine,
 };
 
 use crate::load_run_spec;
@@ -105,17 +106,34 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
 /// the embedded Phase 1 DAG.
 /// Load execution-database tables from a snapshot directory.
 ///
-/// Scans `snapshot_dir/tables/` for Parquet files whose names begin with
-/// `db__movesexecution` (the canonical MOVES execution-DB prefix written by
-/// the Phase 1 capture harness).  Each matching file is read and inserted
-/// into the returned [`InMemoryStore`] under the table name extracted from
-/// the filename suffix (the part after the last `__`, without the `.parquet`
-/// extension, e.g. `samplevehicletrip`).
+/// Prefers the Arrow-IPC bundle at `<snapshot>/tables/execution-db.bundle` when
+/// it exists (written by `moves-snapshot::Snapshot::write` since format v2).
+/// Falls back to scanning `<snapshot>/tables/` for individual Parquet files
+/// whose names begin with `db__movesexecution` for snapshots captured before
+/// the bundle format was introduced.
 ///
-/// The [`InMemoryStore`] uses case-insensitive lookup, so calculators that
-/// call `ctx.tables().iter_typed("SampleVehicleTrip")` will find the entry
-/// stored as `samplevehicletrip`.
+/// All tables are stored in the returned [`InMemoryStore`] under their *short*
+/// name (the last `__`-separated segment, lower-cased). The store uses
+/// case-insensitive lookup, so calculators calling
+/// `ctx.tables().iter_typed("SampleVehicleTrip")` will find the entry stored
+/// as `samplevehicletrip`.
 fn load_execution_db(snapshot_dir: &Path) -> Result<InMemoryStore> {
+    let bundle_path = snapshot_dir.join("tables").join("execution-db.bundle");
+    let mut store = if bundle_path.exists() {
+        read_execution_bundle(&bundle_path)
+            .with_context(|| format!("loading execution-DB bundle {}", bundle_path.display()))?
+    } else {
+        load_execution_db_from_parquet(snapshot_dir)?
+    };
+    // If the SHO table has null distances (MOVES inserts them before calculateDistance
+    // runs), compute distance = SHO * averageSpeed and write back to the store.
+    populate_sho_distances(&mut store).context("populating SHO distances from snapshot")?;
+    Ok(store)
+}
+
+/// Fall-back loader: scan `<snapshot>/tables/` for individual `db__movesexecution*.parquet`
+/// files (snapshots captured before the bundle format was introduced).
+fn load_execution_db_from_parquet(snapshot_dir: &Path) -> Result<InMemoryStore> {
     let tables_dir = snapshot_dir.join("tables");
     let mut store = InMemoryStore::new();
     let dir = fs::read_dir(&tables_dir)
@@ -140,9 +158,6 @@ fn load_execution_db(snapshot_dir: &Path) -> Result<InMemoryStore> {
             .read_parquet(table_name, BufReader::new(file))
             .with_context(|| format!("parsing {}", entry.path().display()))?;
     }
-    // If the SHO table has null distances (MOVES inserts them before calculateDistance
-    // runs), compute distance = SHO * averageSpeed and write back to the store.
-    populate_sho_distances(&mut store).context("populating SHO distances from snapshot")?;
     Ok(store)
 }
 
@@ -399,6 +414,70 @@ mod tests {
     use polars::prelude::NamedFrom;
 
     use super::*;
+
+    fn make_execdb_snapshot() -> (tempfile::TempDir, moves_snapshot::Snapshot) {
+        use moves_snapshot::format::ColumnKind;
+        use moves_snapshot::table::{TableBuilder, Value};
+        use moves_snapshot::Snapshot;
+
+        let mut tb = TableBuilder::new(
+            "db__movesexecution1__activitytype",
+            [
+                ("activitytypeid".to_string(), ColumnKind::Int64),
+                ("activitytype".to_string(), ColumnKind::Utf8),
+            ],
+        )
+        .unwrap()
+        .with_natural_key(["activitytypeid"])
+        .unwrap();
+        tb.push_row([Value::Int64(1), Value::Utf8("Running Exhaust".into())])
+            .unwrap();
+        tb.push_row([Value::Int64(2), Value::Utf8("Start Exhaust".into())])
+            .unwrap();
+        let table = tb.build().unwrap();
+
+        let mut snap = Snapshot::new();
+        snap.add_table(table).unwrap();
+
+        let dir = tempfile::tempdir().unwrap();
+        snap.write(dir.path()).unwrap();
+        (dir, snap)
+    }
+
+    #[test]
+    fn load_execution_db_prefers_bundle_when_present() {
+        let (dir, _snap) = make_execdb_snapshot();
+        // The bundle should have been written by Snapshot::write.
+        let bundle_path = dir.path().join("tables").join("execution-db.bundle");
+        assert!(
+            bundle_path.exists(),
+            "bundle must exist after Snapshot::write"
+        );
+
+        let store = load_execution_db(dir.path()).expect("load must succeed from bundle");
+        assert!(
+            store.contains("activitytype"),
+            "activitytype table must be present in store"
+        );
+        let df = store.get("activitytype").unwrap();
+        assert_eq!(df.height(), 2, "both rows must be loaded");
+    }
+
+    #[test]
+    fn load_execution_db_fallback_works_without_bundle() {
+        let (dir, _snap) = make_execdb_snapshot();
+        // Remove the bundle to force the per-file Parquet fallback.
+        let bundle_path = dir.path().join("tables").join("execution-db.bundle");
+        std::fs::remove_file(&bundle_path).unwrap();
+
+        let store = load_execution_db(dir.path()).expect("fallback load must succeed");
+        assert!(
+            store.contains("activitytype"),
+            "activitytype table must be present in fallback store"
+        );
+        let df = store.get("activitytype").unwrap();
+        assert_eq!(df.height(), 2, "both rows must be loaded via fallback");
+    }
 
     fn make_sho_store() -> InMemoryStore {
         let sho_rows = vec![

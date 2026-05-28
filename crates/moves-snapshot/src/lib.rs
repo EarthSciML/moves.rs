@@ -23,6 +23,7 @@
 //!   serializes via `serde_json` with a stable struct order, and JSON files
 //!   are written with a trailing newline.
 
+pub mod bundle;
 pub mod diff;
 pub mod error;
 pub mod format;
@@ -31,6 +32,7 @@ pub mod snapshot;
 pub mod table;
 pub mod tolerance;
 
+pub use bundle::{write_execution_bundle, BUNDLE_FILE, BUNDLE_MAGIC};
 pub use diff::{diff_snapshots, Diff, DiffOptions, DiffSummary, RowDiff, SchemaDiff, TableChange};
 pub use error::{Error, Result};
 pub use format::{ColumnKind, ColumnSpec, FLOAT_DECIMALS, FORMAT_VERSION};

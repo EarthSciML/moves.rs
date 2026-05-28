@@ -28,6 +28,7 @@ use std::process::ExitCode;
 use clap::{Parser, Subcommand, ValueEnum};
 use serde::Serialize;
 
+use moves_snapshot::bundle::update_execution_bundle_from_parquets;
 use moves_snapshot::diff::DiffOptions;
 use moves_snapshot::tolerance::ToleranceConfig;
 use moves_snapshot::{diff_snapshots, Diff, DiffSummary, RowDiff, SchemaDiff, Snapshot};
@@ -49,6 +50,19 @@ struct Cli {
 enum Command {
     /// Compute a structured diff between two snapshot directories.
     Diff(DiffArgs),
+
+    /// Write (or refresh) `tables/execution-db.bundle` for one or more
+    /// snapshot directories. Reads existing `db__movesexecution*.parquet`
+    /// files and bundles them as Arrow IPC. Use this to migrate snapshots
+    /// captured before bundle support was added.
+    BundleUpdate(BundleUpdateArgs),
+}
+
+#[derive(Debug, Parser)]
+struct BundleUpdateArgs {
+    /// One or more snapshot directories to update.
+    #[arg(value_name = "DIR", required = true)]
+    dirs: Vec<PathBuf>,
 }
 
 #[derive(Debug, Parser)]
@@ -105,6 +119,27 @@ fn main() -> ExitCode {
                 ExitCode::from(2)
             }
         },
+        Command::BundleUpdate(args) => {
+            let mut any_err = false;
+            for dir in &args.dirs {
+                match update_execution_bundle_from_parquets(dir) {
+                    Ok(0) => eprintln!(
+                        "skipped {} (no db__movesexecution tables found)",
+                        dir.display()
+                    ),
+                    Ok(n) => eprintln!("updated {} ({n} tables bundled)", dir.display()),
+                    Err(e) => {
+                        eprintln!("error updating {}: {e}", dir.display());
+                        any_err = true;
+                    }
+                }
+            }
+            if any_err {
+                ExitCode::from(1)
+            } else {
+                ExitCode::SUCCESS
+            }
+        }
     }
 }
 

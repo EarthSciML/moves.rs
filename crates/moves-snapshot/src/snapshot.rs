@@ -134,6 +134,9 @@ impl Snapshot {
         let manifest_bytes = serialize_json(&manifest, &manifest_path)?;
         write_bytes(&manifest_path, &manifest_bytes)?;
 
+        // Write execution-DB bundle for fast loading by `moves run --snapshot`.
+        crate::bundle::write_execution_bundle(dir, &self.tables)?;
+
         Ok(())
     }
 
@@ -480,6 +483,48 @@ mod tests {
         fs::write(&parquet, bytes).unwrap();
         let err = Snapshot::load(dir.path()).unwrap_err();
         assert!(matches!(err, Error::ContentHashMismatch { .. }));
+    }
+
+    #[test]
+    fn write_creates_execution_bundle_when_execdb_tables_present() {
+        use crate::bundle::BUNDLE_FILE;
+
+        let dir = tempdir().unwrap();
+        let mut s = Snapshot::new();
+
+        // Add an execution-DB table (prefix matches db__movesexecution).
+        let mut tb = TableBuilder::new(
+            "db__movesexecution1__activitytype",
+            [("id".to_string(), ColumnKind::Int64)],
+        )
+        .unwrap()
+        .with_natural_key(["id"])
+        .unwrap();
+        tb.push_row([Value::Int64(1)]).unwrap();
+        s.add_table(tb.build().unwrap()).unwrap();
+
+        s.write(dir.path()).unwrap();
+
+        let bundle_path = dir.path().join("tables").join(BUNDLE_FILE);
+        assert!(
+            bundle_path.exists(),
+            "execution-db.bundle should be written when execution-DB tables are present"
+        );
+    }
+
+    #[test]
+    fn write_skips_execution_bundle_when_no_execdb_tables() {
+        use crate::bundle::BUNDLE_FILE;
+
+        let dir = tempdir().unwrap();
+        let s = sample_snapshot(); // only alpha/beta, no db__movesexecution prefix
+        s.write(dir.path()).unwrap();
+
+        let bundle_path = dir.path().join("tables").join(BUNDLE_FILE);
+        assert!(
+            !bundle_path.exists(),
+            "execution-db.bundle should not be created when there are no execution-DB tables"
+        );
     }
 
     #[test]

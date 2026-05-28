@@ -112,4 +112,9 @@ pub enum Error {
     /// A Polars operation failed.
     #[error("polars: {0}")]
     Polars(String),
+
+    /// The execution-DB bundle file is malformed (wrong magic, truncated TOC,
+    /// or out-of-bounds data offset).
+    #[error("invalid execution-DB bundle: {0}")]
+    InvalidBundle(String),
 }
