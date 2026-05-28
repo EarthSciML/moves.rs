@@ -549,6 +549,15 @@ mod tests {
     }
 
     #[test]
+    fn evap_op_mode_generator_is_registered() {
+        let registry = load_registry(None, true).expect("registry should load with calculators");
+        assert!(
+            registry.has_factory("EvaporativeEmissionsOperatingModeDistributionGenerator"),
+            "EvaporativeEmissionsOperatingModeDistributionGenerator must have a factory registered"
+        );
+    }
+
+    #[test]
     fn load_registry_reports_a_missing_dag_file() {
         let err = load_registry(Some(Path::new("/nonexistent/dag.json")), false).unwrap_err();
         assert!(

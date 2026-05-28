@@ -110,8 +110,8 @@ use moves_data::{
     SourceTypeId,
 };
 use moves_framework::{
-    CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStoreTyped, Error,
-    Generator, TableRow,
+    CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStore,
+    DataFrameStoreTyped, Error, Generator, TableRow,
 };
 use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Series};
 
@@ -449,9 +449,21 @@ pub fn op_mode_distribution(
 
     // @step 010, stage 2: the non-operating (soak) modes.
     // opModeFraction = soakActivityFraction * (1 - fractionOfOperating).
+    //
+    // TankTemperatureGenerator writes SoakActivityFraction for the NEXT month
+    // (month + 1, wrapping December → January) relative to its loop context:
+    // a vehicle's soak activity from month M carries forward into month M+1.
+    // The Java EvapOpModeGen's SQL therefore joins on
+    // `saf.monthID = ##context.monthID## + 1`, and the canonical snapshots
+    // confirm this — SAF rows for a month=7 run carry month_id=8.
+    let next_month = if ctx.month_id == 12 {
+        1
+    } else {
+        ctx.month_id + 1
+    };
     let mut rows: Vec<OpModeDistributionRow> = Vec::new();
     for saf in inputs.soak_activity_fraction {
-        if saf.month_id != ctx.month_id || saf.zone_id != ctx.zone_id {
+        if saf.month_id != next_month || saf.zone_id != ctx.zone_id {
             continue;
         }
         // INNER JOIN FractionOfOperating on (sourceType, hourDay).
@@ -1234,8 +1246,28 @@ impl Generator for EvaporativeEmissionsOperatingModeDistributionGenerator {
             pollutant_process_assoc: &pollutant_process_assoc,
         };
         let rows = op_mode_distribution(&context, &inputs);
-        crate::wiring::write_scratch_table(ctx, OUTPUT_TABLES[0], rows)
+        eprintln!(
+            "[EvapOpModeGen] process={} month={} -> {} OpModeDistribution rows",
+            context.process_id.0,
+            context.month_id,
+            rows.len()
+        );
+        // Write to the slow store (not scratch) so that downstream calculators
+        // can find the table via ctx.tables(), which they already use for all
+        // other input tables. The slow store is per-chunk after Arc::make_mut
+        // clones it, so this write is visible only within this chunk.
+        let df = OpModeDistributionRow::into_dataframe(rows)
+            .map_err(|e| Error::Polars(e.to_string()))?;
+        ctx.tables_mut().insert(OUTPUT_TABLES[0], df);
+        Ok(CalculatorOutput::empty())
     }
+}
+
+/// Generator factory — returns a boxed instance for registration with the
+/// `CalculatorRegistry`.
+#[must_use]
+pub fn factory() -> Box<dyn moves_framework::Generator> {
+    Box::new(EvaporativeEmissionsOperatingModeDistributionGenerator::new())
 }
 
 #[cfg(test)]
@@ -1286,7 +1318,10 @@ mod tests {
         }
     }
 
-    /// `SoakActivityFraction` row at the fixed `(zone, month)`.
+    /// `SoakActivityFraction` row at the fixed `(zone, month+1)`.
+    ///
+    /// `TankTemperatureGenerator` writes SAF for the NEXT month (MONTH+1),
+    /// so `op_mode_distribution` joins on `saf.monthID = ctx.month_id + 1`.
     fn saf(
         source_type: u16,
         hour_day: i16,
@@ -1296,7 +1331,7 @@ mod tests {
         SoakActivityFractionRow {
             source_type_id: SourceTypeId(source_type),
             zone_id: ZONE,
-            month_id: MONTH,
+            month_id: MONTH + 1,
             hour_day_id: hour_day,
             op_mode_id: op_mode,
             soak_activity_fraction: fraction,
@@ -1727,7 +1762,7 @@ mod tests {
     }
 
     #[test]
-    fn execute_writes_op_mode_distribution_to_scratch() {
+    fn execute_writes_op_mode_distribution_to_tables() {
         use moves_framework::{
             DataFrameStore, DataFrameStoreTyped, ExecutionLocation, ExecutionTime, InMemoryStore,
             IterationPosition,
@@ -1778,11 +1813,8 @@ mod tests {
         let mut ctx = CalculatorContext::with_position_and_tables(position, store);
         generator.execute(&mut ctx).unwrap();
 
-        let out: Vec<OpModeDistributionRow> = ctx
-            .scratch()
-            .store
-            .iter_typed("OpModeDistribution")
-            .unwrap();
+        let out: Vec<OpModeDistributionRow> =
+            ctx.tables().iter_typed("OpModeDistribution").unwrap();
         // fractionOfOperating = 25/100 = 0.25; soak 151 fraction = 0.6 * 0.75 = 0.45;
         // operating 300 = 1 - 0.45 = 0.55. Expect two rows sorted by opModeID.
         assert_eq!(out.len(), 2, "expected soak + operating rows");

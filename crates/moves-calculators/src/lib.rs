@@ -60,6 +60,7 @@ pub fn register_all(
     use calculators::tank_vapor_venting_calculator;
     use calculators::togspeciation;
     use calculators::welltopump;
+    use generators::evap_op_mode_distribution;
     use generators::meteorology;
     use generators::source_bin_distribution_generator;
     use generators::start_operating_mode_distribution;
@@ -141,6 +142,10 @@ pub fn register_all(
         welltopump::total_energy::factory,
     )?;
 
+    registry.register_generator(
+        evap_op_mode_distribution::EvaporativeEmissionsOperatingModeDistributionGenerator::NAME,
+        evap_op_mode_distribution::factory,
+    )?;
     registry.register_generator("MeteorologyGenerator", meteorology::factory)?;
     registry.register_generator(
         source_bin_distribution_generator::SourceBinDistributionGenerator::NAME,
