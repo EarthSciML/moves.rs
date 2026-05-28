@@ -16,8 +16,9 @@
 //! With identical row contents these settings produce byte-identical Parquet,
 //! which the [`crate::data`] round-trip determinism contract depends on.
 
-use std::io::{Cursor, Write};
+use std::io::Write;
 
+use polars::io::mmap::MmapBytesReader;
 use polars::prelude::{
     DataFrame, ParquetCompression, ParquetReader, ParquetWriter, SerReader, StatisticsOptions,
 };
@@ -54,19 +55,20 @@ pub trait DataFrameStoreParquet: DataFrameStore {
         Ok(())
     }
 
-    /// Read Parquet bytes from `src` and insert the resulting [`DataFrame`]
+    /// Read Parquet data from `src` and insert the resulting [`DataFrame`]
     /// into this store under `name`.
     ///
-    /// The DataFrame is rechunked on read so that column accessors (e.g.
-    /// [`polars::prelude::Series::i32`]) see a single contiguous chunk.
+    /// `src` can be any [`MmapBytesReader`] — a `BufReader<File>` for
+    /// streaming file reads or a `Cursor<&[u8]>` for in-memory bytes.
+    /// Prefer the file-backed form so raw bytes are released as they decode
+    /// rather than holding a full copy alongside the decoded buffers.
     ///
     /// # Errors
     ///
     /// Returns [`Error::Polars`] when `src` is not valid Parquet or when
     /// type inference fails.
-    fn read_parquet(&mut self, name: &str, src: &[u8]) -> Result<()> {
-        let df = ParquetReader::new(Cursor::new(src))
-            .set_rechunk(true)
+    fn read_parquet(&mut self, name: &str, src: impl MmapBytesReader) -> Result<()> {
+        let df = ParquetReader::new(src)
             .finish()
             .map_err(|e| Error::Polars(e.to_string()))?;
         self.insert(name, df);
@@ -91,13 +93,12 @@ pub fn write_dataframe(df: &DataFrame, dest: impl Write) -> Result<()> {
     Ok(())
 }
 
-/// Read Parquet bytes into a [`DataFrame`].
+/// Read Parquet data into a [`DataFrame`].
 ///
 /// Exposed as a standalone helper for callers that do not need to insert the
 /// result into a [`DataFrameStore`] immediately.
-pub fn read_dataframe(src: &[u8]) -> Result<DataFrame> {
-    ParquetReader::new(Cursor::new(src))
-        .set_rechunk(true)
+pub fn read_dataframe(src: impl MmapBytesReader) -> Result<DataFrame> {
+    ParquetReader::new(src)
         .finish()
         .map_err(|e| Error::Polars(e.to_string()))
 }

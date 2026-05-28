@@ -17,6 +17,7 @@
 
 use std::collections::BTreeMap;
 use std::fs;
+use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -133,10 +134,10 @@ fn load_execution_db(snapshot_dir: &Path) -> Result<InMemoryStore> {
             .next()
             .unwrap_or(&name_str)
             .trim_end_matches(".parquet");
-        let bytes = fs::read(entry.path())
-            .with_context(|| format!("reading {}", entry.path().display()))?;
+        let file = fs::File::open(entry.path())
+            .with_context(|| format!("opening {}", entry.path().display()))?;
         store
-            .read_parquet(table_name, &bytes)
+            .read_parquet(table_name, BufReader::new(file))
             .with_context(|| format!("parsing {}", entry.path().display()))?;
     }
     // If the SHO table has null distances (MOVES inserts them before calculateDistance

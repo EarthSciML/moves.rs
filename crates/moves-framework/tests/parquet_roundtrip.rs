@@ -4,6 +4,8 @@
 //! → iter_typed::<ShoRow>` is lossless, and that two writes of the same
 //! [`DataFrame`] produce byte-identical files.
 
+use std::io::Cursor;
+
 use moves_framework::{
     DataFrameStore, DataFrameStoreParquet, DataFrameStoreTyped, InMemoryStore, IntoDataFrame,
     TableRow,
@@ -197,7 +199,9 @@ fn vec_round_trips_element_for_element() {
 
     // read_parquet: Parquet bytes → DataFrame in store
     let mut store2 = InMemoryStore::new();
-    store2.read_parquet("SHO", &buf).expect("read_parquet");
+    store2
+        .read_parquet("SHO", Cursor::new(&buf))
+        .expect("read_parquet");
 
     // iter_typed: DataFrame → Vec<ShoRow>
     let recovered: Vec<ShoRow> = store2.iter_typed("SHO").expect("iter_typed");
