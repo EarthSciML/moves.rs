@@ -1021,6 +1021,14 @@ impl Calculator for PM10BrakeTireCalculator {
     }
 }
 
+pub fn emission_factory() -> Box<dyn Calculator> {
+    Box::new(PM10EmissionCalculator::new())
+}
+
+pub fn brake_tire_factory() -> Box<dyn Calculator> {
+    Box::new(PM10BrakeTireCalculator::new())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

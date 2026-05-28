@@ -2929,6 +2929,10 @@ impl Calculator for BasicRunningPmEmissionCalculator {
     }
 }
 
+pub fn factory() -> Box<dyn moves_framework::Calculator> {
+    Box::new(BasicRunningPmEmissionCalculator::new())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

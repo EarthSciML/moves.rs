@@ -45,6 +45,8 @@ pub fn register_all(
 ) -> std::result::Result<(), moves_framework::Error> {
     use calculators::activitycalculator;
     use calculators::airtoxics;
+    use calculators::basicbraketirepm;
+    use calculators::basicstartpm;
     use calculators::ch4n2o_running_start;
     use calculators::co2ae_running_start_extended_idle;
     use calculators::criteria_running_calculator;
@@ -54,6 +56,8 @@ pub fn register_all(
     use calculators::liquid_leaking_calculator;
     use calculators::nh3;
     use calculators::nrairtoxics;
+    use calculators::pm10;
+    use calculators::pmexhaust;
     use calculators::refueling_loss_calculator;
     use calculators::so2_calculator;
     use calculators::sulfate_pm_calculator;
@@ -124,6 +128,31 @@ pub fn register_all(
     registry.register_calculator(
         nrairtoxics::NrAirToxicsCalculator::NAME,
         nrairtoxics::factory,
+    )?;
+    registry.register_calculator(
+        basicbraketirepm::BasicBrakeWearPmEmissionCalculator::NAME,
+        basicbraketirepm::brakewear_factory,
+    )?;
+    registry.register_calculator(
+        basicbraketirepm::BasicTireWearPmEmissionCalculator::NAME,
+        basicbraketirepm::tirewear_factory,
+    )?;
+    registry.register_calculator(
+        basicstartpm::BasicStartPmEmissionCalculator::NAME,
+        basicstartpm::factory,
+    )?;
+    registry.register_calculator(pm10::PM10EmissionCalculator::NAME, pm10::emission_factory)?;
+    registry.register_calculator(
+        pm10::PM10BrakeTireCalculator::NAME,
+        pm10::brake_tire_factory,
+    )?;
+    registry.register_calculator(
+        pmexhaust::running::BasicRunningPmEmissionCalculator::NAME,
+        pmexhaust::running::factory,
+    )?;
+    registry.register_calculator(
+        pmexhaust::total::PmTotalExhaustCalculator::NAME,
+        pmexhaust::total::factory,
     )?;
     registry.register_calculator(
         welltopump::ch4n2o::Ch4N2oWtpCalculator::NAME,

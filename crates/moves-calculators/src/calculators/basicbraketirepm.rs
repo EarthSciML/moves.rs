@@ -2885,6 +2885,14 @@ impl Calculator for BasicTireWearPmEmissionCalculator {
     }
 }
 
+pub fn brakewear_factory() -> Box<dyn Calculator> {
+    Box::new(BasicBrakeWearPmEmissionCalculator::new())
+}
+
+pub fn tirewear_factory() -> Box<dyn Calculator> {
+    Box::new(BasicTireWearPmEmissionCalculator::new())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

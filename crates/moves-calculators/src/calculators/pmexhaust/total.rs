@@ -498,6 +498,10 @@ impl Calculator for PmTotalExhaustCalculator {
     }
 }
 
+pub fn factory() -> Box<dyn moves_framework::Calculator> {
+    Box::new(PmTotalExhaustCalculator::new())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

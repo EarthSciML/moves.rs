@@ -2422,6 +2422,10 @@ impl Calculator for BasicStartPmEmissionCalculator {
     }
 }
 
+pub fn factory() -> Box<dyn Calculator> {
+    Box::new(BasicStartPmEmissionCalculator::new())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
