@@ -10,6 +10,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use rustc_hash::FxHashMap;
+
 use super::inputs::{
     AvgSpeedBinRow, AvgSpeedDistributionRow, DayOfAnyWeekRow, HotellingCalendarYearRow, HourDayRow,
     HourOfAnyDayRow, RoadTypeRow, RunSpecDayRow, RunSpecSourceTypeRow, SampleVehicleDayRow,
@@ -421,7 +423,7 @@ pub fn starts_per_vehicle(
         .map(|r| r.source_type_id)
         .collect();
     // (sourceTypeID, dayID) -> count of SampleVehicleDay rows.
-    let mut sample_day_count: BTreeMap<(i32, i32), i32> = BTreeMap::new();
+    let mut sample_day_count: FxHashMap<(i32, i32), i32> = FxHashMap::default();
     for sv in sample_vehicle_day {
         *sample_day_count
             .entry((sv.source_type_id, sv.day_id))
