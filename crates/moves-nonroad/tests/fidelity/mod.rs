@@ -65,10 +65,22 @@ pub const REFERENCE_DIR_ENV: &str = "NONROAD_FIDELITY_REFERENCE";
 
 /// The reference-baseline directory, if [`REFERENCE_DIR_ENV`] is set
 /// to a non-empty value.
+///
+/// Relative paths are resolved against the repository root (the
+/// grandparent of this crate's `CARGO_MANIFEST_DIR`), so callers may
+/// pass either an absolute path or a repo-relative path like
+/// `characterization/nonroad-fidelity/baselines`.
 pub fn reference_dir() -> Option<PathBuf> {
-    std::env::var_os(REFERENCE_DIR_ENV)
-        .map(PathBuf::from)
-        .filter(|p| !p.as_os_str().is_empty())
+    let raw = std::env::var_os(REFERENCE_DIR_ENV)?;
+    let p = PathBuf::from(&raw);
+    if p.as_os_str().is_empty() {
+        return None;
+    }
+    if p.is_absolute() {
+        Some(p)
+    } else {
+        Some(fixtures::repo_root().join(p))
+    }
 }
 
 /// Path to `MANIFEST.toml` within `dir`.
