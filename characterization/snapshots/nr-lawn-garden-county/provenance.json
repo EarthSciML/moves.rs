@@ -1,9 +1,9 @@
 {
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "nr-lawn-garden-county",
-  "sif_sha256": "70ea5b8378b278af50e8c44ab011066c59019faed8d141adf4ec6f2045f1e5fd",
-  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixture-image.lock",
-  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixtures/nr-lawn-garden-county.xml",
+  "sif_sha256": "597f1f3e0aef5d23027589ee509207d13486d5c89056906bf323a889f0e02311",
+  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.slit/characterization/fixture-image.lock",
+  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.slit/characterization/fixtures/nr-lawn-garden-county.xml",
   "runspec_sha256": "13b2b63078cf00aba1b3802ab122a760b2d778cb3ab8ff4b05426c5a9afd6d4b",
   "snapshot_aggregate_sha256": "01b915152ce40bffe1235a7d6a9a938a9e63fee1d5bc4a8ca117ffbd76be32cb",
   "output_database": "out_nr_lawn_garden_county",
