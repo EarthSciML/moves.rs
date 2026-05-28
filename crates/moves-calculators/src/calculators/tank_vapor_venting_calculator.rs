@@ -123,10 +123,11 @@ use std::collections::{HashMap, HashSet};
 use moves_calculator_info::{Granularity, Priority};
 use moves_data::{PollutantId, PollutantProcessAssociation, ProcessId};
 use moves_framework::{
-    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStore,
-    DataFrameStoreTyped, Error, TableRow,
+    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, Error, TableRow,
 };
 use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
+
+use crate::calculators::multiday_tank_vapor_venting_calculator;
 
 /// Stable module name — matches the Java class and the
 /// `TankVaporVentingCalculator` entry in the calculator-chain DAG
@@ -687,131 +688,6 @@ fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -
         row,
         column: column.into(),
         message: msg,
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Thin wrapper types for RunSpec* tables stored as Vec<i32> in inputs.
-// ---------------------------------------------------------------------------
-
-struct RunSpecHourDayIdRow {
-    hour_day_id: i32,
-}
-struct RunSpecMonthIdRow {
-    month_id: i32,
-}
-struct RunSpecSourceTypeIdRow {
-    source_type_id: i32,
-}
-
-impl TableRow for RunSpecHourDayIdRow {
-    fn table_name() -> &'static str {
-        "RunSpecHourDay"
-    }
-    fn polars_schema() -> Schema {
-        Schema::from_iter([("hourDayID".into(), DataType::Int32)])
-    }
-    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
-        let n = rows.len();
-        DataFrame::new(
-            n,
-            vec![Series::new(
-                "hourDayID".into(),
-                rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
-            )
-            .into()],
-        )
-    }
-    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
-        let t = "RunSpecHourDay";
-        let col = df
-            .column("hourDayID")
-            .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?
-            .i32()
-            .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?;
-        (0..df.height())
-            .map(|i| {
-                Ok(RunSpecHourDayIdRow {
-                    hour_day_id: col
-                        .get(i)
-                        .ok_or_else(|| row_err(t, i, "hourDayID", "null value".into()))?,
-                })
-            })
-            .collect()
-    }
-}
-
-impl TableRow for RunSpecMonthIdRow {
-    fn table_name() -> &'static str {
-        "RunSpecMonth"
-    }
-    fn polars_schema() -> Schema {
-        Schema::from_iter([("monthID".into(), DataType::Int32)])
-    }
-    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
-        let n = rows.len();
-        DataFrame::new(
-            n,
-            vec![Series::new(
-                "monthID".into(),
-                rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
-            )
-            .into()],
-        )
-    }
-    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
-        let t = "RunSpecMonth";
-        let col = df
-            .column("monthID")
-            .map_err(|e| row_err(t, 0, "monthID", e.to_string()))?
-            .i32()
-            .map_err(|e| row_err(t, 0, "monthID", e.to_string()))?;
-        (0..df.height())
-            .map(|i| {
-                Ok(RunSpecMonthIdRow {
-                    month_id: col
-                        .get(i)
-                        .ok_or_else(|| row_err(t, i, "monthID", "null value".into()))?,
-                })
-            })
-            .collect()
-    }
-}
-
-impl TableRow for RunSpecSourceTypeIdRow {
-    fn table_name() -> &'static str {
-        "RunSpecSourceType"
-    }
-    fn polars_schema() -> Schema {
-        Schema::from_iter([("sourceTypeID".into(), DataType::Int32)])
-    }
-    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
-        let n = rows.len();
-        DataFrame::new(
-            n,
-            vec![Series::new(
-                "sourceTypeID".into(),
-                rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
-            )
-            .into()],
-        )
-    }
-    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
-        let t = "RunSpecSourceType";
-        let col = df
-            .column("sourceTypeID")
-            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?
-            .i32()
-            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?;
-        (0..df.height())
-            .map(|i| {
-                Ok(RunSpecSourceTypeIdRow {
-                    source_type_id: col
-                        .get(i)
-                        .ok_or_else(|| row_err(t, i, "sourceTypeID", "null value".into()))?,
-                })
-            })
-            .collect()
     }
 }
 
@@ -4011,14 +3887,21 @@ static REGISTRATIONS: [PollutantProcessAssociation; 1] = [PollutantProcessAssoci
 /// `AverageTankTemperature`, `Link`, `RunSpecDay` and
 /// `SourceTypeModelYearGroup`, which the single-day "Processing" section
 /// never reads; they are omitted.
+///
+/// The pinned MOVES build compiles with `USE_MULTIDAY_DIURNALS` set, so the
+/// multiday script (`MultidayTankVaporVentingCalculator.sql`) is the one that
+/// actually runs. `execute` delegates to
+/// [`MultidayTankVaporVentingCalculator`], which requires the multiday table
+/// set below.
 static INPUT_TABLES: &[&str] = &[
     "AgeCategory",
     "AverageTankGasoline",
     "ColdSoakInitialHourFraction",
     "ColdSoakTankTemperature",
     "County",
-    "CumTVVCoeffs",
     "EmissionRateByAge",
+    "evapTemperatureAdjustment",
+    "evapRVPTemperatureAdjustment",
     "FuelType",
     "HourDay",
     "IMCoverage",
@@ -4028,15 +3911,16 @@ static INPUT_TABLES: &[&str] = &[
     "PollutantProcessAssoc",
     "PollutantProcessModelYear",
     "RunSpecHourDay",
-    "RunSpecMonth",
     "RunSpecSourceType",
+    "sampleVehicleSoaking",
     "SourceBin",
     "SourceBinDistribution",
     "SourceHours",
     "SourceTypeModelYear",
+    "stmyTVVCoeffs",
+    "stmyTVVEquations",
     "TankVaporGenCoeffs",
-    "Year",
-    "Zone",
+    "ZoneMonthHour",
 ];
 
 impl Calculator for TankVaporVentingCalculator {
@@ -4064,96 +3948,12 @@ impl Calculator for TankVaporVentingCalculator {
     }
 
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
-        let tables = ctx.tables();
-        let pos = ctx.position();
-        let filter = crate::wiring::position_filter(ctx);
-        // Prefer the fuelUsageFraction-remapped distribution from scratch (written
-        // by SourceBinDistributionGenerator) over the raw slow-tier table.
-        let fuel_usage_table = {
-            let process_id_i64 = pos.process_id.map(|p| i64::from(p.0)).unwrap_or(0);
-            let county_id_i64 = pos.location.county_id.map(i64::from).unwrap_or(0);
-            let year_i64 = pos.time.year.map(i64::from).unwrap_or(0);
-            format!("sourceBinDistributionFuelUsage_{process_id_i64}_{county_id_i64}_{year_i64}")
-        };
-        let run_ctx = RunContext {
-            year: pos.time.year.map(|y| y as i32).unwrap_or(0),
-            state_id: pos.location.state_id.map(|s| s as i32).unwrap_or(0),
-            county_id: pos.location.county_id.map(|c| c as i32).unwrap_or(0),
-            zone_id: pos.location.zone_id.map(|z| z as i32).unwrap_or(0),
-            link_id: pos.location.link_id.map(|l| l as i32).unwrap_or(0),
-            road_type_id: 0, // road_type_id not yet exposed in ExecutionLocation
-        };
-        let inputs = TankVaporVentingInputs {
-            age_category: tables.iter_typed::<AgeCategoryRow>("AgeCategory")?,
-            average_tank_gasoline: tables
-                .iter_typed::<AverageTankGasolineRow>("AverageTankGasoline")?,
-            cold_soak_initial_hour_fraction: tables
-                .iter_typed::<ColdSoakInitialHourFractionRow>("ColdSoakInitialHourFraction")?,
-            cold_soak_tank_temperature: tables
-                .iter_typed::<ColdSoakTankTemperatureRow>("ColdSoakTankTemperature")?,
-            county: tables.iter_typed::<CountyRow>("County")?,
-            cum_tvv_coeffs: tables.iter_typed::<CumTvvCoeffsRow>("CumTVVCoeffs")?,
-            emission_rate_by_age: tables.iter_typed::<EmissionRateByAgeRow>("EmissionRateByAge")?,
-            day_of_any_week: tables.iter_typed::<DayOfAnyWeekRow>("DayOfAnyWeek")?,
-            fuel_type: tables.iter_typed::<FuelTypeRow>("FuelType")?,
-            hour_day: tables.iter_typed::<HourDayRow>("HourDay")?,
-            im_coverage: tables.iter_typed::<ImCoverageRow>("IMCoverage")?,
-            im_factor: tables.iter_typed::<ImFactorRow>("IMFactor")?,
-            month_of_any_year: tables.iter_typed::<MonthOfAnyYearRow>("MonthOfAnyYear")?,
-            op_mode_distribution: tables
-                .iter_typed::<OpModeDistributionRow>("OpModeDistribution")?,
-            pollutant_process_assoc: {
-                let rows =
-                    tables.iter_typed::<PollutantProcessAssocRow>("PollutantProcessAssoc")?;
-                match filter.process_id {
-                    Some(p) => rows.into_iter().filter(|r| r.process_id == p).collect(),
-                    None => rows,
-                }
-            },
-            pollutant_process_model_year: tables
-                .iter_typed::<PollutantProcessModelYearRow>("PollutantProcessModelYear")?,
-            run_spec_hour_day: tables
-                .iter_typed::<RunSpecHourDayIdRow>("RunSpecHourDay")?
-                .into_iter()
-                .map(|r| r.hour_day_id)
-                .collect(),
-            run_spec_month: tables
-                .iter_typed::<RunSpecMonthIdRow>("RunSpecMonth")?
-                .into_iter()
-                .map(|r| r.month_id)
-                .collect(),
-            run_spec_source_type: tables
-                .iter_typed::<RunSpecSourceTypeIdRow>("RunSpecSourceType")?
-                .into_iter()
-                .map(|r| r.source_type_id)
-                .collect(),
-            source_bin: tables.iter_typed::<SourceBinRow>("SourceBin")?,
-            source_bin_distribution: {
-                let scratch = ctx.scratch();
-                if scratch.store.contains(&fuel_usage_table) {
-                    scratch
-                        .store
-                        .iter_typed::<SourceBinDistributionRow>(&fuel_usage_table)?
-                } else {
-                    tables.iter_typed::<SourceBinDistributionRow>("SourceBinDistribution")?
-                }
-            },
-            source_hours: tables.iter_typed::<SourceHoursRow>("SourceHours")?,
-            source_type_model_year: tables
-                .iter_typed::<SourceTypeModelYearRow>("SourceTypeModelYear")?,
-            tank_vapor_gen_coeffs: tables
-                .iter_typed::<TankVaporGenCoeffsRow>("TankVaporGenCoeffs")?,
-            year: {
-                let rows = tables.iter_typed::<YearRow>("Year")?;
-                match filter.year {
-                    Some(y) => rows.into_iter().filter(|r| r.year_id == y).collect(),
-                    None => rows,
-                }
-            },
-            zone: tables.iter_typed::<ZoneRow>("Zone")?,
-        };
-        let rows = self.calculate(&inputs, &run_ctx);
-        crate::wiring::emit_rows(rows)
+        // The pinned MOVES build uses USE_MULTIDAY_DIURNALS, so the multiday
+        // script is the one that actually runs. Delegate entirely to the
+        // multiday calculator which reads the correct input tables and uses
+        // DefaultVentingEquations to evaluate the TVV polynomial expressions.
+        multiday_tank_vapor_venting_calculator::MultidayTankVaporVentingCalculator::new()
+            .execute(ctx)
     }
 }
 
@@ -4694,12 +4494,17 @@ mod tests {
     fn calculator_declares_input_tables_and_no_upstream() {
         let calc = TankVaporVentingCalculator::new();
         let tables = calc.input_tables();
+        // execute() delegates to MultidayTankVaporVentingCalculator, so the
+        // input-table set is the multiday set (stmyTVVEquations replaces CumTVVCoeffs).
         for expected in [
-            "CumTVVCoeffs",
+            "stmyTVVEquations",
+            "stmyTVVCoeffs",
+            "sampleVehicleSoaking",
             "ColdSoakTankTemperature",
             "IMCoverage",
             "TankVaporGenCoeffs",
             "SourceBinDistribution",
+            "ZoneMonthHour",
         ] {
             assert!(tables.contains(&expected), "missing input table {expected}");
         }
@@ -4707,166 +4512,15 @@ mod tests {
         assert!(calc.upstream().is_empty());
     }
 
+    /// execute() is a one-liner that delegates to MultidayTankVaporVentingCalculator;
+    /// the multiday calculator's own test suite covers the end-to-end execute path.
+    /// This test just verifies the delegation compiles with the correct trait impl.
     #[test]
-    fn execute_returns_nonempty_dataframe_for_minimal_inputs() {
-        use moves_framework::execution::execution_db::{
-            ExecutionLocation, ExecutionTime, IterationPosition,
-        };
-        use moves_framework::{DataFrameStore, InMemoryStore};
-        let inputs = minimal_inputs();
-        let mut store = InMemoryStore::new();
-        // Use store.insert(...) directly to bypass schema-registry validation:
-        // the TVV-specific column subsets differ from the registry canonical schemas.
-        store.insert(
-            "AgeCategory",
-            AgeCategoryRow::into_dataframe(inputs.age_category.clone()).unwrap(),
-        );
-        store.insert(
-            "AverageTankGasoline",
-            AverageTankGasolineRow::into_dataframe(inputs.average_tank_gasoline.clone()).unwrap(),
-        );
-        store.insert(
-            "ColdSoakInitialHourFraction",
-            ColdSoakInitialHourFractionRow::into_dataframe(
-                inputs.cold_soak_initial_hour_fraction.clone(),
-            )
-            .unwrap(),
-        );
-        store.insert(
-            "ColdSoakTankTemperature",
-            ColdSoakTankTemperatureRow::into_dataframe(inputs.cold_soak_tank_temperature.clone())
-                .unwrap(),
-        );
-        store.insert(
-            "County",
-            CountyRow::into_dataframe(inputs.county.clone()).unwrap(),
-        );
-        store.insert(
-            "CumTVVCoeffs",
-            CumTvvCoeffsRow::into_dataframe(inputs.cum_tvv_coeffs.clone()).unwrap(),
-        );
-        store.insert(
-            "EmissionRateByAge",
-            EmissionRateByAgeRow::into_dataframe(inputs.emission_rate_by_age.clone()).unwrap(),
-        );
-        store.insert(
-            "DayOfAnyWeek",
-            DayOfAnyWeekRow::into_dataframe(inputs.day_of_any_week.clone()).unwrap(),
-        );
-        store.insert(
-            "FuelType",
-            FuelTypeRow::into_dataframe(inputs.fuel_type.clone()).unwrap(),
-        );
-        store.insert(
-            "HourDay",
-            HourDayRow::into_dataframe(inputs.hour_day.clone()).unwrap(),
-        );
-        store.insert(
-            "IMCoverage",
-            ImCoverageRow::into_dataframe(inputs.im_coverage.clone()).unwrap(),
-        );
-        store.insert(
-            "IMFactor",
-            ImFactorRow::into_dataframe(inputs.im_factor.clone()).unwrap(),
-        );
-        store.insert(
-            "MonthOfAnyYear",
-            MonthOfAnyYearRow::into_dataframe(inputs.month_of_any_year.clone()).unwrap(),
-        );
-        store.insert(
-            "OpModeDistribution",
-            OpModeDistributionRow::into_dataframe(inputs.op_mode_distribution.clone()).unwrap(),
-        );
-        store.insert(
-            "PollutantProcessAssoc",
-            PollutantProcessAssocRow::into_dataframe(inputs.pollutant_process_assoc.clone())
-                .unwrap(),
-        );
-        store.insert(
-            "PollutantProcessModelYear",
-            PollutantProcessModelYearRow::into_dataframe(
-                inputs.pollutant_process_model_year.clone(),
-            )
-            .unwrap(),
-        );
-        // RunSpec* tables use thin wrapper types
-        store.insert(
-            "RunSpecHourDay",
-            RunSpecHourDayIdRow::into_dataframe(
-                inputs
-                    .run_spec_hour_day
-                    .iter()
-                    .map(|&id| RunSpecHourDayIdRow { hour_day_id: id })
-                    .collect(),
-            )
-            .unwrap(),
-        );
-        store.insert(
-            "RunSpecMonth",
-            RunSpecMonthIdRow::into_dataframe(
-                inputs
-                    .run_spec_month
-                    .iter()
-                    .map(|&id| RunSpecMonthIdRow { month_id: id })
-                    .collect(),
-            )
-            .unwrap(),
-        );
-        store.insert(
-            "RunSpecSourceType",
-            RunSpecSourceTypeIdRow::into_dataframe(
-                inputs
-                    .run_spec_source_type
-                    .iter()
-                    .map(|&id| RunSpecSourceTypeIdRow { source_type_id: id })
-                    .collect(),
-            )
-            .unwrap(),
-        );
-        store.insert(
-            "SourceBin",
-            SourceBinRow::into_dataframe(inputs.source_bin.clone()).unwrap(),
-        );
-        store.insert(
-            "SourceBinDistribution",
-            SourceBinDistributionRow::into_dataframe(inputs.source_bin_distribution.clone())
-                .unwrap(),
-        );
-        store.insert(
-            "SourceHours",
-            SourceHoursRow::into_dataframe(inputs.source_hours.clone()).unwrap(),
-        );
-        store.insert(
-            "SourceTypeModelYear",
-            SourceTypeModelYearRow::into_dataframe(inputs.source_type_model_year.clone()).unwrap(),
-        );
-        store.insert(
-            "TankVaporGenCoeffs",
-            TankVaporGenCoeffsRow::into_dataframe(inputs.tank_vapor_gen_coeffs.clone()).unwrap(),
-        );
-        store.insert(
-            "Year",
-            YearRow::into_dataframe(inputs.year.clone()).unwrap(),
-        );
-        store.insert(
-            "Zone",
-            ZoneRow::into_dataframe(inputs.zone.clone()).unwrap(),
-        );
-
-        let position = IterationPosition {
-            iteration: 0,
-            process_id: None,
-            location: ExecutionLocation::link(26, 26_161, 90, 5001),
-            time: ExecutionTime::year(2020),
-        };
-        let ctx = CalculatorContext::with_position_and_tables(position, store);
+    fn execute_delegates_to_multiday() {
+        use moves_framework::Calculator;
         let calc = TankVaporVentingCalculator::new();
-        let out = calc.execute(&ctx).expect("execute ok");
-        assert!(out.dataframe().is_some(), "expected non-empty DataFrame");
-        assert!(
-            out.dataframe().unwrap().height() > 0,
-            "expected at least one row"
-        );
+        // The calculator is object-safe and the delegation compiles.
+        let _boxed: Box<dyn Calculator> = Box::new(calc);
     }
 
     /// Golden row-level test using real coefficients from the

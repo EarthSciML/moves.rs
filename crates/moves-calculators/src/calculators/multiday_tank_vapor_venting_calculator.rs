@@ -5110,16 +5110,81 @@ static INPUT_TABLES: &[&str] = &[
     "ZoneMonthHour",
 ];
 
-/// Fallback `VentingEquations` for use in `execute()`: returns `0.0` for
-/// every equation, matching the Java's `CASE … ELSE 0 END` behaviour for
-/// equation names that are not recognised.
-struct ZeroEquations;
-impl VentingEquations for ZeroEquations {
-    fn tvv(&self, _: &str, _: &EquationVars) -> f64 {
-        0.0
+/// The production [`VentingEquations`] evaluator for `execute()`.
+///
+/// The MOVES default database stores `cumTVVCoeffs.tvvEquation` as full SQL
+/// expressions. Java's `alterReplacementsAndSections` replaces them with
+/// sequential abbreviations (T0, T1 … / L0, L1 …) in insertion-scan order,
+/// which is primary-key order of `cumTVVCoeffs`. This struct hard-codes that
+/// mapping against the MOVES 2024-11-12 default database.
+///
+/// TVV equation mapping (insertion-scan order, T0 first):
+/// - T0 `greatest(0,(-(-1*Xn+85)+sqrt(((-1*Xn+85)^2)-(4*1.25)*(-0.25*Xn^2+.2*Xn+70)))/(2*1.25))`
+/// - T1 `greatest(0,(-(-1.21*Xn+187)+sqrt(((-1.21*Xn+187)^2)-(4*1.15)*(-0.071*Xn^2+3.12*Xn+20)))/(2*1.15))`
+/// - T2 `greatest(0,(-(-1.34*Xn+115)+sqrt(((-1.34*Xn+115)^2)-(4*1.90)*(-0.125*Xn^2+2.70*Xn+23)))/(2*1.90))`
+/// - T3 `greatest(0,.8*T0_inner+.2*T2_inner)` (blend of T0 and T2 expressions before max)
+/// - T4 `greatest(0,.6*T0_inner+.4*T2_inner)`
+/// - T5 `greatest(0,.1*T0_inner+.9*T2_inner)`
+///
+/// Leak equation mapping (insertion-scan order, L0 first):
+/// - L0=0.814, L1=0.79, L2=0.796, L3=0.524, L4=0.408, L5=0.388
+/// - L6=0.376, L7=0.365, L8=0.357, L9=0.351, L10=0.952, L11=0.782
+/// Each evaluates as `coefficient * TVGdaily`.
+pub struct DefaultVentingEquations;
+
+/// Inner (pre-`max(0)`) TVV polynomial for T0: `(-b + sqrt(b^2 - 4ac)) / 2a`
+/// where `b = -1*Xn+85`, `a = 1.25`, inner quadratic = `-0.25*Xn^2 + 0.2*Xn + 70`.
+fn tvv_inner_t0(xn: f64) -> f64 {
+    let b = -1.0 * xn + 85.0;
+    let disc = b * b - 4.0 * 1.25 * (-0.25 * xn * xn + 0.2 * xn + 70.0);
+    (-b + disc.max(0.0).sqrt()) / (2.0 * 1.25)
+}
+
+/// Inner TVV polynomial for T1: b = -1.21*Xn+187, a = 1.15, inner = -0.071*Xn^2+3.12*Xn+20.
+fn tvv_inner_t1(xn: f64) -> f64 {
+    let b = -1.21 * xn + 187.0;
+    let disc = b * b - 4.0 * 1.15 * (-0.071 * xn * xn + 3.12 * xn + 20.0);
+    (-b + disc.max(0.0).sqrt()) / (2.0 * 1.15)
+}
+
+/// Inner TVV polynomial for T2: b = -1.34*Xn+115, a = 1.90, inner = -0.125*Xn^2+2.70*Xn+23.
+fn tvv_inner_t2(xn: f64) -> f64 {
+    let b = -1.34 * xn + 115.0;
+    let disc = b * b - 4.0 * 1.90 * (-0.125 * xn * xn + 2.70 * xn + 23.0);
+    (-b + disc.max(0.0).sqrt()) / (2.0 * 1.90)
+}
+
+impl VentingEquations for DefaultVentingEquations {
+    fn tvv(&self, equation: &str, vars: &EquationVars) -> f64 {
+        let xn = vars.xn;
+        match equation {
+            "T0" => tvv_inner_t0(xn).max(0.0),
+            "T1" => tvv_inner_t1(xn).max(0.0),
+            "T2" => tvv_inner_t2(xn).max(0.0),
+            "T3" => (0.8 * tvv_inner_t0(xn) + 0.2 * tvv_inner_t2(xn)).max(0.0),
+            "T4" => (0.6 * tvv_inner_t0(xn) + 0.4 * tvv_inner_t2(xn)).max(0.0),
+            "T5" => (0.1 * tvv_inner_t0(xn) + 0.9 * tvv_inner_t2(xn)).max(0.0),
+            _ => 0.0,
+        }
     }
-    fn leak(&self, _: &str, _: &EquationVars) -> f64 {
-        0.0
+
+    fn leak(&self, equation: &str, vars: &EquationVars) -> f64 {
+        let tvg = vars.tvg_daily;
+        match equation {
+            "L0" => 0.814 * tvg,
+            "L1" => 0.79 * tvg,
+            "L2" => 0.796 * tvg,
+            "L3" => 0.524 * tvg,
+            "L4" => 0.408 * tvg,
+            "L5" => 0.388 * tvg,
+            "L6" => 0.376 * tvg,
+            "L7" => 0.365 * tvg,
+            "L8" => 0.357 * tvg,
+            "L9" => 0.351 * tvg,
+            "L10" => 0.952 * tvg,
+            "L11" => 0.782 * tvg,
+            _ => 0.0,
+        }
     }
 }
 
@@ -5151,6 +5216,7 @@ impl Calculator for MultidayTankVaporVentingCalculator {
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let tables = ctx.tables();
         let pos = ctx.position();
+        let filter = crate::wiring::position_filter(ctx);
         // Prefer the fuelUsageFraction-remapped distribution from scratch (written
         // by SourceBinDistributionGenerator) over the raw slow-tier table.
         let fuel_usage_table = {
@@ -5189,8 +5255,14 @@ impl Calculator for MultidayTankVaporVentingCalculator {
             month_of_any_year: tables.iter_typed::<MonthOfAnyYearRow>("MonthOfAnyYear")?,
             op_mode_distribution: tables
                 .iter_typed::<OpModeDistributionRow>("OpModeDistribution")?,
-            pollutant_process_assoc: tables
-                .iter_typed::<PollutantProcessAssocRow>("PollutantProcessAssoc")?,
+            pollutant_process_assoc: {
+                let rows =
+                    tables.iter_typed::<PollutantProcessAssocRow>("PollutantProcessAssoc")?;
+                match filter.process_id {
+                    Some(p) => rows.into_iter().filter(|r| r.process_id == p).collect(),
+                    None => rows,
+                }
+            },
             pollutant_process_model_year: tables
                 .iter_typed::<PollutantProcessModelYearRow>("PollutantProcessModelYear")?,
             run_spec_hour_day: tables
@@ -5225,7 +5297,7 @@ impl Calculator for MultidayTankVaporVentingCalculator {
                 .iter_typed::<TankVaporGenCoeffsRow>("TankVaporGenCoeffs")?,
             zone_month_hour: tables.iter_typed::<ZoneMonthHourRow>("ZoneMonthHour")?,
         };
-        let rows = self.calculate(&inputs, &run_ctx, &ZeroEquations);
+        let rows = self.calculate(&inputs, &run_ctx, &DefaultVentingEquations);
         crate::wiring::emit_rows(rows)
     }
 }
