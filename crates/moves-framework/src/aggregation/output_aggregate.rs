@@ -510,7 +510,12 @@ fn build_emission_output(
         link_id: keep_opt(kept("linkID"), rep.link_id),
         pollutant_id: keep_opt(kept("pollutantID"), rep.pollutant_id),
         process_id: keep_opt(kept("processID"), rep.process_id),
-        source_type_id: keep_opt(kept("sourceTypeID"), rep.source_type_id),
+        // sourceTypeID uses MySQL ANY_VALUE semantics: the representative
+        // record's value is always carried through regardless of whether
+        // sourceTypeID is a GROUP BY key.  This matches canonical MOVES,
+        // where MySQL returns an arbitrary (but non-NULL) value for non-grouped
+        // columns when all rows in the group share the same source type.
+        source_type_id: rep.source_type_id,
         reg_class_id: keep_opt(kept("regClassID"), rep.reg_class_id),
         fuel_type_id: keep_opt(kept("fuelTypeID"), rep.fuel_type_id),
         fuel_sub_type_id: keep_opt(kept("fuelSubTypeID"), rep.fuel_sub_type_id),
@@ -548,7 +553,7 @@ fn build_activity_output(
         county_id: keep_opt(kept("countyID"), rep.county_id),
         zone_id: keep_opt(kept("zoneID"), rep.zone_id),
         link_id: keep_opt(kept("linkID"), rep.link_id),
-        source_type_id: keep_opt(kept("sourceTypeID"), rep.source_type_id),
+        source_type_id: rep.source_type_id,
         reg_class_id: keep_opt(kept("regClassID"), rep.reg_class_id),
         fuel_type_id: keep_opt(kept("fuelTypeID"), rep.fuel_type_id),
         fuel_sub_type_id: keep_opt(kept("fuelSubTypeID"), rep.fuel_sub_type_id),
@@ -730,7 +735,7 @@ mod tests {
         assert_eq!(row.day_id, None);
         assert_eq!(row.hour_id, None);
         assert_eq!(row.county_id, None);
-        assert_eq!(row.source_type_id, None);
+        assert_eq!(row.source_type_id, Some(21)); // ANY_VALUE from representative record
         assert_eq!(row.scc, None);
         // emissionRate is always dropped; runHash always flows through.
         assert_eq!(row.emission_rate, None);

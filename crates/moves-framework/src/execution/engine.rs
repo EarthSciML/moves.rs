@@ -846,32 +846,52 @@ fn frame_to_emission_records(df: &DataFrame, run_hash: &str) -> Vec<EmissionReco
     let emission_ca = df.column("emissionQuant").ok().and_then(|s| s.f64().ok());
 
     (0..df.height())
-        .map(|i| EmissionRecord {
-            moves_run_id: 1,
-            iteration_id: None,
-            year_id: year_ca.and_then(|c| c.get(i)).map(|v| v as i16),
-            month_id: month_ca.and_then(|c| c.get(i)).map(|v| v as i16),
-            day_id: day_ca.and_then(|c| c.get(i)).map(|v| v as i16),
-            hour_id: hour_ca.and_then(|c| c.get(i)).map(|v| v as i16),
-            state_id: state_ca.and_then(|c| c.get(i)).map(|v| v as i16),
-            county_id: county_ca.and_then(|c| c.get(i)),
-            zone_id: zone_ca.and_then(|c| c.get(i)),
-            link_id: link_ca.and_then(|c| c.get(i)),
-            pollutant_id: pollutant_ca.and_then(|c| c.get(i)).map(|v| v as i16),
-            process_id: process_ca.and_then(|c| c.get(i)).map(|v| v as i16),
-            source_type_id: source_type_ca.and_then(|c| c.get(i)).map(|v| v as i16),
-            reg_class_id: None,
-            fuel_type_id: fuel_type_ca.and_then(|c| c.get(i)).map(|v| v as i16),
-            fuel_sub_type_id: None,
-            model_year_id: model_year_ca.and_then(|c| c.get(i)).map(|v| v as i16),
-            road_type_id: road_type_ca.and_then(|c| c.get(i)).map(|v| v as i16),
-            scc: None,
-            eng_tech_id: None,
-            sector_id: None,
-            hp_id: None,
-            emission_quant: emission_ca.and_then(|c| c.get(i)),
-            emission_rate: None,
-            run_hash: run_hash.to_string(),
+        .map(|i| {
+            let process_v = process_ca.and_then(|c| c.get(i));
+            let source_type_v = source_type_ca.and_then(|c| c.get(i));
+            let fuel_type_v = fuel_type_ca.and_then(|c| c.get(i));
+            let road_type_v = road_type_ca.and_then(|c| c.get(i));
+            // Compute onroad SCC from the four dimension columns using the
+            // canonical formula: "22{fuel:02}{src:02}{road:02}{proc:02}" for
+            // normal road types and "22{fuel:02}{src+1:02}00{proc:02}" for the
+            // off-network/total road type (100).  Matches the canonical SCC
+            // lookup table exactly.  The aggregation plan's onroad_scc flag
+            // then determines whether this value survives to the output.
+            let scc = match (process_v, source_type_v, fuel_type_v, road_type_v) {
+                (Some(proc), Some(src), Some(fuel), Some(road)) => Some(if road == 100 {
+                    format!("22{:02}{:02}00{:02}", fuel, src + 1, proc)
+                } else {
+                    format!("22{:02}{:02}{:02}{:02}", fuel, src, road, proc)
+                }),
+                _ => None,
+            };
+            EmissionRecord {
+                moves_run_id: 1,
+                iteration_id: None,
+                year_id: year_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+                month_id: month_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+                day_id: day_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+                hour_id: hour_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+                state_id: state_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+                county_id: county_ca.and_then(|c| c.get(i)),
+                zone_id: zone_ca.and_then(|c| c.get(i)),
+                link_id: link_ca.and_then(|c| c.get(i)),
+                pollutant_id: pollutant_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+                process_id: process_v.map(|v| v as i16),
+                source_type_id: source_type_v.map(|v| v as i16),
+                reg_class_id: None,
+                fuel_type_id: fuel_type_v.map(|v| v as i16),
+                fuel_sub_type_id: None,
+                model_year_id: model_year_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+                road_type_id: road_type_v.map(|v| v as i16),
+                scc,
+                eng_tech_id: None,
+                sector_id: None,
+                hp_id: None,
+                emission_quant: emission_ca.and_then(|c| c.get(i)),
+                emission_rate: None,
+                run_hash: run_hash.to_string(),
+            }
         })
         .collect()
 }
