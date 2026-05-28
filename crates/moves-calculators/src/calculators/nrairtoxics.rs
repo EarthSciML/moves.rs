@@ -1762,6 +1762,13 @@ impl Calculator for NrAirToxicsCalculator {
     }
 }
 
+/// Construct the calculator as a boxed trait object — matches the engine's
+/// calculator-factory signature so the registry can register it.
+#[must_use]
+pub fn factory() -> Box<dyn Calculator> {
+    Box::new(NrAirToxicsCalculator)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

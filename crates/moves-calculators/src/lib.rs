@@ -44,6 +44,8 @@ pub fn register_all(
     registry: &mut moves_framework::CalculatorRegistry,
 ) -> std::result::Result<(), moves_framework::Error> {
     use calculators::activitycalculator;
+    use calculators::airtoxics;
+    use calculators::airtoxicsdistance;
     use calculators::ch4n2o_running_start;
     use calculators::co2ae_running_start_extended_idle;
     use calculators::criteria_running_calculator;
@@ -52,6 +54,7 @@ pub fn register_all(
     use calculators::evaporative_permeation_calculator;
     use calculators::liquid_leaking_calculator;
     use calculators::nh3;
+    use calculators::nrairtoxics;
     use calculators::refueling_loss_calculator;
     use calculators::so2_calculator;
     use calculators::sulfate_pm_calculator;
@@ -66,6 +69,11 @@ pub fn register_all(
     registry.register_calculator(
         activitycalculator::ActivityCalculator::NAME,
         activitycalculator::factory,
+    )?;
+    registry.register_calculator(airtoxics::AirToxicsCalculator::NAME, airtoxics::factory)?;
+    registry.register_calculator(
+        airtoxicsdistance::AirToxicsDistanceCalculator::NAME,
+        airtoxicsdistance::factory,
     )?;
     registry.register_calculator(
         ch4n2o_running_start::Ch4N2oRunningStartCalculator::NAME,
@@ -116,6 +124,10 @@ pub fn register_all(
     registry.register_calculator(
         togspeciation::TogSpeciationCalculator::NAME,
         togspeciation::factory,
+    )?;
+    registry.register_calculator(
+        nrairtoxics::NrAirToxicsCalculator::NAME,
+        nrairtoxics::factory,
     )?;
     registry.register_calculator(
         welltopump::ch4n2o::Ch4N2oWtpCalculator::NAME,
