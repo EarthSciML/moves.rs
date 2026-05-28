@@ -1,11 +1,11 @@
 {
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "nr-commercial-nation",
-  "sif_sha256": "70ea5b8378b278af50e8c44ab011066c59019faed8d141adf4ec6f2045f1e5fd",
-  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixture-image.lock",
-  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-o785i/characterization/fixtures/nr-commercial-nation.xml",
-  "runspec_sha256": "adf6a99b6abe5a7ed473e5cb90d32f8414d7fe5f0279a06911c70bf0a73e6c9a",
-  "snapshot_aggregate_sha256": "e4fd61083eefbdc83b7732336b236d230fc3153edf9f146d26b43e947672880e",
+  "sif_sha256": "597f1f3e0aef5d23027589ee509207d13486d5c89056906bf323a889f0e02311",
+  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/mo-wwc.3/characterization/fixture-image.lock",
+  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/mo-wwc.3/characterization/fixtures/nr-commercial-nation.xml",
+  "runspec_sha256": "88b7e6edd15f28a985c41b57b3bf429dc0b9b43b7c4b897e2cd611b578634866",
+  "snapshot_aggregate_sha256": "9c65c4b5bd19d8f6540e13d03a6772c2e7642ca49e634af3d2f3ad9a557646f3",
   "output_database": "out_nr_commercial_nation",
   "scale_input_database": null
 }
