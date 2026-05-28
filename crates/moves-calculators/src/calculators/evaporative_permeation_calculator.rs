@@ -281,6 +281,15 @@ pub struct HourDayRow {
     pub hour_id: i32,
 }
 
+/// One `DayOfAnyWeek` row — the number of real days a `dayID` represents.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DayOfAnyWeekRow {
+    /// `dayID`.
+    pub day_id: i32,
+    /// `noOfRealDays` — count of real days within the week portion.
+    pub no_of_real_days: f64,
+}
+
 /// One `Link` row — a road link's geography and road type.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LinkRow {
@@ -491,6 +500,8 @@ pub struct EvaporativePermeationInputs {
     pub fuel_supply: Vec<FuelSupplyRow>,
     /// `HCPermeationCoeff` rows.
     pub hc_permeation_coeff: Vec<HcPermeationCoeffRow>,
+    /// `DayOfAnyWeek` rows.
+    pub day_of_any_week: Vec<DayOfAnyWeekRow>,
     /// `HourDay` rows.
     pub hour_day: Vec<HourDayRow>,
     /// `Link` rows.
@@ -1338,6 +1349,58 @@ impl TableRow for HourDayRow {
                     hour_day_id: hd.get(i).ok_or_else(|| null("hourDayID"))?,
                     day_id: day.get(i).ok_or_else(|| null("dayID"))?,
                     hour_id: hr.get(i).ok_or_else(|| null("hourID"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for DayOfAnyWeekRow {
+    fn table_name() -> &'static str {
+        "DayOfAnyWeek"
+    }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("dayID".into(), DataType::Int32),
+            ("noOfRealDays".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "dayID".into(),
+                    rows.iter().map(|r| r.day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "noOfRealDays".into(),
+                    rows.iter().map(|r| r.no_of_real_days).collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "DayOfAnyWeek";
+        let day = df
+            .column("dayID")
+            .map_err(|e| row_err(t, 0, "dayID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "dayID", e.to_string()))?;
+        let no_of_real_days = df
+            .column("noOfRealDays")
+            .map_err(|e| row_err(t, 0, "noOfRealDays", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "noOfRealDays", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(DayOfAnyWeekRow {
+                    day_id: day.get(i).ok_or_else(|| null("dayID"))?,
+                    no_of_real_days: no_of_real_days.get(i).ok_or_else(|| null("noOfRealDays"))?,
                 })
             })
             .collect()
@@ -3045,6 +3108,16 @@ fn fuel_adjusted_emission_quant(
             .push(faer);
     }
     let link: HashMap<i32, &LinkRow> = inputs.link.iter().map(|l| (l.link_id, l)).collect();
+    let day_id_of: HashMap<i32, i32> = inputs
+        .hour_day
+        .iter()
+        .map(|hd| (hd.hour_day_id, hd.day_id))
+        .collect();
+    let real_days_of: HashMap<i32, f64> = inputs
+        .day_of_any_week
+        .iter()
+        .map(|d| (d.day_id, d.no_of_real_days))
+        .collect();
 
     let mut out = Vec::new();
     for sh in &inputs.source_hours {
@@ -3056,6 +3129,13 @@ fn fuel_adjusted_emission_quant(
         };
         // INNER JOIN Link ON (linkID, l.zoneID = fambr.zoneID).
         let Some(link_row) = link.get(&sh.link_id) else {
+            continue;
+        };
+        // INNER JOIN HourDay → DayOfAnyWeek to get noOfRealDays.
+        let Some(&day_id) = day_id_of.get(&sh.hour_day_id) else {
+            continue;
+        };
+        let Some(&no_of_real_days) = real_days_of.get(&day_id) else {
             continue;
         };
         for faer in matches {
@@ -3072,7 +3152,8 @@ fn fuel_adjusted_emission_quant(
                 reg_class_id: faer.reg_class_id,
                 pol_process_id: faer.pol_process_id,
                 fuel_type_id: faer.fuel_type_id,
-                fuel_adjusted_emission_quant: faer.fuel_adjusted_emission_rate * sh.source_hours,
+                fuel_adjusted_emission_quant: faer.fuel_adjusted_emission_rate * sh.source_hours
+                    / no_of_real_days,
             });
         }
     }
@@ -3401,6 +3482,7 @@ impl Calculator for EvaporativePermeationCalculator {
             fuel_formulation: tables.iter_typed::<FuelFormulationRow>("FuelFormulation")?,
             fuel_subtype: tables.iter_typed::<FuelSubtypeRow>("FuelSubtype")?,
             fuel_supply: tables.iter_typed::<FuelSupplyRow>("FuelSupply")?,
+            day_of_any_week: tables.iter_typed::<DayOfAnyWeekRow>("DayOfAnyWeek")?,
             hc_permeation_coeff: tables.iter_typed::<HcPermeationCoeffRow>("HCPermeationCoeff")?,
             hour_day: tables.iter_typed::<HourDayRow>("HourDay")?,
             link: tables.iter_typed::<LinkRow>("Link")?,
@@ -3524,6 +3606,10 @@ mod tests {
                 fuel_my_group_id: 50,
                 fuel_adjustment: 3.0,
                 fuel_adjustment_gpa: 9.0,
+            }],
+            day_of_any_week: vec![DayOfAnyWeekRow {
+                day_id: 5,
+                no_of_real_days: 1.0,
             }],
             hour_day: vec![HourDayRow {
                 hour_day_id: 85,
@@ -4028,6 +4114,10 @@ mod tests {
         store.insert(
             "HCPermeationCoeff",
             HcPermeationCoeffRow::into_dataframe(inputs.hc_permeation_coeff.clone()).unwrap(),
+        );
+        store.insert(
+            "DayOfAnyWeek",
+            DayOfAnyWeekRow::into_dataframe(inputs.day_of_any_week.clone()).unwrap(),
         );
         store.insert(
             "HourDay",

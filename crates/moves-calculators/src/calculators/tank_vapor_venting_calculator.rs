@@ -299,6 +299,15 @@ pub struct HourDayRow {
     pub hour_id: i32,
 }
 
+/// One `DayOfAnyWeek` row — the number of real days a `dayID` represents.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DayOfAnyWeekRow {
+    /// `dayID`.
+    pub day_id: i32,
+    /// `noOfRealDays` — count of real days within the week portion.
+    pub no_of_real_days: f64,
+}
+
 /// One `IMCoverage` row — an I/M program's coverage of a
 /// `(sourceType, fuelType)` and model-year range.
 ///
@@ -532,6 +541,8 @@ pub struct TankVaporVentingInputs {
     pub emission_rate_by_age: Vec<EmissionRateByAgeRow>,
     /// `FuelType` rows.
     pub fuel_type: Vec<FuelTypeRow>,
+    /// `DayOfAnyWeek` rows.
+    pub day_of_any_week: Vec<DayOfAnyWeekRow>,
     /// `HourDay` rows.
     pub hour_day: Vec<HourDayRow>,
     /// `IMCoverage` rows.
@@ -1480,6 +1491,58 @@ impl TableRow for HourDayRow {
                     hour_day_id: hd.get(i).ok_or_else(|| null("hourDayID"))?,
                     day_id: day.get(i).ok_or_else(|| null("dayID"))?,
                     hour_id: hr.get(i).ok_or_else(|| null("hourID"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for DayOfAnyWeekRow {
+    fn table_name() -> &'static str {
+        "DayOfAnyWeek"
+    }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("dayID".into(), DataType::Int32),
+            ("noOfRealDays".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "dayID".into(),
+                    rows.iter().map(|r| r.day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "noOfRealDays".into(),
+                    rows.iter().map(|r| r.no_of_real_days).collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "DayOfAnyWeek";
+        let day = df
+            .column("dayID")
+            .map_err(|e| row_err(t, 0, "dayID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "dayID", e.to_string()))?;
+        let no_of_real_days = df
+            .column("noOfRealDays")
+            .map_err(|e| row_err(t, 0, "noOfRealDays", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "noOfRealDays", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(DayOfAnyWeekRow {
+                    day_id: day.get(i).ok_or_else(|| null("dayID"))?,
+                    no_of_real_days: no_of_real_days.get(i).ok_or_else(|| null("noOfRealDays"))?,
                 })
             })
             .collect()
@@ -3755,6 +3818,11 @@ fn assemble_emission_output(
         .iter()
         .map(|hd| (hd.hour_day_id, hd))
         .collect();
+    let real_days_of: HashMap<i32, f64> = inputs
+        .day_of_any_week
+        .iter()
+        .map(|d| (d.day_id, d.no_of_real_days))
+        .collect();
     // IMCoverageMergedUngrouped, unique on its five-column index.
     let im_adjust_of: HashMap<ImMergedKey, f64> = im_merged
         .iter()
@@ -3798,10 +3866,15 @@ fn assemble_emission_output(
                 let Some(hd) = hour_day_of.get(&omd.hour_day_id) else {
                     continue;
                 };
+                let Some(&no_of_real_days) = real_days_of.get(&hd.day_id) else {
+                    continue;
+                };
                 let emission_quant =
-                    w.weighted_mean_base_rate * sh.source_hours * omd.op_mode_fraction;
+                    w.weighted_mean_base_rate * sh.source_hours * omd.op_mode_fraction
+                        / no_of_real_days;
                 let emission_quant_im =
-                    w.weighted_mean_base_rate_im * sh.source_hours * omd.op_mode_fraction;
+                    w.weighted_mean_base_rate_im * sh.source_hours * omd.op_mode_fraction
+                        / no_of_real_days;
                 // Apply I/M: blend where an IMCoverageMergedUngrouped row matches.
                 let final_quant = match im_adjust_of.get(&(
                     assoc.process_id,
@@ -4020,6 +4093,7 @@ impl Calculator for TankVaporVentingCalculator {
             county: tables.iter_typed::<CountyRow>("County")?,
             cum_tvv_coeffs: tables.iter_typed::<CumTvvCoeffsRow>("CumTVVCoeffs")?,
             emission_rate_by_age: tables.iter_typed::<EmissionRateByAgeRow>("EmissionRateByAge")?,
+            day_of_any_week: tables.iter_typed::<DayOfAnyWeekRow>("DayOfAnyWeek")?,
             fuel_type: tables.iter_typed::<FuelTypeRow>("FuelType")?,
             hour_day: tables.iter_typed::<HourDayRow>("HourDay")?,
             im_coverage: tables.iter_typed::<ImCoverageRow>("IMCoverage")?,
@@ -4177,6 +4251,10 @@ mod tests {
             fuel_type: vec![FuelTypeRow {
                 fuel_type_id: 1,
                 subject_to_evap_calculations: true,
+            }],
+            day_of_any_week: vec![DayOfAnyWeekRow {
+                day_id: 5,
+                no_of_real_days: 1.0,
             }],
             hour_day: vec![
                 HourDayRow {
@@ -4657,6 +4735,10 @@ mod tests {
         store.insert(
             "EmissionRateByAge",
             EmissionRateByAgeRow::into_dataframe(inputs.emission_rate_by_age.clone()).unwrap(),
+        );
+        store.insert(
+            "DayOfAnyWeek",
+            DayOfAnyWeekRow::into_dataframe(inputs.day_of_any_week.clone()).unwrap(),
         );
         store.insert(
             "FuelType",

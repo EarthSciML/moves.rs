@@ -416,6 +416,15 @@ pub struct HourDayRow {
     pub hour_id: i32,
 }
 
+/// One `DayOfAnyWeek` row — the number of real days a `dayID` represents.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DayOfAnyWeekRow {
+    /// `dayID`.
+    pub day_id: i32,
+    /// `noOfRealDays` — count of real days within the week portion.
+    pub no_of_real_days: f64,
+}
+
 /// One `Link` row — LL-9 reads only the link's road type.
 ///
 /// The SQL extracts the single `Link` row for the iteration link; `countyID`
@@ -472,6 +481,8 @@ pub struct LiquidLeakingInputs {
     pub source_hours: Vec<SourceHoursRow>,
     /// `OpModeDistribution` rows.
     pub op_mode_distribution: Vec<OpModeDistributionRow>,
+    /// `DayOfAnyWeek` rows.
+    pub day_of_any_week: Vec<DayOfAnyWeekRow>,
     /// `HourDay` rows.
     pub hour_day: Vec<HourDayRow>,
     /// `Link` rows (the single iteration link).
@@ -896,6 +907,11 @@ impl LiquidLeakingCalculator {
             .iter()
             .map(|hd| (hd.hour_day_id, hd))
             .collect();
+        let real_days_of: HashMap<i32, f64> = inputs
+            .day_of_any_week
+            .iter()
+            .map(|d| (d.day_id, d.no_of_real_days))
+            .collect();
         let link_by_id: HashMap<i32, &LinkRow> =
             inputs.link.iter().map(|l| (l.link_id, l)).collect();
 
@@ -946,13 +962,19 @@ impl LiquidLeakingCalculator {
             let Some(hd) = hour_day_by_id.get(&key.hour_day_id) else {
                 continue;
             };
+            // INNER JOIN DayOfAnyWeek ON dayID to get noOfRealDays.
+            let Some(&no_of_real_days) = real_days_of.get(&hd.day_id) else {
+                continue;
+            };
 
             // LL-9: emissionQuant = weightedMeanBaseRate × sourceHours ×
-            // opModeFraction; emissionQuantIM the I/M-rate counterpart.
+            // opModeFraction ÷ noOfRealDays; emissionQuantIM the I/M-rate counterpart.
             let mut emission_quant =
-                cell.weighted_mean_base_rate * sh.source_hours * omd.op_mode_fraction;
+                cell.weighted_mean_base_rate * sh.source_hours * omd.op_mode_fraction
+                    / no_of_real_days;
             let emission_quant_im =
-                cell.weighted_mean_base_rate_im * sh.source_hours * omd.op_mode_fraction;
+                cell.weighted_mean_base_rate_im * sh.source_hours * omd.op_mode_fraction
+                    / no_of_real_days;
 
             // Apply I/M: emissionQuant = GREATEST(emissionQuantIM × IMAdjustFract
             // + emissionQuant × (1 − IMAdjustFract), 0). A row with no matching
@@ -2237,6 +2259,58 @@ impl TableRow for HourDayRow {
     }
 }
 
+impl TableRow for DayOfAnyWeekRow {
+    fn table_name() -> &'static str {
+        "DayOfAnyWeek"
+    }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("dayID".into(), DataType::Int32),
+            ("noOfRealDays".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "dayID".into(),
+                    rows.iter().map(|r| r.day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "noOfRealDays".into(),
+                    rows.iter().map(|r| r.no_of_real_days).collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "DayOfAnyWeek";
+        let day = df
+            .column("dayID")
+            .map_err(|e| row_err(t, 0, "dayID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "dayID", e.to_string()))?;
+        let no_of_real_days = df
+            .column("noOfRealDays")
+            .map_err(|e| row_err(t, 0, "noOfRealDays", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "noOfRealDays", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(DayOfAnyWeekRow {
+                    day_id: day.get(i).ok_or_else(|| null("dayID"))?,
+                    no_of_real_days: no_of_real_days.get(i).ok_or_else(|| null("noOfRealDays"))?,
+                })
+            })
+            .collect()
+    }
+}
+
 impl TableRow for LinkRow {
     fn table_name() -> &'static str {
         "Link"
@@ -2567,6 +2641,7 @@ impl Calculator for LiquidLeakingCalculator {
             source_hours: tables.iter_typed::<SourceHoursRow>("SourceHours")?,
             op_mode_distribution: tables
                 .iter_typed::<OpModeDistributionRow>("OpModeDistribution")?,
+            day_of_any_week: tables.iter_typed::<DayOfAnyWeekRow>("DayOfAnyWeek")?,
             hour_day: tables.iter_typed::<HourDayRow>("HourDay")?,
             link: tables.iter_typed::<LinkRow>("Link")?,
         };
@@ -2693,6 +2768,10 @@ mod tests {
                 pol_process_id: 113,
                 op_mode_id: 150,
                 op_mode_fraction: 0.3,
+            }],
+            day_of_any_week: vec![DayOfAnyWeekRow {
+                day_id: 5,
+                no_of_real_days: 1.0,
             }],
             hour_day: vec![HourDayRow {
                 hour_day_id: 85,
@@ -2855,6 +2934,10 @@ mod tests {
             day_id: 2,
             hour_id: 13,
         });
+        inputs.day_of_any_week.push(DayOfAnyWeekRow {
+            day_id: 2,
+            no_of_real_days: 1.0,
+        });
         let rows = LiquidLeakingCalculator::new().calculate(&inputs);
         assert_eq!(rows.len(), 2);
         // Same emission, distinct hour/day dimensions.
@@ -2984,6 +3067,10 @@ mod tests {
             hour_day_id: 109,
             day_id: 2,
             hour_id: 13,
+        });
+        inputs.day_of_any_week.push(DayOfAnyWeekRow {
+            day_id: 2,
+            no_of_real_days: 1.0,
         });
         let rows = LiquidLeakingCalculator::new().calculate(&inputs);
         assert_eq!(rows.len(), 2);
@@ -3169,6 +3256,10 @@ mod tests {
             OpModeDistributionRow::into_dataframe(inputs.op_mode_distribution).unwrap(),
         );
         store.insert(
+            "DayOfAnyWeek",
+            DayOfAnyWeekRow::into_dataframe(inputs.day_of_any_week).unwrap(),
+        );
+        store.insert(
             "HourDay",
             HourDayRow::into_dataframe(inputs.hour_day).unwrap(),
         );
@@ -3201,8 +3292,8 @@ mod tests {
             .unwrap()
             .get(0)
             .unwrap();
-        // weightedMeanBaseRate 1.0 → emissionQuant 3.0, blended with the I/M
-        // rate at IMAdjustFract 0.4 → 1.5 × 0.4 + 3.0 × 0.6 = 2.4.
+        // weightedMeanBaseRate 1.0 → emissionQuant 3.0 / noOfRealDays(1.0), blended
+        // with the I/M rate at IMAdjustFract 0.4 → 1.5 × 0.4 + 3.0 × 0.6 = 2.4.
         assert!((quant - 2.4).abs() < 1e-9, "emissionQuant {quant} != 2.4");
     }
 
