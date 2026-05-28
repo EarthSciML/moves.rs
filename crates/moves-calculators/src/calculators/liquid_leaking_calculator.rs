@@ -147,8 +147,8 @@ use std::collections::{HashMap, HashSet};
 use moves_calculator_info::{Granularity, Priority};
 use moves_data::{PollutantId, PollutantProcessAssociation, ProcessId};
 use moves_framework::{
-    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStoreTyped,
-    Error, TableRow,
+    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStore,
+    DataFrameStoreTyped, Error, TableRow,
 };
 use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
 
@@ -2506,6 +2506,14 @@ impl Calculator for LiquidLeakingCalculator {
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let tables = ctx.tables();
         let pos = ctx.position();
+        // Prefer the fuelUsageFraction-remapped distribution from scratch (written
+        // by SourceBinDistributionGenerator) over the raw slow-tier table.
+        let fuel_usage_table = {
+            let process_id_i64 = pos.process_id.map(|p| i64::from(p.0)).unwrap_or(0);
+            let county_id_i64 = pos.location.county_id.map(i64::from).unwrap_or(0);
+            let year_i64 = pos.time.year.map(i64::from).unwrap_or(0);
+            format!("sourceBinDistributionFuelUsage_{process_id_i64}_{county_id_i64}_{year_i64}")
+        };
         let liquid_ctx = LiquidLeakingContext {
             year: pos.time.year.map(|y| y as i32).unwrap_or(0),
             state_id: pos.location.state_id.map(|s| s as i32).unwrap_or(0),
@@ -2527,8 +2535,16 @@ impl Calculator for LiquidLeakingCalculator {
             emission_rate_by_age: tables.iter_typed::<EmissionRateByAgeRow>("EmissionRateByAge")?,
             source_bin: tables.iter_typed::<SourceBinRow>("SourceBin")?,
             fuel_type: tables.iter_typed::<FuelTypeRow>("FuelType")?,
-            source_bin_distribution: tables
-                .iter_typed::<SourceBinDistributionRow>("SourceBinDistribution")?,
+            source_bin_distribution: {
+                let scratch = ctx.scratch();
+                if scratch.store.contains(&fuel_usage_table) {
+                    scratch
+                        .store
+                        .iter_typed::<SourceBinDistributionRow>(&fuel_usage_table)?
+                } else {
+                    tables.iter_typed::<SourceBinDistributionRow>("SourceBinDistribution")?
+                }
+            },
             source_type_model_year: tables
                 .iter_typed::<SourceTypeModelYearRow>("SourceTypeModelYear")?,
             pollutant_process_model_year: tables

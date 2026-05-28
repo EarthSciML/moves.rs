@@ -120,8 +120,8 @@ use std::collections::{HashMap, HashSet};
 use moves_calculator_info::{Granularity, Priority};
 use moves_data::{PollutantId, PollutantProcessAssociation, ProcessId};
 use moves_framework::{
-    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStoreTyped,
-    Error, TableRow,
+    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStore,
+    DataFrameStoreTyped, Error, TableRow,
 };
 use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
 
@@ -3367,6 +3367,17 @@ impl Calculator for EvaporativePermeationCalculator {
         let pos = ctx.position();
         let year = pos.time.year.map(|y| y as i32).unwrap_or(0);
         let zone_id = pos.location.zone_id.map(|z| z as i32).unwrap_or(0);
+        // The SourceBinDistributionGenerator runs before this calculator and writes
+        // sourceBinDistributionFuelUsage_{process}_{county}_{year} to scratch with
+        // E85→gas fuelUsageFraction remapping applied. Prefer that over the raw
+        // slow-tier SourceBinDistribution; fall back when scratch table is absent
+        // (tests, stubs, or pre-generator execution).
+        let fuel_usage_table = {
+            let process_id_i64 = pos.process_id.map(|p| i64::from(p.0)).unwrap_or(0);
+            let county_id_i64 = pos.location.county_id.map(i64::from).unwrap_or(0);
+            let year_i64 = pos.time.year.map(i64::from).unwrap_or(0);
+            format!("sourceBinDistributionFuelUsage_{process_id_i64}_{county_id_i64}_{year_i64}")
+        };
         let reg_class_rows =
             tables.iter_typed::<RegClassSourceTypeFractionRow>("RegClassSourceTypeFraction")?;
         let with_reg_class = !reg_class_rows.is_empty();
@@ -3407,8 +3418,16 @@ impl Calculator for EvaporativePermeationCalculator {
             reg_class_source_type_fraction: reg_class_rows,
             run_spec_source_type,
             source_bin: tables.iter_typed::<SourceBinRow>("SourceBin")?,
-            source_bin_distribution: tables
-                .iter_typed::<SourceBinDistributionRow>("SourceBinDistribution")?,
+            source_bin_distribution: {
+                let scratch = ctx.scratch();
+                if scratch.store.contains(&fuel_usage_table) {
+                    scratch
+                        .store
+                        .iter_typed::<SourceBinDistributionRow>(&fuel_usage_table)?
+                } else {
+                    tables.iter_typed::<SourceBinDistributionRow>("SourceBinDistribution")?
+                }
+            },
             source_hours: tables.iter_typed::<SourceHoursRow>("SourceHours")?,
             source_type_model_year: tables
                 .iter_typed::<SourceTypeModelYearRow>("SourceTypeModelYear")?,
