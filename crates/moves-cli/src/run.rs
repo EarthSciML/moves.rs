@@ -188,9 +188,7 @@ fn populate_sho_distances(store: &mut InMemoryStore) -> Result<()> {
         let dist_nonzero = find_col("distance")
             .ok()
             .and_then(|c| c.f64().ok().cloned())
-            .map_or(false, |ca| {
-                ca.into_iter().any(|v| v.map_or(false, |d| d != 0.0))
-            });
+            .is_some_and(|ca| ca.into_iter().any(|v| v.is_some_and(|d| d != 0.0)));
         if dist_nonzero {
             return Ok(());
         }
