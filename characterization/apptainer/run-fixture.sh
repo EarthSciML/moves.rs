@@ -175,16 +175,38 @@ fi
 # ----- Step 2: dump MariaDB databases to TSV -----
 echo "[run-fixture] step 2/3 — dumping MariaDB databases to TSV"
 
+# Kill any mariadbd left over from step 1 so the dump container can start
+# MariaDB cleanly on the same port. The container's mariadb-admin shutdown
+# may silently fail (fakeroot auth quirks), leaving an orphan on port 3306.
+MARIADBD_PID_FILE="${MARIADB_SOCK_DIR}/mariadbd.pid"
+if [ -f "${MARIADBD_PID_FILE}" ]; then
+    OLD_PID="$(cat "${MARIADBD_PID_FILE}" 2>/dev/null || true)"
+    if [ -n "${OLD_PID}" ]; then
+        echo "[run-fixture] killing leftover mariadbd PID ${OLD_PID}"
+        kill "${OLD_PID}" 2>/dev/null || true
+    fi
+    rm -f "${MARIADBD_PID_FILE}" "${MARIADB_SOCK_DIR}/mysqld.sock" 2>/dev/null || true
+fi
+# Also wait for port 3306 to clear (start-mariadb-bg.sh does this too,
+# but an explicit wait here avoids a race between the kill and step 2's start).
+for _w in $(seq 1 60); do
+    bash -c 'exec 3<>/dev/tcp/127.0.0.1/3306' 2>/dev/null || break
+    sleep 1
+done
+
 rm -rf "${CAPTURES_DIR}"
 mkdir -p "${CAPTURES_DIR}/databases"
 
 FAKEROOT_FLAG=()
 if [ "${USE_FAKEROOT}" = "1" ]; then
     FAKEROOT_FLAG=( --fakeroot )
-    START_MARIADB="service mariadb start"
-else
-    START_MARIADB="/opt/moves-bin/start-mariadb-bg.sh"
 fi
+# Always use start-mariadb-bg.sh (bind-mounted read-only) for the dump pass.
+# "service mariadb start" is unreliable in fakeroot — the init.d script may
+# find a stale PID file from step 1 and report "running but not responding"
+# even when mariadbd is already stopped. start-mariadb-bg.sh handles port
+# contention, retries, and the moves/moves readiness probe correctly.
+START_MARIADB="/opt/moves-bin/start-mariadb-bg.sh"
 
 # Bind-mount layout for the dump pass. The dump script and start-mariadb-bg.sh
 # live next to this script on the host and are bind-mounted read-only into
