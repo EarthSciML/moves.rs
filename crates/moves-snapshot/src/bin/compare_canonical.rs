@@ -61,6 +61,14 @@ struct Args {
     #[arg(long, value_name = "SECS")]
     moves_rs_wall: Option<f64>,
 
+    /// moves.rs peak RSS in MiB (from `/usr/bin/time -v`; omit if not available).
+    #[arg(long, value_name = "MIB")]
+    moves_rs_peak_mb: Option<f64>,
+
+    /// Canonical-MOVES peak RSS in MiB (from `/usr/bin/time -v`; omit if not available).
+    #[arg(long, value_name = "MIB")]
+    canonical_peak_mb: Option<f64>,
+
     /// Output format.
     #[arg(long, value_enum, default_value_t = Format::Text)]
     format: Format,
@@ -92,6 +100,8 @@ struct FixtureResult {
     canonical_wall_secs: Option<f64>,
     moves_rs_wall_secs: Option<f64>,
     speedup: Option<f64>,
+    canonical_peak_mb: Option<f64>,
+    moves_rs_peak_mb: Option<f64>,
     pollutant_count: usize,
     max_abs_delta: f64,
     max_pct_diff: f64,
@@ -343,6 +353,8 @@ fn build_result(
         canonical_wall_secs: args.canonical_wall,
         moves_rs_wall_secs: args.moves_rs_wall,
         speedup,
+        canonical_peak_mb: args.canonical_peak_mb,
+        moves_rs_peak_mb: args.moves_rs_peak_mb,
         pollutant_count: rows.len(),
         max_abs_delta,
         max_pct_diff,
@@ -370,10 +382,22 @@ fn render_text(out: &mut impl Write, r: &FixtureResult) -> Result<(), Box<dyn st
         .speedup
         .map(|s| format!("{s:.1}×"))
         .unwrap_or_else(|| "N/A".into());
+    let can_peak = r
+        .canonical_peak_mb
+        .map(|m| format!("{m:.1} MiB"))
+        .unwrap_or_else(|| "N/A".into());
+    let mrs_peak = r
+        .moves_rs_peak_mb
+        .map(|m| format!("{m:.1} MiB"))
+        .unwrap_or_else(|| "N/A".into());
 
     writeln!(
         out,
         "Canonical wall: {can_wall} s | moves.rs wall: {mrs_wall} s | Speedup: {speedup}"
+    )?;
+    writeln!(
+        out,
+        "Canonical peak: {can_peak} | moves.rs peak: {mrs_peak}"
     )?;
     writeln!(out)?;
 

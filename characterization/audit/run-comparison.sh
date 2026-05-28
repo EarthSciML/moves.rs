@@ -93,6 +93,17 @@ elapsed_s() {
     awk "BEGIN { printf \"%.1f\", $ms / 1000 }"
 }
 
+# Parse /usr/bin/time -v output file → peak MiB string, or "".
+# "Maximum resident set size (kbytes): N" is in kibibytes on Linux.
+peak_mb_from_time_file() {
+    local tf="$1"
+    local kb
+    kb=$(awk '/Maximum resident set size/{print $NF}' "${tf}" 2>/dev/null || true)
+    if [ -n "${kb}" ] && [ "${kb}" -gt 0 ] 2>/dev/null; then
+        awk "BEGIN { printf \"%.1f\", ${kb}/1024 }"
+    fi
+}
+
 # Build the fixture list.
 if [ -n "${FIXTURES_ARG}" ]; then
     IFS=',' read -ra FIXTURE_LIST <<< "${FIXTURES_ARG}"
@@ -123,6 +134,7 @@ for FIXTURE in "${FIXTURE_LIST[@]}"; do
 
     SNAPSHOT_DIR="${SNAPSHOTS_DIR}/${FIXTURE_NAME}"
     CANONICAL_WALL_ARG=""
+    CANONICAL_PEAK_MB_ARG=""
 
     # ── Canonical MOVES ───────────────────────────────────────────────────────
     if [ ! -d "${SNAPSHOT_DIR}" ] || [ "${REFRESH_CANONICAL}" -eq 1 ]; then
@@ -134,20 +146,32 @@ for FIXTURE in "${FIXTURE_LIST[@]}"; do
             continue
         fi
         printf '[run-canonical] %s ...\n' "${FIXTURE_NAME}" >&2
+        CANONICAL_TIME_FILE="${OUTPUT_DIR}/${FIXTURE_NAME}/canonical-time.txt"
+        mkdir -p "${OUTPUT_DIR}/${FIXTURE_NAME}"
         T0=$(now_ms)
-        "${APPTAINER_DIR}/run-fixture.sh" --fakeroot --runspec "${FIXTURE_XML}"
+        /usr/bin/time -v -o "${CANONICAL_TIME_FILE}" \
+            "${APPTAINER_DIR}/run-fixture.sh" --fakeroot --runspec "${FIXTURE_XML}"
         T1=$(now_ms)
         CANONICAL_WALL=$(elapsed_s $((T1 - T0)))
-        # Store timing alongside snapshot for future re-runs.
+        CANONICAL_PEAK_MB=$(peak_mb_from_time_file "${CANONICAL_TIME_FILE}")
+        # Store timing and peak alongside snapshot for future re-runs.
         printf '%s\n' "${CANONICAL_WALL}" > "${SNAPSHOT_DIR}/timing.txt"
+        [ -n "${CANONICAL_PEAK_MB}" ] && printf '%s\n' "${CANONICAL_PEAK_MB}" > "${SNAPSHOT_DIR}/peak-mb.txt"
         CANONICAL_WALL_ARG="--canonical-wall ${CANONICAL_WALL}"
-        printf '[done-canonical] %s  wall=%s s\n' "${FIXTURE_NAME}" "${CANONICAL_WALL}" >&2
+        [ -n "${CANONICAL_PEAK_MB}" ] && CANONICAL_PEAK_MB_ARG="--canonical-peak-mb ${CANONICAL_PEAK_MB}"
+        printf '[done-canonical] %s  wall=%s s  peak=%s MiB\n' \
+            "${FIXTURE_NAME}" "${CANONICAL_WALL}" "${CANONICAL_PEAK_MB:-N/A}" >&2
     else
-        # Reuse existing snapshot; read cached timing if available.
+        # Reuse existing snapshot; read cached timing and peak if available.
         TIMING_FILE="${SNAPSHOT_DIR}/timing.txt"
         if [ -f "${TIMING_FILE}" ]; then
             CANONICAL_WALL=$(tr -d '[:space:]' < "${TIMING_FILE}")
             CANONICAL_WALL_ARG="--canonical-wall ${CANONICAL_WALL}"
+        fi
+        PEAK_FILE="${SNAPSHOT_DIR}/peak-mb.txt"
+        if [ -f "${PEAK_FILE}" ]; then
+            CANONICAL_PEAK_MB=$(tr -d '[:space:]' < "${PEAK_FILE}")
+            [ -n "${CANONICAL_PEAK_MB}" ] && CANONICAL_PEAK_MB_ARG="--canonical-peak-mb ${CANONICAL_PEAK_MB}"
         fi
         printf '[reuse-canonical] %s  snapshot: %s\n' "${FIXTURE_NAME}" "${SNAPSHOT_DIR}" >&2
     fi
@@ -156,14 +180,20 @@ for FIXTURE in "${FIXTURE_LIST[@]}"; do
     MOVES_RS_OUT="${OUTPUT_DIR}/${FIXTURE_NAME}/moves-rs-output"
     mkdir -p "${MOVES_RS_OUT}"
     printf '[run-moves.rs] %s ...\n' "${FIXTURE_NAME}" >&2
+    MOVES_RS_TIME_FILE="${OUTPUT_DIR}/${FIXTURE_NAME}/moves-rs-time.txt"
     T0=$(now_ms)
-    "${MOVES_BIN}" run \
-        --runspec  "${FIXTURE_XML}" \
-        --output   "${MOVES_RS_OUT}" \
-        --snapshot "${SNAPSHOT_DIR}"
+    /usr/bin/time -v -o "${MOVES_RS_TIME_FILE}" \
+        "${MOVES_BIN}" run \
+            --runspec  "${FIXTURE_XML}" \
+            --output   "${MOVES_RS_OUT}" \
+            --snapshot "${SNAPSHOT_DIR}"
     T1=$(now_ms)
     MOVES_RS_WALL=$(elapsed_s $((T1 - T0)))
-    printf '[done-moves.rs] %s  wall=%s s\n' "${FIXTURE_NAME}" "${MOVES_RS_WALL}" >&2
+    MOVES_RS_PEAK_MB=$(peak_mb_from_time_file "${MOVES_RS_TIME_FILE}")
+    MOVES_RS_PEAK_MB_ARG=""
+    [ -n "${MOVES_RS_PEAK_MB}" ] && MOVES_RS_PEAK_MB_ARG="--moves-rs-peak-mb ${MOVES_RS_PEAK_MB}"
+    printf '[done-moves.rs] %s  wall=%s s  peak=%s MiB\n' \
+        "${FIXTURE_NAME}" "${MOVES_RS_WALL}" "${MOVES_RS_PEAK_MB:-N/A}" >&2
 
     # ── Compare ──────────────────────────────────────────────────────────────
     FIXTURE_JSON="${OUTPUT_DIR}/${FIXTURE_NAME}/report.json"
@@ -173,7 +203,9 @@ for FIXTURE in "${FIXTURE_LIST[@]}"; do
         --moves-rs   "${MOVES_RS_OUT}" \
         --fixture    "${FIXTURE_NAME}" \
         ${CANONICAL_WALL_ARG} \
+        ${CANONICAL_PEAK_MB_ARG} \
         --moves-rs-wall "${MOVES_RS_WALL}" \
+        ${MOVES_RS_PEAK_MB_ARG} \
         --format json \
         > "${FIXTURE_JSON}"
     JSON_FILES+=("${FIXTURE_JSON}")
@@ -186,11 +218,11 @@ REPORT="${OUTPUT_DIR}/audit-report.md"
 {
     printf '# moves.rs Audit Report — %s\n\n' "${TIMESTAMP}"
     printf '## Summary\n\n'
-    printf '| Fixture | Pollutants compared | Max abs delta | Max pct diff | Canonical wall (s) | moves.rs wall (s) | Speedup |\n'
-    printf '|---|---|---|---|---|---|---|\n'
+    printf '| Fixture | Pollutants compared | Max abs delta | Max pct diff | Canonical wall (s) | moves.rs wall (s) | Speedup | moves.rs peak mem (MiB) |\n'
+    printf '|---|---|---|---|---|---|---|---|\n'
     for jf in "${JSON_FILES[@]}"; do
         jq -r \
-            '"| \(.fixture) | \(.pollutant_count) | \(.max_abs_delta | . * 1e6 | round | . / 1e6) | \(.max_pct_diff * 100 | . * 10 | round | . / 10)% | \(.canonical_wall_secs // "N/A") | \(.moves_rs_wall_secs // "N/A") | \(.speedup // "N/A") |"' \
+            '"| \(.fixture) | \(.pollutant_count) | \(.max_abs_delta | . * 1e6 | round | . / 1e6) | \(.max_pct_diff * 100 | . * 10 | round | . / 10)% | \(.canonical_wall_secs // "N/A") | \(.moves_rs_wall_secs // "N/A") | \(.speedup // "N/A") | \(.moves_rs_peak_mb // "N/A") |"' \
             "${jf}"
     done
     printf '\n'
@@ -209,10 +241,16 @@ for jf in "${JSON_FILES[@]}"; do
     MOVES_RS_OUT="${FIXTURE_DIR}/moves-rs-output"
     CANONICAL_WALL=$(jq -r '.canonical_wall_secs // empty' "${jf}")
     MOVES_RS_WALL=$(jq -r '.moves_rs_wall_secs // empty' "${jf}")
+    CANONICAL_PEAK_MB=$(jq -r '.canonical_peak_mb // empty' "${jf}")
+    MOVES_RS_PEAK_MB=$(jq -r '.moves_rs_peak_mb // empty' "${jf}")
     CANONICAL_WALL_ARG=""
     [ -n "${CANONICAL_WALL}" ] && CANONICAL_WALL_ARG="--canonical-wall ${CANONICAL_WALL}"
     MOVES_RS_WALL_ARG=""
     [ -n "${MOVES_RS_WALL}" ] && MOVES_RS_WALL_ARG="--moves-rs-wall ${MOVES_RS_WALL}"
+    CANONICAL_PEAK_MB_ARG=""
+    [ -n "${CANONICAL_PEAK_MB}" ] && CANONICAL_PEAK_MB_ARG="--canonical-peak-mb ${CANONICAL_PEAK_MB}"
+    MOVES_RS_PEAK_MB_ARG=""
+    [ -n "${MOVES_RS_PEAK_MB}" ] && MOVES_RS_PEAK_MB_ARG="--moves-rs-peak-mb ${MOVES_RS_PEAK_MB}"
 
     SNAPSHOT_DIR="${SNAPSHOTS_DIR}/${FIXTURE_NAME}"
     # shellcheck disable=SC2086
@@ -221,7 +259,9 @@ for jf in "${JSON_FILES[@]}"; do
         --moves-rs   "${MOVES_RS_OUT}" \
         --fixture    "${FIXTURE_NAME}" \
         ${CANONICAL_WALL_ARG} \
+        ${CANONICAL_PEAK_MB_ARG} \
         ${MOVES_RS_WALL_ARG} \
+        ${MOVES_RS_PEAK_MB_ARG} \
         --format text \
         >> "${REPORT}"
 done
