@@ -4774,6 +4774,201 @@ mod tests {
         );
     }
 
+    /// Golden row-level test using real coefficients from the
+    /// `characterization/snapshots/process-evap-fvv` fixture for
+    /// sourceType=21, modelYear=2010, August (month=8), hourDay=172 (weekday
+    /// 5 p.m. peak, zone=261610 Washtenaw County MI).
+    ///
+    /// AverageTankGasoline (empty in snapshot) is supplied synthetically with
+    /// ETOHVolume=0.0 so the ethanol weight is 0 and EthanolWeightedTVG = TVG₀.
+    /// Only hours 16 and 17 are modelled; hour=17 is the peak, so the
+    /// TVV-6 prior-hour lookup for hour=16 finds nothing (prior TVV = 0).
+    /// No post-peak decay rows are produced (HourDay rows for hours 18–21 are
+    /// absent).  OpModeDistribution and SourceHours are supplied synthetically.
+    ///
+    /// Hand-derived chain (TVV-3 → TVV-9, no I/M):
+    ///   TVG₀   = 0.008170 × exp(0.2357×9) × (exp(0.0409×81.8977) − exp(0.0409×81.8084))
+    ///          = 0.007079336599388528
+    ///   ewTVG  = TVG₀ × 1.0 (ETOHVol 0.0 → f=0)
+    ///          = 0.007079336599388528
+    ///   cumTVV = 0.0 + ewTVG × (0.269 + 0.053×ewTVG)
+    ///          = 0.0019069977465899486
+    ///   uhTVV  = cumTVV − 0.0 = 0.0019069977465899486 (no prior hour)
+    ///   hTVV   = 1.0 × uhTVV  = 0.0019069977465899486 (CSIF frac=1.0)
+    ///   wMBR   = 0.935510 × hTVV   = 0.0017840154619123626
+    ///   emit   = wMBR × 24.1821 × 1.0 = 0.04314124030151094
+    #[test]
+    fn calculate_snapshot_golden_sourcetype21_modelyear2010_august_hour17() {
+        let ctx = RunContext {
+            year: 2020,
+            state_id: 26,
+            county_id: 26_161,
+            zone_id: 261_610,
+            link_id: 2_616_104,
+            road_type_id: 4,
+        };
+        let inputs = TankVaporVentingInputs {
+            age_category: vec![AgeCategoryRow {
+                age_id: 10,
+                age_group_id: 1014,
+            }],
+            average_tank_gasoline: vec![AverageTankGasolineRow {
+                fuel_type_id: 1,
+                fuel_year_id: 2020,
+                month_group_id: 8,
+                etoh_volume: 0.0,
+                rvp: 9.0,
+            }],
+            cold_soak_initial_hour_fraction: vec![ColdSoakInitialHourFractionRow {
+                source_type_id: 21,
+                zone_id: 261_610,
+                month_id: 8,
+                hour_day_id: 172,
+                initial_hour_day_id: 162,
+                cold_soak_initial_hour_fraction: 1.0,
+            }],
+            cold_soak_tank_temperature: vec![
+                ColdSoakTankTemperatureRow {
+                    month_id: 8,
+                    hour_id: 16,
+                    cold_soak_tank_temperature: 81.808400,
+                },
+                ColdSoakTankTemperatureRow {
+                    month_id: 8,
+                    hour_id: 17,
+                    cold_soak_tank_temperature: 81.897700,
+                },
+            ],
+            county: vec![CountyRow {
+                county_id: 26_161,
+                altitude: 'L',
+            }],
+            cum_tvv_coeffs: vec![CumTvvCoeffsRow {
+                reg_class_id: 20,
+                model_year_group_id: 2010,
+                age_group_id: 1014,
+                pol_process_id: 112,
+                tvv_term_a: 0.0,
+                tvv_term_b: 0.269,
+                tvv_term_c: 0.053,
+                tvv_term_a_im: 0.0,
+                tvv_term_b_im: 0.203,
+                tvv_term_c_im: 0.023,
+            }],
+            emission_rate_by_age: vec![],
+            fuel_type: vec![FuelTypeRow {
+                fuel_type_id: 1,
+                subject_to_evap_calculations: true,
+            }],
+            hour_day: vec![
+                HourDayRow {
+                    hour_day_id: 162,
+                    day_id: 2,
+                    hour_id: 16,
+                },
+                HourDayRow {
+                    hour_day_id: 172,
+                    day_id: 2,
+                    hour_id: 17,
+                },
+            ],
+            im_coverage: vec![],
+            im_factor: vec![],
+            month_of_any_year: vec![MonthOfAnyYearRow {
+                month_id: 8,
+                month_group_id: 8,
+            }],
+            op_mode_distribution: vec![OpModeDistributionRow {
+                source_type_id: 21,
+                hour_day_id: 172,
+                link_id: 2_616_104,
+                pol_process_id: 112,
+                op_mode_id: 151,
+                op_mode_fraction: 1.0,
+            }],
+            pollutant_process_assoc: vec![PollutantProcessAssocRow {
+                pol_process_id: 112,
+                process_id: 12,
+                pollutant_id: 1,
+            }],
+            pollutant_process_model_year: vec![PollutantProcessModelYearRow {
+                pol_process_id: 112,
+                model_year_id: 2010,
+                model_year_group_id: 2010,
+                im_model_year_group_id: 2010,
+            }],
+            run_spec_hour_day: vec![172],
+            run_spec_month: vec![8],
+            run_spec_source_type: vec![21],
+            source_bin: vec![SourceBinRow {
+                source_bin_id: 1_010_120_300_000_000_000,
+                fuel_type_id: 1,
+                reg_class_id: 20,
+                model_year_group_id: 2010,
+            }],
+            source_bin_distribution: vec![SourceBinDistributionRow {
+                source_type_model_year_id: 212_010,
+                pol_process_id: 112,
+                source_bin_id: 1_010_120_300_000_000_000,
+                source_bin_activity_fraction: 0.935510,
+            }],
+            source_hours: vec![SourceHoursRow {
+                hour_day_id: 172,
+                month_id: 8,
+                age_id: 10,
+                source_type_id: 21,
+                source_hours: 24.1821,
+            }],
+            source_type_model_year: vec![SourceTypeModelYearRow {
+                source_type_model_year_id: 212_010,
+                model_year_id: 2010,
+                source_type_id: 21,
+            }],
+            tank_vapor_gen_coeffs: vec![
+                TankVaporGenCoeffsRow {
+                    ethanol_level_id: 0,
+                    altitude: 'L',
+                    tvg_term_a: 0.008170,
+                    tvg_term_b: 0.2357,
+                    tvg_term_c: 0.0409,
+                },
+                TankVaporGenCoeffsRow {
+                    ethanol_level_id: 10,
+                    altitude: 'L',
+                    tvg_term_a: 0.008750,
+                    tvg_term_b: 0.2056,
+                    tvg_term_c: 0.0430,
+                },
+            ],
+            year: vec![YearRow {
+                year_id: 2020,
+                fuel_year_id: 2020,
+            }],
+            zone: vec![ZoneRow {
+                zone_id: 261_610,
+                county_id: 26_161,
+            }],
+        };
+        let rows = TankVaporVentingCalculator::new().calculate(&inputs, &ctx);
+        assert_eq!(rows.len(), 1);
+        let r = rows[0];
+        assert_eq!(r.year_id, 2020);
+        assert_eq!(r.month_id, 8);
+        assert_eq!(r.day_id, 2);
+        assert_eq!(r.hour_id, 17);
+        assert_eq!(r.state_id, 26);
+        assert_eq!(r.county_id, 26_161);
+        assert_eq!(r.zone_id, 261_610);
+        assert_eq!(r.link_id, 2_616_104);
+        assert_eq!(r.pollutant_id, 1);
+        assert_eq!(r.process_id, 12);
+        assert_eq!(r.source_type_id, 21);
+        assert_eq!(r.fuel_type_id, 1);
+        assert_eq!(r.model_year_id, 2010);
+        assert_eq!(r.road_type_id, 4);
+        assert_quant(r.emission_quant, 0.043_141_240_301_510_94);
+    }
+
     #[test]
     fn factory_builds_a_named_calculator() {
         assert_eq!(factory().name(), "TankVaporVentingCalculator");

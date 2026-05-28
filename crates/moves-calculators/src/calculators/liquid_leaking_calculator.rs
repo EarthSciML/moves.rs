@@ -3206,6 +3206,126 @@ mod tests {
         assert!((quant - 2.4).abs() < 1e-9, "emissionQuant {quant} != 2.4");
     }
 
+    /// Golden row-level test using real values from the
+    /// `characterization/snapshots/process-evap-leaks` fixture for
+    /// sourceType=21, modelYear=2010, August (month=8), hourDay=72 (weekday
+    /// 7 a.m., link=2616104 Washtenaw County MI).  OpModeDistribution is
+    /// not in the snapshot so a synthetic frac=1.0 row is supplied.
+    ///
+    /// Hand-derived chain (LL-8 → LL-9, no I/M):
+    ///   LL-8 wMBR        = 0.935510 × 0.048               = 0.04490448
+    ///   LL-9 emitQuant   = 0.04490448 × 24.1821 × 1.0     = 1.085884625808
+    #[test]
+    fn calculate_snapshot_golden_sourcetype21_modelyear2010_august_hourday72() {
+        let inputs = LiquidLeakingInputs {
+            context: LiquidLeakingContext {
+                year: 2020,
+                state_id: 26,
+                county_id: 26_161,
+                zone_id: 261_610,
+                link_id: 2_616_104,
+            },
+            pollutant_process_mapped_model_year: vec![PollutantProcessMappedModelYearRow {
+                pol_process_id: 113,
+                model_year_id: 2010,
+                im_model_year_group_id: 2010,
+            }],
+            pollutant_process_assoc: vec![PollutantProcessAssocRow {
+                pol_process_id: 113,
+                process_id: 13,
+                pollutant_id: 1,
+            }],
+            im_factor: vec![],
+            age_category: vec![AgeCategoryRow {
+                age_id: 10,
+                age_group_id: 1014,
+            }],
+            im_coverage: vec![],
+            emission_rate_by_age: vec![EmissionRateByAgeRow {
+                pol_process_id: 113,
+                source_bin_id: 1_010_120_300_000_000_000,
+                op_mode_id: 150,
+                age_group_id: 1014,
+                mean_base_rate: 0.048,
+                mean_base_rate_im: 0.048,
+            }],
+            source_bin: vec![SourceBinRow {
+                source_bin_id: 1_010_120_300_000_000_000,
+                fuel_type_id: 1,
+                reg_class_id: 20,
+                model_year_group_id: 2010,
+            }],
+            fuel_type: vec![FuelTypeRow {
+                fuel_type_id: 1,
+                subject_to_evap_calculations: true,
+            }],
+            source_bin_distribution: vec![SourceBinDistributionRow {
+                source_type_model_year_id: 212_010,
+                pol_process_id: 113,
+                source_bin_id: 1_010_120_300_000_000_000,
+                source_bin_activity_fraction: 0.935510,
+            }],
+            source_type_model_year: vec![SourceTypeModelYearRow {
+                source_type_model_year_id: 212_010,
+                model_year_id: 2010,
+                source_type_id: 21,
+            }],
+            pollutant_process_model_year: vec![PollutantProcessModelYearRow {
+                pol_process_id: 113,
+                model_year_id: 2010,
+                model_year_group_id: 2010,
+            }],
+            run_spec_month: vec![8],
+            run_spec_hour_day: vec![72],
+            run_spec_source_type: vec![21],
+            source_hours: vec![SourceHoursRow {
+                hour_day_id: 72,
+                month_id: 8,
+                year_id: 2020,
+                age_id: 10,
+                link_id: 2_616_104,
+                source_type_id: 21,
+                source_hours: 24.1821,
+            }],
+            op_mode_distribution: vec![OpModeDistributionRow {
+                source_type_id: 21,
+                hour_day_id: 72,
+                link_id: 2_616_104,
+                pol_process_id: 113,
+                op_mode_id: 150,
+                op_mode_fraction: 1.0,
+            }],
+            hour_day: vec![HourDayRow {
+                hour_day_id: 72,
+                day_id: 2,
+                hour_id: 7,
+            }],
+            link: vec![LinkRow {
+                link_id: 2_616_104,
+                road_type_id: 4,
+            }],
+        };
+        let rows = LiquidLeakingCalculator::new().calculate(&inputs);
+        assert_eq!(rows.len(), 1);
+        let r = rows[0];
+        assert_eq!(r.year_id, 2020);
+        assert_eq!(r.month_id, 8);
+        assert_eq!(r.day_id, 2);
+        assert_eq!(r.hour_id, 7);
+        assert_eq!(r.state_id, 26);
+        assert_eq!(r.county_id, 26_161);
+        assert_eq!(r.zone_id, 261_610);
+        assert_eq!(r.link_id, 2_616_104);
+        assert_eq!(r.pollutant_id, 1);
+        assert_eq!(r.process_id, 13);
+        assert_eq!(r.source_type_id, 21);
+        assert_eq!(r.reg_class_id, 20);
+        assert_eq!(r.fuel_type_id, 1);
+        assert_eq!(r.model_year_id, 2010);
+        assert_eq!(r.road_type_id, 4);
+        assert_close(r.emission_quant, 1.085_884_625_808);
+    }
+
     #[test]
     fn factory_builds_a_named_calculator() {
         assert_eq!(factory().name(), "LiquidLeakingCalculator");

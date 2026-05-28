@@ -4132,6 +4132,186 @@ mod tests {
         );
     }
 
+    /// Golden row-level test using real values from the
+    /// `characterization/snapshots/process-evap-permeation` fixture for
+    /// sourceType=21, modelYear=2010, August (month=8), hourDay=72 (weekday
+    /// 7 a.m., zone=261610 Washtenaw County MI).  OpModeDistribution is
+    /// not in the snapshot so a synthetic frac=1.0 row is supplied.
+    ///
+    /// Hand-derived chain (PC-1b → PC-6):
+    ///   PC-1b meanBaseRate = 0.935510 × 0.0102 × 1.0        = 0.009542202
+    ///   PC-2a tempAdj      = 0.0625 × exp(0.0385 × 64.8371) = 0.758539524…
+    ///   PC-2b wTA          = 0.758539524… × 1.0             = 0.758539524…
+    ///   PC-3  wFA          = 1.0 × 2.1383                   = 2.1383
+    ///   PC-4  adjRate      = 0.009542202 × 2.1383           = 0.020404090…
+    ///   PC-5  adjQuant     = 0.020404090… × 24.1821         = 0.493413757…
+    ///   PC-6  emitQuant    = 0.758539524… × 0.493413757…    = 0.374273837…
+    #[test]
+    fn calculate_snapshot_golden_sourcetype21_modelyear2010_august_hourday72() {
+        let ctx = RunContext {
+            year: 2020,
+            zone_id: 261_610,
+            with_reg_class: true,
+        };
+        let inputs = EvaporativePermeationInputs {
+            age_category: vec![AgeCategoryRow {
+                age_id: 10,
+                age_group_id: 1014,
+            }],
+            average_tank_temperature: vec![AverageTankTemperatureRow {
+                tank_temperature_group_id: 3,
+                zone_id: 261_610,
+                month_id: 8,
+                hour_day_id: 72,
+                op_mode_id: 300,
+                average_tank_temperature: 64.8371,
+            }],
+            county: vec![CountyRow {
+                county_id: 26_161,
+                state_id: 26,
+                gpa_fract: 0.0,
+            }],
+            emission_rate_by_age: vec![EmissionRateByAgeRow {
+                source_bin_id: 1_010_100_300_000_000_000,
+                pol_process_id: 111,
+                age_group_id: 1014,
+                mean_base_rate: 0.0102,
+            }],
+            etoh_bin: vec![EtohBinRow {
+                etoh_thresh_id: 3,
+                etoh_thresh_low: 9.0,
+                etoh_thresh_high: 12.5,
+            }],
+            fuel_formulation: vec![FuelFormulationRow {
+                fuel_formulation_id: 9114,
+                fuel_subtype_id: 12,
+                etoh_volume: Some(10.0),
+            }],
+            fuel_subtype: vec![FuelSubtypeRow {
+                fuel_subtype_id: 12,
+                fuel_type_id: 1,
+            }],
+            fuel_supply: vec![FuelSupplyRow {
+                fuel_year_id: 2020,
+                month_group_id: 8,
+                fuel_formulation_id: 9114,
+                market_share: 1.0,
+            }],
+            hc_permeation_coeff: vec![HcPermeationCoeffRow {
+                pol_process_id: 111,
+                etoh_thresh_id: 3,
+                fuel_my_group_id: 20_102_060,
+                fuel_adjustment: 2.1383,
+                fuel_adjustment_gpa: 2.1383,
+            }],
+            hour_day: vec![HourDayRow {
+                hour_day_id: 72,
+                day_id: 2,
+                hour_id: 7,
+            }],
+            link: vec![LinkRow {
+                link_id: 2_616_104,
+                county_id: 26_161,
+                zone_id: 261_610,
+                road_type_id: 4,
+            }],
+            model_year: vec![ModelYearRow {
+                model_year_id: 2010,
+            }],
+            op_mode_distribution: vec![OpModeDistributionRow {
+                source_type_id: 21,
+                hour_day_id: 72,
+                link_id: 2_616_104,
+                pol_process_id: 111,
+                op_mode_id: 300,
+                op_mode_fraction: 1.0,
+            }],
+            pollutant_process_assoc: vec![PollutantProcessAssocRow {
+                pol_process_id: 111,
+                process_id: 11,
+                pollutant_id: 1,
+            }],
+            pollutant_process_mapped_model_year: vec![PollutantProcessMappedModelYearRow {
+                pol_process_id: 111,
+                model_year_id: 2010,
+                fuel_my_group_id: 20_102_060,
+            }],
+            pollutant_process_model_year: vec![PollutantProcessModelYearRow {
+                pol_process_id: 111,
+                model_year_id: 2010,
+                model_year_group_id: 2010,
+            }],
+            reg_class_source_type_fraction: vec![RegClassSourceTypeFractionRow {
+                fuel_type_id: 1,
+                model_year_id: 2010,
+                source_type_id: 21,
+                reg_class_id: 20,
+                reg_class_fraction: 1.0,
+            }],
+            run_spec_source_type: vec![21],
+            source_bin: vec![SourceBinRow {
+                source_bin_id: 1_010_100_300_000_000_000,
+                fuel_type_id: 1,
+            }],
+            source_bin_distribution: vec![SourceBinDistributionRow {
+                source_type_model_year_id: 212_010,
+                pol_process_id: 111,
+                source_bin_id: 1_010_100_300_000_000_000,
+                source_bin_activity_fraction: 0.935510,
+            }],
+            source_hours: vec![SourceHoursRow {
+                hour_day_id: 72,
+                month_id: 8,
+                year_id: 2020,
+                age_id: 10,
+                link_id: 2_616_104,
+                source_type_id: 21,
+                source_hours: 24.1821,
+            }],
+            source_type_model_year: vec![SourceTypeModelYearRow {
+                source_type_model_year_id: 212_010,
+                model_year_id: 2010,
+                source_type_id: 21,
+            }],
+            source_type_model_year_group: vec![SourceTypeModelYearGroupRow {
+                source_type_id: 21,
+                model_year_group_id: 2010,
+                tank_temperature_group_id: 3,
+            }],
+            temperature_adjustment: vec![TemperatureAdjustmentRow {
+                pol_process_id: 111,
+                fuel_type_id: 1,
+                min_model_year_id: 1950,
+                max_model_year_id: 2060,
+                temp_adjust_term_a: 0.0625,
+                temp_adjust_term_b: 0.0385,
+            }],
+            year: vec![YearRow {
+                year_id: 2020,
+                fuel_year_id: 2020,
+            }],
+        };
+        let rows = EvaporativePermeationCalculator::new().calculate(&inputs, &ctx);
+        assert_eq!(rows.len(), 1);
+        let r = rows[0];
+        assert_eq!(r.state_id, 26);
+        assert_eq!(r.county_id, 26_161);
+        assert_eq!(r.zone_id, 261_610);
+        assert_eq!(r.link_id, 2_616_104);
+        assert_eq!(r.road_type_id, 4);
+        assert_eq!(r.year_id, 2020);
+        assert_eq!(r.month_id, 8);
+        assert_eq!(r.day_id, 2);
+        assert_eq!(r.hour_id, 7);
+        assert_eq!(r.pollutant_id, 1);
+        assert_eq!(r.process_id, 11);
+        assert_eq!(r.source_type_id, 21);
+        assert_eq!(r.reg_class_id, 20);
+        assert_eq!(r.model_year_id, 2010);
+        assert_eq!(r.fuel_type_id, 1);
+        assert_quant(r.emission_quant, 0.374_273_837_400_543_3);
+    }
+
     #[test]
     fn factory_builds_a_named_calculator() {
         assert_eq!(factory().name(), "EvaporativePermeationCalculator");
