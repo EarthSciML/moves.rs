@@ -149,6 +149,23 @@ if [ "${SKIP_RUN}" = "0" ]; then
     FAKEROOT_ARGS=()
     [ "${USE_FAKEROOT}" = "1" ] && FAKEROOT_ARGS=( -f )
 
+    # Wait for MOVES master port 13131 to be free. MOVES hardcodes this port
+    # for master-worker sockets; concurrent instances on the same host conflict
+    # and the second MOVES fails at startup. start-mariadb-bg.sh already waits
+    # for port 3306; mirror that pattern here for 13131.
+    MAX_WAIT_MOVES=1200
+    wait_secs_moves=0
+    while [ "${wait_secs_moves}" -lt "${MAX_WAIT_MOVES}" ]; do
+        bash -c 'exec 3<>/dev/tcp/127.0.0.1/13131' 2>/dev/null || break
+        [ "${wait_secs_moves}" -eq 0 ] && echo "[run-fixture] port 13131 busy, waiting for other MOVES instance..." >&2
+        sleep 5
+        wait_secs_moves=$((wait_secs_moves + 5))
+    done
+    if [ "${wait_secs_moves}" -ge "${MAX_WAIT_MOVES}" ]; then
+        echo "[run-fixture] port 13131 still busy after ${MAX_WAIT_MOVES}s, giving up." >&2
+        exit 1
+    fi
+
     # Phase 0 Task 8 (mo-d7or): tell every JVM under this run to log
     # class-load events into a per-PID file under MOVESTemporary/
     # instrumentation/. The %p substitution gives each forked JVM its
