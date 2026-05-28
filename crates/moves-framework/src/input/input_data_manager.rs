@@ -901,17 +901,31 @@ impl InputDataManager {
     /// Returns [`crate::Error::Polars`] if Polars fails to collect a frame.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn execute(plan: &MergePlan, db: &DefaultDb) -> Result<InMemoryStore> {
+        use rayon::prelude::*;
+
+        let pairs: Vec<_> = plan
+            .tables
+            .par_iter()
+            .filter_map(|table_plan| {
+                let lf = match db.scan(table_plan.table_name, &TableFilter::new()) {
+                    Ok(lf) => lf,
+                    Err(DefaultDbError::SchemaOnly { .. }) => return None,
+                    Err(DefaultDbError::UnknownTable(_)) => return None,
+                    Err(e) => return Some(Err(Error::Polars(e.to_string()))),
+                };
+                let lf = apply_where_clauses(lf, &table_plan.clauses);
+                Some(
+                    lf.collect()
+                        .map(|df| (table_plan.table_name, df))
+                        .map_err(|e| Error::Polars(e.to_string())),
+                )
+            })
+            .collect();
+
         let mut store = InMemoryStore::new();
-        for table_plan in &plan.tables {
-            let lf = match db.scan(table_plan.table_name, &TableFilter::new()) {
-                Ok(lf) => lf,
-                Err(DefaultDbError::SchemaOnly { .. }) => continue,
-                Err(DefaultDbError::UnknownTable(_)) => continue,
-                Err(e) => return Err(Error::Polars(e.to_string())),
-            };
-            let lf = apply_where_clauses(lf, &table_plan.clauses);
-            let df = lf.collect().map_err(|e| Error::Polars(e.to_string()))?;
-            store.insert(table_plan.table_name, df);
+        for pair in pairs {
+            let (name, df) = pair?;
+            store.insert(name, df);
         }
         Ok(store)
     }
