@@ -93,7 +93,7 @@ pub const CALCULATOR_COUNT: usize = 39;
 pub fn all_calculators() -> Vec<Box<dyn Calculator>> {
     vec![
         // Task 45
-        Box::new(BaseRateCalculator),
+        Box::new(BaseRateCalculator::default()),
         // Task 46
         Box::new(CriteriaRunningCalculator::new()),
         // Task 47

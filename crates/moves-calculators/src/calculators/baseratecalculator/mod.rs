@@ -52,7 +52,7 @@ pub mod model;
 pub mod setup;
 
 use std::collections::{BTreeMap, HashMap};
-use std::sync::OnceLock;
+use std::sync::{Arc, Mutex, OnceLock};
 
 use moves_calculator_info::{Granularity, Priority};
 use moves_data::{PollutantId, PollutantProcessAssociation, ProcessId};
@@ -426,11 +426,15 @@ impl TableRow for EmissionOutputRow {
 
 /// The Base Rate Calculator.
 ///
-/// A zero-sized value type: the calculator owns no per-run state, exactly as
-/// the [`Calculator`] trait contract requires. All run-varying input flows
-/// through [`BaseRateCalculator::run`]'s arguments.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct BaseRateCalculator;
+/// Holds a per-location [`PreparedTables`] cache keyed by [`RunConstants`].
+/// `PreparedTables::from_inputs` rebuilds ~20 BTreeMaps on every call; for
+/// multi-iteration runs the same (location, time) fires the calculator
+/// multiple times. The cache amortises that cost across iterations — the
+/// maps are built once per location and reused thereafter.
+#[derive(Debug, Default)]
+pub struct BaseRateCalculator {
+    cache: Mutex<HashMap<RunConstants, Arc<PreparedTables>>>,
+}
 
 /// Run one accumulation pass — the Go `streamBaseRate*` → `calculateAndAccumulate`
 /// → `disburseAccumulatedBlocks` sequence for one input table.
@@ -488,7 +492,24 @@ impl BaseRateCalculator {
         let base_rate_by_age = std::mem::take(&mut inputs.base_rate_by_age);
         let base_rate = std::mem::take(&mut inputs.base_rate);
         let prepared = PreparedTables::from_inputs(inputs, constants);
+        Self::run_with_prepared(
+            smfr_sbd_summary,
+            base_rate_by_age,
+            base_rate,
+            &prepared,
+            constants,
+            flags,
+        )
+    }
 
+    fn run_with_prepared(
+        smfr_sbd_summary: Vec<setup::SmfrSbdSummaryRow>,
+        base_rate_by_age: Vec<setup::BaseRateRow>,
+        base_rate: Vec<setup::BaseRateRow>,
+        prepared: &PreparedTables,
+        constants: &RunConstants,
+        flags: &ModuleFlags,
+    ) -> BaseRateCalculatorOutput {
         // The Go indexes `County[CountyID]` per row; the run processes a
         // single county, so the GPA fraction is resolved once. A county
         // absent from the table yields `0.0` (the Go would have panicked —
@@ -499,17 +520,17 @@ impl BaseRateCalculator {
             .map_or(0.0, |c| c.gpa_fract);
 
         // calculateActivityWeight runs once, ahead of the aggregation tail.
-        let activity_weights = calculate_activity_weight(&smfr_sbd_summary, &prepared, flags);
+        let activity_weights = calculate_activity_weight(&smfr_sbd_summary, prepared, flags);
 
         // Two accumulation passes: age-based then non-age-based.
-        let mut blocks = process_pass(&base_rate_by_age, &prepared, constants, flags, gpa_fract);
+        let mut blocks = process_pass(&base_rate_by_age, prepared, constants, flags, gpa_fract);
         blocks.extend(process_pass(
-            &base_rate, &prepared, constants, flags, gpa_fract,
+            &base_rate, prepared, constants, flags, gpa_fract,
         ));
 
         // Aggregate operating modes and apply the activity weighting.
         for block in &mut blocks {
-            aggregate_and_apply_activity(block, &prepared, flags, &activity_weights);
+            aggregate_and_apply_activity(block, prepared, flags, &activity_weights);
         }
 
         BaseRateCalculatorOutput { blocks }
@@ -604,7 +625,7 @@ impl Calculator for BaseRateCalculator {
             year_id: pos.time.year.map(|y| y as i32).unwrap_or(0),
             month_id: pos.time.month.map(|m| m as i32).unwrap_or(0),
         };
-        let inputs = BaseRateCalculatorInputs {
+        let mut inputs = BaseRateCalculatorInputs {
             base_rate_by_age: tables.iter_typed("BaseRateByAge")?,
             base_rate: tables.iter_typed("BaseRate")?,
             extended_idle_emission_rate_fraction: tables
@@ -638,7 +659,27 @@ impl Calculator for BaseRateCalculator {
             zone_month_hour: tables.iter_typed("ZoneMonthHour")?,
             fuel_supply: build_fuel_supply(tables, &constants)?,
         };
-        let output = BaseRateCalculator::run(inputs, &constants, &ModuleFlags::default());
+        let smfr_sbd_summary = std::mem::take(&mut inputs.smfr_sbd_summary);
+        let base_rate_by_age = std::mem::take(&mut inputs.base_rate_by_age);
+        let base_rate = std::mem::take(&mut inputs.base_rate);
+        let prepared = {
+            let mut cache = self.cache.lock().unwrap_or_else(|e| e.into_inner());
+            if let Some(hit) = cache.get(&constants) {
+                Arc::clone(hit)
+            } else {
+                let p = Arc::new(PreparedTables::from_inputs(inputs, &constants));
+                cache.insert(constants, Arc::clone(&p));
+                p
+            }
+        };
+        let output = Self::run_with_prepared(
+            smfr_sbd_summary,
+            base_rate_by_age,
+            base_rate,
+            &prepared,
+            &constants,
+            &ModuleFlags::default(),
+        );
         let rows = output.rows();
         crate::wiring::emit_rows(rows)
     }
@@ -648,7 +689,7 @@ impl Calculator for BaseRateCalculator {
 /// calculator-factory signature so the registry can register it.
 #[must_use]
 pub fn factory() -> Box<dyn Calculator> {
-    Box::new(BaseRateCalculator)
+    Box::new(BaseRateCalculator::default())
 }
 
 // =============================================================================
@@ -979,7 +1020,7 @@ mod tests {
 
     #[test]
     fn calculator_metadata_matches_calculator_info() {
-        let calc = BaseRateCalculator;
+        let calc = BaseRateCalculator::default();
         assert_eq!(calc.name(), "BaseRateCalculator");
 
         let subs = calc.subscriptions();
@@ -994,7 +1035,7 @@ mod tests {
 
     #[test]
     fn registrations_match_the_96_calculator_info_directives() {
-        let calc = BaseRateCalculator;
+        let calc = BaseRateCalculator::default();
         let regs = calc.registrations();
         assert_eq!(regs.len(), 96);
 
@@ -1025,7 +1066,7 @@ mod tests {
     #[test]
     fn input_tables_name_the_base_rate_generator_output() {
         // The two tables linking this calculator to Task 42's generator.
-        let calc = BaseRateCalculator;
+        let calc = BaseRateCalculator::default();
         assert!(calc.input_tables().contains(&"BaseRate"));
         assert!(calc.input_tables().contains(&"BaseRateByAge"));
         assert!(calc.upstream().is_empty());
@@ -1034,7 +1075,7 @@ mod tests {
     #[test]
     fn calculator_is_object_safe() {
         // The registry stores calculators as `Box<dyn Calculator>`.
-        let calcs: Vec<Box<dyn Calculator>> = vec![Box::new(BaseRateCalculator)];
+        let calcs: Vec<Box<dyn Calculator>> = vec![Box::new(BaseRateCalculator::default())];
         assert_eq!(calcs[0].name(), "BaseRateCalculator");
     }
 
@@ -1207,7 +1248,7 @@ mod tests {
             time: ExecutionTime::hour(2020, 7, 5, 8),
         };
         let ctx = CalculatorContext::with_position_and_tables(position, store);
-        let calc = BaseRateCalculator;
+        let calc = BaseRateCalculator::default();
         let out = calc.execute(&ctx).expect("execute ok");
         assert!(out.dataframe().is_some(), "expected non-empty DataFrame");
         assert!(
@@ -1223,5 +1264,170 @@ mod tests {
             BaseRateCalculator::run(inputs, &RunConstants::default(), &ModuleFlags::default());
         assert!(output.blocks.is_empty());
         assert!(output.rows().is_empty());
+    }
+
+    #[test]
+    fn prepared_tables_cache_is_populated_on_first_call_and_reused_on_second() {
+        use moves_framework::execution::execution_db::{
+            ExecutionLocation, ExecutionTime, IterationPosition,
+        };
+        use moves_framework::{DataFrameStore, InMemoryStore};
+        use setup::{AgeCategoryRow, BaseRateRow, FuelFormulationRow, FuelTypeRow};
+
+        fn minimal_store() -> InMemoryStore {
+            let mut store = InMemoryStore::new();
+            store.insert(
+                "BaseRateByAge",
+                BaseRateRow::into_dataframe(vec![]).unwrap(),
+            );
+            store.insert("BaseRate", BaseRateRow::into_dataframe(vec![]).unwrap());
+            store.insert(
+                "ExtendedIdleEmissionRateFraction",
+                setup::ModelYearFuelFractionRow::into_dataframe(vec![]).unwrap(),
+            );
+            store.insert(
+                "apuEmissionRateFraction",
+                setup::ModelYearFuelFractionRow::into_dataframe(vec![]).unwrap(),
+            );
+            store.insert(
+                "ShorepowerEmissionRateFraction",
+                setup::ModelYearFuelFractionRow::into_dataframe(vec![]).unwrap(),
+            );
+            store.insert(
+                "ZoneMonthHour",
+                setup::ZoneMonthHourRow::into_dataframe(vec![]).unwrap(),
+            );
+            store.insert(
+                "PollutantProcessMappedModelYear",
+                setup::PollutantProcessMappedModelYearRow::into_dataframe(vec![]).unwrap(),
+            );
+            store.insert(
+                "StartTempAdjustment",
+                setup::StartTempAdjustmentRow::into_dataframe(vec![]).unwrap(),
+            );
+            store.insert("County", setup::CountyRow::into_dataframe(vec![]).unwrap());
+            store.insert(
+                "GeneralFuelRatio",
+                setup::GeneralFuelRatioRow::into_dataframe(vec![]).unwrap(),
+            );
+            store.insert(
+                "criteriaRatio",
+                setup::CriteriaRatioRow::into_dataframe(vec![]).unwrap(),
+            );
+            store.insert(
+                "altCriteriaRatio",
+                setup::CriteriaRatioRow::into_dataframe(vec![]).unwrap(),
+            );
+            store.insert(
+                "TemperatureAdjustment",
+                setup::TemperatureAdjustmentRow::into_dataframe(vec![]).unwrap(),
+            );
+            store.insert(
+                "NOxHumidityAdjust",
+                setup::NoxHumidityAdjustRow::into_dataframe(vec![]).unwrap(),
+            );
+            store.insert(
+                "zoneACFactor",
+                setup::ZoneAcFactorRow::into_dataframe(vec![]).unwrap(),
+            );
+            store.insert(
+                "IMFactor",
+                setup::ImFactorRow::into_dataframe(vec![]).unwrap(),
+            );
+            store.insert(
+                "IMCoverage",
+                setup::ImCoverageRow::into_dataframe(vec![]).unwrap(),
+            );
+            store.insert(
+                "EmissionRateAdjustment",
+                setup::EmissionRateAdjustmentRow::into_dataframe(vec![]).unwrap(),
+            );
+            store.insert(
+                "EVEfficiency",
+                setup::EvEfficiencyRow::into_dataframe(vec![]).unwrap(),
+            );
+            store.insert(
+                "universalActivity",
+                setup::UniversalActivityRow::into_dataframe(vec![]).unwrap(),
+            );
+            store.insert(
+                "smfrSBDSummary",
+                setup::SmfrSbdSummaryRow::into_dataframe(vec![]).unwrap(),
+            );
+            store.insert(
+                "AgeCategory",
+                AgeCategoryRow::into_dataframe(vec![]).unwrap(),
+            );
+            store.insert("FuelType", FuelTypeRow::into_dataframe(vec![]).unwrap());
+            store.insert(
+                "FuelFormulation",
+                FuelFormulationRow::into_dataframe(vec![]).unwrap(),
+            );
+            store.insert(
+                "FuelSupply",
+                RawFuelSupplyRow::into_dataframe(vec![]).unwrap(),
+            );
+            store.insert(
+                "FuelSubtype",
+                LocalFuelSubtypeRow::into_dataframe(vec![]).unwrap(),
+            );
+            store.insert(
+                "MonthOfAnyYear",
+                LocalMonthGroupRow::into_dataframe(vec![]).unwrap(),
+            );
+            store
+        }
+
+        let store = minimal_store();
+        let pos_a = IterationPosition {
+            iteration: 0,
+            process_id: None,
+            location: ExecutionLocation::link(26, 26_161, 90, 5001),
+            time: ExecutionTime::hour(2020, 7, 5, 8),
+        };
+        let pos_b = IterationPosition {
+            iteration: 1,
+            process_id: None,
+            location: ExecutionLocation::link(26, 26_161, 90, 5001),
+            time: ExecutionTime::hour(2020, 7, 5, 8),
+        };
+        let pos_c = IterationPosition {
+            iteration: 0,
+            process_id: None,
+            location: ExecutionLocation::link(26, 26_999, 91, 5002),
+            time: ExecutionTime::hour(2020, 7, 5, 8),
+        };
+        use std::sync::Arc;
+        let slow = Arc::new(store);
+
+        let calc = BaseRateCalculator::default();
+        assert_eq!(calc.cache.lock().unwrap().len(), 0, "cache starts empty");
+
+        let ctx_a = CalculatorContext::with_slow(Arc::clone(&slow));
+        // pos_a and pos_b share the same county/zone/link/year/month — same RunConstants.
+        let mut ctx_a = ctx_a;
+        ctx_a.set_position(pos_a);
+        calc.execute(&ctx_a).expect("first execute ok");
+        assert_eq!(calc.cache.lock().unwrap().len(), 1, "one location cached");
+
+        let mut ctx_b = CalculatorContext::with_slow(Arc::clone(&slow));
+        ctx_b.set_position(pos_b);
+        calc.execute(&ctx_b)
+            .expect("second execute ok — same location, cache hit");
+        assert_eq!(
+            calc.cache.lock().unwrap().len(),
+            1,
+            "cache still has one entry after same-position second call"
+        );
+
+        let mut ctx_c = CalculatorContext::with_slow(Arc::clone(&slow));
+        ctx_c.set_position(pos_c);
+        calc.execute(&ctx_c)
+            .expect("third execute ok — different location");
+        assert_eq!(
+            calc.cache.lock().unwrap().len(),
+            2,
+            "two entries after a different-location call"
+        );
     }
 }

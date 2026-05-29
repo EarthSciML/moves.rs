@@ -28,7 +28,7 @@
 /// These identify the bundle the worker was handed: one state / county /
 /// zone / link / year / month. Every base-rate row read in a run shares
 /// them, so they are carried once here rather than per row.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct RunConstants {
     /// State id.
     pub state_id: i32,
