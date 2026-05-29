@@ -251,6 +251,15 @@ pub struct CountyRow {
     pub barometric_pressure: f64,
 }
 
+/// One `DayOfAnyWeek` row — the number of real days a `dayID` represents.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DayOfAnyWeekRow {
+    /// `dayID` — the day-of-week type.
+    pub day_id: i32,
+    /// `noOfRealDays` — count of real days within the week portion.
+    pub no_of_real_days: f64,
+}
+
 /// One `EmissionRateByAge` row — a source bin's mean base rate for an
 /// age group and operating mode.
 ///
@@ -654,6 +663,8 @@ pub struct MultidayTankVaporVentingInputs {
     pub cold_soak_tank_temperature: Vec<ColdSoakTankTemperatureRow>,
     /// `County` rows.
     pub county: Vec<CountyRow>,
+    /// `DayOfAnyWeek` rows.
+    pub day_of_any_week: Vec<DayOfAnyWeekRow>,
     /// `EmissionRateByAge` rows.
     pub emission_rate_by_age: Vec<EmissionRateByAgeRow>,
     /// `evapTemperatureAdjustment` rows (`processID = 12`).
@@ -1232,6 +1243,60 @@ impl TableRow for CountyRow {
                     barometric_pressure: baro_col
                         .get(i)
                         .ok_or_else(|| null("barometricPressure"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for DayOfAnyWeekRow {
+    fn table_name() -> &'static str {
+        "DayOfAnyWeek"
+    }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("dayID".into(), DataType::Int32),
+            ("noOfRealDays".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "dayID".into(),
+                    rows.iter().map(|r| r.day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "noOfRealDays".into(),
+                    rows.iter().map(|r| r.no_of_real_days).collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "DayOfAnyWeek";
+        let day_id_col = df
+            .column("dayID")
+            .map_err(|e| row_err(t, 0, "dayID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "dayID", e.to_string()))?;
+        let no_of_real_days_col = df
+            .column("noOfRealDays")
+            .map_err(|e| row_err(t, 0, "noOfRealDays", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "noOfRealDays", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(DayOfAnyWeekRow {
+                    day_id: day_id_col.get(i).ok_or_else(|| null("dayID"))?,
+                    no_of_real_days: no_of_real_days_col
+                        .get(i)
+                        .ok_or_else(|| null("noOfRealDays"))?,
                 })
             })
             .collect()
@@ -4885,8 +4950,8 @@ fn operating_adjustment(eta: &EvapTemperatureAdjustmentRow, rvp: &AdjustTerms, t
 /// `HourDay`. The emission is
 ///
 /// ```text
-/// emissionQuant   = weightedMeanBaseRate   · sourceHours · opModeFraction
-/// emissionQuantIM = weightedMeanBaseRateIM · sourceHours · opModeFraction
+/// emissionQuant   = weightedMeanBaseRate   · sourceHours · opModeFraction / noOfRealDays
+/// emissionQuantIM = weightedMeanBaseRateIM · sourceHours · opModeFraction / noOfRealDays
 /// ```
 ///
 /// The closing `UPDATE` blends in the I/M adjustment for every row matching an
@@ -4930,6 +4995,11 @@ fn assemble_emission_output(
         .iter()
         .map(|hd| (hd.hour_day_id, hd))
         .collect();
+    let real_days_of: HashMap<i32, f64> = inputs
+        .day_of_any_week
+        .iter()
+        .map(|d| (d.day_id, d.no_of_real_days))
+        .collect();
     let im_adjust_of: HashMap<ImMergedKey, f64> = im_merged
         .iter()
         .map(|m| {
@@ -4972,10 +5042,15 @@ fn assemble_emission_output(
                 let Some(hd) = hour_day_of.get(&omd.hour_day_id) else {
                     continue;
                 };
+                let Some(&no_of_real_days) = real_days_of.get(&hd.day_id) else {
+                    continue;
+                };
                 let emission_quant =
-                    w.weighted_mean_base_rate * sh.source_hours * omd.op_mode_fraction;
+                    w.weighted_mean_base_rate * sh.source_hours * omd.op_mode_fraction
+                        / no_of_real_days;
                 let emission_quant_im =
-                    w.weighted_mean_base_rate_im * sh.source_hours * omd.op_mode_fraction;
+                    w.weighted_mean_base_rate_im * sh.source_hours * omd.op_mode_fraction
+                        / no_of_real_days;
                 let final_quant = match im_adjust_of.get(&(
                     assoc.process_id,
                     assoc.pollutant_id,
@@ -5096,6 +5171,7 @@ static INPUT_TABLES: &[&str] = &[
     "ColdSoakInitialHourFraction",
     "ColdSoakTankTemperature",
     "County",
+    "DayOfAnyWeek",
     "EmissionRateByAge",
     "evapTemperatureAdjustment",
     "evapRVPTemperatureAdjustment",
@@ -5246,8 +5322,16 @@ impl Calculator for MultidayTankVaporVentingCalculator {
         };
         let inputs = MultidayTankVaporVentingInputs {
             age_category: tables.iter_typed::<AgeCategoryRow>("AgeCategory")?,
-            average_tank_gasoline: tables
-                .iter_typed::<AverageTankGasolineRow>("AverageTankGasoline")?,
+            average_tank_gasoline: {
+                let scratch = ctx.scratch();
+                if scratch.store.contains("AverageTankGasoline") {
+                    scratch
+                        .store
+                        .iter_typed::<AverageTankGasolineRow>("AverageTankGasoline")?
+                } else {
+                    tables.iter_typed::<AverageTankGasolineRow>("AverageTankGasoline")?
+                }
+            },
             cold_soak_initial_hour_fraction: tables
                 .iter_typed::<ColdSoakInitialHourFractionRow>("ColdSoakInitialHourFraction")?,
             cold_soak_tank_temperature: tables
@@ -5323,6 +5407,7 @@ impl Calculator for MultidayTankVaporVentingCalculator {
             },
             tank_vapor_gen_coeffs: tables
                 .iter_typed::<TankVaporGenCoeffsRow>("TankVaporGenCoeffs")?,
+            day_of_any_week: tables.iter_typed::<DayOfAnyWeekRow>("DayOfAnyWeek")?,
             zone_month_hour: tables.iter_typed::<ZoneMonthHourRow>("ZoneMonthHour")?,
         };
         let rows = self.calculate(&inputs, &run_ctx, &DefaultVentingEquations);
@@ -5578,6 +5663,10 @@ mod tests {
                     tvg_term_c: 0.01,
                 },
             ],
+            day_of_any_week: vec![DayOfAnyWeekRow {
+                day_id: 5,
+                no_of_real_days: 1.0,
+            }],
             ..MultidayTankVaporVentingInputs::default()
         }
     }
@@ -5923,6 +6012,7 @@ mod tests {
             "sampleVehicleSoaking",
             "TankVaporGenCoeffs",
             "evapRVPTemperatureAdjustment",
+            "DayOfAnyWeek",
         ] {
             assert!(tables.contains(&expected), "missing input table {expected}");
         }
@@ -6071,6 +6161,10 @@ mod tests {
         store.insert(
             "TankVaporGenCoeffs",
             TankVaporGenCoeffsRow::into_dataframe(inputs.tank_vapor_gen_coeffs.clone()).unwrap(),
+        );
+        store.insert(
+            "DayOfAnyWeek",
+            DayOfAnyWeekRow::into_dataframe(inputs.day_of_any_week.clone()).unwrap(),
         );
         store.insert(
             "ZoneMonthHour",
@@ -6254,6 +6348,10 @@ mod tests {
                     temperature: 75.0,
                 },
             ],
+            day_of_any_week: vec![DayOfAnyWeekRow {
+                day_id: 5,
+                no_of_real_days: 1.0,
+            }],
             ..MultidayTankVaporVentingInputs::default()
         };
         let rows = run(&inputs);

@@ -1939,7 +1939,9 @@
       ],
       "registrations_count": 0,
       "depends_on": [],
-      "dependents": [],
+      "dependents": [
+        "TankVaporVentingCalculator"
+      ],
       "chained_downstream": [],
       "java_path": "gov/epa/otaq/moves/master/implementation/ghg/TankFuelGenerator.java"
     },
@@ -2016,7 +2018,8 @@
       "registrations_count": 1,
       "depends_on": [
         "EvaporativeEmissionsOperatingModeDistributionGenerator",
-        "NewTvvYearGenerator"
+        "NewTvvYearGenerator",
+        "TankFuelGenerator"
       ],
       "dependents": [
         "HCSpeciationCalculator"

@@ -92,11 +92,13 @@ impl SnapshotFilter {
                 .collect::<BTreeSet<_>>()
                 .into_iter()
                 .collect(),
+            // MOVES XML months are 0-indexed (key=7 → monthID=8 / August);
+            // add 1 to convert from RunSpec key to MOVES internal monthID.
             month_ids: run_spec
                 .timespan
                 .months
                 .iter()
-                .map(|&m| i64::from(m))
+                .map(|&m| i64::from(m) + 1)
                 .collect::<BTreeSet<_>>()
                 .into_iter()
                 .collect(),
@@ -593,7 +595,7 @@ fn expand_rate_table_rows(
             .iter()
             .find(|c| c.name().to_ascii_lowercase() == name.to_ascii_lowercase())
             .with_context(|| format!("column '{name}' not found in {table}"))?;
-        let casted = if *col.dtype() == DataType::Float32 {
+        let casted = if *col.dtype() == DataType::Float32 || *col.dtype() == DataType::String {
             col.cast(&DataType::Float64)
                 .map_err(|e| anyhow::anyhow!("{e}"))?
         } else {
@@ -1393,7 +1395,11 @@ mod tests {
         assert_eq!(f.county_ids, vec![26161i64]);
         assert_eq!(f.zone_ids, vec![261610i64], "zone = county * 10");
         assert_eq!(f.year_ids, vec![2020i64]);
-        assert_eq!(f.month_ids, vec![7i64]);
+        assert_eq!(
+            f.month_ids,
+            vec![8i64],
+            "month key=7 → monthID=8 (MOVES XML months are 0-indexed)"
+        );
     }
 
     #[test]
