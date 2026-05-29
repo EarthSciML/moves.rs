@@ -575,6 +575,27 @@ fn expand_rate_table_rows(
 
     let is_metal = table.to_ascii_lowercase() == "metalemissionrate";
 
+    // Short-circuit: an empty table (0 rows) is common for snapshots captured
+    // when AirToxicsDistanceCalculator is not active — the Parquet schema may
+    // type meanBaseRate as String rather than Float64, which would cause the
+    // col_f64 cast below to fail. There is nothing to expand.
+    if n == 0 {
+        let mut cols = vec![
+            Series::new("processID".into(), Vec::<i32>::new()).into(),
+            Series::new("pollutantID".into(), Vec::<i32>::new()).into(),
+            Series::new("fuelTypeID".into(), Vec::<i32>::new()).into(),
+        ];
+        if is_metal {
+            cols.push(Series::new("sourceTypeID".into(), Vec::<i32>::new()).into());
+        }
+        cols.extend([
+            Series::new("modelYearID".into(), Vec::<i32>::new()).into(),
+            Series::new("meanBaseRate".into(), Vec::<f64>::new()).into(),
+        ]);
+        return DataFrame::new(0, cols)
+            .map_err(|e| anyhow::anyhow!("{table}: building empty DataFrame: {e}"));
+    }
+
     let col_i32 = |name: &str| -> Result<Vec<i32>> {
         let col = df
             .columns()
@@ -1358,6 +1379,53 @@ mod tests {
         transform_airtoxics_rate_tables(&mut store).expect("transform on empty table failed");
         let df = store.get("dioxinemissionrate").unwrap();
         assert_eq!(df.height(), 0, "empty input yields empty output");
+    }
+
+    #[test]
+    fn transform_empty_rate_table_string_dtype_mean_base_rate() {
+        // Regression for mo-81nw: Polars infers meanBaseRate as String dtype
+        // when the snapshot Parquet was captured from an empty MariaDB table.
+        // expand_rate_table_rows must short-circuit and not attempt a
+        // String → Float64 cast that would crash on the empty series.
+        use polars::prelude::{DataFrame, DataType, NamedFrom, Series};
+        let mut store = InMemoryStore::new();
+        store.insert(
+            "PollutantProcessMappedModelYear",
+            DataFrame::new(
+                1,
+                vec![
+                    Series::new("polProcessID".into(), vec![13001i64]).into(),
+                    Series::new("modelYearID".into(), vec![2010i64]).into(),
+                    Series::new("modelYearGroupID".into(), vec![30140010i64]).into(),
+                    Series::new("fuelMYGroupID".into(), vec![0i64]).into(),
+                    Series::new("IMModelYearGroupID".into(), vec![0i64]).into(),
+                ],
+            )
+            .unwrap(),
+        );
+        // meanBaseRate has String dtype — as inferred from an empty Parquet table.
+        store.insert(
+            "dioxinEmissionRate",
+            DataFrame::new(
+                0,
+                vec![
+                    Series::new("polProcessID".into(), Vec::<i64>::new()).into(),
+                    Series::new("fuelTypeID".into(), Vec::<i64>::new()).into(),
+                    Series::new("modelYearGroupID".into(), Vec::<i64>::new()).into(),
+                    Series::new("meanBaseRate".into(), Vec::<String>::new()).into(),
+                ],
+            )
+            .unwrap(),
+        );
+        transform_airtoxics_rate_tables(&mut store)
+            .expect("empty String-dtype meanBaseRate must not crash");
+        let df = store.get("dioxinemissionrate").unwrap();
+        assert_eq!(df.height(), 0, "empty input yields empty output");
+        assert_eq!(
+            *df.column("meanBaseRate").unwrap().dtype(),
+            DataType::Float64,
+            "output meanBaseRate must be Float64"
+        );
     }
 
     #[test]
