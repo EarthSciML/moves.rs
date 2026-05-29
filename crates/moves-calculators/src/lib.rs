@@ -70,6 +70,7 @@ pub fn register_all(
     use calculators::tank_vapor_venting_calculator;
     use calculators::togspeciation;
     use calculators::welltopump;
+    use generators::avg_speed_op_mode_distribution;
     use generators::evap_op_mode_distribution;
     use generators::fueleffectsgenerator;
     use generators::meteorology;
@@ -212,6 +213,10 @@ pub fn register_all(
         welltopump::total_energy::factory,
     )?;
 
+    registry.register_generator(
+        avg_speed_op_mode_distribution::AverageSpeedOperatingModeDistributionGenerator::NAME,
+        avg_speed_op_mode_distribution::factory,
+    )?;
     registry.register_generator(
         evap_op_mode_distribution::EvaporativeEmissionsOperatingModeDistributionGenerator::NAME,
         evap_op_mode_distribution::factory,

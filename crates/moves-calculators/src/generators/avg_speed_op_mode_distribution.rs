@@ -1216,6 +1216,13 @@ impl Generator for AverageSpeedOperatingModeDistributionGenerator {
     }
 }
 
+/// Generator factory — returns a boxed instance for registration with the
+/// `CalculatorRegistry`.
+#[must_use]
+pub fn factory() -> Box<dyn Generator> {
+    Box::new(AverageSpeedOperatingModeDistributionGenerator::new())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1815,5 +1822,13 @@ mod tests {
         let gen: Box<dyn Generator> =
             Box::new(AverageSpeedOperatingModeDistributionGenerator::new());
         assert_eq!(gen.name(), "AverageSpeedOperatingModeDistributionGenerator");
+    }
+
+    #[test]
+    fn factory_builds_a_named_generator() {
+        assert_eq!(
+            factory().name(),
+            "AverageSpeedOperatingModeDistributionGenerator"
+        );
     }
 }
