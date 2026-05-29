@@ -1,0 +1,15 @@
+[package]
+name = "moves-source-control"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+description = "SourceMaintenance/Manufacturing/UsageControlStrategy — no-op ports of three canonical MOVES Java stubs (Phase 6, mo-7hng)."
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+moves-framework = { path = "../moves-framework" }

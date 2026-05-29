@@ -23,6 +23,7 @@ members = [
     "crates/moves-rate-of-progress",
     "crates/moves-runspec",
     "crates/moves-snapshot",
+    "crates/moves-source-control",
     "crates/moves-sql-macros",
     "crates/moves-wasm",
 ]

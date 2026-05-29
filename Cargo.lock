@@ -1793,6 +1793,7 @@ dependencies = [
  "moves-rate-of-progress",
  "moves-runspec",
  "moves-snapshot",
+ "moves-source-control",
  "polars",
  "rayon",
  "rustc-hash",
@@ -2063,6 +2064,13 @@ dependencies = [
  "tempfile",
  "thiserror 1.0.69",
  "toml",
+]
+
+[[package]]
+name = "moves-source-control"
+version = "0.1.0"
+dependencies = [
+ "moves-framework",
 ]
 
 [[package]]
