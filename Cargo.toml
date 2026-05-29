@@ -10,6 +10,7 @@ members = [
     "crates/moves-default-db-convert",
     "crates/moves-fixture-capture",
     "crates/moves-framework",
+    "crates/moves-fuel-control",
     "crates/moves-import-lev",
     "crates/moves-importer",
     "crates/moves-importer-county",

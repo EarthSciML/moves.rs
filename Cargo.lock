@@ -1787,6 +1787,7 @@ dependencies = [
  "moves-calculator-info",
  "moves-data",
  "moves-framework",
+ "moves-fuel-control",
  "moves-runspec",
  "moves-snapshot",
  "polars",
@@ -1897,6 +1898,14 @@ dependencies = [
  "sha2",
  "tempfile",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "moves-fuel-control"
+version = "0.1.0"
+dependencies = [
+ "moves-framework",
+ "polars",
 ]
 
 [[package]]

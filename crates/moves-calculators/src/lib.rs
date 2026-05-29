@@ -250,3 +250,16 @@ pub fn register_all(
 
     Ok(())
 }
+
+/// Register every wired control strategy factory with `registry`.
+///
+/// Call this after constructing a [`moves_framework::ControlStrategyRegistry`] to
+/// make all ported strategy implementations available for execution. Parallels
+/// [`register_all`] for [`moves_framework::CalculatorRegistry`].
+///
+/// Additional strategies (AVFTControlStrategy, OnRoadRetrofitStrategy,
+/// RateOfProgressControlStrategy, etc.) will be added here as each strategy
+/// wiring bead lands (see mo-j586, mo-4wci, mo-e7ug).
+pub fn register_strategies(registry: &mut moves_framework::ControlStrategyRegistry) {
+    registry.register(|| Box::new(moves_fuel_control::FuelControlStrategy::new()));
+}
