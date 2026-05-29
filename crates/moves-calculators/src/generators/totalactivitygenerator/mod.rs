@@ -149,7 +149,9 @@ impl TableRow for inputs::YearRow {
                 let null = |col: &'static str| row_err(T, i, col, "null value".into());
                 Ok(inputs::YearRow {
                     year_id: year_id.get(i).ok_or_else(|| null("yearID"))?,
-                    is_base_year: is_base_year.get(i).ok_or_else(|| null("isBaseYear"))?,
+                    // Canonical MOVES SQL filters Year via `isBaseYear IN ('Y','y')`,
+                    // so NULL is semantically "not a base year". Match that here.
+                    is_base_year: is_base_year.get(i).unwrap_or(false),
                 })
             })
             .collect()
