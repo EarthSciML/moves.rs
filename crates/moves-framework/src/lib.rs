@@ -108,9 +108,9 @@ pub use control_strategy::{
     ControlStrategyFactory, ControlStrategyRegistry, InternalControlStrategy, StrategySubscription,
 };
 #[cfg(not(target_arch = "wasm32"))]
-pub use data::read_execution_bundle;
-#[cfg(not(target_arch = "wasm32"))]
 pub use data::DataFrameStoreParquet;
+#[cfg(not(target_arch = "wasm32"))]
+pub use data::{read_execution_bundle, read_execution_bundle_filtered};
 pub use data::{
     schema_registry, DataFrameStore, DataFrameStoreTyped, InMemoryStore, IntoDataFrame,
     TableHandle, TableRow, TableSchema, KNOWN_CALCULATOR_INPUT_TABLES,

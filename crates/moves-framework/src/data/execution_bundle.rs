@@ -5,6 +5,7 @@
 //! the `moves-framework` crate does not need to depend on Polars at write
 //! time.
 
+use std::collections::BTreeSet;
 use std::io::Cursor;
 use std::path::Path;
 
@@ -30,10 +31,31 @@ pub fn read_execution_bundle(path: &Path) -> Result<InMemoryStore> {
         path: path.to_path_buf(),
         source,
     })?;
-    parse_bundle(&bytes, path)
+    parse_bundle(&bytes, path, None)
 }
 
-fn parse_bundle(src: &[u8], path: &Path) -> Result<InMemoryStore> {
+/// Like [`read_execution_bundle`] but skips tables whose lowercased short name
+/// is not in `allowed`.
+///
+/// Pass the set returned by
+/// [`CalculatorRegistry::required_input_tables`](crate::calculator::CalculatorRegistry::required_input_tables)
+/// to avoid materialising tables that no registered calculator consumes.
+pub fn read_execution_bundle_filtered(
+    path: &Path,
+    allowed: &BTreeSet<String>,
+) -> Result<InMemoryStore> {
+    let bytes = std::fs::read(path).map_err(|source| Error::Io {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    parse_bundle(&bytes, path, Some(allowed))
+}
+
+fn parse_bundle(
+    src: &[u8],
+    path: &Path,
+    allowed: Option<&BTreeSet<String>>,
+) -> Result<InMemoryStore> {
     if src.len() < 12 {
         return Err(Error::InvalidBundle(format!(
             "{}: too short ({} bytes)",
@@ -108,6 +130,11 @@ fn parse_bundle(src: &[u8], path: &Path) -> Result<InMemoryStore> {
             .next()
             .unwrap_or(&full_name)
             .to_ascii_lowercase();
+        if let Some(allowed) = allowed {
+            if !allowed.contains(&short_name) {
+                continue;
+            }
+        }
         store.insert(short_name, df);
     }
     Ok(store)
@@ -191,5 +218,45 @@ mod tests {
         std::fs::write(&p, &buf).unwrap();
         let store = read_execution_bundle(&p).unwrap();
         assert!(store.names().is_empty());
+    }
+
+    #[test]
+    fn filtered_bundle_skips_tables_not_in_allowed_set() {
+        // Bundle with two tables; allowed set contains only one.
+        let ipc_a = ipc_for_table("db__movesexecution1__tablea", 2);
+        let ipc_b = ipc_for_table("db__movesexecution1__tableb", 5);
+        let bundle = build_bundle_bytes([
+            ("db__movesexecution1__tablea", ipc_a.as_slice()),
+            ("db__movesexecution1__tableb", ipc_b.as_slice()),
+        ]);
+        let dir = tempdir().unwrap();
+        let p = dir.path().join("multi.bundle");
+        std::fs::write(&p, &bundle).unwrap();
+
+        let mut allowed = BTreeSet::new();
+        allowed.insert("tablea".to_string());
+
+        let store = read_execution_bundle_filtered(&p, &allowed).unwrap();
+        assert!(store.get("tablea").is_some(), "tablea must be loaded");
+        assert!(
+            store.get("tableb").is_none(),
+            "tableb must be skipped — not in allowed set"
+        );
+        assert_eq!(store.get("tablea").unwrap().height(), 2);
+    }
+
+    #[test]
+    fn filtered_bundle_with_empty_allowed_loads_nothing() {
+        let ipc = ipc_for_table("db__movesexecution1__activitytype", 1);
+        let bundle = build_bundle_bytes([("db__movesexecution1__activitytype", ipc.as_slice())]);
+        let dir = tempdir().unwrap();
+        let p = dir.path().join("one.bundle");
+        std::fs::write(&p, &bundle).unwrap();
+
+        let store = read_execution_bundle_filtered(&p, &BTreeSet::new()).unwrap();
+        assert!(
+            store.names().is_empty(),
+            "empty allowed set must produce empty store"
+        );
     }
 }

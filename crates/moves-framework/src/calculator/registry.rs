@@ -84,6 +84,10 @@ pub struct CalculatorRegistry {
     module_index: BTreeMap<String, usize>,
     /// Reverse index: `root_name → index into dag.chain_templates`.
     template_index: BTreeMap<String, usize>,
+    /// Slow-store table names (lowercased) required by all registered
+    /// calculators and generators — union of each module's `input_tables()`.
+    /// Populated at registration time so callers can filter snapshot loads.
+    module_input_tables: BTreeSet<String>,
 }
 
 impl CalculatorRegistry {
@@ -108,6 +112,7 @@ impl CalculatorRegistry {
             factories: BTreeMap::new(),
             module_index,
             template_index,
+            module_input_tables: BTreeSet::new(),
         }
     }
 
@@ -136,9 +141,17 @@ impl CalculatorRegistry {
     /// binding overwrites the previous one — Phase 3 should never register
     /// the same name twice, so this is treated as the caller's bug to surface
     /// loudly via an assertion when needed rather than as a typed error.
+    ///
+    /// The factory is called once at registration to read `input_tables()` so
+    /// [`required_input_tables`](Self::required_input_tables) can answer without
+    /// instantiating again later.
     pub fn register_calculator(&mut self, name: &str, factory: CalculatorFactory) -> Result<()> {
         if !self.module_index.contains_key(name) {
             return Err(Error::UnknownModule(name.to_string()));
+        }
+        for t in factory().input_tables() {
+            self.module_input_tables
+                .insert(t.to_ascii_lowercase().to_string());
         }
         self.factories
             .insert(name.to_string(), ModuleFactory::Calculator(factory));
@@ -146,13 +159,36 @@ impl CalculatorRegistry {
     }
 
     /// Register a generator factory under the given DAG name.
+    ///
+    /// Like [`register_calculator`](Self::register_calculator), the factory is
+    /// called once to harvest `input_tables()` for
+    /// [`required_input_tables`](Self::required_input_tables).
     pub fn register_generator(&mut self, name: &str, factory: GeneratorFactory) -> Result<()> {
         if !self.module_index.contains_key(name) {
             return Err(Error::UnknownModule(name.to_string()));
         }
+        for t in factory().input_tables() {
+            self.module_input_tables
+                .insert(t.to_ascii_lowercase().to_string());
+        }
         self.factories
             .insert(name.to_string(), ModuleFactory::Generator(factory));
         Ok(())
+    }
+
+    /// The set of slow-store table names (lowercased) that at least one
+    /// registered calculator or generator declares in its `input_tables()`.
+    ///
+    /// Use this to filter a snapshot load so only tables that any registered
+    /// module actually needs are materialised in memory — tables consumed
+    /// exclusively by unregistered (not-yet-ported) calculators are skipped,
+    /// reducing peak RSS.
+    ///
+    /// Returns an empty set when no factories have been registered (e.g.
+    /// when running without a snapshot).
+    #[must_use]
+    pub fn required_input_tables(&self) -> BTreeSet<String> {
+        self.module_input_tables.clone()
     }
 
     /// Borrow the DAG the registry was constructed with.
@@ -783,5 +819,126 @@ mod tests {
         // UnknownProcessGen has no registrations and process_id 0; under
         // the "matches any process" rule it should be included.
         assert!(modules.contains(&"UnknownProcessGen".to_string()));
+    }
+
+    // ---- required_input_tables tests ----
+
+    // Stubs that declare named input tables so required_input_tables can be tested.
+    #[derive(Debug, Default)]
+    struct CalcWithTables;
+    static CALC_TABLES: &[&str] = &["emissionRate", "SomeTable"];
+    impl Calculator for CalcWithTables {
+        fn name(&self) -> &'static str {
+            "BaseRateCalculator"
+        }
+        fn subscriptions(&self) -> &[crate::calculator::CalculatorSubscription] {
+            &[]
+        }
+        fn registrations(&self) -> &[moves_data::PollutantProcessAssociation] {
+            &[]
+        }
+        fn input_tables(&self) -> &[&'static str] {
+            CALC_TABLES
+        }
+        fn execute(
+            &self,
+            _ctx: &crate::calculator::CalculatorContext,
+        ) -> std::result::Result<crate::calculator::CalculatorOutput, Error> {
+            Ok(crate::calculator::CalculatorOutput::empty())
+        }
+    }
+    fn calc_with_tables() -> Box<dyn Calculator> {
+        Box::new(CalcWithTables)
+    }
+
+    #[derive(Debug, Default)]
+    struct GenWithTables;
+    static GEN_TABLES: &[&str] = &["GenTable", "SharedTable"];
+    impl Generator for GenWithTables {
+        fn name(&self) -> &'static str {
+            "HCSpeciationCalculator"
+        }
+        fn subscriptions(&self) -> &[crate::calculator::CalculatorSubscription] {
+            &[]
+        }
+        fn input_tables(&self) -> &[&'static str] {
+            GEN_TABLES
+        }
+        fn execute(
+            &self,
+            _ctx: &mut crate::calculator::CalculatorContext,
+        ) -> std::result::Result<crate::calculator::CalculatorOutput, Error> {
+            Ok(crate::calculator::CalculatorOutput::empty())
+        }
+    }
+    fn gen_with_tables() -> Box<dyn Generator> {
+        Box::new(GenWithTables)
+    }
+
+    #[test]
+    fn required_input_tables_empty_when_nothing_registered() {
+        let reg = CalculatorRegistry::new(single_calc_dag());
+        assert!(
+            reg.required_input_tables().is_empty(),
+            "no factories → no required tables"
+        );
+    }
+
+    #[test]
+    fn required_input_tables_union_of_registered_modules() {
+        let mut reg = CalculatorRegistry::new(chained_calc_dag());
+        reg.register_calculator("BaseRateCalculator", calc_with_tables)
+            .unwrap();
+        reg.register_generator("HCSpeciationCalculator", gen_with_tables)
+            .unwrap();
+        let tables = reg.required_input_tables();
+        // CalcWithTables: "emissionRate" → "emissionrate", "SomeTable" → "sometable"
+        // GenWithTables: "GenTable" → "gentable", "SharedTable" → "sharedtable"
+        assert!(
+            tables.contains("emissionrate"),
+            "calc tables must be present"
+        );
+        assert!(tables.contains("sometable"), "calc tables must be present");
+        assert!(tables.contains("gentable"), "gen tables must be present");
+        assert!(tables.contains("sharedtable"), "gen tables must be present");
+        assert_eq!(tables.len(), 4, "union has exactly 4 distinct names");
+    }
+
+    #[test]
+    fn required_input_tables_names_are_lowercased() {
+        let mut reg = CalculatorRegistry::new(single_calc_dag());
+        reg.register_calculator("BaseRateCalculator", calc_with_tables)
+            .unwrap();
+        let tables = reg.required_input_tables();
+        // CalcWithTables returns "emissionRate" and "SomeTable"; both must be stored lowercase.
+        assert!(
+            tables.contains("emissionrate"),
+            "mixed-case name must be lowercased"
+        );
+        assert!(
+            !tables.contains("emissionRate"),
+            "original-case name must not appear"
+        );
+    }
+
+    #[test]
+    fn required_input_tables_adding_new_calculator_auto_includes_its_tables() {
+        let mut reg = CalculatorRegistry::new(chained_calc_dag());
+        // Start with an empty set.
+        assert!(reg.required_input_tables().is_empty());
+        // Register one calculator — its tables should appear.
+        reg.register_calculator("BaseRateCalculator", calc_with_tables)
+            .unwrap();
+        let after_first = reg.required_input_tables();
+        assert!(
+            after_first.contains("emissionrate"),
+            "tables from newly registered calculator must appear"
+        );
+        // Register another — its tables should be added too.
+        reg.register_generator("HCSpeciationCalculator", gen_with_tables)
+            .unwrap();
+        let after_second = reg.required_input_tables();
+        assert!(after_second.contains("emissionrate"));
+        assert!(after_second.contains("gentable"));
     }
 }

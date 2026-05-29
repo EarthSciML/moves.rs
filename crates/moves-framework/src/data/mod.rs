@@ -34,7 +34,7 @@ pub mod store;
 
 pub use conversions::{DataFrameStoreTyped, IntoDataFrame, TableRow};
 #[cfg(not(target_arch = "wasm32"))]
-pub use execution_bundle::read_execution_bundle;
+pub use execution_bundle::{read_execution_bundle, read_execution_bundle_filtered};
 #[cfg(not(target_arch = "wasm32"))]
 pub use parquet_io::DataFrameStoreParquet;
 pub use schema_registry::{schema_registry, KNOWN_CALCULATOR_INPUT_TABLES};

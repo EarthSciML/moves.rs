@@ -27,8 +27,9 @@ use moves_calculators::generators::totalactivitygenerator::inputs::{
 };
 use moves_calculators::generators::totalactivitygenerator::model::AverageSpeedRow;
 use moves_framework::{
-    read_execution_bundle, CalculatorRegistry, CountyRow, DataFrameStore, DataFrameStoreTyped,
-    EngineConfig, EngineOutcome, GeographyTables, InMemoryStore, LinkRow, MOVESEngine,
+    read_execution_bundle, read_execution_bundle_filtered, CalculatorRegistry, CountyRow,
+    DataFrameStore, DataFrameStoreTyped, EngineConfig, EngineOutcome, GeographyTables,
+    InMemoryStore, LinkRow, MOVESEngine,
 };
 use moves_runspec::{GeoKind, RunSpec};
 use polars::prelude::{
@@ -186,12 +187,18 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
         .snapshot
         .is_some()
         .then(|| SnapshotFilter::from_run_spec(&run_spec));
+    // Compute the allowed table set before the registry moves into the engine.
+    let allowed_tables = if opts.snapshot.is_some() {
+        Some(registry.required_input_tables())
+    } else {
+        None
+    };
     let mut engine = MOVESEngine::new(run_spec, registry, config);
     if let Some(snapshot_dir) = &opts.snapshot {
         let filter = snap_filter
             .as_ref()
             .expect("built above when snapshot is Some");
-        let store = load_execution_db(snapshot_dir, filter)
+        let store = load_execution_db(snapshot_dir, filter, allowed_tables.as_ref())
             .with_context(|| format!("loading execution DB from {}", snapshot_dir.display()))?;
         let geography = load_geography_from_store(&store)
             .with_context(|| format!("building geography from {}", snapshot_dir.display()))?;
@@ -219,13 +226,30 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
 /// case-insensitive lookup, so calculators calling
 /// `ctx.tables().iter_typed("SampleVehicleTrip")` will find the entry stored
 /// as `samplevehicletrip`.
-fn load_execution_db(snapshot_dir: &Path, filter: &SnapshotFilter) -> Result<InMemoryStore> {
+///
+/// When `allowed_tables` is `Some`, only tables whose lowercased short name
+/// appears in the set are loaded. Tables absent from the set are silently
+/// skipped. Pass [`CalculatorRegistry::required_input_tables`] here to avoid
+/// materialising tables that no registered calculator or generator consumes.
+fn load_execution_db(
+    snapshot_dir: &Path,
+    filter: &SnapshotFilter,
+    allowed_tables: Option<&BTreeSet<String>>,
+) -> Result<InMemoryStore> {
     let bundle_path = snapshot_dir.join("tables").join("execution-db.bundle");
     let mut store = if bundle_path.exists() {
-        read_execution_bundle(&bundle_path)
-            .with_context(|| format!("loading execution-DB bundle {}", bundle_path.display()))?
+        match allowed_tables {
+            Some(allowed) => {
+                read_execution_bundle_filtered(&bundle_path, allowed).with_context(|| {
+                    format!("loading execution-DB bundle {}", bundle_path.display())
+                })?
+            }
+            None => read_execution_bundle(&bundle_path).with_context(|| {
+                format!("loading execution-DB bundle {}", bundle_path.display())
+            })?,
+        }
     } else {
-        load_execution_db_from_parquet(snapshot_dir, filter)?
+        load_execution_db_from_parquet(snapshot_dir, filter, allowed_tables)?
     };
     // If the SHO table has null distances (MOVES inserts them before calculateDistance
     // runs), compute distance = SHO * averageSpeed and write back to the store.
@@ -245,9 +269,13 @@ fn load_execution_db(snapshot_dir: &Path, filter: &SnapshotFilter) -> Result<InM
 /// For tables listed in [`table_filter_expr`] (currently `ZoneMonthHour` and
 /// `CountyYear`) a Polars `LazyFrame` predicate is pushed into the Parquet decoder
 /// so only matching row groups are decoded.  All other tables are read whole.
+///
+/// When `allowed_tables` is `Some`, only tables whose lowercased short name
+/// appears in the set are loaded; others are skipped before opening the file.
 fn load_execution_db_from_parquet(
     snapshot_dir: &Path,
     filter: &SnapshotFilter,
+    allowed_tables: Option<&BTreeSet<String>>,
 ) -> Result<InMemoryStore> {
     let tables_dir = snapshot_dir.join("tables");
     let mut store = InMemoryStore::new();
@@ -268,6 +296,12 @@ fn load_execution_db_from_parquet(
             .unwrap_or(&name_str)
             .trim_end_matches(".parquet")
             .to_owned();
+        // Skip tables not needed by any registered calculator/generator.
+        if let Some(allowed) = allowed_tables {
+            if !allowed.contains(&table_name.to_ascii_lowercase()) {
+                continue;
+            }
+        }
         let path = entry.path();
         let df = if let Some(pred) = table_filter_expr(&table_name, filter) {
             let pl_path = PlRefPath::try_from_pathbuf(path.clone())
@@ -787,7 +821,8 @@ mod tests {
         );
 
         let filter = SnapshotFilter::from_run_spec(&moves_runspec::RunSpec::default());
-        let store = load_execution_db(dir.path(), &filter).expect("load must succeed from bundle");
+        let store =
+            load_execution_db(dir.path(), &filter, None).expect("load must succeed from bundle");
         assert!(
             store.contains("activitytype"),
             "activitytype table must be present in store"
@@ -804,13 +839,92 @@ mod tests {
         std::fs::remove_file(&bundle_path).unwrap();
 
         let filter = SnapshotFilter::from_run_spec(&moves_runspec::RunSpec::default());
-        let store = load_execution_db(dir.path(), &filter).expect("fallback load must succeed");
+        let store =
+            load_execution_db(dir.path(), &filter, None).expect("fallback load must succeed");
         assert!(
             store.contains("activitytype"),
             "activitytype table must be present in fallback store"
         );
         let df = store.get("activitytype").unwrap();
         assert_eq!(df.height(), 2, "both rows must be loaded via fallback");
+    }
+
+    #[test]
+    fn load_execution_db_bundle_skips_table_not_in_allowed_set() {
+        let (dir, _snap) = make_execdb_snapshot();
+        let bundle_path = dir.path().join("tables").join("execution-db.bundle");
+        assert!(bundle_path.exists(), "bundle must exist");
+
+        // Build an allowed set that does NOT include "activitytype".
+        let mut allowed: BTreeSet<String> = BTreeSet::new();
+        allowed.insert("sometable".to_string());
+
+        let filter = SnapshotFilter::from_run_spec(&moves_runspec::RunSpec::default());
+        let store = load_execution_db(dir.path(), &filter, Some(&allowed))
+            .expect("filtered load must succeed");
+        assert!(
+            !store.contains("activitytype"),
+            "activitytype must be absent when not in allowed set"
+        );
+    }
+
+    #[test]
+    fn load_execution_db_bundle_loads_table_when_in_allowed_set() {
+        let (dir, _snap) = make_execdb_snapshot();
+        let bundle_path = dir.path().join("tables").join("execution-db.bundle");
+        assert!(bundle_path.exists(), "bundle must exist");
+
+        let mut allowed: BTreeSet<String> = BTreeSet::new();
+        allowed.insert("activitytype".to_string());
+
+        let filter = SnapshotFilter::from_run_spec(&moves_runspec::RunSpec::default());
+        let store = load_execution_db(dir.path(), &filter, Some(&allowed))
+            .expect("filtered load must succeed");
+        assert!(
+            store.contains("activitytype"),
+            "activitytype must be present when in allowed set"
+        );
+        let df = store.get("activitytype").unwrap();
+        assert_eq!(df.height(), 2);
+    }
+
+    #[test]
+    fn load_execution_db_parquet_skips_table_not_in_allowed_set() {
+        let (dir, _snap) = make_execdb_snapshot();
+        // Remove bundle to force Parquet path.
+        let bundle_path = dir.path().join("tables").join("execution-db.bundle");
+        std::fs::remove_file(&bundle_path).unwrap();
+
+        let mut allowed: BTreeSet<String> = BTreeSet::new();
+        allowed.insert("sometable".to_string()); // activitytype excluded
+
+        let filter = SnapshotFilter::from_run_spec(&moves_runspec::RunSpec::default());
+        let store = load_execution_db(dir.path(), &filter, Some(&allowed))
+            .expect("filtered Parquet load must succeed");
+        assert!(
+            !store.contains("activitytype"),
+            "activitytype must be absent in Parquet path when not in allowed set"
+        );
+    }
+
+    #[test]
+    fn load_execution_db_parquet_loads_table_when_in_allowed_set() {
+        let (dir, _snap) = make_execdb_snapshot();
+        let bundle_path = dir.path().join("tables").join("execution-db.bundle");
+        std::fs::remove_file(&bundle_path).unwrap();
+
+        let mut allowed: BTreeSet<String> = BTreeSet::new();
+        allowed.insert("activitytype".to_string());
+
+        let filter = SnapshotFilter::from_run_spec(&moves_runspec::RunSpec::default());
+        let store = load_execution_db(dir.path(), &filter, Some(&allowed))
+            .expect("filtered Parquet load must succeed");
+        assert!(
+            store.contains("activitytype"),
+            "activitytype must be present when in allowed set"
+        );
+        let df = store.get("activitytype").unwrap();
+        assert_eq!(df.height(), 2);
     }
 
     fn make_sho_store() -> InMemoryStore {
@@ -1389,7 +1503,7 @@ mod tests {
             ..Default::default()
         };
         let filter = SnapshotFilter::from_run_spec(&rs);
-        let store = load_execution_db_from_parquet(dir.path(), &filter)
+        let store = load_execution_db_from_parquet(dir.path(), &filter, None)
             .expect("filtered load must succeed");
         let df = store.get("zonemonthhour").unwrap();
         // Only the row for zone=100, month=7 should survive.
