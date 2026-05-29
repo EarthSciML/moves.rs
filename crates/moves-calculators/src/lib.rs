@@ -71,6 +71,7 @@ pub fn register_all(
     use calculators::togspeciation;
     use calculators::welltopump;
     use generators::evap_op_mode_distribution;
+    use generators::fueleffectsgenerator;
     use generators::meteorology;
     use generators::source_bin_distribution_generator;
     use generators::start_operating_mode_distribution;
@@ -228,6 +229,7 @@ pub fn register_all(
         totalactivitygenerator::TotalActivityGenerator::NAME,
         totalactivitygenerator::factory,
     )?;
+    registry.register_generator("FuelEffectsGenerator", fueleffectsgenerator::factory)?;
 
     Ok(())
 }

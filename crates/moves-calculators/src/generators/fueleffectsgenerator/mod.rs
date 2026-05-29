@@ -1029,6 +1029,10 @@ impl TableRow for GeneralFuelRatioOutputRow {
     }
 }
 
+pub fn factory() -> Box<dyn Generator> {
+    Box::new(FuelEffectsGenerator)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
