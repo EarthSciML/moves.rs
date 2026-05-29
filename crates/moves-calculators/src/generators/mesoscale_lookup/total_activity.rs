@@ -1989,6 +1989,11 @@ impl Generator for MesoscaleLookupTotalActivityGenerator {
     }
 }
 
+/// Factory function for `CalculatorRegistry::register_generator`.
+pub fn factory() -> Box<dyn Generator> {
+    Box::new(MesoscaleLookupTotalActivityGenerator::new())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

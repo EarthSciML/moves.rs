@@ -1509,6 +1509,11 @@ impl Generator for MesoscaleLookupOperatingModeDistributionGenerator {
     }
 }
 
+/// Factory function for `CalculatorRegistry::register_generator`.
+pub fn factory() -> Box<dyn Generator> {
+    Box::new(MesoscaleLookupOperatingModeDistributionGenerator::new())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -76,6 +76,7 @@ pub fn register_all(
     use generators::evap_op_mode_distribution;
     use generators::fueleffectsgenerator;
     use generators::link_op_mode_distribution;
+    use generators::mesoscale_lookup;
     use generators::meteorology;
     use generators::new_tvv_year_generator;
     use generators::operating_mode_distribution;
@@ -276,6 +277,14 @@ pub fn register_all(
         rates_op_mode_distribution::factory,
     )?;
     registry.register_generator(project_tag::ProjectTAG::NAME, project_tag::factory)?;
+    registry.register_generator(
+        mesoscale_lookup::op_mode_distribution::MesoscaleLookupOperatingModeDistributionGenerator::NAME,
+        mesoscale_lookup::op_mode_distribution::factory,
+    )?;
+    registry.register_generator(
+        mesoscale_lookup::total_activity::MesoscaleLookupTotalActivityGenerator::NAME,
+        mesoscale_lookup::total_activity::factory,
+    )?;
 
     Ok(())
 }
