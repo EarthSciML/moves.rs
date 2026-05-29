@@ -15,7 +15,7 @@
 //! out of the box. A caller can still point at a different DAG with
 //! `--calculator-dag` (e.g. to test against a regenerated graph).
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
@@ -27,9 +27,12 @@ use moves_calculators::generators::totalactivitygenerator::inputs::{
 };
 use moves_calculators::generators::totalactivitygenerator::model::AverageSpeedRow;
 use moves_framework::{
-    read_execution_bundle, CalculatorRegistry, CountyRow, DataFrameStore, DataFrameStoreParquet,
-    DataFrameStoreTyped, EngineConfig, EngineOutcome, GeographyTables, InMemoryStore, LinkRow,
-    MOVESEngine,
+    read_execution_bundle, CalculatorRegistry, CountyRow, DataFrameStore, DataFrameStoreTyped,
+    EngineConfig, EngineOutcome, GeographyTables, InMemoryStore, LinkRow, MOVESEngine,
+};
+use moves_runspec::{GeoKind, RunSpec};
+use polars::prelude::{
+    col, lit, Expr, LazyFrame, NamedFrom, PlRefPath, ScanArgsParquet, SerReader, Series,
 };
 
 use crate::load_run_spec;
@@ -41,6 +44,98 @@ use crate::load_run_spec;
 /// `moves-chain-reconstruct` tool.
 const EMBEDDED_CALCULATOR_DAG: &str =
     include_str!("../../../characterization/calculator-chains/calculator-dag.json");
+
+/// Per-run geographic and temporal filter values for snapshot predicate pushdown.
+///
+/// Derived from a [`RunSpec`] before loading the execution-DB snapshot. Only the
+/// Parquet fallback path uses this; the Arrow-IPC bundle path loads tables whole.
+struct SnapshotFilter {
+    /// Zone IDs the run touches. Derived from County geographic selections using
+    /// the MOVES convention `zone_id = county_id * 10`, plus any Zone selections.
+    zone_ids: Vec<i64>,
+    /// County IDs from the RunSpec's geographic selections.
+    county_ids: Vec<i64>,
+    /// Calendar year IDs from the RunSpec's timespan.
+    year_ids: Vec<i64>,
+    /// Month IDs from the RunSpec's timespan.
+    month_ids: Vec<i64>,
+}
+
+impl SnapshotFilter {
+    fn from_run_spec(run_spec: &RunSpec) -> Self {
+        let mut county_set: BTreeSet<i64> = BTreeSet::new();
+        let mut zone_set: BTreeSet<i64> = BTreeSet::new();
+        for sel in &run_spec.geographic_selections {
+            match sel.kind {
+                GeoKind::County => {
+                    let county = i64::from(sel.key);
+                    county_set.insert(county);
+                    // MOVES convention: the default zone for each county is county_id * 10.
+                    zone_set.insert(county * 10);
+                }
+                GeoKind::Zone => {
+                    zone_set.insert(i64::from(sel.key));
+                    county_set.insert(i64::from(sel.key) / 10);
+                }
+                _ => {}
+            }
+        }
+        Self {
+            zone_ids: zone_set.into_iter().collect(),
+            county_ids: county_set.into_iter().collect(),
+            year_ids: run_spec
+                .timespan
+                .years
+                .iter()
+                .map(|&y| i64::from(y))
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect(),
+            month_ids: run_spec
+                .timespan
+                .months
+                .iter()
+                .map(|&m| i64::from(m))
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect(),
+        }
+    }
+}
+
+/// Build a Polars filter expression for a named snapshot table.
+///
+/// Returns `None` when no filter applies (table not recognised, or all
+/// filter sets are empty — e.g. a nation-scale run has no county IDs).
+fn table_filter_expr(table_name: &str, filter: &SnapshotFilter) -> Option<Expr> {
+    fn ids_in(column: &str, ids: &[i64]) -> Option<Expr> {
+        if ids.is_empty() {
+            return None;
+        }
+        let s = Series::new(column.into(), ids);
+        Some(col(column).is_in(lit(s), false))
+    }
+
+    fn and_opt(a: Option<Expr>, b: Option<Expr>) -> Option<Expr> {
+        match (a, b) {
+            (Some(x), Some(y)) => Some(x.and(y)),
+            (Some(x), None) | (None, Some(x)) => Some(x),
+            (None, None) => None,
+        }
+    }
+
+    match table_name {
+        "zonemonthhour" => and_opt(
+            ids_in("zoneID", &filter.zone_ids),
+            ids_in("monthID", &filter.month_ids),
+        ),
+        "countyyear" => and_opt(
+            ids_in("countyID", &filter.county_ids),
+            ids_in("yearID", &filter.year_ids),
+        ),
+        _ => None,
+    }
+}
 
 /// Inputs for one `moves run` invocation.
 #[derive(Debug, Clone)]
@@ -87,9 +182,16 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
         run_date_time: opts.run_date_time.clone(),
         collect_output_in_memory: false,
     };
+    let snap_filter = opts
+        .snapshot
+        .is_some()
+        .then(|| SnapshotFilter::from_run_spec(&run_spec));
     let mut engine = MOVESEngine::new(run_spec, registry, config);
     if let Some(snapshot_dir) = &opts.snapshot {
-        let store = load_execution_db(snapshot_dir)
+        let filter = snap_filter
+            .as_ref()
+            .expect("built above when snapshot is Some");
+        let store = load_execution_db(snapshot_dir, filter)
             .with_context(|| format!("loading execution DB from {}", snapshot_dir.display()))?;
         let geography = load_geography_from_store(&store)
             .with_context(|| format!("building geography from {}", snapshot_dir.display()))?;
@@ -117,13 +219,13 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
 /// case-insensitive lookup, so calculators calling
 /// `ctx.tables().iter_typed("SampleVehicleTrip")` will find the entry stored
 /// as `samplevehicletrip`.
-fn load_execution_db(snapshot_dir: &Path) -> Result<InMemoryStore> {
+fn load_execution_db(snapshot_dir: &Path, filter: &SnapshotFilter) -> Result<InMemoryStore> {
     let bundle_path = snapshot_dir.join("tables").join("execution-db.bundle");
     let mut store = if bundle_path.exists() {
         read_execution_bundle(&bundle_path)
             .with_context(|| format!("loading execution-DB bundle {}", bundle_path.display()))?
     } else {
-        load_execution_db_from_parquet(snapshot_dir)?
+        load_execution_db_from_parquet(snapshot_dir, filter)?
     };
     // If the SHO table has null distances (MOVES inserts them before calculateDistance
     // runs), compute distance = SHO * averageSpeed and write back to the store.
@@ -139,7 +241,14 @@ fn load_execution_db(snapshot_dir: &Path) -> Result<InMemoryStore> {
 
 /// Fall-back loader: scan `<snapshot>/tables/` for individual `db__movesexecution*.parquet`
 /// files (snapshots captured before the bundle format was introduced).
-fn load_execution_db_from_parquet(snapshot_dir: &Path) -> Result<InMemoryStore> {
+///
+/// For tables listed in [`table_filter_expr`] (currently `ZoneMonthHour` and
+/// `CountyYear`) a Polars `LazyFrame` predicate is pushed into the Parquet decoder
+/// so only matching row groups are decoded.  All other tables are read whole.
+fn load_execution_db_from_parquet(
+    snapshot_dir: &Path,
+    filter: &SnapshotFilter,
+) -> Result<InMemoryStore> {
     let tables_dir = snapshot_dir.join("tables");
     let mut store = InMemoryStore::new();
     let dir = fs::read_dir(&tables_dir)
@@ -157,12 +266,25 @@ fn load_execution_db_from_parquet(snapshot_dir: &Path) -> Result<InMemoryStore> 
             .rsplit("__")
             .next()
             .unwrap_or(&name_str)
-            .trim_end_matches(".parquet");
-        let file = fs::File::open(entry.path())
-            .with_context(|| format!("opening {}", entry.path().display()))?;
-        store
-            .read_parquet(table_name, BufReader::new(file))
-            .with_context(|| format!("parsing {}", entry.path().display()))?;
+            .trim_end_matches(".parquet")
+            .to_owned();
+        let path = entry.path();
+        let df = if let Some(pred) = table_filter_expr(&table_name, filter) {
+            let pl_path = PlRefPath::try_from_pathbuf(path.clone())
+                .with_context(|| format!("building Polars path for {}", path.display()))?;
+            LazyFrame::scan_parquet(pl_path, ScanArgsParquet::default())
+                .map_err(|e| anyhow::anyhow!("{e}"))?
+                .filter(pred)
+                .collect()
+                .with_context(|| format!("filtered scan of {}", path.display()))?
+        } else {
+            let file =
+                fs::File::open(&path).with_context(|| format!("opening {}", path.display()))?;
+            polars::prelude::ParquetReader::new(BufReader::new(file))
+                .finish()
+                .map_err(|e| anyhow::anyhow!("parsing {}: {e}", path.display()))?
+        };
+        store.insert(table_name, df);
     }
     Ok(store)
 }
@@ -664,7 +786,8 @@ mod tests {
             "bundle must exist after Snapshot::write"
         );
 
-        let store = load_execution_db(dir.path()).expect("load must succeed from bundle");
+        let filter = SnapshotFilter::from_run_spec(&moves_runspec::RunSpec::default());
+        let store = load_execution_db(dir.path(), &filter).expect("load must succeed from bundle");
         assert!(
             store.contains("activitytype"),
             "activitytype table must be present in store"
@@ -680,7 +803,8 @@ mod tests {
         let bundle_path = dir.path().join("tables").join("execution-db.bundle");
         std::fs::remove_file(&bundle_path).unwrap();
 
-        let store = load_execution_db(dir.path()).expect("fallback load must succeed");
+        let filter = SnapshotFilter::from_run_spec(&moves_runspec::RunSpec::default());
+        let store = load_execution_db(dir.path(), &filter).expect("fallback load must succeed");
         assert!(
             store.contains("activitytype"),
             "activitytype table must be present in fallback store"
@@ -1118,5 +1242,167 @@ mod tests {
         transform_airtoxics_rate_tables(&mut store).expect("transform on empty table failed");
         let df = store.get("dioxinemissionrate").unwrap();
         assert_eq!(df.height(), 0, "empty input yields empty output");
+    }
+
+    // ---- SnapshotFilter and table_filter_expr tests ----
+
+    fn county_run_spec(county_id: u32, year: u32, month: u32) -> moves_runspec::RunSpec {
+        use moves_runspec::{GeoKind, GeographicSelection, Timespan};
+        moves_runspec::RunSpec {
+            geographic_selections: vec![GeographicSelection {
+                kind: GeoKind::County,
+                key: county_id,
+                description: String::new(),
+            }],
+            timespan: Timespan {
+                years: vec![year],
+                months: vec![month],
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn snapshot_filter_derives_zone_from_county() {
+        let rs = county_run_spec(26161, 2020, 7);
+        let f = SnapshotFilter::from_run_spec(&rs);
+        assert_eq!(f.county_ids, vec![26161i64]);
+        assert_eq!(f.zone_ids, vec![261610i64], "zone = county * 10");
+        assert_eq!(f.year_ids, vec![2020i64]);
+        assert_eq!(f.month_ids, vec![7i64]);
+    }
+
+    #[test]
+    fn snapshot_filter_empty_for_nation_scale() {
+        let f = SnapshotFilter::from_run_spec(&moves_runspec::RunSpec::default());
+        assert!(f.county_ids.is_empty());
+        assert!(f.zone_ids.is_empty());
+        assert!(f.year_ids.is_empty());
+        assert!(f.month_ids.is_empty());
+    }
+
+    #[test]
+    fn table_filter_expr_zonemonthhour_returns_expr() {
+        let rs = county_run_spec(26161, 2020, 7);
+        let f = SnapshotFilter::from_run_spec(&rs);
+        assert!(
+            table_filter_expr("zonemonthhour", &f).is_some(),
+            "should produce a filter when zone_ids and month_ids are non-empty"
+        );
+    }
+
+    #[test]
+    fn table_filter_expr_countyyear_returns_expr() {
+        let rs = county_run_spec(26161, 2020, 7);
+        let f = SnapshotFilter::from_run_spec(&rs);
+        assert!(
+            table_filter_expr("countyyear", &f).is_some(),
+            "should produce a filter when county_ids and year_ids are non-empty"
+        );
+    }
+
+    #[test]
+    fn table_filter_expr_none_for_unrecognised_table() {
+        let rs = county_run_spec(26161, 2020, 7);
+        let f = SnapshotFilter::from_run_spec(&rs);
+        assert!(table_filter_expr("emissionrate", &f).is_none());
+        assert!(table_filter_expr("activitytype", &f).is_none());
+    }
+
+    #[test]
+    fn table_filter_expr_none_when_ids_empty() {
+        let f = SnapshotFilter::from_run_spec(&moves_runspec::RunSpec::default());
+        assert!(
+            table_filter_expr("zonemonthhour", &f).is_none(),
+            "no expr when all filter sets are empty (nation-scale run)"
+        );
+        assert!(table_filter_expr("countyyear", &f).is_none());
+    }
+
+    #[test]
+    fn parquet_fallback_applies_filter_to_zonemonthhour() {
+        use moves_snapshot::format::ColumnKind;
+        use moves_snapshot::table::{TableBuilder, Value};
+        use moves_snapshot::Snapshot;
+
+        // Build a snapshot with a small ZoneMonthHour table: 3 zones × 2 months × 1 hour.
+        let mut tb = TableBuilder::new(
+            "db__movesexecution1__zonemonthhour",
+            [
+                ("monthID".to_string(), ColumnKind::Int64),
+                ("zoneID".to_string(), ColumnKind::Int64),
+                ("hourID".to_string(), ColumnKind::Int64),
+                ("temperature".to_string(), ColumnKind::Float64),
+            ],
+        )
+        .unwrap()
+        .with_natural_key(["monthID", "zoneID", "hourID"])
+        .unwrap();
+        // zone 100 (county 10), month 7
+        tb.push_row([
+            Value::Int64(7),
+            Value::Int64(100),
+            Value::Int64(8),
+            Value::Float64(75.0),
+        ])
+        .unwrap();
+        // zone 100, month 8
+        tb.push_row([
+            Value::Int64(8),
+            Value::Int64(100),
+            Value::Int64(8),
+            Value::Float64(80.0),
+        ])
+        .unwrap();
+        // zone 200 (different county), month 7
+        tb.push_row([
+            Value::Int64(7),
+            Value::Int64(200),
+            Value::Int64(8),
+            Value::Float64(70.0),
+        ])
+        .unwrap();
+        let table = tb.build().unwrap();
+        let mut snap = Snapshot::new();
+        snap.add_table(table).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        snap.write(dir.path()).unwrap();
+        // Remove bundle to force Parquet fallback.
+        let bundle = dir.path().join("tables").join("execution-db.bundle");
+        if bundle.exists() {
+            std::fs::remove_file(&bundle).unwrap();
+        }
+
+        // Filter: county 10 → zone 100, month 7.
+        use moves_runspec::{GeoKind, GeographicSelection, Timespan};
+        let rs = moves_runspec::RunSpec {
+            geographic_selections: vec![GeographicSelection {
+                kind: GeoKind::County,
+                key: 10,
+                description: String::new(),
+            }],
+            timespan: Timespan {
+                months: vec![7],
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let filter = SnapshotFilter::from_run_spec(&rs);
+        let store = load_execution_db_from_parquet(dir.path(), &filter)
+            .expect("filtered load must succeed");
+        let df = store.get("zonemonthhour").unwrap();
+        // Only the row for zone=100, month=7 should survive.
+        assert_eq!(df.height(), 1, "filter should keep only 1 matching row");
+        let zone_col = df
+            .column("zoneID")
+            .unwrap()
+            .cast(&polars::prelude::DataType::Int64)
+            .unwrap();
+        assert_eq!(
+            zone_col.i64().unwrap().get(0).unwrap(),
+            100,
+            "surviving row must be zone 100"
+        );
     }
 }
