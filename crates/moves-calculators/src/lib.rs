@@ -264,9 +264,15 @@ pub fn register_all(
 /// make all ported strategy implementations available for execution. Parallels
 /// [`register_all`] for [`moves_framework::CalculatorRegistry`].
 ///
-/// Additional strategies (AVFTControlStrategy, OnRoadRetrofitStrategy,
-/// RateOfProgressControlStrategy, etc.) will be added here as each strategy
-/// wiring bead lands (see mo-j586, mo-4wci, mo-e7ug).
+/// Additional strategies (OnRoadRetrofitStrategy, RateOfProgressControlStrategy,
+/// etc.) will be added here as each strategy wiring bead lands (see mo-4wci, mo-e7ug).
 pub fn register_strategies(registry: &mut moves_framework::ControlStrategyRegistry) {
     registry.register(|| Box::new(moves_fuel_control::FuelControlStrategy::new()));
+    // AVFT uses polars+parquet and is not available on wasm32 (mio linkage issue).
+    #[cfg(not(target_arch = "wasm32"))]
+    registry.register(|| {
+        Box::new(moves_avft::AvftControlStrategy::from_completed(
+            moves_avft::AvftTable::new(),
+        ))
+    });
 }
