@@ -136,6 +136,15 @@ CAPTURES_DIR="${WORKDIR}/captures"
 # carries it back out without further wiring.
 INSTRUMENTATION_DIR="${MOVES_TEMP}/instrumentation"
 
+# Wipe the per-fixture MariaDB datadir before each run so init-mariadb.sh
+# re-seeds from scratch. Otherwise MOVES INSERTs into the OUT tables left
+# behind from previous runs, producing duplicate MOVESRunID rows (e.g. a
+# second canonical run on the same fixture doubles MOVESOutput row count).
+# Override with KEEP_MARIADB_DATA=1 if you intentionally want to reuse the
+# datadir (e.g. for a fast-iterate debugging loop).
+if [ "${KEEP_MARIADB_DATA:-0}" != "1" ]; then
+    rm -rf "${MARIADB_DATA}"
+fi
 mkdir -p "${WORKDIR}" "${MARIADB_DATA}" "${MARIADB_SOCK_DIR}" "${MOVES_TEMP}" "${WORKER_DIR}" "${INSTRUMENTATION_DIR}"
 
 echo "[run-fixture] fixture_name = ${FIXTURE_NAME}"
