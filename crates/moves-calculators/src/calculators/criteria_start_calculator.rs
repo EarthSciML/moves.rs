@@ -2597,7 +2597,8 @@ fn im_coverage_merged(inputs: &CriteriaStartInputs, ctx: &RunContext) -> Vec<ImC
         .map(|r| (r.age_id, r.age_group_id))
         .collect();
     // IMFactor indexed for the `(polProcessID, IMModelYearGroupID)` join.
-    let mut imf_by_key: FxHashMap<(i32, i32), Vec<&ImFactorRow>> = FxHashMap::default();
+    let mut imf_by_key: FxHashMap<(i32, i32), Vec<&ImFactorRow>> =
+        FxHashMap::with_capacity_and_hasher(inputs.im_factor.len(), Default::default());
     for imf in &inputs.im_factor {
         imf_by_key
             .entry((imf.pol_process_id, imf.im_model_year_group_id))
@@ -2607,7 +2608,7 @@ fn im_coverage_merged(inputs: &CriteriaStartInputs, ctx: &RunContext) -> Vec<ImC
     // IMCoverage indexed for the five-column equality join; the model-year
     // range is filtered per matched row.
     let mut imc_by_key: FxHashMap<(i32, i32, i32, i32, i32), Vec<&ImCoverageRow>> =
-        FxHashMap::default();
+        FxHashMap::with_capacity_and_hasher(inputs.im_coverage.len(), Default::default());
     for imc in &inputs.im_coverage {
         imc_by_key
             .entry((
@@ -2622,7 +2623,10 @@ fn im_coverage_merged(inputs: &CriteriaStartInputs, ctx: &RunContext) -> Vec<ImC
     }
 
     // GROUP BY (processID, pollutantID, modelYearID, fuelTypeID, sourceTypeID).
-    let mut totals: FxHashMap<[i32; 5], f64> = FxHashMap::default();
+    let mut totals: FxHashMap<[i32; 5], f64> = FxHashMap::with_capacity_and_hasher(
+        inputs.pollutant_process_mapped_model_year.len(),
+        Default::default(),
+    );
     for ppmy in &inputs.pollutant_process_mapped_model_year {
         // INNER JOIN PollutantProcessAssoc USING (polProcessID).
         let Some(assoc) = ppa.get(&ppmy.pol_process_id) else {
@@ -2719,7 +2723,7 @@ fn fuel_supply_adjustment(
     // criteriaRatio indexed for the CSEC 2-a LEFT JOIN — one key may carry
     // several rows; the join emits one output row per match.
     let mut cr_by_key: FxHashMap<(i32, i32, i32, i32), Vec<&CriteriaRatioRow>> =
-        FxHashMap::default();
+        FxHashMap::with_capacity_and_hasher(inputs.criteria_ratio.len(), Default::default());
     for cr in &inputs.criteria_ratio {
         cr_by_key
             .entry((
@@ -2765,7 +2769,12 @@ fn fuel_supply_adjustment(
 
     // GROUP BY (yearID, monthID, polProcessID, modelYearID, sourceTypeID,
     // fuelTypeID).
-    let mut totals: FxHashMap<[i32; 6], f64> = FxHashMap::default();
+    let totals_cap = inputs.year.len()
+        * inputs.month_of_any_year.len()
+        * pol_process_ids.len()
+        * inputs.source_type_model_year.len();
+    let mut totals: FxHashMap<[i32; 6], f64> =
+        FxHashMap::with_capacity_and_hasher(totals_cap, Default::default());
 
     for county in &inputs.county {
         for ppa in &inputs.pollutant_process_assoc {
@@ -2773,6 +2782,8 @@ fn fuel_supply_adjustment(
             if !pol_process_ids.contains(&ppa.pol_process_id) {
                 continue;
             }
+            let mut supply_weights: Vec<(i32, i32, f64)> =
+                Vec::with_capacity(inputs.year.len() * inputs.month_of_any_year.len());
             for ff in &inputs.fuel_formulation {
                 // Resolve fuel type once per formulation; skip all
                 // SourceTypeModelYear iterations if either lookup fails.
@@ -2785,7 +2796,7 @@ fn fuel_supply_adjustment(
 
                 // Collect (year_id, month_id, market_share) triples for this
                 // formulation once — reused for every SourceTypeModelYear row.
-                let mut supply_weights: Vec<(i32, i32, f64)> = Vec::new();
+                supply_weights.clear();
                 for year in &inputs.year {
                     for may in &inputs.month_of_any_year {
                         if let Some(fs) = fs_by_key.get(&(
@@ -2865,7 +2876,10 @@ fn met_start_adjustment(inputs: &CriteriaStartInputs) -> Vec<MetStartAdjustment>
     // PollutantProcessMappedModelYear indexed for the `(polProcessID,
     // modelYearGroupID)` join — a group spans several model years.
     let mut ppmy_by_key: FxHashMap<(i32, i32), Vec<&PollutantProcessMappedModelYearRow>> =
-        FxHashMap::default();
+        FxHashMap::with_capacity_and_hasher(
+            inputs.pollutant_process_mapped_model_year.len(),
+            Default::default(),
+        );
     for ppmy in &inputs.pollutant_process_mapped_model_year {
         ppmy_by_key
             .entry((ppmy.pol_process_id, ppmy.model_year_group_id))
@@ -2925,13 +2939,14 @@ fn emission_rates_with_im_and_temp(
         .map(|sb| (sb.source_bin_id, sb))
         .collect();
     // AgeCategory indexed by age group — each group holds several ages.
-    let mut ages_by_group: FxHashMap<i32, Vec<&AgeCategoryRow>> = FxHashMap::default();
+    let mut ages_by_group: FxHashMap<i32, Vec<&AgeCategoryRow>> =
+        FxHashMap::with_capacity_and_hasher(inputs.age_category.len(), Default::default());
     for age in &inputs.age_category {
         ages_by_group.entry(age.age_group_id).or_default().push(age);
     }
     // METStartAdjustment indexed for the four-column join.
     let mut msa_by_key: FxHashMap<(i32, i32, i32, i32), Vec<&MetStartAdjustment>> =
-        FxHashMap::default();
+        FxHashMap::with_capacity_and_hasher(met_start.len(), Default::default());
     for msa in met_start {
         msa_by_key
             .entry((
@@ -2999,7 +3014,10 @@ fn met_source_bin_emission_rates(
     // SourceBinDistribution indexed for the `(polProcessID, sourceBinID)`
     // join.
     let mut sbd_by_key: FxHashMap<(i32, i64), Vec<&SourceBinDistributionRow>> =
-        FxHashMap::default();
+        FxHashMap::with_capacity_and_hasher(
+            inputs.source_bin_distribution.len(),
+            Default::default(),
+        );
     for sbd in &inputs.source_bin_distribution {
         sbd_by_key
             .entry((sbd.pol_process_id, sbd.source_bin_id))
@@ -3015,7 +3033,8 @@ fn met_source_bin_emission_rates(
 
     // GROUP BY (zone, month, hour, year, polProcess, sourceType, modelYear,
     // fuelType, opMode).
-    let mut totals: FxHashMap<[i32; 9], (f64, f64)> = FxHashMap::default();
+    let mut totals: FxHashMap<[i32; 9], (f64, f64)> =
+        FxHashMap::with_capacity_and_hasher(emission_rates.len(), Default::default());
     for er in emission_rates {
         // INNER JOIN SourceBinDistribution ON (polProcessID, sourceBinID).
         let Some(sbds) = sbd_by_key.get(&(er.pol_process_id, er.source_bin_id)) else {
@@ -3079,13 +3098,14 @@ fn activity_weighted_emission_rate(
     met_source_bin: &[MetSourceBinEmissionRates],
 ) -> Vec<ActivityWeightedEmissionRate> {
     // HourDay indexed by hour — an hour spans several day types.
-    let mut hour_days_by_hour: FxHashMap<i32, Vec<&HourDayRow>> = FxHashMap::default();
+    let mut hour_days_by_hour: FxHashMap<i32, Vec<&HourDayRow>> =
+        FxHashMap::with_capacity_and_hasher(inputs.hour_day.len(), Default::default());
     for hd in &inputs.hour_day {
         hour_days_by_hour.entry(hd.hour_id).or_default().push(hd);
     }
     // OpModeDistribution indexed for the four-column join.
     let mut omd_by_key: FxHashMap<(i32, i32, i32, i32), Vec<&OpModeDistributionRow>> =
-        FxHashMap::default();
+        FxHashMap::with_capacity_and_hasher(inputs.op_mode_distribution.len(), Default::default());
     for omd in &inputs.op_mode_distribution {
         omd_by_key
             .entry((
@@ -3100,7 +3120,8 @@ fn activity_weighted_emission_rate(
 
     // GROUP BY (zone, year, month, day, hour, polProcess, sourceType,
     // modelYear, fuelType).
-    let mut totals: FxHashMap<[i32; 9], (f64, f64)> = FxHashMap::default();
+    let mut totals: FxHashMap<[i32; 9], (f64, f64)> =
+        FxHashMap::with_capacity_and_hasher(met_source_bin.len(), Default::default());
     for msber in met_source_bin {
         // INNER JOIN HourDay USING (hourID).
         let Some(hour_days) = hour_days_by_hour.get(&msber.hour_id) else {
@@ -3170,7 +3191,8 @@ fn activity_weighted_emission_rate_2(
 ) -> Vec<ActivityWeightedEmissionRate2> {
     // FuelSupplyAdjustment indexed for the six-column join; the county is
     // checked through the Zone join.
-    let mut fsa_by_key: FxHashMap<[i32; 6], Vec<&FuelSupplyAdjustment>> = FxHashMap::default();
+    let mut fsa_by_key: FxHashMap<[i32; 6], Vec<&FuelSupplyAdjustment>> =
+        FxHashMap::with_capacity_and_hasher(fuel_supply_adj.len(), Default::default());
     for fsa in fuel_supply_adj {
         fsa_by_key
             .entry([
@@ -3277,7 +3299,7 @@ fn assemble_emission_output(
 ) -> Vec<CriteriaStartEmissionRow> {
     // ActivityWeightedEmissionRate2 indexed for the seven-column join.
     let mut awer2_by_key: FxHashMap<[i32; 7], Vec<&ActivityWeightedEmissionRate2>> =
-        FxHashMap::default();
+        FxHashMap::with_capacity_and_hasher(activity_weighted_2.len(), Default::default());
     for awer in activity_weighted_2 {
         awer2_by_key
             .entry([
