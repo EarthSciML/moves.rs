@@ -646,6 +646,12 @@ impl TableRow for OpModeDistributionRow {
     }
 }
 
+/// Satisfy the generator-factory signature so the calculator registry can register it.
+#[must_use]
+pub fn factory() -> Box<dyn Generator> {
+    Box::new(OperatingModeDistributionGenerator::new())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

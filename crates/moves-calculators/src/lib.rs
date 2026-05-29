@@ -75,6 +75,7 @@ pub fn register_all(
     use generators::evap_op_mode_distribution;
     use generators::fueleffectsgenerator;
     use generators::meteorology;
+    use generators::operating_mode_distribution;
     use generators::source_bin_distribution_generator;
     use generators::start_operating_mode_distribution;
     use generators::totalactivitygenerator;
@@ -224,6 +225,10 @@ pub fn register_all(
         evap_op_mode_distribution::factory,
     )?;
     registry.register_generator("MeteorologyGenerator", meteorology::factory)?;
+    registry.register_generator(
+        operating_mode_distribution::OperatingModeDistributionGenerator::NAME,
+        operating_mode_distribution::factory,
+    )?;
     registry.register_generator(
         source_bin_distribution_generator::SourceBinDistributionGenerator::NAME,
         source_bin_distribution_generator::factory,
