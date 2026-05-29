@@ -4762,10 +4762,20 @@ fn operating_mode_base_rates(
         if !evap_ok(sb.fuel_type_id) {
             continue;
         }
-        // `averageTankGasoline` only survives for fuel types with RVP knots.
-        let Some(&rvp) = rvp_terms.get(&sb.fuel_type_id) else {
-            continue;
-        };
+        // When AverageTankGasoline is absent (empty execution DB), canonical
+        // MOVES defaults rvpAdjustment to 1.0 for all modes. The canonical
+        // SQL inner-joins on ATG but the worker ATG table is always empty at
+        // Processing time — TankFuelGenerator is a master-side year-level
+        // generator whose output is not transferred to SQL workers.
+        let rvp = rvp_terms
+            .get(&sb.fuel_type_id)
+            .copied()
+            .unwrap_or(AdjustTerms {
+                term3: 0.0,
+                term2: 0.0,
+                term1: 0.0,
+                constant: 1.0,
+            });
         let Some(ages) = age_by_group.get(&er.age_group_id) else {
             continue;
         };
@@ -5291,8 +5301,26 @@ impl Calculator for MultidayTankVaporVentingCalculator {
             source_hours: tables.iter_typed::<SourceHoursRow>("SourceHours")?,
             source_type_model_year: tables
                 .iter_typed::<SourceTypeModelYearRow>("SourceTypeModelYear")?,
-            stmy_tvv_coeffs: tables.iter_typed::<StmyTvvCoeffsRow>("stmyTVVCoeffs")?,
-            stmy_tvv_equations: tables.iter_typed::<StmyTvvEquationsRow>("stmyTVVEquations")?,
+            stmy_tvv_coeffs: {
+                let scratch = ctx.scratch();
+                if scratch.store.contains("stmyTVVCoeffs") {
+                    scratch
+                        .store
+                        .iter_typed::<StmyTvvCoeffsRow>("stmyTVVCoeffs")?
+                } else {
+                    tables.iter_typed::<StmyTvvCoeffsRow>("stmyTVVCoeffs")?
+                }
+            },
+            stmy_tvv_equations: {
+                let scratch = ctx.scratch();
+                if scratch.store.contains("stmyTVVEquations") {
+                    scratch
+                        .store
+                        .iter_typed::<StmyTvvEquationsRow>("stmyTVVEquations")?
+                } else {
+                    tables.iter_typed::<StmyTvvEquationsRow>("stmyTVVEquations")?
+                }
+            },
             tank_vapor_gen_coeffs: tables
                 .iter_typed::<TankVaporGenCoeffsRow>("TankVaporGenCoeffs")?,
             zone_month_hour: tables.iter_typed::<ZoneMonthHourRow>("ZoneMonthHour")?,

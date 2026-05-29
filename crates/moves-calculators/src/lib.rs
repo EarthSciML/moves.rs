@@ -76,6 +76,7 @@ pub fn register_all(
     use generators::fueleffectsgenerator;
     use generators::link_op_mode_distribution;
     use generators::meteorology;
+    use generators::new_tvv_year_generator;
     use generators::operating_mode_distribution;
     use generators::rates_op_mode_distribution;
     use generators::source_bin_distribution_generator;
@@ -234,6 +235,10 @@ pub fn register_all(
         evap_op_mode_distribution::factory,
     )?;
     registry.register_generator("MeteorologyGenerator", meteorology::factory)?;
+    registry.register_generator(
+        new_tvv_year_generator::NewTvvYearGenerator::NAME,
+        new_tvv_year_generator::factory,
+    )?;
     registry.register_generator(
         operating_mode_distribution::OperatingModeDistributionGenerator::NAME,
         operating_mode_distribution::factory,

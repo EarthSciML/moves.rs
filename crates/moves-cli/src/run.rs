@@ -1358,6 +1358,15 @@ mod tests {
         assert_eq!(df.height(), 0, "empty input yields empty output");
     }
 
+    #[test]
+    fn new_tvv_year_generator_is_registered() {
+        let registry = load_registry(None, true).expect("registry should load with calculators");
+        assert!(
+            registry.has_factory("NewTvvYearGenerator"),
+            "NewTvvYearGenerator must have a factory registered"
+        );
+    }
+
     // ---- SnapshotFilter and table_filter_expr tests ----
 
     fn county_run_spec(county_id: u32, year: u32, month: u32) -> moves_runspec::RunSpec {

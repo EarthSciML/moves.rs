@@ -12,6 +12,7 @@ pub mod fueleffectsgenerator;
 pub mod link_op_mode_distribution;
 pub mod mesoscale_lookup;
 pub mod meteorology;
+pub mod new_tvv_year_generator;
 pub mod operating_mode_distribution;
 pub mod rates_op_mode_distribution;
 pub mod source_bin_distribution_generator;
