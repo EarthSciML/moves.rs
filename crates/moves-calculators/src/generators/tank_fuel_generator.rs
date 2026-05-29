@@ -1732,6 +1732,13 @@ impl Generator for TankFuelGenerator {
     }
 }
 
+/// Construct a [`TankFuelGenerator`] as a boxed trait object for registration
+/// via `CalculatorRegistry::register_generator`.
+#[must_use]
+pub fn factory() -> Box<dyn Generator> {
+    Box::new(TankFuelGenerator::new())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -79,6 +79,8 @@ pub fn register_all(
     use generators::source_bin_distribution_generator;
     use generators::sourcetypephysics;
     use generators::start_operating_mode_distribution;
+    use generators::tank_fuel_generator;
+    use generators::tank_temperature_generator;
     use generators::totalactivitygenerator;
 
     registry.register_calculator(
@@ -247,6 +249,11 @@ pub fn register_all(
         sourcetypephysics::SourceTypePhysics::NAME,
         sourcetypephysics::factory,
     )?;
+    registry.register_generator(
+        "TankTemperatureGenerator",
+        tank_temperature_generator::factory,
+    )?;
+    registry.register_generator("TankFuelGenerator", tank_fuel_generator::factory)?;
 
     Ok(())
 }

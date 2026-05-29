@@ -2896,6 +2896,13 @@ impl Generator for TankTemperatureGenerator {
     }
 }
 
+/// Construct a [`TankTemperatureGenerator`] as a boxed trait object for
+/// registration via `CalculatorRegistry::register_generator`.
+#[must_use]
+pub fn factory() -> Box<dyn Generator> {
+    Box::new(TankTemperatureGenerator::new())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
