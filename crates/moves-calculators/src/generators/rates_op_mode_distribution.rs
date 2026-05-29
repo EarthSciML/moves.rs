@@ -1070,6 +1070,13 @@ impl Generator for RatesOperatingModeDistributionGenerator {
     }
 }
 
+/// Generator factory — returns a boxed instance for registration with the
+/// `CalculatorRegistry`.
+#[must_use]
+pub fn factory() -> Box<dyn Generator> {
+    Box::new(RatesOperatingModeDistributionGenerator::new())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

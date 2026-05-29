@@ -77,6 +77,7 @@ pub fn register_all(
     use generators::link_op_mode_distribution;
     use generators::meteorology;
     use generators::operating_mode_distribution;
+    use generators::rates_op_mode_distribution;
     use generators::source_bin_distribution_generator;
     use generators::sourcetypephysics;
     use generators::start_operating_mode_distribution;
@@ -259,6 +260,10 @@ pub fn register_all(
         tank_temperature_generator::factory,
     )?;
     registry.register_generator("TankFuelGenerator", tank_fuel_generator::factory)?;
+    registry.register_generator(
+        rates_op_mode_distribution::RatesOperatingModeDistributionGenerator::NAME,
+        rates_op_mode_distribution::factory,
+    )?;
 
     Ok(())
 }
