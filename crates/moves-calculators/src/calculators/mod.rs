@@ -28,6 +28,7 @@ pub mod liquid_leaking_calculator;
 pub mod multiday_tank_vapor_venting_calculator;
 pub mod nh3;
 pub mod nitrogen_oxide;
+pub mod nonroad_emission;
 pub mod nrairtoxics;
 pub mod nrhcspeciation;
 pub mod pm10;

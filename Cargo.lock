@@ -1789,6 +1789,7 @@ dependencies = [
  "moves-data",
  "moves-framework",
  "moves-fuel-control",
+ "moves-nonroad",
  "moves-runspec",
  "moves-snapshot",
  "polars",

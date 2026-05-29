@@ -16,6 +16,7 @@ moves-calculator-info = { path = "../moves-calculator-info" }
 moves-data = { path = "../moves-data" }
 moves-framework = { path = "../moves-framework" }
 moves-fuel-control = { path = "../moves-fuel-control" }
+moves-nonroad = { path = "../moves-nonroad" }
 rayon = { workspace = true }
 rustc-hash = { workspace = true }
 thiserror = { workspace = true }

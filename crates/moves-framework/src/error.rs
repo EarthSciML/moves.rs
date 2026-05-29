@@ -117,4 +117,14 @@ pub enum Error {
     /// or out-of-bounds data offset).
     #[error("invalid execution-DB bundle: {0}")]
     InvalidBundle(String),
+
+    /// A `moves-nonroad` simulation call failed.
+    ///
+    /// Wraps the `moves_nonroad::Error` string for reporting through the
+    /// `moves-framework` error surface. The `NonroadEmissionCalculator`
+    /// adapter uses this to propagate [`moves_nonroad::run_simulation`]
+    /// failures (year out of range, geography-executor errors, etc.) to
+    /// the master loop.
+    #[error("nonroad simulation error: {0}")]
+    Nonroad(String),
 }

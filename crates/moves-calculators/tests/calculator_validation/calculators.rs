@@ -66,6 +66,7 @@ use moves_calculators::calculators::{
     multiday_tank_vapor_venting_calculator::MultidayTankVaporVentingCalculator,
     nh3::{running::Nh3RunningCalculator, start::Nh3StartCalculator},
     nitrogen_oxide::{NO2Calculator, NOCalculator},
+    nonroad_emission::NonroadEmissionCalculator,
     nrairtoxics::NrAirToxicsCalculator,
     nrhcspeciation::NrHcSpeciationCalculator,
     pm10::{PM10BrakeTireCalculator, PM10EmissionCalculator},
@@ -81,8 +82,8 @@ use moves_calculators::calculators::{
     },
 };
 
-/// The number of calculators the Phase 3 plan lands (Tasks 45–72 + 78).
-pub const CALCULATOR_COUNT: usize = 38;
+/// The number of calculators the Phase 3 plan lands (Tasks 45–72 + 78 + mo-y4bs).
+pub const CALCULATOR_COUNT: usize = 39;
 
 /// Construct every Phase 3 hot-path calculator as a boxed trait object.
 ///
@@ -158,6 +159,8 @@ pub fn all_calculators() -> Vec<Box<dyn Calculator>> {
         Box::new(DistanceCalculator::new()),
         // Task 78 — DummyCalculator (no-op completeness entry)
         Box::new(DummyCalculator),
+        // Task 119 (mo-y4bs) — NonroadEmissionCalculator adapter
+        Box::new(NonroadEmissionCalculator::new()),
     ]
 }
 

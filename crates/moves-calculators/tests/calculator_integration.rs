@@ -22,7 +22,9 @@
 //! calculators. Task 74 adds 3 fixtures (process-nox-speciation,
 //! process-extended-idle, chain-nonhaptog) that close the gap. Task 78 adds
 //! DummyCalculator (no-op, zero registrations) — all 38 calculators are now
-//! in the catalogue; 37 carry registrations covered by fixtures.
+//! in the catalogue; 37 carry registrations covered by fixtures. Task mo-y4bs
+//! adds NonroadEmissionCalculator (nonroad adapter, zero registrations) —
+//! 39 calculators total; 37 carry registrations covered by fixtures.
 //!
 //! See `tests/calculator_validation/mod.rs` for what runs today versus
 //! what is gated behind the Phase 0 snapshot capture and the data
@@ -86,7 +88,7 @@ fn all_26_onroad_fixtures_present_and_parse() {
 }
 
 #[test]
-fn all_38_calculators_registered() {
+fn all_39_calculators_registered() {
     let registered = calculators::all_calculators();
     assert_eq!(
         registered.len(),
@@ -289,7 +291,10 @@ fn harness_status() {
     );
     println!();
     println!("{}", matrix.render());
-    println!("  Status: 38 calculators (37 with registrations + DummyCalculator no-op);");
+    println!(
+        "  Status: 39 calculators (37 with registrations + DummyCalculator no-op \
+         + NonroadEmissionCalculator adapter);"
+    );
     println!(
         "          canonical-capture diff dormant until Phase 0 compute-node run + data plane."
     );

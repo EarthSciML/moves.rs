@@ -60,6 +60,7 @@ pub fn register_all(
     use calculators::liquid_leaking_calculator;
     use calculators::nh3;
     use calculators::nitrogen_oxide;
+    use calculators::nonroad_emission;
     use calculators::nrairtoxics;
     use calculators::nrhcspeciation;
     use calculators::pm10;
@@ -158,6 +159,10 @@ pub fn register_all(
         nh3::running::factory,
     )?;
     registry.register_calculator(nh3::start::Nh3StartCalculator::NAME, nh3::start::factory)?;
+    registry.register_calculator(
+        nonroad_emission::NonroadEmissionCalculator::NAME,
+        nonroad_emission::factory,
+    )?;
     registry.register_calculator(
         refueling_loss_calculator::RefuelingLossCalculator::NAME,
         refueling_loss_calculator::factory,
