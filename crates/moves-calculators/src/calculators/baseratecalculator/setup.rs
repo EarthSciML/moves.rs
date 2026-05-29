@@ -2555,8 +2555,6 @@ pub struct BaseRateCalculatorInputs {
     pub apu_emission_rate_fraction: Vec<ModelYearFuelFractionRow>,
     /// `ShorepowerEmissionRateFraction` rows.
     pub shorepower_emission_rate_fraction: Vec<ModelYearFuelFractionRow>,
-    /// `ZoneMonthHour` rows.
-    pub zone_month_hour: Vec<ZoneMonthHourRow>,
     /// `PollutantProcessMappedModelYear` rows.
     pub pollutant_process_mapped_model_year: Vec<PollutantProcessMappedModelYearRow>,
     /// `StartTempAdjustment` rows.
@@ -2662,7 +2660,11 @@ impl PreparedTables {
     /// `IMFactor` and `AgeGroups` before `IMCoverage`.
     #[must_use]
     #[allow(clippy::too_many_lines)] // One straight-line port of the ~20-table Go `StartSetup`.
-    pub fn from_inputs(inputs: &BaseRateCalculatorInputs, constants: &RunConstants) -> Self {
+    pub fn from_inputs(
+        inputs: &BaseRateCalculatorInputs,
+        zone_month_hour: BTreeMap<ZoneMonthHourKey, ZoneMonthHourDetail>,
+        constants: &RunConstants,
+    ) -> Self {
         let mut prepared = PreparedTables::default();
 
         // The three hourly-fraction tables share a key shape.
@@ -2694,22 +2696,7 @@ impl PreparedTables {
             );
         }
 
-        for row in &inputs.zone_month_hour {
-            prepared.zone_month_hour.insert(
-                ZoneMonthHourKey {
-                    month_id: row.month_id,
-                    zone_id: row.zone_id,
-                    hour_id: row.hour_id,
-                },
-                ZoneMonthHourDetail {
-                    temperature: row.temperature,
-                    rel_humidity: row.rel_humidity,
-                    heat_index: row.heat_index,
-                    specific_humidity: row.specific_humidity,
-                    mol_water_fraction: row.mol_water_fraction,
-                },
-            );
-        }
+        prepared.zone_month_hour = zone_month_hour;
 
         for row in &inputs.pollutant_process_mapped_model_year {
             prepared.pollutant_process_mapped_model_year.insert(
@@ -3019,7 +3006,8 @@ mod tests {
             }],
             ..BaseRateCalculatorInputs::default()
         };
-        let prepared = PreparedTables::from_inputs(&inputs, &RunConstants::default());
+        let prepared =
+            PreparedTables::from_inputs(&inputs, BTreeMap::new(), &RunConstants::default());
         // 1950..=1953 -> four entries; 1940..1949 clamped away.
         assert_eq!(prepared.temperature_adjustment.len(), 4);
         assert!(prepared
@@ -3098,7 +3086,7 @@ mod tests {
             }],
             ..BaseRateCalculatorInputs::default()
         };
-        let prepared = PreparedTables::from_inputs(&inputs, &constants);
+        let prepared = PreparedTables::from_inputs(&inputs, BTreeMap::new(), &constants);
         // model year 2018 -> age 2 -> age group 4; 2019 -> age 1 -> age group 4.
         // Each: 0.5 * (0.01 * 80) = 0.4.
         assert_eq!(
@@ -3138,7 +3126,8 @@ mod tests {
             ],
             ..BaseRateCalculatorInputs::default()
         };
-        let prepared = PreparedTables::from_inputs(&inputs, &RunConstants::default());
+        let prepared =
+            PreparedTables::from_inputs(&inputs, BTreeMap::new(), &RunConstants::default());
         let cell = prepared
             .fuel_supply
             .get(&FuelSupplyKey {

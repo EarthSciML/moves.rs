@@ -62,7 +62,9 @@ use moves_framework::{
 };
 use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
 
-pub use model::{BlockKey, FuelBlock, ModuleFlags, RunConstants};
+pub use model::{
+    BlockKey, FuelBlock, ModuleFlags, RunConstants, ZoneMonthHourDetail, ZoneMonthHourKey,
+};
 pub use setup::{BaseRateCalculatorInputs, PreparedTables};
 
 use adjust::{build_fuel_blocks, process_fuel_block};
@@ -479,10 +481,11 @@ impl BaseRateCalculator {
     #[must_use]
     pub fn run(
         inputs: &BaseRateCalculatorInputs,
+        zone_month_hour: BTreeMap<ZoneMonthHourKey, ZoneMonthHourDetail>,
         constants: &RunConstants,
         flags: &ModuleFlags,
     ) -> BaseRateCalculatorOutput {
-        let prepared = PreparedTables::from_inputs(inputs, constants);
+        let prepared = PreparedTables::from_inputs(inputs, zone_month_hour, constants);
 
         // The Go indexes `County[CountyID]` per row; the run processes a
         // single county, so the GPA fraction is resolved once. A county
@@ -610,6 +613,26 @@ impl Calculator for BaseRateCalculator {
             year_id: pos.time.year.map(|y| y as i32).unwrap_or(0),
             month_id: pos.time.month.map(|m| m as i32).unwrap_or(0),
         };
+        let zone_month_hour: BTreeMap<ZoneMonthHourKey, ZoneMonthHourDetail> = tables
+            .iter_typed::<setup::ZoneMonthHourRow>("ZoneMonthHour")?
+            .into_iter()
+            .map(|row| {
+                (
+                    ZoneMonthHourKey {
+                        month_id: row.month_id,
+                        zone_id: row.zone_id,
+                        hour_id: row.hour_id,
+                    },
+                    ZoneMonthHourDetail {
+                        temperature: row.temperature,
+                        rel_humidity: row.rel_humidity,
+                        heat_index: row.heat_index,
+                        specific_humidity: row.specific_humidity,
+                        mol_water_fraction: row.mol_water_fraction,
+                    },
+                )
+            })
+            .collect();
         let inputs = BaseRateCalculatorInputs {
             base_rate_by_age: tables.iter_typed("BaseRateByAge")?,
             base_rate: tables.iter_typed("BaseRate")?,
@@ -618,7 +641,6 @@ impl Calculator for BaseRateCalculator {
             apu_emission_rate_fraction: tables.iter_typed_or_empty("apuEmissionRateFraction")?,
             shorepower_emission_rate_fraction: tables
                 .iter_typed_or_empty("ShorepowerEmissionRateFraction")?,
-            zone_month_hour: tables.iter_typed("ZoneMonthHour")?,
             pollutant_process_mapped_model_year: tables
                 .iter_typed("PollutantProcessMappedModelYear")?,
             start_temp_adjustment: tables.iter_typed("StartTempAdjustment")?,
@@ -644,7 +666,12 @@ impl Calculator for BaseRateCalculator {
             fuel_formulations: tables.iter_typed("FuelFormulation")?,
             fuel_supply: build_fuel_supply(tables, &constants)?,
         };
-        let output = BaseRateCalculator::run(&inputs, &constants, &ModuleFlags::default());
+        let output = BaseRateCalculator::run(
+            &inputs,
+            zone_month_hour,
+            &constants,
+            &ModuleFlags::default(),
+        );
         let rows = output.rows();
         crate::wiring::emit_rows(rows)
     }
@@ -1225,8 +1252,12 @@ mod tests {
     #[test]
     fn run_on_empty_inputs_yields_empty_output() {
         let inputs = BaseRateCalculatorInputs::default();
-        let output =
-            BaseRateCalculator::run(&inputs, &RunConstants::default(), &ModuleFlags::default());
+        let output = BaseRateCalculator::run(
+            &inputs,
+            BTreeMap::new(),
+            &RunConstants::default(),
+            &ModuleFlags::default(),
+        );
         assert!(output.blocks.is_empty());
         assert!(output.rows().is_empty());
     }
