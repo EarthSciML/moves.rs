@@ -1853,6 +1853,12 @@ impl TableRow for DrivingIdleFractionRow {
     }
 }
 
+/// Generator-factory shim so the calculator registry can register it.
+#[must_use]
+pub fn factory() -> Box<dyn Generator> {
+    Box::new(BaseRateGenerator)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -71,6 +71,7 @@ pub fn register_all(
     use calculators::togspeciation;
     use calculators::welltopump;
     use generators::avg_speed_op_mode_distribution;
+    use generators::baserategenerator;
     use generators::evap_op_mode_distribution;
     use generators::fueleffectsgenerator;
     use generators::meteorology;
@@ -213,6 +214,7 @@ pub fn register_all(
         welltopump::total_energy::factory,
     )?;
 
+    registry.register_generator("BaseRateGenerator", baserategenerator::factory)?;
     registry.register_generator(
         avg_speed_op_mode_distribution::AverageSpeedOperatingModeDistributionGenerator::NAME,
         avg_speed_op_mode_distribution::factory,
