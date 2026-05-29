@@ -265,6 +265,17 @@ fn load_execution_db(
     Ok(store)
 }
 
+/// If `name` ends with exactly four ASCII decimal digits (a year suffix like `2020`),
+/// return the prefix without them; otherwise return `name` unchanged.
+fn strip_year_suffix(name: &str) -> &str {
+    let bytes = name.as_bytes();
+    if bytes.len() > 4 && bytes[bytes.len() - 4..].iter().all(|b| b.is_ascii_digit()) {
+        &name[..name.len() - 4]
+    } else {
+        name
+    }
+}
+
 /// Fall-back loader: scan `<snapshot>/tables/` for individual `db__movesexecution*.parquet`
 /// files (snapshots captured before the bundle format was introduced).
 ///
@@ -299,8 +310,13 @@ fn load_execution_db_from_parquet(
             .trim_end_matches(".parquet")
             .to_owned();
         // Skip tables not needed by any registered calculator/generator.
+        // Year-suffixed tables (e.g. `stmyTVVCoeffs2020`) are admitted when
+        // their base name (e.g. `stmytvvcoeffs`) appears in the allowed set,
+        // because some generators read them dynamically and declare no static
+        // INPUT_TABLES entry.
         if let Some(allowed) = allowed_tables {
-            if !allowed.contains(&table_name.to_ascii_lowercase()) {
+            let lower = table_name.to_ascii_lowercase();
+            if !allowed.contains(&lower) && !allowed.contains(strip_year_suffix(&lower)) {
                 continue;
             }
         }
@@ -948,6 +964,57 @@ mod tests {
         );
         let df = store.get("activitytype").unwrap();
         assert_eq!(df.height(), 2);
+    }
+
+    #[test]
+    fn load_execution_db_parquet_admits_year_suffixed_table_when_base_in_allowed() {
+        use moves_snapshot::format::ColumnKind;
+        use moves_snapshot::table::{TableBuilder, Value};
+        use moves_snapshot::Snapshot;
+
+        // Build a snapshot with a year-suffixed table (stmytvvcoeffs2020).
+        let mut tb = TableBuilder::new(
+            "db__movesexecution1__stmytvvcoeffs2020",
+            [
+                ("sourcetypeid".to_string(), ColumnKind::Int64),
+                ("coeff".to_string(), ColumnKind::Float64),
+            ],
+        )
+        .unwrap()
+        .with_natural_key(["sourcetypeid"])
+        .unwrap();
+        tb.push_row([Value::Int64(21), Value::Float64(1.5)])
+            .unwrap();
+        let table = tb.build().unwrap();
+        let mut snap = Snapshot::new();
+        snap.add_table(table).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        snap.write(dir.path()).unwrap();
+
+        // Remove bundle to force Parquet path.
+        let bundle_path = dir.path().join("tables").join("execution-db.bundle");
+        std::fs::remove_file(&bundle_path).unwrap();
+
+        // Allowed set contains only the base name — no year suffix.
+        let mut allowed: BTreeSet<String> = BTreeSet::new();
+        allowed.insert("stmytvvcoeffs".to_string());
+
+        let filter = SnapshotFilter::from_run_spec(&moves_runspec::RunSpec::default());
+        let store = load_execution_db(dir.path(), &filter, Some(&allowed))
+            .expect("year-suffixed Parquet load must succeed");
+        assert!(
+            store.contains("stmytvvcoeffs2020"),
+            "year-suffixed table must be admitted when base name is in allowed set"
+        );
+        assert_eq!(store.get("stmytvvcoeffs2020").unwrap().height(), 1);
+    }
+
+    #[test]
+    fn strip_year_suffix_strips_four_digits() {
+        assert_eq!(strip_year_suffix("stmytvvcoeffs2020"), "stmytvvcoeffs");
+        assert_eq!(strip_year_suffix("activitytype"), "activitytype");
+        assert_eq!(strip_year_suffix("table202"), "table202");
+        assert_eq!(strip_year_suffix("table20a0"), "table20a0");
     }
 
     fn make_sho_store() -> InMemoryStore {

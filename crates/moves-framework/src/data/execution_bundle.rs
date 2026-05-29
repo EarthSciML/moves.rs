@@ -51,6 +51,17 @@ pub fn read_execution_bundle_filtered(
     parse_bundle(&bytes, path, Some(allowed))
 }
 
+/// If `name` ends with exactly four ASCII decimal digits (a year suffix like `2020`),
+/// return the prefix without them; otherwise return `name` unchanged.
+fn strip_year_suffix(name: &str) -> &str {
+    let bytes = name.as_bytes();
+    if bytes.len() > 4 && bytes[bytes.len() - 4..].iter().all(|b| b.is_ascii_digit()) {
+        &name[..name.len() - 4]
+    } else {
+        name
+    }
+}
+
 fn parse_bundle(
     src: &[u8],
     path: &Path,
@@ -131,7 +142,9 @@ fn parse_bundle(
             .unwrap_or(&full_name)
             .to_ascii_lowercase();
         if let Some(allowed) = allowed {
-            if !allowed.contains(&short_name) {
+            // Year-suffixed tables (e.g. `stmyTVVCoeffs2020`) are admitted when
+            // their base name (e.g. `stmytvvcoeffs`) appears in the allowed set.
+            if !allowed.contains(&short_name) && !allowed.contains(strip_year_suffix(&short_name)) {
                 continue;
             }
         }
@@ -257,6 +270,70 @@ mod tests {
         assert!(
             store.names().is_empty(),
             "empty allowed set must produce empty store"
+        );
+    }
+
+    // --- strip_year_suffix unit tests ---
+
+    #[test]
+    fn strip_year_suffix_strips_four_digits() {
+        assert_eq!(strip_year_suffix("stmytvvcoeffs2020"), "stmytvvcoeffs");
+        assert_eq!(
+            strip_year_suffix("stmytvvequations2020"),
+            "stmytvvequations"
+        );
+    }
+
+    #[test]
+    fn strip_year_suffix_no_change_without_digits() {
+        assert_eq!(strip_year_suffix("activitytype"), "activitytype");
+        assert_eq!(strip_year_suffix("stmytvvcoeffs"), "stmytvvcoeffs");
+    }
+
+    #[test]
+    fn strip_year_suffix_no_change_partial_digits() {
+        // Fewer than 4 trailing digits: no change.
+        assert_eq!(strip_year_suffix("table202"), "table202");
+        // 5 trailing digits: last 4 ("0200") are stripped, leaving "table2".
+        assert_eq!(strip_year_suffix("table20200"), "table2");
+    }
+
+    #[test]
+    fn strip_year_suffix_no_change_mixed_suffix() {
+        assert_eq!(strip_year_suffix("table20a0"), "table20a0");
+    }
+
+    // --- year-suffixed table admission test ---
+
+    #[test]
+    fn filtered_bundle_admits_year_suffixed_table_when_base_in_allowed() {
+        // Simulates the stmyTVVCoeffs2020 scenario: the bundle has a year-suffixed
+        // table, and the allowed set contains only the base (unsuffixed) name.
+        let ipc_year = ipc_for_table("db__movesexecution1__stmytvvcoeffs2020", 3);
+        let ipc_other = ipc_for_table("db__movesexecution1__unrelated", 1);
+        let bundle = build_bundle_bytes([
+            (
+                "db__movesexecution1__stmytvvcoeffs2020",
+                ipc_year.as_slice(),
+            ),
+            ("db__movesexecution1__unrelated", ipc_other.as_slice()),
+        ]);
+        let dir = tempdir().unwrap();
+        let p = dir.path().join("year.bundle");
+        std::fs::write(&p, &bundle).unwrap();
+
+        let mut allowed = BTreeSet::new();
+        allowed.insert("stmytvvcoeffs".to_string()); // base name — no year suffix
+
+        let store = read_execution_bundle_filtered(&p, &allowed).unwrap();
+        assert!(
+            store.get("stmytvvcoeffs2020").is_some(),
+            "year-suffixed table must be admitted when base name is in allowed"
+        );
+        assert_eq!(store.get("stmytvvcoeffs2020").unwrap().height(), 3);
+        assert!(
+            store.get("unrelated").is_none(),
+            "unrelated table must still be skipped"
         );
     }
 }
