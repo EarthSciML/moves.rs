@@ -9,6 +9,10 @@
 # Rust build artifacts
 /target/
 
+# Per-developer Cargo config (e.g. local target-dir redirect).
+# Use CARGO_TARGET_DIR env var or a local .cargo/config.toml for per-rig overrides.
+.cargo/
+
 # Beads / Dolt files (added by bd init)
 .dolt/
 *.db
