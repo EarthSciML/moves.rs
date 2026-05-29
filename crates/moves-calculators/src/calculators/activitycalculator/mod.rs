@@ -99,11 +99,13 @@ pub mod model;
 pub mod population;
 mod rowbuild;
 
-use moves_data::PollutantProcessAssociation;
+use moves_calculator_info::{Granularity, Priority};
+use moves_data::{EmissionProcess, PollutantProcessAssociation};
 use moves_framework::{
     Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStoreTyped,
     Error,
 };
+use std::sync::OnceLock;
 
 pub use fuelfraction::FuelFractionMode;
 pub use inputs::{ActivityInputs, IterationContext};
@@ -111,6 +113,38 @@ pub use model::ActivityRow;
 
 /// Stable module name in the calculator-chain DAG.
 const CALCULATOR_NAME: &str = "ActivityCalculator";
+
+/// Processes [`ActivityCalculator::subscribeToMe`] signs up for — the same
+/// set as `TotalActivityGenerator`, since activity data (SHO, Starts, etc.)
+/// is available for every process that generator covers.
+const SUBSCRIBED_PROCESSES: [&str; 10] = [
+    "Running Exhaust",
+    "Start Exhaust",
+    "Extended Idle Exhaust",
+    "Auxiliary Power Exhaust",
+    "Evap Permeation",
+    "Evap Fuel Vapor Venting",
+    "Evap Fuel Leaks",
+    "Evap Non-Fuel Vapors",
+    "Brakewear",
+    "Tirewear",
+];
+
+fn build_subscriptions() -> Vec<CalculatorSubscription> {
+    let priority = Priority::parse("EMISSION_CALCULATOR")
+        .expect("\"EMISSION_CALCULATOR\" is a valid MasterLoop priority");
+    SUBSCRIBED_PROCESSES
+        .iter()
+        .filter_map(|&name| {
+            let process = EmissionProcess::find_by_name(name)?;
+            Some(CalculatorSubscription::new(
+                process.id,
+                Granularity::Year,
+                priority,
+            ))
+        })
+        .collect()
+}
 
 /// Whether the activity-type key is formed at link or zone resolution — the
 /// Java `ActivityInfo.locationLevel`.
@@ -376,11 +410,14 @@ impl Calculator for ActivityCalculator {
         Self::NAME
     }
 
-    /// Empty: `ActivityCalculator` subscribes dynamically from the RunSpec
-    /// output flags (see the [module docs](self)), so the DAG records no
-    /// static subscription.
+    /// Subscribes to the same nine processes as [`TotalActivityGenerator`],
+    /// at `EMISSION_CALCULATOR` priority so the calculator runs after
+    /// generators have written their scratch tables.
+    ///
+    /// [`TotalActivityGenerator`]: crate::generators::totalactivitygenerator
     fn subscriptions(&self) -> &[CalculatorSubscription] {
-        &[]
+        static SUBSCRIPTIONS: OnceLock<Vec<CalculatorSubscription>> = OnceLock::new();
+        SUBSCRIPTIONS.get_or_init(build_subscriptions).as_slice()
     }
 
     /// Empty: the calculator emits activity, not emissions, and registers no
@@ -522,9 +559,16 @@ mod tests {
     }
 
     #[test]
-    fn subscriptions_and_registrations_are_empty() {
+    fn subscribes_to_activity_processes_and_has_no_emission_registrations() {
         let calc = ActivityCalculator;
-        assert!(calc.subscriptions().is_empty());
+        let subs = calc.subscriptions();
+        // "Evap Non-Fuel Vapors" does not resolve to a valid process; nine of
+        // ten SUBSCRIBED_PROCESSES entries produce a subscription.
+        assert_eq!(subs.len(), 9, "expected 9 activity-process subscriptions");
+        assert!(
+            subs.iter().all(|s| s.granularity == Granularity::Year),
+            "all subscriptions must be YEAR granularity"
+        );
         assert!(calc.registrations().is_empty());
         assert!(calc.upstream().is_empty());
     }

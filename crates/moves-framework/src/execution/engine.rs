@@ -52,7 +52,7 @@ use std::time::{Duration, Instant};
 
 use crate::data::InMemoryStore;
 
-use moves_data::output_schema::{EmissionRecord, MovesRunRecord, OutputTable};
+use moves_data::output_schema::{ActivityRecord, EmissionRecord, MovesRunRecord, OutputTable};
 use moves_data::{PollutantId, ProcessId};
 use moves_runspec::model::Model;
 use moves_runspec::RunSpec;
@@ -63,7 +63,8 @@ use super::execution_db::ExecutionTime;
 use super::execution_runspec::ExecutionRunSpec;
 use super::executor::{chunk_chains, BoundedExecutor, Chunk};
 use crate::aggregation::{
-    emission_aggregation, AggregationInputs, OutputProcessor, StreamingEmissionAgg, UnitScaling,
+    activity_aggregation, emission_aggregation, AggregationInputs, OutputProcessor,
+    StreamingEmissionAgg, UnitScaling,
 };
 use crate::calculator::{
     Calculator, CalculatorContext, CalculatorRegistry, CalculatorSubscription, Generator,
@@ -269,7 +270,10 @@ struct CalculatorMasterLoopable {
     /// group-by sums as they are produced, so peak memory is bounded by the
     /// number of distinct aggregation groups rather than the raw row count.
     streaming_agg: Arc<Mutex<StreamingEmissionAgg>>,
-    /// Run hash stamped into every accumulated [`EmissionRecord`].
+    /// Cross-chunk raw activity-row accumulator. Aggregated and written after
+    /// all chunks complete.
+    activity_acc: Arc<Mutex<Vec<ActivityRecord>>>,
+    /// Run hash stamped into every accumulated [`EmissionRecord`] and [`ActivityRecord`].
     run_hash: Arc<str>,
 }
 
@@ -288,16 +292,26 @@ impl MasterLoopable for CalculatorMasterLoopable {
             // ctx lock released here — conversion and accumulator write happen outside
         };
         if let Some(df) = df {
-            // Only accumulate emission output (has pollutantID); skip activity
-            // output (e.g. MOVESWorkerActivityOutput from DistanceCalculator).
-            if df.height() > 0 && df.column("pollutantID").is_ok() {
-                let records = frame_to_emission_records(&df, &self.run_hash);
-                // DataFrame is freed here before the accumulator lock is taken.
-                drop(df);
-                self.streaming_agg
-                    .lock()
-                    .expect("output accumulator poisoned")
-                    .extend(&records, &UnitScaling)?;
+            if df.height() > 0 {
+                if df.column("pollutantID").is_ok() {
+                    // Emission output: stream into the running group-by aggregator.
+                    let records = frame_to_emission_records(&df, &self.run_hash);
+                    drop(df);
+                    self.streaming_agg
+                        .lock()
+                        .expect("output accumulator poisoned")
+                        .extend(&records, &UnitScaling)?;
+                } else if df.column("activityTypeID").is_ok() {
+                    // Activity output (e.g. MOVESWorkerActivityOutput from
+                    // ActivityCalculator or DistanceCalculator): collect raw rows
+                    // for post-run aggregation via write_aggregated_activity.
+                    let records = frame_to_activity_records(&df, &self.run_hash);
+                    drop(df);
+                    self.activity_acc
+                        .lock()
+                        .expect("activity accumulator poisoned")
+                        .extend(records);
+                }
             }
         }
         Ok(())
@@ -504,9 +518,12 @@ impl MOVESEngine {
         // Peak memory is bounded by N_distinct_groups, not N_raw_rows.
         let agg_inputs = aggregation_inputs_from_run_spec(&self.execution.run_spec);
         let emission_plan = emission_aggregation(&agg_inputs);
+        let activity_plan = activity_aggregation(&agg_inputs);
         let streaming_agg: Arc<Mutex<StreamingEmissionAgg>> =
             Arc::new(Mutex::new(StreamingEmissionAgg::new(emission_plan)?));
         let streaming_agg_ref = Arc::clone(&streaming_agg);
+        let activity_acc: Arc<Mutex<Vec<ActivityRecord>>> = Arc::new(Mutex::new(Vec::new()));
+        let activity_acc_ref = Arc::clone(&activity_acc);
 
         let executor = BoundedExecutor::new(self.config.max_parallel_chunks)?;
         let registry = &self.registry;
@@ -564,6 +581,7 @@ impl MOVESEngine {
                         gate_process: sub.process_id,
                         ctx: Arc::clone(&chunk_ctx),
                         streaming_agg: Arc::clone(&streaming_agg_ref),
+                        activity_acc: Arc::clone(&activity_acc_ref),
                         run_hash: Arc::clone(&run_hash_str),
                     });
                     master.subscribe(MasterLoopableSubscription::new(
@@ -610,18 +628,26 @@ impl MOVESEngine {
 
         // Finalize: drain the streaming aggregator (aggregation was applied
         // inline during execution) and write the rolled-up emission rows.
-        // Drop the local ref clone first so Arc::try_unwrap sees count == 1.
+        // Drop the local ref clones first so Arc::try_unwrap sees count == 1.
         drop(streaming_agg_ref);
         let aggregated_records = Arc::try_unwrap(streaming_agg)
             .expect("streaming_agg still has owners after executor finished")
             .into_inner()
             .expect("streaming_agg mutex poisoned")
             .finalize();
+        drop(activity_acc_ref);
+        let activity_records = Arc::try_unwrap(activity_acc)
+            .expect("activity_acc still has owners after executor finished")
+            .into_inner()
+            .expect("activity_acc mutex poisoned");
 
         let (proc, output_bytes) = if self.config.collect_output_in_memory {
             let p = OutputProcessor::new_memory(&run_record)?;
             if !aggregated_records.is_empty() {
                 p.write_emissions(&aggregated_records)?;
+            }
+            if !activity_records.is_empty() {
+                p.write_aggregated_activity(&activity_plan, &activity_records, &UnitScaling)?;
             }
             let bytes = p.take_memory_files().unwrap_or_default();
             (p, bytes)
@@ -629,6 +655,9 @@ impl MOVESEngine {
             let p = OutputProcessor::new(&self.config.output_root, &run_record)?;
             if !aggregated_records.is_empty() {
                 p.write_emissions(&aggregated_records)?;
+            }
+            if !activity_records.is_empty() {
+                p.write_aggregated_activity(&activity_plan, &activity_records, &UnitScaling)?;
             }
             (p, Vec::new())
         };
@@ -892,6 +921,57 @@ fn frame_to_emission_records(df: &DataFrame, run_hash: &str) -> Vec<EmissionReco
                 emission_rate: None,
                 run_hash: run_hash.to_string(),
             }
+        })
+        .collect()
+}
+
+/// Convert one `MOVESWorkerActivityOutput` [`DataFrame`] to [`ActivityRecord`] rows.
+///
+/// Mirrors [`frame_to_emission_records`] for activity tables: columns are read
+/// by name, missing or wrong-type columns yield `None`. All records carry
+/// `moves_run_id = 1` and the supplied `run_hash`.
+fn frame_to_activity_records(df: &DataFrame, run_hash: &str) -> Vec<ActivityRecord> {
+    let year_ca = df.column("yearID").ok().and_then(|s| s.i32().ok());
+    let month_ca = df.column("monthID").ok().and_then(|s| s.i32().ok());
+    let day_ca = df.column("dayID").ok().and_then(|s| s.i32().ok());
+    let hour_ca = df.column("hourID").ok().and_then(|s| s.i32().ok());
+    let state_ca = df.column("stateID").ok().and_then(|s| s.i32().ok());
+    let county_ca = df.column("countyID").ok().and_then(|s| s.i32().ok());
+    let zone_ca = df.column("zoneID").ok().and_then(|s| s.i32().ok());
+    let link_ca = df.column("linkID").ok().and_then(|s| s.i32().ok());
+    let source_type_ca = df.column("sourceTypeID").ok().and_then(|s| s.i32().ok());
+    let reg_class_ca = df.column("regClassID").ok().and_then(|s| s.i32().ok());
+    let fuel_type_ca = df.column("fuelTypeID").ok().and_then(|s| s.i32().ok());
+    let model_year_ca = df.column("modelYearID").ok().and_then(|s| s.i32().ok());
+    let road_type_ca = df.column("roadTypeID").ok().and_then(|s| s.i32().ok());
+    let activity_type_ca = df.column("activityTypeID").ok().and_then(|s| s.i32().ok());
+    let activity_ca = df.column("activity").ok().and_then(|s| s.f64().ok());
+
+    (0..df.height())
+        .map(|i| ActivityRecord {
+            moves_run_id: 1,
+            iteration_id: None,
+            year_id: year_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+            month_id: month_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+            day_id: day_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+            hour_id: hour_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+            state_id: state_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+            county_id: county_ca.and_then(|c| c.get(i)),
+            zone_id: zone_ca.and_then(|c| c.get(i)),
+            link_id: link_ca.and_then(|c| c.get(i)),
+            source_type_id: source_type_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+            reg_class_id: reg_class_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+            fuel_type_id: fuel_type_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+            fuel_sub_type_id: None,
+            model_year_id: model_year_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+            road_type_id: road_type_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+            scc: None,
+            eng_tech_id: None,
+            sector_id: None,
+            hp_id: None,
+            activity_type_id: activity_type_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+            activity: activity_ca.and_then(|c| c.get(i)),
+            run_hash: run_hash.to_string(),
         })
         .collect()
 }
@@ -1327,6 +1407,7 @@ mod tests {
             gate_process: ProcessId(1),
             ctx: stub_chunk_ctx(),
             streaming_agg: stub_streaming_agg(),
+            activity_acc: Arc::new(Mutex::new(Vec::new())),
             run_hash: Arc::from("test"),
         };
 
@@ -1360,6 +1441,7 @@ mod tests {
             gate_process: ProcessId(1),
             ctx: stub_chunk_ctx(),
             streaming_agg: stub_streaming_agg(),
+            activity_acc: Arc::new(Mutex::new(Vec::new())),
             run_hash: Arc::from("test"),
         };
         let mut ctx = MasterLoopContext::default();
