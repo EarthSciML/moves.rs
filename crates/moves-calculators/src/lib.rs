@@ -77,6 +77,7 @@ pub fn register_all(
     use generators::meteorology;
     use generators::operating_mode_distribution;
     use generators::source_bin_distribution_generator;
+    use generators::sourcetypephysics;
     use generators::start_operating_mode_distribution;
     use generators::totalactivitygenerator;
 
@@ -242,6 +243,10 @@ pub fn register_all(
         totalactivitygenerator::factory,
     )?;
     registry.register_generator("FuelEffectsGenerator", fueleffectsgenerator::factory)?;
+    registry.register_generator(
+        sourcetypephysics::SourceTypePhysics::NAME,
+        sourcetypephysics::factory,
+    )?;
 
     Ok(())
 }

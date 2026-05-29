@@ -8,7 +8,7 @@
             "registrations": 1134,
             "subscriptions": 83,
             "chains": 29,
-            "modules": 63,
+            "modules": 64,
             "direct_subscribers": 34,
             "chained_only_modules": 14,
             "unique_process_pollutant_pairs": 960
@@ -1793,6 +1793,17 @@
                   "dependents": [],
                   "chained_downstream": [],
                   "java_path": "gov/epa/otaq/moves/master/implementation/general/SourceManufacturingControlStrategy.java"
+            },
+            {
+                  "name": "SourceTypePhysics",
+                  "kind": "Generator",
+                  "subscribes_directly": false,
+                  "subscriptions": [],
+                  "registrations_count": 0,
+                  "depends_on": [],
+                  "dependents": [],
+                  "chained_downstream": [],
+                  "java_path": "gov/epa/otaq/moves/master/implementation/ghg/SourceTypePhysics.java"
             },
             {
                   "name": "SourceUsageControlStrategy",

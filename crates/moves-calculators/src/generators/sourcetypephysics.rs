@@ -768,6 +768,13 @@ impl Generator for SourceTypePhysics {
     }
 }
 
+/// Construct the generator as a boxed trait object — matches the engine's
+/// generator-factory signature so the calculator registry can register it.
+#[must_use]
+pub fn factory() -> Box<dyn Generator> {
+    Box::new(SourceTypePhysics::new())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
