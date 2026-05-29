@@ -295,8 +295,11 @@ pub fn register_all(
 /// make all ported strategy implementations available for execution. Parallels
 /// [`register_all`] for [`moves_framework::CalculatorRegistry`].
 ///
-/// Additional strategies (OnRoadRetrofitStrategy, etc.) will be added here as each
-/// strategy wiring bead lands (see mo-4wci).
+/// Currently registered (canonical order, Task 122):
+/// 1. [`moves_fuel_control::FuelControlStrategy`]
+/// 2. [`moves_avft::AvftControlStrategy`] (non-wasm32 only)
+/// 3. [`moves_rate_of_progress::RateOfProgressControlStrategy`]
+/// 4. [`moves_onroad_retrofit::OnRoadRetrofitStrategy`] — modifies `emissionRateAdjustment`
 pub fn register_strategies(registry: &mut moves_framework::ControlStrategyRegistry) {
     registry.register(|| Box::new(moves_fuel_control::FuelControlStrategy::new()));
     // AVFT uses polars+parquet and is not available on wasm32 (mio linkage issue).
@@ -309,6 +312,11 @@ pub fn register_strategies(registry: &mut moves_framework::ControlStrategyRegist
     registry.register(|| {
         Box::new(moves_rate_of_progress::RateOfProgressControlStrategy::new(
             moves_rate_of_progress::RopTable::new(),
+        ))
+    });
+    registry.register(|| {
+        Box::new(moves_onroad_retrofit::OnRoadRetrofitStrategy::new(
+            moves_onroad_retrofit::RetrofitTable::new(),
         ))
     });
 }
