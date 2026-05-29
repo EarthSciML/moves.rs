@@ -166,7 +166,8 @@
 //! [`calculate`](CriteriaRunningCalculator::calculate), and writes the rows to
 //! the worker output.
 
-use std::collections::{HashMap, HashSet};
+use rustc_hash::FxHashMap;
+use std::collections::HashSet;
 
 use moves_calculator_info::{Granularity, Priority};
 use moves_data::{PollutantProcessAssociation, ProcessId};
@@ -3102,19 +3103,19 @@ struct WeightedAndAdjustedEmissionRate3 {
 /// This step is identical to the sibling start calculator's CSEC 1-a.
 fn im_coverage_merged(inputs: &CriteriaRunningInputs, ctx: &RunContext) -> Vec<ImCoverageMerged> {
     // PollutantProcessAssoc lookup — polProcessID → (pollutantID, processID).
-    let ppa: HashMap<i32, &PollutantProcessAssocRow> = inputs
+    let ppa: FxHashMap<i32, &PollutantProcessAssocRow> = inputs
         .pollutant_process_assoc
         .iter()
         .map(|r| (r.pol_process_id, r))
         .collect();
     // AgeCategory lookup — ageID → ageGroupID. `ageID` is the unique key.
-    let age_group_by_age: HashMap<i32, i32> = inputs
+    let age_group_by_age: FxHashMap<i32, i32> = inputs
         .age_category
         .iter()
         .map(|r| (r.age_id, r.age_group_id))
         .collect();
     // IMFactor indexed for the `(polProcessID, IMModelYearGroupID)` join.
-    let mut imf_by_key: HashMap<(i32, i32), Vec<&ImFactorRow>> = HashMap::new();
+    let mut imf_by_key: FxHashMap<(i32, i32), Vec<&ImFactorRow>> = FxHashMap::default();
     for imf in &inputs.im_factor {
         imf_by_key
             .entry((imf.pol_process_id, imf.im_model_year_group_id))
@@ -3123,7 +3124,8 @@ fn im_coverage_merged(inputs: &CriteriaRunningInputs, ctx: &RunContext) -> Vec<I
     }
     // IMCoverage indexed for the five-column equality join; the model-year
     // range is filtered per matched row.
-    let mut imc_by_key: HashMap<(i32, i32, i32, i32, i32), Vec<&ImCoverageRow>> = HashMap::new();
+    let mut imc_by_key: FxHashMap<(i32, i32, i32, i32, i32), Vec<&ImCoverageRow>> =
+        FxHashMap::default();
     for imc in &inputs.im_coverage {
         imc_by_key
             .entry((
@@ -3138,7 +3140,7 @@ fn im_coverage_merged(inputs: &CriteriaRunningInputs, ctx: &RunContext) -> Vec<I
     }
 
     // GROUP BY (processID, pollutantID, modelYearID, fuelTypeID, sourceTypeID).
-    let mut totals: HashMap<[i32; 5], f64> = HashMap::new();
+    let mut totals: FxHashMap<[i32; 5], f64> = FxHashMap::default();
     for ppmy in &inputs.pollutant_process_mapped_model_year {
         // INNER JOIN PollutantProcessAssoc USING (polProcessID).
         let Some(assoc) = ppa.get(&ppmy.pol_process_id) else {
@@ -3237,19 +3239,19 @@ fn fuel_supply_with_fuel_type(
     ctx: &RunContext,
 ) -> Vec<FuelSupplyWithFuelType> {
     // fuelFormulationID → fuelSubtypeID; fuelFormulationID is the unique key.
-    let subtype_of_formulation: HashMap<i32, i32> = inputs
+    let subtype_of_formulation: FxHashMap<i32, i32> = inputs
         .fuel_formulation
         .iter()
         .map(|ff| (ff.fuel_formulation_id, ff.fuel_subtype_id))
         .collect();
     // fuelSubtypeID → fuelTypeID; fuelSubtypeID is the unique key.
-    let fuel_type_of_subtype: HashMap<i32, i32> = inputs
+    let fuel_type_of_subtype: FxHashMap<i32, i32> = inputs
         .fuel_subtype
         .iter()
         .map(|fst| (fst.fuel_subtype_id, fst.fuel_type_id))
         .collect();
     // MonthOfAnyYear indexed by month group — a group spans several months.
-    let mut months_by_group: HashMap<i32, Vec<&MonthOfAnyYearRow>> = HashMap::new();
+    let mut months_by_group: FxHashMap<i32, Vec<&MonthOfAnyYearRow>> = FxHashMap::default();
     for may in &inputs.month_of_any_year {
         months_by_group
             .entry(may.month_group_id)
@@ -3257,7 +3259,7 @@ fn fuel_supply_with_fuel_type(
             .push(may);
     }
     // Year indexed by fuel year.
-    let mut years_by_fuel_year: HashMap<i32, Vec<&YearRow>> = HashMap::new();
+    let mut years_by_fuel_year: FxHashMap<i32, Vec<&YearRow>> = FxHashMap::default();
     for y in &inputs.year {
         years_by_fuel_year
             .entry(y.fuel_year_id)
@@ -3313,7 +3315,8 @@ fn fuel_supply_adjustment(
     fuel_supply_ft: &[FuelSupplyWithFuelType],
 ) -> Vec<FuelSupplyAdjustment> {
     // FuelSupplyWithFuelType indexed for the `fuelFormulationID` join.
-    let mut fsft_by_formulation: HashMap<i32, Vec<&FuelSupplyWithFuelType>> = HashMap::new();
+    let mut fsft_by_formulation: FxHashMap<i32, Vec<&FuelSupplyWithFuelType>> =
+        FxHashMap::default();
     for fsft in fuel_supply_ft {
         fsft_by_formulation
             .entry(fsft.fuel_formulation_id)
@@ -3323,7 +3326,7 @@ fn fuel_supply_adjustment(
 
     // GROUP BY (yearID, monthID, polProcessID, modelYearID, sourceTypeID,
     // fuelTypeID).
-    let mut totals: HashMap<[i32; 6], f64> = HashMap::new();
+    let mut totals: FxHashMap<[i32; 6], f64> = FxHashMap::default();
     for cfa in county_fuel {
         // INNER JOIN FuelSupplyWithFuelType ON (fuelFormulationID).
         let Some(fsfts) = fsft_by_formulation.get(&cfa.fuel_formulation_id) else {
@@ -3367,7 +3370,7 @@ fn fuel_supply_adjustment(
 fn met_adjustment(inputs: &CriteriaRunningInputs) -> Vec<MetAdjustment> {
     // PollutantProcessAssoc lookup — a TemperatureAdjustment row is kept only
     // if its polProcessID resolves to a Running Exhaust (process 1) pair.
-    let ppa: HashMap<i32, &PollutantProcessAssocRow> = inputs
+    let ppa: FxHashMap<i32, &PollutantProcessAssocRow> = inputs
         .pollutant_process_assoc
         .iter()
         .map(|r| (r.pol_process_id, r))
@@ -3416,13 +3419,13 @@ fn met_adjustment(inputs: &CriteriaRunningInputs) -> Vec<MetAdjustment> {
 /// `ZoneMonthHour ⋈ MonthOfAnyYear ⋈ MonthGroupHour`.
 fn ac_on_fraction(inputs: &CriteriaRunningInputs) -> Vec<AcOnFraction> {
     // MonthOfAnyYear lookup — monthID → monthGroupID. `monthID` is unique.
-    let month_group_by_month: HashMap<i32, i32> = inputs
+    let month_group_by_month: FxHashMap<i32, i32> = inputs
         .month_of_any_year
         .iter()
         .map(|may| (may.month_id, may.month_group_id))
         .collect();
     // MonthGroupHour indexed for the `(monthGroupID, hourID)` join.
-    let mgh_by_key: HashMap<(i32, i32), &MonthGroupHourRow> = inputs
+    let mgh_by_key: FxHashMap<(i32, i32), &MonthGroupHourRow> = inputs
         .month_group_hour
         .iter()
         .map(|mgh| ((mgh.month_group_id, mgh.hour_id), mgh))
@@ -3465,7 +3468,7 @@ fn ac_activity_fraction(
     ac_on: &[AcOnFraction],
 ) -> Vec<AcActivityFraction> {
     // SourceTypeAge indexed for the `(sourceTypeID, ageID)` join.
-    let sta_by_key: HashMap<(i32, i32), &SourceTypeAgeRow> = inputs
+    let sta_by_key: FxHashMap<(i32, i32), &SourceTypeAgeRow> = inputs
         .source_type_age
         .iter()
         .map(|sta| ((sta.source_type_id, sta.age_id), sta))
@@ -3506,7 +3509,8 @@ fn weighted_full_ac_adjustment(
     ctx: &RunContext,
 ) -> Vec<WeightedFullAcAdjustment> {
     // FullACAdjustment indexed for the three-column join.
-    let mut faca_by_key: HashMap<(i32, i32, i32), Vec<&FullAcAdjustmentRow>> = HashMap::new();
+    let mut faca_by_key: FxHashMap<(i32, i32, i32), Vec<&FullAcAdjustmentRow>> =
+        FxHashMap::default();
     for faca in &inputs.full_ac_adjustment {
         faca_by_key
             .entry((faca.source_type_id, faca.pol_process_id, faca.op_mode_id))
@@ -3547,17 +3551,18 @@ fn ac_adjustment(
     weighted_full_ac: &[WeightedFullAcAdjustment],
 ) -> Vec<AcAdjustment> {
     // Link indexed by zone — the join keys on zoneID.
-    let mut links_by_zone: HashMap<i32, Vec<&LinkRow>> = HashMap::new();
+    let mut links_by_zone: FxHashMap<i32, Vec<&LinkRow>> = FxHashMap::default();
     for l in &inputs.link {
         links_by_zone.entry(l.zone_id).or_default().push(l);
     }
     // HourDay indexed by hour — an hour spans several day types.
-    let mut hour_days_by_hour: HashMap<i32, Vec<&HourDayRow>> = HashMap::new();
+    let mut hour_days_by_hour: FxHashMap<i32, Vec<&HourDayRow>> = FxHashMap::default();
     for hd in &inputs.hour_day {
         hour_days_by_hour.entry(hd.hour_id).or_default().push(hd);
     }
     // WeightedFullACAdjustment indexed for the three-column join.
-    let mut wfaca_by_key: HashMap<(i32, i32, i32), Vec<&WeightedFullAcAdjustment>> = HashMap::new();
+    let mut wfaca_by_key: FxHashMap<(i32, i32, i32), Vec<&WeightedFullAcAdjustment>> =
+        FxHashMap::default();
     for wfaca in weighted_full_ac {
         wfaca_by_key
             .entry((wfaca.source_type_id, wfaca.link_id, wfaca.hour_day_id))
@@ -3615,12 +3620,12 @@ fn sb_weighted_emission_rate(
     ctx: &RunContext,
 ) -> Vec<SbWeightedEmissionRate> {
     // AgeCategory indexed by age group — each group holds several ages.
-    let mut ages_by_group: HashMap<i32, Vec<&AgeCategoryRow>> = HashMap::new();
+    let mut ages_by_group: FxHashMap<i32, Vec<&AgeCategoryRow>> = FxHashMap::default();
     for age in &inputs.age_category {
         ages_by_group.entry(age.age_group_id).or_default().push(age);
     }
     // SourceTypeModelYear indexed by model year — the join keys on modelYearID.
-    let mut stmy_by_model_year: HashMap<i32, Vec<&SourceTypeModelYearRow>> = HashMap::new();
+    let mut stmy_by_model_year: FxHashMap<i32, Vec<&SourceTypeModelYearRow>> = FxHashMap::default();
     for stmy in &inputs.source_type_model_year {
         stmy_by_model_year
             .entry(stmy.model_year_id)
@@ -3628,7 +3633,8 @@ fn sb_weighted_emission_rate(
             .push(stmy);
     }
     // SourceBinDistribution indexed for the three-column join.
-    let mut sbd_by_key: HashMap<(i32, i32, i64), Vec<&SourceBinDistributionRow>> = HashMap::new();
+    let mut sbd_by_key: FxHashMap<(i32, i32, i64), Vec<&SourceBinDistributionRow>> =
+        FxHashMap::default();
     for sbd in &inputs.source_bin_distribution {
         sbd_by_key
             .entry((
@@ -3640,7 +3646,7 @@ fn sb_weighted_emission_rate(
             .push(sbd);
     }
     // SourceBin lookup — sourceBinID → fuelTypeID.
-    let fuel_type_of_bin: HashMap<i64, i32> = inputs
+    let fuel_type_of_bin: FxHashMap<i64, i32> = inputs
         .source_bin
         .iter()
         .map(|sb| (sb.source_bin_id, sb.fuel_type_id))
@@ -3648,7 +3654,7 @@ fn sb_weighted_emission_rate(
 
     // GROUP BY (polProcessID, sourceTypeID, ageID, fuelTypeID, opModeID); the
     // model year (`year - ageID`) is carried for the SELECT.
-    let mut totals: HashMap<[i32; 5], (f64, f64, i32)> = HashMap::new();
+    let mut totals: FxHashMap<[i32; 5], (f64, f64, i32)> = FxHashMap::default();
     for erim in &inputs.emission_rate_by_age {
         // INNER JOIN AgeCategory ON (ageGroupID).
         let Some(ages) = ages_by_group.get(&erim.age_group_id) else {
@@ -3721,7 +3727,8 @@ fn fully_weighted_emission_rate(
 ) -> Vec<FullyWeightedEmissionRate> {
     // OpModeDistribution indexed for the `USING (polProcessID, sourceTypeID,
     // opModeID)` join.
-    let mut omd_by_key: HashMap<(i32, i32, i32), Vec<&OpModeDistributionRow>> = HashMap::new();
+    let mut omd_by_key: FxHashMap<(i32, i32, i32), Vec<&OpModeDistributionRow>> =
+        FxHashMap::default();
     for omd in &inputs.op_mode_distribution {
         omd_by_key
             .entry((omd.pol_process_id, omd.source_type_id, omd.op_mode_id))
@@ -3766,7 +3773,7 @@ fn temp_and_ac_adjustment(
     ac_adj: &[AcAdjustment],
 ) -> Vec<TempAndAcAdjustment> {
     // ACAdjustment indexed for the five-column join.
-    let mut aca_by_key: HashMap<[i32; 5], Vec<&AcAdjustment>> = HashMap::new();
+    let mut aca_by_key: FxHashMap<[i32; 5], Vec<&AcAdjustment>> = FxHashMap::default();
     for aca in ac_adj {
         aca_by_key
             .entry([
@@ -3822,7 +3829,7 @@ fn fuel_adjusted_rate(
     fuel_supply_adj: &[FuelSupplyAdjustment],
 ) -> Vec<FuelAdjustedRate> {
     // FuelSupplyAdjustment indexed for the six-column left join.
-    let mut fsa_by_key: HashMap<[i32; 6], Vec<&FuelSupplyAdjustment>> = HashMap::new();
+    let mut fsa_by_key: FxHashMap<[i32; 6], Vec<&FuelSupplyAdjustment>> = FxHashMap::default();
     for fsa in fuel_supply_adj {
         fsa_by_key
             .entry([
@@ -3892,15 +3899,15 @@ fn weighted_and_adjusted_emission_rate(
     temp_and_ac: &[TempAndAcAdjustment],
 ) -> Vec<WeightedAndAdjustedEmissionRate> {
     // Link keyed by its `linkID` primary key.
-    let link_by_id: HashMap<i32, &LinkRow> = inputs.link.iter().map(|l| (l.link_id, l)).collect();
+    let link_by_id: FxHashMap<i32, &LinkRow> = inputs.link.iter().map(|l| (l.link_id, l)).collect();
     // HourDay keyed by its `hourDayID` primary key.
-    let hour_day_by_id: HashMap<i32, &HourDayRow> = inputs
+    let hour_day_by_id: FxHashMap<i32, &HourDayRow> = inputs
         .hour_day
         .iter()
         .map(|hd| (hd.hour_day_id, hd))
         .collect();
     // TempAndACAdjustment indexed for the nine-column join.
-    let mut taca_by_key: HashMap<[i32; 9], Vec<&TempAndAcAdjustment>> = HashMap::new();
+    let mut taca_by_key: FxHashMap<[i32; 9], Vec<&TempAndAcAdjustment>> = FxHashMap::default();
     for taca in temp_and_ac {
         taca_by_key
             .entry([
@@ -3920,7 +3927,7 @@ fn weighted_and_adjusted_emission_rate(
 
     // GROUP BY (linkID, yearID, polProcessID, sourceTypeID, modelYearID,
     // fuelTypeID, hourID, dayID, monthID).
-    let mut totals: HashMap<[i32; 9], (f64, f64)> = HashMap::new();
+    let mut totals: FxHashMap<[i32; 9], (f64, f64)> = FxHashMap::default();
     for far in fuel_adjusted {
         // INNER JOIN Link USING (linkID).
         let Some(l) = link_by_id.get(&far.link_id) else {
@@ -4004,7 +4011,7 @@ fn weighted_and_adjusted_emission_rate_2(
     weighted_adjusted: &[WeightedAndAdjustedEmissionRate],
 ) -> Vec<WeightedAndAdjustedEmissionRate> {
     // Link keyed by its `linkID` primary key — TEMP1 resolves the zone here.
-    let link_by_id: HashMap<i32, &LinkRow> = inputs.link.iter().map(|l| (l.link_id, l)).collect();
+    let link_by_id: FxHashMap<i32, &LinkRow> = inputs.link.iter().map(|l| (l.link_id, l)).collect();
     // ZoneMonthHour keyed by (zoneID, monthID, hourID) for the TEMP1 join.
     let zmh_keys: HashSet<(i32, i32, i32)> = inputs
         .zone_month_hour
@@ -4043,7 +4050,7 @@ fn weighted_and_adjusted_emission_rate_2(
 /// the `hourDayID` surrogate to `(dayID, hourID)` through `HourDay`.
 fn build_sho2(inputs: &CriteriaRunningInputs) -> Vec<Sho2> {
     // HourDay keyed by its `hourDayID` primary key.
-    let hour_day_by_id: HashMap<i32, &HourDayRow> = inputs
+    let hour_day_by_id: FxHashMap<i32, &HourDayRow> = inputs
         .hour_day
         .iter()
         .map(|hd| (hd.hour_day_id, hd))
@@ -4077,7 +4084,7 @@ fn weighted_and_adjusted_emission_rate_3(
     weighted_adjusted_2: &[WeightedAndAdjustedEmissionRate],
 ) -> Vec<WeightedAndAdjustedEmissionRate3> {
     // PollutantProcessAssoc lookup — polProcessID → (pollutantID, processID).
-    let ppa: HashMap<i32, &PollutantProcessAssocRow> = inputs
+    let ppa: FxHashMap<i32, &PollutantProcessAssocRow> = inputs
         .pollutant_process_assoc
         .iter()
         .map(|r| (r.pol_process_id, r))
@@ -4122,8 +4129,8 @@ fn assemble_emission_output(
     im_merged: &[ImCoverageMerged],
 ) -> Vec<CriteriaRunningEmissionRow> {
     // WeightedAndAdjustedEmissionRate3 indexed for the six-column SHO3 join.
-    let mut waer3_by_key: HashMap<[i32; 6], Vec<&WeightedAndAdjustedEmissionRate3>> =
-        HashMap::new();
+    let mut waer3_by_key: FxHashMap<[i32; 6], Vec<&WeightedAndAdjustedEmissionRate3>> =
+        FxHashMap::default();
     for w in waer3 {
         waer3_by_key
             .entry([
@@ -4138,10 +4145,10 @@ fn assemble_emission_output(
             .push(w);
     }
     // Link keyed by its `linkID` primary key.
-    let link_by_id: HashMap<i32, &LinkRow> = inputs.link.iter().map(|l| (l.link_id, l)).collect();
+    let link_by_id: FxHashMap<i32, &LinkRow> = inputs.link.iter().map(|l| (l.link_id, l)).collect();
     // IMCoverageMergedUngrouped lookup for the I/M update — one row per key
     // (it is a GROUP BY result).
-    let im_by_key: HashMap<[i32; 5], f64> = im_merged
+    let im_by_key: FxHashMap<[i32; 5], f64> = im_merged
         .iter()
         .map(|im| {
             (

@@ -126,7 +126,7 @@
 //! `execute` materialises a [`Co2aeInputs`] from `ctx`, calls `calculate`, and
 //! writes the [`Co2aeOutput`] rows into `MOVESWorkerOutput`.
 
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 use moves_data::{PollutantId, PollutantProcessAssociation, ProcessId};
 use moves_framework::{
@@ -993,25 +993,25 @@ struct CarbonOxidationCell {
 /// dropped.
 fn carbon_oxidation_by_fuel_type(
     inputs: &Co2aeInputs,
-) -> HashMap<(i32, i32, i32), CarbonOxidationCell> {
-    let formulation: HashMap<i32, &FuelFormulationRow> = inputs
+) -> FxHashMap<(i32, i32, i32), CarbonOxidationCell> {
+    let formulation: FxHashMap<i32, &FuelFormulationRow> = inputs
         .fuel_formulation
         .iter()
         .map(|ff| (ff.fuel_formulation_id, ff))
         .collect();
-    let subtype: HashMap<i32, &FuelSubtypeRow> = inputs
+    let subtype: FxHashMap<i32, &FuelSubtypeRow> = inputs
         .fuel_subtype
         .iter()
         .map(|fst| (fst.fuel_subtype_id, fst))
         .collect();
     // `Year` resolves fuelYearID → yearID; the extract carries one calendar year.
-    let year_of_fuel_year: HashMap<i32, i32> = inputs
+    let year_of_fuel_year: FxHashMap<i32, i32> = inputs
         .year
         .iter()
         .map(|y| (y.fuel_year_id, y.year_id))
         .collect();
 
-    let mut cells: HashMap<(i32, i32, i32), CarbonOxidationCell> = HashMap::new();
+    let mut cells: FxHashMap<(i32, i32, i32), CarbonOxidationCell> = FxHashMap::default();
     for fs in &inputs.fuel_supply {
         // INNER JOIN FuelFormulation ON fuelFormulationID.
         let Some(ff) = formulation.get(&fs.fuel_formulation_id) else {
@@ -1044,15 +1044,15 @@ fn carbon_oxidation_by_fuel_type(
 /// [`Co2aeInputs::step1a_process_ids`] lists. Every join is an `INNER JOIN`.
 fn atmospheric_co2_rows(
     inputs: &Co2aeInputs,
-    carbon_oxidation: &HashMap<(i32, i32, i32), CarbonOxidationCell>,
+    carbon_oxidation: &FxHashMap<(i32, i32, i32), CarbonOxidationCell>,
 ) -> Vec<WorkerOutputRow> {
-    let month_group_of_month: HashMap<i32, i32> = inputs
+    let month_group_of_month: FxHashMap<i32, i32> = inputs
         .month_of_any_year
         .iter()
         .map(|m| (m.month_id, m.month_group_id))
         .collect();
 
-    let mut groups: HashMap<[i32; 14], WorkerOutputRow> = HashMap::new();
+    let mut groups: FxHashMap<[i32; 14], WorkerOutputRow> = FxHashMap::default();
     for w in &inputs.worker_output {
         // mwo.pollutantID = ##totalEnergyConsumptionID## (91).
         if w.pollutant_id != TOTAL_ENERGY_POLLUTANT_ID {
@@ -1109,13 +1109,13 @@ fn co2_equivalent_rows(
     inputs: &Co2aeInputs,
     atmospheric_co2: &[WorkerOutputRow],
 ) -> Vec<WorkerOutputRow> {
-    let gwp_of_pollutant: HashMap<i32, i32> = inputs
+    let gwp_of_pollutant: FxHashMap<i32, i32> = inputs
         .co2_eq_pollutant
         .iter()
         .map(|p| (p.pollutant_id, p.global_warming_potential))
         .collect();
 
-    let mut groups: HashMap<[i32; 14], WorkerOutputRow> = HashMap::new();
+    let mut groups: FxHashMap<[i32; 14], WorkerOutputRow> = FxHashMap::default();
     for w in inputs.worker_output.iter().chain(atmospheric_co2.iter()) {
         // mwo.pollutantID IN (##CO2Step2pollutantIDs##) — "90,5,6".
         if !CO2_EQUIVALENT_INPUTS.contains(&w.pollutant_id) {

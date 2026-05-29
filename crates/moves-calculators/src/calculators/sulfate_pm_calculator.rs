@@ -152,7 +152,7 @@
 //! `ctx.tables()`, calls [`calculate`](SulfatePMCalculator::calculate), and
 //! writes the rows back to `MOVESWorkerOutput`.
 
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 use moves_data::{PollutantId, PollutantProcessAssociation, ProcessId};
 use moves_framework::{
@@ -796,19 +796,19 @@ impl SulfatePMCalculator {
 /// subtype or month group is missing is skipped, contributing nothing.
 fn compute_sulfate_fractions(
     inputs: &SulfatePmInputs,
-) -> HashMap<SulfateFractionKey, SulfateFractionCell> {
-    let formulation: HashMap<i32, &FuelFormulationRow> = inputs
+) -> FxHashMap<SulfateFractionKey, SulfateFractionCell> {
+    let formulation: FxHashMap<i32, &FuelFormulationRow> = inputs
         .fuel_formulation
         .iter()
         .map(|ff| (ff.fuel_formulation_id, ff))
         .collect();
-    let subtype: HashMap<i32, &FuelSubtypeRow> = inputs
+    let subtype: FxHashMap<i32, &FuelSubtypeRow> = inputs
         .fuel_subtype
         .iter()
         .map(|fst| (fst.fuel_subtype_id, fst))
         .collect();
     // monthGroupID → the calendar months it covers.
-    let mut months_of_group: HashMap<i32, Vec<i32>> = HashMap::new();
+    let mut months_of_group: FxHashMap<i32, Vec<i32>> = FxHashMap::default();
     for month in &inputs.month_of_any_year {
         months_of_group
             .entry(month.month_group_id)
@@ -816,7 +816,7 @@ fn compute_sulfate_fractions(
             .push(month.month_id);
     }
 
-    let mut cells: HashMap<SulfateFractionKey, SulfateFractionCell> = HashMap::new();
+    let mut cells: FxHashMap<SulfateFractionKey, SulfateFractionCell> = FxHashMap::default();
     for sf in &inputs.sulfate_fractions {
         for &model_year in &inputs.run_spec_model_years {
             // sf.minModelYearID <= mya.modelYearID <= sf.maxModelYearID.
@@ -876,8 +876,8 @@ fn compute_sulfate_fractions(
 /// primary and crankcase process, and overlapping model-year windows).
 fn index_crankcase_split(
     rows: &[CrankcaseSplitRow],
-) -> HashMap<(i32, i32, i32, i32), Vec<&CrankcaseSplitRow>> {
-    let mut index: HashMap<(i32, i32, i32, i32), Vec<&CrankcaseSplitRow>> = HashMap::new();
+) -> FxHashMap<(i32, i32, i32, i32), Vec<&CrankcaseSplitRow>> {
+    let mut index: FxHashMap<(i32, i32, i32, i32), Vec<&CrankcaseSplitRow>> = FxHashMap::default();
     for row in rows {
         index
             .entry((
@@ -906,7 +906,7 @@ fn sum_to_pollutant(
     keep_process: impl Fn(i32) -> bool,
     output_pollutant: i32,
 ) -> Vec<EmissionRow> {
-    let mut groups: HashMap<[i32; 14], EmissionRow> = HashMap::new();
+    let mut groups: FxHashMap<[i32; 14], EmissionRow> = FxHashMap::default();
     for row in rows {
         if !input_pollutants.contains(&row.pollutant_id) || !keep_process(row.process_id) {
             continue;
@@ -933,7 +933,7 @@ fn sum_to_pollutant(
 /// speciation window, emitting one `outputPollutantID` row whose emission is
 /// scaled by `pmSpeciationFraction`.
 fn speciate(rows: &[EmissionRow], pm_speciation: &[PmSpeciationRow]) -> Vec<EmissionRow> {
-    let mut index: HashMap<(i32, i32, i32, i32), Vec<&PmSpeciationRow>> = HashMap::new();
+    let mut index: FxHashMap<(i32, i32, i32, i32), Vec<&PmSpeciationRow>> = FxHashMap::default();
     for ps in pm_speciation {
         index
             .entry((
@@ -988,7 +988,7 @@ fn compute_non_ec_non_so4_non_om(
 ) -> Vec<EmissionRow> {
     // Σ pmSpeciationFraction over the organic-matter species, keyed by the
     // PMSpeciation sub-aggregate's GROUP BY.
-    let mut fraction_sums: HashMap<(i32, i32, i32, i32, i32, i32), f64> = HashMap::new();
+    let mut fraction_sums: FxHashMap<(i32, i32, i32, i32, i32, i32), f64> = FxHashMap::default();
     for ps in pm_speciation {
         if ps.output_pollutant_id != ORGANIC_CARBON_POLLUTANT
             && ps.output_pollutant_id != NCOM_POLLUTANT
@@ -1007,7 +1007,7 @@ fn compute_non_ec_non_so4_non_om(
             .or_insert(0.0) += ps.pm_speciation_fraction;
     }
 
-    let mut groups: HashMap<[i32; 14], EmissionRow> = HashMap::new();
+    let mut groups: FxHashMap<[i32; 14], EmissionRow> = FxHashMap::default();
     for row in mwo {
         if row.pollutant_id != NON_EC_NON_SO4_PM_POLLUTANT {
             continue;

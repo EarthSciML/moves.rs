@@ -110,7 +110,8 @@
 //! and [`calculate_start`](Ch4N2oRunningStartCalculator::calculate_start);
 //! `execute` is a documented shell returning an empty [`CalculatorOutput`].
 
-use std::collections::{HashMap, HashSet};
+use rustc_hash::FxHashMap;
+use std::collections::HashSet;
 
 use moves_calculator_info::{Granularity, Priority};
 use moves_data::{PollutantProcessAssociation, ProcessId};
@@ -1502,7 +1503,7 @@ fn build_start_inputs(ctx: &CalculatorContext) -> Result<StartExhaustInputs, Err
 /// `(fuelTypeID, pollutantID, processID, sbafXmbr)` quad apiece. Built from
 /// the `(sourceTypeModelYearID, fuelTypeID, pollutantID, processID)`-keyed
 /// `EmissionRate3` aggregation; consumed by the per-`SHO`-row join.
-type EmissionRate3Index = HashMap<(i32, i32), Vec<(i32, i32, i32, f64)>>;
+type EmissionRate3Index = FxHashMap<(i32, i32), Vec<(i32, i32, i32, f64)>>;
 
 /// The MOVES CH4/N2O running-and-start exhaust calculator.
 ///
@@ -1574,19 +1575,19 @@ impl Ch4N2oRunningStartCalculator {
     pub fn calculate_running(&self, inputs: &RunningExhaustInputs) -> Vec<EmissionRow> {
         // PollutantProcessAssoc lookup — resolves polProcessID into
         // (pollutantID, processID).
-        let ppa: HashMap<i32, &PollutantProcessAssocRow> = inputs
+        let ppa: FxHashMap<i32, &PollutantProcessAssocRow> = inputs
             .pollutant_process_assoc
             .iter()
             .map(|r| (r.pol_process_id, r))
             .collect();
         // SourceBin lookup — sourceBinID → fuelTypeID.
-        let source_bin: HashMap<i64, &SourceBinRow> = inputs
+        let source_bin: FxHashMap<i64, &SourceBinRow> = inputs
             .source_bin
             .iter()
             .map(|r| (r.source_bin_id, r))
             .collect();
         // SourceTypeModelYear lookup.
-        let stmy: HashMap<i32, &SourceTypeModelYearRow> = inputs
+        let stmy: FxHashMap<i32, &SourceTypeModelYearRow> = inputs
             .source_type_model_year
             .iter()
             .map(|r| (r.source_type_model_year_id, r))
@@ -1596,7 +1597,7 @@ impl Ch4N2oRunningStartCalculator {
         // polProcessID, kept for pollutantID == 6 and opModeID ∈ [0, 100).
         // Indexed by (polProcessID, sourceBinID); a key carries one
         // meanBaseRate per surviving operating mode.
-        let mut emission_rate2: HashMap<(i32, i64), Vec<f64>> = HashMap::new();
+        let mut emission_rate2: FxHashMap<(i32, i64), Vec<f64>> = FxHashMap::default();
         for er in &inputs.emission_rate {
             if !(RUNNING_OP_MODE_MIN..RUNNING_OP_MODE_MAX).contains(&er.op_mode_id) {
                 continue;
@@ -1618,7 +1619,7 @@ impl Ch4N2oRunningStartCalculator {
         // SourceBinDistribution3 ⋈ EmissionRate2 USING (polProcessID,
         // sourceBinID), grouped by (sourceTypeModelYearID, fuelTypeID,
         // pollutantID, processID).
-        let mut emission_rate3: HashMap<(i32, i32, i32, i32), f64> = HashMap::new();
+        let mut emission_rate3: FxHashMap<(i32, i32, i32, i32), f64> = FxHashMap::default();
         for sbd in &inputs.source_bin_distribution {
             // SBD2: INNER JOIN SourceBin USING (sourceBinID).
             let Some(sb) = source_bin.get(&sbd.source_bin_id) else {
@@ -1654,7 +1655,7 @@ impl Ch4N2oRunningStartCalculator {
         // Index EmissionRate3 by (sourceTypeID, modelYearID) for the
         // WorkerOutputBySourceType join — sourceTypeModelYearID resolves to
         // exactly that pair.
-        let mut er3_index: EmissionRate3Index = HashMap::new();
+        let mut er3_index: EmissionRate3Index = FxHashMap::default();
         for (&(stmy_id, fuel_type_id, pollutant_id, process_id), &sbaf_x_mbr) in &emission_rate3 {
             // stmy present — the SBD3 inner join above required it.
             let Some(stmy_row) = stmy.get(&stmy_id) else {
@@ -1668,10 +1669,10 @@ impl Ch4N2oRunningStartCalculator {
 
         // SHO ⋈ HourDay (SHO2) ⋈ Link ⋈ County (Link2/SHO3) ⋈ EmissionRate3
         // (WorkerOutputBySourceType).
-        let hour_day: HashMap<i32, &HourDayRow> =
+        let hour_day: FxHashMap<i32, &HourDayRow> =
             inputs.hour_day.iter().map(|r| (r.hour_day_id, r)).collect();
-        let link: HashMap<i32, &LinkRow> = inputs.link.iter().map(|r| (r.link_id, r)).collect();
-        let county: HashMap<i32, &CountyRow> =
+        let link: FxHashMap<i32, &LinkRow> = inputs.link.iter().map(|r| (r.link_id, r)).collect();
+        let county: FxHashMap<i32, &CountyRow> =
             inputs.county.iter().map(|r| (r.county_id, r)).collect();
 
         let mut out: Vec<EmissionRow> = Vec::new();
@@ -1733,21 +1734,21 @@ impl Ch4N2oRunningStartCalculator {
     #[must_use]
     pub fn calculate_start(&self, inputs: &StartExhaustInputs) -> Vec<EmissionRow> {
         // Primary-key lookups.
-        let hour_day: HashMap<i32, &HourDayRow> =
+        let hour_day: FxHashMap<i32, &HourDayRow> =
             inputs.hour_day.iter().map(|r| (r.hour_day_id, r)).collect();
-        let county: HashMap<i32, &CountyRow> =
+        let county: FxHashMap<i32, &CountyRow> =
             inputs.county.iter().map(|r| (r.county_id, r)).collect();
-        let source_bin: HashMap<i64, &SourceBinRow> = inputs
+        let source_bin: FxHashMap<i64, &SourceBinRow> = inputs
             .source_bin
             .iter()
             .map(|r| (r.source_bin_id, r))
             .collect();
-        let ppa: HashMap<i32, &PollutantProcessAssocRow> = inputs
+        let ppa: FxHashMap<i32, &PollutantProcessAssocRow> = inputs
             .pollutant_process_assoc
             .iter()
             .map(|r| (r.pol_process_id, r))
             .collect();
-        let zone: HashMap<i32, &ZoneRow> = inputs.zone.iter().map(|r| (r.zone_id, r)).collect();
+        let zone: FxHashMap<i32, &ZoneRow> = inputs.zone.iter().map(|r| (r.zone_id, r)).collect();
         // EmissionProcess set — the `ppa.processID = ep.processID` join
         // gates ppa rows to the extracted process(es).
         let process_ids: HashSet<i32> = inputs
@@ -1758,14 +1759,14 @@ impl Ch4N2oRunningStartCalculator {
         // SourceTypeModelYear keyed by (sourceTypeID, modelYearID) — the
         // `st.ageID = st.yearID - stmy.modelYearID AND st.sourceTypeID =
         // stmy.sourceTypeID` join target.
-        let stmy_by_type_year: HashMap<(i32, i32), &SourceTypeModelYearRow> = inputs
+        let stmy_by_type_year: FxHashMap<(i32, i32), &SourceTypeModelYearRow> = inputs
             .source_type_model_year
             .iter()
             .map(|r| ((r.source_type_id, r.model_year_id), r))
             .collect();
         // Link keyed by zoneID, off-network only — the SQL joins starts to
         // links through `st.zoneID = l.zoneID`; see the method docs.
-        let mut links_by_zone: HashMap<i32, Vec<&LinkRow>> = HashMap::new();
+        let mut links_by_zone: FxHashMap<i32, Vec<&LinkRow>> = FxHashMap::default();
         for l in &inputs.link {
             if l.road_type_id != OFF_NETWORK_ROAD_TYPE_ID {
                 continue;
@@ -1773,7 +1774,7 @@ impl Ch4N2oRunningStartCalculator {
             links_by_zone.entry(l.zone_id).or_default().push(l);
         }
         // SourceBinDistribution keyed by sourceTypeModelYearID.
-        let mut sbd_by_stmy: HashMap<i32, Vec<&SourceBinDistributionRow>> = HashMap::new();
+        let mut sbd_by_stmy: FxHashMap<i32, Vec<&SourceBinDistributionRow>> = FxHashMap::default();
         for sbd in &inputs.source_bin_distribution {
             sbd_by_stmy
                 .entry(sbd.source_type_model_year_id)
@@ -1783,7 +1784,7 @@ impl Ch4N2oRunningStartCalculator {
         // EmissionRate keyed by (polProcessID, sourceBinID) for opModeID ==
         // 100; (polProcessID, sourceBinID, opModeID) is unique, so the
         // start operating mode gives at most one rate per key.
-        let mut emission_rate_start: HashMap<(i32, i64), f64> = HashMap::new();
+        let mut emission_rate_start: FxHashMap<(i32, i64), f64> = FxHashMap::default();
         for er in &inputs.emission_rate {
             if er.op_mode_id != START_OP_MODE_ID {
                 continue;
@@ -1792,7 +1793,7 @@ impl Ch4N2oRunningStartCalculator {
         }
 
         // The fourteen-column GROUP BY accumulator.
-        let mut totals: HashMap<[i32; 14], f64> = HashMap::new();
+        let mut totals: FxHashMap<[i32; 14], f64> = FxHashMap::default();
         for st in &inputs.starts {
             // INNER JOIN HourDay USING (hourDayID).
             let Some(hd) = hour_day.get(&st.hour_day_id) else {
