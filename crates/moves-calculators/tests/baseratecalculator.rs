@@ -11,17 +11,15 @@
 //! End-to-end validation against canonical-MOVES intermediate captures is a
 //! separate downstream task (`moves-rust-migration-plan.md` Task 44).
 
-use std::collections::BTreeMap;
-
 use moves_calculators::calculators::baseratecalculator::setup::{
     AgeCategoryRow, BaseRateCalculatorInputs, BaseRateRow, CriteriaRatioRow,
     EmissionRateAdjustmentRow, EvEfficiencyRow, FuelFormulationRow, FuelSupplyRow,
     GeneralFuelRatioRow, ImCoverageRow, ImFactorRow, ModelYearFuelFractionRow,
     PollutantProcessMappedModelYearRow, SmfrSbdSummaryRow, StartTempAdjustmentRow,
-    TemperatureAdjustmentRow, UniversalActivityRow,
+    TemperatureAdjustmentRow, UniversalActivityRow, ZoneMonthHourRow,
 };
 use moves_calculators::calculators::baseratecalculator::{
-    BaseRateCalculator, ModuleFlags, RunConstants, ZoneMonthHourDetail, ZoneMonthHourKey,
+    BaseRateCalculator, ModuleFlags, RunConstants,
 };
 
 /// State 1 / county 1 / zone 1 / link 0 / year 2020 / month 7.
@@ -87,12 +85,7 @@ fn single_row_passes_through_unchanged_when_no_tables_apply() {
         fuel_supply: fuel_supply_one(),
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(
-        &inputs,
-        BTreeMap::new(),
-        &constants(),
-        &ModuleFlags::default(),
-    );
+    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
     assert_eq!(output.blocks.len(), 1);
     let block = &output.blocks[0];
     assert_eq!(block.key.process_id, 1);
@@ -112,12 +105,7 @@ fn age_based_pass_is_processed_like_the_non_age_pass() {
         fuel_supply: fuel_supply_one(),
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(
-        &inputs,
-        BTreeMap::new(),
-        &constants(),
-        &ModuleFlags::default(),
-    );
+    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
     assert_eq!(output.rows().len(), 1);
     assert_eq!(output.rows()[0].emission_quant, 4.0);
 }
@@ -129,12 +117,7 @@ fn row_without_matching_fuel_supply_is_dropped() {
         base_rate: vec![base_rate_row(2, 1, 4.0, 8.0)],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(
-        &inputs,
-        BTreeMap::new(),
-        &constants(),
-        &ModuleFlags::default(),
-    );
+    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
     assert!(output.blocks.is_empty());
 }
 
@@ -164,12 +147,7 @@ fn two_fuel_formulations_expand_to_two_emissions() {
         ],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(
-        &inputs,
-        BTreeMap::new(),
-        &constants(),
-        &ModuleFlags::default(),
-    );
+    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
     let rows = output.rows();
     assert_eq!(rows.len(), 2);
     // emissions are ordered by fuel formulation id.
@@ -192,12 +170,7 @@ fn rows_sharing_a_key_accumulate_before_aggregation() {
         fuel_supply: fuel_supply_one(),
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(
-        &inputs,
-        BTreeMap::new(),
-        &constants(),
-        &ModuleFlags::default(),
-    );
+    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
     assert_eq!(output.blocks.len(), 1);
     assert_eq!(output.blocks[0].emissions[0].emission_quant, 8.0); // 4 + 4
     assert_eq!(output.blocks[0].emissions[0].emission_rate, 16.0); // 8 + 8
@@ -229,12 +202,7 @@ fn general_fuel_ratio_blends_normal_and_gpa_by_county_fraction() {
         }],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(
-        &inputs,
-        BTreeMap::new(),
-        &constants(),
-        &ModuleFlags::default(),
-    );
+    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
     assert_eq!(output.rows()[0].emission_quant, 12.0); // 4 * 3
     assert_eq!(output.rows()[0].emission_rate, 24.0); // 8 * 3
 }
@@ -258,12 +226,7 @@ fn general_fuel_ratio_outside_its_year_range_does_not_apply() {
         }],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(
-        &inputs,
-        BTreeMap::new(),
-        &constants(),
-        &ModuleFlags::default(),
-    );
+    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
     assert_eq!(output.rows()[0].emission_quant, 4.0); // unchanged
 }
 
@@ -284,12 +247,7 @@ fn criteria_ratio_scales_running_exhaust() {
         }],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(
-        &inputs,
-        BTreeMap::new(),
-        &constants(),
-        &ModuleFlags::default(),
-    );
+    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
     assert_eq!(output.rows()[0].emission_quant, 5.0); // 4 * 1.25
     assert_eq!(output.rows()[0].emission_rate, 10.0); // 8 * 1.25
 }
@@ -337,12 +295,7 @@ fn im_coverage_blends_the_im_and_non_im_rates() {
         }],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(
-        &inputs,
-        BTreeMap::new(),
-        &constants(),
-        &ModuleFlags::default(),
-    );
+    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
     assert_eq!(output.rows()[0].emission_quant, 5.0);
     assert_eq!(output.rows()[0].emission_rate, 10.0);
 }
@@ -366,12 +319,7 @@ fn air_conditioning_adds_the_ac_adjusted_rate() {
         ],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(
-        &inputs,
-        BTreeMap::new(),
-        &constants(),
-        &ModuleFlags::default(),
-    );
+    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
     assert_eq!(output.rows()[0].emission_quant, 5.0); // 4 + 0.5*2
     assert_eq!(output.rows()[0].emission_rate, 8.5); // 8 + 0.5*1
 }
@@ -390,12 +338,7 @@ fn extended_idle_scales_mean_rates_but_not_emission_rates() {
         }],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(
-        &inputs,
-        BTreeMap::new(),
-        &constants(),
-        &ModuleFlags::default(),
-    );
+    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
     assert_eq!(output.rows()[0].emission_quant, 2.0); // 4 * 0.5
     assert_eq!(output.rows()[0].emission_rate, 8.0); // emission rate untouched
 }
@@ -416,12 +359,7 @@ fn apu_scales_mean_rates_for_operating_mode_201() {
         }],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(
-        &inputs,
-        BTreeMap::new(),
-        &constants(),
-        &ModuleFlags::default(),
-    );
+    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
     assert_eq!(output.blocks.len(), 1);
     assert_eq!(output.blocks[0].key.process_id, 91); // not retagged
     assert_eq!(output.rows()[0].emission_quant, 2.0); // 4 * 0.5
@@ -444,12 +382,7 @@ fn shorepower_retags_the_process_to_93() {
         }],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(
-        &inputs,
-        BTreeMap::new(),
-        &constants(),
-        &ModuleFlags::default(),
-    );
+    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
     assert_eq!(output.blocks.len(), 1);
     assert_eq!(output.blocks[0].key.process_id, 93);
     assert_eq!(output.blocks[0].key.pol_process_id, 9191); // stale, by design
@@ -476,7 +409,7 @@ fn emission_rate_adjustment_scales_mean_and_emission_rate() {
         }],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(&inputs, BTreeMap::new(), &constants(), &flags);
+    let output = BaseRateCalculator::run(inputs, &constants(), &flags);
     assert_eq!(output.rows()[0].emission_quant, 2.0); // 4 * 0.5
     assert_eq!(output.rows()[0].emission_rate, 4.0); // 8 * 0.5
 }
@@ -502,7 +435,7 @@ fn ev_efficiency_divides_through_the_efficiency_product() {
         }],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(&inputs, BTreeMap::new(), &constants(), &flags);
+    let output = BaseRateCalculator::run(inputs, &constants(), &flags);
     assert_eq!(output.rows()[0].emission_quant, 16.0); // 4 / 0.25
     assert_eq!(output.rows()[0].emission_rate, 32.0); // 8 / 0.25
 }
@@ -525,28 +458,19 @@ fn temperature_adjustment_applies_the_standard_quadratic_term() {
             term_b: 0.0,
             term_c: Some(0.0),
         }],
-        ..BaseRateCalculatorInputs::default()
-    };
-    let zone_month_hour = BTreeMap::from([(
-        ZoneMonthHourKey {
+        zone_month_hour: vec![ZoneMonthHourRow {
             month_id: 7,
             zone_id: 1,
             hour_id: 8,
-        },
-        ZoneMonthHourDetail {
             temperature: 77.0,
             rel_humidity: 0.0,
             heat_index: 0.0,
             specific_humidity: 0.0,
             mol_water_fraction: 0.0,
-        },
-    )]);
-    let output = BaseRateCalculator::run(
-        &inputs,
-        zone_month_hour,
-        &constants(),
-        &ModuleFlags::default(),
-    );
+        }],
+        ..BaseRateCalculatorInputs::default()
+    };
+    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
     assert_eq!(output.rows()[0].emission_quant, 8.0); // 4 * 2
     assert_eq!(output.rows()[0].emission_rate, 16.0); // 8 * 2
 }
@@ -580,28 +504,19 @@ fn start_temperature_adjustment_applies_the_polynomial_form() {
             term_c: 0.0,
             equation_type: "POLY".to_string(),
         }],
-        ..BaseRateCalculatorInputs::default()
-    };
-    let zone_month_hour = BTreeMap::from([(
-        ZoneMonthHourKey {
+        zone_month_hour: vec![ZoneMonthHourRow {
             month_id: 7,
             zone_id: 1,
             hour_id: 8,
-        },
-        ZoneMonthHourDetail {
             temperature: 71.0,
             rel_humidity: 0.0,
             heat_index: 0.0,
             specific_humidity: 0.0,
             mol_water_fraction: 0.0,
-        },
-    )]);
-    let output = BaseRateCalculator::run(
-        &inputs,
-        zone_month_hour,
-        &constants(),
-        &ModuleFlags::default(),
-    );
+        }],
+        ..BaseRateCalculatorInputs::default()
+    };
+    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
     assert_eq!(output.rows()[0].emission_quant, 2.0); // 4 - 2
     assert_eq!(output.rows()[0].emission_rate, 6.0); // 8 - 2
 }
@@ -641,12 +556,7 @@ fn e85_thc_emits_a_10000_offset_pollutant() {
         }],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(
-        &inputs,
-        BTreeMap::new(),
-        &constants(),
-        &ModuleFlags::default(),
-    );
+    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
     assert_eq!(output.blocks.len(), 2);
     // Block 0: the base pollutant 2, criteria-scaled by 2.
     assert_eq!(output.blocks[0].key.pollutant_id, 2);
@@ -676,7 +586,7 @@ fn apply_activity_converts_a_rate_into_an_inventory() {
         }],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(&inputs, BTreeMap::new(), &constants(), &flags);
+    let output = BaseRateCalculator::run(inputs, &constants(), &flags);
     assert_eq!(output.rows()[0].emission_quant, 12.0); // 4 * 3
     assert_eq!(output.rows()[0].emission_rate, 8.0); // emission rate untouched
 }
@@ -718,7 +628,7 @@ fn aggregate_smfr_weights_emissions_by_the_activity_distribution() {
         ],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(&inputs, BTreeMap::new(), &constants(), &flags);
+    let output = BaseRateCalculator::run(inputs, &constants(), &flags);
     assert_eq!(output.rows()[0].emission_quant, 1.0); // 4 * 0.25
     assert_eq!(output.rows()[0].emission_rate, 2.0); // 8 * 0.25
 }

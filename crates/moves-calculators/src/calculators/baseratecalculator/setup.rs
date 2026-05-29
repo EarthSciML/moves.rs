@@ -2555,6 +2555,8 @@ pub struct BaseRateCalculatorInputs {
     pub apu_emission_rate_fraction: Vec<ModelYearFuelFractionRow>,
     /// `ShorepowerEmissionRateFraction` rows.
     pub shorepower_emission_rate_fraction: Vec<ModelYearFuelFractionRow>,
+    /// `ZoneMonthHour` meteorology rows.
+    pub zone_month_hour: Vec<ZoneMonthHourRow>,
     /// `PollutantProcessMappedModelYear` rows.
     pub pollutant_process_mapped_model_year: Vec<PollutantProcessMappedModelYearRow>,
     /// `StartTempAdjustment` rows.
@@ -2660,15 +2662,11 @@ impl PreparedTables {
     /// `IMFactor` and `AgeGroups` before `IMCoverage`.
     #[must_use]
     #[allow(clippy::too_many_lines)] // One straight-line port of the ~20-table Go `StartSetup`.
-    pub fn from_inputs(
-        inputs: &BaseRateCalculatorInputs,
-        zone_month_hour: BTreeMap<ZoneMonthHourKey, ZoneMonthHourDetail>,
-        constants: &RunConstants,
-    ) -> Self {
+    pub fn from_inputs(inputs: BaseRateCalculatorInputs, constants: &RunConstants) -> Self {
         let mut prepared = PreparedTables::default();
 
         // The three hourly-fraction tables share a key shape.
-        for row in &inputs.extended_idle_emission_rate_fraction {
+        for row in inputs.extended_idle_emission_rate_fraction {
             prepared.extended_idle_emission_rate_fraction.insert(
                 ModelYearFuelKey {
                     model_year_id: row.model_year_id,
@@ -2677,7 +2675,7 @@ impl PreparedTables {
                 row.hour_fraction_adjust,
             );
         }
-        for row in &inputs.apu_emission_rate_fraction {
+        for row in inputs.apu_emission_rate_fraction {
             prepared.apu_emission_rate_fraction.insert(
                 ModelYearFuelKey {
                     model_year_id: row.model_year_id,
@@ -2686,7 +2684,7 @@ impl PreparedTables {
                 row.hour_fraction_adjust,
             );
         }
-        for row in &inputs.shorepower_emission_rate_fraction {
+        for row in inputs.shorepower_emission_rate_fraction {
             prepared.shorepower_emission_rate_fraction.insert(
                 ModelYearFuelKey {
                     model_year_id: row.model_year_id,
@@ -2696,9 +2694,24 @@ impl PreparedTables {
             );
         }
 
-        prepared.zone_month_hour = zone_month_hour;
+        for row in inputs.zone_month_hour {
+            prepared.zone_month_hour.insert(
+                ZoneMonthHourKey {
+                    month_id: row.month_id,
+                    zone_id: row.zone_id,
+                    hour_id: row.hour_id,
+                },
+                ZoneMonthHourDetail {
+                    temperature: row.temperature,
+                    rel_humidity: row.rel_humidity,
+                    heat_index: row.heat_index,
+                    specific_humidity: row.specific_humidity,
+                    mol_water_fraction: row.mol_water_fraction,
+                },
+            );
+        }
 
-        for row in &inputs.pollutant_process_mapped_model_year {
+        for row in inputs.pollutant_process_mapped_model_year {
             prepared.pollutant_process_mapped_model_year.insert(
                 PollutantProcessMappedModelYearKey {
                     pol_process_id: row.pol_process_id,
@@ -2712,7 +2725,7 @@ impl PreparedTables {
             );
         }
 
-        for row in &inputs.start_temp_adjustment {
+        for row in inputs.start_temp_adjustment {
             prepared.start_temp_adjustment.insert(
                 StartTempAdjustmentKey {
                     fuel_type_id: row.fuel_type_id,
@@ -2730,7 +2743,7 @@ impl PreparedTables {
             );
         }
 
-        for row in &inputs.county {
+        for row in inputs.county {
             prepared.county.insert(
                 row.county_id,
                 CountyDetail {
@@ -2745,7 +2758,7 @@ impl PreparedTables {
         // single-element detail (`GeneralFuelRatio[k] = v`), so the last row
         // for a key wins and `details` always holds exactly one range. The
         // port reproduces that; Task 44 decides whether it must accumulate.
-        for row in &inputs.general_fuel_ratio {
+        for row in inputs.general_fuel_ratio {
             prepared.general_fuel_ratio.insert(
                 super::model::GeneralFuelRatioKey {
                     fuel_formulation_id: row.fuel_formulation_id,
@@ -2765,7 +2778,7 @@ impl PreparedTables {
             );
         }
 
-        for row in &inputs.criteria_ratio {
+        for row in inputs.criteria_ratio {
             prepared.criteria_ratio.insert(
                 CriteriaRatioKey {
                     fuel_formulation_id: row.fuel_formulation_id,
@@ -2781,7 +2794,7 @@ impl PreparedTables {
                 },
             );
         }
-        for row in &inputs.alt_criteria_ratio {
+        for row in inputs.alt_criteria_ratio {
             prepared.alt_criteria_ratio.insert(
                 CriteriaRatioKey {
                     fuel_formulation_id: row.fuel_formulation_id,
@@ -2800,7 +2813,7 @@ impl PreparedTables {
 
         // TemperatureAdjustment — one file row expands across its (clamped)
         // model-year range, one map entry per year.
-        for row in &inputs.temperature_adjustment {
+        for row in inputs.temperature_adjustment {
             let min_my = row.min_model_year_id.max(1950);
             let max_my = row.max_model_year_id.min(2060);
             for model_year_id in min_my..=max_my {
@@ -2820,21 +2833,21 @@ impl PreparedTables {
             }
         }
 
-        for row in &inputs.nox_humidity_adjust {
+        for row in inputs.nox_humidity_adjust {
             prepared.nox_humidity_adjust.insert(
                 row.fuel_type_id,
                 NoxHumidityAdjustDetail {
-                    humidity_nox_eq: row.humidity_nox_eq.clone(),
+                    humidity_nox_eq: row.humidity_nox_eq,
                     humidity_term_a: row.humidity_term_a,
                     humidity_term_b: row.humidity_term_b.unwrap_or(0.0),
                     humidity_low_bound: row.humidity_low_bound,
                     humidity_up_bound: row.humidity_up_bound,
-                    humidity_units: row.humidity_units.clone(),
+                    humidity_units: row.humidity_units,
                 },
             );
         }
 
-        for row in &inputs.zone_ac_factor {
+        for row in inputs.zone_ac_factor {
             prepared.zone_ac_factor.insert(
                 ZoneAcFactorKey {
                     hour_id: row.hour_id,
@@ -2845,7 +2858,7 @@ impl PreparedTables {
             );
         }
 
-        for row in &inputs.im_factor {
+        for row in inputs.im_factor {
             prepared.im_factor.insert(
                 ImFactorKey {
                     pol_process_id: row.pol_process_id,
@@ -2860,7 +2873,7 @@ impl PreparedTables {
             );
         }
 
-        for row in &inputs.age_category {
+        for row in inputs.age_category {
             prepared.age_groups.insert(row.age_id, row.age_group_id);
         }
 
@@ -2868,7 +2881,7 @@ impl PreparedTables {
         // and each model year it covers, join through
         // PollutantProcessMappedModelYear → AgeGroups → IMFactor, then
         // accumulate `IMFactor * complianceFactor` into the coverage entry.
-        for row in &inputs.im_coverage {
+        for row in inputs.im_coverage {
             let beg_my = row.beg_model_year_id.max(1950);
             let end_my = row.end_model_year_id.min(2060);
             let compliance_factor = 0.01 * row.compliance_factor;
@@ -2908,7 +2921,7 @@ impl PreparedTables {
             }
         }
 
-        for row in &inputs.emission_rate_adjustment {
+        for row in inputs.emission_rate_adjustment {
             for model_year_id in row.begin_model_year_id..=row.end_model_year_id {
                 prepared.emission_rate_adjustment.insert(
                     PolProcSourceRegFuelMyKey {
@@ -2923,7 +2936,7 @@ impl PreparedTables {
             }
         }
 
-        for row in &inputs.ev_efficiency {
+        for row in inputs.ev_efficiency {
             prepared.ev_efficiency.insert(
                 PolProcSourceRegFuelMyKey {
                     pol_process_id: row.pol_process_id,
@@ -2939,7 +2952,7 @@ impl PreparedTables {
             );
         }
 
-        for row in &inputs.universal_activity {
+        for row in inputs.universal_activity {
             prepared.universal_activity.insert(
                 UniversalActivityKey {
                     hour_day_id: row.hour_day_id,
@@ -2953,15 +2966,15 @@ impl PreparedTables {
                 .insert(row.hour_day_id);
         }
 
-        prepared.fuel_types = inputs.fuel_types.iter().copied().collect();
+        prepared.fuel_types = inputs.fuel_types.into_iter().collect();
 
-        for row in &inputs.fuel_formulations {
+        for row in inputs.fuel_formulations {
             prepared
                 .fuel_formulations
                 .insert(row.fuel_formulation_id, row.fuel_sub_type_id);
         }
 
-        for row in &inputs.fuel_supply {
+        for row in inputs.fuel_supply {
             prepared
                 .fuel_supply
                 .entry(FuelSupplyKey {
@@ -3006,8 +3019,7 @@ mod tests {
             }],
             ..BaseRateCalculatorInputs::default()
         };
-        let prepared =
-            PreparedTables::from_inputs(&inputs, BTreeMap::new(), &RunConstants::default());
+        let prepared = PreparedTables::from_inputs(inputs, &RunConstants::default());
         // 1950..=1953 -> four entries; 1940..1949 clamped away.
         assert_eq!(prepared.temperature_adjustment.len(), 4);
         assert!(prepared
@@ -3086,7 +3098,7 @@ mod tests {
             }],
             ..BaseRateCalculatorInputs::default()
         };
-        let prepared = PreparedTables::from_inputs(&inputs, BTreeMap::new(), &constants);
+        let prepared = PreparedTables::from_inputs(inputs, &constants);
         // model year 2018 -> age 2 -> age group 4; 2019 -> age 1 -> age group 4.
         // Each: 0.5 * (0.01 * 80) = 0.4.
         assert_eq!(
@@ -3126,8 +3138,7 @@ mod tests {
             ],
             ..BaseRateCalculatorInputs::default()
         };
-        let prepared =
-            PreparedTables::from_inputs(&inputs, BTreeMap::new(), &RunConstants::default());
+        let prepared = PreparedTables::from_inputs(inputs, &RunConstants::default());
         let cell = prepared
             .fuel_supply
             .get(&FuelSupplyKey {
