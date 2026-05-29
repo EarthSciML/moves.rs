@@ -15,7 +15,7 @@
 //! out of the box. A caller can still point at a different DAG with
 //! `--calculator-dag` (e.g. to test against a regenerated graph).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
@@ -128,6 +128,12 @@ fn load_execution_db(snapshot_dir: &Path) -> Result<InMemoryStore> {
     // If the SHO table has null distances (MOVES inserts them before calculateDistance
     // runs), compute distance = SHO * averageSpeed and write back to the store.
     populate_sho_distances(&mut store).context("populating SHO distances from snapshot")?;
+    // Apply the AirToxicsDistanceCalculator.sql Section Extract Data transforms
+    // to dioxinEmissionRate and metalEmissionRate: split polProcessID into
+    // (processID, pollutantID) and expand modelYearGroupID to individual
+    // modelYearID rows.
+    transform_airtoxics_rate_tables(&mut store)
+        .context("transforming airToxics emission-rate tables from snapshot")?;
     Ok(store)
 }
 
@@ -292,6 +298,210 @@ fn populate_sho_distances(store: &mut InMemoryStore) -> Result<()> {
         .with_column(Series::new("distance".into(), distances).into())
         .map_err(|e| anyhow::anyhow!("replacing SHO.distance: {e}"))?;
     Ok(())
+}
+
+/// Port of `AirToxicsDistanceCalculator.sql` `Section Extract Data` for the
+/// `dioxinEmissionRate` and `metalEmissionRate` tables.
+///
+/// Raw snapshot tables carry the default-DB schema — `polProcessID` (composite)
+/// and `modelYearGroupID` (group key). The `AirToxicsDistanceCalculator` expects
+/// both already split and expanded. This function applies two transforms so the
+/// calculator sees the worker-extracted schema it requires:
+///
+/// 1. **polProcessID split**: `processID = polProcessID % 100`,
+///    `pollutantID = polProcessID / 100`.
+/// 2. **modelYearGroupID expansion**: each rate row fans out to one row per
+///    individual model year in the group, resolved through
+///    `PollutantProcessMappedModelYear`.
+///
+/// No-ops when `PollutantProcessMappedModelYear` is absent from the store or
+/// when both rate tables are absent. Tables already in the worker-extracted
+/// schema (presence of a `processid` column detected) are left unchanged.
+fn transform_airtoxics_rate_tables(store: &mut InMemoryStore) -> Result<()> {
+    if !store.contains("PollutantProcessMappedModelYear") {
+        return Ok(());
+    }
+    let ppmy_map = build_pol_process_model_year_map(store)?;
+    for &table in &["dioxinEmissionRate", "metalEmissionRate"] {
+        if !store.contains(table) {
+            continue;
+        }
+        // Already transformed: worker-extracted schema has processID, not polProcessID.
+        let already_split = store
+            .get(table)
+            .map(|arc| {
+                arc.columns()
+                    .iter()
+                    .any(|c| c.name().to_ascii_lowercase() == "processid")
+            })
+            .unwrap_or(false);
+        if already_split {
+            continue;
+        }
+        let expanded = expand_rate_table_rows(store, table, &ppmy_map)
+            .with_context(|| format!("expanding {table}"))?;
+        store.insert(table, expanded);
+    }
+    Ok(())
+}
+
+/// Build a `(polProcessID, modelYearGroupID) -> Vec<modelYearID>` expansion
+/// map from the `PollutantProcessMappedModelYear` snapshot table.
+///
+/// `PollutantProcessMappedModelYear` has one row per `(polProcessID,
+/// modelYearID)` pair — the unique key. Inverting to
+/// `(polProcessID, modelYearGroupID)` yields the set of model years each
+/// group spans, which is the join direction the rate-table expansion needs.
+fn build_pol_process_model_year_map(
+    store: &InMemoryStore,
+) -> Result<HashMap<(i32, i32), Vec<i32>>> {
+    let arc = store
+        .get("PollutantProcessMappedModelYear")
+        .context("PollutantProcessMappedModelYear not in store")?;
+    let df = &*arc;
+    let n = df.height();
+    if n == 0 {
+        return Ok(HashMap::new());
+    }
+    let col_i32 = |name: &str| -> Result<Vec<i32>> {
+        let col = df
+            .columns()
+            .iter()
+            .find(|c| c.name().to_ascii_lowercase() == name.to_ascii_lowercase())
+            .with_context(|| {
+                format!("column '{name}' not found in PollutantProcessMappedModelYear")
+            })?
+            .cast(&polars::prelude::DataType::Int32)
+            .with_context(|| format!("{name}: cast to i32 failed"))?;
+        Ok(col
+            .i32()
+            .map_err(|e| anyhow::anyhow!("{e}"))?
+            .into_no_null_iter()
+            .collect())
+    };
+    let pol_proc_ids = col_i32("polProcessID")?;
+    let my_group_ids = col_i32("modelYearGroupID")?;
+    let my_ids = col_i32("modelYearID")?;
+    let mut map: HashMap<(i32, i32), Vec<i32>> = HashMap::new();
+    for i in 0..n {
+        map.entry((pol_proc_ids[i], my_group_ids[i]))
+            .or_default()
+            .push(my_ids[i]);
+    }
+    Ok(map)
+}
+
+/// Expand one rate table from the raw snapshot schema to the worker-extracted
+/// schema the `AirToxicsDistanceCalculator` expects.
+///
+/// **Input** (`dioxinEmissionRate`): `polProcessID`, `fuelTypeID`,
+/// `modelYearGroupID`, `meanBaseRate`, …
+/// **Input** (`metalEmissionRate`): same plus `sourceTypeID`.
+///
+/// **Output** (`dioxinEmissionRate`): `processID`, `pollutantID`, `fuelTypeID`,
+/// `modelYearID`, `meanBaseRate`.
+/// **Output** (`metalEmissionRate`): same plus `sourceTypeID`.
+///
+/// Rows whose `(polProcessID, modelYearGroupID)` key has no entry in
+/// `ppmy_map` are dropped — mirroring the SQL `INNER JOIN` semantics.
+fn expand_rate_table_rows(
+    store: &InMemoryStore,
+    table: &str,
+    ppmy_map: &HashMap<(i32, i32), Vec<i32>>,
+) -> Result<polars::prelude::DataFrame> {
+    use polars::prelude::{DataFrame, DataType, NamedFrom, Series};
+
+    let arc = store.get(table).context("table not in store")?;
+    let df = &*arc;
+    let n = df.height();
+
+    let is_metal = table.to_ascii_lowercase() == "metalemissionrate";
+
+    let col_i32 = |name: &str| -> Result<Vec<i32>> {
+        let col = df
+            .columns()
+            .iter()
+            .find(|c| c.name().to_ascii_lowercase() == name.to_ascii_lowercase())
+            .with_context(|| format!("column '{name}' not found in {table}"))?
+            .cast(&DataType::Int32)
+            .with_context(|| format!("{name}: cast to i32 failed"))?;
+        Ok(col
+            .i32()
+            .map_err(|e| anyhow::anyhow!("{e}"))?
+            .into_no_null_iter()
+            .collect())
+    };
+    let col_f64 = |name: &str| -> Result<Vec<f64>> {
+        let col = df
+            .columns()
+            .iter()
+            .find(|c| c.name().to_ascii_lowercase() == name.to_ascii_lowercase())
+            .with_context(|| format!("column '{name}' not found in {table}"))?;
+        let casted = if *col.dtype() == DataType::Float32 {
+            col.cast(&DataType::Float64)
+                .map_err(|e| anyhow::anyhow!("{e}"))?
+        } else {
+            col.clone()
+        };
+        Ok(casted
+            .f64()
+            .map_err(|e| anyhow::anyhow!("{e}"))?
+            .into_no_null_iter()
+            .collect())
+    };
+
+    let pol_proc_ids = col_i32("polProcessID")?;
+    let fuel_type_ids = col_i32("fuelTypeID")?;
+    let my_group_ids = col_i32("modelYearGroupID")?;
+    let mean_base_rates = col_f64("meanBaseRate")?;
+    let source_type_ids: Option<Vec<i32>> = if is_metal {
+        Some(col_i32("sourceTypeID")?)
+    } else {
+        None
+    };
+
+    let mut out_process_ids: Vec<i32> = Vec::new();
+    let mut out_pollutant_ids: Vec<i32> = Vec::new();
+    let mut out_fuel_type_ids: Vec<i32> = Vec::new();
+    let mut out_source_type_ids: Vec<i32> = Vec::new();
+    let mut out_model_year_ids: Vec<i32> = Vec::new();
+    let mut out_mean_base_rates: Vec<f64> = Vec::new();
+
+    for i in 0..n {
+        let pol_proc = pol_proc_ids[i];
+        let my_grp = my_group_ids[i];
+        let Some(model_years) = ppmy_map.get(&(pol_proc, my_grp)) else {
+            continue; // No expansion entry — INNER JOIN drops the row.
+        };
+        let process_id = pol_proc % 100;
+        let pollutant_id = pol_proc / 100;
+        for &my in model_years {
+            out_process_ids.push(process_id);
+            out_pollutant_ids.push(pollutant_id);
+            out_fuel_type_ids.push(fuel_type_ids[i]);
+            if is_metal {
+                out_source_type_ids.push(source_type_ids.as_ref().unwrap()[i]);
+            }
+            out_model_year_ids.push(my);
+            out_mean_base_rates.push(mean_base_rates[i]);
+        }
+    }
+
+    let n_out = out_process_ids.len();
+    let mut cols = vec![
+        Series::new("processID".into(), out_process_ids).into(),
+        Series::new("pollutantID".into(), out_pollutant_ids).into(),
+        Series::new("fuelTypeID".into(), out_fuel_type_ids).into(),
+    ];
+    if is_metal {
+        cols.push(Series::new("sourceTypeID".into(), out_source_type_ids).into());
+    }
+    cols.extend([
+        Series::new("modelYearID".into(), out_model_year_ids).into(),
+        Series::new("meanBaseRate".into(), out_mean_base_rates).into(),
+    ]);
+    DataFrame::new(n_out, cols)
+        .map_err(|e| anyhow::anyhow!("{table}: building transformed DataFrame: {e}"))
 }
 
 /// Cast a DataFrame column to Int32, returning the Column for row-wise access.
@@ -644,5 +854,269 @@ mod tests {
             err.to_string().contains("loading calculator DAG from"),
             "got: {err}"
         );
+    }
+
+    // Helper: build a minimal store for airtoxics rate-table transform tests.
+    //
+    // PollutantProcessMappedModelYear: polProcessID=13001 (pollutantID=130,
+    // processID=1), modelYearGroupID=30140010, modelYearID in {2010, 2015}.
+    // dioxinEmissionRate raw row: (polProcessID=13001, fuelTypeID=2,
+    //   modelYearGroupID=30140010, meanBaseRate=0.05).
+    // metalEmissionRate raw row: (polProcessID=6301, fuelTypeID=2,
+    //   sourceTypeID=21, modelYearGroupID=30140010, meanBaseRate=0.02).
+    fn make_airtoxics_raw_store() -> InMemoryStore {
+        use polars::prelude::{DataFrame, NamedFrom, Series};
+
+        let mut store = InMemoryStore::new();
+
+        // PollutantProcessMappedModelYear: two model years for group 30140010.
+        let ppmy_df = DataFrame::new(
+            2,
+            vec![
+                Series::new("polProcessID".into(), vec![13001i64, 13001i64]).into(),
+                Series::new("modelYearID".into(), vec![2010i64, 2015i64]).into(),
+                Series::new("modelYearGroupID".into(), vec![30140010i64, 30140010i64]).into(),
+                Series::new("fuelMYGroupID".into(), vec![0i64, 0i64]).into(),
+                Series::new("IMModelYearGroupID".into(), vec![0i64, 0i64]).into(),
+            ],
+        )
+        .unwrap();
+        store.insert("PollutantProcessMappedModelYear", ppmy_df);
+
+        // Raw dioxinEmissionRate (one row: polProcessID=13001, modelYearGroupID=30140010).
+        let dioxin_df = DataFrame::new(
+            1,
+            vec![
+                Series::new("polProcessID".into(), vec![13001i64]).into(),
+                Series::new("fuelTypeID".into(), vec![2i64]).into(),
+                Series::new("modelYearGroupID".into(), vec![30140010i64]).into(),
+                Series::new("units".into(), vec!["g/mile".to_string()]).into(),
+                Series::new("meanBaseRate".into(), vec![0.05f64]).into(),
+                Series::new("meanBaseRateCV".into(), vec![0.0f64]).into(),
+                Series::new("dataSourceId".into(), vec![1i64]).into(),
+            ],
+        )
+        .unwrap();
+        store.insert("dioxinEmissionRate", dioxin_df);
+
+        // Raw metalEmissionRate (one row: polProcessID=6301, modelYearGroupID=30140010).
+        // polProcessID=6301: pollutantID=63, processID=1.
+        // PPMY for polProcessID=6301 not in store — we add it below.
+        let ppmy_df2 = {
+            let ppmy = store.get("PollutantProcessMappedModelYear").unwrap();
+            let mut ppmy2 = (*ppmy).clone();
+            // Append two more rows for polProcessID=6301, same group.
+            let new_df = DataFrame::new(
+                2,
+                vec![
+                    Series::new("polProcessID".into(), vec![6301i64, 6301i64]).into(),
+                    Series::new("modelYearID".into(), vec![2010i64, 2015i64]).into(),
+                    Series::new("modelYearGroupID".into(), vec![30140010i64, 30140010i64]).into(),
+                    Series::new("fuelMYGroupID".into(), vec![0i64, 0i64]).into(),
+                    Series::new("IMModelYearGroupID".into(), vec![0i64, 0i64]).into(),
+                ],
+            )
+            .unwrap();
+            ppmy2.vstack_mut(&new_df).unwrap();
+            ppmy2
+        };
+        store.insert("PollutantProcessMappedModelYear", ppmy_df2);
+
+        let metal_df = DataFrame::new(
+            1,
+            vec![
+                Series::new("polProcessID".into(), vec![6301i64]).into(),
+                Series::new("fuelTypeID".into(), vec![2i64]).into(),
+                Series::new("sourceTypeID".into(), vec![21i64]).into(),
+                Series::new("modelYearGroupID".into(), vec![30140010i64]).into(),
+                Series::new("units".into(), vec!["g/mile".to_string()]).into(),
+                Series::new("meanBaseRate".into(), vec![0.02f64]).into(),
+                Series::new("meanBaseRateCV".into(), vec![0.0f64]).into(),
+                Series::new("dataSourceId".into(), vec![1i64]).into(),
+            ],
+        )
+        .unwrap();
+        store.insert("metalEmissionRate", metal_df);
+
+        store
+    }
+
+    #[test]
+    fn transform_dioxin_splits_pol_process_and_expands_model_years() {
+        let mut store = make_airtoxics_raw_store();
+        transform_airtoxics_rate_tables(&mut store).expect("transform failed");
+
+        let df = store
+            .get("dioxinemissionrate")
+            .expect("table must be present");
+        // One raw row × two model years in the group → two output rows.
+        assert_eq!(
+            df.height(),
+            2,
+            "expected 2 expanded rows, got {}",
+            df.height()
+        );
+
+        let col_i32 = |name: &str| -> Vec<i32> {
+            df.columns()
+                .iter()
+                .find(|c| c.name().to_ascii_lowercase() == name)
+                .unwrap()
+                .cast(&polars::prelude::DataType::Int32)
+                .unwrap()
+                .i32()
+                .unwrap()
+                .into_no_null_iter()
+                .collect()
+        };
+        let process_ids = col_i32("processid");
+        let pollutant_ids = col_i32("pollutantid");
+        let fuel_type_ids = col_i32("fueltypeid");
+        let model_year_ids = col_i32("modelyearid");
+        let rates: Vec<f64> = df
+            .columns()
+            .iter()
+            .find(|c| c.name().to_ascii_lowercase() == "meanbaserate")
+            .unwrap()
+            .f64()
+            .unwrap()
+            .into_no_null_iter()
+            .collect();
+
+        // polProcessID=13001: processID=13001%100=1, pollutantID=13001/100=130.
+        assert!(process_ids.iter().all(|&p| p == 1), "processID must be 1");
+        assert!(
+            pollutant_ids.iter().all(|&p| p == 130),
+            "pollutantID must be 130"
+        );
+        assert!(
+            fuel_type_ids.iter().all(|&f| f == 2),
+            "fuelTypeID must be 2"
+        );
+        // Both model years from the group must appear.
+        let mut my_sorted = model_year_ids.clone();
+        my_sorted.sort();
+        assert_eq!(my_sorted, vec![2010, 2015]);
+        assert!(rates.iter().all(|&r| (r - 0.05).abs() < 1e-12));
+        // Transformed table must NOT have polProcessID or modelYearGroupID columns.
+        assert!(
+            !df.columns()
+                .iter()
+                .any(|c| c.name().to_ascii_lowercase() == "polprocessid"),
+            "polProcessID must be absent after transform"
+        );
+    }
+
+    #[test]
+    fn transform_metal_includes_source_type_id() {
+        let mut store = make_airtoxics_raw_store();
+        transform_airtoxics_rate_tables(&mut store).expect("transform failed");
+
+        let df = store
+            .get("metalemissionrate")
+            .expect("table must be present");
+        assert_eq!(df.height(), 2);
+
+        let col_i32 = |name: &str| -> Vec<i32> {
+            df.columns()
+                .iter()
+                .find(|c| c.name().to_ascii_lowercase() == name)
+                .unwrap()
+                .cast(&polars::prelude::DataType::Int32)
+                .unwrap()
+                .i32()
+                .unwrap()
+                .into_no_null_iter()
+                .collect()
+        };
+        // polProcessID=6301: processID=1, pollutantID=63.
+        assert!(col_i32("processid").iter().all(|&p| p == 1));
+        assert!(col_i32("pollutantid").iter().all(|&p| p == 63));
+        assert!(col_i32("sourcetypeid").iter().all(|&s| s == 21));
+        let mut my_sorted = col_i32("modelyearid");
+        my_sorted.sort();
+        assert_eq!(my_sorted, vec![2010, 2015]);
+    }
+
+    #[test]
+    fn transform_noop_when_ppmy_absent() {
+        let mut store = InMemoryStore::new();
+        // Add raw dioxin rate but no PPMY — transform should silently skip.
+        store.insert(
+            "dioxinEmissionRate",
+            polars::prelude::DataFrame::new(
+                1,
+                vec![
+                    polars::prelude::Series::new("polProcessID".into(), vec![13001i64]).into(),
+                    polars::prelude::Series::new("fuelTypeID".into(), vec![2i64]).into(),
+                    polars::prelude::Series::new("modelYearGroupID".into(), vec![30140010i64])
+                        .into(),
+                    polars::prelude::Series::new("meanBaseRate".into(), vec![0.05f64]).into(),
+                ],
+            )
+            .unwrap(),
+        );
+        transform_airtoxics_rate_tables(&mut store).expect("noop should not error");
+        // Table should be unchanged — still has polProcessID.
+        let df = store.get("dioxinemissionrate").unwrap();
+        assert!(
+            df.columns()
+                .iter()
+                .any(|c| c.name().to_ascii_lowercase() == "polprocessid"),
+            "polProcessID should still be present when PPMY is absent"
+        );
+    }
+
+    #[test]
+    fn transform_noop_when_already_transformed() {
+        let mut store = make_airtoxics_raw_store();
+        // Apply once to get the transformed version.
+        transform_airtoxics_rate_tables(&mut store).expect("first transform failed");
+        // Apply again — must be idempotent (no error, same row count).
+        transform_airtoxics_rate_tables(&mut store).expect("second transform failed");
+        let df = store.get("dioxinemissionrate").unwrap();
+        assert_eq!(
+            df.height(),
+            2,
+            "row count must not change on second transform"
+        );
+    }
+
+    #[test]
+    fn transform_empty_rate_table_produces_empty_output() {
+        use polars::prelude::{DataFrame, NamedFrom, Series};
+        let mut store = InMemoryStore::new();
+        // PPMY with two model years for one group.
+        store.insert(
+            "PollutantProcessMappedModelYear",
+            DataFrame::new(
+                2,
+                vec![
+                    Series::new("polProcessID".into(), vec![13001i64, 13001i64]).into(),
+                    Series::new("modelYearID".into(), vec![2010i64, 2015i64]).into(),
+                    Series::new("modelYearGroupID".into(), vec![30140010i64, 30140010i64]).into(),
+                    Series::new("fuelMYGroupID".into(), vec![0i64, 0i64]).into(),
+                    Series::new("IMModelYearGroupID".into(), vec![0i64, 0i64]).into(),
+                ],
+            )
+            .unwrap(),
+        );
+        // dioxinEmissionRate with 0 rows.
+        store.insert(
+            "dioxinEmissionRate",
+            DataFrame::new(
+                0,
+                vec![
+                    Series::new("polProcessID".into(), Vec::<i64>::new()).into(),
+                    Series::new("fuelTypeID".into(), Vec::<i64>::new()).into(),
+                    Series::new("modelYearGroupID".into(), Vec::<i64>::new()).into(),
+                    Series::new("meanBaseRate".into(), Vec::<f64>::new()).into(),
+                ],
+            )
+            .unwrap(),
+        );
+        transform_airtoxics_rate_tables(&mut store).expect("transform on empty table failed");
+        let df = store.get("dioxinemissionrate").unwrap();
+        assert_eq!(df.height(), 0, "empty input yields empty output");
     }
 }
