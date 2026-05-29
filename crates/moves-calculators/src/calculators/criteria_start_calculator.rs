@@ -134,6 +134,7 @@ use rustc_hash::FxHashMap;
 use std::collections::HashSet;
 
 use rayon::join;
+use rayon::slice::ParallelSliceMut;
 
 use moves_calculator_info::{Granularity, Priority};
 use moves_data::{PollutantProcessAssociation, ProcessId};
@@ -3473,7 +3474,7 @@ impl CriteriaStartCalculator {
         let mut output =
             assemble_emission_output(inputs, ctx, &starts2, &activity_weighted_2, &im_merged);
 
-        output.sort_unstable_by_key(CriteriaStartEmissionRow::dimension_key);
+        output.par_sort_unstable_by_key(CriteriaStartEmissionRow::dimension_key);
         output
     }
 }
