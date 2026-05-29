@@ -74,6 +74,7 @@ pub fn register_all(
     use generators::baserategenerator;
     use generators::evap_op_mode_distribution;
     use generators::fueleffectsgenerator;
+    use generators::link_op_mode_distribution;
     use generators::meteorology;
     use generators::operating_mode_distribution;
     use generators::source_bin_distribution_generator;
@@ -222,6 +223,10 @@ pub fn register_all(
     registry.register_generator(
         avg_speed_op_mode_distribution::AverageSpeedOperatingModeDistributionGenerator::NAME,
         avg_speed_op_mode_distribution::factory,
+    )?;
+    registry.register_generator(
+        link_op_mode_distribution::LinkOperatingModeDistributionGenerator::NAME,
+        link_op_mode_distribution::factory,
     )?;
     registry.register_generator(
         evap_op_mode_distribution::EvaporativeEmissionsOperatingModeDistributionGenerator::NAME,

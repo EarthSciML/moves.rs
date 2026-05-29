@@ -1590,6 +1590,12 @@ impl Generator for LinkOperatingModeDistributionGenerator {
     }
 }
 
+/// Factory for [`moves_framework::GeneratorRegistry`] — returns a
+/// heap-allocated default [`LinkOperatingModeDistributionGenerator`].
+pub fn factory() -> Box<dyn Generator> {
+    Box::new(LinkOperatingModeDistributionGenerator::new())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
