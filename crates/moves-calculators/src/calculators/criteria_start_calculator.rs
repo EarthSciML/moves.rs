@@ -133,6 +133,8 @@
 use rustc_hash::FxHashMap;
 use std::collections::HashSet;
 
+use rayon::join;
+
 use moves_calculator_info::{Granularity, Priority};
 use moves_data::{PollutantProcessAssociation, ProcessId};
 use moves_framework::{
@@ -3442,15 +3444,32 @@ impl CriteriaStartCalculator {
         inputs: &CriteriaStartInputs,
         ctx: &RunContext,
     ) -> Vec<CriteriaStartEmissionRow> {
-        let im_merged = im_coverage_merged(inputs, ctx);
-        let fuel_supply_adj = fuel_supply_adjustment(inputs, ctx);
-        let met_start = met_start_adjustment(inputs);
+        // CSEC 1-a (im_merged), CSEC-2 (fuel_supply_adj), CSEC-3 (met_start),
+        // and the starts2 input for CSEC-8 are mutually independent — each
+        // reads only `inputs`/`ctx`. Run all four in parallel so the Start
+        // chunk exploits multiple cores instead of executing them serially.
+        let ((im_merged, fuel_supply_adj), (met_start, starts2)) = join(
+            || {
+                join(
+                    || im_coverage_merged(inputs, ctx),
+                    || fuel_supply_adjustment(inputs, ctx),
+                )
+            },
+            || {
+                join(
+                    || met_start_adjustment(inputs),
+                    || build_starts2(inputs, ctx),
+                )
+            },
+        );
+        // CSEC-4 through CSEC-7 form a sequential chain: each step feeds
+        // the next. CSEC-7 joins the chain output with `fuel_supply_adj`
+        // (already computed by the parallel phase above).
         let emission_rates = emission_rates_with_im_and_temp(inputs, ctx, &met_start);
         let met_source_bin = met_source_bin_emission_rates(inputs, &emission_rates);
         let activity_weighted = activity_weighted_emission_rate(inputs, &met_source_bin);
         let activity_weighted_2 =
             activity_weighted_emission_rate_2(inputs, &activity_weighted, &fuel_supply_adj);
-        let starts2 = build_starts2(inputs, ctx);
         let mut output =
             assemble_emission_output(inputs, ctx, &starts2, &activity_weighted_2, &im_merged);
 
