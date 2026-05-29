@@ -45,6 +45,7 @@ pub fn register_all(
 ) -> std::result::Result<(), moves_framework::Error> {
     use calculators::activitycalculator;
     use calculators::airtoxics;
+    use calculators::airtoxicsdistance;
     use calculators::baseratecalculator;
     use calculators::basicbraketirepm;
     use calculators::basicstartpm;
@@ -80,6 +81,10 @@ pub fn register_all(
         activitycalculator::factory,
     )?;
     registry.register_calculator(airtoxics::AirToxicsCalculator::NAME, airtoxics::factory)?;
+    registry.register_calculator(
+        airtoxicsdistance::AirToxicsDistanceCalculator::NAME,
+        airtoxicsdistance::factory,
+    )?;
     registry.register_calculator(
         baseratecalculator::BaseRateCalculator::NAME,
         baseratecalculator::factory,

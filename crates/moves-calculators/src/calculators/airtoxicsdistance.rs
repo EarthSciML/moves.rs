@@ -1585,6 +1585,440 @@ impl TableRow for WorkerOutputRow {
 }
 
 // ===========================================================================
+// Section Extract Data — raw default-DB row types and transform helpers.
+//
+// The snapshot stores `dioxinEmissionRate` and `metalEmissionRate` in the
+// raw default-DB schema (`polProcessID`, `modelYearGroupID`, `units`, …).
+// The functions below port the SQL script's `Section Extract Data` step:
+//   * split `polProcessID` → `(processID, pollutantID)` via `PollutantProcessAssoc`;
+//   * expand `modelYearGroupID` → individual `modelYearID` rows via
+//     `PollutantProcessMappedModelYear`;
+//   * normalise `meanBaseRate` to per-mile units (multiply by 1.609 344 when
+//     the `units` column contains "/km").
+// ===========================================================================
+
+/// Raw `dioxinEmissionRate` row from the default-DB / snapshot — before the
+/// `Section Extract Data` transform is applied.
+#[derive(Debug, Clone)]
+struct RawDioxinRateRow {
+    pol_process_id: i32,
+    fuel_type_id: i32,
+    model_year_group_id: i32,
+    units: String,
+    mean_base_rate: f64,
+}
+
+/// Raw `metalEmissionRate` row from the default-DB / snapshot.
+#[derive(Debug, Clone)]
+struct RawMetalRateRow {
+    pol_process_id: i32,
+    fuel_type_id: i32,
+    source_type_id: i32,
+    model_year_group_id: i32,
+    units: String,
+    mean_base_rate: f64,
+}
+
+/// `PollutantProcessAssoc` row — the `polProcessID` → `(processID, pollutantID)` map.
+#[derive(Debug, Clone, Copy)]
+struct LocalPpaRow {
+    pol_process_id: i32,
+    process_id: i32,
+    pollutant_id: i32,
+}
+
+/// `PollutantProcessMappedModelYear` row — maps a `(polProcessID,
+/// modelYearGroupID)` cell to one individual `modelYearID`.
+#[derive(Debug, Clone, Copy)]
+struct LocalPpmyRow {
+    pol_process_id: i32,
+    model_year_group_id: i32,
+    model_year_id: i32,
+}
+
+impl TableRow for RawDioxinRateRow {
+    fn table_name() -> &'static str {
+        "dioxinEmissionRate"
+    }
+
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("polProcessID".into(), DataType::Int32),
+            ("fuelTypeID".into(), DataType::Int32),
+            ("modelYearGroupID".into(), DataType::Int32),
+            ("units".into(), DataType::String),
+            ("meanBaseRate".into(), DataType::Float64),
+        ])
+    }
+
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "polProcessID".into(),
+                    rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelTypeID".into(),
+                    rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "modelYearGroupID".into(),
+                    rows.iter()
+                        .map(|r| r.model_year_group_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "units".into(),
+                    rows.iter().map(|r| r.units.as_str()).collect::<Vec<&str>>(),
+                )
+                .into(),
+                Series::new(
+                    "meanBaseRate".into(),
+                    rows.iter().map(|r| r.mean_base_rate).collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "dioxinEmissionRate";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .f64()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let get_str = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .str()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let pol_proc = get_i32("polProcessID")?;
+        let fuel_type = get_i32("fuelTypeID")?;
+        let my_group = get_i32("modelYearGroupID")?;
+        let units_ca = get_str("units")?;
+        let rate = get_f64("meanBaseRate")?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(RawDioxinRateRow {
+                    pol_process_id: pol_proc.get(i).ok_or_else(|| null("polProcessID"))?,
+                    fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
+                    model_year_group_id: my_group.get(i).ok_or_else(|| null("modelYearGroupID"))?,
+                    units: units_ca.get(i).ok_or_else(|| null("units"))?.to_string(),
+                    mean_base_rate: rate.get(i).ok_or_else(|| null("meanBaseRate"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for RawMetalRateRow {
+    fn table_name() -> &'static str {
+        "metalEmissionRate"
+    }
+
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("polProcessID".into(), DataType::Int32),
+            ("fuelTypeID".into(), DataType::Int32),
+            ("sourceTypeID".into(), DataType::Int32),
+            ("modelYearGroupID".into(), DataType::Int32),
+            ("units".into(), DataType::String),
+            ("meanBaseRate".into(), DataType::Float64),
+        ])
+    }
+
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "polProcessID".into(),
+                    rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelTypeID".into(),
+                    rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "modelYearGroupID".into(),
+                    rows.iter()
+                        .map(|r| r.model_year_group_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "units".into(),
+                    rows.iter().map(|r| r.units.as_str()).collect::<Vec<&str>>(),
+                )
+                .into(),
+                Series::new(
+                    "meanBaseRate".into(),
+                    rows.iter().map(|r| r.mean_base_rate).collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "metalEmissionRate";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let get_f64 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .f64()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let get_str = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .str()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let pol_proc = get_i32("polProcessID")?;
+        let fuel_type = get_i32("fuelTypeID")?;
+        let src_type = get_i32("sourceTypeID")?;
+        let my_group = get_i32("modelYearGroupID")?;
+        let units_ca = get_str("units")?;
+        let rate = get_f64("meanBaseRate")?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(RawMetalRateRow {
+                    pol_process_id: pol_proc.get(i).ok_or_else(|| null("polProcessID"))?,
+                    fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
+                    source_type_id: src_type.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                    model_year_group_id: my_group.get(i).ok_or_else(|| null("modelYearGroupID"))?,
+                    units: units_ca.get(i).ok_or_else(|| null("units"))?.to_string(),
+                    mean_base_rate: rate.get(i).ok_or_else(|| null("meanBaseRate"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for LocalPpaRow {
+    fn table_name() -> &'static str {
+        "PollutantProcessAssoc"
+    }
+
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("polProcessID".into(), DataType::Int32),
+            ("processID".into(), DataType::Int32),
+            ("pollutantID".into(), DataType::Int32),
+        ])
+    }
+
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "polProcessID".into(),
+                    rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "processID".into(),
+                    rows.iter().map(|r| r.process_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "pollutantID".into(),
+                    rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "PollutantProcessAssoc";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let pol_proc = get_i32("polProcessID")?;
+        let process = get_i32("processID")?;
+        let pollutant = get_i32("pollutantID")?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(LocalPpaRow {
+                    pol_process_id: pol_proc.get(i).ok_or_else(|| null("polProcessID"))?,
+                    process_id: process.get(i).ok_or_else(|| null("processID"))?,
+                    pollutant_id: pollutant.get(i).ok_or_else(|| null("pollutantID"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for LocalPpmyRow {
+    fn table_name() -> &'static str {
+        "PollutantProcessMappedModelYear"
+    }
+
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("polProcessID".into(), DataType::Int32),
+            ("modelYearGroupID".into(), DataType::Int32),
+            ("modelYearID".into(), DataType::Int32),
+        ])
+    }
+
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "polProcessID".into(),
+                    rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "modelYearGroupID".into(),
+                    rows.iter()
+                        .map(|r| r.model_year_group_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "modelYearID".into(),
+                    rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "PollutantProcessMappedModelYear";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let pol_proc = get_i32("polProcessID")?;
+        let my_group = get_i32("modelYearGroupID")?;
+        let model_year = get_i32("modelYearID")?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(LocalPpmyRow {
+                    pol_process_id: pol_proc.get(i).ok_or_else(|| null("polProcessID"))?,
+                    model_year_group_id: my_group.get(i).ok_or_else(|| null("modelYearGroupID"))?,
+                    model_year_id: model_year.get(i).ok_or_else(|| null("modelYearID"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+/// Kilometres per mile — used to normalise `/km` rates to per-mile.
+const KM_PER_MILE: f64 = 1.609_344;
+
+fn unit_factor(units: &str) -> f64 {
+    if units.contains("/km") {
+        KM_PER_MILE
+    } else {
+        1.0
+    }
+}
+
+/// Apply the `Section Extract Data` transform for `dioxinEmissionRate`.
+fn extract_dioxin_rates(
+    raw: Vec<RawDioxinRateRow>,
+    ppa: &HashMap<i32, (i32, i32)>,
+    my_of_group: &HashMap<(i32, i32), Vec<i32>>,
+) -> Vec<DioxinEmissionRateRow> {
+    let mut out = Vec::new();
+    for r in raw {
+        let Some(&(process_id, pollutant_id)) = ppa.get(&r.pol_process_id) else {
+            continue;
+        };
+        let factor = unit_factor(&r.units);
+        let Some(model_years) = my_of_group.get(&(r.pol_process_id, r.model_year_group_id)) else {
+            continue;
+        };
+        for &model_year_id in model_years {
+            out.push(DioxinEmissionRateRow {
+                process_id,
+                pollutant_id,
+                fuel_type_id: r.fuel_type_id,
+                model_year_id,
+                mean_base_rate: r.mean_base_rate * factor,
+            });
+        }
+    }
+    out
+}
+
+/// Apply the `Section Extract Data` transform for `metalEmissionRate`.
+fn extract_metal_rates(
+    raw: Vec<RawMetalRateRow>,
+    ppa: &HashMap<i32, (i32, i32)>,
+    my_of_group: &HashMap<(i32, i32), Vec<i32>>,
+) -> Vec<MetalEmissionRateRow> {
+    let mut out = Vec::new();
+    for r in raw {
+        let Some(&(process_id, pollutant_id)) = ppa.get(&r.pol_process_id) else {
+            continue;
+        };
+        let factor = unit_factor(&r.units);
+        let Some(model_years) = my_of_group.get(&(r.pol_process_id, r.model_year_group_id)) else {
+            continue;
+        };
+        for &model_year_id in model_years {
+            out.push(MetalEmissionRateRow {
+                process_id,
+                pollutant_id,
+                fuel_type_id: r.fuel_type_id,
+                source_type_id: r.source_type_id,
+                model_year_id,
+                mean_base_rate: r.mean_base_rate * factor,
+            });
+        }
+    }
+    out
+}
+
+// ===========================================================================
 // The calculator.
 // ===========================================================================
 
@@ -1661,11 +2095,12 @@ fn subscriptions() -> &'static [CalculatorSubscription] {
 /// registering them here too would double-register them.
 static REGISTRATIONS: &[PollutantProcessAssociation] = &[];
 
-/// Tables `AirToxicsDistanceCalculator.sql`'s `Section Processing` reads.
+/// Tables consumed by `AirToxicsDistanceCalculator.sql`.
 ///
-/// `dioxinEmissionRate` / `metalEmissionRate` name the default-DB rate
-/// tables; the data plane applies the `Section Extract Data` transform that
-/// reshapes them into the worker schema this port consumes. The extract-only
+/// `dioxinEmissionRate` and `metalEmissionRate` are the raw default-DB tables;
+/// `PollutantProcessAssoc` and `PollutantProcessMappedModelYear` drive the
+/// `Section Extract Data` transform that resolves and expands them before
+/// `execute` builds [`AirToxicsDistanceInputs`]. The extract-only
 /// `EmissionProcess` table, which `Section Processing` does not read, is
 /// omitted.
 static INPUT_TABLES: &[&str] = &[
@@ -1678,6 +2113,8 @@ static INPUT_TABLES: &[&str] = &[
     "County",
     "dioxinEmissionRate",
     "metalEmissionRate",
+    "PollutantProcessAssoc",
+    "PollutantProcessMappedModelYear",
 ];
 
 impl Calculator for AirToxicsDistanceCalculator {
@@ -1702,6 +2139,21 @@ impl Calculator for AirToxicsDistanceCalculator {
 
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let tables = ctx.tables();
+
+        // Build lookup maps for the Section Extract Data transform.
+        let ppa: HashMap<i32, (i32, i32)> = tables
+            .iter_typed::<LocalPpaRow>("PollutantProcessAssoc")?
+            .into_iter()
+            .map(|r| (r.pol_process_id, (r.process_id, r.pollutant_id)))
+            .collect();
+        let mut my_of_group: HashMap<(i32, i32), Vec<i32>> = HashMap::new();
+        for ppmy in tables.iter_typed::<LocalPpmyRow>("PollutantProcessMappedModelYear")? {
+            my_of_group
+                .entry((ppmy.pol_process_id, ppmy.model_year_group_id))
+                .or_default()
+                .push(ppmy.model_year_id);
+        }
+
         let inputs = AirToxicsDistanceInputs {
             source_bin_distribution: tables.iter_typed("SourceBinDistribution")?,
             source_bin: tables.iter_typed("SourceBin")?,
@@ -1710,8 +2162,16 @@ impl Calculator for AirToxicsDistanceCalculator {
             hour_day: tables.iter_typed("HourDay")?,
             link: tables.iter_typed("Link")?,
             county: tables.iter_typed("County")?,
-            dioxin_emission_rate: tables.iter_typed("dioxinEmissionRate")?,
-            metal_emission_rate: tables.iter_typed("metalEmissionRate")?,
+            dioxin_emission_rate: extract_dioxin_rates(
+                tables.iter_typed("dioxinEmissionRate")?,
+                &ppa,
+                &my_of_group,
+            ),
+            metal_emission_rate: extract_metal_rates(
+                tables.iter_typed("metalEmissionRate")?,
+                &ppa,
+                &my_of_group,
+            ),
         };
         let output_rows = AirToxicsDistanceCalculator::run(&inputs);
         crate::wiring::emit_rows(output_rows)
@@ -1817,15 +2277,20 @@ mod tests {
         assert!(calc.input_tables().contains(&"SHO"));
     }
 
-    #[test]
-    fn execute_wires_through_data_plane() {
+    /// Build store tables for `execute` from `single_flow_inputs`.
+    ///
+    /// Provides the raw default-DB schema for `dioxinEmissionRate` /
+    /// `metalEmissionRate` (with `polProcessID` / `modelYearGroupID`) plus the
+    /// `PollutantProcessAssoc` and `PollutantProcessMappedModelYear` lookup
+    /// tables that `execute` joins to produce the worker schema.
+    fn store_from_single_flow_inputs() -> moves_framework::InMemoryStore {
         use moves_framework::DataFrameStore;
-        let calc = AirToxicsDistanceCalculator::new();
-        let mut store = moves_framework::InMemoryStore::new();
         let inputs = single_flow_inputs();
-        // Use raw insert so validation against the registry SourceBinDistribution
-        // schema (which includes polProcessID) is bypassed — this module's
-        // SourceBinDistributionRow intentionally omits that column.
+        let mut store = moves_framework::InMemoryStore::new();
+
+        // Non-rate tables: raw insert bypasses registry schema validation.
+        // SourceBinDistributionRow intentionally omits the `polProcessID`
+        // column present in the registry schema.
         store.insert(
             "SourceBinDistribution",
             SourceBinDistributionRow::into_dataframe(inputs.source_bin_distribution).unwrap(),
@@ -1845,14 +2310,78 @@ mod tests {
         );
         store.insert("Link", LinkRow::into_dataframe(inputs.link).unwrap());
         store.insert("County", CountyRow::into_dataframe(inputs.county).unwrap());
+
+        // Rate tables: raw default-DB schema with polProcessID and modelYearGroupID.
+        // single_flow_inputs uses:
+        //   dioxin pollutant 130 process 1 → polProcessID = 13001
+        //   metal  pollutant  63 process 1 → polProcessID =  6301
+        // Both expand through modelYearGroupID 10000 → modelYearID 2015.
+        let dioxin_ppid = 13001_i32;
+        let metal_ppid = 6301_i32;
+        let my_group = 10000_i32;
+
         store.insert(
             "dioxinEmissionRate",
-            DioxinEmissionRateRow::into_dataframe(inputs.dioxin_emission_rate).unwrap(),
+            RawDioxinRateRow::into_dataframe(vec![RawDioxinRateRow {
+                pol_process_id: dioxin_ppid,
+                fuel_type_id: 2,
+                model_year_group_id: my_group,
+                units: "g/mile".into(),
+                mean_base_rate: 0.05,
+            }])
+            .unwrap(),
         );
         store.insert(
             "metalEmissionRate",
-            MetalEmissionRateRow::into_dataframe(inputs.metal_emission_rate).unwrap(),
+            RawMetalRateRow::into_dataframe(vec![RawMetalRateRow {
+                pol_process_id: metal_ppid,
+                fuel_type_id: 2,
+                source_type_id: 21,
+                model_year_group_id: my_group,
+                units: "g/mile".into(),
+                mean_base_rate: 0.02,
+            }])
+            .unwrap(),
         );
+        store.insert(
+            "PollutantProcessAssoc",
+            LocalPpaRow::into_dataframe(vec![
+                LocalPpaRow {
+                    pol_process_id: dioxin_ppid,
+                    process_id: 1,
+                    pollutant_id: 130,
+                },
+                LocalPpaRow {
+                    pol_process_id: metal_ppid,
+                    process_id: 1,
+                    pollutant_id: 63,
+                },
+            ])
+            .unwrap(),
+        );
+        store.insert(
+            "PollutantProcessMappedModelYear",
+            LocalPpmyRow::into_dataframe(vec![
+                LocalPpmyRow {
+                    pol_process_id: dioxin_ppid,
+                    model_year_group_id: my_group,
+                    model_year_id: 2015,
+                },
+                LocalPpmyRow {
+                    pol_process_id: metal_ppid,
+                    model_year_group_id: my_group,
+                    model_year_id: 2015,
+                },
+            ])
+            .unwrap(),
+        );
+        store
+    }
+
+    #[test]
+    fn execute_wires_through_data_plane() {
+        let calc = AirToxicsDistanceCalculator::new();
+        let store = store_from_single_flow_inputs();
         let ctx = CalculatorContext::with_tables(store);
         let out = calc.execute(&ctx).expect("execute ok");
         let df = out.dataframe().expect("output should contain a DataFrame");
@@ -1886,6 +2415,46 @@ mod tests {
             (eqs[1] - 4.0).abs() < 1e-12,
             "dioxin emissionQuant {}",
             eqs[1]
+        );
+    }
+
+    #[test]
+    fn execute_normalises_km_units_to_per_mile() {
+        // A rate stored as 0.05 g/km should be multiplied by 1.609344 km/mi
+        // to produce ~0.080 467 2 g/mi before the activity multiply.
+        use moves_framework::DataFrameStore;
+        let mut store = store_from_single_flow_inputs();
+        // Replace the dioxin rate table with a /km entry at the same raw rate.
+        store.insert(
+            "dioxinEmissionRate",
+            RawDioxinRateRow::into_dataframe(vec![RawDioxinRateRow {
+                pol_process_id: 13001,
+                fuel_type_id: 2,
+                model_year_group_id: 10000,
+                units: "g/km".into(),
+                mean_base_rate: 0.05,
+            }])
+            .unwrap(),
+        );
+        let ctx = CalculatorContext::with_tables(store);
+        let out = AirToxicsDistanceCalculator::new()
+            .execute(&ctx)
+            .expect("execute ok");
+        let df = out.dataframe().expect("output DataFrame");
+        // activity = 80 mi; dioxin rate = 0.05 g/km * 1.609344 km/mi.
+        let eqs: Vec<f64> = df
+            .column("emissionQuant")
+            .unwrap()
+            .f64()
+            .unwrap()
+            .into_iter()
+            .map(|v| v.unwrap())
+            .collect();
+        let dioxin_eq = eqs.iter().copied().find(|&v| v > 5.0).unwrap();
+        let expected = 80.0 * 0.05 * KM_PER_MILE;
+        assert!(
+            (dioxin_eq - expected).abs() < 1e-10,
+            "dioxin emissionQuant {dioxin_eq} expected {expected}"
         );
     }
 
