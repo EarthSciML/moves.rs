@@ -174,11 +174,11 @@ mod tests {
     }
 
     #[test]
-    fn matrix_is_23_by_16() {
+    fn matrix_is_23_by_17() {
         let m = matrix();
         assert_eq!(m.fixture_names().len(), 23);
-        assert_eq!(m.generator_names().len(), 16);
-        assert!(m.cells.iter().all(|row| row.len() == 16));
+        assert_eq!(m.generator_names().len(), 17);
+        assert!(m.cells.iter().all(|row| row.len() == 17));
     }
 
     #[test]

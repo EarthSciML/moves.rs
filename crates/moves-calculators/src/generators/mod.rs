@@ -14,6 +14,7 @@ pub mod mesoscale_lookup;
 pub mod meteorology;
 pub mod new_tvv_year_generator;
 pub mod operating_mode_distribution;
+pub mod project_tag;
 pub mod rates_op_mode_distribution;
 pub mod source_bin_distribution_generator;
 pub mod sourcetypephysics;

@@ -61,12 +61,12 @@ fn all_23_onroad_fixtures_present_and_parse() {
 }
 
 #[test]
-fn all_16_generators_registered() {
+fn all_17_generators_registered() {
     let registered = generators::all_generators();
     assert_eq!(
         registered.len(),
         generators::GENERATOR_COUNT,
-        "expected 16 Phase 3 generators"
+        "expected 17 generators (16 Phase 3 + ProjectTAG)"
     );
 
     let names = generators::sorted_generator_names();

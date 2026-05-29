@@ -79,6 +79,7 @@ pub fn register_all(
     use generators::meteorology;
     use generators::new_tvv_year_generator;
     use generators::operating_mode_distribution;
+    use generators::project_tag;
     use generators::rates_op_mode_distribution;
     use generators::source_bin_distribution_generator;
     use generators::sourcetypephysics;
@@ -274,6 +275,7 @@ pub fn register_all(
         rates_op_mode_distribution::RatesOperatingModeDistributionGenerator::NAME,
         rates_op_mode_distribution::factory,
     )?;
+    registry.register_generator(project_tag::ProjectTAG::NAME, project_tag::factory)?;
 
     Ok(())
 }

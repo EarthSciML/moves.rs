@@ -1,11 +1,10 @@
-//! The Phase 3 generator catalogue (Tasks 29–43).
+//! The Phase 3 + Phase 4 generator catalogue (Tasks 29–43, Phase 4 additions).
 //!
-//! Tasks 29–43 of the migration plan port the MOVES onroad
-//! generators. They land **16** `Generator` implementations — one per
-//! task, except Task 35 (`MesoscaleLookup…`) which ports a paired
-//! operating-mode + total-activity generator.
+//! Tasks 29–43 of the migration plan port the MOVES onroad generators — 16
+//! implementations (Task 35 ports two generators). Phase 4 adds `ProjectTAG`
+//! (the project-domain total activity generator, `ProjectTAG.java`).
 //!
-//! [`all_generators`] instantiates all 16 as boxed trait objects.
+//! [`all_generators`] instantiates all 17 as boxed trait objects.
 //! The harness reads `name()`, `subscriptions()`, and
 //! `output_tables()` straight off those objects, so the catalogue is
 //! the live trait impls — there is no hand-copied table to drift.
@@ -23,7 +22,7 @@ use moves_calculators::generators::{
     mesoscale_lookup::op_mode_distribution::MesoscaleLookupOperatingModeDistributionGenerator,
     mesoscale_lookup::total_activity::MesoscaleLookupTotalActivityGenerator,
     meteorology::MeteorologyGenerator,
-    operating_mode_distribution::OperatingModeDistributionGenerator,
+    operating_mode_distribution::OperatingModeDistributionGenerator, project_tag::ProjectTAG,
     rates_op_mode_distribution::RatesOperatingModeDistributionGenerator,
     source_bin_distribution_generator::SourceBinDistributionGenerator,
     sourcetypephysics::SourceTypePhysics,
@@ -32,11 +31,11 @@ use moves_calculators::generators::{
     totalactivitygenerator::TotalActivityGenerator,
 };
 
-/// The number of generators the Phase 3 plan lands (Tasks 29–43,
-/// counting the paired Task 35 generators separately).
-pub const GENERATOR_COUNT: usize = 16;
+/// The number of generators landed so far: 16 Phase 3 (Tasks 29–43) plus
+/// 1 Phase 4 (`ProjectTAG`).
+pub const GENERATOR_COUNT: usize = 17;
 
-/// Construct every Phase 3 generator as a boxed trait object.
+/// Construct every Phase 3 + Phase 4 generator as a boxed trait object.
 ///
 /// The list is the harness's source of truth for "the generators"
 /// — it is the real `Generator` implementations from the
@@ -52,6 +51,7 @@ pub fn all_generators() -> Vec<Box<dyn Generator>> {
         Box::new(MesoscaleLookupTotalActivityGenerator::new()),
         Box::new(MeteorologyGenerator),
         Box::new(OperatingModeDistributionGenerator::new()),
+        Box::new(ProjectTAG::new()),
         Box::new(RatesOperatingModeDistributionGenerator::new()),
         Box::new(SourceBinDistributionGenerator),
         Box::new(SourceTypePhysics::new()),
@@ -96,7 +96,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn catalogue_has_16_generators() {
+    fn catalogue_has_17_generators() {
         assert_eq!(all_generators().len(), GENERATOR_COUNT);
     }
 
