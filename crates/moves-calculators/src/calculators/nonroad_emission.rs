@@ -220,14 +220,20 @@ impl Calculator for NonroadEmissionCalculator {
             );
         }
 
-        // Map the engine's SimEmissionRows onto the MOVESOutput schema.
+        // Map the engine's SimEmissionRows onto the MOVESOutput schema,
+        // allocating the engine's annual emissions onto this iteration's
+        // month/day slice.
+        let month = time.month.map(i32::from);
+        let day = time.day_id.map(i32::from);
         let keys = EmissionTimeKeys {
             year,
-            month: time.month.map(i32::from),
-            day: time.day_id.map(i32::from),
+            month,
+            day,
             hour: time.hour.map(i32::from),
         };
-        match nonroad_loader::emissions_to_dataframe(&outputs.rows, &keys)
+        let temporal =
+            nonroad_loader::build_temporal_factors(store, month.unwrap_or(0), day.unwrap_or(0));
+        match nonroad_loader::emissions_to_dataframe(&outputs.rows, &keys, &temporal)
             .map_err(|e| Error::Polars(e.to_string()))?
         {
             Some(df) => Ok(CalculatorOutput::with_dataframe(df)),

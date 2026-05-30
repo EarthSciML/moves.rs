@@ -344,6 +344,27 @@ fn family_root(scc: &str) -> String {
     }
 }
 
+/// Most-specific lookup of a 10-digit SCC in a key set: try the full SCC,
+/// then progressively zero trailing digit groups (subtype → equipment →
+/// family), since different nr* tables key at different SCC aggregation
+/// levels (e.g. `nrmonthallocation` keys at the equipment level
+/// `2260001000`, not the family root `2260000000`).
+fn scc_lookup<'a, V>(map: &'a BTreeMap<String, V>, scc: &str) -> Option<&'a V> {
+    if let Some(v) = map.get(scc) {
+        return Some(v);
+    }
+    if scc.len() == 10 {
+        for k in [2usize, 4, 6] {
+            let mut key = scc[..10 - k].to_string();
+            key.push_str(&"0".repeat(k));
+            if let Some(v) = map.get(&key) {
+                return Some(v);
+            }
+        }
+    }
+    None
+}
+
 /// Distinct full SCCs present in `nrsourceusetype` (the population /
 /// driver-record SCCs). Empty when the table is absent.
 fn population_sccs<S: DataFrameStore + ?Sized>(store: &S) -> Vec<String> {
@@ -764,16 +785,74 @@ const GRAMS_PER_SHORT_TON: f64 = 1.0 / 1.102_311e-6;
 /// exhaust pollutants (THC, CO, NOx, PM10).
 const SLOT_POLLUTANT: [(usize, i32); 4] = [(0, 1), (1, 2), (2, 3), (5, 100)];
 
+/// Per-SCC temporal allocation factor (month fraction × day fraction)
+/// applied to the engine's *annual* emissions to land on the runspec's
+/// month/day slice. Built from `nrmonthallocation` + `nrdayallocation`.
+///
+/// `monthFraction` is keyed `(SCC, stateID, monthID)`; `dayFraction` is
+/// keyed `(scc, dayID)` (note the lowercase column). An SCC missing from
+/// either table contributes a factor of 1.0 for that dimension (no
+/// allocation), with a family-root (`22XX000000`) fallback first.
+pub fn build_temporal_factors<S: DataFrameStore + ?Sized>(
+    store: &S,
+    month: i32,
+    day: i32,
+) -> BTreeMap<String, f64> {
+    let mut month_by_scc: BTreeMap<String, f64> = BTreeMap::new();
+    if let Some(df) = store.get("nrmonthallocation") {
+        let scc = str_col(&df, "SCC");
+        let m = int_col(&df, "monthID");
+        let f = float_col(&df, "monthFraction");
+        for i in 0..df.height() {
+            if m[i] == month as i64 {
+                month_by_scc.insert(scc[i].clone(), f[i]);
+            }
+        }
+    }
+    let mut day_by_scc: BTreeMap<String, f64> = BTreeMap::new();
+    if let Some(df) = store.get("nrdayallocation") {
+        let scc = str_col(&df, "scc");
+        let d = int_col(&df, "dayID");
+        let f = float_col(&df, "dayFraction");
+        for i in 0..df.height() {
+            if d[i] == day as i64 {
+                day_by_scc.insert(scc[i].clone(), f[i]);
+            }
+        }
+    }
+
+    let lookup = |map: &BTreeMap<String, f64>, scc: &str| -> f64 {
+        map.get(scc)
+            .or_else(|| map.get(&family_root(scc)))
+            .copied()
+            .unwrap_or(1.0)
+    };
+
+    let mut factors = BTreeMap::new();
+    let sccs: std::collections::BTreeSet<&String> =
+        month_by_scc.keys().chain(day_by_scc.keys()).collect();
+    for scc in sccs {
+        factors.insert(
+            scc.clone(),
+            lookup(&month_by_scc, scc) * lookup(&day_by_scc, scc),
+        );
+    }
+    factors
+}
+
 /// Convert the engine's [`SimEmissionRow`]s into a MOVESOutput-shaped
 /// DataFrame the framework's `frame_to_emission_records` consumes.
 ///
 /// Emits one row per `(SimEmissionRow, emitted pollutant)` with non-zero
-/// emissions, converting short tons → grams. Returns `Ok(None)` when no
+/// emissions, converting short tons → grams and applying the per-SCC
+/// `temporal` allocation factor (annual → the runspec month/day slice;
+/// pass an empty map for no allocation). Returns `Ok(None)` when no
 /// non-zero emissions were produced. Integer columns are `i32` (the
 /// physical type the framework reads via `.i32()`).
 pub fn emissions_to_dataframe(
     rows: &[SimEmissionRow],
     keys: &EmissionTimeKeys,
+    temporal: &BTreeMap<String, f64>,
 ) -> PolarsResult<Option<DataFrame>> {
     let mut year = Vec::new();
     let mut month = Vec::new();
@@ -784,6 +863,7 @@ pub fn emissions_to_dataframe(
     let mut quant = Vec::new();
 
     for row in rows {
+        let tfac = scc_lookup(temporal, &row.scc).copied().unwrap_or(1.0);
         for (slot, pid) in SLOT_POLLUTANT {
             let e = row.emissions.get(slot).copied().unwrap_or(0.0);
             if e == 0.0 {
@@ -795,7 +875,7 @@ pub fn emissions_to_dataframe(
             hour.push(keys.hour.unwrap_or(0));
             pollutant.push(pid);
             process.push(1_i32); // nonroad emission process
-            quant.push(e as f64 * GRAMS_PER_SHORT_TON);
+            quant.push(e as f64 * GRAMS_PER_SHORT_TON * tfac);
         }
     }
 
@@ -850,6 +930,9 @@ mod tests {
             "nrengtechfraction",
             "nrsourceusetype",
             "nrbaseyearequippopulation",
+            "nrscrappagecurve",
+            "nrmonthallocation",
+            "nrdayallocation",
         ] {
             if let Some(df) = load(t) {
                 store.insert(t, df);
@@ -918,22 +1001,29 @@ mod tests {
             .filter(|r| r.emissions.iter().any(|&e| e != 0.0))
             .count();
         eprintln!("nonzero rows = {nonzero}");
+        let temporal = build_temporal_factors(&store, 8, 5);
         let mut tot = [0.0f64; 4]; // THC, CO, NOx, PM
         for r in &out.rows {
-            tot[0] += r.emissions[0] as f64;
-            tot[1] += r.emissions[1] as f64;
-            tot[2] += r.emissions[2] as f64;
-            tot[3] += r.emissions[5] as f64;
+            let tf = scc_lookup(&temporal, &r.scc).copied().unwrap_or(1.0);
+            tot[0] += r.emissions[0] as f64 * tf;
+            tot[1] += r.emissions[1] as f64 * tf;
+            tot[2] += r.emissions[2] as f64 * tf;
+            tot[3] += r.emissions[5] as f64 * tf;
         }
         let g = 1.0 / 1.102_311e-6; // short tons -> grams
         eprintln!(
-            "TOTALS grams: THC={:.3e} CO={:.3e} NOx={:.3e} PM={:.3e}",
+            "TOTALS grams (temporal-allocated): THC={:.3e} CO={:.3e} NOx={:.3e} PM={:.3e}",
             tot[0] * g,
             tot[1] * g,
             tot[2] * g,
             tot[3] * g
         );
-        eprintln!("canonical   : THC=1.414e8 CO=6.508e9 NOx=4.947e7 PM=7.818e6");
+        eprintln!(
+            "canonical                       : THC=1.414e8 CO=6.508e9 NOx=4.947e7 PM=7.818e6"
+        );
+        // Sample temporal factors.
+        let sample: Vec<_> = temporal.iter().take(4).collect();
+        eprintln!("sample temporal factors: {sample:?}");
     }
 
     /// Build a tiny in-memory store mimicking the nr* rate tables.
