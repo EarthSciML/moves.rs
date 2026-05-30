@@ -351,16 +351,27 @@ fn build_entries_from_mix<S: DataFrameStore + ?Sized>(store: &S) -> Vec<ExhaustT
     let mut entries = Vec::new();
     for (scc, hp_milli) in pairs {
         let hp_avg = hp_milli as f32 / 1.0e3;
-        // Resolve the tech-mix SCC (specific or family root).
-        let mix_scc = if mix_sccs.contains(&scc) {
-            scc.clone()
-        } else {
-            family_root(&scc)
+        let root = family_root(&scc);
+        // The tech-mix hp bin containing hp_avg. NONROAD's .TECH lookup uses
+        // the most-specific SCC that has a bin covering this hp, then falls
+        // back to the family-root (default) tech file. A specific SCC's tech
+        // rows need not span every hp bin its population uses: e.g.
+        // 2265006010 has tech rows only for 0-25 hp, but its population
+        // extends to 175 hp — those high-hp points are served by the
+        // 2265000000 root's 25-9999 bin. Without the root fallback those
+        // long-lived (~20 yr) high-hp points are dropped, truncating the
+        // model-year span (and losing ~30 old model years for that SCC).
+        let find_bin = |target: &str| {
+            mix.iter().find(|((s, lo, hi), _)| {
+                s.as_str() == target && (*lo as f32) <= hp_avg && hp_avg <= (*hi as f32)
+            })
         };
-        // The tech-mix hp bin containing hp_avg.
-        let Some((_, tech_map)) = mix.iter().find(|((s, lo, hi), _)| {
-            *s == mix_scc && (*lo as f32) <= hp_avg && hp_avg <= (*hi as f32)
-        }) else {
+        let found = if mix_sccs.contains(&scc) {
+            find_bin(&scc).or_else(|| find_bin(&root))
+        } else {
+            find_bin(&root)
+        };
+        let Some((_, tech_map)) = found else {
             continue;
         };
 
@@ -375,7 +386,6 @@ fn build_entries_from_mix<S: DataFrameStore + ?Sized>(store: &S) -> Vec<ExhaustT
         let mut det_cap = vec![0.0_f32; MXPOL * n_tech];
         let mut bsfc = vec![0.0_f32; n_tech];
         let mut by_year: BTreeMap<i32, Vec<f32>> = BTreeMap::new();
-        let root = family_root(&scc);
 
         for (t, &tid) in tech_ids.iter().enumerate() {
             // BSFC: rate lookup, specific SCC then family root.
