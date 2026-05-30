@@ -1421,7 +1421,11 @@ impl TableRow for SbWeightedRateDetail {
         let op = get_i32("opModeID")?;
         let my = get_i32("modelYearID")?;
         let ft = get_i32("fuelTypeID")?;
-        let ag = get_i32("ageGroupID")?;
+        // The non-age `SBWeightedEmissionRate` table is read with this same
+        // struct but has no `ageGroupID` column; its rows carry age group 0
+        // (see [`SbWeightedRateDetail`]). Treat an absent column — and any NULL
+        // within it — as age group 0 rather than erroring.
+        let ag = df.column("ageGroupID").ok().and_then(|c| c.i32().ok().cloned());
         let rc = get_i32("regClassID")?;
         let sbd = get_f64("sumSBD")?;
         let sbdr = get_f64("sumSBDRaw")?;
@@ -1438,7 +1442,7 @@ impl TableRow for SbWeightedRateDetail {
                     op_mode_id: op.get(i).ok_or_else(|| null("opModeID"))?,
                     model_year_id: my.get(i).ok_or_else(|| null("modelYearID"))?,
                     fuel_type_id: ft.get(i).ok_or_else(|| null("fuelTypeID"))?,
-                    age_group_id: ag.get(i).ok_or_else(|| null("ageGroupID"))?,
+                    age_group_id: ag.as_ref().and_then(|c| c.get(i)).unwrap_or(0),
                     reg_class_id: rc.get(i).ok_or_else(|| null("regClassID"))?,
                     sum_sbd: sbd.get(i).ok_or_else(|| null("sumSBD"))?,
                     sum_sbd_raw: sbdr.get(i).ok_or_else(|| null("sumSBDRaw"))?,
