@@ -198,6 +198,15 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
         // which does not re-run against a snapshot), so they must be admitted
         // explicitly or the load filter drops them and distance stays NULL.
         tables.extend(SHO_DISTANCE_INPUT_TABLES.iter().map(|t| (*t).to_owned()));
+        // `populate_source_use_type_physics_mapping` derives the missing
+        // `sourceUseTypePhysicsMapping` table from `sourceUseTypePhysics` when a
+        // snapshot omits the runtime-built mapping; admit both so neither is
+        // filtered out before the synthesis runs.
+        tables.extend(
+            SOURCE_TYPE_PHYSICS_MAPPING_INPUT_TABLES
+                .iter()
+                .map(|t| (*t).to_owned()),
+        );
         Some(tables)
     } else {
         None
@@ -263,6 +272,11 @@ fn load_execution_db(
     // If the SHO table has null distances (MOVES inserts them before calculateDistance
     // runs), compute distance = SHO * averageSpeed and write back to the store.
     populate_sho_distances(&mut store).context("populating SHO distances from snapshot")?;
+    // Synthesise sourceUseTypePhysicsMapping from sourceUseTypePhysics when the
+    // snapshot omits the runtime-built mapping (MOVES builds it inside
+    // SourceUseTypePhysics.setup, which does not re-run against a snapshot).
+    populate_source_use_type_physics_mapping(&mut store)
+        .context("synthesising sourceUseTypePhysicsMapping from snapshot")?;
     Ok(store)
 }
 
@@ -347,6 +361,15 @@ fn load_execution_db_from_parquet(
 /// calculators' declared inputs; these are not among them, so they are added to
 /// the allowed set explicitly. Lower-cased short names, matching the load filter.
 const SHO_DISTANCE_INPUT_TABLES: &[&str] = &["sho", "link", "averagespeed", "hourday"];
+
+/// Tables [`populate_source_use_type_physics_mapping`] needs to synthesise the
+/// `sourceUseTypePhysicsMapping` table when a snapshot captured the source
+/// `sourceUseTypePhysics` table but not the runtime-derived mapping. Neither is
+/// declared as an input by any calculator (calculators read the *mapping*,
+/// which MOVES builds in `SourceUseTypePhysics.setup()`), so they must be
+/// admitted explicitly or the load filter drops them.
+const SOURCE_TYPE_PHYSICS_MAPPING_INPUT_TABLES: &[&str] =
+    &["sourceusetypephysics", "sourceusetypephysicsmapping"];
 
 /// Compute `SHO.distance = SHO * averageSpeed` from snapshot tables and write
 /// back, so downstream calculators find non-null distances in the slow store.
@@ -478,6 +501,68 @@ fn populate_sho_distances(store: &mut InMemoryStore) -> Result<()> {
     sho_mut
         .with_column(Series::new("distance".into(), distances).into())
         .map_err(|e| anyhow::anyhow!("replacing SHO.distance: {e}"))?;
+    Ok(())
+}
+
+/// Synthesise `sourceUseTypePhysicsMapping` from `sourceUseTypePhysics` when a
+/// snapshot omits it.
+///
+/// MOVES builds `sourceUseTypePhysicsMapping` at runtime in
+/// `SourceUseTypePhysics.setup()`; some execution-DB snapshots capture the
+/// source `sourceUseTypePhysics` table but not the derived mapping. When the
+/// mapping is absent (and the source table present), synthesise the **identity
+/// mapping** — the MOVES default when no alternate vehicle physics is
+/// configured: `realSourceTypeID = tempSourceTypeID = sourceTypeID` and
+/// `opModeIDOffset = 0`, carrying the road-load terms (`regClassID`,
+/// `beginModelYearID`, `endModelYearID`, `rollingTermA`, `rotatingTermB`,
+/// `dragTermC`, `sourceMass`, `fixedMassFactor`) through unchanged.
+///
+/// The operating-mode-distribution correctors key on
+/// `realSourceTypeID <> tempSourceTypeID`, so the identity rows are inert and
+/// leave emission results unchanged — they only let calculators that read the
+/// mapping table run instead of erroring on a missing table.
+fn populate_source_use_type_physics_mapping(store: &mut InMemoryStore) -> Result<()> {
+    use polars::prelude::{NamedFrom, Series};
+
+    // Nothing to do if the mapping is already present, or there is no source
+    // physics table to derive it from.
+    if store.contains("sourceUseTypePhysicsMapping") || !store.contains("sourceUseTypePhysics") {
+        return Ok(());
+    }
+
+    let physics = store
+        .get("sourceUseTypePhysics")
+        .context("sourceUseTypePhysics not in store after contains check")?;
+    let mut mapping: polars::prelude::DataFrame = (*physics).clone();
+    drop(physics); // release the Arc clone before mutating the store below
+
+    // Resolve the source-type column case-insensitively (snapshot column
+    // casings vary), then rename it to the mapping's `realSourceTypeID`.
+    let src_col = mapping
+        .get_column_names()
+        .iter()
+        .find(|n| n.as_str().eq_ignore_ascii_case("sourceTypeID"))
+        .map(|n| n.to_string())
+        .context("sourceUseTypePhysics has no sourceTypeID column")?;
+    mapping
+        .rename(&src_col, "realSourceTypeID".into())
+        .map_err(|e| anyhow::anyhow!("renaming sourceTypeID -> realSourceTypeID: {e}"))?;
+
+    // tempSourceTypeID is a copy of realSourceTypeID for the identity mapping.
+    let mut temp = mapping
+        .column("realSourceTypeID")
+        .map_err(|e| anyhow::anyhow!("{e}"))?
+        .clone();
+    temp.rename("tempSourceTypeID".into());
+    let n = mapping.height();
+    mapping
+        .with_column(temp)
+        .map_err(|e| anyhow::anyhow!("adding tempSourceTypeID: {e}"))?;
+    mapping
+        .with_column(Series::new("opModeIDOffset".into(), vec![0i64; n]).into())
+        .map_err(|e| anyhow::anyhow!("adding opModeIDOffset: {e}"))?;
+
+    store.insert("sourceUseTypePhysicsMapping".to_string(), mapping);
     Ok(())
 }
 
@@ -908,6 +993,84 @@ mod tests {
     fn populate_sho_distances_noop_when_no_sho() {
         let mut store = InMemoryStore::new();
         populate_sho_distances(&mut store).expect("should be noop");
+    }
+
+    /// Build a one-row `sourceUseTypePhysics` DataFrame mirroring the snapshot
+    /// schema (int64 IDs, string road-load terms).
+    fn make_physics_df() -> polars::prelude::DataFrame {
+        use polars::prelude::*;
+        df!(
+            "sourceTypeID" => &[21i64],
+            "regClassID" => &[20i64],
+            "beginModelYearID" => &[1950i64],
+            "endModelYearID" => &[2060i64],
+            "rollingTermA" => &["0.156461000000"],
+            "rotatingTermB" => &["0.002001930000"],
+            "dragTermC" => &["0.000492646000"],
+            "sourceMass" => &["1.478800000000"],
+            "fixedMassFactor" => &["1.478800000000"],
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn synthesises_identity_physics_mapping_when_absent() {
+        let mut store = InMemoryStore::new();
+        store.insert("sourceUseTypePhysics".to_string(), make_physics_df());
+        populate_source_use_type_physics_mapping(&mut store)
+            .expect("synthesis should succeed");
+
+        let df = store
+            .get("sourceUseTypePhysicsMapping")
+            .expect("mapping table must be synthesised");
+        // All 11 mapping columns present.
+        for col in [
+            "realSourceTypeID",
+            "tempSourceTypeID",
+            "regClassID",
+            "beginModelYearID",
+            "endModelYearID",
+            "opModeIDOffset",
+            "rollingTermA",
+            "rotatingTermB",
+            "dragTermC",
+            "sourceMass",
+            "fixedMassFactor",
+        ] {
+            assert!(df.column(col).is_ok(), "missing column {col}");
+        }
+        // Identity mapping: real == temp == sourceTypeID, offset 0.
+        let real = df.column("realSourceTypeID").unwrap().i64().unwrap();
+        let temp = df.column("tempSourceTypeID").unwrap().i64().unwrap();
+        let offset = df.column("opModeIDOffset").unwrap().i64().unwrap();
+        assert_eq!(real.get(0), Some(21));
+        assert_eq!(temp.get(0), Some(21));
+        assert_eq!(offset.get(0), Some(0));
+        // The original sourceTypeID column is renamed, not duplicated.
+        assert!(df.column("sourceTypeID").is_err());
+    }
+
+    #[test]
+    fn physics_mapping_synthesis_is_noop_when_mapping_present() {
+        let mut store = InMemoryStore::new();
+        store.insert("sourceUseTypePhysics".to_string(), make_physics_df());
+        // Pre-existing mapping (single sentinel column) must be left untouched.
+        let sentinel = polars::prelude::df!("realSourceTypeID" => &[99i64]).unwrap();
+        store.insert("sourceUseTypePhysicsMapping".to_string(), sentinel);
+        populate_source_use_type_physics_mapping(&mut store).expect("noop");
+        let df = store.get("sourceUseTypePhysicsMapping").unwrap();
+        assert_eq!(df.width(), 1, "existing mapping must not be rebuilt");
+        assert_eq!(
+            df.column("realSourceTypeID").unwrap().i64().unwrap().get(0),
+            Some(99)
+        );
+    }
+
+    #[test]
+    fn physics_mapping_synthesis_is_noop_without_source_table() {
+        let mut store = InMemoryStore::new();
+        populate_source_use_type_physics_mapping(&mut store).expect("noop");
+        assert!(!store.contains("sourceUseTypePhysicsMapping"));
     }
 
     #[test]
