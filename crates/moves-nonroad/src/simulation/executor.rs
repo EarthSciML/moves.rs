@@ -810,7 +810,15 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         _daymthfac: &[f32; crate::common::consts::MXDAYS],
     ) -> AdjustmentTable {
         let oxy = self.executor.reference.fuel_oxygen_pct;
-        let tamb = self.executor.reference.ambient_temp_f;
+        // Per-SCC activity-weighted ambient temperature (warm-daytime-weighted
+        // for daylight-use equipment), falling back to the scalar mean.
+        let tamb = self
+            .executor
+            .reference
+            .ambient_temp_by_scc
+            .get(scc)
+            .copied()
+            .unwrap_or(self.executor.reference.ambient_temp_f);
         // No fuel adjustments configured ⇒ neutral (all-1.0), preserving
         // the legacy behaviour for tests / runs without fuel data.
         if oxy == 0.0 && tamb == 0.0 {

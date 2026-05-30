@@ -1092,6 +1092,104 @@ fn build_ambient_temp<S: DataFrameStore + ?Sized>(store: &S) -> f32 {
     }
 }
 
+/// Per-SCC ambient temperature (°F), activity-weighted by each equipment's
+/// hour-allocation pattern, for the `emsadj.f` exhaust temperature correction.
+///
+/// The correction is non-linear (`exp(a·(T−75))`), so the operative
+/// temperature is the *activity-weighted* mean across the day, not the plain
+/// 24-hour mean: daylight-use equipment runs during the warm afternoon, so its
+/// effective temperature is several °F above the flat average. Using the flat
+/// mean biases gasoline-4-stroke NOx high (and CO/THC low) by ~3% — the
+/// canonical weights `zonemonthhour` temperatures by `nrhourallocation`
+/// fractions, selected per equipment via `nrhourpatternfinder`.
+///
+/// SCC → `NREquipTypeID` (`nrscc`) → hour pattern (`nrhourpatternfinder`) →
+/// hour fractions (`nrhourallocation`); the weight is folded against the
+/// runspec-month hourly mean temperature from `zonemonthhour`.
+fn build_ambient_temp_by_scc<S: DataFrameStore + ?Sized>(store: &S) -> BTreeMap<String, f32> {
+    let mut out = BTreeMap::new();
+    let month = store
+        .get("runspecmonth")
+        .map(|df| {
+            int_col(&df, "monthID")
+                .into_iter()
+                .find(|&m| m > 0)
+                .unwrap_or(0)
+        })
+        .unwrap_or(0);
+    let (Some(zmh), Some(alloc), Some(finder), Some(scc_tbl)) = (
+        store.get("zonemonthhour"),
+        store.get("nrhourallocation"),
+        store.get("nrhourpatternfinder"),
+        store.get("nrscc"),
+    ) else {
+        return out;
+    };
+
+    // Runspec-month hourly mean temperature (averaged over zones).
+    let zm = int_col(&zmh, "monthID");
+    let zh = int_col(&zmh, "hourID");
+    let zt = float_col(&zmh, "temperature");
+    let mut hour_sum: BTreeMap<i64, (f64, u32)> = BTreeMap::new();
+    for i in 0..zmh.height() {
+        if month == 0 || zm[i] == month {
+            let e = hour_sum.entry(zh[i]).or_insert((0.0, 0));
+            e.0 += zt[i];
+            e.1 += 1;
+        }
+    }
+    let hour_temp: BTreeMap<i64, f64> = hour_sum
+        .into_iter()
+        .map(|(h, (s, n))| (h, if n > 0 { s / n as f64 } else { 0.0 }))
+        .collect();
+
+    // Hour-allocation pattern → { hourID → fraction }.
+    let ap = int_col(&alloc, "NRHourAllocPatternID");
+    let ah = int_col(&alloc, "hourID");
+    let af = float_col(&alloc, "hourFraction");
+    let mut pattern_frac: BTreeMap<i64, Vec<(i64, f64)>> = BTreeMap::new();
+    for i in 0..alloc.height() {
+        pattern_frac.entry(ap[i]).or_default().push((ah[i], af[i]));
+    }
+
+    // Activity-weighted temperature per pattern.
+    let pattern_temp: BTreeMap<i64, f32> = pattern_frac
+        .iter()
+        .map(|(&pat, hours)| {
+            let (mut num, mut den) = (0.0_f64, 0.0_f64);
+            for &(h, f) in hours {
+                if let Some(&t) = hour_temp.get(&h) {
+                    num += t * f;
+                    den += f;
+                }
+            }
+            (pat, if den > 0.0 { (num / den) as f32 } else { 0.0 })
+        })
+        .collect();
+
+    // NREquipTypeID → pattern.
+    let fe = int_col(&finder, "NREquipTypeID");
+    let fp = int_col(&finder, "NRHourAllocPatternID");
+    let mut equip_pattern: BTreeMap<i64, i64> = BTreeMap::new();
+    for i in 0..finder.height() {
+        equip_pattern.insert(fe[i], fp[i]);
+    }
+
+    // SCC → NREquipTypeID → pattern → temperature.
+    let sc = str_col(&scc_tbl, "SCC");
+    let se = int_col(&scc_tbl, "NREquipTypeID");
+    for i in 0..scc_tbl.height() {
+        if let Some(&pat) = equip_pattern.get(&se[i]) {
+            if let Some(&t) = pattern_temp.get(&pat) {
+                if t > 0.0 {
+                    out.insert(sc[i].clone(), t);
+                }
+            }
+        }
+    }
+    out
+}
+
 /// Compute the market-share-weighted gasoline fuel oxygen content (weight
 /// %) and whether the supply is predominantly RFG, for the `emsadj.f`
 /// oxygenate exhaust correction. Oxygen % per formulation = `ETOHVolume ×
@@ -1200,6 +1298,7 @@ pub fn load_nonroad_reference<S: DataFrameStore + ?Sized>(
         fuel_oxygen_pct,
         fuel_rfg,
         ambient_temp_f: build_ambient_temp(store),
+        ambient_temp_by_scc: build_ambient_temp_by_scc(store),
         ..ReferenceData::default()
     }
 }
