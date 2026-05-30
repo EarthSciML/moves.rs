@@ -240,18 +240,225 @@ fn load_deterioration<S: DataFrameStore + ?Sized>(store: &S) -> DetMap {
     map
 }
 
-/// Build the per-`(SCC, HP-bin)` exhaust-tech entries — emission factors,
-/// units, deterioration, and BSFC — from `nremissionrate` +
-/// `nrdeterioration`.
+/// Per-`(SCC, engTechID)` emission rates, hp-binned. The `.EMF` side of the
+/// canonical model — looked up by hp containment, with SCC family-root
+/// fallback applied by the caller.
+#[derive(Default, Clone)]
+struct TechRate {
+    /// `pollutant_slot -> [(hp_min, hp_max, (rate, unit))]`.
+    by_pollutant: BTreeMap<usize, Vec<(i64, i64, (f32, EmissionUnitCode))>>,
+    /// `[(hp_min, hp_max, bsfc)]` from polProcessID 9901.
+    bsfc: Vec<(i64, i64, f32)>,
+}
+
+/// Read `nremissionrate` into `(SCC, engTechID) -> TechRate` (the `.EMF`).
+fn load_rate_lookup<S: DataFrameStore + ?Sized>(store: &S) -> BTreeMap<(String, i64), TechRate> {
+    let mut map: BTreeMap<(String, i64), TechRate> = BTreeMap::new();
+    let Some(df) = store.get("nremissionrate") else {
+        return map;
+    };
+    let scc = str_col(&df, "SCC");
+    let pp = int_col(&df, "polProcessID");
+    let hmin = int_col(&df, "hpMin");
+    let hmax = int_col(&df, "hpMax");
+    let tech = int_col(&df, "engTechID");
+    let rate = float_col(&df, "meanBaseRate");
+    let units = str_col(&df, "units");
+    for i in 0..df.height() {
+        let e = map.entry((scc[i].clone(), tech[i])).or_default();
+        if pp[i] == PP_BSFC {
+            e.bsfc.push((hmin[i], hmax[i], rate[i] as f32));
+            continue;
+        }
+        if let Some(ps) = pollutant_slot_for(pp[i]) {
+            e.by_pollutant.entry(ps).or_default().push((
+                hmin[i],
+                hmax[i],
+                (rate[i] as f32, unit_code_for(&units[i])),
+            ));
+        }
+    }
+    map
+}
+
+/// Read `nrengtechfraction` (processGroupID = 1, exhaust) into
+/// `(SCC, hpMin, hpMax) -> { engTechID -> { modelYear -> fraction } }` — the
+/// `.TECH` side, which defines the per-model-year tech mix.
+type TechMix = BTreeMap<(String, i64, i64), BTreeMap<i64, BTreeMap<i64, f32>>>;
+fn load_tech_mix<S: DataFrameStore + ?Sized>(store: &S) -> TechMix {
+    let mut map = TechMix::new();
+    let Some(df) = store.get("nrengtechfraction") else {
+        return map;
+    };
+    let scc = str_col(&df, "SCC");
+    let hmin = int_col(&df, "hpMin");
+    let hmax = int_col(&df, "hpMax");
+    let my = int_col(&df, "modelYearID");
+    let tech = int_col(&df, "engTechID");
+    let frac = float_col(&df, "NREngTechFraction");
+    let pg = int_col(&df, "processGroupID");
+    for i in 0..df.height() {
+        if pg[i] != 1 {
+            continue;
+        }
+        map.entry((scc[i].clone(), hmin[i], hmax[i]))
+            .or_default()
+            .entry(tech[i])
+            .or_default()
+            .insert(my[i], frac[i] as f32);
+    }
+    map
+}
+
+/// First payload whose `(hp_min, hp_max)` bin contains `hp`.
+fn hp_pick<T>(bins: &[(i64, i64, T)], hp: f32) -> Option<&T> {
+    bins.iter()
+        .find(|(lo, hi, _)| (*lo as f32) <= hp && hp <= (*hi as f32))
+        .map(|(_, _, v)| v)
+}
+
+/// Build exhaust-tech entries the canonical way: the tech *mix* comes from
+/// `nrengtechfraction` (the `.TECH` file, per model year), and each tech's
+/// emission factor is looked up from `nremissionrate` (the `.EMF` file) by
+/// engTechID with **independent hp binning** and SCC family-root fallback.
+/// One entry per `(SCC, equipment hpAvg)` from `nrsourceusetype`, with a
+/// point HP range so `find_exhaust_tech(scc, hpAvg)` matches it exactly.
 ///
-/// The returned entries carry `emission_factors` / `emission_units` /
-/// `det_*` laid out `[pollutant_slot * n_tech + tech]` exactly as
-/// [`ExhaustTechEntry`] documents, so `compute_exhaust_factors` can expand
-/// them into the engine's `[year][pollutant][tech]` arrays. `tech_names`
-/// is the engine-tech ID list (stringified) in first-seen order;
-/// `tech_fractions` is left empty here and filled by the tech-fraction
-/// builder (it varies by model year, unlike the rates).
+/// This reproduces NONROAD's two-separate-files model, which the older
+/// rate-driven builder could not: for specific-rate SCCs the rate and
+/// tech-fraction tables use different hp bins and engTechID sets, so a
+/// rate-keyed tech list dropped the mix techs entirely.
+fn build_entries_from_mix<S: DataFrameStore + ?Sized>(store: &S) -> Vec<ExhaustTechEntry> {
+    let mix = load_tech_mix(store);
+    if mix.is_empty() {
+        return Vec::new();
+    }
+    let rates = load_rate_lookup(store);
+    let det = load_deterioration(store);
+
+    let Some(sut) = store.get("nrsourceusetype") else {
+        return Vec::new();
+    };
+    // Distinct (SCC, hpAvg) equipment points.
+    let su_scc = str_col(&sut, "SCC");
+    let su_hp = float_col(&sut, "hpAvg");
+    let mut pairs: std::collections::BTreeSet<(String, i64)> = std::collections::BTreeSet::new();
+    for i in 0..sut.height() {
+        pairs.insert((su_scc[i].clone(), (su_hp[i] * 1.0e3).round() as i64));
+    }
+
+    let mix_sccs: std::collections::BTreeSet<&String> = mix.keys().map(|(s, _, _)| s).collect();
+    let mut entries = Vec::new();
+    for (scc, hp_milli) in pairs {
+        let hp_avg = hp_milli as f32 / 1.0e3;
+        // Resolve the tech-mix SCC (specific or family root).
+        let mix_scc = if mix_sccs.contains(&scc) {
+            scc.clone()
+        } else {
+            family_root(&scc)
+        };
+        // The tech-mix hp bin containing hp_avg.
+        let Some((_, tech_map)) = mix.iter().find(|((s, lo, hi), _)| {
+            *s == mix_scc && (*lo as f32) <= hp_avg && hp_avg <= (*hi as f32)
+        }) else {
+            continue;
+        };
+
+        let mut tech_ids: Vec<i64> = tech_map.keys().copied().collect();
+        tech_ids.truncate(MXTECH);
+        let n_tech = tech_ids.len().max(1);
+
+        let mut emission_factors = vec![0.0_f32; MXPOL * n_tech];
+        let mut emission_units = vec![EmissionUnitCode::GramsPerHpHour; MXPOL * n_tech];
+        let mut det_a = vec![0.0_f32; MXPOL * n_tech];
+        let mut det_b = vec![0.0_f32; MXPOL * n_tech];
+        let mut det_cap = vec![0.0_f32; MXPOL * n_tech];
+        let mut bsfc = vec![0.0_f32; n_tech];
+        let mut by_year: BTreeMap<i32, Vec<f32>> = BTreeMap::new();
+        let root = family_root(&scc);
+
+        for (t, &tid) in tech_ids.iter().enumerate() {
+            // BSFC: rate lookup, specific SCC then family root.
+            bsfc[t] = rates
+                .get(&(scc.clone(), tid))
+                .and_then(|tr| hp_pick(&tr.bsfc, hp_avg).copied())
+                .or_else(|| {
+                    rates
+                        .get(&(root.clone(), tid))
+                        .and_then(|tr| hp_pick(&tr.bsfc, hp_avg).copied())
+                })
+                .unwrap_or(0.0);
+
+            for (pslot, pp_for) in [(0, PP_THC), (1, PP_CO), (2, PP_NOX), (5, PP_PM)] {
+                let picked = rates
+                    .get(&(scc.clone(), tid))
+                    .and_then(|tr| tr.by_pollutant.get(&pslot))
+                    .and_then(|v| hp_pick(v, hp_avg).copied())
+                    .or_else(|| {
+                        rates
+                            .get(&(root.clone(), tid))
+                            .and_then(|tr| tr.by_pollutant.get(&pslot))
+                            .and_then(|v| hp_pick(v, hp_avg).copied())
+                    });
+                let idx = pslot * n_tech + t;
+                if let Some((r, u)) = picked {
+                    emission_factors[idx] = r;
+                    emission_units[idx] = u;
+                }
+                if let Some(&(a, b, c)) = det.get(&(pp_for, tid)) {
+                    det_a[idx] = a;
+                    det_b[idx] = b;
+                    det_cap[idx] = c;
+                }
+            }
+
+            // Per-model-year fractions for this tech.
+            for (&yr, &f) in &tech_map[&tid] {
+                by_year
+                    .entry(yr as i32)
+                    .or_insert_with(|| vec![0.0_f32; n_tech])[t] = f;
+            }
+        }
+
+        // Scalar fallback = the latest model-year mix.
+        let tech_fractions = by_year
+            .iter()
+            .next_back()
+            .map(|(_, v)| v.clone())
+            .unwrap_or_else(|| {
+                let mut d = vec![0.0_f32; n_tech];
+                d[0] = 1.0;
+                d
+            });
+
+        entries.push(ExhaustTechEntry {
+            scc,
+            hp_min: hp_avg,
+            hp_max: hp_avg,
+            tech_names: tech_ids.iter().map(|t| t.to_string()).collect(),
+            tech_fractions,
+            bsfc,
+            emission_factors,
+            emission_units,
+            det_a,
+            det_b,
+            det_cap,
+            tech_fractions_by_year: by_year,
+        });
+    }
+    entries
+}
+
+/// Build the per-`(SCC, HP-bin)` exhaust-tech entries — emission factors,
+/// units, deterioration, and BSFC. Prefers the canonical
+/// `nrengtechfraction`-driven builder ([`build_entries_from_mix`]); falls
+/// back to the legacy rate-driven path when the tech-mix / source-use-type
+/// tables are absent (e.g. unit tests with synthetic rate tables only).
 pub fn build_exhaust_tech_entries<S: DataFrameStore + ?Sized>(store: &S) -> Vec<ExhaustTechEntry> {
+    let from_mix = build_entries_from_mix(store);
+    if !from_mix.is_empty() {
+        return from_mix;
+    }
     let Some(df) = store.get("nremissionrate") else {
         return Vec::new();
     };
@@ -699,6 +906,11 @@ pub fn fill_tech_fractions<S: DataFrameStore + ?Sized>(
         by_key.keys().map(|(s, _, _, _)| s).collect();
 
     for e in entries.iter_mut() {
+        // Entries from the canonical mix-driven builder already carry their
+        // per-model-year fractions; don't overwrite them.
+        if !e.tech_fractions_by_year.is_empty() {
+            continue;
+        }
         let n_tech = e.tech_names.len();
         if n_tech == 0 {
             continue;
