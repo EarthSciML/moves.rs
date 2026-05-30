@@ -99,6 +99,7 @@ const NONROAD_INPUT_TABLES: &[&str] = &[
     "nrsulfuradjustment",
     "nrstatesurrogate",
     "nrsourceusetypephysicsmapping",
+    "runspecsector",
     "nrequipmenttype",
     "nragecategory",
     "nrmodelyear",

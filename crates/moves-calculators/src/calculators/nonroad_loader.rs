@@ -463,15 +463,57 @@ struct SourceUnit {
     population: f32,
 }
 
+/// The sectors the runspec selected (`runspecsector`). `None` ⇒ no
+/// selection table, so no sector filtering is applied.
+fn selected_sectors<S: DataFrameStore + ?Sized>(
+    store: &S,
+) -> Option<std::collections::BTreeSet<i64>> {
+    let df = store.get("runspecsector")?;
+    let set: std::collections::BTreeSet<i64> = int_col(&df, "sectorID").into_iter().collect();
+    (!set.is_empty()).then_some(set)
+}
+
+/// Map each full SCC to its sector via `nrscc` (SCC → NREquipTypeID) and
+/// `nrequipmenttype` (NREquipTypeID → sectorID).
+fn scc_sector_map<S: DataFrameStore + ?Sized>(store: &S) -> BTreeMap<String, i64> {
+    let mut equip_sector: BTreeMap<i64, i64> = BTreeMap::new();
+    if let Some(df) = store.get("nrequipmenttype") {
+        let id = int_col(&df, "NREquipTypeID");
+        let sec = int_col(&df, "sectorID");
+        for i in 0..df.height() {
+            equip_sector.insert(id[i], sec[i]);
+        }
+    }
+    let mut map = BTreeMap::new();
+    if let Some(df) = store.get("nrscc") {
+        let scc = str_col(&df, "SCC");
+        let eq = int_col(&df, "NREquipTypeID");
+        for i in 0..df.height() {
+            if let Some(&sec) = equip_sector.get(&eq[i]) {
+                map.insert(scc[i].clone(), sec);
+            }
+        }
+    }
+    map
+}
+
 /// Join `nrsourceusetype` (SCC, hp, activity by `sourceTypeID`) to
 /// `nrbaseyearequippopulation` (population by `sourceTypeID`), yielding one
-/// [`SourceUnit`] per source type with non-zero population.
+/// [`SourceUnit`] per source type with non-zero population, **restricted to
+/// the runspec's selected sectors** (the snapshot carries every nonroad
+/// sector; the runspec may select only some — e.g. commercial).
 fn load_source_units<S: DataFrameStore + ?Sized>(store: &S) -> Vec<SourceUnit> {
     let Some(sut) = store.get("nrsourceusetype") else {
         return Vec::new();
     };
     let Some(pop) = store.get("nrbaseyearequippopulation") else {
         return Vec::new();
+    };
+    let sectors = selected_sectors(store);
+    let scc_sector = if sectors.is_some() {
+        scc_sector_map(store)
+    } else {
+        BTreeMap::new()
     };
 
     // population by sourceTypeID (summed across any state rows; the fixture
@@ -494,6 +536,13 @@ fn load_source_units<S: DataFrameStore + ?Sized>(store: &S) -> Vec<SourceUnit> {
         let population = pop_by_src.get(&src[i]).copied().unwrap_or(0.0);
         if population <= 0.0 {
             continue;
+        }
+        // Skip equipment outside the runspec's selected sectors.
+        if let Some(sel) = &sectors {
+            match scc_sector.get(&scc[i]) {
+                Some(sec) if sel.contains(sec) => {}
+                _ => continue,
+            }
         }
         units.push(SourceUnit {
             scc: scc[i].clone(),
@@ -933,6 +982,9 @@ mod tests {
             "nrscrappagecurve",
             "nrmonthallocation",
             "nrdayallocation",
+            "runspecsector",
+            "nrequipmenttype",
+            "nrscc",
         ] {
             if let Some(df) = load(t) {
                 store.insert(t, df);
@@ -1002,28 +1054,52 @@ mod tests {
             .count();
         eprintln!("nonzero rows = {nonzero}");
         let temporal = build_temporal_factors(&store, 8, 5);
-        let mut tot = [0.0f64; 4]; // THC, CO, NOx, PM
-        for r in &out.rows {
-            let tf = scc_lookup(&temporal, &r.scc).copied().unwrap_or(1.0);
-            tot[0] += r.emissions[0] as f64 * tf;
-            tot[1] += r.emissions[1] as f64 * tf;
-            tot[2] += r.emissions[2] as f64 * tf;
-            tot[3] += r.emissions[5] as f64 * tf;
-        }
         let g = 1.0 / 1.102_311e-6; // short tons -> grams
-        eprintln!(
-            "TOTALS grams (temporal-allocated): THC={:.3e} CO={:.3e} NOx={:.3e} PM={:.3e}",
-            tot[0] * g,
-            tot[1] * g,
-            tot[2] * g,
-            tot[3] * g
-        );
-        eprintln!(
-            "canonical                       : THC=1.414e8 CO=6.508e9 NOx=4.947e7 PM=7.818e6"
-        );
-        // Sample temporal factors.
-        let sample: Vec<_> = temporal.iter().take(4).collect();
-        eprintln!("sample temporal factors: {sample:?}");
+        let week_norm = 7.0 / 31.0; // dayFraction is per-day-of-week; August=31
+        for (label, extra) in [("month*day", 1.0), ("month*day*7/31", week_norm)] {
+            let mut tot = [0.0f64; 4];
+            for r in &out.rows {
+                let tf = scc_lookup(&temporal, &r.scc).copied().unwrap_or(1.0) * extra;
+                tot[0] += r.emissions[0] as f64 * tf;
+                tot[1] += r.emissions[1] as f64 * tf;
+                tot[2] += r.emissions[2] as f64 * tf;
+                tot[3] += r.emissions[5] as f64 * tf;
+            }
+            eprintln!(
+                "TOTALS [{label}] grams: THC={:.3e} CO={:.3e} NOx={:.3e} PM={:.3e}",
+                tot[0] * g,
+                tot[1] * g,
+                tot[2] * g,
+                tot[3] * g
+            );
+        }
+        eprintln!("canonical              grams: THC=1.414e8 CO=6.508e9 NOx=4.947e7 PM=7.818e6");
+
+        // Tech-mix probe for dominant 2-stroke SCCs: 2-stroke NOx should be
+        // tiny relative to CO. Dump tech fractions and per-tech base rates.
+        for probe in ["2260001010", "2260006010"] {
+            if let Some(e) = executor
+                .reference
+                .exhaust_tech_entries
+                .iter()
+                .find(|e| e.scc == probe)
+            {
+                let nt = e.tech_names.len();
+                eprintln!(
+                    "PROBE {probe} hp=[{},{}] techs={:?}",
+                    e.hp_min, e.hp_max, e.tech_names
+                );
+                eprintln!(
+                    "  tech_fractions={:?} (sum={:.3})",
+                    e.tech_fractions,
+                    e.tech_fractions.iter().sum::<f32>()
+                );
+                let co: Vec<f32> = (0..nt).map(|t| e.emission_factors[nt + t]).collect();
+                let nox: Vec<f32> = (0..nt).map(|t| e.emission_factors[2 * nt + t]).collect();
+                eprintln!("  CO  base rates per tech={co:?}");
+                eprintln!("  NOx base rates per tech={nox:?}");
+            }
+        }
     }
 
     /// Build a tiny in-memory store mimicking the nr* rate tables.
