@@ -2542,9 +2542,10 @@ impl TableRow for TemperatureAdjustmentRow {
                     temp_adjust_term_a: temp_adjust_term_a
                         .get(i)
                         .ok_or_else(|| null("tempAdjustTermA"))?,
-                    temp_adjust_term_b: temp_adjust_term_b
-                        .get(i)
-                        .ok_or_else(|| null("tempAdjustTermB"))?,
+                    // MOVES reads the quadratic coefficient as
+                    // `ifnull(tempAdjustTermB, 0)`: a NULL term drops the
+                    // quadratic, leaving the linear adjustment `1 + d*termA`.
+                    temp_adjust_term_b: temp_adjust_term_b.get(i).unwrap_or(0.0),
                 })
             })
             .collect()

@@ -1467,7 +1467,8 @@ impl TableRow for TemperatureAdjustmentRow {
                         .get(i)
                         .ok_or_else(|| null("maxModelYearID"))?,
                     term_a: term_a.get(i).ok_or_else(|| null("tempAdjustTermA"))?,
-                    term_b: term_b.get(i).ok_or_else(|| null("tempAdjustTermB"))?,
+                    // nullable: SQL NULL coalesces to 0.0 (ifnull), like term_c.
+                    term_b: term_b.get(i).unwrap_or(0.0),
                     term_c: term_c.get(i), // nullable: SQL NULL coalesces to 0.0
                 })
             })
