@@ -68,6 +68,7 @@ fn make_executor() -> ProductionExecutor {
                 tech_names: vec!["T1".into()],
                 tech_fractions: vec![1.0],
                 bsfc: vec![0.45],
+                ..Default::default()
             }],
             evap_tech_entries: vec![EvapTechEntry {
                 scc: "2270001010".into(),
@@ -117,6 +118,7 @@ fn state_level_reference(fips: &str) -> ReferenceData {
             tech_names: vec!["T1".into()],
             tech_fractions: vec![0.0],
             bsfc: vec![],
+            ..Default::default()
         }],
         evap_tech_entries: vec![EvapTechEntry {
             scc: "2270001010".into(),
@@ -164,6 +166,7 @@ fn national_reference(state_fips: &str, scc: &str) -> ReferenceData {
             tech_names: vec!["T1".into()],
             tech_fractions: vec![0.0],
             bsfc: vec![],
+            ..Default::default()
         }],
         evap_tech_entries: vec![EvapTechEntry {
             scc: scc.into(),
@@ -209,6 +212,7 @@ fn us_total_reference(scc: &str) -> ReferenceData {
             tech_names: vec!["T1".into()],
             tech_fractions: vec![0.0],
             bsfc: vec![],
+            ..Default::default()
         }],
         evap_tech_entries: vec![EvapTechEntry {
             scc: scc.into(),
@@ -543,5 +547,77 @@ fn subcounty_region_list_routes_to_county_and_subcounty_dispatch() {
         executor.dispatches[1].dispatch,
         Dispatch::Subcounty,
         "second dispatch is Subcounty"
+    );
+}
+
+// =============================================================================
+// Loaded emission-factor injection (data-plane port, Task 119)
+// =============================================================================
+
+/// Build a county executor whose single exhaust-tech entry carries a
+/// loaded THC base rate (`g/HP-hr`) with no deterioration, so the THC
+/// output slot is a clean function of the injected EF.
+fn county_executor_with_thc_ef(ef_thc: f32) -> ProductionExecutor {
+    use moves_nonroad::common::consts::MXPOL;
+    use moves_nonroad::emissions::exhaust::EmissionUnitCode;
+
+    let mut exec = make_executor();
+    let n_tech = 1; // tech_names == ["T1"]
+    let mut ef = vec![0.0_f32; MXPOL * n_tech];
+    ef[0] = ef_thc; // PollutantIndex::Thc -> slot 0
+    let entry = &mut exec.reference.exhaust_tech_entries[0];
+    entry.emission_factors = ef;
+    entry.emission_units = vec![EmissionUnitCode::GramsPerHpHour; MXPOL * n_tech];
+    entry.det_a = vec![0.0; MXPOL * n_tech];
+    entry.det_b = vec![0.0; MXPOL * n_tech];
+    entry.det_cap = vec![0.0; MXPOL * n_tech];
+    exec
+}
+
+/// Sum of the THC output slot (pollutant slot 0) across all rows for a
+/// one-county, one-SCC run with the given THC base rate.
+fn county_thc_total(ef_thc: f32) -> f32 {
+    let mut executor = county_executor_with_thc_ef(ef_thc);
+    let mut inputs = NonroadInputs::new();
+    inputs.push_group(
+        "2270001010",
+        vec![DriverRecord {
+            region_code: "06037".into(),
+            hp_avg: 25.0,
+            population: 100.0,
+            pop_year: 2020,
+        }],
+    );
+    inputs.regions = RunRegions {
+        selected_counties: vec!["06037".into()],
+        ..RunRegions::default()
+    };
+    let mut opts = NonroadOptions::new(RegionLevel::County, 2020);
+    opts.growth_loaded = true;
+    let out = run_simulation(&opts, &inputs, &mut executor).expect("county run must succeed");
+    out.rows.iter().map(|r| r.emissions[0]).sum()
+}
+
+/// County: a loaded THC emission factor flows through `clcems` into the
+/// THC output slot and scales linearly with the base rate — the core of
+/// the data-plane port. A zero EF yields zero THC (the legacy behaviour);
+/// only BSFC-derived CO2/SOx were produced before this wiring.
+#[test]
+fn county_loaded_thc_ef_produces_linear_nonzero_thc() {
+    let zero = county_thc_total(0.0);
+    let one = county_thc_total(10.0);
+    let two = county_thc_total(20.0);
+
+    assert_eq!(
+        zero, 0.0,
+        "zero THC EF must yield zero THC output, got {zero}"
+    );
+    assert!(
+        one > 0.0,
+        "a non-zero THC EF must yield non-zero THC output, got {one}"
+    );
+    assert!(
+        (two / one - 2.0).abs() < 1e-4,
+        "THC output must scale linearly with the base rate: one={one} two={two}"
     );
 }

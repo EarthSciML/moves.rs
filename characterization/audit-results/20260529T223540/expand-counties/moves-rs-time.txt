@@ -1,0 +1,23 @@
+	Command being timed: "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/target/release/moves run --runspec /projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/expand-counties.xml --output /projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/audit-results/20260529T223540/expand-counties/moves-rs-output --snapshot /projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/snapshots/expand-counties"
+	User time (seconds): 0.56
+	System time (seconds): 0.18
+	Percent of CPU this job got: 168%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.44
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 95576
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 43909
+	Voluntary context switches: 3028
+	Involuntary context switches: 15151
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 16
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

@@ -531,6 +531,7 @@ fn run_exhaust_block<C: GeographyCallbacks + ?Sized>(
     // ---- prccty.f :450–:453 — emfclc. ----
     let factors = callbacks.compute_exhaust_factors(
         record.scc,
+        record.hp_avg,
         &exhaust_tech.tech_names,
         &exhaust_tech.tech_fractions,
         tchmdyr,

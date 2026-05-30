@@ -908,23 +908,28 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
     fn compute_exhaust_factors(
         &mut self,
         scc: &str,
+        hp_avg: f32,
         tech_names: &[String],
         _tech_fractions: &[f32],
         _model_year: i32,
         _year_index: usize,
         _record_index: usize,
     ) -> Result<ExhaustFactorsLookup> {
-        // Look up per-tech BSFC from the reference entry for this SCC.
-        // Emission-factor files are not yet loadable, so all EF arrays
-        // stay zero; CO2 and SOx are rewritten from BSFC by
-        // calculate_exhaust_emissions regardless of the EF values.
         let n_tech = tech_names.len().max(1);
-        let bsfc_per_tech: Vec<f32> = self
+
+        // Resolve the hp-matched reference entry for this SCC — the same
+        // entry `find_exhaust_tech` selected to produce `tech_names`. The
+        // per-tech ordering of every array below is therefore aligned
+        // with `tech_names` / `tech_fractions`.
+        let entry = self
             .executor
             .reference
             .exhaust_tech_entries
             .iter()
-            .find(|e| e.scc == scc)
+            .find(|e| e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max);
+
+        // Per-tech BSFC, broadcast across all calendar years.
+        let bsfc_per_tech: Vec<f32> = entry
             .map(|e| e.bsfc.clone())
             .unwrap_or_else(|| vec![0.0; n_tech]);
         let mut bsfc = vec![0.0_f32; MXAGYR * n_tech];
@@ -933,13 +938,61 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
                 bsfc[y * n_tech + t] = v;
             }
         }
+
+        // EF / unit / deterioration arrays. They default to the legacy
+        // zero-fill (only BSFC-derived CO2/SOx produced); when the
+        // reference entry carries loaded emission factors they are
+        // expanded into the engine's `[year][pollutant][tech]` and
+        // `[pollutant][tech]` layouts. The base rate is the same for
+        // every calendar year — the model-year/age signal enters through
+        // the deterioration coefficients in `calculate_exhaust_emissions`.
+        let mut emission_factors = vec![0.0_f32; MXAGYR * MXPOL * MXTECH];
+        let mut unit_codes = vec![EmissionUnitCode::GramsPerHpHour; MXPOL * MXTECH];
+        let mut adetcf = vec![0.0_f32; MXPOL * MXTECH];
+        let mut bdetcf = vec![0.0_f32; MXPOL * MXTECH];
+        let mut detcap = vec![0.0_f32; MXPOL * MXTECH];
+
+        if let Some(e) = entry {
+            if !e.emission_factors.is_empty() {
+                let stride = n_tech;
+                let tech_span = n_tech.min(MXTECH);
+                for pol in 0..MXPOL {
+                    for t in 0..tech_span {
+                        let src = pol * stride + t;
+                        if src >= e.emission_factors.len() {
+                            continue;
+                        }
+                        let ef = e.emission_factors[src];
+                        if ef != 0.0 {
+                            for y in 0..MXAGYR {
+                                emission_factors[y * (MXPOL * MXTECH) + pol * MXTECH + t] = ef;
+                            }
+                        }
+                        let dst = pol * MXTECH + t;
+                        if let Some(u) = e.emission_units.get(src) {
+                            unit_codes[dst] = *u;
+                        }
+                        if let Some(a) = e.det_a.get(src) {
+                            adetcf[dst] = *a;
+                        }
+                        if let Some(b) = e.det_b.get(src) {
+                            bdetcf[dst] = *b;
+                        }
+                        if let Some(c) = e.det_cap.get(src) {
+                            detcap[dst] = *c;
+                        }
+                    }
+                }
+            }
+        }
+
         Ok(ExhaustFactorsLookup {
-            emission_factors: vec![0.0; MXAGYR * MXPOL * MXTECH],
+            emission_factors,
             bsfc,
-            unit_codes: vec![EmissionUnitCode::GramsPerHpHour; MXPOL * MXTECH],
-            adetcf: vec![0.0; MXPOL * MXTECH],
-            bdetcf: vec![0.0; MXPOL * MXTECH],
-            detcap: vec![0.0; MXPOL * MXTECH],
+            unit_codes,
+            adetcf,
+            bdetcf,
+            detcap,
         })
     }
 
@@ -1030,6 +1083,25 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         let sox_conversion = [SWTGS2, SWTGS4, SWTDSL, SWTLPG, SWTCNG];
         let sox_base = [SWTGS2, SWTGS4, SWTDSL, SWTLPG, SWTCNG];
 
+        // A pollutant takes the EF-gated branch of
+        // `calculate_exhaust_emissions` only when an emission-factor file
+        // was loaded for it (clcems.f :179–181). We derive that from the
+        // populated EF table: a non-zero base rate for any tech slot of
+        // the pollutant means a file is present. CO2/SOx/Displacement are
+        // always computed regardless of this filter. When no EF table is
+        // loaded the filter is all-false, preserving the legacy
+        // BSFC-only (CO2/SOx) behaviour. Built before `calc_inputs` takes
+        // a mutable borrow of `emission_factors`.
+        let mut pollutant_filter = PollutantFilter::empty();
+        for pol in 0..MXPOL {
+            let has = (0..MXTECH).any(|t| {
+                emission_factors
+                    .get(pol * MXTECH + t)
+                    .is_some_and(|&v| v != 0.0)
+            });
+            pollutant_filter = pollutant_filter.set_slot(pol, has);
+        }
+
         let mut calc_inputs = ExhaustCalcInputs {
             year_index,
             tech_index,
@@ -1070,7 +1142,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             sulfur_alternate: None,
         };
 
-        let outputs = calculate_exhaust_emissions(&mut calc_inputs, &PollutantFilter::empty());
+        let outputs = calculate_exhaust_emissions(&mut calc_inputs, &pollutant_filter);
 
         Ok(EmissionsIterationResult {
             emsday_delta: outputs.emissions_day,
@@ -2594,6 +2666,7 @@ mod production {
                     tech_names: vec!["T1".into()],
                     tech_fractions: vec![0.0],
                     bsfc: vec![],
+                    ..Default::default()
                 }],
                 evap_tech_entries: vec![EvapTechEntry {
                     scc: "2270001010".into(),
@@ -2679,6 +2752,7 @@ mod production {
                     tech_names: vec!["T1".into()],
                     tech_fractions: vec![0.0],
                     bsfc: vec![],
+                    ..Default::default()
                 }],
                 evap_tech_entries: vec![EvapTechEntry {
                     scc: "2270001010".into(),
@@ -2758,6 +2832,7 @@ mod production {
                     tech_names: vec!["T1".into()],
                     tech_fractions: vec![0.0],
                     bsfc: vec![],
+                    ..Default::default()
                 }],
                 evap_tech_entries: vec![EvapTechEntry {
                     scc: "2270001010".into(),
@@ -2847,6 +2922,7 @@ mod production {
                     tech_names: vec!["T1".into()],
                     tech_fractions: vec![0.0],
                     bsfc: vec![],
+                    ..Default::default()
                 }],
                 evap_tech_entries: vec![EvapTechEntry {
                     scc: "2270001010".into(),
@@ -2930,6 +3006,7 @@ mod production {
                     tech_names: vec!["T1".into()],
                     tech_fractions: vec![0.0],
                     bsfc: vec![],
+                    ..Default::default()
                 }],
                 evap_tech_entries: vec![EvapTechEntry {
                     scc: "2270001010".into(),
@@ -3015,6 +3092,7 @@ mod production {
                     tech_names: vec!["T1".into()],
                     tech_fractions: vec![0.0],
                     bsfc: vec![],
+                    ..Default::default()
                 }],
                 evap_tech_entries: vec![EvapTechEntry {
                     scc: "2270001010".into(),
@@ -3065,6 +3143,7 @@ mod production {
                     tech_names: vec!["T1".into()],
                     tech_fractions: vec![0.0],
                     bsfc: vec![],
+                    ..Default::default()
                 }],
                 evap_tech_entries: vec![EvapTechEntry {
                     scc: "2270001010".into(),

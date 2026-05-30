@@ -1,0 +1,48 @@
+{
+  "fixture": "nr-commercial-nation",
+  "canonical_wall_secs": null,
+  "moves_rs_wall_secs": 2.6,
+  "speedup": null,
+  "canonical_peak_mb": null,
+  "moves_rs_peak_mb": 234.1,
+  "canonical_row_count": 908,
+  "moves_rs_row_count": 0,
+  "row_count_ratio": 0.0,
+  "pollutant_count": 4,
+  "max_abs_delta": 6507691599.722199,
+  "max_pct_diff": -1.0,
+  "rows": [
+    {
+      "pollutant_id": 1,
+      "name": "Total Gaseous Hydrocarbons",
+      "canonical_emission_quant": 141405394.64466,
+      "moves_rs_emission_quant": 0.0,
+      "delta": -141405394.64466,
+      "pct_diff": -1.0
+    },
+    {
+      "pollutant_id": 2,
+      "name": "Carbon Monoxide (CO)",
+      "canonical_emission_quant": 6507691599.722199,
+      "moves_rs_emission_quant": 0.0,
+      "delta": -6507691599.722199,
+      "pct_diff": -1.0
+    },
+    {
+      "pollutant_id": 3,
+      "name": "Oxides of Nitrogen (NOx)",
+      "canonical_emission_quant": 49471036.65715999,
+      "moves_rs_emission_quant": 0.0,
+      "delta": -49471036.65715999,
+      "pct_diff": -1.0
+    },
+    {
+      "pollutant_id": 100,
+      "name": "MSAT Unspeciated HC",
+      "canonical_emission_quant": 7818427.7788296,
+      "moves_rs_emission_quant": 0.0,
+      "delta": -7818427.7788296,
+      "pct_diff": -1.0
+    }
+  ]
+}

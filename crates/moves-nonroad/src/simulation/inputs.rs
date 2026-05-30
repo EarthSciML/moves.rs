@@ -26,6 +26,7 @@
 //! executor evolve independently.
 
 use crate::driver::{DriverRecord, RunRegions};
+use crate::emissions::exhaust::EmissionUnitCode;
 use crate::geography::common::ActivityUnit;
 use crate::population::retrofit::RetrofitRecord;
 use crate::population::{AgeAdjustmentTable, GrowthIndicatorRecord, ScrappageCurve};
@@ -149,6 +150,29 @@ pub struct ExhaustTechEntry {
     /// Used by `compute_exhaust_factors` to populate the BSFC array for
     /// CO2 and SOx calculations. Must be the same length as `tech_names`.
     pub bsfc: Vec<f32>,
+    /// Per-`(pollutant slot, tech slot)` exhaust emission factors, row-
+    /// major as `[pollutant_slot * tech_names.len() + tech]` (Fortran
+    /// `emsfac` / `emfac`, sourced from NR\*.EMF — here from the MOVES
+    /// `nremissionrate` table). The base rate is constant across calendar
+    /// years; the model-year/age variation enters through deterioration.
+    ///
+    /// Empty ⇒ all factors zero, preserving the legacy behaviour where
+    /// only the BSFC-derived CO2/SOx pollutants are produced. When
+    /// non-empty its length is `MXPOL * tech_names.len()`.
+    pub emission_factors: Vec<f32>,
+    /// Per-`(pollutant slot, tech slot)` EF unit codes, same layout as
+    /// [`emission_factors`](Self::emission_factors). Empty ⇒ every slot
+    /// defaults to g/HP-hr.
+    pub emission_units: Vec<EmissionUnitCode>,
+    /// Per-`(pollutant slot, tech slot)` deterioration A coefficient
+    /// (`adetcf`), same layout as [`emission_factors`](Self::emission_factors).
+    pub det_a: Vec<f32>,
+    /// Per-`(pollutant slot, tech slot)` deterioration B (age-exponent)
+    /// coefficient (`bdetcf`), same layout.
+    pub det_b: Vec<f32>,
+    /// Per-`(pollutant slot, tech slot)` deterioration age cap
+    /// (`detcap`), same layout.
+    pub det_cap: Vec<f32>,
 }
 
 /// One evap-tech-type entry for [`ProductionExecutor`](super::executor::ProductionExecutor) (Fortran `fndevtch`).
