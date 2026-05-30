@@ -340,6 +340,15 @@ pub struct ReferenceData {
     /// Retrofit records from NR*.RFT files. Fortran: `RTRFTDAT` from
     /// `rdrft.f` (`population::retrofit::RetrofitRecord`).
     pub retrofit_records: Vec<RetrofitRecord>,
+    /// Fuel oxygen content (weight %) for the gasoline exhaust oxygenate
+    /// correction (`emsadj.f` :228–256). `0.0` ⇒ no oxygenate correction.
+    pub fuel_oxygen_pct: f32,
+    /// `true` when the gasoline supply is reformulated (RFG); RFG fuel skips
+    /// the oxygenate / sulfur corrections and takes the RFG-bin path instead.
+    pub fuel_rfg: bool,
+    /// Ambient temperature (°F) for the exhaust temperature corrections
+    /// (`emsadj.f` :167–220). `0.0` ⇒ neutral (treated as 75 °F).
+    pub ambient_temp_f: f32,
 }
 
 #[cfg(test)]

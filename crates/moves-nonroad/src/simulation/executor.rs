@@ -37,10 +37,11 @@
 
 use crate::common::consts::{MXAGYR, MXPOL, MXTECH, SWTCNG, SWTDSL, SWTGS2, SWTGS4, SWTLPG};
 use crate::driver::scrptime;
-use crate::driver::{Dispatch, DriverRecord};
+use crate::driver::{fuel_for_scc, Dispatch, DriverRecord};
 use crate::emissions::exhaust::{
-    calculate_exhaust_emissions, ActivityUnit as ExhaustActivityUnit, DayRange, EmissionUnitCode,
-    ExhaustCalcInputs, FuelKind, PollutantFilter,
+    calculate_emission_adjustments, calculate_exhaust_emissions,
+    ActivityUnit as ExhaustActivityUnit, AdjustmentInputs, DailyTemperatures, DayRange,
+    EmissionUnitCode, ExhaustCalcInputs, FuelKind, PollutantFilter, Season,
 };
 use crate::geography::common::fuel_density;
 use crate::geography::common::{
@@ -804,13 +805,58 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
 
     fn emission_adjustments(
         &self,
-        _scc: &str,
-        _fips: &str,
+        scc: &str,
+        fips: &str,
         _daymthfac: &[f32; crate::common::consts::MXDAYS],
     ) -> AdjustmentTable {
-        // Emission adjustments require the EF tables; return a
-        // no-adjustment (all 1.0 / empty) table for now.
-        AdjustmentTable::new(crate::common::consts::MXDAYS)
+        let oxy = self.executor.reference.fuel_oxygen_pct;
+        let tamb = self.executor.reference.ambient_temp_f;
+        // No fuel adjustments configured ⇒ neutral (all-1.0), preserving
+        // the legacy behaviour for tests / runs without fuel data.
+        if oxy == 0.0 && tamb == 0.0 {
+            return AdjustmentTable::new(crate::common::consts::MXDAYS);
+        }
+        // Port of `emsadj.f`: the gasoline exhaust temperature + oxygenate
+        // corrections. The engine evaluates day 1 (begin=end=1), matching
+        // the county adapter's single-day exhaust iteration.
+        let fuel = fuel_for_scc(scc).unwrap_or(FuelKind::Gasoline4Stroke);
+        let temps = DailyTemperatures {
+            daily_temperature_mode: false,
+            daily_ambient_temp_f: Vec::new(),
+            ambient_temp: if tamb > 0.0 { tamb } else { 75.0 },
+        };
+        let dummy_month = [1.0_f32; crate::common::consts::MXDAYS];
+        let inputs = AdjustmentInputs {
+            fuel,
+            scc,
+            fips,
+            day_range: DayRange {
+                begin_day: 1,
+                end_day: 1,
+                winter_skip_begin: 0,
+                winter_skip_end: 0,
+                winter_skip: false,
+            },
+            temperatures: &temps,
+            daily_month_fraction: &dummy_month,
+            rfg: self.executor.reference.fuel_rfg,
+            high_altitude: false,
+            oxygen_percent: oxy,
+            episode_year: 0,
+            month: 0,
+            month_to_season: [Season::Summer; 12],
+            rfg_winter_2_stroke: None,
+            rfg_winter_4_stroke: None,
+            rfg_summer_2_stroke: None,
+            rfg_summer_4_stroke: None,
+            // SOx/altitude unused by the emitted pollutants; neutral values
+            // (soxcor = sox_fuel/sox_base = 1, altitude factor = 1).
+            sox_fuel: [1.0; 5],
+            sox_base: [1.0; 5],
+            sox_diesel_marine: 1.0,
+            altitude_factor: [1.0; 5],
+        };
+        calculate_emission_adjustments(&inputs)
     }
 
     // ---- Model-year and age distribution --------------------------------

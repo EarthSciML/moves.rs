@@ -1050,6 +1050,54 @@ pub fn build_scrappage_curve<S: DataFrameStore + ?Sized>(store: &S) -> Vec<Scrap
     points
 }
 
+/// Compute the market-share-weighted gasoline fuel oxygen content (weight
+/// %) and whether the supply is predominantly RFG, for the `emsadj.f`
+/// oxygenate exhaust correction. Oxygen % per formulation = `ETOHVolume ×
+/// volToWtPercentOxy` (`fuelformulation`); weighted by `nrfuelsupply`
+/// market share over gasoline (fuelTypeID = 1, via `nrfuelsubtype`).
+fn build_fuel_oxygenate<S: DataFrameStore + ?Sized>(store: &S) -> (f32, bool) {
+    let (Some(sup), Some(form)) = (store.get("nrfuelsupply"), store.get("fuelformulation")) else {
+        return (0.0, false);
+    };
+    let f_id = int_col(&form, "fuelFormulationID");
+    let f_sub = int_col(&form, "fuelSubtypeID");
+    let f_etoh = float_col(&form, "ETOHVolume");
+    let f_v2w = float_col(&form, "volToWtPercentOxy");
+    let mut oxy_by_form: BTreeMap<i64, f64> = BTreeMap::new();
+    let mut sub_by_form: BTreeMap<i64, i64> = BTreeMap::new();
+    for i in 0..form.height() {
+        oxy_by_form.insert(f_id[i], f_etoh[i] * f_v2w[i]);
+        sub_by_form.insert(f_id[i], f_sub[i]);
+    }
+    let mut fueltype_by_sub: BTreeMap<i64, i64> = BTreeMap::new();
+    if let Some(st) = store.get("nrfuelsubtype") {
+        let sid = int_col(&st, "fuelSubtypeID");
+        let ft = int_col(&st, "fuelTypeID");
+        for i in 0..st.height() {
+            fueltype_by_sub.insert(sid[i], ft[i]);
+        }
+    }
+    let s_form = int_col(&sup, "fuelFormulationID");
+    let s_share = float_col(&sup, "marketShare");
+    let (mut tot, mut weighted_oxy, mut rfg_share) = (0.0_f64, 0.0_f64, 0.0_f64);
+    for i in 0..sup.height() {
+        let sub = sub_by_form.get(&s_form[i]).copied().unwrap_or(0);
+        if fueltype_by_sub.get(&sub).copied().unwrap_or(0) != 1 {
+            continue; // gasoline only
+        }
+        let share = s_share[i];
+        tot += share;
+        weighted_oxy += share * oxy_by_form.get(&s_form[i]).copied().unwrap_or(0.0);
+        if sub == 11 {
+            rfg_share += share; // fuelSubtypeID 11 = Reformulated Gasoline
+        }
+    }
+    if tot <= 0.0 {
+        return (0.0, false);
+    }
+    ((weighted_oxy / tot) as f32, rfg_share / tot > 0.5)
+}
+
 /// Assemble the full [`ReferenceData`] the [`ProductionExecutor`] needs
 /// from the `nr*` tables. Growth, scrappage, and evap are left at their
 /// neutral defaults for this first end-to-end pass (no growth, default
@@ -1096,6 +1144,8 @@ pub fn load_nonroad_reference<S: DataFrameStore + ?Sized>(
         })
         .collect();
 
+    let (fuel_oxygen_pct, fuel_rfg) = build_fuel_oxygenate(store);
+
     ReferenceData {
         exhaust_tech_entries,
         evap_tech_entries,
@@ -1104,6 +1154,9 @@ pub fn load_nonroad_reference<S: DataFrameStore + ?Sized>(
         growth_records,
         scrappage_curve: build_scrappage_curve(store),
         age_adjustment_table: AgeAdjustmentTable::default(),
+        // emsadj.f oxygenate correction (temperature left neutral for now).
+        fuel_oxygen_pct,
+        fuel_rfg,
         ..ReferenceData::default()
     }
 }
@@ -1314,6 +1367,9 @@ mod tests {
             "nrscc",
             "nrgrowthpatternfinder",
             "nrgrowthindex",
+            "nrfuelsupply",
+            "fuelformulation",
+            "nrfuelsubtype",
         ] {
             if let Some(df) = load(t) {
                 store.insert(t, df);
@@ -1508,6 +1564,39 @@ mod tests {
             let cn = can_nox.get(scc.as_str()).copied().unwrap_or(f64::NAN);
             eprintln!("  {scc}  CO {:.3}   NOx {:.3}", co / cc, nox / cn);
         }
+
+        // Per-model-year CO for 2265006030 vs canonical (recent years dominate).
+        let can_my_co: BTreeMap<i32, f64> = [
+            (2015, 4.37054e7),
+            (2016, 1.22951e8),
+            (2017, 1.76723e8),
+            (2018, 2.66209e8),
+            (2019, 3.07514e8),
+            (2020, 3.31445e8),
+            (2010, 0.0),
+            (1990, 0.0),
+            (1980, 0.0),
+        ]
+        .into_iter()
+        .collect();
+        let tf = scc_lookup(&temporal, &"2265006030".to_string())
+            .copied()
+            .unwrap_or(1.0);
+        let mut my_co: BTreeMap<i32, f64> = BTreeMap::new();
+        for r in &out.rows {
+            if r.scc == "2265006030" {
+                if let Some(my) = r.model_year {
+                    *my_co.entry(my).or_default() += r.emissions[1] as f64 * tf * g;
+                }
+            }
+        }
+        eprintln!("2265006030 per-MY CO (mine vs canonical):");
+        for my in [1990, 2010, 2015, 2016, 2017, 2018, 2019, 2020] {
+            let mine = my_co.get(&my).copied().unwrap_or(0.0);
+            let canon = can_my_co.get(&my).copied();
+            eprintln!("  MY {my}: mine={mine:.3e} canon={canon:?}");
+        }
+        eprintln!("2265006030 distinct model years emitted: {}", my_co.len());
     }
 
     /// Build a tiny in-memory store mimicking the nr* rate tables.
