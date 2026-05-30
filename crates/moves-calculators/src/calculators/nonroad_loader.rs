@@ -473,6 +473,33 @@ fn selected_sectors<S: DataFrameStore + ?Sized>(
     (!set.is_empty()).then_some(set)
 }
 
+/// The fuel types the runspec selected (`runspecfueltype`). `None` ⇒ no
+/// selection table. These are MOVES fuelTypeIDs; nonroad shares
+/// `1 = Gasoline` with onroad but uses `23/24` for diesel — so an onroad
+/// diesel selection (`2`) matches no nonroad SCC, which is exactly how
+/// canonical produces gasoline-only nonroad output for a gas+diesel
+/// runspec.
+fn selected_fuels<S: DataFrameStore + ?Sized>(
+    store: &S,
+) -> Option<std::collections::BTreeSet<i64>> {
+    let df = store.get("runspecfueltype")?;
+    let set: std::collections::BTreeSet<i64> = int_col(&df, "fuelTypeID").into_iter().collect();
+    (!set.is_empty()).then_some(set)
+}
+
+/// Map each full SCC to its nonroad fuel type via `nrscc`.
+fn scc_fuel_map<S: DataFrameStore + ?Sized>(store: &S) -> BTreeMap<String, i64> {
+    let mut map = BTreeMap::new();
+    if let Some(df) = store.get("nrscc") {
+        let scc = str_col(&df, "SCC");
+        let fuel = int_col(&df, "fuelTypeID");
+        for i in 0..df.height() {
+            map.insert(scc[i].clone(), fuel[i]);
+        }
+    }
+    map
+}
+
 /// Map each full SCC to its sector via `nrscc` (SCC → NREquipTypeID) and
 /// `nrequipmenttype` (NREquipTypeID → sectorID).
 fn scc_sector_map<S: DataFrameStore + ?Sized>(store: &S) -> BTreeMap<String, i64> {
@@ -515,6 +542,12 @@ fn load_source_units<S: DataFrameStore + ?Sized>(store: &S) -> Vec<SourceUnit> {
     } else {
         BTreeMap::new()
     };
+    let fuels = selected_fuels(store);
+    let scc_fuel = if fuels.is_some() {
+        scc_fuel_map(store)
+    } else {
+        BTreeMap::new()
+    };
 
     // population by sourceTypeID (summed across any state rows; the fixture
     // carries a single national stateID = 0).
@@ -541,6 +574,13 @@ fn load_source_units<S: DataFrameStore + ?Sized>(store: &S) -> Vec<SourceUnit> {
         if let Some(sel) = &sectors {
             match scc_sector.get(&scc[i]) {
                 Some(sec) if sel.contains(sec) => {}
+                _ => continue,
+            }
+        }
+        // Skip equipment whose fuel is not in the runspec's fuel selection.
+        if let Some(sel) = &fuels {
+            match scc_fuel.get(&scc[i]) {
+                Some(fuel) if sel.contains(fuel) => {}
                 _ => continue,
             }
         }
@@ -983,6 +1023,7 @@ mod tests {
             "nrmonthallocation",
             "nrdayallocation",
             "runspecsector",
+            "runspecfueltype",
             "nrequipmenttype",
             "nrscc",
         ] {
@@ -1075,31 +1116,35 @@ mod tests {
         }
         eprintln!("canonical              grams: THC=1.414e8 CO=6.508e9 NOx=4.947e7 PM=7.818e6");
 
-        // Tech-mix probe for dominant 2-stroke SCCs: 2-stroke NOx should be
-        // tiny relative to CO. Dump tech fractions and per-tech base rates.
-        for probe in ["2260001010", "2260006010"] {
-            if let Some(e) = executor
-                .reference
-                .exhaust_tech_entries
-                .iter()
-                .find(|e| e.scc == probe)
-            {
-                let nt = e.tech_names.len();
-                eprintln!(
-                    "PROBE {probe} hp=[{},{}] techs={:?}",
-                    e.hp_min, e.hp_max, e.tech_names
-                );
-                eprintln!(
-                    "  tech_fractions={:?} (sum={:.3})",
-                    e.tech_fractions,
-                    e.tech_fractions.iter().sum::<f32>()
-                );
-                let co: Vec<f32> = (0..nt).map(|t| e.emission_factors[nt + t]).collect();
-                let nox: Vec<f32> = (0..nt).map(|t| e.emission_factors[2 * nt + t]).collect();
-                eprintln!("  CO  base rates per tech={co:?}");
-                eprintln!("  NOx base rates per tech={nox:?}");
-            }
+        // Per-SCC NOx breakdown with fuel type, to test whether NOx is
+        // dominated by diesel commercial equipment (canonical output is
+        // gasoline-only, fuelTypeID=1).
+        let fuel_df = load("nrscc").unwrap();
+        let fscc = str_col(&fuel_df, "SCC");
+        let ftype = int_col(&fuel_df, "fuelTypeID");
+        let fuel_of: BTreeMap<String, i64> =
+            fscc.into_iter().zip(ftype).collect();
+        let mut per_scc: BTreeMap<String, (f64, f64, i64)> = BTreeMap::new(); // scc -> (nox, co, fuel)
+        for r in &out.rows {
+            let tf = scc_lookup(&temporal, &r.scc).copied().unwrap_or(1.0);
+            let fuel = fuel_of.get(&r.scc).copied().unwrap_or(0);
+            let e = per_scc.entry(r.scc.clone()).or_insert((0.0, 0.0, fuel));
+            e.0 += r.emissions[2] as f64 * tf * g;
+            e.1 += r.emissions[1] as f64 * tf * g;
         }
+        let mut rows: Vec<_> = per_scc.into_iter().collect();
+        rows.sort_by(|a, b| b.1 .0.partial_cmp(&a.1 .0).unwrap());
+        eprintln!("Top NOx SCCs (scc fuel nox_g co_g):");
+        for (scc, (nox, co, fuel)) in rows.iter().take(10) {
+            eprintln!("  {scc} fuel={fuel} nox={nox:.3e} co={co:.3e}");
+        }
+        let nox_gas: f64 = rows
+            .iter()
+            .filter(|(_, (_, _, f))| *f == 1)
+            .map(|(_, (n, _, _))| n)
+            .sum();
+        let nox_all: f64 = rows.iter().map(|(_, (n, _, _))| n).sum();
+        eprintln!("NOx gasoline-only(fuel=1)={nox_gas:.3e}  NOx all={nox_all:.3e}  canonical=4.947e7");
     }
 
     /// Build a tiny in-memory store mimicking the nr* rate tables.
