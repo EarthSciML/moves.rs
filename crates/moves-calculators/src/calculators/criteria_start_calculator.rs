@@ -2767,83 +2767,108 @@ fn fuel_supply_adjustment(
         })
         .collect();
 
+    // CSEC 2-a joins `County`, but the original SQL is parameterised by the
+    // context county (`##context.iterLocation.countyRecordID##`): only the
+    // current county's `GPAFract` participates. The replayed execution-DB
+    // snapshot carries *every* county's `County` row (3232 at national scale),
+    // so resolve the context county's `GPAFract` once here. Looping the whole
+    // `County` table would (a) multiply the work by the county count — the
+    // source of the observed national-scale hang — and (b) fold every county's
+    // GPA contribution into the county-agnostic `totals` keys, inflating the
+    // result. A missing county row leaves `GPAFract = 0` (the GPA term drops
+    // out), matching the LEFT-JOIN-style default.
+    let gpa_fract = inputs
+        .county
+        .iter()
+        .find(|c| c.county_id == ctx.county_id)
+        .map_or(0.0, |c| c.gpa_fract);
+
     // GROUP BY (yearID, monthID, polProcessID, modelYearID, sourceTypeID,
-    // fuelTypeID).
-    let totals_cap = inputs.year.len()
-        * inputs.month_of_any_year.len()
-        * pol_process_ids.len()
-        * inputs.source_type_model_year.len();
+    // fuelTypeID). The capacity is an upper bound on the distinct key count;
+    // cap it so a wide national runspec (many years × months × pol-processes)
+    // cannot request a pathologically large single allocation.
+    let totals_cap = (inputs.year.len())
+        .saturating_mul(inputs.month_of_any_year.len())
+        .saturating_mul(pol_process_ids.len())
+        .saturating_mul(inputs.source_type_model_year.len())
+        .min(1 << 22);
     let mut totals: FxHashMap<[i32; 6], f64> =
         FxHashMap::with_capacity_and_hasher(totals_cap, Default::default());
 
-    for county in &inputs.county {
+    // Iterate FuelFormulation outermost so the per-formulation supply lookup
+    // runs once each. `supply_weights` and the resolved fuel type depend only
+    // on the formulation (not the pollutant-process), so hoisting the
+    // PollutantProcessAssoc loop inside lets formulations with no supply skip
+    // the entire (ppa × SourceTypeModelYear) inner product. The original SQL's
+    // cartesian join `County × PollutantProcessAssoc × FuelFormulation ×
+    // SourceTypeModelYear` is summed into `totals`, so reordering the loops is
+    // result-preserving (addition is commutative).
+    let mut supply_weights: Vec<(i32, i32, f64)> =
+        Vec::with_capacity(inputs.year.len() * inputs.month_of_any_year.len());
+    for ff in &inputs.fuel_formulation {
+        // Resolve fuel type once per formulation; skip everything downstream
+        // if either lookup fails.
+        let Some(&subtype_id) = subtype_of_formulation.get(&ff.fuel_formulation_id) else {
+            continue;
+        };
+        let Some(&fuel_type_id) = fuel_type_of_subtype.get(&subtype_id) else {
+            continue;
+        };
+
+        // Collect (year_id, month_id, market_share) triples for this
+        // formulation once — reused for every (ppa, SourceTypeModelYear) pair.
+        supply_weights.clear();
+        for year in &inputs.year {
+            for may in &inputs.month_of_any_year {
+                if let Some(fs) = fs_by_key.get(&(
+                    ctx.fuel_region_id,
+                    year.fuel_year_id,
+                    may.month_group_id,
+                    ff.fuel_formulation_id,
+                )) {
+                    supply_weights.push((year.year_id, may.month_id, fs.market_share));
+                }
+            }
+        }
+
+        if supply_weights.is_empty() {
+            continue;
+        }
+
         for ppa in &inputs.pollutant_process_assoc {
             // CSEC 2-a `WHERE ppa.polProcessID IN (##pollutantProcessIDs##)`.
             if !pol_process_ids.contains(&ppa.pol_process_id) {
                 continue;
             }
-            let mut supply_weights: Vec<(i32, i32, f64)> =
-                Vec::with_capacity(inputs.year.len() * inputs.month_of_any_year.len());
-            for ff in &inputs.fuel_formulation {
-                // Resolve fuel type once per formulation; skip all
-                // SourceTypeModelYear iterations if either lookup fails.
-                let Some(&subtype_id) = subtype_of_formulation.get(&ff.fuel_formulation_id) else {
-                    continue;
-                };
-                let Some(&fuel_type_id) = fuel_type_of_subtype.get(&subtype_id) else {
-                    continue;
-                };
+            for stmy in &inputs.source_type_model_year {
+                let matches = cr_by_key.get(&(
+                    ppa.pol_process_id,
+                    ff.fuel_formulation_id,
+                    stmy.source_type_id,
+                    stmy.model_year_id,
+                ));
 
-                // Collect (year_id, month_id, market_share) triples for this
-                // formulation once — reused for every SourceTypeModelYear row.
-                supply_weights.clear();
-                for year in &inputs.year {
-                    for may in &inputs.month_of_any_year {
-                        if let Some(fs) = fs_by_key.get(&(
-                            ctx.fuel_region_id,
-                            year.fuel_year_id,
-                            may.month_group_id,
-                            ff.fuel_formulation_id,
-                        )) {
-                            supply_weights.push((year.year_id, may.month_id, fs.market_share));
-                        }
+                let mut accumulate = |fuel_adjustment: f64| {
+                    for &(year_id, month_id, market_share) in &supply_weights {
+                        *totals
+                            .entry([
+                                year_id,
+                                month_id,
+                                ppa.pol_process_id,
+                                stmy.model_year_id,
+                                stmy.source_type_id,
+                                fuel_type_id,
+                            ])
+                            .or_default() += fuel_adjustment * market_share;
                     }
-                }
+                };
 
-                if supply_weights.is_empty() {
-                    continue;
-                }
-
-                for stmy in &inputs.source_type_model_year {
-                    let matches = cr_by_key.get(&(
-                        ppa.pol_process_id,
-                        ff.fuel_formulation_id,
-                        stmy.source_type_id,
-                        stmy.model_year_id,
-                    ));
-
-                    let mut accumulate = |fuel_adjustment: f64| {
-                        for &(year_id, month_id, market_share) in &supply_weights {
-                            *totals
-                                .entry([
-                                    year_id,
-                                    month_id,
-                                    ppa.pol_process_id,
-                                    stmy.model_year_id,
-                                    stmy.source_type_id,
-                                    fuel_type_id,
-                                ])
-                                .or_default() += fuel_adjustment * market_share;
-                        }
-                    };
-
-                    match matches {
-                        // LEFT JOIN miss — ifnull(NULL, 1) gives 1.0.
-                        None => accumulate(1.0),
-                        Some(crs) => {
-                            for cr in crs {
-                                accumulate(cr.ratio + county.gpa_fract * (cr.ratio_gpa - cr.ratio));
-                            }
+                match matches {
+                    // LEFT JOIN miss — ifnull(NULL, 1) gives 1.0.
+                    None => accumulate(1.0),
+                    Some(crs) => {
+                        for cr in crs {
+                            accumulate(cr.ratio + gpa_fract * (cr.ratio_gpa - cr.ratio));
                         }
                     }
                 }
