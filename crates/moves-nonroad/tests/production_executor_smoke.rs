@@ -264,6 +264,7 @@ fn county_one_scc_produces_nonzero_emissions() {
             hp_avg: 25.0,
             population: 100.0,
             pop_year: 2020,
+            median_life: 0.0,
         }],
     );
     inputs.regions = RunRegions {
@@ -319,6 +320,7 @@ fn state_to_county_dispatch_produces_county_rows() {
             hp_avg: 25.0,
             population: 100.0,
             pop_year: 2020,
+            median_life: 0.0,
         }],
     );
     inputs.regions = RunRegions {
@@ -372,6 +374,7 @@ fn state_from_national_dispatch_produces_state_row() {
             hp_avg: 25.0,
             population: 100.0,
             pop_year: 2020,
+            median_life: 0.0,
         }],
     );
     inputs.regions = RunRegions {
@@ -424,6 +427,7 @@ fn national_dispatch_allocates_population_to_state() {
             hp_avg: 25.0,
             population: 100.0,
             pop_year: 2020,
+            median_life: 0.0,
         }],
     );
     // national records ("00000") are always selected; no region filter required
@@ -471,6 +475,7 @@ fn us_total_dispatch_produces_us_total_row() {
             hp_avg: 25.0,
             population: 100.0,
             pop_year: 2020,
+            median_life: 0.0,
         }],
     );
 
@@ -518,6 +523,7 @@ fn subcounty_region_list_routes_to_county_and_subcounty_dispatch() {
             hp_avg: 25.0,
             population: 100.0,
             pop_year: 2020,
+            median_life: 0.0,
         }],
     );
     inputs.regions = RunRegions {
@@ -586,6 +592,7 @@ fn county_thc_total(ef_thc: f32) -> f32 {
             hp_avg: 25.0,
             population: 100.0,
             pop_year: 2020,
+            median_life: 0.0,
         }],
     );
     inputs.regions = RunRegions {

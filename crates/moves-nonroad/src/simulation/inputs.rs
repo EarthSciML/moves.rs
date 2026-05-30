@@ -25,6 +25,8 @@
 //! [`NonroadInputs`] keeps the driver-loop contract small and lets the
 //! executor evolve independently.
 
+use std::collections::BTreeMap;
+
 use crate::driver::{DriverRecord, RunRegions};
 use crate::emissions::exhaust::EmissionUnitCode;
 use crate::geography::common::ActivityUnit;
@@ -173,6 +175,37 @@ pub struct ExhaustTechEntry {
     /// Per-`(pollutant slot, tech slot)` deterioration age cap
     /// (`detcap`), same layout.
     pub det_cap: Vec<f32>,
+    /// Per-model-year tech fractions: `model_year → fractions` aligned to
+    /// [`tech_names`](Self::tech_names). The base emission rates are model-
+    /// year independent, but the tech mix phases cleaner technology in over
+    /// model years (`tchfrc` is read at the per-model-year `tchmdyr`).
+    /// Empty ⇒ the single [`tech_fractions`](Self::tech_fractions) vector
+    /// is used for every model year (legacy behaviour).
+    pub tech_fractions_by_year: BTreeMap<i32, Vec<f32>>,
+}
+
+impl ExhaustTechEntry {
+    /// Tech fractions to use for model year `year`. Resolves
+    /// [`tech_fractions_by_year`](Self::tech_fractions_by_year) by exact
+    /// match, then the nearest earlier year, then the earliest available;
+    /// falls back to the model-year-independent
+    /// [`tech_fractions`](Self::tech_fractions) when no per-year data is
+    /// loaded.
+    pub fn fractions_for_year(&self, year: i32) -> &[f32] {
+        if self.tech_fractions_by_year.is_empty() {
+            return &self.tech_fractions;
+        }
+        if let Some(v) = self.tech_fractions_by_year.get(&year) {
+            return v;
+        }
+        if let Some((_, v)) = self.tech_fractions_by_year.range(..=year).next_back() {
+            return v;
+        }
+        if let Some((_, v)) = self.tech_fractions_by_year.iter().next() {
+            return v;
+        }
+        &self.tech_fractions
+    }
 }
 
 /// One evap-tech-type entry for [`ProductionExecutor`](super::executor::ProductionExecutor) (Fortran `fndevtch`).
@@ -319,6 +352,7 @@ mod tests {
             hp_avg: hp,
             population: pop,
             pop_year: year,
+            median_life: 0.0,
         }
     }
 

@@ -471,9 +471,14 @@ impl ProductionExecutor {
             // we synthesise (0, 2*hp_avg) → mid = hp_avg.
             hp_range: (0.0, ctx.record.hp_avg * 2.0),
             hp_avg: ctx.record.hp_avg,
-            // use_hours and disc_code are not in DriverRecord; use
-            // defaults that keep scrptime in a well-defined state.
-            use_hours: 1000.0,
+            // Median life (scrptime's `mdlfhrs`) from the driver record;
+            // fall back to a neutral 1000.0 when absent so scrptime stays
+            // well-defined. `disc_code` is not carried; DEFAULT curve.
+            use_hours: if ctx.record.median_life > 0.0 {
+                ctx.record.median_life
+            } else {
+                1000.0
+            },
             disc_code: "DEFAULT",
             base_pop_year: ctx.record.pop_year,
             scc: ctx.scc,
@@ -495,7 +500,11 @@ impl ProductionExecutor {
             population: ctx.record.population,
             hp_range: (0.0, ctx.record.hp_avg * 2.0),
             hp_avg: ctx.record.hp_avg,
-            use_hours: 1000.0,
+            use_hours: if ctx.record.median_life > 0.0 {
+                ctx.record.median_life
+            } else {
+                1000.0
+            },
             disc_code: "DEFAULT",
             base_pop_year: ctx.record.pop_year,
             scc: ctx.scc,
@@ -647,7 +656,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
 
     // ---- Technology fractions -------------------------------------------
 
-    fn find_exhaust_tech(&self, scc: &str, hp_avg: f32, _year: i32) -> Option<TechLookup> {
+    fn find_exhaust_tech(&self, scc: &str, hp_avg: f32, year: i32) -> Option<TechLookup> {
         let entry = self
             .executor
             .reference
@@ -657,7 +666,10 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         Some(TechLookup {
             scc_tech_index: 0,
             tech_names: entry.tech_names.clone(),
-            tech_fractions: entry.tech_fractions.clone(),
+            // Per-model-year tech mix (cleaner tech phases in over model
+            // years); falls back to the single vector when no per-year
+            // data is loaded.
+            tech_fractions: entry.fractions_for_year(year).to_vec(),
         })
     }
 
@@ -1065,14 +1077,19 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         // several HP-range entries with different tech mixes, and the
         // tech-slot ordering must line up with the entry `find_exhaust_tech`
         // selected for this record.
-        let entry_fracs: &[f32] = self
+        // Use the per-model-year mix for the current iteration's tech model
+        // year — reconstructed from the loop index as
+        // `tchmdyr = min(episode_year - year_index, tech_year)`
+        // (prccty.f: idxyr = iepyr - iyr + 1; tchmdyr = min(iyr, itchyr)).
+        let tchmdyr = (options.episode_year - year_index as i32).min(options.tech_year);
+        let entry_fracs: Vec<f32> = self
             .executor
             .reference
             .exhaust_tech_entries
             .iter()
             .find(|e| e.scc == record.scc && e.hp_min <= record.hp_avg && record.hp_avg <= e.hp_max)
-            .map(|e| e.tech_fractions.as_slice())
-            .unwrap_or(&[]);
+            .map(|e| e.fractions_for_year(tchmdyr).to_vec())
+            .unwrap_or_default();
         let table_len = (scc_tech_index + 1) * MXTECH;
         let mut tech_fracs = vec![0.0_f32; table_len];
         for (i, &frac) in entry_fracs.iter().enumerate() {
@@ -2326,6 +2343,7 @@ mod tests {
             hp_avg: 25.0,
             population: 100.0,
             pop_year: 2020,
+            median_life: 0.0,
         }
     }
 
@@ -2618,6 +2636,7 @@ mod production {
             hp_avg: 25.0,
             population: 100.0,
             pop_year: 2020,
+            median_life: 0.0,
         }
     }
 
@@ -2804,6 +2823,7 @@ mod production {
             hp_avg: 25.0,
             population: 100.0,
             pop_year: 2020,
+            median_life: 0.0,
         };
         let ctx = DispatchContext {
             dispatch: Dispatch::StateToCounty,
@@ -2884,6 +2904,7 @@ mod production {
             hp_avg: 25.0,
             population: 100.0,
             pop_year: 2020,
+            median_life: 0.0,
         };
         let ctx = DispatchContext {
             dispatch: Dispatch::StateFromNational,
@@ -2974,6 +2995,7 @@ mod production {
             hp_avg: 25.0,
             population: 100.0,
             pop_year: 2020,
+            median_life: 0.0,
         };
         let ctx = DispatchContext {
             dispatch: Dispatch::National,
@@ -3058,6 +3080,7 @@ mod production {
             hp_avg: 25.0,
             population: 100.0,
             pop_year: 2020,
+            median_life: 0.0,
         };
         let ctx = DispatchContext {
             dispatch: Dispatch::UsTotal,
@@ -3116,6 +3139,7 @@ mod production {
             hp_avg: 25.0,
             population: 100.0,
             pop_year: 2020,
+            median_life: 0.0,
         };
         let ctx = DispatchContext {
             dispatch: Dispatch::National,
@@ -3167,6 +3191,7 @@ mod production {
             hp_avg: 25.0,
             population: 100.0,
             pop_year: 2020,
+            median_life: 0.0,
         };
         let ctx = DispatchContext {
             dispatch: Dispatch::UsTotal,

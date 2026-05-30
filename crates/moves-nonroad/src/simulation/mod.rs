@@ -230,6 +230,7 @@ mod tests {
             hp_avg: hp,
             population: pop,
             pop_year: year,
+            median_life: 0.0,
         }
     }
 

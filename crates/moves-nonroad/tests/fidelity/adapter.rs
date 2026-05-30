@@ -389,6 +389,7 @@ mod tests {
             hp_avg: 50.0,
             population: 100.0,
             pop_year: 2021,
+            median_life: 0.0,
         };
         let dispatch_ctx = DispatchContext {
             dispatch: Dispatch::County,
@@ -460,6 +461,7 @@ mod tests {
             hp_avg: 50.0,
             population: 100.0,
             pop_year: 2021,
+            median_life: 0.0,
         };
         let options = NonroadOptions::new(RegionLevel::County, 2021);
         let dispatch_ctx = DispatchContext {
@@ -505,6 +507,7 @@ mod tests {
             hp_avg: 50.0,
             population: 100.0,
             pop_year: 2021,
+            median_life: 0.0,
         };
         let options = NonroadOptions::new(RegionLevel::County, 2021);
         let dispatch_ctx = DispatchContext {

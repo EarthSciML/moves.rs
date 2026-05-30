@@ -317,6 +317,13 @@ pub struct DriverRecord {
     pub population: f32,
     /// Population-input year — Fortran `ipopyr(icurec)`.
     pub pop_year: i32,
+    /// Median life at full load in hours — the `.POP` "usage" field
+    /// (cols 88–92, Fortran `usehrs(icurec)`), MOVES
+    /// `nrsourceusetype.medianLifeFullLoad`. Drives `scrptime`'s
+    /// equipment lifespan (`median_life_years = min(25, median_life /
+    /// load / activity_hrs)`). Defaults to 0.0; the geography routines
+    /// fall back to a neutral value when it is non-positive.
+    pub median_life: f32,
 }
 
 /// Detect a growth-record pair and return its growth rate —
@@ -542,6 +549,7 @@ mod tests {
             hp_avg: hp,
             population: pop,
             pop_year: year,
+            median_life: 0.0,
         }
     }
 
