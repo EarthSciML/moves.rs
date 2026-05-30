@@ -104,6 +104,8 @@ const NONROAD_INPUT_TABLES: &[&str] = &[
     "nrfuelsupply",
     "fuelformulation",
     "nrfuelsubtype",
+    "zonemonthhour",
+    "runspecmonth",
     "nrequipmenttype",
     "nragecategory",
     "nrmodelyear",

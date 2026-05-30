@@ -1050,6 +1050,38 @@ pub fn build_scrappage_curve<S: DataFrameStore + ?Sized>(store: &S) -> Vec<Scrap
     points
 }
 
+/// Average ambient temperature (°F) for the runspec month from
+/// `zonemonthhour`, for the `emsadj.f` exhaust temperature correction.
+/// `0.0` ⇒ no meteorology (temperature correction treated as neutral 75°F).
+fn build_ambient_temp<S: DataFrameStore + ?Sized>(store: &S) -> f32 {
+    let month = store
+        .get("runspecmonth")
+        .map(|df| {
+            int_col(&df, "monthID")
+                .into_iter()
+                .find(|&m| m > 0)
+                .unwrap_or(0)
+        })
+        .unwrap_or(0);
+    let Some(df) = store.get("zonemonthhour") else {
+        return 0.0;
+    };
+    let m = int_col(&df, "monthID");
+    let t = float_col(&df, "temperature");
+    let (mut sum, mut n) = (0.0_f64, 0_u32);
+    for i in 0..df.height() {
+        if month == 0 || m[i] == month {
+            sum += t[i];
+            n += 1;
+        }
+    }
+    if n > 0 {
+        (sum / n as f64) as f32
+    } else {
+        0.0
+    }
+}
+
 /// Compute the market-share-weighted gasoline fuel oxygen content (weight
 /// %) and whether the supply is predominantly RFG, for the `emsadj.f`
 /// oxygenate exhaust correction. Oxygen % per formulation = `ETOHVolume ×
@@ -1154,9 +1186,10 @@ pub fn load_nonroad_reference<S: DataFrameStore + ?Sized>(
         growth_records,
         scrappage_curve: build_scrappage_curve(store),
         age_adjustment_table: AgeAdjustmentTable::default(),
-        // emsadj.f oxygenate correction (temperature left neutral for now).
+        // emsadj.f oxygenate + temperature corrections.
         fuel_oxygen_pct,
         fuel_rfg,
+        ambient_temp_f: build_ambient_temp(store),
         ..ReferenceData::default()
     }
 }
@@ -1180,6 +1213,11 @@ pub fn build_production_executor<S: DataFrameStore + ?Sized>(
 pub fn build_options(analysis_year: i32) -> NonroadOptions {
     let mut opts = NonroadOptions::new(RegionLevel::County, analysis_year);
     opts.growth_loaded = true;
+    // Emit by-model-year exhaust rows so the output matches canonical's
+    // per-(SCC, modelYear) structure. `emissions_to_dataframe` uses only the
+    // by-model-year rows (model_year = Some) to avoid double-counting the
+    // per-record totals the engine also emits.
+    opts.emit_bmy_exhaust = true;
     opts
 }
 
@@ -1288,9 +1326,20 @@ pub fn emissions_to_dataframe(
     let mut hour = Vec::new();
     let mut pollutant = Vec::new();
     let mut process = Vec::new();
+    let mut model_year = Vec::new();
+    let mut scc_out: Vec<String> = Vec::new();
     let mut quant = Vec::new();
 
+    // When by-model-year output is on, the engine emits BOTH per-record-total
+    // rows (model_year = None) and per-model-year rows (model_year = Some).
+    // Use only the by-model-year rows to avoid double-counting — they carry
+    // the SCC × modelYear structure that matches canonical's output.
+    let has_bmy = rows.iter().any(|r| r.model_year.is_some());
+
     for row in rows {
+        if has_bmy && row.model_year.is_none() {
+            continue;
+        }
         let tfac = scc_lookup(temporal, &row.scc).copied().unwrap_or(1.0);
         for (slot, pid) in SLOT_POLLUTANT {
             let e = row.emissions.get(slot).copied().unwrap_or(0.0);
@@ -1303,6 +1352,8 @@ pub fn emissions_to_dataframe(
             hour.push(keys.hour.unwrap_or(0));
             pollutant.push(pid);
             process.push(1_i32); // nonroad emission process
+            model_year.push(row.model_year.unwrap_or(0));
+            scc_out.push(row.scc.clone());
             quant.push(e as f64 * GRAMS_PER_SHORT_TON * tfac);
         }
     }
@@ -1317,6 +1368,8 @@ pub fn emissions_to_dataframe(
         "hourID" => hour,
         "pollutantID" => pollutant,
         "processID" => process,
+        "modelYearID" => model_year,
+        "SCC" => scc_out,
         "emissionQuant" => quant,
     )?;
     Ok(Some(df))
@@ -1370,6 +1423,8 @@ mod tests {
             "nrfuelsupply",
             "fuelformulation",
             "nrfuelsubtype",
+            "zonemonthhour",
+            "runspecmonth",
         ] {
             if let Some(df) = load(t) {
                 store.insert(t, df);

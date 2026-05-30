@@ -873,6 +873,9 @@ fn frame_to_emission_records(df: &DataFrame, run_hash: &str) -> Vec<EmissionReco
     let fuel_type_ca = df.column("fuelTypeID").ok().and_then(|s| s.i32().ok());
     let road_type_ca = df.column("roadTypeID").ok().and_then(|s| s.i32().ok());
     let emission_ca = df.column("emissionQuant").ok().and_then(|s| s.f64().ok());
+    // Optional explicit SCC column (nonroad emits its own 10-digit SCC, which
+    // the onroad dimension-formula below cannot reconstruct).
+    let scc_ca = df.column("SCC").ok().and_then(|s| s.str().ok());
 
     (0..df.height())
         .map(|i| {
@@ -886,14 +889,22 @@ fn frame_to_emission_records(df: &DataFrame, run_hash: &str) -> Vec<EmissionReco
             // off-network/total road type (100).  Matches the canonical SCC
             // lookup table exactly.  The aggregation plan's onroad_scc flag
             // then determines whether this value survives to the output.
-            let scc = match (process_v, source_type_v, fuel_type_v, road_type_v) {
-                (Some(proc), Some(src), Some(fuel), Some(road)) => Some(if road == 100 {
-                    format!("22{:02}{:02}00{:02}", fuel, src + 1, proc)
-                } else {
-                    format!("22{:02}{:02}{:02}{:02}", fuel, src, road, proc)
-                }),
-                _ => None,
-            };
+            // An explicit, non-empty SCC column (nonroad) takes precedence
+            // over the onroad dimension formula.
+            let explicit_scc = scc_ca
+                .and_then(|c| c.get(i))
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string());
+            let scc = explicit_scc.or_else(|| {
+                match (process_v, source_type_v, fuel_type_v, road_type_v) {
+                    (Some(proc), Some(src), Some(fuel), Some(road)) => Some(if road == 100 {
+                        format!("22{:02}{:02}00{:02}", fuel, src + 1, proc)
+                    } else {
+                        format!("22{:02}{:02}{:02}{:02}", fuel, src, road, proc)
+                    }),
+                    _ => None,
+                }
+            });
             EmissionRecord {
                 moves_run_id: 1,
                 iteration_id: None,
