@@ -681,7 +681,11 @@ impl TableRow for OpModeDistributionRow {
                     op_mode_fraction_cv: op_mode_fraction_cv
                         .get(i)
                         .ok_or_else(|| null("opModeFractionCV"))?,
-                    avg_bin_speed: avg_bin_speed.get(i).ok_or_else(|| null("avgBinSpeed"))?,
+                    // MOVES leaves avgBinSpeed NULL in RatesOpModeDistribution
+                    // (the rates path does not populate it; the generator's own
+                    // default is 0.0). It is carried through unchanged here, so
+                    // a NULL becomes 0.0 rather than erroring.
+                    avg_bin_speed: avg_bin_speed.get(i).unwrap_or(0.0),
                     avg_speed_fraction: avg_speed_fraction
                         .get(i)
                         .ok_or_else(|| null("avgSpeedFraction"))?,

@@ -698,7 +698,10 @@ impl TableRow for RatesOpModeDistributionRow {
                         .get(i)
                         .ok_or_else(|| null("avgSpeedBinID"))?
                         as i16,
-                    avg_bin_speed: avg_bin_speed.get(i).ok_or_else(|| null("avgBinSpeed"))?,
+                    // MOVES leaves avgBinSpeed NULL in RatesOpModeDistribution
+                    // (the rates path does not populate it; the default is 0.0).
+                    // Treat a NULL as 0.0 rather than erroring.
+                    avg_bin_speed: avg_bin_speed.get(i).unwrap_or(0.0),
                     pol_process_id: PolProcessId(
                         pol_process_id.get(i).ok_or_else(|| null("polProcessID"))? as u32,
                     ),

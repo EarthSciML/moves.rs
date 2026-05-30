@@ -1077,7 +1077,9 @@ impl TableRow for RatesOpModeDistributionRow {
                     pol_process_id: pol.get(i).ok_or_else(|| null("polProcessID"))?,
                     op_mode_id: op.get(i).ok_or_else(|| null("opModeID"))?,
                     op_mode_fraction: omf.get(i).ok_or_else(|| null("opModeFraction"))?,
-                    avg_bin_speed: abs.get(i).ok_or_else(|| null("avgBinSpeed"))?,
+                    // MOVES leaves avgBinSpeed NULL in RatesOpModeDistribution
+                    // (default 0.0); treat a NULL as 0.0 rather than erroring.
+                    avg_bin_speed: abs.get(i).unwrap_or(0.0),
                     avg_speed_fraction: asf.get(i).ok_or_else(|| null("avgSpeedFraction"))?,
                 })
             })
