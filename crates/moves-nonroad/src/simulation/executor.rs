@@ -1061,12 +1061,16 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             .unwrap_or(0.0);
 
         // Build tech-fractions table indexed [scc_tech_index * MXTECH + tech_index].
+        // Match the hp-binned entry (not just the SCC): an SCC may have
+        // several HP-range entries with different tech mixes, and the
+        // tech-slot ordering must line up with the entry `find_exhaust_tech`
+        // selected for this record.
         let entry_fracs: &[f32] = self
             .executor
             .reference
             .exhaust_tech_entries
             .iter()
-            .find(|e| e.scc == record.scc)
+            .find(|e| e.scc == record.scc && e.hp_min <= record.hp_avg && record.hp_avg <= e.hp_max)
             .map(|e| e.tech_fractions.as_slice())
             .unwrap_or(&[]);
         let table_len = (scc_tech_index + 1) * MXTECH;
