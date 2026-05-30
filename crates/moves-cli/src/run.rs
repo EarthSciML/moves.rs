@@ -277,6 +277,11 @@ fn load_execution_db(
     // SourceUseTypePhysics.setup, which does not re-run against a snapshot).
     populate_source_use_type_physics_mapping(&mut store)
         .context("synthesising sourceUseTypePhysicsMapping from snapshot")?;
+    // Fill the NULL ZoneMonthHour meteorology columns (heatIndex,
+    // specificHumidity, molWaterFraction) that MeteorologyGenerator computes at
+    // runtime but some snapshots capture empty.
+    populate_zone_month_hour_meteorology(&mut store)
+        .context("populating ZoneMonthHour meteorology from snapshot")?;
     Ok(store)
 }
 
@@ -563,6 +568,140 @@ fn populate_source_use_type_physics_mapping(store: &mut InMemoryStore) -> Result
         .map_err(|e| anyhow::anyhow!("adding opModeIDOffset: {e}"))?;
 
     store.insert("sourceUseTypePhysicsMapping".to_string(), mapping);
+    Ok(())
+}
+
+/// Fill the NULL `ZoneMonthHour` meteorology columns (`heatIndex`,
+/// `specificHumidity`, `molWaterFraction`) from `temperature` / `relHumidity`.
+///
+/// MOVES' `MeteorologyGenerator` (`doHeatIndex`) computes these three columns at
+/// runtime and writes them back into `ZoneMonthHour`; some execution-DB
+/// snapshots capture the raw table with `temperature` and `relHumidity` present
+/// but the three derived columns left NULL. Downstream calculators read
+/// `ZoneMonthHour` directly and abort on the NULLs, so reproduce the generator's
+/// computation here via [`build_meteorology_table`] (joining `Zone` → `County`
+/// for each county's barometric pressure / altitude) and write the results back
+/// into the slow store. Rows whose zone/county is missing — which MOVES drops in
+/// its inner-join — keep `heatIndex = temperature` (the `<78 °F` passthrough)
+/// with zero humidity terms so every row stays readable.
+///
+/// No-op when `ZoneMonthHour` is absent, when `heatIndex` already holds a
+/// non-NULL value (snapshot captured the computed table), or when `Zone` /
+/// `County` are unavailable.
+fn populate_zone_month_hour_meteorology(store: &mut InMemoryStore) -> Result<()> {
+    use moves_calculators::generators::meteorology::{build_meteorology_table, MeteorologyInputs};
+    use polars::prelude::{DataType, NamedFrom, Series};
+
+    if !store.contains("ZoneMonthHour") {
+        return Ok(());
+    }
+
+    // Early exit: if heatIndex already carries any non-null value, the snapshot
+    // captured the computed columns — leave the table untouched.
+    {
+        let zmh = store
+            .get("ZoneMonthHour")
+            .context("ZoneMonthHour not in store after contains check")?;
+        let already_filled = zmh
+            .columns()
+            .iter()
+            .find(|c| c.name().eq_ignore_ascii_case("heatIndex"))
+            .and_then(|c| c.cast(&DataType::Float64).ok())
+            .and_then(|c| c.f64().ok().cloned())
+            .is_some_and(|ca| ca.into_iter().any(|v| v.is_some()));
+        if already_filled {
+            return Ok(());
+        }
+    }
+
+    // Zone and County are needed to resolve each county's barometric pressure.
+    if !store.contains("Zone") || !store.contains("County") {
+        return Ok(());
+    }
+
+    let inputs = MeteorologyInputs {
+        zone_month_hour: store
+            .iter_typed("ZoneMonthHour")
+            .context("reading ZoneMonthHour for meteorology")?,
+        zone: store.iter_typed("Zone").context("reading Zone")?,
+        county: store.iter_typed("County").context("reading County")?,
+    };
+    let computed = build_meteorology_table(&inputs);
+
+    // Index the computed meteorology by (zoneID, monthID, hourID).
+    let mut by_key: std::collections::HashMap<(i32, i32, i32), (f64, f64, f64)> =
+        std::collections::HashMap::with_capacity(computed.len());
+    for r in &computed {
+        by_key.insert(
+            (r.zone_id, r.month_id, r.hour_id),
+            (r.heat_index, r.specific_humidity, r.mol_water_fraction),
+        );
+    }
+
+    // Read the existing key columns + temperature (the unmatched-row fallback)
+    // in DataFrame row order, then release the Arc before mutating the store.
+    let (heat, spec, mol) = {
+        let zmh = store.get("ZoneMonthHour").expect("ZoneMonthHour present");
+        let df = &*zmh;
+        let find = |want: &str| -> Result<polars::prelude::Column> {
+            let lower = want.to_ascii_lowercase();
+            df.columns()
+                .iter()
+                .find(|c| c.name().to_ascii_lowercase() == lower)
+                .cloned()
+                .with_context(|| format!("ZoneMonthHour column '{want}' not found"))
+        };
+        let to_i32 = |c: polars::prelude::Column| -> Result<Vec<i32>> {
+            Ok(c.cast(&DataType::Int32)
+                .map_err(|e| anyhow::anyhow!("{e}"))?
+                .i32()
+                .map_err(|e| anyhow::anyhow!("{e}"))?
+                .into_iter()
+                .map(|v| v.unwrap_or(0))
+                .collect())
+        };
+        let zone = to_i32(find("zoneID")?)?;
+        let month = to_i32(find("monthID")?)?;
+        let hour = to_i32(find("hourID")?)?;
+        let temps: Vec<f64> = find("temperature")?
+            .cast(&DataType::Float64)
+            .map_err(|e| anyhow::anyhow!("{e}"))?
+            .f64()
+            .map_err(|e| anyhow::anyhow!("{e}"))?
+            .into_iter()
+            .map(|v| v.unwrap_or(0.0))
+            .collect();
+        let n = df.height();
+        let mut heat = Vec::with_capacity(n);
+        let mut spec = Vec::with_capacity(n);
+        let mut mol = Vec::with_capacity(n);
+        for i in 0..n {
+            match by_key.get(&(zone[i], month[i], hour[i])) {
+                Some(&(hi, sh, mwf)) => {
+                    heat.push(hi);
+                    spec.push(sh);
+                    mol.push(mwf);
+                }
+                None => {
+                    heat.push(temps[i]);
+                    spec.push(0.0);
+                    mol.push(0.0);
+                }
+            }
+        }
+        (heat, spec, mol)
+    };
+
+    let zmh_mut = store.get_mut("ZoneMonthHour").expect("ZoneMonthHour present");
+    zmh_mut
+        .with_column(Series::new("heatIndex".into(), heat).into())
+        .map_err(|e| anyhow::anyhow!("replacing ZoneMonthHour.heatIndex: {e}"))?;
+    zmh_mut
+        .with_column(Series::new("specificHumidity".into(), spec).into())
+        .map_err(|e| anyhow::anyhow!("replacing ZoneMonthHour.specificHumidity: {e}"))?;
+    zmh_mut
+        .with_column(Series::new("molWaterFraction".into(), mol).into())
+        .map_err(|e| anyhow::anyhow!("replacing ZoneMonthHour.molWaterFraction: {e}"))?;
     Ok(())
 }
 
@@ -1071,6 +1210,93 @@ mod tests {
         let mut store = InMemoryStore::new();
         populate_source_use_type_physics_mapping(&mut store).expect("noop");
         assert!(!store.contains("sourceUseTypePhysicsMapping"));
+    }
+
+    /// One-row `ZoneMonthHour` with the three derived columns left NULL, plus
+    /// the `Zone`/`County` rows meteorology needs to resolve pressure.
+    fn make_raw_meteorology_store() -> InMemoryStore {
+        use polars::prelude::*;
+        let mut store = InMemoryStore::new();
+        let zmh = df!(
+            "zoneID" => &[100i64],
+            "monthID" => &[7i64],
+            "hourID" => &[12i64],
+            "temperature" => &[90.0f64],
+            "relHumidity" => &[60.0f64],
+            "heatIndex" => &[None::<f64>],
+            "specificHumidity" => &[None::<f64>],
+            "molWaterFraction" => &[None::<f64>],
+        )
+        .unwrap();
+        let zone = df!("zoneID" => &[100i64], "countyID" => &[26161i64]).unwrap();
+        let county = df!(
+            "countyID" => &[26161i64],
+            "barometricPressure" => &[29.92f64],
+            "altitude" => &[None::<&str>],
+        )
+        .unwrap();
+        store.insert("ZoneMonthHour".to_string(), zmh);
+        store.insert("Zone".to_string(), zone);
+        store.insert("County".to_string(), county);
+        store
+    }
+
+    #[test]
+    fn fills_null_meteorology_columns() {
+        let mut store = make_raw_meteorology_store();
+        populate_zone_month_hour_meteorology(&mut store).expect("fill should succeed");
+        let df = store.get("ZoneMonthHour").unwrap();
+        // 90 °F / 60 % RH is above the 78 °F threshold, so the regression makes
+        // heatIndex exceed the dry-bulb temperature, and the humidity terms are
+        // populated (non-null).
+        let hi = df.column("heatIndex").unwrap().f64().unwrap().get(0).unwrap();
+        assert!(hi > 90.0, "heatIndex {hi} should exceed temperature");
+        assert!(df
+            .column("specificHumidity")
+            .unwrap()
+            .f64()
+            .unwrap()
+            .get(0)
+            .is_some());
+        assert!(df
+            .column("molWaterFraction")
+            .unwrap()
+            .f64()
+            .unwrap()
+            .get(0)
+            .is_some());
+    }
+
+    #[test]
+    fn meteorology_fill_noop_when_already_populated() {
+        use polars::prelude::*;
+        let mut store = InMemoryStore::new();
+        let zmh = df!(
+            "zoneID" => &[100i64], "monthID" => &[7i64], "hourID" => &[12i64],
+            "temperature" => &[90.0f64], "relHumidity" => &[60.0f64],
+            "heatIndex" => &[Some(123.0f64)],
+            "specificHumidity" => &[Some(1.0f64)],
+            "molWaterFraction" => &[Some(0.1f64)],
+        )
+        .unwrap();
+        store.insert("ZoneMonthHour".to_string(), zmh);
+        populate_zone_month_hour_meteorology(&mut store).expect("noop");
+        let hi = store
+            .get("ZoneMonthHour")
+            .unwrap()
+            .column("heatIndex")
+            .unwrap()
+            .f64()
+            .unwrap()
+            .get(0)
+            .unwrap();
+        assert_eq!(hi, 123.0, "pre-populated heatIndex must be preserved");
+    }
+
+    #[test]
+    fn meteorology_fill_noop_when_no_zmh() {
+        let mut store = InMemoryStore::new();
+        populate_zone_month_hour_meteorology(&mut store).expect("noop");
     }
 
     #[test]
