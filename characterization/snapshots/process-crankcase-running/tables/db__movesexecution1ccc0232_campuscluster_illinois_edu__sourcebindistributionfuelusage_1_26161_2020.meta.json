@@ -1,0 +1,38 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__sourcebindistributionfuelusage_1_26161_2020",
+  "schema": [
+    {
+      "name": "sourceTypeModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceBinID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceBinActivityFraction",
+      "kind": "float64"
+    },
+    {
+      "name": "sourceBinActivityFractionCV",
+      "kind": "float64"
+    },
+    {
+      "name": "isUserInput",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeModelYearID",
+    "polProcessID",
+    "sourceBinID"
+  ],
+  "row_count": 375,
+  "float_decimals": 12,
+  "content_sha256": "d6473fb7955a31dd4c81877a2ba95c665b82b7d6b9267d5d82df1c1ab32ba6eb"
+}

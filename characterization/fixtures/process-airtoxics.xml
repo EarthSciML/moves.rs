@@ -29,6 +29,9 @@
 		<pollutantprocessassociation pollutantkey="20" pollutantname="Benzene" processkey="1" processname="Running Exhaust"/>
 		<pollutantprocessassociation pollutantkey="24" pollutantname="1,3-Butadiene" processkey="1" processname="Running Exhaust"/>
 		<pollutantprocessassociation pollutantkey="25" pollutantname="Formaldehyde" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="1" pollutantname="Total Gaseous Hydrocarbons" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="79" pollutantname="Non-Methane Hydrocarbons" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="87" pollutantname="Volatile Organic Compounds" processkey="1" processname="Running Exhaust"/>
 	</pollutantprocessassociations>
 	<databaseselections>
 	</databaseselections>

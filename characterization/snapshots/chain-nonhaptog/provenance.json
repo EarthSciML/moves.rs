@@ -4,8 +4,8 @@
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
   "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
   "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/chain-nonhaptog.xml",
-  "runspec_sha256": "05e3ecd7350b16c6e061050a02178be9d9d05adbd35302c61e67140a50f4df65",
-  "snapshot_aggregate_sha256": "b8c8b2f7722a667df7faf15db6407a12282a97d9627f705cfebf70f797d6b03b",
+  "runspec_sha256": "9c38b76a8d5ab5c98079a6a8bb12c01fa7a08684fd2532f65c5dc9790d4dde20",
+  "snapshot_aggregate_sha256": "0679855ebd3abe9f872ec7dfecfe6941be5ebd2cb75f1d1b66cf4a50caf1935d",
   "output_database": "out_chain_nonhaptog",
   "scale_input_database": null
 }

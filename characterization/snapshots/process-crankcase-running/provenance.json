@@ -4,8 +4,8 @@
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
   "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
   "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/process-crankcase-running.xml",
-  "runspec_sha256": "828a0f16cde55e053061e3d6d0d5f3063f95d89f497b04c06d777ea7b2a680e6",
-  "snapshot_aggregate_sha256": "fa93954655112ad9b0afdf279573c893f873d964ac7af3ad2d244b1cc5c077a1",
+  "runspec_sha256": "e2a859656cd287e1831f96d99e5e401623d88ed8c36473d78d0848c136f8cf92",
+  "snapshot_aggregate_sha256": "8709122d6bfdd0cf0763d194967a2edc5c9d380476ea591ebee5d8faed26d919",
   "output_database": "out_process_crankcase_running",
   "scale_input_database": null
 }

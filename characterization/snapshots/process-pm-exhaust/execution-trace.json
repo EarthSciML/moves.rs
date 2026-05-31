@@ -2,7 +2,7 @@
   "trace_version": "moves-fixture-capture/v1",
   "fixture_name": "process-pm-exhaust",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "runspec_sha256": "876295c54b0b32ba9ee8a8c8a808bc248cf2855d69ef19ec90ad240f80be165f",
+  "runspec_sha256": "4e972d531e9a7dd4387324d73d827e666aa46e0198d5728193e0cb3a11e50a9b",
   "java_classes": [
     {
       "name": "gov.epa.otaq.moves.common.BundleManifest",
@@ -613,6 +613,14 @@
       "kind": "master"
     },
     {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator$GeneralFuelRatioExpression",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator$IntegerPair",
+      "kind": "master"
+    },
+    {
       "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator$ModelYearRange",
       "kind": "master"
     },
@@ -734,6 +742,6 @@
   "worker_bundles": [],
   "sources": {
     "worker_sql_files": 0,
-    "class_load_log_files": 4
+    "class_load_log_files": 6
   }
 }

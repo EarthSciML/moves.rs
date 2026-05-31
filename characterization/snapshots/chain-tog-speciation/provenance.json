@@ -4,8 +4,8 @@
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
   "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
   "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/chain-tog-speciation.xml",
-  "runspec_sha256": "483c2fcc7f8f25bdb4bcd15dd31af43bfa64018b7d020ea5d4be3d1e729d4606",
-  "snapshot_aggregate_sha256": "e1c3d7618a96f9a67205e97adff659702e4c9154332bd28d525b8c8baa8518e0",
+  "runspec_sha256": "5a80e99eb245f67005e643a34a26a3e6c6bc75e05edbc07f923a07e8d89c3159",
+  "snapshot_aggregate_sha256": "33c11afabc0fc7c61e847a42955e39162f2f3ab5b3905834ed12a1cced84089f",
   "output_database": "out_chain_tog_speciation",
   "scale_input_database": null
 }

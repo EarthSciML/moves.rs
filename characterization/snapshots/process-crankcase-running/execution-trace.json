@@ -2,10 +2,26 @@
   "trace_version": "moves-fixture-capture/v1",
   "fixture_name": "process-crankcase-running",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "runspec_sha256": "828a0f16cde55e053061e3d6d0d5f3063f95d89f497b04c06d777ea7b2a680e6",
+  "runspec_sha256": "e2a859656cd287e1831f96d99e5e401623d88ed8c36473d78d0848c136f8cf92",
   "java_classes": [
     {
+      "name": "gov.epa.otaq.moves.common.BundleManifest",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.BundleManifest$ContextHolder",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.BundleManifest$DurationFragment",
+      "kind": "common"
+    },
+    {
       "name": "gov.epa.otaq.moves.common.BundleManifest$MasterFragment",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.BundleManifest$XMLErrorHandler",
       "kind": "common"
     },
     {
@@ -29,6 +45,10 @@
       "kind": "common"
     },
     {
+      "name": "gov.epa.otaq.moves.common.DistributedWorkFilePurpose",
+      "kind": "common"
+    },
+    {
       "name": "gov.epa.otaq.moves.common.DistributedWorkFileState",
       "kind": "common"
     },
@@ -42,6 +62,10 @@
     },
     {
       "name": "gov.epa.otaq.moves.common.InstanceCounter",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.JARUtilities",
       "kind": "common"
     },
     {
@@ -101,6 +125,10 @@
       "kind": "common"
     },
     {
+      "name": "gov.epa.otaq.moves.common.PermutationCreator",
+      "kind": "common"
+    },
+    {
       "name": "gov.epa.otaq.moves.common.PermutationCreator$IDimension",
       "kind": "common"
     },
@@ -125,11 +153,27 @@
       "kind": "common"
     },
     {
+      "name": "gov.epa.otaq.moves.common.TaggedSQLRunner",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.TaggedSQLRunner$ConcurrencyStatistics",
+      "kind": "common"
+    },
+    {
       "name": "gov.epa.otaq.moves.common.TaggedSQLRunner$ConnectionProvider",
       "kind": "common"
     },
     {
       "name": "gov.epa.otaq.moves.common.TaggedSQLRunner$OverrideHandler",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.TaggedSQLRunner$SQLTask",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.TaggedSQLRunner$StatementEntry",
       "kind": "common"
     },
     {
@@ -162,6 +206,82 @@
     },
     {
       "name": "gov.epa.otaq.moves.common.WildCardFileNameFilter",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Common$AddNode",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Common$ComparisonNode",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Common$DivideNode",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Common$ExpNode",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Common$IfNode",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Common$LiteralNode",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Common$MultiplyNode",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Common$NamedExpressionNode",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Common$PowNode",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Common$SubtractNode",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Common$VariableNode",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.ExpressionParser",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.IExpressionNode",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.IVariableSource",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Optimizer",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Optimizer$IOptimizerVariableSource",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Tokenizer",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Tokenizer$Token",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Value",
       "kind": "common"
     },
     {
@@ -230,6 +350,10 @@
     },
     {
       "name": "gov.epa.otaq.moves.master.framework.ExtractedDataCache",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.ExtractedDataCache$CacheEntry",
       "kind": "framework"
     },
     {
@@ -369,6 +493,10 @@
       "kind": "framework"
     },
     {
+      "name": "gov.epa.otaq.moves.master.framework.SQLForWorker",
+      "kind": "framework"
+    },
+    {
       "name": "gov.epa.otaq.moves.master.framework.SQLMacroExpander",
       "kind": "framework"
     },
@@ -453,11 +581,27 @@
       "kind": "master"
     },
     {
+      "name": "gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.BaseRateByAgeHelper$Flags",
+      "kind": "master"
+    },
+    {
       "name": "gov.epa.otaq.moves.master.implementation.ghg.BaseRateCalculator",
       "kind": "master"
     },
     {
       "name": "gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator$1",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.BaseRateGenerator$2",
       "kind": "master"
     },
     {
@@ -473,7 +617,43 @@
       "kind": "master"
     },
     {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator$ExpressionHolder",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator$FuelFormulation",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator$FuelUsageEntry",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator$GeneralFuelRatioExpression",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator$IntegerPair",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator$ModelYearRange",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator$Parameter",
+      "kind": "master"
+    },
+    {
       "name": "gov.epa.otaq.moves.master.implementation.ghg.RatesOperatingModeDistributionGenerator",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.SourceBinDistributionGenerator",
       "kind": "master"
     },
     {
@@ -482,6 +662,10 @@
     },
     {
       "name": "gov.epa.otaq.moves.master.implementation.ghg.TOGSpeciationCalculator",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.TotalActivityGenerator",
       "kind": "master"
     },
     {
@@ -533,7 +717,23 @@
       "kind": "master"
     },
     {
+      "name": "gov.epa.otaq.moves.utils.ApplicationRunner",
+      "kind": "utils"
+    },
+    {
+      "name": "gov.epa.otaq.moves.utils.StreamGobbler",
+      "kind": "utils"
+    },
+    {
+      "name": "gov.epa.otaq.moves.worker.framework.ExternalCalculator",
+      "kind": "framework"
+    },
+    {
       "name": "gov.epa.otaq.moves.worker.framework.RemoteEmissionsCalculator",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.worker.framework.RemoteEmissionsCalculator$TimerInfo",
       "kind": "framework"
     },
     {
@@ -554,6 +754,6 @@
   "worker_bundles": [],
   "sources": {
     "worker_sql_files": 0,
-    "class_load_log_files": 4
+    "class_load_log_files": 6
   }
 }

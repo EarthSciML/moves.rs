@@ -4,8 +4,8 @@
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
   "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
   "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/process-pm-exhaust.xml",
-  "runspec_sha256": "876295c54b0b32ba9ee8a8c8a808bc248cf2855d69ef19ec90ad240f80be165f",
-  "snapshot_aggregate_sha256": "1aa73827ab234a40ed25073c052719f3268e7d643a65c89b405a8caae7be6ff0",
+  "runspec_sha256": "4e972d531e9a7dd4387324d73d827e666aa46e0198d5728193e0cb3a11e50a9b",
+  "snapshot_aggregate_sha256": "1b21a5b25ea6c1092b6b989d24bdfb1c4e47a05634f164e3533f52f5e2566285",
   "output_database": "out_process_pm_exhaust",
   "scale_input_database": null
 }

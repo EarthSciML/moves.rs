@@ -35,6 +35,7 @@ calculators but is not in their registration set.]]></description>
 		<pollutantprocessassociation pollutantkey="32" pollutantname="Nitrogen Oxide (NO)" processkey="1" processname="Running Exhaust"/>
 		<pollutantprocessassociation pollutantkey="33" pollutantname="Nitrogen Dioxide (NO2)" processkey="1" processname="Running Exhaust"/>
 		<pollutantprocessassociation pollutantkey="34" pollutantname="Nitrous Acid (HONO)" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="3" pollutantname="Oxides of Nitrogen (NOx)" processkey="1" processname="Running Exhaust"/>
 	</pollutantprocessassociations>
 	<databaseselections>
 	</databaseselections>
