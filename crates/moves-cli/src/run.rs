@@ -33,7 +33,8 @@ use moves_framework::{
 };
 use moves_runspec::{GeoKind, RunSpec};
 use polars::prelude::{
-    col, lit, Expr, LazyFrame, NamedFrom, PlRefPath, ScanArgsParquet, SerReader, Series,
+    col, concat, lit, Expr, IntoLazy, LazyFrame, NamedFrom, PlRefPath, ScanArgsParquet, SerReader,
+    Series, UnionArgs,
 };
 
 use crate::load_run_spec;
@@ -282,6 +283,10 @@ fn load_execution_db(
     // runtime but some snapshots capture empty.
     populate_zone_month_hour_meteorology(&mut store)
         .context("populating ZoneMonthHour meteorology from snapshot")?;
+    // Union process/year-indexed table variants (e.g. baserate_1_2001, baserate_2_2001)
+    // into their canonical names (e.g. baserate) so calculators can read real data.
+    merge_process_year_variants(&mut store)
+        .context("merging process/year-indexed table variants into canonical names")?;
     Ok(store)
 }
 
@@ -294,6 +299,75 @@ fn strip_year_suffix(name: &str) -> &str {
     } else {
         name
     }
+}
+
+/// Strip all trailing `_<digits>` segments from a lowercased table name, returning
+/// the base name that MOVES uses for the canonical (unpartitioned) form.
+///
+/// MOVES partitions some execution-DB tables by process, county, and/or year into
+/// separate MySQL tables (e.g. `baserate_1_2001`, `baseratebyage_90_2020`).  The
+/// calculator reads the canonical name (`baserate`, `baseratebyage`).  This helper
+/// strips those numeric-index suffixes so the allow-filter admits the variants and
+/// the merge step can union them back under the canonical name.
+///
+/// Examples: `"baserate_1_2001"` → `"baserate"`, `"baserate"` → `"baserate"`,
+/// `"stmytvvcoeffs2020"` → `"stmytvvcoeffs2020"` (no underscore separator, unchanged).
+fn strip_numeric_index_suffix(name: &str) -> &str {
+    let mut end = name.len();
+    loop {
+        match name[..end].rfind('_') {
+            Some(pos) => {
+                let suffix = &name[pos + 1..end];
+                if !suffix.is_empty() && suffix.bytes().all(|b| b.is_ascii_digit()) {
+                    end = pos;
+                } else {
+                    break;
+                }
+            }
+            None => break,
+        }
+    }
+    &name[..end]
+}
+
+/// Union all process/year-indexed table variants into their canonical names.
+///
+/// MOVES splits some execution-DB tables (e.g. `BaseRate`, `BaseRateByAge`) into
+/// separate per-process-per-year MySQL tables (`baserate_1_2001`, `baserate_2_2001`).
+/// The snapshot captures those variants alongside an empty canonical stub (`baserate`).
+/// Calculators read only the canonical name, so this step unions all variants into
+/// that name, replacing the empty stub with the full merged table.
+fn merge_process_year_variants(store: &mut InMemoryStore) -> Result<()> {
+    let all_names: Vec<String> = store.names().into_iter().map(|s| s.to_string()).collect();
+    let mut by_base: std::collections::BTreeMap<String, Vec<String>> =
+        std::collections::BTreeMap::new();
+    for name in &all_names {
+        let base = strip_numeric_index_suffix(name);
+        if base != *name {
+            by_base.entry(base.to_string()).or_default().push(name.clone());
+        }
+    }
+    for (base, variant_names) in by_base {
+        let frames: Vec<LazyFrame> = variant_names
+            .iter()
+            .filter_map(|vname| store.get(vname))
+            .filter(|df| df.height() > 0)
+            .map(|df| df.as_ref().clone().lazy())
+            .collect();
+        if frames.is_empty() {
+            continue;
+        }
+        let merged = if frames.len() == 1 {
+            frames.into_iter().next().unwrap().collect()
+        } else {
+            concat(frames, UnionArgs::default())
+                .map_err(|e| anyhow::anyhow!("concat {base} variants: {e}"))?
+                .collect()
+        }
+        .map_err(|e| anyhow::anyhow!("collecting merged {base}: {e}"))?;
+        store.insert(base, merged);
+    }
+    Ok(())
 }
 
 /// Fall-back loader: scan `<snapshot>/tables/` for individual `db__movesexecution*.parquet`
@@ -334,9 +408,16 @@ fn load_execution_db_from_parquet(
         // their base name (e.g. `stmytvvcoeffs`) appears in the allowed set,
         // because some generators read them dynamically and declare no static
         // INPUT_TABLES entry.
+        // Process/year-indexed tables (e.g. `baserate_1_2001`) are admitted when
+        // their canonical base name (e.g. `baserate`) appears in the allowed set;
+        // they are merged into that canonical name by `merge_process_year_variants`
+        // after loading.
         if let Some(allowed) = allowed_tables {
             let lower = table_name.to_ascii_lowercase();
-            if !allowed.contains(&lower) && !allowed.contains(strip_year_suffix(&lower)) {
+            if !allowed.contains(&lower)
+                && !allowed.contains(strip_year_suffix(&lower))
+                && !allowed.contains(strip_numeric_index_suffix(&lower))
+            {
                 continue;
             }
         }
@@ -973,6 +1054,62 @@ mod tests {
     }
 
     #[test]
+    fn load_execution_db_parquet_admits_and_merges_indexed_tables() {
+        use moves_snapshot::format::ColumnKind;
+        use moves_snapshot::table::{TableBuilder, Value};
+        use moves_snapshot::Snapshot;
+
+        // Build a snapshot with two process/year-indexed baserate variants.
+        let make_table = |name: &str, id_val: i64| {
+            let mut tb = TableBuilder::new(
+                name,
+                [
+                    ("sourcetypeid".to_string(), ColumnKind::Int64),
+                    ("processid".to_string(), ColumnKind::Int64),
+                ],
+            )
+            .unwrap()
+            .with_natural_key(["sourcetypeid", "processid"])
+            .unwrap();
+            tb.push_row([Value::Int64(21), Value::Int64(id_val)])
+                .unwrap();
+            tb.build().unwrap()
+        };
+
+        let mut snap = Snapshot::new();
+        snap.add_table(make_table("db__movesexecution1__baserate_1_2001", 1))
+            .unwrap();
+        snap.add_table(make_table("db__movesexecution1__baserate_2_2001", 2))
+            .unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        snap.write(dir.path()).unwrap();
+
+        // Remove bundle to force Parquet path.
+        let bundle_path = dir.path().join("tables").join("execution-db.bundle");
+        std::fs::remove_file(&bundle_path).unwrap();
+
+        // Allowed set contains only the canonical base name.
+        let mut allowed: BTreeSet<String> = BTreeSet::new();
+        allowed.insert("baserate".to_string());
+
+        let filter = SnapshotFilter::from_run_spec(&moves_runspec::RunSpec::default());
+        let store = load_execution_db(dir.path(), &filter, Some(&allowed))
+            .expect("indexed Parquet load must succeed");
+
+        // The canonical "baserate" must exist and have 2 merged rows.
+        assert!(
+            store.contains("baserate"),
+            "canonical baserate must exist after merge"
+        );
+        let merged = store.get("baserate").unwrap();
+        assert_eq!(
+            merged.height(),
+            2,
+            "merged baserate must have 2 rows (one from each variant)"
+        );
+    }
+
+    #[test]
     fn load_execution_db_parquet_admits_year_suffixed_table_when_base_in_allowed() {
         use moves_snapshot::format::ColumnKind;
         use moves_snapshot::table::{TableBuilder, Value};
@@ -1021,6 +1158,61 @@ mod tests {
         assert_eq!(strip_year_suffix("activitytype"), "activitytype");
         assert_eq!(strip_year_suffix("table202"), "table202");
         assert_eq!(strip_year_suffix("table20a0"), "table20a0");
+    }
+
+    #[test]
+    fn strip_numeric_index_suffix_strips_process_year() {
+        assert_eq!(strip_numeric_index_suffix("baserate_1_2001"), "baserate");
+        assert_eq!(
+            strip_numeric_index_suffix("baseratebyage_90_2020"),
+            "baseratebyage"
+        );
+        assert_eq!(
+            strip_numeric_index_suffix("sourcebindistributionfuelusage_1_26161_2001"),
+            "sourcebindistributionfuelusage"
+        );
+    }
+
+    #[test]
+    fn strip_numeric_index_suffix_no_change_plain_name() {
+        assert_eq!(strip_numeric_index_suffix("baserate"), "baserate");
+        assert_eq!(strip_numeric_index_suffix("activitytype"), "activitytype");
+        // year-only suffix (no underscore separator) is unchanged
+        assert_eq!(
+            strip_numeric_index_suffix("stmytvvcoeffs2020"),
+            "stmytvvcoeffs2020"
+        );
+    }
+
+    #[test]
+    fn merge_process_year_variants_unions_rows() {
+        use moves_framework::{DataFrameStore, InMemoryStore};
+        use polars::prelude::{DataFrame, NamedFrom, Series};
+
+        let make_df = |row_val: i64| {
+            let s = Series::new("id".into(), [row_val]);
+            DataFrame::new(1, vec![s.into()]).unwrap()
+        };
+
+        let mut store = InMemoryStore::new();
+        // Two variants for "baserate", plus an empty canonical stub.
+        store.insert("baserate", DataFrame::default());
+        store.insert("baserate_1_2001", make_df(1));
+        store.insert("baserate_2_2001", make_df(2));
+        // Unrelated table that must not be touched.
+        store.insert("activitytype", make_df(99));
+
+        merge_process_year_variants(&mut store).expect("merge must succeed");
+
+        // Canonical "baserate" must now have 2 rows (union of the two variants).
+        let merged = store.get("baserate").expect("baserate must exist");
+        assert_eq!(merged.height(), 2, "merged baserate must have 2 rows");
+        // Unrelated table must be untouched.
+        assert_eq!(
+            store.get("activitytype").unwrap().height(),
+            1,
+            "activitytype must be unchanged"
+        );
     }
 
     fn make_sho_store() -> InMemoryStore {

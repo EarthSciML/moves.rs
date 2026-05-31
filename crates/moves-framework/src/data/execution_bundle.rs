@@ -62,6 +62,28 @@ fn strip_year_suffix(name: &str) -> &str {
     }
 }
 
+/// Strip all trailing `_<digits>` segments, returning the canonical base name.
+///
+/// Matches the same helper in `moves-cli/src/run.rs`; duplicated here because
+/// `moves-framework` cannot depend on `moves-cli`.  See that copy for details.
+fn strip_numeric_index_suffix(name: &str) -> &str {
+    let mut end = name.len();
+    loop {
+        match name[..end].rfind('_') {
+            Some(pos) => {
+                let suffix = &name[pos + 1..end];
+                if !suffix.is_empty() && suffix.bytes().all(|b| b.is_ascii_digit()) {
+                    end = pos;
+                } else {
+                    break;
+                }
+            }
+            None => break,
+        }
+    }
+    &name[..end]
+}
+
 fn parse_bundle(
     src: &[u8],
     path: &Path,
@@ -144,7 +166,12 @@ fn parse_bundle(
         if let Some(allowed) = allowed {
             // Year-suffixed tables (e.g. `stmyTVVCoeffs2020`) are admitted when
             // their base name (e.g. `stmytvvcoeffs`) appears in the allowed set.
-            if !allowed.contains(&short_name) && !allowed.contains(strip_year_suffix(&short_name)) {
+            // Process/year-indexed tables (e.g. `baserate_1_2001`) are admitted when
+            // their canonical base name (e.g. `baserate`) appears in the allowed set.
+            if !allowed.contains(&short_name)
+                && !allowed.contains(strip_year_suffix(&short_name))
+                && !allowed.contains(strip_numeric_index_suffix(&short_name))
+            {
                 continue;
             }
         }
@@ -301,6 +328,72 @@ mod tests {
     #[test]
     fn strip_year_suffix_no_change_mixed_suffix() {
         assert_eq!(strip_year_suffix("table20a0"), "table20a0");
+    }
+
+    // --- strip_numeric_index_suffix unit tests ---
+
+    #[test]
+    fn strip_numeric_index_suffix_strips_process_year() {
+        assert_eq!(strip_numeric_index_suffix("baserate_1_2001"), "baserate");
+        assert_eq!(
+            strip_numeric_index_suffix("baseratebyage_90_2020"),
+            "baseratebyage"
+        );
+    }
+
+    #[test]
+    fn strip_numeric_index_suffix_strips_three_segments() {
+        assert_eq!(
+            strip_numeric_index_suffix("sourcebindistributionfuelusage_1_26161_2001"),
+            "sourcebindistributionfuelusage"
+        );
+    }
+
+    #[test]
+    fn strip_numeric_index_suffix_no_change_plain_name() {
+        assert_eq!(strip_numeric_index_suffix("baserate"), "baserate");
+        assert_eq!(strip_numeric_index_suffix("activitytype"), "activitytype");
+    }
+
+    #[test]
+    fn strip_numeric_index_suffix_no_change_year_only() {
+        // A bare year suffix (no underscore separator) is NOT stripped — that's
+        // `strip_year_suffix`'s job.
+        assert_eq!(
+            strip_numeric_index_suffix("stmytvvcoeffs2020"),
+            "stmytvvcoeffs2020"
+        );
+    }
+
+    // --- filtered bundle admits numeric-indexed tables ---
+
+    #[test]
+    fn filtered_bundle_admits_indexed_table_when_base_in_allowed() {
+        // Simulates the baserate_1_2001 scenario: the bundle has a process/year-indexed
+        // table, and the allowed set contains only the base (canonical) name.
+        let ipc_indexed = ipc_for_table("db__movesexecution1__baserate_1_2001", 4);
+        let ipc_other = ipc_for_table("db__movesexecution1__unrelated", 1);
+        let bundle = build_bundle_bytes([
+            ("db__movesexecution1__baserate_1_2001", ipc_indexed.as_slice()),
+            ("db__movesexecution1__unrelated", ipc_other.as_slice()),
+        ]);
+        let dir = tempdir().unwrap();
+        let p = dir.path().join("indexed.bundle");
+        std::fs::write(&p, &bundle).unwrap();
+
+        let mut allowed = BTreeSet::new();
+        allowed.insert("baserate".to_string()); // canonical name — no index suffix
+
+        let store = read_execution_bundle_filtered(&p, &allowed).unwrap();
+        assert!(
+            store.get("baserate_1_2001").is_some(),
+            "indexed table must be admitted when base name is in allowed"
+        );
+        assert_eq!(store.get("baserate_1_2001").unwrap().height(), 4);
+        assert!(
+            store.get("unrelated").is_none(),
+            "unrelated table must still be skipped"
+        );
     }
 
     // --- year-suffixed table admission test ---
