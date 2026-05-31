@@ -109,6 +109,15 @@ const NONROAD_INPUT_TABLES: &[&str] = &[
     "nrequipmenttype",
     "nragecategory",
     "nrmodelyear",
+    // Evaporative emission rates by (SCC, HP-bin, polProcessID, engTechID).
+    // Not yet consumed by the data-plane loader (evap calculation is stubbed),
+    // but declaring it here ensures the snapshot loader admits the table into
+    // the in-memory store so the evap wiring can read it without a schema change.
+    "nrevapemissionrate",
+    // Retrofit annual/effective fractions by (SCC, engTech, hp, pollutant, retrofitID).
+    // The engine's ReferenceData carries a retrofit_records slot; this declaration
+    // ensures the table is available in-store for the retrofit loader (Task 123).
+    "nrretrofitfactors",
 ];
 
 /// Adapter that routes onroad master-loop notifications for nonroad
