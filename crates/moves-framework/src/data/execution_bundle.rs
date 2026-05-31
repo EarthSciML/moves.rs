@@ -68,17 +68,12 @@ fn strip_year_suffix(name: &str) -> &str {
 /// `moves-framework` cannot depend on `moves-cli`.  See that copy for details.
 fn strip_numeric_index_suffix(name: &str) -> &str {
     let mut end = name.len();
-    loop {
-        match name[..end].rfind('_') {
-            Some(pos) => {
-                let suffix = &name[pos + 1..end];
-                if !suffix.is_empty() && suffix.bytes().all(|b| b.is_ascii_digit()) {
-                    end = pos;
-                } else {
-                    break;
-                }
-            }
-            None => break,
+    while let Some(pos) = name[..end].rfind('_') {
+        let suffix = &name[pos + 1..end];
+        if !suffix.is_empty() && suffix.bytes().all(|b| b.is_ascii_digit()) {
+            end = pos;
+        } else {
+            break;
         }
     }
     &name[..end]
@@ -374,7 +369,10 @@ mod tests {
         let ipc_indexed = ipc_for_table("db__movesexecution1__baserate_1_2001", 4);
         let ipc_other = ipc_for_table("db__movesexecution1__unrelated", 1);
         let bundle = build_bundle_bytes([
-            ("db__movesexecution1__baserate_1_2001", ipc_indexed.as_slice()),
+            (
+                "db__movesexecution1__baserate_1_2001",
+                ipc_indexed.as_slice(),
+            ),
             ("db__movesexecution1__unrelated", ipc_other.as_slice()),
         ]);
         let dir = tempdir().unwrap();

@@ -196,7 +196,6 @@ jobs:
           cp crates/moves-wasm/demo/README.md  target/doc/demo/
           cp crates/moves-wasm/pkg/moves_wasm.js      target/doc/demo/pkg/
           cp crates/moves-wasm/pkg/moves_wasm_bg.wasm target/doc/demo/pkg/
-          cp crates/moves-wasm/pkg/moves_wasm_bg.js   target/doc/demo/pkg/
 
       - name: Upload docs artifact
         if: github.ref == 'refs/heads/main'

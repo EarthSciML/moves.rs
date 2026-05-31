@@ -988,7 +988,7 @@ mod tests {
 
     #[test]
     fn execute_returns_empty_output_as_stub() {
-        let mut gen = ProjectTAG::new();
+        let gen = ProjectTAG::new();
         let mut ctx = CalculatorContext::new();
         let out = gen.execute(&mut ctx).unwrap();
         // Phase 2 stub: no DataFrame produced yet.

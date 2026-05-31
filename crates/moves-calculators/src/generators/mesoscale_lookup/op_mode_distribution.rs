@@ -1034,7 +1034,8 @@ impl TableRow for SourceTypePhysics {
                     source_type_id: SourceTypeId(
                         source_type_id_col
                             .get(i)
-                            .ok_or_else(|| null("realSourceTypeID"))? as u16,
+                            .ok_or_else(|| null("realSourceTypeID"))?
+                            as u16,
                     ),
                     rolling_term_a: rolling_term_a_col
                         .get(i)

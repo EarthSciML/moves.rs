@@ -314,17 +314,12 @@ fn strip_year_suffix(name: &str) -> &str {
 /// `"stmytvvcoeffs2020"` → `"stmytvvcoeffs2020"` (no underscore separator, unchanged).
 fn strip_numeric_index_suffix(name: &str) -> &str {
     let mut end = name.len();
-    loop {
-        match name[..end].rfind('_') {
-            Some(pos) => {
-                let suffix = &name[pos + 1..end];
-                if !suffix.is_empty() && suffix.bytes().all(|b| b.is_ascii_digit()) {
-                    end = pos;
-                } else {
-                    break;
-                }
-            }
-            None => break,
+    while let Some(pos) = name[..end].rfind('_') {
+        let suffix = &name[pos + 1..end];
+        if !suffix.is_empty() && suffix.bytes().all(|b| b.is_ascii_digit()) {
+            end = pos;
+        } else {
+            break;
         }
     }
     &name[..end]
@@ -344,7 +339,10 @@ fn merge_process_year_variants(store: &mut InMemoryStore) -> Result<()> {
     for name in &all_names {
         let base = strip_numeric_index_suffix(name);
         if base != *name {
-            by_base.entry(base.to_string()).or_default().push(name.clone());
+            by_base
+                .entry(base.to_string())
+                .or_default()
+                .push(name.clone());
         }
     }
     for (base, variant_names) in by_base {
@@ -773,7 +771,9 @@ fn populate_zone_month_hour_meteorology(store: &mut InMemoryStore) -> Result<()>
         (heat, spec, mol)
     };
 
-    let zmh_mut = store.get_mut("ZoneMonthHour").expect("ZoneMonthHour present");
+    let zmh_mut = store
+        .get_mut("ZoneMonthHour")
+        .expect("ZoneMonthHour present");
     zmh_mut
         .with_column(Series::new("heatIndex".into(), heat).into())
         .map_err(|e| anyhow::anyhow!("replacing ZoneMonthHour.heatIndex: {e}"))?;
@@ -1348,8 +1348,7 @@ mod tests {
     fn synthesises_identity_physics_mapping_when_absent() {
         let mut store = InMemoryStore::new();
         store.insert("sourceUseTypePhysics".to_string(), make_physics_df());
-        populate_source_use_type_physics_mapping(&mut store)
-            .expect("synthesis should succeed");
+        populate_source_use_type_physics_mapping(&mut store).expect("synthesis should succeed");
 
         let df = store
             .get("sourceUseTypePhysicsMapping")
@@ -1441,7 +1440,13 @@ mod tests {
         // 90 °F / 60 % RH is above the 78 °F threshold, so the regression makes
         // heatIndex exceed the dry-bulb temperature, and the humidity terms are
         // populated (non-null).
-        let hi = df.column("heatIndex").unwrap().f64().unwrap().get(0).unwrap();
+        let hi = df
+            .column("heatIndex")
+            .unwrap()
+            .f64()
+            .unwrap()
+            .get(0)
+            .unwrap();
         assert!(hi > 90.0, "heatIndex {hi} should exceed temperature");
         assert!(df
             .column("specificHumidity")

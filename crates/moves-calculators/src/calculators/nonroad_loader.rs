@@ -240,13 +240,16 @@ fn load_deterioration<S: DataFrameStore + ?Sized>(store: &S) -> DetMap {
     map
 }
 
+/// hp-binned rate entries `[(hp_min, hp_max, (rate, unit))]` for one pollutant slot.
+type HpBinnedRates = Vec<(i64, i64, (f32, EmissionUnitCode))>;
+
 /// Per-`(SCC, engTechID)` emission rates, hp-binned. The `.EMF` side of the
 /// canonical model — looked up by hp containment, with SCC family-root
 /// fallback applied by the caller.
 #[derive(Default, Clone)]
 struct TechRate {
     /// `pollutant_slot -> [(hp_min, hp_max, (rate, unit))]`.
-    by_pollutant: BTreeMap<usize, Vec<(i64, i64, (f32, EmissionUnitCode))>>,
+    by_pollutant: BTreeMap<usize, HpBinnedRates>,
     /// `[(hp_min, hp_max, bsfc)]` from polProcessID 9901.
     bsfc: Vec<(i64, i64, f32)>,
 }
@@ -1743,9 +1746,7 @@ mod tests {
         ]
         .into_iter()
         .collect();
-        let tf = scc_lookup(&temporal, &"2265006030".to_string())
-            .copied()
-            .unwrap_or(1.0);
+        let tf = scc_lookup(&temporal, "2265006030").copied().unwrap_or(1.0);
         let mut my_co: BTreeMap<i32, f64> = BTreeMap::new();
         for r in &out.rows {
             if r.scc == "2265006030" {
@@ -1815,9 +1816,9 @@ mod tests {
         assert_eq!(bin0.tech_names, vec!["105".to_string()]);
         let n_tech = 1;
         // THC (slot 0) base rate.
-        assert_eq!(bin0.emission_factors[0 * n_tech], 261.0);
+        assert_eq!(bin0.emission_factors[0], 261.0);
         // CO (slot 1), NOx (slot 2), PM (slot 5).
-        assert_eq!(bin0.emission_factors[1 * n_tech], 733.0);
+        assert_eq!(bin0.emission_factors[n_tech], 733.0);
         assert_eq!(bin0.emission_factors[2 * n_tech], 4.5);
         assert_eq!(bin0.emission_factors[5 * n_tech], 1.25);
         // BSFC (polProcess 9901) lands in the per-tech bsfc array, not EF.

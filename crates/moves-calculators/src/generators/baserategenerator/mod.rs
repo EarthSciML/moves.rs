@@ -1427,7 +1427,10 @@ impl TableRow for SbWeightedRateDetail {
         // struct but has no `ageGroupID` column; its rows carry age group 0
         // (see [`SbWeightedRateDetail`]). Treat an absent column — and any NULL
         // within it — as age group 0 rather than erroring.
-        let ag = df.column("ageGroupID").ok().and_then(|c| c.i32().ok().cloned());
+        let ag = df
+            .column("ageGroupID")
+            .ok()
+            .and_then(|c| c.i32().ok().cloned());
         let rc = get_i32("regClassID")?;
         let sbd = get_f64("sumSBD")?;
         let sbdr = get_f64("sumSBDRaw")?;

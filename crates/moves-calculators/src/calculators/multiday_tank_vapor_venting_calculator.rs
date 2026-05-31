@@ -5215,13 +5215,14 @@ static INPUT_TABLES: &[&str] = &[
 /// Leak equation mapping (insertion-scan order, L0 first):
 /// - L0=0.814, L1=0.79, L2=0.796, L3=0.524, L4=0.408, L5=0.388
 /// - L6=0.376, L7=0.365, L8=0.357, L9=0.351, L10=0.952, L11=0.782
+///
 /// Each evaluates as `coefficient * TVGdaily`.
 pub struct DefaultVentingEquations;
 
 /// Inner (pre-`max(0)`) TVV polynomial for T0: `(-b + sqrt(b^2 - 4ac)) / 2a`
 /// where `b = -1*Xn+85`, `a = 1.25`, inner quadratic = `-0.25*Xn^2 + 0.2*Xn + 70`.
 fn tvv_inner_t0(xn: f64) -> f64 {
-    let b = -1.0 * xn + 85.0;
+    let b = -xn + 85.0;
     let disc = b * b - 4.0 * 1.25 * (-0.25 * xn * xn + 0.2 * xn + 70.0);
     (-b + disc.max(0.0).sqrt()) / (2.0 * 1.25)
 }
