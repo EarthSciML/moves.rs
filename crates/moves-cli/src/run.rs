@@ -15,7 +15,7 @@
 //! out of the box. A caller can still point at a different DAG with
 //! `--calculator-dag` (e.g. to test against a regenerated graph).
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
@@ -191,7 +191,23 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
         .then(|| SnapshotFilter::from_run_spec(&run_spec));
     // Compute the allowed table set before the registry moves into the engine.
     let allowed_tables = if opts.snapshot.is_some() {
-        Some(registry.required_input_tables())
+        let mut tables = registry.required_input_tables();
+        // `populate_sho_distances` recomputes the NULL `SHO.distance` column
+        // from these reference tables. They are not declared inputs of any
+        // calculator (MOVES populates distance inside the activity generator,
+        // which does not re-run against a snapshot), so they must be admitted
+        // explicitly or the load filter drops them and distance stays NULL.
+        tables.extend(SHO_DISTANCE_INPUT_TABLES.iter().map(|t| (*t).to_owned()));
+        // `populate_source_use_type_physics_mapping` derives the missing
+        // `sourceUseTypePhysicsMapping` table from `sourceUseTypePhysics` when a
+        // snapshot omits the runtime-built mapping; admit both so neither is
+        // filtered out before the synthesis runs.
+        tables.extend(
+            SOURCE_TYPE_PHYSICS_MAPPING_INPUT_TABLES
+                .iter()
+                .map(|t| (*t).to_owned()),
+        );
+        Some(tables)
     } else {
         None
     };
@@ -256,12 +272,16 @@ fn load_execution_db(
     // If the SHO table has null distances (MOVES inserts them before calculateDistance
     // runs), compute distance = SHO * averageSpeed and write back to the store.
     populate_sho_distances(&mut store).context("populating SHO distances from snapshot")?;
-    // Apply the AirToxicsDistanceCalculator.sql Section Extract Data transforms
-    // to dioxinEmissionRate and metalEmissionRate: split polProcessID into
-    // (processID, pollutantID) and expand modelYearGroupID to individual
-    // modelYearID rows.
-    transform_airtoxics_rate_tables(&mut store)
-        .context("transforming airToxics emission-rate tables from snapshot")?;
+    // Synthesise sourceUseTypePhysicsMapping from sourceUseTypePhysics when the
+    // snapshot omits the runtime-built mapping (MOVES builds it inside
+    // SourceUseTypePhysics.setup, which does not re-run against a snapshot).
+    populate_source_use_type_physics_mapping(&mut store)
+        .context("synthesising sourceUseTypePhysicsMapping from snapshot")?;
+    // Fill the NULL ZoneMonthHour meteorology columns (heatIndex,
+    // specificHumidity, molWaterFraction) that MeteorologyGenerator computes at
+    // runtime but some snapshots capture empty.
+    populate_zone_month_hour_meteorology(&mut store)
+        .context("populating ZoneMonthHour meteorology from snapshot")?;
     Ok(store)
 }
 
@@ -340,6 +360,21 @@ fn load_execution_db_from_parquet(
     }
     Ok(store)
 }
+
+/// Reference tables [`populate_sho_distances`] needs to recompute the NULL
+/// `SHO.distance` column. Snapshot loading filters tables down to the registered
+/// calculators' declared inputs; these are not among them, so they are added to
+/// the allowed set explicitly. Lower-cased short names, matching the load filter.
+const SHO_DISTANCE_INPUT_TABLES: &[&str] = &["sho", "link", "averagespeed", "hourday"];
+
+/// Tables [`populate_source_use_type_physics_mapping`] needs to synthesise the
+/// `sourceUseTypePhysicsMapping` table when a snapshot captured the source
+/// `sourceUseTypePhysics` table but not the runtime-derived mapping. Neither is
+/// declared as an input by any calculator (calculators read the *mapping*,
+/// which MOVES builds in `SourceUseTypePhysics.setup()`), so they must be
+/// admitted explicitly or the load filter drops them.
+const SOURCE_TYPE_PHYSICS_MAPPING_INPUT_TABLES: &[&str] =
+    &["sourceusetypephysics", "sourceusetypephysicsmapping"];
 
 /// Compute `SHO.distance = SHO * averageSpeed` from snapshot tables and write
 /// back, so downstream calculators find non-null distances in the slow store.
@@ -474,229 +509,200 @@ fn populate_sho_distances(store: &mut InMemoryStore) -> Result<()> {
     Ok(())
 }
 
-/// Port of `AirToxicsDistanceCalculator.sql` `Section Extract Data` for the
-/// `dioxinEmissionRate` and `metalEmissionRate` tables.
+/// Synthesise `sourceUseTypePhysicsMapping` from `sourceUseTypePhysics` when a
+/// snapshot omits it.
 ///
-/// Raw snapshot tables carry the default-DB schema — `polProcessID` (composite)
-/// and `modelYearGroupID` (group key). The `AirToxicsDistanceCalculator` expects
-/// both already split and expanded. This function applies two transforms so the
-/// calculator sees the worker-extracted schema it requires:
+/// MOVES builds `sourceUseTypePhysicsMapping` at runtime in
+/// `SourceUseTypePhysics.setup()`; some execution-DB snapshots capture the
+/// source `sourceUseTypePhysics` table but not the derived mapping. When the
+/// mapping is absent (and the source table present), synthesise the **identity
+/// mapping** — the MOVES default when no alternate vehicle physics is
+/// configured: `realSourceTypeID = tempSourceTypeID = sourceTypeID` and
+/// `opModeIDOffset = 0`, carrying the road-load terms (`regClassID`,
+/// `beginModelYearID`, `endModelYearID`, `rollingTermA`, `rotatingTermB`,
+/// `dragTermC`, `sourceMass`, `fixedMassFactor`) through unchanged.
 ///
-/// 1. **polProcessID split**: `processID = polProcessID % 100`,
-///    `pollutantID = polProcessID / 100`.
-/// 2. **modelYearGroupID expansion**: each rate row fans out to one row per
-///    individual model year in the group, resolved through
-///    `PollutantProcessMappedModelYear`.
-///
-/// No-ops when `PollutantProcessMappedModelYear` is absent from the store or
-/// when both rate tables are absent. Tables already in the worker-extracted
-/// schema (presence of a `processid` column detected) are left unchanged.
-fn transform_airtoxics_rate_tables(store: &mut InMemoryStore) -> Result<()> {
-    if !store.contains("PollutantProcessMappedModelYear") {
+/// The operating-mode-distribution correctors key on
+/// `realSourceTypeID <> tempSourceTypeID`, so the identity rows are inert and
+/// leave emission results unchanged — they only let calculators that read the
+/// mapping table run instead of erroring on a missing table.
+fn populate_source_use_type_physics_mapping(store: &mut InMemoryStore) -> Result<()> {
+    use polars::prelude::{NamedFrom, Series};
+
+    // Nothing to do if the mapping is already present, or there is no source
+    // physics table to derive it from.
+    if store.contains("sourceUseTypePhysicsMapping") || !store.contains("sourceUseTypePhysics") {
         return Ok(());
     }
-    let ppmy_map = build_pol_process_model_year_map(store)?;
-    for &table in &["dioxinEmissionRate", "metalEmissionRate"] {
-        if !store.contains(table) {
-            continue;
-        }
-        // Already transformed: worker-extracted schema has processID, not polProcessID.
-        let already_split = store
-            .get(table)
-            .map(|arc| {
-                arc.columns()
-                    .iter()
-                    .any(|c| c.name().to_ascii_lowercase() == "processid")
-            })
-            .unwrap_or(false);
-        if already_split {
-            continue;
-        }
-        let expanded = expand_rate_table_rows(store, table, &ppmy_map)
-            .with_context(|| format!("expanding {table}"))?;
-        store.insert(table, expanded);
-    }
+
+    let physics = store
+        .get("sourceUseTypePhysics")
+        .context("sourceUseTypePhysics not in store after contains check")?;
+    let mut mapping: polars::prelude::DataFrame = (*physics).clone();
+    drop(physics); // release the Arc clone before mutating the store below
+
+    // Resolve the source-type column case-insensitively (snapshot column
+    // casings vary), then rename it to the mapping's `realSourceTypeID`.
+    let src_col = mapping
+        .get_column_names()
+        .iter()
+        .find(|n| n.as_str().eq_ignore_ascii_case("sourceTypeID"))
+        .map(|n| n.to_string())
+        .context("sourceUseTypePhysics has no sourceTypeID column")?;
+    mapping
+        .rename(&src_col, "realSourceTypeID".into())
+        .map_err(|e| anyhow::anyhow!("renaming sourceTypeID -> realSourceTypeID: {e}"))?;
+
+    // tempSourceTypeID is a copy of realSourceTypeID for the identity mapping.
+    let mut temp = mapping
+        .column("realSourceTypeID")
+        .map_err(|e| anyhow::anyhow!("{e}"))?
+        .clone();
+    temp.rename("tempSourceTypeID".into());
+    let n = mapping.height();
+    mapping
+        .with_column(temp)
+        .map_err(|e| anyhow::anyhow!("adding tempSourceTypeID: {e}"))?;
+    mapping
+        .with_column(Series::new("opModeIDOffset".into(), vec![0i64; n]).into())
+        .map_err(|e| anyhow::anyhow!("adding opModeIDOffset: {e}"))?;
+
+    store.insert("sourceUseTypePhysicsMapping".to_string(), mapping);
     Ok(())
 }
 
-/// Build a `(polProcessID, modelYearGroupID) -> Vec<modelYearID>` expansion
-/// map from the `PollutantProcessMappedModelYear` snapshot table.
+/// Fill the NULL `ZoneMonthHour` meteorology columns (`heatIndex`,
+/// `specificHumidity`, `molWaterFraction`) from `temperature` / `relHumidity`.
 ///
-/// `PollutantProcessMappedModelYear` has one row per `(polProcessID,
-/// modelYearID)` pair — the unique key. Inverting to
-/// `(polProcessID, modelYearGroupID)` yields the set of model years each
-/// group spans, which is the join direction the rate-table expansion needs.
-fn build_pol_process_model_year_map(
-    store: &InMemoryStore,
-) -> Result<HashMap<(i32, i32), Vec<i32>>> {
-    let arc = store
-        .get("PollutantProcessMappedModelYear")
-        .context("PollutantProcessMappedModelYear not in store")?;
-    let df = &*arc;
-    let n = df.height();
-    if n == 0 {
-        return Ok(HashMap::new());
+/// MOVES' `MeteorologyGenerator` (`doHeatIndex`) computes these three columns at
+/// runtime and writes them back into `ZoneMonthHour`; some execution-DB
+/// snapshots capture the raw table with `temperature` and `relHumidity` present
+/// but the three derived columns left NULL. Downstream calculators read
+/// `ZoneMonthHour` directly and abort on the NULLs, so reproduce the generator's
+/// computation here via [`build_meteorology_table`] (joining `Zone` → `County`
+/// for each county's barometric pressure / altitude) and write the results back
+/// into the slow store. Rows whose zone/county is missing — which MOVES drops in
+/// its inner-join — keep `heatIndex = temperature` (the `<78 °F` passthrough)
+/// with zero humidity terms so every row stays readable.
+///
+/// No-op when `ZoneMonthHour` is absent, when `heatIndex` already holds a
+/// non-NULL value (snapshot captured the computed table), or when `Zone` /
+/// `County` are unavailable.
+fn populate_zone_month_hour_meteorology(store: &mut InMemoryStore) -> Result<()> {
+    use moves_calculators::generators::meteorology::{build_meteorology_table, MeteorologyInputs};
+    use polars::prelude::{DataType, NamedFrom, Series};
+
+    if !store.contains("ZoneMonthHour") {
+        return Ok(());
     }
-    let col_i32 = |name: &str| -> Result<Vec<i32>> {
-        let col = df
+
+    // Early exit: if heatIndex already carries any non-null value, the snapshot
+    // captured the computed columns — leave the table untouched.
+    {
+        let zmh = store
+            .get("ZoneMonthHour")
+            .context("ZoneMonthHour not in store after contains check")?;
+        let already_filled = zmh
             .columns()
             .iter()
-            .find(|c| c.name().to_ascii_lowercase() == name.to_ascii_lowercase())
-            .with_context(|| {
-                format!("column '{name}' not found in PollutantProcessMappedModelYear")
-            })?
-            .cast(&polars::prelude::DataType::Int32)
-            .with_context(|| format!("{name}: cast to i32 failed"))?;
-        Ok(col
-            .i32()
-            .map_err(|e| anyhow::anyhow!("{e}"))?
-            .into_no_null_iter()
-            .collect())
-    };
-    let pol_proc_ids = col_i32("polProcessID")?;
-    let my_group_ids = col_i32("modelYearGroupID")?;
-    let my_ids = col_i32("modelYearID")?;
-    let mut map: HashMap<(i32, i32), Vec<i32>> = HashMap::new();
-    for i in 0..n {
-        map.entry((pol_proc_ids[i], my_group_ids[i]))
-            .or_default()
-            .push(my_ids[i]);
-    }
-    Ok(map)
-}
-
-/// Expand one rate table from the raw snapshot schema to the worker-extracted
-/// schema the `AirToxicsDistanceCalculator` expects.
-///
-/// **Input** (`dioxinEmissionRate`): `polProcessID`, `fuelTypeID`,
-/// `modelYearGroupID`, `meanBaseRate`, …
-/// **Input** (`metalEmissionRate`): same plus `sourceTypeID`.
-///
-/// **Output** (`dioxinEmissionRate`): `processID`, `pollutantID`, `fuelTypeID`,
-/// `modelYearID`, `meanBaseRate`.
-/// **Output** (`metalEmissionRate`): same plus `sourceTypeID`.
-///
-/// Rows whose `(polProcessID, modelYearGroupID)` key has no entry in
-/// `ppmy_map` are dropped — mirroring the SQL `INNER JOIN` semantics.
-fn expand_rate_table_rows(
-    store: &InMemoryStore,
-    table: &str,
-    ppmy_map: &HashMap<(i32, i32), Vec<i32>>,
-) -> Result<polars::prelude::DataFrame> {
-    use polars::prelude::{DataFrame, DataType, NamedFrom, Series};
-
-    let arc = store.get(table).context("table not in store")?;
-    let df = &*arc;
-    let n = df.height();
-
-    let is_metal = table.to_ascii_lowercase() == "metalemissionrate";
-
-    // Short-circuit: an empty table (0 rows) is common for snapshots captured
-    // when AirToxicsDistanceCalculator is not active — the Parquet schema may
-    // type meanBaseRate as String rather than Float64, which would cause the
-    // col_f64 cast below to fail. There is nothing to expand.
-    if n == 0 {
-        let mut cols = vec![
-            Series::new("processID".into(), Vec::<i32>::new()).into(),
-            Series::new("pollutantID".into(), Vec::<i32>::new()).into(),
-            Series::new("fuelTypeID".into(), Vec::<i32>::new()).into(),
-        ];
-        if is_metal {
-            cols.push(Series::new("sourceTypeID".into(), Vec::<i32>::new()).into());
+            .find(|c| c.name().eq_ignore_ascii_case("heatIndex"))
+            .and_then(|c| c.cast(&DataType::Float64).ok())
+            .and_then(|c| c.f64().ok().cloned())
+            .is_some_and(|ca| ca.into_iter().any(|v| v.is_some()));
+        if already_filled {
+            return Ok(());
         }
-        cols.extend([
-            Series::new("modelYearID".into(), Vec::<i32>::new()).into(),
-            Series::new("meanBaseRate".into(), Vec::<f64>::new()).into(),
-        ]);
-        return DataFrame::new(0, cols)
-            .map_err(|e| anyhow::anyhow!("{table}: building empty DataFrame: {e}"));
     }
 
-    let col_i32 = |name: &str| -> Result<Vec<i32>> {
-        let col = df
-            .columns()
-            .iter()
-            .find(|c| c.name().to_ascii_lowercase() == name.to_ascii_lowercase())
-            .with_context(|| format!("column '{name}' not found in {table}"))?
-            .cast(&DataType::Int32)
-            .with_context(|| format!("{name}: cast to i32 failed"))?;
-        Ok(col
-            .i32()
-            .map_err(|e| anyhow::anyhow!("{e}"))?
-            .into_no_null_iter()
-            .collect())
+    // Zone and County are needed to resolve each county's barometric pressure.
+    if !store.contains("Zone") || !store.contains("County") {
+        return Ok(());
+    }
+
+    let inputs = MeteorologyInputs {
+        zone_month_hour: store
+            .iter_typed("ZoneMonthHour")
+            .context("reading ZoneMonthHour for meteorology")?,
+        zone: store.iter_typed("Zone").context("reading Zone")?,
+        county: store.iter_typed("County").context("reading County")?,
     };
-    let col_f64 = |name: &str| -> Result<Vec<f64>> {
-        let col = df
-            .columns()
-            .iter()
-            .find(|c| c.name().to_ascii_lowercase() == name.to_ascii_lowercase())
-            .with_context(|| format!("column '{name}' not found in {table}"))?;
-        let casted = if *col.dtype() == DataType::Float32 || *col.dtype() == DataType::String {
-            col.cast(&DataType::Float64)
-                .map_err(|e| anyhow::anyhow!("{e}"))?
-        } else {
-            col.clone()
+    let computed = build_meteorology_table(&inputs);
+
+    // Index the computed meteorology by (zoneID, monthID, hourID).
+    let mut by_key: std::collections::HashMap<(i32, i32, i32), (f64, f64, f64)> =
+        std::collections::HashMap::with_capacity(computed.len());
+    for r in &computed {
+        by_key.insert(
+            (r.zone_id, r.month_id, r.hour_id),
+            (r.heat_index, r.specific_humidity, r.mol_water_fraction),
+        );
+    }
+
+    // Read the existing key columns + temperature (the unmatched-row fallback)
+    // in DataFrame row order, then release the Arc before mutating the store.
+    let (heat, spec, mol) = {
+        let zmh = store.get("ZoneMonthHour").expect("ZoneMonthHour present");
+        let df = &*zmh;
+        let find = |want: &str| -> Result<polars::prelude::Column> {
+            let lower = want.to_ascii_lowercase();
+            df.columns()
+                .iter()
+                .find(|c| c.name().to_ascii_lowercase() == lower)
+                .cloned()
+                .with_context(|| format!("ZoneMonthHour column '{want}' not found"))
         };
-        Ok(casted
+        let to_i32 = |c: polars::prelude::Column| -> Result<Vec<i32>> {
+            Ok(c.cast(&DataType::Int32)
+                .map_err(|e| anyhow::anyhow!("{e}"))?
+                .i32()
+                .map_err(|e| anyhow::anyhow!("{e}"))?
+                .into_iter()
+                .map(|v| v.unwrap_or(0))
+                .collect())
+        };
+        let zone = to_i32(find("zoneID")?)?;
+        let month = to_i32(find("monthID")?)?;
+        let hour = to_i32(find("hourID")?)?;
+        let temps: Vec<f64> = find("temperature")?
+            .cast(&DataType::Float64)
+            .map_err(|e| anyhow::anyhow!("{e}"))?
             .f64()
             .map_err(|e| anyhow::anyhow!("{e}"))?
-            .into_no_null_iter()
-            .collect())
-    };
-
-    let pol_proc_ids = col_i32("polProcessID")?;
-    let fuel_type_ids = col_i32("fuelTypeID")?;
-    let my_group_ids = col_i32("modelYearGroupID")?;
-    let mean_base_rates = col_f64("meanBaseRate")?;
-    let source_type_ids: Option<Vec<i32>> = if is_metal {
-        Some(col_i32("sourceTypeID")?)
-    } else {
-        None
-    };
-
-    let mut out_process_ids: Vec<i32> = Vec::new();
-    let mut out_pollutant_ids: Vec<i32> = Vec::new();
-    let mut out_fuel_type_ids: Vec<i32> = Vec::new();
-    let mut out_source_type_ids: Vec<i32> = Vec::new();
-    let mut out_model_year_ids: Vec<i32> = Vec::new();
-    let mut out_mean_base_rates: Vec<f64> = Vec::new();
-
-    for i in 0..n {
-        let pol_proc = pol_proc_ids[i];
-        let my_grp = my_group_ids[i];
-        let Some(model_years) = ppmy_map.get(&(pol_proc, my_grp)) else {
-            continue; // No expansion entry — INNER JOIN drops the row.
-        };
-        let process_id = pol_proc % 100;
-        let pollutant_id = pol_proc / 100;
-        for &my in model_years {
-            out_process_ids.push(process_id);
-            out_pollutant_ids.push(pollutant_id);
-            out_fuel_type_ids.push(fuel_type_ids[i]);
-            if is_metal {
-                out_source_type_ids.push(source_type_ids.as_ref().unwrap()[i]);
+            .into_iter()
+            .map(|v| v.unwrap_or(0.0))
+            .collect();
+        let n = df.height();
+        let mut heat = Vec::with_capacity(n);
+        let mut spec = Vec::with_capacity(n);
+        let mut mol = Vec::with_capacity(n);
+        for i in 0..n {
+            match by_key.get(&(zone[i], month[i], hour[i])) {
+                Some(&(hi, sh, mwf)) => {
+                    heat.push(hi);
+                    spec.push(sh);
+                    mol.push(mwf);
+                }
+                None => {
+                    heat.push(temps[i]);
+                    spec.push(0.0);
+                    mol.push(0.0);
+                }
             }
-            out_model_year_ids.push(my);
-            out_mean_base_rates.push(mean_base_rates[i]);
         }
-    }
+        (heat, spec, mol)
+    };
 
-    let n_out = out_process_ids.len();
-    let mut cols = vec![
-        Series::new("processID".into(), out_process_ids).into(),
-        Series::new("pollutantID".into(), out_pollutant_ids).into(),
-        Series::new("fuelTypeID".into(), out_fuel_type_ids).into(),
-    ];
-    if is_metal {
-        cols.push(Series::new("sourceTypeID".into(), out_source_type_ids).into());
-    }
-    cols.extend([
-        Series::new("modelYearID".into(), out_model_year_ids).into(),
-        Series::new("meanBaseRate".into(), out_mean_base_rates).into(),
-    ]);
-    DataFrame::new(n_out, cols)
-        .map_err(|e| anyhow::anyhow!("{table}: building transformed DataFrame: {e}"))
+    let zmh_mut = store.get_mut("ZoneMonthHour").expect("ZoneMonthHour present");
+    zmh_mut
+        .with_column(Series::new("heatIndex".into(), heat).into())
+        .map_err(|e| anyhow::anyhow!("replacing ZoneMonthHour.heatIndex: {e}"))?;
+    zmh_mut
+        .with_column(Series::new("specificHumidity".into(), spec).into())
+        .map_err(|e| anyhow::anyhow!("replacing ZoneMonthHour.specificHumidity: {e}"))?;
+    zmh_mut
+        .with_column(Series::new("molWaterFraction".into(), mol).into())
+        .map_err(|e| anyhow::anyhow!("replacing ZoneMonthHour.molWaterFraction: {e}"))?;
+    Ok(())
 }
 
 /// Cast a DataFrame column to Int32, returning the Column for row-wise access.
@@ -1128,6 +1134,171 @@ mod tests {
         populate_sho_distances(&mut store).expect("should be noop");
     }
 
+    /// Build a one-row `sourceUseTypePhysics` DataFrame mirroring the snapshot
+    /// schema (int64 IDs, string road-load terms).
+    fn make_physics_df() -> polars::prelude::DataFrame {
+        use polars::prelude::*;
+        df!(
+            "sourceTypeID" => &[21i64],
+            "regClassID" => &[20i64],
+            "beginModelYearID" => &[1950i64],
+            "endModelYearID" => &[2060i64],
+            "rollingTermA" => &["0.156461000000"],
+            "rotatingTermB" => &["0.002001930000"],
+            "dragTermC" => &["0.000492646000"],
+            "sourceMass" => &["1.478800000000"],
+            "fixedMassFactor" => &["1.478800000000"],
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn synthesises_identity_physics_mapping_when_absent() {
+        let mut store = InMemoryStore::new();
+        store.insert("sourceUseTypePhysics".to_string(), make_physics_df());
+        populate_source_use_type_physics_mapping(&mut store)
+            .expect("synthesis should succeed");
+
+        let df = store
+            .get("sourceUseTypePhysicsMapping")
+            .expect("mapping table must be synthesised");
+        // All 11 mapping columns present.
+        for col in [
+            "realSourceTypeID",
+            "tempSourceTypeID",
+            "regClassID",
+            "beginModelYearID",
+            "endModelYearID",
+            "opModeIDOffset",
+            "rollingTermA",
+            "rotatingTermB",
+            "dragTermC",
+            "sourceMass",
+            "fixedMassFactor",
+        ] {
+            assert!(df.column(col).is_ok(), "missing column {col}");
+        }
+        // Identity mapping: real == temp == sourceTypeID, offset 0.
+        let real = df.column("realSourceTypeID").unwrap().i64().unwrap();
+        let temp = df.column("tempSourceTypeID").unwrap().i64().unwrap();
+        let offset = df.column("opModeIDOffset").unwrap().i64().unwrap();
+        assert_eq!(real.get(0), Some(21));
+        assert_eq!(temp.get(0), Some(21));
+        assert_eq!(offset.get(0), Some(0));
+        // The original sourceTypeID column is renamed, not duplicated.
+        assert!(df.column("sourceTypeID").is_err());
+    }
+
+    #[test]
+    fn physics_mapping_synthesis_is_noop_when_mapping_present() {
+        let mut store = InMemoryStore::new();
+        store.insert("sourceUseTypePhysics".to_string(), make_physics_df());
+        // Pre-existing mapping (single sentinel column) must be left untouched.
+        let sentinel = polars::prelude::df!("realSourceTypeID" => &[99i64]).unwrap();
+        store.insert("sourceUseTypePhysicsMapping".to_string(), sentinel);
+        populate_source_use_type_physics_mapping(&mut store).expect("noop");
+        let df = store.get("sourceUseTypePhysicsMapping").unwrap();
+        assert_eq!(df.width(), 1, "existing mapping must not be rebuilt");
+        assert_eq!(
+            df.column("realSourceTypeID").unwrap().i64().unwrap().get(0),
+            Some(99)
+        );
+    }
+
+    #[test]
+    fn physics_mapping_synthesis_is_noop_without_source_table() {
+        let mut store = InMemoryStore::new();
+        populate_source_use_type_physics_mapping(&mut store).expect("noop");
+        assert!(!store.contains("sourceUseTypePhysicsMapping"));
+    }
+
+    /// One-row `ZoneMonthHour` with the three derived columns left NULL, plus
+    /// the `Zone`/`County` rows meteorology needs to resolve pressure.
+    fn make_raw_meteorology_store() -> InMemoryStore {
+        use polars::prelude::*;
+        let mut store = InMemoryStore::new();
+        let zmh = df!(
+            "zoneID" => &[100i64],
+            "monthID" => &[7i64],
+            "hourID" => &[12i64],
+            "temperature" => &[90.0f64],
+            "relHumidity" => &[60.0f64],
+            "heatIndex" => &[None::<f64>],
+            "specificHumidity" => &[None::<f64>],
+            "molWaterFraction" => &[None::<f64>],
+        )
+        .unwrap();
+        let zone = df!("zoneID" => &[100i64], "countyID" => &[26161i64]).unwrap();
+        let county = df!(
+            "countyID" => &[26161i64],
+            "barometricPressure" => &[29.92f64],
+            "altitude" => &[None::<&str>],
+        )
+        .unwrap();
+        store.insert("ZoneMonthHour".to_string(), zmh);
+        store.insert("Zone".to_string(), zone);
+        store.insert("County".to_string(), county);
+        store
+    }
+
+    #[test]
+    fn fills_null_meteorology_columns() {
+        let mut store = make_raw_meteorology_store();
+        populate_zone_month_hour_meteorology(&mut store).expect("fill should succeed");
+        let df = store.get("ZoneMonthHour").unwrap();
+        // 90 °F / 60 % RH is above the 78 °F threshold, so the regression makes
+        // heatIndex exceed the dry-bulb temperature, and the humidity terms are
+        // populated (non-null).
+        let hi = df.column("heatIndex").unwrap().f64().unwrap().get(0).unwrap();
+        assert!(hi > 90.0, "heatIndex {hi} should exceed temperature");
+        assert!(df
+            .column("specificHumidity")
+            .unwrap()
+            .f64()
+            .unwrap()
+            .get(0)
+            .is_some());
+        assert!(df
+            .column("molWaterFraction")
+            .unwrap()
+            .f64()
+            .unwrap()
+            .get(0)
+            .is_some());
+    }
+
+    #[test]
+    fn meteorology_fill_noop_when_already_populated() {
+        use polars::prelude::*;
+        let mut store = InMemoryStore::new();
+        let zmh = df!(
+            "zoneID" => &[100i64], "monthID" => &[7i64], "hourID" => &[12i64],
+            "temperature" => &[90.0f64], "relHumidity" => &[60.0f64],
+            "heatIndex" => &[Some(123.0f64)],
+            "specificHumidity" => &[Some(1.0f64)],
+            "molWaterFraction" => &[Some(0.1f64)],
+        )
+        .unwrap();
+        store.insert("ZoneMonthHour".to_string(), zmh);
+        populate_zone_month_hour_meteorology(&mut store).expect("noop");
+        let hi = store
+            .get("ZoneMonthHour")
+            .unwrap()
+            .column("heatIndex")
+            .unwrap()
+            .f64()
+            .unwrap()
+            .get(0)
+            .unwrap();
+        assert_eq!(hi, 123.0, "pre-populated heatIndex must be preserved");
+    }
+
+    #[test]
+    fn meteorology_fill_noop_when_no_zmh() {
+        let mut store = InMemoryStore::new();
+        populate_zone_month_hour_meteorology(&mut store).expect("noop");
+    }
+
     #[test]
     fn populate_sho_distances_handles_str_sho_column() {
         // Regression: snapshots from canonical MOVES sometimes serialize the
@@ -1181,317 +1352,6 @@ mod tests {
         assert!(
             err.to_string().contains("loading calculator DAG from"),
             "got: {err}"
-        );
-    }
-
-    // Helper: build a minimal store for airtoxics rate-table transform tests.
-    //
-    // PollutantProcessMappedModelYear: polProcessID=13001 (pollutantID=130,
-    // processID=1), modelYearGroupID=30140010, modelYearID in {2010, 2015}.
-    // dioxinEmissionRate raw row: (polProcessID=13001, fuelTypeID=2,
-    //   modelYearGroupID=30140010, meanBaseRate=0.05).
-    // metalEmissionRate raw row: (polProcessID=6301, fuelTypeID=2,
-    //   sourceTypeID=21, modelYearGroupID=30140010, meanBaseRate=0.02).
-    fn make_airtoxics_raw_store() -> InMemoryStore {
-        use polars::prelude::{DataFrame, NamedFrom, Series};
-
-        let mut store = InMemoryStore::new();
-
-        // PollutantProcessMappedModelYear: two model years for group 30140010.
-        let ppmy_df = DataFrame::new(
-            2,
-            vec![
-                Series::new("polProcessID".into(), vec![13001i64, 13001i64]).into(),
-                Series::new("modelYearID".into(), vec![2010i64, 2015i64]).into(),
-                Series::new("modelYearGroupID".into(), vec![30140010i64, 30140010i64]).into(),
-                Series::new("fuelMYGroupID".into(), vec![0i64, 0i64]).into(),
-                Series::new("IMModelYearGroupID".into(), vec![0i64, 0i64]).into(),
-            ],
-        )
-        .unwrap();
-        store.insert("PollutantProcessMappedModelYear", ppmy_df);
-
-        // Raw dioxinEmissionRate (one row: polProcessID=13001, modelYearGroupID=30140010).
-        let dioxin_df = DataFrame::new(
-            1,
-            vec![
-                Series::new("polProcessID".into(), vec![13001i64]).into(),
-                Series::new("fuelTypeID".into(), vec![2i64]).into(),
-                Series::new("modelYearGroupID".into(), vec![30140010i64]).into(),
-                Series::new("units".into(), vec!["g/mile".to_string()]).into(),
-                Series::new("meanBaseRate".into(), vec![0.05f64]).into(),
-                Series::new("meanBaseRateCV".into(), vec![0.0f64]).into(),
-                Series::new("dataSourceId".into(), vec![1i64]).into(),
-            ],
-        )
-        .unwrap();
-        store.insert("dioxinEmissionRate", dioxin_df);
-
-        // Raw metalEmissionRate (one row: polProcessID=6301, modelYearGroupID=30140010).
-        // polProcessID=6301: pollutantID=63, processID=1.
-        // PPMY for polProcessID=6301 not in store — we add it below.
-        let ppmy_df2 = {
-            let ppmy = store.get("PollutantProcessMappedModelYear").unwrap();
-            let mut ppmy2 = (*ppmy).clone();
-            // Append two more rows for polProcessID=6301, same group.
-            let new_df = DataFrame::new(
-                2,
-                vec![
-                    Series::new("polProcessID".into(), vec![6301i64, 6301i64]).into(),
-                    Series::new("modelYearID".into(), vec![2010i64, 2015i64]).into(),
-                    Series::new("modelYearGroupID".into(), vec![30140010i64, 30140010i64]).into(),
-                    Series::new("fuelMYGroupID".into(), vec![0i64, 0i64]).into(),
-                    Series::new("IMModelYearGroupID".into(), vec![0i64, 0i64]).into(),
-                ],
-            )
-            .unwrap();
-            ppmy2.vstack_mut(&new_df).unwrap();
-            ppmy2
-        };
-        store.insert("PollutantProcessMappedModelYear", ppmy_df2);
-
-        let metal_df = DataFrame::new(
-            1,
-            vec![
-                Series::new("polProcessID".into(), vec![6301i64]).into(),
-                Series::new("fuelTypeID".into(), vec![2i64]).into(),
-                Series::new("sourceTypeID".into(), vec![21i64]).into(),
-                Series::new("modelYearGroupID".into(), vec![30140010i64]).into(),
-                Series::new("units".into(), vec!["g/mile".to_string()]).into(),
-                Series::new("meanBaseRate".into(), vec![0.02f64]).into(),
-                Series::new("meanBaseRateCV".into(), vec![0.0f64]).into(),
-                Series::new("dataSourceId".into(), vec![1i64]).into(),
-            ],
-        )
-        .unwrap();
-        store.insert("metalEmissionRate", metal_df);
-
-        store
-    }
-
-    #[test]
-    fn transform_dioxin_splits_pol_process_and_expands_model_years() {
-        let mut store = make_airtoxics_raw_store();
-        transform_airtoxics_rate_tables(&mut store).expect("transform failed");
-
-        let df = store
-            .get("dioxinemissionrate")
-            .expect("table must be present");
-        // One raw row × two model years in the group → two output rows.
-        assert_eq!(
-            df.height(),
-            2,
-            "expected 2 expanded rows, got {}",
-            df.height()
-        );
-
-        let col_i32 = |name: &str| -> Vec<i32> {
-            df.columns()
-                .iter()
-                .find(|c| c.name().to_ascii_lowercase() == name)
-                .unwrap()
-                .cast(&polars::prelude::DataType::Int32)
-                .unwrap()
-                .i32()
-                .unwrap()
-                .into_no_null_iter()
-                .collect()
-        };
-        let process_ids = col_i32("processid");
-        let pollutant_ids = col_i32("pollutantid");
-        let fuel_type_ids = col_i32("fueltypeid");
-        let model_year_ids = col_i32("modelyearid");
-        let rates: Vec<f64> = df
-            .columns()
-            .iter()
-            .find(|c| c.name().to_ascii_lowercase() == "meanbaserate")
-            .unwrap()
-            .f64()
-            .unwrap()
-            .into_no_null_iter()
-            .collect();
-
-        // polProcessID=13001: processID=13001%100=1, pollutantID=13001/100=130.
-        assert!(process_ids.iter().all(|&p| p == 1), "processID must be 1");
-        assert!(
-            pollutant_ids.iter().all(|&p| p == 130),
-            "pollutantID must be 130"
-        );
-        assert!(
-            fuel_type_ids.iter().all(|&f| f == 2),
-            "fuelTypeID must be 2"
-        );
-        // Both model years from the group must appear.
-        let mut my_sorted = model_year_ids.clone();
-        my_sorted.sort();
-        assert_eq!(my_sorted, vec![2010, 2015]);
-        assert!(rates.iter().all(|&r| (r - 0.05).abs() < 1e-12));
-        // Transformed table must NOT have polProcessID or modelYearGroupID columns.
-        assert!(
-            !df.columns()
-                .iter()
-                .any(|c| c.name().to_ascii_lowercase() == "polprocessid"),
-            "polProcessID must be absent after transform"
-        );
-    }
-
-    #[test]
-    fn transform_metal_includes_source_type_id() {
-        let mut store = make_airtoxics_raw_store();
-        transform_airtoxics_rate_tables(&mut store).expect("transform failed");
-
-        let df = store
-            .get("metalemissionrate")
-            .expect("table must be present");
-        assert_eq!(df.height(), 2);
-
-        let col_i32 = |name: &str| -> Vec<i32> {
-            df.columns()
-                .iter()
-                .find(|c| c.name().to_ascii_lowercase() == name)
-                .unwrap()
-                .cast(&polars::prelude::DataType::Int32)
-                .unwrap()
-                .i32()
-                .unwrap()
-                .into_no_null_iter()
-                .collect()
-        };
-        // polProcessID=6301: processID=1, pollutantID=63.
-        assert!(col_i32("processid").iter().all(|&p| p == 1));
-        assert!(col_i32("pollutantid").iter().all(|&p| p == 63));
-        assert!(col_i32("sourcetypeid").iter().all(|&s| s == 21));
-        let mut my_sorted = col_i32("modelyearid");
-        my_sorted.sort();
-        assert_eq!(my_sorted, vec![2010, 2015]);
-    }
-
-    #[test]
-    fn transform_noop_when_ppmy_absent() {
-        let mut store = InMemoryStore::new();
-        // Add raw dioxin rate but no PPMY — transform should silently skip.
-        store.insert(
-            "dioxinEmissionRate",
-            polars::prelude::DataFrame::new(
-                1,
-                vec![
-                    polars::prelude::Series::new("polProcessID".into(), vec![13001i64]).into(),
-                    polars::prelude::Series::new("fuelTypeID".into(), vec![2i64]).into(),
-                    polars::prelude::Series::new("modelYearGroupID".into(), vec![30140010i64])
-                        .into(),
-                    polars::prelude::Series::new("meanBaseRate".into(), vec![0.05f64]).into(),
-                ],
-            )
-            .unwrap(),
-        );
-        transform_airtoxics_rate_tables(&mut store).expect("noop should not error");
-        // Table should be unchanged — still has polProcessID.
-        let df = store.get("dioxinemissionrate").unwrap();
-        assert!(
-            df.columns()
-                .iter()
-                .any(|c| c.name().to_ascii_lowercase() == "polprocessid"),
-            "polProcessID should still be present when PPMY is absent"
-        );
-    }
-
-    #[test]
-    fn transform_noop_when_already_transformed() {
-        let mut store = make_airtoxics_raw_store();
-        // Apply once to get the transformed version.
-        transform_airtoxics_rate_tables(&mut store).expect("first transform failed");
-        // Apply again — must be idempotent (no error, same row count).
-        transform_airtoxics_rate_tables(&mut store).expect("second transform failed");
-        let df = store.get("dioxinemissionrate").unwrap();
-        assert_eq!(
-            df.height(),
-            2,
-            "row count must not change on second transform"
-        );
-    }
-
-    #[test]
-    fn transform_empty_rate_table_produces_empty_output() {
-        use polars::prelude::{DataFrame, NamedFrom, Series};
-        let mut store = InMemoryStore::new();
-        // PPMY with two model years for one group.
-        store.insert(
-            "PollutantProcessMappedModelYear",
-            DataFrame::new(
-                2,
-                vec![
-                    Series::new("polProcessID".into(), vec![13001i64, 13001i64]).into(),
-                    Series::new("modelYearID".into(), vec![2010i64, 2015i64]).into(),
-                    Series::new("modelYearGroupID".into(), vec![30140010i64, 30140010i64]).into(),
-                    Series::new("fuelMYGroupID".into(), vec![0i64, 0i64]).into(),
-                    Series::new("IMModelYearGroupID".into(), vec![0i64, 0i64]).into(),
-                ],
-            )
-            .unwrap(),
-        );
-        // dioxinEmissionRate with 0 rows.
-        store.insert(
-            "dioxinEmissionRate",
-            DataFrame::new(
-                0,
-                vec![
-                    Series::new("polProcessID".into(), Vec::<i64>::new()).into(),
-                    Series::new("fuelTypeID".into(), Vec::<i64>::new()).into(),
-                    Series::new("modelYearGroupID".into(), Vec::<i64>::new()).into(),
-                    Series::new("meanBaseRate".into(), Vec::<f64>::new()).into(),
-                ],
-            )
-            .unwrap(),
-        );
-        transform_airtoxics_rate_tables(&mut store).expect("transform on empty table failed");
-        let df = store.get("dioxinemissionrate").unwrap();
-        assert_eq!(df.height(), 0, "empty input yields empty output");
-    }
-
-    #[test]
-    fn transform_empty_rate_table_string_dtype_mean_base_rate() {
-        // Regression for mo-81nw: Polars infers meanBaseRate as String dtype
-        // when the snapshot Parquet was captured from an empty MariaDB table.
-        // expand_rate_table_rows must short-circuit and not attempt a
-        // String → Float64 cast that would crash on the empty series.
-        use polars::prelude::{DataFrame, DataType, NamedFrom, Series};
-        let mut store = InMemoryStore::new();
-        store.insert(
-            "PollutantProcessMappedModelYear",
-            DataFrame::new(
-                1,
-                vec![
-                    Series::new("polProcessID".into(), vec![13001i64]).into(),
-                    Series::new("modelYearID".into(), vec![2010i64]).into(),
-                    Series::new("modelYearGroupID".into(), vec![30140010i64]).into(),
-                    Series::new("fuelMYGroupID".into(), vec![0i64]).into(),
-                    Series::new("IMModelYearGroupID".into(), vec![0i64]).into(),
-                ],
-            )
-            .unwrap(),
-        );
-        // meanBaseRate has String dtype — as inferred from an empty Parquet table.
-        store.insert(
-            "dioxinEmissionRate",
-            DataFrame::new(
-                0,
-                vec![
-                    Series::new("polProcessID".into(), Vec::<i64>::new()).into(),
-                    Series::new("fuelTypeID".into(), Vec::<i64>::new()).into(),
-                    Series::new("modelYearGroupID".into(), Vec::<i64>::new()).into(),
-                    Series::new("meanBaseRate".into(), Vec::<String>::new()).into(),
-                ],
-            )
-            .unwrap(),
-        );
-        transform_airtoxics_rate_tables(&mut store)
-            .expect("empty String-dtype meanBaseRate must not crash");
-        let df = store.get("dioxinemissionrate").unwrap();
-        assert_eq!(df.height(), 0, "empty input yields empty output");
-        assert_eq!(
-            *df.column("meanBaseRate").unwrap().dtype(),
-            DataType::Float64,
-            "output meanBaseRate must be Float64"
         );
     }
 

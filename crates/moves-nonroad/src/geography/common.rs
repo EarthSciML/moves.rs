@@ -696,6 +696,7 @@ pub trait GeographyCallbacks {
     fn compute_exhaust_factors(
         &mut self,
         scc: &str,
+        hp_avg: f32,
         tech_names: &[String],
         tech_fractions: &[f32],
         model_year: i32,
@@ -844,6 +845,7 @@ impl GeographyCallbacks for NoopCallbacks {
     fn compute_exhaust_factors(
         &mut self,
         _: &str,
+        _: f32,
         _: &[String],
         _: &[f32],
         _: i32,

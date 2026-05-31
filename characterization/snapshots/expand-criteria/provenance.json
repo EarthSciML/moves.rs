@@ -1,11 +1,11 @@
 {
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "expand-criteria",
-  "sif_sha256": "597f1f3e0aef5d23027589ee509207d13486d5c89056906bf323a889f0e02311",
-  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.capable/worktrees/mo-wwc.2/characterization/fixture-image.lock",
-  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.capable/worktrees/mo-wwc.2/characterization/fixtures/expand-criteria.xml",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/expand-criteria.xml",
   "runspec_sha256": "b0f8a3898ab2779a198f0ddb1e808dc530e4ebbef23a56d30e32c778b0a0518c",
-  "snapshot_aggregate_sha256": "ef408a92aecf581f8e461bbaa442fdb78fbf4275bf146cd2a767056b02c57aea",
+  "snapshot_aggregate_sha256": "31bebf9e6f069cae881ebebae2cfeeb8bcb99cb4a4e5f7c3fd099ba954943fdb",
   "output_database": "out_expand_criteria",
   "scale_input_database": null
 }

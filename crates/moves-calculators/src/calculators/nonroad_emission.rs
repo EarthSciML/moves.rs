@@ -61,11 +61,10 @@ use moves_data::{PollutantProcessAssociation, ProcessId};
 use moves_framework::{
     Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, Error,
 };
-use moves_nonroad::driver::RegionLevel;
-use moves_nonroad::{
-    simulation::{ProductionExecutor, ReferenceData},
-    NonroadInputs, NonroadOptions,
-};
+
+use moves_framework::data::DataFrameStore;
+
+use crate::calculators::nonroad_loader::{self, EmissionTimeKeys};
 
 /// MOVES default episode year used when the iteration position carries
 /// no year (e.g. when the master loop fires before entering YEAR scope).
@@ -74,6 +73,43 @@ const DEFAULT_YEAR: i32 = 2020;
 /// Subscribed process IDs — the nine nonroad emission processes the
 /// `calculator-dag.json` records for `NonroadEmissionCalculator`.
 const SUBSCRIBED_PROCESS_IDS: &[u16] = &[1, 15, 18, 19, 20, 21, 30, 31, 32];
+
+/// The `nr*` execution-DB tables the data-plane loader reads to build the
+/// NONROAD engine inputs. Declared via [`Calculator::input_tables`] so the
+/// snapshot loader admits them (the loader only loads tables in the union
+/// of every calculator's declared inputs).
+const NONROAD_INPUT_TABLES: &[&str] = &[
+    "nremissionrate",
+    "nrdeterioration",
+    "nrengtechfraction",
+    "nrsourceusetype",
+    "nrbaseyearequippopulation",
+    "nrmonthallocation",
+    "nrdayallocation",
+    "nrhourallocation",
+    "nrhourallocpattern",
+    "nrhourpatternfinder",
+    "nrgrowthindex",
+    "nrgrowthpattern",
+    "nrgrowthpatternfinder",
+    "nrscrappagecurve",
+    "nrscc",
+    "nrhprangebin",
+    "nrhpcategory",
+    "nrsulfuradjustment",
+    "nrstatesurrogate",
+    "nrsourceusetypephysicsmapping",
+    "runspecsector",
+    "runspecfueltype",
+    "nrfuelsupply",
+    "fuelformulation",
+    "nrfuelsubtype",
+    "zonemonthhour",
+    "runspecmonth",
+    "nrequipmenttype",
+    "nragecategory",
+    "nrmodelyear",
+];
 
 /// Adapter that routes onroad master-loop notifications for nonroad
 /// emission processes into `moves-nonroad`'s [`run_simulation`] API.
@@ -125,6 +161,12 @@ impl Calculator for NonroadEmissionCalculator {
         &self.subscriptions
     }
 
+    /// Declares the `nr*` execution-DB tables the data-plane loader reads,
+    /// so the snapshot loader admits them into the in-memory store.
+    fn input_tables(&self) -> &[&'static str] {
+        NONROAD_INPUT_TABLES
+    }
+
     /// `NonroadEmissionCalculator` emits no `MOVESWorkerOutput` rows of its
     /// own: the Java class delegated to `nonroad.exe`, which wrote to separate
     /// output tables. In `moves-nonroad`, the simulation output flows through
@@ -145,22 +187,65 @@ impl Calculator for NonroadEmissionCalculator {
     /// default reference data, returning [`CalculatorOutput::empty()`]
     /// until the output-mapping wiring is in place.
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
-        let year = ctx
-            .position()
-            .time
-            .year
-            .map(i32::from)
-            .unwrap_or(DEFAULT_YEAR);
+        let time = &ctx.position().time;
+        let year = time.year.map(i32::from).unwrap_or(DEFAULT_YEAR);
 
-        let options = NonroadOptions::new(RegionLevel::County, year);
-        let inputs = NonroadInputs::new();
-        let ref_data = ReferenceData::default();
-        let mut executor = ProductionExecutor::new(&ref_data);
+        // Build the NONROAD engine inputs from the nr* execution-DB tables
+        // (the in-process replacement for the Java input-file generator).
+        let store = ctx.tables();
+        let options = nonroad_loader::build_options(year);
+        let inputs = nonroad_loader::build_nonroad_inputs(store, year);
+        let debug = std::env::var("MOVES_NR_DEBUG").is_ok();
+        if debug {
+            eprintln!(
+                "[nr] execute year={year} groups={} records={} has_nremissionrate={} has_pop={}",
+                inputs.group_count(),
+                inputs.record_count(),
+                store.contains("nremissionrate"),
+                store.contains("nrbaseyearequippopulation"),
+            );
+        }
+        if inputs.is_empty() {
+            // No nonroad population in this run — nothing to compute.
+            return Ok(CalculatorOutput::empty());
+        }
+        let mut executor = nonroad_loader::build_production_executor(store, year);
 
-        moves_nonroad::run_simulation(&options, &inputs, &mut executor)
+        let outputs = moves_nonroad::run_simulation(&options, &inputs, &mut executor)
             .map_err(|e| Error::Nonroad(e.to_string()))?;
+        if debug {
+            let nonzero = outputs
+                .rows
+                .iter()
+                .filter(|r| r.emissions.iter().any(|&e| e != 0.0))
+                .count();
+            eprintln!(
+                "[nr] sim rows={} nonzero_rows={} counters={:?}",
+                outputs.rows.len(),
+                nonzero,
+                outputs.counters,
+            );
+        }
 
-        Ok(CalculatorOutput::empty())
+        // Map the engine's SimEmissionRows onto the MOVESOutput schema,
+        // allocating the engine's annual emissions onto this iteration's
+        // month/day slice.
+        let month = time.month.map(i32::from);
+        let day = time.day_id.map(i32::from);
+        let keys = EmissionTimeKeys {
+            year,
+            month,
+            day,
+            hour: time.hour.map(i32::from),
+        };
+        let temporal =
+            nonroad_loader::build_temporal_factors(store, month.unwrap_or(0), day.unwrap_or(0));
+        match nonroad_loader::emissions_to_dataframe(&outputs.rows, &keys, &temporal)
+            .map_err(|e| Error::Polars(e.to_string()))?
+        {
+            Some(df) => Ok(CalculatorOutput::with_dataframe(df)),
+            None => Ok(CalculatorOutput::empty()),
+        }
     }
 }
 

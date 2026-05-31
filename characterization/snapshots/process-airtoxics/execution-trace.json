@@ -1,8 +1,8 @@
 {
   "trace_version": "moves-fixture-capture/v1",
   "fixture_name": "process-airtoxics",
-  "sif_sha256": "f8d7ae76464c5e273dcc675bb91b3062fa1f41c87907e9403fe8c1cbe5482a59",
-  "runspec_sha256": "195730d91cb042e0c7f45873fa4ebbcc1e08addea4e20c00c29694b267a93e7a",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "runspec_sha256": "347e044c52497f60027f64fdb353aa0bccc0b575dd801ed058829fb88cac3c44",
   "java_classes": [
     {
       "name": "gov.epa.otaq.moves.common.BundleManifest",
@@ -645,6 +645,14 @@
       "kind": "master"
     },
     {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.HCSpeciationCalculator",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.HCSpeciationCalculator$HCEntry",
+      "kind": "master"
+    },
+    {
       "name": "gov.epa.otaq.moves.master.implementation.ghg.RatesOperatingModeDistributionGenerator",
       "kind": "master"
     },
@@ -717,6 +725,10 @@
       "kind": "utils"
     },
     {
+      "name": "gov.epa.otaq.moves.utils.StreamGobbler",
+      "kind": "utils"
+    },
+    {
       "name": "gov.epa.otaq.moves.worker.framework.ExternalCalculator",
       "kind": "framework"
     },
@@ -746,6 +758,6 @@
   "worker_bundles": [],
   "sources": {
     "worker_sql_files": 0,
-    "class_load_log_files": 2
+    "class_load_log_files": 6
   }
 }

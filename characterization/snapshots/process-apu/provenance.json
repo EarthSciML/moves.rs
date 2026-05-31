@@ -1,11 +1,11 @@
 {
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "process-apu",
-  "sif_sha256": "f8d7ae76464c5e273dcc675bb91b3062fa1f41c87907e9403fe8c1cbe5482a59",
-  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/mo-wwc.8/characterization/fixture-image.lock",
-  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/mo-wwc.8/characterization/fixtures/process-apu.xml",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/process-apu.xml",
   "runspec_sha256": "4f84b5e154ed2f218c1e2d799655e6a84129cd70557c594a65335d8493d58c8b",
-  "snapshot_aggregate_sha256": "0b752651752e9c3c249e1589e8a0f5ce9aa3b8871e8e05dab7ca90ae4f86d15d",
+  "snapshot_aggregate_sha256": "be66ce09b8bf748f5618968f9308900b8d544ab1f11c900b21d04d02c755e80b",
   "output_database": "out_process_apu",
   "scale_input_database": null
 }

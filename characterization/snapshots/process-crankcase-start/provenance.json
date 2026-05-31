@@ -1,11 +1,11 @@
 {
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "process-crankcase-start",
-  "sif_sha256": "f8d7ae76464c5e273dcc675bb91b3062fa1f41c87907e9403fe8c1cbe5482a59",
-  "sif_path": "/scratch.local/ctessum/earthcity/rigs/moves.rs/worktrees/mo-wwc.6/characterization/fixture-image.lock",
-  "runspec_path": "/scratch.local/ctessum/earthcity/rigs/moves.rs/worktrees/mo-wwc.6/characterization/fixtures/process-crankcase-start.xml",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/process-crankcase-start.xml",
   "runspec_sha256": "ef2920bfa60136442574eb1cf529aa996263d1fa0bd497ae498324de887ec488",
-  "snapshot_aggregate_sha256": "b93a9310ccf953fe6195b9b1e6404ce7d340fcf740b2b7445217a4c7076b2433",
+  "snapshot_aggregate_sha256": "eb62488927f2789e1311a8ea7c8e41bf0e2c45685035e862f547a050bd0e2a3f",
   "output_database": "out_process_crankcase_start",
   "scale_input_database": null
 }

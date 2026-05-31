@@ -1,0 +1,15 @@
+{
+  "fixture": "expand-counties",
+  "canonical_wall_secs": null,
+  "moves_rs_wall_secs": 0.8,
+  "speedup": null,
+  "canonical_peak_mb": null,
+  "moves_rs_peak_mb": 93.1,
+  "canonical_row_count": 0,
+  "moves_rs_row_count": 0,
+  "row_count_ratio": 0.0,
+  "pollutant_count": 0,
+  "max_abs_delta": 0.0,
+  "max_pct_diff": 0.0,
+  "rows": []
+}

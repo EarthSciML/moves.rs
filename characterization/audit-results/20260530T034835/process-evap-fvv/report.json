@@ -1,0 +1,24 @@
+{
+  "fixture": "process-evap-fvv",
+  "canonical_wall_secs": null,
+  "moves_rs_wall_secs": 0.7,
+  "speedup": null,
+  "canonical_peak_mb": null,
+  "moves_rs_peak_mb": 93.8,
+  "canonical_row_count": 128,
+  "moves_rs_row_count": 128,
+  "row_count_ratio": 1.0,
+  "pollutant_count": 1,
+  "max_abs_delta": 0.0459561538118578,
+  "max_pct_diff": -0.00008221551295706814,
+  "rows": [
+    {
+      "pollutant_id": 1,
+      "name": "Total Gaseous Hydrocarbons",
+      "canonical_emission_quant": 558.9718066450002,
+      "moves_rs_emission_quant": 558.9258504911884,
+      "delta": -0.0459561538118578,
+      "pct_diff": -0.00008221551295706814
+    }
+  ]
+}

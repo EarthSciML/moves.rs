@@ -1,0 +1,23 @@
+	Command being timed: "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/target/release/moves run --runspec /projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/mixed-onroad-nonroad.xml --output /projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/audit-results/20260530T034835/mixed-onroad-nonroad/moves-rs-output --snapshot /projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/snapshots/mixed-onroad-nonroad"
+	User time (seconds): 0.90
+	System time (seconds): 0.48
+	Percent of CPU this job got: 45%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:03.07
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 448632
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 489
+	Minor (reclaiming a frame) page faults: 192625
+	Voluntary context switches: 3451
+	Involuntary context switches: 6232
+	Swaps: 0
+	File system inputs: 154320
+	File system outputs: 24
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

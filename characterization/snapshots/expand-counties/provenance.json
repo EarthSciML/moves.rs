@@ -1,11 +1,11 @@
 {
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "expand-counties",
-  "sif_sha256": "597f1f3e0aef5d23027589ee509207d13486d5c89056906bf323a889f0e02311",
-  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.capable/worktrees/mo-wwc.2/characterization/fixture-image.lock",
-  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.capable/worktrees/mo-wwc.2/characterization/fixtures/expand-counties.xml",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/expand-counties.xml",
   "runspec_sha256": "fe8dae4244a87abec258167cbe49334ac48c6a62515e334b6dc2437057d78758",
-  "snapshot_aggregate_sha256": "f60033e29de1b9e8f2f13882bb3a5faa0cf864d932dbe10e5db63917ef97dc62",
+  "snapshot_aggregate_sha256": "7035588892e5047c4692621fc1c23da408442c008c61869a12d5bc3020c2613a",
   "output_database": "out_expand_counties",
   "scale_input_database": null
 }

@@ -1,11 +1,11 @@
 {
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "nr-construction-state",
-  "sif_sha256": "597f1f3e0aef5d23027589ee509207d13486d5c89056906bf323a889f0e02311",
-  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/mo-wwc.3/characterization/fixture-image.lock",
-  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/mo-wwc.3/characterization/fixtures/nr-construction-state.xml",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/nr-construction-state.xml",
   "runspec_sha256": "0d71ba7561e51824463c131de4ae71431f61eb83519a4cb6a32f7da599694cc0",
-  "snapshot_aggregate_sha256": "cc3d9deb3bb69b3e55d2be7538d131d12e5a4306d1c885abd08fe54d6f530279",
+  "snapshot_aggregate_sha256": "d74911b713140a62bb8286f649a47be704f00343b14eca5a984aa5a7900ef5a0",
   "output_database": "out_nr_construction_state",
   "scale_input_database": null
 }

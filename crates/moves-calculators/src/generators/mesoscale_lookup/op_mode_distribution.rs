@@ -943,7 +943,9 @@ impl TableRow for SourceTypePhysics {
     }
     fn polars_schema() -> polars::prelude::Schema {
         polars::prelude::Schema::from_iter([
-            ("sourceTypeID".into(), DataType::Int32),
+            // `sourceUseTypePhysicsMapping` keys physics by the real source type
+            // the terms apply to; there is no plain `sourceTypeID` column.
+            ("realSourceTypeID".into(), DataType::Int32),
             ("rollingTermA".into(), DataType::Float64),
             ("rotatingTermB".into(), DataType::Float64),
             ("dragTermC".into(), DataType::Float64),
@@ -957,7 +959,7 @@ impl TableRow for SourceTypePhysics {
             n,
             vec![
                 Series::new(
-                    "sourceTypeID".into(),
+                    "realSourceTypeID".into(),
                     rows.iter()
                         .map(|r| r.source_type_id.0 as i32)
                         .collect::<Vec<i32>>(),
@@ -996,10 +998,10 @@ impl TableRow for SourceTypePhysics {
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "sourceUseTypePhysicsMapping";
         let source_type_id_col = df
-            .column("sourceTypeID")
-            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?
+            .column("realSourceTypeID")
+            .map_err(|e| row_err(t, 0, "realSourceTypeID", e.to_string()))?
             .i32()
-            .map_err(|e| row_err(t, 0, "sourceTypeID", e.to_string()))?;
+            .map_err(|e| row_err(t, 0, "realSourceTypeID", e.to_string()))?;
         let rolling_term_a_col = df
             .column("rollingTermA")
             .map_err(|e| row_err(t, 0, "rollingTermA", e.to_string()))?
@@ -1032,7 +1034,7 @@ impl TableRow for SourceTypePhysics {
                     source_type_id: SourceTypeId(
                         source_type_id_col
                             .get(i)
-                            .ok_or_else(|| null("sourceTypeID"))? as u16,
+                            .ok_or_else(|| null("realSourceTypeID"))? as u16,
                     ),
                     rolling_term_a: rolling_term_a_col
                         .get(i)

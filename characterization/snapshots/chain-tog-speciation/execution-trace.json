@@ -1,8 +1,8 @@
 {
   "trace_version": "moves-fixture-capture/v1",
   "fixture_name": "chain-tog-speciation",
-  "sif_sha256": "f8d7ae76464c5e273dcc675bb91b3062fa1f41c87907e9403fe8c1cbe5482a59",
-  "runspec_sha256": "483c2fcc7f8f25bdb4bcd15dd31af43bfa64018b7d020ea5d4be3d1e729d4606",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "runspec_sha256": "5a80e99eb245f67005e643a34a26a3e6c6bc75e05edbc07f923a07e8d89c3159",
   "java_classes": [
     {
       "name": "gov.epa.otaq.moves.common.BundleManifest",
@@ -262,6 +262,10 @@
     },
     {
       "name": "gov.epa.otaq.moves.common.expression.IVariableSource",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Optimizer",
       "kind": "common"
     },
     {
@@ -609,7 +613,19 @@
       "kind": "master"
     },
     {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator$FuelFormulation",
+      "kind": "master"
+    },
+    {
       "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator$FuelUsageEntry",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator$GeneralFuelRatioExpression",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator$IntegerPair",
       "kind": "master"
     },
     {
@@ -701,6 +717,10 @@
       "kind": "utils"
     },
     {
+      "name": "gov.epa.otaq.moves.utils.StreamGobbler",
+      "kind": "utils"
+    },
+    {
       "name": "gov.epa.otaq.moves.worker.framework.ExternalCalculator",
       "kind": "framework"
     },
@@ -730,6 +750,6 @@
   "worker_bundles": [],
   "sources": {
     "worker_sql_files": 0,
-    "class_load_log_files": 2
+    "class_load_log_files": 6
   }
 }

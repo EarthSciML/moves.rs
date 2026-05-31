@@ -33,6 +33,11 @@ coverage matrix records TogSpeciationCalculator as NotExercised by it.]]></descr
 	</roadtypes>
 	<pollutantprocessassociations>
 		<pollutantprocessassociation pollutantkey="88" pollutantname="Non-HAP Total Organic Gases" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="1" pollutantname="Total Gaseous Hydrocarbons" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="5" pollutantname="Methane (CH4)" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="79" pollutantname="Non-Methane Hydrocarbons" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="80" pollutantname="Non-Methane Organic Gases" processkey="1" processname="Running Exhaust"/>
+		<pollutantprocessassociation pollutantkey="86" pollutantname="Total Organic Gases" processkey="1" processname="Running Exhaust"/>
 	</pollutantprocessassociations>
 	<databaseselections>
 	</databaseselections>

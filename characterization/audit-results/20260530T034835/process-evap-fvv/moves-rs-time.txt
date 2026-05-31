@@ -1,0 +1,23 @@
+	Command being timed: "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/target/release/moves run --runspec /projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/process-evap-fvv.xml --output /projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/audit-results/20260530T034835/process-evap-fvv/moves-rs-output --snapshot /projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/snapshots/process-evap-fvv"
+	User time (seconds): 0.32
+	System time (seconds): 0.18
+	Percent of CPU this job got: 69%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.73
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 96024
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 2
+	Minor (reclaiming a frame) page faults: 37160
+	Voluntary context switches: 3148
+	Involuntary context switches: 6465
+	Swaps: 0
+	File system inputs: 17384
+	File system outputs: 64
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

@@ -1262,6 +1262,17 @@ impl PollutantFilter {
         self
     }
 
+    /// Set the flag for the pollutant in 0-based `slot`. Out-of-range
+    /// slots are ignored. Lets callers that hold a populated EF table
+    /// (indexed by `PollutantIndex::slot()`) build a filter without
+    /// re-deriving the [`PollutantIndex`] for each slot.
+    pub fn set_slot(mut self, slot: usize, on: bool) -> Self {
+        if slot < self.has_file.len() {
+            self.has_file[slot] = on;
+        }
+        self
+    }
+
     /// Read the flag for one pollutant.
     pub fn has_factor_file(&self, pollutant: PollutantIndex) -> bool {
         self.has_file[pollutant.slot()]

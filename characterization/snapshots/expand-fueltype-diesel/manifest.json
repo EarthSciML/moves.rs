@@ -117,9 +117,9 @@
     },
     {
       "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__baserate_1_2020",
-      "row_count": 0,
-      "content_sha256": "cadecb0d725bad7bd0a3101fad79f3f8dade0d2dbe4abad4cc8f41f2da101743",
-      "metadata_sha256": "48ab5a14ad784238c0787defa2ab632d21ff68de0b31084a509c33bc1ab597f0"
+      "row_count": 660,
+      "content_sha256": "296b35db2d57c73747c152b7418b28cba038cb0119b115507d5398df42ebebfd",
+      "metadata_sha256": "609839e7c44cc63920fcbe0564a0f31cc03ff03a058636c1c69923b354739711"
     },
     {
       "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__baserate_2_2020",
@@ -279,9 +279,9 @@
     },
     {
       "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__drivingidlefraction",
-      "row_count": 0,
-      "content_sha256": "86b7598d0fd0c5dca3fccf20b94f275e838bdfe98c21b6938719a25dc6d10abe",
-      "metadata_sha256": "ed91f3cd4a5840221fbb36d4a3fd2c43f4ef1e1bb5ea0bf0b6c69259a9c8c855"
+      "row_count": 4,
+      "content_sha256": "0adac3c5c6db1b127cf280d7ac0482179c20502a4fb1032daece77fd79469c36",
+      "metadata_sha256": "ab5a22887d8323cd7bedb8cf4a1ae658fb05b303ed7becd53f3cc9be4be8953d"
     },
     {
       "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__e10fuelproperties",
@@ -2037,15 +2037,15 @@
     },
     {
       "name": "db__out_expand_fueltype_diesel__finalaggafter",
-      "row_count": 0,
-      "content_sha256": "eeade7974f2fa07eef640ba5f7130b4b4a482149c018b22ca7609244585a921d",
-      "metadata_sha256": "ad18a650272ee6ffae3cb7d1d0f2e2abed7b9c2575d3c7e8f84e0301c06bb5d6"
+      "row_count": 496,
+      "content_sha256": "6c63712730d76315ec669f6b5545ce57a1e2fe5f7c99804ddb3d91612b1d50e7",
+      "metadata_sha256": "9a4b0a3d446e28dd20ff4729692b26910db06aa34d01e0471beaa294a3e6f2af"
     },
     {
       "name": "db__out_expand_fueltype_diesel__finalaggbefore",
-      "row_count": 0,
-      "content_sha256": "eeade7974f2fa07eef640ba5f7130b4b4a482149c018b22ca7609244585a921d",
-      "metadata_sha256": "0272958cb0b2f6c71661728e2899f352cfb5612bff94b89c6f98470a4315928b"
+      "row_count": 496,
+      "content_sha256": "6c63712730d76315ec669f6b5545ce57a1e2fe5f7c99804ddb3d91612b1d50e7",
+      "metadata_sha256": "1143457cbefbb2d839a2e96aff57c7d4d215f02ad2e2de67d1a2003f17ef1d23"
     },
     {
       "name": "db__out_expand_fueltype_diesel__movesactivityoutput",
@@ -2055,15 +2055,15 @@
     },
     {
       "name": "db__out_expand_fueltype_diesel__movesoutput",
-      "row_count": 0,
-      "content_sha256": "eeade7974f2fa07eef640ba5f7130b4b4a482149c018b22ca7609244585a921d",
-      "metadata_sha256": "7c573eda441f8fe12a1a33d76716901fa3af3f6495f49a23f34417d89903bc46"
+      "row_count": 496,
+      "content_sha256": "e12c4fa5f63edc336ace8d9c8cec98e3bd044da44ad8cba57f9de78e8be84362",
+      "metadata_sha256": "c9352717d0d1d2244c5a93ab9fb0719143ff50bef99f08a24e9028c902e5fcb2"
     },
     {
       "name": "db__out_expand_fueltype_diesel__movestablesused",
       "row_count": 146,
-      "content_sha256": "d41dca036407396a373f53276ecaa91c91aea803aae328a8bed7d4a858473bc3",
-      "metadata_sha256": "a7313d714d5b2790234a0ddef416714544f9635ed920a80ce600b8623cf216f3"
+      "content_sha256": "eff799e474e36f2152921675819ae9126e0fc7662a4ed64fd46d103aa9d1a9f2",
+      "metadata_sha256": "53cb49c3af78321042957f60f4e9d8d0903e1678cc406a79e0dbcd3685929ce9"
     },
     {
       "name": "db__out_expand_fueltype_diesel__rateperdistance",
@@ -2109,9 +2109,9 @@
     },
     {
       "name": "db__out_expand_fueltype_diesel__temporaryoutputimport",
-      "row_count": 0,
-      "content_sha256": "eeade7974f2fa07eef640ba5f7130b4b4a482149c018b22ca7609244585a921d",
-      "metadata_sha256": "a606e2a626ea486d90c89f9cbbd3b2c9e179604acb6ab71a4a776e0591a3b064"
+      "row_count": 496,
+      "content_sha256": "6c63712730d76315ec669f6b5545ce57a1e2fe5f7c99804ddb3d91612b1d50e7",
+      "metadata_sha256": "c4d4b8d03efcb22a3ccf7f1a5b74e24bec78f711b353db6c5a82ae65593d36b4"
     },
     {
       "name": "db__out_expand_fueltype_diesel__translate_activitytype",
@@ -2211,9 +2211,9 @@
     },
     {
       "name": "db__out_expand_fueltype_diesel__unitconvertafter",
-      "row_count": 0,
-      "content_sha256": "eeade7974f2fa07eef640ba5f7130b4b4a482149c018b22ca7609244585a921d",
-      "metadata_sha256": "8788f5201e43f0708e6093d589e09f37b94939d3b72ad3e936ffae91e66b0466"
+      "row_count": 496,
+      "content_sha256": "e12c4fa5f63edc336ace8d9c8cec98e3bd044da44ad8cba57f9de78e8be84362",
+      "metadata_sha256": "143964aa5f127141b47bd9ad114cf080695d81ca10eaa28c96a3347f02aa1cba"
     },
     {
       "name": "moves_temporary__manyworkers__workerfolder__workertemp__activity_tbl",
@@ -2229,10 +2229,10 @@
     },
     {
       "name": "moves_temporary__manyworkers__workerfolder__workertemp__output_tbl",
-      "row_count": 0,
-      "content_sha256": "9db4b506d041e133f04bcca42b7f8d3d4448d692b393eaa63cadfde73abda0d4",
-      "metadata_sha256": "8f06ec7337a9dc6d8925b666c06a3a0d6ff7d9cdea4862c40268f4a59a429d1c"
+      "row_count": 496,
+      "content_sha256": "65c729a11defbab854fb5b7d1612a01611b163b204ab976884be4e61aab730f3",
+      "metadata_sha256": "3cd0aceaf313f061c615607e81957551accb1cce44674b5bf9b7f882e5319044"
     }
   ],
-  "aggregate_sha256": "a7de2ea88410a78bd6eaac24e280cfddc3a7048552eb34514166c3f2b43affac"
+  "aggregate_sha256": "db1a85e96dedaccf9e53871c1379df558558272ef44c3eb490cb566f47f7c96d"
 }

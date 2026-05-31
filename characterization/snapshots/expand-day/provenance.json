@@ -1,11 +1,11 @@
 {
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "expand-day",
-  "sif_sha256": "597f1f3e0aef5d23027589ee509207d13486d5c89056906bf323a889f0e02311",
-  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.capable/worktrees/mo-wwc.2/characterization/fixture-image.lock",
-  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.capable/worktrees/mo-wwc.2/characterization/fixtures/expand-day.xml",
-  "runspec_sha256": "2be728442f94403a2a2be658c0d91072afd635f2fa0d3d74d797dd002dbf2805",
-  "snapshot_aggregate_sha256": "185adfd5917aef1fe9aef92f7b3e1898a6f1177c3c31ba28e9feee6006c617f9",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/expand-day.xml",
+  "runspec_sha256": "c238a1969d13be0596a92828b0a4b140d9646a5eaba4e0de7fee9c49f96ea8fd",
+  "snapshot_aggregate_sha256": "3bbd347342d8974131db57b4bf496fa2fc3ed169ec879741124cc8189dc24ce6",
   "output_database": "out_expand_day",
   "scale_input_database": null
 }

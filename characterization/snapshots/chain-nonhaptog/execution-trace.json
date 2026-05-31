@@ -1,8 +1,8 @@
 {
   "trace_version": "moves-fixture-capture/v1",
   "fixture_name": "chain-nonhaptog",
-  "sif_sha256": "f8d7ae76464c5e273dcc675bb91b3062fa1f41c87907e9403fe8c1cbe5482a59",
-  "runspec_sha256": "05e3ecd7350b16c6e061050a02178be9d9d05adbd35302c61e67140a50f4df65",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "runspec_sha256": "9c38b76a8d5ab5c98079a6a8bb12c01fa7a08684fd2532f65c5dc9790d4dde20",
   "java_classes": [
     {
       "name": "gov.epa.otaq.moves.common.BundleManifest",
@@ -262,6 +262,10 @@
     },
     {
       "name": "gov.epa.otaq.moves.common.expression.IVariableSource",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Optimizer",
       "kind": "common"
     },
     {
@@ -609,7 +613,19 @@
       "kind": "master"
     },
     {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator$FuelFormulation",
+      "kind": "master"
+    },
+    {
       "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator$FuelUsageEntry",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator$GeneralFuelRatioExpression",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator$IntegerPair",
       "kind": "master"
     },
     {
@@ -618,6 +634,14 @@
     },
     {
       "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator$Parameter",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.HCSpeciationCalculator",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.HCSpeciationCalculator$HCEntry",
       "kind": "master"
     },
     {
@@ -693,6 +717,10 @@
       "kind": "utils"
     },
     {
+      "name": "gov.epa.otaq.moves.utils.StreamGobbler",
+      "kind": "utils"
+    },
+    {
       "name": "gov.epa.otaq.moves.worker.framework.ExternalCalculator",
       "kind": "framework"
     },
@@ -722,6 +750,6 @@
   "worker_bundles": [],
   "sources": {
     "worker_sql_files": 0,
-    "class_load_log_files": 2
+    "class_load_log_files": 6
   }
 }

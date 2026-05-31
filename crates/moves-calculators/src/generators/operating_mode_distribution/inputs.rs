@@ -348,11 +348,13 @@ impl TableRow for DriveScheduleAssocRow {
             .map_err(|e| row_err(t, 0, "driveScheduleID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "driveScheduleID", e.to_string()))?;
+        // `isRamp` defaults to 'N' (non-ramp) in MOVES, and some snapshots omit
+        // the column entirely. Treat an absent column — and any NULL within it —
+        // as non-ramp, matching the MOVES default rather than erroring.
         let is_ramp = df
             .column("isRamp")
-            .map_err(|e| row_err(t, 0, "isRamp", e.to_string()))?
-            .bool()
-            .map_err(|e| row_err(t, 0, "isRamp", e.to_string()))?;
+            .ok()
+            .and_then(|c| c.bool().ok().cloned());
         (0..df.height())
             .map(|i| {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
@@ -367,7 +369,7 @@ impl TableRow for DriveScheduleAssocRow {
                         .get(i)
                         .ok_or_else(|| null("driveScheduleID"))?
                         as i16,
-                    is_ramp: is_ramp.get(i).ok_or_else(|| null("isRamp"))?,
+                    is_ramp: is_ramp.as_ref().and_then(|c| c.get(i)).unwrap_or(false),
                 })
             })
             .collect()

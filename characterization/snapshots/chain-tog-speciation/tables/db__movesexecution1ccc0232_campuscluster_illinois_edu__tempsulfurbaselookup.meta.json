@@ -1,0 +1,26 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__tempsulfurbaselookup",
+  "schema": [
+    {
+      "name": "sulfurBasis",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "sulfurGPAMax",
+      "kind": "float64"
+    },
+    {
+      "name": "sulfurBase",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 41,
+  "float_decimals": 12,
+  "content_sha256": "40c4429802d5221e9b57788570ecac2cc4731f7e68706def6a5ba694f481d857"
+}

@@ -37,10 +37,11 @@
 
 use crate::common::consts::{MXAGYR, MXPOL, MXTECH, SWTCNG, SWTDSL, SWTGS2, SWTGS4, SWTLPG};
 use crate::driver::scrptime;
-use crate::driver::{Dispatch, DriverRecord};
+use crate::driver::{fuel_for_scc, Dispatch, DriverRecord};
 use crate::emissions::exhaust::{
-    calculate_exhaust_emissions, ActivityUnit as ExhaustActivityUnit, DayRange, EmissionUnitCode,
-    ExhaustCalcInputs, FuelKind, PollutantFilter,
+    calculate_emission_adjustments, calculate_exhaust_emissions,
+    ActivityUnit as ExhaustActivityUnit, AdjustmentInputs, DailyTemperatures, DayRange,
+    EmissionUnitCode, ExhaustCalcInputs, FuelKind, PollutantFilter, Season,
 };
 use crate::geography::common::fuel_density;
 use crate::geography::common::{
@@ -471,9 +472,14 @@ impl ProductionExecutor {
             // we synthesise (0, 2*hp_avg) → mid = hp_avg.
             hp_range: (0.0, ctx.record.hp_avg * 2.0),
             hp_avg: ctx.record.hp_avg,
-            // use_hours and disc_code are not in DriverRecord; use
-            // defaults that keep scrptime in a well-defined state.
-            use_hours: 1000.0,
+            // Median life (scrptime's `mdlfhrs`) from the driver record;
+            // fall back to a neutral 1000.0 when absent so scrptime stays
+            // well-defined. `disc_code` is not carried; DEFAULT curve.
+            use_hours: if ctx.record.median_life > 0.0 {
+                ctx.record.median_life
+            } else {
+                1000.0
+            },
             disc_code: "DEFAULT",
             base_pop_year: ctx.record.pop_year,
             scc: ctx.scc,
@@ -495,7 +501,11 @@ impl ProductionExecutor {
             population: ctx.record.population,
             hp_range: (0.0, ctx.record.hp_avg * 2.0),
             hp_avg: ctx.record.hp_avg,
-            use_hours: 1000.0,
+            use_hours: if ctx.record.median_life > 0.0 {
+                ctx.record.median_life
+            } else {
+                1000.0
+            },
             disc_code: "DEFAULT",
             base_pop_year: ctx.record.pop_year,
             scc: ctx.scc,
@@ -647,7 +657,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
 
     // ---- Technology fractions -------------------------------------------
 
-    fn find_exhaust_tech(&self, scc: &str, hp_avg: f32, _year: i32) -> Option<TechLookup> {
+    fn find_exhaust_tech(&self, scc: &str, hp_avg: f32, year: i32) -> Option<TechLookup> {
         let entry = self
             .executor
             .reference
@@ -657,7 +667,10 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         Some(TechLookup {
             scc_tech_index: 0,
             tech_names: entry.tech_names.clone(),
-            tech_fractions: entry.tech_fractions.clone(),
+            // Per-model-year tech mix (cleaner tech phases in over model
+            // years); falls back to the single vector when no per-year
+            // data is loaded.
+            tech_fractions: entry.fractions_for_year(year).to_vec(),
         })
     }
 
@@ -792,13 +805,66 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
 
     fn emission_adjustments(
         &self,
-        _scc: &str,
-        _fips: &str,
+        scc: &str,
+        fips: &str,
         _daymthfac: &[f32; crate::common::consts::MXDAYS],
     ) -> AdjustmentTable {
-        // Emission adjustments require the EF tables; return a
-        // no-adjustment (all 1.0 / empty) table for now.
-        AdjustmentTable::new(crate::common::consts::MXDAYS)
+        let oxy = self.executor.reference.fuel_oxygen_pct;
+        // Per-SCC activity-weighted ambient temperature (warm-daytime-weighted
+        // for daylight-use equipment), falling back to the scalar mean.
+        let tamb = self
+            .executor
+            .reference
+            .ambient_temp_by_scc
+            .get(scc)
+            .copied()
+            .unwrap_or(self.executor.reference.ambient_temp_f);
+        // No fuel adjustments configured ⇒ neutral (all-1.0), preserving
+        // the legacy behaviour for tests / runs without fuel data.
+        if oxy == 0.0 && tamb == 0.0 {
+            return AdjustmentTable::new(crate::common::consts::MXDAYS);
+        }
+        // Port of `emsadj.f`: the gasoline exhaust temperature + oxygenate
+        // corrections. The engine evaluates day 1 (begin=end=1), matching
+        // the county adapter's single-day exhaust iteration.
+        let fuel = fuel_for_scc(scc).unwrap_or(FuelKind::Gasoline4Stroke);
+        let temps = DailyTemperatures {
+            daily_temperature_mode: false,
+            daily_ambient_temp_f: Vec::new(),
+            ambient_temp: if tamb > 0.0 { tamb } else { 75.0 },
+        };
+        let dummy_month = [1.0_f32; crate::common::consts::MXDAYS];
+        let inputs = AdjustmentInputs {
+            fuel,
+            scc,
+            fips,
+            day_range: DayRange {
+                begin_day: 1,
+                end_day: 1,
+                winter_skip_begin: 0,
+                winter_skip_end: 0,
+                winter_skip: false,
+            },
+            temperatures: &temps,
+            daily_month_fraction: &dummy_month,
+            rfg: self.executor.reference.fuel_rfg,
+            high_altitude: false,
+            oxygen_percent: oxy,
+            episode_year: 0,
+            month: 0,
+            month_to_season: [Season::Summer; 12],
+            rfg_winter_2_stroke: None,
+            rfg_winter_4_stroke: None,
+            rfg_summer_2_stroke: None,
+            rfg_summer_4_stroke: None,
+            // SOx/altitude unused by the emitted pollutants; neutral values
+            // (soxcor = sox_fuel/sox_base = 1, altitude factor = 1).
+            sox_fuel: [1.0; 5],
+            sox_base: [1.0; 5],
+            sox_diesel_marine: 1.0,
+            altitude_factor: [1.0; 5],
+        };
+        calculate_emission_adjustments(&inputs)
     }
 
     // ---- Model-year and age distribution --------------------------------
@@ -908,23 +974,28 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
     fn compute_exhaust_factors(
         &mut self,
         scc: &str,
+        hp_avg: f32,
         tech_names: &[String],
         _tech_fractions: &[f32],
         _model_year: i32,
         _year_index: usize,
         _record_index: usize,
     ) -> Result<ExhaustFactorsLookup> {
-        // Look up per-tech BSFC from the reference entry for this SCC.
-        // Emission-factor files are not yet loadable, so all EF arrays
-        // stay zero; CO2 and SOx are rewritten from BSFC by
-        // calculate_exhaust_emissions regardless of the EF values.
         let n_tech = tech_names.len().max(1);
-        let bsfc_per_tech: Vec<f32> = self
+
+        // Resolve the hp-matched reference entry for this SCC — the same
+        // entry `find_exhaust_tech` selected to produce `tech_names`. The
+        // per-tech ordering of every array below is therefore aligned
+        // with `tech_names` / `tech_fractions`.
+        let entry = self
             .executor
             .reference
             .exhaust_tech_entries
             .iter()
-            .find(|e| e.scc == scc)
+            .find(|e| e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max);
+
+        // Per-tech BSFC, broadcast across all calendar years.
+        let bsfc_per_tech: Vec<f32> = entry
             .map(|e| e.bsfc.clone())
             .unwrap_or_else(|| vec![0.0; n_tech]);
         let mut bsfc = vec![0.0_f32; MXAGYR * n_tech];
@@ -933,13 +1004,61 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
                 bsfc[y * n_tech + t] = v;
             }
         }
+
+        // EF / unit / deterioration arrays. They default to the legacy
+        // zero-fill (only BSFC-derived CO2/SOx produced); when the
+        // reference entry carries loaded emission factors they are
+        // expanded into the engine's `[year][pollutant][tech]` and
+        // `[pollutant][tech]` layouts. The base rate is the same for
+        // every calendar year — the model-year/age signal enters through
+        // the deterioration coefficients in `calculate_exhaust_emissions`.
+        let mut emission_factors = vec![0.0_f32; MXAGYR * MXPOL * MXTECH];
+        let mut unit_codes = vec![EmissionUnitCode::GramsPerHpHour; MXPOL * MXTECH];
+        let mut adetcf = vec![0.0_f32; MXPOL * MXTECH];
+        let mut bdetcf = vec![0.0_f32; MXPOL * MXTECH];
+        let mut detcap = vec![0.0_f32; MXPOL * MXTECH];
+
+        if let Some(e) = entry {
+            if !e.emission_factors.is_empty() {
+                let stride = n_tech;
+                let tech_span = n_tech.min(MXTECH);
+                for pol in 0..MXPOL {
+                    for t in 0..tech_span {
+                        let src = pol * stride + t;
+                        if src >= e.emission_factors.len() {
+                            continue;
+                        }
+                        let ef = e.emission_factors[src];
+                        if ef != 0.0 {
+                            for y in 0..MXAGYR {
+                                emission_factors[y * (MXPOL * MXTECH) + pol * MXTECH + t] = ef;
+                            }
+                        }
+                        let dst = pol * MXTECH + t;
+                        if let Some(u) = e.emission_units.get(src) {
+                            unit_codes[dst] = *u;
+                        }
+                        if let Some(a) = e.det_a.get(src) {
+                            adetcf[dst] = *a;
+                        }
+                        if let Some(b) = e.det_b.get(src) {
+                            bdetcf[dst] = *b;
+                        }
+                        if let Some(c) = e.det_cap.get(src) {
+                            detcap[dst] = *c;
+                        }
+                    }
+                }
+            }
+        }
+
         Ok(ExhaustFactorsLookup {
-            emission_factors: vec![0.0; MXAGYR * MXPOL * MXTECH],
+            emission_factors,
             bsfc,
-            unit_codes: vec![EmissionUnitCode::GramsPerHpHour; MXPOL * MXTECH],
-            adetcf: vec![0.0; MXPOL * MXTECH],
-            bdetcf: vec![0.0; MXPOL * MXTECH],
-            detcap: vec![0.0; MXPOL * MXTECH],
+            unit_codes,
+            adetcf,
+            bdetcf,
+            detcap,
         })
     }
 
@@ -1008,14 +1127,23 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             .unwrap_or(0.0);
 
         // Build tech-fractions table indexed [scc_tech_index * MXTECH + tech_index].
-        let entry_fracs: &[f32] = self
+        // Match the hp-binned entry (not just the SCC): an SCC may have
+        // several HP-range entries with different tech mixes, and the
+        // tech-slot ordering must line up with the entry `find_exhaust_tech`
+        // selected for this record.
+        // Use the per-model-year mix for the current iteration's tech model
+        // year — reconstructed from the loop index as
+        // `tchmdyr = min(episode_year - year_index, tech_year)`
+        // (prccty.f: idxyr = iepyr - iyr + 1; tchmdyr = min(iyr, itchyr)).
+        let tchmdyr = (options.episode_year - year_index as i32).min(options.tech_year);
+        let entry_fracs: Vec<f32> = self
             .executor
             .reference
             .exhaust_tech_entries
             .iter()
-            .find(|e| e.scc == record.scc)
-            .map(|e| e.tech_fractions.as_slice())
-            .unwrap_or(&[]);
+            .find(|e| e.scc == record.scc && e.hp_min <= record.hp_avg && record.hp_avg <= e.hp_max)
+            .map(|e| e.fractions_for_year(tchmdyr).to_vec())
+            .unwrap_or_default();
         let table_len = (scc_tech_index + 1) * MXTECH;
         let mut tech_fracs = vec![0.0_f32; table_len];
         for (i, &frac) in entry_fracs.iter().enumerate() {
@@ -1029,6 +1157,25 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         let mut emission_factors = factors.emission_factors.clone();
         let sox_conversion = [SWTGS2, SWTGS4, SWTDSL, SWTLPG, SWTCNG];
         let sox_base = [SWTGS2, SWTGS4, SWTDSL, SWTLPG, SWTCNG];
+
+        // A pollutant takes the EF-gated branch of
+        // `calculate_exhaust_emissions` only when an emission-factor file
+        // was loaded for it (clcems.f :179–181). We derive that from the
+        // populated EF table: a non-zero base rate for any tech slot of
+        // the pollutant means a file is present. CO2/SOx/Displacement are
+        // always computed regardless of this filter. When no EF table is
+        // loaded the filter is all-false, preserving the legacy
+        // BSFC-only (CO2/SOx) behaviour. Built before `calc_inputs` takes
+        // a mutable borrow of `emission_factors`.
+        let mut pollutant_filter = PollutantFilter::empty();
+        for pol in 0..MXPOL {
+            let has = (0..MXTECH).any(|t| {
+                emission_factors
+                    .get(pol * MXTECH + t)
+                    .is_some_and(|&v| v != 0.0)
+            });
+            pollutant_filter = pollutant_filter.set_slot(pol, has);
+        }
 
         let mut calc_inputs = ExhaustCalcInputs {
             year_index,
@@ -1070,7 +1217,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             sulfur_alternate: None,
         };
 
-        let outputs = calculate_exhaust_emissions(&mut calc_inputs, &PollutantFilter::empty());
+        let outputs = calculate_exhaust_emissions(&mut calc_inputs, &pollutant_filter);
 
         Ok(EmissionsIterationResult {
             emsday_delta: outputs.emissions_day,
@@ -2250,6 +2397,7 @@ mod tests {
             hp_avg: 25.0,
             population: 100.0,
             pop_year: 2020,
+            median_life: 0.0,
         }
     }
 
@@ -2542,6 +2690,7 @@ mod production {
             hp_avg: 25.0,
             population: 100.0,
             pop_year: 2020,
+            median_life: 0.0,
         }
     }
 
@@ -2594,6 +2743,7 @@ mod production {
                     tech_names: vec!["T1".into()],
                     tech_fractions: vec![0.0],
                     bsfc: vec![],
+                    ..Default::default()
                 }],
                 evap_tech_entries: vec![EvapTechEntry {
                     scc: "2270001010".into(),
@@ -2679,6 +2829,7 @@ mod production {
                     tech_names: vec!["T1".into()],
                     tech_fractions: vec![0.0],
                     bsfc: vec![],
+                    ..Default::default()
                 }],
                 evap_tech_entries: vec![EvapTechEntry {
                     scc: "2270001010".into(),
@@ -2726,6 +2877,7 @@ mod production {
             hp_avg: 25.0,
             population: 100.0,
             pop_year: 2020,
+            median_life: 0.0,
         };
         let ctx = DispatchContext {
             dispatch: Dispatch::StateToCounty,
@@ -2758,6 +2910,7 @@ mod production {
                     tech_names: vec!["T1".into()],
                     tech_fractions: vec![0.0],
                     bsfc: vec![],
+                    ..Default::default()
                 }],
                 evap_tech_entries: vec![EvapTechEntry {
                     scc: "2270001010".into(),
@@ -2805,6 +2958,7 @@ mod production {
             hp_avg: 25.0,
             population: 100.0,
             pop_year: 2020,
+            median_life: 0.0,
         };
         let ctx = DispatchContext {
             dispatch: Dispatch::StateFromNational,
@@ -2847,6 +3001,7 @@ mod production {
                     tech_names: vec!["T1".into()],
                     tech_fractions: vec![0.0],
                     bsfc: vec![],
+                    ..Default::default()
                 }],
                 evap_tech_entries: vec![EvapTechEntry {
                     scc: "2270001010".into(),
@@ -2894,6 +3049,7 @@ mod production {
             hp_avg: 25.0,
             population: 100.0,
             pop_year: 2020,
+            median_life: 0.0,
         };
         let ctx = DispatchContext {
             dispatch: Dispatch::National,
@@ -2930,6 +3086,7 @@ mod production {
                     tech_names: vec!["T1".into()],
                     tech_fractions: vec![0.0],
                     bsfc: vec![],
+                    ..Default::default()
                 }],
                 evap_tech_entries: vec![EvapTechEntry {
                     scc: "2270001010".into(),
@@ -2977,6 +3134,7 @@ mod production {
             hp_avg: 25.0,
             population: 100.0,
             pop_year: 2020,
+            median_life: 0.0,
         };
         let ctx = DispatchContext {
             dispatch: Dispatch::UsTotal,
@@ -3015,6 +3173,7 @@ mod production {
                     tech_names: vec!["T1".into()],
                     tech_fractions: vec![0.0],
                     bsfc: vec![],
+                    ..Default::default()
                 }],
                 evap_tech_entries: vec![EvapTechEntry {
                     scc: "2270001010".into(),
@@ -3034,6 +3193,7 @@ mod production {
             hp_avg: 25.0,
             population: 100.0,
             pop_year: 2020,
+            median_life: 0.0,
         };
         let ctx = DispatchContext {
             dispatch: Dispatch::National,
@@ -3065,6 +3225,7 @@ mod production {
                     tech_names: vec!["T1".into()],
                     tech_fractions: vec![0.0],
                     bsfc: vec![],
+                    ..Default::default()
                 }],
                 evap_tech_entries: vec![EvapTechEntry {
                     scc: "2270001010".into(),
@@ -3084,6 +3245,7 @@ mod production {
             hp_avg: 25.0,
             population: 100.0,
             pop_year: 2020,
+            median_life: 0.0,
         };
         let ctx = DispatchContext {
             dispatch: Dispatch::UsTotal,

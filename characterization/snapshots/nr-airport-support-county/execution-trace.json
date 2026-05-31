@@ -1,11 +1,27 @@
 {
   "trace_version": "moves-fixture-capture/v1",
   "fixture_name": "nr-airport-support-county",
-  "sif_sha256": "597f1f3e0aef5d23027589ee509207d13486d5c89056906bf323a889f0e02311",
-  "runspec_sha256": "979c0c8ee0027a3e2cab97c79efa4fa4fa56ffd830efe10e5752fca9e763b03e",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "runspec_sha256": "b5f1a3305ab0b1297eeb8aa6618287db2a03847fa824105736a35c863648bfd6",
   "java_classes": [
     {
+      "name": "gov.epa.otaq.moves.common.BundleManifest",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.BundleManifest$ContextHolder",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.BundleManifest$DurationFragment",
+      "kind": "common"
+    },
+    {
       "name": "gov.epa.otaq.moves.common.BundleManifest$MasterFragment",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.BundleManifest$XMLErrorHandler",
       "kind": "common"
     },
     {
@@ -29,6 +45,10 @@
       "kind": "common"
     },
     {
+      "name": "gov.epa.otaq.moves.common.DistributedWorkFilePurpose",
+      "kind": "common"
+    },
+    {
       "name": "gov.epa.otaq.moves.common.DistributedWorkFileState",
       "kind": "common"
     },
@@ -42,6 +62,10 @@
     },
     {
       "name": "gov.epa.otaq.moves.common.InstanceCounter",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.JARUtilities",
       "kind": "common"
     },
     {
@@ -102,6 +126,10 @@
     },
     {
       "name": "gov.epa.otaq.moves.common.PerformanceProfiler",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.PermutationCreator",
       "kind": "common"
     },
     {
@@ -189,6 +217,10 @@
       "kind": "framework"
     },
     {
+      "name": "gov.epa.otaq.moves.master.framework.EmissionCalculatorExternal",
+      "kind": "framework"
+    },
+    {
       "name": "gov.epa.otaq.moves.master.framework.EmissionCalculatorInboundUnbundler",
       "kind": "framework"
     },
@@ -205,6 +237,10 @@
       "kind": "framework"
     },
     {
+      "name": "gov.epa.otaq.moves.master.framework.ExecutionLocation",
+      "kind": "framework"
+    },
+    {
       "name": "gov.epa.otaq.moves.master.framework.ExecutionLocationProducer",
       "kind": "framework"
     },
@@ -218,6 +254,10 @@
     },
     {
       "name": "gov.epa.otaq.moves.master.framework.ExtractedDataCache",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.ExtractedDataCache$CacheEntry",
       "kind": "framework"
     },
     {
@@ -305,7 +345,19 @@
       "kind": "framework"
     },
     {
+      "name": "gov.epa.otaq.moves.master.framework.MasterLoopContext$IContextFilter",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.MasterLoopGranularity",
+      "kind": "framework"
+    },
+    {
       "name": "gov.epa.otaq.moves.master.framework.MasterLoopable",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.MasterLoopableSubscription",
       "kind": "framework"
     },
     {
@@ -337,6 +389,14 @@
       "kind": "framework"
     },
     {
+      "name": "gov.epa.otaq.moves.master.framework.RoadType",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.SQLForWorker",
+      "kind": "framework"
+    },
+    {
       "name": "gov.epa.otaq.moves.master.framework.SQLMacroExpander",
       "kind": "framework"
     },
@@ -354,6 +414,10 @@
     },
     {
       "name": "gov.epa.otaq.moves.master.framework.UncertaintyParameters",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.WeeksInMonthHelper",
       "kind": "framework"
     },
     {
@@ -421,6 +485,58 @@
       "kind": "master"
     },
     {
+      "name": "gov.epa.otaq.moves.master.nonroad.NonroadDataFileHelper",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.nonroad.NonroadDataFileHelper$LineMerger",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.nonroad.NonroadDataFilesObj",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.nonroad.NonroadEmissionCalculator",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.nonroad.NonroadEmissionFacInfo",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.nonroad.NonroadHelper",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.nonroad.NonroadInputCreator",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.nonroad.NonroadOptFileHelper",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.nonroad.NonroadOptFileSqlHelper",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.nonroad.NonroadOptfileOptionsPacket",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.nonroad.NonroadOptfileRegionPacket",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.nonroad.NonroadPMBasedSulfur",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.nonroad.NonroadTemparyDataFileManager",
+      "kind": "master"
+    },
+    {
       "name": "gov.epa.otaq.moves.master.runspec.DistanceMeasurementSystem",
       "kind": "master"
     },
@@ -469,7 +585,39 @@
       "kind": "master"
     },
     {
+      "name": "gov.epa.otaq.moves.utils.ApplicationRunner",
+      "kind": "utils"
+    },
+    {
+      "name": "gov.epa.otaq.moves.utils.FormatUtil",
+      "kind": "utils"
+    },
+    {
+      "name": "gov.epa.otaq.moves.utils.StreamGobbler",
+      "kind": "utils"
+    },
+    {
+      "name": "gov.epa.otaq.moves.worker.framework.ExternalCalculator",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.worker.framework.NonroadOutputDataLoader",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.worker.framework.NonroadOutputDataLoader$BmvRecord",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.worker.framework.NonroadOutputDataLoader$BmyRecord",
+      "kind": "framework"
+    },
+    {
       "name": "gov.epa.otaq.moves.worker.framework.RemoteEmissionsCalculator",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.worker.framework.RemoteEmissionsCalculator$TimerInfo",
       "kind": "framework"
     },
     {

@@ -1,11 +1,11 @@
 {
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "nr-agriculture-state",
-  "sif_sha256": "597f1f3e0aef5d23027589ee509207d13486d5c89056906bf323a889f0e02311",
-  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/mo-wwc.3/characterization/fixture-image.lock",
-  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/mo-wwc.3/characterization/fixtures/nr-agriculture-state.xml",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/nr-agriculture-state.xml",
   "runspec_sha256": "49a7d56e1700bc8f801b98292222f3faaf41d22be81e84304c3676bf019f104c",
-  "snapshot_aggregate_sha256": "5f0d3fef760166ea6ec1573bcbdb0a3e879f0de29ec5fca07e5527c42daac7c2",
+  "snapshot_aggregate_sha256": "a8d54f0de01d83a0ad617c8f5f83610f3bec06298ea267b017dc2ba982e0fa95",
   "output_database": "out_nr_agriculture_state",
   "scale_input_database": null
 }

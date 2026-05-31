@@ -135,9 +135,9 @@
     },
     {
       "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__baseratebyage_1_2020",
-      "row_count": 0,
-      "content_sha256": "e6575a8c00cc85fc9069f9f2ccaec336cd7e1a1a2ec1e7ff34a0f1906d931470",
-      "metadata_sha256": "7c1f8e8a4ecb68d5037059ec76a423b0171f80fc75e492faab8aeed0bca65651"
+      "row_count": 744,
+      "content_sha256": "5c62da27cb1bf4f5a93a1fb58b1966711d835a7d83e726fc7b9a705f882bb725",
+      "metadata_sha256": "ac047dcbc35a9a9e989b0f096836cdda1c7b307812f9c3af159e67eba74d128e"
     },
     {
       "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__baseratebyage_2_2020",
@@ -273,9 +273,9 @@
     },
     {
       "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__drivingidlefraction",
-      "row_count": 0,
-      "content_sha256": "86b7598d0fd0c5dca3fccf20b94f275e838bdfe98c21b6938719a25dc6d10abe",
-      "metadata_sha256": "ed91f3cd4a5840221fbb36d4a3fd2c43f4ef1e1bb5ea0bf0b6c69259a9c8c855"
+      "row_count": 2,
+      "content_sha256": "49100c336f3a5d6232b55b0fe87217d6610026d0921cd164f187a99860b2a3ff",
+      "metadata_sha256": "951b63985b05ffc2ff1c066e1275bdc0e997d87b7aa33cccb9f5ad640e1ae187"
     },
     {
       "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__e10fuelproperties",
@@ -2049,9 +2049,9 @@
     },
     {
       "name": "db__movesworker1ccc0232_campuscluster_illinois_edu__baserateoutput",
-      "row_count": 0,
-      "content_sha256": "4e302bdea5993aea6e7578281cf9dce340093053232456b09e53ddef1bb19b1e",
-      "metadata_sha256": "48ad3ceb8fb849cc178c7b06359379577513d01499c79d0e516684fc75b00ccd"
+      "row_count": 744,
+      "content_sha256": "5a80b99ee3952e2ccd3c06f6b6f7a7bd9afc494901c70db7edcddf19b6a3221b",
+      "metadata_sha256": "0cd955e84ff425c2bbcf9232fb8f38b61288d85f26f61fd8144de844566a3ef2"
     },
     {
       "name": "db__movesworker1ccc0232_campuscluster_illinois_edu__movesworkeractivityoutput",
@@ -2067,9 +2067,9 @@
     },
     {
       "name": "db__out_expand_criteria__baserateoutput",
-      "row_count": 0,
-      "content_sha256": "4e302bdea5993aea6e7578281cf9dce340093053232456b09e53ddef1bb19b1e",
-      "metadata_sha256": "bf7760e320aaeb2d755e0a6dc15efb2f28e0ebe6caeb01c45a11a625d7bb5dca"
+      "row_count": 744,
+      "content_sha256": "28f8bc952810371a04242cfef9de11930bc642afe1dbc2b0f697e5be40c89b9d",
+      "metadata_sha256": "d0d29c39fcb153a039cf3d96b09dd13c3abc2e639cad08ce3dbaed15b04bca65"
     },
     {
       "name": "db__out_expand_criteria__baserateunits",
@@ -2079,15 +2079,15 @@
     },
     {
       "name": "db__out_expand_criteria__finalaggafter",
-      "row_count": 0,
-      "content_sha256": "eeade7974f2fa07eef640ba5f7130b4b4a482149c018b22ca7609244585a921d",
-      "metadata_sha256": "fe76fca331d990970bf40dd7375eda5340a7822cf91bef8b67100db56b07f6ab"
+      "row_count": 744,
+      "content_sha256": "f4cdc0d6aa4555e072c9a1154c49c3e38773c988e6f6a19ba18303675628f4e1",
+      "metadata_sha256": "4e65dbbbce8952386bafc81603f1b899f65b36c79d3bc55418fcce63ab5064e3"
     },
     {
       "name": "db__out_expand_criteria__finalaggbefore",
-      "row_count": 0,
-      "content_sha256": "eeade7974f2fa07eef640ba5f7130b4b4a482149c018b22ca7609244585a921d",
-      "metadata_sha256": "d935f0e8d3451c3ca676f6f626167ae9acd10b0da796b5873e4f218e6607abf4"
+      "row_count": 744,
+      "content_sha256": "f4cdc0d6aa4555e072c9a1154c49c3e38773c988e6f6a19ba18303675628f4e1",
+      "metadata_sha256": "c4c824c5e15573fdca1ea817634f23892bbb789ec43bf0be8833bf4879886747"
     },
     {
       "name": "db__out_expand_criteria__movesactivityoutput",
@@ -2097,15 +2097,15 @@
     },
     {
       "name": "db__out_expand_criteria__movesoutput",
-      "row_count": 0,
-      "content_sha256": "eeade7974f2fa07eef640ba5f7130b4b4a482149c018b22ca7609244585a921d",
-      "metadata_sha256": "24ac5e17e91c6cd138e010a77bbf0d3705fcb1ac3744569231d8e52aeb824567"
+      "row_count": 744,
+      "content_sha256": "f4cdc0d6aa4555e072c9a1154c49c3e38773c988e6f6a19ba18303675628f4e1",
+      "metadata_sha256": "f92190e725cea4654a24b4c5244db3ef0c9657c93b8a76ba1d60b2eb66458725"
     },
     {
       "name": "db__out_expand_criteria__movestablesused",
       "row_count": 149,
-      "content_sha256": "be92e6d452ef0abd3350f6978c8155c0b46f30e648260f93108c82c2343081f0",
-      "metadata_sha256": "182114753797f16a7f20b699c5f4a936bd0e161da31f2019f0120912a7ba0eca"
+      "content_sha256": "d759d0efe54745e9f5a541d47248cc42f9f69dbb90ad463ae7e2e4acb2da8937",
+      "metadata_sha256": "3ddd45a54a4092fec1b38fc7e2f1077a2ad17f6983d8d482bf02dc2d442936a5"
     },
     {
       "name": "db__out_expand_criteria__rateperdistance",
@@ -2151,9 +2151,9 @@
     },
     {
       "name": "db__out_expand_criteria__temporaryoutputimport",
-      "row_count": 0,
-      "content_sha256": "eeade7974f2fa07eef640ba5f7130b4b4a482149c018b22ca7609244585a921d",
-      "metadata_sha256": "37fe77d5e2fd34a50bc6e2f6ccde0b5318486323b362bd3ea69030a04ff4384f"
+      "row_count": 744,
+      "content_sha256": "f4cdc0d6aa4555e072c9a1154c49c3e38773c988e6f6a19ba18303675628f4e1",
+      "metadata_sha256": "a8b4f06c6e98c3ae79ea689d23ccdc3e653dbaea94d7d58c44c1520d84938a02"
     },
     {
       "name": "db__out_expand_criteria__translate_activitytype",
@@ -2253,9 +2253,9 @@
     },
     {
       "name": "db__out_expand_criteria__unitconvertafter",
-      "row_count": 0,
-      "content_sha256": "eeade7974f2fa07eef640ba5f7130b4b4a482149c018b22ca7609244585a921d",
-      "metadata_sha256": "067bffdc7dd7b0ada67344be8be6fbd838766a73dc8f298e26c7b4ae15b3c204"
+      "row_count": 744,
+      "content_sha256": "f4cdc0d6aa4555e072c9a1154c49c3e38773c988e6f6a19ba18303675628f4e1",
+      "metadata_sha256": "c7d93f8ecfa086e2cc7680bde44ad7aa730bebda69b94dd258ed32adc8ae8169"
     },
     {
       "name": "moves_temporary__manyworkers__workerfolder__workertemp__activity_tbl",
@@ -2265,16 +2265,16 @@
     },
     {
       "name": "moves_temporary__manyworkers__workerfolder__workertemp__baserateoutput_tbl",
-      "row_count": 0,
-      "content_sha256": "9db4b506d041e133f04bcca42b7f8d3d4448d692b393eaa63cadfde73abda0d4",
-      "metadata_sha256": "334e5c22cbf51a886fc1bb898434bf6f31f92f265694127c4e2765967ed2793c"
+      "row_count": 744,
+      "content_sha256": "97cffa97994ee92b545fbfcdfc389c6fcfe3fe91dec54595aed4012ac66b3b29",
+      "metadata_sha256": "786579cfb0c6332fd68a520425cb0f02d40e8c33715711cf80ea4b5e52b4ea0a"
     },
     {
       "name": "moves_temporary__manyworkers__workerfolder__workertemp__output_tbl",
-      "row_count": 0,
-      "content_sha256": "9db4b506d041e133f04bcca42b7f8d3d4448d692b393eaa63cadfde73abda0d4",
-      "metadata_sha256": "8f06ec7337a9dc6d8925b666c06a3a0d6ff7d9cdea4862c40268f4a59a429d1c"
+      "row_count": 744,
+      "content_sha256": "baa10b82111879d014d4418a7cd214c588d6b4ff266a508fbe5deeb95683047a",
+      "metadata_sha256": "0d375c3c0c09be7daf5e48e1d544159f90632bcf0987bd6bb2ac9c86f73525f5"
     }
   ],
-  "aggregate_sha256": "ef408a92aecf581f8e461bbaa442fdb78fbf4275bf146cd2a767056b02c57aea"
+  "aggregate_sha256": "31bebf9e6f069cae881ebebae2cfeeb8bcb99cb4a4e5f7c3fd099ba954943fdb"
 }
