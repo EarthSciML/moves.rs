@@ -2,7 +2,7 @@
   "trace_version": "moves-fixture-capture/v1",
   "fixture_name": "process-tirewear",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "runspec_sha256": "77be1222b2a0e70ad52a135cb64a9d6b1c398a9db87401247c43808e763697c9",
+  "runspec_sha256": "d6877717972b9ffe6aa0a50b991309db719f53ed86b7e9519aba6cfdc0199783",
   "java_classes": [
     {
       "name": "gov.epa.otaq.moves.common.BundleManifest",
@@ -58,6 +58,10 @@
     },
     {
       "name": "gov.epa.otaq.moves.common.FileUtilities",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.FileUtilities$FileWithDate",
       "kind": "common"
     },
     {
@@ -206,6 +210,78 @@
     },
     {
       "name": "gov.epa.otaq.moves.common.WildCardFileNameFilter",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Common$AddNode",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Common$ComparisonNode",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Common$DivideNode",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Common$ExpNode",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Common$IfNode",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Common$LiteralNode",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Common$MultiplyNode",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Common$NamedExpressionNode",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Common$PowNode",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Common$SubtractNode",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Common$VariableNode",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.ExpressionParser",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.IExpressionNode",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.IVariableSource",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Optimizer$IOptimizerVariableSource",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Tokenizer",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Tokenizer$Token",
+      "kind": "common"
+    },
+    {
+      "name": "gov.epa.otaq.moves.common.expression.Value",
       "kind": "common"
     },
     {
@@ -533,6 +609,26 @@
       "kind": "master"
     },
     {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator$ExpressionHolder",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator$FuelUsageEntry",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator$ModelYearRange",
+      "kind": "master"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.implementation.ghg.FuelEffectsGenerator$Parameter",
+      "kind": "master"
+    },
+    {
       "name": "gov.epa.otaq.moves.master.implementation.ghg.PM10BrakeTireCalculator",
       "kind": "master"
     },
@@ -642,6 +738,6 @@
   "worker_bundles": [],
   "sources": {
     "worker_sql_files": 0,
-    "class_load_log_files": 4
+    "class_load_log_files": 8
   }
 }

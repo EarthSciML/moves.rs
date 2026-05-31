@@ -4,8 +4,8 @@
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
   "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
   "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/process-brakewear.xml",
-  "runspec_sha256": "1e7a89f9113b3f7ba421819c016297ee1dd5c05c803393a60a9dc8fd11a4935e",
-  "snapshot_aggregate_sha256": "5239cc172564f2820ca5fe47f50021c9ba171438b89788ab58e2f21e9ce08c2c",
+  "runspec_sha256": "6232e5eb3ce040d1f9abba1f76cc53a289540312ce5e205eb60ea9f99b8ecea9",
+  "snapshot_aggregate_sha256": "ab0f35f73265fe0b4dcbda351c7092b9fb3965fb5964da7d207a6b604ef21e73",
   "output_database": "out_process_brakewear",
   "scale_input_database": null
 }

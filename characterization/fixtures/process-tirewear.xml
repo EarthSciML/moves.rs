@@ -1,5 +1,5 @@
 <runspec version="MOVES5.0.1">
-	<description><![CDATA[Tirewear PM10 + PM2.5 — exercises PM10BrakeTireCalculator chain.]]></description>
+	<description><![CDATA[Tirewear PM10 + PM2.5 — exercises PM10BrakeTireCalculator chain. Includes a Total Energy / Running Exhaust carrier pollutant: tirewear (proc 10) alone makes the Go BaseRateGenerator panic on the missing sourceUseTypePhysicsMapping table, which MOVES only builds when a running-exhaust process is selected.]]></description>
 	<models>
 		<model value="ONROAD"/>
 	</models>
@@ -28,6 +28,7 @@
 	<pollutantprocessassociations>
 		<pollutantprocessassociation pollutantkey="107" pollutantname="Primary PM10 - Tirewear Particulate" processkey="10" processname="Tirewear"/>
 		<pollutantprocessassociation pollutantkey="117" pollutantname="Primary PM2.5 - Tirewear Particulate" processkey="10" processname="Tirewear"/>
+		<pollutantprocessassociation pollutantkey="91" pollutantname="Total Energy Consumption" processkey="1" processname="Running Exhaust"/>
 	</pollutantprocessassociations>
 	<databaseselections>
 	</databaseselections>

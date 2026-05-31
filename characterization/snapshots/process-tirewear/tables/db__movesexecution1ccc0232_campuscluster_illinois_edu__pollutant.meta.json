@@ -42,7 +42,7 @@
   "natural_key": [
     "pollutantID"
   ],
-  "row_count": 2,
+  "row_count": 3,
   "float_decimals": 12,
-  "content_sha256": "85dba793429f1b509489b53952cdb4c138049bf9a955c2280b197c9b9ad93d27"
+  "content_sha256": "609550a405be9b305715f5e76493e41b8d20d50454fe2705f66901edef51aab4"
 }

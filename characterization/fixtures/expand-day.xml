@@ -1,5 +1,5 @@
 <runspec version="MOVES5.0.1">
-	<description><![CDATA[Sample expanded to a full day (hours 1-24, weekday + weekend).]]></description>
+	<description><![CDATA[Sample expanded over the day dimension: weekday + weekend (dayID 5 + 2), single representative hour. Uses one hour (like the sibling expand-* fixtures) because the energy pollutants selected here return zero output over the full 1-24 hour range — hours 19-24 zero the bundle (a MOVES bundling quirk); the weekday/weekend expansion is what this fixture exercises.]]></description>
 	<models>
 		<model value="ONROAD"/>
 	</models>
@@ -13,8 +13,8 @@
 		<month key="7"/>
 		<day key="2"/>
 		<day key="5"/>
-		<beginhour key="1"/>
-		<endhour key="24"/>
+		<beginhour key="6"/>
+		<endhour key="6"/>
 		<aggregateBy key="Hour"/>
 	</timespan>
 	<onroadvehicleselections>
