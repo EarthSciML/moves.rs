@@ -109,6 +109,13 @@ const NONROAD_INPUT_TABLES: &[&str] = &[
     "nrequipmenttype",
     "nragecategory",
     "nrmodelyear",
+    // Evaporative path — admitted now so the store caches the data;
+    // actual computation wiring is deferred until compute_evap_iteration
+    // is implemented (executor.rs: CountyAdapter::compute_evap_iteration).
+    "nrevapemissionrate",
+    // Retrofit data — 0 rows in most fixtures; admitted for completeness
+    // so the RetrofitRecord builder can read it when rows are present.
+    "nrretrofitfactors",
 ];
 
 /// Adapter that routes onroad master-loop notifications for nonroad

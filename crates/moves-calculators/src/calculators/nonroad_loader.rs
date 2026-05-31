@@ -1239,10 +1239,20 @@ fn build_fuel_oxygenate<S: DataFrameStore + ?Sized>(store: &S) -> (f32, bool) {
 }
 
 /// Assemble the full [`ReferenceData`] the [`ProductionExecutor`] needs
-/// from the `nr*` tables. Growth, scrappage, and evap are left at their
-/// neutral defaults for this first end-to-end pass (no growth, default
-/// scrappage); the exhaust rate + activity + tech-fraction path is fully
-/// populated.
+/// from the `nr*` tables.
+///
+/// # Coverage (Task 142 audit)
+///
+/// | Path | Status |
+/// |---|---|
+/// | Exhaust rate + activity + tech-fraction | Fully wired; produces 908 rows for `nr-commercial-nation` |
+/// | Growth (cross-reference + index records) | Wired from `nrgrowthpatternfinder`/`nrgrowthindex` |
+/// | Scrappage curve | Wired from `nrscrappagecurve` |
+/// | Fuel-oxygen/RFG oxygenate correction | Wired from `nrfuelsupply`/`fuelformulation` |
+/// | Ambient temperature correction | Wired from `zonemonthhour` + `nrhourallocation` |
+/// | Retrofit records | Not yet loaded from `nrretrofitfactors` (0 rows in current fixtures) |
+/// | Evap tech entries | Zero-fraction stubs — evap loop is gated by `evtchfrc <= 0` in `process.rs`, so `compute_evap_iteration` (which has `todo!()`) is never called. Real evap entries require `nrevapemissionrate` + a working `compute_evap_iteration`. |
+/// | Evap emission rates | `nrevapemissionrate` now admitted to store (NONROAD_INPUT_TABLES) but not yet wired into `evap_tech_entries` |
 pub fn load_nonroad_reference<S: DataFrameStore + ?Sized>(
     store: &S,
     analysis_year: i32,
@@ -1251,11 +1261,14 @@ pub fn load_nonroad_reference<S: DataFrameStore + ?Sized>(
     fill_tech_fractions(&mut exhaust_tech_entries, store, analysis_year);
     let activity_entries = build_activity_entries(store);
 
-    // The county routine requires an *evap* tech lookup to succeed before
-    // it computes exhaust (it skips the record otherwise). We don't yet
-    // compute evaporative emissions, so mirror each exhaust (SCC, HP bin)
-    // with a zero-fraction evap entry: the lookup succeeds and the per-tech
-    // loop contributes nothing.
+    // The county routine (process.rs) requires an *evap* tech lookup to
+    // succeed before it computes exhaust — if find_evap_tech returns None
+    // the whole record is skipped (not just evap). Mirror each exhaust
+    // (SCC, HP bin) with a zero-fraction evap entry so the lookup always
+    // succeeds while contributing nothing to the evap loop (the loop gate
+    // `evtchfrc <= 0.0 → continue` skips all iterations). Real evap
+    // entries require implementing compute_evap_iteration (executor.rs)
+    // and loading evap emission factors from `nrevapemissionrate`.
     let evap_tech_entries = exhaust_tech_entries
         .iter()
         .map(|e| EvapTechEntry {
