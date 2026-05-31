@@ -1,11 +1,11 @@
 {
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "process-crankcase-extidle",
-  "sif_sha256": "f8d7ae76464c5e273dcc675bb91b3062fa1f41c87907e9403fe8c1cbe5482a59",
-  "sif_path": "/scratch.local/ctessum/earthcity/rigs/moves.rs/worktrees/mo-wwc.6/characterization/fixture-image.lock",
-  "runspec_path": "/scratch.local/ctessum/earthcity/rigs/moves.rs/worktrees/mo-wwc.6/characterization/fixtures/process-crankcase-extidle.xml",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/process-crankcase-extidle.xml",
   "runspec_sha256": "0b2e528afb13af0c59c24db08b6e1d48672cf0436b1b58c7c6232b94ea726656",
-  "snapshot_aggregate_sha256": "2d9bacad1fe12a850773a0cd6e3fc3552864402273dcd8b1dd71c974b9606e7e",
+  "snapshot_aggregate_sha256": "89635f10ae1584d01a9627c433c712bd62c707eef9ed45e4b985b2045cd1f8ad",
   "output_database": "out_process_crankcase_extidle",
   "scale_input_database": null
 }

@@ -1,11 +1,11 @@
 {
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "nr-logging-county",
-  "sif_sha256": "597f1f3e0aef5d23027589ee509207d13486d5c89056906bf323a889f0e02311",
-  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.slit/characterization/fixture-image.lock",
-  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.slit/characterization/fixtures/nr-logging-county.xml",
-  "runspec_sha256": "5c8f57a91bd6c170b2548959e4669938b727593d5448690bcde70cc25e7fc894",
-  "snapshot_aggregate_sha256": "bfca1085eb0b93b83218eb5513e62c4e732c4d263514541ac2ece3b1a71e20fc",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/nr-logging-county.xml",
+  "runspec_sha256": "f13ba8748e6a0f912562df25d024d18608d1d7c7417d1bc64ae6182f006c0065",
+  "snapshot_aggregate_sha256": "9269d64ae4344e7c582d0c4f7d4c91bb5961a0307ed140e573464b478fb9fa37",
   "output_database": "out_nr_logging_county",
   "scale_input_database": null
 }

@@ -1,11 +1,11 @@
 {
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "nr-lawn-garden-county",
-  "sif_sha256": "597f1f3e0aef5d23027589ee509207d13486d5c89056906bf323a889f0e02311",
-  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.slit/characterization/fixture-image.lock",
-  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.slit/characterization/fixtures/nr-lawn-garden-county.xml",
-  "runspec_sha256": "13b2b63078cf00aba1b3802ab122a760b2d778cb3ab8ff4b05426c5a9afd6d4b",
-  "snapshot_aggregate_sha256": "01b915152ce40bffe1235a7d6a9a938a9e63fee1d5bc4a8ca117ffbd76be32cb",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/nr-lawn-garden-county.xml",
+  "runspec_sha256": "14c8e87babf9a4912a256f46f96bca0335a973deab9d9c5ae719a47efefd7167",
+  "snapshot_aggregate_sha256": "e96272c6ac2006dd3b0b9ac8523be8b542e3a68c4262af18bb8e82ed54b5e665",
   "output_database": "out_nr_lawn_garden_county",
   "scale_input_database": null
 }

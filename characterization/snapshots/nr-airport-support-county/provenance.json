@@ -1,11 +1,11 @@
 {
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "nr-airport-support-county",
-  "sif_sha256": "597f1f3e0aef5d23027589ee509207d13486d5c89056906bf323a889f0e02311",
-  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.slit/characterization/fixture-image.lock",
-  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.slit/characterization/fixtures/nr-airport-support-county.xml",
-  "runspec_sha256": "979c0c8ee0027a3e2cab97c79efa4fa4fa56ffd830efe10e5752fca9e763b03e",
-  "snapshot_aggregate_sha256": "d9796c554efa62edd27261054cd0c29d0cc4862fefb2cff4fbc2bde167e9e6e6",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/nr-airport-support-county.xml",
+  "runspec_sha256": "b5f1a3305ab0b1297eeb8aa6618287db2a03847fa824105736a35c863648bfd6",
+  "snapshot_aggregate_sha256": "dc03beaa960075cbcd83d6518811778c30e741c11d3289b2b353f391397a829b",
   "output_database": "out_nr_airport_support_county",
   "scale_input_database": null
 }

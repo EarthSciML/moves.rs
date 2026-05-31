@@ -1,0 +1,98 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "moves_temporary__manyworkers__workerfolder__workertemp3__output_tbl",
+  "schema": [
+    {
+      "name": "col_0",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_1",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_2",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_3",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_4",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_5",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_6",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_7",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_8",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_9",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_10",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_11",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_12",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_13",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_14",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_15",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_16",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_17",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_18",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_19",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_20",
+      "kind": "utf8"
+    },
+    {
+      "name": "col_21",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 128,
+  "float_decimals": 12,
+  "content_sha256": "9862e75be7d467fdc2d009f1be678e756f8a7e64bc0a71b1564632d75d65ef01"
+}

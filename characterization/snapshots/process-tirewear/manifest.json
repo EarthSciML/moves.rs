@@ -1948,8 +1948,8 @@
     {
       "name": "db__out_process_tirewear__movestablesused",
       "row_count": 136,
-      "content_sha256": "273826bf1ee81e7b2faddd7556cd072c83c184e9817742b89ab5c93c78c9deb9",
-      "metadata_sha256": "e371c45c3babf0c3de744d8c45623183f1a7a9a3d456808eb0cb3fb6a7a39ddb"
+      "content_sha256": "eec2967949d4da021ccdf0eedeb6f4249adb341b1b84150bd1d56b840d6b4a93",
+      "metadata_sha256": "08eee333abe10e34881b91f04cf572062655f1be44f0b66e7af1be334adf098d"
     },
     {
       "name": "db__out_process_tirewear__rateperdistance",
@@ -2100,7 +2100,25 @@
       "row_count": 0,
       "content_sha256": "eeade7974f2fa07eef640ba5f7130b4b4a482149c018b22ca7609244585a921d",
       "metadata_sha256": "e1b3eebff3fe974a2c74839ec826c67500b32f63a66966d2582f86271c11a921"
+    },
+    {
+      "name": "moves_temporary__manyworkers__workerfolder__workertemp__activity_tbl",
+      "row_count": 0,
+      "content_sha256": "9db4b506d041e133f04bcca42b7f8d3d4448d692b393eaa63cadfde73abda0d4",
+      "metadata_sha256": "138b6a9003a98406047dfd79eb5c05521015426999245c83705f1769596e6f7b"
+    },
+    {
+      "name": "moves_temporary__manyworkers__workerfolder__workertemp__baserateoutput_tbl",
+      "row_count": 0,
+      "content_sha256": "9db4b506d041e133f04bcca42b7f8d3d4448d692b393eaa63cadfde73abda0d4",
+      "metadata_sha256": "334e5c22cbf51a886fc1bb898434bf6f31f92f265694127c4e2765967ed2793c"
+    },
+    {
+      "name": "moves_temporary__manyworkers__workerfolder__workertemp__output_tbl",
+      "row_count": 0,
+      "content_sha256": "9db4b506d041e133f04bcca42b7f8d3d4448d692b393eaa63cadfde73abda0d4",
+      "metadata_sha256": "8f06ec7337a9dc6d8925b666c06a3a0d6ff7d9cdea4862c40268f4a59a429d1c"
     }
   ],
-  "aggregate_sha256": "7c2413a72918566b44a679243b85fcadd70af8ac43c54940e472b37e74abc9b2"
+  "aggregate_sha256": "b48daba80269387b3432bf09fa2bbe4ddfc6c4b998378a5525ede92d7dc59cf6"
 }

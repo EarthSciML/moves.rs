@@ -1,7 +1,7 @@
 {
   "trace_version": "moves-fixture-capture/v1",
   "fixture_name": "nr-agriculture-state",
-  "sif_sha256": "597f1f3e0aef5d23027589ee509207d13486d5c89056906bf323a889f0e02311",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
   "runspec_sha256": "49a7d56e1700bc8f801b98292222f3faaf41d22be81e84304c3676bf019f104c",
   "java_classes": [
     {
@@ -605,6 +605,14 @@
       "kind": "framework"
     },
     {
+      "name": "gov.epa.otaq.moves.worker.framework.NonroadOutputDataLoader$BmvRecord",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.worker.framework.NonroadOutputDataLoader$BmyRecord",
+      "kind": "framework"
+    },
+    {
       "name": "gov.epa.otaq.moves.worker.framework.RemoteEmissionsCalculator",
       "kind": "framework"
     },
@@ -630,6 +638,6 @@
   "worker_bundles": [],
   "sources": {
     "worker_sql_files": 0,
-    "class_load_log_files": 2
+    "class_load_log_files": 8
   }
 }

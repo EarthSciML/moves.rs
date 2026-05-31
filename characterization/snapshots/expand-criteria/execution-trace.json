@@ -1,7 +1,7 @@
 {
   "trace_version": "moves-fixture-capture/v1",
   "fixture_name": "expand-criteria",
-  "sif_sha256": "597f1f3e0aef5d23027589ee509207d13486d5c89056906bf323a889f0e02311",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
   "runspec_sha256": "b0f8a3898ab2779a198f0ddb1e808dc530e4ebbef23a56d30e32c778b0a0518c",
   "java_classes": [
     {
@@ -733,6 +733,10 @@
       "kind": "utils"
     },
     {
+      "name": "gov.epa.otaq.moves.utils.StreamGobbler",
+      "kind": "utils"
+    },
+    {
       "name": "gov.epa.otaq.moves.worker.framework.ExternalCalculator",
       "kind": "framework"
     },
@@ -762,6 +766,6 @@
   "worker_bundles": [],
   "sources": {
     "worker_sql_files": 0,
-    "class_load_log_files": 2
+    "class_load_log_files": 4
   }
 }

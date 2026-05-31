@@ -1,11 +1,11 @@
 {
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "nr-railroad-support-nation",
-  "sif_sha256": "597f1f3e0aef5d23027589ee509207d13486d5c89056906bf323a889f0e02311",
-  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/mo-wwc.3/characterization/fixture-image.lock",
-  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/mo-wwc.3/characterization/fixtures/nr-railroad-support-nation.xml",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/nr-railroad-support-nation.xml",
   "runspec_sha256": "7592d266cba9a6ef2bdce28b06dd386f74d22f044e36bbce377dc9d3a3c9637f",
-  "snapshot_aggregate_sha256": "b55ca39d785bd7fd1e95e424719e47271ac89453024456e19c05e15264e98868",
+  "snapshot_aggregate_sha256": "fba445f53036945537986366cc98f69ca2d85a4b6e2afe42ca62612d3a37ea5e",
   "output_database": "out_nr_railroad_support_nation",
   "scale_input_database": null
 }

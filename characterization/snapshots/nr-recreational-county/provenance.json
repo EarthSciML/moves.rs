@@ -1,11 +1,11 @@
 {
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "nr-recreational-county",
-  "sif_sha256": "597f1f3e0aef5d23027589ee509207d13486d5c89056906bf323a889f0e02311",
-  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.slit/characterization/fixture-image.lock",
-  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.slit/characterization/fixtures/nr-recreational-county.xml",
-  "runspec_sha256": "a79f8f0d67a4964b24d6dce351c326d66dcf46a4809f741da2df102bf48a6b31",
-  "snapshot_aggregate_sha256": "6f5c9384920037b7bed1710753b291c2ba5cbf7fee07864aacca67ef09f6e648",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/nr-recreational-county.xml",
+  "runspec_sha256": "b0482a33685c3db53f59e9327ce1e611f345625459d91a5d9d000d3ba86f352c",
+  "snapshot_aggregate_sha256": "1fc61dbe57d120566ee20070aacbfbab60532eafbd131d32eda263f776bb20e6",
   "output_database": "out_nr_recreational_county",
   "scale_input_database": null
 }

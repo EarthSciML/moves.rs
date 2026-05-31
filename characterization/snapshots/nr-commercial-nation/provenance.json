@@ -1,11 +1,11 @@
 {
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "nr-commercial-nation",
-  "sif_sha256": "597f1f3e0aef5d23027589ee509207d13486d5c89056906bf323a889f0e02311",
-  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/mo-wwc.3/characterization/fixture-image.lock",
-  "runspec_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/mo-wwc.3/characterization/fixtures/nr-commercial-nation.xml",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/nr-commercial-nation.xml",
   "runspec_sha256": "88b7e6edd15f28a985c41b57b3bf429dc0b9b43b7c4b897e2cd611b578634866",
-  "snapshot_aggregate_sha256": "9c65c4b5bd19d8f6540e13d03a6772c2e7642ca49e634af3d2f3ad9a557646f3",
+  "snapshot_aggregate_sha256": "c2055cea75ca2f2d153f9cd50eacaccdb99a9088d038b3e09d46f1ec5728671d",
   "output_database": "out_nr_commercial_nation",
   "scale_input_database": null
 }
