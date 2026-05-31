@@ -57,6 +57,11 @@ RunSpec format reference, and output schema.
 
 The port compiles to WebAssembly and runs in modern browsers with no server-side computation.
 
+**Hosted demo:** [https://earthsciml.github.io/moves.rs/demo/](https://earthsciml.github.io/moves.rs/demo/)
+(published to GitHub Pages automatically on each push to `main` that passes CI, alongside the API docs)
+
+To run the demo locally instead:
+
 ```bash
 # Build the WASM package
 wasm-pack build --target web crates/moves-wasm

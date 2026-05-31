@@ -445,9 +445,19 @@ for:
 `moves.rs` compiles to WebAssembly and runs entirely in the browser — no
 server-side computation required.
 
-### Try the demo
+### Hosted demo
 
-Build and serve the included browser demo:
+**Live URL:** [https://earthsciml.github.io/moves.rs/demo/](https://earthsciml.github.io/moves.rs/demo/)
+
+The demo is rebuilt and published to GitHub Pages automatically on every push to
+`main` that passes CI — as part of the CI Pages deploy, alongside the API docs.  It supports:
+
+* Uploading a **RunSpec XML** file and running the onroad simulation — outputs
+  are returned as downloadable Parquet files.
+* Uploading a **NONROAD `.POP`** population file and running the NONROAD
+  simulation — outputs show run counters.
+
+### Run the demo locally
 
 ```bash
 # Build the WASM package (requires wasm-pack: cargo install wasm-pack)
@@ -458,13 +468,6 @@ python3 -m http.server 8080 --directory crates/moves-wasm
 
 # Open http://localhost:8080/demo/ in your browser
 ```
-
-The demo lets you:
-
-* Upload a **RunSpec XML** file and run the onroad simulation — outputs land
-  as downloadable Parquet files.
-* Upload a **NONROAD `.POP`** population file and run the NONROAD simulation —
-  outputs show run counters.
 
 See [`crates/moves-wasm/demo/README.md`](../crates/moves-wasm/demo/README.md)
 for step-by-step instructions.
