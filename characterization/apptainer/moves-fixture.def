@@ -108,6 +108,12 @@ From: canonical-moves.sif
     test -f /opt/moves/gov/epa/otaq/moves/master/framework/OutputProcessor.class
     test -f /opt/moves/gov/epa/otaq/moves/worker/framework/RemoteEmissionsCalculator.class
 
+    # Onroad external Go calculators inherited from the canonical SIF must
+    # survive the `ant compileall` recompile (clean only deletes *.class).
+    # If they're gone, onroad fixtures capture 0 emission rows.
+    test -f /opt/moves/calc/externalcalculatorgo64.exe
+    test -f /opt/moves/generators/externalgenerator64.exe
+
 %labels
     Maintainer earthcity moves.rs
     org.opencontainers.image.title moves-fixture

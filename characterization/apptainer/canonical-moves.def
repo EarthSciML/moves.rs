@@ -102,6 +102,32 @@ From: ubuntu:24.04
     sha256sum /opt/moves/NONROAD/NR08a/NONROAD.exe | awk '{print $1}' \
         > /opt/moves/.nonroad-binary-sha256
 
+    # ----- Onroad external Go calculators -----
+    # MOVES' onroad pipeline does NOT compute emissions in Java: at runtime
+    # BaseRateGenerator execs generators/externalgenerator64.exe and the
+    # worker's RemoteEmissionsCalculator execs calc/externalcalculatorgo64.exe.
+    # If those compiled binaries are absent, both steps fail with
+    # "External generator does not exist" / "Cannot run program ...exe" and
+    # every onroad run extracts 0 rows -> empty MOVESOutput. (Only the evap
+    # processes, which run purely in Java/SQL, and the Fortran NONROAD model
+    # produce output without them.) MOVES' build.xml has a `go64` target for
+    # this, but the `compile`/`compileall` targets we run do NOT invoke it,
+    # so build the two 64-bit Linux binaries explicitly with the same flags
+    # build.xml uses. Go is installed under /usr/local/go (Go install step
+    # above) but is not on %post's PATH, so put it on PATH here. `ant clean`
+    # only deletes **/*.class, so these .exe files survive the fixture SIF's
+    # `ant compileall` recompile.
+    export PATH="/usr/local/go/bin:${PATH}"
+    export GOPATH=/tmp/go
+    ( cd /opt/moves/calc \
+        && GOARCH=amd64 GOMAXPROCS=4 go build \
+            -o externalcalculatorgo64.exe externalcalculatorgo.go )
+    ( cd /opt/moves/generators \
+        && GOARCH=amd64 GOMAXPROCS=4 go build -mod vendor \
+            -o externalgenerator64.exe externalgenerator.go )
+    test -f /opt/moves/calc/externalcalculatorgo64.exe
+    test -f /opt/moves/generators/externalgenerator64.exe
+
     # ----- Initialize MariaDB and load the default DB -----
     install -d -o mysql -g mysql -m 0750 /var/lib/mysql
     install -d -o mysql -g mysql -m 0755 /var/run/mysqld
@@ -275,6 +301,9 @@ SQL
     test -f /opt/moves/.canonical-commit
     test -f /opt/moves/NONROAD/NR08a/NONROAD.exe
     test -f /opt/moves/.nonroad-binary-sha256
+    # Onroad external Go calculators — without these every onroad run yields 0 rows.
+    test -f /opt/moves/calc/externalcalculatorgo64.exe
+    test -f /opt/moves/generators/externalgenerator64.exe
     test -d /var/lib/mysql-seed
     test -x /opt/moves-bin/init-mariadb.sh
     test -x /opt/moves-bin/start-mariadb-bg.sh
