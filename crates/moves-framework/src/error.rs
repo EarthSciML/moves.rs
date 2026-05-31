@@ -122,7 +122,7 @@ pub enum Error {
     ///
     /// Wraps the `moves_nonroad::Error` string for reporting through the
     /// `moves-framework` error surface. The `NonroadEmissionCalculator`
-    /// adapter uses this to propagate [`moves_nonroad::run_simulation`]
+    /// adapter uses this to propagate `moves_nonroad::run_simulation`
     /// failures (year out of range, geography-executor errors, etc.) to
     /// the master loop.
     #[error("nonroad simulation error: {0}")]

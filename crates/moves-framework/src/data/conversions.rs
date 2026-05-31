@@ -236,7 +236,7 @@ pub trait DataFrameStoreTyped: DataFrameStore {
         R::from_dataframe(&df)
     }
 
-    /// Like [`iter_typed`], but returns an empty `Vec` if the table is not
+    /// Like `iter_typed`, but returns an empty `Vec` if the table is not
     /// present in the store instead of an error. Use for tables that the
     /// MOVES execution DB may not create for all RunSpec configurations (e.g.
     /// `ExtendedIdleEmissionRateFraction` for process 90, which is absent from
@@ -254,7 +254,7 @@ pub trait DataFrameStoreTyped: DataFrameStore {
     /// Each returned [`polars::prelude::Series`] is an Arc-backed view of the
     /// underlying Arrow column — no row data is copied.  Use this as a
     /// building block for hot paths that need direct index-based access to
-    /// column data without the heap allocation that [`iter_typed`] incurs for
+    /// column data without the heap allocation that `iter_typed` incurs for
     /// `Vec<R>`.
     ///
     /// Columns are returned in the order requested.  Returns an error if the

@@ -348,7 +348,7 @@ pub struct ReferenceData {
     pub fuel_rfg: bool,
     /// Ambient temperature (°F) for the exhaust temperature corrections
     /// (`emsadj.f` :167–220). `0.0` ⇒ neutral (treated as 75 °F). Used as
-    /// the fallback when an SCC has no entry in [`ambient_temp_by_scc`].
+    /// the fallback when an SCC has no entry in `ambient_temp_by_scc`.
     pub ambient_temp_f: f32,
     /// Per-SCC ambient temperature (°F) for the exhaust temperature
     /// corrections, activity-weighted by the equipment's hour-allocation
@@ -356,7 +356,7 @@ pub struct ReferenceData {
     /// correction is non-linear (`exp`), so the activity-weighted mean (which
     /// favours warm daytime hours for daylight-use equipment) is what the
     /// canonical reproduces — a flat 24-hour mean biases NOx high and CO/THC
-    /// low. Empty ⇒ fall back to the scalar [`ambient_temp_f`].
+    /// low. Empty ⇒ fall back to the scalar `ambient_temp_f`.
     pub ambient_temp_by_scc: std::collections::BTreeMap<String, f32>,
 }
 

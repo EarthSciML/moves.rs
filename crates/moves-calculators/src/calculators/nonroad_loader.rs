@@ -461,7 +461,7 @@ fn build_entries_from_mix<S: DataFrameStore + ?Sized>(store: &S) -> Vec<ExhaustT
 
 /// Build the per-`(SCC, HP-bin)` exhaust-tech entries — emission factors,
 /// units, deterioration, and BSFC. Prefers the canonical
-/// `nrengtechfraction`-driven builder ([`build_entries_from_mix`]); falls
+/// `nrengtechfraction`-driven builder (`build_entries_from_mix`); falls
 /// back to the legacy rate-driven path when the tech-mix / source-use-type
 /// tables are absent (e.g. unit tests with synthetic rate tables only).
 pub fn build_exhaust_tech_entries<S: DataFrameStore + ?Sized>(store: &S) -> Vec<ExhaustTechEntry> {
@@ -819,7 +819,7 @@ fn load_source_units<S: DataFrameStore + ?Sized>(store: &S) -> Vec<SourceUnit> {
 }
 
 /// Build the [`NonroadInputs`] population bundle: one [`DriverRecord`] per
-/// source unit, grouped by SCC, all assigned to [`PSEUDO_COUNTY`]. The
+/// source unit, grouped by SCC, all assigned to `PSEUDO_COUNTY`. The
 /// population is the base-year (`NRBaseYearID`) snapshot; the engine's
 /// `age_distribution` projects it forward to the analysis (growth) year.
 pub fn build_nonroad_inputs<S: DataFrameStore + ?Sized>(

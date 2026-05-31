@@ -129,7 +129,7 @@ pub trait InternalControlStrategy: Send + Sync + std::fmt::Debug {
     /// calculators see the user-specified fractions instead of the defaults.
     ///
     /// `tables` is the mutable slow-tier execution database. Write to it via
-    /// [`InMemoryStore::insert`] or the [`crate::DataFrameStoreTyped`] helpers.
+    /// `InMemoryStore::insert` or the [`crate::DataFrameStoreTyped`] helpers.
     ///
     /// Default: no-op.
     fn pre_run(&self, _tables: &mut InMemoryStore) -> Result<(), Error> {

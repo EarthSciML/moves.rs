@@ -92,7 +92,7 @@ pub struct DispatchContext<'a> {
     /// The 10-character SCC of the dispatching record's group.
     pub scc: &'a str,
     /// Fuel resolved from the SCC by
-    /// [`fuel_for_scc`](crate::driver::fuel_for_scc). `None` is the
+    /// [`fuel_for_scc`]. `None` is the
     /// Fortran `ifuel = 0` "no prefix matched" default.
     pub fuel: Option<FuelKind>,
     /// The population record being dispatched.

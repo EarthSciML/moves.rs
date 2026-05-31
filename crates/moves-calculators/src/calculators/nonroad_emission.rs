@@ -190,7 +190,7 @@ impl Calculator for NonroadEmissionCalculator {
     /// Run the NONROAD simulation for the current master-loop iteration.
     ///
     /// Extracts the episode year from `ctx.position().time.year`, falls
-    /// back to [`DEFAULT_YEAR`] when the position carries none (should
+    /// back to `DEFAULT_YEAR` when the position carries none (should
     /// not happen at `DAY` granularity, but defensively handled).
     /// Calls [`moves_nonroad::run_simulation`] with empty inputs and
     /// default reference data, returning [`CalculatorOutput::empty()`]

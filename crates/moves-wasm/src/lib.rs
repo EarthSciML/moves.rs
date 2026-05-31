@@ -392,6 +392,11 @@ fn nonroad_inputs_from_pop(
             hp_avg,
             population,
             pop_year: year,
+            // The .POP demo input carries no source-use-type table, so there is
+            // no medianLifeFullLoad to supply. 0.0 is the documented sentinel:
+            // the geography routines fall back to a neutral lifespan when
+            // median_life is non-positive (see DriverRecord::median_life).
+            median_life: 0.0,
         };
         if let Some(&idx) = scc_to_idx.get(&scc) {
             groups[idx].1.push(driver_rec);

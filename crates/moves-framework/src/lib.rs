@@ -80,9 +80,9 @@
 //!   back [`ExecutionTables`] and [`ScratchNamespace`]; both tiers are wired
 //!   through [`CalculatorContext`]. [`InternalControlStrategy::pre_run`]
 //!   receives `&mut InMemoryStore` so strategies can write to the slow tier
-//!   before the master loop begins. [`DistanceCalculator::execute`] is the
+//!   before the master loop begins. `DistanceCalculator::execute` is the
 //!   pilot that reads all seven input tables and emits a distance activity
-//!   `DataFrame` end-to-end. [`AvftControlStrategy::pre_run`] writes the
+//!   `DataFrame` end-to-end. `AvftControlStrategy::pre_run` writes the
 //!   completed AVFT fleet-composition table into the slow tier.
 //! * Task 89 — [`OutputProcessor`], the strongly-typed Parquet writer for
 //!   the three output tables defined by [`moves_data::output_schema`].
