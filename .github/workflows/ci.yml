@@ -177,6 +177,27 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: cp static/docs-index.html target/doc/index.html
 
+      # Build the WASM browser demo and fold it into the Pages artifact under
+      # /demo/, so the single GitHub Pages deploy serves both the cargo docs
+      # (at the root) and the hosted WASM demo (at /demo/).
+      - name: Install wasm32 target + wasm-pack
+        if: github.ref == 'refs/heads/main'
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo install wasm-pack --locked
+
+      - name: Build WASM demo into docs/demo
+        if: github.ref == 'refs/heads/main'
+        run: |
+          wasm-pack build --target web crates/moves-wasm
+          mkdir -p target/doc/demo/pkg
+          cp crates/moves-wasm/demo/index.html target/doc/demo/
+          cp crates/moves-wasm/demo/worker.js  target/doc/demo/
+          cp crates/moves-wasm/demo/README.md  target/doc/demo/
+          cp crates/moves-wasm/pkg/moves_wasm.js      target/doc/demo/pkg/
+          cp crates/moves-wasm/pkg/moves_wasm_bg.wasm target/doc/demo/pkg/
+          cp crates/moves-wasm/pkg/moves_wasm_bg.js   target/doc/demo/pkg/
+
       - name: Upload docs artifact
         if: github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3

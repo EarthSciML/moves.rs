@@ -449,8 +449,8 @@ server-side computation required.
 
 **Live URL:** [https://earthsciml.github.io/moves.rs/demo/](https://earthsciml.github.io/moves.rs/demo/)
 
-The demo is rebuilt and published automatically on every push to `main` that
-passes CI (via `.github/workflows/deploy-wasm-demo.yml`).  It supports:
+The demo is rebuilt and published to GitHub Pages automatically on every push to
+`main` that passes CI — as part of the CI Pages deploy, alongside the API docs.  It supports:
 
 * Uploading a **RunSpec XML** file and running the onroad simulation — outputs
   are returned as downloadable Parquet files.
