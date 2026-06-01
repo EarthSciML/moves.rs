@@ -1,4 +1,4 @@
-//! Shared types and helpers for the //! routines.
+//! Shared types and helpers for the county and subcounty processing routines.
 //!
 //! Both [`process_county`] (`prccty.f`) and [`process_subcounty`]
 //! (`prcsub.f`) consume the same record shape, the same run options,
@@ -6,11 +6,10 @@
 //! output. The pieces live here so [`county`] and [`subcounty`] only
 //! carry the routine-specific orchestration.
 //!
-//! : super
-//! [`process_county`]: super::process_county
-//! [`process_subcounty`]: super::process_subcounty
-//! [`county`]: super::county
-//! [`subcounty`]: super::subcounty
+//! [`process_county`]: crate::geography::process_county
+//! [`process_subcounty`]: crate::geography::process_subcounty
+//! [`county`]: crate::geography::county
+//! [`subcounty`]: crate::geography::subcounty
 
 use crate::common::consts::{DENCNG, DENDSL, DENGAS, DENLPG, MXDAYS, MXHPC};
 use crate::emissions::exhaust::{AdjustmentTable, EmissionUnitCode, FuelKind};

@@ -254,9 +254,9 @@ mod tests {
         let bytes = encode_parquet(&sample_table()).unwrap();
         let reader = SerializedFileReader::new(bytes::Bytes::from(bytes)).unwrap();
         let schema = reader.metadata().file_metadata().schema_descr();
- // `column(i)` hands back an owned `ColumnDescPtr`; hold the
- // descriptors in a `Vec` so the `&str` names borrowed from them
- // outlive the closure.
+        // `column(i)` hands back an owned `ColumnDescPtr`; hold the
+        // descriptors in a `Vec` so the `&str` names borrowed from them
+        // outlive the closure.
         let columns: Vec<_> = (0..schema.num_columns())
             .map(|i| schema.column(i))
             .collect();
@@ -270,7 +270,7 @@ mod tests {
         let path = dir.path().join("nested/dir/out.parquet");
         write_parquet(&sample_table(), &path).unwrap();
         assert!(path.exists());
- // The .tmp sibling must be gone after rename.
+        // The .tmp sibling must be gone after rename.
         let mut tmp = path.clone();
         tmp.set_extension("parquet.tmp");
         assert!(!tmp.exists(), "tmp file should have been renamed");

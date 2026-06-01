@@ -78,10 +78,15 @@ fn scale_inputs_dir() -> Option<PathBuf> {
 
 // ── fixture selection ─────────────────────────────────────────────────────────
 
-/// All default-scale onroad fixtures (exclude `nr-*`, `scale-*`, `mixed-*`).
+/// All default-scale onroad fixtures (exclude `nr-*`, `scale-*`, `mixed-*`, and
+/// the `error-*` negative-test RunSpecs, which belong to the RunSpec-parser
+/// error tests, not the benchmark).
 fn default_scale_fixtures() -> Vec<PathBuf> {
     collect_fixtures(|name| {
-        !name.starts_with("nr-") && !name.starts_with("scale-") && !name.starts_with("mixed-")
+        !name.starts_with("nr-")
+            && !name.starts_with("scale-")
+            && !name.starts_with("mixed-")
+            && !name.starts_with("error-")
     })
 }
 

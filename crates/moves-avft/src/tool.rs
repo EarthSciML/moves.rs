@@ -47,19 +47,19 @@ pub struct ToolInputs<'a> {
 /// `messages` table.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Message {
- /// User input did not sum to 1 for a (source type, model year)
- /// group — the gap-filling step is renormalizing.
+    /// User input did not sum to 1 for a (source type, model year)
+    /// group — the gap-filling step is renormalizing.
     Renormalizing {
         source_type_id: SourceTypeId,
         model_year_id: ModelYearId,
         observed_sum: f64,
     },
- /// A source type is absent from the user input file; defaults are
- /// being used for all of it.
+    /// A source type is absent from the user input file; defaults are
+    /// being used for all of it.
     SourceTypeAbsent { source_type_id: SourceTypeId },
- /// `KnownFractions` projection was selected, but the known-fractions
- /// table is missing entries for some projection years for this
- /// source type. The proportional projection covers them instead.
+    /// `KnownFractions` projection was selected, but the known-fractions
+    /// table is missing entries for some projection years for this
+    /// source type. The proportional projection covers them instead.
     KnownFractionsIncomplete {
         source_type_id: SourceTypeId,
         missing_years: Vec<ModelYearId>,
@@ -135,7 +135,7 @@ fn run_source_type(
 
     let gap_filled = gap_fill(method, source_type_id, last_my, input, default, report)?;
 
- // Sum check after gap fill — matches the SQL's HAVING ABS(SUM-1)>0.00001 guard.
+    // Sum check after gap fill — matches the SQL's HAVING ABS(SUM-1)>0.00001 guard.
     enforce_post_gap_fill_sum(source_type_id, &gap_filled, last_my)?;
 
     project(
@@ -214,7 +214,7 @@ fn gap_fill_automatic(
     default: &AvftTable,
     report: &mut ToolReport,
 ) -> Result<AvftTable> {
- // Step 1: build a renormalized-inputs view of just the user table.
+    // Step 1: build a renormalized-inputs view of just the user table.
     let mut user_renormed: BTreeMap<AvftKey, f64> = BTreeMap::new();
     let user_sums = group_sums_for_source_type(input, source_type_id);
     for r in input.rows_for_source_type(source_type_id) {
@@ -222,7 +222,7 @@ fn gap_fill_automatic(
             .get(&(r.source_type_id, r.model_year_id))
             .unwrap_or(&0.0);
         if s > 0.0 {
- // renormalize but flag warning if sum deviates from 1
+            // renormalize but flag warning if sum deviates from 1
             if (s - 1.0).abs() > SUM_TOLERANCE {
                 report.messages.push(Message::Renormalizing {
                     source_type_id: r.source_type_id,
@@ -234,8 +234,8 @@ fn gap_fill_automatic(
         }
     }
 
- // Step 2: zero-fill against defaultAVFT keys (model years 1950..=last_my)
- // — produce the same shape as the SQL's "GapFilling_With0s".
+    // Step 2: zero-fill against defaultAVFT keys (model years 1950..=last_my)
+    // — produce the same shape as the SQL's "GapFilling_With0s".
     let mut zero_filled_keys: BTreeSet<AvftKey> = BTreeSet::new();
     for r in default
         .rows_for_source_type(source_type_id)
@@ -243,19 +243,19 @@ fn gap_fill_automatic(
     {
         zero_filled_keys.insert(r.key());
     }
- // Combine: user-renormed rows take precedence; the rest are 0.
+    // Combine: user-renormed rows take precedence; the rest are 0.
     let mut zero_filled: BTreeMap<AvftKey, f64> = BTreeMap::new();
     for k in &zero_filled_keys {
         let v = user_renormed.get(k).copied().unwrap_or(0.0);
         zero_filled.insert(*k, v);
     }
 
- // Step 3: drop (sourceType, modelYear) groups whose total fraction is 0
- // — these are "missing model years" we'll let the defaults handle in the
- // subsequent renormalize-inputs pass.
+    // Step 3: drop (sourceType, modelYear) groups whose total fraction is 0
+    // — these are "missing model years" we'll let the defaults handle in the
+    // subsequent renormalize-inputs pass.
     let mut group_totals: BTreeMap<(SourceTypeId, ModelYearId), f64> = BTreeMap::new();
     for (k, v) in &zero_filled {
- *group_totals
+        *group_totals
             .entry((k.source_type_id, k.model_year_id))
             .or_insert(0.0) += v;
     }
@@ -267,7 +267,7 @@ fn gap_fill_automatic(
             > 0.0
     });
 
- // Re-pack as an AvftTable so the next pass can read it.
+    // Re-pack as an AvftTable so the next pass can read it.
     let interim_input: AvftTable = zero_filled
         .into_iter()
         .map(|(k, v)| AvftRecord {
@@ -279,7 +279,7 @@ fn gap_fill_automatic(
         })
         .collect();
 
- // Step 4: apply renormalize-inputs gap-fill on the cleaned interim.
+    // Step 4: apply renormalize-inputs gap-fill on the cleaned interim.
     gap_fill_defaults_renormalize_inputs(source_type_id, last_my, &interim_input, default, report)
 }
 
@@ -324,19 +324,19 @@ fn build_combined(
 ///
 /// Mirrors `AVFTTool_GapFilling_Defaults_Renormalize_Inputs`.
 fn renormalize_inputs(table: &mut BTreeMap<AvftKey, Combined>, report: &mut ToolReport) {
- // Group sums.
+    // Group sums.
     let mut sum_of_defaults: BTreeMap<(SourceTypeId, ModelYearId), f64> = BTreeMap::new();
     let mut sum_of_inputs: BTreeMap<(SourceTypeId, ModelYearId), f64> = BTreeMap::new();
     for (k, v) in table.iter() {
         let group = (k.source_type_id, k.model_year_id);
         if v.is_user {
- *sum_of_inputs.entry(group).or_insert(0.0) += v.fraction;
+            *sum_of_inputs.entry(group).or_insert(0.0) += v.fraction;
         } else {
- *sum_of_defaults.entry(group).or_insert(0.0) += v.fraction;
+            *sum_of_defaults.entry(group).or_insert(0.0) += v.fraction;
         }
     }
- // Surface renormalization warnings for any group whose user-supplied
- // rows did not sum to (1 - sumOfDefaults).
+    // Surface renormalization warnings for any group whose user-supplied
+    // rows did not sum to (1 - sumOfDefaults).
     let mut groups_seen: BTreeSet<(SourceTypeId, ModelYearId)> = BTreeSet::new();
     for (k, _) in table.iter() {
         let group = (k.source_type_id, k.model_year_id);
@@ -351,7 +351,7 @@ fn renormalize_inputs(table: &mut BTreeMap<AvftKey, Combined>, report: &mut Tool
             }
         }
     }
- // Rescale.
+    // Rescale.
     for (k, v) in table.iter_mut() {
         if !v.is_user {
             continue;
@@ -375,9 +375,9 @@ fn renormalize_defaults(table: &mut BTreeMap<AvftKey, Combined>) {
     for (k, v) in table.iter() {
         let group = (k.source_type_id, k.model_year_id);
         if v.is_user {
- *sum_of_inputs.entry(group).or_insert(0.0) += v.fraction;
+            *sum_of_inputs.entry(group).or_insert(0.0) += v.fraction;
         } else {
- *sum_of_defaults.entry(group).or_insert(0.0) += v.fraction;
+            *sum_of_defaults.entry(group).or_insert(0.0) += v.fraction;
         }
     }
     for (k, v) in table.iter_mut() {
@@ -414,7 +414,7 @@ fn group_sums_for_source_type(
 ) -> BTreeMap<(SourceTypeId, ModelYearId), f64> {
     let mut sums = BTreeMap::new();
     for r in table.rows_for_source_type(source_type_id) {
- *sums
+        *sums
             .entry((r.source_type_id, r.model_year_id))
             .or_insert(0.0) += r.fuel_eng_fraction;
     }
@@ -431,7 +431,7 @@ fn enforce_post_gap_fill_sum(
 ) -> Result<()> {
     let mut sums: BTreeMap<(SourceTypeId, ModelYearId), f64> = BTreeMap::new();
     for r in table.rows_for_source_type(source_type_id) {
- *sums
+        *sums
             .entry((r.source_type_id, r.model_year_id))
             .or_insert(0.0) += r.fuel_eng_fraction;
     }
@@ -468,7 +468,7 @@ fn project(
     messages: &mut Vec<Message>,
     output: &mut AvftTable,
 ) -> Result<()> {
- // Always emit the rows up to last_my from the gap-filled input.
+    // Always emit the rows up to last_my from the gap-filled input.
     let cap = last_my.min(analysis_year);
     for r in gap_filled
         .rows_for_source_type(source_type_id)
@@ -477,9 +477,9 @@ fn project(
         output.insert(r);
     }
     if analysis_year <= last_my {
- // Nothing left to project — last_my is already at or past the
- // analysis year. Match the SQL's behavior of skipping the
- // projection step in this case.
+        // Nothing left to project — last_my is already at or past the
+        // analysis year. Match the SQL's behavior of skipping the
+        // projection step in this case.
         return Ok(());
     }
 
@@ -532,10 +532,10 @@ fn project_constant(
         .map(|r| ((r.fuel_type_id, r.eng_tech_id), r.fuel_eng_fraction))
         .collect();
 
- // The SQL `JOIN defaultavft d USING (sourceTypeID, fuelTypeID, engTechID)`
- // — the future-year rows take their (fuel, eng) skeleton from the
- // defaults so we always emit the same (fuel × eng) cardinality as
- // the defaults.
+    // The SQL `JOIN defaultavft d USING (sourceTypeID, fuelTypeID, engTechID)`
+    // — the future-year rows take their (fuel, eng) skeleton from the
+    // defaults so we always emit the same (fuel × eng) cardinality as
+    // the defaults.
     let future_keys: BTreeSet<(FuelTypeId, EngTechId, ModelYearId)> = default
         .rows_for_source_type(source_type_id)
         .filter(|r| r.model_year_id > last_my && r.model_year_id <= analysis_year)
@@ -603,10 +603,10 @@ fn project_known_fractions(
     messages: &mut Vec<Message>,
     output: &mut AvftTable,
 ) -> Result<()> {
- // Bucket per (st, my, fuel, eng) with an "is known" flag.
+    // Bucket per (st, my, fuel, eng) with an "is known" flag.
     let mut projected: BTreeMap<AvftKey, (f64, bool)> = BTreeMap::new();
 
- // Known rows.
+    // Known rows.
     for r in known
         .rows_for_source_type(source_type_id)
         .filter(|r| r.model_year_id > last_my && r.model_year_id <= analysis_year)
@@ -614,8 +614,8 @@ fn project_known_fractions(
         projected.insert(r.key(), (r.fuel_eng_fraction, true));
     }
 
- // Default-derived rows (scaled by baseline ratios) for every default
- // (st, fuel, eng) the known table didn't already cover.
+    // Default-derived rows (scaled by baseline ratios) for every default
+    // (st, fuel, eng) the known table didn't already cover.
     let ratios = baseline_ratios(source_type_id, last_my, gap_filled, default);
     for r in default
         .rows_for_source_type(source_type_id)
@@ -634,7 +634,7 @@ fn project_known_fractions(
         projected.insert(key, (scaled, false));
     }
 
- // Enforce minimum boundary for non-known rows.
+    // Enforce minimum boundary for non-known rows.
     for (k, (frac, is_known)) in projected.iter_mut() {
         if *is_known {
             continue;
@@ -649,21 +649,21 @@ fn project_known_fractions(
             .unwrap_or(*frac);
         let min = def / BOUNDARY_RATIO_LIMIT;
         if *frac < min {
- *frac = min;
+            *frac = min;
         }
     }
 
- // Group sums.
+    // Group sums.
     let mut known_sum: BTreeMap<ModelYearId, f64> = BTreeMap::new();
     let mut not_known_sum: BTreeMap<ModelYearId, f64> = BTreeMap::new();
     let mut years_with_not_known: BTreeSet<ModelYearId> = BTreeSet::new();
     let mut years_with_known: BTreeSet<ModelYearId> = BTreeSet::new();
     for (k, (v, is_known)) in &projected {
         if *is_known {
- *known_sum.entry(k.model_year_id).or_insert(0.0) += v;
+            *known_sum.entry(k.model_year_id).or_insert(0.0) += v;
             years_with_known.insert(k.model_year_id);
         } else {
- *not_known_sum.entry(k.model_year_id).or_insert(0.0) += v;
+            *not_known_sum.entry(k.model_year_id).or_insert(0.0) += v;
             years_with_not_known.insert(k.model_year_id);
         }
     }
@@ -678,7 +678,7 @@ fn project_known_fractions(
         });
     }
 
- // Renormalize the non-known rows to (1 - knownSum) per model year.
+    // Renormalize the non-known rows to (1 - knownSum) per model year.
     for (k, (v, is_known)) in projected.iter_mut() {
         if *is_known {
             continue;
@@ -686,11 +686,11 @@ fn project_known_fractions(
         let nk = not_known_sum.get(&k.model_year_id).copied().unwrap_or(0.0);
         let ks = known_sum.get(&k.model_year_id).copied().unwrap_or(0.0);
         if nk > 0.0 {
- *v = *v / nk * (1.0 - ks);
+            *v = *v / nk * (1.0 - ks);
         }
     }
 
- // Emit.
+    // Emit.
     for (k, (v, _)) in projected {
         output.insert(AvftRecord {
             source_type_id: k.source_type_id,
@@ -797,7 +797,7 @@ fn enforce_minimum_boundary(
 fn normalize_per_my(rows: Vec<AvftRecord>) -> Vec<AvftRecord> {
     let mut sums: BTreeMap<(SourceTypeId, ModelYearId), f64> = BTreeMap::new();
     for r in &rows {
- *sums
+        *sums
             .entry((r.source_type_id, r.model_year_id))
             .or_insert(0.0) += r.fuel_eng_fraction;
     }
@@ -819,8 +819,8 @@ mod tests {
     use super::*;
     use crate::spec::{GapFillingMethod, MethodEntry, ProjectionMethod};
 
- /// Small synthetic default AVFT covering source type 11, model
- /// years 2018..=2022, fuels {1, 2}, single engine tech 1.
+    /// Small synthetic default AVFT covering source type 11, model
+    /// years 2018..=2022, fuels {1, 2}, single engine tech 1.
     fn default_table() -> AvftTable {
         let mut t = AvftTable::new();
         for my in 2018..=2022 {
@@ -833,7 +833,7 @@ mod tests {
     #[test]
     fn constant_projection_carries_last_year_forward() {
         let mut input = AvftTable::new();
- // user supplies entire history for fuel 1 = 0.8, fuel 2 = 0.2.
+        // user supplies entire history for fuel 1 = 0.8, fuel 2 = 0.2.
         for my in 2018..=2022 {
             input.insert(AvftRecord::new(11, my, 1, 1, 0.8));
             input.insert(AvftRecord::new(11, my, 2, 1, 0.2));
@@ -849,8 +849,8 @@ mod tests {
             }],
         };
         let default = default_table();
- // For Constant projection, the future-year skeleton comes from
- // `default` (model years > last_my). Extend the default through 2024.
+        // For Constant projection, the future-year skeleton comes from
+        // `default` (model years > last_my). Extend the default through 2024.
         let mut def = default;
         for my in 2023..=2024 {
             def.insert(AvftRecord::new(11, my, 1, 1, 0.9));
@@ -864,7 +864,7 @@ mod tests {
             known_fractions: &known,
         };
         let report = run(&inputs).unwrap();
- // 2023 and 2024 should be 0.8 / 0.2 (the last_my baseline).
+        // 2023 and 2024 should be 0.8 / 0.2 (the last_my baseline).
         let r2023_1 = report.output.get(&AvftKey {
             source_type_id: 11,
             model_year_id: 2023,
@@ -925,17 +925,17 @@ mod tests {
 
     #[test]
     fn gap_fill_renormalize_inputs_rescales_user_share() {
- // User supplies fuel=1 with 0.4; defaults sum to fuel1=0.9, fuel2=0.1.
- // Renormalize-inputs: keep defaults (sum=0.1 from fuel2), rescale
- // user rows so total = 1. User_sum = 0.4, default_sum = 0.1
- // → scaled fuel1 = 0.4 / 0.4 * (1 - 0.1) = 0.9.
+        // User supplies fuel=1 with 0.4; defaults sum to fuel1=0.9, fuel2=0.1.
+        // Renormalize-inputs: keep defaults (sum=0.1 from fuel2), rescale
+        // user rows so total = 1. User_sum = 0.4, default_sum = 0.1
+        // → scaled fuel1 = 0.4 / 0.4 * (1 - 0.1) = 0.9.
         let mut input = AvftTable::new();
         input.insert(AvftRecord::new(11, 2020, 1, 1, 0.4));
         let def = default_table();
         let mut report = ToolReport::default();
         let filled =
             gap_fill_defaults_renormalize_inputs(11, 2022, &input, &def, &mut report).unwrap();
- // Should have entries for 2020 fuel 1 and fuel 2.
+        // Should have entries for 2020 fuel 1 and fuel 2.
         let f1 = filled
             .get(&AvftKey {
                 source_type_id: 11,
@@ -958,9 +958,9 @@ mod tests {
 
     #[test]
     fn gap_fill_preserve_inputs_scales_defaults() {
- // User: fuel1=0.6; defaults: fuel1=0.9, fuel2=0.1.
- // Preserve-inputs renormalizes defaults: default_sum=0.1 (fuel2)
- // → fuel2 = 0.1 / 0.1 * (1 - 0.6) = 0.4. Result: fuel1=0.6, fuel2=0.4.
+        // User: fuel1=0.6; defaults: fuel1=0.9, fuel2=0.1.
+        // Preserve-inputs renormalizes defaults: default_sum=0.1 (fuel2)
+        // → fuel2 = 0.1 / 0.1 * (1 - 0.6) = 0.4. Result: fuel1=0.6, fuel2=0.4.
         let mut input = AvftTable::new();
         input.insert(AvftRecord::new(11, 2020, 1, 1, 0.6));
         let def = default_table();
@@ -1021,18 +1021,18 @@ mod tests {
     #[test]
     fn known_fractions_use_explicit_rows_and_renormalize_remainder() {
         let mut input = AvftTable::new();
- // Match defaults so baseline ratio = 1.
+        // Match defaults so baseline ratio = 1.
         for my in 2018..=2022 {
             input.insert(AvftRecord::new(11, my, 1, 1, 0.9));
             input.insert(AvftRecord::new(11, my, 2, 1, 0.1));
         }
         let mut def = default_table();
- // Default the projection years too — fuel1=0.9, fuel2=0.1.
+        // Default the projection years too — fuel1=0.9, fuel2=0.1.
         for my in 2023..=2024 {
             def.insert(AvftRecord::new(11, my, 1, 1, 0.9));
             def.insert(AvftRecord::new(11, my, 2, 1, 0.1));
         }
- // Known fractions: in 2024, fuel 2 share rises to 0.5.
+        // Known fractions: in 2024, fuel 2 share rises to 0.5.
         let mut known = AvftTable::new();
         known.insert(AvftRecord::new(11, 2024, 2, 1, 0.5));
         let spec = ToolSpec {
@@ -1070,7 +1070,7 @@ mod tests {
                 eng_tech_id: 1,
             })
             .unwrap();
- // fuel 2 is known = 0.5; fuel 1 (not known) renormalizes to 0.5.
+        // fuel 2 is known = 0.5; fuel 1 (not known) renormalizes to 0.5.
         assert!((r2024_2 - 0.5).abs() < 1e-9);
         assert!((r2024_1 - 0.5).abs() < 1e-9);
     }

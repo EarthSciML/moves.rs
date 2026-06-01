@@ -28,14 +28,14 @@ pub use crate::csv_io::{read_csv, read_reader, ReadReport};
 /// Non-fatal observation about the imported table.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Warning {
- /// Sum of fractions for a (source type, model year) group is between
- /// 0 and 1 — the tool will renormalize, but the user is told.
+    /// Sum of fractions for a (source type, model year) group is between
+    /// 0 and 1 — the tool will renormalize, but the user is told.
     FractionSumBelowOne {
         source_type_id: SourceTypeId,
         model_year_id: ModelYearId,
         sum: f64,
     },
- /// Duplicate primary key seen during CSV parse — the later row wins.
+    /// Duplicate primary key seen during CSV parse — the later row wins.
     DuplicateKey(AvftRecord),
 }
 
@@ -55,7 +55,7 @@ pub struct Report {
 pub fn validate(table: &AvftTable) -> Result<Report> {
     let mut report = Report::default();
 
- // 1) Per-row negative fraction check.
+    // 1) Per-row negative fraction check.
     for r in table.iter() {
         if round4(r.fuel_eng_fraction) < 0 {
             return Err(Error::NegativeFraction {
@@ -68,14 +68,14 @@ pub fn validate(table: &AvftTable) -> Result<Report> {
         }
     }
 
- // 2) Per-group sum checks. Group by (sourceTypeID, modelYearID).
- // Match the canonical SQL: SUM the raw f64 values, *then* round.
+    // 2) Per-group sum checks. Group by (sourceTypeID, modelYearID).
+    // Match the canonical SQL: SUM the raw f64 values, *then* round.
     let mut sums: BTreeMap<(SourceTypeId, ModelYearId), f64> = BTreeMap::new();
     for r in table.iter() {
         let bucket = sums
             .entry((r.source_type_id, r.model_year_id))
             .or_insert(0.0);
- *bucket += r.fuel_eng_fraction;
+        *bucket += r.fuel_eng_fraction;
     }
     for ((st, my), sum_raw) in sums {
         let sum_q = round4(sum_raw);
@@ -106,7 +106,7 @@ pub fn validate(table: &AvftTable) -> Result<Report> {
 /// uses; MySQL's `ROUND` is half-away-from-zero. We reproduce that here.
 fn round4(v: f64) -> i64 {
     let scaled = v * 10_000.0;
- // half-away-from-zero rounding
+    // half-away-from-zero rounding
     if scaled >= 0.0 {
         (scaled + 0.5) as i64
     } else {
@@ -184,10 +184,10 @@ mod tests {
 
     #[test]
     fn does_not_warn_on_zero_sum_group() {
- // A (source type, model year) group whose every row is exactly
- // 0 is treated as "no input for this group at all" rather than
- // as a partial sum to renormalize — matches the SQL's
- // `HAVING sum > 0` filter on the WARNING insert.
+        // A (source type, model year) group whose every row is exactly
+        // 0 is treated as "no input for this group at all" rather than
+        // as a partial sum to renormalize — matches the SQL's
+        // `HAVING sum > 0` filter on the WARNING insert.
         let t: AvftTable = [AvftRecord::new(11, 2020, 1, 1, 0.0)].into_iter().collect();
         let r = validate(&t).unwrap();
         assert!(r.warnings.is_empty());
@@ -195,17 +195,17 @@ mod tests {
 
     #[test]
     fn four_decimal_rounding_at_boundary() {
- // 0.50004 + 0.50003 = 1.00007; rounded to 4 decimals = 1.0001 > 1.
- // But 0.50004 rounds individually to 0.5000, so the per-row
- // floor would say sum=1.0000. The Java SQL rounds the SUM, not
- // the addends; we follow the same convention.
+        // 0.50004 + 0.50003 = 1.00007; rounded to 4 decimals = 1.0001 > 1.
+        // But 0.50004 rounds individually to 0.5000, so the per-row
+        // floor would say sum=1.0000. The Java SQL rounds the SUM, not
+        // the addends; we follow the same convention.
         let t: AvftTable = [
             AvftRecord::new(11, 2020, 1, 1, 0.50004),
             AvftRecord::new(11, 2020, 2, 1, 0.50003),
         ]
         .into_iter()
         .collect();
- // Sum is 1.00007 → round4 = 10_001 > 10_000 → ERROR.
+        // Sum is 1.00007 → round4 = 10_001 > 10_000 → ERROR.
         match validate(&t) {
             Err(Error::FractionSumExceedsOne { .. }) => {}
             other => panic!("got {other:?}"),
