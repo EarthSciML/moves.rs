@@ -39,6 +39,18 @@ wasm-bindgen-rayon = { workspace = true, optional = true }
 
 # parquet without C-compiled codecs so the WASM build does not require clang.
 parquet = { version = "55", default-features = false, features = ["arrow", "base64"] }
+# arrow IPC reader for wasm32-compatible execution-DB bundle parsing.
+# arrow::ipc::reader::FileReader is pure-Rust and compiles on wasm32-unknown-unknown.
+arrow = { workspace = true }
+
+# polars-core for store-setup helpers (populate_link, build_runspec_tables, etc.).
+# Wasm32 uses polars-core only (no lazy/parquet → no mio). Native uses full polars
+# so the helpers can work with richer data. The helpers themselves only use core ops.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+polars = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+polars = { version = "0.53", default-features = false }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

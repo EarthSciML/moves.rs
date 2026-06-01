@@ -83,7 +83,7 @@ fn run_fixture_bytes(fixture: &Path, max_parallel_chunks: usize) -> Vec<u8> {
         run_date_time: Some("2026-01-01T00:00:00".to_string()),
         snapshot: None,
         scale_input: None,
-            default_db: None,
+        default_db: None,
     };
     let outcome = run_simulation(&opts).unwrap_or_else(|e| {
         panic!(
