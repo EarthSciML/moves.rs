@@ -165,7 +165,7 @@ fn run_fixture(path: &Path, max_parallel_chunks: usize) -> Result<FixtureResult,
         run_date_time: None,
         snapshot: None,
         scale_input: None,
-            default_db: None,
+        default_db: None,
     };
     let outcome = run_simulation(&opts).map_err(|e| format!("{name}: {e}"))?;
     let rss_after = read_peak_rss_mib();

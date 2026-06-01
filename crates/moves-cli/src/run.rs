@@ -269,27 +269,13 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
         // Default-DB path: load the Parquet default database, synthesise the Link
         // table from ZoneRoadType, build RunSpec* tables from the RunSpec, and
         // optionally overlay CDB/PDB tables on top before wiring into the engine.
-        let db = DefaultDb::open(default_db_path)
-            .with_context(|| format!("opening default DB at {}", default_db_path.display()))?;
-        let filters = RunSpecFilters::from_runspec(&run_spec);
-        let plan = InputDataManager::plan(&filters, &default_tables());
-        let mut store = InputDataManager::execute(&plan, &db)
-            .map_err(|e| anyhow::anyhow!("loading default DB: {e}"))?;
-        if let Some(scale_dir) = &opts.scale_input {
-            overlay_scale_input_db(&mut store, scale_dir).with_context(|| {
-                format!("loading scale-input DB from {}", scale_dir.display())
+        let store = build_default_db_store(default_db_path, &run_spec, opts.scale_input.as_deref())
+            .with_context(|| {
+                format!(
+                    "building default-DB store from {}",
+                    default_db_path.display()
+                )
             })?;
-        }
-        populate_link_from_zone_road_type(&mut store)
-            .context("synthesising Link from ZoneRoadType")?;
-        build_runspec_tables(&run_spec, &mut store)
-            .context("building RunSpec tables from RunSpec")?;
-        populate_source_use_type_physics_mapping(&mut store)
-            .context("synthesising sourceUseTypePhysicsMapping")?;
-        populate_zone_month_hour_meteorology(&mut store)
-            .context("populating ZoneMonthHour meteorology")?;
-        merge_process_year_variants(&mut store)
-            .context("merging process/year-indexed table variants")?;
         let geography = load_geography_from_store(&store).with_context(|| {
             format!(
                 "building geography from default DB at {}",
@@ -1006,7 +992,7 @@ fn load_geography_from_store(store: &InMemoryStore) -> Result<GeographyTables> {
 /// when a non-empty `Link` table is already present (user-supplied CDB/PDB
 /// data takes precedence).
 fn populate_link_from_zone_road_type(store: &mut InMemoryStore) -> Result<()> {
-    use polars::prelude::{DataType, DataFrame, NamedFrom, Series};
+    use polars::prelude::{DataFrame, DataType, NamedFrom, Series};
 
     if !store.contains("ZoneRoadType") {
         return Ok(());
@@ -1129,7 +1115,12 @@ fn build_runspec_tables(runspec: &RunSpec, store: &mut InMemoryStore) -> Result<
         }
         ids.into_iter().collect()
     };
-    insert_i32(store, "RunSpecSourceType", "sourceTypeID", source_type_ids.clone());
+    insert_i32(
+        store,
+        "RunSpecSourceType",
+        "sourceTypeID",
+        source_type_ids.clone(),
+    );
 
     // RunSpecPollutantProcess (single column: polProcessID).
     let pol_process_ids: Vec<i32> = {
@@ -1139,7 +1130,12 @@ fn build_runspec_tables(runspec: &RunSpec, store: &mut InMemoryStore) -> Result<
         }
         ids.into_iter().collect()
     };
-    insert_i32(store, "RunSpecPollutantProcess", "polProcessID", pol_process_ids);
+    insert_i32(
+        store,
+        "RunSpecPollutantProcess",
+        "polProcessID",
+        pol_process_ids,
+    );
 
     // RunSpecDay.
     let day_ids: Vec<i32> = {
@@ -1218,9 +1214,7 @@ fn build_runspec_tables(runspec: &RunSpec, store: &mut InMemoryStore) -> Result<
                 .cloned()
         };
         let mut month_to_group: BTreeMap<i32, i32> = BTreeMap::new();
-        if let (Some(mid_col), Some(mgid_col)) =
-            (find("monthID"), find("monthGroupID"))
-        {
+        if let (Some(mid_col), Some(mgid_col)) = (find("monthID"), find("monthGroupID")) {
             let mids = mid_col
                 .cast(&DataType::Int32)
                 .ok()
@@ -1257,8 +1251,7 @@ fn build_runspec_tables(runspec: &RunSpec, store: &mut InMemoryStore) -> Result<
         }
         pairs.into_iter().collect()
     };
-    let (sf_source_ids, sf_fuel_ids): (Vec<i64>, Vec<i64>) =
-        source_fuel_pairs.into_iter().unzip();
+    let (sf_source_ids, sf_fuel_ids): (Vec<i64>, Vec<i64>) = source_fuel_pairs.into_iter().unzip();
     let n = sf_source_ids.len();
     let sf_df = DataFrame::new(
         n,
@@ -1271,6 +1264,58 @@ fn build_runspec_tables(runspec: &RunSpec, store: &mut InMemoryStore) -> Result<
     store.insert("RunSpecSourceFuelType".to_string(), sf_df);
 
     Ok(())
+}
+
+/// Build the in-memory execution store from a converted default-DB Parquet
+/// tree, applying RunSpec-scoped filters via [`InputDataManager`] and then
+/// synthesising the `Link`, `RunSpec*`, and meteorology tables.
+///
+/// This is the data-setup half of the `--default-db` run path, exposed as a
+/// standalone function so integration tests can inspect or validate the
+/// generated execution tables without driving the full calculator engine.
+///
+/// The returned [`InMemoryStore`] contains:
+/// * All default-DB tables loaded by [`InputDataManager`] (filtered to the
+///   RunSpec's geography, time, pollutant, and vehicle dimensions).
+/// * An optional County/Project-scale overlay from `scale_dir`.
+/// * A synthesised `Link` table derived from `ZoneRoadType`.
+/// * Synthesised `RunSpec*` tables (year, month, day, hour, etc.) derived
+///   from the RunSpec.
+/// * Synthesised `sourceUseTypePhysicsMapping` (identity mapping from
+///   `sourceUseTypePhysics`).
+/// * Filled-in `ZoneMonthHour` meteorology columns (`heatIndex`,
+///   `specificHumidity`, `molWaterFraction`).
+/// * Process/year-indexed table variants merged into their canonical names.
+///
+/// # Errors
+///
+/// Fails if the default-DB cannot be opened, a Polars scan fails during
+/// table loading, or a synthesis step returns an error.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn build_default_db_store(
+    default_db_path: &Path,
+    run_spec: &RunSpec,
+    scale_dir: Option<&Path>,
+) -> Result<InMemoryStore> {
+    let db = DefaultDb::open(default_db_path)
+        .with_context(|| format!("opening default DB at {}", default_db_path.display()))?;
+    let filters = RunSpecFilters::from_runspec(run_spec);
+    let plan = InputDataManager::plan(&filters, &default_tables());
+    let mut store = InputDataManager::execute(&plan, &db)
+        .map_err(|e| anyhow::anyhow!("loading default DB: {e}"))?;
+    if let Some(sd) = scale_dir {
+        overlay_scale_input_db(&mut store, sd)
+            .with_context(|| format!("loading scale-input DB from {}", sd.display()))?;
+    }
+    populate_link_from_zone_road_type(&mut store).context("synthesising Link from ZoneRoadType")?;
+    build_runspec_tables(run_spec, &mut store).context("building RunSpec tables from RunSpec")?;
+    populate_source_use_type_physics_mapping(&mut store)
+        .context("synthesising sourceUseTypePhysicsMapping")?;
+    populate_zone_month_hour_meteorology(&mut store)
+        .context("populating ZoneMonthHour meteorology")?;
+    merge_process_year_variants(&mut store)
+        .context("merging process/year-indexed table variants")?;
+    Ok(store)
 }
 
 fn load_registry(path: Option<&Path>, with_calculators: bool) -> Result<CalculatorRegistry> {
@@ -2165,7 +2210,10 @@ mod tests {
             .into_no_null_iter()
             .collect();
         // countyID = zoneID / 10
-        assert!(county_ids.iter().all(|&c| c == 26161), "countyID = zoneID/10");
+        assert!(
+            county_ids.iter().all(|&c| c == 26161),
+            "countyID = zoneID/10"
+        );
     }
 
     #[test]
@@ -2187,7 +2235,12 @@ mod tests {
         let link = store.get("link").unwrap();
         assert_eq!(link.height(), 1, "pre-existing Link must be preserved");
         assert_eq!(
-            link.column("linkID").unwrap().i32().unwrap().get(0).unwrap(),
+            link.column("linkID")
+                .unwrap()
+                .i32()
+                .unwrap()
+                .get(0)
+                .unwrap(),
             999
         );
     }

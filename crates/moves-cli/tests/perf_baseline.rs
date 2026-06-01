@@ -202,7 +202,7 @@ fn single_fixture_timing_fields_are_populated() {
         run_date_time: None,
         snapshot: None,
         scale_input: None,
-            default_db: None,
+        default_db: None,
     })
     .expect("run must succeed");
 

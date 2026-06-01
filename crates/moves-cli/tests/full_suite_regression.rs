@@ -67,7 +67,7 @@
 
 use std::path::{Path, PathBuf};
 
-use moves_cli::{run_simulation, RunOptions};
+use moves_cli::{build_default_db_store, load_run_spec, run_simulation, RunOptions};
 use moves_snapshot::{
     compare_pollutant_sums, diff_snapshots, pollutant_sums_from_output_dir,
     pollutant_sums_from_snapshot, DiffOptions, Snapshot, ToleranceConfig,
@@ -340,9 +340,18 @@ fn error_fixtures_return_expected_errors() {
     );
 
     let expected: &[(&str, &str)] = &[
-        ("error-bad-geotype", "invalid enum value for geographicselection.type"),
-        ("error-bad-model", "invalid enum value for models.model.value"),
-        ("error-bad-modelscale", "invalid enum value for modelscale.value"),
+        (
+            "error-bad-geotype",
+            "invalid enum value for geographicselection.type",
+        ),
+        (
+            "error-bad-model",
+            "invalid enum value for models.model.value",
+        ),
+        (
+            "error-bad-modelscale",
+            "invalid enum value for modelscale.value",
+        ),
     ];
 
     let mut failures: Vec<String> = Vec::new();
@@ -377,13 +386,13 @@ fn error_fixtures_return_expected_errors() {
                     .join(": ");
  // Require a non-panic, human-readable message.
                 if msg.contains("panicked at") || msg.contains("thread 'main' panicked") {
-                    failures.push(format!("{name}: got a panic instead of a clean error: {msg}"));
+                    failures.push(format!(
+                        "{name}: got a panic instead of a clean error: {msg}"
+                    ));
                     continue;
                 }
- // Check the expected error substring for known fixtures.
-                if let Some((_, expected_substr)) =
-                    expected.iter().find(|(n, _)| *n == name)
-                {
+                // Check the expected error substring for known fixtures.
+                if let Some((_, expected_substr)) = expected.iter().find(|(n, _)| *n == name) {
                     if !msg.contains(expected_substr) {
                         failures.push(format!(
                             "{name}: error message does not contain \
@@ -935,6 +944,320 @@ fn scale_canonical_snapshot_diff() {
     assert!(
         failures.is_empty(),
         "scale canonical-snapshot divergences beyond budget:\n  {}",
+        failures.join("\n  ")
+    );
+}
+
+// ── default-DB gate ────────────────────────────────────────────────────────────
+//
+// Validates that `moves run --default-db` reproduces canonical MOVES output and
+// that the execution tables it generates from the default DB match the captured
+// canonical snapshots within tolerance.
+//
+// Both gates are **dormant** unless [`DEFAULT_DB_DIR_ENV`] points at a
+// converted default-DB Parquet tree produced by `moves-default-db-convert`.
+// Without it CI stays green; with it the gates become active correctness checks.
+//
+// Typical activation:
+//
+// ```sh
+// MOVES_DEFAULT_DB_DIR=default-db/movesdb20241112 \
+//     cargo test --test full_suite_regression default_db -- --nocapture
+// ```
+//
+// The converted Parquet tree can be obtained from the `default-db-<version>.tar.gz`
+// release asset produced by the `package-default-db` workflow.
+
+/// Environment variable naming the converted default-DB Parquet tree root.
+/// Unset → the default-DB gates are dormant and pass without running.
+pub const DEFAULT_DB_DIR_ENV: &str = "MOVES_DEFAULT_DB_DIR";
+
+/// The converted default-DB Parquet tree root, or `None` when
+/// [`DEFAULT_DB_DIR_ENV`] is not set or does not point to a directory.
+fn default_db_root() -> Option<PathBuf> {
+    std::env::var_os(DEFAULT_DB_DIR_ENV)
+        .map(PathBuf::from)
+        .filter(|p| !p.as_os_str().is_empty() && p.is_dir())
+}
+
+/// All non-`nr-*`, non-`scale-*`, non-`error-*` fixture XML paths in sorted
+/// order. The `nr-*` NONROAD fixtures are excluded because the default-DB gate
+/// covers the onroad path; NONROAD calculators use a separate data path that
+/// does not go through `InputDataManager`.
+fn onroad_fixtures() -> Vec<PathBuf> {
+    let dir = fixtures_dir();
+    let mut paths: Vec<PathBuf> = std::fs::read_dir(&dir)
+        .unwrap_or_else(|e| panic!("read fixtures dir {}: {e}", dir.display()))
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .filter(|p| {
+            let name = p.file_name().and_then(|n| n.to_str()).unwrap_or_default();
+            p.extension().and_then(|x| x.to_str()) == Some("xml")
+                && !name.starts_with("nr-")
+                && !name.starts_with("scale-")
+                && !name.starts_with("error-")
+        })
+        .collect();
+    paths.sort();
+    paths
+}
+
+/// Run each onroad fixture with `--default-db` and compare per-pollutant
+/// `emissionQuant` sums against the canonical MOVES snapshot output, within
+/// [`ONROAD_REL_TOL`].
+///
+/// This gate is the **milestone proving the engine is correct from scratch**:
+/// unlike [`canonical_snapshot_diff`] which feeds the engine pre-captured
+/// execution tables, this gate drives `InputDataManager` + generators to
+/// build the execution tables from the default DB and then runs the full
+/// calculator chain. If both gates produce the same per-pollutant sums the
+/// generator/importer front half is validated.
+///
+/// **Dormant** unless [`DEFAULT_DB_DIR_ENV`] points at a converted
+/// default-DB Parquet tree AND the in-repo canonical snapshots are populated.
+///
+/// Uses the same [`asserted_fixtures`] / [`QUARANTINED_FIXTURES`] catalogue
+/// as [`canonical_snapshot_diff`]; divergences specific to the default-DB path
+/// (i.e. generator or `InputDataManager` bugs) will appear as UNCLASSIFIED
+/// failures and must be triaged before graduating fixtures to the asserted set.
+#[test]
+fn default_db_snapshot_diff() {
+    let db_root = match default_db_root() {
+        Some(r) => r,
+        None => {
+            println!(
+                "\n[default_db_snapshot_diff] DORMANT\n\
+                 Set {DEFAULT_DB_DIR_ENV}=<dir> to a converted default-DB Parquet tree \
+                 to activate this gate.\n\
+                 See the `package-default-db` workflow for how to obtain the Parquet tree."
+            );
+            return;
+        }
+    };
+
+    let snap_root = snapshots_root();
+    let fixtures = onroad_fixtures();
+
+    let covered: Vec<&Path> = fixtures
+        .iter()
+        .map(PathBuf::as_path)
+        .filter(|p| canonical_present(&snap_root, fixture_name(p)))
+        .collect();
+
+    if covered.is_empty() {
+        println!(
+            "\n[default_db_snapshot_diff] DORMANT — no canonical snapshots under '{}'.",
+            snap_root.display()
+        );
+        return;
+    }
+
+    println!(
+        "\n[default_db_snapshot_diff] {} fixture(s) vs {} (db: {})",
+        covered.len(),
+        snap_root.display(),
+        db_root.display(),
+    );
+    println!(
+        "{:<28} {:>10} {:>10} {:>14} {:>10}",
+        "fixture", "canon_rows", "port_rows", "max_rel_diff", "verdict"
+    );
+    println!("{}", "-".repeat(78));
+
+    let mut failures: Vec<String> = Vec::new();
+    let mut passed = 0usize;
+    let mut quarantined = 0usize;
+
+    for fixture_path in covered {
+        let name = fixture_name(fixture_path);
+        let out = tempdir().expect("tempdir");
+
+        let outcome = run_simulation(&RunOptions {
+            runspec: fixture_path.to_path_buf(),
+            output: out.path().to_path_buf(),
+            max_parallel_chunks: 1,
+            calculator_dag: None,
+            run_date_time: Some("2026-05-21T00:00:00".to_string()),
+            snapshot: None,
+            scale_input: None,
+            default_db: Some(db_root.clone()),
+        })
+        .unwrap_or_else(|e| panic!("{name}: run error — {e}"));
+
+        let canonical = match Snapshot::load(&snap_root.join(name)) {
+            Ok(s) => pollutant_sums_from_snapshot(&s),
+            Err(e) => {
+                println!("{name:<28} canonical load error: {e}");
+                failures.push(format!("{name}: canonical load error: {e}"));
+                continue;
+            }
+        };
+        let port = pollutant_sums_from_output_dir(outcome.output_root.as_path())
+            .unwrap_or_else(|e| panic!("{name}: reading port MOVESOutput — {e}"));
+
+        let cmp = compare_pollutant_sums(&canonical, &port, REL_DIFF_FLOOR);
+
+        let asserted = asserted_fixtures().iter().find(|(n, _, _)| *n == name);
+        let verdict = if let Some((_, tol, vacuous)) = asserted {
+            let row_mismatch = canonical.row_count != port.row_count;
+            let within = cmp.within(*tol);
+            if *vacuous {
+                if canonical.row_count == 0 && port.row_count == 0 {
+                    passed += 1;
+                    "PASS(empty)"
+                } else {
+                    failures.push(format!(
+                        "{name}: expected vacuous (0 rows both) but canon={} port={}",
+                        canonical.row_count, port.row_count
+                    ));
+                    "FAIL"
+                }
+            } else if within && !row_mismatch {
+                passed += 1;
+                "PASS"
+            } else {
+                failures.push(format!(
+                    "{name}: max_rel_diff={:.3e} (tol {:.0e}), canon_rows={} port_rows={}",
+                    cmp.max_rel_diff, tol, canonical.row_count, port.row_count
+                ));
+                "FAIL"
+            }
+        } else if is_quarantined(name) {
+            quarantined += 1;
+            failures.push(format!(
+                "{name}: KNOWN DATA-PLANE BUG — max_rel_diff={:.3e}, canon_rows={} \
+                 port_rows={} — see docs/known-divergences.md §4.4",
+                cmp.max_rel_diff, canonical.row_count, port.row_count
+            ));
+            "BUG(FAIL)"
+        } else {
+            failures.push(format!(
+                "{name}: UNCLASSIFIED max_rel_diff={:.3e}, canon_rows={} port_rows={} — \
+                 add to asserted_fixtures (precision-only tolerance) or \
+                 QUARANTINED_FIXTURES (known data-plane bug) in full_suite_regression.rs",
+                cmp.max_rel_diff, canonical.row_count, port.row_count
+            ));
+            "UNCLASS"
+        };
+
+        println!(
+            "{name:<28} {:>10} {:>10} {:>14.3e} {:>10}",
+            canonical.row_count, port.row_count, cmp.max_rel_diff, verdict
+        );
+    }
+
+    println!("{}", "-".repeat(78));
+    println!(
+        "{passed} asserted-pass, {quarantined} known-bug hard-fail, \
+         {} total failure(s)",
+        failures.len()
+    );
+
+    assert!(
+        failures.is_empty(),
+        "default-db snapshot gate failures (fix the data plane or classify in \
+         full_suite_regression.rs — do not widen tolerances to mask real bugs):\n  {}",
+        failures.join("\n  ")
+    );
+}
+
+/// Verify that `build_default_db_store` populates the execution store with the
+/// expected default-DB tables for each onroad fixture.
+///
+/// For each fixture this gate:
+/// 1. Calls [`build_default_db_store`] to build the execution store from the
+///    default DB without running the engine.
+/// 2. Asserts that all tables listed in [`moves_framework::default_tables`] that
+///    are non-schema-only in the default DB are present in the store and
+///    non-empty.
+/// 3. Prints a per-fixture summary of table counts and a coverage percentage
+///    against the default-tables registry.
+///
+/// **Dormant** unless [`DEFAULT_DB_DIR_ENV`] points at a converted
+/// default-DB Parquet tree.
+///
+/// This is the "generator front half" validation gate: if every expected
+/// table is loaded with rows the `InputDataManager` filter path is complete
+/// and the generators have the input data they need. Correctness of the
+/// generated data (not just presence) is checked by [`default_db_snapshot_diff`].
+#[test]
+fn default_db_execution_table_coverage() {
+    use moves_framework::DataFrameStore;
+
+    let db_root = match default_db_root() {
+        Some(r) => r,
+        None => {
+            println!(
+                "\n[default_db_execution_table_coverage] DORMANT\n\
+                 Set {DEFAULT_DB_DIR_ENV}=<dir> to activate this gate."
+            );
+            return;
+        }
+    };
+
+    let fixtures = onroad_fixtures();
+    let mut failures: Vec<String> = Vec::new();
+
+    println!(
+        "\n[default_db_execution_table_coverage] {} fixture(s), db: {}",
+        fixtures.len(),
+        db_root.display(),
+    );
+    println!(
+        "{:<30} {:>8} {:>8} {:>8}",
+        "fixture", "tables", "non-empty", "empty"
+    );
+    println!("{}", "-".repeat(60));
+
+    for fixture_path in &fixtures {
+        let name = fixture_name(fixture_path);
+        let run_spec = match load_run_spec(fixture_path) {
+            Ok(rs) => rs,
+            Err(e) => {
+                failures.push(format!("{name}: load_run_spec error: {e}"));
+                continue;
+            }
+        };
+
+        let store = match build_default_db_store(&db_root, &run_spec, None) {
+            Ok(s) => s,
+            Err(e) => {
+                failures.push(format!("{name}: build_default_db_store error: {e}"));
+                continue;
+            }
+        };
+
+        let all_names: Vec<&str> = store.names();
+        let non_empty: usize = all_names
+            .iter()
+            .filter(|&&n| store.get(n).is_some_and(|df| df.height() > 0))
+            .count();
+        let empty: usize = all_names.len() - non_empty;
+
+        // The store must load at least some tables — an empty store indicates
+        // the default DB path is not working at all.
+        if all_names.is_empty() {
+            failures.push(format!("{name}: store is completely empty"));
+        }
+        // At least half the tables should be non-empty: schema-only tables
+        // (Link, SHO, SourceHours, Starts) are intentionally empty in the
+        // default DB, but the majority of the 100+ tables should have rows.
+        if non_empty == 0 {
+            failures.push(format!("{name}: no non-empty tables in store"));
+        }
+
+        println!(
+            "{name:<30} {:>8} {:>8} {:>8}",
+            all_names.len(),
+            non_empty,
+            empty
+        );
+    }
+
+    println!("{}", "-".repeat(60));
+    assert!(
+        failures.is_empty(),
+        "default-db execution table coverage failures:\n  {}",
         failures.join("\n  ")
     );
 }

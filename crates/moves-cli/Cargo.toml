@@ -29,6 +29,7 @@ polars = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]
+moves-framework = { path = "../moves-framework" }
 moves-snapshot = { path = "../moves-snapshot" }
 parquet = { workspace = true }
 tempfile = { workspace = true }
