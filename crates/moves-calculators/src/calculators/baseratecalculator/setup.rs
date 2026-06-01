@@ -423,6 +423,20 @@ pub struct FuelTypeRow {
     pub fuel_type_id: i32,
 }
 
+/// One `runSpecRoadType` row — a road type the RunSpec selects.
+///
+/// MOVES drives the BaseRate worker off a join to `runSpecRoadType`, so the
+/// worker only processes rate rows whose road type the run selected. The port
+/// reads `BaseRateByAge` for every road type the generator emitted (running
+/// exhaust on the selected on-road type, start exhaust on off-network
+/// `roadTypeID` 1, …), so it mirrors that join by filtering the rate input to
+/// these ids.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct RunSpecRoadTypeRow {
+    /// Road type id the RunSpec selected.
+    pub road_type_id: i32,
+}
+
 fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -> MfError {
     MfError::RowExtraction {
         table: table.to_string(),
@@ -2357,6 +2371,42 @@ impl TableRow for FuelTypeRow {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
                 Ok(FuelTypeRow {
                     fuel_type_id: fuel_type_id.get(i).ok_or_else(|| null("fuelTypeID"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for RunSpecRoadTypeRow {
+    fn table_name() -> &'static str {
+        "runSpecRoadType"
+    }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([("roadTypeID".into(), DataType::Int32)])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![Series::new(
+                "roadTypeID".into(),
+                rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>(),
+            )
+            .into()],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "runSpecRoadType";
+        let road_type_id = df
+            .column("roadTypeID")
+            .map_err(|e| row_err(t, 0, "roadTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "roadTypeID", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(RunSpecRoadTypeRow {
+                    road_type_id: road_type_id.get(i).ok_or_else(|| null("roadTypeID"))?,
                 })
             })
             .collect()
