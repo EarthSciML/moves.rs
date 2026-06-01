@@ -1,8 +1,10 @@
-//! Full-suite regression pass — Phase 7 Task 126 (`mo-uj3ke`).
+//! Full-suite regression pass — Phase 7 Task 126 (`mo-uj3ke`), expanded by
+//! Task 148 (`mo-6oj`).
 //!
-//! Runs **all 34 characterization fixtures** (24 onroad + 10 NONROAD; the 3
-//! `scale-*` fixtures that require additional input databases are excluded by
-//! default) through the complete Rust port and verifies:
+//! Runs **all 40 characterization fixtures** (30 onroad + 10 NONROAD; the 3
+//! `scale-*` fixtures that require additional input databases and the 3
+//! `error-*` fixtures that are expected to fail are both excluded from the
+//! smoke-test suite) through the complete Rust port and verifies:
 //!
 //! # Scale fixtures (County / Project / Rates)
 //!
@@ -138,10 +140,12 @@ fn tolerance_opts() -> DiffOptions {
     }
 }
 
-/// All non-`scale-*` fixture XML paths in sorted order.
+/// All non-`scale-*`, non-`error-*` fixture XML paths in sorted order.
 ///
-/// 37 total fixtures; 3 `scale-*` excluded (require additional input
-/// databases). Result: 24 onroad (including mixed-onroad-nonroad) + 10 NONROAD = 34 fixtures.
+/// 46 total fixtures; 3 `scale-*` excluded (require additional input
+/// databases), 3 `error-*` excluded (expected parse errors — tested by
+/// [`error_fixtures_return_expected_errors`]). Result: 30 onroad (including
+/// mixed-onroad-nonroad) + 10 NONROAD = 40 fixtures.
 fn all_fixtures() -> Vec<PathBuf> {
     let dir = fixtures_dir();
     let mut paths: Vec<PathBuf> = std::fs::read_dir(&dir)
@@ -150,7 +154,9 @@ fn all_fixtures() -> Vec<PathBuf> {
         .map(|e| e.path())
         .filter(|p| {
             let name = p.file_name().and_then(|n| n.to_str()).unwrap_or_default();
-            p.extension().and_then(|x| x.to_str()) == Some("xml") && !name.starts_with("scale-")
+            p.extension().and_then(|x| x.to_str()) == Some("xml")
+                && !name.starts_with("scale-")
+                && !name.starts_with("error-")
         })
         .collect();
     paths.sort();
@@ -167,19 +173,23 @@ fn canonical_present(snapshots_root: &Path, name: &str) -> bool {
 
 // ── fixture catalogue ─────────────────────────────────────────────────────────
 
-/// The fixture catalogue must contain exactly 34 non-scale fixtures.
+/// The fixture catalogue must contain exactly 40 non-scale non-error fixtures.
 ///
-/// 37 total in `characterization/fixtures/`:
-/// - 24 onroad/mixed (non-`nr-`, non-`scale-`): 23 default-scale + `mixed-onroad-nonroad`
+/// 46 total in `characterization/fixtures/`:
+/// - 30 onroad/mixed (non-`nr-`, non-`scale-`, non-`error-`):
+///   23 original default-scale + `mixed-onroad-nonroad` + 6 added by Task 148
+///   (`expand-counties-large`, `expand-multifuel`, `expand-fullyear`,
+///   `expand-multiyear`, `expand-roadtypes`, `rates-minimal`)
 /// - 10 NONROAD (`nr-*.xml`)
 /// - 3 `scale-*.xml` (excluded — require additional input databases)
+/// - 3 `error-*.xml` (excluded — test expected parse failures separately)
 #[test]
 fn fixture_catalogue_size() {
     let fixtures = all_fixtures();
     assert_eq!(
         fixtures.len(),
-        34,
-        "expected 34 non-scale fixtures (24 onroad/mixed + 10 NONROAD), \
+        40,
+        "expected 40 non-scale non-error fixtures (30 onroad/mixed + 10 NONROAD), \
          found {}. Update this test if the catalogue changes.",
         fixtures.len()
     );
@@ -194,8 +204,8 @@ fn fixture_catalogue_size() {
         .count();
 
     assert_eq!(
-        onroad_count, 24,
-        "expected 24 onroad/mixed fixtures, found {onroad_count}"
+        onroad_count, 30,
+        "expected 30 onroad/mixed fixtures, found {onroad_count}"
     );
     assert_eq!(
         nonroad_count, 10,
@@ -208,8 +218,6 @@ fn fixture_catalogue_size() {
 /// Every fixture must complete without error and produce a non-empty module plan.
 ///
 /// Prints a regression table matching `docs/known-divergences.md`.
-/// All 34 fixtures are expected to report 0 modules executed in Phase 7
-/// (pre-data-plane), which is the known baseline this test pins.
 #[test]
 fn all_fixtures_run_without_error() {
     let fixtures = all_fixtures();
@@ -296,6 +304,105 @@ fn nonroad_fixtures_plan_modules() {
             "{name}: no modules planned"
         );
     }
+}
+
+// ── error-fixture gate ────────────────────────────────────────────────────────
+
+/// Every `error-*` fixture must fail to parse and produce a clear, actionable
+/// error message (no panics, no cryptic internal errors).
+///
+/// Each `error-*.xml` in `characterization/fixtures/` is a deliberately
+/// invalid RunSpec. The test asserts:
+/// 1. `run_simulation` returns `Err(...)` (not `Ok`).
+/// 2. The error message contains a human-readable description of the problem
+///    — not a Rust panic backtrace or an opaque internal code.
+///
+/// Added by Task 148 (`mo-6oj`) to characterize the error-handling paths.
+#[test]
+fn error_fixtures_return_expected_errors() {
+    let dir = fixtures_dir();
+    let mut error_fixtures: Vec<PathBuf> = std::fs::read_dir(&dir)
+        .unwrap_or_else(|e| panic!("read fixtures dir {}: {e}", dir.display()))
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .filter(|p| {
+            let name = p.file_name().and_then(|n| n.to_str()).unwrap_or_default();
+            p.extension().and_then(|x| x.to_str()) == Some("xml") && name.starts_with("error-")
+        })
+        .collect();
+    error_fixtures.sort();
+
+    assert!(
+        !error_fixtures.is_empty(),
+        "no error-* fixtures found under {}",
+        dir.display()
+    );
+
+    let expected: &[(&str, &str)] = &[
+        ("error-bad-geotype", "invalid enum value for geographicselection.type"),
+        ("error-bad-model", "invalid enum value for models.model.value"),
+        ("error-bad-modelscale", "invalid enum value for modelscale.value"),
+    ];
+
+    let mut failures: Vec<String> = Vec::new();
+
+    for fixture in &error_fixtures {
+        let name = fixture_name(fixture);
+        let out = tempdir().expect("tempdir");
+        let result = run_simulation(&RunOptions {
+            runspec: fixture.clone(),
+            output: out.path().to_path_buf(),
+            max_parallel_chunks: 1,
+            calculator_dag: None,
+            run_date_time: Some("2026-05-21T00:00:00".to_string()),
+            snapshot: None,
+            scale_input: None,
+        });
+
+        match result {
+            Ok(_) => {
+                failures.push(format!(
+                    "{name}: expected Err but got Ok — fixture should trigger a parse error"
+                ));
+            }
+            Err(e) => {
+                // Collect the full error chain so we see the root cause, not
+                // just the outermost `anyhow` context frame.
+                let msg: String = e
+                    .chain()
+                    .map(|c| c.to_string())
+                    .collect::<Vec<_>>()
+                    .join(": ");
+                // Require a non-panic, human-readable message.
+                if msg.contains("panicked at") || msg.contains("thread 'main' panicked") {
+                    failures.push(format!("{name}: got a panic instead of a clean error: {msg}"));
+                    continue;
+                }
+                // Check the expected error substring for known fixtures.
+                if let Some((_, expected_substr)) =
+                    expected.iter().find(|(n, _)| *n == name)
+                {
+                    if !msg.contains(expected_substr) {
+                        failures.push(format!(
+                            "{name}: error message does not contain \
+                             expected substring {expected_substr:?}; got: {msg}"
+                        ));
+                    } else {
+                        println!("{name}: ok — {msg}");
+                    }
+                } else {
+                    // Unknown error fixture — just require it returns an error.
+                    println!("{name}: ok (unknown fixture, got error) — {msg}");
+                }
+            }
+        }
+    }
+
+    assert!(
+        failures.is_empty(),
+        "error-fixture gate failures:\n  {}",
+        failures.join("\n  ")
+    );
 }
 
 // ── canonical-diff gate ───────────────────────────────────────────────────────

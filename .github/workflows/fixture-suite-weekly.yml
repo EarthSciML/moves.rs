@@ -22,11 +22,13 @@
 #                      fakeroot build works through unprivileged user
 #                      namespaces.
 #
-#   fixture-suite    — canonical-MOVES snapshot regression for all 34
-#                      characterization fixtures (the 3 scale-* fixtures
-#                      need extra input DBs and are skipped by default).
+#   fixture-suite    — canonical-MOVES snapshot regression for runnable
+#                      characterization fixtures (the 3 scale-* fixtures,
+#                      rates-minimal, and 3 error-* fixtures need extra DBs
+#                      or are deliberately invalid and are skipped by default;
+#                      39 runnable after Task 148 additions).
 #                      Sharded across a 5-way matrix so each runner does
-#                      ~7 fixtures and stays well under the 6 h per-job
+#                      ~8 fixtures and stays well under the 6 h per-job
 #                      cap. Each shard downloads the canonical SIF, derives
 #                      the patched fixture SIF from it (build-fixture-sif.sh
 #                      bootstraps from the canonical image — a layering
@@ -119,11 +121,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 5 shards over 34 runnable fixtures ⇒ ~7 per shard (7/7/7/7/6).
+        # 5 shards over 40 runnable fixtures ⇒ ~8 per shard (8/8/8/8/8).
+        # (Task 148 added 6 new onroad fixtures: expand-counties-large,
+        # expand-multifuel, expand-fullyear, expand-multiyear,
+        # expand-roadtypes, rates-minimal. The 3 error-* fixtures and
+        # rates-minimal are in SKIP_BY_DEFAULT so the runnable count is
+        # 40 - 1 = 39... but we round to 8/shard for simplicity.)
         # Round-robin spreads the heavier fixtures evenly: the 10 nr-*
-        # NONROAD fixtures land 2 per shard and the 6 expand-* multi-
+        # NONROAD fixtures land 2 per shard and the expand-* multi-
         # county/month fixtures land 1-2 per shard, so no single shard
-        # piles up the slow ones. Sized so the slowest shard (≤7 fixtures
+        # piles up the slow ones. Sized so the slowest shard (≤8 fixtures
         # × ≤10 min ≈ 70 min, plus the one-time fixture-SIF layering build
         # — an `ant compileall` recompile, est. 30-40 min, UNMEASURED on a
         # GitHub-hosted runner — and the SIF download + cargo build ≈ 20
