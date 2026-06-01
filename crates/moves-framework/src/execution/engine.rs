@@ -533,6 +533,11 @@ impl MOVESEngine {
         let executor = BoundedExecutor::new(self.config.max_parallel_chunks)?;
         let registry = &self.registry;
         let chunk_slow = Arc::clone(&self.slow_store);
+        // The run's model scale, captured for each chunk's CalculatorContext so
+        // scale-sensitive calculators (BaseRateCalculator inventory activity
+        // weighting) can branch on it. Mirrors the Java
+        // `ExecutionRunSpec.getModelScale()`.
+        let run_scale = self.execution.model_scale();
         // Per-chunk wall times collected from within the parallel closure.
         // Indexed to match the `chunks` slice order: `chunk_slot[i]` holds
         // the timing for `chunks[i]`. Using a `Mutex<Vec<Option<...>>>` lets
@@ -569,9 +574,11 @@ impl MOVESEngine {
             // different Arcs, providing per-chunk scratch isolation.
             // The slow tier (execution-DB tables) is shared read-only across
             // all chunks via the same Arc.
-            let chunk_ctx: Arc<Mutex<CalculatorContext>> = Arc::new(Mutex::new(
-                CalculatorContext::with_slow(Arc::clone(&chunk_slow)),
-            ));
+            let chunk_ctx: Arc<Mutex<CalculatorContext>> = Arc::new(Mutex::new({
+                let mut ctx = CalculatorContext::with_slow(Arc::clone(&chunk_slow));
+                ctx.set_model_scale(run_scale);
+                ctx
+            }));
             for name in chunk.modules() {
                 let Some(instance) = instantiate(registry, name) else {
                     continue;

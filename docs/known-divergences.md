@@ -186,22 +186,37 @@ causes — one structural (now fixed) and one numerical (still open):
    90/91); evap/refueling/etc. calculators are untouched, so the previously
    asserted `process-evap-fvv` (off-network process 12) is unaffected.
 
-2. *Un-weighted rates instead of inventory mass (STILL OPEN).* The port hardcodes
-   `ModuleFlags::default()` (`apply_activity`/`aggregate_smfr`/discard flags all
-   false) in `execute`, and the `universalActivity` table the weighting multiplies
-   by is **not in the captured execution DB** (canonical builds it internally from
-   SHO × source-bin distribution × the model-year age distribution and never
-   persists it). So the surviving roadType-4 rows carry the raw BaseRate rate, not
-   `rate × activity`. The error is **per-model-year**: canonical/port row-level
-   ratios run monotonically from ≈0.22 (MY 1981) to ≈7 (MY 1999), the signature of
-   the missing fleet-population (age-distribution) weight — not a uniform scalar.
-   `max_rel_diff`≈0.83 for `expand-criteria`. Reproducing it requires
-   reconstructing `universalActivity` and deriving the runspec-driven `BRC_*`
-   section flags — a Phase-level onroad activity-weighting piece not yet present.
+2. *Un-weighted rates instead of inventory mass (FIXED for criteria pollutants).*
+   The port previously hardcoded `ModuleFlags::default()` (`apply_activity` false)
+   in `execute`, and the `universalActivity` table the weighting multiplies by is
+   **not in the captured execution DB** (canonical builds it internally from SHO /
+   Starts and never persists it). So the surviving roadType-4 rows carried the raw
+   BaseRate rate, not `rate × activity`. The error was **per-model-year**:
+   canonical/port row-level ratios ran from ≈0.22 to ≈7, the signature of the
+   missing fleet-population weight. `max_rel_diff`≈0.83 for `expand-criteria`.
 
-Until item 2 lands these fixtures stay in `QUARANTINED_FIXTURES`: the row
-*shape* now matches canonical, but the emitted *mass* does not, and the gate
-asserts on `emissionQuant`.
+   **Fix:** `BaseRateCalculator::execute` now derives `apply_activity` from the
+   run's `ModelScale` (`Inv`/`MACROSCALE` = inventory → on; `Rates` → off),
+   threaded through `CalculatorContext::model_scale()`, and `build_universal_activity`
+   synthesizes `universalActivity` from the snapshot's `SHO` (process 1/9/10, per
+   link) / `Starts` (process 2, per zone) with `modelYearID = year − ageID`.
+   Crucially the activity is **`SHO / noOfRealDays`**, not raw `SHO`: empirically,
+   per model year and day-type, canonical `MOVESOutput = port_base × SHO /
+   noOfRealDays` (weekend ÷2, weekday ÷5) — the port's base emission already
+   carries the real-day count, so a raw-`SHO` multiply double-counts it (a constant
+   ≈4.3× over-emit). With this, `expand-criteria` matches canonical to f64
+   precision (`max_rel_diff` ≈ 8.5e-8) and has graduated to `asserted_fixtures`.
+
+   *Still open — energy-unit conversion.* The sibling `expand-*` fixtures select
+   **energy** (pollutant 91). Their base rate is in KJ and the runspec asks for
+   `energyunits="Million BTU"`, but the onroad output path applies no energy-unit
+   conversion (canonical: KJ ÷ `1055.0559 × 1e6`). `max_rel_diff` ≈ 1.055e6 — a
+   clean constant unit factor, the sole remaining blocker for `expand-day`,
+   `expand-month`, `expand-counties`, `expand-sourcetype`, `expand-fueltype-diesel`.
+
+Until the energy-unit conversion lands the energy-selecting fixtures stay in
+`QUARANTINED_FIXTURES`: the row *shape* matches canonical and criteria mass now
+matches, but energy *mass* is off by the missing unit factor.
 
 **`process-apu`** is the same gap surfacing through a fixture that *was*
 asserted-vacuous only because the month bug suppressed its output. Its

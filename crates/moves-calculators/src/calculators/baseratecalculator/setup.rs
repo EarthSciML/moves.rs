@@ -437,6 +437,16 @@ pub struct RunSpecRoadTypeRow {
     pub road_type_id: i32,
 }
 
+/// One `RunSpecHourDay` row — the selected `hourDayID`. The GetActivity SQL
+/// section joins `SHO`/`Starts` to this table to restrict the activity to the
+/// run's selected hours; [`crate::calculators::baseratecalculator`]'s
+/// `build_universal_activity` mirrors that filter.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct RunSpecHourDayRow {
+    /// Hour/day id the RunSpec selected.
+    pub hour_day_id: i32,
+}
+
 fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -> MfError {
     MfError::RowExtraction {
         table: table.to_string(),
@@ -2407,6 +2417,42 @@ impl TableRow for RunSpecRoadTypeRow {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
                 Ok(RunSpecRoadTypeRow {
                     road_type_id: road_type_id.get(i).ok_or_else(|| null("roadTypeID"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+impl TableRow for RunSpecHourDayRow {
+    fn table_name() -> &'static str {
+        "RunSpecHourDay"
+    }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([("hourDayID".into(), DataType::Int32)])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![Series::new(
+                "hourDayID".into(),
+                rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+            )
+            .into()],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "RunSpecHourDay";
+        let hour_day_id = df
+            .column("hourDayID")
+            .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "hourDayID", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(RunSpecHourDayRow {
+                    hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))?,
                 })
             })
             .collect()

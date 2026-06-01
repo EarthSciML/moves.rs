@@ -333,6 +333,13 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
         ("process-evap-leaks", ONROAD_REL_TOL, false), // ~1.6e-7
         ("process-evap-permeation", ONROAD_REL_TOL, false), // ~2.1e-7
         ("nr-commercial-nation", NONROAD_REL_TOL, false), // ~3.5e-3 (real*4)
+        // expand-criteria: inventory activity weighting now wired in
+        // BaseRateCalculator (universalActivity = SHO / noOfRealDays applied as
+        // ApplyActivity). Criteria pollutants (THC/CO/NOx) match canonical to
+        // f64 precision (~8.5e-8). The sibling expand-* fixtures select energy
+        // (pollutant 91) and stay quarantined on the separate KJ→Million-BTU
+        // output-unit conversion. See docs/known-divergences.md §4.4.
+        ("expand-criteria", ONROAD_REL_TOL, false), // ~8.5e-8
         // process-apu was asserted-vacuous (canon 0 / port 0) only because the
         // month off-by-one blocked all BaseRate output. With that fixed the
         // BaseRate path now emits the process-91 / opMode-201,203 (APU /
@@ -356,19 +363,20 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
 /// data plane is fixed it should graduate from this list into
 /// [`asserted_fixtures`].
 const QUARANTINED_FIXTURES: &[&str] = &[
-    // OVER-emit class — ROW SHAPE now matches canonical (process / road type /
-    // pollutant / row count), but the emitted MASS does not. Two causes were
-    // separated: (1) the port emitted off-network start-exhaust rows (process 2,
-    // roadTypeID 1) the RunSpec never selected — FIXED by mirroring the MOVES
-    // worker's `runSpecRoadType` join inside `BaseRateCalculator::execute`; and
-    // (2) the surviving rows carry the raw BaseRate rate, not `rate × activity`
-    // — the per-model-year inventory activity weighting (`universalActivity`,
-    // built by canonical from SHO × source-bin × age and never persisted) is not
-    // yet wired, so `emissionQuant` is off by the missing fleet-population
-    // factor (max_rel_diff ≈ 0.83 for expand-criteria). Still quarantined on
-    // mass. See docs/known-divergences.md §4.4 reported bug 1.
+    // OVER-emit class — ROW SHAPE matches canonical (process / road type /
+    // pollutant / row count). Two mass causes were separated and FIXED: (1) the
+    // port emitted off-network start-exhaust rows (process 2, roadTypeID 1) the
+    // RunSpec never selected — fixed by mirroring the worker's `runSpecRoadType`
+    // join; and (2) the surviving rows carried the raw BaseRate rate, not
+    // `rate × activity` — the inventory activity weighting (`universalActivity`,
+    // never persisted) is now synthesized as `SHO / noOfRealDays` and applied
+    // (`ApplyActivity`) in `BaseRateCalculator::execute`, gated on `ModelScale`.
+    // `expand-criteria` (criteria pollutants) now matches canonical and has
+    // GRADUATED to asserted_fixtures. The fixtures below remain quarantined for
+    // a DIFFERENT, separate reason: they select energy (pollutant 91), whose
+    // KJ→Million-BTU output-unit conversion the port does not yet apply
+    // (max_rel_diff ≈ 1.055e6). See docs/known-divergences.md §4.4 bug 1.
     "expand-counties",
-    "expand-criteria",
     "expand-day",
     "expand-fueltype-diesel",
     "expand-month",
