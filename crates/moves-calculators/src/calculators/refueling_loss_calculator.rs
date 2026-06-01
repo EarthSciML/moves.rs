@@ -1383,6 +1383,231 @@ impl TableRow for RefuelingFuelTypeRow {
     }
 }
 
+/// One `FuelType` row — only `fuelTypeID` and the nullable `fuelDensity` the
+/// `RefuelingFuelType` synthesis reads. `fuelDensity` is `NULL` for fuel types
+/// without a defined density (e.g. electricity, id 9), which the synthesis
+/// drops (`fuelDensity > 0`).
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct FuelTypeDensityRow {
+    fuel_type_id: i32,
+    fuel_density: Option<f64>,
+}
+impl TableRow for FuelTypeDensityRow {
+    fn table_name() -> &'static str {
+        "FuelType"
+    }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("fuelTypeID".into(), DataType::Int32),
+            ("fuelDensity".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "fuelTypeID".into(),
+                    rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelDensity".into(),
+                    rows.iter().map(|r| r.fuel_density).collect::<Vec<Option<f64>>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "FuelType";
+        let id = df
+            .column("fuelTypeID")
+            .map_err(|e| row_err(t, 0, "fuelTypeID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "fuelTypeID", e.to_string()))?;
+        let dens = df
+            .column("fuelDensity")
+            .map_err(|e| row_err(t, 0, "fuelDensity", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "fuelDensity", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                Ok(FuelTypeDensityRow {
+                    fuel_type_id: id
+                        .get(i)
+                        .ok_or_else(|| row_err(t, i, "fuelTypeID", "null value".into()))?,
+                    fuel_density: dens.get(i),
+                })
+            })
+            .collect()
+    }
+}
+
+/// One `FuelSubtype` row — only `fuelSubtypeID`, `fuelTypeID` and the nullable
+/// `energyContent` the `RefuelingFuelType` synthesis reads. A `NULL` or
+/// non-positive `energyContent` is dropped before the market-share sum.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct FuelSubtypeEnergyRow {
+    fuel_subtype_id: i32,
+    fuel_type_id: i32,
+    energy_content: Option<f64>,
+}
+impl TableRow for FuelSubtypeEnergyRow {
+    fn table_name() -> &'static str {
+        "FuelSubtype"
+    }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("fuelSubtypeID".into(), DataType::Int32),
+            ("fuelTypeID".into(), DataType::Int32),
+            ("energyContent".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "fuelSubtypeID".into(),
+                    rows.iter().map(|r| r.fuel_subtype_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelTypeID".into(),
+                    rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "energyContent".into(),
+                    rows.iter()
+                        .map(|r| r.energy_content)
+                        .collect::<Vec<Option<f64>>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "FuelSubtype";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let sid = get_i32("fuelSubtypeID")?;
+        let tid = get_i32("fuelTypeID")?;
+        let ec = df
+            .column("energyContent")
+            .map_err(|e| row_err(t, 0, "energyContent", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "energyContent", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(FuelSubtypeEnergyRow {
+                    fuel_subtype_id: sid.get(i).ok_or_else(|| null("fuelSubtypeID"))?,
+                    fuel_type_id: tid.get(i).ok_or_else(|| null("fuelTypeID"))?,
+                    energy_content: ec.get(i),
+                })
+            })
+            .collect()
+    }
+}
+
+/// Synthesise the `RefuelingFuelType` computed extract from its constituent
+/// default-DB tables, reproducing the SQL "Extract Data" aggregation:
+///
+/// ```sql
+/// SELECT ft.fuelTypeID, sum(marketShare*energyContent) as energyContent,
+///        fuelDensity, rsm.monthID
+/// FROM FuelType ft
+///   JOIN FuelSubtype  ON fuelTypeID
+///   JOIN FuelFormulation ON fuelSubtypeID
+///   JOIN FuelSupply   ON fuelFormulationID
+///   JOIN MonthOfAnyYear ON monthGroupID
+///   JOIN RunSpecMonth ON monthID
+/// WHERE energyContent > 0 AND fuelDensity > 0
+/// GROUP BY fuelTypeID, monthID;
+/// ```
+///
+/// The store's `FuelSupply` is already extracted to the run's fuel region and
+/// year, so the SQL's `fuelRegionID` / `year` join filters are implicit; the
+/// `RunSpecMonth` filter is reproduced by fanning each `monthGroupID` across its
+/// `MonthOfAnyYear` months (months without an energy row drop in the downstream
+/// inner join anyway). Per-subtype `energyContent ≤ 0`/`NULL` and per-fuel-type
+/// `fuelDensity ≤ 0`/`NULL` rows are dropped before the sum, matching the SQL
+/// `WHERE`.
+fn build_refueling_fuel_type(
+    tables: &impl DataFrameStoreTyped,
+    fuel_supply: &[RefuelingFuelSupplyRow],
+    fuel_formulation: &[RefuelingFuelFormulationRow],
+    month_of_any_year: &[RefuelingMonthOfAnyYearRow],
+) -> Result<Vec<RefuelingFuelTypeRow>, Error> {
+    // fuelTypeID → fuelDensity, keeping only fuelDensity > 0.
+    let density: HashMap<i32, f64> = tables
+        .iter_typed::<FuelTypeDensityRow>("FuelType")?
+        .into_iter()
+        .filter_map(|r| r.fuel_density.filter(|&d| d > 0.0).map(|d| (r.fuel_type_id, d)))
+        .collect();
+    // fuelSubtypeID → (fuelTypeID, energyContent), keeping only energyContent > 0.
+    let subtype: HashMap<i32, (i32, f64)> = tables
+        .iter_typed::<FuelSubtypeEnergyRow>("FuelSubtype")?
+        .into_iter()
+        .filter_map(|r| {
+            r.energy_content
+                .filter(|&e| e > 0.0)
+                .map(|e| (r.fuel_subtype_id, (r.fuel_type_id, e)))
+        })
+        .collect();
+    // fuelFormulationID → fuelSubtypeID.
+    let formulation: HashMap<i32, i32> = fuel_formulation
+        .iter()
+        .map(|ff| (ff.fuel_formulation_id, ff.fuel_subtype_id))
+        .collect();
+    // monthGroupID → [monthID].
+    let mut group_months: HashMap<i32, Vec<i32>> = HashMap::new();
+    for m in month_of_any_year {
+        group_months
+            .entry(m.month_group_id)
+            .or_default()
+            .push(m.month_id);
+    }
+    // sum(marketShare × energyContent) per (fuelTypeID, monthID).
+    let mut acc: HashMap<(i32, i32), f64> = HashMap::new();
+    for row in fuel_supply {
+        let Some(&sub) = formulation.get(&row.fuel_formulation_id) else {
+            continue;
+        };
+        let Some(&(fuel_type, energy)) = subtype.get(&sub) else {
+            continue;
+        };
+        let Some(months) = group_months.get(&row.month_group_id) else {
+            continue;
+        };
+        for &month in months {
+            *acc.entry((fuel_type, month)).or_default() += row.market_share * energy;
+        }
+    }
+    let mut out: Vec<RefuelingFuelTypeRow> = acc
+        .into_iter()
+        .filter(|&(_, energy)| energy > 0.0)
+        .filter_map(|((fuel_type, month), energy)| {
+            density.get(&fuel_type).map(|&fuel_density| RefuelingFuelTypeRow {
+                fuel_type_id: fuel_type,
+                month_id: month,
+                energy_content: energy,
+                fuel_density,
+            })
+        })
+        .collect();
+    out.sort_by_key(|r| (r.fuel_type_id, r.month_id));
+    Ok(out)
+}
+
 impl TableRow for EnergyRow {
     fn table_name() -> &'static str {
         "MOVESWorkerOutput"
@@ -2242,32 +2467,59 @@ impl Calculator for RefuelingLossCalculator {
         let tables = ctx.tables();
         let rs_pol_processes =
             tables.iter_typed::<RunSpecPollutantProcessRow>("RunSpecPollutantProcess")?;
+        // The calculator produces only THC (pollutant 1); the Java
+        // `pollutantIDs` array is `{1}`, and `subscribeToMe` intersects the
+        // RunSpec's requested `(pollutant, process)` with that singleton when
+        // building `##refuelingDisplacement.pollutantIDs##` /
+        // `##refuelingSpillage.pollutantIDs##`. A naive
+        // `polProcessID % 100 == process` filter would wrongly admit other
+        // pollutants the RunSpec selects for processes 18/19 — e.g. TOG (86),
+        // which is produced downstream by `TOGSpeciationCalculator` chaining off
+        // this calculator's THC, not by this calculator. Intersect with THC.
         let refueling_displacement_pollutant: Vec<i32> = rs_pol_processes
             .iter()
-            .filter(|r| r.pol_process_id % 100 == DISPLACEMENT_PROCESS_ID)
+            .filter(|r| {
+                r.pol_process_id % 100 == DISPLACEMENT_PROCESS_ID
+                    && r.pol_process_id / 100 == i32::from(THC_POLLUTANT.0)
+            })
             .map(|r| r.pol_process_id / 100)
             .collect();
         let refueling_spillage_pollutant: Vec<i32> = rs_pol_processes
             .iter()
-            .filter(|r| r.pol_process_id % 100 == SPILLAGE_PROCESS_ID)
+            .filter(|r| {
+                r.pol_process_id % 100 == SPILLAGE_PROCESS_ID
+                    && r.pol_process_id / 100 == i32::from(THC_POLLUTANT.0)
+            })
             .map(|r| r.pol_process_id / 100)
             .collect();
+        let refueling_fuel_supply = tables.iter_typed::<RefuelingFuelSupplyRow>("FuelSupply")?;
+        let refueling_fuel_formulation =
+            tables.iter_typed::<RefuelingFuelFormulationRow>("FuelFormulation")?;
+        let refueling_month_of_any_year =
+            tables.iter_typed::<RefuelingMonthOfAnyYearRow>("MonthOfAnyYear")?;
+        // `RefuelingFuelType` is a computed extract absent from the snapshot's
+        // captured tables; synthesise it from its constituent default-DB tables
+        // (the SQL's "Extract Data" aggregation).
+        let refueling_fuel_type = build_refueling_fuel_type(
+            tables,
+            &refueling_fuel_supply,
+            &refueling_fuel_formulation,
+            &refueling_month_of_any_year,
+        )?;
         let inputs = RefuelingLossInputs {
             refueling_zone_month_hour: tables
                 .iter_typed::<RefuelingZoneMonthHourRow>("ZoneMonthHour")?,
             refueling_factors: tables.iter_typed::<RefuelingFactorsRow>("RefuelingFactors")?,
-            refueling_fuel_supply: tables.iter_typed::<RefuelingFuelSupplyRow>("FuelSupply")?,
-            refueling_fuel_formulation: tables
-                .iter_typed::<RefuelingFuelFormulationRow>("FuelFormulation")?,
-            refueling_month_of_any_year: tables
-                .iter_typed::<RefuelingMonthOfAnyYearRow>("MonthOfAnyYear")?,
+            refueling_fuel_supply,
+            refueling_fuel_formulation,
+            refueling_month_of_any_year,
             refueling_fuel_subtype: tables.iter_typed::<RefuelingFuelSubtypeRow>("FuelSubtype")?,
             refueling_control_technology: tables
                 .iter_typed::<RefuelingControlTechnologyRow>("RefuelingControlTechnology")?,
             refueling_county_year: tables.iter_typed::<RefuelingCountyYearRow>("CountyYear")?,
             source_type_tech_adjustment: tables
                 .iter_typed::<SourceTypeTechAdjustmentRow>("SourceTypeTechAdjustment")?,
-            refueling_fuel_type: tables.iter_typed::<RefuelingFuelTypeRow>("RefuelingFuelType")?,
+            refueling_fuel_type,
             refueling_displacement_pollutant,
             refueling_spillage_pollutant,
             energy: tables.iter_typed::<EnergyRow>("MOVESWorkerOutput")?,
@@ -2788,14 +3040,30 @@ mod tests {
             "RefuelingFactors",
             RefuelingFactorsRow::into_dataframe(inputs.refueling_factors.clone()).unwrap(),
         );
+        // `execute` synthesises `RefuelingFuelType` from its constituent
+        // default-DB tables, so the store carries those (not a pre-built
+        // `RefuelingFuelType`). These reproduce `minimal_inputs`' expected
+        // `RefuelingFuelType{fuelType 1, month 7, energyContent 2.0,
+        // fuelDensity 5.0}`: fuel formulation 100 → subtype 10 (fuelType 1,
+        // energyContent 2.0), market share 1.0 in month group 3 (→ month 7),
+        // fuelDensity 5.0.
         store.insert(
             "FuelSupply",
-            RefuelingFuelSupplyRow::into_dataframe(inputs.refueling_fuel_supply.clone()).unwrap(),
+            RefuelingFuelSupplyRow::into_dataframe(vec![RefuelingFuelSupplyRow {
+                month_group_id: 3,
+                fuel_formulation_id: 100,
+                market_share: 1.0,
+            }])
+            .unwrap(),
         );
         store.insert(
             "FuelFormulation",
-            RefuelingFuelFormulationRow::into_dataframe(inputs.refueling_fuel_formulation.clone())
-                .unwrap(),
+            RefuelingFuelFormulationRow::into_dataframe(vec![RefuelingFuelFormulationRow {
+                fuel_formulation_id: 100,
+                fuel_subtype_id: 10,
+                rvp: 0.0,
+            }])
+            .unwrap(),
         );
         store.insert(
             "MonthOfAnyYear",
@@ -2803,8 +3071,21 @@ mod tests {
                 .unwrap(),
         );
         store.insert(
+            "FuelType",
+            FuelTypeDensityRow::into_dataframe(vec![FuelTypeDensityRow {
+                fuel_type_id: 1,
+                fuel_density: Some(5.0),
+            }])
+            .unwrap(),
+        );
+        store.insert(
             "FuelSubtype",
-            RefuelingFuelSubtypeRow::into_dataframe(inputs.refueling_fuel_subtype.clone()).unwrap(),
+            FuelSubtypeEnergyRow::into_dataframe(vec![FuelSubtypeEnergyRow {
+                fuel_subtype_id: 10,
+                fuel_type_id: 1,
+                energy_content: Some(2.0),
+            }])
+            .unwrap(),
         );
         store.insert(
             "RefuelingControlTechnology",
@@ -2821,10 +3102,6 @@ mod tests {
             "SourceTypeTechAdjustment",
             SourceTypeTechAdjustmentRow::into_dataframe(inputs.source_type_tech_adjustment.clone())
                 .unwrap(),
-        );
-        store.insert(
-            "RefuelingFuelType",
-            RefuelingFuelTypeRow::into_dataframe(inputs.refueling_fuel_type.clone()).unwrap(),
         );
         store.insert(
             "MOVESWorkerOutput",

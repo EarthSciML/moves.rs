@@ -220,12 +220,20 @@ impl ModuleInstance {
         }
     }
 
- /// Run the module against `ctx`. Returns the calculator's emission
- /// DataFrame if any, or `None` for generators and empty outputs.
- ///
- /// Accepts `&mut CalculatorContext` so generators can write to
- /// `ctx.scratch_mut()`. Calculators receive a shared `&CalculatorContext`
- /// via the automatic coercion from `&mut`.
+    /// The module's calculator/generator name (for diagnostics).
+    fn name(&self) -> &'static str {
+        match self {
+            ModuleInstance::Calculator(c) => c.name(),
+            ModuleInstance::Generator(g) => g.name(),
+        }
+    }
+
+    /// Run the module against `ctx`. Returns the calculator's emission
+    /// DataFrame if any, or `None` for generators and empty outputs.
+    ///
+    /// Accepts `&mut CalculatorContext` so generators can write to
+    /// `ctx.scratch_mut()`. Calculators receive a shared `&CalculatorContext`
+    /// via the automatic coercion from `&mut`.
     fn execute(&self, ctx: &mut CalculatorContext) -> Result<Option<DataFrame>> {
         match self {
             ModuleInstance::Calculator(c) => Ok(c.execute(ctx)?.into_dataframe()),
@@ -708,11 +716,35 @@ impl MOVESEngine {
                     };
                     let out = match out {
                         Ok(out) => out,
-                        Err(_) => continue,
+                        Err(e) => {
+                            if std::env::var_os("MOVES_DEBUG_CHAINED").is_some() {
+                                eprintln!(
+                                    "[chained-skip] {} error: {e}",
+                                    module.name()
+                                );
+                            }
+                            continue;
+                        }
                     };
-                    let Some(df) = out else { continue };
-                    if df.height() == 0 || df.column("pollutantID").is_err() {
+                    let Some(df) = out else {
+                        if std::env::var_os("MOVES_DEBUG_CHAINED").is_some() {
+                            eprintln!("[chained-empty] {} returned no DataFrame", module.name());
+                        }
                         continue;
+                    };
+                    if df.height() == 0 || df.column("pollutantID").is_err() {
+                        if std::env::var_os("MOVES_DEBUG_CHAINED").is_some() {
+                            eprintln!(
+                                "[chained-empty] {} emitted {} rows (pollutantID present: {})",
+                                module.name(),
+                                df.height(),
+                                df.column("pollutantID").is_ok()
+                            );
+                        }
+                        continue;
+                    }
+                    if std::env::var_os("MOVES_DEBUG_CHAINED").is_some() {
+                        eprintln!("[chained-ok] {} emitted {} rows", module.name(), df.height());
                     }
                     let records = frame_to_emission_records(&df, &run_hash_str);
                     acc.lock()
