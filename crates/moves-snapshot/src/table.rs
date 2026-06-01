@@ -69,8 +69,8 @@ impl NormalizedColumn {
         self.len() == 0
     }
 
-    /// Stringified view of cell `i` for diffing and sort. Returns `None` when
-    /// the cell is null.
+ /// Stringified view of cell `i` for diffing and sort. Returns `None` when
+ /// the cell is null.
     pub fn cell_string(&self, i: usize) -> Option<String> {
         match self {
             NormalizedColumn::Int64(v) => v[i].map(|n| n.to_string()),
@@ -118,8 +118,8 @@ impl Table {
         self.schema.iter().position(|c| c.name == name)
     }
 
-    /// Construct from already-normalized columnar data (e.g., when loading
-    /// from disk). Validates lengths and kind agreement.
+ /// Construct from already-normalized columnar data (e.g., when loading
+ /// from disk). Validates lengths and kind agreement.
     pub fn from_normalized(
         name: String,
         schema: Vec<ColumnSpec>,
@@ -164,9 +164,9 @@ impl Table {
         })
     }
 
-    /// Convert to an Arrow RecordBatch for parquet writing. Float columns
-    /// surface as Utf8 in the arrow schema, since that's what gets written
-    /// to disk.
+ /// Convert to an Arrow RecordBatch for parquet writing. Float columns
+ /// surface as Utf8 in the arrow schema, since that's what gets written
+ /// to disk.
     pub fn to_record_batch(&self) -> Result<(SchemaRef, RecordBatch)> {
         let mut fields = Vec::with_capacity(self.schema.len());
         let mut arrays: Vec<ArrayRef> = Vec::with_capacity(self.schema.len());
@@ -180,8 +180,8 @@ impl Table {
         Ok((schema, batch))
     }
 
-    /// Reconstruct a Table from a parquet-derived RecordBatch plus the
-    /// per-table metadata recovered from the sidecar.
+ /// Reconstruct a Table from a parquet-derived RecordBatch plus the
+ /// per-table metadata recovered from the sidecar.
     pub fn from_record_batch(
         name: String,
         schema_spec: Vec<ColumnSpec>,
@@ -245,8 +245,8 @@ impl TableBuilder {
         })
     }
 
-    /// Set the natural-key columns. Order matters: rows are sorted first by
-    /// `natural_key[0]`, then `natural_key[1]`, etc.
+ /// Set the natural-key columns. Order matters: rows are sorted first by
+ /// `natural_key[0]`, then `natural_key[1]`, etc.
     pub fn with_natural_key<I, S>(mut self, key: I) -> Result<Self>
     where
         I: IntoIterator<Item = S>,
@@ -279,8 +279,8 @@ impl TableBuilder {
                     actual: val.type_name().to_string(),
                 });
             }
-            // i is unused beyond bounds-pairing; keep as a stable iterator
-            // anchor in case we add per-row diagnostics.
+ // i is unused beyond bounds-pairing; keep as a stable iterator
+ // anchor in case we add per-row diagnostics.
             let _ = i;
         }
         self.rows.push(row);
@@ -288,10 +288,10 @@ impl TableBuilder {
     }
 
     pub fn build(mut self) -> Result<Table> {
-        // Sort first (Vec<Vec<Value>> form makes this straightforward).
+ // Sort first (Vec<Vec<Value>> form makes this straightforward).
         sort_rows(&mut self.rows, &self.schema, &self.natural_key);
 
-        // Pivot row-major to columnar, normalizing floats as we go.
+ // Pivot row-major to columnar, normalizing floats as we go.
         let n_cols = self.schema.len();
         let n_rows = self.rows.len();
         let mut columns: Vec<NormalizedColumn> = Vec::with_capacity(n_cols);
@@ -386,7 +386,7 @@ fn sort_rows(rows: &mut [Vec<Value>], schema: &[ColumnSpec], natural_key: &[Stri
 }
 
 fn compare_values(kind: ColumnKind, a: &Value, b: &Value) -> Ordering {
-    // Nulls sort first, deterministically.
+ // Nulls sort first, deterministically.
     match (a, b) {
         (Value::Null, Value::Null) => return Ordering::Equal,
         (Value::Null, _) => return Ordering::Less,
@@ -396,8 +396,8 @@ fn compare_values(kind: ColumnKind, a: &Value, b: &Value) -> Ordering {
     match (kind, a, b) {
         (ColumnKind::Int64, Value::Int64(x), Value::Int64(y)) => x.cmp(y),
         (ColumnKind::Float64, Value::Float64(x), Value::Float64(y)) => {
-            // Sort by the canonical fixed-decimal string so the order is
-            // identical before and after normalization.
+ // Sort by the canonical fixed-decimal string so the order is
+ // identical before and after normalization.
             let xs = float_to_fixed_decimal(*x, FLOAT_DECIMALS);
             let ys = float_to_fixed_decimal(*y, FLOAT_DECIMALS);
             xs.cmp(&ys)
@@ -518,8 +518,8 @@ fn arrow_to_column(table: &str, spec: &ColumnSpec, array: &dyn Array) -> Result<
         }
     }
     .map_err(|err| {
-        // Surface a richer message if the array's data type doesn't even
-        // correspond to any supported kind.
+ // Surface a richer message if the array's data type doesn't even
+ // correspond to any supported kind.
         if matches!(err, Error::ColumnTypeMismatch { .. }) {
             match array.data_type() {
                 DataType::Int64 | DataType::Utf8 | DataType::Boolean => err,

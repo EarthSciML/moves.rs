@@ -8,10 +8,10 @@
 //!
 //! ```text
 //! <captures-dir>/
-//!   databases/<db-name>/<table>.tsv          ← rows (mariadb -B -N -r format)
-//!   databases/<db-name>/<table>.schema.tsv   ← name<TAB>data_type<TAB>column_key per column
-//!   moves-temporary/<file>                   ← contents of MOVESTemporary/
-//!   worker-folder/<workerN>/<file>           ← contents of WorkerFolder/WorkerTempXX/
+//! databases/<db-name>/<table>.tsv ← rows (mariadb -B -N -r format)
+//! databases/<db-name>/<table>.schema.tsv ← name<TAB>data_type<TAB>column_key per column
+//! moves-temporary/<file> ← contents of MOVESTemporary/
+//! worker-folder/<workerN>/<file> ← contents of WorkerFolder/WorkerTempXX/
 //! ```
 //!
 //! [`build_snapshot`] walks this directory deterministically and produces a
@@ -21,8 +21,8 @@
 //! * MariaDB dumps are decoded via the `mariadb -B -N -r` raw escape set.
 //! * Float values inherit the snapshot crate's fixed-decimal canonicalization.
 //! * Worker `.tbl` / `.csv` files are imported as all-utf8 tables (literal
-//!   bytes) since they ship without a schema sidecar — type-aware
-//!   normalization comes from the database dumps.
+//! bytes) since they ship without a schema sidecar — type-aware
+//! normalization comes from the database dumps.
 
 pub mod capture;
 pub mod coverage;

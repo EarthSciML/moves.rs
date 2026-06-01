@@ -4,8 +4,8 @@ This document is the public-facing performance benchmark for the Rust port of
 MOVES, comparing it against canonical MOVES (EPA's Java implementation) on six
 representative workloads.
 
-**Latest measurement:** 2026-06-01 (Phase 8, real-emission output; Task 146)  
-**Baseline measurement:** 2026-05-21 (Phase 7, framework overhead only; Task 127)  
+**Latest measurement:** 2026-06-01 (real-emission output)
+**Baseline measurement:** 2026-05-21 (framework overhead only)
 **Host:** Intel Xeon Gold 6248, 20 physical cores @ 2.50 GHz, Linux (1 thread/core)
 
 ---
@@ -83,9 +83,9 @@ actually executed (not unimplemented stubs):
 impl% = modules_executed / modules_planned × 100
 ```
 
-In Phase 7 this is 0 % because calculator `execute()` methods returned
-`CalculatorOutput::empty()` with no execution database wired. In Phase 8
-(2026-06-01) it is **95.5 %** (42 of 44 modules) when run with `--snapshot`
+In the framework-overhead baseline this is 0 % because calculator `execute()` methods returned
+`CalculatorOutput::empty()` with no execution database wired. In the real-emission
+measurements (2026-06-01) it is **95.5 %** (42 of 44 modules) when run with `--snapshot`
 supplying the execution database. The remaining 2 modules are specialty
 calculators pending port.
 
@@ -93,7 +93,7 @@ calculators pending port.
 
 Each workload group is measured at `--max-parallel-chunks` = 1, 2, 4, and
 NCPU (the host's available CPU count). The speedup column is relative to
-N = 1. In Phase 7 (no real data) the executor has nothing substantial to
+N = 1. In the framework-overhead baseline (no real data) the executor has nothing substantial to
 parallelize; the sweep exercises the scheduling infrastructure.
 
 ### Scale fixtures
@@ -105,12 +105,12 @@ containing those files to enable them:
 
 ```sh
 BENCHMARK_SCALE_INPUTS_DIR=/path/to/scale-inputs \
-    cargo test -p moves-cli --test benchmark_suite --release -- --nocapture
+ cargo test -p moves-cli --test benchmark_suite --release -- --nocapture
 ```
 
 ---
 
-## Phase 8 real-emission measurements
+## Real-emission measurements
 
 These numbers reflect **real emission output** — calculators execute against
 captured execution-database snapshots and produce actual `MOVESOutput` rows.
@@ -143,14 +143,14 @@ energy pollutants; no user-supplied input database required)
 #### Rust port
 
 ```
-N     wall(ms)   plan(ms)   exec(ms)   chunks  impl%   peak_RSS_MiB
+N wall(ms) plan(ms) exec(ms) chunks impl% peak_RSS_MiB
 --------------------------------------------------------------------
- 1       121.0        0.2      120.3       26   95.5%          110.1
-20        29.7        0.2       28.5       26   95.5%          120.9
+ 1 121.0 0.2 120.3 26 95.5% 110.1
+20 29.7 0.2 28.5 26 95.5% 120.9
 ```
 
-Speedup N=1→N=20: **4.1×**  
-Process elapsed (includes binary start + Parquet load): 500 ms at N=1, 150 ms at N=20  
+Speedup N=1→N=20: **4.1×** 
+Process elapsed (includes binary start + Parquet load): 500 ms at N=1, 150 ms at N=20 
 Cold-start first-run wall time: 187 ms at N=1 (snapshot Parquet loads from disk)
 
 #### Canonical MOVES (MOVES5.0.1, MariaDB 11.4, Temurin JDK 21)
@@ -190,13 +190,13 @@ The speedup sources (as projected):
 #### Rust port
 
 ```
-N     wall(ms)   plan(ms)   exec(ms)   chunks  impl%   peak_RSS_MiB
+N wall(ms) plan(ms) exec(ms) chunks impl% peak_RSS_MiB
 --------------------------------------------------------------------
- 1       402.0        0.2      400.0       26   95.5%          113.8
-20       124.0        0.2      123.0       26   95.5%          133.1
+ 1 402.0 0.2 400.0 26 95.5% 113.8
+20 124.0 0.2 123.0 26 95.5% 133.1
 ```
 
-Speedup N=1→N=20: **3.2×**  
+Speedup N=1→N=20: **3.2×** 
 Cold-start first-run wall time: 432 ms at N=1
 
 County-count scaling at N=1: 402 ms / 121 ms = **3.3×** per 3-county vs 1-county
@@ -224,12 +224,12 @@ MOVES invocation regardless of county count.
 
 ---
 
-## Phase 7 baseline measurements (framework overhead only)
+## Framework-overhead baseline measurements
 
 These numbers reflect **pure framework overhead** — RunSpec parsing,
 calculator-graph planning, chunk scheduling, and `MOVESRun.parquet` output.
 Calculator `execute()` methods do no work yet; they return empty output
-immediately. The data plane (Phase 4) that feeds real row data is not yet
+immediately. The data plane that feeds real row data is not yet
 wired.
 
 This is not a fair head-to-head comparison with canonical MOVES (which does
@@ -239,78 +239,78 @@ that every run will pay regardless of workload complexity.
 ### 1. Default-Scale National (onroad, 23 fixtures, N=1)
 
 ```
-fixture                                wall(ms)   plan(ms)   exec(ms)  chunks   impl%
+fixture wall(ms) plan(ms) exec(ms) chunks impl%
 ---------------------------------------------------------------------------------------
-chain-nonhaptog                             2.8        0.7        0.2      26      0%
-chain-tog-speciation                        2.8        0.7        0.2      26      0%
-expand-counties                             2.9        0.8        0.2      27      0%
-expand-criteria                             3.0        0.8        0.2      27      0%
-expand-day                                  3.3        0.8        0.5      27      0%
-expand-fueltype-diesel                      3.1        0.8        0.2      27      0%
-expand-month                                3.4        0.8        0.3      27      0%
-expand-sourcetype                           3.2        0.8        0.2      27      0%
-process-airtoxics                           3.0        0.8        0.2      26      0%
-process-apu                                 2.8        0.7        0.2      25      0%
-process-brakewear                           2.8        0.7        0.2      24      0%
-process-crankcase-extidle                   2.9        0.7        0.2      20      0%
-process-crankcase-running                   2.9        0.7        0.2      21      0%
-process-crankcase-start                     2.8        0.7        0.2      20      0%
-process-evap-fvv                            2.9        0.7        0.2      25      0%
-process-evap-leaks                          2.8        0.7        0.2      25      0%
-process-evap-permeation                     2.9        0.7        0.2      24      0%
-process-extended-idle                       2.9        0.7        0.2      25      0%
-process-nox-speciation                      2.9        0.7        0.2      25      0%
-process-pm-exhaust                          2.8        0.7        0.2      26      0%
-process-refueling                           3.0        0.8        0.2      27      0%
-process-tirewear                            2.8        0.7        0.2      25      0%
-sample-runspec                              3.1        0.8        0.2      27      0%
+chain-nonhaptog 2.8 0.7 0.2 26 0%
+chain-tog-speciation 2.8 0.7 0.2 26 0%
+expand-counties 2.9 0.8 0.2 27 0%
+expand-criteria 3.0 0.8 0.2 27 0%
+expand-day 3.3 0.8 0.5 27 0%
+expand-fueltype-diesel 3.1 0.8 0.2 27 0%
+expand-month 3.4 0.8 0.3 27 0%
+expand-sourcetype 3.2 0.8 0.2 27 0%
+process-airtoxics 3.0 0.8 0.2 26 0%
+process-apu 2.8 0.7 0.2 25 0%
+process-brakewear 2.8 0.7 0.2 24 0%
+process-crankcase-extidle 2.9 0.7 0.2 20 0%
+process-crankcase-running 2.9 0.7 0.2 21 0%
+process-crankcase-start 2.8 0.7 0.2 20 0%
+process-evap-fvv 2.9 0.7 0.2 25 0%
+process-evap-leaks 2.8 0.7 0.2 25 0%
+process-evap-permeation 2.9 0.7 0.2 24 0%
+process-extended-idle 2.9 0.7 0.2 25 0%
+process-nox-speciation 2.9 0.7 0.2 25 0%
+process-pm-exhaust 2.8 0.7 0.2 26 0%
+process-refueling 3.0 0.8 0.2 27 0%
+process-tirewear 2.8 0.7 0.2 25 0%
+sample-runspec 3.1 0.8 0.2 27 0%
 ---------------------------------------------------------------------------------------
-TOTAL (23 fixtures)                        67.9       16.7
+TOTAL (23 fixtures) 67.9 16.7
 ```
 
 **N sweep:**
 
 ```
-     N   total_wall_ms   speedup  peak_RSS_MiB
+ N total_wall_ms speedup peak_RSS_MiB
 ------------------------------------------------
-     1           470.2      1.00           0.0
-     2           468.4      1.00           0.0
-     4           470.9      1.00           0.0
-    20           506.1      0.93           0.3
+ 1 470.2 1.00 0.0
+ 2 468.4 1.00 0.0
+ 4 470.9 1.00 0.0
+ 20 506.1 0.93 0.3
 ```
 
 Framework overhead per fixture: **2.8–3.4 ms**. Planning dominates at ~0.7–0.8 ms;
 execution of 20–27 empty MasterLoops costs ~0.2 ms. Throughput is flat across
-N because planning (sequential) is ~4× execution (parallel-eligible) in Phase 7.
+N because planning (sequential) is ~4× execution (parallel-eligible) at this stage.
 
 ### 2. NONROAD-Only (10 fixtures, N=1)
 
 ```
-fixture                                wall(ms)   plan(ms)   exec(ms)  chunks   impl%
+fixture wall(ms) plan(ms) exec(ms) chunks impl%
 ---------------------------------------------------------------------------------------
-nr-agriculture-state                        2.5        0.4        0.2      18      0%
-nr-airport-support-county                   2.5        0.4        0.2      18      0%
-nr-commercial-nation                        2.5        0.4        0.2      18      0%
-nr-construction-state                       2.8        0.4        0.2      18      0%
-nr-industrial-county                        2.6        0.3        0.3      18      0%
-nr-lawn-garden-county                       2.5        0.4        0.2      18      0%
-nr-logging-county                           2.5        0.4        0.2      18      0%
-nr-pleasure-craft-state                     2.7        0.5        0.2      19      0%
-nr-railroad-support-nation                  2.5        0.4        0.2      18      0%
-nr-recreational-county                      2.5        0.4        0.2      18      0%
+nr-agriculture-state 2.5 0.4 0.2 18 0%
+nr-airport-support-county 2.5 0.4 0.2 18 0%
+nr-commercial-nation 2.5 0.4 0.2 18 0%
+nr-construction-state 2.8 0.4 0.2 18 0%
+nr-industrial-county 2.6 0.3 0.3 18 0%
+nr-lawn-garden-county 2.5 0.4 0.2 18 0%
+nr-logging-county 2.5 0.4 0.2 18 0%
+nr-pleasure-craft-state 2.7 0.5 0.2 19 0%
+nr-railroad-support-nation 2.5 0.4 0.2 18 0%
+nr-recreational-county 2.5 0.4 0.2 18 0%
 ---------------------------------------------------------------------------------------
-TOTAL (10 fixtures)                        25.7        3.7
+TOTAL (10 fixtures) 25.7 3.7
 ```
 
 **N sweep:**
 
 ```
-     N   total_wall_ms   speedup  peak_RSS_MiB
+ N total_wall_ms speedup peak_RSS_MiB
 ------------------------------------------------
-     1           200.0      1.00           0.0
-     2           213.5      0.94           0.0
-     4           203.6      0.98           0.0
-    20           206.2      0.97           0.0
+ 1 200.0 1.00 0.0
+ 2 213.5 0.94 0.0
+ 4 203.6 0.98 0.0
+ 20 206.2 0.97 0.0
 ```
 
 NONROAD fixtures plan 18–19 chunks (fewer than onroad's 20–27) and have slightly
@@ -320,20 +320,20 @@ has fewer modules. Framework overhead per fixture: **2.5–2.8 ms**.
 ### 3. Mixed Onroad + NONROAD (1 fixture, N=1)
 
 ```
-fixture                                wall(ms)   plan(ms)   exec(ms)  chunks   impl%
+fixture wall(ms) plan(ms) exec(ms) chunks impl%
 ---------------------------------------------------------------------------------------
-mixed-onroad-nonroad                        3.0        0.8        0.2      27      0%
+mixed-onroad-nonroad 3.0 0.8 0.2 27 0%
 ```
 
 **N sweep:**
 
 ```
-     N   total_wall_ms   speedup  peak_RSS_MiB
+ N total_wall_ms speedup peak_RSS_MiB
 ------------------------------------------------
-     1            20.5      1.00           0.0
-     2            20.5      1.00           0.0
-     4            20.5      1.00           0.0
-    20            21.3      0.96           0.0
+ 1 20.5 1.00 0.0
+ 2 20.5 1.00 0.0
+ 4 20.5 1.00 0.0
+ 20 21.3 0.96 0.0
 ```
 
 The dual-model path (ONROAD + NONROAD) plans 27 chunks — the combined graph
@@ -353,7 +353,7 @@ for context; Rust port times are pending scale-input availability:
 | Project-Scale (link-level) | 2–8 min | TBD (needs PDB inputs) |
 | Rates-mode (emission-rate lookup) | 3–10 min | TBD |
 
-> The Phase 8 benchmark (§above) used the `DEFAULT` domain which runs against
+> The real-emission benchmark (§above) used the `DEFAULT` domain which runs against
 > the embedded default database and does not require CDB/PDB. Scale inputs are
 > needed to benchmark the county-inventory (`Inv` / `SINGLE` domain) path.
 > Set `BENCHMARK_SCALE_INPUTS_DIR` once scale inputs are available.
@@ -362,7 +362,7 @@ for context; Rust port times are pending scale-input availability:
 
 ## Canonical MOVES comparison — measured results
 
-### Phase 8 real-emission comparison (Task 146)
+### Real-emission comparison
 
 The Rust port now executes **42 of 44 calculator-graph modules (95.5%)** against
 captured execution-database snapshots, producing real `MOVESOutput` rows that
@@ -394,30 +394,30 @@ across the run.
 | Rust port peak RSS N=20 (3-county) | 133 MiB |
 
 The Rust port uses **1.7–1.9×** less memory than canonical MOVES at the same
-workload scale.  Canonical MOVES's MariaDB process contributes ~100–150 MiB
+workload scale. Canonical MOVES's MariaDB process contributes ~100–150 MiB
 (in-process buffer pool plus MyISAM key cache) independent of workload size.
 
-### Phase 7 framework-floor note
+### Framework-overhead baseline note
 
-At the Phase 7 framework-overhead level (before the data plane was wired), the
+At the framework-overhead level (before the data plane was wired), the
 Rust port completed one default-scale fixture in **~3 ms**. A comparable
 canonical MOVES run took **5–15 minutes**, but that comparison was meaningless
-because the Rust port was not yet computing anything. The Phase 8 numbers above
+because the Rust port was not yet computing anything. The real-emission numbers above
 are the first meaningful head-to-head comparison.
 
-What the Phase 7 numbers confirmed (and still hold in Phase 8):
+What the framework-overhead baseline numbers confirmed (and still hold with real emission output):
 
 - **Per-fixture framework tax is 0.2 ms** (planning; measured with warm cache).
-  This is the minimum overhead that every run pays regardless of workload
-  complexity. For a 28-second canonical-MOVES run, this represents
-  **0.001 % of total runtime** — the framework is not the bottleneck.
+ This is the minimum overhead that every run pays regardless of workload
+ complexity. For a 28-second canonical-MOVES run, this represents
+ **0.001 % of total runtime** — the framework is not the bottleneck.
 - **Planning scales with the calculator graph, not the workload data.**
-  The same fixture takes the same planning time whether it processes one
-  row or one million. Canonical MOVES pays schema-creation overhead per-run
-  regardless of county count; the Rust port pays a flat ~0.2 ms.
-- **Peak RSS at framework level is 11–12 MiB.** The Phase 8 data shows that
-  loading the full snapshot (execution-database Parquet) raises this to
-  ~110 MiB at N=1 — still well below canonical MOVES's 206 MiB.
+ The same fixture takes the same planning time whether it processes one
+ row or one million. Canonical MOVES pays schema-creation overhead per-run
+ regardless of county count; the Rust port pays a flat ~0.2 ms.
+- **Peak RSS at framework level is 11–12 MiB.** The real-emission data shows that
+ loading the full snapshot (execution-database Parquet) raises this to
+ ~110 MiB at N=1 — still well below canonical MOVES's 206 MiB.
 
 ---
 
@@ -430,8 +430,9 @@ peak_RSS ≈ process_baseline + N × max_chain_working_set
 ```
 
 where `max_chain_working_set` is the largest peak DataFrame allocation any
-single calculator chain holds in memory simultaneously. In Phase 7 this is
-zero (empty output). Once Phase 4 lands, estimates per machine class are:
+single calculator chain holds in memory simultaneously. At the framework-overhead
+baseline this is zero (empty output). Once the data plane is wired,
+estimates per machine class are:
 
 | Machine type | Estimated chain working set | Recommended N | Estimated peak RSS |
 |---|---|---|---|
@@ -446,16 +447,16 @@ performance-isolation guarantees the executor provides.
 
 ## Output-correctness vs. tolerance
 
-The `impl%` column tracks forward progress through the port. When Phase 4
-lands and calculators produce real output, this column will rise from 0 % to
-100 % as each fixture's calculator graph becomes fully executed.
+The `impl%` column tracks forward progress through the port. As calculators
+produce real output, this column will rise from 0 % to 100 % as each
+fixture's calculator graph becomes fully executed.
 
 The correctness gate — diffing Rust port output against canonical-MOVES
 snapshots within per-column tolerance budgets — is documented in
 `docs/known-divergences.md`. Activating it requires:
 
 1. Canonical-MOVES snapshots captured from `characterization/run-all-fixtures.sh`.
-2. Real output from the Rust port (Phase 4 data-plane deliverable).
+2. Real output from the Rust port.
 
 Expected divergence categories and their tolerance budgets are pre-documented
 in §4 of `known-divergences.md`.
@@ -464,7 +465,7 @@ in §4 of `known-divergences.md`.
 
 ## Reproducing
 
-### Phase 8 real-emission benchmark (with canonical-snapshot execution database)
+### Real-emission benchmark (with canonical-snapshot execution database)
 
 ```sh
 # Build the release binary:
@@ -472,24 +473,24 @@ cargo build --release -p moves-cli
 
 # single-county fixture at N=1 (serial):
 /usr/bin/time -v target/release/moves run \
-    --runspec characterization/fixtures/sample-runspec.xml \
-    --snapshot characterization/snapshots/sample-runspec \
-    --max-parallel-chunks 1 \
-    --output /tmp/moves-bench-n1
+ --runspec characterization/fixtures/sample-runspec.xml \
+ --snapshot characterization/snapshots/sample-runspec \
+ --max-parallel-chunks 1 \
+ --output /tmp/moves-bench-n1
 
 # single-county fixture at N=<ncpu> (parallel):
 /usr/bin/time -v target/release/moves run \
-    --runspec characterization/fixtures/sample-runspec.xml \
-    --snapshot characterization/snapshots/sample-runspec \
-    --max-parallel-chunks 0 \
-    --output /tmp/moves-bench-ncpu   # 0 = use all CPUs
+ --runspec characterization/fixtures/sample-runspec.xml \
+ --snapshot characterization/snapshots/sample-runspec \
+ --max-parallel-chunks 0 \
+ --output /tmp/moves-bench-ncpu # 0 = use all CPUs
 
 # 3-county wider fixture:
 /usr/bin/time -v target/release/moves run \
-    --runspec characterization/fixtures/expand-counties.xml \
-    --snapshot characterization/snapshots/expand-counties \
-    --max-parallel-chunks 0 \
-    --output /tmp/moves-bench-3county
+ --runspec characterization/fixtures/expand-counties.xml \
+ --snapshot characterization/snapshots/expand-counties \
+ --max-parallel-chunks 0 \
+ --output /tmp/moves-bench-3county
 ```
 
 The `--snapshot` flag loads the captured execution database (Parquet files under
@@ -504,23 +505,23 @@ cd characterization/apptainer
 
 # sample-runspec (single county, single hour):
 SIF=./canonical-moves.sif \
-  /usr/bin/time -v \
-  bash run-moves.sh \
-    --runspec ../../fixtures/sample-runspec.xml \
-    -- main1worker 2>&1 | grep -E "Total time|Elapsed|Maximum resident"
+ /usr/bin/time -v \
+ bash run-moves.sh \
+ --runspec ../../fixtures/sample-runspec.xml \
+ -- main1worker 2>&1 | grep -E "Total time|Elapsed|Maximum resident"
 
 # expand-counties (3 counties, single hour):
 SIF=./canonical-moves.sif \
-  /usr/bin/time -v \
-  bash run-moves.sh \
-    --runspec ../../fixtures/expand-counties.xml \
-    -- main1worker 2>&1 | grep -E "Total time|Elapsed|Maximum resident"
+ /usr/bin/time -v \
+ bash run-moves.sh \
+ --runspec ../../fixtures/expand-counties.xml \
+ -- main1worker 2>&1 | grep -E "Total time|Elapsed|Maximum resident"
 ```
 
 Each run creates a fresh MariaDB data directory under `$WORKDIR` (default
 `/scratch/$USER/moves-canonical`); delete it between runs for a clean start.
 
-### Phase 7 framework-overhead baseline
+### Framework-overhead baseline
 
 ```sh
 # Framework-overhead baseline (no external inputs, ~0.5 s):
@@ -528,29 +529,30 @@ cargo test -p moves-cli --test benchmark_suite --release -- --nocapture
 
 # Include County/Project/Rates scale fixtures (requires CDB/PDB inputs):
 BENCHMARK_SCALE_INPUTS_DIR=/path/to/scale-inputs \
-    cargo test -p moves-cli --test benchmark_suite --release -- --nocapture
+ cargo test -p moves-cli --test benchmark_suite --release -- --nocapture
 ```
 
 Note: the benchmark suite test does NOT use `--snapshot`; it measures pure
 framework overhead with an empty execution database (impl% = 0%). The numbers
-in §Phase 8 above were collected using the `moves run --snapshot` path.
+in the real-emission measurements section above were collected using the
+`moves run --snapshot` path.
 
 ### Profiling
 
 ```sh
 # Cache-miss instrumentation (Linux, requires perf):
 perf stat \
-    -e cache-misses,cache-references,L1-dcache-loads,L1-dcache-load-misses \
-    target/release/moves run \
-        --runspec characterization/fixtures/sample-runspec.xml \
-        --snapshot characterization/snapshots/sample-runspec \
-        --output /tmp/moves-out
+ -e cache-misses,cache-references,L1-dcache-loads,L1-dcache-load-misses \
+ target/release/moves run \
+ --runspec characterization/fixtures/sample-runspec.xml \
+ --snapshot characterization/snapshots/sample-runspec \
+ --output /tmp/moves-out
 
 # Flamegraph (requires cargo-flamegraph):
 cargo flamegraph -p moves-cli -- run \
-    --runspec characterization/fixtures/sample-runspec.xml \
-    --snapshot characterization/snapshots/sample-runspec \
-    --output /tmp/moves-out
+ --runspec characterization/fixtures/sample-runspec.xml \
+ --snapshot characterization/snapshots/sample-runspec \
+ --output /tmp/moves-out
 ```
 
 ---
@@ -560,9 +562,9 @@ cargo flamegraph -p moves-cli -- run \
 To update with new measurements:
 
 1. Rebuild the release binary (`cargo build --release -p moves-cli`).
-2. Run the Phase 8 benchmarks above for `sample-runspec` and `expand-counties`.
+2. Run the real-emission benchmarks above for `sample-runspec` and `expand-counties`.
 3. Run canonical MOVES for the same fixtures.
-4. Fill in the §Phase 8 tables in this document.
+4. Fill in the real-emission comparison tables in this document.
 5. Update `impl%` (target: 100 % once all 44 planned modules are ported).
 6. For County/Project/Rates scale fixtures, set `BENCHMARK_SCALE_INPUTS_DIR`
-   and fill in §4–6 (currently skipped — no CDB/PDB inputs available).
+ and fill in §4–6 (currently skipped — no CDB/PDB inputs available).

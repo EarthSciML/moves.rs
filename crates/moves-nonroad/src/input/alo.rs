@@ -1,6 +1,6 @@
 //! Spatial-allocation cross-reference (`.ALO`) parser (`rdalo.f`).
 //!
-//! Task 94. Parses the regression-coefficient file that maps SCC
+//!Parses the regression-coefficient file that maps SCC
 //! equipment codes to spatial allocation surrogates. The format is
 //! line-pair: every SCC contributes two consecutive records — one
 //! line of regression coefficients, one line of the indicator
@@ -13,17 +13,17 @@
 //!
 //! ```text
 //! /ALLOC XREF/
-//! <SCC      ><coeff1   ><coeff2   ><coeff3   >
-//! <SCC      ><indcd1   ><indcd2   ><indcd3   >
+//! <SCC ><coeff1 ><coeff2 ><coeff3 >
+//! <SCC ><indcd1 ><indcd2 ><indcd3 >
 //! ...
 //! /END/
 //! ```
 //!
 //! - Cols 1–10: SCC code (must match between the two lines).
 //! - Cols 11–20, 21–30, 31–40: up to `MXCOEF = 3` ten-character
-//!   fields. On the coefficient line each is an `F10.0`; on the
-//!   indicator line each is a left-justified character field whose
-//!   leading 3 characters form the indicator code.
+//! fields. On the coefficient line each is an `F10.0`; on the
+//! indicator line each is a left-justified character field whose
+//! leading 3 characters form the indicator code.
 //!
 //! Trailing blank fields signal "no more coefficients for this
 //! SCC" — the Fortran source breaks the loop at the first blank
@@ -36,7 +36,7 @@
 //! the current run and, if not, skips both the coefficient and
 //! indicator lines. That filtering depends on COMMON-block state
 //! set up by `getind.f` / `iniasc.f` and is deferred to higher-
-//! level callers (Tasks 99 and 105). This module returns every
+//! level callers. This module returns every
 //! well-formed allocation pair.
 
 use crate::{Error, Result};
@@ -54,12 +54,12 @@ pub const COEF_SUM_TOLERANCE: f32 = 0.001;
 /// One parsed allocation cross-reference record.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AllocationRecord {
-    /// SCC equipment code (10 chars).
+ /// SCC equipment code (10 chars).
     pub scc: String,
-    /// Up to `MAX_COEF` regression coefficients, in column order.
+ /// Up to `MAX_COEF` regression coefficients, in column order.
     pub coefficients: Vec<f32>,
-    /// Indicator codes (3 chars each, left-justified), one per
-    /// coefficient. Always the same length as `coefficients`.
+ /// Indicator codes (3 chars each, left-justified), one per
+ /// coefficient. Always the same length as `coefficients`.
     pub indicator_codes: Vec<String>,
 }
 
@@ -81,7 +81,7 @@ pub fn read_alo<R: BufRead>(reader: R) -> Result<Vec<AllocationRecord>> {
         })
     });
 
-    // Skip until /ALLOC XREF/.
+ // Skip until /ALLOC XREF/.
     let mut in_packet = false;
     let mut last_line_num: usize = 0;
     for next in iter.by_ref() {
@@ -143,7 +143,7 @@ pub fn read_alo<R: BufRead>(reader: R) -> Result<Vec<AllocationRecord>> {
             });
         }
 
-        // The matching indicator-code line must immediately follow.
+ // The matching indicator-code line must immediately follow.
         let (ind_line_num, ind_line) = match iter.next() {
             Some(next) => next?,
             None => {
@@ -236,11 +236,11 @@ fn parse_indicator_fields(line: &str, n_coeffs: usize) -> Vec<String> {
         let end = start + 9;
         let field = column(line, start, end);
         let trimmed = field.trim_start();
-        // The Fortran source stores `indtmp(i)(1:3)` — the first
-        // three characters of the left-justified 10-char field.
+ // The Fortran source stores `indtmp(i)(1:3)` — the first
+ // three characters of the left-justified 10-char field.
         let mut code: String = trimmed.chars().take(3).collect();
-        // Pad to 3 chars if shorter, matching Fortran's blank-padded
-        // CHARACTER*3 storage.
+ // Pad to 3 chars if shorter, matching Fortran's blank-padded
+ // CHARACTER*3 storage.
         while code.len() < 3 {
             code.push(' ');
         }
@@ -269,8 +269,8 @@ fn column(line: &str, start_1based: usize, end_1based: usize) -> &str {
 mod tests {
     use super::*;
 
-    /// Build one column-aligned 40-char line: SCC in cols 1–10,
-    /// then up to 3 ten-char fields starting at col 11.
+ /// Build one column-aligned 40-char line: SCC in cols 1–10,
+ /// then up to 3 ten-char fields starting at col 11.
     fn line(scc: &str, fields: &[&str]) -> String {
         let mut buf = vec![b' '; 40];
         let put = |buf: &mut [u8], start_1based: usize, value: &str, width: usize| {
@@ -281,8 +281,8 @@ mod tests {
         };
         put(&mut buf, 1, scc, 10);
         for (slot, field) in fields.iter().enumerate().take(MAX_COEF) {
-            // right-justify numeric / left-justify will just place
-            // the value at the start of the slot
+ // right-justify numeric / left-justify will just place
+ // the value at the start of the slot
             put(&mut buf, 11 + slot * 10, field, 10);
         }
         String::from_utf8(buf).unwrap()
@@ -304,7 +304,7 @@ mod tests {
 
     #[test]
     fn handles_partial_coefficients() {
-        // Only one coefficient = 1.0; remaining slots blank.
+ // Only one coefficient = 1.0; remaining slots blank.
         let coef = line("2270002003", &["1.0       ", "          ", "          "]);
         let ind = line("2270002003", &["POP       ", "          ", "          "]);
         let input = format!("/ALLOC XREF/\n{coef}\n{ind}\n/END/\n");
@@ -377,7 +377,7 @@ mod tests {
 
     #[test]
     fn allows_coefficient_sum_within_tolerance() {
-        // Within 0.001 of 1.0
+ // Within 0.001 of 1.0
         let coef = line("2270002003", &["0.5005    ", "0.5       ", "          "]);
         let ind = line("2270002003", &["POP       ", "EMP       ", "          "]);
         let input = format!("/ALLOC XREF/\n{coef}\n{ind}\n/END/\n");
@@ -389,7 +389,7 @@ mod tests {
     #[test]
     fn errors_when_indicator_line_missing() {
         let coef = line("2270002003", &["1.0       ", "", ""]);
-        // Coefficient line followed immediately by /END/.
+ // Coefficient line followed immediately by /END/.
         let input = format!("/ALLOC XREF/\n{coef}\n/END/\n");
 
         let err = read_alo(input.as_bytes()).unwrap_err();

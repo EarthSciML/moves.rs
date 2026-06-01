@@ -6,21 +6,21 @@
 //! syntactic landmarks that the MOVES codebase uses consistently:
 //!
 //! * `extends GenericCalculatorBase` — the calculator inherits subscription
-//!   plumbing. Its constructor's `super(...)` call carries the granularity
-//!   (2nd positional arg) and priority adjustment (3rd positional arg).
+//! plumbing. Its constructor's `super(...)` call carries the granularity
+//! (2nd positional arg) and priority adjustment (3rd positional arg).
 //! * `targetLoop.subscribe(this, <process>, MasterLoopGranularity.X,
-//!   MasterLoopPriority.Y)` inside `subscribeToMe()` — the calculator
-//!   subscribes itself directly.
+//! MasterLoopPriority.Y)` inside `subscribeToMe()` — the calculator
+//! subscribes itself directly.
 //! * `// This is a chained calculator, so don't subscribe to the MasterLoop`
-//!   plus `c.chainCalculator(this)` — the calculator is chained-only;
-//!   granularity comes from whatever upstream calculator triggers it.
+//! plus `c.chainCalculator(this)` — the calculator is chained-only;
+//! granularity comes from whatever upstream calculator triggers it.
 //!
 //! The scanner returns one or more [`JavaSubscription`] records per class.
 //! For the GenericCalculatorBase path, the granularity covers every
 //! pollutant-process the constructor declares. For explicit
 //! `targetLoop.subscribe` calls, each call becomes one record with the
 //! process placeholder filled in literally (it's almost always a variable
-//! reference, not a hard-coded process id — Phase 2 resolves it at
+//! reference, not a hard-coded process id — resolves it at
 //! runtime).
 //!
 //! This is a best-effort fill-in for calculators that are absent from
@@ -42,18 +42,18 @@ use crate::loop_meta::{Granularity, Priority, PriorityBase};
 /// How a calculator hooks into the MasterLoop.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SubscribeStyle {
-    /// Inherits `subscribeToMe` from `GenericCalculatorBase`; granularity
-    /// comes from the `super(...)` call.
+ /// Inherits `subscribeToMe` from `GenericCalculatorBase`; granularity
+ /// comes from the `super(...)` call.
     GenericBase,
-    /// Overrides `subscribeToMe` with explicit `targetLoop.subscribe(...)`
-    /// calls.
+ /// Overrides `subscribeToMe` with explicit `targetLoop.subscribe(...)`
+ /// calls.
     Explicit,
-    /// Overrides `subscribeToMe` to chain itself via
-    /// `c.chainCalculator(this)` and does NOT call `targetLoop.subscribe`.
-    /// Granularity is whatever the upstream trigger declares.
+ /// Overrides `subscribeToMe` to chain itself via
+ /// `c.chainCalculator(this)` and does NOT call `targetLoop.subscribe`.
+ /// Granularity is whatever the upstream trigger declares.
     ChainedOnly,
-    /// `subscribeToMe` neither subscribed nor chained — likely
-    /// abstract/utility class or a base we shouldn't scan from.
+ /// `subscribeToMe` neither subscribed nor chained — likely
+ /// abstract/utility class or a base we shouldn't scan from.
     Unknown,
 }
 
@@ -62,19 +62,19 @@ pub enum SubscribeStyle {
 /// `process_expr` is the literal text between the `subscribe(this,` and the
 /// next comma — usually a variable name like `process` or
 /// `pollutants.process`, not a numeric id. We keep it as a string for
-/// transparency; Phase 2 resolves it during DAG instantiation.
+/// transparency; resolves it during DAG instantiation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct JavaSubscription {
     pub calculator: String,
     pub java_path: PathBuf,
     pub style: SubscribeStyle,
-    /// `None` for chained-only calculators.
+ /// `None` for chained-only calculators.
     pub granularity: Option<Granularity>,
-    /// `None` for chained-only calculators.
+ /// `None` for chained-only calculators.
     pub priority: Option<Priority>,
-    /// Free-form description of the process selector. Empty for chained
-    /// calculators or for GenericCalculatorBase (which subscribes against
-    /// every entry in the constructor's `pollutantProcessIDs` array).
+ /// Free-form description of the process selector. Empty for chained
+ /// calculators or for GenericCalculatorBase (which subscribes against
+ /// every entry in the constructor's `pollutantProcessIDs` array).
     pub process_expr: String,
 }
 
@@ -136,11 +136,11 @@ fn visit_dir(dir: &Path, f: &mut dyn FnMut(&Path) -> Result<()>) -> Result<()> {
 /// Returns:
 /// * Zero records if the file isn't a calculator class.
 /// * One record per explicit `targetLoop.subscribe(...)` call inside
-///   `subscribeToMe()` for an `EmissionCalculator` subclass.
+/// `subscribeToMe()` for an `EmissionCalculator` subclass.
 /// * One record for the constructor's `super(...)` granularity + priority
-///   for a `GenericCalculatorBase` subclass.
+/// for a `GenericCalculatorBase` subclass.
 /// * One record with style `ChainedOnly` for a class whose `subscribeToMe`
-///   only chains.
+/// only chains.
 pub fn parse_java_subscriptions(text: &str, path: &Path) -> Vec<JavaSubscription> {
     let Some(class_name) = find_top_level_class_name(text) else {
         return Vec::new();
@@ -165,7 +165,7 @@ pub fn parse_java_subscriptions(text: &str, path: &Path) -> Vec<JavaSubscription
         return out;
     }
 
-    // Scan inside subscribeToMe() for explicit subscribe calls.
+ // Scan inside subscribeToMe() for explicit subscribe calls.
     if let Some(body) = extract_subscribe_to_me_body(text) {
         let mut explicit_found = false;
         for hit in find_target_loop_subscribe_calls(body) {
@@ -227,12 +227,12 @@ fn is_java_ident_char(c: char) -> bool {
 
 /// Return the symbol name following `extends` for `class CLASS_NAME ... extends X`.
 /// Stops at any non-identifier character (which excludes generic parameters
-/// — we don't need them).
+/// we don't need them).
 fn find_base_class(text: &str, class_name: &str) -> Option<String> {
     let class_decl = format!("class {class_name}");
     let class_idx = text.find(&class_decl)?;
     let rest = &text[class_idx + class_decl.len()..];
-    // We allow `extends` to appear within the next line or two.
+ // We allow `extends` to appear within the next line or two.
     let stop = rest.find('{').unwrap_or(rest.len());
     let header = &rest[..stop];
     let ext_idx = header.find("extends ")?;
@@ -368,14 +368,14 @@ fn find_first_int_after(text: &str) -> Option<i32> {
             continue;
         }
         if c == '/' && bytes.get(i + 1).map(|&b| b as char) == Some('/') {
-            // line comment — skip to end of line
+ // line comment — skip to end of line
             while i < bytes.len() && (bytes[i] as char) != '\n' {
                 i += 1;
             }
             continue;
         }
         if c == '/' && bytes.get(i + 1).map(|&b| b as char) == Some('*') {
-            // block comment — skip to closing */
+ // block comment — skip to closing */
             i += 2;
             while i + 1 < bytes.len()
                 && !((bytes[i] as char) == '*' && (bytes[i + 1] as char) == '/')
@@ -385,7 +385,7 @@ fn find_first_int_after(text: &str) -> Option<i32> {
             i += 2;
             continue;
         }
-        // Otherwise expect optional sign + digits.
+ // Otherwise expect optional sign + digits.
         let start = i;
         if c == '-' || c == '+' {
             i += 1;
@@ -481,8 +481,8 @@ fn parse_priority_expr(arg: &str) -> Option<Priority> {
     if tail.is_empty() {
         return Some(Priority { base, offset: 0 });
     }
-    // tail starts with '+' or '-' then either an int literal or a variable
-    // we can't statically resolve.
+ // tail starts with '+' or '-' then either an int literal or a variable
+ // we can't statically resolve.
     let sign = tail.as_bytes()[0] as char;
     if sign != '+' && sign != '-' {
         return Some(Priority { base, offset: 0 });
@@ -492,8 +492,8 @@ fn parse_priority_expr(arg: &str) -> Option<Priority> {
         .find(|c: char| !c.is_ascii_digit())
         .unwrap_or(after_sign.len());
     if digit_end == 0 {
-        // Symbolic offset (e.g. `+priorityAdjustment`) — we can't resolve
-        // it statically. Treat as the unadjusted base.
+ // Symbolic offset (e.g. `+priorityAdjustment`) — we can't resolve
+ // it statically. Treat as the unadjusted base.
         return Some(Priority { base, offset: 0 });
     }
     let n: i32 = after_sign[..digit_end].parse().ok()?;
@@ -622,8 +622,8 @@ public class BazCalc extends EmissionCalculator {
 
     #[test]
     fn explicit_subscribe_priority_with_symbolic_offset() {
-        // Boilerplate inside GenericCalculatorBase itself — its
-        // subscribeToMe uses MasterLoopPriority.EMISSION_CALCULATOR+priorityAdjustment.
+ // Boilerplate inside GenericCalculatorBase itself — its
+ // subscribeToMe uses MasterLoopPriority.EMISSION_CALCULATOR+priorityAdjustment.
         let src = r#"
 public class GenericCalculatorBase extends EmissionCalculator {
     public void subscribeToMe(MasterLoop targetLoop) {
@@ -633,14 +633,13 @@ public class GenericCalculatorBase extends EmissionCalculator {
 }
 "#;
         let hits = parse(src);
-        // The base class isn't a GenericCalculatorBase subclass itself —
-        // and granularity is a variable. We don't try to resolve.
+ // The base class isn't a GenericCalculatorBase subclass itself // and granularity is a variable. We don't try to resolve.
         assert_eq!(hits.len(), 1);
-        // granularity is None because `granularity` (lowercase) isn't a
-        // MasterLoopGranularity.X reference.
+ // granularity is None because `granularity` (lowercase) isn't a
+ // MasterLoopGranularity.X reference.
         assert_eq!(hits[0].granularity, None);
-        // Style falls through to Unknown because we couldn't parse the
-        // call as an explicit subscribe at a static granularity.
+ // Style falls through to Unknown because we couldn't parse the
+ // call as an explicit subscribe at a static granularity.
         assert_eq!(hits[0].style, SubscribeStyle::Unknown);
     }
 
@@ -649,7 +648,7 @@ public class GenericCalculatorBase extends EmissionCalculator {
         let src = r#"
 public class HCSpeciationCalculator extends EmissionCalculator {
     public void subscribeToMe(MasterLoop targetLoop) {
-        // This is a chained calculator, so don't subscribe to the MasterLoop.
+ // This is a chained calculator, so don't subscribe to the MasterLoop.
         for (EmissionCalculator c : upstream) {
             c.chainCalculator(this);
         }
@@ -678,7 +677,7 @@ public class JustAUtility {
         use tempfile::tempdir;
 
         let dir = tempdir().unwrap();
-        // Write three calc files in non-alphabetical disk order.
+ // Write three calc files in non-alphabetical disk order.
         fs::write(
             dir.path().join("BBB.java"),
             r#"public class BBB extends GenericCalculatorBase {
@@ -697,7 +696,7 @@ public class JustAUtility {
             dir.path().join("CCC.java"),
             r#"public class CCC extends EmissionCalculator {
                     public void subscribeToMe(MasterLoop targetLoop) {
-                        // This is a chained calculator
+ // This is a chained calculator
                         upstream.chainCalculator(this);
                     }
                 }"#,

@@ -1,4 +1,4 @@
-//! Mesoscale-Lookup generators — Phase 3 Task 35.
+//! Mesoscale-Lookup generators —.
 //!
 //! Ports the two `gov/epa/otaq/moves/master/implementation/ghg/` classes
 //! that build the activity and operating-mode tables for runs using the
@@ -6,14 +6,14 @@
 //! looked up rather than derived):
 //!
 //! * [`op_mode_distribution`] — `MesoscaleLookupOperatingModeDistributionGenerator`,
-//!   the operating-mode-fraction table;
+//! the operating-mode-fraction table;
 //! * [`total_activity`] — `MesoscaleLookupTotalActivityGenerator`, the
-//!   `SHO` / `SourceHours` activity-basis tables.
+//! `SHO` / `SourceHours` activity-basis tables.
 //!
 //! Each submodule ports one generator: the numerically faithful compute
 //! core as tested free functions, plus the [`moves_framework::Generator`]
 //! implementation carrying real master-loop metadata. See the submodule
-//! documentation for the per-generator algorithm and the Task 50
+//! documentation for the per-generator algorithm and the
 //! data-plane boundary.
 
 pub mod op_mode_distribution;

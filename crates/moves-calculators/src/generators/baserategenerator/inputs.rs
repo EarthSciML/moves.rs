@@ -5,7 +5,7 @@
 //! pure port instead takes a [`BaseRateInputs`] value holding those tables
 //! as plain row vectors and a [`PreparedTables`] derived from it.
 //!
-//! [`BaseRateInputs`] is the data-plane contract: a future Task 50
+//! [`BaseRateInputs`] is the data-plane contract: a future
 //! (`DataFrameStore`) wiring populates it from the scratch / default-DB
 //! `DataFrame`s. [`PreparedTables::from_inputs`] applies the per-table `WHERE`
 //! filters, joins, sorts and keying that the Go SQL statements performed.
@@ -24,62 +24,62 @@ use super::model::{
 /// One `avgSpeedBin` row: average bin speed keyed by bin id.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct AvgSpeedBinRow {
-    /// Average-speed bin id.
+ /// Average-speed bin id.
     pub avg_speed_bin_id: i32,
-    /// Average bin speed.
+ /// Average bin speed.
     pub avg_bin_speed: f64,
 }
 
 /// One `driveSchedule` row: average speed keyed by drive-schedule id.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct DriveScheduleRow {
-    /// Drive-schedule id.
+ /// Drive-schedule id.
     pub drive_schedule_id: i32,
-    /// Average speed of the schedule.
+ /// Average speed of the schedule.
     pub average_speed: f64,
 }
 
 /// One `avgSpeedDistribution` row (before the `avgSpeedBin` join).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct AvgSpeedDistributionRow {
-    /// Source type id.
+ /// Source type id.
     pub source_type_id: i32,
-    /// Road type id.
+ /// Road type id.
     pub road_type_id: i32,
-    /// Hour/day id.
+ /// Hour/day id.
     pub hour_day_id: i32,
-    /// Average-speed bin id.
+ /// Average-speed bin id.
     pub avg_speed_bin_id: i32,
-    /// Average-speed-bin fraction.
+ /// Average-speed-bin fraction.
     pub avg_speed_fraction: f64,
 }
 
 /// One `SBWeightedDistanceRate` row.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct SbWeightedDistanceRow {
-    /// Source type id.
+ /// Source type id.
     pub source_type_id: i32,
-    /// Average-speed bin id.
+ /// Average-speed bin id.
     pub avg_speed_bin_id: i32,
-    /// Pollutant/process id.
+ /// Pollutant/process id.
     pub pol_process_id: i32,
-    /// Model year id.
+ /// Model year id.
     pub model_year_id: i32,
-    /// Fuel type id.
+ /// Fuel type id.
     pub fuel_type_id: i32,
-    /// Regulatory class id.
+ /// Regulatory class id.
     pub reg_class_id: i32,
-    /// Mean base rate.
+ /// Mean base rate.
     pub mean_base_rate: f64,
-    /// Mean base rate, I/M adjusted.
+ /// Mean base rate, I/M adjusted.
     pub mean_base_rate_im: f64,
-    /// Mean base rate, air-conditioning adjusted.
+ /// Mean base rate, air-conditioning adjusted.
     pub mean_base_rate_ac_adj: f64,
-    /// Mean base rate, I/M and air-conditioning adjusted.
+ /// Mean base rate, I/M and air-conditioning adjusted.
     pub mean_base_rate_im_ac_adj: f64,
-    /// Source-bin distribution sum.
+ /// Source-bin distribution sum.
     pub sum_sbd: f64,
-    /// Raw source-bin distribution sum.
+ /// Raw source-bin distribution sum.
     pub sum_sbd_raw: f64,
 }
 
@@ -87,20 +87,20 @@ pub struct SbWeightedDistanceRow {
 /// uses. Needed only to reproduce the `runSpecPollutantProcess` join.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct OpModePolProcRow {
-    /// Pollutant/process id.
+ /// Pollutant/process id.
     pub pol_process_id: i32,
-    /// Operating-mode id.
+ /// Operating-mode id.
     pub op_mode_id: i32,
 }
 
 /// One `driveScheduleAssoc` row.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct DriveScheduleAssocRow {
-    /// Source type id.
+ /// Source type id.
     pub source_type_id: i32,
-    /// Road type id.
+ /// Road type id.
     pub road_type_id: i32,
-    /// Drive-schedule id.
+ /// Drive-schedule id.
     pub drive_schedule_id: i32,
 }
 
@@ -110,34 +110,34 @@ pub struct DriveScheduleAssocRow {
 /// scans it into a variable and never reads it.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RatesOpModeDistributionRow {
-    /// Source type id.
+ /// Source type id.
     pub source_type_id: i32,
-    /// Road type id.
+ /// Road type id.
     pub road_type_id: i32,
-    /// Average-speed bin id.
+ /// Average-speed bin id.
     pub avg_speed_bin_id: i32,
-    /// Hour/day id.
+ /// Hour/day id.
     pub hour_day_id: i32,
-    /// Pollutant/process id.
+ /// Pollutant/process id.
     pub pol_process_id: i32,
-    /// Operating-mode id.
+ /// Operating-mode id.
     pub op_mode_id: i32,
-    /// Operating-mode fraction.
+ /// Operating-mode fraction.
     pub op_mode_fraction: f64,
-    /// Average bin speed.
+ /// Average bin speed.
     pub avg_bin_speed: f64,
-    /// Average-speed-bin fraction.
+ /// Average-speed-bin fraction.
     pub avg_speed_fraction: f64,
 }
 
 /// One `driveScheduleSecond` row: a vehicle speed sample.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct DriveScheduleSecondRow {
-    /// Drive-schedule id.
+ /// Drive-schedule id.
     pub drive_schedule_id: i32,
-    /// Second within the schedule.
+ /// Second within the schedule.
     pub second: i32,
-    /// Vehicle speed at this second.
+ /// Vehicle speed at this second.
     pub speed: f64,
 }
 
@@ -149,41 +149,41 @@ pub struct DriveScheduleSecondRow {
 /// `JOIN` / `ORDER BY` semantics.
 #[derive(Debug, Clone, Default)]
 pub struct BaseRateInputs {
-    /// `avgSpeedBin` rows.
+ /// `avgSpeedBin` rows.
     pub avg_speed_bin: Vec<AvgSpeedBinRow>,
-    /// `driveSchedule` rows.
+ /// `driveSchedule` rows.
     pub drive_schedule: Vec<DriveScheduleRow>,
-    /// `avgSpeedDistribution` rows.
+ /// `avgSpeedDistribution` rows.
     pub avg_speed_distribution: Vec<AvgSpeedDistributionRow>,
-    /// `sourceUseTypePhysicsMapping` rows.
+ /// `sourceUseTypePhysicsMapping` rows.
     pub source_use_type_physics_mapping: Vec<SourceUseTypePhysicsMappingDetail>,
-    /// `SBWeightedEmissionRateByAge` rows.
+ /// `SBWeightedEmissionRateByAge` rows.
     pub sb_weighted_emission_rate_by_age: Vec<SbWeightedRateDetail>,
-    /// `SBWeightedEmissionRate` rows (`age_group_id` ignored / `0`).
+ /// `SBWeightedEmissionRate` rows (`age_group_id` ignored / `0`).
     pub sb_weighted_emission_rate: Vec<SbWeightedRateDetail>,
-    /// `SBWeightedDistanceRate` rows.
+ /// `SBWeightedDistanceRate` rows.
     pub sb_weighted_distance_rate: Vec<SbWeightedDistanceRow>,
-    /// `runSpecRoadType` rows (`roadTypeID`).
+ /// `runSpecRoadType` rows (`roadTypeID`).
     pub run_spec_road_type: Vec<i32>,
-    /// `runSpecHourDay` rows (`hourDayID`).
+ /// `runSpecHourDay` rows (`hourDayID`).
     pub run_spec_hour_day: Vec<i32>,
-    /// `runSpecSourceType` rows (`sourceTypeID`).
+ /// `runSpecSourceType` rows (`sourceTypeID`).
     pub run_spec_source_type: Vec<i32>,
-    /// `runSpecPollutantProcess` rows (`polProcessID`).
+ /// `runSpecPollutantProcess` rows (`polProcessID`).
     pub run_spec_pollutant_process: Vec<i32>,
-    /// `opModePolProcAssoc` rows — needed for the `runSpecPollutantProcess`
-    /// join.
+ /// `opModePolProcAssoc` rows — needed for the `runSpecPollutantProcess`
+ /// join.
     pub op_mode_pol_proc_assoc: Vec<OpModePolProcRow>,
-    /// `driveScheduleAssoc` rows.
+ /// `driveScheduleAssoc` rows.
     pub drive_schedule_assoc: Vec<DriveScheduleAssocRow>,
-    /// `operatingMode` rows.
+ /// `operatingMode` rows.
     pub operating_mode: Vec<OperatingMode>,
-    /// `RatesOpModeDistribution` rows (core-path input).
+ /// `RatesOpModeDistribution` rows (core-path input).
     pub rates_op_mode_distribution: Vec<RatesOpModeDistributionRow>,
-    /// `driveScheduleSecond` rows (drive-cycle-path input).
+ /// `driveScheduleSecond` rows (drive-cycle-path input).
     pub drive_schedule_second: Vec<DriveScheduleSecondRow>,
-    /// Whether the run is a Project-domain run
-    /// (`configuration.Singleton.IsProject`).
+ /// Whether the run is a Project-domain run
+ /// (`configuration.Singleton.IsProject`).
     pub is_project: bool,
 }
 
@@ -196,49 +196,49 @@ pub struct BaseRateInputs {
 /// hourDayID, opModeID, avgSpeedBinID` the Go comments require.
 #[derive(Debug, Clone, Default)]
 pub struct PreparedTables {
-    /// Average bin speed keyed by `avgSpeedBinID`.
+ /// Average bin speed keyed by `avgSpeedBinID`.
     pub avg_speed_bin: BTreeMap<i32, f64>,
-    /// Average schedule speed keyed by `driveScheduleID`.
+ /// Average schedule speed keyed by `driveScheduleID`.
     pub drive_schedule: BTreeMap<i32, f64>,
-    /// Average-speed distribution keyed by source/road/hour/bin.
+ /// Average-speed distribution keyed by source/road/hour/bin.
     pub avg_speed_distribution: BTreeMap<AvgSpeedDistributionKey, AvgSpeedDistributionDetail>,
-    /// All physics-mapping records, ordered by real source type then
-    /// begin model year.
+ /// All physics-mapping records, ordered by real source type then
+ /// begin model year.
     pub source_use_type_physics_mapping: Vec<SourceUseTypePhysicsMappingDetail>,
-    /// Physics mapping keyed by `tempSourceTypeID` (unique).
+ /// Physics mapping keyed by `tempSourceTypeID` (unique).
     pub physics_by_temp_source_type: BTreeMap<i32, SourceUseTypePhysicsMappingDetail>,
-    /// Physics mapping keyed by `realSourceTypeID` (last record wins, as in
-    /// the Go map assignment).
+ /// Physics mapping keyed by `realSourceTypeID` (last record wins, as in
+ /// the Go map assignment).
     pub physics_by_real_source_type: BTreeMap<i32, SourceUseTypePhysicsMappingDetail>,
-    /// `SBWeightedEmissionRateByAge` records keyed by source/process/opmode.
+ /// `SBWeightedEmissionRateByAge` records keyed by source/process/opmode.
     pub sb_weighted_emission_rate_by_age: BTreeMap<SbWeightedRateKey, Vec<SbWeightedRateDetail>>,
-    /// `SBWeightedEmissionRate` records keyed by source/process/opmode.
+ /// `SBWeightedEmissionRate` records keyed by source/process/opmode.
     pub sb_weighted_emission_rate: BTreeMap<SbWeightedRateKey, Vec<SbWeightedRateDetail>>,
-    /// Run-spec road types excluding off-network (`roadTypeID == 1`).
+ /// Run-spec road types excluding off-network (`roadTypeID == 1`).
     pub run_spec_road_type: Vec<i32>,
-    /// Run-spec road types including off-network.
+ /// Run-spec road types including off-network.
     pub run_spec_road_type_with_off_network: Vec<i32>,
-    /// Run-spec hour/day ids.
+ /// Run-spec hour/day ids.
     pub run_spec_hour_day: Vec<i32>,
-    /// Run-spec source type ids.
+ /// Run-spec source type ids.
     pub run_spec_source_type: Vec<i32>,
-    /// Pollutant/process ids that need drive cycles for this process.
+ /// Pollutant/process ids that need drive cycles for this process.
     pub run_spec_pol_process_id: Vec<i32>,
-    /// Drive-schedule ids keyed by source/road type.
+ /// Drive-schedule ids keyed by source/road type.
     pub drive_schedule_assoc: BTreeMap<DriveScheduleAssocKey, Vec<i32>>,
-    /// Operating-mode definitions keyed by `opModeID`
-    /// (`1 < opModeID < 100`, excluding `26` and `36`).
+ /// Operating-mode definitions keyed by `opModeID`
+ /// (`1 < opModeID < 100`, excluding `26` and `36`).
     pub operating_modes: BTreeMap<i32, OperatingMode>,
 }
 
 impl PreparedTables {
-    /// Build the prepared tables from raw [`BaseRateInputs`], applying every
-    /// filter/join/order the Go `read*` helpers and SQL statements applied.
+ /// Build the prepared tables from raw [`BaseRateInputs`], applying every
+ /// filter/join/order the Go `read*` helpers and SQL statements applied.
     #[must_use]
     pub fn from_inputs(inputs: &BaseRateInputs, flags: &ExternalFlags) -> Self {
         let mut prepared = PreparedTables::default();
 
-        // readAvgSpeedBin / readDriveSchedule — straight loads.
+ // readAvgSpeedBin / readDriveSchedule — straight loads.
         for row in &inputs.avg_speed_bin {
             prepared
                 .avg_speed_bin
@@ -250,8 +250,8 @@ impl PreparedTables {
                 .insert(row.drive_schedule_id, row.average_speed);
         }
 
-        // readAvgSpeedDistribution — inner join avgSpeedBin, optional
-        // roadType filter.
+ // readAvgSpeedDistribution — inner join avgSpeedBin, optional
+ // roadType filter.
         for row in &inputs.avg_speed_distribution {
             if flags.road_type_id > 0 && row.road_type_id != flags.road_type_id {
                 continue;
@@ -273,8 +273,8 @@ impl PreparedTables {
             );
         }
 
-        // readSourceUseTypePhysicsMapping — select distinct, order by
-        // realSourceTypeID, beginModelYearID.
+ // readSourceUseTypePhysicsMapping — select distinct, order by
+ // realSourceTypeID, beginModelYearID.
         let mut physics: Vec<SourceUseTypePhysicsMappingDetail> = Vec::new();
         for &row in &inputs.source_use_type_physics_mapping {
             if !physics.contains(&row) {
@@ -289,15 +289,15 @@ impl PreparedTables {
             prepared
                 .physics_by_temp_source_type
                 .insert(row.temp_source_type_id, row);
-            // Last record for a real source type wins, mirroring the Go
-            // `map[...] = d` overwrite under the begin-model-year ordering.
+ // Last record for a real source type wins, mirroring the Go
+ // `map[...] = d` overwrite under the begin-model-year ordering.
             prepared
                 .physics_by_real_source_type
                 .insert(row.real_source_type_id, row);
         }
         prepared.source_use_type_physics_mapping = physics;
 
-        // readSBWeightedEmissionRateByAge — filter by process.
+ // readSBWeightedEmissionRateByAge — filter by process.
         for &row in &inputs.sb_weighted_emission_rate_by_age {
             if row.pol_process_id % 100 != flags.process_id {
                 continue;
@@ -313,8 +313,8 @@ impl PreparedTables {
                 .push(row);
         }
 
-        // readSBWeightedEmissionRate — filter by process, plus the
-        // opModeID >= 1000 records are also filed under opModeID % 100.
+ // readSBWeightedEmissionRate — filter by process, plus the
+ // opModeID >= 1000 records are also filed under opModeID % 100.
         for &row in &inputs.sb_weighted_emission_rate {
             if row.pol_process_id % 100 != flags.process_id {
                 continue;
@@ -343,8 +343,8 @@ impl PreparedTables {
             }
         }
 
-        // readRunSpecRoadType — roadTypeID in (0,100), optional filter, then
-        // split off off-network (roadTypeID == 1).
+ // readRunSpecRoadType — roadTypeID in (0,100), optional filter, then
+ // split off off-network (roadTypeID == 1).
         let mut road_with_oni: BTreeSet<i32> = BTreeSet::new();
         for &road_type_id in &inputs.run_spec_road_type {
             if !(road_type_id > 0 && road_type_id < 100) {
@@ -358,13 +358,13 @@ impl PreparedTables {
         prepared.run_spec_road_type_with_off_network = road_with_oni.iter().copied().collect();
         prepared.run_spec_road_type = road_with_oni.iter().copied().filter(|&r| r != 1).collect();
 
-        // readRunSpecHourDay / readRunSpecSourceType — sorted ascending so
-        // the drive-cycle enumeration order is well defined.
+ // readRunSpecHourDay / readRunSpecSourceType — sorted ascending so
+ // the drive-cycle enumeration order is well defined.
         prepared.run_spec_hour_day = sorted_unique(&inputs.run_spec_hour_day);
         prepared.run_spec_source_type = sorted_unique(&inputs.run_spec_source_type);
 
-        // readRunSpecPollutantProcess — inner join opModePolProcAssoc,
-        // filter to driving-cycle operating modes for this process.
+ // readRunSpecPollutantProcess — inner join opModePolProcAssoc,
+ // filter to driving-cycle operating modes for this process.
         let in_run_spec: BTreeSet<i32> =
             inputs.run_spec_pollutant_process.iter().copied().collect();
         let mut pol_proc: BTreeSet<i32> = BTreeSet::new();
@@ -380,8 +380,8 @@ impl PreparedTables {
         }
         prepared.run_spec_pol_process_id = pol_proc.into_iter().collect();
 
-        // readDriveScheduleAssoc — inner join runSpecRoadType (raw table),
-        // optional roadType filter.
+ // readDriveScheduleAssoc — inner join runSpecRoadType (raw table),
+ // optional roadType filter.
         let raw_road_types: BTreeSet<i32> = inputs.run_spec_road_type.iter().copied().collect();
         for row in &inputs.drive_schedule_assoc {
             if !raw_road_types.contains(&row.road_type_id) {
@@ -400,7 +400,7 @@ impl PreparedTables {
                 .push(row.drive_schedule_id);
         }
 
-        // readOperatingMode — 1 < opModeID < 100, excluding 26 and 36.
+ // readOperatingMode — 1 < opModeID < 100, excluding 26 and 36.
         for &mode in &inputs.operating_mode {
             if mode.op_mode_id > 1
                 && mode.op_mode_id < 100
@@ -447,7 +447,7 @@ mod tests {
                     avg_speed_bin_id: 10,
                     avg_speed_fraction: 0.4,
                 },
-                // No matching bin — dropped by the inner join.
+ // No matching bin — dropped by the inner join.
                 AvgSpeedDistributionRow {
                     source_type_id: 21,
                     road_type_id: 3,
@@ -524,12 +524,12 @@ mod tests {
                     pol_process_id: 101,
                     op_mode_id: 0,
                 },
-                // process 1, but op mode >= 100 — excluded.
+ // process 1, but op mode >= 100 — excluded.
                 OpModePolProcRow {
                     pol_process_id: 201,
                     op_mode_id: 300,
                 },
-                // process 1 and a driving op mode, but not in run spec.
+ // process 1 and a driving op mode, but not in run spec.
                 OpModePolProcRow {
                     pol_process_id: 301,
                     op_mode_id: 5,

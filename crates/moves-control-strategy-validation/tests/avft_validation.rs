@@ -1,4 +1,4 @@
-//! AVFT control-strategy validation (Phase 6 Task 124).
+//! AVFT control-strategy validation.
 //!
 //! Validates [`AvftControlStrategy`] constructed from both a pre-built table
 //! (`from_completed`) and from raw tool inputs (`from_tool_inputs`), confirming
@@ -213,7 +213,7 @@ fn check_fractions_sum_to_one(t: &AvftTable) {
 
     let mut sums: BTreeMap<(i32, i32), f64> = BTreeMap::new();
     for rec in t.to_vec() {
-        *sums
+ *sums
             .entry((rec.source_type_id, rec.model_year_id))
             .or_insert(0.0) += rec.fuel_eng_fraction;
     }

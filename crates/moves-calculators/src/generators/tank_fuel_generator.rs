@@ -1,5 +1,5 @@
 //! `TankFuelGenerator` — commingled tank-fuel RVP and ethanol volume
-//! (migration-plan Task 39).
+//! ().
 //!
 //! Ports `gov/epa/otaq/moves/master/implementation/ghg/TankFuelGenerator.java`
 //! (589 lines). The Java generator "builds commingled RVP information for the
@@ -17,13 +17,13 @@
 //! statements with no branch points — the source comments label them
 //! TFG-1a … TFG-3b. [`calculate_average_tank_gasoline`] ports that sequence:
 //!
-//! | Java step                                       | Rust |
+//! | Java step | Rust |
 //! |-------------------------------------------------|------|
-//! | `regionCounty` region / fuel-year lookup        | `resolve_fuel_region` |
-//! | TFG-1a `TFGUsedFuelFormulation`                 | `build_used_fuel_formulations` |
-//! | TFG-1b/1c/1d/1e/3a `TFGFuelSupplyAverage`       | `build_fuel_supply_averages` |
-//! | TFG-2a `TFGZone`                                | `build_zone_temperatures` |
-//! | TFG-2b/2c/2d/3b `TFGZoneFuel` → output rows     | [`calculate_average_tank_gasoline`] |
+//! | `regionCounty` region / fuel-year lookup | `resolve_fuel_region` |
+//! | TFG-1a `TFGUsedFuelFormulation` | `build_used_fuel_formulations` |
+//! | TFG-1b/1c/1d/1e/3a `TFGFuelSupplyAverage` | `build_fuel_supply_averages` |
+//! | TFG-2a `TFGZone` | `build_zone_temperatures` |
+//! | TFG-2b/2c/2d/3b `TFGZoneFuel` → output rows | [`calculate_average_tank_gasoline`] |
 //!
 //! # SQL tables → typed inputs
 //!
@@ -47,19 +47,19 @@
 //! All arithmetic runs in `f64`, matching MySQL, which evaluates every
 //! expression in double precision. The MOVES default-DB and temp-table
 //! columns are declared `float` (32-bit) / `double` (64-bit); the 32-bit
-//! storage of intermediates is a data-plane concern (Phase 4 Parquet
-//! conversion / Task 50) and is not emulated here. The resulting divergence
-//! from canonical MOVES is bounded well within the Phase 3 tolerance budget
+//! storage of intermediates is a data-plane concern (Parquet
+//! conversion /) and is not emulated here. The resulting divergence
+//! from canonical MOVES is bounded well within the tolerance budget
 //! (`characterization/tolerance.toml`).
 //!
 //! # Data-plane deferral
 //!
-//! The framework data plane (`ExecutionTables` / `ScratchNamespace`, Task 50
+//! The framework data plane (`ExecutionTables` / `ScratchNamespace`,
 //! `DataFrameStore`) is still a placeholder, so [`TankFuelGenerator`]'s
-//! `Generator::execute` returns an empty output — the established Phase 2
+//! `Generator::execute` returns an empty output — the established
 //! pattern. The ported computation lives in the pure
 //! [`calculate_average_tank_gasoline`] function and is fully exercised by the
-//! crate tests; Task 50 wiring will read the input tables from the
+//! crate tests; wiring will read the input tables from the
 //! [`CalculatorContext`], call it per `(county, year)`, and write
 //! `AverageTankGasoline` into the scratch namespace.
 
@@ -84,45 +84,45 @@ const WEATHERING_CONSTANT: f64 = 0.049;
 const FUEL_REGION_CODE_ID: i32 = 1;
 
 // =============================================================================
-//   Input table rows
+// Input table rows
 // =============================================================================
 
 /// One `FuelSupply` row: the market share of a fuel formulation within a
 /// `(fuel region, fuel year, month group)`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FuelSupplyRow {
-    /// `fuelRegionID`.
+ /// `fuelRegionID`.
     pub fuel_region_id: i32,
-    /// `fuelYearID`.
+ /// `fuelYearID`.
     pub fuel_year_id: i32,
-    /// `monthGroupID`.
+ /// `monthGroupID`.
     pub month_group_id: i32,
-    /// `fuelFormulationID`.
+ /// `fuelFormulationID`.
     pub fuel_formulation_id: i32,
-    /// `marketShare` — fraction of the fuel supply; rows with a non-positive
-    /// (or `NaN`) share are excluded, matching the SQL `marketShare > 0`.
+ /// `marketShare` — fraction of the fuel supply; rows with a non-positive
+ /// (or `NaN`) share are excluded, matching the SQL `marketShare > 0`.
     pub market_share: f64,
 }
 
 /// One `FuelFormulation` row — only the columns `TankFuelGenerator` reads.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FuelFormulationRow {
-    /// `fuelFormulationID`.
+ /// `fuelFormulationID`.
     pub fuel_formulation_id: i32,
-    /// `fuelSubtypeID`.
+ /// `fuelSubtypeID`.
     pub fuel_subtype_id: i32,
-    /// `RVP` — Reid Vapor Pressure of the formulation.
+ /// `RVP` — Reid Vapor Pressure of the formulation.
     pub rvp: f64,
-    /// `ETOHVolume` — ethanol volume percentage.
+ /// `ETOHVolume` — ethanol volume percentage.
     pub etoh_volume: f64,
 }
 
 /// One `FuelSubtype` row — maps a fuel subtype to its fuel type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FuelSubtypeRow {
-    /// `fuelSubtypeID`.
+ /// `fuelSubtypeID`.
     pub fuel_subtype_id: i32,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
 }
 
@@ -130,65 +130,65 @@ pub struct FuelSubtypeRow {
 /// TFG-1a join filters on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FuelTypeRow {
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `subjectToEvapCalculations = 'Y'`.
+ /// `subjectToEvapCalculations = 'Y'`.
     pub subject_to_evap_calculations: bool,
 }
 
 /// One `Year` row — maps a calendar year to its fuel year.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct YearRow {
-    /// `yearID` — calendar year.
+ /// `yearID` — calendar year.
     pub year_id: i32,
-    /// `fuelYearID`.
+ /// `fuelYearID`.
     pub fuel_year_id: i32,
 }
 
 /// One `MonthofAnyYear` row — maps a month to its month group.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MonthOfAnyYearRow {
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `monthGroupID`.
+ /// `monthGroupID`.
     pub month_group_id: i32,
 }
 
 /// One `Zone` row — maps a zone to its county.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ZoneRow {
-    /// `zoneID`.
+ /// `zoneID`.
     pub zone_id: i32,
-    /// `countyID`.
+ /// `countyID`.
     pub county_id: i32,
 }
 
 /// One `ZoneMonthHour` row — only the columns `TankFuelGenerator` reads.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ZoneMonthHourRow {
-    /// `zoneID`.
+ /// `zoneID`.
     pub zone_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `temperature` — hourly zone temperature (°F).
+ /// `temperature` — hourly zone temperature (°F).
     pub temperature: f64,
 }
 
 /// One `regionCounty` row — associates a county with a fuel region / fuel year.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RegionCountyRow {
-    /// `regionID`.
+ /// `regionID`.
     pub region_id: i32,
-    /// `countyID`.
+ /// `countyID`.
     pub county_id: i32,
-    /// `regionCodeID`.
+ /// `regionCodeID`.
     pub region_code_id: i32,
-    /// `fuelYearID`.
+ /// `fuelYearID`.
     pub fuel_year_id: i32,
 }
 
 // =============================================================================
-//   Output
+// Output
 // =============================================================================
 
 /// One `AverageTankGasoline` row — the generator's output, keyed by
@@ -200,20 +200,20 @@ pub struct RegionCountyRow {
 /// generated row for that key.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AverageTankGasolineRow {
-    /// `zoneID`.
+ /// `zoneID`.
     pub zone_id: i32,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `fuelYearID`.
+ /// `fuelYearID`.
     pub fuel_year_id: i32,
-    /// `monthGroupID`.
+ /// `monthGroupID`.
     pub month_group_id: i32,
-    /// `ETOHVolume` — market-share-weighted average tank ethanol volume.
+ /// `ETOHVolume` — market-share-weighted average tank ethanol volume.
     pub etoh_volume: f64,
-    /// `RVP` — commingled, weathered tank Reid Vapor Pressure.
+ /// `RVP` — commingled, weathered tank Reid Vapor Pressure.
     pub rvp: f64,
-    /// `isUserInput` — `false` (`'N'`) for generated rows, `true` (`'Y'`)
-    /// for user-supplied rows.
+ /// `isUserInput` — `false` (`'N'`) for generated rows, `true` (`'Y'`)
+ /// for user-supplied rows.
     pub is_user_input: bool,
 }
 
@@ -224,38 +224,38 @@ pub struct AverageTankGasolineRow {
 /// `(county, year)` invocation of a run.
 #[derive(Debug, Clone, Default)]
 pub struct TankFuelInputs {
-    /// `FuelSupply`.
+ /// `FuelSupply`.
     pub fuel_supply: Vec<FuelSupplyRow>,
-    /// `FuelFormulation`.
+ /// `FuelFormulation`.
     pub fuel_formulation: Vec<FuelFormulationRow>,
-    /// `FuelSubtype`.
+ /// `FuelSubtype`.
     pub fuel_subtype: Vec<FuelSubtypeRow>,
-    /// `FuelType`.
+ /// `FuelType`.
     pub fuel_type: Vec<FuelTypeRow>,
-    /// `Year`.
+ /// `Year`.
     pub year: Vec<YearRow>,
-    /// `MonthofAnyYear`.
+ /// `MonthofAnyYear`.
     pub month_of_any_year: Vec<MonthOfAnyYearRow>,
-    /// `Zone`.
+ /// `Zone`.
     pub zone: Vec<ZoneRow>,
-    /// `ZoneMonthHour`.
+ /// `ZoneMonthHour`.
     pub zone_month_hour: Vec<ZoneMonthHourRow>,
-    /// `regionCounty`.
+ /// `regionCounty`.
     pub region_county: Vec<RegionCountyRow>,
-    /// `RunSpecYear` — calendar years selected by the RunSpec.
+ /// `RunSpecYear` — calendar years selected by the RunSpec.
     pub runspec_year_ids: Vec<i32>,
-    /// `RunSpecMonthGroup` — month groups selected by the RunSpec.
+ /// `RunSpecMonthGroup` — month groups selected by the RunSpec.
     pub runspec_month_group_ids: Vec<i32>,
-    /// `RunSpecMonth` — months selected by the RunSpec.
+ /// `RunSpecMonth` — months selected by the RunSpec.
     pub runspec_month_ids: Vec<i32>,
-    /// Pre-existing `AverageTankGasoline` rows (typically user input). A key
-    /// present here blocks the generated row for that key — the Java
-    /// `insert ignore` semantics.
+ /// Pre-existing `AverageTankGasoline` rows (typically user input). A key
+ /// present here blocks the generated row for that key — the Java
+ /// `insert ignore` semantics.
     pub prior_average_tank_gasoline: Vec<AverageTankGasolineRow>,
 }
 
 // =============================================================================
-//   Scalar formulas (step 100)
+// Scalar formulas (step 100)
 // =============================================================================
 
 /// `kGasoline` — gasoline-portion volume-correction factor (TFG-1a, reused
@@ -351,7 +351,7 @@ fn commingled_factor(gasohol_market_share: Option<f64>) -> f64 {
 }
 
 // =============================================================================
-//   Intermediate (temp) tables
+// Intermediate (temp) tables
 // =============================================================================
 
 /// One `TFGUsedFuelFormulation` row, keyed in a map by `fuelFormulationID`.
@@ -385,7 +385,7 @@ struct ZoneTemperature {
 }
 
 // =============================================================================
-//   Steps
+// Steps
 // =============================================================================
 
 /// Resolve the fuel region and fuel year for a `(county, calendar-year)`.
@@ -496,8 +496,8 @@ fn build_fuel_supply_averages(
         .map(|f| (f.fuel_formulation_id, f))
         .collect();
 
-    /// Per-group running sums; the gasohol share stays `None` until a
-    /// gasohol-range formulation contributes, mirroring TFG-1c's `NULL`.
+ /// Per-group running sums; the gasohol share stays `None` until a
+ /// gasohol-range formulation contributes, mirroring TFG-1c's `NULL`.
     #[derive(Default)]
     struct Accum {
         sum_rvp_ms: f64,
@@ -530,30 +530,30 @@ fn build_fuel_supply_averages(
         acc.sum_etoh_ms += ff.etoh_volume * weight;
         acc.sum_gas_portion_rvp_ms += uff.gas_portion_rvp * weight;
         acc.sum_ms += weight;
-        // TFG-1c: gasohol is a formulation with 4 <= ETOHVolume <= 20.
+ // TFG-1c: gasohol is a formulation with 4 <= ETOHVolume <= 20.
         if (4.0..=20.0).contains(&ff.etoh_volume) {
-            *acc.gasohol_market_share.get_or_insert(0.0) += weight;
+ *acc.gasohol_market_share.get_or_insert(0.0) += weight;
         }
     }
 
     groups
         .into_iter()
         .map(|((fuel_type_id, fuel_year_id, month_group_id), acc)| {
-            // TFG-1b: market-share-weighted averages.
+ // TFG-1b: market-share-weighted averages.
             let linear_average_rvp = acc.sum_rvp_ms / acc.sum_ms;
             let tank_average_etoh_volume = acc.sum_etoh_ms / acc.sum_ms;
             let average_gas_portion_rvp = acc.sum_gas_portion_rvp_ms / acc.sum_ms;
-            // TFG-1d: K-factors at the average tank ethanol volume.
+ // TFG-1d: K-factors at the average tank ethanol volume.
             let average_k_gasoline = k_gasoline(tank_average_etoh_volume);
             let average_k_ethanol = k_ethanol(tank_average_etoh_volume);
-            // TFG-1e: unweathered commingled RVP.
+ // TFG-1e: unweathered commingled RVP.
             let no_weathering_reddy_rvp = reddy_rvp(
                 average_k_gasoline,
                 average_k_ethanol,
                 tank_average_etoh_volume,
                 average_gas_portion_rvp,
             );
-            // TFG-3a: gasohol-commingling correction.
+ // TFG-3a: gasohol-commingling correction.
             let commingled_rvp = linear_average_rvp * commingled_factor(acc.gasohol_market_share);
             FuelSupplyAverage {
                 fuel_type_id,
@@ -589,7 +589,7 @@ fn build_zone_temperatures(inputs: &TankFuelInputs, county_id: i32) -> Vec<ZoneT
         .collect();
     let runspec_months: HashSet<i32> = inputs.runspec_month_ids.iter().copied().collect();
 
-    // (zoneID, monthGroupID) -> (min temperature, max temperature)
+ // (zoneID, monthGroupID) -> (min temperature, max temperature)
     let mut extremes: BTreeMap<(i32, i32), (f64, f64)> = BTreeMap::new();
     for zmh in &inputs.zone_month_hour {
         if !zones_in_county.contains(&zmh.zone_id) || !runspec_months.contains(&zmh.month_id) {
@@ -601,8 +601,8 @@ fn build_zone_temperatures(inputs: &TankFuelInputs, county_id: i32) -> Vec<ZoneT
         extremes
             .entry((zmh.zone_id, month_group_id))
             .and_modify(|(lo, hi)| {
-                *lo = lo.min(zmh.temperature);
-                *hi = hi.max(zmh.temperature);
+ *lo = lo.min(zmh.temperature);
+ *hi = hi.max(zmh.temperature);
             })
             .or_insert((zmh.temperature, zmh.temperature));
     }
@@ -643,9 +643,9 @@ pub fn calculate_average_tank_gasoline(
         return Vec::new();
     };
 
-    // The TFG-1 joins pass FuelSupply through `Year ⋈ RunSpecYear`, which
-    // multiplies each row by the count of run-selected calendar years sharing
-    // the resolved fuel year. Folded into the market-share weight below.
+ // The TFG-1 joins pass FuelSupply through `Year ⋈ RunSpecYear`, which
+ // multiplies each row by the count of run-selected calendar years sharing
+ // the resolved fuel year. Folded into the market-share weight below.
     let runspec_years: HashSet<i32> = inputs.runspec_year_ids.iter().copied().collect();
     let year_multiplicity = inputs
         .year
@@ -672,7 +672,7 @@ pub fn calculate_average_tank_gasoline(
     );
     let zone_temperatures = build_zone_temperatures(inputs, county_id);
 
-    // The TFG-2b join is `TFGZone ⋈ TFGFuelSupplyAverage using (monthGroupID)`.
+ // The TFG-2b join is `TFGZone ⋈ TFGFuelSupplyAverage using (monthGroupID)`.
     let mut averages_by_month_group: HashMap<i32, Vec<&FuelSupplyAverage>> = HashMap::new();
     for average in &averages {
         averages_by_month_group
@@ -693,20 +693,20 @@ pub fn calculate_average_tank_gasoline(
             continue;
         };
         for &fsa in averages {
-            // TFG-2b: weathering ratio at this zone's evaporative temperature.
+ // TFG-2b: weathering ratio at this zone's evaporative temperature.
             let ratio = ratio_gasoline_rvp_loss(zone.zone_evap_temp, fsa.average_gas_portion_rvp);
-            // TFG-2c: weathered gasoline-portion RVP.
+ // TFG-2c: weathered gasoline-portion RVP.
             let weathered_gas_portion_rvp =
                 fsa.average_gas_portion_rvp * (1.0 - ratio * WEATHERING_CONSTANT);
-            // TFG-2d: weathered commingled RVP.
+ // TFG-2d: weathered commingled RVP.
             let weathered_reddy_rvp = reddy_rvp(
                 fsa.average_k_gasoline,
                 fsa.average_k_ethanol,
                 fsa.tank_average_etoh_volume,
                 weathered_gas_portion_rvp,
             );
-            // TFG-3b: final RVP = weathered RVP scaled by the commingling
-            // correction, renormalised by the unweathered commingled RVP.
+ // TFG-3b: final RVP = weathered RVP scaled by the commingling
+ // correction, renormalised by the unweathered commingled RVP.
             let rvp = weathered_reddy_rvp * fsa.commingled_rvp / fsa.no_weathering_reddy_rvp;
 
             let key = (
@@ -735,7 +735,7 @@ pub fn calculate_average_tank_gasoline(
 }
 
 // =============================================================================
-//   Data-plane helpers
+// Data-plane helpers
 // =============================================================================
 
 fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -> Error {
@@ -1589,7 +1589,7 @@ impl TableRow for RunSpecMonthRow {
 }
 
 // =============================================================================
-//   Generator
+// Generator
 // =============================================================================
 
 /// Default-DB tables [`TankFuelGenerator`] reads, in canonical MOVES casing.
@@ -1612,13 +1612,13 @@ static INPUT_TABLES: &[&str] = &[
 /// Scratch table [`TankFuelGenerator`] writes.
 static OUTPUT_TABLES: &[&str] = &["AverageTankGasoline"];
 
-/// The Task 39 generator — the framework adapter around
+/// The generator — the framework adapter around
 /// [`calculate_average_tank_gasoline`].
 ///
 /// Ports the master-loop surface of `TankFuelGenerator.java`: it subscribes
 /// for *Evap Fuel Vapor Venting* and *Evap Fuel Leaks* at `YEAR` granularity,
 /// `GENERATOR` priority, and declares the `AverageTankGasoline` scratch table
-/// it produces. `Generator::execute` is an empty stand-in until the Task 50
+/// it produces. `Generator::execute` is an empty stand-in until the
 /// data plane lands — see the module docs.
 #[derive(Debug, Clone)]
 pub struct TankFuelGenerator {
@@ -1626,17 +1626,17 @@ pub struct TankFuelGenerator {
 }
 
 impl TankFuelGenerator {
-    /// Construct the generator with its two master-loop subscriptions.
+ /// Construct the generator with its two master-loop subscriptions.
     #[must_use]
     pub fn new() -> Self {
-        // `MasterLoopPriority.GENERATOR` — see `TankFuelGenerator.subscribeToMe`.
+ // `MasterLoopPriority.GENERATOR` — see `TankFuelGenerator.subscribeToMe`.
         let priority =
             Priority::parse("GENERATOR").expect("\"GENERATOR\" is a canonical MasterLoopPriority");
         Self {
             subscriptions: vec![
-                // Evap Fuel Vapor Venting (process 12).
+ // Evap Fuel Vapor Venting (process 12).
                 CalculatorSubscription::new(ProcessId(12), Granularity::Year, priority),
-                // Evap Fuel Leaks (process 13).
+ // Evap Fuel Leaks (process 13).
                 CalculatorSubscription::new(ProcessId(13), Granularity::Year, priority),
             ],
         }
@@ -1743,9 +1743,9 @@ pub fn factory() -> Box<dyn Generator> {
 mod tests {
     use super::*;
 
-    /// Assert two `f64`s agree within a tolerance comfortably tighter than any
-    /// platform `libm` `pow` discrepancy yet far looser than a real algorithm
-    /// bug. Reference values are computed independently (see the test docs).
+ /// Assert two `f64`s agree within a tolerance comfortably tighter than any
+ /// platform `libm` `pow` discrepancy yet far looser than a real algorithm
+ /// bug. Reference values are computed independently (see the test docs).
     fn assert_close(got: f64, expected: f64, what: &str) {
         let diff = (got - expected).abs();
         assert!(
@@ -1754,61 +1754,61 @@ mod tests {
         );
     }
 
-    // --- scalar formulas ---------------------------------------------------
+ // --- scalar formulas ---------------------------------------------------
 
     #[test]
     fn k_gasoline_matches_reference() {
-        // Pure mul/add — fully deterministic IEEE-754 arithmetic.
-        // k_gasoline(0) = 1.0; k_gasoline(10) = -7e-4 + 0.02 + 0.024 + 1.0.
+ // Pure mul/add — fully deterministic IEEE-754 arithmetic.
+ // k_gasoline(0) = 1.0; k_gasoline(10) = -7e-4 + 0.02 + 0.024 + 1.0.
         assert_close(k_gasoline(0.0), 1.0, "k_gasoline(0)");
         assert_close(k_gasoline(10.0), 1.0433, "k_gasoline(10)");
     }
 
     #[test]
     fn k_ethanol_branches() {
-        // etoh <= 0 takes the constant branch; > 0 the power-law branch.
+ // etoh <= 0 takes the constant branch; > 0 the power-law branch.
         assert_close(k_ethanol(0.0), 1000.0, "k_ethanol(0)");
         assert_close(k_ethanol(-1.0), 1000.0, "k_ethanol(-1)");
-        // Reference: 46.321 * 10^-0.8422, computed with Python `math`.
+ // Reference: 46.321 * 10^-0.8422, computed with Python `math`.
         assert_close(k_ethanol(10.0), 6.661_590_412_093_28, "k_ethanol(10)");
     }
 
     #[test]
     fn gas_portion_rvp_and_reddy_rvp_are_inverse() {
-        // `reddy_rvp` recombines what `gas_portion_rvp` splits out, so feeding
-        // an unweathered gas-portion RVP back through `reddy_rvp` reconstructs
-        // the original formulation RVP.
+ // `reddy_rvp` recombines what `gas_portion_rvp` splits out, so feeding
+ // an unweathered gas-portion RVP back through `reddy_rvp` reconstructs
+ // the original formulation RVP.
         for &(rvp, etoh) in &[(12.0, 10.0), (9.0, 0.0), (13.5, 15.0), (7.8, 5.5)] {
             let gpr = gas_portion_rvp(rvp, etoh);
             let recombined = reddy_rvp(k_gasoline(etoh), k_ethanol(etoh), etoh, gpr);
             assert_close(recombined, rvp, "reddy_rvp ∘ gas_portion_rvp");
         }
-        // A zero-ethanol formulation's gas portion is just its RVP.
+ // A zero-ethanol formulation's gas portion is just its RVP.
         assert_close(gas_portion_rvp(9.0, 0.0), 9.0, "gas_portion_rvp(9, 0)");
     }
 
     #[test]
     fn zone_evap_temp_branches() {
-        // Cool zone (zoneMax < 40): midpoint.
+ // Cool zone (zoneMax < 40): midpoint.
         assert_close(zone_evap_temp(30.0, 35.0), 32.5, "midpoint, cool");
-        // Degenerate range (zoneMax <= zoneMin): midpoint.
+ // Degenerate range (zoneMax <= zoneMin): midpoint.
         assert_close(zone_evap_temp(50.0, 50.0), 50.0, "midpoint, flat");
-        // Warm, wide zone: the regression branch.
-        // -1.7474 + 1.029*45 + 0.99202*50 - 0.0025173*45*50.
+ // Warm, wide zone: the regression branch.
+ // -1.7474 + 1.029*45 + 0.99202*50 - 0.0025173*45*50.
         assert_close(zone_evap_temp(45.0, 95.0), 88.494_675, "regression");
     }
 
     #[test]
     fn ratio_gasoline_rvp_loss_clamps_at_zero() {
-        // A low evaporative temperature drives the numerator negative — the
-        // `greatest(0, ...)` clamp pins the ratio at zero.
+ // A low evaporative temperature drives the numerator negative — the
+ // `greatest(0, ...)` clamp pins the ratio at zero.
         assert_close(
             ratio_gasoline_rvp_loss(32.5, 9.969_426_630_383_43),
             0.0,
             "clamped ratio",
         );
-        // A warm zone yields a positive, sub-unity ratio. Reference:
-        // (-2.4908 + 0.026196*80 + 0.00076898*80*10) / (-0.0860 + 0.070592*10).
+ // A warm zone yields a positive, sub-unity ratio. Reference:
+ // (-2.4908 + 0.026196*80 + 0.00076898*80*10) / (-0.0860 + 0.070592*10).
         assert_close(
             ratio_gasoline_rvp_loss(80.0, 10.0),
             0.354_987_740_353_594_04,
@@ -1818,7 +1818,7 @@ mod tests {
 
     #[test]
     fn commingled_factor_bands() {
-        // Every band boundary, plus the NULL / below-0.1 fallthrough.
+ // Every band boundary, plus the NULL / below-0.1 fallthrough.
         assert_close(commingled_factor(Some(1.0)), 1.000, "share >= 1.0");
         assert_close(commingled_factor(Some(0.95)), 1.018, "share >= 0.9");
         assert_close(commingled_factor(Some(0.6)), 1.038, "share >= 0.6");
@@ -1828,12 +1828,12 @@ mod tests {
         assert_close(commingled_factor(None), 1.000, "no gasohol (NULL)");
     }
 
-    // --- fixtures ----------------------------------------------------------
+ // --- fixtures ----------------------------------------------------------
 
-    /// Fixture A: one gasoline formulation (`ETOHVolume = 10`, `RVP = 12`,
-    /// `marketShare = 1`) in one zone of one county, one month group, one
-    /// run-selected year. The warm/wide zone (`45 °F`–`95 °F`) exercises the
-    /// `zoneEvapTemp` regression branch and a non-zero weathering ratio.
+ /// Fixture A: one gasoline formulation (`ETOHVolume = 10`, `RVP = 12`,
+ /// `marketShare = 1`) in one zone of one county, one month group, one
+ /// run-selected year. The warm/wide zone (`45 °F`–`95 °F`) exercises the
+ /// `zoneEvapTemp` regression branch and a non-zero weathering ratio.
     fn fixture_single_formulation() -> TankFuelInputs {
         TankFuelInputs {
             fuel_supply: vec![FuelSupplyRow {
@@ -1894,10 +1894,10 @@ mod tests {
         }
     }
 
-    /// Fixture B: two formulations sharing a fuel type / month group — a
-    /// gasohol (`ETOHVolume = 10`, `share 0.6`) and an `E0` (`ETOHVolume = 0`,
-    /// `share 0.4`). The cool zone (`30 °F`–`35 °F`) exercises the
-    /// `zoneEvapTemp` midpoint branch and the zero-weathering clamp.
+ /// Fixture B: two formulations sharing a fuel type / month group — a
+ /// gasohol (`ETOHVolume = 10`, `share 0.6`) and an `E0` (`ETOHVolume = 0`,
+ /// `share 0.4`). The cool zone (`30 °F`–`35 °F`) exercises the
+ /// `zoneEvapTemp` midpoint branch and the zero-weathering clamp.
     fn fixture_two_formulations() -> TankFuelInputs {
         let mut inputs = fixture_single_formulation();
         inputs.fuel_supply = vec![
@@ -1945,13 +1945,13 @@ mod tests {
         inputs
     }
 
-    // --- end-to-end --------------------------------------------------------
+ // --- end-to-end --------------------------------------------------------
 
     #[test]
     fn single_formulation_full_chain() {
-        // Reference values traced through every TFG step in Python:
-        //   etohVolume = tankAverageETOHVolume = 10.0
-        //   rvp        = weatheredReddyRVP (noWeatheringReddyRVP == commingledRVP == 12.0)
+ // Reference values traced through every TFG step in Python:
+ // etohVolume = tankAverageETOHVolume = 10.0
+ // rvp = weatheredReddyRVP (noWeatheringReddyRVP == commingledRVP == 12.0)
         let rows = calculate_average_tank_gasoline(&fixture_single_formulation(), 1000, 2020);
         assert_eq!(rows.len(), 1, "one zone × one fuel-supply group");
         let row = rows[0];
@@ -1966,11 +1966,11 @@ mod tests {
 
     #[test]
     fn two_formulations_full_chain() {
-        // Reference values from the Python trace:
-        //   tankAverageETOHVolume = (10*0.6 + 0*0.4) / 1.0      = 6.0
-        //   gasoholMarketShare    = 0.6  -> commingled factor 1.038
-        //   zoneEvapTemp          = (30+35)/2 = 32.5 -> ratio clamped to 0
-        //   rvp = commingledRVP = linearAverageRVP(10.5) * 1.038 = 10.899
+ // Reference values from the Python trace:
+ // tankAverageETOHVolume = (10*0.6 + 0*0.4) / 1.0 = 6.0
+ // gasoholMarketShare = 0.6 -> commingled factor 1.038
+ // zoneEvapTemp = (30+35)/2 = 32.5 -> ratio clamped to 0
+ // rvp = commingledRVP = linearAverageRVP(10.5) * 1.038 = 10.899
         let rows = calculate_average_tank_gasoline(&fixture_two_formulations(), 1000, 2020);
         assert_eq!(rows.len(), 1);
         assert_close(rows[0].etoh_volume, 6.0, "etoh_volume");
@@ -1979,8 +1979,8 @@ mod tests {
 
     #[test]
     fn prior_user_input_blocks_generated_row() {
-        // A pre-existing AverageTankGasoline row on the generated key makes the
-        // Java `insert ignore` a no-op — the generator emits nothing for it.
+ // A pre-existing AverageTankGasoline row on the generated key makes the
+ // Java `insert ignore` a no-op — the generator emits nothing for it.
         let mut inputs = fixture_single_formulation();
         inputs.prior_average_tank_gasoline = vec![AverageTankGasolineRow {
             zone_id: 90_000,
@@ -1998,18 +1998,18 @@ mod tests {
     #[test]
     fn unresolved_region_yields_no_rows() {
         let inputs = fixture_single_formulation();
-        // No regionCounty row for county 9999.
+ // No regionCounty row for county 9999.
         assert!(calculate_average_tank_gasoline(&inputs, 9999, 2020).is_empty());
-        // No Year row maps the resolved fuel year to calendar year 1999.
+ // No Year row maps the resolved fuel year to calendar year 1999.
         assert!(calculate_average_tank_gasoline(&inputs, 1000, 1999).is_empty());
-        // Empty inputs resolve nothing.
+ // Empty inputs resolve nothing.
         assert!(calculate_average_tank_gasoline(&TankFuelInputs::default(), 1, 2020).is_empty());
     }
 
     #[test]
     fn non_evap_fuel_type_is_excluded() {
-        // A fuel type that is not subjectToEvapCalculations drops out of the
-        // TFG-1a join, leaving no fuel-supply averages and no output.
+ // A fuel type that is not subjectToEvapCalculations drops out of the
+ // TFG-1a join, leaving no fuel-supply averages and no output.
         let mut inputs = fixture_single_formulation();
         inputs.fuel_type[0].subject_to_evap_calculations = false;
         assert!(calculate_average_tank_gasoline(&inputs, 1000, 2020).is_empty());
@@ -2017,8 +2017,8 @@ mod tests {
 
     #[test]
     fn unselected_month_group_is_excluded() {
-        // FuelSupply for a month group outside RunSpecMonthGroup is filtered
-        // out, even though zone temperatures still exist for the run months.
+ // FuelSupply for a month group outside RunSpecMonthGroup is filtered
+ // out, even though zone temperatures still exist for the run months.
         let mut inputs = fixture_single_formulation();
         inputs.runspec_month_group_ids = vec![2];
         assert!(calculate_average_tank_gasoline(&inputs, 1000, 2020).is_empty());
@@ -2026,9 +2026,9 @@ mod tests {
 
     #[test]
     fn output_is_sorted_across_multiple_zones() {
-        // Two zones in the county — output must be sorted by the
-        // (zone, fuel type, fuel year, month group) key regardless of input
-        // order, so the generator is deterministic.
+ // Two zones in the county — output must be sorted by the
+ // (zone, fuel type, fuel year, month group) key regardless of input
+ // order, so the generator is deterministic.
         let mut inputs = fixture_single_formulation();
         inputs.zone.push(ZoneRow {
             zone_id: 80_000,
@@ -2050,17 +2050,17 @@ mod tests {
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0].zone_id, 80_000);
         assert_eq!(rows[1].zone_id, 90_000);
-        // Identical fuel supply / temperatures -> identical RVP per zone.
+ // Identical fuel supply / temperatures -> identical RVP per zone.
         assert_close(rows[0].rvp, rows[1].rvp, "per-zone rvp");
     }
 
     #[test]
     fn shared_fuel_year_multiplicity_scales_gasohol_share() {
-        // Two run-selected calendar years share the resolved fuel year, so the
-        // `Year ⋈ RunSpecYear` join doubles every FuelSupply row. The ratio
-        // averages are invariant, but the gasohol share scales: a 0.6 share
-        // doubles to 1.2 (>= 1.0), shifting the commingling factor 1.038 ->
-        // 1.000 and the RVP from 10.899 to linearAverageRVP = 10.5.
+ // Two run-selected calendar years share the resolved fuel year, so the
+ // `Year ⋈ RunSpecYear` join doubles every FuelSupply row. The ratio
+ // averages are invariant, but the gasohol share scales: a 0.6 share
+ // doubles to 1.2 (>= 1.0), shifting the commingling factor 1.038 ->
+ // 1.000 and the RVP from 10.899 to linearAverageRVP = 10.5.
         let mut inputs = fixture_two_formulations();
         inputs.year.push(YearRow {
             year_id: 2021,
@@ -2073,7 +2073,7 @@ mod tests {
         assert_close(rows[0].rvp, 10.5, "commingling factor collapses to 1.000");
     }
 
-    // --- generator metadata ------------------------------------------------
+ // --- generator metadata ------------------------------------------------
 
     #[test]
     fn generator_metadata_matches_calculator_dag() {
@@ -2103,7 +2103,7 @@ mod tests {
 
         let inputs = fixture_single_formulation();
 
-        // Load all input tables into the store.
+ // Load all input tables into the store.
         let mut store = InMemoryStore::default();
         store.insert(
             "FuelSupply",
@@ -2180,7 +2180,7 @@ mod tests {
                 .unwrap(),
         );
 
-        // county_id = 1000, calendar_year = 2020
+ // county_id = 1000, calendar_year = 2020
         let position = IterationPosition {
             iteration: 0,
             process_id: Some(ProcessId(12)),
@@ -2203,7 +2203,7 @@ mod tests {
             .iter_typed("AverageTankGasoline")
             .unwrap();
 
-        // single_formulation_full_chain: one row, zone 90_000, rvp ≈ 11.571.
+ // single_formulation_full_chain: one row, zone 90_000, rvp ≈ 11.571.
         assert_eq!(out.len(), 1, "expected one AverageTankGasoline row");
         assert_eq!(out[0].zone_id, 90_000);
         assert_eq!(out[0].fuel_type_id, 1);
@@ -2216,7 +2216,7 @@ mod tests {
 
     #[test]
     fn generator_is_object_safe() {
-        // The CalculatorRegistry stores generators as `Box<dyn Generator>`.
+ // The CalculatorRegistry stores generators as `Box<dyn Generator>`.
         let gens: Vec<Box<dyn Generator>> = vec![Box::new(TankFuelGenerator::new())];
         assert_eq!(gens[0].name(), "TankFuelGenerator");
     }

@@ -26,11 +26,11 @@
 //! signal the engine to invalidate and reload those tables before calculators
 //! consume them.
 //!
-//! # Data-plane status (Task 50)
+//! # Data-plane status
 //!
 //! The actual write of the adjusted emission rates into the execution database
 //! is deferred until `moves-framework`'s `ExecutionTables` gains a mutable
-//! write API (Task 50 / `DataFrameStore`). The `modified_tables` declaration
+//! write API. The `modified_tables` declaration
 //! already signals the engine which tables will be modified, so the hook-up
 //! is a single `TODO` line once the data plane lands.
 
@@ -47,15 +47,15 @@ pub struct RateOfProgressControlStrategy {
 }
 
 impl RateOfProgressControlStrategy {
-    /// Build from a [`RopTable`] of reduction parameters.
-    ///
-    /// The table is applied in [`pre_run`](Self::pre_run) to modify emission
-    /// rate tables in the execution database before calculators run.
+ /// Build from a [`RopTable`] of reduction parameters.
+ ///
+ /// The table is applied in [`pre_run`](Self::pre_run) to modify emission
+ /// rate tables in the execution database before calculators run.
     pub fn new(table: RopTable) -> Self {
         Self { table }
     }
 
-    /// The reduction table that will be applied in [`pre_run`](Self::pre_run).
+ /// The reduction table that will be applied in [`pre_run`](Self::pre_run).
     pub fn table(&self) -> &RopTable {
         &self.table
     }
@@ -67,13 +67,13 @@ impl InternalControlStrategy for RateOfProgressControlStrategy {
     }
 
     fn modified_tables(&self) -> &[&'static str] {
-        // The ROP strategy modifies the emission rate tables that downstream
-        // calculators consume — specifically the rates keyed by
-        // (pollutantID, sourceTypeID, regClassID, modelYearID).
-        //
-        // TODO(Task 50 / DataFrameStore): replace this placeholder list with
-        // the actual execution-DB table names once the data plane is defined.
-        // The names below match the Java strategy's `getModifiedTables()` return.
+ // The ROP strategy modifies the emission rate tables that downstream
+ // calculators consume — specifically the rates keyed by
+ // (pollutantID, sourceTypeID, regClassID, modelYearID).
+ //
+ // TODO( / DataFrameStore): replace this placeholder list with
+ // the actual execution-DB table names once the data plane is defined.
+ // The names below match the Java strategy's `getModifiedTables()` return.
         &["ratepollutantprocessmodelyeargroup", "sourceTypeModelYear"]
     }
 
@@ -81,10 +81,10 @@ impl InternalControlStrategy for RateOfProgressControlStrategy {
         &self,
         _tables: &mut InMemoryStore,
     ) -> std::result::Result<(), moves_framework::Error> {
-        // TODO: apply `self.table` reductions to the emission-rate tables in
-        // `_tables`. Requires reading the target rate tables, joining against
-        // `RopRecord` fields, and writing scaled rows back. Deferred to a
-        // follow-on bead; `modified_tables` already signals the engine.
+ // TODO: apply `self.table` reductions to the emission-rate tables in
+ // `_tables`. Requires reading the target rate tables, joining against
+ // `RopRecord` fields, and writing scaled rows back. Deferred to a
+ // follow-on work item; `modified_tables` already signals the engine.
         Ok(())
     }
 }

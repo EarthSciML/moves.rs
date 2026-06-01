@@ -1,16 +1,16 @@
 # moves-importer-validation
 
-The MOVES **importer validation suite** — Phase 4 Task 88.
+The MOVES **importer validation suite**.
 
-Phase 4 ports five MOVES input-database importers to Rust:
+This crate ports five MOVES input-database importers to Rust:
 
-| Crate                   | Importer                      | Task |
-|-------------------------|-------------------------------|------|
-| `moves-importer-county` | County Database (CDB)         | 83   |
-| `moves-importer-pdb`    | Project Database (PDB)        | 84   |
-| `moves-nonroad-import`  | Nonroad input database        | 85   |
-| `moves-avft`            | Alternative Vehicle Fuel Tech | 86   |
-| `moves-import-lev`      | LEV / NLEV alternative rates  | 87   |
+| Crate | Importer |
+|-------------------------|-------------------------------|
+| `moves-importer-county` | County Database (CDB) |
+| `moves-importer-pdb` | Project Database (PDB) |
+| `moves-nonroad-import` | Nonroad input database |
+| `moves-avft` | Alternative Vehicle Fuel Tech |
+| `moves-import-lev` | LEV / NLEV alternative rates |
 
 This crate closes the loop. It runs those importers against representative
 user source files and compares the resulting Parquet against the tables
@@ -20,7 +20,7 @@ a candidate importer bug.
 ## How the comparison works
 
 Canonical MOVES loads a user CDB/PDB into a MariaDB scratch database. The
-Phase 0 capture pipeline (`moves-fixture-capture`) dumps every such table
+capture pipeline (`moves-fixture-capture`) dumps every such table
 into a snapshot as `db__<database>__<table>` — see
 `characterization/snapshots/README.md`.
 
@@ -28,12 +28,12 @@ The harness in `src/lib.rs`:
 
 1. Runs a Rust importer on the user source files.
 2. Normalizes the importer's Parquet output into a `moves_snapshot::Table`
-   with [`parquet_to_table`] — the *same* normalization the canonical
-   snapshot applies (rows sorted by the natural key, floats rounded to a
-   fixed-decimal string).
+ with [`parquet_to_table`] — the *same* normalization the canonical
+ snapshot applies (rows sorted by the natural key, floats rounded to a
+ fixed-decimal string).
 3. Diffs the normalized importer table against the canonical `db__…`
-   table with [`compare_importer_output`], which wraps
-   `moves_snapshot::diff_snapshots` and classifies the result.
+ table with [`compare_importer_output`], which wraps
+ `moves_snapshot::diff_snapshots` and classifies the result.
 
 [`compare_importer_output`] distinguishes genuine importer bugs (changed
 cells, added/removed rows, stray columns, type mismatches) from
@@ -47,12 +47,12 @@ columns are surfaced but not counted as bugs.
 The `tests/` run in two modes:
 
 * **Always (CI).** Run each importer against the committed fixtures under
-  `fixtures/`, normalize the output, and verify it is a well-formed,
-  snapshot-stable table (`assert_snapshot_stable`). The harness itself is
-  unit-tested in `src/lib.rs` with synthetic canonical data, so the
-  comparison logic is fully exercised in CI.
+ `fixtures/`, normalize the output, and verify it is a well-formed,
+ snapshot-stable table (`assert_snapshot_stable`). The harness itself is
+ unit-tested in `src/lib.rs` with synthetic canonical data, so the
+ comparison logic is fully exercised in CI.
 * **When canonical snapshots are present.** Additionally diff importer
-  output against the canonical `db__…` tables and fail on genuine drift.
+ output against the canonical `db__…` tables and fail on genuine drift.
 
 The canonical-MOVES snapshots are produced on an HPC compute node
 (Apptainer + the patched MOVES SIF) and are **not committed** to the
@@ -68,14 +68,14 @@ schema-complete inputs anchored on Washtenaw County, Michigan (county
 
 ```
 fixtures/
-├── cdb/        County importer inputs (SourceTypeYear, ZoneRoadType,
-│               SourceTypeAgeDistribution, Zone)
-├── pdb/        Project importer inputs (Link, linkSourceTypeHour,
-│               driveScheduleSecondLink, offNetworkLink, OpModeDistribution)
-├── nonroad/    Nonroad importer inputs (nrbaseyearequippopulation,
-│               nrengtechfraction)
-├── lev/        LEV alternative-rate input (EmissionRateByAgeLEV)
-└── avft/       AVFT input (avft)
+├── cdb/ County importer inputs (SourceTypeYear, ZoneRoadType,
+│ SourceTypeAgeDistribution, Zone)
+├── pdb/ Project importer inputs (Link, linkSourceTypeHour,
+│ driveScheduleSecondLink, offNetworkLink, OpModeDistribution)
+├── nonroad/ Nonroad importer inputs (nrbaseyearequippopulation,
+│ nrengtechfraction)
+├── lev/ LEV alternative-rate input (EmissionRateByAgeLEV)
+└── avft/ AVFT input (avft)
 ```
 
 These same files are the input to the canonical-MOVES comparison: the
@@ -87,13 +87,13 @@ the importer and canonical MOVES see identical inputs.
 To enable the gated comparison for the CDB importers:
 
 1. On an HPC compute node with the built `moves-fixture.sif`, run
-   canonical MOVES for a County-scale RunSpec whose County data manager
-   input database is loaded from `fixtures/cdb/`.
+ canonical MOVES for a County-scale RunSpec whose County data manager
+ input database is loaded from `fixtures/cdb/`.
 2. Capture the run with `moves-fixture-capture`, writing the snapshot to
-   `characterization/snapshots/importer-validation-cdb/`.
+ `characterization/snapshots/importer-validation-cdb/`.
 3. Re-run `cargo test -p moves-importer-validation`. The `cdb` tests now
-   diff importer output against the captured `db__…__sourcetypeyear`,
-   `db__…__zoneroadtype`, etc. tables.
+ diff importer output against the captured `db__…__sourcetypeyear`,
+ `db__…__zoneroadtype`, etc. tables.
 
 The PDB importers follow the same procedure with a Project-scale RunSpec
 and the snapshot directory `characterization/snapshots/importer-validation-pdb/`.

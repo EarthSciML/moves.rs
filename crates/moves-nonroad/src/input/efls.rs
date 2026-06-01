@@ -1,6 +1,6 @@
 //! Emission-factor-files dispatcher (`rdefls.f`).
 //!
-//! Task 97 introduced this dispatcher; Task 96 wires it up to the
+//! introduced this dispatcher; wires it up to the
 //! exhaust ([`super::emfc`]) and evap ([`super::evemfc`]) emission
 //! factor parsers. The Fortran `rdefls.f` opens every
 //! per-pollutant emission factor file (and per-pollutant
@@ -8,10 +8,10 @@
 //!
 //! - `rdemfc` for exhaust pollutants `IDXTHC..=IDXCRA`,
 //! - `rdspil` (this crate's [`super::spillage`]) when the evap
-//!   pollutant index is `IDXSPL`,
+//! pollutant index is `IDXSPL`,
 //! - `rdevemfc` for the remaining evap pollutants,
 //! - `rddetr` (this crate's [`super::deterioration`]) for any
-//!   deterioration files configured.
+//! deterioration files configured.
 //!
 //! Callers pass a [`PollutantBundle`] per pollutant; each bundle
 //! carries the pollutant name, an optional emission-factor file
@@ -41,44 +41,44 @@ use super::spillage::{read_spil, SpillageRecord};
 /// `rdemfc.f` :173 / `rdevemfc.f` :177-180.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PollutantKind {
-    /// Exhaust pollutant — dispatched to [`read_emf`].
+ /// Exhaust pollutant — dispatched to [`read_emf`].
     Exhaust {
-        /// `true` for the crankcase HC pollutant (`IDXCRA`),
-        /// which triggers the `MULT`-units rule at
-        /// `rdemfc.f` :173.
+ /// `true` for the crankcase HC pollutant (`IDXCRA`),
+ /// which triggers the `MULT`-units rule at
+ /// `rdemfc.f` :173.
         is_crankcase: bool,
     },
-    /// Evap pollutant — dispatched to [`read_evemf`] with the
-    /// unit policy encoded by [`EvapPollutantKind`].
+ /// Evap pollutant — dispatched to [`read_evemf`] with the
+ /// unit policy encoded by [`EvapPollutantKind`].
     Evap(EvapPollutantKind),
-    /// Spillage — dispatched to [`read_spil`].
+ /// Spillage — dispatched to [`read_spil`].
     Spillage,
 }
 
 /// Per-pollutant input bundle.
 #[derive(Debug, Clone)]
 pub struct PollutantBundle {
-    /// Pollutant name (e.g., `THC`, `CO`, `NOX`, `CRA`, `DIU`).
+ /// Pollutant name (e.g., `THC`, `CO`, `NOX`, `CRA`, `DIU`).
     pub name: String,
-    /// Optional emission-factor file path
-    /// (`facfl(idxpol)` in Fortran).
+ /// Optional emission-factor file path
+ /// (`facfl(idxpol)` in Fortran).
     pub factor_file: Option<PathBuf>,
-    /// Optional deterioration file path (`detfl(idxpol)`).
+ /// Optional deterioration file path (`detfl(idxpol)`).
     pub det_file: Option<PathBuf>,
-    /// Which parser to use for this pollutant.
+ /// Which parser to use for this pollutant.
     pub kind: PollutantKind,
 }
 
 /// Loaded emission-factor data, organized by pollutant.
 #[derive(Debug, Default, Clone)]
 pub struct EmissionFactorTables {
-    /// Exhaust emission-factor records, keyed by pollutant name.
+ /// Exhaust emission-factor records, keyed by pollutant name.
     pub exhaust: HashMap<String, Vec<EmissionFactorRecord>>,
-    /// Evap emission-factor records, keyed by pollutant name.
+ /// Evap emission-factor records, keyed by pollutant name.
     pub evap: HashMap<String, Vec<EvapEmissionFactorRecord>>,
-    /// Spillage records (populated for the spillage pollutant).
+ /// Spillage records (populated for the spillage pollutant).
     pub spillage: Vec<SpillageRecord>,
-    /// Deterioration records, keyed by pollutant name.
+ /// Deterioration records, keyed by pollutant name.
     pub deterioration: HashMap<String, Vec<DeteriorationRecord>>,
 }
 

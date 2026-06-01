@@ -1,12 +1,12 @@
 //! `moves-wasm` — WebAssembly entry point for the MOVES Rust port.
 //!
-//! Exposes the MOVES onroad simulation engine (Task 132) and the
-//! NONROAD nonroad-emissions simulation engine (Task 133) to browser
+//! Exposes the MOVES onroad simulation engine and the
+//! NONROAD nonroad-emissions simulation engine to browser
 //! JavaScript via [`wasm-bindgen`](https://github.com/rustwasm/wasm-bindgen).
 //! The module is compiled with `--target wasm32-unknown-unknown` and loaded
 //! via a standard ES module or Webpack bundle.
 //!
-//! # Concurrency (Task 134)
+//! # Concurrency
 //!
 //! Two concurrency levels are supported:
 //!
@@ -24,7 +24,7 @@
 //!
 //! ```text
 //! RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals" \
-//!   cargo build --target wasm32-unknown-unknown --features wasm-threads
+//! cargo build --target wasm32-unknown-unknown --features wasm-threads
 //! ```
 //!
 //! The page (or the hosting Worker) must be served with cross-origin isolation
@@ -36,8 +36,7 @@
 //! ```
 //!
 //! Call `init_thread_pool(n)` from JavaScript before the first simulation.
-//! Simulation functions must then be called **from a Web Worker context** —
-//! browsers disallow `atomic.wait` on the main thread, which rayon uses for
+//! Simulation functions must then be called **from a Web Worker context**//! browsers disallow `atomic.wait` on the main thread, which rayon uses for
 //! synchronisation. See `docs/wasm-threading.md` for a complete deployment
 //! example.
 //!
@@ -64,7 +63,7 @@
 //! const result = run_simulation(runspecXml, 0);
 //!
 //! for (const [path, bytes] of Object.entries(result)) {
-//!   console.log(path, bytes.byteLength, "bytes");
+//! console.log(path, bytes.byteLength, "bytes");
 //! }
 //! ```
 //!
@@ -90,7 +89,7 @@
 //! // Options as a JSON string; population data as Uint8Array from a file
 //! // picker (<input type="file">) or OPFS.
 //! const options = JSON.stringify({ episode_year: 2020, region_level: "COUNTY",
-//!                                   selected_counties: ["06037"] });
+//! selected_counties: ["06037"] });
 //! const popBytes = new Uint8Array(await popFile.arrayBuffer());
 //!
 //! // Returns { completion_message: "…", counters: { scc_groups_planned: …, … } }
@@ -98,7 +97,7 @@
 //! console.log(result.completion_message);
 //! ```
 //!
-//! See `moves-rust-migration-plan.md` Tasks 132–134 and `docs/wasm-threading.md`.
+//! See `moves-rust-.md` and `docs/wasm-threading.md`.
 
 // Pull in the onroad calculator and generator implementations so they are
 // compiled into the WASM module. Registration with the engine registry is
@@ -136,7 +135,7 @@ use wasm_bindgen::prelude::*;
 #[cfg(feature = "wasm-threads")]
 pub use wasm_bindgen_rayon::init_thread_pool;
 
-/// The Phase 1 calculator-chain DAG, embedded at compile time.
+/// The calculator-chain DAG, embedded at compile time.
 const EMBEDDED_CALCULATOR_DAG: &str =
     include_str!("../../../characterization/calculator-chains/calculator-dag.json");
 
@@ -145,16 +144,16 @@ const EMBEDDED_CALCULATOR_DAG: &str =
 /// # Arguments
 ///
 /// * `runspec_xml` — RunSpec document as an XML string. The caller
-///   typically reads this from a file picker (`<input type="file">`) or
-///   from OPFS via `FileSystemFileHandle.getFile().text()`.
+/// typically reads this from a file picker (`<input type="file">`) or
+/// from OPFS via `FileSystemFileHandle.getFile().text()`.
 ///
 /// * `max_parallel_chunks` — Maximum number of independent calculator chains
-///   that may run concurrently. Pass `0` to let the engine choose (resolves
-///   to 1 in a single-threaded build; to the global rayon thread count in a
-///   `wasm-threads` build after `init_thread_pool` has been called).
-///   Pass `1` to force sequential execution regardless of build flags.
-///   Values > 1 require the `wasm-threads` build **and** a Web Worker calling
-///   context — see `docs/wasm-threading.md`.
+/// that may run concurrently. Pass `0` to let the engine choose (resolves
+/// to 1 in a single-threaded build; to the global rayon thread count in a
+/// `wasm-threads` build after `init_thread_pool` has been called).
+/// Pass `1` to force sequential execution regardless of build flags.
+/// Values > 1 require the `wasm-threads` build **and** a Web Worker calling
+/// context — see `docs/wasm-threading.md`.
 ///
 /// # Returns
 ///
@@ -163,9 +162,9 @@ const EMBEDDED_CALCULATOR_DAG: &str =
 ///
 /// ```json
 /// {
-///   "MOVESRun.parquet": Uint8Array,
-///   "MOVESOutput/yearID=2020/monthID=1/part.parquet": Uint8Array,
-///   ...
+/// "MOVESRun.parquet": Uint8Array,
+/// "MOVESOutput/yearID=2020/monthID=1/part.parquet": Uint8Array,
+/// ...
 /// }
 /// ```
 ///
@@ -198,7 +197,7 @@ pub fn run_simulation(runspec_xml: &str, max_parallel_chunks: u32) -> Result<JsV
         .run()
         .map_err(|e| JsValue::from_str(&format!("Engine error: {e}")))?;
 
-    // Convert the collected (path, bytes) pairs into a JS object.
+ // Convert the collected (path, bytes) pairs into a JS object.
     let obj = js_sys::Object::new();
     for (path, bytes) in outcome.output_bytes {
         let key = JsValue::from_str(
@@ -214,50 +213,49 @@ pub fn run_simulation(runspec_xml: &str, max_parallel_chunks: u32) -> Result<JsV
 
 /// Run a NONROAD nonroad-emissions simulation in the browser.
 ///
-/// Input data arrives as browser-supplied bytes via the File API or OPFS —
-/// no `std::fs` calls are made. Parsers consume `std::io::Cursor` wrappers
+/// Input data arrives as browser-supplied bytes via the File API or OPFS/// no `std::fs` calls are made. Parsers consume `std::io::Cursor` wrappers
 /// around the supplied byte slices, which is the WASM-compatible I/O path
 /// described in `ARCHITECTURE.md` § 4.3.
 ///
 /// # Arguments
 ///
 /// * `options_json` — JSON object with run configuration. Required:
-///   - `"episode_year"`: integer, 1990–2099.
+/// - `"episode_year"`: integer, 1990–2099.
 ///
-///   Optional (with defaults):
-///   - `"region_level"`: `"COUNTY"` | `"STATE"` | `"50STATE"` |
-///     `"SUBCOUNTY"` | `"US TOTAL"` (default `"COUNTY"`).
-///   - `"growth_year"`, `"tech_year"`: integers; default to `episode_year`.
-///   - `"total_mode"`, `"daily_output"`, `"emit_bmy_exhaust"`,
-///     `"emit_bmy_evap"`, `"emit_si"`: booleans (default `false`).
-///   - `"growth_loaded"`, `"retrofit_loaded"`, `"spillage_loaded"`:
-///     booleans (default `false`).
-///   - `"title"`: string (default `""`).
-///   - `"selected_counties"`: array of 5-character FIPS strings (default:
-///     no county filter — the driver accepts all records).
+/// Optional (with defaults):
+/// - `"region_level"`: `"COUNTY"` | `"STATE"` | `"50STATE"` |
+/// `"SUBCOUNTY"` | `"US TOTAL"` (default `"COUNTY"`).
+/// - `"growth_year"`, `"tech_year"`: integers; default to `episode_year`.
+/// - `"total_mode"`, `"daily_output"`, `"emit_bmy_exhaust"`,
+/// `"emit_bmy_evap"`, `"emit_si"`: booleans (default `false`).
+/// - `"growth_loaded"`, `"retrofit_loaded"`, `"spillage_loaded"`:
+/// booleans (default `false`).
+/// - `"title"`: string (default `""`).
+/// - `"selected_counties"`: array of 5-character FIPS strings (default:
+/// no county filter — the driver accepts all records).
 ///
 /// * `pop_bytes` — Contents of a NONROAD `.POP` population file as a
-///   `Uint8Array`. Load from a file picker (`<input type="file">`) or
-///   OPFS:
-///   ```js
-///   const popBytes = new Uint8Array(await popFile.arrayBuffer());
-///   ```
+/// `Uint8Array`. Load from a file picker (`<input type="file">`) or
+/// OPFS:
+/// ```js
+/// const popBytes = new Uint8Array(await popFile.arrayBuffer());
+/// ```
 ///
 /// # Returns
 ///
 /// On success:
 /// ```json
 /// {
-///   "completion_message": "Successful completion — no warnings",
-///   "counters": {
-///     "scc_groups_planned": 12,
-///     "scc_groups_skipped": 0,
-///     "records_visited": 240,
-///     "records_not_selected": 0,
-///     "records_no_dispatch": 0,
-///     "dispatch_calls": 240,
-///     "geography_skips": 0
-///   }
+/// "completion_message": "Successful completion — no warnings",
+/// "counters": {
+/// "scc_groups_planned": 12,
+/// "scc_groups_skipped": 0,
+/// "records_visited": 240,
+/// "records_not_selected": 0,
+/// "records_no_dispatch": 0,
+/// "dispatch_calls": 240,
+/// "geography_skips": 0
+/// }
 /// }
 /// ```
 ///
@@ -313,18 +311,18 @@ pub fn run_nonroad_simulation(options_json: &str, pop_bytes: &[u8]) -> Result<Js
         })
         .unwrap_or_default();
 
-    // Parse population data from browser-supplied bytes using an in-memory
-    // reader — the WASM-compatible path that replaces std::fs::File::open.
+ // Parse population data from browser-supplied bytes using an in-memory
+ // reader — the WASM-compatible path that replaces std::fs::File::open.
     let pop_records = read_pop(std::io::Cursor::new(pop_bytes))
         .map_err(|e| JsValue::from_str(&format!("population file parse error: {e}")))?;
 
-    // Group population records by SCC (file order) into NonroadInputs.
+ // Group population records by SCC (file order) into NonroadInputs.
     let inputs = nonroad_inputs_from_pop(pop_records, selected_counties);
 
-    // Run via PlanRecordingExecutor — exercises the full driver loop
-    // (SCC dispatch decisions, region filtering, growth-pair detection)
-    // without the numerical geography-routine evaluation, which the
-    // native orchestrator handles and will be wired into WASM later.
+ // Run via PlanRecordingExecutor — exercises the full driver loop
+ // (SCC dispatch decisions, region filtering, growth-pair detection)
+ // without the numerical geography-routine evaluation, which the
+ // native orchestrator handles and will be wired into WASM later.
     let mut executor = PlanRecordingExecutor::new();
     let outputs = nonroad_run_simulation(&options, &inputs, &mut executor)
         .map_err(|e| JsValue::from_str(&format!("simulation error: {e}")))?;
@@ -392,10 +390,10 @@ fn nonroad_inputs_from_pop(
             hp_avg,
             population,
             pop_year: year,
-            // The .POP demo input carries no source-use-type table, so there is
-            // no medianLifeFullLoad to supply. 0.0 is the documented sentinel:
-            // the geography routines fall back to a neutral lifespan when
-            // median_life is non-positive (see DriverRecord::median_life).
+ // The .POP demo input carries no source-use-type table, so there is
+ // no medianLifeFullLoad to supply. 0.0 is the documented sentinel:
+ // the geography routines fall back to a neutral lifespan when
+ // median_life is non-positive (see DriverRecord::median_life).
             median_life: 0.0,
         };
         if let Some(&idx) = scc_to_idx.get(&scc) {
@@ -432,18 +430,18 @@ fn js_set_num(obj: &js_sys::Object, key: &str, val: f64) -> Result<(), JsValue> 
         .map_err(|_| JsValue::from_str("failed to set property"))
 }
 
-/// Build a [`CalculatorRegistry`] from the embedded Phase 1 DAG, with
+/// Build a [`CalculatorRegistry`] from the embedded DAG, with
 /// all ported onroad calculators and generators registered.
 fn build_registry() -> Result<CalculatorRegistry, String> {
     let dag: CalculatorDag = serde_json::from_str(EMBEDDED_CALCULATOR_DAG)
         .map_err(|e| format!("embedded DAG parse error: {e}"))?;
     let registry = CalculatorRegistry::new(dag);
-    // Phase 3 calculator registration will be added here as calculators are
-    // ported. For now the registry carries the DAG structure for planning
-    // (module ordering, chunking) even though no factories are registered
-    // yet — the engine reports all planned modules as "unimplemented" and
-    // produces an empty-but-correctly-shaped output, exactly as the native
-    // CLI does in the current Phase 2 / Phase 3 state.
+ // calculator registration will be added here as calculators are
+ // ported. For now the registry carries the DAG structure for planning
+ // (module ordering, chunking) even though no factories are registered
+ // yet — the engine reports all planned modules as "unimplemented" and
+ // produces an empty-but-correctly-shaped output, exactly as the native
+ // CLI does in the current / state.
     Ok(registry)
 }
 
@@ -491,8 +489,8 @@ mod tests {
         );
     }
 
-    /// Build a 130-char fixed-width `.POP` record, matching the column layout
-    /// in `rdpop.f` / `getpop.f`. Right-justifies HP fields and population.
+ /// Build a 130-char fixed-width `.POP` record, matching the column layout
+ /// in `rdpop.f` / `getpop.f`. Right-justifies HP fields and population.
     #[allow(clippy::too_many_arguments)]
     fn build_pop_record(
         fips: &str,

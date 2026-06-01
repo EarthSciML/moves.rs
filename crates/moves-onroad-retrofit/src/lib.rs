@@ -1,5 +1,5 @@
 //! `moves-onroad-retrofit` — OnRoadRetrofit internal control strategy
-//! (Phase 6 Task 122).
+//!.
 //!
 //! Ports `gov.epa.otaq.moves.master.implementation.ghg.internalcontrolstrategies
 //! .onroadretrofit.OnRoadRetrofit` from the Java MOVES source
@@ -13,7 +13,7 @@
 //! - Which source types and model-year range the program targets
 //! - What fraction of the matching fleet has been retrofitted by a given year
 //! - How effective the retrofit device is at reducing emissions for a specific
-//!   pollutant/process pair
+//! pollutant/process pair
 //!
 //! The combined emission adjustment factor for a given
 //! `(sourceType, modelYear, pollutant, process)` combination is:
@@ -30,16 +30,16 @@
 //! use moves_onroad_retrofit::{OnRoadRetrofitStrategy, RetrofitRecord, RetrofitTable};
 //!
 //! let programs: RetrofitTable = vec![
-//!     RetrofitRecord::new(
-//!         11,    // sourceTypeID: passenger cars
-//!         2005,  // startModelYear
-//!         2015,  // endModelYear
-//!         2020,  // retrofitYearID
-//!         98,    // pollutantID: CO2 equivalent
-//!         1,     // processID: running exhaust
-//!         0.25,  // 25% of fleet retrofitted by 2020
-//!         0.80,  // 80% emission reduction per retrofitted vehicle
-//!     ),
+//! RetrofitRecord::new(
+//! 11, // sourceTypeID: passenger cars
+//! 2005, // startModelYear
+//! 2015, // endModelYear
+//! 2020, // retrofitYearID
+//! 98, // pollutantID: CO2 equivalent
+//! 1, // processID: running exhaust
+//! 0.25, // 25% of fleet retrofitted by 2020
+//! 0.80, // 80% emission reduction per retrofitted vehicle
+//! ),
 //! ]
 //! .into_iter()
 //! .collect();
@@ -51,7 +51,7 @@
 //! # Data-plane status
 //!
 //! The write of computed adjustment factors into `emissionRateAdjustment` is
-//! deferred to Task 50 (`DataFrameStore`). See
+//! deferred to (`DataFrameStore`). See
 //! [`control_strategy::OnRoadRetrofitStrategy`]'s `pre_run` implementation for the TODO
 //! comment.
 

@@ -7,13 +7,13 @@
 //! output writer. Schema definitions and the pollutant/process/source-type/
 //! road-type enums live here so every consumer agrees on column names and types.
 //!
-//! See `moves-rust-migration-plan.md`:
+//! See `moves-rust-.md`:
 //!
-//! * Task 14 — Pollutant/process/source-type/road-type enums
-//! * Task 50 — `DataFrameStore`
-//! * Task 89 — Unified Parquet output schema
+//! * — Pollutant/process/source-type/road-type enums
+//! * — `DataFrameStore`
+//! * — Unified Parquet output schema
 //!
-//! # Definitional types (Task 14)
+//! # Definitional types
 //!
 //! [`Pollutant`], [`EmissionProcess`], [`RoadType`], [`SourceType`], and
 //! [`PollutantProcessAssociation`] port the small Java classes of the same
@@ -27,7 +27,7 @@
 //! `characterization/calculator-chains/calculator-dag.json` execution-chain
 //! enumeration; road-type and source-type names come from the MOVES5
 //! technical reference (the `RoadType` and `SourceUseType` tables). The
-//! runtime DB layer (Task 50, Phase 4) reconciles these against the live
+//! runtime DB layer reconciles these against the live
 //! default DB at startup; any drift is a deliberate cutover.
 
 pub mod error;

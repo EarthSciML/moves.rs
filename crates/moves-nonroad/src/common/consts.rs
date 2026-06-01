@@ -7,14 +7,14 @@
 //! that:
 //!
 //! * code reviewing the port against the Fortran source can confirm
-//!   the original dimensions;
+//! the original dimensions;
 //! * fixture data using the original ceilings round-trips through
-//!   the port without surprise resizing;
+//! the port without surprise resizing;
 //! * test suites can use them as sanity ceilings (e.g. assert that
-//!   no fixture loads more than [`MXEMFC`] records, confirming the
-//!   port has not silently exceeded the original capacity).
+//! no fixture loads more than [`MXEMFC`] records, confirming the
+//! port has not silently exceeded the original capacity).
 //!
-//! Task 93 ports the rest of `nonrdprm.inc` (chemical constants,
+//! ports the rest of `nonrdprm.inc` (chemical constants,
 //! conversion factors) into this module as additional `pub const`
 //! items.
 
@@ -75,7 +75,7 @@ pub const MXAGE: usize = 10;
 /// Maximum days in a year.
 ///
 /// Original Fortran parameter: `MXDAYS = 365` in `nonrdprm.inc`.
-/// Leap-year handling is documented in Task 113.
+/// Leap-year handling is documented in.
 pub const MXDAYS: usize = 365;
 
 /// Maximum subcounty entries.
@@ -315,8 +315,8 @@ pub const RGAS: f64 = 0.08206;
 
 // ============================================================================
 // Sentinels, conversion factors, and per-fuel coefficients used by
-// the Task 106 exhaust calculator (clcems / emfclc / emsadj / unitcf)
-// and the Task 107 evaporative calculator (clcevems / evemfclc).
+// the exhaust calculator (clcems / emfclc / emsadj / unitcf)
+// and the evaporative calculator (clcevems / evemfclc).
 // ============================================================================
 
 /// Real-valued "missing" sentinel.

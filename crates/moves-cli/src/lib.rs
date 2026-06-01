@@ -13,16 +13,16 @@
 //! | `import-cdb` | [`import_cdb`] | [`moves_importer`] / [`moves_importer_county`] |
 //! | `convert-runspec` | [`convert_runspec`] | [`moves_runspec`] |
 //!
-//! See `moves-rust-migration-plan.md`:
+//! See `moves-rust-.md`:
 //!
-//! * Task 11 — Workspace and project skeleton (this crate).
-//! * Task 28 — CLI and end-to-end smoke test (this commit). Closes Phase 2.
+//! * — Workspace and project skeleton (this crate).
+//! * — CLI and end-to-end smoke test (this commit). Closes.
 //!
-//! # Phase 2 status
+//! # status
 //!
 //! `run` drives the full [`moves_framework::MOVESEngine`] pipeline — parse
 //! RunSpec, plan and chunk the calculator graph, walk one `MasterLoop` per
-//! chunk, finalise the `OutputProcessor`. No Phase 3 calculators are ported
+//! chunk, finalise the `OutputProcessor`. No calculators are ported
 //! yet, so the engine reports every planned module as unimplemented and the
 //! run produces an empty-but-correctly-shaped `MOVESRun.parquet`. The
 //! `crates/moves-cli/tests/end_to_end.rs` smoke test exercises exactly that
@@ -49,22 +49,22 @@ pub use moves_framework::EngineOutcome;
 /// The two interchange formats a RunSpec can be stored in.
 ///
 /// MOVES ships RunSpecs as XML; the Rust port adds a human-friendlier TOML
-/// surface (migration-plan Task 13). The two are isomorphic — see
+/// surface (). The two are isomorphic — see
 /// [`convert_runspec`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RunSpecFormat {
-    /// Legacy MOVES XML (`.xml` / `.mrs`).
+ /// Legacy MOVES XML (`.xml` / `.mrs`).
     Xml,
-    /// The recommended TOML format (`.toml`).
+ /// The recommended TOML format (`.toml`).
     Toml,
 }
 
 impl RunSpecFormat {
-    /// Infer the format from a path's extension: `xml` / `mrs` → [`Xml`],
-    /// `toml` → [`Toml`]. Case-insensitive. `None` for anything else.
-    ///
-    /// [`Xml`]: RunSpecFormat::Xml
-    /// [`Toml`]: RunSpecFormat::Toml
+ /// Infer the format from a path's extension: `xml` / `mrs` → [`Xml`],
+ /// `toml` → [`Toml`]. Case-insensitive. `None` for anything else.
+ ///
+ /// [`Xml`]: RunSpecFormat::Xml
+ /// [`Toml`]: RunSpecFormat::Toml
     #[must_use]
     pub fn from_path(path: &Path) -> Option<Self> {
         let ext = path.extension()?.to_str()?;
@@ -77,7 +77,7 @@ impl RunSpecFormat {
         }
     }
 
-    /// The other format — the target of an XML↔TOML conversion.
+ /// The other format — the target of an XML↔TOML conversion.
     #[must_use]
     pub fn opposite(self) -> Self {
         match self {
@@ -86,7 +86,7 @@ impl RunSpecFormat {
         }
     }
 
-    /// The canonical file extension for this format (no leading dot).
+ /// The canonical file extension for this format (no leading dot).
     #[must_use]
     pub fn extension(self) -> &'static str {
         match self {
@@ -95,7 +95,7 @@ impl RunSpecFormat {
         }
     }
 
-    /// A short human label for diagnostics.
+ /// A short human label for diagnostics.
     #[must_use]
     pub fn label(self) -> &'static str {
         match self {

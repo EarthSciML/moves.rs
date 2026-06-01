@@ -2,18 +2,18 @@
 //!
 //! Both the XML reader/writer (`xml_format`) and TOML reader/writer
 //! (`toml_format`) project to and from this single representation; that
-//! is what makes the two formats *isomorphic* in the sense Task 13 asks
+//! is what makes the two formats *isomorphic* in the sense asks
 //! for. Conversion between the formats is always model-mediated:
 //!
 //! ```text
-//! TOML  <─ to_toml ── RunSpec ── to_xml ─>  XML
-//!  │                    ▲                    │
-//!  └── from_toml ───────┴── from_xml ────────┘
+//! TOML <─ to_toml ── RunSpec ── to_xml ─> XML
+//! │ ▲ │
+//! └── from_toml ───────┴── from_xml ────────┘
 //! ```
 //!
 //! The model deliberately stores `(id, name)` pairs for pollutants,
 //! processes, road types, source types, and fuel types rather than
-//! strongly-typed enums. Task 14 (`Pollutant`/`EmissionProcess`/`SourceType`
+//! strongly-typed enums. (`Pollutant`/`EmissionProcess`/`SourceType`
 //! /`RoadType` definitional code) will introduce the canonical enums and
 //! lookup tables backed by `phf`; once that lands, the `_name` fields
 //! become derivable and this module can drop them.
@@ -71,12 +71,12 @@ pub enum Model {
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ModelScale {
-    /// Legacy onroad inventory scale (`MACROSCALE`).
+ /// Legacy onroad inventory scale (`MACROSCALE`).
     #[default]
     Macro,
-    /// Inventory output (`Inv`) — the standard NONROAD/onroad inventory mode.
+ /// Inventory output (`Inv`) — the standard NONROAD/onroad inventory mode.
     Inventory,
-    /// Emission-rates output (`Rates`).
+ /// Emission-rates output (`Rates`).
     Rates,
 }
 
@@ -204,7 +204,7 @@ pub struct OffroadVehicleSelection {
 }
 
 /// `offroadvehiclescc[scc, description]` — placeholder until non-empty
-/// fixtures are added (Task 12 extends).
+/// fixtures are added.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OffroadVehicleScc {
     pub scc: String,
@@ -221,7 +221,7 @@ pub struct RoadType {
 
 /// `pollutantprocessassociation[pollutantkey, pollutantname, processkey, processname]`.
 ///
-/// Stored as `(id, name)` pairs; Task 14 introduces the canonical
+/// Stored as `(id, name)` pairs; introduces the canonical
 /// pollutant/process enums and the names become derivable.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PollutantProcessAssociation {
@@ -233,14 +233,14 @@ pub struct PollutantProcessAssociation {
 
 /// `databaseselection` — content-free in observed fixtures.
 ///
-/// Task 12 will extend this with the canonical attributes (server,
+/// will extend this with the canonical attributes (server,
 /// database, description, etc.) once a non-empty fixture appears.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatabaseSelection {}
 
 /// `internalcontrolstrategy` — content-free in observed fixtures.
 ///
-/// Strategy declarations land in Phase 6 (Tasks 64–67); the structure
+/// Strategy declarations land in; the structure
 /// will likely become an enum tagged by strategy type. Until then this
 /// is a stub.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -458,9 +458,9 @@ pub enum MassUnit {
     Kilograms,
     #[default]
     Grams,
-    /// Short tons (US, 2000 lb). XML: `Tons (short)`.
+ /// Short tons (US, 2000 lb). XML: `Tons (short)`.
     TonsShort,
-    /// Metric tonnes (1000 kg). XML: `Tons (metric)`.
+ /// Metric tonnes (1000 kg). XML: `Tons (metric)`.
     TonsMetric,
 }
 

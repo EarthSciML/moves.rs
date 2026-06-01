@@ -1,6 +1,6 @@
 //! Deterioration-factor parser (`rddetr.f`).
 //!
-//! Task 97. Parses a deterioration-factor file used to model emissions
+//!Parses a deterioration-factor file used to model emissions
 //! drift with engine age. Each record provides coefficients to the
 //! equation `DF = 1 + A * age^B`, with a cap on the result.
 //!
@@ -29,15 +29,15 @@ use std::path::PathBuf;
 /// One deterioration-factor record.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DeteriorationRecord {
-    /// Technology type (10-character key, upper-cased).
+ /// Technology type (10-character key, upper-cased).
     pub tech_type: String,
-    /// Coefficient `A` in `DF = 1 + A * age^B`.
+ /// Coefficient `A` in `DF = 1 + A * age^B`.
     pub a: f32,
-    /// Coefficient `B`.
+ /// Coefficient `B`.
     pub b: f32,
-    /// Cap on the deterioration multiplier.
+ /// Cap on the deterioration multiplier.
     pub cap: f32,
-    /// Pollutant name associated with the file.
+ /// Pollutant name associated with the file.
     pub pollutant: String,
 }
 
@@ -138,7 +138,7 @@ ADV       0.02 1.0 1.3 HC
         };
         assert!((deterioration_multiplier(&r, 0.0) - 1.0).abs() < 1e-6);
         assert!((deterioration_multiplier(&r, 1.0) - 1.1).abs() < 1e-6);
-        // capped
+ // capped
         assert!((deterioration_multiplier(&r, 100.0) - 1.5).abs() < 1e-6);
     }
 

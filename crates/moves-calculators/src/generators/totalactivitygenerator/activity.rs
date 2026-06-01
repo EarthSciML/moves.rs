@@ -31,16 +31,16 @@ pub const COMBINATION_LONG_HAUL_TRUCK: i32 = 62;
 /// hour)` pair behind its `hourDayID`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceTypeHour2Row {
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `dayID`.
+ /// `dayID`.
     pub day_id: i32,
-    /// `hourID`.
+ /// `hourID`.
     pub hour_id: i32,
-    /// `idleSHOFactor` — carried from `SourceTypeHour` for fidelity; step
-    /// 180 itself reads only `hotellingDist`.
+ /// `idleSHOFactor` — carried from `SourceTypeHour` for fidelity; step
+ /// 180 itself reads only `hotellingDist`.
     pub idle_sho_factor: f64,
-    /// `hotellingDist` — hourly distribution weight for hotelling hours.
+ /// `hotellingDist` — hourly distribution weight for hotelling hours.
     pub hotelling_dist: f64,
 }
 
@@ -48,14 +48,14 @@ pub struct SourceTypeHour2Row {
 /// sample for a `(sourceType, hourDay)`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StartsPerSampleVehicleRow {
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `hourDayID`.
+ /// `hourDayID`.
     pub hour_day_id: i32,
-    /// `starts` — `count(trips) * noOfRealDays`.
+ /// `starts` — `count(trips) * noOfRealDays`.
     pub starts: f64,
-    /// `dayID` — the day type behind `hourDayID`, kept for the
-    /// `StartsPerVehicle` divisor join.
+ /// `dayID` — the day type behind `hourDayID`, kept for the
+ /// `StartsPerVehicle` divisor join.
     pub day_id: i32,
 }
 
@@ -73,7 +73,7 @@ pub fn source_type_hour_expanded(
     run_spec_day: &[RunSpecDayRow],
 ) -> Vec<SourceTypeHour2Row> {
     let run_spec_days: BTreeSet<i32> = run_spec_day.iter().map(|r| r.day_id).collect();
-    // hourDayID -> (hourID, dayID) for in-RunSpec day types only.
+ // hourDayID -> (hourID, dayID) for in-RunSpec day types only.
     let hour_day_of: BTreeMap<i32, (i32, i32)> = hour_day
         .iter()
         .filter(|r| run_spec_days.contains(&r.day_id))
@@ -126,7 +126,7 @@ pub fn average_speed(
         .iter()
         .map(|r| (r.avg_speed_bin_id, r.avg_bin_speed))
         .collect();
-    // hourDayID -> (hourID, dayID), gated to RunSpec day types and known hours.
+ // hourDayID -> (hourID, dayID), gated to RunSpec day types and known hours.
     let hour_day_of: BTreeMap<i32, (i32, i32)> = hour_day
         .iter()
         .filter(|r| run_spec_days.contains(&r.day_id) && hours.contains(&r.hour_id))
@@ -144,7 +144,7 @@ pub fn average_speed(
         let Some(&speed) = bin_speed.get(&asd.avg_speed_bin_id) else {
             continue;
         };
-        *totals
+ *totals
             .entry((asd.road_type_id, asd.source_type_id, day_id, hour_id))
             .or_insert(0.0) += speed * asd.avg_speed_fraction;
     }
@@ -227,7 +227,7 @@ pub fn vmt_by_age_roadway_day(
     zone_id: i32,
     has_hotelling_hours_per_day_input: bool,
 ) -> Vec<VmtByAgeRoadwayDayRow> {
-    // (zoneID, roadTypeID) -> SHOAllocFactor and yearID -> hotellingRate.
+ // (zoneID, roadTypeID) -> SHOAllocFactor and yearID -> hotellingRate.
     let sho_alloc: BTreeMap<(i32, i32), f64> = zone_road_type
         .iter()
         .map(|r| ((r.zone_id, r.road_type_id), r.sho_alloc_factor))
@@ -237,13 +237,13 @@ pub fn vmt_by_age_roadway_day(
         .map(|r| (r.year_id, r.hotelling_rate))
         .collect();
 
-    // Sum hourly VMT to daily totals for the long-haul source type.
+ // Sum hourly VMT to daily totals for the long-haul source type.
     let mut daily: BTreeMap<(i32, i32, i32, i32, i32), f64> = BTreeMap::new();
     for v in vmt_by_age_roadway_hour {
         if v.source_type_id != COMBINATION_LONG_HAUL_TRUCK {
             continue;
         }
-        *daily
+ *daily
             .entry((v.year_id, v.road_type_id, v.age_id, v.month_id, v.day_id))
             .or_insert(0.0) += v.vmt;
     }
@@ -271,8 +271,8 @@ pub fn vmt_by_age_roadway_day(
         })
         .collect();
 
-    // Delete non-restricted-access road types unless there is no restricted-
-    // access hotelling activity and the user supplied hotelling input.
+ // Delete non-restricted-access road types unless there is no restricted-
+ // access hotelling activity and the user supplied hotelling input.
     let restricted_hotelling: f64 = rows
         .iter()
         .filter(|r| r.road_type_id == 2 || r.road_type_id == 4)
@@ -296,7 +296,7 @@ pub fn idle_hours_by_age_hour(
     vmt_by_age_roadway_day: &[VmtByAgeRoadwayDayRow],
     source_type_hour_2: &[SourceTypeHour2Row],
 ) -> Vec<IdleHoursByAgeHourRow> {
-    // (sourceTypeID, dayID) -> [(hourID, hotellingDist)].
+ // (sourceTypeID, dayID) -> [(hourID, hotellingDist)].
     let mut hours_by_source_day: BTreeMap<(i32, i32), Vec<(i32, f64)>> = BTreeMap::new();
     for sth in source_type_hour_2 {
         hours_by_source_day
@@ -311,7 +311,7 @@ pub fn idle_hours_by_age_hour(
             continue;
         };
         for &(hour_id, hotelling_dist) in hours {
-            *totals
+ *totals
                 .entry((
                     v.year_id,
                     v.source_type_id,
@@ -355,13 +355,13 @@ pub fn starts_per_sample_vehicle(
     hour_day: &[HourDayRow],
     day_of_any_week: &[DayOfAnyWeekRow],
 ) -> Vec<StartsPerSampleVehicleRow> {
-    // vehID -> sourceTypeID (SampleVehicleDay is keyed by (vehID, dayID); the
-    // sourceTypeID is a property of the vehicle, constant across its days).
+ // vehID -> sourceTypeID (SampleVehicleDay is keyed by (vehID, dayID); the
+ // sourceTypeID is a property of the vehicle, constant across its days).
     let source_type_of_veh: BTreeMap<i32, i32> = sample_vehicle_day
         .iter()
         .map(|r| (r.veh_id, r.source_type_id))
         .collect();
-    // (hourID, dayID) -> hourDayID.
+ // (hourID, dayID) -> hourDayID.
     let hour_day_id: BTreeMap<(i32, i32), i32> = hour_day
         .iter()
         .map(|r| ((r.hour_id, r.day_id), r.hour_day_id))
@@ -371,7 +371,7 @@ pub fn starts_per_sample_vehicle(
         .map(|r| (r.day_id, r.no_of_real_days))
         .collect();
 
-    // Count trips per (sourceTypeID, hourDayID); remember the dayID.
+ // Count trips per (sourceTypeID, hourDayID); remember the dayID.
     let mut counts: BTreeMap<(i32, i32), (i32, i32)> = BTreeMap::new();
     for trip in sample_vehicle_trip {
         if !trip.has_key_on_time {
@@ -396,7 +396,7 @@ pub fn starts_per_sample_vehicle(
             Some(StartsPerSampleVehicleRow {
                 source_type_id,
                 hour_day_id,
-                // `i32` -> `f64` is lossless: trip counts are small.
+ // `i32` -> `f64` is lossless: trip counts are small.
                 starts: f64::from(count) * no_of_real_days,
                 day_id,
             })
@@ -422,10 +422,10 @@ pub fn starts_per_vehicle(
         .iter()
         .map(|r| r.source_type_id)
         .collect();
-    // (sourceTypeID, dayID) -> count of SampleVehicleDay rows.
+ // (sourceTypeID, dayID) -> count of SampleVehicleDay rows.
     let mut sample_day_count: FxHashMap<(i32, i32), i32> = FxHashMap::default();
     for sv in sample_vehicle_day {
-        *sample_day_count
+ *sample_day_count
             .entry((sv.source_type_id, sv.day_id))
             .or_insert(0) += 1;
     }
@@ -444,7 +444,7 @@ pub fn starts_per_vehicle(
         out.push(StartsPerVehicleRow {
             source_type_id: ssv.source_type_id,
             hour_day_id: ssv.hour_day_id,
-            // `i32` -> `f64` is lossless: sample-vehicle counts are small.
+ // `i32` -> `f64` is lossless: sample-vehicle counts are small.
             starts_per_vehicle: ssv.starts / f64::from(count),
         });
     }
@@ -463,7 +463,7 @@ pub fn starts_by_age_hour(
     source_type_age_population: &[SourceTypeAgePopulationRow],
     starts_per_vehicle: &[StartsPerVehicleRow],
 ) -> Vec<StartsByAgeHourRow> {
-    // sourceTypeID -> [(hourDayID, startsPerVehicle)].
+ // sourceTypeID -> [(hourDayID, startsPerVehicle)].
     let mut starts_by_source: BTreeMap<i32, Vec<(i32, f64)>> = BTreeMap::new();
     for spv in starts_per_vehicle {
         starts_by_source
@@ -514,19 +514,19 @@ pub fn shp_by_age_hour(
         .map(|r| (r.day_id, r.no_of_real_days))
         .collect();
 
-    // Sum SHO over road types within each (year, source, age, month, day, hour).
+ // Sum SHO over road types within each (year, source, age, month, day, hour).
     let mut sho_sum: BTreeMap<(i32, i32, i32, i32, i32, i32), f64> = BTreeMap::new();
     for sarh in sho_by_age_roadway_hour {
         if sarh.vmt <= 0.0 {
             continue;
         }
-        // Drop the cell unless both inner-join partners exist.
+ // Drop the cell unless both inner-join partners exist.
         if !population_of.contains_key(&(sarh.year_id, sarh.source_type_id, sarh.age_id))
             || !real_days.contains_key(&sarh.day_id)
         {
             continue;
         }
-        *sho_sum
+ *sho_sum
             .entry((
                 sarh.year_id,
                 sarh.source_type_id,
@@ -606,7 +606,7 @@ mod tests {
                 day_id: 6,
             },
         ];
-        // RunSpec selects day 5 only.
+ // RunSpec selects day 5 only.
         let rsd = [RunSpecDayRow { day_id: 5 }];
         let out = source_type_hour_expanded(&sth, &hd, &rsd);
         assert_eq!(out.len(), 1);
@@ -653,7 +653,7 @@ mod tests {
         }];
         let out = average_speed(&road, &rsst, &rsd, &hoad, &asb, &asd, &hd);
         assert_eq!(out.len(), 1);
-        // 20*0.25 + 60*0.75 = 5 + 45 = 50.
+ // 20*0.25 + 60*0.75 = 5 + 45 = 50.
         assert!((out[0].average_speed - 50.0).abs() < EPS);
     }
 
@@ -669,7 +669,7 @@ mod tests {
         }];
         let out = sho_by_age_roadway_hour(&hourly, &speed);
         assert_eq!(out.len(), 1);
-        // 500 / 50 = 10.
+ // 500 / 50 = 10.
         assert!((out[0].sho - 10.0).abs() < EPS);
         assert!((out[0].vmt - 500.0).abs() < EPS);
     }
@@ -677,7 +677,7 @@ mod tests {
     #[test]
     fn sho_is_zero_without_average_speed() {
         let hourly = [varh(2, 21, 0, 5, 8, 500.0)];
-        // No AverageSpeed row -> the LEFT JOIN yields SHO = 0.
+ // No AverageSpeed row -> the LEFT JOIN yields SHO = 0.
         let out = sho_by_age_roadway_hour(&hourly, &[]);
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].sho, 0.0);
@@ -685,7 +685,7 @@ mod tests {
 
     #[test]
     fn vmt_by_age_roadway_day_sums_and_applies_hotelling_rate() {
-        // Two hours of long-haul VMT on road 2, day 5.
+ // Two hours of long-haul VMT on road 2, day 5.
         let hourly = [
             varh(2, COMBINATION_LONG_HAUL_TRUCK, 0, 5, 8, 300.0),
             varh(2, COMBINATION_LONG_HAUL_TRUCK, 0, 5, 9, 200.0),
@@ -702,14 +702,14 @@ mod tests {
         }];
         let out = vmt_by_age_roadway_day(&hourly, &zrt, &hcy, 100, false);
         assert_eq!(out.len(), 1);
-        // dailyVMT = 500; hotellingHours = 500 * 0.5 * 0.1 = 25.
+ // dailyVMT = 500; hotellingHours = 500 * 0.5 * 0.1 = 25.
         assert!((out[0].vmt - 500.0).abs() < EPS);
         assert!((out[0].hotelling_hours - 25.0).abs() < EPS);
     }
 
     #[test]
     fn vmt_by_age_roadway_day_deletes_non_restricted_roads() {
-        // Road 3 is non-restricted; road 2 has hotelling activity.
+ // Road 3 is non-restricted; road 2 has hotelling activity.
         let hourly = [
             varh(2, COMBINATION_LONG_HAUL_TRUCK, 0, 5, 8, 500.0),
             varh(3, COMBINATION_LONG_HAUL_TRUCK, 0, 5, 8, 100.0),
@@ -725,7 +725,7 @@ mod tests {
             hotelling_rate: 1.0,
         }];
         let out = vmt_by_age_roadway_day(&hourly, &zrt, &hcy, 100, false);
-        // Road 3 dropped — restricted-access roads carry the hotelling.
+ // Road 3 dropped — restricted-access roads carry the hotelling.
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].road_type_id, 2);
     }
@@ -761,13 +761,13 @@ mod tests {
         let out = idle_hours_by_age_hour(&day, &sth2);
         assert_eq!(out.len(), 2);
         let hour8 = out.iter().find(|r| r.hour_id == 8).unwrap();
-        // 100 * 0.3 = 30.
+ // 100 * 0.3 = 30.
         assert!((hour8.idle_hours - 30.0).abs() < EPS);
     }
 
     #[test]
     fn starts_per_vehicle_divides_starts_by_sample_count() {
-        // Two sample vehicles of source type 21 observed on day 5.
+ // Two sample vehicles of source type 21 observed on day 5.
         let svd = [
             SampleVehicleDayRow {
                 veh_id: 1,
@@ -788,7 +788,7 @@ mod tests {
         }];
         let out = starts_per_vehicle(&svd, &ssv, &[]);
         assert_eq!(out.len(), 1);
-        // 8 starts / 2 sample vehicles = 4 starts per vehicle.
+ // 8 starts / 2 sample vehicles = 4 starts per vehicle.
         assert!((out[0].starts_per_vehicle - 4.0).abs() < EPS);
     }
 
@@ -805,7 +805,7 @@ mod tests {
             starts: 8.0,
             day_id: 5,
         }];
-        // Source type 21 already has StartsPerVehicle rows — skip it.
+ // Source type 21 already has StartsPerVehicle rows — skip it.
         let existing = [StartsPerVehicleRow {
             source_type_id: 21,
             hour_day_id: 85,
@@ -835,7 +835,7 @@ mod tests {
                 hour_id: 8,
                 has_key_on_time: true,
             },
-            // Marker trip — keyOnTime is null, so it is not counted.
+ // Marker trip — keyOnTime is null, so it is not counted.
             SampleVehicleTripRow {
                 veh_id: 1,
                 day_id: 5,
@@ -854,7 +854,7 @@ mod tests {
         }];
         let out = starts_per_sample_vehicle(&svd, &trips, &hd, &dow);
         assert_eq!(out.len(), 1);
-        // 2 real trips * 2 real days = 4.
+ // 2 real trips * 2 real days = 4.
         assert!((out[0].starts - 4.0).abs() < EPS);
     }
 
@@ -873,13 +873,13 @@ mod tests {
         }];
         let out = starts_by_age_hour(&stap, &spv);
         assert_eq!(out.len(), 1);
-        // 1000 * 2.5 = 2500.
+ // 1000 * 2.5 = 2500.
         assert!((out[0].starts - 2500.0).abs() < EPS);
     }
 
     #[test]
     fn shp_is_population_days_minus_summed_sho() {
-        // Two road types in the same (year,source,age,month,day,hour) cell.
+ // Two road types in the same (year,source,age,month,day,hour) cell.
         let sho = [
             ShoByAgeRoadwayHourRow {
                 year_id: 2020,
@@ -918,7 +918,7 @@ mod tests {
         }];
         let out = shp_by_age_hour(&sho, &stap, &dow);
         assert_eq!(out.len(), 1);
-        // (100 * 2) - (6 + 4) = 200 - 10 = 190.
+ // (100 * 2) - (6 + 4) = 200 - 10 = 190.
         assert!((out[0].shp - 190.0).abs() < EPS);
     }
 

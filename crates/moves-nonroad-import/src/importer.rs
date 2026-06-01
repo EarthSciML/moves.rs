@@ -5,8 +5,8 @@
 //! * `input_dir` — a directory containing the per-table CSV templates.
 //! * `output_dir` — where to write the Parquet files plus the manifest.
 //! * `tables` — an explicit list of tables to import, defaulting to all
-//!   four built-ins. Selecting a subset is useful for partial updates
-//!   (a user revising only their retrofit factors) and for tests.
+//! four built-ins. Selecting a subset is useful for partial updates
+//! (a user revising only their retrofit factors) and for tests.
 //!
 //! We return an [`ImportReport`] summarising what was written. Skipped
 //! tables (named in `tables` but with no CSV on disk) are surfaced via
@@ -16,14 +16,14 @@
 //!
 //! ```text
 //! <output_dir>/
-//!   manifest.json
-//!   nrbaseyearequippopulation.parquet
-//!   nrengtechfraction.parquet
-//!   nrretrofitfactors.parquet
-//!   nrmonthallocation.parquet
+//! manifest.json
+//! nrbaseyearequippopulation.parquet
+//! nrengtechfraction.parquet
+//! nrretrofitfactors.parquet
+//! nrmonthallocation.parquet
 //! ```
 //!
-//! Phase 4 Task 80 partitions the default-DB tree to keep memory use
+//! partitions the default-DB tree to keep memory use
 //! bounded; user-input tables are several orders of magnitude smaller
 //! (a fully-populated `nrmonthallocation` is ~6k rows for all states ×
 //! 25 equip types × 12 months) so partitioning would only add noise.
@@ -42,17 +42,17 @@ use crate::tables::{self, ImporterEntry};
 pub struct ImportOptions {
     pub input_dir: PathBuf,
     pub output_dir: PathBuf,
-    /// If empty, all built-in tables are processed. Otherwise only the
-    /// named tables (case-insensitive). Tables in this list that aren't
-    /// recognised raise [`Error::Internal`] — typos shouldn't silently
-    /// no-op.
+ /// If empty, all built-in tables are processed. Otherwise only the
+ /// named tables (case-insensitive). Tables in this list that aren't
+ /// recognised raise [`Error::Internal`] — typos shouldn't silently
+ /// no-op.
     pub tables: Vec<String>,
-    /// If `false` (default), CSVs that don't exist on disk are recorded
-    /// as `skipped` rather than erroring. Set `true` to require every
-    /// selected table to be present.
+ /// If `false` (default), CSVs that don't exist on disk are recorded
+ /// as `skipped` rather than erroring. Set `true` to require every
+ /// selected table to be present.
     pub require_all_tables: bool,
-    /// Optional override for the `generated_at_utc` field in the
-    /// manifest. Tests pass a fixed string for byte-stable comparisons.
+ /// Optional override for the `generated_at_utc` field in the
+ /// manifest. Tests pass a fixed string for byte-stable comparisons.
     pub generated_at_utc: Option<String>,
 }
 
@@ -155,10 +155,10 @@ fn select_tables(requested: &[String]) -> Result<Vec<&'static ImporterEntry>> {
 
 fn now_iso8601_utc() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
-    // Tests pass `generated_at_utc` explicitly so this branch is only
-    // exercised by humans running the importer interactively. We avoid
-    // pulling in `chrono`/`time` for one call site by formatting the
-    // Unix epoch ourselves.
+ // Tests pass `generated_at_utc` explicitly so this branch is only
+ // exercised by humans running the importer interactively. We avoid
+ // pulling in `chrono`/`time` for one call site by formatting the
+ // Unix epoch ourselves.
     let secs = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs() as i64)
@@ -177,7 +177,7 @@ fn unix_to_civil(secs: i64) -> (i32, u32, u32, u32, u32, u32) {
     let minute = ((secs_of_day % 3_600) / 60) as u32;
     let second = (secs_of_day % 60) as u32;
 
-    // Days since 1970-01-01 → civil(year, month, day).
+ // Days since 1970-01-01 → civil(year, month, day).
     let z = days + 719_468;
     let era = z.div_euclid(146_097);
     let doe = z.rem_euclid(146_097) as u64;
@@ -231,11 +231,11 @@ mod tests {
 
     #[test]
     fn unix_to_civil_known_epochs() {
-        // 1970-01-01T00:00:00Z
+ // 1970-01-01T00:00:00Z
         assert_eq!(unix_to_civil(0), (1970, 1, 1, 0, 0, 0));
-        // 2000-01-01T00:00:00Z = 946_684_800
+ // 2000-01-01T00:00:00Z = 946_684_800
         assert_eq!(unix_to_civil(946_684_800), (2000, 1, 1, 0, 0, 0));
-        // 2024-02-29T12:34:56Z (leap day) = 1_709_210_096
+ // 2024-02-29T12:34:56Z (leap day) = 1_709_210_096
         assert_eq!(unix_to_civil(1_709_210_096), (2024, 2, 29, 12, 34, 56));
     }
 }

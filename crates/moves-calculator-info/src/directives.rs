@@ -8,8 +8,8 @@
 //!
 //! ```text
 //! Registration\tOutputPollutantName\tOutputPollutantID\tProcessName\tProcessID\tModuleName
-//! Subscribe   \tModuleName         \tProcessName      \tProcessID \tGranularity\tPriority
-//! Chain       \tOutputModuleName   \tInputModuleName
+//! Subscribe \tModuleName \tProcessName \tProcessID \tGranularity\tPriority
+//! Chain \tOutputModuleName \tInputModuleName
 //! ```
 //!
 //! The parser is strict about column counts but tolerates trailing
@@ -57,10 +57,10 @@ pub struct SubscribeDirective {
 /// module's results (per `InterconnectionTracker.recordChain`'s contract).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChainDirective {
-    /// The downstream consumer (the calculator that needs the input's
-    /// output to do its own work).
+ /// The downstream consumer (the calculator that needs the input's
+ /// output to do its own work).
     pub output: String,
-    /// The upstream producer (the calculator whose results are consumed).
+ /// The upstream producer (the calculator whose results are consumed).
     pub input: String,
     pub location: DirectiveLocation,
 }
@@ -72,7 +72,7 @@ pub struct CalculatorInfo {
     pub registrations: Vec<RegistrationDirective>,
     pub subscribes: Vec<SubscribeDirective>,
     pub chains: Vec<ChainDirective>,
-    /// SHA-256 of the input file, lowercase hex, for provenance.
+ /// SHA-256 of the input file, lowercase hex, for provenance.
     pub source_sha256: String,
 }
 
@@ -105,7 +105,7 @@ pub fn parse_calculator_info_str(text: &str, path: &Path) -> Result<CalculatorIn
 
     for (idx, raw_line) in text.lines().enumerate() {
         let line_no = idx + 1;
-        // Strip optional UTF-8 BOM on the first line.
+ // Strip optional UTF-8 BOM on the first line.
         let trimmed_bom = if line_no == 1 {
             raw_line.strip_prefix('\u{feff}').unwrap_or(raw_line)
         } else {
@@ -237,7 +237,7 @@ fn parse_u32(s: &str, path: &Path, line: usize, label: &str) -> Result<u32> {
 }
 
 impl CalculatorInfo {
-    /// Convenience: empty value for tests / fixtures.
+ /// Convenience: empty value for tests / fixtures.
     pub fn empty() -> Self {
         CalculatorInfo {
             registrations: Vec::new(),
@@ -247,14 +247,14 @@ impl CalculatorInfo {
         }
     }
 
-    /// Discard the parsed value's hash. Useful when comparing parses by
-    /// directive content rather than provenance.
+ /// Discard the parsed value's hash. Useful when comparing parses by
+ /// directive content rather than provenance.
     pub fn without_hash(mut self) -> Self {
         self.source_sha256.clear();
         self
     }
 
-    /// Total directive count — matches the migration plan's headline number.
+ /// Total directive count — matches the 's headline number.
     pub fn total_directives(&self) -> usize {
         self.registrations.len() + self.subscribes.len() + self.chains.len()
     }
@@ -277,8 +277,8 @@ mod tests {
     #[test]
     fn parses_three_directive_kinds() {
         let text = "// Registration\tOutputPollutantName\t...\n\
-                    // Subscribe\tModule\t...\n\
-                    // Chain\tOutput\tInput\n\
+ // Subscribe\tModule\t...\n\
+ // Chain\tOutput\tInput\n\
                     Registration\tCO\t2\tRunning Exhaust\t1\tBaseRateCalculator\n\
                     Subscribe\tBaseRateCalculator\tRunning Exhaust\t1\tMONTH\tEMISSION_CALCULATOR\n\
                     Chain\tHCSpeciationCalculator\tBaseRateCalculator\n";
@@ -360,7 +360,7 @@ mod tests {
         let a = parse_calculator_info_str("// hi\n", Path::new("<a>")).unwrap();
         let b = parse_calculator_info_str("// hi\n", Path::new("<b>")).unwrap();
         assert_eq!(a.source_sha256, b.source_sha256);
-        // Sanity: changing one byte changes the hash.
+ // Sanity: changing one byte changes the hash.
         let c = parse_calculator_info_str("// bye\n", Path::new("<a>")).unwrap();
         assert_ne!(a.source_sha256, c.source_sha256);
     }

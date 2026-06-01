@@ -1,6 +1,6 @@
 //! Growth-extrapolation parser (`rdgxrf.f`).
 //!
-//! Task 95. Parses the `.GXR` input file that contains growth
+//!Parses the `.GXR` input file that contains growth
 //! extrapolation factors for projecting equipment populations beyond
 //! the base year.
 //!
@@ -36,11 +36,11 @@ use std::path::PathBuf;
 /// Growth extrapolation record for one county/equipment combination.
 #[derive(Debug, Clone)]
 pub struct GrowthExtrapolationRecord {
-    /// County index (0-based).
+ /// County index (0-based).
     pub county_idx: usize,
-    /// Equipment index (0-based).
+ /// Equipment index (0-based).
     pub equipment_idx: usize,
-    /// Year factors (one per extrapolation year).
+ /// Year factors (one per extrapolation year).
     pub year_factors: Vec<f64>,
 }
 
@@ -51,7 +51,7 @@ pub fn read_gxr<R: BufRead>(reader: R) -> Result<Array3<f64>> {
     let mut lines = reader.lines();
     let mut line_num = 0;
 
-    // Read header (skip blank and comment lines)
+ // Read header (skip blank and comment lines)
     let header_line = loop {
         line_num += 1;
         let line = lines
@@ -109,7 +109,7 @@ pub fn read_gxr<R: BufRead>(reader: R) -> Result<Array3<f64>> {
     let mut gxr = Array3::from_elem((n_counties, n_equipment, n_years), 1.0);
     line_num = 1;
 
-    // Read growth extrapolation records
+ // Read growth extrapolation records
     for line_result in lines {
         line_num += 1;
         let line = line_result.map_err(|e| Error::Io {
@@ -163,7 +163,7 @@ pub fn read_gxr<R: BufRead>(reader: R) -> Result<Array3<f64>> {
             });
         }
 
-        // Read year factors
+ // Read year factors
         for (year_idx, val_str) in parts[2..].iter().enumerate() {
             if year_idx >= n_years {
                 break;
@@ -194,7 +194,7 @@ pub fn read_gxr_records<R: BufRead>(reader: R) -> Result<Vec<GrowthExtrapolation
     let mut lines = reader.lines();
     let mut line_num = 0;
 
-    // Skip header (first non-blank, non-comment line)
+ // Skip header (first non-blank, non-comment line)
     loop {
         line_num += 1;
         let line = lines
@@ -214,7 +214,7 @@ pub fn read_gxr_records<R: BufRead>(reader: R) -> Result<Vec<GrowthExtrapolation
         }
     }
 
-    // Read growth extrapolation records
+ // Read growth extrapolation records
     for line_result in lines {
         let line = line_result.map_err(|e| Error::Io {
             path: PathBuf::from(".GXR"),
@@ -270,7 +270,7 @@ pub fn get_gxr_factor(
     equipment_idx: usize,
     year_idx: usize,
 ) -> f64 {
-    *gxr.get([county_idx, equipment_idx, year_idx])
+ *gxr.get([county_idx, equipment_idx, year_idx])
         .unwrap_or(&1.0)
 }
 

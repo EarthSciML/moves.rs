@@ -1,35 +1,35 @@
-//! Concurrency-tuning and memory-pressure test — Task 76 (`mo-e0da`).
+//! Concurrency-tuning and memory-pressure test — ().
 //!
 //! Sweeps `--max-parallel-chunks` from 1 to NCPU on the full onroad fixture
 //! suite, measuring total throughput (wall time) and peak RSS at each N.
 //! Prints the tuning curve and asserts two invariants:
 //!
-//! 1. **Throughput does not degrade at higher N.**  Total wall time at NCPU
-//!    must not exceed total wall time at N=1 by more than a noise factor.
+//! 1. **Throughput does not degrade at higher N.** Total wall time at NCPU
+//! must not exceed total wall time at N=1 by more than a noise factor.
 //!
-//! 2. **Peak RSS is bounded by the chain-isolation model.**  In Phase 3
-//!    (calculators return empty output; no data-plane working set),
-//!    `max_chain_working_set ≈ 0`, so peak RSS should be essentially flat
-//!    across N.  The assertion enforces a generous ceiling:
-//!    `rss(N) ≤ rss(N=1) + N × RSS_PER_EXTRA_CHUNK_MIB`.
-//!    A violation means calculator chains are sharing more state than they
-//!    should — a correctness bug masquerading as a memory issue.
+//! 2. **Peak RSS is bounded by the chain-isolation model.** In
+//! (calculators return empty output; no data-plane working set),
+//! `max_chain_working_set ≈ 0`, so peak RSS should be essentially flat
+//! across N. The assertion enforces a generous ceiling:
+//! `rss(N) ≤ rss(N=1) + N × RSS_PER_EXTRA_CHUNK_MIB`.
+//! A violation means calculator chains are sharing more state than they
+//! should — a correctness bug masquerading as a memory issue.
 //!
 //! # Measurement methodology
 //!
 //! `VmHWM` from `/proc/self/status` is the process-lifetime high-water mark
-//! — monotonic and non-decreasing within a test run.  To isolate each N's
+//! monotonic and non-decreasing within a test run. To isolate each N's
 //! contribution, this test runs N values in ascending order: the RSS reading
 //! after the sweep at level N captures the max across all prior levels plus
-//! that level's runs.  The *delta* between consecutive readings is the
+//! that level's runs. The *delta* between consecutive readings is the
 //! additional memory the higher-parallelism run consumed.
 //!
-//! # Phase 3 caveat
+//! # caveat
 //!
-//! All calculators return `CalculatorOutput::empty()` today.  The throughput
+//! All calculators return `CalculatorOutput::empty()` today. The throughput
 //! numbers reflect **framework overhead** only: RunSpec parsing, planning,
-//! MasterLoop setup, and `MOVESRun.parquet` output.  Once the data plane
-//! lands (Phase 4), per-chain working sets will be non-zero and the RSS
+//! MasterLoop setup, and `MOVESRun.parquet` output. Once the data plane
+//! lands, per-chain working sets will be non-zero and the RSS
 //! model will exercise real memory pressure.
 
 use std::path::{Path, PathBuf};
@@ -81,14 +81,12 @@ fn read_peak_rss_mib() -> Option<f64> {
 }
 
 /// Maximum allowed additional RSS per extra parallel chunk slot, MiB.
-/// In Phase 3 (empty calculators), each chain's working set is ~0 beyond
-/// the MasterLoop struct overhead.  2 MiB per slot is extremely generous —
-/// a violation here means something is sharing unexpected mutable state.
+/// In (empty calculators), each chain's working set is ~0 beyond
+/// the MasterLoop struct overhead. 2 MiB per slot is extremely generous/// a violation here means something is sharing unexpected mutable state.
 const RSS_PER_EXTRA_CHUNK_MIB: f64 = 2.0;
 
 /// Maximum wall-time slowdown allowed at NCPU vs N=1.
-/// Higher parallelism can only help (or be neutral) on the fixture suite —
-/// execution is ~15% of total wall time in Phase 3, but we allow a 2× noise
+/// Higher parallelism can only help (or be neutral) on the fixture suite/// execution is ~15% of total wall time in but we allow a 2× noise
 /// factor so slow CI machines don't flap.
 const MAX_THROUGHPUT_REGRESSION_FACTOR: f64 = 2.0;
 
@@ -132,7 +130,7 @@ fn concurrency_tuning_sweep() {
         .map(|n| n.get())
         .unwrap_or(1);
 
-    // Sweep: 1, 2, 4, 8, ... doubling up to NCPU; then NCPU itself.
+ // Sweep: 1, 2, 4, 8, ... doubling up to NCPU; then NCPU itself.
     let mut n_values: Vec<(usize, String)> = Vec::new();
     let mut n = 1usize;
     while n < ncpu {
@@ -152,7 +150,7 @@ fn concurrency_tuning_sweep() {
     }
     let mut rows: Vec<Row> = Vec::new();
 
-    // Run in ascending N order so the monotonic VmHWM captures the deltas.
+ // Run in ascending N order so the monotonic VmHWM captures the deltas.
     let mut prev_rss: Option<f64> = None;
     for (n, label) in &n_values {
         let (wall_ms, rss_mib) = run_all_fixtures(&fixtures, *n);
@@ -172,13 +170,13 @@ fn concurrency_tuning_sweep() {
         });
     }
 
-    // Compute speedup relative to N=1.
+ // Compute speedup relative to N=1.
     let baseline_wall = rows[0].wall_ms;
     for row in &mut rows {
         row.speedup = baseline_wall / row.wall_ms;
     }
 
-    // Print the table.
+ // Print the table.
     println!(
         "\n{:>12}  {:>12}  {:>10}  {:>10}  {:>12}",
         "N", "total_wall_ms", "speedup", "RSS_MiB", "delta_RSS_MiB"
@@ -203,7 +201,7 @@ fn concurrency_tuning_sweep() {
     let n1_row = &rows[0];
     let ncpu_row = rows.last().unwrap();
 
-    // Assertion 1: throughput must not degrade beyond noise factor.
+ // Assertion 1: throughput must not degrade beyond noise factor.
     assert!(
         ncpu_row.wall_ms <= n1_row.wall_ms * MAX_THROUGHPUT_REGRESSION_FACTOR,
         "Throughput regression at N={}: wall {:.1} ms > N=1 wall {:.1} ms × {:.0} \
@@ -215,9 +213,9 @@ fn concurrency_tuning_sweep() {
         n1_row.wall_ms * MAX_THROUGHPUT_REGRESSION_FACTOR,
     );
 
-    // Assertion 2: RSS must stay within the chain-isolation model.
-    // At Phase 3 (empty calculators), expected additional RSS = N × ~0.
-    // We allow RSS_PER_EXTRA_CHUNK_MIB per additional parallel slot as slack.
+ // Assertion 2: RSS must stay within the chain-isolation model.
+ // At (empty calculators), expected additional RSS = N × ~0.
+ // We allow RSS_PER_EXTRA_CHUNK_MIB per additional parallel slot as slack.
     if let (Some(rss_n1), Some(rss_ncpu)) = (n1_row.rss_mib, ncpu_row.rss_mib) {
         let extra_slots = ncpu_row.n.saturating_sub(1) as f64;
         let rss_ceiling = rss_n1 + extra_slots * RSS_PER_EXTRA_CHUNK_MIB;
@@ -237,7 +235,7 @@ fn concurrency_tuning_sweep() {
 }
 
 /// Single-fixture throughput sanity check: all N values run without error
-/// and produce non-zero timing fields.  Lighter-weight than the full sweep.
+/// and produce non-zero timing fields. Lighter-weight than the full sweep.
 #[test]
 fn all_parallelism_levels_run_the_airtoxics_fixture() {
     let fixture = fixtures_dir().join("process-airtoxics.xml");

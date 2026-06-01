@@ -3,10 +3,10 @@
 //! The Java tool reads an XML `AVFTToolSpec` document with:
 //!
 //! * `lastCompleteModelYear` — model years up to (and including) this
-//!   year come from the user input; later years are projected.
+//! year come from the user input; later years are projected.
 //! * `analysisYear` — the projection target.
 //! * `methodEntries[]` — per-source-type `{enabled, gapFilling,
-//!   projection}` triples.
+//! projection}` triples.
 //! * `inputAVFTFile`, `knownFractionsFile`, `outputAVFTFile` — file paths.
 //!
 //! The TOML form keeps the field names short and uses kebab-case enum
@@ -67,27 +67,27 @@ pub const PROJECTION_CONSTANT: &str = "Constant";
 ///
 /// * [`GapFillingMethod::Automatic`] → `AVFTTool_GapFilling_Automatic`
 /// * [`GapFillingMethod::DefaultsRenormalizeInputs`] →
-///   `AVFTTool_GapFilling_Defaults_Renormalize_Inputs`
+/// `AVFTTool_GapFilling_Defaults_Renormalize_Inputs`
 /// * [`GapFillingMethod::DefaultsPreserveInputs`] →
-///   `AVFTTool_GapFilling_Defaults_Preserve_Inputs`
+/// `AVFTTool_GapFilling_Defaults_Preserve_Inputs`
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum GapFillingMethod {
-    /// Fill missing model years with zeros (renormalizing the inputs
-    /// first); fall back to defaults for source-type / model-year
-    /// combinations the user did not supply at all.
+ /// Fill missing model years with zeros (renormalizing the inputs
+ /// first); fall back to defaults for source-type / model-year
+ /// combinations the user did not supply at all.
     Automatic,
-    /// Fill missing rows from the default AVFT, then rescale the user's
-    /// rows so the full distribution sums to 1.
+ /// Fill missing rows from the default AVFT, then rescale the user's
+ /// rows so the full distribution sums to 1.
     DefaultsRenormalizeInputs,
-    /// Fill missing rows from the default AVFT, then rescale the
-    /// *default* rows so the full distribution sums to 1 — the user's
-    /// values are kept as supplied.
+ /// Fill missing rows from the default AVFT, then rescale the
+ /// *default* rows so the full distribution sums to 1 — the user's
+ /// values are kept as supplied.
     DefaultsPreserveInputs,
 }
 
 impl GapFillingMethod {
-    /// Human-readable label matching the Java GUI strings.
+ /// Human-readable label matching the Java GUI strings.
     pub fn label(self) -> &'static str {
         match self {
             GapFillingMethod::Automatic => GAP_FILLING_AUTOMATIC,
@@ -109,20 +109,20 @@ impl GapFillingMethod {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ProjectionMethod {
-    /// Carry the last-complete-model-year row forward without change.
+ /// Carry the last-complete-model-year row forward without change.
     Constant,
-    /// Use the model-supplied default AVFT for the projection years.
+ /// Use the model-supplied default AVFT for the projection years.
     National,
-    /// Scale each fuel/engine row by the user-vs-default ratio observed
-    /// at `lastCompleteModelYear`, then renormalize.
+ /// Scale each fuel/engine row by the user-vs-default ratio observed
+ /// at `lastCompleteModelYear`, then renormalize.
     Proportional,
-    /// Read explicit projection-year rows from a "known fractions" CSV.
-    /// Default-derived rows fill gaps and renormalize alongside.
+ /// Read explicit projection-year rows from a "known fractions" CSV.
+ /// Default-derived rows fill gaps and renormalize alongside.
     KnownFractions,
 }
 
 impl ProjectionMethod {
-    /// Human-readable label matching the Java GUI strings.
+ /// Human-readable label matching the Java GUI strings.
     pub fn label(self) -> &'static str {
         match self {
             ProjectionMethod::Constant => PROJECTION_CONSTANT,
@@ -154,24 +154,24 @@ fn default_enabled() -> bool {
 /// Complete tool spec.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ToolSpec {
-    /// Inclusive upper bound for model years that come from the user
-    /// input. Projection runs from `last_complete_model_year + 1`
-    /// through `analysis_year`.
+ /// Inclusive upper bound for model years that come from the user
+ /// input. Projection runs from `last_complete_model_year + 1`
+ /// through `analysis_year`.
     pub last_complete_model_year: ModelYearId,
-    /// Target year for the projection.
+ /// Target year for the projection.
     pub analysis_year: ModelYearId,
-    /// One row per source type the tool should process.
+ /// One row per source type the tool should process.
     #[serde(default, rename = "method")]
     pub methods: Vec<MethodEntry>,
 }
 
 impl ToolSpec {
-    /// Parse a TOML string into a [`ToolSpec`].
+ /// Parse a TOML string into a [`ToolSpec`].
     pub fn from_toml_str(input: &str) -> std::result::Result<Self, toml::de::Error> {
         toml::from_str(input)
     }
 
-    /// Load a TOML file from disk.
+ /// Load a TOML file from disk.
     pub fn from_toml_file(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
         let text = std::fs::read_to_string(path).map_err(|e| Error::io(path, e))?;
@@ -181,16 +181,16 @@ impl ToolSpec {
         })
     }
 
-    /// Lookup the entry for a given source type.
+ /// Lookup the entry for a given source type.
     pub fn find(&self, source_type_id: SourceTypeId) -> Option<&MethodEntry> {
         self.methods
             .iter()
             .find(|m| m.source_type_id == source_type_id)
     }
 
-    /// Validate the spec for internal consistency. Surfaces missing
-    /// required fields (e.g., `analysis_year < last_complete_model_year`)
-    /// before any database work happens.
+ /// Validate the spec for internal consistency. Surfaces missing
+ /// required fields (e.g., `analysis_year < last_complete_model_year`)
+ /// before any database work happens.
     pub fn validate(&self) -> Result<()> {
         if self.last_complete_model_year < 1950 {
             return Err(Error::ToolSpec(format!(
@@ -204,8 +204,8 @@ impl ToolSpec {
                 self.analysis_year, self.last_complete_model_year
             )));
         }
-        // Duplicate source-type entries would be silently last-wins via
-        // `find`; surface them instead.
+ // Duplicate source-type entries would be silently last-wins via
+ // `find`; surface them instead.
         for (i, m) in self.methods.iter().enumerate() {
             if self.methods[..i]
                 .iter()
@@ -249,7 +249,7 @@ mod tests {
         assert_eq!(spec.methods[0].source_type_id, 11);
         assert_eq!(spec.methods[0].gap_filling, GapFillingMethod::Automatic);
         assert_eq!(spec.methods[0].projection, ProjectionMethod::Proportional);
-        // default enabled
+ // default enabled
         assert!(spec.methods[1].enabled);
         assert_eq!(
             spec.methods[1].gap_filling,

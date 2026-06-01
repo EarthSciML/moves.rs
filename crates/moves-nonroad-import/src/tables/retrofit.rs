@@ -3,34 +3,34 @@
 //! Schema mirrors `CreateDefault.sql`:
 //!
 //! ```sql
-//! CREATE TABLE  nrRetrofitFactors (
-//!   retrofitStartYear         smallint(6) NOT NULL,
-//!   retrofitEndYear           smallint(6) NOT NULL,
-//!   StartModelYear            smallint(6) NOT NULL,
-//!   EndModelYear              smallint(6) NOT NULL,
-//!   SCC                       char(10)    NOT NULL,
-//!   engTechID                 smallint(6) NOT NULL,
-//!   hpMin                     smallint(6) NOT NULL,
-//!   hpMax                     smallint(6) NOT NULL,
-//!   pollutantID               smallint(6) NOT NULL,
-//!   retrofitID                smallint(6) NOT NULL,
-//!   annualFractionRetrofit    float       DEFAULT NULL,
-//!   retrofitEffectiveFraction float       DEFAULT NULL,
-//!   PRIMARY KEY (SCC, engTechID, hpMin, hpMax, pollutantID, retrofitID)
+//! CREATE TABLE nrRetrofitFactors (
+//! retrofitStartYear smallint(6) NOT NULL,
+//! retrofitEndYear smallint(6) NOT NULL,
+//! StartModelYear smallint(6) NOT NULL,
+//! EndModelYear smallint(6) NOT NULL,
+//! SCC char(10) NOT NULL,
+//! engTechID smallint(6) NOT NULL,
+//! hpMin smallint(6) NOT NULL,
+//! hpMax smallint(6) NOT NULL,
+//! pollutantID smallint(6) NOT NULL,
+//! retrofitID smallint(6) NOT NULL,
+//! annualFractionRetrofit float DEFAULT NULL,
+//! retrofitEffectiveFraction float DEFAULT NULL,
+//! PRIMARY KEY (SCC, engTechID, hpMin, hpMax, pollutantID, retrofitID)
 //! )
 //! ```
 //!
 //! Validation rules:
 //!
 //! * Year columns are bounded `[1990, 2099]`. The lower bound matches
-//!   the earliest retrofit fixtures shipped in EPA's reference inputs.
+//! the earliest retrofit fixtures shipped in EPA's reference inputs.
 //! * `hpMin`, `hpMax` are NonNegative.
 //! * `annualFractionRetrofit`, `retrofitEffectiveFraction` are nullable
-//!   but `[0, 1]` when present (matching NEIQA's per-row range warning).
+//! but `[0, 1]` when present (matching NEIQA's per-row range warning).
 //! * Cross-row invariants: none. The retrofit table accumulates rather
-//!   than partitions, so per-key fraction sums need not equal 1.0; that
-//!   would over-constrain templates that genuinely allocate < 100 % of
-//!   the population.
+//! than partitions, so per-key fraction sums need not equal 1.0; that
+//! would over-constrain templates that genuinely allocate < 100 % of
+//! the population.
 
 use arrow::datatypes::DataType;
 

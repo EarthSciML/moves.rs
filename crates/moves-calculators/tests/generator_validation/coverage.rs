@@ -1,6 +1,6 @@
 //! The fixture × generator coverage matrix.
 //!
-//! "Run all fixtures through the Rust generators" (the Task 44 bead)
+//! "Run all fixtures through the Rust generators" (the work item)
 //! is a cross-product: for each onroad fixture, which generators does
 //! a MOVES run of that fixture exercise? A generator's master-loop
 //! subscription fires for a run iff the run exercises one of the
@@ -31,10 +31,10 @@ use super::generators::subscribed_process_ids;
 /// generator, and the emission processes they share.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CoverageCell {
-    /// `true` when the fixture and generator share at least one
-    /// emission process.
+ /// `true` when the fixture and generator share at least one
+ /// emission process.
     pub exercised: bool,
-    /// The shared process IDs, ascending. Empty iff `!exercised`.
+ /// The shared process IDs, ascending. Empty iff `!exercised`.
     pub shared_processes: Vec<u32>,
 }
 
@@ -50,7 +50,7 @@ pub struct CoverageMatrix {
 }
 
 impl CoverageMatrix {
-    /// Build the matrix from the fixture and generator catalogues.
+ /// Build the matrix from the fixture and generator catalogues.
     pub fn build(fixtures: &[OnroadFixture], generators: &[Box<dyn Generator>]) -> Self {
         let generator_processes: Vec<_> = generators
             .iter()
@@ -85,28 +85,28 @@ impl CoverageMatrix {
         }
     }
 
-    /// The fixture names, in row order.
+ /// The fixture names, in row order.
     pub fn fixture_names(&self) -> &[String] {
         &self.fixture_names
     }
 
-    /// The generator names, in column order.
+ /// The generator names, in column order.
     pub fn generator_names(&self) -> &[String] {
         &self.generator_names
     }
 
-    /// The cell for a `(fixture index, generator index)` pair.
+ /// The cell for a `(fixture index, generator index)` pair.
     pub fn cell(&self, fixture: usize, generator: usize) -> &CoverageCell {
         &self.cells[fixture][generator]
     }
 
-    /// Total exercised `(fixture, generator)` pairs — the number of
-    /// table diffs the activated gate performs.
+ /// Total exercised `(fixture, generator)` pairs — the number of
+ /// table diffs the activated gate performs.
     pub fn exercised_pair_count(&self) -> usize {
         self.cells.iter().flatten().filter(|c| c.exercised).count()
     }
 
-    /// The generators a fixture exercises, by name, in column order.
+ /// The generators a fixture exercises, by name, in column order.
     pub fn generators_for_fixture(&self, fixture: &str) -> Vec<&str> {
         let Some(f) = self.fixture_names.iter().position(|n| n == fixture) else {
             return Vec::new();
@@ -119,7 +119,7 @@ impl CoverageMatrix {
             .collect()
     }
 
-    /// The fixtures that exercise a generator, by name, in row order.
+ /// The fixtures that exercise a generator, by name, in row order.
     pub fn fixtures_for_generator(&self, generator: &str) -> Vec<&str> {
         let Some(g) = self.generator_names.iter().position(|n| n == generator) else {
             return Vec::new();
@@ -132,10 +132,10 @@ impl CoverageMatrix {
             .collect()
     }
 
-    /// Render the matrix as a Markdown table — one row per fixture,
-    /// listing the processes it exercises and the generators that
-    /// fire. Printed by the harness status banner under
-    /// `cargo test -- --nocapture`.
+ /// Render the matrix as a Markdown table — one row per fixture,
+ /// listing the processes it exercises and the generators that
+ /// fire. Printed by the harness status banner under
+ /// `cargo test -- --nocapture`.
     pub fn render_markdown(&self) -> String {
         let mut out = String::from(
             "| Fixture | Processes | Generators exercised |\n\
@@ -183,8 +183,8 @@ mod tests {
 
     #[test]
     fn every_fixture_exercises_at_least_one_generator() {
-        // A fixture that fired no generator would be untestable by this
-        // gate — and almost certainly a bug in the process join.
+ // A fixture that fired no generator would be untestable by this
+ // gate — and almost certainly a bug in the process join.
         let m = matrix();
         for fixture in m.fixture_names() {
             let gens = m.generators_for_fixture(fixture);
@@ -197,7 +197,7 @@ mod tests {
 
     #[test]
     fn source_type_physics_is_exercised_by_no_fixture() {
-        // It has no subscriptions — a helper, not master-loop scheduled.
+ // It has no subscriptions — a helper, not master-loop scheduled.
         let m = matrix();
         assert!(
             m.fixtures_for_generator("SourceTypePhysics").is_empty(),

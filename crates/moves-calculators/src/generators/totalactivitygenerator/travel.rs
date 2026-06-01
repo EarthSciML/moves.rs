@@ -19,14 +19,14 @@ use super::model::{
 /// The four working tables step 140 builds, in dependency order.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct TravelFractionTables {
-    /// `HPMSVTypePopulation` — analysis-year population by HPMS type.
+ /// `HPMSVTypePopulation` — analysis-year population by HPMS type.
     pub hpms_v_type_population: Vec<HpmsVTypePopulationRow>,
-    /// `FractionWithinHPMSVType` — a cohort's share of its HPMS-type
-    /// population.
+ /// `FractionWithinHPMSVType` — a cohort's share of its HPMS-type
+ /// population.
     pub fraction_within_hpms_v_type: Vec<FractionWithinHpmsVTypeRow>,
-    /// `HPMSTravelFraction` — relative-MAR-weighted HPMS-type travel share.
+ /// `HPMSTravelFraction` — relative-MAR-weighted HPMS-type travel share.
     pub hpms_travel_fraction: Vec<HpmsTravelFractionRow>,
-    /// `TravelFraction` — final per-cohort travel share.
+ /// `TravelFraction` — final per-cohort travel share.
     pub travel_fraction: Vec<TravelFractionRow>,
 }
 
@@ -54,7 +54,7 @@ pub fn hpms_v_type_population(
         let Some(&hpms) = hpms_of.get(&row.source_type_id) else {
             continue;
         };
-        *totals.entry(hpms).or_insert(0.0) += row.population;
+ *totals.entry(hpms).or_insert(0.0) += row.population;
     }
     totals
         .into_iter()
@@ -83,7 +83,7 @@ pub fn fraction_within_hpms_v_type(
         .iter()
         .map(|r| (r.source_type_id, r.hpms_v_type_id))
         .collect();
-    // (yearID, HPMSVTypeID) -> population.
+ // (yearID, HPMSVTypeID) -> population.
     let hpms_population: BTreeMap<(i32, i32), f64> = hpms_v_type_population
         .iter()
         .map(|r| ((r.year_id, r.hpms_v_type_id), r.population))
@@ -141,7 +141,7 @@ pub fn hpms_travel_fraction(
         let Some(&mar) = relative_mar.get(&(row.source_type_id, row.age_id)) else {
             continue;
         };
-        *totals.entry((row.year_id, hpms)).or_insert(0.0) += row.fraction * mar;
+ *totals.entry((row.year_id, hpms)).or_insert(0.0) += row.fraction * mar;
     }
     totals
         .into_iter()
@@ -211,10 +211,10 @@ pub fn travel_fraction(
     }
 
     if vmt_provided_by_source_type {
-        // Renormalise by (year, sourceType).
+ // Renormalise by (year, sourceType).
         let mut sums: BTreeMap<(i32, i32), f64> = BTreeMap::new();
         for row in &out {
-            *sums.entry((row.year_id, row.source_type_id)).or_insert(0.0) += row.fraction;
+ *sums.entry((row.year_id, row.source_type_id)).or_insert(0.0) += row.fraction;
         }
         for row in &mut out {
             let total = sums
@@ -283,7 +283,7 @@ pub fn grow_vmt_to_analysis_year(
     base_year: i32,
     analysis_year: i32,
 ) -> Vec<AnalysisYearVmtRow> {
-    // HPMS types reachable from a RunSpec source type.
+ // HPMS types reachable from a RunSpec source type.
     let run_spec_types: BTreeMap<i32, ()> = run_spec_source_type
         .iter()
         .map(|r| (r.source_type_id, ()))
@@ -296,7 +296,7 @@ pub fn grow_vmt_to_analysis_year(
     hpms_types.sort_unstable();
     hpms_types.dedup();
 
-    // HPMSVTypeYear lookups.
+ // HPMSVTypeYear lookups.
     let base_vmt: BTreeMap<(i32, i32), f64> = hpms_v_type_year
         .iter()
         .map(|r| ((r.year_id, r.hpms_v_type_id), r.hpms_base_year_vmt))
@@ -306,7 +306,7 @@ pub fn grow_vmt_to_analysis_year(
         .map(|r| ((r.year_id, r.hpms_v_type_id), r.vmt_growth_factor))
         .collect();
 
-    // (year, HPMSVTypeID) -> VMT, seeded at the base year.
+ // (year, HPMSVTypeID) -> VMT, seeded at the base year.
     let mut vmt: BTreeMap<(i32, i32), f64> = BTreeMap::new();
     for &hpms in &hpms_types {
         if let Some(&base) = base_vmt.get(&(base_year, hpms)) {
@@ -368,12 +368,12 @@ mod tests {
 
     #[test]
     fn hpms_population_sums_source_types_into_their_hpms_type() {
-        // Source types 21 and 31 both roll up to HPMS type 10.
+ // Source types 21 and 31 both roll up to HPMS type 10.
         let pop = [
             stap(2020, 21, 0, 100.0),
             stap(2020, 21, 1, 50.0),
             stap(2020, 31, 0, 25.0),
-            // A different year — ignored.
+ // A different year — ignored.
             stap(2019, 21, 0, 999.0),
         ];
         let suts = [sut(21, 10), sut(31, 10)];
@@ -414,31 +414,31 @@ mod tests {
 
     #[test]
     fn travel_fraction_full_chain_normalises_to_one() {
-        // One HPMS type, one source type, two ages with equal MAR.
+ // One HPMS type, one source type, two ages with equal MAR.
         let pop = [stap(2020, 21, 0, 100.0), stap(2020, 21, 1, 100.0)];
         let suts = [sut(21, 10)];
         let stas = [sta(21, 0, 1.0), sta(21, 1, 1.0)];
         let tables = calculate_fraction_of_travel_using_hpms(&pop, &suts, &stas, 2020, false);
-        // Each cohort is half the population; with equal MAR each travels
-        // half. fraction = (0.5 * 1.0) / 1.0 = 0.5.
+ // Each cohort is half the population; with equal MAR each travels
+ // half. fraction = (0.5 * 1.0) / 1.0 = 0.5.
         assert_eq!(tables.travel_fraction.len(), 2);
         for row in &tables.travel_fraction {
             assert!((row.fraction - 0.5).abs() < EPS);
         }
-        // HPMSTravelFraction = sum(0.5*1 + 0.5*1) = 1.0.
+ // HPMSTravelFraction = sum(0.5*1 + 0.5*1) = 1.0.
         assert_eq!(tables.hpms_travel_fraction.len(), 1);
         assert!((tables.hpms_travel_fraction[0].fraction - 1.0).abs() < EPS);
     }
 
     #[test]
     fn travel_fraction_weights_by_relative_mar() {
-        // Age 0 travels twice as much per vehicle as age 1.
+ // Age 0 travels twice as much per vehicle as age 1.
         let pop = [stap(2020, 21, 0, 100.0), stap(2020, 21, 1, 100.0)];
         let suts = [sut(21, 10)];
         let stas = [sta(21, 0, 2.0), sta(21, 1, 1.0)];
         let tables = calculate_fraction_of_travel_using_hpms(&pop, &suts, &stas, 2020, false);
-        // fwhvt = 0.5 each. HPMSTravelFraction = 0.5*2 + 0.5*1 = 1.5.
-        // TravelFraction age 0 = (0.5*2)/1.5 = 0.6666…; age 1 = (0.5*1)/1.5.
+ // fwhvt = 0.5 each. HPMSTravelFraction = 0.5*2 + 0.5*1 = 1.5.
+ // TravelFraction age 0 = (0.5*2)/1.5 = 0.6666…; age 1 = (0.5*1)/1.5.
         let frac = |age| {
             tables
                 .travel_fraction
@@ -453,21 +453,21 @@ mod tests {
 
     #[test]
     fn travel_fraction_renormalises_when_vmt_is_by_source_type() {
-        // Without renormalisation the two ages sum to 1.0 already; force a
-        // non-unit sum by giving the HPMS type a second source type so the
-        // per-source-type renormalisation is observable.
+ // Without renormalisation the two ages sum to 1.0 already; force a
+ // non-unit sum by giving the HPMS type a second source type so the
+ // per-source-type renormalisation is observable.
         let pop = [stap(2020, 21, 0, 100.0), stap(2020, 21, 1, 100.0)];
         let suts = [sut(21, 10)];
         let stas = [sta(21, 0, 2.0), sta(21, 1, 1.0)];
         let normalised = calculate_fraction_of_travel_using_hpms(&pop, &suts, &stas, 2020, true);
-        // After renormalising by (year, sourceType) the fractions sum to 1.
+ // After renormalising by (year, sourceType) the fractions sum to 1.
         let sum: f64 = normalised.travel_fraction.iter().map(|r| r.fraction).sum();
         assert!((sum - 1.0).abs() < EPS);
     }
 
     #[test]
     fn grow_vmt_seeds_base_year_and_compounds_growth() {
-        // HPMS type 10 starts at 1000 VMT in 2020 and grows 10%/yr.
+ // HPMS type 10 starts at 1000 VMT in 2020 and grows 10%/yr.
         let hvty = [
             HpmsVTypeYearRow {
                 year_id: 2020,
@@ -494,7 +494,7 @@ mod tests {
         let vmt = |year| out.iter().find(|r| r.year_id == year).unwrap().vmt;
         assert!((vmt(2020) - 1000.0).abs() < EPS);
         assert!((vmt(2021) - 1100.0).abs() < EPS);
-        // 1100 * 1.2 = 1320.
+ // 1100 * 1.2 = 1320.
         assert!((vmt(2022) - 1320.0).abs() < EPS);
     }
 
@@ -506,8 +506,8 @@ mod tests {
             hpms_base_year_vmt: 1000.0,
             vmt_growth_factor: 1.0,
         }];
-        // RunSpec selects source type 99, which rolls up to HPMS type 20,
-        // not 10 — so HPMS type 10 gets no AnalysisYearVMT row.
+ // RunSpec selects source type 99, which rolls up to HPMS type 20,
+ // not 10 — so HPMS type 10 gets no AnalysisYearVMT row.
         let rsst = [RunSpecSourceTypeRow { source_type_id: 99 }];
         let suts = [sut(99, 20)];
         let out = grow_vmt_to_analysis_year(&hvty, &rsst, &suts, 2020, 2020);

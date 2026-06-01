@@ -3,9 +3,9 @@
 //! The Java importer has no SQL-level invariants (the source comments
 //! explicitly note "no SQL error checks for DriveScheduleSecondLinkImporter"
 //! at line 155). All validation is per-cell:
-//!   - `linkID`, `secondID`, `speed` are NOT NULL
-//!   - `secondID` must be ≥ 0 (FILTER_NON_NEGATIVE)
-//!   - `speed` must be ≥ 0 (FILTER_NON_NEGATIVE)
+//! - `linkID`, `secondID`, `speed` are NOT NULL
+//! - `secondID` must be ≥ 0 (FILTER_NON_NEGATIVE)
+//! - `speed` must be ≥ 0 (FILTER_NON_NEGATIVE)
 //!
 //! Both filters are no-ops in Java (FILTER_NON_NEGATIVE accepts any
 //! finite f64 there); we apply the same semantic in [`crate::filter`].

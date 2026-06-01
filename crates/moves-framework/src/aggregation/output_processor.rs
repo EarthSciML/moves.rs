@@ -1,26 +1,26 @@
-//! Parquet writer for the unified MOVES output schema (Phase 4 Task 89).
+//! Parquet writer for the unified MOVES output schema.
 //!
 //! Materialises the column declarations from
 //! [`moves_data::output_schema`] into the on-disk layout described by
-//! Task 89:
+//!:
 //!
 //! ```text
 //! <output-root>/
-//!   MOVESRun.parquet
-//!   MOVESOutput/
-//!     yearID=2020/monthID=1/part.parquet
-//!     yearID=2020/monthID=7/part.parquet
-//!     ...
-//!   MOVESActivityOutput/
-//!     yearID=2020/monthID=1/part.parquet
-//!     ...
+//! MOVESRun.parquet
+//! MOVESOutput/
+//! yearID=2020/monthID=1/part.parquet
+//! yearID=2020/monthID=7/part.parquet
+//! ...
+//! MOVESActivityOutput/
+//! yearID=2020/monthID=1/part.parquet
+//! ...
 //! ```
 //!
-//! [`OutputProcessor`] is the Phase 2 skeleton called out by the
-//! migration plan ("wire into Phase 2 `OutputProcessor`"). Phase 3
+//! [`OutputProcessor`] is the skeleton called out by the
+//! ("wire into `OutputProcessor`").
 //! calculators will deliver per-iteration outputs through it; until
 //! [`CalculatorOutput`](crate::CalculatorOutput) widens to a real
-//! `DataFrame` (Task 50), callers construct strongly-typed
+//! `DataFrame`, callers construct strongly-typed
 //! [`moves_data::EmissionRecord`] / [`moves_data::ActivityRecord`]
 //! values directly.
 //!
@@ -102,7 +102,7 @@ type MemoryFiles = Vec<(PathBuf, Vec<u8>)>;
 /// `MOVESOutput/` and `MOVESActivityOutput/`.
 ///
 /// The processor is stateless between calls — it owns no buffered rows.
-/// Phase 3 calculators can call the partition writers multiple times if
+/// calculators can call the partition writers multiple times if
 /// they produce one partition at a time (the typical case under the
 /// hour/day/month/year MasterLoop iteration). Two writes to the same
 /// `(yearID, monthID)` *overwrite* the partition file; the caller is
@@ -110,28 +110,27 @@ type MemoryFiles = Vec<(PathBuf, Vec<u8>)>;
 ///
 /// [`write_aggregated_emissions`](Self::write_aggregated_emissions) /
 /// [`write_aggregated_activity`](Self::write_aggregated_activity) apply a
-/// Task 25 [`AggregationPlan`] — group-by, `SUM`, temporal rescaling —
-/// before writing; that roll-up step is the Task 26 port of
+/// [`AggregationPlan`] — group-by, `SUM`, temporal rescaling/// before writing; that roll-up step is the port of
 /// `OutputProcessor.java`.
 ///
-/// **Phase 2 skeleton.** The strongly-typed row API will be widened to
-/// accept Polars `DataFrame`s once Task 50 lands; calculator wiring (Task
+/// **skeleton.** The strongly-typed row API will be widened to
+/// accept Polars `DataFrame`s once lands; calculator wiring (Task
 /// 27 `MOVESEngine`) is a follow-up.
 #[derive(Debug, Clone)]
 pub struct OutputProcessor {
     output_root: PathBuf,
-    /// When `Some`, parquet bytes are collected in memory instead of being
-    /// written to `output_root`. Used by the WASM build (Task 132).
+ /// When `Some`, parquet bytes are collected in memory instead of being
+ /// written to `output_root`. Used by the WASM build.
     memory: Option<Arc<Mutex<MemoryFiles>>>,
 }
 
 impl OutputProcessor {
-    /// Create a new output processor rooted at `output_root` and write
-    /// the single [`MovesRunRecord`] to `MOVESRun.parquet`.
-    ///
-    /// `output_root` is created if it does not exist. `MOVESRun.parquet`
-    /// is overwritten if present, so re-running a fixture against the
-    /// same output directory replaces the previous run's metadata.
+ /// Create a new output processor rooted at `output_root` and write
+ /// the single [`MovesRunRecord`] to `MOVESRun.parquet`.
+ ///
+ /// `output_root` is created if it does not exist. `MOVESRun.parquet`
+ /// is overwritten if present, so re-running a fixture against the
+ /// same output directory replaces the previous run's metadata.
     pub fn new(output_root: impl Into<PathBuf>, run: &MovesRunRecord) -> Result<Self> {
         let output_root = output_root.into();
         std::fs::create_dir_all(&output_root).map_err(|source| Error::Io {
@@ -146,13 +145,13 @@ impl OutputProcessor {
         Ok(proc)
     }
 
-    /// Create an in-memory output processor that collects parquet bytes
-    /// instead of writing to the filesystem.
-    ///
-    /// Call [`take_memory_files`](Self::take_memory_files) to retrieve the
-    /// collected `(relative-path, bytes)` pairs after writing. Intended for
-    /// the `wasm32-unknown-unknown` target (Task 132) where no real filesystem
-    /// is available.
+ /// Create an in-memory output processor that collects parquet bytes
+ /// instead of writing to the filesystem.
+ ///
+ /// Call [`take_memory_files`](Self::take_memory_files) to retrieve the
+ /// collected `(relative-path, bytes)` pairs after writing. Intended for
+ /// the `wasm32-unknown-unknown` target where no real filesystem
+ /// is available.
     pub fn new_memory(run: &MovesRunRecord) -> Result<Self> {
         let proc = Self {
             output_root: PathBuf::from(""),
@@ -162,12 +161,12 @@ impl OutputProcessor {
         Ok(proc)
     }
 
-    /// Drain the in-memory file collection and return all `(path, bytes)` pairs.
-    ///
-    /// Returns `None` if the processor was created with [`new`](Self::new)
-    /// (filesystem mode). Paths are relative to the logical output root.
-    ///
-    /// [`new`]: Self::new
+ /// Drain the in-memory file collection and return all `(path, bytes)` pairs.
+ ///
+ /// Returns `None` if the processor was created with [`new`](Self::new)
+ /// (filesystem mode). Paths are relative to the logical output root.
+ ///
+ /// [`new`]: Self::new
     pub fn take_memory_files(&self) -> Option<MemoryFiles> {
         self.memory.as_ref().map(|arc| {
             let mut guard = arc.lock().expect("output memory mutex poisoned");
@@ -175,18 +174,18 @@ impl OutputProcessor {
         })
     }
 
-    /// Root directory the processor writes into.
+ /// Root directory the processor writes into.
     #[must_use]
     pub fn output_root(&self) -> &Path {
         &self.output_root
     }
 
-    /// Relative-from-root path the processor writes for a `(table,
-    /// year, month)` triple. `year`/`month` are ignored for
-    /// [`OutputTable::Run`].
-    ///
-    /// Visible so callers (tests, future merge logic) can predict the
-    /// layout without re-deriving the rules.
+ /// Relative-from-root path the processor writes for a `(table,
+ /// year, month)` triple. `year`/`month` are ignored for
+ /// [`OutputTable::Run`].
+ ///
+ /// Visible so callers (tests, future merge logic) can predict the
+ /// layout without re-deriving the rules.
     #[must_use]
     pub fn partition_path(table: OutputTable, year: Option<i16>, month: Option<i16>) -> PathBuf {
         match table {
@@ -201,14 +200,14 @@ impl OutputProcessor {
         }
     }
 
-    /// Write a batch of [`EmissionRecord`]s, grouped by
-    /// `(yearID, monthID)` and written one parquet file per partition.
-    ///
-    /// Rows in `records` may be in any order; the writer groups them
-    /// internally. Each output file's row order matches the order in
-    /// which rows appear in the input slice for that partition — i.e.,
-    /// a stable in-partition sort is up to the caller. (Determinism
-    /// guarantees still hold for any fixed input ordering.)
+ /// Write a batch of [`EmissionRecord`]s, grouped by
+ /// `(yearID, monthID)` and written one parquet file per partition.
+ ///
+ /// Rows in `records` may be in any order; the writer groups them
+ /// internally. Each output file's row order matches the order in
+ /// which rows appear in the input slice for that partition — i.e.,
+ /// a stable in-partition sort is up to the caller. (Determinism
+ /// guarantees still hold for any fixed input ordering.)
     pub fn write_emissions(&self, records: &[EmissionRecord]) -> Result<Vec<PathBuf>> {
         let groups = group_by_year_month(records, |r| (r.year_id, r.month_id));
         let mut written = Vec::with_capacity(groups.len());
@@ -222,10 +221,10 @@ impl OutputProcessor {
         Ok(written)
     }
 
-    /// Write a batch of [`ActivityRecord`]s.
-    ///
-    /// See [`write_emissions`](Self::write_emissions) for grouping and
-    /// ordering semantics.
+ /// Write a batch of [`ActivityRecord`]s.
+ ///
+ /// See [`write_emissions`](Self::write_emissions) for grouping and
+ /// ordering semantics.
     pub fn write_activity(&self, records: &[ActivityRecord]) -> Result<Vec<PathBuf>> {
         let groups = group_by_year_month(records, |r| (r.year_id, r.month_id));
         let mut written = Vec::with_capacity(groups.len());
@@ -239,23 +238,23 @@ impl OutputProcessor {
         Ok(written)
     }
 
-    /// Aggregate `records` with an emission [`AggregationPlan`] and write
-    /// the rolled-up partitions.
-    ///
-    /// This is the Task 26 entry point: it composes
-    /// [`aggregate_emissions`] — the group-by + `SUM` roll-up ported from
-    /// `OutputProcessor.java` — with [`write_emissions`](Self::write_emissions),
-    /// the Task 89 Parquet writer. `factors` supplies the per-row temporal
-    /// rescaling; pass [`UnitScaling`](crate::UnitScaling) when the plan
-    /// carries no temporal scaling.
-    ///
-    /// Returns the partition file paths written, exactly as
-    /// [`write_emissions`](Self::write_emissions) does.
-    ///
-    /// # Errors
-    ///
-    /// Surfaces [`Error::AggregationPlanMismatch`] from
-    /// [`aggregate_emissions`] and any I/O / Parquet error from the writer.
+ /// Aggregate `records` with an emission [`AggregationPlan`] and write
+ /// the rolled-up partitions.
+ ///
+ /// This is the entry point: it composes
+ /// [`aggregate_emissions`] — the group-by + `SUM` roll-up ported from
+ /// `OutputProcessor.java` — with [`write_emissions`](Self::write_emissions),
+ /// the Parquet writer. `factors` supplies the per-row temporal
+ /// rescaling; pass [`UnitScaling`](crate::UnitScaling) when the plan
+ /// carries no temporal scaling.
+ ///
+ /// Returns the partition file paths written, exactly as
+ /// [`write_emissions`](Self::write_emissions) does.
+ ///
+ /// # Errors
+ ///
+ /// Surfaces [`Error::AggregationPlanMismatch`] from
+ /// [`aggregate_emissions`] and any I/O / Parquet error from the writer.
     pub fn write_aggregated_emissions(
         &self,
         plan: &AggregationPlan,
@@ -266,17 +265,17 @@ impl OutputProcessor {
         self.write_emissions(&aggregated)
     }
 
-    /// Aggregate `records` with an activity [`AggregationPlan`] and write
-    /// the rolled-up partitions.
-    ///
-    /// The activity-table counterpart of
-    /// [`write_aggregated_emissions`](Self::write_aggregated_emissions); see
-    /// it for the composition and `factors` semantics.
-    ///
-    /// # Errors
-    ///
-    /// Surfaces [`Error::AggregationPlanMismatch`] from
-    /// [`aggregate_activity`] and any I/O / Parquet error from the writer.
+ /// Aggregate `records` with an activity [`AggregationPlan`] and write
+ /// the rolled-up partitions.
+ ///
+ /// The activity-table counterpart of
+ /// [`write_aggregated_emissions`](Self::write_aggregated_emissions); see
+ /// it for the composition and `factors` semantics.
+ ///
+ /// # Errors
+ ///
+ /// Surfaces [`Error::AggregationPlanMismatch`] from
+ /// [`aggregate_activity`] and any I/O / Parquet error from the writer.
     pub fn write_aggregated_activity(
         &self,
         plan: &AggregationPlan,
@@ -295,13 +294,13 @@ impl OutputProcessor {
         Ok(())
     }
 
-    /// Write one parquet file to the appropriate backend.
-    ///
-    /// In filesystem mode: `output_root.join(rel)` is written atomically.
-    /// In memory mode: `(rel, bytes)` is pushed to the collection buffer.
-    ///
-    /// Returns the absolute path used (filesystem mode) or `rel` unchanged
-    /// (memory mode — no real path exists).
+ /// Write one parquet file to the appropriate backend.
+ ///
+ /// In filesystem mode: `output_root.join(rel)` is written atomically.
+ /// In memory mode: `(rel, bytes)` is pushed to the collection buffer.
+ ///
+ /// Returns the absolute path used (filesystem mode) or `rel` unchanged
+ /// (memory mode — no real path exists).
     fn store_parquet(
         &self,
         rel: &Path,
@@ -336,9 +335,9 @@ fn group_by_year_month<R, F>(rows: &[R], key: F) -> Vec<(PartitionKey, Vec<&R>)>
 where
     F: Fn(&R) -> PartitionKey,
 {
-    // BTreeMap to keep an ordering that's stable across runs even if the
-    // input ordering changes. `Option<i16>` orders Nones first, which is
-    // exactly the partition order we want on disk.
+ // BTreeMap to keep an ordering that's stable across runs even if the
+ // input ordering changes. `Option<i16>` orders Nones first, which is
+ // exactly the partition order we want on disk.
     let mut buckets: BTreeMap<PartitionKey, Vec<&R>> = BTreeMap::new();
     for row in rows {
         buckets.entry(key(row)).or_default().push(row);
@@ -742,7 +741,7 @@ mod tests {
         assert_eq!(batch.num_rows(), 1);
         assert_eq!(batch.num_columns(), MOVES_RUN_COLUMNS_LEN);
 
-        // Validate a few representative columns
+ // Validate a few representative columns
         let col_idx_for = |name: &str| {
             batch
                 .schema()
@@ -876,8 +875,8 @@ mod tests {
             .path()
             .join("MOVESOutput/yearID=2020/monthID=1/part.parquet");
         let batch = read_parquet(&path);
-        // Second write replaces the first — observed row count reflects
-        // the rewrite-don't-append semantics.
+ // Second write replaces the first — observed row count reflects
+ // the rewrite-don't-append semantics.
         assert_eq!(batch.num_rows(), 2);
     }
 
@@ -889,7 +888,7 @@ mod tests {
         assert!(written.is_empty());
         let written = proc.write_activity(&[]).unwrap();
         assert!(written.is_empty());
-        // MOVESRun.parquet still exists from the new() call.
+ // MOVESRun.parquet still exists from the new() call.
         assert!(dir.path().join("MOVESRun.parquet").exists());
     }
 
@@ -907,8 +906,8 @@ mod tests {
         assert_eq!(batch.num_columns(), MOVES_ACTIVITY_OUTPUT_COLUMNS.len());
     }
 
-    /// `AggregationInputs` for a Year + Nation run — the maximally-collapsing
-    /// configuration, so the roll-up half is easy to read back off disk.
+ /// `AggregationInputs` for a Year + Nation run — the maximally-collapsing
+ /// configuration, so the roll-up half is easy to read back off disk.
     fn year_nation_inputs<'a>(
         models: &'a [moves_runspec::model::Model],
         breakdown: &'a moves_runspec::model::OutputBreakdown,
@@ -941,8 +940,8 @@ mod tests {
         let breakdown = OutputBreakdown::default();
         let plan = emission_aggregation(&year_nation_inputs(&[Model::Onroad], &breakdown));
 
-        // Three rows across two months — Year aggregation collapses month
-        // and geography, so all three roll into one row.
+ // Three rows across two months — Year aggregation collapses month
+ // and geography, so all three roll into one row.
         let rows = vec![
             emission(Some(2020), Some(1), 1.0),
             emission(Some(2020), Some(1), 2.0),
@@ -953,7 +952,7 @@ mod tests {
             .unwrap();
         assert_eq!(written.len(), 1, "all rows roll into one partition");
 
-        // monthID collapsed to NULL → the __NULL__ partition directory.
+ // monthID collapsed to NULL → the __NULL__ partition directory.
         let expected = dir
             .path()
             .join("MOVESOutput/yearID=2020/monthID=__NULL__/part.parquet");
@@ -967,7 +966,7 @@ mod tests {
             .downcast_ref::<arrow::array::Float64Array>()
             .unwrap();
         assert_eq!(quant.value(0), 7.0, "1.0 + 2.0 + 4.0");
-        // monthID is null in the rolled-up row.
+ // monthID is null in the rolled-up row.
         assert!(
             batch
                 .column(batch.schema().index_of("monthID").unwrap())
@@ -1032,8 +1031,8 @@ mod tests {
         );
     }
 
-    // Use locally to assert against schema length in `new_writes_moves_run_parquet`
-    // without re-importing the slice.
+ // Use locally to assert against schema length in `new_writes_moves_run_parquet`
+ // without re-importing the slice.
     const MOVES_RUN_COLUMNS_LEN: usize = moves_data::output_schema::MOVES_RUN_COLUMNS.len();
     use moves_data::output_schema::{MOVES_ACTIVITY_OUTPUT_COLUMNS, MOVES_OUTPUT_COLUMNS};
 }

@@ -1,7 +1,7 @@
 //! Integration test: every committed fixture in `characterization/fixtures/`
 //! must parse via `RunSpec::from_file` and produce a unique fixture name.
 //!
-//! This guards the Phase 0 Task 5 + Task 6 acceptance: the fixture set is
+//! This guards the + acceptance: the fixture set is
 //! the regression baseline every other phase verifies against, so a fixture
 //! file that doesn't even round-trip through the host-side parser is a
 //! regression in itself.
@@ -25,7 +25,7 @@ fn fixture_catalog_parses_and_is_unique() {
     let dir = fixtures_dir();
     assert!(
         dir.is_dir(),
-        "expected fixtures dir at {} — Phase 0 Task 5/6 deliverable missing",
+        "expected fixtures dir at {} — characterization/fixtures/ directory missing",
         dir.display()
     );
 
@@ -39,14 +39,13 @@ fn fixture_catalog_parses_and_is_unique() {
 
     assert!(
         entries.len() >= 30,
-        "fixture catalogue is below Phase 0 Task 5/6 floor of 30: got {}",
+        "fixture catalogue is below the expected floor of 30: got {}",
         entries.len()
     );
     assert!(
         entries.len() <= 37,
-        "fixture catalogue is above Phase 0 Task 5/6 ceiling of 37: got {} \
-         (Task 74 added 3 fixtures beyond the original 33; ceiling updated in Task 78; \
-          Task 127 added mixed-onroad-nonroad; ceiling updated to 37)",
+        "fixture catalogue is above the expected ceiling of 37: got {} \
+         (the ceiling was last updated when mixed-onroad-nonroad was added)",
         entries.len()
     );
 
@@ -92,9 +91,9 @@ fn fixture_catalog_parses_and_is_unique() {
             path.display()
         );
         if !output_dbs.insert(runspec.output_database.clone()) {
-            // sample-runspec.xml uses JUnitTestOutput (the canonical name);
-            // every other fixture must pick a unique name so concurrent runs
-            // don't write to the same MariaDB schema.
+ // sample-runspec.xml uses JUnitTestOutput (the canonical name);
+ // every other fixture must pick a unique name so concurrent runs
+ // don't write to the same MariaDB schema.
             panic!(
                 "duplicate <outputdatabase databasename={}> in {}",
                 runspec.output_database,

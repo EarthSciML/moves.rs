@@ -1,6 +1,6 @@
 //! Scrappage-curve parser (`rdscrp.f`).
 //!
-//! Task 97. Parses the `/SCRAPPAGE/` packet defining a discretized
+//!Parses the `/SCRAPPAGE/` packet defining a discretized
 //! scrappage curve: pairs of `(useful_life_bin, percent_scrapped)`.
 //! Bins must be monotonically non-decreasing; bins beyond the
 //! supplied curve default to 100% scrapped.
@@ -25,9 +25,9 @@ use std::path::PathBuf;
 /// One discretized scrappage point.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ScrappagePoint {
-    /// Useful-life bin (e.g., 25.0 = 25% of useful life).
+ /// Useful-life bin (e.g., 25.0 = 25% of useful life).
     pub bin: f32,
-    /// Percent of equipment scrapped at this bin.
+ /// Percent of equipment scrapped at this bin.
     pub percent: f32,
 }
 

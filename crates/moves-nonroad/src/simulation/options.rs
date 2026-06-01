@@ -1,5 +1,4 @@
-//! Run configuration for [`run_simulation`](super::run_simulation) —
-//! the in-memory replacement for the NONROAD `.opt` file.
+//! Run configuration for [`run_simulation`](super::run_simulation)//! the in-memory replacement for the NONROAD `.opt` file.
 //!
 //! The Fortran source reads the `.opt` file into ten-plus COMMON
 //! blocks (`nonrdusr.inc` and friends); MOVES, in the Java↔Fortran
@@ -32,7 +31,7 @@ use crate::{Error, Result};
 /// Lowest episode / growth / technology year [`NonroadOptions::validate`]
 /// accepts. A sanity floor, not a NONROAD domain limit — the
 /// authoritative range check belongs to the option-file parser
-/// (`rdnropt.f`, Task 99 / [`crate::input::options`]).
+/// (`rdnropt.f`, / [`crate::input::options`]).
 pub const MIN_YEAR: i32 = 1990;
 
 /// Highest episode / growth / technology year [`NonroadOptions::validate`]
@@ -55,69 +54,65 @@ pub const MAX_YEAR: i32 = 2099;
 /// struct literal is equally valid.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NonroadOptions {
-    /// Geographic level the run operates at — Fortran `reglvl`.
-    /// Drives [`dispatch_for`](crate::driver::dispatch_for): the same
-    /// population record dispatches to different geography routines at
-    /// different levels.
+ /// Geographic level the run operates at — Fortran `reglvl`.
+ /// Drives [`dispatch_for`](crate::driver::dispatch_for): the same
+ /// population record dispatches to different geography routines at
+ /// different levels.
     pub region_level: RegionLevel,
 
-    /// Episode year — Fortran `iepyr`. Anchors the model-year loop in
-    /// every geography routine.
+ /// Episode year — Fortran `iepyr`. Anchors the model-year loop in
+ /// every geography routine.
     pub episode_year: i32,
 
-    /// Growth year — Fortran `igryr`. The year population is grown /
-    /// back-cast to before the age distribution is applied.
+ /// Growth year — Fortran `igryr`. The year population is grown /
+ /// back-cast to before the age distribution is applied.
     pub growth_year: i32,
 
-    /// Technology year — Fortran `itchyr`. Caps the model year when
-    /// looking up technology-fraction data (`min(model_year, itchyr)`).
+ /// Technology year — Fortran `itchyr`. Caps the model year when
+ /// looking up technology-fraction data (`min(model_year, itchyr)`).
     pub tech_year: i32,
 
-    /// `true` for a "total" (period-summed) run, `false` for a
-    /// typical-day run — Fortran `ismtyp == IDXTOT`.
+ /// `true` for a "total" (period-summed) run, `false` for a
+ /// typical-day run — Fortran `ismtyp == IDXTOT`.
     pub total_mode: bool,
 
-    /// `true` when day-of-year output is requested — Fortran `ldayfl`.
+ /// `true` when day-of-year output is requested — Fortran `ldayfl`.
     pub daily_output: bool,
 
-    /// `true` when by-model-year *exhaust* output is requested —
-    /// Fortran `lbmyfl`.
+ /// `true` when by-model-year *exhaust* output is requested /// Fortran `lbmyfl`.
     pub emit_bmy_exhaust: bool,
 
-    /// `true` when by-model-year *evaporative* output is requested —
-    /// Fortran `levbmyfl`.
+ /// `true` when by-model-year *evaporative* output is requested /// Fortran `levbmyfl`.
     pub emit_bmy_evap: bool,
 
-    /// `true` when the SI (state-import) report is requested —
-    /// Fortran `lsifl`.
+ /// `true` when the SI (state-import) report is requested /// Fortran `lsifl`.
     pub emit_si: bool,
 
-    /// `true` when the growth-file packet was loaded — Fortran
-    /// `lgrwfl`. A future-year or back-cast run with this `false` is
-    /// the Fortran `7003` fatal-error path.
+ /// `true` when the growth-file packet was loaded — Fortran
+ /// `lgrwfl`. A future-year or back-cast run with this `false` is
+ /// the Fortran `7003` fatal-error path.
     pub growth_loaded: bool,
 
-    /// `true` when retrofit records were loaded — Fortran `lrtrftfl`.
+ /// `true` when retrofit records were loaded — Fortran `lrtrftfl`.
     pub retrofit_loaded: bool,
 
-    /// `true` when the spillage / refueling-mode packet was loaded —
-    /// Fortran `lfacfl(IDXSPL)`. Gates evaporative refueling setup.
+ /// `true` when the spillage / refueling-mode packet was loaded /// Fortran `lfacfl(IDXSPL)`. Gates evaporative refueling setup.
     pub spillage_loaded: bool,
 
-    /// Free-text run title — Fortran `title1`. Echoed into the
-    /// completion banner and output headers; not otherwise load-bearing.
+ /// Free-text run title — Fortran `title1`. Echoed into the
+ /// completion banner and output headers; not otherwise load-bearing.
     pub title: String,
 }
 
 impl NonroadOptions {
-    /// Create a [`NonroadOptions`] for a run at `region_level` whose
-    /// episode, growth, and technology years are all `year`.
-    ///
-    /// Every output channel ([`emit_bmy_exhaust`](Self::emit_bmy_exhaust),
-    /// [`emit_si`](Self::emit_si), …) starts disabled and every
-    /// loaded-packet flag starts `false`; the title is empty. This is
-    /// the minimal single-year run — callers enable channels and set
-    /// the growth/tech years they need afterwards.
+ /// Create a [`NonroadOptions`] for a run at `region_level` whose
+ /// episode, growth, and technology years are all `year`.
+ ///
+ /// Every output channel ([`emit_bmy_exhaust`](Self::emit_bmy_exhaust),
+ /// [`emit_si`](Self::emit_si), …) starts disabled and every
+ /// loaded-packet flag starts `false`; the title is empty. This is
+ /// the minimal single-year run — callers enable channels and set
+ /// the growth/tech years they need afterwards.
     pub fn new(region_level: RegionLevel, year: i32) -> Self {
         Self {
             region_level,
@@ -136,31 +131,31 @@ impl NonroadOptions {
         }
     }
 
-    /// `true` when *any* by-model-year channel (exhaust or evap) is
-    /// requested. The geography routines build the by-model-year
-    /// accumulators only when this holds.
+ /// `true` when *any* by-model-year channel (exhaust or evap) is
+ /// requested. The geography routines build the by-model-year
+ /// accumulators only when this holds.
     pub fn emit_bmy(&self) -> bool {
         self.emit_bmy_exhaust || self.emit_bmy_evap
     }
 
-    /// Validate the run-global years.
-    ///
-    /// Each of [`episode_year`](Self::episode_year),
-    /// [`growth_year`](Self::growth_year), and
-    /// [`tech_year`](Self::tech_year) must fall within
-    /// `[MIN_YEAR, MAX_YEAR]`. The bounds are a sanity check that
-    /// catches an unset (`0`) or transposed field before the driver
-    /// loop runs — the authoritative range is the option-file parser's
-    /// (`rdnropt.f`).
-    ///
-    /// Cross-field relationships (e.g. growth year vs. episode year)
-    /// are *not* checked: a back-cast run legitimately has
-    /// `growth_year < episode_year`, and the geography routines accept
-    /// either ordering.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::Config`] naming the first out-of-range field.
+ /// Validate the run-global years.
+ ///
+ /// Each of [`episode_year`](Self::episode_year),
+ /// [`growth_year`](Self::growth_year), and
+ /// [`tech_year`](Self::tech_year) must fall within
+ /// `[MIN_YEAR, MAX_YEAR]`. The bounds are a sanity check that
+ /// catches an unset (`0`) or transposed field before the driver
+ /// loop runs — the authoritative range is the option-file parser's
+ /// (`rdnropt.f`).
+ ///
+ /// Cross-field relationships (e.g. growth year vs. episode year)
+ /// are *not* checked: a back-cast run legitimately has
+ /// `growth_year < episode_year`, and the geography routines accept
+ /// either ordering.
+ ///
+ /// # Errors
+ ///
+ /// [`Error::Config`] naming the first out-of-range field.
     pub fn validate(&self) -> Result<()> {
         check_year("episode_year", self.episode_year)?;
         check_year("growth_year", self.growth_year)?;
@@ -231,8 +226,8 @@ mod tests {
 
     #[test]
     fn validate_accepts_a_backcast_run() {
-        // growth_year < episode_year is a legitimate back-cast — not
-        // a cross-field error.
+ // growth_year < episode_year is a legitimate back-cast — not
+ // a cross-field error.
         let mut opts = NonroadOptions::new(RegionLevel::County, 2020);
         opts.growth_year = 2005;
         assert!(opts.validate().is_ok());
@@ -240,8 +235,8 @@ mod tests {
 
     #[test]
     fn validate_rejects_unset_episode_year() {
-        // The most common mistake: a struct built field-by-field with
-        // episode_year left at its 0 default.
+ // The most common mistake: a struct built field-by-field with
+ // episode_year left at its 0 default.
         let mut opts = NonroadOptions::new(RegionLevel::County, 2020);
         opts.episode_year = 0;
         let err = opts.validate().unwrap_err();

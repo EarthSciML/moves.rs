@@ -1,5 +1,5 @@
-//! `BasicRunningPMEmissionCalculator` — the running-exhaust-PM half of Phase 3
-//! Task 53 (the total-exhaust-PM half is [`super::total`]).
+//! `BasicRunningPMEmissionCalculator` — the running-exhaust-PM half of
+//! (the total-exhaust-PM half is [`super::total`]).
 //!
 //! Pure-Rust port of `BasicRunningPMEmissionCalculator.java` and the
 //! processing pipeline of `database/BasicPM25Calculator.sql`.
@@ -23,13 +23,13 @@
 //! body is the constructor, which passes five arguments up:
 //!
 //! ```text
-//! super(new String[] { "11801", "11201" },          // polProcessIDs
-//!       MasterLoopGranularity.YEAR,                  // granularity
-//!       0,                                           // priority offset
-//!       "database/BasicPM25Calculator.sql",          // script
-//!       new String[]{ "HasManyOpModes", "EmissionRateByAgeRates",
-//!                     "SourceHoursOperatingActivity",
-//!                     "ApplyTemperatureAdjustment" });// enabled sections
+//! super(new String[] { "11801", "11201" }, // polProcessIDs
+//! MasterLoopGranularity.YEAR, // granularity
+//! 0, // priority offset
+//! "database/BasicPM25Calculator.sql", // script
+//! new String[]{ "HasManyOpModes", "EmissionRateByAgeRates",
+//! "SourceHoursOperatingActivity",
+//! "ApplyTemperatureAdjustment" });// enabled sections
 //! ```
 //!
 //! `BasicPM25Calculator.sql` is a *generic template*: it carries mutually
@@ -40,7 +40,7 @@
 //! configuration. This port implements **only** that configuration — the
 //! single path `BasicRunningPMEmissionCalculator` exercises — not the generic
 //! template. The other section variants belong to sibling calculators and to
-//! `BasicStartPMEmissionCalculator` (migration-plan Task 54, a separate
+//! `BasicStartPMEmissionCalculator` (, a separate
 //! script `BasicStartPM25Calculator.sql`).
 //!
 //! The `polProcessID` strings encode `pollutantID * 100 + processID`:
@@ -54,24 +54,24 @@
 //! in the SQL. With this calculator's section selection they are:
 //!
 //! 1. **Weight emission rates by operating mode** (`step1_op_mode_weighted`).
-//!    `EmissionRateByAge.meanBaseRate` is multiplied by
-//!    `OpModeDistribution.opModeFraction` and summed over operating mode,
-//!    keyed by `(hourDay, sourceType, sourceBin, ageGroup, polProcess)`.
+//! `EmissionRateByAge.meanBaseRate` is multiplied by
+//! `OpModeDistribution.opModeFraction` and summed over operating mode,
+//! keyed by `(hourDay, sourceType, sourceBin, ageGroup, polProcess)`.
 //! 2. **Weight by source bin** (`step2_fully_weighted`). The op-mode-weighted
-//!    rate is multiplied by `SourceBinDistribution.sourceBinActivityFraction`
-//!    and summed over source bin, resolving the `(fuelType, modelYear, age)`
-//!    dimensions.
+//! rate is multiplied by `SourceBinDistribution.sourceBinActivityFraction`
+//! and summed over source bin, resolving the `(fuelType, modelYear, age)`
+//! dimensions.
 //! 3. **Multiply by activity** (`step3_unadjusted`). The fully weighted rate
-//!    is multiplied by `SHO.SHO` (source-hours operating) to give an
-//!    unadjusted emission quantity.
+//! is multiplied by `SHO.SHO` (source-hours operating) to give an
+//! unadjusted emission quantity.
 //! 4. **Apply the fuel adjustment** (`step4_fuel_adjusted`). A
-//!    market-share-weighted fuel-effect ratio (`generalFuelRatio`, blended
-//!    GPA / non-GPA) scales the emission quantity.
+//! market-share-weighted fuel-effect ratio (`generalFuelRatio`, blended
+//! GPA / non-GPA) scales the emission quantity.
 //! 5. **Apply the temperature adjustment** (`step5_temperature_adjusted`).
-//!    Below 72 °F the quantity is scaled by `exp(tempAdjustTermA·(72−T))`.
+//! Below 72 °F the quantity is scaled by `exp(tempAdjustTermA·(72−T))`.
 //! 6. **Convert to worker-output rows** (`step6_worker_output`). The
-//!    `polProcessID` is split back into `(pollutantID, processID)` and the
-//!    iteration geography is attached.
+//! `polProcessID` is split back into `(pollutantID, processID)` and the
+//! iteration geography is attached.
 //!
 //! The script's "Create Remote Tables" / "Extract Data" / "Cleanup" sections
 //! are MariaDB I/O boilerplate — they load the per-iteration filtered tables
@@ -81,37 +81,37 @@
 //! # Fidelity notes
 //!
 //! * **`FLOAT` intermediate columns.** Every "BRPMC Step" writes its result
-//!   into a `FLOAT` (32-bit) temp column while MariaDB evaluates the
-//!   arithmetic in `DOUBLE`; a value therefore truncates to `f32` between
-//!   steps. This port computes in [`f64`] throughout, matching the precedent
-//!   set by the generator ports (migration-plan Tasks 33 and 41): the
-//!   ~1e-7-relative truncation drift is left for the Task 44 / Task 117
-//!   fidelity gate to rule bug-compatible or not against canonical captures.
+//! into a `FLOAT` (32-bit) temp column while MariaDB evaluates the
+//! arithmetic in `DOUBLE`; a value therefore truncates to `f32` between
+//! steps. This port computes in [`f64`] throughout, matching the precedent
+//! set by the generator ports ( and 41): the
+//! ~1e-7-relative truncation drift is left for the /
+//! fidelity gate to rule bug-compatible or not against canonical captures.
 //! * **`SELECT DISTINCT` in Steps 1 and 4.** Step 1 selects six columns
-//!   (`hourDay, sourceType, sourceBin, ageGroup, polProcess`, and the weighted
-//!   rate) from a join that also threads `SourceBinDistribution`,
-//!   `AgeCategory` and `SourceTypeModelYear` — tables whose columns are *not*
-//!   selected. A single `(opMode, rate)` pair can satisfy the join through
-//!   several source-bin / model-year chains, producing duplicate output rows;
-//!   `SELECT DISTINCT` collapses them so the pair is summed once. The port
-//!   reproduces this by de-duplicating the exact emitted tuples (the rate
-//!   compared by its `f64` bit pattern) before the group-and-sum. Step 4-c's
-//!   `SELECT DISTINCT` is reproduced the same way.
+//! (`hourDay, sourceType, sourceBin, ageGroup, polProcess`, and the weighted
+//! rate) from a join that also threads `SourceBinDistribution`,
+//! `AgeCategory` and `SourceTypeModelYear` — tables whose columns are *not*
+//! selected. A single `(opMode, rate)` pair can satisfy the join through
+//! several source-bin / model-year chains, producing duplicate output rows;
+//! `SELECT DISTINCT` collapses them so the pair is summed once. The port
+//! reproduces this by de-duplicating the exact emitted tuples (the rate
+//! compared by its `f64` bit pattern) before the group-and-sum. Step 4-c's
+//! `SELECT DISTINCT` is reproduced the same way.
 //! * **Cross joins.** `BRPMC Step 4-b`'s `FuelSupplyAdjustment` query and
-//!   `BRPMC Step 6` use MariaDB `INNER JOIN`s with no `ON` clause — i.e.
-//!   cross joins. The port iterates the cartesian product directly. In
-//!   `Step 6` the cross-joined `Link` table is extract-filtered to the
-//!   iteration's single link, so it normally contributes exactly one row.
+//! `BRPMC Step 6` use MariaDB `INNER JOIN`s with no `ON` clause — i.e.
+//! cross joins. The port iterates the cartesian product directly. In
+//! `Step 6` the cross-joined `Link` table is extract-filtered to the
+//! iteration's single link, so it normally contributes exactly one row.
 //! * **Sum order.** Steps 1, 2 and 4-b sum `f64` values; the SQL `GROUP BY`
-//!   carries `ORDER BY NULL`, leaving the accumulation order undefined. The
-//!   port accumulates in input-row order, which is deterministic for a fixed
-//!   input. Any divergence from MariaDB's order is within the tolerance the
-//!   migration plan already accepts for unordered floating-point sums.
+//! carries `ORDER BY NULL`, leaving the accumulation order undefined. The
+//! port accumulates in input-row order, which is deterministic for a fixed
+//! input. Any divergence from MariaDB's order is within the tolerance the
+//! already accepts for unordered floating-point sums.
 //!
 //! # Chain metadata — a superseded calculator
 //!
 //! `BasicRunningPMEmissionCalculator` is a **legacy calculator superseded by
-//! `BaseRateCalculator`** (migration-plan Task 45). The modern base-rate
+//! `BaseRateCalculator`** (). The modern base-rate
 //! methodology produces the same running-exhaust PM2.5 output, so a current
 //! MOVES run wires `BaseRateCalculator`, not this calculator: its
 //! `ModuleName` is absent from `CalculatorInfo.txt`, and
@@ -121,21 +121,20 @@
 //! Consequently [`registrations`](Calculator::registrations) returns an
 //! empty slice — pollutants 112 and 118 for Running Exhaust are registered
 //! to `BaseRateCalculator`, and returning them here too would double-register
-//! the pairs. The DAG still records a single subscription —
-//! `subscribes_directly: true`, granularity `YEAR`, priority
+//! the pairs. The DAG still records a single subscription//! `subscribes_directly: true`, granularity `YEAR`, priority
 //! `EMISSION_CALCULATOR` — but with a placeholder `process_id` of `0`, since
 //! the static analyser could see the Java but not resolve the `polProcessID`
 //! strings to a process. [`subscriptions`](Calculator::subscriptions)
 //! resolves them: both `11801` and `11201` decode to process 1. See each
 //! trait method's doc comment for the derivation.
 //!
-//! # Data plane (Task 50)
+//! # Data plane
 //!
 //! [`Calculator::execute`] is a shell: its [`CalculatorContext`] exposes only
-//! the Phase 2 placeholder `ExecutionTables` / `ScratchNamespace`, which have
+//! the placeholder `ExecutionTables` / `ScratchNamespace`, which have
 //! no row storage. The faithful pipeline is
 //! [`BasicRunningPmEmissionCalculator::run`], fully unit-tested. Once the
-//! `DataFrameStore` (migration-plan Task 50) lands, `execute` materialises a
+//! `DataFrameStore` () lands, `execute` materialises a
 //! [`BasicRunningPmInputs`] and a [`RunContext`] from the context, calls
 //! `run`, and writes the [`MovesWorkerOutputRow`]s back.
 
@@ -174,52 +173,52 @@ const REFERENCE_TEMPERATURE_F: f64 = 72.0;
 /// One `OpModeDistribution` row — the operating-mode fractions.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OpModeDistributionRow {
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `hourDayID`.
+ /// `hourDayID`.
     pub hour_day_id: i32,
-    /// `polProcessID`.
+ /// `polProcessID`.
     pub pol_process_id: i32,
-    /// `opModeID`.
+ /// `opModeID`.
     pub op_mode_id: i32,
-    /// `opModeFraction` — the fraction of activity in this operating mode.
+ /// `opModeFraction` — the fraction of activity in this operating mode.
     pub op_mode_fraction: f64,
 }
 
 /// One `EmissionRateByAge` row — the age-resolved base emission rates.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct EmissionRateByAgeRow {
-    /// `polProcessID`.
+ /// `polProcessID`.
     pub pol_process_id: i32,
-    /// `opModeID`.
+ /// `opModeID`.
     pub op_mode_id: i32,
-    /// `sourceBinID`.
+ /// `sourceBinID`.
     pub source_bin_id: i64,
-    /// `ageGroupID`.
+ /// `ageGroupID`.
     pub age_group_id: i32,
-    /// `meanBaseRate` — the base emission rate.
+ /// `meanBaseRate` — the base emission rate.
     pub mean_base_rate: f64,
 }
 
 /// One `SourceBinDistribution` row — the source-bin activity fractions.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceBinDistributionRow {
-    /// `polProcessID`.
+ /// `polProcessID`.
     pub pol_process_id: i32,
-    /// `sourceBinID`.
+ /// `sourceBinID`.
     pub source_bin_id: i64,
-    /// `sourceTypeModelYearID`.
+ /// `sourceTypeModelYearID`.
     pub source_type_model_year_id: i32,
-    /// `sourceBinActivityFraction` — the fraction of activity in this bin.
+ /// `sourceBinActivityFraction` — the fraction of activity in this bin.
     pub source_bin_activity_fraction: f64,
 }
 
 /// One `AgeCategory` row — maps an age group to its representative age.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AgeCategoryRow {
-    /// `ageGroupID`.
+ /// `ageGroupID`.
     pub age_group_id: i32,
-    /// `ageID` — the age in years; `modelYear = runYear − ageID`.
+ /// `ageID` — the age in years; `modelYear = runYear − ageID`.
     pub age_id: i32,
 }
 
@@ -227,22 +226,22 @@ pub struct AgeCategoryRow {
 /// key to its source type and model year.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceTypeModelYearRow {
-    /// `sourceTypeModelYearID`.
+ /// `sourceTypeModelYearID`.
     pub source_type_model_year_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `modelYearID`.
+ /// `modelYearID`.
     pub model_year_id: i32,
 }
 
 /// One `PollutantProcessModelYear` row — the model-year-group mapping.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PollutantProcessModelYearRow {
-    /// `polProcessID`.
+ /// `polProcessID`.
     pub pol_process_id: i32,
-    /// `modelYearID`.
+ /// `modelYearID`.
     pub model_year_id: i32,
-    /// `modelYearGroupID`.
+ /// `modelYearGroupID`.
     pub model_year_group_id: i32,
 }
 
@@ -250,77 +249,77 @@ pub struct PollutantProcessModelYearRow {
 /// group.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceBinRow {
-    /// `sourceBinID`.
+ /// `sourceBinID`.
     pub source_bin_id: i64,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `modelYearGroupID`.
+ /// `modelYearGroupID`.
     pub model_year_group_id: i32,
 }
 
 /// One `SHO` row — source-hours-operating activity.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ShoRow {
-    /// `hourDayID`.
+ /// `hourDayID`.
     pub hour_day_id: i32,
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `ageID`.
+ /// `ageID`.
     pub age_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `SHO` — the source-hours-operating quantity.
+ /// `SHO` — the source-hours-operating quantity.
     pub sho: f64,
 }
 
 /// One `FuelSupply` row — the per-fuel-formulation market shares.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FuelSupplyRow {
-    /// `fuelFormulationID`.
+ /// `fuelFormulationID`.
     pub fuel_formulation_id: i32,
-    /// `fuelYearID`.
+ /// `fuelYearID`.
     pub fuel_year_id: i32,
-    /// `monthGroupID`.
+ /// `monthGroupID`.
     pub month_group_id: i32,
-    /// `marketShare` — the formulation's share of the supply.
+ /// `marketShare` — the formulation's share of the supply.
     pub market_share: f64,
 }
 
 /// One `FuelFormulation` row — maps a formulation to its fuel subtype.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FuelFormulationRow {
-    /// `fuelFormulationID`.
+ /// `fuelFormulationID`.
     pub fuel_formulation_id: i32,
-    /// `fuelSubTypeID`.
+ /// `fuelSubTypeID`.
     pub fuel_sub_type_id: i32,
 }
 
 /// One `FuelSubType` row — maps a fuel subtype to its fuel type.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FuelSubTypeRow {
-    /// `fuelSubTypeID`.
+ /// `fuelSubTypeID`.
     pub fuel_sub_type_id: i32,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
 }
 
 /// One `MonthOfAnyYear` row — maps a month to its month group.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MonthOfAnyYearRow {
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `monthGroupID`.
+ /// `monthGroupID`.
     pub month_group_id: i32,
 }
 
 /// One `Year` row — maps a calendar year to its fuel year.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct YearRow {
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `fuelYearID`.
+ /// `fuelYearID`.
     pub fuel_year_id: i32,
 }
 
@@ -328,16 +327,16 @@ pub struct YearRow {
 /// adjustment blends GPA and non-GPA fuel-effect ratios with.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CountyRow {
-    /// `countyID`.
+ /// `countyID`.
     pub county_id: i32,
-    /// `GPAFract` — the fraction of the county inside the GPA region.
+ /// `GPAFract` — the fraction of the county inside the GPA region.
     pub gpa_fract: f64,
 }
 
 /// One `RunSpecSourceType` row — a source type selected by the RunSpec.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RunSpecSourceTypeRow {
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
 }
 
@@ -346,36 +345,36 @@ pub struct RunSpecSourceTypeRow {
 /// sourceType)` combination through its model-year and age ranges.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GeneralFuelRatioRow {
-    /// `fuelFormulationID`.
+ /// `fuelFormulationID`.
     pub fuel_formulation_id: i32,
-    /// `polProcessID`.
+ /// `polProcessID`.
     pub pol_process_id: i32,
-    /// `minModelYearID` — inclusive lower bound of the model-year range.
+ /// `minModelYearID` — inclusive lower bound of the model-year range.
     pub min_model_year_id: i32,
-    /// `maxModelYearID` — inclusive upper bound of the model-year range.
+ /// `maxModelYearID` — inclusive upper bound of the model-year range.
     pub max_model_year_id: i32,
-    /// `minAgeID` — inclusive lower bound of the age range.
+ /// `minAgeID` — inclusive lower bound of the age range.
     pub min_age_id: i32,
-    /// `maxAgeID` — inclusive upper bound of the age range.
+ /// `maxAgeID` — inclusive upper bound of the age range.
     pub max_age_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `fuelEffectRatio` — the non-GPA fuel-effect ratio; `None` (SQL `NULL`)
-    /// is treated as `1` by the `ifnull(…, 1)` in the SQL.
+ /// `fuelEffectRatio` — the non-GPA fuel-effect ratio; `None` (SQL `NULL`)
+ /// is treated as `1` by the `ifnull(…, 1)` in the SQL.
     pub fuel_effect_ratio: Option<f64>,
-    /// `fuelEffectRatioGPA` — the GPA fuel-effect ratio; `None` (SQL `NULL`)
-    /// is likewise treated as `1`.
+ /// `fuelEffectRatioGPA` — the GPA fuel-effect ratio; `None` (SQL `NULL`)
+ /// is likewise treated as `1`.
     pub fuel_effect_ratio_gpa: Option<f64>,
 }
 
 /// One `HourDay` row — splits an hour-day surrogate into its day and hour.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HourDayRow {
-    /// `hourDayID`.
+ /// `hourDayID`.
     pub hour_day_id: i32,
-    /// `dayID`.
+ /// `dayID`.
     pub day_id: i32,
-    /// `hourID`.
+ /// `hourID`.
     pub hour_id: i32,
 }
 
@@ -383,11 +382,11 @@ pub struct HourDayRow {
 /// iteration's zone.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ZoneMonthHourRow {
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `hourID`.
+ /// `hourID`.
     pub hour_id: i32,
-    /// `temperature` — the ambient temperature, °F.
+ /// `temperature` — the ambient temperature, °F.
     pub temperature: f64,
 }
 
@@ -395,19 +394,19 @@ pub struct ZoneMonthHourRow {
 /// temperature-correction term.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TemperatureAdjustmentRow {
-    /// `polProcessID`.
+ /// `polProcessID`.
     pub pol_process_id: i32,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `minModelYearID` — inclusive lower bound of the model-year range.
+ /// `minModelYearID` — inclusive lower bound of the model-year range.
     pub min_model_year_id: i32,
-    /// `maxModelYearID` — inclusive upper bound of the model-year range.
+ /// `maxModelYearID` — inclusive upper bound of the model-year range.
     pub max_model_year_id: i32,
-    /// `tempAdjustTermA` — the exponential coefficient. `None` (SQL `NULL`)
-    /// makes the `exp(…)` `NULL`, which the SQL `coalesce` falls back from to
-    /// the unadjusted quantity. The `ApplyLinearTemperatureAdjustment`
-    /// section's `tempAdjustTermB` is not modelled — that section is not in
-    /// this calculator's selection.
+ /// `tempAdjustTermA` — the exponential coefficient. `None` (SQL `NULL`)
+ /// makes the `exp(…)` `NULL`, which the SQL `coalesce` falls back from to
+ /// the unadjusted quantity. The `ApplyLinearTemperatureAdjustment`
+ /// section's `tempAdjustTermB` is not modelled — that section is not in
+ /// this calculator's selection.
     pub temp_adjust_term_a: Option<f64>,
 }
 
@@ -415,20 +414,20 @@ pub struct TemperatureAdjustmentRow {
 /// pollutant and process.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PollutantProcessAssocRow {
-    /// `polProcessID`.
+ /// `polProcessID`.
     pub pol_process_id: i32,
-    /// `pollutantID`.
+ /// `pollutantID`.
     pub pollutant_id: i32,
-    /// `processID`.
+ /// `processID`.
     pub process_id: i32,
 }
 
 /// One `Link` row — carries the road type stamped onto the output.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LinkRow {
-    /// `linkID`.
+ /// `linkID`.
     pub link_id: i32,
-    /// `roadTypeID`.
+ /// `roadTypeID`.
     pub road_type_id: i32,
 }
 
@@ -436,17 +435,17 @@ pub struct LinkRow {
 /// calendar year and the iteration geography.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct RunContext {
-    /// `##context.year##` — the run's calendar year. `modelYear` is derived
-    /// from it as `year − age`.
+ /// `##context.year##` — the run's calendar year. `modelYear` is derived
+ /// from it as `year − age`.
     pub year: i32,
-    /// `##context.iterLocation.stateRecordID##` — stamped onto the output.
+ /// `##context.iterLocation.stateRecordID##` — stamped onto the output.
     pub state_id: i32,
-    /// `##context.iterLocation.countyRecordID##` — stamped onto the output
-    /// and used as the `FuelSupplyWithFuelType.countyID` literal.
+ /// `##context.iterLocation.countyRecordID##` — stamped onto the output
+ /// and used as the `FuelSupplyWithFuelType.countyID` literal.
     pub county_id: i32,
-    /// `##context.iterLocation.zoneRecordID##` — stamped onto the output.
+ /// `##context.iterLocation.zoneRecordID##` — stamped onto the output.
     pub zone_id: i32,
-    /// `##context.iterLocation.linkRecordID##` — stamped onto the output.
+ /// `##context.iterLocation.linkRecordID##` — stamped onto the output.
     pub link_id: i32,
 }
 
@@ -455,47 +454,47 @@ pub struct RunContext {
 /// script's "Extract Data" section would have loaded.
 #[derive(Debug, Clone, Default)]
 pub struct BasicRunningPmInputs {
-    /// `OpModeDistribution`.
+ /// `OpModeDistribution`.
     pub op_mode_distribution: Vec<OpModeDistributionRow>,
-    /// `EmissionRateByAge`.
+ /// `EmissionRateByAge`.
     pub emission_rate_by_age: Vec<EmissionRateByAgeRow>,
-    /// `SourceBinDistribution`.
+ /// `SourceBinDistribution`.
     pub source_bin_distribution: Vec<SourceBinDistributionRow>,
-    /// `AgeCategory`.
+ /// `AgeCategory`.
     pub age_category: Vec<AgeCategoryRow>,
-    /// `SourceTypeModelYear`.
+ /// `SourceTypeModelYear`.
     pub source_type_model_year: Vec<SourceTypeModelYearRow>,
-    /// `PollutantProcessModelYear`.
+ /// `PollutantProcessModelYear`.
     pub pollutant_process_model_year: Vec<PollutantProcessModelYearRow>,
-    /// `SourceBin`.
+ /// `SourceBin`.
     pub source_bin: Vec<SourceBinRow>,
-    /// `SHO` — source-hours-operating activity.
+ /// `SHO` — source-hours-operating activity.
     pub sho: Vec<ShoRow>,
-    /// `FuelSupply`.
+ /// `FuelSupply`.
     pub fuel_supply: Vec<FuelSupplyRow>,
-    /// `FuelFormulation`.
+ /// `FuelFormulation`.
     pub fuel_formulation: Vec<FuelFormulationRow>,
-    /// `FuelSubType`.
+ /// `FuelSubType`.
     pub fuel_sub_type: Vec<FuelSubTypeRow>,
-    /// `MonthOfAnyYear`.
+ /// `MonthOfAnyYear`.
     pub month_of_any_year: Vec<MonthOfAnyYearRow>,
-    /// `Year`.
+ /// `Year`.
     pub year: Vec<YearRow>,
-    /// `County`.
+ /// `County`.
     pub county: Vec<CountyRow>,
-    /// `RunSpecSourceType`.
+ /// `RunSpecSourceType`.
     pub run_spec_source_type: Vec<RunSpecSourceTypeRow>,
-    /// `generalFuelRatio`.
+ /// `generalFuelRatio`.
     pub general_fuel_ratio: Vec<GeneralFuelRatioRow>,
-    /// `HourDay`.
+ /// `HourDay`.
     pub hour_day: Vec<HourDayRow>,
-    /// `ZoneMonthHour`.
+ /// `ZoneMonthHour`.
     pub zone_month_hour: Vec<ZoneMonthHourRow>,
-    /// `TemperatureAdjustment`.
+ /// `TemperatureAdjustment`.
     pub temperature_adjustment: Vec<TemperatureAdjustmentRow>,
-    /// `PollutantProcessAssoc`.
+ /// `PollutantProcessAssoc`.
     pub pollutant_process_assoc: Vec<PollutantProcessAssocRow>,
-    /// `Link`.
+ /// `Link`.
     pub link: Vec<LinkRow>,
 }
 
@@ -504,35 +503,35 @@ pub struct BasicRunningPmInputs {
 /// produces.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MovesWorkerOutputRow {
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `dayID`.
+ /// `dayID`.
     pub day_id: i32,
-    /// `hourID`.
+ /// `hourID`.
     pub hour_id: i32,
-    /// `stateID`.
+ /// `stateID`.
     pub state_id: i32,
-    /// `countyID`.
+ /// `countyID`.
     pub county_id: i32,
-    /// `zoneID`.
+ /// `zoneID`.
     pub zone_id: i32,
-    /// `linkID`.
+ /// `linkID`.
     pub link_id: i32,
-    /// `pollutantID` — 112 (elemental carbon) or 118 (composite non-EC).
+ /// `pollutantID` — 112 (elemental carbon) or 118 (composite non-EC).
     pub pollutant_id: i32,
-    /// `processID` — always 1 (Running Exhaust) for this calculator.
+ /// `processID` — always 1 (Running Exhaust) for this calculator.
     pub process_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `modelYearID`.
+ /// `modelYearID`.
     pub model_year_id: i32,
-    /// `roadTypeID`.
+ /// `roadTypeID`.
     pub road_type_id: i32,
-    /// `emissionQuant` — the temperature- and fuel-adjusted emission quantity.
+ /// `emissionQuant` — the temperature- and fuel-adjusted emission quantity.
     pub emission_quant: f64,
 }
 
@@ -654,7 +653,7 @@ fn ifnull_one(value: Option<f64>) -> f64 {
 /// per-operating-mode `opModeFraction · meanBaseRate` products are summed by
 /// `(hourDay, sourceType, sourceBin, ageGroup, polProcess)`.
 fn step1_op_mode_weighted(inputs: &BasicRunningPmInputs, year: i32) -> Vec<OpModeWeightedRate> {
-    /// Group key — every dimension the sum is bucketed by.
+ /// Group key — every dimension the sum is bucketed by.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
     struct Key {
         hour_day_id: i32,
@@ -696,8 +695,8 @@ fn step1_op_mode_weighted(inputs: &BasicRunningPmInputs, year: i32) -> Vec<OpMod
                             age_group_id: er.age_group_id,
                             pol_process_id: omd.pol_process_id,
                         };
-                        // `SELECT DISTINCT`: a join chain that re-emits the
-                        // exact same six-column row contributes once.
+ // `SELECT DISTINCT`: a join chain that re-emits the
+ // exact same six-column row contributes once.
                         if seen.insert((
                             key.hour_day_id,
                             key.source_type_id,
@@ -706,7 +705,7 @@ fn step1_op_mode_weighted(inputs: &BasicRunningPmInputs, year: i32) -> Vec<OpMod
                             key.pol_process_id,
                             value.to_bits(),
                         )) {
-                            *weighted.entry(key).or_insert(0.0) += value;
+ *weighted.entry(key).or_insert(0.0) += value;
                         }
                     }
                 }
@@ -738,7 +737,7 @@ fn step2_fully_weighted(
     year: i32,
     op_mode_weighted: &[OpModeWeightedRate],
 ) -> Vec<FullyWeightedRate> {
-    /// Group key for the source-bin weighting sum.
+ /// Group key for the source-bin weighting sum.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
     struct Key {
         hour_day_id: i32,
@@ -781,7 +780,7 @@ fn step2_fully_weighted(
                                 continue;
                             }
                             let value = sbd.source_bin_activity_fraction
-                                * omer.op_mode_weighted_mean_base_rate;
+ * omer.op_mode_weighted_mean_base_rate;
                             let key = Key {
                                 hour_day_id: omer.hour_day_id,
                                 source_type_id: omer.source_type_id,
@@ -790,7 +789,7 @@ fn step2_fully_weighted(
                                 pol_process_id: omer.pol_process_id,
                                 age_id: acat.age_id,
                             };
-                            *weighted.entry(key).or_insert(0.0) += value;
+ *weighted.entry(key).or_insert(0.0) += value;
                         }
                     }
                 }
@@ -904,7 +903,7 @@ fn fuel_supply_adjustment(
     year: i32,
     fuel_supply_with_fuel_type: &[FuelSupplyWithFuelType],
 ) -> Vec<FuelSupplyAdjustment> {
-    /// Group key for the fuel-adjustment sum.
+ /// Group key for the fuel-adjustment sum.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
     struct Key {
         year_id: i32,
@@ -922,8 +921,8 @@ fn fuel_supply_adjustment(
             let age = year - ppmy.model_year_id;
             for fsft in fuel_supply_with_fuel_type {
                 for rst in &inputs.run_spec_source_type {
-                    // LEFT JOIN generalFuelRatio: collect every matching row;
-                    // an empty match still contributes one term (ratios = 1).
+ // LEFT JOIN generalFuelRatio: collect every matching row;
+ // an empty match still contributes one term (ratios = 1).
                     let mut matched_any = false;
                     let mut accumulate = |gfr: Option<&GeneralFuelRatioRow>| {
                         let ratio = ifnull_one(gfr.and_then(|g| g.fuel_effect_ratio));
@@ -937,7 +936,7 @@ fn fuel_supply_adjustment(
                             source_type_id: rst.source_type_id,
                             fuel_type_id: fsft.fuel_type_id,
                         };
-                        *adjustment.entry(key).or_insert(0.0) += blended * fsft.market_share;
+ *adjustment.entry(key).or_insert(0.0) += blended * fsft.market_share;
                     };
                     for gfr in &inputs.general_fuel_ratio {
                         if gfr.fuel_formulation_id == fsft.fuel_formulation_id
@@ -1008,12 +1007,12 @@ fn step4_fuel_adjusted(
             {
                 continue;
             }
-            // The SQL `coalesce(f.fuelAdjustment * q, q)` guards a NULL
-            // `fuelAdjustment`. `fuelAdjustment` is a `SUM` over a non-empty
-            // cross-join group, so it is never NULL here; the product is the
-            // adjusted quantity.
+ // The SQL `coalesce(f.fuelAdjustment * q, q)` guards a NULL
+ // `fuelAdjustment`. `fuelAdjustment` is a `SUM` over a non-empty
+ // cross-join group, so it is never NULL here; the product is the
+ // adjusted quantity.
             let emission_quant = f.fuel_adjustment * u.unadjusted_emission_quant;
-            // `SELECT DISTINCT` over the seven id columns and the quantity.
+ // `SELECT DISTINCT` over the seven id columns and the quantity.
             if seen.insert((
                 u.year_id,
                 u.month_id,
@@ -1062,7 +1061,7 @@ fn step5_temperature_adjusted(
                 if zmh.month_id != u.month_id || zmh.hour_id != hd.hour_id {
                     continue;
                 }
-                // LEFT JOIN TemperatureAdjustment, model-year in range.
+ // LEFT JOIN TemperatureAdjustment, model-year in range.
                 let mut matched_any = false;
                 let mut emit = |term_a: Option<f64>| {
                     let emission_quant =
@@ -1090,8 +1089,8 @@ fn step5_temperature_adjusted(
                     }
                 }
                 if !matched_any {
-                    // No TemperatureAdjustment row: the SQL CASE falls to its
-                    // ELSE 0, `exp(0) = 1`, quantity unchanged.
+ // No TemperatureAdjustment row: the SQL CASE falls to its
+ // ELSE 0, `exp(0) = 1`, quantity unchanged.
                     emit(None);
                 }
             }
@@ -1110,11 +1109,11 @@ fn temperature_adjusted_quant(quant: f64, temperature: f64, term_a: Option<f64>)
     if temperature <= REFERENCE_TEMPERATURE_F {
         match term_a {
             Some(a) => quant * (a * (REFERENCE_TEMPERATURE_F - temperature)).exp(),
-            // `exp(NULL)` is NULL; `coalesce` yields the unadjusted quantity.
+ // `exp(NULL)` is NULL; `coalesce` yields the unadjusted quantity.
             None => quant,
         }
     } else {
-        // Above 72 °F the CASE is `ELSE 0`; `exp(0) = 1`.
+ // Above 72 °F the CASE is `ELSE 0`; `exp(0) = 1`.
         quant
     }
 }
@@ -1186,21 +1185,21 @@ fn output_sort_key(row: &MovesWorkerOutputRow) -> (i32, i32, i32, i32, i32, i32,
 pub struct BasicRunningPmEmissionCalculator;
 
 impl BasicRunningPmEmissionCalculator {
-    /// Chain-DAG name — matches the Java class and the `calculator-dag.json`
-    /// entry.
+ /// Chain-DAG name — matches the Java class and the `calculator-dag.json`
+ /// entry.
     pub const NAME: &'static str = CALCULATOR_NAME;
 
-    /// Construct the calculator.
+ /// Construct the calculator.
     #[must_use]
     pub fn new() -> Self {
         Self
     }
 
-    /// Run the six-step `BasicPM25Calculator.sql` processing pipeline over a
-    /// fully materialised set of input tables.
-    ///
-    /// Returns the emission rows in the structure of `MOVESWorkerOutput`,
-    /// sorted by their integer dimension columns for deterministic output.
+ /// Run the six-step `BasicPM25Calculator.sql` processing pipeline over a
+ /// fully materialised set of input tables.
+ ///
+ /// Returns the emission rows in the structure of `MOVESWorkerOutput`,
+ /// sorted by their integer dimension columns for deterministic output.
     #[must_use]
     pub fn run(
         &self,
@@ -2870,19 +2869,19 @@ impl Calculator for BasicRunningPmEmissionCalculator {
         subscriptions()
     }
 
-    /// Empty — `BasicRunningPMEmissionCalculator` is a legacy calculator
-    /// superseded by `BaseRateCalculator` (migration-plan Task 45).
-    ///
-    /// The Java `GenericCalculatorBase` constructor's `polProcessID` array
-    /// `{ "11801", "11201" }` would register the calculator for elemental
-    /// carbon PM2.5 (112) and composite non-EC PM2.5 (118), both for Running
-    /// Exhaust (process 1). But `BaseRateCalculator` already registers those
-    /// two pairs — pollutants 112 and 118 are in its exhaust-pollutant set,
-    /// process 1 in its process set — so a current MOVES run produces this
-    /// output through the base-rate path, and `calculator-dag.json` records
-    /// `registrations_count: 0` here. Returning the pairs would double-register
-    /// them against `BaseRateCalculator`; this method returns the empty slice
-    /// the trait permits.
+ /// Empty — `BasicRunningPMEmissionCalculator` is a legacy calculator
+ /// superseded by `BaseRateCalculator` ().
+ ///
+ /// The Java `GenericCalculatorBase` constructor's `polProcessID` array
+ /// `{ "11801", "11201" }` would register the calculator for elemental
+ /// carbon PM2.5 (112) and composite non-EC PM2.5 (118), both for Running
+ /// Exhaust (process 1). But `BaseRateCalculator` already registers those
+ /// two pairs — pollutants 112 and 118 are in its exhaust-pollutant set,
+ /// process 1 in its process set — so a current MOVES run produces this
+ /// output through the base-rate path, and `calculator-dag.json` records
+ /// `registrations_count: 0` here. Returning the pairs would double-register
+ /// them against `BaseRateCalculator`; this method returns the empty slice
+ /// the trait permits.
     fn registrations(&self) -> &[PollutantProcessAssociation] {
         NO_REGISTRATIONS
     }
@@ -2937,10 +2936,10 @@ pub fn factory() -> Box<dyn moves_framework::Calculator> {
 mod tests {
     use super::*;
 
-    /// Build the minimal input set that carries one emission through all six
-    /// steps. One operating mode, one source bin, one age, one fuel type, one
-    /// month/hour — so each step's join resolves to a single row and the
-    /// arithmetic can be checked by hand.
+ /// Build the minimal input set that carries one emission through all six
+ /// steps. One operating mode, one source bin, one age, one fuel type, one
+ /// month/hour — so each step's join resolves to a single row and the
+ /// arithmetic can be checked by hand.
     fn single_path_inputs() -> (BasicRunningPmInputs, RunContext) {
         let ctx = RunContext {
             year: 2020,
@@ -3063,7 +3062,7 @@ mod tests {
         let calc = BasicRunningPmEmissionCalculator::new();
         let subs = calc.subscriptions();
         assert_eq!(subs.len(), 1);
-        // Both Java `polProcessID` strings decode to process 1.
+ // Both Java `polProcessID` strings decode to process 1.
         assert_eq!(subs[0].process_id, ProcessId(1));
         assert_eq!(subs[0].granularity, Granularity::Year);
         assert_eq!(subs[0].priority.display(), "EMISSION_CALCULATOR");
@@ -3071,9 +3070,9 @@ mod tests {
 
     #[test]
     fn registrations_are_empty_superseded_by_base_rate_calculator() {
-        // A legacy calculator superseded by BaseRateCalculator: its (112, 1)
-        // and (118, 1) pairs are registered to BaseRateCalculator, so this
-        // calculator registers nothing to avoid double-registration.
+ // A legacy calculator superseded by BaseRateCalculator: its (112, 1)
+ // and (118, 1) pairs are registered to BaseRateCalculator, so this
+ // calculator registers nothing to avoid double-registration.
         let calc = BasicRunningPmEmissionCalculator::new();
         assert!(calc.registrations().is_empty());
     }
@@ -3206,11 +3205,11 @@ mod tests {
 
     #[test]
     fn single_path_carries_one_emission_through_all_six_steps() {
-        // Step 1: opModeFraction(0.5) * meanBaseRate(4.0)        = 2.0
-        // Step 2: sourceBinActivityFraction(0.5) * 2.0           = 1.0
-        // Step 3: fullyWeightedMeanBaseRate(1.0) * SHO(10.0)     = 10.0
-        // Step 4: no generalFuelRatio match, gpaFract 0 → ratio 1, *10.0 = 10.0
-        // Step 5: temperature 80 °F > 72 °F → no scaling         = 10.0
+ // Step 1: opModeFraction(0.5) * meanBaseRate(4.0) = 2.0
+ // Step 2: sourceBinActivityFraction(0.5) * 2.0 = 1.0
+ // Step 3: fullyWeightedMeanBaseRate(1.0) * SHO(10.0) = 10.0
+ // Step 4: no generalFuelRatio match, gpaFract 0 → ratio 1, *10.0 = 10.0
+ // Step 5: temperature 80 °F > 72 °F → no scaling = 10.0
         let calc = BasicRunningPmEmissionCalculator::new();
         let (inputs, ctx) = single_path_inputs();
         let out = calc.run(&inputs, &ctx);
@@ -3225,7 +3224,7 @@ mod tests {
         assert_eq!(row.day_id, 5);
         assert_eq!(row.hour_id, 20);
         assert_eq!(row.road_type_id, 4);
-        // Geography is stamped from the RunContext.
+ // Geography is stamped from the RunContext.
         assert_eq!(row.state_id, 26);
         assert_eq!(row.county_id, 26161);
         assert_eq!(row.zone_id, 261_610);
@@ -3234,8 +3233,8 @@ mod tests {
 
     #[test]
     fn temperature_below_reference_scales_the_quantity_up() {
-        // temperature 62 °F ≤ 72 °F, with a TemperatureAdjustment row:
-        // factor = exp(tempAdjustTermA * (72 - 62)) = exp(0.01 * 10).
+ // temperature 62 °F ≤ 72 °F, with a TemperatureAdjustment row:
+ // factor = exp(tempAdjustTermA * (72 - 62)) = exp(0.01 * 10).
         let calc = BasicRunningPmEmissionCalculator::new();
         let (mut inputs, ctx) = single_path_inputs();
         inputs.zone_month_hour[0].temperature = 62.0;
@@ -3254,8 +3253,8 @@ mod tests {
 
     #[test]
     fn temperature_adjustment_outside_model_year_range_does_not_apply() {
-        // The model year (2015) falls outside the TemperatureAdjustment
-        // range, so the left join misses and the quantity is unchanged.
+ // The model year (2015) falls outside the TemperatureAdjustment
+ // range, so the left join misses and the quantity is unchanged.
         let calc = BasicRunningPmEmissionCalculator::new();
         let (mut inputs, ctx) = single_path_inputs();
         inputs.zone_month_hour[0].temperature = 62.0;
@@ -3273,8 +3272,8 @@ mod tests {
 
     #[test]
     fn fuel_adjustment_blends_gpa_and_non_gpa_ratios() {
-        // gpaFract 0.25, fuelEffectRatio 2.0, fuelEffectRatioGPA 6.0:
-        // blended = 2.0 + 0.25 * (6.0 - 2.0) = 3.0; emission 10.0 → 30.0.
+ // gpaFract 0.25, fuelEffectRatio 2.0, fuelEffectRatioGPA 6.0:
+ // blended = 2.0 + 0.25 * (6.0 - 2.0) = 3.0; emission 10.0 → 30.0.
         let calc = BasicRunningPmEmissionCalculator::new();
         let (mut inputs, ctx) = single_path_inputs();
         inputs.county[0].gpa_fract = 0.25;
@@ -3296,10 +3295,10 @@ mod tests {
 
     #[test]
     fn op_mode_weighting_sums_over_operating_modes() {
-        // Two operating modes contribute to the same source bin / age; their
-        // opModeFraction * meanBaseRate products sum in BRPMC Step 1.
-        // mode 300: 0.5 * 4.0 = 2.0;  mode 301: 0.5 * 8.0 = 4.0;  sum = 6.0.
-        // Step 2: 0.5 * 6.0 = 3.0;  Step 3: 3.0 * 10.0 = 30.0.
+ // Two operating modes contribute to the same source bin / age; their
+ // opModeFraction * meanBaseRate products sum in BRPMC Step 1.
+ // mode 300: 0.5 * 4.0 = 2.0; mode 301: 0.5 * 8.0 = 4.0; sum = 6.0.
+ // Step 2: 0.5 * 6.0 = 3.0; Step 3: 3.0 * 10.0 = 30.0.
         let calc = BasicRunningPmEmissionCalculator::new();
         let (mut inputs, ctx) = single_path_inputs();
         inputs.op_mode_distribution.push(OpModeDistributionRow {
@@ -3323,13 +3322,12 @@ mod tests {
 
     #[test]
     fn step1_distinct_collapses_source_bin_join_multiplicity() {
-        // One (operating mode, rate) pair reaches the BRPMC Step 1 output
-        // through two SourceBinDistribution → SourceTypeModelYear chains —
-        // two source-type-model-year surrogates that resolve to the same
-        // model year. Both chains emit the identical six-column row; the
-        // SourceBinDistribution / SourceTypeModelYear columns are not among
-        // the six, so `SELECT DISTINCT` collapses the pair and the rate is
-        // summed exactly once.
+ // One (operating mode, rate) pair reaches the BRPMC Step 1 output
+ // through two SourceBinDistribution → SourceTypeModelYear chains // two source-type-model-year surrogates that resolve to the same
+ // model year. Both chains emit the identical six-column row; the
+ // SourceBinDistribution / SourceTypeModelYear columns are not among
+ // the six, so `SELECT DISTINCT` collapses the pair and the rate is
+ // summed exactly once.
         let inputs = BasicRunningPmInputs {
             op_mode_distribution: vec![OpModeDistributionRow {
                 source_type_id: 21,
@@ -3379,25 +3377,25 @@ mod tests {
         };
         let weighted = step1_op_mode_weighted(&inputs, 2020);
         assert_eq!(weighted.len(), 1);
-        // opModeFraction(0.5) * meanBaseRate(4.0) = 2.0, counted once.
+ // opModeFraction(0.5) * meanBaseRate(4.0) = 2.0, counted once.
         assert!((weighted[0].op_mode_weighted_mean_base_rate - 2.0).abs() < 1e-12);
     }
 
     #[test]
     fn temperature_adjusted_quant_handles_the_three_cases() {
-        // Above the reference temperature: identity.
+ // Above the reference temperature: identity.
         assert!((temperature_adjusted_quant(10.0, 80.0, Some(0.01)) - 10.0).abs() < 1e-12);
-        // At or below, with a coefficient: exponential scaling.
+ // At or below, with a coefficient: exponential scaling.
         let expected = 10.0 * (0.01_f64 * (72.0 - 60.0)).exp();
         assert!((temperature_adjusted_quant(10.0, 60.0, Some(0.01)) - expected).abs() < 1e-9);
-        // At or below, but a NULL coefficient: `exp(NULL)` → coalesce → q.
+ // At or below, but a NULL coefficient: `exp(NULL)` → coalesce → q.
         assert!((temperature_adjusted_quant(10.0, 60.0, None) - 10.0).abs() < 1e-12);
     }
 
     #[test]
     fn no_running_exhaust_activity_yields_no_rows() {
-        // Drop the SHO activity: BRPMC Step 3 produces nothing, so the
-        // pipeline yields no rows.
+ // Drop the SHO activity: BRPMC Step 3 produces nothing, so the
+ // pipeline yields no rows.
         let calc = BasicRunningPmEmissionCalculator::new();
         let (mut inputs, ctx) = single_path_inputs();
         inputs.sho.clear();

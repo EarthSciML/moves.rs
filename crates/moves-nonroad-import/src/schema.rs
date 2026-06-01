@@ -9,16 +9,15 @@
 //! `required` and `rule` are independent concerns:
 //!
 //! * `required: true` rejects empty cells outright. Used for primary-key
-//!   columns and `NOT NULL` columns in the DDL.
+//! columns and `NOT NULL` columns in the DDL.
 //! * `rule` constrains the *value* and is only applied when the cell is
-//!   non-empty. This keeps "nullable but non-negative when present" — a
-//!   common Nonroad pattern (`annualFractionRetrofit float DEFAULT NULL`
-//!   with a [0, 1] business rule) — expressible without a combinatorial
-//!   rule explosion.
+//! non-empty. This keeps "nullable but non-negative when present" — a
+//! common Nonroad pattern (`annualFractionRetrofit float DEFAULT NULL`
+//! with a [0, 1] business rule) — expressible without a combinatorial
+//! rule explosion.
 //!
 //! The arrow-type set is intentionally narrow (Int64 / Float64 / Utf8). The
-//! Nonroad input tables use `smallint(6)`, `int`, `float`, and `char(N)` —
-//! all of which map to one of those three. Single-character flag columns
+//! Nonroad input tables use `smallint(6)`, `int`, `float`, and `char(N)`//! all of which map to one of those three. Single-character flag columns
 //! (e.g. `NRSourceUseType.isPumpFilled char(1)`) stay Utf8 here; the
 //! downstream consumer interprets the character.
 
@@ -27,21 +26,21 @@ use arrow::datatypes::DataType;
 /// One column in a Nonroad input table.
 #[derive(Debug, Clone)]
 pub struct Column {
-    /// Column name. Case-matched against the user's CSV header and
-    /// preserved verbatim into Parquet so the schema matches the
-    /// Nonroad default-DB layout (`CreateNRDefault.sql`).
+ /// Column name. Case-matched against the user's CSV header and
+ /// preserved verbatim into Parquet so the schema matches the
+ /// Nonroad default-DB layout (`CreateNRDefault.sql`).
     pub name: &'static str,
-    /// Original MariaDB type. Carried for the manifest; not used during
-    /// conversion.
+ /// Original MariaDB type. Carried for the manifest; not used during
+ /// conversion.
     pub mysql_type: &'static str,
     pub arrow_type: DataType,
     pub primary_key: bool,
-    /// Reject NULL outright. Set on every PK column and every column
-    /// declared `NOT NULL` in the DDL.
+ /// Reject NULL outright. Set on every PK column and every column
+ /// declared `NOT NULL` in the DDL.
     pub required: bool,
-    /// Constraint applied to the *value* once parsed. Bypassed for NULL
-    /// cells (`required: false` columns can opt out of value checks
-    /// entirely by leaving the cell blank).
+ /// Constraint applied to the *value* once parsed. Bypassed for NULL
+ /// cells (`required: false` columns can opt out of value checks
+ /// entirely by leaving the cell blank).
     pub rule: Rule,
 }
 
@@ -50,15 +49,15 @@ pub struct Column {
 /// rather than strings.
 #[derive(Debug, Clone, Copy)]
 pub enum Rule {
-    /// No value constraint.
+ /// No value constraint.
     None,
-    /// Integer in `[lo, hi]` (inclusive). Used for `monthID ∈ [1, 12]`
-    /// and similar bounded identifiers.
+ /// Integer in `[lo, hi]` (inclusive). Used for `monthID ∈ [1, 12]`
+ /// and similar bounded identifiers.
     IntRange { lo: i64, hi: i64 },
-    /// Float in `[lo, hi]` (inclusive). Used for fractional columns
-    /// (`monthFraction ∈ [0, 1]`).
+ /// Float in `[lo, hi]` (inclusive). Used for fractional columns
+ /// (`monthFraction ∈ [0, 1]`).
     FloatRange { lo: f64, hi: f64 },
-    /// Numeric ≥ 0. `population`, `growthIndex`, `surrogateQuant`.
+ /// Numeric ≥ 0. `population`, `growthIndex`, `surrogateQuant`.
     NonNegative,
 }
 
@@ -82,14 +81,14 @@ pub enum CrossRowInvariant {
 /// Full table descriptor: name + columns + invariants.
 #[derive(Debug, Clone)]
 pub struct TableSchema {
-    /// Lower-case table name, matching the Nonroad default-DB convention.
+ /// Lower-case table name, matching the Nonroad default-DB convention.
     pub name: &'static str,
     pub columns: &'static [Column],
     pub invariants: &'static [CrossRowInvariant],
 }
 
 impl TableSchema {
-    /// Names of the columns flagged `primary_key: true`, in declaration order.
+ /// Names of the columns flagged `primary_key: true`, in declaration order.
     pub fn primary_key(&self) -> Vec<&'static str> {
         self.columns
             .iter()
@@ -98,7 +97,7 @@ impl TableSchema {
             .collect()
     }
 
-    /// Index of `name` in `columns`, if present.
+ /// Index of `name` in `columns`, if present.
     pub fn column_index(&self, name: &str) -> Option<usize> {
         self.columns.iter().position(|c| c.name == name)
     }

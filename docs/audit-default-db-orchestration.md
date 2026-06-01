@@ -1,7 +1,5 @@
 # Audit: Generator Completeness + `moves run --default-db` Orchestration Design
 
-*Bead: mo-znp.1 — Scopes B2 and B3 of epic mo-znp*
-
 ---
 
 ## 1. Generator Status Table
@@ -22,29 +20,28 @@
 | `StartOperatingModeDistributionGenerator` | **complete** | onroad | startsOpModeDistribution, StartsByAgeHour | Reads SampleVehicleTrip, SampleVehicleDay, OperatingMode, HourDay, Link, RunSpec tables. |
 | `TankFuelGenerator` | **complete** | onroad | AverageTankGasoline | Reads 14 tables: ZoneMonthHour (post-meteorology), FuelSupply, FuelFormulation, regionCounty. |
 | `TankTemperatureGenerator` | **complete** | onroad | ColdSoakTankTemperature, AverageTankTemperature, SoakActivityFraction, ColdSoakInitialHourFraction | Reads 9 tables including ZoneMonthHour (post-meteorology). |
-| `FuelEffectsGenerator` | **partial** | onroad | GeneralFuelRatio | Reads FuelFormulation, FuelSubtype, FuelSupply. **Missing**: ATRatio, criteriaRatio, MTBERatio (predictive/complex-model paths not yet ported). |
+| `FuelEffectsGenerator` | **partial** | onroad | GeneralFuelRatio | Reads FuelFormulation, FuelSubtype, FuelSupply. **Missing**: ATRatio, criteriaRatio, MTBERatio (predictive/complex-model paths not yet ported from the Java MOVES implementation). |
 | `MesoscaleLookupTotalActivityGenerator` | **complete** | onroad | SHO, SourceHours (mesoscale path) | Alternative to TotalActivity + allocation for mesoscale; reads Year, SourceTypeYear, Link, etc. |
 | `MesoscaleLookupOperatingModeDistributionGenerator` | **complete** | onroad | OpModeDistribution (mesoscale) | Alternative operating-mode path for mesoscale; reads DriveScheduleAssoc, AvgSpeedBin, etc. |
 | `ProjectTAG` | **stub** | onroad | (empty) | Returns `CalculatorOutput::empty()`. The test asserts this explicitly (`execute_returns_empty_output_as_stub`). Needed for project-scale runs. |
 
-**Nonroad generators** live in `crates/moves-nonroad/` and use their own Phase-5 simulation path (`run_simulation`), not the generator/calculator DAG framework. Out of scope for initial default-DB work.
+**Nonroad generators** live in `crates/moves-nonroad/` and use their own simulation path (`run_simulation`), not the generator/calculator DAG framework. Out of scope for initial default-DB work.
 
 ---
 
 ## 2. Dependency-Ordered Execution Plan
 
-### Phase 0: Open Default DB + Load Tables
+###: Open Default DB + Load Tables
 
 ```
 DefaultDb::open(parquet_dir)
 MergePlan::plan(&RunSpecFilters::from_runspec(runspec), &default_tables())
-MergePlan::execute(&plan, &db)  →  InMemoryStore (slow_store)
+MergePlan::execute(&plan, &db) → InMemoryStore (slow_store)
 ```
 
-`default_tables()` covers ~187 table specs. The result is an `InMemoryStore`
-filtered to the RunSpec's geography/time/pollutant/process dimensions.
+`default_tables()` covers ~187 table specs. The result is an `InMemoryStore` filtered to the RunSpec's geography/time/pollutant/process dimensions.
 
-### Phase 1: Build RunSpec-Derived Tables
+###: Build RunSpec-Derived Tables
 
 *These are not in the default DB; they must be synthesized from the RunSpec.*
 
@@ -65,7 +62,7 @@ Tables to generate:
 
 Insert into slow_store so generators find them via `ctx.tables()`.
 
-### Phase 2: Synthesize Link Table
+###: Synthesize Link Table
 
 *Link is schema-only in the default DB. Must be built from zone/road-type geometry.*
 
@@ -73,9 +70,7 @@ Insert into slow_store so generators find them via `ctx.tables()`.
 link_from_zone_road_type(zone_road_type_df, road_type_df) → Link DataFrame
 ```
 
-MOVES convention: one Link row per (county, zone, road-type) combination.
-`zoneID = countyID * 10` for default zones. `linkID = zoneID * 100 + roadTypeID`
-(or use same convention Java uses). Insert into slow_store.
+MOVES convention: one Link row per (county, zone, road-type) combination. `zoneID = countyID * 10` for default zones. `linkID = zoneID * 100 + roadTypeID` (or use same convention Java uses). Insert into slow_store.
 
 Then build `GeographyTables` from Link + County:
 ```
@@ -83,75 +78,72 @@ GeographyTables::new(links, counties)
 engine.execution.build_execution_locations(&geography)
 ```
 
-### Phase 3: Run Generators (in dependency order)
+###: Run Generators (in dependency order)
 
 Generators execute inside the engine's master loop per (county, zone, road-type, month, day, hour) chunk. The order below reflects data dependencies:
 
 ```
 Step 1 (parallel — no generator-scratch dependencies):
-  MeteorologyGenerator         reads: ZoneMonthHour, Zone, County
-                               writes: ZoneMonthHour (augmented)
-  NewTvvYearGenerator          reads: (slow_store TVV tables)
-                               writes: stmyTVVCoeffs, stmyTVVEquations
-  RatesOperatingModeDistributionGenerator
-                               reads: pollutantProcessAssoc, RunSpec tables
-                               writes: RatesOpModeDistribution
+ MeteorologyGenerator reads: ZoneMonthHour, Zone, County
+ writes: ZoneMonthHour (augmented)
+ NewTvvYearGenerator reads: (slow_store TVV tables)
+ writes: stmyTVVCoeffs, stmyTVVEquations
+ RatesOperatingModeDistributionGenerator
+ reads: pollutantProcessAssoc, RunSpec tables
+ writes: RatesOpModeDistribution
 
 Step 2 (after Meteorology):
-  TankTemperatureGenerator     reads: ZoneMonthHour✓, SampleVehicleDay/Trip
-                               writes: ColdSoakTankTemperature, AverageTankTemperature,
-                                       SoakActivityFraction, ColdSoakInitialHourFraction
-  TankFuelGenerator            reads: ZoneMonthHour✓, FuelSupply, AverageTankGasoline
-                               writes: AverageTankGasoline (refined)
+ TankTemperatureGenerator reads: ZoneMonthHour✓, SampleVehicleDay/Trip
+ writes: ColdSoakTankTemperature, AverageTankTemperature,
+ SoakActivityFraction, ColdSoakInitialHourFraction
+ TankFuelGenerator reads: ZoneMonthHour✓, FuelSupply, AverageTankGasoline
+ writes: AverageTankGasoline (refined)
 
 Step 3 (after RatesOpModeDist):
-  SourceTypePhysics            reads: sourceUseTypePhysicsMapping, RatesOpModeDistribution✓
-                               writes: RatesOpModeDistribution (corrected)
+ SourceTypePhysics reads: sourceUseTypePhysicsMapping, RatesOpModeDistribution✓
+ writes: RatesOpModeDistribution (corrected)
 
 Step 4 (parallel):
-  TotalActivityGenerator       reads: Year, SourceTypeYear, SourceTypeAgeDistribution, ...
-                               writes: SourceTypeAgePopulation, TravelFraction,
-                                       SHOByAgeRoadwayHour, etc. (12 tables)
-     [Mesoscale alternative: MesoscaleLookupTotalActivityGenerator → SHO, SourceHours]
-  SourceBinDistributionGenerator
-                               reads: AVFT, PollutantProcessModelYear, SourceBin, ...
-                               writes: SBWeightedEmissionRate, SBWeightedEmissionRateByAge,
-                                       SBWeightedDistanceRate
-  OperatingModeDistributionGenerator  (OR AverageSpeedOMDG)
-                               reads: DriveSchedule, AvgSpeedBin, OperatingMode
-                               writes: OpModeDistribution
+ TotalActivityGenerator reads: Year, SourceTypeYear, SourceTypeAgeDistribution, ...
+ writes: SourceTypeAgePopulation, TravelFraction,
+ SHOByAgeRoadwayHour, etc. (12 tables)
+ [Mesoscale alternative: MesoscaleLookupTotalActivityGenerator → SHO, SourceHours]
+ SourceBinDistributionGenerator
+ reads: AVFT, PollutantProcessModelYear, SourceBin, ...
+ writes: SBWeightedEmissionRate, SBWeightedEmissionRateByAge,
+ SBWeightedDistanceRate
+ OperatingModeDistributionGenerator (OR AverageSpeedOMDG)
+ reads: DriveSchedule, AvgSpeedBin, OperatingMode
+ writes: OpModeDistribution
 
 Step 5 (after TotalActivity allocation → SHO/SourceHours):
-  EvaporativeEmissionsOperatingModeDistributionGenerator
-                               reads: sourceHours✓, sho✓, SoakActivityFraction✓
-                               writes: OpModeDistribution (evap)
-  LinkOperatingModeDistributionGenerator
-                               reads: opModeDistribution✓, driveScheduleSecondLink, link
-                               writes: link-level opModeDistribution
-  StartOperatingModeDistributionGenerator
-                               reads: SampleVehicleTrip, SampleVehicleDay, Link, ...
-                               writes: startsOpModeDistribution
+ EvaporativeEmissionsOperatingModeDistributionGenerator
+ reads: sourceHours✓, sho✓, SoakActivityFraction✓
+ writes: OpModeDistribution (evap)
+ LinkOperatingModeDistributionGenerator
+ reads: opModeDistribution✓, driveScheduleSecondLink, link
+ writes: link-level opModeDistribution
+ StartOperatingModeDistributionGenerator
+ reads: SampleVehicleTrip, SampleVehicleDay, Link, ...
+ writes: startsOpModeDistribution
 
 Step 6 (after SourceBinDist + RatesOpModeDist + SourceTypePhysics):
-  BaseRateGenerator            reads: RatesOpModeDistribution✓, SBWeightedEmissionRate✓,
-                                       SBWeightedDistanceRate✓
-                               writes: BaseRate, BaseRateByAge, DrivingIdleFraction
+ BaseRateGenerator reads: RatesOpModeDistribution✓, SBWeightedEmissionRate✓,
+ SBWeightedDistanceRate✓
+ writes: BaseRate, BaseRateByAge, DrivingIdleFraction
 
 Step 7 (fuel effects, mostly parallel with BaseRate):
-  FuelEffectsGenerator         reads: FuelFormulation, FuelSubtype, FuelSupply
-                               writes: GeneralFuelRatio
+ FuelEffectsGenerator reads: FuelFormulation, FuelSubtype, FuelSupply
+ writes: GeneralFuelRatio
 ```
 
-### Phase 4: Run Calculators
+###: Run Calculators
 
-The existing 63-module / 960-pair calculator DAG runs unchanged — it reads
-from the same scratch namespace the generators populated. No changes needed
-here for the initial default-DB path.
+The existing 63-module / 960-pair calculator DAG runs unchanged — it reads from the same scratch namespace the generators populated. No changes needed here for the initial default-DB path.
 
-### Phase 5: Output
+###: Output
 
-Same as current snapshot path: Parquet output under `<output>/`. Aggregation
-plan is built from RunSpec, identical to existing implementation.
+Same as current snapshot path: Parquet output under `<output>/`. Aggregation plan is built from RunSpec, identical to existing implementation.
 
 ---
 
@@ -159,9 +151,7 @@ plan is built from RunSpec, identical to existing implementation.
 
 ### What `InputDataManager` already provides
 
-`MergePlan::execute(&plan, &db)` (implemented, non-wasm only) produces an
-`InMemoryStore` with ~187 default-DB tables filtered to the RunSpec's
-geography/time/pollutant/process dimensions. This covers:
+`MergePlan::execute(&plan, &db)` (implemented, non-wasm only) produces an `InMemoryStore` with ~187 default-DB tables filtered to the RunSpec's geography/time/pollutant/process dimensions. This covers:
 
 - **Geography**: County, Zone, State, Region tables — filtered by RunSpec counties/states
 - **Time**: Year, MonthOfAnyYear, DayOfAnyWeek, HourOfAnyDay — filtered by RunSpec timespan
@@ -201,117 +191,64 @@ geography/time/pollutant/process dimensions. This covers:
 
 ### B1 (Large) — Link table synthesis
 
-**What's missing**: The default DB marks `Link`, `SHO`, `SourceHours`, `Starts` as
-schema-only (no rows). `GeographyTables::new(links, counties)` requires `LinkRow`
-data to drive the engine's iteration over execution locations. Without Link rows the
-engine has zero chunks to process.
+**What's missing**: The default DB marks `Link`, `SHO`, `SourceHours`, `Starts` as schema-only (no rows). `GeographyTables::new(links, counties)` requires `LinkRow` data to drive the engine's iteration over execution locations. Without Link rows the engine has zero chunks to process.
 
-**Fix**: Add a `populate_link_from_zone_road_type(store: &mut InMemoryStore) -> Result<()>`
-function in `run.rs` (analogous to `populate_source_use_type_physics_mapping` and
-`populate_sho_distances`).
-Use ZoneRoadType + RoadType from the default DB. Assign synthetic linkIDs via
-`zoneID * 10 + roadTypeID`. This is the same convention MOVES uses for
-county-scale runs without a custom project network.
+**Fix**: Add a `populate_link_from_zone_road_type(store: &mut InMemoryStore) -> Result<()>` function in `run.rs` (analogous to `populate_source_use_type_physics_mapping` and `populate_sho_distances`). Use ZoneRoadType + RoadType from the default DB. Assign synthetic linkIDs via `zoneID * 10 + roadTypeID`. This is the same convention MOVES uses for county-scale runs without a custom project network.
 
 **Blocks**: All of `moves run --default-db`. Estimated: **medium** (1–2 days).
 
 ### B2 (Medium) — RunSpec-derived table building
 
-**What's missing**: No function converts a `RunSpec` into the set of
-`RunSpec*` DataFrames that generators read (RunSpecSourceType,
-RunSpecPollutantProcess, RunSpecDay, RunSpecHourDay, RunSpecMonth,
-RunSpecYear, RunSpecRoadType, RunSpecMonthGroup, RunSpecSourceFuelType).
-Currently these exist only in snapshots (captured from Java's
-ExecutionRunSpec).
+**What's missing**: No function converts a `RunSpec` into the set of `RunSpec*` DataFrames that generators read (RunSpecSourceType, RunSpecPollutantProcess, RunSpecDay, RunSpecHourDay, RunSpecMonth, RunSpecYear, RunSpecRoadType, RunSpecMonthGroup, RunSpecSourceFuelType). Currently these exist only in snapshots (captured from Java's ExecutionRunSpec).
 
-**Fix**: New `build_runspec_tables(runspec: &RunSpec, db: &InMemoryStore) -> InMemoryStore`
-function. Most tables are simple projections of the RunSpec fields. A few
-(RunSpecSourceFuelType, RunSpecMonthGroup) need a join with default-DB lookup
-tables (FuelSubtype, MonthOfAnyYear).
+**Fix**: New `build_runspec_tables(runspec: &RunSpec, db: &InMemoryStore) -> InMemoryStore` function. Most tables are simple projections of the RunSpec fields. A few (RunSpecSourceFuelType, RunSpecMonthGroup) need a join with default-DB lookup tables (FuelSubtype, MonthOfAnyYear).
 
-**Blocks**: All generators that read RunSpec tables (most of them).
-Estimated: **medium** (2–3 days).
+**Blocks**: All generators that read RunSpec tables (most of them). Estimated: **medium** (2–3 days).
 
 ### B3 (Small) — CLI `--default-db` flag on `moves run`
 
-**What's missing**: `RunOptions` has no `default_db` field. The `cmd_run`
-dispatch in `main.rs` has no branch for default-DB loading.
+**What's missing**: `RunOptions` has no `default_db` field. The `cmd_run` dispatch in `main.rs` has no branch for default-DB loading.
 
-**Fix**: Add `default_db: Option<PathBuf>` to `RunOptions`; add
-`--default-db` to the `clap` `Run` variant; add a new execution branch
-in `run_simulation` that calls `MergePlan::execute` + `build_runspec_tables`
-+ Link synthesis + `engine.with_slow_store(store)`. The existing snapshot path
-stays unchanged.
+**Fix**: Add `default_db: Option<PathBuf>` to `RunOptions`; add `--default-db` to the `clap` `Run` variant; add a new execution branch in `run_simulation` that calls `MergePlan::execute` + `build_runspec_tables` + Link synthesis + `engine.with_slow_store(store)`. The existing snapshot path stays unchanged.
 
 **Blocks**: User-facing entry point. Estimated: **small** (0.5 day, gated on B1+B2).
 
 ### B4 (Medium) — TotalActivity → allocation → SHO wiring
 
-**What's missing**: `TotalActivityGenerator::execute` writes `SHOByAgeRoadwayHour`
-to scratch, but the per-link `SHO`, `SourceHours`, and `Starts` tables (consumed
-by EvapOMDGenerator and StartOMDGenerator) require an additional **allocation kernel**
-step that distributes zone-level activity to individual links. In the snapshot
-path these tables come from the captured execution DB; for default-DB they must be
-computed.
+**What's missing**: `TotalActivityGenerator::execute` writes `SHOByAgeRoadwayHour` to scratch, but the per-link `SHO`, `SourceHours`, and `Starts` tables (consumed by EvapOMDGenerator and StartOMDGenerator) require an additional **allocation kernel** step that distributes zone-level activity to individual links. In the snapshot path these tables come from the captured execution DB; for default-DB they must be computed.
 
-The `totalactivitygenerator::allocation` submodule exists but its integration into
-the master loop for the default-DB path is not wired. Check whether
-`MesoscaleLookupTotalActivityGenerator` (which directly produces SHO/SourceHours)
-is usable as the county-scale alternative.
+The `totalactivitygenerator::allocation` submodule exists but its integration into the master loop for the default-DB path is not wired. Check whether `MesoscaleLookupTotalActivityGenerator` (which directly produces SHO/SourceHours) is usable as the county-scale alternative.
 
-**Blocks**: `EvaporativeEmissionsOperatingModeDistributionGenerator`,
-`StartOperatingModeDistributionGenerator` (they read `sho`/`sourceHours`).
-Estimated: **medium** (1–2 days to validate and wire).
+**Blocks**: `EvaporativeEmissionsOperatingModeDistributionGenerator`, `StartOperatingModeDistributionGenerator` (they read `sho`/`sourceHours`). Estimated: **medium** (1–2 days to validate and wire).
 
 ### B5 (Small) — FuelEffectsGenerator partial coverage
 
-**What's missing**: ATRatio, criteriaRatio, MTBERatio paths (predictive/complex model).
-The implemented `generalFuelRatio` path is sufficient for criteria pollutants.
+**What's missing**: ATRatio, criteriaRatio, MTBERatio paths (predictive/complex model). The implemented `generalFuelRatio` path is sufficient for criteria pollutants.
 
-**Blocks**: Some pollutant sub-types (sulfur/benzene complex model paths).
-Does not block the core CO/HC/NOx/PM calculation. Estimated: **small** (1 day).
+**Blocks**: Some pollutant sub-types (sulfur/benzene complex model paths). Does not block the core CO/HC/NOx/PM calculation. Estimated: **small** (1 day).
 
 ### B6 (Small) — ProjectTAG stub
 
-**What's missing**: `ProjectTAG::execute` returns `CalculatorOutput::empty()`.
-This blocks project-scale runs (not needed for county-scale default-DB).
+**What's missing**: `ProjectTAG::execute` returns `CalculatorOutput::empty()`. This blocks project-scale runs (not needed for county-scale default-DB).
 
 **Blocks**: Project-scale runs only. Estimated: **small** (1 day).
 
 ### B7 (None for B2/B3 scope) — Nonroad
 
-Nonroad uses a separate `run_simulation` path in `crates/moves-nonroad/` and is out
-of scope for `moves run --default-db` (which targets onroad). No action needed.
+Nonroad uses a separate `run_simulation` path in `crates/moves-nonroad/` and is out of scope for `moves run --default-db` (which targets onroad). No action needed.
 
 ---
 
 ## 5. Summary
 
-All 17 onroad generators under `crates/moves-calculators/src/generators/` have real
-Polars/Rust `execute()` implementations — 15 are fully functional, 1 is partial
-(FuelEffectsGenerator missing some ratio paths), and 1 is a stub (ProjectTAG). All
-17 are registered in `moves_calculators::register_all` and would run in the engine
-today against a snapshot. The "Phase 2 placeholder" comments in module headers are
-outdated: Task 50 (`DataFrameStore` / `InMemoryStore`) is complete and the generators
-read/write correctly through `CalculatorContext`.
+All 17 onroad generators under `crates/moves-calculators/src/generators/` have real Polars/Rust `execute()` implementations — 15 are fully functional, 1 is partial (FuelEffectsGenerator missing some ratio paths), and 1 is a stub (ProjectTAG). All 17 are registered in `moves_calculators::register_all` and would run in the engine today against a snapshot. The placeholder comments in module headers are outdated: `DataFrameStore` / `InMemoryStore` is complete and the generators read/write correctly through `CalculatorContext`.
 
-The critical gap for B2 (`moves run --default-db`) is **not** in the generators
-themselves but in the data-loading pipeline upstream of them. Two new pieces of
-infrastructure are needed: (1) a function that synthesizes the `Link` table from
-`ZoneRoadType` + `RoadType` (since the default DB ships Link as schema-only), and
-(2) a function that builds the RunSpec-derived tables (`RunSpecSourceType`,
-`RunSpecPollutantProcess`, `RunSpecDay`, `RunSpecHourDay`, etc.) from the
-`RunSpec` struct. `InputDataManager::MergePlan::execute` (Task 24) is already
-complete and can load all default-DB tables filtered to the RunSpec. Once B1 and B2
-are resolved, wiring the CLI flag (B3) is straightforward. B4 (SHO allocation
-wiring) needs validation but may be avoidable via `MesoscaleLookupTotalActivityGenerator`.
+The critical gap for `moves run --default-db` is **not** in the generators themselves but in the data-loading pipeline upstream of them. Two new pieces of infrastructure are needed: (1) a function that synthesizes the `Link` table from `ZoneRoadType` + `RoadType` (since the default DB ships Link as schema-only), and (2) a function that builds the RunSpec-derived tables (`RunSpecSourceType`, `RunSpecPollutantProcess`, `RunSpecDay`, `RunSpecHourDay`, etc.) from the `RunSpec` struct. `InputDataManager::MergePlan::execute` is already complete and can load all default-DB tables filtered to the RunSpec. Once B1 and B2 are resolved, wiring the CLI flag (B3) is straightforward. B4 (SHO allocation wiring) needs validation but may be avoidable via `MesoscaleLookupTotalActivityGenerator`.
 
-Recommended B2/B3 implementation order:
+Recommended implementation order:
 1. `populate_link_from_zone_road_type(store)` in `run.rs` — unblocks geography setup
 2. `build_runspec_tables(runspec, db)` in `run.rs` or new module — unblocks generators
 3. `--default-db` CLI flag + new execution branch in `run_simulation` — user-facing
 4. Validate SHO allocation or switch to MesoscaleLookup path — unblocks evap/start OMD
 
-This scoping covers B2 (native `moves run --default-db`) entirely. B3
-(wasm/in-browser) builds on B2 but requires additional wasm-compat passes for
-the Parquet I/O (currently gated on `#[cfg(not(target_arch = "wasm32"))]`).
+This scoping covers the native `moves run --default-db` path entirely. The wasm/in-browser path builds on this but requires additional wasm-compat passes for the Parquet I/O (currently gated on `#[cfg(not(target_arch = "wasm32"))]`).

@@ -1,6 +1,6 @@
 //! Exhaust technology-fraction parser (`rdtech.f`).
 //!
-//! Task 96. Parses a `.TCH` file's `/TECH FRAC/` packet: per
+//!Parses a `.TCH` file's `/TECH FRAC/` packet: per
 //! (SCC, HP-range, year) the file lists how the equipment
 //! population splits across exhaust technology types. After
 //! reading, fractions are renormalised so each group sums to
@@ -10,19 +10,19 @@
 //!
 //! Header line:
 //!
-//! | Cols    | Field                              |
+//! | Cols | Field |
 //! |---------|------------------------------------|
-//! | 6–15    | SCC code                           |
-//! | 21–25   | HP range min (F5.0)                |
-//! | 26–30   | HP range max (F5.0)                |
-//! | 35+     | Tech-type codes (10 chars each)    |
+//! | 6–15 | SCC code |
+//! | 21–25 | HP range min (F5.0) |
+//! | 26–30 | HP range max (F5.0) |
+//! | 35+ | Tech-type codes (10 chars each) |
 //!
 //! Data line (cols 6–15 blank):
 //!
-//! | Cols    | Field                              |
+//! | Cols | Field |
 //! |---------|------------------------------------|
-//! | 1–5     | Year (I5)                          |
-//! | 35+     | Tech fractions (F10.0 each)        |
+//! | 1–5 | Year (I5) |
+//! | 35+ | Tech fractions (F10.0 each) |
 //!
 //! If the `/TECH FRAC/` keyword is missing, the Fortran returns
 //! the `ISKIP` code rather than `ISUCES` and the caller continues
@@ -44,20 +44,20 @@ use crate::{Error, Result};
 /// (or 0.0 if every value was zero).
 #[derive(Debug, Clone, PartialEq)]
 pub struct TechFractionGroup {
-    /// SCC code (10 chars, left-justified, upper-cased).
+ /// SCC code (10 chars, left-justified, upper-cased).
     pub scc: String,
-    /// HP-range minimum.
+ /// HP-range minimum.
     pub hp_min: f32,
-    /// HP-range maximum.
+ /// HP-range maximum.
     pub hp_max: f32,
-    /// Model year.
+ /// Model year.
     pub year: i32,
-    /// Tech-type → fraction, in header order.
+ /// Tech-type → fraction, in header order.
     pub fractions: Vec<(String, f32)>,
 }
 
 impl TechFractionGroup {
-    /// Sum of fractions before renormalisation.
+ /// Sum of fractions before renormalisation.
     pub fn raw_sum(&self) -> f32 {
         self.fractions.iter().map(|(_, f)| f).sum()
     }
@@ -112,7 +112,7 @@ pub fn read_tech<R: BufRead>(reader: R) -> Result<Vec<TechFractionGroup>> {
     }
 
     if !in_packet {
-        // ISKIP — no /TECH FRAC/ packet found.
+ // ISKIP — no /TECH FRAC/ packet found.
         return Ok(Vec::new());
     }
 
@@ -208,7 +208,7 @@ fn renormalise(groups: &mut [TechFractionGroup]) {
         let sum: f32 = group.fractions.iter().map(|(_, f)| *f).sum();
         if sum > 0.0 {
             for (_, f) in group.fractions.iter_mut() {
-                *f /= sum;
+ *f /= sum;
             }
         }
     }
@@ -302,7 +302,7 @@ mod tests {
         let g = &groups[0];
         assert_eq!(g.scc, "2270001000");
         assert_eq!(g.year, 2010);
-        // 0.40 + 0.40 = 0.80; renormalise → 0.50 each.
+ // 0.40 + 0.40 = 0.80; renormalise → 0.50 each.
         assert!((g.fractions[0].1 - 0.5).abs() < 1e-6);
         assert!((g.fractions[1].1 - 0.5).abs() < 1e-6);
         assert_eq!(g.fractions[0].0, "BASE");

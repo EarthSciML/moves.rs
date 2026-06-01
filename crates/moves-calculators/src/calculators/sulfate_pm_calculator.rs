@@ -1,5 +1,4 @@
-//! Port of `SulfatePMCalculator.java` and `database/SulfatePMCalculator.sql` —
-//! migration plan Phase 3, Task 57.
+//! Port of `SulfatePMCalculator.java` and `database/SulfatePMCalculator.sql`//! .
 //!
 //! `SulfatePMCalculator` is the MOVES **PM2.5 speciation** calculator. Upstream
 //! the rates engine produces two coarse exhaust-particulate tallies — unadjusted
@@ -16,8 +15,7 @@
 //! (112) and NonECPM (118) inputs and chains itself onto them, running in the
 //! same master-loop pass. In the rates-first engine that producer is
 //! `BaseRateCalculator`: `CalculatorInfo.txt` records `Chain SulfatePMCalculator
-//! BaseRateCalculator` — `SulfatePMCalculator` depends on `BaseRateCalculator` —
-//! and no `Subscribe` directive for `SulfatePMCalculator`. The [`Calculator`]
+//! BaseRateCalculator` — `SulfatePMCalculator` depends on `BaseRateCalculator`//! and no `Subscribe` directive for `SulfatePMCalculator`. The [`Calculator`]
 //! metadata mirrors that: [`subscriptions`](Calculator::subscriptions) is empty
 //! and [`upstream`](Calculator::upstream) names `BaseRateCalculator`.
 //!
@@ -28,9 +26,9 @@
 //! and a matching water (H2O aerosol) fraction:
 //!
 //! ```text
-//! adjustment        = 1 + BaseFuelSulfateFraction × (sulfurLevel ÷ BaseFuelSulfurLevel − 1)
-//! SulfateFraction   = Σ marketShare × SulfatenonECPMFraction × adjustment
-//! H2OFraction       = Σ marketShare × H2ONonECPMFraction     × adjustment
+//! adjustment = 1 + BaseFuelSulfateFraction × (sulfurLevel ÷ BaseFuelSulfurLevel − 1)
+//! SulfateFraction = Σ marketShare × SulfatenonECPMFraction × adjustment
+//! H2OFraction = Σ marketShare × H2ONonECPMFraction × adjustment
 //! ```
 //!
 //! It then splits the composite NonECPM (118) of every emission row into three
@@ -66,8 +64,7 @@
 //!
 //! Every SQL join is an `INNER JOIN`, so a row with no match on the join key is
 //! dropped; the port reproduces that with map lookups that skip on a miss. The
-//! general fuel-effect ratio is applied by a multi-table `UPDATE`, not a join —
-//! a row with no matching ratio keeps its value unchanged.
+//! general fuel-effect ratio is applied by a multi-table `UPDATE`, not a join//! a row with no matching ratio keeps its value unchanged.
 //!
 //! [`calculate`](SulfatePMCalculator::calculate) returns the **final state of
 //! `MOVESWorkerOutput`**: the input rows minus the consumed EC and NonECPM,
@@ -90,8 +87,7 @@
 //! `SulfatePMCalculator.sql` writes every intermediate table
 //! (`oneCountyYearSulfateFractions`, `sPMOneCountyYearGeneralFuelRatio`,
 //! `crankcaseSplit`, `spmSplit1`) with `double` columns, and MariaDB evaluates
-//! the arithmetic in `DOUBLE`; this port computes in `f64` end to end, so —
-//! unlike the `SO2Calculator` port — there is no `FLOAT` intermediate column to
+//! the arithmetic in `DOUBLE`; this port computes in `f64` end to end, so//! unlike the `SO2Calculator` port — there is no `FLOAT` intermediate column to
 //! truncate. `crankcaseRatio`, `pmSpeciationFraction`, `marketShare` and
 //! `sulfurLevel` are `FLOAT` model *inputs*, already `f32`-quantised before
 //! [`calculate`](SulfatePMCalculator::calculate) sees them;
@@ -129,11 +125,11 @@
 //! output; MOVES leaves `MOVESWorkerOutput` physically unordered (no
 //! `ORDER BY`).
 //!
-//! # Scope of this port — data plane (Task 50)
+//! # Scope of this port — data plane
 //!
 //! [`calculate`](SulfatePMCalculator::calculate) is the numeric algorithm. Its
 //! [`SulfatePmInputs`] argument is the set of tables the SQL reads, as plain
-//! row vectors; a future Task 50 (`DataFrameStore`) wiring populates it from the
+//! row vectors; a future (`DataFrameStore`) wiring populates it from the
 //! per-run filtered execution database. The SQL's "Extract Data" section also
 //! narrows the source tables to the run's county, year and fuel region and
 //! pre-aggregates the general fuel-effect ratio into
@@ -143,7 +139,7 @@
 //! `SO2Calculator` treatment of its `so2PMOneCountyYearGeneralFuelRatio`.
 //!
 //! [`Calculator::execute`] receives a [`CalculatorContext`] whose
-//! `ExecutionTables` / `ScratchNamespace` are Phase 2 placeholders until the
+//! `ExecutionTables` / `ScratchNamespace` are placeholders until the
 //! `DataFrameStore` lands, so `execute` cannot yet read the input tables nor
 //! emit `MOVESWorkerOutput`. The numeric algorithm is fully ported and
 //! unit-tested on [`calculate`](SulfatePMCalculator::calculate); `execute` is a
@@ -237,7 +233,7 @@ const TOM_INPUTS: [i32; 2] = [ORGANIC_CARBON_POLLUTANT, NCOM_POLLUTANT];
 
 // ===========================================================================
 // Input tables — plain Rust mirrors of the tables `SulfatePMCalculator.sql`
-// reads. Following the Phase 3 convention every `INT`/`SMALLINT` identifier is
+// reads. Following the convention every `INT`/`SMALLINT` identifier is
 // an `i32` and every `FLOAT`/`DOUBLE` quantity is an `f64`. Only the columns the
 // algorithm reads are modelled.
 // ===========================================================================
@@ -250,24 +246,24 @@ const TOM_INPUTS: [i32; 2] = [ORGANIC_CARBON_POLLUTANT, NCOM_POLLUTANT];
 /// modelled.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FuelSupplyRow {
-    /// `monthGroupID` — the month group this share applies to.
+ /// `monthGroupID` — the month group this share applies to.
     pub month_group_id: i32,
-    /// `fuelFormulationID` — joins to [`FuelFormulationRow::fuel_formulation_id`].
+ /// `fuelFormulationID` — joins to [`FuelFormulationRow::fuel_formulation_id`].
     pub fuel_formulation_id: i32,
-    /// `marketShare` — this formulation's share of the fuel supply.
+ /// `marketShare` — this formulation's share of the fuel supply.
     pub market_share: f64,
 }
 
 /// One `FuelFormulation` row — a fuel blend's subtype and sulfur level.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FuelFormulationRow {
-    /// `fuelFormulationID` — the formulation primary key.
+ /// `fuelFormulationID` — the formulation primary key.
     pub fuel_formulation_id: i32,
-    /// `fuelSubtypeID` — joins to [`FuelSubtypeRow::fuel_subtype_id`].
+ /// `fuelSubtypeID` — joins to [`FuelSubtypeRow::fuel_subtype_id`].
     pub fuel_subtype_id: i32,
-    /// `sulfurLevel` — fuel sulfur content. The SQL reads it as
-    /// `coalesce(sulfurLevel, 0)`, so a `NULL` is modelled as `None` and
-    /// treated as `0.0`. `FLOAT` in MOVES.
+ /// `sulfurLevel` — fuel sulfur content. The SQL reads it as
+ /// `coalesce(sulfurLevel, 0)`, so a `NULL` is modelled as `None` and
+ /// treated as `0.0`. `FLOAT` in MOVES.
     pub sulfur_level: Option<f64>,
 }
 
@@ -277,9 +273,9 @@ pub struct FuelFormulationRow {
 /// columns (energy content, etc.) are not modelled.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FuelSubtypeRow {
-    /// `fuelSubtypeID` — the subtype primary key.
+ /// `fuelSubtypeID` — the subtype primary key.
     pub fuel_subtype_id: i32,
-    /// `fuelTypeID` — the parent fuel type.
+ /// `fuelTypeID` — the parent fuel type.
     pub fuel_type_id: i32,
 }
 
@@ -288,34 +284,34 @@ pub struct FuelSubtypeRow {
 /// reference values the fuel-sulfur adjustment is relative to.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SulfateFractionsRow {
-    /// `processID` — the emission process the fractions apply to.
+ /// `processID` — the emission process the fractions apply to.
     pub process_id: i32,
-    /// `fuelTypeID` — the fuel type the fractions apply to.
+ /// `fuelTypeID` — the fuel type the fractions apply to.
     pub fuel_type_id: i32,
-    /// `sourceTypeID` — the source (vehicle) type the fractions apply to.
+ /// `sourceTypeID` — the source (vehicle) type the fractions apply to.
     pub source_type_id: i32,
-    /// `minModelYearID` — inclusive lower bound of the model-year window.
+ /// `minModelYearID` — inclusive lower bound of the model-year window.
     pub min_model_year_id: i32,
-    /// `maxModelYearID` — inclusive upper bound of the model-year window.
+ /// `maxModelYearID` — inclusive upper bound of the model-year window.
     pub max_model_year_id: i32,
-    /// `SulfatenonECPMFraction` — base sulfate fraction of NonECPM.
+ /// `SulfatenonECPMFraction` — base sulfate fraction of NonECPM.
     pub sulfate_non_ec_pm_fraction: f64,
-    /// `H2ONonECPMFraction` — base water (aerosol) fraction of NonECPM.
+ /// `H2ONonECPMFraction` — base water (aerosol) fraction of NonECPM.
     pub h2o_non_ec_pm_fraction: f64,
-    /// `BaseFuelSulfateFraction` — the sensitivity of the sulfate fraction to
-    /// the fuel sulfur level, relative to the base fuel.
+ /// `BaseFuelSulfateFraction` — the sensitivity of the sulfate fraction to
+ /// the fuel sulfur level, relative to the base fuel.
     pub base_fuel_sulfate_fraction: f64,
-    /// `BaseFuelSulfurLevel` — the sulfur level of the base fuel the fractions
-    /// were measured against; the denominator of the adjustment.
+ /// `BaseFuelSulfurLevel` — the sulfur level of the base fuel the fractions
+ /// were measured against; the denominator of the adjustment.
     pub base_fuel_sulfur_level: f64,
 }
 
 /// One `MonthOfAnyYear` row — the `monthID → monthGroupID` mapping.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MonthGroupRow {
-    /// `monthID` — the calendar month.
+ /// `monthID` — the calendar month.
     pub month_id: i32,
-    /// `monthGroupID` — the month group it belongs to.
+ /// `monthGroupID` — the month group it belongs to.
     pub month_group_id: i32,
 }
 
@@ -328,23 +324,23 @@ pub struct MonthGroupRow {
 /// fuel-effect rows, so only the residue is affected.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GeneralFuelRatioRow {
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `pollutantID` — always 120 (NonECNonSO4PM) in this extract.
+ /// `pollutantID` — always 120 (NonECNonSO4PM) in this extract.
     pub pollutant_id: i32,
-    /// `processID`.
+ /// `processID`.
     pub process_id: i32,
-    /// `minModelYearID` — inclusive lower bound of the applicable model years.
+ /// `minModelYearID` — inclusive lower bound of the applicable model years.
     pub min_model_year_id: i32,
-    /// `maxModelYearID` — inclusive upper bound of the applicable model years.
+ /// `maxModelYearID` — inclusive upper bound of the applicable model years.
     pub max_model_year_id: i32,
-    /// `minAgeID` — inclusive lower bound of the applicable vehicle ages.
+ /// `minAgeID` — inclusive lower bound of the applicable vehicle ages.
     pub min_age_id: i32,
-    /// `maxAgeID` — inclusive upper bound of the applicable vehicle ages.
+ /// `maxAgeID` — inclusive upper bound of the applicable vehicle ages.
     pub max_age_id: i32,
-    /// `fuelEffectRatio` — the multiplier applied to the residue emission.
+ /// `fuelEffectRatio` — the multiplier applied to the residue emission.
     pub fuel_effect_ratio: f64,
 }
 
@@ -356,22 +352,22 @@ pub struct GeneralFuelRatioRow {
 /// emission row is split into one output row per matching `crankcaseSplit` row.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CrankcaseSplitRow {
-    /// `processID` — the output process (a primary exhaust or crankcase
-    /// process); the split row stamps this onto its output emission row.
+ /// `processID` — the output process (a primary exhaust or crankcase
+ /// process); the split row stamps this onto its output emission row.
     pub process_id: i32,
-    /// `pollutantID` — the pollutant the split applies to.
+ /// `pollutantID` — the pollutant the split applies to.
     pub pollutant_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `regClassID`.
+ /// `regClassID`.
     pub reg_class_id: i32,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `minModelYearID` — inclusive lower bound of the model-year window.
+ /// `minModelYearID` — inclusive lower bound of the model-year window.
     pub min_model_year_id: i32,
-    /// `maxModelYearID` — inclusive upper bound of the model-year window.
+ /// `maxModelYearID` — inclusive upper bound of the model-year window.
     pub max_model_year_id: i32,
-    /// `crankcaseRatio` — the multiplier. `FLOAT` in MOVES; a model input.
+ /// `crankcaseRatio` — the multiplier. `FLOAT` in MOVES; a model input.
     pub crankcase_ratio: f64,
 }
 
@@ -379,22 +375,22 @@ pub struct CrankcaseSplitRow {
 /// pollutant into one output species.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PmSpeciationRow {
-    /// `processID` — the emission process.
+ /// `processID` — the emission process.
     pub process_id: i32,
-    /// `inputPollutantID` — the particulate pollutant being speciated.
+ /// `inputPollutantID` — the particulate pollutant being speciated.
     pub input_pollutant_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `minModelYearID` — inclusive lower bound of the model-year window.
+ /// `minModelYearID` — inclusive lower bound of the model-year window.
     pub min_model_year_id: i32,
-    /// `maxModelYearID` — inclusive upper bound of the model-year window.
+ /// `maxModelYearID` — inclusive upper bound of the model-year window.
     pub max_model_year_id: i32,
-    /// `outputPollutantID` — the species produced.
+ /// `outputPollutantID` — the species produced.
     pub output_pollutant_id: i32,
-    /// `pmSpeciationFraction` — the fraction of the input pollutant the species
-    /// makes up. `FLOAT` in MOVES; a model input.
+ /// `pmSpeciationFraction` — the fraction of the input pollutant the species
+ /// makes up. `FLOAT` in MOVES; a model input.
     pub pm_speciation_fraction: f64,
 }
 
@@ -409,46 +405,46 @@ pub struct PmSpeciationRow {
 /// documentation](self)).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct EmissionRow {
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `dayID`.
+ /// `dayID`.
     pub day_id: i32,
-    /// `hourID`.
+ /// `hourID`.
     pub hour_id: i32,
-    /// `stateID`.
+ /// `stateID`.
     pub state_id: i32,
-    /// `countyID`.
+ /// `countyID`.
     pub county_id: i32,
-    /// `zoneID`.
+ /// `zoneID`.
     pub zone_id: i32,
-    /// `linkID`.
+ /// `linkID`.
     pub link_id: i32,
-    /// `pollutantID`.
+ /// `pollutantID`.
     pub pollutant_id: i32,
-    /// `processID`.
+ /// `processID`.
     pub process_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `regClassID`.
+ /// `regClassID`.
     pub reg_class_id: i32,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `modelYearID`.
+ /// `modelYearID`.
     pub model_year_id: i32,
-    /// `roadTypeID`.
+ /// `roadTypeID`.
     pub road_type_id: i32,
-    /// `emissionQuant` — the emission quantity. `DOUBLE` in MOVES.
+ /// `emissionQuant` — the emission quantity. `DOUBLE` in MOVES.
     pub emission_quant: f64,
-    /// `emissionRate` — the emission rate. `DOUBLE` in MOVES.
+ /// `emissionRate` — the emission rate. `DOUBLE` in MOVES.
     pub emission_rate: f64,
 }
 
 impl EmissionRow {
-    /// The full integer dimension tuple — every column except the two emission
-    /// values. Used to sort the output deterministically: MOVES leaves
-    /// `MOVESWorkerOutput` physically unordered.
+ /// The full integer dimension tuple — every column except the two emission
+ /// values. Used to sort the output deterministically: MOVES leaves
+ /// `MOVESWorkerOutput` physically unordered.
     fn dimension_key(&self) -> [i32; 15] {
         [
             self.year_id,
@@ -469,10 +465,10 @@ impl EmissionRow {
         ]
     }
 
-    /// The integer dimension tuple **excluding** `pollutantID` — the `GROUP BY`
-    /// key of the SQL's `MakePM2.5Total` / NonECPM-resum / TOM / NonECNonSO4NonOM
-    /// steps, which sum several pollutants into one and stamp a literal
-    /// `pollutantID` onto the result.
+ /// The integer dimension tuple **excluding** `pollutantID` — the `GROUP BY`
+ /// key of the SQL's `MakePM2.5Total` / NonECPM-resum / TOM / NonECNonSO4NonOM
+ /// steps, which sum several pollutants into one and stamp a literal
+ /// `pollutantID` onto the result.
     fn non_pollutant_key(&self) -> [i32; 14] {
         [
             self.year_id,
@@ -497,51 +493,51 @@ impl EmissionRow {
 /// plain row vectors, plus the run-context scalars its `##…##` placeholders
 /// resolve.
 ///
-/// A future Task 50 (`DataFrameStore`) wiring populates this from the per-run
+/// A future (`DataFrameStore`) wiring populates this from the per-run
 /// filtered execution database; until then it is the explicit data-plane
 /// contract the unit tests build directly.
 #[derive(Debug, Clone, Default)]
 pub struct SulfatePmInputs {
-    /// `FuelSupply` rows (single fuel region and fuel year).
+ /// `FuelSupply` rows (single fuel region and fuel year).
     pub fuel_supply: Vec<FuelSupplyRow>,
-    /// `FuelFormulation` rows.
+ /// `FuelFormulation` rows.
     pub fuel_formulation: Vec<FuelFormulationRow>,
-    /// `FuelSubtype` rows — the formulation → fuel-type mapping.
+ /// `FuelSubtype` rows — the formulation → fuel-type mapping.
     pub fuel_subtype: Vec<FuelSubtypeRow>,
-    /// `sulfateFractions` rows — the base sulfate/water fractions and the
-    /// base-fuel reference values.
+ /// `sulfateFractions` rows — the base sulfate/water fractions and the
+ /// base-fuel reference values.
     pub sulfate_fractions: Vec<SulfateFractionsRow>,
-    /// `MonthOfAnyYear` rows — the `monthID → monthGroupID` mapping.
+ /// `MonthOfAnyYear` rows — the `monthID → monthGroupID` mapping.
     pub month_of_any_year: Vec<MonthGroupRow>,
-    /// The model years the run covers — distinct `RunSpecModelYearAge.modelYearID`
-    /// for the run year. The `sulfateFractions` model-year ranges are expanded
-    /// onto these.
+ /// The model years the run covers — distinct `RunSpecModelYearAge.modelYearID`
+ /// for the run year. The `sulfateFractions` model-year ranges are expanded
+ /// onto these.
     pub run_spec_model_years: Vec<i32>,
-    /// `sPMOneCountyYearGeneralFuelRatio` rows — the pre-aggregated general
-    /// fuel-effect multiplier. May be empty: a cell with no matching ratio keeps
-    /// its emission unchanged.
+ /// `sPMOneCountyYearGeneralFuelRatio` rows — the pre-aggregated general
+ /// fuel-effect multiplier. May be empty: a cell with no matching ratio keeps
+ /// its emission unchanged.
     pub general_fuel_ratio: Vec<GeneralFuelRatioRow>,
-    /// `crankcaseSplit` rows — the crankcase-to-exhaust split fractions.
+ /// `crankcaseSplit` rows — the crankcase-to-exhaust split fractions.
     pub crankcase_split: Vec<CrankcaseSplitRow>,
-    /// `PMSpeciation` rows — the species speciation fractions.
+ /// `PMSpeciation` rows — the species speciation fractions.
     pub pm_speciation: Vec<PmSpeciationRow>,
-    /// `MOVESWorkerOutput` rows — the upstream emission records. The calculation
-    /// consumes the EC (112) and NonECPM (118) rows and passes every other
-    /// pollutant through unchanged.
+ /// `MOVESWorkerOutput` rows — the upstream emission records. The calculation
+ /// consumes the EC (112) and NonECPM (118) rows and passes every other
+ /// pollutant through unchanged.
     pub worker_output: Vec<EmissionRow>,
-    /// The iteration's primary exhaust process — `context.iterProcess`.
+ /// The iteration's primary exhaust process — `context.iterProcess`.
     pub primary_process_id: i32,
-    /// The iteration's crankcase process, if the primary process has one
-    /// (running → 15, start → 16, extended-idle → 17; auxiliary-power has
-    /// none).
+ /// The iteration's crankcase process, if the primary process has one
+ /// (running → 15, start → 16, extended-idle → 17; auxiliary-power has
+ /// none).
     pub crankcase_process_id: Option<i32>,
-    /// The processes for which the RunSpec requests Primary Exhaust PM2.5 -
-    /// Total (110) — `##primaryAndCrankcaseProcessIDsForPM25Total##`. Empty
-    /// disables the `MakePM2.5Total` section.
+ /// The processes for which the RunSpec requests Primary Exhaust PM2.5 -
+ /// Total (110) — `##primaryAndCrankcaseProcessIDsForPM25Total##`. Empty
+ /// disables the `MakePM2.5Total` section.
     pub pm25_total_process_ids: Vec<i32>,
-    /// The `pollutantID × 100 + processID` values the RunSpec requests output
-    /// for — `##polProcessIDs##`. A TOM (123) or NonECNonSO4NonOM (124) row is
-    /// kept only if its composite id is in this set.
+ /// The `pollutantID × 100 + processID` values the RunSpec requests output
+ /// for — `##polProcessIDs##`. A TOM (123) or NonECNonSO4NonOM (124) row is
+ /// kept only if its composite id is in this set.
     pub output_pol_processes: Vec<i32>,
 }
 
@@ -551,17 +547,17 @@ pub struct SulfatePmInputs {
 /// residue split uses.
 #[derive(Debug, Clone, Copy, Default)]
 struct SulfateFractionCell {
-    /// `SulfateNonECPMFraction` — `Σ marketShare × SulfatenonECPMFraction ×
-    /// adjustment`.
+ /// `SulfateNonECPMFraction` — `Σ marketShare × SulfatenonECPMFraction ×
+ /// adjustment`.
     sulfate_fraction: f64,
-    /// `H2ONonECPMFraction` — `Σ marketShare × H2ONonECPMFraction ×
-    /// adjustment`.
+ /// `H2ONonECPMFraction` — `Σ marketShare × H2ONonECPMFraction ×
+ /// adjustment`.
     h2o_fraction: f64,
-    /// `UnadjustedSulfatenonECPMFraction` — the base sulfate fraction, unweighted
-    /// and unadjusted, used by the residue (120) split.
+ /// `UnadjustedSulfatenonECPMFraction` — the base sulfate fraction, unweighted
+ /// and unadjusted, used by the residue (120) split.
     unadjusted_sulfate_fraction: f64,
-    /// `UnadjustedH2ONonECPMFraction` — the base water fraction, unweighted and
-    /// unadjusted, used by the residue (120) split.
+ /// `UnadjustedH2ONonECPMFraction` — the base water fraction, unweighted and
+ /// unadjusted, used by the residue (120) split.
     unadjusted_h2o_fraction: f64,
 }
 
@@ -578,30 +574,30 @@ type SulfateFractionKey = (i32, i32, i32, i32, i32);
 pub struct SulfatePMCalculator;
 
 impl SulfatePMCalculator {
-    /// Stable module name — matches the Java class and the chain-DAG entry.
+ /// Stable module name — matches the Java class and the chain-DAG entry.
     pub const NAME: &'static str = CALCULATOR_NAME;
 
-    /// Compute the speciated `MOVESWorkerOutput` — the port of
-    /// `SulfatePMCalculator.sql`.
-    ///
-    /// Returns the final state of `MOVESWorkerOutput`: the input rows minus the
-    /// consumed EC (112) and the NonECPM (118) of the iteration's processes,
-    /// plus the EC, sulfate, water, adjusted NonECPM, optional PM2.5 total,
-    /// trace species, Total Organic Matter and NonECNonSO4NonOM the script
-    /// inserts. The internal residue pollutant 120 is always dropped; Total
-    /// Organic Matter (123) and NonECNonSO4NonOM (124) are kept only when the
-    /// RunSpec requests them. The result is sorted by its integer dimension
-    /// columns for deterministic output.
+ /// Compute the speciated `MOVESWorkerOutput` — the port of
+ /// `SulfatePMCalculator.sql`.
+ ///
+ /// Returns the final state of `MOVESWorkerOutput`: the input rows minus the
+ /// consumed EC (112) and the NonECPM (118) of the iteration's processes,
+ /// plus the EC, sulfate, water, adjusted NonECPM, optional PM2.5 total,
+ /// trace species, Total Organic Matter and NonECNonSO4NonOM the script
+ /// inserts. The internal residue pollutant 120 is always dropped; Total
+ /// Organic Matter (123) and NonECNonSO4NonOM (124) are kept only when the
+ /// RunSpec requests them. The result is sorted by its integer dimension
+ /// columns for deterministic output.
     #[must_use]
     pub fn calculate(&self, inputs: &SulfatePmInputs) -> Vec<EmissionRow> {
         let fractions = compute_sulfate_fractions(inputs);
 
-        // --- spmOutput: copy EC (112) and split NonECPM (118) --------------
-        // The SQL copies every unadjusted EC row into spmOutput, then builds
-        // spmSplit1 (three conversion fractions per oneCountyYearSulfateFractions
-        // cell) and joins it to the NonECPM rows. This port folds spmSplit1 into
-        // the lookup: each 118 row resolves its fraction cell and emits one
-        // sulfate (115), one water (119) and one residue (120) row.
+ // --- spmOutput: copy EC (112) and split NonECPM (118) --------------
+ // The SQL copies every unadjusted EC row into spmOutput, then builds
+ // spmSplit1 (three conversion fractions per oneCountyYearSulfateFractions
+ // cell) and joins it to the NonECPM rows. This port folds spmSplit1 into
+ // the lookup: each 118 row resolves its fraction cell and emits one
+ // sulfate (115), one water (119) and one residue (120) row.
         let mut spm_output: Vec<EmissionRow> = Vec::new();
         for row in &inputs.worker_output {
             if row.pollutant_id == EC_POLLUTANT {
@@ -612,8 +608,8 @@ impl SulfatePMCalculator {
             if row.pollutant_id != NON_EC_PM_POLLUTANT {
                 continue;
             }
-            // INNER JOIN spmSplit1 — a NonECPM row with no fraction cell for
-            // its (process, fuel, source, month, modelYear) is dropped.
+ // INNER JOIN spmSplit1 — a NonECPM row with no fraction cell for
+ // its (process, fuel, source, month, modelYear) is dropped.
             let key: SulfateFractionKey = (
                 row.process_id,
                 row.fuel_type_id,
@@ -624,9 +620,9 @@ impl SulfatePMCalculator {
             let Some(cell) = fractions.get(&key) else {
                 continue;
             };
-            // 115 = NonECPM × adjusted sulfate fraction,
-            // 119 = NonECPM × adjusted water fraction,
-            // 120 = NonECPM × greatest(1 − unadjusted water − unadjusted sulfate, 0).
+ // 115 = NonECPM × adjusted sulfate fraction,
+ // 119 = NonECPM × adjusted water fraction,
+ // 120 = NonECPM × greatest(1 − unadjusted water − unadjusted sulfate, 0).
             let residue_fraction =
                 (1.0 - cell.unadjusted_h2o_fraction - cell.unadjusted_sulfate_fraction).max(0.0);
             for (out_pollutant, fraction) in [
@@ -643,10 +639,10 @@ impl SulfatePMCalculator {
             }
         }
 
-        // --- apply the general fuel-effect ratio ---------------------------
-        // A multi-table UPDATE: only the residue (120) carries ratio rows, so
-        // only the residue is rescaled; a row with no matching ratio is left
-        // unchanged. Match by exact ids and model-year/age ranges.
+ // --- apply the general fuel-effect ratio ---------------------------
+ // A multi-table UPDATE: only the residue (120) carries ratio rows, so
+ // only the residue is rescaled; a row with no matching ratio is left
+ // unchanged. Match by exact ids and model-year/age ranges.
         for row in &mut spm_output {
             let age = row.year_id - row.model_year_id;
             if let Some(gfr) = inputs.general_fuel_ratio.iter().find(|gfr| {
@@ -664,11 +660,11 @@ impl SulfatePMCalculator {
             }
         }
 
-        // --- crankcase split → spmOutput2 ----------------------------------
-        // Each spmOutput row joins crankcaseSplit on (pollutant, fuel, source,
-        // regClass) with the model year inside the split's window — the join
-        // does not constrain process, so a primary-process row that matches a
-        // primary and a crankcase split row yields one of each.
+ // --- crankcase split → spmOutput2 ----------------------------------
+ // Each spmOutput row joins crankcaseSplit on (pollutant, fuel, source,
+ // regClass) with the model year inside the split's window — the join
+ // does not constrain process, so a primary-process row that matches a
+ // primary and a crankcase split row yields one of each.
         let crankcase_index = index_crankcase_split(&inputs.crankcase_split);
         let mut spm_output2: Vec<EmissionRow> = Vec::new();
         for row in &spm_output {
@@ -695,15 +691,15 @@ impl SulfatePMCalculator {
             }
         }
 
-        // --- assemble the final MOVESWorkerOutput --------------------------
+ // --- assemble the final MOVESWorkerOutput --------------------------
         let mut primary_and_crankcase = vec![inputs.primary_process_id];
         if let Some(crankcase) = inputs.crankcase_process_id {
             primary_and_crankcase.push(crankcase);
         }
 
-        // Start from the input minus the consumed EC (deleted unconditionally)
-        // and the NonECPM of the iteration's processes (deleted before the
-        // adjusted NonECPM is re-inserted).
+ // Start from the input minus the consumed EC (deleted unconditionally)
+ // and the NonECPM of the iteration's processes (deleted before the
+ // adjusted NonECPM is re-inserted).
         let mut mwo: Vec<EmissionRow> = inputs
             .worker_output
             .iter()
@@ -717,8 +713,8 @@ impl SulfatePMCalculator {
             .copied()
             .collect();
 
-        // Section MakePM2.5Total — sum EC, residue, sulfate and water into 110
-        // for the requested processes. An empty list disables the section.
+ // Section MakePM2.5Total — sum EC, residue, sulfate and water into 110
+ // for the requested processes. An empty list disables the section.
         if !inputs.pm25_total_process_ids.is_empty() {
             mwo.extend(sum_to_pollutant(
                 &spm_output2,
@@ -728,15 +724,15 @@ impl SulfatePMCalculator {
             ));
         }
 
-        // Copy EC, sulfate, water and residue verbatim to the output.
+ // Copy EC, sulfate, water and residue verbatim to the output.
         for row in &spm_output2 {
             if COPIED_SPECIES.contains(&row.pollutant_id) {
                 mwo.push(*row);
             }
         }
 
-        // Re-sum the adjusted residue, sulfate and water into NonECPM (118) for
-        // the iteration's processes.
+ // Re-sum the adjusted residue, sulfate and water into NonECPM (118) for
+ // the iteration's processes.
         mwo.extend(sum_to_pollutant(
             &spm_output2,
             &NON_EC_PM_INPUTS,
@@ -744,22 +740,22 @@ impl SulfatePMCalculator {
             NON_EC_PM_POLLUTANT,
         ));
 
-        // Speciate the spmOutput2 species into the trace metals/ions and
-        // organic carbon.
+ // Speciate the spmOutput2 species into the trace metals/ions and
+ // organic carbon.
         mwo.extend(speciate(&spm_output2, &inputs.pm_speciation));
 
-        // Total Organic Matter (123) = organic carbon (111) + NCOM (122),
-        // read from the output as it stands after speciation.
+ // Total Organic Matter (123) = organic carbon (111) + NCOM (122),
+ // read from the output as it stands after speciation.
         let tom = sum_to_pollutant(&mwo, &TOM_INPUTS, |_| true, TOM_POLLUTANT);
         mwo.extend(tom);
 
-        // NonECNonSO4NonOM PM (124) = residue (120) with its organic matter
-        // removed.
+ // NonECNonSO4NonOM PM (124) = residue (120) with its organic matter
+ // removed.
         let non_om = compute_non_ec_non_so4_non_om(&mwo, &inputs.pm_speciation);
         mwo.extend(non_om);
 
-        // Drop the internal residue (120) unconditionally; drop TOM (123) and
-        // NonECNonSO4NonOM (124) unless the RunSpec requested them.
+ // Drop the internal residue (120) unconditionally; drop TOM (123) and
+ // NonECNonSO4NonOM (124) unless the RunSpec requested them.
         mwo.retain(|row| {
             if row.pollutant_id == NON_EC_NON_SO4_PM_POLLUTANT {
                 return false;
@@ -780,7 +776,7 @@ impl SulfatePMCalculator {
 }
 
 /// Port of the SQL's `oneCountyYearSulfateFractions` "Extract Data" aggregation
-/// — the headline fuel-sulfur sulfate-fraction algorithm.
+/// the headline fuel-sulfur sulfate-fraction algorithm.
 ///
 /// For each `sulfateFractions` row and each run-spec model year inside its
 /// window, the market-share-weighted adjusted sulfate and water fractions are
@@ -807,7 +803,7 @@ fn compute_sulfate_fractions(
         .iter()
         .map(|fst| (fst.fuel_subtype_id, fst))
         .collect();
-    // monthGroupID → the calendar months it covers.
+ // monthGroupID → the calendar months it covers.
     let mut months_of_group: FxHashMap<i32, Vec<i32>> = FxHashMap::default();
     for month in &inputs.month_of_any_year {
         months_of_group
@@ -819,33 +815,33 @@ fn compute_sulfate_fractions(
     let mut cells: FxHashMap<SulfateFractionKey, SulfateFractionCell> = FxHashMap::default();
     for sf in &inputs.sulfate_fractions {
         for &model_year in &inputs.run_spec_model_years {
-            // sf.minModelYearID <= mya.modelYearID <= sf.maxModelYearID.
+ // sf.minModelYearID <= mya.modelYearID <= sf.maxModelYearID.
             if model_year < sf.min_model_year_id || model_year > sf.max_model_year_id {
                 continue;
             }
             for fs in &inputs.fuel_supply {
-                // INNER JOIN FuelFormulation USING (fuelFormulationID).
+ // INNER JOIN FuelFormulation USING (fuelFormulationID).
                 let Some(ff) = formulation.get(&fs.fuel_formulation_id) else {
                     continue;
                 };
-                // INNER JOIN FuelSubtype USING (fuelSubtypeID), with the
-                // subtype's fuel type pinned to this sulfateFractions row's.
+ // INNER JOIN FuelSubtype USING (fuelSubtypeID), with the
+ // subtype's fuel type pinned to this sulfateFractions row's.
                 let Some(fst) = subtype.get(&ff.fuel_subtype_id) else {
                     continue;
                 };
                 if fst.fuel_type_id != sf.fuel_type_id {
                     continue;
                 }
-                // INNER JOIN MonthOfAnyYear ON monthGroupID.
+ // INNER JOIN MonthOfAnyYear ON monthGroupID.
                 let Some(months) = months_of_group.get(&fs.month_group_id) else {
                     continue;
                 };
-                // adjustment = 1 + BaseFuelSulfateFraction
-                //              × (coalesce(sulfurLevel, 0) / BaseFuelSulfurLevel − 1).
+ // adjustment = 1 + BaseFuelSulfateFraction
+ // × (coalesce(sulfurLevel, 0) / BaseFuelSulfurLevel − 1).
                 let sulfur_level = ff.sulfur_level.unwrap_or(0.0);
                 let adjustment = 1.0
                     + sf.base_fuel_sulfate_fraction
-                        * ((sulfur_level / sf.base_fuel_sulfur_level) - 1.0);
+ * ((sulfur_level / sf.base_fuel_sulfur_level) - 1.0);
                 for &month_id in months {
                     let cell = cells
                         .entry((
@@ -986,8 +982,8 @@ fn compute_non_ec_non_so4_non_om(
     mwo: &[EmissionRow],
     pm_speciation: &[PmSpeciationRow],
 ) -> Vec<EmissionRow> {
-    // Σ pmSpeciationFraction over the organic-matter species, keyed by the
-    // PMSpeciation sub-aggregate's GROUP BY.
+ // Σ pmSpeciationFraction over the organic-matter species, keyed by the
+ // PMSpeciation sub-aggregate's GROUP BY.
     let mut fraction_sums: FxHashMap<(i32, i32, i32, i32, i32, i32), f64> = FxHashMap::default();
     for ps in pm_speciation {
         if ps.output_pollutant_id != ORGANIC_CARBON_POLLUTANT
@@ -995,7 +991,7 @@ fn compute_non_ec_non_so4_non_om(
         {
             continue;
         }
-        *fraction_sums
+ *fraction_sums
             .entry((
                 ps.process_id,
                 ps.input_pollutant_id,
@@ -1087,8 +1083,7 @@ static REGISTRATIONS: [PollutantProcessAssociation; REGISTRATION_COUNT] = {
 /// subscription of its own.
 static NO_SUBSCRIPTIONS: &[CalculatorSubscription] = &[];
 
-/// The upstream calculator `SulfatePMCalculator` chains off —
-/// `BaseRateCalculator`, which produces the EC (112) and NonECPM (118) records
+/// The upstream calculator `SulfatePMCalculator` chains off/// `BaseRateCalculator`, which produces the EC (112) and NonECPM (118) records
 /// the speciation consumes. `CalculatorInfo.txt` records
 /// `Chain SulfatePMCalculator BaseRateCalculator`.
 static UPSTREAM: &[&str] = &["BaseRateCalculator"];
@@ -2214,9 +2209,9 @@ impl Calculator for SulfatePMCalculator {
         Self::NAME
     }
 
-    /// `SulfatePMCalculator` is a chained calculator: it does not subscribe to
-    /// the MasterLoop directly but fires when its upstream `BaseRateCalculator`
-    /// does. `CalculatorInfo.txt` carries no `Subscribe` directive for it.
+ /// `SulfatePMCalculator` is a chained calculator: it does not subscribe to
+ /// the MasterLoop directly but fires when its upstream `BaseRateCalculator`
+ /// does. `CalculatorInfo.txt` carries no `Subscribe` directive for it.
     fn subscriptions(&self) -> &[CalculatorSubscription] {
         NO_SUBSCRIPTIONS
     }
@@ -2225,8 +2220,7 @@ impl Calculator for SulfatePMCalculator {
         &REGISTRATIONS
     }
 
-    /// `SulfatePMCalculator` chains off `BaseRateCalculator` —
-    /// `CalculatorInfo.txt` records `Chain SulfatePMCalculator BaseRateCalculator`.
+ /// `SulfatePMCalculator` chains off `BaseRateCalculator` /// `CalculatorInfo.txt` records `Chain SulfatePMCalculator BaseRateCalculator`.
     fn upstream(&self) -> &[&'static str] {
         UPSTREAM
     }
@@ -2253,7 +2247,7 @@ pub fn factory() -> Box<dyn Calculator> {
 mod tests {
     use super::*;
 
-    /// Assert `actual` matches `expected` within `f64` slack.
+ /// Assert `actual` matches `expected` within `f64` slack.
     fn assert_close(actual: f64, expected: f64) {
         assert!(
             (actual - expected).abs() < 1e-9,
@@ -2261,9 +2255,9 @@ mod tests {
         );
     }
 
-    /// One EC / NonECPM emission row in the minimal scenario's dimension cell:
-    /// year 2020, month 1, model year 2018, fuel type 2, source type 21,
-    /// reg class 30, process 1 (Running Exhaust).
+ /// One EC / NonECPM emission row in the minimal scenario's dimension cell:
+ /// year 2020, month 1, model year 2018, fuel type 2, source type 21,
+ /// reg class 30, process 1 (Running Exhaust).
     fn base_row(pollutant: i32, quant: f64, rate: f64) -> EmissionRow {
         EmissionRow {
             year_id: 2020,
@@ -2286,18 +2280,18 @@ mod tests {
         }
     }
 
-    /// A minimal one-cell scenario with hand-computable results.
-    ///
-    /// One fuel formulation (sulfur level 30) over one month, one
-    /// `sulfateFractions` row (base sulfate 0.2, base water 0.05,
-    /// `BaseFuelSulfateFraction` 0.1, `BaseFuelSulfurLevel` 10), so
-    /// `adjustment = 1 + 0.1 × (30/10 − 1) = 1.2` and the adjusted fractions
-    /// are sulfate 0.24, water 0.06; the residue fraction is
-    /// `1 − 0.05 − 0.2 = 0.75`.
-    ///
-    /// Inputs: EC (112) quant 100, NonECPM (118) quant 1000. Crankcase split is
-    /// the identity (primary process, ratio 1). One `PMSpeciation` row
-    /// speciates the residue (120) into organic carbon (111) at fraction 0.3.
+ /// A minimal one-cell scenario with hand-computable results.
+ ///
+ /// One fuel formulation (sulfur level 30) over one month, one
+ /// `sulfateFractions` row (base sulfate 0.2, base water 0.05,
+ /// `BaseFuelSulfateFraction` 0.1, `BaseFuelSulfurLevel` 10), so
+ /// `adjustment = 1 + 0.1 × (30/10 − 1) = 1.2` and the adjusted fractions
+ /// are sulfate 0.24, water 0.06; the residue fraction is
+ /// `1 − 0.05 − 0.2 = 0.75`.
+ ///
+ /// Inputs: EC (112) quant 100, NonECPM (118) quant 1000. Crankcase split is
+ /// the identity (primary process, ratio 1). One `PMSpeciation` row
+ /// speciates the residue (120) into organic carbon (111) at fraction 0.3.
     fn minimal_inputs() -> SulfatePmInputs {
         SulfatePmInputs {
             fuel_supply: vec![FuelSupplyRow {
@@ -2358,8 +2352,8 @@ mod tests {
         }
     }
 
-    /// An identity crankcase split — keeps the pollutant in the primary process
-    /// (process 1) with ratio 1, so `spmOutput2` equals `spmOutput`.
+ /// An identity crankcase split — keeps the pollutant in the primary process
+ /// (process 1) with ratio 1, so `spmOutput2` equals `spmOutput`.
     fn crankcase_identity(pollutant: i32) -> CrankcaseSplitRow {
         CrankcaseSplitRow {
             process_id: 1,
@@ -2373,8 +2367,8 @@ mod tests {
         }
     }
 
-    /// Find the single output row for `pollutant`, asserting there is exactly
-    /// one.
+ /// Find the single output row for `pollutant`, asserting there is exactly
+ /// one.
     fn row_for(rows: &[EmissionRow], pollutant: i32) -> EmissionRow {
         let matches: Vec<&EmissionRow> = rows
             .iter()
@@ -2386,13 +2380,13 @@ mod tests {
             "expected exactly one row for pollutant {pollutant}, got {}",
             matches.len(),
         );
-        *matches[0]
+ *matches[0]
     }
 
     #[test]
     fn compute_sulfate_fractions_applies_the_fuel_sulfur_adjustment() {
-        // adjustment = 1 + 0.1 × (30/10 − 1) = 1.2;
-        // sulfate 0.2 × 1.2 = 0.24, water 0.05 × 1.2 = 0.06.
+ // adjustment = 1 + 0.1 × (30/10 − 1) = 1.2;
+ // sulfate 0.2 × 1.2 = 0.24, water 0.05 × 1.2 = 0.06.
         let cells = compute_sulfate_fractions(&minimal_inputs());
         let cell = cells.get(&(1, 2, 21, 1, 2018)).expect("cell present");
         assert_close(cell.sulfate_fraction, 0.24);
@@ -2403,7 +2397,7 @@ mod tests {
 
     #[test]
     fn compute_sulfate_fractions_coalesces_a_null_sulfur_level_to_zero() {
-        // A null sulfur level → adjustment = 1 + 0.1 × (0/10 − 1) = 0.9.
+ // A null sulfur level → adjustment = 1 + 0.1 × (0/10 − 1) = 0.9.
         let mut inputs = minimal_inputs();
         inputs.fuel_formulation[0].sulfur_level = None;
         let cells = compute_sulfate_fractions(&inputs);
@@ -2414,9 +2408,9 @@ mod tests {
 
     #[test]
     fn compute_sulfate_fractions_weights_by_market_share() {
-        // Two formulations, shares 0.25 / 0.75, sulfur 30 / 10:
-        //   adj30 = 1.2, adj10 = 1 + 0.1 × (10/10 − 1) = 1.0
-        //   sulfate = 0.25 × 0.2 × 1.2 + 0.75 × 0.2 × 1.0 = 0.06 + 0.15 = 0.21
+ // Two formulations, shares 0.25 / 0.75, sulfur 30 / 10:
+ // adj30 = 1.2, adj10 = 1 + 0.1 × (10/10 − 1) = 1.0
+ // sulfate = 0.25 × 0.2 × 1.2 + 0.75 × 0.2 × 1.0 = 0.06 + 0.15 = 0.21
         let mut inputs = minimal_inputs();
         inputs.fuel_supply = vec![
             FuelSupplyRow {
@@ -2442,12 +2436,12 @@ mod tests {
 
     #[test]
     fn calculate_minimal_scenario_produces_the_full_species_family() {
-        // spmOutput: EC 100; from NonECPM 1000 — 115 = 1000×0.24 = 240,
-        // 119 = 1000×0.06 = 60, 120 = 1000×0.75 = 750.
-        // 118 re-sum = 240 + 60 + 750 = 1050.
-        // 111 = 750 × 0.3 = 225; 123 (TOM) = 225; 124 = 750 × (1 − 0.3) = 525.
+ // spmOutput: EC 100; from NonECPM 1000 — 115 = 1000×0.24 = 240,
+ // 119 = 1000×0.06 = 60, 120 = 1000×0.75 = 750.
+ // 118 re-sum = 240 + 60 + 750 = 1050.
+ // 111 = 750 × 0.3 = 225; 123 (TOM) = 225; 124 = 750 × (1 − 0.3) = 525.
         let rows = SulfatePMCalculator.calculate(&minimal_inputs());
-        // EC, sulfate, water, NonECPM, organic carbon, TOM, NonECNonSO4NonOM.
+ // EC, sulfate, water, NonECPM, organic carbon, TOM, NonECNonSO4NonOM.
         assert_eq!(rows.len(), 7, "expected seven output rows");
         assert_close(row_for(&rows, EC_POLLUTANT).emission_quant, 100.0);
         assert_close(row_for(&rows, SULFATE_POLLUTANT).emission_quant, 240.0);
@@ -2466,8 +2460,8 @@ mod tests {
 
     #[test]
     fn calculate_scales_the_emission_rate_alongside_the_quantity() {
-        // The minimal NonECPM rate is 50: 115 = 50×0.24 = 12, 119 = 50×0.06 = 3,
-        // 120 = 50×0.75 = 37.5; 118 re-sum = 52.5.
+ // The minimal NonECPM rate is 50: 115 = 50×0.24 = 12, 119 = 50×0.06 = 3,
+ // 120 = 50×0.75 = 37.5; 118 re-sum = 52.5.
         let rows = SulfatePMCalculator.calculate(&minimal_inputs());
         assert_close(row_for(&rows, EC_POLLUTANT).emission_rate, 10.0);
         assert_close(row_for(&rows, SULFATE_POLLUTANT).emission_rate, 12.0);
@@ -2477,7 +2471,7 @@ mod tests {
 
     #[test]
     fn calculate_drops_the_internal_residue_pollutant() {
-        // Pollutant 120 (NonECNonSO4PM) is always deleted from the output.
+ // Pollutant 120 (NonECNonSO4PM) is always deleted from the output.
         let rows = SulfatePMCalculator.calculate(&minimal_inputs());
         assert!(rows
             .iter()
@@ -2486,9 +2480,9 @@ mod tests {
 
     #[test]
     fn calculate_clamps_the_residue_fraction_at_zero() {
-        // Base fractions that sum above 1 (sulfate 0.7, water 0.5) would give a
-        // negative residue fraction; greatest(…, 0) clamps it, so the residue,
-        // organic carbon, TOM and NonECNonSO4NonOM are all zero.
+ // Base fractions that sum above 1 (sulfate 0.7, water 0.5) would give a
+ // negative residue fraction; greatest(…, 0) clamps it, so the residue,
+ // organic carbon, TOM and NonECNonSO4NonOM are all zero.
         let mut inputs = minimal_inputs();
         inputs.sulfate_fractions[0].sulfate_non_ec_pm_fraction = 0.7;
         inputs.sulfate_fractions[0].h2o_non_ec_pm_fraction = 0.5;
@@ -2503,10 +2497,10 @@ mod tests {
 
     #[test]
     fn calculate_applies_the_general_fuel_ratio_to_the_residue_only() {
-        // A ratio of 2 for pollutant 120 doubles the residue: 120 → 1500, so
-        // 118 re-sum = 240 + 60 + 1500 = 1800, 111 = 1500×0.3 = 450,
-        // 124 = 1500×0.7 = 1050. Sulfate (115) and water (119) are untouched.
-        // base_row: year=2020, model_year=2018, age=2, fuel=2, source=21.
+ // A ratio of 2 for pollutant 120 doubles the residue: 120 → 1500, so
+ // 118 re-sum = 240 + 60 + 1500 = 1800, 111 = 1500×0.3 = 450,
+ // 124 = 1500×0.7 = 1050. Sulfate (115) and water (119) are untouched.
+ // base_row: year=2020, model_year=2018, age=2, fuel=2, source=21.
         let mut inputs = minimal_inputs();
         inputs.general_fuel_ratio = vec![GeneralFuelRatioRow {
             fuel_type_id: 2,
@@ -2535,8 +2529,8 @@ mod tests {
 
     #[test]
     fn calculate_leaves_emission_unchanged_when_no_fuel_ratio_matches() {
-        // A ratio row that matches every column but the fuel type does not
-        // apply — the SQL UPDATE leaves the unmatched row untouched.
+ // A ratio row that matches every column but the fuel type does not
+ // apply — the SQL UPDATE leaves the unmatched row untouched.
         let mut inputs = minimal_inputs();
         inputs.general_fuel_ratio = vec![GeneralFuelRatioRow {
             fuel_type_id: 99, // mismatches base_row fuel_type_id 2
@@ -2555,9 +2549,9 @@ mod tests {
 
     #[test]
     fn calculate_splits_each_species_across_the_crankcase_process() {
-        // Add a crankcase split (process 15, ratio 0.1) for every species. Each
-        // primary-process row now also produces a crankcase-process row scaled
-        // by 0.1, so every species appears for processes 1 and 15.
+ // Add a crankcase split (process 15, ratio 0.1) for every species. Each
+ // primary-process row now also produces a crankcase-process row scaled
+ // by 0.1, so every species appears for processes 1 and 15.
         let mut inputs = minimal_inputs();
         for pollutant in COPIED_SPECIES {
             inputs.crankcase_split.push(CrankcaseSplitRow {
@@ -2577,9 +2571,9 @@ mod tests {
             .filter(|r| r.pollutant_id == SULFATE_POLLUTANT && r.process_id == 15)
             .collect();
         assert_eq!(sulfate_15.len(), 1);
-        // 240 (primary sulfate) × 0.1.
+ // 240 (primary sulfate) × 0.1.
         assert_close(sulfate_15[0].emission_quant, 24.0);
-        // The primary-process sulfate row survives unchanged.
+ // The primary-process sulfate row survives unchanged.
         let sulfate_1: Vec<&EmissionRow> = rows
             .iter()
             .filter(|r| r.pollutant_id == SULFATE_POLLUTANT && r.process_id == 1)
@@ -2590,8 +2584,8 @@ mod tests {
 
     #[test]
     fn calculate_makes_pm25_total_when_the_section_is_enabled() {
-        // With process 1 in the PM2.5-total list, pollutant 110 is the sum of
-        // EC 100, sulfate 240, water 60 and residue 750 = 1150.
+ // With process 1 in the PM2.5-total list, pollutant 110 is the sum of
+ // EC 100, sulfate 240, water 60 and residue 750 = 1150.
         let mut inputs = minimal_inputs();
         inputs.pm25_total_process_ids = vec![1];
         let rows = SulfatePMCalculator.calculate(&inputs);
@@ -2600,15 +2594,15 @@ mod tests {
 
     #[test]
     fn calculate_omits_pm25_total_when_the_section_is_disabled() {
-        // The minimal scenario leaves the PM2.5-total list empty.
+ // The minimal scenario leaves the PM2.5-total list empty.
         let rows = SulfatePMCalculator.calculate(&minimal_inputs());
         assert!(rows.iter().all(|r| r.pollutant_id != PM25_TOTAL_POLLUTANT));
     }
 
     #[test]
     fn calculate_keeps_tom_and_residue_species_only_when_requested() {
-        // With an empty output-pol-process list, TOM (123) and NonECNonSO4NonOM
-        // (124) are dropped; the other five species remain.
+ // With an empty output-pol-process list, TOM (123) and NonECNonSO4NonOM
+ // (124) are dropped; the other five species remain.
         let mut inputs = minimal_inputs();
         inputs.output_pol_processes = vec![];
         let rows = SulfatePMCalculator.calculate(&inputs);
@@ -2621,8 +2615,8 @@ mod tests {
 
     #[test]
     fn calculate_speciates_into_multiple_output_species() {
-        // A second PMSpeciation row makes NCOM (122) at fraction 0.1 from the
-        // residue; TOM (123) is then organic carbon 225 + NCOM 75 = 300.
+ // A second PMSpeciation row makes NCOM (122) at fraction 0.1 from the
+ // residue; TOM (123) is then organic carbon 225 + NCOM 75 = 300.
         let mut inputs = minimal_inputs();
         inputs.pm_speciation.push(PmSpeciationRow {
             process_id: 1,
@@ -2637,7 +2631,7 @@ mod tests {
         let rows = SulfatePMCalculator.calculate(&inputs);
         assert_close(row_for(&rows, NCOM_POLLUTANT).emission_quant, 75.0);
         assert_close(row_for(&rows, TOM_POLLUTANT).emission_quant, 300.0);
-        // ratio124 = 1 − (0.3 + 0.1) = 0.6, so 124 = 750 × 0.6 = 450.
+ // ratio124 = 1 − (0.3 + 0.1) = 0.6, so 124 = 750 × 0.6 = 450.
         assert_close(
             row_for(&rows, NON_EC_NON_SO4_NON_OM_POLLUTANT).emission_quant,
             450.0,
@@ -2646,7 +2640,7 @@ mod tests {
 
     #[test]
     fn calculate_passes_unrelated_pollutants_through() {
-        // A CO (pollutant 2) row the calculator does not touch survives intact.
+ // A CO (pollutant 2) row the calculator does not touch survives intact.
         let mut inputs = minimal_inputs();
         inputs.worker_output.push(base_row(2, 999.0, 9.0));
         let rows = SulfatePMCalculator.calculate(&inputs);
@@ -2657,9 +2651,9 @@ mod tests {
 
     #[test]
     fn calculate_consumes_the_input_ec_and_non_ec_pm_rows() {
-        // The output's EC (112) is the adjusted/crankcase-split EC, not the raw
-        // input row, and the input NonECPM (118) is replaced by the re-sum.
-        // Both still come back exactly once.
+ // The output's EC (112) is the adjusted/crankcase-split EC, not the raw
+ // input row, and the input NonECPM (118) is replaced by the re-sum.
+ // Both still come back exactly once.
         let rows = SulfatePMCalculator.calculate(&minimal_inputs());
         assert_eq!(
             rows.iter()
@@ -2677,8 +2671,8 @@ mod tests {
 
     #[test]
     fn calculate_drops_a_non_ec_pm_row_without_a_fraction_cell() {
-        // A NonECPM row whose model year is outside every sulfateFractions
-        // window resolves no cell, so it produces no sulfate/water/residue.
+ // A NonECPM row whose model year is outside every sulfateFractions
+ // window resolves no cell, so it produces no sulfate/water/residue.
         let mut inputs = minimal_inputs();
         inputs.run_spec_model_years = vec![1990];
         inputs.worker_output = vec![
@@ -2689,7 +2683,7 @@ mod tests {
             },
         ];
         let rows = SulfatePMCalculator.calculate(&inputs);
-        // Only EC survives — no sulfate, water, residue or downstream species.
+ // Only EC survives — no sulfate, water, residue or downstream species.
         assert!(rows.iter().all(|r| r.pollutant_id == EC_POLLUTANT));
     }
 
@@ -2725,11 +2719,11 @@ mod tests {
 
     #[test]
     fn registrations_are_the_133_calculator_info_directives() {
-        // 19 PM-species pollutants × 7 exhaust processes = 133 Registration
-        // directives in CalculatorInfo.txt.
+ // 19 PM-species pollutants × 7 exhaust processes = 133 Registration
+ // directives in CalculatorInfo.txt.
         let regs = SulfatePMCalculator.registrations();
         assert_eq!(regs.len(), 133);
-        // Every registered pollutant appears for exactly the 7 processes.
+ // Every registered pollutant appears for exactly the 7 processes.
         for &pollutant in &REGISTERED_POLLUTANTS {
             let mut procs: Vec<u16> = regs
                 .iter()
@@ -2739,7 +2733,7 @@ mod tests {
             procs.sort_unstable();
             assert_eq!(procs, vec![1, 2, 15, 16, 17, 90, 91]);
         }
-        // No pair is registered twice.
+ // No pair is registered twice.
         let mut pairs: Vec<(u16, u16)> = regs
             .iter()
             .map(|r| (r.pollutant_id.0, r.process_id.0))

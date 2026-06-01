@@ -1,5 +1,5 @@
 //! Port of `LiquidLeakingCalculator.java` and
-//! `database/LiquidLeakingCalculator.sql` — migration plan Phase 3, Task 61.
+//! `database/LiquidLeakingCalculator.sql` — .
 //!
 //! `LiquidLeakingCalculator` computes **Total Gaseous Hydrocarbon (THC)**
 //! emissions for the **Evap Fuel Leaks** process — the raw fuel that weeps
@@ -33,16 +33,16 @@
 //!
 //! ```text
 //! emissionQuant = max(emissionQuantIM × IMAdjustFract
-//!                     + emissionQuant × (1 − IMAdjustFract), 0)
+//! + emissionQuant × (1 − IMAdjustFract), 0)
 //! ```
 //!
 //! * `weightedMeanBaseRate` — the source-bin-activity-weighted mean leak rate
-//!   for the cell, with `weightedMeanBaseRateIM` its I/M-program counterpart.
+//! for the cell, with `weightedMeanBaseRateIM` its I/M-program counterpart.
 //! * `sourceHours` — the hours of vehicle activity in the cell.
 //! * `opModeFraction` — the fraction of that activity in the cell's operating
-//!   mode.
+//! mode.
 //! * `IMAdjustFract` — the I/M adjustment fraction: a value of `f` blends the
-//!   I/M rate in at weight `f` and the non-I/M rate at weight `1 − f`.
+//! I/M rate in at weight `f` and the non-I/M rate at weight `1 − f`.
 //!
 //! # Algorithm — the SQL "Processing" section
 //!
@@ -81,14 +81,14 @@
 //! unconditionally adds `"WithRegClassID"` to the enabled SQL sections, so
 //! `NoRegClassID` is dead in current MOVES. This port implements
 //! `WithRegClassID` alone; `LiquidLeakingCalculator.sql` retains `NoRegClassID`
-//! as reference. This matches the `ActivityCalculator` port (Task 71).
+//! as reference. This matches the `ActivityCalculator` port.
 //!
 //! # Scope of this port
 //!
 //! [`calculate`](LiquidLeakingCalculator::calculate) is the SQL "Processing"
 //! section. Its [`LiquidLeakingInputs`] argument is the set of tables the
 //! SQL's "Create Remote Tables" / "Extract Data" sections produce, as plain
-//! row vectors; a future Task 50 (`DataFrameStore`) wiring populates it from
+//! row vectors; a future (`DataFrameStore`) wiring populates it from
 //! the per-run filtered execution database.
 //!
 //! The "Extract Data" `WHERE` clauses are the data-plane contract, not the
@@ -113,7 +113,7 @@
 //! `f64` end to end, so it does not reproduce the `f32` truncation MOVES
 //! applies when it writes those intermediates — a sub-`1e-7` relative drift.
 //! Reproducing it bug-for-bug is the calculator integration validation call
-//! (`mo-fvuf`), matching the `SO2Calculator` / `DistanceCalculator` precedent.
+//! (), matching the `SO2Calculator` / `DistanceCalculator` precedent.
 //! `meanBaseRate`, `meanBaseRateIM`, `sourceBinActivityFraction`,
 //! `sourceHours`, `opModeFraction`, `IMFactor` and `complianceFactor` are
 //! likewise `FLOAT` columns, but they are model *inputs* — already
@@ -129,11 +129,11 @@
 //! `f64::max`; it bites only when `IMAdjustFract` exceeds 1 and the I/M rate
 //! is below the non-I/M rate, which would otherwise drive the blend negative.
 //!
-//! # Data plane (Task 50)
+//! # Data plane
 //!
 //! [`Calculator::execute`] receives a [`CalculatorContext`] whose
-//! `ExecutionTables` / `ScratchNamespace` are Phase 2 placeholders until the
-//! `DataFrameStore` lands (migration-plan Task 50), so `execute` cannot yet
+//! `ExecutionTables` / `ScratchNamespace` are placeholders until the
+//! `DataFrameStore` lands (), so `execute` cannot yet
 //! read the input tables nor emit `MOVESWorkerOutput`. The numeric algorithm
 //! is fully ported and unit-tested on
 //! [`calculate`](LiquidLeakingCalculator::calculate); `execute` is a
@@ -169,7 +169,7 @@ const EVAP_FUEL_LEAKS_PROCESS: ProcessId = ProcessId(13);
 // ===========================================================================
 // Input tables — plain Rust mirrors of the tables `LiquidLeakingCalculator.sql`'s
 // "Extract Data" section pulls that feed the "Processing" section. Following
-// the Phase 3 convention, every `INT`/`SMALLINT` identifier is an `i32` (the
+// the convention, every `INT`/`SMALLINT` identifier is an `i32` (the
 // `BIGINT` `sourceBinID` an `i64`) and every `FLOAT`/`DOUBLE` quantity is an
 // `f64`. Only the columns the algorithm reads are modelled.
 // ===========================================================================
@@ -183,15 +183,15 @@ const EVAP_FUEL_LEAKS_PROCESS: ProcessId = ProcessId(13);
 /// the (single-row) `County` / `Zone` / `Link` extracts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct LiquidLeakingContext {
-    /// `##context.year##` — the calendar year of the run.
+ /// `##context.year##` — the calendar year of the run.
     pub year: i32,
-    /// `##context.iterLocation.stateRecordID##`.
+ /// `##context.iterLocation.stateRecordID##`.
     pub state_id: i32,
-    /// `##context.iterLocation.countyRecordID##`.
+ /// `##context.iterLocation.countyRecordID##`.
     pub county_id: i32,
-    /// `##context.iterLocation.zoneRecordID##`.
+ /// `##context.iterLocation.zoneRecordID##`.
     pub zone_id: i32,
-    /// `##context.iterLocation.linkRecordID##`.
+ /// `##context.iterLocation.linkRecordID##`.
     pub link_id: i32,
 }
 
@@ -199,11 +199,11 @@ pub struct LiquidLeakingContext {
 /// resolving a `polProcessID` and model year to its I/M model-year group.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PollutantProcessMappedModelYearRow {
-    /// `polProcessID` — `pollutantID × 100 + processID`.
+ /// `polProcessID` — `pollutantID × 100 + processID`.
     pub pol_process_id: i32,
-    /// `modelYearID` — the individual model year.
+ /// `modelYearID` — the individual model year.
     pub model_year_id: i32,
-    /// `IMModelYearGroupID` — joins to [`ImFactorRow::im_model_year_group_id`].
+ /// `IMModelYearGroupID` — joins to [`ImFactorRow::im_model_year_group_id`].
     pub im_model_year_group_id: i32,
 }
 
@@ -213,11 +213,11 @@ pub struct PollutantProcessMappedModelYearRow {
 /// every row here is for the Evap Fuel Leaks process.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PollutantProcessAssocRow {
-    /// `polProcessID` — `pollutantID × 100 + processID`.
+ /// `polProcessID` — `pollutantID × 100 + processID`.
     pub pol_process_id: i32,
-    /// `processID` — the emission process.
+ /// `processID` — the emission process.
     pub process_id: i32,
-    /// `pollutantID` — the pollutant.
+ /// `pollutantID` — the pollutant.
     pub pollutant_id: i32,
 }
 
@@ -225,21 +225,21 @@ pub struct PollutantProcessAssocRow {
 /// factor for an `(I/M model-year group, age group)`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ImFactorRow {
-    /// `polProcessID`.
+ /// `polProcessID`.
     pub pol_process_id: i32,
-    /// `inspectFreq` — inspection frequency.
+ /// `inspectFreq` — inspection frequency.
     pub inspect_freq: i32,
-    /// `testStandardsID` — test standards.
+ /// `testStandardsID` — test standards.
     pub test_standards_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `IMModelYearGroupID`.
+ /// `IMModelYearGroupID`.
     pub im_model_year_group_id: i32,
-    /// `ageGroupID` — joins to [`AgeCategoryRow::age_group_id`].
+ /// `ageGroupID` — joins to [`AgeCategoryRow::age_group_id`].
     pub age_group_id: i32,
-    /// `IMFactor` — the I/M emission factor. `FLOAT` in MOVES.
+ /// `IMFactor` — the I/M emission factor. `FLOAT` in MOVES.
     pub im_factor: f64,
 }
 
@@ -249,9 +249,9 @@ pub struct ImFactorRow {
 /// `ageGroupID` and pin the age via `modelYearID = year − ageID`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AgeCategoryRow {
-    /// `ageID` — vehicle age in years.
+ /// `ageID` — vehicle age in years.
     pub age_id: i32,
-    /// `ageGroupID` — the age group the age belongs to.
+ /// `ageGroupID` — the age group the age belongs to.
     pub age_group_id: i32,
 }
 
@@ -262,22 +262,22 @@ pub struct AgeCategoryRow {
 /// the extract and are not modelled — see the [module documentation](self).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ImCoverageRow {
-    /// `polProcessID`.
+ /// `polProcessID`.
     pub pol_process_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `inspectFreq` — joins to [`ImFactorRow::inspect_freq`].
+ /// `inspectFreq` — joins to [`ImFactorRow::inspect_freq`].
     pub inspect_freq: i32,
-    /// `testStandardsID` — joins to [`ImFactorRow::test_standards_id`].
+ /// `testStandardsID` — joins to [`ImFactorRow::test_standards_id`].
     pub test_standards_id: i32,
-    /// `begModelYearID` — first model year the program covers.
+ /// `begModelYearID` — first model year the program covers.
     pub beg_model_year_id: i32,
-    /// `endModelYearID` — last model year the program covers.
+ /// `endModelYearID` — last model year the program covers.
     pub end_model_year_id: i32,
-    /// `complianceFactor` — program compliance, as a percentage. `FLOAT` in
-    /// MOVES; LL-1 scales it by `0.01`.
+ /// `complianceFactor` — program compliance, as a percentage. `FLOAT` in
+ /// MOVES; LL-1 scales it by `0.01`.
     pub compliance_factor: f64,
 }
 
@@ -285,17 +285,17 @@ pub struct ImCoverageRow {
 /// `(source bin, operating mode, age group)`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct EmissionRateByAgeRow {
-    /// `polProcessID`.
+ /// `polProcessID`.
     pub pol_process_id: i32,
-    /// `sourceBinID` — `BIGINT` in MOVES.
+ /// `sourceBinID` — `BIGINT` in MOVES.
     pub source_bin_id: i64,
-    /// `opModeID` — the operating mode (150, 151 or 300 for fuel leaks).
+ /// `opModeID` — the operating mode (150, 151 or 300 for fuel leaks).
     pub op_mode_id: i32,
-    /// `ageGroupID` — joins to [`AgeCategoryRow::age_group_id`].
+ /// `ageGroupID` — joins to [`AgeCategoryRow::age_group_id`].
     pub age_group_id: i32,
-    /// `meanBaseRate` — the non-I/M base rate. `FLOAT` in MOVES.
+ /// `meanBaseRate` — the non-I/M base rate. `FLOAT` in MOVES.
     pub mean_base_rate: f64,
-    /// `meanBaseRateIM` — the I/M base rate. `FLOAT` in MOVES.
+ /// `meanBaseRateIM` — the I/M base rate. `FLOAT` in MOVES.
     pub mean_base_rate_im: f64,
 }
 
@@ -303,14 +303,14 @@ pub struct EmissionRateByAgeRow {
 /// model-year group.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SourceBinRow {
-    /// `sourceBinID` — `BIGINT` in MOVES.
+ /// `sourceBinID` — `BIGINT` in MOVES.
     pub source_bin_id: i64,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `regClassID` — regulatory class, the `WithRegClassID` output dimension.
+ /// `regClassID` — regulatory class, the `WithRegClassID` output dimension.
     pub reg_class_id: i32,
-    /// `modelYearGroupID` — joins to
-    /// [`PollutantProcessModelYearRow::model_year_group_id`].
+ /// `modelYearGroupID` — joins to
+ /// [`PollutantProcessModelYearRow::model_year_group_id`].
     pub model_year_group_id: i32,
 }
 
@@ -318,10 +318,10 @@ pub struct SourceBinRow {
 /// joins on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FuelTypeRow {
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `subjectToEvapCalculations = 'Y'` — only fuel types flagged here
-    /// contribute to the evaporative leak calculation.
+ /// `subjectToEvapCalculations = 'Y'` — only fuel types flagged here
+ /// contribute to the evaporative leak calculation.
     pub subject_to_evap_calculations: bool,
 }
 
@@ -329,15 +329,15 @@ pub struct FuelTypeRow {
 /// `(sourceType, modelYear)` group.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceBinDistributionRow {
-    /// `sourceTypeModelYearID` — joins to
-    /// [`SourceTypeModelYearRow::source_type_model_year_id`].
+ /// `sourceTypeModelYearID` — joins to
+ /// [`SourceTypeModelYearRow::source_type_model_year_id`].
     pub source_type_model_year_id: i32,
-    /// `polProcessID` — joined to [`EmissionRateByAgeRow::pol_process_id`].
+ /// `polProcessID` — joined to [`EmissionRateByAgeRow::pol_process_id`].
     pub pol_process_id: i32,
-    /// `sourceBinID` — `BIGINT` in MOVES.
+ /// `sourceBinID` — `BIGINT` in MOVES.
     pub source_bin_id: i64,
-    /// `sourceBinActivityFraction` — the bin's activity share. `FLOAT` in
-    /// MOVES.
+ /// `sourceBinActivityFraction` — the bin's activity share. `FLOAT` in
+ /// MOVES.
     pub source_bin_activity_fraction: f64,
 }
 
@@ -345,11 +345,11 @@ pub struct SourceBinDistributionRow {
 /// source type and model year.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SourceTypeModelYearRow {
-    /// `sourceTypeModelYearID` — the surrogate key.
+ /// `sourceTypeModelYearID` — the surrogate key.
     pub source_type_model_year_id: i32,
-    /// `modelYearID`.
+ /// `modelYearID`.
     pub model_year_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
 }
 
@@ -357,11 +357,11 @@ pub struct SourceTypeModelYearRow {
 /// `(polProcess, modelYear)` to a model-year group.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PollutantProcessModelYearRow {
-    /// `polProcessID`.
+ /// `polProcessID`.
     pub pol_process_id: i32,
-    /// `modelYearID`.
+ /// `modelYearID`.
     pub model_year_id: i32,
-    /// `modelYearGroupID` — joins to [`SourceBinRow::model_year_group_id`].
+ /// `modelYearGroupID` — joins to [`SourceBinRow::model_year_group_id`].
     pub model_year_group_id: i32,
 }
 
@@ -371,19 +371,19 @@ pub struct PollutantProcessModelYearRow {
 /// link; `calculate` joins it on its six-column natural key.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceHoursRow {
-    /// `hourDayID`.
+ /// `hourDayID`.
     pub hour_day_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `ageID` — vehicle age; LL-9 binds it to `year − modelYearID`.
+ /// `ageID` — vehicle age; LL-9 binds it to `year − modelYearID`.
     pub age_id: i32,
-    /// `linkID`.
+ /// `linkID`.
     pub link_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `sourceHours` — the activity hours. `FLOAT` in MOVES.
+ /// `sourceHours` — the activity hours. `FLOAT` in MOVES.
     pub source_hours: f64,
 }
 
@@ -391,37 +391,37 @@ pub struct SourceHoursRow {
 /// operating mode.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OpModeDistributionRow {
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `hourDayID`.
+ /// `hourDayID`.
     pub hour_day_id: i32,
-    /// `linkID`.
+ /// `linkID`.
     pub link_id: i32,
-    /// `polProcessID`.
+ /// `polProcessID`.
     pub pol_process_id: i32,
-    /// `opModeID`.
+ /// `opModeID`.
     pub op_mode_id: i32,
-    /// `opModeFraction` — the operating-mode activity share. `FLOAT` in MOVES.
+ /// `opModeFraction` — the operating-mode activity share. `FLOAT` in MOVES.
     pub op_mode_fraction: f64,
 }
 
 /// One `HourDay` row — resolves an `hourDayID` into its day and hour.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HourDayRow {
-    /// `hourDayID` — the combined hour/day key.
+ /// `hourDayID` — the combined hour/day key.
     pub hour_day_id: i32,
-    /// `dayID`.
+ /// `dayID`.
     pub day_id: i32,
-    /// `hourID`.
+ /// `hourID`.
     pub hour_id: i32,
 }
 
 /// One `DayOfAnyWeek` row — the number of real days a `dayID` represents.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DayOfAnyWeekRow {
-    /// `dayID`.
+ /// `dayID`.
     pub day_id: i32,
-    /// `noOfRealDays` — count of real days within the week portion.
+ /// `noOfRealDays` — count of real days within the week portion.
     pub no_of_real_days: f64,
 }
 
@@ -432,9 +432,9 @@ pub struct DayOfAnyWeekRow {
 /// them from [`LiquidLeakingContext`]) and are not modelled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LinkRow {
-    /// `linkID`.
+ /// `linkID`.
     pub link_id: i32,
-    /// `roadTypeID`.
+ /// `roadTypeID`.
     pub road_type_id: i32,
 }
 
@@ -442,50 +442,50 @@ pub struct LinkRow {
 /// "Extract Data" section produces, as plain row vectors, plus the iteration
 /// [`LiquidLeakingContext`].
 ///
-/// A future Task 50 (`DataFrameStore`) wiring populates this from the per-run
+/// A future (`DataFrameStore`) wiring populates this from the per-run
 /// filtered execution database; until then it is the explicit data-plane
 /// contract the unit tests build directly.
 #[derive(Debug, Clone, Default)]
 pub struct LiquidLeakingInputs {
-    /// The iteration year and location.
+ /// The iteration year and location.
     pub context: LiquidLeakingContext,
-    /// `PollutantProcessMappedModelYear` rows — the LL-1 model-year driver.
+ /// `PollutantProcessMappedModelYear` rows — the LL-1 model-year driver.
     pub pollutant_process_mapped_model_year: Vec<PollutantProcessMappedModelYearRow>,
-    /// `PollutantProcessAssoc` rows for the Evap Fuel Leaks process.
+ /// `PollutantProcessAssoc` rows for the Evap Fuel Leaks process.
     pub pollutant_process_assoc: Vec<PollutantProcessAssocRow>,
-    /// `IMFactor` rows.
+ /// `IMFactor` rows.
     pub im_factor: Vec<ImFactorRow>,
-    /// `AgeCategory` rows — the `ageID → ageGroupID` mapping.
+ /// `AgeCategory` rows — the `ageID → ageGroupID` mapping.
     pub age_category: Vec<AgeCategoryRow>,
-    /// `IMCoverage` rows (single county/year, `useIMyn = 'Y'`).
+ /// `IMCoverage` rows (single county/year, `useIMyn = 'Y'`).
     pub im_coverage: Vec<ImCoverageRow>,
-    /// `EmissionRateByAge` rows — the leak base rates.
+ /// `EmissionRateByAge` rows — the leak base rates.
     pub emission_rate_by_age: Vec<EmissionRateByAgeRow>,
-    /// `SourceBin` rows.
+ /// `SourceBin` rows.
     pub source_bin: Vec<SourceBinRow>,
-    /// `FuelType` rows — LL-8 keeps only `subjectToEvapCalculations = 'Y'`.
+ /// `FuelType` rows — LL-8 keeps only `subjectToEvapCalculations = 'Y'`.
     pub fuel_type: Vec<FuelTypeRow>,
-    /// `SourceBinDistribution` rows.
+ /// `SourceBinDistribution` rows.
     pub source_bin_distribution: Vec<SourceBinDistributionRow>,
-    /// `SourceTypeModelYear` rows.
+ /// `SourceTypeModelYear` rows.
     pub source_type_model_year: Vec<SourceTypeModelYearRow>,
-    /// `PollutantProcessModelYear` rows — the LL-8 existence filter.
+ /// `PollutantProcessModelYear` rows — the LL-8 existence filter.
     pub pollutant_process_model_year: Vec<PollutantProcessModelYearRow>,
-    /// `RunSpecMonth` — the run's months; LL-8 cross-joins it.
+ /// `RunSpecMonth` — the run's months; LL-8 cross-joins it.
     pub run_spec_month: Vec<i32>,
-    /// `RunSpecHourDay` — the run's hour/day combinations; LL-8 cross-joins it.
+ /// `RunSpecHourDay` — the run's hour/day combinations; LL-8 cross-joins it.
     pub run_spec_hour_day: Vec<i32>,
-    /// `RunSpecSourceType` — the run's source types; LL-8's existence filter.
+ /// `RunSpecSourceType` — the run's source types; LL-8's existence filter.
     pub run_spec_source_type: Vec<i32>,
-    /// `SourceHours` rows.
+ /// `SourceHours` rows.
     pub source_hours: Vec<SourceHoursRow>,
-    /// `OpModeDistribution` rows.
+ /// `OpModeDistribution` rows.
     pub op_mode_distribution: Vec<OpModeDistributionRow>,
-    /// `DayOfAnyWeek` rows.
+ /// `DayOfAnyWeek` rows.
     pub day_of_any_week: Vec<DayOfAnyWeekRow>,
-    /// `HourDay` rows.
+ /// `HourDay` rows.
     pub hour_day: Vec<HourDayRow>,
-    /// `Link` rows (the single iteration link).
+ /// `Link` rows (the single iteration link).
     pub link: Vec<LinkRow>,
 }
 
@@ -497,46 +497,46 @@ pub struct LiquidLeakingInputs {
 /// after applying I/M, so the final row carries only `emissionQuant`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LiquidLeakingEmissionRow {
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `dayID`.
+ /// `dayID`.
     pub day_id: i32,
-    /// `hourID`.
+ /// `hourID`.
     pub hour_id: i32,
-    /// `stateID`.
+ /// `stateID`.
     pub state_id: i32,
-    /// `countyID`.
+ /// `countyID`.
     pub county_id: i32,
-    /// `zoneID`.
+ /// `zoneID`.
     pub zone_id: i32,
-    /// `linkID`.
+ /// `linkID`.
     pub link_id: i32,
-    /// `pollutantID` — always 1 (Total Gaseous Hydrocarbons).
+ /// `pollutantID` — always 1 (Total Gaseous Hydrocarbons).
     pub pollutant_id: i32,
-    /// `processID` — always 13 (Evap Fuel Leaks).
+ /// `processID` — always 13 (Evap Fuel Leaks).
     pub process_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `regClassID`.
+ /// `regClassID`.
     pub reg_class_id: i32,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `modelYearID`.
+ /// `modelYearID`.
     pub model_year_id: i32,
-    /// `roadTypeID`.
+ /// `roadTypeID`.
     pub road_type_id: i32,
-    /// `emissionQuant` — the liquid-leak emission quantity, after I/M.
+ /// `emissionQuant` — the liquid-leak emission quantity, after I/M.
     pub emission_quant: f64,
 }
 
 impl LiquidLeakingEmissionRow {
-    /// The integer dimension tuple — every column except `emissionQuant`.
-    /// Used to sort the output deterministically: MOVES leaves
-    /// `MOVESWorkerOutput` physically unordered (the SQL `INSERT … SELECT` has
-    /// no `ORDER BY`), so the port sorts purely to make the result
-    /// reproducible.
+ /// The integer dimension tuple — every column except `emissionQuant`.
+ /// Used to sort the output deterministically: MOVES leaves
+ /// `MOVESWorkerOutput` physically unordered (the SQL `INSERT … SELECT` has
+ /// no `ORDER BY`), so the port sorts purely to make the result
+ /// reproducible.
     fn dimension_key(&self) -> [i32; 15] {
         [
             self.year_id,
@@ -588,9 +588,9 @@ struct WmbrKey {
 /// A `WeightedMeanBaseRate` cell — the two activity-weighted base rates.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 struct WmbrCell {
-    /// `Σ sourceBinActivityFraction × meanBaseRate`.
+ /// `Σ sourceBinActivityFraction × meanBaseRate`.
     weighted_mean_base_rate: f64,
-    /// `Σ sourceBinActivityFraction × meanBaseRateIM`.
+ /// `Σ sourceBinActivityFraction × meanBaseRateIM`.
     weighted_mean_base_rate_im: f64,
 }
 
@@ -602,13 +602,13 @@ struct WmbrCell {
 /// by `(processID, pollutantID, modelYearID, fuelTypeID, sourceTypeID)`. The
 /// `GROUP BY` on those five columns means each key carries a single fraction.
 fn im_coverage_merged(inputs: &LiquidLeakingInputs) -> HashMap<ImAdjustKey, f64> {
-    // PollutantProcessAssoc by polProcessID (the table's key).
+ // PollutantProcessAssoc by polProcessID (the table's key).
     let ppa_by_pol_process: HashMap<i32, &PollutantProcessAssocRow> = inputs
         .pollutant_process_assoc
         .iter()
         .map(|ppa| (ppa.pol_process_id, ppa))
         .collect();
-    // IMFactor grouped by (polProcessID, IMModelYearGroupID).
+ // IMFactor grouped by (polProcessID, IMModelYearGroupID).
     let mut imf_by_key: HashMap<(i32, i32), Vec<&ImFactorRow>> = HashMap::new();
     for imf in &inputs.im_factor {
         imf_by_key
@@ -616,7 +616,7 @@ fn im_coverage_merged(inputs: &LiquidLeakingInputs) -> HashMap<ImAdjustKey, f64>
             .or_default()
             .push(imf);
     }
-    // IMCoverage grouped by the five exact-match join columns.
+ // IMCoverage grouped by the five exact-match join columns.
     let mut imc_by_key: HashMap<(i32, i32, i32, i32, i32), Vec<&ImCoverageRow>> = HashMap::new();
     for imc in &inputs.im_coverage {
         imc_by_key
@@ -630,9 +630,9 @@ fn im_coverage_merged(inputs: &LiquidLeakingInputs) -> HashMap<ImAdjustKey, f64>
             .or_default()
             .push(imc);
     }
-    // AgeCategory as an (ageID, ageGroupID) membership set: the join is
-    // `AgeCategory.ageGroupID = IMFactor.ageGroupID`, gated by the WHERE
-    // clause to the single age that resolves the model year.
+ // AgeCategory as an (ageID, ageGroupID) membership set: the join is
+ // `AgeCategory.ageGroupID = IMFactor.ageGroupID`, gated by the WHERE
+ // clause to the single age that resolves the model year.
     let age_categories: HashSet<(i32, i32)> = inputs
         .age_category
         .iter()
@@ -641,23 +641,23 @@ fn im_coverage_merged(inputs: &LiquidLeakingInputs) -> HashMap<ImAdjustKey, f64>
 
     let mut im_adjust: HashMap<ImAdjustKey, f64> = HashMap::new();
     for ppmy in &inputs.pollutant_process_mapped_model_year {
-        // INNER JOIN PollutantProcessAssoc ON polProcessID.
+ // INNER JOIN PollutantProcessAssoc ON polProcessID.
         let Some(ppa) = ppa_by_pol_process.get(&ppmy.pol_process_id) else {
             continue;
         };
-        // INNER JOIN IMFactor ON (polProcessID, IMModelYearGroupID).
+ // INNER JOIN IMFactor ON (polProcessID, IMModelYearGroupID).
         let Some(imfs) = imf_by_key.get(&(ppmy.pol_process_id, ppmy.im_model_year_group_id)) else {
             continue;
         };
-        // The WHERE clause `modelYearID = year − ageID` pins the age.
+ // The WHERE clause `modelYearID = year − ageID` pins the age.
         let age_id = inputs.context.year - ppmy.model_year_id;
         for imf in imfs {
-            // INNER JOIN AgeCategory ON ageGroupID, satisfied only when the
-            // pinned age belongs to the IMFactor row's age group.
+ // INNER JOIN AgeCategory ON ageGroupID, satisfied only when the
+ // pinned age belongs to the IMFactor row's age group.
             if !age_categories.contains(&(age_id, imf.age_group_id)) {
                 continue;
             }
-            // INNER JOIN IMCoverage ON the five exact-match columns.
+ // INNER JOIN IMCoverage ON the five exact-match columns.
             let Some(imcs) = imc_by_key.get(&(
                 ppmy.pol_process_id,
                 imf.inspect_freq,
@@ -668,8 +668,8 @@ fn im_coverage_merged(inputs: &LiquidLeakingInputs) -> HashMap<ImAdjustKey, f64>
                 continue;
             };
             for imc in imcs {
-                // … plus the model-year range. The IMCoverage county/year
-                // filter is pre-applied by the extract (see the module docs).
+ // … plus the model-year range. The IMCoverage county/year
+ // filter is pre-applied by the extract (see the module docs).
                 if imc.beg_model_year_id > ppmy.model_year_id
                     || imc.end_model_year_id < ppmy.model_year_id
                 {
@@ -682,7 +682,7 @@ fn im_coverage_merged(inputs: &LiquidLeakingInputs) -> HashMap<ImAdjustKey, f64>
                     fuel_type_id: imf.fuel_type_id,
                     source_type_id: imc.source_type_id,
                 };
-                *im_adjust.entry(key).or_default() += imf.im_factor * imc.compliance_factor * 0.01;
+ *im_adjust.entry(key).or_default() += imf.im_factor * imc.compliance_factor * 0.01;
             }
         }
     }
@@ -702,7 +702,7 @@ fn weighted_mean_base_rate(inputs: &LiquidLeakingInputs) -> HashMap<WmbrKey, Wmb
         .iter()
         .map(|sb| (sb.source_bin_id, sb))
         .collect();
-    // FuelType ⋈ subjectToEvapCalculations = 'Y' — an existence filter.
+ // FuelType ⋈ subjectToEvapCalculations = 'Y' — an existence filter.
     let evap_fuel_types: HashSet<i32> = inputs
         .fuel_type
         .iter()
@@ -718,8 +718,8 @@ fn weighted_mean_base_rate(inputs: &LiquidLeakingInputs) -> HashMap<WmbrKey, Wmb
         .iter()
         .map(|stmy| (stmy.source_type_model_year_id, stmy))
         .collect();
-    // PollutantProcessModelYear as a (polProcessID, modelYearID,
-    // modelYearGroupID) membership set — LL-8's existence filter.
+ // PollutantProcessModelYear as a (polProcessID, modelYearID,
+ // modelYearGroupID) membership set — LL-8's existence filter.
     let ppmy_set: HashSet<(i32, i32, i32)> = inputs
         .pollutant_process_model_year
         .iter()
@@ -740,15 +740,15 @@ fn weighted_mean_base_rate(inputs: &LiquidLeakingInputs) -> HashMap<WmbrKey, Wmb
 
     let mut wmbr: HashMap<WmbrKey, WmbrCell> = HashMap::new();
     for er in &inputs.emission_rate_by_age {
-        // INNER JOIN SourceBin ON sourceBinID.
+ // INNER JOIN SourceBin ON sourceBinID.
         let Some(sb) = source_bin_by_id.get(&er.source_bin_id) else {
             continue;
         };
-        // INNER JOIN FuelType ON fuelTypeID AND subjectToEvapCalculations='Y'.
+ // INNER JOIN FuelType ON fuelTypeID AND subjectToEvapCalculations='Y'.
         if !evap_fuel_types.contains(&sb.fuel_type_id) {
             continue;
         }
-        // INNER JOIN SourceBinDistribution ON sourceBinID AND polProcessID.
+ // INNER JOIN SourceBinDistribution ON sourceBinID AND polProcessID.
         let Some(sbds) = sbd_by_bin.get(&er.source_bin_id) else {
             continue;
         };
@@ -756,18 +756,18 @@ fn weighted_mean_base_rate(inputs: &LiquidLeakingInputs) -> HashMap<WmbrKey, Wmb
             if sbd.pol_process_id != er.pol_process_id {
                 continue;
             }
-            // INNER JOIN SourceTypeModelYear ON sourceTypeModelYearID.
+ // INNER JOIN SourceTypeModelYear ON sourceTypeModelYearID.
             let Some(stmy) = stmy_by_id.get(&sbd.source_type_model_year_id) else {
                 continue;
             };
-            // … AND stmy.modelYearID = year − AgeCategory.ageID, with
-            // AgeCategory joined on EmissionRateByAge.ageGroupID.
+ // … AND stmy.modelYearID = year − AgeCategory.ageID, with
+ // AgeCategory joined on EmissionRateByAge.ageGroupID.
             let age_id = inputs.context.year - stmy.model_year_id;
             if !age_categories.contains(&(age_id, er.age_group_id)) {
                 continue;
             }
-            // INNER JOIN PollutantProcessModelYear ON
-            // (polProcessID, modelYearID, modelYearGroupID).
+ // INNER JOIN PollutantProcessModelYear ON
+ // (polProcessID, modelYearID, modelYearGroupID).
             if !ppmy_set.contains(&(
                 sbd.pol_process_id,
                 stmy.model_year_id,
@@ -775,12 +775,12 @@ fn weighted_mean_base_rate(inputs: &LiquidLeakingInputs) -> HashMap<WmbrKey, Wmb
             )) {
                 continue;
             }
-            // INNER JOIN RunSpecSourceType ON sourceTypeID.
+ // INNER JOIN RunSpecSourceType ON sourceTypeID.
             if !run_spec_source_type.contains(&stmy.source_type_id) {
                 continue;
             }
-            // CROSS JOIN RunSpecMonth, RunSpecHourDay — the month and hour/day
-            // come from the run spec, not from any joined data row.
+ // CROSS JOIN RunSpecMonth, RunSpecHourDay — the month and hour/day
+ // come from the run spec, not from any joined data row.
             for &month_id in &inputs.run_spec_month {
                 for &hour_day_id in &inputs.run_spec_hour_day {
                     let key = WmbrKey {
@@ -813,21 +813,21 @@ fn weighted_mean_base_rate(inputs: &LiquidLeakingInputs) -> HashMap<WmbrKey, Wmb
 /// [`calculate`](Self::calculate).
 #[derive(Debug, Clone)]
 pub struct LiquidLeakingCalculator {
-    /// The single master-loop subscription, built once in [`Self::new`].
+ /// The single master-loop subscription, built once in [`Self::new`].
     subscriptions: [CalculatorSubscription; 1],
 }
 
 impl LiquidLeakingCalculator {
-    /// Stable module name — matches the Java class and the chain-DAG entry.
+ /// Stable module name — matches the Java class and the chain-DAG entry.
     pub const NAME: &'static str = CALCULATOR_NAME;
 
-    /// Construct the calculator with its master-loop subscription.
-    ///
-    /// `CalculatorInfo.txt` records one `Subscribe` directive for
-    /// `LiquidLeakingCalculator`: the Evap Fuel Leaks process (13) at `MONTH`
-    /// granularity with `EMISSION_CALCULATOR` priority — the Java constructor
-    /// passes `MasterLoopGranularity.MONTH` and offset `0` from the standard
-    /// `EMISSION_CALCULATOR` priority.
+ /// Construct the calculator with its master-loop subscription.
+ ///
+ /// `CalculatorInfo.txt` records one `Subscribe` directive for
+ /// `LiquidLeakingCalculator`: the Evap Fuel Leaks process (13) at `MONTH`
+ /// granularity with `EMISSION_CALCULATOR` priority — the Java constructor
+ /// passes `MasterLoopGranularity.MONTH` and offset `0` from the standard
+ /// `EMISSION_CALCULATOR` priority.
     #[must_use]
     pub fn new() -> Self {
         let priority = Priority::parse("EMISSION_CALCULATOR")
@@ -841,28 +841,28 @@ impl LiquidLeakingCalculator {
         }
     }
 
-    /// Compute the liquid-leak emission rows — the port of the
-    /// `LiquidLeakingCalculator.sql` "Processing" section.
-    ///
-    /// Returns no rows when no dimension cell survives every `INNER JOIN`: an
-    /// `EmissionRateByAge` row contributes only if its source bin resolves a
-    /// `subjectToEvapCalculations` fuel type, a source-bin distribution, a
-    /// source-type/model-year, an age category and a pollutant-process model
-    /// year, and the resulting `WeightedMeanBaseRate` cell then resolves a
-    /// `SourceHours` row, an `OpModeDistribution` row, a pollutant/process, a
-    /// link and an hour/day. The result is sorted by its integer dimension
-    /// columns for deterministic output; MOVES leaves `MOVESWorkerOutput`
-    /// physically unordered.
+ /// Compute the liquid-leak emission rows — the port of the
+ /// `LiquidLeakingCalculator.sql` "Processing" section.
+ ///
+ /// Returns no rows when no dimension cell survives every `INNER JOIN`: an
+ /// `EmissionRateByAge` row contributes only if its source bin resolves a
+ /// `subjectToEvapCalculations` fuel type, a source-bin distribution, a
+ /// source-type/model-year, an age category and a pollutant-process model
+ /// year, and the resulting `WeightedMeanBaseRate` cell then resolves a
+ /// `SourceHours` row, an `OpModeDistribution` row, a pollutant/process, a
+ /// link and an hour/day. The result is sorted by its integer dimension
+ /// columns for deterministic output; MOVES leaves `MOVESWorkerOutput`
+ /// physically unordered.
     #[must_use]
     pub fn calculate(&self, inputs: &LiquidLeakingInputs) -> Vec<LiquidLeakingEmissionRow> {
-        // --- LL-1: IMCoverageMergedUngrouped --------------------------------
+ // --- LL-1: IMCoverageMergedUngrouped --------------------------------
         let im_adjust = im_coverage_merged(inputs);
 
-        // --- LL-8: WeightedMeanBaseRate -------------------------------------
+ // --- LL-8: WeightedMeanBaseRate -------------------------------------
         let wmbr = weighted_mean_base_rate(inputs);
 
-        // --- LL-9 + Apply I/M -----------------------------------------------
-        // SourceHours by its six-column natural key.
+ // --- LL-9 + Apply I/M -----------------------------------------------
+ // SourceHours by its six-column natural key.
         let source_hours_by_key: HashMap<(i32, i32, i32, i32, i32, i32), &SourceHoursRow> = inputs
             .source_hours
             .iter()
@@ -880,7 +880,7 @@ impl LiquidLeakingCalculator {
                 )
             })
             .collect();
-        // OpModeDistribution by its five-column natural key.
+ // OpModeDistribution by its five-column natural key.
         let omd_by_key: HashMap<(i32, i32, i32, i32, i32), &OpModeDistributionRow> = inputs
             .op_mode_distribution
             .iter()
@@ -917,15 +917,15 @@ impl LiquidLeakingCalculator {
 
         let ctx = &inputs.context;
 
-        // Iterate WeightedMeanBaseRate in a stable key order so the output is
-        // deterministic regardless of hash-map layout.
+ // Iterate WeightedMeanBaseRate in a stable key order so the output is
+ // deterministic regardless of hash-map layout.
         let mut wmbr_entries: Vec<(&WmbrKey, &WmbrCell)> = wmbr.iter().collect();
         wmbr_entries.sort_unstable_by_key(|&(key, _)| *key);
 
         let mut out: Vec<LiquidLeakingEmissionRow> = Vec::new();
         for (key, cell) in wmbr_entries {
-            // INNER JOIN SourceHours — `ageID = year − modelYearID`, `linkID`
-            // the iteration link.
+ // INNER JOIN SourceHours — `ageID = year − modelYearID`, `linkID`
+ // the iteration link.
             let sh_key = (
                 key.hour_day_id,
                 key.month_id,
@@ -937,9 +937,9 @@ impl LiquidLeakingCalculator {
             let Some(sh) = source_hours_by_key.get(&sh_key) else {
                 continue;
             };
-            // INNER JOIN OpModeDistribution — `hourDayID`/`opModeID`/
-            // `polProcessID` from the working-table row, `linkID` the
-            // iteration link.
+ // INNER JOIN OpModeDistribution — `hourDayID`/`opModeID`/
+ // `polProcessID` from the working-table row, `linkID` the
+ // iteration link.
             let omd_key = (
                 key.source_type_id,
                 key.hour_day_id,
@@ -950,25 +950,25 @@ impl LiquidLeakingCalculator {
             let Some(omd) = omd_by_key.get(&omd_key) else {
                 continue;
             };
-            // INNER JOIN PollutantProcessAssoc ON polProcessID.
+ // INNER JOIN PollutantProcessAssoc ON polProcessID.
             let Some(ppa) = ppa_by_pol_process.get(&key.pol_process_id) else {
                 continue;
             };
-            // INNER JOIN Link ON the iteration link.
+ // INNER JOIN Link ON the iteration link.
             let Some(link) = link_by_id.get(&ctx.link_id) else {
                 continue;
             };
-            // INNER JOIN HourDay ON hourDayID.
+ // INNER JOIN HourDay ON hourDayID.
             let Some(hd) = hour_day_by_id.get(&key.hour_day_id) else {
                 continue;
             };
-            // INNER JOIN DayOfAnyWeek ON dayID to get noOfRealDays.
+ // INNER JOIN DayOfAnyWeek ON dayID to get noOfRealDays.
             let Some(&no_of_real_days) = real_days_of.get(&hd.day_id) else {
                 continue;
             };
 
-            // LL-9: emissionQuant = weightedMeanBaseRate × sourceHours ×
-            // opModeFraction ÷ noOfRealDays; emissionQuantIM the I/M-rate counterpart.
+ // LL-9: emissionQuant = weightedMeanBaseRate × sourceHours ×
+ // opModeFraction ÷ noOfRealDays; emissionQuantIM the I/M-rate counterpart.
             let mut emission_quant =
                 cell.weighted_mean_base_rate * sh.source_hours * omd.op_mode_fraction
                     / no_of_real_days;
@@ -976,10 +976,10 @@ impl LiquidLeakingCalculator {
                 cell.weighted_mean_base_rate_im * sh.source_hours * omd.op_mode_fraction
                     / no_of_real_days;
 
-            // Apply I/M: emissionQuant = GREATEST(emissionQuantIM × IMAdjustFract
-            // + emissionQuant × (1 − IMAdjustFract), 0). A row with no matching
-            // IMCoverageMergedUngrouped cell keeps its value — the SQL UPDATE
-            // leaves unmatched rows untouched.
+ // Apply I/M: emissionQuant = GREATEST(emissionQuantIM × IMAdjustFract
+ // + emissionQuant × (1 − IMAdjustFract), 0). A row with no matching
+ // IMCoverageMergedUngrouped cell keeps its value — the SQL UPDATE
+ // leaves unmatched rows untouched.
             let im_key = ImAdjustKey {
                 process_id: ppa.process_id,
                 pollutant_id: ppa.pollutant_id,
@@ -1013,10 +1013,10 @@ impl LiquidLeakingCalculator {
             });
         }
 
-        // Stable sort by the dimension columns: two rows can share a dimension
-        // key (they differ only in the operating mode, which the output row
-        // does not carry), and a stable sort keeps them in WeightedMeanBaseRate
-        // key order.
+ // Stable sort by the dimension columns: two rows can share a dimension
+ // key (they differ only in the operating mode, which the output row
+ // does not carry), and a stable sort keeps them in WeightedMeanBaseRate
+ // key order.
         out.sort_by_key(LiquidLeakingEmissionRow::dimension_key);
         out
     }
@@ -2568,10 +2568,10 @@ impl Calculator for LiquidLeakingCalculator {
         REGISTRATIONS
     }
 
-    // `upstream` keeps the trait default (empty). `LiquidLeakingCalculator` is
-    // a direct MasterLoop subscriber; the one `Chain` directive that names it
-    // has it as the inModule (`HCSpeciationCalculator` chains off it), so the
-    // dependency edge runs the other way and this calculator has no upstream.
+ // `upstream` keeps the trait default (empty). `LiquidLeakingCalculator` is
+ // a direct MasterLoop subscriber; the one `Chain` directive that names it
+ // has it as the inModule (`HCSpeciationCalculator` chains off it), so the
+ // dependency edge runs the other way and this calculator has no upstream.
 
     fn input_tables(&self) -> &[&'static str] {
         INPUT_TABLES
@@ -2581,8 +2581,8 @@ impl Calculator for LiquidLeakingCalculator {
         let tables = ctx.tables();
         let pos = ctx.position();
         let filter = crate::wiring::position_filter(ctx);
-        // Prefer the fuelUsageFraction-remapped distribution from scratch (written
-        // by SourceBinDistributionGenerator) over the raw slow-tier table.
+ // Prefer the fuelUsageFraction-remapped distribution from scratch (written
+ // by SourceBinDistributionGenerator) over the raw slow-tier table.
         let fuel_usage_table = {
             let process_id_i64 = pos.process_id.map(|p| i64::from(p.0)).unwrap_or(0);
             let county_id_i64 = pos.location.county_id.map(i64::from).unwrap_or(0);
@@ -2668,17 +2668,17 @@ pub fn factory() -> Box<dyn Calculator> {
 mod tests {
     use super::*;
 
-    /// Build a one-bin / one-rate input whose single output row has
-    /// `emission_quant == 2.4`:
-    ///
-    /// * LL-1: `IMAdjustFract = 0.5 × 80.0 × 0.01 = 0.4`.
-    /// * LL-8: `weightedMeanBaseRate = 0.5 × 2.0 = 1.0`,
-    ///   `weightedMeanBaseRateIM = 0.5 × 1.0 = 0.5`.
-    /// * LL-9: `emissionQuant = 1.0 × 10.0 × 0.3 = 3.0`,
-    ///   `emissionQuantIM = 0.5 × 10.0 × 0.3 = 1.5`.
-    /// * I/M: `max(1.5 × 0.4 + 3.0 × 0.6, 0) = 0.6 + 1.8 = 2.4`.
-    ///
-    /// Values are chosen for an exact result, not physical realism.
+ /// Build a one-bin / one-rate input whose single output row has
+ /// `emission_quant == 2.4`:
+ ///
+ /// * LL-1: `IMAdjustFract = 0.5 × 80.0 × 0.01 = 0.4`.
+ /// * LL-8: `weightedMeanBaseRate = 0.5 × 2.0 = 1.0`,
+ /// `weightedMeanBaseRateIM = 0.5 × 1.0 = 0.5`.
+ /// * LL-9: `emissionQuant = 1.0 × 10.0 × 0.3 = 3.0`,
+ /// `emissionQuantIM = 0.5 × 10.0 × 0.3 = 1.5`.
+ /// * I/M: `max(1.5 × 0.4 + 3.0 × 0.6, 0) = 0.6 + 1.8 = 2.4`.
+ ///
+ /// Values are chosen for an exact result, not physical realism.
     fn minimal_inputs() -> LiquidLeakingInputs {
         LiquidLeakingInputs {
             context: LiquidLeakingContext {
@@ -2792,8 +2792,8 @@ mod tests {
         }
     }
 
-    /// Assert `actual` matches `expected` within `f64` slack — the
-    /// FLOAT-column fidelity note means the port computes in `f64`.
+ /// Assert `actual` matches `expected` within `f64` slack — the
+ /// FLOAT-column fidelity note means the port computes in `f64`.
     fn assert_close(actual: f64, expected: f64) {
         assert!(
             (actual - expected).abs() < 1e-9,
@@ -2806,8 +2806,8 @@ mod tests {
         let rows = LiquidLeakingCalculator::new().calculate(&minimal_inputs());
         assert_eq!(rows.len(), 1);
         let r = rows[0];
-        // The dimension cell — year and location from the context, the rest
-        // carried through the working tables.
+ // The dimension cell — year and location from the context, the rest
+ // carried through the working tables.
         assert_eq!(r.year_id, 2020);
         assert_eq!(r.month_id, 7);
         assert_eq!(r.day_id, 5);
@@ -2823,16 +2823,16 @@ mod tests {
         assert_eq!(r.fuel_type_id, 1);
         assert_eq!(r.model_year_id, 2018);
         assert_eq!(r.road_type_id, 5);
-        // weightedMeanBaseRate 1.0 → emissionQuant 3.0, blended with the I/M
-        // rate at IMAdjustFract 0.4 → 1.5 × 0.4 + 3.0 × 0.6 = 2.4.
+ // weightedMeanBaseRate 1.0 → emissionQuant 3.0, blended with the I/M
+ // rate at IMAdjustFract 0.4 → 1.5 × 0.4 + 3.0 × 0.6 = 2.4.
         assert_close(r.emission_quant, 2.4);
     }
 
     #[test]
     fn calculate_leaves_emission_unadjusted_without_im_coverage() {
-        // With no IMCoverage there is no IMCoverageMergedUngrouped cell, so the
-        // I/M UPDATE leaves the row untouched: emissionQuant stays at the LL-9
-        // value 1.0 × 10.0 × 0.3 = 3.0.
+ // With no IMCoverage there is no IMCoverageMergedUngrouped cell, so the
+ // I/M UPDATE leaves the row untouched: emissionQuant stays at the LL-9
+ // value 1.0 × 10.0 × 0.3 = 3.0.
         let mut inputs = minimal_inputs();
         inputs.im_coverage.clear();
         let rows = LiquidLeakingCalculator::new().calculate(&inputs);
@@ -2842,9 +2842,9 @@ mod tests {
 
     #[test]
     fn calculate_leaves_emission_unadjusted_when_im_is_for_another_source_type() {
-        // An I/M program for source type 99 builds an IMCoverageMergedUngrouped
-        // cell keyed to source type 99; the output row is source type 21, so
-        // the I/M UPDATE's join misses and the row keeps its LL-9 value.
+ // An I/M program for source type 99 builds an IMCoverageMergedUngrouped
+ // cell keyed to source type 99; the output row is source type 21, so
+ // the I/M UPDATE's join misses and the row keeps its LL-9 value.
         let mut inputs = minimal_inputs();
         inputs.im_factor[0].source_type_id = 99;
         inputs.im_coverage[0].source_type_id = 99;
@@ -2855,9 +2855,9 @@ mod tests {
 
     #[test]
     fn calculate_clamps_negative_im_blend_to_zero() {
-        // IMAdjustFract = 2.5 × 80.0 × 0.01 = 2.0 and a zero I/M rate drive the
-        // blend negative: 0.0 × 2.0 + 3.0 × (1 − 2.0) = −3.0; GREATEST(…, 0)
-        // clamps it to 0.
+ // IMAdjustFract = 2.5 × 80.0 × 0.01 = 2.0 and a zero I/M rate drive the
+ // blend negative: 0.0 × 2.0 + 3.0 × (1 − 2.0) = −3.0; GREATEST(…, 0)
+ // clamps it to 0.
         let mut inputs = minimal_inputs();
         inputs.im_factor[0].im_factor = 2.5;
         inputs.emission_rate_by_age[0].mean_base_rate_im = 0.0;
@@ -2868,9 +2868,9 @@ mod tests {
 
     #[test]
     fn calculate_sums_im_adjustment_over_overlapping_programs() {
-        // Two IMCoverage programs cover model year 2018; LL-1 sums their
-        // contributions: IMAdjustFract = 0.4 + 0.4 = 0.8. The programs differ
-        // in test-standards id so both join the (matching) IMFactor rows.
+ // Two IMCoverage programs cover model year 2018; LL-1 sums their
+ // contributions: IMAdjustFract = 0.4 + 0.4 = 0.8. The programs differ
+ // in test-standards id so both join the (matching) IMFactor rows.
         let mut inputs = minimal_inputs();
         inputs.im_factor.push(ImFactorRow {
             test_standards_id: 9,
@@ -2882,15 +2882,15 @@ mod tests {
         });
         let rows = LiquidLeakingCalculator::new().calculate(&inputs);
         assert_eq!(rows.len(), 1);
-        // max(1.5 × 0.8 + 3.0 × 0.2, 0) = 1.2 + 0.6 = 1.8.
+ // max(1.5 × 0.8 + 3.0 × 0.2, 0) = 1.2 + 0.6 = 1.8.
         assert_close(rows[0].emission_quant, 1.8);
     }
 
     #[test]
     fn calculate_weights_base_rate_by_source_bin_activity_fraction() {
-        // A second source bin of the same dimension cell adds to the same
-        // WeightedMeanBaseRate key: weightedMeanBaseRate = 0.5 × 2.0 +
-        // 0.25 × 4.0 = 2.0. Drop I/M to isolate the LL-8 weighting.
+ // A second source bin of the same dimension cell adds to the same
+ // WeightedMeanBaseRate key: weightedMeanBaseRate = 0.5 × 2.0 +
+ // 0.25 × 4.0 = 2.0. Drop I/M to isolate the LL-8 weighting.
         let mut inputs = minimal_inputs();
         inputs.im_coverage.clear();
         inputs.source_bin.push(SourceBinRow {
@@ -2917,15 +2917,15 @@ mod tests {
         });
         let rows = LiquidLeakingCalculator::new().calculate(&inputs);
         assert_eq!(rows.len(), 1);
-        // emissionQuant = 2.0 × 10.0 × 0.3 = 6.0.
+ // emissionQuant = 2.0 × 10.0 × 0.3 = 6.0.
         assert_close(rows[0].emission_quant, 6.0);
     }
 
     #[test]
     fn calculate_cross_joins_run_spec_hour_days() {
-        // Two RunSpecHourDay rows cross-join into two WeightedMeanBaseRate
-        // cells; with a SourceHours / OpModeDistribution / HourDay row for each
-        // hour/day, LL-9 emits one output row per hour/day.
+ // Two RunSpecHourDay rows cross-join into two WeightedMeanBaseRate
+ // cells; with a SourceHours / OpModeDistribution / HourDay row for each
+ // hour/day, LL-9 emits one output row per hour/day.
         let mut inputs = minimal_inputs();
         inputs.run_spec_hour_day = vec![85, 109];
         inputs.source_hours.push(SourceHoursRow {
@@ -2947,7 +2947,7 @@ mod tests {
         });
         let rows = LiquidLeakingCalculator::new().calculate(&inputs);
         assert_eq!(rows.len(), 2);
-        // Same emission, distinct hour/day dimensions.
+ // Same emission, distinct hour/day dimensions.
         for r in &rows {
             assert_close(r.emission_quant, 2.4);
         }
@@ -2957,8 +2957,8 @@ mod tests {
 
     #[test]
     fn calculate_drops_fuel_type_not_subject_to_evap() {
-        // A fuel type with subjectToEvapCalculations = 'N' fails the LL-8
-        // FuelType join — no WeightedMeanBaseRate cell, no output.
+ // A fuel type with subjectToEvapCalculations = 'N' fails the LL-8
+ // FuelType join — no WeightedMeanBaseRate cell, no output.
         let mut inputs = minimal_inputs();
         inputs.fuel_type[0].subject_to_evap_calculations = false;
         assert!(LiquidLeakingCalculator::new().calculate(&inputs).is_empty());
@@ -2966,7 +2966,7 @@ mod tests {
 
     #[test]
     fn calculate_drops_rows_without_an_ll8_join() {
-        // Each LL-8 inner join, removed in turn, drops the only dimension cell.
+ // Each LL-8 inner join, removed in turn, drops the only dimension cell.
         let base = minimal_inputs();
 
         let mut no_source_bin = base.clone();
@@ -2997,7 +2997,7 @@ mod tests {
             .calculate(&no_run_source_type)
             .is_empty());
 
-        // No AgeCategory row resolves the model year to an age.
+ // No AgeCategory row resolves the model year to an age.
         let mut no_age = base;
         no_age.age_category.clear();
         assert!(LiquidLeakingCalculator::new().calculate(&no_age).is_empty());
@@ -3005,7 +3005,7 @@ mod tests {
 
     #[test]
     fn calculate_drops_rows_without_an_ll9_join() {
-        // Each LL-9 inner join, removed in turn, drops the output row.
+ // Each LL-9 inner join, removed in turn, drops the output row.
         let base = minimal_inputs();
 
         let mut no_source_hours = base.clone();
@@ -3039,8 +3039,8 @@ mod tests {
 
     #[test]
     fn calculate_drops_source_hours_for_the_wrong_age() {
-        // SourceHours is joined on `ageID = year − modelYearID`; an age that
-        // does not match the model year (2020 − 2018 = 2) misses the join.
+ // SourceHours is joined on `ageID = year − modelYearID`; an age that
+ // does not match the model year (2020 − 2018 = 2) misses the join.
         let mut inputs = minimal_inputs();
         inputs.source_hours[0].age_id = 5;
         assert!(LiquidLeakingCalculator::new().calculate(&inputs).is_empty());
@@ -3048,8 +3048,8 @@ mod tests {
 
     #[test]
     fn calculate_drops_op_mode_distribution_for_a_different_op_mode() {
-        // OpModeDistribution is joined on the WeightedMeanBaseRate cell's
-        // operating mode; a row for another op mode misses the join.
+ // OpModeDistribution is joined on the WeightedMeanBaseRate cell's
+ // operating mode; a row for another op mode misses the join.
         let mut inputs = minimal_inputs();
         inputs.op_mode_distribution[0].op_mode_id = 300;
         assert!(LiquidLeakingCalculator::new().calculate(&inputs).is_empty());
@@ -3057,9 +3057,9 @@ mod tests {
 
     #[test]
     fn calculate_output_is_sorted_by_dimension_key() {
-        // Two hour/day rows produce two output rows; the result comes back
-        // dimension-key sorted regardless of input order. hourDay 109 (day 2,
-        // hour 13) sorts before hourDay 85 (day 5, hour 8).
+ // Two hour/day rows produce two output rows; the result comes back
+ // dimension-key sorted regardless of input order. hourDay 109 (day 2,
+ // hour 13) sorts before hourDay 85 (day 5, hour 8).
         let mut inputs = minimal_inputs();
         inputs.run_spec_hour_day = vec![85, 109];
         inputs.source_hours.push(SourceHoursRow {
@@ -3108,8 +3108,8 @@ mod tests {
 
     #[test]
     fn calculator_subscribes_to_evap_fuel_leaks_at_month_granularity() {
-        // CalculatorInfo.txt: Subscribe LiquidLeakingCalculator Evap Fuel Leaks
-        // 13 MONTH EMISSION_CALCULATOR.
+ // CalculatorInfo.txt: Subscribe LiquidLeakingCalculator Evap Fuel Leaks
+ // 13 MONTH EMISSION_CALCULATOR.
         let calc = LiquidLeakingCalculator::new();
         let subs = calc.subscriptions();
         assert_eq!(subs.len(), 1);
@@ -3120,8 +3120,8 @@ mod tests {
 
     #[test]
     fn calculator_registers_thc_for_evap_fuel_leaks() {
-        // CalculatorInfo.txt: Registration Total Gaseous Hydrocarbons 1
-        // Evap Fuel Leaks 13 LiquidLeakingCalculator.
+ // CalculatorInfo.txt: Registration Total Gaseous Hydrocarbons 1
+ // Evap Fuel Leaks 13 LiquidLeakingCalculator.
         let calc = LiquidLeakingCalculator::new();
         let regs = calc.registrations();
         assert_eq!(regs.len(), 1);
@@ -3131,8 +3131,8 @@ mod tests {
 
     #[test]
     fn calculator_has_no_upstream() {
-        // A direct subscriber: the only Chain directive naming the calculator
-        // has it as the inModule, so it depends on nothing upstream.
+ // A direct subscriber: the only Chain directive naming the calculator
+ // has it as the inModule, so it depends on nothing upstream.
         assert!(LiquidLeakingCalculator::new().upstream().is_empty());
     }
 
@@ -3299,20 +3299,20 @@ mod tests {
             .unwrap()
             .get(0)
             .unwrap();
-        // weightedMeanBaseRate 1.0 → emissionQuant 3.0 / noOfRealDays(1.0), blended
-        // with the I/M rate at IMAdjustFract 0.4 → 1.5 × 0.4 + 3.0 × 0.6 = 2.4.
+ // weightedMeanBaseRate 1.0 → emissionQuant 3.0 / noOfRealDays(1.0), blended
+ // with the I/M rate at IMAdjustFract 0.4 → 1.5 × 0.4 + 3.0 × 0.6 = 2.4.
         assert!((quant - 2.4).abs() < 1e-9, "emissionQuant {quant} != 2.4");
     }
 
-    /// Golden row-level test using real values from the
-    /// `characterization/snapshots/process-evap-leaks` fixture for
-    /// sourceType=21, modelYear=2010, August (month=8), hourDay=72 (weekday
-    /// 7 a.m., link=2616104 Washtenaw County MI).  OpModeDistribution is
-    /// not in the snapshot so a synthetic frac=1.0 row is supplied.
-    ///
-    /// Hand-derived chain (LL-8 → LL-9, no I/M):
-    ///   LL-8 wMBR        = 0.935510 × 0.048               = 0.04490448
-    ///   LL-9 emitQuant   = 0.04490448 × 24.1821 × 1.0 / 2.0 = 0.542942312904
+ /// Golden row-level test using real values from the
+ /// `characterization/snapshots/process-evap-leaks` fixture for
+ /// sourceType=21, modelYear=2010, August (month=8), hourDay=72 (weekday
+ /// 7 a.m., link=2616104 Washtenaw County MI). OpModeDistribution is
+ /// not in the snapshot so a synthetic frac=1.0 row is supplied.
+ ///
+ /// Hand-derived chain (LL-8 → LL-9, no I/M):
+ /// LL-8 wMBR = 0.935510 × 0.048 = 0.04490448
+ /// LL-9 emitQuant = 0.04490448 × 24.1821 × 1.0 / 2.0 = 0.542942312904
     #[test]
     fn calculate_snapshot_golden_sourcetype21_modelyear2010_august_hourday72() {
         let inputs = LiquidLeakingInputs {
@@ -3435,7 +3435,7 @@ mod tests {
 
     #[test]
     fn calculator_is_object_safe() {
-        // The registry stores calculators as Box<dyn Calculator>.
+ // The registry stores calculators as Box<dyn Calculator>.
         let calc: Box<dyn Calculator> = Box::new(LiquidLeakingCalculator::new());
         assert_eq!(calc.name(), "LiquidLeakingCalculator");
     }

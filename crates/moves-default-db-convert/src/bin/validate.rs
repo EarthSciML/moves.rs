@@ -1,7 +1,7 @@
 //! `moves-default-db-validate` CLI.
 //!
 //! Validate a converted default-DB Parquet tree against the source TSV
-//! dump (Phase 4 Task 81). Reports manifest drift, schema regressions,
+//! dump. Reports manifest drift, schema regressions,
 //! row-count mismatches, and per-column aggregate disagreements between
 //! the source TSV and the readback of the Parquet partitions.
 //!
@@ -9,9 +9,9 @@
 //!
 //! ```sh
 //! moves-default-db-validate \
-//!   --output-root default-db/movesdb20241112 \
-//!   --tsv-dir     default-db/movesdb20241112/_tsv \
-//!   [--aggregate-row-cap 2000000]
+//! --output-root default-db/movesdb20241112 \
+//! --tsv-dir default-db/movesdb20241112/_tsv \
+//! [--aggregate-row-cap 2000000]
 //! ```
 
 use std::path::PathBuf;
@@ -24,31 +24,31 @@ use moves_default_db_convert::{validate, ValidateOptions};
 #[derive(Debug, Parser)]
 #[command(
     name = "moves-default-db-validate",
-    about = "Validate a converted default-DB Parquet tree against its source TSV dump (Phase 4 Task 81).",
+    about = "Validate a converted default-DB Parquet tree against its source TSV dump.",
     version
 )]
 struct Args {
-    /// Path to the converted output root (contains `manifest.json`).
+ /// Path to the converted output root (contains `manifest.json`).
     #[arg(long, value_name = "DIR")]
     output_root: PathBuf,
 
-    /// Path to the source TSV dump directory (contains `<Table>.tsv` and
-    /// `<Table>.schema.tsv` pairs). Typically `<output>/_tsv`.
+ /// Path to the source TSV dump directory (contains `<Table>.tsv` and
+ /// `<Table>.schema.tsv` pairs). Typically `<output>/_tsv`.
     #[arg(long, value_name = "DIR")]
     tsv_dir: PathBuf,
 
-    /// Per-table row count above which we skip the aggregate cross-check.
-    /// `0` disables aggregate validation entirely (row counts + schema
-    /// only). Omit to validate every row regardless of table size.
+ /// Per-table row count above which we skip the aggregate cross-check.
+ /// `0` disables aggregate validation entirely (row counts + schema
+ /// only). Omit to validate every row regardless of table size.
     #[arg(long, value_name = "ROWS")]
     aggregate_row_cap: Option<u64>,
 
-    /// Emit findings as JSON instead of pretty-printed text.
+ /// Emit findings as JSON instead of pretty-printed text.
     #[arg(long, default_value_t = false)]
     json: bool,
 
-    /// Maximum number of findings to print per kind before truncating.
-    /// Default 20. Does not affect the JSON output.
+ /// Maximum number of findings to print per kind before truncating.
+ /// Default 20. Does not affect the JSON output.
     #[arg(long, default_value_t = 20, value_name = "N")]
     max_findings_per_kind: usize,
 }
@@ -130,7 +130,7 @@ fn emit_text(report: &moves_default_db_convert::ValidationReport, max_per_kind: 
 }
 
 fn emit_json(report: &moves_default_db_convert::ValidationReport) {
-    // Roll our own simple JSON to keep the dependency surface tiny.
+ // Roll our own simple JSON to keep the dependency surface tiny.
     let summary = &report.summary;
     let mut s = String::new();
     s.push_str("{\n");

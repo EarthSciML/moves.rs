@@ -1,6 +1,6 @@
 //! Find/lookup utility routines (`fnd*.f`).
 //!
-//! Task 101. Ports NONROAD's family of linear-search-with-fallback
+//!Ports NONROAD's family of linear-search-with-fallback
 //! lookup helpers. The Fortran source has 16 `fnd*.f` files (~2,450
 //! lines combined); each walks a Fortran COMMON-block array and
 //! returns a 1-based index (0 = no match) or a similar sentinel.
@@ -27,29 +27,29 @@
 //!
 //! | Routine | Rust function | Inputs available |
 //! |---|---|---|
-//! | `fndchr.f`  | [`find_string`]            | (utility — any `&[String]`) |
-//! | `fndasc.f`  | [`find_scc_hierarchy`]     | (utility — any `&[String]`) |
-//! | `fndhpc.f`  | [`find_hp_category`]       | (utility — uses [`HPCLEV`]) |
+//! | `fndchr.f` | [`find_string`] | (utility — any `&[String]`) |
+//! | `fndasc.f` | [`find_scc_hierarchy`] | (utility — any `&[String]`) |
+//! | `fndhpc.f` | [`find_hp_category`] | (utility — uses [`HPCLEV`]) |
 //! | `fndscrp.f` | [`find_scrappage_percent`] | [`input::scrappage::ScrappagePoint`](crate::input::scrappage::ScrappagePoint) |
-//! | `fndreg.f`  | [`find_region`]            | [`input::region_def::RegionDefinitions`](crate::input::region_def::RegionDefinitions) |
-//! | `fnddet.f`  | [`find_deterioration`]     | [`input::deterioration::DeteriorationRecord`](crate::input::deterioration::DeteriorationRecord) |
-//! | `fndact.f`  | [`find_activity`]          | [`input::activity::ActivityRecord`](crate::input::activity::ActivityRecord) |
-//! | `fndrfm.f`  | [`find_refueling_mode`]    | [`input::spillage::SpillageRecord`](crate::input::spillage::SpillageRecord) |
+//! | `fndreg.f` | [`find_region`] | [`input::region_def::RegionDefinitions`](crate::input::region_def::RegionDefinitions) |
+//! | `fnddet.f` | [`find_deterioration`] | [`input::deterioration::DeteriorationRecord`](crate::input::deterioration::DeteriorationRecord) |
+//! | `fndact.f` | [`find_activity`] | [`input::activity::ActivityRecord`](crate::input::activity::ActivityRecord) |
+//! | `fndrfm.f` | [`find_refueling_mode`] | [`input::spillage::SpillageRecord`](crate::input::spillage::SpillageRecord) |
 //! | `fndevefc.f`| [`find_evap_emission_factor`] | [`input::evemfc::EvapEmissionFactorRecord`](crate::input::evemfc::EvapEmissionFactorRecord) |
 //!
 //! # What's deferred
 //!
 //! Seven `fnd*.f` routines port the lookup logic over data tables
-//! that are produced by parsers not yet ported in Phase 5:
+//! that are produced by parsers not yet ported in:
 //!
 //! | Routine | Blocking task | Reason |
 //! |---|---|---|
-//! | `fndefc.f`    | Task 96 (`rdemfc.f` `.EMF` parser)            | Needs the EMF record type |
-//! | `fndtch.f`    | Task 96 (`rdtech.f` `.TCH` parser)            | Needs the tech-fraction record type |
-//! | `fndevtch.f`  | Task 96 (`rdevtech.f` `.EVTCH` parser)        | Needs the evap tech-fraction record type |
-//! | `fndrtrft.f`  | Task 98 (`rdrtrft.f` retrofit parser)         | Needs the retrofit record type and filter arrays |
-//! | `fndgxf.f`    | Task 95 follow-up (`rdgxrf.f` cross-reference) | Current [`crate::input::gxr`] parses a different `.GXR` layout (factor grid) than the cross-reference array (FIPS × SCC × HP × tech × indicator) that `fndgxf` queries |
-//! | `fndtpm.f`    | Task 95 follow-up (`.DAT` temporal profiles)   | Current [`crate::input::seasonal::SeasonalRecord`] stores monthly factors per equipment, not the `(SCC, subregion, monthly-profile-code, daily-profile-code)` lookup table fndtpm walks |
+//! | `fndefc.f` | (`rdemfc.f` `.EMF` parser) | Needs the EMF record type |
+//! | `fndtch.f` | (`rdtech.f` `.TCH` parser) | Needs the tech-fraction record type |
+//! | `fndevtch.f` | (`rdevtech.f` `.EVTCH` parser) | Needs the evap tech-fraction record type |
+//! | `fndrtrft.f` | (`rdrtrft.f` retrofit parser) | Needs the retrofit record type and filter arrays |
+//! | `fndgxf.f` | follow-up (`rdgxrf.f` cross-reference) | Current [`crate::input::gxr`] parses a different `.GXR` layout (factor grid) than the cross-reference array (FIPS × SCC × HP × tech × indicator) that `fndgxf` queries |
+//! | `fndtpm.f` | follow-up (`.DAT` temporal profiles) | Current [`crate::input::seasonal::SeasonalRecord`] stores monthly factors per equipment, not the `(SCC, subregion, monthly-profile-code, daily-profile-code)` lookup table fndtpm walks |
 //!
 //! `fndkey.f` searches a *file* (Fortran unit number) for a keyword
 //! by reading lines. This has no Rust equivalent in this design:
@@ -64,21 +64,21 @@
 //!
 //! # Indexing
 //!
-//! Per the migration-plan task description, the long-term plan is
+//! Per the task description, the long-term plan is
 //! to replace many of these linear walks with `HashMap` / `BTreeMap`
 //! indices. The current ports preserve the linear-walk semantics
 //! one-for-one because:
 //!
 //! * Most lookups carry multi-criteria precedence (SCC hierarchy ×
-//!   region × HP range × year) where a single `HashMap` key won't
-//!   suffice and the precedence resolution still requires walking
-//!   candidates.
+//! region × HP range × year) where a single `HashMap` key won't
+//! suffice and the precedence resolution still requires walking
+//! candidates.
 //! * Fixture-table sizes are typically a few hundred to a few thousand
-//!   records — linear walks complete in microseconds.
-//! * The numerical-fidelity gate (Task 115) needs the port to behave
-//!   identically to the Fortran source; an indexed lookup that picks
-//!   a different "best" match on equal-precedence ties would be a
-//!   silent divergence.
+//! records — linear walks complete in microseconds.
+//! * The numerical-fidelity gate needs the port to behave
+//! identically to the Fortran source; an indexed lookup that picks
+//! a different "best" match on equal-precedence ties would be a
+//! silent divergence.
 //!
 //! Callers that want pre-indexing build a `HashMap<&str, usize>` over
 //! the SCC/key field of their record slice and pass it alongside the
@@ -175,8 +175,8 @@ pub fn find_string(needle: &str, haystack: &[String]) -> Option<usize> {
 ///
 /// 1. If an entry equals the input SCC exactly, return that index immediately.
 /// 2. Otherwise record the *last* occurrence of the 7-digit global form
-///    (`{first 7 chars}000`) and the *last* occurrence of the 4-digit
-///    global form (`{first 4 chars}000000`).
+/// (`{first 7 chars}000`) and the *last* occurrence of the 4-digit
+/// global form (`{first 4 chars}000000`).
 /// 3. After the walk, prefer the 7-digit match; fall back to the 4-digit.
 ///
 /// The "last occurrence" semantics matters: when multiple records share
@@ -253,7 +253,7 @@ pub fn find_scrappage_percent(frac_life_used: f32, points: &[ScrappagePoint]) ->
 ///
 /// 1. Exact 5-digit FIPS entry in some region's state list.
 /// 2. Otherwise, the *last* region containing a state-wildcard entry
-///    (FIPS with `"000"` suffix, first 2 digits matching the input).
+/// (FIPS with `"000"` suffix, first 2 digits matching the input).
 /// 3. Otherwise, the *last* region containing the national wildcard `"00000"`.
 ///
 /// The Fortran source returns a 1-based region index that callers then
@@ -415,7 +415,7 @@ pub fn find_activity(
 /// span:
 ///
 /// ```text
-///     idiff = max(int(hp - splpcb), int(splpce - hp))
+/// idiff = max(int(hp - splpcb), int(splpce - hp))
 /// ```
 ///
 /// where a smaller `idiff` means the HP range is more tightly centered
@@ -480,14 +480,14 @@ pub fn find_refueling_mode(
 /// linearly and tracks four scalars for the running "best match":
 ///
 /// * `iasc` — SCC hierarchy index of the current best (0 = exact match,
-///   1 = 7-digit global, 2 = 4-digit global; smaller is more specific);
+/// 1 = 7-digit global, 2 = 4-digit global; smaller is more specific);
 /// * `idfhpc` — HP-range half-width of the current best (smaller is more
-///   tightly centred on the input HP);
+/// tightly centred on the input HP);
 /// * `tecmatch` — exact tech code or [`TECH_DEFAULT`] of the current
-///   best (exact beats default);
+/// best (exact beats default);
 /// * `idfyr` — `year - record.year` of the current best (smaller is
-///   closer to the input year, with the year-greater-than-input case
-///   rejected up front).
+/// closer to the input year, with the year-greater-than-input case
+/// rejected up front).
 ///
 /// Precedence (highest first): most specific SCC, most specific HP,
 /// most specific tech type, highest year not exceeding the input.
@@ -527,11 +527,11 @@ pub fn find_evap_emission_factor(
             continue;
         };
         if year < rec.year {
-            // Record's year is later than the input — skip without
-            // adjusting bookkeeping (the Fortran source updates the
-            // `iemyr` COMMON here; the Rust port omits that side
-            // effect — callers that need a "next allowable year"
-            // hint can compute it externally).
+ // Record's year is later than the input — skip without
+ // adjusting bookkeeping (the Fortran source updates the
+ // `iemyr` COMMON here; the Rust port omits that side
+ // effect — callers that need a "next allowable year"
+ // hint can compute it externally).
             continue;
         }
 
@@ -585,7 +585,7 @@ mod tests {
         v.to_string()
     }
 
-    // ---- find_string ----
+ // ---- find_string ----
 
     #[test]
     fn find_string_matches_first_occurrence() {
@@ -601,7 +601,7 @@ mod tests {
         assert_eq!(find_string("X", &haystack), None);
     }
 
-    // ---- find_scc_hierarchy ----
+ // ---- find_scc_hierarchy ----
 
     #[test]
     fn scc_hierarchy_exact_match_short_circuits() {
@@ -630,8 +630,8 @@ mod tests {
 
     #[test]
     fn scc_hierarchy_returns_last_occurrence_of_global() {
-        // Fortran semantics: when multiple records share the same global
-        // SCC form, the last one wins (Fortran "last write" sets the index).
+ // Fortran semantics: when multiple records share the same global
+ // SCC form, the last one wins (Fortran "last write" sets the index).
         let haystack = vec![
             s("2265001000"), // first 7-digit
             s("2265001000"), // second 7-digit — should win
@@ -645,7 +645,7 @@ mod tests {
         assert_eq!(find_scc_hierarchy("2265001010", &haystack), None);
     }
 
-    // ---- find_hp_category ----
+ // ---- find_hp_category ----
 
     #[test]
     fn hp_category_exact_match() {
@@ -661,7 +661,7 @@ mod tests {
         assert_eq!(find_hp_category(9999.0), None);
     }
 
-    // ---- find_scrappage_percent ----
+ // ---- find_scrappage_percent ----
 
     fn sample_scrappage() -> Vec<ScrappagePoint> {
         vec![
@@ -693,15 +693,15 @@ mod tests {
     #[test]
     fn scrappage_within_range_returns_lower_bin_percent() {
         let pts = sample_scrappage();
-        // 60.0 falls between bin 50 (40%) and bin 75 (75%) → returns 40%
+ // 60.0 falls between bin 50 (40%) and bin 75 (75%) → returns 40%
         assert_eq!(find_scrappage_percent(60.0, &pts), Some(40.0));
     }
 
     #[test]
     fn scrappage_at_first_bin_returns_first_percent() {
         let pts = sample_scrappage();
-        // frac == first.bin: not < first.bin, so falls into the windowed
-        // search. Bin 50 > 25, so returns percent at index 0 = 10%.
+ // frac == first.bin: not < first.bin, so falls into the windowed
+ // search. Bin 50 > 25, so returns percent at index 0 = 10%.
         assert_eq!(find_scrappage_percent(25.0, &pts), Some(10.0));
     }
 
@@ -717,7 +717,7 @@ mod tests {
         assert_eq!(find_scrappage_percent(50.0, &pts), None);
     }
 
-    // ---- find_region ----
+ // ---- find_region ----
 
     fn sample_regions() -> RegionDefinitions {
         let mut defs = RegionDefinitions::default();
@@ -749,14 +749,14 @@ mod tests {
     #[test]
     fn region_state_wildcard_match() {
         let defs = sample_regions();
-        // Indiana state-wide via "18000"
+ // Indiana state-wide via "18000"
         assert_eq!(find_region("18045", &defs), Some("EAST"));
     }
 
     #[test]
     fn region_national_wildcard_match() {
         let defs = sample_regions();
-        // Texas (not in any explicit region) falls through to NATIONAL
+ // Texas (not in any explicit region) falls through to NATIONAL
         assert_eq!(find_region("48201", &defs), Some("NATIONAL"));
     }
 
@@ -768,7 +768,7 @@ mod tests {
         assert_eq!(find_region("48201", &defs), None);
     }
 
-    // ---- find_deterioration ----
+ // ---- find_deterioration ----
 
     fn sample_det() -> Vec<DeteriorationRecord> {
         vec![
@@ -816,7 +816,7 @@ mod tests {
         assert_eq!(find_deterioration("T3", "CO", &recs), None);
     }
 
-    // ---- find_activity ----
+ // ---- find_activity ----
 
     fn act_rec(scc: &str, sub: &str, hp_lo: f32, hp_hi: f32) -> ActivityRecord {
         ActivityRecord {
@@ -859,7 +859,7 @@ mod tests {
             act_rec("2265001010", "", 0.0, 50.0),     // exact + global
             act_rec("2265001000", "EAST", 0.0, 50.0), // 7-digit + region
         ];
-        // No exact+region available; the next tier is exact+global.
+ // No exact+region available; the next tier is exact+global.
         assert_eq!(
             find_activity("2265001010", "17031", 25.0, &recs, &defs),
             Some(0)
@@ -914,7 +914,7 @@ mod tests {
         );
     }
 
-    // ---- find_refueling_mode ----
+ // ---- find_refueling_mode ----
 
     fn spill_rec(
         scc: &str,
@@ -1040,18 +1040,18 @@ mod tests {
         );
     }
 
-    // ---- helpers ----
+ // ---- helpers ----
 
     #[test]
     fn scc_global_forms_pad_correctly() {
         assert_eq!(scc_global_7("2265001010"), "2265001000");
         assert_eq!(scc_global_4("2265001010"), "2265000000");
-        // Short input gets padded out to 10 chars.
+ // Short input gets padded out to 10 chars.
         assert_eq!(scc_global_7("226"), "2260000000");
         assert_eq!(scc_global_4("22"), "2200000000");
     }
 
-    // ---- find_evap_emission_factor ----
+ // ---- find_evap_emission_factor ----
 
     use crate::input::evemfc::{EvapEmissionFactorRecord, EvapEmissionUnits};
 
@@ -1113,7 +1113,7 @@ mod tests {
             evap_rec("2270002003", "ALL", 0.0, 100.0, 2019, 0.10),
             evap_rec("2270002003", "ALL", 0.0, 100.0, 2025, 0.20),
         ];
-        // Looking up year 2020: 2025 record should be skipped.
+ // Looking up year 2020: 2025 record should be skipped.
         let idx = find_evap_emission_factor("2270002003", "E1", 50.0, 2020, &recs).unwrap();
         assert_eq!(recs[idx].factor, 0.10);
     }
@@ -1163,7 +1163,7 @@ mod tests {
     fn evefc_prefers_tighter_hp_range_on_tied_scc() {
         let recs = vec![
             evap_rec("2270002003", "ALL", 0.0, 100.0, 2020, 0.10),
-            // Tighter HP centered on 50: 40..60 → idiff = max(50-40, 60-50) = 10
+ // Tighter HP centered on 50: 40..60 → idiff = max(50-40, 60-50) = 10
             evap_rec("2270002003", "ALL", 40.0, 60.0, 2020, 0.42),
         ];
         let idx = find_evap_emission_factor("2270002003", "E1", 50.0, 2020, &recs).unwrap();

@@ -6,22 +6,22 @@
 //! plus the generators that run ahead of them in the master loop. Each
 //! module declares the `(pollutant, process)` pairs it produces and the
 //! granularity at which it subscribes to the master loop; `moves-framework`
-//! drives them according to the chain reconstructed in Phase 1
-//! (Task 10, `moves-calculator-info`).
+//! drives them according to the chain reconstructed in
+//!.
 //!
-//! See `moves-rust-migration-plan.md`:
+//! See `moves-rust-.md`:
 //!
-//! * Phase 3 — Tasks 29–43 cover the generators, Tasks 45–88 the calculators.
+//! * — cover the generators, the calculators.
 //!
-//! # Phase 3 status
+//! # status
 //!
-//! The crate is filled in module by module by the Phase 3 implementation
+//! The crate is filled in module by module by the implementation
 //! tasks, grouped into two areas: the [`generators`] module hosts the
-//! generator ports (Tasks 29–43) and the [`calculators`] module hosts the
-//! calculator ports (Tasks 45–88). Each port adds its module under the
+//! generator ports and the [`calculators`] module hosts the
+//! calculator ports. Each port adds its module under the
 //! relevant area and registers it with a single `pub mod` line in that
 //! area's `mod.rs`, never in this file — so the crate root stays a stable,
-//! merge-conflict-free area list as Phase 3 grows.
+//! merge-conflict-free area list as grows.
 
 pub mod calculators;
 pub mod error;
@@ -106,12 +106,12 @@ pub fn register_all(
         crankcase_emission::CrankcaseEmissionCalculatorNonPM::NAME,
         crankcase_emission::nonpm_factory,
     )?;
-    // multiday_tank_vapor_venting_calculator is intentionally not registered:
-    // it has no DAG entry — "MultidayTankVaporVentingCalculator" is not in
-    // calculator-dag.json. The live TankVaporVentingCalculator DAG entry and
-    // its (THC × process 12) registration belong to tank_vapor_venting_calculator
-    // (already registered above). The multiday module is the algorithm body a
-    // future runtime would dispatch to via USE_MULTIDAY_DIURNALS.
+ // multiday_tank_vapor_venting_calculator is intentionally not registered:
+ // it has no DAG entry — "MultidayTankVaporVentingCalculator" is not in
+ // calculator-dag.json. The live TankVaporVentingCalculator DAG entry and
+ // its (THC × process 12) registration belong to tank_vapor_venting_calculator
+ // (already registered above). The multiday module is the algorithm body a
+ // future runtime would dispatch to via USE_MULTIDAY_DIURNALS.
     registry.register_calculator(
         nitrogen_oxide::NOCalculator::NAME,
         nitrogen_oxide::no_factory,
@@ -296,10 +296,10 @@ pub fn register_all(
 /// [`register_all`] for [`moves_framework::CalculatorRegistry`].
 ///
 /// Additional strategies (OnRoadRetrofitStrategy, etc.) will be added here as each
-/// strategy wiring bead lands (see mo-4wci).
+/// strategy wiring work item lands (see ).
 pub fn register_strategies(registry: &mut moves_framework::ControlStrategyRegistry) {
     registry.register(|| Box::new(moves_fuel_control::FuelControlStrategy::new()));
-    // AVFT uses polars+parquet and is not available on wasm32 (mio linkage issue).
+ // AVFT uses polars+parquet and is not available on wasm32 (mio linkage issue).
     #[cfg(not(target_arch = "wasm32"))]
     registry.register(|| {
         Box::new(moves_avft::AvftControlStrategy::from_completed(

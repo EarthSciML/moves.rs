@@ -4,7 +4,7 @@
 //! the conventional CSV filename the user is expected to provide.
 //!
 //! The four importers materialised here are the ones called out in the
-//! Phase 4 Task 85 description ("population, age distribution, retrofit,
+//! description ("population, age distribution, retrofit,
 //! monthly throttle"). Adding a sibling importer is a matter of writing
 //! one more module, registering it in [`all`], and providing a fixture.
 
@@ -23,7 +23,7 @@ use crate::schema::TableSchema;
 pub struct ImporterEntry {
     pub schema: &'static TableSchema,
     pub csv_filename: &'static str,
-    /// Output Parquet filename (relative to the manifest's root).
+ /// Output Parquet filename (relative to the manifest's root).
     pub parquet_filename: &'static str,
 }
 

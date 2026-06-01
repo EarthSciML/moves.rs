@@ -1,7 +1,7 @@
 //! `compare-canonical` — compare a canonical-MOVES snapshot against a moves.rs output directory.
 //!
 //! Reads the `db__movesoutput__movesoutput` table from a canonical fixture snapshot
-//! and the `MOVESOutput/` partitioned Parquet tree from a moves.rs run.  Groups
+//! and the `MOVESOutput/` partitioned Parquet tree from a moves.rs run. Groups
 //! by `pollutantID`, sums `emissionQuant`, and emits a per-pollutant comparison
 //! table in either Markdown or JSON.
 //!
@@ -9,12 +9,12 @@
 //!
 //! ```sh
 //! compare-canonical \
-//!     --canonical  characterization/snapshots/sample-runspec \
-//!     --moves-rs   /tmp/audit/sample-runspec/moves-rs-output \
-//!     --fixture    sample-runspec \
-//!     [--canonical-wall 42.0] \
-//!     [--moves-rs-wall  0.5]  \
-//!     [--format text|json]
+//! --canonical characterization/snapshots/sample-runspec \
+//! --moves-rs /tmp/audit/sample-runspec/moves-rs-output \
+//! --fixture sample-runspec \
+//! [--canonical-wall 42.0] \
+//! [--moves-rs-wall 0.5] \
+//! [--format text|json]
 //! ```
 //!
 //! Exit codes: 0 = success, 2 = error.
@@ -39,35 +39,35 @@ use moves_snapshot::{
     version
 )]
 struct Args {
-    /// Canonical fixture snapshot directory (from `characterization/snapshots/<fixture>`).
+ /// Canonical fixture snapshot directory (from `characterization/snapshots/<fixture>`).
     #[arg(long, value_name = "DIR")]
     canonical: PathBuf,
 
-    /// moves.rs output directory (produced by `moves run --output <dir>`).
+ /// moves.rs output directory (produced by `moves run --output <dir>`).
     #[arg(long, value_name = "DIR")]
     moves_rs: PathBuf,
 
-    /// Fixture name used in the report header.
+ /// Fixture name used in the report header.
     #[arg(long, value_name = "NAME")]
     fixture: String,
 
-    /// Canonical-MOVES wall-clock time in seconds (omit if not available).
+ /// Canonical-MOVES wall-clock time in seconds (omit if not available).
     #[arg(long, value_name = "SECS")]
     canonical_wall: Option<f64>,
 
-    /// moves.rs wall-clock time in seconds.
+ /// moves.rs wall-clock time in seconds.
     #[arg(long, value_name = "SECS")]
     moves_rs_wall: Option<f64>,
 
-    /// moves.rs peak RSS in MiB (from `/usr/bin/time -v`; omit if not available).
+ /// moves.rs peak RSS in MiB (from `/usr/bin/time -v`; omit if not available).
     #[arg(long, value_name = "MIB")]
     moves_rs_peak_mb: Option<f64>,
 
-    /// Canonical-MOVES peak RSS in MiB (from `/usr/bin/time -v`; omit if not available).
+ /// Canonical-MOVES peak RSS in MiB (from `/usr/bin/time -v`; omit if not available).
     #[arg(long, value_name = "MIB")]
     canonical_peak_mb: Option<f64>,
 
-    /// Output format.
+ /// Output format.
     #[arg(long, value_enum, default_value_t = Format::Text)]
     format: Format,
 }

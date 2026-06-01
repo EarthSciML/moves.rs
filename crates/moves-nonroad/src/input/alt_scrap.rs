@@ -1,6 +1,6 @@
 //! Alternate-scrappage-curves parser (`rdalt.f`).
 //!
-//! Task 97. Parses the optional `/ALTERNATE SCRAPPAGE/` packet. Unlike
+//!Parses the optional `/ALTERNATE SCRAPPAGE/` packet. Unlike
 //! [`scrappage`](super::scrappage), this packet carries multiple
 //! named curves: a header line lists curve names, and each subsequent
 //! row gives an age bin followed by one percent value per named
@@ -28,18 +28,18 @@ use std::path::PathBuf;
 /// One row of alternate-scrappage data.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AlternateScrappageRow {
-    /// Useful-life bin.
+ /// Useful-life bin.
     pub bin: f32,
-    /// Percent values, one per named curve.
+ /// Percent values, one per named curve.
     pub percents: Vec<f32>,
 }
 
 /// Parsed alternate-scrappage packet.
 #[derive(Debug, Default, Clone)]
 pub struct AlternateScrappage {
-    /// Names of each curve column.
+ /// Names of each curve column.
     pub names: Vec<String>,
-    /// Rows of (bin, percents).
+ /// Rows of (bin, percents).
     pub rows: Vec<AlternateScrappageRow>,
 }
 

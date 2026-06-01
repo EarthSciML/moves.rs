@@ -1,17 +1,17 @@
-//! Exhaust emissions calculator (Task 106).
+//! Exhaust emissions calculator.
 //!
 //! Ports four tightly-coupled Fortran subroutines from
 //! `NONROAD/NR08a/SOURCE/`:
 //!
 //! | Fortran | Rust |
 //! |---|---|
-//! | `unitcf.f` (80)   | [`unit_conversion_factor`]                                    |
-//! | `emsadj.f` (343)  | [`calculate_emission_adjustments`]                            |
-//! | `emfclc.f` (314)  | [`compute_emission_factor_for_tech`] (+ [`apply_deterioration`]) |
-//! | `clcems.f` (360)  | [`calculate_exhaust_emissions`]                               |
+//! | `unitcf.f` (80) | [`unit_conversion_factor`] |
+//! | `emsadj.f` (343) | [`calculate_emission_adjustments`] |
+//! | `emfclc.f` (314) | [`compute_emission_factor_for_tech`] (+ [`apply_deterioration`]) |
+//! | `clcems.f` (360) | [`calculate_exhaust_emissions`] |
 //!
 //! The Fortran code is the most numerically-sensitive piece of
-//! NONROAD; the migration plan flags Task 106 for two weeks
+//! NONROAD; the flags for two weeks
 //! including fixture-fidelity validation. The Rust port preserves
 //! the order of arithmetic operations exactly so the
 //! single-precision intermediate rounding stays bit-identical to
@@ -23,7 +23,7 @@
 //! The Fortran routines pull most of their inputs from COMMON
 //! blocks (`/optdat/`, `/perdat/`, `/rfgdat/`, `/actdat/`, …). The
 //! Rust port takes every value as an explicit function parameter
-//! so the port is testable in isolation and so future Task 113
+//! so the port is testable in isolation and so future
 //! (driver loop) can wire it up against the eventual
 //! `NonroadContext`. Each input bag carries the same fields the
 //! Fortran COMMON would have supplied, named for clarity.
@@ -33,7 +33,7 @@
 //! All calculations use `f32` (single precision). The Fortran
 //! source declares every variable `real*4`; matching the storage
 //! type is required to produce the same rounding behaviour, which
-//! is exactly what Task 115 validates against canonical fixtures.
+//! is exactly what validates against canonical fixtures.
 //! Where the Fortran code multiplies several `real*4` quantities in
 //! a specific order (e.g. `a * b * c * d` versus `(a * b) * (c * d)`),
 //! the Rust port reproduces the original associativity.
@@ -54,62 +54,62 @@ use crate::common::consts::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum PollutantIndex {
-    /// Total hydrocarbons (IDXTHC = 1).
+ /// Total hydrocarbons (IDXTHC = 1).
     Thc = 1,
-    /// Carbon monoxide (IDXCO = 2).
+ /// Carbon monoxide (IDXCO = 2).
     Co = 2,
-    /// Nitrogen oxides (IDXNOX = 3).
+ /// Nitrogen oxides (IDXNOX = 3).
     Nox = 3,
-    /// Carbon dioxide (IDXCO2 = 4).
+ /// Carbon dioxide (IDXCO2 = 4).
     Co2 = 4,
-    /// Sulfur oxides (IDXSOX = 5).
+ /// Sulfur oxides (IDXSOX = 5).
     Sox = 5,
-    /// Particulate matter (IDXPM = 6).
+ /// Particulate matter (IDXPM = 6).
     Pm = 6,
-    /// Crankcase HC (IDXCRA = 7).
+ /// Crankcase HC (IDXCRA = 7).
     Crankcase = 7,
-    /// Diurnal evap (IDXDIU = 8). Skipped by the exhaust calc.
+ /// Diurnal evap (IDXDIU = 8). Skipped by the exhaust calc.
     Diurnal = 8,
-    /// Tank permeation (IDXTKP = 9). Skipped by the exhaust calc.
+ /// Tank permeation (IDXTKP = 9). Skipped by the exhaust calc.
     TankPerm = 9,
-    /// Non-rec-marine hose permeation (IDXHOS = 10). Skipped.
+ /// Non-rec-marine hose permeation (IDXHOS = 10). Skipped.
     HosePerm = 10,
-    /// Rec-marine fill-neck permeation (IDXNCK = 11). Skipped.
+ /// Rec-marine fill-neck permeation (IDXNCK = 11). Skipped.
     NeckPerm = 11,
-    /// Rec-marine supply/return permeation (IDXSR = 12). Skipped.
+ /// Rec-marine supply/return permeation (IDXSR = 12). Skipped.
     SupplyReturnPerm = 12,
-    /// Rec-marine vent permeation (IDXVNT = 13). Skipped.
+ /// Rec-marine vent permeation (IDXVNT = 13). Skipped.
     VentPerm = 13,
-    /// Hot soak (IDXSOK = 14). Skipped.
+ /// Hot soak (IDXSOK = 14). Skipped.
     HotSoak = 14,
-    /// Refueling displacement (IDXDIS = 15).
+ /// Refueling displacement (IDXDIS = 15).
     Displacement = 15,
-    /// Spillage (IDXSPL = 16). Skipped by the exhaust calc.
+ /// Spillage (IDXSPL = 16). Skipped by the exhaust calc.
     Spillage = 16,
-    /// Running loss (IDXRLS = 17). Skipped by the exhaust calc.
+ /// Running loss (IDXRLS = 17). Skipped by the exhaust calc.
     RunningLoss = 17,
-    /// Start emissions: THC (IDSTHC = 18).
+ /// Start emissions: THC (IDSTHC = 18).
     StartThc = 18,
-    /// Start emissions: CO (IDSCO = 19).
+ /// Start emissions: CO (IDSCO = 19).
     StartCo = 19,
-    /// Start emissions: NOx (IDSNOX = 20).
+ /// Start emissions: NOx (IDSNOX = 20).
     StartNox = 20,
-    /// Start emissions: CO2 (IDSCO2 = 21).
+ /// Start emissions: CO2 (IDSCO2 = 21).
     StartCo2 = 21,
-    /// Start emissions: SOx (IDSSOX = 22).
+ /// Start emissions: SOx (IDSSOX = 22).
     StartSox = 22,
-    /// Start emissions: PM (IDSPM = 23).
+ /// Start emissions: PM (IDSPM = 23).
     StartPm = 23,
 }
 
 impl PollutantIndex {
-    /// 0-based slot index into per-pollutant arrays of length [`MXPOL`].
+ /// 0-based slot index into per-pollutant arrays of length [`MXPOL`].
     #[inline]
     pub const fn slot(self) -> usize {
         self as usize - 1
     }
 
-    /// 1-based Fortran index.
+ /// 1-based Fortran index.
     #[inline]
     pub const fn fortran_index(self) -> usize {
         self as usize
@@ -128,21 +128,21 @@ impl PollutantIndex {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum FuelKind {
-    /// 2-stroke gasoline (IDXGS2 = 1).
+ /// 2-stroke gasoline (IDXGS2 = 1).
     Gasoline2Stroke = 1,
-    /// 4-stroke gasoline (IDXGS4 = 2).
+ /// 4-stroke gasoline (IDXGS4 = 2).
     Gasoline4Stroke = 2,
-    /// Diesel (IDXDSL = 3).
+ /// Diesel (IDXDSL = 3).
     Diesel = 3,
-    /// LPG (IDXLPG = 4).
+ /// LPG (IDXLPG = 4).
     Lpg = 4,
-    /// CNG (IDXCNG = 5).
+ /// CNG (IDXCNG = 5).
     Cng = 5,
 }
 
 impl FuelKind {
-    /// 1-based Fortran index, useful for indexing into per-fuel
-    /// tables such as `soxbas`/`soxful`/`altfac`.
+ /// 1-based Fortran index, useful for indexing into per-fuel
+ /// tables such as `soxbas`/`soxful`/`altfac`.
     #[inline]
     pub const fn fortran_index(self) -> usize {
         self as usize
@@ -161,33 +161,33 @@ impl FuelKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum EmissionUnitCode {
-    /// `G/HR` — grams per hour (IDXGHR = 1).
+ /// `G/HR` — grams per hour (IDXGHR = 1).
     GramsPerHour = 1,
-    /// `G/HP-HR` — grams per horsepower-hour (IDXGHP = 2).
+ /// `G/HP-HR` — grams per horsepower-hour (IDXGHP = 2).
     GramsPerHpHour = 2,
-    /// `G/GALLON` — grams per gallon of fuel (IDXGAL = 3).
+ /// `G/GALLON` — grams per gallon of fuel (IDXGAL = 3).
     GramsPerGallon = 3,
-    /// `G/TANK` — grams per tank volume (IDXTNK = 4).
+ /// `G/TANK` — grams per tank volume (IDXTNK = 4).
     GramsPerTank = 4,
-    /// `G/DAY` — grams per day (IDXGDY = 5).
+ /// `G/DAY` — grams per day (IDXGDY = 5).
     GramsPerDay = 5,
-    /// `G/START` — grams per engine start (IDXGST = 6).
+ /// `G/START` — grams per engine start (IDXGST = 6).
     GramsPerStart = 6,
-    /// `MULT` — unitless multiplier (IDXMLT = 7).
+ /// `MULT` — unitless multiplier (IDXMLT = 7).
     Multiplier = 7,
-    /// `G/M2/DAY` — grams per square metre per day (IDXGMD = 8).
+ /// `G/M2/DAY` — grams per square metre per day (IDXGMD = 8).
     GramsPerM2Day = 8,
 }
 
 impl EmissionUnitCode {
-    /// Fortran 1-based index.
+ /// Fortran 1-based index.
     #[inline]
     pub const fn fortran_index(self) -> usize {
         self as usize
     }
 
-    /// Construct from the Fortran 1-based index, returning `None`
-    /// for values outside `1..=8`.
+ /// Construct from the Fortran 1-based index, returning `None`
+ /// for values outside `1..=8`.
     pub const fn from_fortran(idx: u8) -> Option<Self> {
         match idx {
             1 => Some(Self::GramsPerHour),
@@ -215,13 +215,13 @@ impl EmissionUnitCode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum ActivityUnit {
-    /// `HRS/YR` — hours per year (IDXHRY = 1).
+ /// `HRS/YR` — hours per year (IDXHRY = 1).
     HoursPerYear = 1,
-    /// `HRS/DAY` — hours per day (IDXHRD = 2).
+ /// `HRS/DAY` — hours per day (IDXHRD = 2).
     HoursPerDay = 2,
-    /// `GAL/YR` — gallons per year (IDXGLY = 3).
+ /// `GAL/YR` — gallons per year (IDXGLY = 3).
     GallonsPerYear = 3,
-    /// `GAL/DAY` — gallons per day (IDXGLD = 4).
+ /// `GAL/DAY` — gallons per day (IDXGLD = 4).
     GallonsPerDay = 4,
 }
 
@@ -231,16 +231,16 @@ pub enum ActivityUnit {
 /// The Fortran function dispatches on the EF unit `index`:
 ///
 /// - `IDXGHP` (`G/HP-HR`): convert g/hp-hr → g/hr by multiplying
-///   by `hpavg * faclod(indlod)`.
+/// by `hpavg * faclod(indlod)`.
 /// - `IDXGAL` (`G/GALLON`): convert g/gallon → g/hr by
-///   multiplying by `bsfc * faclod(indlod) * hpavg / density`.
-///   The special case `iactun ∈ {IDXGLY, IDXGLD}` (activity is
-///   already in gallon units) bypasses the conversion and returns
-///   1.0. When `density == 0`, returns 0 to avoid divide-by-zero.
+/// multiplying by `bsfc * faclod(indlod) * hpavg / density`.
+/// The special case `iactun ∈ {IDXGLY, IDXGLD}` (activity is
+/// already in gallon units) bypasses the conversion and returns
+/// 1.0. When `density == 0`, returns 0 to avoid divide-by-zero.
 /// - `IDXGDY` (`G/DAY`): returns the days-per-year `FACGDY` (always 1.0).
 /// - `IDXMLT` (`MULT`): returns 1.0 (unitless multiplier).
 /// - All other codes (`G/HR`, `G/TANK`, `G/START`, `G/M2/DAY`):
-///   returns 1.0 (the conversion is a no-op at this layer).
+/// returns 1.0 (the conversion is a no-op at this layer).
 ///
 /// `activity_unit` corresponds to the Fortran `iactun(indlod)`
 /// COMMON-block read; `load_factor` corresponds to
@@ -266,11 +266,11 @@ pub fn unit_conversion_factor(
                 }
             }
         },
-        // FACGDY in nonrdefc.inc is hardcoded as 1.0; we hardcode the
-        // result here to keep the port self-contained.
+ // FACGDY in nonrdefc.inc is hardcoded as 1.0; we hardcode the
+ // result here to keep the port self-contained.
         EmissionUnitCode::GramsPerDay => 1.0,
         EmissionUnitCode::Multiplier => 1.0,
-        // G/HR, G/TANK, G/START, G/M2/DAY: pass-through.
+ // G/HR, G/TANK, G/START, G/M2/DAY: pass-through.
         _ => 1.0,
     }
 }
@@ -288,13 +288,13 @@ pub fn unit_conversion_factor(
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Season {
-    /// Winter season (IDXWTR = 1).
+ /// Winter season (IDXWTR = 1).
     Winter = 1,
-    /// Spring season (IDXSPR = 2).
+ /// Spring season (IDXSPR = 2).
     Spring = 2,
-    /// Summer season (IDXSUM = 3).
+ /// Summer season (IDXSUM = 3).
     Summer = 3,
-    /// Fall season (IDXFAL = 4).
+ /// Fall season (IDXFAL = 4).
     Fall = 4,
 }
 
@@ -308,15 +308,15 @@ pub enum Season {
 /// bin; the Rust port consumes the already-selected bin).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RfgBinFactors {
-    /// THC multiplier (`rfggs*(iseas, idxyr, IDXTHC)`).
+ /// THC multiplier (`rfggs*(iseas, idxyr, IDXTHC)`).
     pub thc: f32,
-    /// CO multiplier.
+ /// CO multiplier.
     pub co: f32,
-    /// NOx multiplier.
+ /// NOx multiplier.
     pub nox: f32,
-    /// SOx multiplier.
+ /// SOx multiplier.
     pub sox: f32,
-    /// PM multiplier.
+ /// PM multiplier.
     pub pm: f32,
 }
 
@@ -326,18 +326,18 @@ pub struct RfgBinFactors {
 /// `[skip_start, skip_end]` inclusive Julian day range to bypass).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DayRange {
-    /// First Julian day in the period (inclusive, 1-based).
+ /// First Julian day in the period (inclusive, 1-based).
     pub begin_day: i32,
-    /// Last Julian day in the period (inclusive, 1-based).
+ /// Last Julian day in the period (inclusive, 1-based).
     pub end_day: i32,
-    /// First Julian day of the skip window (only used when
-    /// `winter_skip == true`).
+ /// First Julian day of the skip window (only used when
+ /// `winter_skip == true`).
     pub winter_skip_begin: i32,
-    /// Last Julian day of the skip window (only used when
-    /// `winter_skip == true`).
+ /// Last Julian day of the skip window (only used when
+ /// `winter_skip == true`).
     pub winter_skip_end: i32,
-    /// `true` when running a winter daily inventory; days in
-    /// `[winter_skip_begin, winter_skip_end]` are skipped.
+ /// `true` when running a winter daily inventory; days in
+ /// `[winter_skip_begin, winter_skip_end]` are skipped.
     pub winter_skip: bool,
 }
 
@@ -348,17 +348,17 @@ pub struct DayRange {
 /// is read; otherwise the constant `amtemp` is used.
 #[derive(Debug, Clone)]
 pub struct DailyTemperatures {
-    /// `true` when daily temperature/RVP arrays are used
-    /// (`ldayfl` in Fortran). When `false`, every day uses
-    /// [`Self::ambient_temp`].
+ /// `true` when daily temperature/RVP arrays are used
+ /// (`ldayfl` in Fortran). When `false`, every day uses
+ /// [`Self::ambient_temp`].
     pub daily_temperature_mode: bool,
-    /// Per-day ambient temperature in °F when
-    /// `daily_temperature_mode` is true. Length must be at least
-    /// `day_range.end_day` (1-based Julian days; index `i` holds
-    /// the temperature for day `i+1`).
+ /// Per-day ambient temperature in °F when
+ /// `daily_temperature_mode` is true. Length must be at least
+ /// `day_range.end_day` (1-based Julian days; index `i` holds
+ /// the temperature for day `i+1`).
     pub daily_ambient_temp_f: Vec<f32>,
-    /// Single ambient temperature in °F used when
-    /// `daily_temperature_mode` is false (Fortran `amtemp`).
+ /// Single ambient temperature in °F used when
+ /// `daily_temperature_mode` is false (Fortran `amtemp`).
     pub ambient_temp: f32,
 }
 
@@ -370,58 +370,58 @@ pub struct DailyTemperatures {
 /// variable it replaces.
 #[derive(Debug, Clone)]
 pub struct AdjustmentInputs<'a> {
-    /// Fuel type (`ifuel` in `/eqpdat/`).
+ /// Fuel type (`ifuel` in `/eqpdat/`).
     pub fuel: FuelKind,
-    /// SCC code of the equipment (`asccod`).
+ /// SCC code of the equipment (`asccod`).
     pub scc: &'a str,
-    /// 5-digit FIPS code (`code`).
+ /// 5-digit FIPS code (`code`).
     pub fips: &'a str,
-    /// Day range (output of `dayloop`).
+ /// Day range (output of `dayloop`).
     pub day_range: DayRange,
-    /// Daily temperature context (`/optdat/` daytmp + `ldayfl`).
+ /// Daily temperature context (`/optdat/` daytmp + `ldayfl`).
     pub temperatures: &'a DailyTemperatures,
-    /// Per-day month-fraction (`daymthfac`, only used when
-    /// `temperatures.daily_temperature_mode` is true and the
-    /// pollutant is activity-based — not diurnal, tank/hose
-    /// permeation, or spillage).
+ /// Per-day month-fraction (`daymthfac`, only used when
+ /// `temperatures.daily_temperature_mode` is true and the
+ /// pollutant is activity-based — not diurnal, tank/hose
+ /// permeation, or spillage).
     pub daily_month_fraction: &'a [f32],
-    /// `true` when RFG adjustments should be applied (`lrfg`).
+ /// `true` when RFG adjustments should be applied (`lrfg`).
     pub rfg: bool,
-    /// `true` when running in a high-altitude region (`lhigh`).
+ /// `true` when running in a high-altitude region (`lhigh`).
     pub high_altitude: bool,
-    /// Oxygen weight-fraction in the fuel, percent (`oxypct`).
+ /// Oxygen weight-fraction in the fuel, percent (`oxypct`).
     pub oxygen_percent: f32,
-    /// `iepyr` — episode year (used by RFG bin lookup).
+ /// `iepyr` — episode year (used by RFG bin lookup).
     pub episode_year: i32,
-    /// `imonth` (1..=12), or 0 when not in monthly mode. Drives
-    /// `iseas = idseas(imonth)` for RFG.
+ /// `imonth` (1..=12), or 0 when not in monthly mode. Drives
+ /// `iseas = idseas(imonth)` for RFG.
     pub month: u8,
-    /// `idseas` lookup (12 entries), produced by `read_seasonal`.
-    /// Slot `i-1` holds the season for calendar month `i`.
+ /// `idseas` lookup (12 entries), produced by `read_seasonal`.
+ /// Slot `i-1` holds the season for calendar month `i`.
     pub month_to_season: [Season; 12],
-    /// RFG year-bin factors, pre-selected per season. The caller
-    /// supplies the matching bin or `None` if the episode year is
-    /// outside all bins (in which case no RFG adjustment is
-    /// applied). Indexing: `[Season::Winter.slot(), Season::Summer.slot()]`
-    /// — Spring and Fall are not used by the Fortran source.
+ /// RFG year-bin factors, pre-selected per season. The caller
+ /// supplies the matching bin or `None` if the episode year is
+ /// outside all bins (in which case no RFG adjustment is
+ /// applied). Indexing: `[Season::Winter.slot(), Season::Summer.slot()]`
+ /// — Spring and Fall are not used by the Fortran source.
     pub rfg_winter_2_stroke: Option<RfgBinFactors>,
-    /// RFG winter factors for 4-stroke gasoline.
+ /// RFG winter factors for 4-stroke gasoline.
     pub rfg_winter_4_stroke: Option<RfgBinFactors>,
-    /// RFG summer factors for 2-stroke gasoline.
+ /// RFG summer factors for 2-stroke gasoline.
     pub rfg_summer_2_stroke: Option<RfgBinFactors>,
-    /// RFG summer factors for 4-stroke gasoline.
+ /// RFG summer factors for 4-stroke gasoline.
     pub rfg_summer_4_stroke: Option<RfgBinFactors>,
-    /// Episode-fuel sulfur fraction for each fuel
-    /// (`soxful(IDXGS2..IDXCNG)`).
+ /// Episode-fuel sulfur fraction for each fuel
+ /// (`soxful(IDXGS2..IDXCNG)`).
     pub sox_fuel: [f32; 5],
-    /// Base sulfur fraction for each fuel (`soxbas(IDXGS2..IDXCNG)`).
+ /// Base sulfur fraction for each fuel (`soxbas(IDXGS2..IDXCNG)`).
     pub sox_base: [f32; 5],
-    /// Rec-marine diesel sulfur override (`soxdsm`). Only applies
-    /// when the SCC's first 7 digits are `"2282020"` or
-    /// `"2280002"`.
+ /// Rec-marine diesel sulfur override (`soxdsm`). Only applies
+ /// when the SCC's first 7 digits are `"2282020"` or
+ /// `"2280002"`.
     pub sox_diesel_marine: f32,
-    /// Altitude correction factors by fuel
-    /// (`altfac(IDXGS2..IDXCNG)`).
+ /// Altitude correction factors by fuel
+ /// (`altfac(IDXGS2..IDXCNG)`).
     pub altitude_factor: [f32; 5],
 }
 
@@ -439,9 +439,9 @@ pub struct AdjustmentTable {
 }
 
 impl AdjustmentTable {
-    /// Construct an all-ones table with `n_days` Julian days per
-    /// pollutant. The factor `1.0` is the multiplicative identity
-    /// that the per-correction passes layer on top of.
+ /// Construct an all-ones table with `n_days` Julian days per
+ /// pollutant. The factor `1.0` is the multiplicative identity
+ /// that the per-correction passes layer on top of.
     pub fn new(n_days: usize) -> Self {
         Self {
             data: vec![1.0; MXPOL * n_days],
@@ -449,14 +449,14 @@ impl AdjustmentTable {
         }
     }
 
-    /// Number of Julian days carried per pollutant.
+ /// Number of Julian days carried per pollutant.
     pub fn n_days(&self) -> usize {
         self.n_days
     }
 
-    /// Read the adjustment factor for a `(pollutant, day_0based)`
-    /// pair. `day_0based` is the 0-based offset within the day
-    /// vector (i.e. Julian day minus 1).
+ /// Read the adjustment factor for a `(pollutant, day_0based)`
+ /// pair. `day_0based` is the 0-based offset within the day
+ /// vector (i.e. Julian day minus 1).
     pub fn get(&self, pollutant: PollutantIndex, day_0based: usize) -> f32 {
         self.data[pollutant.slot() * self.n_days + day_0based]
     }
@@ -474,22 +474,22 @@ impl AdjustmentTable {
 ///
 /// 1. Initialize all entries to `1.0`.
 /// 2. For activity-based pollutants (not diurnal IDX8..IDX13 and
-///    not spillage IDX16), if `ldayfl`, multiply by the per-day
-///    month-fraction `daymthfac(jday)`.
+/// not spillage IDX16), if `ldayfl`, multiply by the per-day
+/// month-fraction `daymthfac(jday)`.
 /// 3. Temperature corrections for THC/CO/NOx, branching on fuel
-///    (4-stroke gasoline applies; 2-stroke gasoline has zero
-///    coefficients — placeholder kept for future data).
+/// (4-stroke gasoline applies; 2-stroke gasoline has zero
+/// coefficients — placeholder kept for future data).
 /// 4. Oxygenate correction for THC/CO/NOx, only when `lrfg` is
-///    false and fuel is gasoline.
+/// false and fuel is gasoline.
 /// 5. SOx sulfur correction, applied to IDXSOX; uses the
-///    rec-marine diesel sulfur override for the SCC prefixes
-///    `2282020*` / `2280002*`.
+/// rec-marine diesel sulfur override for the SCC prefixes
+/// `2282020*` / `2280002*`.
 /// 6. Altitude correction for IDXTHC..IDXSOX, when `lhigh` and
-///    fuel is one of the five known fuels.
+/// fuel is one of the five known fuels.
 /// 7. RFG correction for THC/CO/NOX/SOX/PM, only when `lrfg` and
-///    `iseas ∈ {Winter, Summer}` and the year-bin lookup succeeded.
+/// `iseas ∈ {Winter, Summer}` and the year-bin lookup succeeded.
 /// 8. Tank/hose permeation temperature corrections (IDXTKP, IDXHOS,
-///    IDXNCK, IDXSR, IDXVNT).
+/// IDXNCK, IDXSR, IDXVNT).
 ///
 /// Steps 7 and 8 fire even when fuel is non-gasoline (the Fortran
 /// source does not gate them by fuel — only by `lrfg`). The Rust
@@ -507,8 +507,8 @@ pub fn calculate_emission_adjustments(inputs: &AdjustmentInputs<'_>) -> Adjustme
             continue;
         }
 
-        // Day index for the per-day month-fraction lookup
-        // (0-based offset).
+ // Day index for the per-day month-fraction lookup
+ // (0-based offset).
         let jday_idx = (jday - 1) as usize;
 
         let tamb: f32 = if inputs.temperatures.daily_temperature_mode {
@@ -517,15 +517,15 @@ pub fn calculate_emission_adjustments(inputs: &AdjustmentInputs<'_>) -> Adjustme
             inputs.temperatures.ambient_temp
         };
 
-        // The temperature/oxygenate/altitude/RFG/permeation logic
-        // multiplies INTO the existing adjfac (which starts at 1.0).
-        // Mirror that by computing each factor and folding it in.
+ // The temperature/oxygenate/altitude/RFG/permeation logic
+ // multiplies INTO the existing adjfac (which starts at 1.0).
+ // Mirror that by computing each factor and folding it in.
 
-        // --- Step 2: per-day month-fraction for activity-based EFs ---
-        // emsadj.f :144–151. Skipped when ldayfl=false, when the
-        // pollutant index is in IDXDIU..IDXVNT (8..=13) or equals
-        // IDXSPL (16). The Fortran loops `i=1,MXPOL`; the Rust
-        // port mirrors that exact loop.
+ // --- Step 2: per-day month-fraction for activity-based EFs ---
+ // emsadj.f :144–151. Skipped when ldayfl=false, when the
+ // pollutant index is in IDXDIU..IDXVNT (8..=13) or equals
+ // IDXSPL (16). The Fortran loops `i=1,MXPOL`; the Rust
+ // port mirrors that exact loop.
         if inputs.temperatures.daily_temperature_mode {
             let factor = inputs.daily_month_fraction[jday_idx];
             for pol_one_based in 1..=MXPOL {
@@ -536,8 +536,8 @@ pub fn calculate_emission_adjustments(inputs: &AdjustmentInputs<'_>) -> Adjustme
             }
         }
 
-        // --- Step 3: temperature corrections for THC/CO/NOX ---
-        // emsadj.f :167–194 (4-stroke) and :198–220 (2-stroke).
+ // --- Step 3: temperature corrections for THC/CO/NOX ---
+ // emsadj.f :167–194 (4-stroke) and :198–220 (2-stroke).
         match inputs.fuel {
             FuelKind::Gasoline4Stroke => {
                 let (a_thc, a_co, a_nox) = if tamb <= 75.0 {
@@ -561,10 +561,10 @@ pub fn calculate_emission_adjustments(inputs: &AdjustmentInputs<'_>) -> Adjustme
                 );
             }
             FuelKind::Gasoline2Stroke => {
-                // Coefficients are 0.0 — exp(0) = 1, so the
-                // multiply is a no-op. Mirror it exactly so a future
-                // data update (changing the coefficients) only needs
-                // to edit one place.
+ // Coefficients are 0.0 — exp(0) = 1, so the
+ // multiply is a no-op. Mirror it exactly so a future
+ // data update (changing the coefficients) only needs
+ // to edit one place.
                 let dt = tamb - 75.0;
                 multiply(
                     &mut table,
@@ -579,7 +579,7 @@ pub fn calculate_emission_adjustments(inputs: &AdjustmentInputs<'_>) -> Adjustme
                     (0.0_f32 * dt).exp(),
                 );
                 if tamb >= 75.0 {
-                    // The Fortran writes NOx only on the >=75 branch.
+ // The Fortran writes NOx only on the >=75 branch.
                     multiply(
                         &mut table,
                         PollutantIndex::Nox,
@@ -587,15 +587,15 @@ pub fn calculate_emission_adjustments(inputs: &AdjustmentInputs<'_>) -> Adjustme
                         (0.0_f32 * dt).exp(),
                     );
                 }
-                // Note: the <75 branch in the Fortran does not
-                // adjust NOx (no `acoeff` assignment). We mirror
-                // that by leaving NOx untouched in that branch.
+ // Note: the <75 branch in the Fortran does not
+ // adjust NOx (no `acoeff` assignment). We mirror
+ // that by leaving NOx untouched in that branch.
             }
             _ => {}
         }
 
-        // --- Step 4: oxygenate correction for THC/CO/NOX ---
-        // emsadj.f :228–256. Only when !lrfg and gasoline.
+ // --- Step 4: oxygenate correction for THC/CO/NOX ---
+ // emsadj.f :228–256. Only when !lrfg and gasoline.
         if !inputs.rfg {
             if let FuelKind::Gasoline4Stroke = inputs.fuel {
                 let oxy = inputs.oxygen_percent;
@@ -621,10 +621,10 @@ pub fn calculate_emission_adjustments(inputs: &AdjustmentInputs<'_>) -> Adjustme
             }
         }
 
-        // --- Step 5: sulfur correction for SOx ---
-        // emsadj.f :260–271. Only when !lrfg and fuel is one of the
-        // five fuels (i.e. always in this enum). The rec-marine
-        // override applies to SCC prefixes "2282020" / "2280002".
+ // --- Step 5: sulfur correction for SOx ---
+ // emsadj.f :260–271. Only when !lrfg and fuel is one of the
+ // five fuels (i.e. always in this enum). The rec-marine
+ // override applies to SCC prefixes "2282020" / "2280002".
         if !inputs.rfg {
             let fuel_slot = inputs.fuel.fortran_index() - 1;
             let base = inputs.sox_base[fuel_slot];
@@ -635,8 +635,8 @@ pub fn calculate_emission_adjustments(inputs: &AdjustmentInputs<'_>) -> Adjustme
             multiply(&mut table, PollutantIndex::Sox, jday_idx, soxcor);
         }
 
-        // --- Step 6: altitude correction for THC..SOX ---
-        // emsadj.f :275–279.
+ // --- Step 6: altitude correction for THC..SOX ---
+ // emsadj.f :275–279.
         if inputs.high_altitude {
             let fuel_slot = inputs.fuel.fortran_index() - 1;
             let af = inputs.altitude_factor[fuel_slot];
@@ -651,8 +651,8 @@ pub fn calculate_emission_adjustments(inputs: &AdjustmentInputs<'_>) -> Adjustme
             }
         }
 
-        // --- Step 7: RFG correction ---
-        // emsadj.f :283–316.
+ // --- Step 7: RFG correction ---
+ // emsadj.f :283–316.
         if inputs.rfg && inputs.month >= 1 && inputs.month <= 12 {
             let iseas = inputs.month_to_season[inputs.month as usize - 1];
             if matches!(iseas, Season::Winter | Season::Summer) {
@@ -673,14 +673,14 @@ pub fn calculate_emission_adjustments(inputs: &AdjustmentInputs<'_>) -> Adjustme
             }
         }
 
-        // --- Step 8: tank/hose permeation temperature corrections ---
-        // emsadj.f :321–327. Always applied (no fuel/lrfg gating).
+ // --- Step 8: tank/hose permeation temperature corrections ---
+ // emsadj.f :321–327. Always applied (no fuel/lrfg gating).
         let tkp = 3.788519e-2_f32 * (3.850818e-2_f32 * tamb).exp();
         let hos = 6.013899e-2_f32 * (3.850818e-2_f32 * tamb).exp();
         multiply(&mut table, PollutantIndex::TankPerm, jday_idx, tkp);
         multiply(&mut table, PollutantIndex::HosePerm, jday_idx, hos);
-        // The Fortran assigns NCK/SR/VNT to the *post-multiply* HOS
-        // value (line 325–327: `adjfac(IDXNCK,jday) = adjfac(IDXHOS,jday)`).
+ // The Fortran assigns NCK/SR/VNT to the *post-multiply* HOS
+ // value (line 325–327: `adjfac(IDXNCK,jday) = adjfac(IDXHOS,jday)`).
         let hos_value = table.get(PollutantIndex::HosePerm, jday_idx);
         table.set(PollutantIndex::NeckPerm, jday_idx, hos_value);
         table.set(PollutantIndex::SupplyReturnPerm, jday_idx, hos_value);
@@ -712,17 +712,17 @@ fn set_by_one_based(table: &mut AdjustmentTable, pol_one_based: usize, day_idx: 
 /// from `nonrdefc.inc` `/detdat/`.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct DeteriorationCoefficients {
-    /// A-coefficient (`detavl`). Zero means no deterioration.
+ /// A-coefficient (`detavl`). Zero means no deterioration.
     pub a: f32,
-    /// B-coefficient (`detbvl`). Defaults to `1.0`.
+ /// B-coefficient (`detbvl`). Defaults to `1.0`.
     pub b: f32,
-    /// Cap on the age used by `1 + A * age^B`.
+ /// Cap on the age used by `1 + A * age^B`.
     pub cap: f32,
 }
 
 impl DeteriorationCoefficients {
-    /// Default "no deterioration" coefficients, matching the
-    /// Fortran initializer at `emfclc.f` :122–125.
+ /// Default "no deterioration" coefficients, matching the
+ /// Fortran initializer at `emfclc.f` :122–125.
     pub const fn none() -> Self {
         Self {
             a: 0.0,
@@ -738,20 +738,20 @@ impl DeteriorationCoefficients {
 /// given `(pollutant, tech)` pair, the caller supplies the EF
 /// value and its unit code (the result of `fndefc(...)`), plus the
 /// deterioration coefficients (the result of `fnddet(...)`). The
-/// upstream parsers and lookups land in Tasks 96 and 101.
+/// upstream parsers and lookups land in and 101.
 #[derive(Debug, Clone, Copy)]
 pub struct EmissionFactorContext {
-    /// Emission-factor value from the table (`exhfac(idxefc, idxspc)`).
-    /// `None` means no record was found — the calculator treats
-    /// this as `RMISS` for tech fractions > 0, and as 0 otherwise.
+ /// Emission-factor value from the table (`exhfac(idxefc, idxspc)`).
+ /// `None` means no record was found — the calculator treats
+ /// this as `RMISS` for tech fractions > 0, and as 0 otherwise.
     pub factor: Option<f32>,
-    /// Units code (`iexhun(idxefc, idxspc)`). Ignored when `factor`
-    /// is `None`.
+ /// Units code (`iexhun(idxefc, idxspc)`). Ignored when `factor`
+ /// is `None`.
     pub unit: EmissionUnitCode,
-    /// Deterioration coefficients (`detavl`/`detbvl`/`capdet`),
-    /// or [`DeteriorationCoefficients::none`] when no
-    /// deterioration record exists for this `(tech, pollutant)`
-    /// pair.
+ /// Deterioration coefficients (`detavl`/`detbvl`/`capdet`),
+ /// or [`DeteriorationCoefficients::none`] when no
+ /// deterioration record exists for this `(tech, pollutant)`
+ /// pair.
     pub deterioration: DeteriorationCoefficients,
 }
 
@@ -763,13 +763,13 @@ pub struct EmissionFactorContext {
 /// fan-out and the per-tech lookup search; the Rust port factors
 /// that responsibility out to two layers:
 ///
-/// 1. The driver (Task 113) walks the tech list and performs the
-///    `fndefc`/`fnddet` lookups (Task 101 + Task 96 land those
-///    helpers).
+/// 1. The driver walks the tech list and performs the
+/// `fndefc`/`fnddet` lookups ( + land those
+/// helpers).
 /// 2. This function takes the already-resolved
-///    [`EmissionFactorContext`] for one `(year, pollutant, tech)`
-///    slot and writes the corresponding cells of the output
-///    arrays.
+/// [`EmissionFactorContext`] for one `(year, pollutant, tech)`
+/// slot and writes the corresponding cells of the output
+/// arrays.
 ///
 /// Returns the missing-record flag — `true` when the lookup
 /// produced no record and the tech fraction is positive (so the
@@ -805,19 +805,19 @@ pub fn compute_emission_factor_for_tech(
             false
         }
         None if tech_fraction > 0.0 => {
-            // Mirrors emfclc.f :270–276: when no factor is found
-            // and the tech fraction is positive, emit the warning.
-            // The EF cell stays at its initialised value of RMISS,
-            // matching the Fortran's reliance on the pre-init loop
-            // (`emfclc.f` :115–127) which writes RMISS into the
-            // EF cell whenever tecfrc > 0.
+ // Mirrors emfclc.f :270–276: when no factor is found
+ // and the tech fraction is positive, emit the warning.
+ // The EF cell stays at its initialised value of RMISS,
+ // matching the Fortran's reliance on the pre-init loop
+ // (`emfclc.f` :115–127) which writes RMISS into the
+ // EF cell whenever tecfrc > 0.
             emission_factors[cell] = RMISS;
             true
         }
         None => {
-            // tech_fraction == 0: leave the EF at 0 (the Fortran's
-            // pre-init loop writes 0.0 into the EF cell when
-            // tecfrc == 0). Don't warn.
+ // tech_fraction == 0: leave the EF at 0 (the Fortran's
+ // pre-init loop writes 0.0 into the EF cell when
+ // tecfrc == 0). Don't warn.
             emission_factors[cell] = 0.0;
             false
         }
@@ -848,11 +848,11 @@ pub fn apply_deterioration(coef: &DeteriorationCoefficients, age: f32) -> f32 {
 /// alternate applies).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct SulfurAlternate {
-    /// Alternate base sulfur level (`sulalt`), or negative when
-    /// not specified.
+ /// Alternate base sulfur level (`sulalt`), or negative when
+ /// not specified.
     pub alternate_base: f32,
-    /// Alternate sulfur conversion factor (`sulcnv`), or negative
-    /// when not specified.
+ /// Alternate sulfur conversion factor (`sulcnv`), or negative
+ /// when not specified.
     pub alternate_conversion: f32,
 }
 
@@ -865,104 +865,104 @@ pub struct SulfurAlternate {
 /// Dimensioning conventions:
 ///
 /// - `emission_factors` is row-major `[year][pollutant][tech]`
-///   matching the Fortran `emsfac(MXAGYR, MXPOL, MXTECH)` array.
-///   Total length: `MXAGYR * MXPOL * MXTECH`.
+/// matching the Fortran `emsfac(MXAGYR, MXPOL, MXTECH)` array.
+/// Total length: `MXAGYR * MXPOL * MXTECH`.
 /// - `adetcf`/`bdetcf`/`detcap` are row-major `[pollutant][tech]`
-///   matching `adetcf(MXPOL, MXTECH)` etc. Total length:
-///   `MXPOL * MXTECH`.
+/// matching `adetcf(MXPOL, MXTECH)` etc. Total length:
+/// `MXPOL * MXTECH`.
 /// - `unit_codes` is row-major `[pollutant][tech]` matching
-///   `idxunt(MXPOL, MXTECH)`.
+/// `idxunt(MXPOL, MXTECH)`.
 /// - `daily_adjustments` is the output of
-///   [`calculate_emission_adjustments`].
+/// [`calculate_emission_adjustments`].
 #[derive(Debug)]
 pub struct ExhaustCalcInputs<'a> {
-    /// Year index in the emission-factor arrays (`idxyr`, 1-based
-    /// in Fortran; this field is 0-based).
+ /// Year index in the emission-factor arrays (`idxyr`, 1-based
+ /// in Fortran; this field is 0-based).
     pub year_index: usize,
-    /// Tech-type index in the emission-factor arrays (`idxtec`,
-    /// 0-based).
+ /// Tech-type index in the emission-factor arrays (`idxtec`,
+ /// 0-based).
     pub tech_index: usize,
-    /// Index into `tchfrc` for the current SCC (`idxtch`, 0-based).
-    /// Used by the SOx/PM alternate-sulfur lookup.
+ /// Index into `tchfrc` for the current SCC (`idxtch`, 0-based).
+ /// Used by the SOx/PM alternate-sulfur lookup.
     pub scc_tech_index: usize,
-    /// Age of the equipment for deterioration calc (`dage`).
+ /// Age of the equipment for deterioration calc (`dage`).
     pub equipment_age: f32,
-    /// Deterioration cap by `[pollutant][tech]` (`detcap`).
+ /// Deterioration cap by `[pollutant][tech]` (`detcap`).
     pub detcap: &'a [f32],
-    /// Deterioration A-coefficient by `[pollutant][tech]` (`adetcf`).
+ /// Deterioration A-coefficient by `[pollutant][tech]` (`adetcf`).
     pub adetcf: &'a [f32],
-    /// Deterioration B-coefficient by `[pollutant][tech]` (`bdetcf`).
+ /// Deterioration B-coefficient by `[pollutant][tech]` (`bdetcf`).
     pub bdetcf: &'a [f32],
-    /// EF unit codes by `[pollutant][tech]` (`idxunt`).
+ /// EF unit codes by `[pollutant][tech]` (`idxunt`).
     pub unit_codes: &'a [EmissionUnitCode],
-    /// Technology-type fraction for the current `(year, tech)`
-    /// (`tfrac`).
+ /// Technology-type fraction for the current `(year, tech)`
+ /// (`tfrac`).
     pub tech_fraction: f32,
-    /// Average horsepower (`hpval`).
+ /// Average horsepower (`hpval`).
     pub hp_avg: f32,
-    /// Fuel density (`denful`).
+ /// Fuel density (`denful`).
     pub fuel_density: f32,
-    /// BSFC value for this `(year, tech)` (`bsfval`).
+ /// BSFC value for this `(year, tech)` (`bsfval`).
     pub bsfc: f32,
-    /// Activity-record index (`iact`, 0-based).
+ /// Activity-record index (`iact`, 0-based).
     pub activity_index: usize,
-    /// Load factor `faclod(iact)`.
+ /// Load factor `faclod(iact)`.
     pub load_factor: f32,
-    /// Activity units `iactun(iact)`.
+ /// Activity units `iactun(iact)`.
     pub activity_unit: ActivityUnit,
-    /// Daily emission adjustments (output of
-    /// [`calculate_emission_adjustments`]).
+ /// Daily emission adjustments (output of
+ /// [`calculate_emission_adjustments`]).
     pub daily_adjustments: &'a AdjustmentTable,
-    /// Time-period adjustment factor (`adjtime`).
+ /// Time-period adjustment factor (`adjtime`).
     pub adjustment_time: f32,
-    /// Day range (output of `dayloop`).
+ /// Day range (output of `dayloop`).
     pub day_range: DayRange,
-    /// Mutable EF array, indexed `[year][pollutant][tech]`. The
-    /// SOx and CO2 branches REWRITE entries of this array (see
-    /// `clcems.f` :226 and :256). The CRA branch reads but does
-    /// not write.
+ /// Mutable EF array, indexed `[year][pollutant][tech]`. The
+ /// SOx and CO2 branches REWRITE entries of this array (see
+ /// `clcems.f` :226 and :256). The CRA branch reads but does
+ /// not write.
     pub emission_factors: &'a mut [f32],
-    /// Starts-per-hour adjustment (`sadj`).
+ /// Starts-per-hour adjustment (`sadj`).
     pub starts_adjustment: f32,
-    /// Temporal adjustment factor (`tpltmp`). The Fortran source
-    /// stores it in `tpltmp2` (a local copy) to avoid mutating the
-    /// caller's value — the Rust port just shadows the input.
+ /// Temporal adjustment factor (`tpltmp`). The Fortran source
+ /// stores it in `tpltmp2` (a local copy) to avoid mutating the
+ /// caller's value — the Rust port just shadows the input.
     pub temporal_adjustment: f32,
-    /// Equipment population (`pop`).
+ /// Equipment population (`pop`).
     pub population: f32,
-    /// Model-year fraction (`mfrac`).
+ /// Model-year fraction (`mfrac`).
     pub model_year_fraction: f32,
-    /// Period day count (`ndays`).
+ /// Period day count (`ndays`).
     pub n_days: i32,
-    /// Activity adjustment (`afac`).
+ /// Activity adjustment (`afac`).
     pub activity_adjustment: f32,
-    /// Tech-fraction array for the current SCC, indexed
-    /// `[scc_tech_index * MXTECH + tech_index]`. Replaces the
-    /// Fortran `tchfrc(idxtch, idxtec)` COMMON-block read.
+ /// Tech-fraction array for the current SCC, indexed
+ /// `[scc_tech_index * MXTECH + tech_index]`. Replaces the
+ /// Fortran `tchfrc(idxtch, idxtec)` COMMON-block read.
     pub tech_fractions_table: &'a [f32],
-    /// Retrofit reduction fractions by pollutant slot (`MXPOL`
-    /// entries). The Fortran reads `rtrftplltntrdfrc(idxspc)` from
-    /// the COMMON block; the Rust port takes the array directly.
+ /// Retrofit reduction fractions by pollutant slot (`MXPOL`
+ /// entries). The Fortran reads `rtrftplltntrdfrc(idxspc)` from
+ /// the COMMON block; the Rust port takes the array directly.
     pub retrofit_reduction: &'a [f32],
-    /// Fuel kind (`ifuel`).
+ /// Fuel kind (`ifuel`).
     pub fuel: FuelKind,
-    /// SOx conversion factor by fuel (`soxfrc`).
+ /// SOx conversion factor by fuel (`soxfrc`).
     pub sox_conversion: [f32; 5],
-    /// Base sulfur level by fuel (`soxbas`).
+ /// Base sulfur level by fuel (`soxbas`).
     pub sox_base: [f32; 5],
-    /// Alternate sulfur lookup for this `(scc_tech_index, tech_index)`,
-    /// or `None` for no alternate.
+ /// Alternate sulfur lookup for this `(scc_tech_index, tech_index)`,
+ /// or `None` for no alternate.
     pub sulfur_alternate: Option<SulfurAlternate>,
 }
 
 /// Outputs of [`calculate_exhaust_emissions`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExhaustCalcOutputs {
-    /// Per-pollutant emissions for the current day-range
-    /// (`emsday(MXPOL)`). Length: [`MXPOL`].
+ /// Per-pollutant emissions for the current day-range
+ /// (`emsday(MXPOL)`). Length: [`MXPOL`].
     pub emissions_day: Vec<f32>,
-    /// Per-pollutant emissions accumulated across model years
-    /// (`emsbmy(MXPOL)`). Length: [`MXPOL`].
+ /// Per-pollutant emissions accumulated across model years
+ /// (`emsbmy(MXPOL)`). Length: [`MXPOL`].
     pub emissions_by_model_year: Vec<f32>,
 }
 
@@ -982,35 +982,35 @@ impl Default for ExhaustCalcOutputs {
 /// The Fortran source:
 ///
 /// 1. Loops over Julian days in the period (skipping winter-summer
-///    days when in winter-daily mode).
+/// days when in winter-daily mode).
 /// 2. For each day, loops over the pollutants `IDXTHC..MXPOL`,
-///    skipping the diurnal/permeation range and pollutants without
-///    an emission-factor file (except CO2, SOx, DIS — which are
-///    always computed).
+/// skipping the diurnal/permeation range and pollutants without
+/// an emission-factor file (except CO2, SOx, DIS — which are
+/// always computed).
 /// 3. Computes a deterioration multiplier `1 + A * age^B`, capped
-///    at `detcap` (capping the age argument).
+/// at `detcap` (capping the age argument).
 /// 4. Multiplies the EF by the unit conversion, the deterioration
-///    multiplier, the day's emission adjustment, and the time-period
-///    adjustment.
+/// multiplier, the day's emission adjustment, and the time-period
+/// adjustment.
 /// 5. Handles three special-case pollutants:
-///    - **THC**: saves the un-adjusted product `EF * cvt * det` for
-///      later use by SOx and CRA.
-///    - **SOx**: rewrites the EF using
-///      `hp*load * (BSFC*453.6*(1-soxcnv) - thcEF*cvtbck) *
-///      0.01 * soxbas * 2`, then applies the day's adjustments.
-///    - **CRA**: multiplies EF by the saved THC EF before adjustment.
-///    - **CO2**: rewrites the EF using
-///      `hp*load * (BSFC*453.6 - thcEF*cvtbck) * cfrac * 44/12`,
-///      then applies the day's adjustments.
+/// - **THC**: saves the un-adjusted product `EF * cvt * det` for
+/// later use by SOx and CRA.
+/// - **SOx**: rewrites the EF using
+/// `hp*load * (BSFC*453.6*(1-soxcnv) - thcEF*cvtbck) *
+/// 0.01 * soxbas * 2`, then applies the day's adjustments.
+/// - **CRA**: multiplies EF by the saved THC EF before adjustment.
+/// - **CO2**: rewrites the EF using
+/// `hp*load * (BSFC*453.6 - thcEF*cvtbck) * cfrac * 44/12`,
+/// then applies the day's adjustments.
 /// 6. For PM diesel: subtracts a sulfur correction
-///    `bsfval*453.6*hp*load*7*soxcnv*0.01*adjtime * (sulbas*adjPM
-///    - soxbas*adjSOx)` to account for sulfur-driven PM.
+/// `bsfval*453.6*hp*load*7*soxcnv*0.01*adjtime * (sulbas*adjPM
+/// - soxbas*adjSOx)` to account for sulfur-driven PM.
 /// 7. Multiplies by `pop * mfrac * tchfrc * tpltmp2` and either
-///    `sadj` (for IDSTHC..IDSPM start emissions) or
-///    `ndays`/`afac` (for normal pollutants, depending on unit).
+/// `sadj` (for IDSTHC..IDSPM start emissions) or
+/// `ndays`/`afac` (for normal pollutants, depending on unit).
 /// 8. Applies the retrofit reduction `(1 - retro(idxspc))`.
 /// 9. Converts to tons via `CVTTON` and accumulates into
-///    `emsday`/`emsbmy`.
+/// `emsday`/`emsbmy`.
 pub fn calculate_exhaust_emissions(
     inputs: &mut ExhaustCalcInputs<'_>,
     pollutant_filter: &PollutantFilter,
@@ -1040,7 +1040,7 @@ pub fn calculate_exhaust_emissions(
         let jday_idx = (jday - 1) as usize;
 
         for idxspc in 1..=MXPOL {
-            // Skip diurnal..RLS (8..=17) — these are not exhaust.
+ // Skip diurnal..RLS (8..=17) — these are not exhaust.
             if (8..=17).contains(&idxspc) {
                 continue;
             }
@@ -1048,9 +1048,9 @@ pub fn calculate_exhaust_emissions(
                 continue;
             };
 
-            // Skip if no emission-factor file was supplied AND the
-            // pollutant is not one of CO2/SOX/DIS (which are always
-            // computed). Mirrors clcems.f :179–181.
+ // Skip if no emission-factor file was supplied AND the
+ // pollutant is not one of CO2/SOX/DIS (which are always
+ // computed). Mirrors clcems.f :179–181.
             if !pollutant_filter.has_factor_file(pollutant)
                 && pollutant != PollutantIndex::Co2
                 && pollutant != PollutantIndex::Sox
@@ -1059,7 +1059,7 @@ pub fn calculate_exhaust_emissions(
                 continue;
             }
 
-            // Deterioration: cap age, then compute 1 + A * age^B.
+ // Deterioration: cap age, then compute 1 + A * age^B.
             let det_cell = pollutant.slot() * MXTECH + inputs.tech_index;
             let det = DeteriorationCoefficients {
                 a: inputs.adetcf[det_cell],
@@ -1081,18 +1081,18 @@ pub fn calculate_exhaust_emissions(
             let ef_cell = ef_cell(inputs.year_index, pollutant, inputs.tech_index);
             let adjems = inputs.daily_adjustments.get(pollutant, jday_idx);
             let mut emstmp = inputs.emission_factors[ef_cell]
-                * cvttmp
-                * detrat
-                * adjems
-                * inputs.adjustment_time;
+ * cvttmp
+ * detrat
+ * adjems
+ * inputs.adjustment_time;
 
-            // Save the un-adjusted THC product for later SOx/CRA use.
+ // Save the un-adjusted THC product for later SOx/CRA use.
             if pollutant == PollutantIndex::Thc {
                 ems_thc = inputs.emission_factors[ef_cell] * cvttmp * detrat;
             }
 
-            // --- SOx: rewrite EF and recompute emstmp. ---
-            // clcems.f :213–232.
+ // --- SOx: rewrite EF and recompute emstmp. ---
+ // clcems.f :213–232.
             if pollutant == PollutantIndex::Sox && inputs.tech_fraction > 0.0 {
                 let cvtbck = if inputs.hp_avg * inputs.load_factor == 0.0 {
                     0.0
@@ -1106,19 +1106,19 @@ pub fn calculate_exhaust_emissions(
                     }
                 }
                 let new_ef = inputs.hp_avg
-                    * inputs.load_factor
-                    * (inputs.bsfc * GRMLB as f32 * (1.0 - soxcnv) - ems_thc * cvtbck)
-                    * 0.01
-                    * inputs.sox_base[fuel_slot]
-                    * 2.0;
+ * inputs.load_factor
+ * (inputs.bsfc * GRMLB as f32 * (1.0 - soxcnv) - ems_thc * cvtbck)
+ * 0.01
+ * inputs.sox_base[fuel_slot]
+ * 2.0;
                 inputs.emission_factors[ef_cell] = new_ef;
                 emstmp = new_ef * adjems * inputs.adjustment_time;
             }
 
-            // --- Crankcase HC ---
-            // clcems.f :236–241. Multiplies the EF (already a
-            // MULT-type fraction) by ems_thc, the un-adjusted THC
-            // product.
+ // --- Crankcase HC ---
+ // clcems.f :236–241. Multiplies the EF (already a
+ // MULT-type fraction) by ems_thc, the un-adjusted THC
+ // product.
             if pollutant == PollutantIndex::Crankcase
                 && inputs.tech_fraction > 0.0
                 && ems_thc_factor_positive(
@@ -1132,8 +1132,8 @@ pub fn calculate_exhaust_emissions(
                     inputs.emission_factors[ef_cell] * ems_thc * adjems * inputs.adjustment_time;
             }
 
-            // --- CO2: rewrite EF as a function of BSFC. ---
-            // clcems.f :245–261.
+ // --- CO2: rewrite EF as a function of BSFC. ---
+ // clcems.f :245–261.
             if pollutant == PollutantIndex::Co2 && inputs.tech_fraction > 0.0 {
                 let cvtbck = if inputs.hp_avg * inputs.load_factor == 0.0 {
                     0.0
@@ -1141,17 +1141,17 @@ pub fn calculate_exhaust_emissions(
                     1.0 / (inputs.hp_avg * inputs.load_factor)
                 };
                 let new_ef = inputs.hp_avg
-                    * inputs.load_factor
-                    * (inputs.bsfc * GRMLB as f32 - ems_thc * cvtbck)
-                    * cfrac
-                    * 44.0
+ * inputs.load_factor
+ * (inputs.bsfc * GRMLB as f32 - ems_thc * cvtbck)
+ * cfrac
+ * 44.0
                     / 12.0;
                 inputs.emission_factors[ef_cell] = new_ef;
                 emstmp = new_ef * detrat * adjems * inputs.adjustment_time;
             }
 
-            // --- PM diesel sulfur correction ---
-            // clcems.f :267–302.
+ // --- PM diesel sulfur correction ---
+ // clcems.f :267–302.
             if pollutant == PollutantIndex::Pm && inputs.fuel == FuelKind::Diesel {
                 let dsl_slot = FuelKind::Diesel.fortran_index() - 1;
                 let mut sulbas = inputs.sox_base[dsl_slot];
@@ -1168,47 +1168,47 @@ pub fn calculate_exhaust_emissions(
                     let adj_pm = inputs.daily_adjustments.get(PollutantIndex::Pm, jday_idx);
                     let adj_sox = inputs.daily_adjustments.get(PollutantIndex::Sox, jday_idx);
                     emstmp -= inputs.bsfc
-                        * GRMLB as f32
-                        * inputs.hp_avg
-                        * inputs.load_factor
-                        * 7.0
-                        * soxcnv
-                        * 0.01
-                        * inputs.adjustment_time
-                        * (sulbas * adj_pm - inputs.sox_base[dsl_slot] * adj_sox);
+ * GRMLB as f32
+ * inputs.hp_avg
+ * inputs.load_factor
+ * 7.0
+ * soxcnv
+ * 0.01
+ * inputs.adjustment_time
+ * (sulbas * adj_pm - inputs.sox_base[dsl_slot] * adj_sox);
                 }
             }
 
-            // --- Starts vs. activity-based emissions ---
-            // clcems.f :306–320.
+ // --- Starts vs. activity-based emissions ---
+ // clcems.f :306–320.
             let tchfrc =
                 inputs.tech_fractions_table[inputs.scc_tech_index * MXTECH + inputs.tech_index];
             let emiss = if (pollutant as u8) >= (PollutantIndex::StartThc as u8) {
                 emstmp
-                    * inputs.starts_adjustment
-                    * tpltmp2
-                    * inputs.population
-                    * inputs.model_year_fraction
-                    * tchfrc
+ * inputs.starts_adjustment
+ * tpltmp2
+ * inputs.population
+ * inputs.model_year_fraction
+ * tchfrc
             } else if unit == EmissionUnitCode::GramsPerDay {
                 emstmp
-                    * (inputs.n_days as f32)
-                    * tpltmp2
-                    * inputs.population
-                    * inputs.model_year_fraction
-                    * tchfrc
+ * (inputs.n_days as f32)
+ * tpltmp2
+ * inputs.population
+ * inputs.model_year_fraction
+ * tchfrc
             } else {
                 emstmp
-                    * inputs.activity_adjustment
-                    * tpltmp2
-                    * inputs.population
-                    * inputs.model_year_fraction
-                    * tchfrc
+ * inputs.activity_adjustment
+ * tpltmp2
+ * inputs.population
+ * inputs.model_year_fraction
+ * tchfrc
             };
 
-            // --- Missing-value propagation ---
-            // clcems.f :322–337. If the EF is missing OR emsday is
-            // already RMISS-flagged, propagate RMISS.
+ // --- Missing-value propagation ---
+ // clcems.f :322–337. If the EF is missing OR emsday is
+ // already RMISS-flagged, propagate RMISS.
             if inputs.emission_factors[ef_cell] < 0.0
                 || outputs.emissions_day[pollutant.slot()] < 0.0
             {
@@ -1217,7 +1217,7 @@ pub fn calculate_exhaust_emissions(
                 continue;
             }
 
-            // --- Retrofit reduction (clcems.f :330–332) ---
+ // --- Retrofit reduction (clcems.f :330–332) ---
             let retro = inputs.retrofit_reduction[pollutant.slot()];
             let mut emiss = emiss;
             if retro > 0.0 {
@@ -1242,30 +1242,30 @@ pub struct PollutantFilter {
 }
 
 impl PollutantFilter {
-    /// All pollutants off — no exhaust file loaded.
+ /// All pollutants off — no exhaust file loaded.
     pub fn empty() -> Self {
         Self {
             has_file: vec![false; MXPOL],
         }
     }
 
-    /// All pollutants on (useful for tests).
+ /// All pollutants on (useful for tests).
     pub fn all() -> Self {
         Self {
             has_file: vec![true; MXPOL],
         }
     }
 
-    /// Set the flag for one pollutant.
+ /// Set the flag for one pollutant.
     pub fn set(mut self, pollutant: PollutantIndex, on: bool) -> Self {
         self.has_file[pollutant.slot()] = on;
         self
     }
 
-    /// Set the flag for the pollutant in 0-based `slot`. Out-of-range
-    /// slots are ignored. Lets callers that hold a populated EF table
-    /// (indexed by `PollutantIndex::slot()`) build a filter without
-    /// re-deriving the [`PollutantIndex`] for each slot.
+ /// Set the flag for the pollutant in 0-based `slot`. Out-of-range
+ /// slots are ignored. Lets callers that hold a populated EF table
+ /// (indexed by `PollutantIndex::slot()`) build a filter without
+ /// re-deriving the [`PollutantIndex`] for each slot.
     pub fn set_slot(mut self, slot: usize, on: bool) -> Self {
         if slot < self.has_file.len() {
             self.has_file[slot] = on;
@@ -1273,7 +1273,7 @@ impl PollutantFilter {
         self
     }
 
-    /// Read the flag for one pollutant.
+ /// Read the flag for one pollutant.
     pub fn has_factor_file(&self, pollutant: PollutantIndex) -> bool {
         self.has_file[pollutant.slot()]
     }
@@ -1332,7 +1332,7 @@ mod tests {
     use super::*;
     use crate::common::consts::{SWTDSL, SWTGS2, SWTGS4};
 
-    // ---- unitcf ----
+ // ---- unitcf ----
 
     #[test]
     fn unitcf_gram_per_hp_hr_returns_hp_times_load() {
@@ -1349,7 +1349,7 @@ mod tests {
 
     #[test]
     fn unitcf_gallon_normal_uses_bsfc_load_hp_density() {
-        // (bsfc * load * hp) / density = (0.4 * 0.5 * 75) / 6.237
+ // (bsfc * load * hp) / density = (0.4 * 0.5 * 75) / 6.237
         let v = unit_conversion_factor(
             EmissionUnitCode::GramsPerGallon,
             75.0,
@@ -1399,7 +1399,7 @@ mod tests {
         }
     }
 
-    // ---- deterioration ----
+ // ---- deterioration ----
 
     #[test]
     fn deterioration_uncapped_evaluates_curve() {
@@ -1419,7 +1419,7 @@ mod tests {
             b: 1.0,
             cap: 2.0,
         };
-        // age=5 should be capped to age=2 → 1 + 0.1*2 = 1.2.
+ // age=5 should be capped to age=2 → 1 + 0.1*2 = 1.2.
         let v = apply_deterioration(&coef, 5.0);
         assert!((v - 1.2).abs() < 1e-6);
     }
@@ -1443,10 +1443,10 @@ mod tests {
         assert!((v - 1.0).abs() < 1e-6);
     }
 
-    // ---- compute_emission_factor_for_tech ----
+ // ---- compute_emission_factor_for_tech ----
 
     fn ef_grid() -> Vec<f32> {
-        // 51 years × 23 pollutants × 15 techs = 17,595 cells.
+ // 51 years × 23 pollutants × 15 techs = 17,595 cells.
         vec![0.0; MXAGYR * MXPOL * MXTECH]
     }
 
@@ -1555,7 +1555,7 @@ mod tests {
         assert_eq!(efs[cell], 0.0);
     }
 
-    // ---- emsadj ----
+ // ---- emsadj ----
 
     fn make_inputs<'a>(
         fuel: FuelKind,
@@ -1610,7 +1610,7 @@ mod tests {
 
     #[test]
     fn emsadj_all_factors_default_to_one_when_nothing_applies() {
-        // Use a non-gasoline fuel (LPG) with no RFG/altitude, ambient = 75 F.
+ // Use a non-gasoline fuel (LPG) with no RFG/altitude, ambient = 75 F.
         let daily_temps: Vec<f32> = vec![75.0; MXDAYS];
         let daily_mfrac: Vec<f32> = vec![1.0; MXDAYS];
         let temperatures = DailyTemperatures {
@@ -1627,11 +1627,11 @@ mod tests {
             &temperatures,
         );
         let t = calculate_emission_adjustments(&inputs);
-        // THC/CO/NOx untouched (LPG): all 1.0.
+ // THC/CO/NOx untouched (LPG): all 1.0.
         assert!((t.get(PollutantIndex::Thc, 0) - 1.0).abs() < 1e-6);
         assert!((t.get(PollutantIndex::Co, 0) - 1.0).abs() < 1e-6);
         assert!((t.get(PollutantIndex::Nox, 0) - 1.0).abs() < 1e-6);
-        // SOx: sox_fuel[lpg]/sox_base[lpg] = SWTGS2/SWTGS2 = 1.0.
+ // SOx: sox_fuel[lpg]/sox_base[lpg] = SWTGS2/SWTGS2 = 1.0.
         assert!((t.get(PollutantIndex::Sox, 0) - 1.0).abs() < 1e-6);
     }
 
@@ -1647,14 +1647,14 @@ mod tests {
         let inputs = make_inputs(
             FuelKind::Gasoline4Stroke,
             true,
-            // disable oxygenate path
+ // disable oxygenate path
             false,
             "2270001000",
             &daily_mfrac,
             &temperatures,
         );
         let t = calculate_emission_adjustments(&inputs);
-        // dT = 50 - 75 = -25
+ // dT = 50 - 75 = -25
         let expected_thc = (-0.00240_f32 * -25.0_f32).exp();
         let expected_co = (0.0015784_f32 * -25.0_f32).exp();
         let expected_nox = (-0.00892_f32 * -25.0_f32).exp();
@@ -1681,10 +1681,10 @@ mod tests {
             &temperatures,
         );
         let t = calculate_emission_adjustments(&inputs);
-        // dT=0 so temp factor = exp(0) = 1, then oxygenate at oxypct=2:
-        // THC: 1 - 0.045*2 = 0.91
-        // CO:  1 - 0.062*2 = 0.876
-        // NOx: 1 + 0.115*2 = 1.23
+ // dT=0 so temp factor = exp(0) = 1, then oxygenate at oxypct=2:
+ // THC: 1 - 0.045*2 = 0.91
+ // CO: 1 - 0.062*2 = 0.876
+ // NOx: 1 + 0.115*2 = 1.23
         assert!((t.get(PollutantIndex::Thc, 0) - 0.91).abs() < 1e-5);
         assert!((t.get(PollutantIndex::Co, 0) - 0.876).abs() < 1e-5);
         assert!((t.get(PollutantIndex::Nox, 0) - 1.23).abs() < 1e-5);
@@ -1709,7 +1709,7 @@ mod tests {
         );
         inputs.sox_fuel[FuelKind::Diesel.fortran_index() - 1] = 0.05;
         let t = calculate_emission_adjustments(&inputs);
-        // soxcor = soxdsm / soxbas[diesel] = 0.15 / SWTDSL = 0.15 / 0.33
+ // soxcor = soxdsm / soxbas[diesel] = 0.15 / SWTDSL = 0.15 / 0.33
         let expected = 0.15_f32 / SWTDSL;
         assert!((t.get(PollutantIndex::Sox, 0) - expected).abs() < 1e-5);
     }
@@ -1726,22 +1726,22 @@ mod tests {
         let inputs = make_inputs(
             FuelKind::Diesel,
             true,
-            // disable oxygenate
+ // disable oxygenate
             true,
             "2270001000",
             &daily_mfrac,
             &temperatures,
         );
         let t = calculate_emission_adjustments(&inputs);
-        // altitude_factor[diesel] = 1.3
+ // altitude_factor[diesel] = 1.3
         assert!((t.get(PollutantIndex::Thc, 0) - 1.3).abs() < 1e-5);
         assert!((t.get(PollutantIndex::Co, 0) - 1.3).abs() < 1e-5);
         assert!((t.get(PollutantIndex::Nox, 0) - 1.3).abs() < 1e-5);
         assert!((t.get(PollutantIndex::Co2, 0) - 1.3).abs() < 1e-5);
-        // SOx is 1.0 (the rfg=true branch skips sulfur, so SOx ×= 1
-        // before altitude). After altitude: 1.3.
+ // SOx is 1.0 (the rfg=true branch skips sulfur, so SOx ×= 1
+ // before altitude). After altitude: 1.3.
         assert!((t.get(PollutantIndex::Sox, 0) - 1.3).abs() < 1e-5);
-        // PM is untouched by altitude (only THC..SOX = 1..=5).
+ // PM is untouched by altitude (only THC..SOX = 1..=5).
         assert!((t.get(PollutantIndex::Pm, 0) - 1.0).abs() < 1e-5);
     }
 
@@ -1767,7 +1767,7 @@ mod tests {
         let expected_hos = 6.013899e-2_f32 * (3.850818e-2_f32 * 85.0_f32).exp();
         assert!((t.get(PollutantIndex::TankPerm, 0) - expected_tkp).abs() < 1e-6);
         assert!((t.get(PollutantIndex::HosePerm, 0) - expected_hos).abs() < 1e-6);
-        // NCK/SR/VNT all copy from HOS (post-multiply value).
+ // NCK/SR/VNT all copy from HOS (post-multiply value).
         assert!((t.get(PollutantIndex::NeckPerm, 0) - expected_hos).abs() < 1e-6);
         assert!((t.get(PollutantIndex::SupplyReturnPerm, 0) - expected_hos).abs() < 1e-6);
         assert!((t.get(PollutantIndex::VentPerm, 0) - expected_hos).abs() < 1e-6);
@@ -1798,11 +1798,11 @@ mod tests {
             winter_skip: true,
         };
         let t = calculate_emission_adjustments(&inputs);
-        // Days 3..=8 are skipped → remain 1.0.
+ // Days 3..=8 are skipped → remain 1.0.
         for d in 2..=7 {
             assert_eq!(t.get(PollutantIndex::TankPerm, d), 1.0);
         }
-        // Days 1, 2, 9, 10 get the permeation factor.
+ // Days 1, 2, 9, 10 get the permeation factor.
         let expected_tkp = 3.788519e-2_f32 * (3.850818e-2_f32 * 85.0_f32).exp();
         for d in [0, 1, 8, 9] {
             assert!((t.get(PollutantIndex::TankPerm, d) - expected_tkp).abs() < 1e-6);
@@ -1838,14 +1838,14 @@ mod tests {
         assert!((t.get(PollutantIndex::Thc, 0) - 0.9).abs() < 1e-6);
         assert!((t.get(PollutantIndex::Pm, 0) - 0.97).abs() < 1e-6);
 
-        // Switch to spring → no RFG bin applies.
+ // Switch to spring → no RFG bin applies.
         inputs.month = 4;
         let t2 = calculate_emission_adjustments(&inputs);
         assert_eq!(t2.get(PollutantIndex::Thc, 0), 1.0);
         assert_eq!(t2.get(PollutantIndex::Pm, 0), 1.0);
     }
 
-    // ---- calculate_exhaust_emissions ----
+ // ---- calculate_exhaust_emissions ----
 
     #[allow(clippy::too_many_arguments)]
     fn make_calc_inputs<'a>(
@@ -1896,9 +1896,9 @@ mod tests {
 
     #[test]
     fn clcems_thc_with_unit_ghp_hr_produces_emission() {
-        // Single day, single tech, single year. THC with G/HP-HR.
+ // Single day, single tech, single year. THC with G/HP-HR.
         let mut efs = ef_grid();
-        // Year 0, THC (slot 0), tech 0:
+ // Year 0, THC (slot 0), tech 0:
         efs[ef_cell(0, PollutantIndex::Thc, 0)] = 2.5;
         let adetcf = det_grid_f32();
         let bdetcf = det_grid_f32();
@@ -1921,9 +1921,9 @@ mod tests {
         );
         let filter = PollutantFilter::empty().set(PollutantIndex::Thc, true);
         let out = calculate_exhaust_emissions(&mut inputs, &filter);
-        // emstmp = 2.5 * (75*0.5) * 1.0 * 1.0 * 1.0 = 93.75 g
-        // emiss = 93.75 * 1.0 * 1.0 * 10.0 * 0.1 * 1.0 = 93.75 (afac branch)
-        // CVTTON = 1.102311e-6
+ // emstmp = 2.5 * (75*0.5) * 1.0 * 1.0 * 1.0 = 93.75 g
+ // emiss = 93.75 * 1.0 * 1.0 * 10.0 * 0.1 * 1.0 = 93.75 (afac branch)
+ // CVTTON = 1.102311e-6
         let expected = 93.75_f32 * 1.102311e-6_f32;
         assert!((out.emissions_day[PollutantIndex::Thc.slot()] - expected).abs() < 1e-10);
     }
@@ -1931,9 +1931,9 @@ mod tests {
     #[test]
     fn clcems_co2_rewrites_ef_using_bsfc() {
         let mut efs = ef_grid();
-        // THC needs a value too — CO2 uses ems_thc.
+ // THC needs a value too — CO2 uses ems_thc.
         efs[ef_cell(0, PollutantIndex::Thc, 0)] = 1.0;
-        // CO2 starting EF is overwritten — value irrelevant.
+ // CO2 starting EF is overwritten — value irrelevant.
         let adetcf = det_grid_f32();
         let bdetcf = det_grid_f32();
         let detcap = det_grid_f32();
@@ -1953,21 +1953,21 @@ mod tests {
         let mut inputs = make_calc_inputs(
             &mut efs, &adetcf, &bdetcf, &detcap, &units, &adj, &tch, &retro, day_range,
         );
-        // CO2 is always computed even without an EF file.
+ // CO2 is always computed even without an EF file.
         let filter = PollutantFilter::empty().set(PollutantIndex::Thc, true);
         let _ = calculate_exhaust_emissions(&mut inputs, &filter);
-        // CO2 EF was rewritten to
-        //   hp*load * (bsfc*GRMLB - ems_thc*cvtbck) * CMFDSL * 44/12
-        // where ems_thc = THC_factor * cvttmp * detrat (no day adj!) = 1.0 * 37.5 * 1.0 = 37.5
-        // cvttmp = hp*load = 75*0.5 = 37.5 (G/HP-HR)
-        // cvtbck = 1 / (hp*load) = 1/37.5 ≈ 0.02667
-        // new_ef = 37.5 * (0.4*453.6 - 37.5*0.02667) * 0.87 * 44/12
-        //        = 37.5 * (181.44 - 1.0) * 0.87 * 3.66667
-        //        = 37.5 * 180.44 * 0.87 * 3.66667
+ // CO2 EF was rewritten to
+ // hp*load * (bsfc*GRMLB - ems_thc*cvtbck) * CMFDSL * 44/12
+ // where ems_thc = THC_factor * cvttmp * detrat (no day adj!) = 1.0 * 37.5 * 1.0 = 37.5
+ // cvttmp = hp*load = 75*0.5 = 37.5 (G/HP-HR)
+ // cvtbck = 1 / (hp*load) = 1/37.5 ≈ 0.02667
+ // new_ef = 37.5 * (0.4*453.6 - 37.5*0.02667) * 0.87 * 44/12
+ // = 37.5 * (181.44 - 1.0) * 0.87 * 3.66667
+ // = 37.5 * 180.44 * 0.87 * 3.66667
         let new_ef = 37.5_f32
-            * (0.4_f32 * 453.6_f32 - 37.5_f32 * (1.0_f32 / 37.5_f32))
-            * 0.87_f32
-            * 44.0_f32
+ * (0.4_f32 * 453.6_f32 - 37.5_f32 * (1.0_f32 / 37.5_f32))
+ * 0.87_f32
+ * 44.0_f32
             / 12.0_f32;
         let cell = ef_cell(0, PollutantIndex::Co2, 0);
         assert!(
@@ -2004,7 +2004,7 @@ mod tests {
         );
         let filter = PollutantFilter::empty().set(PollutantIndex::Thc, true);
         let out = calculate_exhaust_emissions(&mut inputs, &filter);
-        // Same as first test but × 0.5
+ // Same as first test but × 0.5
         let expected =
             0.5_f32 * (1.0_f32 * 37.5_f32 * 1.0 * 1.0 * 1.0 * 10.0 * 0.1) * 1.102311e-6_f32;
         assert!((out.emissions_day[PollutantIndex::Thc.slot()] - expected).abs() < 1e-10);
@@ -2044,8 +2044,8 @@ mod tests {
 
     #[test]
     fn clcems_skips_diurnal_range() {
-        // Even if we mark IDXDIU's EF positive, the calculator
-        // must skip the 8..=17 range.
+ // Even if we mark IDXDIU's EF positive, the calculator
+ // must skip the 8..=17 range.
         let mut efs = ef_grid();
         efs[ef_cell(0, PollutantIndex::Diurnal, 0)] = 100.0;
         let adetcf = det_grid_f32();
@@ -2097,8 +2097,8 @@ mod tests {
         inputs.n_days = 30;
         let filter = PollutantFilter::empty().set(PollutantIndex::Thc, true);
         let out = calculate_exhaust_emissions(&mut inputs, &filter);
-        // G/DAY: emstmp = 2.0 (no conversion), then * ndays(30) * tpltmp(1)
-        // * pop(10) * mfrac(0.1) * tchfrc(1) = 60
+ // G/DAY: emstmp = 2.0 (no conversion), then * ndays(30) * tpltmp(1)
+ // * pop(10) * mfrac(0.1) * tchfrc(1) = 60
         let expected = 60.0_f32 * 1.102311e-6_f32;
         assert!((out.emissions_day[PollutantIndex::Thc.slot()] - expected).abs() < 1e-10);
     }

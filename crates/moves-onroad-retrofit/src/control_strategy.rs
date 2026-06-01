@@ -25,12 +25,12 @@
 //! are indexed by model year and retrofit year — they do not vary across
 //! counties or months within a single MOVES run.
 //!
-//! # Data-plane status (Task 50)
+//! # Data-plane status
 //!
 //! The computed adjustment factors would normally be written into the
 //! `emissionRateAdjustment` table in the execution database so downstream
 //! emission calculators consume them. That write is deferred until
-//! `moves-framework`'s `ExecutionTables` gains a mutable write API (Task 50
+//! `moves-framework`'s `ExecutionTables` gains a mutable write API (
 //! / `DataFrameStore`). The `modified_tables` declaration already signals the
 //! engine which table will be modified.
 
@@ -47,12 +47,12 @@ pub struct OnRoadRetrofitStrategy {
 }
 
 impl OnRoadRetrofitStrategy {
-    /// Build from a [`RetrofitTable`] already loaded from user input.
+ /// Build from a [`RetrofitTable`] already loaded from user input.
     pub fn new(programs: RetrofitTable) -> Self {
         Self { programs }
     }
 
-    /// The retrofit programs this strategy will apply.
+ /// The retrofit programs this strategy will apply.
     pub fn programs(&self) -> &RetrofitTable {
         &self.programs
     }
@@ -71,12 +71,12 @@ impl InternalControlStrategy for OnRoadRetrofitStrategy {
         &self,
         _tables: &mut InMemoryStore,
     ) -> std::result::Result<(), moves_framework::Error> {
-        // TODO: compute combined adjustment factors from `self.programs` and
-        // write them into `_tables` as `"emissionRateAdjustment"`. Requires
-        // iterating `(sourceType, modelYear, pollutant, process)` combinations
-        // present in the execution database and calling
-        // `self.programs.combined_factor(...)` for the run's analysis year.
-        // Deferred to a follow-on bead; `modified_tables` already signals the engine.
+ // TODO: compute combined adjustment factors from `self.programs` and
+ // write them into `_tables` as `"emissionRateAdjustment"`. Requires
+ // iterating `(sourceType, modelYear, pollutant, process)` combinations
+ // present in the execution database and calling
+ // `self.programs.combined_factor(...)` for the run's analysis year.
+ // Deferred to a follow-on work item; `modified_tables` already signals the engine.
         Ok(())
     }
 }

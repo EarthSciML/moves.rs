@@ -1,7 +1,7 @@
 //! MOVES-format evaporative technology-fraction parser
 //! (`rdevtech_moves.f`).
 //!
-//! Task 96. Reads the `/MOVES EVAP TECH FRAC/` packet — same
+//!Reads the `/MOVES EVAP TECH FRAC/` packet — same
 //! two-line-per-entry layout as [`super::tech_moves`] but for
 //! evap groups. Tech codes use the `E + 8 digits` encoding
 //! documented at `rdevtech.f` :117-134 and validated here per
@@ -159,7 +159,7 @@ fn renormalise(groups: &mut [EvapTechFractionGroup]) {
         let sum: f32 = group.fractions.iter().map(|(_, f)| *f).sum();
         if sum > 0.0 {
             for (_, f) in group.fractions.iter_mut() {
-                *f /= sum;
+ *f /= sum;
             }
         }
     }

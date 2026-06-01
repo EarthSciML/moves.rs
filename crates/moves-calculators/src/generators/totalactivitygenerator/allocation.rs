@@ -14,7 +14,7 @@
 //! That sequencing — and the three external `database/Adjust*.sql` scripts
 //! (`AdjustStarts`, `AdjustHotelling`, `AdjustTotalIdleFraction`) the Java
 //! shells out to — is master-loop orchestration, not generator arithmetic.
-//! It lands with the Task 50 `execute` wiring, exactly as Task 29's
+//! It lands with the `execute` wiring, exactly as's
 //! `SourceBinDistributionGenerator` left its per-callback dedup state to that
 //! wiring. This module ports the kernels as standalone pure functions; the
 //! orchestration calls them.
@@ -22,7 +22,7 @@
 //! Every kernel here is the **inventory-domain** form. The
 //! `ModelScale.MESOSCALE_LOOKUP` branches (off-network idle divided by the
 //! 16 average-speed-bin rows; distance from `LinkAverageSpeed` rather than
-//! `AverageSpeed`) belong to Task 35's `MesoscaleLookupTotalActivityGenerator`
+//! `AverageSpeed`) belong to `MesoscaleLookupTotalActivityGenerator`
 //! and are deliberately not duplicated here.
 
 use std::collections::BTreeMap;
@@ -55,33 +55,33 @@ pub const OFF_NETWORK_ROAD_TYPE: i32 = 1;
 /// One `ZoneRoadTypeLinkTemp` row — a link with its zone's `SHOAllocFactor`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ZoneRoadTypeLinkRow {
-    /// `roadTypeID`.
+ /// `roadTypeID`.
     pub road_type_id: i32,
-    /// `linkID`.
+ /// `linkID`.
     pub link_id: i32,
-    /// `SHOAllocFactor` — copied from `ZoneRoadType`.
+ /// `SHOAllocFactor` — copied from `ZoneRoadType`.
     pub sho_alloc_factor: f64,
 }
 
 /// One `SHO` row — source hours operating allocated to a link.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ShoRow {
-    /// `hourDayID`.
+ /// `hourDayID`.
     pub hour_day_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `ageID`.
+ /// `ageID`.
     pub age_id: i32,
-    /// `linkID`.
+ /// `linkID`.
     pub link_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `SHO` — source hours operating.
+ /// `SHO` — source hours operating.
     pub sho: f64,
-    /// `distance` — distance travelled, populated by [`calculate_distance`]
-    /// (`0.0` until then, matching the Java's pre-step-200 state).
+ /// `distance` — distance travelled, populated by [`calculate_distance`]
+ /// (`0.0` until then, matching the Java's pre-step-200 state).
     pub distance: f64,
 }
 
@@ -89,40 +89,40 @@ pub struct ShoRow {
 /// fuel type.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HotellingHoursRow {
-    /// `hourDayID`.
+ /// `hourDayID`.
     pub hour_day_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `ageID`.
+ /// `ageID`.
     pub age_id: i32,
-    /// `zoneID`.
+ /// `zoneID`.
     pub zone_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `hotellingHours` — total hotelling hours, including extended idle.
+ /// `hotellingHours` — total hotelling hours, including extended idle.
     pub hotelling_hours: f64,
 }
 
 /// One `SHP` row — source hours parked allocated to a zone.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ShpRow {
-    /// `hourDayID`.
+ /// `hourDayID`.
     pub hour_day_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `ageID`.
+ /// `ageID`.
     pub age_id: i32,
-    /// `zoneID`.
+ /// `zoneID`.
     pub zone_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `SHP` — source hours parked.
+ /// `SHP` — source hours parked.
     pub shp: f64,
 }
 
@@ -136,7 +136,7 @@ pub fn zone_road_type_link(
     link: &[LinkRow],
     zone_id: i32,
 ) -> Vec<ZoneRoadTypeLinkRow> {
-    // roadTypeID -> SHOAllocFactor for the zone.
+ // roadTypeID -> SHOAllocFactor for the zone.
     let factor_of: BTreeMap<i32, f64> = zone_road_type
         .iter()
         .filter(|r| r.zone_id == zone_id)
@@ -173,7 +173,7 @@ pub fn allocate_sho(
         .iter()
         .map(|r| (r.hour_day_id, ()))
         .collect();
-    // roadTypeID -> [(linkID, SHOAllocFactor)].
+ // roadTypeID -> [(linkID, SHOAllocFactor)].
     let mut links_by_road: BTreeMap<i32, Vec<(i32, f64)>> = BTreeMap::new();
     for zrt in zone_road_type_link {
         links_by_road
@@ -210,17 +210,17 @@ pub fn allocate_sho(
 /// argument count readable.
 #[derive(Debug, Clone, Copy)]
 pub struct OffNetworkIdleTables<'a> {
-    /// `Link` — links keyed by `linkID`, carrying their road type and zone.
+ /// `Link` — links keyed by `linkID`, carrying their road type and zone.
     pub link: &'a [LinkRow],
-    /// `County` — the county type and parent state of each county.
+ /// `County` — the county type and parent state of each county.
     pub county: &'a [CountyRow],
-    /// `State` — the idle region of each state.
+ /// `State` — the idle region of each state.
     pub state: &'a [StateRow],
-    /// `HourDay` — the `(hour, day)` catalogue.
+ /// `HourDay` — the `(hour, day)` catalogue.
     pub hour_day: &'a [HourDayRow],
-    /// `TotalIdleFraction` — total idle shares.
+ /// `TotalIdleFraction` — total idle shares.
     pub total_idle_fraction: &'a [TotalIdleFractionRow],
-    /// `DrivingIdleFraction` — on-network idle shares.
+ /// `DrivingIdleFraction` — on-network idle shares.
     pub driving_idle_fraction: &'a [DrivingIdleFractionRow],
 }
 
@@ -233,9 +233,9 @@ pub struct OffNetworkIdleTables<'a> {
 ///
 /// ```text
 /// SHO = totalIdleFraction != 1
-///     ? max( sum(sho) * (totalIdleFraction - sum(sho*drivingIdleFraction)/sum(sho))
-///            / (1 - totalIdleFraction), 0 )
-///     : 0
+/// ? max( sum(sho) * (totalIdleFraction - sum(sho*drivingIdleFraction)/sum(sho))
+/// / (1 - totalIdleFraction), 0 )
+/// : 0
 /// ```
 ///
 /// `totalIdleFraction` is the `TotalIdleFraction` row whose model-year window
@@ -263,7 +263,7 @@ pub fn off_network_idle_sho(
         .iter()
         .map(|hd| (hd.hour_day_id, hd.day_id))
         .collect();
-    // (hourDayID, yearID, roadTypeID, sourceTypeID) -> drivingIdleFraction.
+ // (hourDayID, yearID, roadTypeID, sourceTypeID) -> drivingIdleFraction.
     let driving_idle: BTreeMap<(i32, i32, i32, i32), f64> = tables
         .driving_idle_fraction
         .iter()
@@ -274,7 +274,7 @@ pub fn off_network_idle_sho(
             )
         })
         .collect();
-    // The off-network links of the zone.
+ // The off-network links of the zone.
     let off_network_links: Vec<i32> = tables
         .link
         .iter()
@@ -282,7 +282,7 @@ pub fn off_network_idle_sho(
         .map(|l| l.link_id)
         .collect();
 
-    // Accumulators keyed by the GROUP BY tuple.
+ // Accumulators keyed by the GROUP BY tuple.
     let mut sum_sho: BTreeMap<(i32, i32, i32, i32, i32, i32), f64> = BTreeMap::new();
     let mut sum_sho_dif: BTreeMap<(i32, i32, i32, i32, i32, i32), f64> = BTreeMap::new();
     let mut group_tif: BTreeMap<(i32, i32, i32, i32, i32, i32), f64> = BTreeMap::new();
@@ -291,7 +291,7 @@ pub fn off_network_idle_sho(
         if s.year_id != analysis_year {
             continue;
         }
-        // The source link must exist and be on the network.
+ // The source link must exist and be on the network.
         let Some(source_link) = link_of.get(&s.link_id) else {
             continue;
         };
@@ -312,7 +312,7 @@ pub fn off_network_idle_sho(
         let model_year = s.year_id - s.age_id;
 
         for &off_link_id in &off_network_links {
-            // county / state / idle region of the off-network link.
+ // county / state / idle region of the off-network link.
             let Some(off_link) = link_of.get(&off_link_id) else {
                 continue;
             };
@@ -341,8 +341,8 @@ pub fn off_network_idle_sho(
                 off_link_id,
                 s.source_type_id,
             );
-            *sum_sho.entry(key).or_insert(0.0) += s.sho;
-            *sum_sho_dif.entry(key).or_insert(0.0) += s.sho * driving_idle_fraction;
+ *sum_sho.entry(key).or_insert(0.0) += s.sho;
+ *sum_sho_dif.entry(key).or_insert(0.0) += s.sho * driving_idle_fraction;
             group_tif.insert(key, tif.total_idle_fraction);
         }
     }
@@ -379,7 +379,7 @@ pub fn off_network_idle_sho(
 /// sum(IdleHoursByAgeHour.idleHours * SampleVehiclePopulation.stmyFraction)`.
 /// Both tables are filtered to source type
 /// [`COMBINATION_LONG_HAUL_TRUCK`](super::activity::COMBINATION_LONG_HAUL_TRUCK)
-/// — the only vehicle that hotels — and joined on `modelYearID = yearID -
+/// the only vehicle that hotels — and joined on `modelYearID = yearID -
 /// ageID`, grouped by `(hourDay, month, year, age, zone, sourceType,
 /// fuelType)`.
 #[must_use]
@@ -392,12 +392,12 @@ pub fn hotelling_hours(
 ) -> Vec<HotellingHoursRow> {
     use super::activity::COMBINATION_LONG_HAUL_TRUCK;
 
-    // (hourID, dayID) -> hourDayID.
+ // (hourID, dayID) -> hourDayID.
     let hour_day_id: BTreeMap<(i32, i32), i32> = hour_day
         .iter()
         .map(|hd| ((hd.hour_id, hd.day_id), hd.hour_day_id))
         .collect();
-    // modelYearID -> [(fuelTypeID, stmyFraction)] for long-haul trucks.
+ // modelYearID -> [(fuelTypeID, stmyFraction)] for long-haul trucks.
     let mut fuels_by_model_year: BTreeMap<i32, Vec<(i32, f64)>> = BTreeMap::new();
     for svp in sample_vehicle_population {
         if svp.source_type_id == COMBINATION_LONG_HAUL_TRUCK {
@@ -421,7 +421,7 @@ pub fn hotelling_hours(
             continue;
         };
         for &(fuel_type_id, stmy_fraction) in fuels {
-            *totals
+ *totals
                 .entry((
                     hd_id,
                     ihah.month_id,
@@ -472,7 +472,7 @@ pub fn allocate_shp(
     else {
         return Vec::new();
     };
-    // (hourID, dayID) -> hourDayID, gated to RunSpec-selected hourDays.
+ // (hourID, dayID) -> hourDayID, gated to RunSpec-selected hourDays.
     let selected: BTreeMap<i32, ()> = run_spec_hour_day
         .iter()
         .map(|r| (r.hour_day_id, ()))
@@ -525,7 +525,7 @@ pub fn calculate_distance(
         .iter()
         .map(|hd| (hd.hour_day_id, (hd.day_id, hd.hour_id)))
         .collect();
-    // (roadTypeID, sourceTypeID, dayID, hourID) -> averageSpeed.
+ // (roadTypeID, sourceTypeID, dayID, hourID) -> averageSpeed.
     let speed_of: BTreeMap<(i32, i32, i32, i32), f64> = average_speed
         .iter()
         .map(|a| {
@@ -724,7 +724,7 @@ impl TableRow for ShoRow {
                     link_id: link_id.get(i).ok_or_else(|| null("linkID"))?,
                     source_type_id: source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))?,
                     sho: sho.get(i).ok_or_else(|| null("SHO"))?,
-                    // NULL distance is the pre-computation state; default to 0.0.
+ // NULL distance is the pre-computation state; default to 0.0.
                     distance: distance.get(i).unwrap_or(0.0),
                 })
             })
@@ -772,7 +772,7 @@ mod tests {
         }];
         let links = [
             link(1001, 100, 2, 9),
-            // A link in another zone — excluded.
+ // A link in another zone — excluded.
             link(2001, 200, 2, 9),
         ];
         let out = zone_road_type_link(&zrt, &links, 100);
@@ -792,7 +792,7 @@ mod tests {
         let rshd = [RunSpecHourDayRow { hour_day_id: 85 }];
         let out = allocate_sho(&sarh, &zrtl, &rshd, 2020);
         assert_eq!(out.len(), 1);
-        // 10 * 0.5 = 5.
+ // 10 * 0.5 = 5.
         assert!((out[0].sho - 5.0).abs() < EPS);
         assert_eq!(out[0].link_id, 1001);
     }
@@ -805,14 +805,14 @@ mod tests {
             link_id: 1001,
             sho_alloc_factor: 1.0,
         }];
-        // hourDay 85 is not in RunSpecHourDay.
+ // hourDay 85 is not in RunSpecHourDay.
         let out = allocate_sho(&sarh, &zrtl, &[], 2020);
         assert!(out.is_empty());
     }
 
     #[test]
     fn off_network_idle_applies_the_oni_formula() {
-        // One on-network SHO row on road 2, link 1001.
+ // One on-network SHO row on road 2, link 1001.
         let allocated = [ShoRow {
             hour_day_id: 85,
             month_id: 1,
@@ -825,7 +825,7 @@ mod tests {
         }];
         let links = [
             link(1001, 100, 2, 9),
-            // Off-network link in the same zone.
+ // Off-network link in the same zone.
             link(1000, 100, OFF_NETWORK_ROAD_TYPE, 9),
         ];
         let counties = [CountyRow {
@@ -869,8 +869,8 @@ mod tests {
         };
         let out = off_network_idle_sho(&allocated, &tables, 100, 2020);
         assert_eq!(out.len(), 1);
-        // sum(sho)=100, sum(sho*dif)=10, tif=0.5.
-        // oni = 100 * (0.5 - 10/100) / (1 - 0.5) = 100 * 0.4 / 0.5 = 80.
+ // sum(sho)=100, sum(sho*dif)=10, tif=0.5.
+ // oni = 100 * (0.5 - 10/100) / (1 - 0.5) = 100 * 0.4 / 0.5 = 80.
         assert!((out[0].sho - 80.0).abs() < EPS);
         assert_eq!(out[0].link_id, 1000);
     }
@@ -946,7 +946,7 @@ mod tests {
             hour_id: 8,
             idle_hours: 200.0,
         }];
-        // Model year 2020 split 70% diesel / 30% gasoline.
+ // Model year 2020 split 70% diesel / 30% gasoline.
         let svp = [
             SampleVehiclePopulationRow {
                 source_type_id: 62,
@@ -969,7 +969,7 @@ mod tests {
         let out = hotelling_hours(&ihah, &svp, &hd, 100, 2020);
         assert_eq!(out.len(), 2);
         let diesel = out.iter().find(|r| r.fuel_type_id == 2).unwrap();
-        // 200 * 0.7 = 140.
+ // 200 * 0.7 = 140.
         assert!((diesel.hotelling_hours - 140.0).abs() < EPS);
     }
 
@@ -996,7 +996,7 @@ mod tests {
         }];
         let out = allocate_shp(&shp, &hd, &rshd, &zone, 100, 2020);
         assert_eq!(out.len(), 1);
-        // 1000 * 0.25 = 250.
+ // 1000 * 0.25 = 250.
         assert!((out[0].shp - 250.0).abs() < EPS);
     }
 
@@ -1027,7 +1027,7 @@ mod tests {
         }];
         let out = calculate_distance(&sho, &links, &speed, &hd);
         assert_eq!(out.len(), 1);
-        // 10 * 55 = 550.
+ // 10 * 55 = 550.
         assert!((out[0].distance - 550.0).abs() < EPS);
     }
 
@@ -1043,7 +1043,7 @@ mod tests {
             sho: 10.0,
             distance: 0.0,
         }];
-        // Off-network link with no AverageSpeed — distance stays 0.
+ // Off-network link with no AverageSpeed — distance stays 0.
         let links = [link(1000, 100, OFF_NETWORK_ROAD_TYPE, 9)];
         let hd = [HourDayRow {
             hour_day_id: 85,

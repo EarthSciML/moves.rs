@@ -9,10 +9,10 @@
 //!
 //! ```sh
 //! moves-default-db-convert \
-//!   --tsv-dir   /tmp/dump/movesdb20241112 \
-//!   --plan      characterization/default-db-schema/tables.json \
-//!   --output    default-db/movesdb20241112 \
-//!   --moves-db-version movesdb20241112
+//! --tsv-dir /tmp/dump/movesdb20241112 \
+//! --plan characterization/default-db-schema/tables.json \
+//! --output default-db/movesdb20241112 \
+//! --moves-db-version movesdb20241112
 //! ```
 
 use std::path::PathBuf;
@@ -25,37 +25,37 @@ use moves_default_db_convert::{convert, ConvertOptions};
 #[derive(Debug, Parser)]
 #[command(
     name = "moves-default-db-convert",
-    about = "Convert a MOVES default-DB TSV dump into partitioned Parquet (Phase 4 Task 80).",
+    about = "Convert a MOVES default-DB TSV dump into partitioned Parquet.",
     version
 )]
 struct Args {
-    /// Directory containing the `<Table>.tsv` and `<Table>.schema.tsv`
-    /// pairs produced by the dump stage.
+ /// Directory containing the `<Table>.tsv` and `<Table>.schema.tsv`
+ /// pairs produced by the dump stage.
     #[arg(long, value_name = "DIR")]
     tsv_dir: PathBuf,
 
-    /// Path to `characterization/default-db-schema/tables.json`.
+ /// Path to `characterization/default-db-schema/tables.json`.
     #[arg(long, value_name = "PATH")]
     plan: PathBuf,
 
-    /// Output root. The converter writes the versioned subtree plus
-    /// `manifest.json` under this directory.
+ /// Output root. The converter writes the versioned subtree plus
+ /// `manifest.json` under this directory.
     #[arg(long, value_name = "DIR")]
     output: PathBuf,
 
-    /// MOVES default DB version label (used for the manifest's
-    /// `moves_db_version` field). Match the EPA release naming, e.g.
-    /// `movesdb20241112`.
+ /// MOVES default DB version label (used for the manifest's
+ /// `moves_db_version` field). Match the EPA release naming, e.g.
+ /// `movesdb20241112`.
     #[arg(long, value_name = "LABEL")]
     moves_db_version: String,
 
-    /// If set, error out when a table from the plan is missing from the
-    /// TSV directory. Default: skip silently and report in the summary.
+ /// If set, error out when a table from the plan is missing from the
+ /// TSV directory. Default: skip silently and report in the summary.
     #[arg(long, default_value_t = false)]
     require_every_table: bool,
 
-    /// Override the manifest's `generated_at_utc` field. Use for
-    /// reproducible diffs across runs.
+ /// Override the manifest's `generated_at_utc` field. Use for
+ /// reproducible diffs across runs.
     #[arg(long, value_name = "ISO8601")]
     generated_at_utc: Option<String>,
 }

@@ -1,20 +1,20 @@
-//! `moves-coverage` CLI — Phase 1 Task 9 deliverable.
+//! `moves-coverage` CLI — deliverable.
 //!
 //! Reads every `execution-trace.json` under a snapshots root and writes
 //! a suite-wide coverage rollup to `<output-dir>/coverage-map.json`.
 //!
 //! ```sh
 //! moves-coverage \
-//!   --snapshots-dir characterization/snapshots \
-//!   --output-dir characterization/coverage
+//! --snapshots-dir characterization/snapshots \
+//! --output-dir characterization/coverage
 //! ```
 //!
 //! Exit codes:
 //!
-//! | code | meaning                                              |
+//! | code | meaning |
 //! |------|------------------------------------------------------|
-//! | 0    | coverage map written successfully                    |
-//! | 1    | error (unreadable snapshots root, malformed trace, …) |
+//! | 0 | coverage map written successfully |
+//! | 1 | error (unreadable snapshots root, malformed trace, …) |
 //!
 //! See `crate::coverage` for the schema of the emitted JSON and the
 //! determinism contract.
@@ -35,14 +35,14 @@ use moves_fixture_capture::{
     version
 )]
 struct Args {
-    /// Snapshots root, typically `characterization/snapshots`. Each
-    /// immediate subdirectory is treated as one fixture; subdirectories
-    /// without an `execution-trace.json` are skipped silently.
+ /// Snapshots root, typically `characterization/snapshots`. Each
+ /// immediate subdirectory is treated as one fixture; subdirectories
+ /// without an `execution-trace.json` are skipped silently.
     #[arg(long, value_name = "DIR")]
     snapshots_dir: PathBuf,
 
-    /// Output directory. Will be created if absent. The file is written
-    /// as `<output-dir>/coverage-map.json`.
+ /// Output directory. Will be created if absent. The file is written
+ /// as `<output-dir>/coverage-map.json`.
     #[arg(long, value_name = "DIR")]
     output_dir: PathBuf,
 }

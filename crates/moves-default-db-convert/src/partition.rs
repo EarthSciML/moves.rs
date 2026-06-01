@@ -7,10 +7,10 @@
 //! `characterization/default-db-schema/partitioning-plan.md`:
 //!
 //! * `county` → first of `countyID`, `zoneID`, `stateID` in the PK; file
-//!   path component is `county=`, `zone=`, or `state=` accordingly so the
-//!   reader can predicate-push by the actual column name.
+//! path component is `county=`, `zone=`, or `state=` accordingly so the
+//! reader can predicate-push by the actual column name.
 //! * `year_x_county` → outer partition `year=` from `yearID`, inner
-//!   partition by the same county/zone/state rule.
+//! partition by the same county/zone/state rule.
 //! * `year` → `year=` from `yearID`.
 //! * `model_year` → `modelYear=` from `modelYearID`.
 //! * `monolithic` / `schema_only` → no partition columns.
@@ -28,9 +28,9 @@ const COUNTY_LIKE: &[&str] = &["countyID", "zoneID", "stateID"];
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PartitionSpec {
     pub strategy: PartitionStrategy,
-    /// Ordered list of (column-name, path-label) pairs. Empty for
-    /// monolithic and schema-only strategies. Path-label is the prefix
-    /// that appears in directory components (`county=42/...`).
+ /// Ordered list of (column-name, path-label) pairs. Empty for
+ /// monolithic and schema-only strategies. Path-label is the prefix
+ /// that appears in directory components (`county=42/...`).
     pub columns: Vec<PartitionColumn>,
 }
 

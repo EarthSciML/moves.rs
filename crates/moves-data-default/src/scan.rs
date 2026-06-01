@@ -45,8 +45,8 @@ pub struct DefaultDb {
 }
 
 impl DefaultDb {
-    /// Open a default-DB tree rooted at `root`. `root` must contain a
-    /// `manifest.json` from `moves-default-db-convert`.
+ /// Open a default-DB tree rooted at `root`. `root` must contain a
+ /// `manifest.json` from `moves-default-db-convert`.
     pub fn open(root: impl Into<PathBuf>) -> Result<Self> {
         let root = root.into();
         let manifest_path = root.join(MANIFEST_FILENAME);
@@ -54,47 +54,47 @@ impl DefaultDb {
         Ok(Self { root, manifest })
     }
 
-    /// Root directory the reader was opened against.
+ /// Root directory the reader was opened against.
     pub fn root(&self) -> &Path {
         &self.root
     }
 
-    /// EPA release label, e.g. `movesdb20241112`.
+ /// EPA release label, e.g. `movesdb20241112`.
     pub fn db_version(&self) -> &str {
         &self.manifest.moves_db_version
     }
 
-    /// Full manifest (parsed, schema-version checked).
+ /// Full manifest (parsed, schema-version checked).
     pub fn manifest(&self) -> &Manifest {
         &self.manifest
     }
 
-    /// Look up a table manifest by case-insensitive name.
+ /// Look up a table manifest by case-insensitive name.
     pub fn table(&self, name: &str) -> Option<&TableManifest> {
         find_table(&self.manifest, name)
     }
 
-    /// Iterate every table manifest in the database.
+ /// Iterate every table manifest in the database.
     pub fn tables(&self) -> impl Iterator<Item = &TableManifest> {
         self.manifest.tables.iter()
     }
 
-    /// Build a [`LazyFrame`] over the named table.
-    ///
-    /// `filter` drives partition pruning: only Parquet files whose
-    /// partition values satisfy every constrained predicate are loaded.
-    /// An empty filter loads every partition. Predicates against
-    /// non-partition columns are not part of `TableFilter` — express
-    /// those on the returned `LazyFrame` with `.filter(col("x").eq(...))`.
-    ///
-    /// Returns:
-    ///
-    /// * [`Error::UnknownTable`] — `name` is not in the manifest.
-    /// * [`Error::SchemaOnly`] — the table is a schema-only sidecar
-    ///   (no Parquet data); use [`DefaultDb::schema_sidecar`].
-    /// * [`Error::UnknownPartitionColumn`] — the filter references a
-    ///   column the table is not partitioned on. Surfacing this loudly
-    ///   prevents a silent "no pruning happened" bug.
+ /// Build a [`LazyFrame`] over the named table.
+ ///
+ /// `filter` drives partition pruning: only Parquet files whose
+ /// partition values satisfy every constrained predicate are loaded.
+ /// An empty filter loads every partition. Predicates against
+ /// non-partition columns are not part of `TableFilter` — express
+ /// those on the returned `LazyFrame` with `.filter(col("x").eq(...))`.
+ ///
+ /// Returns:
+ ///
+ /// * [`Error::UnknownTable`] — `name` is not in the manifest.
+ /// * [`Error::SchemaOnly`] — the table is a schema-only sidecar
+ /// (no Parquet data); use [`DefaultDb::schema_sidecar`].
+ /// * [`Error::UnknownPartitionColumn`] — the filter references a
+ /// column the table is not partitioned on. Surfacing this loudly
+ /// prevents a silent "no pruning happened" bug.
     pub fn scan(&self, name: &str, filter: &TableFilter) -> Result<LazyFrame> {
         let table = self
             .table(name)
@@ -109,9 +109,9 @@ impl DefaultDb {
         scan_partitions(&self.root, &selected)
     }
 
-    /// Read the schema-only sidecar for a `schema_only` table (e.g.
-    /// `SHO`). Returns `None` for tables that ship with data; the data
-    /// path is [`Self::scan`] instead.
+ /// Read the schema-only sidecar for a `schema_only` table (e.g.
+ /// `SHO`). Returns `None` for tables that ship with data; the data
+ /// path is [`Self::scan`] instead.
     pub fn schema_sidecar(&self, name: &str) -> Result<Option<SchemaOnlySidecar>> {
         let table = self
             .table(name)
@@ -161,8 +161,8 @@ fn select_partitions<'a>(
     filter: &TableFilter,
 ) -> Vec<&'a PartitionManifest> {
     if table.partition_columns.is_empty() {
-        // Monolithic table: the manifest has exactly one partition (the
-        // single Parquet file). No pruning to do.
+ // Monolithic table: the manifest has exactly one partition (the
+ // single Parquet file). No pruning to do.
         return table.partitions.iter().collect();
     }
     table
@@ -344,8 +344,8 @@ mod tests {
 
     #[test]
     fn validate_filter_columns_accepts_subset() {
-        // year_x_county table, filter only by year — that's fine; not
-        // every partition column must be constrained.
+ // year_x_county table, filter only by year — that's fine; not
+ // every partition column must be constrained.
         let t = mk_table("T", &["yearID", "countyID"], vec![]);
         let f = TableFilter::new().partition_eq("yearID", 2020i64);
         validate_filter_columns(&t, &f).unwrap();
@@ -372,8 +372,8 @@ mod tests {
         assert_eq!(df.width(), 0);
     }
 
-    // Mute unused warnings for helpers used by integration tests but not
-    // by every unit test path.
+ // Mute unused warnings for helpers used by integration tests but not
+ // by every unit test path.
     fn _column_manifest_is_referenced() -> ColumnManifest {
         ColumnManifest {
             name: "x".into(),

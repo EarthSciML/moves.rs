@@ -14,10 +14,10 @@
 //! * Optional UTF-8 BOM at the start of file.
 //! * Optional Windows-style `\r\n` line endings.
 //! * Double-quoted fields: outer `"`s stripped, internal `""` collapsed
-//!   to one `"`. Cells with embedded commas or quotes require quoting.
+//! to one `"`. Cells with embedded commas or quotes require quoting.
 //! * Empty cells → `None`. Whitespace-only cells with surrounding quotes
-//!   are preserved; bare whitespace cells are also passed through (the
-//!   schema layer rejects them where typing requires non-empty).
+//! are preserved; bare whitespace cells are also passed through (the
+//! schema layer rejects them where typing requires non-empty).
 
 use std::path::{Path, PathBuf};
 
@@ -119,8 +119,8 @@ fn split_line(path: &Path, line_no: usize, line: &str) -> Result<Vec<Option<Stri
     let mut i = 0;
     loop {
         if i >= n {
-            // Either the line is empty or we just consumed a trailing ','.
-            // Either way, the implicit final cell is empty.
+ // Either the line is empty or we just consumed a trailing ','.
+ // Either way, the implicit final cell is empty.
             out.push(None);
             return Ok(out);
         }
@@ -180,7 +180,7 @@ fn split_line(path: &Path, line_no: usize, line: &str) -> Result<Vec<Option<Stri
         if i >= n {
             return Ok(out);
         }
-        // Consume the field separator.
+ // Consume the field separator.
         debug_assert_eq!(bytes[i], b',');
         i += 1;
     }

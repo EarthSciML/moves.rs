@@ -1,11 +1,11 @@
-//! Ammonia (NH3) exhaust calculators — Phase 3 Task 66.
+//! Ammonia (NH3) exhaust calculators —.
 //!
-//! Ports the two ammonia calculators the migration plan groups into Task 66:
+//! Ports the two ammonia calculators the groups into:
 //!
 //! * [`running::Nh3RunningCalculator`] — `NH3RunningCalculator`, the
-//!   running-exhaust ammonia calculator (process 1).
+//! running-exhaust ammonia calculator (process 1).
 //! * [`start::Nh3StartCalculator`] — `NH3StartCalculator`, the start-exhaust
-//!   ammonia calculator (process 2).
+//! ammonia calculator (process 2).
 //!
 //! Both are thin `GenericCalculatorBase` subclasses driving near-identical
 //! scripts (`database/NH3RunningCalculator.sql`,
@@ -18,11 +18,11 @@
 //!
 //! Neither calculator is wired into the pinned MOVES runtime. `CalculatorInfo.txt`
 //! registers `Ammonia (NH3)` on Running Exhaust and Start Exhaust to
-//! `BaseRateCalculator` (migration-plan Task 45), the modern base-rate
+//! `BaseRateCalculator` (), the modern base-rate
 //! calculator that superseded the older per-pollutant scripted-SQL
 //! calculators; `characterization/calculator-chains/calculator-dag.json`
-//! records both NH3 modules with `registrations_count: 0`. The migration plan
-//! still lists the classes as Task 66, so this module ports their algorithms
+//! records both NH3 modules with `registrations_count: 0`. The 
+//! still lists the classes as, so this module ports their algorithms
 //! faithfully for reference and cross-validation, with each calculator's
 //! [`Calculator::registrations`](moves_framework::Calculator::registrations)
 //! returning an empty slice. See each calculator module's supersession note.

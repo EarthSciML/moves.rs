@@ -1,5 +1,4 @@
-//! NONROAD numerical-fidelity validation harness — Task 115
-//! (`mo-065ko`).
+//! NONROAD numerical-fidelity validation harness//! ().
 //!
 //! This integration test is the entry point of the fidelity gate.
 //! The harness machinery lives in the [`fidelity`] module tree
@@ -7,14 +6,14 @@
 //!
 //! The tests below, in order:
 //!
-//! 1. pin the ten Phase 0 NONROAD fixtures;
+//! 1. pin the ten NONROAD fixtures;
 //! 2. confirm the tolerance table classifies every `dbgemit` label;
 //! 3. route live `age_distribution` output through the divergence
-//!    engine — the harness machinery exercised on real port output;
+//! engine — the harness machinery exercised on real port output;
 //! 4. confirm the engine catches a perturbed port value;
 //! 5. route live `growth_factor` output through the engine;
 //! 6. load and validate a gfortran reference corpus when one is
-//!    supplied via `NONROAD_FIDELITY_REFERENCE`;
+//! supplied via `NONROAD_FIDELITY_REFERENCE`;
 //! 7. print a harness-status banner.
 //!
 //! See `tests/fidelity/mod.rs` for the full what-runs-today breakdown.
@@ -86,7 +85,7 @@ fn fixture_options_for_entry(name: &str) -> Option<NonroadOptions> {
 #[test]
 fn all_ten_nonroad_fixtures_are_present_and_valid() {
     let fixtures =
-        fixtures::load_all_fixtures().expect("the ten Phase 0 NONROAD fixtures must be readable");
+        fixtures::load_all_fixtures().expect("the ten NONROAD fixtures must be readable");
     assert_eq!(fixtures.len(), 10, "expected ten nr-*.xml fixtures");
 
     for fixture in &fixtures {
@@ -119,9 +118,9 @@ fn all_ten_nonroad_fixtures_are_present_and_valid() {
 
 #[test]
 fn tolerance_table_covers_the_dbgemit_label_set() {
-    // Every value label the four dbgemit instrumentation patches
-    // emit (characterization/nonroad-build/README.md) must be
-    // classified by the tolerance policy.
+ // Every value label the four dbgemit instrumentation patches
+ // emit (characterization/nonroad-build/README.md) must be
+ // classified by the tolerance policy.
     let dbgemit_labels: &[(Phase, &[&str])] = &[
         (Phase::Getpop, &["popeqp", "avghpc", "usehrs", "ipopyr"]),
         (Phase::Agedist, &["mdyrfrc", "baspop"]),
@@ -140,8 +139,8 @@ fn tolerance_table_covers_the_dbgemit_label_set() {
         }
     }
 
-    // The bead's three rules, spot-checked: a year index is a count
-    // (absolute), an emissions value is an energy quantity (relative).
+ // The work item's three rules, spot-checked: a year index is a count
+ // (absolute), an emissions value is an energy quantity (relative).
     assert_eq!(
         tolerance::classify(Phase::Getpop, "ipopyr"),
         tolerance::Quantity::Count
@@ -158,8 +157,8 @@ fn harness_composes_with_live_agedist_output() {
     let ctx = Context::parse("call=1,fips=26000,year=2021");
     let port = adapter::agedist_records(&ctx, &result);
 
-    // The adapter must produce dbgemit-shaped records: `mdyrfrc`
-    // carries MXAGYR values, `baspop` carries one.
+ // The adapter must produce dbgemit-shaped records: `mdyrfrc`
+ // carries MXAGYR values, `baspop` carries one.
     let mdyrfrc = port
         .iter()
         .find(|r| r.label == "mdyrfrc")
@@ -171,18 +170,18 @@ fn harness_composes_with_live_agedist_output() {
         .expect("agedist adapter must emit a baspop record");
     assert_eq!(baspop.values.len(), 1);
 
-    // Plumbing check: live port output routed through the
-    // divergence engine against itself shows zero divergences. This
-    // exercises adapter → compare_runs on genuine `moves-nonroad`
-    // output. It is *not* a fidelity check against gfortran — that
-    // needs the reference corpus (see `reference_corpus_*`).
+ // Plumbing check: live port output routed through the
+ // divergence engine against itself shows zero divergences. This
+ // exercises adapter → compare_runs on genuine `moves-nonroad`
+ // output. It is *not* a fidelity check against gfortran — that
+ // needs the reference corpus (see `reference_corpus_*`).
     let report = compare_runs("self-check::agedist", &port, &port);
     assert!(report.passed(), "self-comparison must pass:\n{report}");
     assert_eq!(report.values_compared, MXAGYR + 1);
 
-    // Sanity anchor: the known case grows the youngest-age fraction
-    // to ≈ 0.10 and leaves the base population at 100. Loose f32
-    // tolerance — this is a smoke check on the port, not the gate.
+ // Sanity anchor: the known case grows the youngest-age fraction
+ // to ≈ 0.10 and leaves the base population at 100. Loose f32
+ // tolerance — this is a smoke check on the port, not the gate.
     assert!((result.mdyrfrc[0] - 0.10).abs() < 1e-5);
     assert!((result.base_population - 100.0).abs() < 1e-5);
 }
@@ -193,8 +192,8 @@ fn divergence_engine_catches_a_perturbed_port_value() {
     let ctx = Context::parse("call=1,fips=26000,year=2021");
     let port = adapter::agedist_records(&ctx, &result);
 
-    // Perturb a single mdyrfrc value well beyond the 1e-9 relative
-    // budget; the engine must report exactly that one divergence.
+ // Perturb a single mdyrfrc value well beyond the 1e-9 relative
+ // budget; the engine must report exactly that one divergence.
     let mut perturbed = port.clone();
     let mdyrfrc = perturbed
         .iter_mut()
@@ -208,7 +207,7 @@ fn divergence_engine_catches_a_perturbed_port_value() {
     assert_eq!(report.divergences[0].index, 1);
     assert_eq!(report.divergences[0].key.label, "mdyrfrc");
 
-    // The JSON form is the artifact handed to Task 116 triage.
+ // The JSON form is the artifact handed to triage.
     let json = report.to_json();
     assert!(json.contains("self-check::perturbed"));
     assert!(json.contains("\"divergences\""));
@@ -216,8 +215,8 @@ fn divergence_engine_catches_a_perturbed_port_value() {
 
 #[test]
 fn harness_composes_with_live_grwfac_output() {
-    // A two-year national growth-indicator series — enough for
-    // `grwfac` to compute a slope.
+ // A two-year national growth-indicator series — enough for
+ // `grwfac` to compute a slope.
     let records = [
         GrowthIndicatorRecord {
             indicator: "POP".to_string(),
@@ -253,14 +252,14 @@ fn reference_corpus_validates_when_present() {
         eprintln!(
             "NONROAD fidelity gate: DORMANT. Set {} to a directory of \
              captured gfortran `dbgemit` baselines (one <fixture>.tsv per \
-             Phase 0 NONROAD fixture) to activate reference validation. \
+             NONROAD fixture) to activate reference validation. \
              See characterization/nonroad-fidelity/README.md.",
             fidelity::REFERENCE_DIR_ENV
         );
         return;
     };
 
-    // Load and validate MANIFEST.toml.
+ // Load and validate MANIFEST.toml.
     let manifest_path = fidelity::manifest_path(&dir);
     let manifest_text = std::fs::read_to_string(&manifest_path).unwrap_or_else(|e| {
         panic!(
@@ -275,7 +274,7 @@ fn reference_corpus_validates_when_present() {
         )
     });
 
-    // Assert the manifest names exactly the ten FIXTURE_NAMES.
+ // Assert the manifest names exactly the ten FIXTURE_NAMES.
     let mut manifest_names: Vec<&str> = manifest.fixtures.iter().map(|e| e.name.as_str()).collect();
     manifest_names.sort_unstable();
     let mut expected_names = fixtures::FIXTURE_NAMES.to_vec();
@@ -285,14 +284,14 @@ fn reference_corpus_validates_when_present() {
         "MANIFEST.toml must list exactly the ten FIXTURE_NAMES"
     );
 
-    // For each fixture in the manifest: verify SHA256, parse TSV, check phases.
+ // For each fixture in the manifest: verify SHA256, parse TSV, check phases.
     let mut validated = 0;
     for entry in &manifest.fixtures {
         let tsv_path = dir.join(&entry.path);
         let tsv_bytes = std::fs::read(&tsv_path)
             .unwrap_or_else(|e| panic!("cannot read {}: {e}", tsv_path.display()));
 
-        // Verify the TSV's SHA256 matches the manifest.
+ // Verify the TSV's SHA256 matches the manifest.
         let hash = Sha256::digest(&tsv_bytes);
         let actual_sha256: String = hash.iter().map(|b| format!("{b:02x}")).collect();
         assert_eq!(
@@ -301,7 +300,7 @@ fn reference_corpus_validates_when_present() {
             entry.name, entry.sha256, actual_sha256
         );
 
-        // Parse and structurally validate the TSV.
+ // Parse and structurally validate the TSV.
         let records = parse_reference(BufReader::new(tsv_bytes.as_slice()))
             .unwrap_or_else(|e| panic!("{}: {e}", tsv_path.display()));
         assert!(
@@ -310,17 +309,17 @@ fn reference_corpus_validates_when_present() {
             tsv_path.display()
         );
 
-        // Assert at least one record per Phase.
+ // Assert at least one record per Phase.
         for phase in Phase::all() {
             let n = records.iter().filter(|r| r.phase == phase).count();
             assert!(n > 0, "{}: no records for phase {phase}", entry.name);
             eprintln!("  {} · {phase}: {n} record(s)", entry.name);
         }
 
-        // Port-side capture: run the fixture through ProductionExecutor
-        // wrapped in InstrumentingExecutor and compare against the
-        // reference corpus. Skip gracefully when the fixture XML is
-        // missing or its options cannot be built.
+ // Port-side capture: run the fixture through ProductionExecutor
+ // wrapped in InstrumentingExecutor and compare against the
+ // reference corpus. Skip gracefully when the fixture XML is
+ // missing or its options cannot be built.
         if let Some(options) = fixture_options_for_entry(&entry.name) {
             let ref_data = ReferenceData::default();
             let prod = ProductionExecutor::new(&ref_data);
@@ -350,8 +349,8 @@ fn reference_corpus_validates_when_present() {
 
 #[test]
 fn fidelity_harness_status() {
-    // An always-on status line, visible under `cargo test -- --nocapture`.
-    eprintln!("── NONROAD numerical-fidelity harness · Task 115 (mo-065ko) ──");
+ // An always-on status line, visible under `cargo test -- --nocapture`.
+    eprintln!("── NONROAD numerical-fidelity harness ──");
     eprintln!("  fixtures registered:  {}", fixtures::FIXTURE_NAMES.len());
     eprintln!(
         "  tolerance budget:     energy {:e} relative · count {:e} absolute · key exact",

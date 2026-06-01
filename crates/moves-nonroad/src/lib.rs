@@ -5,7 +5,7 @@
 //! (118 `.f` files, ~29.4k lines, plus 11 `.inc` files defining 65
 //! named COMMON blocks) with a library that exposes a
 //! `run_simulation` entry point for direct in-process invocation by
-//! the moves-rs orchestrator (Phase 2). No subprocess, no scratch
+//! the moves-rs orchestrator. No subprocess, no scratch
 //! files, no MariaDB ingestion.
 //!
 //! See [`ARCHITECTURE.md`](https://github.com/EarthSciML/moves.rs/blob/main/crates/moves-nonroad/ARCHITECTURE.md)
@@ -13,17 +13,17 @@
 //! map and the cross-cutting policies on array sizes, error handling,
 //! I/O, and WASM compatibility.
 //!
-//! # Phase 5 status
+//! # status
 //!
-//! This crate is being filled in module by module by the Phase 5
-//! implementation tasks (92–118), on top of the Task 91 skeleton
+//! This crate is being filled in module by module by the
+//! implementation tasks (92–118), on top of the skeleton
 //! (module structure plus shared types — [`Error`], [`Result`],
 //! [`common::NonroadContext`]).
 //!
 //! [`run_simulation`] — the single in-process entry point — is the
-//! Task 117 integration step ([`simulation`]). It ports `nonroad.f`'s
+//! integration step ([`simulation`]). It ports `nonroad.f`'s
 //! two-level driver loop (the outer `getpop` SCC-group loop and the
-//! inner record loop) on top of the Task 113 record-loop planner, and
+//! inner record loop) on top of the record-loop planner, and
 //! defines the [`NonroadOptions`] / [`NonroadInputs`] /
 //! [`NonroadOutputs`] integration types that replace the Java↔Fortran
 //! bridge's `.opt`-file generation, input-file generation, and MariaDB
@@ -42,7 +42,7 @@
 //! ```
 //! use moves_nonroad::driver::RegionLevel;
 //! use moves_nonroad::simulation::{
-//!     run_simulation, NonroadInputs, NonroadOptions, ProductionExecutor, ReferenceData,
+//! run_simulation, NonroadInputs, NonroadOptions, ProductionExecutor, ReferenceData,
 //! };
 //!
 //! let ref_data = ReferenceData::default();

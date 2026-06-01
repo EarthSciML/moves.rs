@@ -1,6 +1,6 @@
 //! Spatial-indicator parser (`rdind.f`).
 //!
-//! Task 97. Parses spatial-allocation indicator files. The Fortran
+//!Parses spatial-allocation indicator files. The Fortran
 //! source iterates over a list of allocation files (each containing
 //! a single `/INDICATORS/` packet), filters records by region scope
 //! and active allocation codes, and writes a sorted scratch file.
@@ -27,7 +27,7 @@
 //! streaming-file search with rewinds against the sorted scratch
 //! file; the Rust port collapses it to an in-memory hash lookup that
 //! preserves the year-selection rule documented on [`IndicatorTable`]
-//! (Task 99).
+//!.
 
 use crate::{Error, Result};
 use std::collections::HashMap;
@@ -37,21 +37,21 @@ use std::path::PathBuf;
 /// One indicator record.
 #[derive(Debug, Clone, PartialEq)]
 pub struct IndicatorRecord {
-    /// 3-character allocation code.
+ /// 3-character allocation code.
     pub code: String,
-    /// 5-digit FIPS code.
+ /// 5-digit FIPS code.
     pub fips: String,
-    /// 5-character subcounty identifier.
+ /// 5-character subcounty identifier.
     pub subcounty: String,
-    /// 4-character year string (kept as text to match Fortran sort key).
+ /// 4-character year string (kept as text to match Fortran sort key).
     pub year: String,
-    /// Allocation value.
+ /// Allocation value.
     pub value: f64,
 }
 
 impl IndicatorRecord {
-    /// Sort key matching Fortran's character-key concatenation
-    /// (`code // fips // subcounty // year`). 17 characters wide.
+ /// Sort key matching Fortran's character-key concatenation
+ /// (`code // fips // subcounty // year`). 17 characters wide.
     pub fn sort_key(&self) -> String {
         format!(
             "{:<3}{:<5}{:<5}{:<4}",
@@ -138,10 +138,10 @@ pub fn sort_indicators(records: &mut [IndicatorRecord]) {
 /// using the same priority as the Fortran routine:
 ///
 /// 1. The latest record whose year is `<= year_target` (closest
-///    earlier year wins).
+/// earlier year wins).
 /// 2. Otherwise, the earliest record whose year is `> year_target`.
 /// 3. Otherwise (no records match `code`/`fips`/`subcounty`),
-///    `None`.
+/// `None`.
 ///
 /// The 2005 EPA revision removed year interpolation; the lookup
 /// returns the closest-earlier value verbatim (`getind.f` :138).
@@ -154,18 +154,18 @@ pub fn sort_indicators(records: &mut [IndicatorRecord]) {
 /// pass either form.
 #[derive(Debug, Default, Clone)]
 pub struct IndicatorTable {
-    /// `(code, fips, subcounty)` → year-ascending `(year, value)` pairs.
+ /// `(code, fips, subcounty)` → year-ascending `(year, value)` pairs.
     by_region: HashMap<(String, String, String), Vec<(i32, f32)>>,
 }
 
 impl IndicatorTable {
-    /// Build a lookup table from a sequence of records.
-    ///
-    /// Records whose `year` field does not parse as an integer are
-    /// skipped — production indicator files store 4-digit years, so
-    /// this is defensive against malformed inputs that the streaming
-    /// Fortran reader would have surfaced via its own format-error
-    /// path.
+ /// Build a lookup table from a sequence of records.
+ ///
+ /// Records whose `year` field does not parse as an integer are
+ /// skipped — production indicator files store 4-digit years, so
+ /// this is defensive against malformed inputs that the streaming
+ /// Fortran reader would have surfaced via its own format-error
+ /// path.
     pub fn new<I: IntoIterator<Item = IndicatorRecord>>(records: I) -> Self {
         let mut table = Self::default();
         for record in records {
@@ -185,26 +185,26 @@ impl IndicatorTable {
         table
     }
 
-    /// Number of distinct `(code, fips, subcounty)` groups.
+ /// Number of distinct `(code, fips, subcounty)` groups.
     pub fn group_count(&self) -> usize {
         self.by_region.len()
     }
 
-    /// Whether any record exists for `(code, fips, subcounty)`.
+ /// Whether any record exists for `(code, fips, subcounty)`.
     pub fn has_region(&self, code: &str, fips: &str, subcounty: &str) -> bool {
         let key = Self::normalize_key(code, fips, subcounty);
         self.by_region.contains_key(&key)
     }
 
-    /// Look up the indicator value for `code` at `(fips, subcounty)`
-    /// for `year_target`, applying the year-selection rule
-    /// documented on [`IndicatorTable`].
-    ///
-    /// Returns `None` only when no record exists for the
-    /// `(code, fips, subcounty)` triple. If a triple has any
-    /// records at all, this method always returns `Some(_)` — the
-    /// selection rule guarantees a hit either at or after the
-    /// target year.
+ /// Look up the indicator value for `code` at `(fips, subcounty)`
+ /// for `year_target`, applying the year-selection rule
+ /// documented on [`IndicatorTable`].
+ ///
+ /// Returns `None` only when no record exists for the
+ /// `(code, fips, subcounty)` triple. If a triple has any
+ /// records at all, this method always returns `Some(_)` — the
+ /// selection rule guarantees a hit either at or after the
+ /// target year.
     pub fn lookup(&self, code: &str, fips: &str, subcounty: &str, year_target: i32) -> Option<f32> {
         let key = Self::normalize_key(code, fips, subcounty);
         let years = self.by_region.get(&key)?;
@@ -230,13 +230,13 @@ fn select_year(years: &[(i32, f32)], year_target: i32) -> Option<f32> {
     let mut earliest_gt: Option<(i32, f32)> = None;
     for (year, value) in years {
         if *year <= year_target {
-            // Sorted ascending → keep overwriting; final survivor is
-            // the closest earlier year.
+ // Sorted ascending → keep overwriting; final survivor is
+ // the closest earlier year.
             latest_le = Some((*year, *value));
         } else if earliest_gt.is_none() {
             earliest_gt = Some((*year, *value));
-            // No need to keep scanning — subsequent entries are
-            // further from the target.
+ // No need to keep scanning — subsequent entries are
+ // further from the target.
             break;
         }
     }
@@ -388,8 +388,8 @@ POP 17031 00000 2020
 
     #[test]
     fn indicator_table_lookup_returns_f32() {
-        // Indicator values are REAL*4 in the Fortran source; the
-        // table stores f32 even though the parsed records carry f64.
+ // Indicator values are REAL*4 in the Fortran source; the
+ // table stores f32 even though the parsed records carry f64.
         let records = vec![rec("POP", "17000", "", "2020", 0.123_456_789_f64)];
         let table = IndicatorTable::new(records);
         let v = table.lookup("POP", "17000", "", 2020).unwrap();

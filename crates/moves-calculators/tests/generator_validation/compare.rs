@@ -1,20 +1,20 @@
 //! Diff a generator's produced table against a canonical snapshot.
 //!
-//! The comparison reuses the Phase 0 [`moves_snapshot`] crate — the
+//! The comparison reuses the [`moves_snapshot`] crate — the
 //! canonical-MOVES captures *are* `moves_snapshot`-format snapshots,
-//! so the gate diffs with the same engine Phase 0's own
+//! so the gate diffs with the same engine's own
 //! regression-detection uses rather than reinventing one.
 //!
 //! Two layers:
 //!
 //! * [`compare_table`] is the pure, in-memory machinery — diff one
-//!   produced [`Table`] against one canonical [`Table`] under a
-//!   tolerance budget. It is what every machinery test exercises.
+//! produced [`Table`] against one canonical [`Table`] under a
+//! tolerance budget. It is what every machinery test exercises.
 //! * [`validate_table`] is the disk-aware orchestration — locate the
-//!   fixture's canonical snapshot, resolve the table matching the
-//!   generator's output, and run [`compare_table`]. It is what the
-//!   activated gate calls per `(fixture, generator)` coverage cell;
-//!   today, with no snapshots in the repo, it reports [`Dormant`].
+//! fixture's canonical snapshot, resolve the table matching the
+//! generator's output, and run [`compare_table`]. It is what the
+//! activated gate calls per `(fixture, generator)` coverage cell;
+//! today, with no snapshots in the repo, it reports [`Dormant`].
 //!
 //! [`Dormant`]: ValidationStatus::Dormant
 
@@ -26,15 +26,13 @@ use moves_snapshot::{
 };
 use serde::Serialize;
 
-/// The `manifest.json` file every `moves_snapshot` snapshot carries —
-/// its presence is how the harness tells a populated snapshot
+/// The `manifest.json` file every `moves_snapshot` snapshot carries/// its presence is how the harness tells a populated snapshot
 /// directory from an empty placeholder.
 const MANIFEST_FILE: &str = "manifest.json";
 
 /// Load the tolerance budget from `characterization/generator-validation/`.
 ///
-/// The committed `tolerance.toml` is the version-controlled budget —
-/// the per-(table, column) absolute tolerances the canonical-capture
+/// The committed `tolerance.toml` is the version-controlled budget/// the per-(table, column) absolute tolerances the canonical-capture
 /// diff applies, including the documented *expected* divergences.
 ///
 /// # Errors
@@ -66,7 +64,7 @@ pub fn canonical_snapshot_present(snapshots_root: &Path, fixture: &str) -> bool 
 /// 1. exact name match,
 /// 2. case-insensitive exact match,
 /// 3. a *unique* table whose lower-cased name contains the
-///    lower-cased output name as a substring.
+/// lower-cased output name as a substring.
 ///
 /// An ambiguous or absent match yields `None`; the precise mapping is
 /// finalised against a real capture when the gate activates.
@@ -135,41 +133,41 @@ pub fn compare_table(
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ValidationStatus {
-    /// No populated canonical snapshot for the fixture — the gate is
-    /// dormant for this `(fixture, generator)` pair.
+ /// No populated canonical snapshot for the fixture — the gate is
+ /// dormant for this `(fixture, generator)` pair.
     Dormant,
-    /// The canonical snapshot exists but holds no table matching the
-    /// generator's output — a naming-resolution gap to settle at
-    /// activation, or a generator producing an uncaptured table.
+ /// The canonical snapshot exists but holds no table matching the
+ /// generator's output — a naming-resolution gap to settle at
+ /// activation, or a generator producing an uncaptured table.
     CanonicalTableMissing,
-    /// The produced table matched the canonical capture within the
-    /// tolerance budget.
+ /// The produced table matched the canonical capture within the
+ /// tolerance budget.
     Matched,
-    /// The produced table diverged from the canonical capture.
+ /// The produced table diverged from the canonical capture.
     Diverged,
 }
 
 /// The validation result for one `(fixture, generator)` coverage cell.
 #[derive(Debug, Clone, Serialize)]
 pub struct TableValidation {
-    /// Fixture name.
+ /// Fixture name.
     pub fixture: String,
-    /// Generator name.
+ /// Generator name.
     pub generator: String,
-    /// The generator-output table that was validated.
+ /// The generator-output table that was validated.
     pub output_table: String,
-    /// The canonical snapshot table [`Self::output_table`] resolved
-    /// to — `Some` once a canonical capture is present and matched,
-    /// preserving which database table the diff ran against.
+ /// The canonical snapshot table [`Self::output_table`] resolved
+ /// to — `Some` once a canonical capture is present and matched,
+ /// preserving which database table the diff ran against.
     pub canonical_table: Option<String>,
-    /// The verdict.
+ /// The verdict.
     pub status: ValidationStatus,
-    /// The structured diff — `Some` only when [`Self::status`] is
-    /// [`Matched`](ValidationStatus::Matched) or
-    /// [`Diverged`](ValidationStatus::Diverged).
+ /// The structured diff — `Some` only when [`Self::status`] is
+ /// [`Matched`](ValidationStatus::Matched) or
+ /// [`Diverged`](ValidationStatus::Diverged).
     pub diff: Option<Diff>,
-    /// Aggregate diff counts, mirrored from [`Self::diff`] for quick
-    /// CI scanning.
+ /// Aggregate diff counts, mirrored from [`Self::diff`] for quick
+ /// CI scanning.
     pub summary: Option<DiffSummary>,
 }
 
@@ -178,11 +176,11 @@ pub struct TableValidation {
 /// Locates `<snapshots_root>/<fixture>/`, and:
 ///
 /// * with no populated snapshot there, returns
-///   [`ValidationStatus::Dormant`] — the repository state today;
+/// [`ValidationStatus::Dormant`] — the repository state today;
 /// * with a snapshot but no table matching `produced.name()`,
-///   returns [`ValidationStatus::CanonicalTableMissing`];
+/// returns [`ValidationStatus::CanonicalTableMissing`];
 /// * otherwise diffs and returns [`Matched`](ValidationStatus::Matched)
-///   or [`Diverged`](ValidationStatus::Diverged).
+/// or [`Diverged`](ValidationStatus::Diverged).
 ///
 /// # Errors
 ///
@@ -236,7 +234,7 @@ pub fn validate_table(
 }
 
 /// Serialise a batch of validations as pretty JSON — the CI artifact
-/// handed on for triage, mirroring the Task 115 fidelity report.
+/// handed on for triage, mirroring the fidelity report.
 pub fn report_json(validations: &[TableValidation]) -> String {
     serde_json::to_string_pretty(validations)
         .unwrap_or_else(|e| format!("{{\"serialization_error\":\"{e}\"}}"))
@@ -247,7 +245,7 @@ mod tests {
     use super::*;
     use moves_snapshot::{ColumnKind, TableBuilder, Value};
 
-    /// A two-column table: an `id` key and a `value` float.
+ /// A two-column table: an `id` key and a `value` float.
     fn table(name: &str, rows: &[(i64, f64)]) -> Table {
         let mut builder = TableBuilder::new(
             name,
@@ -292,11 +290,11 @@ mod tests {
     fn tolerance_absorbs_a_sub_budget_difference() {
         let canonical = table("T", &[(1, 1.0)]);
         let produced = table("T", &[(1, 1.0 + 1e-7)]);
-        // Strict: the difference shows.
+ // Strict: the difference shows.
         assert!(!compare_table(&produced, &canonical, &strict())
             .unwrap()
             .is_empty());
-        // Within a 1e-6 budget: absorbed.
+ // Within a 1e-6 budget: absorbed.
         let lenient = DiffOptions::default().with_default_float_tolerance(1e-6);
         assert!(compare_table(&produced, &canonical, &lenient)
             .unwrap()
@@ -305,7 +303,7 @@ mod tests {
 
     #[test]
     fn the_name_gap_does_not_block_pairing() {
-        // Produced is the scratch name; canonical is the database path.
+ // Produced is the scratch name; canonical is the database path.
         let canonical = table("db__movesexecution__zonemonthhour", &[(1, 1.0)]);
         let produced = table("ZoneMonthHour", &[(1, 1.0)]);
         let diff = compare_table(&produced, &canonical, &strict()).unwrap();
@@ -366,8 +364,8 @@ mod tests {
 
     #[test]
     fn validate_table_matches_against_a_written_snapshot() {
-        // Build a canonical snapshot on disk, then validate an identical
-        // produced table against it — the activated gate's happy path.
+ // Build a canonical snapshot on disk, then validate an identical
+ // produced table against it — the activated gate's happy path.
         let root = tempfile::tempdir().unwrap();
         let fixture_dir = root.path().join("process-brakewear");
         let mut canonical = Snapshot::new();
@@ -387,7 +385,7 @@ mod tests {
         .unwrap();
         assert_eq!(matched.status, ValidationStatus::Matched);
 
-        // A diverging produced table flips the verdict.
+ // A diverging produced table flips the verdict.
         let diverged_table = table("ZoneMonthHour", &[(1, 70.0), (2, 99.0)]);
         let diverged = validate_table(
             root.path(),

@@ -55,7 +55,7 @@ yearID,sourceTypeID,sourceTypePopulation
     assert_eq!(out.table_name, "SourceTypeYear");
     assert!(!out.sha256.is_empty());
 
-    // Re-reading the bytes with Parquet must reproduce the same values.
+ // Re-reading the bytes with Parquet must reproduce the same values.
     let cursor = bytes::Bytes::from(out.bytes);
     let arrow_reader =
         parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder::try_new(cursor)
@@ -67,8 +67,8 @@ yearID,sourceTypeID,sourceTypePopulation
     let b = &batches[0];
     assert_eq!(b.num_rows(), 4);
 
-    // Verify rows are sorted lexicographically by primary key
-    // (yearID asc, sourceTypeID asc).
+ // Verify rows are sorted lexicographically by primary key
+ // (yearID asc, sourceTypeID asc).
     let year = b
         .column_by_name("yearID")
         .unwrap()
@@ -104,8 +104,8 @@ zoneID,roadTypeID,SHOAllocFactor
 
     let ctx = ValidationContext::without_default_db();
     let cross_msgs = importer.validate_imported(&[imported], &ctx);
-    // Every road type's column sums to 0.30 across one zone, so every
-    // road type fails the sum-to-1 invariant. Should be 4 errors.
+ // Every road type's column sums to 0.30 across one zone, so every
+ // road type fails the sum-to-1 invariant. Should be 4 errors.
     let errors: Vec<_> = cross_msgs.iter().filter(|m| m.is_error()).collect();
     assert_eq!(errors.len(), 4, "got: {errors:?}");
 }
@@ -152,8 +152,8 @@ sourceTypeID,yearID,ageID,ageFraction
         .as_any()
         .downcast_ref::<arrow::array::Int64Array>()
         .unwrap();
-    // Primary key is (sourceTypeID, yearID, ageID). Same sourceTypeID
-    // and yearID across all rows, so ages come out in ascending order.
+ // Primary key is (sourceTypeID, yearID, ageID). Same sourceTypeID
+ // and yearID across all rows, so ages come out in ascending order.
     assert_eq!(
         (0..b.num_rows()).map(|i| age.value(i)).collect::<Vec<_>>(),
         vec![0, 1, 2]
@@ -178,6 +178,6 @@ yearID,sourceTypeID,sourceTypePopulation
         .iter()
         .filter(|m| matches!(m.severity, Severity::Warning))
         .collect();
-    // yearID and sourceTypeID are FK columns; each emits one warning.
+ // yearID and sourceTypeID are FK columns; each emits one warning.
     assert_eq!(warnings.len(), 2);
 }

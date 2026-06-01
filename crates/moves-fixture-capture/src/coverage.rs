@@ -1,12 +1,11 @@
-//! Phase 1 Task 9: aggregate fixture execution traces into a coverage map.
+//!: aggregate fixture execution traces into a coverage map.
 //!
-//! Phase 0 produces one [`ExecutionTrace`] per fixture as a sidecar to the
+//! produces one [`ExecutionTrace`] per fixture as a sidecar to the
 //! snapshot. This module rolls those per-fixture traces up into a
 //! suite-wide [`CoverageMap`]: for each Java class, SQL macro file, and Go
 //! calculator, how many fixtures invoke it, how many worker bundles
 //! reference it, and what fraction of the suite-wide statement workload it
-//! accounts for. The output drives Phase 3 calculator-port ordering —
-//! hot-path items first.
+//! accounts for. The output drives calculator-port ordering//! hot-path items first.
 //!
 //! ## Inputs
 //!
@@ -20,18 +19,18 @@
 //! ## Weighting
 //!
 //! The coverage map needs to answer "fraction of total execution time" but
-//! [`ExecutionTrace`] does not carry timings — Phase 0 instrumentation
+//! [`ExecutionTrace`] does not carry timings — instrumentation
 //! captures *which* code ran, not *for how long*. The map uses
 //! [`WorkerBundle::statement_count`](crate::trace::WorkerBundle::statement_count)
 //! as a proxy:
 //!
 //! * The **suite-wide weight** is the sum of `statement_count` across all
-//!   worker bundles of all fixtures.
+//! worker bundles of all fixtures.
 //! * An item's **statement weight** is the sum of `statement_count` over
-//!   every bundle that referenced it. A Java class loaded only via the JVM
-//!   class-load log (i.e. not seen in any bundle's `worker.sql`) gets
-//!   `statement_weight = 0` — the fixture-fraction column still captures
-//!   that it was reached.
+//! every bundle that referenced it. A Java class loaded only via the JVM
+//! class-load log (i.e. not seen in any bundle's `worker.sql`) gets
+//! `statement_weight = 0` — the fixture-fraction column still captures
+//! that it was reached.
 //!
 //! `statement_count` is a coarse proxy; the resulting ranking is meant for
 //! migration-ordering heuristics, not precise time accounting.
@@ -72,42 +71,42 @@ pub const COVERAGE_FILE: &str = "coverage-map.json";
 pub const TRACE_FILE: &str = "execution-trace.json";
 
 /// Cap for the cross-category `hot_paths` list. Top-N items by score
-/// across all three item kinds. Phase 3 will work down this list in order.
+/// across all three item kinds. will work down this list in order.
 pub const HOT_PATHS_LIMIT: usize = 50;
 
 /// Suite-wide coverage rollup. Sibling structure of [`ExecutionTrace`],
 /// but per-suite rather than per-fixture.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CoverageMap {
-    /// Schema version. Mirrors `ExecutionTrace::trace_version`'s role.
+ /// Schema version. Mirrors `ExecutionTrace::trace_version`'s role.
     pub coverage_version: String,
 
-    /// Number of fixtures aggregated into this map (i.e. number of
-    /// `execution-trace.json` files read).
+ /// Number of fixtures aggregated into this map (i.e. number of
+ /// `execution-trace.json` files read).
     pub total_fixtures: usize,
 
-    /// Suite-wide statement-count sum across every worker bundle of every
-    /// fixture. Denominator for `statement_weight_fraction`.
+ /// Suite-wide statement-count sum across every worker bundle of every
+ /// fixture. Denominator for `statement_weight_fraction`.
     pub total_statement_weight: usize,
 
-    /// One entry per source trace, sorted alphabetically by `fixture_name`.
-    /// Lets consumers correlate suite-level aggregates back to the
-    /// per-fixture inputs without re-reading the traces.
+ /// One entry per source trace, sorted alphabetically by `fixture_name`.
+ /// Lets consumers correlate suite-level aggregates back to the
+ /// per-fixture inputs without re-reading the traces.
     pub fixtures: Vec<FixtureSummary>,
 
-    /// Java class coverage, sorted by descending `score` with `name` as
-    /// the deterministic tiebreaker.
+ /// Java class coverage, sorted by descending `score` with `name` as
+ /// the deterministic tiebreaker.
     pub java_classes: Vec<JavaClassCoverage>,
 
-    /// SQL macro/template file coverage, sorted by descending `score`
-    /// with `id` as the tiebreaker.
+ /// SQL macro/template file coverage, sorted by descending `score`
+ /// with `id` as the tiebreaker.
     pub sql_files: Vec<ItemCoverage>,
 
-    /// Go calculator coverage, sorted by descending `score` with `id` as
-    /// the tiebreaker.
+ /// Go calculator coverage, sorted by descending `score` with `id` as
+ /// the tiebreaker.
     pub go_calculators: Vec<ItemCoverage>,
 
-    /// Flat, cross-category migration-ordering hint.
+ /// Flat, cross-category migration-ordering hint.
     pub hot_paths: Vec<HotPath>,
 }
 
@@ -115,24 +114,24 @@ pub struct CoverageMap {
 /// just enough of the trace to identify it back to its snapshot.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FixtureSummary {
-    /// Mirrors `ExecutionTrace::fixture_name`.
+ /// Mirrors `ExecutionTrace::fixture_name`.
     pub fixture_name: String,
-    /// Mirrors `ExecutionTrace::sif_sha256`.
+ /// Mirrors `ExecutionTrace::sif_sha256`.
     pub sif_sha256: String,
-    /// Mirrors `ExecutionTrace::runspec_sha256`.
+ /// Mirrors `ExecutionTrace::runspec_sha256`.
     pub runspec_sha256: String,
-    /// Mirrors `ExecutionTrace::trace_version` — surfaced in case the
-    /// suite has a mix of trace schema versions during a transition.
+ /// Mirrors `ExecutionTrace::trace_version` — surfaced in case the
+ /// suite has a mix of trace schema versions during a transition.
     pub trace_version: String,
-    /// `ExecutionTrace::java_classes.len()`.
+ /// `ExecutionTrace::java_classes.len()`.
     pub java_class_count: usize,
-    /// `ExecutionTrace::sql_files.len()`.
+ /// `ExecutionTrace::sql_files.len()`.
     pub sql_file_count: usize,
-    /// `ExecutionTrace::go_calculators.len()`.
+ /// `ExecutionTrace::go_calculators.len()`.
     pub go_calculator_count: usize,
-    /// `ExecutionTrace::worker_bundles.len()`.
+ /// `ExecutionTrace::worker_bundles.len()`.
     pub worker_bundle_count: usize,
-    /// Sum of `worker_bundles[].statement_count`.
+ /// Sum of `worker_bundles[].statement_count`.
     pub statement_count: usize,
 }
 
@@ -140,33 +139,33 @@ pub struct FixtureSummary {
 /// the generic [`ItemCoverage`] columns.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct JavaClassCoverage {
-    /// Fully qualified Java class name (e.g.
-    /// `gov.epa.otaq.moves.master.calculator.BaseRateCalculator`).
+ /// Fully qualified Java class name (e.g.
+ /// `gov.epa.otaq.moves.master.calculator.BaseRateCalculator`).
     pub name: String,
-    /// Hierarchy tag from the underlying [`JavaClass::kind`](crate::trace::JavaClass::kind).
-    /// One of `calculator`, `generator`, `framework`, `worker`, `master`,
-    /// `common`, `utils`, `other`.
+ /// Hierarchy tag from the underlying [`JavaClass::kind`](crate::trace::JavaClass::kind).
+ /// One of `calculator`, `generator`, `framework`, `worker`, `master`,
+ /// `common`, `utils`, `other`.
     pub kind: String,
-    /// Number of distinct fixtures whose trace contains this class.
+ /// Number of distinct fixtures whose trace contains this class.
     pub fixture_count: usize,
-    /// `fixture_count / total_fixtures`. `0.0` when there are no
-    /// fixtures.
+ /// `fixture_count / total_fixtures`. `0.0` when there are no
+ /// fixtures.
     pub fixture_fraction: f64,
-    /// Fixture names that contain this class, sorted alphabetically.
+ /// Fixture names that contain this class, sorted alphabetically.
     pub fixtures: Vec<String>,
-    /// Number of `(fixture, worker_bundle)` pairs that referenced this
-    /// class in their `worker.sql`. Class-load-log-only references count
-    /// 0 here.
+ /// Number of `(fixture, worker_bundle)` pairs that referenced this
+ /// class in their `worker.sql`. Class-load-log-only references count
+ /// 0 here.
     pub bundle_count: usize,
-    /// Sum of `worker_bundles[].statement_count` for the bundles in
-    /// `bundle_count`. Proxy for time spent in code paths that reference
-    /// this class.
+ /// Sum of `worker_bundles[].statement_count` for the bundles in
+ /// `bundle_count`. Proxy for time spent in code paths that reference
+ /// this class.
     pub statement_weight: usize,
-    /// `statement_weight / total_statement_weight`. `0.0` when the suite
-    /// has no statements (e.g. empty suite).
+ /// `statement_weight / total_statement_weight`. `0.0` when the suite
+ /// has no statements (e.g. empty suite).
     pub statement_weight_fraction: f64,
-    /// `(fixture_fraction + statement_weight_fraction) / 2`. Used for the
-    /// ranking; high score = high migration priority.
+ /// `(fixture_fraction + statement_weight_fraction) / 2`. Used for the
+ /// ranking; high score = high migration priority.
     pub score: f64,
 }
 
@@ -174,25 +173,25 @@ pub struct JavaClassCoverage {
 /// the same shape; only the `id` semantics differ (path vs. name).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ItemCoverage {
-    /// Identifier: SQL path (`database/CalculatorSQL/...`) for SQL files,
-    /// calculator name for Go calculators.
+ /// Identifier: SQL path (`database/CalculatorSQL/...`) for SQL files,
+ /// calculator name for Go calculators.
     pub id: String,
-    /// Number of distinct fixtures that referenced this item.
+ /// Number of distinct fixtures that referenced this item.
     pub fixture_count: usize,
-    /// `fixture_count / total_fixtures`. `0.0` for empty suites.
+ /// `fixture_count / total_fixtures`. `0.0` for empty suites.
     pub fixture_fraction: f64,
-    /// Fixture names that referenced this item, sorted alphabetically.
+ /// Fixture names that referenced this item, sorted alphabetically.
     pub fixtures: Vec<String>,
-    /// Number of `(fixture, worker_bundle)` pairs that referenced this
-    /// item.
+ /// Number of `(fixture, worker_bundle)` pairs that referenced this
+ /// item.
     pub bundle_count: usize,
-    /// Sum of `worker_bundles[].statement_count` for the bundles in
-    /// `bundle_count`.
+ /// Sum of `worker_bundles[].statement_count` for the bundles in
+ /// `bundle_count`.
     pub statement_weight: usize,
-    /// `statement_weight / total_statement_weight`. `0.0` for empty
-    /// suites.
+ /// `statement_weight / total_statement_weight`. `0.0` for empty
+ /// suites.
     pub statement_weight_fraction: f64,
-    /// `(fixture_fraction + statement_weight_fraction) / 2`.
+ /// `(fixture_fraction + statement_weight_fraction) / 2`.
     pub score: f64,
 }
 
@@ -201,15 +200,15 @@ pub struct ItemCoverage {
 /// [`HOT_PATHS_LIMIT`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HotPath {
-    /// Item category. One of `java_class`, `sql_file`, `go_calculator`.
+ /// Item category. One of `java_class`, `sql_file`, `go_calculator`.
     pub kind: String,
-    /// Identifier — matches the per-category row's `name`/`id` column.
+ /// Identifier — matches the per-category row's `name`/`id` column.
     pub id: String,
-    /// Number of distinct fixtures that referenced this item.
+ /// Number of distinct fixtures that referenced this item.
     pub fixture_count: usize,
-    /// Statement-count weight (see [`ItemCoverage::statement_weight`]).
+ /// Statement-count weight (see [`ItemCoverage::statement_weight`]).
     pub statement_weight: usize,
-    /// Same score as the per-category row.
+ /// Same score as the per-category row.
     pub score: f64,
 }
 
@@ -359,8 +358,8 @@ fn aggregate_java_classes(
         }
         for bundle in &trace.worker_bundles {
             for cls in &bundle.java_classes {
-                *bundle_count_by_name.entry(cls.clone()).or_default() += 1;
-                *weight_by_name.entry(cls.clone()).or_default() += bundle.statement_count;
+ *bundle_count_by_name.entry(cls.clone()).or_default() += 1;
+ *weight_by_name.entry(cls.clone()).or_default() += bundle.statement_count;
             }
         }
     }
@@ -421,8 +420,8 @@ where
         }
         for bundle in &trace.worker_bundles {
             for id in bundle_ids(bundle) {
-                *bundle_count_by_id.entry(id.clone()).or_default() += 1;
-                *weight_by_id.entry(id.clone()).or_default() += bundle.statement_count;
+ *bundle_count_by_id.entry(id.clone()).or_default() += 1;
+ *weight_by_id.entry(id.clone()).or_default() += bundle.statement_count;
             }
         }
     }
@@ -523,7 +522,7 @@ mod tests {
 
     const TRACE_VERSION: &str = "moves-fixture-capture/v1";
 
-    /// `(id, java_classes, sql_files, go_calculators, statement_count)`.
+ /// `(id, java_classes, sql_files, go_calculators, statement_count)`.
     type BundleSpec<'a> = (&'a str, &'a [&'a str], &'a [&'a str], &'a [&'a str], usize);
 
     fn trace(
@@ -637,7 +636,7 @@ mod tests {
         assert_eq!(map.go_calculators.len(), 1);
         assert_eq!(map.go_calculators[0].id, "BaseRateCalculator");
 
-        // Hot paths span all three categories.
+ // Hot paths span all three categories.
         assert_eq!(map.hot_paths.len(), 3);
         assert!(map.hot_paths.iter().any(|h| h.kind == "java_class"));
         assert!(map.hot_paths.iter().any(|h| h.kind == "sql_file"));
@@ -646,7 +645,7 @@ mod tests {
 
     #[test]
     fn aggregates_fixture_membership_across_traces() {
-        // Two fixtures: one references BaseRate, the other references BaseRate + Criteria.
+ // Two fixtures: one references BaseRate, the other references BaseRate + Criteria.
         let t1 = trace(
             "f1",
             &[(
@@ -701,7 +700,7 @@ mod tests {
         assert_eq!(base.fixture_fraction, 1.0);
         assert_eq!(base.statement_weight, 150);
         assert_eq!(base.bundle_count, 2);
-        // 1.0 (everywhere) + 1.0 (all weight) / 2 = 1.0
+ // 1.0 (everywhere) + 1.0 (all weight) / 2 = 1.0
         assert_eq!(base.score, 1.0);
 
         let criteria = map
@@ -713,14 +712,14 @@ mod tests {
         assert_eq!(criteria.fixture_fraction, 0.5);
         assert_eq!(criteria.statement_weight, 50);
         assert!((criteria.statement_weight_fraction - 50.0 / 150.0).abs() < 1e-12);
-        // Sorted by descending score; BaseRate must precede Criteria.
+ // Sorted by descending score; BaseRate must precede Criteria.
         assert_eq!(map.java_classes[0].name, base.name);
     }
 
     #[test]
     fn class_load_only_class_gets_zero_weight_but_nonzero_coverage() {
-        // The Java class is in the top-level java_classes list (came from
-        // a class-load log) but not in any bundle's worker.sql refs.
+ // The Java class is in the top-level java_classes list (came from
+ // a class-load log) but not in any bundle's worker.sql refs.
         let t = trace(
             "f1",
             &[("gov.epa.otaq.moves.utils.FileUtil", "utils")],
@@ -744,8 +743,8 @@ mod tests {
 
     #[test]
     fn sorted_by_score_descending_with_id_tiebreak() {
-        // Two SQL files with identical coverage but different paths must
-        // come back sorted by path alphabetically when scores tie.
+ // Two SQL files with identical coverage but different paths must
+ // come back sorted by path alphabetically when scores tie.
         let t = trace(
             "f1",
             &[],
@@ -770,7 +769,7 @@ mod tests {
 
     #[test]
     fn hot_paths_truncated_to_limit() {
-        // Build a single trace with > HOT_PATHS_LIMIT distinct SQL files.
+ // Build a single trace with > HOT_PATHS_LIMIT distinct SQL files.
         let n = HOT_PATHS_LIMIT + 10;
         let sql_ids: Vec<String> = (0..n).map(|i| format!("database/f{i:04}.sql")).collect();
         let sql_pairs: Vec<(&str, &[&str])> = sql_ids
@@ -857,15 +856,15 @@ mod tests {
             &[],
         );
 
-        // Subdir with trace.
+ // Subdir with trace.
         std::fs::create_dir_all(dir.path().join("a")).unwrap();
         let json = serde_json::to_vec_pretty(&t).unwrap();
         std::fs::write(dir.path().join("a").join(TRACE_FILE), json).unwrap();
 
-        // Subdir without trace — must be skipped.
+ // Subdir without trace — must be skipped.
         std::fs::create_dir_all(dir.path().join("b")).unwrap();
 
-        // Non-directory at root — must be ignored.
+ // Non-directory at root — must be ignored.
         std::fs::write(dir.path().join("README.md"), b"hi").unwrap();
 
         let got = read_traces_dir(dir.path()).unwrap();
@@ -900,7 +899,7 @@ mod tests {
 
     #[test]
     fn hot_paths_rank_high_coverage_over_low_coverage() {
-        // Three classes: one ubiquitous + heavy, one ubiquitous + light, one rare.
+ // Three classes: one ubiquitous + heavy, one ubiquitous + light, one rare.
         let t1 = trace(
             "f1",
             &[
@@ -965,20 +964,20 @@ mod tests {
             ],
         );
         let map = build_coverage_map(&[t1, t2]);
-        // Top hot path must be BaseRateCalculator (in every fixture, all heavy bundles).
+ // Top hot path must be BaseRateCalculator (in every fixture, all heavy bundles).
         let top = &map.hot_paths[0];
         assert_eq!(top.kind, "java_class");
         assert!(top.id.ends_with("BaseRateCalculator"));
-        // LightHelper appears in every fixture too but with less weight than BaseRate?
-        // Actually LightHelper has identical bundle membership to BaseRate here so
-        // it should tie with BaseRate on score; the deterministic tiebreaker is the id.
-        // BaseRateCalculator < LightHelper alphabetically, so BaseRate comes first.
+ // LightHelper appears in every fixture too but with less weight than BaseRate?
+ // Actually LightHelper has identical bundle membership to BaseRate here so
+ // it should tie with BaseRate on score; the deterministic tiebreaker is the id.
+ // BaseRateCalculator < LightHelper alphabetically, so BaseRate comes first.
         assert_eq!(
             map.hot_paths[1].id,
             "gov.epa.otaq.moves.master.calculator.LightHelper"
         );
-        // Rare edge case should be later: only 1 fixture (0.5 fraction) and only 10
-        // statements (10/1110 ≈ 0.009 fraction) — score ≈ 0.255.
+ // Rare edge case should be later: only 1 fixture (0.5 fraction) and only 10
+ // statements (10/1110 ≈ 0.009 fraction) — score ≈ 0.255.
         let rare_pos = map
             .hot_paths
             .iter()

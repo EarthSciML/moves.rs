@@ -1,4 +1,4 @@
-//! NONROAD `BLOCK DATA` static tables — `blknon.f` (Task 114).
+//! NONROAD `BLOCK DATA` static tables — `blknon.f`.
 //!
 //! Fortran's `BLOCK DATA` program unit initialises named COMMON-block
 //! variables at load time. `blknon.f` is NONROAD's: it seeds the
@@ -13,34 +13,31 @@
 //! owns them:
 //!
 //! * **All-zero / all-false arrays** — `ndtfac` (`MXPOL*0`), `ldays`
-//!   (`2*.FALSE.`), `lmonth` (`12*.FALSE.`), and the SI-report
-//!   accumulators `popsi`/`actsi`/`fuelsi`/`emissi`. A Rust `Vec` or
-//!   array gets these from `Default`; the SI accumulator's zero state
-//!   is [`crate::output::si_report::SiReport::default`].
+//! (`2*.FALSE.`), `lmonth` (`12*.FALSE.`), and the SI-report
+//! accumulators `popsi`/`actsi`/`fuelsi`/`emissi`. A Rust `Vec` or
+//! array gets these from `Default`; the SI accumulator's zero state
+//! is [`crate::output::si_report::SiReport::default`].
 //! * **`hpclev`** — the 18 horsepower-category boundaries are already
-//!   ported as [`crate::output::find::HPCLEV`] (Task 101); they are
-//!   not duplicated here.
+//! ported as [`crate::output::find::HPCLEV`]; they are
+//! not duplicated here.
 //! * **Scratch filenames** — [`SCRATCH_POP_FILE`], [`SCRATCH_IND_FILE`]
-//!   and [`SCRATCH_GRW_FILE`] are kept as documentation of the legacy
-//!   names, but the Rust port has no on-disk scratch files (the I/O
-//!   policy of `ARCHITECTURE.md` § 4.3 passes in-memory buffers), so
-//!   nothing reads them at runtime.
+//! and [`SCRATCH_GRW_FILE`] are kept as documentation of the legacy
+//! names, but the Rust port has no on-disk scratch files (the I/O
+//! policy of `ARCHITECTURE.md` § 4.3 passes in-memory buffers), so
+//! nothing reads them at runtime.
 
 use crate::common::consts::MXPOL;
 
-/// Legacy scratch-file name for the sorted population data —
-/// `blknon.f` `data spopfl /'poptmp.txt'/`.
+/// Legacy scratch-file name for the sorted population data/// `blknon.f` `data spopfl /'poptmp.txt'/`.
 ///
 /// The Rust port keeps reference data in memory and never writes this
 /// file; the constant documents the original name only.
 pub const SCRATCH_POP_FILE: &str = "poptmp.txt";
 
-/// Legacy scratch-file name for the spatial-indicator data —
-/// `blknon.f` `data indfl /'indtmp.txt'/`.
+/// Legacy scratch-file name for the spatial-indicator data/// `blknon.f` `data indfl /'indtmp.txt'/`.
 pub const SCRATCH_IND_FILE: &str = "indtmp.txt";
 
-/// Legacy scratch-file name for the growth-indicator data —
-/// `blknon.f` `data grwfl /'grwtmp.txt'/`.
+/// Legacy scratch-file name for the growth-indicator data/// `blknon.f` `data grwfl /'grwtmp.txt'/`.
 pub const SCRATCH_GRW_FILE: &str = "grwtmp.txt";
 
 /// Season index for each month — `blknon.f` `data idseas /…/`.
@@ -203,8 +200,8 @@ mod tests {
 
     #[test]
     fn si_index_groups_threes_into_fourteen_bins() {
-        // Each consecutive run of three input codes shares one bin,
-        // and the bins run 1..=14.
+ // Each consecutive run of three input codes shares one bin,
+ // and the bins run 1..=14.
         for (i, &bin) in SI_INDEX.iter().enumerate() {
             assert_eq!(bin as usize, i / 3 + 1);
         }
@@ -224,10 +221,10 @@ mod tests {
         assert_eq!(POLLUTANT_NAMES.len(), MXPOL);
         assert_eq!(POLLUTANT_AMS_NAMES.len(), MXPOL);
         assert_eq!(POLLUTANT_SAROAD.len(), MXPOL);
-        // The hydrocarbon family carries the THC criteria pollutant.
+ // The hydrocarbon family carries the THC criteria pollutant.
         assert_eq!(POLLUTANT_AMS_NAMES[6], "THC"); // crankcase
         assert_eq!(POLLUTANT_SAROAD[6], 43101); // crankcase = ISCTHC
-                                                // CO2 is left uninitialised by blknon.f.
+ // CO2 is left uninitialised by blknon.f.
         assert_eq!(POLLUTANT_SAROAD[3], 0);
     }
 }

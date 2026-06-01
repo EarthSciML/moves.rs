@@ -247,7 +247,7 @@ mod tests {
             lines[0],
             "sourceTypeID,modelYearID,fuelTypeID,engTechID,fuelEngFraction"
         );
-        // canonical row order: (11, 2020, 1, 1), (11, 2020, 2, 1), (21, 2020, 1, 1)
+ // canonical row order: (11, 2020, 1, 1), (11, 2020, 2, 1), (21, 2020, 1, 1)
         assert_eq!(lines[1], "11,2020,1,1,0.7");
         assert_eq!(lines[2], "11,2020,2,1,0.3");
         assert_eq!(lines[3], "21,2020,1,1,0.7");

@@ -5,16 +5,16 @@
 //!
 //! ```sql
 //! CREATE TABLE NREngTechFraction (
-//!   sourceTypeID    smallint(6) NOT NULL,
-//!   modelYearID     smallint(6) NOT NULL,
-//!   processID       smallint(6) NOT NULL,
-//!   engTechID       smallint(6) NOT NULL,
-//!   NREngTechFraction float     NOT NULL,
-//!   PRIMARY KEY (sourceTypeID, modelYearID, processID, engTechID)
+//! sourceTypeID smallint(6) NOT NULL,
+//! modelYearID smallint(6) NOT NULL,
+//! processID smallint(6) NOT NULL,
+//! engTechID smallint(6) NOT NULL,
+//! NREngTechFraction float NOT NULL,
+//! PRIMARY KEY (sourceTypeID, modelYearID, processID, engTechID)
 //! )
 //! ```
 //!
-//! "Age distribution" in the Phase 4 task description maps onto this
+//! "Age distribution" in the task description maps onto this
 //! table because a Nonroad equipment cohort is identified by its
 //! `modelYearID`; the per-(sourceTypeID, modelYearID, processID) total
 //! over `engTechID` is the engine-technology distribution at that age.
@@ -22,13 +22,13 @@
 //! Validation rules:
 //!
 //! * `modelYearID` is bounded `[1950, 2099]`. The wider bound matches
-//!   default-DB coverage (model-year fidelity tests use `2024..=2031`).
+//! default-DB coverage (model-year fidelity tests use `2024..=2031`).
 //! * `processID` is bounded `[1, 99]` (MOVES process IDs).
 //! * `NREngTechFraction` is `[0, 1]` per cell.
 //! * **Cross-row invariant:** the engTechID fractions must sum to 1.0
-//!   per (sourceTypeID, modelYearID, processID) tuple — this matches
-//!   the MOVES NREngTechFraction summation rule that NEIQA assumes
-//!   downstream.
+//! per (sourceTypeID, modelYearID, processID) tuple — this matches
+//! the MOVES NREngTechFraction summation rule that NEIQA assumes
+//! downstream.
 
 use arrow::datatypes::DataType;
 

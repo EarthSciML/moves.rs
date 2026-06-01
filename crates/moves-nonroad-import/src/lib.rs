@@ -1,4 +1,4 @@
-//! `moves-nonroad-import` — Phase 4 Task 85.
+//! `moves-nonroad-import` —.
 //!
 //! Convert user-supplied Nonroad-input CSV templates into the same
 //! Parquet layout the default-DB converter (`moves-default-db-convert`)
@@ -11,30 +11,30 @@
 //! Per importer, in order:
 //!
 //! 1. **Read.** [`csv::read_csv`] parses the user's `<table>.csv` into a
-//!    [`csv::CsvFile`].
+//! [`csv::CsvFile`].
 //! 2. **Validate.** [`convert::convert_table`] verifies the header,
-//!    coerces every cell into a typed [`parquet_writer::Cell`], runs
-//!    per-cell rules (see [`schema::Rule`]), checks for duplicate
-//!    primary keys, and applies cross-row invariants (currently
-//!    [`schema::CrossRowInvariant::FractionSum`]).
+//! coerces every cell into a typed [`parquet_writer::Cell`], runs
+//! per-cell rules (see [`schema::Rule`]), checks for duplicate
+//! primary keys, and applies cross-row invariants (currently
+//! [`schema::CrossRowInvariant::FractionSum`]).
 //! 3. **Write.** [`parquet_writer::encode_parquet`] serialises the
-//!    typed rows into a deterministic Parquet byte buffer; the
-//!    orchestrator atomically writes it to disk.
+//! typed rows into a deterministic Parquet byte buffer; the
+//! orchestrator atomically writes it to disk.
 //! 4. **Manifest.** A [`manifest::Manifest`] (schema tag
-//!    `moves-nonroad-import-manifest/v1`) sits next to the Parquet
-//!    files so a downstream loader can discover what's present without
-//!    walking the directory.
+//! `moves-nonroad-import-manifest/v1`) sits next to the Parquet
+//! files so a downstream loader can discover what's present without
+//! walking the directory.
 //!
 //! ## Built-in importers
 //!
-//! Phase 4 Task 85 names four importers:
+//! names four importers:
 //!
-//! | Importer (table)        | What it carries                                |
+//! | Importer (table) | What it carries |
 //! |-------------------------|------------------------------------------------|
 //! | `nrbaseyearequippopulation` | Base-year equipment population by source × state |
-//! | `nrengtechfraction`        | Engine-technology fraction by model year (the Nonroad analogue of on-road `AgeDistribution`) |
-//! | `nrretrofitfactors`        | Retrofit annual & effective fractions by SCC × engTech × hp × pollutant × retrofitID |
-//! | `nrmonthallocation`        | Per-equipment monthly allocation fractions by state |
+//! | `nrengtechfraction` | Engine-technology fraction by model year (the Nonroad analogue of on-road `AgeDistribution`) |
+//! | `nrretrofitfactors` | Retrofit annual & effective fractions by SCC × engTech × hp × pollutant × retrofitID |
+//! | `nrmonthallocation` | Per-equipment monthly allocation fractions by state |
 //!
 //! ## Caller
 //!
@@ -46,8 +46,8 @@
 //! # Ok::<(), moves_nonroad_import::Error>(())
 //! ```
 //!
-//! See `moves-rust-migration-plan.md` Task 85 and the sibling crate
-//! `moves-default-db-convert` (Task 80) for the matching default-DB
+//! See `moves-rust-.md` and the sibling crate
+//! `moves-default-db-convert` for the matching default-DB
 //! pipeline.
 
 pub mod convert;

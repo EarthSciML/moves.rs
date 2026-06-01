@@ -3,29 +3,29 @@
 //! Every bucket-A calculator follows the same three-step shape:
 //!
 //! ```text
-//! 1. build_inputs(ctx)        — read tables, apply position filters
-//! 2. kernel(&inputs)          — run the calculator algorithm
-//! 3. emit_rows(rows)          — convert output rows to CalculatorOutput
+//! 1. build_inputs(ctx) — read tables, apply position filters
+//! 2. kernel(&inputs) — run the calculator algorithm
+//! 3. emit_rows(rows) — convert output rows to CalculatorOutput
 //! ```
 //!
 //! Every generator follows a parallel shape:
 //!
 //! ```text
-//! 1. build_inputs(ctx)        — read tables from ctx.tables()
-//! 2. kernel(&inputs)          — run the generator algorithm
+//! 1. build_inputs(ctx) — read tables from ctx.tables()
+//! 2. kernel(&inputs) — run the generator algorithm
 //! 3. write_scratch_table(ctx) — write output rows to ctx.scratch()
 //! ```
 //!
 //! This module provides the non-calculator-specific glue:
 //!
 //! * [`position_filter`] — extract the master-loop position as a set of
-//!   optional `i32` column predicates.
+//! optional `i32` column predicates.
 //! * [`PositionFilter::matches`] — test a `(year, county, process)` triple
-//!   against the extracted filters.
+//! against the extracted filters.
 //! * [`emit_rows`] — convert any `IntoDataFrame` row vector into a
-//!   [`CalculatorOutput`] wrapping a `MOVESWorkerOutput` `DataFrame`.
+//! [`CalculatorOutput`] wrapping a `MOVESWorkerOutput` `DataFrame`.
 //! * [`write_scratch_table`] — convert a row vector to a `DataFrame` and
-//!   store it in the scratch namespace.
+//! store it in the scratch namespace.
 //!
 //! All helpers are `pub(crate)` — they are implementation detail shared across
 //! calculators and generators, not part of the public API.
@@ -43,21 +43,21 @@ use moves_framework::{CalculatorContext, CalculatorOutput, Error, IntoDataFrame,
 /// test individual rows from an iterator.
 #[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct PositionFilter {
-    /// `yearID` predicate, derived from `ctx.position().time.year`.
+ /// `yearID` predicate, derived from `ctx.position().time.year`.
     pub year: Option<i32>,
-    /// `processID` predicate, derived from `ctx.position().process_id`.
+ /// `processID` predicate, derived from `ctx.position().process_id`.
     pub process_id: Option<i32>,
-    /// `countyID` predicate, derived from `ctx.position().location.county_id`.
+ /// `countyID` predicate, derived from `ctx.position().location.county_id`.
     pub county_id: Option<i32>,
 }
 
 impl PositionFilter {
-    /// Returns `true` when a row with the given `(year_id, county_id,
-    /// process_id)` values satisfies every concrete predicate.
-    ///
-    /// A `None` field is treated as a wildcard — the row always passes on
-    /// that dimension. Call once per row in the `MOVESWorkerOutput` position
-    /// filter inside each calculator's `build_inputs`.
+ /// Returns `true` when a row with the given `(year_id, county_id,
+ /// process_id)` values satisfies every concrete predicate.
+ ///
+ /// A `None` field is treated as a wildcard — the row always passes on
+ /// that dimension. Call once per row in the `MOVESWorkerOutput` position
+ /// filter inside each calculator's `build_inputs`.
     pub(crate) fn matches(&self, year_id: i32, county_id: i32, process_id: i32) -> bool {
         self.year.map_or(true, |y| y == year_id)
             && self.county_id.map_or(true, |c| c == county_id)

@@ -6,10 +6,10 @@
 //! threads:
 //!
 //! 1. Per-state population (`popsta(idx)`) — either allocated from the
-//!    national total (via [`crate::allocation::allocate_state`]) or
-//!    set directly from `popeqp(icurec)` when `idxsta > 0`.
+//! national total (via [`crate::allocation::allocate_state`]) or
+//! set directly from `popeqp(icurec)` when `idxsta > 0`.
 //! 2. Per-state model-year × tech × exhaust + evap iterations,
-//!    identical in structure to `prcus.f`.
+//! identical in structure to `prcus.f`.
 //!
 //! The Rust port shares the structured-output and callback-trait
 //! design from [`super::prcus`]. The trait is renamed to
@@ -21,18 +21,18 @@
 //!
 //! - `popus -> popsta(idx)` everywhere.
 //! - State loop wraps everything from `daymthf` onward; lookups that
-//!   take a FIPS code are now per-state (`statcd(idx)`).
+//! take a FIPS code are now per-state (`statcd(idx)`).
 //! - The per-state-loop body precomputes per-model-year evap data
-//!   (rfmode, tank, tfull, …) before the state loop so it stays
-//!   independent of state — see `prcnat.f` :363–:478.
+//! (rfmode, tank, tfull, …) before the state loop so it stays
+//! independent of state — see `prcnat.f` :363–:478.
 //! - The model-year inner loop is essentially the same as `prcus.f`'s
-//!   except for the state index in `popsta(idx)`.
+//! except for the state index in `popsta(idx)`.
 //! - A "state has its own records" skip (`lstlev(idx)`) early-returns
-//!   from the per-state body without emitting output (see
-//!   `prcnat.f` :490–:492).
+//! from the per-state body without emitting output (see
+//! `prcnat.f` :490–:492).
 //! - The allocation step at the top (`alosta`) is skipped when
-//!   `idxsta > 0`; `nstarc(idxsta)` is bumped instead and the state
-//!   gets `grwsta = 1.0` (see `prcnat.f` :311–:315).
+//! `idxsta > 0`; `nstarc(idxsta)` is bumped instead and the state
+//! gets `grwsta = 1.0` (see `prcnat.f` :311–:315).
 //!
 //! Numerical-fidelity policy: same as [`super::prcus`] — all
 //! arithmetic stays in `f32` and the order of operations preserves
@@ -57,14 +57,14 @@ use crate::{Error, Result};
 /// is called with a national-record marker.
 #[derive(Debug, Clone, PartialEq)]
 pub struct StateAllocationOutcome {
-    /// Per-state population allocations. Indexed parallel to the
-    /// `StateDescriptor` slice supplied to the routine.
+ /// Per-state population allocations. Indexed parallel to the
+ /// `StateDescriptor` slice supplied to the routine.
     pub populations: Vec<f32>,
-    /// Per-state growth values. Same indexing.
+ /// Per-state growth values. Same indexing.
     pub growth: Vec<f32>,
-    /// `true` iff at least one state got non-zero population
-    /// (Fortran `luse`); the Fortran source uses it to gate counting
-    /// the allocation as "used."
+ /// `true` iff at least one state got non-zero population
+ /// (Fortran `luse`); the Fortran source uses it to gate counting
+ /// the allocation as "used."
     pub used: bool,
 }
 
@@ -74,13 +74,13 @@ pub struct StateAllocationOutcome {
 /// Method names mirror the Fortran routines they replace; the
 /// per-state lookups take an explicit FIPS argument.
 pub trait NationalCallbacks {
-    /// `fndasc(asccod, ascalo, nalorc)` — national-to-state
-    /// allocation entry. `None` triggers
-    /// [`GeographyError::AllocationNotFound`].
+ /// `fndasc(asccod, ascalo, nalorc)` — national-to-state
+ /// allocation entry. `None` triggers
+ /// [`GeographyError::AllocationNotFound`].
     fn find_allocation(&mut self, scc: &str) -> Option<()>;
-    /// `alosta(..)` — perform the national-to-state allocation. The
-    /// callback owns the allocation table; the result is returned as
-    /// [`StateAllocationOutcome`].
+ /// `alosta(..)` — perform the national-to-state allocation. The
+ /// callback owns the allocation table; the result is returned as
+ /// [`StateAllocationOutcome`].
     fn allocate_to_states(
         &mut self,
         scc: &str,
@@ -88,31 +88,31 @@ pub trait NationalCallbacks {
         national_population: f32,
         growth: f32,
     ) -> Result<StateAllocationOutcome>;
-    /// `fndtch(scc, hp_avg, tech_year)`.
+ /// `fndtch(scc, hp_avg, tech_year)`.
     fn find_exhaust_tech(&mut self, scc: &str, hp_avg: f32, year: i32)
         -> Option<ExhaustTechLookup>;
-    /// `fndevtch(scc, hp_avg, tech_year)`.
+ /// `fndevtch(scc, hp_avg, tech_year)`.
     fn find_evap_tech(&mut self, scc: &str, hp_avg: f32, year: i32) -> Option<EvapTechLookup>;
-    /// `fndgxf(state_fips, scc, hp_avg)`.
+ /// `fndgxf(state_fips, scc, hp_avg)`.
     fn find_growth_xref(&mut self, fips: &str, scc: &str, hp_avg: f32) -> Option<i32>;
-    /// `fndact(scc, state_fips, hp_avg)`.
+ /// `fndact(scc, state_fips, hp_avg)`.
     fn find_activity(&mut self, scc: &str, fips: &str, hp_avg: f32) -> Option<ActivityLookup>;
-    /// `daymthf(scc, state_fips)`.
+ /// `daymthf(scc, state_fips)`.
     fn day_month_factor(&mut self, scc: &str, fips: &str) -> DayMonthFactor;
-    /// `getgrw(indcod)`.
+ /// `getgrw(indcod)`.
     fn load_growth(&mut self, _indcod: i32) -> Result<()> {
         Ok(())
     }
-    /// `grwfac(year1, year2, fips, indcod)`.
+ /// `grwfac(year1, year2, fips, indcod)`.
     fn growth_factor(&mut self, year1: i32, year2: i32, fips: &str, indcod: i32) -> Result<f32>;
-    /// `modyr(..)` — per-state initial age-distribution.
+ /// `modyr(..)` — per-state initial age-distribution.
     fn model_year(
         &mut self,
         eq: &EquipmentRecord,
         activity: &ActivityLookup,
         growth_factor: f32,
     ) -> Result<ModelYearOutput>;
-    /// `agedist(..)` — grow the age distribution + base population.
+ /// `agedist(..)` — grow the age distribution + base population.
     #[allow(clippy::too_many_arguments)]
     fn age_distribution(
         &mut self,
@@ -124,13 +124,13 @@ pub trait NationalCallbacks {
         fips: &str,
         indcod: i32,
     ) -> Result<f32>;
-    /// `fndrtrft(1, scc, hp_avg)`.
+ /// `fndrtrft(1, scc, hp_avg)`.
     fn filter_retrofits_by_scc_hp(&mut self, scc: &str, hp_avg: f32) -> Result<()>;
-    /// `fndrtrft(2, year)`.
+ /// `fndrtrft(2, year)`.
     fn filter_retrofits_by_year(&mut self, year: i32) -> Result<()>;
-    /// `fndrtrft(3, tech)`.
+ /// `fndrtrft(3, tech)`.
     fn filter_retrofits_by_tech(&mut self, tech: &str) -> Result<()>;
-    /// `clcrtrft(..)`.
+ /// `clcrtrft(..)`.
     fn calculate_retrofit(
         &mut self,
         pop: f32,
@@ -139,9 +139,9 @@ pub trait NationalCallbacks {
         model_year: i32,
         tech: &str,
     ) -> Result<RetrofitResult>;
-    /// `clcems(..)` for exhaust emissions.
+ /// `clcems(..)` for exhaust emissions.
     fn calculate_exhaust(&mut self, inputs: &ExhaustCallInputs<'_>) -> Result<ExhaustResult>;
-    /// `clcevems(..)` for evap emissions.
+ /// `clcevems(..)` for evap emissions.
     fn calculate_evap(&mut self, inputs: &EvapCallInputs<'_>) -> Result<EvapResult>;
 }
 
@@ -149,23 +149,23 @@ pub trait NationalCallbacks {
 /// the inputs that don't depend on per-state state.
 #[derive(Debug, Clone)]
 pub struct NationalContext<'a> {
-    /// Per-record equipment data.
+ /// Per-record equipment data.
     pub equipment: EquipmentRecord,
-    /// Run-time options.
+ /// Run-time options.
     pub run_options: RunOptions,
-    /// 10-character SCC for the current iteration.
+ /// 10-character SCC for the current iteration.
     pub scc: &'a str,
-    /// HP-level table (`hpclev`).
+ /// HP-level table (`hpclev`).
     pub hp_levels: &'a [f32],
-    /// State descriptors (FIPS + `lstacd` + `lstlev` parallel).
+ /// State descriptors (FIPS + `lstacd` + `lstlev` parallel).
     pub states: &'a [StateDescriptor],
-    /// 1-based state index (`idxsta`). `0` or negative encodes
-    /// "national record" — triggers the `alosta` allocation; positive
-    /// encodes "state record" — only the given state is processed.
+ /// 1-based state index (`idxsta`). `0` or negative encodes
+ /// "national record" — triggers the `alosta` allocation; positive
+ /// encodes "state record" — only the given state is processed.
     pub state_index: i32,
-    /// Pre-fetched growth value passed by the caller (`growth`
-    /// argument in Fortran). `-9.0` means "not yet computed" and is
-    /// passed through to the allocation callback.
+ /// Pre-fetched growth value passed by the caller (`growth`
+ /// argument in Fortran). `-9.0` means "not yet computed" and is
+ /// passed through to the allocation callback.
     pub growth_hint: f32,
 }
 
@@ -178,11 +178,11 @@ pub struct NationalContext<'a> {
 /// Errors:
 ///
 /// - [`GeographyError::AllocationNotFound`] when the SCC lacks
-///   national-to-state allocation coefficients.
+/// national-to-state allocation coefficients.
 /// - [`GeographyError::GrowthFileMissing`] when the run requested
-///   growth-dependent processing without loading `/GROWTH FILES/`.
+/// growth-dependent processing without loading `/GROWTH FILES/`.
 /// - [`GeographyError::GrowthIndicatorNotFound`] when a state's
-///   growth cross-reference lookup fails.
+/// growth cross-reference lookup fails.
 /// - any error propagated from a callback.
 pub fn process_national_record(
     ctx: &NationalContext<'_>,
@@ -198,15 +198,15 @@ pub fn process_national_record(
         ..Default::default()
     };
 
-    // --- HP level (prcnat.f :252–:265) ---
+ // --- HP level (prcnat.f :252–:265) ---
     let hpmid = (eq.hp_range_min + eq.hp_range_max) / 2.0;
     let hplev = hp_level_for_midpoint(hpmid, ctx.hp_levels);
     let hpval = eq.hp_avg;
 
     let popus = eq.population;
 
-    // --- zero-population: emit a zero record per selected state and
-    //     return (prcnat.f :268–:280) ---
+ // --- zero-population: emit a zero record per selected state and
+ // return (prcnat.f :268–:280) ---
     if popus <= 0.0 {
         for state in ctx.states {
             if !state.selected {
@@ -231,14 +231,14 @@ pub fn process_national_record(
         return Ok(output);
     }
 
-    // --- per-state population + growth setup (prcnat.f :283–:315) ---
-    // Either allocate from the national total via `alosta`, or assign
-    // the full population to a single state.
+ // --- per-state population + growth setup (prcnat.f :283–:315) ---
+ // Either allocate from the national total via `alosta`, or assign
+ // the full population to a single state.
     let mut popsta = vec![0.0_f32; ctx.states.len()];
     let mut grwsta = vec![1.0_f32; ctx.states.len()];
 
     if ctx.state_index <= 0 {
-        // National record — call alosta to spread popus across states.
+ // National record — call alosta to spread popus across states.
         if callbacks.find_allocation(scc).is_none() {
             return Err(Error::Config(
                 GeographyError::AllocationNotFound {
@@ -274,7 +274,7 @@ pub fn process_national_record(
         output.state_record_counts[idx] += 1;
     }
 
-    // --- tech sanity check at the run's tech_year (prcnat.f :320–:345) ---
+ // --- tech sanity check at the run's tech_year (prcnat.f :320–:345) ---
     let tech_at_tech_year = callbacks.find_exhaust_tech(scc, hpval, opt.tech_year);
     if tech_at_tech_year.is_none() {
         output.warnings.push(GeographyWarning::MissingExhaustTech {
@@ -294,18 +294,18 @@ pub fn process_national_record(
         return Ok(output);
     }
 
-    // --- fuel density (prcnat.f :350–:358) ---
+ // --- fuel density (prcnat.f :350–:358) ---
     let denful = fuel_density(opt.fuel);
 
-    // --- growth-file packet required (prcnat.f :543 / :7003) ---
+ // --- growth-file packet required (prcnat.f :543 / :7003) ---
     if !opt.growth_loaded {
         return Err(Error::Config(GeographyError::GrowthFileMissing.to_string()));
     }
 
-    // --- state loop (prcnat.f :482–:889) ---
+ // --- state loop (prcnat.f :482–:889) ---
     for (idx, state) in ctx.states.iter().enumerate() {
-        // Skip if state not selected, or if doing national record
-        // but state has its own records (prcnat.f :487–:492).
+ // Skip if state not selected, or if doing national record
+ // but state has its own records (prcnat.f :487–:492).
         if !state.selected {
             continue;
         }
@@ -316,8 +316,8 @@ pub fn process_national_record(
         let fips = state.fips.as_str();
         let pop_state = popsta[idx];
 
-        // --- zero state population — write zero record, continue
-        //     (prcnat.f :497–:502) ---
+ // --- zero state population — write zero record, continue
+ // (prcnat.f :497–:502) ---
         if pop_state <= 0.0 {
             output.state_outputs.push(StateOutput {
                 fips: fips.to_string(),
@@ -339,7 +339,7 @@ pub fn process_national_record(
 
         let mut emsday = zero_emissions();
 
-        // --- daymthf + adjtime/tplfac/tplful (prcnat.f :514–:534) ---
+ // --- daymthf + adjtime/tplfac/tplful (prcnat.f :514–:534) ---
         let dmf = callbacks.day_month_factor(scc, fips);
         let ndays = dmf.n_days;
         let adjtime: f32 = if opt.total_mode {
@@ -356,7 +356,7 @@ pub fn process_national_record(
         };
         let tplful: f32 = dmf.mthf * dmf.dayf;
 
-        // --- growth Xref + activity (prcnat.f :544–:565) ---
+ // --- growth Xref + activity (prcnat.f :544–:565) ---
         let Some(indcod) = callbacks.find_growth_xref(fips, scc, hpval) else {
             return Err(Error::Config(
                 GeographyError::GrowthIndicatorNotFound {
@@ -391,23 +391,23 @@ pub fn process_national_record(
                 emissions_day: missing_emissions(),
                 missing: true,
             });
-            // The Fortran source `goto 9999`s here, ending the entire
-            // routine. The Rust port mirrors that — once a state hits
-            // missing activity, the run aborts (early return).
+ // The Fortran source `goto 9999`s here, ending the entire
+ // routine. The Rust port mirrors that — once a state hits
+ // missing activity, the run aborts (early return).
             return Ok(output);
         };
 
-        // --- load growth + base-year growth factor (prcnat.f :569–:581) ---
+ // --- load growth + base-year growth factor (prcnat.f :569–:581) ---
         callbacks.load_growth(indcod)?;
         let grwtmp = callbacks.growth_factor(eq.pop_year, eq.pop_year + 1, fips, indcod)?;
-        // Track the per-state growth for downstream use.
+ // Track the per-state growth for downstream use.
         grwsta[idx] = grwtmp;
 
-        // --- modyr -> initial age distribution (prcnat.f :586–:589) ---
+ // --- modyr -> initial age distribution (prcnat.f :586–:589) ---
         let my_out = callbacks.model_year(eq, &activity, grwsta[idx])?;
         let nyrlif = my_out.nyrlif;
 
-        // --- agedist -> grown population (prcnat.f :595–:598) ---
+ // --- agedist -> grown population (prcnat.f :595–:598) ---
         let pop_state = callbacks
             .age_distribution(
                 pop_state,
@@ -420,7 +420,7 @@ pub fn process_national_record(
             )?
             .max(0.0);
 
-        // --- initialise totals (prcnat.f :603–:621) ---
+ // --- initialise totals (prcnat.f :603–:621) ---
         let mut poptot: f32 = 0.0;
         let mut acttot: f32 = 0.0;
         let mut strtot: f32 = 0.0;
@@ -431,12 +431,12 @@ pub fn process_national_record(
         let mut evacttot: f32 = 0.0;
         let mut evstrtot: f32 = 0.0;
 
-        // --- filter retrofits by SCC + HP (prcnat.f :612–:615) ---
+ // --- filter retrofits by SCC + HP (prcnat.f :612–:615) ---
         if opt.retrofit_loaded {
             callbacks.filter_retrofits_by_scc_hp(scc, hpval)?;
         }
 
-        // --- model-year loop (prcnat.f :625–:866) ---
+ // --- model-year loop (prcnat.f :625–:866) ---
         let iepyr = opt.episode_year;
         let lo = iepyr - (nyrlif as i32) + 1;
         let hi = iepyr;
@@ -454,7 +454,7 @@ pub fn process_national_record(
 
             let tchmdyr = iyr.min(opt.tech_year);
 
-            // --- exhaust tech for this model year (prcnat.f :377–:399 / :659) ---
+ // --- exhaust tech for this model year (prcnat.f :377–:399 / :659) ---
             let Some(tech) = callbacks.find_exhaust_tech(scc, hpval, tchmdyr) else {
                 output.warnings.push(GeographyWarning::MissingExhaustTech {
                     scc: scc.to_string(),
@@ -464,14 +464,14 @@ pub fn process_national_record(
                 return Ok(output);
             };
 
-            // --- filter retrofits by model year (prcnat.f :650–:655) ---
+ // --- filter retrofits by model year (prcnat.f :650–:655) ---
             if opt.retrofit_loaded {
                 callbacks.filter_retrofits_by_year(iyr)?;
             }
 
             let mut fulbmytot: f32 = 0.0;
 
-            // --- exhaust tech-type loop (prcnat.f :659–:757) ---
+ // --- exhaust tech-type loop (prcnat.f :659–:757) ---
             for (tech_i, tech_name) in tech.tech_names.iter().enumerate() {
                 let tfrac = tech.fractions[tech_i];
                 if tfrac <= 0.0 {
@@ -515,12 +515,12 @@ pub fn process_national_record(
 
                 let actbmy = actadj * pop_state * modfrc * tplful * tfrac * adjtime;
                 let fulbmy = tplful
-                    * pop_state
-                    * actadj
-                    * modfrc
-                    * tfrac
-                    * (hpval * activity.load_factor / denful.max(f32::MIN_POSITIVE))
-                    * adjtime;
+ * pop_state
+ * actadj
+ * modfrc
+ * tfrac
+ * (hpval * activity.load_factor / denful.max(f32::MIN_POSITIVE))
+ * adjtime;
 
                 fulcsm += fulbmy;
                 fulbmytot += fulbmy;
@@ -558,12 +558,12 @@ pub fn process_national_record(
                 }
             }
 
-            // --- population / activity / starts totals (prcnat.f :761–:765) ---
+ // --- population / activity / starts totals (prcnat.f :761–:765) ---
             poptot += pop_state * modfrc;
             acttot += actadj * pop_state * modfrc * tplful * adjtime;
             strtot += stradj * pop_state * modfrc * tplful * adjtime;
 
-            // --- evap tech for this model year (prcnat.f :412 / :774) ---
+ // --- evap tech for this model year (prcnat.f :412 / :774) ---
             let Some(evtech) = callbacks.find_evap_tech(scc, hpval, tchmdyr) else {
                 output.warnings.push(GeographyWarning::MissingEvapTech {
                     scc: scc.to_string(),
@@ -573,7 +573,7 @@ pub fn process_national_record(
                 return Ok(output);
             };
 
-            // --- evap tech-type loop (prcnat.f :774–:854) ---
+ // --- evap tech-type loop (prcnat.f :774–:854) ---
             for (evtech_i, evtech_name) in evtech.tech_names.iter().enumerate() {
                 let evfrac = evtech.fractions[evtech_i];
                 if evfrac <= 0.0 {
@@ -665,8 +665,8 @@ pub fn process_national_record(
             missing: false,
         });
 
-        // Suppress unused warnings — these counters are reported in
-        // the Fortran SI report (see `wrtsi.f`); deferred to Task 114.
+ // Suppress unused warnings — these counters are reported in
+ // the Fortran SI report (see `wrtsi.f`); deferred to.
         let _ = (strtot, evpoptot, evacttot, evstrtot);
     }
 
@@ -731,7 +731,7 @@ mod tests {
                 selected: true,
                 has_state_records: false,
             },
-            // Unselected state — should be skipped.
+ // Unselected state — should be skipped.
             StateDescriptor {
                 fips: "36000".to_string(),
                 selected: false,
@@ -740,8 +740,8 @@ mod tests {
         ]
     }
 
-    /// Reusable happy-path stub. Each state runs through the
-    /// model-year loop with a single (modfrc=1.0) year.
+ /// Reusable happy-path stub. Each state runs through the
+ /// model-year loop with a single (modfrc=1.0) year.
     struct HappyCallbacks {
         states_seen: Vec<String>,
         exhaust_calls: usize,
@@ -767,7 +767,7 @@ mod tests {
             national_population: f32,
             growth: f32,
         ) -> Result<StateAllocationOutcome> {
-            // Equal split across selected states.
+ // Equal split across selected states.
             let selected: Vec<_> = states
                 .iter()
                 .enumerate()
@@ -916,7 +916,7 @@ mod tests {
         };
         let mut cb = HappyCallbacks::new();
         let out = process_national_record(&ctx, &mut cb).unwrap();
-        // 2 selected states -> 2 outputs.
+ // 2 selected states -> 2 outputs.
         assert_eq!(out.state_outputs.len(), 2);
         assert!(out.state_outputs.iter().all(|s| s.population == 0.0));
         assert!(out.state_outputs.iter().all(|s| !s.missing));
@@ -937,14 +937,14 @@ mod tests {
         let mut cb = HappyCallbacks::new();
         let out = process_national_record(&ctx, &mut cb).unwrap();
         assert_eq!(out.state_outputs.len(), 2);
-        // Per-state pop = 2000/2 = 1000.
+ // Per-state pop = 2000/2 = 1000.
         assert!((out.state_outputs[0].population - 1000.0).abs() < 1e-3);
         assert!((out.state_outputs[1].population - 1000.0).abs() < 1e-3);
-        // Two states × (1 exhaust + 1 evap) = 2 of each calculator call.
+ // Two states × (1 exhaust + 1 evap) = 2 of each calculator call.
         assert_eq!(cb.exhaust_calls, 2);
         assert_eq!(cb.evap_calls, 2);
-        // Unselected state ("36000") should never have been queried
-        // for activity.
+ // Unselected state ("36000") should never have been queried
+ // for activity.
         assert!(!cb.states_seen.iter().any(|s| s == "36000"));
         assert_eq!(out.national_record_count, 1);
     }
@@ -963,8 +963,8 @@ mod tests {
         };
         let mut cb = HappyCallbacks::new();
         let out = process_national_record(&ctx, &mut cb).unwrap();
-        // State #1 (0-based idx 0) has population 0 -> zero record;
-        // state #2 (idx 1) has full population -> processed.
+ // State #1 (0-based idx 0) has population 0 -> zero record;
+ // state #2 (idx 1) has full population -> processed.
         assert_eq!(out.state_outputs.len(), 2);
         let s1 = out
             .state_outputs
@@ -996,7 +996,7 @@ mod tests {
         };
         let mut cb = HappyCallbacks::new();
         let out = process_national_record(&ctx, &mut cb).unwrap();
-        // Only 06000 and 17000 should be in the output.
+ // Only 06000 and 17000 should be in the output.
         let fipses: Vec<&str> = out.state_outputs.iter().map(|s| s.fips.as_str()).collect();
         assert!(fipses.contains(&"06000"));
         assert!(fipses.contains(&"17000"));

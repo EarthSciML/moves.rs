@@ -1,21 +1,21 @@
 //! Parameterised geography processing — the merged core of
 //! `prccty.f` (county) and `prcsub.f` (subcounty).
 //!
-//! Task 109 ported `prccty.f` and `prcsub.f` as the separate
+//! ported `prccty.f` and `prcsub.f` as the separate
 //! [`process_county`] and [`process_subcounty`] functions for
-//! fidelity. Task 112 merges their orchestration here: the two
+//! fidelity. merges their orchestration here: the two
 //! Fortran routines consume the same record shape
 //! ([`PopulationRecord`]), the same run options ([`RunOptions`]), the
 //! same callback surface ([`GeographyCallbacks`]), and produce the
 //! same output ([`ProcessOutput`]). They differ in exactly one place
-//! — how the per-record population is resolved before the model-year
+//! how the per-record population is resolved before the model-year
 //! loop:
 //!
 //! - **County** uses [`PopulationRecord::population`] directly.
 //! - **Subcounty** runs an extra `fndasc` + subcounty-marker +
-//!   `alosub` step (`prcsub.f` :240–:266) that subdivides the
-//!   state-level population, and tags every output record with the
-//!   resolved subcounty marker.
+//! `alosub` step (`prcsub.f` :240–:266) that subdivides the
+//! state-level population, and tags every output record with the
+//! resolved subcounty marker.
 //!
 //! [`process_geography`] takes a [`ProcessLevel`] selector to pick
 //! between the two; the model-year / tech-type orchestration that
@@ -37,34 +37,34 @@ use super::common::{
 use crate::common::consts::{MXPOL, RMISS};
 use crate::{Error, Result};
 
-/// Which of the two Task 109 routines [`process_geography`] runs.
+/// Which of the two routines [`process_geography`] runs.
 ///
 /// `prccty.f` and `prcsub.f` share the entire model-year / tech-type
 /// core; they differ only in how the per-record population is
 /// resolved before the loop runs.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ProcessLevel {
-    /// County-level processing — `prccty.f`. The population comes
-    /// straight from the record's `population` field; output records
-    /// carry a blank subcounty marker.
+ /// County-level processing — `prccty.f`. The population comes
+ /// straight from the record's `population` field; output records
+ /// carry a blank subcounty marker.
     County,
-    /// Subcounty-level processing — `prcsub.f`. An extra `fndasc` +
-    /// subcounty-marker + `alosub` step (`prcsub.f` :240–:266)
-    /// subdivides the population; output records carry the resolved
-    /// subcounty marker.
+ /// Subcounty-level processing — `prcsub.f`. An extra `fndasc` +
+ /// subcounty-marker + `alosub` step (`prcsub.f` :240–:266)
+ /// subdivides the population; output records carry the resolved
+ /// subcounty marker.
     Subcounty {
-        /// Original record index (`icurec`), threaded into `alosub`.
+ /// Original record index (`icurec`), threaded into `alosub`.
         record_index: usize,
-        /// Cached growth value (the `growth` argument to `prcsub.f`).
-        /// `None` is the Fortran `-9` "not yet computed" sentinel;
-        /// the callback's `allocate_subcounty` produces a real value
-        /// in that case.
+ /// Cached growth value (the `growth` argument to `prcsub.f`).
+ /// `None` is the Fortran `-9` "not yet computed" sentinel;
+ /// the callback's `allocate_subcounty` produces a real value
+ /// in that case.
         cached_growth: Option<f32>,
     },
 }
 
 /// Process one county- or subcounty-level population record. Merged
-/// port of `prccty.f` and `prcsub.f` (Task 112).
+/// port of `prccty.f` and `prcsub.f`.
 ///
 /// The `level` selector picks between the two Fortran routines — see
 /// [`ProcessLevel`]. Everything after the population-resolution step
@@ -80,24 +80,24 @@ pub enum ProcessLevel {
 /// # Arguments
 ///
 /// - `level`: county vs. subcounty, plus the subcounty-only
-///   `icurec` / `growth` inputs.
+/// `icurec` / `growth` inputs.
 /// - `record`: per-record COMMON-block reads (`/popdat/` slot).
 /// - `options`: run-level settings (`/optdat/`, `/eqpdat/`, `/io/`).
 /// - `callbacks`: dependency surface that supplies the helpers the
-///   Fortran sources call (`fndtch`, `fndevtch`, `emfclc`,
-///   `evemfclc`, `daymthf`, `emsadj`, `getgrw`, `grwfac`, `modyr`,
-///   `agedist`, `clcems`, `clcevems`, `fndrtrft`, `fndrfm`, `fndchr`,
-///   plus the subcounty-only `fndasc` / `alosub`).
+/// Fortran sources call (`fndtch`, `fndevtch`, `emfclc`,
+/// `evemfclc`, `daymthf`, `emsadj`, `getgrw`, `grwfac`, `modyr`,
+/// `agedist`, `clcems`, `clcevems`, `fndrtrft`, `fndrfm`, `fndchr`,
+/// plus the subcounty-only `fndasc` / `alosub`).
 ///
 /// # Failures
 ///
 /// - [`Error::Config`] when `options.growth_enabled` is `false` — the
-///   Fortran source's `7003` error path triggers an explicit I/O
-///   message and exits.
+/// Fortran source's `7003` error path triggers an explicit I/O
+/// message and exits.
 /// - [`Error::Config`] when a subcounty record's SCC has no
-///   allocation coefficients (`prcsub.f` :240 — the `7000` path).
+/// allocation coefficients (`prcsub.f` :240 — the `7000` path).
 /// - Errors propagated from any callback method (`clcems`-style
-///   numerics, growth-data I/O, etc.).
+/// numerics, growth-data I/O, etc.).
 pub fn process_geography<C: GeographyCallbacks + ?Sized>(
     level: ProcessLevel,
     record: &PopulationRecord<'_>,
@@ -115,31 +115,31 @@ pub fn process_geography<C: GeographyCallbacks + ?Sized>(
 
     let fipin = record.region_code;
 
-    // ---- prccty.f :204–:209 / prcsub.f :208–:212 — county-FIPS
-    //      lookup. ISKIP early-out. ----
+ // ---- prccty.f :204–:209 / prcsub.f :208–:212 — county-FIPS
+ // lookup. ISKIP early-out. ----
     let Some(fips_idx) = callbacks.find_fips(fipin) else {
         return Ok(ProcessOutcome::Skipped(output));
     };
     callbacks.tally_county_record(fips_idx);
 
-    // ---- prccty.f :214–:225 / prcsub.f :217–:228 — HP-level lookup. ----
+ // ---- prccty.f :214–:225 / prcsub.f :217–:228 — HP-level lookup. ----
     let hplev = hp_level_lookup(record.hp_range, &options.hp_levels);
     let hpval = record.hp_avg;
     output.hp_level = hplev;
 
-    // ---- Population resolution — the one place the two routines
-    //      diverge before the shared core. County reads the record
-    //      population directly; subcounty runs the `fndasc` +
-    //      subcounty-marker + `alosub` chain (`prcsub.f` :240–:266). ----
+ // ---- Population resolution — the one place the two routines
+ // diverge before the shared core. County reads the record
+ // population directly; subcounty runs the `fndasc` +
+ // subcounty-marker + `alosub` chain (`prcsub.f` :240–:266). ----
     let (population, subcur) = match level {
         ProcessLevel::County => (record.population, String::new()),
         ProcessLevel::Subcounty {
             record_index,
             cached_growth,
         } => {
-            // ---- prcsub.f :240–:241 — fndasc. Missing → 7000 error
-            //      path: the Fortran source writes an ERROR message
-            //      and falls through to 9999 with `ierr = IFAIL`. ----
+ // ---- prcsub.f :240–:241 — fndasc. Missing → 7000 error
+ // path: the Fortran source writes an ERROR message
+ // and falls through to 9999 with `ierr = IFAIL`. ----
             let idxasc = match callbacks.find_allocation(record.scc) {
                 Some(idx) => idx,
                 None => {
@@ -150,7 +150,7 @@ pub fn process_geography<C: GeographyCallbacks + ?Sized>(
                 }
             };
 
-            // ---- prcsub.f :247–:258 — find the subcounty marker. ----
+ // ---- prcsub.f :247–:258 — find the subcounty marker. ----
             let subcur = match callbacks.find_subcounty(fipin) {
                 Some(s) => s,
                 None => {
@@ -162,7 +162,7 @@ pub fn process_geography<C: GeographyCallbacks + ?Sized>(
             }
             output.subcounty = subcur.clone();
 
-            // ---- prcsub.f :263–:266 — alosub. ----
+ // ---- prcsub.f :263–:266 — alosub. ----
             let alloc = callbacks.allocate_subcounty(
                 record_index,
                 idxasc,
@@ -179,8 +179,8 @@ pub fn process_geography<C: GeographyCallbacks + ?Sized>(
         }
     };
 
-    // ---- prccty.f :236–:242 / prcsub.f :271–:277 — zero-population
-    //      early-out. ----
+ // ---- prccty.f :236–:242 / prcsub.f :271–:277 — zero-population
+ // early-out. ----
     if population <= 0.0 {
         output.dat_records.push(DatRecord {
             fips: fipin.to_string(),
@@ -199,16 +199,15 @@ pub fn process_geography<C: GeographyCallbacks + ?Sized>(
         return Ok(ProcessOutcome::Success(output));
     }
 
-    // ---- prccty.f :251–:262 / prcsub.f :282–:293 — exhaust tech-type
-    //      lookup. Validated up-front so we can ISKIP early; the
-    //      per-model-year loop re-queries with `tchmdyr`
-    //      (`prccty.f` :440) to match the Fortran semantics. ----
+ // ---- prccty.f :251–:262 / prcsub.f :282–:293 — exhaust tech-type
+ // lookup. Validated up-front so we can ISKIP early; the
+ // per-model-year loop re-queries with `tchmdyr`
+ // (`prccty.f` :440) to match the Fortran semantics. ----
     if callbacks
         .find_exhaust_tech(record.scc, hpval, options.tech_year)
         .is_none()
     {
-        // `prccty.f` and `prcsub.f` word this warning differently —
-        // preserve each verbatim.
+ // `prccty.f` and `prcsub.f` word this warning differently // preserve each verbatim.
         let message = match level {
             ProcessLevel::County => format!(
                 "WARNING: Could not find any exhaust technology fractions for equipment: \
@@ -230,9 +229,9 @@ pub fn process_geography<C: GeographyCallbacks + ?Sized>(
         return Ok(ProcessOutcome::Skipped(output));
     }
 
-    // ---- prccty.f :267–:278 / prcsub.f :298–:309 — evap tech-type
-    //      lookup. Validated up-front; the per-model-year loop
-    //      re-queries with `tchmdyr`. ----
+ // ---- prccty.f :267–:278 / prcsub.f :298–:309 — evap tech-type
+ // lookup. Validated up-front; the per-model-year loop
+ // re-queries with `tchmdyr`. ----
     if callbacks
         .find_evap_tech(record.scc, hpval, options.tech_year)
         .is_none()
@@ -258,20 +257,20 @@ pub fn process_geography<C: GeographyCallbacks + ?Sized>(
         return Ok(ProcessOutcome::Skipped(output));
     }
 
-    // ---- prccty.f :282–:291 / prcsub.f :313–:322 — fuel density. ----
+ // ---- prccty.f :282–:291 / prcsub.f :313–:322 — fuel density. ----
     let denful = fuel_density(options.fuel);
 
-    // ---- prccty.f :297 / prcsub.f :328 — daymthf. ----
+ // ---- prccty.f :297 / prcsub.f :328 — daymthf. ----
     let (daymthfac, mthf, dayf, ndays) = callbacks.day_month_factors(record.scc, fipin);
 
-    // ---- prccty.f :301–:312 / prcsub.f :332–:343 — time-period factors. ----
+ // ---- prccty.f :301–:312 / prcsub.f :332–:343 — time-period factors. ----
     let tp = time_period_setup(options.sum_type, ndays, options.daily_mode, mthf, dayf);
 
-    // ---- prccty.f :317 / prcsub.f :348 — emsadj. ----
+ // ---- prccty.f :317 / prcsub.f :348 — emsadj. ----
     let adjems = callbacks.emission_adjustments(record.scc, fipin, &daymthfac);
 
-    // ---- prccty.f :326–:328 / prcsub.f :357–:359 — growth file
-    //      required for any non-base-year run. ----
+ // ---- prccty.f :326–:328 / prcsub.f :357–:359 — growth file
+ // required for any non-base-year run. ----
     if !options.growth_enabled {
         return Err(Error::Config(
             "Could not find the /GROWTH FILES/ packet of options file. \
@@ -292,8 +291,8 @@ pub fn process_geography<C: GeographyCallbacks + ?Sized>(
             ))
         })?;
 
-    // ---- prccty.f :332–:352 / prcsub.f :363–:383 — activity lookup.
-    //      Missing → RMISS path. ----
+ // ---- prccty.f :332–:352 / prcsub.f :363–:383 — activity lookup.
+ // Missing → RMISS path. ----
     let idxact = match callbacks.find_activity(record.scc, fipin, hpval) {
         Some(idx) => idx,
         None => {
@@ -308,14 +307,14 @@ pub fn process_geography<C: GeographyCallbacks + ?Sized>(
                     hi = record.hp_range.1,
                 ),
             });
-            // Fortran :344–:346: emsday(j) = RMISS for j outside
-            // [IDXDIU, IDXRLS]. IDXDIU = 8 (slot 7), IDXRLS = 17 (slot
-            // 16). The exclusion gates are inclusive in Fortran
-            // indices; mirrored as 1-based here.
+ // Fortran :344–:346: emsday(j) = RMISS for j outside
+ // [IDXDIU, IDXRLS]. IDXDIU = 8 (slot 7), IDXRLS = 17 (slot
+ // 16). The exclusion gates are inclusive in Fortran
+ // indices; mirrored as 1-based here.
             for (j, slot) in output.emissions_day.iter_mut().enumerate() {
                 let j1 = j + 1; // back to 1-based for the comparison.
                 if !(8..=17).contains(&j1) {
-                    *slot = RMISS;
+ *slot = RMISS;
                 }
             }
             output.dat_records.push(DatRecord {
@@ -336,12 +335,12 @@ pub fn process_geography<C: GeographyCallbacks + ?Sized>(
         }
     };
 
-    // ---- prccty.f :356–:357 / prcsub.f :388–:389 — getgrw. ----
-    // The Fortran source loads the growth-factor data into the
-    // growth-state COMMON; the Rust port lets the callback handle it
-    // inside `model_year_and_agedist`.
-    //
-    // ---- prccty.f :373–:385 / prcsub.f :404–:416 — modyr + agedist. ----
+ // ---- prccty.f :356–:357 / prcsub.f :388–:389 — getgrw. ----
+ // The Fortran source loads the growth-factor data into the
+ // growth-state COMMON; the Rust port lets the callback handle it
+ // inside `model_year_and_agedist`.
+ //
+ // ---- prccty.f :373–:385 / prcsub.f :404–:416 — modyr + agedist. ----
     let modyr_agedist = callbacks.model_year_and_agedist(
         idxact,
         record,
@@ -352,12 +351,12 @@ pub fn process_geography<C: GeographyCallbacks + ?Sized>(
         population,
     )?;
 
-    // Retrofit filter type 1: SCC + HP.
+ // Retrofit filter type 1: SCC + HP.
     if options.retrofit_enabled {
         callbacks.filter_retrofits(RetrofitFilter::SccHp, record.scc, hpval, 0, "")?;
     }
 
-    // Running accumulators.
+ // Running accumulators.
     let mut poptot: f32 = 0.0;
     let mut acttot: f32 = 0.0;
     let mut strtot: f32 = 0.0;
@@ -369,26 +368,26 @@ pub fn process_geography<C: GeographyCallbacks + ?Sized>(
 
     let activity = callbacks.activity_record(idxact);
 
-    // ---- prccty.f :412–:716 / prcsub.f :443–:747 — model-year loop. ----
+ // ---- prccty.f :412–:716 / prcsub.f :443–:747 — model-year loop. ----
     let iepyr = options.episode_year;
     let nyrlif = modyr_agedist.nyrlif;
-    // Fortran loop: `do 60 iyr = iepyr - nyrlif + 1, iepyr`.
+ // Fortran loop: `do 60 iyr = iepyr - nyrlif + 1, iepyr`.
     for iyr in (iepyr - nyrlif as i32 + 1)..=iepyr {
-        // `idxyr = iepyr - iyr + 1` (1-based). Convert to 0-based.
+ // `idxyr = iepyr - iyr + 1` (1-based). Convert to 0-based.
         let idxyr_one_based = iepyr - iyr + 1;
         let idxyr0 = (idxyr_one_based - 1) as usize;
 
-        // Skip model years with zero/negative fractions.
+ // Skip model years with zero/negative fractions.
         if modyr_agedist.modfrc.get(idxyr0).copied().unwrap_or(0.0) <= 0.0 {
             continue;
         }
 
         let mut fulbmytot: f32 = 0.0;
 
-        // ---- prccty.f :431 — tchmdyr = min(iyr, itchyr). ----
+ // ---- prccty.f :431 — tchmdyr = min(iyr, itchyr). ----
         let tchmdyr = iyr.min(options.tech_year);
 
-        // ---- Exhaust ----
+ // ---- Exhaust ----
         run_exhaust_block(
             record,
             options,
@@ -417,7 +416,7 @@ pub fn process_geography<C: GeographyCallbacks + ?Sized>(
             &mut output,
         )?;
 
-        // ---- Evap ----
+ // ---- Evap ----
         run_evap_block(
             record,
             options,
@@ -443,7 +442,7 @@ pub fn process_geography<C: GeographyCallbacks + ?Sized>(
         )?;
     }
 
-    // ---- prccty.f :720–:724 / prcsub.f :751–:755 — emsams fold-in. ----
+ // ---- prccty.f :720–:724 / prcsub.f :751–:755 — emsams fold-in. ----
     let mut emsams_delta = vec![0.0_f32; MXPOL];
     for (i, &v) in output.emissions_day.iter().enumerate() {
         if v > 0.0 {
@@ -453,14 +452,14 @@ pub fn process_geography<C: GeographyCallbacks + ?Sized>(
     output.emsams_delta = emsams_delta;
     output.emsams_fips_index = Some(fips_idx);
 
-    // ---- prccty.f :737 / prcsub.f :768 — fracretro = unitsretro / poptot. ----
+ // ---- prccty.f :737 / prcsub.f :768 — fracretro = unitsretro / poptot. ----
     let fracretro = if poptot > 0.0 {
         unitsretro / poptot
     } else {
         0.0
     };
 
-    // ---- prccty.f :741–:743 / prcsub.f :772–:774 — wrtdat. ----
+ // ---- prccty.f :741–:743 / prcsub.f :772–:774 — wrtdat. ----
     output.dat_records.push(DatRecord {
         fips: fipin.to_string(),
         subcounty: subcur,
@@ -476,10 +475,10 @@ pub fn process_geography<C: GeographyCallbacks + ?Sized>(
         emissions: output.emissions_day.clone(),
     });
 
-    // strtot / evpoptot / evacttot / evstrtot are accumulated in
-    // Fortran but the source code does not surface them to the wrtdat
-    // record. They are used by the SI report (wrtsi.f) which ports
-    // separately in Task 114. We discard them here.
+ // strtot / evpoptot / evacttot / evstrtot are accumulated in
+ // Fortran but the source code does not surface them to the wrtdat
+ // record. They are used by the SI report (wrtsi.f) which ports
+ // separately in. We discard them here.
     let _ = (strtot, evpoptot, evacttot, evstrtot);
 
     Ok(ProcessOutcome::Success(output))
@@ -516,19 +515,19 @@ fn run_exhaust_block<C: GeographyCallbacks + ?Sized>(
     fulbmytot: &mut f32,
     output: &mut ProcessOutput,
 ) -> Result<()> {
-    // ---- prccty.f :440–:445 — re-resolve idxtch for tchmdyr. ----
+ // ---- prccty.f :440–:445 — re-resolve idxtch for tchmdyr. ----
     let exhaust_tech = match callbacks.find_exhaust_tech(record.scc, record.hp_avg, tchmdyr) {
         Some(t) => t,
-        // Fortran source does not error on a per-year miss — it would
-        // silently fall through. The up-front lookup already accepted
-        // the SCC, so a miss here is a data bug; we still skip the
-        // year to avoid a hard crash.
+ // Fortran source does not error on a per-year miss — it would
+ // silently fall through. The up-front lookup already accepted
+ // the SCC, so a miss here is a data bug; we still skip the
+ // year to avoid a hard crash.
         None => return Ok(()),
     };
 
     let n_tech = exhaust_tech.tech_names.len();
 
-    // ---- prccty.f :450–:453 — emfclc. ----
+ // ---- prccty.f :450–:453 — emfclc. ----
     let factors = callbacks.compute_exhaust_factors(
         record.scc,
         record.hp_avg,
@@ -536,12 +535,12 @@ fn run_exhaust_block<C: GeographyCallbacks + ?Sized>(
         &exhaust_tech.tech_fractions,
         tchmdyr,
         idxyr0,
-        // record_index is used only by error messages; pass 0 since
-        // we do not yet track the original `icurec` here.
+ // record_index is used only by error messages; pass 0 since
+ // we do not yet track the original `icurec` here.
         0,
     )?;
 
-    // ---- prccty.f :456–:460 — retrofit filter type 2: model year. ----
+ // ---- prccty.f :456–:460 — retrofit filter type 2: model year. ----
     if options.retrofit_enabled {
         callbacks.filter_retrofits(RetrofitFilter::ModelYear, "", 0.0, iyr, "")?;
     }
@@ -549,7 +548,7 @@ fn run_exhaust_block<C: GeographyCallbacks + ?Sized>(
     let activity_unit = activity.activity_unit;
     let tpltmp_exhaust = temporal_adjustment(activity_unit, tplfac);
 
-    // ---- prccty.f :464–:554 — per-tech-type loop. ----
+ // ---- prccty.f :464–:554 — per-tech-type loop. ----
     for tech_idx in 0..n_tech {
         let tchfrc = exhaust_tech.tech_fractions[tech_idx];
         if tchfrc <= 0.0 {
@@ -562,14 +561,14 @@ fn run_exhaust_block<C: GeographyCallbacks + ?Sized>(
         let mut fracretrobmy: f32 = 0.0;
         let mut unitsretrobmy: f32 = 0.0;
 
-        // ---- prccty.f :488–:496 — retrofit type 3 filter + clcrtrft. ----
+ // ---- prccty.f :488–:496 — retrofit type 3 filter + clcrtrft. ----
         if options.retrofit_enabled {
             callbacks.filter_retrofits(RetrofitFilter::TechType, "", 0.0, 0, &tech_name)?;
             let surviving = callbacks.surviving_retrofits();
-            // Run the already-ported retrofit calculator. The
-            // accumulator pollutant_reduction_fraction is owned by the
-            // callback's RetrofitState; we just call to populate
-            // fracretrobmy + unitsretrobmy.
+ // Run the already-ported retrofit calculator. The
+ // accumulator pollutant_reduction_fraction is owned by the
+ // callback's RetrofitState; we just call to populate
+ // fracretrobmy + unitsretrobmy.
             let mut pollutant_rdfrc = vec![0.0_f32; MXPOL];
             let ctx = crate::emissions::retrofit::RetrofitCalcContext {
                 scc: record.scc,
@@ -586,10 +585,10 @@ fn run_exhaust_block<C: GeographyCallbacks + ?Sized>(
             )?;
             fracretrobmy = outcome.frac_retro;
             unitsretrobmy = outcome.units_retro;
-            *unitsretro += unitsretrobmy;
+ *unitsretro += unitsretrobmy;
         }
 
-        // ---- prccty.f :510–:516 — clcems. ----
+ // ---- prccty.f :510–:516 — clcems. ----
         let iter = callbacks.compute_exhaust_iteration(
             record,
             options,
@@ -610,32 +609,32 @@ fn run_exhaust_block<C: GeographyCallbacks + ?Sized>(
         )?;
         accumulate_iteration_into_output(&iter, output);
 
-        // ---- prccty.f :520–:524 — actbmy / fulbmy ----
-        // Fortran: actbmy = actadj(idxyr) * popcty * modfrc(idxyr) * tplful * tchfrc(idxtch,i) * adjtime
+ // ---- prccty.f :520–:524 — actbmy / fulbmy ----
+ // Fortran: actbmy = actadj(idxyr) * popcty * modfrc(idxyr) * tplful * tchfrc(idxtch,i) * adjtime
         let actbmy = modyr_agedist.actadj[idxyr0]
-            * population
-            * modyr_agedist.modfrc[idxyr0]
-            * tplful
-            * tchfrc
-            * adjtime;
+ * population
+ * modyr_agedist.modfrc[idxyr0]
+ * tplful
+ * tchfrc
+ * adjtime;
         let fulbmy = tplful
-            * population
-            * modyr_agedist.actadj[idxyr0]
-            * modyr_agedist.modfrc[idxyr0]
-            * tchfrc
-            * (record.hp_avg
-                * activity.load_factor
-                * factors
+ * population
+ * modyr_agedist.actadj[idxyr0]
+ * modyr_agedist.modfrc[idxyr0]
+ * tchfrc
+ * (record.hp_avg
+ * activity.load_factor
+ * factors
                     .bsfc
                     .get(idxyr0 * exhaust_tech.tech_names.len() + tech_idx)
                     .copied()
                     .unwrap_or(0.0)
                 / denful)
-            * adjtime;
-        *fulcsm += fulbmy;
-        *fulbmytot += fulbmy;
+ * adjtime;
+ *fulcsm += fulbmy;
+ *fulbmytot += fulbmy;
 
-        // ---- prccty.f :537–:543 — wrtbmy (exhaust). ----
+ // ---- prccty.f :537–:543 — wrtbmy (exhaust). ----
         if options.write_bmy_exhaust {
             output.bmy_records.push(BmyRecord {
                 fips: record.region_code.to_string(),
@@ -656,7 +655,7 @@ fn run_exhaust_block<C: GeographyCallbacks + ?Sized>(
             });
         }
 
-        // ---- prccty.f :547–:550 — sitot. ----
+ // ---- prccty.f :547–:550 — sitot. ----
         if options.write_si {
             output.si_records.push(SiRecord {
                 tech_name: tech_name.clone(),
@@ -668,7 +667,7 @@ fn run_exhaust_block<C: GeographyCallbacks + ?Sized>(
         }
     }
 
-    // ---- prccty.f :558–:562 — exhaust pop/act/starts accumulator. ----
+ // ---- prccty.f :558–:562 — exhaust pop/act/starts accumulator. ----
     accumulate_exhaust_iteration(
         poptot,
         acttot,
@@ -711,7 +710,7 @@ fn run_evap_block<C: GeographyCallbacks + ?Sized>(
     fulbmytot: f32,
     output: &mut ProcessOutput,
 ) -> Result<()> {
-    // ---- prccty.f :573 — evap tech-type for tchmdyr. ----
+ // ---- prccty.f :573 — evap tech-type for tchmdyr. ----
     let evap_tech = match callbacks.find_evap_tech(record.scc, record.hp_avg, tchmdyr) {
         Some(t) => t,
         None => return Ok(()),
@@ -719,21 +718,21 @@ fn run_evap_block<C: GeographyCallbacks + ?Sized>(
 
     let n_evtech = evap_tech.tech_names.len();
 
-    // ---- prccty.f :575–:626 — per-evtech refueling data assembly. ----
+ // ---- prccty.f :575–:626 — per-evtech refueling data assembly. ----
     let mut refueling_data: Vec<RefuelingData> = vec![RefuelingData::default(); n_evtech];
     #[allow(clippy::needless_range_loop)] // multiple parallel arrays indexed by i
     for i in 0..n_evtech {
         if !options.spillage_enabled {
             continue;
         }
-        // Fortran: idxall = fndrfm(asccod, hpval, TECDEF) — fallback
-        // to the default tech for when the per-tech lookup misses.
+ // Fortran: idxall = fndrfm(asccod, hpval, TECDEF) — fallback
+ // to the default tech for when the per-tech lookup misses.
         let default_rfm = callbacks.find_refueling(record.scc, record.hp_avg, "ALL       ");
-        // The Fortran source builds a probe tech name from the
-        // evap-tech code: `tname = 'E' // evtecnam(i)(j:j)` where
-        // `j = IDXSPL - IDXDIU + 2 - 3`. IDXSPL=16, IDXDIU=8, so
-        // `j = 16 - 8 + 2 - 3 = 7`. We use the 7th character of the
-        // evap tech name (0-based offset 6).
+ // The Fortran source builds a probe tech name from the
+ // evap-tech code: `tname = 'E' // evtecnam(i)(j:j)` where
+ // `j = IDXSPL - IDXDIU + 2 - 3`. IDXSPL=16, IDXDIU=8, so
+ // `j = 16 - 8 + 2 - 3 = 7`. We use the 7th character of the
+ // evap tech name (0-based offset 6).
         let evname = &evap_tech.tech_names[i];
         let probe = if evname.len() >= 7 {
             format!("E{}", &evname[6..7])
@@ -745,8 +744,8 @@ fn run_evap_block<C: GeographyCallbacks + ?Sized>(
         if let Some(r) = resolved {
             refueling_data[i] = r;
         } else {
-            // Fortran source warns + sets tank = -9 (i.e. mode is
-            // empty and tank is sentinel). We surface the warning.
+ // Fortran source warns + sets tank = -9 (i.e. mode is
+ // empty and tank is sentinel). We surface the warning.
             output.warnings.push(ProcessWarning {
                 kind: WarningKind::MissingEmissionFactor,
                 message: format!(
@@ -761,7 +760,7 @@ fn run_evap_block<C: GeographyCallbacks + ?Sized>(
         }
     }
 
-    // ---- prccty.f :631–:634 — evemfclc. ----
+ // ---- prccty.f :631–:634 — evemfclc. ----
     let evap_factors = callbacks.compute_evap_factors(
         record.scc,
         &evap_tech.tech_names,
@@ -774,7 +773,7 @@ fn run_evap_block<C: GeographyCallbacks + ?Sized>(
     let activity_unit = activity.activity_unit;
     let tpltmp_evap = temporal_adjustment(activity_unit, tplfac);
 
-    // ---- prccty.f :638–:704 — per-evtech-type loop. ----
+ // ---- prccty.f :638–:704 — per-evtech-type loop. ----
     #[allow(clippy::needless_range_loop)] // multiple parallel arrays indexed by tech_idx
     for tech_idx in 0..n_evtech {
         let evtchfrc = evap_tech.tech_fractions[tech_idx];
@@ -783,10 +782,10 @@ fn run_evap_block<C: GeographyCallbacks + ?Sized>(
         }
         let tech_name = evap_tech.tech_names[tech_idx].clone();
 
-        // ---- prccty.f :660 — fulbmy = fulbmytot * evtecfrc(i). ----
+ // ---- prccty.f :660 — fulbmy = fulbmytot * evtecfrc(i). ----
         let fulbmy = fulbmytot * evtchfrc;
 
-        // ---- prccty.f :664–:674 — clcevems. ----
+ // ---- prccty.f :664–:674 — clcevems. ----
         let iter = callbacks.compute_evap_iteration(
             record,
             options,
@@ -809,16 +808,16 @@ fn run_evap_block<C: GeographyCallbacks + ?Sized>(
         )?;
         accumulate_iteration_into_output(&iter, output);
 
-        // ---- prccty.f :679–:681 — popbmy / actbmy. ----
+ // ---- prccty.f :679–:681 — popbmy / actbmy. ----
         let popbmy = population * modyr_agedist.modfrc[idxyr0] * evtchfrc;
         let actbmy = modyr_agedist.actadj[idxyr0]
-            * population
-            * modyr_agedist.modfrc[idxyr0]
-            * tplful
-            * evtchfrc
-            * adjtime;
+ * population
+ * modyr_agedist.modfrc[idxyr0]
+ * tplful
+ * evtchfrc
+ * adjtime;
 
-        // ---- prccty.f :685–:693 — wrtbmy (evap). ----
+ // ---- prccty.f :685–:693 — wrtbmy (evap). ----
         if options.write_bmy_evap {
             output.bmy_records.push(BmyRecord {
                 fips: record.region_code.to_string(),
@@ -839,7 +838,7 @@ fn run_evap_block<C: GeographyCallbacks + ?Sized>(
             });
         }
 
-        // ---- prccty.f :697–:700 — sitot. ----
+ // ---- prccty.f :697–:700 — sitot. ----
         if options.write_si {
             output.si_records.push(SiRecord {
                 tech_name: tech_name.clone(),
@@ -851,7 +850,7 @@ fn run_evap_block<C: GeographyCallbacks + ?Sized>(
         }
     }
 
-    // ---- prccty.f :708–:712 — evap pop/act/starts accumulator. ----
+ // ---- prccty.f :708–:712 — evap pop/act/starts accumulator. ----
     accumulate_evap_iteration(
         evpoptot,
         evacttot,
@@ -874,10 +873,10 @@ fn accumulate_iteration_into_output(iter: &EmissionsIterationResult, output: &mu
         if i >= output.emissions_day.len() {
             break;
         }
-        // Fortran semantics: when the iteration produces RMISS for a
-        // pollutant slot, the day-level slot becomes RMISS too. The
-        // `compute_*_iteration` callback decides this on its end — we
-        // just add.
+ // Fortran semantics: when the iteration produces RMISS for a
+ // pollutant slot, the day-level slot becomes RMISS too. The
+ // `compute_*_iteration` callback decides this on its end — we
+ // just add.
         output.emissions_day[i] += delta;
     }
 }

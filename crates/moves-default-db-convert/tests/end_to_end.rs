@@ -49,8 +49,8 @@ fn audit_tables_json_parses_cleanly() {
         plan.tables.len()
     );
 
-    // Spot-check known strategy assignments from the partitioning plan
-    // doc — surfaces drift between audit and converter early.
+ // Spot-check known strategy assignments from the partitioning plan
+ // doc — surfaces drift between audit and converter early.
     let year = plan.get("Year").expect("Year is in the audit");
     assert_eq!(
         year.partition.strategy,
@@ -168,11 +168,11 @@ fn pipeline_writes_mixed_strategies_with_valid_parquet() {
     };
     let (manifest, report) = convert(&opts).unwrap();
 
-    // Table list is sorted by case-folded name.
+ // Table list is sorted by case-folded name.
     let names: Vec<&str> = manifest.tables.iter().map(|t| t.name.as_str()).collect();
     assert_eq!(names, vec!["Link", "Surrogate", "Year"]);
 
-    // Year is monolithic with 2 rows.
+ // Year is monolithic with 2 rows.
     let year = manifest.tables.iter().find(|t| t.name == "Year").unwrap();
     assert_eq!(year.partition_strategy, "monolithic");
     assert_eq!(year.row_count, 2);
@@ -183,7 +183,7 @@ fn pipeline_writes_mixed_strategies_with_valid_parquet() {
         "Year parquet"
     );
 
-    // Link is schema-only with a sidecar.
+ // Link is schema-only with a sidecar.
     let link = manifest.tables.iter().find(|t| t.name == "Link").unwrap();
     assert_eq!(link.partition_strategy, "schema_only");
     assert_eq!(link.row_count, 0);
@@ -191,7 +191,7 @@ fn pipeline_writes_mixed_strategies_with_valid_parquet() {
     assert!(out_dir.join("Link.schema.json").exists());
     assert!(!out_dir.join("Link.parquet").exists());
 
-    // Surrogate is county-strategy with stateID fallback => `state=` partitions.
+ // Surrogate is county-strategy with stateID fallback => `state=` partitions.
     let sur = manifest
         .tables
         .iter()
@@ -215,7 +215,7 @@ fn pipeline_writes_mixed_strategies_with_valid_parquet() {
     assert_eq!(p06.values, vec!["06".to_string()]);
     assert_eq!(p17.values, vec!["17".to_string()]);
 
-    // Round-trip a partition and confirm NULL preserved.
+ // Round-trip a partition and confirm NULL preserved.
     let bytes = std::fs::read(out_dir.join(&p17.path)).unwrap();
     let batches = read_back(&bytes);
     assert_eq!(batches.len(), 1);
@@ -230,7 +230,7 @@ fn pipeline_writes_mixed_strategies_with_valid_parquet() {
     assert!(!value_col.is_null(1)); // 4.5
     assert!(value_col.is_null(2)); // NULL
 
-    // Report aggregates match.
+ // Report aggregates match.
     assert_eq!(report.tables_written, 3);
     assert_eq!(report.partitions_written, 3); // Year + 2 Surrogate partitions
     assert_eq!(report.total_rows, 7);
@@ -379,7 +379,7 @@ fn cli_runs_end_to_end() {
 }
 
 /// Validate binary runs against a freshly-converted tree and reports no
-/// errors. Exercises the Task 81 deliverable end-to-end via the CLI:
+/// errors. Exercises the deliverable end-to-end via the CLI:
 /// convert -> validate -> exit 0.
 #[test]
 fn validate_cli_passes_on_clean_round_trip() {
@@ -416,7 +416,7 @@ fn validate_cli_passes_on_clean_round_trip() {
     );
     write(&tsv_dir.join("Year.tsv"), b"1990\tY\n2000\tN\n");
 
-    // Convert first.
+ // Convert first.
     let convert_bin = env!("CARGO_BIN_EXE_moves-default-db-convert");
     let out = Command::new(convert_bin)
         .args([
@@ -439,7 +439,7 @@ fn validate_cli_passes_on_clean_round_trip() {
         String::from_utf8_lossy(&out.stderr)
     );
 
-    // Then validate. Must report clean.
+ // Then validate. Must report clean.
     let validate_bin = env!("CARGO_BIN_EXE_moves-default-db-validate");
     let out = Command::new(validate_bin)
         .args([
@@ -510,8 +510,8 @@ fn validate_cli_detects_corrupted_parquet() {
         .output()
         .unwrap();
 
-    // Tamper: append a byte. The footer is at the end; the SHA mismatches
-    // and the Parquet reader may also reject.
+ // Tamper: append a byte. The footer is at the end; the SHA mismatches
+ // and the Parquet reader may also reject.
     let pq = out_dir.join("Year.parquet");
     let mut bytes = std::fs::read(&pq).unwrap();
     bytes.push(0x00);
@@ -536,8 +536,8 @@ fn validate_cli_detects_corrupted_parquet() {
 }
 
 fn repo_root() -> std::path::PathBuf {
-    // Tests run with CARGO_MANIFEST_DIR set to the crate dir; the workspace
-    // root is its grandparent (../..).
+ // Tests run with CARGO_MANIFEST_DIR set to the crate dir; the workspace
+ // root is its grandparent (../..).
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()

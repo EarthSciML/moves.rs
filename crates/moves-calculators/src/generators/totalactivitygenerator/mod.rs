@@ -1,4 +1,4 @@
-//! Total Activity Generator — Phase 3 Task 36.
+//! Total Activity Generator —.
 //!
 //! Pure-Rust port of
 //! `gov/epa/otaq/moves/master/implementation/ghg/TotalActivityGenerator.java`
@@ -42,8 +42,8 @@
 //! ported as the standalone pure kernels in [`allocation`], but the master
 //! loop's per-`(process, zone, link)` sequencing of those kernels — together
 //! with the three external `database/Adjust*.sql` scripts the Java shells
-//! out to — is orchestration that lands with the Task 50 `execute` wiring,
-//! exactly as Task 29's `SourceBinDistributionGenerator` deferred its
+//! out to — is orchestration that lands with the `execute` wiring,
+//! exactly as `SourceBinDistributionGenerator` deferred its
 //! per-callback dedup state.
 //!
 //! # Data-plane status
@@ -51,9 +51,9 @@
 //! [`TotalActivityGenerator::run`] is the numerical entry point and is fully
 //! exercised by this crate's tests. The [`Generator`] trait's
 //! [`execute`](Generator::execute) method is a shell: the
-//! [`CalculatorContext`] it receives exposes only the Phase 2 placeholder
+//! [`CalculatorContext`] it receives exposes only the placeholder
 //! `ExecutionTables` / `ScratchNamespace`, which have no row storage yet.
-//! Task 50 (`DataFrameStore`) lands that storage; `execute` will then
+//! (`DataFrameStore`) lands that storage; `execute` will then
 //! materialise a [`TotalActivityInputs`] from the context, call
 //! [`run`](TotalActivityGenerator::run), and write the
 //! [`TotalActivityOutput`] back into the scratch namespace. Until then
@@ -149,8 +149,8 @@ impl TableRow for inputs::YearRow {
                 let null = |col: &'static str| row_err(T, i, col, "null value".into());
                 Ok(inputs::YearRow {
                     year_id: year_id.get(i).ok_or_else(|| null("yearID"))?,
-                    // Canonical MOVES SQL filters Year via `isBaseYear IN ('Y','y')`,
-                    // so NULL is semantically "not a base year". Match that here.
+ // Canonical MOVES SQL filters Year via `isBaseYear IN ('Y','y')`,
+ // so NULL is semantically "not a base year". Match that here.
                     is_base_year: is_base_year.get(i).unwrap_or(false),
                 })
             })
@@ -1613,7 +1613,7 @@ impl TableRow for inputs::ZoneRoadTypeRow {
         let zone_id = get_i32("zoneID")?;
         let road_type_id = get_i32("roadTypeID")?;
         let sho_alloc_factor = get_f64("SHOAllocFactor")?;
-        // SHPAllocFactor absent in snapshots captured without hotelling — default to 0.0.
+ // SHPAllocFactor absent in snapshots captured without hotelling — default to 0.0.
         let shp_opt = df.column("SHPAllocFactor").ok().and_then(|s| s.f64().ok());
         (0..df.height())
             .map(|i| {
@@ -2876,7 +2876,7 @@ const GENERATOR_NAME: &str = "TotalActivityGenerator";
 /// `MasterLoopPriority` it uses for each.
 ///
 /// Running Exhaust subscribes at `GENERATOR-3` ("Run after BaseRateGenerator"
-/// — the Java comment); every other process at plain `GENERATOR`.
+/// the Java comment); every other process at plain `GENERATOR`.
 /// `"Evap Non-Fuel Vapors"` has no row in the MOVES process table, so
 /// [`EmissionProcess::find_by_name`] drops it — the exact behaviour of the
 /// Java `if (process != null)` guard. The nine that resolve match the
@@ -2884,10 +2884,9 @@ const GENERATOR_NAME: &str = "TotalActivityGenerator";
 /// `characterization/calculator-chains/calculator-dag.json`.
 ///
 /// **Fidelity note.** That DAG, reconstructed from `CalculatorInfo.txt`,
-/// records Running Exhaust at plain `GENERATOR`; the Java `subscribeToMe` —
-/// the runtime source of truth — overrides it to `GENERATOR-3` so the
+/// records Running Exhaust at plain `GENERATOR`; the Java `subscribeToMe`/// the runtime source of truth — overrides it to `GENERATOR-3` so the
 /// generator runs after `BaseRateGenerator` (`GENERATOR-2`). This port
-/// follows the Java. Task 44's generator-integration validation reconciles
+/// follows the Java. generator-integration validation reconciles
 /// the metadata.
 const SUBSCRIBED_PROCESSES: [(&str, &str); 10] = [
     ("Running Exhaust", "GENERATOR-3"),
@@ -2940,7 +2939,7 @@ static INPUT_TABLES: &[&str] = &[
 /// year/zone activity tables [`run`](TotalActivityGenerator::run) produces.
 /// Their per-link spatial allocation (`SHO`, `SHP`, `SourceHours`,
 /// `hotellingHours`) is sequenced by the master loop from the
-/// [`allocation`] kernels once the Task 50 data plane lands.
+/// [`allocation`] kernels once the data plane lands.
 static OUTPUT_TABLES: &[&str] = &[
     "SourceTypeAgePopulation",
     "SourceTypeAgeDistribution",
@@ -2984,26 +2983,26 @@ fn build_subscriptions() -> Vec<CalculatorSubscription> {
 pub struct TotalActivityGenerator;
 
 impl TotalActivityGenerator {
-    /// Stable module name — matches the `TotalActivityGenerator` entry in
-    /// the Phase 1 calculator-chain DAG.
+ /// Stable module name — matches the `TotalActivityGenerator` entry in
+ /// the calculator-chain DAG.
     pub const NAME: &'static str = GENERATOR_NAME;
 
-    /// Compute the year/zone activity tables — algorithm steps 110-189.
-    ///
-    /// Ports the year- and zone-scoped body of `executeLoop`: determine the
-    /// base year, grow the vehicle population and HPMS-typed VMT forward to
-    /// the analysis year, split VMT across road type / source type / age /
-    /// hour, and convert it to a total-activity basis (`SHO`, hotelling
-    /// hours, starts, `SHP`).
-    ///
-    /// When no base year is at or below [`TotalActivityInputs::analysis_year`]
-    /// the Java logs the failure and abandons the year; this port returns an
-    /// empty [`TotalActivityOutput`] in that case.
+ /// Compute the year/zone activity tables — algorithm steps 110-189.
+ ///
+ /// Ports the year- and zone-scoped body of `executeLoop`: determine the
+ /// base year, grow the vehicle population and HPMS-typed VMT forward to
+ /// the analysis year, split VMT across road type / source type / age /
+ /// hour, and convert it to a total-activity basis (`SHO`, hotelling
+ /// hours, starts, `SHP`).
+ ///
+ /// When no base year is at or below [`TotalActivityInputs::analysis_year`]
+ /// the Java logs the failure and abandons the year; this port returns an
+ /// empty [`TotalActivityOutput`] in that case.
     #[must_use]
     pub fn run(&self, inputs: &TotalActivityInputs) -> TotalActivityOutput {
         let analysis_year = inputs.analysis_year;
 
-        // Steps 110-139 — population.
+ // Steps 110-139 — population.
         let Some(base_year) = population::determine_base_year(&inputs.year, analysis_year) else {
             return TotalActivityOutput::default();
         };
@@ -3021,7 +3020,7 @@ impl TotalActivityGenerator {
             analysis_year,
         );
 
-        // Steps 140-159 — HPMS travel fraction and VMT growth.
+ // Steps 140-159 — HPMS travel fraction and VMT growth.
         let vmt_by_source_type =
             !inputs.source_type_day_vmt.is_empty() || !inputs.source_type_year_vmt.is_empty();
         let travel = travel::calculate_fraction_of_travel_using_hpms(
@@ -3039,7 +3038,7 @@ impl TotalActivityGenerator {
             analysis_year,
         );
 
-        // Steps 160-179 — VMT allocation by road type, source, age, hour.
+ // Steps 160-179 — VMT allocation by road type, source, age, hour.
         let annual_vmt = vmt::allocate_vmt_by_road_type_source_age(
             &travel.travel_fraction,
             &inputs.road_type,
@@ -3080,7 +3079,7 @@ impl TotalActivityGenerator {
         let vmt_by_my_road_hour_fraction =
             vmt::vmt_by_my_road_hour_fraction(&vmt_by_age_roadway_hour);
 
-        // Steps 180-189 — conversion to total-activity basis.
+ // Steps 180-189 — conversion to total-activity basis.
         let source_type_hour_2 = activity::source_type_hour_expanded(
             &inputs.source_type_hour,
             &inputs.hour_day,
@@ -3117,8 +3116,8 @@ impl TotalActivityGenerator {
             &starts_per_sample_vehicle,
             &inputs.starts_per_vehicle,
         );
-        // StartsByAgeHour joins the full StartsPerVehicle table — the rows
-        // already present plus the ones just computed.
+ // StartsByAgeHour joins the full StartsPerVehicle table — the rows
+ // already present plus the ones just computed.
         let mut starts_per_vehicle_full = inputs.starts_per_vehicle.clone();
         starts_per_vehicle_full.extend(new_starts_per_vehicle);
         let starts_by_age_hour =
@@ -3171,9 +3170,9 @@ impl Generator for TotalActivityGenerator {
         OUTPUT_TABLES
     }
 
-    /// Execute the generator: read all input tables from `ctx.tables()`,
-    /// run the activity-computation chain, and write the 12 output tables
-    /// to `ctx.scratch()`.
+ /// Execute the generator: read all input tables from `ctx.tables()`,
+ /// run the activity-computation chain, and write the 12 output tables
+ /// to `ctx.scratch()`.
     fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
         let pos = ctx.position();
         let analysis_year = pos
@@ -3228,7 +3227,7 @@ impl Generator for TotalActivityGenerator {
 
         let output = self.run(&inputs);
 
-        // Write all 12 output tables to scratch.
+ // Write all 12 output tables to scratch.
         macro_rules! write_scratch {
             ($rows:expr, $name:literal) => {{
                 let df = $rows
@@ -3266,8 +3265,8 @@ mod tests {
     use super::*;
     use moves_data::ProcessId;
 
-    /// Build a minimal one-source-type, one-base-year input that exercises
-    /// the population → travel → VMT → activity chain end to end.
+ /// Build a minimal one-source-type, one-base-year input that exercises
+ /// the population → travel → VMT → activity chain end to end.
     fn minimal_inputs() -> TotalActivityInputs {
         use inputs::{
             AvgSpeedBinRow, AvgSpeedDistributionRow, DayOfAnyWeekRow, DayVmtFractionRow,
@@ -3326,7 +3325,7 @@ mod tests {
             }],
             hpms_v_type_year: vec![],
             run_spec_source_type: vec![RunSpecSourceTypeRow { source_type_id: 21 }],
-            // VMT supplied by source type.
+ // VMT supplied by source type.
             source_type_year_vmt: vec![SourceTypeYearVmtRow {
                 year_id: 2020,
                 source_type_id: 21,
@@ -3403,7 +3402,7 @@ mod tests {
     fn subscribes_to_nine_year_granularity_processes() {
         let gen = TotalActivityGenerator;
         let subs = gen.subscriptions();
-        // Ten processes are listed; "Evap Non-Fuel Vapors" does not resolve.
+ // Ten processes are listed; "Evap Non-Fuel Vapors" does not resolve.
         assert_eq!(subs.len(), 9);
         assert!(subs.iter().all(|s| s.granularity == Granularity::Year));
     }
@@ -3411,15 +3410,15 @@ mod tests {
     #[test]
     fn running_exhaust_subscribes_after_baserategenerator() {
         let gen = TotalActivityGenerator;
-        // Running Exhaust is processID 1; the Java subscribes it at
-        // GENERATOR-3 so it runs after BaseRateGenerator (GENERATOR-2).
+ // Running Exhaust is processID 1; the Java subscribes it at
+ // GENERATOR-3 so it runs after BaseRateGenerator (GENERATOR-2).
         let running = gen
             .subscriptions()
             .iter()
             .find(|s| s.process_id == ProcessId(1))
             .expect("Running Exhaust subscription present");
         assert_eq!(running.priority.display(), "GENERATOR-3");
-        // Start Exhaust (processID 2) stays at plain GENERATOR.
+ // Start Exhaust (processID 2) stays at plain GENERATOR.
         let start = gen
             .subscriptions()
             .iter()
@@ -3446,7 +3445,7 @@ mod tests {
         let inp = minimal_inputs();
         let mut store = InMemoryStore::new();
 
-        // Load every required table into the slow-tier store.
+ // Load every required table into the slow-tier store.
         store.insert("Year", inp.year.clone().into_dataframe().unwrap());
         store.insert(
             "SourceTypeYear",
@@ -3556,7 +3555,7 @@ mod tests {
     #[test]
     fn run_without_a_base_year_yields_empty_output() {
         let mut inputs = minimal_inputs();
-        // No base year at or below the analysis year.
+ // No base year at or below the analysis year.
         inputs.year = vec![inputs::YearRow {
             year_id: 2030,
             is_base_year: true,
@@ -3569,7 +3568,7 @@ mod tests {
     fn run_produces_the_activity_chain() {
         let out = TotalActivityGenerator.run(&minimal_inputs());
 
-        // Population: 1000 vehicles split 60/40 across two ages.
+ // Population: 1000 vehicles split 60/40 across two ages.
         assert_eq!(out.source_type_age_population.len(), 2);
         let age0 = out
             .source_type_age_population
@@ -3578,18 +3577,18 @@ mod tests {
             .unwrap();
         assert!((age0.population - 600.0).abs() < 1e-9);
 
-        // VMT flows all the way to the single hour cell:
-        // 8400 annual VMT, all on road 2, month/day/hour fractions all 1,
-        // 7-day month -> weeksPerMonth 1 -> 8400 hourly VMT.
+ // VMT flows all the way to the single hour cell:
+ // 8400 annual VMT, all on road 2, month/day/hour fractions all 1,
+ // 7-day month -> weeksPerMonth 1 -> 8400 hourly VMT.
         assert_eq!(out.vmt_by_age_roadway_hour.len(), 2); // one row per age
         let total_vmt: f64 = out.vmt_by_age_roadway_hour.iter().map(|r| r.vmt).sum();
         assert!((total_vmt - 8400.0).abs() < 1e-6);
 
-        // SHO = VMT / averageSpeed; averageSpeed = 60.
+ // SHO = VMT / averageSpeed; averageSpeed = 60.
         let total_sho: f64 = out.sho_by_age_roadway_hour.iter().map(|r| r.sho).sum();
         assert!((total_sho - 8400.0 / 60.0).abs() < 1e-6);
 
-        // The analysis-year age distribution was rebuilt.
+ // The analysis-year age distribution was rebuilt.
         assert_eq!(out.source_type_age_distribution_additions.len(), 0);
     }
 }

@@ -1,4 +1,4 @@
-//! Calculator integration-validation harness — Tasks 73+74 (`mo-fvuf`, `mo-wkjj`).
+//! Calculator integration-validation harness —+74 (, ).
 //!
 //! This integration test is the entry point of the calculator
 //! integration-validation gate. The harness machinery lives in the
@@ -9,25 +9,24 @@
 //! The tests below, in order:
 //!
 //! 1. pin the 26 onroad fixtures and confirm each parses;
-//! 2. pin the 37 Phase 3 calculators (Tasks 45–72);
+//! 2. pin the 37 calculators;
 //! 3. confirm the coverage matrix reaches every fixture;
 //! 4. confirm every calculator is covered by at least one fixture;
 //! 5. confirm the diff engine catches a perturbed calculator value;
 //! 6. confirm the tolerance budget parses (no expected divergences yet);
 //! 7. validate against canonical snapshots when present — dormant
-//!    until the Phase 0 compute-node run populates them;
+//! until the compute-node run populates them;
 //! 8. print a harness-status banner.
 //!
-//! Task 73 built the harness over 23 hot-path fixtures with 4 known-uncovered
-//! calculators. Task 74 adds 3 fixtures (process-nox-speciation,
-//! process-extended-idle, chain-nonhaptog) that close the gap. Task 78 adds
+//! built the harness over 23 hot-path fixtures with 4 known-uncovered
+//! calculators. adds 3 fixtures (process-nox-speciation,
+//! process-extended-idle, chain-nonhaptog) that close the gap. adds
 //! DummyCalculator (no-op, zero registrations) — all 38 calculators are now
-//! in the catalogue; 37 carry registrations covered by fixtures. Task mo-y4bs
-//! adds NonroadEmissionCalculator (nonroad adapter, zero registrations) —
-//! 39 calculators total; 37 carry registrations covered by fixtures.
+//! in the catalogue; 37 carry registrations covered by fixtures. Task 
+//! adds NonroadEmissionCalculator (nonroad adapter, zero registrations)//! 39 calculators total; 37 carry registrations covered by fixtures.
 //!
 //! See `tests/calculator_validation/mod.rs` for what runs today versus
-//! what is gated behind the Phase 0 snapshot capture and the data
+//! what is gated behind the snapshot capture and the data
 //! plane, and `characterization/calculator-validation/README.md` for
 //! the gate overview.
 
@@ -65,7 +64,7 @@ fn all_26_onroad_fixtures_present_and_parse() {
     assert_eq!(
         loaded.len(),
         26,
-        "expected 26 onroad fixtures (23 hot-path + 3 Task 74)"
+        "expected 26 onroad fixtures (23 hot-path + 3 additional)"
     );
 
     for fixture in &loaded {
@@ -93,7 +92,7 @@ fn all_39_calculators_registered() {
     assert_eq!(
         registered.len(),
         calculators::CALCULATOR_COUNT,
-        "expected {} Phase 3 calculators, got {}",
+        "expected {} calculators, got {}",
         calculators::CALCULATOR_COUNT,
         registered.len()
     );
@@ -123,17 +122,17 @@ fn coverage_matrix_reaches_every_fixture() {
 
 #[test]
 fn coverage_matrix_every_calculator_covered() {
-    // Task 74 (`mo-wkjj`) added three fixtures that cover the four calculators
-    // the original 23 hot-path fixtures left uncovered:
-    //
-    //   process-nox-speciation  → NOCalculator (32,1), NO2Calculator (33,1)
-    //   process-extended-idle   → CO2AERunningStartExtendedIdleCalculator (90,90)
-    //   chain-nonhaptog         → TogSpeciationCalculator (88,1)
-    //
-    // Task 78 adds DummyCalculator with empty registrations — it has no
-    // (pollutant, process) pairs and can never appear as "covered" in the
-    // fixture matrix. It is listed in KNOWN_UNCOVERED as an intentional
-    // exception; the Java original also produced no output.
+ // () added three fixtures that cover the four calculators
+ // the original 23 hot-path fixtures left uncovered:
+ //
+ // process-nox-speciation → NOCalculator (32,1), NO2Calculator (33,1)
+ // process-extended-idle → CO2AERunningStartExtendedIdleCalculator (90,90)
+ // chain-nonhaptog → TogSpeciationCalculator (88,1)
+ //
+ // adds DummyCalculator with empty registrations — it has no
+ // (pollutant, process) pairs and can never appear as "covered" in the
+ // fixture matrix. It is listed in KNOWN_UNCOVERED as an intentional
+ // exception; the Java original also produced no output.
     const KNOWN_UNCOVERED: &[&str] = &["DummyCalculator"];
 
     let loaded_fixtures = fixtures::load_all_fixtures().expect("the 26 onroad fixtures must load");
@@ -275,7 +274,7 @@ fn harness_status() {
         .count();
 
     println!();
-    println!("=== Calculator integration-validation harness (Tasks 73+74) ===");
+    println!("=== Calculator integration-validation harness ===");
     println!(
         "  Fixtures    : {} (23 hot-path + 3 full-coverage)",
         loaded_fixtures.len()
@@ -296,7 +295,7 @@ fn harness_status() {
          + NonroadEmissionCalculator adapter);"
     );
     println!(
-        "          canonical-capture diff dormant until Phase 0 compute-node run + data plane."
+        "          canonical-capture diff dormant until compute-node run + data plane."
     );
     println!("================================================================");
 }

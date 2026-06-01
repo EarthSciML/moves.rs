@@ -1,13 +1,13 @@
-//! `moves` — the MOVES command-line entry point (migration-plan Task 28).
+//! `moves` — the MOVES command-line entry point ().
 //!
 //! Three subcommands:
 //!
 //! * `moves run --runspec <path>` — parse a RunSpec, walk the calculator
-//!   graph, and write output Parquet.
+//! graph, and write output Parquet.
 //! * `moves import-cdb --input <dir> --output <dir>` — validate County-scale
-//!   input CSVs and write them as Parquet.
+//! input CSVs and write them as Parquet.
 //! * `moves convert-runspec --input <path>` — convert a RunSpec between XML
-//!   and TOML.
+//! and TOML.
 //!
 //! The command logic lives in the `moves-cli` library so it is unit- and
 //! integration-testable without spawning a subprocess; this file is just the
@@ -15,11 +15,11 @@
 //!
 //! Exit codes:
 //!
-//! | code | meaning                                                          |
+//! | code | meaning |
 //! |------|------------------------------------------------------------------|
-//! | 0    | success                                                          |
-//! | 1    | a command-level failure, or `import-cdb` rejected a table        |
-//! | 2    | argument-parsing error (emitted by `clap`)                       |
+//! | 0 | success |
+//! | 1 | a command-level failure, or `import-cdb` rejected a table |
+//! | 2 | argument-parsing error (emitted by `clap`) |
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -43,41 +43,41 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Run a MOVES simulation from a RunSpec.
+ /// Run a MOVES simulation from a RunSpec.
     Run {
-        /// RunSpec to execute (`.xml`, `.mrs`, or `.toml`).
+ /// RunSpec to execute (`.xml`, `.mrs`, or `.toml`).
         #[arg(long, value_name = "PATH")]
         runspec: PathBuf,
 
-        /// Directory output Parquet is written to. Created if absent.
+ /// Directory output Parquet is written to. Created if absent.
         #[arg(long, value_name = "DIR", default_value = "moves-output")]
         output: PathBuf,
 
-        /// Maximum calculator chains run concurrently (0 = host parallelism).
+ /// Maximum calculator chains run concurrently (0 = host parallelism).
         #[arg(long, value_name = "N", default_value_t = 0)]
         max_parallel_chunks: usize,
 
-        /// Override calculator-chain DAG (default: the embedded Phase 1 DAG).
+ /// Override calculator-chain DAG (default: the embedded DAG).
         #[arg(long, value_name = "PATH")]
         calculator_dag: Option<PathBuf>,
 
-        /// Value for the `MOVESRun.runDateTime` output column. Left unset by
-        /// default, which keeps the run's output byte-stable.
+ /// Value for the `MOVESRun.runDateTime` output column. Left unset by
+ /// default, which keeps the run's output byte-stable.
         #[arg(long, value_name = "ISO8601")]
         run_date_time: Option<String>,
 
-        /// Path to a canonical MOVES snapshot directory whose
-        /// `tables/db__movesexecution*.parquet` files supply the
-        /// execution-database slow tier for all calculators.
+ /// Path to a canonical MOVES snapshot directory whose
+ /// `tables/db__movesexecution*.parquet` files supply the
+ /// execution-database slow tier for all calculators.
         #[arg(long, value_name = "DIR")]
         snapshot: Option<PathBuf>,
 
-        /// Path to a County/Project-scale input directory produced by
-        /// `moves import-cdb` (CDB) or the PDB importer. Every
-        /// `*.parquet` file in this directory is loaded into the
-        /// execution-database slow tier, overriding any same-named table
-        /// already loaded from the snapshot. Use for RunSpecs that set
-        /// `<modeldomain>` to `SINGLE` (County) or `PROJECT`.
+ /// Path to a County/Project-scale input directory produced by
+ /// `moves import-cdb` (CDB) or the PDB importer. Every
+ /// `*.parquet` file in this directory is loaded into the
+ /// execution-database slow tier, overriding any same-named table
+ /// already loaded from the snapshot. Use for RunSpecs that set
+ /// `<modeldomain>` to `SINGLE` (County) or `PROJECT`.
         #[arg(long, value_name = "DIR")]
         scale_input: Option<PathBuf>,
 
@@ -91,30 +91,30 @@ enum Command {
         default_db: Option<PathBuf>,
     },
 
-    /// Import County-database (CDB) input CSV files into Parquet.
+ /// Import County-database (CDB) input CSV files into Parquet.
     ImportCdb {
-        /// Directory holding the `<TableName>.csv` files.
+ /// Directory holding the `<TableName>.csv` files.
         #[arg(long, value_name = "DIR")]
         input: PathBuf,
 
-        /// Directory the validated `<TableName>.parquet` files go to.
+ /// Directory the validated `<TableName>.parquet` files go to.
         #[arg(long, value_name = "DIR")]
         output: PathBuf,
 
-        /// Converted default-DB Parquet tree, for foreign-key validation.
-        /// Without it, FK checks degrade to warnings.
+ /// Converted default-DB Parquet tree, for foreign-key validation.
+ /// Without it, FK checks degrade to warnings.
         #[arg(long, value_name = "DIR")]
         default_db: Option<PathBuf>,
     },
 
-    /// Convert a RunSpec between XML and TOML.
+ /// Convert a RunSpec between XML and TOML.
     ConvertRunspec {
-        /// RunSpec to convert (`.xml`, `.mrs`, or `.toml`).
+ /// RunSpec to convert (`.xml`, `.mrs`, or `.toml`).
         #[arg(long, value_name = "PATH")]
         input: PathBuf,
 
-        /// Output path. Defaults to the input path with the format's
-        /// extension swapped (`.xml` ↔ `.toml`).
+ /// Output path. Defaults to the input path with the format's
+ /// extension swapped (`.xml` ↔ `.toml`).
         #[arg(long, value_name = "PATH")]
         output: Option<PathBuf>,
     },

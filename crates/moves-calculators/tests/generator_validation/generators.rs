@@ -1,7 +1,7 @@
-//! The Phase 3 + Phase 4 generator catalogue (Tasks 29–43, Phase 4 additions).
+//! The + generator catalogue.
 //!
-//! Tasks 29–43 of the migration plan port the MOVES onroad generators — 16
-//! implementations (Task 35 ports two generators). Phase 4 adds `ProjectTAG`
+//! of the port the MOVES onroad generators — 16
+//! implementations. adds `ProjectTAG`
 //! (the project-domain total activity generator, `ProjectTAG.java`).
 //!
 //! [`all_generators`] instantiates all 17 as boxed trait objects.
@@ -31,14 +31,14 @@ use moves_calculators::generators::{
     totalactivitygenerator::TotalActivityGenerator,
 };
 
-/// The number of generators landed so far: 16 Phase 3 (Tasks 29–43) plus
-/// 1 Phase 4 (`ProjectTAG`).
+/// The number of generators landed so far: 16 plus
+/// 1 (`ProjectTAG`).
 pub const GENERATOR_COUNT: usize = 17;
 
-/// Construct every Phase 3 + Phase 4 generator as a boxed trait object.
+/// Construct every + generator as a boxed trait object.
 ///
 /// The list is the harness's source of truth for "the generators"
-/// — it is the real `Generator` implementations from the
+/// it is the real `Generator` implementations from the
 /// `moves-calculators` crate, not a description of them.
 pub fn all_generators() -> Vec<Box<dyn Generator>> {
     vec![
@@ -117,10 +117,10 @@ mod tests {
 
     #[test]
     fn every_generator_subscribes_or_is_a_known_helper() {
-        // All generators are master-loop scheduled except SourceTypePhysics,
-        // a helper that other generators invoke directly. Any *other*
-        // generator with no subscriptions would never fire — a bug worth
-        // catching here.
+ // All generators are master-loop scheduled except SourceTypePhysics,
+ // a helper that other generators invoke directly. Any *other*
+ // generator with no subscriptions would never fire — a bug worth
+ // catching here.
         for generator in all_generators() {
             let subs = subscribed_process_ids(generator.as_ref());
             if subs.is_empty() {

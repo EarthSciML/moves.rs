@@ -1,7 +1,7 @@
-//! The Phase 3 calculator catalogue (Tasks 45–72 + 78 closing checkpoint).
+//! The calculator catalogue.
 //!
-//! Tasks 45–72 port the MOVES onroad hot-path emission calculators (37
-//! implementations). Task 78 adds `DummyCalculator` (the no-op placeholder
+//! port the MOVES onroad hot-path emission calculators (37
+//! implementations). adds `DummyCalculator` (the no-op placeholder
 //! from `CalculatorInfo.txt`) to satisfy the "every module is represented"
 //! completeness criterion, bringing the total to **38**:
 //!
@@ -82,84 +82,84 @@ use moves_calculators::calculators::{
     },
 };
 
-/// The number of calculators the Phase 3 plan lands (Tasks 45–72 + 78 + mo-y4bs).
+/// The number of calculators the plan lands.
 pub const CALCULATOR_COUNT: usize = 39;
 
-/// Construct every Phase 3 hot-path calculator as a boxed trait object.
+/// Construct every hot-path calculator as a boxed trait object.
 ///
 /// The list is the harness's source of truth for "the calculators"
-/// — it is the real `Calculator` implementations from the
+/// it is the real `Calculator` implementations from the
 /// `moves-calculators` crate, not a description of them.
 pub fn all_calculators() -> Vec<Box<dyn Calculator>> {
     vec![
-        // Task 45
+ //
         Box::new(BaseRateCalculator::default()),
-        // Task 46
+ //
         Box::new(CriteriaRunningCalculator::new()),
-        // Task 47
+ //
         Box::new(CriteriaStartCalculator::new()),
-        // Task 48
+ //
         Box::new(HcSpeciationCalculator::new()),
-        // Task 49
+ //
         Box::new(NrHcSpeciationCalculator::new()),
-        // Task 50
+ //
         Box::new(AirToxicsCalculator::new()),
-        // Task 51
+ //
         Box::new(AirToxicsDistanceCalculator::new()),
-        // Task 52
+ //
         Box::new(NrAirToxicsCalculator::new()),
-        // Task 53
+ //
         Box::new(PmTotalExhaustCalculator::new()),
         Box::new(BasicRunningPmEmissionCalculator::new()),
-        // Task 54
+ //
         Box::new(BasicStartPmEmissionCalculator::new()),
-        // Task 55
+ //
         Box::new(PM10EmissionCalculator::new()),
         Box::new(PM10BrakeTireCalculator::new()),
-        // Task 56
+ //
         Box::new(BasicBrakeWearPmEmissionCalculator::new()),
         Box::new(BasicTireWearPmEmissionCalculator::new()),
-        // Task 57
+ //
         Box::new(SulfatePMCalculator),
-        // Task 58
+ //
         Box::new(EvaporativePermeationCalculator::new()),
-        // Task 59
+ //
         Box::new(TankVaporVentingCalculator::new()),
-        // Task 60
+ //
         Box::new(MultidayTankVaporVentingCalculator::new()),
-        // Task 61
+ //
         Box::new(LiquidLeakingCalculator::new()),
-        // Task 62
+ //
         Box::new(RefuelingLossCalculator),
-        // Task 63
+ //
         Box::new(CrankcaseEmissionCalculatorNonPM),
         Box::new(CrankcaseEmissionCalculatorPM),
-        // Task 64
+ //
         Box::new(CO2AERunningStartExtendedIdleCalculator),
-        // Task 65
+ //
         Box::new(Ch4N2oRunningStartCalculator::new()),
-        // Task 66
+ //
         Box::new(Nh3RunningCalculator::new()),
         Box::new(Nh3StartCalculator::new()),
-        // Task 67
+ //
         Box::new(SO2Calculator),
-        // Task 68
+ //
         Box::new(NOCalculator::new()),
         Box::new(NO2Calculator::new()),
-        // Task 69
+ //
         Box::new(WellToPumpProcessor),
         Box::new(Co2AtmosphericWtpCalculator),
         Box::new(Ch4N2oWtpCalculator),
         Box::new(Co2EquivalentWtpCalculator),
-        // Task 70
+ //
         Box::new(TogSpeciationCalculator),
-        // Task 71
+ //
         Box::new(ActivityCalculator),
-        // Task 72
+ //
         Box::new(DistanceCalculator::new()),
-        // Task 78 — DummyCalculator (no-op completeness entry)
+ // — DummyCalculator (no-op completeness entry)
         Box::new(DummyCalculator),
-        // Task 119 (mo-y4bs) — NonroadEmissionCalculator adapter
+ // () — NonroadEmissionCalculator adapter
         Box::new(NonroadEmissionCalculator::new()),
     ]
 }
@@ -183,7 +183,7 @@ pub fn registered_ppa_ids(calculator: &dyn Calculator) -> BTreeSet<(u32, u32)> {
         .collect()
 }
 
-/// The sorted, deduplicated names of all Phase 3 calculators.
+/// The sorted, deduplicated names of all calculators.
 pub fn sorted_calculator_names() -> Vec<String> {
     let mut names: Vec<String> = all_calculators()
         .iter()
@@ -203,7 +203,7 @@ mod tests {
         assert_eq!(
             calcs.len(),
             CALCULATOR_COUNT,
-            "expected {CALCULATOR_COUNT} Phase 3 calculators, got {}",
+            "expected {CALCULATOR_COUNT} calculators, got {}",
             calcs.len()
         );
     }
@@ -233,7 +233,7 @@ mod tests {
     fn registered_ppa_ids_are_pairs_of_u32() {
         for calc in all_calculators() {
             let ppa_ids = registered_ppa_ids(calc.as_ref());
-            // All returned pairs must have positive IDs — MOVES IDs are 1-based.
+ // All returned pairs must have positive IDs — MOVES IDs are 1-based.
             for &(pollutant_id, process_id) in &ppa_ids {
                 assert!(pollutant_id > 0, "{}: zero pollutant_id", calc.name());
                 assert!(process_id > 0, "{}: zero process_id", calc.name());

@@ -1,4 +1,4 @@
-# Task 92: COMMON Block Replacement Design
+#: COMMON Block Replacement Design
 
 ## Overview
 
@@ -30,28 +30,28 @@ Based on the Fortran source audit (`NONROAD/NR08a/SOURCE/`):
 
 ### 1. `common::consts` (from `nonrdprm.inc`)
 
-**Task 93** handles the full port. This is the constants module (already exists).
+handles the full port. This is the constants module (already exists).
 
 ```rust
 pub mod consts {
-    // Array dimension parameters (documentation only)
-    pub const MXEQIP: usize = 25;
-    pub const MXPOL: usize = 23;
-    pub const NSTATE: usize = 53;
-    pub const NCNTY: usize = 3400;
-    pub const MXTECH: usize = 15;
-    pub const MXEVTECH: usize = 15;
-    pub const MXHPC: usize = 18;
-    pub const MXAGYR: usize = 51;
-    pub const MXDAYS: usize = 365;
-    pub const MXSUBC: usize = 300;
-    pub const MXEMFC: usize = 13_000;
-    pub const MXDTFC: usize = 120;
-    pub const MXPOP: usize = 1_000;
-    
-    // Chemical and conversion constants (Task 93)
-    pub const DENGAS: f64 = 6.237;  // Density of gas (lb/gal)
-    // ... more constants
+ // Array dimension parameters (documentation only)
+ pub const MXEQIP: usize = 25;
+ pub const MXPOL: usize = 23;
+ pub const NSTATE: usize = 53;
+ pub const NCNTY: usize = 3400;
+ pub const MXTECH: usize = 15;
+ pub const MXEVTECH: usize = 15;
+ pub const MXHPC: usize = 18;
+ pub const MXAGYR: usize = 51;
+ pub const MXDAYS: usize = 365;
+ pub const MXSUBC: usize = 300;
+ pub const MXEMFC: usize = 13_000;
+ pub const MXDTFC: usize = 120;
+ pub const MXPOP: usize = 1_000;
+ 
+ // Chemical and conversion constants
+ pub const DENGAS: f64 = 6.237; // Density of gas (lb/gal)
+ // ... more constants
 }
 ```
 
@@ -62,42 +62,42 @@ pub mod consts {
 ```rust
 #[derive(Debug, Default, Clone)]
 pub struct UserOptions {
-    /// Input file paths
-    pub pop_file: PathBuf,
-    pub alo_file: PathBuf,
-    pub grw_file: PathBuf,
-    pub sea_file: PathBuf,
-    pub emf_file: PathBuf,
-    pub tch_file: PathBuf,
-    pub rtrft_file: Option<PathBuf>,
-    
-    /// Output configuration
-    pub output_dir: PathBuf,
-    pub output_format: OutputFormat,  // legacy, parquet, or both
-    
-    /// Run parameters
-    pub start_year: u16,
-    pub end_year: u16,
-    pub start_month: u8,
-    pub end_month: u8,
-    pub start_day: u8,
-    pub end_day: u8,
-    
-    /// Geographic scope
-    pub geography_level: GeographyLevel,  // US, STATE, COUNTY, SUBCOUNTY
-    pub state_codes: Vec<i32>,
-    pub county_codes: Vec<i32>,
-    
-    /// Pollutant selection
-    pub active_pollutants: Vec<Pollutant>,
-    
-    /// Control strategy flags
-    pub retrofit_enabled: bool,
-    pub moves_mode: bool,
-    
-    /// Diagnostic flags
-    pub debug_output: bool,
-    pub verbose: bool,
+ /// Input file paths
+ pub pop_file: PathBuf,
+ pub alo_file: PathBuf,
+ pub grw_file: PathBuf,
+ pub sea_file: PathBuf,
+ pub emf_file: PathBuf,
+ pub tch_file: PathBuf,
+ pub rtrft_file: Option<PathBuf>,
+ 
+ /// Output configuration
+ pub output_dir: PathBuf,
+ pub output_format: OutputFormat, // legacy, parquet, or both
+ 
+ /// Run parameters
+ pub start_year: u16,
+ pub end_year: u16,
+ pub start_month: u8,
+ pub end_month: u8,
+ pub start_day: u8,
+ pub end_day: u8,
+ 
+ /// Geographic scope
+ pub geography_level: GeographyLevel, // US, STATE, COUNTY, SUBCOUNTY
+ pub state_codes: Vec<i32>,
+ pub county_codes: Vec<i32>,
+ 
+ /// Pollutant selection
+ pub active_pollutants: Vec<Pollutant>,
+ 
+ /// Control strategy flags
+ pub retrofit_enabled: bool,
+ pub moves_mode: bool,
+ 
+ /// Diagnostic flags
+ pub debug_output: bool,
+ pub verbose: bool,
 }
 ```
 
@@ -108,35 +108,35 @@ pub struct UserOptions {
 ```rust
 #[derive(Debug, Default, Clone)]
 pub struct EmissionsState {
-    /// Exhaust emission factors: [SCC][eqip][pollutant][age][mode]
-    pub exhaust_factors: HashMap<SccKey, ExhaustFactorTable>,
-    
-    /// Evaporative emission factors
-    pub evaporative_factors: HashMap<SccKey, EvapFactorTable>,
-    
-    /// Deterioration factors
-    pub deterioration_factors: HashMap<SccKey, DetFactorTable>,
-    
-    /// Unit conversion factors
-    pub unit_conversions: UnitConversionTable,
+ /// Exhaust emission factors: [SCC][eqip][pollutant][age][mode]
+ pub exhaust_factors: HashMap<SccKey, ExhaustFactorTable>,
+ 
+ /// Evaporative emission factors
+ pub evaporative_factors: HashMap<SccKey, EvapFactorTable>,
+ 
+ /// Deterioration factors
+ pub deterioration_factors: HashMap<SccKey, DetFactorTable>,
+ 
+ /// Unit conversion factors
+ pub unit_conversions: UnitConversionTable,
 }
 
 #[derive(Debug, Clone)]
 pub struct ExhaustFactorTable {
-    /// [equipment_idx][pollutant_idx][age_idx][operating_mode]
-    pub rates: Vec<Vec<Vec<Vec<f64>>>>,
+ /// [equipment_idx][pollutant_idx][age_idx][operating_mode]
+ pub rates: Vec<Vec<Vec<Vec<f64>>>>,
 }
 
 #[derive(Debug, Clone)]
 pub struct EvapFactorTable {
-    // Similar structure for evaporative emissions
-    pub rates: Vec<Vec<Vec<f64>>>,
+ // Similar structure for evaporative emissions
+ pub rates: Vec<Vec<Vec<f64>>>,
 }
 
 #[derive(Debug, Clone)]
 pub struct DetFactorTable {
-    /// Deterioration multipliers by age
-    pub factors: Vec<f64>,
+ /// Deterioration multipliers by age
+ pub factors: Vec<f64>,
 }
 ```
 
@@ -147,48 +147,48 @@ pub struct DetFactorTable {
 ```rust
 #[derive(Debug, Default, Clone)]
 pub struct PopulationState {
-    /// Population records: [SCC][equipment][FIPS]
-    pub populations: Vec<PopulationRecord>,
-    
-    /// Age distributions: [SCC][equipment][FIPS][age]
-    pub age_distributions: HashMap<AgeKey, Vec<f64>>,
-    
-    /// Growth factors: [SCC][equipment][FIPS][year]
-    pub growth_factors: HashMap<GrowthKey, Vec<f64>>,
-    
-    /// Base year populations
-    pub base_populations: HashMap<BasePopKey, f64>,
-    
-    /// Scrappage rates
-    pub scrappage_rates: Vec<f64>,
-    
-    /// Retrofit population adjustments
-    pub retrofit_adjustments: Vec<RetrofitPopAdjustment>,
+ /// Population records: [SCC][equipment][FIPS]
+ pub populations: Vec<PopulationRecord>,
+ 
+ /// Age distributions: [SCC][equipment][FIPS][age]
+ pub age_distributions: HashMap<AgeKey, Vec<f64>>,
+ 
+ /// Growth factors: [SCC][equipment][FIPS][year]
+ pub growth_factors: HashMap<GrowthKey, Vec<f64>>,
+ 
+ /// Base year populations
+ pub base_populations: HashMap<BasePopKey, f64>,
+ 
+ /// Scrappage rates
+ pub scrappage_rates: Vec<f64>,
+ 
+ /// Retrofit population adjustments
+ pub retrofit_adjustments: Vec<RetrofitPopAdjustment>,
 }
 
 #[derive(Debug, Clone)]
 pub struct PopulationRecord {
-    pub scc: i32,
-    pub equipment_idx: usize,
-    pub fips: i32,
-    pub population: f64,
-    pub avg_hp: f64,
-    pub use_hours: f64,
-    pub model_year: i16,
+ pub scc: i32,
+ pub equipment_idx: usize,
+ pub fips: i32,
+ pub population: f64,
+ pub avg_hp: f64,
+ pub use_hours: f64,
+ pub model_year: i16,
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct AgeKey {
-    pub scc: i32,
-    pub equipment_idx: usize,
-    pub fips: i32,
+ pub scc: i32,
+ pub equipment_idx: usize,
+ pub fips: i32,
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct GrowthKey {
-    pub scc: i32,
-    pub equipment_idx: usize,
-    pub fips: i32,
+ pub scc: i32,
+ pub equipment_idx: usize,
+ pub fips: i32,
 }
 ```
 
@@ -199,37 +199,37 @@ pub struct GrowthKey {
 ```rust
 #[derive(Debug, Default, Clone)]
 pub struct AllocationState {
-    /// County allocation factors
-    pub county_allocations: Vec<CountyAllocation>,
-    
-    /// State-to-county allocation factors
-    pub state_to_county: Vec<StateCountyAllocation>,
-    
-    /// Subcounty allocation factors
-    pub subcounty_allocations: Vec<SubcountyAllocation>,
-    
-    /// Zone mappings
-    pub zone_mappings: HashMap<i32, Vec<ZoneRecord>>,
+ /// County allocation factors
+ pub county_allocations: Vec<CountyAllocation>,
+ 
+ /// State-to-county allocation factors
+ pub state_to_county: Vec<StateCountyAllocation>,
+ 
+ /// Subcounty allocation factors
+ pub subcounty_allocations: Vec<SubcountyAllocation>,
+ 
+ /// Zone mappings
+ pub zone_mappings: HashMap<i32, Vec<ZoneRecord>>,
 }
 
 #[derive(Debug, Clone)]
 pub struct CountyAllocation {
-    pub fips: i32,
-    pub factor: f64,
+ pub fips: i32,
+ pub factor: f64,
 }
 
 #[derive(Debug, Clone)]
 pub struct StateCountyAllocation {
-    pub state_code: i32,
-    pub county_code: i32,
-    pub factor: f64,
+ pub state_code: i32,
+ pub county_code: i32,
+ pub factor: f64,
 }
 
 #[derive(Debug, Clone)]
 pub struct SubcountyAllocation {
-    pub fips: i32,
-    pub subcounty_id: i32,
-    pub factor: f64,
+ pub fips: i32,
+ pub subcounty_id: i32,
+ pub factor: f64,
 }
 ```
 
@@ -240,23 +240,23 @@ pub struct SubcountyAllocation {
 ```rust
 #[derive(Debug, Default, Clone)]
 pub struct GrowthState {
-    /// Growth factor tables by year
-    pub growth_table: Vec<GrowthRecord>,
-    
-    /// Growth adjustment factors
-    pub adjustment_factors: Vec<GrowthAdjustment>,
-    
-    /// Year indices
-    pub year_indices: Vec<i16>,
+ /// Growth factor tables by year
+ pub growth_table: Vec<GrowthRecord>,
+ 
+ /// Growth adjustment factors
+ pub adjustment_factors: Vec<GrowthAdjustment>,
+ 
+ /// Year indices
+ pub year_indices: Vec<i16>,
 }
 
 #[derive(Debug, Clone)]
 pub struct GrowthRecord {
-    pub scc: i32,
-    pub equipment_idx: usize,
-    pub fips: i32,
-    pub year: i16,
-    pub factor: f64,
+ pub scc: i32,
+ pub equipment_idx: usize,
+ pub fips: i32,
+ pub year: i16,
+ pub factor: f64,
 }
 ```
 
@@ -267,29 +267,29 @@ pub struct GrowthRecord {
 ```rust
 #[derive(Debug, Default, Clone)]
 pub struct SeasonalState {
-    /// Seasonal factors by month
-    pub monthly_factors: Vec<MonthlyFactor>,
-    
-    /// Day-specific adjustments
-    pub day_adjustments: Vec<DayAdjustment>,
-    
-    /// Day-of-year fractions
-    pub day_fractions: [f64; 365],
-    
-    /// Month-to-day mappings
-    pub month_days: [i32; 12],
+ /// Seasonal factors by month
+ pub monthly_factors: Vec<MonthlyFactor>,
+ 
+ /// Day-specific adjustments
+ pub day_adjustments: Vec<DayAdjustment>,
+ 
+ /// Day-of-year fractions
+ pub day_fractions: [f64; 365],
+ 
+ /// Month-to-day mappings
+ pub month_days: [i32; 12],
 }
 
 #[derive(Debug, Clone)]
 pub struct MonthlyFactor {
-    pub month: u8,
-    pub factor: f64,
+ pub month: u8,
+ pub factor: f64,
 }
 
 #[derive(Debug, Clone)]
 pub struct DayAdjustment {
-    pub day_of_year: i32,
-    pub adjustment: f64,
+ pub day_of_year: i32,
+ pub adjustment: f64,
 }
 ```
 
@@ -300,30 +300,30 @@ pub struct DayAdjustment {
 ```rust
 #[derive(Debug, Default, Clone)]
 pub struct TechnologyState {
-    /// Exhaust technology tables
-    pub exhaust_technologies: Vec<TechnologyRecord>,
-    
-    /// Evaporative technology tables
-    pub evaporative_technologies: Vec<EvapTechnologyRecord>,
-    
-    /// Technology mappings by SCC
-    pub scc_technology_map: HashMap<i32, Vec<TechMapping>>,
+ /// Exhaust technology tables
+ pub exhaust_technologies: Vec<TechnologyRecord>,
+ 
+ /// Evaporative technology tables
+ pub evaporative_technologies: Vec<EvapTechnologyRecord>,
+ 
+ /// Technology mappings by SCC
+ pub scc_technology_map: HashMap<i32, Vec<TechMapping>>,
 }
 
 #[derive(Debug, Clone)]
 pub struct TechnologyRecord {
-    pub scc: i32,
-    pub tech_idx: usize,
-    pub tech_type: TechType,
-    pub control_efficiency: f64,
+ pub scc: i32,
+ pub tech_idx: usize,
+ pub tech_type: TechType,
+ pub control_efficiency: f64,
 }
 
 #[derive(Debug, Clone)]
 pub struct EvapTechnologyRecord {
-    pub scc: i32,
-    pub evap_tech_idx: usize,
-    pub evap_type: EvapTechType,
-    pub control_efficiency: f64,
+ pub scc: i32,
+ pub evap_tech_idx: usize,
+ pub evap_type: EvapTechType,
+ pub control_efficiency: f64,
 }
 ```
 
@@ -334,31 +334,31 @@ pub struct EvapTechnologyRecord {
 ```rust
 #[derive(Debug, Default, Clone)]
 pub struct EquipmentState {
-    /// Equipment category definitions
-    pub equipment_categories: Vec<EquipmentCategory>,
-    
-    /// SCC definitions
-    pub scc_definitions: Vec<SccDefinition>,
-    
-    /// SCC to equipment mappings
-    pub scc_to_equipment: HashMap<i32, Vec<EquipmentMapping>>,
-    
-    /// Horsepower categories
-    pub hp_categories: Vec<HpCategory>,
+ /// Equipment category definitions
+ pub equipment_categories: Vec<EquipmentCategory>,
+ 
+ /// SCC definitions
+ pub scc_definitions: Vec<SccDefinition>,
+ 
+ /// SCC to equipment mappings
+ pub scc_to_equipment: HashMap<i32, Vec<EquipmentMapping>>,
+ 
+ /// Horsepower categories
+ pub hp_categories: Vec<HpCategory>,
 }
 
 #[derive(Debug, Clone)]
 pub struct EquipmentCategory {
-    pub idx: usize,
-    pub name: String,
-    pub base_year: i16,
+ pub idx: usize,
+ pub name: String,
+ pub base_year: i16,
 }
 
 #[derive(Debug, Clone)]
 pub struct SccDefinition {
-    pub scc: i32,
-    pub description: String,
-    pub category: SccCategory,
+ pub scc: i32,
+ pub description: String,
+ pub category: SccCategory,
 }
 ```
 
@@ -369,52 +369,52 @@ pub struct SccDefinition {
 ```rust
 #[derive(Debug, Default, Clone)]
 pub struct GeographyState {
-    /// FIPS code tables
-    pub fips_tables: FipsTables,
-    
-    /// State definitions
-    pub states: Vec<StateDefinition>,
-    
-    /// County definitions
-    pub counties: Vec<CountyDefinition>,
-    
-    /// Subcounty definitions
-    pub subcounties: Vec<SubcountyDefinition>,
-    
-    /// Geographic allocation tables
-    pub geo_allocations: Vec<GeoAllocation>,
+ /// FIPS code tables
+ pub fips_tables: FipsTables,
+ 
+ /// State definitions
+ pub states: Vec<StateDefinition>,
+ 
+ /// County definitions
+ pub counties: Vec<CountyDefinition>,
+ 
+ /// Subcounty definitions
+ pub subcounties: Vec<SubcountyDefinition>,
+ 
+ /// Geographic allocation tables
+ pub geo_allocations: Vec<GeoAllocation>,
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct FipsTables {
-    /// FIPS → state mapping
-    pub fips_to_state: HashMap<i32, i32>,
-    
-    /// State → FIPS list
-    pub state_to_fips: HashMap<i32, Vec<i32>>,
-    
-    /// State codes
-    pub state_codes: Vec<i32>,
-    
-    /// County codes
-    pub county_codes: Vec<i32>,
+ /// FIPS → state mapping
+ pub fips_to_state: HashMap<i32, i32>,
+ 
+ /// State → FIPS list
+ pub state_to_fips: HashMap<i32, Vec<i32>>,
+ 
+ /// State codes
+ pub state_codes: Vec<i32>,
+ 
+ /// County codes
+ pub county_codes: Vec<i32>,
 }
 
 #[derive(Debug, Clone)]
 pub struct StateDefinition {
-    pub code: i32,
-    pub name: String,
-    pub fips_start: i32,
-    pub fips_end: i32,
+ pub code: i32,
+ pub name: String,
+ pub fips_start: i32,
+ pub fips_end: i32,
 }
 
 #[derive(Debug, Clone)]
 pub struct CountyDefinition {
-    pub fips: i32,
-    pub state_code: i32,
-    pub county_code: i32,
-    pub name: String,
-    pub zone: i32,
+ pub fips: i32,
+ pub state_code: i32,
+ pub county_code: i32,
+ pub name: String,
+ pub zone: i32,
 }
 ```
 
@@ -425,27 +425,27 @@ pub struct CountyDefinition {
 ```rust
 #[derive(Debug, Default, Clone)]
 pub struct RetrofitState {
-    /// Retrofit records
-    pub retrofits: Vec<RetrofitRecord>,
-    
-    /// Retrofit technology mappings
-    pub retrofit_tech_map: HashMap<i32, RetrofitTechMapping>,
-    
-    /// Retrofit effectiveness tables
-    pub effectiveness: Vec<RetrofitEffectiveness>,
-    
-    /// Validation flags
-    pub validation_errors: Vec<RetrofitValidationError>,
+ /// Retrofit records
+ pub retrofits: Vec<RetrofitRecord>,
+ 
+ /// Retrofit technology mappings
+ pub retrofit_tech_map: HashMap<i32, RetrofitTechMapping>,
+ 
+ /// Retrofit effectiveness tables
+ pub effectiveness: Vec<RetrofitEffectiveness>,
+ 
+ /// Validation flags
+ pub validation_errors: Vec<RetrofitValidationError>,
 }
 
 #[derive(Debug, Clone)]
 pub struct RetrofitRecord {
-    pub scc: i32,
-    pub equipment_idx: usize,
-    pub fips: i32,
-    pub retrofit_type: i32,
-    pub year_installed: i16,
-    pub effectiveness: f64,
+ pub scc: i32,
+ pub equipment_idx: usize,
+ pub fips: i32,
+ pub retrofit_type: i32,
+ pub year_installed: i16,
+ pub effectiveness: f64,
 }
 ```
 
@@ -454,28 +454,28 @@ pub struct RetrofitRecord {
 ```rust
 #[derive(Debug, Default, Clone)]
 pub struct NonroadContext {
-    pub options: UserOptions,
-    pub emissions: EmissionsState,
-    pub population: PopulationState,
-    pub allocation: AllocationState,
-    pub growth: GrowthState,
-    pub seasonal: SeasonalState,
-    pub technology: TechnologyState,
-    pub equipment: EquipmentState,
-    pub geography: GeographyState,
-    pub retrofit: RetrofitState,
-    
-    /// Runtime state (updated during execution)
-    pub current_year: i16,
-    pub current_month: u8,
-    pub current_day: u8,
-    pub current_scc: i32,
-    pub current_equipment_idx: usize,
-    pub current_fips: i32,
-    
-    /// Output accumulators
-    pub emission_outputs: Vec<EmissionOutput>,
-    pub warning_messages: Vec<WarningMessage>,
+ pub options: UserOptions,
+ pub emissions: EmissionsState,
+ pub population: PopulationState,
+ pub allocation: AllocationState,
+ pub growth: GrowthState,
+ pub seasonal: SeasonalState,
+ pub technology: TechnologyState,
+ pub equipment: EquipmentState,
+ pub geography: GeographyState,
+ pub retrofit: RetrofitState,
+ 
+ /// Runtime state (updated during execution)
+ pub current_year: i16,
+ pub current_month: u8,
+ pub current_day: u8,
+ pub current_scc: i32,
+ pub current_equipment_idx: usize,
+ pub current_fips: i32,
+ 
+ /// Output accumulators
+ pub emission_outputs: Vec<EmissionOutput>,
+ pub warning_messages: Vec<WarningMessage>,
 }
 ```
 
@@ -498,13 +498,13 @@ for now. Future refactoring may split into sub-modules per state type.
 
 ```
 src/common/
-├── mod.rs              # NonroadContext + all state types (Task 92 DONE)
-└── consts.rs           # Parameters and constants (Task 93 pending)
+├── mod.rs # NonroadContext + all state types
+└── consts.rs # Parameters and constants
 ```
 
 ## Implementation Status
 
-✅ **Task 92 Complete**: COMMON block replacement design implemented
+✅ ** Complete**: COMMON block replacement design implemented
 
 - All 10 state structs defined
 - `NonroadContext` top-level container with all fields
@@ -512,7 +512,7 @@ src/common/
 - `#[non_exhaustive]` on public structs for future extension
 - All types derive `Debug`, `Clone`, and `Default` where appropriate
 
-⏳ **Task 93 Pending**: Parameter and constant translation
+⏳ ** Pending**: Parameter and constant translation
 
 - Move `nonrdprm.inc` chemical constants to `consts.rs`
 - Add units and provenance documentation

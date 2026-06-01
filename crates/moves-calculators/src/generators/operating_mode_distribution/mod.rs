@@ -2,8 +2,7 @@
 //! (`gov.epa.otaq.moves.master.implementation.ghg`) — the generator that
 //! builds the running-exhaust and brakewear `OpModeDistribution` table.
 //!
-//! Migration plan: Phase 3, Task 30.
-//!
+//! //!
 //! # What this generator produces
 //!
 //! An *operating-mode distribution* is the fraction of a vehicle's operating
@@ -23,21 +22,21 @@
 //! computational core is ported in [`pipeline`]:
 //!
 //! 1. **OMDG-1** ([`bracket_average_speed_bins`]) — bracket each average-speed
-//!    bin between the two driving cycles whose average speeds straddle it,
-//!    clamping bins outside the cycle range.
+//! bin between the two driving cycles whose average speeds straddle it,
+//! clamping bins outside the cycle range.
 //! 2. **OMDG-2/-3** — split each bin's average-speed-distribution fraction
-//!    between its bracketing cycles and sum per driving cycle, giving a
-//!    per-`(sourceType, roadType, hourDay, driveSchedule)` drive-schedule
-//!    fraction.
+//! between its bracketing cycles and sum per driving cycle, giving a
+//! per-`(sourceType, roadType, hourDay, driveSchedule)` drive-schedule
+//! fraction.
 //! 3. **OMDG-4** — compute second-by-second vehicle-specific power (VSP) from
-//!    the road-load polynomial in `sourceUseTypePhysicsMapping`.
+//! the road-load polynomial in `sourceUseTypePhysicsMapping`.
 //! 4. **OMDG-5** — bin every second into an operating mode from its VSP,
-//!    speed and acceleration (braking, idle and the VSP/speed bins).
+//! speed and acceleration (braking, idle and the VSP/speed bins).
 //! 5. **OMDG-6** — divide the per-mode second counts by the total, giving an
-//!    operating-mode fraction per driving cycle.
+//! operating-mode fraction per driving cycle.
 //! 6. **OMDG-7** ([`op_mode_distribution`]) — weight the per-cycle fractions
-//!    by the drive-schedule fractions and sum, then copy each represented
-//!    pollutant/process its representative's distribution.
+//! by the drive-schedule fractions and sum, then copy each represented
+//! pollutant/process its representative's distribution.
 //!
 //! # Scope of the port
 //!
@@ -48,9 +47,9 @@
 //! cross-joins `OpModeFraction2` with `Link` (`roadTypeID → linkID`) to fill
 //! the link-keyed `OpModeDistribution` table, skipping link rows a user
 //! supplied directly. That projection belongs to [`Generator::execute`] once
-//! the Task 50 data plane lands; see [`OpModeFractionRow`].
+//! the data plane lands; see [`OpModeFractionRow`].
 //!
-//! **Deferred to `SourceTypePhysics` (migration-plan Task 37).** `executeLoop`
+//! **Deferred to `SourceTypePhysics` ().** `executeLoop`
 //! also calls `modelYearPhysics.setup`, `modelYearPhysics.updateEmissionRateTables`
 //! and `modelYearPhysics.updateOperatingModeDistribution`. Those belong to the
 //! `SourceTypePhysics` port; this generator *consumes*
@@ -68,13 +67,13 @@
 //! (`f32`) columns, and the OMDG-6 `count(*) / secondSum` is integer division,
 //! which MariaDB evaluates as `DECIMAL` rounded to `div_precision_increment`
 //! places. The resulting divergence is systematic, bounded and tracked by the
-//! Task 44 generator-validation tolerance budget.
+//! generator-validation tolerance budget.
 //!
-//! # Data plane (Task 50)
+//! # Data plane
 //!
 //! [`Generator::execute`] receives a [`CalculatorContext`] whose
 //! `ExecutionTables` / `ScratchNamespace` are Phase-2 placeholders until the
-//! `DataFrameStore` lands (migration-plan Task 50), so `execute` cannot yet
+//! `DataFrameStore` lands (), so `execute` cannot yet
 //! read the input tables nor write `OpModeDistribution`. The numerically
 //! faithful algorithm is fully ported and unit-tested in [`op_mode_distribution`];
 //! once the data plane exists, `execute` projects an [`OmdgInputs`] out of
@@ -116,19 +115,19 @@ const BRAKEWEAR: ProcessId = ProcessId(9);
 /// documentation for the scope of the port.
 #[derive(Debug, Clone)]
 pub struct OperatingModeDistributionGenerator {
-    /// The two master-loop subscriptions, built once in [`Self::new`].
+ /// The two master-loop subscriptions, built once in [`Self::new`].
     subscriptions: [CalculatorSubscription; 2],
 }
 
 impl OperatingModeDistributionGenerator {
-    /// Chain-DAG name — matches the Java class name.
+ /// Chain-DAG name — matches the Java class name.
     pub const NAME: &'static str = "OperatingModeDistributionGenerator";
 
-    /// Construct the generator with its master-loop subscriptions.
-    ///
-    /// Mirrors `subscribeToMe`: Running Exhaust and Brakewear, both at `YEAR`
-    /// granularity (year level for source bins from the
-    /// `SourceBinDistributionGenerator`), `GENERATOR` priority.
+ /// Construct the generator with its master-loop subscriptions.
+ ///
+ /// Mirrors `subscribeToMe`: Running Exhaust and Brakewear, both at `YEAR`
+ /// granularity (year level for source bins from the
+ /// `SourceBinDistributionGenerator`), `GENERATOR` priority.
     #[must_use]
     pub fn new() -> Self {
         let priority =
@@ -170,8 +169,7 @@ static INPUT_TABLES: &[&str] = &[
 /// Scratch-namespace table this generator writes.
 static OUTPUT_TABLES: &[&str] = &["OpModeDistribution"];
 
-/// Upstream module: `SourceTypePhysics` builds `sourceUseTypePhysicsMapping` —
-/// the road-load polynomial terms and real/temporary source-type rows the VSP
+/// Upstream module: `SourceTypePhysics` builds `sourceUseTypePhysicsMapping`/// the road-load polynomial terms and real/temporary source-type rows the VSP
 /// calculation reads.
 static UPSTREAM: &[&str] = &["SourceTypePhysics"];
 
@@ -196,14 +194,14 @@ impl Generator for OperatingModeDistributionGenerator {
         OUTPUT_TABLES
     }
 
-    /// Run the generator for the current master-loop iteration.
-    ///
-    /// Reads the OMDG input tables from `ctx.tables()`, runs the
-    /// [`op_mode_distribution`] kernel, cross-joins the result with the
-    /// `Link` table on `roadTypeID` to fill link-keyed `OpModeDistribution`
-    /// rows, and writes them to the scratch namespace.
+ /// Run the generator for the current master-loop iteration.
+ ///
+ /// Reads the OMDG input tables from `ctx.tables()`, runs the
+ /// [`op_mode_distribution`] kernel, cross-joins the result with the
+ /// `Link` table on `roadTypeID` to fill link-keyed `OpModeDistribution`
+ /// rows, and writes them to the scratch namespace.
     fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
-        // -- Read all input tables --
+ // -- Read all input tables --
         let drive_schedule: Vec<DriveScheduleRow> = ctx.tables().iter_typed("DriveSchedule")?;
         let drive_schedule_assoc: Vec<DriveScheduleAssocRow> =
             ctx.tables().iter_typed("DriveScheduleAssoc")?;
@@ -220,17 +218,17 @@ impl Generator for OperatingModeDistributionGenerator {
         let pol_process_represented: Vec<PolProcessRepresentedRow> =
             ctx.tables().iter_typed("OMDGPolProcessRepresented")?;
 
-        // RunSpec selections — separate wrapper row types.
+ // RunSpec selections — separate wrapper row types.
         let run_spec_source_type_rows: Vec<OmdgRunSpecSourceTypeRow> =
             ctx.tables().iter_typed("RunSpecSourceType")?;
         let run_spec_road_type_rows: Vec<OmdgRunSpecRoadTypeRow> =
             ctx.tables().iter_typed("RunSpecRoadType")?;
         let run_spec_hour_day_rows: Vec<OmdgHourDayRow> = ctx.tables().iter_typed("HourDay")?;
 
-        // Link table for the cross-join step.
+ // Link table for the cross-join step.
         let link_rows: Vec<OmdgLinkRow> = ctx.tables().iter_typed("Link")?;
 
-        // -- Convert RunSpec wrapper rows to plain id slices --
+ // -- Convert RunSpec wrapper rows to plain id slices --
         let run_spec_source_type: Vec<SourceTypeId> = run_spec_source_type_rows
             .iter()
             .map(|r| SourceTypeId(r.source_type_id as u16))
@@ -244,7 +242,7 @@ impl Generator for OperatingModeDistributionGenerator {
             .map(|r| r.hour_day_id as i16)
             .collect();
 
-        // -- Build OmdgInputs and run the kernel --
+ // -- Build OmdgInputs and run the kernel --
         let omdg_inputs = OmdgInputs {
             drive_schedule: &drive_schedule,
             drive_schedule_assoc: &drive_schedule_assoc,
@@ -261,9 +259,9 @@ impl Generator for OperatingModeDistributionGenerator {
         };
         let fractions = op_mode_distribution(&omdg_inputs);
 
-        // -- Cross-join OpModeFractionRow with Link on roadTypeID --
-        // Java: INSERT IGNORE INTO OpModeDistribution SELECT linkID, ...
-        //        FROM OpModeFraction2 INNER JOIN Link ON link.roadTypeID = opModeFraction.roadTypeID
+ // -- Cross-join OpModeFractionRow with Link on roadTypeID --
+ // Java: INSERT IGNORE INTO OpModeDistribution SELECT linkID, ...
+ // FROM OpModeFraction2 INNER JOIN Link ON link.roadTypeID = opModeFraction.roadTypeID
         let mut output_rows: Vec<OpModeDistributionRow> = Vec::new();
         for fraction in &fractions {
             for link in &link_rows {
@@ -286,7 +284,7 @@ impl Generator for OperatingModeDistributionGenerator {
 }
 
 // ============================================================================
-// Data-plane wiring (Task 50) — helper row types and TableRow impls for
+// Data-plane wiring — helper row types and TableRow impls for
 // the RunSpec selection tables and the Link cross-join table.
 // ============================================================================
 
@@ -303,7 +301,7 @@ fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -
 /// One `RunSpecSourceType` row — a source type the RunSpec selects.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OmdgRunSpecSourceTypeRow {
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
 }
 
@@ -346,7 +344,7 @@ impl TableRow for OmdgRunSpecSourceTypeRow {
 /// One `RunSpecRoadType` row — a road type the RunSpec selects.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OmdgRunSpecRoadTypeRow {
-    /// `roadTypeID`.
+ /// `roadTypeID`.
     pub road_type_id: i32,
 }
 
@@ -390,7 +388,7 @@ impl TableRow for OmdgRunSpecRoadTypeRow {
 /// `RunSpecHour` × `RunSpecDay` joined through `HourDay`).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OmdgHourDayRow {
-    /// `hourDayID`.
+ /// `hourDayID`.
     pub hour_day_id: i32,
 }
 
@@ -433,9 +431,9 @@ impl TableRow for OmdgHourDayRow {
 /// One `Link` row — the `(linkID, roadTypeID)` the cross-join uses.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OmdgLinkRow {
-    /// `linkID`.
+ /// `linkID`.
     pub link_id: i32,
-    /// `roadTypeID`.
+ /// `roadTypeID`.
     pub road_type_id: i32,
 }
 
@@ -498,19 +496,19 @@ impl TableRow for OmdgLinkRow {
 /// `(linkID, sourceTypeID, hourDayID, polProcessID, opModeID, opModeFraction)`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OpModeDistributionRow {
-    /// `sourceTypeID` (real or temporary).
+ /// `sourceTypeID` (real or temporary).
     pub source_type_id: SourceTypeId,
-    /// `roadTypeID`.
+ /// `roadTypeID`.
     pub road_type_id: RoadTypeId,
-    /// `linkID` — from the `Link` cross-join.
+ /// `linkID` — from the `Link` cross-join.
     pub link_id: i32,
-    /// `hourDayID`.
+ /// `hourDayID`.
     pub hour_day_id: i16,
-    /// `polProcessID`.
+ /// `polProcessID`.
     pub pol_process_id: PolProcessId,
-    /// `opModeID`.
+ /// `opModeID`.
     pub op_mode_id: i16,
-    /// `opModeFraction`.
+ /// `opModeFraction`.
     pub op_mode_fraction: f64,
 }
 
@@ -668,7 +666,7 @@ mod tests {
         let subscriptions = generator.subscriptions();
         assert_eq!(subscriptions.len(), 2);
         let processes: Vec<ProcessId> = subscriptions.iter().map(|s| s.process_id).collect();
-        // Running Exhaust (1) and Brakewear (9).
+ // Running Exhaust (1) and Brakewear (9).
         assert_eq!(processes, vec![ProcessId(1), ProcessId(9)]);
         for subscription in subscriptions {
             assert_eq!(subscription.granularity, Granularity::Year);
@@ -678,7 +676,7 @@ mod tests {
 
     #[test]
     fn generator_is_object_safe() {
-        // The registry stores generators as Box<dyn Generator>.
+ // The registry stores generators as Box<dyn Generator>.
         let generator: Box<dyn Generator> = Box::new(OperatingModeDistributionGenerator::new());
         assert_eq!(generator.name(), "OperatingModeDistributionGenerator");
     }
@@ -689,10 +687,10 @@ mod tests {
         assert_eq!(generator.subscriptions().len(), 2);
     }
 
-    // ── execute() integration test ──────────────────────────────────────
+ // ── execute() integration test ──────────────────────────────────────
 
-    /// Populate an `InMemoryStore` with the minimum tables needed for the
-    /// two-cycle scenario used in pipeline tests, plus RunSpec and Link tables.
+ /// Populate an `InMemoryStore` with the minimum tables needed for the
+ /// two-cycle scenario used in pipeline tests, plus RunSpec and Link tables.
     fn minimal_execute_store() -> moves_framework::InMemoryStore {
         use super::inputs::{
             AvgSpeedBinRow, AvgSpeedDistributionRow, DriveScheduleAssocRow, DriveScheduleRow,
@@ -709,7 +707,7 @@ mod tests {
 
         let mut store = InMemoryStore::new();
 
-        // DriveSchedule: two cycles
+ // DriveSchedule: two cycles
         store.insert(
             "DriveSchedule",
             DriveScheduleRow::into_dataframe(vec![
@@ -725,7 +723,7 @@ mod tests {
             .unwrap(),
         );
 
-        // DriveScheduleAssoc
+ // DriveScheduleAssoc
         store.insert(
             "DriveScheduleAssoc",
             DriveScheduleAssocRow::into_dataframe(vec![
@@ -745,7 +743,7 @@ mod tests {
             .unwrap(),
         );
 
-        // DriveScheduleSecond: idle cycle (ds1) and 30-mph cycle (ds2)
+ // DriveScheduleSecond: idle cycle (ds1) and 30-mph cycle (ds2)
         let mut seconds = Vec::new();
         for s in 0i16..=3 {
             seconds.push(DriveScheduleSecondRow {
@@ -764,7 +762,7 @@ mod tests {
             DriveScheduleSecondRow::into_dataframe(seconds).unwrap(),
         );
 
-        // AvgSpeedBin: one bin at 20 mph
+ // AvgSpeedBin: one bin at 20 mph
         store.insert(
             "AvgSpeedBin",
             AvgSpeedBinRow::into_dataframe(vec![AvgSpeedBinRow {
@@ -774,7 +772,7 @@ mod tests {
             .unwrap(),
         );
 
-        // AvgSpeedDistribution: all weight on bin 1
+ // AvgSpeedDistribution: all weight on bin 1
         store.insert(
             "AvgSpeedDistribution",
             AvgSpeedDistributionRow::into_dataframe(vec![AvgSpeedDistributionRow {
@@ -787,7 +785,7 @@ mod tests {
             .unwrap(),
         );
 
-        // OperatingMode: idle (1) is a special case; mode 30 catches VSP=0, speed>=1
+ // OperatingMode: idle (1) is a special case; mode 30 catches VSP=0, speed>=1
         store.insert(
             "OperatingMode",
             OperatingModeRow::into_dataframe(vec![OperatingModeRow {
@@ -800,7 +798,7 @@ mod tests {
             .unwrap(),
         );
 
-        // OpModePolProcAssoc: idle and mode 30 for POL_PROCESS
+ // OpModePolProcAssoc: idle and mode 30 for POL_PROCESS
         store.insert(
             "OpModePolProcAssoc",
             OpModePolProcAssocRow::into_dataframe(vec![
@@ -816,7 +814,7 @@ mod tests {
             .unwrap(),
         );
 
-        // sourceUseTypePhysicsMapping: identity mapping, flat physics
+ // sourceUseTypePhysicsMapping: identity mapping, flat physics
         store.insert(
             "sourceUseTypePhysicsMapping",
             PhysicsMappingRow::into_dataframe(vec![PhysicsMappingRow {
@@ -831,13 +829,13 @@ mod tests {
             .unwrap(),
         );
 
-        // OMDGPolProcessRepresented: empty (no represented pol/processes)
+ // OMDGPolProcessRepresented: empty (no represented pol/processes)
         store.insert(
             "OMDGPolProcessRepresented",
             PolProcessRepresentedRow::into_dataframe(vec![]).unwrap(),
         );
 
-        // RunSpecSourceType
+ // RunSpecSourceType
         store.insert(
             "RunSpecSourceType",
             OmdgRunSpecSourceTypeRow::into_dataframe(vec![OmdgRunSpecSourceTypeRow {
@@ -846,7 +844,7 @@ mod tests {
             .unwrap(),
         );
 
-        // RunSpecRoadType
+ // RunSpecRoadType
         store.insert(
             "RunSpecRoadType",
             OmdgRunSpecRoadTypeRow::into_dataframe(vec![OmdgRunSpecRoadTypeRow {
@@ -855,7 +853,7 @@ mod tests {
             .unwrap(),
         );
 
-        // HourDay: one hour/day id
+ // HourDay: one hour/day id
         store.insert(
             "HourDay",
             OmdgHourDayRow::into_dataframe(vec![OmdgHourDayRow {
@@ -864,7 +862,7 @@ mod tests {
             .unwrap(),
         );
 
-        // Link: one link on road type 5
+ // Link: one link on road type 5
         store.insert(
             "Link",
             OmdgLinkRow::into_dataframe(vec![OmdgLinkRow {
@@ -887,7 +885,7 @@ mod tests {
 
         let generator = OperatingModeDistributionGenerator::new();
         let out = generator.execute(&mut ctx).expect("execute ok");
-        // Generator writes to scratch, not the primary output DataFrame.
+ // Generator writes to scratch, not the primary output DataFrame.
         assert!(out.dataframe().is_none());
 
         let rows: Vec<OpModeDistributionRow> = ctx
@@ -896,10 +894,10 @@ mod tests {
             .iter_typed("OpModeDistribution")
             .expect("OpModeDistribution in scratch");
 
-        // Two OpModeFractionRows (idle=0.5, mode30=0.5) × one Link = 2 rows.
+ // Two OpModeFractionRows (idle=0.5, mode30=0.5) × one Link = 2 rows.
         assert_eq!(rows.len(), 2, "expected 2 rows, got: {rows:?}");
 
-        // All rows share the same link, source type, road type and hour/day.
+ // All rows share the same link, source type, road type and hour/day.
         for r in &rows {
             assert_eq!(r.link_id, 1001);
             assert_eq!(r.source_type_id, SourceTypeId(21));
@@ -908,7 +906,7 @@ mod tests {
             assert_eq!(r.pol_process_id, PolProcessId(101));
         }
 
-        // One row for idle (op mode 1) and one for mode 30, each fraction 0.5.
+ // One row for idle (op mode 1) and one for mode 30, each fraction 0.5.
         let idle_row = rows.iter().find(|r| r.op_mode_id == 1).expect("idle row");
         assert!((idle_row.op_mode_fraction - 0.5).abs() < 1e-12);
         let mode30_row = rows
@@ -923,7 +921,7 @@ mod tests {
         use moves_framework::{DataFrameStore, DataFrameStoreTyped, IterationPosition};
 
         let mut store = minimal_execute_store();
-        // Replace the Link table with an empty one.
+ // Replace the Link table with an empty one.
         store.insert("Link", OmdgLinkRow::into_dataframe(vec![]).unwrap());
 
         let pos = IterationPosition::default();

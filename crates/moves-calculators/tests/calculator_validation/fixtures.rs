@@ -1,11 +1,11 @@
-//! The Phase 0 onroad fixture catalogue.
+//! The onroad fixture catalogue.
 //!
-//! Phase 0 (`characterization/fixtures/README.md`) ships 33 RunSpec
+//! (`characterization/fixtures/README.md`) ships 33 RunSpec
 //! fixtures. Twenty-three select the **onroad** model — the runs that
-//! exercise the Phase 3 calculators this harness validates; the other
-//! ten are `nr-*.xml` NONROAD fixtures owned by the Task 115 gate.
+//! exercise the calculators this harness validates; the other
+//! ten are `nr-*.xml` NONROAD fixtures owned by the gate.
 //!
-//! Task 74 (`mo-wkjj`) adds three more onroad fixtures that cover the
+//! () adds three more onroad fixtures that cover the
 //! four calculators the original 23 hot-path fixtures left uncovered:
 //! `process-nox-speciation` (NOCalculator, NO2Calculator),
 //! `process-extended-idle` (CO2AERunningStartExtendedIdleCalculator),
@@ -28,11 +28,11 @@ use super::repo_root;
 /// The 26 onroad fixture names — the file stems of the non-`nr-*`
 /// RunSpec XMLs in `characterization/fixtures/`.
 ///
-/// The original 23 Phase 0 hot-path fixtures are listed first; the
-/// three Task 74 (`mo-wkjj`) fixtures that cover the previously
+/// The original 23 hot-path fixtures are listed first; the
+/// three () fixtures that cover the previously
 /// uncovered calculators follow.
 pub const ONROAD_FIXTURE_NAMES: &[&str] = &[
-    // Phase 0 hot-path fixtures (23)
+ // hot-path fixtures (23)
     "sample-runspec",
     "expand-day",
     "expand-month",
@@ -56,13 +56,13 @@ pub const ONROAD_FIXTURE_NAMES: &[&str] = &[
     "scale-county",
     "scale-project",
     "scale-rates",
-    // Task 74 fixtures — cover the four previously uncovered calculators (3)
+ // fixtures — cover the four previously uncovered calculators (3)
     "process-nox-speciation", // NOCalculator (32,1), NO2Calculator (33,1)
     "process-extended-idle",  // CO2AERunningStartExtendedIdleCalculator (90,90)
     "chain-nonhaptog",        // TogSpeciationCalculator (88,1)
 ];
 
-/// The Phase 0 fixture directory: `characterization/fixtures/`.
+/// The fixture directory: `characterization/fixtures/`.
 pub fn fixtures_dir() -> PathBuf {
     repo_root().join("characterization").join("fixtures")
 }
@@ -99,27 +99,27 @@ impl std::error::Error for FixtureError {}
 /// parsed from the RunSpec XML.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OnroadFixture {
-    /// The fixture name (file stem, e.g. `process-brakewear`).
+ /// The fixture name (file stem, e.g. `process-brakewear`).
     pub name: String,
-    /// Absolute path to the RunSpec XML.
+ /// Absolute path to the RunSpec XML.
     pub path: PathBuf,
-    /// `true` when the RunSpec selects no NONROAD model.
+ /// `true` when the RunSpec selects no NONROAD model.
     pub is_onroad: bool,
-    /// `<modelscale>`.
+ /// `<modelscale>`.
     pub scale: ModelScale,
-    /// `<modeldomain>`.
+ /// `<modeldomain>`.
     pub domain: Option<ModelDomain>,
-    /// First `<timespan>` calendar year, if the RunSpec records one.
+ /// First `<timespan>` calendar year, if the RunSpec records one.
     pub year: Option<u32>,
-    /// Distinct process IDs the fixture exercises, ascending.
-    /// Subset of `ppa_ids` — retained for compatibility with the
-    /// process-based coverage logic.
+ /// Distinct process IDs the fixture exercises, ascending.
+ /// Subset of `ppa_ids` — retained for compatibility with the
+ /// process-based coverage logic.
     pub process_ids: Vec<u32>,
-    /// Distinct `(pollutant_id, process_id)` pairs the fixture exercises,
-    /// sorted by (process_id, pollutant_id). This is the key the coverage
-    /// matrix joins calculator registrations on.
+ /// Distinct `(pollutant_id, process_id)` pairs the fixture exercises,
+ /// sorted by (process_id, pollutant_id). This is the key the coverage
+ /// matrix joins calculator registrations on.
     pub ppa_ids: Vec<(u32, u32)>,
-    /// The RunSpec `<description>` CDATA text, if present.
+ /// The RunSpec `<description>` CDATA text, if present.
     pub description: Option<String>,
 }
 
@@ -249,7 +249,7 @@ mod tests {
                 "{} has no (pollutant, process) pairs",
                 fixture.name
             );
-            // ppa_ids always at least as large as process_ids
+ // ppa_ids always at least as large as process_ids
             assert!(fixture.ppa_ids.len() >= fixture.process_ids.len());
         }
     }

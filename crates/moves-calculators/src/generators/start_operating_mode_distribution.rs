@@ -1,4 +1,4 @@
-//! `StartOperatingModeDistributionGenerator` — Phase 3 Task 32.
+//! `StartOperatingModeDistributionGenerator` —.
 //!
 //! Ports `gov.epa.otaq.moves.master.implementation.ghg.StartOperatingModeDistributionGenerator`
 //! (479 lines of Java). The generator builds the **start-exhaust
@@ -16,21 +16,21 @@
 //! zone change:
 //!
 //! 1. **Soak time (step 100).** `calculateSoakTime` self-joins
-//!    `SampleVehicleTrip` on `priorTripID`: `soakTime = keyOnTime −
-//!    keyOffTime[prior trip]`, the engine-off gap before the start. A trip
-//!    with no prior trip produces no soak-time row — the self-join is an
-//!    INNER JOIN.
+//! `SampleVehicleTrip` on `priorTripID`: `soakTime = keyOnTime −
+//! keyOffTime[prior trip]`, the engine-off gap before the start. A trip
+//! with no prior trip produces no soak-time row — the self-join is an
+//! INNER JOIN.
 //! 2. **Start operating mode (step 200).** `calculateStartOpMode` joins each
-//!    soak time against the `OperatingMode` soak-time bands
-//!    (`minSoakTime` … `maxSoakTime`) and keeps the matching modes.
+//! soak time against the `OperatingMode` soak-time bands
+//! (`minSoakTime` … `maxSoakTime`) and keeps the matching modes.
 //! 3. **Operating-mode fraction (step 300).** `calculateOpModeFraction`
-//!    counts the starts per (source type, hour-day) and, within each, the
-//!    starts in every operating mode; `opModeFraction = count(opMode) /
-//!    starts`.
+//! counts the starts per (source type, hour-day) and, within each, the
+//! starts in every operating mode; `opModeFraction = count(opMode) /
+//! starts`.
 //! 4. **Populate (step 400).** `populateOperatingModeDistribution` copies the
-//!    fractions into the `OpModeDistribution` / `RatesOpModeDistribution`
-//!    execution tables for the start (process 2) and crankcase-start
-//!    (process 16) processes.
+//! fractions into the `OpModeDistribution` / `RatesOpModeDistribution`
+//! execution tables for the start (process 2) and crankcase-start
+//! (process 16) processes.
 //!
 //! # What this port keeps
 //!
@@ -51,13 +51,13 @@
 //!
 //! # Data-plane status
 //!
-//! The `moves-framework` calculator data plane is still a Phase 2 skeleton:
+//! The `moves-framework` calculator data plane is still a skeleton:
 //! the [`CalculatorContext`] passed to [`execute`](Generator::execute)
 //! exposes only placeholder execution tables and scratch namespace with no
 //! row storage. So `execute` cannot read `SampleVehicleTrip` or write
 //! `OpModeDistribution` yet — it returns an empty [`CalculatorOutput`],
-//! matching every other Phase 2/3 module (Task 28's empty-output smoke
-//! test). Task 50 (`DataFrameStore`) lands the storage; `execute` then walks
+//! matching every other/3 module (empty-output smoke
+//! test). (`DataFrameStore`) lands the storage; `execute` then walks
 //! the trips through [`classify_trip`], aggregates with [`op_mode_fraction`],
 //! and writes the result. The functions below are complete and tested and
 //! are what `execute` will call.
@@ -178,49 +178,49 @@ pub fn soak_time(key_on_time: i32, prior_key_off_time: i32) -> i32 {
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OperatingMode {
-    /// `opModeID` — the operating-mode primary key.
+ /// `opModeID` — the operating-mode primary key.
     pub op_mode_id: u16,
-    /// `minSoakTime` — inclusive lower bound of the soak-time band, or
-    /// `None` for a band open at the bottom.
+ /// `minSoakTime` — inclusive lower bound of the soak-time band, or
+ /// `None` for a band open at the bottom.
     pub min_soak_time: Option<i32>,
-    /// `maxSoakTime` — exclusive upper bound of the soak-time band, or
-    /// `None` for a band open at the top.
+ /// `maxSoakTime` — exclusive upper bound of the soak-time band, or
+ /// `None` for a band open at the top.
     pub max_soak_time: Option<i32>,
 }
 
 impl OperatingMode {
-    /// Whether `soak_time` falls in this operating mode's soak-time band.
-    ///
-    /// Ports the `calculateStartOpMode` WHERE clause verbatim:
-    ///
-    /// ```sql
-    /// (minSoakTime <= soakTime OR (minSoakTime IS NULL AND maxSoakTime IS NOT NULL))
-    /// AND (maxSoakTime > soakTime OR (maxSoakTime IS NULL AND minSoakTime IS NOT NULL))
-    /// ```
-    ///
-    /// SQL three-valued logic collapses to four cases:
-    ///
-    /// * **both bounds present** — the half-open interval `[min, max)`;
-    /// * **only `max`** — `soak_time < max` (band open at the bottom);
-    /// * **only `min`** — `soak_time >= min` (band open at the top);
-    /// * **neither bound** — never matches: each clause is `NULL OR FALSE`,
-    ///   i.e. SQL `UNKNOWN`, and `UNKNOWN AND UNKNOWN` is not `TRUE`.
-    ///
-    /// A clause evaluates to `UNKNOWN` only in the both-`None` case — every
-    /// other case makes it definitely `TRUE` or definitely `FALSE` — and that
-    /// case is rejected anyway, so collapsing an `UNKNOWN` clause to `false`
-    /// is exact.
+ /// Whether `soak_time` falls in this operating mode's soak-time band.
+ ///
+ /// Ports the `calculateStartOpMode` WHERE clause verbatim:
+ ///
+ /// ```sql
+ /// (minSoakTime <= soakTime OR (minSoakTime IS NULL AND maxSoakTime IS NOT NULL))
+ /// AND (maxSoakTime > soakTime OR (maxSoakTime IS NULL AND minSoakTime IS NOT NULL))
+ /// ```
+ ///
+ /// SQL three-valued logic collapses to four cases:
+ ///
+ /// * **both bounds present** — the half-open interval `[min, max)`;
+ /// * **only `max`** — `soak_time < max` (band open at the bottom);
+ /// * **only `min`** — `soak_time >= min` (band open at the top);
+ /// * **neither bound** — never matches: each clause is `NULL OR FALSE`,
+ /// i.e. SQL `UNKNOWN`, and `UNKNOWN AND UNKNOWN` is not `TRUE`.
+ ///
+ /// A clause evaluates to `UNKNOWN` only in the both-`None` case — every
+ /// other case makes it definitely `TRUE` or definitely `FALSE` — and that
+ /// case is rejected anyway, so collapsing an `UNKNOWN` clause to `false`
+ /// is exact.
     #[must_use]
     pub fn matches(self, soak_time: i32) -> bool {
-        // Lower clause: `minSoakTime <= soakTime`, or — when minSoakTime is
-        // NULL — true exactly when maxSoakTime is present.
+ // Lower clause: `minSoakTime <= soakTime`, or — when minSoakTime is
+ // NULL — true exactly when maxSoakTime is present.
         let lower_ok = match (self.min_soak_time, self.max_soak_time) {
             (Some(min), _) => min <= soak_time,
             (None, Some(_)) => true,
             (None, None) => false,
         };
-        // Upper clause: `maxSoakTime > soakTime`, or — when maxSoakTime is
-        // NULL — true exactly when minSoakTime is present.
+ // Upper clause: `maxSoakTime > soakTime`, or — when maxSoakTime is
+ // NULL — true exactly when minSoakTime is present.
         let upper_ok = match (self.max_soak_time, self.min_soak_time) {
             (Some(max), _) => max > soak_time,
             (None, Some(_)) => true,
@@ -253,10 +253,10 @@ pub fn classify_start_op_mode(soak_time: i32, operating_modes: &[OperatingMode])
 /// operating mode(s) that soak time falls in.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StartClassification {
-    /// Soak time before the start, `keyOnTime − keyOffTime[prior trip]`.
+ /// Soak time before the start, `keyOnTime − keyOffTime[prior trip]`.
     pub soak_time: i32,
-    /// Matching `opModeID`s — see [`classify_start_op_mode`]. Canonically a
-    /// single element.
+ /// Matching `opModeID`s — see [`classify_start_op_mode`]. Canonically a
+ /// single element.
     pub op_mode_ids: Vec<u16>,
 }
 
@@ -306,7 +306,7 @@ pub fn classify_trip(
 /// This port returns the exact `f64` ratio. The four-place rounding is a
 /// divergence of up to 5 × 10⁻⁵ — larger than the `(5/9)` rounding noted in
 /// `MeteorologyGenerator` — so whether to reproduce MariaDB's `DECIMAL`
-/// rounding is deferred to Task 44's canonical-capture comparison, which can
+/// rounding is deferred to canonical-capture comparison, which can
 /// confirm the live `div_precision_increment` and rounding mode.
 #[must_use]
 pub fn op_mode_fraction(op_mode_count: u64, total_starts: u64) -> f64 {
@@ -376,20 +376,20 @@ fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -
 /// table. The generator self-joins this on `priorTripID` to compute soak times.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SampleVehicleTripRow {
-    /// `vehID` — the sample vehicle primary key.
+ /// `vehID` — the sample vehicle primary key.
     pub veh_id: i32,
-    /// `dayID` — the day of the week (MOVES5: 2 = weekend, 5 = weekday).
+ /// `dayID` — the day of the week (MOVES5: 2 = weekend, 5 = weekday).
     pub day_id: i32,
-    /// `tripID` — this trip's ID.
+ /// `tripID` — this trip's ID.
     pub trip_id: i32,
-    /// `hourID` — the hour-of-day this trip starts (1–24).
+ /// `hourID` — the hour-of-day this trip starts (1–24).
     pub hour_id: i32,
-    /// `priorTripID` — ID of the immediately preceding trip; `None` when
-    /// there is no prior trip (i.e. this is the first trip).
+ /// `priorTripID` — ID of the immediately preceding trip; `None` when
+ /// there is no prior trip (i.e. this is the first trip).
     pub prior_trip_id: Option<i32>,
-    /// `keyOnTime` — engine-on time (INT minutes since midnight).
+ /// `keyOnTime` — engine-on time (INT minutes since midnight).
     pub key_on_time: i32,
-    /// `keyOffTime` — engine-off time (INT minutes since midnight).
+ /// `keyOffTime` — engine-off time (INT minutes since midnight).
     pub key_off_time: i32,
 }
 
@@ -468,7 +468,7 @@ impl TableRow for SampleVehicleTripRow {
         let prior_trip_id = get_i32("priorTripID")?;
         let key_on_time = get_i32("keyOnTime")?;
         let key_off_time = get_i32("keyOffTime")?;
-        // Rows with NULL keyOnTime are marker trips — skip them (Java filter).
+ // Rows with NULL keyOnTime are marker trips — skip them (Java filter).
         let mut rows = Vec::with_capacity(df.height());
         for i in 0..df.height() {
             let Some(kot) = key_on_time.get(i) else {
@@ -492,11 +492,11 @@ impl TableRow for SampleVehicleTripRow {
 /// One `SampleVehicleDay` row — maps a `(vehID, dayID)` to a `sourceTypeID`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SampleVehicleDayRow {
-    /// `vehID` — the sample vehicle.
+ /// `vehID` — the sample vehicle.
     pub veh_id: i32,
-    /// `dayID` — the day of the week.
+ /// `dayID` — the day of the week.
     pub day_id: i32,
-    /// `sourceTypeID` — the vehicle source type.
+ /// `sourceTypeID` — the vehicle source type.
     pub source_type_id: i32,
 }
 
@@ -562,11 +562,11 @@ impl TableRow for SampleVehicleDayRow {
 /// the columns the soak-time classification uses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OperatingModeRow {
-    /// `opModeID` — the operating mode primary key.
+ /// `opModeID` — the operating mode primary key.
     pub op_mode_id: i32,
-    /// `minSoakTime` — inclusive lower bound of the soak-time band (nullable).
+ /// `minSoakTime` — inclusive lower bound of the soak-time band (nullable).
     pub min_soak_time: Option<i32>,
-    /// `maxSoakTime` — exclusive upper bound of the soak-time band (nullable).
+ /// `maxSoakTime` — exclusive upper bound of the soak-time band (nullable).
     pub max_soak_time: Option<i32>,
 }
 
@@ -650,13 +650,13 @@ impl TableRow for OperatingModeRow {
 /// link-/pol-process-scoped ones.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StartOpModeDistributionRow {
-    /// `sourceTypeID` — the MOVES source (vehicle) type.
+ /// `sourceTypeID` — the MOVES source (vehicle) type.
     pub source_type_id: i32,
-    /// `hourDayID` — `hourID * 10 + dayID` composite.
+ /// `hourDayID` — `hourID * 10 + dayID` composite.
     pub hour_day_id: i32,
-    /// `opModeID` — the start operating mode.
+ /// `opModeID` — the start operating mode.
     pub op_mode_id: i32,
-    /// `opModeFraction` — fraction of starts in this mode.
+ /// `opModeFraction` — fraction of starts in this mode.
     pub op_mode_fraction: f64,
 }
 
@@ -743,13 +743,13 @@ impl TableRow for StartOpModeDistributionRow {
 /// `OpModeDistribution` for the start-exhaust generator's purposes.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RatesOpModeDistributionRow {
-    /// `sourceTypeID` — the MOVES source type.
+ /// `sourceTypeID` — the MOVES source type.
     pub source_type_id: i32,
-    /// `hourDayID` — `hourID * 10 + dayID` composite.
+ /// `hourDayID` — `hourID * 10 + dayID` composite.
     pub hour_day_id: i32,
-    /// `opModeID` — operating mode (100 = "All Starts"; 101+ = soak bands).
+ /// `opModeID` — operating mode (100 = "All Starts"; 101+ = soak bands).
     pub op_mode_id: i32,
-    /// `opModeFraction` — fraction of starts in this mode (1.0 for op-mode 100).
+ /// `opModeFraction` — fraction of starts in this mode (1.0 for op-mode 100).
     pub op_mode_fraction: f64,
 }
 
@@ -832,11 +832,11 @@ impl TableRow for RatesOpModeDistributionRow {
 /// Inputs to [`build_start_op_mode_distribution`].
 #[derive(Debug, Clone)]
 pub struct StartOpModeInputs {
-    /// `SampleVehicleTrip` rows.
+ /// `SampleVehicleTrip` rows.
     pub trips: Vec<SampleVehicleTripRow>,
-    /// `SampleVehicleDay` rows — maps `(vehID, dayID)` → `sourceTypeID`.
+ /// `SampleVehicleDay` rows — maps `(vehID, dayID)` → `sourceTypeID`.
     pub vehicle_days: Vec<SampleVehicleDayRow>,
-    /// `OperatingMode` rows — the soak-time band table.
+ /// `OperatingMode` rows — the soak-time band table.
     pub operating_modes: Vec<OperatingModeRow>,
 }
 
@@ -846,14 +846,14 @@ pub struct StartOpModeInputs {
 /// Steps 100–300 from `executeLoop`:
 ///
 /// 1. **Soak time (step 100):** self-join `SampleVehicleTrip` on `priorTripID`
-///    (INNER JOIN — only trips with a prior trip get a soak-time row).
+/// (INNER JOIN — only trips with a prior trip get a soak-time row).
 /// 2. **Start op mode (step 200):** join each soak time against `OperatingMode`
-///    soak-time bands, keeping all matching modes.
+/// soak-time bands, keeping all matching modes.
 /// 3. **Op-mode fraction (step 300):** aggregate counts by
-///    `(sourceTypeID, hourDayID)` and divide by total starts per cell.
+/// `(sourceTypeID, hourDayID)` and divide by total starts per cell.
 /// 4. **Populate (step 400):** emit `OpModeDistribution` rows from the
-///    per-mode fractions, plus `RatesOpModeDistribution` rows that include an
-///    extra op-mode-100 ("All Starts") row with fraction 1.0 per cell.
+/// per-mode fractions, plus `RatesOpModeDistribution` rows that include an
+/// extra op-mode-100 ("All Starts") row with fraction 1.0 per cell.
 ///
 /// Returns `(op_mode_rows, rates_rows)`.
 pub fn build_start_op_mode_distribution(
@@ -862,22 +862,22 @@ pub fn build_start_op_mode_distribution(
     Vec<StartOpModeDistributionRow>,
     Vec<RatesOpModeDistributionRow>,
 ) {
-    // Index SampleVehicleDay: (vehID, dayID) -> sourceTypeID.
+ // Index SampleVehicleDay: (vehID, dayID) -> sourceTypeID.
     let veh_day_to_source_type: std::collections::HashMap<(i32, i32), i32> = inputs
         .vehicle_days
         .iter()
         .map(|vd| ((vd.veh_id, vd.day_id), vd.source_type_id))
         .collect();
 
-    // Index SampleVehicleTrip: (vehID, dayID, tripID) -> keyOffTime,
-    // for the prior-trip self-join.
+ // Index SampleVehicleTrip: (vehID, dayID, tripID) -> keyOffTime,
+ // for the prior-trip self-join.
     let trip_key_off: std::collections::HashMap<(i32, i32, i32), i32> = inputs
         .trips
         .iter()
         .map(|t| ((t.veh_id, t.day_id, t.trip_id), t.key_off_time))
         .collect();
 
-    // Convert OperatingModeRow to OperatingMode for classify_start_op_mode.
+ // Convert OperatingModeRow to OperatingMode for classify_start_op_mode.
     let op_modes: Vec<OperatingMode> = inputs
         .operating_modes
         .iter()
@@ -888,17 +888,17 @@ pub fn build_start_op_mode_distribution(
         })
         .collect();
 
-    // Steps 100–200: for each trip that has a priorTripID, compute soak time
-    // and classify into operating mode(s). Accumulate counts by
-    // (sourceTypeID, hourDayID, opModeID).
-    //
-    // `counts[(source_type, hour_day, op_mode_id)]` = number of starts in mode.
-    // `totals[(source_type, hour_day)]` = total starts (denominator for fraction).
+ // Steps 100–200: for each trip that has a priorTripID, compute soak time
+ // and classify into operating mode(s). Accumulate counts by
+ // (sourceTypeID, hourDayID, opModeID).
+ //
+ // `counts[(source_type, hour_day, op_mode_id)]` = number of starts in mode.
+ // `totals[(source_type, hour_day)]` = total starts (denominator for fraction).
     let mut counts: BTreeMap<(i32, i32, i32), u64> = BTreeMap::new();
     let mut totals: BTreeMap<(i32, i32), u64> = BTreeMap::new();
 
     for trip in &inputs.trips {
-        // Only process trips with a prior trip (INNER JOIN on priorTripID).
+ // Only process trips with a prior trip (INNER JOIN on priorTripID).
         let Some(prior_trip_id) = trip.prior_trip_id else {
             continue;
         };
@@ -907,34 +907,34 @@ pub fn build_start_op_mode_distribution(
             continue;
         };
 
-        // Look up sourceTypeID from SampleVehicleDay.
+ // Look up sourceTypeID from SampleVehicleDay.
         let Some(&source_type_id) = veh_day_to_source_type.get(&(trip.veh_id, trip.day_id)) else {
             continue;
         };
 
-        // Compute soak time and classify into op mode(s).
+ // Compute soak time and classify into op mode(s).
         let soak = soak_time(trip.key_on_time, prior_key_off);
         let matched_modes = classify_start_op_mode(soak, &op_modes);
 
-        // Compose hourDayID.
+ // Compose hourDayID.
         let hd_id = hour_day_id(trip.hour_id as u16, trip.day_id as u16) as i32;
 
-        // One start contributes to the total for this (sourceType, hourDay).
-        *totals.entry((source_type_id, hd_id)).or_insert(0) += 1;
+ // One start contributes to the total for this (sourceType, hourDay).
+ *totals.entry((source_type_id, hd_id)).or_insert(0) += 1;
 
-        // And one count for each matching op mode (canonically exactly one).
+ // And one count for each matching op mode (canonically exactly one).
         for mode_id in &matched_modes {
-            *counts
+ *counts
                 .entry((source_type_id, hd_id, *mode_id as i32))
                 .or_insert(0) += 1;
         }
     }
 
-    // Step 300 + 400: compute fractions and emit rows.
+ // Step 300 + 400: compute fractions and emit rows.
     let mut op_mode_rows: Vec<StartOpModeDistributionRow> = Vec::new();
     let mut rates_rows: Vec<RatesOpModeDistributionRow> = Vec::new();
 
-    // Collect unique (source_type, hour_day) cells for the rates "All Starts" row.
+ // Collect unique (source_type, hour_day) cells for the rates "All Starts" row.
     let cells: std::collections::BTreeSet<(i32, i32)> = totals.keys().copied().collect();
 
     for (source_type_id, hour_day_id_val) in &cells {
@@ -945,7 +945,7 @@ pub fn build_start_op_mode_distribution(
             continue;
         }
 
-        // Emit the op-mode-100 "All Starts" row for RatesOpModeDistribution.
+ // Emit the op-mode-100 "All Starts" row for RatesOpModeDistribution.
         rates_rows.push(RatesOpModeDistributionRow {
             source_type_id: *source_type_id,
             hour_day_id: *hour_day_id_val,
@@ -954,7 +954,7 @@ pub fn build_start_op_mode_distribution(
         });
     }
 
-    // Emit per-mode fraction rows.
+ // Emit per-mode fraction rows.
     for ((source_type_id, hd_id, op_mode_id), &count) in &counts {
         let total = *totals.get(&(*source_type_id, *hd_id)).unwrap_or(&1);
         let fraction = op_mode_fraction(count, total);
@@ -976,7 +976,7 @@ pub fn build_start_op_mode_distribution(
     (op_mode_rows, rates_rows)
 }
 
-/// MOVES `StartOperatingModeDistributionGenerator` (migration plan Task 32).
+/// MOVES `StartOperatingModeDistributionGenerator` ().
 ///
 /// Builds the start-exhaust operating-mode distribution. Holds no per-run
 /// state — every input arrives through the [`CalculatorContext`] passed to
@@ -1023,21 +1023,21 @@ impl Generator for StartOperatingModeDistributionGenerator {
     }
 
     fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
-        // Read the three input tables the kernel needs.
+ // Read the three input tables the kernel needs.
         let inputs = StartOpModeInputs {
             trips: ctx.tables().iter_typed("SampleVehicleTrip")?,
             vehicle_days: ctx.tables().iter_typed("SampleVehicleDay")?,
             operating_modes: ctx.tables().iter_typed("OperatingMode")?,
         };
 
-        // Run steps 100–400: soak time → start op mode → op-mode fraction →
-        // populate both output tables.
+ // Run steps 100–400: soak time → start op mode → op-mode fraction →
+ // populate both output tables.
         let (op_mode_rows, rates_rows) = build_start_op_mode_distribution(&inputs);
 
-        // Write OpModeDistribution to scratch.
+ // Write OpModeDistribution to scratch.
         crate::wiring::write_scratch_table(ctx, OUTPUT_TABLES[0], op_mode_rows)?;
 
-        // Write RatesOpModeDistribution to scratch directly (second table).
+ // Write RatesOpModeDistribution to scratch directly (second table).
         let rates_df = RatesOpModeDistributionRow::into_dataframe(rates_rows)
             .map_err(|e| Error::Polars(e.to_string()))?;
         ctx.scratch_mut().insert(OUTPUT_TABLES[1], rates_df);
@@ -1058,29 +1058,29 @@ pub fn factory() -> Box<dyn Generator> {
 mod tests {
     use super::*;
 
-    // ---- soak_time ----
+ // ---- soak_time ----
 
     #[test]
     fn soak_time_is_key_on_minus_prior_key_off() {
-        // The engine sat off from the prior trip's key-off (480) until this
-        // trip's key-on (540).
+ // The engine sat off from the prior trip's key-off (480) until this
+ // trip's key-on (540).
         assert_eq!(soak_time(540, 480), 60);
         assert_eq!(soak_time(1000, 0), 1000);
     }
 
     #[test]
     fn soak_time_can_be_negative_for_overlapping_trips() {
-        // The Java does not floor the difference; overlapping sample trips
-        // give a negative soak time.
+ // The Java does not floor the difference; overlapping sample trips
+ // give a negative soak time.
         assert_eq!(soak_time(100, 130), -30);
         assert_eq!(soak_time(0, 0), 0);
     }
 
-    // ---- OperatingMode::matches ----
+ // ---- OperatingMode::matches ----
 
     #[test]
     fn closed_band_matches_as_half_open_interval() {
-        // [min, max): min inclusive, max exclusive.
+ // [min, max): min inclusive, max exclusive.
         let mode = OperatingMode {
             op_mode_id: 102,
             min_soak_time: Some(10),
@@ -1096,7 +1096,7 @@ mod tests {
 
     #[test]
     fn open_below_band_matches_everything_under_max() {
-        // minSoakTime NULL, maxSoakTime present: `soak < max`.
+ // minSoakTime NULL, maxSoakTime present: `soak < max`.
         let mode = OperatingMode {
             op_mode_id: 101,
             min_soak_time: None,
@@ -1111,7 +1111,7 @@ mod tests {
 
     #[test]
     fn open_above_band_matches_everything_from_min() {
-        // minSoakTime present, maxSoakTime NULL: `soak >= min`.
+ // minSoakTime present, maxSoakTime NULL: `soak >= min`.
         let mode = OperatingMode {
             op_mode_id: 150,
             min_soak_time: Some(720),
@@ -1124,7 +1124,7 @@ mod tests {
 
     #[test]
     fn band_with_no_bounds_never_matches() {
-        // Both NULL: each WHERE clause is SQL UNKNOWN, never selected.
+ // Both NULL: each WHERE clause is SQL UNKNOWN, never selected.
         let mode = OperatingMode {
             op_mode_id: 999,
             min_soak_time: None,
@@ -1135,9 +1135,9 @@ mod tests {
         assert!(!mode.matches(i32::MAX));
     }
 
-    // ---- classify_start_op_mode ----
+ // ---- classify_start_op_mode ----
 
-    /// Three modes tiling the soak axis: `(-∞,60)`, `[60,360)`, `[360,∞)`.
+ /// Three modes tiling the soak axis: `(-∞,60)`, `[60,360)`, `[360,∞)`.
     fn partitioned_modes() -> [OperatingMode; 3] {
         [
             OperatingMode {
@@ -1178,7 +1178,7 @@ mod tests {
 
     #[test]
     fn a_soak_time_in_a_gap_classifies_to_no_mode() {
-        // Non-canonical table with a hole between [0,10) and [20,30).
+ // Non-canonical table with a hole between [0,10) and [20,30).
         let modes = [
             OperatingMode {
                 op_mode_id: 1,
@@ -1196,7 +1196,7 @@ mod tests {
 
     #[test]
     fn overlapping_bands_yield_every_match_in_input_order() {
-        // The INNER JOIN emits a row per match; order follows the slice.
+ // The INNER JOIN emits a row per match; order follows the slice.
         let modes = [
             OperatingMode {
                 op_mode_id: 8,
@@ -1212,12 +1212,12 @@ mod tests {
         assert_eq!(classify_start_op_mode(15, &modes), vec![8, 7]);
     }
 
-    // ---- classify_trip ----
+ // ---- classify_trip ----
 
     #[test]
     fn classify_trip_combines_soak_time_and_classification() {
         let modes = partitioned_modes();
-        // key-on 800, prior key-off 500 → soak 300 → mode 102.
+ // key-on 800, prior key-off 500 → soak 300 → mode 102.
         let result = classify_trip(800, 500, &modes);
         assert_eq!(
             result,
@@ -1235,7 +1235,7 @@ mod tests {
         assert!(result.op_mode_ids.is_empty());
     }
 
-    // ---- op_mode_fraction ----
+ // ---- op_mode_fraction ----
 
     #[test]
     fn op_mode_fraction_is_count_over_starts() {
@@ -1245,8 +1245,8 @@ mod tests {
 
     #[test]
     fn op_mode_fraction_of_a_bucket_sums_to_one() {
-        // Every start of a (source type, hour-day) lands in exactly one mode,
-        // so the per-mode fractions sum to 1.
+ // Every start of a (source type, hour-day) lands in exactly one mode,
+ // so the per-mode fractions sum to 1.
         let starts = 10;
         let sum: f64 = [3_u64, 5, 2]
             .iter()
@@ -1260,7 +1260,7 @@ mod tests {
         assert_eq!(op_mode_fraction(0, 12), 0.0);
     }
 
-    // ---- hour_day_id ----
+ // ---- hour_day_id ----
 
     #[test]
     fn hour_day_id_packs_hour_and_day() {
@@ -1269,30 +1269,30 @@ mod tests {
         assert_eq!(hour_day_id(24, 5), 245);
     }
 
-    // ---- pollutant filter ----
+ // ---- pollutant filter ----
 
     #[test]
     fn recognized_pollutants_are_the_twelve_start_exhaust_species() {
         assert_eq!(RECOGNIZED_START_EXHAUST_POLLUTANTS.len(), 12);
-        // Ascending by id, no duplicates.
+ // Ascending by id, no duplicates.
         assert!(RECOGNIZED_START_EXHAUST_POLLUTANTS
             .windows(2)
             .all(|w| w[0].0 < w[1].0));
-        // Spot-check the endpoints: THC (1) and Composite – NonECPM (118).
+ // Spot-check the endpoints: THC (1) and Composite – NonECPM (118).
         assert!(is_recognized_start_exhaust_pollutant(PollutantId(1)));
         assert!(is_recognized_start_exhaust_pollutant(PollutantId(118)));
     }
 
     #[test]
     fn unlisted_pollutant_is_not_recognized() {
-        // Methane (5) and Benzene (20) are not in the start-exhaust set.
+ // Methane (5) and Benzene (20) are not in the start-exhaust set.
         assert!(!is_recognized_start_exhaust_pollutant(PollutantId(5)));
         assert!(!is_recognized_start_exhaust_pollutant(PollutantId(20)));
     }
 
     #[test]
     fn pol_process_filter_requires_the_start_exhaust_process() {
-        // CO is recognised, but only paired with Start Exhaust (2).
+ // CO is recognised, but only paired with Start Exhaust (2).
         let co_start = PollutantProcessAssociation {
             pollutant_id: PollutantId(2),
             process_id: START_EXHAUST_PROCESS_ID,
@@ -1307,7 +1307,7 @@ mod tests {
 
     #[test]
     fn pol_process_filter_rejects_an_unrecognized_pollutant() {
-        // Methane (5) at the start-exhaust process is still rejected.
+ // Methane (5) at the start-exhaust process is still rejected.
         let ch4_start = PollutantProcessAssociation {
             pollutant_id: PollutantId(5),
             process_id: START_EXHAUST_PROCESS_ID,
@@ -1315,7 +1315,7 @@ mod tests {
         assert!(!is_recognized_start_exhaust_pol_process(ch4_start));
     }
 
-    // ---- Generator trait ----
+ // ---- Generator trait ----
 
     #[test]
     fn generator_name_matches_java_class() {
@@ -1327,8 +1327,8 @@ mod tests {
 
     #[test]
     fn generator_has_a_single_start_exhaust_subscription() {
-        // The chain DAG records one subscription: Start Exhaust, PROCESS
-        // granularity, GENERATOR priority.
+ // The chain DAG records one subscription: Start Exhaust, PROCESS
+ // granularity, GENERATOR priority.
         let subs = StartOperatingModeDistributionGenerator.subscriptions();
         assert_eq!(subs.len(), 1);
         assert_eq!(subs[0].process_id, START_EXHAUST_PROCESS_ID);
@@ -1350,7 +1350,7 @@ mod tests {
 
     #[test]
     fn generator_has_no_upstream() {
-        // The DAG lists no `depends_on` — the generator is a root subscriber.
+ // The DAG lists no `depends_on` — the generator is a root subscriber.
         assert!(StartOperatingModeDistributionGenerator
             .upstream()
             .is_empty());
@@ -1358,7 +1358,7 @@ mod tests {
 
     #[test]
     fn generator_subscriptions_are_stable_across_calls() {
-        // The OnceLock-backed slice is identical on every call.
+ // The OnceLock-backed slice is identical on every call.
         let first = StartOperatingModeDistributionGenerator.subscriptions();
         let second = StartOperatingModeDistributionGenerator.subscriptions();
         assert_eq!(first, second);
@@ -1366,22 +1366,22 @@ mod tests {
 
     #[test]
     fn execute_writes_both_output_tables_to_scratch() {
-        // Integration test: seed SampleVehicleTrip / SampleVehicleDay /
-        // OperatingMode, run execute(), and verify both OpModeDistribution
-        // and RatesOpModeDistribution appear in scratch with correct contents.
+ // Integration test: seed SampleVehicleTrip / SampleVehicleDay /
+ // OperatingMode, run execute(), and verify both OpModeDistribution
+ // and RatesOpModeDistribution appear in scratch with correct contents.
         use moves_framework::{DataFrameStore, InMemoryStore};
 
-        // Two trips for vehicle 1, day 5 (weekday):
-        //   trip 1: no priorTripID (first trip of the day — no soak time).
-        //   trip 2: priorTripID = 1, key-on at 540, prior key-off at 480
-        //           → soak time = 60.
-        // OperatingMode: [(-∞,60) → 101], [60,∞) → 102].
-        // soak = 60 falls in [60,∞) → opModeID 102.
-        // sourceTypeID for (vehID=1, dayID=5) is 21.
-        // hourID for trip 2 is 9 (8 am–9 am slot), dayID 5.
-        // hourDayID = 9*10+5 = 95.
-        // Only one start: opModeFraction(102) = 1/1 = 1.0.
-        // RatesOpModeDistribution also gets opMode 100 with fraction 1.0.
+ // Two trips for vehicle 1, day 5 (weekday):
+ // trip 1: no priorTripID (first trip of the day — no soak time).
+ // trip 2: priorTripID = 1, key-on at 540, prior key-off at 480
+ // → soak time = 60.
+ // OperatingMode: [(-∞,60) → 101], [60,∞) → 102].
+ // soak = 60 falls in [60,∞) → opModeID 102.
+ // sourceTypeID for (vehID=1, dayID=5) is 21.
+ // hourID for trip 2 is 9 (8 am–9 am slot), dayID 5.
+ // hourDayID = 9*10+5 = 95.
+ // Only one start: opModeFraction(102) = 1/1 = 1.0.
+ // RatesOpModeDistribution also gets opMode 100 with fraction 1.0.
 
         let mut store = InMemoryStore::new();
         store.insert(
@@ -1438,10 +1438,10 @@ mod tests {
         let out = StartOperatingModeDistributionGenerator
             .execute(&mut ctx)
             .expect("execute ok");
-        // Generator writes to scratch — main output is empty.
+ // Generator writes to scratch — main output is empty.
         assert!(out.dataframe().is_none());
 
-        // Read back OpModeDistribution.
+ // Read back OpModeDistribution.
         let omd: Vec<StartOpModeDistributionRow> = ctx
             .scratch()
             .store
@@ -1449,18 +1449,18 @@ mod tests {
             .expect("OpModeDistribution in scratch");
         assert_eq!(omd.len(), 1, "one start → one op-mode row");
         assert_eq!(omd[0].source_type_id, 21);
-        // hourDayID = hourID*10 + dayID = 9*10 + 5 = 95
+ // hourDayID = hourID*10 + dayID = 9*10 + 5 = 95
         assert_eq!(omd[0].hour_day_id, 95);
         assert_eq!(omd[0].op_mode_id, 102); // soak = 60, which is [60,∞)
         assert!((omd[0].op_mode_fraction - 1.0).abs() < 1e-12);
 
-        // Read back RatesOpModeDistribution.
+ // Read back RatesOpModeDistribution.
         let romd: Vec<RatesOpModeDistributionRow> = ctx
             .scratch()
             .store
             .iter_typed("RatesOpModeDistribution")
             .expect("RatesOpModeDistribution in scratch");
-        // Expect: op-mode 100 (All Starts, fraction 1.0) + op-mode 102 (fraction 1.0).
+ // Expect: op-mode 100 (All Starts, fraction 1.0) + op-mode 102 (fraction 1.0).
         assert_eq!(romd.len(), 2, "rates: All-Starts row + per-mode row");
         let all_starts = romd
             .iter()
@@ -1478,8 +1478,8 @@ mod tests {
 
     #[test]
     fn execute_drops_first_trips_with_no_prior_trip() {
-        // Trip 1 has no prior trip → no soak time → no start row.
-        // Only trips with a priorTripID contribute starts.
+ // Trip 1 has no prior trip → no soak time → no start row.
+ // Only trips with a priorTripID contribute starts.
         use moves_framework::{DataFrameStore, InMemoryStore};
 
         let mut store = InMemoryStore::new();
@@ -1537,15 +1537,15 @@ mod tests {
 
     #[test]
     fn execute_aggregates_two_starts_across_op_modes() {
-        // Two trips with priorTripID, one classifying into mode 101, one into 102.
-        // Fractions: mode 101 = 1/2 = 0.5, mode 102 = 1/2 = 0.5.
+ // Two trips with priorTripID, one classifying into mode 101, one into 102.
+ // Fractions: mode 101 = 1/2 = 0.5, mode 102 = 1/2 = 0.5.
         use moves_framework::{DataFrameStore, InMemoryStore};
 
         let mut store = InMemoryStore::new();
         store.insert(
             "SampleVehicleTrip",
             SampleVehicleTripRow::into_dataframe(vec![
-                // trip 1: no prior (anchor trip)
+ // trip 1: no prior (anchor trip)
                 SampleVehicleTripRow {
                     veh_id: 1,
                     day_id: 5,
@@ -1555,8 +1555,8 @@ mod tests {
                     key_on_time: 0,
                     key_off_time: 30,
                 },
-                // trip 2: soak = 540 - 30 = 510 → [360,∞) which is NOT in these modes; but we use simpler modes:
-                // Let's set soak = 540 - 30 = 510. With mode 101 = (-∞,60) and 102 = [60,∞), it goes to 102.
+ // trip 2: soak = 540 - 30 = 510 → [360,∞) which is NOT in these modes; but we use simpler modes:
+ // Let's set soak = 540 - 30 = 510. With mode 101 = (-∞,60) and 102 = [60,∞), it goes to 102.
                 SampleVehicleTripRow {
                     veh_id: 1,
                     day_id: 5,
@@ -1566,7 +1566,7 @@ mod tests {
                     key_on_time: 540,
                     key_off_time: 600,
                 },
-                // trip 3: soak = 601 - 600 = 1 → mode 101 (-∞,60).
+ // trip 3: soak = 601 - 600 = 1 → mode 101 (-∞,60).
                 SampleVehicleTripRow {
                     veh_id: 1,
                     day_id: 5,
@@ -1615,12 +1615,12 @@ mod tests {
             .store
             .iter_typed("OpModeDistribution")
             .expect("table present");
-        // Two starts across two different (hour_day, op_mode) cells — different hourIDs,
-        // so two distinct hourDayIDs: 9*10+5=95 and 10*10+5=105.
+ // Two starts across two different (hour_day, op_mode) cells — different hourIDs,
+ // so two distinct hourDayIDs: 9*10+5=95 and 10*10+5=105.
         assert_eq!(omd.len(), 2, "one mode per distinct (hourDay, opMode) cell");
         for row in &omd {
             assert_eq!(row.source_type_id, 21);
-            // Each cell has exactly 1 start of 1 total → fraction 1.0.
+ // Each cell has exactly 1 start of 1 total → fraction 1.0.
             assert!(
                 (row.op_mode_fraction - 1.0).abs() < 1e-12,
                 "fraction for op_mode {} hourDay {}: {}",
@@ -1633,8 +1633,8 @@ mod tests {
 
     #[test]
     fn generator_execute_is_ok() {
-        // Smoke-test that execute is callable with an empty context.
-        // Empty tables cause iter_typed to fail, so we seed minimal tables.
+ // Smoke-test that execute is callable with an empty context.
+ // Empty tables cause iter_typed to fail, so we seed minimal tables.
         use moves_framework::{DataFrameStore, InMemoryStore};
         let mut store = InMemoryStore::new();
         store.insert(

@@ -36,11 +36,11 @@ pub const COLUMNS: [&str; 5] = [
 #[derive(Debug, Default)]
 pub struct ReadReport {
     pub table: RopTable,
-    /// Records whose key was already present in the table when they were
-    /// encountered (last-write-wins, but duplicates are reported here).
+ /// Records whose key was already present in the table when they were
+ /// encountered (last-write-wins, but duplicates are reported here).
     pub duplicate_keys: Vec<RopRecord>,
-    /// Records with `reductionFraction` outside `[0.0, 1.0]` that were
-    /// rejected.
+ /// Records with `reductionFraction` outside `[0.0, 1.0]` that were
+ /// rejected.
     pub invalid_fractions: Vec<RopRecord>,
 }
 
@@ -240,7 +240,7 @@ mod tests {
             lines[0],
             "pollutantID,sourceTypeID,regClassID,modelYearID,reductionFraction"
         );
-        // canonical row order is key-lexicographic
+ // canonical row order is key-lexicographic
         assert_eq!(lines[1], "1,11,10,2020,0.25");
         assert_eq!(lines[2], "1,21,20,2020,0.15");
         assert_eq!(lines[3], "2,21,10,2020,0.1");

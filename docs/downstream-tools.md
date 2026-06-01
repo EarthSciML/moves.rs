@@ -7,11 +7,9 @@ the tools downstream researchers actually use — pandas, R, Polars,
 DuckDB, and Apache Spark — and walks three end-to-end analyses that
 reproduce common canonical-MOVES post-processing.
 
-It ships with Phase 4 Task 90 of the
-[migration plan](../moves-rust-migration-plan.md). The goal is zero
-friction: every snippet below is copy-pasteable, and the
-[sample-dataset generator](#generate-a-sample-dataset) lets you run all
-of them without a full MOVES run.
+The goal is zero friction: every snippet below is copy-pasteable, and
+the [sample-dataset generator](#generate-a-sample-dataset) lets you run
+all of them without a full MOVES run.
 
 ## The output layout
 
@@ -21,20 +19,20 @@ A run writes three logical tables under an output root:
 sample-output/
 ├── MOVESRun.parquet
 ├── MOVESOutput/
-│   ├── yearID=2020/monthID=1/part.parquet
-│   ├── yearID=2020/monthID=7/part.parquet
-│   └── …
+│ ├── yearID=2020/monthID=1/part.parquet
+│ ├── yearID=2020/monthID=7/part.parquet
+│ └── …
 └── MOVESActivityOutput/
-    ├── yearID=2020/monthID=1/part.parquet
-    └── …
+ ├── yearID=2020/monthID=1/part.parquet
+ └── …
 ```
 
 * `MOVESRun.parquet` — one row of run metadata (units, RunSpec
-  description, provenance hashes).
+ description, provenance hashes).
 * `MOVESOutput/` — per-`(time, location, pollutant, process)`
-  emissions. Hive-partitioned by `(yearID, monthID)`.
+ emissions. Hive-partitioned by `(yearID, monthID)`.
 * `MOVESActivityOutput/` — per-`(time, location, activity-type)`
-  activity. Same partition layout.
+ activity. Same partition layout.
 
 The single most useful fact for downstream code: **the partition
 columns `yearID` and `monthID` are also stored inside every row.** A
@@ -63,70 +61,70 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 ROOT = Path("sample-output")
-RUN_HASH = "0" * 64  # stand-in for the real hex SHA-256 runHash
+RUN_HASH = "0" * 64 # stand-in for the real hex SHA-256 runHash
 ROOT.mkdir(parents=True, exist_ok=True)
 
 # --- MOVESRun.parquet — one row of run metadata ---------------------
 pq.write_table(
-    pa.table({
-        "MOVESRunID": [1],
-        "runSpecDescription": ["downstream-tools.md sample run"],
-        "scale": ["County"],
-        "massUnits": ["Grams"],
-        "timeUnits": ["Hours"],
-        "distanceUnits": ["Miles"],
-        "energyUnits": ["Joules"],
-        "runHash": [RUN_HASH],
-        "calculatorVersion": ["moves-rs sample"],
-    }),
-    ROOT / "MOVESRun.parquet",
+ pa.table({
+ "MOVESRunID": [1],
+ "runSpecDescription": ["downstream-tools.md sample run"],
+ "scale": ["County"],
+ "massUnits": ["Grams"],
+ "timeUnits": ["Hours"],
+ "distanceUnits": ["Miles"],
+ "energyUnits": ["Joules"],
+ "runHash": [RUN_HASH],
+ "calculatorVersion": ["moves-rs sample"],
+ }),
+ ROOT / "MOVESRun.parquet",
 )
 
-counties = [26161, 26163]      # Washtenaw + Wayne counties, Michigan
-months = [1, 7]                # January + July
-pollutants = [2, 3, 110, 87]   # CO, NOx, PM2.5, VOC
-processes = [1, 2]             # Running Exhaust, Start Exhaust
+counties = [26161, 26163] # Washtenaw + Wayne counties, Michigan
+months = [1, 7] # January + July
+pollutants = [2, 3, 110, 87] # CO, NOx, PM2.5, VOC
+processes = [1, 2] # Running Exhaust, Start Exhaust
 
 # --- MOVESOutput/ — emissions, one partition file per month ---------
 for month in months:
-    rows = []
-    for county, poll, proc in itertools.product(
-        counties, pollutants, processes
-    ):
-        quant = float(county % 1000 + poll + proc * 10)
-        rows.append({
-            "MOVESRunID": 1,
-            "yearID": 2020, "monthID": month, "dayID": 5, "hourID": 8,
-            "stateID": county // 1000, "countyID": county,
-            "zoneID": county * 10, "linkID": county * 100,
-            "pollutantID": poll, "processID": proc,
-            "sourceTypeID": 21, "regClassID": 30,
-            "fuelTypeID": 1, "modelYearID": 2018, "roadTypeID": 5,
-            "SCC": f"220100{proc:02d}10",
-            "emissionQuant": quant,
-            "emissionRate": quant / 1000.0,
-            "runHash": RUN_HASH,
-        })
-    part = ROOT / "MOVESOutput" / "yearID=2020" / f"monthID={month}"
-    part.mkdir(parents=True, exist_ok=True)
-    pq.write_table(pa.Table.from_pylist(rows), part / "part.parquet")
+ rows = []
+ for county, poll, proc in itertools.product(
+ counties, pollutants, processes
+ ):
+ quant = float(county % 1000 + poll + proc * 10)
+ rows.append({
+ "MOVESRunID": 1,
+ "yearID": 2020, "monthID": month, "dayID": 5, "hourID": 8,
+ "stateID": county // 1000, "countyID": county,
+ "zoneID": county * 10, "linkID": county * 100,
+ "pollutantID": poll, "processID": proc,
+ "sourceTypeID": 21, "regClassID": 30,
+ "fuelTypeID": 1, "modelYearID": 2018, "roadTypeID": 5,
+ "SCC": f"220100{proc:02d}10",
+ "emissionQuant": quant,
+ "emissionRate": quant / 1000.0,
+ "runHash": RUN_HASH,
+ })
+ part = ROOT / "MOVESOutput" / "yearID=2020" / f"monthID={month}"
+ part.mkdir(parents=True, exist_ok=True)
+ pq.write_table(pa.Table.from_pylist(rows), part / "part.parquet")
 
 # --- MOVESActivityOutput/ — activity, one partition file per month --
 for month in months:
-    rows = []
-    for county in counties:
-        for activity_type, value in [(1, county * 1.5), (6, county * 0.2)]:
-            rows.append({
-                "MOVESRunID": 1,
-                "yearID": 2020, "monthID": month, "dayID": 5, "hourID": 8,
-                "stateID": county // 1000, "countyID": county,
-                "sourceTypeID": 21, "fuelTypeID": 1, "roadTypeID": 5,
-                "activityTypeID": activity_type, "activity": float(value),
-                "runHash": RUN_HASH,
-            })
-    part = ROOT / "MOVESActivityOutput" / "yearID=2020" / f"monthID={month}"
-    part.mkdir(parents=True, exist_ok=True)
-    pq.write_table(pa.Table.from_pylist(rows), part / "part.parquet")
+ rows = []
+ for county in counties:
+ for activity_type, value in [(1, county * 1.5), (6, county * 0.2)]:
+ rows.append({
+ "MOVESRunID": 1,
+ "yearID": 2020, "monthID": month, "dayID": 5, "hourID": 8,
+ "stateID": county // 1000, "countyID": county,
+ "sourceTypeID": 21, "fuelTypeID": 1, "roadTypeID": 5,
+ "activityTypeID": activity_type, "activity": float(value),
+ "runHash": RUN_HASH,
+ })
+ part = ROOT / "MOVESActivityOutput" / "yearID=2020" / f"monthID={month}"
+ part.mkdir(parents=True, exist_ok=True)
+ pq.write_table(pa.Table.from_pylist(rows), part / "part.parquet")
 
 print(f"wrote sample output to {ROOT.resolve()}")
 ```
@@ -147,7 +145,7 @@ import polars as pl
 # scan_parquet is lazy — nothing is read until .collect().
 emissions = pl.scan_parquet("sample-output/MOVESOutput/**/*.parquet")
 activity = pl.scan_parquet("sample-output/MOVESActivityOutput/**/*.parquet")
-run = pl.read_parquet("sample-output/MOVESRun.parquet")  # singleton, eager
+run = pl.read_parquet("sample-output/MOVESRun.parquet") # singleton, eager
 
 print(emissions.head().collect())
 ```
@@ -161,11 +159,11 @@ import pandas as pd
 
 
 def load_table(directory: str) -> pd.DataFrame:
-    """Concatenate every partition file under a MOVES output table."""
-    files = sorted(glob.glob(f"{directory}/**/*.parquet", recursive=True))
-    return pd.concat(
-        (pd.read_parquet(f) for f in files), ignore_index=True
-    )
+ """Concatenate every partition file under a MOVES output table."""
+ files = sorted(glob.glob(f"{directory}/**/*.parquet", recursive=True))
+ return pd.concat(
+ (pd.read_parquet(f) for f in files), ignore_index=True
+ )
 
 
 emissions = load_table("sample-output/MOVESOutput")
@@ -184,12 +182,12 @@ import duckdb
 
 con = duckdb.connect()
 con.sql("""
-    CREATE VIEW emissions AS
-    SELECT * FROM read_parquet('sample-output/MOVESOutput/**/*.parquet');
-    CREATE VIEW activity AS
-    SELECT * FROM read_parquet('sample-output/MOVESActivityOutput/**/*.parquet');
-    CREATE VIEW run AS
-    SELECT * FROM read_parquet('sample-output/MOVESRun.parquet');
+ CREATE VIEW emissions AS
+ SELECT * FROM read_parquet('sample-output/MOVESOutput/**/*.parquet');
+ CREATE VIEW activity AS
+ SELECT * FROM read_parquet('sample-output/MOVESActivityOutput/**/*.parquet');
+ CREATE VIEW run AS
+ SELECT * FROM read_parquet('sample-output/MOVESRun.parquet');
 """)
 con.sql("SELECT * FROM emissions LIMIT 5").show()
 ```
@@ -204,9 +202,9 @@ library(arrow)
 library(dplyr)
 
 load_table <- function(dir) {
-  files <- list.files(dir, pattern = "\\.parquet$",
-                      recursive = TRUE, full.names = TRUE)
-  open_dataset(files)            # a vector of files → no partition inference
+ files <- list.files(dir, pattern = "\\.parquet$",
+ recursive = TRUE, full.names = TRUE)
+ open_dataset(files) # a vector of files → no partition inference
 }
 
 emissions <- load_table("sample-output/MOVESOutput")
@@ -229,10 +227,10 @@ spark = SparkSession.builder.appName("moves-output").getOrCreate()
 
 
 def load_table(path: str):
-    # recursiveFileLookup=true reads every parquet under `path` and skips
-    # Spark's partition discovery, so the yearID/monthID columns come
-    # from the row data.
-    return spark.read.option("recursiveFileLookup", "true").parquet(path)
+ # recursiveFileLookup=true reads every parquet under `path` and skips
+ # Spark's partition discovery, so the yearID/monthID columns come
+ # from the row data.
+ return spark.read.option("recursiveFileLookup", "true").parquet(path)
 
 
 emissions = load_table("sample-output/MOVESOutput")
@@ -252,16 +250,16 @@ open only the partition files that match:
 # Polars — pass the directory, not a glob.
 import polars as pl
 df = (
-    pl.scan_parquet("sample-output/MOVESOutput", hive_partitioning=True)
-    .filter(pl.col("yearID") == 2020)
-    .collect()
+ pl.scan_parquet("sample-output/MOVESOutput", hive_partitioning=True)
+ .filter(pl.col("yearID") == 2020)
+ .collect()
 )
 ```
 
 ```sql
 -- DuckDB
 SELECT * FROM read_parquet(
-    'sample-output/MOVESOutput/**/*.parquet', hive_partitioning = true)
+ 'sample-output/MOVESOutput/**/*.parquet', hive_partitioning = true)
 WHERE yearID = 2020 AND monthID IN (6, 7, 8);
 ```
 
@@ -294,12 +292,12 @@ run = pl.read_parquet("sample-output/MOVESRun.parquet")
 units = run.select("runHash", "massUnits", "timeUnits", "distanceUnits")
 
 emissions = (
-    pl.scan_parquet("sample-output/MOVESOutput/**/*.parquet")
-    .join(units.lazy(), on="runHash", how="left")
-    .collect()
+ pl.scan_parquet("sample-output/MOVESOutput/**/*.parquet")
+ .join(units.lazy(), on="runHash", how="left")
+ .collect()
 )
 print(emissions.select("countyID", "pollutantID", "emissionQuant",
-                        "massUnits").head())
+ "massUnits").head())
 ```
 
 ### Activity output
@@ -313,11 +311,11 @@ print(emissions.select("countyID", "pollutantID", "emissionQuant",
 from pyspark.sql import functions as F
 
 vmt = (
-    load_table("sample-output/MOVESActivityOutput")
-    .filter(F.col("activityTypeID") == 1)        # 1 = distance travelled
-    .groupBy("yearID", "countyID")
-    .agg(F.sum("activity").alias("vmt"))
-    .orderBy("yearID", "countyID")
+ load_table("sample-output/MOVESActivityOutput")
+ .filter(F.col("activityTypeID") == 1) # 1 = distance travelled
+ .groupBy("yearID", "countyID")
+ .agg(F.sum("activity").alias("vmt"))
+ .orderBy("yearID", "countyID")
 )
 vmt.show()
 ```
@@ -343,30 +341,30 @@ default-DB `pollutant` and `emissionprocess` tables are authoritative.
 
 ```python
 POLLUTANT = {
-    1: "Total Gaseous Hydrocarbons",
-    2: "Carbon Monoxide (CO)",
-    3: "Oxides of Nitrogen (NOx)",
-    5: "Methane (CH4)",
-    6: "Nitrous Oxide (N2O)",
-    20: "Benzene",
-    25: "Formaldehyde",
-    87: "Volatile Organic Compounds",
-    100: "Primary Exhaust PM10 - Total",
-    110: "Primary Exhaust PM2.5 - Total",
+ 1: "Total Gaseous Hydrocarbons",
+ 2: "Carbon Monoxide (CO)",
+ 3: "Oxides of Nitrogen (NOx)",
+ 5: "Methane (CH4)",
+ 6: "Nitrous Oxide (N2O)",
+ 20: "Benzene",
+ 25: "Formaldehyde",
+ 87: "Volatile Organic Compounds",
+ 100: "Primary Exhaust PM10 - Total",
+ 110: "Primary Exhaust PM2.5 - Total",
 }
 PROCESS = {
-    1: "Running Exhaust",
-    2: "Start Exhaust",
-    9: "Brakewear",
-    10: "Tirewear",
-    11: "Evap Permeation",
-    12: "Evap Fuel Vapor Venting",
-    13: "Evap Fuel Leaks",
-    15: "Crankcase Running Exhaust",
-    16: "Crankcase Start Exhaust",
-    17: "Crankcase Extended Idle Exhaust",
-    18: "Refueling Displacement Vapor Loss",
-    19: "Refueling Spillage Loss",
+ 1: "Running Exhaust",
+ 2: "Start Exhaust",
+ 9: "Brakewear",
+ 10: "Tirewear",
+ 11: "Evap Permeation",
+ 12: "Evap Fuel Vapor Venting",
+ 13: "Evap Fuel Leaks",
+ 15: "Crankcase Running Exhaust",
+ 16: "Crankcase Start Exhaust",
+ 17: "Crankcase Extended Idle Exhaust",
+ 18: "Refueling Displacement Vapor Loss",
+ 19: "Refueling Spillage Loss",
 }
 ```
 
@@ -386,13 +384,13 @@ Collapse the hourly/daily/monthly/process/source-type detail of
 ```sql
 -- DuckDB
 SELECT
-    countyID,
-    SCC,
-    pollutantID,
-    sum(emissionQuant) AS annual_emission_quant
+ countyID,
+ SCC,
+ pollutantID,
+ sum(emissionQuant) AS annual_emission_quant
 FROM read_parquet('sample-output/MOVESOutput/**/*.parquet')
 WHERE yearID = 2020
-  AND emissionQuant IS NOT NULL
+ AND emissionQuant IS NOT NULL
 GROUP BY countyID, SCC, pollutantID
 ORDER BY countyID, SCC, pollutantID;
 ```
@@ -403,14 +401,14 @@ The same rollup in Polars:
 import polars as pl
 
 nei = (
-    pl.scan_parquet("sample-output/MOVESOutput/**/*.parquet")
-    .filter(
-        (pl.col("yearID") == 2020) & pl.col("emissionQuant").is_not_null()
-    )
-    .group_by("countyID", "SCC", "pollutantID")
-    .agg(pl.col("emissionQuant").sum().alias("annual_emission_quant"))
-    .sort("countyID", "SCC", "pollutantID")
-    .collect()
+ pl.scan_parquet("sample-output/MOVESOutput/**/*.parquet")
+ .filter(
+ (pl.col("yearID") == 2020) & pl.col("emissionQuant").is_not_null()
+ )
+ .group_by("countyID", "SCC", "pollutantID")
+ .agg(pl.col("emissionQuant").sum().alias("annual_emission_quant"))
+ .sort("countyID", "SCC", "pollutantID")
+ .collect()
 )
 print(nei)
 ```
@@ -435,16 +433,16 @@ run = pl.read_parquet("sample-output/MOVESRun.parquet")
 assert run["massUnits"][0] == "Grams", "adjust the conversion factor"
 
 rollup = (
-    pl.scan_parquet("sample-output/MOVESOutput/**/*.parquet")
-    .filter(pl.col("emissionQuant").is_not_null())
-    .group_by("yearID", "countyID", "pollutantID")
-    .agg(pl.col("emissionQuant").sum().alias("emission_quant_g"))
-    .with_columns(
-        (pl.col("emission_quant_g") / GRAMS_PER_US_TON)
-        .alias("emission_us_tons")
-    )
-    .sort("yearID", "countyID", "pollutantID")
-    .collect()
+ pl.scan_parquet("sample-output/MOVESOutput/**/*.parquet")
+ .filter(pl.col("emissionQuant").is_not_null())
+ .group_by("yearID", "countyID", "pollutantID")
+ .agg(pl.col("emissionQuant").sum().alias("emission_quant_g"))
+ .with_columns(
+ (pl.col("emission_quant_g") / GRAMS_PER_US_TON)
+ .alias("emission_us_tons")
+ )
+ .sort("yearID", "countyID", "pollutantID")
+ .collect()
 )
 print(rollup)
 ```
@@ -458,14 +456,14 @@ library(dplyr)
 grams_per_us_ton <- 907184.74
 
 rollup <- open_dataset(
-    list.files("sample-output/MOVESOutput", pattern = "\\.parquet$",
-               recursive = TRUE, full.names = TRUE)) |>
-  filter(!is.na(emissionQuant)) |>
-  group_by(yearID, countyID, pollutantID) |>
-  summarise(emission_quant_g = sum(emissionQuant), .groups = "drop") |>
-  mutate(emission_us_tons = emission_quant_g / grams_per_us_ton) |>
-  arrange(yearID, countyID, pollutantID) |>
-  collect()
+ list.files("sample-output/MOVESOutput", pattern = "\\.parquet$",
+ recursive = TRUE, full.names = TRUE)) |>
+ filter(!is.na(emissionQuant)) |>
+ group_by(yearID, countyID, pollutantID) |>
+ summarise(emission_quant_g = sum(emissionQuant), .groups = "drop") |>
+ mutate(emission_us_tons = emission_quant_g / grams_per_us_ton) |>
+ arrange(yearID, countyID, pollutantID) |>
+ collect()
 
 print(rollup)
 ```
@@ -481,13 +479,13 @@ CSV with a deterministic row order so the file is reproducible:
 ```sql
 -- DuckDB
 COPY (
-    SELECT yearID, monthID, hourID, countyID, zoneID, linkID,
-           sourceTypeID, regClassID, fuelTypeID, modelYearID,
-           roadTypeID, pollutantID, processID, emissionRate
-    FROM read_parquet('sample-output/MOVESOutput/**/*.parquet')
-    WHERE emissionRate IS NOT NULL
-    ORDER BY yearID, monthID, hourID, countyID, linkID,
-             pollutantID, processID, sourceTypeID, modelYearID
+ SELECT yearID, monthID, hourID, countyID, zoneID, linkID,
+ sourceTypeID, regClassID, fuelTypeID, modelYearID,
+ roadTypeID, pollutantID, processID, emissionRate
+ FROM read_parquet('sample-output/MOVESOutput/**/*.parquet')
+ WHERE emissionRate IS NOT NULL
+ ORDER BY yearID, monthID, hourID, countyID, linkID,
+ pollutantID, processID, sourceTypeID, modelYearID
 ) TO 'moves_rates.csv' (FORMAT CSV, HEADER);
 ```
 
@@ -499,16 +497,16 @@ import glob
 import pandas as pd
 
 rate_cols = [
-    "yearID", "monthID", "hourID", "countyID", "zoneID", "linkID",
-    "sourceTypeID", "regClassID", "fuelTypeID", "modelYearID",
-    "roadTypeID", "pollutantID", "processID", "emissionRate",
+ "yearID", "monthID", "hourID", "countyID", "zoneID", "linkID",
+ "sourceTypeID", "regClassID", "fuelTypeID", "modelYearID",
+ "roadTypeID", "pollutantID", "processID", "emissionRate",
 ]
 
 files = sorted(
-    glob.glob("sample-output/MOVESOutput/**/*.parquet", recursive=True)
+ glob.glob("sample-output/MOVESOutput/**/*.parquet", recursive=True)
 )
 emissions = pd.concat(
-    (pd.read_parquet(f) for f in files), ignore_index=True
+ (pd.read_parquet(f) for f in files), ignore_index=True
 )
 
 rates = emissions.loc[emissions["emissionRate"].notna(), rate_cols]
@@ -527,18 +525,18 @@ default-DB content hashes, calculator-DAG hash). It appears on every
 emission, activity, and run row. Two uses:
 
 * **Pool many runs into one dataset.** Concatenate the outputs of
-  several runs into a shared directory; `runHash` distinguishes which
-  run produced each row without consulting `MOVESRun`.
+ several runs into a shared directory; `runHash` distinguishes which
+ run produced each row without consulting `MOVESRun`.
 
-  ```sql
-  SELECT DISTINCT runHash
-  FROM read_parquet('pooled/MOVESOutput/**/*.parquet');
-  ```
+ ```sql
+ SELECT DISTINCT runHash
+ FROM read_parquet('pooled/MOVESOutput/**/*.parquet');
+ ```
 
 * **Deduplicate cached results.** Identical inputs produce an identical
-  `runHash` and — per the determinism contract in
-  [`output-schema.md`](output-schema.md) — byte-identical Parquet, so a
-  result cache can key on `runHash`.
+ `runHash` and — per the determinism contract in
+ [`output-schema.md`](output-schema.md) — byte-identical Parquet, so a
+ result cache can key on `runHash`.
 
 `MOVESRun.calculatorVersion` records the `moves.rs` build that produced
 the run, for per-run audits.
@@ -546,31 +544,29 @@ the run, for per-run audits.
 ## Caveats and limitations
 
 * **Not for regulatory submissions.** These examples demonstrate the
-  *mechanics* of MOVES post-processing. `moves.rs` is not validated for
-  State Implementation Plan, transportation-conformity, or official NEI
-  submissions — use canonical EPA MOVES for regulatory work. See
-  migration-plan Task 129 (porting guide) for the full caveat.
+ *mechanics* of MOVES post-processing. `moves.rs` is not validated for
+ State Implementation Plan, transportation-conformity, or official NEI
+ submissions — use canonical EPA MOVES for regulatory work.
 * **`emissionQuant` vs `emissionRate`.** Both columns exist on
-  `MOVESOutput`. A run produces an *inventory* (`emissionQuant`
-  populated) or *rates* (`emissionRate` populated) depending on its
-  RunSpec output configuration; filter on `… IS NOT NULL` for whichever
-  your run produced. The sample on this page fills both so every example
-  runs.
+ `MOVESOutput`. A run produces an *inventory* (`emissionQuant`
+ populated) or *rates* (`emissionRate` populated) depending on its
+ RunSpec output configuration; filter on `… IS NOT NULL` for whichever
+ your run produced. The sample on this page fills both so every example
+ runs.
 * **Units are per-run.** `emissionQuant`, `emissionRate`, and `activity`
-  carry no implicit unit — read `MOVESRun.massUnits` /
-  `timeUnits` / `distanceUnits` / `energyUnits` before converting.
-* **Output schema is stable; calculators are in progress.** The Task 89
-  Parquet schema is stable — legacy columns are frozen, and new columns
-  may only be appended. The calculators that populate it are being ported
-  across Phases 2–3 (onroad) and Phase 5 (nonroad); treat values from
-  in-progress calculators as provisional.
+ carry no implicit unit — read `MOVESRun.massUnits` /
+ `timeUnits` / `distanceUnits` / `energyUnits` before converting.
+* **Output schema is stable; calculators are in progress.** The
+ Parquet schema is stable — legacy columns are frozen, and new columns
+ may only be appended. The calculators that populate it cover both
+ onroad and nonroad emissions; treat values from in-progress calculators
+ as provisional.
 
 ## See also
 
 * [`output-schema.md`](output-schema.md) — canonical column reference
-  for the three output tables.
+ for the three output tables.
 * [`runspec-toml.md`](runspec-toml.md) — the TOML RunSpec format that
-  configures a run (including its output units).
-* [`moves-rust-migration-plan.md`](../moves-rust-migration-plan.md) —
-  Task 90 (this page) and Task 128 (the broader user manual that extends
-  it).
+ configures a run (including its output units).
+* [`moves-rust-md`](../moves-rust-md) — the
+ broader user manual for `moves.rs`.

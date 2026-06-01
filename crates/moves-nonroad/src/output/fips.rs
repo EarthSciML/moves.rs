@@ -8,7 +8,7 @@
 //! semantically it is one ~600-line block of hard-coded initialization
 //! that runs once at NONROAD startup.
 //!
-//! Per the migration plan (Task 100), the table moves to a compile-time
+//! Per the , the table moves to a compile-time
 //! Rust static. Callers that previously indexed `statcd(N)` / `statnm(N)`
 //! now consult [`STATES`] directly or use [`lookup_by_code`] /
 //! [`lookup_by_name`]. The Fortran indices are 1-based; here [`STATES`]
@@ -25,12 +25,12 @@ use crate::common::consts::NSTATE;
 /// One U.S. state or territory entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StateEntry {
-    /// 5-character FIPS state code, e.g. `"01000"` for Alabama. The
-    /// trailing `"000"` is the county portion, always zero in this
-    /// table because these are state-level (not county) entries.
+ /// 5-character FIPS state code, e.g. `"01000"` for Alabama. The
+ /// trailing `"000"` is the county portion, always zero in this
+ /// table because these are state-level (not county) entries.
     pub code: &'static str,
-    /// State or territory display name. Matches the spelling used in
-    /// the original Fortran arrays (e.g. `"Wash DC"`, `"US Virgin Islands"`).
+ /// State or territory display name. Matches the spelling used in
+ /// the original Fortran arrays (e.g. `"Wash DC"`, `"US Virgin Islands"`).
     pub name: &'static str,
 }
 
@@ -41,7 +41,7 @@ pub struct StateEntry {
 /// source (Alabama); index 52 corresponds to `statcd(53)` (US Virgin
 /// Islands).
 pub static STATES: [StateEntry; NSTATE] = [
-    // in1fip.f — entries 1..=14
+ // in1fip.f — entries 1..=14
     StateEntry {
         code: "01000",
         name: "Alabama",
@@ -98,7 +98,7 @@ pub static STATES: [StateEntry; NSTATE] = [
         code: "17000",
         name: "Illinois",
     },
-    // in2fip.f — entries 15..=24
+ // in2fip.f — entries 15..=24
     StateEntry {
         code: "18000",
         name: "Indiana",
@@ -139,7 +139,7 @@ pub static STATES: [StateEntry; NSTATE] = [
         code: "27000",
         name: "Minnesota",
     },
-    // in3fip.f — entries 25..=35
+ // in3fip.f — entries 25..=35
     StateEntry {
         code: "28000",
         name: "Mississippi",
@@ -184,7 +184,7 @@ pub static STATES: [StateEntry; NSTATE] = [
         code: "38000",
         name: "North Dakota",
     },
-    // in4fip.f — entries 36..=44
+ // in4fip.f — entries 36..=44
     StateEntry {
         code: "39000",
         name: "Ohio",
@@ -221,7 +221,7 @@ pub static STATES: [StateEntry; NSTATE] = [
         code: "48000",
         name: "Texas",
     },
-    // in5fip.f — entries 45..=53
+ // in5fip.f — entries 45..=53
     StateEntry {
         code: "49000",
         name: "Utah",
@@ -379,10 +379,10 @@ mod tests {
 
     #[test]
     fn fortran_1_based_index_round_trip() {
-        // statcd(1) == "01000" Alabama in the Fortran source
+ // statcd(1) == "01000" Alabama in the Fortran source
         assert_eq!(STATES[0].code, "01000");
         assert_eq!(STATES[0].name, "Alabama");
-        // statcd(53) == "78000" US Virgin Islands
+ // statcd(53) == "78000" US Virgin Islands
         assert_eq!(STATES[NSTATE - 1].code, "78000");
         assert_eq!(STATES[NSTATE - 1].name, "US Virgin Islands");
     }

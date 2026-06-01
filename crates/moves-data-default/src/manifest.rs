@@ -1,6 +1,6 @@
 //! Manifest loader.
 //!
-//! The default-DB conversion crate (Phase 4 Task 80) writes a
+//! The default-DB conversion crate writes a
 //! `manifest.json` (schema tag `moves-default-db-manifest/v1`) alongside
 //! the Parquet tree. The reader uses the manifest to discover which
 //! files belong to which table, which partition values they carry, and

@@ -2,9 +2,9 @@
 //!
 //! Per Java's `getProjectDataStatus` (lines 254-300):
 //! - The table is required only when an off-network link is present
-//!   (`Link` table contains a row with `roadTypeID == 1`).
+//! (`Link` table contains a row with `roadTypeID == 1`).
 //! - When required: every selected source type and hour-day must
-//!   appear in OpModeDistribution.
+//! appear in OpModeDistribution.
 //!
 //! Java further filters the *template* (the empty file the GUI hands
 //! to users) to drop hotelling/auxiliary op modes via
@@ -109,7 +109,7 @@ mod tests {
 1,26161,261610,4,1,1,55,a,
 ",
         );
-        // hourDayID set asks for 75 — but no off-network link, so check skips.
+ // hourDayID set asks for 75 — but no off-network link, so check skips.
         validate_against_runspec(
             &report.batch,
             &onnet,

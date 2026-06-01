@@ -1,7 +1,7 @@
-//! Public benchmark suite — Task 127 (`mo-6w7oo`).
+//! Public benchmark suite — ().
 //!
 //! Measures wall time, peak memory, and output-correctness metrics across the
-//! six representative workload categories from the migration plan, sweeping
+//! six representative workload categories from the , sweeping
 //! `--max-parallel-chunks` at 1, 2, 4, and NCPU.
 //!
 //! # Workload categories
@@ -26,8 +26,8 @@
 //! # Output-correctness column
 //!
 //! Each workload row reports `impl%` — the fraction of planned calculator
-//! modules that were executed (not unimplemented stubs). In Phase 7 this is
-//! 0 % because the data plane is not yet wired; once Phase 4 lands the number
+//! modules that were executed (not unimplemented stubs). In this is
+//! 0 % because the data plane is not yet wired; once lands the number
 //! will climb toward 100 %.
 //!
 //! # Reproducing
@@ -38,7 +38,7 @@
 //!
 //! # Include County/Project/Rates scale fixtures:
 //! BENCHMARK_SCALE_INPUTS_DIR=/path/to/scale-inputs \
-//!     cargo test -p moves-cli --test benchmark_suite -- --nocapture
+//! cargo test -p moves-cli --test benchmark_suite -- --nocapture
 //!
 //! # Release build for publication-quality numbers:
 //! cargo test -p moves-cli --test benchmark_suite --release -- --nocapture
@@ -324,7 +324,7 @@ fn benchmark_all_workload_categories() {
     println!(
         "\n\
         ═══════════════════════════════════════════════════════════════\n\
-        MOVES-Rust Benchmark Suite — Task 127\n\
+        MOVES-Rust Benchmark Suite\n\
         Host CPUs: {ncpu}\n\
         Scale inputs: {}\n\
         ═══════════════════════════════════════════════════════════════",
@@ -336,7 +336,7 @@ fn benchmark_all_workload_categories() {
 
     let mut failures: Vec<String> = Vec::new();
 
-    // ── 1. Default-scale national (onroad) ─────────────────────────────────
+ // ── 1. Default-scale national (onroad) ─────────────────────────────────
     {
         let fixtures = default_scale_fixtures();
         println!(
@@ -347,7 +347,7 @@ fn benchmark_all_workload_categories() {
         print_n_sweep("Default-Scale", &fixtures, ncpu, &mut failures);
     }
 
-    // ── 2. NONROAD-only ───────────────────────────────────────────────────
+ // ── 2. NONROAD-only ───────────────────────────────────────────────────
     {
         let fixtures = nonroad_fixtures();
         println!("\n\n## 2. NONROAD-Only ({} fixtures)\n", fixtures.len());
@@ -355,7 +355,7 @@ fn benchmark_all_workload_categories() {
         print_n_sweep("NONROAD-Only", &fixtures, ncpu, &mut failures);
     }
 
-    // ── 3. Mixed onroad + NONROAD ─────────────────────────────────────────
+ // ── 3. Mixed onroad + NONROAD ─────────────────────────────────────────
     {
         let fixtures = mixed_fixtures();
         println!(
@@ -366,7 +366,7 @@ fn benchmark_all_workload_categories() {
         print_n_sweep("Mixed Onroad+NONROAD", &fixtures, ncpu, &mut failures);
     }
 
-    // ── 4–6. Scale fixtures (need external inputs) ────────────────────────
+ // ── 4–6. Scale fixtures (need external inputs) ────────────────────────
     let scale_kinds = [
         (
             "scale-county",
@@ -396,7 +396,7 @@ fn benchmark_all_workload_categories() {
         }
     }
 
-    // ── assertion ─────────────────────────────────────────────────────────
+ // ── assertion ─────────────────────────────────────────────────────────
     assert!(
         failures.is_empty(),
         "benchmark failures:\n  {}",

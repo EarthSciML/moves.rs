@@ -1,5 +1,5 @@
 //! Port of `RefuelingLossCalculator.java` and
-//! `database/RefuelingLossCalculator.sql` — migration plan Phase 3, Task 62.
+//! `database/RefuelingLossCalculator.sql` — .
 //!
 //! `RefuelingLossCalculator` computes **Total Gaseous Hydrocarbon (THC)**
 //! emissions for the two refueling processes — the fuel vapour displaced from a
@@ -39,9 +39,9 @@
 //!
 //! ```text
 //! displacedVaporRate = exp(A + B×tankTemperatureDif + C×refuelingTemperature
-//!                          + D×averageRVP)                      [floored]
-//! adjustedVaporRate  = displacedVaporRate     × (1−P) × (1−T)
-//!                    + controlledRefuelingRate × (1−P) × T
+//! + D×averageRVP) [floored]
+//! adjustedVaporRate = displacedVaporRate × (1−P) × (1−T)
+//! + controlledRefuelingRate × (1−P) × T
 //! ```
 //!
 //! For **spillage** the rate is a flat base rate, adjusted the same way:
@@ -51,15 +51,15 @@
 //! ```
 //!
 //! * `refuelingTemperature` — the ambient hourly temperature, optionally
-//!   re-expressed by the 2008 California study relation `20.30 + 0.81 × t`
-//!   with `t` clamped to `[vaporLowTLimit, vaporHighTLimit]`.
+//! re-expressed by the 2008 California study relation `20.30 + 0.81 × t`
+//! with `t` clamped to `[vaporLowTLimit, vaporHighTLimit]`.
 //! * `tankTemperatureDif` — `vaporTermE × refuelingTemperature + vaporTermF`,
-//!   clamped to `[0, tankTDiffLimit]`.
+//! clamped to `[0, tankTDiffLimit]`.
 //! * `averageRVP` — the market-share-weighted Reid vapour pressure of the
-//!   `(month, fuelType)` fuel supply.
+//! `(month, fuelType)` fuel supply.
 //! * `T` — `refuelingTechAdjustment`, the control-technology penetration.
 //! * `P` / `Pspill` — `refuelingVaporProgramAdjust` / `refuelingSpillProgramAdjust`,
-//!   the Stage II vapour-recovery program reductions.
+//! the Stage II vapour-recovery program reductions.
 //!
 //! # Algorithm — the SQL "Processing" section
 //!
@@ -70,10 +70,10 @@
 //!
 //! | SQL working table / step | This port |
 //! |--------------------------|-----------|
-//! | `RefuelingAverageRVP` (REFEC-2)        | `average_rvp` → `(monthID, fuelTypeID) → averageRVP` |
-//! | `RefuelingTemp` (REFEC-1, 2)           | `refueling_temp` → `fuelTypeID → [(monthID, hourID, displacedVaporRate)]` |
-//! | `RefuelingDisplacement` (REFEC-3, 4)   | `refueling_displacement` → `DisplacementKey → adjustedVaporRate` |
-//! | `RefuelingSpillage` (REFEC-5, 6)       | `refueling_spillage` → `SpillageKey → adjustedSpillRate` |
+//! | `RefuelingAverageRVP` (REFEC-2) | `average_rvp` → `(monthID, fuelTypeID) → averageRVP` |
+//! | `RefuelingTemp` (REFEC-1, 2) | `refueling_temp` → `fuelTypeID → [(monthID, hourID, displacedVaporRate)]` |
+//! | `RefuelingDisplacement` (REFEC-3, 4) | `refueling_displacement` → `DisplacementKey → adjustedVaporRate` |
+//! | `RefuelingSpillage` (REFEC-5, 6) | `refueling_spillage` → `SpillageKey → adjustedSpillRate` |
 //! | `RefuelingWorkerOutputTemp` + `MOVESWorkerOutput` (REFEC-7, 8) | the [`calculate`](RefuelingLossCalculator::calculate) join loop → `Vec<`[`RefuelingEmissionRow`]`>` |
 //!
 //! `RefuelingTemp` is the cross product of the run's `(month, hour)`
@@ -104,30 +104,30 @@
 //! [`calculate`](RefuelingLossCalculator::calculate) is the SQL "Processing"
 //! section. Its [`RefuelingLossInputs`] argument is the set of tables the SQL's
 //! "Create Remote Tables" / "Extract Data" sections produce, as plain row
-//! vectors; a future Task 50 (`DataFrameStore`) wiring populates it from the
+//! vectors; a future (`DataFrameStore`) wiring populates it from the
 //! per-run filtered execution database.
 //!
 //! Several things the SQL does are *not* the algorithm and are left to that
 //! wiring:
 //!
 //! * The "Extract Data" `WHERE` clauses — `RefuelingControlTechnology` and
-//!   `SourceTypeTechAdjustment` filtered to processes 18/19 and a 40-year model
-//!   range, `RefuelingFuelType` aggregated from the run's fuel supply with
-//!   `energyContent > 0` and `fuelDensity > 0`, the location/time tables
-//!   filtered to the iteration county, zone and year — are the data-plane
-//!   contract. `calculate` treats its inputs as already so filtered.
+//! `SourceTypeTechAdjustment` filtered to processes 18/19 and a 40-year model
+//! range, `RefuelingFuelType` aggregated from the run's fuel supply with
+//! `energyContent > 0` and `fuelDensity > 0`, the location/time tables
+//! filtered to the iteration county, zone and year — are the data-plane
+//! contract. `calculate` treats its inputs as already so filtered.
 //! * The Java `doExecute` enables the `RefuelingDisplacementVaporLoss` /
-//!   `RefuelingSpillageLoss` script sections per the RunSpec's requested
-//!   processes, populating `##refuelingDisplacement.pollutantIDs##` /
-//!   `##refuelingSpillage.pollutantIDs##` accordingly. `calculate` reproduces
-//!   that gate through [`RefuelingLossInputs::refueling_displacement_pollutant`]
-//!   and [`refueling_spillage_pollutant`](RefuelingLossInputs::refueling_spillage_pollutant):
-//!   the SQL emits one output row per `(workerOutputTemp row × pollutant)`, so
-//!   an empty pollutant set yields no rows for that process — exactly as a
-//!   disabled section does.
+//! `RefuelingSpillageLoss` script sections per the RunSpec's requested
+//! processes, populating `##refuelingDisplacement.pollutantIDs##` /
+//! `##refuelingSpillage.pollutantIDs##` accordingly. `calculate` reproduces
+//! that gate through [`RefuelingLossInputs::refueling_displacement_pollutant`]
+//! and [`refueling_spillage_pollutant`](RefuelingLossInputs::refueling_spillage_pollutant):
+//! the SQL emits one output row per `(workerOutputTemp row × pollutant)`, so
+//! an empty pollutant set yields no rows for that process — exactly as a
+//! disabled section does.
 //! * `SCC` is written `NULL` and `MOVESRunID` / `iterationID` are left to the
-//!   insert's column defaults; none is modelled, matching `SO2Calculator`'s
-//!   treatment of its pass-through columns.
+//! insert's column defaults; none is modelled, matching `SO2Calculator`'s
+//! treatment of its pass-through columns.
 //!
 //! # Fidelity notes
 //!
@@ -138,7 +138,7 @@
 //! This port sums and multiplies in `f64` end to end, so it does not reproduce
 //! the `f32` truncation MOVES applies when it writes those intermediates — a
 //! sub-`1e-7` relative drift. Reproducing it bug-for-bug is the calculator
-//! integration validation call (`mo-fvuf`), matching the `SO2Calculator` /
+//! integration validation call (), matching the `SO2Calculator` /
 //! `LiquidLeakingCalculator` precedent. The `RefuelingFactors` terms,
 //! `marketShare`, `RVP`, `energyContent` and `fuelDensity` are likewise `FLOAT`
 //! columns, but they are model *inputs* — already `f32`-quantised before
@@ -159,11 +159,11 @@
 //! `fuelDensity > 0` rows, so the divisor is strictly positive; a zero divisor
 //! is unreachable on extract-conformant input.
 //!
-//! # Data plane (Task 50)
+//! # Data plane
 //!
 //! [`Calculator::execute`] receives a [`CalculatorContext`] whose
-//! `ExecutionTables` / `ScratchNamespace` are Phase 2 placeholders until the
-//! `DataFrameStore` lands (migration-plan Task 50), so `execute` cannot yet
+//! `ExecutionTables` / `ScratchNamespace` are placeholders until the
+//! `DataFrameStore` lands (), so `execute` cannot yet
 //! read the input tables nor emit `MOVESWorkerOutput`. The numeric algorithm is
 //! fully ported and unit-tested on
 //! [`calculate`](RefuelingLossCalculator::calculate); `execute` is a documented
@@ -224,7 +224,7 @@ const SPILLAGE_COUNTY_YEAR_FUEL_TYPES: [(i32, bool); 5] =
 // ===========================================================================
 // Input tables — plain Rust mirrors of the tables `RefuelingLossCalculator.sql`'s
 // "Create Remote Tables" / "Extract Data" sections produce that feed the
-// "Processing" section. Following the Phase 3 convention, every `INT`/`SMALLINT`
+// "Processing" section. Following the convention, every `INT`/`SMALLINT`
 // identifier is an `i32` and every `FLOAT`/`DOUBLE` quantity is an `f64`. Only
 // the columns the refueling algorithm reads are modelled.
 // ===========================================================================
@@ -237,11 +237,11 @@ const SPILLAGE_COUNTY_YEAR_FUEL_TYPES: [(i32, bool); 5] =
 /// modelled. The "Processing" section reads only `temperature`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RefuelingZoneMonthHourRow {
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `hourID`.
+ /// `hourID`.
     pub hour_id: i32,
-    /// `temperature` — the ambient hourly temperature in °F. `DOUBLE` in MOVES.
+ /// `temperature` — the ambient hourly temperature in °F. `DOUBLE` in MOVES.
     pub temperature: f64,
 }
 
@@ -253,32 +253,32 @@ pub struct RefuelingZoneMonthHourRow {
 /// not modelled.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RefuelingFactorsRow {
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `vaporTermA` — the constant term of the displaced-vapour exponential.
+ /// `vaporTermA` — the constant term of the displaced-vapour exponential.
     pub vapor_term_a: f64,
-    /// `vaporTermB` — the `tankTemperatureDif` coefficient.
+ /// `vaporTermB` — the `tankTemperatureDif` coefficient.
     pub vapor_term_b: f64,
-    /// `vaporTermC` — the `refuelingTemperature` coefficient.
+ /// `vaporTermC` — the `refuelingTemperature` coefficient.
     pub vapor_term_c: f64,
-    /// `vaporTermD` — the `averageRVP` coefficient.
+ /// `vaporTermD` — the `averageRVP` coefficient.
     pub vapor_term_d: f64,
-    /// `vaporTermE` — the `refuelingTemperature` coefficient of
-    /// `tankTemperatureDif`.
+ /// `vaporTermE` — the `refuelingTemperature` coefficient of
+ /// `tankTemperatureDif`.
     pub vapor_term_e: f64,
-    /// `vaporTermF` — the constant term of `tankTemperatureDif`.
+ /// `vaporTermF` — the constant term of `tankTemperatureDif`.
     pub vapor_term_f: f64,
-    /// `vaporLowTLimit` — the lower bound of the refueling-temperature clamp.
-    /// A value of `0` (with `vaporHighTLimit` also `0`) disables the clamp.
+ /// `vaporLowTLimit` — the lower bound of the refueling-temperature clamp.
+ /// A value of `0` (with `vaporHighTLimit` also `0`) disables the clamp.
     pub vapor_low_t_limit: f64,
-    /// `vaporHighTLimit` — the upper bound of the refueling-temperature clamp.
+ /// `vaporHighTLimit` — the upper bound of the refueling-temperature clamp.
     pub vapor_high_t_limit: f64,
-    /// `tankTDiffLimit` — the upper bound of `tankTemperatureDif`.
+ /// `tankTDiffLimit` — the upper bound of `tankTemperatureDif`.
     pub tank_t_diff_limit: f64,
-    /// `minimumRefuelingVaporLoss` — the floor applied to `displacedVaporRate`.
-    /// A value `≤ −1` floors the rate to `0` instead.
+ /// `minimumRefuelingVaporLoss` — the floor applied to `displacedVaporRate`.
+ /// A value `≤ −1` floors the rate to `0` instead.
     pub minimum_refueling_vapor_loss: f64,
-    /// `refuelingSpillRate` — the unadjusted spillage base rate.
+ /// `refuelingSpillRate` — the unadjusted spillage base rate.
     pub refueling_spill_rate: f64,
 }
 
@@ -290,12 +290,12 @@ pub struct RefuelingFactorsRow {
 /// modelled.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RefuelingFuelSupplyRow {
-    /// `monthGroupID` — joins to [`RefuelingMonthOfAnyYearRow::month_group_id`].
+ /// `monthGroupID` — joins to [`RefuelingMonthOfAnyYearRow::month_group_id`].
     pub month_group_id: i32,
-    /// `fuelFormulationID` — joins to
-    /// [`RefuelingFuelFormulationRow::fuel_formulation_id`].
+ /// `fuelFormulationID` — joins to
+ /// [`RefuelingFuelFormulationRow::fuel_formulation_id`].
     pub fuel_formulation_id: i32,
-    /// `marketShare` — the formulation's share of the fuel supply.
+ /// `marketShare` — the formulation's share of the fuel supply.
     pub market_share: f64,
 }
 
@@ -306,12 +306,12 @@ pub struct RefuelingFuelSupplyRow {
 /// "Processing" section reads only `RVP` (and `fuelSubtypeID` to join).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RefuelingFuelFormulationRow {
-    /// `fuelFormulationID`.
+ /// `fuelFormulationID`.
     pub fuel_formulation_id: i32,
-    /// `fuelSubtypeID` — joins to [`RefuelingFuelSubtypeRow::fuel_subtype_id`].
+ /// `fuelSubtypeID` — joins to [`RefuelingFuelSubtypeRow::fuel_subtype_id`].
     pub fuel_subtype_id: i32,
-    /// `RVP` — Reid vapour pressure. Nullable in MOVES; a `NULL` is supplied as
-    /// `0.0` (see the [module documentation](self)).
+ /// `RVP` — Reid vapour pressure. Nullable in MOVES; a `NULL` is supplied as
+ /// `0.0` (see the [module documentation](self)).
     pub rvp: f64,
 }
 
@@ -322,18 +322,18 @@ pub struct RefuelingFuelFormulationRow {
 /// the group.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RefuelingMonthOfAnyYearRow {
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `monthGroupID`.
+ /// `monthGroupID`.
     pub month_group_id: i32,
 }
 
 /// One `RefuelingFuelSubtype` row — the `fuelSubtypeID → fuelTypeID` mapping.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RefuelingFuelSubtypeRow {
-    /// `fuelSubtypeID`.
+ /// `fuelSubtypeID`.
     pub fuel_subtype_id: i32,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
 }
 
@@ -345,22 +345,22 @@ pub struct RefuelingFuelSubtypeRow {
 /// section reads the `processID = 18` rows.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RefuelingControlTechnologyRow {
-    /// `processID`.
+ /// `processID`.
     pub process_id: i32,
-    /// `modelYearID`.
+ /// `modelYearID`.
     pub model_year_id: i32,
-    /// `regClassID`.
+ /// `regClassID`.
     pub reg_class_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `ageID`.
+ /// `ageID`.
     pub age_id: i32,
-    /// `refuelingTechAdjustment` — the control-technology penetration `T`.
+ /// `refuelingTechAdjustment` — the control-technology penetration `T`.
     pub refueling_tech_adjustment: f64,
-    /// `controlledRefuelingRate` — the displaced-vapour rate of a fully
-    /// controlled vehicle.
+ /// `controlledRefuelingRate` — the displaced-vapour rate of a fully
+ /// controlled vehicle.
     pub controlled_refueling_rate: f64,
 }
 
@@ -369,14 +369,13 @@ pub struct RefuelingControlTechnologyRow {
 ///
 /// The SQL extracts `CountyYear` filtered to the iteration county and year, so
 /// the table carries one row (or none); see the [module documentation](self).
-/// The "Processing" section reads only the two program-adjustment columns —
-/// `countyID` and `yearID` are not modelled.
+/// The "Processing" section reads only the two program-adjustment columns/// `countyID` and `yearID` are not modelled.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RefuelingCountyYearRow {
-    /// `refuelingVaporProgramAdjust` — the Stage II displacement-vapour
-    /// reduction `P`.
+ /// `refuelingVaporProgramAdjust` — the Stage II displacement-vapour
+ /// reduction `P`.
     pub refueling_vapor_program_adjust: f64,
-    /// `refuelingSpillProgramAdjust` — the Stage II spillage reduction `Pspill`.
+ /// `refuelingSpillProgramAdjust` — the Stage II spillage reduction `Pspill`.
     pub refueling_spill_program_adjust: f64,
 }
 
@@ -387,13 +386,13 @@ pub struct RefuelingCountyYearRow {
 /// reads the `processID = 19` rows.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceTypeTechAdjustmentRow {
-    /// `processID`.
+ /// `processID`.
     pub process_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `modelYearID`.
+ /// `modelYearID`.
     pub model_year_id: i32,
-    /// `refuelingTechAdjustment` — the control-technology penetration `T`.
+ /// `refuelingTechAdjustment` — the control-technology penetration `T`.
     pub refueling_tech_adjustment: f64,
 }
 
@@ -406,13 +405,13 @@ pub struct SourceTypeTechAdjustmentRow {
 /// `energyContent > 0` and `fuelDensity > 0`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RefuelingFuelTypeRow {
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `energyContent` — the market-weighted fuel energy content.
+ /// `energyContent` — the market-weighted fuel energy content.
     pub energy_content: f64,
-    /// `fuelDensity` — the fuel density.
+ /// `fuelDensity` — the fuel density.
     pub fuel_density: f64,
 }
 
@@ -424,39 +423,39 @@ pub struct RefuelingFuelTypeRow {
 /// applies that filter, so an input may carry other rows.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct EnergyRow {
-    /// `pollutantID` — the refueling calculation uses only `91`.
+ /// `pollutantID` — the refueling calculation uses only `91`.
     pub pollutant_id: i32,
-    /// `processID` — the exhaust process the energy was consumed in.
+ /// `processID` — the exhaust process the energy was consumed in.
     pub process_id: i32,
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `dayID`.
+ /// `dayID`.
     pub day_id: i32,
-    /// `hourID`.
+ /// `hourID`.
     pub hour_id: i32,
-    /// `stateID`.
+ /// `stateID`.
     pub state_id: i32,
-    /// `countyID`.
+ /// `countyID`.
     pub county_id: i32,
-    /// `zoneID`.
+ /// `zoneID`.
     pub zone_id: i32,
-    /// `linkID`.
+ /// `linkID`.
     pub link_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `regClassID`.
+ /// `regClassID`.
     pub reg_class_id: i32,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `modelYearID`.
+ /// `modelYearID`.
     pub model_year_id: i32,
-    /// `roadTypeID`.
+ /// `roadTypeID`.
     pub road_type_id: i32,
-    /// `emissionQuant` — the Total Energy Consumption quantity. `DOUBLE`.
+ /// `emissionQuant` — the Total Energy Consumption quantity. `DOUBLE`.
     pub emission_quant: f64,
-    /// `emissionRate` — the Total Energy Consumption rate. `DOUBLE`.
+ /// `emissionRate` — the Total Energy Consumption rate. `DOUBLE`.
     pub emission_rate: f64,
 }
 
@@ -464,43 +463,43 @@ pub struct EnergyRow {
 /// "Create Remote Tables" / "Extract Data" sections produce, as plain row
 /// vectors.
 ///
-/// A future Task 50 (`DataFrameStore`) wiring populates this from the per-run
+/// A future (`DataFrameStore`) wiring populates this from the per-run
 /// filtered execution database; until then it is the explicit data-plane
 /// contract the unit tests build directly.
 #[derive(Debug, Clone, Default)]
 pub struct RefuelingLossInputs {
-    /// `RefuelingZoneMonthHour` rows — the iteration zone's hourly
-    /// temperatures.
+ /// `RefuelingZoneMonthHour` rows — the iteration zone's hourly
+ /// temperatures.
     pub refueling_zone_month_hour: Vec<RefuelingZoneMonthHourRow>,
-    /// `RefuelingFactors` rows — the per-fuel-type coefficients.
+ /// `RefuelingFactors` rows — the per-fuel-type coefficients.
     pub refueling_factors: Vec<RefuelingFactorsRow>,
-    /// `RefuelingFuelSupply` rows — the fuel supply for `averageRVP`.
+ /// `RefuelingFuelSupply` rows — the fuel supply for `averageRVP`.
     pub refueling_fuel_supply: Vec<RefuelingFuelSupplyRow>,
-    /// `RefuelingFuelFormulation` rows — the fuel formulations' `RVP`.
+ /// `RefuelingFuelFormulation` rows — the fuel formulations' `RVP`.
     pub refueling_fuel_formulation: Vec<RefuelingFuelFormulationRow>,
-    /// `RefuelingMonthOfAnyYear` rows — the `monthID → monthGroupID` mapping.
+ /// `RefuelingMonthOfAnyYear` rows — the `monthID → monthGroupID` mapping.
     pub refueling_month_of_any_year: Vec<RefuelingMonthOfAnyYearRow>,
-    /// `RefuelingFuelSubtype` rows — the `fuelSubtypeID → fuelTypeID` mapping.
+ /// `RefuelingFuelSubtype` rows — the `fuelSubtypeID → fuelTypeID` mapping.
     pub refueling_fuel_subtype: Vec<RefuelingFuelSubtypeRow>,
-    /// `RefuelingControlTechnology` rows — the displacement control technology.
+ /// `RefuelingControlTechnology` rows — the displacement control technology.
     pub refueling_control_technology: Vec<RefuelingControlTechnologyRow>,
-    /// `RefuelingCountyYear` rows — the run county/year Stage II reductions.
+ /// `RefuelingCountyYear` rows — the run county/year Stage II reductions.
     pub refueling_county_year: Vec<RefuelingCountyYearRow>,
-    /// `SourceTypeTechAdjustment` rows — the spillage control technology.
+ /// `SourceTypeTechAdjustment` rows — the spillage control technology.
     pub source_type_tech_adjustment: Vec<SourceTypeTechAdjustmentRow>,
-    /// `RefuelingFuelType` rows — the market-weighted fuel energy and density.
+ /// `RefuelingFuelType` rows — the market-weighted fuel energy and density.
     pub refueling_fuel_type: Vec<RefuelingFuelTypeRow>,
-    /// `RefuelingDisplacementPollutant` — the pollutant ids the displacement
-    /// output is cross-joined with (the `##refuelingDisplacement.pollutantIDs##`
-    /// set, normally `[1]`). An empty set yields no displacement rows.
+ /// `RefuelingDisplacementPollutant` — the pollutant ids the displacement
+ /// output is cross-joined with (the `##refuelingDisplacement.pollutantIDs##`
+ /// set, normally `[1]`). An empty set yields no displacement rows.
     pub refueling_displacement_pollutant: Vec<i32>,
-    /// `RefuelingSpillagePollutant` — the pollutant ids the spillage output is
-    /// cross-joined with (the `##refuelingSpillage.pollutantIDs##` set, normally
-    /// `[1]`). An empty set yields no spillage rows.
+ /// `RefuelingSpillagePollutant` — the pollutant ids the spillage output is
+ /// cross-joined with (the `##refuelingSpillage.pollutantIDs##` set, normally
+ /// `[1]`). An empty set yields no spillage rows.
     pub refueling_spillage_pollutant: Vec<i32>,
-    /// `MOVESWorkerOutput` rows. The calculation reads only the Total Energy
-    /// Consumption rows (`pollutantID` 91, `processID` 1/2/90/91); any other
-    /// row present is ignored, as the SQL's `WHERE` clause does.
+ /// `MOVESWorkerOutput` rows. The calculation reads only the Total Energy
+ /// Consumption rows (`pollutantID` 91, `processID` 1/2/90/91); any other
+ /// row present is ignored, as the SQL's `WHERE` clause does.
     pub energy: Vec<EnergyRow>,
 }
 
@@ -513,49 +512,49 @@ pub struct RefuelingLossInputs {
 /// `process_id` is 18 (displacement) or 19 (spillage).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RefuelingEmissionRow {
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `dayID`.
+ /// `dayID`.
     pub day_id: i32,
-    /// `hourID`.
+ /// `hourID`.
     pub hour_id: i32,
-    /// `stateID`.
+ /// `stateID`.
     pub state_id: i32,
-    /// `countyID`.
+ /// `countyID`.
     pub county_id: i32,
-    /// `zoneID`.
+ /// `zoneID`.
     pub zone_id: i32,
-    /// `linkID`.
+ /// `linkID`.
     pub link_id: i32,
-    /// `pollutantID` — the refueling pollutant (1, THC).
+ /// `pollutantID` — the refueling pollutant (1, THC).
     pub pollutant_id: i32,
-    /// `processID` — 18 (Refueling Displacement Vapor Loss) or 19 (Refueling
-    /// Spillage Loss).
+ /// `processID` — 18 (Refueling Displacement Vapor Loss) or 19 (Refueling
+ /// Spillage Loss).
     pub process_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `regClassID`.
+ /// `regClassID`.
     pub reg_class_id: i32,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `modelYearID`.
+ /// `modelYearID`.
     pub model_year_id: i32,
-    /// `roadTypeID`.
+ /// `roadTypeID`.
     pub road_type_id: i32,
-    /// `emissionQuant` — the refueling-loss emission quantity.
+ /// `emissionQuant` — the refueling-loss emission quantity.
     pub emission_quant: f64,
-    /// `emissionRate` — the refueling-loss emission rate.
+ /// `emissionRate` — the refueling-loss emission rate.
     pub emission_rate: f64,
 }
 
 impl RefuelingEmissionRow {
-    /// The integer dimension tuple — every column except the two emission
-    /// values. Used to sort the output deterministically: MOVES leaves
-    /// `MOVESWorkerOutput` physically unordered (the SQL `INSERT … SELECT` has
-    /// no `ORDER BY`), so the port sorts purely to make the result
-    /// reproducible.
+ /// The integer dimension tuple — every column except the two emission
+ /// values. Used to sort the output deterministically: MOVES leaves
+ /// `MOVESWorkerOutput` physically unordered (the SQL `INSERT … SELECT` has
+ /// no `ORDER BY`), so the port sorts purely to make the result
+ /// reproducible.
     fn dimension_key(&self) -> [i32; 15] {
         [
             self.year_id,
@@ -1764,7 +1763,7 @@ struct SpillageKey {
 struct RefuelingTempCell {
     month_id: i32,
     hour_id: i32,
-    /// `displacedVaporRate` — post-floor (REFEC-2).
+ /// `displacedVaporRate` — post-floor (REFEC-2).
     displaced_vapor_rate: f64,
 }
 
@@ -1778,20 +1777,20 @@ struct RefuelingTempCell {
 /// `RefuelingMonthOfAnyYear` and `RefuelingFactors` defaults to `0.0` — the
 /// SQL's `INSERT IGNORE` fill.
 fn average_rvp(inputs: &RefuelingLossInputs) -> HashMap<(i32, i32), f64> {
-    // RefuelingFuelFormulation by fuelFormulationID (the table's key).
+ // RefuelingFuelFormulation by fuelFormulationID (the table's key).
     let formulation_by_id: HashMap<i32, &RefuelingFuelFormulationRow> = inputs
         .refueling_fuel_formulation
         .iter()
         .map(|ff| (ff.fuel_formulation_id, ff))
         .collect();
-    // RefuelingFuelSubtype's fuelSubtypeID → fuelTypeID (the table's key).
+ // RefuelingFuelSubtype's fuelSubtypeID → fuelTypeID (the table's key).
     let fuel_type_by_subtype: HashMap<i32, i32> = inputs
         .refueling_fuel_subtype
         .iter()
         .map(|fst| (fst.fuel_subtype_id, fst.fuel_type_id))
         .collect();
-    // RefuelingMonthOfAnyYear grouped monthGroupID → [monthID]: a month group
-    // spans several months, so a monthGroup-keyed fuel supply fans out.
+ // RefuelingMonthOfAnyYear grouped monthGroupID → [monthID]: a month group
+ // spans several months, so a monthGroup-keyed fuel supply fans out.
     let mut months_by_group: HashMap<i32, Vec<i32>> = HashMap::new();
     for moay in &inputs.refueling_month_of_any_year {
         months_by_group
@@ -1802,25 +1801,25 @@ fn average_rvp(inputs: &RefuelingLossInputs) -> HashMap<(i32, i32), f64> {
 
     let mut rvp: HashMap<(i32, i32), f64> = HashMap::new();
     for fs in &inputs.refueling_fuel_supply {
-        // INNER JOIN RefuelingFuelFormulation ON fuelFormulationID.
+ // INNER JOIN RefuelingFuelFormulation ON fuelFormulationID.
         let Some(ff) = formulation_by_id.get(&fs.fuel_formulation_id) else {
             continue;
         };
-        // INNER JOIN RefuelingFuelSubtype ON fuelSubtypeID.
+ // INNER JOIN RefuelingFuelSubtype ON fuelSubtypeID.
         let Some(&fuel_type_id) = fuel_type_by_subtype.get(&ff.fuel_subtype_id) else {
             continue;
         };
-        // INNER JOIN RefuelingMonthOfAnyYear ON monthGroupID.
+ // INNER JOIN RefuelingMonthOfAnyYear ON monthGroupID.
         let Some(month_ids) = months_by_group.get(&fs.month_group_id) else {
             continue;
         };
         for &month_id in month_ids {
-            *rvp.entry((month_id, fuel_type_id)).or_default() += ff.rvp * fs.market_share;
+ *rvp.entry((month_id, fuel_type_id)).or_default() += ff.rvp * fs.market_share;
         }
     }
 
-    // Default fill: every (monthID ∈ RefuelingMonthOfAnyYear, fuelTypeID ∈
-    // RefuelingFactors) absent above gets averageRVP = 0.0.
+ // Default fill: every (monthID ∈ RefuelingMonthOfAnyYear, fuelTypeID ∈
+ // RefuelingFactors) absent above gets averageRVP = 0.0.
     for moay in &inputs.refueling_month_of_any_year {
         for factors in &inputs.refueling_factors {
             rvp.entry((moay.month_id, factors.fuel_type_id))
@@ -1844,12 +1843,12 @@ fn refueling_temp(
     average_rvp: &HashMap<(i32, i32), f64>,
 ) -> HashMap<i32, Vec<RefuelingTempCell>> {
     let mut temp_by_fuel: HashMap<i32, Vec<RefuelingTempCell>> = HashMap::new();
-    // CROSS JOIN RefuelingZoneMonthHour, RefuelingFactors.
+ // CROSS JOIN RefuelingZoneMonthHour, RefuelingFactors.
     for rzmh in &inputs.refueling_zone_month_hour {
         for factors in &inputs.refueling_factors {
-            // REFEC-1: refuelingTemperature. The 2008 California study relation
-            // 20.30 + 0.81 × t applies only when both temperature limits are
-            // set; t is then clamped to [vaporLowTLimit, vaporHighTLimit].
+ // REFEC-1: refuelingTemperature. The 2008 California study relation
+ // 20.30 + 0.81 × t applies only when both temperature limits are
+ // set; t is then clamped to [vaporLowTLimit, vaporHighTLimit].
             let refueling_temperature =
                 if factors.vapor_high_t_limit != 0.0 && factors.vapor_low_t_limit != 0.0 {
                     let clamped = factors
@@ -1861,7 +1860,7 @@ fn refueling_temp(
                     rzmh.temperature
                 };
 
-            // REFEC-1: tankTemperatureDif, clamped to [0, tankTDiffLimit].
+ // REFEC-1: tankTemperatureDif, clamped to [0, tankTDiffLimit].
             let raw_tank_dif = factors.vapor_term_e * refueling_temperature + factors.vapor_term_f;
             let tank_temperature_dif = if raw_tank_dif >= factors.tank_t_diff_limit {
                 factors.tank_t_diff_limit
@@ -1871,11 +1870,11 @@ fn refueling_temp(
                 raw_tank_dif
             };
 
-            // REFEC-2: displacedVaporRate. The SQL UPDATE fires only where a
-            // RefuelingAverageRVP row matches (monthID, fuelTypeID); a miss
-            // leaves the column at its 0.0 default. The default fill in
-            // `average_rvp` makes a miss reachable only for a month absent from
-            // RefuelingMonthOfAnyYear.
+ // REFEC-2: displacedVaporRate. The SQL UPDATE fires only where a
+ // RefuelingAverageRVP row matches (monthID, fuelTypeID); a miss
+ // leaves the column at its 0.0 default. The default fill in
+ // `average_rvp` makes a miss reachable only for a month absent from
+ // RefuelingMonthOfAnyYear.
             let displaced_raw = match average_rvp.get(&(rzmh.month_id, factors.fuel_type_id)) {
                 Some(&avg) => (factors.vapor_term_a
                     + factors.vapor_term_b * tank_temperature_dif
@@ -1885,8 +1884,8 @@ fn refueling_temp(
                 None => 0.0,
             };
 
-            // REFEC-2: floor displacedVaporRate at minimumRefuelingVaporLoss
-            // (or 0 when that sentinel is ≤ −1).
+ // REFEC-2: floor displacedVaporRate at minimumRefuelingVaporLoss
+ // (or 0 when that sentinel is ≤ −1).
             let displaced_vapor_rate = if displaced_raw < factors.minimum_refueling_vapor_loss
                 || factors.minimum_refueling_vapor_loss <= -1.0
             {
@@ -1926,26 +1925,26 @@ fn refueling_displacement(
     temp_by_fuel: &HashMap<i32, Vec<RefuelingTempCell>>,
 ) -> HashMap<DisplacementKey, f64> {
     let mut displacement: HashMap<DisplacementKey, f64> = HashMap::new();
-    // CROSS JOIN RefuelingCountyYear — the run's single county/year row.
+ // CROSS JOIN RefuelingCountyYear — the run's single county/year row.
     for rcy in &inputs.refueling_county_year {
         for rct in &inputs.refueling_control_technology {
-            // WHERE rct.processID = 18.
+ // WHERE rct.processID = 18.
             if rct.process_id != DISPLACEMENT_PROCESS_ID {
                 continue;
             }
-            // INNER JOIN RefuelingTemp ON rct.fuelTypeID = rt.fuelTypeID.
+ // INNER JOIN RefuelingTemp ON rct.fuelTypeID = rt.fuelTypeID.
             let Some(cells) = temp_by_fuel.get(&rct.fuel_type_id) else {
                 continue;
             };
             for cell in cells {
-                // adjustedVaporRate = displacedVaporRate × (1−P) × (1−T)
-                //                   + controlledRefuelingRate × (1−P) × T.
+ // adjustedVaporRate = displacedVaporRate × (1−P) × (1−T)
+ // + controlledRefuelingRate × (1−P) × T.
                 let adjusted_vapor_rate = cell.displaced_vapor_rate
-                    * (1.0 - rcy.refueling_vapor_program_adjust)
-                    * (1.0 - rct.refueling_tech_adjustment)
+ * (1.0 - rcy.refueling_vapor_program_adjust)
+ * (1.0 - rct.refueling_tech_adjustment)
                     + rct.controlled_refueling_rate
-                        * (1.0 - rcy.refueling_vapor_program_adjust)
-                        * rct.refueling_tech_adjustment;
+ * (1.0 - rcy.refueling_vapor_program_adjust)
+ * rct.refueling_tech_adjustment;
                 displacement.insert(
                     DisplacementKey {
                         model_year_id: rct.model_year_id,
@@ -1974,7 +1973,7 @@ fn refueling_displacement(
 /// sourceTypeID, modelYearID)`; as with the displacement table, that index
 /// implies at most one input county/year row.
 fn refueling_spillage(inputs: &RefuelingLossInputs) -> HashMap<SpillageKey, f64> {
-    // RefuelingFactors by fuelTypeID (the table's key).
+ // RefuelingFactors by fuelTypeID (the table's key).
     let factors_by_fuel: HashMap<i32, &RefuelingFactorsRow> = inputs
         .refueling_factors
         .iter()
@@ -1983,26 +1982,26 @@ fn refueling_spillage(inputs: &RefuelingLossInputs) -> HashMap<SpillageKey, f64>
 
     let mut spillage: HashMap<SpillageKey, f64> = HashMap::new();
     for rcy in &inputs.refueling_county_year {
-        // The ALTER + INSERT fan-out: gasoline (1) and E85 (5) keep the run's
-        // refuelingSpillProgramAdjust; fuel types 2, 3 and 9 zero it.
+ // The ALTER + INSERT fan-out: gasoline (1) and E85 (5) keep the run's
+ // refuelingSpillProgramAdjust; fuel types 2, 3 and 9 zero it.
         for &(fuel_type_id, retains_program_adjust) in &SPILLAGE_COUNTY_YEAR_FUEL_TYPES {
             let spill_program_adjust = if retains_program_adjust {
                 rcy.refueling_spill_program_adjust
             } else {
                 0.0
             };
-            // INNER JOIN RefuelingFactors ON RefuelingCountyYear.fuelTypeID.
+ // INNER JOIN RefuelingFactors ON RefuelingCountyYear.fuelTypeID.
             let Some(factors) = factors_by_fuel.get(&fuel_type_id) else {
                 continue;
             };
             for stta in &inputs.source_type_tech_adjustment {
-                // WHERE SourceTypeTechAdjustment.processID = 19.
+ // WHERE SourceTypeTechAdjustment.processID = 19.
                 if stta.process_id != SPILLAGE_PROCESS_ID {
                     continue;
                 }
-                // adjustedSpillRate = (1−Pspill) × ((1−T) × refuelingSpillRate).
+ // adjustedSpillRate = (1−Pspill) × ((1−T) × refuelingSpillRate).
                 let adjusted_spill_rate = (1.0 - spill_program_adjust)
-                    * ((1.0 - stta.refueling_tech_adjustment) * factors.refueling_spill_rate);
+ * ((1.0 - stta.refueling_tech_adjustment) * factors.refueling_spill_rate);
                 spillage.insert(
                     SpillageKey {
                         fuel_type_id,
@@ -2058,57 +2057,56 @@ fn emission_row(
 pub struct RefuelingLossCalculator;
 
 impl RefuelingLossCalculator {
-    /// Stable module name — matches the Java class and the chain-DAG entry.
+ /// Stable module name — matches the Java class and the chain-DAG entry.
     pub const NAME: &'static str = CALCULATOR_NAME;
 
-    /// Compute the refueling-loss emission rows — the port of the
-    /// `RefuelingLossCalculator.sql` "Processing" section.
-    ///
-    /// Each Total Energy Consumption row (`MOVESWorkerOutput`, pollutant 91,
-    /// process 1/2/90/91) that resolves a `RefuelingFuelType` cell yields a
-    /// displacement row when its dimension cell resolves a `RefuelingDisplacement`
-    /// rate, and a spillage row when it resolves a `RefuelingSpillage` rate —
-    /// every SQL join is an `INNER JOIN`. Each such row is emitted once per
-    /// pollutant in the matching `Refueling…Pollutant` set, so an empty set
-    /// suppresses that process (the script's section gate). The result is
-    /// sorted by its integer dimension columns for deterministic output; MOVES
-    /// leaves `MOVESWorkerOutput` physically unordered.
+ /// Compute the refueling-loss emission rows — the port of the
+ /// `RefuelingLossCalculator.sql` "Processing" section.
+ ///
+ /// Each Total Energy Consumption row (`MOVESWorkerOutput`, pollutant 91,
+ /// process 1/2/90/91) that resolves a `RefuelingFuelType` cell yields a
+ /// displacement row when its dimension cell resolves a `RefuelingDisplacement`
+ /// rate, and a spillage row when it resolves a `RefuelingSpillage` rate /// every SQL join is an `INNER JOIN`. Each such row is emitted once per
+ /// pollutant in the matching `Refueling…Pollutant` set, so an empty set
+ /// suppresses that process (the script's section gate). The result is
+ /// sorted by its integer dimension columns for deterministic output; MOVES
+ /// leaves `MOVESWorkerOutput` physically unordered.
     #[must_use]
     pub fn calculate(&self, inputs: &RefuelingLossInputs) -> Vec<RefuelingEmissionRow> {
-        // --- REFEC-1, 2: RefuelingAverageRVP and RefuelingTemp --------------
+ // --- REFEC-1, 2: RefuelingAverageRVP and RefuelingTemp --------------
         let average_rvp = average_rvp(inputs);
         let temp_by_fuel = refueling_temp(inputs, &average_rvp);
 
-        // --- REFEC-3..6: the two adjusted-rate working tables --------------
+ // --- REFEC-3..6: the two adjusted-rate working tables --------------
         let displacement = refueling_displacement(inputs, &temp_by_fuel);
         let spillage = refueling_spillage(inputs);
 
-        // RefuelingFuelType by (fuelTypeID, monthID) — the REFEC-7 energy join.
+ // RefuelingFuelType by (fuelTypeID, monthID) — the REFEC-7 energy join.
         let fuel_type_by_key: HashMap<(i32, i32), &RefuelingFuelTypeRow> = inputs
             .refueling_fuel_type
             .iter()
             .map(|rft| ((rft.fuel_type_id, rft.month_id), rft))
             .collect();
 
-        // --- REFEC-7, 8: join each energy row to a rate --------------------
+ // --- REFEC-7, 8: join each energy row to a rate --------------------
         let mut out: Vec<RefuelingEmissionRow> = Vec::new();
         for mwo in &inputs.energy {
-            // WHERE mwo.processID IN (1, 2, 90, 91) AND mwo.pollutantID = 91.
+ // WHERE mwo.processID IN (1, 2, 90, 91) AND mwo.pollutantID = 91.
             if mwo.pollutant_id != TOTAL_ENERGY_POLLUTANT_ID
                 || !ENERGY_SOURCE_PROCESS_IDS.contains(&mwo.process_id)
             {
                 continue;
             }
-            // INNER JOIN RefuelingFuelType ON (fuelTypeID, monthID).
+ // INNER JOIN RefuelingFuelType ON (fuelTypeID, monthID).
             let Some(rft) = fuel_type_by_key.get(&(mwo.fuel_type_id, mwo.month_id)) else {
                 continue;
             };
-            // energyContent and fuelDensity are extract-filtered > 0, so the
-            // divisor is strictly positive (see the module documentation).
+ // energyContent and fuelDensity are extract-filtered > 0, so the
+ // divisor is strictly positive (see the module documentation).
             let divisor = rft.energy_content * rft.fuel_density;
             let age_id = mwo.year_id - mwo.model_year_id;
 
-            // Refueling Displacement Vapor Loss (process 18).
+ // Refueling Displacement Vapor Loss (process 18).
             let displacement_key = DisplacementKey {
                 model_year_id: mwo.model_year_id,
                 reg_class_id: mwo.reg_class_id,
@@ -2132,7 +2130,7 @@ impl RefuelingLossCalculator {
                 }
             }
 
-            // Refueling Spillage Loss (process 19).
+ // Refueling Spillage Loss (process 19).
             let spillage_key = SpillageKey {
                 fuel_type_id: mwo.fuel_type_id,
                 source_type_id: mwo.source_type_id,
@@ -2153,10 +2151,10 @@ impl RefuelingLossCalculator {
             }
         }
 
-        // Stable sort by the dimension columns: two output rows can share a
-        // dimension key (energy rows for different source processes collapse
-        // onto the same output process), and a stable sort keeps them in
-        // energy-input order.
+ // Stable sort by the dimension columns: two output rows can share a
+ // dimension key (energy rows for different source processes collapse
+ // onto the same output process), and a stable sort keeps them in
+ // energy-input order.
         out.sort_by_key(RefuelingEmissionRow::dimension_key);
         out
     }
@@ -2183,8 +2181,7 @@ static REGISTRATIONS: &[PollutantProcessAssociation] = &[
     },
 ];
 
-/// The upstream calculator `RefuelingLossCalculator` chains off —
-/// `BaseRateCalculator`, which produces the Total Energy Consumption
+/// The upstream calculator `RefuelingLossCalculator` chains off/// `BaseRateCalculator`, which produces the Total Energy Consumption
 /// (pollutant 91) records the refueling formulae consume. `calculator-dag.json`
 /// records it as `depends_on: ["BaseRateCalculator"]`.
 static UPSTREAM: &[&str] = &["BaseRateCalculator"];
@@ -2220,10 +2217,10 @@ impl Calculator for RefuelingLossCalculator {
         Self::NAME
     }
 
-    /// `RefuelingLossCalculator` is a chained calculator: it does not subscribe
-    /// to the MasterLoop directly but fires when its upstream
-    /// `BaseRateCalculator` does. `calculator-dag.json` records
-    /// `subscribes_directly: false` and an empty `subscriptions` list.
+ /// `RefuelingLossCalculator` is a chained calculator: it does not subscribe
+ /// to the MasterLoop directly but fires when its upstream
+ /// `BaseRateCalculator` does. `calculator-dag.json` records
+ /// `subscribes_directly: false` and an empty `subscriptions` list.
     fn subscriptions(&self) -> &[CalculatorSubscription] {
         NO_SUBSCRIPTIONS
     }
@@ -2232,8 +2229,7 @@ impl Calculator for RefuelingLossCalculator {
         REGISTRATIONS
     }
 
-    /// `RefuelingLossCalculator` chains off `BaseRateCalculator` —
-    /// `calculator-dag.json` records `depends_on: ["BaseRateCalculator"]`.
+ /// `RefuelingLossCalculator` chains off `BaseRateCalculator` /// `calculator-dag.json` records `depends_on: ["BaseRateCalculator"]`.
     fn upstream(&self) -> &[&'static str] {
         UPSTREAM
     }
@@ -2291,8 +2287,8 @@ pub fn factory() -> Box<dyn Calculator> {
 mod tests {
     use super::*;
 
-    /// Assert `actual` matches `expected` within `f64` slack — the
-    /// FLOAT-column fidelity note means the port computes in `f64`.
+ /// Assert `actual` matches `expected` within `f64` slack — the
+ /// FLOAT-column fidelity note means the port computes in `f64`.
     fn assert_close(actual: f64, expected: f64) {
         assert!(
             (actual - expected).abs() < 1e-9,
@@ -2300,10 +2296,10 @@ mod tests {
         );
     }
 
-    /// A `RefuelingFactors` row whose vapour terms are all zero — so
-    /// `displacedVaporRate = exp(0) = 1.0` exactly — with a `refuelingSpillRate`
-    /// of `2.0` and no temperature clamp or rate floor active. Tests tweak the
-    /// fields they exercise.
+ /// A `RefuelingFactors` row whose vapour terms are all zero — so
+ /// `displacedVaporRate = exp(0) = 1.0` exactly — with a `refuelingSpillRate`
+ /// of `2.0` and no temperature clamp or rate floor active. Tests tweak the
+ /// fields they exercise.
     fn neutral_factors(fuel_type_id: i32) -> RefuelingFactorsRow {
         RefuelingFactorsRow {
             fuel_type_id,
@@ -2321,9 +2317,9 @@ mod tests {
         }
     }
 
-    /// A single Total Energy Consumption row for fuel type 1, month 7, hour 8,
-    /// model year 2015 of run year 2020 (age 5) with `emissionQuant = 100.0`
-    /// and `emissionRate = 4.0`.
+ /// A single Total Energy Consumption row for fuel type 1, month 7, hour 8,
+ /// model year 2015 of run year 2020 (age 5) with `emissionQuant = 100.0`
+ /// and `emissionRate = 4.0`.
     fn energy_row() -> EnergyRow {
         EnergyRow {
             pollutant_id: 91,
@@ -2346,16 +2342,16 @@ mod tests {
         }
     }
 
-    /// A minimal one-fuel / one-energy-row input. With neutral factors and zero
-    /// adjustments the rates resolve exactly:
-    ///
-    /// * `displacedVaporRate = exp(0) = 1.0`, `adjustedVaporRate = 1.0`.
-    /// * `adjustedSpillRate = (1−0) × ((1−0) × 2.0) = 2.0`.
-    /// * `energyContent × fuelDensity = 2.0 × 5.0 = 10.0`.
-    /// * displacement `emissionQuant = 1.0 × 100.0 / 10.0 = 10.0`,
-    ///   `emissionRate = 1.0 × 4.0 / 10.0 = 0.4`.
-    /// * spillage `emissionQuant = 2.0 × 100.0 / 10.0 = 20.0`,
-    ///   `emissionRate = 2.0 × 4.0 / 10.0 = 0.8`.
+ /// A minimal one-fuel / one-energy-row input. With neutral factors and zero
+ /// adjustments the rates resolve exactly:
+ ///
+ /// * `displacedVaporRate = exp(0) = 1.0`, `adjustedVaporRate = 1.0`.
+ /// * `adjustedSpillRate = (1−0) × ((1−0) × 2.0) = 2.0`.
+ /// * `energyContent × fuelDensity = 2.0 × 5.0 = 10.0`.
+ /// * displacement `emissionQuant = 1.0 × 100.0 / 10.0 = 10.0`,
+ /// `emissionRate = 1.0 × 4.0 / 10.0 = 0.4`.
+ /// * spillage `emissionQuant = 2.0 × 100.0 / 10.0 = 20.0`,
+ /// `emissionRate = 2.0 × 4.0 / 10.0 = 0.8`.
     fn minimal_inputs() -> RefuelingLossInputs {
         RefuelingLossInputs {
             refueling_zone_month_hour: vec![RefuelingZoneMonthHourRow {
@@ -2366,8 +2362,8 @@ mod tests {
             refueling_factors: vec![neutral_factors(1)],
             refueling_fuel_supply: vec![],
             refueling_fuel_formulation: vec![],
-            // Month 7 must appear so the averageRVP default fill reaches it,
-            // letting the displacedVaporRate UPDATE fire.
+ // Month 7 must appear so the averageRVP default fill reaches it,
+ // letting the displacedVaporRate UPDATE fire.
             refueling_month_of_any_year: vec![RefuelingMonthOfAnyYearRow {
                 month_id: 7,
                 month_group_id: 3,
@@ -2410,13 +2406,13 @@ mod tests {
         let rows = RefuelingLossCalculator.calculate(&minimal_inputs());
         assert_eq!(rows.len(), 2);
 
-        // Sorted by dimension key — process 18 sorts before 19.
+ // Sorted by dimension key — process 18 sorts before 19.
         let displacement = rows[0];
         let spillage = rows[1];
         assert_eq!(displacement.process_id, 18);
         assert_eq!(spillage.process_id, 19);
 
-        // Dimension columns are carried verbatim from the energy row.
+ // Dimension columns are carried verbatim from the energy row.
         assert_eq!(displacement.year_id, 2020);
         assert_eq!(displacement.month_id, 7);
         assert_eq!(displacement.day_id, 5);
@@ -2431,7 +2427,7 @@ mod tests {
         assert_eq!(displacement.model_year_id, 2015);
         assert_eq!(displacement.road_type_id, 4);
 
-        // Both processes relabel the pollutant to THC (1).
+ // Both processes relabel the pollutant to THC (1).
         assert_eq!(displacement.pollutant_id, 1);
         assert_eq!(spillage.pollutant_id, 1);
 
@@ -2443,11 +2439,11 @@ mod tests {
 
     #[test]
     fn technology_and_program_adjustments_blend_the_displacement_rate() {
-        // refuelingTechAdjustment = 0.25, controlledRefuelingRate = 4.0,
-        // refuelingVaporProgramAdjust = 0.10:
-        //   adjustedVaporRate = 1.0 × 0.90 × 0.75 + 4.0 × 0.90 × 0.25
-        //                     = 0.675 + 0.90 = 1.575
-        //   emissionQuant = 1.575 × 100.0 / 10.0 = 15.75
+ // refuelingTechAdjustment = 0.25, controlledRefuelingRate = 4.0,
+ // refuelingVaporProgramAdjust = 0.10:
+ // adjustedVaporRate = 1.0 × 0.90 × 0.75 + 4.0 × 0.90 × 0.25
+ // = 0.675 + 0.90 = 1.575
+ // emissionQuant = 1.575 × 100.0 / 10.0 = 15.75
         let mut inputs = minimal_inputs();
         inputs.refueling_control_technology[0].refueling_tech_adjustment = 0.25;
         inputs.refueling_control_technology[0].controlled_refueling_rate = 4.0;
@@ -2461,11 +2457,11 @@ mod tests {
 
     #[test]
     fn temperature_clamp_uses_the_california_study_relation() {
-        // vaporLowTLimit = 60, vaporHighTLimit = 90, temperature = 120 → the
-        // clamp pins the temperature to 90, then refuelingTemperature =
-        // 20.30 + 0.81 × 90 = 93.2. With vaporTermC = 0.01 (other terms 0)
-        // displacedVaporRate = exp(0.01 × 93.2). Energy 10 / divisor 10 makes
-        // emissionQuant == displacedVaporRate.
+ // vaporLowTLimit = 60, vaporHighTLimit = 90, temperature = 120 → the
+ // clamp pins the temperature to 90, then refuelingTemperature =
+ // 20.30 + 0.81 × 90 = 93.2. With vaporTermC = 0.01 (other terms 0)
+ // displacedVaporRate = exp(0.01 × 93.2). Energy 10 / divisor 10 makes
+ // emissionQuant == displacedVaporRate.
         let mut inputs = minimal_inputs();
         inputs.refueling_factors[0].vapor_low_t_limit = 60.0;
         inputs.refueling_factors[0].vapor_high_t_limit = 90.0;
@@ -2486,9 +2482,9 @@ mod tests {
 
     #[test]
     fn tank_temperature_difference_is_clamped_to_its_limit() {
-        // vaporTermE = 1.0, vaporTermF = 0.0 → raw tankTemperatureDif equals the
-        // refueling temperature (75.0); tankTDiffLimit = 30 caps it at 30.
-        // vaporTermB = 0.01 → displacedVaporRate = exp(0.01 × 30) = exp(0.3).
+ // vaporTermE = 1.0, vaporTermF = 0.0 → raw tankTemperatureDif equals the
+ // refueling temperature (75.0); tankTDiffLimit = 30 caps it at 30.
+ // vaporTermB = 0.01 → displacedVaporRate = exp(0.01 × 30) = exp(0.3).
         let mut inputs = minimal_inputs();
         inputs.refueling_factors[0].vapor_term_e = 1.0;
         inputs.refueling_factors[0].vapor_term_b = 0.01;
@@ -2504,8 +2500,8 @@ mod tests {
 
     #[test]
     fn minimum_refueling_vapor_loss_floors_the_rate() {
-        // displacedVaporRate would be exp(0) = 1.0, but minimumRefuelingVaporLoss
-        // = 3.0 floors it to 3.0. emissionQuant = 3.0 × 100.0 / 10.0 = 30.0.
+ // displacedVaporRate would be exp(0) = 1.0, but minimumRefuelingVaporLoss
+ // = 3.0 floors it to 3.0. emissionQuant = 3.0 × 100.0 / 10.0 = 30.0.
         let mut inputs = minimal_inputs();
         inputs.refueling_factors[0].minimum_refueling_vapor_loss = 3.0;
 
@@ -2516,8 +2512,8 @@ mod tests {
 
     #[test]
     fn negative_minimum_refueling_vapor_loss_zeroes_the_rate() {
-        // minimumRefuelingVaporLoss ≤ −1 is the sentinel that zeroes
-        // displacedVaporRate; the displacement emission is then 0.
+ // minimumRefuelingVaporLoss ≤ −1 is the sentinel that zeroes
+ // displacedVaporRate; the displacement emission is then 0.
         let mut inputs = minimal_inputs();
         inputs.refueling_factors[0].minimum_refueling_vapor_loss = -1.0;
 
@@ -2529,9 +2525,9 @@ mod tests {
 
     #[test]
     fn average_rvp_weights_rvp_by_market_share() {
-        // Two formulations of fuel type 1, market shares 0.25 / 0.75, RVP 8 / 12:
-        //   averageRVP = 0.25 × 8 + 0.75 × 12 = 11.0
-        // vaporTermD = 0.1 → displacedVaporRate = exp(0.1 × 11.0) = exp(1.1).
+ // Two formulations of fuel type 1, market shares 0.25 / 0.75, RVP 8 / 12:
+ // averageRVP = 0.25 × 8 + 0.75 × 12 = 11.0
+ // vaporTermD = 0.1 → displacedVaporRate = exp(0.1 × 11.0) = exp(1.1).
         let mut inputs = minimal_inputs();
         inputs.refueling_factors[0].vapor_term_d = 0.1;
         inputs.refueling_fuel_subtype = vec![RefuelingFuelSubtypeRow {
@@ -2565,15 +2561,15 @@ mod tests {
 
         let rows = RefuelingLossCalculator.calculate(&inputs);
         let displacement = rows.iter().find(|r| r.process_id == 18).unwrap();
-        // emissionQuant = displacedVaporRate × 100.0 / 10.0 = exp(1.1) × 10.0.
+ // emissionQuant = displacedVaporRate × 100.0 / 10.0 = exp(1.1) × 10.0.
         assert_close(displacement.emission_quant, 1.1_f64.exp() * 10.0);
     }
 
     #[test]
     fn spillage_zeroes_the_program_adjustment_for_non_gasoline_fuels() {
-        // Fuel type 2 (diesel): the synthesised RefuelingCountyYear row carries
-        // refuelingSpillProgramAdjust = 0 even though the run county/year sets
-        // it to 0.5. adjustedSpillRate = (1−0) × ((1−0) × 2.0) = 2.0.
+ // Fuel type 2 (diesel): the synthesised RefuelingCountyYear row carries
+ // refuelingSpillProgramAdjust = 0 even though the run county/year sets
+ // it to 0.5. adjustedSpillRate = (1−0) × ((1−0) × 2.0) = 2.0.
         let mut inputs = minimal_inputs();
         inputs.refueling_county_year[0].refueling_spill_program_adjust = 0.5;
         inputs.refueling_factors = vec![neutral_factors(2)];
@@ -2584,15 +2580,15 @@ mod tests {
 
         let rows = RefuelingLossCalculator.calculate(&inputs);
         let spillage = rows.iter().find(|r| r.process_id == 19).unwrap();
-        // (1 − 0) × ((1 − 0) × 2.0) × 100.0 / 10.0 = 20.0.
+ // (1 − 0) × ((1 − 0) × 2.0) × 100.0 / 10.0 = 20.0.
         assert_close(spillage.emission_quant, 20.0);
     }
 
     #[test]
     fn spillage_applies_the_program_adjustment_to_gasoline() {
-        // Fuel type 1 (gasoline) keeps the run's refuelingSpillProgramAdjust:
-        //   adjustedSpillRate = (1−0.5) × ((1−0) × 2.0) = 1.0
-        //   emissionQuant = 1.0 × 100.0 / 10.0 = 10.0
+ // Fuel type 1 (gasoline) keeps the run's refuelingSpillProgramAdjust:
+ // adjustedSpillRate = (1−0.5) × ((1−0) × 2.0) = 1.0
+ // emissionQuant = 1.0 × 100.0 / 10.0 = 10.0
         let mut inputs = minimal_inputs();
         inputs.refueling_county_year[0].refueling_spill_program_adjust = 0.5;
 
@@ -2603,8 +2599,8 @@ mod tests {
 
     #[test]
     fn displacement_row_dropped_when_control_technology_is_missing() {
-        // No RefuelingControlTechnology row → RefuelingDisplacement is empty →
-        // the INNER JOIN drops the displacement output. Spillage still resolves.
+ // No RefuelingControlTechnology row → RefuelingDisplacement is empty →
+ // the INNER JOIN drops the displacement output. Spillage still resolves.
         let mut inputs = minimal_inputs();
         inputs.refueling_control_technology.clear();
 
@@ -2615,8 +2611,8 @@ mod tests {
 
     #[test]
     fn refueling_fuel_type_miss_drops_the_energy_row_entirely() {
-        // RefuelingFuelType for a different month → the (fuelType, month) join
-        // misses, so neither process produces a row.
+ // RefuelingFuelType for a different month → the (fuelType, month) join
+ // misses, so neither process produces a row.
         let mut inputs = minimal_inputs();
         inputs.refueling_fuel_type[0].month_id = 1;
 
@@ -2625,8 +2621,8 @@ mod tests {
 
     #[test]
     fn empty_displacement_pollutant_set_suppresses_displacement_rows() {
-        // An empty ##refuelingDisplacement.pollutantIDs## set is how a disabled
-        // script section reads — no displacement rows, spillage unaffected.
+ // An empty ##refuelingDisplacement.pollutantIDs## set is how a disabled
+ // script section reads — no displacement rows, spillage unaffected.
         let mut inputs = minimal_inputs();
         inputs.refueling_displacement_pollutant.clear();
 
@@ -2648,7 +2644,7 @@ mod tests {
     #[test]
     fn energy_rows_for_unrelated_pollutants_or_processes_are_ignored() {
         let mut inputs = minimal_inputs();
-        // A non-energy pollutant and an out-of-set process are both dropped.
+ // A non-energy pollutant and an out-of-set process are both dropped.
         inputs.energy.push(EnergyRow {
             pollutant_id: 2,
             ..energy_row()
@@ -2658,14 +2654,14 @@ mod tests {
             ..energy_row()
         });
 
-        // Still exactly the two rows the one valid energy row produces.
+ // Still exactly the two rows the one valid energy row produces.
         assert_eq!(RefuelingLossCalculator.calculate(&inputs).len(), 2);
     }
 
     #[test]
     fn extended_idle_energy_row_is_a_valid_source_process() {
-        // Process 90 (extended idle) is in the source set; it still produces
-        // refueling output, stamped with the refueling process id.
+ // Process 90 (extended idle) is in the source set; it still produces
+ // refueling output, stamped with the refueling process id.
         let mut inputs = minimal_inputs();
         inputs.energy[0].process_id = 90;
 
@@ -2678,8 +2674,8 @@ mod tests {
 
     #[test]
     fn no_county_year_row_yields_no_output() {
-        // With no RefuelingCountyYear row both rate tables are empty, so the
-        // calculator emits nothing — the empty-extract edge case.
+ // With no RefuelingCountyYear row both rate tables are empty, so the
+ // calculator emits nothing — the empty-extract edge case.
         let mut inputs = minimal_inputs();
         inputs.refueling_county_year.clear();
 
@@ -2688,8 +2684,8 @@ mod tests {
 
     #[test]
     fn output_is_sorted_by_dimension_key() {
-        // Two energy rows differing only in modelYearID; the output must be
-        // ordered by the dimension key regardless of input order.
+ // Two energy rows differing only in modelYearID; the output must be
+ // ordered by the dimension key regardless of input order.
         let mut inputs = minimal_inputs();
         inputs
             .refueling_control_technology
@@ -2733,15 +2729,15 @@ mod tests {
 
     #[test]
     fn calculator_is_a_chained_calculator_with_no_subscriptions() {
-        // calculator-dag.json: subscribes_directly false, subscriptions [].
+ // calculator-dag.json: subscribes_directly false, subscriptions [].
         assert!(RefuelingLossCalculator.subscriptions().is_empty());
     }
 
     #[test]
     fn registrations_match_the_two_calculator_info_directives() {
-        // CalculatorInfo.txt records two Registration directives: THC (1) for
-        // Refueling Displacement Vapor Loss (18) and Refueling Spillage Loss
-        // (19) — registrations_count 2 in calculator-dag.json.
+ // CalculatorInfo.txt records two Registration directives: THC (1) for
+ // Refueling Displacement Vapor Loss (18) and Refueling Spillage Loss
+ // (19) — registrations_count 2 in calculator-dag.json.
         let regs = RefuelingLossCalculator.registrations();
         assert_eq!(regs.len(), 2);
         assert!(regs.iter().all(|r| r.pollutant_id == PollutantId(1)));
@@ -2752,7 +2748,7 @@ mod tests {
 
     #[test]
     fn calculator_chains_off_base_rate_calculator() {
-        // calculator-dag.json records depends_on ["BaseRateCalculator"].
+ // calculator-dag.json records depends_on ["BaseRateCalculator"].
         assert_eq!(RefuelingLossCalculator.upstream(), &["BaseRateCalculator"]);
     }
 
@@ -2834,7 +2830,7 @@ mod tests {
             "MOVESWorkerOutput",
             EnergyRow::into_dataframe(inputs.energy.clone()).unwrap(),
         );
-        // THC (pollutant 1) for process 18 → polProcessID = 118, for process 19 → polProcessID = 119
+ // THC (pollutant 1) for process 18 → polProcessID = 118, for process 19 → polProcessID = 119
         store.insert(
             "RunSpecPollutantProcess",
             RunSpecPollutantProcessRow::into_dataframe(vec![
@@ -2863,7 +2859,7 @@ mod tests {
 
     #[test]
     fn calculator_is_object_safe() {
-        // The registry stores calculators as Box<dyn Calculator>.
+ // The registry stores calculators as Box<dyn Calculator>.
         let calc: Box<dyn Calculator> = Box::new(RefuelingLossCalculator);
         assert_eq!(calc.name(), "RefuelingLossCalculator");
     }

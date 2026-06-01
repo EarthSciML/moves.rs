@@ -1,7 +1,7 @@
-//! Subcounty-level processing — port of `prcsub.f` (Task 109).
+//! Subcounty-level processing — port of `prcsub.f`.
 //!
 //! `prcsub.f` (829 lines) does the county-to-subregion allocation of
-//! populations and applies emission + seasonality factors. Task 112
+//! populations and applies emission + seasonality factors.
 //! merged it with `prccty.f` into the shared, parameterised
 //! [`process_geography`] routine; [`process_subcounty`] is now a thin
 //! wrapper that selects [`ProcessLevel::Subcounty`]. The
@@ -34,19 +34,19 @@ pub struct SubcountyRecordIndex(pub usize);
 /// # Arguments
 ///
 /// - `record_index`: original record index `icurec`, threaded
-///   through to `alosub` in the callback. The Fortran source uses it
-///   as an index into the population COMMON arrays.
+/// through to `alosub` in the callback. The Fortran source uses it
+/// as an index into the population COMMON arrays.
 /// - `record`: per-record COMMON-block reads. For subcounty
-///   processing, `region_code` is the 5-character FIPS prefix of the
-///   matched `reglst` entry (the trailing 5 hold the subcounty
-///   marker).
+/// processing, `region_code` is the 5-character FIPS prefix of the
+/// matched `reglst` entry (the trailing 5 hold the subcounty
+/// marker).
 /// - `cached_growth`: the `growth` argument to `prcsub.f`. A sentinel
-///   value `< 0` (Fortran's `-9`) means "not yet computed"; pass
-///   `None` in that case and the callback's `allocate_subcounty`
-///   produces a real value.
+/// value `< 0` (Fortran's `-9`) means "not yet computed"; pass
+/// `None` in that case and the callback's `allocate_subcounty`
+/// produces a real value.
 /// - `options`: run-level settings.
 /// - `callbacks`: dependency surface (same trait as the county
-///   processor).
+/// processor).
 pub fn process_subcounty<C: GeographyCallbacks + ?Sized>(
     record_index: SubcountyRecordIndex,
     record: &PopulationRecord<'_>,
@@ -124,7 +124,7 @@ mod tests {
         assert!(outcome.is_skipped());
     }
 
-    // ---- Custom callback that finds FIPS but not allocation; should be a fatal Config. ----
+ // ---- Custom callback that finds FIPS but not allocation; should be a fatal Config. ----
     struct FipsButNoAlloc;
     impl GeographyCallbacks for FipsButNoAlloc {
         fn find_fips(&self, _: &str) -> Option<usize> {
@@ -262,8 +262,8 @@ mod tests {
                 age_code: String::new(),
             }
         }
-        // Default `find_allocation` returns None — this is the
-        // 7000-path trigger.
+ // Default `find_allocation` returns None — this is the
+ // 7000-path trigger.
     }
 
     #[test]

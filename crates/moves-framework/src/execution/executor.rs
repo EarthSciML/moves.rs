@@ -1,7 +1,7 @@
-//! Bounded-concurrency executor — Task 27's parallelism layer.
+//! Bounded-concurrency executor — parallelism layer.
 //!
-//! The migration plan's concurrency model (see `moves-rust-migration-plan.md`,
-//! "Concurrency and memory model" plus Task 27) replaces MOVES's
+//! The 's concurrency model (see `moves-rust-.md`,
+//! "Concurrency and memory model" plus) replaces MOVES's
 //! filesystem-mediated master/worker split with in-process data parallelism
 //! over the calculator-graph DAG. Memory pressure in that model is dominated
 //! by how many `DataFrame` intermediates are live at once, which scales
@@ -13,22 +13,22 @@
 //! explicitly:
 //!
 //! * [`chunk_chains`] — the chunking logic. It splits a set of calculator
-//!   modules into [`Chunk`]s: the weakly-connected components of the
-//!   dependency DAG. Two modules land in the same chunk iff a chain of
-//!   `depends_on` edges connects them, so distinct chunks share no data
-//!   and can run in any interleaving. Within a chunk the modules are
-//!   topologically ordered — a chunk runs *sequentially* inside itself.
+//! modules into [`Chunk`]s: the weakly-connected components of the
+//! dependency DAG. Two modules land in the same chunk iff a chain of
+//! `depends_on` edges connects them, so distinct chunks share no data
+//! and can run in any interleaving. Within a chunk the modules are
+//! topologically ordered — a chunk runs *sequentially* inside itself.
 //! * [`Semaphore`] — a counting semaphore (`Mutex` + `Condvar`). The
-//!   executor holds one permit per unit of allowed parallelism and a chunk
-//!   acquires a permit for the whole span in which it allocates and holds
-//!   its working set. With `N` permits, at most `N` chunk working sets are
-//!   ever live, which is what bounds peak memory.
+//! executor holds one permit per unit of allowed parallelism and a chunk
+//! acquires a permit for the whole span in which it allocates and holds
+//! its working set. With `N` permits, at most `N` chunk working sets are
+//! ever live, which is what bounds peak memory.
 //! * [`BoundedExecutor`] — builds a [`rayon::ThreadPool`] per
-//!   [`execute`](BoundedExecutor::execute) call, sized to
-//!   `min(--max-parallel-chunks, chunks.len())`, and dispatches chunks onto
-//!   it, each gated by the semaphore. `N` chunks run concurrently; the rest
-//!   queue. Capping to `chunks.len()` avoids idle threads spinning in the
-//!   steal-loop when the chunk count is smaller than the hardware limit.
+//! [`execute`](BoundedExecutor::execute) call, sized to
+//! `min(--max-parallel-chunks, chunks.len())`, and dispatches chunks onto
+//! it, each gated by the semaphore. `N` chunks run concurrently; the rest
+//! queue. Capping to `chunks.len()` avoids idle threads spinning in the
+//! steal-loop when the chunk count is smaller than the hardware limit.
 //!
 //! # Why both a pool *and* a semaphore
 //!
@@ -52,12 +52,12 @@
 //! it empirically, reading `VmHWM` from `/proc/self/status` in an isolated
 //! process where the measurement cannot be perturbed by other tests.
 //!
-//! # Phase 2 status
+//! # status
 //!
 //! The executor is data-plane agnostic: [`BoundedExecutor::execute`] takes
-//! an arbitrary per-chunk closure. Task 27's [`crate::MOVESEngine`] uses it
-//! to run one [`crate::MasterLoop`] per chunk; Phase 3 calculators allocate
-//! their real `DataFrame` working sets inside that closure once Task 50's
+//! an arbitrary per-chunk closure. [`crate::MOVESEngine`] uses it
+//! to run one [`crate::MasterLoop`] per chunk; calculators allocate
+//! their real `DataFrame` working sets inside that closure once's
 //! data plane lands. Nothing here changes when they do.
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
@@ -73,8 +73,7 @@ use crate::error::{Error, Result};
 /// A counting semaphore: a permit pool of fixed size that blocks
 /// [`acquire`](Self::acquire) when empty and refills on permit drop.
 ///
-/// Rust's standard library has no semaphore (and `tokio`'s is async-only —
-/// the migration plan reserves `tokio` for I/O boundaries), so the
+/// Rust's standard library has no semaphore (and `tokio`'s is async-only/// the reserves `tokio` for I/O boundaries), so the
 /// executor carries this small `Mutex` + `Condvar` implementation. It is
 /// the gate that makes "at most `N` chunk working sets resident" a
 /// guarantee: a chunk holds a permit for exactly the span in which its
@@ -84,20 +83,20 @@ use crate::error::{Error, Result};
 /// chunk that panics still releases its permit during unwinding.
 #[derive(Debug)]
 pub struct Semaphore {
-    /// Permits currently available. `0` means [`acquire`](Self::acquire)
-    /// blocks until a [`SemaphorePermit`] is dropped.
+ /// Permits currently available. `0` means [`acquire`](Self::acquire)
+ /// blocks until a [`SemaphorePermit`] is dropped.
     available: Mutex<usize>,
-    /// Signalled by [`release`](Self::release) whenever a permit returns.
+ /// Signalled by [`release`](Self::release) whenever a permit returns.
     refilled: Condvar,
 }
 
 impl Semaphore {
-    /// Construct a semaphore holding `permits` permits.
-    ///
-    /// `permits == 0` produces a semaphore that blocks every
-    /// [`acquire`](Self::acquire) forever; callers size it to a positive
-    /// parallelism limit ([`BoundedExecutor`] resolves `0` to a sensible
-    /// default before reaching here).
+ /// Construct a semaphore holding `permits` permits.
+ ///
+ /// `permits == 0` produces a semaphore that blocks every
+ /// [`acquire`](Self::acquire) forever; callers size it to a positive
+ /// parallelism limit ([`BoundedExecutor`] resolves `0` to a sensible
+ /// default before reaching here).
     #[must_use]
     pub fn new(permits: usize) -> Self {
         Self {
@@ -106,30 +105,30 @@ impl Semaphore {
         }
     }
 
-    /// Take one permit, blocking the calling thread until one is free.
-    ///
-    /// The returned [`SemaphorePermit`] holds the permit; dropping it
-    /// returns the permit and wakes one waiter.
+ /// Take one permit, blocking the calling thread until one is free.
+ ///
+ /// The returned [`SemaphorePermit`] holds the permit; dropping it
+ /// returns the permit and wakes one waiter.
     #[must_use = "the permit is released as soon as it is dropped"]
     pub fn acquire(&self) -> SemaphorePermit<'_> {
         let mut available = self.available.lock().expect("semaphore mutex poisoned");
-        // `while`, not `if`: `Condvar::wait` is allowed spurious wakeups.
+ // `while`, not `if`: `Condvar::wait` is allowed spurious wakeups.
         while *available == 0 {
             available = self
                 .refilled
                 .wait(available)
                 .expect("semaphore mutex poisoned");
         }
-        *available -= 1;
+ *available -= 1;
         SemaphorePermit { semaphore: self }
     }
 
-    /// Return one permit to the pool. Private — callers release by dropping
-    /// the [`SemaphorePermit`] guard.
+ /// Return one permit to the pool. Private — callers release by dropping
+ /// the [`SemaphorePermit`] guard.
     fn release(&self) {
         let mut available = self.available.lock().expect("semaphore mutex poisoned");
-        *available += 1;
-        // One returned permit can satisfy exactly one waiter.
+ *available += 1;
+ // One returned permit can satisfy exactly one waiter.
         self.refilled.notify_one();
     }
 }
@@ -163,33 +162,33 @@ impl Drop for SemaphorePermit<'_> {
 /// sequentially inside itself.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Chunk {
-    /// Module names, topologically ordered (upstream producers first).
+ /// Module names, topologically ordered (upstream producers first).
     modules: Vec<String>,
 }
 
 impl Chunk {
-    /// Wrap a topologically-ordered module list. Private — chunks are
-    /// produced by [`chunk_chains`], which is responsible for the
-    /// independence and ordering invariants.
+ /// Wrap a topologically-ordered module list. Private — chunks are
+ /// produced by [`chunk_chains`], which is responsible for the
+ /// independence and ordering invariants.
     fn new(modules: Vec<String>) -> Self {
         Self { modules }
     }
 
-    /// The chunk's modules, in execution (topological) order.
+ /// The chunk's modules, in execution (topological) order.
     #[must_use]
     pub fn modules(&self) -> &[String] {
         &self.modules
     }
 
-    /// Number of modules in the chunk.
+ /// Number of modules in the chunk.
     #[must_use]
     pub fn len(&self) -> usize {
         self.modules.len()
     }
 
-    /// Whether the chunk has no modules. A well-formed chunk always has at
-    /// least one; the method exists so Clippy's `len`-without-`is_empty`
-    /// lint stays quiet and for symmetry with the standard collections.
+ /// Whether the chunk has no modules. A well-formed chunk always has at
+ /// least one; the method exists so Clippy's `len`-without-`is_empty`
+ /// lint stays quiet and for symmetry with the standard collections.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.modules.is_empty()
@@ -197,7 +196,7 @@ impl Chunk {
 }
 
 /// Split `names` into independent [`Chunk`]s — the chunking logic of
-/// Task 27's bounded-concurrency executor.
+/// bounded-concurrency executor.
 ///
 /// Two modules share a chunk iff a path of `depends_on` edges (in either
 /// direction) connects them within `names`; that is, chunks are the
@@ -217,16 +216,16 @@ impl Chunk {
 /// chunk contains a cycle. The MOVES calculator chain is acyclic by
 /// construction, so this signals malformed input data.
 pub fn chunk_chains(registry: &CalculatorRegistry, names: &[&str]) -> Result<Vec<Chunk>> {
-    // BTreeSet → deterministic, de-duplicated iteration order.
+ // BTreeSet → deterministic, de-duplicated iteration order.
     let members: BTreeSet<&str> = names.iter().copied().collect();
     if members.is_empty() {
         return Ok(Vec::new());
     }
 
-    // Undirected adjacency restricted to `members`. Every directed
-    // `depends_on` edge is recorded once from the dependent's side; adding
-    // it symmetrically captures the whole undirected graph without also
-    // walking `dependents`.
+ // Undirected adjacency restricted to `members`. Every directed
+ // `depends_on` edge is recorded once from the dependent's side; adding
+ // it symmetrically captures the whole undirected graph without also
+ // walking `dependents`.
     let mut adjacency: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
     for &name in &members {
         let Some(module) = registry.module(name) else {
@@ -240,10 +239,10 @@ pub fn chunk_chains(registry: &CalculatorRegistry, names: &[&str]) -> Result<Vec
         }
     }
 
-    // Connected components via BFS. Iterating `members` in sorted order
-    // and starting each component at the first not-yet-seen member means
-    // components are discovered — and therefore returned — ordered by
-    // their smallest module name.
+ // Connected components via BFS. Iterating `members` in sorted order
+ // and starting each component at the first not-yet-seen member means
+ // components are discovered — and therefore returned — ordered by
+ // their smallest module name.
     let mut visited: BTreeSet<&str> = BTreeSet::new();
     let mut chunks: Vec<Chunk> = Vec::new();
     for &start in &members {
@@ -262,7 +261,7 @@ pub fn chunk_chains(registry: &CalculatorRegistry, names: &[&str]) -> Result<Vec
                 }
             }
         }
-        // Order the component so producers precede consumers.
+ // Order the component so producers precede consumers.
         let ordered = registry.topological_order(&component)?;
         chunks.push(Chunk::new(ordered));
     }
@@ -291,8 +290,8 @@ fn resolve_parallelism(requested: usize) -> usize {
     }
     #[cfg(target_arch = "wasm32")]
     {
-        // rayon::current_num_threads() returns the global pool thread count.
-        // Before init_thread_pool is called the pool is single-threaded (1).
+ // rayon::current_num_threads() returns the global pool thread count.
+ // Before init_thread_pool is called the pool is single-threaded (1).
         rayon::current_num_threads().max(1)
     }
 }
@@ -304,7 +303,7 @@ fn resolve_parallelism(requested: usize) -> usize {
 ///
 /// On `wasm32-unknown-unknown`, chunks are dispatched to rayon's global
 /// thread pool, which is backed by Web Workers when JavaScript calls
-/// `init_thread_pool(n)` before invoking any simulation function (Task 134,
+/// `init_thread_pool(n)` before invoking any simulation function (,
 /// `wasm-threads` feature). When `init_thread_pool` has not been called (or
 /// the binary was compiled without `+atomics`), the global pool is
 /// single-threaded and chunks run sequentially. Either way the
@@ -318,62 +317,62 @@ fn resolve_parallelism(requested: usize) -> usize {
 /// [`execute`](Self::execute) calls, each with its own chunk set.
 #[derive(Debug)]
 pub struct BoundedExecutor {
-    /// Resolved parallelism limit — the maximum number of chunks that may run
-    /// concurrently.  The per-`execute` pool is built lazily (capped to
-    /// `min(limit, chunks.len())` so idle threads never spin when the chunk
-    /// set is smaller than the hardware parallelism).
+ /// Resolved parallelism limit — the maximum number of chunks that may run
+ /// concurrently. The per-`execute` pool is built lazily (capped to
+ /// `min(limit, chunks.len())` so idle threads never spin when the chunk
+ /// set is smaller than the hardware parallelism).
     limit: usize,
 }
 
 impl BoundedExecutor {
-    /// Build an executor capped at `max_parallel_chunks` concurrent chunks.
-    ///
-    /// `max_parallel_chunks == 0` selects the host's available parallelism
-    /// (number of hardware threads, or 1 on `wasm32`). Any positive value is
-    /// used verbatim, so callers tuning for a memory-constrained environment
-    /// can force a low limit regardless of core count.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::ThreadPool`] if `rayon` cannot build the per-`execute`
-    /// pool — for example when the OS refuses to spawn the worker threads.
-    /// Never fails on `wasm32` (no pool is created).
+ /// Build an executor capped at `max_parallel_chunks` concurrent chunks.
+ ///
+ /// `max_parallel_chunks == 0` selects the host's available parallelism
+ /// (number of hardware threads, or 1 on `wasm32`). Any positive value is
+ /// used verbatim, so callers tuning for a memory-constrained environment
+ /// can force a low limit regardless of core count.
+ ///
+ /// # Errors
+ ///
+ /// Returns [`Error::ThreadPool`] if `rayon` cannot build the per-`execute`
+ /// pool — for example when the OS refuses to spawn the worker threads.
+ /// Never fails on `wasm32` (no pool is created).
     pub fn new(max_parallel_chunks: usize) -> Result<Self> {
         let limit = resolve_parallelism(max_parallel_chunks);
         Ok(Self { limit })
     }
 
-    /// The resolved parallelism limit — the maximum number of chunks (and
-    /// chunk working sets) that run concurrently.
+ /// The resolved parallelism limit — the maximum number of chunks (and
+ /// chunk working sets) that run concurrently.
     #[must_use]
     pub fn limit(&self) -> usize {
         self.limit
     }
 
-    /// Run every chunk in `chunks` through `run_chunk`, with at most
-    /// [`limit`](Self::limit) running concurrently.
-    ///
-    /// Each chunk acquires a [`Semaphore`] permit before running its body and
-    /// releases the permit after (including on panic, via the guard's `Drop`),
-    /// so at most `limit` chunk working sets are ever live.
-    ///
-    /// On native: chunks are dispatched onto the owned rayon pool and the call
-    /// blocks until every chunk has finished.
-    ///
-    /// On `wasm32` with `limit == 1` (or rayon single-threaded): chunks run
-    /// sequentially in the calling thread.
-    ///
-    /// On `wasm32` with `limit > 1` and a multi-threaded rayon global pool
-    /// (initialized by `init_thread_pool` in JavaScript): chunks are
-    /// dispatched to Web Workers via `rayon::scope`. **The caller must be
-    /// running in a Web Worker context** — browsers disallow `atomic.wait` on
-    /// the main thread, which rayon uses for synchronisation.
-    ///
-    /// # Errors
-    ///
-    /// If one or more chunk bodies return [`Err`], the first error is returned
-    /// after all chunks complete. In sequential mode the first error stops
-    /// execution immediately.
+ /// Run every chunk in `chunks` through `run_chunk`, with at most
+ /// [`limit`](Self::limit) running concurrently.
+ ///
+ /// Each chunk acquires a [`Semaphore`] permit before running its body and
+ /// releases the permit after (including on panic, via the guard's `Drop`),
+ /// so at most `limit` chunk working sets are ever live.
+ ///
+ /// On native: chunks are dispatched onto the owned rayon pool and the call
+ /// blocks until every chunk has finished.
+ ///
+ /// On `wasm32` with `limit == 1` (or rayon single-threaded): chunks run
+ /// sequentially in the calling thread.
+ ///
+ /// On `wasm32` with `limit > 1` and a multi-threaded rayon global pool
+ /// (initialized by `init_thread_pool` in JavaScript): chunks are
+ /// dispatched to Web Workers via `rayon::scope`. **The caller must be
+ /// running in a Web Worker context** — browsers disallow `atomic.wait` on
+ /// the main thread, which rayon uses for synchronisation.
+ ///
+ /// # Errors
+ ///
+ /// If one or more chunk bodies return [`Err`], the first error is returned
+ /// after all chunks complete. In sequential mode the first error stops
+ /// execution immediately.
     pub fn execute<F>(&self, chunks: &[Chunk], run_chunk: F) -> Result<()>
     where
         F: Fn(&Chunk) -> Result<()> + Sync,
@@ -389,8 +388,8 @@ impl BoundedExecutor {
     where
         F: Fn(&Chunk) -> Result<()> + Sync,
     {
-        // Cap the pool to chunks.len() so idle workers never spin in the
-        // steal-loop when the chunk set is smaller than the hardware limit.
+ // Cap the pool to chunks.len() so idle workers never spin in the
+ // steal-loop when the chunk set is smaller than the hardware limit.
         let effective = self.limit.min(chunks.len());
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(effective)
@@ -405,9 +404,9 @@ impl BoundedExecutor {
                 let permits = &permits;
                 let errors = &errors;
                 scope.spawn(move |_| {
-                    // Hold a permit for the whole body: the working set the
-                    // chunk allocates inside `run_chunk` stays bounded by
-                    // `limit` concurrent copies.
+ // Hold a permit for the whole body: the working set the
+ // chunk allocates inside `run_chunk` stays bounded by
+ // `limit` concurrent copies.
                     let _permit = permits.acquire();
                     if let Err(err) = run_chunk(chunk) {
                         errors
@@ -430,16 +429,15 @@ impl BoundedExecutor {
         }
     }
 
-    /// `wasm32` execution: sequential when `limit == 1` (or rayon is
-    /// single-threaded), parallel via rayon's global Web Worker pool when
-    /// `limit > 1` (requires `init_thread_pool` in JS + `+atomics` build).
+ /// `wasm32` execution: sequential when `limit == 1` (or rayon is
+ /// single-threaded), parallel via rayon's global Web Worker pool when
+ /// `limit > 1` (requires `init_thread_pool` in JS + `+atomics` build).
     #[cfg(target_arch = "wasm32")]
     fn execute_impl<F>(&self, chunks: &[Chunk], run_chunk: &F) -> Result<()>
     where
         F: Fn(&Chunk) -> Result<()> + Sync,
     {
-        // Sequential path: one chunk at a time. Safe on any WASM context —
-        // the semaphore never needs to block because chunks are serialised.
+ // Sequential path: one chunk at a time. Safe on any WASM context // the semaphore never needs to block because chunks are serialised.
         if self.limit <= 1 {
             let permits = Semaphore::new(self.limit);
             for chunk in chunks {
@@ -449,10 +447,10 @@ impl BoundedExecutor {
             return Ok(());
         }
 
-        // Parallel path: dispatch to rayon's global pool, which is backed by
-        // Web Workers when JavaScript called init_thread_pool(n) before
-        // invoking this simulation. Requires a Web Worker calling context
-        // (atomic.wait is forbidden on the browser main thread).
+ // Parallel path: dispatch to rayon's global pool, which is backed by
+ // Web Workers when JavaScript called init_thread_pool(n) before
+ // invoking this simulation. Requires a Web Worker calling context
+ // (atomic.wait is forbidden on the browser main thread).
         let permits = Semaphore::new(self.limit);
         let errors: Mutex<Vec<Error>> = Mutex::new(Vec::new());
 
@@ -492,14 +490,14 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Barrier};
 
-    // ---- Semaphore ---------------------------------------------------------
+ // ---- Semaphore ---------------------------------------------------------
 
     #[test]
     fn semaphore_acquire_decrements_and_permit_drop_restores() {
         let sem = Semaphore::new(2);
         let a = sem.acquire();
         let b = sem.acquire();
-        // Both permits taken; the count is exhausted.
+ // Both permits taken; the count is exhausted.
         assert_eq!(*sem.available.lock().unwrap(), 0);
         drop(a);
         assert_eq!(*sem.available.lock().unwrap(), 1);
@@ -509,8 +507,8 @@ mod tests {
 
     #[test]
     fn semaphore_blocks_until_a_permit_is_released() {
-        // One permit, two threads contending. The second `acquire` must
-        // block until the first permit's guard drops.
+ // One permit, two threads contending. The second `acquire` must
+ // block until the first permit's guard drops.
         let sem = Arc::new(Semaphore::new(1));
         let held = sem.acquire();
 
@@ -524,8 +522,8 @@ mod tests {
             })
         };
 
-        // Give the waiter time to reach (and block on) `acquire`. It cannot
-        // have progressed: the only permit is still held here.
+ // Give the waiter time to reach (and block on) `acquire`. It cannot
+ // have progressed: the only permit is still held here.
         std::thread::sleep(std::time::Duration::from_millis(50));
         assert_eq!(progressed.load(Ordering::SeqCst), 0);
 
@@ -534,7 +532,7 @@ mod tests {
         assert_eq!(progressed.load(Ordering::SeqCst), 1);
     }
 
-    // ---- chunk_chains ------------------------------------------------------
+ // ---- chunk_chains ------------------------------------------------------
 
     fn parse(text: &str) -> CalculatorInfo {
         parse_calculator_info_str(text, Path::new("test")).unwrap()
@@ -544,7 +542,7 @@ mod tests {
         CalculatorRegistry::new(build_dag(&parse(text), &[]).unwrap())
     }
 
-    /// Sorted module list of a chunk — order-insensitive content check.
+ /// Sorted module list of a chunk — order-insensitive content check.
     fn members(chunk: &Chunk) -> Vec<String> {
         let mut m = chunk.modules().to_vec();
         m.sort();
@@ -559,7 +557,7 @@ mod tests {
 
     #[test]
     fn chunk_chains_unconnected_modules_each_form_a_singleton() {
-        // Three direct subscribers, no chain edges between them.
+ // Three direct subscribers, no chain edges between them.
         let reg = registry(
             "Subscribe\tApple\tRunning Exhaust\t1\tMONTH\tEMISSION_CALCULATOR\n\
              Subscribe\tBanana\tRunning Exhaust\t1\tMONTH\tEMISSION_CALCULATOR\n\
@@ -567,7 +565,7 @@ mod tests {
         );
         let chunks = chunk_chains(&reg, &["Cherry", "Apple", "Banana"]).unwrap();
         assert_eq!(chunks.len(), 3);
-        // Chunk order is by smallest member name, independent of input order.
+ // Chunk order is by smallest member name, independent of input order.
         assert_eq!(chunks[0].modules(), ["Apple"]);
         assert_eq!(chunks[1].modules(), ["Banana"]);
         assert_eq!(chunks[2].modules(), ["Cherry"]);
@@ -575,7 +573,7 @@ mod tests {
 
     #[test]
     fn chunk_chains_groups_a_dependency_path_into_one_chunk() {
-        // UpstreamGen → Root → Leaf is a single connected component.
+ // UpstreamGen → Root → Leaf is a single connected component.
         let reg = registry(
             "Registration\tCO\t2\tRunning Exhaust\t1\tRoot\n\
              Subscribe\tRoot\tRunning Exhaust\t1\tMONTH\tEMISSION_CALCULATOR\n\
@@ -585,13 +583,13 @@ mod tests {
         );
         let chunks = chunk_chains(&reg, &["Leaf", "Root", "UpstreamGen"]).unwrap();
         assert_eq!(chunks.len(), 1);
-        // Topologically ordered: producers before consumers.
+ // Topologically ordered: producers before consumers.
         assert_eq!(chunks[0].modules(), ["UpstreamGen", "Root", "Leaf"]);
     }
 
     #[test]
     fn chunk_chains_separates_independent_components() {
-        // Two disjoint chains: (GenA→RootA) and (GenB→RootB).
+ // Two disjoint chains: (GenA→RootA) and (GenB→RootB).
         let reg = registry(
             "Registration\tCO\t2\tRunning Exhaust\t1\tRootA\n\
              Registration\tNOx\t3\tRunning Exhaust\t1\tRootB\n\
@@ -604,10 +602,10 @@ mod tests {
         );
         let chunks = chunk_chains(&reg, &["RootA", "RootB", "GenA", "GenB"]).unwrap();
         assert_eq!(chunks.len(), 2);
-        // Component reachable from "GenA" sorts first (smallest member).
+ // Component reachable from "GenA" sorts first (smallest member).
         assert_eq!(members(&chunks[0]), ["GenA", "RootA"]);
         assert_eq!(members(&chunks[1]), ["GenB", "RootB"]);
-        // Each chunk is internally topo-ordered.
+ // Each chunk is internally topo-ordered.
         assert_eq!(chunks[0].modules(), ["GenA", "RootA"]);
         assert_eq!(chunks[1].modules(), ["GenB", "RootB"]);
     }
@@ -638,9 +636,9 @@ mod tests {
         assert_eq!(chunks[1].modules(), ["NotInDag"]);
     }
 
-    // ---- BoundedExecutor — wiring -----------------------------------------
+ // ---- BoundedExecutor — wiring -----------------------------------------
 
-    /// Build `count` singleton chunks named `m0..m{count}`.
+ /// Build `count` singleton chunks named `m0..m{count}`.
     fn synthetic_chunks(count: usize) -> Vec<Chunk> {
         (0..count)
             .map(|i| Chunk::new(vec![format!("m{i}")]))
@@ -703,19 +701,19 @@ mod tests {
         }
     }
 
-    // ---- BoundedExecutor — memory-pressure regression ---------------------
-    //
-    // Peak memory ≈ limit × max(chunk working set). These tests pin that
-    // relationship: the bounded-concurrency cap is what keeps peak RSS
-    // proportional to `--max-parallel-chunks`.
+ // ---- BoundedExecutor — memory-pressure regression ---------------------
+ //
+ // Peak memory ≈ limit × max(chunk working set). These tests pin that
+ // relationship: the bounded-concurrency cap is what keeps peak RSS
+ // proportional to `--max-parallel-chunks`.
 
-    /// Drive `4 * limit` chunks through an executor of the given limit and
-    /// return the greatest number of chunks observed running concurrently.
-    ///
-    /// A `Barrier` of `limit` parties makes the result deterministic: the
-    /// pool has exactly `limit` threads, so `limit` chunk bodies reach the
-    /// barrier together, observe a concurrency of `limit`, and only then
-    /// release — no sleeps, no timing assumptions.
+ /// Drive `4 * limit` chunks through an executor of the given limit and
+ /// return the greatest number of chunks observed running concurrently.
+ ///
+ /// A `Barrier` of `limit` parties makes the result deterministic: the
+ /// pool has exactly `limit` threads, so `limit` chunk bodies reach the
+ /// barrier together, observe a concurrency of `limit`, and only then
+ /// release — no sleeps, no timing assumptions.
     fn observed_peak_concurrency(limit: usize) -> usize {
         let exec = BoundedExecutor::new(limit).unwrap();
         let chunks = synthetic_chunks(4 * limit);
@@ -730,16 +728,16 @@ mod tests {
             Ok(())
         })
         .unwrap();
-        // `active` returns to zero once every chunk has finished.
+ // `active` returns to zero once every chunk has finished.
         assert_eq!(active.load(Ordering::SeqCst), 0);
         peak.load(Ordering::SeqCst)
     }
 
     #[test]
     fn executor_caps_concurrency_at_the_limit() {
-        // The observed peak equals the limit exactly: the barrier proves
-        // `limit` is reached, the pool + semaphore prove it is never
-        // exceeded.
+ // The observed peak equals the limit exactly: the barrier proves
+ // `limit` is reached, the pool + semaphore prove it is never
+ // exceeded.
         for limit in [1, 2, 3, 5] {
             assert_eq!(
                 observed_peak_concurrency(limit),
@@ -751,16 +749,16 @@ mod tests {
 
     #[test]
     fn doubling_the_limit_doubles_peak_concurrency() {
-        // The core memory-pressure invariant: peak co-residency scales
-        // linearly with `--max-parallel-chunks`, so peak RSS does too.
+ // The core memory-pressure invariant: peak co-residency scales
+ // linearly with `--max-parallel-chunks`, so peak RSS does too.
         assert_eq!(observed_peak_concurrency(2), 2);
         assert_eq!(observed_peak_concurrency(4), 4);
         assert_eq!(observed_peak_concurrency(8), 8);
     }
 
-    // The empirical peak-RSS counterpart of these tests — actually reading
-    // `VmHWM` while chunks hold real buffers — lives in the
-    // `tests/memory_pressure.rs` integration test. It runs in its own
-    // process so the process-global RSS high-water mark is not perturbed by
-    // the other tests in this binary.
+ // The empirical peak-RSS counterpart of these tests — actually reading
+ // `VmHWM` while chunks hold real buffers — lives in the
+ // `tests/memory_pressure.rs` integration test. It runs in its own
+ // process so the process-global RSS high-water mark is not perturbed by
+ // the other tests in this binary.
 }

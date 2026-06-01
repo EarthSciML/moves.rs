@@ -17,13 +17,12 @@
 //!
 //! The Java SQL script also surfaces:
 //! * `ERROR: Year ... is outside the range of 1990-2060` — covered by
-//!   [`Filter::Year`]'s built-in range check in
-//!   [`moves_importer::validate_table`].
+//! [`Filter::Year`]'s built-in range check in
+//! [`moves_importer::validate_table`].
 //! * `ERROR: Missing sourceTypePopulation value for sourceTypeID: ...`
-//!   — covered by [`Filter::NonNegative`]'s null check.
-//! * Default-zero rows for source types not provided by the user —
-//!   not enforced here; downstream merge in the InputDataManager
-//!   (Task 24) is the place for that synthesis.
+//! covered by [`Filter::NonNegative`]'s null check.
+//! * Default-zero rows for source types not provided by the user//! not enforced here; downstream merge in the InputDataManager
+//! is the place for that synthesis.
 //!
 //! [`Filter::Year`]: moves_importer::Filter::Year
 //! [`Filter::SourceType`]: moves_importer::Filter::SourceType

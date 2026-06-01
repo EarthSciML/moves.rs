@@ -5,24 +5,24 @@
 //!
 //! ```text
 //! <captures-dir>/
-//!   databases/<db-name>/<table>.tsv          ← rows (mariadb -B -N -e SELECT ...)
-//!   databases/<db-name>/<table>.schema.tsv   ← column metadata sidecar
-//!   moves-temporary/<file>                   ← MOVESTemporary contents
-//!   worker-folder/<workerN>/<file>           ← WorkerFolder/WorkerTempXX/ contents
+//! databases/<db-name>/<table>.tsv ← rows (mariadb -B -N -e SELECT ...)
+//! databases/<db-name>/<table>.schema.tsv ← column metadata sidecar
+//! moves-temporary/<file> ← MOVESTemporary contents
+//! worker-folder/<workerN>/<file> ← WorkerFolder/WorkerTempXX/ contents
 //! ```
 //!
 //! Tables are named in the snapshot using `<source>__<segment>__<segment>`,
 //! lowercased. Examples:
 //!
-//! | Source path                                       | Snapshot table name             |
+//! | Source path | Snapshot table name |
 //! |---------------------------------------------------|---------------------------------|
-//! | `databases/movesoutput/movesactivityoutput.tsv`   | `db__movesoutput__movesactivityoutput` |
-//! | `moves-temporary/SourceTypeYearVMT_2020.tbl`      | `moves_temporary__sourcetypeyearvmt_2020_tbl` |
-//! | `worker-folder/WorkerTemp00/Output.tbl`           | `worker_folder__workertemp00__output_tbl` |
+//! | `databases/movesoutput/movesactivityoutput.tsv` | `db__movesoutput__movesactivityoutput` |
+//! | `moves-temporary/SourceTypeYearVMT_2020.tbl` | `moves_temporary__sourcetypeyearvmt_2020_tbl` |
+//! | `worker-folder/WorkerTemp00/Output.tbl` | `worker_folder__workertemp00__output_tbl` |
 //!
 //! The walk is deterministic (lexicographic), tables are inserted into a
 //! `BTreeMap` keyed by the snapshot table name, and the snapshot crate's
-//! own `write` is byte-deterministic — together giving the bead's "same
+//! own `write` is byte-deterministic — together giving the work item's "same
 //! inputs → byte-identical snapshot" guarantee.
 
 use std::path::{Path, PathBuf};
@@ -43,9 +43,9 @@ const WORKER_FOLDER_SUBDIR: &str = "worker-folder";
 /// Configuration for [`build_snapshot`].
 #[derive(Debug, Clone, Default)]
 pub struct BuildOptions {
-    /// If set, database directories whose name matches one of these
-    /// (case-insensitively) are skipped. Use to exclude the default DB,
-    /// which is unchanged by a run and would just bloat the snapshot.
+ /// If set, database directories whose name matches one of these
+ /// (case-insensitively) are skipped. Use to exclude the default DB,
+ /// which is unchanged by a run and would just bloat the snapshot.
     pub exclude_databases: Vec<String>,
 }
 
@@ -107,7 +107,7 @@ fn add_databases(root: &Path, opts: &BuildOptions, snapshot: &mut Snapshot) -> R
 }
 
 fn add_one_database(db_name: &str, db_path: &Path, snapshot: &mut Snapshot) -> Result<()> {
-    // Group .tsv with .schema.tsv. We list once and dispatch.
+ // Group .tsv with .schema.tsv. We list once and dispatch.
     let entries = walk_files(db_path)?;
     let mut tables: std::collections::BTreeMap<String, (Option<PathBuf>, Option<PathBuf>)> =
         std::collections::BTreeMap::new();
@@ -121,8 +121,8 @@ fn add_one_database(db_name: &str, db_path: &Path, snapshot: &mut Snapshot) -> R
         } else if let Some(stem) = rel.strip_suffix(".tsv") {
             tables.entry(stem.to_string()).or_default().0 = Some(abs);
         }
-        // Other extensions (e.g. .sql from mariadb-dump) are ignored — the
-        // snapshot format stores tabular data only.
+ // Other extensions (e.g. .sql from mariadb-dump) are ignored — the
+ // snapshot format stores tabular data only.
     }
 
     for (stem, (data_path, schema_path)) in tables {
@@ -172,10 +172,10 @@ fn add_worker_folder(root: &Path, snapshot: &mut Snapshot) -> Result<()> {
 fn add_tabular_tree(dir: &Path, prefix: &str, snapshot: &mut Snapshot) -> Result<()> {
     let entries = walk_files(dir)?;
     for entry in entries {
-        // Only `.tbl` and `.csv` files are imported as snapshot tables.
-        // Other artifacts (logs, sql dumps, etc.) live in the source tree
-        // for forensic reading but don't enter the snapshot — they aren't
-        // tabular and the snapshot format wants tables.
+ // Only `.tbl` and `.csv` files are imported as snapshot tables.
+ // Other artifacts (logs, sql dumps, etc.) live in the source tree
+ // for forensic reading but don't enter the snapshot — they aren't
+ // tabular and the snapshot format wants tables.
         let rel = &entry.relative;
         let lower = rel.to_ascii_lowercase();
         if !(lower.ends_with(".tbl") || lower.ends_with(".csv")) {
@@ -216,7 +216,7 @@ mod tests {
     }
 
     fn populate_canonical_capture(root: &Path) {
-        // One database with two tables.
+ // One database with two tables.
         write_capture(
             root,
             "databases/movesoutput/movesactivityoutput.schema.tsv",
@@ -237,7 +237,7 @@ mod tests {
             "databases/movesoutput/movesoutput.tsv",
             b"1\t0.001\n2\t0.002\n",
         );
-        // The default DB — should be excluded.
+ // The default DB — should be excluded.
         write_capture(
             root,
             "databases/movesdb20241112/sourceusetype.schema.tsv",
@@ -248,13 +248,13 @@ mod tests {
             "databases/movesdb20241112/sourceusetype.tsv",
             b"21\tpassengercar\n",
         );
-        // MOVESTemporary contents.
+ // MOVESTemporary contents.
         write_capture(
             root,
             "moves-temporary/SourceTypeYearVMT_2020.tbl",
             b"sourcetypeid\tyear\tvmt\n21\t2020\t1.5e9\n",
         );
-        // WorkerFolder bundle (a typical worker output file).
+ // WorkerFolder bundle (a typical worker output file).
         write_capture(
             root,
             "worker-folder/WorkerTemp00/Output.tbl",
@@ -265,7 +265,7 @@ mod tests {
             "worker-folder/WorkerTemp01/Output.tbl",
             b"a\tb\n3\t4\n",
         );
-        // A non-tabular file in worker folder — should be ignored.
+ // A non-tabular file in worker folder — should be ignored.
         write_capture(root, "worker-folder/WorkerTemp00/log.txt", b"some log\n");
     }
 
@@ -296,7 +296,7 @@ mod tests {
         assert_eq!(activity.row_count(), 3);
         assert_eq!(activity.natural_key(), &["yearid", "monthid"]);
 
-        // Default DB excluded — no `db__movesdb20241112__sourceusetype` table.
+ // Default DB excluded — no `db__movesdb20241112__sourceusetype` table.
         assert!(snapshot
             .table("db__movesdb20241112__sourceusetype")
             .is_none());
@@ -315,7 +315,7 @@ mod tests {
         snap.write(snap_dir1.path()).unwrap();
         snap.write(snap_dir2.path()).unwrap();
 
-        // Compare every file across the two snapshot dirs.
+ // Compare every file across the two snapshot dirs.
         let files1 = walk_files(snap_dir1.path()).unwrap();
         let files2 = walk_files(snap_dir2.path()).unwrap();
         let rels1: Vec<&str> = files1.iter().map(|e| e.relative.as_str()).collect();
@@ -330,8 +330,8 @@ mod tests {
 
     #[test]
     fn deterministic_across_independent_capture_dirs() {
-        // Two captures dirs with byte-identical content but built in
-        // different temp directories must produce byte-identical snapshots.
+ // Two captures dirs with byte-identical content but built in
+ // different temp directories must produce byte-identical snapshots.
         let cap1 = tempdir().unwrap();
         let cap2 = tempdir().unwrap();
         populate_canonical_capture(cap1.path());
@@ -361,7 +361,7 @@ mod tests {
     #[test]
     fn missing_subdirs_yield_partial_snapshot() {
         let dir = tempdir().unwrap();
-        // Only databases — no MOVESTemporary, no WorkerFolder.
+ // Only databases — no MOVESTemporary, no WorkerFolder.
         write_capture(
             dir.path(),
             "databases/movesoutput/t.schema.tsv",

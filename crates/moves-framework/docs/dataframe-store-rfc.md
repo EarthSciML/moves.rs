@@ -1,8 +1,8 @@
 # DataFrameStore RFC
 
-**Status**: Proposed  
-**Bead**: mo-o6xhs  
-**Implements**: Blocker 2 (Task 50) — data-plane wiring for `moves-framework`
+**Status**: Proposed 
+
+**Implements**: Blocker 2 — data-plane wiring for `moves-framework`
 
 ---
 
@@ -11,13 +11,13 @@
 `CalculatorContext` holds two placeholder structs today:
 
 ```rust
-pub struct ExecutionTables { _private: () }  // slow tier — read-only default-DB tables
+pub struct ExecutionTables { _private: () } // slow tier — read-only default-DB tables
 pub struct ScratchNamespace { _private: () } // scratch tier — per-chunk generator output
 ```
 
-Phase 3 calculators implement `execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput>` but cannot read input tables or write outputs because the data plane is absent. Every calculator's `execute` returns `Ok(CalculatorOutput::empty())`.
+calculators implement `execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput>` but cannot read input tables or write outputs because the data plane is absent. Every calculator's `execute` returns `Ok(CalculatorOutput::empty())`.
 
-The DataFrameStore landing (Task 50) replaces both placeholders with concrete Polars-backed storage. This RFC locks the trait/struct surface, backend choice, and concurrency contract before any code lands.
+The DataFrameStore landing replaces both placeholders with concrete Polars-backed storage. This RFC locks the trait/struct surface, backend choice, and concurrency contract before any code lands.
 
 ---
 
@@ -48,10 +48,10 @@ The typed-row-vec pattern (`Vec<ShoRow>`, `DistanceInputs`, etc.) stays as the *
 /// `Generator::output_tables()` declaration must have a registered
 /// `TableSchema`. Task T3 (`schema_registry`) enforces this at startup.
 pub struct TableSchema {
-    /// Canonical table name, e.g. `"sho"`, `"sourceBinDistribution"`.
-    pub name: &'static str,
-    /// Polars column schema: ordered (name, DataType) pairs.
-    pub schema: polars::prelude::SchemaRef,
+ /// Canonical table name, e.g. `"sho"`, `"sourceBinDistribution"`.
+ pub name: &'static str,
+ /// Polars column schema: ordered (name, DataType) pairs.
+ pub schema: polars::prelude::SchemaRef,
 }
 ```
 
@@ -65,17 +65,17 @@ pub struct TableSchema {
 ///
 /// The trait is object-safe; the registry holds `Box<dyn DataFrameStore>`.
 pub trait DataFrameStore: Send + Sync {
-    /// Return the DataFrame stored under `name`, or `None` if absent.
-    fn get(&self, name: &str) -> Option<Arc<polars::prelude::DataFrame>>;
+ /// Return the DataFrame stored under `name`, or `None` if absent.
+ fn get(&self, name: &str) -> Option<Arc<polars::prelude::DataFrame>>;
 
-    /// Insert (or replace) a DataFrame under `name`.
-    fn insert(&mut self, name: &str, df: polars::prelude::DataFrame);
+ /// Insert (or replace) a DataFrame under `name`.
+ fn insert(&mut self, name: &str, df: polars::prelude::DataFrame);
 
-    /// Return `true` if a DataFrame is stored under `name`.
-    fn contains(&self, name: &str) -> bool;
+ /// Return `true` if a DataFrame is stored under `name`.
+ fn contains(&self, name: &str) -> bool;
 
-    /// Return all stored table names, in insertion order.
-    fn names(&self) -> Vec<&str>;
+ /// Return all stored table names, in insertion order.
+ fn names(&self) -> Vec<&str>;
 }
 ```
 
@@ -88,7 +88,7 @@ pub trait DataFrameStore: Send + Sync {
 /// the scratch tier (allocated fresh per chunk by the MasterLoop engine).
 #[derive(Debug, Default)]
 pub struct InMemoryStore {
-    tables: BTreeMap<String, Arc<polars::prelude::DataFrame>>,
+ tables: BTreeMap<String, Arc<polars::prelude::DataFrame>>,
 }
 ```
 
@@ -99,18 +99,18 @@ pub struct InMemoryStore {
 ///
 /// `Arc<InMemoryStore>` is shared across all chunks in a run;
 /// no calculator or generator may call `insert` on it during a run.
-/// Loading is driven by `InputDataManager` (Task 24 / T3).
+/// Loading is driven by `InputDataManager`.
 pub struct ExecutionTables {
-    store: Arc<InMemoryStore>,
+ store: Arc<InMemoryStore>,
 }
 
 /// Scratch tier — per-chunk generator output, owned and mutable.
 ///
-/// Allocated fresh at chunk start by `MasterLoopEngine`.  Generators
+/// Allocated fresh at chunk start by `MasterLoopEngine`. Generators
 /// write via `insert`; downstream calculators read via `get`.
 /// Dropped when the chunk's iteration completes.
 pub struct ScratchNamespace {
-    store: InMemoryStore,
+ store: InMemoryStore,
 }
 ```
 
@@ -120,9 +120,9 @@ pub struct ScratchNamespace {
 
 ```rust
 pub struct CalculatorContext {
-    tables: ExecutionTables,        // Arc-shared, read-only slow tier
-    scratch: ScratchNamespace,      // owned, mutable scratch tier
-    position: IterationPosition,
+ tables: ExecutionTables, // Arc-shared, read-only slow tier
+ scratch: ScratchNamespace, // owned, mutable scratch tier
+ position: IterationPosition,
 }
 ```
 
@@ -133,17 +133,17 @@ pub struct CalculatorContext {
 ```rust
 /// Value returned by `Calculator::execute`.
 ///
-/// Wraps an optional emission DataFrame.  `empty()` is valid for Phase 2
+/// Wraps an optional emission DataFrame. `empty()` is valid for
 /// shells still waiting on data-plane wiring; `with_dataframe(df)` is used
 /// by wired calculators starting with the DistanceCalculator pilot (T5).
 pub struct CalculatorOutput {
-    df: Option<polars::prelude::DataFrame>,
+ df: Option<polars::prelude::DataFrame>,
 }
 
 impl CalculatorOutput {
-    pub fn empty() -> Self { Self { df: None } }
-    pub fn with_dataframe(df: polars::prelude::DataFrame) -> Self { Self { df: Some(df) } }
-    pub fn into_dataframe(self) -> Option<polars::prelude::DataFrame> { self.df }
+ pub fn empty() -> Self { Self { df: None } }
+ pub fn with_dataframe(df: polars::prelude::DataFrame) -> Self { Self { df: Some(df) } }
+ pub fn into_dataframe(self) -> Option<polars::prelude::DataFrame> { self.df }
 }
 ```
 
@@ -157,18 +157,18 @@ To shield calculator authors from raw Polars schema manipulation, Task T3 adds:
 /// Conversion from a typed row-vec to a Polars DataFrame.
 /// Implemented by derive-helper for each `*Row` struct.
 pub trait IntoDataFrame {
-    fn into_dataframe(self) -> Result<polars::prelude::DataFrame, Error>;
+ fn into_dataframe(self) -> Result<polars::prelude::DataFrame, Error>;
 }
 
 // Convenience on the store:
 impl InMemoryStore {
-    /// Insert a typed row-vec as a DataFrame, validating schema.
-    pub fn insert_typed<R: IntoDataFrame>(&mut self, name: &str, rows: Vec<R>)
-        -> Result<(), Error>;
+ /// Insert a typed row-vec as a DataFrame, validating schema.
+ pub fn insert_typed<R: IntoDataFrame>(&mut self, name: &str, rows: Vec<R>)
+ -> Result<(), Error>;
 
-    /// Read a named table back into a typed row-vec.
-    pub fn iter_typed<R: TryFrom<polars::prelude::DataFrame>>(&self, name: &str)
-        -> Result<Vec<R>, Error>;
+ /// Read a named table back into a typed row-vec.
+ pub fn iter_typed<R: TryFrom<polars::prelude::DataFrame>>(&self, name: &str)
+ -> Result<Vec<R>, Error>;
 }
 ```
 
@@ -190,16 +190,16 @@ ctx.scratch_mut().store.insert_typed("sourceBinDistribution", output.distributio
 
 ```rust
 pub enum Error {
-    // ... existing variants ...
+ // ... existing variants ...
 
-    /// A table required by a calculator was absent from the store.
-    TableNotFound { name: String },
+ /// A table required by a calculator was absent from the store.
+ TableNotFound { name: String },
 
-    /// A DataFrame in the store did not match the expected schema.
-    SchemaMismatch { name: String, expected: String, got: String },
+ /// A DataFrame in the store did not match the expected schema.
+ SchemaMismatch { name: String, expected: String, got: String },
 
-    /// A Polars operation failed.
-    Polars(polars::error::PolarsError),
+ /// A Polars operation failed.
+ Polars(polars::error::PolarsError),
 }
 ```
 
@@ -248,18 +248,18 @@ store_can_be_held_inside_calculator_context
 
 ```rust
 fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
-    let inputs = DistanceInputs {
-        sho:                     ctx.tables().store.iter_typed("sho")?,
-        link:                    ctx.tables().store.iter_typed("link")?,
-        county:                  ctx.tables().store.iter_typed("county")?,
-        source_bin:              ctx.tables().store.iter_typed("sourceBin")?,
-        source_bin_distribution: ctx.tables().store.iter_typed("sourceBinDistribution")?,
-        source_type_model_year:  ctx.tables().store.iter_typed("sourceTypeModelYear")?,
-        hour_day:                ctx.tables().store.iter_typed("hourDay")?,
-    };
-    let rows = Self::calculate(&inputs, ctx.position().process_id.unwrap_or(ProcessId(1)))?;
-    let df = rows.into_dataframe()?;
-    Ok(CalculatorOutput::with_dataframe(df))
+ let inputs = DistanceInputs {
+ sho: ctx.tables().store.iter_typed("sho")?,
+ link: ctx.tables().store.iter_typed("link")?,
+ county: ctx.tables().store.iter_typed("county")?,
+ source_bin: ctx.tables().store.iter_typed("sourceBin")?,
+ source_bin_distribution: ctx.tables().store.iter_typed("sourceBinDistribution")?,
+ source_type_model_year: ctx.tables().store.iter_typed("sourceTypeModelYear")?,
+ hour_day: ctx.tables().store.iter_typed("hourDay")?,
+ };
+ let rows = Self::calculate(&inputs, ctx.position().process_id.unwrap_or(ProcessId(1)))?;
+ let df = rows.into_dataframe()?;
+ Ok(CalculatorOutput::with_dataframe(df))
 }
 ```
 
@@ -276,15 +276,15 @@ fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
 
 ```rust
 fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
-    let svp: Vec<SampleVehiclePopulationRow> =
-        ctx.tables().store.iter_typed("sampleVehiclePopulation")?;
-    let ppmyr: Vec<PollutantProcessModelYearRow> =
-        ctx.tables().store.iter_typed("pollutantProcessModelYear")?;
-    // ... build tables and call pollutant_process_distribution() ...
-    let output = pollutant_process_distribution(&tables, pol_process_id);
-    ctx.scratch_mut().store.insert_typed("sourceBinDistribution", output.distribution)?;
-    ctx.scratch_mut().store.insert_typed("sourceBin", output.new_source_bins)?;
-    Ok(CalculatorOutput::empty())
+ let svp: Vec<SampleVehiclePopulationRow> =
+ ctx.tables().store.iter_typed("sampleVehiclePopulation")?;
+ let ppmyr: Vec<PollutantProcessModelYearRow> =
+ ctx.tables().store.iter_typed("pollutantProcessModelYear")?;
+ // ... build tables and call pollutant_process_distribution() ...
+ let output = pollutant_process_distribution(&tables, pol_process_id);
+ ctx.scratch_mut().store.insert_typed("sourceBinDistribution", output.distribution)?;
+ ctx.scratch_mut().store.insert_typed("sourceBin", output.new_source_bins)?;
+ Ok(CalculatorOutput::empty())
 }
 ```
 
@@ -318,7 +318,7 @@ Fields: `fuel_supply`, `fuel_formulation`, `fuel_sub_type`, `fuel_type`, `year`,
 21 fields covering: `age_category`, `county`, `criteria_ratio`, `emission_rate_by_age`, `fuel_formulation`, `fuel_subtype`, `fuel_supply`, `full_ac_adjustment`, `fuel_type`, `hour_day`, `im_coverage`, `im_factor`, `link`, `model_year`, `month_group_hour`, `month_of_any_year`, `op_mode_distribution`, `pollutant_process_assoc`, `pollutant_process_mapped_model_year`, `sho`, `source_bin`, `source_bin_distribution`, `source_type_age`, `source_type_model_year`, `temperature_adjustment`, `year`, `zone_month_hour`. Each maps to the snake_case → camelCase table name via `iter_typed`.
 
 ### `SourceBinDistributionGenerator` (source_bin_distribution_generator.rs)
-Reads: `sampleVehiclePopulation`, `pollutantProcessModelYear`, `modelYearGroup`, `sourceTypePolProcess`, `sourceTypeModelYear`, `runSpecSourceFuelType`, `fuelUsageFraction`.  
+Reads: `sampleVehiclePopulation`, `pollutantProcessModelYear`, `modelYearGroup`, `sourceTypePolProcess`, `sourceTypeModelYear`, `runSpecSourceFuelType`, `fuelUsageFraction`. 
 Writes: `sourceBin`, `sourceBinDistribution`. Mapped in §7.2.
 
 ---
@@ -327,13 +327,13 @@ Writes: `sourceBin`, `sourceBinDistribution`. Mapped in §7.2.
 
 | Tag | Task | Gates |
 |-----|------|-------|
-| b2-t1 | Add `DataFrameStore` trait + `InMemoryStore` + replace placeholders (`mo-u40zv`) | All |
-| b2-t2 | Typed helpers: `IntoDataFrame`, `iter_typed`, schema registry (`mo-92rst`) | b2-t1 |
-| b2-t3 | Parquet round-trip determinism (`mo-99fn8`) | b2-t2 |
-| b2-t4 | Slow-tier loading via `InputDataManager` (`mo-j7rtx`) | b2-t2 |
-| b2-t5 | Pilot wire: `DistanceCalculator::execute` end-to-end (`mo-ymv41`) | b2-t2 |
-| b2-t6 | Scratch-tier writes with per-chunk ownership (`mo-um3el`) | b2-t4 |
-| b2-t7 | NONROAD data-plane integration (`mo-jshvm`) | b2-t6 |
+| b2-t1 | Add `DataFrameStore` trait + `InMemoryStore` + replace placeholders () | All |
+| b2-t2 | Typed helpers: `IntoDataFrame`, `iter_typed`, schema registry () | b2-t1 |
+| b2-t3 | Parquet round-trip determinism () | b2-t2 |
+| b2-t4 | Slow-tier loading via `InputDataManager` () | b2-t2 |
+| b2-t5 | Pilot wire: `DistanceCalculator::execute` end-to-end () | b2-t2 |
+| b2-t6 | Scratch-tier writes with per-chunk ownership () | b2-t4 |
+| b2-t7 | NONROAD data-plane integration () | b2-t6 |
 
 ---
 

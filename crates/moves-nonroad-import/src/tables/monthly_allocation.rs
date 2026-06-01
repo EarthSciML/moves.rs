@@ -1,14 +1,14 @@
-//! `nrmonthallocation` importer (the Phase 4 "monthly throttle").
+//! `nrmonthallocation` importer (the "monthly throttle").
 //!
 //! Schema mirrors `CreateNRDefault.sql`:
 //!
 //! ```sql
 //! CREATE TABLE NRMonthAllocation (
-//!   NREquipTypeID smallint(6) NOT NULL,
-//!   stateID       smallint(6) NOT NULL,
-//!   monthID       smallint(6) NOT NULL,
-//!   monthFraction float       NOT NULL,
-//!   PRIMARY KEY (NREquipTypeID, stateID, monthID)
+//! NREquipTypeID smallint(6) NOT NULL,
+//! stateID smallint(6) NOT NULL,
+//! monthID smallint(6) NOT NULL,
+//! monthFraction float NOT NULL,
+//! PRIMARY KEY (NREquipTypeID, stateID, monthID)
 //! )
 //! ```
 //!
@@ -18,10 +18,10 @@
 //! * `stateID` is `[1, 99]`.
 //! * `monthFraction` is `[0, 1]` per cell.
 //! * **Cross-row invariant:** the per-`(NREquipTypeID, stateID)` sum of
-//!   `monthFraction` must equal 1.0 within 1e-3. NEIQA flags violations
-//!   of this invariant as a warning; we promote it to a hard error
-//!   because downstream apportionment quietly miscounts when the sum
-//!   drifts.
+//! `monthFraction` must equal 1.0 within 1e-3. NEIQA flags violations
+//! of this invariant as a warning; we promote it to a hard error
+//! because downstream apportionment quietly miscounts when the sum
+//! drifts.
 
 use arrow::datatypes::DataType;
 

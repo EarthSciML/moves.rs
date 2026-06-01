@@ -1,5 +1,5 @@
 //! Port of `WellToPumpProcessor.java` and `database/WellToPumpCalculator.sql`
-//! — migration plan Phase 3, Task 69.
+//! .
 //!
 //! `WellToPumpProcessor` computes **well-to-pump (upstream) Total Energy
 //! Consumption** — the energy spent extracting, refining and distributing the
@@ -14,9 +14,9 @@
 //! `CalculatorInfo.txt`, and `characterization/calculator-chains/calculator-dag.json`
 //! records `WellToPumpProcessor` with `registrations_count: 0`,
 //! `subscriptions: []` and `depends_on: []`. The modern base-rate engine
-//! (`BaseRateCalculator`, migration-plan Task 45) absorbed the per-pollutant
-//! scripted-SQL calculators; the migration plan still lists this class as part
-//! of Task 69, so the module ports its algorithm faithfully for reference and
+//! (`BaseRateCalculator`, ) absorbed the per-pollutant
+//! scripted-SQL calculators; the still lists this class as part
+//! of, so the module ports its algorithm faithfully for reference and
 //! cross-validation with [`Calculator::registrations`] returning an empty
 //! slice. See [`super::common`] for the cluster's shared infrastructure.
 //!
@@ -52,7 +52,7 @@
 //! county, year, month, fuel type and pollutant that key the factor table).
 //! This port reproduces that grouping: it accumulates `Σ emissionQuant` per
 //! group and multiplies by the group's factor once, **not** per row — the
-//! distinction is observable in `f64` rounding and matters for `mo-fvuf`
+//! distinction is observable in `f64` rounding and matters for 
 //! validation.
 //!
 //! The output row is stamped with the well-to-pump process (99) and keeps the
@@ -70,25 +70,25 @@
 //! section plus the GREET interpolation and market-share weighting of the
 //! "Extract Data" section (factored into [`super::common`]). Its [`WtpInputs`]
 //! argument is the set of tables the SQL extracts, as plain row vectors; a
-//! future Task 50 (`DataFrameStore`) wiring populates it from the per-run
+//! future (`DataFrameStore`) wiring populates it from the per-run
 //! filtered execution database.
 //!
 //! The Java `doExecute` gates the whole calculator on the RunSpec actually
 //! requesting Total Energy Consumption for Well-To-Pump; that is
 //! execution-gating, reproduced by `calculate` returning no rows on empty
 //! input, matching the `SO2Calculator` precedent. `MOVESRunID` and `SCC` are
-//! pass-through columns left to the Task 50 wiring.
+//! pass-through columns left to the wiring.
 //!
 //! The SQL keys `WTPFactorByFuelType` by the literal context `countyID` and
 //! joins it `wfft.countyID = mwo.countyID`; a master-loop invocation is
 //! single-county, so the join is trivially satisfied and the port carries
 //! `countyID` straight from the energy row, matching `SO2Calculator`.
 //!
-//! # Data plane (Task 50)
+//! # Data plane
 //!
 //! [`Calculator::execute`] receives a [`CalculatorContext`] whose execution
-//! tables and scratch namespace are Phase 2 placeholders until the
-//! `DataFrameStore` lands (migration-plan Task 50), so `execute` cannot yet
+//! tables and scratch namespace are placeholders until the
+//! `DataFrameStore` lands (), so `execute` cannot yet
 //! read `MOVESWorkerOutput` nor write the well-to-pump rows back. The numeric
 //! algorithm is fully ported and unit-tested on
 //! [`calculate`](WellToPumpProcessor::calculate); `execute` is a documented
@@ -134,8 +134,8 @@ struct GroupKey {
     county_id: i32,
     zone_id: i32,
     link_id: i32,
-    /// The well-to-pump factor table's pollutant — 91, Total Energy
-    /// Consumption.
+ /// The well-to-pump factor table's pollutant — 91, Total Energy
+ /// Consumption.
     pollutant_id: i32,
     source_type_id: i32,
     fuel_type_id: i32,
@@ -160,19 +160,19 @@ struct GroupAccumulator {
 pub struct WellToPumpProcessor;
 
 impl WellToPumpProcessor {
-    /// Stable module name — matches the Java class and the chain-DAG entry.
+ /// Stable module name — matches the Java class and the chain-DAG entry.
     pub const NAME: &'static str = CALCULATOR_NAME;
 
-    /// Compute the well-to-pump Total Energy Consumption rows — the port of
-    /// `WellToPumpCalculator.sql`.
-    ///
-    /// Returns no rows when the inputs carry no usable energy: an energy
-    /// record contributes only if it is pollutant 91 for a process other than
-    /// Well-To-Pump, its month resolves a month group, and its
-    /// `(year, monthGroup, fuelType)` resolves a well-to-pump factor — every
-    /// SQL join is an `INNER JOIN`. The result is ordered by its `GROUP BY`
-    /// cell for deterministic output; MOVES leaves `MOVESWorkerOutput`
-    /// physically unordered.
+ /// Compute the well-to-pump Total Energy Consumption rows — the port of
+ /// `WellToPumpCalculator.sql`.
+ ///
+ /// Returns no rows when the inputs carry no usable energy: an energy
+ /// record contributes only if it is pollutant 91 for a process other than
+ /// Well-To-Pump, its month resolves a month group, and its
+ /// `(year, monthGroup, fuelType)` resolves a well-to-pump factor — every
+ /// SQL join is an `INNER JOIN`. The result is ordered by its `GROUP BY`
+ /// cell for deterministic output; MOVES leaves `MOVESWorkerOutput`
+ /// physically unordered.
     #[must_use]
     pub fn calculate(&self, inputs: &WtpInputs) -> Vec<WorkerOutputRow> {
         let factor_table = build_wtp_factor_by_fuel_type(inputs);
@@ -180,20 +180,20 @@ impl WellToPumpProcessor {
 
         let mut groups: BTreeMap<GroupKey, GroupAccumulator> = BTreeMap::new();
         for energy in &inputs.worker_output {
-            // mwo.pollutantID = 91.
+ // mwo.pollutantID = 91.
             if energy.pollutant_id != TOTAL_ENERGY_POLLUTANT_ID {
                 continue;
             }
-            // mwo.processID <> 99 — do not re-process well-to-pump energy.
+ // mwo.processID <> 99 — do not re-process well-to-pump energy.
             if energy.process_id == WELL_TO_PUMP_PROCESS_ID {
                 continue;
             }
-            // INNER JOIN may ON may.monthID = mwo.monthID.
+ // INNER JOIN may ON may.monthID = mwo.monthID.
             let Some(&month_group_id) = month_group.get(&energy.month_id) else {
                 continue;
             };
-            // INNER JOIN wfft ON yearID, monthGroupID, fuelTypeID (countyID is
-            // the trivially-satisfied single-county join).
+ // INNER JOIN wfft ON yearID, monthGroupID, fuelTypeID (countyID is
+ // the trivially-satisfied single-county join).
             let Some(cells) =
                 factor_table.get(&(energy.year_id, month_group_id, energy.fuel_type_id))
             else {
@@ -240,8 +240,8 @@ impl WellToPumpProcessor {
                 fuel_type_id: key.fuel_type_id,
                 model_year_id: key.model_year_id,
                 road_type_id: key.road_type_id,
-                // SUM(mwo.emissionQuant) * wfft.WTPFactor — the factor
-                // multiplies the summed energy, not each row.
+ // SUM(mwo.emissionQuant) * wfft.WTPFactor — the factor
+ // multiplies the summed energy, not each row.
                 emission_quant: accumulator.summed_energy * accumulator.factor,
             })
             .collect()
@@ -273,15 +273,15 @@ impl Calculator for WellToPumpProcessor {
         Self::NAME
     }
 
-    /// `WellToPumpProcessor` is a chained calculator: it does not subscribe to
-    /// the MasterLoop directly. `calculator-dag.json` records
-    /// `subscribes_directly: false` and an empty `subscriptions` list.
+ /// `WellToPumpProcessor` is a chained calculator: it does not subscribe to
+ /// the MasterLoop directly. `calculator-dag.json` records
+ /// `subscribes_directly: false` and an empty `subscriptions` list.
     fn subscriptions(&self) -> &[CalculatorSubscription] {
         NO_SUBSCRIPTIONS
     }
 
-    /// Empty — `WellToPumpProcessor` is superseded by `BaseRateCalculator` and
-    /// registers no `(pollutant, process)` pairs; see the module-level note.
+ /// Empty — `WellToPumpProcessor` is superseded by `BaseRateCalculator` and
+ /// registers no `(pollutant, process)` pairs; see the module-level note.
     fn registrations(&self) -> &[PollutantProcessAssociation] {
         NO_REGISTRATIONS
     }
@@ -329,9 +329,9 @@ mod tests {
         YearRow,
     };
 
-    /// Build a one-formulation / one-energy-row input. The well-to-pump factor
-    /// is `100.0 × 1.0 = 100.0` (rate × market share) and the single energy
-    /// record is `200.0`, so the one output row is `200.0 × 100.0 = 20000.0`.
+ /// Build a one-formulation / one-energy-row input. The well-to-pump factor
+ /// is `100.0 × 1.0 = 100.0` (rate × market share) and the single energy
+ /// record is `200.0`, so the one output row is `200.0 × 100.0 = 20000.0`.
     fn minimal_inputs() -> WtpInputs {
         WtpInputs {
             greet: vec![GreetWellToPumpRow {
@@ -395,7 +395,7 @@ mod tests {
         let rows = WellToPumpProcessor.calculate(&minimal_inputs());
         assert_eq!(rows.len(), 1);
         let r = rows[0];
-        // Dimension cell carried straight from the energy row.
+ // Dimension cell carried straight from the energy row.
         assert_eq!(r.year_id, 2020);
         assert_eq!(r.month_id, 1);
         assert_eq!(r.county_id, 26_161);
@@ -403,18 +403,18 @@ mod tests {
         assert_eq!(r.fuel_type_id, 2);
         assert_eq!(r.model_year_id, 2018);
         assert_eq!(r.road_type_id, 4);
-        // Pollutant stays 91 (Total Energy); process is stamped 99.
+ // Pollutant stays 91 (Total Energy); process is stamped 99.
         assert_eq!(r.pollutant_id, 91);
         assert_eq!(r.process_id, 99);
-        // 200.0 × (100.0 × 1.0).
+ // 200.0 × (100.0 × 1.0).
         assert_close(r.emission_quant, 20_000.0);
     }
 
     #[test]
     fn calculate_sums_energy_across_source_processes() {
-        // Two energy records, processes 1 and 2, same dimension cell — the
-        // GROUP BY omits processID, so they collapse into one output row and
-        // the factor multiplies the *sum*.
+ // Two energy records, processes 1 and 2, same dimension cell — the
+ // GROUP BY omits processID, so they collapse into one output row and
+ // the factor multiplies the *sum*.
         let mut inputs = minimal_inputs();
         inputs.worker_output.push(WorkerOutputRow {
             process_id: 2,
@@ -423,13 +423,13 @@ mod tests {
         });
         let rows = WellToPumpProcessor.calculate(&inputs);
         assert_eq!(rows.len(), 1);
-        // (200.0 + 50.0) × 100.0.
+ // (200.0 + 50.0) × 100.0.
         assert_close(rows[0].emission_quant, 25_000.0);
     }
 
     #[test]
     fn calculate_excludes_well_to_pump_process_input() {
-        // An energy record already on process 99 must not be re-processed.
+ // An energy record already on process 99 must not be re-processed.
         let mut inputs = minimal_inputs();
         inputs.worker_output[0].process_id = 99;
         assert!(WellToPumpProcessor.calculate(&inputs).is_empty());
@@ -437,8 +437,8 @@ mod tests {
 
     #[test]
     fn calculate_ignores_non_energy_rows() {
-        // A record whose pollutant is not Total Energy Consumption (91) is not
-        // a well-to-pump input.
+ // A record whose pollutant is not Total Energy Consumption (91) is not
+ // a well-to-pump input.
         let mut inputs = minimal_inputs();
         inputs.worker_output[0].pollutant_id = 2;
         assert!(WellToPumpProcessor.calculate(&inputs).is_empty());
@@ -446,8 +446,8 @@ mod tests {
 
     #[test]
     fn calculate_drops_energy_without_a_month_group() {
-        // The energy record's month is absent from MonthOfAnyYear — the inner
-        // join drops it.
+ // The energy record's month is absent from MonthOfAnyYear — the inner
+ // join drops it.
         let mut inputs = minimal_inputs();
         inputs.month_of_any_year.clear();
         assert!(WellToPumpProcessor.calculate(&inputs).is_empty());
@@ -455,7 +455,7 @@ mod tests {
 
     #[test]
     fn calculate_drops_energy_without_a_factor() {
-        // No fuel supply → no well-to-pump factor for the energy cell.
+ // No fuel supply → no well-to-pump factor for the energy cell.
         let mut inputs = minimal_inputs();
         inputs.fuel_supply.clear();
         assert!(WellToPumpProcessor.calculate(&inputs).is_empty());
@@ -463,7 +463,7 @@ mod tests {
 
     #[test]
     fn calculate_separates_distinct_dimension_cells() {
-        // Two energy records on distinct links yield two output rows.
+ // Two energy records on distinct links yield two output rows.
         let mut inputs = minimal_inputs();
         inputs.worker_output.push(WorkerOutputRow {
             link_id: 9999,
@@ -472,7 +472,7 @@ mod tests {
         });
         let rows = WellToPumpProcessor.calculate(&inputs);
         assert_eq!(rows.len(), 2);
-        // BTreeMap ordering: link 5001 before 9999.
+ // BTreeMap ordering: link 5001 before 9999.
         assert_eq!(rows[0].link_id, 5001);
         assert_eq!(rows[1].link_id, 9999);
         assert_close(rows[0].emission_quant, 20_000.0);
@@ -494,19 +494,19 @@ mod tests {
 
     #[test]
     fn calculator_is_chained_with_no_subscriptions() {
-        // calculator-dag.json: subscribes_directly false, subscriptions [].
+ // calculator-dag.json: subscribes_directly false, subscriptions [].
         assert!(WellToPumpProcessor.subscriptions().is_empty());
     }
 
     #[test]
     fn registrations_are_empty_because_the_process_is_unwired() {
-        // Process 99 has no Registration directive; dag registrations_count 0.
+ // Process 99 has no Registration directive; dag registrations_count 0.
         assert!(WellToPumpProcessor.registrations().is_empty());
     }
 
     #[test]
     fn upstream_is_empty() {
-        // The unwired process leaves the DAG depends_on empty.
+ // The unwired process leaves the DAG depends_on empty.
         assert!(WellToPumpProcessor.upstream().is_empty());
     }
 

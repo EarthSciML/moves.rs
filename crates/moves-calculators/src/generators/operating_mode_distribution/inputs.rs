@@ -5,7 +5,7 @@
 //!
 //! Each struct is the Rust analogue of one MySQL table referenced by the
 //! `SELECT` statements in `OperatingModeDistributionGenerator.java`. Once the
-//! Task 50 data plane lands, [`Generator::execute`] builds an [`OmdgInputs`]
+//! data plane lands, [`Generator::execute`] builds an [`OmdgInputs`]
 //! view from `ctx.tables()`; until then the pipeline functions in
 //! [`super::pipeline`] take an [`OmdgInputs`] directly so the numerically
 //! faithful algorithm can be exercised by unit tests.
@@ -30,9 +30,9 @@ use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Seri
 /// compares against `avgSpeedBin.avgBinSpeed`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DriveScheduleRow {
-    /// `driveScheduleID`.
+ /// `driveScheduleID`.
     pub drive_schedule_id: i16,
-    /// `averageSpeed` — the cycle's mean speed, mph.
+ /// `averageSpeed` — the cycle's mean speed, mph.
     pub average_speed: f64,
 }
 
@@ -46,13 +46,13 @@ pub struct DriveScheduleRow {
 /// [`validate_drive_schedule_distribution`]: super::pipeline::validate_drive_schedule_distribution
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DriveScheduleAssocRow {
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: SourceTypeId,
-    /// `roadTypeID`.
+ /// `roadTypeID`.
     pub road_type_id: RoadTypeId,
-    /// `driveScheduleID`.
+ /// `driveScheduleID`.
     pub drive_schedule_id: i16,
-    /// `isRamp = 'Y'` — a ramp driving cycle.
+ /// `isRamp = 'Y'` — a ramp driving cycle.
     pub is_ramp: bool,
 }
 
@@ -62,11 +62,11 @@ pub struct DriveScheduleAssocRow {
 /// miles per hour; the VSP step converts it to metres per second.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DriveScheduleSecondRow {
-    /// `driveScheduleID`.
+ /// `driveScheduleID`.
     pub drive_schedule_id: i16,
-    /// `second` — the elapsed-time index within the cycle.
+ /// `second` — the elapsed-time index within the cycle.
     pub second: i16,
-    /// `speed` — instantaneous speed at this second, mph.
+ /// `speed` — instantaneous speed at this second, mph.
     pub speed: f64,
 }
 
@@ -75,9 +75,9 @@ pub struct DriveScheduleSecondRow {
 /// Java: `AvgSpeedBin (avgSpeedBinID, avgBinSpeed)`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AvgSpeedBinRow {
-    /// `avgSpeedBinID`.
+ /// `avgSpeedBinID`.
     pub avg_speed_bin_id: i16,
-    /// `avgBinSpeed` — the bin's nominal average speed, mph.
+ /// `avgBinSpeed` — the bin's nominal average speed, mph.
     pub avg_bin_speed: f64,
 }
 
@@ -88,16 +88,16 @@ pub struct AvgSpeedBinRow {
 /// avgSpeedBinID, avgSpeedFraction)`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AvgSpeedDistributionRow {
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: SourceTypeId,
-    /// `roadTypeID`.
+ /// `roadTypeID`.
     pub road_type_id: RoadTypeId,
-    /// `hourDayID`.
+ /// `hourDayID`.
     pub hour_day_id: i16,
-    /// `avgSpeedBinID`.
+ /// `avgSpeedBinID`.
     pub avg_speed_bin_id: i16,
-    /// `avgSpeedFraction` — fraction of time in this bin (the bin fractions
-    /// for one `(sourceType, roadType, hourDay)` sum to 1).
+ /// `avgSpeedFraction` — fraction of time in this bin (the bin fractions
+ /// for one `(sourceType, roadType, hourDay)` sum to 1).
     pub avg_speed_fraction: f64,
 }
 
@@ -110,15 +110,15 @@ pub struct AvgSpeedDistributionRow {
 /// `result.wasNull()` handling, which omits the corresponding `WHERE` clause.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OperatingModeRow {
-    /// `opModeID`. The op-mode-binning step considers only `1 < opModeID < 100`.
+ /// `opModeID`. The op-mode-binning step considers only `1 < opModeID < 100`.
     pub op_mode_id: i16,
-    /// `VSPLower` — inclusive lower vehicle-specific-power bound, or `None`.
+ /// `VSPLower` — inclusive lower vehicle-specific-power bound, or `None`.
     pub vsp_lower: Option<f64>,
-    /// `VSPUpper` — exclusive upper vehicle-specific-power bound, or `None`.
+ /// `VSPUpper` — exclusive upper vehicle-specific-power bound, or `None`.
     pub vsp_upper: Option<f64>,
-    /// `speedLower` — inclusive lower speed bound (mph), or `None`.
+ /// `speedLower` — inclusive lower speed bound (mph), or `None`.
     pub speed_lower: Option<f64>,
-    /// `speedUpper` — exclusive upper speed bound (mph), or `None`.
+ /// `speedUpper` — exclusive upper speed bound (mph), or `None`.
     pub speed_upper: Option<f64>,
 }
 
@@ -131,37 +131,37 @@ pub struct OperatingModeRow {
 /// distribution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OpModePolProcAssocRow {
-    /// `polProcessID`.
+ /// `polProcessID`.
     pub pol_process_id: PolProcessId,
-    /// `opModeID`.
+ /// `opModeID`.
     pub op_mode_id: i16,
 }
 
 /// One `sourceUseTypePhysicsMapping` row — the road-load polynomial terms a
 /// source type carries into the VSP calculation.
 ///
-/// Built by `SourceTypePhysics` (migration-plan Task 37) and consumed here as
+/// Built by `SourceTypePhysics` () and consumed here as
 /// an input. `real_source_type_id` is the traditional source type;
 /// `temp_source_type_id` is a temporary source type carved out for a
 /// model-year-range / regulatory-class split (equal to `real_source_type_id`
 /// for the identity mapping every source type always receives).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PhysicsMappingRow {
-    /// `realSourceTypeID`.
+ /// `realSourceTypeID`.
     pub real_source_type_id: SourceTypeId,
-    /// `tempSourceTypeID` — unique per row.
+ /// `tempSourceTypeID` — unique per row.
     pub temp_source_type_id: SourceTypeId,
-    /// `rollingTermA` — rolling-resistance term of the road-load polynomial.
+ /// `rollingTermA` — rolling-resistance term of the road-load polynomial.
     pub rolling_term_a: f64,
-    /// `rotatingTermB` — rotating-mass term of the road-load polynomial.
+ /// `rotatingTermB` — rotating-mass term of the road-load polynomial.
     pub rotating_term_b: f64,
-    /// `dragTermC` — aerodynamic-drag term of the road-load polynomial.
+ /// `dragTermC` — aerodynamic-drag term of the road-load polynomial.
     pub drag_term_c: f64,
-    /// `sourceMass` — vehicle mass used in the VSP calculation. The Java VSP
-    /// `SELECT` joins `sourceMass <> 0`, so a zero-mass mapping contributes
-    /// no VSP rows.
+ /// `sourceMass` — vehicle mass used in the VSP calculation. The Java VSP
+ /// `SELECT` joins `sourceMass <> 0`, so a zero-mass mapping contributes
+ /// no VSP rows.
     pub source_mass: f64,
-    /// `fixedMassFactor` — the VSP denominator.
+ /// `fixedMassFactor` — the VSP denominator.
     pub fixed_mass_factor: f64,
 }
 
@@ -173,9 +173,9 @@ pub struct PhysicsMappingRow {
 /// pollutant/process and copies it onto the represented one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PolProcessRepresentedRow {
-    /// `polProcessID` — the represented pollutant/process.
+ /// `polProcessID` — the represented pollutant/process.
     pub pol_process_id: PolProcessId,
-    /// `representingPolProcessID` — whose distribution is copied onto it.
+ /// `representingPolProcessID` — whose distribution is copied onto it.
     pub representing_pol_process_id: PolProcessId,
 }
 
@@ -187,35 +187,35 @@ pub struct PolProcessRepresentedRow {
 /// `RunSpecHour`, `RunSpecDay` and `HourDay`.
 #[derive(Debug, Clone, Copy)]
 pub struct OmdgInputs<'a> {
-    /// `DriveSchedule` — driving cycles and their average speeds.
+ /// `DriveSchedule` — driving cycles and their average speeds.
     pub drive_schedule: &'a [DriveScheduleRow],
-    /// `DriveScheduleAssoc` — driving cycles per `(sourceType, roadType)`.
+ /// `DriveScheduleAssoc` — driving cycles per `(sourceType, roadType)`.
     pub drive_schedule_assoc: &'a [DriveScheduleAssocRow],
-    /// `DriveScheduleSecond` — the per-second speed trace of each cycle.
+ /// `DriveScheduleSecond` — the per-second speed trace of each cycle.
     pub drive_schedule_second: &'a [DriveScheduleSecondRow],
-    /// `AvgSpeedBin` — average-speed bins and their nominal speeds.
+ /// `AvgSpeedBin` — average-speed bins and their nominal speeds.
     pub avg_speed_bin: &'a [AvgSpeedBinRow],
-    /// `AvgSpeedDistribution` — time fraction per average-speed bin.
+ /// `AvgSpeedDistribution` — time fraction per average-speed bin.
     pub avg_speed_distribution: &'a [AvgSpeedDistributionRow],
-    /// `OperatingMode` — the VSP / speed bounds of each operating mode.
+ /// `OperatingMode` — the VSP / speed bounds of each operating mode.
     pub operating_mode: &'a [OperatingModeRow],
-    /// `OpModePolProcAssoc` — operating modes per pollutant/process.
+ /// `OpModePolProcAssoc` — operating modes per pollutant/process.
     pub op_mode_pol_proc_assoc: &'a [OpModePolProcAssocRow],
-    /// `sourceUseTypePhysicsMapping` — road-load polynomial terms.
+ /// `sourceUseTypePhysicsMapping` — road-load polynomial terms.
     pub physics_mapping: &'a [PhysicsMappingRow],
-    /// `OMDGPolProcessRepresented` — represented-pollutant/process mappings.
+ /// `OMDGPolProcessRepresented` — represented-pollutant/process mappings.
     pub pol_process_represented: &'a [PolProcessRepresentedRow],
-    /// `RunSpecSourceType.sourceTypeID` — the RunSpec's selected source types.
+ /// `RunSpecSourceType.sourceTypeID` — the RunSpec's selected source types.
     pub run_spec_source_type: &'a [SourceTypeId],
-    /// `RunSpecRoadType.roadTypeID` — the RunSpec's selected road types.
+ /// `RunSpecRoadType.roadTypeID` — the RunSpec's selected road types.
     pub run_spec_road_type: &'a [RoadTypeId],
-    /// The RunSpec's selected `hourDayID`s (`RunSpecHour` × `RunSpecDay`
-    /// joined through `HourDay`).
+ /// The RunSpec's selected `hourDayID`s (`RunSpecHour` × `RunSpecDay`
+ /// joined through `HourDay`).
     pub run_spec_hour_day: &'a [i16],
 }
 
 // ============================================================================
-// Data-plane wiring (Task 50) — TableRow impls for all input row types.
+// Data-plane wiring — TableRow impls for all input row types.
 // ============================================================================
 
 /// Build a [`Error::RowExtraction`] for a missing/bad cell.
@@ -348,9 +348,8 @@ impl TableRow for DriveScheduleAssocRow {
             .map_err(|e| row_err(t, 0, "driveScheduleID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "driveScheduleID", e.to_string()))?;
-        // `isRamp` defaults to 'N' (non-ramp) in MOVES, and some snapshots omit
-        // the column entirely. Treat an absent column — and any NULL within it —
-        // as non-ramp, matching the MOVES default rather than erroring.
+ // `isRamp` defaults to 'N' (non-ramp) in MOVES, and some snapshots omit
+ // the column entirely. Treat an absent column — and any NULL within it // as non-ramp, matching the MOVES default rather than erroring.
         let is_ramp = df
             .column("isRamp")
             .ok()

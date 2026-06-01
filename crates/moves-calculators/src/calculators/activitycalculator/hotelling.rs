@@ -11,10 +11,10 @@
 //! fuel type and `hotellingActivityDistribution` on a model-year range:
 //!
 //! * [`extended_idle_hours`] keeps `opModeID = 200`, emitting `activityTypeID`
-//!   3 (extended idle).
+//! 3 (extended idle).
 //! * [`hotelling_hours`] keeps `opModeID ∈ {201, 203, 204}`, emitting
-//!   `activityTypeID` 13 / 14 / 15 (hotelling diesel-aux / battery-or-AC /
-//!   engines-off).
+//! `activityTypeID` 13 / 14 / 15 (hotelling diesel-aux / battery-or-AC /
+//! engines-off).
 //!
 //! Only the `WithRegClassID` script variant is ported — see the
 //! [module docs](super).
@@ -63,14 +63,14 @@ where
     let ctx = &inputs.context;
     let mut out = Vec::new();
     for s in &inputs.hotelling_hours {
-        // INNER JOIN HourDay h.
+ // INNER JOIN HourDay h.
         let Some(h) = hour_day.get(&s.hour_day_id) else {
             continue;
         };
         let model_year_id = s.year_id - s.age_id;
-        // INNER JOIN RegClassSourceTypeFraction stf — keyed by the activity
-        // row's own fuel type. Phrased as `FuelRegClassWeight`s with that
-        // fixed fuel type so [`weighted`] can complete the rows.
+ // INNER JOIN RegClassSourceTypeFraction stf — keyed by the activity
+ // row's own fuel type. Phrased as `FuelRegClassWeight`s with that
+ // fixed fuel type so [`weighted`] can complete the rows.
         let reg_weights: Vec<FuelRegClassWeight> = reg
             .reg_classes(s.source_type_id, s.fuel_type_id, model_year_id)
             .iter()
@@ -83,9 +83,9 @@ where
         if reg_weights.is_empty() {
             continue;
         }
-        // INNER JOIN hotellingActivityDistribution ha — same fuel type, an
-        // op mode the section processes, and a model-year range covering the
-        // row's model year.
+ // INNER JOIN hotellingActivityDistribution ha — same fuel type, an
+ // op mode the section processes, and a model-year range covering the
+ // row's model year.
         let Some(candidates) = dist.get(&s.fuel_type_id) else {
             continue;
         };
@@ -146,8 +146,8 @@ pub fn hotelling_hours(inputs: &ActivityInputs, reg: &RegClassIndex) -> Vec<Acti
             201 => 13,
             203 => 14,
             204 => 15,
-            // The SQL `CASE` falls through to 8; unreachable here because the
-            // `opModeID IN (201,203,204)` join already excluded everything else.
+ // The SQL `CASE` falls through to 8; unreachable here because the
+ // `opModeID IN (201,203,204)` join already excluded everything else.
             _ => 8,
         },
     )
@@ -173,8 +173,8 @@ mod tests {
         }
     }
 
-    /// One diesel (fuelType 2) hotelling-hours row, model year 2015, with a
-    /// single regulatory class covering the whole bin.
+ /// One diesel (fuelType 2) hotelling-hours row, model year 2015, with a
+ /// single regulatory class covering the whole bin.
     fn base_inputs() -> ActivityInputs {
         ActivityInputs {
             context: ctx(),
@@ -215,7 +215,7 @@ mod tests {
                 fuel_type_id: 2,
                 op_mode_fraction: 0.25,
             },
-            // opMode 201 is a hotelling mode — extended idle must ignore it.
+ // opMode 201 is a hotelling mode — extended idle must ignore it.
             HotellingActivityDistributionRow {
                 op_mode_id: 201,
                 begin_model_year_id: 1990,
@@ -228,7 +228,7 @@ mod tests {
         let rows = extended_idle_hours(&inputs, &reg);
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].activity_type_id, 3);
-        // 200 hotelling hours * 0.25 op-mode fraction * 1.0 reg-class fraction.
+ // 200 hotelling hours * 0.25 op-mode fraction * 1.0 reg-class fraction.
         assert!((rows[0].activity - 50.0).abs() < 1e-9);
         assert_eq!(rows[0].fuel_type_id, 2);
         assert_eq!(rows[0].model_year_id, 2015);
@@ -259,7 +259,7 @@ mod tests {
                 fuel_type_id: 2,
                 op_mode_fraction: 0.2,
             },
-            // opMode 200 is extended idle — the hotelling section ignores it.
+ // opMode 200 is extended idle — the hotelling section ignores it.
             HotellingActivityDistributionRow {
                 op_mode_id: 200,
                 begin_model_year_id: 1990,
@@ -283,7 +283,7 @@ mod tests {
     #[test]
     fn model_year_outside_the_distribution_range_is_dropped() {
         let mut inputs = base_inputs();
-        // Row model year is 2015; this range starts in 2018.
+ // Row model year is 2015; this range starts in 2018.
         inputs.hotelling_activity_distribution = vec![HotellingActivityDistributionRow {
             op_mode_id: 200,
             begin_model_year_id: 2018,
@@ -298,7 +298,7 @@ mod tests {
     #[test]
     fn fuel_type_mismatch_drops_the_distribution_join() {
         let mut inputs = base_inputs();
-        // Distribution is for gasoline (fuelType 1); the row is diesel (2).
+ // Distribution is for gasoline (fuelType 1); the row is diesel (2).
         inputs.hotelling_activity_distribution = vec![HotellingActivityDistributionRow {
             op_mode_id: 200,
             begin_model_year_id: 1990,

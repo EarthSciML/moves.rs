@@ -3,9 +3,9 @@
 //! FIPS shape, finite-or-positive-emissions invariants, and expected
 //! `dispatch_calls` per test.
 //!
-//! Validates the acceptance criteria from bead mo-dj10l:
+//! Validates the acceptance criteria from work item :
 //! - All six dispatch variants (County, State→County, State←National,
-//!   National→State, US-Total, Subcounty) have a passing test.
+//! National→State, US-Total, Subcounty) have a passing test.
 //! - Each test name tags the dispatch variant.
 //! - `outputs.counters.dispatch_calls` matches the expected count per test.
 //! - No test relies on `RMISS` sentinels (negative tests are separate).
@@ -250,7 +250,7 @@ fn us_total_reference(scc: &str) -> ReferenceData {
 
 /// Existing county pilot: one county record → non-zero emissions.
 ///
-/// Validates mo-peoe4 acceptance criteria: row count >= 1, FIPS == "06037",
+/// Validates acceptance criteria: row count >= 1, FIPS == "06037",
 /// geography_skips == 0, at least one positive emission.
 #[test]
 fn county_one_scc_produces_nonzero_emissions() {
@@ -430,7 +430,7 @@ fn national_dispatch_allocates_population_to_state() {
             median_life: 0.0,
         }],
     );
-    // national records ("00000") are always selected; no region filter required
+ // national records ("00000") are always selected; no region filter required
 
     let mut opts = NonroadOptions::new(RegionLevel::Nation, 2020);
     opts.growth_loaded = true;
@@ -504,8 +504,7 @@ fn us_total_dispatch_produces_us_total_row() {
 /// Subcounty allocation tables (NR*.SCO) are not yet loadable, so
 /// `process_subcounty` cannot run to completion via `ProductionExecutor`.
 /// This test uses `PlanRecordingExecutor` to verify dispatch routing:
-/// a whole-county `region_list` entry triggers exactly two calls —
-/// `Dispatch::County` then `Dispatch::Subcounty`.
+/// a whole-county `region_list` entry triggers exactly two calls/// `Dispatch::County` then `Dispatch::Subcounty`.
 ///
 /// dispatch_calls == 2, dispatches[0] == County, dispatches[1] == Subcounty.
 #[test]
@@ -528,9 +527,9 @@ fn subcounty_region_list_routes_to_county_and_subcounty_dispatch() {
     );
     inputs.regions = RunRegions {
         selected_counties: vec!["06037".into()],
-        // A whole-county entry (exact 5-char match) triggers both
-        // Dispatch::County and Dispatch::Subcounty per subcounty_dispatch
-        // in driver/run.rs.
+ // A whole-county entry (exact 5-char match) triggers both
+ // Dispatch::County and Dispatch::Subcounty per subcounty_dispatch
+ // in driver/run.rs.
         region_list: vec!["06037".into()],
         ..RunRegions::default()
     };
@@ -557,7 +556,7 @@ fn subcounty_region_list_routes_to_county_and_subcounty_dispatch() {
 }
 
 // =============================================================================
-// Loaded emission-factor injection (data-plane port, Task 119)
+// Loaded emission-factor injection (data-plane port,)
 // =============================================================================
 
 /// Build a county executor whose single exhaust-tech entry carries a

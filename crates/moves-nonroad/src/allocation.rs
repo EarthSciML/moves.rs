@@ -64,7 +64,7 @@ use crate::{Error, Result};
 /// indicator lookups (parent in `alocty`/`alosta`; child blank
 /// before subcounty assignment in `alosub`).
 ///
-/// Mirrors `subtmp = '     '` in the Fortran source. Callers and
+/// Mirrors `subtmp = ' '` in the Fortran source. Callers and
 /// indicator records must use the same marker for state-level
 /// lookups to match.
 pub const STATE_LEVEL_SUBCOUNTY: &str = "";
@@ -76,14 +76,14 @@ pub const STATE_LEVEL_SUBCOUNTY: &str = "";
 /// `lctlev` (county-has-county-level-records flag).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CountyDescriptor {
-    /// 5-character county FIPS code.
+ /// 5-character county FIPS code.
     pub fips: String,
-    /// `true` iff the county is requested for the current run
-    /// (Fortran `lfipcd`).
+ /// `true` iff the county is requested for the current run
+ /// (Fortran `lfipcd`).
     pub selected: bool,
-    /// `true` iff the county has its own county-level population
-    /// records and therefore should not be allocated from the state
-    /// total (Fortran `lctlev`).
+ /// `true` iff the county has its own county-level population
+ /// records and therefore should not be allocated from the state
+ /// total (Fortran `lctlev`).
     pub has_county_records: bool,
 }
 
@@ -94,14 +94,14 @@ pub struct CountyDescriptor {
 /// (state-has-state-level-records flag).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StateDescriptor {
-    /// 5-character state FIPS code, e.g. `"17000"` for Illinois.
+ /// 5-character state FIPS code, e.g. `"17000"` for Illinois.
     pub fips: String,
-    /// `true` iff the state is requested for the current run
-    /// (Fortran `lstacd`).
+ /// `true` iff the state is requested for the current run
+ /// (Fortran `lstacd`).
     pub selected: bool,
-    /// `true` iff the state has its own state-level records and
-    /// therefore should not be allocated from the national total
-    /// (Fortran `lstlev`).
+ /// `true` iff the state has its own state-level records and
+ /// therefore should not be allocated from the national total
+ /// (Fortran `lstlev`).
     pub has_state_records: bool,
 }
 
@@ -118,15 +118,15 @@ pub struct StateDescriptor {
 /// the growth state from this entry."
 #[derive(Debug, Clone, PartialEq)]
 pub struct CountyAllocation {
-    /// County FIPS code (copied from [`CountyDescriptor::fips`]).
+ /// County FIPS code (copied from [`CountyDescriptor::fips`]).
     pub fips: String,
-    /// Allocated county population (`popcty(idxfip)` in `alocty.f`).
-    /// Always zero when the county was skipped.
+ /// Allocated county population (`popcty(idxfip)` in `alocty.f`).
+ /// Always zero when the county was skipped.
     pub population: f32,
-    /// Growth factor to store in the county slot
-    /// (`grwcty(idxfip) = growth` at `alocty.f` :145), or `None`
-    /// when the county was skipped and the caller should leave any
-    /// pre-existing growth value alone.
+ /// Growth factor to store in the county slot
+ /// (`grwcty(idxfip) = growth` at `alocty.f` :145), or `None`
+ /// when the county was skipped and the caller should leave any
+ /// pre-existing growth value alone.
     pub growth: Option<f32>,
 }
 
@@ -136,13 +136,13 @@ pub struct CountyAllocation {
 /// non-skipped states (`alosta.f` :106 / :140).
 #[derive(Debug, Clone, PartialEq)]
 pub struct StateAllocation {
-    /// State FIPS code (copied from [`StateDescriptor::fips`]).
+ /// State FIPS code (copied from [`StateDescriptor::fips`]).
     pub fips: String,
-    /// Allocated state population (`popsta(idxsta)` in `alosta.f`).
-    /// Always zero when the state was skipped.
+ /// Allocated state population (`popsta(idxsta)` in `alosta.f`).
+ /// Always zero when the state was skipped.
     pub population: f32,
-    /// Growth factor (`grwsta(idxsta)` in `alosta.f`), or `None`
-    /// when the state was skipped.
+ /// Growth factor (`grwsta(idxsta)` in `alosta.f`), or `None`
+ /// when the state was skipped.
     pub growth: Option<f32>,
 }
 
@@ -150,12 +150,12 @@ pub struct StateAllocation {
 /// output pair of `alosub.f`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SubcountyAllocation {
-    /// Subcounty identifier, after left-justification (Fortran
-    /// `subtmp = subreg; lftjst(subtmp)` at `alosub.f` :114).
+ /// Subcounty identifier, after left-justification (Fortran
+ /// `subtmp = subreg; lftjst(subtmp)` at `alosub.f` :114).
     pub subcounty: String,
-    /// Allocated subcounty population (`popsub` in `alosub.f`).
+ /// Allocated subcounty population (`popsub` in `alosub.f`).
     pub population: f32,
-    /// Growth factor (`grwsub` in `alosub.f`).
+ /// Growth factor (`grwsub` in `alosub.f`).
     pub growth: f32,
 }
 
@@ -165,12 +165,12 @@ pub struct SubcountyAllocation {
 /// For each indicator code in `record`:
 ///
 /// 1. The state-level indicator value is looked up at `state_fips`
-///    with [`STATE_LEVEL_SUBCOUNTY`] (`valsta` in the Fortran).
+/// with [`STATE_LEVEL_SUBCOUNTY`] (`valsta` in the Fortran).
 /// 2. For each selected county, the county-level value is looked up
-///    at the county's FIPS with [`STATE_LEVEL_SUBCOUNTY`] (`valcty`).
+/// at the county's FIPS with [`STATE_LEVEL_SUBCOUNTY`] (`valcty`).
 /// 3. The county receives `state_population * Σ_i (valcty[i] /
-///    valsta[i]) * coeff[i]`, summed over slots with
-///    `valsta[i] > 0` (`alocty.f` :137–:140).
+/// valsta[i]) * coeff[i]`, summed over slots with
+/// `valsta[i] > 0` (`alocty.f` :137–:140).
 ///
 /// Counties with `selected = false` or `has_county_records = true`
 /// receive zero population (Fortran `goto 20`, `alocty.f` :116–:117).
@@ -399,8 +399,8 @@ mod tests {
 
     #[test]
     fn allocate_county_splits_state_population_by_indicator_ratio() {
-        // One indicator with coefficient 1.0 → county share is just
-        // the value ratio.
+ // One indicator with coefficient 1.0 → county share is just
+ // the value ratio.
         let record = alo_record("2270002003", &[("POP", 1.0)]);
         let indicators = IndicatorTable::new(vec![
             ind_record("POP", "17000", "", 2020, 1000.0),
@@ -419,9 +419,9 @@ mod tests {
 
     #[test]
     fn allocate_county_multiple_indicators_weighted_sum() {
-        // Two indicators with coefficients summing to 1.
-        // valalo = (cty_pop / sta_pop) * 0.7 + (cty_emp / sta_emp) * 0.3
-        //        = (10/100)*0.7 + (5/20)*0.3 = 0.07 + 0.075 = 0.145
+ // Two indicators with coefficients summing to 1.
+ // valalo = (cty_pop / sta_pop) * 0.7 + (cty_emp / sta_emp) * 0.3
+ // = (10/100)*0.7 + (5/20)*0.3 = 0.07 + 0.075 = 0.145
         let record = alo_record("AAA", &[("POP", 0.7), ("EMP", 0.3)]);
         let indicators = IndicatorTable::new(vec![
             ind_record("POP", "17000", "", 2020, 100.0),
@@ -442,8 +442,8 @@ mod tests {
         let indicators = IndicatorTable::new(vec![
             ind_record("POP", "17000", "", 2020, 100.0),
             ind_record("POP", "17031", "", 2020, 30.0),
-            // No record for 17043 and 17097 — the skip path must not
-            // call the lookup, otherwise we'd see an error.
+ // No record for 17043 and 17097 — the skip path must not
+ // call the lookup, otherwise we'd see an error.
         ]);
         let counties = vec![
             county("17031", true, false),  // computed
@@ -463,8 +463,8 @@ mod tests {
 
     #[test]
     fn allocate_county_drops_terms_with_zero_state_indicator() {
-        // POP exists at 17000 but is 0; EMP is positive. Only EMP
-        // contributes (matching `alocty.f` :137–:140).
+ // POP exists at 17000 but is 0; EMP is positive. Only EMP
+ // contributes (matching `alocty.f` :137–:140).
         let record = alo_record("AAA", &[("POP", 0.5), ("EMP", 0.5)]);
         let indicators = IndicatorTable::new(vec![
             ind_record("POP", "17000", "", 2020, 0.0),
@@ -475,7 +475,7 @@ mod tests {
         let counties = vec![county("17031", true, false)];
         let out =
             allocate_county("17000", &counties, &record, &indicators, 2020, 100.0, 1.0).unwrap();
-        // Only the EMP term: 100 * (5/20) * 0.5 = 12.5
+ // Only the EMP term: 100 * (5/20) * 0.5 = 12.5
         assert!((out[0].population - 12.5).abs() < 1e-4);
     }
 
@@ -483,7 +483,7 @@ mod tests {
     fn allocate_county_missing_state_indicator_errors() {
         let record = alo_record("AAA", &[("POP", 1.0)]);
         let indicators = IndicatorTable::new(vec![
-            // State POP missing entirely.
+ // State POP missing entirely.
             ind_record("POP", "17031", "", 2020, 10.0),
         ]);
         let counties = vec![county("17031", true, false)];
@@ -506,7 +506,7 @@ mod tests {
         let record = alo_record("AAA", &[("POP", 1.0)]);
         let indicators = IndicatorTable::new(vec![
             ind_record("POP", "17000", "", 2020, 100.0),
-            // County 17031 missing.
+ // County 17031 missing.
         ]);
         let counties = vec![county("17031", true, false)];
         let err = allocate_county("17000", &counties, &record, &indicators, 2020, 100.0, 1.0)
@@ -574,7 +574,7 @@ mod tests {
             ind_record("POP", "17031", "", 2020, 100.0),
             ind_record("POP", "17031", "DOWN", 2020, 40.0),
         ]);
-        // Leading whitespace must be stripped before lookup.
+ // Leading whitespace must be stripped before lookup.
         let out =
             allocate_subcounty("17031", "  DOWN", &record, &indicators, 2020, 200.0, 1.0).unwrap();
         assert_eq!(out.subcounty, "DOWN");
@@ -586,7 +586,7 @@ mod tests {
         let record = alo_record("AAA", &[("POP", 1.0)]);
         let indicators = IndicatorTable::new(vec![
             ind_record("POP", "17031", "", 2020, 100.0),
-            // Subcounty DOWN missing.
+ // Subcounty DOWN missing.
         ]);
         let err = allocate_subcounty("17031", "DOWN", &record, &indicators, 2020, 200.0, 1.0)
             .unwrap_err();
@@ -612,13 +612,13 @@ mod tests {
         ]);
         let counties = vec![county("17031", true, false)];
 
-        // Mid-year 2015: closest-earlier rule -> use 2010 records.
+ // Mid-year 2015: closest-earlier rule -> use 2010 records.
         let out =
             allocate_county("17000", &counties, &record, &indicators, 2015, 100.0, 1.0).unwrap();
         let expected = 100.0_f32 * (300.0_f32 / 1000.0); // 30.0
         assert!((out[0].population - expected).abs() < 1e-4);
 
-        // After last year: still 2020.
+ // After last year: still 2020.
         let out =
             allocate_county("17000", &counties, &record, &indicators, 2030, 100.0, 1.0).unwrap();
         let expected = 100.0_f32 * (250.0_f32 / 800.0);
@@ -631,7 +631,7 @@ mod tests {
             compute_alloc_factor(&[0.0, 2.0], &[5.0, 4.0], &[0.5, 0.5]),
             (4.0 / 2.0) * 0.5
         );
-        // Negative parent values also drop.
+ // Negative parent values also drop.
         assert_eq!(
             compute_alloc_factor(&[-1.0, 4.0], &[5.0, 8.0], &[0.5, 0.5]),
             (8.0 / 4.0) * 0.5

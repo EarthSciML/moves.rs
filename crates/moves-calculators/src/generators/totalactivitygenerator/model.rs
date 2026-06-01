@@ -22,13 +22,13 @@
 /// sourceType, age)`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceTypeAgePopulationRow {
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `ageID`.
+ /// `ageID`.
     pub age_id: i32,
-    /// `population` — vehicles of this type and age in the year.
+ /// `population` — vehicles of this type and age in the year.
     pub population: f64,
 }
 
@@ -39,11 +39,11 @@ pub struct SourceTypeAgePopulationRow {
 /// One `HPMSVTypePopulation` row — population rolled up to HPMS vehicle type.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HpmsVTypePopulationRow {
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `HPMSVTypeID`.
+ /// `HPMSVTypeID`.
     pub hpms_v_type_id: i32,
-    /// `population` — summed vehicle population for the HPMS type.
+ /// `population` — summed vehicle population for the HPMS type.
     pub population: f64,
 }
 
@@ -51,13 +51,13 @@ pub struct HpmsVTypePopulationRow {
 /// HPMS-type population.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FractionWithinHpmsVTypeRow {
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `ageID`.
+ /// `ageID`.
     pub age_id: i32,
-    /// `fraction` — `population / HPMSVTypePopulation.population`.
+ /// `fraction` — `population / HPMSVTypePopulation.population`.
     pub fraction: f64,
 }
 
@@ -65,11 +65,11 @@ pub struct FractionWithinHpmsVTypeRow {
 /// an HPMS vehicle type.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HpmsTravelFractionRow {
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `HPMSVTypeID`.
+ /// `HPMSVTypeID`.
     pub hpms_v_type_id: i32,
-    /// `fraction` — `sum(FractionWithinHPMSVType * relativeMAR)`.
+ /// `fraction` — `sum(FractionWithinHPMSVType * relativeMAR)`.
     pub fraction: f64,
 }
 
@@ -77,14 +77,14 @@ pub struct HpmsTravelFractionRow {
 /// to a `(sourceType, age)`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TravelFractionRow {
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `ageID`.
+ /// `ageID`.
     pub age_id: i32,
-    /// `fraction` — `(FractionWithinHPMSVType * relativeMAR) /
-    /// HPMSTravelFraction`.
+ /// `fraction` — `(FractionWithinHPMSVType * relativeMAR) /
+ /// HPMSTravelFraction`.
     pub fraction: f64,
 }
 
@@ -95,11 +95,11 @@ pub struct TravelFractionRow {
 /// One `AnalysisYearVMT` row — VMT grown to the analysis year, by HPMS type.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AnalysisYearVmtRow {
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `HPMSVTypeID`.
+ /// `HPMSVTypeID`.
     pub hpms_v_type_id: i32,
-    /// `VMT` — vehicle miles travelled.
+ /// `VMT` — vehicle miles travelled.
     pub vmt: f64,
 }
 
@@ -111,15 +111,15 @@ pub struct AnalysisYearVmtRow {
 /// sourceType, age)`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AnnualVmtByAgeRoadwayRow {
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `roadTypeID`.
+ /// `roadTypeID`.
     pub road_type_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `ageID`.
+ /// `ageID`.
     pub age_id: i32,
-    /// `VMT` — annual vehicle miles travelled.
+ /// `VMT` — annual vehicle miles travelled.
     pub vmt: f64,
 }
 
@@ -130,23 +130,23 @@ pub struct AnnualVmtByAgeRoadwayRow {
 /// One `VMTByAgeRoadwayHour` row — VMT temporally allocated to an hour.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct VmtByAgeRoadwayHourRow {
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `roadTypeID`.
+ /// `roadTypeID`.
     pub road_type_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `ageID`.
+ /// `ageID`.
     pub age_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `dayID`.
+ /// `dayID`.
     pub day_id: i32,
-    /// `hourID`.
+ /// `hourID`.
     pub hour_id: i32,
-    /// `hourDayID`.
+ /// `hourDayID`.
     pub hour_day_id: i32,
-    /// `VMT` — hourly vehicle miles travelled.
+ /// `VMT` — hourly vehicle miles travelled.
     pub vmt: f64,
 }
 
@@ -154,23 +154,23 @@ pub struct VmtByAgeRoadwayHourRow {
 /// `(roadType, sourceType, month, hour, day)` cell.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct VmtByMyRoadHourFractionRow {
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `roadTypeID`.
+ /// `roadTypeID`.
     pub road_type_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `modelYearID` — derived as `yearID - ageID`.
+ /// `modelYearID` — derived as `yearID - ageID`.
     pub model_year_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `hourID`.
+ /// `hourID`.
     pub hour_id: i32,
-    /// `dayID`.
+ /// `dayID`.
     pub day_id: i32,
-    /// `hourDayID`.
+ /// `hourDayID`.
     pub hour_day_id: i32,
-    /// `vmtFraction` — `VMT / totalVMT` over the model-year cell.
+ /// `vmtFraction` — `VMT / totalVMT` over the model-year cell.
     pub vmt_fraction: f64,
 }
 
@@ -181,15 +181,15 @@ pub struct VmtByMyRoadHourFractionRow {
 /// One `AverageSpeed` row — activity-weighted average speed.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AverageSpeedRow {
-    /// `roadTypeID`.
+ /// `roadTypeID`.
     pub road_type_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `dayID`.
+ /// `dayID`.
     pub day_id: i32,
-    /// `hourID`.
+ /// `hourID`.
     pub hour_id: i32,
-    /// `averageSpeed` — `sum(avgBinSpeed * avgSpeedFraction)` (mph).
+ /// `averageSpeed` — `sum(avgBinSpeed * avgSpeedFraction)` (mph).
     pub average_speed: f64,
 }
 
@@ -197,25 +197,25 @@ pub struct AverageSpeedRow {
 /// was derived from carried alongside.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ShoByAgeRoadwayHourRow {
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `roadTypeID`.
+ /// `roadTypeID`.
     pub road_type_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `ageID`.
+ /// `ageID`.
     pub age_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `dayID`.
+ /// `dayID`.
     pub day_id: i32,
-    /// `hourID`.
+ /// `hourID`.
     pub hour_id: i32,
-    /// `hourDayID`.
+ /// `hourDayID`.
     pub hour_day_id: i32,
-    /// `SHO` — source hours operating (`VMT / averageSpeed`).
+ /// `SHO` — source hours operating (`VMT / averageSpeed`).
     pub sho: f64,
-    /// `VMT` — the hourly VMT the `SHO` was derived from.
+ /// `VMT` — the hourly VMT the `SHO` was derived from.
     pub vmt: f64,
 }
 
@@ -223,22 +223,22 @@ pub struct ShoByAgeRoadwayHourRow {
 /// from it.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct VmtByAgeRoadwayDayRow {
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `roadTypeID`.
+ /// `roadTypeID`.
     pub road_type_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `ageID`.
+ /// `ageID`.
     pub age_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `dayID`.
+ /// `dayID`.
     pub day_id: i32,
-    /// `VMT` — daily vehicle miles travelled.
+ /// `VMT` — daily vehicle miles travelled.
     pub vmt: f64,
-    /// `hotellingHours` — hotelling hours, `VMT * SHOAllocFactor *
-    /// hotellingRate`.
+ /// `hotellingHours` — hotelling hours, `VMT * SHOAllocFactor *
+ /// hotellingRate`.
     pub hotelling_hours: f64,
 }
 
@@ -249,19 +249,19 @@ pub struct VmtByAgeRoadwayDayRow {
 /// off-network idle.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct IdleHoursByAgeHourRow {
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `ageID`.
+ /// `ageID`.
     pub age_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `dayID`.
+ /// `dayID`.
     pub day_id: i32,
-    /// `hourID`.
+ /// `hourID`.
     pub hour_id: i32,
-    /// `idleHours` — hotelling hours allocated to this hour.
+ /// `idleHours` — hotelling hours allocated to this hour.
     pub idle_hours: f64,
 }
 
@@ -269,15 +269,15 @@ pub struct IdleHoursByAgeHourRow {
 /// hourDay, age)`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StartsByAgeHourRow {
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `hourDayID`.
+ /// `hourDayID`.
     pub hour_day_id: i32,
-    /// `ageID`.
+ /// `ageID`.
     pub age_id: i32,
-    /// `starts` — `population * startsPerVehicle`.
+ /// `starts` — `population * startsPerVehicle`.
     pub starts: f64,
 }
 
@@ -285,19 +285,19 @@ pub struct StartsByAgeHourRow {
 /// month, day, hour)`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ShpByAgeHourRow {
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `ageID`.
+ /// `ageID`.
     pub age_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `dayID`.
+ /// `dayID`.
     pub day_id: i32,
-    /// `hourID`.
+ /// `hourID`.
     pub hour_id: i32,
-    /// `SHP` — source hours parked, `(population * noOfRealDays) - sum(SHO)`.
+ /// `SHP` — source hours parked, `(population * noOfRealDays) - sum(SHO)`.
     pub shp: f64,
 }
 
@@ -312,33 +312,33 @@ pub struct ShpByAgeHourRow {
 /// per-zone *spatial allocation* (steps 190-209: `SHO`, `SHP`,
 /// `SourceHours`, `hotellingHours`, distance) is the
 /// [`super::allocation`] kernel set, driven by the master loop's
-/// per-`(process, zone, link)` iteration once the Task 50 data plane lands.
+/// per-`(process, zone, link)` iteration once the data plane lands.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct TotalActivityOutput {
-    /// `SourceTypeAgePopulation` — population by `(year, sourceType, age)`.
+ /// `SourceTypeAgePopulation` — population by `(year, sourceType, age)`.
     pub source_type_age_population: Vec<SourceTypeAgePopulationRow>,
-    /// `SourceTypeAgeDistribution` rows the generator `INSERT IGNORE`s for
-    /// the analysis year (step 130's by-product).
+ /// `SourceTypeAgeDistribution` rows the generator `INSERT IGNORE`s for
+ /// the analysis year (step 130's by-product).
     pub source_type_age_distribution_additions: Vec<super::inputs::SourceTypeAgeDistributionRow>,
-    /// `TravelFraction` — travel share by `(year, sourceType, age)`.
+ /// `TravelFraction` — travel share by `(year, sourceType, age)`.
     pub travel_fraction: Vec<TravelFractionRow>,
-    /// `AnalysisYearVMT` — VMT grown to the analysis year.
+ /// `AnalysisYearVMT` — VMT grown to the analysis year.
     pub analysis_year_vmt: Vec<AnalysisYearVmtRow>,
-    /// `AnnualVMTByAgeRoadway` — annual VMT by `(roadType, sourceType, age)`.
+ /// `AnnualVMTByAgeRoadway` — annual VMT by `(roadType, sourceType, age)`.
     pub annual_vmt_by_age_roadway: Vec<AnnualVmtByAgeRoadwayRow>,
-    /// `VMTByAgeRoadwayHour` — hourly VMT.
+ /// `VMTByAgeRoadwayHour` — hourly VMT.
     pub vmt_by_age_roadway_hour: Vec<VmtByAgeRoadwayHourRow>,
-    /// `vmtByMYRoadHourFraction` — model-year VMT fractions.
+ /// `vmtByMYRoadHourFraction` — model-year VMT fractions.
     pub vmt_by_my_road_hour_fraction: Vec<VmtByMyRoadHourFractionRow>,
-    /// `SHOByAgeRoadwayHour` — source hours operating.
+ /// `SHOByAgeRoadwayHour` — source hours operating.
     pub sho_by_age_roadway_hour: Vec<ShoByAgeRoadwayHourRow>,
-    /// `VMTByAgeRoadwayDay` — daily VMT and hotelling hours.
+ /// `VMTByAgeRoadwayDay` — daily VMT and hotelling hours.
     pub vmt_by_age_roadway_day: Vec<VmtByAgeRoadwayDayRow>,
-    /// `IdleHoursByAgeHour` — hotelling activity by hour.
+ /// `IdleHoursByAgeHour` — hotelling activity by hour.
     pub idle_hours_by_age_hour: Vec<IdleHoursByAgeHourRow>,
-    /// `StartsByAgeHour` — engine starts.
+ /// `StartsByAgeHour` — engine starts.
     pub starts_by_age_hour: Vec<StartsByAgeHourRow>,
-    /// `SHPByAgeHour` — source hours parked.
+ /// `SHPByAgeHour` — source hours parked.
     pub shp_by_age_hour: Vec<ShpByAgeHourRow>,
 }
 

@@ -9,7 +9,7 @@
 //!
 //! ## Type widening parity with the default-DB convert pipeline
 //!
-//! The Phase 4 Task 80 converter (`moves-default-db-convert::types`)
+//! The converter (`moves-default-db-convert::types`)
 //! widens every MariaDB integer flavor to `Int64` and every floating-point
 //! flavor to `Float64` so cross-stage joins line up. We use the same
 //! widening here so importer Parquet matches default-DB Parquet for the
@@ -24,37 +24,37 @@ use crate::filter::Filter;
 /// reader needs to coerce, validate, and emit it.
 #[derive(Debug, Clone)]
 pub struct Column {
-    /// MOVES column name. Case is *display* — header matching is
-    /// case-insensitive (Java's `equalsIgnoreCase`).
+ /// MOVES column name. Case is *display* — header matching is
+ /// case-insensitive (Java's `equalsIgnoreCase`).
     pub name: &'static str,
-    /// Arrow type emitted in Parquet output. We use widened types
-    /// (`Int64`, `Float64`, `Utf8`) per the default-DB convention.
+ /// Arrow type emitted in Parquet output. We use widened types
+ /// (`Int64`, `Float64`, `Utf8`) per the default-DB convention.
     pub data_type: DataType,
-    /// `true` if the column is allowed to be empty in the input. Mirrors
-    /// `metaData.isNullable` from `BasicDataHandler.doImport`.
+ /// `true` if the column is allowed to be empty in the input. Mirrors
+ /// `metaData.isNullable` from `BasicDataHandler.doImport`.
     pub nullable: bool,
-    /// Per-cell filter to apply after parsing. `None` is the
-    /// empty-string sentinel Java uses for "no filter".
+ /// Per-cell filter to apply after parsing. `None` is the
+ /// empty-string sentinel Java uses for "no filter".
     pub filter: Option<Filter>,
 }
 
 /// Schema for one importer-managed table.
 #[derive(Debug, Clone)]
 pub struct TableSchema {
-    /// MOVES table name as written to the manifest and Parquet path.
-    /// Case matches `tables.json` so importer output and default-DB
-    /// output sit at identical relative paths.
+ /// MOVES table name as written to the manifest and Parquet path.
+ /// Case matches `tables.json` so importer output and default-DB
+ /// output sit at identical relative paths.
     pub name: &'static str,
-    /// Columns in the order the CSV template lists them (also the
-    /// order written to Parquet — we don't re-order columns).
+ /// Columns in the order the CSV template lists them (also the
+ /// order written to Parquet — we don't re-order columns).
     pub columns: &'static [Column],
 }
 
 impl TableSchema {
-    /// Build the Arrow schema (every field is nullable so missing CSV
-    /// cells flow through as Arrow null — matches the default-DB
-    /// converter, which marks every Parquet field nullable to absorb
-    /// MariaDB NULLs verbatim).
+ /// Build the Arrow schema (every field is nullable so missing CSV
+ /// cells flow through as Arrow null — matches the default-DB
+ /// converter, which marks every Parquet field nullable to absorb
+ /// MariaDB NULLs verbatim).
     pub fn arrow_schema(&self) -> SchemaRef {
         let fields: Vec<Field> = self
             .columns
@@ -64,10 +64,10 @@ impl TableSchema {
         Arc::new(ArrowSchema::new(fields))
     }
 
-    /// Find a column by case-insensitive name. Returns `(index,
-    /// &Column)`. Mirrors the header-matching pass in
-    /// `BasicDataHandler.doImport` (around line 837 in
-    /// `BasicDataHandler.java`).
+ /// Find a column by case-insensitive name. Returns `(index,
+ /// &Column)`. Mirrors the header-matching pass in
+ /// `BasicDataHandler.doImport` (around line 837 in
+ /// `BasicDataHandler.java`).
     pub fn find_column(&self, name: &str) -> Option<(usize, &Column)> {
         self.columns
             .iter()

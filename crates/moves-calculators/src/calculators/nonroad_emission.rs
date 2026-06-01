@@ -2,7 +2,7 @@
 //! in-process simulation API — port of
 //! `gov/epa/otaq/moves/master/nonroad/NonroadEmissionCalculator.java`.
 //!
-//! Migration plan: Phase 5, Task 119 (`mo-y4bs`).
+//! 
 //!
 //! # What this adapter does
 //!
@@ -20,22 +20,21 @@
 //! 1. Extracts the episode year from the iteration position.
 //! 2. Builds a [`NonroadOptions`] for a county-level run.
 //! 3. Creates a [`NonroadInputs`] bundle (currently empty — the
-//!    data-plane wiring that populates it from execution-DB tables
-//!    is a follow-on task).
+//! data-plane wiring that populates it from execution-DB tables
+//! is a follow-on task).
 //! 4. Calls [`run_simulation`] with a [`ProductionExecutor`] backed
-//!    by default (empty) [`ReferenceData`].
+//! by default (empty) [`ReferenceData`].
 //! 5. Returns [`CalculatorOutput::empty()`] — the output-to-DataFrame
-//!    conversion (mapping [`SimEmissionRow`] onto the unified Parquet
-//!    output schema) is likewise deferred until the data-plane wiring
-//!    lands.
+//! conversion (mapping [`SimEmissionRow`] onto the unified Parquet
+//! output schema) is likewise deferred until the data-plane wiring
+//! lands.
 //!
 //! # Why empty inputs are safe for now
 //!
 //! `NonroadInputs::new()` creates an SCC-group list with no records
 //! and an unconstrained region selection. `run_simulation` exits its
 //! outer SCC-group loop immediately and returns an empty
-//! `NonroadOutputs`. The call is a pure no-op — no I/O, no panics —
-//! so the adapter can be registered and exercised by the
+//! `NonroadOutputs`. The call is a pure no-op — no I/O, no panics//! so the adapter can be registered and exercised by the
 //! mixed-onroad-nonroad fixture today, even though the actual nonroad
 //! emission numbers will only appear once the population-data wiring
 //! is done.
@@ -109,14 +108,14 @@ const NONROAD_INPUT_TABLES: &[&str] = &[
     "nrequipmenttype",
     "nragecategory",
     "nrmodelyear",
-    // Evaporative emission rates by (SCC, HP-bin, polProcessID, engTechID).
-    // Not yet consumed by the data-plane loader (evap calculation is stubbed),
-    // but declaring it here ensures the snapshot loader admits the table into
-    // the in-memory store so the evap wiring can read it without a schema change.
+ // Evaporative emission rates by (SCC, HP-bin, polProcessID, engTechID).
+ // Not yet consumed by the data-plane loader (evap calculation is stubbed),
+ // but declaring it here ensures the snapshot loader admits the table into
+ // the in-memory store so the evap wiring can read it without a schema change.
     "nrevapemissionrate",
-    // Retrofit annual/effective fractions by (SCC, engTech, hp, pollutant, retrofitID).
-    // The engine's ReferenceData carries a retrofit_records slot; this declaration
-    // ensures the table is available in-store for the retrofit loader (Task 123).
+ // Retrofit annual/effective fractions by (SCC, engTech, hp, pollutant, retrofitID).
+ // The engine's ReferenceData carries a retrofit_records slot; this declaration
+ // ensures the table is available in-store for the retrofit loader.
     "nrretrofitfactors",
 ];
 
@@ -137,12 +136,12 @@ pub struct NonroadEmissionCalculator {
 }
 
 impl NonroadEmissionCalculator {
-    /// DAG name — matches the Java class and the `calculator-dag.json` entry.
+ /// DAG name — matches the Java class and the `calculator-dag.json` entry.
     pub const NAME: &'static str = "NonroadEmissionCalculator";
 
-    /// Construct the adapter, building one [`CalculatorSubscription`]
-    /// per subscribed process at `DAY` granularity /
-    /// `EMISSION_CALCULATOR` priority.
+ /// Construct the adapter, building one [`CalculatorSubscription`]
+ /// per subscribed process at `DAY` granularity /
+ /// `EMISSION_CALCULATOR` priority.
     #[must_use]
     pub fn new() -> Self {
         let priority = Priority::parse("EMISSION_CALCULATOR")
@@ -170,37 +169,37 @@ impl Calculator for NonroadEmissionCalculator {
         &self.subscriptions
     }
 
-    /// Declares the `nr*` execution-DB tables the data-plane loader reads,
-    /// so the snapshot loader admits them into the in-memory store.
+ /// Declares the `nr*` execution-DB tables the data-plane loader reads,
+ /// so the snapshot loader admits them into the in-memory store.
     fn input_tables(&self) -> &[&'static str] {
         NONROAD_INPUT_TABLES
     }
 
-    /// `NonroadEmissionCalculator` emits no `MOVESWorkerOutput` rows of its
-    /// own: the Java class delegated to `nonroad.exe`, which wrote to separate
-    /// output tables. In `moves-nonroad`, the simulation output flows through
-    /// `NonroadOutputs` and will be mapped to the unified Parquet schema by
-    /// the data-plane wiring (a follow-on task). Until that wiring lands,
-    /// this slice is empty — consistent with `calculator-dag.json`'s
-    /// `registrations_count: 0`.
+ /// `NonroadEmissionCalculator` emits no `MOVESWorkerOutput` rows of its
+ /// own: the Java class delegated to `nonroad.exe`, which wrote to separate
+ /// output tables. In `moves-nonroad`, the simulation output flows through
+ /// `NonroadOutputs` and will be mapped to the unified Parquet schema by
+ /// the data-plane wiring (a follow-on task). Until that wiring lands,
+ /// this slice is empty — consistent with `calculator-dag.json`'s
+ /// `registrations_count: 0`.
     fn registrations(&self) -> &[PollutantProcessAssociation] {
         &[]
     }
 
-    /// Run the NONROAD simulation for the current master-loop iteration.
-    ///
-    /// Extracts the episode year from `ctx.position().time.year`, falls
-    /// back to `DEFAULT_YEAR` when the position carries none (should
-    /// not happen at `DAY` granularity, but defensively handled).
-    /// Calls [`moves_nonroad::run_simulation`] with empty inputs and
-    /// default reference data, returning [`CalculatorOutput::empty()`]
-    /// until the output-mapping wiring is in place.
+ /// Run the NONROAD simulation for the current master-loop iteration.
+ ///
+ /// Extracts the episode year from `ctx.position().time.year`, falls
+ /// back to `DEFAULT_YEAR` when the position carries none (should
+ /// not happen at `DAY` granularity, but defensively handled).
+ /// Calls [`moves_nonroad::run_simulation`] with empty inputs and
+ /// default reference data, returning [`CalculatorOutput::empty()`]
+ /// until the output-mapping wiring is in place.
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let time = &ctx.position().time;
         let year = time.year.map(i32::from).unwrap_or(DEFAULT_YEAR);
 
-        // Build the NONROAD engine inputs from the nr* execution-DB tables
-        // (the in-process replacement for the Java input-file generator).
+ // Build the NONROAD engine inputs from the nr* execution-DB tables
+ // (the in-process replacement for the Java input-file generator).
         let store = ctx.tables();
         let options = nonroad_loader::build_options(year);
         let inputs = nonroad_loader::build_nonroad_inputs(store, year);
@@ -215,7 +214,7 @@ impl Calculator for NonroadEmissionCalculator {
             );
         }
         if inputs.is_empty() {
-            // No nonroad population in this run — nothing to compute.
+ // No nonroad population in this run — nothing to compute.
             return Ok(CalculatorOutput::empty());
         }
         let mut executor = nonroad_loader::build_production_executor(store, year);
@@ -236,9 +235,9 @@ impl Calculator for NonroadEmissionCalculator {
             );
         }
 
-        // Map the engine's SimEmissionRows onto the MOVESOutput schema,
-        // allocating the engine's annual emissions onto this iteration's
-        // month/day slice.
+ // Map the engine's SimEmissionRows onto the MOVESOutput schema,
+ // allocating the engine's annual emissions onto this iteration's
+ // month/day slice.
         let month = time.month.map(i32::from);
         let day = time.day_id.map(i32::from);
         let keys = EmissionTimeKeys {

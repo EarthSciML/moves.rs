@@ -1,4 +1,4 @@
-//! Characterization tests for the Base Rate Calculator (Task 45).
+//! Characterization tests for the Base Rate Calculator.
 //!
 //! Each test builds a small input scenario whose expected output is
 //! hand-derived from the Go `baseratecalculator.go` algorithm, then drives
@@ -9,7 +9,7 @@
 //!
 //! These tests pin the port against the Go reference as traced from source.
 //! End-to-end validation against canonical-MOVES intermediate captures is a
-//! separate downstream task (`moves-rust-migration-plan.md` Task 44).
+//! separate downstream task (`moves-rust-.md`).
 
 use moves_calculators::calculators::baseratecalculator::setup::{
     AgeCategoryRow, BaseRateCalculatorInputs, BaseRateRow, CriteriaRatioRow,
@@ -78,8 +78,8 @@ fn base_rate_row(pollutant: i32, process: i32, mean: f64, rate: f64) -> BaseRate
 
 #[test]
 fn single_row_passes_through_unchanged_when_no_tables_apply() {
-    // No lookup tables: every adjustment is skipped, aggregate_op_modes just
-    // sums the one base rate by market share.
+ // No lookup tables: every adjustment is skipped, aggregate_op_modes just
+ // sums the one base rate by market share.
     let inputs = BaseRateCalculatorInputs {
         base_rate: vec![base_rate_row(2, 1, 4.0, 8.0)],
         fuel_supply: fuel_supply_one(),
@@ -99,7 +99,7 @@ fn single_row_passes_through_unchanged_when_no_tables_apply() {
 
 #[test]
 fn age_based_pass_is_processed_like_the_non_age_pass() {
-    // A row in `base_rate_by_age` flows through the same pipeline.
+ // A row in `base_rate_by_age` flows through the same pipeline.
     let inputs = BaseRateCalculatorInputs {
         base_rate_by_age: vec![base_rate_row(2, 1, 4.0, 8.0)],
         fuel_supply: fuel_supply_one(),
@@ -112,7 +112,7 @@ fn age_based_pass_is_processed_like_the_non_age_pass() {
 
 #[test]
 fn row_without_matching_fuel_supply_is_dropped() {
-    // No fuel supply -> the row expands to zero base rates and is dropped.
+ // No fuel supply -> the row expands to zero base rates and is dropped.
     let inputs = BaseRateCalculatorInputs {
         base_rate: vec![base_rate_row(2, 1, 4.0, 8.0)],
         ..BaseRateCalculatorInputs::default()
@@ -150,7 +150,7 @@ fn two_fuel_formulations_expand_to_two_emissions() {
     let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
     let rows = output.rows();
     assert_eq!(rows.len(), 2);
-    // emissions are ordered by fuel formulation id.
+ // emissions are ordered by fuel formulation id.
     assert_eq!(rows[0].fuel_formulation_id, 100);
     assert_eq!(rows[0].emission_quant, 3.0); // 4 * 0.75
     assert_eq!(rows[1].fuel_formulation_id, 101);
@@ -159,8 +159,8 @@ fn two_fuel_formulations_expand_to_two_emissions() {
 
 #[test]
 fn rows_sharing_a_key_accumulate_before_aggregation() {
-    // Two rows differing only in operating mode (not part of the block key)
-    // accumulate into one block; aggregate_op_modes then sums both.
+ // Two rows differing only in operating mode (not part of the block key)
+ // accumulate into one block; aggregate_op_modes then sums both.
     let mut row_a = base_rate_row(2, 1, 4.0, 8.0);
     row_a.op_mode_id = 0;
     let mut row_b = base_rate_row(2, 1, 4.0, 8.0);
@@ -178,7 +178,7 @@ fn rows_sharing_a_key_accumulate_before_aggregation() {
 
 #[test]
 fn general_fuel_ratio_blends_normal_and_gpa_by_county_fraction() {
-    // r = ratio + gpaFract*(ratioGPA - ratio) = 2 + 0.5*(4 - 2) = 3.
+ // r = ratio + gpaFract*(ratioGPA - ratio) = 2 + 0.5*(4 - 2) = 3.
     let inputs = BaseRateCalculatorInputs {
         base_rate: vec![base_rate_row(2, 1, 4.0, 8.0)],
         fuel_supply: fuel_supply_one(),
@@ -209,7 +209,7 @@ fn general_fuel_ratio_blends_normal_and_gpa_by_county_fraction() {
 
 #[test]
 fn general_fuel_ratio_outside_its_year_range_does_not_apply() {
-    // model year 2018 is outside [2000, 2010]; no scaling.
+ // model year 2018 is outside [2000, 2010]; no scaling.
     let inputs = BaseRateCalculatorInputs {
         base_rate: vec![base_rate_row(2, 1, 4.0, 8.0)],
         fuel_supply: fuel_supply_one(),
@@ -254,8 +254,8 @@ fn criteria_ratio_scales_running_exhaust() {
 
 #[test]
 fn im_coverage_blends_the_im_and_non_im_rates() {
-    // IM coverage = imFactor * (0.01 * complianceFactor) = 0.5 * 0.5 = 0.25.
-    // meanBaseRate = (1 - 0.25)*4 + 0.25*8 = 5; emissionRate = 0.75*8 + 0.25*16 = 10.
+ // IM coverage = imFactor * (0.01 * complianceFactor) = 0.5 * 0.5 = 0.25.
+ // meanBaseRate = (1 - 0.25)*4 + 0.25*8 = 5; emissionRate = 0.75*8 + 0.25*16 = 10.
     let mut row = base_rate_row(2, 1, 4.0, 8.0);
     row.mean_base_rate_im = 8.0;
     row.emission_rate_im = 16.0;
@@ -302,7 +302,7 @@ fn im_coverage_blends_the_im_and_non_im_rates() {
 
 #[test]
 fn air_conditioning_adds_the_ac_adjusted_rate() {
-    // process 1 (not start exhaust): rate += acFactor * acAdj.
+ // process 1 (not start exhaust): rate += acFactor * acAdj.
     let mut row = base_rate_row(2, 1, 4.0, 8.0);
     row.mean_base_rate_ac_adj = 2.0;
     row.emission_rate_ac_adj = 1.0;
@@ -326,8 +326,8 @@ fn air_conditioning_adds_the_ac_adjusted_rate() {
 
 #[test]
 fn extended_idle_scales_mean_rates_but_not_emission_rates() {
-    // process 90: the four mean-base-rate fields scale by the opMode-200
-    // fraction; emission rates are untouched.
+ // process 90: the four mean-base-rate fields scale by the opMode-200
+ // fraction; emission rates are untouched.
     let inputs = BaseRateCalculatorInputs {
         base_rate: vec![base_rate_row(2, 90, 4.0, 8.0)],
         fuel_supply: fuel_supply_one(),
@@ -345,8 +345,8 @@ fn extended_idle_scales_mean_rates_but_not_emission_rates() {
 
 #[test]
 fn apu_scales_mean_rates_for_operating_mode_201() {
-    // process 91, operating mode 201: the four mean-base-rate fields scale
-    // by the opMode-201 fraction; the process is not retagged.
+ // process 91, operating mode 201: the four mean-base-rate fields scale
+ // by the opMode-201 fraction; the process is not retagged.
     let mut row = base_rate_row(91, 91, 4.0, 8.0);
     row.op_mode_id = 201;
     let inputs = BaseRateCalculatorInputs {
@@ -368,8 +368,8 @@ fn apu_scales_mean_rates_for_operating_mode_201() {
 
 #[test]
 fn shorepower_retags_the_process_to_93() {
-    // process 91, operating mode 203: process is retagged 91 -> 93, but
-    // pol_process_id is deliberately not recomputed (stays 9191).
+ // process 91, operating mode 203: process is retagged 91 -> 93, but
+ // pol_process_id is deliberately not recomputed (stays 9191).
     let mut row = base_rate_row(91, 91, 4.0, 8.0);
     row.op_mode_id = 203;
     let inputs = BaseRateCalculatorInputs {
@@ -416,7 +416,7 @@ fn emission_rate_adjustment_scales_mean_and_emission_rate() {
 
 #[test]
 fn ev_efficiency_divides_through_the_efficiency_product() {
-    // divisor = battery * charging = 0.5 * 0.5 = 0.25.
+ // divisor = battery * charging = 0.5 * 0.5 = 0.25.
     let flags = ModuleFlags {
         ev_efficiency: true,
         ..ModuleFlags::default()
@@ -442,8 +442,8 @@ fn ev_efficiency_divides_through_the_efficiency_product() {
 
 #[test]
 fn temperature_adjustment_applies_the_standard_quadratic_term() {
-    // CO (pollutant 2), process 1: standard form
-    // factor = 1 + (temp-75)*(A + (temp-75)*B). temp 77, A 0.5, B 0 -> 2.0.
+ // CO (pollutant 2), process 1: standard form
+ // factor = 1 + (temp-75)*(A + (temp-75)*B). temp 77, A 0.5, B 0 -> 2.0.
     let inputs = BaseRateCalculatorInputs {
         base_rate: vec![base_rate_row(2, 1, 4.0, 8.0)],
         fuel_supply: fuel_supply_one(),
@@ -477,9 +477,9 @@ fn temperature_adjustment_applies_the_standard_quadratic_term() {
 
 #[test]
 fn start_temperature_adjustment_applies_the_polynomial_form() {
-    // process 2, pollutant 1, polProcessID 102. POLY form:
-    // rate = base + weight * d * (A + d*(B + d*C)),  d = least(temp,75) - 75.
-    // temp 71 -> d = -4; A 1, B 0, C 0; weight 0.5 -> base + 0.5*(-4)*1 = base - 2.
+ // process 2, pollutant 1, polProcessID 102. POLY form:
+ // rate = base + weight * d * (A + d*(B + d*C)), d = least(temp,75) - 75.
+ // temp 71 -> d = -4; A 1, B 0, C 0; weight 0.5 -> base + 0.5*(-4)*1 = base - 2.
     let mut row = base_rate_row(1, 2, 4.0, 8.0);
     row.op_mode_fraction = 0.5;
     row.op_mode_fraction_rate = 0.5;
@@ -523,9 +523,9 @@ fn start_temperature_adjustment_applies_the_polynomial_form() {
 
 #[test]
 fn e85_thc_emits_a_10000_offset_pollutant() {
-    // E85 formulation (subtype 51), model year >= 2001, criteria + alt
-    // criteria ratios present. The criteria step scales the base block by
-    // 2.0; the E85 block then scales a copy by altRatio/ratio = 6/2 = 3.
+ // E85 formulation (subtype 51), model year >= 2001, criteria + alt
+ // criteria ratios present. The criteria step scales the base block by
+ // 2.0; the E85 block then scales a copy by altRatio/ratio = 6/2 = 3.
     let cr_key = (100, 201, 21, 2018, 2);
     let inputs = BaseRateCalculatorInputs {
         base_rate: vec![base_rate_row(2, 1, 4.0, 8.0)],
@@ -558,10 +558,10 @@ fn e85_thc_emits_a_10000_offset_pollutant() {
     };
     let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
     assert_eq!(output.blocks.len(), 2);
-    // Block 0: the base pollutant 2, criteria-scaled by 2.
+ // Block 0: the base pollutant 2, criteria-scaled by 2.
     assert_eq!(output.blocks[0].key.pollutant_id, 2);
     assert_eq!(output.blocks[0].emissions[0].emission_quant, 8.0); // 4 * 2
-                                                                   // Block 1: pollutant 10002, scaled again by 3 (alt/criteria ratio).
+ // Block 1: pollutant 10002, scaled again by 3 (alt/criteria ratio).
     assert_eq!(output.blocks[1].key.pollutant_id, 10002);
     assert_eq!(output.blocks[1].key.pol_process_id, 1_000_201);
     assert_eq!(output.blocks[1].emissions[0].emission_quant, 24.0); // 8 * 3
@@ -570,7 +570,7 @@ fn e85_thc_emits_a_10000_offset_pollutant() {
 
 #[test]
 fn apply_activity_converts_a_rate_into_an_inventory() {
-    // BRC_ApplyActivity: emission quantity scales by universal activity.
+ // BRC_ApplyActivity: emission quantity scales by universal activity.
     let flags = ModuleFlags {
         apply_activity: true,
         ..ModuleFlags::default()
@@ -593,8 +593,8 @@ fn apply_activity_converts_a_rate_into_an_inventory() {
 
 #[test]
 fn aggregate_smfr_weights_emissions_by_the_activity_distribution() {
-    // Two reg classes contribute activity 1 and 3; with regClassID discarded
-    // they share a total of 4, so reg class 10 normalises to 1/4 = 0.25.
+ // Two reg classes contribute activity 1 and 3; with regClassID discarded
+ // they share a total of 4, so reg class 10 normalises to 1/4 = 0.25.
     let flags = ModuleFlags {
         aggregate_smfr: true,
         adjust_mean_base_rate_and_emission_rate: true,

@@ -1,14 +1,14 @@
-# Concurrency Tuning — Task 76
+# Concurrency Tuning
 
 This document records the `--max-parallel-chunks` sweep results and recommended
-settings for the Rust MOVES port, as established by migration-plan Task 76.
+settings for the Rust MOVES port.
 
 ---
 
 ## Background
 
-The bounded-concurrency executor (Task 27) runs independent calculator chains
-in parallel, capping concurrent chains at `--max-parallel-chunks`.  Peak memory
+The bounded-concurrency executor runs independent calculator chains
+in parallel, capping concurrent chains at `--max-parallel-chunks`. Peak memory
 scales linearly with the limit:
 
 ```
@@ -16,54 +16,54 @@ peak_RSS ≈ process_baseline + N × max_chain_working_set
 ```
 
 where `max_chain_working_set` is the largest peak DataFrame allocation any
-single chain needs.  Setting `N` too high wastes memory; setting it too low
+single chain needs. Setting `N` too high wastes memory; setting it too low
 leaves CPU cores idle and reduces throughput.
 
 The executor guarantees the bound deterministically — each chain holds a
 semaphore permit for its entire execution, so at most `N` working sets are
-resident at once.  The unit tests in `crates/moves-framework/src/execution/executor.rs`
+resident at once. The unit tests in `crates/moves-framework/src/execution/executor.rs`
 (the barrier-based concurrency test) and the integration test in
 `crates/moves-framework/tests/memory_pressure.rs` (real 8 MiB buffers + VmHWM)
 both pin this relationship.
 
 ---
 
-## Phase 3 measurement (pre-data-plane, 2026-05-21)
+## Pre-data-plane measurement (2026-05-21)
 
 **Method:** `cargo test -p moves-cli --test concurrency_tuning -- --nocapture`
-on the CI host (20-core Intel Xeon Gold 6248 @ 2.50 GHz).  Sweeps N from 1 to
-NCPU on all 23 onroad fixtures.  Each cell reports total wall time across all
+on the CI host (20-core Intel Xeon Gold 6248 @ 2.50 GHz). Sweeps N from 1 to
+NCPU on all 23 onroad fixtures. Each cell reports total wall time across all
 23 fixtures and the process peak RSS (VmHWM) after that sweep.
 
-**Phase 3 caveat:** Calculators return `CalculatorOutput::empty()` —
-no data-plane working set exists yet.  These numbers reflect **framework
+**Caveat:** Calculators return `CalculatorOutput::empty()` —
+no data-plane working set exists yet. These numbers reflect **framework
 overhead** only: RunSpec parsing, calculator-graph planning, MasterLoop setup,
-and `MOVESRun.parquet` output.  The per-chain working set is essentially zero.
+and `MOVESRun.parquet` output. The per-chain working set is essentially zero.
 
 ```
-           N  total_wall_ms  speedup   RSS_MiB  delta_RSS_MiB
+ N total_wall_ms speedup RSS_MiB delta_RSS_MiB
 --------------------------------------------------------------
-           1          480.8     1.00      10.6           10.6
-           2          488.3     0.98      10.6            0.0
-           4          483.1     1.00      10.6            0.0
-           8          513.9     0.94      10.6            0.0
-          16          500.5     0.96      10.6            0.0
-   20 (NCPU)          507.8     0.95      10.6            0.0
+ 1 480.8 1.00 10.6 10.6
+ 2 488.3 0.98 10.6 0.0
+ 4 483.1 1.00 10.6 0.0
+ 8 513.9 0.94 10.6 0.0
+ 16 500.5 0.96 10.6 0.0
+ 20 (NCPU) 507.8 0.95 10.6 0.0
 ```
 
 Key observations:
 
-- **Throughput is flat** — speedup ≈ 1.0 at all N.  In Phase 3, planning
-  (~0.8 ms per fixture) dominates over execution (~0.2 ms), and planning is
-  sequential.  There is nothing to parallelize across.
+- **Throughput is flat** — speedup ≈ 1.0 at all N. Planning
+ (~0.8 ms per fixture) dominates over execution (~0.2 ms), and planning is
+ sequential. There is nothing to parallelize across.
 
-- **Peak RSS is flat at 10.6 MiB** — delta is 0.0 MiB beyond N=1.  This
-  confirms the chain-isolation model: with `max_chain_working_set ≈ 0`, memory
-  is constant regardless of N.  No unexpected state sharing exists between
-  calculator chains.
+- **Peak RSS is flat at 10.6 MiB** — delta is 0.0 MiB beyond N=1. This
+ confirms the chain-isolation model: with `max_chain_working_set ≈ 0`, memory
+ is constant regardless of N. No unexpected state sharing exists between
+ calculator chains.
 
-- **N has no measurable effect on Phase 3 runs.**  Any value from 1 to NCPU
-  produces equivalent performance and memory footprint.
+- **N has no measurable effect on these pre-data-plane runs.** Any value from 1 to NCPU
+ produces equivalent performance and memory footprint.
 
 ---
 
@@ -75,7 +75,7 @@ The measurement validates the invariant from `executor.rs`:
 peak_RSS(N=20) = 10.6 MiB = peak_RSS(N=1)
 ```
 
-With empty working sets, `N × 0 = 0` additional memory is expected.  The
+With empty working sets, `N × 0 = 0` additional memory is expected. The
 integration test in `crates/moves-cli/tests/concurrency_tuning.rs` asserts this
 programmatically:
 
@@ -88,10 +88,10 @@ state — a correctness bug masquerading as a memory issue, not a tuning problem
 
 ---
 
-## Phase 4 projections (once data plane lands)
+## Projections once the data plane lands
 
-When Phase 4 connects the Parquet data plane, each calculator chain holds a
-working set proportional to the DataFrame columns it reads and writes.  The
+When the Parquet data plane is connected, each calculator chain holds a
+working set proportional to the DataFrame columns it reads and writes. The
 memory model then becomes load-bearing:
 
 | Machine type | Estimated chain working set | Recommended N | Est. peak RSS |
@@ -104,15 +104,15 @@ The recommended N values are soft: the right choice depends on actual working
 set size (fixture scale, pollutant count), available RAM, and whether the run is
 memory-bound or CPU-bound.
 
-**Tuning procedure (Phase 4):**
+**Tuning procedure (once data plane lands):**
 
 1. Run a representative fixture with `--max-parallel-chunks 1` and record peak
-   RSS.  This is `process_baseline + 1 × max_chain_working_set`.
-2. Run the same fixture with `--max-parallel-chunks 4`.  Check that peak RSS ≈
-   `baseline + 4 × working_set`.  If it is, the model holds and you can predict
-   RSS at any N.
+ RSS. This is `process_baseline + 1 × max_chain_working_set`.
+2. Run the same fixture with `--max-parallel-chunks 4`. Check that peak RSS ≈
+ `baseline + 4 × working_set`. If it is, the model holds and you can predict
+ RSS at any N.
 3. Choose N so that predicted peak RSS stays under 50–70% of available RAM
-   (leave headroom for OS page cache and other processes).
+ (leave headroom for OS page cache and other processes).
 
 ---
 
@@ -133,8 +133,7 @@ cargo test -p moves-framework --test memory_pressure -- --nocapture
 
 ## Next steps
 
-- **Task 77** — Concurrency correctness: verify byte-identical output at N=1,
-  4, NCPU (completed; see `crates/moves-cli/tests/concurrency_correctness.rs`).
-- **Task 78** — Phase 3 closing checkpoint.
-- **Phase 4** — Data plane landing; re-run this sweep with real working sets,
-  update the table and recommended-N guidance above.
+- **Concurrency correctness** — verify byte-identical output at N=1,
+ 4, NCPU (completed; see `crates/moves-cli/tests/concurrency_correctness.rs`).
+- **Data plane landing** — re-run this sweep with real working sets,
+ update the table and recommended-N guidance above.

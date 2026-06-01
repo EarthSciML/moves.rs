@@ -1,4 +1,4 @@
-//! `SourceBinDistributionGenerator` — Task 29.
+//! `SourceBinDistributionGenerator` —.
 //!
 //! Ports `gov/epa/otaq/moves/master/implementation/ghg/SourceBinDistributionGenerator.java`
 //! (711 lines Java + embedded SQL). The generator apportions vehicle-population
@@ -13,15 +13,15 @@
 //! The Java class is one MasterLoop generator with three phases:
 //!
 //! * **`doFirstTime`** (once per run) — derive the model-year window the run
-//!   needs ([`model_year_range`]) and the fuels each source type is equipped
-//!   with ([`fuel_types_by_source_type`]).
+//! needs ([`model_year_range`]) and the fuels each source type is equipped
+//! with ([`fuel_types_by_source_type`]).
 //! * **`doPollutantProcess`** (once per new `(pollutant, process)`) — for each
-//!   not-yet-populated source type, aggregate `sampleVehiclePopulation`
-//!   fractions into source bins and emit `SourceBin` + `SourceBinDistribution`
-//!   rows. See [`pollutant_process_distribution`].
+//! not-yet-populated source type, aggregate `sampleVehiclePopulation`
+//! fractions into source bins and emit `SourceBin` + `SourceBinDistribution`
+//! rows. See [`pollutant_process_distribution`].
 //! * **`doCountyYear`** (once per new `(process, county, year)`) — re-base the
-//!   distribution from *equipped* fuels onto the fuels actually *used* in that
-//!   county/year via `fuelUsageFraction`. See [`county_year_distribution`].
+//! distribution from *equipped* fuels onto the fuels actually *used* in that
+//! county/year via `fuelUsageFraction`. See [`county_year_distribution`].
 //!
 //! # Source-bin identity
 //!
@@ -29,12 +29,12 @@
 //! the components stay human-readable in the database. [`source_bin_id`] is
 //! the pure port of the Java `update SBDGSVP set sourceBinID = …` statement.
 //!
-//! # Phase 2 / data-plane status
+//! # / data-plane status
 //!
-//! `moves-framework`'s [`CalculatorContext`] is still a Phase 2 skeleton — the
+//! `moves-framework`'s [`CalculatorContext`] is still a skeleton — the
 //! slow-tier [tables](CalculatorContext::tables) and the
 //! [scratch namespace](CalculatorContext::scratch) are placeholder structs
-//! until Task 50 lands the `DataFrameStore`. So [`Generator::execute`] here
+//! until lands the `DataFrameStore`. So [`Generator::execute`] here
 //! returns an empty [`CalculatorOutput`]: there is no table store to read from
 //! or write to yet.
 //!
@@ -49,8 +49,8 @@
 //! The Java instance fields that dedupe work across MasterLoop callbacks
 //! (`processesDone`, `countyYearsDone`, `cleanupPriorProcess`) are run
 //! orchestration, not part of the distribution math; they belong with the
-//! Task 50 `execute` wiring. The `PROJECT`-domain `modelYearPhysics`
-//! call-out is `SourceTypePhysics` (Task 37) and is out of scope here.
+//! `execute` wiring. The `PROJECT`-domain `modelYearPhysics`
+//! call-out is `SourceTypePhysics` and is out of scope here.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::OnceLock;
@@ -73,19 +73,19 @@ use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Seri
 /// modelYear)` population in a given `(fuel, engTech, regClass)` cell.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SampleVehiclePopulationRow {
-    /// `sourceTypeModelYearID` — packed `sourceTypeID * 10000 + modelYearID`.
+ /// `sourceTypeModelYearID` — packed `sourceTypeID * 10000 + modelYearID`.
     pub source_type_model_year_id: i64,
-    /// `modelYearID` — calendar model year.
+ /// `modelYearID` — calendar model year.
     pub model_year_id: i64,
-    /// `sourceTypeID` — MOVES source (vehicle) type.
+ /// `sourceTypeID` — MOVES source (vehicle) type.
     pub source_type_id: i64,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i64,
-    /// `engTechID` — engine-technology id.
+ /// `engTechID` — engine-technology id.
     pub eng_tech_id: i64,
-    /// `regClassID` — regulatory class id.
+ /// `regClassID` — regulatory class id.
     pub reg_class_id: i64,
-    /// `stmyFraction` — population fraction for this cell.
+ /// `stmyFraction` — population fraction for this cell.
     pub stmy_fraction: f64,
 }
 
@@ -93,11 +93,11 @@ pub struct SampleVehiclePopulationRow {
 /// to its model-year group. Primary key is `(polProcessID, modelYearID)`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PollutantProcessModelYearRow {
-    /// `polProcessID` — composite `pollutantID * 100 + processID`.
+ /// `polProcessID` — composite `pollutantID * 100 + processID`.
     pub pol_process_id: i64,
-    /// `modelYearID`.
+ /// `modelYearID`.
     pub model_year_id: i64,
-    /// `modelYearGroupID` for this pollutant-process and model year.
+ /// `modelYearGroupID` for this pollutant-process and model year.
     pub model_year_group_id: i64,
 }
 
@@ -105,9 +105,9 @@ pub struct PollutantProcessModelYearRow {
 /// Primary key is `modelYearGroupID`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ModelYearGroupRow {
-    /// `modelYearGroupID`.
+ /// `modelYearGroupID`.
     pub model_year_group_id: i64,
-    /// `shortModYrGroupID` — the abbreviated group id packed into source bins.
+ /// `shortModYrGroupID` — the abbreviated group id packed into source bins.
     pub short_mod_yr_group_id: i64,
 }
 
@@ -116,15 +116,15 @@ pub struct ModelYearGroupRow {
 /// group. Primary key is `(sourceTypeID, polProcessID)`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceTypePolProcessRow {
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i64,
-    /// `polProcessID`.
+ /// `polProcessID`.
     pub pol_process_id: i64,
-    /// `isRegClassReqd` — when set, source bins keep `regClassID`; otherwise it
-    /// collapses to `0` and reg classes merge.
+ /// `isRegClassReqd` — when set, source bins keep `regClassID`; otherwise it
+ /// collapses to `0` and reg classes merge.
     pub is_reg_class_required: bool,
-    /// `isMYGroupReqd` — when set, source bins keep the model-year group;
-    /// otherwise `modelYearGroupID` / `shortModYrGroupID` collapse to `0`.
+ /// `isMYGroupReqd` — when set, source bins keep the model-year group;
+ /// otherwise `modelYearGroupID` / `shortModYrGroupID` collapse to `0`.
     pub is_my_group_required: bool,
 }
 
@@ -133,9 +133,9 @@ pub struct SourceTypePolProcessRow {
 /// source type. Primary key is `sourceTypeModelYearID`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceTypeModelYearRow {
-    /// `sourceTypeModelYearID`.
+ /// `sourceTypeModelYearID`.
     pub source_type_model_year_id: i64,
-    /// `sourceTypeID` owning that `sourceTypeModelYearID`.
+ /// `sourceTypeID` owning that `sourceTypeModelYearID`.
     pub source_type_id: i64,
 }
 
@@ -143,9 +143,9 @@ pub struct SourceTypeModelYearRow {
 /// selects. Feeds [`fuel_types_by_source_type`].
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RunSpecSourceFuelTypeRow {
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i64,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i64,
 }
 
@@ -154,20 +154,20 @@ pub struct RunSpecSourceFuelTypeRow {
 /// appends newly discovered ones.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceBinRow {
-    /// `sourceBinID` — see [`source_bin_id`].
+ /// `sourceBinID` — see [`source_bin_id`].
     pub source_bin_id: i64,
-    /// `engSizeID` — always `0` for the onroad source bins this generator
-    /// builds.
+ /// `engSizeID` — always `0` for the onroad source bins this generator
+ /// builds.
     pub eng_size_id: i64,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i64,
-    /// `engTechID`.
+ /// `engTechID`.
     pub eng_tech_id: i64,
-    /// `regClassID`.
+ /// `regClassID`.
     pub reg_class_id: i64,
-    /// `modelYearGroupID`.
+ /// `modelYearGroupID`.
     pub model_year_group_id: i64,
-    /// `weightClassID` — always `0` for these onroad source bins.
+ /// `weightClassID` — always `0` for these onroad source bins.
     pub weight_class_id: i64,
 }
 
@@ -180,13 +180,13 @@ pub struct SourceBinRow {
 /// omitted from this port.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceBinDistributionRow {
-    /// `sourceTypeModelYearID`.
+ /// `sourceTypeModelYearID`.
     pub source_type_model_year_id: i64,
-    /// `polProcessID`.
+ /// `polProcessID`.
     pub pol_process_id: i64,
-    /// `sourceBinID`.
+ /// `sourceBinID`.
     pub source_bin_id: i64,
-    /// `sourceBinActivityFraction` — the activity weight assigned to the bin.
+ /// `sourceBinActivityFraction` — the activity weight assigned to the bin.
     pub source_bin_activity_fraction: f64,
 }
 
@@ -194,17 +194,17 @@ pub struct SourceBinDistributionRow {
 /// that is, in a given county/fuel-year, actually fuelled by another.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FuelUsageFractionRow {
-    /// `countyID`.
+ /// `countyID`.
     pub county_id: i64,
-    /// `fuelYearID`.
+ /// `fuelYearID`.
     pub fuel_year_id: i64,
-    /// `modelYearGroupID` — `0` means "applies to every model-year group".
+ /// `modelYearGroupID` — `0` means "applies to every model-year group".
     pub model_year_group_id: i64,
-    /// `sourceBinFuelTypeID` — the fuel the vehicle is *equipped* for.
+ /// `sourceBinFuelTypeID` — the fuel the vehicle is *equipped* for.
     pub source_bin_fuel_type_id: i64,
-    /// `fuelSupplyFuelTypeID` — the fuel actually *supplied*.
+ /// `fuelSupplyFuelTypeID` — the fuel actually *supplied*.
     pub fuel_supply_fuel_type_id: i64,
-    /// `usageFraction` — share of equipped activity that uses the supply fuel.
+ /// `usageFraction` — share of equipped activity that uses the supply fuel.
     pub usage_fraction: f64,
 }
 
@@ -215,9 +215,9 @@ pub struct FuelUsageFractionRow {
 /// The model-year window a run needs, as computed by [`model_year_range`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ModelYearRange {
-    /// Earliest model year — `min(calendar years) - max(AgeCategory.ageID)`.
+ /// Earliest model year — `min(calendar years) - max(AgeCategory.ageID)`.
     pub first_model_year_needed: i64,
-    /// Latest model year — `max(calendar years)`.
+ /// Latest model year — `max(calendar years)`.
     pub last_model_year_needed: i64,
 }
 
@@ -232,31 +232,31 @@ pub const FALLBACK_MODEL_YEAR_RANGE: ModelYearRange = ModelYearRange {
 /// time, and the distribution rows weighting them.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct SourceBinDistributionOutput {
-    /// `SourceBin` rows whose `sourceBinID` was not already present — to be
-    /// appended to the `SourceBin` table.
+ /// `SourceBin` rows whose `sourceBinID` was not already present — to be
+ /// appended to the `SourceBin` table.
     pub new_source_bins: Vec<SourceBinRow>,
-    /// `SourceBinDistribution` rows to insert.
+ /// `SourceBinDistribution` rows to insert.
     pub distribution: Vec<SourceBinDistributionRow>,
 }
 
 /// Bundle of table slices [`pollutant_process_distribution`] reads. Grouping
 /// them keeps the call readable and mirrors the [`CalculatorContext`] the
-/// Task 50 data plane will hand the generator.
+/// data plane will hand the generator.
 #[derive(Debug, Clone, Copy)]
 pub struct SourceBinTables<'a> {
-    /// `sampleVehiclePopulation`.
+ /// `sampleVehiclePopulation`.
     pub sample_vehicle_population: &'a [SampleVehiclePopulationRow],
-    /// `PollutantProcessModelYear`.
+ /// `PollutantProcessModelYear`.
     pub pollutant_process_model_year: &'a [PollutantProcessModelYearRow],
-    /// `ModelYearGroup`.
+ /// `ModelYearGroup`.
     pub model_year_group: &'a [ModelYearGroupRow],
-    /// `SourceTypePolProcess`.
+ /// `SourceTypePolProcess`.
     pub source_type_pol_process: &'a [SourceTypePolProcessRow],
-    /// `SourceTypeModelYear`.
+ /// `SourceTypeModelYear`.
     pub source_type_model_year: &'a [SourceTypeModelYearRow],
-    /// `SourceBin` — rows already present before this pass.
+ /// `SourceBin` — rows already present before this pass.
     pub source_bin: &'a [SourceBinRow],
-    /// `SourceBinDistribution` — rows already present before this pass.
+ /// `SourceBinDistribution` — rows already present before this pass.
     pub source_bin_distribution: &'a [SourceBinDistributionRow],
 }
 
@@ -291,29 +291,29 @@ struct SourceBinFuelUsageRow {
 /// `(pollutantID, processID)` components.
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct PollutantProcessAssocRow {
-    /// `polProcessID`.
+ /// `polProcessID`.
     pub pol_process_id: i64,
-    /// `pollutantID`.
+ /// `pollutantID`.
     pub pollutant_id: i64,
-    /// `processID`.
+ /// `processID`.
     pub process_id: i64,
 }
 
 /// One `AgeCategory` row: maps a vehicle age id to its age group.
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct AgeCategoryRow {
-    /// `ageID` — vehicle age in years.
+ /// `ageID` — vehicle age in years.
     pub age_id: i64,
-    /// `ageGroupID`.
+ /// `ageGroupID`.
     pub age_group_id: i64,
 }
 
 /// One `Year` row: maps a calendar year to its fuel year.
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct YearRow {
-    /// `yearID` — calendar year.
+ /// `yearID` — calendar year.
     pub year_id: i64,
-    /// `fuelYearID` — the fuel year for this calendar year.
+ /// `fuelYearID` — the fuel year for this calendar year.
     pub fuel_year_id: i64,
 }
 
@@ -1182,11 +1182,11 @@ impl TableRow for YearRow {
 /// component owns a fixed decimal slot:
 ///
 /// ```text
-/// 1_000_000_000_000_000_000   leading marker digit
-///   + fuelTypeID         * 10_000_000_000_000_000
-///   + engTechID          *    100_000_000_000_000
-///   + regClassID         *      1_000_000_000_000
-///   + shortModYrGroupID  *         10_000_000_000
+/// 1_000_000_000_000_000_000 leading marker digit
+/// + fuelTypeID * 10_000_000_000_000_000
+/// + engTechID * 100_000_000_000_000
+/// + regClassID * 1_000_000_000_000
+/// + shortModYrGroupID * 10_000_000_000
 /// ```
 ///
 /// The Java statement has two further `0 * …` terms — the `engSizeID` and
@@ -1293,13 +1293,13 @@ fn source_types_to_use(
 /// Mirrors the `coreSQL` join/filter/group:
 ///
 /// * inner join to `PollutantProcessModelYear` on `(polProcessID,
-///   modelYearID)` and to `ModelYearGroup` on `modelYearGroupID` — a row with
-///   no match in either is dropped;
+/// modelYearID)` and to `ModelYearGroup` on `modelYearGroupID` — a row with
+/// no match in either is dropped;
 /// * keep rows for `source_type_id`, with `modelYearID` inside `year_range`,
-///   a `fuelTypeID` in `fuel_type_ids`, and `stmyFraction > 0.0`;
+/// a `fuelTypeID` in `fuel_type_ids`, and `stmyFraction > 0.0`;
 /// * group by `(sourceTypeModelYearID, fuelTypeID, engTechID)`, additionally
-///   by `regClassID` when `is_reg_class_required` and by `shortModYrGroupID`
-///   when `is_my_group_required`, summing `stmyFraction`.
+/// by `regClassID` when `is_reg_class_required` and by `shortModYrGroupID`
+/// when `is_my_group_required`, summing `stmyFraction`.
 ///
 /// When a class/group is not required its id collapses to `0` in both the
 /// group key and the output (so, e.g., reg classes merge). `sourceBinID` is
@@ -1315,8 +1315,8 @@ fn aggregate_svp(
     is_reg_class_required: bool,
     is_my_group_required: bool,
 ) -> Vec<SbdgsvpRow> {
-    // PollutantProcessModelYear PK is (polProcessID, modelYearID); ModelYearGroup
-    // PK is modelYearGroupID — so each makes a unique lookup map.
+ // PollutantProcessModelYear PK is (polProcessID, modelYearID); ModelYearGroup
+ // PK is modelYearGroupID — so each makes a unique lookup map.
     let model_year_group_of: BTreeMap<(i64, i64), i64> = tables
         .pollutant_process_model_year
         .iter()
@@ -1328,9 +1328,9 @@ fn aggregate_svp(
         .map(|r| (r.model_year_group_id, r.short_mod_yr_group_id))
         .collect();
 
-    // Group key: (sourceTypeModelYearID, fuelTypeID, engTechID, regClassKey,
-    // shortKey). The map value accumulates the summed fraction in a fully
-    // populated row.
+ // Group key: (sourceTypeModelYearID, fuelTypeID, engTechID, regClassKey,
+ // shortKey). The map value accumulates the summed fraction in a fully
+ // populated row.
     let mut groups: BTreeMap<(i64, i64, i64, i64, i64), SbdgsvpRow> = BTreeMap::new();
 
     for row in tables.sample_vehicle_population {
@@ -1342,7 +1342,7 @@ fn aggregate_svp(
         if !in_scope {
             continue;
         }
-        // Inner joins: drop the row if either match is missing.
+ // Inner joins: drop the row if either match is missing.
         let Some(&model_year_group_id) =
             model_year_group_of.get(&(pol_process_id, row.model_year_id))
         else {
@@ -1427,7 +1427,7 @@ fn build_source_bin_distribution(
 ) -> Vec<SourceBinDistributionRow> {
     let mut by_bin: BTreeMap<(i64, i64), f64> = BTreeMap::new();
     for row in sbdgsvp {
-        *by_bin
+ *by_bin
             .entry((row.source_type_model_year_id, row.source_bin_id))
             .or_insert(0.0) += row.stmy_fraction;
     }
@@ -1475,7 +1475,7 @@ pub fn pollutant_process_distribution(
     );
     let to_use = source_types_to_use(tables.source_type_pol_process, pol_process_id, &blocked);
 
-    // (sourceTypeID, polProcessID) -> (isRegClassReqd, isMYGroupReqd).
+ // (sourceTypeID, polProcessID) -> (isRegClassReqd, isMYGroupReqd).
     let requirement_flags: BTreeMap<i64, (bool, bool)> = tables
         .source_type_pol_process
         .iter()
@@ -1490,7 +1490,7 @@ pub fn pollutant_process_distribution(
 
     let mut output = SourceBinDistributionOutput::default();
     for source_type_id in to_use {
-        // The Java skips a source type with no equipped fuels.
+ // The Java skips a source type with no equipped fuels.
         let Some(fuels) = fuels_by_source_type.get(&source_type_id) else {
             continue;
         };
@@ -1572,8 +1572,7 @@ fn source_bin_fuel_usage(
 /// Re-base a source-bin distribution from equipped fuels onto the fuels
 /// actually used in one `(process, county, year)`.
 ///
-/// Pure port of the Java `doCountyYear` (the `USE_FUELUSAGEFRACTION` branch —
-/// `CompilationFlags.USE_FUELUSAGEFRACTION` is `true`). It builds the
+/// Pure port of the Java `doCountyYear` (the `USE_FUELUSAGEFRACTION` branch/// `CompilationFlags.USE_FUELUSAGEFRACTION` is `true`). It builds the
 /// equipped→used remapping with `source_bin_fuel_usage`, then converts each
 /// in-scope distribution row:
 /// `sourceBinActivityFraction[usedSourceBinID] = sum(usageFraction *
@@ -1598,7 +1597,7 @@ pub fn county_year_distribution(
 ) -> Vec<SourceBinDistributionRow> {
     let usage = source_bin_fuel_usage(fuel_usage_fractions, source_bins, county_id, fuel_year_id);
 
-    // Index the remapping by equipped bin: equipped -> [(used, usageFraction)].
+ // Index the remapping by equipped bin: equipped -> [(used, usageFraction)].
     let mut used_by_equipped: BTreeMap<i64, Vec<(i64, f64)>> = BTreeMap::new();
     for u in &usage {
         used_by_equipped
@@ -1616,7 +1615,7 @@ pub fn county_year_distribution(
             continue;
         };
         for &(used_bin_id, usage_fraction) in remaps {
-            *by_used
+ *by_used
                 .entry((d.source_type_model_year_id, d.pol_process_id, used_bin_id))
                 .or_insert(0.0) += usage_fraction * d.source_bin_activity_fraction;
         }
@@ -1644,15 +1643,15 @@ pub fn county_year_distribution(
 /// The `SourceBinDistributionGenerator` MasterLoop generator.
 ///
 /// A zero-sized value type — like every `moves-framework` generator it owns no
-/// per-run state (the Task 50 `execute` wiring carries the `processesDone` /
+/// per-run state (the `execute` wiring carries the `processesDone` /
 /// `countyYearsDone` dedupe state). See the [module documentation](self) for
 /// the algorithm and the data-plane status.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SourceBinDistributionGenerator;
 
 impl SourceBinDistributionGenerator {
-    /// Stable module name — matches the `SourceBinDistributionGenerator` entry
-    /// in the Phase 1 calculator-chain DAG.
+ /// Stable module name — matches the `SourceBinDistributionGenerator` entry
+ /// in the calculator-chain DAG.
     pub const NAME: &'static str = "SourceBinDistributionGenerator";
 }
 
@@ -1740,17 +1739,17 @@ impl Generator for SourceBinDistributionGenerator {
         OUTPUT_TABLES
     }
 
-    /// Run the source-bin distribution for the current `(process, county, year)`
-    /// iteration.
-    ///
-    /// Reads all input tables from `ctx.tables()`, extracts the current position
-    /// (`process_id`, `county_id`, `year`) from `ctx.position()`, calls
-    /// [`pollutant_process_distribution`] for each `polProcessID` belonging to the
-    /// current process, then calls [`county_year_distribution`] to re-base on
-    /// the fuels actually used in this county/year. Writes `SourceBin` and
-    /// `SourceBinDistribution` rows to the scratch namespace.
+ /// Run the source-bin distribution for the current `(process, county, year)`
+ /// iteration.
+ ///
+ /// Reads all input tables from `ctx.tables()`, extracts the current position
+ /// (`process_id`, `county_id`, `year`) from `ctx.position()`, calls
+ /// [`pollutant_process_distribution`] for each `polProcessID` belonging to the
+ /// current process, then calls [`county_year_distribution`] to re-base on
+ /// the fuels actually used in this county/year. Writes `SourceBin` and
+ /// `SourceBinDistribution` rows to the scratch namespace.
     fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
-        // -- Extract position ---------------------------------------------------
+ // -- Extract position ---------------------------------------------------
         let pos = ctx.position();
         let process_id = pos
             .process_id
@@ -1764,7 +1763,7 @@ impl Generator for SourceBinDistributionGenerator {
             .year
             .ok_or_else(|| Error::Polars("no year in iteration position".into()))?;
 
-        // -- Read all input tables ----------------------------------------------
+ // -- Read all input tables ----------------------------------------------
         let svp: Vec<SampleVehiclePopulationRow> =
             ctx.tables().iter_typed("sampleVehiclePopulation")?;
         let ppmy: Vec<PollutantProcessModelYearRow> =
@@ -1783,12 +1782,12 @@ impl Generator for SourceBinDistributionGenerator {
         let age_cat: Vec<AgeCategoryRow> = ctx.tables().iter_typed("AgeCategory")?;
         let years: Vec<YearRow> = ctx.tables().iter_typed("Year")?;
 
-        // -- Compute helper data -----------------------------------------------
+ // -- Compute helper data -----------------------------------------------
 
-        // Max ageID for model-year-range calculation.
+ // Max ageID for model-year-range calculation.
         let max_age_id: i64 = age_cat.iter().map(|r| r.age_id).max().unwrap_or(0);
 
-        // Fuel year for the current calendar year.
+ // Fuel year for the current calendar year.
         let year_i64 = i64::from(year);
         let fuel_year_id: i64 = years
             .iter()
@@ -1796,15 +1795,15 @@ impl Generator for SourceBinDistributionGenerator {
             .map(|r| r.fuel_year_id)
             .unwrap_or(year_i64);
 
-        // Model-year range from the set of all calendar years in Year table.
+ // Model-year range from the set of all calendar years in Year table.
         let run_spec_years: Vec<i64> = years.iter().map(|r| r.year_id).collect();
         let year_range =
             model_year_range(&run_spec_years, max_age_id).unwrap_or(FALLBACK_MODEL_YEAR_RANGE);
 
-        // Fuels by source type.
+ // Fuels by source type.
         let fuels_by_source_type = fuel_types_by_source_type(&rsft);
 
-        // All polProcessIDs belonging to the current process.
+ // All polProcessIDs belonging to the current process.
         let process_id_i64 = i64::from(process_id.0);
         let process_pol_process_ids: BTreeSet<i64> = ppa
             .iter()
@@ -1812,7 +1811,7 @@ impl Generator for SourceBinDistributionGenerator {
             .map(|r| r.pol_process_id)
             .collect();
 
-        // Build the SourceBinTables view (starts with existing bins/dist).
+ // Build the SourceBinTables view (starts with existing bins/dist).
         let tables = SourceBinTables {
             sample_vehicle_population: &svp,
             pollutant_process_model_year: &ppmy,
@@ -1823,7 +1822,7 @@ impl Generator for SourceBinDistributionGenerator {
             source_bin_distribution: &existing_dist,
         };
 
-        // -- Run doPollutantProcess for each polProcessID ----------------------
+ // -- Run doPollutantProcess for each polProcessID ----------------------
         let mut all_new_bins: Vec<SourceBinRow> = Vec::new();
         let mut all_distribution: Vec<SourceBinDistributionRow> = Vec::new();
 
@@ -1838,11 +1837,11 @@ impl Generator for SourceBinDistributionGenerator {
             all_distribution.extend(out.distribution);
         }
 
-        // Collect all source bins (existing + newly generated).
+ // Collect all source bins (existing + newly generated).
         let mut all_bins: Vec<SourceBinRow> = existing_bins.clone();
         all_bins.extend(all_new_bins.iter().copied());
 
-        // -- Run doCountyYear --------------------------------------------------
+ // -- Run doCountyYear --------------------------------------------------
         let county_id_i64 = i64::from(county_id);
         let county_year_dist = county_year_distribution(
             &all_distribution,
@@ -1853,14 +1852,14 @@ impl Generator for SourceBinDistributionGenerator {
             fuel_year_id,
         );
 
-        // -- Write scratch tables ----------------------------------------------
-        // Write SourceBin (new bins only — existing ones are already in the store).
+ // -- Write scratch tables ----------------------------------------------
+ // Write SourceBin (new bins only — existing ones are already in the store).
         crate::wiring::write_scratch_table(ctx, "SourceBin", all_new_bins)?;
 
-        // Write SourceBinDistribution (the doPollutantProcess output).
+ // Write SourceBinDistribution (the doPollutantProcess output).
         crate::wiring::write_scratch_table(ctx, "SourceBinDistribution", all_distribution)?;
 
-        // Write the county-year rebased distribution under its process-specific name.
+ // Write the county-year rebased distribution under its process-specific name.
         let table_name =
             format!("sourceBinDistributionFuelUsage_{process_id_i64}_{county_id_i64}_{year_i64}");
         crate::wiring::write_scratch_table(ctx, &table_name, county_year_dist)
@@ -1871,14 +1870,14 @@ impl Generator for SourceBinDistributionGenerator {
 mod tests {
     use super::*;
 
-    /// f64 comparison tolerance for the activity-fraction sums under test.
+ /// f64 comparison tolerance for the activity-fraction sums under test.
     const EPS: f64 = 1e-9;
 
     fn close(a: f64, b: f64) -> bool {
         (a - b).abs() < EPS
     }
 
-    // -- compact row constructors -------------------------------------------
+ // -- compact row constructors -------------------------------------------
 
     fn svp(
         stmyid: i64,
@@ -1962,7 +1961,7 @@ mod tests {
         }
     }
 
-    // -- source_bin_id ------------------------------------------------------
+ // -- source_bin_id ------------------------------------------------------
 
     #[test]
     fn source_bin_id_marker_digit_only_when_all_components_zero() {
@@ -1979,20 +1978,20 @@ mod tests {
 
     #[test]
     fn source_bin_id_combines_components_additively() {
-        // Diesel (2), engTech 1, regClass 47, no short group.
+ // Diesel (2), engTech 1, regClass 47, no short group.
         assert_eq!(source_bin_id(2, 1, 47, 0), 1_020_147_000_000_000_000);
-        // All four slots populated.
+ // All four slots populated.
         assert_eq!(source_bin_id(2, 1, 20, 3), 1_020_120_030_000_000_000);
     }
 
     #[test]
     fn source_bin_id_stays_well_within_i64() {
-        // Even an out-of-band fuel id keeps the packed value positive.
+ // Even an out-of-band fuel id keeps the packed value positive.
         assert!(source_bin_id(90, 9, 99, 99) > 0);
         assert!(source_bin_id(90, 9, 99, 99) < i64::MAX);
     }
 
-    // -- model_year_range ---------------------------------------------------
+ // -- model_year_range ---------------------------------------------------
 
     #[test]
     fn model_year_range_spans_min_minus_age_to_max() {
@@ -2019,7 +2018,7 @@ mod tests {
         assert_eq!(FALLBACK_MODEL_YEAR_RANGE.last_model_year_needed, 2060);
     }
 
-    // -- fuel_types_by_source_type -----------------------------------------
+ // -- fuel_types_by_source_type -----------------------------------------
 
     #[test]
     fn fuel_types_grouped_and_deduplicated_per_source_type() {
@@ -2047,7 +2046,7 @@ mod tests {
         assert_eq!(map[&31], BTreeSet::from([2]));
     }
 
-    // -- block_source_types / source_types_to_use --------------------------
+ // -- block_source_types / source_types_to_use --------------------------
 
     #[test]
     fn block_source_types_collects_source_types_with_existing_distribution() {
@@ -2068,8 +2067,8 @@ mod tests {
 
     #[test]
     fn block_source_types_inner_join_drops_unmapped_rows() {
-        // The distribution row's sourceTypeModelYearID is absent from
-        // SourceTypeModelYear — the inner join drops it, so nothing is blocked.
+ // The distribution row's sourceTypeModelYearID is absent from
+ // SourceTypeModelYear — the inner join drops it, so nothing is blocked.
         let distribution = [sbd(999999, 101, 7, 0.5)];
         let stmy = [SourceTypeModelYearRow {
             source_type_model_year_id: 210020,
@@ -2090,7 +2089,7 @@ mod tests {
         assert_eq!(to_use, BTreeSet::from([21]));
     }
 
-    // -- aggregate_svp ------------------------------------------------------
+ // -- aggregate_svp ------------------------------------------------------
 
     #[test]
     fn aggregate_svp_merges_reg_classes_when_not_required() {
@@ -2217,7 +2216,7 @@ mod tests {
         assert!(out.is_empty(), "both rows fail an inner join");
     }
 
-    // -- new_source_bins / build_source_bin_distribution -------------------
+ // -- new_source_bins / build_source_bin_distribution -------------------
 
     #[test]
     fn pollutant_process_distribution_basic_two_source_types() {
@@ -2243,13 +2242,13 @@ mod tests {
         };
         let out = pollutant_process_distribution(101, &tables, &fuels, range);
 
-        // Both source types resolve to the same bin (fuel 1, engTech 1, no
-        // class/group) — it is emitted to SourceBin exactly once.
+ // Both source types resolve to the same bin (fuel 1, engTech 1, no
+ // class/group) — it is emitted to SourceBin exactly once.
         let bin_id = source_bin_id(1, 1, 0, 0);
         assert_eq!(out.new_source_bins.len(), 1);
         assert_eq!(out.new_source_bins[0].source_bin_id, bin_id);
 
-        // One distribution row per source type, each summing to 1.0.
+ // One distribution row per source type, each summing to 1.0.
         assert_eq!(out.distribution.len(), 2);
         for row in &out.distribution {
             assert_eq!(row.source_bin_id, bin_id);
@@ -2273,7 +2272,7 @@ mod tests {
         let ppmy_rows = [ppmy(101, 2020, 5)];
         let myg_rows = [myg(5, 50)];
         let stpp_rows = [stpp(21, 101, false, false), stpp(31, 101, false, false)];
-        // Source type 21 already has a distribution row for polProcess 101.
+ // Source type 21 already has a distribution row for polProcess 101.
         let existing_dist = [sbd(210020, 101, 42, 1.0)];
         let stmy_rows = [SourceTypeModelYearRow {
             source_type_model_year_id: 210020,
@@ -2295,7 +2294,7 @@ mod tests {
         };
         let out = pollutant_process_distribution(101, &tables, &fuels, range);
 
-        // Only source type 31 is (re)computed.
+ // Only source type 31 is (re)computed.
         assert_eq!(out.distribution.len(), 1);
         assert_eq!(out.distribution[0].source_type_model_year_id, 310020);
     }
@@ -2340,7 +2339,7 @@ mod tests {
             source_type_pol_process: &stpp_rows,
             ..empty_tables()
         };
-        // No fuels mapped for source type 21.
+ // No fuels mapped for source type 21.
         let fuels = BTreeMap::new();
         let range = ModelYearRange {
             first_model_year_needed: 2000,
@@ -2363,7 +2362,7 @@ mod tests {
         assert_eq!(out, SourceBinDistributionOutput::default());
     }
 
-    // -- county_year_distribution ------------------------------------------
+ // -- county_year_distribution ------------------------------------------
 
     #[test]
     fn county_year_distribution_remaps_equipped_fuel_to_used_fuel() {
@@ -2421,7 +2420,7 @@ mod tests {
         let out =
             county_year_distribution(&distribution, &source_bins, &fuel_usage, &valid, 5, 2020);
 
-        // Only the polProcess-101 row, only the county-5 fuel-usage row.
+ // Only the polProcess-101 row, only the county-5 fuel-usage row.
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].pol_process_id, 101);
         assert!(close(out[0].source_bin_activity_fraction, 0.8));
@@ -2468,7 +2467,7 @@ mod tests {
         assert!(close(out[1].source_bin_activity_fraction, 0.5)); // 0.25 * 2.0
     }
 
-    // -- Generator trait ----------------------------------------------------
+ // -- Generator trait ----------------------------------------------------
 
     #[test]
     fn generator_name_matches_dag_module() {
@@ -2479,7 +2478,7 @@ mod tests {
 
     #[test]
     fn subscribed_process_names_resolve_to_nine_processes() {
-        // "Evap Non-Fuel Vapors" has no MOVES process; the rest resolve.
+ // "Evap Non-Fuel Vapors" has no MOVES process; the rest resolve.
         let resolved: Vec<&str> = SUBSCRIBED_PROCESS_NAMES
             .iter()
             .copied()
@@ -2502,7 +2501,7 @@ mod tests {
             assert_eq!(sub.priority, priority);
         }
 
-        // Process ids per characterization/calculator-chains/calculator-dag.json.
+ // Process ids per characterization/calculator-chains/calculator-dag.json.
         let process_ids: BTreeSet<u16> = subs.iter().map(|s| s.process_id.0).collect();
         assert_eq!(
             process_ids,
@@ -2531,17 +2530,17 @@ mod tests {
 
     #[test]
     fn execute_round_trip_produces_source_bin_and_distribution() {
-        // Integration test: wire all input tables into a CalculatorContext,
-        // execute the generator, and confirm SourceBin + SourceBinDistribution
-        // appear in scratch with the expected content.
+ // Integration test: wire all input tables into a CalculatorContext,
+ // execute the generator, and confirm SourceBin + SourceBinDistribution
+ // appear in scratch with the expected content.
         use moves_data::ProcessId;
         use moves_framework::execution::execution_db::{
             ExecutionLocation, ExecutionTime, IterationPosition,
         };
         use moves_framework::{DataFrameStore, InMemoryStore};
 
-        // ---- position --------------------------------------------------------
-        // Process 1 = Running Exhaust; county 99001; year 2020.
+ // ---- position --------------------------------------------------------
+ // Process 1 = Running Exhaust; county 99001; year 2020.
         let pos = IterationPosition {
             iteration: 0,
             process_id: Some(ProcessId(1)),
@@ -2549,10 +2548,10 @@ mod tests {
             time: ExecutionTime::year(2020),
         };
 
-        // ---- input data ------------------------------------------------------
-        // One source type (21), one fuel type (1), one model year (2020),
-        // one reg class (10), one eng tech (1). polProcessID = 101 (pollutant
-        // 1, process 1).
+ // ---- input data ------------------------------------------------------
+ // One source type (21), one fuel type (1), one model year (2020),
+ // one reg class (10), one eng tech (1). polProcessID = 101 (pollutant
+ // 1, process 1).
 
         let stmy_id: i64 = 210020; // sourceTypeID * 10000 + modelYearID
         let pol_process_id: i64 = 101; // pollutant 1 * 100 + process 1
@@ -2624,14 +2623,14 @@ mod tests {
             .unwrap(),
         );
 
-        // Empty existing SourceBin and SourceBinDistribution tables.
+ // Empty existing SourceBin and SourceBinDistribution tables.
         store.insert("SourceBin", SourceBinRow::into_dataframe(vec![]).unwrap());
         store.insert(
             "SourceBinDistribution",
             SourceBinDistributionRow::into_dataframe(vec![]).unwrap(),
         );
 
-        // fuelUsageFraction: fuel 1 maps entirely to itself (no switching).
+ // fuelUsageFraction: fuel 1 maps entirely to itself (no switching).
         let equipped_bin = source_bin_id(1, 1, 0, 0);
         store.insert(
             "fuelUsageFraction",
@@ -2646,7 +2645,7 @@ mod tests {
             .unwrap(),
         );
 
-        // PollutantProcessAssoc: polProcessID 101 → processID 1.
+ // PollutantProcessAssoc: polProcessID 101 → processID 1.
         store.insert(
             "PollutantProcessAssoc",
             PollutantProcessAssocRow::into_dataframe(vec![PollutantProcessAssocRow {
@@ -2657,7 +2656,7 @@ mod tests {
             .unwrap(),
         );
 
-        // AgeCategory: one age (30 years max).
+ // AgeCategory: one age (30 years max).
         store.insert(
             "AgeCategory",
             AgeCategoryRow::into_dataframe(vec![AgeCategoryRow {
@@ -2667,7 +2666,7 @@ mod tests {
             .unwrap(),
         );
 
-        // Year table: 2020 → fuelYear 2020.
+ // Year table: 2020 → fuelYear 2020.
         store.insert(
             "Year",
             YearRow::into_dataframe(vec![YearRow {
@@ -2677,13 +2676,13 @@ mod tests {
             .unwrap(),
         );
 
-        // ---- execute ---------------------------------------------------------
+ // ---- execute ---------------------------------------------------------
         let mut ctx = CalculatorContext::with_position_and_tables(pos, store);
         let result = SourceBinDistributionGenerator.execute(&mut ctx);
         assert!(result.is_ok(), "execute failed: {result:?}");
 
-        // ---- inspect scratch -------------------------------------------------
-        // SourceBin scratch should have the one new bin.
+ // ---- inspect scratch -------------------------------------------------
+ // SourceBin scratch should have the one new bin.
         let bins: Vec<SourceBinRow> = ctx
             .scratch()
             .store
@@ -2698,7 +2697,7 @@ mod tests {
         assert_eq!(bins[0].eng_size_id, 0);
         assert_eq!(bins[0].weight_class_id, 0);
 
-        // SourceBinDistribution scratch should have one distribution row.
+ // SourceBinDistribution scratch should have one distribution row.
         let dist: Vec<SourceBinDistributionRow> = ctx
             .scratch()
             .store
@@ -2710,7 +2709,7 @@ mod tests {
         assert_eq!(dist[0].source_bin_id, equipped_bin);
         assert!((dist[0].source_bin_activity_fraction - 1.0).abs() < 1e-9);
 
-        // County-year rebased distribution should exist under the process-specific name.
+ // County-year rebased distribution should exist under the process-specific name.
         let fuel_usage_table =
             format!("sourceBinDistributionFuelUsage_1_{}_{}", county_id, year_id);
         let cyd: Vec<SourceBinDistributionRow> = ctx

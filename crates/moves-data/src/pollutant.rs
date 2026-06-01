@@ -7,7 +7,7 @@
 //!
 //! Runtime metadata not stored on the static records (display group,
 //! `isAffectedByOnroad`/`Nonroad`, etc.) lives in the data plane and is
-//! reconciled at runtime by `moves-framework` (Task 50/89).
+//! reconciled at runtime by `moves-framework`.
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -66,42 +66,42 @@ impl FromStr for PollutantId {
 /// the fields are public so consumers can pattern-match.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Pollutant {
-    /// Database key (`pollutantID`).
+ /// Database key (`pollutantID`).
     pub id: PollutantId,
-    /// Display name as it appears in the default DB.
+ /// Display name as it appears in the default DB.
     pub name: &'static str,
 }
 
 impl Pollutant {
-    /// Look up the canonical pollutant with the given id.
-    ///
-    /// Returns `None` if no canonical pollutant has the id.
+ /// Look up the canonical pollutant with the given id.
+ ///
+ /// Returns `None` if no canonical pollutant has the id.
     #[must_use]
     pub fn find_by_id(id: PollutantId) -> Option<Self> {
         BY_ID.get(&id.0).copied()
     }
 
-    /// Look up the canonical pollutant with the given name.
-    ///
-    /// Case-insensitive (ASCII). Also accepts a numeric id encoded as a
-    /// string — `"1"` resolves to "Total Gaseous Hydrocarbons" — matching
-    /// the Java [`Pollutant.findByName`] fallback that lets RunSpec text
-    /// fields carry either form.
-    ///
-    /// [`Pollutant.findByName`]: https://github.com/USEPA/EPA_MOVES_Model/blob/main/gov/epa/otaq/moves/master/framework/Pollutant.java
+ /// Look up the canonical pollutant with the given name.
+ ///
+ /// Case-insensitive (ASCII). Also accepts a numeric id encoded as a
+ /// string — `"1"` resolves to "Total Gaseous Hydrocarbons" — matching
+ /// the Java [`Pollutant.findByName`] fallback that lets RunSpec text
+ /// fields carry either form.
+ ///
+ /// [`Pollutant.findByName`]: https://github.com/USEPA/EPA_MOVES_Model/blob/main/gov/epa/otaq/moves/master/framework/Pollutant.java
     #[must_use]
     pub fn find_by_name(name: &str) -> Option<Self> {
         let key = name.to_ascii_lowercase();
         if let Some(hit) = BY_NAME_LOWER.get(key.as_str()).copied() {
             return Some(hit);
         }
-        // Java accepts the numeric id as a name too — `"1"` is a valid lookup.
+ // Java accepts the numeric id as a name too — `"1"` is a valid lookup.
         name.parse::<u16>()
             .ok()
             .and_then(|n| Self::find_by_id(PollutantId(n)))
     }
 
-    /// Iterate every canonical pollutant in ascending-id order.
+ /// Iterate every canonical pollutant in ascending-id order.
     pub fn all() -> impl Iterator<Item = Self> {
         ALL_POLLUTANTS.iter().copied()
     }
@@ -915,10 +915,10 @@ static BY_NAME_LOWER: phf::Map<&'static str, Pollutant> = phf::phf_map! {
 mod tests {
     use super::*;
 
-    // Ports the spirit of `gov/epa/otaq/moves/master/framework/PollutantTest.java`.
-    // The Java test creates synthetic mutable instances; the Rust port replaces
-    // the mutable registry with compile-time canonical phf maps, so the test
-    // covers the canonical lookups instead.
+ // Ports the spirit of `gov/epa/otaq/moves/master/framework/PollutantTest.java`.
+ // The Java test creates synthetic mutable instances; the Rust port replaces
+ // the mutable registry with compile-time canonical phf maps, so the test
+ // covers the canonical lookups instead.
 
     #[test]
     fn find_by_id_returns_canonical_match() {
@@ -929,7 +929,7 @@ mod tests {
 
     #[test]
     fn find_by_id_returns_none_for_unknown() {
-        // 7777 sits in the gap between canonical ids — explicitly not assigned.
+ // 7777 sits in the gap between canonical ids — explicitly not assigned.
         assert!(Pollutant::find_by_id(PollutantId(7777)).is_none());
     }
 
@@ -945,8 +945,8 @@ mod tests {
 
     #[test]
     fn find_by_name_accepts_numeric_id_fallback() {
-        // The Java findByName falls back to numeric-id matching when the
-        // input parses as a number — runspec text fields may carry either form.
+ // The Java findByName falls back to numeric-id matching when the
+ // input parses as a number — runspec text fields may carry either form.
         let by_name = Pollutant::find_by_name("Total Gaseous Hydrocarbons").unwrap();
         let by_numeric = Pollutant::find_by_name("1").unwrap();
         assert_eq!(by_name, by_numeric);

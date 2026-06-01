@@ -1,6 +1,6 @@
 //! `moves-importer-pdb` — Project-scale (PDB) input-database importer.
 //!
-//! Phase 4 Task 84 of the Rust port. Reads the project-scale CSV
+//! of the Rust port. Reads the project-scale CSV
 //! tables a MOVES user authors against the PDB template, validates
 //! per-cell types and (against an optional [`RunSpecFilter`])
 //! membership constraints, runs the cross-row invariants Java
@@ -12,18 +12,18 @@
 //! Java's `ImporterInstantiator` tags five importers as
 //! project-only (`|project|` purpose without `|county|`):
 //!
-//! | Java importer                     | Table                     | Module                                       |
+//! | Java importer | Table | Module |
 //! |-----------------------------------|---------------------------|----------------------------------------------|
-//! | `LinkImporter`                    | `Link`                    | [`tables::link`]                              |
-//! | `LinkSourceTypeHourImporter`      | `linkSourceTypeHour`      | [`tables::link_source_type_hour`]             |
-//! | `DriveScheduleSecondLinkImporter` | `driveScheduleSecondLink` | [`tables::drive_schedule_second_link`]        |
-//! | `OffNetworkLinkImporter`          | `offNetworkLink`          | [`tables::off_network_link`]                  |
-//! | `LinkOpmodeDistributionImporter`  | `OpModeDistribution`      | [`tables::op_mode_distribution`]              |
+//! | `LinkImporter` | `Link` | [`tables::link`] |
+//! | `LinkSourceTypeHourImporter` | `linkSourceTypeHour` | [`tables::link_source_type_hour`] |
+//! | `DriveScheduleSecondLinkImporter` | `driveScheduleSecondLink` | [`tables::drive_schedule_second_link`] |
+//! | `OffNetworkLinkImporter` | `offNetworkLink` | [`tables::off_network_link`] |
+//! | `LinkOpmodeDistributionImporter` | `OpModeDistribution` | [`tables::op_mode_distribution`] |
 //!
 //! The other importers Java reuses across project + county domains
 //! (`AgeDistribution`, `Fuel`, `Meteorology`, `Zone`, `Hotelling`,
 //! `IM`, `OnRoadRetrofit`, `Generic`, `AVFT`) belong to the CDB
-//! importer crate (Task 83) — they share the same `BasicDataHandler`
+//! importer crate — they share the same `BasicDataHandler`
 //! plumbing, so once that lands the per-table modules will consume the
 //! same [`csv_reader`] and [`parquet_writer`] this crate already
 //! exposes.
@@ -35,14 +35,14 @@
 //! use moves_importer_pdb::{filter::RunSpecFilter, ImportSession};
 //!
 //! let runspec = RunSpecFilter::default()
-//!     .with_counties([26161])
-//!     .with_zones([261610]);
+//! .with_counties([26161])
+//! .with_zones([261610]);
 //!
 //! let session = ImportSession::builder("/tmp/pdb-out", &runspec)
-//!     .with_link("/tmp/link.csv")
-//!     .with_link_source_type_hour("/tmp/link_source_type_hour.csv")
-//!     .with_drive_schedule_second_link("/tmp/drive_schedule.csv")
-//!     .build()?;
+//! .with_link("/tmp/link.csv")
+//! .with_link_source_type_hour("/tmp/link_source_type_hour.csv")
+//! .with_drive_schedule_second_link("/tmp/drive_schedule.csv")
+//! .build()?;
 //! let manifest = session.write_to_disk()?;
 //! println!("loaded {} tables", manifest.tables.len());
 //! # Ok::<(), moves_importer_pdb::Error>(())
@@ -51,14 +51,14 @@
 //! ## What we don't replicate
 //!
 //! * **Excel input.** Java's `CellFileReader` reads `.xls`/`.xlsx`
-//!   transparently via Apache POI. We support CSV only.
+//! transparently via Apache POI. We support CSV only.
 //! * **GUI template generation.** The Java importers emit
-//!   pre-populated CSV templates the user fills in. That's a CLI
-//!   concern — see Phase 5+ tooling.
+//! pre-populated CSV templates the user fills in. That's a CLI
+//! concern — see+ tooling.
 //! * **MariaDB `LOAD DATA INFILE`.** Java loads into a temporary
-//!   MariaDB instance after CSV parsing. The Rust port writes
-//!   straight to Parquet; the runtime reader (`moves-data-default`,
-//!   Task 82) consumes that Parquet directly.
+//! MariaDB instance after CSV parsing. The Rust port writes
+//! straight to Parquet; the runtime reader (`moves-data-default`,
+//! ) consumes that Parquet directly.
 
 pub mod csv_reader;
 pub mod error;
@@ -102,9 +102,9 @@ struct PlanEntry {
 }
 
 impl<'a> ImportSession<'a> {
-    /// Begin building a session. `output_root` is the directory that
-    /// will receive `<table>.parquet` files plus `manifest.json`. The
-    /// directory is created on `write_to_disk` if it doesn't exist.
+ /// Begin building a session. `output_root` is the directory that
+ /// will receive `<table>.parquet` files plus `manifest.json`. The
+ /// directory is created on `write_to_disk` if it doesn't exist.
     pub fn builder<P: Into<PathBuf>>(
         output_root: P,
         runspec: &'a RunSpecFilter,
@@ -116,8 +116,8 @@ impl<'a> ImportSession<'a> {
         }
     }
 
-    /// Read every planned CSV, write the Parquet files atomically,
-    /// and write `manifest.json` alongside them. Returns the manifest.
+ /// Read every planned CSV, write the Parquet files atomically,
+ /// and write `manifest.json` alongside them. Returns the manifest.
     pub fn write_to_disk(&self) -> Result<Manifest> {
         std::fs::create_dir_all(&self.output_root).map_err(|source| Error::Io {
             path: self.output_root.clone(),

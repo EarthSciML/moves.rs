@@ -309,7 +309,7 @@ mod tests {
         let path = dir.path().join("out.bin");
         write_atomic(&path, b"hello").unwrap();
         assert_eq!(std::fs::read(&path).unwrap(), b"hello");
-        // No leftover .tmp file.
+ // No leftover .tmp file.
         let entries: Vec<_> = std::fs::read_dir(dir.path())
             .unwrap()
             .map(|e| e.unwrap().file_name().into_string().unwrap())

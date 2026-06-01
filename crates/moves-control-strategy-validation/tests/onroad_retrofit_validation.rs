@@ -1,7 +1,7 @@
-//! OnRoadRetrofit control-strategy validation (Phase 6 Task 124).
+//! OnRoadRetrofit control-strategy validation.
 //!
 //! Canonical Java formula:
-//!   `factor = ∏ over active programs p of (1 − p.fraction × p.effectiveness)`
+//! `factor = ∏ over active programs p of (1 − p.fraction × p.effectiveness)`
 //!
 //! "Active" means `p.retrofitYearID ≤ analysisYear` AND model year within
 //! `[p.startModelYear, p.endModelYear]`. Source: `OnRoadRetrofit.java` in
@@ -84,9 +84,9 @@ fn zero_fraction_retrofitted_means_no_adjustment() {
 
 #[test]
 fn two_programs_same_scope_multiply() {
-    // Program A: 30% of fleet, 60% effective → factor = 1 − 0.30×0.60 = 0.82
-    // Program B: 20% of fleet, 50% effective → factor = 1 − 0.20×0.50 = 0.90
-    // Combined: 0.82 × 0.90 = 0.738
+ // Program A: 30% of fleet, 60% effective → factor = 1 − 0.30×0.60 = 0.82
+ // Program B: 20% of fleet, 50% effective → factor = 1 − 0.20×0.50 = 0.90
+ // Combined: 0.82 × 0.90 = 0.738
     let programs: RetrofitTable = [
         rec(11, 2000, 2015, 2010, 3, 1, 0.30, 0.60),
         rec(11, 2000, 2015, 2015, 3, 1, 0.20, 0.50),
@@ -103,11 +103,11 @@ fn two_programs_same_scope_multiply() {
 
 #[test]
 fn three_programs_compound() {
-    // Three programs, each with distinct non-trivial parameters.
-    // Program A: fraction=0.40, effectiveness=0.70 → factor = 0.72
-    // Program B: fraction=0.25, effectiveness=0.80 → factor = 0.80
-    // Program C: fraction=0.10, effectiveness=0.90 → factor = 0.91
-    // Combined: 0.72 × 0.80 × 0.91 = 0.52416
+ // Three programs, each with distinct non-trivial parameters.
+ // Program A: fraction=0.40, effectiveness=0.70 → factor = 0.72
+ // Program B: fraction=0.25, effectiveness=0.80 → factor = 0.80
+ // Program C: fraction=0.10, effectiveness=0.90 → factor = 0.91
+ // Combined: 0.72 × 0.80 × 0.91 = 0.52416
     let programs: RetrofitTable = [
         rec(21, 2010, 2020, 2018, 98, 1, 0.40, 0.70),
         rec(21, 2010, 2020, 2020, 98, 1, 0.25, 0.80),
@@ -132,7 +132,7 @@ fn future_retrofit_year_not_yet_applied() {
     let programs: RetrofitTable = [rec(11, 2005, 2015, 2030, 3, 1, 0.50, 0.80)]
         .into_iter()
         .collect();
-    // Analysis year 2025 < retrofitYear 2030 → program not yet active.
+ // Analysis year 2025 < retrofitYear 2030 → program not yet active.
     let actual = programs.combined_factor(11, 2010, 3, 1, 2025);
     assert!(
         (actual - 1.0).abs() < 1e-12,
@@ -207,7 +207,7 @@ fn two_source_types_independent_factors() {
     let f21 = programs.combined_factor(21, 2010, 3, 1, 2025);
     assert!((f11 - (1.0 - 0.25 * 0.80)).abs() < 1e-12);
     assert!((f21 - (1.0 - 0.40 * 0.60)).abs() < 1e-12);
-    // Cross-type: source 21's programs do not bleed into source 11.
+ // Cross-type: source 21's programs do not bleed into source 11.
     assert!((f11 - f21).abs() > 1e-6, "source types must be independent");
 }
 

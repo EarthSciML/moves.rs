@@ -4,20 +4,20 @@
 //! `gov.epa.otaq.moves.master.framework`:
 //!
 //! * `MasterLoopGranularity` → [`Granularity`], re-exported from
-//!   [`moves_calculator_info`]. Phase 1 already encoded the constants and
-//!   the [`Granularity::execution_index`] sort key.
+//! [`moves_calculator_info`]. already encoded the constants and
+//! the [`Granularity::execution_index`] sort key.
 //! * `MasterLoopable` → [`MasterLoopable`] trait.
 //! * `MasterLoopableSubscription` → [`MasterLoopableSubscription`] record
-//!   with [`Ord`] matching Java's `compareTo`.
-//! * `MasterLoop` → [`MasterLoop`] iteration engine (Task 20) walking
-//!   `iteration → process → state → county → zone → link → year → month →
-//!   day → hour` and dispatching subscribers on entry (forward pass) and
-//!   exit (cleanup pass) at each level. The engine consumes
-//!   [`crate::ExecutionLocation`] / [`crate::ExecutionTime`] values
-//!   (Task 23) and writes the firing position into
-//!   [`MasterLoopContext::position`].
+//! with [`Ord`] matching Java's `compareTo`.
+//! * `MasterLoop` → [`MasterLoop`] iteration engine walking
+//! `iteration → process → state → county → zone → link → year → month →
+//! day → hour` and dispatching subscribers on entry (forward pass) and
+//! exit (cleanup pass) at each level. The engine consumes
+//! [`crate::ExecutionLocation`] / [`crate::ExecutionTime`] values
+//! and writes the firing position into
+//! [`MasterLoopContext::position`].
 //!
-//! Task 21 (`notifyLoopablesOfLoopChange` / `hasLoopables`) refines the
+//! (`notifyLoopablesOfLoopChange` / `hasLoopables`) refines the
 //! dispatch inside [`MasterLoop::run`] with the `hasLoopables`
 //! short-circuit: the `year → month → day → hour` nest descends only as
 //! deep as the finest registered subscription, so a run whose
@@ -34,13 +34,13 @@
 //! Sort order, smallest first:
 //!
 //! 1. Granularity, coarse → fine. PROCESS first; HOUR next-to-last;
-//!    MATCH_FINEST last. See [`Granularity::execution_index`].
+//! MATCH_FINEST last. See [`Granularity::execution_index`].
 //! 2. Priority, high → low. Higher integer priorities fire earlier inside
-//!    the same granularity bucket.
+//! the same granularity bucket.
 //! 3. Loopable identity. Two subscriptions of the same [`Arc`]ed loopable
-//!    compare equal; subscriptions of different loopables get a stable
-//!    non-equal ordering. The relative order between different loopables
-//!    is unspecified (same as Java).
+//! compare equal; subscriptions of different loopables get a stable
+//! non-equal ordering. The relative order between different loopables
+//! is unspecified (same as Java).
 
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
@@ -61,50 +61,50 @@ pub use moves_calculator_info::Granularity;
 /// subscriber reads `position.process_id` and `position.location.state_id`
 /// and ignores the rest. Location / time components below the firing
 /// granularity hold `None`, matching the [`ExecutionLocation`] /
-/// [`ExecutionTime`] convention from Task 23.
+/// [`ExecutionTime`] convention from.
 ///
-/// The Task 19 adapter that bridges [`MasterLoopable`] to
+/// The adapter that bridges [`MasterLoopable`] to
 /// [`crate::Calculator`] reads `position` here and builds the
 /// corresponding [`crate::CalculatorContext`] for the calculator
 /// callback.
 #[derive(Debug, Clone, Default)]
 pub struct MasterLoopContext {
-    /// Current iteration counter, process, location, and time. Updated
-    /// in place as [`MasterLoop`] descends and ascends each level.
+ /// Current iteration counter, process, location, and time. Updated
+ /// in place as [`MasterLoop`] descends and ascends each level.
     pub position: IterationPosition,
-    /// Granularity bucket the loop is currently firing. `None` while the
-    /// loop is initialising.
+ /// Granularity bucket the loop is currently firing. `None` while the
+ /// loop is initialising.
     pub execution_granularity: Option<Granularity>,
-    /// Priority of the subscription firing this context. Higher integers
-    /// fire earlier inside a granularity bucket.
+ /// Priority of the subscription firing this context. Higher integers
+ /// fire earlier inside a granularity bucket.
     pub execution_priority: i32,
-    /// `false` for the forward pass (calls
-    /// [`MasterLoopable::execute_at_granularity`]); `true` for the reverse
-    /// pass (calls [`MasterLoopable::clean_data_loop`]).
+ /// `false` for the forward pass (calls
+ /// [`MasterLoopable::execute_at_granularity`]); `true` for the reverse
+ /// pass (calls [`MasterLoopable::clean_data_loop`]).
     pub is_clean_up: bool,
 }
 
 /// Implemented by every object that participates in MasterLoop iteration.
 /// Ports [`MasterLoopable`](https://github.com/USEPA/EPA_MOVES_Model/blob/HEAD/gov/epa/otaq/moves/master/framework/MasterLoopable.java).
 ///
-/// Generators and emission calculators (Phase 2 Task 18) are the principal
+/// Generators and emission calculators are the principal
 /// implementors. Java's `subscribeToMe(MasterLoop)` is intentionally not
 /// part of the trait: the Rust port drives subscription through
-/// `CalculatorRegistry` (Task 19), not by asking each loopable to
+/// `CalculatorRegistry`, not by asking each loopable to
 /// self-register.
 ///
 /// Java's `executeLoop` is renamed [`MasterLoopable::execute_at_granularity`]
-/// per the migration plan (Task 21).
+/// per the .
 pub trait MasterLoopable: Send + Sync + std::fmt::Debug {
-    /// Run the subscriber for the current loop context. Fires once per
-    /// iteration at the granularity the subscription was registered at.
+ /// Run the subscriber for the current loop context. Fires once per
+ /// iteration at the granularity the subscription was registered at.
     fn execute_at_granularity(&self, context: &MasterLoopContext) -> Result<(), Error>;
 
-    /// Cleanup pass for data created during
-    /// [`MasterLoopable::execute_at_granularity`]. Most emission calculators
-    /// have an empty implementation; generators override this to drop their
-    /// per-iteration scratch tables. Default no-op, matching the Java-side
-    /// convention.
+ /// Cleanup pass for data created during
+ /// [`MasterLoopable::execute_at_granularity`]. Most emission calculators
+ /// have an empty implementation; generators override this to drop their
+ /// per-iteration scratch tables. Default no-op, matching the Java-side
+ /// convention.
     fn clean_data_loop(&self, _context: &MasterLoopContext) -> Result<(), Error> {
         Ok(())
     }
@@ -124,16 +124,16 @@ pub trait MasterLoopable: Send + Sync + std::fmt::Debug {
 /// when subscribing.
 #[derive(Debug, Clone)]
 pub struct MasterLoopableSubscription {
-    /// Granularity bucket this subscription fires in.
+ /// Granularity bucket this subscription fires in.
     pub granularity: Granularity,
-    /// Priority within the granularity bucket. Higher fires earlier.
+ /// Priority within the granularity bucket. Higher fires earlier.
     pub priority: i32,
-    /// The loopable to fire.
+ /// The loopable to fire.
     pub loopable: Arc<dyn MasterLoopable>,
 }
 
 impl MasterLoopableSubscription {
-    /// Construct a subscription from its three components.
+ /// Construct a subscription from its three components.
     pub fn new(granularity: Granularity, priority: i32, loopable: Arc<dyn MasterLoopable>) -> Self {
         Self {
             granularity,
@@ -158,7 +158,7 @@ impl PartialOrd for MasterLoopableSubscription {
 }
 
 impl Ord for MasterLoopableSubscription {
-    /// Java-faithful ordering. See module docs for the full invariant.
+ /// Java-faithful ordering. See module docs for the full invariant.
     fn cmp(&self, other: &Self) -> Ordering {
         let g = self
             .granularity
@@ -167,18 +167,18 @@ impl Ord for MasterLoopableSubscription {
         if g != Ordering::Equal {
             return g;
         }
-        // Higher priority sorts first → reverse natural integer order.
-        // Java: `other.priority - this.priority`.
+ // Higher priority sorts first → reverse natural integer order.
+ // Java: `other.priority - this.priority`.
         let p = other.priority.cmp(&self.priority);
         if p != Ordering::Equal {
             return p;
         }
-        // Identity tie-break. Java compares `Object.hashCode()`, which for
-        // objects without an overridden `hashCode` is a JVM-assigned
-        // identity hash; the Arc data-pointer address gives the equivalent
-        // stable-within-a-run semantics in Rust. Cast to `*const ()` to
-        // strip the vtable half of the `dyn` fat pointer — fat pointers
-        // don't impl `Ord` directly.
+ // Identity tie-break. Java compares `Object.hashCode()`, which for
+ // objects without an overridden `hashCode` is a JVM-assigned
+ // identity hash; the Arc data-pointer address gives the equivalent
+ // stable-within-a-run semantics in Rust. Cast to `*const ()` to
+ // strip the vtable half of the `dyn` fat pointer — fat pointers
+ // don't impl `Ord` directly.
         let lhs = Arc::as_ptr(&self.loopable) as *const ();
         let rhs = Arc::as_ptr(&other.loopable) as *const ();
         lhs.cmp(&rhs)
@@ -193,22 +193,22 @@ impl Ord for MasterLoopableSubscription {
 /// [`MasterLoop.java`](https://github.com/USEPA/EPA_MOVES_Model/blob/HEAD/gov/epa/otaq/moves/master/framework/MasterLoop.java).
 /// The Java code interleaves the iteration scaffolding with `MOVESThread`-
 /// based parallel bundle execution; the Rust port keeps only the
-/// scaffolding. The migration plan calls that split out explicitly: the
-/// bundle-level parallelism is Phase 4 territory and is replaced by
-/// structured concurrency at the engine layer (Task 25), not here.
+/// scaffolding. The calls that split out explicitly: the
+/// bundle-level parallelism is territory and is replaced by
+/// structured concurrency at the engine layer, not here.
 ///
 /// # Iteration order
 ///
 /// [`MasterLoop::run`] walks the nested loop:
 ///
 /// 1. `iteration` — `0..self.iterations` (rare; almost always one
-///    iteration, matching `MOVESEngine.numIterations`).
+/// iteration, matching `MOVESEngine.numIterations`).
 /// 2. `process` — every [`moves_data::ProcessId`] in
-///    [`MasterLoop::processes`].
+/// [`MasterLoop::processes`].
 /// 3. `state` → `county` → `zone` → `link` — grouped from
-///    [`MasterLoop::locations`] by leading IDs.
+/// [`MasterLoop::locations`] by leading IDs.
 /// 4. `year` → `month` → `day_id` → `hour` — grouped from
-///    [`MasterLoop::times`] by leading components.
+/// [`MasterLoop::times`] by leading components.
 ///
 /// Each location / time level fires its subscribers on entry (forward
 /// pass, [`MasterLoopable::execute_at_granularity`]) and on exit, after
@@ -216,7 +216,7 @@ impl Ord for MasterLoopableSubscription {
 /// (cleanup pass, [`MasterLoopable::clean_data_loop`]). `MatchFinest`
 /// subscriptions pin to the deepest level in play (`HOUR` for inventory
 /// runs) and fire after the `HOUR` subscriptions on each `HOUR`
-/// iteration. The `hasLoopables` short-circuit (Task 21) trims the
+/// iteration. The `hasLoopables` short-circuit trims the
 /// time nest to the finest granularity anyone subscribes at: a run
 /// whose subscribers all sit at `PROCESS` never enters the
 /// `year → month → day → hour` nest at all. See the private
@@ -251,21 +251,21 @@ impl Ord for MasterLoopableSubscription {
 /// erroring `run` unwinds.
 #[derive(Debug)]
 pub struct MasterLoop {
-    /// Number of top-level iterations. Defaults to `1`. `0` causes
-    /// [`run`](Self::run) to be a no-op.
+ /// Number of top-level iterations. Defaults to `1`. `0` causes
+ /// [`run`](Self::run) to be a no-op.
     pub iterations: u32,
-    /// Processes to iterate; the full `location × time` nest runs once
-    /// per process.
+ /// Processes to iterate; the full `location × time` nest runs once
+ /// per process.
     pub processes: Vec<moves_data::ProcessId>,
-    /// Fully-specified locations to iterate (every id `Some`). Grouped
-    /// at runtime into the `state → county → zone → link` nest.
+ /// Fully-specified locations to iterate (every id `Some`). Grouped
+ /// at runtime into the `state → county → zone → link` nest.
     pub locations: Vec<ExecutionLocation>,
-    /// Fully-specified times to iterate (every field `Some`). Grouped
-    /// at runtime into the `year → month → day_id → hour` nest.
+ /// Fully-specified times to iterate (every field `Some`). Grouped
+ /// at runtime into the `year → month → day_id → hour` nest.
     pub times: Vec<ExecutionTime>,
-    /// Sorted subscriptions. Maintained in
-    /// [`MasterLoopableSubscription::cmp`] order by
-    /// [`subscribe`](Self::subscribe).
+ /// Sorted subscriptions. Maintained in
+ /// [`MasterLoopableSubscription::cmp`] order by
+ /// [`subscribe`](Self::subscribe).
     subscriptions: Vec<MasterLoopableSubscription>,
 }
 
@@ -276,9 +276,9 @@ impl Default for MasterLoop {
 }
 
 impl MasterLoop {
-    /// Empty loop with `iterations = 1`. Populate `processes`,
-    /// `locations`, `times`, and add subscriptions before calling
-    /// [`run`](Self::run).
+ /// Empty loop with `iterations = 1`. Populate `processes`,
+ /// `locations`, `times`, and add subscriptions before calling
+ /// [`run`](Self::run).
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -290,40 +290,40 @@ impl MasterLoop {
         }
     }
 
-    /// Register a subscription. The list stays sorted by
-    /// [`MasterLoopableSubscription::cmp`] so the engine iterates
-    /// subscribers in execution order without re-sorting per level.
+ /// Register a subscription. The list stays sorted by
+ /// [`MasterLoopableSubscription::cmp`] so the engine iterates
+ /// subscribers in execution order without re-sorting per level.
     pub fn subscribe(&mut self, sub: MasterLoopableSubscription) {
         self.subscriptions.push(sub);
         self.subscriptions.sort();
     }
 
-    /// Currently registered subscriptions in execution order. Mostly
-    /// useful in tests and diagnostic dumps.
+ /// Currently registered subscriptions in execution order. Mostly
+ /// useful in tests and diagnostic dumps.
     #[must_use]
     pub fn subscriptions(&self) -> &[MasterLoopableSubscription] {
         &self.subscriptions
     }
 
-    /// Drive the full nested iteration. Returns the first error any
-    /// subscription's [`MasterLoopable::execute_at_granularity`] or
-    /// [`MasterLoopable::clean_data_loop`] surfaces.
-    ///
-    /// `iterations = 0`, empty `processes`, empty `locations`, or empty
-    /// `times` all collapse the nest at the corresponding level — the
-    /// engine simply doesn't visit anything below that point.
-    ///
-    /// Input [`ExecutionLocation`]s and [`ExecutionTime`]s with `None`
-    /// leading components are skipped at the grouping step (we can't
-    /// place them in the nest without knowing where they go).
+ /// Drive the full nested iteration. Returns the first error any
+ /// subscription's [`MasterLoopable::execute_at_granularity`] or
+ /// [`MasterLoopable::clean_data_loop`] surfaces.
+ ///
+ /// `iterations = 0`, empty `processes`, empty `locations`, or empty
+ /// `times` all collapse the nest at the corresponding level — the
+ /// engine simply doesn't visit anything below that point.
+ ///
+ /// Input [`ExecutionLocation`]s and [`ExecutionTime`]s with `None`
+ /// leading components are skipped at the grouping step (we can't
+ /// place them in the nest without knowing where they go).
     pub fn run(&self) -> Result<(), Error> {
         let location_groups = group_locations(&self.locations);
         let time_groups = group_times(&self.times);
-        // `hasLoopables` short-circuit (Task 21): probe the subscription
-        // set once up front so `run_times` can skip every time level
-        // below the finest subscriber. Subscriptions are fixed for the
-        // life of a `run` (it borrows `&self`), so a single probe is
-        // exact for every process and location.
+ // `hasLoopables` short-circuit: probe the subscription
+ // set once up front so `run_times` can skip every time level
+ // below the finest subscriber. Subscriptions are fixed for the
+ // life of a `run` (it borrows `&self`), so a single probe is
+ // exact for every process and location.
         let depth = self.time_nest_depth();
         let mut ctx = MasterLoopContext::default();
 
@@ -342,12 +342,12 @@ impl MasterLoop {
         Ok(())
     }
 
-    /// Walk the `state → county → zone → link` location nest, firing
-    /// each level's subscribers and descending into `run_times` at the
-    /// innermost `link`. `depth` is forwarded untouched to `run_times`;
-    /// the location nest itself is never short-circuited, matching Java's
-    /// `loopThroughProcess`, which always iterates every execution
-    /// location.
+ /// Walk the `state → county → zone → link` location nest, firing
+ /// each level's subscribers and descending into `run_times` at the
+ /// innermost `link`. `depth` is forwarded untouched to `run_times`;
+ /// the location nest itself is never short-circuited, matching Java's
+ /// `loopThroughProcess`, which always iterates every execution
+ /// location.
     fn run_locations(
         &self,
         location_groups: &LocationGroups,
@@ -385,18 +385,17 @@ impl MasterLoop {
         Ok(())
     }
 
-    /// Forward + cleanup walk of the `year → month → day → hour` time
-    /// nest, gated by the `hasLoopables` short-circuit.
-    ///
-    /// `depth` (from `time_nest_depth`) caps how far the nest descends —
-    /// a level runs only when some subscriber fires there or finer. This
-    /// ports the `mustLoopOver*` guards in `MasterLoop.loopThroughTime`:
-    /// Java wraps each `for` in `if (mustLoopOver…)`, the port wraps each
-    /// in `if depth >= …`. A level's cleanup notification sits inside
-    /// that level's guard, so a skipped level fires neither its forward
-    /// nor its cleanup pass — matching Java, where
-    /// `notifyLoopablesOfLoopChange(…, true)` is itself inside the
-    /// `if (mustLoopOver…)` block.
+ /// Forward + cleanup walk of the `year → month → day → hour` time
+ /// nest, gated by the `hasLoopables` short-circuit.
+ ///
+ /// `depth` (from `time_nest_depth`) caps how far the nest descends /// a level runs only when some subscriber fires there or finer. This
+ /// ports the `mustLoopOver*` guards in `MasterLoop.loopThroughTime`:
+ /// Java wraps each `for` in `if (mustLoopOver…)`, the port wraps each
+ /// in `if depth >= …`. A level's cleanup notification sits inside
+ /// that level's guard, so a skipped level fires neither its forward
+ /// nor its cleanup pass — matching Java, where
+ /// `notifyLoopablesOfLoopChange(…, true)` is itself inside the
+ /// `if (mustLoopOver…)` block.
     fn run_times(
         &self,
         time_groups: &TimeGroups,
@@ -448,10 +447,10 @@ impl MasterLoop {
         Ok(())
     }
 
-    /// Forward pass: invoke
-    /// [`MasterLoopable::execute_at_granularity`] on every subscription
-    /// matching `granularity`, in execution order (priority high-to-low
-    /// inside the granularity bucket, with identity tie-break).
+ /// Forward pass: invoke
+ /// [`MasterLoopable::execute_at_granularity`] on every subscription
+ /// matching `granularity`, in execution order (priority high-to-low
+ /// inside the granularity bucket, with identity tie-break).
     fn notify_at(
         &self,
         granularity: Granularity,
@@ -469,8 +468,8 @@ impl MasterLoop {
         Ok(())
     }
 
-    /// Cleanup pass: invoke [`MasterLoopable::clean_data_loop`] on every
-    /// subscription matching `granularity`, in reverse execution order.
+ /// Cleanup pass: invoke [`MasterLoopable::clean_data_loop`] on every
+ /// subscription matching `granularity`, in reverse execution order.
     fn cleanup_at(
         &self,
         granularity: Granularity,
@@ -488,37 +487,37 @@ impl MasterLoop {
         Ok(())
     }
 
-    /// Port of `MasterLoop.hasLoopables`: whether any registered
-    /// subscription fires at exactly `granularity`.
-    ///
-    /// Java keys subscriptions by `EmissionProcess` in a `TreeMap` and
-    /// answers per process; this port keeps one global subscription list
-    /// — a subscriber that cares about a single process filters on
-    /// `ctx.position.process_id` itself — so the answer is
-    /// process-independent. Java walks its per-process `TreeSet`,
-    /// skipping coarser entries and stopping at the first granularity
-    /// `>=` the target; an exact-match scan is equivalent here because
-    /// `subscribe` keeps `subscriptions` sorted and `time_nest_depth`
-    /// needs only the yes/no answer.
+ /// Port of `MasterLoop.hasLoopables`: whether any registered
+ /// subscription fires at exactly `granularity`.
+ ///
+ /// Java keys subscriptions by `EmissionProcess` in a `TreeMap` and
+ /// answers per process; this port keeps one global subscription list
+ /// — a subscriber that cares about a single process filters on
+ /// `ctx.position.process_id` itself — so the answer is
+ /// process-independent. Java walks its per-process `TreeSet`,
+ /// skipping coarser entries and stopping at the first granularity
+ /// `>=` the target; an exact-match scan is equivalent here because
+ /// `subscribe` keeps `subscriptions` sorted and `time_nest_depth`
+ /// needs only the yes/no answer.
     fn has_loopables(&self, granularity: Granularity) -> bool {
         self.subscriptions
             .iter()
             .any(|sub| sub.granularity == granularity)
     }
 
-    /// Decide how deep `run` drives the time nest, porting the
-    /// `mustLoopOver*` cascade in `MasterLoop.loopThroughProcess`: the
-    /// finest granularity anyone subscribes to sets the depth, and every
-    /// coarser time level above it is implied.
-    ///
-    /// Java probes `hasLoopables(HOUR / DAY / MONTH / YEAR)`. This port
-    /// also folds `MATCH_FINEST` into the `HOUR` probe. Java can leave it
-    /// out because its `notifyLoopablesOfLoopChange` never dispatches a
-    /// `MATCH_FINEST` subscription (it nulls them out); this port *does*
-    /// dispatch them — Task 20 fires them at the `HOUR` level, right
-    /// after the `HOUR` subscribers — so the `HOUR` loop must stay alive
-    /// whenever a `MATCH_FINEST` subscription exists, or it would
-    /// silently never fire.
+ /// Decide how deep `run` drives the time nest, porting the
+ /// `mustLoopOver*` cascade in `MasterLoop.loopThroughProcess`: the
+ /// finest granularity anyone subscribes to sets the depth, and every
+ /// coarser time level above it is implied.
+ ///
+ /// Java probes `hasLoopables(HOUR / DAY / MONTH / YEAR)`. This port
+ /// also folds `MATCH_FINEST` into the `HOUR` probe. Java can leave it
+ /// out because its `notifyLoopablesOfLoopChange` never dispatches a
+ /// `MATCH_FINEST` subscription (it nulls them out); this port *does*
+ /// dispatch them — fires them at the `HOUR` level, right
+ /// after the `HOUR` subscribers — so the `HOUR` loop must stay alive
+ /// whenever a `MATCH_FINEST` subscription exists, or it would
+ /// silently never fire.
     fn time_nest_depth(&self) -> TimeNestDepth {
         if self.has_loopables(Granularity::Hour) || self.has_loopables(Granularity::MatchFinest) {
             TimeNestDepth::Hour
@@ -548,17 +547,17 @@ impl MasterLoop {
 /// level test into a plain `depth >= TimeNestDepth::Month` comparison.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum TimeNestDepth {
-    /// No `YEAR` / `MONTH` / `DAY` / `HOUR` subscriber: the whole time
-    /// nest is skipped and `run_times` returns immediately.
+ /// No `YEAR` / `MONTH` / `DAY` / `HOUR` subscriber: the whole time
+ /// nest is skipped and `run_times` returns immediately.
     Skip,
-    /// Iterate `year` only.
+ /// Iterate `year` only.
     Year,
-    /// Iterate `year` then `month`.
+ /// Iterate `year` then `month`.
     Month,
-    /// Iterate `year`, `month`, then `day`.
+ /// Iterate `year`, `month`, then `day`.
     Day,
-    /// Iterate the full `year → month → day → hour` nest. Also chosen
-    /// when only a `MATCH_FINEST` subscriber is registered.
+ /// Iterate the full `year → month → day → hour` nest. Also chosen
+ /// when only a `MATCH_FINEST` subscriber is registered.
     Hour,
 }
 
@@ -574,9 +573,9 @@ type TimeGroups = BTreeMap<u16, BTreeMap<u8, BTreeMap<u8, Vec<u8>>>>;
 fn group_locations(locations: &[ExecutionLocation]) -> LocationGroups {
     let mut out: LocationGroups = BTreeMap::new();
     for l in locations {
-        // Locations with any None leading id can't be placed in the nest
-        // without inventing a key — skip them. Callers are expected to
-        // pass fully-populated link-granularity tuples.
+ // Locations with any None leading id can't be placed in the nest
+ // without inventing a key — skip them. Callers are expected to
+ // pass fully-populated link-granularity tuples.
         let (Some(s), Some(c), Some(z), Some(k)) = (l.state_id, l.county_id, l.zone_id, l.link_id)
         else {
             continue;
@@ -614,9 +613,9 @@ mod tests {
     use super::*;
     use std::sync::Arc;
 
-    /// A minimal `MasterLoopable` used to drive subscription-ordering
-    /// tests. The body never runs — these tests exercise the `compareTo`
-    /// port, not the iteration loop (Task 20).
+ /// A minimal `MasterLoopable` used to drive subscription-ordering
+ /// tests. The body never runs — these tests exercise the `compareTo`
+ /// port, not the iteration loop.
     #[derive(Debug)]
     struct DummyLoopable;
 
@@ -626,9 +625,9 @@ mod tests {
         }
     }
 
-    /// Java's helper: maps a signed `int` to `-1 / 0 / 1`. Lets us assert
-    /// `compareTo` polarity without depending on the specific magnitude
-    /// the implementation returns.
+ /// Java's helper: maps a signed `int` to `-1 / 0 / 1`. Lets us assert
+ /// `compareTo` polarity without depending on the specific magnitude
+ /// the implementation returns.
     fn unit(ord: Ordering) -> i32 {
         match ord {
             Ordering::Less => -1,
@@ -641,7 +640,7 @@ mod tests {
         Arc::new(DummyLoopable) as Arc<dyn MasterLoopable>
     }
 
-    // ---- Direct ports of MasterLoopableSubscriptionTest.testCompareTo ----
+ // ---- Direct ports of MasterLoopableSubscriptionTest.testCompareTo ----
 
     #[test]
     fn loopable_equals_itself() {
@@ -653,7 +652,7 @@ mod tests {
             Ordering::Equal,
             "subscriptions of the same loopable at the same (granularity, priority) should compare equal"
         );
-        // Symmetry (trivially, since both are Equal).
+ // Symmetry (trivially, since both are Equal).
         assert_eq!(unit(a.cmp(&b)), -unit(b.cmp(&a)));
     }
 
@@ -671,8 +670,8 @@ mod tests {
 
     #[test]
     fn day_sorts_before_hour() {
-        // Java: subscriptionA.granularity = HOUR, subscriptionB.granularity = DAY
-        //       expected: A.compareTo(B) = +1 (A "greater", so B sorts first).
+ // Java: subscriptionA.granularity = HOUR, subscriptionB.granularity = DAY
+ // expected: A.compareTo(B) = +1 (A "greater", so B sorts first).
         let l = dummy();
         let hour = MasterLoopableSubscription::new(Granularity::Hour, 10, l.clone());
         let day = MasterLoopableSubscription::new(Granularity::Day, 10, l);
@@ -686,8 +685,8 @@ mod tests {
 
     #[test]
     fn higher_priority_sorts_first() {
-        // Java: subscriptionA.priority = 100, subscriptionB.priority = 10
-        //       expected: A.compareTo(B) = -1 (A "less", A fires first).
+ // Java: subscriptionA.priority = 100, subscriptionB.priority = 10
+ // expected: A.compareTo(B) = -1 (A "less", A fires first).
         let l = dummy();
         let hi = MasterLoopableSubscription::new(Granularity::Hour, 100, l.clone());
         let lo = MasterLoopableSubscription::new(Granularity::Hour, 10, l);
@@ -699,12 +698,12 @@ mod tests {
         assert_eq!(unit(hi.cmp(&lo)), -unit(lo.cmp(&hi)));
     }
 
-    // ---- Additional invariants the Java test commented out covers ----
+ // ---- Additional invariants the Java test commented out covers ----
 
     #[test]
     fn process_granularity_fires_before_hour() {
-        // Java iteration order: PROCESS (coarsest) first, HOUR (finest)
-        // near-last.
+ // Java iteration order: PROCESS (coarsest) first, HOUR (finest)
+ // near-last.
         let l = dummy();
         let process = MasterLoopableSubscription::new(Granularity::Process, 10, l.clone());
         let hour = MasterLoopableSubscription::new(Granularity::Hour, 10, l);
@@ -713,8 +712,8 @@ mod tests {
 
     #[test]
     fn match_finest_sorts_after_every_real_granularity() {
-        // MATCH_FINEST is the sentinel — it pins a calculator to the finest
-        // granularity in play, firing after everything else at its level.
+ // MATCH_FINEST is the sentinel — it pins a calculator to the finest
+ // granularity in play, firing after everything else at its level.
         let l = dummy();
         let mf = MasterLoopableSubscription::new(Granularity::MatchFinest, 10, l.clone());
         for g in [
@@ -739,10 +738,10 @@ mod tests {
 
     #[test]
     fn sorting_yields_coarse_first_iteration_order() {
-        // Build one subscription per granularity, shuffle (by construction
-        // order), sort, and assert we get the Java MasterLoop iteration
-        // sequence: PROCESS → STATE → COUNTY → ZONE → LINK → YEAR →
-        // MONTH → DAY → HOUR → MATCH_FINEST.
+ // Build one subscription per granularity, shuffle (by construction
+ // order), sort, and assert we get the Java MasterLoop iteration
+ // sequence: PROCESS → STATE → COUNTY → ZONE → LINK → YEAR →
+ // MONTH → DAY → HOUR → MATCH_FINEST.
         let l = dummy();
         let mut subs: Vec<_> = [
             Granularity::Hour,
@@ -780,8 +779,8 @@ mod tests {
 
     #[test]
     fn within_one_granularity_higher_priority_first() {
-        // Two subscriptions at the same granularity, different priorities.
-        // Sort should put the high-priority one first.
+ // Two subscriptions at the same granularity, different priorities.
+ // Sort should put the high-priority one first.
         let l = dummy();
         let mut subs = [
             MasterLoopableSubscription::new(Granularity::Month, 10, l.clone()),
@@ -796,33 +795,33 @@ mod tests {
 
     #[test]
     fn cross_granularity_priority_does_not_invert_granularity_order() {
-        // Granularity always wins over priority. A high-priority HOUR
-        // subscription still sorts after a low-priority PROCESS one.
+ // Granularity always wins over priority. A high-priority HOUR
+ // subscription still sorts after a low-priority PROCESS one.
         let l = dummy();
         let hi_hour = MasterLoopableSubscription::new(Granularity::Hour, 10_000, l.clone());
         let lo_process = MasterLoopableSubscription::new(Granularity::Process, 1, l);
         assert_eq!(unit(lo_process.cmp(&hi_hour)), -1);
     }
 
-    // ---- Trait sanity ----
+ // ---- Trait sanity ----
 
     #[test]
     fn default_clean_data_loop_is_no_op() {
         let dummy = DummyLoopable;
         let ctx = MasterLoopContext::default();
-        // Should not panic; should return Ok.
+ // Should not panic; should return Ok.
         dummy.clean_data_loop(&ctx).unwrap();
     }
 
-    // ---- MasterLoop iteration engine (Task 20) -------------------------
+ // ---- MasterLoop iteration engine -------------------------
 
     use moves_data::ProcessId;
     use std::sync::Mutex;
 
-    /// Snapshot of one `MasterLoopContext` callback for assertion. We
-    /// can't store `&MasterLoopContext` borrows in the recorder, and we
-    /// don't want to clone the entire context for every callback — keep
-    /// the fields we actually assert on.
+ /// Snapshot of one `MasterLoopContext` callback for assertion. We
+ /// can't store `&MasterLoopContext` borrows in the recorder, and we
+ /// don't want to clone the entire context for every callback — keep
+ /// the fields we actually assert on.
     #[derive(Debug, Clone, PartialEq, Eq)]
     struct CallRecord {
         tag: &'static str,
@@ -835,8 +834,8 @@ mod tests {
         is_clean_up: bool,
     }
 
-    /// `MasterLoopable` that appends one [`CallRecord`] per invocation
-    /// to a shared `Vec`. Lets tests assert the full call sequence.
+ /// `MasterLoopable` that appends one [`CallRecord`] per invocation
+ /// to a shared `Vec`. Lets tests assert the full call sequence.
     #[derive(Debug)]
     struct RecordingLoopable {
         tag: &'static str,
@@ -873,9 +872,9 @@ mod tests {
         }
     }
 
-    /// `MasterLoopable` whose `execute_at_granularity` returns
-    /// `Err(NotImplemented)` after the first call. Used to assert that
-    /// the loop aborts on the first error.
+ /// `MasterLoopable` whose `execute_at_granularity` returns
+ /// `Err(NotImplemented)` after the first call. Used to assert that
+ /// the loop aborts on the first error.
     #[derive(Debug)]
     struct FailingLoopable {
         log: Arc<Mutex<Vec<CallRecord>>>,
@@ -938,9 +937,9 @@ mod tests {
         let lo = RecordingLoopable::new("lo", log.clone());
         let hi = RecordingLoopable::new("hi", log.clone());
         let mut ml = MasterLoop::new();
-        // Insert low-priority first, then high-priority. After both
-        // inserts, subscriptions() should yield highest-priority first
-        // at the same granularity.
+ // Insert low-priority first, then high-priority. After both
+ // inserts, subscriptions() should yield highest-priority first
+ // at the same granularity.
         ml.subscribe(MasterLoopableSubscription::new(Granularity::Hour, 10, lo));
         ml.subscribe(MasterLoopableSubscription::new(Granularity::Hour, 100, hi));
         let prios: Vec<i32> = ml.subscriptions().iter().map(|s| s.priority).collect();
@@ -954,7 +953,7 @@ mod tests {
     #[test]
     fn empty_loop_runs_no_callbacks() {
         let ml = MasterLoop::new();
-        // No processes/locations/times and no subscribers. Should be a no-op.
+ // No processes/locations/times and no subscribers. Should be a no-op.
         ml.run().unwrap();
     }
 
@@ -971,7 +970,7 @@ mod tests {
             probe,
         ));
         ml.run().unwrap();
-        // No processes ⇒ the outer loop body never runs ⇒ no callbacks.
+ // No processes ⇒ the outer loop body never runs ⇒ no callbacks.
         assert!(snapshot(&log).is_empty());
     }
 
@@ -982,8 +981,8 @@ mod tests {
         let mut ml = MasterLoop::new();
         ml.processes.push(ProcessId(1));
         ml.processes.push(ProcessId(2));
-        // No locations/times — but PROCESS-granularity subs still fire
-        // before the location loop is entered.
+ // No locations/times — but PROCESS-granularity subs still fire
+ // before the location loop is entered.
         ml.subscribe(MasterLoopableSubscription::new(
             Granularity::Process,
             10,
@@ -991,16 +990,16 @@ mod tests {
         ));
         ml.run().unwrap();
         let calls = snapshot(&log);
-        // Two processes × (forward + cleanup) = 4 calls.
+ // Two processes × (forward + cleanup) = 4 calls.
         assert_eq!(calls.len(), 4);
         assert_eq!(calls[0].granularity, Some(Granularity::Process));
         assert_eq!(calls[0].process_id, Some(ProcessId(1)));
         assert!(!calls[0].is_clean_up);
-        // Second call is cleanup for the same process (no nested loop ⇒
-        // we go straight from forward to cleanup).
+ // Second call is cleanup for the same process (no nested loop ⇒
+ // we go straight from forward to cleanup).
         assert_eq!(calls[1].process_id, Some(ProcessId(1)));
         assert!(calls[1].is_clean_up);
-        // Then process 2: forward + cleanup.
+ // Then process 2: forward + cleanup.
         assert_eq!(calls[2].process_id, Some(ProcessId(2)));
         assert!(!calls[2].is_clean_up);
         assert_eq!(calls[3].process_id, Some(ProcessId(2)));
@@ -1009,9 +1008,9 @@ mod tests {
 
     #[test]
     fn single_hour_path_visits_every_granularity_top_to_bottom() {
-        // One process × one location × one time. Subscribe at every
-        // granularity. Forward pass should visit them coarse-to-fine
-        // exactly once.
+ // One process × one location × one time. Subscribe at every
+ // granularity. Forward pass should visit them coarse-to-fine
+ // exactly once.
         let log = shared_log();
         let mut ml = MasterLoop::new();
         ml.processes.push(ProcessId(1));
@@ -1036,7 +1035,7 @@ mod tests {
         ml.run().unwrap();
         let calls = snapshot(&log);
 
-        // Filter to forward-pass calls only — cleanup interleaves.
+ // Filter to forward-pass calls only — cleanup interleaves.
         let forward: Vec<_> = calls.iter().filter(|c| !c.is_clean_up).collect();
         let forward_grans: Vec<_> = forward.iter().map(|c| c.granularity.unwrap()).collect();
         assert_eq!(
@@ -1056,10 +1055,10 @@ mod tests {
             "forward pass must walk coarse→fine, MATCH_FINEST last",
         );
 
-        // Cleanup forms a balanced unwinding: MATCH_FINEST→HOUR at the
-        // innermost level, then Day→Month→Year as we exit the time loop,
-        // then Link→Zone→County→State as we exit the location loop, then
-        // Process at the very end.
+ // Cleanup forms a balanced unwinding: MATCH_FINEST→HOUR at the
+ // innermost level, then Day→Month→Year as we exit the time loop,
+ // then Link→Zone→County→State as we exit the location loop, then
+ // Process at the very end.
         let cleanup: Vec<_> = calls.iter().filter(|c| c.is_clean_up).collect();
         let cleanup_grans: Vec<_> = cleanup.iter().map(|c| c.granularity.unwrap()).collect();
         assert_eq!(
@@ -1082,7 +1081,7 @@ mod tests {
 
     #[test]
     fn context_carries_correct_location_and_time_at_each_level() {
-        // Subscribe only at HOUR — verify position fields are all set.
+ // Subscribe only at HOUR — verify position fields are all set.
         let log = shared_log();
         let probe = RecordingLoopable::new("hour", log.clone());
         let mut ml = MasterLoop::new();
@@ -1107,8 +1106,8 @@ mod tests {
 
     #[test]
     fn state_level_only_carries_state_id_in_location() {
-        // Subscribe at STATE — verify county/zone/link components are
-        // `None` since the loop hasn't entered them yet.
+ // Subscribe at STATE — verify county/zone/link components are
+ // `None` since the loop hasn't entered them yet.
         let log = shared_log();
         let probe = RecordingLoopable::new("state", log.clone());
         let mut ml = MasterLoop::new();
@@ -1157,10 +1156,10 @@ mod tests {
 
     #[test]
     fn locations_group_by_leading_ids() {
-        // Two counties under the same state, each with one link. STATE
-        // subscriber should fire ONCE per unique state (here 1 state),
-        // COUNTY subscriber should fire ONCE per unique (state, county)
-        // (here 2 counties).
+ // Two counties under the same state, each with one link. STATE
+ // subscriber should fire ONCE per unique state (here 1 state),
+ // COUNTY subscriber should fire ONCE per unique (state, county)
+ // (here 2 counties).
         let log = shared_log();
         let state_sub = RecordingLoopable::new("state", log.clone());
         let county_sub = RecordingLoopable::new("county", log.clone());
@@ -1199,16 +1198,16 @@ mod tests {
             2,
             "two unique (state, county) → two COUNTY forward calls",
         );
-        // Verify the county IDs visited cover both inputs (BTreeMap
-        // iteration is by numeric ID, so order is deterministic 1, 2).
+ // Verify the county IDs visited cover both inputs (BTreeMap
+ // iteration is by numeric ID, so order is deterministic 1, 2).
         assert_eq!(county_fwd[0].location.county_id, Some(1));
         assert_eq!(county_fwd[1].location.county_id, Some(2));
     }
 
     #[test]
     fn times_group_by_leading_components() {
-        // Two months under the same year. YEAR sub fires once, MONTH sub
-        // fires twice.
+ // Two months under the same year. YEAR sub fires once, MONTH sub
+ // fires twice.
         let log = shared_log();
         let year_sub = RecordingLoopable::new("year", log.clone());
         let month_sub = RecordingLoopable::new("month", log.clone());
@@ -1252,8 +1251,8 @@ mod tests {
         ml.processes.push(ProcessId(1));
         ml.locations.push(loc(1, 1, 1, 1));
         ml.times.push(et(2020, 1, 5, 8));
-        // Register low first, high second, to make sure subscribe()'s
-        // sort drives execution order rather than insertion order.
+ // Register low first, high second, to make sure subscribe()'s
+ // sort drives execution order rather than insertion order.
         ml.subscribe(MasterLoopableSubscription::new(Granularity::Hour, 10, lo));
         ml.subscribe(MasterLoopableSubscription::new(Granularity::Hour, 100, hi));
         ml.run().unwrap();
@@ -1262,7 +1261,7 @@ mod tests {
             .iter()
             .filter(|c| c.granularity == Some(Granularity::Hour))
             .collect();
-        // Hour forward: hi then lo. Hour cleanup: lo then hi (reverse).
+ // Hour forward: hi then lo. Hour cleanup: lo then hi (reverse).
         assert_eq!(hour_calls.len(), 4);
         assert_eq!(hour_calls[0].tag, "hi");
         assert!(!hour_calls[0].is_clean_up);
@@ -1304,7 +1303,7 @@ mod tests {
         let mut ml = MasterLoop::new();
         ml.processes.push(ProcessId(1));
         ml.locations.push(loc(1, 1, 1, 1));
-        // Two hours so we observe per-hour interleaving.
+ // Two hours so we observe per-hour interleaving.
         ml.times.push(et(2020, 1, 5, 1));
         ml.times.push(et(2020, 1, 5, 2));
         ml.subscribe(MasterLoopableSubscription::new(
@@ -1321,12 +1320,12 @@ mod tests {
         let calls = snapshot(&log);
         let fwd: Vec<_> = calls.iter().filter(|c| !c.is_clean_up).collect();
         assert_eq!(fwd.len(), 4, "two hours × (hour + match_finest)");
-        // Hour 1: hour then match_finest.
+ // Hour 1: hour then match_finest.
         assert_eq!(fwd[0].tag, "hour");
         assert_eq!(fwd[0].time.hour, Some(1));
         assert_eq!(fwd[1].tag, "mf");
         assert_eq!(fwd[1].time.hour, Some(1));
-        // Hour 2: hour then match_finest.
+ // Hour 2: hour then match_finest.
         assert_eq!(fwd[2].tag, "hour");
         assert_eq!(fwd[2].time.hour, Some(2));
         assert_eq!(fwd[3].tag, "mf");
@@ -1376,8 +1375,8 @@ mod tests {
 
     #[test]
     fn forward_error_aborts_remaining_iteration() {
-        // Two subscribers at HOUR. The high-priority one errors; the
-        // low-priority one must never fire.
+ // Two subscribers at HOUR. The high-priority one errors; the
+ // low-priority one must never fire.
         let log = shared_log();
         let high = Arc::new(FailingLoopable { log: log.clone() }) as Arc<dyn MasterLoopable>;
         let low = RecordingLoopable::new("low", log.clone());
@@ -1398,9 +1397,9 @@ mod tests {
         }
         let calls = snapshot(&log);
         let by_tag: Vec<&str> = calls.iter().map(|c| c.tag).collect();
-        // Forward at coarser levels fires first; then the failing hour
-        // subscriber. The low-priority hour subscriber never gets a turn,
-        // and no cleanup runs.
+ // Forward at coarser levels fires first; then the failing hour
+ // subscriber. The low-priority hour subscriber never gets a turn,
+ // and no cleanup runs.
         assert!(by_tag.contains(&"fail"));
         assert!(
             !by_tag.contains(&"low"),
@@ -1410,8 +1409,8 @@ mod tests {
 
     #[test]
     fn loopable_with_two_subscriptions_fires_at_each() {
-        // One loopable subscribes at PROCESS and at HOUR. It should fire
-        // at both levels.
+ // One loopable subscribes at PROCESS and at HOUR. It should fire
+ // at both levels.
         let log = shared_log();
         let probe = RecordingLoopable::new("multi", log.clone());
         let mut ml = MasterLoop::new();
@@ -1441,9 +1440,9 @@ mod tests {
 
     #[test]
     fn duplicate_link_in_input_fires_twice() {
-        // Locations: (1,1,1,1) appears twice. LINK subscriber should fire
-        // twice. This matches Java behaviour when the producer emits
-        // repeated tuples.
+ // Locations: (1,1,1,1) appears twice. LINK subscriber should fire
+ // twice. This matches Java behaviour when the producer emits
+ // repeated tuples.
         let log = shared_log();
         let probe = RecordingLoopable::new("link", log.clone());
         let mut ml = MasterLoop::new();
@@ -1467,8 +1466,8 @@ mod tests {
 
     #[test]
     fn groups_iterate_in_numeric_id_order_regardless_of_input_order() {
-        // Submit locations in descending state order; STATE forward calls
-        // should fire in ASCENDING numeric order (BTreeMap key order).
+ // Submit locations in descending state order; STATE forward calls
+ // should fire in ASCENDING numeric order (BTreeMap key order).
         let log = shared_log();
         let probe = RecordingLoopable::new("state", log.clone());
         let mut ml = MasterLoop::new();
@@ -1493,9 +1492,9 @@ mod tests {
 
     #[test]
     fn partially_populated_locations_are_skipped_by_grouping() {
-        // ExecutionLocation::state(1) has county/zone/link None — can't
-        // place it in the nest. group_locations skips it; no callbacks
-        // for that location.
+ // ExecutionLocation::state(1) has county/zone/link None — can't
+ // place it in the nest. group_locations skips it; no callbacks
+ // for that location.
         let log = shared_log();
         let probe = RecordingLoopable::new("link", log.clone());
         let mut ml = MasterLoop::new();
@@ -1514,7 +1513,7 @@ mod tests {
             .filter(|c| c.granularity == Some(Granularity::Link) && !c.is_clean_up)
             .filter_map(|c| c.location.state_id)
             .collect();
-        // Only the fully-populated location (state 2) fires.
+ // Only the fully-populated location (state 2) fires.
         assert_eq!(states, vec![2]);
     }
 
@@ -1530,7 +1529,7 @@ mod tests {
         assert!(g.is_empty());
     }
 
-    // ---- hasLoopables short-circuit (Task 21) --------------------------
+ // ---- hasLoopables short-circuit --------------------------
 
     #[test]
     fn has_loopables_reports_exact_granularity_membership() {
@@ -1540,8 +1539,8 @@ mod tests {
             10,
             dummy(),
         ));
-        // Exact match only — neither coarser, finer, nor the MatchFinest
-        // sentinel counts as a Day subscriber.
+ // Exact match only — neither coarser, finer, nor the MatchFinest
+ // sentinel counts as a Day subscriber.
         assert!(ml.has_loopables(Granularity::Day));
         assert!(!ml.has_loopables(Granularity::Hour));
         assert!(!ml.has_loopables(Granularity::Month));
@@ -1552,11 +1551,11 @@ mod tests {
 
     #[test]
     fn time_nest_depth_tracks_the_finest_time_subscription() {
-        // No subscriptions at all → the whole time nest is skipped.
+ // No subscriptions at all → the whole time nest is skipped.
         assert_eq!(MasterLoop::new().time_nest_depth(), TimeNestDepth::Skip);
 
-        // Each finer subscription deepens the nest; coarser ones already
-        // registered never shrink it back.
+ // Each finer subscription deepens the nest; coarser ones already
+ // registered never shrink it back.
         let mut ml = MasterLoop::new();
         ml.subscribe(MasterLoopableSubscription::new(
             Granularity::Year,
@@ -1586,8 +1585,8 @@ mod tests {
 
     #[test]
     fn time_nest_depth_skips_when_only_process_or_location_subscribers() {
-        // PROCESS / STATE / COUNTY / ZONE / LINK are not time
-        // granularities; none of them should pull the time nest open.
+ // PROCESS / STATE / COUNTY / ZONE / LINK are not time
+ // granularities; none of them should pull the time nest open.
         let mut ml = MasterLoop::new();
         for g in [
             Granularity::Process,
@@ -1603,9 +1602,9 @@ mod tests {
 
     #[test]
     fn time_nest_depth_treats_match_finest_as_hour_depth() {
-        // A MatchFinest subscriber fires at the HOUR level in this port
-        // (Java never dispatches it), so it must keep the full time nest
-        // alive even with no real HOUR subscriber.
+ // A MatchFinest subscriber fires at the HOUR level in this port
+ // (Java never dispatches it), so it must keep the full time nest
+ // alive even with no real HOUR subscriber.
         let mut ml = MasterLoop::new();
         ml.subscribe(MasterLoopableSubscription::new(
             Granularity::MatchFinest,
@@ -1617,10 +1616,10 @@ mod tests {
 
     #[test]
     fn match_finest_only_subscription_still_fires() {
-        // No real-granularity subscriber, only MatchFinest. The
-        // short-circuit must still open the HOUR loop so the subscriber
-        // is dispatched — otherwise a registered subscription would
-        // silently never fire.
+ // No real-granularity subscriber, only MatchFinest. The
+ // short-circuit must still open the HOUR loop so the subscriber
+ // is dispatched — otherwise a registered subscription would
+ // silently never fire.
         let log = shared_log();
         let mf = RecordingLoopable::new("mf", log.clone());
         let mut ml = MasterLoop::new();
@@ -1642,9 +1641,9 @@ mod tests {
 
     #[test]
     fn day_subscription_fires_under_short_circuit() {
-        // DAY is the finest subscription → depth Day; the hour loop is
-        // short-circuited away. Two days under one month fire the DAY
-        // subscriber twice, each with the hour component still None.
+ // DAY is the finest subscription → depth Day; the hour loop is
+ // short-circuited away. Two days under one month fire the DAY
+ // subscriber twice, each with the hour component still None.
         let log = shared_log();
         let day_sub = RecordingLoopable::new("day", log.clone());
         let mut ml = MasterLoop::new();
