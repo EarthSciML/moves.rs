@@ -406,6 +406,30 @@ jobs:
               fi
               echo "::endgroup::"
           done
+
+          # Write MANIFEST.toml so the fidelity harness finds a COMPLETE corpus.
+          # reference_dir() returns Some once NONROAD_FIDELITY_REFERENCE is set,
+          # so the harness stops skipping and then REQUIRES this manifest (and
+          # verifies each TSV's SHA256 against it). Mirrors generate-corpus.sh.
+          SIF_PATH="characterization/apptainer/canonical-moves.sif"
+          SIF_SHA256="$( [ -f "${SIF_PATH}" ] && sha256sum "${SIF_PATH}" | awk '{print $1}' || echo unknown )"
+          {
+            printf '# NONROAD gfortran reference corpus manifest (CI-generated).\n'
+            printf 'sif_sha256 = "%s"\n\n' "${SIF_SHA256}"
+            for tsv in "${OUT_DIR}"/*.tsv; do
+              [ -f "${tsv}" ] || continue
+              name="$(basename "${tsv}" .tsv)"
+              printf '[[fixtures]]\n'
+              printf 'name         = "%s"\n' "${name}"
+              printf 'path         = "%s.tsv"\n' "${name}"
+              printf 'sha256       = "%s"\n' "$(sha256sum "${tsv}" | awk '{print $1}')"
+              printf 'bytes        = %d\n' "$(stat -c '%s' "${tsv}")"
+              printf 'rows         = %d\n' "$(wc -l < "${tsv}")"
+              printf 'wall_seconds = 0\n\n'
+            done
+          } > "${OUT_DIR}/MANIFEST.toml"
+          echo "[nonroad-fidelity] wrote MANIFEST.toml ($(grep -c '^\[\[fixtures\]\]' "${OUT_DIR}/MANIFEST.toml") fixtures)"
+
           exit "${fail}"
 
       # Run the NONROAD fidelity harness against the gfortran captures.
