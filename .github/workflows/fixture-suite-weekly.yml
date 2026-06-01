@@ -161,6 +161,18 @@ jobs:
           echo "APPTAINER_CACHEDIR=${{ github.workspace }}/.apptainer-scratch" >> "${GITHUB_ENV}"
           mkdir -p "${{ github.workspace }}/.apptainer-scratch"
 
+      # ubuntu-24.04 restricts unprivileged user namespaces by default, which
+      # breaks `apptainer build/exec --fakeroot` (build-fixture-sif.sh and the
+      # per-fixture run-fixture.sh both use it). Lift it (passwordless sudo);
+      # harmless no-op if the knob is absent. The build-sif composite action
+      # does this for the other jobs; this shard sets it up itself because it
+      # downloads the SIF rather than going through that action.
+      - name: Allow unprivileged user namespaces (fakeroot)
+        run: |
+          if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+
       # Pull the canonical SIF built by the build-sif job into the apptainer
       # dir, exactly where build-fixture-sif.sh and run-fixture.sh expect it.
       - name: Download canonical SIF artifact
@@ -191,6 +203,7 @@ jobs:
           characterization/run-all-fixtures.sh \
               --fakeroot \
               --keep-going \
+              --workdir-root "${GITHUB_WORKSPACE}/fixture-workdir" \
               --shard "${{ matrix.shard }}/${SHARDS}" \
               --output-root artifacts/snapshots-fresh \
               ${INCLUDE_ARG}
