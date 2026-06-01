@@ -623,7 +623,18 @@ impl Calculator for BaseRateCalculator {
             zone_id: pos.location.zone_id.map(|z| z as i32).unwrap_or(0),
             link_id: pos.location.link_id.map(|l| l as i32).unwrap_or(0),
             year_id: pos.time.year.map(|y| y as i32).unwrap_or(0),
-            month_id: pos.time.month.map(|m| m as i32).unwrap_or(0),
+            // MOVES keys its execution DB (and every captured snapshot) by the
+            // internal `monthID = RunSpec <month key> + 1` (e.g. `<month
+            // key="7"/>` → monthID 8 / August). The sibling generators apply
+            // the same `+1` (`SnapshotFilter::from_run_spec`,
+            // `evap_op_mode_distribution::fraction_of_operating`); mirror it
+            // here so the fuel-supply join (`build_fuel_blocks`) keys on the
+            // monthID the snapshot's fuel supply was captured at.
+            month_id: pos
+                .time
+                .month
+                .map(|m| if m == 12 { 1 } else { m as i32 + 1 })
+                .unwrap_or(0),
         };
         let mut inputs = BaseRateCalculatorInputs {
             base_rate_by_age: tables.iter_typed("BaseRateByAge")?,
@@ -660,8 +671,22 @@ impl Calculator for BaseRateCalculator {
             fuel_supply: build_fuel_supply(tables, &constants)?,
         };
         let smfr_sbd_summary = std::mem::take(&mut inputs.smfr_sbd_summary);
-        let base_rate_by_age = std::mem::take(&mut inputs.base_rate_by_age);
-        let base_rate = std::mem::take(&mut inputs.base_rate);
+        let mut base_rate_by_age = std::mem::take(&mut inputs.base_rate_by_age);
+        let mut base_rate = std::mem::take(&mut inputs.base_rate);
+        // MOVES splits `BaseRate`/`BaseRateByAge` into per-process execution-DB
+        // tables (`baseratebyage_1_2020` = process 1, `_2_2020` = process 2,
+        // …); `merge_process_year_variants` unions them back under the
+        // canonical name, so the merged table carries every process. The
+        // master loop fires this multi-process subscriber once per subscribed
+        // process (the engine gates `execute` on `position.process_id`), so
+        // without a per-process filter every firing would emit every process's
+        // rows — ~2× the canonical row count. Restrict to the firing process
+        // so each position emits only its own process, matching canonical's
+        // per-process `baseRateOutput`.
+        if let Some(process_id) = pos.process_id.map(|p| p.0 as i32) {
+            base_rate_by_age.retain(|r| r.process_id == process_id);
+            base_rate.retain(|r| r.process_id == process_id);
+        }
         let prepared = {
             let mut cache = self.cache.lock().unwrap_or_else(|e| e.into_inner());
             if let Some(hit) = cache.get(&constants) {
@@ -1234,9 +1259,14 @@ mod tests {
         );
         store.insert(
             "MonthOfAnyYear",
+            // `MonthOfAnyYear` maps the fuel `monthGroupID` to the internal
+            // `monthID`. `execute` now keys `RunConstants.month_id` off the
+            // position month with the MOVES `+1` convention (position month 7
+            // → monthID 8), so the fuel supply must land at the same monthID
+            // for the join in `build_fuel_blocks` to match — map group 7 → 8.
             LocalMonthGroupRow::into_dataframe(vec![LocalMonthGroupRow {
                 month_group_id: 7,
-                month_id: 7,
+                month_id: 8,
             }])
             .unwrap(),
         );

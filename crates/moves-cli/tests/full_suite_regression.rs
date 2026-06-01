@@ -333,7 +333,14 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
         ("process-evap-leaks", ONROAD_REL_TOL, false), // ~1.6e-7
         ("process-evap-permeation", ONROAD_REL_TOL, false), // ~2.1e-7
         ("nr-commercial-nation", NONROAD_REL_TOL, false), // ~3.5e-3 (real*4)
-        ("process-apu", ONROAD_REL_TOL, true),
+        // process-apu was asserted-vacuous (canon 0 / port 0) only because the
+        // month off-by-one blocked all BaseRate output. With that fixed the
+        // BaseRate path now emits the process-91 / opMode-201,203 (APU /
+        // shorepower) energy rates, which canonical drops from baseRateOutput
+        // (its baserateoutput is 0 even though baserate_91_2020 has 358 rows
+        // and a baserateunits row exists). Reproducing that requires the
+        // runspec-derived BRC activity gating the port has not yet wired —
+        // see QUARANTINED_FIXTURES and docs/known-divergences.md §4.4.
         ("process-crankcase-extidle", ONROAD_REL_TOL, true),
         ("process-crankcase-start", ONROAD_REL_TOL, true),
         ("process-extended-idle", ONROAD_REL_TOL, true),
@@ -349,6 +356,16 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
 /// data plane is fixed it should graduate from this list into
 /// [`asserted_fixtures`].
 const QUARANTINED_FIXTURES: &[&str] = &[
+    // Onroad BaseRate path emits un-activity-weighted rates for every process
+    // it is subscribed to (1/2/9/10/90/91), where canonical writes
+    // activity-weighted inventory and gates whole processes/op-modes out of
+    // baseRateOutput via the runspec-derived BRC sections. The port therefore
+    // over-emits (start/idle/APU rows canonical drops) and the surviving
+    // emissionQuant totals are off by the missing activity factor. Affects the
+    // criteria/energy onroad-exhaust fixtures below and process-apu (which the
+    // month fix unblocked from asserted-vacuous to a 91/91 energy emission
+    // canonical writes as 0). See docs/known-divergences.md §4.4.
+    "process-apu",
     // Onroad-exhaust path emits a fixed ~8,632-row block of NONROAD-coded rows
     // (SCC 2260/2265/2282/2285) regardless of the RunSpec — identical bytes
     // across every onroad fixture. Emitted mass is ~7 orders of magnitude high.

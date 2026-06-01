@@ -72,6 +72,19 @@ use moves_data::output_schema::{ActivityRecord, EmissionRecord};
 use crate::aggregation::{AggregationPlan, AggregationTable, TemporalScaling};
 use crate::error::{Error, Result};
 
+/// Lowest `pollutantID` reserved for MOVES' synthetic, output-internal
+/// pollutants.
+///
+/// MOVES uses the `>= 10000` range for parallel tallies that exist only to
+/// drive a downstream calculation and are never written to `MOVESOutput`:
+/// `altTHC` (10001, the Pseudo-THC tally the `FuelEffectsGenerator` derives
+/// and `HCSpeciationCalculator` consumes to speciate ethanol E70/E85 running
+/// and start exhaust) and `altNMHC` (10079, the NMHC speciated from `altTHC`
+/// on that same path). Both flow through the worker `MOVESWorkerOutput` stream
+/// so HC speciation can read them, but the final output must drop them — no
+/// captured canonical `MOVESOutput` carries any `pollutantID >= 10000`.
+const FIRST_INTERNAL_POLLUTANT_ID: i16 = 10_000;
+
 /// Per-row temporal scaling factors for metric aggregation.
 ///
 /// When an [`AggregationPlan`]'s `SUM` column carries a [`TemporalScaling`]
@@ -287,6 +300,10 @@ impl StreamingEmissionAgg {
     /// applied). The first record seen for a group becomes its representative
     /// (source of key-column values for [`finalize`](Self::finalize)).
     ///
+    /// Records carrying a synthetic, output-internal pollutant
+    /// (`pollutantID >= 10000` — `altTHC`/`altNMHC`) are skipped: they exist
+    /// only to drive HC speciation and never reach `MOVESOutput`.
+    ///
     /// # Errors
     ///
     /// Returns [`Error::AggregationPlanMismatch`] if a group-by column name
@@ -298,6 +315,15 @@ impl StreamingEmissionAgg {
         factors: &impl TemporalScalingFactors,
     ) -> Result<()> {
         for rec in records {
+            // Drop MOVES' synthetic, output-internal pollutants (altTHC 10001,
+            // altNMHC 10079): they are produced only to feed HC speciation via
+            // the worker stream and never appear in canonical `MOVESOutput`.
+            if rec
+                .pollutant_id
+                .is_some_and(|p| p >= FIRST_INTERNAL_POLLUTANT_ID)
+            {
+                continue;
+            }
             let mut key = Vec::with_capacity(self.keys.len());
             for &col in &self.keys {
                 key.push(emission_key_value(rec, col)?);
@@ -1070,6 +1096,35 @@ mod tests {
         let stream = agg.finalize();
 
         assert_eq!(batch, stream, "streaming and batch results must match");
+    }
+
+    #[test]
+    fn streaming_agg_drops_internal_synthetic_pollutants() {
+        // altTHC (10001) / altNMHC (10079) feed HC speciation through the
+        // worker stream but must never reach MOVESOutput. The streaming
+        // accumulator drops every pollutantID >= 10000.
+        let b = breakdown_all_false();
+        let plan = emission_aggregation(&inputs(
+            OutputTimestep::Year,
+            GeographicOutputDetail::Nation,
+            &[Model::Onroad],
+            &b,
+        ));
+        let rows = vec![
+            emission(1, 1, Some(1.0)),     // THC — kept
+            emission(10001, 1, Some(2.0)), // altTHC — dropped
+            emission(10079, 1, Some(4.0)), // altNMHC — dropped
+            emission(79, 1, Some(8.0)),    // NMHC — kept
+        ];
+        let mut agg = StreamingEmissionAgg::new(plan).unwrap();
+        agg.extend(&rows, &UnitScaling).unwrap();
+        let out = agg.finalize();
+        let pollutants: Vec<_> = out.iter().filter_map(|r| r.pollutant_id).collect();
+        assert_eq!(
+            pollutants,
+            vec![1, 79],
+            "only non-synthetic pollutants survive to output"
+        );
     }
 
     #[test]

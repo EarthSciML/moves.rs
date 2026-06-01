@@ -90,8 +90,8 @@ a tolerance); each graduates to the asserted set once its data plane is fixed.
 | `process-evap-leaks` | 128→128 | 1.6e-7 | **precision-only — asserted** |
 | `process-evap-permeation` | 128→128 | 2.1e-7 | **precision-only — asserted** |
 | `nr-commercial-nation` | 908→908 | 3.5e-3 | **precision-only (real\*4) — asserted** (`NONROAD_REL_TOL`) |
-| `process-apu`, `process-crankcase-extidle`, `process-crankcase-start`, `process-extended-idle` | 0→0 | — | **vacuous — asserted** (canonical has no `MOVESOutput`; port emits none either) |
-| `chain-nonhaptog`, `chain-tog-speciation`, `expand-counties`, `expand-criteria`, `expand-day`, `expand-fueltype-diesel`, `expand-month`, `expand-sourcetype`, `mixed-onroad-nonroad`, `process-airtoxics`, `process-brakewear`, `process-crankcase-running`, `process-nox-speciation`, `process-pm-exhaust`, `process-refueling`, `process-tirewear`, `sample-runspec` | N→0 (was →8,632) | −100 % (was ~1e40 %) | **NONROAD-garbage root-cause FIXED; residual onroad-emits-0 gap — quarantined** (see §4.4 reported bug 1) |
+| `process-crankcase-extidle`, `process-crankcase-start`, `process-extended-idle` | 0→0 | — | **vacuous — asserted** (canonical has no `MOVESOutput`; the port has no BaseRate input rows for these and emits none either) |
+| `chain-nonhaptog`, `chain-tog-speciation`, `expand-counties`, `expand-criteria`, `expand-day`, `expand-fueltype-diesel`, `expand-month`, `expand-sourcetype`, `mixed-onroad-nonroad`, `process-airtoxics`, `process-apu`, `process-brakewear`, `process-crankcase-running`, `process-nox-speciation`, `process-pm-exhaust`, `process-refueling`, `process-tirewear`, `sample-runspec` | N→M (no longer 0) | varies | **onroad-emits-0 month root-cause FIXED; residual BaseRate activity-weighting gap — quarantined** (see §4.4 reported bug 1) |
 | `nr-agriculture-state`, `nr-airport-support-county`, `nr-industrial-county`, `nr-railroad-support-nation` | N→0 | −100 % | **reported bug (NONROAD emits nothing) — quarantined** |
 | `nr-construction-state`, `nr-lawn-garden-county`, `nr-logging-county`, `nr-pleasure-craft-state`, `nr-recreational-county` | mismatched | 1e3–1e6 % | **reported bug (NONROAD population/coverage) — quarantined** |
 
@@ -134,14 +134,56 @@ calls it with the run's model flags. After the fix, all 17 onroad fixtures emit
 mixed/NONROAD fixtures are unaffected (NONROAD still selected → calculator still
 runs).
 
-**Residual gap (separate bug, still quarantined).** With the garbage removed,
-the onroad fixtures now diverge the *other* way: the onroad emission data plane
-(`BaseRateGenerator` → `BaseRateCalculator` → criteria/PM/etc.) executes but
-emits **0** `MOVESOutput` rows against the captured execution DB, where canonical
-has the real onroad SCC `2201…` rows (e.g. `expand-criteria` 744, `sample-runspec`
-84, `process-pm-exhaust` 1,456). That is a distinct onroad data-plane gap — not
-the NONROAD-garbage bug — so these fixtures stay in `QUARANTINED_FIXTURES`
-(−100 % vs a fixed catastrophic ~1e40 %) until the onroad output wiring lands.
+**Residual gap (separate bug, still quarantined) — onroad-emits-0 root cause now FIXED; deeper activity-weighting gap remains.**
+With the NONROAD garbage removed, the onroad fixtures had diverged the *other*
+way: the onroad emission data plane (`BaseRateGenerator` → `BaseRateCalculator`
+→ criteria/PM/etc.) emitted **0** `MOVESOutput` rows where canonical has real
+onroad SCC `2201…` rows. The **0-rows** cause was a month off-by-one:
+`BaseRateCalculator::execute` keyed its fuel-supply join on the raw RunSpec month
+(`pos.time.month`, 7) while MOVES keys its execution DB and every snapshot by the
+internal `monthID = <month key> + 1` (8) — applied by every sibling generator
+(`SnapshotFilter::from_run_spec`, `evap_op_mode_distribution`) but not here. With
+no fuel-supply match every `BaseRateByAge`/`BaseRate` row was dropped → 0 output.
+
+The month fix (mirror the `+1`) is landed, plus two coordinated fixes the
+unblocked output exposed: (a) `merge_process_year_variants` unions the
+per-**process** execution-DB tables (`baseratebyage_1_2020` = process 1,
+`_2_2020` = process 2) under the canonical name, and the multi-process
+`BaseRateCalculator` subscriber fired once per process emitted *every* process's
+rows at *every* position (~2×) — fixed by filtering the merged rows to
+`position().process_id` inside `execute`; and (b) the synthetic `altTHC` (10001)
+/ `altNMHC` (10079) tallies leaked into `MOVESOutput` — fixed by dropping
+`pollutantID >= 10000` in `StreamingEmissionAgg::extend` (no canonical
+`MOVESOutput` carries any such pollutant; they exist only to feed HC speciation
+through the worker stream).
+
+**Why these fixtures still cannot graduate.** Ground truth (the captured
+snapshots) shows the onroad fixtures are **inventory ("Inv") scale**: canonical's
+`MOVESOutput.emissionQuant` is the BaseRate **rate × per-(sourceType, modelYear,
+…) activity** (SHO / starts / hotelling), and whole processes / operating modes
+are **gated out** of `baseRateOutput` by the runspec-derived `BRC_*` sections.
+Concretely for `expand-criteria`: canonical writes 744 rows — process **1 only**,
+roadType **4**, op-mode **0** — even though `baseratebyage_2_2020` (process 2
+start, roadType 1, op-modes 101–108) holds 5,952 valid rows with a valid SCC join
+(canonical's `baserateoutput` excludes them entirely). The port hardcodes
+`ModuleFlags::default()` (`apply_activity`/`aggregate_smfr`/discard flags all
+false), so it emits **un-weighted rates for every subscribed process** (1/2/9/10/
+90/91): for `expand-criteria` 1,488 rows (process 1 *and* 2, roadTypes 1 *and* 4)
+with `emissionQuant` summing to the raw rate (≈2× canonical, `max_rel_diff`≈0.81).
+Reproducing canonical requires deriving the `BRC_*` section flags from the
+RunSpec and wiring the inventory activity weighting — a Phase-level onroad
+data-plane piece not yet present. Until it lands these fixtures stay in
+`QUARANTINED_FIXTURES`.
+
+**`process-apu`** is the same gap surfacing through a fixture that *was*
+asserted-vacuous only because the month bug suppressed its output. Its
+`baserate_91_2020` has 358 process-91 / pollutant-91 (energy) rows at op-modes
+201/203 (APU/shorepower), and a `baserateunits` row (KJ/s) exists, yet canonical
+writes **0** to both `baserateoutput` and `MOVESOutput` (the APU/shorepower idle
+energy is activity-gated). The port now emits ~100 un-weighted rows, so `apu`
+moved from `asserted_fixtures` (vacuous) into `QUARANTINED_FIXTURES` rather than
+having its assertion forced or a tolerance widened.
+
 `mixed-onroad-nonroad` also stays quarantined: its captured canonical
 `MOVESOutput` is empty (0 rows) while the port's NONROAD half legitimately emits
 ~8,632 rows.
