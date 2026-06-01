@@ -102,6 +102,11 @@ pub mod masterloop;
 
 pub use error::{Error, Result};
 
+// `ModelScale` appears in the public `CalculatorContext` API
+// (`model_scale()`), so downstream calculator crates need to name it without
+// taking a direct `moves-runspec` dependency.
+pub use moves_runspec::model::ModelScale;
+
 pub use aggregation::*;
 pub use calculator::*;
 pub use control_strategy::{

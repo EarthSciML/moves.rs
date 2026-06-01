@@ -511,4 +511,50 @@ impl EnergyUnit {
             _ => None,
         }
     }
+
+    /// `EnergyMeasurementSystem.conversionToJoulesFactor` — Joules per one unit
+    /// of this measurement system (`Joules` 1, `KiloJoules` 1000, `Million BTU`
+    /// `1055.0559 × 1e6`).
+    #[must_use]
+    pub fn joules_per_unit(self) -> f64 {
+        match self {
+            Self::Joules => 1.0,
+            Self::KiloJoules => 1000.0,
+            Self::MillionBtu => 1055.0559 * 1_000_000.0,
+        }
+    }
+
+    /// Factor that converts an energy quantity from MOVES' **base energy unit
+    /// (kilojoules)** to this output unit. The canonical `OutputProcessor`
+    /// rebases the kilojoule worker output to the run's `energyUnits`:
+    /// `out = kJ × 1000 / joulesPerUnit(target)` (kJ → J, then J → target).
+    #[must_use]
+    pub fn factor_from_kilojoules(self) -> f64 {
+        1000.0 / self.joules_per_unit()
+    }
+}
+
+#[cfg(test)]
+mod energy_unit_tests {
+    use super::EnergyUnit;
+
+    #[test]
+    fn kilojoules_is_the_base_unit() {
+        assert_eq!(EnergyUnit::KiloJoules.factor_from_kilojoules(), 1.0);
+    }
+
+    #[test]
+    fn joules_scales_up_by_a_thousand() {
+        assert_eq!(EnergyUnit::Joules.factor_from_kilojoules(), 1000.0);
+    }
+
+    #[test]
+    fn million_btu_matches_the_canonical_constant() {
+        // EnergyMeasurementSystem.MMBTU = 1055.0559 * 1e6 J per Million BTU;
+        // kJ → MMBTU = 1000 / that. ~9.478e-7, the inverse of the empirically
+        // observed ~1.055e6 over-emit before the conversion landed.
+        let f = EnergyUnit::MillionBtu.factor_from_kilojoules();
+        assert!((f - 1000.0 / (1055.0559 * 1_000_000.0)).abs() < 1e-18);
+        assert!((1.0 / f - 1_055_055.9).abs() < 1.0);
+    }
 }

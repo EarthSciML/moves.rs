@@ -532,10 +532,15 @@ impl MOVESEngine {
         let executor = BoundedExecutor::new(self.config.max_parallel_chunks)?;
         let registry = &self.registry;
         let chunk_slow = Arc::clone(&self.slow_store);
- // Per-chunk wall times collected from within the parallel closure.
- // Indexed to match the `chunks` slice order: `chunk_slot[i]` holds
- // the timing for `chunks[i]`. Using a `Mutex<Vec<Option<...>>>` lets
- // parallel closures write their slot without contending on others.
+        // The run's model scale, captured for each chunk's CalculatorContext so
+        // scale-sensitive calculators (BaseRateCalculator inventory activity
+        // weighting) can branch on it. Mirrors the Java
+        // `ExecutionRunSpec.getModelScale()`.
+        let run_scale = self.execution.model_scale();
+        // Per-chunk wall times collected from within the parallel closure.
+        // Indexed to match the `chunks` slice order: `chunk_slot[i]` holds
+        // the timing for `chunks[i]`. Using a `Mutex<Vec<Option<...>>>` lets
+        // parallel closures write their slot without contending on others.
         let chunk_slot: Arc<Mutex<Vec<Option<Duration>>>> =
             Arc::new(Mutex::new(vec![None; chunks.len()]));
         let chunk_slot_ref = Arc::clone(&chunk_slot);
@@ -563,14 +568,16 @@ impl MOVESEngine {
                     ));
                 }
             }
- // One CalculatorContext per chunk: generators write scratch here,
- // calculators in the same chunk read it. Different chunks get
- // different Arcs, providing per-chunk scratch isolation.
- // The slow tier (execution-DB tables) is shared read-only across
- // all chunks via the same Arc.
-            let chunk_ctx: Arc<Mutex<CalculatorContext>> = Arc::new(Mutex::new(
-                CalculatorContext::with_slow(Arc::clone(&chunk_slow)),
-            ));
+            // One CalculatorContext per chunk: generators write scratch here,
+            // calculators in the same chunk read it. Different chunks get
+            // different Arcs, providing per-chunk scratch isolation.
+            // The slow tier (execution-DB tables) is shared read-only across
+            // all chunks via the same Arc.
+            let chunk_ctx: Arc<Mutex<CalculatorContext>> = Arc::new(Mutex::new({
+                let mut ctx = CalculatorContext::with_slow(Arc::clone(&chunk_slow));
+                ctx.set_model_scale(run_scale);
+                ctx
+            }));
             for name in chunk.modules() {
                 let Some(instance) = instantiate(registry, name) else {
                     continue;
@@ -634,11 +641,27 @@ impl MOVESEngine {
  // inline during execution) and write the rolled-up emission rows.
  // Drop the local ref clones first so Arc::try_unwrap sees count == 1.
         drop(streaming_agg_ref);
-        let aggregated_records = Arc::try_unwrap(streaming_agg)
+        let mut aggregated_records = Arc::try_unwrap(streaming_agg)
             .expect("streaming_agg still has owners after executor finished")
             .into_inner()
             .expect("streaming_agg mutex poisoned")
             .finalize();
+
+        // Mass & energy unit conversion (canonical `OutputProcessor` step 1).
+        // MOVES' worker output is in grams (mass) and kilojoules (energy); the
+        // run's `outputFactors` rebase that to the chosen units. Mass output is
+        // already grams for every fixture, but energy pollutants (91/92/93) must
+        // be rebased from kJ to the run's `energyUnits` (e.g. Million BTU).
+        let energy_factor = self
+            .execution
+            .run_spec
+            .output_factors
+            .mass
+            .energy_units
+            .factor_from_kilojoules();
+        if (energy_factor - 1.0).abs() > f64::EPSILON {
+            apply_energy_unit_conversion(&mut aggregated_records, energy_factor);
+        }
         drop(activity_acc_ref);
         let activity_records = Arc::try_unwrap(activity_acc)
             .expect("activity_acc still has owners after executor finished")
@@ -834,6 +857,31 @@ fn run_hash(run_spec: &RunSpec) -> String {
         serde_json::to_vec(run_spec).expect("RunSpec is plain data and always serializes to JSON");
     let digest = Sha256::digest(&json);
     digest.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+/// MOVES energy pollutants (`Pollutant.energyOrMass = 'energy'`): Total Energy
+/// Consumption (91), Petroleum Energy (92), Fossil Fuel Energy (93). Their
+/// `emissionQuant` is produced in kilojoules and rebased to the run's
+/// `energyUnits`; mass pollutants are unaffected.
+const ENERGY_POLLUTANT_IDS: [i16; 3] = [91, 92, 93];
+
+/// Rebase energy-pollutant `emissionQuant`/`emissionRate` from MOVES' base unit
+/// (kilojoules) to the run's output energy unit — the energy half of the
+/// canonical `OutputProcessor` "Mass & Energy unit conversion" step. `factor`
+/// is [`EnergyUnit::factor_from_kilojoules`]; mass pollutants are left as-is.
+fn apply_energy_unit_conversion(records: &mut [EmissionRecord], factor: f64) {
+    for r in records.iter_mut() {
+        if r.pollutant_id
+            .is_some_and(|p| ENERGY_POLLUTANT_IDS.contains(&p))
+        {
+            if let Some(q) = r.emission_quant.as_mut() {
+                *q *= factor;
+            }
+            if let Some(rate) = r.emission_rate.as_mut() {
+                *rate *= factor;
+            }
+        }
+    }
 }
 
 /// Build an [`AggregationInputs`] from a [`RunSpec`].

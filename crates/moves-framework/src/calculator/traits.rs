@@ -67,6 +67,7 @@ use std::sync::Arc;
 
 use moves_calculator_info::{Granularity, Priority};
 use moves_data::{PollutantProcessAssociation, ProcessId};
+use moves_runspec::model::ModelScale;
 use polars::prelude::DataFrame;
 
 use crate::data::InMemoryStore;
@@ -105,6 +106,13 @@ pub struct CalculatorContext {
  /// `ScratchNamespace` so there is no cross-chunk scratch leakage.
     scratch: ScratchNamespace,
     position: IterationPosition,
+    /// The run's [`ModelScale`] (`targetRunSpec.scale`). `None` in the
+    /// default/test contexts that don't model a full run; the engine sets it
+    /// per chunk so scale-sensitive calculators (e.g. `BaseRateCalculator`'s
+    /// inventory activity weighting) can branch on it without re-deriving the
+    /// runspec. Mirrors `ExecutionRunSpec.getModelScale()` used by the Java
+    /// `BaseRateCalculator.doExecute`.
+    scale: Option<ModelScale>,
 }
 
 impl CalculatorContext {
@@ -123,6 +131,7 @@ impl CalculatorContext {
             slow: Arc::default(),
             scratch: ScratchNamespace::empty(),
             position,
+            scale: None,
         }
     }
 
@@ -135,6 +144,7 @@ impl CalculatorContext {
             slow: Arc::new(store),
             scratch: ScratchNamespace::empty(),
             position: IterationPosition::default(),
+            scale: None,
         }
     }
 
@@ -146,6 +156,7 @@ impl CalculatorContext {
             slow: Arc::new(store),
             scratch: ScratchNamespace::empty(),
             position,
+            scale: None,
         }
     }
 
@@ -158,6 +169,7 @@ impl CalculatorContext {
             slow,
             scratch: ScratchNamespace::empty(),
             position: IterationPosition::default(),
+            scale: None,
         }
     }
 
@@ -199,6 +211,19 @@ impl CalculatorContext {
  /// position without replacing the shared slow tier or scratch.
     pub fn set_position(&mut self, position: IterationPosition) {
         self.position = position;
+    }
+
+    /// The run's [`ModelScale`], if the engine set it. `None` in default/test
+    /// contexts.
+    #[must_use]
+    pub fn model_scale(&self) -> Option<ModelScale> {
+        self.scale
+    }
+
+    /// Set the run's [`ModelScale`]. The engine calls this once per chunk
+    /// context so scale-sensitive calculator bodies can read it.
+    pub fn set_model_scale(&mut self, scale: ModelScale) {
+        self.scale = Some(scale);
     }
 }
 

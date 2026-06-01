@@ -104,6 +104,17 @@ static INPUT_TABLES: &[&str] = &[
     "FuelSubtype",
     "MonthOfAnyYear",
     "runSpecRoadType",
+    // Activity tables the GetActivity SQL section reads to build
+    // `universalActivity` (see `build_universal_activity`): SHO drives
+    // running-exhaust inventory weighting (process 1/9/10), Starts drives
+    // start-exhaust (process 2). `RunSpecHourDay` restricts to selected hours;
+    // `HourDay`/`DayOfAnyWeek` map the hour-day to its real-day count (the
+    // per-day-type activity divisor — see `build_universal_activity`).
+    "SHO",
+    "Starts",
+    "RunSpecHourDay",
+    "HourDay",
+    "DayOfAnyWeek",
 ];
 
 /// One flattened output record — a [`BlockKey`] paired with one fuel
@@ -657,7 +668,15 @@ impl Calculator for BaseRateCalculator {
             im_coverage: tables.iter_typed("IMCoverage")?,
             emission_rate_adjustment: tables.iter_typed("EmissionRateAdjustment")?,
             ev_efficiency: tables.iter_typed("EVEfficiency")?,
-            universal_activity: tables.iter_typed_or_empty("universalActivity")?,
+            // MOVES never persists `universalActivity` (it is a runtime-derived
+            // worker table); rebuild it from the snapshot's `SHO`/`Starts`
+            // activity tables per the GetActivity SQL section, keyed to the
+            // firing process. Falls back to the (empty) snapshot table for
+            // unit-test contexts that pre-seed `universalActivity` directly.
+            universal_activity: match pos.process_id.map(|p| p.0 as i32) {
+                Some(pid) => build_universal_activity(tables, &constants, pid)?,
+                None => tables.iter_typed_or_empty("universalActivity")?,
+            },
             smfr_sbd_summary: tables.iter_typed_or_empty("smfrSBDSummary")?,
             age_category: tables.iter_typed("AgeCategory")?,
             fuel_types: tables
@@ -716,13 +735,25 @@ impl Calculator for BaseRateCalculator {
                 p
             }
         };
+        // Inventory (MACROSCALE / Inv) runs convert rates to an inventory by
+        // multiplying `meanBaseRate * universalActivity` — the Java
+        // `BaseRateCalculator.doExecute` enables the `ApplyActivity` section for
+        // every process when `getModelScale() == MACROSCALE`. Rates
+        // (MESOSCALE_LOOKUP) output leaves the rate unscaled. SMFR aggregation
+        // (`aggregate_smfr`) is a rates-mode concern and stays off here.
+        let flags = ModuleFlags {
+            apply_activity: ctx
+                .model_scale()
+                .is_some_and(|s| s != moves_framework::ModelScale::Rates),
+            ..ModuleFlags::default()
+        };
         let output = Self::run_with_prepared(
             smfr_sbd_summary,
             base_rate_by_age,
             base_rate,
             &prepared,
             &constants,
-            &ModuleFlags::default(),
+            &flags,
         );
         let rows = output.rows();
         crate::wiring::emit_rows(rows)
@@ -1055,6 +1086,437 @@ fn build_fuel_supply(
             })
         })
         .collect();
+    Ok(rows)
+}
+
+// =============================================================================
+// universalActivity synthesis — the GetActivity SQL section.
+//
+// MOVES' `BaseRateCalculator.sql` builds `universalActivity(hourDayID,
+// modelYearID, sourceTypeID, activity)` at the Month context, keyed off the
+// firing process:
+//   * Process 1/9/10 (Running Exhaust, Brakewear, Tirewear): `activity = SHO`,
+//     from `SHO` joined to `RunSpecHourDay`, filtered to the iteration's month,
+//     year and link.
+//   * Process 2 (Starts): `activity = starts`, from `Starts` joined to
+//     `RunSpecHourDay`, filtered to month, year and zone.
+// `modelYearID = year - ageID`. The snapshot never persists `universalActivity`
+// (it is a runtime-derived worker table), so the port rebuilds it here from the
+// `SHO`/`Starts` activity tables the snapshot does carry. The `ApplyActivity`
+// SQL section then multiplies `meanBaseRate * activity` to turn the rate into an
+// inventory — wired via [`ModuleFlags::apply_activity`].
+// =============================================================================
+
+/// One raw `SHO` row — only the columns the GetActivity section reads.
+struct RawShoRow {
+    hour_day_id: i32,
+    month_id: i32,
+    year_id: i32,
+    age_id: i32,
+    link_id: i32,
+    source_type_id: i32,
+    sho: f64,
+}
+
+impl TableRow for RawShoRow {
+    fn table_name() -> &'static str {
+        "SHO"
+    }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("hourDayID".into(), DataType::Int32),
+            ("monthID".into(), DataType::Int32),
+            ("yearID".into(), DataType::Int32),
+            ("ageID".into(), DataType::Int32),
+            ("linkID".into(), DataType::Int32),
+            ("sourceTypeID".into(), DataType::Int32),
+            ("SHO".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "hourDayID".into(),
+                    rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "yearID".into(),
+                    rows.iter().map(|r| r.year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "ageID".into(),
+                    rows.iter().map(|r| r.age_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "linkID".into(),
+                    rows.iter().map(|r| r.link_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "SHO".into(),
+                    rows.iter().map(|r| r.sho).collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "SHO";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let hour_day_id = get_i32("hourDayID")?;
+        let month_id = get_i32("monthID")?;
+        let year_id = get_i32("yearID")?;
+        let age_id = get_i32("ageID")?;
+        let link_id = get_i32("linkID")?;
+        let source_type_id = get_i32("sourceTypeID")?;
+        let sho = df
+            .column("SHO")
+            .map_err(|e| row_err(t, 0, "SHO", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "SHO", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(RawShoRow {
+                    hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))?,
+                    month_id: month_id.get(i).ok_or_else(|| null("monthID"))?,
+                    year_id: year_id.get(i).ok_or_else(|| null("yearID"))?,
+                    age_id: age_id.get(i).ok_or_else(|| null("ageID"))?,
+                    link_id: link_id.get(i).ok_or_else(|| null("linkID"))?,
+                    source_type_id: source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                    sho: sho.get(i).ok_or_else(|| null("SHO"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+/// One raw `Starts` row — only the columns the GetActivity section reads.
+struct RawStartsRow {
+    hour_day_id: i32,
+    month_id: i32,
+    year_id: i32,
+    age_id: i32,
+    zone_id: i32,
+    source_type_id: i32,
+    starts: f64,
+}
+
+impl TableRow for RawStartsRow {
+    fn table_name() -> &'static str {
+        "Starts"
+    }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("hourDayID".into(), DataType::Int32),
+            ("monthID".into(), DataType::Int32),
+            ("yearID".into(), DataType::Int32),
+            ("ageID".into(), DataType::Int32),
+            ("zoneID".into(), DataType::Int32),
+            ("sourceTypeID".into(), DataType::Int32),
+            ("starts".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "hourDayID".into(),
+                    rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "yearID".into(),
+                    rows.iter().map(|r| r.year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "ageID".into(),
+                    rows.iter().map(|r| r.age_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "zoneID".into(),
+                    rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "starts".into(),
+                    rows.iter().map(|r| r.starts).collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "Starts";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let hour_day_id = get_i32("hourDayID")?;
+        let month_id = get_i32("monthID")?;
+        let year_id = get_i32("yearID")?;
+        let age_id = get_i32("ageID")?;
+        let zone_id = get_i32("zoneID")?;
+        let source_type_id = get_i32("sourceTypeID")?;
+        let starts = df
+            .column("starts")
+            .map_err(|e| row_err(t, 0, "starts", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "starts", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(RawStartsRow {
+                    hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))?,
+                    month_id: month_id.get(i).ok_or_else(|| null("monthID"))?,
+                    year_id: year_id.get(i).ok_or_else(|| null("yearID"))?,
+                    age_id: age_id.get(i).ok_or_else(|| null("ageID"))?,
+                    zone_id: zone_id.get(i).ok_or_else(|| null("zoneID"))?,
+                    source_type_id: source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                    starts: starts.get(i).ok_or_else(|| null("starts"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+/// One raw `HourDay` row — `hourDayID → dayID`.
+struct RawHourDayRow {
+    hour_day_id: i32,
+    day_id: i32,
+}
+
+impl TableRow for RawHourDayRow {
+    fn table_name() -> &'static str {
+        "HourDay"
+    }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("hourDayID".into(), DataType::Int32),
+            ("dayID".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "hourDayID".into(),
+                    rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "dayID".into(),
+                    rows.iter().map(|r| r.day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "HourDay";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let hour_day_id = get_i32("hourDayID")?;
+        let day_id = get_i32("dayID")?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(RawHourDayRow {
+                    hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))?,
+                    day_id: day_id.get(i).ok_or_else(|| null("dayID"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+/// One raw `DayOfAnyWeek` row — `dayID → noOfRealDays`.
+struct RawDayOfWeekRow {
+    day_id: i32,
+    no_of_real_days: f64,
+}
+
+impl TableRow for RawDayOfWeekRow {
+    fn table_name() -> &'static str {
+        "DayOfAnyWeek"
+    }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("dayID".into(), DataType::Int32),
+            ("noOfRealDays".into(), DataType::Float64),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "dayID".into(),
+                    rows.iter().map(|r| r.day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "noOfRealDays".into(),
+                    rows.iter().map(|r| r.no_of_real_days).collect::<Vec<f64>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "DayOfAnyWeek";
+        let day_id = df
+            .column("dayID")
+            .map_err(|e| row_err(t, 0, "dayID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "dayID", e.to_string()))?;
+        let no_of_real_days = df
+            .column("noOfRealDays")
+            .map_err(|e| row_err(t, 0, "noOfRealDays", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "noOfRealDays", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(RawDayOfWeekRow {
+                    day_id: day_id.get(i).ok_or_else(|| null("dayID"))?,
+                    no_of_real_days: no_of_real_days.get(i).ok_or_else(|| null("noOfRealDays"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+/// Build `universalActivity` for the firing process — the GetActivity SQL
+/// section. Returns the per-`(hourDay, modelYear, sourceType)` activity rows the
+/// `ApplyActivity` step multiplies the base rate by. Processes without a modelled
+/// activity source (e.g. 90/91 hotelling, not exercised by the inventory
+/// onroad-exhaust fixtures) yield an empty vector, leaving the rate unscaled.
+///
+/// The activity divides the raw `SHO`/`Starts` (which the snapshot tabulates as
+/// a per-day-type total over the `noOfRealDays` real days that day-type stands
+/// for) by `noOfRealDays`, because the port's base emission already carries the
+/// real-day count: empirically, for every model year and day-type, canonical
+/// `MOVESOutput = port_base * SHO / noOfRealDays` (weekend ÷2, weekday ÷5).
+/// Applying the raw `SHO` double-counts the day weighting (a constant ~4.3×
+/// over-emit on the inventory fixtures).
+fn build_universal_activity(
+    tables: &moves_framework::InMemoryStore,
+    constants: &RunConstants,
+    process_id: i32,
+) -> moves_framework::Result<Vec<setup::UniversalActivityRow>> {
+    use std::collections::{BTreeMap, BTreeSet};
+
+    // RunSpecHourDay restricts activity to the selected hour/day combinations.
+    let run_spec_hour_days: BTreeSet<i32> = tables
+        .iter_typed_or_empty::<setup::RunSpecHourDayRow>("RunSpecHourDay")?
+        .into_iter()
+        .map(|r| r.hour_day_id)
+        .collect();
+    let in_run = |hour_day_id: i32| {
+        run_spec_hour_days.is_empty() || run_spec_hour_days.contains(&hour_day_id)
+    };
+
+    // hourDayID → noOfRealDays (via dayID), the per-day-type activity divisor.
+    let day_real_days: BTreeMap<i32, f64> = tables
+        .iter_typed_or_empty::<RawDayOfWeekRow>("DayOfAnyWeek")?
+        .into_iter()
+        .map(|r| (r.day_id, r.no_of_real_days))
+        .collect();
+    let hour_day_real_days: BTreeMap<i32, f64> = tables
+        .iter_typed_or_empty::<RawHourDayRow>("HourDay")?
+        .into_iter()
+        .filter_map(|r| day_real_days.get(&r.day_id).map(|n| (r.hour_day_id, *n)))
+        .collect();
+    // A missing or zero divisor leaves the activity unscaled (divisor 1.0).
+    let divisor = |hour_day_id: i32| -> f64 {
+        match hour_day_real_days.get(&hour_day_id).copied() {
+            Some(n) if n != 0.0 => n,
+            _ => 1.0,
+        }
+    };
+
+    let rows = match process_id {
+        // Running Exhaust, Brakewear, Tirewear: activity = SHO (per link).
+        1 | 9 | 10 => tables
+            .iter_typed_or_empty::<RawShoRow>("SHO")?
+            .into_iter()
+            .filter(|r| {
+                r.month_id == constants.month_id
+                    && r.year_id == constants.year_id
+                    && r.link_id == constants.link_id
+                    && in_run(r.hour_day_id)
+            })
+            .map(|r| setup::UniversalActivityRow {
+                hour_day_id: r.hour_day_id,
+                model_year_id: constants.year_id - r.age_id,
+                source_type_id: r.source_type_id,
+                activity: r.sho / divisor(r.hour_day_id),
+            })
+            .collect(),
+        // Starts: activity = starts (per zone).
+        2 => tables
+            .iter_typed_or_empty::<RawStartsRow>("Starts")?
+            .into_iter()
+            .filter(|r| {
+                r.month_id == constants.month_id
+                    && r.year_id == constants.year_id
+                    && r.zone_id == constants.zone_id
+                    && in_run(r.hour_day_id)
+            })
+            .map(|r| setup::UniversalActivityRow {
+                hour_day_id: r.hour_day_id,
+                model_year_id: constants.year_id - r.age_id,
+                source_type_id: r.source_type_id,
+                activity: r.starts / divisor(r.hour_day_id),
+            })
+            .collect(),
+        _ => Vec::new(),
+    };
     Ok(rows)
 }
 
