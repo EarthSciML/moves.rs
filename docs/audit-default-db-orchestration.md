@@ -206,8 +206,9 @@ schema-only (no rows). `GeographyTables::new(links, counties)` requires `LinkRow
 data to drive the engine's iteration over execution locations. Without Link rows the
 engine has zero chunks to process.
 
-**Fix**: Add a `synthesize_link_from_zone_road_type(store: &InMemoryStore) -> Vec<LinkRow>`
-function in `run.rs` (analogous to `synthesize_sourceuse_type_physics_mapping`).
+**Fix**: Add a `populate_link_from_zone_road_type(store: &mut InMemoryStore) -> Result<()>`
+function in `run.rs` (analogous to `populate_source_use_type_physics_mapping` and
+`populate_sho_distances`).
 Use ZoneRoadType + RoadType from the default DB. Assign synthetic linkIDs via
 `zoneID * 10 + roadTypeID`. This is the same convention MOVES uses for
 county-scale runs without a custom project network.
@@ -306,7 +307,7 @@ are resolved, wiring the CLI flag (B3) is straightforward. B4 (SHO allocation
 wiring) needs validation but may be avoidable via `MesoscaleLookupTotalActivityGenerator`.
 
 Recommended B2/B3 implementation order:
-1. `synthesize_link(store)` in `run.rs` — unblocks geography setup
+1. `populate_link_from_zone_road_type(store)` in `run.rs` — unblocks geography setup
 2. `build_runspec_tables(runspec, db)` in `run.rs` or new module — unblocks generators
 3. `--default-db` CLI flag + new execution branch in `run_simulation` — user-facing
 4. Validate SHO allocation or switch to MesoscaleLookup path — unblocks evap/start OMD
