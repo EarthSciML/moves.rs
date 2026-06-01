@@ -182,14 +182,8 @@ fn accumulate_output_file(path: &Path, sums: &mut BTreeMap<i64, f64>) -> io::Res
             (Ok(p), Ok(e)) => (p, e),
             _ => continue,
         };
-        let pids = batch
-            .column(pid_idx)
-            .as_any()
-            .downcast_ref::<Int16Array>();
-        let eqs = batch
-            .column(eq_idx)
-            .as_any()
-            .downcast_ref::<Float64Array>();
+        let pids = batch.column(pid_idx).as_any().downcast_ref::<Int16Array>();
+        let eqs = batch.column(eq_idx).as_any().downcast_ref::<Float64Array>();
         let (pids, eqs) = match (pids, eqs) {
             (Some(p), Some(e)) => (p, e),
             _ => continue,
@@ -217,7 +211,12 @@ pub fn compare_pollutant_sums(
     port: &PollutantSums,
     abs_floor: f64,
 ) -> PollutantComparison {
-    let ids: BTreeSet<i64> = canonical.sums.keys().chain(port.sums.keys()).copied().collect();
+    let ids: BTreeSet<i64> = canonical
+        .sums
+        .keys()
+        .chain(port.sums.keys())
+        .copied()
+        .collect();
 
     let mut rows = Vec::with_capacity(ids.len());
     let mut max_abs_delta = 0.0_f64;
