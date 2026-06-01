@@ -91,7 +91,7 @@ a tolerance); each graduates to the asserted set once its data plane is fixed.
 | `process-evap-permeation` | 128→128 | 2.1e-7 | **precision-only — asserted** |
 | `nr-commercial-nation` | 908→908 | 3.5e-3 | **precision-only (real\*4) — asserted** (`NONROAD_REL_TOL`) |
 | `process-apu`, `process-crankcase-extidle`, `process-crankcase-start`, `process-extended-idle` | 0→0 | — | **vacuous — asserted** (canonical has no `MOVESOutput`; port emits none either) |
-| `chain-nonhaptog`, `chain-tog-speciation`, `expand-counties`, `expand-criteria`, `expand-day`, `expand-fueltype-diesel`, `expand-month`, `expand-sourcetype`, `mixed-onroad-nonroad`, `process-airtoxics`, `process-brakewear`, `process-crankcase-running`, `process-nox-speciation`, `process-pm-exhaust`, `process-refueling`, `process-tirewear`, `sample-runspec` | →8,632 (fixed) | ~1e40–1e43 % | **reported bug (onroad-exhaust) — quarantined** |
+| `chain-nonhaptog`, `chain-tog-speciation`, `expand-counties`, `expand-criteria`, `expand-day`, `expand-fueltype-diesel`, `expand-month`, `expand-sourcetype`, `mixed-onroad-nonroad`, `process-airtoxics`, `process-brakewear`, `process-crankcase-running`, `process-nox-speciation`, `process-pm-exhaust`, `process-refueling`, `process-tirewear`, `sample-runspec` | N→0 (was →8,632) | −100 % (was ~1e40 %) | **NONROAD-garbage root-cause FIXED; residual onroad-emits-0 gap — quarantined** (see §4.4 reported bug 1) |
 | `nr-agriculture-state`, `nr-airport-support-county`, `nr-industrial-county`, `nr-railroad-support-nation` | N→0 | −100 % | **reported bug (NONROAD emits nothing) — quarantined** |
 | `nr-construction-state`, `nr-lawn-garden-county`, `nr-logging-county`, `nr-pleasure-craft-state`, `nr-recreational-county` | mismatched | 1e3–1e6 % | **reported bug (NONROAD population/coverage) — quarantined** |
 
@@ -100,17 +100,51 @@ No tolerance was widened to absorb a bug. The only tolerances applied
 matching fixtures, whose divergences are sub-tolerance float-accumulation /
 `real*4` artifacts (§4.2).
 
-### Reported bug 1 — onroad-exhaust path emits fixed NONROAD-coded garbage
+### Reported bug 1 — onroad-exhaust path emitted fixed NONROAD-coded garbage — ROOT-CAUSE FIXED
 
-Every onroad fixture, run against its own snapshot, writes a **byte-identical**
-~8,632-row `MOVESOutput` block regardless of the RunSpec (verified: the part
-files for `expand-criteria`, `chain-nonhaptog`, and `expand-fueltype-diesel` are
-identical, `Σ emissionQuant = 43520901035.30757`). The rows carry NONROAD SCC
-codes (`2260…/2265…/2282…/2285…`) with `sourceTypeID`/`fuelTypeID`/`sectorID`
-all NULL, and emit ~7 orders of magnitude more mass than canonical. The onroad
-emission data plane is not actually driven by the RunSpec or the snapshot's
-`baserateoutput` (which holds the correct onroad SCC `2201…` rows). This must be
-fixed in the onroad calculator/output wiring; it is **not** a tolerance matter.
+**Original symptom.** Every onroad fixture, run against its own snapshot, wrote
+a **byte-identical** ~8,632-row `MOVESOutput` block regardless of the RunSpec
+(verified: the part files for `expand-criteria`, `chain-nonhaptog`, and
+`expand-fueltype-diesel` were identical, `Σ emissionQuant = 43520901035.30757`).
+The rows carried NONROAD SCC codes (`2260…/2265…/2282…/2285…`) with
+`sourceTypeID`/`fuelTypeID`/`sectorID` all NULL, and emitted ~7 orders of
+magnitude more mass than canonical.
+
+**Root cause (found 2026-05-31).** It was never the onroad calculators emitting
+garbage — they emit nothing (see the residual gap below). The whole block came
+from `NonroadEmissionCalculator` firing on **onroad-only** RunSpecs. The MOVES
+NONROAD emission processes (1, 15, 18–21, 30–32) share the process-ID namespace
+with onroad, and `CalculatorRegistry::modules_for_runspec` selected modules
+purely by `(pollutant, process)` with **no model filter**. So for any onroad run
+that selects process 1 (Running Exhaust) — i.e. every onroad fixture — the
+planner pulled in `NonroadEmissionCalculator` (plus its NONROAD-only downstream
+`NRHCSpeciationCalculator`/`NRAirToxicsCalculator`). Its `execute` then ran a
+full NONROAD simulation against the `nr*` execution-DB tables, which are
+default-DB content captured **identically** in every snapshot — hence the
+byte-identical, RunSpec-independent block (only `runHash` differed). Canonical
+MOVES gates this chain on the model selection (`Models.evaluateModels`); the
+Rust planner had dropped that dimension.
+
+**Fix.** `CalculatorRegistry::execution_order_for_models` (new) drops the
+NONROAD-only module set — computed from the DAG: the `.../master/nonroad/`
+package module plus its transitive `chained_downstream` closure — when the
+RunSpec does not select the NONROAD model. `MOVESEngine::planned_modules` now
+calls it with the run's model flags. After the fix, all 17 onroad fixtures emit
+**0** NONROAD-coded rows (the garbage is gone); `nr-commercial-nation` and the
+mixed/NONROAD fixtures are unaffected (NONROAD still selected → calculator still
+runs).
+
+**Residual gap (separate bug, still quarantined).** With the garbage removed,
+the onroad fixtures now diverge the *other* way: the onroad emission data plane
+(`BaseRateGenerator` → `BaseRateCalculator` → criteria/PM/etc.) executes but
+emits **0** `MOVESOutput` rows against the captured execution DB, where canonical
+has the real onroad SCC `2201…` rows (e.g. `expand-criteria` 744, `sample-runspec`
+84, `process-pm-exhaust` 1,456). That is a distinct onroad data-plane gap — not
+the NONROAD-garbage bug — so these fixtures stay in `QUARANTINED_FIXTURES`
+(−100 % vs a fixed catastrophic ~1e40 %) until the onroad output wiring lands.
+`mixed-onroad-nonroad` also stays quarantined: its captured canonical
+`MOVESOutput` is empty (0 rows) while the port's NONROAD half legitimately emits
+~8,632 rows.
 
 ### Reported bug 2 — several NONROAD fixtures emit nothing or a wrong row count
 

@@ -444,8 +444,13 @@ impl MOVESEngine {
     /// Returns [`crate::Error::CyclicChain`] if the filtered chain DAG has
     /// a cycle.
     pub fn planned_modules(&self) -> Result<Vec<String>> {
+        let models = &self.execution.run_spec.models;
+        // Empty model selection defaults to ONROAD (matching Java's
+        // `Models.evaluateModels` on an empty list and `models_label`).
+        let nonroad = models.contains(&Model::Nonroad);
+        let onroad = models.is_empty() || models.contains(&Model::Onroad);
         self.registry
-            .execution_order_for_runspec(&self.selections())
+            .execution_order_for_models(&self.selections(), onroad, nonroad)
     }
 
     /// The planned modules split into independent calculator chains —

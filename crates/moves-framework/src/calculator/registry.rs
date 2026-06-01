@@ -385,6 +385,43 @@ impl CalculatorRegistry {
         Ok(out)
     }
 
+    /// The set of NONROAD-only module names: every module the MOVES NONROAD
+    /// model owns, which must **not** run for a RunSpec that does not select
+    /// the NONROAD model.
+    ///
+    /// The NONROAD emission processes (1, 15, 18–21, 30–32) share the
+    /// process-ID namespace with onroad, so the bare `(pollutant, process)`
+    /// filter in [`modules_for_runspec`](Self::modules_for_runspec) pulls
+    /// `NonroadEmissionCalculator`
+    /// (and its NONROAD-only chained downstream — `NRHCSpeciationCalculator`,
+    /// `NRAirToxicsCalculator`) into the plan for an onroad-only run. Canonical
+    /// MOVES gates these on the model selection (`Models.evaluateModels`);
+    /// [`execution_order_for_models`](Self::execution_order_for_models) drops
+    /// this set when NONROAD is not selected.
+    ///
+    /// The set is computed from the DAG, not hard-coded: a module is in it iff
+    /// its Java source lives under the `.../master/nonroad/` package (only
+    /// `NonroadEmissionCalculator` does), together with the transitive
+    /// `chained_downstream` closure of every such module (the NR speciation /
+    /// air-toxics calculators, whose only upstream is the nonroad calculator).
+    #[must_use]
+    pub fn nonroad_only_modules(&self) -> BTreeSet<String> {
+        let mut set: BTreeSet<String> = BTreeSet::new();
+        for m in &self.dag.modules {
+            let is_nonroad_pkg = m
+                .java_path
+                .as_deref()
+                .is_some_and(|p| p.replace('\\', "/").contains("/nonroad/"));
+            if is_nonroad_pkg {
+                set.insert(m.name.clone());
+                for d in &m.chained_downstream {
+                    set.insert(d.clone());
+                }
+            }
+        }
+        set
+    }
+
     /// Convenience: filter + topo-sort in one call. Returns the modules
     /// relevant to `selections`, in execution-safe order.
     pub fn execution_order_for_runspec(
@@ -392,6 +429,37 @@ impl CalculatorRegistry {
         selections: &[(PollutantId, ProcessId)],
     ) -> Result<Vec<String>> {
         let names = self.modules_for_runspec(selections);
+        let refs: Vec<&str> = names.iter().map(String::as_str).collect();
+        self.topological_order(&refs)
+    }
+
+    /// Like [`execution_order_for_runspec`](Self::execution_order_for_runspec)
+    /// but gated on the RunSpec's model selection.
+    ///
+    /// When `nonroad` is `false`, every module in
+    /// [`nonroad_only_modules`](Self::nonroad_only_modules) is dropped from the
+    /// plan before topological ordering — so an onroad-only RunSpec never runs
+    /// `NonroadEmissionCalculator` (which would otherwise emit a fixed block of
+    /// NONROAD-coded `MOVESOutput` rows against the `nr*` execution-DB tables
+    /// present in every snapshot, regardless of the onroad RunSpec). This
+    /// mirrors canonical MOVES, where the NONROAD calculator chain only
+    /// subscribes when the NONROAD model is selected.
+    ///
+    /// `onroad` is accepted for symmetry and forward use; it does not currently
+    /// drop any modules (the onroad calculators live in the shared `ghg`
+    /// package and are filtered by `(pollutant, process)` alone).
+    pub fn execution_order_for_models(
+        &self,
+        selections: &[(PollutantId, ProcessId)],
+        onroad: bool,
+        nonroad: bool,
+    ) -> Result<Vec<String>> {
+        let _ = onroad;
+        let mut names = self.modules_for_runspec(selections);
+        if !nonroad {
+            let drop = self.nonroad_only_modules();
+            names.retain(|n| !drop.contains(n));
+        }
         let refs: Vec<&str> = names.iter().map(String::as_str).collect();
         self.topological_order(&refs)
     }
@@ -424,7 +492,8 @@ fn subscription_matches(sub: &SubscriptionEntry, process_set: &BTreeSet<u32>) ->
 mod tests {
     use super::*;
     use moves_calculator_info::{
-        build_dag, parse_calculator_info_str, CalculatorInfo, Granularity, Priority,
+        build_dag, parse_calculator_info_str, CalculatorInfo, Granularity, JavaSubscription,
+        Priority, SubscribeStyle,
     };
     use moves_data::{PollutantId, ProcessId};
     use std::path::Path;
@@ -587,6 +656,94 @@ mod tests {
         let reg = CalculatorRegistry::new(single_calc_dag());
         let selections = vec![(PollutantId(99), ProcessId(99))];
         assert!(reg.modules_for_runspec(&selections).is_empty());
+    }
+
+    /// DAG where an onroad calculator and a NONROAD calculator both register
+    /// for the same shared `(pollutant, process)` pair, and the NONROAD
+    /// calculator drives a chained NONROAD downstream. The NONROAD calculator's
+    /// Java source lives under `.../master/nonroad/`, which is how
+    /// `nonroad_only_modules` discriminates it from the shared `ghg` package.
+    fn shared_process_onroad_nonroad_dag() -> CalculatorDag {
+        let info = parse(
+            "Registration\tCO\t2\tRunning Exhaust\t1\tBaseRateCalculator\n\
+             Registration\tCO\t2\tRunning Exhaust\t1\tNonroadEmissionCalculator\n\
+             Registration\tCO\t2\tRunning Exhaust\t1\tNRHCSpeciationCalculator\n\
+             Subscribe\tBaseRateCalculator\tRunning Exhaust\t1\tMONTH\tEMISSION_CALCULATOR\n\
+             Subscribe\tNonroadEmissionCalculator\tRunning Exhaust\t1\tDAY\tEMISSION_CALCULATOR\n\
+             Chain\tNRHCSpeciationCalculator\tNonroadEmissionCalculator\n",
+        );
+        // The source-dir scan supplies the Java package path; only the nonroad
+        // calculator lives under `.../master/nonroad/`.
+        let java = vec![
+            JavaSubscription {
+                calculator: "BaseRateCalculator".to_string(),
+                java_path: std::path::PathBuf::from(
+                    "gov/epa/otaq/moves/master/implementation/ghg/BaseRateCalculator.java",
+                ),
+                style: SubscribeStyle::Explicit,
+                granularity: Some(Granularity::Month),
+                priority: Some(Priority::parse("EMISSION_CALCULATOR").unwrap()),
+                process_expr: "process".to_string(),
+            },
+            JavaSubscription {
+                calculator: "NonroadEmissionCalculator".to_string(),
+                java_path: std::path::PathBuf::from(
+                    "gov/epa/otaq/moves/master/nonroad/NonroadEmissionCalculator.java",
+                ),
+                style: SubscribeStyle::Explicit,
+                granularity: Some(Granularity::Day),
+                priority: Some(Priority::parse("EMISSION_CALCULATOR").unwrap()),
+                process_expr: "process".to_string(),
+            },
+        ];
+        build_dag(&info, &java).unwrap()
+    }
+
+    #[test]
+    fn nonroad_only_modules_finds_calc_and_chained_downstream() {
+        let reg = CalculatorRegistry::new(shared_process_onroad_nonroad_dag());
+        let nr = reg.nonroad_only_modules();
+        assert!(
+            nr.contains("NonroadEmissionCalculator"),
+            "the /nonroad/ packaged calculator must be in the set"
+        );
+        assert!(
+            nr.contains("NRHCSpeciationCalculator"),
+            "its chained NONROAD downstream must be in the set"
+        );
+        assert!(
+            !nr.contains("BaseRateCalculator"),
+            "the shared-package onroad calculator must not be in the set"
+        );
+    }
+
+    #[test]
+    fn execution_order_for_models_drops_nonroad_when_not_selected() {
+        let reg = CalculatorRegistry::new(shared_process_onroad_nonroad_dag());
+        let selections = vec![(PollutantId(2), ProcessId(1))];
+
+        // ONROAD only: NONROAD calculator chain must be excluded even though it
+        // registered for the selected (pollutant, process) pair.
+        let onroad = reg
+            .execution_order_for_models(&selections, true, false)
+            .unwrap();
+        assert!(onroad.contains(&"BaseRateCalculator".to_string()));
+        assert!(
+            !onroad.contains(&"NonroadEmissionCalculator".to_string()),
+            "onroad-only plan must not include NonroadEmissionCalculator"
+        );
+        assert!(
+            !onroad.contains(&"NRHCSpeciationCalculator".to_string()),
+            "onroad-only plan must not include the NONROAD chained downstream"
+        );
+
+        // NONROAD selected: the NONROAD chain is included.
+        let with_nr = reg
+            .execution_order_for_models(&selections, true, true)
+            .unwrap();
+        assert!(with_nr.contains(&"NonroadEmissionCalculator".to_string()));
+        assert!(with_nr.contains(&"NRHCSpeciationCalculator".to_string()));
+        assert!(with_nr.contains(&"BaseRateCalculator".to_string()));
     }
 
     #[test]
