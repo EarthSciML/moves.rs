@@ -56,13 +56,19 @@ From: ubuntu:24.04
 
     locale-gen en_US.UTF-8
 
-    # ----- MariaDB 11.4 from the official repo -----
-    curl -fsSL https://r.mariadb.com/downloads/mariadb_repo_setup -o /tmp/mariadb_repo_setup
-    chmod +x /tmp/mariadb_repo_setup
-    /tmp/mariadb_repo_setup --mariadb-server-version="mariadb-${MARIADB_SERIES}" --skip-maxscale
-    rm -f /tmp/mariadb_repo_setup
+    # ----- MariaDB ${MARIADB_VERSION} from the permanent per-version archive -----
+    # deb.mariadb.org/<series> keeps only the two newest minors, so an exact
+    # pin there ages out. archive.mariadb.org keeps a permanent, GPG-signed
+    # per-version repo with noble support — pin to it for reproducibility.
+    install -d -m 0755 /etc/apt/keyrings
+    curl -fsSL https://supplychain.mariadb.com/MariaDB-Server-GPG-KEY \
+        | gpg --dearmor -o /etc/apt/keyrings/mariadb.gpg
+    echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/mariadb.gpg] https://archive.mariadb.org/mariadb-${MARIADB_VERSION}/repo/ubuntu noble main" \
+        > /etc/apt/sources.list.d/mariadb.list
     apt-get update
-    apt-get install -y --no-install-recommends mariadb-server mariadb-client
+    apt-get install -y --no-install-recommends \
+        "mariadb-server=${MARIADB_DEB_VERSION}" \
+        "mariadb-client=${MARIADB_DEB_VERSION}"
 
     # ----- Eclipse Temurin JDK 17 -----
     install -d -m 0755 /etc/apt/keyrings
@@ -71,7 +77,7 @@ From: ubuntu:24.04
     echo "deb [signed-by=/etc/apt/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb noble main" \
         > /etc/apt/sources.list.d/adoptium.list
     apt-get update
-    apt-get install -y --no-install-recommends "${JDK_PACKAGE}"
+    apt-get install -y --no-install-recommends "${JDK_PACKAGE}=${JDK_DEB_VERSION}"
     # ant depends on default-jre-headless (OpenJDK 21), which update-alternatives
     # may prefer over Temurin 17. Pin the 'java' alternative to Temurin 17 so
     # the %test and runtime both see the correct version.
@@ -308,7 +314,7 @@ SQL
     test -x /opt/moves-bin/init-mariadb.sh
     test -x /opt/moves-bin/start-mariadb-bg.sh
     test -f /etc/mysql/mariadb.conf.d/99-moves.cnf
-    /usr/sbin/mariadbd --version | grep -q "${MARIADB_SERIES}" \
+    /usr/sbin/mariadbd --version | grep -q "${MARIADB_VERSION}" \
         || { echo "MariaDB version mismatch"; exit 1; }
     "${JAVA_HOME}/bin/java" -version 2>&1 | grep -q '17\.' \
         || { echo "JDK 17 missing at JAVA_HOME=${JAVA_HOME}"; exit 1; }
