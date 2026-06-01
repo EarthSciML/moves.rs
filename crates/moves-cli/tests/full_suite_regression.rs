@@ -451,6 +451,14 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
         ("process-evap-leaks", ONROAD_REL_TOL, false), // ~1.6e-7
         ("process-evap-permeation", ONROAD_REL_TOL, false), // ~2.1e-7
         ("nr-commercial-nation", NONROAD_REL_TOL, false), // ~3.5e-3 (real*4)
+        // process-refueling: the chained RefuelingLossCalculator now runs (the
+        // engine's chainCalculator step), reads a synthesized RefuelingFuelType
+        // extract, gates output to THC (pollutant 1), and reconciles the
+        // regClass-collapsed energy MOVESWorkerOutput against the per-reg-class
+        // RefuelingControlTechnology in the displacement join. Displacement
+        // (1,18) = 1042 / 128 rows and spillage (1,19) = 451.05 / 208 rows both
+        // match canonical to f64 precision.
+        ("process-refueling", ONROAD_REL_TOL, false),
         // expand-criteria: inventory activity weighting now wired in
         // BaseRateCalculator (universalActivity = SHO / noOfRealDays applied as
         // ApplyActivity). Criteria pollutants (THC/CO/NOx) match canonical to
@@ -510,14 +518,16 @@ const QUARANTINED_FIXTURES: &[&str] = &[
  // UNDER-emit class — calculator-chain coverage gaps (a DIFFERENT bug from
  // the over-emit above): downstream speciation / chained calculators fire but
  // produce no rows for several pollutants/processes, so the port emits FEWER
- // rows than canonical. process-pm-exhaust emits only PM components 112/118
- // (the two BasicRunningPM produces) and is missing 100/110/111/115/119;
- // process-airtoxics / process-nox-speciation / chain-* emit one base
- // process's worth where canonical has the full speciated set; brakewear /
- // tirewear / crankcase-running under-emit a whole slice (and also carry the
- // activity-weighting mass gap). process-refueling emits the WRONG content // BaseRate energy (process 1 / pollutant 91) instead of refueling THC
- // (processes 18/19 / pollutant 1), whose calculator is not wired. See
- // docs/known-divergences.md §4.4 reported bug 3.
+ // rows than canonical. process-airtoxics / process-nox-speciation / chain-*
+ // emit one base process's worth where canonical has the full speciated set;
+ // brakewear / tirewear / crankcase-running under-emit a whole slice.
+ // process-pm-exhaust now emits all seven PM species (100/110/111/112/115/118/
+ // 119) — SulfatePMCalculator runs and the crankcase split reconciles the
+ // regClass-collapsed worker output — and 111/115 match canonical exactly with
+ // 100/110 within ~1.2%; it stays quarantined only because the upstream
+ // BaseRate emits spurious fuelType-9 (electricity) exhaust PM that canonical
+ // excludes, doubling EC (112) and NonECPM (118). See
+ // docs/known-divergences.md §4.4.
     "chain-nonhaptog",
     "chain-tog-speciation",
     "process-airtoxics",
@@ -525,7 +535,6 @@ const QUARANTINED_FIXTURES: &[&str] = &[
     "process-crankcase-running",
     "process-nox-speciation",
     "process-pm-exhaust",
-    "process-refueling",
     "process-tirewear",
  // NONROAD fixtures that emit nothing (port row count 0 vs a populated
  // canonical) or a wrong row count — population/sector-coverage gaps.
@@ -577,10 +586,12 @@ fn canonical_snapshot_diff() {
     let root = snapshots_root();
     let fixtures = all_fixtures();
 
+    let only = std::env::var("MOVES_DIFF_ONLY").ok();
     let covered: Vec<&Path> = fixtures
         .iter()
         .map(|p| p.as_path())
         .filter(|p| canonical_present(&root, fixture_name(p)))
+        .filter(|p| only.as_deref().is_none_or(|n| fixture_name(p) == n))
         .collect();
 
     if covered.is_empty() {
