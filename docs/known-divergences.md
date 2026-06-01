@@ -91,7 +91,10 @@ a tolerance); each graduates to the asserted set once its data plane is fixed.
 | `process-evap-permeation` | 128→128 | 2.1e-7 | **precision-only — asserted** |
 | `nr-commercial-nation` | 908→908 | 3.5e-3 | **precision-only (real\*4) — asserted** (`NONROAD_REL_TOL`) |
 | `process-crankcase-extidle`, `process-crankcase-start`, `process-extended-idle` | 0→0 | — | **vacuous — asserted** (canonical has no `MOVESOutput`; the port has no BaseRate input rows for these and emits none either) |
-| `chain-nonhaptog`, `chain-tog-speciation`, `expand-counties`, `expand-criteria`, `expand-day`, `expand-fueltype-diesel`, `expand-month`, `expand-sourcetype`, `mixed-onroad-nonroad`, `process-airtoxics`, `process-apu`, `process-brakewear`, `process-crankcase-running`, `process-nox-speciation`, `process-pm-exhaust`, `process-refueling`, `process-tirewear`, `sample-runspec` | N→M (no longer 0) | varies | **onroad-emits-0 month root-cause FIXED; residual BaseRate activity-weighting gap — quarantined** (see §4.4 reported bug 1) |
+| `expand-counties` (750→750), `expand-criteria` (744→744), `expand-day` (250→250), `expand-fueltype-diesel` (496→496), `expand-month` (500→500), `expand-sourcetype` (860→860), `sample-runspec` (84→84) | **row count = canonical** | varies (mass) | **over-emit ROW count FIXED (`runSpecRoadType` join); residual BaseRate activity-weighting MASS gap — quarantined** (§4.4 reported bug 1, item 2) |
+| `chain-nonhaptog`, `chain-tog-speciation`, `process-airtoxics`, `process-nox-speciation`, `process-pm-exhaust`, `process-brakewear`, `process-tirewear`, `process-crankcase-running` | port < canonical | varies | **UNDER-emit — calculator-chain coverage gap (missing speciated pollutants / PM-speciation chain not producing) — quarantined** (§4.4 reported bug 3) |
+| `process-refueling` | 250 vs 336 | — | **wrong content — refueling calculator (processes 18/19, THC) not wired; BaseRate energy (process 1, pollutant 91) leaks in — quarantined** (§4.4 reported bug 3) |
+| `process-apu`, `mixed-onroad-nonroad` | varies | varies | **activity-gate / empty-canonical artifacts — quarantined** (§4.4 reported bug 1) |
 | `nr-agriculture-state`, `nr-airport-support-county`, `nr-industrial-county`, `nr-railroad-support-nation` | N→0 | −100 % | **reported bug (NONROAD emits nothing) — quarantined** |
 | `nr-construction-state`, `nr-lawn-garden-county`, `nr-logging-county`, `nr-pleasure-craft-state`, `nr-recreational-county` | mismatched | 1e3–1e6 % | **reported bug (NONROAD population/coverage) — quarantined** |
 
@@ -157,23 +160,48 @@ rows at *every* position (~2×) — fixed by filtering the merged rows to
 `MOVESOutput` carries any such pollutant; they exist only to feed HC speciation
 through the worker stream).
 
-**Why these fixtures still cannot graduate.** Ground truth (the captured
-snapshots) shows the onroad fixtures are **inventory ("Inv") scale**: canonical's
-`MOVESOutput.emissionQuant` is the BaseRate **rate × per-(sourceType, modelYear,
-…) activity** (SHO / starts / hotelling), and whole processes / operating modes
-are **gated out** of `baseRateOutput` by the runspec-derived `BRC_*` sections.
-Concretely for `expand-criteria`: canonical writes 744 rows — process **1 only**,
-roadType **4**, op-mode **0** — even though `baseratebyage_2_2020` (process 2
-start, roadType 1, op-modes 101–108) holds 5,952 valid rows with a valid SCC join
-(canonical's `baserateoutput` excludes them entirely). The port hardcodes
-`ModuleFlags::default()` (`apply_activity`/`aggregate_smfr`/discard flags all
-false), so it emits **un-weighted rates for every subscribed process** (1/2/9/10/
-90/91): for `expand-criteria` 1,488 rows (process 1 *and* 2, roadTypes 1 *and* 4)
-with `emissionQuant` summing to the raw rate (≈2× canonical, `max_rel_diff`≈0.81).
-Reproducing canonical requires deriving the `BRC_*` section flags from the
-RunSpec and wiring the inventory activity weighting — a Phase-level onroad
-data-plane piece not yet present. Until it lands these fixtures stay in
-`QUARANTINED_FIXTURES`.
+**Over-emit ROW count now FIXED (`runSpecRoadType` join); residual MASS gap is
+the activity weighting.** Ground truth (the captured snapshots) shows the onroad
+fixtures are **inventory ("Inv") scale**, and the over-emit had two independent
+causes — one structural (now fixed) and one numerical (still open):
+
+1. *Off-network start rows the run does not select (FIXED).* Canonical drives the
+   BaseRate worker off a **join to `runSpecRoadType`**, so it only materialises
+   rate rows whose road type the RunSpec selects. The generator emits process 1
+   (running exhaust) on the selected on-road type (roadType 4) and process 2
+   (start exhaust) on off-network **roadType 1**; `runspecroadtype` for the
+   onroad-exhaust fixtures is `{4}` only, so canonical's `baserateoutput` /
+   `MOVESOutput` carries **process 1, roadType 4 only** (744 rows for
+   `expand-criteria`) and **no start rows at all** — even though
+   `baseratebyage_2_2020` (process 2, roadType 1, op-modes 101–108) holds 5,952
+   valid rate rows. The port read *every* road type back via
+   `merge_process_year_variants` and emitted the roadType-1 start block too
+   (1,488 rows = process 1 @ rt 4 + process 2 @ rt 1). **Fixed** by mirroring the
+   worker's join: `BaseRateCalculator::execute` reads `runSpecRoadType` and keeps
+   only rate rows on a selected road type (an empty/absent table imposes no
+   restriction, preserving unit-test behaviour). The port now emits 744 rows for
+   `expand-criteria` — process 1, roadType 4, pollutants 1/2/3 — **matching
+   canonical's row count, processes, road type and pollutants exactly.** The
+   filter is scoped to the `BaseRateCalculator` input only (processes 1/2/9/10/
+   90/91); evap/refueling/etc. calculators are untouched, so the previously
+   asserted `process-evap-fvv` (off-network process 12) is unaffected.
+
+2. *Un-weighted rates instead of inventory mass (STILL OPEN).* The port hardcodes
+   `ModuleFlags::default()` (`apply_activity`/`aggregate_smfr`/discard flags all
+   false) in `execute`, and the `universalActivity` table the weighting multiplies
+   by is **not in the captured execution DB** (canonical builds it internally from
+   SHO × source-bin distribution × the model-year age distribution and never
+   persists it). So the surviving roadType-4 rows carry the raw BaseRate rate, not
+   `rate × activity`. The error is **per-model-year**: canonical/port row-level
+   ratios run monotonically from ≈0.22 (MY 1981) to ≈7 (MY 1999), the signature of
+   the missing fleet-population (age-distribution) weight — not a uniform scalar.
+   `max_rel_diff`≈0.83 for `expand-criteria`. Reproducing it requires
+   reconstructing `universalActivity` and deriving the runspec-driven `BRC_*`
+   section flags — a Phase-level onroad activity-weighting piece not yet present.
+
+Until item 2 lands these fixtures stay in `QUARANTINED_FIXTURES`: the row
+*shape* now matches canonical, but the emitted *mass* does not, and the gate
+asserts on `emissionQuant`.
 
 **`process-apu`** is the same gap surfacing through a fixture that *was*
 asserted-vacuous only because the month bug suppressed its output. Its
@@ -200,6 +228,50 @@ population / sector-coverage gaps in the data plane, to be fixed there. Only
 
 As each fixture's data plane is fixed it should graduate from
 `QUARANTINED_FIXTURES` into `asserted_fixtures` in the gate.
+
+### Reported bug 3 — onroad UNDER-emit: calculator-chain coverage gaps
+
+A second class of onroad fixtures emits **fewer** rows than canonical (the
+opposite of the over-emit above) because downstream speciation / chained
+calculators fire but produce no rows for several pollutants or processes. These
+are distinct from the BaseRate activity-weighting gap (§4.4 bug 1) and from the
+`runSpecRoadType` row-shape fix.
+
+* **`process-pm-exhaust`** — canonical writes 7 PM pollutants (100 PM10-total,
+  110 PM2.5-total, 111 organic carbon, 112 elemental carbon, 115 sulfate, 118
+  composite non-EC, 119 H₂O), 1,456 rows. The port emits **only 112 and 118**
+  (496 rows) — exactly the two running-exhaust components
+  `BasicRunningPmEmissionCalculator` produces. The OC (111) and sulfate (115)
+  component producers and the `PmTotalExhaustCalculator` (which forms 100/110 by
+  re-labelling OC+EC+sulfate) emit **0** in the snapshot path — the chained
+  PM-speciation inputs they read are not populated. (Note also the per-pollutant
+  row count differs, 248 port vs 208 canonical — a separate model-year/grouping
+  difference.) The PM-speciation chain data-flow must be wired before this can
+  graduate.
+
+* **`process-airtoxics` (1,288 vs 248), `process-nox-speciation` (872 vs 248),
+  `chain-nonhaptog` / `chain-tog-speciation` (1,080 vs 248)** — same family: the
+  air-toxics / NOx-speciation / HC-speciation calculators that fan a base
+  pollutant out into many species produce far fewer species rows than canonical
+  (the port emits ≈248, a single base process's worth, where canonical has the
+  full speciated set). Chained-calculator coverage gap.
+
+* **`process-brakewear` / `process-tirewear` (500 vs 750)** and
+  **`process-crankcase-running` (744 vs 1,368)** — under-emit by a whole
+  pollutant/process slice (and additionally carry the activity-weighting mass
+  gap on the rows they do emit).
+
+* **`process-refueling` (250 vs 336)** — *wrong content*, not just under-count.
+  Canonical writes refueling **processes 18 (displacement) + 19 (spillage)**,
+  **pollutant 1 (THC)**. The port writes **process 1, pollutant 91 (total
+  energy)** instead: the refueling calculator (processes 18/19) is not producing,
+  and the `BaseRateCalculator` energy subscription (process 1 / pollutant 91)
+  leaks into the run. This needs the refueling calculator wired and the energy
+  leak gated, independent of the `runSpecRoadType` fix.
+
+All of bug 3 is calculator-chain data-plane work; none was forced or
+tolerance-masked, and each fixture graduates from `QUARANTINED_FIXTURES` once its
+chain emits the canonical pollutant/process set within tolerance.
 
 ---
 

@@ -104,6 +104,7 @@ static INPUT_TABLES: &[&str] = &[
     "FuelSupply",
     "FuelSubtype",
     "MonthOfAnyYear",
+    "runSpecRoadType",
 ];
 
 /// One flattened output record — a [`BlockKey`] paired with one fuel
@@ -686,6 +687,26 @@ impl Calculator for BaseRateCalculator {
         if let Some(process_id) = pos.process_id.map(|p| p.0 as i32) {
             base_rate_by_age.retain(|r| r.process_id == process_id);
             base_rate.retain(|r| r.process_id == process_id);
+        }
+        // MOVES drives the BaseRate worker off a join to `runSpecRoadType`, so
+        // it only processes rate rows whose road type the RunSpec selected. The
+        // generator emits rates for every process's natural road type — running
+        // exhaust on the selected on-road type(s), but start exhaust (process 2)
+        // on off-network `roadTypeID` 1 — and the port reads them all back via
+        // `merge_process_year_variants`. Without this join the port emits the
+        // off-network start rows even when the run selects only an on-road type
+        // (e.g. road type 4), where canonical's `baseRateOutput`/`MOVESOutput`
+        // carry no start rows at all. Mirror the join: keep only rate rows on a
+        // selected road type. An empty/absent `runSpecRoadType` (unit-test
+        // contexts) imposes no restriction.
+        let selected_road_types: std::collections::BTreeSet<i32> = tables
+            .iter_typed_or_empty::<setup::RunSpecRoadTypeRow>("runSpecRoadType")?
+            .into_iter()
+            .map(|r| r.road_type_id)
+            .collect();
+        if !selected_road_types.is_empty() {
+            base_rate_by_age.retain(|r| selected_road_types.contains(&r.road_type_id));
+            base_rate.retain(|r| selected_road_types.contains(&r.road_type_id));
         }
         let prepared = {
             let mut cache = self.cache.lock().unwrap_or_else(|e| e.into_inner());

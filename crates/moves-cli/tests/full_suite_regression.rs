@@ -356,28 +356,45 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
 /// data plane is fixed it should graduate from this list into
 /// [`asserted_fixtures`].
 const QUARANTINED_FIXTURES: &[&str] = &[
-    // Onroad BaseRate path emits un-activity-weighted rates for every process
-    // it is subscribed to (1/2/9/10/90/91), where canonical writes
-    // activity-weighted inventory and gates whole processes/op-modes out of
-    // baseRateOutput via the runspec-derived BRC sections. The port therefore
-    // over-emits (start/idle/APU rows canonical drops) and the surviving
-    // emissionQuant totals are off by the missing activity factor. Affects the
-    // criteria/energy onroad-exhaust fixtures below and process-apu (which the
-    // month fix unblocked from asserted-vacuous to a 91/91 energy emission
-    // canonical writes as 0). See docs/known-divergences.md §4.4.
-    "process-apu",
-    // Onroad-exhaust path emits a fixed ~8,632-row block of NONROAD-coded rows
-    // (SCC 2260/2265/2282/2285) regardless of the RunSpec — identical bytes
-    // across every onroad fixture. Emitted mass is ~7 orders of magnitude high.
-    "chain-nonhaptog",
-    "chain-tog-speciation",
+    // OVER-emit class — ROW SHAPE now matches canonical (process / road type /
+    // pollutant / row count), but the emitted MASS does not. Two causes were
+    // separated: (1) the port emitted off-network start-exhaust rows (process 2,
+    // roadTypeID 1) the RunSpec never selected — FIXED by mirroring the MOVES
+    // worker's `runSpecRoadType` join inside `BaseRateCalculator::execute`; and
+    // (2) the surviving rows carry the raw BaseRate rate, not `rate × activity`
+    // — the per-model-year inventory activity weighting (`universalActivity`,
+    // built by canonical from SHO × source-bin × age and never persisted) is not
+    // yet wired, so `emissionQuant` is off by the missing fleet-population
+    // factor (max_rel_diff ≈ 0.83 for expand-criteria). Still quarantined on
+    // mass. See docs/known-divergences.md §4.4 reported bug 1.
     "expand-counties",
     "expand-criteria",
     "expand-day",
     "expand-fueltype-diesel",
     "expand-month",
     "expand-sourcetype",
+    "sample-runspec",
+    // process-apu: BaseRate emits the process-91 / op-mode-201,203 (APU /
+    // shorepower) energy rates canonical activity-gates to 0 in baseRateOutput;
+    // same missing-activity-weighting gap. mixed-onroad-nonroad: canonical
+    // MOVESOutput is empty (0 rows) while the port's NONROAD half emits ~8,632
+    // legitimate rows (separate/known). See docs/known-divergences.md §4.4.
+    "process-apu",
     "mixed-onroad-nonroad",
+    // UNDER-emit class — calculator-chain coverage gaps (a DIFFERENT bug from
+    // the over-emit above): downstream speciation / chained calculators fire but
+    // produce no rows for several pollutants/processes, so the port emits FEWER
+    // rows than canonical. process-pm-exhaust emits only PM components 112/118
+    // (the two BasicRunningPM produces) and is missing 100/110/111/115/119;
+    // process-airtoxics / process-nox-speciation / chain-* emit one base
+    // process's worth where canonical has the full speciated set; brakewear /
+    // tirewear / crankcase-running under-emit a whole slice (and also carry the
+    // activity-weighting mass gap). process-refueling emits the WRONG content —
+    // BaseRate energy (process 1 / pollutant 91) instead of refueling THC
+    // (processes 18/19 / pollutant 1), whose calculator is not wired. See
+    // docs/known-divergences.md §4.4 reported bug 3.
+    "chain-nonhaptog",
+    "chain-tog-speciation",
     "process-airtoxics",
     "process-brakewear",
     "process-crankcase-running",
@@ -385,7 +402,6 @@ const QUARANTINED_FIXTURES: &[&str] = &[
     "process-pm-exhaust",
     "process-refueling",
     "process-tirewear",
-    "sample-runspec",
     // NONROAD fixtures that emit nothing (port row count 0 vs a populated
     // canonical) or a wrong row count — population/sector-coverage gaps.
     "nr-agriculture-state",
