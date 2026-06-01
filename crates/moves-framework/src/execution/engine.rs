@@ -46,6 +46,7 @@
 //! [`MOVESEngine::execution_run_spec_mut`] drives the full
 //! `state → county → zone → link` nest immediately.
 
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -275,6 +276,14 @@ struct CalculatorMasterLoopable {
     activity_acc: Arc<Mutex<Vec<ActivityRecord>>>,
  /// Run hash stamped into every accumulated [`EmissionRecord`] and [`ActivityRecord`].
     run_hash: Arc<str>,
+    /// The RunSpec's user-selected `(pollutantID, processID)` pairs. Emission
+    /// rows whose pair is absent are dropped before aggregation — canonical
+    /// writes `MOVESOutput` from the selected `pollutantProcessIDs` only, so the
+    /// intermediate pollutants a calculator produces to feed a chained
+    /// downstream (e.g. BaseRate's Total Energy 91/process-1 feeding refueling)
+    /// never reach the final output. An empty set imposes no filter (the
+    /// unit-test contexts that drive a stub calculator with no selections).
+    selected_pol_proc: Arc<BTreeSet<(u16, u16)>>,
 }
 
 impl MasterLoopable for CalculatorMasterLoopable {
@@ -294,9 +303,25 @@ impl MasterLoopable for CalculatorMasterLoopable {
         if let Some(df) = df {
             if df.height() > 0 {
                 if df.column("pollutantID").is_ok() {
- // Emission output: stream into the running group-by aggregator.
-                    let records = frame_to_emission_records(&df, &self.run_hash);
+                    // Emission output: stream into the running group-by aggregator.
+                    let mut records = frame_to_emission_records(&df, &self.run_hash);
                     drop(df);
+                    // Drop intermediate pollutants the RunSpec never selected
+                    // (chain prerequisites such as BaseRate energy 91/1) before
+                    // they reach the aggregator — the worker-level filter
+                    // canonical applies via `pollutantProcessIDs`. Done here,
+                    // pre-aggregation, while the rows still carry processID
+                    // (the aggregator may NULL it for runs that don't break the
+                    // output down by process).
+                    if !self.selected_pol_proc.is_empty() {
+                        records.retain(|r| match (r.pollutant_id, r.process_id) {
+                            (Some(p), Some(proc)) => u16::try_from(p)
+                                .ok()
+                                .zip(u16::try_from(proc).ok())
+                                .is_some_and(|pair| self.selected_pol_proc.contains(&pair)),
+                            _ => true,
+                        });
+                    }
                     self.streaming_agg
                         .lock()
                         .expect("output accumulator poisoned")
@@ -516,10 +541,29 @@ impl MOVESEngine {
         let run_record = self.build_run_record();
         let run_hash_str: Arc<str> = run_record.run_hash.clone().into();
 
- // Build the emission aggregation plan upfront so the streaming
- // accumulator can fold records directly into running group-by sums
- // during execution rather than buffering raw rows until run end.
- // Peak memory is bounded by N_distinct_groups, not N_raw_rows.
+        // The RunSpec's user-selected (pollutant, process) pairs — the
+        // worker-output filter each calculator adapter applies before
+        // aggregation. Use `run_spec` (the raw selections), NOT
+        // `execution.pollutant_process_associations` (the *expanded* set that
+        // adds the chain prerequisites we must drop, e.g. BaseRate energy 91/1).
+        let selected_pol_proc: Arc<BTreeSet<(u16, u16)>> = Arc::new(
+            self.execution
+                .run_spec
+                .pollutant_process_associations
+                .iter()
+                .filter_map(|a| {
+                    Some((
+                        u16::try_from(a.pollutant_id).ok()?,
+                        u16::try_from(a.process_id).ok()?,
+                    ))
+                })
+                .collect(),
+        );
+
+        // Build the emission aggregation plan upfront so the streaming
+        // accumulator can fold records directly into running group-by sums
+        // during execution rather than buffering raw rows until run end.
+        // Peak memory is bounded by N_distinct_groups, not N_raw_rows.
         let agg_inputs = aggregation_inputs_from_run_spec(&self.execution.run_spec);
         let emission_plan = emission_aggregation(&agg_inputs);
         let activity_plan = activity_aggregation(&agg_inputs);
@@ -594,6 +638,7 @@ impl MOVESEngine {
                         streaming_agg: Arc::clone(&streaming_agg_ref),
                         activity_acc: Arc::clone(&activity_acc_ref),
                         run_hash: Arc::clone(&run_hash_str),
+                        selected_pol_proc: Arc::clone(&selected_pol_proc),
                     });
                     master.subscribe(MasterLoopableSubscription::new(
                         sub.granularity,
@@ -1471,6 +1516,7 @@ mod tests {
             streaming_agg: stub_streaming_agg(),
             activity_acc: Arc::new(Mutex::new(Vec::new())),
             run_hash: Arc::from("test"),
+            selected_pol_proc: Arc::new(std::collections::BTreeSet::new()),
         };
 
         let mut ctx = MasterLoopContext::default();
@@ -1505,6 +1551,7 @@ mod tests {
             streaming_agg: stub_streaming_agg(),
             activity_acc: Arc::new(Mutex::new(Vec::new())),
             run_hash: Arc::from("test"),
+            selected_pol_proc: Arc::new(std::collections::BTreeSet::new()),
         };
         let mut ctx = MasterLoopContext::default();
         ctx.position.process_id = Some(ProcessId(1));
