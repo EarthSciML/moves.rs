@@ -2080,6 +2080,7 @@ dependencies = [
 name = "moves-wasm"
 version = "0.1.0"
 dependencies = [
+ "arrow",
  "js-sys",
  "moves-calculator-info",
  "moves-calculators",
@@ -2087,6 +2088,7 @@ dependencies = [
  "moves-nonroad",
  "moves-runspec",
  "parquet",
+ "polars",
  "serde_json",
  "wasm-bindgen",
  "wasm-bindgen-rayon",
