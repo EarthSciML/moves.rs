@@ -82,6 +82,7 @@ fn run_fixture_bytes(fixture: &Path, max_parallel_chunks: usize) -> Vec<u8> {
         // parallelism variants; the engine does not stamp the wall clock.
         run_date_time: Some("2026-01-01T00:00:00".to_string()),
         snapshot: None,
+        scale_input: None,
     };
     let outcome = run_simulation(&opts).unwrap_or_else(|e| {
         panic!(
@@ -174,6 +175,7 @@ fn all_parallelism_settings_complete_without_error() {
             calculator_dag: None,
             run_date_time: Some("2026-01-01T00:00:00".to_string()),
             snapshot: None,
+            scale_input: None,
         })
         .unwrap_or_else(|e| panic!("run at parallel={limit}: {e}"));
 

@@ -70,6 +70,7 @@ fn run_sample_runspec_walks_the_graph_and_writes_shaped_output() {
         calculator_dag: None, // the embedded Phase 1 DAG
         run_date_time: Some("2026-05-17T00:00:00".to_string()),
         snapshot: None,
+        scale_input: None,
     };
     let outcome = run_simulation(&opts).expect("run should succeed");
 
@@ -133,6 +134,7 @@ fn run_accepts_a_toml_runspec() {
         calculator_dag: None,
         run_date_time: None,
         snapshot: None,
+        scale_input: None,
     };
     let outcome = run_simulation(&opts).expect("run from TOML should succeed");
     assert!(outcome.run_record_path.is_file());
@@ -148,6 +150,7 @@ fn run_reports_a_missing_runspec() {
         calculator_dag: None,
         run_date_time: None,
         snapshot: None,
+        scale_input: None,
     };
     let err = run_simulation(&opts).unwrap_err();
     assert!(err.to_string().contains("reading RunSpec"), "got: {err}");

@@ -71,6 +71,15 @@ enum Command {
         /// execution-database slow tier for all calculators.
         #[arg(long, value_name = "DIR")]
         snapshot: Option<PathBuf>,
+
+        /// Path to a County/Project-scale input directory produced by
+        /// `moves import-cdb` (CDB) or the PDB importer. Every
+        /// `*.parquet` file in this directory is loaded into the
+        /// execution-database slow tier, overriding any same-named table
+        /// already loaded from the snapshot. Use for RunSpecs that set
+        /// `<modeldomain>` to `SINGLE` (County) or `PROJECT`.
+        #[arg(long, value_name = "DIR")]
+        scale_input: Option<PathBuf>,
     },
 
     /// Import County-database (CDB) input CSV files into Parquet.
@@ -121,6 +130,7 @@ fn dispatch(command: Command) -> anyhow::Result<ExitCode> {
             calculator_dag,
             run_date_time,
             snapshot,
+            scale_input,
         } => cmd_run(RunOptions {
             runspec,
             output,
@@ -128,6 +138,7 @@ fn dispatch(command: Command) -> anyhow::Result<ExitCode> {
             calculator_dag,
             run_date_time,
             snapshot,
+            scale_input,
         }),
         Command::ImportCdb {
             input,

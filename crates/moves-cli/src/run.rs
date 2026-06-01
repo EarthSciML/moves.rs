@@ -163,6 +163,19 @@ pub struct RunOptions {
     /// files under `<snapshot>/tables/` are loaded as the execution-database
     /// slow tier and made available to calculators via `ctx.tables()`.
     pub snapshot: Option<PathBuf>,
+    /// Path to a County/Project-scale input directory produced by
+    /// `moves import-cdb` (CDB) or the PDB importer. When present, every
+    /// `*.parquet` file in the directory is loaded and inserted into the
+    /// execution-database slow tier, **overriding** any same-named table
+    /// that the snapshot (or default-DB) already loaded. This implements
+    /// the MOVES County/Project-scale data-preference rule: user-supplied
+    /// CDB/PDB tables take precedence over the default database for the
+    /// tables they cover, while all other tables continue to come from the
+    /// snapshot/default-DB.
+    ///
+    /// Applies when the RunSpec sets `<modeldomain>` to `SINGLE` (County)
+    /// or `PROJECT`.
+    pub scale_input: Option<PathBuf>,
 }
 
 /// Run a MOVES simulation: parse the RunSpec, build the calculator
@@ -175,7 +188,8 @@ pub struct RunOptions {
 /// output.
 pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
     let run_spec = load_run_spec(&opts.runspec)?;
-    let registry = load_registry(opts.calculator_dag.as_deref(), opts.snapshot.is_some())?;
+    let has_slow_store = opts.snapshot.is_some() || opts.scale_input.is_some();
+    let registry = load_registry(opts.calculator_dag.as_deref(), has_slow_store)?;
     let config = EngineConfig {
         output_root: opts.output.clone(),
         max_parallel_chunks: opts.max_parallel_chunks,
@@ -217,10 +231,27 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
         let filter = snap_filter
             .as_ref()
             .expect("built above when snapshot is Some");
-        let store = load_execution_db(snapshot_dir, filter, allowed_tables.as_ref())
+        let mut store = load_execution_db(snapshot_dir, filter, allowed_tables.as_ref())
             .with_context(|| format!("loading execution DB from {}", snapshot_dir.display()))?;
+        // Overlay any County/Project-scale Parquet tables on top of the snapshot
+        // tables. CDB/PDB tables take precedence for the tables they supply.
+        if let Some(scale_dir) = &opts.scale_input {
+            overlay_scale_input_db(&mut store, scale_dir)
+                .with_context(|| format!("loading scale-input DB from {}", scale_dir.display()))?;
+        }
         let geography = load_geography_from_store(&store)
             .with_context(|| format!("building geography from {}", snapshot_dir.display()))?;
+        engine = engine.with_slow_store(store);
+        engine
+            .execution_run_spec_mut()
+            .build_execution_locations(&geography);
+    } else if let Some(scale_dir) = &opts.scale_input {
+        // Scale-only path: no snapshot — build a store from CDB/PDB Parquet alone.
+        let mut store = InMemoryStore::new();
+        overlay_scale_input_db(&mut store, scale_dir)
+            .with_context(|| format!("loading scale-input DB from {}", scale_dir.display()))?;
+        let geography = load_geography_from_store(&store)
+            .with_context(|| format!("building geography from {}", scale_dir.display()))?;
         engine = engine.with_slow_store(store);
         engine
             .execution_run_spec_mut()
@@ -288,6 +319,42 @@ fn load_execution_db(
     merge_process_year_variants(&mut store)
         .context("merging process/year-indexed table variants into canonical names")?;
     Ok(store)
+}
+
+/// Overlay County/Project-scale (CDB/PDB) Parquet files from `scale_dir` into
+/// an existing [`InMemoryStore`].
+///
+/// Scans `scale_dir` for every `*.parquet` file, reads each, and inserts it
+/// into `store` using the stem (filename without `.parquet`) as the table name,
+/// **replacing** any same-named table that was already in the store.  This
+/// implements the MOVES County/Project-scale data preference rule: user-supplied
+/// CDB/PDB tables override the default-database tables for the tables they cover;
+/// tables not present in the CDB/PDB directory continue to come from the
+/// snapshot or default DB.
+///
+/// The table name inserted is the **stem as-is** (preserving the original case
+/// the importer wrote, e.g. `"Link"` rather than `"link"`). The store uses
+/// case-insensitive lookup, so calculators that ask for `"link"` or `"LINK"` will
+/// find the value regardless.
+fn overlay_scale_input_db(store: &mut InMemoryStore, scale_dir: &Path) -> Result<()> {
+    let dir = fs::read_dir(scale_dir)
+        .with_context(|| format!("reading scale-input directory {}", scale_dir.display()))?;
+    for entry in dir {
+        let entry = entry.context("reading scale-input directory entry")?;
+        let file_name = entry.file_name();
+        let name_str = file_name.to_string_lossy();
+        if !name_str.ends_with(".parquet") {
+            continue;
+        }
+        let table_name = name_str.trim_end_matches(".parquet").to_owned();
+        let path = entry.path();
+        let file = fs::File::open(&path).with_context(|| format!("opening {}", path.display()))?;
+        let df = polars::prelude::ParquetReader::new(BufReader::new(file))
+            .finish()
+            .map_err(|e| anyhow::anyhow!("parsing {}: {e}", path.display()))?;
+        store.insert(table_name, df);
+    }
+    Ok(())
 }
 
 /// If `name` ends with exactly four ASCII decimal digits (a year suffix like `2020`),
