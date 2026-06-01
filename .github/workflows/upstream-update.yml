@@ -31,11 +31,28 @@
 #                    must be accessible from the runner).
 #
 # Requirements:
-#   * Self-hosted runner with labels: self-hosted, apptainer, fakeroot
-#   * gfortran label is NOT required for this workflow (NONROAD fidelity is
+#   * Runs on a GitHub-hosted ubuntu-24.04 runner. Apptainer + fakeroot are
+#     provided by the shared `.github/actions/build-sif` composite action,
+#     which also points APPTAINER_TMPDIR/CACHEDIR at a build scratch dir
+#     with headroom for the build sandbox + the ~1.1 GB SIF, and lifts the
+#     ubuntu-24.04 AppArmor unprivileged-userns restriction
+#     (kernel.apparmor_restrict_unprivileged_userns) that otherwise blocks
+#     `apptainer build --fakeroot` on the default hosted image.
+#   * gfortran is NOT required for this workflow (NONROAD fidelity is
 #     run by fixture-suite-weekly.yml separately).
-#   * The runner must have git, python3, cargo (stable Rust), and gh CLI.
+#   * git, python3, cargo (stable Rust), and gh CLI are preinstalled on
+#     ubuntu-24.04; the Rust toolchain step pins the cargo channel.
 #   * GITHUB_TOKEN must have contents:write and pull-requests:write.
+#
+# SIF builds on this workflow:
+#   * The canonical-moves SIF is rebuilt with the NEW pins in Stage 7 via a
+#     DIRECT build-sif.sh call carrying MOVES_COMMIT / MOVESDB_SHA256 /
+#     MOVESDB_LOCAL_PATH overrides — the build-sif composite action takes no
+#     inputs and cannot carry those, so it is used only to install Apptainer
+#     and warm the shared SIF cache (of the pre-update image). Stage 7
+#     force-rebuilds regardless, so a stale cache is harmless.
+#   * The fixture SIF (Stage 10) bootstraps from that rebuilt canonical SIF
+#     and likewise needs Apptainer, which the composite action installs.
 
 name: upstream-update
 
@@ -64,7 +81,7 @@ concurrency:
 jobs:
   upstream-update:
     name: Upstream MOVES update (${{ github.event.inputs.movesdb_label }})
-    runs-on: [self-hosted, apptainer, fakeroot]
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
       pull-requests: write
@@ -98,6 +115,18 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           key: upstream-update
+
+      # Install Apptainer (+ fakeroot prerequisites) and warm the shared SIF
+      # cache. On a hosted runner this is what makes `apptainer build
+      # --fakeroot` work — installing Apptainer, lifting the ubuntu-24.04
+      # AppArmor userns restriction, and routing APPTAINER_TMPDIR/CACHEDIR to
+      # a build scratch dir. NOTE: this builds/restores the PRE-UPDATE canonical SIF
+      # (keyed on the committed def/files/build-sif.sh, before Stage 5
+      # mutates versions.env); Stage 7 then force-rebuilds it with the new
+      # pins, so a stale cache here is harmless. Stage 10's fixture SIF also
+      # relies on the Apptainer install this step provides.
+      - name: Install Apptainer + warm SIF cache
+        uses: ./.github/actions/build-sif
 
       # ── Stage 1: fetch MOVES source ───────────────────────────────────────
       - name: Shallow-clone MOVES source at new commit
@@ -200,6 +229,14 @@ jobs:
           echo "::notice::tables.json updated — review partitioning-plan.md for new/changed tables"
 
       # ── Stage 7: rebuild SIF ─────────────────────────────────────────────
+      # Direct build-sif.sh call (NOT the composite action): this rebuild
+      # carries the NEW pins as env overrides (MOVES_COMMIT / MOVESDB_SHA256)
+      # and feeds the just-acquired, SHA-verified zip via MOVESDB_LOCAL_PATH.
+      # The build-sif composite action takes no inputs and so cannot carry
+      # these — Apptainer itself was already installed by the
+      # "Install Apptainer + warm SIF cache" step above. build-sif.sh uses
+      # `apptainer build --force`, so it rebuilds even over a warm cache and
+      # rewrites characterization/canonical-image.lock with the new SHA.
       - name: Rebuild canonical-moves SIF
         run: |
           MOVES_COMMIT="${MOVES_COMMIT}" \
