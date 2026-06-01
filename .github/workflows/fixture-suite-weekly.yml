@@ -38,12 +38,14 @@
 #   nonroad-fidelity — NONROAD numerical-fidelity check, also GitHub-hosted
 #                      (ubuntu-24.04). gfortran is preinstalled on the runner;
 #                      it builds an instrumented gfortran NONROAD binary and
-#                      runs each nr-* fixture through the canonical SIF with
-#                      NRDBG_FILE set, then diffs port-vs-gfortran. It gets the
-#                      SIF the same way as everything else (`needs: build-sif`
-#                      + the shared composite action / cache), so there is no
-#                      second cold build; bind/scratch dirs live under
-#                      $GITHUB_WORKSPACE (the roomy root disk).
+#                      runs each nr-* fixture through the canonical SIF via
+#                      run-moves.sh (no --fakeroot; start-mariadb-bg.sh starts
+#                      MariaDB as the calling user, bypassing the fakeroot
+#                      MariaDB-startup failure on GitHub-hosted runners), then
+#                      diffs port-vs-gfortran. It gets the SIF the same way as
+#                      everything else (`needs: build-sif` + the shared
+#                      composite action / cache), so there is no second cold
+#                      build; bind/scratch dirs live under $GITHUB_WORKSPACE.
 #
 # Disk note (GitHub-hosted jobs): Apptainer scratch (APPTAINER_TMPDIR /
 # APPTAINER_CACHEDIR) is placed on the roomy root disk (GITHUB_WORKSPACE,
@@ -162,12 +164,12 @@ jobs:
           mkdir -p "${{ github.workspace }}/.apptainer-scratch"
 
       # ubuntu-24.04 restricts unprivileged user namespaces by default, which
-      # breaks `apptainer build/exec --fakeroot` (build-fixture-sif.sh and the
-      # per-fixture run-fixture.sh both use it). Lift it (passwordless sudo);
-      # harmless no-op if the knob is absent. The build-sif composite action
-      # does this for the other jobs; this shard sets it up itself because it
-      # downloads the SIF rather than going through that action.
-      - name: Allow unprivileged user namespaces (fakeroot)
+      # blocks both `apptainer build --fakeroot` (needed by build-fixture-sif.sh)
+      # and rootless `apptainer exec` (needed for per-fixture runs). Lift it
+      # (passwordless sudo); harmless no-op if the knob is absent. The build-sif
+      # composite action does this for the other jobs; this shard sets it up
+      # itself because it downloads the SIF rather than going through that action.
+      - name: Allow unprivileged user namespaces
         run: |
           if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
@@ -201,7 +203,6 @@ jobs:
           INCLUDE_ARG=""
           if [ -n "${INCLUDE:-}" ]; then INCLUDE_ARG="--include ${INCLUDE}"; fi
           characterization/run-all-fixtures.sh \
-              --fakeroot \
               --keep-going \
               --workdir-root "${GITHUB_WORKSPACE}/fixture-workdir" \
               --shard "${{ matrix.shard }}/${SHARDS}" \
@@ -272,8 +273,9 @@ jobs:
   #
   # GitHub-hosted (ubuntu-24.04), `needs: build-sif` so it restores the same
   # cached canonical SIF the build-sif job produced via the shared composite
-  # action (no second cold build), then runs the gfortran reference binary +
-  # `apptainer exec --fakeroot` against that SIF.
+  # action (no second cold build), then runs the gfortran reference binary via
+  # run-moves.sh (no --fakeroot; uses start-mariadb-bg.sh directly) against
+  # that SIF.
   #
   # When to expect failures:
   #   * A new divergence between the Rust port and gfortran reference that
@@ -351,7 +353,7 @@ jobs:
       - name: Generate NONROAD gfortran reference captures
         run: |
           set -u
-          SIF="characterization/apptainer/canonical-moves.sif"
+          SIF="$(pwd)/characterization/apptainer/canonical-moves.sif"
           FIXTURES_DIR="characterization/fixtures"
           OUT_DIR="$(pwd)/artifacts/nonroad-fidelity-ref"
           mkdir -p "${OUT_DIR}"
@@ -360,51 +362,37 @@ jobs:
           for fixture in "${FIXTURES_DIR}"/nr-*.xml; do
               name="$(basename "${fixture}" .xml)"
               WORKDIR="${GITHUB_WORKSPACE}/nonroad-cap/${name}"
-              NRDBG_DIR="${WORKDIR}/nrdbg-out"
-              mkdir -p "${WORKDIR}/mariadb-data" \
-                       "${WORKDIR}/run-mysqld" \
-                       "${WORKDIR}/MOVESTemporary" \
-                       "${WORKDIR}/WorkerFolder" \
-                       "${NRDBG_DIR}"
+              MOVES_TEMP="${WORKDIR}/MOVESTemporary"
+              # NRDBG_FILE is a container-side path under MOVESTemporary, which
+              # run-moves.sh bind-mounts from the host at WORKDIR/MOVESTemporary.
+              # After the run, the TSV appears at MOVES_TEMP/${name}.tsv on the host.
+              NRDBG_CONTAINER="/opt/moves/MOVESTemporary/${name}.tsv"
+              NRDBG_HOST="${MOVES_TEMP}/${name}.tsv"
+
+              mkdir -p "${WORKDIR}"
 
               echo "::group::NONROAD capture ${name}"
 
-              # Run the fixture through the SIF with:
-              #   1. Instrumented NONROAD.exe bind-mounted over the SIF's binary
-              #   2. NRDBG_DIR bind-mounted to /tmp/nrdbg-out inside the container
-              #   3. NRDBG_FILE=/tmp/nrdbg-out/<name>.tsv so the Fortran
-              #      writes the capture into our host-side directory
-              #   4. The fixture XML bind-mounted to testdata/ inside MOVES
-              apptainer exec --fakeroot \
-                  --bind "${WORKDIR}/mariadb-data:/var/lib/mysql" \
-                  --bind "${WORKDIR}/run-mysqld:/var/run/mysqld" \
-                  --bind "${WORKDIR}/MOVESTemporary:/opt/moves/MOVESTemporary" \
-                  --bind "${WORKDIR}/WorkerFolder:/opt/moves/WorkerFolder" \
-                  --bind "${NONROAD_EXE}:/opt/moves/NONROAD/NR08a/NONROAD.exe" \
-                  --bind "${NRDBG_DIR}:/tmp/nrdbg-out" \
-                  --bind "$(realpath "${fixture}"):/opt/moves/testdata/${name}.xml" \
-                  --env "NRDBG_FILE=/tmp/nrdbg-out/${name}.tsv" \
-                  "${SIF}" \
-                  bash -c "
-                      set -eu
-                      /opt/moves-bin/init-mariadb.sh
-                      service mariadb start
-                      for i in \$(seq 1 60); do
-                          [ -S /var/run/mysqld/mysqld.sock ] && break
-                          sleep 1
-                      done
-                      cd /opt/moves
-                      ant crun -Drunspec=testdata/${name}.xml
-                      service mariadb stop || true
-                  " || {
+              # run-moves.sh handles the full bind-mount layout (mariadb-data,
+              # run-mysqld, MOVESTemporary, WorkerFolder, manyworkers.txt,
+              # maketodo.txt, start-mariadb-bg.sh) and starts MariaDB via
+              # start-mariadb-bg.sh (no --fakeroot, no `service mariadb start`).
+              # NONROAD_EXE is bind-mounted over the SIF binary automatically
+              # when the env var is set. The absolute runspec path is bound via
+              # the parent-dir bind that run-moves.sh injects for absolute paths.
+              SIF="${SIF}" \
+              NONROAD_EXE="${NONROAD_EXE}" \
+              WORKDIR="${WORKDIR}" \
+              NRDBG_FILE="${NRDBG_CONTAINER}" \
+                  characterization/apptainer/run-moves.sh \
+                  --runspec "$(realpath "${fixture}")" || {
                   echo "::warning::NONROAD run failed for ${name}"
                   fail=1
               }
 
               # Copy the capture to the shared output dir.
-              TSV="${NRDBG_DIR}/${name}.tsv"
-              if [ -f "${TSV}" ]; then
-                  cp "${TSV}" "${OUT_DIR}/${name}.tsv"
+              if [ -f "${NRDBG_HOST}" ]; then
+                  cp "${NRDBG_HOST}" "${OUT_DIR}/${name}.tsv"
                   echo "[nonroad-fidelity] captured $(wc -l < "${OUT_DIR}/${name}.tsv") lines for ${name}"
               else
                   echo "::warning::no capture produced for ${name} (NRDBG_FILE not written)"

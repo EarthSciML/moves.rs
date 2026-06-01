@@ -22,10 +22,12 @@
 #   --runspec PATH        RunSpec XML to execute. Path on the host.
 #
 # Optional:
-#   -f, --fakeroot        Use Apptainer --fakeroot mode (matches the
-#                         `service mariadb start` path baked into the SIF).
-#                         Without this, mariadbd is started as the calling
-#                         user via /opt/moves-bin/start-mariadb-bg.sh.
+#   -f, --fakeroot        Pass --fakeroot to apptainer exec. Both modes start
+#                         mariadbd via start-mariadb-bg.sh; in fakeroot mode
+#                         the effective user is root so mariadbd runs with
+#                         --user=root; without it, mariadbd runs as the calling
+#                         user. GitHub-hosted runners: do NOT use --fakeroot —
+#                         MariaDB startup fails under fakeroot on hosted runners.
 #   --sif PATH            moves-fixture.sif path (default: ./moves-fixture.sif).
 #   --workdir DIR         Host scratch root (default: /scratch/$USER/moves-fixture/<fixture>).
 #   --output-dir DIR      Snapshot output directory
