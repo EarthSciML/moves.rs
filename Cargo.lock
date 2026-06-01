@@ -2081,6 +2081,7 @@ name = "moves-wasm"
 version = "0.1.0"
 dependencies = [
  "arrow",
+ "bytes",
  "js-sys",
  "moves-calculator-info",
  "moves-calculators",

@@ -247,6 +247,8 @@ jobs:
           rm -f "/tmp/${ARCHIVE}"
           echo "Published default-DB ${DB_VERSION} at demo/data/${DB_VERSION}/"
           du -sh "target/doc/demo/data/${DB_VERSION}/"
+          # Write a pointer file so the demo JS can discover the latest DB version.
+          echo "{\"db_version\":\"${DB_VERSION}\"}" > target/doc/demo/data/latest.json
 
       - name: Upload docs artifact
         if: github.ref == 'refs/heads/main'

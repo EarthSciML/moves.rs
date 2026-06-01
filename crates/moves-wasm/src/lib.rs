@@ -111,8 +111,9 @@ use moves_nonroad::{
         PlanRecordingExecutor,
     },
 };
-use moves_runspec::from_xml_str;
+use moves_runspec::{from_xml_str, GeoKind};
 use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsCast;
 
 /// Initialize the rayon Web Worker thread pool.
 ///
@@ -242,6 +243,247 @@ pub fn run_simulation_from_bundle(
 
     let mut store = default_db::parse_bundle_to_store(bundle_bytes)
         .map_err(|e| JsValue::from_str(&format!("Bundle parse error: {e}")))?;
+
+    default_db::setup_execution_store(&run_spec, &mut store)
+        .map_err(|e| JsValue::from_str(&format!("Store setup error: {e}")))?;
+
+    let geography = default_db::load_geography_from_store(&store)
+        .map_err(|e| JsValue::from_str(&format!("Geography error: {e}")))?;
+
+    let registry = build_registry()
+        .map_err(|e| JsValue::from_str(&format!("Registry build error: {e}")))?;
+
+    let config = EngineConfig {
+        output_root: std::path::PathBuf::from(""),
+        max_parallel_chunks: max_parallel_chunks as usize,
+        run_spec_file_name: None,
+        run_date_time: None,
+        collect_output_in_memory: true,
+    };
+
+    let mut engine = MOVESEngine::new(run_spec.clone(), registry, config);
+    engine = engine.with_slow_store(store);
+    engine
+        .execution_run_spec_mut()
+        .build_execution_locations(&geography);
+
+    let outcome = engine
+        .run()
+        .map_err(|e| JsValue::from_str(&format!("Engine error: {e}")))?;
+
+    let obj = js_sys::Object::new();
+    for (path, bytes) in outcome.output_bytes {
+        let key = JsValue::from_str(
+            path.to_str()
+                .ok_or_else(|| JsValue::from_str("non-UTF8 output path"))?,
+        );
+        let value: JsValue = js_sys::Uint8Array::from(bytes.as_slice()).into();
+        js_sys::Reflect::set(&obj, &key, &value)
+            .map_err(|_| JsValue::from_str("failed to set output property"))?;
+    }
+    Ok(obj.into())
+}
+
+/// Compute which default-DB partition paths are needed for a given RunSpec.
+///
+/// Parses the RunSpec and the manifest.json from the default-DB Pages tree
+/// and returns the relative paths of every Parquet partition file that the
+/// simulation will need.  The caller fetches those files, then passes them to
+/// [`run_simulation_from_partitions`].
+///
+/// # Arguments
+///
+/// * `runspec_xml` — RunSpec document as an XML string.
+/// * `manifest_json` — Contents of `manifest.json` from the default-DB Pages
+///   tree (e.g. fetched from `/demo/data/<db_version>/manifest.json`).
+///
+/// # Returns
+///
+/// A JavaScript `Array` of relative path strings, e.g.
+/// `["County.parquet", "ZoneMonthHour/county=26161/part.parquet", …]`.
+/// Each path is relative to the manifest's root (the `<db_version>/`
+/// directory), so the full fetch URL is
+/// `/demo/data/<db_version>/<path>`.
+///
+/// # Errors
+///
+/// Returns a JavaScript `Error` if the RunSpec or manifest cannot be parsed.
+#[wasm_bindgen]
+pub fn required_partition_paths(
+    runspec_xml: &str,
+    manifest_json: &str,
+) -> Result<JsValue, JsValue> {
+    use std::collections::BTreeSet;
+
+    let run_spec = from_xml_str(runspec_xml)
+        .map_err(|e| JsValue::from_str(&format!("RunSpec parse error: {e}")))?;
+
+    // County IDs and derived zone / state IDs from the geographic selections.
+    let mut county_ids: BTreeSet<i64> = BTreeSet::new();
+    let mut state_ids: BTreeSet<i64> = BTreeSet::new();
+    for sel in &run_spec.geographic_selections {
+        match sel.kind {
+            GeoKind::County => {
+                let c = sel.key as i64;
+                county_ids.insert(c);
+                state_ids.insert(c / 1000); // FIPS: countyID / 1000 = stateID
+            }
+            GeoKind::State => {
+                state_ids.insert(sel.key as i64);
+            }
+            _ => {}
+        }
+    }
+    // Default zones: county_id * 10 (MOVES convention).
+    let zone_ids: BTreeSet<i64> = county_ids.iter().map(|&c| c * 10).collect();
+    let year_ids: BTreeSet<i64> = run_spec.timespan.years.iter().map(|&y| y as i64).collect();
+
+    let manifest: serde_json::Value = serde_json::from_str(manifest_json)
+        .map_err(|e| JsValue::from_str(&format!("manifest parse error: {e}")))?;
+
+    let tables = manifest["tables"]
+        .as_array()
+        .ok_or_else(|| JsValue::from_str("manifest missing 'tables' array"))?;
+
+    let arr = js_sys::Array::new();
+    for table in tables {
+        let strategy = table["partition_strategy"].as_str().unwrap_or("");
+        if strategy == "schema_only" {
+            continue;
+        }
+
+        let partition_columns: Vec<String> = table["partition_columns"]
+            .as_array()
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_ascii_lowercase()))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let partitions = match table["partitions"].as_array() {
+            Some(p) => p,
+            None => continue,
+        };
+
+        for partition in partitions {
+            let path = match partition["path"].as_str() {
+                Some(p) if !p.is_empty() => p,
+                _ => continue,
+            };
+
+            let values: Vec<String> = partition["values"]
+                .as_array()
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|v| v.as_str().map(str::to_string))
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            if partition_path_needed(
+                &partition_columns,
+                &values,
+                &county_ids,
+                &zone_ids,
+                &state_ids,
+                &year_ids,
+            ) {
+                arr.push(&JsValue::from_str(path));
+            }
+        }
+    }
+
+    Ok(arr.into())
+}
+
+/// Returns `true` when the partition described by `(columns, values)` is
+/// needed for a run whose geography/time is described by the supplied sets.
+///
+/// An unconstrained dimension (empty set, or column not recognised) passes
+/// unconditionally so that `required_partition_paths` is never over-
+/// conservative about what to exclude.
+fn partition_path_needed(
+    columns: &[String],
+    values: &[String],
+    county_ids: &std::collections::BTreeSet<i64>,
+    zone_ids: &std::collections::BTreeSet<i64>,
+    state_ids: &std::collections::BTreeSet<i64>,
+    year_ids: &std::collections::BTreeSet<i64>,
+) -> bool {
+    for (col, val) in columns.iter().zip(values.iter()) {
+        let parsed: Option<i64> = val.parse().ok();
+        let ok = match col.as_str() {
+            "countyid" => county_ids.is_empty() || parsed.map_or(true, |v| county_ids.contains(&v)),
+            "zoneid" => zone_ids.is_empty() || parsed.map_or(true, |v| zone_ids.contains(&v)),
+            "stateid" => state_ids.is_empty() || parsed.map_or(true, |v| state_ids.contains(&v)),
+            "yearid" => year_ids.is_empty() || parsed.map_or(true, |v| year_ids.contains(&v)),
+            _ => true,
+        };
+        if !ok {
+            return false;
+        }
+    }
+    true
+}
+
+/// Run a MOVES onroad simulation from pre-fetched default-DB partition files.
+///
+/// This is the main entry point for arbitrary-RunSpec execution in the demo.
+/// The caller:
+/// 1. Calls [`required_partition_paths`] to get the list of paths.
+/// 2. Fetches each path from the Pages tree.
+/// 3. Passes the fetched bytes here.
+///
+/// # Arguments
+///
+/// * `runspec_xml` — RunSpec document as an XML string.
+/// * `partitions_js` — A JavaScript `Array` of objects of the form
+///   `{ path: string, bytes: Uint8Array }`.  Each `path` must match one
+///   of the values returned by [`required_partition_paths`]; `bytes` is
+///   the raw Parquet file content.
+/// * `max_parallel_chunks` — See [`run_simulation`].
+///
+/// # Returns
+///
+/// Same shape as [`run_simulation`]: a JavaScript object mapping relative
+/// output file paths to `Uint8Array` Parquet bytes.
+///
+/// # Errors
+///
+/// Returns a JavaScript `Error` if the RunSpec cannot be parsed, any
+/// partition file cannot be decoded, or the engine encounters a fatal error.
+#[wasm_bindgen]
+pub fn run_simulation_from_partitions(
+    runspec_xml: &str,
+    partitions_js: JsValue,
+    max_parallel_chunks: u32,
+) -> Result<JsValue, JsValue> {
+    let run_spec = from_xml_str(runspec_xml)
+        .map_err(|e| JsValue::from_str(&format!("RunSpec parse error: {e}")))?;
+
+    // Unpack JS Array<{path: string, bytes: Uint8Array}> into Rust Vec.
+    let arr: js_sys::Array = partitions_js
+        .dyn_into::<js_sys::Array>()
+        .map_err(|_| JsValue::from_str("partitions must be an Array"))?;
+
+    let mut partition_files: Vec<(String, Vec<u8>)> = Vec::with_capacity(arr.length() as usize);
+    for i in 0..arr.length() {
+        let item = arr.get(i);
+        let path = js_sys::Reflect::get(&item, &JsValue::from_str("path"))
+            .map_err(|_| JsValue::from_str("partition missing 'path'"))?
+            .as_string()
+            .ok_or_else(|| JsValue::from_str("partition 'path' must be a string"))?;
+        let bytes_val = js_sys::Reflect::get(&item, &JsValue::from_str("bytes"))
+            .map_err(|_| JsValue::from_str("partition missing 'bytes'"))?;
+        let uint8arr: js_sys::Uint8Array = bytes_val
+            .dyn_into::<js_sys::Uint8Array>()
+            .map_err(|_| JsValue::from_str("partition 'bytes' must be a Uint8Array"))?;
+        partition_files.push((path, uint8arr.to_vec()));
+    }
+
+    let mut store = default_db::load_partitions_to_store(&partition_files)
+        .map_err(|e| JsValue::from_str(&format!("Partition load error: {e}")))?;
 
     default_db::setup_execution_store(&run_spec, &mut store)
         .map_err(|e| JsValue::from_str(&format!("Store setup error: {e}")))?;
@@ -600,6 +842,103 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// `required_partition_paths` returns county-filtered paths for a minimal manifest.
+    #[test]
+    fn required_partition_paths_filters_by_county() {
+        let runspec_xml = include_str!(
+            "../../../characterization/fixtures/sample-runspec.xml"
+        );
+        // Minimal manifest with one monolithic table and one county-partitioned table.
+        let manifest_json = r#"{
+            "schema_version": "moves-default-db-manifest/v1",
+            "moves_db_version": "movesdb20241112",
+            "moves_commit": "abc",
+            "plan_sha256": "0",
+            "generated_at_utc": "1970-01-01T00:00:00Z",
+            "tables": [
+                {
+                    "name": "County",
+                    "partition_strategy": "monolithic",
+                    "partition_columns": [],
+                    "row_count": 1,
+                    "columns": [],
+                    "primary_key": [],
+                    "partitions": [{"path": "County.parquet", "values": [], "row_count": 1, "sha256": "0", "bytes": 1}]
+                },
+                {
+                    "name": "IMCoverage",
+                    "partition_strategy": "year_x_county",
+                    "partition_columns": ["yearID", "countyID"],
+                    "row_count": 2,
+                    "columns": [],
+                    "primary_key": [],
+                    "partitions": [
+                        {"path": "IMCoverage/year=2001/county=26161/part.parquet", "values": ["2001", "26161"], "row_count": 1, "sha256": "0", "bytes": 1},
+                        {"path": "IMCoverage/year=2001/county=99999/part.parquet", "values": ["2001", "99999"], "row_count": 1, "sha256": "0", "bytes": 1}
+                    ]
+                },
+                {
+                    "name": "Link",
+                    "partition_strategy": "schema_only",
+                    "partition_columns": [],
+                    "row_count": 0,
+                    "columns": [],
+                    "primary_key": [],
+                    "partitions": []
+                }
+            ]
+        }"#;
+
+        let run_spec = from_xml_str(runspec_xml).expect("RunSpec must parse");
+        // Sample RunSpec uses county 26161 (Washtenaw, MI), year 2001.
+        let county_id: i64 = run_spec
+            .geographic_selections
+            .iter()
+            .find(|s| matches!(s.kind, moves_runspec::GeoKind::County))
+            .map(|s| s.key as i64)
+            .expect("sample RunSpec must have a county selection");
+        assert_eq!(county_id, 26161);
+
+        // Build the path list using the pure-Rust helper.
+        let mut county_ids = std::collections::BTreeSet::new();
+        county_ids.insert(county_id);
+        let zone_ids: std::collections::BTreeSet<i64> = county_ids.iter().map(|&c| c * 10).collect();
+        let state_ids: std::collections::BTreeSet<i64> = county_ids.iter().map(|&c| c / 1000).collect();
+        let year_ids: std::collections::BTreeSet<i64> = run_spec.timespan.years.iter().map(|&y| y as i64).collect();
+
+        let manifest: serde_json::Value = serde_json::from_str(manifest_json).unwrap();
+        let mut paths: Vec<String> = Vec::new();
+        for table in manifest["tables"].as_array().unwrap() {
+            let strategy = table["partition_strategy"].as_str().unwrap_or("");
+            if strategy == "schema_only" { continue; }
+            let cols: Vec<String> = table["partition_columns"].as_array().unwrap_or(&vec![])
+                .iter().filter_map(|v| v.as_str().map(|s| s.to_ascii_lowercase())).collect();
+            for partition in table["partitions"].as_array().unwrap_or(&vec![]) {
+                let path = partition["path"].as_str().unwrap_or("");
+                let values: Vec<String> = partition["values"].as_array().unwrap_or(&vec![])
+                    .iter().filter_map(|v| v.as_str().map(str::to_string)).collect();
+                if partition_path_needed(&cols, &values, &county_ids, &zone_ids, &state_ids, &year_ids) {
+                    paths.push(path.to_string());
+                }
+            }
+        }
+
+        // Monolithic table must always be included.
+        assert!(paths.contains(&"County.parquet".to_string()), "County must be included");
+        // The matching county=26161 partition must be included.
+        assert!(
+            paths.contains(&"IMCoverage/year=2001/county=26161/part.parquet".to_string()),
+            "county=26161 partition must be included"
+        );
+        // The non-matching county=99999 partition must be excluded.
+        assert!(
+            !paths.contains(&"IMCoverage/year=2001/county=99999/part.parquet".to_string()),
+            "county=99999 partition must be excluded"
+        );
+        // schema_only table must not appear.
+        assert!(!paths.iter().any(|p| p.contains("Link")), "Link (schema_only) must be excluded");
     }
 
     /// `run_simulation_from_bundle` runs the default-db pipeline on a minimal

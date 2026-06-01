@@ -79,6 +79,53 @@
 </section>
 
 <!-- ------------------------------------------------------------------ -->
+<section id="defaultdb-section">
+  <h2>Default-DB simulation (arbitrary RunSpec)</h2>
+  <p>
+    Upload <em>any</em> RunSpec XML.  The demo fetches only the default-DB
+    partitions your RunSpec needs from this site, builds an execution store
+    in-browser, and runs the onroad calculator chain — no pre-packaged
+    snapshot required.
+  </p>
+  <p class="note" id="defaultdb-unavail" style="display:none">
+    Default-DB not yet published.  Run <code>package-default-db</code> and
+    then re-deploy Pages to enable this section.
+  </p>
+  <div id="defaultdb-available">
+    <p class="note">
+      DB version: <code id="db-version-label">loading…</code>
+    </p>
+    <label>
+      RunSpec XML
+      <input type="file" id="defaultdb-runspec-file" accept=".xml">
+    </label>
+    <label>
+      Max parallel chunks (0 = auto; &gt;1 requires multi-thread build)
+      <input type="number" id="defaultdb-max-parallel-chunks" value="0" min="0" max="128" style="width:6rem">
+    </label>
+    <button id="run-defaultdb-btn" disabled>Run default-DB simulation</button>
+    <p class="note">Select a RunSpec XML file to enable the button.</p>
+
+    <div id="defaultdb-log-wrapper">
+      <div id="defaultdb-log" style="display:none">
+        <strong>Log</strong>
+        <div id="defaultdb-log-content" class="log" style="background:#181818;border:1px solid #444;padding:0.5rem;height:150px;overflow-y:auto;font-size:0.85rem;white-space:pre-wrap;color:#aaa;margin-top:0.25rem;"></div>
+      </div>
+    </div>
+
+    <div id="defaultdb-progress" style="display:none;margin-top:0.5rem">
+      Fetching partitions: <span id="defaultdb-progress-text">0 / 0</span>
+      <progress id="defaultdb-progress-bar" value="0" max="100" style="width:100%;display:block;margin-top:0.25rem"></progress>
+    </div>
+
+    <div id="defaultdb-results" style="margin-top:1rem;display:none">
+      <strong>Output files</strong>
+      <div id="defaultdb-file-list"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ------------------------------------------------------------------ -->
 <section id="nonroad-section">
   <h2>NONROAD simulation</h2>
   <p>
@@ -145,6 +192,91 @@ function appendLog(logEl, msg) {
     content.textContent += msg + "\n";
     content.scrollTop = content.scrollHeight;
 }
+
+// -----------------------------------------------------------------------
+// Default-DB section — discover the published DB version on page load.
+// -----------------------------------------------------------------------
+let dbVersion = null;
+
+(async () => {
+    try {
+        const resp = await fetch("./data/latest.json");
+        if (!resp.ok) throw new Error("no latest.json");
+        const data = await resp.json();
+        dbVersion = data.db_version;
+        document.getElementById("db-version-label").textContent = dbVersion;
+    } catch (_) {
+        document.getElementById("defaultdb-unavail").style.display = "";
+        document.getElementById("defaultdb-available").style.display = "none";
+    }
+})();
+
+const defaultdbRunspecInput = document.getElementById("defaultdb-runspec-file");
+const runDefaultdbBtn       = document.getElementById("run-defaultdb-btn");
+const defaultdbMaxChunks    = document.getElementById("defaultdb-max-parallel-chunks");
+const defaultdbLogEl        = document.getElementById("defaultdb-log");
+const defaultdbLogContent   = document.getElementById("defaultdb-log-content");
+const defaultdbProgress     = document.getElementById("defaultdb-progress");
+const defaultdbProgressText = document.getElementById("defaultdb-progress-text");
+const defaultdbProgressBar  = document.getElementById("defaultdb-progress-bar");
+const defaultdbResults      = document.getElementById("defaultdb-results");
+const defaultdbFileList     = document.getElementById("defaultdb-file-list");
+
+defaultdbRunspecInput.addEventListener("change", () => {
+    runDefaultdbBtn.disabled = !defaultdbRunspecInput.files.length || !dbVersion;
+});
+
+runDefaultdbBtn.addEventListener("click", async () => {
+    const file = defaultdbRunspecInput.files[0];
+    if (!file || !dbVersion) return;
+
+    runDefaultdbBtn.disabled = true;
+    defaultdbLogEl.style.display = "block";
+    defaultdbProgress.style.display = "none";
+    defaultdbResults.style.display = "none";
+    defaultdbLogContent.textContent = "";
+    defaultdbFileList.innerHTML = "";
+
+    const runspecXml = await file.text();
+    const maxParallelChunks = parseInt(defaultdbMaxChunks.value, 10) || 0;
+
+    appendLog(defaultdbLogContent, `RunSpec: ${file.name} (${file.size} bytes)`);
+    appendLog(defaultdbLogContent, `DB version: ${dbVersion}`);
+
+    // The data directory is served at ./data/<dbVersion>/ relative to this page.
+    const dbBaseUrl = `./data/${dbVersion}`;
+
+    const worker = makeWorker(defaultdbLogEl);
+    worker.onmessage = (e) => {
+        const msg = e.data;
+        if (msg.type === "log") {
+            appendLog(defaultdbLogContent, msg.message);
+        } else if (msg.type === "progress") {
+            defaultdbProgress.style.display = "block";
+            defaultdbProgressText.textContent = `${msg.fetched} / ${msg.total}`;
+            defaultdbProgressBar.value = msg.fetched;
+            defaultdbProgressBar.max   = msg.total;
+        } else if (msg.type === "result" && msg.mode === "default-db") {
+            appendLog(defaultdbLogContent, `Done — ${msg.files.length} output file(s).`);
+            defaultdbResults.style.display = "block";
+            for (const { name, bytes } of msg.files) {
+                const blob = new Blob([bytes], { type: "application/octet-stream" });
+                const url  = URL.createObjectURL(blob);
+                const a    = document.createElement("a");
+                a.href     = url;
+                a.download = name.replace(/\//g, "_");
+                a.textContent = `⬇ ${name} (${bytes.byteLength.toLocaleString()} bytes)`;
+                a.className = "download-link";
+                defaultdbFileList.appendChild(a);
+            }
+            runDefaultdbBtn.disabled = false;
+        } else if (msg.type === "error") {
+            appendLog(defaultdbLogContent, `ERROR: ${msg.message}`);
+            runDefaultdbBtn.disabled = false;
+        }
+    };
+    worker.postMessage({ type: "default-db", runspecXml, dbBaseUrl, maxParallelChunks });
+});
 
 // -----------------------------------------------------------------------
 // Onroad

@@ -32,6 +32,7 @@ moves-calculators = { path = "../moves-calculators" }
 moves-framework = { path = "../moves-framework" }
 moves-nonroad = { path = "../moves-nonroad" }
 moves-runspec = { path = "../moves-runspec" }
+bytes = { workspace = true }
 js-sys = { workspace = true }
 serde_json = { workspace = true }
 wasm-bindgen = { workspace = true }

@@ -18,6 +18,7 @@ use std::io::Cursor;
 use arrow::array::{Array, ArrayRef};
 use arrow::datatypes::DataType as ArrowDT;
 use arrow::ipc::reader::FileReader as ArrowFileReader;
+use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 
 use moves_calculators::generators::meteorology::{build_meteorology_table, MeteorologyInputs};
 use moves_framework::{
@@ -208,6 +209,115 @@ pub fn load_geography_from_store(store: &InMemoryStore) -> Result<GeographyTable
     };
 
     Ok(GeographyTables::new(links, counties))
+}
+
+// ---------------------------------------------------------------------------
+// Partition-file loading (Parquet from Pages)
+// ---------------------------------------------------------------------------
+
+/// Parse a Parquet file (from the default-DB Pages tree) into a polars
+/// [`DataFrame`].
+///
+/// Uses `parquet::arrow::arrow_reader` (pure Rust, wasm32-compatible) to
+/// produce Arrow `RecordBatch`es, then converts each column via the same
+/// typed extraction used by [`ipc_bytes_to_polars_df`].
+pub fn parquet_bytes_to_polars_df(parquet_bytes: &[u8]) -> Result<DataFrame, String> {
+    let bytes = bytes::Bytes::copy_from_slice(parquet_bytes);
+    let builder = ParquetRecordBatchReaderBuilder::try_new(bytes)
+        .map_err(|e| format!("Parquet open: {e}"))?;
+    let schema = builder.schema().clone();
+    let n_cols = schema.fields().len();
+    let col_names: Vec<String> = schema.fields().iter().map(|f| f.name().clone()).collect();
+    let col_types: Vec<ArrowDT> = schema
+        .fields()
+        .iter()
+        .map(|f| f.data_type().clone())
+        .collect();
+
+    let reader = builder
+        .build()
+        .map_err(|e| format!("Parquet reader build: {e}"))?;
+
+    struct ColumnAccum {
+        arrays: Vec<ArrayRef>,
+    }
+    let mut cols: Vec<ColumnAccum> = (0..n_cols)
+        .map(|_| ColumnAccum { arrays: Vec::new() })
+        .collect();
+    let mut total_rows = 0usize;
+
+    for batch_result in reader {
+        let batch = batch_result.map_err(|e| format!("reading Parquet batch: {e}"))?;
+        total_rows += batch.num_rows();
+        for (i, col) in batch.columns().iter().enumerate() {
+            cols[i].arrays.push(col.clone());
+        }
+    }
+
+    let mut series_vec: Vec<Column> = Vec::with_capacity(n_cols);
+    for (col_idx, (name, dt)) in col_names.into_iter().zip(col_types.iter()).enumerate() {
+        let s = arrow_arrays_to_polars_series(&name, dt, &cols[col_idx].arrays, total_rows)?;
+        series_vec.push(s.into());
+    }
+
+    DataFrame::new_infer_height(series_vec)
+        .map_err(|e| format!("building DataFrame from Parquet: {e}"))
+}
+
+/// Load a set of `(relative_path, parquet_bytes)` pairs into an
+/// [`InMemoryStore`].
+///
+/// Each path must follow the default-DB Pages-tree layout:
+/// - Monolithic: `<TableName>.parquet`
+/// - County-partitioned: `<TableName>/county=<id>/part.parquet`
+/// - Year×county: `<TableName>/year=<y>/county=<id>/part.parquet`
+/// - Model-year: `<TableName>/modelYear=<y>/part.parquet`
+///
+/// The table name is the first path segment (with `.parquet` stripped for
+/// monolithic files). Multiple partitions for the same table are vstacked
+/// into a single DataFrame. The store uses lowercased keys (matches
+/// [`InMemoryStore`]'s internal convention).
+pub fn load_partitions_to_store(
+    partition_files: &[(String, Vec<u8>)],
+) -> Result<InMemoryStore, String> {
+    // Group Parquet files by table name.
+    let mut by_table: BTreeMap<String, Vec<DataFrame>> = BTreeMap::new();
+
+    for (path, bytes) in partition_files {
+        // Table name = first path segment, strip ".parquet" for monolithic files.
+        let table_name = path
+            .split('/')
+            .next()
+            .unwrap_or(path.as_str())
+            .trim_end_matches(".parquet")
+            .to_string();
+        if table_name.is_empty() {
+            continue;
+        }
+        let df = parquet_bytes_to_polars_df(bytes)
+            .map_err(|e| format!("parsing partition '{path}': {e}"))?;
+        by_table.entry(table_name).or_default().push(df);
+    }
+
+    let mut store = InMemoryStore::new();
+    for (table_name, mut dfs) in by_table {
+        if dfs.is_empty() {
+            continue;
+        }
+        let merged = if dfs.len() == 1 {
+            dfs.remove(0)
+        } else {
+            let mut base = dfs[0].clone();
+            for extra in &dfs[1..] {
+                base = base
+                    .vstack(extra)
+                    .map_err(|e| format!("vstacking {table_name}: {e}"))?;
+            }
+            base
+        };
+        store.insert(table_name, merged);
+    }
+    Ok(store)
 }
 
 // ---------------------------------------------------------------------------
