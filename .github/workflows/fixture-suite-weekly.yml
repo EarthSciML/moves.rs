@@ -1,9 +1,9 @@
-# Weekly fixture-suite regression check.
+# Weekly fixture-suite regression check (GitHub-hosted).
 #
-# Runs every Monday morning UTC against the pinned canonical-MOVES SIF
-# (characterization/fixture-image.lock). Re-runs the fixture suite and
-# diffs each produced snapshot against the committed baseline under
-# characterization/snapshots/. Any drift signals one of:
+# Runs every Monday morning UTC against the pinned canonical-MOVES SIF.
+# Re-runs the fixture suite and diffs each produced snapshot against the
+# committed baseline under characterization/snapshots/. Any drift signals
+# one of:
 #
 #   1. Upstream MOVES changed (new EPA release, patched JAR, default-DB
 #      schema bump). The diff tells us which tables / cells moved.
@@ -12,40 +12,54 @@
 #   3. Build host divergence (gfortran flags, MariaDB version, Apptainer
 #      version). Investigate before pinning a new SIF SHA.
 #
-# Two separate jobs run in this workflow (both on the same self-hosted runner):
+# Topology — three jobs:
 #
-#   fixture-suite   — canonical-MOVES snapshot regression for all 34
-#                     characterization fixtures. Fails on any snapshot drift
-#                     beyond tolerance/tolerance.toml.
+#   build-sif        — builds the canonical-MOVES SIF once via the shared
+#                      composite action (.github/actions/build-sif), then
+#                      uploads it as an artifact so the fixture shards can
+#                      pull it without each rebuilding the 1.1 GB image.
+#                      Runs on a GitHub-hosted ubuntu-24.04 runner; the
+#                      fakeroot build works through unprivileged user
+#                      namespaces.
 #
-#   nonroad-fidelity — NONROAD numerical-fidelity check. Builds the
-#                      locally-fixed gfortran NONROAD binary (phase0-02
-#                      flag set) from the pinned MOVES commit, runs each
-#                      nr-*.xml fixture through it with NRDBG_FILE set to
-#                      capture intermediate state, then runs
-#                      `cargo test -p moves-nonroad --test nonroad_fidelity`
-#                      with NONROAD_FIDELITY_REFERENCE set. Fails if any
-#                      divergence between the Rust port and the gfortran
-#                      reference exceeds the tolerance budget declared in
-#                      crates/moves-nonroad/tests/fidelity/tolerance.rs.
+#   fixture-suite    — canonical-MOVES snapshot regression for all 34
+#                      characterization fixtures (the 3 scale-* fixtures
+#                      need extra input DBs and are skipped by default).
+#                      Sharded across a 5-way matrix so each runner does
+#                      ~7 fixtures and stays well under the 6 h per-job
+#                      cap. Each shard downloads the canonical SIF, derives
+#                      the patched fixture SIF from it (build-fixture-sif.sh
+#                      bootstraps from the canonical image — a layering
+#                      build that re-runs `ant compileall` on the patched
+#                      MOVES sources, not a from-scratch bootstrap), runs
+#                      only its shard, and diffs against baseline. Fails on
+#                      any drift beyond tolerance.toml.
 #
-# Why a self-hosted runner: the canonical-MOVES SIF is ~5GB, requires
-# Apptainer + --fakeroot, and a fresh build takes 1–2 hours. Each
-# fixture takes 5–10 minutes; the full suite runs for a few CPU-hours.
-# GitHub-hosted runners cannot accommodate this — neither the disk nor
-# the Apptainer prerequisite is available.
+#   nonroad-fidelity — NONROAD numerical-fidelity check. UNCHANGED from the
+#                      self-hosted design: it builds an instrumented
+#                      gfortran NONROAD binary and runs against the
+#                      canonical SIF with NRDBG_FILE set. This cannot run on
+#                      GitHub-hosted runners (it needs gfortran + builds a
+#                      Fortran binary against the pinned MOVES tree), so it
+#                      stays on the self-hosted [apptainer, fakeroot,
+#                      gfortran] labels and builds its own canonical SIF
+#                      (cache-first). It is independent of the two
+#                      GitHub-hosted jobs above (no `needs:`), because a
+#                      self-hosted job must not gate on GitHub-hosted runner
+#                      availability or on the 1-day fixture-SIF artifact.
 #
-# Self-hosted runner labels expected:
-#   self-hosted    — opt-in to organization runners
-#   apptainer      — Apptainer (or Singularity in Apptainer-compat mode)
-#                    available on PATH
-#   fakeroot       — kernel + apptainer.conf permit `apptainer build
-#                    --fakeroot`
-#   gfortran       — gfortran available on PATH (nonroad-fidelity only)
+# Disk note (GitHub-hosted jobs): Apptainer scratch (APPTAINER_TMPDIR /
+# APPTAINER_CACHEDIR) is placed on the roomy root disk (GITHUB_WORKSPACE,
+# on /, ~22-29 GB free), NOT on RUNNER_TEMP (/mnt, the ~14 GB secondary
+# disk). The from-scratch canonical build and the layering fixture build
+# both need several GB of sandbox; /mnt is too small.
 #
-# When self-hosted infrastructure isn't yet wired up, the workflow runs
-# (manually via workflow_dispatch) and reports a skip. The schedule trigger
-# is harmless until a runner with these labels comes online.
+# Why two SIFs (canonical + fixture): canonical-moves.sif is the immutable
+# reference whose SHA256 pins the whole migration's baseline. The snapshot
+# suite runs the *fixture* SIF (moves-fixture.sif = canonical + the
+# intermediate-state-capture patch); run-fixture.sh and the
+# moves-fixture-capture --sif-lockfile both consume it. So the shards build
+# moves-fixture.sif locally from the downloaded canonical SIF.
 
 name: fixture-suite-weekly
 
@@ -56,7 +70,7 @@ on:
   workflow_dispatch:
     inputs:
       include_pattern:
-        description: "Glob fed to run-all-fixtures.sh --include (default: all)"
+        description: "Glob fed to run-all-fixtures.sh --include (default: all). NOTE: when set, this filters within each shard; the matrix still fans out 5 ways."
         required: false
         default: ""
       tolerance_config:
@@ -74,13 +88,52 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # ── Build the canonical SIF once and publish it as an artifact ────────────
+  build-sif:
+    name: build canonical SIF
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      # Shared composite action: installs Apptainer, restores/saves the SIF
+      # cache, builds (cache-first) onto the roomy root disk, and leaves
+      # the SIF at characterization/apptainer/canonical-moves.sif.
+      - uses: ./.github/actions/build-sif
+
+      # Hand the built SIF to the fixture-suite shards. retention-days: 1 —
+      # this artifact is a within-run handoff, not a durable deliverable.
+      - name: Upload canonical SIF artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: canonical-moves-sif
+          path: characterization/apptainer/canonical-moves.sif
+          if-no-files-found: error
+          retention-days: 1
+
+  # ── Sharded fixture suite ─────────────────────────────────────────────────
   fixture-suite:
-    name: fixture-suite (self-hosted apptainer)
-    # Requires Apptainer + fakeroot. The job is skipped — *not* failed —
-    # when no matching runner is online so a missing self-hosted runner
-    # doesn't manufacture a phantom regression alert.
-    runs-on: [self-hosted, apptainer, fakeroot]
-    timeout-minutes: 600
+    name: fixture-suite (shard ${{ matrix.shard }}/5)
+    needs: build-sif
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        # 5 shards over 34 runnable fixtures ⇒ ~7 per shard (7/7/7/7/6).
+        # Round-robin spreads the heavier fixtures evenly: the 10 nr-*
+        # NONROAD fixtures land 2 per shard and the 6 expand-* multi-
+        # county/month fixtures land 1-2 per shard, so no single shard
+        # piles up the slow ones. Sized so the slowest shard (≤7 fixtures
+        # × ≤10 min ≈ 70 min, plus the one-time fixture-SIF layering build
+        # — an `ant compileall` recompile, est. 30-40 min, UNMEASURED on a
+        # GitHub-hosted runner — and the SIF download + cargo build ≈ 20
+        # min ⇒ ~2-2.5 h) stays comfortably under the 6 h cap. Going wider
+        # mostly multiplies the per-shard fixture-SIF build cost for little
+        # wall-clock gain, so 5 is the balance point.
+        shard: [1, 2, 3, 4, 5]
+    env:
+      SHARDS: 5
 
     steps:
       - uses: actions/checkout@v4
@@ -94,14 +147,44 @@ jobs:
       - name: Build moves-snapshot CLI
         run: cargo build --release --workspace --bin moves-snapshot
 
-      - name: Build canonical and fixture SIFs (cache-first)
-        # build-sif.sh / build-fixture-sif.sh are no-ops if the lockfile
-        # already points at a built image.
-        run: |
-          characterization/apptainer/build-sif.sh
-          characterization/apptainer/build-fixture-sif.sh
+      # The fixture shards consume Apptainer directly (they do NOT rebuild
+      # the canonical SIF — they download it). Install Apptainer and point
+      # its scratch at the roomy root disk for the fixture-SIF layering
+      # build and the per-fixture container runs.
+      - name: Install Apptainer
+        uses: eWaterCycle/setup-apptainer@v2
 
-      - name: Run the fixture suite
+      # Apptainer scratch goes on the roomy root disk (GITHUB_WORKSPACE, on
+      # /), NOT on RUNNER_TEMP (/mnt is only ~14 GB). The `ant compileall`
+      # layering build plus squashfs assembly of the 1.1 GB fixture SIF
+      # needs several GB of sandbox.
+      - name: Point Apptainer scratch at the roomy root disk
+        run: |
+          echo "APPTAINER_TMPDIR=${{ github.workspace }}/.apptainer-scratch" >> "${GITHUB_ENV}"
+          echo "APPTAINER_CACHEDIR=${{ github.workspace }}/.apptainer-scratch" >> "${GITHUB_ENV}"
+          mkdir -p "${{ github.workspace }}/.apptainer-scratch"
+
+      # Pull the canonical SIF built by the build-sif job into the apptainer
+      # dir, exactly where build-fixture-sif.sh and run-fixture.sh expect it.
+      - name: Download canonical SIF artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: canonical-moves-sif
+          path: characterization/apptainer/
+
+      # Derive the patched fixture SIF (moves-fixture.sif) from the
+      # downloaded canonical SIF. This is a layering build (From: localimage
+      # canonical-moves.sif + the intermediate-state-capture patch, then
+      # `ant compileall`), not a from-scratch bootstrap.
+      - name: Build fixture SIF from canonical
+        run: characterization/apptainer/build-fixture-sif.sh
+
+      # Run ONLY this shard's slice of the suite. --shard I/N partitions the
+      # script's own resolved fixture list (round-robin), so the union of
+      # shards 1..5 is exactly the 34-fixture default set with the scale-*
+      # fixtures correctly excluded — no fixture dropped or doubled.
+      # include_pattern (if provided) further filters within the shard.
+      - name: Run the fixture suite (shard ${{ matrix.shard }}/${{ env.SHARDS }})
         env:
           INCLUDE: ${{ github.event.inputs.include_pattern }}
         run: |
@@ -111,6 +194,7 @@ jobs:
           characterization/run-all-fixtures.sh \
               --fakeroot \
               --keep-going \
+              --shard "${{ matrix.shard }}/${SHARDS}" \
               --output-root artifacts/snapshots-fresh \
               ${INCLUDE_ARG}
 
@@ -127,8 +211,9 @@ jobs:
           fi
 
           # Track exit codes so a single drifted fixture doesn't mask
-          # other drifted fixtures.
+          # other drifted fixtures in the same shard.
           drift=0
+          shopt -s nullglob
           for fresh in artifacts/snapshots-fresh/*/; do
               name="$(basename "${fresh}")"
               baseline="characterization/snapshots/${name}"
@@ -153,7 +238,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fixture-diffs
+          # Per-shard artifact name so the 5 shards don't collide.
+          name: fixture-diffs-shard-${{ matrix.shard }}
           path: |
             artifacts/diffs/*.json
             artifacts/snapshots-fresh/*/manifest.json
@@ -175,6 +261,12 @@ jobs:
   # up the job it will fail the prerequisite check clearly rather than
   # silently skipping.
   #
+  # This job stays on self-hosted runners (it cannot run on GitHub-hosted
+  # ones) and is INDEPENDENT of the GitHub-hosted build-sif / fixture-suite
+  # jobs: it builds its own canonical SIF (cache-first; build-sif.sh no-ops
+  # when characterization/canonical-image.lock already matches on the
+  # runner) rather than consuming the 1-day fixture-suite artifact.
+  #
   # When to expect failures:
   #   * A new divergence between the Rust port and gfortran reference that
   #     exceeds the tolerance budget in tolerance.rs — file a bug.
@@ -188,8 +280,6 @@ jobs:
     runs-on: [self-hosted, apptainer, fakeroot, gfortran]
     timeout-minutes: 240
     if: ${{ github.event.inputs.skip_nonroad_fidelity != 'true' }}
-    # The canonical SIF must be built before NONROAD can run.
-    needs: fixture-suite
 
     steps:
       - uses: actions/checkout@v4
@@ -201,6 +291,13 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           key: nonroad-fidelity
+
+      # Build the canonical SIF on this self-hosted runner (cache-first).
+      # build-sif.sh is a no-op when canonical-image.lock already points at
+      # a built image, so this is fast on a warm runner. Required because
+      # this job no longer depends on a job that builds the SIF for it.
+      - name: Build canonical SIF (cache-first)
+        run: characterization/apptainer/build-sif.sh
 
       # The gfortran label on the runner guarantees gfortran is on PATH.
       # This step verifies the version so it appears in the log for
@@ -322,3 +419,4 @@ jobs:
           path: artifacts/nonroad-fidelity-ref/*.tsv
           if-no-files-found: warn
           retention-days: 14
+

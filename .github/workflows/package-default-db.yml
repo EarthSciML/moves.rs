@@ -1,13 +1,29 @@
 # Package the default-DB Parquet tree and upload it to a GitHub Release.
 #
-# Triggered manually (workflow_dispatch). Requires a self-hosted runner
-# with Apptainer + fakeroot (the same labels used by fixture-suite-weekly).
+# Triggered manually (workflow_dispatch). Runs on a GitHub-hosted
+# ubuntu-24.04 runner. The canonical-MOVES SIF (Apptainer + fakeroot) is
+# built by the shared `.github/actions/build-sif` composite action, which
+# installs Apptainer, points APPTAINER_TMPDIR/CACHEDIR at a build scratch
+# dir with enough headroom for the build sandbox + the ~1.1 GB SIF,
+# restores/saves an actions/cache of the built SIF, and runs
+# characterization/apptainer/build-sif.sh — leaving the image at
+# characterization/apptainer/canonical-moves.sif.
+#
+# NOTE (hosted-runner prerequisite, owned by the build-sif action): on
+# ubuntu-24.04 unprivileged user namespaces are restricted by AppArmor by
+# default (kernel.apparmor_restrict_unprivileged_userns=1), which blocks
+# `apptainer build --fakeroot`. The composite action is responsible for
+# lifting that restriction (e.g. `sudo sysctl -w
+# kernel.apparmor_restrict_unprivileged_userns=0`) or installing an
+# AppArmor profile for apptainer; if it does not, the SIF build fails with
+# "Failed to create user namespace: Permission denied".
 #
 # The workflow:
 #   1. Checks out the tag specified by the `tag` input.
 #   2. Builds the `moves-default-db-convert` and `moves-default-db-validate`
 #      binaries at that tag.
-#   3. Builds the canonical-MOVES SIF (cache-first, same as fixture-suite).
+#   3. Builds the canonical-MOVES SIF via the build-sif composite action
+#      (cache-first; the shared cache key reuses the SIF across runs).
 #   4. Dumps the default database from the canonical SIF via
 #      `dump-default-db.sh` (Stage 1 — requires Apptainer + fakeroot).
 #   5. Converts the TSV dump to the Parquet layout via
@@ -15,6 +31,38 @@
 #   6. Validates the Parquet tree via `moves-default-db-validate`.
 #   7. Compresses the Parquet tree to `default-db-<db_version>.tar.gz`.
 #   8. Uploads the archive to the GitHub Release for `tag`.
+#   9. Publishes a demo-friendly Parquet subset (the tree minus the
+#      intermediate `_tsv/` dump) as a workflow artifact so the WASM demo
+#      hosted on GitHub Pages can serve it same-origin (see note below).
+#
+# On hosted runners the SIF build relies on the movesdb zip that ships
+# inside the cloned MOVES tree at database/Setup/movesdb20241112.zip:
+# characterization/apptainer/files/versions.env pins MOVESDB_URL="" and CI
+# has no MOVESDB_LOCAL_PATH, so build-sif.sh / the def use that in-tree zip
+# (SHA256-verified against the pin). No download is required.
+#
+# ── Making the artifact fetchable by the WASM demo ────────────────────────
+# The browser demo (crates/moves-wasm/demo/) is deployed to GitHub Pages by
+# ci.yml's `docs` job at <pages-root>/demo/. The multi-thread WASM build
+# sets Cross-Origin-Embedder-Policy: require-corp, so EVERY resource the
+# page fetches must be same-origin OR carry
+# `Cross-Origin-Resource-Policy: cross-origin` — a plain GitHub *release
+# asset* is cross-origin and ships no CORP header, so the COEP build would
+# block it (docs/wasm-threading.md, "Cross-origin isolation requirement").
+#
+# The robust, header-free path is therefore to serve the Parquet tree
+# SAME-ORIGIN from the Pages site under /demo/data/. This workflow runs on
+# a release tag (not on push-to-main) and does not build the Pages site, so
+# it cannot write the Pages artifact directly. Instead it exposes the
+# pruned tree two ways:
+#   * a Release asset `default-db-<db_version>.tar.gz` (download / archival;
+#     usable cross-origin only by the single-thread demo, which needs no
+#     COEP), and
+#   * a workflow artifact `default-db-parquet` that ci.yml's Pages `docs`
+#     job (or a maintainer) can download and copy into
+#     target/doc/demo/data/<db_version>/ on the next Pages deploy, giving
+#     the demo a same-origin `/demo/data/<db_version>/...` URL that works
+#     under COEP with no extra headers.
 #
 # Inputs:
 #   tag         — the release tag to attach the artifact to (e.g. v0.1.0).
@@ -46,7 +94,7 @@ concurrency:
 jobs:
   package:
     name: Package default-DB (${{ github.event.inputs.db_version }}) for ${{ github.event.inputs.tag }}
-    runs-on: [self-hosted, apptainer, fakeroot]
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
 
@@ -69,10 +117,15 @@ jobs:
           --bin moves-default-db-convert
           --bin moves-default-db-validate
 
+      # Builds the canonical-MOVES SIF (Apptainer + fakeroot) on the hosted
+      # runner. The composite action installs Apptainer, restores/saves the
+      # shared SIF cache, points APPTAINER_TMPDIR/CACHEDIR at a build
+      # scratch dir, lifts the ubuntu-24.04 AppArmor userns restriction so
+      # `--fakeroot` works, and runs build-sif.sh — leaving the image at
+      # characterization/apptainer/canonical-moves.sif. build-sif.sh is a
+      # no-op if the lockfile already matches, so cache hits make this fast.
       - name: Build canonical-MOVES SIF (cache-first)
-        # build-sif.sh is a no-op if the lockfile already points at a
-        # built SIF image, so this step is fast on repeated runs.
-        run: characterization/apptainer/build-sif.sh
+        uses: ./.github/actions/build-sif
 
       # convert-default-db.sh runs Stage 1 (dump inside the SIF) and
       # Stage 2 (TSV → Parquet via moves-default-db-convert) in one call.
@@ -115,3 +168,42 @@ jobs:
           gh release upload "${{ github.event.inputs.tag }}" \
             "${ARCHIVE}" \
             --clobber
+
+      # ── Demo-friendly publish ────────────────────────────────────────────
+      # Stage a pruned copy of the tree (manifest.json + the Parquet
+      # partitions, WITHOUT the bulky intermediate _tsv/ dump) and upload it
+      # as the `default-db-parquet` workflow artifact. This is the default DB
+      # itself, not a precomputed snapshot: it is the foundation for running
+      # ARBITRARY RunSpecs in the browser (epic mo-znp). A follow-up
+      # (mo-znp.5) lays it out as a partition-fetchable tree under the Pages
+      # /demo/data/<db_version>/ path (same-origin, no CORS) so the demo can
+      # fetch only the partitions a RunSpec needs. Nothing consumes it yet.
+      - name: Stage demo Parquet subset (drop intermediate _tsv/)
+        env:
+          DB_VERSION: ${{ github.event.inputs.db_version }}
+        run: |
+          DEMO_DIR="demo-data/${DB_VERSION}"
+          rm -rf demo-data
+          mkdir -p "${DEMO_DIR}"
+          # Copy everything except the _tsv/ intermediate dump.
+          rsync -a --exclude '_tsv/' "default-db/${DB_VERSION}/" "${DEMO_DIR}/"
+          echo "[demo] Parquet subset staged at ${DEMO_DIR}:"
+          du -sh "${DEMO_DIR}"
+          {
+            echo "### Default-DB Parquet published"
+            echo ""
+            echo "- DB version: \`${DB_VERSION}\`"
+            echo "- Release asset: \`${ARCHIVE}\` on tag \`${{ github.event.inputs.tag }}\` (cross-origin; usable by the single-thread demo only — the COEP/require-corp multi-thread build blocks cross-origin fetches without a CORP header)."
+            echo "- Workflow artifact: \`default-db-parquet\` (pruned tree, no \`_tsv/\`)."
+            echo ""
+            echo "**Demo fetch (recommended):** fold the \`default-db-parquet\` artifact into \`target/doc/demo/data/${DB_VERSION}/\` during the Pages deploy (ci.yml \`docs\` job) so the demo can fetch it **same-origin** at \`/demo/data/${DB_VERSION}/...\`. A same-origin Pages path is COEP-compatible with no \`Cross-Origin-Resource-Policy\` header; see docs/wasm-threading.md."
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload demo Parquet subset artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: default-db-parquet
+          path: demo-data/${{ github.event.inputs.db_version }}
+          if-no-files-found: error
+          retention-days: 7
+

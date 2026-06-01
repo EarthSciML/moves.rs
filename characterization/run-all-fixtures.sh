@@ -9,7 +9,7 @@
 # Usage:
 #   ./run-all-fixtures.sh [-f|--fakeroot] [--include PATTERN] [--exclude PATTERN]
 #                         [--keep-going] [--sif PATH] [--workdir-root DIR]
-#                         [--output-root DIR] [--list]
+#                         [--output-root DIR] [--list] [--shard I/N]
 #
 # Options:
 #   -f, --fakeroot        Forwarded to run-fixture.sh (Apptainer --fakeroot mode).
@@ -22,6 +22,9 @@
 #   --output-root DIR     Per-fixture snapshot parent (default: ../snapshots).
 #   --keep-going          Continue after failed fixtures (default: stop on first).
 #   --list                Print the resolved fixture list and exit.
+#   --shard I/N           Run only shard I of N (1-based), round-robin over the
+#                         resolved fixture list. The union of shards 1..N equals
+#                         an unsharded run. Used by the CI matrix to parallelize.
 #   -h, --help            This message.
 #
 # Exit code:
@@ -52,6 +55,7 @@ USE_FAKEROOT=0
 SIF=""
 KEEP_GOING=0
 LIST_ONLY=0
+SHARD=""          # "I/N" — run only shard I of N (1-based). Empty = all.
 WORKDIR_ROOT=""
 OUTPUT_ROOT="${HERE}/snapshots"
 declare -a INCLUDES=()
@@ -79,6 +83,7 @@ while [ $# -gt 0 ]; do
         --workdir-root)   WORKDIR_ROOT="$2"; shift ;;
         --output-root)    OUTPUT_ROOT="$2"; shift ;;
         --list)           LIST_ONLY=1 ;;
+        --shard)          SHARD="$2"; shift ;;
         -h|--help)        usage; exit 0 ;;
         *)
             echo "FATAL: unknown argument $1" >&2
@@ -129,13 +134,47 @@ while IFS= read -r -d '' xml; do
     elif [ "${#INCLUDES[@]}" -eq 0 ]; then
         # No explicit filter — apply default skips.
         if matches_any "$name" "${SKIP_BY_DEFAULT[@]}"; then
-            echo "[run-all] skipping ${name} (needs additional input DB; pass --include ${name})"
+            echo "[run-all] skipping ${name} (needs additional input DB; pass --include ${name})" >&2
             continue
         fi
     fi
 
     FIXTURES+=("$xml")
 done < <(find "${FIXTURES_DIR}" -maxdepth 1 -type f -name '*.xml' -print0 | sort -z)
+
+# ----- Optional sharding (--shard I/N) -------------------------------------
+# Partition the resolved fixture list across N shards so a CI matrix can run
+# the suite in parallel. The partition is applied AFTER include/exclude/
+# default-skip resolution, so the union of all N shards is exactly the set
+# that an unsharded run would execute (no fixture dropped, none doubled).
+#
+# Assignment is round-robin (stride N): fixture at sorted index k (0-based)
+# goes to shard (k % N) + 1. Round-robin — rather than contiguous blocks —
+# spreads the heavier fixtures (the grouped nr-* NONROAD and expand-* multi-
+# county/month runs, which sort adjacently) evenly across shards instead of
+# piling them into one.
+if [ -n "${SHARD}" ]; then
+    if ! [[ "${SHARD}" =~ ^[0-9]+/[0-9]+$ ]]; then
+        echo "FATAL: --shard must be I/N (e.g. 1/5), got: ${SHARD}" >&2
+        exit 2
+    fi
+    SHARD_I="${SHARD%/*}"
+    SHARD_N="${SHARD#*/}"
+    if [ "${SHARD_N}" -lt 1 ] || [ "${SHARD_I}" -lt 1 ] || [ "${SHARD_I}" -gt "${SHARD_N}" ]; then
+        echo "FATAL: --shard I/N requires 1 <= I <= N and N >= 1, got: ${SHARD}" >&2
+        exit 2
+    fi
+    declare -a SHARDED=()
+    k=0
+    for f in "${FIXTURES[@]}"; do
+        if [ "$(( k % SHARD_N + 1 ))" -eq "${SHARD_I}" ]; then
+            SHARDED+=("$f")
+        fi
+        k=$((k + 1))
+    done
+    FIXTURES=("${SHARDED[@]+"${SHARDED[@]}"}")
+    echo "[run-all] shard ${SHARD_I}/${SHARD_N}: ${#FIXTURES[@]} of ${k} resolved fixture(s)" >&2
+fi
 
 if [ "${#FIXTURES[@]}" -eq 0 ]; then
     echo "[run-all] no fixtures selected — nothing to do." >&2
