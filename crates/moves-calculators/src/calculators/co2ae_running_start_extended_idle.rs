@@ -730,15 +730,22 @@ impl TableRow for Co2EqPollutantRow {
         };
         let poll = get_i32("pollutantID")?;
         let gwp = get_i32("globalWarmingPotential")?;
+        // The SQL extracts `Pollutant` filtered to a non-null, strictly-positive
+        // `globalWarmingPotential` (only CO2-equivalent species — CO2, CH4, N2O
+        // — carry one; every other pollutant row has NULL). The port reads the
+        // raw `Pollutant` table, so apply that WHERE clause here: skip rows whose
+        // `globalWarmingPotential` is NULL or non-positive rather than erroring.
         (0..df.height())
-            .map(|i| {
-                let null = |col: &'static str| row_err(t, i, col, "null value".into());
-                Ok(Co2EqPollutantRow {
-                    pollutant_id: poll.get(i).ok_or_else(|| null("pollutantID"))?,
-                    global_warming_potential: gwp
-                        .get(i)
-                        .ok_or_else(|| null("globalWarmingPotential"))?,
-                })
+            .filter_map(|i| {
+                let pollutant_id = poll.get(i)?;
+                let g = gwp.get(i)?;
+                if g <= 0 {
+                    return None;
+                }
+                Some(Ok(Co2EqPollutantRow {
+                    pollutant_id,
+                    global_warming_potential: g,
+                }))
             })
             .collect()
     }

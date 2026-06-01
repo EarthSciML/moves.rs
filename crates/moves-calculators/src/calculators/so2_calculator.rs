@@ -678,7 +678,14 @@ impl TableRow for FuelSubTypeRow {
                 Ok(FuelSubTypeRow {
                     fuel_sub_type_id: sub_type.get(i).ok_or_else(|| null("fuelSubTypeID"))?,
                     fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
-                    energy_content: energy.get(i).ok_or_else(|| null("energyContent"))?,
+                    // `energyContent` is NULL for non-combustion subtypes
+                    // (e.g. electricity). In MOVES `SO2FuelCalculation1`
+                    // computes `SUM(marketShare * energyContent)`, where a
+                    // NULL term contributes nothing to the SUM. Those rows are
+                    // also excluded by the downstream FuelType join, so reading
+                    // NULL as 0.0 reproduces the SQL exactly while keeping the
+                    // reader total. See `build_fuel_calc1` (line ~1636).
+                    energy_content: energy.get(i).unwrap_or(0.0),
                 })
             })
             .collect()
@@ -1120,6 +1127,143 @@ impl TableRow for GeneralFuelRatioRow {
     }
 }
 
+/// Raw `generalFuelRatio` runtime-table row — the columns the SO2 SQL reads
+/// *before* pre-aggregating them into `so2PMOneCountyYearGeneralFuelRatio`.
+///
+/// The default-DB snapshot carries this raw runtime table (with model-year and
+/// age *ranges* and no `monthID` / `yearID`), not the pre-aggregated extract
+/// [`GeneralFuelRatioRow`] models. The port therefore reads these rows and
+/// synthesizes the extract in [`synthesize_general_fuel_ratio`]. Only the
+/// columns the synthesis needs are modelled; the GPA / age columns are read but
+/// folded in per the simplifications documented on the synthesis function.
+#[derive(Debug, Clone, Copy)]
+struct RawGeneralFuelRatioRow {
+    fuel_type_id: i32,
+    source_type_id: i32,
+    fuel_formulation_id: i32,
+    pollutant_id: i32,
+    process_id: i32,
+    min_model_year_id: i32,
+    max_model_year_id: i32,
+    fuel_effect_ratio: Option<f64>,
+}
+
+impl TableRow for RawGeneralFuelRatioRow {
+    fn table_name() -> &'static str {
+        "GeneralFuelRatio"
+    }
+
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("fuelTypeID".into(), DataType::Int32),
+            ("sourceTypeID".into(), DataType::Int32),
+            ("fuelFormulationID".into(), DataType::Int32),
+            ("pollutantID".into(), DataType::Int32),
+            ("processID".into(), DataType::Int32),
+            ("minModelYearID".into(), DataType::Int32),
+            ("maxModelYearID".into(), DataType::Int32),
+            ("fuelEffectRatio".into(), DataType::Float64),
+        ])
+    }
+
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "fuelTypeID".into(),
+                    rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelFormulationID".into(),
+                    rows.iter()
+                        .map(|r| r.fuel_formulation_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "pollutantID".into(),
+                    rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "processID".into(),
+                    rows.iter().map(|r| r.process_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "minModelYearID".into(),
+                    rows.iter()
+                        .map(|r| r.min_model_year_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "maxModelYearID".into(),
+                    rows.iter()
+                        .map(|r| r.max_model_year_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelEffectRatio".into(),
+                    rows.iter()
+                        .map(|r| r.fuel_effect_ratio)
+                        .collect::<Vec<Option<f64>>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "GeneralFuelRatio";
+        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let fuel_type = get_i32("fuelTypeID")?;
+        let source_type = get_i32("sourceTypeID")?;
+        let formulation = get_i32("fuelFormulationID")?;
+        let pollutant = get_i32("pollutantID")?;
+        let process = get_i32("processID")?;
+        let min_my = get_i32("minModelYearID")?;
+        let max_my = get_i32("maxModelYearID")?;
+        let ratio = df
+            .column("fuelEffectRatio")
+            .map_err(|e| row_err(t, 0, "fuelEffectRatio", e.to_string()))?
+            .f64()
+            .map_err(|e| row_err(t, 0, "fuelEffectRatio", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(RawGeneralFuelRatioRow {
+                    fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
+                    source_type_id: source_type.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                    fuel_formulation_id: formulation
+                        .get(i)
+                        .ok_or_else(|| null("fuelFormulationID"))?,
+                    pollutant_id: pollutant.get(i).ok_or_else(|| null("pollutantID"))?,
+                    process_id: process.get(i).ok_or_else(|| null("processID"))?,
+                    min_model_year_id: min_my.get(i).ok_or_else(|| null("minModelYearID"))?,
+                    max_model_year_id: max_my.get(i).ok_or_else(|| null("maxModelYearID"))?,
+                    // `fuelEffectRatio` is NULL → 1 (the SQL's `ifnull(...,1)`).
+                    fuel_effect_ratio: ratio.get(i),
+                })
+            })
+            .collect()
+    }
+}
+
 impl TableRow for EnergyRow {
     fn table_name() -> &'static str {
         "MOVESWorkerOutput"
@@ -1509,6 +1653,110 @@ type FuelEffectRatioIndex = HashMap<(i32, i32, i32, i32, i32, i32, i32), f64>;
 // Data-plane helpers — canonical bucket-A wiring pattern (pilot).
 // ===========================================================================
 
+/// Synthesize the `so2PMOneCountyYearGeneralFuelRatio` extract from the raw
+/// runtime `generalFuelRatio` table.
+///
+/// The SQL pre-aggregates `generalFuelRatio` (a model-year / age *range* table
+/// with no `monthID`) into a per-`(fuelType, sourceType, month, pollutant,
+/// process, modelYear, year)` cell carrying a market-share-weighted
+/// `fuelEffectRatio`:
+///
+/// ```sql
+/// sum((ifnull(fuelEffectRatio,1)
+///      + GPAFract*(ifnull(fuelEffectRatioGPA,1) - ifnull(fuelEffectRatio,1)))
+///     * marketShare)
+/// ```
+///
+/// grouped over the run-spec model years, fuel-supply formulations, and months.
+/// SO2 (pollutant 31) carries **no** `generalFuelRatio` rows in standard MOVES
+/// data — sulfur is handled directly via the fuel sulfur level — so the extract
+/// is empty and the SO2 fuel-effect multiplier defaults to 1. The synthesis
+/// reproduces that exactly (empty in, empty out) and, for the rare non-empty
+/// case, the market-share-weighted blend, under three simplifications that hold
+/// for the available fixtures and are noted here: `GPAFract = 0` (so the GPA
+/// term drops and the blend reduces to `fuelEffectRatio * marketShare`), all
+/// ages within a `generalFuelRatio` row's `[minAgeID, maxAgeID]` window are
+/// admitted, and every `FuelSupply` row is taken as belonging to the run's fuel
+/// year.
+fn synthesize_general_fuel_ratio(
+    ctx: &CalculatorContext,
+    year: Option<i32>,
+    process_id: Option<i32>,
+) -> Result<Vec<GeneralFuelRatioRow>, Error> {
+    let tables = ctx.tables();
+    let raw: Vec<RawGeneralFuelRatioRow> = tables
+        .iter_typed::<RawGeneralFuelRatioRow>("GeneralFuelRatio")?
+        .into_iter()
+        .filter(|r| {
+            r.pollutant_id == i32::from(SO2_POLLUTANT.0)
+                && process_id.is_none_or(|p| r.process_id == p)
+        })
+        .collect();
+    // No SO2 fuel-effect rows (the universal case) → empty extract, multiplier 1.
+    let (false, Some(year)) = (raw.is_empty(), year) else {
+        return Ok(Vec::new());
+    };
+
+    let fuel_supply = tables.iter_typed::<FuelSupplyRow>("FuelSupply")?;
+    let model_years: Vec<i32> = tables
+        .iter_typed::<RunSpecModelYearIdRow>("RunSpecModelYear")?
+        .into_iter()
+        .map(|r| r.model_year_id)
+        .collect();
+    let mut months_of_group: HashMap<i32, Vec<i32>> = HashMap::new();
+    for m in tables.iter_typed::<MonthGroupRow>("MonthOfAnyYear")? {
+        months_of_group
+            .entry(m.month_group_id)
+            .or_default()
+            .push(m.month_id);
+    }
+
+    let mut acc: HashMap<(i32, i32, i32, i32, i32, i32, i32), f64> = HashMap::new();
+    for gfr in &raw {
+        for fs in &fuel_supply {
+            if fs.fuel_formulation_id != gfr.fuel_formulation_id {
+                continue;
+            }
+            let Some(month_ids) = months_of_group.get(&fs.month_group_id) else {
+                continue;
+            };
+            for &model_year in &model_years {
+                if model_year < gfr.min_model_year_id || model_year > gfr.max_model_year_id {
+                    continue;
+                }
+                for &month_id in month_ids {
+                    let key = (
+                        gfr.fuel_type_id,
+                        gfr.source_type_id,
+                        month_id,
+                        gfr.pollutant_id,
+                        gfr.process_id,
+                        model_year,
+                        year,
+                    );
+                    // GPAFract = 0 → blend reduces to fuelEffectRatio * marketShare.
+                    *acc.entry(key).or_default() +=
+                        gfr.fuel_effect_ratio.unwrap_or(1.0) * fs.market_share;
+                }
+            }
+        }
+    }
+
+    Ok(acc
+        .into_iter()
+        .map(|((ft, st, mo, po, pr, my, yr), ratio)| GeneralFuelRatioRow {
+            fuel_type_id: ft,
+            source_type_id: st,
+            month_id: mo,
+            pollutant_id: po,
+            process_id: pr,
+            model_year_id: my,
+            year_id: yr,
+            fuel_effect_ratio: ratio,
+        })
+        .collect())
+}
+
 /// Read all SO2 input tables from `ctx.tables()`.
 ///
 /// Position filtering uses [`crate::wiring::position_filter`] to extract the
@@ -1550,7 +1798,7 @@ fn build_inputs(ctx: &CalculatorContext) -> Result<So2Inputs, Error> {
             .map(|r| r.model_year_id)
             .collect(),
         month_of_any_year: tables.iter_typed::<MonthGroupRow>("MonthOfAnyYear")?,
-        general_fuel_ratio: tables.iter_typed::<GeneralFuelRatioRow>("GeneralFuelRatio")?,
+        general_fuel_ratio: synthesize_general_fuel_ratio(ctx, filter.year, filter.process_id)?,
         energy: {
             let rows = tables.iter_typed::<EnergyRow>("MOVESWorkerOutput")?;
             rows.into_iter()
@@ -2348,9 +2596,14 @@ mod tests {
             "MonthOfAnyYear",
             MonthGroupRow::into_dataframe(inputs.month_of_any_year).unwrap(),
         );
+        // `build_inputs` synthesizes the `so2PMOneCountyYearGeneralFuelRatio`
+        // extract from the raw runtime `generalFuelRatio` table, so insert that
+        // raw shape. Empty here → no SO2 fuel-effect rows → multiplier 1, which
+        // matches `inputs.general_fuel_ratio` being empty for the minimal case.
+        let _ = inputs.general_fuel_ratio;
         store.insert(
             "GeneralFuelRatio",
-            GeneralFuelRatioRow::into_dataframe(inputs.general_fuel_ratio).unwrap(),
+            RawGeneralFuelRatioRow::into_dataframe(vec![]).unwrap(),
         );
         store.insert(
             "MOVESWorkerOutput",

@@ -419,16 +419,21 @@ impl CrankcaseEmissionCalculator {
  // regClassID, fuelTypeID) → ratio rows. The table's primary key
  // includes the model-year range, so a cell may carry several rows;
  // the per-row model-year test below picks the matching one(s).
-        let mut ratio_index: HashMap<(i32, i32, i32, i32), Vec<&CrankcaseEmissionRatioRow>> =
+        // Index by (polProcessID, sourceTypeID, fuelTypeID) — regClassID is
+        // reconciled at the join site below rather than baked into the key.
+        // BaseRate collapses `regClassID` to 0 in `MOVESWorkerOutput` when the
+        // RunSpec does not break output down by reg class (canonical
+        // `baseRateOutput` / `MOVESOutput` carry NULL regClass too), but the
+        // `CrankcaseEmissionRatio` table carries concrete per-reg-class rows.
+        // A literal regClass-equality join would therefore never match a
+        // collapsed worker row. Mirroring the RefuelingLoss / SulfatePM
+        // reconciliation, the regClass is carried on the value and enforced
+        // only when the worker row's regClass is itself non-zero.
+        let mut ratio_index: HashMap<(i32, i32, i32), Vec<&CrankcaseEmissionRatioRow>> =
             HashMap::new();
         for r in &inputs.crankcase_emission_ratio {
             ratio_index
-                .entry((
-                    r.pol_process_id,
-                    r.source_type_id,
-                    r.reg_class_id,
-                    r.fuel_type_id,
-                ))
+                .entry((r.pol_process_id, r.source_type_id, r.fuel_type_id))
                 .or_default()
                 .push(r);
         }
@@ -449,15 +454,17 @@ impl CrankcaseEmissionCalculator {
             };
  // INNER JOIN r ON polProcessID, sourceTypeID, regClassID,
  // fuelTypeID.
-            let Some(ratios) = ratio_index.get(&(
-                pol_process_id,
-                mwo.source_type_id,
-                mwo.reg_class_id,
-                mwo.fuel_type_id,
-            )) else {
+            let Some(ratios) =
+                ratio_index.get(&(pol_process_id, mwo.source_type_id, mwo.fuel_type_id))
+            else {
                 continue;
             };
             for r in ratios {
+ // regClass reconciliation: a non-zero worker regClass must match the
+ // ratio row's; a zero (collapsed) worker regClass is a wildcard.
+                if mwo.reg_class_id != 0 && r.reg_class_id != mwo.reg_class_id {
+                    continue;
+                }
  // … and r.minModelYearID <= mwo.modelYearID <= r.maxModelYearID.
                 if mwo.model_year_id < r.min_model_year_id
                     || mwo.model_year_id > r.max_model_year_id
@@ -1115,11 +1122,14 @@ impl TableRow for CrankcasePollutantProcessAssocRow {
 fn build_inputs(ctx: &CalculatorContext) -> Result<CrankcaseInputs, Error> {
     let tables = ctx.tables();
     let filter = crate::wiring::position_filter(ctx);
+    let crankcase_emission_ratio =
+        tables.iter_typed::<CrankcaseEmissionRatioRow>("CrankcaseEmissionRatio")?;
     Ok(CrankcaseInputs {
-        crankcase_emission_ratio: tables
-            .iter_typed::<CrankcaseEmissionRatioRow>("CrankcaseEmissionRatio")?,
-        crankcase_pollutant_process_assoc: tables
-            .iter_typed::<CrankcasePollutantProcessAssocRow>("CrankcasePollutantProcessAssoc")?,
+        crankcase_pollutant_process_assoc: synthesize_crankcase_ppa(
+            ctx,
+            &crankcase_emission_ratio,
+        )?,
+        crankcase_emission_ratio,
         worker_output: {
             let rows = tables.iter_typed::<MovesWorkerOutputRow>("MOVESWorkerOutput")?;
             rows.into_iter()
@@ -1127,6 +1137,43 @@ fn build_inputs(ctx: &CalculatorContext) -> Result<CrankcaseInputs, Error> {
                 .collect()
         },
     })
+}
+
+/// Synthesize the `##prefix##CrankcasePollutantProcessAssoc` extract.
+///
+/// The default-DB snapshot carries the full `PollutantProcessAssoc` table but
+/// not the per-prefix crankcase extract, which the SQL builds with:
+///
+/// ```sql
+/// select distinct ppa.polProcessID, ppa.processID, ppa.pollutantID
+/// from PollutantProcessAssoc ppa
+/// inner join CrankcaseEmissionRatio c on (c.polProcessID = ppa.polProcessID)
+/// ...
+/// ```
+///
+/// i.e. the `(polProcessID, processID, pollutantID)` rows of
+/// `PollutantProcessAssoc` whose `polProcessID` appears in the (already
+/// model-year / source-fuel narrowed) `CrankcaseEmissionRatio` extract. The
+/// port reads the full `CrankcaseEmissionRatio` and applies the model-year
+/// window per row in [`CrankcaseEmissionCalculator::calculate`], so restricting
+/// the association to the ratio rows' distinct `polProcessID`s reproduces the
+/// extract exactly.
+fn synthesize_crankcase_ppa(
+    ctx: &CalculatorContext,
+    crankcase_emission_ratio: &[CrankcaseEmissionRatioRow],
+) -> Result<Vec<CrankcasePollutantProcessAssocRow>, Error> {
+    let ratio_pol_procs: std::collections::HashSet<i32> = crankcase_emission_ratio
+        .iter()
+        .map(|r| r.pol_process_id)
+        .collect();
+    let ppa = ctx
+        .tables()
+        .iter_typed::<CrankcasePollutantProcessAssocRow>("PollutantProcessAssoc")?;
+    let mut seen = std::collections::HashSet::new();
+    Ok(ppa
+        .into_iter()
+        .filter(|r| ratio_pol_procs.contains(&r.pol_process_id) && seen.insert(r.pol_process_id))
+        .collect())
 }
 
 /// Convert crankcase output rows to a [`CalculatorOutput`] carrying the
@@ -1592,8 +1639,11 @@ mod tests {
             "CrankcaseEmissionRatio",
             CrankcaseEmissionRatioRow::into_dataframe(inputs.crankcase_emission_ratio).unwrap(),
         );
+        // The port synthesizes the crankcase association from the full
+        // `PollutantProcessAssoc` table (filtered to the ratio rows'
+        // polProcessIDs), so insert the rows under that name.
         store.insert(
-            "CrankcasePollutantProcessAssoc",
+            "PollutantProcessAssoc",
             CrankcasePollutantProcessAssocRow::into_dataframe(
                 inputs.crankcase_pollutant_process_assoc,
             )
@@ -1651,8 +1701,11 @@ mod tests {
             "CrankcaseEmissionRatio",
             CrankcaseEmissionRatioRow::into_dataframe(inputs.crankcase_emission_ratio).unwrap(),
         );
+        // The port synthesizes the crankcase association from the full
+        // `PollutantProcessAssoc` table (filtered to the ratio rows'
+        // polProcessIDs), so insert the rows under that name.
         store.insert(
-            "CrankcasePollutantProcessAssoc",
+            "PollutantProcessAssoc",
             CrankcasePollutantProcessAssocRow::into_dataframe(
                 inputs.crankcase_pollutant_process_assoc,
             )
