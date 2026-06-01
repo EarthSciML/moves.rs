@@ -2,14 +2,14 @@
 //!
 //! Output convention matches `moves-default-db-convert::parquet_writer`
 //! so importer-emitted Parquet sits next to default-DB Parquet and the
-//! Phase 4 Task 82 lazy reader can scan either:
+//! lazy reader can scan either:
 //!
 //! * Uncompressed; no dictionary; no statistics; `PARQUET_1_0` writer
-//!   version. Byte-stable for a fixed input.
+//! version. Byte-stable for a fixed input.
 //! * Atomic write via `.tmp` rename so a crash mid-write never leaves
-//!   a torn Parquet file in the output tree.
+//! a torn Parquet file in the output tree.
 //! * SHA-256 over the file bytes, returned alongside row count for the
-//!   import manifest.
+//! import manifest.
 
 use std::path::{Path, PathBuf};
 

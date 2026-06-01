@@ -1,6 +1,5 @@
 //! Port of `CO2EqivalentWTPCalculator.java` and
-//! `database/CO2EqivalentWTPCalculator.sql` — migration plan Phase 3,
-//! Task 69.
+//! `database/CO2EqivalentWTPCalculator.sql` —.//!.
 //!
 //! `CO2EqivalentWTPCalculator` computes **well-to-pump (upstream) CO2
 //! equivalent** — the climate-impact-weighted sum of the well-to-pump
@@ -17,9 +16,9 @@
 //! `CalculatorInfo.txt`, and `characterization/calculator-chains/calculator-dag.json`
 //! records `CO2EqivalentWTPCalculator` with `registrations_count: 0`,
 //! `subscriptions: []` and `depends_on: []`. The modern base-rate engine
-//! (`BaseRateCalculator`, migration-plan Task 45) absorbed the per-pollutant
-//! scripted-SQL calculators; the migration plan still lists this class as part
-//! of Task 69, so the module ports its algorithm faithfully for reference and
+//! (`BaseRateCalculator`, ) absorbed the per-pollutant
+//! scripted-SQL calculators; the still lists this class as part
+//! of, so the module ports its algorithm faithfully for reference and
 //! cross-validation with [`Calculator::registrations`] returning an empty
 //! slice. See [`super::common`] for the cluster's shared infrastructure.
 //!
@@ -74,7 +73,7 @@
 //!
 //! [`calculate`](Co2EquivalentWtpCalculator::calculate) is the SQL
 //! "Processing" section. Its [`Co2EquivalentWtpInputs`] argument is the set of
-//! tables the SQL extracts, as plain row vectors; a future Task 50
+//! tables the SQL extracts, as plain row vectors; a future
 //! (`DataFrameStore`) wiring populates it from the per-run filtered execution
 //! database — in particular [`Co2EquivalentWtpInputs::worker_output`] carries
 //! the process-99 rows the other three WTP calculators write back.
@@ -86,13 +85,13 @@
 //! pollutant is not requested). That is execution-gating, reproduced by
 //! `calculate` filtering input records to the well-to-pump process and
 //! returning no rows on empty input, matching the `SO2Calculator` precedent.
-//! `MOVESRunID` and `SCC` are pass-through columns left to the Task 50 wiring.
+//! `MOVESRunID` and `SCC` are pass-through columns left to the wiring.
 //!
-//! # Data plane (Task 50)
+//! # Data plane
 //!
 //! [`Calculator::execute`] receives a [`CalculatorContext`] whose execution
-//! tables and scratch namespace are Phase 2 placeholders until the
-//! `DataFrameStore` lands (migration-plan Task 50), so `execute` cannot yet
+//! tables and scratch namespace are placeholders until the
+//! `DataFrameStore` lands (), so `execute` cannot yet
 //! read `MOVESWorkerOutput` nor write the CO2-equivalent rows back. The
 //! numeric algorithm is fully ported and unit-tested on
 //! [`calculate`](Co2EquivalentWtpCalculator::calculate); `execute` is a
@@ -142,9 +141,9 @@ const EQUIVALENT_CO2_INPUT_POLLUTANT_IDS: [i32; 3] = [5, 6, 90];
 /// 6) always carry a populated `SMALLINT` potential in real data.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PollutantGwpRow {
-    /// `pollutantID`.
+ /// `pollutantID`.
     pub pollutant_id: i32,
-    /// `globalWarmingPotential` — the `SMALLINT` climate-impact multiplier.
+ /// `globalWarmingPotential` — the `SMALLINT` climate-impact multiplier.
     pub global_warming_potential: i32,
 }
 
@@ -205,16 +204,16 @@ impl TableRow for PollutantGwpRow {
 /// Inputs to [`Co2EquivalentWtpCalculator::calculate`] — the tables the SQL's
 /// "Extract Data" section produces, as plain row vectors.
 ///
-/// A future Task 50 (`DataFrameStore`) wiring populates this from the per-run
+/// A future (`DataFrameStore`) wiring populates this from the per-run
 /// filtered execution database; until then it is the explicit data-plane
 /// contract the unit tests build directly.
 #[derive(Debug, Clone, Default)]
 pub struct Co2EquivalentWtpInputs {
-    /// `MOVESWorkerOutput` rows. The calculation reads the well-to-pump
-    /// atmospheric CO2, methane and nitrous oxide records (the process-99
-    /// output of the other three WTP calculators); any other row is ignored.
+ /// `MOVESWorkerOutput` rows. The calculation reads the well-to-pump
+ /// atmospheric CO2, methane and nitrous oxide records (the process-99
+ /// output of the other three WTP calculators); any other row is ignored.
     pub worker_output: Vec<WorkerOutputRow>,
-    /// `Pollutant` rows — the `pollutantID → globalWarmingPotential` mapping.
+ /// `Pollutant` rows — the `pollutantID → globalWarmingPotential` mapping.
     pub pollutant_gwp: Vec<PollutantGwpRow>,
 }
 
@@ -235,10 +234,10 @@ struct GroupKey {
     county_id: i32,
     zone_id: i32,
     link_id: i32,
-    /// `mwo.processID` — a `GROUP BY` axis, carried through to the output row.
+ /// `mwo.processID` — a `GROUP BY` axis, carried through to the output row.
     process_id: i32,
-    /// The source pollutant — a `GROUP BY` axis; the output row is stamped
-    /// with CO2 equivalent regardless.
+ /// The source pollutant — a `GROUP BY` axis; the output row is stamped
+ /// with CO2 equivalent regardless.
     source_pollutant_id: i32,
     source_type_id: i32,
     fuel_type_id: i32,
@@ -255,18 +254,18 @@ struct GroupKey {
 pub struct Co2EquivalentWtpCalculator;
 
 impl Co2EquivalentWtpCalculator {
-    /// Stable module name — matches the Java class and the chain-DAG entry.
+ /// Stable module name — matches the Java class and the chain-DAG entry.
     pub const NAME: &'static str = CALCULATOR_NAME;
 
-    /// Compute the well-to-pump CO2-equivalent rows — the port of
-    /// `CO2EqivalentWTPCalculator.sql`.
-    ///
-    /// Returns no rows when the inputs carry no usable records: a record
-    /// contributes only if it is a well-to-pump (process 99) atmospheric CO2,
-    /// methane or nitrous oxide row and its pollutant resolves a global
-    /// warming potential — the SQL `INNER JOIN`. The result is ordered by its
-    /// `GROUP BY` cell for deterministic output; MOVES leaves
-    /// `MOVESWorkerOutput` physically unordered.
+ /// Compute the well-to-pump CO2-equivalent rows — the port of
+ /// `CO2EqivalentWTPCalculator.sql`.
+ ///
+ /// Returns no rows when the inputs carry no usable records: a record
+ /// contributes only if it is a well-to-pump (process 99) atmospheric CO2,
+ /// methane or nitrous oxide row and its pollutant resolves a global
+ /// warming potential — the SQL `INNER JOIN`. The result is ordered by its
+ /// `GROUP BY` cell for deterministic output; MOVES leaves
+ /// `MOVESWorkerOutput` physically unordered.
     #[must_use]
     pub fn calculate(&self, inputs: &Co2EquivalentWtpInputs) -> Vec<WorkerOutputRow> {
         let gwp: HashMap<i32, i32> = inputs
@@ -275,19 +274,19 @@ impl Co2EquivalentWtpCalculator {
             .map(|p| (p.pollutant_id, p.global_warming_potential))
             .collect();
 
-        // emissionQuant = Σ (emission × globalWarmingPotential), grouped by
-        // the output dimension including the source pollutant and process.
+ // emissionQuant = Σ (emission × globalWarmingPotential), grouped by
+ // the output dimension including the source pollutant and process.
         let mut groups: BTreeMap<GroupKey, f64> = BTreeMap::new();
         for record in &inputs.worker_output {
-            // mwo.pollutantID IN (90, 5, 6).
+ // mwo.pollutantID IN (90, 5, 6).
             if !EQUIVALENT_CO2_INPUT_POLLUTANT_IDS.contains(&record.pollutant_id) {
                 continue;
             }
-            // ##CO2Step2EqprocessIDs## — mwo.processID IN (99).
+ // ##CO2Step2EqprocessIDs## — mwo.processID IN (99).
             if record.process_id != WELL_TO_PUMP_PROCESS_ID {
                 continue;
             }
-            // INNER JOIN CO2EqWTPStep2Pollutant ON mwo.pollutantID.
+ // INNER JOIN CO2EqWTPStep2Pollutant ON mwo.pollutantID.
             let Some(&potential) = gwp.get(&record.pollutant_id) else {
                 continue;
             };
@@ -307,7 +306,7 @@ impl Co2EquivalentWtpCalculator {
                 model_year_id: record.model_year_id,
                 road_type_id: record.road_type_id,
             };
-            *groups.entry(key).or_insert(0.0) += record.emission_quant * f64::from(potential);
+ *groups.entry(key).or_insert(0.0) += record.emission_quant * f64::from(potential);
         }
 
         groups
@@ -333,8 +332,7 @@ impl Co2EquivalentWtpCalculator {
     }
 }
 
-/// `CO2EqivalentWTPCalculator` is a chained calculator —
-/// `subscribes_directly: false` in `calculator-dag.json` — so it declares no
+/// `CO2EqivalentWTPCalculator` is a chained calculator/// `subscribes_directly: false` in `calculator-dag.json` — so it declares no
 /// MasterLoop subscription.
 static NO_SUBSCRIPTIONS: &[CalculatorSubscription] = &[];
 
@@ -351,16 +349,16 @@ impl Calculator for Co2EquivalentWtpCalculator {
         Self::NAME
     }
 
-    /// `CO2EqivalentWTPCalculator` is a chained calculator: it does not
-    /// subscribe to the MasterLoop directly. `calculator-dag.json` records
-    /// `subscribes_directly: false` and an empty `subscriptions` list.
+ /// `CO2EqivalentWTPCalculator` is a chained calculator: it does not
+ /// subscribe to the MasterLoop directly. `calculator-dag.json` records
+ /// `subscribes_directly: false` and an empty `subscriptions` list.
     fn subscriptions(&self) -> &[CalculatorSubscription] {
         NO_SUBSCRIPTIONS
     }
 
-    /// Empty — `CO2EqivalentWTPCalculator` is superseded by
-    /// `BaseRateCalculator` and registers no `(pollutant, process)` pairs; see
-    /// the module-level note.
+ /// Empty — `CO2EqivalentWTPCalculator` is superseded by
+ /// `BaseRateCalculator` and registers no `(pollutant, process)` pairs; see
+ /// the module-level note.
     fn registrations(&self) -> &[PollutantProcessAssociation] {
         NO_REGISTRATIONS
     }
@@ -369,12 +367,12 @@ impl Calculator for Co2EquivalentWtpCalculator {
         INPUT_TABLES
     }
 
-    /// Phase 2 skeleton — returns an empty [`CalculatorOutput`].
-    ///
-    /// [`CalculatorContext`] cannot yet surface the input tables or accept the
-    /// `MOVESWorkerOutput` rows — that lands with the Task 50 `DataFrameStore`.
-    /// The computation is ported and tested in
-    /// [`Co2EquivalentWtpCalculator::calculate`].
+ /// skeleton — returns an empty [`CalculatorOutput`].
+ ///
+ /// [`CalculatorContext`] cannot yet surface the input tables or accept the
+ /// `MOVESWorkerOutput` rows — that lands with the `DataFrameStore`.
+ /// The computation is ported and tested in
+ /// [`Co2EquivalentWtpCalculator::calculate`].
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let tables = ctx.tables();
         let inputs = Co2EquivalentWtpInputs {
@@ -397,9 +395,9 @@ pub fn factory() -> Box<dyn Calculator> {
 mod tests {
     use super::*;
 
-    /// One well-to-pump methane record and the global warming potentials of
-    /// the three input pollutants. The single record is `200.0` of methane
-    /// (GWP 25), so the one output row is `200.0 × 25 = 5000.0`.
+ /// One well-to-pump methane record and the global warming potentials of
+ /// the three input pollutants. The single record is `200.0` of methane
+ /// (GWP 25), so the one output row is `200.0 × 25 = 5000.0`.
     fn minimal_inputs() -> Co2EquivalentWtpInputs {
         Co2EquivalentWtpInputs {
             worker_output: vec![WorkerOutputRow {
@@ -450,18 +448,18 @@ mod tests {
         let r = rows[0];
         assert_eq!(r.county_id, 26_161);
         assert_eq!(r.fuel_type_id, 2);
-        // Pollutant relabelled to CO2 equivalent; process kept at 99.
+ // Pollutant relabelled to CO2 equivalent; process kept at 99.
         assert_eq!(r.pollutant_id, 98);
         assert_eq!(r.process_id, 99);
-        // 200.0 × 25.
+ // 200.0 × 25.
         assert_close(r.emission_quant, 5_000.0);
     }
 
     #[test]
     fn calculate_keeps_source_pollutants_separate() {
-        // One record per input pollutant in the same dimension cell: the
-        // GROUP BY includes mwo.pollutantID, so each yields its own
-        // CO2-equivalent output row.
+ // One record per input pollutant in the same dimension cell: the
+ // GROUP BY includes mwo.pollutantID, so each yields its own
+ // CO2-equivalent output row.
         let mut inputs = minimal_inputs();
         inputs.worker_output = vec![
             WorkerOutputRow {
@@ -483,7 +481,7 @@ mod tests {
         let rows = Co2EquivalentWtpCalculator.calculate(&inputs);
         assert_eq!(rows.len(), 3);
         assert!(rows.iter().all(|r| r.pollutant_id == 98));
-        // 1000×1, 200×25, 10×298.
+ // 1000×1, 200×25, 10×298.
         let mut quants: Vec<f64> = rows.iter().map(|r| r.emission_quant).collect();
         quants.sort_by(f64::total_cmp);
         assert_close(quants[0], 1_000.0);
@@ -493,7 +491,7 @@ mod tests {
 
     #[test]
     fn calculate_sums_records_of_one_source_pollutant() {
-        // Two methane records in the same cell collapse into one output row.
+ // Two methane records in the same cell collapse into one output row.
         let mut inputs = minimal_inputs();
         inputs.worker_output.push(WorkerOutputRow {
             emission_quant: 40.0,
@@ -501,14 +499,14 @@ mod tests {
         });
         let rows = Co2EquivalentWtpCalculator.calculate(&inputs);
         assert_eq!(rows.len(), 1);
-        // (200.0 + 40.0) × 25.
+ // (200.0 + 40.0) × 25.
         assert_close(rows[0].emission_quant, 6_000.0);
     }
 
     #[test]
     fn calculate_ignores_pollutants_outside_the_input_set() {
-        // A well-to-pump Total Energy (91) record is not a CO2-equivalent
-        // input — only 90, 5 and 6 are summed.
+ // A well-to-pump Total Energy (91) record is not a CO2-equivalent
+ // input — only 90, 5 and 6 are summed.
         let mut inputs = minimal_inputs();
         inputs.worker_output[0].pollutant_id = 91;
         assert!(Co2EquivalentWtpCalculator.calculate(&inputs).is_empty());
@@ -516,8 +514,8 @@ mod tests {
 
     #[test]
     fn calculate_ignores_non_well_to_pump_records() {
-        // A methane record on a tailpipe process (running exhaust, 1) is not
-        // a well-to-pump input — the SQL filters mwo.processID IN (99).
+ // A methane record on a tailpipe process (running exhaust, 1) is not
+ // a well-to-pump input — the SQL filters mwo.processID IN (99).
         let mut inputs = minimal_inputs();
         inputs.worker_output[0].process_id = 1;
         assert!(Co2EquivalentWtpCalculator.calculate(&inputs).is_empty());
@@ -525,7 +523,7 @@ mod tests {
 
     #[test]
     fn calculate_drops_records_without_a_global_warming_potential() {
-        // No Pollutant-table entry for methane → the inner join drops it.
+ // No Pollutant-table entry for methane → the inner join drops it.
         let mut inputs = minimal_inputs();
         inputs.pollutant_gwp.retain(|p| p.pollutant_id != 5);
         assert!(Co2EquivalentWtpCalculator.calculate(&inputs).is_empty());
@@ -553,7 +551,7 @@ mod tests {
 
     #[test]
     fn calculator_name_matches_dag_module() {
-        // The dag preserves the MOVES source's "Eqivalent" misspelling.
+ // The dag preserves the MOVES source's "Eqivalent" misspelling.
         assert_eq!(
             Co2EquivalentWtpCalculator.name(),
             "CO2EqivalentWTPCalculator"

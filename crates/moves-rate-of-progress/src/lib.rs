@@ -1,5 +1,5 @@
 //! `moves-rate-of-progress` — Rate-of-Progress internal control strategy
-//! (Phase 6 Task 121).
+//!.
 //!
 //! Ports `gov.epa.otaq.moves.master.implementation.internalcontrolstrategies.rateofprogress.RateOfProgressStrategy`
 //! from the Java MOVES source (~1k lines).
@@ -9,8 +9,7 @@
 //! The Rate-of-Progress (ROP) control strategy applies emission-reduction
 //! percentages by pollutant, source type, regulatory class, and model year.
 //! It is used to model the effect of regulations that mandate specific
-//! percentage reductions in pollutant output from specific vehicle classes —
-//! for example, the Clean Air Act Title I Rate of Progress requirements.
+//! percentage reductions in pollutant output from specific vehicle classes//! for example, the Clean Air Act Title I Rate of Progress requirements.
 //!
 //! # Data model
 //!
@@ -45,7 +44,7 @@
 //! registry.register(|| Box::new(RateOfProgressControlStrategy::new(table.clone())));
 //! ```
 //!
-//! See `moves-rust-migration-plan.md` Task 121.
+//! See `moves-rust-.md`.
 
 pub mod control_strategy;
 pub mod csv_io;

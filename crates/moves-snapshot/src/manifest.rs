@@ -11,9 +11,9 @@ use crate::format::{ColumnSpec, FLOAT_DECIMALS, FORMAT_VERSION};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Manifest {
     pub format_version: String,
-    /// Sorted lexicographically by `name` so the JSON itself is deterministic.
+ /// Sorted lexicographically by `name` so the JSON itself is deterministic.
     pub tables: Vec<ManifestEntry>,
-    /// Hash over the table list — see `compute_aggregate_hash`.
+ /// Hash over the table list — see `compute_aggregate_hash`.
     pub aggregate_sha256: String,
 }
 
@@ -127,7 +127,7 @@ mod tests {
 
     #[test]
     fn sha256_hex_known_vector() {
-        // SHA-256("abc") = ba7816bf...
+ // SHA-256("abc") = ba7816bf...
         assert_eq!(
             sha256_hex(b"abc"),
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"

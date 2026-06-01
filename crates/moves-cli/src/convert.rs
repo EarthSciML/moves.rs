@@ -1,8 +1,8 @@
 //! `moves convert-runspec` — convert a RunSpec between XML and TOML.
 //!
 //! Both directions route through the canonical [`moves_runspec::RunSpec`]
-//! model, so XML↔TOML conversion is lossless by construction (migration-plan
-//! Task 13). The conversion direction is inferred from file extensions: the
+//! model, so XML↔TOML conversion is lossless by construction (
+//!). The conversion direction is inferred from file extensions: the
 //! input's extension picks the parser, the output's extension picks the
 //! serializer. With no `--output`, the target format is the opposite of the
 //! input's and the output path is the input path with its extension swapped.
@@ -21,23 +21,23 @@ use crate::{load_run_spec, RunSpecFormat};
 /// Inputs for one `moves convert-runspec` invocation.
 #[derive(Debug, Clone)]
 pub struct ConvertOptions {
-    /// RunSpec to convert. Its extension selects the input parser.
+ /// RunSpec to convert. Its extension selects the input parser.
     pub input: PathBuf,
-    /// Destination path. `None` derives it from the input path with the
-    /// target format's extension.
+ /// Destination path. `None` derives it from the input path with the
+ /// target format's extension.
     pub output: Option<PathBuf>,
 }
 
 /// What [`convert_runspec`] did — the resolved paths and formats.
 #[derive(Debug, Clone)]
 pub struct ConvertOutcome {
-    /// The input path that was read.
+ /// The input path that was read.
     pub input: PathBuf,
-    /// The output path that was written.
+ /// The output path that was written.
     pub output: PathBuf,
-    /// The format the input was parsed as.
+ /// The format the input was parsed as.
     pub from: RunSpecFormat,
-    /// The format the output was written as.
+ /// The format the output was written as.
     pub to: RunSpecFormat,
 }
 

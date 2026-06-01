@@ -1,5 +1,5 @@
 //! NonRoadRetrofit internal control strategy — wires NONROAD retrofit records
-//! (ported from `clcrtrft.f` in Task 108) into the unified control-strategy
+//! (ported from `clcrtrft.f` in) into the unified control-strategy
 //! framework.
 //!
 //! # Role
@@ -25,11 +25,11 @@
 //! months within a single run. The framework's post-`pre_run` table
 //! invalidation is signalled via `modified_tables`.
 //!
-//! # Data-plane status (Task 50)
+//! # Data-plane status
 //!
 //! Writing computed reduction fractions into the execution database is deferred
 //! until `moves-framework`'s `ExecutionTables` gains a mutable write API
-//! (Task 50 / `DataFrameStore`). The `modified_tables` declaration already
+//!The `modified_tables` declaration already
 //! signals the engine which tables will be modified.
 
 use moves_framework::{InMemoryStore, InternalControlStrategy};
@@ -50,13 +50,13 @@ pub struct NonRoadRetrofitStrategy {
 }
 
 impl NonRoadRetrofitStrategy {
-    /// Build from a list of retrofit records already parsed from an `.RTR`
-    /// input file.
+ /// Build from a list of retrofit records already parsed from an `.RTR`
+ /// input file.
     pub fn new(records: Vec<RetrofitRecord>) -> Self {
         Self { records }
     }
 
-    /// The retrofit records this strategy will apply.
+ /// The retrofit records this strategy will apply.
     pub fn records(&self) -> &[RetrofitRecord] {
         &self.records
     }
@@ -68,11 +68,11 @@ impl InternalControlStrategy for NonRoadRetrofitStrategy {
     }
 
     fn modified_tables(&self) -> &[&'static str] {
-        // NONROAD does not write into the onroad `emissionRateAdjustment`
-        // table; instead the per-SCC reduction is applied inline during the
-        // geography loop. There is no shared execution-DB table to invalidate.
-        // When Task 50 (DataFrameStore) lands, this will declare the NONROAD
-        // output table that receives the adjusted emission totals.
+ // NONROAD does not write into the onroad `emissionRateAdjustment`
+ // table; instead the per-SCC reduction is applied inline during the
+ // geography loop. There is no shared execution-DB table to invalidate.
+ // When (DataFrameStore) lands, this will declare the NONROAD
+ // output table that receives the adjusted emission totals.
         &[]
     }
 
@@ -80,8 +80,8 @@ impl InternalControlStrategy for NonRoadRetrofitStrategy {
         &self,
         _tables: &mut InMemoryStore,
     ) -> std::result::Result<(), moves_framework::Error> {
-        // Retrofit records are accessed via `records()` by the nonroad
-        // geography loop directly — no execution-database write needed here.
+ // Retrofit records are accessed via `records()` by the nonroad
+ // geography loop directly — no execution-database write needed here.
         Ok(())
     }
 }

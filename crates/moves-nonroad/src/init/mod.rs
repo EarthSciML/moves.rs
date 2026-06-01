@@ -1,6 +1,6 @@
 //! NONROAD initialisation orchestration.
 //!
-//! Task 99. The Fortran source partitions the initialisation work
+//!The Fortran source partitions the initialisation work
 //! across three files:
 //!
 //! | File | Role |
@@ -17,17 +17,17 @@
 //! - [`intadj`] — sulfur and RFG-adjustment table initialiser.
 //! - [`intams`] — AMS output parameter initialiser.
 //! - [`intnon`] — high-level orchestrator that sequences the
-//!   options-file packet parsers.
+//! options-file packet parsers.
 //!
 //! # Status
 //!
-//! Task 99 implemented as a scoped orchestrator: the
+//! implemented as a scoped orchestrator: the
 //! options-file-resident packets are parsed in the same order as the
 //! Fortran source. Per-file loaders (allocation, indicator, growth,
 //! activity, population, emission factors, BSFC, seasonality, tech,
 //! evap tech, daily, retrofit) are reachable through their existing
 //! modules in [`crate::input`]; the full driver wires them up in
-//! Task 113.
+//!.
 
 pub mod intadj;
 pub mod intams;

@@ -4,17 +4,17 @@
 //! These routines underpin the retrofit input pipeline:
 //!
 //! - [`init_retrofit_state`] (`initrtrft.f`) — set up the empty
-//!   retrofit-arrays state with the four valid pollutants
-//!   (`HC`/`CO`/`NOX`/`PM`) and their index map.
+//! retrofit-arrays state with the four valid pollutants
+//! (`HC`/`CO`/`NOX`/`PM`) and their index map.
 //! - [`compare_retrofits`] (`cmprrtrft.f`) — three-way comparison
-//!   used by sorting, with two comparison modes.
+//! used by sorting, with two comparison modes.
 //! - [`swap_retrofits`] (`swaprtrft.f`) — in-place swap of two
-//!   retrofit slots (in Rust this collapses to [`<[T]>::swap`], but
-//!   we expose a typed wrapper for the Fortran cross-reference).
+//! retrofit slots (in Rust this collapses to [`<[T]>::swap`], but
+//! we expose a typed wrapper for the Fortran cross-reference).
 //! - [`sort_retrofits`] (`srtrtrft.f`) — quicksort variant that
-//!   orders retrofit records via [`compare_retrofits`].
+//! orders retrofit records via [`compare_retrofits`].
 //! - [`engine_overlap`] (`rtrftengovrlp.f`) — predicate on two
-//!   retrofit records: do their engine sets intersect?
+//! retrofit records: do their engine sets intersect?
 //!
 //! # State shape
 //!
@@ -47,53 +47,53 @@ pub const RTRFTTECHTYPE_ALL: &str = "ALL";
 /// `record` numbers and exposes them via `record_index`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RetrofitRecord {
-    /// 0-based record number from the input file (`rtrftrec`).
+ /// 0-based record number from the input file (`rtrftrec`).
     pub record_index: usize,
-    /// Retrofit ID (same number for sibling rows that affect
-    /// different pollutants of one retrofit; `rtrftid`).
+ /// Retrofit ID (same number for sibling rows that affect
+ /// different pollutants of one retrofit; `rtrftid`).
     pub id: i32,
-    /// First calendar year of retrofitting (`rtrftryst`).
+ /// First calendar year of retrofitting (`rtrftryst`).
     pub year_retrofit_start: i32,
-    /// Last calendar year of retrofitting (`rtrftryen`).
+ /// Last calendar year of retrofitting (`rtrftryen`).
     pub year_retrofit_end: i32,
-    /// First model year affected (`rtrftmyst`).
+ /// First model year affected (`rtrftmyst`).
     pub year_model_start: i32,
-    /// Last model year affected (`rtrftmyen`).
+ /// Last model year affected (`rtrftmyen`).
     pub year_model_end: i32,
-    /// SCC code or [`RTRFTSCC_ALL`] (`rtrftscc`).
+ /// SCC code or [`RTRFTSCC_ALL`] (`rtrftscc`).
     pub scc: String,
-    /// Tech type or [`RTRFTTECHTYPE_ALL`] (`rtrfttechtype`).
+ /// Tech type or [`RTRFTTECHTYPE_ALL`] (`rtrfttechtype`).
     pub tech_type: String,
-    /// Minimum HP, non-inclusive (`rtrfthpmn`).
+ /// Minimum HP, non-inclusive (`rtrfthpmn`).
     pub hp_min: f32,
-    /// Maximum HP, inclusive (`rtrfthpmx`).
+ /// Maximum HP, inclusive (`rtrfthpmx`).
     pub hp_max: f32,
-    /// Annual retrofit fraction OR total retrofitted count
-    /// (`rtrftannualfracorn`). Values `> 1.0` are interpreted as
-    /// absolute counts; `0.0..=1.0` as a fraction.
+ /// Annual retrofit fraction OR total retrofitted count
+ /// (`rtrftannualfracorn`). Values `> 1.0` are interpreted as
+ /// absolute counts; `0.0..=1.0` as a fraction.
     pub annual_frac_or_count: f32,
-    /// Retrofit effectiveness, `0.0..=1.0` (`rtrfteffect`).
+ /// Retrofit effectiveness, `0.0..=1.0` (`rtrfteffect`).
     pub effectiveness: f32,
-    /// Pollutant name (`HC` / `CO` / `NOX` / `PM`;
-    /// `rtrftpollutant`).
+ /// Pollutant name (`HC` / `CO` / `NOX` / `PM`;
+ /// `rtrftpollutant`).
     pub pollutant: String,
-    /// Index into the main pollutant table for the named pollutant
-    /// (`rtrftplltntidx`). Use [`RetrofitPollutant::for_name`] to
-    /// derive this from `pollutant`.
+ /// Index into the main pollutant table for the named pollutant
+ /// (`rtrftplltntidx`). Use [`RetrofitPollutant::for_name`] to
+ /// derive this from `pollutant`.
     pub pollutant_idx: i32,
 }
 
 /// Comparison mode for [`compare_retrofits`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Comparison {
-    /// Compare retrofit ID, then pollutant, then record number.
-    /// Used by callers that need a stable ordering keyed on
-    /// retrofit identity (`cmprrtrft.f` :69–102).
+ /// Compare retrofit ID, then pollutant, then record number.
+ /// Used by callers that need a stable ordering keyed on
+ /// retrofit identity (`cmprrtrft.f` :69–102).
     IdPollutantRecord,
-    /// Compare model year end, then maximum HP.
-    /// Used by `fndrtrft` — an optimization there depends on
-    /// model-year-end being the first criterion (`cmprrtrft.f`
-    /// :108–112). Do not reorder.
+ /// Compare model year end, then maximum HP.
+ /// Used by `fndrtrft` — an optimization there depends on
+ /// model-year-end being the first criterion (`cmprrtrft.f`
+ /// :108–112). Do not reorder.
     ModelYearMaxHp,
 }
 
@@ -111,9 +111,9 @@ pub enum RetrofitPollutant {
 }
 
 impl RetrofitPollutant {
-    /// Look up a pollutant by its 10-char field value (case-
-    /// insensitive, trimmed). Returns `None` for unknown
-    /// pollutants.
+ /// Look up a pollutant by its 10-char field value (case-
+ /// insensitive, trimmed). Returns `None` for unknown
+ /// pollutants.
     pub fn for_name(name: &str) -> Option<Self> {
         match name.trim().to_ascii_uppercase().as_str() {
             "HC" => Some(Self::Hc),
@@ -124,8 +124,8 @@ impl RetrofitPollutant {
         }
     }
 
-    /// Canonical 10-character field value
-    /// (matches the strings stored in `rtrftplltnt`).
+ /// Canonical 10-character field value
+ /// (matches the strings stored in `rtrftplltnt`).
     pub fn canonical_name(self) -> &'static str {
         match self {
             Self::Hc => "HC",
@@ -135,8 +135,8 @@ impl RetrofitPollutant {
         }
     }
 
-    /// 1-based pollutant-array index, matching `rtrftplltntidxmp`
-    /// (`initrtrft.f` :64–67).
+ /// 1-based pollutant-array index, matching `rtrftplltntidxmp`
+ /// (`initrtrft.f` :64–67).
     pub fn pollutant_index(self) -> i32 {
         match self {
             Self::Hc => IDXTHC as i32,
@@ -146,10 +146,10 @@ impl RetrofitPollutant {
         }
     }
 
-    /// Inverse of [`pollutant_index`](Self::pollutant_index): map a
-    /// stored `rtrftplltntidx` value back to the typed enum. Returns
-    /// `None` for any index that doesn't correspond to one of the
-    /// four retrofit pollutants.
+ /// Inverse of [`pollutant_index`](Self::pollutant_index): map a
+ /// stored `rtrftplltntidx` value back to the typed enum. Returns
+ /// `None` for any index that doesn't correspond to one of the
+ /// four retrofit pollutants.
     pub fn from_pollutant_index(idx: i32) -> Option<Self> {
         if idx == IDXTHC as i32 {
             Some(Self::Hc)
@@ -164,12 +164,12 @@ impl RetrofitPollutant {
         }
     }
 
-    /// 0-based slot in the `rtrftplltnt` array (HC=0, CO=1, NOX=2,
-    /// PM=3) — the dense position used by per-retrofit accumulator
-    /// arrays sized to [`NRTRFTPLLTNT`](crate::common::consts::NRTRFTPLLTNT).
-    ///
-    /// Equivalent to `rtrftplltntidx`'s 1..4 value in the Fortran
-    /// source, less one for Rust's 0-based indexing.
+ /// 0-based slot in the `rtrftplltnt` array (HC=0, CO=1, NOX=2,
+ /// PM=3) — the dense position used by per-retrofit accumulator
+ /// arrays sized to [`NRTRFTPLLTNT`](crate::common::consts::NRTRFTPLLTNT).
+ ///
+ /// Equivalent to `rtrftplltntidx`'s 1..4 value in the Fortran
+ /// source, less one for Rust's 0-based indexing.
     pub fn slot(self) -> usize {
         match self {
             Self::Hc => 0,
@@ -186,14 +186,14 @@ impl RetrofitPollutant {
 /// (`rtrftplltnt`, `rtrftplltntidxmp`, `rtrftplltntrdfrc`).
 #[derive(Debug, Clone)]
 pub struct RetrofitState {
-    /// Retrofit records, populated by `rdrtrft.f` (Task 98).
+ /// Retrofit records, populated by `rdrtrft.f`.
     pub records: Vec<RetrofitRecord>,
-    /// Pollutants valid in retrofit records, in `rtrftplltnt` order
-    /// (HC, CO, NOX, PM).
+ /// Pollutants valid in retrofit records, in `rtrftplltnt` order
+ /// (HC, CO, NOX, PM).
     pub valid_pollutants: [RetrofitPollutant; 4],
-    /// Pollutant reduction fractions for the current iteration
-    /// (`rtrftplltntrdfrc`). Indexed by pollutant index; sized to
-    /// [`MXPOL`].
+ /// Pollutant reduction fractions for the current iteration
+ /// (`rtrftplltntrdfrc`). Indexed by pollutant index; sized to
+ /// [`MXPOL`].
     pub pollutant_reduction_fraction: Vec<f32>,
 }
 
@@ -307,10 +307,10 @@ pub fn sort_retrofits(records: &mut [RetrofitRecord], mode: Comparison, start: u
             }
         }
 
-        // Recurse on the two partitions. The pivot lives at `r`
-        // after partitioning; the Fortran source guards `r - 1`
-        // and `r + 1` against the partition bounds via the
-        // outer `stop - start > 1` check, so we mirror that.
+ // Recurse on the two partitions. The pivot lives at `r`
+ // after partitioning; the Fortran source guards `r - 1`
+ // and `r + 1` against the partition bounds via the
+ // outer `stop - start > 1` check, so we mirror that.
         if r > start {
             sort_retrofits(records, mode, start, r - 1);
         }
@@ -327,16 +327,16 @@ pub fn sort_retrofits(records: &mut [RetrofitRecord], mode: Comparison, start: u
 /// these conditions hold:
 ///
 /// 1. SCC ranges overlap (per the all-inclusive / 4-digit-global /
-///    7-digit-global / exact matching rules in `rtrftengovrlp.f`
-///    :60–80);
+/// 7-digit-global / exact matching rules in `rtrftengovrlp.f`
+/// :60–80);
 /// 2. tech-type ranges overlap (either is `ALL`, or they match);
 /// 3. HP ranges overlap (`hp_min` is non-inclusive, so `hp_max(a)
-///    <= hp_min(b)` is *not* an overlap).
+/// <= hp_min(b)` is *not* an overlap).
 pub fn engine_overlap(records: &[RetrofitRecord], a: usize, b: usize) -> bool {
     let ra = &records[a];
     let rb = &records[b];
 
-    // --- SCC overlap (rtrftengovrlp.f :60–80) ---
+ // --- SCC overlap (rtrftengovrlp.f :60–80) ---
     if ra.scc != RTRFTSCC_ALL && rb.scc != RTRFTSCC_ALL && ra.scc != rb.scc {
         let a_4global = scc_segment(&ra.scc, 5, 10) == Some("000000");
         let b_4global = scc_segment(&rb.scc, 5, 10) == Some("000000");
@@ -357,7 +357,7 @@ pub fn engine_overlap(records: &[RetrofitRecord], a: usize, b: usize) -> bool {
         }
     }
 
-    // --- tech-type overlap (rtrftengovrlp.f :84–89) ---
+ // --- tech-type overlap (rtrftengovrlp.f :84–89) ---
     if ra.tech_type != RTRFTTECHTYPE_ALL
         && rb.tech_type != RTRFTTECHTYPE_ALL
         && ra.tech_type != rb.tech_type
@@ -365,8 +365,8 @@ pub fn engine_overlap(records: &[RetrofitRecord], a: usize, b: usize) -> bool {
         return false;
     }
 
-    // --- HP overlap (rtrftengovrlp.f :93–96): hp_min is non-inclusive,
-    //     so equality at the boundary does not count as overlap ---
+ // --- HP overlap (rtrftengovrlp.f :93–96): hp_min is non-inclusive,
+ // so equality at the boundary does not count as overlap ---
     if ra.hp_max <= rb.hp_min || rb.hp_max <= ra.hp_min {
         return false;
     }
@@ -444,7 +444,7 @@ mod tests {
             Some(RetrofitPollutant::Pm)
         );
         assert_eq!(RetrofitPollutant::for_name("CH4"), None);
-        // pollutant indices match the Fortran IDXTHC/CO/NOX/PM mapping
+ // pollutant indices match the Fortran IDXTHC/CO/NOX/PM mapping
         assert_eq!(RetrofitPollutant::Hc.pollutant_index(), 1);
         assert_eq!(RetrofitPollutant::Co.pollutant_index(), 2);
         assert_eq!(RetrofitPollutant::Nox.pollutant_index(), 3);
@@ -561,7 +561,7 @@ mod tests {
         assert!(recs.is_empty());
 
         let mut recs = vec![rec(1, 1, 0)];
-        // length 1 → stop = 0, start = 0, stop - start = 0 → no-op
+ // length 1 → stop = 0, start = 0, stop - start = 0 → no-op
         sort_retrofits(&mut recs, Comparison::IdPollutantRecord, 0, 0);
         assert_eq!(recs.len(), 1);
     }
@@ -590,7 +590,7 @@ mod tests {
             overlap_rec("ALL", "ALL", 0.0, 50.0),
             overlap_rec("ALL", "ALL", 50.0, 100.0),
         ];
-        // hp_max(a) == hp_min(b) → non-inclusive → no overlap
+ // hp_max(a) == hp_min(b) → non-inclusive → no overlap
         assert!(!engine_overlap(&recs, 0, 1));
     }
 
@@ -623,7 +623,7 @@ mod tests {
 
     #[test]
     fn overlap_yes_when_one_scc_is_4digit_global() {
-        // 2270000000 = 4-digit global for "22700"-family
+ // 2270000000 = 4-digit global for "22700"-family
         let recs = vec![
             overlap_rec("2270000000", "ALL", 0.0, 100.0),
             overlap_rec("2270002003", "ALL", 0.0, 100.0),
@@ -642,7 +642,7 @@ mod tests {
 
     #[test]
     fn overlap_yes_when_one_scc_is_7digit_global() {
-        // 2270002000 = 7-digit global for "2270002"-family
+ // 2270002000 = 7-digit global for "2270002"-family
         let recs = vec![
             overlap_rec("2270002000", "ALL", 0.0, 100.0),
             overlap_rec("2270002003", "ALL", 0.0, 100.0),

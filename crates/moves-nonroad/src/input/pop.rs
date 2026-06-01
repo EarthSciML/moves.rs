@@ -1,6 +1,6 @@
 //! Population (`.POP`) parser (`rdpop.f`, `getpop.f`).
 //!
-//! Task 94. Parses the NONROAD `.POP` (population) input format,
+//!Parses the NONROAD `.POP` (population) input format,
 //! which lists base-year equipment populations by FIPS region,
 //! subregion, year, SCC, and horsepower category.
 //!
@@ -13,19 +13,19 @@
 //! parsed from fixed columns (1-based, inclusive — preserved here
 //! so the layout matches `rdpop.f` and `getpop.f` directly):
 //!
-//! | Cols    | Field                          | Source ref      |
+//! | Cols | Field | Source ref |
 //! |---------|--------------------------------|-----------------|
-//! | 1–5     | FIPS code                      | `rdpop.f` :139  |
-//! | 7–11    | Subregion                      | `rdpop.f` :140  |
-//! | 13–16   | Year (I4)                      | `rdpop.f` :141  |
-//! | 18–27   | SCC code                       | `rdpop.f` :138  |
-//! | 70–74   | HP min (F5.0)                  | `rdpop.f` :142  |
-//! | 76–80   | HP max (F5.0)                  | `rdpop.f` :144  |
-//! | 82–86   | HP avg (F5.0, optional)        | `rdpop.f` :146  |
-//! | 88–92   | Usage factor (F5.0)            | `getpop.f` :128 |
-//! | 93–102  | Tech / dist code               | `getpop.f` :129 |
-//! | 108–122 | Population value (digits, may  | `getpop.f` :201 |
-//! |         | contain commas)                |                 |
+//! | 1–5 | FIPS code | `rdpop.f` :139 |
+//! | 7–11 | Subregion | `rdpop.f` :140 |
+//! | 13–16 | Year (I4) | `rdpop.f` :141 |
+//! | 18–27 | SCC code | `rdpop.f` :138 |
+//! | 70–74 | HP min (F5.0) | `rdpop.f` :142 |
+//! | 76–80 | HP max (F5.0) | `rdpop.f` :144 |
+//! | 82–86 | HP avg (F5.0, optional) | `rdpop.f` :146 |
+//! | 88–92 | Usage factor (F5.0) | `getpop.f` :128 |
+//! | 93–102 | Tech / dist code | `getpop.f` :129 |
+//! | 108–122 | Population value (digits, may | `getpop.f` :201 |
+//! | | contain commas) | |
 //!
 //! If `hp_avg` is blank, it defaults to `(hp_min + hp_max) / 2`,
 //! matching `rdpop.f` :151.
@@ -36,7 +36,7 @@
 //! sub-county, state-only) and equipment-list filtering against
 //! the COMMON-block state set up by `getind.f` / `iniasc.f`.
 //! That filtering is deferred to the higher-level driver
-//! (Tasks 99 and 103); this module returns every well-formed
+//!; this module returns every well-formed
 //! population record.
 //!
 //! # Sorting (deferred)
@@ -53,29 +53,29 @@ use std::path::{Path, PathBuf};
 /// One parsed population record from a `.POP` file.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PopulationRecord {
-    /// FIPS region code (state || county; 5 chars, left-justified).
+ /// FIPS region code (state || county; 5 chars, left-justified).
     pub fips: String,
-    /// Subregion code (5 chars).
+ /// Subregion code (5 chars).
     pub subregion: String,
-    /// Calendar year.
+ /// Calendar year.
     pub year: i32,
-    /// SCC equipment code (10 chars).
+ /// SCC equipment code (10 chars).
     pub scc: String,
-    /// Horsepower-category lower bound.
+ /// Horsepower-category lower bound.
     pub hp_min: f32,
-    /// Horsepower-category upper bound.
+ /// Horsepower-category upper bound.
     pub hp_max: f32,
-    /// Horsepower-category midpoint (`(hp_min + hp_max) / 2` if
-    /// blank in the file).
+ /// Horsepower-category midpoint (`(hp_min + hp_max) / 2` if
+ /// blank in the file).
     pub hp_avg: f32,
-    /// Usage factor (annual hours, etc.).
+ /// Usage factor (annual hours, etc.).
     pub usage: f32,
-    /// Technology/distribution code (10 chars, left-justified).
+ /// Technology/distribution code (10 chars, left-justified).
     pub tech_code: String,
-    /// Equipment population. `getpop.f` :211 reads this field into
-    /// `valtmp`, a `real*4`; the port keeps it `f32` so the value
-    /// carries exactly the single-precision rounding the Fortran
-    /// reference does (Task 116 numerical-fidelity triage, `mo-490cm`).
+ /// Equipment population. `getpop.f` :211 reads this field into
+ /// `valtmp`, a `real*4`; the port keeps it `f32` so the value
+ /// carries exactly the single-precision rounding the Fortran
+ /// reference does.
     pub population: f32,
 }
 
@@ -111,10 +111,10 @@ pub fn read_pop<R: BufRead>(reader: R) -> Result<Vec<PopulationRecord>> {
             break;
         }
 
-        // Blank lines inside the packet are tolerated (the Fortran
-        // parser would treat them as records with empty fields and
-        // bail out on the numeric reads; we skip them to avoid
-        // confusing error messages on whitespace).
+ // Blank lines inside the packet are tolerated (the Fortran
+ // parser would treat them as records with empty fields and
+ // bail out on the numeric reads; we skip them to avoid
+ // confusing error messages on whitespace).
         if line.trim().is_empty() {
             continue;
         }
@@ -227,7 +227,7 @@ fn parse_f5(field: &str, name: &str, line: &str, line_num: usize, path: &Path) -
 /// port parses straight to `f32` so the value carries exactly the
 /// single-precision rounding the Fortran reference does; an `f64`
 /// parse would retain digits the reference cannot hold and diverge
-/// under the Task 115 fidelity budget (`mo-490cm`).
+/// under the fidelity budget ().
 fn parse_pop_value(field: &str, line: &str, line_num: usize, path: &Path) -> Result<f32> {
     let cleaned: String = field.chars().filter(|c| *c != ' ' && *c != ',').collect();
     if cleaned.is_empty() {
@@ -261,8 +261,8 @@ mod tests {
         tech: &str,
         pop: &str,
     ) -> String {
-        // Build a 122-char fixed-width record matching rdpop.f /
-        // getpop.f column layout.
+ // Build a 122-char fixed-width record matching rdpop.f /
+ // getpop.f column layout.
         let mut buf = vec![b' '; 130];
         let put = |buf: &mut [u8], start_1based: usize, value: &str, width: usize| {
             let start = start_1based - 1;
@@ -274,7 +274,7 @@ mod tests {
         put(&mut buf, 7, sub, 5);
         put(&mut buf, 13, year, 4);
         put(&mut buf, 18, scc, 10);
-        // right-justify HP fields in 5-char slot
+ // right-justify HP fields in 5-char slot
         let put_right = |buf: &mut [u8], start_1based: usize, value: &str, width: usize| {
             let pad = width.saturating_sub(value.len());
             let start = start_1based - 1 + pad;
@@ -462,12 +462,12 @@ mod tests {
 
     #[test]
     fn population_carries_real4_precision() {
-        // 16_777_217 = 2^24 + 1 is the smallest integer that `real*4`
-        // cannot represent exactly; it rounds to 16_777_216. `getpop.f`
-        // :211 reads the population into `valtmp` (`real*4`), so the
-        // port must round the same way. An `f64` parse would keep the
-        // exact 16_777_217 and diverge from the Fortran reference
-        // (Task 116, `mo-490cm`).
+ // 16_777_217 = 2^24 + 1 is the smallest integer that `real*4`
+ // cannot represent exactly; it rounds to 16_777_216. `getpop.f`
+ // :211 reads the population into `valtmp` (`real*4`), so the
+ // port must round the same way. An `f64` parse would keep the
+ // exact 16_777_217 and diverge from the Fortran reference
+ //.
         let line = build_pop_line(
             "06000",
             "00000",

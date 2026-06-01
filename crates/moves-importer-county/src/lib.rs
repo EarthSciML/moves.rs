@@ -1,5 +1,5 @@
 //! `moves-importer-county` — County-scale (CDB) input-database importers
-//! (Phase 4 Task 83).
+//!.
 //!
 //! Each importer here ports one Java class from
 //! `gov/epa/otaq/moves/master/implementation/importers/`. The
@@ -21,7 +21,7 @@
 //! The remaining ~20 CDB importers (`AverageSpeedDistribution`,
 //! `FuelSupply`, `FuelFormulation`, `IMCoverage`, `Hotelling`, etc.)
 //! follow the same pattern and will be added in follow-up tasks under
-//! mo-t8eg's tracking. See `moves-rust-migration-plan.md` Task 83 for
+//! 's tracking. See `moves-rust-.md` for
 //! the full list, and the Java sources for the validation SQL each
 //! needs ported.
 //!
@@ -49,7 +49,7 @@ pub use zone_road_type::ZoneRoadTypeImporter;
 /// Use this in the importer CLI as the default work list:
 /// ```ignore
 /// for importer in moves_importer_county::ALL {
-///     run(importer, &user_inputs)?;
+/// run(importer, &user_inputs)?;
 /// }
 /// ```
 pub const ALL: &[&dyn moves_importer::Importer] = &[

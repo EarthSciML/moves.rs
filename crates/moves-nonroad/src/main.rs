@@ -1,7 +1,6 @@
 //! Native CLI entry point for `moves-nonroad`.
 //!
-//! Phase 5. The library's in-process entry point —
-//! [`moves_nonroad::run_simulation`] — is wired up by the Task 117
+//!The library's in-process entry point//! [`moves_nonroad::run_simulation`] — is wired up by the
 //! integration step ([`moves_nonroad::simulation`]). This binary is
 //! the native-only thin wrapper described in `ARCHITECTURE.md` § 7:
 //! it will read a NONROAD options file and its inputs from disk, call
@@ -24,16 +23,16 @@ use moves_nonroad::simulation::PlanRecordingExecutor;
 use moves_nonroad::{run_simulation, NonroadInputs, NonroadOptions};
 
 fn main() {
-    // An empty run: valid options, no SCC groups. This always
-    // succeeds — it exercises the Task 117 entry point end to end and
-    // produces the "successful completion" banner.
+ // An empty run: valid options, no SCC groups. This always
+ // succeeds — it exercises the entry point end to end and
+ // produces the "successful completion" banner.
     let options = NonroadOptions::new(RegionLevel::County, 2020);
     let inputs = NonroadInputs::new();
     let mut executor = PlanRecordingExecutor::new();
 
     match run_simulation(&options, &inputs, &mut executor) {
         Ok(outputs) => {
-            eprintln!("moves-nonroad: run_simulation entry point is wired up (Task 117).");
+            eprintln!("moves-nonroad: run_simulation entry point is wired up.");
             eprintln!("{}", outputs.completion_message);
             eprintln!(
                 "Empty run summary: {} SCC groups planned, {} dispatch calls, \
@@ -49,8 +48,8 @@ fn main() {
             );
         }
         Err(err) => {
-            // Unreachable for an empty run, but reported rather than
-            // panicked so a future non-empty wiring fails cleanly.
+ // Unreachable for an empty run, but reported rather than
+ // panicked so a future non-empty wiring fails cleanly.
             eprintln!("moves-nonroad: run_simulation failed: {err}");
         }
     }

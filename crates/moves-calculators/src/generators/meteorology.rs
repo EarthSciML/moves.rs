@@ -2,18 +2,17 @@
 //! `ZoneMonthHour` execution table.
 //!
 //! Ports `gov.epa.otaq.moves.master.implementation.general.MeteorologyGenerator`
-//! (migration plan Task 41). The Java generator runs one SQL pass —
-//! `doHeatIndex` — that:
+//! (). The Java generator runs one SQL pass//! `doHeatIndex` — that:
 //!
 //! 1. Fills a missing `County.barometricPressure` / `County.altitude` with
-//!    altitude-group defaults.
+//! altitude-group defaults.
 //! 2. Writes `ZoneMonthHour.heatIndex` — the dry-bulb temperature below
-//!    78 °F, the National Weather Service heat-index regression (capped at
-//!    120 °F) at or above it.
+//! 78 °F, the National Weather Service heat-index regression (capped at
+//! 120 °F) at or above it.
 //! 3. Writes `ZoneMonthHour.specificHumidity` and
-//!    `ZoneMonthHour.molWaterFraction` from a saturation-vapour-pressure
-//!    chain (intermediate `TK` / `PH2O` / `XH2O` / `PV` tables in the Java;
-//!    pure functions here).
+//! `ZoneMonthHour.molWaterFraction` from a saturation-vapour-pressure
+//! chain (intermediate `TK` / `PH2O` / `XH2O` / `PV` tables in the Java;
+//! pure functions here).
 //!
 //! # Structure of this port
 //!
@@ -24,7 +23,7 @@
 //! implements the framework [`Generator`] trait around them.
 //!
 //! `MeteorologyGenerator::execute` returns an empty [`CalculatorOutput`]
-//! until the Task 50 data plane lands the `ZoneMonthHour` / `Zone` /
+//! until the data plane lands the `ZoneMonthHour` / `Zone` /
 //! `County` tables it would iterate; the numeric port above is complete
 //! and is what `execute` will apply row by row.
 //!
@@ -78,9 +77,9 @@ const SPECIFIC_HUMIDITY_CONSTANT: f64 = 621.1;
 /// A county's altitude class — `H` (high) or `L` (low) in `County.altitude`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Altitude {
-    /// `'H'` — high altitude.
+ /// `'H'` — high altitude.
     High,
-    /// `'L'` — low altitude.
+ /// `'L'` — low altitude.
     Low,
 }
 
@@ -88,9 +87,9 @@ pub enum Altitude {
 /// [`resolve_county_meteorology`] default-fill — both fields populated.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CountyMeteorology {
-    /// Barometric pressure in inches of mercury.
+ /// Barometric pressure in inches of mercury.
     pub barometric_pressure_inhg: f64,
-    /// Altitude class.
+ /// Altitude class.
     pub altitude: Altitude,
 }
 
@@ -99,11 +98,11 @@ pub struct CountyMeteorology {
 /// Two `UPDATE County` statements, in order:
 ///
 /// 1. A county with a missing or non-positive `barometricPressure` is
-///    given 24.59 inHg when its `altitude` is `'H'`, 28.94 inHg otherwise
-///    — a NULL or non-`H` altitude both take the SQL `CASE` `ELSE` branch.
+/// given 24.59 inHg when its `altitude` is `'H'`, 28.94 inHg otherwise
+/// a NULL or non-`H` altitude both take the SQL `CASE` `ELSE` branch.
 /// 2. A county with a missing or non-`H`/`L` `altitude` is then classed
-///    `Low` when its (now-populated) pressure is at least 25.8403 inHg,
-///    `High` below that.
+/// `Low` when its (now-populated) pressure is at least 25.8403 inHg,
+/// `High` below that.
 ///
 /// `pressure` is `None` for a SQL NULL; `altitude` is `None` for a NULL or
 /// any value outside `('H','L')` — the SQL guard is `altitude not in
@@ -122,23 +121,23 @@ pub fn resolve_county_meteorology(
     pressure: Option<f64>,
     altitude: Option<Altitude>,
 ) -> CountyMeteorology {
-    // Step 1 — `UPDATE County SET barometricPressure = ...
-    //           WHERE barometricPressure IS NULL OR barometricPressure <= 0`.
-    // A value is kept only when present and strictly positive.
+ // Step 1 — `UPDATE County SET barometricPressure = ...
+ // WHERE barometricPressure IS NULL OR barometricPressure <= 0`.
+ // A value is kept only when present and strictly positive.
     let barometric_pressure_inhg = match pressure {
         Some(p) if p > 0.0 => p,
         _ => match altitude {
             Some(Altitude::High) => DEFAULT_PRESSURE_HIGH_ALTITUDE,
-            // 'L', NULL, and out-of-domain altitudes all take the SQL ELSE.
+ // 'L', NULL, and out-of-domain altitudes all take the SQL ELSE.
             Some(Altitude::Low) | None => DEFAULT_PRESSURE_LOW_ALTITUDE,
         },
     };
 
-    // Step 2 — `UPDATE County SET altitude = ...
-    //           WHERE barometricPressure IS NOT NULL
-    //             AND (altitude IS NULL OR altitude NOT IN ('H','L'))`.
-    // Step 1 guarantees a non-NULL pressure, so the first guard always
-    // holds here; only the altitude guard discriminates.
+ // Step 2 — `UPDATE County SET altitude = ...
+ // WHERE barometricPressure IS NOT NULL
+ // AND (altitude IS NULL OR altitude NOT IN ('H','L'))`.
+ // Step 1 guarantees a non-NULL pressure, so the first guard always
+ // holds here; only the altitude guard discriminates.
     let derived_altitude = if barometric_pressure_inhg >= ALTITUDE_PRESSURE_THRESHOLD {
         Altitude::Low
     } else {
@@ -173,8 +172,8 @@ pub fn heat_index(temperature_f: f64, rel_humidity: f64) -> f64 {
     }
     let t = temperature_f;
     let rh = rel_humidity;
-    // Term order mirrors the SQL expression so the left-to-right f64
-    // summation matches MariaDB's.
+ // Term order mirrors the SQL expression so the left-to-right f64
+ // summation matches MariaDB's.
     let hi = -42.379 + 2.04901523 * t + 10.14333127 * rh
         - 0.22475541 * t * rh
         - 0.00683783 * t * t
@@ -195,7 +194,7 @@ pub fn heat_index(temperature_f: f64, rel_humidity: f64) -> f64 {
 /// (default 4) places — 0.5556 — before promotion to a double. This port
 /// uses the exact ratio `5.0 / 9.0`; the two differ by roughly 8e-6
 /// relative, far inside any generator tolerance budget, and `5.0 / 9.0` is
-/// the conversion the expression denotes. Task 44's canonical-capture
+/// the conversion the expression denotes. canonical-capture
 /// comparison is the place to revisit this if a divergence appears.
 #[must_use]
 pub fn fahrenheit_to_kelvin(temperature_f: f64) -> f64 {
@@ -203,7 +202,7 @@ pub fn fahrenheit_to_kelvin(temperature_f: f64) -> f64 {
 }
 
 /// Saturation vapour pressure of water (kPa) at temperature `tk` (Kelvin)
-/// — the Java `PH2O` table expression.
+/// the Java `PH2O` table expression.
 ///
 /// A Goff-Gratch-form polynomial in `tk / 273.15`; at the ice point
 /// (`tk` of 273.15) every temperature-dependent term vanishes and the
@@ -211,8 +210,8 @@ pub fn fahrenheit_to_kelvin(temperature_f: f64) -> f64 {
 /// saturation pressure of water at 0 °C.
 #[must_use]
 pub fn saturation_vapor_pressure(tk: f64) -> f64 {
-    // `TK/273.15` and `273.15/TK` are distinct expressions in the SQL;
-    // keep them separate here too rather than reusing a reciprocal.
+ // `TK/273.15` and `273.15/TK` are distinct expressions in the SQL;
+ // keep them separate here too rather than reusing a reciprocal.
     let tk_over_ref = tk / 273.15;
     let ref_over_tk = 273.15 / tk;
     let exponent = 10.79574 * (1.0 - ref_over_tk) - 5.028 * tk_over_ref.log10()
@@ -258,22 +257,22 @@ pub fn specific_humidity(vapor_partial_pressure_kpa: f64, barometric_pressure_in
 /// value left by [`resolve_county_meteorology`].
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ZoneMonthHourInputs {
-    /// `ZoneMonthHour.temperature` — dry-bulb temperature, °F.
+ /// `ZoneMonthHour.temperature` — dry-bulb temperature, °F.
     pub temperature_f: f64,
-    /// `ZoneMonthHour.relHumidity` — relative humidity, percent.
+ /// `ZoneMonthHour.relHumidity` — relative humidity, percent.
     pub rel_humidity: f64,
-    /// Resolved `County.barometricPressure` for the row's zone, inHg.
+ /// Resolved `County.barometricPressure` for the row's zone, inHg.
     pub barometric_pressure_inhg: f64,
 }
 
 /// The three `ZoneMonthHour` columns the generator writes.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ZoneMonthHourMeteorology {
-    /// `ZoneMonthHour.heatIndex`, °F.
+ /// `ZoneMonthHour.heatIndex`, °F.
     pub heat_index: f64,
-    /// `ZoneMonthHour.specificHumidity`, g H2O / kg dry air.
+ /// `ZoneMonthHour.specificHumidity`, g H2O / kg dry air.
     pub specific_humidity: f64,
-    /// `ZoneMonthHour.molWaterFraction`, mol H2O / mol ambient air.
+ /// `ZoneMonthHour.molWaterFraction`, mol H2O / mol ambient air.
     pub mol_water_fraction: f64,
 }
 
@@ -327,15 +326,15 @@ fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -
 /// relative humidity for a `(zone, month, hour)` cell.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MeteorologyZoneMonthHourRow {
-    /// `zoneID` — the zone.
+ /// `zoneID` — the zone.
     pub zone_id: i32,
-    /// `monthID` — calendar month.
+ /// `monthID` — calendar month.
     pub month_id: i32,
-    /// `hourID` — hour of day.
+ /// `hourID` — hour of day.
     pub hour_id: i32,
-    /// `temperature` — dry-bulb temperature, °F.
+ /// `temperature` — dry-bulb temperature, °F.
     pub temperature_f: f64,
-    /// `relHumidity` — relative humidity, percent.
+ /// `relHumidity` — relative humidity, percent.
     pub rel_humidity: f64,
 }
 
@@ -422,9 +421,9 @@ impl TableRow for MeteorologyZoneMonthHourRow {
 /// One `Zone` row read by [`MeteorologyGenerator`] — the zone→county mapping.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MeteorologyZoneRow {
-    /// `zoneID` — the zone primary key.
+ /// `zoneID` — the zone primary key.
     pub zone_id: i32,
-    /// `countyID` — the county the zone belongs to.
+ /// `countyID` — the county the zone belongs to.
     pub county_id: i32,
 }
 
@@ -483,13 +482,13 @@ impl TableRow for MeteorologyZoneRow {
 /// [`resolve_county_meteorology`] fills in defaults for `NULL` values.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MeteorologyCountyRow {
-    /// `countyID` — the county primary key.
+ /// `countyID` — the county primary key.
     pub county_id: i32,
-    /// `barometricPressure` — nullable `DOUBLE`, inches of mercury. `None`
-    /// when the DB row has `NULL` or a non-positive value.
+ /// `barometricPressure` — nullable `DOUBLE`, inches of mercury. `None`
+ /// when the DB row has `NULL` or a non-positive value.
     pub barometric_pressure: Option<f64>,
-    /// `altitude` — nullable `CHAR(1)`: `'H'` high / `'L'` low. `None` when
-    /// the DB row has `NULL` or a character outside `('H','L')`.
+ /// `altitude` — nullable `CHAR(1)`: `'H'` high / `'L'` low. `None` when
+ /// the DB row has `NULL` or a character outside `('H','L')`.
     pub altitude: Option<char>,
 }
 
@@ -565,36 +564,35 @@ impl TableRow for MeteorologyCountyRow {
 /// the generator reads.
 #[derive(Debug, Clone, Default)]
 pub struct MeteorologyInputs {
-    /// `ZoneMonthHour` rows — one per `(zone, month, hour)` cell.
+ /// `ZoneMonthHour` rows — one per `(zone, month, hour)` cell.
     pub zone_month_hour: Vec<MeteorologyZoneMonthHourRow>,
-    /// `Zone` rows — the zone→county mapping.
+ /// `Zone` rows — the zone→county mapping.
     pub zone: Vec<MeteorologyZoneRow>,
-    /// `County` rows — barometric pressure and altitude class.
+ /// `County` rows — barometric pressure and altitude class.
     pub county: Vec<MeteorologyCountyRow>,
 }
 
 // ---- Output row type -------------------------------------------------------
 
-/// One `ZoneMonthHour` row written to scratch by [`MeteorologyGenerator`] —
-/// the original temperature/humidity inputs plus the three computed meteorology
+/// One `ZoneMonthHour` row written to scratch by [`MeteorologyGenerator`]/// the original temperature/humidity inputs plus the three computed meteorology
 /// columns.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MeteorologyOutputRow {
-    /// `zoneID` — the zone.
+ /// `zoneID` — the zone.
     pub zone_id: i32,
-    /// `monthID` — calendar month.
+ /// `monthID` — calendar month.
     pub month_id: i32,
-    /// `hourID` — hour of day.
+ /// `hourID` — hour of day.
     pub hour_id: i32,
-    /// `temperature` — dry-bulb temperature, °F (pass-through from input).
+ /// `temperature` — dry-bulb temperature, °F (pass-through from input).
     pub temperature_f: f64,
-    /// `relHumidity` — relative humidity, percent (pass-through from input).
+ /// `relHumidity` — relative humidity, percent (pass-through from input).
     pub rel_humidity: f64,
-    /// `heatIndex` — apparent temperature, °F.
+ /// `heatIndex` — apparent temperature, °F.
     pub heat_index: f64,
-    /// `specificHumidity` — g H2O / kg dry air.
+ /// `specificHumidity` — g H2O / kg dry air.
     pub specific_humidity: f64,
-    /// `molWaterFraction` — mol H2O / mol ambient air.
+ /// `molWaterFraction` — mol H2O / mol ambient air.
     pub mol_water_fraction: f64,
 }
 
@@ -719,8 +717,7 @@ impl TableRow for MeteorologyOutputRow {
 /// [`resolve_county_meteorology`] to fill defaults, then calls
 /// [`compute_zone_month_hour`] to produce the three output columns.
 ///
-/// Rows with no matching `Zone` or `County` entry are silently dropped —
-/// the same behaviour as the Java's inner-join SQL.
+/// Rows with no matching `Zone` or `County` entry are silently dropped/// the same behaviour as the Java's inner-join SQL.
 pub fn build_meteorology_table(inputs: &MeteorologyInputs) -> Vec<MeteorologyOutputRow> {
     let zone_to_county: HashMap<i32, i32> = inputs
         .zone
@@ -766,7 +763,7 @@ pub fn build_meteorology_table(inputs: &MeteorologyInputs) -> Vec<MeteorologyOut
     rows
 }
 
-/// MOVES `MeteorologyGenerator` (migration plan Task 41).
+/// MOVES `MeteorologyGenerator` ().
 ///
 /// Builds the meteorology fields of `ZoneMonthHour`. Holds no per-run
 /// state: every input arrives through the [`CalculatorContext`] passed to
@@ -831,11 +828,11 @@ pub fn factory() -> Box<dyn Generator> {
 mod tests {
     use super::*;
 
-    // ---- heat_index ----
+ // ---- heat_index ----
 
     #[test]
     fn heat_index_below_threshold_is_temperature() {
-        // The `WHERE temperature < 78` UPDATE leaves heatIndex == temperature.
+ // The `WHERE temperature < 78` UPDATE leaves heatIndex == temperature.
         assert_eq!(heat_index(70.0, 50.0), 70.0);
         assert_eq!(heat_index(32.0, 99.0), 32.0);
         assert_eq!(heat_index(-10.0, 0.0), -10.0);
@@ -848,8 +845,8 @@ mod tests {
 
     #[test]
     fn heat_index_at_threshold_uses_regression() {
-        // temperature == 78 falls into the `>= 78.0` UPDATE, not the
-        // passthrough, so the result is the polynomial — not 78.
+ // temperature == 78 falls into the `>= 78.0` UPDATE, not the
+ // passthrough, so the result is the polynomial — not 78.
         let hi = heat_index(78.0, 50.0);
         assert_ne!(hi, 78.0);
         assert!(hi.is_finite());
@@ -857,31 +854,31 @@ mod tests {
 
     #[test]
     fn heat_index_matches_hand_computed_regression() {
-        // T = 80 °F, RH = 40 %: the NWS regression summed term-by-term
-        // left-to-right is 79.9293732 (independent hand calculation).
+ // T = 80 °F, RH = 40 %: the NWS regression summed term-by-term
+ // left-to-right is 79.9293732 (independent hand calculation).
         let hi = heat_index(80.0, 40.0);
         assert!((hi - 79.9293732).abs() < 1e-6, "heat_index(80, 40) = {hi}");
     }
 
     #[test]
     fn heat_index_caps_at_120() {
-        // Extreme heat drives the regression well past 120; the SQL
-        // `least(..., 120)` clamps it.
+ // Extreme heat drives the regression well past 120; the SQL
+ // `least(..., 120)` clamps it.
         assert_eq!(heat_index(115.0, 95.0), 120.0);
         assert_eq!(heat_index(140.0, 100.0), 120.0);
     }
 
-    // ---- fahrenheit_to_kelvin ----
+ // ---- fahrenheit_to_kelvin ----
 
     #[test]
     fn fahrenheit_to_kelvin_ice_point() {
-        // 32 °F is exactly 273.15 K: (5/9)·0 + 273.15.
+ // 32 °F is exactly 273.15 K: (5/9)·0 + 273.15.
         assert_eq!(fahrenheit_to_kelvin(32.0), 273.15);
     }
 
     #[test]
     fn fahrenheit_to_kelvin_steam_point() {
-        // 212 °F is 373.15 K (100 °C).
+ // 212 °F is 373.15 K (100 °C).
         assert!((fahrenheit_to_kelvin(212.0) - 373.15).abs() < 1e-9);
     }
 
@@ -890,30 +887,30 @@ mod tests {
         assert!(fahrenheit_to_kelvin(60.0) < fahrenheit_to_kelvin(90.0));
     }
 
-    // ---- saturation_vapor_pressure ----
+ // ---- saturation_vapor_pressure ----
 
     #[test]
     fn saturation_vapor_pressure_at_ice_point() {
-        // At TK = 273.15 every temperature term vanishes; the result is
-        // 10^-0.2138602 ≈ 0.611 kPa, water's saturation pressure at 0 °C.
+ // At TK = 273.15 every temperature term vanishes; the result is
+ // 10^-0.2138602 ≈ 0.611 kPa, water's saturation pressure at 0 °C.
         let p = saturation_vapor_pressure(273.15);
         assert!((p - 0.611).abs() < 0.01, "PH2O(273.15) = {p}");
     }
 
     #[test]
     fn saturation_vapor_pressure_increases_with_temperature() {
-        // Warmer air holds more water: PH2O must rise with TK.
+ // Warmer air holds more water: PH2O must rise with TK.
         let cold = saturation_vapor_pressure(fahrenheit_to_kelvin(40.0));
         let warm = saturation_vapor_pressure(fahrenheit_to_kelvin(95.0));
         assert!(warm > cold);
         assert!(cold > 0.0);
     }
 
-    // ---- vapor_partial_pressure / mole_fraction / specific_humidity ----
+ // ---- vapor_partial_pressure / mole_fraction / specific_humidity ----
 
     #[test]
     fn vapor_partial_pressure_scales_with_humidity() {
-        // PV = relHumidity/100 * PH2O.
+ // PV = relHumidity/100 * PH2O.
         assert_eq!(vapor_partial_pressure(50.0, 2.0), 1.0);
         assert_eq!(vapor_partial_pressure(0.0, 2.0), 0.0);
         assert_eq!(vapor_partial_pressure(100.0, 2.0), 2.0);
@@ -921,8 +918,8 @@ mod tests {
 
     #[test]
     fn mole_fraction_is_vapor_over_total_pressure() {
-        // With relHumidity 100 %, XH2O = PH2O / (PB · 3.38639). Choosing
-        // PH2O == PB·3.38639 makes the fraction exactly 1.
+ // With relHumidity 100 %, XH2O = PH2O / (PB · 3.38639). Choosing
+ // PH2O == PB·3.38639 makes the fraction exactly 1.
         let pb = 2.0;
         let ph2o = pb * INHG_TO_KPA;
         assert!((mole_fraction(100.0, ph2o, pb) - 1.0).abs() < 1e-12);
@@ -935,13 +932,13 @@ mod tests {
 
     #[test]
     fn specific_humidity_is_positive_for_real_inputs() {
-        // PB·3.38639 dominates PV for any realistic atmosphere, so the
-        // denominator stays positive and specificHumidity is positive.
+ // PB·3.38639 dominates PV for any realistic atmosphere, so the
+ // denominator stays positive and specificHumidity is positive.
         let sh = specific_humidity(1.5, 29.0);
         assert!(sh > 0.0 && sh.is_finite(), "specific_humidity = {sh}");
     }
 
-    // ---- resolve_county_meteorology ----
+ // ---- resolve_county_meteorology ----
 
     #[test]
     fn county_keeps_valid_pressure_and_altitude() {
@@ -952,7 +949,7 @@ mod tests {
 
     #[test]
     fn county_missing_pressure_uses_high_altitude_default() {
-        // NULL and non-positive pressures both trigger the fill-in.
+ // NULL and non-positive pressures both trigger the fill-in.
         for missing in [None, Some(0.0), Some(-3.0)] {
             let resolved = resolve_county_meteorology(missing, Some(Altitude::High));
             assert_eq!(
@@ -965,8 +962,8 @@ mod tests {
 
     #[test]
     fn county_missing_pressure_non_high_altitude_uses_low_default() {
-        // SQL `CASE WHEN altitude='H' ... ELSE 28.94`: 'L' and NULL both
-        // take the ELSE branch.
+ // SQL `CASE WHEN altitude='H' ... ELSE 28.94`: 'L' and NULL both
+ // take the ELSE branch.
         let low = resolve_county_meteorology(None, Some(Altitude::Low));
         assert_eq!(low.barometric_pressure_inhg, DEFAULT_PRESSURE_LOW_ALTITUDE);
         assert_eq!(low.altitude, Altitude::Low);
@@ -980,7 +977,7 @@ mod tests {
 
     #[test]
     fn county_missing_altitude_derived_from_pressure() {
-        // At least 25.8403 inHg classes Low, below it High.
+ // At least 25.8403 inHg classes Low, below it High.
         let low = resolve_county_meteorology(Some(30.0), None);
         assert_eq!(low.altitude, Altitude::Low);
         assert_eq!(low.barometric_pressure_inhg, 30.0);
@@ -992,15 +989,15 @@ mod tests {
 
     #[test]
     fn county_altitude_threshold_is_inclusive_low() {
-        // Exactly 25.8403 inHg → Low (`barometricPressure >= 25.8403`).
+ // Exactly 25.8403 inHg → Low (`barometricPressure >= 25.8403`).
         let resolved = resolve_county_meteorology(Some(ALTITUDE_PRESSURE_THRESHOLD), None);
         assert_eq!(resolved.altitude, Altitude::Low);
     }
 
     #[test]
     fn county_all_missing_falls_through_both_defaults() {
-        // NULL pressure + NULL altitude: step 1 gives 28.94 (ELSE branch),
-        // step 2 then classes 28.94 >= 25.8403 as Low.
+ // NULL pressure + NULL altitude: step 1 gives 28.94 (ELSE branch),
+ // step 2 then classes 28.94 >= 25.8403 as Low.
         let resolved = resolve_county_meteorology(None, None);
         assert_eq!(
             resolved.barometric_pressure_inhg,
@@ -1009,7 +1006,7 @@ mod tests {
         assert_eq!(resolved.altitude, Altitude::Low);
     }
 
-    // ---- compute_zone_month_hour ----
+ // ---- compute_zone_month_hour ----
 
     #[test]
     fn compute_row_cold_uses_temperature_for_heat_index() {
@@ -1038,11 +1035,11 @@ mod tests {
         assert_eq!(out.heat_index, heat_index(88.0, 65.0));
         assert_eq!(out.specific_humidity, specific_humidity(pv, 29.92));
         assert_eq!(out.mol_water_fraction, mole_fraction(65.0, ph2o, 29.92));
-        // 88 °F at 65 % RH is a "feels hotter than it is" day.
+ // 88 °F at 65 % RH is a "feels hotter than it is" day.
         assert!(out.heat_index > 88.0);
     }
 
-    // ---- Generator trait ----
+ // ---- Generator trait ----
 
     #[test]
     fn generator_name_matches_java_class() {
@@ -1061,9 +1058,9 @@ mod tests {
 
     #[test]
     fn generator_subscription_process_ids_match_java_order() {
-        // MeteorologyGenerator.subscribeToMe: Running Exhaust (1), Extended
-        // Idle Exhaust (90), Start Exhaust (2), Auxiliary Power Exhaust
-        // (91), Tirewear (10), Brakewear (9).
+ // MeteorologyGenerator.subscribeToMe: Running Exhaust (1), Extended
+ // Idle Exhaust (90), Start Exhaust (2), Auxiliary Power Exhaust
+ // (91), Tirewear (10), Brakewear (9).
         let ids: Vec<u16> = MeteorologyGenerator
             .subscriptions()
             .iter()
@@ -1077,13 +1074,13 @@ mod tests {
         let gen = MeteorologyGenerator;
         assert_eq!(gen.input_tables(), &["ZoneMonthHour", "Zone", "County"]);
         assert_eq!(gen.output_tables(), &["ZoneMonthHour"]);
-        // No upstream generators — MeteorologyGenerator is a root generator.
+ // No upstream generators — MeteorologyGenerator is a root generator.
         assert!(gen.upstream().is_empty());
     }
 
     #[test]
     fn generator_subscriptions_are_stable_across_calls() {
-        // The OnceLock-backed slice is identical on every call.
+ // The OnceLock-backed slice is identical on every call.
         let first = MeteorologyGenerator.subscriptions();
         let second = MeteorologyGenerator.subscriptions();
         assert_eq!(first, second);
@@ -1091,10 +1088,10 @@ mod tests {
 
     #[test]
     fn execute_writes_computed_meteorology_to_scratch() {
-        // Integration test: execute reads ZoneMonthHour/Zone/County from
-        // ctx.tables(), runs the doHeatIndex kernel, and writes the augmented
-        // ZoneMonthHour table to ctx.scratch(). Read it back and assert the
-        // kernel's direct output matches.
+ // Integration test: execute reads ZoneMonthHour/Zone/County from
+ // ctx.tables(), runs the doHeatIndex kernel, and writes the augmented
+ // ZoneMonthHour table to ctx.scratch(). Read it back and assert the
+ // kernel's direct output matches.
         use moves_framework::{DataFrameStore, InMemoryStore};
 
         let zone_id = 261_610_i32;
@@ -1136,10 +1133,10 @@ mod tests {
 
         let mut ctx = CalculatorContext::with_tables(store);
         let out = MeteorologyGenerator.execute(&mut ctx).expect("execute ok");
-        // Generator writes to scratch, not the main output.
+ // Generator writes to scratch, not the main output.
         assert!(out.dataframe().is_none());
 
-        // Read the scratch table back as typed rows.
+ // Read the scratch table back as typed rows.
         let rows: Vec<MeteorologyOutputRow> = ctx
             .scratch()
             .store
@@ -1147,7 +1144,7 @@ mod tests {
             .expect("ZoneMonthHour in scratch");
         assert_eq!(rows.len(), 1);
 
-        // Compare against what the kernel functions compute directly.
+ // Compare against what the kernel functions compute directly.
         let expected_county = resolve_county_meteorology(Some(29.92), Some(Altitude::Low));
         let expected = compute_zone_month_hour(ZoneMonthHourInputs {
             temperature_f,
@@ -1168,7 +1165,7 @@ mod tests {
 
     #[test]
     fn execute_drops_zmh_rows_with_no_zone_match() {
-        // ZoneMonthHour rows whose zoneID has no Zone entry are silently dropped.
+ // ZoneMonthHour rows whose zoneID has no Zone entry are silently dropped.
         use moves_framework::{DataFrameStore, InMemoryStore};
         let mut store = InMemoryStore::new();
         store.insert(
@@ -1182,7 +1179,7 @@ mod tests {
             }])
             .unwrap(),
         );
-        // Zone table maps a different zone; County maps that county.
+ // Zone table maps a different zone; County maps that county.
         store.insert(
             "Zone",
             MeteorologyZoneRow::into_dataframe(vec![MeteorologyZoneRow {
@@ -1212,8 +1209,8 @@ mod tests {
 
     #[test]
     fn execute_applies_county_default_fill_for_null_pressure_and_altitude() {
-        // When County has NULL barometricPressure and NULL altitude, the
-        // default fill gives 28.94 inHg / Low — verify the output uses it.
+ // When County has NULL barometricPressure and NULL altitude, the
+ // default fill gives 28.94 inHg / Low — verify the output uses it.
         use moves_framework::{DataFrameStore, InMemoryStore};
         let mut store = InMemoryStore::new();
         store.insert(
@@ -1252,9 +1249,9 @@ mod tests {
             .iter_typed("ZoneMonthHour")
             .expect("scratch table present");
         assert_eq!(rows.len(), 1);
-        // 55 °F is below the 78 °F threshold so heat_index == temperature.
+ // 55 °F is below the 78 °F threshold so heat_index == temperature.
         assert_eq!(rows[0].heat_index, 55.0);
-        // specific_humidity and mol_water_fraction must be positive.
+ // specific_humidity and mol_water_fraction must be positive.
         assert!(rows[0].specific_humidity > 0.0);
         assert!(rows[0].mol_water_fraction > 0.0);
     }

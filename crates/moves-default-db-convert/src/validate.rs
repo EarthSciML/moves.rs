@@ -1,29 +1,29 @@
 //! Validate a converted default-DB Parquet tree against the source TSV
 //! dump (and, transitively, the upstream MariaDB content).
 //!
-//! Phase 4 Task 81. Checks executed per table:
+//!Checks executed per table:
 //!
 //! 1. **Manifest cross-check** — every partition file the manifest names
-//!    exists on disk, and `partitions[*].row_count` matches the actual
-//!    Parquet row count and `partitions[*].sha256` matches the file hash.
+//! exists on disk, and `partitions[*].row_count` matches the actual
+//! Parquet row count and `partitions[*].sha256` matches the file hash.
 //! 2. **Schema fidelity** — the Arrow schema read back from each Parquet
-//!    matches the column list and types recorded in the manifest. Catches
-//!    type-coercion bugs in the writer.
+//! matches the column list and types recorded in the manifest. Catches
+//! type-coercion bugs in the writer.
 //! 3. **Row totals** — `sum(partitions.row_count) == lines(source.tsv)`,
-//!    where the TSV is the byte-identical artifact the dumper produced
-//!    from `SELECT * ORDER BY 1..N`.
+//! where the TSV is the byte-identical artifact the dumper produced
+//! from `SELECT * ORDER BY 1..N`.
 //! 4. **Per-column aggregates** — for every column whose Arrow type is
-//!    `Int64` or `Float64`, recompute `count_non_null`, `min`, `max`,
-//!    and `sum` from (a) the source TSV (parsed with the same rules the
-//!    converter applies) and (b) the Parquet contents. The two must
-//!    match. For Float64, exact equality is the contract: the converter
-//!    parses TSV via `str::parse::<f64>`, the reader returns the same
-//!    bit pattern, and we sum in a deterministic primary-key order so no
-//!    floating-point reordering can creep in.
+//! `Int64` or `Float64`, recompute `count_non_null`, `min`, `max`,
+//! and `sum` from (a) the source TSV (parsed with the same rules the
+//! converter applies) and (b) the Parquet contents. The two must
+//! match. For Float64, exact equality is the contract: the converter
+//! parses TSV via `str::parse::<f64>`, the reader returns the same
+//! bit pattern, and we sum in a deterministic primary-key order so no
+//! floating-point reordering can creep in.
 //! 5. **First-row spot check** — read the first row from the source TSV
-//!    and the first row from the first partition, compare field-by-field
-//!    using the converter's TSV-decode rules. Catches obvious type/order
-//!    regressions even if the aggregates accidentally collide.
+//! and the first row from the first partition, compare field-by-field
+//! using the converter's TSV-decode rules. Catches obvious type/order
+//! regressions even if the aggregates accidentally collide.
 //!
 //! This module is deliberately self-contained: it does not depend on
 //! MariaDB or the SIF at validation time. Transitivity argument:
@@ -56,18 +56,18 @@ pub struct Finding {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FindingKind {
-    /// File on disk doesn't match what the manifest claims.
+ /// File on disk doesn't match what the manifest claims.
     ManifestDriftError,
-    /// Parquet schema doesn't match the manifest's column list.
+ /// Parquet schema doesn't match the manifest's column list.
     SchemaError,
-    /// Sum-of-partition-rows doesn't equal source TSV line count.
+ /// Sum-of-partition-rows doesn't equal source TSV line count.
     RowCountError,
-    /// A per-column aggregate computed on Parquet doesn't match the value
-    /// computed on the source TSV.
+ /// A per-column aggregate computed on Parquet doesn't match the value
+ /// computed on the source TSV.
     AggregateError,
-    /// First-row field-by-field comparison disagrees.
+ /// First-row field-by-field comparison disagrees.
     RowContentError,
-    /// Anything else worth flagging that isn't a contract break.
+ /// Anything else worth flagging that isn't a contract break.
     Warning,
 }
 
@@ -104,15 +104,15 @@ impl ValidationReport {
 /// Configuration for a validation run.
 #[derive(Debug, Clone)]
 pub struct ValidateOptions {
-    /// Root of the converted output (the directory that contains
-    /// `manifest.json`).
+ /// Root of the converted output (the directory that contains
+ /// `manifest.json`).
     pub output_root: PathBuf,
-    /// Directory of source TSV pairs (`<Table>.tsv` + `<Table>.schema.tsv`).
+ /// Directory of source TSV pairs (`<Table>.tsv` + `<Table>.schema.tsv`).
     pub tsv_dir: PathBuf,
-    /// Per-table maximum row count above which to skip the field-level
-    /// aggregate check. Huge tables (millions of rows) get spot-checked by
-    /// row counts and schema only. Set to 0 to skip aggregate checks for
-    /// every table; `None` to never skip.
+ /// Per-table maximum row count above which to skip the field-level
+ /// aggregate check. Huge tables (millions of rows) get spot-checked by
+ /// row counts and schema only. Set to 0 to skip aggregate checks for
+ /// every table; `None` to never skip.
     pub aggregate_row_cap: Option<u64>,
 }
 
@@ -142,8 +142,8 @@ fn validate_table(
     opts: &ValidateOptions,
     report: &mut ValidationReport,
 ) -> Result<()> {
-    // Skip schema-only tables: their contract is "no Parquet body, just a
-    // sidecar." Verify the sidecar exists and matches.
+ // Skip schema-only tables: their contract is "no Parquet body, just a
+ // sidecar." Verify the sidecar exists and matches.
     if entry.partition_strategy == "schema_only" {
         if let Some(sidecar) = &entry.schema_only_path {
             let sidecar_path = opts.output_root.join(sidecar);
@@ -162,7 +162,7 @@ fn validate_table(
         return Ok(());
     }
 
-    // ----- manifest drift: every partition file exists with the recorded hash -----
+ // ----- manifest drift: every partition file exists with the recorded hash -----
     for partition in &entry.partitions {
         let abs = opts.output_root.join(&partition.path);
         let bytes = match std::fs::read(&abs) {
@@ -191,17 +191,17 @@ fn validate_table(
         }
     }
 
-    // ----- schema fidelity: read back each partition, verify Arrow types match -----
-    // Plus collect total Parquet-side row count.
+ // ----- schema fidelity: read back each partition, verify Arrow types match -----
+ // Plus collect total Parquet-side row count.
     let mut parquet_rows: u64 = 0;
     let mut sample_first_row: Option<Vec<Option<String>>> = None;
     let mut parquet_aggs = ColumnAggregates::new(&entry.columns);
     for (idx, partition) in entry.partitions.iter().enumerate() {
         let abs = opts.output_root.join(&partition.path);
-        // Re-read the bytes for record-batch iteration. Missing files are
-        // already recorded above as `ManifestDriftError`; corrupted files
-        // surface here. Both are recorded as findings rather than propagated
-        // as errors so the validator can report on every table in one pass.
+ // Re-read the bytes for record-batch iteration. Missing files are
+ // already recorded above as `ManifestDriftError`; corrupted files
+ // surface here. Both are recorded as findings rather than propagated
+ // as errors so the validator can report on every table in one pass.
         let bytes = match std::fs::read(&abs) {
             Ok(b) => b,
             Err(_) => continue,
@@ -254,10 +254,10 @@ fn validate_table(
             };
             let schema = batch.schema();
             if idx == 0 && partition_row_count == 0 && batch.num_rows() > 0 {
-                // Record the first row for the spot check.
+ // Record the first row for the spot check.
                 sample_first_row = Some(extract_row_strings(&batch, 0));
             }
-            // Schema cross-check: column count + types.
+ // Schema cross-check: column count + types.
             if schema.fields().len() != entry.columns.len() {
                 push(
                     report,
@@ -301,9 +301,9 @@ fn validate_table(
                     }
                 }
             }
-            // Tally Parquet-side aggregates over numeric columns. Cap on
-            // aggregate inclusion happens at table scope; we always tally
-            // and just decide whether to compare at the table level.
+ // Tally Parquet-side aggregates over numeric columns. Cap on
+ // aggregate inclusion happens at table scope; we always tally
+ // and just decide whether to compare at the table level.
             parquet_aggs.absorb_batch(&batch);
             partition_row_count += batch.num_rows() as u64;
         }
@@ -324,14 +324,14 @@ fn validate_table(
         parquet_rows += partition_row_count;
     }
 
-    // ----- row totals vs source TSV -----
+ // ----- row totals vs source TSV -----
     let tsv_match =
         crate::convert::find_tsv_case_insensitive_pub(&opts.tsv_dir, &entry.name, ".tsv")?;
     let schema_tsv =
         crate::convert::find_tsv_case_insensitive_pub(&opts.tsv_dir, &entry.name, ".schema.tsv")?;
     let (Some(tsv_path), Some(schema_path)) = (tsv_match, schema_tsv) else {
-        // Source TSV missing — that's fine if the manifest also has zero
-        // rows; otherwise it's a hole worth flagging.
+ // Source TSV missing — that's fine if the manifest also has zero
+ // rows; otherwise it's a hole worth flagging.
         if parquet_rows != 0 {
             push(
                 report,
@@ -348,8 +348,8 @@ fn validate_table(
         return Ok(());
     };
 
-    // Re-parse the schema TSV — gives us the same SchemaColumn vec the
-    // converter used, which we need to compare per-column aggregates.
+ // Re-parse the schema TSV — gives us the same SchemaColumn vec the
+ // converter used, which we need to compare per-column aggregates.
     let dump_columns = crate::tsv::read_schema_tsv(&schema_path)?;
     let tsv_row_count = crate::tsv::count_rows(&tsv_path)?;
     if tsv_row_count != entry.row_count {
@@ -375,7 +375,7 @@ fn validate_table(
         );
     }
 
-    // ----- per-column aggregate equality (TSV vs Parquet) -----
+ // ----- per-column aggregate equality (TSV vs Parquet) -----
     let allow_aggregates = opts
         .aggregate_row_cap
         .map(|cap| cap > 0 && tsv_row_count <= cap)
@@ -394,11 +394,11 @@ fn validate_table(
         compare_aggregates(&tsv_aggs, &parquet_aggs, &entry.name, report);
 
         if let (Some(t), Some(p)) = (first_tsv_row, sample_first_row.as_ref()) {
-            // The Parquet-side first row may live in a different partition
-            // (the BTreeMap groups by partition value). Only compare when
-            // the table isn't partitioned — for partitioned tables we
-            // already check row count + aggregates, which catches the same
-            // ordering bugs without needing partition-aware merging here.
+ // The Parquet-side first row may live in a different partition
+ // (the BTreeMap groups by partition value). Only compare when
+ // the table isn't partitioned — for partitioned tables we
+ // already check row count + aggregates, which catches the same
+ // ordering bugs without needing partition-aware merging here.
             if entry.partition_strategy == "monolithic" {
                 compare_first_row(&t, p, &dump_columns, &entry.name, report);
             }
@@ -548,9 +548,9 @@ fn extract_row_strings(
 /// only used in row-content reports — for actual comparison we always parse
 /// both sides and compare bit patterns.
 fn format_f64_like_tsv(v: f64) -> String {
-    // Best-effort textual rendering for diagnostic messages. The real
-    // comparison goes through `f64::to_bits`, so this string is only ever
-    // user-visible.
+ // Best-effort textual rendering for diagnostic messages. The real
+ // comparison goes through `f64::to_bits`, so this string is only ever
+ // user-visible.
     let s = format!("{}", v);
     if s == "NaN" {
         "NULL".to_string()
@@ -572,11 +572,11 @@ struct ColumnAggregate {
     int_seen: bool,
     float_min_bits: u64,
     float_max_bits: u64,
-    /// A 128-bit signed accumulator treated as a fixed-decimal-shifted
-    /// integer (f64 × 10^9). Gives a deterministic order-independent
-    /// signal for "do the two sources see the same values?" — the exact
-    /// sum-of-doubles is order-dependent and meaningless for
-    /// cross-comparison anyway.
+ /// A 128-bit signed accumulator treated as a fixed-decimal-shifted
+ /// integer (f64 × 10^9). Gives a deterministic order-independent
+ /// signal for "do the two sources see the same values?" — the exact
+ /// sum-of-doubles is order-dependent and meaningless for
+ /// cross-comparison anyway.
     float_sum_scaled: i128,
     float_seen: bool,
 }
@@ -704,7 +704,7 @@ impl ColumnAggregates {
 }
 
 fn update_float_min_max(agg: &mut ColumnAggregate, v: f64) {
-    // Track via total-ordering bits so NaN sorts deterministically.
+ // Track via total-ordering bits so NaN sorts deterministically.
     let v_bits = v.to_bits();
     let prev_min = f64::from_bits(agg.float_min_bits);
     let prev_max = f64::from_bits(agg.float_max_bits);
@@ -910,11 +910,11 @@ mod tests {
     #[test]
     fn validate_catches_parquet_corruption() {
         let (tsv_dir, out_dir, _guard) = round_trip_setup();
-        // Tamper with the Parquet file.
+ // Tamper with the Parquet file.
         let bad = out_dir.join("Sample.parquet");
         let mut bytes = std::fs::read(&bad).unwrap();
-        // Flip a byte in the body (well past the magic). This breaks the
-        // sha256 and may also break the file content.
+ // Flip a byte in the body (well past the magic). This breaks the
+ // sha256 and may also break the file content.
         bytes[200] ^= 0xff;
         std::fs::write(&bad, &bytes).unwrap();
         let report = validate(&ValidateOptions {
@@ -930,7 +930,7 @@ mod tests {
     #[test]
     fn validate_catches_missing_partition() {
         let (tsv_dir, out_dir, _guard) = round_trip_setup();
-        // Delete the Parquet file. The manifest still claims it.
+ // Delete the Parquet file. The manifest still claims it.
         std::fs::remove_file(out_dir.join("Sample.parquet")).unwrap();
         let report = validate(&ValidateOptions {
             output_root: out_dir,

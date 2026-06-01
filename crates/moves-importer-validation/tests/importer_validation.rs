@@ -1,18 +1,18 @@
-//! Importer validation suite — Phase 4 Task 88.
+//! Importer validation suite —.
 //!
 //! Each module runs one Rust importer against the committed fixtures
 //! under `fixtures/`, normalizes the Parquet output through the
 //! [`moves_importer_validation`] harness, and:
 //!
 //! * verifies the output is a well-formed, snapshot-stable table
-//!   (`assert_snapshot_stable`) — this always runs in CI;
+//! (`assert_snapshot_stable`) — this always runs in CI;
 //! * diffs the output against the canonical-MOVES capture for the same
-//!   inputs (`compare_to_canonical`) — this runs only when the operator
-//!   has produced the snapshot (the capture suite is HPC-gated; see the
-//!   crate `README.md`), and otherwise reports a skip.
+//! inputs (`compare_to_canonical`) — this runs only when the operator
+//! has produced the snapshot (the capture suite is HPC-gated; see the
+//! crate `README.md`), and otherwise reports a skip.
 //!
 //! A drift against canonical MOVES is a candidate importer bug, which is
-//! exactly the signal Task 88 is built to surface.
+//! exactly the signal is built to surface.
 
 use std::path::PathBuf;
 
@@ -94,7 +94,7 @@ fn compare_to_canonical(snapshot_name: &str, moves_table: &str, importer_parquet
 
 #[test]
 fn characterization_dir_is_discoverable() {
-    // The gated comparison depends on locating `characterization/`.
+ // The gated comparison depends on locating `characterization/`.
     assert!(
         characterization_dir().is_some(),
         "characterization/ directory should be reachable from the crate"
@@ -103,15 +103,15 @@ fn characterization_dir_is_discoverable() {
 
 #[test]
 fn canonical_snapshots_are_gated_not_required() {
-    // A snapshot that has certainly not been captured must resolve to a
-    // clean skip, never an error — this is what keeps CI green while the
-    // capture suite stays HPC-gated.
+ // A snapshot that has certainly not been captured must resolve to a
+ // clean skip, never an error — this is what keeps CI green while the
+ // capture suite stays HPC-gated.
     let result = load_canonical_snapshot("importer-validation-does-not-exist").unwrap();
     assert!(result.is_none());
 }
 
 // ---------------------------------------------------------------------------
-// County Database (CDB) importers — Task 83.
+// County Database (CDB) importers —.
 // ---------------------------------------------------------------------------
 mod cdb {
     use super::*;
@@ -124,11 +124,11 @@ mod cdb {
         AgeDistributionImporter, SourceTypePopulationImporter, ZoneImporter, ZoneRoadTypeImporter,
     };
 
-    /// Run a CDB importer against its fixture CSV(s): read, validate
-    /// (per-column + cross-row), and encode Parquet. The committed
-    /// fixtures are clean inputs, so any validation *error* fails the
-    /// suite. Returns one [`TableOutput`] per importer table, in
-    /// descriptor order.
+ /// Run a CDB importer against its fixture CSV(s): read, validate
+ /// (per-column + cross-row), and encode Parquet. The committed
+ /// fixtures are clean inputs, so any validation *error* fails the
+ /// suite. Returns one [`TableOutput`] per importer table, in
+ /// descriptor order.
     fn run(importer: &dyn Importer, csvs: &[PathBuf]) -> Vec<TableOutput> {
         let descriptors = importer.tables();
         assert_eq!(
@@ -213,7 +213,7 @@ mod cdb {
 
     #[test]
     fn zone_importer_emits_zone_and_zone_road_type() {
-        // ZoneImporter is a two-table importer: `zone` then `zoneRoadType`.
+ // ZoneImporter is a two-table importer: `zone` then `zoneRoadType`.
         let out = run(
             &ZoneImporter,
             &[fixture("cdb/Zone.csv"), fixture("cdb/ZoneRoadType.csv")],
@@ -235,15 +235,15 @@ mod cdb {
 }
 
 // ---------------------------------------------------------------------------
-// Project Database (PDB) importer — Task 84.
+// Project Database (PDB) importer —.
 // ---------------------------------------------------------------------------
 mod pdb {
     use super::*;
 
     use moves_importer_pdb::{filter::RunSpecFilter, ImportSession};
 
-    /// MOVES natural key for each project-scale table — the columns the
-    /// canonical snapshot sorts and keys rows on.
+ /// MOVES natural key for each project-scale table — the columns the
+ /// canonical snapshot sorts and keys rows on.
     fn natural_key(table: &str) -> &'static [&'static str] {
         match table {
             "Link" => &["linkID"],
@@ -291,14 +291,14 @@ mod pdb {
             compare_to_canonical("importer-validation-pdb", &entry.name, &bytes);
             total_rows += entry.row_count;
         }
-        // 4 links + 9 link-source-type-hour + 5 drive-schedule + 2
-        // off-network + 4 op-mode rows.
+ // 4 links + 9 link-source-type-hour + 5 drive-schedule + 2
+ // off-network + 4 op-mode rows.
         assert_eq!(total_rows, 24);
     }
 }
 
 // ---------------------------------------------------------------------------
-// Nonroad input-database importer — Task 85.
+// Nonroad input-database importer —.
 // ---------------------------------------------------------------------------
 mod nonroad {
     use super::*;
@@ -309,17 +309,17 @@ mod nonroad {
     fn nonroad_importer_output_is_snapshot_comparable() {
         let out_dir = tempfile::tempdir().unwrap();
         let mut opts = ImportOptions::new(fixture("nonroad"), out_dir.path());
-        // Fixed stamp keeps the manifest byte-stable across runs.
+ // Fixed stamp keeps the manifest byte-stable across runs.
         opts.generated_at_utc = Some("2026-05-16T00:00:00Z".to_string());
         let (manifest, report) = import(&opts).expect("nonroad import runs");
 
-        // Two of the four built-in tables have committed fixtures; the
-        // rest are absent and skip cleanly (require_all_tables = false).
+ // Two of the four built-in tables have committed fixtures; the
+ // rest are absent and skip cleanly (require_all_tables = false).
         assert_eq!(report.tables_written.len(), 2);
         assert_eq!(manifest.tables.len(), 2);
 
         for entry in &manifest.tables {
-            // The Nonroad manifest records the primary key per table.
+ // The Nonroad manifest records the primary key per table.
             let key: Vec<&str> = entry.primary_key.iter().map(String::as_str).collect();
             let path = out_dir.path().join(&entry.path);
             let table =
@@ -331,7 +331,7 @@ mod nonroad {
 }
 
 // ---------------------------------------------------------------------------
-// LEV / NLEV alternative-rate importer — Task 87.
+// LEV / NLEV alternative-rate importer —.
 // ---------------------------------------------------------------------------
 mod lev {
     use super::*;
@@ -358,7 +358,7 @@ mod lev {
 }
 
 // ---------------------------------------------------------------------------
-// AVFT importer — Task 86.
+// AVFT importer —.
 // ---------------------------------------------------------------------------
 mod avft {
     use super::*;

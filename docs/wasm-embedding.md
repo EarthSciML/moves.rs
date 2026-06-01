@@ -1,18 +1,18 @@
 # Embedding the moves.rs WASM module in third-party tools
 
 This guide explains how to integrate the `moves-wasm` package into your own
-JavaScript/TypeScript application.  It covers installation, API reference,
+JavaScript/TypeScript application. It covers installation, API reference,
 bundler integration, and deployment requirements.
 
 ## Prerequisites
 
 - A modern browser or a Node.js/Deno runtime that can execute WASM.
 - The `moves_wasm.js` JS glue and `moves_wasm_bg.wasm` binary, produced by
-  `wasm-pack build --target web crates/moves-wasm` from the repo root.
+ `wasm-pack build --target web crates/moves-wasm` from the repo root.
 
 ## Installation
 
-The package is not yet published to npm.  Copy the `pkg/` directory (produced
+The package is not yet published to npm. Copy the `pkg/` directory (produced
 by `wasm-pack`) into your project, or reference it from a local path:
 
 ```bash
@@ -32,7 +32,7 @@ The WASM module exposes two main functions and one optional threading initialise
 
 ### `init(input?)`
 
-Initialises the WASM binary.  Must be called (and awaited) once before any
+Initialises the WASM binary. Must be called (and awaited) once before any
 other function.
 
 ```js
@@ -54,9 +54,9 @@ Parquet bytes:
 
 ```js
 {
-  "MOVESRun.parquet": Uint8Array,
-  "MOVESOutput/yearID=2020/monthID=1/part.parquet": Uint8Array,
-  ...
+ "MOVESRun.parquet": Uint8Array,
+ "MOVESOutput/yearID=2020/monthID=1/part.parquet": Uint8Array,
+ ...
 }
 ```
 
@@ -74,7 +74,7 @@ const runspecXml = await fetch("sample-runspec.xml").then(r => r.text());
 const result = run_simulation(runspecXml, 0);
 
 for (const [path, bytes] of Object.entries(result)) {
-  console.log(`${path}: ${bytes.byteLength} bytes`);
+ console.log(`${path}: ${bytes.byteLength} bytes`);
 }
 ```
 
@@ -104,16 +104,16 @@ Runs the NONROAD simulation.
 
 ```js
 {
-  "completion_message": "Successful completion — no warnings",
-  "counters": {
-    "scc_groups_planned": 12,
-    "scc_groups_skipped": 0,
-    "records_visited": 240,
-    "records_not_selected": 0,
-    "records_no_dispatch": 0,
-    "dispatch_calls": 240,
-    "geography_skips": 0
-  }
+ "completion_message": "Successful completion — no warnings",
+ "counters": {
+ "scc_groups_planned": 12,
+ "scc_groups_skipped": 0,
+ "records_visited": 240,
+ "records_not_selected": 0,
+ "records_no_dispatch": 0,
+ "dispatch_calls": 240,
+ "geography_skips": 0
+ }
 }
 ```
 
@@ -129,9 +129,9 @@ await init();
 
 const popBytes = new Uint8Array(await fetch("equipment.POP").then(r => r.arrayBuffer()));
 const options = JSON.stringify({
-  episode_year: 2020,
-  region_level: "COUNTY",
-  selected_counties: ["06037", "06038"],
+ episode_year: 2020,
+ region_level: "COUNTY",
+ selected_counties: ["06037", "06038"],
 });
 
 const result = run_nonroad_simulation(options, popBytes);
@@ -141,9 +141,9 @@ console.log(result.counters);
 
 ### `init_thread_pool(numThreads)` — multi-thread build only
 
-Initialises the rayon Web Worker thread pool.  Only available in the
-`wasm-threads` feature build.  Call once, after `init()`, before the first
-simulation.  Returns a `Promise` that resolves when all workers are ready.
+Initialises the rayon Web Worker thread pool. Only available in the
+`wasm-threads` feature build. Call once, after `init()`, before the first
+simulation. Returns a `Promise` that resolves when all workers are ready.
 
 ```js
 await init();
@@ -157,8 +157,8 @@ deployment instructions.
 
 ## Running off the main thread (recommended)
 
-Simulation functions are synchronous and CPU-intensive.  They block the
-calling thread for the duration of the run.  To keep the browser UI
+Simulation functions are synchronous and CPU-intensive. They block the
+calling thread for the duration of the run. To keep the browser UI
 responsive, run them inside a **Web Worker**:
 
 **simulation-worker.js**
@@ -169,18 +169,18 @@ import init, { run_simulation } from "./moves-wasm/moves_wasm.js";
 let ready = false;
 
 self.onmessage = async ({ data }) => {
-  if (!ready) {
-    await init();
-    ready = true;
-  }
+ if (!ready) {
+ await init();
+ ready = true;
+ }
 
-  try {
-    const result = run_simulation(data.runspecXml, data.maxParallelChunks ?? 0);
-    const files = Object.entries(result).map(([name, bytes]) => ({ name, bytes }));
-    self.postMessage({ ok: true, files }, files.map(f => f.bytes.buffer));
-  } catch (err) {
-    self.postMessage({ ok: false, error: String(err) });
-  }
+ try {
+ const result = run_simulation(data.runspecXml, data.maxParallelChunks ?? 0);
+ const files = Object.entries(result).map(([name, bytes]) => ({ name, bytes }));
+ self.postMessage({ ok: true, files }, files.map(f => f.bytes.buffer));
+ } catch (err) {
+ self.postMessage({ ok: false, error: String(err) });
+ }
 };
 ```
 
@@ -188,18 +188,18 @@ self.onmessage = async ({ data }) => {
 
 ```js
 const worker = new Worker(new URL("simulation-worker.js", import.meta.url),
-                          { type: "module" });
+ { type: "module" });
 
 worker.postMessage({ runspecXml, maxParallelChunks: 0 });
 
 worker.onmessage = ({ data }) => {
-  if (data.ok) {
-    for (const { name, bytes } of data.files) {
-      console.log(`${name}: ${bytes.byteLength} bytes`);
-    }
-  } else {
-    console.error(data.error);
-  }
+ if (data.ok) {
+ for (const { name, bytes } of data.files) {
+ console.log(`${name}: ${bytes.byteLength} bytes`);
+ }
+ } else {
+ console.error(data.error);
+ }
 };
 ```
 
@@ -215,14 +215,14 @@ Convert a `Uint8Array` output buffer to a download link:
 
 ```js
 function downloadParquet(bytes, filename) {
-  const blob = new Blob([bytes], { type: "application/octet-stream" });
-  const url  = URL.createObjectURL(blob);
-  const a    = Object.assign(document.createElement("a"), {
-    href: url, download: filename, textContent: `Download ${filename}`,
-  });
-  document.body.appendChild(a);
-  // Release the object URL when no longer needed
-  a.addEventListener("click", () => setTimeout(() => URL.revokeObjectURL(url), 60_000));
+ const blob = new Blob([bytes], { type: "application/octet-stream" });
+ const url = URL.createObjectURL(blob);
+ const a = Object.assign(document.createElement("a"), {
+ href: url, download: filename, textContent: `Download ${filename}`,
+ });
+ document.body.appendChild(a);
+ // Release the object URL when no longer needed
+ a.addEventListener("click", () => setTimeout(() => URL.revokeObjectURL(url), 60_000));
 }
 ```
 
@@ -234,8 +234,8 @@ For large outputs, write directly to the browser's OPFS instead of holding
 everything in memory:
 
 ```js
-const root   = await navigator.storage.getDirectory();
-const dir    = await root.getDirectoryHandle("moves-output", { create: true });
+const root = await navigator.storage.getDirectory();
+const dir = await root.getDirectoryHandle("moves-output", { create: true });
 const handle = await dir.getFileHandle("MOVESRun.parquet", { create: true });
 const writable = await handle.createWritable();
 await writable.write(bytes);
@@ -254,7 +254,7 @@ isolation headers, unlike `SharedArrayBuffer`.
 ```js
 // webpack.config.js
 module.exports = {
-  experiments: { asyncWebAssembly: true },
+ experiments: { asyncWebAssembly: true },
 };
 ```
 
@@ -273,7 +273,7 @@ await init();
 
 ### Vite
 
-No special configuration needed for the default `--target web` build.  Vite
+No special configuration needed for the default `--target web` build. Vite
 resolves the WASM file automatically.
 
 ```bash
@@ -306,14 +306,14 @@ Configure your bundler to treat `.wasm` files as assets (Rollup:
 |-------------|-------|
 | Static hosting | Any CDN or server that can serve `.js` and `.wasm` files. |
 | MIME type for `.wasm` | Server must respond with `Content-Type: application/wasm`. Most CDNs do this automatically; some require configuration. |
-| COEP/COOP headers | **Only** required for the multi-thread `wasm-threads` build.  Not required for the default single-thread build. |
+| COEP/COOP headers | **Only** required for the multi-thread `wasm-threads` build. Not required for the default single-thread build. |
 | HTTPS | Required in production for Service Workers and OPFS; not required for `localhost` testing. |
 
 ---
 
 ## Troubleshooting
 
-**"Failed to fetch" / 404 on `.wasm` file**  
+**"Failed to fetch" / 404 on `.wasm` file** 
 The WASM binary must be co-located with the JS glue file, or the path
 passed to `init()` must point to the `.wasm` file explicitly:
 
@@ -321,23 +321,23 @@ passed to `init()` must point to the `.wasm` file explicitly:
 await init(new URL("./moves_wasm_bg.wasm", import.meta.url));
 ```
 
-**`SharedArrayBuffer is not defined`**  
-The page is missing COEP/COOP headers.  This is only needed for the
-multi-thread build.  The default single-thread build does not require these
+**`SharedArrayBuffer is not defined`** 
+The page is missing COEP/COOP headers. This is only needed for the
+multi-thread build. The default single-thread build does not require these
 headers.
 
-**Worker uses ES module but browser doesn't support it**  
-Set `{ type: "module" }` when constructing the Worker.  If the browser
+**Worker uses ES module but browser doesn't support it** 
+Set `{ type: "module" }` when constructing the Worker. If the browser
 doesn't support module workers, use a bundler to produce a classic-format
 worker bundle.
 
-**`atomics.wait` error on main thread**  
-Move the `run_simulation(…, n > 1)` call into a Web Worker.  Browsers
+**`atomics.wait` error on main thread** 
+Move the `run_simulation(…, n > 1)` call into a Web Worker. Browsers
 prohibit `atomics.wait` on the main thread to prevent freezing the UI.
 
-**Simulation hangs or takes very long**  
+**Simulation hangs or takes very long** 
 A large RunSpec (many pollutants, many county-year combinations) can take
-minutes on a single thread in WASM.  Use `maxParallelChunks > 1` with the
+minutes on a single thread in WASM. Use `maxParallelChunks > 1` with the
 multi-thread build, or pre-filter the RunSpec to a smaller scope.
 
 ---
@@ -345,9 +345,9 @@ multi-thread build, or pre-filter the RunSpec to a smaller scope.
 ## See also
 
 - [`docs/wasm-threading.md`](wasm-threading.md) — multi-thread deployment and
-  COEP/COOP header configuration
+ COEP/COOP header configuration
 - [`crates/moves-wasm/demo/`](../crates/moves-wasm/demo/) — minimal demo page
-  showing the API in use
+ showing the API in use
 - [`docs/output-schema.md`](output-schema.md) — Parquet output column reference
 - [`docs/downstream-tools.md`](downstream-tools.md) — reading MOVES output in
-  Python, R, DuckDB, Polars, and Spark
+ Python, R, DuckDB, Polars, and Spark

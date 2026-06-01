@@ -3,18 +3,18 @@
 //! Each call processes one [`CsvFile`] against one [`TableSchema`]:
 //!
 //! 1. **Header check.** Column names must match the schema in declared
-//!    order. Reordered or missing columns are rejected with a precise
-//!    diagnostic — silently re-mapping by name would mask a malformed
-//!    template.
+//! order. Reordered or missing columns are rejected with a precise
+//! diagnostic — silently re-mapping by name would mask a malformed
+//! template.
 //! 2. **Type coercion + per-cell rule.** Each cell is parsed to the
-//!    declared `arrow_type` and then run through its [`Rule`]. Failures
-//!    carry the source line, column name, and offending value.
+//! declared `arrow_type` and then run through its [`Rule`]. Failures
+//! carry the source line, column name, and offending value.
 //! 3. **Duplicate primary-key detection.** Rows are grouped by their PK
-//!    tuple; the second occurrence is an error. The Nonroad CDB tables
-//!    are small enough that an in-memory `HashSet` is fine.
+//! tuple; the second occurrence is an error. The Nonroad CDB tables
+//! are small enough that an in-memory `HashSet` is fine.
 //! 4. **Cross-row invariants.** Currently only [`CrossRowInvariant::FractionSum`]
-//!    (sum-to-1 by group). The summation is applied after the duplicate
-//!    check so an in-range duplicate doesn't double-count.
+//! (sum-to-1 by group). The summation is applied after the duplicate
+//! check so an in-range duplicate doesn't double-count.
 //!
 //! The result is a `Vec<TypedRow>` ready for the parquet writer plus the
 //! per-column metadata for the manifest.
@@ -288,7 +288,7 @@ fn apply_cross_row_invariants(
                 rows,
                 fraction_column,
                 group_columns,
-                *tolerance,
+ *tolerance,
             )?,
         }
     }
@@ -344,7 +344,7 @@ fn check_fraction_sum(
                 });
             }
         };
-        *sums.entry(key).or_insert(0.0) += v;
+ *sums.entry(key).or_insert(0.0) += v;
     }
     for (key, sum) in sums {
         if (sum - 1.0).abs() > tolerance {
@@ -511,8 +511,8 @@ mod tests {
                 required: true,
                 rule: Rule::None,
             },
-            // Nullable but range-checked when present — the common
-            // "DEFAULT NULL with a business-rule range" pattern.
+ // Nullable but range-checked when present — the common
+ // "DEFAULT NULL with a business-rule range" pattern.
             Column {
                 name: "population",
                 mysql_type: "float",
@@ -656,7 +656,7 @@ mod tests {
             columns: COLS,
             invariants: INV,
         };
-        // Two groups each summing to exactly 1.0.
+ // Two groups each summing to exactly 1.0.
         let rows = vec![
             (1, 1, "0.5"),
             (1, 2, "0.5"),

@@ -1,13 +1,13 @@
-//! The numerical-fidelity tolerance policy for Task 115.
+//! The numerical-fidelity tolerance policy for.
 //!
-//! The bead fixes three comparison rules for diffing the Rust port
+//! The work item fixes three comparison rules for diffing the Rust port
 //! against the gfortran NONROAD reference:
 //!
-//! | Class            | Rule                       | Constant                       |
+//! | Class | Rule | Constant |
 //! |------------------|----------------------------|--------------------------------|
-//! | Energy quantity  | `1e-9` **relative**        | [`ENERGY_RELATIVE_TOLERANCE`]   |
-//! | Count / index    | `1e-12` **absolute**       | [`COUNT_ABSOLUTE_TOLERANCE`]    |
-//! | SCC/eqp/year key | **exact** match            | (no constant — bitwise `==`)    |
+//! | Energy quantity | `1e-9` **relative** | [`ENERGY_RELATIVE_TOLERANCE`] |
+//! | Count / index | `1e-12` **absolute** | [`COUNT_ABSOLUTE_TOLERANCE`] |
+//! | SCC/eqp/year key | **exact** match | (no constant — bitwise `==`) |
 //!
 //! [`classify`] maps each emitted `dbgemit` variable to its class;
 //! [`compare`] applies the matching rule to one expected/actual pair.
@@ -20,42 +20,41 @@
 //! than a single `f32` ULP: any energy quantity that is not
 //! bit-identical between the port and the reference is reported.
 //!
-//! That strictness is deliberate. Task 115 is a *surface-everything*
+//! That strictness is deliberate. is a *surface-everything*
 //! characterization gate — it is supposed to expose every divergence
 //! (`EXP`/`LOG`/`POW` differences, summation order, accumulated
-//! rounding) so that Task 116 (`mo-490cm`, numerical-divergence
+//! rounding) so that (, numerical-divergence
 //! triage) can examine each one and, where a divergence is a
 //! tolerable artifact, widen the budget for that specific
 //! pollutant/equipment class. The constants below are the knobs
-//! Task 116 turns.
+//! turns.
 
 use super::reference::Phase;
 
-/// Relative tolerance for energy quantities (bead: `1e-9` relative).
+/// Relative tolerance for energy quantities (work item: `1e-9` relative).
 pub const ENERGY_RELATIVE_TOLERANCE: f64 = 1e-9;
 
-/// Absolute tolerance for counts and indices (bead: `1e-12`
+/// Absolute tolerance for counts and indices (work item: `1e-12`
 /// absolute).
 pub const COUNT_ABSOLUTE_TOLERANCE: f64 = 1e-12;
 
 /// The comparison class a quantity falls into.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize)]
 pub enum Quantity {
-    /// A continuous physical or derived quantity — emissions,
-    /// populations, growth factors, fractions. Compared with a
-    /// relative tolerance ([`ENERGY_RELATIVE_TOLERANCE`]).
+ /// A continuous physical or derived quantity — emissions,
+ /// populations, growth factors, fractions. Compared with a
+ /// relative tolerance ([`ENERGY_RELATIVE_TOLERANCE`]).
     Energy,
-    /// An integer count or index — e.g. a record's year. Compared
-    /// with an absolute tolerance ([`COUNT_ABSOLUTE_TOLERANCE`]),
-    /// which for the small integers involved is effectively exact.
+ /// An integer count or index — e.g. a record's year. Compared
+ /// with an absolute tolerance ([`COUNT_ABSOLUTE_TOLERANCE`]),
+ /// which for the small integers involved is effectively exact.
     Count,
-    /// A key that identifies a record rather than measuring it —
-    /// SCC, equipment code, year key. Compared bit-exactly.
+ /// A key that identifies a record rather than measuring it /// SCC, equipment code, year key. Compared bit-exactly.
     Key,
 }
 
 impl Quantity {
-    /// A short human description of the rule, for divergence reports.
+ /// A short human description of the rule, for divergence reports.
     pub fn rule(self) -> &'static str {
         match self {
             Quantity::Energy => "1e-9 relative",
@@ -75,19 +74,19 @@ impl Quantity {
 /// falls back to [`Quantity::Energy`] for the unknown label and
 /// [`is_known`] lets the harness report the gap.
 const CLASSIFIED_LABELS: &[(Phase, &str, Quantity)] = &[
-    // getpop.f — per-SCC population apportionment.
+ // getpop.f — per-SCC population apportionment.
     (Phase::Getpop, "popeqp", Quantity::Energy),
     (Phase::Getpop, "avghpc", Quantity::Energy),
     (Phase::Getpop, "usehrs", Quantity::Energy),
     (Phase::Getpop, "ipopyr", Quantity::Count),
-    // agedist.f — age-distribution growth.
+ // agedist.f — age-distribution growth.
     (Phase::Agedist, "mdyrfrc", Quantity::Energy),
     (Phase::Agedist, "baspop", Quantity::Energy),
-    // grwfac.f — growth-factor application.
+ // grwfac.f — growth-factor application.
     (Phase::Grwfac, "factor", Quantity::Energy),
     (Phase::Grwfac, "baseyearind", Quantity::Energy),
     (Phase::Grwfac, "growthyearind", Quantity::Energy),
-    // clcems.f — exhaust-emissions calculation.
+ // clcems.f — exhaust-emissions calculation.
     (Phase::Clcems, "emsday", Quantity::Energy),
     (Phase::Clcems, "emsbmy", Quantity::Energy),
     (Phase::Clcems, "pop", Quantity::Energy),
@@ -99,7 +98,7 @@ const CLASSIFIED_LABELS: &[(Phase, &str, Quantity)] = &[
 /// Classify one emitted variable into its [`Quantity`] class.
 ///
 /// Unknown `(phase, label)` pairs fall back to [`Quantity::Energy`]
-/// — the relative rule surfaces divergences rather than hiding them.
+/// the relative rule surfaces divergences rather than hiding them.
 /// Pair this with [`is_known`] to detect labels the table does not
 /// yet cover.
 pub fn classify(phase: Phase, label: &str) -> Quantity {
@@ -128,21 +127,21 @@ pub fn classified_labels() -> &'static [(Phase, &'static str, Quantity)] {
 /// The outcome of comparing one expected/actual value pair.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
 pub struct Comparison {
-    /// The quantity class the rule was drawn from.
+ /// The quantity class the rule was drawn from.
     pub quantity: Quantity,
-    /// `|expected - actual|`. `NaN`/`inf` when an operand is
-    /// non-finite.
+ /// `|expected - actual|`. `NaN`/`inf` when an operand is
+ /// non-finite.
     pub abs_diff: f64,
-    /// `abs_diff / max(|expected|, |actual|)`, or `0.0` when both
-    /// operands are zero. `NaN`/`inf` when an operand is non-finite.
+ /// `abs_diff / max(|expected|, |actual|)`, or `0.0` when both
+ /// operands are zero. `NaN`/`inf` when an operand is non-finite.
     pub rel_diff: f64,
-    /// `true` when the pair satisfies its class's tolerance rule.
+ /// `true` when the pair satisfies its class's tolerance rule.
     pub within_tolerance: bool,
-    /// `true` when either operand is `NaN` or infinite. A non-finite
-    /// pair is always worth a human's attention even when the
-    /// verdict is `within_tolerance` (e.g. both `NaN`): NONROAD's
-    /// `real*4` arithmetic can silently produce non-finite values
-    /// and the harness must not let them pass unremarked.
+ /// `true` when either operand is `NaN` or infinite. A non-finite
+ /// pair is always worth a human's attention even when the
+ /// verdict is `within_tolerance` (e.g. both `NaN`): NONROAD's
+ /// `real*4` arithmetic can silently produce non-finite values
+ /// and the harness must not let them pass unremarked.
     pub non_finite: bool,
 }
 
@@ -207,7 +206,7 @@ mod tests {
     fn unknown_label_falls_back_to_energy() {
         assert_eq!(classify(Phase::Clcems, "brand_new_var"), Quantity::Energy);
         assert!(!is_known(Phase::Clcems, "brand_new_var"));
-        // A label real for one phase is unknown for another.
+ // A label real for one phase is unknown for another.
         assert!(!is_known(Phase::Agedist, "emsday"));
     }
 
@@ -225,23 +224,23 @@ mod tests {
 
     #[test]
     fn energy_relative_tolerance_boundary() {
-        // Within: relative diff just under 1e-9.
+ // Within: relative diff just under 1e-9.
         let c = compare(1.0, 1.0 + 9e-10, Quantity::Energy);
         assert!(c.within_tolerance);
         assert!(c.rel_diff < ENERGY_RELATIVE_TOLERANCE);
-        // Outside: relative diff above 1e-9.
+ // Outside: relative diff above 1e-9.
         let c = compare(1.0, 1.0 + 5e-9, Quantity::Energy);
         assert!(!c.within_tolerance);
-        // abs_diff is ≈ 5e-9, give or take f64 representation error.
+ // abs_diff is ≈ 5e-9, give or take f64 representation error.
         assert!((4.9e-9..5.1e-9).contains(&c.abs_diff));
     }
 
     #[test]
     fn energy_uses_relative_not_absolute_scale() {
-        // A large emissions value: 1e-9 relative is a big absolute slack.
+ // A large emissions value: 1e-9 relative is a big absolute slack.
         let big = compare(1.0e9, 1.0e9 + 0.5, Quantity::Energy);
         assert!(big.within_tolerance, "0.5 of 1e9 is within 1e-9 relative");
-        // The same absolute gap on a small value fails.
+ // The same absolute gap on a small value fails.
         let small = compare(1.0e-3, 1.0e-3 + 0.5, Quantity::Energy);
         assert!(!small.within_tolerance);
     }
@@ -264,8 +263,8 @@ mod tests {
     fn count_uses_absolute_tolerance() {
         assert!(compare(2021.0, 2021.0 + 1e-13, Quantity::Count).within_tolerance);
         assert!(!compare(2021.0, 2022.0, Quantity::Count).within_tolerance);
-        // 1e-9 relative would pass year 2021 vs 2021.000002; absolute
-        // 1e-12 does not — counts must be (effectively) exact.
+ // 1e-9 relative would pass year 2021 vs 2021.000002; absolute
+ // 1e-12 does not — counts must be (effectively) exact.
         assert!(!compare(2021.0, 2021.000002, Quantity::Count).within_tolerance);
     }
 

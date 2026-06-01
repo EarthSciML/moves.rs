@@ -1,5 +1,5 @@
-//! `NH3StartCalculator` — the start-exhaust ammonia calculator of Phase 3
-//! Task 66 (the running-exhaust half is [`super::running`]).
+//! `NH3StartCalculator` — the start-exhaust ammonia calculator of
+//! (the running-exhaust half is [`super::running`]).
 //!
 //! Pure-Rust port of `NH3StartCalculator.java` and the "Processing" section
 //! of `database/NH3StartCalculator.sql`.
@@ -29,20 +29,20 @@
 //! SQL:
 //!
 //! 1. **`NH3SEC 1` — merge I/M coverage.** Build the per-`(polProcess,
-//!    modelYear, fuelType, sourceType)` I/M adjustment fraction. Identical to
-//!    `NH3REC 1`; ported by the shared [`merge_im_coverage`].
+//! modelYear, fuelType, sourceType)` I/M adjustment fraction. Identical to
+//! `NH3REC 1`; ported by the shared [`merge_im_coverage`].
 //! 2. **`NH3SEC-2` — weight by source bin.** Sum `meanBaseRate ×
-//!    sourceBinActivityFraction` over source bins. Ported by the shared
-//!    [`weight_by_source_bin`]; this calculator then cross-joins the RunSpec
-//!    months and hours (the SQL's `SourceBinEmissionRates`).
+//! sourceBinActivityFraction` over source bins. Ported by the shared
+//! [`weight_by_source_bin`]; this calculator then cross-joins the RunSpec
+//! months and hours (the SQL's `SourceBinEmissionRates`).
 //! 3. **`NH3SEC-3` — weight by operating mode.** Sum `meanBaseRate ×
-//!    opModeFraction` over operating modes, resolving the `dayID` dimension
-//!    by joining `HourDay` on `hourID`. Ported by `weight_by_op_mode`.
+//! opModeFraction` over operating modes, resolving the `dayID` dimension
+//! by joining `HourDay` on `hourID`. Ported by `weight_by_op_mode`.
 //! 4. **`NH3SEC-4` — multiply by activity.** Build `Starts2` (engine starts
-//!    keyed by `modelYearID = yearID - ageID`), join it to the weighted rate
-//!    and `PollutantProcessAssoc`, and form `emissionQuant = meanBaseRate ×
-//!    starts` (and the parallel `emissionQuantIM`). Ported by
-//!    `multiply_by_activity`.
+//! keyed by `modelYearID = yearID - ageID`), join it to the weighted rate
+//! and `PollutantProcessAssoc`, and form `emissionQuant = meanBaseRate ×
+//! starts` (and the parallel `emissionQuantIM`). Ported by
+//! `multiply_by_activity`.
 //!
 //! The closing `-- Apply IM` `UPDATE` blends `emissionQuant` with
 //! `emissionQuantIM`; that is the shared [`finalize_with_im`].
@@ -64,7 +64,7 @@
 //! # Chain metadata — a superseded calculator
 //!
 //! `NH3StartCalculator` is a **legacy calculator superseded by
-//! `BaseRateCalculator`** (migration-plan Task 45). `CalculatorInfo.txt`
+//! `BaseRateCalculator`** (). `CalculatorInfo.txt`
 //! registers `Ammonia (NH3)` on Start Exhaust to `BaseRateCalculator`, not to
 //! this calculator; `characterization/calculator-chains/calculator-dag.json`
 //! records `NH3StartCalculator` with `registrations_count: 0` and
@@ -73,7 +73,7 @@
 //! Consequently [`registrations`](Calculator::registrations) returns an empty
 //! slice — registering `(30, 2)` here too would double-register the pair
 //! against `BaseRateCalculator`. The DAG still records a single subscription
-//! — `subscribes_directly: true`, granularity `YEAR`, priority
+//! `subscribes_directly: true`, granularity `YEAR`, priority
 //! `EMISSION_CALCULATOR` — but with a placeholder `process_id` of `0`;
 //! [`subscriptions`](Calculator::subscriptions) resolves it to process 2.
 //!
@@ -82,15 +82,15 @@
 //! The fidelity notes of [`super::running`] apply unchanged: the SQL stores
 //! intermediate rates in `FLOAT` columns while MariaDB evaluates in `DOUBLE`,
 //! and this port computes in [`f64`] end to end without reproducing the
-//! inter-step truncation (a sub-`1e-7` relative drift left to the Task 73/74
+//! inter-step truncation (a sub-`1e-7` relative drift left to the/74
 //! fidelity gate). The SQL has no integer/integer literal division.
 //!
-//! # Data plane (Task 50)
+//! # Data plane
 //!
 //! [`Calculator::execute`] is a shell: its [`CalculatorContext`] exposes only
-//! the Phase 2 placeholder `ExecutionTables` / `ScratchNamespace`. The
+//! the placeholder `ExecutionTables` / `ScratchNamespace`. The
 //! faithful pipeline is [`Nh3StartCalculator::calculate`], fully unit-tested.
-//! Once the `DataFrameStore` (migration-plan Task 50) lands, `execute`
+//! Once the `DataFrameStore` () lands, `execute`
 //! materialises a [`StartInputs`] and a [`StartContext`] from the context,
 //! calls `calculate`, and writes the [`EmissionRow`]s back.
 
@@ -136,58 +136,58 @@ const OFF_NETWORK_ROAD_TYPE_ID: i32 = 1;
 /// age, zone, sourceType)` cell. Engine starts are zone-level, not link-level.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StartsRow {
-    /// `hourDayID` — joins to [`HourDayRow::hour_day_id`].
+ /// `hourDayID` — joins to [`HourDayRow::hour_day_id`].
     pub hour_day_id: i32,
-    /// `monthID` — calendar month.
+ /// `monthID` — calendar month.
     pub month_id: i32,
-    /// `yearID` — calendar year.
+ /// `yearID` — calendar year.
     pub year_id: i32,
-    /// `ageID` — vehicle age in years; `modelYearID = yearID - ageID`.
+ /// `ageID` — vehicle age in years; `modelYearID = yearID - ageID`.
     pub age_id: i32,
-    /// `zoneID` — the zone the starts occur in.
+ /// `zoneID` — the zone the starts occur in.
     pub zone_id: i32,
-    /// `sourceTypeID` — MOVES source (vehicle) type.
+ /// `sourceTypeID` — MOVES source (vehicle) type.
     pub source_type_id: i32,
-    /// `starts` — number of engine starts.
+ /// `starts` — number of engine starts.
     pub starts: f64,
 }
 
 /// The fully materialised inputs to [`Nh3StartCalculator::calculate`] — the
 /// tables the SQL's "Extract Data" section produces, as plain row vectors.
 ///
-/// A future Task 50 (`DataFrameStore`) wiring populates this from the per-run
+/// A future (`DataFrameStore`) wiring populates this from the per-run
 /// filtered execution database; until then it is the explicit data-plane
 /// contract the unit tests build directly.
 #[derive(Debug, Clone, Default)]
 pub struct StartInputs {
-    /// `Starts` rows — the start-exhaust activity.
+ /// `Starts` rows — the start-exhaust activity.
     pub starts: Vec<StartsRow>,
-    /// `RunSpecMonth` — the calendar months the run covers.
+ /// `RunSpecMonth` — the calendar months the run covers.
     pub runspec_months: Vec<i32>,
-    /// `RunSpecHour` — the hours of day the run covers.
+ /// `RunSpecHour` — the hours of day the run covers.
     pub runspec_hours: Vec<i32>,
-    /// `EmissionRateByAge` rows.
+ /// `EmissionRateByAge` rows.
     pub emission_rate_by_age: Vec<EmissionRateByAgeRow>,
-    /// `AgeCategory` rows.
+ /// `AgeCategory` rows.
     pub age_category: Vec<AgeCategoryRow>,
-    /// `SourceTypeModelYear` rows.
+ /// `SourceTypeModelYear` rows.
     pub source_type_model_year: Vec<SourceTypeModelYearRow>,
-    /// `SourceBinDistribution` rows.
+ /// `SourceBinDistribution` rows.
     pub source_bin_distribution: Vec<SourceBinDistributionRow>,
-    /// `SourceBin` rows.
+ /// `SourceBin` rows.
     pub source_bin: Vec<SourceBinRow>,
-    /// `OpModeDistribution` rows.
+ /// `OpModeDistribution` rows.
     pub op_mode_distribution: Vec<OpModeDistributionRow>,
-    /// `HourDay` rows.
+ /// `HourDay` rows.
     pub hour_day: Vec<HourDayRow>,
-    /// `PollutantProcessAssoc` rows.
+ /// `PollutantProcessAssoc` rows.
     pub pollutant_process_assoc: Vec<PollutantProcessAssocRow>,
-    /// `PollutantProcessMappedModelYear` rows (for the I/M merge).
+ /// `PollutantProcessMappedModelYear` rows (for the I/M merge).
     pub pollutant_process_mapped_model_year: Vec<PollutantProcessMappedModelYearRow>,
-    /// `IMFactor` rows (for the I/M merge).
+ /// `IMFactor` rows (for the I/M merge).
     pub im_factor: Vec<ImFactorRow>,
-    /// `IMCoverage` rows (for the I/M merge), already filtered to
-    /// `useIMyn = 'Y'` by the SQL's "Extract Data" section.
+ /// `IMCoverage` rows (for the I/M merge), already filtered to
+ /// `useIMyn = 'Y'` by the SQL's "Extract Data" section.
     pub im_coverage: Vec<ImCoverageRow>,
 }
 
@@ -195,17 +195,17 @@ pub struct StartInputs {
 /// `##context.iterLocation.…##` and `##context.year##`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StartContext {
-    /// `##context.year##` — the calendar year of the run.
+ /// `##context.year##` — the calendar year of the run.
     pub year_id: i32,
-    /// `##context.iterLocation.stateRecordID##` — the output `stateID`.
+ /// `##context.iterLocation.stateRecordID##` — the output `stateID`.
     pub state_id: i32,
-    /// `##context.iterLocation.countyRecordID##` — the output `countyID`, and
-    /// the county the I/M merge filters `IMCoverage` to.
+ /// `##context.iterLocation.countyRecordID##` — the output `countyID`, and
+ /// the county the I/M merge filters `IMCoverage` to.
     pub county_id: i32,
-    /// `##context.iterLocation.zoneRecordID##` — the iteration zone, joined
-    /// against each `Starts` row's `zoneID`.
+ /// `##context.iterLocation.zoneRecordID##` — the iteration zone, joined
+ /// against each `Starts` row's `zoneID`.
     pub zone_id: i32,
-    /// `##context.iterLocation.linkRecordID##` — the output `linkID`.
+ /// `##context.iterLocation.linkRecordID##` — the output `linkID`.
     pub link_id: i32,
 }
 
@@ -353,37 +353,37 @@ impl TableRow for StartsRow {
 pub struct Nh3StartCalculator;
 
 impl Nh3StartCalculator {
-    /// Chain-DAG name — matches the Java class and the `calculator-dag.json`
-    /// entry.
+ /// Chain-DAG name — matches the Java class and the `calculator-dag.json`
+ /// entry.
     pub const NAME: &'static str = CALCULATOR_NAME;
 
-    /// Construct the calculator.
+ /// Construct the calculator.
     #[must_use]
     pub fn new() -> Self {
         Self
     }
 
-    /// Whether the master loop should run this calculator for the given road
-    /// type — the port of `NH3StartCalculator.doesProcessContext`.
-    ///
-    /// `NH3StartCalculator` implements `MasterLoopContext.IContextFilter`:
-    /// start-exhaust emissions live on the off-network road type, so the Java
-    /// predicate rejects a context whose `roadTypeRecordID` is a positive,
-    /// non-off-network id. An absent road type (`<= 0`) still passes — the
-    /// filter only excludes a *known* on-network road type.
+ /// Whether the master loop should run this calculator for the given road
+ /// type — the port of `NH3StartCalculator.doesProcessContext`.
+ ///
+ /// `NH3StartCalculator` implements `MasterLoopContext.IContextFilter`:
+ /// start-exhaust emissions live on the off-network road type, so the Java
+ /// predicate rejects a context whose `roadTypeRecordID` is a positive,
+ /// non-off-network id. An absent road type (`<= 0`) still passes — the
+ /// filter only excludes a *known* on-network road type.
     #[must_use]
     pub fn processes_road_type(road_type_id: i32) -> bool {
         !(road_type_id > 0 && road_type_id != OFF_NETWORK_ROAD_TYPE_ID)
     }
 
-    /// Run the calculator over a fully materialised set of input tables.
-    ///
-    /// Chains the four `NH3SEC` processing steps of `NH3StartCalculator.sql`
-    /// and returns the `MOVESWorkerOutput` rows the SQL would insert, sorted
-    /// by their dimension columns for deterministic output.
+ /// Run the calculator over a fully materialised set of input tables.
+ ///
+ /// Chains the four `NH3SEC` processing steps of `NH3StartCalculator.sql`
+ /// and returns the `MOVESWorkerOutput` rows the SQL would insert, sorted
+ /// by their dimension columns for deterministic output.
     #[must_use]
     pub fn calculate(inputs: &StartInputs, ctx: &StartContext) -> Vec<EmissionRow> {
-        // NH3SEC 1: merge I/M coverage.
+ // NH3SEC 1: merge I/M coverage.
         let merged = merge_im_coverage(
             ctx.year_id,
             ctx.county_id,
@@ -393,7 +393,7 @@ impl Nh3StartCalculator {
             &inputs.im_coverage,
             &inputs.pollutant_process_assoc,
         );
-        // NH3SEC-2: weight by source bin.
+ // NH3SEC-2: weight by source bin.
         let source_bin_rates = weight_by_source_bin(
             ctx.year_id,
             &inputs.emission_rate_by_age,
@@ -402,11 +402,11 @@ impl Nh3StartCalculator {
             &inputs.source_bin_distribution,
             &inputs.source_bin,
         );
-        // NH3SEC-3: weight by operating mode (and cross-join months/hours).
+ // NH3SEC-3: weight by operating mode (and cross-join months/hours).
         let activity_weighted = weight_by_op_mode(&source_bin_rates, inputs);
-        // NH3SEC-4: multiply by Starts activity.
+ // NH3SEC-4: multiply by Starts activity.
         let rows_with_im = multiply_by_activity(&activity_weighted, inputs, ctx);
-        // -- Apply IM.
+ // -- Apply IM.
         finalize_with_im(rows_with_im, &merged)
     }
 }
@@ -434,8 +434,8 @@ fn weight_by_op_mode(
     source_bin_rates: &[SourceBinEmissionRate],
     inputs: &StartInputs,
 ) -> Vec<ActivityWeightedRate> {
-    // OpModeDistribution indexed by the join key. Unlike the running
-    // calculator, the start `NH3SEC-3` join carries no `linkID`.
+ // OpModeDistribution indexed by the join key. Unlike the running
+ // calculator, the start `NH3SEC-3` join carries no `linkID`.
     let mut omd_by: HashMap<(i32, i32, i32, i32), Vec<&OpModeDistributionRow>> = HashMap::new();
     for omd in &inputs.op_mode_distribution {
         omd_by
@@ -448,24 +448,24 @@ fn weight_by_op_mode(
             .or_default()
             .push(omd);
     }
-    // HourDay indexed by hourID — a single hour spans several day types.
+ // HourDay indexed by hourID — a single hour spans several day types.
     let mut hour_day_by_hour: HashMap<i32, Vec<&HourDayRow>> = HashMap::new();
     for hd in &inputs.hour_day {
         hour_day_by_hour.entry(hd.hour_id).or_default().push(hd);
     }
 
-    // NH3SEC-3: sum opModeFraction × meanBaseRate over operating mode,
-    // grouped by (polProcess, sourceType, modelYear, fuelType, dayID, hourID).
+ // NH3SEC-3: sum opModeFraction × meanBaseRate over operating mode,
+ // grouped by (polProcess, sourceType, modelYear, fuelType, dayID, hourID).
     let mut acc: HashMap<OpModeGroupKey, (f64, f64)> = HashMap::new();
     for sber in source_bin_rates {
         for &hour_id in &inputs.runspec_hours {
-            // INNER JOIN HourDay ON hourID — expands the row by day type.
+ // INNER JOIN HourDay ON hourID — expands the row by day type.
             let Some(hour_days) = hour_day_by_hour.get(&hour_id) else {
                 continue;
             };
             for hd in hour_days {
-                // INNER JOIN OpModeDistribution USING (sourceTypeID,
-                // hourDayID, polProcessID, opModeID).
+ // INNER JOIN OpModeDistribution USING (sourceTypeID,
+ // hourDayID, polProcessID, opModeID).
                 let Some(omds) = omd_by.get(&(
                     sber.source_type_id,
                     hd.hour_day_id,
@@ -492,7 +492,7 @@ fn weight_by_op_mode(
         }
     }
 
-    // Cross-join the RunSpec months.
+ // Cross-join the RunSpec months.
     let mut keys: Vec<&OpModeGroupKey> = acc.keys().collect();
     keys.sort_unstable();
     let mut out: Vec<ActivityWeightedRate> = Vec::new();
@@ -522,12 +522,12 @@ fn weight_by_op_mode(
 /// Ports the SQL's `Starts2`/`MOVESWorkerOutput` chain:
 ///
 /// * `Starts2` joins `Starts` to `HourDay` and derives `modelYearID =
-///   yearID - ageID`;
+/// yearID - ageID`;
 /// * the final insert joins `Starts2`, `ActivityWeightedEmissionRate` (on
-///   `zoneID, monthID, hourID, dayID, yearID, sourceTypeID, modelYearID`) and
-///   `PollutantProcessAssoc` (on `polProcessID`), forming
-///   `emissionQuant = meanBaseRate × starts` (and `emissionQuantIM`
-///   likewise).
+/// `zoneID, monthID, hourID, dayID, yearID, sourceTypeID, modelYearID`) and
+/// `PollutantProcessAssoc` (on `polProcessID`), forming
+/// `emissionQuant = meanBaseRate × starts` (and `emissionQuantIM`
+/// likewise).
 ///
 /// The weighted rate carries the constant iteration `zoneID`/`yearID`; the
 /// join keeps only `Starts` rows in that zone and year. The output `linkID`
@@ -539,15 +539,15 @@ fn multiply_by_activity(
     inputs: &StartInputs,
     ctx: &StartContext,
 ) -> Vec<(EmissionRow, f64)> {
-    // PollutantProcessAssoc lookup — resolves polProcessID.
+ // PollutantProcessAssoc lookup — resolves polProcessID.
     let ppa: HashMap<i32, &PollutantProcessAssocRow> = inputs
         .pollutant_process_assoc
         .iter()
         .map(|r| (r.pol_process_id, r))
         .collect();
-    // ActivityWeightedEmissionRate indexed by the Starts2 join key. The
-    // constant zoneID/yearID are checked per `Starts` row below, so the key
-    // is (monthID, hourID, dayID, sourceTypeID, modelYearID).
+ // ActivityWeightedEmissionRate indexed by the Starts2 join key. The
+ // constant zoneID/yearID are checked per `Starts` row below, so the key
+ // is (monthID, hourID, dayID, sourceTypeID, modelYearID).
     let mut awer_by: HashMap<(i32, i32, i32, i32, i32), Vec<ActivityWeightedEntry>> =
         HashMap::new();
     for awr in activity_weighted {
@@ -576,14 +576,14 @@ fn multiply_by_activity(
         inputs.hour_day.iter().map(|r| (r.hour_day_id, r)).collect();
     let mut out: Vec<(EmissionRow, f64)> = Vec::new();
     for st in &inputs.starts {
-        // Starts2: INNER JOIN HourDay USING (hourDayID).
+ // Starts2: INNER JOIN HourDay USING (hourDayID).
         let Some(hd) = hour_day.get(&st.hour_day_id) else {
             continue;
         };
         let model_year_id = st.year_id - st.age_id;
-        // The Starts2 ⋈ ActivityWeightedEmissionRate join requires
-        // s.zoneID = awer.zoneID (the constant iteration zone) and
-        // s.yearID = awer.yearID (the constant run year).
+ // The Starts2 ⋈ ActivityWeightedEmissionRate join requires
+ // s.zoneID = awer.zoneID (the constant iteration zone) and
+ // s.yearID = awer.yearID (the constant run year).
         if st.zone_id != ctx.zone_id || st.year_id != ctx.year_id {
             continue;
         }
@@ -686,14 +686,13 @@ impl Calculator for Nh3StartCalculator {
         subscriptions()
     }
 
-    /// `NH3StartCalculator` registers **no** `(pollutant, process)` pairs —
-    /// see `REGISTRATIONS` and the module-level supersession note.
+ /// `NH3StartCalculator` registers **no** `(pollutant, process)` pairs /// see `REGISTRATIONS` and the module-level supersession note.
     fn registrations(&self) -> &[PollutantProcessAssociation] {
         REGISTRATIONS
     }
 
-    // `upstream` keeps the trait default (empty): `calculator-dag.json`
-    // records no `depends_on` edges for `NH3StartCalculator`.
+ // `upstream` keeps the trait default (empty): `calculator-dag.json`
+ // records no `depends_on` edges for `NH3StartCalculator`.
 
     fn input_tables(&self) -> &[&'static str] {
         INPUT_TABLES
@@ -757,13 +756,13 @@ mod tests {
     use super::*;
     use crate::calculators::nh3::common::NH3_POLLUTANT_ID;
 
-    /// NH3 Start Exhaust `polProcessID` — `pollutant 30 × 100 + process 2`.
+ /// NH3 Start Exhaust `polProcessID` — `pollutant 30 × 100 + process 2`.
     const NH3_START_POL_PROCESS: i32 = 3002;
 
-    /// A one-`Starts`, one-bin, one-operating-mode start input with no I/M
-    /// coverage. The single output row is
-    /// `emissionQuant = starts 10 × (opModeFraction 1 × (sbaf 1 ×
-    /// meanBaseRate 3)) = 30`.
+ /// A one-`Starts`, one-bin, one-operating-mode start input with no I/M
+ /// coverage. The single output row is
+ /// `emissionQuant = starts 10 × (opModeFraction 1 × (sbaf 1 ×
+ /// meanBaseRate 3)) = 30`.
     fn minimal_inputs() -> StartInputs {
         StartInputs {
             starts: vec![StartsRow {
@@ -856,17 +855,17 @@ mod tests {
         assert_eq!(row.county_id, 26_161);
         assert_eq!(row.zone_id, 261_610);
         assert_eq!(row.link_id, 5001);
-        // Start exhaust is reported on the off-network road type.
+ // Start exhaust is reported on the off-network road type.
         assert_eq!(row.road_type_id, 1);
-        // starts 10 × opModeFraction 1 × (sbaf 1 × meanBaseRate 3) = 30.
+ // starts 10 × opModeFraction 1 × (sbaf 1 × meanBaseRate 3) = 30.
         assert!((row.emission_quant - 30.0).abs() < 1e-9);
     }
 
     #[test]
     fn calculate_blends_in_the_im_quantity_where_coverage_exists() {
         let mut inputs = minimal_inputs();
-        // emissionQuant = 30 (meanBaseRate 3 × starts 10),
-        // emissionQuantIM = 10 (meanBaseRateIM 1 × starts 10).
+ // emissionQuant = 30 (meanBaseRate 3 × starts 10),
+ // emissionQuantIM = 10 (meanBaseRateIM 1 × starts 10).
         inputs.pollutant_process_mapped_model_year = vec![PollutantProcessMappedModelYearRow {
             pol_process_id: NH3_START_POL_PROCESS,
             model_year_id: 2018,
@@ -897,8 +896,8 @@ mod tests {
 
         let out = Nh3StartCalculator::calculate(&inputs, &ctx());
         assert_eq!(out.len(), 1);
-        // IMAdjustFract = 50 × 80 × 0.01 = 40. Blend = 10 × 40 + 30 ×
-        // (1 - 40) = 400 - 1170 = -770 → GREATEST(…, 0) = 0.
+ // IMAdjustFract = 50 × 80 × 0.01 = 40. Blend = 10 × 40 + 30 ×
+ // (1 - 40) = 400 - 1170 = -770 → GREATEST(…, 0) = 0.
         assert!((out[0].emission_quant - 0.0).abs() < 1e-9);
     }
 
@@ -946,7 +945,7 @@ mod tests {
 
     #[test]
     fn processes_road_type_admits_off_network_and_absent_road_types() {
-        // Off-network and "no road type" pass; a known on-network type fails.
+ // Off-network and "no road type" pass; a known on-network type fails.
         assert!(Nh3StartCalculator::processes_road_type(1));
         assert!(Nh3StartCalculator::processes_road_type(0));
         assert!(Nh3StartCalculator::processes_road_type(-1));
@@ -1073,7 +1072,7 @@ mod tests {
             .unwrap()
             .get(0)
             .unwrap();
-        // starts 10 × opModeFraction 1 × (sbaf 1 × meanBaseRate 3) = 30.
+ // starts 10 × opModeFraction 1 × (sbaf 1 × meanBaseRate 3) = 30.
         assert!((quant - 30.0).abs() < 1e-9, "emissionQuant {quant} != 30.0");
     }
 

@@ -33,7 +33,7 @@ Each release provides:
 
 * `moves` — the main MOVES binary.
 * `moves-default-db-convert` — converts an EPA MOVES default-DB MariaDB dump
-  to the Parquet layout `moves.rs` expects.
+ to the Parquet layout `moves.rs` expects.
 
 Download the archive for your platform (`moves-<version>-<target>.tar.gz` on
 Linux/macOS, `.zip` on Windows), extract, and place the binaries somewhere on
@@ -65,10 +65,10 @@ Pure-Rust port of EPA's MOVES on-road and NONROAD emissions model.
 Usage: moves <COMMAND>
 
 Commands:
-  run              Run a MOVES simulation from a RunSpec
-  import-cdb       Import County-database (CDB) input CSV files into Parquet
-  convert-runspec  Convert a RunSpec between XML and TOML
-  help             Print this message or the help of the given subcommand(s)
+ run Run a MOVES simulation from a RunSpec
+ import-cdb Import County-database (CDB) input CSV files into Parquet
+ convert-runspec Convert a RunSpec between XML and TOML
+ help Print this message or the help of the given subcommand(s)
 ```
 
 ---
@@ -82,41 +82,40 @@ MOVES run.
 
 ```bash
 moves run \
-  --runspec characterization/fixtures/sample-runspec.xml \
-  --output  /tmp/sample-out
+ --runspec characterization/fixtures/sample-runspec.xml \
+ --output /tmp/sample-out
 ```
 
-Expected output (Phase 3 — calculators return empty results until the Phase 4
-data plane lands; the framework, RunSpec parser, and output writer are fully
+Expected output (the framework, RunSpec parser, and output writer are fully
 functional):
 
 ```
 [moves run] characterization/fixtures/sample-runspec.xml
-  scale            : MACROSCALE
-  models           : ["OnRoad"]
-  counties         : [26161]
-  years            : [2001]
-  months           : [6]
-  pollutants       : 10
-  iterations       : 1
-  max parallelism  : <N>
-  wall time        : X.X ms  (plan Y.Y ms, exec Z.Z ms)
-  peak RSS         : X.X MiB
-  output directory : /tmp/sample-out
-  run record       : /tmp/sample-out/MOVESRun.parquet
+ scale : MACROSCALE
+ models : ["OnRoad"]
+ counties : [26161]
+ years : [2001]
+ months : [6]
+ pollutants : 10
+ iterations : 1
+ max parallelism : <N>
+ wall time : X.X ms (plan Y.Y ms, exec Z.Z ms)
+ peak RSS : X.X MiB
+ output directory : /tmp/sample-out
+ run record : /tmp/sample-out/MOVESRun.parquet
 ```
 
 The output directory contains:
 
 ```
 /tmp/sample-out/
-├── MOVESRun.parquet               # run metadata (one row)
-├── MOVESOutput/                   # per-emission rows (may be empty in Phase 3)
-│   └── yearID=2001/monthID=6/
-│       └── part.parquet
-└── MOVESActivityOutput/           # per-activity rows (may be empty in Phase 3)
-    └── yearID=2001/monthID=6/
-        └── part.parquet
+├── MOVESRun.parquet # run metadata (one row)
+├── MOVESOutput/ # per-emission rows
+│ └── yearID=2001/monthID=6/
+│ └── part.parquet
+└── MOVESActivityOutput/ # per-activity rows
+ └── yearID=2001/monthID=6/
+ └── part.parquet
 ```
 
 See [Output format](#output-format) for the full schema.
@@ -127,7 +126,7 @@ If you want to explore the TOML format before writing your own RunSpec:
 
 ```bash
 moves convert-runspec \
-  --input characterization/fixtures/sample-runspec.xml
+ --input characterization/fixtures/sample-runspec.xml
 # writes characterization/fixtures/sample-runspec.toml
 ```
 
@@ -175,48 +174,48 @@ self-documenting.
 description = "Tutorial run — Washtenaw County, June 2020"
 
 [run]
-models  = ["onroad"]
-scale   = "macro"
+models = ["onroad"]
+scale = "macro"
 pm_size = 25
 
 [[geo]]
-type        = "county"
-key         = 26161
+type = "county"
+key = 26161
 description = "MICHIGAN - Washtenaw County"
 
 [time]
-years      = [2020]
-months     = [6]
-days       = ["weekday"]
+years = [2020]
+months = [6]
+days = ["weekday"]
 begin_hour = 6
-end_hour   = 20
+end_hour = 20
 
 [[onroad]]
-fuel_type_id   = 1
+fuel_type_id = 1
 fuel_type_desc = "Gasoline"
 source_type_id = 21
 source_type_name = "Passenger Car"
 
 [[road_type]]
-road_type_id   = 5
+road_type_id = 5
 road_type_name = "Urban Unrestricted Access"
 model_combination = "M6"
 
 [[pollutant_process]]
-pollutant_id   = 2
-pollutant      = "Carbon Monoxide (CO)"
-process_id     = 1
-process        = "Running Exhaust"
+pollutant_id = 2
+pollutant = "Carbon Monoxide (CO)"
+process_id = 1
+process = "Running Exhaust"
 
 [[pollutant_process]]
-pollutant_id   = 3
-pollutant      = "Oxides of Nitrogen (NOx)"
-process_id     = 1
-process        = "Running Exhaust"
+pollutant_id = 3
+pollutant = "Oxides of Nitrogen (NOx)"
+process_id = 1
+process = "Running Exhaust"
 
 [output]
 geographic_output_detail = "county"
-output_emission_quant    = true
+output_emission_quant = true
 ```
 
 Save as `my-run.toml` and run:
@@ -262,21 +261,21 @@ To generate the Parquet tree yourself from a canonical MOVES installation:
 
 1. Run the dump script inside the MOVES Apptainer image:
 
-   ```bash
-   characterization/default-db-conversion/dump-default-db.sh \
-     /path/to/canonical-moves.sif \
-     /tmp/dump/movesdb20241112
-   ```
+ ```bash
+ characterization/default-db-conversion/dump-default-db.sh \
+ /path/to/canonical-moves.sif \
+ /tmp/dump/movesdb20241112
+ ```
 
 2. Convert the TSV dump to Parquet:
 
-   ```bash
-   moves-default-db-convert \
-     --tsv-dir      /tmp/dump/movesdb20241112 \
-     --plan         characterization/default-db-schema/tables.json \
-     --output       default-db/movesdb20241112 \
-     --moves-db-version movesdb20241112
-   ```
+ ```bash
+ moves-default-db-convert \
+ --tsv-dir /tmp/dump/movesdb20241112 \
+ --plan characterization/default-db-schema/tables.json \
+ --output default-db/movesdb20241112 \
+ --moves-db-version movesdb20241112
+ ```
 
 See `characterization/default-db-conversion/README.md` for full details.
 
@@ -284,8 +283,7 @@ See `characterization/default-db-conversion/README.md` for full details.
 
 The converted default-DB tree is embedded in the binary for the default
 MOVES database version. For custom DB versions, point `--default-db` at
-the converted directory (when that flag is available — see migration-plan
-Task 81 for the status of runtime DB selection).
+the converted directory (when that flag is available).
 
 ---
 
@@ -303,9 +301,9 @@ default database. The Rust port supports two import formats:
 
 ```bash
 moves import-cdb \
-  --input   /path/to/cdb-csvs/ \
-  --output  /path/to/cdb-parquet/ \
-  [--default-db /path/to/default-db/movesdb20241112]
+ --input /path/to/cdb-csvs/ \
+ --output /path/to/cdb-parquet/ \
+ [--default-db /path/to/default-db/movesdb20241112]
 ```
 
 `--input` must be a directory with `<TableName>.csv` files (one per table,
@@ -326,25 +324,24 @@ apply, but referential integrity is not enforced.
 | `Zone` | Allocation factors sum to 1.0 per `countyID` |
 
 Additional tables (`AverageSpeedDistribution`, `FuelSupply`, `IMCoverage`,
-`Hotelling`, and others) will be added in follow-up tasks (tracked under
-migration-plan Task 83). The command automatically covers each new table as
-it is added — no CLI change is needed.
+`Hotelling`, and others) will be added in follow-up tasks. The command
+automatically covers each new table as it is added — no CLI change is needed.
 
 #### Sample session
 
 ```
 $ moves import-cdb --input cdb/ --output cdb-out/ --default-db default-db/movesdb20241112
 [moves import-cdb] cdb/
-  ok       SourceTypePopulation          1456 row(s)
-             -> cdb-out/SourceTypePopulation.parquet
-  ok       ZoneRoadType                   160 row(s)
-             -> cdb-out/ZoneRoadType.parquet
-  ok       AgeDistribution               4680 row(s)
-             -> cdb-out/AgeDistribution.parquet
-  ok       Zone                             5 row(s)
-             -> cdb-out/Zone.parquet
-  --       ZoneRoadType (Zone domain)    no ZoneRoadType.csv in input directory
-  4 written, 0 rejected, 1 missing
+ ok SourceTypePopulation 1456 row(s)
+ -> cdb-out/SourceTypePopulation.parquet
+ ok ZoneRoadType 160 row(s)
+ -> cdb-out/ZoneRoadType.parquet
+ ok AgeDistribution 4680 row(s)
+ -> cdb-out/AgeDistribution.parquet
+ ok Zone 5 row(s)
+ -> cdb-out/Zone.parquet
+ -- ZoneRoadType (Zone domain) no ZoneRoadType.csv in input directory
+ 4 written, 0 rejected, 1 missing
 ```
 
 A rejected table (validation errors found) causes `moves import-cdb` to
@@ -382,11 +379,11 @@ Every `moves run` writes three Parquet tables to the output directory:
 <output>/
 ├── MOVESRun.parquet
 ├── MOVESOutput/
-│   ├── yearID=<y>/monthID=<m>/part.parquet
-│   └── …
+│ ├── yearID=<y>/monthID=<m>/part.parquet
+│ └── …
 └── MOVESActivityOutput/
-    ├── yearID=<y>/monthID=<m>/part.parquet
-    └── …
+ ├── yearID=<y>/monthID=<m>/part.parquet
+ └── …
 ```
 
 | Table | Contents |
@@ -407,7 +404,7 @@ of the run, set by the RunSpec's `[output]` section.
 A run operates in one of two modes:
 
 * **Inventory mode** — `emissionQuant` (a mass) is populated; `emissionRate`
-  is `null`.
+ is `null`.
 * **Rates mode** — `emissionRate` is populated; `emissionQuant` is `null`.
 
 Filter on `IS NOT NULL` for whichever column your run produces.
@@ -450,12 +447,12 @@ server-side computation required.
 **Live URL:** [https://earthsciml.github.io/moves.rs/demo/](https://earthsciml.github.io/moves.rs/demo/)
 
 The demo is rebuilt and published to GitHub Pages automatically on every push to
-`main` that passes CI — as part of the CI Pages deploy, alongside the API docs.  It supports:
+`main` that passes CI — as part of the CI Pages deploy, alongside the API docs. It supports:
 
 * Uploading a **RunSpec XML** file and running the onroad simulation — outputs
-  are returned as downloadable Parquet files.
+ are returned as downloadable Parquet files.
 * Uploading a **NONROAD `.POP`** population file and running the NONROAD
-  simulation — outputs show run counters.
+ simulation — outputs show run counters.
 
 ### Run the demo locally
 
@@ -478,7 +475,7 @@ The WASM module exposes two functions callable from JavaScript:
 
 ```js
 import init, { run_simulation, run_nonroad_simulation }
-    from "./moves_wasm.js";
+ from "./moves_wasm.js";
 
 await init();
 
@@ -495,13 +492,13 @@ deployment checklist, see **[`docs/wasm-embedding.md`](wasm-embedding.md)**.
 ### Multi-threaded WASM
 
 A second build variant uses rayon-backed Web Workers for parallel execution
-within the browser.  It requires a nightly Rust toolchain and cross-origin
-isolation headers (`COEP`/`COOP`) on the serving page.  See
+within the browser. It requires a nightly Rust toolchain and cross-origin
+isolation headers (`COEP`/`COOP`) on the serving page. See
 **[`docs/wasm-threading.md`](wasm-threading.md)** for details.
 
 It also provides three complete worked analyses:
 
-1. **NEI submission summary** — county × SCC × pollutant annual totals
+1. **NEI submission summary** — county x SCC x pollutant annual totals
 2. **County-level inventory rollup** — mass in US tons, pandas + R variants
 3. **Rates-mode CSV export** — deterministic flat CSV for SMOKE-MOVES
 
@@ -516,13 +513,12 @@ GROUP BY countyID, pollutantID
 ORDER BY countyID, pollutantID;
 ```
 
-### Extending the phase4-90 examples
+### Extending the downstream-tools examples
 
-[Task 90](downstream-tools.md) built the base loader patterns. Two useful
-extensions for production workflows:
+Two useful extensions for production workflows:
 
 **Add human-readable labels.** The default-DB dimension tables
-(`pollutant`, `emissionprocess`, `sourceusetype`, `roadtype`, …) are
+(`pollutant`, `emissionprocess`, `sourceusetype`, `roadtype`, ...) are
 Parquet files under `<output-root>/movesdb<YYYYMMDD>/<table>/`. Join them
 on the numeric ID columns:
 
@@ -530,12 +526,12 @@ on the numeric ID columns:
 import polars as pl
 
 emissions = pl.scan_parquet("out/MOVESOutput/**/*.parquet")
-pollutant  = pl.scan_parquet("default-db/movesdb20241112/pollutant/*.parquet")
+pollutant = pl.scan_parquet("default-db/movesdb20241112/pollutant/*.parquet")
 
 labeled = (
-    emissions
-    .join(pollutant.select("pollutantID", "pollutantName"), on="pollutantID", how="left")
-    .collect()
+ emissions
+ .join(pollutant.select("pollutantID", "pollutantName"), on="pollutantID", how="left")
+ .collect()
 )
 ```
 
@@ -573,26 +569,23 @@ kills; setting it too low leaves cores idle.
 ### Quick-tuning procedure
 
 1. Run a representative fixture with `--max-parallel-chunks 1` and record
-   peak RSS from the output line `peak RSS`.
+ peak RSS from the output line `peak RSS`.
 2. Run the same fixture with `--max-parallel-chunks 4`. Check that peak
-   RSS ≈ `baseline + 4 × working_set`.
-3. Choose N so that predicted peak RSS stays under **50–70% of available
-   RAM**, leaving headroom for the OS page cache and other processes.
+ RSS ≈ `baseline + 4 × working_set`.
+3. Choose N so that predicted peak RSS stays under **50-70% of available
+ RAM**, leaving headroom for the OS page cache and other processes.
 
 ### Recommended starting points
 
 | Machine | RAM | Recommended N | Expected peak RSS |
 |---------|-----|--------------|-------------------|
-| Laptop | 8–16 GiB | 2–4 | 0.5–1.5 GiB |
-| Workstation | 32–128 GiB | 8–16 | 1–4 GiB |
-| Server | 256+ GiB | 32+ | 3–12 GiB |
+| Laptop | 8-16 GiB | 2-4 | 0.5-1.5 GiB |
+| Workstation | 32-128 GiB | 8-16 | 1-4 GiB |
+| Server | 256+ GiB | 32+ | 3-12 GiB |
 
-These are soft estimates for county-scale runs once the Phase 4 data plane
-is fully connected. In Phase 3 (pre-data-plane), per-chain working set is
-essentially zero and N has no measurable effect on memory or throughput.
+These are soft estimates for county-scale runs.
 
-For the **full measurement methodology**, per-parallelism sweep results, and
-phase-by-phase projections, see **[`concurrency-tuning.md`](concurrency-tuning.md)**.
+For the **full measurement methodology** and per-parallelism sweep results, see **[`concurrency-tuning.md`](concurrency-tuning.md)**.
 
 ---
 
@@ -602,7 +595,7 @@ phase-by-phase projections, see **[`concurrency-tuning.md`](concurrency-tuning.m
 
 ```
 moves run --runspec <PATH> [--output <DIR>] [--max-parallel-chunks <N>]
-          [--calculator-dag <PATH>] [--run-date-time <ISO8601>]
+ [--calculator-dag <PATH>] [--run-date-time <ISO8601>]
 ```
 
 | Flag | Default | Description |
@@ -610,7 +603,7 @@ moves run --runspec <PATH> [--output <DIR>] [--max-parallel-chunks <N>]
 | `--runspec` | *(required)* | RunSpec file (`.xml`, `.mrs`, or `.toml`) |
 | `--output` | `moves-output/` | Directory for output Parquet. Created if absent. |
 | `--max-parallel-chunks` | 0 (all cores) | Maximum concurrent calculator chains. See [Tuning](#tuning---max-parallel-chunks). |
-| `--calculator-dag` | *(embedded Phase 1 DAG)* | Override the calculator-chain dependency graph. |
+| `--calculator-dag` | *(embedded DAG)* | Override the calculator-chain dependency graph. |
 | `--run-date-time` | *(unset)* | Override `runDateTime` in `MOVESRun.parquet`. Unset keeps output byte-stable. |
 
 Exit codes: `0` success, `1` failure, `2` argument error.
@@ -639,13 +632,13 @@ Converts a RunSpec between XML (`.xml`, `.mrs`) and TOML (`.toml`).
 The output path defaults to the input path with the extension swapped.
 
 ```bash
-# XML → TOML
+# XML -> TOML
 moves convert-runspec --input my-run.xml
-# → my-run.toml
+# -> my-run.toml
 
-# TOML → XML (for tools that require canonical MOVES XML)
+# TOML -> XML (for tools that require canonical MOVES XML)
 moves convert-runspec --input my-run.toml
-# → my-run.xml
+# -> my-run.xml
 
 # Explicit output path
 moves convert-runspec --input my-run.xml --output /tmp/run.toml
@@ -655,8 +648,8 @@ moves convert-runspec --input my-run.xml --output /tmp/run.toml
 
 ```
 moves-default-db-convert --tsv-dir <DIR> --plan <PATH> --output <DIR>
-                          --moves-db-version <LABEL>
-                          [--require-every-table] [--generated-at-utc <ISO8601>]
+ --moves-db-version <LABEL>
+ [--require-every-table] [--generated-at-utc <ISO8601>]
 ```
 
 Converts a MOVES default-DB TSV dump (from
@@ -671,7 +664,7 @@ layout the runtime reads. See [Default database](#default-database).
 regulatory submissions** — do not use it for State Implementation Plan (SIP)
 filings, transportation-conformity analysis, or official National Emissions
 Inventory submissions. Use EPA's canonical MOVES for regulatory work.
-See migration-plan Task 129 (porting guide) for a full discussion of
+See [`known-divergences.md`](known-divergences.md) for a full discussion of
 behavioral divergences from canonical MOVES.
 
 ---
@@ -684,7 +677,7 @@ behavioral divergences from canonical MOVES.
 * [`control-strategies.md`](control-strategies.md) — AVFT, ROP, OnRoad/NONROAD Retrofit
 * [`concurrency-tuning.md`](concurrency-tuning.md) — `--max-parallel-chunks` measurement and recommendations
 * [`known-divergences.md`](known-divergences.md) — documented differences from canonical MOVES
-* [`../moves-rust-migration-plan.md`](../moves-rust-migration-plan.md) — development roadmap
+* [`../moves-rust-md`](../moves-rust-md) — development roadmap
 * [`wasm-embedding.md`](wasm-embedding.md) — embedding the WASM module in third-party tools
 * [`wasm-threading.md`](wasm-threading.md) — multi-thread WASM build and COEP/COOP headers
 * [`../crates/moves-wasm/demo/README.md`](../crates/moves-wasm/demo/README.md) — browser demo build instructions

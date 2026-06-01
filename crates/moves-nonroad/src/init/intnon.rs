@@ -1,9 +1,9 @@
 //! Options-file initialisation sequencer (`intnon.f`).
 //!
-//! Task 99. The Fortran `intnon.f` is a 307-line driver that walks
+//!The Fortran `intnon.f` is a 307-line driver that walks
 //! every `rd*.f` parser in a fixed order, stopping on the first
 //! failure. In Rust the per-parser implementations already live in
-//! [`crate::input`] (Tasks 94–98); this module supplies the
+//! [`crate::input`]; this module supplies the
 //! orchestration glue.
 //!
 //! # Scope of the Rust port
@@ -11,20 +11,20 @@
 //! The Fortran routine touches three categories of input:
 //!
 //! 1. **Options-file packets** — `/OPTIONS/`, `/PERIOD/`, `/REGION/`,
-//!    `/SOURCE CATEGORY/`, `/EMFAC FILES/`, `/DETERIORATE FILES/`,
-//!    `/STAGE II/`, `/PM BASE SULFUR/` — all parsed from the same
-//!    options-file content.
+//! `/SOURCE CATEGORY/`, `/EMFAC FILES/`, `/DETERIORATE FILES/`,
+//! `/STAGE II/`, `/PM BASE SULFUR/` — all parsed from the same
+//! options-file content.
 //! 2. **Files declared in `/RUNFILES/`** — allocation, activity,
-//!    technology, seasonality, regions, FIPS, retrofit, population.
+//! technology, seasonality, regions, FIPS, retrofit, population.
 //! 3. **Cross-cutting initialisation** — [`crate::init::intadj`]
-//!    seeds the sulfur/RFG adjustment tables, [`crate::init::intams`]
-//!    seeds the AMS output parameters.
+//! seeds the sulfur/RFG adjustment tables, [`crate::init::intams`]
+//! seeds the AMS output parameters.
 //!
 //! [`run_options_file_init`] implements (1) and (3) — everything that
 //! is bounded by the options-file content. The per-file loaders
 //! covered in (2) remain available through their respective modules
 //! and the [`crate::input::efls`] / [`crate::input::bsfc`]
-//! dispatchers; Task 113 ties (2) into the full driver loop.
+//! dispatchers; ties (2) into the full driver loop.
 //!
 //! # Fortran source
 //!
@@ -49,35 +49,34 @@ use super::intams::{initialize_ams_params, AmsParams};
 /// initialisation.
 #[derive(Debug, Clone)]
 pub struct OptionsFileState {
-    /// Parsed `/OPTIONS/` packet.
+ /// Parsed `/OPTIONS/` packet.
     pub options: OptionsConfig,
-    /// Parsed `/PERIOD/` packet.
+ /// Parsed `/PERIOD/` packet.
     pub period: PeriodConfig,
-    /// Parsed `/REGION/` packet.
+ /// Parsed `/REGION/` packet.
     pub region: RegionConfig,
-    /// Parsed `/SOURCE CATEGORY/` packet (defaults to "all sources"
-    /// when absent).
+ /// Parsed `/SOURCE CATEGORY/` packet (defaults to "all sources"
+ /// when absent).
     pub source_category: SourceCategorySelection,
-    /// Parsed `/EMFAC FILES/` + `/DETERIORATE FILES/` packets.
+ /// Parsed `/EMFAC FILES/` + `/DETERIORATE FILES/` packets.
     pub emfac_files: EmfacFiles,
-    /// Parsed `/STAGE II/` packet (passthrough if absent).
+ /// Parsed `/STAGE II/` packet (passthrough if absent).
     pub stage2: Stage2Factor,
-    /// Parsed `/PM BASE SULFUR/` packet (empty if absent).
+ /// Parsed `/PM BASE SULFUR/` packet (empty if absent).
     pub sulfur: Vec<SulfurRecord>,
-    /// Sulfur and RFG-adjustment tables seeded from
-    /// [`Self::options`].
+ /// Sulfur and RFG-adjustment tables seeded from
+ /// [`Self::options`].
     pub adjustments: AdjustmentTables,
-    /// AMS output parameters seeded from [`Self::period`].
+ /// AMS output parameters seeded from [`Self::period`].
     pub ams: AmsParams,
-    /// Non-fatal warnings collected across parsers + initialisers.
+ /// Non-fatal warnings collected across parsers + initialisers.
     pub warnings: Vec<String>,
 }
 
 /// Run the options-file initialisation sequence.
 ///
 /// `options_text` is the full contents of the `.opt` file. Each
-/// sub-parser scans it from the start for its specific packet —
-/// mirroring how the Fortran source rewinds `IORUSR` between calls.
+/// sub-parser scans it from the start for its specific packet/// mirroring how the Fortran source rewinds `IORUSR` between calls.
 ///
 /// The function returns at the first fatal parse error encountered,
 /// matching the Fortran `goto 9999` short-circuit behaviour.
@@ -123,9 +122,9 @@ mod tests {
     use crate::input::region::RegionLevel;
 
     fn sample_options_file() -> String {
-        // A minimum-viable options file that exercises every required
-        // packet in the order intnon.f walks them. Optional packets
-        // are exercised in dedicated tests.
+ // A minimum-viable options file that exercises every required
+ // packet in the order intnon.f walks them. Optional packets
+ // are exercised in dedicated tests.
         "\
 /OPTIONS/
 Title 1            : Demo
@@ -186,26 +185,26 @@ PM EXHAUST         : pm.det
     fn parses_minimal_options_file() {
         let text = sample_options_file();
         let state = run_options_file_init(&text).unwrap();
-        // Options
+ // Options
         assert_eq!(state.options.altitude, AltitudeFlag::Low);
-        // Period
+ // Period
         assert_eq!(state.period.period_type, PeriodType::Annual);
         assert_eq!(state.period.episode_year, 2025);
-        // Region
+ // Region
         assert_eq!(state.region.level, RegionLevel::County);
-        // Source category
+ // Source category
         assert!(matches!(
             state.source_category,
             SourceCategorySelection::Selected(_)
         ));
-        // Emfac files
+ // Emfac files
         assert_eq!(state.emfac_files.bsfc.to_str().unwrap(), "bsfc.dat");
-        // Stage2 / sulfur default to no-op
+ // Stage2 / sulfur default to no-op
         assert!((state.stage2.retention_factor - 1.0).abs() < 1e-6);
         assert!(state.sulfur.is_empty());
-        // Adjustments populated
+ // Adjustments populated
         assert!((state.adjustments.sox_full[0] - 0.030).abs() < 1e-6);
-        // AMS parameters populated
+ // AMS parameters populated
         assert_eq!(state.ams.report_type, 'B');
         assert_eq!(state.ams.reference_year, 25);
     }
@@ -230,7 +229,7 @@ BASE       0.0015 0.07
     fn typical_day_annual_collects_warning_from_intams() {
         let text = sample_options_file().replace("TOTAL", "TYPICAL DAY");
         let state = run_options_file_init(&text).unwrap();
-        // intams emits a typical-day-mismatch warning for annual typical-day.
+ // intams emits a typical-day-mismatch warning for annual typical-day.
         assert_eq!(state.period.summary_type, SummaryType::TypicalDay);
         assert!(
             state.warnings.iter().any(|w| w.contains("typical day")),
@@ -241,7 +240,7 @@ BASE       0.0015 0.07
 
     #[test]
     fn missing_required_packet_short_circuits() {
-        // Strip the /OPTIONS/ packet entirely.
+ // Strip the /OPTIONS/ packet entirely.
         let text = "\
 /PERIOD/
 Period Type        : ANNUAL
@@ -274,8 +273,8 @@ RM VENT PERM       : vent.dat
 /END/
 ";
         let err = run_options_file_init(text).unwrap_err();
-        // /OPTIONS/ packet is the first parser invoked, so its
-        // absence surfaces first.
+ // /OPTIONS/ packet is the first parser invoked, so its
+ // absence surfaces first.
         let msg = format!("{err}");
         assert!(
             msg.contains("/OPTIONS/") || msg.contains("OPTIONS"),

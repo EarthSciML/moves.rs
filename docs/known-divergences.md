@@ -1,6 +1,6 @@
-# Known Divergences — Phase 7 Regression Baseline (Task 126, `mo-uj3ke`)
+# Known Divergences — Regression Baseline
 
-This document is the "known divergences" record required by Phase 7 Task 126.
+This document is the "known divergences" record for the regression methodology.
 It describes the regression methodology for the full-suite pass and catalogues
 the current state of the port against the 34-fixture characterization suite.
 
@@ -36,18 +36,18 @@ It has two layers:
 `characterization/snapshots/` tree is populated for all 34 non-scale fixtures;
 override the tree with `REGRESSION_SNAPSHOTS_DIR=<path>`):
 - Runs each fixture with `--snapshot`, so the calculators execute against the
-  captured execution DB and the engine writes the real `MOVESOutput/` tree
-  (not just `MOVESRun.parquet`).
+ captured execution DB and the engine writes the real `MOVESOutput/` tree
+ (not just `MOVESRun.parquet`).
 - Sums `emissionQuant` per `pollutantID` from both the canonical `MOVESOutput`
-  table and the port's `MOVESOutput/` tree, then compares the per-pollutant
-  totals (`moves_snapshot::compare_pollutant_sums`).
+ table and the port's `MOVESOutput/` tree, then compares the per-pollutant
+ totals (`moves_snapshot::compare_pollutant_sums`).
 - **Hard-asserts** on the fixtures whose data plane matches canonical within a
-  documented precision-only tolerance (§4.2 below).
+ documented precision-only tolerance (§4.2 below).
 - **Hard-fails** (operator decision) on fixtures with a known, reported
-  data-plane bug (§4.4 below) — it is OK for CI to be red while results are
-  wrong. Masking a divergence with a widened tolerance is worse than no gate,
-  so a quarantined fixture stays in the gate (failing CI) and graduates to the
-  asserted set only once its data plane is actually fixed.
+ data-plane bug (§4.4 below) — it is OK for CI to be red while results are
+ wrong. Masking a divergence with a widened tolerance is worse than no gate,
+ so a quarantined fixture stays in the gate (failing CI) and graduates to the
+ asserted set only once its data plane is actually fixed.
 
 ### Why per-pollutant sums, not a cell-level diff
 
@@ -166,25 +166,25 @@ fixtures are **inventory ("Inv") scale**, and the over-emit had two independent
 causes — one structural (now fixed) and one numerical (still open):
 
 1. *Off-network start rows the run does not select (FIXED).* Canonical drives the
-   BaseRate worker off a **join to `runSpecRoadType`**, so it only materialises
-   rate rows whose road type the RunSpec selects. The generator emits process 1
-   (running exhaust) on the selected on-road type (roadType 4) and process 2
-   (start exhaust) on off-network **roadType 1**; `runspecroadtype` for the
-   onroad-exhaust fixtures is `{4}` only, so canonical's `baserateoutput` /
-   `MOVESOutput` carries **process 1, roadType 4 only** (744 rows for
-   `expand-criteria`) and **no start rows at all** — even though
-   `baseratebyage_2_2020` (process 2, roadType 1, op-modes 101–108) holds 5,952
-   valid rate rows. The port read *every* road type back via
-   `merge_process_year_variants` and emitted the roadType-1 start block too
-   (1,488 rows = process 1 @ rt 4 + process 2 @ rt 1). **Fixed** by mirroring the
-   worker's join: `BaseRateCalculator::execute` reads `runSpecRoadType` and keeps
-   only rate rows on a selected road type (an empty/absent table imposes no
-   restriction, preserving unit-test behaviour). The port now emits 744 rows for
-   `expand-criteria` — process 1, roadType 4, pollutants 1/2/3 — **matching
-   canonical's row count, processes, road type and pollutants exactly.** The
-   filter is scoped to the `BaseRateCalculator` input only (processes 1/2/9/10/
-   90/91); evap/refueling/etc. calculators are untouched, so the previously
-   asserted `process-evap-fvv` (off-network process 12) is unaffected.
+ BaseRate worker off a **join to `runSpecRoadType`**, so it only materialises
+ rate rows whose road type the RunSpec selects. The generator emits process 1
+ (running exhaust) on the selected on-road type (roadType 4) and process 2
+ (start exhaust) on off-network **roadType 1**; `runspecroadtype` for the
+ onroad-exhaust fixtures is `{4}` only, so canonical's `baserateoutput` /
+ `MOVESOutput` carries **process 1, roadType 4 only** (744 rows for
+ `expand-criteria`) and **no start rows at all** — even though
+ `baseratebyage_2_2020` (process 2, roadType 1, op-modes 101–108) holds 5,952
+ valid rate rows. The port read *every* road type back via
+ `merge_process_year_variants` and emitted the roadType-1 start block too
+ (1,488 rows = process 1 @ rt 4 + process 2 @ rt 1). **Fixed** by mirroring the
+ worker's join: `BaseRateCalculator::execute` reads `runSpecRoadType` and keeps
+ only rate rows on a selected road type (an empty/absent table imposes no
+ restriction, preserving unit-test behaviour). The port now emits 744 rows for
+ `expand-criteria` — process 1, roadType 4, pollutants 1/2/3 — **matching
+ canonical's row count, processes, road type and pollutants exactly.** The
+ filter is scoped to the `BaseRateCalculator` input only (processes 1/2/9/10/
+ 90/91); evap/refueling/etc. calculators are untouched, so the previously
+ asserted `process-evap-fvv` (off-network process 12) is unaffected.
 
 2. *Un-weighted rates instead of inventory mass (FIXED for criteria pollutants).*
    The port previously hardcoded `ModuleFlags::default()` (`apply_activity` false)
@@ -262,36 +262,36 @@ are distinct from the BaseRate activity-weighting gap (§4.4 bug 1) and from the
 `runSpecRoadType` row-shape fix.
 
 * **`process-pm-exhaust`** — canonical writes 7 PM pollutants (100 PM10-total,
-  110 PM2.5-total, 111 organic carbon, 112 elemental carbon, 115 sulfate, 118
-  composite non-EC, 119 H₂O), 1,456 rows. The port emits **only 112 and 118**
-  (496 rows) — exactly the two running-exhaust components
-  `BasicRunningPmEmissionCalculator` produces. The OC (111) and sulfate (115)
-  component producers and the `PmTotalExhaustCalculator` (which forms 100/110 by
-  re-labelling OC+EC+sulfate) emit **0** in the snapshot path — the chained
-  PM-speciation inputs they read are not populated. (Note also the per-pollutant
-  row count differs, 248 port vs 208 canonical — a separate model-year/grouping
-  difference.) The PM-speciation chain data-flow must be wired before this can
-  graduate.
+ 110 PM2.5-total, 111 organic carbon, 112 elemental carbon, 115 sulfate, 118
+ composite non-EC, 119 H₂O), 1,456 rows. The port emits **only 112 and 118**
+ (496 rows) — exactly the two running-exhaust components
+ `BasicRunningPmEmissionCalculator` produces. The OC (111) and sulfate (115)
+ component producers and the `PmTotalExhaustCalculator` (which forms 100/110 by
+ re-labelling OC+EC+sulfate) emit **0** in the snapshot path — the chained
+ PM-speciation inputs they read are not populated. (Note also the per-pollutant
+ row count differs, 248 port vs 208 canonical — a separate model-year/grouping
+ difference.) The PM-speciation chain data-flow must be wired before this can
+ graduate.
 
 * **`process-airtoxics` (1,288 vs 248), `process-nox-speciation` (872 vs 248),
-  `chain-nonhaptog` / `chain-tog-speciation` (1,080 vs 248)** — same family: the
-  air-toxics / NOx-speciation / HC-speciation calculators that fan a base
-  pollutant out into many species produce far fewer species rows than canonical
-  (the port emits ≈248, a single base process's worth, where canonical has the
-  full speciated set). Chained-calculator coverage gap.
+ `chain-nonhaptog` / `chain-tog-speciation` (1,080 vs 248)** — same family: the
+ air-toxics / NOx-speciation / HC-speciation calculators that fan a base
+ pollutant out into many species produce far fewer species rows than canonical
+ (the port emits ≈248, a single base process's worth, where canonical has the
+ full speciated set). Chained-calculator coverage gap.
 
 * **`process-brakewear` / `process-tirewear` (500 vs 750)** and
-  **`process-crankcase-running` (744 vs 1,368)** — under-emit by a whole
-  pollutant/process slice (and additionally carry the activity-weighting mass
-  gap on the rows they do emit).
+ **`process-crankcase-running` (744 vs 1,368)** — under-emit by a whole
+ pollutant/process slice (and additionally carry the activity-weighting mass
+ gap on the rows they do emit).
 
 * **`process-refueling` (250 vs 336)** — *wrong content*, not just under-count.
-  Canonical writes refueling **processes 18 (displacement) + 19 (spillage)**,
-  **pollutant 1 (THC)**. The port writes **process 1, pollutant 91 (total
-  energy)** instead: the refueling calculator (processes 18/19) is not producing,
-  and the `BaseRateCalculator` energy subscription (process 1 / pollutant 91)
-  leaks into the run. This needs the refueling calculator wired and the energy
-  leak gated, independent of the `runSpecRoadType` fix.
+ Canonical writes refueling **processes 18 (displacement) + 19 (spillage)**,
+ **pollutant 1 (THC)**. The port writes **process 1, pollutant 91 (total
+ energy)** instead: the refueling calculator (processes 18/19) is not producing,
+ and the `BaseRateCalculator` energy subscription (process 1 / pollutant 91)
+ leaks into the run. This needs the refueling calculator wired and the energy
+ leak gated, independent of the `runSpecRoadType` fix.
 
 All of bug 3 is calculator-chain data-plane work; none was forced or
 tolerance-masked, and each fixture graduates from `QUARANTINED_FIXTURES` once its
@@ -299,60 +299,59 @@ chain emits the canonical pollutant/process set within tolerance.
 
 ---
 
-## 2. Phase 7 baseline — all fixtures run without error
+## 2. Initial baseline — all fixtures run without error
 
-Recorded on 2026-05-21 against the `polecat/mo-uj3ke` branch (Phase 7 entry).
-All 34 fixtures complete without error. All plan > 0 modules. All execute 0
-modules (expected — see §3).
+Recorded on 2026-05-21. All 34 fixtures complete without error. All plan > 0
+modules. All execute 0 modules (expected — see §3).
 
 ```
-fixture                                     planned executed   unimpl
+fixture planned executed unimpl
 ------------------------------------------------------------------------
-chain-nonhaptog                                  43        0       43
-chain-tog-speciation                             43        0       43
-expand-counties                                  44        0       44
-expand-criteria                                  44        0       44
-expand-day                                       44        0       44
-expand-fueltype-diesel                           44        0       44
-expand-month                                     44        0       44
-expand-sourcetype                                44        0       44
-mixed-onroad-nonroad                             44        0       44
-nr-agriculture-state                             18        0       18
-nr-airport-support-county                        18        0       18
-nr-commercial-nation                             18        0       18
-nr-construction-state                            18        0       18
-nr-industrial-county                             18        0       18
-nr-lawn-garden-county                            18        0       18
-nr-logging-county                                18        0       18
-nr-pleasure-craft-state                          21        0       21
-nr-railroad-support-nation                       18        0       18
-nr-recreational-county                           18        0       18
-process-airtoxics                                43        0       43
-process-apu                                      40        0       40
-process-brakewear                                39        0       39
-process-crankcase-extidle                        35        0       35
-process-crankcase-running                        38        0       38
-process-crankcase-start                          35        0       35
-process-evap-fvv                                 40        0       40
-process-evap-leaks                               40        0       40
-process-evap-permeation                          39        0       39
-process-extended-idle                            40        0       40
-process-nox-speciation                           40        0       40
-process-pm-exhaust                               43        0       43
-process-refueling                                44        0       44
-process-tirewear                                 40        0       40
-sample-runspec                                   44        0       44
+chain-nonhaptog 43 0 43
+chain-tog-speciation 43 0 43
+expand-counties 44 0 44
+expand-criteria 44 0 44
+expand-day 44 0 44
+expand-fueltype-diesel 44 0 44
+expand-month 44 0 44
+expand-sourcetype 44 0 44
+mixed-onroad-nonroad 44 0 44
+nr-agriculture-state 18 0 18
+nr-airport-support-county 18 0 18
+nr-commercial-nation 18 0 18
+nr-construction-state 18 0 18
+nr-industrial-county 18 0 18
+nr-lawn-garden-county 18 0 18
+nr-logging-county 18 0 18
+nr-pleasure-craft-state 21 0 21
+nr-railroad-support-nation 18 0 18
+nr-recreational-county 18 0 18
+process-airtoxics 43 0 43
+process-apu 40 0 40
+process-brakewear 39 0 39
+process-crankcase-extidle 35 0 35
+process-crankcase-running 38 0 38
+process-crankcase-start 35 0 35
+process-evap-fvv 40 0 40
+process-evap-leaks 40 0 40
+process-evap-permeation 39 0 39
+process-extended-idle 40 0 40
+process-nox-speciation 40 0 40
+process-pm-exhaust 43 0 43
+process-refueling 44 0 44
+process-tirewear 40 0 40
+sample-runspec 44 0 44
 ------------------------------------------------------------------------
 34 fixtures
 ```
 
 **What "0 executed" means:** The calculator `execute()` methods return
 `CalculatorOutput::empty()` because the `CalculatorContext` does not yet carry
-real row data — that is Phase 4's `DataFrameStore` deliverable. The numerical
-implementations are complete (all Phase 3 calculator unit tests pass), but the
-per-fixture materialisation path is not yet wired. This is the expected Phase 7
-entry state; wiring the data plane is what turns "0 executed" into real
-emission outputs.
+real row data — that is the `DataFrameStore` deliverable. The numerical
+implementations are complete (all calculator unit tests pass), but the
+per-fixture materialisation path is not yet wired. This is the expected entry
+state; wiring the data plane is what turns "0 executed" into real emission
+outputs.
 
 ---
 
@@ -362,8 +361,8 @@ The gate is now active (§1b). It required two inputs, both of which now exist:
 
 ### Input 1: Canonical MOVES snapshots
 
-The Phase 0 snapshot captures require running canonical MOVES in an Apptainer
-SIF on an HPC node with root-capable namespacing:
+The snapshot captures require running canonical MOVES in an Apptainer SIF on an
+HPC node with root-capable namespacing:
 
 ```sh
 # Build the SIF (one-time, ~1–2 hours):
@@ -396,8 +395,7 @@ cargo test --test full_suite_regression canonical_snapshot_diff -- --nocapture
 
 ## 4. Expected divergence categories
 
-Based on the migration plan and the Phase 3 calculator-validation harness
-experience, divergences are expected to fall into four categories:
+Divergences are expected to fall into four categories:
 
 ### 4.1 Within tolerance: ordering differences in tied-row aggregates
 
@@ -416,14 +414,14 @@ them in the `OutputProcessor`.
 
 Float summation order differs between the Java/Go original and the Rust port.
 For most calculators the difference is sub-1e-9, within the default tolerance
-budget. The calculator-validation harness (Task 73/74) documented no
-divergences beyond 1e-9 for the 26 onroad fixtures it covers.
+budget. The calculator-validation harness documented no divergences beyond 1e-9
+for the 26 onroad fixtures it covers.
 
 NONROAD arithmetic uses Fortran single-precision (`real*4`) in the original;
 the Rust port uses `f64` throughout. This can produce results that are more
 accurate but differ numerically from the canonical captures. The
-`nonroad-fidelity` gate (Task 115) characterised per-variable tolerance
-budgets for the intermediate NONROAD quantities; those budgets carry over to
+`nonroad-fidelity` gate characterised per-variable tolerance budgets for the
+intermediate NONROAD quantities; those budgets carry over to
 the end-to-end output tables.
 
 **Resolution:** the gate's per-pollutant relative tolerances absorb this drift
@@ -461,22 +459,22 @@ the case, and verify the divergence disappears.
 ```sh
 # 1. Run the full suite with snapshots.
 REGRESSION_SNAPSHOTS_DIR=characterization/snapshots \
-    cargo test --test full_suite_regression -- --nocapture 2>&1 | tee /tmp/regression.log
+ cargo test --test full_suite_regression -- --nocapture 2>&1 | tee /tmp/regression.log
 
 # 2. Inspect divergences for a specific fixture.
 target/release/moves-snapshot diff \
-    characterization/snapshots/process-airtoxics/ \
-    /tmp/port-output/process-airtoxics/ \
-    --tolerance characterization/tolerance.toml \
-    --format json | jq '.diff.table_changes[] | {table, cells: (.row_diffs | length)}'
+ characterization/snapshots/process-airtoxics/ \
+ /tmp/port-output/process-airtoxics/ \
+ --tolerance characterization/tolerance.toml \
+ --format json | jq '.diff.table_changes[] | {table, cells: (.row_diffs | length)}'
 
 # 3. Accept a characterised artifact — edit characterization/tolerance.toml:
-#    [tables."db__movesoutput__movesoutput"]
-#    emissionQuant = 1e-7   # artifact: Fortran real*4 vs Rust f64 for nr-* fixtures
+# [tables."db__movesoutput__movesoutput"]
+# emissionQuant = 1e-7 # artifact: Fortran real*4 vs Rust f64 for nr-* fixtures
 
 # 4. Re-run gate to confirm the divergence is now within budget.
 REGRESSION_SNAPSHOTS_DIR=characterization/snapshots \
-    cargo test --test full_suite_regression canonical_snapshot_diff -- --nocapture
+ cargo test --test full_suite_regression canonical_snapshot_diff -- --nocapture
 ```
 
 ---
@@ -492,6 +490,6 @@ The three excluded `scale-*` fixtures require additional input databases:
 | `scale-rates` | Rates-mode setup database |
 
 These fixtures will be added to the regression suite after the CDB/PDB
-importers (Phase 4 Tasks 83–84) and a matching test fixture set are in place.
+importers and a matching test fixture set are in place.
 The `run-all-fixtures.sh` script has the same exclusion: pass
 `--include scale-county` to opt in once the inputs are available.

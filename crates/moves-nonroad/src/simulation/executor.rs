@@ -6,11 +6,11 @@
 //!
 //! `nonroad.f`'s record loop ([`plan_scc_group`](crate::driver::plan_scc_group))
 //! decides *which* geography routine each population record dispatches
-//! to. Task 113 ported that decision logic as a pure planner and named
+//! to. ported that decision logic as a pure planner and named
 //! its consumer explicitly:
 //!
 //! > the executor that runs each decision against the geography
-//! > routines and the writers is the Task 117 integration layer.
+//! > routines and the writers is the integration layer.
 //!
 //! [`run_simulation`](super::run_simulation) *is* that executor — it
 //! walks the planner's [`DriverStep`](crate::driver::DriverStep)s and
@@ -26,14 +26,14 @@
 //! This module provides two executors:
 //!
 //! - **[`ProductionExecutor`]** — assembles the four callback traits
-//!   ([`GeographyCallbacks`], [`StateCallbacks`], [`UsTotalCallbacks`],
-//!   [`NationalCallbacks`]) from loaded reference-data tables and calls
-//!   the real geography routines.
+//! ([`GeographyCallbacks`], [`StateCallbacks`], [`UsTotalCallbacks`],
+//! [`NationalCallbacks`]) from loaded reference-data tables and calls
+//! the real geography routines.
 //! - **[`PlanRecordingExecutor`]** — records each dispatch and returns
-//!   empty output; makes the driver loop exercisable without any
-//!   reference data. It is also the minimal shape the NONROAD
-//!   numerical-fidelity harness (Tasks 115/116) needs for capturing
-//!   port-side intermediate state.
+//! empty output; makes the driver loop exercisable without any
+//! reference data. It is also the minimal shape the NONROAD
+//! numerical-fidelity harness needs for capturing
+//! port-side intermediate state.
 
 use crate::common::consts::{MXAGYR, MXPOL, MXTECH, SWTCNG, SWTDSL, SWTGS2, SWTGS4, SWTLPG};
 use crate::driver::scrptime;
@@ -87,20 +87,20 @@ use crate::emissions::exhaust::AdjustmentTable;
 /// of the six geography routines.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DispatchContext<'a> {
-    /// Which geography routine this record dispatches to.
+ /// Which geography routine this record dispatches to.
     pub dispatch: Dispatch,
-    /// The 10-character SCC of the dispatching record's group.
+ /// The 10-character SCC of the dispatching record's group.
     pub scc: &'a str,
-    /// Fuel resolved from the SCC by
-    /// [`fuel_for_scc`]. `None` is the
-    /// Fortran `ifuel = 0` "no prefix matched" default.
+ /// Fuel resolved from the SCC by
+ /// [`fuel_for_scc`]. `None` is the
+ /// Fortran `ifuel = 0` "no prefix matched" default.
     pub fuel: Option<FuelKind>,
-    /// The population record being dispatched.
+ /// The population record being dispatched.
     pub record: &'a DriverRecord,
-    /// Per-year fractional growth rate when this record paired with
-    /// its successor as a growth record; `None` is the Fortran
-    /// `growth = -9` "no growth record" sentinel. See
-    /// [`growth_pair`](crate::driver::growth_pair).
+ /// Per-year fractional growth rate when this record paired with
+ /// its successor as a growth record; `None` is the Fortran
+ /// `growth = -9` "no growth record" sentinel. See
+ /// [`growth_pair`](crate::driver::growth_pair).
     pub growth: Option<f32>,
 }
 
@@ -114,26 +114,26 @@ pub struct DispatchContext<'a> {
 /// [`absorb`](super::NonroadOutputs::absorb).
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct GeographyExecution {
-    /// Emission rows the routine produced. Empty for a routine that
-    /// took an early-out (`ISKIP`) or for a planning-only executor.
+ /// Emission rows the routine produced. Empty for a routine that
+ /// took an early-out (`ISKIP`) or for a planning-only executor.
     pub rows: Vec<SimEmissionRow>,
-    /// Non-fatal warnings the routine raised — the Fortran `chkwrn`
-    /// channel.
+ /// Non-fatal warnings the routine raised — the Fortran `chkwrn`
+ /// channel.
     pub warnings: Vec<String>,
-    /// `true` when the routine took an `ISKIP` early-out (county not
-    /// in run, zero population, missing technology fractions, …).
-    /// Counted into [`RunCounters::geography_skips`](super::RunCounters::geography_skips).
+ /// `true` when the routine took an `ISKIP` early-out (county not
+ /// in run, zero population, missing technology fractions, …).
+ /// Counted into [`RunCounters::geography_skips`](super::RunCounters::geography_skips).
     pub skipped: bool,
-    /// National-level records the routine processed — Fortran
-    /// `nnatrc`. `0` for the county / state / subcounty levels.
+ /// National-level records the routine processed — Fortran
+ /// `nnatrc`. `0` for the county / state / subcounty levels.
     pub national_record_count: i32,
 }
 
 impl GeographyExecution {
-    /// A skipped (`ISKIP`) execution: no rows, no warnings.
-    ///
-    /// The shorthand a production executor returns when a geography
-    /// routine takes an early-out.
+ /// A skipped (`ISKIP`) execution: no rows, no warnings.
+ ///
+ /// The shorthand a production executor returns when a geography
+ /// routine takes an early-out.
     pub fn skipped() -> Self {
         Self {
             skipped: true,
@@ -156,21 +156,21 @@ impl GeographyExecution {
 /// both a concrete `&mut impl GeographyExecutor` and a
 /// `&mut dyn GeographyExecutor`.
 pub trait GeographyExecutor {
-    /// Execute one geography-routine dispatch.
-    ///
-    /// `ctx` identifies the routine ([`DispatchContext::dispatch`]) and
-    /// carries the record, SCC, fuel, and growth rate; `options`
-    /// carries the run-global settings. The returned
-    /// [`GeographyExecution`] is the routine's output in the uniform
-    /// shape the driver loop folds into the run result.
-    ///
-    /// # Errors
-    ///
-    /// Propagates any [`Error`] the geography routine
-    /// raises — a non-finite emission accumulator, a missing
-    /// allocation coefficient, an exhausted retrofit population, …. An
-    /// error aborts the whole run: NONROAD has no per-record error
-    /// recovery, and neither does the port.
+ /// Execute one geography-routine dispatch.
+ ///
+ /// `ctx` identifies the routine ([`DispatchContext::dispatch`]) and
+ /// carries the record, SCC, fuel, and growth rate; `options`
+ /// carries the run-global settings. The returned
+ /// [`GeographyExecution`] is the routine's output in the uniform
+ /// shape the driver loop folds into the run result.
+ ///
+ /// # Errors
+ ///
+ /// Propagates any [`Error`] the geography routine
+ /// raises — a non-finite emission accumulator, a missing
+ /// allocation coefficient, an exhausted retrofit population, …. An
+ /// error aborts the whole run: NONROAD has no per-record error
+ /// recovery, and neither does the port.
     fn execute(
         &mut self,
         ctx: &DispatchContext<'_>,
@@ -186,26 +186,26 @@ pub trait GeographyExecutor {
 /// outlive the inputs that produced it.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RecordedDispatch {
-    /// The geography routine the record dispatched to.
+ /// The geography routine the record dispatched to.
     pub dispatch: Dispatch,
-    /// SCC of the dispatching record's group.
+ /// SCC of the dispatching record's group.
     pub scc: String,
-    /// Fuel resolved from the SCC.
+ /// Fuel resolved from the SCC.
     pub fuel: Option<FuelKind>,
-    /// Region code of the dispatched record.
+ /// Region code of the dispatched record.
     pub region_code: String,
-    /// Average HP of the dispatched record.
+ /// Average HP of the dispatched record.
     pub hp_avg: f32,
-    /// Equipment population of the dispatched record.
+ /// Equipment population of the dispatched record.
     pub population: f32,
-    /// Population-input year of the dispatched record.
+ /// Population-input year of the dispatched record.
     pub pop_year: i32,
-    /// Growth rate carried by the dispatching driver step.
+ /// Growth rate carried by the dispatching driver step.
     pub growth: Option<f32>,
 }
 
 impl RecordedDispatch {
-    /// Detach a [`DispatchContext`] into an owned [`RecordedDispatch`].
+ /// Detach a [`DispatchContext`] into an owned [`RecordedDispatch`].
     pub fn from_context(ctx: &DispatchContext<'_>) -> Self {
         Self {
             dispatch: ctx.dispatch,
@@ -227,51 +227,51 @@ impl RecordedDispatch {
 /// purposes:
 ///
 /// 1. **Dry-run planning.** Driving
-///    [`run_simulation`](super::run_simulation) with a
-///    `PlanRecordingExecutor` produces a
-///    [`NonroadOutputs`](super::NonroadOutputs) whose
-///    [`counters`](super::NonroadOutputs::counters) and
-///    [`completion_message`](super::NonroadOutputs::completion_message)
-///    are fully populated — the complete run *structure* — while
-///    [`dispatches`](Self::dispatches) holds the ordered dispatch
-///    plan. The orchestrator can inspect what a run *will* do before
-///    paying for the numerics.
+/// [`run_simulation`](super::run_simulation) with a
+/// `PlanRecordingExecutor` produces a
+/// [`NonroadOutputs`](super::NonroadOutputs) whose
+/// [`counters`](super::NonroadOutputs::counters) and
+/// [`completion_message`](super::NonroadOutputs::completion_message)
+/// are fully populated — the complete run *structure* — while
+/// [`dispatches`](Self::dispatches) holds the ordered dispatch
+/// plan. The orchestrator can inspect what a run *will* do before
+/// paying for the numerics.
 /// 2. **Instrumentation skeleton.** It is the minimal shape of the
-///    recording executor the numerical-fidelity harness needs (see the
-///    module docs): swap the empty [`GeographyExecution`] for the real
-///    routine output and the recorder also captures port-side
-///    intermediate state.
+/// recording executor the numerical-fidelity harness needs (see the
+/// module docs): swap the empty [`GeographyExecution`] for the real
+/// routine output and the recorder also captures port-side
+/// intermediate state.
 /// 3. **Test double.** Unit and integration tests assert the driver
-///    loop's dispatch order and counters against
-///    [`dispatches`](Self::dispatches) without standing up the
-///    geography routines.
+/// loop's dispatch order and counters against
+/// [`dispatches`](Self::dispatches) without standing up the
+/// geography routines.
 ///
 /// Every [`execute`](GeographyExecutor::execute) call returns an empty
 /// (non-skipped) [`GeographyExecution`], so a recorded run produces no
 /// emission rows.
 #[derive(Debug, Clone, Default)]
 pub struct PlanRecordingExecutor {
-    /// Every dispatch the driver loop made, in order.
+ /// Every dispatch the driver loop made, in order.
     pub dispatches: Vec<RecordedDispatch>,
 }
 
 impl PlanRecordingExecutor {
-    /// Create an executor with an empty dispatch log.
+ /// Create an executor with an empty dispatch log.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Number of dispatches recorded so far.
+ /// Number of dispatches recorded so far.
     pub fn len(&self) -> usize {
         self.dispatches.len()
     }
 
-    /// `true` when no dispatch has been recorded.
+ /// `true` when no dispatch has been recorded.
     pub fn is_empty(&self) -> bool {
         self.dispatches.is_empty()
     }
 
-    /// The recorded dispatches that targeted `dispatch`.
+ /// The recorded dispatches that targeted `dispatch`.
     pub fn dispatches_to(&self, dispatch: Dispatch) -> Vec<&RecordedDispatch> {
         self.dispatches
             .iter()
@@ -292,8 +292,8 @@ impl GeographyExecutor for PlanRecordingExecutor {
 }
 
 // (Entry types ExhaustTechEntry, EvapTechEntry, GrowthXrefEntry,
-//  ActivityTableEntry, NationalAllocationEntry are defined in
-//  super::inputs and re-imported above.)
+// ActivityTableEntry, NationalAllocationEntry are defined in
+// super::inputs and re-imported above.)
 
 // =============================================================================
 // ProductionExecutor
@@ -304,7 +304,7 @@ impl GeographyExecutor for PlanRecordingExecutor {
 /// traits (`GeographyCallbacks`, `StateCallbacks`, `UsTotalCallbacks`,
 /// `NationalCallbacks`) from loaded reference-data tables.
 ///
-/// # Callback-surface audit (T1 / mo-5w1lc)
+/// # Callback-surface audit (T1 / )
 ///
 /// Every method listed below appears on one or more of the four callback
 /// traits. For each method: (a) the reference-data table it reads, and
@@ -404,7 +404,7 @@ impl GeographyExecutor for PlanRecordingExecutor {
 /// 4. **NR\*.SCO** — subcounty allocation coefficients.
 /// 5. **NR\*.ALO** — national-to-state allocation coefficients.
 /// 6. **`alosub` / `alosta` ports** — allocation math (pure computation,
-///    no new files, but not yet ported).
+/// no new files, but not yet ported).
 ///
 /// Tech-type fractions (NR\*.EF), activity records (NR\*.ACT), growth
 /// cross-reference and growth-factor data (NR\*.GRW), and retrofit
@@ -412,45 +412,45 @@ impl GeographyExecutor for PlanRecordingExecutor {
 /// the caller.
 #[derive(Debug, Default)]
 pub struct ProductionExecutor {
-    /// County FIPS codes in the run (`fipcod(NCNTY)`). Used by
-    /// `CountyAdapter::find_fips` to map a region-code to its slot
-    /// index.
+ /// County FIPS codes in the run (`fipcod(NCNTY)`). Used by
+ /// `CountyAdapter::find_fips` to map a region-code to its slot
+ /// index.
     pub county_fips: Vec<String>,
-    /// HP-category midpoints (`hpclev(1..MXHPC)`) used by the
-    /// `hp_level_lookup` call in [`process_county`] /
-    /// [`process_subcounty`]. Defaults to all-zeros (every HP record
-    /// resolves to `9999.0`); set to the standard NONROAD values for
-    /// production runs.
+ /// HP-category midpoints (`hpclev(1..MXHPC)`) used by the
+ /// `hp_level_lookup` call in [`process_county`] /
+ /// [`process_subcounty`]. Defaults to all-zeros (every HP record
+ /// resolves to `9999.0`); set to the standard NONROAD values for
+ /// production runs.
     pub hp_levels: [f32; MXHPC],
-    /// State descriptors for national dispatch. Parallel to the
-    /// `statcd`/`lstacd`/`lstlev` Fortran arrays; required to build
-    /// [`NationalContext::states`].
+ /// State descriptors for national dispatch. Parallel to the
+ /// `statcd`/`lstacd`/`lstlev` Fortran arrays; required to build
+ /// [`NationalContext::states`].
     pub state_descriptors: Vec<StateDescriptor>,
-    /// Reference tables loaded from input files — tech fractions,
-    /// activity records, growth data, allocation, retrofit, and
-    /// temporal factors. Built once per run by the orchestrator and
-    /// passed to [`ProductionExecutor::new`].
+ /// Reference tables loaded from input files — tech fractions,
+ /// activity records, growth data, allocation, retrofit, and
+ /// temporal factors. Built once per run by the orchestrator and
+ /// passed to [`ProductionExecutor::new`].
     pub reference: ReferenceData,
 }
 
 impl ProductionExecutor {
-    /// Create a `ProductionExecutor` from a pre-loaded [`ReferenceData`] bundle.
-    ///
-    /// All other fields (`county_fips`, `hp_levels`, `state_descriptors`)
-    /// default to empty; every county / subcounty dispatch returns
-    /// [`GeographyExecution::skipped`] (FIPS not found) until
-    /// `county_fips` and the other fields are populated after construction.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use moves_nonroad::simulation::{ProductionExecutor, ReferenceData};
-    ///
-    /// let ref_data = ReferenceData::default();
-    /// let executor = ProductionExecutor::new(&ref_data);
-    /// assert!(executor.reference.exhaust_tech_entries.is_empty());
-    /// assert!(executor.reference.retrofit_records.is_empty());
-    /// ```
+ /// Create a `ProductionExecutor` from a pre-loaded [`ReferenceData`] bundle.
+ ///
+ /// All other fields (`county_fips`, `hp_levels`, `state_descriptors`)
+ /// default to empty; every county / subcounty dispatch returns
+ /// [`GeographyExecution::skipped`] (FIPS not found) until
+ /// `county_fips` and the other fields are populated after construction.
+ ///
+ /// # Examples
+ ///
+ /// ```
+ /// use moves_nonroad::simulation::{ProductionExecutor, ReferenceData};
+ ///
+ /// let ref_data = ReferenceData::default();
+ /// let executor = ProductionExecutor::new(&ref_data);
+ /// assert!(executor.reference.exhaust_tech_entries.is_empty());
+ /// assert!(executor.reference.retrofit_records.is_empty());
+ /// ```
     pub fn new(ref_data: &ReferenceData) -> Self {
         Self {
             reference: ref_data.clone(),
@@ -468,13 +468,13 @@ impl ProductionExecutor {
         let record = PopulationRecord {
             region_code: &ctx.record.region_code,
             population: ctx.record.population,
-            // hp_range midpoint = hp_avg; DriverRecord has no range so
-            // we synthesise (0, 2*hp_avg) → mid = hp_avg.
+ // hp_range midpoint = hp_avg; DriverRecord has no range so
+ // we synthesise (0, 2*hp_avg) → mid = hp_avg.
             hp_range: (0.0, ctx.record.hp_avg * 2.0),
             hp_avg: ctx.record.hp_avg,
-            // Median life (scrptime's `mdlfhrs`) from the driver record;
-            // fall back to a neutral 1000.0 when absent so scrptime stays
-            // well-defined. `disc_code` is not carried; DEFAULT curve.
+ // Median life (scrptime's `mdlfhrs`) from the driver record;
+ // fall back to a neutral 1000.0 when absent so scrptime stays
+ // well-defined. `disc_code` is not carried; DEFAULT curve.
             use_hours: if ctx.record.median_life > 0.0 {
                 ctx.record.median_life
             } else {
@@ -530,8 +530,8 @@ impl ProductionExecutor {
         let hp_levels = self.hp_levels;
         let state_ctx = build_state_context(ctx, options, &hp_levels);
 
-        // Build county list by filtering county_fips to those whose
-        // 2-char state prefix matches the state FIPS in region_code.
+ // Build county list by filtering county_fips to those whose
+ // 2-char state prefix matches the state FIPS in region_code.
         let state_prefix = ctx.record.region_code.get(..2).unwrap_or("");
         let counties: Vec<CountyInput> = self
             .county_fips
@@ -624,12 +624,12 @@ impl GeographyExecutor for ProductionExecutor {
 /// reference-data fields.
 struct CountyAdapter<'a> {
     executor: &'a mut ProductionExecutor,
-    /// Indices of currently-surviving retrofit records — narrowed
-    /// progressively by [`filter_retrofits`](GeographyCallbacks::filter_retrofits).
+ /// Indices of currently-surviving retrofit records — narrowed
+ /// progressively by [`filter_retrofits`](GeographyCallbacks::filter_retrofits).
     retrofit_survivors: Vec<usize>,
-    /// Population growth rate from the driver record pair
-    /// ([`DispatchContext::growth`]). Forwarded to [`scrptime`] as the
-    /// `pop_growth_factor` argument.
+ /// Population growth rate from the driver record pair
+ /// ([`DispatchContext::growth`]). Forwarded to [`scrptime`] as the
+ /// `pop_growth_factor` argument.
     ctx_growth: Option<f32>,
 }
 
@@ -644,18 +644,18 @@ impl<'a> CountyAdapter<'a> {
 }
 
 impl<'a> GeographyCallbacks for CountyAdapter<'a> {
-    // ---- FIPS / region selection -----------------------------------------
+ // ---- FIPS / region selection -----------------------------------------
 
     fn find_fips(&self, fips: &str) -> Option<usize> {
         self.executor.county_fips.iter().position(|f| f == fips)
     }
 
     fn tally_county_record(&mut self, _fips_idx: usize) {
-        // County record tallies are informational only and not yet
-        // surfaced to the executor's output. No-op for now.
+ // County record tallies are informational only and not yet
+ // surfaced to the executor's output. No-op for now.
     }
 
-    // ---- Technology fractions -------------------------------------------
+ // ---- Technology fractions -------------------------------------------
 
     fn find_exhaust_tech(&self, scc: &str, hp_avg: f32, year: i32) -> Option<TechLookup> {
         let entry = self
@@ -667,9 +667,9 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         Some(TechLookup {
             scc_tech_index: 0,
             tech_names: entry.tech_names.clone(),
-            // Per-model-year tech mix (cleaner tech phases in over model
-            // years); falls back to the single vector when no per-year
-            // data is loaded.
+ // Per-model-year tech mix (cleaner tech phases in over model
+ // years); falls back to the single vector when no per-year
+ // data is loaded.
             tech_fractions: entry.fractions_for_year(year).to_vec(),
         })
     }
@@ -689,11 +689,11 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
     }
 
     fn find_refueling(&self, _scc: &str, _hp_avg: f32, _tech_name: &str) -> Option<RefuelingData> {
-        // Spillage-mode records not yet loaded; always miss.
+ // Spillage-mode records not yet loaded; always miss.
         None
     }
 
-    // ---- Growth cross-reference -----------------------------------------
+ // ---- Growth cross-reference -----------------------------------------
 
     fn find_growth_xref(&self, fips: &str, scc: &str, hp_avg: f32) -> Option<usize> {
         self.executor
@@ -705,7 +705,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             })
     }
 
-    // ---- Activity records -----------------------------------------------
+ // ---- Activity records -----------------------------------------------
 
     fn find_activity(&self, scc: &str, fips: &str, _hp_avg: f32) -> Option<usize> {
         self.executor
@@ -737,7 +737,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         }
     }
 
-    // ---- Retrofit filtering ---------------------------------------------
+ // ---- Retrofit filtering ---------------------------------------------
 
     fn filter_retrofits(
         &mut self,
@@ -749,7 +749,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
     ) -> Result<()> {
         match filter {
             RetrofitFilter::SccHp => {
-                // Initialise: keep records whose SCC and HP range match.
+ // Initialise: keep records whose SCC and HP range match.
                 self.retrofit_survivors = self
                     .executor
                     .reference
@@ -765,14 +765,14 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
                     .collect();
             }
             RetrofitFilter::ModelYear => {
-                // Narrow: keep records whose model-year span contains model_year.
+ // Narrow: keep records whose model-year span contains model_year.
                 self.retrofit_survivors.retain(|&i| {
                     let r = &self.executor.reference.retrofit_records[i];
                     r.year_model_start <= model_year && model_year <= r.year_model_end
                 });
             }
             RetrofitFilter::TechType => {
-                // Narrow: keep records whose tech type matches.
+ // Narrow: keep records whose tech type matches.
                 self.retrofit_survivors.retain(|&i| {
                     let r = &self.executor.reference.retrofit_records[i];
                     r.tech_type.trim() == tech_name.trim()
@@ -790,16 +790,16 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             .collect()
     }
 
-    // ---- Temporal factors -----------------------------------------------
+ // ---- Temporal factors -----------------------------------------------
 
     fn day_month_factors(
         &self,
         _scc: &str,
         _fips: &str,
     ) -> ([f32; crate::common::consts::MXDAYS], f32, f32, i32) {
-        // Temporal-factor file not yet loaded. Return a neutral
-        // single-day factor: mthf=1, dayf=1, ndays=1. This collapses
-        // the emission period to one day (adjtime=1 in total mode).
+ // Temporal-factor file not yet loaded. Return a neutral
+ // single-day factor: mthf=1, dayf=1, ndays=1. This collapses
+ // the emission period to one day (adjtime=1 in total mode).
         ([0.0; crate::common::consts::MXDAYS], 1.0, 1.0, 1)
     }
 
@@ -810,8 +810,8 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         _daymthfac: &[f32; crate::common::consts::MXDAYS],
     ) -> AdjustmentTable {
         let oxy = self.executor.reference.fuel_oxygen_pct;
-        // Per-SCC activity-weighted ambient temperature (warm-daytime-weighted
-        // for daylight-use equipment), falling back to the scalar mean.
+ // Per-SCC activity-weighted ambient temperature (warm-daytime-weighted
+ // for daylight-use equipment), falling back to the scalar mean.
         let tamb = self
             .executor
             .reference
@@ -819,14 +819,14 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             .get(scc)
             .copied()
             .unwrap_or(self.executor.reference.ambient_temp_f);
-        // No fuel adjustments configured ⇒ neutral (all-1.0), preserving
-        // the legacy behaviour for tests / runs without fuel data.
+ // No fuel adjustments configured ⇒ neutral (all-1.0), preserving
+ // the legacy behaviour for tests / runs without fuel data.
         if oxy == 0.0 && tamb == 0.0 {
             return AdjustmentTable::new(crate::common::consts::MXDAYS);
         }
-        // Port of `emsadj.f`: the gasoline exhaust temperature + oxygenate
-        // corrections. The engine evaluates day 1 (begin=end=1), matching
-        // the county adapter's single-day exhaust iteration.
+ // Port of `emsadj.f`: the gasoline exhaust temperature + oxygenate
+ // corrections. The engine evaluates day 1 (begin=end=1), matching
+ // the county adapter's single-day exhaust iteration.
         let fuel = fuel_for_scc(scc).unwrap_or(FuelKind::Gasoline4Stroke);
         let temps = DailyTemperatures {
             daily_temperature_mode: false,
@@ -857,8 +857,8 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             rfg_winter_4_stroke: None,
             rfg_summer_2_stroke: None,
             rfg_summer_4_stroke: None,
-            // SOx/altitude unused by the emitted pollutants; neutral values
-            // (soxcor = sox_fuel/sox_base = 1, altitude factor = 1).
+ // SOx/altitude unused by the emitted pollutants; neutral values
+ // (soxcor = sox_fuel/sox_base = 1, altitude factor = 1).
             sox_fuel: [1.0; 5],
             sox_base: [1.0; 5],
             sox_diesel_marine: 1.0,
@@ -867,7 +867,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         calculate_emission_adjustments(&inputs)
     }
 
-    // ---- Model-year and age distribution --------------------------------
+ // ---- Model-year and age distribution --------------------------------
 
     fn model_year_and_agedist(
         &mut self,
@@ -879,7 +879,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         growth_year: i32,
         base_population: f32,
     ) -> Result<ModelYearAgedistResult> {
-        // 1. Growth indicator from cross-reference.
+ // 1. Growth indicator from cross-reference.
         let indicator = self
             .executor
             .reference
@@ -892,15 +892,15 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
                 ))
             })?;
 
-        // 2. Select growth records for this indicator (clone to avoid
-        //    borrow-checker conflict with the scrptime closure below).
+ // 2. Select growth records for this indicator (clone to avoid
+ // borrow-checker conflict with the scrptime closure below).
         let selected: Vec<GrowthIndicatorRecord> =
             select_for_indicator(&self.executor.reference.growth_records, &indicator)
                 .into_iter()
                 .cloned()
                 .collect();
 
-        // 3. Activity entry.
+ // 3. Activity entry.
         let act = self
             .executor
             .reference
@@ -913,7 +913,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             })?
             .clone();
 
-        // 4. Convert ActivityUnit from geography::common to population::modyr.
+ // 4. Convert ActivityUnit from geography::common to population::modyr.
         let units = match act.activity_unit {
             ActivityUnit::HoursPerYear => ActivityUnits::HoursPerYear,
             ActivityUnit::HoursPerDay => ActivityUnits::HoursPerDay,
@@ -921,13 +921,13 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             ActivityUnit::GallonsPerDay => ActivityUnits::GallonsPerDay,
         };
 
-        // 5. Clone scrappage curve so the closure can capture it by move.
+ // 5. Clone scrappage curve so the closure can capture it by move.
         let curve = self.executor.reference.scrappage_curve.clone();
         let use_hours = record.use_hours;
         let load_factor = act.load_factor;
         let pop_growth_factor = self.ctx_growth.unwrap_or(0.0);
 
-        // 6. model_year → calls scrptime closure.
+ // 6. model_year → calls scrptime closure.
         let modyr_out = model_year(
             act.starts,
             act.activity_level,
@@ -939,7 +939,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             move |acttmp| scrptime(use_hours, load_factor, acttmp, pop_growth_factor, &curve),
         )?;
 
-        // 7. age_distribution → uses growth records for forward/backward growth.
+ // 7. age_distribution → uses growth records for forward/backward growth.
         let selected_refs: Vec<&GrowthIndicatorRecord> = selected.iter().collect();
         let agedist_out = age_distribution(
             base_population,
@@ -950,10 +950,10 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             |y1, y2| growth_factor(&selected_refs, y1, y2, fips),
         )?;
 
-        // 8. Build ModelYearAgedistResult. modfrc comes from agedist
-        //    (grown to growth_year); the per-year adjustments from modyr.
+ // 8. Build ModelYearAgedistResult. modfrc comes from agedist
+ // (grown to growth_year); the per-year adjustments from modyr.
         let nyrlif = modyr_out.nyrlif;
-        // Ensure stradj/actadj/detage have at least nyrlif slots.
+ // Ensure stradj/actadj/detage have at least nyrlif slots.
         let pad = |mut v: Vec<f32>| -> Vec<f32> {
             v.resize(nyrlif, 0.0);
             v
@@ -969,7 +969,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         })
     }
 
-    // ---- Emission factor lookups ----------------------------------------
+ // ---- Emission factor lookups ----------------------------------------
 
     fn compute_exhaust_factors(
         &mut self,
@@ -983,10 +983,10 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
     ) -> Result<ExhaustFactorsLookup> {
         let n_tech = tech_names.len().max(1);
 
-        // Resolve the hp-matched reference entry for this SCC — the same
-        // entry `find_exhaust_tech` selected to produce `tech_names`. The
-        // per-tech ordering of every array below is therefore aligned
-        // with `tech_names` / `tech_fractions`.
+ // Resolve the hp-matched reference entry for this SCC — the same
+ // entry `find_exhaust_tech` selected to produce `tech_names`. The
+ // per-tech ordering of every array below is therefore aligned
+ // with `tech_names` / `tech_fractions`.
         let entry = self
             .executor
             .reference
@@ -994,7 +994,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             .iter()
             .find(|e| e.scc == scc && e.hp_min <= hp_avg && hp_avg <= e.hp_max);
 
-        // Per-tech BSFC, broadcast across all calendar years.
+ // Per-tech BSFC, broadcast across all calendar years.
         let bsfc_per_tech: Vec<f32> = entry
             .map(|e| e.bsfc.clone())
             .unwrap_or_else(|| vec![0.0; n_tech]);
@@ -1005,13 +1005,13 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             }
         }
 
-        // EF / unit / deterioration arrays. They default to the legacy
-        // zero-fill (only BSFC-derived CO2/SOx produced); when the
-        // reference entry carries loaded emission factors they are
-        // expanded into the engine's `[year][pollutant][tech]` and
-        // `[pollutant][tech]` layouts. The base rate is the same for
-        // every calendar year — the model-year/age signal enters through
-        // the deterioration coefficients in `calculate_exhaust_emissions`.
+ // EF / unit / deterioration arrays. They default to the legacy
+ // zero-fill (only BSFC-derived CO2/SOx produced); when the
+ // reference entry carries loaded emission factors they are
+ // expanded into the engine's `[year][pollutant][tech]` and
+ // `[pollutant][tech]` layouts. The base rate is the same for
+ // every calendar year — the model-year/age signal enters through
+ // the deterioration coefficients in `calculate_exhaust_emissions`.
         let mut emission_factors = vec![0.0_f32; MXAGYR * MXPOL * MXTECH];
         let mut unit_codes = vec![EmissionUnitCode::GramsPerHpHour; MXPOL * MXTECH];
         let mut adetcf = vec![0.0_f32; MXPOL * MXTECH];
@@ -1074,7 +1074,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         Ok(EvapFactorsLookup::default())
     }
 
-    // ---- Emission calculators ------------------------------------------
+ // ---- Emission calculators ------------------------------------------
 
     #[allow(clippy::too_many_arguments)]
     fn compute_exhaust_iteration(
@@ -1096,9 +1096,9 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         n_days: i32,
         activity_index: usize,
     ) -> Result<EmissionsIterationResult> {
-        // Look up load factor and activity unit from the activity entry.
-        // The entry was already validated by model_year_and_agedist, so
-        // unwrap_or is a safe fallback.
+ // Look up load factor and activity unit from the activity entry.
+ // The entry was already validated by model_year_and_agedist, so
+ // unwrap_or is a safe fallback.
         let (load_factor, activity_unit_geo) = self
             .executor
             .reference
@@ -1114,7 +1114,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             ActivityUnit::GallonsPerDay => ExhaustActivityUnit::GallonsPerDay,
         };
 
-        // Extract scalar BSFC for this (year, tech) from the lookup table.
+ // Extract scalar BSFC for this (year, tech) from the lookup table.
         let n_tech = if factors.bsfc.is_empty() {
             1
         } else {
@@ -1126,15 +1126,15 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             .copied()
             .unwrap_or(0.0);
 
-        // Build tech-fractions table indexed [scc_tech_index * MXTECH + tech_index].
-        // Match the hp-binned entry (not just the SCC): an SCC may have
-        // several HP-range entries with different tech mixes, and the
-        // tech-slot ordering must line up with the entry `find_exhaust_tech`
-        // selected for this record.
-        // Use the per-model-year mix for the current iteration's tech model
-        // year — reconstructed from the loop index as
-        // `tchmdyr = min(episode_year - year_index, tech_year)`
-        // (prccty.f: idxyr = iepyr - iyr + 1; tchmdyr = min(iyr, itchyr)).
+ // Build tech-fractions table indexed [scc_tech_index * MXTECH + tech_index].
+ // Match the hp-binned entry (not just the SCC): an SCC may have
+ // several HP-range entries with different tech mixes, and the
+ // tech-slot ordering must line up with the entry `find_exhaust_tech`
+ // selected for this record.
+ // Use the per-model-year mix for the current iteration's tech model
+ // year — reconstructed from the loop index as
+ // `tchmdyr = min(episode_year - year_index, tech_year)`
+ // (prccty.f: idxyr = iepyr - iyr + 1; tchmdyr = min(iyr, itchyr)).
         let tchmdyr = (options.episode_year - year_index as i32).min(options.tech_year);
         let entry_fracs: Vec<f32> = self
             .executor
@@ -1158,15 +1158,15 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         let sox_conversion = [SWTGS2, SWTGS4, SWTDSL, SWTLPG, SWTCNG];
         let sox_base = [SWTGS2, SWTGS4, SWTDSL, SWTLPG, SWTCNG];
 
-        // A pollutant takes the EF-gated branch of
-        // `calculate_exhaust_emissions` only when an emission-factor file
-        // was loaded for it (clcems.f :179–181). We derive that from the
-        // populated EF table: a non-zero base rate for any tech slot of
-        // the pollutant means a file is present. CO2/SOx/Displacement are
-        // always computed regardless of this filter. When no EF table is
-        // loaded the filter is all-false, preserving the legacy
-        // BSFC-only (CO2/SOx) behaviour. Built before `calc_inputs` takes
-        // a mutable borrow of `emission_factors`.
+ // A pollutant takes the EF-gated branch of
+ // `calculate_exhaust_emissions` only when an emission-factor file
+ // was loaded for it (clcems.f :179–181). We derive that from the
+ // populated EF table: a non-zero base rate for any tech slot of
+ // the pollutant means a file is present. CO2/SOx/Displacement are
+ // always computed regardless of this filter. When no EF table is
+ // loaded the filter is all-false, preserving the legacy
+ // BSFC-only (CO2/SOx) behaviour. Built before `calc_inputs` takes
+ // a mutable borrow of `emission_factors`.
         let mut pollutant_filter = PollutantFilter::empty();
         for pol in 0..MXPOL {
             let has = (0..MXTECH).any(|t| {
@@ -1267,8 +1267,8 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
 /// returns.
 struct StateAdapter<'a> {
     executor: &'a mut ProductionExecutor,
-    /// Indices of currently-surviving retrofit records — narrowed
-    /// progressively by the three `filter_retrofits_by_*` methods.
+ /// Indices of currently-surviving retrofit records — narrowed
+ /// progressively by the three `filter_retrofits_by_*` methods.
     retrofit_survivors: Vec<usize>,
 }
 
@@ -1332,7 +1332,7 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
             .activity_entries
             .iter()
             .find(|e| e.scc == scc && (e.fips.is_empty() || e.fips == fips))?;
-        // Convert geography::common::ActivityUnit → emissions::exhaust::ActivityUnit.
+ // Convert geography::common::ActivityUnit → emissions::exhaust::ActivityUnit.
         let units = match entry.activity_unit {
             ActivityUnit::HoursPerYear => ExhaustActivityUnit::HoursPerYear,
             ActivityUnit::HoursPerDay => ExhaustActivityUnit::HoursPerDay,
@@ -1375,7 +1375,7 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
                 .cloned()
                 .collect();
         if selected.is_empty() {
-            // No growth data loaded; return zero (no growth).
+ // No growth data loaded; return zero (no growth).
             return Ok(0.0);
         }
         let refs: Vec<&GrowthIndicatorRecord> = selected.iter().collect();
@@ -1388,7 +1388,7 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
         activity: &ActivityLookup,
         pop_growth_factor: f32,
     ) -> Result<PrcusModelYearOutput> {
-        // Convert emissions::exhaust::ActivityUnit → population::modyr::ActivityUnits.
+ // Convert emissions::exhaust::ActivityUnit → population::modyr::ActivityUnits.
         let units = match activity.units {
             ExhaustActivityUnit::HoursPerYear => ActivityUnits::HoursPerYear,
             ExhaustActivityUnit::HoursPerDay => ActivityUnits::HoursPerDay,
@@ -1504,8 +1504,8 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
     }
 
     fn calculate_exhaust(&mut self, _inputs: &ExhaustCallInputs<'_>) -> Result<ExhaustResult> {
-        // Emission-factor tables not yet loaded; return zero-emission result.
-        // Only reached when tech_fraction > 0; tests use zero fractions.
+ // Emission-factor tables not yet loaded; return zero-emission result.
+ // Only reached when tech_fraction > 0; tests use zero fractions.
         todo!(
             "StateAdapter::calculate_exhaust: wire to calculate_exhaust_emissions \
              once NR*.EMF tables are loaded"
@@ -2450,7 +2450,7 @@ mod tests {
             .execute(&ctx(Dispatch::County, "b", &r2), &opts)
             .unwrap();
 
-        // Each call returns an empty, non-skipped execution.
+ // Each call returns an empty, non-skipped execution.
         assert_eq!(out1, GeographyExecution::default());
         assert_eq!(out2, GeographyExecution::default());
         assert!(!out1.skipped);
@@ -2479,9 +2479,9 @@ mod tests {
 
     #[test]
     fn production_executor_skips_all_dispatch_variants() {
-        // With an empty ProductionExecutor (no county_fips, no tables),
-        // county/subcounty dispatch returns FIPS-not-found (Skipped),
-        // and the other variants still return the placeholder Skipped.
+ // With an empty ProductionExecutor (no county_fips, no tables),
+ // county/subcounty dispatch returns FIPS-not-found (Skipped),
+ // and the other variants still return the placeholder Skipped.
         let mut exec = ProductionExecutor::new(&ReferenceData::default());
         let opts = NonroadOptions::new(RegionLevel::County, 2020);
         let record = rec("06037");
@@ -2502,8 +2502,8 @@ mod tests {
 
     #[test]
     fn plan_recording_executor_is_object_safe() {
-        // The trait must be usable as `dyn` so `run_simulation` can
-        // take a trait object.
+ // The trait must be usable as `dyn` so `run_simulation` can
+ // take a trait object.
         let mut concrete = PlanRecordingExecutor::new();
         let dynamic: &mut dyn GeographyExecutor = &mut concrete;
         let opts = NonroadOptions::new(RegionLevel::County, 2020);
@@ -2514,10 +2514,10 @@ mod tests {
         assert_eq!(concrete.len(), 1);
     }
 
-    /// `process_output_to_rows` maps one DatRecord → wrtdat-shaped row
-    /// and one BmyRecord → wrtbmy-shaped row. Field copies (FIPS, SCC,
-    /// HP, channel) are verified for both. RMISS sentinel in emissions
-    /// is preserved as-is.
+ /// `process_output_to_rows` maps one DatRecord → wrtdat-shaped row
+ /// and one BmyRecord → wrtbmy-shaped row. Field copies (FIPS, SCC,
+ /// HP, channel) are verified for both. RMISS sentinel in emissions
+ /// is preserved as-is.
     #[test]
     fn process_output_to_rows_dat_and_bmy() {
         use crate::common::consts::RMISS;
@@ -2583,10 +2583,10 @@ mod tests {
         assert_eq!(bmy_row.tech_type.as_deref(), Some("T1"));
     }
 
-    /// `geography_output_to_rows` maps one StateOutput → wrtdat-shaped
-    /// row and one ByModelYearOutput → wrtbmy-shaped row. Warnings on
-    /// the GeographyOutput are preserved in `GeographyExecution::warnings`
-    /// after the execution wrapper collects them.
+ /// `geography_output_to_rows` maps one StateOutput → wrtdat-shaped
+ /// row and one ByModelYearOutput → wrtbmy-shaped row. Warnings on
+ /// the GeographyOutput are preserved in `GeographyExecution::warnings`
+ /// after the execution wrapper collects them.
     #[test]
     fn geography_output_to_rows_state_and_bmy_with_warning() {
         use crate::geography::{ByModelYearOutput, GeographyOutput, GeographyWarning, StateOutput};
@@ -2654,7 +2654,7 @@ mod tests {
         assert_eq!(bmy_row.model_year, Some(2010));
         assert_eq!(bmy_row.tech_type.as_deref(), Some("T1"));
 
-        // Warnings survive through geography_output_to_execution.
+ // Warnings survive through geography_output_to_execution.
         let exec = geography_output_to_execution(geo_out);
         assert_eq!(exec.rows.len(), 2);
         assert!(!exec.warnings.is_empty(), "warnings must be preserved");
@@ -2700,7 +2700,7 @@ mod production {
         opts
     }
 
-    /// (a) Empty reference tables → county FIPS not found → `Skipped`.
+ /// (a) Empty reference tables → county FIPS not found → `Skipped`.
     #[test]
     fn county_empty_ref_returns_skipped() {
         let mut exec = ProductionExecutor::new(&ReferenceData::default());
@@ -2718,18 +2718,18 @@ mod production {
         assert!(result.rows.is_empty());
     }
 
-    /// (b) Minimal reference (one FIPS, one exhaust tech with zero fraction,
-    /// one evap tech with zero fraction, one growth xref, one activity
-    /// entry, zero retrofits) → non-skipped, exactly one `SimEmissionRow`.
-    ///
-    /// Zero tech fractions cause the per-tech-type loop body to be
-    /// skipped (`if tchfrc <= 0.0 { continue }`), so
-    /// `compute_exhaust_iteration` and `compute_evap_iteration` are
-    /// never called — no need for the emission-factor tables.
-    /// `compute_exhaust_factors` / `compute_evap_factors` IS called and
-    /// returns `ExhaustFactorsLookup::default()` / `EvapFactorsLookup::default()`.
-    /// The model-year loop accumulates population fractions into `poptot`,
-    /// and `wrtdat` emits one `DatRecord` → one `SimEmissionRow`.
+ /// (b) Minimal reference (one FIPS, one exhaust tech with zero fraction,
+ /// one evap tech with zero fraction, one growth xref, one activity
+ /// entry, zero retrofits) → non-skipped, exactly one `SimEmissionRow`.
+ ///
+ /// Zero tech fractions cause the per-tech-type loop body to be
+ /// skipped (`if tchfrc <= 0.0 { continue }`), so
+ /// `compute_exhaust_iteration` and `compute_evap_iteration` are
+ /// never called — no need for the emission-factor tables.
+ /// `compute_exhaust_factors` / `compute_evap_factors` IS called and
+ /// returns `ExhaustFactorsLookup::default()` / `EvapFactorsLookup::default()`.
+ /// The model-year loop accumulates population fractions into `poptot`,
+ /// and `wrtdat` emits one `DatRecord` → one `SimEmissionRow`.
     #[test]
     fn county_minimal_ref_returns_one_row() {
         let mut exec = ProductionExecutor {
@@ -2759,8 +2759,8 @@ mod production {
                     hp_max: 100.0,
                     indicator: "GDP".into(),
                 }],
-                // growth_records empty: growth_year == episode_year == pop_year
-                // (2020), so age_distribution never calls growth_factor.
+ // growth_records empty: growth_year == episode_year == pop_year
+ // (2020), so age_distribution never calls growth_factor.
                 growth_records: vec![],
                 activity_entries: vec![ActivityTableEntry {
                     scc: "2270001010".into(),
@@ -2809,13 +2809,13 @@ mod production {
         assert_eq!(row.channel, EmissionChannel::Exhaust);
     }
 
-    /// (c) StateToCounty dispatch with two counties in the state →
-    /// two `SimEmissionRow`s (one per county).
-    ///
-    /// Zero tech fractions skip the exhaust/evap iteration so EF
-    /// tables are not required. The model-year loop still accumulates
-    /// `poptot`, and `process_state_to_county_record` allocates one
-    /// `StateOutput` per selected county.
+ /// (c) StateToCounty dispatch with two counties in the state →
+ /// two `SimEmissionRow`s (one per county).
+ ///
+ /// Zero tech fractions skip the exhaust/evap iteration so EF
+ /// tables are not required. The model-year loop still accumulates
+ /// `poptot`, and `process_state_to_county_record` allocates one
+ /// `StateOutput` per selected county.
     #[test]
     fn state_to_county_minimal_ref_returns_two_rows() {
         let mut exec = ProductionExecutor {
@@ -2896,8 +2896,8 @@ mod production {
         assert!(fips_set.contains("06059"));
     }
 
-    /// (d) StateFromNational dispatch with a state-level record →
-    /// exactly one `SimEmissionRow` at the state FIPS.
+ /// (d) StateFromNational dispatch with a state-level record →
+ /// exactly one `SimEmissionRow` at the state FIPS.
     #[test]
     fn state_from_national_minimal_ref_returns_one_row() {
         let mut exec = ProductionExecutor {
@@ -2974,13 +2974,13 @@ mod production {
         assert_eq!(result.rows[0].fips, "06000");
     }
 
-    /// (e) National dispatch with one state and one allocation entry →
-    /// one `SimEmissionRow` at the state FIPS.
-    ///
-    /// `state_index = 0` (national record) triggers `alosta`; the
-    /// uniform-allocation stub gives state "06000" the full population.
-    /// Zero tech fractions bypass the emission iteration; one `StateOutput`
-    /// is still emitted per selected state.
+ /// (e) National dispatch with one state and one allocation entry →
+ /// one `SimEmissionRow` at the state FIPS.
+ ///
+ /// `state_index = 0` (national record) triggers `alosta`; the
+ /// uniform-allocation stub gives state "06000" the full population.
+ /// Zero tech fractions bypass the emission iteration; one `StateOutput`
+ /// is still emitted per selected state.
     #[test]
     fn national_minimal_ref_returns_one_row() {
         let mut exec = ProductionExecutor {
@@ -3069,11 +3069,11 @@ mod production {
         assert_eq!(result.rows[0].fips, "06000");
     }
 
-    /// (f) US-total dispatch with a minimal reference table →
-    /// one `SimEmissionRow` at FIPS `"00000"`.
-    ///
-    /// Zero tech fractions bypass the emission iteration; one `StateOutput`
-    /// for `"00000"` is still emitted.
+ /// (f) US-total dispatch with a minimal reference table →
+ /// one `SimEmissionRow` at FIPS `"00000"`.
+ ///
+ /// Zero tech fractions bypass the emission iteration; one `StateOutput`
+ /// for `"00000"` is still emitted.
     #[test]
     fn us_total_minimal_ref_returns_one_row() {
         let mut exec = ProductionExecutor {
@@ -3154,8 +3154,8 @@ mod production {
         assert_eq!(result.rows[0].fips, "00000");
     }
 
-    /// (g) National dispatch with no allocation entry for the SCC →
-    /// `AllocationNotFound` error.
+ /// (g) National dispatch with no allocation entry for the SCC →
+ /// `AllocationNotFound` error.
     #[test]
     fn national_allocation_not_found() {
         let mut exec = ProductionExecutor {
@@ -3211,8 +3211,8 @@ mod production {
         );
     }
 
-    /// (h) US-total dispatch with `growth_loaded = false` →
-    /// `GrowthFileMissing` error.
+ /// (h) US-total dispatch with `growth_loaded = false` →
+ /// `GrowthFileMissing` error.
     #[test]
     fn us_total_growth_file_missing() {
         let mut exec = ProductionExecutor {

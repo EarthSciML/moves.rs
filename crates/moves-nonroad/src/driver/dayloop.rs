@@ -45,14 +45,14 @@ const MONTH_START: [i32; 13] = [1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305
 /// `IDXWTR`/`IDXSPR`/`IDXSUM`/`IDXFAL` parameters from `nonrdprm.inc`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Season {
-    /// Winter — `IDXWTR = 1`. The wrap-around season; produces a skip
-    /// span (see the module docs).
+ /// Winter — `IDXWTR = 1`. The wrap-around season; produces a skip
+ /// span (see the module docs).
     Winter,
-    /// Spring — `IDXSPR = 2`.
+ /// Spring — `IDXSPR = 2`.
     Spring,
-    /// Summer — `IDXSUM = 3`.
+ /// Summer — `IDXSUM = 3`.
     Summer,
-    /// Fall — `IDXFAL = 4`.
+ /// Fall — `IDXFAL = 4`.
     Fall,
 }
 
@@ -63,12 +63,12 @@ pub enum Season {
 /// is meaningful only inside its own branch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DayLoopPeriod {
-    /// Annual — `IDXANN = 1`. Spans the whole year.
+ /// Annual — `IDXANN = 1`. Spans the whole year.
     Annual,
-    /// Monthly — `IDXMTH = 2`. The payload is the 1-based month
-    /// (`imonth`, 1 = January … 12 = December).
+ /// Monthly — `IDXMTH = 2`. The payload is the 1-based month
+ /// (`imonth`, 1 = January … 12 = December).
     Monthly(u32),
-    /// Seasonal — `IDXSES = 3`.
+ /// Seasonal — `IDXSES = 3`.
     Seasonal(Season),
 }
 
@@ -76,26 +76,26 @@ pub enum DayLoopPeriod {
 /// `lskip` quintet `dayloop.f` produces.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DayRange {
-    /// First day-of-year to iterate, 1-based (`jbday`).
+ /// First day-of-year to iterate, 1-based (`jbday`).
     pub begin_day: i32,
-    /// Last day-of-year to iterate, 1-based, inclusive (`jeday`).
+ /// Last day-of-year to iterate, 1-based, inclusive (`jeday`).
     pub end_day: i32,
-    /// First day-of-year of the excluded skip span (`jbskip`); `0`
-    /// when [`has_skip`](DayRange::has_skip) is `false`.
+ /// First day-of-year of the excluded skip span (`jbskip`); `0`
+ /// when [`has_skip`](DayRange::has_skip) is `false`.
     pub skip_begin: i32,
-    /// Last day-of-year of the excluded skip span (`jeskip`),
-    /// inclusive; `0` when [`has_skip`](DayRange::has_skip) is `false`.
+ /// Last day-of-year of the excluded skip span (`jeskip`),
+ /// inclusive; `0` when [`has_skip`](DayRange::has_skip) is `false`.
     pub skip_end: i32,
-    /// `true` when `[skip_begin, skip_end]` must be excluded from the
-    /// `begin_day..=end_day` iteration (`lskip`). Set only for a
-    /// seasonal winter run.
+ /// `true` when `[skip_begin, skip_end]` must be excluded from the
+ /// `begin_day..=end_day` iteration (`lskip`). Set only for a
+ /// seasonal winter run.
     pub has_skip: bool,
 }
 
 impl DayRange {
-    /// The single-iteration default `dayloop.f` returns when daily
-    /// temperature / RVP data was not loaded: `begin_day = end_day =
-    /// 1`, no skip.
+ /// The single-iteration default `dayloop.f` returns when daily
+ /// temperature / RVP data was not loaded: `begin_day = end_day =
+ /// 1`, no skip.
     const SINGLE: DayRange = DayRange {
         begin_day: 1,
         end_day: 1,
@@ -111,7 +111,7 @@ impl DayRange {
 /// temperature / RVP data was supplied). When it is `false` the day
 /// loop collapses to a single iteration regardless of `period`.
 pub fn day_loop(daily_temps_loaded: bool, period: DayLoopPeriod) -> DayRange {
-    // dayloop.f :73 — no daily data, single-iteration default.
+ // dayloop.f :73 — no daily data, single-iteration default.
     if !daily_temps_loaded {
         return DayRange::SINGLE;
     }
@@ -119,7 +119,7 @@ pub fn day_loop(daily_temps_loaded: bool, period: DayLoopPeriod) -> DayRange {
     let last_day = MXDAYS as i32; // 365
 
     match period {
-        // dayloop.f :77–79
+ // dayloop.f :77–79
         DayLoopPeriod::Annual => DayRange {
             begin_day: 1,
             end_day: last_day,
@@ -127,12 +127,12 @@ pub fn day_loop(daily_temps_loaded: bool, period: DayLoopPeriod) -> DayRange {
             skip_end: 0,
             has_skip: false,
         },
-        // dayloop.f :97–100
+ // dayloop.f :97–100
         DayLoopPeriod::Monthly(month) => {
-            // Fortran indexes daynum(imonth) / daynum(imonth+1); clamp
-            // to a valid month so an out-of-range caller can never
-            // index out of bounds. Production callers always pass
-            // 1..=12 (the option-file parser validates the month).
+ // Fortran indexes daynum(imonth) / daynum(imonth+1); clamp
+ // to a valid month so an out-of-range caller can never
+ // index out of bounds. Production callers always pass
+ // 1..=12 (the option-file parser validates the month).
             let month = month.clamp(1, 12) as usize;
             DayRange {
                 begin_day: MONTH_START[month - 1],
@@ -142,10 +142,10 @@ pub fn day_loop(daily_temps_loaded: bool, period: DayLoopPeriod) -> DayRange {
                 has_skip: false,
             }
         }
-        // dayloop.f :80–96
+ // dayloop.f :80–96
         DayLoopPeriod::Seasonal(season) => match season {
-            // Winter wraps the year: full-year span with a skip over
-            // spring + summer + fall (dayloop.f :81–86).
+ // Winter wraps the year: full-year span with a skip over
+ // spring + summer + fall (dayloop.f :81–86).
             Season::Winter => DayRange {
                 begin_day: 1,
                 end_day: last_day,
@@ -153,7 +153,7 @@ pub fn day_loop(daily_temps_loaded: bool, period: DayLoopPeriod) -> DayRange {
                 skip_end: MONTH_START[11] - 1, // daynum(12) - 1 = 334
                 has_skip: true,
             },
-            // dayloop.f :87–89
+ // dayloop.f :87–89
             Season::Spring => DayRange {
                 begin_day: MONTH_START[2],   // daynum(3) = 60
                 end_day: MONTH_START[5] - 1, // daynum(6) - 1 = 151
@@ -161,7 +161,7 @@ pub fn day_loop(daily_temps_loaded: bool, period: DayLoopPeriod) -> DayRange {
                 skip_end: 0,
                 has_skip: false,
             },
-            // dayloop.f :90–92
+ // dayloop.f :90–92
             Season::Summer => DayRange {
                 begin_day: MONTH_START[5],   // daynum(6) = 152
                 end_day: MONTH_START[8] - 1, // daynum(9) - 1 = 243
@@ -169,7 +169,7 @@ pub fn day_loop(daily_temps_loaded: bool, period: DayLoopPeriod) -> DayRange {
                 skip_end: 0,
                 has_skip: false,
             },
-            // dayloop.f :93–95
+ // dayloop.f :93–95
             Season::Fall => DayRange {
                 begin_day: MONTH_START[8],    // daynum(9) = 244
                 end_day: MONTH_START[11] - 1, // daynum(12) - 1 = 334
@@ -187,8 +187,8 @@ mod tests {
 
     #[test]
     fn no_daily_data_collapses_to_single_iteration() {
-        // Regardless of period, ldayfl = false ⇒ the single-iteration
-        // default (dayloop.f :65–73).
+ // Regardless of period, ldayfl = false ⇒ the single-iteration
+ // default (dayloop.f :65–73).
         for period in [
             DayLoopPeriod::Annual,
             DayLoopPeriod::Monthly(7),
@@ -238,17 +238,17 @@ mod tests {
 
     #[test]
     fn seasons_plus_winter_skip_tile_the_year() {
-        // Winter (1..59 and 335..365) + spring + summer + fall must
-        // exactly cover days 1..=365 with no gap or overlap.
+ // Winter (1..59 and 335..365) + spring + summer + fall must
+ // exactly cover days 1..=365 with no gap or overlap.
         let spring = day_loop(true, DayLoopPeriod::Seasonal(Season::Spring));
         let summer = day_loop(true, DayLoopPeriod::Seasonal(Season::Summer));
         let fall = day_loop(true, DayLoopPeriod::Seasonal(Season::Fall));
-        // Spring starts the day after winter's pre-skip stretch.
+ // Spring starts the day after winter's pre-skip stretch.
         assert_eq!(spring.begin_day, 60);
-        // Each season abuts the next.
+ // Each season abuts the next.
         assert_eq!(summer.begin_day, spring.end_day + 1);
         assert_eq!(fall.begin_day, summer.end_day + 1);
-        // Winter's skip span is exactly spring ∪ summer ∪ fall.
+ // Winter's skip span is exactly spring ∪ summer ∪ fall.
         let winter = day_loop(true, DayLoopPeriod::Seasonal(Season::Winter));
         assert_eq!(winter.skip_begin, spring.begin_day);
         assert_eq!(winter.skip_end, fall.end_day);
@@ -266,18 +266,18 @@ mod tests {
 
     #[test]
     fn monthly_mid_year() {
-        // July: daynum(7) = 182 .. daynum(8) - 1 = 212.
+ // July: daynum(7) = 182 .. daynum(8) - 1 = 212.
         let jul = day_loop(true, DayLoopPeriod::Monthly(7));
         assert_eq!((jul.begin_day, jul.end_day), (182, 212));
-        // February (non-leap): 32 .. 59.
+ // February (non-leap): 32 .. 59.
         let feb = day_loop(true, DayLoopPeriod::Monthly(2));
         assert_eq!((feb.begin_day, feb.end_day), (32, 59));
     }
 
     #[test]
     fn monthly_out_of_range_clamps() {
-        // Defensive: a 0 or 13+ month must not panic. Clamp to the
-        // nearest valid month.
+ // Defensive: a 0 or 13+ month must not panic. Clamp to the
+ // nearest valid month.
         assert_eq!(day_loop(true, DayLoopPeriod::Monthly(0)).begin_day, 1);
         assert_eq!(day_loop(true, DayLoopPeriod::Monthly(99)).end_day, 365);
     }

@@ -1,6 +1,6 @@
 //! End-to-end PDB import: CSV → Parquet → read back via Parquet
 //! reader and verify schema + row counts. Runs the same call surface
-//! a downstream tool (e.g. the importer validation suite at Task 88)
+//! a downstream tool (e.g. the importer validation suite at)
 //! would use.
 
 use std::io::Write;
@@ -32,8 +32,8 @@ fn full_pdb_round_trip_matches_default_db_schema() {
         .with_op_modes([0, 1, 11, 21])
         .with_pol_processes([1101, 9001]);
 
-    // Fixtures: a minimal but realistic Washtenaw County (matches
-    // characterization/fixtures/scale-project.xml's host county).
+ // Fixtures: a minimal but realistic Washtenaw County (matches
+ // characterization/fixtures/scale-project.xml's host county).
     let link_csv = write_fixture(
         dir.path(),
         "link.csv",
@@ -93,7 +93,7 @@ fn full_pdb_round_trip_matches_default_db_schema() {
     let manifest = session.write_to_disk().unwrap();
     assert_eq!(manifest.tables.len(), 5);
 
-    // Verify each Parquet file reads back with the schema we expect.
+ // Verify each Parquet file reads back with the schema we expect.
     for entry in &manifest.tables {
         let bytes = std::fs::read(&entry.output_path).unwrap();
         let bytes = Bytes::from(bytes);
@@ -115,11 +115,11 @@ fn full_pdb_round_trip_matches_default_db_schema() {
 
 #[test]
 fn parquet_schema_matches_default_db_widening() {
-    // moves-default-db-convert widens every MariaDB integer flavor to
-    // Int64 and float to Float64. Verify the importer follows the
-    // same convention so a downstream consumer can union-scan
-    // default-DB Parquet and importer-emitted Parquet for the same
-    // table without schema disagreement.
+ // moves-default-db-convert widens every MariaDB integer flavor to
+ // Int64 and float to Float64. Verify the importer follows the
+ // same convention so a downstream consumer can union-scan
+ // default-DB Parquet and importer-emitted Parquet for the same
+ // table without schema disagreement.
     let expected_link = Arc::new(ArrowSchema::new(vec![
         Field::new("linkID", DataType::Int64, true),
         Field::new("countyID", DataType::Int64, true),
@@ -136,12 +136,12 @@ fn parquet_schema_matches_default_db_widening() {
 
 #[test]
 fn off_network_link_only_runs_when_road_type_one_selected() {
-    // If the runspec selects road type 4 only (no off-network), the
-    // off-network coverage check is a no-op. The CSV reader still
-    // imports the file and writes it to Parquet — but downstream
-    // OpModeDistribution coverage is gated on actual presence of an
-    // off-network link in the Link table, not on the runspec's road
-    // type set.
+ // If the runspec selects road type 4 only (no off-network), the
+ // off-network coverage check is a no-op. The CSV reader still
+ // imports the file and writes it to Parquet — but downstream
+ // OpModeDistribution coverage is gated on actual presence of an
+ // off-network link in the Link table, not on the runspec's road
+ // type set.
     let dir = TempDir::new().unwrap();
     let runspec = RunSpecFilter::default()
         .with_road_types([4])
@@ -215,9 +215,9 @@ fn warnings_are_recorded_in_manifest_when_runspec_filter_rejects() {
 
 #[test]
 fn cross_stage_parquet_layout_matches_default_db_path_convention() {
-    // moves-data-default expects per-table Parquet at
-    // `<root>/<table>.parquet` for monolithic tables (every PDB table
-    // is monolithic). Verify the importer writes to the same layout.
+ // moves-data-default expects per-table Parquet at
+ // `<root>/<table>.parquet` for monolithic tables (every PDB table
+ // is monolithic). Verify the importer writes to the same layout.
     let dir = TempDir::new().unwrap();
     let runspec = RunSpecFilter::default();
     let link_csv = write_fixture(

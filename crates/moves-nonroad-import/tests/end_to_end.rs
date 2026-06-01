@@ -27,8 +27,8 @@ fn write_all_fixtures(dir: &std::path::Path) {
          2,26,750.0,2020\n\
          1,27,2000.0,2020\n",
     );
-    // Age distribution = NREngTechFraction; per-(sourceTypeID, modelYearID,
-    // processID) sum to 1.0 across the engTechID axis.
+ // Age distribution = NREngTechFraction; per-(sourceTypeID, modelYearID,
+ // processID) sum to 1.0 across the engTechID axis.
     write_fixture(
         dir,
         "nrengtechfraction.csv",
@@ -46,19 +46,19 @@ fn write_all_fixtures(dir: &std::path::Path) {
          2020,2030,2010,2020,2270002000,10,50,300,3,1,0.25,0.85\n\
          2021,2031,2011,2021,2270002000,10,50,300,3,2,0.10,0.90\n",
     );
-    // Monthly throttle: per-(NREquipTypeID, stateID) sum to 1.0 across months.
+ // Monthly throttle: per-(NREquipTypeID, stateID) sum to 1.0 across months.
     let mut monthly = String::from("NREquipTypeID,stateID,monthID,monthFraction\n");
     for &state in &[26u16, 27] {
         for month in 1..=12u16 {
             monthly.push_str(&format!("1,{state},{month},0.083333\n"));
         }
-        // Last month bumped slightly so the per-state sum is exactly 1.0.
+ // Last month bumped slightly so the per-state sum is exactly 1.0.
         monthly.push_str(&format!("2,{state},12,0.5\n"));
         for month in 1..=11u16 {
             monthly.push_str(&format!("2,{state},{month},0.0454545\n"));
         }
     }
-    // The 12 × 0.083333 = 0.999996 sum is within the 1e-3 tolerance.
+ // The 12 × 0.083333 = 0.999996 sum is within the 1e-3 tolerance.
     write_fixture(dir, "nrmonthallocation.csv", &monthly);
 }
 
@@ -88,7 +88,7 @@ fn imports_all_four_named_tables() {
     assert!(report.tables_skipped.is_empty());
     assert_eq!(report.total_rows, 3 + 5 + 2 + 48);
 
-    // Manifest written + finalised in alphabetical order.
+ // Manifest written + finalised in alphabetical order.
     let manifest_path = output.join(MANIFEST_FILENAME);
     let from_disk = read_manifest(&manifest_path).unwrap();
     assert_eq!(from_disk, manifest);
@@ -103,8 +103,8 @@ fn imports_all_four_named_tables() {
         ]
     );
 
-    // Each named Parquet file exists, has a non-zero size, and the sha
-    // recorded in the manifest matches the bytes on disk.
+ // Each named Parquet file exists, has a non-zero size, and the sha
+ // recorded in the manifest matches the bytes on disk.
     for entry in &manifest.tables {
         let path = output.join(&entry.path);
         let bytes = std::fs::read(&path).unwrap();
@@ -117,8 +117,8 @@ fn imports_all_four_named_tables() {
         );
     }
 
-    // Round-trip the population Parquet: we should see the three rows
-    // we wrote in the order they appeared.
+ // Round-trip the population Parquet: we should see the three rows
+ // we wrote in the order they appeared.
     let batch = read_back(&output.join("nrbaseyearequippopulation.parquet"));
     assert_eq!(batch.num_rows(), 3);
     assert_eq!(batch.num_columns(), 4);
@@ -171,7 +171,7 @@ fn missing_csv_is_skipped_by_default_and_required_on_demand() {
     let input = dir.path().join("input");
     let output = dir.path().join("output");
     std::fs::create_dir_all(&input).unwrap();
-    // Only the population fixture is provided.
+ // Only the population fixture is provided.
     write_fixture(
         &input,
         "nrbaseyearequippopulation.csv",
@@ -199,7 +199,7 @@ fn fraction_sum_violation_reports_offending_group() {
     let input = dir.path().join("input");
     let output = dir.path().join("output");
     std::fs::create_dir_all(&input).unwrap();
-    // Only this importer; two months sum to 0.5 instead of 1.0.
+ // Only this importer; two months sum to 0.5 instead of 1.0.
     write_fixture(
         &input,
         "nrmonthallocation.csv",
@@ -259,7 +259,7 @@ fn retrofit_nullable_fractions_pass_through() {
     let input = dir.path().join("input");
     let output = dir.path().join("output");
     std::fs::create_dir_all(&input).unwrap();
-    // Both annualFractionRetrofit and retrofitEffectiveFraction empty.
+ // Both annualFractionRetrofit and retrofitEffectiveFraction empty.
     write_fixture(
         &input,
         "nrretrofitfactors.csv",

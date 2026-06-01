@@ -7,14 +7,14 @@
 //!
 //! | File | Lines | Role | Task |
 //! |---|---|---|---|
-//! | `clcems.f`    | 360 | Exhaust emissions                | 106 |
-//! | `emfclc.f`    | 314 | Exhaust EF lookup                | 106 |
-//! | `emsadj.f`    | 343 | Emissions adjustments            | 106 |
-//! | `unitcf.f`    |  80 | Unit conversion factors          | 106 |
-//! | `intadj.f`    | 141 | Integer-adjusted EF lookup       | 106 |
-//! | `clcevems.f`  | 721 | Evaporative emissions            | 107 |
-//! | `evemfclc.f`  | 370 | Evaporative EF lookup            | 107 |
-//! | `clcrtrft.f`  | 309 | Retrofit emissions               | 108 |
+//! | `clcems.f` | 360 | Exhaust emissions | 106 |
+//! | `emfclc.f` | 314 | Exhaust EF lookup | 106 |
+//! | `emsadj.f` | 343 | Emissions adjustments | 106 |
+//! | `unitcf.f` | 80 | Unit conversion factors | 106 |
+//! | `intadj.f` | 141 | Integer-adjusted EF lookup | 106 |
+//! | `clcevems.f` | 721 | Evaporative emissions | 107 |
+//! | `evemfclc.f` | 370 | Evaporative EF lookup | 107 |
+//! | `clcrtrft.f` | 309 | Retrofit emissions | 108 |
 //!
 //! Plus the retrofit validators (`vldrtrftrecs.f`,
 //! `vldrtrfthp.f`, `vldrtrftscc.f`, `vldrtrfttchtyp.f`).
@@ -24,12 +24,12 @@
 //!
 //! # Submodules
 //!
-//! - [`exhaust`]: Task 106 — exhaust emissions calculator (`clcems`,
-//!   `emfclc`, `emsadj`, `unitcf`).
-//! - [`evaporative`]: Task 107 — evaporative emissions calculator
-//!   (`clcevems`, `evemfclc`).
-//! - [`retrofit`]: Task 108 — retrofit-emission reductions
-//!   (`clcrtrft` and validators).
+//! - [`exhaust`]: — exhaust emissions calculator (`clcems`,
+//! `emfclc`, `emsadj`, `unitcf`).
+//! - [`evaporative`]: — evaporative emissions calculator
+//! (`clcevems`, `evemfclc`).
+//! - [`retrofit`]: — retrofit-emission reductions
+//! (`clcrtrft` and validators).
 //!
 //! The submodules' public surface is re-exported here so callers
 //! can `use crate::emissions::*` without picking a submodule.

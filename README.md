@@ -19,19 +19,14 @@ MOVES (Motor Vehicle Emission Simulator) is the U.S. EPA's official model for es
 ## Status — v0.1.0
 
 The port covers all ~70 onroad calculators, the full NONROAD model (a
-pure-Rust rewrite of the 29k-line Fortran NONROAD2008a), and all four Phase-6
-control strategies. The characterization suite (37 fixtures) completes without
-error.
+pure-Rust rewrite of the 29k-line Fortran NONROAD2008a), and all four control
+strategies. The characterization suite (37 fixtures) completes without error,
+including emission output.
 
-**One significant gap in v0.1:** The Phase 4 data-plane wiring is not yet
-complete. `moves run` plans the full calculator graph and parses your RunSpec
-correctly, but calculators return empty output because the default-database
-Parquet feed into the calculator context is not yet wired. Emission numbers
-will appear once Phase 4 lands. See [what's not yet supported](docs/porting-guide.md#what-is-not-yet-supported).
-
-**In short:** use v0.1 to validate RunSpec parsing, inspect calculator-graph
-planning, and exercise control-strategy configuration. Do not expect emission
-rows yet.
+`moves run` plans the full calculator graph, parses your RunSpec correctly,
+feeds the default-database Parquet data into the calculator context, and
+produces emission rows. See [what's not yet supported](docs/porting-guide.md#what-is-not-yet-supported)
+for any remaining limitations.
 
 ## Quick start
 
@@ -44,8 +39,8 @@ cargo build --release --locked
 
 # Run the included sample RunSpec
 ./target/release/moves run \
-    --runspec characterization/fixtures/sample-runspec.xml \
-    --output /tmp/moves-out
+ --runspec characterization/fixtures/sample-runspec.xml \
+ --output /tmp/moves-out
 ```
 
 Pre-built binaries for Linux (x86_64, aarch64), macOS (x86_64, aarch64), and Windows (x86_64) are available on the [Releases page](https://github.com/EarthSciML/moves.rs/releases).

@@ -1,7 +1,7 @@
 //! Output manifest written next to the per-table Parquet files.
 //!
 //! Schema tag: `moves-default-db-manifest/v1`. Downstream consumers (the
-//! lazy-loading reader, Task 82) read this to discover which files belong
+//! lazy-loading reader,) read this to discover which files belong
 //! to which table, validate row counts at load time, and detect drift.
 
 use serde::{Deserialize, Serialize};
@@ -19,7 +19,7 @@ pub struct Manifest {
     pub moves_commit: String,
     pub plan_sha256: String,
     pub generated_at_utc: String,
-    /// Sorted by case-folded `name`.
+ /// Sorted by case-folded `name`.
     pub tables: Vec<TableManifest>,
 }
 
@@ -49,9 +49,9 @@ pub struct ColumnManifest {
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct PartitionManifest {
-    /// Relative path under the output root.
+ /// Relative path under the output root.
     pub path: String,
-    /// Partition key values in the same order as `TableManifest.partition_columns`.
+ /// Partition key values in the same order as `TableManifest.partition_columns`.
     #[serde(default)]
     pub values: Vec<String>,
     pub row_count: u64,

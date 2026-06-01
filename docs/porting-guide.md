@@ -46,7 +46,7 @@ passed directly to `moves run --runspec <path>` without modification. See
 | Model path | Status |
 |-----------|--------|
 | Onroad (Default Scale / Macroscale) | Supported — all ~70 calculators implemented |
-| NONROAD | Supported — full Fortran→Rust port (Phase 5) |
+| NONROAD | Supported — full Fortran→Rust port |
 | Mixed onroad + NONROAD | Supported |
 
 ### Emission processes (onroad)
@@ -58,7 +58,7 @@ auxiliary power, and HC/NOx speciation chains.
 
 ### Control strategies
 
-All four Phase-6 control strategies are implemented and available via RunSpec
+All four control strategies are implemented and available via RunSpec
 `<internalcontrolstrategy>` blocks. See
 [`docs/control-strategies.md`](control-strategies.md) for input file formats
 and worked examples.
@@ -86,8 +86,8 @@ supplied) foreign-key constraints. See `moves import-cdb --help` for details.
 Convert an existing canonical-MOVES RunSpec from XML to TOML (or back):
 
 ```sh
-moves convert-runspec --input my_run.xml          # writes my_run.toml
-moves convert-runspec --input my_run.toml         # writes my_run.xml
+moves convert-runspec --input my_run.xml # writes my_run.toml
+moves convert-runspec --input my_run.toml # writes my_run.xml
 moves convert-runspec --input my_run.xml --output other_name.toml
 ```
 
@@ -95,7 +95,7 @@ moves convert-runspec --input my_run.xml --output other_name.toml
 
 ## What is not yet supported
 
-### Emission output data (Phase 4 data plane — v0.1 state)
+### Emission output data (v0.1 state)
 
 **In the current release, `moves run` produces the `MOVESRun.parquet` metadata
 file and plans the full calculator graph, but calculator `execute()` methods
@@ -103,21 +103,20 @@ return empty output.** The `MOVESOutput/` and `MOVESActivityOutput/` partitions
 are created but contain no emission rows.
 
 This is the expected v0.1 state. The data plane that materialises per-row
-default-database lookups into `CalculatorContext` is Phase 4's deliverable; it
-is not yet wired. You will see output like:
+default-database lookups into `CalculatorContext` is not yet wired. You will see output like:
 
 ```
 [moves run] my_run.xml
-  calculator graph : 44 module(s) planned across 1 chunk(s)
-  executed         : 0
-  not yet ported   : 44 module(s)
-  ...
+ calculator graph : 44 module(s) planned across 1 chunk(s)
+ executed : 0
+ not yet ported : 44 module(s)
+ ...
 ```
 
 The "not yet ported" label here is misleading — the calculators are
-implemented, but without the data plane they produce no output. Once Phase 4
-is wired, the executed count will equal the planned count and emission rows
-will appear in the output Parquet.
+implemented, but without the data plane they produce no output. Once the data
+plane is wired, the executed count will equal the planned count and emission
+rows will appear in the output Parquet.
 
 **Practical implication:** use the port today to validate that your RunSpec
 parses correctly, that the calculator graph is planned as expected, and that
@@ -129,7 +128,7 @@ until the data plane is live.
 County-Scale and Project-Scale runs require user-supplied County Databases
 (CDB) or Project Databases (PDB). The `import-cdb` command is available and
 produces validated Parquet. However, the data-plane wiring to feed CDB-sourced
-Parquet into the calculator context is part of Phase 4 and is not yet complete.
+Parquet into the calculator context is not yet complete.
 
 The three scale fixtures (`scale-county.xml`, `scale-project.xml`,
 `scale-rates.xml`) are excluded from the standard regression suite for this
@@ -181,7 +180,7 @@ later, it will parse without modification.
 The TOML format is easier to edit by hand and supports comments. Convert once:
 
 ```sh
-moves convert-runspec --input my_run.xml   # -> my_run.toml
+moves convert-runspec --input my_run.xml # -> my_run.toml
 ```
 
 Then edit `my_run.toml` as needed. See [`docs/runspec-toml.md`](runspec-toml.md)
@@ -197,9 +196,9 @@ MOVES commit `25dc6c8`, MOVES5.0.1).
 
 ```sh
 moves import-cdb \
-    --input  my_cdb_csvs/ \
-    --output my_cdb_parquet/ \
-    --default-db /path/to/default-db-parquet/
+ --input my_cdb_csvs/ \
+ --output my_cdb_parquet/ \
+ --default-db /path/to/default-db-parquet/
 ```
 
 Fix any validation errors the importer reports before proceeding.
@@ -214,18 +213,18 @@ at the CLI level in v0.1.
 
 ```sh
 moves run \
-    --runspec  my_run.toml \
-    --output   ./my-output \
-    --max-parallel-chunks 4   # optional; 0 = use all logical CPUs
+ --runspec my_run.toml \
+ --output ./my-output \
+ --max-parallel-chunks 4 # optional; 0 = use all logical CPUs
 ```
 
 On completion the output directory contains:
 
 ```
 my-output/
-├── MOVESRun.parquet          # run metadata (always written)
-├── MOVESOutput/              # emission rows (empty until Phase 4 data plane)
-└── MOVESActivityOutput/      # activity rows (empty until Phase 4 data plane)
+├── MOVESRun.parquet # run metadata (always written)
+├── MOVESOutput/ # emission rows (empty until data plane is wired)
+└── MOVESActivityOutput/ # activity rows (empty until data plane is wired)
 ```
 
 ---
@@ -288,17 +287,16 @@ execution. The Rust port keeps all intermediate data in memory (Polars
 ### Performance
 
 `moves.rs` targets a 10–50× wall-time improvement over canonical MOVES for
-County-Scale and Project-Scale workloads (see Task 127 benchmark report once
-it is published). Default-Scale runs benefit proportionally. Memory usage
-scales with `--max-parallel-chunks`; if peak RSS is too high, lower the
-parallelism setting.
+County-Scale and Project-Scale workloads. Default-Scale runs benefit
+proportionally. Memory usage scales with `--max-parallel-chunks`; if peak RSS
+is too high, lower the parallelism setting.
 
 ---
 
 ## How to compare outputs
 
-Once the Phase 4 data plane is live, you can compare `moves.rs` output
-against canonical MOVES snapshots with the `moves-snapshot` tool.
+Once the default-database data-plane wiring is live, you can compare `moves.rs`
+output against canonical MOVES snapshots with the `moves-snapshot` tool.
 
 ### Run canonical MOVES and capture a snapshot
 
@@ -314,8 +312,8 @@ This populates `characterization/snapshots/<fixture-name>/` in the
 
 ```sh
 moves run \
-    --runspec  characterization/fixtures/sample-runspec.xml \
-    --output   /tmp/port-output/sample-runspec/
+ --runspec characterization/fixtures/sample-runspec.xml \
+ --output /tmp/port-output/sample-runspec/
 ```
 
 ### Diff the two
@@ -323,11 +321,11 @@ moves run \
 ```sh
 # Produce a JSON diff within the tolerance budget:
 target/release/moves-snapshot diff \
-    characterization/snapshots/sample-runspec/ \
-    /tmp/port-output/sample-runspec/ \
-    --tolerance characterization/tolerance.toml \
-    --format json \
-  | jq '.diff.table_changes[] | {table, cells: (.row_diffs | length)}'
+ characterization/snapshots/sample-runspec/ \
+ /tmp/port-output/sample-runspec/ \
+ --tolerance characterization/tolerance.toml \
+ --format json \
+ | jq '.diff.table_changes[] | {table, cells: (.row_diffs | length)}'
 ```
 
 ### Enable the regression gate
@@ -336,7 +334,7 @@ Set `REGRESSION_SNAPSHOTS_DIR` to run the diff as part of `cargo test`:
 
 ```sh
 REGRESSION_SNAPSHOTS_DIR=characterization/snapshots \
-    cargo test --test full_suite_regression -- --nocapture
+ cargo test --test full_suite_regression -- --nocapture
 ```
 
 Divergences within the budget in `characterization/tolerance.toml` are

@@ -1,19 +1,17 @@
-//! Well-To-Pump (WTP) emission calculators — Phase 3 Task 69.
+//! Well-To-Pump (WTP) emission calculators —.
 //!
-//! Ports the four calculators the migration plan groups into Task 69, which
+//! Ports the four calculators the groups into, which
 //! together model **well-to-pump (upstream) emissions** — the energy and
 //! greenhouse gases spent extracting, refining and distributing a fuel before
 //! it ever reaches a vehicle's tank, as distinct from the pump-to-wheel
 //! emissions the vehicle itself produces:
 //!
 //! * [`total_energy::WellToPumpProcessor`] — `WellToPumpProcessor`, the
-//!   well-to-pump Total Energy Consumption (pollutant 91).
+//! well-to-pump Total Energy Consumption (pollutant 91).
 //! * [`ch4n2o::Ch4N2oWtpCalculator`] — `CH4N2OWTPCalculator`, well-to-pump
-//!   methane (5) and nitrous oxide (6).
-//! * [`co2_atmospheric::Co2AtmosphericWtpCalculator`] —
-//!   `CO2AtmosphericWTPCalculator`, well-to-pump atmospheric CO2 (90).
-//! * [`co2_equivalent::Co2EquivalentWtpCalculator`] —
-//!   `CO2EqivalentWTPCalculator`, well-to-pump CO2 equivalent (98).
+//! methane (5) and nitrous oxide (6).
+//! * [`co2_atmospheric::Co2AtmosphericWtpCalculator`]//! `CO2AtmosphericWTPCalculator`, well-to-pump atmospheric CO2 (90).
+//! * [`co2_equivalent::Co2EquivalentWtpCalculator`]//! `CO2EqivalentWTPCalculator`, well-to-pump CO2 equivalent (98).
 //!
 //! # Two steps
 //!
@@ -39,8 +37,8 @@
 //! `CalculatorInfo.txt`, and `characterization/calculator-chains/calculator-dag.json`
 //! records every WTP module with `registrations_count: 0`, `subscriptions: []`
 //! and `depends_on: []`. The modern base-rate engine (`BaseRateCalculator`,
-//! migration-plan Task 45) superseded the older per-pollutant scripted-SQL
-//! calculators. The migration plan still lists the four classes as Task 69, so
+//! ) superseded the older per-pollutant scripted-SQL
+//! calculators. The still lists the four classes as, so
 //! this module ports their algorithms faithfully for reference and
 //! cross-validation, with each calculator's
 //! [`Calculator::registrations`](moves_framework::Calculator::registrations),

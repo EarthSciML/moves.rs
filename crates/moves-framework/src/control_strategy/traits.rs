@@ -18,19 +18,18 @@
 //! The engine calls lifecycle hooks in this order:
 //!
 //! 1. [`pre_run`](InternalControlStrategy::pre_run) — once before the first
-//!    master-loop iteration. Strategies use this to load and transform global input
-//!    tables (e.g. AVFT applies fleet-composition changes to the `AVFT` table here).
+//! master-loop iteration. Strategies use this to load and transform global input
+//! tables (e.g. AVFT applies fleet-composition changes to the `AVFT` table here).
 //!
 //! 2. [`execute`](InternalControlStrategy::execute) — once per subscribed master-loop
-//!    iteration, at the granularity and process each [`StrategySubscription`] specifies.
-//!    Strategies use this for per-location or per-time modifications (e.g. retrofit
-//!    reduction factors applied per county per year).
+//! iteration, at the granularity and process each [`StrategySubscription`] specifies.
+//! Strategies use this for per-location or per-time modifications (e.g. retrofit
+//! reduction factors applied per county per year).
 //!
 //! 3. [`post_run`](InternalControlStrategy::post_run) — once after the last master-loop
-//!    iteration completes. Typically used for cleanup or summary reporting.
+//! iteration completes. Typically used for cleanup or summary reporting.
 //!
-//! `pre_run` and `post_run` run outside the parallel-chunk section of the engine —
-//! they are called from a single thread. `execute` may be called concurrently from
+//! `pre_run` and `post_run` run outside the parallel-chunk section of the engine//! they are called from a single thread. `execute` may be called concurrently from
 //! multiple threads when the engine runs calculator chains in parallel; strategy
 //! implementations must be `Sync` (already enforced by the trait bound) and must
 //! internally synchronise any mutable state they access from `execute`.
@@ -50,18 +49,18 @@ use crate::error::Error;
 /// for a strategy that must run before others at the same granularity).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StrategySubscription {
-    /// MOVES process this subscription is gated to.
+ /// MOVES process this subscription is gated to.
     pub process_id: ProcessId,
-    /// Granularity bucket the subscription fires in.
+ /// Granularity bucket the subscription fires in.
     pub granularity: Granularity,
-    /// Offset added to the `INTERNAL_CONTROL_STRATEGY` base (1000).
-    /// Use `0` for the default; positive values run before others
-    /// in the same granularity band.
+ /// Offset added to the `INTERNAL_CONTROL_STRATEGY` base (1000).
+ /// Use `0` for the default; positive values run before others
+ /// in the same granularity band.
     pub priority_offset: i32,
 }
 
 impl StrategySubscription {
-    /// Construct with explicit priority offset.
+ /// Construct with explicit priority offset.
     #[must_use]
     pub fn new(process_id: ProcessId, granularity: Granularity, priority_offset: i32) -> Self {
         Self {
@@ -71,19 +70,19 @@ impl StrategySubscription {
         }
     }
 
-    /// Construct with zero priority offset — the most common case.
+ /// Construct with zero priority offset — the most common case.
     #[must_use]
     pub fn at(process_id: ProcessId, granularity: Granularity) -> Self {
         Self::new(process_id, granularity, 0)
     }
 
-    /// Computed MasterLoop priority integer value.
-    ///
-    /// Equals `INTERNAL_CONTROL_STRATEGY` base (1000) plus any offset. The
-    /// master loop sorts higher values first within a granularity bucket.
+ /// Computed MasterLoop priority integer value.
+ ///
+ /// Equals `INTERNAL_CONTROL_STRATEGY` base (1000) plus any offset. The
+ /// master loop sorts higher values first within a granularity bucket.
     #[must_use]
     pub fn priority(&self) -> i32 {
-        // INTERNAL_CONTROL_STRATEGY base = 1000 (from PriorityBase::base_value).
+ // INTERNAL_CONTROL_STRATEGY base = 1000 (from PriorityBase::base_value).
         Priority::parse("INTERNAL_CONTROL_STRATEGY")
             .expect("known-good constant")
             .value()
@@ -101,56 +100,56 @@ impl StrategySubscription {
 /// mutable per-run bookkeeping must be held behind interior mutability with
 /// appropriate synchronisation (see lifecycle notes above).
 pub trait InternalControlStrategy: Send + Sync + std::fmt::Debug {
-    /// Stable identifier used for registration and diagnostic logging.
+ /// Stable identifier used for registration and diagnostic logging.
     fn name(&self) -> &'static str;
 
-    /// Master-loop subscriptions this strategy fires at per-iteration.
-    ///
-    /// Returns an empty slice for strategies that only use `pre_run` / `post_run`
-    /// and do not need per-iteration callbacks.
+ /// Master-loop subscriptions this strategy fires at per-iteration.
+ ///
+ /// Returns an empty slice for strategies that only use `pre_run` / `post_run`
+ /// and do not need per-iteration callbacks.
     fn subscriptions(&self) -> &[StrategySubscription] {
         &[]
     }
 
-    /// Default-DB tables this strategy reads from or writes to.
-    ///
-    /// The engine inspects this list after calling `pre_run` to know which
-    /// tables must be invalidated and reloaded before calculators see them.
-    /// Tables absent from this list are assumed unmodified.
+ /// Default-DB tables this strategy reads from or writes to.
+ ///
+ /// The engine inspects this list after calling `pre_run` to know which
+ /// tables must be invalidated and reloaded before calculators see them.
+ /// Tables absent from this list are assumed unmodified.
     fn modified_tables(&self) -> &[&'static str] {
         &[]
     }
 
-    /// Called once before the master loop begins.
-    ///
-    /// Use this for global input-table transformations that apply for the
-    /// entire run — for example, the AVFT strategy writes its completed
-    /// fleet-composition table into `tables` as `"AVFT"` here so downstream
-    /// calculators see the user-specified fractions instead of the defaults.
-    ///
-    /// `tables` is the mutable slow-tier execution database. Write to it via
-    /// `InMemoryStore::insert` or the [`crate::DataFrameStoreTyped`] helpers.
-    ///
-    /// Default: no-op.
+ /// Called once before the master loop begins.
+ ///
+ /// Use this for global input-table transformations that apply for the
+ /// entire run — for example, the AVFT strategy writes its completed
+ /// fleet-composition table into `tables` as `"AVFT"` here so downstream
+ /// calculators see the user-specified fractions instead of the defaults.
+ ///
+ /// `tables` is the mutable slow-tier execution database. Write to it via
+ /// `InMemoryStore::insert` or the [`crate::DataFrameStoreTyped`] helpers.
+ ///
+ /// Default: no-op.
     fn pre_run(&self, _tables: &mut InMemoryStore) -> Result<(), Error> {
         Ok(())
     }
 
-    /// Called once per subscribed master-loop iteration at the granularity
-    /// and process registered in [`subscriptions`](Self::subscriptions).
-    ///
-    /// Use this for per-location or per-time table modifications. May be
-    /// called concurrently when the engine runs calculator chains in
-    /// parallel — implementations that touch shared state must synchronise.
-    ///
-    /// Default: no-op.
+ /// Called once per subscribed master-loop iteration at the granularity
+ /// and process registered in [`subscriptions`](Self::subscriptions).
+ ///
+ /// Use this for per-location or per-time table modifications. May be
+ /// called concurrently when the engine runs calculator chains in
+ /// parallel — implementations that touch shared state must synchronise.
+ ///
+ /// Default: no-op.
     fn execute(&self, _ctx: &CalculatorContext) -> Result<(), Error> {
         Ok(())
     }
 
-    /// Called once after all master-loop iterations complete.
-    ///
-    /// Use for cleanup or summary output. Default: no-op.
+ /// Called once after all master-loop iterations complete.
+ ///
+ /// Use for cleanup or summary output. Default: no-op.
     fn post_run(&self, _ctx: &CalculatorContext) -> Result<(), Error> {
         Ok(())
     }

@@ -2,12 +2,12 @@
 //!
 //! Implements the canonical [`RunSpec`] model plus two surface formats:
 //!
-//! * **TOML** — the recommended, hand-authored format (Task 13). Short
-//!   table names, named-enum values, supports comments.
+//! * **TOML** — the recommended, hand-authored format. Short
+//! table names, named-enum values, supports comments.
 //! * **XML** — the legacy MOVES `.mrs` / `.xml` format. The serializer
-//!   emits the canonical Java-style layout produced by
-//!   `gov.epa.otaq.moves.master.runspec.RunSpecXML.save`, so
-//!   `serialize → parse → serialize` is byte-stable.
+//! emits the canonical Java-style layout produced by
+//! `gov.epa.otaq.moves.master.runspec.RunSpecXML.save`, so
+//! `serialize → parse → serialize` is byte-stable.
 //!
 //! Conversion is always model-mediated, so XML↔TOML round-trips through
 //! a single [`RunSpec`] value are isomorphic by construction. See
@@ -24,13 +24,13 @@
 //! println!("{}", toml);
 //! ```
 //!
-//! See `moves-rust-migration-plan.md`:
+//! See `moves-rust-.md`:
 //!
-//! * Task 12 — RunSpec XML parser
-//! * Task 13 — TOML-based RunSpec format
-//! * Task 14 — Pollutant/process/source-type/road-type enums (will replace
-//!   the `(id, name)` pairs in pollutant/process/road-type/fuel-type
-//!   selections once the canonical lookup tables land in `moves-data`).
+//! * — RunSpec XML parser
+//! * — TOML-based RunSpec format
+//! * — Pollutant/process/source-type/road-type enums (will replace
+//! the `(id, name)` pairs in pollutant/process/road-type/fuel-type
+//! selections once the canonical lookup tables land in `moves-data`).
 
 pub mod error;
 pub mod model;

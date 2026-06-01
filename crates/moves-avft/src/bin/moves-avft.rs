@@ -16,7 +16,7 @@ use moves_avft::{csv_io, import, parquet_io, tool, AvftTable, ToolSpec};
 #[command(
     name = "moves-avft",
     version,
-    about = "AVFT importer + AVFT Tool (Phase 4 Task 86)"
+    about = "AVFT importer + AVFT Tool"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -25,37 +25,37 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Validate a user AVFT CSV against the canonical importer rules.
+ /// Validate a user AVFT CSV against the canonical importer rules.
     Validate {
-        /// Path to the user AVFT CSV (columns: sourceTypeID, modelYearID,
-        /// fuelTypeID, engTechID, fuelEngFraction).
+ /// Path to the user AVFT CSV (columns: sourceTypeID, modelYearID,
+ /// fuelTypeID, engTechID, fuelEngFraction).
         #[arg(long)]
         input: PathBuf,
     },
-    /// Run the AVFT Tool: gap-fill + project the user AVFT into a
-    /// complete table. Emits CSV and/or Parquet output.
+ /// Run the AVFT Tool: gap-fill + project the user AVFT into a
+ /// complete table. Emits CSV and/or Parquet output.
     Tool {
-        /// Path to the TOML tool spec.
+ /// Path to the TOML tool spec.
         #[arg(long)]
         spec: PathBuf,
-        /// Path to the user AVFT CSV.
+ /// Path to the user AVFT CSV.
         #[arg(long)]
         input: PathBuf,
-        /// Path to the default AVFT CSV. Typically derived from the
-        /// default DB's `samplevehiclepopulation` table — see
-        /// `gov/epa/otaq/moves/master/gui/avfttool/AVFTTool.sql`'s
-        /// `AVFTTool_CreateDefaultAVFT` procedure for the canonical
-        /// computation.
+ /// Path to the default AVFT CSV. Typically derived from the
+ /// default DB's `samplevehiclepopulation` table — see
+ /// `gov/epa/otaq/moves/master/gui/avfttool/AVFTTool.sql`'s
+ /// `AVFTTool_CreateDefaultAVFT` procedure for the canonical
+ /// computation.
         #[arg(long = "default-avft")]
         default_avft: PathBuf,
-        /// Optional path to a known-fractions CSV (required only when
-        /// the spec selects projection = "known-fractions").
+ /// Optional path to a known-fractions CSV (required only when
+ /// the spec selects projection = "known-fractions").
         #[arg(long = "known-fractions")]
         known_fractions: Option<PathBuf>,
-        /// Write the completed AVFT to this CSV path.
+ /// Write the completed AVFT to this CSV path.
         #[arg(long = "output-csv")]
         output_csv: Option<PathBuf>,
-        /// Write the completed AVFT to this Parquet path.
+ /// Write the completed AVFT to this Parquet path.
         #[arg(long = "output-parquet")]
         output_parquet: Option<PathBuf>,
     },

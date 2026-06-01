@@ -34,7 +34,7 @@ pub struct AvftRecord {
 }
 
 impl AvftRecord {
-    /// Construct a record from typed values.
+ /// Construct a record from typed values.
     pub fn new(
         source_type_id: SourceTypeId,
         model_year_id: ModelYearId,
@@ -51,8 +51,8 @@ impl AvftRecord {
         }
     }
 
-    /// `(sourceTypeID, modelYearID, fuelTypeID, engTechID)` — the
-    /// canonical primary key.
+ /// `(sourceTypeID, modelYearID, fuelTypeID, engTechID)` — the
+ /// canonical primary key.
     pub fn key(&self) -> AvftKey {
         AvftKey {
             source_type_id: self.source_type_id,
@@ -84,41 +84,41 @@ pub struct AvftTable {
 }
 
 impl AvftTable {
-    /// Create an empty table.
+ /// Create an empty table.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Number of rows in the table.
+ /// Number of rows in the table.
     pub fn len(&self) -> usize {
         self.records.len()
     }
 
-    /// `true` if the table has no rows.
+ /// `true` if the table has no rows.
     pub fn is_empty(&self) -> bool {
         self.records.is_empty()
     }
 
-    /// Insert a record. If the key already exists the new fraction
-    /// replaces it (the canonical SQL importer uses `INSERT IGNORE`
-    /// against a primary-key constraint, but for the in-memory model
-    /// the simplest semantics is last-write-wins; the CSV reader
-    /// surfaces duplicate keys to the caller separately).
+ /// Insert a record. If the key already exists the new fraction
+ /// replaces it (the canonical SQL importer uses `INSERT IGNORE`
+ /// against a primary-key constraint, but for the in-memory model
+ /// the simplest semantics is last-write-wins; the CSV reader
+ /// surfaces duplicate keys to the caller separately).
     pub fn insert(&mut self, record: AvftRecord) {
         self.records.insert(record.key(), record.fuel_eng_fraction);
     }
 
-    /// Look up the fraction for the given key, if any.
+ /// Look up the fraction for the given key, if any.
     pub fn get(&self, key: &AvftKey) -> Option<f64> {
         self.records.get(key).copied()
     }
 
-    /// Whether the table contains an entry for the given key.
+ /// Whether the table contains an entry for the given key.
     pub fn contains_key(&self, key: &AvftKey) -> bool {
         self.records.contains_key(key)
     }
 
-    /// Iterate the table in canonical order (key-lexicographic).
+ /// Iterate the table in canonical order (key-lexicographic).
     pub fn iter(&self) -> impl Iterator<Item = AvftRecord> + '_ {
         self.records.iter().map(|(k, v)| AvftRecord {
             source_type_id: k.source_type_id,
@@ -129,12 +129,12 @@ impl AvftTable {
         })
     }
 
-    /// Materialize the table as a `Vec<AvftRecord>` in canonical order.
+ /// Materialize the table as a `Vec<AvftRecord>` in canonical order.
     pub fn to_vec(&self) -> Vec<AvftRecord> {
         self.iter().collect()
     }
 
-    /// Iterate only the rows that match a given `sourceTypeID`.
+ /// Iterate only the rows that match a given `sourceTypeID`.
     pub fn rows_for_source_type(
         &self,
         source_type_id: SourceTypeId,
@@ -143,22 +143,22 @@ impl AvftTable {
             .filter(move |r| r.source_type_id == source_type_id)
     }
 
-    /// Set of `sourceTypeID`s present in the table (in ascending order).
+ /// Set of `sourceTypeID`s present in the table (in ascending order).
     pub fn source_types(&self) -> Vec<SourceTypeId> {
         let mut s: Vec<SourceTypeId> = self.records.keys().map(|k| k.source_type_id).collect();
         s.dedup();
-        // BTreeMap iteration is sorted by full key, so source_type_id
-        // values appear non-decreasingly but with duplicates from the
-        // (my, fuel, eng) cartesian — dedup leaves the ascending set.
+ // BTreeMap iteration is sorted by full key, so source_type_id
+ // values appear non-decreasingly but with duplicates from the
+ // (my, fuel, eng) cartesian — dedup leaves the ascending set.
         s
     }
 
-    /// Remove every row whose `sourceTypeID` matches `id`.
+ /// Remove every row whose `sourceTypeID` matches `id`.
     pub fn remove_source_type(&mut self, id: SourceTypeId) {
         self.records.retain(|k, _| k.source_type_id != id);
     }
 
-    /// Number of rows in the table for a given `sourceTypeID`.
+ /// Number of rows in the table for a given `sourceTypeID`.
     pub fn count_for_source_type(&self, id: SourceTypeId) -> usize {
         self.records
             .keys()

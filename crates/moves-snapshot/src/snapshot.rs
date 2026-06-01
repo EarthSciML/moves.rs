@@ -23,8 +23,7 @@ const MANIFEST_FILE: &str = "manifest.json";
 
 /// In-memory collection of normalized tables that maps to a snapshot directory.
 ///
-/// Tables are stored keyed by name in lexicographic order, so iteration —
-/// and the resulting on-disk manifest — is deterministic.
+/// Tables are stored keyed by name in lexicographic order, so iteration/// and the resulting on-disk manifest — is deterministic.
 #[derive(Debug, Clone, Default)]
 pub struct Snapshot {
     tables: BTreeMap<String, Table>,
@@ -65,9 +64,9 @@ impl Snapshot {
         Ok(())
     }
 
-    /// Write the snapshot to `dir`, creating it if absent. Any existing
-    /// `manifest.json` and `tables/` are removed first so the resulting bytes
-    /// only depend on `self`.
+ /// Write the snapshot to `dir`, creating it if absent. Any existing
+ /// `manifest.json` and `tables/` are removed first so the resulting bytes
+ /// only depend on `self`.
     pub fn write(&self, dir: &Path) -> Result<()> {
         fs::create_dir_all(dir).map_err(|source| Error::Io {
             path: dir.to_path_buf(),
@@ -121,8 +120,8 @@ impl Snapshot {
             });
         }
 
-        // BTreeMap iteration is already sorted; sort defensively in case a
-        // later refactor swaps the storage type.
+ // BTreeMap iteration is already sorted; sort defensively in case a
+ // later refactor swaps the storage type.
         entries.sort_by(|a, b| a.name.cmp(&b.name));
         let aggregate_sha256 = compute_aggregate_hash(&entries);
 
@@ -134,13 +133,13 @@ impl Snapshot {
         let manifest_bytes = serialize_json(&manifest, &manifest_path)?;
         write_bytes(&manifest_path, &manifest_bytes)?;
 
-        // Write execution-DB bundle for fast loading by `moves run --snapshot`.
+ // Write execution-DB bundle for fast loading by `moves run --snapshot`.
         crate::bundle::write_execution_bundle(dir, &self.tables)?;
 
         Ok(())
     }
 
-    /// Load a snapshot from `dir`, validating manifest hashes.
+ /// Load a snapshot from `dir`, validating manifest hashes.
     pub fn load(dir: &Path) -> Result<Self> {
         let manifest_path = dir.join(MANIFEST_FILE);
         let manifest_bytes = fs::read(&manifest_path).map_err(|source| {
@@ -168,9 +167,9 @@ impl Snapshot {
             });
         }
 
-        // Verify the aggregate hash before doing any expensive parquet
-        // decoding. If the manifest itself was tampered with this catches it
-        // up front.
+ // Verify the aggregate hash before doing any expensive parquet
+ // decoding. If the manifest itself was tampered with this catches it
+ // up front.
         let recomputed_aggregate = compute_aggregate_hash(&manifest.tables);
         if recomputed_aggregate != manifest.aggregate_sha256 {
             return Err(Error::AggregateHashMismatch {
@@ -232,10 +231,10 @@ impl Snapshot {
         Ok(snapshot)
     }
 
-    /// Return the snapshot's aggregate hash by re-deriving it from the in-memory
-    /// tables. Equivalent to writing the snapshot and reading
-    /// `manifest.aggregate_sha256` — useful for callers that want the
-    /// content-address without touching disk.
+ /// Return the snapshot's aggregate hash by re-deriving it from the in-memory
+ /// tables. Equivalent to writing the snapshot and reading
+ /// `manifest.aggregate_sha256` — useful for callers that want the
+ /// content-address without touching disk.
     pub fn aggregate_hash(&self) -> Result<String> {
         let mut entries = Vec::with_capacity(self.tables.len());
         for table in self.tables.values() {
@@ -248,7 +247,7 @@ impl Snapshot {
                 table.row_count() as u64,
                 content_sha256.clone(),
             );
-            // Use the same JSON encoding the writer uses so the hash matches.
+ // Use the same JSON encoding the writer uses so the hash matches.
             let meta_bytes = serialize_json_inmem(&meta)?;
             let metadata_sha256 = sha256_hex(&meta_bytes);
             entries.push(ManifestEntry {
@@ -400,7 +399,7 @@ mod tests {
         s1.write(dir.path()).unwrap();
         let s2 = Snapshot::load(dir.path()).unwrap();
 
-        // Same table set, same content.
+ // Same table set, same content.
         let names1: Vec<_> = s1.table_names().collect();
         let names2: Vec<_> = s2.table_names().collect();
         assert_eq!(names1, names2);
@@ -476,7 +475,7 @@ mod tests {
         let s = sample_snapshot();
         s.write(dir.path()).unwrap();
         let parquet = dir.path().join("tables/alpha.parquet");
-        // Tamper with one byte. Pick the last byte to avoid header magic.
+ // Tamper with one byte. Pick the last byte to avoid header magic.
         let mut bytes = fs::read(&parquet).unwrap();
         let last = bytes.len() - 1;
         bytes[last] ^= 0xFF;
@@ -492,7 +491,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let mut s = Snapshot::new();
 
-        // Add an execution-DB table (prefix matches db__movesexecution).
+ // Add an execution-DB table (prefix matches db__movesexecution).
         let mut tb = TableBuilder::new(
             "db__movesexecution1__activitytype",
             [("id".to_string(), ColumnKind::Int64)],

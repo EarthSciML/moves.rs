@@ -51,17 +51,17 @@ pub fn start_temp_adjust(
     temperature: f64,
 ) -> f64 {
     if pol_process_id == 11202 || pol_process_id == 11802 {
-        // rate = rate * B * exp(A * (72 - least(temp, 72))) + C
+ // rate = rate * B * exp(A * (72 - least(temp, 72))) + C
         base_value * detail.term_b * (detail.term_a * (72.0 - temperature.min(72.0))).exp()
             + detail.term_c
     } else if detail.is_log {
-        // rate = rate + weight * (B * exp(A * (least(temp, 75) - 75)) + C)
+ // rate = rate + weight * (B * exp(A * (least(temp, 75) - 75)) + C)
         base_value
             + weight_fraction
-                * (detail.term_b * (detail.term_a * (temperature.min(75.0) - 75.0)).exp()
+ * (detail.term_b * (detail.term_a * (temperature.min(75.0) - 75.0)).exp()
                     + detail.term_c)
     } else {
-        // rate = rate + weight * d * (A + d * (B + d * C)),  d = least(temp,75) - 75
+ // rate = rate + weight * d * (A + d * (B + d * C)), d = least(temp,75) - 75
         let d = temperature.min(75.0) - 75.0;
         base_value + weight_fraction * d * (detail.term_a + d * (detail.term_b + d * detail.term_c))
     }
@@ -73,11 +73,11 @@ pub fn start_temp_adjust(
 /// Four cases keyed on the row's process / pollutant / fuel type:
 ///
 /// * PM (process 1/2, pollutant 118/112) — a multiplicative exponential
-///   capped at `1.0` above 72 °F.
+/// capped at `1.0` above 72 °F.
 /// * EV running energy (process 1, fuel type 9, pollutant 91) — a quadratic
-///   cold-temperature adjustment, suppressed for warm light-duty conditions.
+/// cold-temperature adjustment, suppressed for warm light-duty conditions.
 /// * NOx (process 1/90/91, pollutant 3) — a fuel-type-specific temperature
-///   term multiplied by the humidity factor `k`.
+/// term multiplied by the humidity factor `k`.
 /// * everything else — the standard quadratic temperature term.
 ///
 /// `key` supplies the process / pollutant / fuel-type / source-type ids;
@@ -96,7 +96,7 @@ pub fn general_temp_adjust(
     let process_id = key.process_id;
     let pollutant_id = key.pollutant_id;
 
-    // PM: process 1/2, pollutant 118/112.
+ // PM: process 1/2, pollutant 118/112.
     if (process_id == 1 || process_id == 2) && (pollutant_id == 118 || pollutant_id == 112) {
         if temperature <= 72.0 {
             return (detail.term_a * (72.0 - temperature)).exp();
@@ -104,28 +104,28 @@ pub fn general_temp_adjust(
         return 1.0;
     }
 
-    // EV running energy: process 1, fuel type 9, pollutant 91.
+ // EV running energy: process 1, fuel type 9, pollutant 91.
     if process_id == 1 && key.fuel_type_id == 9 && pollutant_id == 91 {
         let mut adj = (temperature - 72.0) * (detail.term_a + detail.term_b * (temperature - 72.0));
         if adj < 0.0 {
             adj = 0.0;
         }
-        // Light-duty AC usage is set by the heat index, not this cold term.
+ // Light-duty AC usage is set by the heat index, not this cold term.
         if key.source_type_id < 40 && heat_index > 67.0 {
             adj = 0.0;
         }
-        // At project scale a negative base rate flips the adjustment sign so
-        // regen braking is not assumed more effective when cold.
+ // At project scale a negative base rate flips the adjustment sign so
+ // regen braking is not assumed more effective when cold.
         if is_project && baserate < 0.0 {
             return 1.0 - adj;
         }
         return 1.0 + adj;
     }
 
-    // NOx: process 1/90/91, pollutant 3.
+ // NOx: process 1/90/91, pollutant 3.
     if (process_id == 1 || process_id == 90 || process_id == 91) && pollutant_id == 3 {
         let temp_adjust = if key.fuel_type_id == 2 {
-            // No diesel adjustment above 25 °C (77 °F).
+ // No diesel adjustment above 25 °C (77 °F).
             if temperature > 77.0 {
                 0.0
             } else {
@@ -137,7 +137,7 @@ pub fn general_temp_adjust(
         return (1.0 + temp_adjust) * k;
     }
 
-    // Standard quadratic temperature term.
+ // Standard quadratic temperature term.
     1.0 + (temperature - 75.0) * (detail.term_a + (temperature - 75.0) * detail.term_b)
 }
 
@@ -337,8 +337,8 @@ pub fn process_fuel_block(
         fuel_type_id: fb.key.fuel_type_id,
     };
 
-    // Extended Idle (process 90): scale mean base rates by the opMode-200
-    // fraction. Emission rates are left untouched.
+ // Extended Idle (process 90): scale mean base rates by the opMode-200
+ // fraction. Emission rates are left untouched.
     if fb.key.process_id == 90 && !prepared.extended_idle_emission_rate_fraction.is_empty() {
         if let Some(&adjust) = prepared
             .extended_idle_emission_rate_fraction
@@ -347,8 +347,8 @@ pub fn process_fuel_block(
             scale_mean_base_rates(op_mode, adjust);
         }
     }
-    // APU (process 91, opMode 201): scale mean base rates by the opMode-201
-    // fraction.
+ // APU (process 91, opMode 201): scale mean base rates by the opMode-201
+ // fraction.
     if fb.key.process_id == 91
         && op_mode_id == 201
         && !prepared.apu_emission_rate_fraction.is_empty()
@@ -357,10 +357,10 @@ pub fn process_fuel_block(
             scale_mean_base_rates(op_mode, adjust);
         }
     }
-    // Shorepower (process 91, opMode 203): retag the process 91 -> 93 so the
-    // output is not aggregated with APU, then scale mean base rates. The
-    // process is retagged whether or not a fraction is found; pol_process_id
-    // is deliberately not recomputed (see the module docs).
+ // Shorepower (process 91, opMode 203): retag the process 91 -> 93 so the
+ // output is not aggregated with APU, then scale mean base rates. The
+ // process is retagged whether or not a fraction is found; pol_process_id
+ // is deliberately not recomputed (see the module docs).
     if fb.key.process_id == 91
         && op_mode_id == 203
         && !prepared.shorepower_emission_rate_fraction.is_empty()
@@ -371,7 +371,7 @@ pub fn process_fuel_block(
         }
     }
 
-    // Start temperature adjustment (process 2).
+ // Start temperature adjustment (process 2).
     if fb.key.process_id == 2 {
         if let (Some(zmh), true, Some(ppmy)) = (zmh, fuel_type_known, ppmy) {
             let sta = prepared
@@ -387,8 +387,8 @@ pub fn process_fuel_block(
                 let pp = fb.key.pol_process_id;
                 let temp = zmh.temperature;
                 for br in &mut op_mode.base_rates {
-                    // Mean base rates weight by the inventory opMode fraction;
-                    // emission rates weight by the rate opMode fraction.
+ // Mean base rates weight by the inventory opMode fraction;
+ // emission rates weight by the rate opMode fraction.
                     br.mean_base_rate =
                         start_temp_adjust(&sta, br.mean_base_rate, pp, general_fraction, temp);
                     br.mean_base_rate_im =
@@ -435,8 +435,8 @@ pub fn process_fuel_block(
         }
     }
 
-    // General fuel ratio: blend the normal and GPA fuel-effect ratios by the
-    // county GPA fraction, then scale every rate field.
+ // General fuel ratio: blend the normal and GPA fuel-effect ratios by the
+ // county GPA fraction, then scale every rate field.
     if !prepared.general_fuel_ratio.is_empty() {
         for br in &mut op_mode.base_rates {
             let gr = prepared.general_fuel_ratio.get(&GeneralFuelRatioKey {
@@ -459,8 +459,8 @@ pub fn process_fuel_block(
         }
     }
 
-    // Criteria ratio (running / start exhaust): blend by GPA fraction and
-    // scale every rate field.
+ // Criteria ratio (running / start exhaust): blend by GPA fraction and
+ // scale every rate field.
     if (fb.key.process_id == 1 || fb.key.process_id == 2) && !prepared.criteria_ratio.is_empty() {
         for br in &mut op_mode.base_rates {
             let cr = prepared
@@ -479,9 +479,9 @@ pub fn process_fuel_block(
         }
     }
 
-    // Temperature + humidity adjustment. The detail is looked up by the exact
-    // regClassID, then by the regClassID-0 wildcard, then defaults to a
-    // zero-valued detail (a no-op adjustment).
+ // Temperature + humidity adjustment. The detail is looked up by the exact
+ // regClassID, then by the regClassID-0 wildcard, then defaults to a
+ // zero-valued detail (a no-op adjustment).
     if let (true, Some(zmh)) = (fuel_type_known, zmh) {
         let ta = prepared
             .temperature_adjustment
@@ -503,8 +503,8 @@ pub fn process_fuel_block(
             })
             .copied()
             .unwrap_or_default();
-        // The humidity factor only matters for the NOx branch, but the Go
-        // computes it whenever the NOx-humidity row exists.
+ // The humidity factor only matters for the NOx branch, but the Go
+ // computes it whenever the NOx-humidity row exists.
         let k = nha.map_or(1.0, |nha| calculate_nox_k(&zmh, nha));
         for br in &mut op_mode.base_rates {
             let factor = general_temp_adjust(
@@ -520,8 +520,8 @@ pub fn process_fuel_block(
         }
     }
 
-    // Air conditioning (every process except start exhaust): add the
-    // AC-adjusted rate, scaled by the AC factor.
+ // Air conditioning (every process except start exhaust): add the
+ // AC-adjusted rate, scaled by the AC factor.
     if fb.key.process_id != 2 {
         let ac = prepared
             .zone_ac_factor
@@ -534,9 +534,9 @@ pub fn process_fuel_block(
         if let Some(factor) = ac {
             if factor > 0.0 {
                 for br in &mut op_mode.base_rates {
-                    // A negative base rate (only reachable at project scale)
-                    // pairs with a negative AC adjustment, so the adjustment
-                    // is subtracted to move the rate toward zero.
+ // A negative base rate (only reachable at project scale)
+ // pairs with a negative AC adjustment, so the adjustment
+ // is subtracted to move the rate toward zero.
                     if br.mean_base_rate >= 0.0 || !flags.is_project {
                         br.mean_base_rate += factor * br.mean_base_rate_ac_adj;
                         br.mean_base_rate_im += factor * br.mean_base_rate_im_ac_adj;
@@ -553,7 +553,7 @@ pub fn process_fuel_block(
         }
     }
 
-    // I/M programs: blend the I/M and non-I/M rates by the coverage fraction.
+ // I/M programs: blend the I/M and non-I/M rates by the coverage fraction.
     if let Some(&im_adjust) = prepared.im_coverage.get(&ImCoverageKey {
         pol_process_id: fb.key.pol_process_id,
         model_year_id: fb.key.model_year_id,
@@ -568,8 +568,8 @@ pub fn process_fuel_block(
         }
     }
 
-    // Emission rate adjustment — applied before the E85 duplication so the
-    // duplicated records inherit the adjusted rate.
+ // Emission rate adjustment — applied before the E85 duplication so the
+ // duplicated records inherit the adjusted rate.
     if flags.emission_rate_adjustment && !prepared.emission_rate_adjustment.is_empty() {
         if let Some(&a) = prepared
             .emission_rate_adjustment
@@ -588,16 +588,16 @@ pub fn process_fuel_block(
         }
     }
 
-    // E85 THC: where an E85 formulation (subtype 51/52) carries an alternate
-    // criteria ratio, emit a 10000-offset pollutant scaled by altRatio/ratio.
+ // E85 THC: where an E85 formulation (subtype 51/52) carries an alternate
+ // criteria ratio, emit a 10000-offset pollutant scaled by altRatio/ratio.
     let e85_block = build_e85_block(&fb, prepared, gpa_fract);
 
     let mut blocks = vec![fb];
     blocks.extend(e85_block);
 
-    // EV efficiency: divide the rate through the battery and charging
-    // efficiencies. Applied to the E85 block as well, matching the Go loop
-    // over every fuel block of the unit.
+ // EV efficiency: divide the rate through the battery and charging
+ // efficiencies. Applied to the E85 block as well, matching the Go loop
+ // over every fuel block of the unit.
     if flags.ev_efficiency && !prepared.ev_efficiency.is_empty() {
         for block in &mut blocks {
             apply_ev_efficiency(block, prepared);
@@ -640,7 +640,7 @@ fn build_e85_block(fb: &FuelBlock, prepared: &PreparedTables, gpa_fract: f64) ->
         ) else {
             continue;
         };
-        // Scale the E10-RVP-based effect to the E85-RVP-based effect.
+ // Scale the E10-RVP-based effect to the E85-RVP-based effect.
         let ar = acr.ratio + gpa_fract * (acr.ratio_gpa - acr.ratio);
         let r = cr.ratio + gpa_fract * (cr.ratio_gpa - cr.ratio);
         let ar_to_r = if r > 0.0 { ar / r } else { 0.0 };
@@ -658,7 +658,7 @@ fn build_e85_block(fb: &FuelBlock, prepared: &PreparedTables, gpa_fract: f64) ->
     }
 
     new_op_mode.map(|op_mode| {
-        // NewFuelBlock copies the key, then re-tags the pollutant 10000-up.
+ // NewFuelBlock copies the key, then re-tags the pollutant 10000-up.
         let mut key = fb.key;
         key.pollutant_id += 10000;
         key.pol_process_id = key.pollutant_id * 100 + key.process_id;
@@ -711,14 +711,14 @@ mod tests {
 
     #[test]
     fn start_temp_adjust_pm_multiplicative_form() {
-        // polProcessID 11202: rate*B*exp(A*(72-least(temp,72)))+C.
-        // A=0 -> exp(0)=1, so result = base*B + C.
+ // polProcessID 11202: rate*B*exp(A*(72-least(temp,72)))+C.
+ // A=0 -> exp(0)=1, so result = base*B + C.
         let d = detail(0.0, 3.0, 7.0, false, false);
         assert_eq!(
             start_temp_adjust(&d, 2.0, 11202, 0.0, 50.0),
             2.0 * 3.0 + 7.0
         );
-        // temp above 72 is clamped to 72, still exp(0).
+ // temp above 72 is clamped to 72, still exp(0).
         assert_eq!(
             start_temp_adjust(&d, 2.0, 11802, 0.0, 90.0),
             2.0 * 3.0 + 7.0
@@ -727,16 +727,16 @@ mod tests {
 
     #[test]
     fn start_temp_adjust_log_form_weights_by_fraction() {
-        // isLog: base + weight*(B*exp(A*(least(temp,75)-75))+C). A=0 -> exp 0.
+ // isLog: base + weight*(B*exp(A*(least(temp,75)-75))+C). A=0 -> exp 0.
         let d = detail(0.0, 5.0, 1.0, true, false);
-        // weight 0.5, temp 75 -> base + 0.5*(5*1 + 1) = base + 3.
+ // weight 0.5, temp 75 -> base + 0.5*(5*1 + 1) = base + 3.
         assert_eq!(start_temp_adjust(&d, 10.0, 301, 0.5, 75.0), 13.0);
     }
 
     #[test]
     fn start_temp_adjust_poly_and_default_branches_are_identical() {
-        // The Go POLY branch and its fallback are byte-identical; is_poly
-        // must not change the result.
+ // The Go POLY branch and its fallback are byte-identical; is_poly
+ // must not change the result.
         let poly = detail(1.0, 2.0, 3.0, false, true);
         let neither = detail(1.0, 2.0, 3.0, false, false);
         let got_poly = start_temp_adjust(&poly, 4.0, 301, 1.0, 60.0);
@@ -754,7 +754,7 @@ mod tests {
             humidity_up_bound: 20.0,
             humidity_units: String::new(),
         };
-        // specific humidity 100 clamps to 20: 1 - 0.01*(20-10.71).
+ // specific humidity 100 clamps to 20: 1 - 0.01*(20-10.71).
         let zmh = ZoneMonthHourDetail {
             specific_humidity: 100.0,
             ..ZoneMonthHourDetail::default()
@@ -787,14 +787,14 @@ mod tests {
             general_temp_adjust(&ta, &key, 1.0, 90.0, 0.0, 1.0, false),
             1.0
         );
-        // At/below 72 -> exp(A*(72-temp)).
+ // At/below 72 -> exp(A*(72-temp)).
         let got = general_temp_adjust(&ta, &key, 1.0, 72.0, 0.0, 1.0, false);
         assert_eq!(got, 1.0); // exp(0)
     }
 
     #[test]
     fn general_temp_adjust_nox_multiplies_by_humidity_k() {
-        // NOx, non-diesel: (1 + (temp-75)*(A+(temp-75)*B)) * k. temp 75 -> 1*k.
+ // NOx, non-diesel: (1 + (temp-75)*(A+(temp-75)*B)) * k. temp 75 -> 1*k.
         let ta = TemperatureAdjustmentDetail {
             term_a: 0.1,
             term_b: 0.2,
@@ -814,7 +814,7 @@ mod tests {
 
     #[test]
     fn general_temp_adjust_ev_project_negative_baserate_flips_sign() {
-        // EV running energy, project scale, negative base rate -> 1 - adj.
+ // EV running energy, project scale, negative base rate -> 1 - adj.
         let ta = TemperatureAdjustmentDetail {
             term_a: 1.0,
             term_b: 0.0,
@@ -827,12 +827,12 @@ mod tests {
             source_type_id: 62, // >= 40 so the heat-index suppression is off
             ..BlockKey::default()
         };
-        // temp 73: adj = (73-72)*(1 + 0) = 1. project + negative baserate.
+ // temp 73: adj = (73-72)*(1 + 0) = 1. project + negative baserate.
         assert_eq!(
             general_temp_adjust(&ta, &key, 1.0, 73.0, 0.0, -5.0, true),
             0.0
         );
-        // Non-project, same inputs -> 1 + adj.
+ // Non-project, same inputs -> 1 + adj.
         assert_eq!(
             general_temp_adjust(&ta, &key, 1.0, 73.0, 0.0, -5.0, false),
             2.0

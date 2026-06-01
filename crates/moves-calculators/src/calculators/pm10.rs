@@ -1,5 +1,5 @@
 //! Port of `PM10EmissionCalculator` and `PM10BrakeTireCalculator` — the two
-//! MOVES PM10 calculators — migration plan Phase 3, Task 55.
+//! MOVES PM10 calculators — .
 //!
 //! Java/SQL source:
 //! `gov/epa/otaq/moves/master/implementation/ghg/PM10EmissionCalculator.java`
@@ -15,7 +15,7 @@
 //!
 //! ```text
 //! PM10 emissionQuant = PM2.5 emissionQuant × PM10PM25Ratio
-//! PM10 emissionRate  = PM2.5 emissionRate  × PM10PM25Ratio
+//! PM10 emissionRate = PM2.5 emissionRate × PM10PM25Ratio
 //! ```
 //!
 //! # Two calculators, one algorithm
@@ -53,10 +53,10 @@
 //! The SQL resolves a worker-output row's ratio with a two-step inner join:
 //!
 //! 1. `PM10PollutantProcessAssoc` maps the source row's `processID` plus the
-//!    target PM10 `pollutantID` to a `polProcessID`.
+//! target PM10 `pollutantID` to a `polProcessID`.
 //! 2. `PM10EmissionRatio` is matched on that `polProcessID`, the source row's
-//!    `sourceTypeID` and `fuelTypeID`, and a model-year range that brackets
-//!    its `modelYearID`.
+//! `sourceTypeID` and `fuelTypeID`, and a model-year range that brackets
+//! its `modelYearID`.
 //!
 //! Every join is an `INNER JOIN`: a worker-output row that resolves no ratio
 //! is silently dropped, which `compute_pm10` reproduces with map lookups that
@@ -98,34 +98,33 @@
 //! # Fidelity notes
 //!
 //! * **`PM10PM25Ratio` is `FLOAT`.** MOVES stores the ratio in a 32-bit
-//!   `FLOAT` column; it is a model *input*, already `f32`-quantised before
-//!   [`calculate`](PM10EmissionCalculator::calculate) sees it, so the port
-//!   models it as `f64` and the quantisation is the data plane's concern —
-//!   matching the `SO2Calculator` treatment of its `FLOAT` input columns. The
-//!   product is written to a `DOUBLE` temp column (`PM10MOVESWorkerOutputTemp`),
-//!   so no `f32` truncation occurs on the result and the port's `f64` multiply
-//!   matches MariaDB's `DOUBLE` arithmetic.
+//! `FLOAT` column; it is a model *input*, already `f32`-quantised before
+//! [`calculate`](PM10EmissionCalculator::calculate) sees it, so the port
+//! models it as `f64` and the quantisation is the data plane's concern//! matching the `SO2Calculator` treatment of its `FLOAT` input columns. The
+//! product is written to a `DOUBLE` temp column (`PM10MOVESWorkerOutputTemp`),
+//! so no `f32` truncation occurs on the result and the port's `f64` multiply
+//! matches MariaDB's `DOUBLE` arithmetic.
 //! * **No division.** The processing pipeline is a single multiplication, so
-//!   the MariaDB `int / int` rounding gotcha does not arise.
+//! the MariaDB `int / int` rounding gotcha does not arise.
 //! * **`emissionQuant` / `emissionRate` are `DOUBLE NULL`.** The port models
-//!   both as a present `f64`; a `NULL` source value (which would propagate a
-//!   SQL `NULL` through the product) is a data-plane (Task 50) concern.
+//! both as a present `f64`; a `NULL` source value (which would propagate a
+//! SQL `NULL` through the product) is a data-plane concern.
 //!
-//! # Scope and data plane (Task 50)
+//! # Scope and data plane
 //!
 //! [`calculate`](PM10EmissionCalculator::calculate) ports each SQL script's
 //! "Processing" section. Its [`Pm10Inputs`] argument is the set of tables the
-//! "Extract Data" section produces; a future Task 50 (`DataFrameStore`)
+//! "Extract Data" section produces; a future (`DataFrameStore`)
 //! wiring populates it from the per-run filtered execution database and the
 //! upstream calculator's `MOVESWorkerOutput` rows.
 //!
 //! `MOVESRunID`, `iterationID` and `SCC` are pass-through columns the SQL
 //! copies verbatim from the source row; following the `SO2Calculator`
-//! precedent they are not modelled here — the Task 50 output wiring carries
+//! precedent they are not modelled here — the output wiring carries
 //! them.
 //!
 //! [`Calculator::execute`] receives a [`CalculatorContext`] whose
-//! `ExecutionTables` / `ScratchNamespace` are Phase 2 placeholders, so it
+//! `ExecutionTables` / `ScratchNamespace` are placeholders, so it
 //! cannot yet read the input tables nor emit `MOVESWorkerOutput`. The numeric
 //! algorithm is fully ported and unit-tested on
 //! [`calculate`](PM10EmissionCalculator::calculate); `execute` is a
@@ -166,7 +165,7 @@ const TIREWEAR_PM10_POLLUTANT_ID: i32 = 107;
 // ===========================================================================
 // Input / output rows — plain Rust mirrors of the tables each SQL script's
 // "Extract Data" section pulls and the `MOVESWorkerOutput` rows it produces.
-// Following the Phase 3 convention, every `INT`/`SMALLINT` identifier is an
+// Following the convention, every `INT`/`SMALLINT` identifier is an
 // `i32` and every `FLOAT`/`DOUBLE` quantity is an `f64`.
 // ===========================================================================
 
@@ -182,48 +181,48 @@ const TIREWEAR_PM10_POLLUTANT_ID: i32 = 107;
 /// copies verbatim; they are not modelled (see the [module documentation](self)).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MovesWorkerOutputRow {
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `dayID`.
+ /// `dayID`.
     pub day_id: i32,
-    /// `hourID`.
+ /// `hourID`.
     pub hour_id: i32,
-    /// `stateID`.
+ /// `stateID`.
     pub state_id: i32,
-    /// `countyID`.
+ /// `countyID`.
     pub county_id: i32,
-    /// `zoneID`.
+ /// `zoneID`.
     pub zone_id: i32,
-    /// `linkID`.
+ /// `linkID`.
     pub link_id: i32,
-    /// `pollutantID` — a PM2.5 pollutant on an input row, the corresponding
-    /// PM10 pollutant on an output row.
+ /// `pollutantID` — a PM2.5 pollutant on an input row, the corresponding
+ /// PM10 pollutant on an output row.
     pub pollutant_id: i32,
-    /// `processID` — the emission process; carried unchanged onto the PM10 row.
+ /// `processID` — the emission process; carried unchanged onto the PM10 row.
     pub process_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `regClassID`.
+ /// `regClassID`.
     pub reg_class_id: i32,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `modelYearID`.
+ /// `modelYearID`.
     pub model_year_id: i32,
-    /// `roadTypeID`.
+ /// `roadTypeID`.
     pub road_type_id: i32,
-    /// `emissionQuant` — the emission quantity.
+ /// `emissionQuant` — the emission quantity.
     pub emission_quant: f64,
-    /// `emissionRate` — the emission rate.
+ /// `emissionRate` — the emission rate.
     pub emission_rate: f64,
 }
 
 impl MovesWorkerOutputRow {
-    /// The integer dimension tuple — every column except the two emission
-    /// values. Used to sort the output deterministically: MOVES leaves
-    /// `MOVESWorkerOutput` physically unordered (the SQL `INSERT … SELECT`
-    /// has no `ORDER BY`), so the port sorts purely for reproducibility.
+ /// The integer dimension tuple — every column except the two emission
+ /// values. Used to sort the output deterministically: MOVES leaves
+ /// `MOVESWorkerOutput` physically unordered (the SQL `INSERT … SELECT`
+ /// has no `ORDER BY`), so the port sorts purely for reproducibility.
     fn dimension_key(&self) -> [i32; 15] {
         [
             self.year_id,
@@ -253,19 +252,19 @@ impl MovesWorkerOutputRow {
 /// not modelled.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Pm10EmissionRatioRow {
-    /// `polProcessID` — `pollutantID × 100 + processID` of the PM10 pollutant;
-    /// joins to [`Pm10PollutantProcessAssocRow::pol_process_id`].
+ /// `polProcessID` — `pollutantID × 100 + processID` of the PM10 pollutant;
+ /// joins to [`Pm10PollutantProcessAssocRow::pol_process_id`].
     pub pol_process_id: i32,
-    /// `sourceTypeID` — the source type the ratio applies to.
+ /// `sourceTypeID` — the source type the ratio applies to.
     pub source_type_id: i32,
-    /// `fuelTypeID` — the fuel type the ratio applies to.
+ /// `fuelTypeID` — the fuel type the ratio applies to.
     pub fuel_type_id: i32,
-    /// `minModelYearID` — inclusive lower bound of the model-year range.
+ /// `minModelYearID` — inclusive lower bound of the model-year range.
     pub min_model_year_id: i32,
-    /// `maxModelYearID` — inclusive upper bound of the model-year range.
+ /// `maxModelYearID` — inclusive upper bound of the model-year range.
     pub max_model_year_id: i32,
-    /// `PM10PM25Ratio` — the PM10 ÷ PM2.5 multiplier. `FLOAT` in MOVES (see
-    /// the [module fidelity notes](self)).
+ /// `PM10PM25Ratio` — the PM10 ÷ PM2.5 multiplier. `FLOAT` in MOVES (see
+ /// the [module fidelity notes](self)).
     pub pm10_pm25_ratio: f64,
 }
 
@@ -277,11 +276,11 @@ pub struct Pm10EmissionRatioRow {
 /// `isAffectedByEvapIM` columns are not modelled.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Pm10PollutantProcessAssocRow {
-    /// `polProcessID` — `pollutantID × 100 + processID`.
+ /// `polProcessID` — `pollutantID × 100 + processID`.
     pub pol_process_id: i32,
-    /// `processID` — the emission process.
+ /// `processID` — the emission process.
     pub process_id: i32,
-    /// `pollutantID` — the PM10 pollutant.
+ /// `pollutantID` — the PM10 pollutant.
     pub pollutant_id: i32,
 }
 
@@ -289,20 +288,20 @@ pub struct Pm10PollutantProcessAssocRow {
 /// [`PM10BrakeTireCalculator::calculate`] — the tables each SQL script's
 /// "Extract Data" section produces, as plain row vectors.
 ///
-/// A future Task 50 (`DataFrameStore`) wiring populates this from the per-run
+/// A future (`DataFrameStore`) wiring populates this from the per-run
 /// filtered execution database (`PM10EmissionRatio`, `PollutantProcessAssoc`)
 /// and the upstream calculator's `MOVESWorkerOutput`; until then it is the
 /// explicit data-plane contract the unit tests build directly.
 #[derive(Debug, Clone, Default)]
 pub struct Pm10Inputs {
-    /// `MOVESWorkerOutput` rows — the upstream calculator's PM2.5 records. A
-    /// row whose pollutant is not an active PM2.5 source for the calculator is
-    /// ignored, as the SQL's `WHERE` pollutant-pair block does.
+ /// `MOVESWorkerOutput` rows — the upstream calculator's PM2.5 records. A
+ /// row whose pollutant is not an active PM2.5 source for the calculator is
+ /// ignored, as the SQL's `WHERE` pollutant-pair block does.
     pub worker_output: Vec<MovesWorkerOutputRow>,
-    /// `PM10EmissionRatio` rows — the PM10-to-PM2.5 ratio lookup table.
+ /// `PM10EmissionRatio` rows — the PM10-to-PM2.5 ratio lookup table.
     pub pm10_emission_ratio: Vec<Pm10EmissionRatioRow>,
-    /// `PM10PollutantProcessAssoc` rows — the legal `(PM10 pollutant, process)`
-    /// pairs, resolving each to its ratio-keying `polProcessID`.
+ /// `PM10PollutantProcessAssoc` rows — the legal `(PM10 pollutant, process)`
+ /// pairs, resolving each to its ratio-keying `polProcessID`.
     pub pm10_pollutant_process_assoc: Vec<Pm10PollutantProcessAssocRow>,
 }
 
@@ -675,9 +674,9 @@ fn build_inputs(ctx: &CalculatorContext) -> Result<Pm10Inputs, Error> {
 /// `PM10BrakeTireCalculator` carries two (`116 → 106`, `117 → 107`).
 #[derive(Debug, Clone, Copy)]
 struct Pm10PollutantPair {
-    /// `mwo.pollutantID` — the PM2.5 pollutant of the source worker-output row.
+ /// `mwo.pollutantID` — the PM2.5 pollutant of the source worker-output row.
     source_pm25: i32,
-    /// `ppa.pollutantID` — the PM10 pollutant of the produced row.
+ /// `ppa.pollutantID` — the PM10 pollutant of the produced row.
     output_pm10: i32,
 }
 
@@ -695,20 +694,20 @@ fn compute_pm10(
     inputs: &Pm10Inputs,
     pollutant_pairs: &[Pm10PollutantPair],
 ) -> Vec<MovesWorkerOutputRow> {
-    // PM10PollutantProcessAssoc indexed by (processID, pollutantID) →
-    // polProcessID. The SQL extract is a `SELECT DISTINCT` and
-    // PollutantProcessAssoc's primary key makes polProcessID determine
-    // (pollutant, process), so each (processID, pollutantID) cell resolves
-    // exactly one polProcessID.
+ // PM10PollutantProcessAssoc indexed by (processID, pollutantID) →
+ // polProcessID. The SQL extract is a `SELECT DISTINCT` and
+ // PollutantProcessAssoc's primary key makes polProcessID determine
+ // (pollutant, process), so each (processID, pollutantID) cell resolves
+ // exactly one polProcessID.
     let ppa_index: HashMap<(i32, i32), i32> = inputs
         .pm10_pollutant_process_assoc
         .iter()
         .map(|p| ((p.process_id, p.pollutant_id), p.pol_process_id))
         .collect();
 
-    // PM10EmissionRatio indexed by (polProcessID, sourceTypeID, fuelTypeID) →
-    // the rows for that cell. The table's unique index allows several
-    // model-year ranges per cell, so the value is a list.
+ // PM10EmissionRatio indexed by (polProcessID, sourceTypeID, fuelTypeID) →
+ // the rows for that cell. The table's unique index allows several
+ // model-year ranges per cell, so the value is a list.
     let mut ratio_index: HashMap<(i32, i32, i32), Vec<&Pm10EmissionRatioRow>> = HashMap::new();
     for ratio in &inputs.pm10_emission_ratio {
         ratio_index
@@ -723,20 +722,20 @@ fn compute_pm10(
 
     let mut out: Vec<MovesWorkerOutputRow> = Vec::new();
     for mwo in &inputs.worker_output {
-        // WHERE OR-block: the source row's PM2.5 pollutant selects the PM10
-        // pollutant of the produced row. A row whose pollutant is not an
-        // active PM2.5 source matches no pair and is dropped.
+ // WHERE OR-block: the source row's PM2.5 pollutant selects the PM10
+ // pollutant of the produced row. A row whose pollutant is not an
+ // active PM2.5 source matches no pair and is dropped.
         for pair in pollutant_pairs
             .iter()
             .filter(|p| p.source_pm25 == mwo.pollutant_id)
         {
-            // INNER JOIN PM10PollutantProcessAssoc ON processID, with the
-            // WHERE pinning ppa.pollutantID to the target PM10 pollutant.
+ // INNER JOIN PM10PollutantProcessAssoc ON processID, with the
+ // WHERE pinning ppa.pollutantID to the target PM10 pollutant.
             let Some(&pol_process_id) = ppa_index.get(&(mwo.process_id, pair.output_pm10)) else {
                 continue;
             };
-            // INNER JOIN PM10EmissionRatio ON polProcessID, sourceTypeID,
-            // fuelTypeID, and a model-year range bracketing modelYearID.
+ // INNER JOIN PM10EmissionRatio ON polProcessID, sourceTypeID,
+ // fuelTypeID, and a model-year range bracketing modelYearID.
             let Some(ratios) =
                 ratio_index.get(&(pol_process_id, mwo.source_type_id, mwo.fuel_type_id))
             else {
@@ -748,9 +747,9 @@ fn compute_pm10(
                 {
                     continue;
                 }
-                // PM10 = PM2.5 × PM10PM25Ratio, applied to both the quantity
-                // and the rate; every other column is carried from the source
-                // row, with only the pollutant relabelled to its PM10 sibling.
+ // PM10 = PM2.5 × PM10PM25Ratio, applied to both the quantity
+ // and the rate; every other column is carried from the source
+ // row, with only the pollutant relabelled to its PM10 sibling.
                 out.push(MovesWorkerOutputRow {
                     pollutant_id: pair.output_pm10,
                     emission_quant: mwo.emission_quant * ratio.pm10_pm25_ratio,
@@ -788,8 +787,7 @@ static INPUT_TABLES: &[&str] = &[
 // The exhaust PM10 calculator.
 // ===========================================================================
 
-/// The active `(PM2.5, PM10)` pollutant pair of `PM10EmissionCalculator` —
-/// Total Exhaust PM2.5 (110) → Total Exhaust PM10 (100).
+/// The active `(PM2.5, PM10)` pollutant pair of `PM10EmissionCalculator`/// Total Exhaust PM2.5 (110) → Total Exhaust PM10 (100).
 ///
 /// The Java class's organic-carbon (111 → 101), elemental-carbon (112 → 102)
 /// and sulfate (115 → 105) registrations are all commented out, so only Total
@@ -838,8 +836,7 @@ static EMISSION_REGISTRATIONS: &[PollutantProcessAssociation] = &[
     },
 ];
 
-/// The upstream calculator `PM10EmissionCalculator` chains off —
-/// `SulfatePMCalculator`, the producer of Total PM2.5 (pollutant 110) in the
+/// The upstream calculator `PM10EmissionCalculator` chains off/// `SulfatePMCalculator`, the producer of Total PM2.5 (pollutant 110) in the
 /// pinned runtime. `calculator-dag.json` records
 /// `depends_on: ["SulfatePMCalculator"]`.
 static EMISSION_UPSTREAM: &[&str] = &["SulfatePMCalculator"];
@@ -855,22 +852,22 @@ static EMISSION_UPSTREAM: &[&str] = &["SulfatePMCalculator"];
 pub struct PM10EmissionCalculator;
 
 impl PM10EmissionCalculator {
-    /// Stable module name — matches the Java class and the chain-DAG entry.
+ /// Stable module name — matches the Java class and the chain-DAG entry.
     pub const NAME: &'static str = EMISSION_CALCULATOR_NAME;
 
-    /// Construct the calculator.
+ /// Construct the calculator.
     #[must_use]
     pub fn new() -> Self {
         Self
     }
 
-    /// Compute the Total Exhaust PM10 rows — the port of the
-    /// `PM10EmissionCalculator.sql` "Processing" section.
-    ///
-    /// Each `MOVESWorkerOutput` row carrying Total PM2.5 (pollutant 110) is
-    /// scaled by its `PM10EmissionRatio` into a Total PM10 (pollutant 100)
-    /// row; a row that resolves no ratio is dropped. The result is sorted by
-    /// its integer dimension columns for deterministic output.
+ /// Compute the Total Exhaust PM10 rows — the port of the
+ /// `PM10EmissionCalculator.sql` "Processing" section.
+ ///
+ /// Each `MOVESWorkerOutput` row carrying Total PM2.5 (pollutant 110) is
+ /// scaled by its `PM10EmissionRatio` into a Total PM10 (pollutant 100)
+ /// row; a row that resolves no ratio is dropped. The result is sorted by
+ /// its integer dimension columns for deterministic output.
     #[must_use]
     pub fn calculate(&self, inputs: &Pm10Inputs) -> Vec<MovesWorkerOutputRow> {
         compute_pm10(inputs, EMISSION_POLLUTANT_PAIRS)
@@ -882,10 +879,10 @@ impl Calculator for PM10EmissionCalculator {
         Self::NAME
     }
 
-    /// `PM10EmissionCalculator` is a chained calculator: it does not subscribe
-    /// to the MasterLoop directly but fires when its upstream
-    /// `SulfatePMCalculator` does. `calculator-dag.json` records
-    /// `subscribes_directly: false` and an empty `subscriptions` list.
+ /// `PM10EmissionCalculator` is a chained calculator: it does not subscribe
+ /// to the MasterLoop directly but fires when its upstream
+ /// `SulfatePMCalculator` does. `calculator-dag.json` records
+ /// `subscribes_directly: false` and an empty `subscriptions` list.
     fn subscriptions(&self) -> &[CalculatorSubscription] {
         NO_SUBSCRIPTIONS
     }
@@ -894,8 +891,7 @@ impl Calculator for PM10EmissionCalculator {
         EMISSION_REGISTRATIONS
     }
 
-    /// `PM10EmissionCalculator` chains off `SulfatePMCalculator` —
-    /// `calculator-dag.json` records `depends_on: ["SulfatePMCalculator"]`.
+ /// `PM10EmissionCalculator` chains off `SulfatePMCalculator` /// `calculator-dag.json` records `depends_on: ["SulfatePMCalculator"]`.
     fn upstream(&self) -> &[&'static str] {
         EMISSION_UPSTREAM
     }
@@ -916,7 +912,7 @@ impl Calculator for PM10EmissionCalculator {
 // ===========================================================================
 
 /// The two active `(PM2.5, PM10)` pollutant pairs of `PM10BrakeTireCalculator`
-/// — Brakewear PM2.5 (116) → Brakewear PM10 (106) and Tirewear PM2.5 (117) →
+/// Brakewear PM2.5 (116) → Brakewear PM10 (106) and Tirewear PM2.5 (117) →
 /// Tirewear PM10 (107).
 static BRAKE_TIRE_POLLUTANT_PAIRS: &[Pm10PollutantPair] = &[
     Pm10PollutantPair {
@@ -947,8 +943,7 @@ static BRAKE_TIRE_REGISTRATIONS: &[PollutantProcessAssociation] = &[
     },
 ];
 
-/// The upstream calculator `PM10BrakeTireCalculator` chains off —
-/// `BaseRateCalculator`, the producer of brake/tire PM2.5 (pollutants 116 /
+/// The upstream calculator `PM10BrakeTireCalculator` chains off/// `BaseRateCalculator`, the producer of brake/tire PM2.5 (pollutants 116 /
 /// 117) in the pinned runtime. `calculator-dag.json` records
 /// `depends_on: ["BaseRateCalculator"]`.
 static BRAKE_TIRE_UPSTREAM: &[&str] = &["BaseRateCalculator"];
@@ -964,23 +959,23 @@ static BRAKE_TIRE_UPSTREAM: &[&str] = &["BaseRateCalculator"];
 pub struct PM10BrakeTireCalculator;
 
 impl PM10BrakeTireCalculator {
-    /// Stable module name — matches the Java class and the chain-DAG entry.
+ /// Stable module name — matches the Java class and the chain-DAG entry.
     pub const NAME: &'static str = BRAKE_TIRE_CALCULATOR_NAME;
 
-    /// Construct the calculator.
+ /// Construct the calculator.
     #[must_use]
     pub fn new() -> Self {
         Self
     }
 
-    /// Compute the brake/tire PM10 rows — the port of the
-    /// `PM10BrakeTireCalculator.sql` "Processing" section.
-    ///
-    /// Each `MOVESWorkerOutput` row carrying brake-wear (116) or tire-wear
-    /// (117) PM2.5 is scaled by its `PM10EmissionRatio` into the PM10 sibling
-    /// pollutant (106 / 107); a row that resolves no ratio is dropped. The
-    /// result is sorted by its integer dimension columns for deterministic
-    /// output.
+ /// Compute the brake/tire PM10 rows — the port of the
+ /// `PM10BrakeTireCalculator.sql` "Processing" section.
+ ///
+ /// Each `MOVESWorkerOutput` row carrying brake-wear (116) or tire-wear
+ /// (117) PM2.5 is scaled by its `PM10EmissionRatio` into the PM10 sibling
+ /// pollutant (106 / 107); a row that resolves no ratio is dropped. The
+ /// result is sorted by its integer dimension columns for deterministic
+ /// output.
     #[must_use]
     pub fn calculate(&self, inputs: &Pm10Inputs) -> Vec<MovesWorkerOutputRow> {
         compute_pm10(inputs, BRAKE_TIRE_POLLUTANT_PAIRS)
@@ -992,10 +987,10 @@ impl Calculator for PM10BrakeTireCalculator {
         Self::NAME
     }
 
-    /// `PM10BrakeTireCalculator` is a chained calculator: it does not subscribe
-    /// to the MasterLoop directly but fires when its upstream
-    /// `BaseRateCalculator` does. `calculator-dag.json` records
-    /// `subscribes_directly: false` and an empty `subscriptions` list.
+ /// `PM10BrakeTireCalculator` is a chained calculator: it does not subscribe
+ /// to the MasterLoop directly but fires when its upstream
+ /// `BaseRateCalculator` does. `calculator-dag.json` records
+ /// `subscribes_directly: false` and an empty `subscriptions` list.
     fn subscriptions(&self) -> &[CalculatorSubscription] {
         NO_SUBSCRIPTIONS
     }
@@ -1004,8 +999,7 @@ impl Calculator for PM10BrakeTireCalculator {
         BRAKE_TIRE_REGISTRATIONS
     }
 
-    /// `PM10BrakeTireCalculator` chains off `BaseRateCalculator` —
-    /// `calculator-dag.json` records `depends_on: ["BaseRateCalculator"]`.
+ /// `PM10BrakeTireCalculator` chains off `BaseRateCalculator` /// `calculator-dag.json` records `depends_on: ["BaseRateCalculator"]`.
     fn upstream(&self) -> &[&'static str] {
         BRAKE_TIRE_UPSTREAM
     }
@@ -1033,10 +1027,10 @@ pub fn brake_tire_factory() -> Box<dyn Calculator> {
 mod tests {
     use super::*;
 
-    /// Build a `MOVESWorkerOutput` row with the given pollutant and process,
-    /// fixed dimension columns, `emissionQuant = 200.0` and
-    /// `emissionRate = 5.0`. Values are chosen for exact scaled results, not
-    /// physical realism.
+ /// Build a `MOVESWorkerOutput` row with the given pollutant and process,
+ /// fixed dimension columns, `emissionQuant = 200.0` and
+ /// `emissionRate = 5.0`. Values are chosen for exact scaled results, not
+ /// physical realism.
     fn worker_row(pollutant_id: i32, process_id: i32) -> MovesWorkerOutputRow {
         MovesWorkerOutputRow {
             year_id: 2020,
@@ -1059,9 +1053,9 @@ mod tests {
         }
     }
 
-    /// Build a `PM10EmissionRatio` row for the given `polProcessID` and ratio,
-    /// matching `worker_row`'s source/fuel type and an all-encompassing
-    /// model-year range.
+ /// Build a `PM10EmissionRatio` row for the given `polProcessID` and ratio,
+ /// matching `worker_row`'s source/fuel type and an all-encompassing
+ /// model-year range.
     fn ratio_row(pol_process_id: i32, ratio: f64) -> Pm10EmissionRatioRow {
         Pm10EmissionRatioRow {
             pol_process_id,
@@ -1073,8 +1067,8 @@ mod tests {
         }
     }
 
-    /// Build a `PM10PollutantProcessAssoc` row, deriving `polProcessID` as
-    /// `pollutantID × 100 + processID` exactly as the MOVES default DB does.
+ /// Build a `PM10PollutantProcessAssoc` row, deriving `polProcessID` as
+ /// `pollutantID × 100 + processID` exactly as the MOVES default DB does.
     fn ppa_row(process_id: i32, pollutant_id: i32) -> Pm10PollutantProcessAssocRow {
         Pm10PollutantProcessAssocRow {
             pol_process_id: pollutant_id * 100 + process_id,
@@ -1083,7 +1077,7 @@ mod tests {
         }
     }
 
-    /// Assert `actual` matches `expected` within `f64` slack.
+ /// Assert `actual` matches `expected` within `f64` slack.
     fn assert_close(actual: f64, expected: f64) {
         assert!(
             (actual - expected).abs() < 1e-9,
@@ -1095,17 +1089,17 @@ mod tests {
     fn emission_scales_total_pm25_into_total_pm10() {
         let inputs = Pm10Inputs {
             worker_output: vec![worker_row(TOTAL_PM25_POLLUTANT_ID, 1)],
-            // PM10 Total (100), Running (1) → polProcessID 10001.
+ // PM10 Total (100), Running (1) → polProcessID 10001.
             pm10_emission_ratio: vec![ratio_row(10_001, 1.5)],
             pm10_pollutant_process_assoc: vec![ppa_row(1, TOTAL_PM10_POLLUTANT_ID)],
         };
         let rows = PM10EmissionCalculator::new().calculate(&inputs);
         assert_eq!(rows.len(), 1);
         let r = rows[0];
-        // The pollutant is relabelled 110 → 100; the process is carried through.
+ // The pollutant is relabelled 110 → 100; the process is carried through.
         assert_eq!(r.pollutant_id, TOTAL_PM10_POLLUTANT_ID);
         assert_eq!(r.process_id, 1);
-        // Both emission values are scaled by the ratio.
+ // Both emission values are scaled by the ratio.
         assert_close(r.emission_quant, 300.0); // 200.0 × 1.5
         assert_close(r.emission_rate, 7.5); // 5.0 × 1.5
     }
@@ -1120,7 +1114,7 @@ mod tests {
         let rows = PM10EmissionCalculator::new().calculate(&inputs);
         assert_eq!(rows.len(), 1);
         let r = rows[0];
-        // Every dimension column but the pollutant is copied from the source.
+ // Every dimension column but the pollutant is copied from the source.
         let src = worker_row(TOTAL_PM25_POLLUTANT_ID, 1);
         assert_eq!(r.year_id, src.year_id);
         assert_eq!(r.month_id, src.month_id);
@@ -1139,8 +1133,8 @@ mod tests {
 
     #[test]
     fn emission_drops_non_total_pm25_source_rows() {
-        // Organic-carbon (111) and elemental-carbon (112) PM2.5 are dormant
-        // branches of PM10EmissionCalculator — only Total (110) is live.
+ // Organic-carbon (111) and elemental-carbon (112) PM2.5 are dormant
+ // branches of PM10EmissionCalculator — only Total (110) is live.
         let inputs = Pm10Inputs {
             worker_output: vec![worker_row(111, 1), worker_row(112, 1)],
             pm10_emission_ratio: vec![
@@ -1159,11 +1153,11 @@ mod tests {
 
     #[test]
     fn emission_converts_crankcase_process_rows() {
-        // PM10EmissionCalculator registers and converts the three crankcase
-        // exhaust processes (15, 16, 17) too.
+ // PM10EmissionCalculator registers and converts the three crankcase
+ // exhaust processes (15, 16, 17) too.
         let inputs = Pm10Inputs {
             worker_output: vec![worker_row(TOTAL_PM25_POLLUTANT_ID, 15)],
-            // PM10 Total (100), Crankcase Running (15) → polProcessID 10015.
+ // PM10 Total (100), Crankcase Running (15) → polProcessID 10015.
             pm10_emission_ratio: vec![ratio_row(10_015, 1.25)],
             pm10_pollutant_process_assoc: vec![ppa_row(15, TOTAL_PM10_POLLUTANT_ID)],
         };
@@ -1176,8 +1170,8 @@ mod tests {
 
     #[test]
     fn emission_drops_row_with_no_pollutant_process_assoc() {
-        // No PM10PollutantProcessAssoc row for the process — the inner join
-        // drops the source row.
+ // No PM10PollutantProcessAssoc row for the process — the inner join
+ // drops the source row.
         let inputs = Pm10Inputs {
             worker_output: vec![worker_row(TOTAL_PM25_POLLUTANT_ID, 1)],
             pm10_emission_ratio: vec![ratio_row(10_001, 1.5)],
@@ -1194,21 +1188,21 @@ mod tests {
             pm10_pollutant_process_assoc: vec![ppa_row(1, TOTAL_PM10_POLLUTANT_ID)],
         };
 
-        // No ratio at all → dropped.
+ // No ratio at all → dropped.
         let mut no_ratio = base.clone();
         no_ratio.pm10_emission_ratio.clear();
         assert!(PM10EmissionCalculator::new()
             .calculate(&no_ratio)
             .is_empty());
 
-        // A ratio whose source type does not match the worker row → dropped.
+ // A ratio whose source type does not match the worker row → dropped.
         let mut wrong_source_type = base.clone();
         wrong_source_type.pm10_emission_ratio[0].source_type_id = 99;
         assert!(PM10EmissionCalculator::new()
             .calculate(&wrong_source_type)
             .is_empty());
 
-        // A ratio whose fuel type does not match → dropped.
+ // A ratio whose fuel type does not match → dropped.
         let mut wrong_fuel_type = base;
         wrong_fuel_type.pm10_emission_ratio[0].fuel_type_id = 99;
         assert!(PM10EmissionCalculator::new()
@@ -1223,7 +1217,7 @@ mod tests {
             pm10_emission_ratio: vec![ratio_row(10_001, 1.5)],
             pm10_pollutant_process_assoc: vec![ppa_row(1, TOTAL_PM10_POLLUTANT_ID)],
         };
-        // worker_row's modelYearID is 2015; narrow the ratio range past it.
+ // worker_row's modelYearID is 2015; narrow the ratio range past it.
         inputs.pm10_emission_ratio[0].min_model_year_id = 2016;
         inputs.pm10_emission_ratio[0].max_model_year_id = 2020;
         assert!(PM10EmissionCalculator::new().calculate(&inputs).is_empty());
@@ -1236,7 +1230,7 @@ mod tests {
             pm10_emission_ratio: vec![ratio_row(10_001, 1.5)],
             pm10_pollutant_process_assoc: vec![ppa_row(1, TOTAL_PM10_POLLUTANT_ID)],
         };
-        // A range that exactly equals the worker row's model year still matches.
+ // A range that exactly equals the worker row's model year still matches.
         inputs.pm10_emission_ratio[0].min_model_year_id = 2015;
         inputs.pm10_emission_ratio[0].max_model_year_id = 2015;
         assert_eq!(PM10EmissionCalculator::new().calculate(&inputs).len(), 1);
@@ -1244,9 +1238,9 @@ mod tests {
 
     #[test]
     fn emission_emits_one_row_per_matching_ratio_range() {
-        // Two PM10EmissionRatio rows whose model-year ranges both cover the
-        // worker row's model year — the SQL join cross-product yields two PM10
-        // rows.
+ // Two PM10EmissionRatio rows whose model-year ranges both cover the
+ // worker row's model year — the SQL join cross-product yields two PM10
+ // rows.
         let inputs = Pm10Inputs {
             worker_output: vec![worker_row(TOTAL_PM25_POLLUTANT_ID, 1)],
             pm10_emission_ratio: vec![
@@ -1280,9 +1274,9 @@ mod tests {
                 worker_row(TIREWEAR_PM25_POLLUTANT_ID, 10),
             ],
             pm10_emission_ratio: vec![
-                // PM10 Brakewear (106), Brakewear (9) → polProcessID 10609.
+ // PM10 Brakewear (106), Brakewear (9) → polProcessID 10609.
                 ratio_row(10_609, 1.5),
-                // PM10 Tirewear (107), Tirewear (10) → polProcessID 10710.
+ // PM10 Tirewear (107), Tirewear (10) → polProcessID 10710.
                 ratio_row(10_710, 3.0),
             ],
             pm10_pollutant_process_assoc: vec![
@@ -1310,7 +1304,7 @@ mod tests {
 
     #[test]
     fn brake_tire_drops_unmapped_pollutants() {
-        // Total PM2.5 (110) is not a brake/tire source — only 116 / 117 are.
+ // Total PM2.5 (110) is not a brake/tire source — only 116 / 117 are.
         let inputs = Pm10Inputs {
             worker_output: vec![worker_row(TOTAL_PM25_POLLUTANT_ID, 9)],
             pm10_emission_ratio: vec![ratio_row(10_609, 1.5)],
@@ -1321,8 +1315,8 @@ mod tests {
 
     #[test]
     fn output_is_sorted_by_dimension_key() {
-        // Two worker rows on distinct links produce two PM10 rows; the result
-        // comes back dimension-key sorted regardless of input order.
+ // Two worker rows on distinct links produce two PM10 rows; the result
+ // comes back dimension-key sorted regardless of input order.
         let mut high_link = worker_row(TOTAL_PM25_POLLUTANT_ID, 1);
         high_link.link_id = 9999; // sorts after link 5001
         let inputs = Pm10Inputs {
@@ -1367,16 +1361,16 @@ mod tests {
 
     #[test]
     fn both_calculators_are_chained_with_no_subscriptions() {
-        // calculator-dag.json: subscribes_directly false, subscriptions [].
+ // calculator-dag.json: subscribes_directly false, subscriptions [].
         assert!(PM10EmissionCalculator::new().subscriptions().is_empty());
         assert!(PM10BrakeTireCalculator::new().subscriptions().is_empty());
     }
 
     #[test]
     fn emission_registrations_match_the_seven_calculator_info_directives() {
-        // calculator-dag.json records registrations_count 7: PM10 Total (100)
-        // for the running (1), start (2), extended-idle (90), aux-power (91)
-        // and crankcase (15, 16, 17) exhaust processes.
+ // calculator-dag.json records registrations_count 7: PM10 Total (100)
+ // for the running (1), start (2), extended-idle (90), aux-power (91)
+ // and crankcase (15, 16, 17) exhaust processes.
         let calc = PM10EmissionCalculator::new();
         let regs = calc.registrations();
         assert_eq!(regs.len(), 7);
@@ -1388,8 +1382,8 @@ mod tests {
 
     #[test]
     fn brake_tire_registrations_match_the_two_calculator_info_directives() {
-        // calculator-dag.json records registrations_count 2: PM10 Brakewear
-        // (106) for Brakewear (9), PM10 Tirewear (107) for Tirewear (10).
+ // calculator-dag.json records registrations_count 2: PM10 Brakewear
+ // (106) for Brakewear (9), PM10 Tirewear (107) for Tirewear (10).
         let calc = PM10BrakeTireCalculator::new();
         let regs = calc.registrations();
         assert_eq!(regs.len(), 2);
@@ -1405,7 +1399,7 @@ mod tests {
 
     #[test]
     fn calculators_chain_off_their_dag_upstream() {
-        // calculator-dag.json depends_on entries.
+ // calculator-dag.json depends_on entries.
         assert_eq!(
             PM10EmissionCalculator::new().upstream(),
             &["SulfatePMCalculator"]
@@ -1435,9 +1429,9 @@ mod tests {
     #[test]
     fn execute_wires_through_data_plane() {
         use moves_framework::DataFrameStore;
-        // Seed store with the emission_scales_total_pm25_into_total_pm10 scenario:
-        // one Total PM2.5 (110) worker row, one PM10EmissionRatio (ratio 1.5),
-        // one PollutantProcessAssoc mapping (100, process 1) → polProcessID 10001.
+ // Seed store with the emission_scales_total_pm25_into_total_pm10 scenario:
+ // one Total PM2.5 (110) worker row, one PM10EmissionRatio (ratio 1.5),
+ // one PollutantProcessAssoc mapping (100, process 1) → polProcessID 10001.
         let worker = worker_row(TOTAL_PM25_POLLUTANT_ID, 1);
         let ratio = ratio_row(10_001, 1.5);
         let ppa = ppa_row(1, TOTAL_PM10_POLLUTANT_ID);
@@ -1486,7 +1480,7 @@ mod tests {
     #[test]
     fn brake_tire_execute_wires_through_data_plane() {
         use moves_framework::DataFrameStore;
-        // Seed store with the brake_tire_scales_brakewear_and_tirewear_pm25 scenario.
+ // Seed store with the brake_tire_scales_brakewear_and_tirewear_pm25 scenario.
         let workers = vec![
             worker_row(BRAKEWEAR_PM25_POLLUTANT_ID, 9),
             worker_row(TIREWEAR_PM25_POLLUTANT_ID, 10),
@@ -1525,7 +1519,7 @@ mod tests {
 
     #[test]
     fn calculators_are_object_safe() {
-        // The registry stores calculators as Box<dyn Calculator>.
+ // The registry stores calculators as Box<dyn Calculator>.
         let calcs: Vec<Box<dyn Calculator>> = vec![
             Box::new(PM10EmissionCalculator::new()),
             Box::new(PM10BrakeTireCalculator::new()),

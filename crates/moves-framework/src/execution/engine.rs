@@ -1,47 +1,47 @@
 //! `MOVESEngine` — the entry point that ties the framework together.
 //!
-//! Ports `gov.epa.otaq.moves.master.framework.MOVESEngine` (Task 27). The
+//! Ports `gov.epa.otaq.moves.master.framework.MOVESEngine`. The
 //! Java original is a ~2k-line GUI/console singleton that owns a worker
 //! thread pool, MariaDB connection management, distributed-bundle handoff,
-//! and a heartbeat thread. The migration plan strips all of that: the Rust
+//! and a heartbeat thread. The strips all of that: the Rust
 //! port has no master/worker split, no MariaDB, and no filesystem-mediated
 //! intermediate state, so the engine collapses to the orchestration spine.
 //!
 //! # The pipeline
 //!
-//! [`MOVESEngine::run`] walks the steps the migration plan lists for
-//! Task 27 — *load RunSpec → instantiate ExecutionRunSpec → register
+//! [`MOVESEngine::run`] walks the steps the lists for
+//! *load RunSpec → instantiate ExecutionRunSpec → register
 //! calculators → build CalculatorContext → run MasterLoop → finalize
 //! OutputProcessor*:
 //!
-//! 1. **Instantiate [`ExecutionRunSpec`]** (Task 15) from the parsed
-//!    [`RunSpec`] — the runtime view: target pollutants / processes,
-//!    timespan sets, vehicle selections.
-//! 2. **Plan the calculator graph** — [`CalculatorRegistry`] (Task 19)
-//!    filters the chain DAG to the RunSpec's `(pollutant, process)`
-//!    selections and topologically orders the result.
-//! 3. **Chunk it** — [`chunk_chains`] (Task 27's executor) splits the
-//!    planned modules into independent calculator chains.
-//! 4. **Run** — one [`MasterLoop`] (Task 20) per chunk, dispatched through
-//!    the [`BoundedExecutor`] so at most `--max-parallel-chunks` chains run
-//!    concurrently. Each chunk instantiates its calculators / generators,
-//!    wraps them in a `MasterLoopable` adapter, and subscribes them to its
-//!    loop.
+//! 1. **Instantiate [`ExecutionRunSpec`]** from the parsed
+//! [`RunSpec`] — the runtime view: target pollutants / processes,
+//! timespan sets, vehicle selections.
+//! 2. **Plan the calculator graph** — [`CalculatorRegistry`]
+//! filters the chain DAG to the RunSpec's `(pollutant, process)`
+//! selections and topologically orders the result.
+//! 3. **Chunk it** — [`chunk_chains`] (executor) splits the
+//! planned modules into independent calculator chains.
+//! 4. **Run** — one [`MasterLoop`] per chunk, dispatched through
+//! the [`BoundedExecutor`] so at most `--max-parallel-chunks` chains run
+//! concurrently. Each chunk instantiates its calculators / generators,
+//! wraps them in a `MasterLoopable` adapter, and subscribes them to its
+//! loop.
 //! 5. **Finalize** — build the `MOVESRun` metadata record and hand it to
-//!    [`OutputProcessor`] (Tasks 26 / 89), which writes `MOVESRun.parquet`.
+//! [`OutputProcessor`], which writes `MOVESRun.parquet`.
 //!
-//! # Phase 2 status
+//! # status
 //!
-//! No Phase 3 calculators exist yet, so a registry typically has no
+//! No calculators exist yet, so a registry typically has no
 //! factories registered: every planned module is reported in
 //! [`EngineOutcome::modules_unimplemented`] and the per-chunk
-//! [`MasterLoop`]s run with no subscribers. That is the expected Phase 2
-//! state — the engine machinery is complete and exercised; Task 28's
-//! end-to-end test and the Phase 3 calculators fill in the bodies.
+//! [`MasterLoop`]s run with no subscribers. That is the expected
+//! state — the engine machinery is complete and exercised;'s
+//! end-to-end test and the calculators fill in the bodies.
 //!
 //! Geographic iteration is similarly thin: [`ExecutionRunSpec`] leaves
 //! [`execution_locations`](ExecutionRunSpec::execution_locations) empty
-//! until Task 16's location producer and the Task 50 data plane land. A
+//! until location producer and the data plane land. A
 //! caller (or a test) that populates it through
 //! [`MOVESEngine::execution_run_spec_mut`] drives the full
 //! `state → county → zone → link` nest immediately.
@@ -79,35 +79,35 @@ use crate::masterloop::{
 /// [`RunSpec`] itself.
 #[derive(Debug, Clone)]
 pub struct EngineConfig {
-    /// Directory the [`OutputProcessor`] writes into. Created if absent.
-    /// Ignored when [`collect_output_in_memory`](Self::collect_output_in_memory)
-    /// is `true`.
+ /// Directory the [`OutputProcessor`] writes into. Created if absent.
+ /// Ignored when [`collect_output_in_memory`](Self::collect_output_in_memory)
+ /// is `true`.
     pub output_root: PathBuf,
-    /// Maximum number of calculator chains run concurrently — the
-    /// `--max-parallel-chunks` lever. `0` selects the host's available
-    /// parallelism. See [`crate::execution::executor`] for the memory model.
-    ///
-    /// The WASM build (Task 132) defaults this to 1 because `wasm32-unknown-unknown`
-    /// has no threads until Task 134 enables the threads proposal.
+ /// Maximum number of calculator chains run concurrently — the
+ /// `--max-parallel-chunks` lever. `0` selects the host's available
+ /// parallelism. See [`crate::execution::executor`] for the memory model.
+ ///
+ /// The WASM build defaults this to 1 because `wasm32-unknown-unknown`
+ /// has no threads until enables the threads proposal.
     pub max_parallel_chunks: usize,
-    /// RunSpec file name recorded in the `MOVESRun` metadata row. `None`
-    /// leaves the column null (e.g. a RunSpec built in memory).
+ /// RunSpec file name recorded in the `MOVESRun` metadata row. `None`
+ /// leaves the column null (e.g. a RunSpec built in memory).
     pub run_spec_file_name: Option<String>,
-    /// Run timestamp recorded in the `MOVESRun` metadata row. Left to the
-    /// caller — rather than stamped from the wall clock — so a run is
-    /// reproducible and its `MOVESRun.parquet` is byte-stable for the
-    /// snapshot-determinism contract. `None` leaves the column null.
+ /// Run timestamp recorded in the `MOVESRun` metadata row. Left to the
+ /// caller — rather than stamped from the wall clock — so a run is
+ /// reproducible and its `MOVESRun.parquet` is byte-stable for the
+ /// snapshot-determinism contract. `None` leaves the column null.
     pub run_date_time: Option<String>,
-    /// When `true`, output Parquet bytes are collected in memory and returned
-    /// in [`EngineOutcome::output_bytes`] rather than written to
-    /// [`output_root`](Self::output_root). Used by the `wasm32` build (Task 132)
-    /// where no real filesystem is available.
+ /// When `true`, output Parquet bytes are collected in memory and returned
+ /// in [`EngineOutcome::output_bytes`] rather than written to
+ /// [`output_root`](Self::output_root). Used by the `wasm32` build
+ /// where no real filesystem is available.
     pub collect_output_in_memory: bool,
 }
 
 impl EngineConfig {
-    /// Config rooted at `output_root` with host-chosen parallelism and no
-    /// metadata overrides.
+ /// Config rooted at `output_root` with host-chosen parallelism and no
+ /// metadata overrides.
     #[must_use]
     pub fn new(output_root: impl Into<PathBuf>) -> Self {
         Self {
@@ -124,76 +124,76 @@ impl EngineConfig {
 /// and where the output landed.
 ///
 /// The timing fields (`wall_time`, `planning_time`, `execution_time`) are
-/// zero-valued until Task 75 wires them in, but are present from that task
+/// zero-valued until wires them in, but are present from that task
 /// onward so downstream tooling (the `moves run` summary, perf tests) can
 /// read them without touching the engine innards.
 #[derive(Debug, Clone)]
 pub struct EngineOutcome {
-    /// Number of MasterLoop iterations performed (one unless the RunSpec
-    /// asked for uncertainty estimation).
+ /// Number of MasterLoop iterations performed (one unless the RunSpec
+ /// asked for uncertainty estimation).
     pub iterations: u32,
-    /// Every calculator-graph module relevant to the RunSpec, in
-    /// topological order.
+ /// Every calculator-graph module relevant to the RunSpec, in
+ /// topological order.
     pub modules_planned: Vec<String>,
-    /// The planned modules split into independent calculator chains.
+ /// The planned modules split into independent calculator chains.
     pub chunks: Vec<Chunk>,
-    /// Planned modules that had a registered factory and were therefore
-    /// instantiated and subscribed to a MasterLoop.
+ /// Planned modules that had a registered factory and were therefore
+ /// instantiated and subscribed to a MasterLoop.
     pub modules_executed: Vec<String>,
-    /// Planned modules with no registered factory — not yet ported.
-    /// Expected to be the whole plan until Phase 3 lands calculators.
+ /// Planned modules with no registered factory — not yet ported.
+ /// Expected to be the whole plan until lands calculators.
     pub modules_unimplemented: Vec<String>,
-    /// The resolved parallelism limit (`config.max_parallel_chunks`, with
-    /// `0` expanded to the host's available parallelism).
+ /// The resolved parallelism limit (`config.max_parallel_chunks`, with
+ /// `0` expanded to the host's available parallelism).
     pub max_parallel_chunks: usize,
-    /// Directory the output was written to.
+ /// Directory the output was written to.
     pub output_root: PathBuf,
-    /// Path of the `MOVESRun.parquet` metadata file.
+ /// Path of the `MOVESRun.parquet` metadata file.
     pub run_record_path: PathBuf,
 
-    // --- Task 75: performance baseline fields ---
-    /// Total wall time from the start of [`MOVESEngine::run`] to the return
-    /// of the finalisation step, including output-file I/O.
+ // ---: performance baseline fields ---
+ /// Total wall time from the start of [`MOVESEngine::run`] to the return
+ /// of the finalisation step, including output-file I/O.
     pub wall_time: Duration,
-    /// Time spent planning (topological sort + chunking) before the
-    /// executor starts.
+ /// Time spent planning (topological sort + chunking) before the
+ /// executor starts.
     pub planning_time: Duration,
-    /// Time spent running all MasterLoops through the [`BoundedExecutor`].
-    /// Parallel chunks overlap, so this is wall time from executor dispatch
-    /// to executor return — not the sum of per-chunk times.
+ /// Time spent running all MasterLoops through the [`BoundedExecutor`].
+ /// Parallel chunks overlap, so this is wall time from executor dispatch
+ /// to executor return — not the sum of per-chunk times.
     pub execution_time: Duration,
-    /// Wall time for each calculator chain (chunk), in the same order as
-    /// [`chunks`](Self::chunks). Each entry is the wall time for that chunk's
-    /// `MasterLoop::run` call — measured within the parallel closure, so
-    /// entries from concurrent chunks overlap in real time.
+ /// Wall time for each calculator chain (chunk), in the same order as
+ /// [`chunks`](Self::chunks). Each entry is the wall time for that chunk's
+ /// `MasterLoop::run` call — measured within the parallel closure, so
+ /// entries from concurrent chunks overlap in real time.
     pub chunk_wall_times: Vec<Duration>,
-    /// Peak resident-set size in KiB at the end of the run, read from
-    /// `/proc/self/status` (`VmHWM`). `None` on non-Linux hosts or when
-    /// `/proc` is unavailable.
+ /// Peak resident-set size in KiB at the end of the run, read from
+ /// `/proc/self/status` (`VmHWM`). `None` on non-Linux hosts or when
+ /// `/proc` is unavailable.
     pub peak_rss_kib: Option<u64>,
 
-    /// Names of all control strategies that were instantiated and driven
-    /// through `pre_run → per-iteration → post_run` for this run, in
-    /// registration order. Empty when no strategies are registered.
+ /// Names of all control strategies that were instantiated and driven
+ /// through `pre_run → per-iteration → post_run` for this run, in
+ /// registration order. Empty when no strategies are registered.
     pub strategies_applied: Vec<String>,
 
-    /// Output Parquet files collected in memory, populated when
-    /// [`EngineConfig::collect_output_in_memory`] was `true`.
-    /// Each entry is `(relative-path, bytes)` in the same layout that
-    /// [`OutputProcessor`] would write to disk. Empty when filesystem
-    /// output was used instead.
+ /// Output Parquet files collected in memory, populated when
+ /// [`EngineConfig::collect_output_in_memory`] was `true`.
+ /// Each entry is `(relative-path, bytes)` in the same layout that
+ /// [`OutputProcessor`] would write to disk. Empty when filesystem
+ /// output was used instead.
     pub output_bytes: Vec<(PathBuf, Vec<u8>)>,
 }
 
 impl EngineOutcome {
-    /// Number of independent calculator chains the run was split into.
+ /// Number of independent calculator chains the run was split into.
     #[must_use]
     pub fn chunk_count(&self) -> usize {
         self.chunks.len()
     }
 
-    /// Whether every planned module had a registered factory — i.e. the
-    /// calculator graph is fully ported. `false` throughout Phase 2.
+ /// Whether every planned module had a registered factory — i.e. the
+ /// calculator graph is fully ported. `false` throughout.
     #[must_use]
     pub fn is_fully_implemented(&self) -> bool {
         self.modules_unimplemented.is_empty()
@@ -204,14 +204,14 @@ impl EngineOutcome {
 /// instantiates from registry factories and runs through a MasterLoop.
 #[derive(Debug)]
 enum ModuleInstance {
-    /// An emission [`Calculator`].
+ /// An emission [`Calculator`].
     Calculator(Box<dyn Calculator>),
-    /// A [`Generator`].
+ /// A [`Generator`].
     Generator(Box<dyn Generator>),
 }
 
 impl ModuleInstance {
-    /// MasterLoop subscriptions the module declares.
+ /// MasterLoop subscriptions the module declares.
     fn subscriptions(&self) -> &[CalculatorSubscription] {
         match self {
             ModuleInstance::Calculator(c) => c.subscriptions(),
@@ -219,12 +219,12 @@ impl ModuleInstance {
         }
     }
 
-    /// Run the module against `ctx`. Returns the calculator's emission
-    /// DataFrame if any, or `None` for generators and empty outputs.
-    ///
-    /// Accepts `&mut CalculatorContext` so generators can write to
-    /// `ctx.scratch_mut()`. Calculators receive a shared `&CalculatorContext`
-    /// via the automatic coercion from `&mut`.
+ /// Run the module against `ctx`. Returns the calculator's emission
+ /// DataFrame if any, or `None` for generators and empty outputs.
+ ///
+ /// Accepts `&mut CalculatorContext` so generators can write to
+ /// `ctx.scratch_mut()`. Calculators receive a shared `&CalculatorContext`
+ /// via the automatic coercion from `&mut`.
     fn execute(&self, ctx: &mut CalculatorContext) -> Result<Option<DataFrame>> {
         match self {
             ModuleInstance::Calculator(c) => Ok(c.execute(ctx)?.into_dataframe()),
@@ -258,30 +258,30 @@ impl ModuleInstance {
 /// loop is iterating a different process.
 #[derive(Debug)]
 struct CalculatorMasterLoopable {
-    /// The shared calculator / generator instance.
+ /// The shared calculator / generator instance.
     module: Arc<ModuleInstance>,
-    /// Process the originating subscription is registered for. The adapter
-    /// fires only while the loop iterates this process.
+ /// Process the originating subscription is registered for. The adapter
+ /// fires only while the loop iterates this process.
     gate_process: ProcessId,
-    /// Per-chunk shared context. All adapters within one chunk share the
-    /// same `Arc`; adapters in different chunks hold different `Arc`s.
+ /// Per-chunk shared context. All adapters within one chunk share the
+ /// same `Arc`; adapters in different chunks hold different `Arc`s.
     ctx: Arc<Mutex<CalculatorContext>>,
-    /// Cross-chunk streaming aggregator: emission rows are folded into running
-    /// group-by sums as they are produced, so peak memory is bounded by the
-    /// number of distinct aggregation groups rather than the raw row count.
+ /// Cross-chunk streaming aggregator: emission rows are folded into running
+ /// group-by sums as they are produced, so peak memory is bounded by the
+ /// number of distinct aggregation groups rather than the raw row count.
     streaming_agg: Arc<Mutex<StreamingEmissionAgg>>,
-    /// Cross-chunk raw activity-row accumulator. Aggregated and written after
-    /// all chunks complete.
+ /// Cross-chunk raw activity-row accumulator. Aggregated and written after
+ /// all chunks complete.
     activity_acc: Arc<Mutex<Vec<ActivityRecord>>>,
-    /// Run hash stamped into every accumulated [`EmissionRecord`] and [`ActivityRecord`].
+ /// Run hash stamped into every accumulated [`EmissionRecord`] and [`ActivityRecord`].
     run_hash: Arc<str>,
 }
 
 impl MasterLoopable for CalculatorMasterLoopable {
     fn execute_at_granularity(&self, context: &MasterLoopContext) -> Result<()> {
-        // Gate on process: the master loop calls every granularity-matching
-        // subscription, but a calculator subscription is scoped to one
-        // process.
+ // Gate on process: the master loop calls every granularity-matching
+ // subscription, but a calculator subscription is scoped to one
+ // process.
         if context.position.process_id != Some(self.gate_process) {
             return Ok(());
         }
@@ -289,12 +289,12 @@ impl MasterLoopable for CalculatorMasterLoopable {
             let mut ctx = self.ctx.lock().expect("CalculatorContext mutex poisoned");
             ctx.set_position(context.position);
             self.module.execute(&mut ctx)?
-            // ctx lock released here — conversion and accumulator write happen outside
+ // ctx lock released here — conversion and accumulator write happen outside
         };
         if let Some(df) = df {
             if df.height() > 0 {
                 if df.column("pollutantID").is_ok() {
-                    // Emission output: stream into the running group-by aggregator.
+ // Emission output: stream into the running group-by aggregator.
                     let records = frame_to_emission_records(&df, &self.run_hash);
                     drop(df);
                     self.streaming_agg
@@ -302,9 +302,9 @@ impl MasterLoopable for CalculatorMasterLoopable {
                         .expect("output accumulator poisoned")
                         .extend(&records, &UnitScaling)?;
                 } else if df.column("activityTypeID").is_ok() {
-                    // Activity output (e.g. MOVESWorkerActivityOutput from
-                    // ActivityCalculator or DistanceCalculator): collect raw rows
-                    // for post-run aggregation via write_aggregated_activity.
+ // Activity output (e.g. MOVESWorkerActivityOutput from
+ // ActivityCalculator or DistanceCalculator): collect raw rows
+ // for post-run aggregation via write_aggregated_activity.
                     let records = frame_to_activity_records(&df, &self.run_hash);
                     drop(df);
                     self.activity_acc
@@ -343,31 +343,31 @@ impl MasterLoopable for StrategyMasterLoopable {
 /// [`CalculatorRegistry`], its [`ControlStrategyRegistry`], and the
 /// [`EngineConfig`], and drives the run.
 ///
-/// See the [module docs](self) for the pipeline and Phase 2 caveats.
+/// See the [module docs](self) for the pipeline and caveats.
 #[derive(Debug)]
 pub struct MOVESEngine {
-    /// Runtime view of the RunSpec being executed (Task 15).
+ /// Runtime view of the RunSpec being executed.
     execution: ExecutionRunSpec,
-    /// Calculator-graph DAG plus factory bindings (Task 19).
+ /// Calculator-graph DAG plus factory bindings.
     registry: CalculatorRegistry,
-    /// Control-strategy factories (Task 119). Empty by default.
+ /// Control-strategy factories. Empty by default.
     strategy_registry: ControlStrategyRegistry,
-    /// Output directory and parallelism tuning.
+ /// Output directory and parallelism tuning.
     config: EngineConfig,
-    /// Pre-loaded execution-database tables shared across all chunk contexts.
-    /// Populated by [`with_slow_store`](Self::with_slow_store); empty by
-    /// default (calculators receive an empty slow tier).
+ /// Pre-loaded execution-database tables shared across all chunk contexts.
+ /// Populated by [`with_slow_store`](Self::with_slow_store); empty by
+ /// default (calculators receive an empty slow tier).
     slow_store: Arc<InMemoryStore>,
 }
 
 impl MOVESEngine {
-    /// Build an engine for `run_spec`, deriving its [`ExecutionRunSpec`].
-    ///
-    /// The `registry` carries the calculator-graph DAG and whatever Phase 3
-    /// factory bindings have been registered; `config` supplies the output
-    /// directory and parallelism limit. Control strategies default to none;
-    /// use [`with_strategy_registry`](Self::with_strategy_registry) to attach
-    /// strategies.
+ /// Build an engine for `run_spec`, deriving its [`ExecutionRunSpec`].
+ ///
+ /// The `registry` carries the calculator-graph DAG and whatever
+ /// factory bindings have been registered; `config` supplies the output
+ /// directory and parallelism limit. Control strategies default to none;
+ /// use [`with_strategy_registry`](Self::with_strategy_registry) to attach
+ /// strategies.
     #[must_use]
     pub fn new(run_spec: RunSpec, registry: CalculatorRegistry, config: EngineConfig) -> Self {
         Self {
@@ -379,55 +379,55 @@ impl MOVESEngine {
         }
     }
 
-    /// Pre-load execution-database tables into every chunk's
-    /// [`CalculatorContext`] slow tier.
-    ///
-    /// Call this after [`new`](Self::new) and before [`run`](Self::run) to
-    /// give calculators access to the filtered default-DB / execution-DB
-    /// tables they read via `ctx.tables()`. Without this call the slow tier
-    /// is empty and any `iter_typed` call in a calculator will return a
-    /// "table not found" error.
+ /// Pre-load execution-database tables into every chunk's
+ /// [`CalculatorContext`] slow tier.
+ ///
+ /// Call this after [`new`](Self::new) and before [`run`](Self::run) to
+ /// give calculators access to the filtered default-DB / execution-DB
+ /// tables they read via `ctx.tables()`. Without this call the slow tier
+ /// is empty and any `iter_typed` call in a calculator will return a
+ /// "table not found" error.
     #[must_use]
     pub fn with_slow_store(mut self, store: InMemoryStore) -> Self {
         self.slow_store = Arc::new(store);
         self
     }
 
-    /// Attach a [`ControlStrategyRegistry`] to this engine. Strategies are
-    /// instantiated and driven through `pre_run → per-iteration → post_run`
-    /// on the next call to [`run`](Self::run).
+ /// Attach a [`ControlStrategyRegistry`] to this engine. Strategies are
+ /// instantiated and driven through `pre_run → per-iteration → post_run`
+ /// on the next call to [`run`](Self::run).
     pub fn with_strategy_registry(mut self, sr: ControlStrategyRegistry) -> Self {
         self.strategy_registry = sr;
         self
     }
 
-    /// The runtime view of the RunSpec.
+ /// The runtime view of the RunSpec.
     #[must_use]
     pub fn execution_run_spec(&self) -> &ExecutionRunSpec {
         &self.execution
     }
 
-    /// Mutable access to the runtime view — chiefly so callers can populate
-    /// [`execution_locations`](ExecutionRunSpec::execution_locations)
-    /// before [`run`](Self::run) (Task 16's location producer, or a test).
+ /// Mutable access to the runtime view — chiefly so callers can populate
+ /// [`execution_locations`](ExecutionRunSpec::execution_locations)
+ /// before [`run`](Self::run) (location producer, or a test).
     pub fn execution_run_spec_mut(&mut self) -> &mut ExecutionRunSpec {
         &mut self.execution
     }
 
-    /// The calculator registry.
+ /// The calculator registry.
     #[must_use]
     pub fn registry(&self) -> &CalculatorRegistry {
         &self.registry
     }
 
-    /// The engine configuration.
+ /// The engine configuration.
     #[must_use]
     pub fn config(&self) -> &EngineConfig {
         &self.config
     }
 
-    /// The RunSpec's `(pollutant, process)` selections, as the
-    /// [`CalculatorRegistry`] filter expects them.
+ /// The RunSpec's `(pollutant, process)` selections, as the
+ /// [`CalculatorRegistry`] filter expects them.
     fn selections(&self) -> Vec<(PollutantId, ProcessId)> {
         self.execution
             .pollutant_process_associations
@@ -436,48 +436,47 @@ impl MOVESEngine {
             .collect()
     }
 
-    /// Every calculator-graph module relevant to this run, topologically
-    /// ordered (upstream producers before downstream consumers).
-    ///
-    /// # Errors
-    ///
-    /// Returns [`crate::Error::CyclicChain`] if the filtered chain DAG has
-    /// a cycle.
+ /// Every calculator-graph module relevant to this run, topologically
+ /// ordered (upstream producers before downstream consumers).
+ ///
+ /// # Errors
+ ///
+ /// Returns [`crate::Error::CyclicChain`] if the filtered chain DAG has
+ /// a cycle.
     pub fn planned_modules(&self) -> Result<Vec<String>> {
         let models = &self.execution.run_spec.models;
-        // Empty model selection defaults to ONROAD (matching Java's
-        // `Models.evaluateModels` on an empty list and `models_label`).
+ // Empty model selection defaults to ONROAD (matching Java's
+ // `Models.evaluateModels` on an empty list and `models_label`).
         let nonroad = models.contains(&Model::Nonroad);
         let onroad = models.is_empty() || models.contains(&Model::Onroad);
         self.registry
             .execution_order_for_models(&self.selections(), onroad, nonroad)
     }
 
-    /// The planned modules split into independent calculator chains —
-    /// what the [`BoundedExecutor`] dispatches.
-    ///
-    /// # Errors
-    ///
-    /// Propagates [`crate::Error::CyclicChain`] from planning / chunking.
+ /// The planned modules split into independent calculator chains /// what the [`BoundedExecutor`] dispatches.
+ ///
+ /// # Errors
+ ///
+ /// Propagates [`crate::Error::CyclicChain`] from planning / chunking.
     pub fn planned_chunks(&self) -> Result<Vec<Chunk>> {
         let modules = self.planned_modules()?;
         let refs: Vec<&str> = modules.iter().map(String::as_str).collect();
         chunk_chains(&self.registry, &refs)
     }
 
-    /// Execute the run: plan and chunk the calculator graph, drive one
-    /// [`MasterLoop`] per chunk through the [`BoundedExecutor`], and write
-    /// the `MOVESRun` metadata via the [`OutputProcessor`].
-    ///
-    /// # Errors
-    ///
-    /// * [`crate::Error::CyclicChain`] — the calculator chain DAG has a
-    ///   cycle.
-    /// * [`crate::Error::ThreadPool`] — the bounded-concurrency pool failed
-    ///   to build.
-    /// * [`crate::Error::Io`] / [`crate::Error::Arrow`] /
-    ///   [`crate::Error::Parquet`] — writing `MOVESRun.parquet` failed.
-    /// * Any error a calculator's `execute` surfaces during the run.
+ /// Execute the run: plan and chunk the calculator graph, drive one
+ /// [`MasterLoop`] per chunk through the [`BoundedExecutor`], and write
+ /// the `MOVESRun` metadata via the [`OutputProcessor`].
+ ///
+ /// # Errors
+ ///
+ /// * [`crate::Error::CyclicChain`] — the calculator chain DAG has a
+ /// cycle.
+ /// * [`crate::Error::ThreadPool`] — the bounded-concurrency pool failed
+ /// to build.
+ /// * [`crate::Error::Io`] / [`crate::Error::Arrow`] /
+ /// [`crate::Error::Parquet`] — writing `MOVESRun.parquet` failed.
+ /// * Any error a calculator's `execute` surfaces during the run.
     pub fn run(&mut self) -> Result<EngineOutcome> {
         let t_start = Instant::now();
 
@@ -487,16 +486,16 @@ impl MOVESEngine {
         let chunks = chunk_chains(&self.registry, &module_refs)?;
         let planning_time = t_plan_start.elapsed();
 
-        // Shared, immutable per-run iteration plan handed to every chunk's
-        // MasterLoop. `locations` is empty until Task 16 / the data plane
-        // populate `execution_locations`; `times` is the timespan product.
+ // Shared, immutable per-run iteration plan handed to every chunk's
+ // MasterLoop. `locations` is empty until / the data plane
+ // populate `execution_locations`; `times` is the timespan product.
         let iterations = self.execution.how_many_iterations_will_be_performed();
         let processes: Vec<ProcessId> = self.execution.target_processes.iter().copied().collect();
         let locations: Vec<_> = self.execution.execution_locations.iter().copied().collect();
         let times = build_times(&self.execution);
 
-        // Instantiate control strategies and run their pre_run hooks before
-        // the master loop starts. pre_run runs single-threaded here.
+ // Instantiate control strategies and run their pre_run hooks before
+ // the master loop starts. pre_run runs single-threaded here.
         let strategies: Vec<Arc<dyn InternalControlStrategy>> = self
             .strategy_registry
             .instantiate_all()
@@ -509,18 +508,18 @@ impl MOVESEngine {
             s.pre_run(Arc::make_mut(&mut self.slow_store))?;
         }
 
-        // Pre-build the run record — it depends only on the immutable RunSpec
-        // and EngineConfig, so it is safe to construct before the executor runs.
-        // The run_hash is also handed to each CalculatorMasterLoopable so that
-        // DataFrames can be converted to EmissionRecords inline (and freed)
-        // rather than buffered for a post-run bulk conversion.
+ // Pre-build the run record — it depends only on the immutable RunSpec
+ // and EngineConfig, so it is safe to construct before the executor runs.
+ // The run_hash is also handed to each CalculatorMasterLoopable so that
+ // DataFrames can be converted to EmissionRecords inline (and freed)
+ // rather than buffered for a post-run bulk conversion.
         let run_record = self.build_run_record();
         let run_hash_str: Arc<str> = run_record.run_hash.clone().into();
 
-        // Build the emission aggregation plan upfront so the streaming
-        // accumulator can fold records directly into running group-by sums
-        // during execution rather than buffering raw rows until run end.
-        // Peak memory is bounded by N_distinct_groups, not N_raw_rows.
+ // Build the emission aggregation plan upfront so the streaming
+ // accumulator can fold records directly into running group-by sums
+ // during execution rather than buffering raw rows until run end.
+ // Peak memory is bounded by N_distinct_groups, not N_raw_rows.
         let agg_inputs = aggregation_inputs_from_run_spec(&self.execution.run_spec);
         let emission_plan = emission_aggregation(&agg_inputs);
         let activity_plan = activity_aggregation(&agg_inputs);
@@ -553,9 +552,9 @@ impl MOVESEngine {
             master.processes = processes.clone();
             master.locations = locations.clone();
             master.times = times.clone();
-            // Subscribe control strategies at INTERNAL_CONTROL_STRATEGY priority
-            // (fires before generators and emission calculators). The same Arc
-            // instance is shared across all chunks; execute() must be thread-safe.
+ // Subscribe control strategies at INTERNAL_CONTROL_STRATEGY priority
+ // (fires before generators and emission calculators). The same Arc
+ // instance is shared across all chunks; execute() must be thread-safe.
             for strategy in &strategies {
                 for sub in strategy.subscriptions() {
                     let adapter = Arc::new(StrategyMasterLoopable {
@@ -584,9 +583,9 @@ impl MOVESEngine {
                     continue;
                 };
                 let module = Arc::new(instance);
-                // One MasterLoop subscription per declared calculator
-                // subscription, all sharing the single module instance and
-                // the chunk's CalculatorContext.
+ // One MasterLoop subscription per declared calculator
+ // subscription, all sharing the single module instance and
+ // the chunk's CalculatorContext.
                 for sub in module.subscriptions() {
                     let adapter = Arc::new(CalculatorMasterLoopable {
                         module: Arc::clone(&module),
@@ -605,9 +604,9 @@ impl MOVESEngine {
             }
             master.run()?;
             let elapsed = t_chunk.elapsed();
-            // Find the slot that corresponds to this chunk by pointer identity.
-            // Safe: `chunk` is a reference into the `chunks` slice that was
-            // passed to `execute`, so `ptr::eq` finds the exact element.
+ // Find the slot that corresponds to this chunk by pointer identity.
+ // Safe: `chunk` is a reference into the `chunks` slice that was
+ // passed to `execute`, so `ptr::eq` finds the exact element.
             if let Ok(mut slots) = chunk_slot_ref.lock() {
                 if let Some(idx) = chunks.iter().position(|c| std::ptr::eq(c, chunk)) {
                     slots[idx] = Some(elapsed);
@@ -616,7 +615,7 @@ impl MOVESEngine {
             Ok(())
         })?;
 
-        // post_run hooks run single-threaded after all chunks complete.
+ // post_run hooks run single-threaded after all chunks complete.
         let post_run_ctx = CalculatorContext::new();
         for s in &strategies {
             s.post_run(&post_run_ctx)?;
@@ -627,7 +626,7 @@ impl MOVESEngine {
             .map(|slots| slots.iter().map(|opt| opt.unwrap_or_default()).collect())
             .unwrap_or_else(|_| vec![Duration::ZERO; chunks.len()]);
 
-        // Partition the plan into executed (had a factory) and not-yet-ported.
+ // Partition the plan into executed (had a factory) and not-yet-ported.
         let mut modules_executed = Vec::new();
         let mut modules_unimplemented = Vec::new();
         for name in &modules_planned {
@@ -638,9 +637,9 @@ impl MOVESEngine {
             }
         }
 
-        // Finalize: drain the streaming aggregator (aggregation was applied
-        // inline during execution) and write the rolled-up emission rows.
-        // Drop the local ref clones first so Arc::try_unwrap sees count == 1.
+ // Finalize: drain the streaming aggregator (aggregation was applied
+ // inline during execution) and write the rolled-up emission rows.
+ // Drop the local ref clones first so Arc::try_unwrap sees count == 1.
         drop(streaming_agg_ref);
         let mut aggregated_records = Arc::try_unwrap(streaming_agg)
             .expect("streaming_agg still has owners after executor finished")
@@ -717,13 +716,13 @@ impl MOVESEngine {
         })
     }
 
-    /// Build the single `MOVESRun` metadata row from the RunSpec's output
-    /// settings — the Rust analogue of `MOVESEngine.createOutputRunRecord`,
-    /// minus the MariaDB `INSERT`.
-    ///
-    /// Wall-clock fields (`run_date_time`, `minutes_duration`) are not
-    /// stamped here: `run_date_time` comes from the [`EngineConfig`] so a
-    /// run stays reproducible, and `minutes_duration` is left null.
+ /// Build the single `MOVESRun` metadata row from the RunSpec's output
+ /// settings — the Rust analogue of `MOVESEngine.createOutputRunRecord`,
+ /// minus the MariaDB `INSERT`.
+ ///
+ /// Wall-clock fields (`run_date_time`, `minutes_duration`) are not
+ /// stamped here: `run_date_time` comes from the [`EngineConfig`] so a
+ /// run stays reproducible, and `minutes_duration` is left null.
     fn build_run_record(&self) -> MovesRunRecord {
         let run_spec = &self.execution.run_spec;
         let version = format!("moves-framework {}", env!("CARGO_PKG_VERSION"));
@@ -774,7 +773,7 @@ impl MOVESEngine {
 
 /// Instantiate the named module from the registry, trying the calculator
 /// factory first then the generator factory. `None` if neither is
-/// registered (the Phase 2 default).
+/// registered (the default).
 fn instantiate(registry: &CalculatorRegistry, name: &str) -> Option<ModuleInstance> {
     if let Some(calc) = registry.instantiate_calculator(name) {
         return Some(ModuleInstance::Calculator(calc));
@@ -909,8 +908,8 @@ fn aggregation_inputs_from_run_spec(run_spec: &RunSpec) -> AggregationInputs<'_>
 /// `run_hash`. Called inline from [`CalculatorMasterLoopable::execute_at_granularity`]
 /// so the DataFrame can be freed immediately after conversion.
 fn frame_to_emission_records(df: &DataFrame, run_hash: &str) -> Vec<EmissionRecord> {
-    // Resolve column handles once per frame — O(columns) cost, no per-row Vec.
-    // Missing or wrong-type columns become None; .get(i) does lazy per-element access.
+ // Resolve column handles once per frame — O(columns) cost, no per-row Vec.
+ // Missing or wrong-type columns become None; .get(i) does lazy per-element access.
     let year_ca = df.column("yearID").ok().and_then(|s| s.i32().ok());
     let month_ca = df.column("monthID").ok().and_then(|s| s.i32().ok());
     let day_ca = df.column("dayID").ok().and_then(|s| s.i32().ok());
@@ -926,8 +925,8 @@ fn frame_to_emission_records(df: &DataFrame, run_hash: &str) -> Vec<EmissionReco
     let fuel_type_ca = df.column("fuelTypeID").ok().and_then(|s| s.i32().ok());
     let road_type_ca = df.column("roadTypeID").ok().and_then(|s| s.i32().ok());
     let emission_ca = df.column("emissionQuant").ok().and_then(|s| s.f64().ok());
-    // Optional explicit SCC column (nonroad emits its own 10-digit SCC, which
-    // the onroad dimension-formula below cannot reconstruct).
+ // Optional explicit SCC column (nonroad emits its own 10-digit SCC, which
+ // the onroad dimension-formula below cannot reconstruct).
     let scc_ca = df.column("SCC").ok().and_then(|s| s.str().ok());
 
     (0..df.height())
@@ -936,14 +935,14 @@ fn frame_to_emission_records(df: &DataFrame, run_hash: &str) -> Vec<EmissionReco
             let source_type_v = source_type_ca.and_then(|c| c.get(i));
             let fuel_type_v = fuel_type_ca.and_then(|c| c.get(i));
             let road_type_v = road_type_ca.and_then(|c| c.get(i));
-            // Compute onroad SCC from the four dimension columns using the
-            // canonical formula: "22{fuel:02}{src:02}{road:02}{proc:02}" for
-            // normal road types and "22{fuel:02}{src+1:02}00{proc:02}" for the
-            // off-network/total road type (100).  Matches the canonical SCC
-            // lookup table exactly.  The aggregation plan's onroad_scc flag
-            // then determines whether this value survives to the output.
-            // An explicit, non-empty SCC column (nonroad) takes precedence
-            // over the onroad dimension formula.
+ // Compute onroad SCC from the four dimension columns using the
+ // canonical formula: "22{fuel:02}{src:02}{road:02}{proc:02}" for
+ // normal road types and "22{fuel:02}{src+1:02}00{proc:02}" for the
+ // off-network/total road type (100). Matches the canonical SCC
+ // lookup table exactly. The aggregation plan's onroad_scc flag
+ // then determines whether this value survives to the output.
+ // An explicit, non-empty SCC column (nonroad) takes precedence
+ // over the onroad dimension formula.
             let explicit_scc = scc_ca
                 .and_then(|c| c.get(i))
                 .filter(|s| !s.is_empty())
@@ -1041,7 +1040,7 @@ fn frame_to_activity_records(df: &DataFrame, run_hash: &str) -> Vec<ActivityReco
 }
 
 /// Path of the `MOVESRun.parquet` file under an output root — exposed so a
-/// CLI (Task 28) can predict the layout without re-deriving it.
+/// CLI can predict the layout without re-deriving it.
 #[must_use]
 pub fn run_record_path(output_root: &Path) -> PathBuf {
     output_root.join(OutputProcessor::partition_path(
@@ -1065,11 +1064,11 @@ mod tests {
     use std::sync::Arc;
     use tempfile::tempdir;
 
-    // ---- Test doubles ------------------------------------------------------
+ // ---- Test doubles ------------------------------------------------------
 
-    /// Calculator that bumps a counter on every `execute`. The counter is a
-    /// `&'static AtomicUsize` so the type works both for direct
-    /// construction and behind a non-capturing factory `fn`.
+ /// Calculator that bumps a counter on every `execute`. The counter is a
+ /// `&'static AtomicUsize` so the type works both for direct
+ /// construction and behind a non-capturing factory `fn`.
     #[derive(Debug)]
     struct StubCalc {
         name: &'static str,
@@ -1093,7 +1092,7 @@ mod tests {
         }
     }
 
-    /// Generator that bumps a counter on every `execute`.
+ /// Generator that bumps a counter on every `execute`.
     #[derive(Debug)]
     struct StubGen {
         name: &'static str,
@@ -1114,8 +1113,8 @@ mod tests {
         }
     }
 
-    /// One PROCESS-granularity subscription for Running Exhaust (process 1)
-    /// — fires once per process iteration, independent of the location nest.
+ /// One PROCESS-granularity subscription for Running Exhaust (process 1)
+ /// — fires once per process iteration, independent of the location nest.
     fn process_subs() -> Vec<CalculatorSubscription> {
         vec![CalculatorSubscription::new(
             ProcessId(1),
@@ -1124,15 +1123,15 @@ mod tests {
         )]
     }
 
-    // Per-test execution counters. Each static is referenced by exactly one
-    // test (through exactly one factory), so the parallel test runner never
-    // races on them.
+ // Per-test execution counters. Each static is referenced by exactly one
+ // test (through exactly one factory), so the parallel test runner never
+ // races on them.
     static ENGINE_RUN_CALC: AtomicUsize = AtomicUsize::new(0);
     static PARTITION_RUN_CALC: AtomicUsize = AtomicUsize::new(0);
     static ADAPTER_GATE_CALC: AtomicUsize = AtomicUsize::new(0);
     static ADAPTER_GEN: AtomicUsize = AtomicUsize::new(0);
 
-    /// Factory for the `run_executes_a_registered_calculator` test.
+ /// Factory for the `run_executes_a_registered_calculator` test.
     fn base_rate_factory() -> Box<dyn Calculator> {
         Box::new(StubCalc {
             name: "BaseRateCalculator",
@@ -1141,8 +1140,7 @@ mod tests {
         })
     }
 
-    /// Factory for the `run_partitions_modules_by_registered_factory` test —
-    /// a separate counter keeps it from racing the test above.
+ /// Factory for the `run_partitions_modules_by_registered_factory` test /// a separate counter keeps it from racing the test above.
     fn partition_factory() -> Box<dyn Calculator> {
         Box::new(StubCalc {
             name: "BaseRateCalculator",
@@ -1151,10 +1149,10 @@ mod tests {
         })
     }
 
-    // ---- RunSpec / registry fixtures --------------------------------------
+ // ---- RunSpec / registry fixtures --------------------------------------
 
-    /// RunSpec selecting CO (pollutant 2) for Running Exhaust (process 1),
-    /// a single county-scale July weekday hour.
+ /// RunSpec selecting CO (pollutant 2) for Running Exhaust (process 1),
+ /// a single county-scale July weekday hour.
     fn sample_runspec() -> RunSpec {
         RunSpec {
             models: vec![Model::Onroad],
@@ -1177,8 +1175,8 @@ mod tests {
         }
     }
 
-    /// Registry over a one-calculator DAG: BaseRateCalculator, registered
-    /// for (CO, Running Exhaust), subscribing at PROCESS granularity.
+ /// Registry over a one-calculator DAG: BaseRateCalculator, registered
+ /// for (CO, Running Exhaust), subscribing at PROCESS granularity.
     fn single_calc_registry() -> CalculatorRegistry {
         let info = parse_calculator_info_str(
             "Registration\tCO\t2\tRunning Exhaust\t1\tBaseRateCalculator\n\
@@ -1189,7 +1187,7 @@ mod tests {
         CalculatorRegistry::new(build_dag(&info, &[]).unwrap())
     }
 
-    /// Registry over a two-module chain: UpstreamGen → BaseRateCalculator.
+ /// Registry over a two-module chain: UpstreamGen → BaseRateCalculator.
     fn chained_registry() -> CalculatorRegistry {
         let info = parse_calculator_info_str(
             "Registration\tCO\t2\tRunning Exhaust\t1\tBaseRateCalculator\n\
@@ -1206,7 +1204,7 @@ mod tests {
         EngineConfig::new(root)
     }
 
-    // ---- ExecutionRunSpec wiring ------------------------------------------
+ // ---- ExecutionRunSpec wiring ------------------------------------------
 
     #[test]
     fn new_derives_the_execution_run_spec() {
@@ -1222,7 +1220,7 @@ mod tests {
         assert!(exec.hours.contains(&8));
     }
 
-    // ---- Planning ----------------------------------------------------------
+ // ---- Planning ----------------------------------------------------------
 
     #[test]
     fn planned_modules_filters_to_the_runspec_selection() {
@@ -1239,7 +1237,7 @@ mod tests {
 
     #[test]
     fn planned_modules_is_empty_when_no_pair_matches() {
-        // RunSpec selects (pollutant 99, process 99) — nothing in the DAG.
+ // RunSpec selects (pollutant 99, process 99) — nothing in the DAG.
         let mut spec = sample_runspec();
         spec.pollutant_process_associations = vec![PollutantProcessAssociation {
             pollutant_id: 99,
@@ -1259,12 +1257,12 @@ mod tests {
             config(Path::new("/tmp/unused")),
         );
         let chunks = engine.planned_chunks().unwrap();
-        // UpstreamGen → BaseRateCalculator is one connected chain.
+ // UpstreamGen → BaseRateCalculator is one connected chain.
         assert_eq!(chunks.len(), 1);
         assert_eq!(chunks[0].modules(), ["UpstreamGen", "BaseRateCalculator"]);
     }
 
-    // ---- run() -------------------------------------------------------------
+ // ---- run() -------------------------------------------------------------
 
     #[test]
     fn run_writes_the_moves_run_metadata_file() {
@@ -1326,7 +1324,7 @@ mod tests {
             .unwrap();
         let mut engine = MOVESEngine::new(sample_runspec(), registry, config(dir.path()));
         engine.run().unwrap();
-        // One iteration × one process × one PROCESS-granularity subscription.
+ // One iteration × one process × one PROCESS-granularity subscription.
         assert_eq!(ENGINE_RUN_CALC.load(Ordering::SeqCst), 1);
     }
 
@@ -1344,7 +1342,7 @@ mod tests {
             single_calc_registry(),
             config(dir2.path()),
         );
-        // `0` expands to the host's available parallelism.
+ // `0` expands to the host's available parallelism.
         let outcome = engine2.run().unwrap();
         assert!(outcome.max_parallel_chunks >= 1);
     }
@@ -1359,7 +1357,7 @@ mod tests {
         assert_eq!(engine.run().unwrap().iterations, 4);
     }
 
-    // ---- Run-record construction ------------------------------------------
+ // ---- Run-record construction ------------------------------------------
 
     #[test]
     fn build_run_record_maps_runspec_fields() {
@@ -1381,7 +1379,7 @@ mod tests {
             record.run_spec_description.as_deref(),
             Some("engine fixture")
         );
-        // SHA-256 hex is 64 lowercase hex chars.
+ // SHA-256 hex is 64 lowercase hex chars.
         assert_eq!(record.run_hash.len(), 64);
         assert!(record.run_hash.bytes().all(|b| b.is_ascii_hexdigit()));
     }
@@ -1420,7 +1418,7 @@ mod tests {
             aggregate_by: None,
         };
         let exec = ExecutionRunSpec::new(spec);
-        // 2 years × 2 months × 1 day × 2 hours = 8 fully-specified tuples.
+ // 2 years × 2 months × 1 day × 2 hours = 8 fully-specified tuples.
         let times = build_times(&exec);
         assert_eq!(times.len(), 8);
         assert!(times.iter().all(|t| {
@@ -1428,7 +1426,7 @@ mod tests {
         }));
     }
 
-    // ---- Adapter -----------------------------------------------------------
+ // ---- Adapter -----------------------------------------------------------
 
     fn stub_chunk_ctx() -> Arc<Mutex<CalculatorContext>> {
         Arc::new(Mutex::new(CalculatorContext::new()))
@@ -1476,17 +1474,17 @@ mod tests {
         };
 
         let mut ctx = MasterLoopContext::default();
-        // Matching process: the module runs.
+ // Matching process: the module runs.
         ctx.position.process_id = Some(ProcessId(1));
         adapter.execute_at_granularity(&ctx).unwrap();
         assert_eq!(ADAPTER_GATE_CALC.load(Ordering::SeqCst), 1);
 
-        // Different process: gated out, no run.
+ // Different process: gated out, no run.
         ctx.position.process_id = Some(ProcessId(2));
         adapter.execute_at_granularity(&ctx).unwrap();
         assert_eq!(ADAPTER_GATE_CALC.load(Ordering::SeqCst), 1);
 
-        // No process set (e.g. start-of-run): gated out.
+ // No process set (e.g. start-of-run): gated out.
         ctx.position.process_id = None;
         adapter.execute_at_granularity(&ctx).unwrap();
         assert_eq!(ADAPTER_GATE_CALC.load(Ordering::SeqCst), 1);
@@ -1520,13 +1518,13 @@ mod tests {
         assert_eq!(run_record_path(root), root.join("MOVESRun.parquet"));
     }
 
-    // ---- Control-strategy integration ------------------------------------
-    //
-    // Each test uses its own static counters and strategy type so the
-    // parallel test runner cannot race on shared state — the same pattern
-    // the calculator tests above use for ENGINE_RUN_CALC / PARTITION_RUN_CALC.
+ // ---- Control-strategy integration ------------------------------------
+ //
+ // Each test uses its own static counters and strategy type so the
+ // parallel test runner cannot race on shared state — the same pattern
+ // the calculator tests above use for ENGINE_RUN_CALC / PARTITION_RUN_CALC.
 
-    // --- strategies_applied test ---
+ // --- strategies_applied test ---
     #[derive(Debug)]
     struct NamedStrategy;
     impl InternalControlStrategy for NamedStrategy {
@@ -1559,7 +1557,7 @@ mod tests {
         assert_eq!(outcome.strategies_applied, vec!["NamedStrategy"]);
     }
 
-    // --- pre_run / post_run fire once ---
+ // --- pre_run / post_run fire once ---
     static LIFECYCLE_PRE: AtomicUsize = AtomicUsize::new(0);
     static LIFECYCLE_POST: AtomicUsize = AtomicUsize::new(0);
 
@@ -1597,7 +1595,7 @@ mod tests {
         assert_eq!(LIFECYCLE_POST.load(Ordering::SeqCst), 1);
     }
 
-    // --- execute fires per-process-iteration ---
+ // --- execute fires per-process-iteration ---
     static EXEC_COUNT: AtomicUsize = AtomicUsize::new(0);
 
     #[derive(Debug)]
@@ -1631,9 +1629,9 @@ mod tests {
         let dir = tempdir().unwrap();
         let mut sr = ControlStrategyRegistry::new();
         sr.register(exec_count_factory);
-        // sample_runspec selects one process (Running Exhaust, id 1). The
-        // single_calc_registry produces one chunk, so ExecCountStrategy.execute
-        // fires once: one process × one chunk.
+ // sample_runspec selects one process (Running Exhaust, id 1). The
+ // single_calc_registry produces one chunk, so ExecCountStrategy.execute
+ // fires once: one process × one chunk.
         let mut engine =
             MOVESEngine::new(sample_runspec(), single_calc_registry(), config(dir.path()))
                 .with_strategy_registry(sr);
@@ -1641,7 +1639,7 @@ mod tests {
         assert_eq!(EXEC_COUNT.load(Ordering::SeqCst), 1);
     }
 
-    // --- adapter gate test ---
+ // --- adapter gate test ---
     static GATE_CTR: AtomicUsize = AtomicUsize::new(0);
 
     #[derive(Debug)]
@@ -1658,8 +1656,8 @@ mod tests {
 
     #[test]
     fn strategy_adapter_gates_on_process_id() {
-        // Direct unit-test of StrategyMasterLoopable: fires for the matching
-        // process and no-ops for others.
+ // Direct unit-test of StrategyMasterLoopable: fires for the matching
+ // process and no-ops for others.
         GATE_CTR.store(0, Ordering::SeqCst);
         let strategy: Arc<dyn InternalControlStrategy> = Arc::new(GatedStrategy);
         let adapter = StrategyMasterLoopable {
@@ -1667,33 +1665,33 @@ mod tests {
             gate_process: ProcessId(1),
         };
         let mut ctx = MasterLoopContext::default();
-        // Matching process fires.
+ // Matching process fires.
         ctx.position.process_id = Some(ProcessId(1));
         adapter.execute_at_granularity(&ctx).unwrap();
         assert_eq!(GATE_CTR.load(Ordering::SeqCst), 1);
-        // Different process: gated out.
+ // Different process: gated out.
         ctx.position.process_id = Some(ProcessId(2));
         adapter.execute_at_granularity(&ctx).unwrap();
         assert_eq!(GATE_CTR.load(Ordering::SeqCst), 1);
-        // No process set: gated out.
+ // No process set: gated out.
         ctx.position.process_id = None;
         adapter.execute_at_granularity(&ctx).unwrap();
         assert_eq!(GATE_CTR.load(Ordering::SeqCst), 1);
     }
 
-    // ---- chunk_* tests: per-chunk scratch isolation and visibility ----------
-    //
-    // These tests verify:
-    // 1. Generators write scratch; downstream calculators in the same chunk
-    //    can read it (topo-order visibility).
-    // 2. Separate chunks have disjoint scratch namespaces (isolation).
-    //
-    // Each test uses its own static AtomicBool flags and named `fn` factories
-    // so the parallel test runner never races on shared state.
+ // ---- chunk_* tests: per-chunk scratch isolation and visibility ----------
+ //
+ // These tests verify:
+ // 1. Generators write scratch; downstream calculators in the same chunk
+ // can read it (topo-order visibility).
+ // 2. Separate chunks have disjoint scratch namespaces (isolation).
+ //
+ // Each test uses its own static AtomicBool flags and named `fn` factories
+ // so the parallel test runner never races on shared state.
 
     use std::sync::atomic::AtomicBool;
 
-    /// Generator that writes a one-row DataFrame under a fixed scratch key.
+ /// Generator that writes a one-row DataFrame under a fixed scratch key.
     #[derive(Debug)]
     struct ScratchWriterGen {
         name: &'static str,
@@ -1717,7 +1715,7 @@ mod tests {
         }
     }
 
-    /// Calculator that records whether `key` is present in the chunk scratch.
+ /// Calculator that records whether `key` is present in the chunk scratch.
     #[derive(Debug)]
     struct ScratchCheckCalc {
         name: &'static str,
@@ -1762,7 +1760,7 @@ mod tests {
         )]
     }
 
-    /// Build a single-chain registry: writer (generator) → checker (calculator).
+ /// Build a single-chain registry: writer (generator) → checker (calculator).
     fn single_scratch_registry(writer: &'static str, checker: &'static str) -> CalculatorRegistry {
         let info_str = "Registration\tCO\t2\tRunning Exhaust\t1\t".to_string()
             + checker
@@ -1779,7 +1777,7 @@ mod tests {
         CalculatorRegistry::new(build_dag(&info, &[]).unwrap())
     }
 
-    /// Build a two-chain registry: two independent (writer → checker) chains.
+ /// Build a two-chain registry: two independent (writer → checker) chains.
     fn two_chain_registry(
         writer_a: &'static str,
         checker_a: &'static str,
@@ -1811,7 +1809,7 @@ mod tests {
         CalculatorRegistry::new(build_dag(&info, &[]).unwrap())
     }
 
-    // -- chunk_scratch_visible_within_chunk_topo_order ----------------------
+ // -- chunk_scratch_visible_within_chunk_topo_order ----------------------
 
     static VISIBLE_FOUND: AtomicBool = AtomicBool::new(false);
 
@@ -1833,8 +1831,8 @@ mod tests {
 
     #[test]
     fn chunk_scratch_visible_within_chunk_topo_order() {
-        // GENERATOR priority fires before EMISSION_CALCULATOR. The calculator
-        // must find the key the generator wrote in the same chunk context.
+ // GENERATOR priority fires before EMISSION_CALCULATOR. The calculator
+ // must find the key the generator wrote in the same chunk context.
         VISIBLE_FOUND.store(false, Ordering::SeqCst);
         let dir = tempdir().unwrap();
         let mut registry = single_scratch_registry("VisibleWriter", "VisibleChecker");
@@ -1852,7 +1850,7 @@ mod tests {
         );
     }
 
-    // -- generator_write_then_calculator_read_same_chunk_roundtrips ---------
+ // -- generator_write_then_calculator_read_same_chunk_roundtrips ---------
 
     static ROUNDTRIP_FOUND: AtomicBool = AtomicBool::new(false);
 
@@ -1874,7 +1872,7 @@ mod tests {
 
     #[test]
     fn generator_write_then_calculator_read_same_chunk_roundtrips() {
-        // End-to-end roundtrip: generator inserts a DataFrame, calculator reads it.
+ // End-to-end roundtrip: generator inserts a DataFrame, calculator reads it.
         ROUNDTRIP_FOUND.store(false, Ordering::SeqCst);
         let dir = tempdir().unwrap();
         let mut registry = single_scratch_registry("RoundtripWriter", "RoundtripChecker");
@@ -1892,7 +1890,7 @@ mod tests {
         );
     }
 
-    // -- chunk_scratch_is_isolated_across_chunks ----------------------------
+ // -- chunk_scratch_is_isolated_across_chunks ----------------------------
 
     static ISO_A_SAW_B: AtomicBool = AtomicBool::new(false);
     static ISO_B_SAW_A: AtomicBool = AtomicBool::new(false);
@@ -1943,8 +1941,8 @@ mod tests {
 
     #[test]
     fn chunk_scratch_is_isolated_across_chunks() {
-        // Two independent chains run sequentially. Each checker looks for the
-        // other chain's scratch key — isolated contexts must prevent leakage.
+ // Two independent chains run sequentially. Each checker looks for the
+ // other chain's scratch key — isolated contexts must prevent leakage.
         ISO_A_SAW_B.store(false, Ordering::SeqCst);
         ISO_B_SAW_A.store(false, Ordering::SeqCst);
         let dir = tempdir().unwrap();
@@ -1962,7 +1960,7 @@ mod tests {
         );
     }
 
-    // -- concurrent_chunks_do_not_observe_each_others_scratch ---------------
+ // -- concurrent_chunks_do_not_observe_each_others_scratch ---------------
 
     static CONC_A_SAW_B: AtomicBool = AtomicBool::new(false);
     static CONC_B_SAW_A: AtomicBool = AtomicBool::new(false);
@@ -2000,9 +1998,9 @@ mod tests {
 
     #[test]
     fn concurrent_chunks_do_not_observe_each_others_scratch() {
-        // Two independent chains, parallel execution. Each chunk's
-        // CalculatorContext is a separate Arc<Mutex<…>> so concurrent
-        // execution cannot cause cross-chunk scratch leakage.
+ // Two independent chains, parallel execution. Each chunk's
+ // CalculatorContext is a separate Arc<Mutex<…>> so concurrent
+ // execution cannot cause cross-chunk scratch leakage.
         CONC_A_SAW_B.store(false, Ordering::SeqCst);
         CONC_B_SAW_A.store(false, Ordering::SeqCst);
         let dir = tempdir().unwrap();
@@ -2030,18 +2028,18 @@ mod tests {
         );
     }
 
-    // ---- Streaming aggregation regression ----------------------------------
-    //
-    // Verifies that a calculator producing emission DataFrames has its rows
-    // folded into the streaming aggregator and written to Parquet correctly.
-    // Raw row accumulation is replaced by streaming aggregation, so peak
-    // in-memory residency is bounded by N_distinct_groups × record_size.
+ // ---- Streaming aggregation regression ----------------------------------
+ //
+ // Verifies that a calculator producing emission DataFrames has its rows
+ // folded into the streaming aggregator and written to Parquet correctly.
+ // Raw row accumulation is replaced by streaming aggregation, so peak
+ // in-memory residency is bounded by N_distinct_groups × record_size.
 
     static EMITTING_RUNS: AtomicUsize = AtomicUsize::new(0);
 
-    /// Calculator that returns a tiny emission DataFrame (two rows, same
-    /// pollutant/year/month/day/hour) on every invocation. Used to verify
-    /// the streaming aggregation path end-to-end.
+ /// Calculator that returns a tiny emission DataFrame (two rows, same
+ /// pollutant/year/month/day/hour) on every invocation. Used to verify
+ /// the streaming aggregation path end-to-end.
     #[derive(Debug)]
     struct EmittingCalc {
         subs: Vec<CalculatorSubscription>,
@@ -2060,9 +2058,9 @@ mod tests {
         fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput> {
             EMITTING_RUNS.fetch_add(1, Ordering::SeqCst);
             use polars::prelude::{DataFrame, NamedFrom, Series};
-            // Emit two rows for pollutant 2 (CO), emissionQuant 1.0 and 2.0.
-            // Both rows share identical key columns so they roll into one
-            // aggregated row with emissionQuant = 3.0.
+ // Emit two rows for pollutant 2 (CO), emissionQuant 1.0 and 2.0.
+ // Both rows share identical key columns so they roll into one
+ // aggregated row with emissionQuant = 3.0.
             let df = DataFrame::new(
                 2,
                 vec![
@@ -2107,18 +2105,18 @@ mod tests {
         let mut engine = MOVESEngine::new(sample_runspec(), registry, config(dir.path()));
         engine.run().unwrap();
 
-        // The calculator fired once (one process × one PROCESS-granularity sub).
+ // The calculator fired once (one process × one PROCESS-granularity sub).
         assert_eq!(EMITTING_RUNS.load(Ordering::SeqCst), 1);
 
-        // The emission Parquet must exist under MOVESOutput/.
-        // sample_runspec is Hour timestep (years=[2020], months=[7], days=[5],
-        // hours=[8]), so the partition is yearID=2020/monthID=7.
+ // The emission Parquet must exist under MOVESOutput/.
+ // sample_runspec is Hour timestep (years=[2020], months=[7], days=[5],
+ // hours=[8]), so the partition is yearID=2020/monthID=7.
         let partition = dir
             .path()
             .join("MOVESOutput/yearID=2020/monthID=7/part.parquet");
         assert!(partition.exists(), "emission partition must be written");
 
-        // Read it back and check row count and summed emissionQuant.
+ // Read it back and check row count and summed emissionQuant.
         use bytes::Bytes;
         use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
         let raw = std::fs::read(&partition).unwrap();
@@ -2128,10 +2126,10 @@ mod tests {
             .unwrap();
         let batch = reader.next().unwrap().unwrap();
 
-        // Hour + County aggregation: all dimensions kept, so each raw row
-        // may map to a distinct group. Two rows with the same keys (same
-        // pollutant/year/month/day/hour) should aggregate into one row with
-        // emissionQuant = 1.0 + 2.0 = 3.0.
+ // Hour + County aggregation: all dimensions kept, so each raw row
+ // may map to a distinct group. Two rows with the same keys (same
+ // pollutant/year/month/day/hour) should aggregate into one row with
+ // emissionQuant = 1.0 + 2.0 = 3.0.
         let quant_idx = batch.schema().index_of("emissionQuant").unwrap();
         let quant_col = batch
             .column(quant_idx)

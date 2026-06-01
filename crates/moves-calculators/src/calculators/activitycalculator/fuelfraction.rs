@@ -5,9 +5,7 @@
 //! non-hotelling activity section runs to split a base activity quantity
 //! across the source bin.
 //!
-//! `createSourceTypeFuelFraction` builds the `sourceTypeFuelFraction` table —
-//! the share of a `(sourceType, modelYear)` population on each fuel type —
-//! from the sample-vehicle fleet. The script offers two variants, selected by
+//! `createSourceTypeFuelFraction` builds the `sourceTypeFuelFraction` table//! the share of a `(sourceType, modelYear)` population on each fuel type//! from the sample-vehicle fleet. The script offers two variants, selected by
 //! the Java `CompilationFlags.USE_FUELUSAGEFRACTION` flag and modelled here
 //! by [`FuelFractionMode`].
 //!
@@ -28,14 +26,14 @@ use super::model::SourceTypeFuelFractionRow;
 /// `CompilationFlags.USE_FUELUSAGEFRACTION` switch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum FuelFractionMode {
-    /// `UseSampleVehiclePopulation` — `tempFuelFraction` is `sum(stmyFraction)`
-    /// straight from `sampleVehiclePopulation`. The default, matching
-    /// `USE_FUELUSAGEFRACTION = false`.
+ /// `UseSampleVehiclePopulation` — `tempFuelFraction` is `sum(stmyFraction)`
+ /// straight from `sampleVehiclePopulation`. The default, matching
+ /// `USE_FUELUSAGEFRACTION = false`.
     #[default]
     SampleVehiclePopulation,
-    /// `UseFuelUsageFraction` — `tempFuelFraction` reassigns each vehicle's
-    /// nominal fuel to the fuel it actually burns via `fuelUsageFraction`,
-    /// weighting by `usageFraction`.
+ /// `UseFuelUsageFraction` — `tempFuelFraction` reassigns each vehicle's
+ /// nominal fuel to the fuel it actually burns via `fuelUsageFraction`,
+ /// weighting by `usageFraction`.
     FuelUsageFraction,
 }
 
@@ -56,20 +54,20 @@ pub fn create_source_type_fuel_fraction(
     inputs: &ActivityInputs,
     mode: FuelFractionMode,
 ) -> Vec<SourceTypeFuelFractionRow> {
-    // `sourceTypeFuelFractionTemp` — numerator, keyed (sourceTypeModelYearID,
-    // fuelTypeID).
+ // `sourceTypeFuelFractionTemp` — numerator, keyed (sourceTypeModelYearID,
+ // fuelTypeID).
     let temp = build_temp(inputs, mode);
 
-    // `sourceTypeFuelFractionTotal` — denominator, keyed sourceTypeModelYearID:
-    // sum(stmyFraction) over all fuel types.
+ // `sourceTypeFuelFractionTotal` — denominator, keyed sourceTypeModelYearID:
+ // sum(stmyFraction) over all fuel types.
     let mut total: HashMap<i32, f64> = HashMap::new();
     for svp in &inputs.sample_vehicle_population {
-        *total.entry(svp.source_type_model_year_id).or_insert(0.0) += svp.stmy_fraction;
+ *total.entry(svp.source_type_model_year_id).or_insert(0.0) += svp.stmy_fraction;
     }
 
-    // The `UPDATE sourceTypeFuelFractionTotal, sourceTypeModelYear` step:
-    // resolve each surrogate key to its (sourceType, modelYear). Rows with no
-    // match keep NULL ids and are dropped by the final join.
+ // The `UPDATE sourceTypeFuelFractionTotal, sourceTypeModelYear` step:
+ // resolve each surrogate key to its (sourceType, modelYear). Rows with no
+ // match keep NULL ids and are dropped by the final join.
     let resolve: HashMap<i32, (i32, i32)> = inputs
         .source_type_model_year
         .iter()
@@ -81,7 +79,7 @@ pub fn create_source_type_fuel_fraction(
         })
         .collect();
 
-    // `runSpecSourceFuelType` gate on the final join.
+ // `runSpecSourceFuelType` gate on the final join.
     let run_spec: HashSet<(i32, i32)> = inputs
         .run_spec_source_fuel_type
         .iter()
@@ -90,15 +88,15 @@ pub fn create_source_type_fuel_fraction(
 
     let mut out = Vec::with_capacity(temp.len());
     for (&(stmy_id, fuel_type_id), &temp_fuel_fraction) in &temp {
-        // INNER JOIN sourceTypeFuelFractionTotal t.
+ // INNER JOIN sourceTypeFuelFractionTotal t.
         let Some(&temp_total) = total.get(&stmy_id) else {
             continue;
         };
-        // The UPDATE-supplied (sourceTypeID, modelYearID); NULL ids drop out.
+ // The UPDATE-supplied (sourceTypeID, modelYearID); NULL ids drop out.
         let Some(&(source_type_id, model_year_id)) = resolve.get(&stmy_id) else {
             continue;
         };
-        // INNER JOIN runSpecSourceFuelType rs.
+ // INNER JOIN runSpecSourceFuelType rs.
         if !run_spec.contains(&(source_type_id, fuel_type_id)) {
             continue;
         }
@@ -131,16 +129,16 @@ fn build_temp(inputs: &ActivityInputs, mode: FuelFractionMode) -> HashMap<(i32, 
     let mut temp: HashMap<(i32, i32), f64> = HashMap::new();
     match mode {
         FuelFractionMode::SampleVehiclePopulation => {
-            // sum(stmyFraction) GROUP BY sourceTypeModelYearID, fuelTypeID.
+ // sum(stmyFraction) GROUP BY sourceTypeModelYearID, fuelTypeID.
             for svp in &inputs.sample_vehicle_population {
-                *temp
+ *temp
                     .entry((svp.source_type_model_year_id, svp.fuel_type_id))
                     .or_insert(0.0) += svp.stmy_fraction;
             }
         }
         FuelFractionMode::FuelUsageFraction => {
-            // fuelUsageFraction filtered to this county / fuel year, indexed
-            // by the nominal (source-bin) fuel type.
+ // fuelUsageFraction filtered to this county / fuel year, indexed
+ // by the nominal (source-bin) fuel type.
             let mut usage: HashMap<i32, Vec<(i32, f64)>> = HashMap::new();
             for fuf in &inputs.fuel_usage_fraction {
                 if fuf.county_id == inputs.context.county_id
@@ -153,14 +151,14 @@ fn build_temp(inputs: &ActivityInputs, mode: FuelFractionMode) -> HashMap<(i32, 
                         .push((fuf.fuel_supply_fuel_type_id, fuf.usage_fraction));
                 }
             }
-            // sum(stmyFraction * usageFraction) GROUP BY sourceTypeModelYearID,
-            // fuelSupplyFuelTypeID.
+ // sum(stmyFraction * usageFraction) GROUP BY sourceTypeModelYearID,
+ // fuelSupplyFuelTypeID.
             for svp in &inputs.sample_vehicle_population {
                 let Some(supplies) = usage.get(&svp.fuel_type_id) else {
                     continue;
                 };
                 for &(supply_fuel_type_id, usage_fraction) in supplies {
-                    *temp
+ *temp
                         .entry((svp.source_type_model_year_id, supply_fuel_type_id))
                         .or_insert(0.0) += svp.stmy_fraction * usage_fraction;
                 }
@@ -178,7 +176,7 @@ pub struct FuelFractionIndex {
 }
 
 impl FuelFractionIndex {
-    /// Index `sourceTypeFuelFraction` rows by `(sourceTypeID, modelYearID)`.
+ /// Index `sourceTypeFuelFraction` rows by `(sourceTypeID, modelYearID)`.
     #[must_use]
     pub fn new(rows: &[SourceTypeFuelFractionRow]) -> Self {
         let mut map: HashMap<(i32, i32), Vec<(i32, f64)>> = HashMap::new();
@@ -190,9 +188,9 @@ impl FuelFractionIndex {
         Self { rows: map }
     }
 
-    /// The `(fuelTypeID, fuelFraction)` rows of a `(sourceType, modelYear)`
-    /// bin — empty when the bin has no fuel-fraction row (the `stff` inner
-    /// join then drops it).
+ /// The `(fuelTypeID, fuelFraction)` rows of a `(sourceType, modelYear)`
+ /// bin — empty when the bin has no fuel-fraction row (the `stff` inner
+ /// join then drops it).
     #[must_use]
     pub fn fractions(&self, source_type_id: i32, model_year_id: i32) -> &[(i32, f64)] {
         self.rows
@@ -209,8 +207,8 @@ pub struct RegClassIndex {
 }
 
 impl RegClassIndex {
-    /// Index `RegClassSourceTypeFraction` rows by `(sourceTypeID, fuelTypeID,
-    /// modelYearID)`.
+ /// Index `RegClassSourceTypeFraction` rows by `(sourceTypeID, fuelTypeID,
+ /// modelYearID)`.
     #[must_use]
     pub fn new(rows: &[super::inputs::RegClassSourceTypeFractionRow]) -> Self {
         let mut map: HashMap<(i32, i32, i32), Vec<(i32, f64)>> = HashMap::new();
@@ -222,9 +220,9 @@ impl RegClassIndex {
         Self { rows: map }
     }
 
-    /// The `(regClassID, regClassFraction)` rows of a `(sourceType, fuelType,
-    /// modelYear)` bin — empty when the bin has none (the `stf` inner join
-    /// then drops it).
+ /// The `(regClassID, regClassFraction)` rows of a `(sourceType, fuelType,
+ /// modelYear)` bin — empty when the bin has none (the `stf` inner join
+ /// then drops it).
     #[must_use]
     pub fn reg_classes(
         &self,
@@ -242,11 +240,11 @@ impl RegClassIndex {
 /// the weight `fuelFraction * regClassFraction` applied to the base activity.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FuelRegClassWeight {
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `regClassID`.
+ /// `regClassID`.
     pub reg_class_id: i32,
-    /// `fuelFraction * regClassFraction`.
+ /// `fuelFraction * regClassFraction`.
     pub weight: f64,
 }
 
@@ -287,9 +285,9 @@ mod tests {
     };
     use super::*;
 
-    /// Build inputs for one source-type/model-year sampled across two fuel
-    /// types: stmyID 7 = (sourceType 21, modelYear 2018), fuel 1 share 0.75,
-    /// fuel 2 share 0.25.
+ /// Build inputs for one source-type/model-year sampled across two fuel
+ /// types: stmyID 7 = (sourceType 21, modelYear 2018), fuel 1 share 0.75,
+ /// fuel 2 share 0.25.
     fn two_fuel_inputs() -> ActivityInputs {
         ActivityInputs {
             sample_vehicle_population: vec![
@@ -330,12 +328,12 @@ mod tests {
             FuelFractionMode::SampleVehiclePopulation,
         );
         assert_eq!(out.len(), 2);
-        // 0.75 / (0.75 + 0.25) and 0.25 / 1.0.
+ // 0.75 / (0.75 + 0.25) and 0.25 / 1.0.
         assert!((out[0].fuel_fraction - 0.75).abs() < 1e-12);
         assert_eq!(out[0].fuel_type_id, 1);
         assert!((out[1].fuel_fraction - 0.25).abs() < 1e-12);
         assert_eq!(out[1].fuel_type_id, 2);
-        // Output carries the resolved (sourceType, modelYear).
+ // Output carries the resolved (sourceType, modelYear).
         assert!(out
             .iter()
             .all(|r| r.source_type_id == 21 && r.model_year_id == 2018));
@@ -344,20 +342,20 @@ mod tests {
     #[test]
     fn run_spec_gate_drops_unselected_fuel_pairs() {
         let mut inputs = two_fuel_inputs();
-        // Drop fuel 2 from the RunSpec selection.
+ // Drop fuel 2 from the RunSpec selection.
         inputs.run_spec_source_fuel_type.pop();
         let out =
             create_source_type_fuel_fraction(&inputs, FuelFractionMode::SampleVehiclePopulation);
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].fuel_type_id, 1);
-        // The denominator still includes the dropped fuel's sample share.
+ // The denominator still includes the dropped fuel's sample share.
         assert!((out[0].fuel_fraction - 0.75).abs() < 1e-12);
     }
 
     #[test]
     fn unresolved_surrogate_key_drops_out() {
         let mut inputs = two_fuel_inputs();
-        // Remove the sourceTypeModelYear row: the UPDATE leaves NULL ids.
+ // Remove the sourceTypeModelYear row: the UPDATE leaves NULL ids.
         inputs.source_type_model_year.clear();
         let out =
             create_source_type_fuel_fraction(&inputs, FuelFractionMode::SampleVehiclePopulation);
@@ -373,7 +371,7 @@ mod tests {
             fuel_year_id: 2018,
             ..IterationContext::default()
         };
-        // All of nominal fuel 1 is actually burned as supply fuel 2.
+ // All of nominal fuel 1 is actually burned as supply fuel 2.
         inputs.fuel_usage_fraction = vec![
             FuelUsageFractionRow {
                 county_id: 26161,
@@ -393,7 +391,7 @@ mod tests {
             },
         ];
         let out = create_source_type_fuel_fraction(&inputs, FuelFractionMode::FuelUsageFraction);
-        // Both nominal fuels collapse onto supply fuel 2: one row, fraction 1.
+ // Both nominal fuels collapse onto supply fuel 2: one row, fraction 1.
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].fuel_type_id, 2);
         assert!((out[0].fuel_fraction - 1.0).abs() < 1e-12);
@@ -408,7 +406,7 @@ mod tests {
             fuel_year_id: 2018,
             ..IterationContext::default()
         };
-        // Wrong county / fuel year / model-year group — all filtered out.
+ // Wrong county / fuel year / model-year group — all filtered out.
         inputs.fuel_usage_fraction = vec![
             FuelUsageFractionRow {
                 county_id: 99999,
@@ -471,10 +469,10 @@ mod tests {
             fuel_type_id: 1,
             fuel_fraction: 0.8,
         }]);
-        // No RegClassSourceTypeFraction rows: the `stf` join yields nothing.
+ // No RegClassSourceTypeFraction rows: the `stf` join yields nothing.
         let reg = RegClassIndex::new(&[]);
         assert!(fuel_reg_class_weights(&fuel, &reg, 21, 2018).is_empty());
-        // Unknown bin: the `stff` join yields nothing.
+ // Unknown bin: the `stff` join yields nothing.
         let reg2 = RegClassIndex::new(&[RegClassSourceTypeFractionRow {
             source_type_id: 21,
             fuel_type_id: 1,

@@ -2,8 +2,7 @@
 //! `SourceTypePhysics` external-generator step that corrects the rates-mode
 //! `RatesOpModeDistribution` operating-mode-distribution table.
 //!
-//! Migration plan: Phase 3, Task 37.
-//!
+//! //!
 //! # What this step does
 //!
 //! MOVES models some `(model-year range, regulatory class)` combinations
@@ -14,9 +13,9 @@
 //!
 //! * temporary source types are replaced with their real source type;
 //! * the normal operating modes (`0..100`) of a temporary source type are
-//!   shifted by a per-mapping `opModeIDOffset` into a range unique to that
-//!   temporary source type, so a real source type can carry several
-//!   model-year-specific operating-mode sets at once;
+//! shifted by a per-mapping `opModeIDOffset` into a range unique to that
+//! temporary source type, so a real source type can carry several
+//! model-year-specific operating-mode sets at once;
 //! * wildcard placeholders and superseded real-source-type rows are dropped.
 //!
 //! The `sourceUseTypePhysicsMapping` table drives the rewrite: each record
@@ -33,7 +32,7 @@
 //!
 //! The wider `SourceTypePhysics.java` class (1 053 lines) also offsets
 //! emission-rate tables and builds the expanded-operating-modes table — the
-//! "tractive power / vehicle-specific power" work the migration-plan summary
+//! "tractive power / vehicle-specific power" work the summary
 //! alludes to. None of that is in the pinned Go file, so none of it is in
 //! this task; the Go file is exactly the `RatesOpModeDistribution`
 //! external-generator fast path and nothing else.
@@ -60,11 +59,11 @@
 //! reproduces both: it processes rows in descending primary-key order and
 //! keeps the first row written for each output primary key.
 //!
-//! # Data plane (Task 50)
+//! # Data plane
 //!
 //! [`Generator::execute`] receives a [`CalculatorContext`] whose
 //! `ExecutionTables` / `ScratchNamespace` are Phase-2 placeholders until the
-//! `DataFrameStore` lands (migration-plan Task 50), so `execute` cannot yet
+//! `DataFrameStore` lands (), so `execute` cannot yet
 //! read `sourceUseTypePhysicsMapping` / `RatesOpModeDistribution` nor write
 //! the corrected table back. The numerically faithful algorithm is fully
 //! ported and unit-tested on [`SourceUseTypePhysicsMapping`]; once the data
@@ -106,11 +105,11 @@ const NORMAL_OP_MODE_COUNT: i32 = 100;
 /// unique to it, so the real source type can host several at once.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SourceUseTypePhysicsMappingDetail {
-    /// `realSourceTypeID`.
+ /// `realSourceTypeID`.
     pub real_source_type_id: SourceTypeId,
-    /// `tempSourceTypeID`.
+ /// `tempSourceTypeID`.
     pub temp_source_type_id: SourceTypeId,
-    /// `opModeIDOffset`.
+ /// `opModeIDOffset`.
     pub op_mode_id_offset: i32,
 }
 
@@ -128,8 +127,7 @@ pub struct SourceUseTypePhysicsMappingDetail {
 /// negative `polProcessID` values as wildcard placeholders, which the
 /// unsigned `PolProcessId` newtype cannot represent.
 ///
-/// `op_mode_fraction_cv` is the post-`COALESCE(opModeFractionCV, 0)` value —
-/// the Go query coalesces a `NULL` to `0`.
+/// `op_mode_fraction_cv` is the post-`COALESCE(opModeFractionCV, 0)` value/// the Go query coalesces a `NULL` to `0`.
 ///
 /// `moves_calculators::generators::rates_op_mode_distribution` defines a
 /// narrower, eight-column `RatesOpModeDistributionRow` for the rows *that*
@@ -142,37 +140,36 @@ pub struct SourceUseTypePhysicsMappingDetail {
 /// avgSpeedBinID)`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OpModeDistributionRow {
-    /// `sourceTypeID` — the correction's lookup key; rewritten temp→real.
+ /// `sourceTypeID` — the correction's lookup key; rewritten temp→real.
     pub source_type_id: SourceTypeId,
-    /// `roadTypeID` — carried through unchanged.
+ /// `roadTypeID` — carried through unchanged.
     pub road_type_id: i32,
-    /// `avgSpeedBinID` — carried through unchanged.
+ /// `avgSpeedBinID` — carried through unchanged.
     pub avg_speed_bin_id: i32,
-    /// `hourDayID` — carried through unchanged.
+ /// `hourDayID` — carried through unchanged.
     pub hour_day_id: i32,
-    /// `polProcessID` — `pollutantID * 100 + processID`; raw signed (a
-    /// negative value is a wildcard placeholder).
+ /// `polProcessID` — `pollutantID * 100 + processID`; raw signed (a
+ /// negative value is a wildcard placeholder).
     pub pol_process_id: i32,
-    /// `opModeID` — possibly shifted by `opModeIDOffset` (rule 4).
+ /// `opModeID` — possibly shifted by `opModeIDOffset` (rule 4).
     pub op_mode_id: i32,
-    /// `opModeFraction` — carried through unchanged.
+ /// `opModeFraction` — carried through unchanged.
     pub op_mode_fraction: f64,
-    /// `opModeFractionCV` — carried through unchanged (post-`COALESCE`).
+ /// `opModeFractionCV` — carried through unchanged (post-`COALESCE`).
     pub op_mode_fraction_cv: f64,
-    /// `avgBinSpeed` — carried through unchanged.
+ /// `avgBinSpeed` — carried through unchanged.
     pub avg_bin_speed: f64,
-    /// `avgSpeedFraction` — carried through unchanged.
+ /// `avgSpeedFraction` — carried through unchanged.
     pub avg_speed_fraction: f64,
 }
 
-/// Primary-key tuple of `RatesOpModeDistribution`, in primary-key order —
-/// the columns the Go `ORDER BY` sorts on and the `INSERT IGNORE`
+/// Primary-key tuple of `RatesOpModeDistribution`, in primary-key order/// the columns the Go `ORDER BY` sorts on and the `INSERT IGNORE`
 /// de-duplicates on.
 type RowKey = (SourceTypeId, i32, i32, i32, i32, i32);
 
 impl OpModeDistributionRow {
-    /// The primary-key projection: `(sourceTypeID, polProcessID, roadTypeID,
-    /// hourDayID, opModeID, avgSpeedBinID)`.
+ /// The primary-key projection: `(sourceTypeID, polProcessID, roadTypeID,
+ /// hourDayID, opModeID, avgSpeedBinID)`.
     fn primary_key(&self) -> RowKey {
         (
             self.source_type_id,
@@ -189,14 +186,14 @@ impl OpModeDistributionRow {
 /// `RatesOpModeDistribution` row.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RowCorrection {
-    /// The row is dropped from the corrected table.
+ /// The row is dropped from the corrected table.
     Drop,
-    /// The row is kept, with its source type and operating mode possibly
-    /// rewritten.
+ /// The row is kept, with its source type and operating mode possibly
+ /// rewritten.
     Keep {
-        /// The (possibly temp→real swapped) source type.
+ /// The (possibly temp→real swapped) source type.
         source_type_id: SourceTypeId,
-        /// The (possibly offset-shifted) operating mode.
+ /// The (possibly offset-shifted) operating mode.
         op_mode_id: i32,
     },
 }
@@ -208,47 +205,47 @@ pub enum RowCorrection {
 /// [`build`](Self::build).
 #[derive(Debug, Clone, Default)]
 pub struct SourceUseTypePhysicsMapping {
-    /// Every mapping record, in build order — the Go exported
-    /// `SourceUseTypePhysicsMapping` slice.
+ /// Every mapping record, in build order — the Go exported
+ /// `SourceUseTypePhysicsMapping` slice.
     details: Vec<SourceUseTypePhysicsMappingDetail>,
-    /// Records keyed by `tempSourceTypeID` (each is unique) — the Go
-    /// `SourceUseTypePhysicsMappingByTempSourceType`.
+ /// Records keyed by `tempSourceTypeID` (each is unique) — the Go
+ /// `SourceUseTypePhysicsMappingByTempSourceType`.
     by_temp_source_type: HashMap<SourceTypeId, SourceUseTypePhysicsMappingDetail>,
-    /// Records keyed by `realSourceTypeID` — the Go
-    /// `SourceUseTypePhysicsMappingByRealSourceType`. A `realSourceTypeID`
-    /// can be shared, so on collision the last record in build order wins
-    /// (the Go comment: "ok to overwrite something else").
+ /// Records keyed by `realSourceTypeID` — the Go
+ /// `SourceUseTypePhysicsMappingByRealSourceType`. A `realSourceTypeID`
+ /// can be shared, so on collision the last record in build order wins
+ /// (the Go comment: "ok to overwrite something else").
     by_real_source_type: HashMap<SourceTypeId, SourceUseTypePhysicsMappingDetail>,
 }
 
 impl SourceUseTypePhysicsMapping {
-    /// Build the mapping from `sourceUseTypePhysicsMapping` records — the
-    /// in-memory half of the Go `setupTables`.
-    ///
-    /// `details` is expected to be the result of the Go query
-    /// `select distinct realSourceTypeID, tempSourceTypeID, opModeIDOffset
-    /// from sourceUseTypePhysicsMapping where realSourceTypeID <>
-    /// tempSourceTypeID order by realSourceTypeID, beginModelYearID`.
-    /// Records with `real_source_type_id == temp_source_type_id` are skipped
-    /// here too, mirroring the query's `WHERE` clause defensively.
-    ///
-    /// The build order matters for [`by_real_source_type`](Self) only: when
-    /// two records share a `realSourceTypeID`, the last one wins, so callers
-    /// must preserve the query's `ORDER BY realSourceTypeID,
-    /// beginModelYearID` — the same contract the Go has with its SQL layer.
+ /// Build the mapping from `sourceUseTypePhysicsMapping` records — the
+ /// in-memory half of the Go `setupTables`.
+ ///
+ /// `details` is expected to be the result of the Go query
+ /// `select distinct realSourceTypeID, tempSourceTypeID, opModeIDOffset
+ /// from sourceUseTypePhysicsMapping where realSourceTypeID <>
+ /// tempSourceTypeID order by realSourceTypeID, beginModelYearID`.
+ /// Records with `real_source_type_id == temp_source_type_id` are skipped
+ /// here too, mirroring the query's `WHERE` clause defensively.
+ ///
+ /// The build order matters for [`by_real_source_type`](Self) only: when
+ /// two records share a `realSourceTypeID`, the last one wins, so callers
+ /// must preserve the query's `ORDER BY realSourceTypeID,
+ /// beginModelYearID` — the same contract the Go has with its SQL layer.
     #[must_use]
     pub fn build(details: impl IntoIterator<Item = SourceUseTypePhysicsMappingDetail>) -> Self {
         let mut all = Vec::new();
         let mut by_temp_source_type = HashMap::new();
         let mut by_real_source_type = HashMap::new();
         for detail in details {
-            // Mirror the Go query's `where realSourceTypeID <> tempSourceTypeID`.
+ // Mirror the Go query's `where realSourceTypeID <> tempSourceTypeID`.
             if detail.real_source_type_id == detail.temp_source_type_id {
                 continue;
             }
             all.push(detail);
             by_temp_source_type.insert(detail.temp_source_type_id, detail);
-            // Last record in build order wins, as in the Go `map[real] = d`.
+ // Last record in build order wins, as in the Go `map[real] = d`.
             by_real_source_type.insert(detail.real_source_type_id, detail);
         }
         Self {
@@ -258,13 +255,13 @@ impl SourceUseTypePhysicsMapping {
         }
     }
 
-    /// Every mapping record, in build order.
+ /// Every mapping record, in build order.
     #[must_use]
     pub fn details(&self) -> &[SourceUseTypePhysicsMappingDetail] {
         &self.details
     }
 
-    /// The record whose `tempSourceTypeID` is `id`, if any.
+ /// The record whose `tempSourceTypeID` is `id`, if any.
     #[must_use]
     pub fn temp_source_type_detail(
         &self,
@@ -273,8 +270,8 @@ impl SourceUseTypePhysicsMapping {
         self.by_temp_source_type.get(&id)
     }
 
-    /// The record whose `realSourceTypeID` is `id`, if any (the
-    /// last-build-order record when several share that real source type).
+ /// The record whose `realSourceTypeID` is `id`, if any (the
+ /// last-build-order record when several share that real source type).
     #[must_use]
     pub fn real_source_type_detail(
         &self,
@@ -283,29 +280,29 @@ impl SourceUseTypePhysicsMapping {
         self.by_real_source_type.get(&id)
     }
 
-    /// Apply the `SourceTypePhysics` correction to one row, identified by
-    /// its source type, operating mode, and pollutant/process.
-    ///
-    /// Direct port of the per-row rule cascade in the Go
-    /// `coreUpdateOperatingModeDistribution_RatesOpModeDistribution`. The Go
-    /// walks a fixed sequence of rules guarded by a `didHandle` flag, so the
-    /// first rule that matches decides the row; this port `return`s on the
-    /// first match, which is equivalent. The rules, in order:
-    ///
-    /// 1. negative `polProcessID` (a wildcard placeholder) → drop;
-    /// 2. a temporary source type whose operating mode is already in its
-    ///    offset range, on a running-exhaust row → swap to the real source
-    ///    type, keep the mode;
-    /// 3. brakewear → swap a temporary source type's row to its real source
-    ///    type; drop a non-mapped source type's brakewear row;
-    /// 4. a temporary source type's *normal* operating mode, on a
-    ///    running-exhaust row → swap to the real source type and shift the
-    ///    mode by `opModeIDOffset`;
-    /// 5. (unreachable — see the inline comment) drop a temporary source
-    ///    type's already-promoted normal mode;
-    /// 6. a real source type that now has a mapping → drop its leftover
-    ///    normal operating modes;
-    /// 7. otherwise → keep the row unchanged.
+ /// Apply the `SourceTypePhysics` correction to one row, identified by
+ /// its source type, operating mode, and pollutant/process.
+ ///
+ /// Direct port of the per-row rule cascade in the Go
+ /// `coreUpdateOperatingModeDistribution_RatesOpModeDistribution`. The Go
+ /// walks a fixed sequence of rules guarded by a `didHandle` flag, so the
+ /// first rule that matches decides the row; this port `return`s on the
+ /// first match, which is equivalent. The rules, in order:
+ ///
+ /// 1. negative `polProcessID` (a wildcard placeholder) → drop;
+ /// 2. a temporary source type whose operating mode is already in its
+ /// offset range, on a running-exhaust row → swap to the real source
+ /// type, keep the mode;
+ /// 3. brakewear → swap a temporary source type's row to its real source
+ /// type; drop a non-mapped source type's brakewear row;
+ /// 4. a temporary source type's *normal* operating mode, on a
+ /// running-exhaust row → swap to the real source type and shift the
+ /// mode by `opModeIDOffset`;
+ /// 5. (unreachable — see the inline comment) drop a temporary source
+ /// type's already-promoted normal mode;
+ /// 6. a real source type that now has a mapping → drop its leftover
+ /// normal operating modes;
+ /// 7. otherwise → keep the row unchanged.
     #[must_use]
     pub fn correct_row(
         &self,
@@ -316,20 +313,20 @@ impl SourceUseTypePhysicsMapping {
         let temp_detail = self.temp_source_type_detail(source_type_id);
         let real_detail = self.real_source_type_detail(source_type_id);
 
-        // The Go's "polProcessID < 0 || mod(polProcessID,100) = 1" guard,
-        // shared by rules 2, 4, 5 and 6. After rule 1 the `< 0` half is
-        // always false (negatives are dropped); it is kept here for a
-        // literal correspondence to the Go expression.
+ // The Go's "polProcessID < 0 || mod(polProcessID,100) = 1" guard,
+ // shared by rules 2, 4, 5 and 6. After rule 1 the `< 0` half is
+ // always false (negatives are dropped); it is kept here for a
+ // literal correspondence to the Go expression.
         let running_or_wildcard =
             pol_process_id < 0 || pol_process_id % 100 == RUNNING_EXHAUST_PROCESS_ID;
 
-        // Rule 1 — drop wildcard placeholders (negative polProcessID).
+ // Rule 1 — drop wildcard placeholders (negative polProcessID).
         if pol_process_id < 0 {
             return RowCorrection::Drop;
         }
 
-        // Rule 2 — a temporary source type whose operating mode is already
-        // in its offset range: swap to the real source type, keep the mode.
+ // Rule 2 — a temporary source type whose operating mode is already
+ // in its offset range: swap to the real source type, keep the mode.
         if let Some(detail) = temp_detail.filter(|d| {
             running_or_wildcard
                 && (d.op_mode_id_offset..d.op_mode_id_offset + NORMAL_OP_MODE_COUNT)
@@ -341,10 +338,10 @@ impl SourceUseTypePhysicsMapping {
             };
         }
 
-        // Rule 3 — brakewear: a temporary source type's brakewear row swaps
-        // to the real source type; a non-mapped source type's brakewear row
-        // is dropped. Brakewear is not a running-exhaust process, so rules
-        // 2/4/5/6 never reach a brakewear row.
+ // Rule 3 — brakewear: a temporary source type's brakewear row swaps
+ // to the real source type; a non-mapped source type's brakewear row
+ // is dropped. Brakewear is not a running-exhaust process, so rules
+ // 2/4/5/6 never reach a brakewear row.
         if pol_process_id == BRAKEWEAR_POL_PROCESS_ID {
             return match temp_detail {
                 Some(detail) => RowCorrection::Keep {
@@ -355,8 +352,8 @@ impl SourceUseTypePhysicsMapping {
             };
         }
 
-        // Rule 4 — promote a temporary source type's normal operating mode:
-        // swap to the real source type and shift the mode by the offset.
+ // Rule 4 — promote a temporary source type's normal operating mode:
+ // swap to the real source type and shift the mode by the offset.
         if let Some(detail) = temp_detail
             .filter(|_| running_or_wildcard && (0..NORMAL_OP_MODE_COUNT).contains(&op_mode_id))
         {
@@ -366,11 +363,11 @@ impl SourceUseTypePhysicsMapping {
             };
         }
 
-        // Rule 5 — drop a temporary source type's already-promoted normal
-        // operating mode. Unreachable: rule 4's condition is a superset of
-        // this one (rule 5 only adds `opModeIDOffset > 0`), so any row that
-        // reaches here already failed rule 4's guard. Ported for a faithful,
-        // line-by-line correspondence to the Go.
+ // Rule 5 — drop a temporary source type's already-promoted normal
+ // operating mode. Unreachable: rule 4's condition is a superset of
+ // this one (rule 5 only adds `opModeIDOffset > 0`), so any row that
+ // reaches here already failed rule 4's guard. Ported for a faithful,
+ // line-by-line correspondence to the Go.
         if temp_detail.is_some_and(|d| {
             d.op_mode_id_offset > 0
                 && running_or_wildcard
@@ -379,8 +376,8 @@ impl SourceUseTypePhysicsMapping {
             return RowCorrection::Drop;
         }
 
-        // Rule 6 — a real source type that now has a mapping (offset > 0) no
-        // longer owns the normal operating modes: drop them.
+ // Rule 6 — a real source type that now has a mapping (offset > 0) no
+ // longer owns the normal operating modes: drop them.
         if real_detail.is_some_and(|d| {
             temp_detail.is_none()
                 && d.op_mode_id_offset > 0
@@ -390,20 +387,20 @@ impl SourceUseTypePhysicsMapping {
             return RowCorrection::Drop;
         }
 
-        // Rule 7 — default: keep the row unchanged.
+ // Rule 7 — default: keep the row unchanged.
         RowCorrection::Keep {
             source_type_id,
             op_mode_id,
         }
     }
 
-    /// Apply the correction to a full [`OpModeDistributionRow`].
-    ///
-    /// Returns `None` when the row is dropped, or `Some(row)` with the
-    /// source type and operating mode rewritten per [`correct_row`] and
-    /// every other column carried through unchanged.
-    ///
-    /// [`correct_row`]: Self::correct_row
+ /// Apply the correction to a full [`OpModeDistributionRow`].
+ ///
+ /// Returns `None` when the row is dropped, or `Some(row)` with the
+ /// source type and operating mode rewritten per [`correct_row`] and
+ /// every other column carried through unchanged.
+ ///
+ /// [`correct_row`]: Self::correct_row
     #[must_use]
     pub fn correct(&self, row: OpModeDistributionRow) -> Option<OpModeDistributionRow> {
         match self.correct_row(row.source_type_id, row.op_mode_id, row.pol_process_id) {
@@ -419,33 +416,33 @@ impl SourceUseTypePhysicsMapping {
         }
     }
 
-    /// Apply the correction to a whole `RatesOpModeDistribution` table.
-    ///
-    /// Port of the Go
-    /// `coreUpdateOperatingModeDistribution_RatesOpModeDistribution` row
-    /// loop. Rows are processed in the Go `ORDER BY` order — descending by
-    /// primary key — and the rewritten rows are de-duplicated with
-    /// `INSERT IGNORE` semantics (first-written wins). The two together
-    /// resolve the rule-4 collision described in the module docs: when a
-    /// promoted row's shifted operating mode lands on an already-offset
-    /// row's primary key, the already-offset row, processed first, survives.
-    ///
-    /// The result is returned in ascending primary-key order — a
-    /// `RatesOpModeDistribution` table is a set, so the order is for
-    /// deterministic output only.
+ /// Apply the correction to a whole `RatesOpModeDistribution` table.
+ ///
+ /// Port of the Go
+ /// `coreUpdateOperatingModeDistribution_RatesOpModeDistribution` row
+ /// loop. Rows are processed in the Go `ORDER BY` order — descending by
+ /// primary key — and the rewritten rows are de-duplicated with
+ /// `INSERT IGNORE` semantics (first-written wins). The two together
+ /// resolve the rule-4 collision described in the module docs: when a
+ /// promoted row's shifted operating mode lands on an already-offset
+ /// row's primary key, the already-offset row, processed first, survives.
+ ///
+ /// The result is returned in ascending primary-key order — a
+ /// `RatesOpModeDistribution` table is a set, so the order is for
+ /// deterministic output only.
     #[must_use]
     pub fn correct_table(
         &self,
         rows: impl IntoIterator<Item = OpModeDistributionRow>,
     ) -> Vec<OpModeDistributionRow> {
-        // The Go reads `RatesOpModeDistribution` ordered by its full primary
-        // key descending; process the rows in that order so the
-        // `INSERT IGNORE` collision resolution below keeps the right row.
+ // The Go reads `RatesOpModeDistribution` ordered by its full primary
+ // key descending; process the rows in that order so the
+ // `INSERT IGNORE` collision resolution below keeps the right row.
         let mut input: Vec<OpModeDistributionRow> = rows.into_iter().collect();
         input.sort_unstable_by_key(|row| Reverse(row.primary_key()));
 
-        // `LOAD DATA INFILE ... IGNORE`: when two rewritten rows share an
-        // output primary key, the first one written wins.
+ // `LOAD DATA INFILE ... IGNORE`: when two rewritten rows share an
+ // output primary key, the first one written wins.
         let mut seen: HashSet<RowKey> = HashSet::new();
         let mut out: Vec<OpModeDistributionRow> = Vec::new();
         for row in input {
@@ -463,11 +460,10 @@ impl SourceUseTypePhysicsMapping {
 }
 
 // ---------------------------------------------------------------------------
-// Data-plane helpers (Task 50)
+// Data-plane helpers
 // ---------------------------------------------------------------------------
 
-/// Build a typed [`Error::RowExtraction`] for a column extraction failure —
-/// matches the pattern used by every other data-plane generator.
+/// Build a typed [`Error::RowExtraction`] for a column extraction failure/// matches the pattern used by every other data-plane generator.
 fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -> Error {
     Error::RowExtraction {
         table: table.into(),
@@ -681,10 +677,10 @@ impl TableRow for OpModeDistributionRow {
                     op_mode_fraction_cv: op_mode_fraction_cv
                         .get(i)
                         .ok_or_else(|| null("opModeFractionCV"))?,
-                    // MOVES leaves avgBinSpeed NULL in RatesOpModeDistribution
-                    // (the rates path does not populate it; the generator's own
-                    // default is 0.0). It is carried through unchanged here, so
-                    // a NULL becomes 0.0 rather than erroring.
+ // MOVES leaves avgBinSpeed NULL in RatesOpModeDistribution
+ // (the rates path does not populate it; the generator's own
+ // default is 0.0). It is carried through unchanged here, so
+ // a NULL becomes 0.0 rather than erroring.
                     avg_bin_speed: avg_bin_speed.get(i).unwrap_or(0.0),
                     avg_speed_fraction: avg_speed_fraction
                         .get(i)
@@ -719,10 +715,10 @@ static OUTPUT_TABLES: &[&str] = &["RatesOpModeDistribution"];
 pub struct SourceTypePhysics;
 
 impl SourceTypePhysics {
-    /// Chain-DAG name — matches the Java class / Go package name.
+ /// Chain-DAG name — matches the Java class / Go package name.
     pub const NAME: &'static str = "SourceTypePhysics";
 
-    /// Construct the generator.
+ /// Construct the generator.
     #[must_use]
     pub fn new() -> Self {
         Self
@@ -734,13 +730,13 @@ impl Generator for SourceTypePhysics {
         Self::NAME
     }
 
-    /// `SourceTypePhysics` carries no master-loop subscription of its own:
-    /// the pinned `SourceTypePhysics.java` is a helper class, not a
-    /// `MasterLoopable`, and the step is not a node in the reconstructed
-    /// calculator chain DAG. Its correction runs when the rates-mode
-    /// operating-mode pipeline invokes it. The registry still registers the
-    /// module by [`name`](Generator::name) so chain `upstream` references to
-    /// `"SourceTypePhysics"` resolve.
+ /// `SourceTypePhysics` carries no master-loop subscription of its own:
+ /// the pinned `SourceTypePhysics.java` is a helper class, not a
+ /// `MasterLoopable`, and the step is not a node in the reconstructed
+ /// calculator chain DAG. Its correction runs when the rates-mode
+ /// operating-mode pipeline invokes it. The registry still registers the
+ /// module by [`name`](Generator::name) so chain `upstream` references to
+ /// `"SourceTypePhysics"` resolve.
     fn subscriptions(&self) -> &[CalculatorSubscription] {
         NO_SUBSCRIPTIONS
     }
@@ -753,12 +749,12 @@ impl Generator for SourceTypePhysics {
         OUTPUT_TABLES
     }
 
-    /// Run the correction for the current master-loop iteration.
-    ///
-    /// Reads `sourceUseTypePhysicsMapping` and `RatesOpModeDistribution` from
-    /// `ctx.tables()`, builds a [`SourceUseTypePhysicsMapping`], applies
-    /// [`correct_table`](SourceUseTypePhysicsMapping::correct_table), and
-    /// writes the corrected `RatesOpModeDistribution` to scratch.
+ /// Run the correction for the current master-loop iteration.
+ ///
+ /// Reads `sourceUseTypePhysicsMapping` and `RatesOpModeDistribution` from
+ /// `ctx.tables()`, builds a [`SourceUseTypePhysicsMapping`], applies
+ /// [`correct_table`](SourceUseTypePhysicsMapping::correct_table), and
+ /// writes the corrected `RatesOpModeDistribution` to scratch.
     fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
         let mapping_details: Vec<SourceUseTypePhysicsMappingDetail> =
             ctx.tables().iter_typed("sourceUseTypePhysicsMapping")?;
@@ -783,7 +779,7 @@ pub fn factory() -> Box<dyn Generator> {
 mod tests {
     use super::*;
 
-    /// A `sourceUseTypePhysicsMapping` record helper.
+ /// A `sourceUseTypePhysicsMapping` record helper.
     fn detail(real: u16, temp: u16, offset: i32) -> SourceUseTypePhysicsMappingDetail {
         SourceUseTypePhysicsMappingDetail {
             real_source_type_id: SourceTypeId(real),
@@ -792,9 +788,9 @@ mod tests {
         }
     }
 
-    /// A `RatesOpModeDistribution` row helper with fixed carry-through
-    /// columns — only source type, operating mode and pollutant/process,
-    /// the fields the correction inspects, are parameterised.
+ /// A `RatesOpModeDistribution` row helper with fixed carry-through
+ /// columns — only source type, operating mode and pollutant/process,
+ /// the fields the correction inspects, are parameterised.
     fn row(source_type: u16, op_mode: i32, pol_process: i32) -> OpModeDistributionRow {
         OpModeDistributionRow {
             source_type_id: SourceTypeId(source_type),
@@ -810,9 +806,9 @@ mod tests {
         }
     }
 
-    /// A running-exhaust `polProcessID` (`mod 100 == 1`).
+ /// A running-exhaust `polProcessID` (`mod 100 == 1`).
     const RUNNING: i32 = 101;
-    /// A non-running `polProcessID` — start exhaust, process 2.
+ /// A non-running `polProcessID` — start exhaust, process 2.
     const START: i32 = 102;
 
     #[test]
@@ -828,14 +824,14 @@ mod tests {
             mapping.real_source_type_detail(SourceTypeId(30)),
             Some(&detail(30, 130, 2000)),
         );
-        // A real source type is not indexed as a temporary one.
+ // A real source type is not indexed as a temporary one.
         assert!(mapping.temp_source_type_detail(SourceTypeId(20)).is_none());
         assert!(mapping.real_source_type_detail(SourceTypeId(120)).is_none());
     }
 
     #[test]
     fn build_skips_records_with_equal_real_and_temp_source_type() {
-        // Mirrors the Go query's `where realSourceTypeID <> tempSourceTypeID`.
+ // Mirrors the Go query's `where realSourceTypeID <> tempSourceTypeID`.
         let mapping =
             SourceUseTypePhysicsMapping::build([detail(20, 120, 1000), detail(30, 30, 0)]);
         assert_eq!(mapping.details().len(), 1);
@@ -845,8 +841,8 @@ mod tests {
 
     #[test]
     fn build_last_record_wins_for_duplicate_real_source_type() {
-        // Two records share realSourceTypeID 20; the Go `map[real] = d`
-        // keeps the last in build order.
+ // Two records share realSourceTypeID 20; the Go `map[real] = d`
+ // keeps the last in build order.
         let mapping =
             SourceUseTypePhysicsMapping::build([detail(20, 120, 1000), detail(20, 121, 2000)]);
         assert_eq!(mapping.details().len(), 2);
@@ -854,7 +850,7 @@ mod tests {
             mapping.real_source_type_detail(SourceTypeId(20)),
             Some(&detail(20, 121, 2000)),
         );
-        // Both temporary source types remain individually indexed.
+ // Both temporary source types remain individually indexed.
         assert!(mapping.temp_source_type_detail(SourceTypeId(120)).is_some());
         assert!(mapping.temp_source_type_detail(SourceTypeId(121)).is_some());
     }
@@ -862,12 +858,12 @@ mod tests {
     #[test]
     fn rule1_negative_pol_process_id_is_dropped() {
         let mapping = SourceUseTypePhysicsMapping::build([detail(20, 120, 1000)]);
-        // Dropped for a mapped temporary source type ...
+ // Dropped for a mapped temporary source type ...
         assert_eq!(
             mapping.correct_row(SourceTypeId(120), 5, -1),
             RowCorrection::Drop,
         );
-        // ... and for a source type absent from the mapping.
+ // ... and for a source type absent from the mapping.
         assert_eq!(
             mapping.correct_row(SourceTypeId(99), 5, -7),
             RowCorrection::Drop,
@@ -877,7 +873,7 @@ mod tests {
     #[test]
     fn rule2_offset_range_mode_swaps_source_type_keeps_mode() {
         let mapping = SourceUseTypePhysicsMapping::build([detail(20, 120, 1000)]);
-        // op mode 1005 is inside the offset range [1000, 1100).
+ // op mode 1005 is inside the offset range [1000, 1100).
         assert_eq!(
             mapping.correct_row(SourceTypeId(120), 1005, RUNNING),
             RowCorrection::Keep {
@@ -890,8 +886,8 @@ mod tests {
     #[test]
     fn rule2_requires_running_or_wildcard_pol_process() {
         let mapping = SourceUseTypePhysicsMapping::build([detail(20, 120, 1000)]);
-        // Same row on a non-running process: rule 2 does not fire, and no
-        // later rule matches, so the row is kept unchanged (rule 7).
+ // Same row on a non-running process: rule 2 does not fire, and no
+ // later rule matches, so the row is kept unchanged (rule 7).
         assert_eq!(
             mapping.correct_row(SourceTypeId(120), 1005, START),
             RowCorrection::Keep {
@@ -908,12 +904,12 @@ mod tests {
             source_type_id: SourceTypeId(20),
             op_mode_id: 1000,
         };
-        // op mode == offset is inside the range ...
+ // op mode == offset is inside the range ...
         assert_eq!(
             mapping.correct_row(SourceTypeId(120), 1000, RUNNING),
             keep_swapped
         );
-        // ... offset + 99 is the last mode inside it ...
+ // ... offset + 99 is the last mode inside it ...
         assert_eq!(
             mapping.correct_row(SourceTypeId(120), 1099, RUNNING),
             RowCorrection::Keep {
@@ -921,8 +917,8 @@ mod tests {
                 op_mode_id: 1099,
             },
         );
-        // ... offset + 100 is past it, and op mode 1100 is not a normal
-        // mode either, so rule 7 keeps it unchanged.
+ // ... offset + 100 is past it, and op mode 1100 is not a normal
+ // mode either, so rule 7 keeps it unchanged.
         assert_eq!(
             mapping.correct_row(SourceTypeId(120), 1100, RUNNING),
             RowCorrection::Keep {
@@ -947,7 +943,7 @@ mod tests {
     #[test]
     fn rule3_brakewear_without_mapping_is_dropped() {
         let mapping = SourceUseTypePhysicsMapping::build([detail(20, 120, 1000)]);
-        // Source type 999 is not a temporary source type in the mapping.
+ // Source type 999 is not a temporary source type in the mapping.
         assert_eq!(
             mapping.correct_row(SourceTypeId(999), 7, BRAKEWEAR_POL_PROCESS_ID),
             RowCorrection::Drop,
@@ -956,9 +952,9 @@ mod tests {
 
     #[test]
     fn rule4_promotes_normal_mode_by_offset() {
-        // This row also satisfies rule 5's literal condition (temp detail,
-        // offset > 0, normal mode, running) — rule 4 reaches it first and
-        // promotes it, demonstrating rule 5 is shadowed.
+ // This row also satisfies rule 5's literal condition (temp detail,
+ // offset > 0, normal mode, running) — rule 4 reaches it first and
+ // promotes it, demonstrating rule 5 is shadowed.
         let mapping = SourceUseTypePhysicsMapping::build([detail(20, 120, 1000)]);
         assert_eq!(
             mapping.correct_row(SourceTypeId(120), 7, RUNNING),
@@ -972,7 +968,7 @@ mod tests {
     #[test]
     fn rule4_requires_running_or_wildcard_pol_process() {
         let mapping = SourceUseTypePhysicsMapping::build([detail(20, 120, 1000)]);
-        // Normal mode on a non-running process: no rule fires, kept as-is.
+ // Normal mode on a non-running process: no rule fires, kept as-is.
         assert_eq!(
             mapping.correct_row(SourceTypeId(120), 7, START),
             RowCorrection::Keep {
@@ -984,9 +980,9 @@ mod tests {
 
     #[test]
     fn rule2_precedes_rule4_when_offset_below_100() {
-        // offset 50 makes rule 2's range [50, 150) overlap rule 4's [0, 100)
-        // on [50, 100). op mode 70 is in the overlap: rule 2 wins, so the
-        // mode is kept (70), not promoted (70 + 50 = 120).
+ // offset 50 makes rule 2's range [50, 150) overlap rule 4's [0, 100)
+ // on [50, 100). op mode 70 is in the overlap: rule 2 wins, so the
+ // mode is kept (70), not promoted (70 + 50 = 120).
         let mapping = SourceUseTypePhysicsMapping::build([detail(20, 120, 50)]);
         assert_eq!(
             mapping.correct_row(SourceTypeId(120), 70, RUNNING),
@@ -1000,8 +996,8 @@ mod tests {
     #[test]
     fn rule6_drops_leftover_real_source_type_normal_modes() {
         let mapping = SourceUseTypePhysicsMapping::build([detail(20, 120, 1000)]);
-        // Source type 20 is the real source type; its normal modes on a
-        // running process are now owned by the temporary source type.
+ // Source type 20 is the real source type; its normal modes on a
+ // running process are now owned by the temporary source type.
         assert_eq!(
             mapping.correct_row(SourceTypeId(20), 7, RUNNING),
             RowCorrection::Drop,
@@ -1011,7 +1007,7 @@ mod tests {
     #[test]
     fn rule6_keeps_real_source_type_offset_modes() {
         let mapping = SourceUseTypePhysicsMapping::build([detail(20, 120, 1000)]);
-        // op mode 1500 is not a normal mode, so rule 6 does not fire.
+ // op mode 1500 is not a normal mode, so rule 6 does not fire.
         assert_eq!(
             mapping.correct_row(SourceTypeId(20), 1500, RUNNING),
             RowCorrection::Keep {
@@ -1023,7 +1019,7 @@ mod tests {
 
     #[test]
     fn rule6_skipped_when_real_source_type_has_zero_offset() {
-        // realSourceTypeDetail.opModeIDOffset must be > 0 for rule 6.
+ // realSourceTypeDetail.opModeIDOffset must be > 0 for rule 6.
         let mapping = SourceUseTypePhysicsMapping::build([detail(20, 120, 0)]);
         assert_eq!(
             mapping.correct_row(SourceTypeId(20), 7, RUNNING),
@@ -1037,7 +1033,7 @@ mod tests {
     #[test]
     fn rule7_unmapped_source_type_kept_unchanged() {
         let mapping = SourceUseTypePhysicsMapping::build([detail(20, 120, 1000)]);
-        // Source type 55 appears nowhere in the mapping.
+ // Source type 55 appears nowhere in the mapping.
         assert_eq!(
             mapping.correct_row(SourceTypeId(55), 8, RUNNING),
             RowCorrection::Keep {
@@ -1064,9 +1060,8 @@ mod tests {
     fn correct_carries_through_unmodified_columns() {
         let mapping = SourceUseTypePhysicsMapping::build([detail(20, 120, 1000)]);
         let input = row(120, 7, RUNNING);
-        // Rule 4 swaps the source type and promotes the mode; every other
-        // column — road type, speed bin, hour/day, all four fractions —
-        // is carried through unchanged.
+ // Rule 4 swaps the source type and promotes the mode; every other
+ // column — road type, speed bin, hour/day, all four fractions // is carried through unchanged.
         let expected = OpModeDistributionRow {
             source_type_id: SourceTypeId(20),
             op_mode_id: 1007,
@@ -1083,11 +1078,11 @@ mod tests {
 
     #[test]
     fn correct_table_offset_collision_keeps_already_offset_row() {
-        // The module-doc collision: with offset 1000, an already-offset row
-        // (op mode 1005, rule 2) and a normal row (op mode 5, rule 4 →
-        // 5 + 1000 = 1005) both rewrite to the same primary key. The Go
-        // `ORDER BY` processes the larger original op mode first, and
-        // `INSERT IGNORE` keeps it — so the already-offset row survives.
+ // The module-doc collision: with offset 1000, an already-offset row
+ // (op mode 1005, rule 2) and a normal row (op mode 5, rule 4 →
+ // 5 + 1000 = 1005) both rewrite to the same primary key. The Go
+ // `ORDER BY` processes the larger original op mode first, and
+ // `INSERT IGNORE` keeps it — so the already-offset row survives.
         let mapping = SourceUseTypePhysicsMapping::build([detail(20, 120, 1000)]);
         let already_offset = OpModeDistributionRow {
             op_mode_fraction: 0.9,
@@ -1097,7 +1092,7 @@ mod tests {
             op_mode_fraction: 0.1,
             ..row(120, 5, RUNNING)
         };
-        // Pass the loser first to prove `correct_table` sorts internally.
+ // Pass the loser first to prove `correct_table` sorts internally.
         let result = mapping.correct_table([normal, already_offset]);
         let expected = OpModeDistributionRow {
             source_type_id: SourceTypeId(20),
@@ -1117,9 +1112,9 @@ mod tests {
 
     #[test]
     fn correct_table_output_is_sorted_by_primary_key() {
-        // Unmapped source types: every row is kept unchanged (rule 7), so
-        // the output rows equal the inputs and must come back primary-key
-        // sorted regardless of input order.
+ // Unmapped source types: every row is kept unchanged (rule 7), so
+ // the output rows equal the inputs and must come back primary-key
+ // sorted regardless of input order.
         let mapping = SourceUseTypePhysicsMapping::default();
         let rows = [
             row(55, 9, RUNNING),
@@ -1142,9 +1137,9 @@ mod tests {
     fn generator_metadata() {
         let generator = SourceTypePhysics::new();
         assert_eq!(generator.name(), "SourceTypePhysics");
-        // No master-loop subscription — see the trait-impl doc comment.
+ // No master-loop subscription — see the trait-impl doc comment.
         assert!(generator.subscriptions().is_empty());
-        // No declared upstream module (trait default).
+ // No declared upstream module (trait default).
         assert!(generator.upstream().is_empty());
         assert!(generator
             .input_tables()
@@ -1161,17 +1156,17 @@ mod tests {
             DataFrameStore, DataFrameStoreTyped, InMemoryStore, IterationPosition,
         };
 
-        // mapping: real=20, temp=120, offset=1000.
+ // mapping: real=20, temp=120, offset=1000.
         let mapping_rows = vec![SourceUseTypePhysicsMappingDetail {
             real_source_type_id: SourceTypeId(20),
             temp_source_type_id: SourceTypeId(120),
             op_mode_id_offset: 1000,
         }];
 
-        // Two input rows:
-        //   (a) temp source type 120, normal op mode 7, running exhaust -> rule 4:
-        //       becomes (source=20, op_mode=1007).
-        //   (b) temp source type 120, negative polProcessID -> rule 1: dropped.
+ // Two input rows:
+ // (a) temp source type 120, normal op mode 7, running exhaust -> rule 4:
+ // becomes (source=20, op_mode=1007).
+ // (b) temp source type 120, negative polProcessID -> rule 1: dropped.
         let input_rows = vec![
             OpModeDistributionRow {
                 source_type_id: SourceTypeId(120),
@@ -1225,11 +1220,11 @@ mod tests {
             .iter_typed("RatesOpModeDistribution")
             .expect("RatesOpModeDistribution written to scratch");
 
-        // Only the running-exhaust row survives; it is rewritten by rule 4.
+ // Only the running-exhaust row survives; it is rewritten by rule 4.
         assert_eq!(out.len(), 1, "dropped row excluded, kept row rewritten");
         assert_eq!(out[0].source_type_id, SourceTypeId(20));
         assert_eq!(out[0].op_mode_id, 1007);
-        // Carry-through columns are unchanged.
+ // Carry-through columns are unchanged.
         assert_eq!(out[0].road_type_id, 5);
         assert!((out[0].op_mode_fraction - 0.4).abs() < 1e-12);
     }
@@ -1254,7 +1249,7 @@ mod tests {
         }];
 
         let mut store = InMemoryStore::default();
-        // Empty mapping table.
+ // Empty mapping table.
         store.insert(
             "sourceUseTypePhysicsMapping",
             SourceUseTypePhysicsMappingDetail::into_dataframe(vec![]).unwrap(),
@@ -1275,13 +1270,13 @@ mod tests {
             .iter_typed("RatesOpModeDistribution")
             .expect("RatesOpModeDistribution written to scratch");
 
-        // Empty mapping -> rule 7 keeps every row unchanged.
+ // Empty mapping -> rule 7 keeps every row unchanged.
         assert_eq!(out, input_rows);
     }
 
     #[test]
     fn generator_is_object_safe() {
-        // The registry stores generators as Box<dyn Generator>.
+ // The registry stores generators as Box<dyn Generator>.
         let generator: Box<dyn Generator> = Box::new(SourceTypePhysics::new());
         assert_eq!(generator.name(), "SourceTypePhysics");
     }

@@ -10,11 +10,11 @@
 //! # Inputs
 //!
 //! - `default_curve`: the curve loaded from the `/SCRAPPAGE/`
-//!   packet (`rdscrp.f`).
+//! packet (`rdscrp.f`).
 //! - `alternates`: optional alternate-curve table (`rdalt.f`).
 //! - `name`: 10-character curve name. The reserved value
-//!   `"DEFAULT"` always returns the default curve and never
-//!   produces a warning.
+//! `"DEFAULT"` always returns the default curve and never
+//! produces a warning.
 //!
 //! # Numerical-fidelity note
 //!
@@ -35,10 +35,10 @@ pub type AlternateCurves = AlternateScrappage;
 /// Selected curve + diagnostic.
 #[derive(Debug, Clone)]
 pub struct SelectedScrappage {
-    /// The (bin, percent) curve to use.
+ /// The (bin, percent) curve to use.
     pub curve: ScrappageCurve,
-    /// Non-empty when the requested name fell back to default
-    /// because it was not present in the alternates.
+ /// Non-empty when the requested name fell back to default
+ /// because it was not present in the alternates.
     pub fallback_warning: Option<String>,
 }
 
@@ -55,9 +55,9 @@ pub fn select_scrappage(
 ) -> SelectedScrappage {
     let trimmed = name.trim();
 
-    // The Fortran path always populates the output arrays with the
-    // default curve first (getscrp.f :67–70). Reproduce that here so
-    // the fallback path returns the default without additional work.
+ // The Fortran path always populates the output arrays with the
+ // default curve first (getscrp.f :67–70). Reproduce that here so
+ // the fallback path returns the default without additional work.
     let default = default_curve.to_vec();
 
     if trimmed.eq_ignore_ascii_case(DEFAULT_CURVE_NAME) {
@@ -101,9 +101,9 @@ pub fn select_scrappage(
         }
     };
 
-    // Build the alternate curve from the column at `idx`. The
-    // alternate-table bins are shared across all columns; each
-    // column carries its own percent values per bin.
+ // Build the alternate curve from the column at `idx`. The
+ // alternate-table bins are shared across all columns; each
+ // column carries its own percent values per bin.
     let mut curve = Vec::with_capacity(alts.rows.len());
     for row in &alts.rows {
         let percent = row.percents.get(idx).copied().unwrap_or(0.0);

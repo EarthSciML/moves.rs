@@ -7,10 +7,10 @@
 //!
 //! ```text
 //! -- Section Foo
-//!   ... SQL ...
-//!   -- Section Bar
-//!     ... nested SQL ...
-//!   -- End Section Bar
+//! ... SQL ...
+//! -- Section Bar
+//! ... nested SQL ...
+//! -- End Section Bar
 //! -- End Section Foo
 //! ```
 //!
@@ -20,8 +20,7 @@
 //! nested section regardless of its own name, matching the Java stack-based
 //! algorithm exactly.
 //!
-//! This module ports the first pass of `readAndHandleScriptedCalculations` —
-//! the part that turns the raw line list into a section-filtered line list,
+//! This module ports the first pass of `readAndHandleScriptedCalculations`//! the part that turns the raw line list into a section-filtered line list,
 //! with optional `##context.*##`-style replacements applied to non-marker
 //! lines. The second pass (routing surviving sections into
 //! `sqlForWorker.{processingSQL, dataExportSQL, cleanupSQL}` and folding in
@@ -34,18 +33,18 @@ use crate::expander::do_replacements;
 /// enabled/disabled sections crossed, for the CLI to report on.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct SectionProcessOutput {
-    /// Lines that survived section filtering, in original order, with
-    /// section-marker lines retained where the enclosing context was
-    /// enabled (matching Java behavior: those markers stay in the output
-    /// so the downstream second pass can act on them).
+ /// Lines that survived section filtering, in original order, with
+ /// section-marker lines retained where the enclosing context was
+ /// enabled (matching Java behavior: those markers stay in the output
+ /// so the downstream second pass can act on them).
     pub lines: Vec<String>,
-    /// Total number of `-- Section X` markers encountered.
+ /// Total number of `-- Section X` markers encountered.
     pub sections_seen: usize,
-    /// Sections whose contents were emitted because the enclosing context
-    /// was enabled AND the name was in the enabled set.
+ /// Sections whose contents were emitted because the enclosing context
+ /// was enabled AND the name was in the enabled set.
     pub sections_kept: usize,
-    /// Sections whose contents were dropped because either the enclosing
-    /// context was disabled OR the name was missing from the enabled set.
+ /// Sections whose contents were dropped because either the enclosing
+ /// context was disabled OR the name was missing from the enabled set.
     pub sections_dropped: usize,
 }
 
@@ -57,16 +56,16 @@ pub struct SectionProcessOutput {
 /// For each line, trimmed:
 ///
 /// * `"-- Section <name>"` — push the current `is_in_enabled_section` state
-///   onto a stack, then update the state:
-///   if the current state is `true`, set the new state to whether `<name>`
-///   is in `enabled_sections`; otherwise the new state stays `false` (nested
-///   sections inside a disabled section are disabled regardless of their
-///   own name). The marker line is emitted **only when the post-update
-///   state is `true`** (Java: `if (isInEnabledSection) replacedSQL.add(sql)`).
+/// onto a stack, then update the state:
+/// if the current state is `true`, set the new state to whether `<name>`
+/// is in `enabled_sections`; otherwise the new state stays `false` (nested
+/// sections inside a disabled section are disabled regardless of their
+/// own name). The marker line is emitted **only when the post-update
+/// state is `true`** (Java: `if (isInEnabledSection) replacedSQL.add(sql)`).
 /// * `"-- End Section"` — emit the marker if the section was enabled, then
-///   pop the stack, restoring the parent state.
+/// pop the stack, restoring the parent state.
 /// * any other non-empty line — emit it, with `replacements` applied via
-///   [`do_replacements`], but only when the current state is `true`.
+/// [`do_replacements`], but only when the current state is `true`.
 ///
 /// The leading-stack value is `true` (the script's outermost scope is always
 /// enabled). Blank lines and lines that trim to empty are dropped silently,
@@ -75,11 +74,11 @@ pub struct SectionProcessOutput {
 /// # Arguments
 ///
 /// * `lines` — raw SQL lines, in script order. Each entry is one statement
-///   or comment (the way `appendSQLScriptToList` produces it in Java).
+/// or comment (the way `appendSQLScriptToList` produces it in Java).
 /// * `enabled_sections` — section names the runtime decided to keep.
-///   Membership test is case-insensitive (`TreeSetIgnoreCase` in Java).
+/// Membership test is case-insensitive (`TreeSetIgnoreCase` in Java).
 /// * `replacements` — `(macro_name, value)` pairs applied to non-marker
-///   lines via [`do_replacements`]. Pass `&[]` for no replacements.
+/// lines via [`do_replacements`]. Pass `&[]` for no replacements.
 pub fn process_sections(
     lines: &[String],
     enabled_sections: &[&str],
@@ -103,10 +102,10 @@ pub fn process_sections(
 
         if let Some(name) = strip_section_prefix(trimmed) {
             out.sections_seen += 1;
-            // Java: only re-evaluate the enable bit when we're CURRENTLY in
-            // an enabled context. Once we descend into a disabled section,
-            // every nested section stays disabled (the inner name doesn't
-            // override the outer disable).
+ // Java: only re-evaluate the enable bit when we're CURRENTLY in
+ // an enabled context. Once we descend into a disabled section,
+ // every nested section stays disabled (the inner name doesn't
+ // override the outer disable).
             if is_in_enabled_section {
                 is_in_enabled_section = is_enabled(name);
             }
@@ -121,14 +120,14 @@ pub fn process_sections(
             if is_in_enabled_section {
                 out.lines.push(trimmed.to_string());
             }
-            // Pop the section-open state and restore the parent.
+ // Pop the section-open state and restore the parent.
             stack.pop();
-            // The leading `true` we pushed before iteration guarantees the
-            // stack is never empty here for well-formed input. For ill-formed
-            // input (more `End Section` than `Section`), preserve the Java
-            // behavior — Java would have thrown an EmptyStackException; we
-            // fall back to `true` so the rest of the script still gets
-            // processed, which is more useful than panicking in a docs tool.
+ // The leading `true` we pushed before iteration guarantees the
+ // stack is never empty here for well-formed input. For ill-formed
+ // input (more `End Section` than `Section`), preserve the Java
+ // behavior — Java would have thrown an EmptyStackException; we
+ // fall back to `true` so the rest of the script still gets
+ // processed, which is more useful than panicking in a docs tool.
             is_in_enabled_section = *stack.last().unwrap_or(&true);
         } else if is_in_enabled_section {
             let line = if replacements.is_empty() {
@@ -150,9 +149,9 @@ pub fn process_sections(
 /// of 10 characters so a line like `"-- SectionFoo"` is matched as section
 /// name `"Foo"` (an edge case Java accepts).
 fn strip_section_prefix(trimmed: &str) -> Option<&str> {
-    // `-- End Section` also starts with `-- ` but has `E` at byte 3, so it
-    // doesn't match `"-- Section"`. No special-case needed; Java's
-    // `if/else if` on `startsWith` exploits the same property.
+ // `-- End Section` also starts with `-- ` but has `E` at byte 3, so it
+ // doesn't match `"-- Section"`. No special-case needed; Java's
+ // `if/else if` on `startsWith` exploits the same property.
     trimmed.strip_prefix("-- Section").map(str::trim)
 }
 
@@ -265,7 +264,7 @@ C;
             vec![
                 "-- Section Outer".to_string(),
                 "A;".to_string(),
-                // Inner section is dropped entirely — markers and body.
+ // Inner section is dropped entirely — markers and body.
                 "C;".to_string(),
                 "-- End Section Outer".to_string(),
             ]
@@ -274,10 +273,10 @@ C;
 
     #[test]
     fn nested_enabled_inside_disabled_stays_disabled() {
-        // Even with "Inner" in enabled, the outer "Outer" being disabled
-        // forces everything inside to drop. Mirrors the Java rule:
-        // re-evaluate the enable bit ONLY when currently in an enabled
-        // context.
+ // Even with "Inner" in enabled, the outer "Outer" being disabled
+ // forces everything inside to drop. Mirrors the Java rule:
+ // re-evaluate the enable bit ONLY when currently in an enabled
+ // context.
         let sql = "\
 -- Section Outer
 A;
@@ -344,10 +343,10 @@ SELECT 2;";
 
     #[test]
     fn end_section_without_matching_open_does_not_panic() {
-        // Documentation-tool defensive behavior: feeding malformed input
-        // should still produce something, not panic.
+ // Documentation-tool defensive behavior: feeding malformed input
+ // should still produce something, not panic.
         let out = process_sections(&lines("-- End Section Foo\nSELECT 1;"), &[], &[]);
-        // We still emit the marker because the leading stack value is `true`.
+ // We still emit the marker because the leading stack value is `true`.
         assert_eq!(
             out.lines,
             vec!["-- End Section Foo".to_string(), "SELECT 1;".to_string()]

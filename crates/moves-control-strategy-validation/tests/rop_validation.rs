@@ -1,4 +1,4 @@
-//! Rate-of-Progress control-strategy validation (Phase 6 Task 124).
+//! Rate-of-Progress control-strategy validation.
 //!
 //! Canonical Java formula: `emission_scale_factor = 1.0 − reductionFraction`.
 //! Source: `RateOfProgressStrategy.java` in `internalcontrolstrategies/rateofprogress/`.
@@ -149,7 +149,7 @@ fn emission_scale_factors_match_canonical_formula() {
 #[test]
 fn scale_factor_is_one_for_absent_key() {
     let t = load_fixture();
-    // Pollutant 99 is not in the fixture — expect no change (factor 1.0).
+ // Pollutant 99 is not in the fixture — expect no change (factor 1.0).
     let key = RopKey {
         pollutant_id: 99,
         source_type_id: 11,
@@ -162,7 +162,7 @@ fn scale_factor_is_one_for_absent_key() {
 #[test]
 fn scale_factor_is_one_for_absent_model_year() {
     let t = load_fixture();
-    // Model year 2000 is not in the fixture for any row.
+ // Model year 2000 is not in the fixture for any row.
     let key = RopKey {
         pollutant_id: 3,
         source_type_id: 11,

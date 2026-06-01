@@ -38,20 +38,20 @@ fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -
 /// year)`; these are the location/time of that call.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct IterationContext {
-    /// `##context.year##` — the calendar year being processed.
+ /// `##context.year##` — the calendar year being processed.
     pub year: i32,
-    /// `##context.iterLocation.stateRecordID##`.
+ /// `##context.iterLocation.stateRecordID##`.
     pub state_id: i32,
-    /// `##context.iterLocation.countyRecordID##`.
+ /// `##context.iterLocation.countyRecordID##`.
     pub county_id: i32,
-    /// `##context.iterLocation.zoneRecordID##`.
+ /// `##context.iterLocation.zoneRecordID##`.
     pub zone_id: i32,
-    /// `##context.iterLocation.linkRecordID##`.
+ /// `##context.iterLocation.linkRecordID##`.
     pub link_id: i32,
-    /// `##context.iterLocation.roadTypeRecordID##`.
+ /// `##context.iterLocation.roadTypeRecordID##`.
     pub road_type_id: i32,
-    /// `##context.fuelYearID##` — the fuel year, used only by the
-    /// `UseFuelUsageFraction` variant of `createSourceTypeFuelFraction`.
+ /// `##context.fuelYearID##` — the fuel year, used only by the
+ /// `UseFuelUsageFraction` variant of `createSourceTypeFuelFraction`.
     pub fuel_year_id: i32,
 }
 
@@ -64,19 +64,19 @@ pub struct IterationContext {
 /// context.iterLocation.linkRecordID`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceHoursRow {
-    /// `hourDayID`.
+ /// `hourDayID`.
     pub hour_day_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `ageID`.
+ /// `ageID`.
     pub age_id: i32,
-    /// `linkID`.
+ /// `linkID`.
     pub link_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `sourceHours` — the base source-hours quantity.
+ /// `sourceHours` — the base source-hours quantity.
     pub source_hours: f64,
 }
 
@@ -89,19 +89,19 @@ pub struct SourceHoursRow {
 /// processes `SHO` identically for both.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ShoRow {
-    /// `hourDayID`.
+ /// `hourDayID`.
     pub hour_day_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `ageID`.
+ /// `ageID`.
     pub age_id: i32,
-    /// `linkID`.
+ /// `linkID`.
     pub link_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `SHO` — the base source-hours-operating quantity.
+ /// `SHO` — the base source-hours-operating quantity.
     pub sho: f64,
 }
 
@@ -110,19 +110,19 @@ pub struct ShoRow {
 /// context.iterLocation.zoneRecordID`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ShpRow {
-    /// `hourDayID`.
+ /// `hourDayID`.
     pub hour_day_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `ageID`.
+ /// `ageID`.
     pub age_id: i32,
-    /// `zoneID` — the SQL copies this onto the output row.
+ /// `zoneID` — the SQL copies this onto the output row.
     pub zone_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `SHP` — the base source-hours-parked quantity.
+ /// `SHP` — the base source-hours-parked quantity.
     pub shp: f64,
 }
 
@@ -131,19 +131,19 @@ pub struct ShpRow {
 /// context.iterLocation.zoneRecordID`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StartsRow {
-    /// `hourDayID`.
+ /// `hourDayID`.
     pub hour_day_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `ageID`.
+ /// `ageID`.
     pub age_id: i32,
-    /// `zoneID`.
+ /// `zoneID`.
     pub zone_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `starts` — the base engine-starts quantity.
+ /// `starts` — the base engine-starts quantity.
     pub starts: f64,
 }
 
@@ -156,21 +156,21 @@ pub struct StartsRow {
 /// `sourceTypeFuelFraction`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HotellingHoursRow {
-    /// `hourDayID`.
+ /// `hourDayID`.
     pub hour_day_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `ageID`.
+ /// `ageID`.
     pub age_id: i32,
-    /// `zoneID` — the SQL copies this onto the output row.
+ /// `zoneID` — the SQL copies this onto the output row.
     pub zone_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `hotellingHours` — the base hotelling-hours quantity.
+ /// `hotellingHours` — the base hotelling-hours quantity.
     pub hotelling_hours: f64,
 }
 
@@ -181,11 +181,11 @@ pub struct HotellingHoursRow {
 /// One `HourDay` row — the `hourDayID` → `(day, hour)` decomposition.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct HourDayRow {
-    /// `hourDayID`.
+ /// `hourDayID`.
     pub hour_day_id: i32,
-    /// `dayID`.
+ /// `dayID`.
     pub day_id: i32,
-    /// `hourID`.
+ /// `hourID`.
     pub hour_id: i32,
 }
 
@@ -193,14 +193,14 @@ pub struct HourDayRow {
 /// zoneID = context.iterLocation.zoneRecordID`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LinkRow {
-    /// `linkID`.
+ /// `linkID`.
     pub link_id: i32,
-    /// `zoneID`.
+ /// `zoneID`.
     pub zone_id: i32,
-    /// `roadTypeID` — `1` marks the off-network link.
+ /// `roadTypeID` — `1` marks the off-network link.
     pub road_type_id: i32,
-    /// `linkVolume` — vehicle volume on the link, read only by the
-    /// Project-domain on-roadway `Population` allocation.
+ /// `linkVolume` — vehicle volume on the link, read only by the
+ /// Project-domain on-roadway `Population` allocation.
     pub link_volume: f64,
 }
 
@@ -209,15 +209,15 @@ pub struct LinkRow {
 /// modelYearID BETWEEN context.year - 40 AND context.year`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RegClassSourceTypeFractionRow {
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `modelYearID`.
+ /// `modelYearID`.
     pub model_year_id: i32,
-    /// `regClassID` — regulatory class.
+ /// `regClassID` — regulatory class.
     pub reg_class_id: i32,
-    /// `regClassFraction` — the bin's share of the regulatory class.
+ /// `regClassFraction` — the bin's share of the regulatory class.
     pub reg_class_fraction: f64,
 }
 
@@ -227,16 +227,16 @@ pub struct RegClassSourceTypeFractionRow {
 /// context.year - 40`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HotellingActivityDistributionRow {
-    /// `opModeID` — `200` extended idle; `201`/`203`/`204` hotelling
-    /// diesel-aux / battery-or-AC / engines-off.
+ /// `opModeID` — `200` extended idle; `201`/`203`/`204` hotelling
+ /// diesel-aux / battery-or-AC / engines-off.
     pub op_mode_id: i32,
-    /// `beginModelYearID` — inclusive start of the model-year range.
+ /// `beginModelYearID` — inclusive start of the model-year range.
     pub begin_model_year_id: i32,
-    /// `endModelYearID` — inclusive end of the model-year range.
+ /// `endModelYearID` — inclusive end of the model-year range.
     pub end_model_year_id: i32,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `opModeFraction` — the op-mode's share of hotelling hours.
+ /// `opModeFraction` — the op-mode's share of hotelling hours.
     pub op_mode_fraction: f64,
 }
 
@@ -248,11 +248,11 @@ pub struct HotellingActivityDistributionRow {
 /// `(sourceTypeModelYear, fuelType)`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SampleVehiclePopulationRow {
-    /// `sourceTypeModelYearID` — the `(sourceType, modelYear)` surrogate key.
+ /// `sourceTypeModelYearID` — the `(sourceType, modelYear)` surrogate key.
     pub source_type_model_year_id: i32,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `stmyFraction` — the sample-vehicle fraction of the source bin.
+ /// `stmyFraction` — the sample-vehicle fraction of the source bin.
     pub stmy_fraction: f64,
 }
 
@@ -263,18 +263,18 @@ pub struct SampleVehiclePopulationRow {
 /// `createSourceTypeFuelFraction`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FuelUsageFractionRow {
-    /// `countyID`.
+ /// `countyID`.
     pub county_id: i32,
-    /// `fuelYearID`.
+ /// `fuelYearID`.
     pub fuel_year_id: i32,
-    /// `modelYearGroupID` — the SQL keeps only `modelYearGroupID = 0`.
+ /// `modelYearGroupID` — the SQL keeps only `modelYearGroupID = 0`.
     pub model_year_group_id: i32,
-    /// `sourceBinFuelTypeID` — the vehicle's nominal (source-bin) fuel type.
+ /// `sourceBinFuelTypeID` — the vehicle's nominal (source-bin) fuel type.
     pub source_bin_fuel_type_id: i32,
-    /// `fuelSupplyFuelTypeID` — the fuel actually supplied / burned.
+ /// `fuelSupplyFuelTypeID` — the fuel actually supplied / burned.
     pub fuel_supply_fuel_type_id: i32,
-    /// `usageFraction` — the share of the nominal fuel reassigned to the
-    /// supply fuel.
+ /// `usageFraction` — the share of the nominal fuel reassigned to the
+ /// supply fuel.
     pub usage_fraction: f64,
 }
 
@@ -282,11 +282,11 @@ pub struct FuelUsageFractionRow {
 /// surrogate key into its `(sourceType, modelYear)` pair.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SourceTypeModelYearRow {
-    /// `sourceTypeModelYearID`.
+ /// `sourceTypeModelYearID`.
     pub source_type_model_year_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `modelYearID`.
+ /// `modelYearID`.
     pub model_year_id: i32,
 }
 
@@ -294,9 +294,9 @@ pub struct SourceTypeModelYearRow {
 /// RunSpec selected; gates the final `sourceTypeFuelFraction` join.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct RunSpecSourceFuelTypeRow {
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
 }
 
@@ -308,7 +308,7 @@ pub struct RunSpecSourceFuelTypeRow {
 /// to drive the Non-Project `Population` source-type fraction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SourceUseTypeRow {
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
 }
 
@@ -316,12 +316,12 @@ pub struct SourceUseTypeRow {
 /// types.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RoadTypeDistributionRow {
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `roadTypeID`.
+ /// `roadTypeID`.
     pub road_type_id: i32,
-    /// `roadTypeVMTFraction` — the road type's share of the source type's
-    /// VMT.
+ /// `roadTypeVMTFraction` — the road type's share of the source type's
+ /// VMT.
     pub road_type_vmt_fraction: f64,
 }
 
@@ -334,12 +334,12 @@ pub struct RoadTypeDistributionRow {
 /// road type.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ZoneRoadTypeRow {
-    /// `zoneID`.
+ /// `zoneID`.
     pub zone_id: i32,
-    /// `roadTypeID`.
+ /// `roadTypeID`.
     pub road_type_id: i32,
-    /// `SHOAllocFactor` — source-hours-operating allocation factor, summed
-    /// over source type.
+ /// `SHOAllocFactor` — source-hours-operating allocation factor, summed
+ /// over source type.
     pub sho_alloc_factor: f64,
 }
 
@@ -348,11 +348,11 @@ pub struct ZoneRoadTypeRow {
 /// the three columns below.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceTypeAgePopulationRow {
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `ageID`.
+ /// `ageID`.
     pub age_id: i32,
-    /// `population` — vehicles of this type and age.
+ /// `population` — vehicles of this type and age.
     pub population: f64,
 }
 
@@ -360,7 +360,7 @@ pub struct SourceTypeAgePopulationRow {
 /// the Non-Project `Population` join.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct RunSpecSourceTypeRow {
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
 }
 
@@ -368,11 +368,11 @@ pub struct RunSpecSourceTypeRow {
 /// used by the Project-domain `Population` allocation.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OffNetworkLinkRow {
-    /// `zoneID`.
+ /// `zoneID`.
     pub zone_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `vehiclePopulation` — off-network vehicle population.
+ /// `vehiclePopulation` — off-network vehicle population.
     pub vehicle_population: f64,
 }
 
@@ -381,12 +381,12 @@ pub struct OffNetworkLinkRow {
 /// allocation. Extracted for links in the iteration zone.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LinkSourceTypeHourRow {
-    /// `linkID`.
+ /// `linkID`.
     pub link_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `sourceTypeHourFraction` — the source type's share of the link's
-    /// hourly volume.
+ /// `sourceTypeHourFraction` — the source type's share of the link's
+ /// hourly volume.
     pub source_type_hour_fraction: f64,
 }
 
@@ -395,11 +395,11 @@ pub struct LinkSourceTypeHourRow {
 /// Extracted `WHERE yearID = context.year` and joined to `RunSpecSourceType`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceTypeAgeDistributionRow {
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `ageID`.
+ /// `ageID`.
     pub age_id: i32,
-    /// `ageFraction` — the age cohort's share of the source-type population.
+ /// `ageFraction` — the age cohort's share of the source-type population.
     pub age_fraction: f64,
 }
 
@@ -1963,67 +1963,67 @@ impl TableRow for SourceTypeAgeDistributionRow {
 /// reads, plus the iteration [`context`](Self::context).
 ///
 /// The Java reads these rows out of the MariaDB execution database; the pure
-/// port instead takes them as plain row vectors. A future Task 50
+/// port instead takes them as plain row vectors. A future
 /// (`DataFrameStore`) wiring populates this from the scratch / default-DB
 /// `DataFrame`s. [`Default`] yields an all-empty bundle so a test (or a
 /// section that an [`ActivityConfig`](super::ActivityConfig) leaves disabled)
 /// can fill in only the tables it needs.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ActivityInputs {
-    /// The master-loop iteration location and time.
+ /// The master-loop iteration location and time.
     pub context: IterationContext,
 
-    /// `SourceHours` — base source hours (`activityTypeID` 2).
+ /// `SourceHours` — base source hours (`activityTypeID` 2).
     pub source_hours: Vec<SourceHoursRow>,
-    /// `SHO` — base source hours operating; feeds the `SHO` and `ONI`
-    /// sections (both `activityTypeID` 4).
+ /// `SHO` — base source hours operating; feeds the `SHO` and `ONI`
+ /// sections (both `activityTypeID` 4).
     pub sho: Vec<ShoRow>,
-    /// `SHP` — base source hours parked (`activityTypeID` 5).
+ /// `SHP` — base source hours parked (`activityTypeID` 5).
     pub shp: Vec<ShpRow>,
-    /// `Starts` — base engine starts (`activityTypeID` 7).
+ /// `Starts` — base engine starts (`activityTypeID` 7).
     pub starts: Vec<StartsRow>,
-    /// `hotellingHours` — base hotelling hours, feeding `ExtendedIdleHours`
-    /// (`activityTypeID` 3) and `hotellingHours` (`activityTypeID` 13/14/15).
+ /// `hotellingHours` — base hotelling hours, feeding `ExtendedIdleHours`
+ /// (`activityTypeID` 3) and `hotellingHours` (`activityTypeID` 13/14/15).
     pub hotelling_hours: Vec<HotellingHoursRow>,
 
-    /// `HourDay` — the `hourDayID` → `(day, hour)` lookup.
+ /// `HourDay` — the `hourDayID` → `(day, hour)` lookup.
     pub hour_day: Vec<HourDayRow>,
-    /// `link` — road links in the iteration zone.
+ /// `link` — road links in the iteration zone.
     pub link: Vec<LinkRow>,
-    /// `RegClassSourceTypeFraction` — regulatory-class split of each source
-    /// bin.
+ /// `RegClassSourceTypeFraction` — regulatory-class split of each source
+ /// bin.
     pub reg_class_source_type_fraction: Vec<RegClassSourceTypeFractionRow>,
-    /// `hotellingActivityDistribution` — op-mode split of hotelling activity.
+ /// `hotellingActivityDistribution` — op-mode split of hotelling activity.
     pub hotelling_activity_distribution: Vec<HotellingActivityDistributionRow>,
 
-    /// `sampleVehiclePopulation` — sample-vehicle fleet, the basis of
-    /// `sourceTypeFuelFraction`.
+ /// `sampleVehiclePopulation` — sample-vehicle fleet, the basis of
+ /// `sourceTypeFuelFraction`.
     pub sample_vehicle_population: Vec<SampleVehiclePopulationRow>,
-    /// `fuelUsageFraction` — re-fuelling reassignment (`UseFuelUsageFraction`
-    /// variant only).
+ /// `fuelUsageFraction` — re-fuelling reassignment (`UseFuelUsageFraction`
+ /// variant only).
     pub fuel_usage_fraction: Vec<FuelUsageFractionRow>,
-    /// `sourceTypeModelYear` — `sourceTypeModelYearID` key resolution.
+ /// `sourceTypeModelYear` — `sourceTypeModelYearID` key resolution.
     pub source_type_model_year: Vec<SourceTypeModelYearRow>,
-    /// `runSpecSourceFuelType` — RunSpec-selected `(sourceType, fuelType)`
-    /// pairs.
+ /// `runSpecSourceFuelType` — RunSpec-selected `(sourceType, fuelType)`
+ /// pairs.
     pub run_spec_source_fuel_type: Vec<RunSpecSourceFuelTypeRow>,
 
-    /// `sourceUseType` — source types, for the Non-Project `Population`
-    /// fraction.
+ /// `sourceUseType` — source types, for the Non-Project `Population`
+ /// fraction.
     pub source_use_type: Vec<SourceUseTypeRow>,
-    /// `roadTypeDistribution` — per-source-type road-type VMT split.
+ /// `roadTypeDistribution` — per-source-type road-type VMT split.
     pub road_type_distribution: Vec<RoadTypeDistributionRow>,
-    /// `zoneRoadType` — pre-summed `SHOAllocFactor` per road type.
+ /// `zoneRoadType` — pre-summed `SHOAllocFactor` per road type.
     pub zone_road_type: Vec<ZoneRoadTypeRow>,
-    /// `sourceTypeAgePopulation` — population by `(sourceType, age)`.
+ /// `sourceTypeAgePopulation` — population by `(sourceType, age)`.
     pub source_type_age_population: Vec<SourceTypeAgePopulationRow>,
-    /// `runSpecSourceType` — RunSpec-selected source types.
+ /// `runSpecSourceType` — RunSpec-selected source types.
     pub run_spec_source_type: Vec<RunSpecSourceTypeRow>,
-    /// `offNetworkLink` — off-network population (Project domain).
+ /// `offNetworkLink` — off-network population (Project domain).
     pub off_network_link: Vec<OffNetworkLinkRow>,
-    /// `linkSourceTypeHour` — on-roadway source-type volume share (Project
-    /// domain).
+ /// `linkSourceTypeHour` — on-roadway source-type volume share (Project
+ /// domain).
     pub link_source_type_hour: Vec<LinkSourceTypeHourRow>,
-    /// `sourceTypeAgeDistribution` — age split (Project-domain `Population`).
+ /// `sourceTypeAgeDistribution` — age split (Project-domain `Population`).
     pub source_type_age_distribution: Vec<SourceTypeAgeDistributionRow>,
 }

@@ -1,19 +1,19 @@
 //! Diff a calculator's produced table against a canonical snapshot.
 //!
-//! The comparison reuses the Phase 0 [`moves_snapshot`] crate — the
+//! The comparison reuses the [`moves_snapshot`] crate — the
 //! canonical-MOVES captures *are* `moves_snapshot`-format snapshots,
-//! so the gate diffs with the same engine Phase 0's own
+//! so the gate diffs with the same engine's own
 //! regression-detection uses rather than reinventing one.
 //!
 //! Two layers:
 //!
 //! * [`compare_table`] is the pure, in-memory machinery — diff one
-//!   produced [`Table`] against one canonical [`Table`] under a
-//!   tolerance budget.
+//! produced [`Table`] against one canonical [`Table`] under a
+//! tolerance budget.
 //! * [`validate_table`] is the disk-aware orchestration — locate the
-//!   fixture's canonical snapshot, resolve the table matching the
-//!   calculator's output, and run [`compare_table`]. With no snapshots
-//!   in the repo it reports [`ValidationStatus::Dormant`].
+//! fixture's canonical snapshot, resolve the table matching the
+//! calculator's output, and run [`compare_table`]. With no snapshots
+//! in the repo it reports [`ValidationStatus::Dormant`].
 
 use std::path::Path;
 
@@ -105,15 +105,15 @@ pub fn compare_table(
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ValidationStatus {
-    /// No canonical snapshot present — gate is dormant.
+ /// No canonical snapshot present — gate is dormant.
     Dormant,
-    /// Canonical snapshot present but no matching table found.
+ /// Canonical snapshot present but no matching table found.
     CanonicalTableMissing,
-    /// Produced and canonical tables match within tolerance.
+ /// Produced and canonical tables match within tolerance.
     Matched,
-    /// Produced and canonical tables diverge beyond tolerance.
+ /// Produced and canonical tables diverge beyond tolerance.
     Diverged,
-    /// Produced and canonical tables have different row counts (join-cardinality bug).
+ /// Produced and canonical tables have different row counts (join-cardinality bug).
     RowCountMismatch { canonical: usize, produced: usize },
 }
 

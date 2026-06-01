@@ -3,7 +3,7 @@
 //! builds the Total-Activity (`SHO` / `SourceHours`) records for
 //! Mesoscale-Lookup runs.
 //!
-//! Migration plan: Phase 3, Task 35 (paired with [`super::op_mode_distribution`]).
+//! Paired with [`super::op_mode_distribution`].
 //!
 //! # What this generator produces
 //!
@@ -22,15 +22,15 @@
 //!
 //! * **`Tag-0`** find the base year ([`determine_base_year`]);
 //! * **`Tag-1`** base-year population = source-type population × age
-//!   fraction ([`base_year_population`]);
+//! fraction ([`base_year_population`]);
 //! * **`Tag-2`** grow the population year by year with survival,
-//!   migration and sales-growth rates ([`grow_population`] /
-//!   [`grow_one_year`]) — the meatiest step;
+//! migration and sales-growth rates ([`grow_population`] /
+//! [`grow_one_year`]) — the meatiest step;
 //! * **`Tag-3`** the HPMS travel-fraction chain ([`travel_fractions`]);
 //! * **`Tag-5`/`-6`** apportion the annual travel fraction across road
-//!   type, month, day and hour ([`apportion_to_hour`]);
+//! type, month, day and hour ([`apportion_to_hour`]);
 //! * **`Tag-7`** SHO is set equal to VMT (a deliberate identity — see
-//!   below);
+//! below);
 //! * **`Tag-9`** distance = SHO × average speed ([`link_distance`]).
 //!
 //! [`total_activity_basis`] composes `Tag-0` … `Tag-3` into the
@@ -48,15 +48,15 @@
 //! So the genuine activity computation ends at the travel fractions and
 //! their month/day/hour apportionment; the `VMT → SHO → link →
 //! SourceHours` chain is proportional bookkeeping. This port reflects that
-//! — it computes the fractions and the apportionment formula, and leaves
+//! it computes the fractions and the apportionment formula, and leaves
 //! the uniform link redistribution to the data-plane `execute` step.
 //!
-//! # Data plane (Task 50)
+//! # Data plane
 //!
 //! The Java reads ~20 MariaDB tables and writes `SHO` / `SourceHours`.
 //! [`Generator::execute`] receives a [`CalculatorContext`] whose
 //! `ExecutionTables` / `ScratchNamespace` are Phase-2 placeholders until
-//! the `DataFrameStore` lands (migration-plan Task 50), so `execute`
+//! the `DataFrameStore` lands (), so `execute`
 //! cannot yet read those tables nor write the activity tables. The
 //! numerically faithful algorithm is fully ported and unit-tested in the
 //! free functions below.
@@ -64,14 +64,14 @@
 //! # Fidelity notes
 //!
 //! * The Java grows the population *incrementally* across `executeLoop`
-//!   calls, caching `SourceTypeAgePopulation` between years. This port's
-//!   [`grow_population`] recomputes from the base year on each call; the
-//!   recurrence is identical, so the result is numerically the same — the
-//!   Java caching is only a performance optimisation.
+//! calls, caching `SourceTypeAgePopulation` between years. This port's
+//! [`grow_population`] recomputes from the base year on each call; the
+//! recurrence is identical, so the result is numerically the same — the
+//! Java caching is only a performance optimisation.
 //! * MOVES stores the intermediate population / fraction tables in
-//!   `FLOAT` (32-bit) columns while evaluating in `DOUBLE`. This port
-//!   computes in `f64` throughout, matching the Task 41 / Task 33
-//!   precedent; the bug-compatibility decision is deferred to Task 44.
+//! `FLOAT` (32-bit) columns while evaluating in `DOUBLE`. This port
+//! computes in `f64` throughout, matching the /
+//! precedent; the bug-compatibility decision is deferred to.
 
 use std::collections::BTreeMap;
 
@@ -106,15 +106,15 @@ const OLDEST_AGE: i16 = 40;
 /// the growth / migration rates used to grow it.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceTypeYearRow {
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i16,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i16,
-    /// `sourceTypePopulation` — total vehicles of this type in this year.
+ /// `sourceTypePopulation` — total vehicles of this type in this year.
     pub source_type_population: f64,
-    /// `salesGrowthFactor` — applied to the age-0 cohort.
+ /// `salesGrowthFactor` — applied to the age-0 cohort.
     pub sales_growth_factor: f64,
-    /// `migrationRate` — applied to every cohort each year.
+ /// `migrationRate` — applied to every cohort each year.
     pub migration_rate: f64,
 }
 
@@ -122,13 +122,13 @@ pub struct SourceTypeYearRow {
 /// population at a given age in a given year.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceTypeAgeDistributionRow {
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i16,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i16,
-    /// `ageID`.
+ /// `ageID`.
     pub age_id: i16,
-    /// `ageFraction` — the share of the source type's population at this age.
+ /// `ageFraction` — the share of the source type's population at this age.
     pub age_fraction: f64,
 }
 
@@ -136,13 +136,13 @@ pub struct SourceTypeAgeDistributionRow {
 /// relative mileage-accumulation rate.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceTypeAgeRow {
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i16,
-    /// `ageID`.
+ /// `ageID`.
     pub age_id: i16,
-    /// `survivalRate` — the fraction of a cohort surviving one year.
+ /// `survivalRate` — the fraction of a cohort surviving one year.
     pub survival_rate: f64,
-    /// `relativeMAR` — relative mileage-accumulation rate (Tag-3 weight).
+ /// `relativeMAR` — relative mileage-accumulation rate (Tag-3 weight).
     pub relative_mar: f64,
 }
 
@@ -151,13 +151,13 @@ pub struct SourceTypeAgeRow {
 /// and [`grow_population`].
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceTypeAgePopulationRow {
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i16,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i16,
-    /// `ageID`.
+ /// `ageID`.
     pub age_id: i16,
-    /// `population` — vehicle count in this cell.
+ /// `population` — vehicle count in this cell.
     pub population: f64,
 }
 
@@ -165,10 +165,10 @@ pub struct SourceTypeAgePopulationRow {
 /// vehicle type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SourceUseTypeRow {
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i16,
-    /// `HPMSVTypeID` — the HPMS vehicle-type bucket this source type
-    /// rolls up into.
+ /// `HPMSVTypeID` — the HPMS vehicle-type bucket this source type
+ /// rolls up into.
     pub hpms_v_type_id: i16,
 }
 
@@ -177,13 +177,13 @@ pub struct SourceUseTypeRow {
 /// activity basis [`total_activity_basis`] returns.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TravelFractionRow {
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i16,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i16,
-    /// `ageID`.
+ /// `ageID`.
     pub age_id: i16,
-    /// `fraction` — the travel fraction for this cell.
+ /// `fraction` — the travel fraction for this cell.
     pub fraction: f64,
 }
 
@@ -191,9 +191,9 @@ pub struct TravelFractionRow {
 /// year nearest an analysis year.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct YearRow {
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i16,
-    /// `isBaseYear` — whether this year carries base population data.
+ /// `isBaseYear` — whether this year carries base population data.
     pub is_base_year: bool,
 }
 
@@ -254,12 +254,12 @@ pub fn base_year_population(
 /// produces the current year's population:
 ///
 /// * **age 0** — `(prevPop[0] / prevMigrationRate) × salesGrowthFactor ×
-///   migrationRate`, skipped when `prevMigrationRate = 0` (the Java
-///   `sty.migrationRate <> 0` filter);
+/// migrationRate`, skipped when `prevMigrationRate = 0` (the Java
+/// `sty.migrationRate <> 0` filter);
 /// * **ages 1‥39** — `prevPop[age-1] × survivalRate[age-1] ×
-///   migrationRate`;
+/// migrationRate`;
 /// * **age 40** (the cumulative bucket) — `prevPop[39] × survivalRate[39]
-///   × migrationRate + prevPop[40] × survivalRate[40] × migrationRate`.
+/// × migrationRate + prevPop[40] × survivalRate[40] × migrationRate`.
 ///
 /// `current_year` labels the produced rows.
 #[must_use]
@@ -293,7 +293,7 @@ pub fn grow_one_year(
             });
         };
 
-        // age 0 — new sales, scaled out of the previous migration rate.
+ // age 0 — new sales, scaled out of the previous migration rate.
         let prev_migration_rate = prev_migration.get(&source_type_id).copied().unwrap_or(0.0);
         if prev_migration_rate != 0.0 {
             if let Some(&prev_pop) = prev.get(&(source_type_id, 0)) {
@@ -304,7 +304,7 @@ pub fn grow_one_year(
             }
         }
 
-        // ages 1‥39 — survivors of the previous age, one year older.
+ // ages 1‥39 — survivors of the previous age, one year older.
         for age in 1..OLDEST_AGE {
             let prev_age = age - 1;
             if let (Some(&prev_pop), Some(&rate)) = (
@@ -315,8 +315,8 @@ pub fn grow_one_year(
             }
         }
 
-        // age 40 — the cumulative bucket: survivors of 39 plus survivors
-        // of the existing 40-and-older bucket.
+ // age 40 — the cumulative bucket: survivors of 39 plus survivors
+ // of the existing 40-and-older bucket.
         let from_39 = match (
             prev.get(&(source_type_id, OLDEST_AGE - 1)),
             survival.get(&(source_type_id, OLDEST_AGE - 1)),
@@ -386,12 +386,12 @@ pub fn grow_population(
 ///
 /// 1. `HPMSVTypePopulation` — total population per HPMS vehicle type;
 /// 2. `FractionWithinHPMSVType` — each cell's share of its HPMS type's
-///    population (computed only where the HPMS-type total is non-zero);
+/// population (computed only where the HPMS-type total is non-zero);
 /// 3. `HPMSTravelFraction` — `Σ (fractionWithin × relativeMAR)` per HPMS
-///    type;
+/// type;
 /// 4. `TravelFraction` — `(fractionWithin × relativeMAR) /
-///    hpmsTravelFraction` (computed only where the HPMS travel fraction
-///    is non-zero).
+/// hpmsTravelFraction` (computed only where the HPMS travel fraction
+/// is non-zero).
 ///
 /// `population` is the analysis-year population by `(sourceType, age)`.
 #[must_use]
@@ -409,15 +409,15 @@ pub fn travel_fractions(
         .map(|a| ((a.source_type_id, a.age_id), a.relative_mar))
         .collect();
 
-    // Step 1: population summed per HPMS vehicle type.
+ // Step 1: population summed per HPMS vehicle type.
     let mut hpms_population: BTreeMap<i16, f64> = BTreeMap::new();
     for row in population {
         if let Some(&hpms) = hpms_of.get(&row.source_type_id) {
-            *hpms_population.entry(hpms).or_insert(0.0) += row.population;
+ *hpms_population.entry(hpms).or_insert(0.0) += row.population;
         }
     }
 
-    // Step 2: each cell's share of its HPMS type's population.
+ // Step 2: each cell's share of its HPMS type's population.
     struct Within {
         year_id: i16,
         source_type_id: i16,
@@ -445,15 +445,15 @@ pub fn travel_fractions(
         });
     }
 
-    // Step 3: Σ (fractionWithin × relativeMAR) per HPMS type.
+ // Step 3: Σ (fractionWithin × relativeMAR) per HPMS type.
     let mut hpms_travel: BTreeMap<i16, f64> = BTreeMap::new();
     for w in &within {
         if let Some(&mar) = relative_mar.get(&(w.source_type_id, w.age_id)) {
-            *hpms_travel.entry(w.hpms).or_insert(0.0) += w.fraction * mar;
+ *hpms_travel.entry(w.hpms).or_insert(0.0) += w.fraction * mar;
         }
     }
 
-    // Step 4: normalise each cell by its HPMS type's travel fraction.
+ // Step 4: normalise each cell by its HPMS type's travel fraction.
     let mut rows: Vec<TravelFractionRow> = Vec::new();
     for w in &within {
         let Some(&mar) = relative_mar.get(&(w.source_type_id, w.age_id)) else {
@@ -597,8 +597,8 @@ impl TableRow for YearRow {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
                 Ok(YearRow {
                     year_id: year_id_col.get(i).ok_or_else(|| null("yearID"))? as i16,
-                    // Canonical MOVES SQL filters Year via `isBaseYear IN ('Y','y')`,
-                    // so NULL is semantically "not a base year". Match that here.
+ // Canonical MOVES SQL filters Year via `isBaseYear IN ('Y','y')`,
+ // so NULL is semantically "not a base year". Match that here.
                     is_base_year: is_base_year_col.get(i).unwrap_or(0) != 0,
                 })
             })
@@ -1431,21 +1431,21 @@ impl TableRow for HourDayRow {
 /// The mesoscale-lookup version uses `SHO = VMT` (the travel fraction, already
 /// a proportional quantity); `distance = SHO × averageSpeed`.
 pub struct ShoOutputRow {
-    /// `hourDayID`.
+ /// `hourDayID`.
     pub hour_day_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i16,
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i16,
-    /// `ageID`.
+ /// `ageID`.
     pub age_id: i16,
-    /// `linkID`.
+ /// `linkID`.
     pub link_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i16,
-    /// `SHO` — source-hours operating (equals VMT for mesoscale lookup).
+ /// `SHO` — source-hours operating (equals VMT for mesoscale lookup).
     pub sho: f64,
-    /// `distance` — `SHO × averageSpeed`.
+ /// `distance` — `SHO × averageSpeed`.
     pub distance: f64,
 }
 
@@ -1582,19 +1582,19 @@ impl TableRow for ShoOutputRow {
 ///
 /// For mesoscale-lookup runs `sourceHours = SHO` (the proportional identity).
 pub struct SourceHoursOutputRow {
-    /// `hourDayID`.
+ /// `hourDayID`.
     pub hour_day_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i16,
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i16,
-    /// `ageID`.
+ /// `ageID`.
     pub age_id: i16,
-    /// `linkID`.
+ /// `linkID`.
     pub link_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i16,
-    /// `sourceHours`.
+ /// `sourceHours`.
     pub source_hours: f64,
 }
 
@@ -1742,27 +1742,27 @@ static OUTPUT_TABLES: &[&str] = &["SHO", "SourceHours"];
 /// documentation for the algorithm and the scope of the port.
 #[derive(Debug, Clone)]
 pub struct MesoscaleLookupTotalActivityGenerator {
-    /// The master-loop subscriptions, built once in [`Self::new`].
+ /// The master-loop subscriptions, built once in [`Self::new`].
     subscriptions: Vec<CalculatorSubscription>,
 }
 
 impl MesoscaleLookupTotalActivityGenerator {
-    /// Chain-DAG name — matches the Java class name.
+ /// Chain-DAG name — matches the Java class name.
     pub const NAME: &'static str = "MesoscaleLookupTotalActivityGenerator";
 
-    /// Construct the generator with its master-loop subscriptions.
-    ///
-    /// Mirrors `subscribeToMe`: Running Exhaust, Evap Permeation, Evap
-    /// Fuel Vapor Venting, Evap Fuel Leaks, Brakewear and Tirewear, all at
-    /// `YEAR` granularity, `GENERATOR` priority. The Java additionally
-    /// guards each subscription with `doesHavePollutantAndProcess` — a
-    /// runtime RunSpec decision the registry / engine applies — so the
-    /// static metadata lists every process unconditionally.
-    ///
-    /// The Java also attempts an `"Evap Non-Fuel Vapors"` subscription;
-    /// that process name does not resolve in the pinned MOVES default-DB
-    /// process table, so `EmissionProcess.findByName` returns `null` and
-    /// the subscription is never made — it is correspondingly absent here.
+ /// Construct the generator with its master-loop subscriptions.
+ ///
+ /// Mirrors `subscribeToMe`: Running Exhaust, Evap Permeation, Evap
+ /// Fuel Vapor Venting, Evap Fuel Leaks, Brakewear and Tirewear, all at
+ /// `YEAR` granularity, `GENERATOR` priority. The Java additionally
+ /// guards each subscription with `doesHavePollutantAndProcess` — a
+ /// runtime RunSpec decision the registry / engine applies — so the
+ /// static metadata lists every process unconditionally.
+ ///
+ /// The Java also attempts an `"Evap Non-Fuel Vapors"` subscription;
+ /// that process name does not resolve in the pinned MOVES default-DB
+ /// process table, so `EmissionProcess.findByName` returns `null` and
+ /// the subscription is never made — it is correspondingly absent here.
     #[must_use]
     pub fn new() -> Self {
         let priority =
@@ -1804,21 +1804,21 @@ impl Generator for MesoscaleLookupTotalActivityGenerator {
         OUTPUT_TABLES
     }
 
-    /// Run the generator for the current master-loop iteration.
-    ///
-    /// Reads the input tables from `ctx.tables()`, runs the Tag-0…Tag-9
-    /// pipeline for the current analysis year, and writes the `SHO` and
-    /// `SourceHours` activity tables to `ctx.scratch()`.
-    ///
-    /// For mesoscale-lookup runs `SHO = VMT` (the travel fraction) and
-    /// `sourceHours = SHO`; `distance = SHO × averageSpeed`.  Apportionment
-    /// to months/days/hours uses `monthVMTFraction × dayVMTFraction ×
-    /// hourVMTFraction / 1` (weeks-in-month defaults to 1 because
-    /// `monthOfAnyYear` is not in the generator's input table set).  Links
-    /// are iterated uniformly; each link's road type drives the day/hour
-    /// fraction lookup.
+ /// Run the generator for the current master-loop iteration.
+ ///
+ /// Reads the input tables from `ctx.tables()`, runs the Tag-0…Tag-9
+ /// pipeline for the current analysis year, and writes the `SHO` and
+ /// `SourceHours` activity tables to `ctx.scratch()`.
+ ///
+ /// For mesoscale-lookup runs `SHO = VMT` (the travel fraction) and
+ /// `sourceHours = SHO`; `distance = SHO × averageSpeed`. Apportionment
+ /// to months/days/hours uses `monthVMTFraction × dayVMTFraction ×
+ /// hourVMTFraction / 1` (weeks-in-month defaults to 1 because
+ /// `monthOfAnyYear` is not in the generator's input table set). Links
+ /// are iterated uniformly; each link's road type drives the day/hour
+ /// fraction lookup.
     fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
-        // ── position ──────────────────────────────────────────────────────────
+ // ── position ──────────────────────────────────────────────────────────
         let year_id = ctx
             .position()
             .time
@@ -1826,7 +1826,7 @@ impl Generator for MesoscaleLookupTotalActivityGenerator {
             .ok_or_else(|| Error::Polars("no year in iteration position".into()))?
             as i16;
 
-        // ── read input tables ─────────────────────────────────────────────────
+ // ── read input tables ─────────────────────────────────────────────────
         let years: Vec<YearRow> = ctx.tables().iter_typed("year")?;
         let source_type_years: Vec<SourceTypeYearRow> =
             ctx.tables().iter_typed("sourceTypeYear")?;
@@ -1845,7 +1845,7 @@ impl Generator for MesoscaleLookupTotalActivityGenerator {
             ctx.tables().iter_typed("linkAverageSpeed")?;
         let hour_days: Vec<HourDayRow> = ctx.tables().iter_typed("hourDay")?;
 
-        // ── Tag-0…Tag-3: travel fractions ─────────────────────────────────────
+ // ── Tag-0…Tag-3: travel fractions ─────────────────────────────────────
         let travel_fracs = match total_activity_basis(
             year_id,
             &years,
@@ -1856,7 +1856,7 @@ impl Generator for MesoscaleLookupTotalActivityGenerator {
         ) {
             Some(v) => v,
             None => {
-                // No qualifying base year — write empty tables and return.
+ // No qualifying base year — write empty tables and return.
                 let empty_sho: Vec<ShoOutputRow> = Vec::new();
                 crate::wiring::write_scratch_table(ctx, OUTPUT_TABLES[0], empty_sho)?;
                 let empty_sh: Vec<SourceHoursOutputRow> = Vec::new();
@@ -1868,13 +1868,13 @@ impl Generator for MesoscaleLookupTotalActivityGenerator {
             }
         };
 
-        // ── lookup maps ───────────────────────────────────────────────────────
-        // (sourceTypeID, monthID) -> monthVMTFraction
+ // ── lookup maps ───────────────────────────────────────────────────────
+ // (sourceTypeID, monthID) -> monthVMTFraction
         let month_frac: BTreeMap<(i16, i16), f64> = month_vmt_fractions
             .iter()
             .map(|r| ((r.source_type_id, r.month_id), r.month_vmt_fraction))
             .collect();
-        // (sourceTypeID, monthID, roadTypeID, dayID) -> dayVMTFraction
+ // (sourceTypeID, monthID, roadTypeID, dayID) -> dayVMTFraction
         let day_frac: BTreeMap<(i16, i16, i16, i16), f64> = day_vmt_fractions
             .iter()
             .map(|r| {
@@ -1884,7 +1884,7 @@ impl Generator for MesoscaleLookupTotalActivityGenerator {
                 )
             })
             .collect();
-        // (sourceTypeID, roadTypeID, dayID, hourID) -> hourVMTFraction
+ // (sourceTypeID, roadTypeID, dayID, hourID) -> hourVMTFraction
         let hour_frac: BTreeMap<(i16, i16, i16, i16), f64> = hour_vmt_fractions
             .iter()
             .map(|r| {
@@ -1894,19 +1894,19 @@ impl Generator for MesoscaleLookupTotalActivityGenerator {
                 )
             })
             .collect();
-        // linkID -> averageSpeed
+ // linkID -> averageSpeed
         let avg_speed: BTreeMap<i32, f64> = link_avg_speeds
             .iter()
             .map(|r| (r.link_id, r.average_speed))
             .collect();
-        // hourDayID -> (dayID, hourID)
+ // hourDayID -> (dayID, hourID)
         let _hour_day_map: BTreeMap<i32, (i16, i16)> = hour_days
             .iter()
             .map(|r| (r.hour_day_id, (r.day_id, r.hour_id)))
             .collect();
-        // collect distinct (monthID, dayID, hourID, hourDayID) combinations
+ // collect distinct (monthID, dayID, hourID, hourDayID) combinations
         let mut month_day_hour_hd: Vec<(i16, i16, i16, i32)> = {
-            // monthIDs from month_vmt_fractions; dayID/hourID/hourDayID from hourDay
+ // monthIDs from month_vmt_fractions; dayID/hourID/hourDayID from hourDay
             let months: std::collections::BTreeSet<i16> =
                 month_vmt_fractions.iter().map(|r| r.month_id).collect();
             hour_days
@@ -1921,9 +1921,9 @@ impl Generator for MesoscaleLookupTotalActivityGenerator {
         month_day_hour_hd.sort_unstable();
         month_day_hour_hd.dedup();
 
-        // ── Tag-5…Tag-7/Tag-9: apportion and build output rows ────────────────
-        // weeks_in_month defaults to 1 (Java WeeksInMonthHelper fallback for
-        // unknown months, since MonthOfAnyYear is not in INPUT_TABLES).
+ // ── Tag-5…Tag-7/Tag-9: apportion and build output rows ────────────────
+ // weeks_in_month defaults to 1 (Java WeeksInMonthHelper fallback for
+ // unknown months, since MonthOfAnyYear is not in INPUT_TABLES).
         let weeks_in_month = 1.0_f64;
 
         let mut sho_rows: Vec<ShoOutputRow> = Vec::new();
@@ -1951,10 +1951,10 @@ impl Generator for MesoscaleLookupTotalActivityGenerator {
                         .copied()
                         .unwrap_or(0.0);
 
-                    // Tag-5/6: apportion travel fraction to this hour.
+ // Tag-5/6: apportion travel fraction to this hour.
                     let sho =
                         apportion_to_hour(tf.fraction, m_frac, d_frac, h_frac, weeks_in_month);
-                    // Tag-9: distance = SHO × averageSpeed.
+ // Tag-9: distance = SHO × averageSpeed.
                     let distance = link_distance(sho, speed);
 
                     sho_rows.push(ShoOutputRow {
@@ -1967,7 +1967,7 @@ impl Generator for MesoscaleLookupTotalActivityGenerator {
                         sho,
                         distance,
                     });
-                    // SourceHours = SHO (mesoscale-lookup identity).
+ // SourceHours = SHO (mesoscale-lookup identity).
                     source_hours_rows.push(SourceHoursOutputRow {
                         hour_day_id,
                         month_id,
@@ -1981,7 +1981,7 @@ impl Generator for MesoscaleLookupTotalActivityGenerator {
             }
         }
 
-        // ── write scratch tables ──────────────────────────────────────────────
+ // ── write scratch tables ──────────────────────────────────────────────
         crate::wiring::write_scratch_table(ctx, OUTPUT_TABLES[0], sho_rows)?;
         let sh_df = source_hours_rows
             .into_dataframe()
@@ -2020,11 +2020,11 @@ mod tests {
                 is_base_year: true,
             },
         ];
-        // 2005 → the greatest base year not after it is 2000.
+ // 2005 → the greatest base year not after it is 2000.
         assert_eq!(determine_base_year(&years, 2005), Some(2000));
-        // 2010 itself is a base year.
+ // 2010 itself is a base year.
         assert_eq!(determine_base_year(&years, 2010), Some(2010));
-        // Before any base year → None.
+ // Before any base year → None.
         assert_eq!(determine_base_year(&years, 1985), None);
     }
 
@@ -2050,7 +2050,7 @@ mod tests {
                 age_id: 1,
                 age_fraction: 0.75,
             },
-            // A different year must be ignored.
+ // A different year must be ignored.
             SourceTypeAgeDistributionRow {
                 year_id: 1999,
                 source_type_id: 21,
@@ -2066,8 +2066,8 @@ mod tests {
 
     #[test]
     fn grow_one_year_age_zero_uses_sales_growth_and_migration() {
-        // prevPop[0] = 100, prevMigration = 2, salesGrowth = 1.5,
-        // migration = 3 → (100/2)·1.5·3 = 225.
+ // prevPop[0] = 100, prevMigration = 2, salesGrowth = 1.5,
+ // migration = 3 → (100/2)·1.5·3 = 225.
         let prev: BTreeMap<(i16, i16), f64> = [((21, 0), 100.0)].into_iter().collect();
         let prev_years = [SourceTypeYearRow {
             year_id: 2000,
@@ -2090,8 +2090,8 @@ mod tests {
 
     #[test]
     fn grow_one_year_age_zero_skipped_when_prev_migration_zero() {
-        // prevMigrationRate = 0 → the Java `migrationRate <> 0` filter
-        // drops the age-0 row entirely (no division by zero).
+ // prevMigrationRate = 0 → the Java `migrationRate <> 0` filter
+ // drops the age-0 row entirely (no division by zero).
         let prev: BTreeMap<(i16, i16), f64> = [((21, 0), 100.0)].into_iter().collect();
         let prev_years = [SourceTypeYearRow {
             year_id: 2000,
@@ -2113,8 +2113,8 @@ mod tests {
 
     #[test]
     fn grow_one_year_shifts_ages_with_survival_and_migration() {
-        // prevPop[age 0] = 80, survivalRate[0] = 0.9, migration = 1.1 →
-        // age 1 = 80·0.9·1.1 = 79.2.
+ // prevPop[age 0] = 80, survivalRate[0] = 0.9, migration = 1.1 →
+ // age 1 = 80·0.9·1.1 = 79.2.
         let prev: BTreeMap<(i16, i16), f64> = [((21, 0), 80.0)].into_iter().collect();
         let years = [SourceTypeYearRow {
             year_id: 2001,
@@ -2129,7 +2129,7 @@ mod tests {
             survival_rate: 0.9,
             relative_mar: 1.0,
         }];
-        // No previous-year SourceTypeYear → age 0 skipped, age 1 present.
+ // No previous-year SourceTypeYear → age 0 skipped, age 1 present.
         let grown = grow_one_year(2001, &prev, &[], &years, &ages);
         let age1 = grown.iter().find(|r| r.age_id == 1).expect("age 1 row");
         assert!((age1.population - 79.2).abs() < 1e-9);
@@ -2137,8 +2137,8 @@ mod tests {
 
     #[test]
     fn grow_one_year_age_40_accumulates_39_and_existing_40() {
-        // age 40 = prev[39]·survival[39]·mig + prev[40]·survival[40]·mig
-        //        = 10·0.5·2 + 20·0.25·2 = 10 + 10 = 20.
+ // age 40 = prev[39]·survival[39]·mig + prev[40]·survival[40]·mig
+ // = 10·0.5·2 + 20·0.25·2 = 10 + 10 = 20.
         let prev: BTreeMap<(i16, i16), f64> =
             [((21, 39), 10.0), ((21, 40), 20.0)].into_iter().collect();
         let years = [SourceTypeYearRow {
@@ -2181,9 +2181,9 @@ mod tests {
 
     #[test]
     fn grow_population_iterates_multiple_years() {
-        // Two-year grow of a single age-1 cohort: each year multiplies by
-        // survivalRate[0]·migration. With survival 1.0 and migration 1.0,
-        // age advances 0 → 1 → 2 and the count is preserved.
+ // Two-year grow of a single age-1 cohort: each year multiplies by
+ // survivalRate[0]·migration. With survival 1.0 and migration 1.0,
+ // age advances 0 → 1 → 2 and the count is preserved.
         let base = [SourceTypeAgePopulationRow {
             year_id: 2000,
             source_type_id: 21,
@@ -2208,7 +2208,7 @@ mod tests {
             })
             .collect();
         let grown = grow_population(2000, 2002, &base, &years, &ages);
-        // The age-0 cohort has advanced to age 2, count unchanged.
+ // The age-0 cohort has advanced to age 2, count unchanged.
         let age2 = grown.iter().find(|r| r.age_id == 2).expect("age 2 row");
         assert_eq!(age2.year_id, 2002);
         assert!((age2.population - 100.0).abs() < 1e-9);
@@ -2216,8 +2216,8 @@ mod tests {
 
     #[test]
     fn travel_fractions_normalise_within_hpms_type() {
-        // One HPMS type, two source types. relativeMAR = 1 everywhere, so
-        // TravelFraction = fractionWithin (each cell's population share).
+ // One HPMS type, two source types. relativeMAR = 1 everywhere, so
+ // TravelFraction = fractionWithin (each cell's population share).
         let population = [
             SourceTypeAgePopulationRow {
                 year_id: 2010,
@@ -2257,20 +2257,20 @@ mod tests {
             },
         ];
         let fractions = travel_fractions(&population, &use_types, &ages);
-        // fractionWithin = 0.3 / 0.7; hpmsTravel = 0.3·1 + 0.7·1 = 1.0;
-        // TravelFraction = fractionWithin / 1.0.
+ // fractionWithin = 0.3 / 0.7; hpmsTravel = 0.3·1 + 0.7·1 = 1.0;
+ // TravelFraction = fractionWithin / 1.0.
         assert_eq!(fractions.len(), 2);
         assert!((fractions[0].fraction - 0.3).abs() < 1e-9);
         assert!((fractions[1].fraction - 0.7).abs() < 1e-9);
-        // Travel fractions within an HPMS type sum to 1.
+ // Travel fractions within an HPMS type sum to 1.
         let total: f64 = fractions.iter().map(|f| f.fraction).sum();
         assert!((total - 1.0).abs() < 1e-9);
     }
 
     #[test]
     fn travel_fractions_weight_by_relative_mar() {
-        // Equal populations but the second cell has twice the relativeMAR
-        // → it gets twice the travel fraction.
+ // Equal populations but the second cell has twice the relativeMAR
+ // → it gets twice the travel fraction.
         let population = [
             SourceTypeAgePopulationRow {
                 year_id: 2010,
@@ -2304,8 +2304,8 @@ mod tests {
             },
         ];
         let fractions = travel_fractions(&population, &use_types, &ages);
-        // fractionWithin = 0.5 each; hpmsTravel = 0.5·1 + 0.5·2 = 1.5;
-        // TravelFraction = {0.5·1/1.5, 0.5·2/1.5} = {1/3, 2/3}.
+ // fractionWithin = 0.5 each; hpmsTravel = 0.5·1 + 0.5·2 = 1.5;
+ // TravelFraction = {0.5·1/1.5, 0.5·2/1.5} = {1/3, 2/3}.
         assert!((fractions[0].fraction - 1.0 / 3.0).abs() < 1e-9);
         assert!((fractions[1].fraction - 2.0 / 3.0).abs() < 1e-9);
     }
@@ -2342,7 +2342,7 @@ mod tests {
         let basis =
             total_activity_basis(2010, &years, &source_type_years, &dist, &ages, &use_types)
                 .expect("base year resolves");
-        // The single cell carries the whole HPMS type's travel.
+ // The single cell carries the whole HPMS type's travel.
         assert_eq!(basis.len(), 1);
         assert!((basis[0].fraction - 1.0).abs() < 1e-9);
     }
@@ -2358,7 +2358,7 @@ mod tests {
 
     #[test]
     fn apportion_to_hour_multiplies_fractions_and_divides_by_weeks() {
-        // 1000 · 0.1 · 0.2 · 0.5 / 4 = 2.5.
+ // 1000 · 0.1 · 0.2 · 0.5 / 4 = 2.5.
         let v = apportion_to_hour(1000.0, 0.1, 0.2, 0.5, 4.0);
         assert!((v - 2.5).abs() < 1e-9);
     }
@@ -2378,7 +2378,7 @@ mod tests {
         let gen = MesoscaleLookupTotalActivityGenerator::new();
         assert_eq!(gen.name(), "MesoscaleLookupTotalActivityGenerator");
         assert_eq!(gen.output_tables(), &["SHO", "SourceHours"]);
-        // No upstream generator dependency.
+ // No upstream generator dependency.
         assert!(gen.upstream().is_empty());
         let subs = gen.subscriptions();
         assert_eq!(subs.len(), 6);
@@ -2402,8 +2402,8 @@ mod tests {
 
     #[test]
     fn generator_execute_errors_without_year_in_position() {
-        // execute() requires a year in the iteration position; an empty
-        // context (no year set) should return an error, not panic.
+ // execute() requires a year in the iteration position; an empty
+ // context (no year set) should return an error, not panic.
         let gen = MesoscaleLookupTotalActivityGenerator::new();
         let mut ctx = CalculatorContext::new();
         assert!(gen.execute(&mut ctx).is_err());
@@ -2421,12 +2421,12 @@ mod tests {
             DataFrameStore, DataFrameStoreTyped, ExecutionTime, InMemoryStore, IterationPosition,
         };
 
-        // One source type, one age, one base year.
+ // One source type, one age, one base year.
         let year_id: i16 = 2020;
 
         let mut store = InMemoryStore::default();
 
-        // year table — 2020 is the base year.
+ // year table — 2020 is the base year.
         store.insert(
             "year",
             YearRow::into_dataframe(vec![YearRow {
@@ -2436,7 +2436,7 @@ mod tests {
             .unwrap(),
         );
 
-        // sourceTypeYear — source type 21, population 1000.
+ // sourceTypeYear — source type 21, population 1000.
         store.insert(
             "sourceTypeYear",
             SourceTypeYearRow::into_dataframe(vec![SourceTypeYearRow {
@@ -2449,7 +2449,7 @@ mod tests {
             .unwrap(),
         );
 
-        // sourceTypeAgeDistribution — 100% in age 0.
+ // sourceTypeAgeDistribution — 100% in age 0.
         store.insert(
             "sourceTypeAgeDistribution",
             SourceTypeAgeDistributionRow::into_dataframe(vec![SourceTypeAgeDistributionRow {
@@ -2461,7 +2461,7 @@ mod tests {
             .unwrap(),
         );
 
-        // sourceTypeAge — relativeMAR = 1.
+ // sourceTypeAge — relativeMAR = 1.
         store.insert(
             "sourceTypeAge",
             SourceTypeAgeRow::into_dataframe(vec![SourceTypeAgeRow {
@@ -2473,7 +2473,7 @@ mod tests {
             .unwrap(),
         );
 
-        // sourceUseType — source type 21 maps to HPMS type 10.
+ // sourceUseType — source type 21 maps to HPMS type 10.
         store.insert(
             "sourceUseType",
             SourceUseTypeRow::into_dataframe(vec![SourceUseTypeRow {
@@ -2483,7 +2483,7 @@ mod tests {
             .unwrap(),
         );
 
-        // monthVMTFraction — month 1 gets all the VMT.
+ // monthVMTFraction — month 1 gets all the VMT.
         store.insert(
             "monthVMTFraction",
             MonthVmtFractionRow::into_dataframe(vec![MonthVmtFractionRow {
@@ -2494,7 +2494,7 @@ mod tests {
             .unwrap(),
         );
 
-        // dayVMTFraction — road type 2, day 5 gets all the VMT.
+ // dayVMTFraction — road type 2, day 5 gets all the VMT.
         store.insert(
             "dayVMTFraction",
             DayVmtFractionRow::into_dataframe(vec![DayVmtFractionRow {
@@ -2507,7 +2507,7 @@ mod tests {
             .unwrap(),
         );
 
-        // hourVMTFraction — road type 2, day 5, hour 8 gets all the VMT.
+ // hourVMTFraction — road type 2, day 5, hour 8 gets all the VMT.
         store.insert(
             "hourVMTFraction",
             HourVmtFractionRow::into_dataframe(vec![HourVmtFractionRow {
@@ -2520,7 +2520,7 @@ mod tests {
             .unwrap(),
         );
 
-        // link — one link on road type 2.
+ // link — one link on road type 2.
         store.insert(
             "link",
             LinkRow::into_dataframe(vec![LinkRow {
@@ -2530,7 +2530,7 @@ mod tests {
             .unwrap(),
         );
 
-        // linkAverageSpeed — link 101 average speed 55 mph.
+ // linkAverageSpeed — link 101 average speed 55 mph.
         store.insert(
             "linkAverageSpeed",
             LinkAverageSpeedRow::into_dataframe(vec![LinkAverageSpeedRow {
@@ -2540,7 +2540,7 @@ mod tests {
             .unwrap(),
         );
 
-        // hourDay — hour 8, day 5 → hourDayID = 85.
+ // hourDay — hour 8, day 5 → hourDayID = 85.
         store.insert(
             "hourDay",
             HourDayRow::into_dataframe(vec![HourDayRow {
@@ -2551,8 +2551,8 @@ mod tests {
             .unwrap(),
         );
 
-        // roadType — not consumed by execute directly, but declared in INPUT_TABLES.
-        // Leave absent; iter_typed will return an empty vec for missing tables.
+ // roadType — not consumed by execute directly, but declared in INPUT_TABLES.
+ // Leave absent; iter_typed will return an empty vec for missing tables.
 
         let position = IterationPosition {
             iteration: 0,
@@ -2570,10 +2570,10 @@ mod tests {
         let mut ctx = CalculatorContext::with_position_and_tables(position, store);
         gen.execute(&mut ctx).unwrap();
 
-        // ── verify SHO table ──────────────────────────────────────────────────
-        // travel fraction = 1.0 (single cell, all HPMS type's travel).
-        // SHO = 1.0 × 1.0 × 1.0 × 1.0 / 1.0 = 1.0.
-        // distance = 1.0 × 55.0 = 55.0.
+ // ── verify SHO table ──────────────────────────────────────────────────
+ // travel fraction = 1.0 (single cell, all HPMS type's travel).
+ // SHO = 1.0 × 1.0 × 1.0 × 1.0 / 1.0 = 1.0.
+ // distance = 1.0 × 55.0 = 55.0.
         let sho_out: Vec<ShoOutputRow> = ctx.scratch().store.iter_typed("SHO").unwrap();
         assert_eq!(sho_out.len(), 1, "SHO table should have one row");
         let sho_row = &sho_out[0];
@@ -2592,8 +2592,8 @@ mod tests {
             "distance = SHO × avgSpeed"
         );
 
-        // ── verify SourceHours table ──────────────────────────────────────────
-        // sourceHours = SHO (mesoscale-lookup identity).
+ // ── verify SourceHours table ──────────────────────────────────────────
+ // sourceHours = SHO (mesoscale-lookup identity).
         let sh_out: Vec<SourceHoursOutputRow> =
             ctx.scratch().store.iter_typed("SourceHours").unwrap();
         assert_eq!(sh_out.len(), 1, "SourceHours table should have one row");

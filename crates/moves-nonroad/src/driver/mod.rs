@@ -8,23 +8,23 @@
 //!
 //! | File | Lines | Role | Submodule |
 //! |---|---|---|---|
-//! | `nonroad.f`  | 397 | Main entry point; orchestration | [`run`] |
-//! | `dayloop.f`  | 126 | Day-of-year loop | [`dayloop`] |
-//! | `daymthf.f`  | 194 | Month → day fractioning | [`daymthf`] |
-//! | `dispit.f`   |  50 | Iteration progress display | [`progress`] |
-//! | `mspinit.f`  |  41 | Progress-spinner advance | [`progress`] |
-//! | `spinit.f`   |  38 | Progress-spinner init (dead) | [`progress`] |
+//! | `nonroad.f` | 397 | Main entry point; orchestration | [`run`] |
+//! | `dayloop.f` | 126 | Day-of-year loop | [`dayloop`] |
+//! | `daymthf.f` | 194 | Month → day fractioning | [`daymthf`] |
+//! | `dispit.f` | 50 | Iteration progress display | [`progress`] |
+//! | `mspinit.f` | 41 | Progress-spinner advance | [`progress`] |
+//! | `spinit.f` | 38 | Progress-spinner init (dead) | [`progress`] |
 //! | `scrptime.f` | 212 | Scrappage-time accounting | [`mod@scrptime`] |
 //!
 //! # Naming note
 //!
-//! The migration plan (`moves-rust-migration-plan.md`, Task 91)
+//! The (`moves-rust-.md`,)
 //! refers to this cluster as `moves-nonroad::main`. The actual
 //! module is named `driver` to avoid collision with the `fn main()`
 //! function in `src/main.rs`. See `ARCHITECTURE.md` § 2.1 for the
 //! discussion.
 //!
-//! # Scope of this port (Task 113)
+//! # Scope of this port
 //!
 //! `nonroad.f` is the program's outermost orchestration: it reads the
 //! options file, loads every input, drives the SCC × geography × year
@@ -32,9 +32,9 @@
 //! owned by *later* tasks:
 //!
 //! - the output writers (`wrthdr`, `wrtsum`, `wrtsi`, `wrtams`,
-//!   `clsnon`) are **Task 114**, which depends on this task;
+//! `clsnon`) are, which depends on this task;
 //! - assembling the fully-populated callback context that the six
-//!   geography routines need is the **Task 117** integration step.
+//! geography routines need is the integration step.
 //!
 //! So this module ports the driver loop the way the `geography`
 //! module ported its routines (`ARCHITECTURE.md` § 2.2): the
@@ -44,14 +44,14 @@
 //! Concretely:
 //!
 //! - [`dayloop`], [`daymthf`], [`mod@scrptime`], and [`progress`] are the
-//!   six self-contained helper routines — fully ported and tested.
+//! six self-contained helper routines — fully ported and tested.
 //! - [`run`] ports `nonroad.f`'s record loop: SCC-prefix fuel
-//!   classification, the growth-record-pair lookahead, region-shape
-//!   classification, and the region-level dispatch decision. The loop
-//!   is exposed as a *planner* ([`run::plan_scc_group`]) that produces
-//!   the ordered sequence of geography-routine dispatch decisions; the
-//!   executor that runs each decision against the geography routines
-//!   and the writers is the Task 117 integration layer.
+//! classification, the growth-record-pair lookahead, region-shape
+//! classification, and the region-level dispatch decision. The loop
+//! is exposed as a *planner* ([`run::plan_scc_group`]) that produces
+//! the ordered sequence of geography-routine dispatch decisions; the
+//! executor that runs each decision against the geography routines
+//! and the writers is the integration layer.
 
 pub mod dayloop;
 pub mod daymthf;

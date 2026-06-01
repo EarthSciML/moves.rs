@@ -1,4 +1,4 @@
-//! Characterization tests for the Base Rate Generator (Task 42).
+//! Characterization tests for the Base Rate Generator.
 //!
 //! Each test builds a small input scenario whose expected output is
 //! hand-derived from the Go `baserategenerator.go` algorithm, then drives
@@ -9,8 +9,8 @@
 //!
 //! These tests pin the port against the Go reference as traced from source.
 //! End-to-end validation against canonical-MOVES intermediate captures is a
-//! separate downstream task (`moves-rust-migration-plan.md` Task 44), which
-//! needs the Phase 0 fixture corpus not present in this crate.
+//! separate downstream task (`moves-rust-.md`), which
+//! needs the fixture corpus not present in this crate.
 
 use moves_calculators::generators::baserategenerator::inputs::{
     AvgSpeedBinRow, AvgSpeedDistributionRow, BaseRateInputs, DriveScheduleAssocRow,
@@ -73,8 +73,8 @@ fn flags_plain(process_id: i32) -> ExternalFlags {
 
 #[test]
 fn core_path_base_rate_no_weighting() {
-    // Process 2 (Start Exhaust) always takes the core RatesOpModeDistribution
-    // path. With every weighting flag off, t = opModeFraction throughout.
+ // Process 2 (Start Exhaust) always takes the core RatesOpModeDistribution
+ // path. With every weighting flag off, t = opModeFraction throughout.
     let inputs = BaseRateInputs {
         rates_op_mode_distribution: vec![romd_row(21, 102, 15, 0.5)],
         sb_weighted_emission_rate: vec![rate(21, 102, 15, 8.0)],
@@ -92,7 +92,7 @@ fn core_path_base_rate_no_weighting() {
     assert_eq!(r.pollutant_id, 1);
     assert_eq!(r.model_year_id, 2016);
     assert_eq!(r.op_mode_id, 0); // collapsed: neither flag set
-                                 // t = opModeFraction(0.5); meanBaseRate = 8 * 0.5.
+ // t = opModeFraction(0.5); meanBaseRate = 8 * 0.5.
     assert_eq!(r.mean_base_rate, 4.0);
     assert_eq!(r.mean_base_rate_im, 2.0);
     assert_eq!(r.mean_base_rate_ac_adj, 1.0);
@@ -101,14 +101,14 @@ fn core_path_base_rate_no_weighting() {
     assert_eq!(r.op_mode_fraction, 0.5);
     assert_eq!(r.op_mode_fraction_rate, 0.5);
 
-    // No SBWeightedEmissionRateByAge rows supplied.
+ // No SBWeightedEmissionRateByAge rows supplied.
     assert!(out.base_rate_by_age.is_empty());
     assert!(out.driving_idle_fraction.is_empty());
 }
 
 #[test]
 fn core_path_applies_sbd_and_speed_fraction_weighting() {
-    // useSumSBD, useSumSBDRaw, useAvgSpeedFraction all on.
+ // useSumSBD, useSumSBDRaw, useAvgSpeedFraction all on.
     let flags = ExternalFlags {
         process_id: 2,
         use_sum_sbd: true,
@@ -125,13 +125,13 @@ fn core_path_applies_sbd_and_speed_fraction_weighting() {
 
     assert_eq!(out.base_rate.len(), 1);
     let r = out.base_rate[0];
-    // opModeFraction 0.5, avgSpeedFraction 0.5, sumSBD 0.5, sumSBDRaw 0.25.
-    // op_mode_fraction = 0.5 * 0.5 * 0.5 = 0.125.
+ // opModeFraction 0.5, avgSpeedFraction 0.5, sumSBD 0.5, sumSBDRaw 0.25.
+ // op_mode_fraction = 0.5 * 0.5 * 0.5 = 0.125.
     assert_eq!(r.op_mode_fraction, 0.125);
     assert_eq!(r.op_mode_fraction_rate, 0.125);
-    // meanBaseRate t = 0.5 * 0.5 * 0.25 = 0.0625; 8 * 0.0625 = 0.5.
+ // meanBaseRate t = 0.5 * 0.5 * 0.25 = 0.0625; 8 * 0.0625 = 0.5.
     assert_eq!(r.mean_base_rate, 0.5);
-    // emissionRate t = opModeFraction * avgSpeedFraction = 0.25; 8 * 0.25 = 2.
+ // emissionRate t = opModeFraction * avgSpeedFraction = 0.25; 8 * 0.25 = 2.
     assert_eq!(r.emission_rate, 2.0);
 }
 
@@ -153,19 +153,19 @@ fn use_avg_speed_bin_retains_op_mode_and_divides_by_speed() {
 
     assert_eq!(out.base_rate.len(), 1);
     let r = out.base_rate[0];
-    // useAvgSpeedBin retains the real operating mode and bin in the record.
+ // useAvgSpeedBin retains the real operating mode and bin in the record.
     assert_eq!(r.op_mode_id, 15);
     assert_eq!(r.avg_speed_bin_id, 8);
-    // emissionRate t = opModeFraction * avgSpeedFraction / avgBinSpeed
-    //              = 0.5 * 1 / 4 = 0.125; 8 * 0.125 = 1.0.
+ // emissionRate t = opModeFraction * avgSpeedFraction / avgBinSpeed
+ // = 0.5 * 1 / 4 = 0.125; 8 * 0.125 = 1.0.
     assert_eq!(r.emission_rate, 1.0);
     assert_eq!(r.emission_rate_im, 0.5);
 }
 
 #[test]
 fn duplicate_romd_rows_are_deduplicated() {
-    // Two identical RatesOpModeDistribution rows collapse to one romd block;
-    // a failed dedup would double the accumulated rate.
+ // Two identical RatesOpModeDistribution rows collapse to one romd block;
+ // a failed dedup would double the accumulated rate.
     let inputs = BaseRateInputs {
         rates_op_mode_distribution: vec![romd_row(21, 102, 15, 0.5), romd_row(21, 102, 15, 0.5)],
         sb_weighted_emission_rate: vec![rate(21, 102, 15, 8.0)],
@@ -173,13 +173,13 @@ fn duplicate_romd_rows_are_deduplicated() {
     };
     let out = BaseRateGenerator::run(&inputs, &flags_plain(2));
     assert_eq!(out.base_rate.len(), 1);
-    // Single contribution: 8 * 0.5, not 8.0.
+ // Single contribution: 8 * 0.5, not 8.0.
     assert_eq!(out.base_rate[0].mean_base_rate, 4.0);
 }
 
 #[test]
 fn negative_pol_process_is_dropped_as_wildcard() {
-    // polProcessID < 0 is a wildcard placeholder — handled, not written.
+ // polProcessID < 0 is a wildcard placeholder — handled, not written.
     let inputs = BaseRateInputs {
         rates_op_mode_distribution: vec![romd_row(21, -1, 15, 0.5)],
         sb_weighted_emission_rate: vec![rate(21, -1, 15, 8.0)],
@@ -191,9 +191,9 @@ fn negative_pol_process_is_dropped_as_wildcard() {
 
 #[test]
 fn physics_mapping_promotes_op_mode_and_swaps_source_type() {
-    // Project-domain process 1 takes the core path. A romd row under temp
-    // source type 99 is promoted: source type swapped to the real 21 and the
-    // operating mode shifted by the offset.
+ // Project-domain process 1 takes the core path. A romd row under temp
+ // source type 99 is promoted: source type swapped to the real 21 and the
+ // operating mode shifted by the offset.
     let physics = SourceUseTypePhysicsMappingDetail {
         real_source_type_id: 21,
         temp_source_type_id: 99,
@@ -206,7 +206,7 @@ fn physics_mapping_promotes_op_mode_and_swaps_source_type() {
     let inputs = BaseRateInputs {
         is_project: true,
         rates_op_mode_distribution: vec![romd_row(99, 101, 15, 0.5)],
-        // Rate filed under op mode 1015 (promoted) by the >= 1000 dual-keying.
+ // Rate filed under op mode 1015 (promoted) by the >= 1000 dual-keying.
         sb_weighted_emission_rate: vec![rate(21, 101, 1015, 8.0)],
         source_use_type_physics_mapping: vec![physics],
         ..BaseRateInputs::default()
@@ -214,15 +214,15 @@ fn physics_mapping_promotes_op_mode_and_swaps_source_type() {
     let out = BaseRateGenerator::run(&inputs, &flags_plain(1));
 
     assert_eq!(out.base_rate.len(), 1);
-    // Source type swapped from the temp 99 to the real 21.
+ // Source type swapped from the temp 99 to the real 21.
     assert_eq!(out.base_rate[0].source_type_id, 21);
     assert_eq!(out.base_rate[0].mean_base_rate, 4.0);
 }
 
 #[test]
 fn physics_promotion_skipped_for_ineligible_process() {
-    // The promotion branches gate on Running (1) / Brakewear (9). A Start
-    // Exhaust (process 2) row under a temp source type is kept verbatim.
+ // The promotion branches gate on Running (1) / Brakewear (9). A Start
+ // Exhaust (process 2) row under a temp source type is kept verbatim.
     let physics = SourceUseTypePhysicsMappingDetail {
         real_source_type_id: 21,
         temp_source_type_id: 99,
@@ -238,20 +238,20 @@ fn physics_promotion_skipped_for_ineligible_process() {
     let out = BaseRateGenerator::run(&inputs, &flags_plain(2));
 
     assert_eq!(out.base_rate.len(), 1);
-    // Not swapped — process 2 is ineligible for the promotion.
+ // Not swapped — process 2 is ineligible for the promotion.
     assert_eq!(out.base_rate[0].source_type_id, 99);
 }
 
 #[test]
 fn offset_op_mode_without_matching_rate_is_skipped_for_base_rate() {
-    // A romd block at op mode >= 1000 with no matching SBWeightedEmissionRate
-    // is skipped to avoid the double-counting the Go comment describes.
+ // A romd block at op mode >= 1000 with no matching SBWeightedEmissionRate
+ // is skipped to avoid the double-counting the Go comment describes.
     let mut row = romd_row(21, 102, 1015, 0.5);
     row.op_mode_id = 1015;
     let inputs = BaseRateInputs {
         rates_op_mode_distribution: vec![row],
-        // Rate only under op mode 15 — note prepare does NOT dual-key the
-        // ByAge table, and op mode 1015 is absent here.
+ // Rate only under op mode 15 — note prepare does NOT dual-key the
+ // ByAge table, and op mode 1015 is absent here.
         sb_weighted_emission_rate_by_age: vec![rate(21, 102, 15, 8.0)],
         ..BaseRateInputs::default()
     };
@@ -261,9 +261,9 @@ fn offset_op_mode_without_matching_rate_is_skipped_for_base_rate() {
 
 #[test]
 fn by_age_offset_op_mode_falls_back_for_brakewear() {
-    // Brakewear (process 9): a romd block at op mode 1015 with no ByAge rate
-    // there falls back to the non-offset op mode 15. Project domain forces
-    // the core path so the romd block is controlled directly.
+ // Brakewear (process 9): a romd block at op mode 1015 with no ByAge rate
+ // there falls back to the non-offset op mode 15. Project domain forces
+ // the core path so the romd block is controlled directly.
     let inputs = BaseRateInputs {
         is_project: true,
         rates_op_mode_distribution: vec![romd_row(21, 109, 1015, 0.5)],
@@ -274,7 +274,7 @@ fn by_age_offset_op_mode_falls_back_for_brakewear() {
 
     assert_eq!(out.base_rate_by_age.len(), 1);
     assert_eq!(out.base_rate_by_age[0].mean_base_rate, 4.0);
-    // BaseRateByAge keeps the age dimension from the rate record.
+ // BaseRateByAge keeps the age dimension from the rate record.
     assert_eq!(out.base_rate_by_age[0].age_group_id, 0);
 }
 
@@ -312,13 +312,13 @@ fn distance_rates_contribute_to_base_rate() {
     };
     let out = BaseRateGenerator::run(&inputs, &flags_plain(2));
 
-    // One (road, hour) combination => one distance-derived BaseRate row.
+ // One (road, hour) combination => one distance-derived BaseRate row.
     assert_eq!(out.base_rate.len(), 1);
     let r = out.base_rate[0];
     assert_eq!(r.source_type_id, 21);
     assert_eq!(r.road_type_id, 5);
     assert_eq!(r.hour_day_id, 85);
-    // All weighting off: t = 1 throughout, meanBaseRate = 8.
+ // All weighting off: t = 1 throughout, meanBaseRate = 8.
     assert_eq!(r.mean_base_rate, 8.0);
     assert_eq!(r.emission_rate, 8.0);
     assert_eq!(r.op_mode_fraction, 1.0);
@@ -326,10 +326,10 @@ fn distance_rates_contribute_to_base_rate() {
 
 #[test]
 fn drive_cycle_path_produces_base_rate_and_idle_fraction() {
-    // Non-project process 1 takes the drive-cycle path. A drive schedule of
-    // all-idle seconds bins entirely to operating mode 1; the bracketed bin
-    // therefore carries opModeFraction[1] = 1, the enumeration emits one
-    // idle romd block, and the driving-idle fraction is 1.
+ // Non-project process 1 takes the drive-cycle path. A drive schedule of
+ // all-idle seconds bins entirely to operating mode 1; the bracketed bin
+ // therefore carries opModeFraction[1] = 1, the enumeration emits one
+ // idle romd block, and the driving-idle fraction is 1.
     let physics = SourceUseTypePhysicsMappingDetail {
         real_source_type_id: 21,
         temp_source_type_id: 21,
@@ -403,7 +403,7 @@ fn drive_cycle_path_produces_base_rate_and_idle_fraction() {
     assert_eq!(r.op_mode_id, 0); // flags off => collapsed
     assert_eq!(r.mean_base_rate, 8.0);
 
-    // Driving-idle fraction: all driving time is idle.
+ // Driving-idle fraction: all driving time is idle.
     assert_eq!(out.driving_idle_fraction.len(), 1);
     let idle = out.driving_idle_fraction[0];
     assert_eq!(idle.source_type_id, 21);
@@ -415,13 +415,13 @@ fn drive_cycle_path_produces_base_rate_and_idle_fraction() {
 
 #[test]
 fn reg_class_filter_drops_non_matching_rates() {
-    // A drive-cycle romd block carries the physics record's regClassID; the
-    // aggregator drops rates whose regClassID differs. Use the core path via
-    // a hand-built romd block by routing through project-domain process 1
-    // with a physics mapping that contributes its regClassID only on the
-    // drive-cycle path — so here, verify on the by-age core path instead:
-    // a romd block from the core path has regClassID 0, which disables the
-    // filter, so every rate is kept regardless of its regClassID.
+ // A drive-cycle romd block carries the physics record's regClassID; the
+ // aggregator drops rates whose regClassID differs. Use the core path via
+ // a hand-built romd block by routing through project-domain process 1
+ // with a physics mapping that contributes its regClassID only on the
+ // drive-cycle path — so here, verify on the by-age core path instead:
+ // a romd block from the core path has regClassID 0, which disables the
+ // filter, so every rate is kept regardless of its regClassID.
     let inputs = BaseRateInputs {
         rates_op_mode_distribution: vec![romd_row(21, 102, 15, 0.5)],
         sb_weighted_emission_rate_by_age: vec![
@@ -434,14 +434,14 @@ fn reg_class_filter_drops_non_matching_rates() {
         ..BaseRateInputs::default()
     };
     let out = BaseRateGenerator::run(&inputs, &flags_plain(2));
-    // Two distinct rate records (regClass 20 and 48) => two ByAge rows,
-    // because the core-path block's regClassID 0 disables the filter.
+ // Two distinct rate records (regClass 20 and 48) => two ByAge rows,
+ // because the core-path block's regClassID 0 disables the filter.
     assert_eq!(out.base_rate_by_age.len(), 2);
 }
 
 #[test]
 fn process_filter_excludes_other_processes_from_rates() {
-    // A rate for process 1 must not appear when generating for process 2.
+ // A rate for process 1 must not appear when generating for process 2.
     let inputs = BaseRateInputs {
         rates_op_mode_distribution: vec![romd_row(21, 102, 15, 0.5)],
         sb_weighted_emission_rate: vec![

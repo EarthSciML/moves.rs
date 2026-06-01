@@ -10,7 +10,7 @@
 //! # names contain double underscores and dots in the snapshot layout.
 //! [tables."db__movesoutput__movesoutput"]
 //! emissionQuant = 1e-6
-//! emissionRate  = 1e-6
+//! emissionRate = 1e-6
 //!
 //! [tables."db__movesoutput__activityoutput"]
 //! activity = 1e-3
@@ -66,20 +66,20 @@ pub enum ToleranceError {
 /// Deserialized tolerance config.
 #[derive(Debug, Clone, Default, PartialEq, Deserialize)]
 pub struct ToleranceConfig {
-    /// Default absolute tolerance applied to every Float64 column unless
-    /// overridden by [`Self::tables`]. `0.0` means strict equality.
+ /// Default absolute tolerance applied to every Float64 column unless
+ /// overridden by [`Self::tables`]. `0.0` means strict equality.
     #[serde(default)]
     pub default_float_tolerance: f64,
 
-    /// Per-table, per-column overrides. Outer key: table name. Inner map:
-    /// column name -> absolute tolerance.
+ /// Per-table, per-column overrides. Outer key: table name. Inner map:
+ /// column name -> absolute tolerance.
     #[serde(default)]
     pub tables: BTreeMap<String, BTreeMap<String, f64>>,
 }
 
 impl ToleranceConfig {
-    /// Read and parse a TOML config from disk. Validates that every
-    /// tolerance value is finite and non-negative.
+ /// Read and parse a TOML config from disk. Validates that every
+ /// tolerance value is finite and non-negative.
     pub fn from_file(path: &Path) -> Result<Self, ToleranceError> {
         let bytes = std::fs::read(path).map_err(|source| ToleranceError::Io {
             path: path.to_path_buf(),
@@ -243,7 +243,7 @@ v = -0.1
             tables: BTreeMap::from([("t".to_string(), BTreeMap::from([("v".to_string(), 1e-6)]))]),
         };
         let opts: DiffOptions = cfg.into();
-        // Smoke-test by constructing the opposite options manually.
+ // Smoke-test by constructing the opposite options manually.
         let manual = DiffOptions::default()
             .with_default_float_tolerance(1e-9)
             .with_column_tolerance("t", "v", 1e-6);

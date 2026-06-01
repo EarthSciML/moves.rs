@@ -2,8 +2,8 @@
 //! `AirToxicsDistanceCalculator`, MOVES's distance-ratioed air-toxics
 //! calculator.
 //!
-//! Migration plan: Phase 3, Task 51. The emission-ratioed sibling is Task 50
-//! ([`super::airtoxics`]); the Nonroad air-toxics calculator is Task 52
+//! The emission-ratioed sibling is
+//! ([`super::airtoxics`]); the Nonroad air-toxics calculator is
 //! ([`super::nrairtoxics`]).
 //!
 //! # What this calculator does
@@ -22,16 +22,14 @@
 //! pinned runtime registry `CalculatorInfo.txt`, and
 //! `characterization/calculator-chains/calculator-dag.json` records
 //! `registrations_count: 0` for it. The distance-ratioed Running-Exhaust
-//! toxics it would produce — pollutants 60–67 and 130–146, all process 1 —
-//! are registered to `BaseRateCalculator` (Task 45) instead.
+//! toxics it would produce — pollutants 60–67 and 130–146, all process 1//! are registered to `BaseRateCalculator` instead.
 //! [`Calculator::registrations`] therefore returns an **empty slice**:
 //! re-registering those pairs here would double-register them against the
 //! already-merged `BaseRateCalculator`. The Java constructor's legacy
 //! `EmissionCalculatorRegistration.register(...)` loop (25 placeholder
 //! `ATRatioEntry` pairs) is intentionally not ported.
 //!
-//! The calculator does still subscribe directly to the master loop —
-//! `calculator-dag.json` records `subscribes_directly: true` — so
+//! The calculator does still subscribe directly to the master loop//! `calculator-dag.json` records `subscribes_directly: true` — so
 //! [`Calculator::subscriptions`] is non-empty (see below).
 //!
 //! # Java / SQL structure
@@ -49,25 +47,25 @@
 //! as six functions, chained by [`AirToxicsDistanceCalculator::run`]:
 //!
 //! 1. **Fuel-type activity fractions** (`fuel_type_activity_fractions`, SQL
-//!    `SBD2`) — join `SourceBinDistribution` to `SourceBin` on `sourceBinID`
-//!    and `SUM` `sourceBinActivityFraction` per
-//!    `(sourceTypeModelYearID, fuelTypeID)`.
+//! `SBD2`) — join `SourceBinDistribution` to `SourceBin` on `sourceBinID`
+//! and `SUM` `sourceBinActivityFraction` per
+//! `(sourceTypeModelYearID, fuelTypeID)`.
 //! 2. **Distance fractions** (`distance_fractions`, SQL `DistFracts`) — join
-//!    `SourceTypeModelYear` to step 1 on `sourceTypeModelYearID`, resolving
-//!    the `(sourceTypeID, modelYearID)` of each fraction.
+//! `SourceTypeModelYear` to step 1 on `sourceTypeModelYearID`, resolving
+//! the `(sourceTypeID, modelYearID)` of each fraction.
 //! 3. **Located vehicle distance** (`located_distances`, SQL `SHO2` ⋈
-//!    `Link2` ⋈ `SHO3`) — join `SHO` to `HourDay` (resolving day/hour and
-//!    `modelYearID = yearID - ageID`) and to `Link` / `County` (resolving the
-//!    state / county / zone / road type of the link).
+//! `Link2` ⋈ `SHO3`) — join `SHO` to `HourDay` (resolving day/hour and
+//! `modelYearID = yearID - ageID`) and to `Link` / `County` (resolving the
+//! state / county / zone / road type of the link).
 //! 4. **Activity output** (`activity_output`, SQL `ATActivityOutput`) — join
-//!    steps 2 and 3 on `(sourceTypeID, modelYearID)`;
-//!    `activity = distance * fuelTypeActivityFraction`.
+//! steps 2 and 3 on `(sourceTypeID, modelYearID)`;
+//! `activity = distance * fuelTypeActivityFraction`.
 //! 5. **Dioxin emissions** (`dioxin_emissions`) — join the activity to
-//!    `dioxinEmissionRate` on `(fuelTypeID, modelYearID)`;
-//!    `emissionQuant = activity * meanBaseRate`.
+//! `dioxinEmissionRate` on `(fuelTypeID, modelYearID)`;
+//! `emissionQuant = activity * meanBaseRate`.
 //! 6. **Metal emissions** (`metal_emissions`) — join the activity to
-//!    `metalEmissionRate` on `(sourceTypeID, fuelTypeID, modelYearID)`;
-//!    `emissionQuant = activity * meanBaseRate`.
+//! `metalEmissionRate` on `(sourceTypeID, fuelTypeID, modelYearID)`;
+//! `emissionQuant = activity * meanBaseRate`.
 //!
 //! Steps 5 and 6 each emit [`WorkerOutputRow`]s; `run` concatenates them.
 //! The SQL `activityTypeID` is the constant 1 (distance travelled);
@@ -86,36 +84,36 @@
 //! `Create Remote Tables` section), already:
 //!
 //! * **unit-normalised** — `meanBaseRate` is scaled to native units (grams
-//!   per mile / TEQ per mile): a `g/km` or `TEQ/km` rate is multiplied by
-//!   1.609344 km/mile;
+//! per mile / TEQ per mile): a `g/km` or `TEQ/km` rate is multiplied by
+//! 1.609344 km/mile;
 //! * **`polProcessID`-split** — `pollutantProcessAssoc` splits the default-DB
-//!   `polProcessID` into `(processID, pollutantID)`;
+//! `polProcessID` into `(processID, pollutantID)`;
 //! * **model-year-expanded** — the `modelYear` join expands each
-//!   `modelYearGroupID` into the model years it covers.
+//! `modelYearGroupID` into the model years it covers.
 //!
 //! The Java `UseDioxinEmissionRate` / `UseMetalEmissionRate` section flags
 //! gate whether each rate path runs; this port expresses the gate naturally
-//! — an empty `dioxin_emission_rate` / `metal_emission_rate` input simply
+//! an empty `dioxin_emission_rate` / `metal_emission_rate` input simply
 //! yields no dioxin / metal output.
 //!
 //! # Fidelity notes
 //!
 //! * **`FLOAT` intermediate columns.** The SQL holds
-//!   `SBD2.fuelTypeActivityFraction`, `ATActivityOutput.activity` and
-//!   `MOVESWorkerOutput.emissionQuant` in `FLOAT` (32-bit) columns while
-//!   evaluating the arithmetic in `DOUBLE`, so it truncates to `f32`
-//!   precision between steps. This port computes in `f64` throughout; the
-//!   bug-compatibility decision is deferred to Task 44 (calculator
-//!   integration validation), matching the Task 41 / Task 33 generator
-//!   precedents.
+//! `SBD2.fuelTypeActivityFraction`, `ATActivityOutput.activity` and
+//! `MOVESWorkerOutput.emissionQuant` in `FLOAT` (32-bit) columns while
+//! evaluating the arithmetic in `DOUBLE`, so it truncates to `f32`
+//! precision between steps. This port computes in `f64` throughout; the
+//! bug-compatibility decision is deferred to (calculator
+//! integration validation), matching the / generator
+//! precedents.
 //! * **`SCC` is always `NULL`.** `ATActivityOutput` never receives an `SCC`
-//!   value (the `INSERT` omits the column) and the script has no `SCCOutput`
-//!   / `NoSCCOutput` section, so every `MOVESWorkerOutput` row has a `NULL`
-//!   `SCC`; [`WorkerOutputRow`] omits the column.
+//! value (the `INSERT` omits the column) and the script has no `SCCOutput`
+//! / `NoSCCOutput` section, so every `MOVESWorkerOutput` row has a `NULL`
+//! `SCC`; [`WorkerOutputRow`] omits the column.
 //! * **No deduplication.** The SQL `INSERT ... SELECT` keeps every join row;
-//!   so does this port. `run` returns the rows sorted by their full key for
-//!   a deterministic result (the SQL insert order over MyISAM tables is
-//!   undefined).
+//! so does this port. `run` returns the rows sorted by their full key for
+//! a deterministic result (the SQL insert order over MyISAM tables is
+//! undefined).
 //!
 //! # Data plane pending
 //!
@@ -158,20 +156,20 @@ const RUNNING_EXHAUST_PROCESS_ID: u16 = 1;
 /// reference `polProcessID`, so the column is not modelled.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceBinDistributionRow {
-    /// `sourceTypeModelYearID` — the source-type / model-year key.
+ /// `sourceTypeModelYearID` — the source-type / model-year key.
     pub source_type_model_year_id: i32,
-    /// `sourceBinID` — the source bin (a `BIGINT` in MOVES).
+ /// `sourceBinID` — the source bin (a `BIGINT` in MOVES).
     pub source_bin_id: i64,
-    /// `sourceBinActivityFraction` — fraction of activity in this bin.
+ /// `sourceBinActivityFraction` — fraction of activity in this bin.
     pub source_bin_activity_fraction: f64,
 }
 
 /// One `SourceBin` row — supplies a source bin's fuel type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SourceBinRow {
-    /// `sourceBinID`.
+ /// `sourceBinID`.
     pub source_bin_id: i64,
-    /// `fuelTypeID` — the fuel type of the bin.
+ /// `fuelTypeID` — the fuel type of the bin.
     pub fuel_type_id: i32,
 }
 
@@ -179,11 +177,11 @@ pub struct SourceBinRow {
 /// `(sourceTypeID, modelYearID)`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SourceTypeModelYearRow {
-    /// `sourceTypeModelYearID` — the surrogate key.
+ /// `sourceTypeModelYearID` — the surrogate key.
     pub source_type_model_year_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `modelYearID` — the vehicle model year.
+ /// `modelYearID` — the vehicle model year.
     pub model_year_id: i32,
 }
 
@@ -191,52 +189,52 @@ pub struct SourceTypeModelYearRow {
 /// distance travelled.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ShoRow {
-    /// `hourDayID` — joined hour-of-day / day-of-week bucket.
+ /// `hourDayID` — joined hour-of-day / day-of-week bucket.
     pub hour_day_id: i32,
-    /// `yearID` — the calendar year.
+ /// `yearID` — the calendar year.
     pub year_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `ageID` — the vehicle age; `modelYearID = yearID - ageID`.
+ /// `ageID` — the vehicle age; `modelYearID = yearID - ageID`.
     pub age_id: i32,
-    /// `linkID`.
+ /// `linkID`.
     pub link_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `distance` — distance travelled, in miles.
+ /// `distance` — distance travelled, in miles.
     pub distance: f64,
 }
 
 /// One `HourDay` row — decodes an `hourDayID` into day-of-week and hour.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HourDayRow {
-    /// `hourDayID`.
+ /// `hourDayID`.
     pub hour_day_id: i32,
-    /// `dayID` — day-of-week bucket.
+ /// `dayID` — day-of-week bucket.
     pub day_id: i32,
-    /// `hourID` — hour-of-day.
+ /// `hourID` — hour-of-day.
     pub hour_id: i32,
 }
 
 /// One `Link` row — the road link, supplying its location columns.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LinkRow {
-    /// `linkID`.
+ /// `linkID`.
     pub link_id: i32,
-    /// `countyID` — resolves the link's state through `County`.
+ /// `countyID` — resolves the link's state through `County`.
     pub county_id: i32,
-    /// `zoneID`.
+ /// `zoneID`.
     pub zone_id: i32,
-    /// `roadTypeID`.
+ /// `roadTypeID`.
     pub road_type_id: i32,
 }
 
 /// One `County` row — maps a county to its state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CountyRow {
-    /// `countyID`.
+ /// `countyID`.
     pub county_id: i32,
-    /// `stateID`.
+ /// `stateID`.
     pub state_id: i32,
 }
 
@@ -250,15 +248,15 @@ pub struct CountyRow {
 /// note).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DioxinEmissionRateRow {
-    /// `processID`.
+ /// `processID`.
     pub process_id: i32,
-    /// `pollutantID`.
+ /// `pollutantID`.
     pub pollutant_id: i32,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `modelYearID`.
+ /// `modelYearID`.
     pub model_year_id: i32,
-    /// `meanBaseRate` — emission per mile travelled.
+ /// `meanBaseRate` — emission per mile travelled.
     pub mean_base_rate: f64,
 }
 
@@ -268,17 +266,17 @@ pub struct DioxinEmissionRateRow {
 /// Like [`DioxinEmissionRateRow`] but additionally keyed on `sourceTypeID`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MetalEmissionRateRow {
-    /// `processID`.
+ /// `processID`.
     pub process_id: i32,
-    /// `pollutantID`.
+ /// `pollutantID`.
     pub pollutant_id: i32,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `modelYearID`.
+ /// `modelYearID`.
     pub model_year_id: i32,
-    /// `meanBaseRate` — emission per mile travelled.
+ /// `meanBaseRate` — emission per mile travelled.
     pub mean_base_rate: f64,
 }
 
@@ -286,23 +284,23 @@ pub struct MetalEmissionRateRow {
 /// `Section Processing` reads.
 #[derive(Debug, Clone, Default)]
 pub struct AirToxicsDistanceInputs {
-    /// `SourceBinDistribution` rows.
+ /// `SourceBinDistribution` rows.
     pub source_bin_distribution: Vec<SourceBinDistributionRow>,
-    /// `SourceBin` rows.
+ /// `SourceBin` rows.
     pub source_bin: Vec<SourceBinRow>,
-    /// `SourceTypeModelYear` rows.
+ /// `SourceTypeModelYear` rows.
     pub source_type_model_year: Vec<SourceTypeModelYearRow>,
-    /// `SHO` rows.
+ /// `SHO` rows.
     pub sho: Vec<ShoRow>,
-    /// `HourDay` rows.
+ /// `HourDay` rows.
     pub hour_day: Vec<HourDayRow>,
-    /// `Link` rows.
+ /// `Link` rows.
     pub link: Vec<LinkRow>,
-    /// `County` rows.
+ /// `County` rows.
     pub county: Vec<CountyRow>,
-    /// Worker-extracted `dioxinEmissionRate` rows.
+ /// Worker-extracted `dioxinEmissionRate` rows.
     pub dioxin_emission_rate: Vec<DioxinEmissionRateRow>,
-    /// Worker-extracted `metalEmissionRate` rows.
+ /// Worker-extracted `metalEmissionRate` rows.
     pub metal_emission_rate: Vec<MetalEmissionRateRow>,
 }
 
@@ -379,35 +377,35 @@ struct ActivityOutputRow {
 /// populate are modelled.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WorkerOutputRow {
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `dayID`.
+ /// `dayID`.
     pub day_id: i32,
-    /// `hourID`.
+ /// `hourID`.
     pub hour_id: i32,
-    /// `stateID`.
+ /// `stateID`.
     pub state_id: i32,
-    /// `countyID`.
+ /// `countyID`.
     pub county_id: i32,
-    /// `zoneID`.
+ /// `zoneID`.
     pub zone_id: i32,
-    /// `linkID`.
+ /// `linkID`.
     pub link_id: i32,
-    /// `pollutantID` — from the joined emission-rate row.
+ /// `pollutantID` — from the joined emission-rate row.
     pub pollutant_id: i32,
-    /// `processID` — from the joined emission-rate row.
+ /// `processID` — from the joined emission-rate row.
     pub process_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `modelYearID`.
+ /// `modelYearID`.
     pub model_year_id: i32,
-    /// `roadTypeID`.
+ /// `roadTypeID`.
     pub road_type_id: i32,
-    /// `emissionQuant` — `activity * meanBaseRate`.
+ /// `emissionQuant` — `activity * meanBaseRate`.
     pub emission_quant: f64,
 }
 
@@ -468,7 +466,7 @@ fn sort_key(row: &WorkerOutputRow) -> WorkerOutputSortKey {
 /// `SourceBinDistribution` row whose `sourceBinID` is absent from `SourceBin`.
 /// The `BTreeMap` accumulator keeps the result ordered by the `GROUP BY` key.
 fn fuel_type_activity_fractions(inputs: &AirToxicsDistanceInputs) -> Vec<FuelTypeActivityFraction> {
-    // SourceBin's fuel type, keyed by source bin id.
+ // SourceBin's fuel type, keyed by source bin id.
     let fuel_type_of: HashMap<i64, i32> = inputs
         .source_bin
         .iter()
@@ -480,7 +478,7 @@ fn fuel_type_activity_fractions(inputs: &AirToxicsDistanceInputs) -> Vec<FuelTyp
         let Some(&fuel_type_id) = fuel_type_of.get(&sbd.source_bin_id) else {
             continue;
         };
-        *acc.entry((sbd.source_type_model_year_id, fuel_type_id))
+ *acc.entry((sbd.source_type_model_year_id, fuel_type_id))
             .or_insert(0.0) += sbd.source_bin_activity_fraction;
     }
     acc.into_iter()
@@ -555,9 +553,9 @@ fn located_distances(inputs: &AirToxicsDistanceInputs) -> Vec<LocatedDistance> {
         .iter()
         .map(|c| (c.county_id, c.state_id))
         .collect();
-    // `Link2`: a link keyed by id, carrying its location columns. The
-    // `filter_map` enforces `Link2`'s `INNER JOIN County` — a link whose
-    // county is unknown is dropped.
+ // `Link2`: a link keyed by id, carrying its location columns. The
+ // `filter_map` enforces `Link2`'s `INNER JOIN County` — a link whose
+ // county is unknown is dropped.
     let link_by_id: HashMap<i32, (i32, i32, i32, i32)> = inputs
         .link
         .iter()
@@ -612,7 +610,7 @@ fn activity_output(
     distance_fractions: &[DistanceFraction],
     located: &[LocatedDistance],
 ) -> Vec<ActivityOutputRow> {
-    // DistFracts indexed by the `(sourceTypeID, modelYearID)` join key.
+ // DistFracts indexed by the `(sourceTypeID, modelYearID)` join key.
     let mut df_by_key: HashMap<(i32, i32), Vec<&DistanceFraction>> = HashMap::new();
     for df in distance_fractions {
         df_by_key
@@ -657,7 +655,7 @@ fn activity_output(
 /// Ports the join `ATActivityOutput a INNER JOIN dioxinEmissionRate r
 /// ON (r.fuelTypeID = a.fuelTypeID AND r.modelYearID = a.modelYearID)` with
 /// `emissionQuant = activity * meanBaseRate`. The join ignores `sourceTypeID`
-/// — a dioxin rate applies to every source type at its `(fuelTypeID,
+/// a dioxin rate applies to every source type at its `(fuelTypeID,
 /// modelYearID)` — and an activity row fans out to one output row per
 /// `(processID, pollutantID)` registered for that key.
 fn dioxin_emissions(
@@ -1590,11 +1588,11 @@ impl TableRow for WorkerOutputRow {
 // The snapshot stores `dioxinEmissionRate` and `metalEmissionRate` in the
 // raw default-DB schema (`polProcessID`, `modelYearGroupID`, `units`, …).
 // The functions below port the SQL script's `Section Extract Data` step:
-//   * split `polProcessID` → `(processID, pollutantID)` via `PollutantProcessAssoc`;
-//   * expand `modelYearGroupID` → individual `modelYearID` rows via
-//     `PollutantProcessMappedModelYear`;
-//   * normalise `meanBaseRate` to per-mile units (multiply by 1.609 344 when
-//     the `units` column contains "/km").
+// * split `polProcessID` → `(processID, pollutantID)` via `PollutantProcessAssoc`;
+// * expand `modelYearGroupID` → individual `modelYearID` rows via
+// `PollutantProcessMappedModelYear`;
+// * normalise `meanBaseRate` to per-mile units (multiply by 1.609 344 when
+// the `units` column contains "/km").
 // ===========================================================================
 
 /// Raw `dioxinEmissionRate` row from the default-DB / snapshot — before the
@@ -2031,23 +2029,23 @@ fn extract_metal_rates(
 pub struct AirToxicsDistanceCalculator;
 
 impl AirToxicsDistanceCalculator {
-    /// Chain-DAG name — matches the Java class and the `calculator-dag.json`
-    /// entry.
+ /// Chain-DAG name — matches the Java class and the `calculator-dag.json`
+ /// entry.
     pub const NAME: &'static str = "AirToxicsDistanceCalculator";
 
-    /// Construct the calculator.
+ /// Construct the calculator.
     #[must_use]
     pub fn new() -> Self {
         Self
     }
 
-    /// Run the calculator over a fully materialised set of input tables.
-    ///
-    /// Chains the six processing steps of `AirToxicsDistanceCalculator.sql`
-    /// and returns the `MOVESWorkerOutput` rows the dioxin and metal sections
-    /// would insert. The rows are sorted by their full key for a deterministic
-    /// result (the SQL `INSERT ... SELECT` order over MyISAM tables is
-    /// undefined).
+ /// Run the calculator over a fully materialised set of input tables.
+ ///
+ /// Chains the six processing steps of `AirToxicsDistanceCalculator.sql`
+ /// and returns the `MOVESWorkerOutput` rows the dioxin and metal sections
+ /// would insert. The rows are sorted by their full key for a deterministic
+ /// result (the SQL `INSERT ... SELECT` order over MyISAM tables is
+ /// undefined).
     #[must_use]
     pub fn run(inputs: &AirToxicsDistanceInputs) -> Vec<WorkerOutputRow> {
         let fuel_type_fractions = fuel_type_activity_fractions(inputs);
@@ -2126,9 +2124,9 @@ impl Calculator for AirToxicsDistanceCalculator {
         subscriptions()
     }
 
-    /// No registrations — `AirToxicsDistanceCalculator` is superseded by
-    /// `BaseRateCalculator` (see `REGISTRATIONS` and the module-level
-    /// supersession note).
+ /// No registrations — `AirToxicsDistanceCalculator` is superseded by
+ /// `BaseRateCalculator` (see `REGISTRATIONS` and the module-level
+ /// supersession note).
     fn registrations(&self) -> &[PollutantProcessAssociation] {
         REGISTRATIONS
     }
@@ -2140,7 +2138,7 @@ impl Calculator for AirToxicsDistanceCalculator {
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let tables = ctx.tables();
 
-        // Build lookup maps for the Section Extract Data transform.
+ // Build lookup maps for the Section Extract Data transform.
         let ppa: HashMap<i32, (i32, i32)> = tables
             .iter_typed::<LocalPpaRow>("PollutantProcessAssoc")?
             .into_iter()
@@ -2189,12 +2187,12 @@ pub fn factory() -> Box<dyn Calculator> {
 mod tests {
     use super::*;
 
-    /// A minimal set of inputs that flows one distance record cleanly through
-    /// all six steps, producing one dioxin and one metal output row.
-    ///
-    /// `year = 2020`, age 5 ⇒ `modelYearID = 2015`; one source type (21), one
-    /// source bin (900, fuel type 2), one link (8001 in county 26161, state
-    /// 26). Distance 100 mi, fuel-type activity fraction 0.8 ⇒ activity 80 mi.
+ /// A minimal set of inputs that flows one distance record cleanly through
+ /// all six steps, producing one dioxin and one metal output row.
+ ///
+ /// `year = 2020`, age 5 ⇒ `modelYearID = 2015`; one source type (21), one
+ /// source bin (900, fuel type 2), one link (8001 in county 26161, state
+ /// 26). Distance 100 mi, fuel-type activity fraction 0.8 ⇒ activity 80 mi.
     fn single_flow_inputs() -> AirToxicsDistanceInputs {
         AirToxicsDistanceInputs {
             source_bin_distribution: vec![SourceBinDistributionRow {
@@ -2258,18 +2256,18 @@ mod tests {
         let calc = AirToxicsDistanceCalculator::new();
         assert_eq!(calc.name(), "AirToxicsDistanceCalculator");
 
-        // One subscription: Running Exhaust, YEAR, EMISSION_CALCULATOR.
+ // One subscription: Running Exhaust, YEAR, EMISSION_CALCULATOR.
         let subs = calc.subscriptions();
         assert_eq!(subs.len(), 1);
         assert_eq!(subs[0].process_id, ProcessId(1));
         assert_eq!(subs[0].granularity, Granularity::Year);
         assert_eq!(subs[0].priority.display(), "EMISSION_CALCULATOR");
 
-        // No registrations — superseded by BaseRateCalculator
-        // (calculator-dag.json: registrations_count 0).
+ // No registrations — superseded by BaseRateCalculator
+ // (calculator-dag.json: registrations_count 0).
         assert!(calc.registrations().is_empty());
 
-        // depends_on is empty in the DAG entry.
+ // depends_on is empty in the DAG entry.
         assert!(calc.upstream().is_empty());
 
         assert!(calc.input_tables().contains(&"dioxinEmissionRate"));
@@ -2277,20 +2275,20 @@ mod tests {
         assert!(calc.input_tables().contains(&"SHO"));
     }
 
-    /// Build store tables for `execute` from `single_flow_inputs`.
-    ///
-    /// Provides the raw default-DB schema for `dioxinEmissionRate` /
-    /// `metalEmissionRate` (with `polProcessID` / `modelYearGroupID`) plus the
-    /// `PollutantProcessAssoc` and `PollutantProcessMappedModelYear` lookup
-    /// tables that `execute` joins to produce the worker schema.
+ /// Build store tables for `execute` from `single_flow_inputs`.
+ ///
+ /// Provides the raw default-DB schema for `dioxinEmissionRate` /
+ /// `metalEmissionRate` (with `polProcessID` / `modelYearGroupID`) plus the
+ /// `PollutantProcessAssoc` and `PollutantProcessMappedModelYear` lookup
+ /// tables that `execute` joins to produce the worker schema.
     fn store_from_single_flow_inputs() -> moves_framework::InMemoryStore {
         use moves_framework::DataFrameStore;
         let inputs = single_flow_inputs();
         let mut store = moves_framework::InMemoryStore::new();
 
-        // Non-rate tables: raw insert bypasses registry schema validation.
-        // SourceBinDistributionRow intentionally omits the `polProcessID`
-        // column present in the registry schema.
+ // Non-rate tables: raw insert bypasses registry schema validation.
+ // SourceBinDistributionRow intentionally omits the `polProcessID`
+ // column present in the registry schema.
         store.insert(
             "SourceBinDistribution",
             SourceBinDistributionRow::into_dataframe(inputs.source_bin_distribution).unwrap(),
@@ -2311,11 +2309,11 @@ mod tests {
         store.insert("Link", LinkRow::into_dataframe(inputs.link).unwrap());
         store.insert("County", CountyRow::into_dataframe(inputs.county).unwrap());
 
-        // Rate tables: raw default-DB schema with polProcessID and modelYearGroupID.
-        // single_flow_inputs uses:
-        //   dioxin pollutant 130 process 1 → polProcessID = 13001
-        //   metal  pollutant  63 process 1 → polProcessID =  6301
-        // Both expand through modelYearGroupID 10000 → modelYearID 2015.
+ // Rate tables: raw default-DB schema with polProcessID and modelYearGroupID.
+ // single_flow_inputs uses:
+ // dioxin pollutant 130 process 1 → polProcessID = 13001
+ // metal pollutant 63 process 1 → polProcessID = 6301
+ // Both expand through modelYearGroupID 10000 → modelYearID 2015.
         let dioxin_ppid = 13001_i32;
         let metal_ppid = 6301_i32;
         let my_group = 10000_i32;
@@ -2385,9 +2383,9 @@ mod tests {
         let ctx = CalculatorContext::with_tables(store);
         let out = calc.execute(&ctx).expect("execute ok");
         let df = out.dataframe().expect("output should contain a DataFrame");
-        // single_flow_inputs: 1 dioxin + 1 metal row (pollutants 63 and 130).
+ // single_flow_inputs: 1 dioxin + 1 metal row (pollutants 63 and 130).
         assert_eq!(df.height(), 2, "expected 2 output rows");
-        // Sorted by key (pollutant 63 < 130): metal first, dioxin second.
+ // Sorted by key (pollutant 63 < 130): metal first, dioxin second.
         let pols: Vec<i32> = df
             .column("pollutantID")
             .unwrap()
@@ -2397,7 +2395,7 @@ mod tests {
             .map(|v| v.unwrap())
             .collect();
         assert_eq!(pols, vec![63, 130]);
-        // activity = 100 mi * 0.8 fraction = 80 mi.
+ // activity = 100 mi * 0.8 fraction = 80 mi.
         let eqs: Vec<f64> = df
             .column("emissionQuant")
             .unwrap()
@@ -2420,11 +2418,11 @@ mod tests {
 
     #[test]
     fn execute_normalises_km_units_to_per_mile() {
-        // A rate stored as 0.05 g/km should be multiplied by 1.609344 km/mi
-        // to produce ~0.080 467 2 g/mi before the activity multiply.
+ // A rate stored as 0.05 g/km should be multiplied by 1.609344 km/mi
+ // to produce ~0.080 467 2 g/mi before the activity multiply.
         use moves_framework::DataFrameStore;
         let mut store = store_from_single_flow_inputs();
-        // Replace the dioxin rate table with a /km entry at the same raw rate.
+ // Replace the dioxin rate table with a /km entry at the same raw rate.
         store.insert(
             "dioxinEmissionRate",
             RawDioxinRateRow::into_dataframe(vec![RawDioxinRateRow {
@@ -2441,7 +2439,7 @@ mod tests {
             .execute(&ctx)
             .expect("execute ok");
         let df = out.dataframe().expect("output DataFrame");
-        // activity = 80 mi; dioxin rate = 0.05 g/km * 1.609344 km/mi.
+ // activity = 80 mi; dioxin rate = 0.05 g/km * 1.609344 km/mi.
         let eqs: Vec<f64> = df
             .column("emissionQuant")
             .unwrap()
@@ -2472,7 +2470,7 @@ mod tests {
     #[test]
     fn end_to_end_single_flow() {
         let out = AirToxicsDistanceCalculator::run(&single_flow_inputs());
-        // One dioxin row + one metal row, sorted by key (pollutant 63 < 130).
+ // One dioxin row + one metal row, sorted by key (pollutant 63 < 130).
         assert_eq!(out.len(), 2);
 
         let metal = out[0];
@@ -2489,21 +2487,21 @@ mod tests {
         assert_eq!(metal.county_id, 26161);
         assert_eq!(metal.zone_id, 261_610);
         assert_eq!(metal.road_type_id, 4);
-        // activity 80 mi * 0.02 rate.
+ // activity 80 mi * 0.02 rate.
         assert!((metal.emission_quant - 1.6).abs() < 1e-12);
 
         let dioxin = out[1];
         assert_eq!(dioxin.pollutant_id, 130);
         assert_eq!(dioxin.process_id, 1);
         assert_eq!(dioxin.source_type_id, 21);
-        // activity 80 mi * 0.05 rate.
+ // activity 80 mi * 0.05 rate.
         assert!((dioxin.emission_quant - 4.0).abs() < 1e-12);
     }
 
     #[test]
     fn fuel_type_activity_fractions_sum_over_source_bins() {
-        // A second source bin, same source-type/model-year, same fuel type:
-        // the SBD2 GROUP BY sums the two activity fractions.
+ // A second source bin, same source-type/model-year, same fuel type:
+ // the SBD2 GROUP BY sums the two activity fractions.
         let mut inputs = single_flow_inputs();
         inputs.source_bin.push(SourceBinRow {
             source_bin_id: 901,
@@ -2525,7 +2523,7 @@ mod tests {
 
     #[test]
     fn fuel_type_activity_fractions_split_distinct_fuel_types() {
-        // Two bins of different fuel types stay in separate SBD2 groups.
+ // Two bins of different fuel types stay in separate SBD2 groups.
         let mut inputs = single_flow_inputs();
         inputs.source_bin.push(SourceBinRow {
             source_bin_id: 902,
@@ -2540,7 +2538,7 @@ mod tests {
             });
         let sbd2 = fuel_type_activity_fractions(&inputs);
         assert_eq!(sbd2.len(), 2);
-        // BTreeMap key order: fuel type 1 before fuel type 2.
+ // BTreeMap key order: fuel type 1 before fuel type 2.
         assert_eq!(sbd2[0].fuel_type_id, 1);
         assert!((sbd2[0].fuel_type_activity_fraction - 0.2).abs() < 1e-12);
         assert_eq!(sbd2[1].fuel_type_id, 2);
@@ -2549,8 +2547,8 @@ mod tests {
 
     #[test]
     fn fuel_type_activity_fractions_drop_bins_absent_from_source_bin() {
-        // A SourceBinDistribution row whose bin is not in SourceBin is dropped
-        // by the INNER JOIN.
+ // A SourceBinDistribution row whose bin is not in SourceBin is dropped
+ // by the INNER JOIN.
         let mut inputs = single_flow_inputs();
         inputs
             .source_bin_distribution
@@ -2578,7 +2576,7 @@ mod tests {
 
     #[test]
     fn distance_fractions_drop_fractions_with_unknown_source_type_model_year() {
-        // No SourceTypeModelYear row for the surrogate key -> dropped.
+ // No SourceTypeModelYear row for the surrogate key -> dropped.
         let mut inputs = single_flow_inputs();
         inputs.source_type_model_year.clear();
         let sbd2 = fuel_type_activity_fractions(&inputs);
@@ -2589,7 +2587,7 @@ mod tests {
     fn located_distances_compute_model_year_from_age() {
         let located = located_distances(&single_flow_inputs());
         assert_eq!(located.len(), 1);
-        // modelYearID = yearID - ageID = 2020 - 5.
+ // modelYearID = yearID - ageID = 2020 - 5.
         assert_eq!(located[0].model_year_id, 2015);
         assert_eq!(located[0].day_id, 5);
         assert_eq!(located[0].hour_id, 14);
@@ -2609,7 +2607,7 @@ mod tests {
 
     #[test]
     fn located_distances_drop_links_whose_county_is_unknown() {
-        // Link2's INNER JOIN County drops a link whose county is absent.
+ // Link2's INNER JOIN County drops a link whose county is absent.
         let mut inputs = single_flow_inputs();
         inputs.county.clear();
         assert!(located_distances(&inputs).is_empty());
@@ -2623,7 +2621,7 @@ mod tests {
         let located = located_distances(&inputs);
         let activity = activity_output(&dist, &located);
         assert_eq!(activity.len(), 1);
-        // distance 100 * fuelTypeActivityFraction 0.8.
+ // distance 100 * fuelTypeActivityFraction 0.8.
         assert!((activity[0].activity - 80.0).abs() < 1e-12);
         assert_eq!(activity[0].fuel_type_id, 2);
         assert_eq!(activity[0].source_type_id, 21);
@@ -2632,8 +2630,8 @@ mod tests {
 
     #[test]
     fn activity_output_fans_out_per_fuel_type() {
-        // Two fuel types for the same source-type/model-year: the distance is
-        // apportioned to each.
+ // Two fuel types for the same source-type/model-year: the distance is
+ // apportioned to each.
         let mut inputs = single_flow_inputs();
         inputs.source_bin.push(SourceBinRow {
             source_bin_id: 902,
@@ -2652,14 +2650,14 @@ mod tests {
         let activity = activity_output(&dist, &located);
         assert_eq!(activity.len(), 2);
         let total: f64 = activity.iter().map(|a| a.activity).sum();
-        // 100 * 0.2 + 100 * 0.8.
+ // 100 * 0.2 + 100 * 0.8.
         assert!((total - 100.0).abs() < 1e-12);
     }
 
     #[test]
     fn dioxin_rate_fans_out_to_multiple_pollutants() {
-        // A second dioxin congener at the same (fuelTypeID, modelYearID):
-        // the activity fans out to one output row per pollutant.
+ // A second dioxin congener at the same (fuelTypeID, modelYearID):
+ // the activity fans out to one output row per pollutant.
         let mut inputs = single_flow_inputs();
         inputs.dioxin_emission_rate.push(DioxinEmissionRateRow {
             process_id: 1,
@@ -2672,14 +2670,14 @@ mod tests {
         let dioxin: Vec<_> = out.iter().filter(|r| r.pollutant_id >= 130).collect();
         assert_eq!(dioxin.len(), 2);
         let total: f64 = dioxin.iter().map(|r| r.emission_quant).sum();
-        // 80 * 0.05 + 80 * 0.07.
+ // 80 * 0.05 + 80 * 0.07.
         assert!((total - (4.0 + 5.6)).abs() < 1e-12);
     }
 
     #[test]
     fn dioxin_join_ignores_source_type() {
-        // A dioxin rate has no sourceTypeID column: it applies to whatever
-        // source type the activity row carries.
+ // A dioxin rate has no sourceTypeID column: it applies to whatever
+ // source type the activity row carries.
         let mut inputs = single_flow_inputs();
         inputs.metal_emission_rate.clear();
         inputs.source_type_model_year[0].source_type_id = 62;
@@ -2692,8 +2690,8 @@ mod tests {
 
     #[test]
     fn metal_join_requires_a_matching_source_type() {
-        // The metalEmissionRate join keys on sourceTypeID; a mismatch yields
-        // no metal output (the dioxin row still flows).
+ // The metalEmissionRate join keys on sourceTypeID; a mismatch yields
+ // no metal output (the dioxin row still flows).
         let mut inputs = single_flow_inputs();
         inputs.metal_emission_rate[0].source_type_id = 99;
         let out = AirToxicsDistanceCalculator::run(&inputs);
@@ -2703,7 +2701,7 @@ mod tests {
 
     #[test]
     fn output_is_deterministically_sorted_regardless_of_input_order() {
-        // Reversing the input rows must not change the sorted output.
+ // Reversing the input rows must not change the sorted output.
         let inputs = single_flow_inputs();
         let mut reversed = inputs.clone();
         reversed.dioxin_emission_rate.push(DioxinEmissionRateRow {
@@ -2719,7 +2717,7 @@ mod tests {
         let out_a = AirToxicsDistanceCalculator::run(&reversed);
         let out_b = AirToxicsDistanceCalculator::run(&forward);
         assert_eq!(out_a, out_b);
-        // Keys ascend: pollutant 63 (metal), 130, 145 (dioxin).
+ // Keys ascend: pollutant 63 (metal), 130, 145 (dioxin).
         let pollutants: Vec<i32> = out_a.iter().map(|r| r.pollutant_id).collect();
         assert_eq!(pollutants, vec![63, 130, 145]);
     }

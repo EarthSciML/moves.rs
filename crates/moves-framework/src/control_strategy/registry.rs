@@ -34,30 +34,30 @@ pub struct ControlStrategyRegistry {
 }
 
 impl ControlStrategyRegistry {
-    /// Create an empty registry.
+ /// Create an empty registry.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Register a factory. Strategies are instantiated in registration order.
+ /// Register a factory. Strategies are instantiated in registration order.
     pub fn register(&mut self, factory: ControlStrategyFactory) {
         self.factories.push(factory);
     }
 
-    /// Instantiate every registered strategy, in registration order.
+ /// Instantiate every registered strategy, in registration order.
     #[must_use]
     pub fn instantiate_all(&self) -> Vec<Box<dyn InternalControlStrategy>> {
         self.factories.iter().map(|f| f()).collect()
     }
 
-    /// Number of registered factories.
+ /// Number of registered factories.
     #[must_use]
     pub fn len(&self) -> usize {
         self.factories.len()
     }
 
-    /// True iff no factories have been registered.
+ /// True iff no factories have been registered.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.factories.is_empty()
@@ -112,7 +112,7 @@ mod tests {
         r.register(|| Box::new(AlphaStrategy));
         let a = r.instantiate_all();
         let b = r.instantiate_all();
-        // Both lists have the same names — each call produced a fresh instance.
+ // Both lists have the same names — each call produced a fresh instance.
         assert_eq!(a[0].name(), b[0].name());
     }
 

@@ -1,7 +1,7 @@
 //! Small platform / environment helpers ported from `getsys.f`,
 //! `getime.f`, and (cross-referenced) `getind.f`.
 //!
-//! Task 99. These three Fortran files are interactive-shell and
+//!These three Fortran files are interactive-shell and
 //! current-date plumbing that the Rust port handles with the standard
 //! library:
 //!

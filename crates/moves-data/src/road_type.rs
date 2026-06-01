@@ -51,31 +51,31 @@ impl FromStr for RoadTypeId {
 /// Canonical identity of a MOVES road type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct RoadType {
-    /// Database key (`roadTypeID`).
+ /// Database key (`roadTypeID`).
     pub id: RoadTypeId,
-    /// Display name (`roadDesc` in the default DB).
+ /// Display name (`roadDesc` in the default DB).
     pub name: &'static str,
 }
 
 impl RoadType {
-    /// Look up the canonical road type with the given id.
+ /// Look up the canonical road type with the given id.
     #[must_use]
     pub fn find_by_id(id: RoadTypeId) -> Option<Self> {
         BY_ID.get(&id.0).copied()
     }
 
-    /// Look up the canonical road type by name (case-insensitive ASCII).
-    ///
-    /// Java `RoadType.findByName` is name-only — it does not fall back to
-    /// matching the numeric id as text, unlike `Pollutant.findByName` and
-    /// `EmissionProcess.findByName`.
+ /// Look up the canonical road type by name (case-insensitive ASCII).
+ ///
+ /// Java `RoadType.findByName` is name-only — it does not fall back to
+ /// matching the numeric id as text, unlike `Pollutant.findByName` and
+ /// `EmissionProcess.findByName`.
     #[must_use]
     pub fn find_by_name(name: &str) -> Option<Self> {
         let key = name.to_ascii_lowercase();
         BY_NAME_LOWER.get(key.as_str()).copied()
     }
 
-    /// Iterate every canonical road type in ascending-id order.
+ /// Iterate every canonical road type in ascending-id order.
     pub fn all() -> impl Iterator<Item = Self> {
         ALL_ROAD_TYPES.iter().copied()
     }
@@ -133,7 +133,7 @@ static BY_NAME_LOWER: phf::Map<&'static str, RoadType> = phf::phf_map! {
 mod tests {
     use super::*;
 
-    // Ports the spirit of RoadTypeTest.java.
+ // Ports the spirit of RoadTypeTest.java.
 
     #[test]
     fn find_by_name_returns_canonical_match() {
@@ -151,16 +151,16 @@ mod tests {
 
     #[test]
     fn find_by_name_returns_none_for_unknown() {
-        // RoadTypeTest.java checks that `findByName(" ")` returns null;
-        // our equivalent is `find_by_name(" ")`.
+ // RoadTypeTest.java checks that `findByName(" ")` returns null;
+ // our equivalent is `find_by_name(" ")`.
         assert!(RoadType::find_by_name(" ").is_none());
         assert!(RoadType::find_by_name("type1").is_none());
     }
 
     #[test]
     fn find_by_name_does_not_accept_numeric_id() {
-        // Java's RoadType.findByName is name-only, unlike Pollutant /
-        // EmissionProcess. "1" must not resolve to Off-Network.
+ // Java's RoadType.findByName is name-only, unlike Pollutant /
+ // EmissionProcess. "1" must not resolve to Off-Network.
         assert!(RoadType::find_by_name("1").is_none());
     }
 

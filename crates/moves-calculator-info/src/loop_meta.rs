@@ -42,7 +42,7 @@ pub enum Granularity {
 }
 
 impl Granularity {
-    /// Symbolic name as it appears in `CalculatorInfo.txt`.
+ /// Symbolic name as it appears in `CalculatorInfo.txt`.
     pub fn as_str(self) -> &'static str {
         match self {
             Granularity::Hour => "HOUR",
@@ -58,10 +58,10 @@ impl Granularity {
         }
     }
 
-    /// Mirror of Java's
-    /// [`MasterLoopGranularity.granularityValue`](https://github.com/USEPA/EPA_MOVES_Model/blob/HEAD/gov/epa/otaq/moves/master/framework/MasterLoopGranularity.java)
-    /// — coarser-grained constants get higher integers. Use
-    /// [`execution_index`](Self::execution_index) for sort keys.
+ /// Mirror of Java's
+ /// [`MasterLoopGranularity.granularityValue`](https://github.com/USEPA/EPA_MOVES_Model/blob/HEAD/gov/epa/otaq/moves/master/framework/MasterLoopGranularity.java)
+ /// — coarser-grained constants get higher integers. Use
+ /// [`execution_index`](Self::execution_index) for sort keys.
     pub fn granularity_value(self) -> i32 {
         match self {
             Granularity::Hour => 1,
@@ -77,12 +77,12 @@ impl Granularity {
         }
     }
 
-    /// Sort key for execution order: lower = fires earlier. Java's
-    /// `compareTo` returns `other.value - this.value` so that the
-    /// `TreeSet` natural order places COARSER granularities first inside
-    /// the MasterLoop — we mirror that here by flipping the sign.
-    /// `MatchFinest` is a special case: it pins a calculator to the finest
-    /// granularity in play, so it sorts last (largest `execution_index`).
+ /// Sort key for execution order: lower = fires earlier. Java's
+ /// `compareTo` returns `other.value - this.value` so that the
+ /// `TreeSet` natural order places COARSER granularities first inside
+ /// the MasterLoop — we mirror that here by flipping the sign.
+ /// `MatchFinest` is a special case: it pins a calculator to the finest
+ /// granularity in play, so it sorts last (largest `execution_index`).
     pub fn execution_index(self) -> i32 {
         match self {
             Granularity::MatchFinest => i32::MAX,
@@ -134,10 +134,10 @@ impl<'de> Deserialize<'de> for Granularity {
 /// (`"EMISSION_CALCULATOR"`, `"EMISSION_CALCULATOR+1"`, `"42"`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Priority {
-    /// One of `INTERNAL_CONTROL_STRATEGY` / `GENERATOR` / `EMISSION_CALCULATOR`
-    /// or the integer literal if it lay outside every band.
+ /// One of `INTERNAL_CONTROL_STRATEGY` / `GENERATOR` / `EMISSION_CALCULATOR`
+ /// or the integer literal if it lay outside every band.
     pub base: PriorityBase,
-    /// Offset from the named base. Positive means earlier execution.
+ /// Offset from the named base. Positive means earlier execution.
     pub offset: i32,
 }
 
@@ -146,7 +146,7 @@ pub enum PriorityBase {
     InternalControlStrategy,
     Generator,
     EmissionCalculator,
-    /// Raw integer literal that didn't fall inside any decode band.
+ /// Raw integer literal that didn't fall inside any decode band.
     Other,
 }
 
@@ -171,13 +171,13 @@ impl PriorityBase {
 }
 
 impl Priority {
-    /// Total integer value, matching Java's `MasterLoopPriority` constants.
+ /// Total integer value, matching Java's `MasterLoopPriority` constants.
     pub fn value(self) -> i32 {
         self.base.base_value() + self.offset
     }
 
-    /// Reconstruct the `MasterLoopPriority.decode(int)` textual form, e.g.
-    /// `"EMISSION_CALCULATOR"`, `"EMISSION_CALCULATOR+1"`, `"GENERATOR-2"`.
+ /// Reconstruct the `MasterLoopPriority.decode(int)` textual form, e.g.
+ /// `"EMISSION_CALCULATOR"`, `"EMISSION_CALCULATOR+1"`, `"GENERATOR-2"`.
     pub fn display(self) -> String {
         if self.base == PriorityBase::Other {
             self.value().to_string()
@@ -190,9 +190,9 @@ impl Priority {
         }
     }
 
-    /// Parse one of the textual forms produced by
-    /// [`MasterLoopPriority.decode`](https://github.com/USEPA/EPA_MOVES_Model/blob/HEAD/gov/epa/otaq/moves/master/framework/MasterLoopPriority.java).
-    /// Returns `None` for inputs that aren't recognisable.
+ /// Parse one of the textual forms produced by
+ /// [`MasterLoopPriority.decode`](https://github.com/USEPA/EPA_MOVES_Model/blob/HEAD/gov/epa/otaq/moves/master/framework/MasterLoopPriority.java).
+ /// Returns `None` for inputs that aren't recognisable.
     pub fn parse(input: &str) -> Option<Self> {
         let bases = [
             (
@@ -248,8 +248,8 @@ impl PartialOrd for Priority {
 }
 
 impl Ord for Priority {
-    /// Higher integer value sorts greater. Use `Reverse(priority)` when
-    /// you want "earliest-fires-first" iteration order.
+ /// Higher integer value sorts greater. Use `Reverse(priority)` when
+ /// you want "earliest-fires-first" iteration order.
     fn cmp(&self, other: &Self) -> Ordering {
         self.value().cmp(&other.value())
     }
@@ -279,10 +279,10 @@ mod tests {
 
     #[test]
     fn granularity_execution_order_coarse_first() {
-        // Process is coarser than Month — fires earlier — smaller execution_index.
+ // Process is coarser than Month — fires earlier — smaller execution_index.
         assert!(Granularity::Process.execution_index() < Granularity::Month.execution_index());
         assert!(Granularity::Month.execution_index() < Granularity::Hour.execution_index());
-        // MatchFinest is special — fires last.
+ // MatchFinest is special — fires last.
         assert!(Granularity::Hour.execution_index() < Granularity::MatchFinest.execution_index());
     }
 

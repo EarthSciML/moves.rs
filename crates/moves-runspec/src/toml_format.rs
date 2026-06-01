@@ -12,11 +12,11 @@
 //!
 //! 1. Hand-authored RunSpecs use the friendlier surface;
 //! 2. The XML compatibility format can mutate independently of the TOML
-//!    surface as Task 12 grows it out (additional optional elements,
-//!    deprecated attributes, etc.);
+//! surface as grows it out (additional optional elements,
+//! deprecated attributes, etc.);
 //! 3. Both surfaces converge on the canonical [`RunSpec`] model, so a
-//!    XML→model→TOML→model→XML round-trip is model-identical by
-//!    construction.
+//! XML→model→TOML→model→XML round-trip is model-identical by
+//! construction.
 
 use serde::{Deserialize, Serialize};
 

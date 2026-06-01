@@ -6,14 +6,14 @@
 //! the *same* record shape — the same phase, the same labels, the
 //! same value-vector lengths. These adapters are that bridge.
 //!
-//! | Phase    | `moves-nonroad` output / source                   | Emitted labels                           |
+//! | Phase | `moves-nonroad` output / source | Emitted labels |
 //! |----------|---------------------------------------------------|------------------------------------------|
-//! | `GETPOP` | `&[SelectedPopulation]`                           | `popeqp`, `avghpc`, `usehrs`, `ipopyr`   |
-//! | `GETPOP` | [`DispatchContext`] (executor boundary)           | `popeqp`, `avghpc`, `ipopyr`             |
-//! | `AGEDIST`| `AgeDistributionResult`                           | `mdyrfrc`, `baspop`                      |
-//! | `GRWFAC` | `GrowthFactor`                                    | `factor`, `baseyearind`, `growthyearind` |
-//! | `CLCEMS` | `ExhaustCalcOutputs`                              | `emsday`, `emsbmy`                       |
-//! | `CLCEMS` | [`GeographyExecution`] rows (executor boundary)   | `emsday`                                 |
+//! | `GETPOP` | `&[SelectedPopulation]` | `popeqp`, `avghpc`, `usehrs`, `ipopyr` |
+//! | `GETPOP` | [`DispatchContext`] (executor boundary) | `popeqp`, `avghpc`, `ipopyr` |
+//! | `AGEDIST`| `AgeDistributionResult` | `mdyrfrc`, `baspop` |
+//! | `GRWFAC` | `GrowthFactor` | `factor`, `baseyearind`, `growthyearind` |
+//! | `CLCEMS` | `ExhaustCalcOutputs` | `emsday`, `emsbmy` |
+//! | `CLCEMS` | [`GeographyExecution`] rows (executor boundary) | `emsday` |
 //!
 //! The labels match the `dbgemit` patch table in
 //! `characterization/nonroad-build/README.md`.
@@ -25,7 +25,7 @@
 //! It delegates every dispatch to the inner executor, then appends
 //! [`Phase::Getpop`] records built from the [`DispatchContext`] and
 //! [`Phase::Clcems`] records built from the returned
-//! [`GeographyExecution`] rows.  Intermediate AGEDIST and GRWFAC
+//! [`GeographyExecution`] rows. Intermediate AGEDIST and GRWFAC
 //! state is not visible at this boundary and is therefore omitted;
 //! those phases are captured only by the fine-grained adapters above.
 //!
@@ -161,23 +161,23 @@ pub fn clcems_records(ctx: &Context, out: &ExhaustCalcOutputs) -> Vec<ReferenceR
 /// On each [`execute`](GeographyExecutor::execute) call the executor:
 /// 1. delegates to the inner executor;
 /// 2. appends [`Phase::Getpop`] records from the [`DispatchContext`]
-///    via [`getpop_records_from_driver`]; and
+/// via [`getpop_records_from_driver`]; and
 /// 3. appends [`Phase::Clcems`] records from the returned
-///    [`GeographyExecution`] rows via [`clcems_records_from_rows`].
+/// [`GeographyExecution`] rows via [`clcems_records_from_rows`].
 ///
 /// The accumulated [`captured`](Self::captured) records are the
 /// port-side input to [`super::divergence::compare_runs`].
 pub struct InstrumentingExecutor<G: GeographyExecutor> {
-    /// The wrapped executor that evaluates the geography routines.
+ /// The wrapped executor that evaluates the geography routines.
     pub inner: G,
-    /// Port-side records accumulated across all dispatches.
+ /// Port-side records accumulated across all dispatches.
     pub captured: Vec<ReferenceRecord>,
     call_counter: usize,
 }
 
 impl<G: GeographyExecutor> InstrumentingExecutor<G> {
-    /// Wrap `inner` in a new instrumenting executor with an empty
-    /// capture log.
+ /// Wrap `inner` in a new instrumenting executor with an empty
+ /// capture log.
     pub fn new(inner: G) -> Self {
         Self {
             inner,
@@ -343,7 +343,7 @@ mod tests {
         assert_eq!(popeqp.values, vec![100.0, 250.0]);
         let ipopyr = records.iter().find(|r| r.label == "ipopyr").unwrap();
         assert_eq!(ipopyr.values, vec![2018.0, 2021.0]);
-        // Every array has one entry per selected population.
+ // Every array has one entry per selected population.
         for r in &records {
             assert_eq!(r.values.len(), pops.len());
         }
@@ -475,7 +475,7 @@ mod tests {
         let mut instr = InstrumentingExecutor::new(inner);
         instr.execute(&dispatch_ctx, &options).unwrap();
 
-        // Three GETPOP records per dispatch (popeqp, avghpc, ipopyr).
+ // Three GETPOP records per dispatch (popeqp, avghpc, ipopyr).
         let getpop: Vec<_> = instr
             .captured
             .iter()
@@ -486,7 +486,7 @@ mod tests {
         assert!(labels.contains(&"popeqp"));
         assert!(labels.contains(&"ipopyr"));
 
-        // PlanRecordingExecutor returns no rows → no CLCEMS records.
+ // PlanRecordingExecutor returns no rows → no CLCEMS records.
         let clcems_count = instr
             .captured
             .iter()
@@ -494,7 +494,7 @@ mod tests {
             .count();
         assert_eq!(clcems_count, 0);
 
-        // Call counter is reflected in the context.
+ // Call counter is reflected in the context.
         assert_eq!(instr.captured[0].context.call(), Some(1));
     }
 
@@ -522,9 +522,9 @@ mod tests {
         instr.execute(&dispatch_ctx, &options).unwrap();
         instr.execute(&dispatch_ctx, &options).unwrap();
 
-        // Two dispatches × 3 GETPOP records each = 6 total.
+ // Two dispatches × 3 GETPOP records each = 6 total.
         assert_eq!(instr.captured.len(), 6);
-        // Second dispatch has call=2.
+ // Second dispatch has call=2.
         let second_call_records: Vec<_> = instr
             .captured
             .iter()

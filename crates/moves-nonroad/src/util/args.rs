@@ -1,6 +1,6 @@
 //! Command-line argument helper (`getsys.f`).
 //!
-//! Task 99. The Fortran `getsys.f` reads the first argument as the
+//!The Fortran `getsys.f` reads the first argument as the
 //! options filename, falling back to an interactive prompt when no
 //! argument is supplied. In the Rust port the CLI is the caller's
 //! responsibility — this module exposes a small helper that returns
@@ -18,11 +18,11 @@
 /// Outcome of resolving an options-file argument.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Outcome {
-    /// The first command-line argument, taken to be the options file.
+ /// The first command-line argument, taken to be the options file.
     Argument(String),
-    /// No argument supplied — the Fortran source then prompted the
-    /// user via `IORSTD`. The Rust port leaves the prompt to the
-    /// caller and just signals that the argument was absent.
+ /// No argument supplied — the Fortran source then prompted the
+ /// user via `IORSTD`. The Rust port leaves the prompt to the
+ /// caller and just signals that the argument was absent.
     Prompt,
 }
 
@@ -36,7 +36,7 @@ where
     S: Into<String>,
 {
     let mut iter = args.into_iter().map(Into::into);
-    // Drop argv[0].
+ // Drop argv[0].
     let _ = iter.next();
     match iter.next() {
         Some(s) if !s.trim().is_empty() => Outcome::Argument(trimmed_first_token(&s)),
@@ -56,9 +56,9 @@ pub fn get_options_filename() -> Outcome {
 }
 
 fn trimmed_first_token(s: &str) -> String {
-    // Mirrors the Fortran `lftjst` + `INDEX(cline, ' ')` slice: trim
-    // leading whitespace then take everything up to the first
-    // embedded space.
+ // Mirrors the Fortran `lftjst` + `INDEX(cline, ' ')` slice: trim
+ // leading whitespace then take everything up to the first
+ // embedded space.
     let stripped = s.trim_start();
     match stripped.find(char::is_whitespace) {
         Some(idx) => stripped[..idx].to_string(),
@@ -81,7 +81,7 @@ mod tests {
 
     #[test]
     fn drops_trailing_space_padded_argument() {
-        // Fortran semantics: the first whitespace splits the argument.
+ // Fortran semantics: the first whitespace splits the argument.
         let argv = vec!["nonroad", "demo.opt extra"];
         assert_eq!(
             resolve(argv.into_iter()),

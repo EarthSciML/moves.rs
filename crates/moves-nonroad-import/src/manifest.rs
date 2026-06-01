@@ -1,7 +1,7 @@
 //! Output manifest written next to the imported Parquet tree.
 //!
 //! Schema tag: `moves-nonroad-import-manifest/v1`. The shape mirrors the
-//! default-DB converter's manifest (Phase 4 Task 80) so a downstream reader
+//! default-DB converter's manifest so a downstream reader
 //! that already understands one can be taught the other with a single
 //! schema-version check; the user-input importer evolves on its own
 //! lifecycle, so the schema tag is distinct.
@@ -21,8 +21,7 @@ pub struct Manifest {
     pub tables: Vec<TableManifest>,
 }
 
-/// Per-table manifest entry. Always monolithic for user-input tables —
-/// they are smaller than the partitioned default-DB tables and partitioning
+/// Per-table manifest entry. Always monolithic for user-input tables/// they are smaller than the partitioned default-DB tables and partitioning
 /// is not justified.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct TableManifest {

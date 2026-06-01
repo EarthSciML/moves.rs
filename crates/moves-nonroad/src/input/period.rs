@@ -1,6 +1,6 @@
 //! Period-packet parser (`rdnrper.f`).
 //!
-//! Task 97. Parses the `/PERIOD/` packet from the options file. The
+//!Parses the `/PERIOD/` packet from the options file. The
 //! packet defines:
 //!
 //! - period type (annual / monthly / seasonal),
@@ -22,14 +22,14 @@
 //!
 //! ```text
 //! /PERIOD/
-//! Period Type        : ANNUAL
-//! Summary Type       : TYPICAL DAY
-//! Episode Year       : 2020
-//! Season             : SUMMER
-//! Month              : JANUARY
-//! Day                : WEEKDAY
-//! Growth Year        : 2020
-//! Technology Year    : 2020
+//! Period Type : ANNUAL
+//! Summary Type : TYPICAL DAY
+//! Episode Year : 2020
+//! Season : SUMMER
+//! Month : JANUARY
+//! Day : WEEKDAY
+//! Growth Year : 2020
+//! Technology Year : 2020
 //! /END/
 //! ```
 //!
@@ -44,42 +44,42 @@ use std::path::PathBuf;
 /// Period type (annual / monthly / seasonal).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PeriodType {
-    /// Annual inventory.
+ /// Annual inventory.
     Annual,
-    /// Single-month inventory.
+ /// Single-month inventory.
     Monthly,
-    /// Seasonal inventory.
+ /// Seasonal inventory.
     Seasonal,
 }
 
 /// Summary type (typical-day vs. total-period).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SummaryType {
-    /// Typical-day inventory.
+ /// Typical-day inventory.
     TypicalDay,
-    /// Total-period inventory.
+ /// Total-period inventory.
     TotalPeriod,
 }
 
 /// Season (only meaningful for [`PeriodType::Seasonal`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Season {
-    /// December–February.
+ /// December–February.
     Winter,
-    /// March–May.
+ /// March–May.
     Spring,
-    /// June–August.
+ /// June–August.
     Summer,
-    /// September–November.
+ /// September–November.
     Fall,
 }
 
 /// Day-of-week selector (only meaningful for typical-day).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DayKind {
-    /// Weekday.
+ /// Weekday.
     Weekday,
-    /// Weekend.
+ /// Weekend.
     Weekend,
 }
 
@@ -91,23 +91,23 @@ pub const MAX_YEAR: i32 = 2050;
 /// Parsed `/PERIOD/` packet.
 #[derive(Debug, Clone)]
 pub struct PeriodConfig {
-    /// Period type.
+ /// Period type.
     pub period_type: PeriodType,
-    /// Summary type.
+ /// Summary type.
     pub summary_type: SummaryType,
-    /// Episode year (4-digit).
+ /// Episode year (4-digit).
     pub episode_year: i32,
-    /// Season (only when `period_type == Seasonal`).
+ /// Season (only when `period_type == Seasonal`).
     pub season: Option<Season>,
-    /// Month index 1..=12 (only when `period_type == Monthly`).
+ /// Month index 1..=12 (only when `period_type == Monthly`).
     pub month: Option<u8>,
-    /// Day-of-week kind (only for typical-day summaries).
+ /// Day-of-week kind (only for typical-day summaries).
     pub day_kind: Option<DayKind>,
-    /// Growth year (defaults to episode year).
+ /// Growth year (defaults to episode year).
     pub growth_year: i32,
-    /// Technology year (defaults to episode year).
+ /// Technology year (defaults to episode year).
     pub technology_year: i32,
-    /// Non-fatal warnings produced during parsing.
+ /// Non-fatal warnings produced during parsing.
     pub warnings: Vec<String>,
 }
 
@@ -141,8 +141,8 @@ pub fn read_period<R: BufRead>(reader: R) -> Result<PeriodConfig> {
             continue;
         }
 
-        // The Fortran source reads the value field starting at column 21.
-        // Any text after a `:` separator works equally well in practice.
+ // The Fortran source reads the value field starting at column 21.
+ // Any text after a `:` separator works equally well in practice.
         let value = extract_value(&line);
         values.push((value, line_num));
     }

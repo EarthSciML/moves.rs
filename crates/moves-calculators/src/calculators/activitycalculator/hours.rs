@@ -10,12 +10,12 @@
 //! Two placement families differ only in where the output row sits:
 //!
 //! * **Link-located** — `SourceHours` (`activityTypeID` 2) and `SHO` /`ONI`
-//!   (`activityTypeID` 4): the row's own `linkID`, the joined `Link`'s
-//!   `roadTypeID`, and the iteration zone.
+//! (`activityTypeID` 4): the row's own `linkID`, the joined `Link`'s
+//! `roadTypeID`, and the iteration zone.
 //! * **Zone-located** — `SHP` (`activityTypeID` 5) and `Starts`
-//!   (`activityTypeID` 7): the iteration link and road type, with no `Link`
-//!   join. `SHP` copies the activity row's `zoneID`; `Starts` uses the
-//!   iteration zone.
+//! (`activityTypeID` 7): the iteration link and road type, with no `Link`
+//! join. `SHP` copies the activity row's `zoneID`; `Starts` uses the
+//! iteration zone.
 //!
 //! Only the `WithRegClassID` script variant is ported — see the
 //! [module docs](super) for why `NoRegClassID` is dead in MOVES.
@@ -52,7 +52,7 @@ pub fn source_hours(
     let ctx = &inputs.context;
     let mut out = Vec::new();
     for s in &inputs.source_hours {
-        // INNER JOIN HourDay h, INNER JOIN Link l.
+ // INNER JOIN HourDay h, INNER JOIN Link l.
         let (Some(h), Some(l)) = (hour_day.get(&s.hour_day_id), link.get(&s.link_id)) else {
             continue;
         };
@@ -218,7 +218,7 @@ mod tests {
         }
     }
 
-    /// One fuel type (share 1.0) split across two regulatory classes 60/40.
+ /// One fuel type (share 1.0) split across two regulatory classes 60/40.
     fn fuel_and_reg() -> (FuelFractionIndex, RegClassIndex) {
         let fuel = FuelFractionIndex::new(&[SourceTypeFuelFractionRow {
             source_type_id: 21,
@@ -274,7 +274,7 @@ mod tests {
         };
         let rows = source_hours(&inputs, &fuel, &reg);
         assert_eq!(rows.len(), 2); // one per regulatory class
-                                   // 100 * 1.0 * 0.6 and 100 * 1.0 * 0.4.
+ // 100 * 1.0 * 0.6 and 100 * 1.0 * 0.4.
         assert!((rows[0].activity - 60.0).abs() < 1e-9);
         assert!((rows[1].activity - 40.0).abs() < 1e-9);
         let r = &rows[0];
@@ -302,7 +302,7 @@ mod tests {
             source_type_id: 21,
             source_hours: 100.0,
         };
-        // HourDay present but the link is missing.
+ // HourDay present but the link is missing.
         let inputs = ActivityInputs {
             context: ctx(),
             hour_day: vec![HourDayRow {

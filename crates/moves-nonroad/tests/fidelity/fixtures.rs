@@ -1,8 +1,8 @@
-//! The Phase 0 NONROAD fixture catalogue.
+//! The NONROAD fixture catalogue.
 //!
-//! Phase 0 (`characterization/fixtures/README.md`) ships ten
+//! (`characterization/fixtures/README.md`) ships ten
 //! `nr-*.xml` RunSpec fixtures — one NONROAD model run per
-//! equipment sector and geography level. Task 115's bead is to run
+//! equipment sector and geography level. work item is to run
 //! *all* of them through the Rust port and diff each against the
 //! gfortran reference.
 //!
@@ -15,7 +15,7 @@
 
 use std::path::{Path, PathBuf};
 
-/// The ten Phase 0 NONROAD fixture names, matching the `nr-*.xml`
+/// The ten NONROAD fixture names, matching the `nr-*.xml`
 /// files in `characterization/fixtures/`. The fixture *name* is the
 /// file stem (see `characterization/fixtures/README.md` § "Naming
 /// conventions").
@@ -44,7 +44,7 @@ pub fn repo_root() -> PathBuf {
         .to_path_buf()
 }
 
-/// The Phase 0 fixture directory: `characterization/fixtures/`.
+/// The fixture directory: `characterization/fixtures/`.
 pub fn fixtures_dir() -> PathBuf {
     repo_root().join("characterization").join("fixtures")
 }
@@ -53,25 +53,25 @@ pub fn fixtures_dir() -> PathBuf {
 /// scraped from the RunSpec XML.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct NonroadFixture {
-    /// The fixture name (file stem, e.g. `nr-construction-state`).
+ /// The fixture name (file stem, e.g. `nr-construction-state`).
     pub name: String,
-    /// Absolute path to the RunSpec XML.
+ /// Absolute path to the RunSpec XML.
     pub path: PathBuf,
-    /// `true` when the RunSpec selects the NONROAD model.
+ /// `true` when the RunSpec selects the NONROAD model.
     pub is_nonroad: bool,
-    /// Geography level — `STATE`, `COUNTY`, or `NATION` — from the
-    /// `<geographicselection type="…">` element.
+ /// Geography level — `STATE`, `COUNTY`, or `NATION` — from the
+ /// `<geographicselection type="…">` element.
     pub geography_level: Option<String>,
-    /// Calendar year from the RunSpec `<timespan>`.
+ /// Calendar year from the RunSpec `<timespan>`.
     pub year: Option<i32>,
-    /// The RunSpec `<description>` CDATA text, if present.
+ /// The RunSpec `<description>` CDATA text, if present.
     pub description: Option<String>,
 }
 
 impl NonroadFixture {
-    /// The expected filename of this fixture's gfortran reference
-    /// capture within the directory named by the
-    /// `NONROAD_FIDELITY_REFERENCE` environment variable.
+ /// The expected filename of this fixture's gfortran reference
+ /// capture within the directory named by the
+ /// `NONROAD_FIDELITY_REFERENCE` environment variable.
     pub fn reference_filename(&self) -> String {
         format!("{}.tsv", self.name)
     }
@@ -122,7 +122,7 @@ pub fn load_fixture(name: &str) -> std::io::Result<NonroadFixture> {
     })
 }
 
-/// Load all ten Phase 0 NONROAD fixtures, in [`FIXTURE_NAMES`] order.
+/// Load all ten NONROAD fixtures, in [`FIXTURE_NAMES`] order.
 ///
 /// # Errors
 ///
@@ -160,7 +160,7 @@ mod tests {
     #[test]
     fn attr_of_skips_the_plural_container_element() {
         let xml = r#"<models><model value="NONROAD"/></models>"#;
-        // "<model " (trailing space) must not match "<models>".
+ // "<model " (trailing space) must not match "<models>".
         assert_eq!(attr_of(xml, "<model ", "value").as_deref(), Some("NONROAD"));
         let geo = r#"<geographicselections><geographicselection type="STATE" key="26"/>"#;
         assert_eq!(
@@ -192,9 +192,9 @@ mod tests {
         assert_eq!(fixture.reference_filename(), "nr-construction-state.tsv");
     }
 
-    /// Verify that `FIXTURE_NAMES` exactly matches the fixture names listed in
-    /// `characterization/nonroad-fidelity/FIXTURES`, line for line and in the
-    /// same order. Fails at compile-fail granularity when the two lists drift.
+ /// Verify that `FIXTURE_NAMES` exactly matches the fixture names listed in
+ /// `characterization/nonroad-fidelity/FIXTURES`, line for line and in the
+ /// same order. Fails at compile-fail granularity when the two lists drift.
     #[test]
     fn verify_fixture_names_match_corpus_manifest() {
         let fixtures_file = repo_root()

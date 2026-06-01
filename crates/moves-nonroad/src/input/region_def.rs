@@ -1,6 +1,6 @@
 //! Region-definition parser (`rdrgndf.f`).
 //!
-//! Task 97. Parses the `/REGIONS/` packet from a region-definition
+//!Parses the `/REGIONS/` packet from a region-definition
 //! file. Each line associates a region code with a state FIPS code.
 //! A region accumulates the state FIPS codes of every record that
 //! references it.
@@ -27,19 +27,19 @@ use std::path::PathBuf;
 /// Region-to-states mapping.
 #[derive(Debug, Default, Clone)]
 pub struct RegionDefinitions {
-    /// Insertion order of region codes.
+ /// Insertion order of region codes.
     pub region_order: Vec<String>,
-    /// Map from region code to its list of state FIPS codes.
+ /// Map from region code to its list of state FIPS codes.
     pub regions: HashMap<String, Vec<String>>,
 }
 
 impl RegionDefinitions {
-    /// Number of distinct region codes.
+ /// Number of distinct region codes.
     pub fn region_count(&self) -> usize {
         self.region_order.len()
     }
 
-    /// State FIPS codes for `region`, if any.
+ /// State FIPS codes for `region`, if any.
     pub fn states_for(&self, region: &str) -> Option<&[String]> {
         self.regions.get(region).map(|v| v.as_slice())
     }

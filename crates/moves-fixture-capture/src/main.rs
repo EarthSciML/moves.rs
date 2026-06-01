@@ -8,10 +8,10 @@
 //!
 //! ```sh
 //! moves-fixture-capture \
-//!   --captures-dir /scratch/.../captures \
-//!   --runspec /opt/moves/testdata/SampleRunSpec.xml \
-//!   --sif-lockfile characterization/fixture-image.lock \
-//!   --output-dir characterization/snapshots/samplerunspec
+//! --captures-dir /scratch/.../captures \
+//! --runspec /opt/moves/testdata/SampleRunSpec.xml \
+//! --sif-lockfile characterization/fixture-image.lock \
+//! --output-dir characterization/snapshots/samplerunspec
 //! ```
 //!
 //! The output directory is overwritten on each invocation (the snapshot
@@ -36,36 +36,36 @@ use moves_fixture_capture::{
     version
 )]
 struct Args {
-    /// Captures directory laid out by `run-fixture.sh`.
+ /// Captures directory laid out by `run-fixture.sh`.
     #[arg(long, value_name = "DIR")]
     captures_dir: PathBuf,
 
-    /// RunSpec XML the run executed against. Used for provenance and to
-    /// determine which database is the read-only default DB (excluded from
-    /// the snapshot).
+ /// RunSpec XML the run executed against. Used for provenance and to
+ /// determine which database is the read-only default DB (excluded from
+ /// the snapshot).
     #[arg(long, value_name = "PATH")]
     runspec: PathBuf,
 
-    /// `fixture-image.lock` from `characterization/`. Provides the SIF
-    /// SHA256 written into provenance.
+ /// `fixture-image.lock` from `characterization/`. Provides the SIF
+ /// SHA256 written into provenance.
     #[arg(long, value_name = "PATH")]
     sif_lockfile: PathBuf,
 
-    /// Output snapshot directory. Will be created if absent. Existing
-    /// `manifest.json` and `tables/` are replaced atomically; other files
-    /// (such as a stale `provenance.json`) are overwritten in place.
+ /// Output snapshot directory. Will be created if absent. Existing
+ /// `manifest.json` and `tables/` are replaced atomically; other files
+ /// (such as a stale `provenance.json`) are overwritten in place.
     #[arg(long, value_name = "DIR")]
     output_dir: PathBuf,
 
-    /// Override the fixture name written into provenance. Defaults to the
-    /// filename-derived value from the RunSpec.
+ /// Override the fixture name written into provenance. Defaults to the
+ /// filename-derived value from the RunSpec.
     #[arg(long, value_name = "NAME")]
     fixture_name: Option<String>,
 
-    /// Additional database directories to exclude (case-insensitive). The
-    /// RunSpec's scale-input DB is always excluded; this flag lets you
-    /// drop more (e.g. `mysql`, `sys` if the dumper accidentally dumped
-    /// them). Repeatable.
+ /// Additional database directories to exclude (case-insensitive). The
+ /// RunSpec's scale-input DB is always excluded; this flag lets you
+ /// drop more (e.g. `mysql`, `sys` if the dumper accidentally dumped
+ /// them). Repeatable.
     #[arg(long = "exclude-db", value_name = "DB")]
     exclude_db: Vec<String>,
 }
@@ -91,9 +91,9 @@ fn run() -> moves_fixture_capture::Result<()> {
         })?;
     let runspec_sha256 = provenance::sha256_hex(&runspec_bytes);
 
-    // Build options: always exclude the scale-input DB (it's read-only
-    // during a run, and pinned by the SIF SHA already). Layer in any
-    // user-specified extras.
+ // Build options: always exclude the scale-input DB (it's read-only
+ // during a run, and pinned by the SIF SHA already). Layer in any
+ // user-specified extras.
     let mut opts = BuildOptions::default();
     if let Some(default_db) = runspec.scale_input_database.as_deref() {
         opts = opts.excluding_db(default_db);
@@ -104,9 +104,9 @@ fn run() -> moves_fixture_capture::Result<()> {
 
     let snapshot = build_snapshot(&args.captures_dir, &opts)?;
 
-    // Materialize the snapshot before computing the aggregate hash for the
-    // provenance — the hash and the on-disk manifest are guaranteed to
-    // agree because the snapshot crate hashes the same bytes.
+ // Materialize the snapshot before computing the aggregate hash for the
+ // provenance — the hash and the on-disk manifest are guaranteed to
+ // agree because the snapshot crate hashes the same bytes.
     snapshot.write(&args.output_dir)?;
     let aggregate_sha = snapshot.aggregate_hash()?;
 
@@ -132,11 +132,11 @@ fn run() -> moves_fixture_capture::Result<()> {
     );
     write_provenance(&args.output_dir, &prov)?;
 
-    // Phase 0 Task 8 (mo-d7or): per-fixture execution trace assembled
-    // from worker.sql + JVM class-load logs in the captures dir. Sibling
-    // of provenance.json. Emitted unconditionally — an empty captures
-    // dir produces an empty (but valid) trace, so consumers can rely on
-    // the file existing.
+ // (): per-fixture execution trace assembled
+ // from worker.sql + JVM class-load logs in the captures dir. Sibling
+ // of provenance.json. Emitted unconditionally — an empty captures
+ // dir produces an empty (but valid) trace, so consumers can rely on
+ // the file existing.
     let trace_inputs = TraceInputs {
         captures_dir: &args.captures_dir,
         fixture_name: &fixture_name,

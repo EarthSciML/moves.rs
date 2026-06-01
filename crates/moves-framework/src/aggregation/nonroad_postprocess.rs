@@ -1,6 +1,6 @@
 //! NONROAD-specific output post-processing — ports the summarization
-//! scripts in `database/NonroadProcessingScripts/` (migration plan
-//! Task 118).
+//! scripts in `database/NonroadProcessingScripts/` (
+//!).
 //!
 //! Canonical MOVES ships ~19 SQL scripts that a user runs against a
 //! finished NONROAD run's output database to roll the raw
@@ -21,19 +21,18 @@
 //!
 //! | Family | Scripts | Function |
 //! |---|---|---|
-//! | Inventory  | 6 | [`inventory`] |
+//! | Inventory | 6 | [`inventory`] |
 //! | Population | 1 | [`population_by_sector_and_scc`] |
 //! | Emission factors | 11 | [`emission_factors`] |
 //!
 //! # Why typed records, not Polars
 //!
-//! The migration plan sketches these scripts becoming Polars
+//! The sketches these scripts becoming Polars
 //! expressions. As with the sibling [`output_aggregate`](super::output_aggregate)
-//! module — the port of `OutputProcessor.java`'s `GROUP BY` roll-up —
-//! the aggregation runs over strongly-typed [`EmissionRecord`] /
+//! module — the port of `OutputProcessor.java`'s `GROUP BY` roll-up//! the aggregation runs over strongly-typed [`EmissionRecord`] /
 //! [`ActivityRecord`] vectors instead: `moves-framework` carries no
 //! `polars` dependency, and the concrete `DataFrameStore` data plane
-//! (Task 50) has not landed. The group-by / `SUM` mechanics are
+//! has not landed. The group-by / `SUM` mechanics are
 //! identical whichever row representation the data plane ultimately
 //! delivers; this module's tests pin the reference semantics a future
 //! `LazyFrame` port must reproduce.
@@ -41,25 +40,25 @@
 //! # SQL fidelity notes
 //!
 //! * **`SUM` and `NULL`.** Metric sums use SQL `SUM` semantics: `NULL`
-//!   inputs are skipped, and a group whose every metric input is
-//!   `NULL` yields `NULL` (`None`) rather than `0.0`.
+//! inputs are skipped, and a group whose every metric input is
+//! `NULL` yields `NULL` (`None`) rather than `0.0`.
 //! * **Mass-unit conversion.** The emission-factor scripts multiply
-//!   `SUM(emissionQuant)` by a `movesrun.massUnits`→grams factor (the
-//!   inline `units` table); [`mass_units_to_grams`] is that table. An
-//!   unrecognized unit reproduces the SQL `LEFT JOIN` miss — the
-//!   factor is `NULL`, so the converted quantity is `None`. The
-//!   inventory scripts do *not* convert: they carry `massUnits`
-//!   through as a label column.
+//! `SUM(emissionQuant)` by a `movesrun.massUnits`→grams factor (the
+//! inline `units` table); [`mass_units_to_grams`] is that table. An
+//! unrecognized unit reproduces the SQL `LEFT JOIN` miss — the
+//! factor is `NULL`, so the converted quantity is `None`. The
+//! inventory scripts do *not* convert: they carry `massUnits`
+//! through as a label column.
 //! * **Reference joins.** The equipment-grouped scripts join
-//!   `movesoutput.SCC` to the `nrscc` / `nrequipmenttype` /
-//!   `nrhprangebin` reference tables. Those are not part of the
-//!   unified output schema, so the caller supplies them through
-//!   [`NrSccLookup`] (the same dependency-injection shape the
-//!   aggregator uses for [`TemporalScalingFactors`](super::TemporalScalingFactors)).
-//!   A lookup miss leaves the derived column `None`, matching the
-//!   `LEFT JOIN`.
+//! `movesoutput.SCC` to the `nrscc` / `nrequipmenttype` /
+//! `nrhprangebin` reference tables. Those are not part of the
+//! unified output schema, so the caller supplies them through
+//! [`NrSccLookup`] (the same dependency-injection shape the
+//! aggregator uses for [`TemporalScalingFactors`](super::TemporalScalingFactors)).
+//! A lookup miss leaves the derived column `None`, matching the
+//! `LEFT JOIN`.
 //! * **Determinism.** Output rows are emitted in group-key sort order,
-//!   independent of input order.
+//! independent of input order.
 //!
 //! [`EmissionRecord`]: moves_data::EmissionRecord
 //! [`ActivityRecord`]: moves_data::ActivityRecord
@@ -158,14 +157,14 @@ pub struct NrSccLookup {
 }
 
 impl NrSccLookup {
-    /// An empty lookup. Equivalent to [`NrSccLookup::default`].
+ /// An empty lookup. Equivalent to [`NrSccLookup::default`].
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Register one `nrscc` row: the equipment type, fuel type, and
-    /// description an SCC code maps to. Builder-style; chains.
+ /// Register one `nrscc` row: the equipment type, fuel type, and
+ /// description an SCC code maps to. Builder-style; chains.
     #[must_use]
     pub fn with_scc(
         mut self,
@@ -185,8 +184,8 @@ impl NrSccLookup {
         self
     }
 
-    /// Register one `nrequipmenttype` row: the sector and description
-    /// for an equipment-type ID. Builder-style; chains.
+ /// Register one `nrequipmenttype` row: the sector and description
+ /// for an equipment-type ID. Builder-style; chains.
     #[must_use]
     pub fn with_equipment(
         mut self,
@@ -204,53 +203,53 @@ impl NrSccLookup {
         self
     }
 
-    /// Register one `nrhprangebin` row: the bin name for an HP-range-bin
-    /// ID (`movesoutput.hpID`). Builder-style; chains.
+ /// Register one `nrhprangebin` row: the bin name for an HP-range-bin
+ /// ID (`movesoutput.hpID`). Builder-style; chains.
     #[must_use]
     pub fn with_hp_bin(mut self, hp_id: i16, bin_name: impl Into<String>) -> Self {
         self.hp_bins.insert(hp_id, bin_name.into());
         self
     }
 
-    /// Register one `enginetech` row: the description for an
-    /// engine-tech ID. Builder-style; chains.
+ /// Register one `enginetech` row: the description for an
+ /// engine-tech ID. Builder-style; chains.
     #[must_use]
     pub fn with_eng_tech(mut self, eng_tech_id: i16, description: impl Into<String>) -> Self {
         self.eng_tech.insert(eng_tech_id, description.into());
         self
     }
 
-    /// `nrscc.nrEquipTypeID` for an SCC code.
+ /// `nrscc.nrEquipTypeID` for an SCC code.
     fn equip_type_of(&self, scc: Option<&str>) -> Option<i32> {
         self.scc.get(scc?)?.nr_equip_type_id
     }
 
-    /// `nrscc.fuelTypeID` for an SCC code.
+ /// `nrscc.fuelTypeID` for an SCC code.
     fn fuel_type_of(&self, scc: Option<&str>) -> Option<i16> {
         self.scc.get(scc?)?.fuel_type_id
     }
 
-    /// `nrscc.description` for an SCC code.
+ /// `nrscc.description` for an SCC code.
     fn scc_description(&self, scc: Option<&str>) -> Option<String> {
         self.scc.get(scc?)?.description.clone()
     }
 
-    /// `nrequipmenttype.sectorID` for an equipment-type ID.
+ /// `nrequipmenttype.sectorID` for an equipment-type ID.
     fn sector_of(&self, equip: Option<i32>) -> Option<i16> {
         self.equipment.get(&equip?)?.sector_id
     }
 
-    /// `nrequipmenttype.description` for an equipment-type ID.
+ /// `nrequipmenttype.description` for an equipment-type ID.
     fn equip_description(&self, equip: Option<i32>) -> Option<String> {
         self.equipment.get(&equip?)?.description.clone()
     }
 
-    /// `nrhprangebin.binName` for an HP-range-bin ID.
+ /// `nrhprangebin.binName` for an HP-range-bin ID.
     fn hp_bin(&self, hp_id: Option<i16>) -> Option<String> {
         self.hp_bins.get(&hp_id?).cloned()
     }
 
-    /// `enginetech` description for an engine-tech ID.
+ /// `enginetech` description for an engine-tech ID.
     fn eng_tech_description(&self, eng_tech_id: Option<i16>) -> Option<String> {
         self.eng_tech.get(&eng_tech_id?).cloned()
     }
@@ -270,7 +269,7 @@ struct SqlSum {
 }
 
 impl SqlSum {
-    /// Fold one value into the sum. `None` (SQL `NULL`) is skipped.
+ /// Fold one value into the sum. `None` (SQL `NULL`) is skipped.
     fn add(&mut self, value: Option<f64>) {
         if let Some(v) = value {
             self.sum += v;
@@ -278,7 +277,7 @@ impl SqlSum {
         }
     }
 
-    /// The SQL `SUM` result: `None` if no non-`NULL` input was folded.
+ /// The SQL `SUM` result: `None` if no non-`NULL` input was folded.
     fn value(self) -> Option<f64> {
         self.seen.then_some(self.sum)
     }
@@ -301,18 +300,18 @@ impl<'a> RunUnits<'a> {
         }
     }
 
-    /// `movesrun.timeUnits` for a run.
+ /// `movesrun.timeUnits` for a run.
     fn time_units(&self, run: i16) -> Option<String> {
         self.by_run.get(&run)?.time_units.clone()
     }
 
-    /// `movesrun.massUnits` for a run.
+ /// `movesrun.massUnits` for a run.
     fn mass_units(&self, run: i16) -> Option<String> {
         self.by_run.get(&run)?.mass_units.clone()
     }
 
-    /// The mass→grams factor for a run — `NULL` if the run is unknown
-    /// or its `massUnits` is unrecognized.
+ /// The mass→grams factor for a run — `NULL` if the run is unknown
+ /// or its `massUnits` is unrecognized.
     fn mass_factor(&self, run: i16) -> Option<f64> {
         mass_units_to_grams(&self.mass_units(run)?)
     }
@@ -327,30 +326,30 @@ impl<'a> RunUnits<'a> {
 /// a different set of `GROUP BY` keys.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum InventoryReport {
-    /// `Inventory_by_County_and_Pollutant.sql` — keyed by run, time,
-    /// state, county, sector, pollutant, process.
+ /// `Inventory_by_County_and_Pollutant.sql` — keyed by run, time,
+ /// state, county, sector, pollutant, process.
     ByCountyAndPollutant,
-    /// `Inventory_by_County_FuelType_Pollutant.sql` — adds fuel type
-    /// and fuel sub-type to [`ByCountyAndPollutant`](Self::ByCountyAndPollutant).
+ /// `Inventory_by_County_FuelType_Pollutant.sql` — adds fuel type
+ /// and fuel sub-type to [`ByCountyAndPollutant`](Self::ByCountyAndPollutant).
     ByCountyFuelTypeAndPollutant,
-    /// `Inventory_by_EquipmentType_Pollutant.sql` — keyed by equipment
-    /// type (via `nrscc`), its sector, fuel type, fuel sub-type,
-    /// pollutant, process.
+ /// `Inventory_by_EquipmentType_Pollutant.sql` — keyed by equipment
+ /// type (via `nrscc`), its sector, fuel type, fuel sub-type,
+ /// pollutant, process.
     ByEquipmentTypeAndPollutant,
-    /// `Inventory_by_Equipment_Horsepower_Pollutant.sql` — adds the
-    /// HP-range bin to [`ByEquipmentTypeAndPollutant`](Self::ByEquipmentTypeAndPollutant).
+ /// `Inventory_by_Equipment_Horsepower_Pollutant.sql` — adds the
+ /// HP-range bin to [`ByEquipmentTypeAndPollutant`](Self::ByEquipmentTypeAndPollutant).
     ByEquipmentHorsepowerAndPollutant,
-    /// `Inventory_by_Sector_Horsepower_Pollutant.sql` — keyed by
-    /// sector (via `nrscc`→`nrequipmenttype`), HP-range bin, fuel type,
-    /// fuel sub-type, pollutant, process.
+ /// `Inventory_by_Sector_Horsepower_Pollutant.sql` — keyed by
+ /// sector (via `nrscc`→`nrequipmenttype`), HP-range bin, fuel type,
+ /// fuel sub-type, pollutant, process.
     BySectorHorsepowerAndPollutant,
-    /// `Inventory_by_Sector_SCC_Pollutant.sql` — keyed by sector, SCC,
-    /// fuel type, fuel sub-type, pollutant, process.
+ /// `Inventory_by_Sector_SCC_Pollutant.sql` — keyed by sector, SCC,
+ /// fuel type, fuel sub-type, pollutant, process.
     BySectorSccAndPollutant,
 }
 
 impl InventoryReport {
-    /// The name of the script (and output table) this variant ports.
+ /// The name of the script (and output table) this variant ports.
     #[must_use]
     pub fn script_name(self) -> &'static str {
         match self {
@@ -376,45 +375,45 @@ impl InventoryReport {
 /// grams.
 #[derive(Debug, Clone, PartialEq)]
 pub struct InventoryRow {
-    /// `MOVESRunID`.
+ /// `MOVESRunID`.
     pub moves_run_id: i16,
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: Option<i16>,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: Option<i16>,
-    /// `dayID`.
+ /// `dayID`.
     pub day_id: Option<i16>,
-    /// `stateID` — every inventory report keys on it; `None` only when
-    /// the source row's `stateID` was `NULL`.
+ /// `stateID` — every inventory report keys on it; `None` only when
+ /// the source row's `stateID` was `NULL`.
     pub state_id: Option<i16>,
-    /// `countyID`.
+ /// `countyID`.
     pub county_id: Option<i32>,
-    /// `sectorID` — from the record for the county/SCC reports, from
-    /// `nrequipmenttype` for the equipment/sector reports.
+ /// `sectorID` — from the record for the county/SCC reports, from
+ /// `nrequipmenttype` for the equipment/sector reports.
     pub sector_id: Option<i16>,
-    /// `nrEquipTypeID` — set only for the equipment-keyed reports.
+ /// `nrEquipTypeID` — set only for the equipment-keyed reports.
     pub nr_equip_type_id: Option<i32>,
-    /// `nrequipmenttype.description` for [`nr_equip_type_id`](Self::nr_equip_type_id).
+ /// `nrequipmenttype.description` for [`nr_equip_type_id`](Self::nr_equip_type_id).
     pub equip_description: Option<String>,
-    /// `SCC` — set only by [`InventoryReport::BySectorSccAndPollutant`].
+ /// `SCC` — set only by [`InventoryReport::BySectorSccAndPollutant`].
     pub scc: Option<String>,
-    /// `hpID` — set only for the horsepower-keyed reports.
+ /// `hpID` — set only for the horsepower-keyed reports.
     pub hp_id: Option<i16>,
-    /// `nrhprangebin.binName` for [`hp_id`](Self::hp_id).
+ /// `nrhprangebin.binName` for [`hp_id`](Self::hp_id).
     pub hp_bin: Option<String>,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: Option<i16>,
-    /// `fuelSubTypeID`.
+ /// `fuelSubTypeID`.
     pub fuel_sub_type_id: Option<i16>,
-    /// `pollutantID`.
+ /// `pollutantID`.
     pub pollutant_id: Option<i16>,
-    /// `processID`.
+ /// `processID`.
     pub process_id: Option<i16>,
-    /// `SUM(emissionQuant)` — in the run's native `mass_units`.
+ /// `SUM(emissionQuant)` — in the run's native `mass_units`.
     pub emission_quant: Option<f64>,
-    /// `movesrun.timeUnits`.
+ /// `movesrun.timeUnits`.
     pub time_units: Option<String>,
-    /// `movesrun.massUnits`.
+ /// `movesrun.massUnits`.
     pub mass_units: Option<String>,
 }
 
@@ -474,7 +473,7 @@ pub fn inventory(
 /// Build the `GROUP BY` key for one emission record under `report`.
 fn inv_key(report: InventoryReport, rec: &EmissionRecord, lookup: &NrSccLookup) -> InvKey {
     let scc = rec.scc.as_deref();
-    // Common location dimensions — keyed by every inventory report.
+ // Common location dimensions — keyed by every inventory report.
     let mut key = InvKey {
         run: rec.moves_run_id,
         year: rec.year_id,
@@ -569,27 +568,27 @@ fn inv_row(
 /// schema of `Population_by_Sector_and_SCC.sql`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PopulationRow {
-    /// `MOVESRunID`.
+ /// `MOVESRunID`.
     pub moves_run_id: i16,
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: Option<i16>,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: Option<i16>,
-    /// `dayID`.
+ /// `dayID`.
     pub day_id: Option<i16>,
-    /// `countyID`.
+ /// `countyID`.
     pub county_id: Option<i32>,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: Option<i16>,
-    /// `sectorID`.
+ /// `sectorID`.
     pub sector_id: Option<i16>,
-    /// `SCC`.
+ /// `SCC`.
     pub scc: Option<String>,
-    /// `SUM(activity)` over the equipment-population activity type.
+ /// `SUM(activity)` over the equipment-population activity type.
     pub population: Option<f64>,
-    /// `movesrun.timeUnits`.
+ /// `movesrun.timeUnits`.
     pub time_units: Option<String>,
-    /// `movesrun.massUnits`.
+ /// `movesrun.massUnits`.
     pub mass_units: Option<String>,
 }
 
@@ -669,39 +668,39 @@ pub fn population_by_sector_and_scc(
 /// `per_Vehicle_*_by_*_and_ModelYear` script.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum EmissionFactorReport {
-    /// `EmissionFactors_per_OperatingHour_by_SCC.sql`.
+ /// `EmissionFactors_per_OperatingHour_by_SCC.sql`.
     PerOperatingHourByScc,
-    /// `EmissionFactors_per_OperatingHour_by_SCC_and_ModelYear.sql`.
+ /// `EmissionFactors_per_OperatingHour_by_SCC_and_ModelYear.sql`.
     PerOperatingHourBySccAndModelYear,
-    /// `EmissionFactors_per_OperatingHour_by_Equipment.sql`.
+ /// `EmissionFactors_per_OperatingHour_by_Equipment.sql`.
     PerOperatingHourByEquipment,
-    /// `EmissionFactors_per_OperatingHour_by_Equipment_and_Horsepower.sql`.
+ /// `EmissionFactors_per_OperatingHour_by_Equipment_and_Horsepower.sql`.
     PerOperatingHourByEquipmentAndHorsepower,
-    /// `EmissionFactors_per_hphr_by_SCC.sql`.
+ /// `EmissionFactors_per_hphr_by_SCC.sql`.
     PerHpHrByScc,
-    /// `EmissionFactors_per_hphr_by_SCC_and_ModelYear.sql`.
+ /// `EmissionFactors_per_hphr_by_SCC_and_ModelYear.sql`.
     PerHpHrBySccAndModelYear,
-    /// `EmissionFactors_per_hphr_by_Equipment.sql`.
+ /// `EmissionFactors_per_hphr_by_Equipment.sql`.
     PerHpHrByEquipment,
-    /// `EmissionFactors_per_hphr_by_Equipment_and_Horsepower.sql`.
+ /// `EmissionFactors_per_hphr_by_Equipment_and_Horsepower.sql`.
     PerHpHrByEquipmentAndHorsepower,
-    /// `EmissionFactors_per_Vehicle_by_SCC.sql`.
+ /// `EmissionFactors_per_Vehicle_by_SCC.sql`.
     PerVehicleByScc,
-    /// `EmissionFactors_per_Vehicle_by_Equipment.sql`.
+ /// `EmissionFactors_per_Vehicle_by_Equipment.sql`.
     PerVehicleByEquipment,
-    /// `EmissionFactors_per_Vehicle_by_Equipment_and_Horsepower.sql`.
+ /// `EmissionFactors_per_Vehicle_by_Equipment_and_Horsepower.sql`.
     PerVehicleByEquipmentAndHorsepower,
 }
 
 /// The activity quantity an emission factor is expressed per.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Denominator {
-    /// `SUM(activity)` over source (operating) hours — `activityTypeID = 2`.
+ /// `SUM(activity)` over source (operating) hours — `activityTypeID = 2`.
     OperatingHours,
-    /// `SUM(avgHorsepower × sourceHours × loadFactor)` — activity types
-    /// 9, 2, and 12 multiplied per finest-grain row, then summed.
+ /// `SUM(avgHorsepower × sourceHours × loadFactor)` — activity types
+ /// 9, 2, and 12 multiplied per finest-grain row, then summed.
     HpHours,
-    /// `SUM(activity)` over equipment population — `activityTypeID = 6`.
+ /// `SUM(activity)` over equipment population — `activityTypeID = 6`.
     Vehicles,
 }
 
@@ -709,21 +708,21 @@ enum Denominator {
 /// out by, beyond the always-present run / time / state / county keys.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum EfGrouping {
-    /// Keyed by SCC.
+ /// Keyed by SCC.
     Scc,
-    /// Keyed by SCC and model year.
+ /// Keyed by SCC and model year.
     SccModelYear,
-    /// Keyed by SCC, HP bin, model year, and engine tech — the finer
-    /// `per_hphr_by_SCC_and_ModelYear` key set.
+ /// Keyed by SCC, HP bin, model year, and engine tech — the finer
+ /// `per_hphr_by_SCC_and_ModelYear` key set.
     SccHorsepowerModelYearEngTech,
-    /// Keyed by equipment type and (`nrscc`) fuel type.
+ /// Keyed by equipment type and (`nrscc`) fuel type.
     Equipment,
-    /// Keyed by equipment type, HP bin, and fuel type.
+ /// Keyed by equipment type, HP bin, and fuel type.
     EquipmentHorsepower,
 }
 
 impl EmissionFactorReport {
-    /// The name of the script (and output table) this variant ports.
+ /// The name of the script (and output table) this variant ports.
     #[must_use]
     pub fn script_name(self) -> &'static str {
         match self {
@@ -749,7 +748,7 @@ impl EmissionFactorReport {
         }
     }
 
-    /// The activity quantity this report's factor is expressed per.
+ /// The activity quantity this report's factor is expressed per.
     fn denominator(self) -> Denominator {
         match self {
             Self::PerOperatingHourByScc
@@ -766,7 +765,7 @@ impl EmissionFactorReport {
         }
     }
 
-    /// The `GROUP BY` shape this report rolls up to.
+ /// The `GROUP BY` shape this report rolls up to.
     fn grouping(self) -> EfGrouping {
         match self {
             Self::PerOperatingHourByScc | Self::PerHpHrByScc | Self::PerVehicleByScc => {
@@ -783,9 +782,9 @@ impl EmissionFactorReport {
         }
     }
 
-    /// The `emissionRateUnits` label string. The per-vehicle scripts
-    /// build it as `concat('g/vehicle per ', @timeUnits)`, where
-    /// `@timeUnits` is the first run's `timeUnits`.
+ /// The `emissionRateUnits` label string. The per-vehicle scripts
+ /// build it as `concat('g/vehicle per ', @timeUnits)`, where
+ /// `@timeUnits` is the first run's `timeUnits`.
     fn rate_units(self, time_units: Option<&str>) -> String {
         match self.denominator() {
             Denominator::OperatingHours => "g/hr".to_string(),
@@ -804,53 +803,53 @@ impl EmissionFactorReport {
 /// decorations its `LEFT JOIN`s supply, leaving the rest `None`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct EmissionFactorRow {
-    /// `MOVESRunID`.
+ /// `MOVESRunID`.
     pub moves_run_id: i16,
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: Option<i16>,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: Option<i16>,
-    /// `dayID`.
+ /// `dayID`.
     pub day_id: Option<i16>,
-    /// `stateID`.
+ /// `stateID`.
     pub state_id: Option<i16>,
-    /// `countyID`.
+ /// `countyID`.
     pub county_id: Option<i32>,
-    /// `SCC` — set for the SCC-grouped reports.
+ /// `SCC` — set for the SCC-grouped reports.
     pub scc: Option<String>,
-    /// `nrscc.description` for [`scc`](Self::scc).
+ /// `nrscc.description` for [`scc`](Self::scc).
     pub scc_description: Option<String>,
-    /// `nrEquipTypeID` — set for the equipment-grouped reports.
+ /// `nrEquipTypeID` — set for the equipment-grouped reports.
     pub nr_equip_type_id: Option<i32>,
-    /// `nrequipmenttype.description` for [`nr_equip_type_id`](Self::nr_equip_type_id).
+ /// `nrequipmenttype.description` for [`nr_equip_type_id`](Self::nr_equip_type_id).
     pub equip_description: Option<String>,
-    /// `fuelTypeID` — `nrscc.fuelTypeID` of the SCC: a grouping key for
-    /// the equipment reports, a decoration for the SCC reports.
+ /// `fuelTypeID` — `nrscc.fuelTypeID` of the SCC: a grouping key for
+ /// the equipment reports, a decoration for the SCC reports.
     pub fuel_type_id: Option<i16>,
-    /// `hpID` — set for the horsepower-keyed reports.
+ /// `hpID` — set for the horsepower-keyed reports.
     pub hp_id: Option<i16>,
-    /// `nrhprangebin.binName` for [`hp_id`](Self::hp_id).
+ /// `nrhprangebin.binName` for [`hp_id`](Self::hp_id).
     pub hp_bin: Option<String>,
-    /// `modelYearID` — set for the model-year-keyed reports.
+ /// `modelYearID` — set for the model-year-keyed reports.
     pub model_year_id: Option<i16>,
-    /// `engTechID` — set by `per_hphr_by_SCC_and_ModelYear`.
+ /// `engTechID` — set by `per_hphr_by_SCC_and_ModelYear`.
     pub eng_tech_id: Option<i16>,
-    /// `enginetech` description for [`eng_tech_id`](Self::eng_tech_id).
+ /// `enginetech` description for [`eng_tech_id`](Self::eng_tech_id).
     pub eng_tech_description: Option<String>,
-    /// `pollutantID`.
+ /// `pollutantID`.
     pub pollutant_id: Option<i16>,
-    /// `processID`.
+ /// `processID`.
     pub process_id: Option<i16>,
-    /// `units.factor × SUM(emissionQuant)` — emissions in grams.
+ /// `units.factor × SUM(emissionQuant)` — emissions in grams.
     pub emission_quant: Option<f64>,
-    /// The factor's denominator: `SUM` of operating hours,
-    /// horsepower-hours, or vehicle population, per the
-    /// [`EmissionFactorReport`] variant.
+ /// The factor's denominator: `SUM` of operating hours,
+ /// horsepower-hours, or vehicle population, per the
+ /// [`EmissionFactorReport`] variant.
     pub denominator: Option<f64>,
-    /// `emissionQuant / denominator`, or `None` when the denominator
-    /// is `NULL` or zero.
+ /// `emissionQuant / denominator`, or `None` when the denominator
+ /// is `NULL` or zero.
     pub emission_rate: Option<f64>,
-    /// `emissionRateUnits` — `g/hr`, `g/hp-hr`, or `g/vehicle per …`.
+ /// `emissionRateUnits` — `g/hr`, `g/hp-hr`, or `g/vehicle per …`.
     pub emission_rate_units: String,
 }
 
@@ -992,11 +991,11 @@ fn compute_hp_hours(activity: &[ActivityRecord]) -> BTreeMap<RecordDims, f64> {
             _ => continue,
         };
         if let Some(value) = rec.activity {
-            *bucket.entry(RecordDims::from_activity(rec)).or_default() += value;
+ *bucket.entry(RecordDims::from_activity(rec)).or_default() += value;
         }
     }
-    // hphr exists where sourceHours and horsepower both match;
-    // hpHours is filled only where loadFactor also matches.
+ // hphr exists where sourceHours and horsepower both match;
+ // hpHours is filled only where loadFactor also matches.
     source_hours
         .into_iter()
         .filter_map(|(dims, hours)| {
@@ -1067,7 +1066,7 @@ pub fn emission_factors(
     let run_units = RunUnits::new(runs);
     let grouping = report.grouping();
 
-    // Numerator: SUM(emissionQuant) grouped by key + pollutant + process.
+ // Numerator: SUM(emissionQuant) grouped by key + pollutant + process.
     let mut numerator: BTreeMap<(EfKey, Option<i16>, Option<i16>), SqlSum> = BTreeMap::new();
     for rec in emissions {
         let key = ef_key(&RecordDims::from_emission(rec), grouping, lookup);
@@ -1077,29 +1076,29 @@ pub fn emission_factors(
             .add(rec.emission_quant);
     }
 
-    // Denominator: the activity quantity grouped by key alone.
+ // Denominator: the activity quantity grouped by key alone.
     let denominator = ef_denominator(report, activity, lookup);
 
-    // `@timeUnits` — the per-vehicle label reads `movesrun.timeUnits`
-    // of the first run, matching the script's `select … limit 1`.
+ // `@timeUnits` — the per-vehicle label reads `movesrun.timeUnits`
+ // of the first run, matching the script's `select … limit 1`.
     let time_units = runs.first().and_then(|r| r.time_units.clone());
     let rate_units = report.rate_units(time_units.as_deref());
 
     let mut rows = Vec::new();
     for ((key, pollutant, process), num_sum) in numerator {
-        // INNER JOIN temp1 ⋈ temp2: drop a numerator group with no
-        // matching denominator group.
+ // INNER JOIN temp1 ⋈ temp2: drop a numerator group with no
+ // matching denominator group.
         let Some(denom_sum) = denominator.get(&key) else {
             continue;
         };
         let denominator_value = denom_sum.value();
         let factor = run_units.mass_factor(key.run);
-        // units.factor × SUM(emissionQuant): NULL if either is NULL.
+ // units.factor × SUM(emissionQuant): NULL if either is NULL.
         let emission_quant = match (factor, num_sum.value()) {
             (Some(f), Some(s)) => Some(f * s),
             _ => None,
         };
-        // IF(denominator != 0, emissionQuant / denominator, NULL).
+ // IF(denominator != 0, emissionQuant / denominator, NULL).
         let emission_rate = match denominator_value {
             Some(d) if d != 0.0 => emission_quant.map(|e| e / d),
             _ => None,
@@ -1142,8 +1141,8 @@ fn ef_row(
         scc_description: lookup.scc_description(scc),
         nr_equip_type_id: key.nr_equip_type,
         equip_description: lookup.equip_description(key.nr_equip_type),
-        // nrscc.fuelTypeID: a grouping key for the equipment reports,
-        // a decoration derived from the SCC for the SCC reports.
+ // nrscc.fuelTypeID: a grouping key for the equipment reports,
+ // a decoration derived from the SCC for the SCC reports.
         fuel_type_id: key.fuel_type.or_else(|| lookup.fuel_type_of(scc)),
         hp_id: key.hp_id,
         hp_bin: lookup.hp_bin(key.hp_id),
@@ -1163,10 +1162,10 @@ fn ef_row(
 mod tests {
     use super::*;
 
-    // ---- record factories ----------------------------------------------
+ // ---- record factories ----------------------------------------------
 
-    /// An emission record with all dimensions at fixed defaults; the
-    /// caller overrides whatever a test cares about.
+ /// An emission record with all dimensions at fixed defaults; the
+ /// caller overrides whatever a test cares about.
     fn emission() -> EmissionRecord {
         EmissionRecord {
             moves_run_id: 1,
@@ -1197,7 +1196,7 @@ mod tests {
         }
     }
 
-    /// An activity record with all dimensions at fixed defaults.
+ /// An activity record with all dimensions at fixed defaults.
     fn activity(activity_type_id: i16, value: Option<f64>) -> ActivityRecord {
         ActivityRecord {
             moves_run_id: 1,
@@ -1257,7 +1256,7 @@ mod tests {
         }
     }
 
-    // ---- mass_units_to_grams --------------------------------------------
+ // ---- mass_units_to_grams --------------------------------------------
 
     #[test]
     fn mass_units_table_matches_the_sql_units_rows() {
@@ -1269,14 +1268,14 @@ mod tests {
 
     #[test]
     fn mass_units_lookup_is_case_insensitive_and_misses_to_none() {
-        // MySQL's default collation makes the join case-insensitive.
+ // MySQL's default collation makes the join case-insensitive.
         assert_eq!(mass_units_to_grams("KG"), Some(1000.0));
         assert_eq!(mass_units_to_grams("Ton"), Some(907_185.0));
-        // An unrecognized unit is the LEFT JOIN miss → NULL factor.
+ // An unrecognized unit is the LEFT JOIN miss → NULL factor.
         assert_eq!(mass_units_to_grams("stone"), None);
     }
 
-    // ---- SqlSum ----------------------------------------------------------
+ // ---- SqlSum ----------------------------------------------------------
 
     #[test]
     fn sql_sum_skips_nulls_and_an_all_null_group_is_null() {
@@ -1289,12 +1288,12 @@ mod tests {
         assert_eq!(s.value(), Some(5.0));
     }
 
-    // ---- inventory -------------------------------------------------------
+ // ---- inventory -------------------------------------------------------
 
     #[test]
     fn inventory_by_county_sums_emission_quant_per_group() {
-        // Two rows in one (county, sector, pollutant, process) group,
-        // one in another pollutant.
+ // Two rows in one (county, sector, pollutant, process) group,
+ // one in another pollutant.
         let mut a = emission();
         a.emission_quant = Some(10.0);
         let mut b = emission();
@@ -1314,10 +1313,10 @@ mod tests {
         assert_eq!(rows[0].emission_quant, Some(12.5));
         assert_eq!(rows[0].county_id, Some(17031));
         assert_eq!(rows[0].sector_id, Some(3));
-        // Inventory carries units as labels and does NOT convert.
+ // Inventory carries units as labels and does NOT convert.
         assert_eq!(rows[0].mass_units.as_deref(), Some("g"));
         assert_eq!(rows[0].time_units.as_deref(), Some("hours"));
-        // SCC / equipment dimensions are absent from this report.
+ // SCC / equipment dimensions are absent from this report.
         assert_eq!(rows[0].scc, None);
         assert_eq!(rows[0].nr_equip_type_id, None);
         assert_eq!(rows[1].pollutant_id, Some(3));
@@ -1326,8 +1325,8 @@ mod tests {
 
     #[test]
     fn inventory_by_county_does_not_convert_tons_to_grams() {
-        // The inventory scripts have no `units` join — a ton-unit run
-        // still reports the raw summed quantity.
+ // The inventory scripts have no `units` join — a ton-unit run
+ // still reports the raw summed quantity.
         let mut a = emission();
         a.emission_quant = Some(3.0);
         let rows = inventory(
@@ -1342,7 +1341,7 @@ mod tests {
 
     #[test]
     fn inventory_by_equipment_type_uses_the_reference_lookup() {
-        // SCC 2270001060 → equipment type 7 → sector 11; fuel type 4.
+ // SCC 2270001060 → equipment type 7 → sector 11; fuel type 4.
         let lookup = NrSccLookup::new()
             .with_scc(
                 "2270001060",
@@ -1372,9 +1371,9 @@ mod tests {
 
     #[test]
     fn inventory_equipment_lookup_miss_collapses_derived_columns_to_none() {
-        // Empty lookup → the SCC→equipment LEFT JOIN misses; the
-        // derived columns are NULL and every row collapses into one
-        // all-NULL-equipment group.
+ // Empty lookup → the SCC→equipment LEFT JOIN misses; the
+ // derived columns are NULL and every row collapses into one
+ // all-NULL-equipment group.
         let mut a = emission();
         a.emission_quant = Some(4.0);
         let rows = inventory(
@@ -1406,18 +1405,18 @@ mod tests {
             &NrSccLookup::new(),
         );
         assert_eq!(rows.len(), 2);
-        // BTreeMap key order: "AAA" sorts before "ZZZ".
+ // BTreeMap key order: "AAA" sorts before "ZZZ".
         assert_eq!(rows[0].scc.as_deref(), Some("AAA"));
         assert_eq!(rows[0].fuel_type_id, Some(1));
         assert_eq!(rows[0].fuel_sub_type_id, Some(10));
         assert_eq!(rows[1].scc.as_deref(), Some("ZZZ"));
     }
 
-    // ---- population ------------------------------------------------------
+ // ---- population ------------------------------------------------------
 
     #[test]
     fn population_sums_only_the_population_activity_type() {
-        // activityTypeID 6 is population; 2 (source hours) is ignored.
+ // activityTypeID 6 is population; 2 (source hours) is ignored.
         let pop_a = activity(ACTIVITY_POPULATION, Some(100.0));
         let pop_b = activity(ACTIVITY_POPULATION, Some(40.0));
         let hours = activity(ACTIVITY_SOURCE_HOURS, Some(9999.0));
@@ -1435,11 +1434,11 @@ mod tests {
         assert!(population_by_sector_and_scc(&[], &[]).is_empty());
     }
 
-    // ---- emission factors: operating hour -------------------------------
+ // ---- emission factors: operating hour -------------------------------
 
     #[test]
     fn ef_per_operating_hour_by_scc_divides_grams_by_hours() {
-        // 5 g of emissions over 2 operating hours → 2.5 g/hr.
+ // 5 g of emissions over 2 operating hours → 2.5 g/hr.
         let mut e = emission();
         e.emission_quant = Some(5.0);
         let hours = activity(ACTIVITY_SOURCE_HOURS, Some(2.0));
@@ -1461,8 +1460,8 @@ mod tests {
 
     #[test]
     fn ef_converts_emission_quant_from_tons_to_grams() {
-        // A ton-unit run: emissionQuant is scaled by 907185 before the
-        // rate is taken.
+ // A ton-unit run: emissionQuant is scaled by 907185 before the
+ // rate is taken.
         let mut e = emission();
         e.emission_quant = Some(1.0);
         let hours = activity(ACTIVITY_SOURCE_HOURS, Some(1.0));
@@ -1480,8 +1479,8 @@ mod tests {
 
     #[test]
     fn ef_unknown_mass_units_null_the_converted_quantity() {
-        // An unrecognized massUnits is the `units` LEFT JOIN miss:
-        // `units.factor` is NULL, so `factor * SUM(...)` is NULL.
+ // An unrecognized massUnits is the `units` LEFT JOIN miss:
+ // `units.factor` is NULL, so `factor * SUM(...)` is NULL.
         let mut e = emission();
         e.emission_quant = Some(5.0);
         let hours = activity(ACTIVITY_SOURCE_HOURS, Some(2.0));
@@ -1500,8 +1499,8 @@ mod tests {
 
     #[test]
     fn ef_zero_denominator_yields_a_null_rate() {
-        // IF(hours != 0, …, NULL): a zero denominator → NULL rate, but
-        // the row is still emitted with its emissionQuant.
+ // IF(hours != 0, …, NULL): a zero denominator → NULL rate, but
+ // the row is still emitted with its emissionQuant.
         let mut e = emission();
         e.emission_quant = Some(5.0);
         let hours = activity(ACTIVITY_SOURCE_HOURS, Some(0.0));
@@ -1521,11 +1520,11 @@ mod tests {
 
     #[test]
     fn ef_numerator_without_a_denominator_group_is_dropped() {
-        // INNER JOIN temp1 ⋈ temp2: an emissions group with no
-        // matching activity group produces no output row.
+ // INNER JOIN temp1 ⋈ temp2: an emissions group with no
+ // matching activity group produces no output row.
         let mut e = emission();
         e.emission_quant = Some(5.0);
-        // No activity at all.
+ // No activity at all.
         let rows = emission_factors(
             EmissionFactorReport::PerOperatingHourByScc,
             &[e],
@@ -1538,8 +1537,8 @@ mod tests {
 
     #[test]
     fn ef_splits_the_numerator_by_pollutant_and_process() {
-        // One SCC group, two pollutants → two rows sharing the
-        // denominator; process also splits the numerator.
+ // One SCC group, two pollutants → two rows sharing the
+ // denominator; process also splits the numerator.
         let mut e1 = emission();
         e1.pollutant_id = Some(2);
         e1.emission_quant = Some(6.0);
@@ -1562,12 +1561,12 @@ mod tests {
         assert_eq!(rows[1].emission_rate, Some(3.0));
     }
 
-    // ---- emission factors: horsepower-hour ------------------------------
+ // ---- emission factors: horsepower-hour ------------------------------
 
     #[test]
     fn ef_per_hphr_multiplies_horsepower_hours_and_load_factor() {
-        // hpHours = avgHorsepower(50) × sourceHours(4) × loadFactor(0.5)
-        //         = 100. 200 g / 100 hp-hr → 2 g/hp-hr.
+ // hpHours = avgHorsepower(50) × sourceHours(4) × loadFactor(0.5)
+ // = 100. 200 g / 100 hp-hr → 2 g/hp-hr.
         let mut e = emission();
         e.emission_quant = Some(200.0);
         let source = activity(ACTIVITY_SOURCE_HOURS, Some(4.0));
@@ -1589,9 +1588,9 @@ mod tests {
 
     #[test]
     fn ef_per_hphr_drops_a_finest_grain_key_missing_load_factor() {
-        // sourceHours and horsepower match but no loadFactor row →
-        // hphr.hpHours stays NULL → no denominator group → INNER JOIN
-        // drops the numerator row.
+ // sourceHours and horsepower match but no loadFactor row →
+ // hphr.hpHours stays NULL → no denominator group → INNER JOIN
+ // drops the numerator row.
         let mut e = emission();
         e.emission_quant = Some(50.0);
         let source = activity(ACTIVITY_SOURCE_HOURS, Some(4.0));
@@ -1607,12 +1606,12 @@ mod tests {
         assert!(rows.is_empty());
     }
 
-    // ---- emission factors: per vehicle ----------------------------------
+ // ---- emission factors: per vehicle ----------------------------------
 
     #[test]
     fn ef_per_vehicle_divides_by_population_and_labels_with_time_units() {
-        // 30 g over a population of 6 → 5 g/vehicle; the label embeds
-        // the run's timeUnits.
+ // 30 g over a population of 6 → 5 g/vehicle; the label embeds
+ // the run's timeUnits.
         let mut e = emission();
         e.emission_quant = Some(30.0);
         let pop = activity(ACTIVITY_POPULATION, Some(6.0));
@@ -1630,12 +1629,12 @@ mod tests {
         assert_eq!(rows[0].emission_rate_units, "g/vehicle per days");
     }
 
-    // ---- emission factors: equipment grouping ---------------------------
+ // ---- emission factors: equipment grouping ---------------------------
 
     #[test]
     fn ef_by_equipment_groups_two_sccs_into_one_equipment_type() {
-        // Two SCCs both map to equipment type 7 / fuel type 4 — their
-        // emissions and hours collapse into one equipment group.
+ // Two SCCs both map to equipment type 7 / fuel type 4 — their
+ // emissions and hours collapse into one equipment group.
         let lookup = NrSccLookup::new()
             .with_scc("A", Some(7), Some(4), Some("Loaders".to_string()))
             .with_scc("B", Some(7), Some(4), Some("Loaders".to_string()))
@@ -1668,7 +1667,7 @@ mod tests {
         assert_eq!(rows[0].scc, None, "equipment reports drop SCC");
     }
 
-    // ---- determinism -----------------------------------------------------
+ // ---- determinism -----------------------------------------------------
 
     #[test]
     fn emission_factor_output_order_is_independent_of_input_order() {
@@ -1711,7 +1710,7 @@ mod tests {
 
     #[test]
     fn script_names_are_distinct() {
-        // Every report variant names a distinct ported script.
+ // Every report variant names a distinct ported script.
         let inv = [
             InventoryReport::ByCountyAndPollutant,
             InventoryReport::ByCountyFuelTypeAndPollutant,

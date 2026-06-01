@@ -62,13 +62,23 @@ declare -a INCLUDES=()
 declare -a EXCLUDES=()
 
 # Fixtures that require additional supporting input databases at run time
-# (county data manager, project links/zones, rates-mode setup). These are
-# excluded by default so the standard "run all" path works without
-# operator-specific setup. Pass `--include PATTERN` to opt them back in.
+# (county data manager, project links/zones, rates-mode setup) OR that are
+# deliberately invalid RunSpecs (error-* fixtures). These are excluded by
+# default so the standard "run all" path works without operator-specific setup.
+# Pass `--include PATTERN` to opt them back in.
 declare -a SKIP_BY_DEFAULT=(
     "scale-county"
     "scale-project"
     "scale-rates"
+    # rates-minimal: rates-mode (MESOSCALE_LOOKUP) requires county-scale CDB
+    # input setup, same as scale-rates. Rust port tests planning only.
+    "rates-minimal"
+    # error-*: deliberately invalid RunSpecs that are expected to fail parsing.
+    # They are tested by the Rust regression suite's error_fixtures_return_expected_errors
+    # test, not by canonical-MOVES runs.
+    "error-bad-modelscale"
+    "error-bad-model"
+    "error-bad-geotype"
 )
 
 usage() { sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'; }

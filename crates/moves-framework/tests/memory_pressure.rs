@@ -1,6 +1,6 @@
-//! Memory-pressure regression for Task 27's bounded-concurrency executor.
+//! Memory-pressure regression for bounded-concurrency executor.
 //!
-//! The migration plan requires that "doubling the parallelism limit roughly
+//! The requires that "doubling the parallelism limit roughly
 //! doubles peak RSS as expected". The unit tests in `executor.rs` pin the
 //! *mechanism* deterministically — a barrier proves exactly `limit` chunks
 //! are co-resident. This integration test confirms the *consequence*
@@ -69,14 +69,14 @@ fn peak_rss_holding_buffers(chunks: &[Chunk], limit: usize) -> u64 {
     executor
         .execute(chunks, |_chunk| {
             let mut buffer = vec![0u8; BUFFER_BYTES];
-            // Touch every page so the buffer is genuinely resident.
+ // Touch every page so the buffer is genuinely resident.
             let mut page = 0;
             while page < BUFFER_BYTES {
                 buffer[page] = 1;
                 page += PAGE;
             }
-            // Hold the buffer across the rendezvous: at the barrier, `limit`
-            // buffers are simultaneously resident.
+ // Hold the buffer across the rendezvous: at the barrier, `limit`
+ // buffers are simultaneously resident.
             std::hint::black_box(&buffer);
             barrier.wait();
             std::hint::black_box(&buffer);
@@ -88,7 +88,7 @@ fn peak_rss_holding_buffers(chunks: &[Chunk], limit: usize) -> u64 {
 
 #[test]
 fn peak_rss_grows_with_the_parallelism_limit() {
-    // Skip rather than fail if /proc is unavailable (restricted sandbox).
+ // Skip rather than fail if /proc is unavailable (restricted sandbox).
     if peak_rss_kib().is_none() {
         return;
     }
@@ -103,9 +103,9 @@ fn peak_rss_grows_with_the_parallelism_limit() {
         "independent modules must each form their own chunk"
     );
 
-    // `VmHWM` is monotonic, so measure the low limit first. limit 1 holds
-    // one 8 MiB buffer at a time; limit 8 holds eight — a true peak-RSS
-    // delta near 56 MiB. The 24 MiB threshold absorbs allocator / OS slack.
+ // `VmHWM` is monotonic, so measure the low limit first. limit 1 holds
+ // one 8 MiB buffer at a time; limit 8 holds eight — a true peak-RSS
+ // delta near 56 MiB. The 24 MiB threshold absorbs allocator / OS slack.
     let baseline = peak_rss_holding_buffers(&chunks, 1);
     let wide = peak_rss_holding_buffers(&chunks, 8);
     let growth_kib = wide.saturating_sub(baseline);

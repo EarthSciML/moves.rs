@@ -1,13 +1,13 @@
 //! `moves run` — load a RunSpec, walk the calculator graph, write output.
 //!
-//! Thin wrapper over [`moves_framework::MOVESEngine`] (migration-plan
-//! Task 27): it parses the RunSpec, builds the [`CalculatorRegistry`] from
-//! the Phase 1 calculator-chain DAG, hands both to the engine, and returns
+//! Thin wrapper over [`moves_framework::MOVESEngine`] (
+//!): it parses the RunSpec, builds the [`CalculatorRegistry`] from
+//! the calculator-chain DAG, hands both to the engine, and returns
 //! the engine's [`EngineOutcome`].
 //!
 //! # The calculator DAG
 //!
-//! The engine needs the calculator-graph DAG that Phase 1 Task 10
+//! The engine needs the calculator-graph DAG that
 //! reconstructed. The committed artifact lives at
 //! `characterization/calculator-chains/calculator-dag.json`; `moves run`
 //! embeds it at compile time so the binary is self-contained — running
@@ -26,10 +26,11 @@ use moves_calculators::generators::totalactivitygenerator::inputs::{
     HourDayRow, LinkRow as ShoLinkRow,
 };
 use moves_calculators::generators::totalactivitygenerator::model::AverageSpeedRow;
+use moves_data_default::DefaultDb;
 use moves_framework::{
-    read_execution_bundle, read_execution_bundle_filtered, CalculatorRegistry, CountyRow,
-    DataFrameStore, DataFrameStoreTyped, EngineConfig, EngineOutcome, GeographyTables,
-    InMemoryStore, LinkRow, MOVESEngine,
+    default_tables, read_execution_bundle, read_execution_bundle_filtered, CalculatorRegistry,
+    CountyRow, DataFrameStore, DataFrameStoreTyped, EngineConfig, EngineOutcome, GeographyTables,
+    InMemoryStore, InputDataManager, LinkRow, MOVESEngine, RunSpecFilters,
 };
 use moves_runspec::{GeoKind, RunSpec};
 use polars::prelude::{
@@ -39,10 +40,10 @@ use polars::prelude::{
 
 use crate::load_run_spec;
 
-/// The Phase 1 calculator-chain DAG, embedded at compile time.
+/// The calculator-chain DAG, embedded at compile time.
 ///
 /// `moves run` uses this whenever `--calculator-dag` is not supplied. The
-/// source artifact is the byte-stable JSON written by the Phase 1
+/// source artifact is the byte-stable JSON written by the
 /// `moves-chain-reconstruct` tool.
 const EMBEDDED_CALCULATOR_DAG: &str =
     include_str!("../../../characterization/calculator-chains/calculator-dag.json");
@@ -52,14 +53,14 @@ const EMBEDDED_CALCULATOR_DAG: &str =
 /// Derived from a [`RunSpec`] before loading the execution-DB snapshot. Only the
 /// Parquet fallback path uses this; the Arrow-IPC bundle path loads tables whole.
 struct SnapshotFilter {
-    /// Zone IDs the run touches. Derived from County geographic selections using
-    /// the MOVES convention `zone_id = county_id * 10`, plus any Zone selections.
+ /// Zone IDs the run touches. Derived from County geographic selections using
+ /// the MOVES convention `zone_id = county_id * 10`, plus any Zone selections.
     zone_ids: Vec<i64>,
-    /// County IDs from the RunSpec's geographic selections.
+ /// County IDs from the RunSpec's geographic selections.
     county_ids: Vec<i64>,
-    /// Calendar year IDs from the RunSpec's timespan.
+ /// Calendar year IDs from the RunSpec's timespan.
     year_ids: Vec<i64>,
-    /// Month IDs from the RunSpec's timespan.
+ /// Month IDs from the RunSpec's timespan.
     month_ids: Vec<i64>,
 }
 
@@ -72,7 +73,7 @@ impl SnapshotFilter {
                 GeoKind::County => {
                     let county = i64::from(sel.key);
                     county_set.insert(county);
-                    // MOVES convention: the default zone for each county is county_id * 10.
+ // MOVES convention: the default zone for each county is county_id * 10.
                     zone_set.insert(county * 10);
                 }
                 GeoKind::Zone => {
@@ -93,8 +94,8 @@ impl SnapshotFilter {
                 .collect::<BTreeSet<_>>()
                 .into_iter()
                 .collect(),
-            // MOVES XML months are 0-indexed (key=7 → monthID=8 / August);
-            // add 1 to convert from RunSpec key to MOVES internal monthID.
+ // MOVES XML months are 0-indexed (key=7 → monthID=8 / August);
+ // add 1 to convert from RunSpec key to MOVES internal monthID.
             month_ids: run_spec
                 .timespan
                 .months
@@ -144,38 +145,45 @@ fn table_filter_expr(table_name: &str, filter: &SnapshotFilter) -> Option<Expr> 
 /// Inputs for one `moves run` invocation.
 #[derive(Debug, Clone)]
 pub struct RunOptions {
-    /// Path to the RunSpec file (`.xml`, `.mrs`, or `.toml`).
+ /// Path to the RunSpec file (`.xml`, `.mrs`, or `.toml`).
     pub runspec: PathBuf,
-    /// Directory the engine writes output Parquet into. Created if absent.
+ /// Directory the engine writes output Parquet into. Created if absent.
     pub output: PathBuf,
-    /// `--max-parallel-chunks`: the maximum number of calculator chains run
-    /// concurrently. `0` selects the host's available parallelism.
+ /// `--max-parallel-chunks`: the maximum number of calculator chains run
+ /// concurrently. `0` selects the host's available parallelism.
     pub max_parallel_chunks: usize,
-    /// Optional override for the calculator-chain DAG. `None` uses the
-    /// Phase 1 DAG embedded in the binary at compile time.
+ /// Optional override for the calculator-chain DAG. `None` uses the
+ /// DAG embedded in the binary at compile time.
     pub calculator_dag: Option<PathBuf>,
-    /// Optional value for the `MOVESRun.runDateTime` output column. `None`
-    /// leaves it null, which keeps the run's output byte-stable — the
-    /// engine deliberately does not stamp the wall clock itself.
+ /// Optional value for the `MOVESRun.runDateTime` output column. `None`
+ /// leaves it null, which keeps the run's output byte-stable — the
+ /// engine deliberately does not stamp the wall clock itself.
     pub run_date_time: Option<String>,
-    /// Path to a canonical MOVES snapshot directory (as written by the Phase 1
-    /// capture harness). When present, the `db__movesexecution*` Parquet
-    /// files under `<snapshot>/tables/` are loaded as the execution-database
-    /// slow tier and made available to calculators via `ctx.tables()`.
+ /// Path to a canonical MOVES snapshot directory (as written by the
+ /// capture harness). When present, the `db__movesexecution*` Parquet
+ /// files under `<snapshot>/tables/` are loaded as the execution-database
+ /// slow tier and made available to calculators via `ctx.tables()`.
     pub snapshot: Option<PathBuf>,
-    /// Path to a County/Project-scale input directory produced by
-    /// `moves import-cdb` (CDB) or the PDB importer. When present, every
-    /// `*.parquet` file in the directory is loaded and inserted into the
-    /// execution-database slow tier, **overriding** any same-named table
-    /// that the snapshot (or default-DB) already loaded. This implements
-    /// the MOVES County/Project-scale data-preference rule: user-supplied
-    /// CDB/PDB tables take precedence over the default database for the
-    /// tables they cover, while all other tables continue to come from the
-    /// snapshot/default-DB.
-    ///
-    /// Applies when the RunSpec sets `<modeldomain>` to `SINGLE` (County)
-    /// or `PROJECT`.
+ /// Path to a County/Project-scale input directory produced by
+ /// `moves import-cdb` (CDB) or the PDB importer. When present, every
+ /// `*.parquet` file in the directory is loaded and inserted into the
+ /// execution-database slow tier, **overriding** any same-named table
+ /// that the snapshot (or default-DB) already loaded. This implements
+ /// the MOVES County/Project-scale data-preference rule: user-supplied
+ /// CDB/PDB tables take precedence over the default database for the
+ /// tables they cover, while all other tables continue to come from the
+ /// snapshot/default-DB.
+ ///
+ /// Applies when the RunSpec sets `<modeldomain>` to `SINGLE` (County)
+ /// or `PROJECT`.
     pub scale_input: Option<PathBuf>,
+    /// Path to a converted default-DB Parquet tree (as written by
+    /// `moves-default-db-convert`). When present, the default database is
+    /// loaded and filtered to the RunSpec's geography/time/pollutant/process
+    /// dimensions, providing the execution-database slow tier without a
+    /// captured snapshot. The `Link` table and all `RunSpec*` tables are
+    /// synthesised from the RunSpec and the loaded default-DB tables.
+    pub default_db: Option<PathBuf>,
 }
 
 /// Run a MOVES simulation: parse the RunSpec, build the calculator
@@ -188,7 +196,8 @@ pub struct RunOptions {
 /// output.
 pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
     let run_spec = load_run_spec(&opts.runspec)?;
-    let has_slow_store = opts.snapshot.is_some() || opts.scale_input.is_some();
+    let has_slow_store =
+        opts.snapshot.is_some() || opts.scale_input.is_some() || opts.default_db.is_some();
     let registry = load_registry(opts.calculator_dag.as_deref(), has_slow_store)?;
     let config = EngineConfig {
         output_root: opts.output.clone(),
@@ -204,19 +213,19 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
         .snapshot
         .is_some()
         .then(|| SnapshotFilter::from_run_spec(&run_spec));
-    // Compute the allowed table set before the registry moves into the engine.
+ // Compute the allowed table set before the registry moves into the engine.
     let allowed_tables = if opts.snapshot.is_some() {
         let mut tables = registry.required_input_tables();
-        // `populate_sho_distances` recomputes the NULL `SHO.distance` column
-        // from these reference tables. They are not declared inputs of any
-        // calculator (MOVES populates distance inside the activity generator,
-        // which does not re-run against a snapshot), so they must be admitted
-        // explicitly or the load filter drops them and distance stays NULL.
+ // `populate_sho_distances` recomputes the NULL `SHO.distance` column
+ // from these reference tables. They are not declared inputs of any
+ // calculator (MOVES populates distance inside the activity generator,
+ // which does not re-run against a snapshot), so they must be admitted
+ // explicitly or the load filter drops them and distance stays NULL.
         tables.extend(SHO_DISTANCE_INPUT_TABLES.iter().map(|t| (*t).to_owned()));
-        // `populate_source_use_type_physics_mapping` derives the missing
-        // `sourceUseTypePhysicsMapping` table from `sourceUseTypePhysics` when a
-        // snapshot omits the runtime-built mapping; admit both so neither is
-        // filtered out before the synthesis runs.
+ // `populate_source_use_type_physics_mapping` derives the missing
+ // `sourceUseTypePhysicsMapping` table from `sourceUseTypePhysics` when a
+ // snapshot omits the runtime-built mapping; admit both so neither is
+ // filtered out before the synthesis runs.
         tables.extend(
             SOURCE_TYPE_PHYSICS_MAPPING_INPUT_TABLES
                 .iter()
@@ -226,15 +235,15 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
     } else {
         None
     };
-    let mut engine = MOVESEngine::new(run_spec, registry, config);
+    let mut engine = MOVESEngine::new(run_spec.clone(), registry, config);
     if let Some(snapshot_dir) = &opts.snapshot {
         let filter = snap_filter
             .as_ref()
             .expect("built above when snapshot is Some");
         let mut store = load_execution_db(snapshot_dir, filter, allowed_tables.as_ref())
             .with_context(|| format!("loading execution DB from {}", snapshot_dir.display()))?;
-        // Overlay any County/Project-scale Parquet tables on top of the snapshot
-        // tables. CDB/PDB tables take precedence for the tables they supply.
+ // Overlay any County/Project-scale Parquet tables on top of the snapshot
+ // tables. CDB/PDB tables take precedence for the tables they supply.
         if let Some(scale_dir) = &opts.scale_input {
             overlay_scale_input_db(&mut store, scale_dir)
                 .with_context(|| format!("loading scale-input DB from {}", scale_dir.display()))?;
@@ -246,12 +255,47 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
             .execution_run_spec_mut()
             .build_execution_locations(&geography);
     } else if let Some(scale_dir) = &opts.scale_input {
-        // Scale-only path: no snapshot — build a store from CDB/PDB Parquet alone.
+ // Scale-only path: no snapshot — build a store from CDB/PDB Parquet alone.
         let mut store = InMemoryStore::new();
         overlay_scale_input_db(&mut store, scale_dir)
             .with_context(|| format!("loading scale-input DB from {}", scale_dir.display()))?;
         let geography = load_geography_from_store(&store)
             .with_context(|| format!("building geography from {}", scale_dir.display()))?;
+        engine = engine.with_slow_store(store);
+        engine
+            .execution_run_spec_mut()
+            .build_execution_locations(&geography);
+    } else if let Some(default_db_path) = &opts.default_db {
+        // Default-DB path: load the Parquet default database, synthesise the Link
+        // table from ZoneRoadType, build RunSpec* tables from the RunSpec, and
+        // optionally overlay CDB/PDB tables on top before wiring into the engine.
+        let db = DefaultDb::open(default_db_path)
+            .with_context(|| format!("opening default DB at {}", default_db_path.display()))?;
+        let filters = RunSpecFilters::from_runspec(&run_spec);
+        let plan = InputDataManager::plan(&filters, &default_tables());
+        let mut store = InputDataManager::execute(&plan, &db)
+            .map_err(|e| anyhow::anyhow!("loading default DB: {e}"))?;
+        if let Some(scale_dir) = &opts.scale_input {
+            overlay_scale_input_db(&mut store, scale_dir).with_context(|| {
+                format!("loading scale-input DB from {}", scale_dir.display())
+            })?;
+        }
+        populate_link_from_zone_road_type(&mut store)
+            .context("synthesising Link from ZoneRoadType")?;
+        build_runspec_tables(&run_spec, &mut store)
+            .context("building RunSpec tables from RunSpec")?;
+        populate_source_use_type_physics_mapping(&mut store)
+            .context("synthesising sourceUseTypePhysicsMapping")?;
+        populate_zone_month_hour_meteorology(&mut store)
+            .context("populating ZoneMonthHour meteorology")?;
+        merge_process_year_variants(&mut store)
+            .context("merging process/year-indexed table variants")?;
+        let geography = load_geography_from_store(&store).with_context(|| {
+            format!(
+                "building geography from default DB at {}",
+                default_db_path.display()
+            )
+        })?;
         engine = engine.with_slow_store(store);
         engine
             .execution_run_spec_mut()
@@ -262,7 +306,7 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
 }
 
 /// Build the [`CalculatorRegistry`] — from `path` if given, otherwise from
-/// the embedded Phase 1 DAG.
+/// the embedded DAG.
 /// Load execution-database tables from a snapshot directory.
 ///
 /// Prefers the Arrow-IPC bundle at `<snapshot>/tables/execution-db.bundle` when
@@ -301,21 +345,21 @@ fn load_execution_db(
     } else {
         load_execution_db_from_parquet(snapshot_dir, filter, allowed_tables)?
     };
-    // If the SHO table has null distances (MOVES inserts them before calculateDistance
-    // runs), compute distance = SHO * averageSpeed and write back to the store.
+ // If the SHO table has null distances (MOVES inserts them before calculateDistance
+ // runs), compute distance = SHO * averageSpeed and write back to the store.
     populate_sho_distances(&mut store).context("populating SHO distances from snapshot")?;
-    // Synthesise sourceUseTypePhysicsMapping from sourceUseTypePhysics when the
-    // snapshot omits the runtime-built mapping (MOVES builds it inside
-    // SourceUseTypePhysics.setup, which does not re-run against a snapshot).
+ // Synthesise sourceUseTypePhysicsMapping from sourceUseTypePhysics when the
+ // snapshot omits the runtime-built mapping (MOVES builds it inside
+ // SourceUseTypePhysics.setup, which does not re-run against a snapshot).
     populate_source_use_type_physics_mapping(&mut store)
         .context("synthesising sourceUseTypePhysicsMapping from snapshot")?;
-    // Fill the NULL ZoneMonthHour meteorology columns (heatIndex,
-    // specificHumidity, molWaterFraction) that MeteorologyGenerator computes at
-    // runtime but some snapshots capture empty.
+ // Fill the NULL ZoneMonthHour meteorology columns (heatIndex,
+ // specificHumidity, molWaterFraction) that MeteorologyGenerator computes at
+ // runtime but some snapshots capture empty.
     populate_zone_month_hour_meteorology(&mut store)
         .context("populating ZoneMonthHour meteorology from snapshot")?;
-    // Union process/year-indexed table variants (e.g. baserate_1_2001, baserate_2_2001)
-    // into their canonical names (e.g. baserate) so calculators can read real data.
+ // Union process/year-indexed table variants (e.g. baserate_1_2001, baserate_2_2001)
+ // into their canonical names (e.g. baserate) so calculators can read real data.
     merge_process_year_variants(&mut store)
         .context("merging process/year-indexed table variants into canonical names")?;
     Ok(store)
@@ -326,7 +370,7 @@ fn load_execution_db(
 ///
 /// Scans `scale_dir` for every `*.parquet` file, reads each, and inserts it
 /// into `store` using the stem (filename without `.parquet`) as the table name,
-/// **replacing** any same-named table that was already in the store.  This
+/// **replacing** any same-named table that was already in the store. This
 /// implements the MOVES County/Project-scale data preference rule: user-supplied
 /// CDB/PDB tables override the default-database tables for the tables they cover;
 /// tables not present in the CDB/PDB directory continue to come from the
@@ -372,8 +416,8 @@ fn strip_year_suffix(name: &str) -> &str {
 /// the base name that MOVES uses for the canonical (unpartitioned) form.
 ///
 /// MOVES partitions some execution-DB tables by process, county, and/or year into
-/// separate MySQL tables (e.g. `baserate_1_2001`, `baseratebyage_90_2020`).  The
-/// calculator reads the canonical name (`baserate`, `baseratebyage`).  This helper
+/// separate MySQL tables (e.g. `baserate_1_2001`, `baseratebyage_90_2020`). The
+/// calculator reads the canonical name (`baserate`, `baseratebyage`). This helper
 /// strips those numeric-index suffixes so the allow-filter admits the variants and
 /// the merge step can union them back under the canonical name.
 ///
@@ -440,7 +484,7 @@ fn merge_process_year_variants(store: &mut InMemoryStore) -> Result<()> {
 ///
 /// For tables listed in [`table_filter_expr`] (currently `ZoneMonthHour` and
 /// `CountyYear`) a Polars `LazyFrame` predicate is pushed into the Parquet decoder
-/// so only matching row groups are decoded.  All other tables are read whole.
+/// so only matching row groups are decoded. All other tables are read whole.
 ///
 /// When `allowed_tables` is `Some`, only tables whose lowercased short name
 /// appears in the set are loaded; others are skipped before opening the file.
@@ -457,26 +501,26 @@ fn load_execution_db_from_parquet(
         let entry = entry.context("reading directory entry")?;
         let file_name = entry.file_name();
         let name_str = file_name.to_string_lossy();
-        // Only the execution-DB tables; skip output-DB and other prefixes.
+ // Only the execution-DB tables; skip output-DB and other prefixes.
         if !name_str.starts_with("db__movesexecution") || !name_str.ends_with(".parquet") {
             continue;
         }
-        // Extract the table name: last `__`-separated segment, strip `.parquet`.
+ // Extract the table name: last `__`-separated segment, strip `.parquet`.
         let table_name = name_str
             .rsplit("__")
             .next()
             .unwrap_or(&name_str)
             .trim_end_matches(".parquet")
             .to_owned();
-        // Skip tables not needed by any registered calculator/generator.
-        // Year-suffixed tables (e.g. `stmyTVVCoeffs2020`) are admitted when
-        // their base name (e.g. `stmytvvcoeffs`) appears in the allowed set,
-        // because some generators read them dynamically and declare no static
-        // INPUT_TABLES entry.
-        // Process/year-indexed tables (e.g. `baserate_1_2001`) are admitted when
-        // their canonical base name (e.g. `baserate`) appears in the allowed set;
-        // they are merged into that canonical name by `merge_process_year_variants`
-        // after loading.
+ // Skip tables not needed by any registered calculator/generator.
+ // Year-suffixed tables (e.g. `stmyTVVCoeffs2020`) are admitted when
+ // their base name (e.g. `stmytvvcoeffs`) appears in the allowed set,
+ // because some generators read them dynamically and declare no static
+ // INPUT_TABLES entry.
+ // Process/year-indexed tables (e.g. `baserate_1_2001`) are admitted when
+ // their canonical base name (e.g. `baserate`) appears in the allowed set;
+ // they are merged into that canonical name by `merge_process_year_variants`
+ // after loading.
         if let Some(allowed) = allowed_tables {
             let lower = table_name.to_ascii_lowercase();
             if !allowed.contains(&lower)
@@ -526,14 +570,14 @@ const SOURCE_TYPE_PHYSICS_MAPPING_INPUT_TABLES: &[&str] =
 /// back, so downstream calculators find non-null distances in the slow store.
 ///
 /// The implementation avoids materialising `Vec<ShoRow>` for the full SHO
-/// table (which can exceed 1 M rows).  Instead it:
-///   1. Reads only the four columns needed for distance arithmetic into owned
-///      `Vec<i32>` / `Vec<f64>` buffers, then releases the `Arc<DataFrame>`.
-///   2. Uses [`DataFrameStoreTyped::iter_typed`] for the small lookup tables
-///      (Link, AverageSpeed, HourDay), which are typically <1000 rows.
-///   3. Computes a `Vec<f64>` distance column and writes it back in-place via
-///      [`InMemoryStore::get_mut`], which avoids cloning the Arrow buffers
-///      because the outer `Arc<DataFrame>` refcount is 1 at that point.
+/// table (which can exceed 1 M rows). Instead it:
+/// 1. Reads only the four columns needed for distance arithmetic into owned
+/// `Vec<i32>` / `Vec<f64>` buffers, then releases the `Arc<DataFrame>`.
+/// 2. Uses [`DataFrameStoreTyped::iter_typed`] for the small lookup tables
+/// (Link, AverageSpeed, HourDay), which are typically <1000 rows.
+/// 3. Computes a `Vec<f64>` distance column and writes it back in-place via
+/// [`InMemoryStore::get_mut`], which avoids cloning the Arrow buffers
+/// because the outer `Arc<DataFrame>` refcount is 1 at that point.
 fn populate_sho_distances(store: &mut InMemoryStore) -> Result<()> {
     use polars::prelude::{DataType, NamedFrom, Series};
 
@@ -541,17 +585,17 @@ fn populate_sho_distances(store: &mut InMemoryStore) -> Result<()> {
         return Ok(());
     }
 
-    // --- Phase 1: read SHO column data ---
-    // We extract only the columns needed for the computation and collect them
-    // into owned Vecs so the Arc<DataFrame> borrow is released before we need
-    // &mut InMemoryStore below.
+ // ---: read SHO column data ---
+ // We extract only the columns needed for the computation and collect them
+ // into owned Vecs so the Arc<DataFrame> borrow is released before we need
+ // &mut InMemoryStore below.
     let (link_ids, hour_day_ids, source_type_ids, sho_vals, n) = {
         let sho_arc = store
             .get("SHO")
             .context("SHO not in store after contains check")?;
         let df = &*sho_arc;
 
-        // Case-insensitive column finder for snapshot tables (all-lowercase MySQL names).
+ // Case-insensitive column finder for snapshot tables (all-lowercase MySQL names).
         let find_col = |want: &str| -> Result<polars::prelude::Column> {
             let lower = want.to_ascii_lowercase();
             df.columns()
@@ -561,7 +605,7 @@ fn populate_sho_distances(store: &mut InMemoryStore) -> Result<()> {
                 .with_context(|| format!("SHO column '{want}' not found"))
         };
 
-        // Early exit: if any distance is already non-zero, skip.
+ // Early exit: if any distance is already non-zero, skip.
         let dist_nonzero = find_col("distance")
             .ok()
             .and_then(|c| c.f64().ok().cloned())
@@ -570,7 +614,7 @@ fn populate_sho_distances(store: &mut InMemoryStore) -> Result<()> {
             return Ok(());
         }
 
-        // Cast helper: accepts Int32 or Int64 snapshot columns.
+ // Cast helper: accepts Int32 or Int64 snapshot columns.
         let to_i32_vec = |col: polars::prelude::Column| -> Result<Vec<i32>> {
             let casted = if *col.dtype() == DataType::Int64 {
                 col.cast(&DataType::Int32)
@@ -599,7 +643,7 @@ fn populate_sho_distances(store: &mut InMemoryStore) -> Result<()> {
         (link_ids, hour_day_ids, source_type_ids, sho_vals, n)
     }; // sho_arc is dropped; Arc<DataFrame> refcount returns to 1
 
-    // --- Phase 2: build lookup tables from small reference tables ---
+ // ---: build lookup tables from small reference tables ---
     if !store.contains("Link") || !store.contains("AverageSpeed") || !store.contains("HourDay") {
         return Ok(());
     }
@@ -629,7 +673,7 @@ fn populate_sho_distances(store: &mut InMemoryStore) -> Result<()> {
         })
         .collect();
 
-    // --- Phase 3: compute distance column (same formula as calculate_distance) ---
+ // ---: compute distance column (same formula as calculate_distance) ---
     let distances: Vec<f64> = (0..n)
         .map(|i| {
             (|| {
@@ -646,8 +690,8 @@ fn populate_sho_distances(store: &mut InMemoryStore) -> Result<()> {
         return Ok(());
     }
 
-    // --- Phase 4: update distance column in-place ---
-    // Arc<DataFrame> refcount is 1 (sho_arc was dropped); no DataFrame clone occurs.
+ // ---: update distance column in-place ---
+ // Arc<DataFrame> refcount is 1 (sho_arc was dropped); no DataFrame clone occurs.
     let sho_mut = store.get_mut("SHO").expect("SHO was present above");
     sho_mut
         .with_column(Series::new("distance".into(), distances).into())
@@ -675,8 +719,8 @@ fn populate_sho_distances(store: &mut InMemoryStore) -> Result<()> {
 fn populate_source_use_type_physics_mapping(store: &mut InMemoryStore) -> Result<()> {
     use polars::prelude::{NamedFrom, Series};
 
-    // Nothing to do if the mapping is already present, or there is no source
-    // physics table to derive it from.
+ // Nothing to do if the mapping is already present, or there is no source
+ // physics table to derive it from.
     if store.contains("sourceUseTypePhysicsMapping") || !store.contains("sourceUseTypePhysics") {
         return Ok(());
     }
@@ -687,8 +731,8 @@ fn populate_source_use_type_physics_mapping(store: &mut InMemoryStore) -> Result
     let mut mapping: polars::prelude::DataFrame = (*physics).clone();
     drop(physics); // release the Arc clone before mutating the store below
 
-    // Resolve the source-type column case-insensitively (snapshot column
-    // casings vary), then rename it to the mapping's `realSourceTypeID`.
+ // Resolve the source-type column case-insensitively (snapshot column
+ // casings vary), then rename it to the mapping's `realSourceTypeID`.
     let src_col = mapping
         .get_column_names()
         .iter()
@@ -699,7 +743,7 @@ fn populate_source_use_type_physics_mapping(store: &mut InMemoryStore) -> Result
         .rename(&src_col, "realSourceTypeID".into())
         .map_err(|e| anyhow::anyhow!("renaming sourceTypeID -> realSourceTypeID: {e}"))?;
 
-    // tempSourceTypeID is a copy of realSourceTypeID for the identity mapping.
+ // tempSourceTypeID is a copy of realSourceTypeID for the identity mapping.
     let mut temp = mapping
         .column("realSourceTypeID")
         .map_err(|e| anyhow::anyhow!("{e}"))?
@@ -742,8 +786,8 @@ fn populate_zone_month_hour_meteorology(store: &mut InMemoryStore) -> Result<()>
         return Ok(());
     }
 
-    // Early exit: if heatIndex already carries any non-null value, the snapshot
-    // captured the computed columns — leave the table untouched.
+ // Early exit: if heatIndex already carries any non-null value, the snapshot
+ // captured the computed columns — leave the table untouched.
     {
         let zmh = store
             .get("ZoneMonthHour")
@@ -760,7 +804,7 @@ fn populate_zone_month_hour_meteorology(store: &mut InMemoryStore) -> Result<()>
         }
     }
 
-    // Zone and County are needed to resolve each county's barometric pressure.
+ // Zone and County are needed to resolve each county's barometric pressure.
     if !store.contains("Zone") || !store.contains("County") {
         return Ok(());
     }
@@ -774,7 +818,7 @@ fn populate_zone_month_hour_meteorology(store: &mut InMemoryStore) -> Result<()>
     };
     let computed = build_meteorology_table(&inputs);
 
-    // Index the computed meteorology by (zoneID, monthID, hourID).
+ // Index the computed meteorology by (zoneID, monthID, hourID).
     let mut by_key: std::collections::HashMap<(i32, i32, i32), (f64, f64, f64)> =
         std::collections::HashMap::with_capacity(computed.len());
     for r in &computed {
@@ -784,8 +828,8 @@ fn populate_zone_month_hour_meteorology(store: &mut InMemoryStore) -> Result<()>
         );
     }
 
-    // Read the existing key columns + temperature (the unmatched-row fallback)
-    // in DataFrame row order, then release the Arc before mutating the store.
+ // Read the existing key columns + temperature (the unmatched-row fallback)
+ // in DataFrame row order, then release the Arc before mutating the store.
     let (heat, spec, mol) = {
         let zmh = store.get("ZoneMonthHour").expect("ZoneMonthHour present");
         let df = &*zmh;
@@ -870,7 +914,7 @@ fn cast_to_i32(df: &polars::prelude::DataFrame, name: &str) -> Result<polars::pr
 fn load_geography_from_store(store: &InMemoryStore) -> Result<GeographyTables> {
     let links: Vec<LinkRow> = if let Some(arc_df) = store.get("link") {
         let df = &*arc_df;
-        // Cast all four columns once; iterate row-wise to avoid 4 intermediate Vecs.
+ // Cast all four columns once; iterate row-wise to avoid 4 intermediate Vecs.
         let link_id_s = cast_to_i32(df, "linkID")?;
         let county_id_s = cast_to_i32(df, "countyID")?;
         let zone_id_s = cast_to_i32(df, "zoneID")?;
@@ -945,6 +989,290 @@ fn load_geography_from_store(store: &InMemoryStore) -> Result<GeographyTables> {
     Ok(GeographyTables::new(links, counties))
 }
 
+/// Synthesise the `Link` table from `ZoneRoadType` + `RoadType` when the
+/// default DB provides no Link rows.
+///
+/// The default DB ships `Link` as schema-only (zero rows). For county-scale
+/// runs the engine needs at least one `LinkRow` per (zone, road-type) to
+/// iterate over execution locations. This function reads the `ZoneRoadType`
+/// table (which does have rows — one per zone × road-type combination) and
+/// constructs synthetic `Link` rows using the MOVES county-scale convention:
+///
+/// * `countyID  = zoneID / 10`  (default zone = county × 10)
+/// * `linkID    = zoneID * 10 + roadTypeID`
+///
+/// The result is inserted into the store under the canonical name `"Link"`.
+/// The function is a no-op when `ZoneRoadType` is absent from the store, or
+/// when a non-empty `Link` table is already present (user-supplied CDB/PDB
+/// data takes precedence).
+fn populate_link_from_zone_road_type(store: &mut InMemoryStore) -> Result<()> {
+    use polars::prelude::{DataType, DataFrame, NamedFrom, Series};
+
+    if !store.contains("ZoneRoadType") {
+        return Ok(());
+    }
+    // Respect user-supplied Link table (e.g. from a CDB/PDB overlay).
+    if store.get("link").is_some_and(|df| df.height() > 0) {
+        return Ok(());
+    }
+
+    let (zone_ids, road_type_ids) = {
+        let arc = store
+            .get("ZoneRoadType")
+            .expect("ZoneRoadType present after contains check");
+        let df = &*arc;
+        let find = |want: &str| -> Result<polars::prelude::Column> {
+            let lower = want.to_ascii_lowercase();
+            df.columns()
+                .iter()
+                .find(|c| c.name().to_ascii_lowercase() == lower)
+                .cloned()
+                .with_context(|| format!("ZoneRoadType column '{want}' not found"))
+        };
+        let zone_col = find("zoneID")?
+            .cast(&DataType::Int32)
+            .map_err(|e| anyhow::anyhow!("ZoneRoadType.zoneID cast: {e}"))?;
+        let road_col = find("roadTypeID")?
+            .cast(&DataType::Int32)
+            .map_err(|e| anyhow::anyhow!("ZoneRoadType.roadTypeID cast: {e}"))?;
+        let zids: Vec<i32> = zone_col
+            .i32()
+            .map_err(|e| anyhow::anyhow!("{e}"))?
+            .into_iter()
+            .map(|v| v.unwrap_or(0))
+            .collect();
+        let rids: Vec<i32> = road_col
+            .i32()
+            .map_err(|e| anyhow::anyhow!("{e}"))?
+            .into_iter()
+            .map(|v| v.unwrap_or(0))
+            .collect();
+        (zids, rids)
+    };
+
+    // Deduplicate (zoneID, roadTypeID) pairs; synthesise linkID and countyID.
+    let mut seen: BTreeSet<(i32, i32)> = BTreeSet::new();
+    let mut link_ids: Vec<i32> = Vec::new();
+    let mut county_ids: Vec<i32> = Vec::new();
+    let mut out_zone_ids: Vec<i32> = Vec::new();
+    let mut out_road_type_ids: Vec<i32> = Vec::new();
+    for (&zone_id, &road_type_id) in zone_ids.iter().zip(road_type_ids.iter()) {
+        if seen.insert((zone_id, road_type_id)) {
+            link_ids.push(zone_id * 10 + road_type_id);
+            county_ids.push(zone_id / 10);
+            out_zone_ids.push(zone_id);
+            out_road_type_ids.push(road_type_id);
+        }
+    }
+    if link_ids.is_empty() {
+        return Ok(());
+    }
+
+    let n = link_ids.len();
+    let link_df = DataFrame::new(
+        n,
+        vec![
+            Series::new("linkID".into(), link_ids).into(),
+            Series::new("countyID".into(), county_ids).into(),
+            Series::new("zoneID".into(), out_zone_ids).into(),
+            Series::new("roadTypeID".into(), out_road_type_ids).into(),
+        ],
+    )
+    .map_err(|e| anyhow::anyhow!("building Link DataFrame: {e}"))?;
+    store.insert("Link".to_string(), link_df);
+    Ok(())
+}
+
+/// Build the `RunSpec*` tables that generators read from the execution-DB
+/// slow tier, synthesising them from the parsed [`RunSpec`] and the already-
+/// loaded default-DB tables in `store`.
+///
+/// The default DB does not contain RunSpec-specific selection tables — they
+/// are normally written by Java MOVES into `MOVESExecution` just before the
+/// generators run. This function replicates that step in pure Rust, producing:
+///
+/// | Table | Column | Source |
+/// |-------|--------|--------|
+/// | `RunSpecSourceType` | `sourceTypeID` (i32) | `onroad_vehicle_selections` |
+/// | `RunSpecPollutantProcess` | `polProcessID` (i32) | `pollutant_process_associations` |
+/// | `RunSpecDay` | `dayID` (i32) | `timespan.days` |
+/// | `RunSpecHour` | `hourID` (i32) | `timespan.begin_hour..=end_hour` |
+/// | `RunSpecHourDay` | `hourDayID` (i32) | hours × days cross-product |
+/// | `RunSpecMonth` | `monthID` (i32) | `timespan.months` |
+/// | `RunSpecYear` | `yearID` (i32) | `timespan.years` |
+/// | `RunSpecRoadType` | `roadTypeID` (i32) | `road_types` |
+/// | `RunSpecMonthGroup` | `monthGroupID` (i32) | `MonthGroupOfAnyYear` join |
+/// | `RunSpecSourceFuelType` | `sourceTypeID`, `fuelTypeID` (i64) | onroad selections |
+///
+/// `RunSpecHourDay` uses the MOVES packed-key formula `hourDayID = hourID × 10 + dayID`.
+///
+/// `RunSpecMonthGroup` is derived by joining the RunSpec months against the
+/// `MonthGroupOfAnyYear` table in the store; if that table is absent the
+/// month ID is used as the month group ID directly (safe fallback — in the
+/// default MOVES configuration each month belongs to its own group).
+fn build_runspec_tables(runspec: &RunSpec, store: &mut InMemoryStore) -> Result<()> {
+    use polars::prelude::{DataFrame, DataType, NamedFrom, Series};
+
+    // Helper: insert a single-column Int32 table.
+    let insert_i32 = |store: &mut InMemoryStore, name: &str, col: &str, vals: Vec<i32>| {
+        let n = vals.len();
+        let df = DataFrame::new(n, vec![Series::new(col.into(), vals).into()])
+            .expect("single-column DataFrame should never fail");
+        store.insert(name.to_string(), df);
+    };
+
+    // RunSpecSourceType.
+    let source_type_ids: Vec<i32> = {
+        let mut ids: BTreeSet<i32> = BTreeSet::new();
+        for sel in &runspec.onroad_vehicle_selections {
+            ids.insert(sel.source_type_id as i32);
+        }
+        ids.into_iter().collect()
+    };
+    insert_i32(store, "RunSpecSourceType", "sourceTypeID", source_type_ids.clone());
+
+    // RunSpecPollutantProcess (single column: polProcessID).
+    let pol_process_ids: Vec<i32> = {
+        let mut ids: BTreeSet<i32> = BTreeSet::new();
+        for assoc in &runspec.pollutant_process_associations {
+            ids.insert((assoc.pollutant_id * 100 + assoc.process_id) as i32);
+        }
+        ids.into_iter().collect()
+    };
+    insert_i32(store, "RunSpecPollutantProcess", "polProcessID", pol_process_ids);
+
+    // RunSpecDay.
+    let day_ids: Vec<i32> = {
+        let mut ids: BTreeSet<i32> = BTreeSet::new();
+        for &d in &runspec.timespan.days {
+            ids.insert(d as i32);
+        }
+        ids.into_iter().collect()
+    };
+    insert_i32(store, "RunSpecDay", "dayID", day_ids.clone());
+
+    // RunSpecHour.
+    let hour_ids: Vec<i32> = match (runspec.timespan.begin_hour, runspec.timespan.end_hour) {
+        (Some(b), Some(e)) if b <= e => (b..=e).map(|h| h as i32).collect(),
+        (Some(h), _) | (_, Some(h)) => vec![h as i32],
+        (None, None) => Vec::new(),
+    };
+    insert_i32(store, "RunSpecHour", "hourID", hour_ids.clone());
+
+    // RunSpecHourDay: cross-product, packed key = hourID * 10 + dayID.
+    let hour_day_ids: Vec<i32> = {
+        let mut ids: BTreeSet<i32> = BTreeSet::new();
+        for &h in &hour_ids {
+            for &d in &day_ids {
+                ids.insert(h * 10 + d);
+            }
+        }
+        ids.into_iter().collect()
+    };
+    insert_i32(store, "RunSpecHourDay", "hourDayID", hour_day_ids);
+
+    // RunSpecMonth.
+    // Month values from the RunSpec are used as-is (matching RunSpecFilters::from_runspec
+    // which also passes them through without adjustment).
+    let month_ids: Vec<i32> = {
+        let mut ids: BTreeSet<i32> = BTreeSet::new();
+        for &m in &runspec.timespan.months {
+            ids.insert(m as i32);
+        }
+        ids.into_iter().collect()
+    };
+    insert_i32(store, "RunSpecMonth", "monthID", month_ids.clone());
+
+    // RunSpecYear.
+    let year_ids: Vec<i32> = {
+        let mut ids: BTreeSet<i32> = BTreeSet::new();
+        for &y in &runspec.timespan.years {
+            ids.insert(y as i32);
+        }
+        ids.into_iter().collect()
+    };
+    insert_i32(store, "RunSpecYear", "yearID", year_ids);
+
+    // RunSpecRoadType (note: generators access this as "runSpecRoadType" or
+    // "RunSpecRoadType" — InMemoryStore uses case-insensitive lookup).
+    let road_type_ids: Vec<i32> = {
+        let mut ids: BTreeSet<i32> = BTreeSet::new();
+        for rt in &runspec.road_types {
+            ids.insert(rt.road_type_id as i32);
+        }
+        ids.into_iter().collect()
+    };
+    insert_i32(store, "RunSpecRoadType", "roadTypeID", road_type_ids);
+
+    // RunSpecMonthGroup: derive monthGroupID from MonthGroupOfAnyYear if present.
+    let month_group_ids: Vec<i32> = if store.contains("MonthGroupOfAnyYear") {
+        let arc = store
+            .get("MonthGroupOfAnyYear")
+            .expect("MonthGroupOfAnyYear present after contains check");
+        let df = &*arc;
+        let find = |want: &str| {
+            let lower = want.to_ascii_lowercase();
+            df.columns()
+                .iter()
+                .find(|c| c.name().to_ascii_lowercase() == lower)
+                .cloned()
+        };
+        let mut month_to_group: BTreeMap<i32, i32> = BTreeMap::new();
+        if let (Some(mid_col), Some(mgid_col)) =
+            (find("monthID"), find("monthGroupID"))
+        {
+            let mids = mid_col
+                .cast(&DataType::Int32)
+                .ok()
+                .and_then(|c| c.i32().ok().cloned());
+            let mgids = mgid_col
+                .cast(&DataType::Int32)
+                .ok()
+                .and_then(|c| c.i32().ok().cloned());
+            if let (Some(mids), Some(mgids)) = (mids, mgids) {
+                for i in 0..df.height() {
+                    if let (Some(mid), Some(mgid)) = (mids.get(i), mgids.get(i)) {
+                        month_to_group.insert(mid, mgid);
+                    }
+                }
+            }
+        }
+        let mut groups: BTreeSet<i32> = BTreeSet::new();
+        for &m in &month_ids {
+            groups.insert(*month_to_group.get(&m).unwrap_or(&m));
+        }
+        groups.into_iter().collect()
+    } else {
+        // Fallback: each month is its own month group.
+        month_ids.clone()
+    };
+    insert_i32(store, "RunSpecMonthGroup", "monthGroupID", month_group_ids);
+
+    // RunSpecSourceFuelType: unique (sourceTypeID, fuelTypeID) pairs, Int64 per
+    // SourceBinDistributionGenerator's RunSpecSourceFuelTypeRow schema.
+    let source_fuel_pairs: Vec<(i64, i64)> = {
+        let mut pairs: BTreeSet<(i64, i64)> = BTreeSet::new();
+        for sel in &runspec.onroad_vehicle_selections {
+            pairs.insert((sel.source_type_id as i64, sel.fuel_type_id as i64));
+        }
+        pairs.into_iter().collect()
+    };
+    let (sf_source_ids, sf_fuel_ids): (Vec<i64>, Vec<i64>) =
+        source_fuel_pairs.into_iter().unzip();
+    let n = sf_source_ids.len();
+    let sf_df = DataFrame::new(
+        n,
+        vec![
+            Series::new("sourceTypeID".into(), sf_source_ids).into(),
+            Series::new("fuelTypeID".into(), sf_fuel_ids).into(),
+        ],
+    )
+    .map_err(|e| anyhow::anyhow!("building RunSpecSourceFuelType: {e}"))?;
+    store.insert("RunSpecSourceFuelType".to_string(), sf_df);
+
+    Ok(())
+}
+
 fn load_registry(path: Option<&Path>, with_calculators: bool) -> Result<CalculatorRegistry> {
     let mut registry = match path {
         Some(path) => CalculatorRegistry::load_from_json(path)
@@ -1006,7 +1334,7 @@ mod tests {
     #[test]
     fn load_execution_db_prefers_bundle_when_present() {
         let (dir, _snap) = make_execdb_snapshot();
-        // The bundle should have been written by Snapshot::write.
+ // The bundle should have been written by Snapshot::write.
         let bundle_path = dir.path().join("tables").join("execution-db.bundle");
         assert!(
             bundle_path.exists(),
@@ -1027,7 +1355,7 @@ mod tests {
     #[test]
     fn load_execution_db_fallback_works_without_bundle() {
         let (dir, _snap) = make_execdb_snapshot();
-        // Remove the bundle to force the per-file Parquet fallback.
+ // Remove the bundle to force the per-file Parquet fallback.
         let bundle_path = dir.path().join("tables").join("execution-db.bundle");
         std::fs::remove_file(&bundle_path).unwrap();
 
@@ -1048,7 +1376,7 @@ mod tests {
         let bundle_path = dir.path().join("tables").join("execution-db.bundle");
         assert!(bundle_path.exists(), "bundle must exist");
 
-        // Build an allowed set that does NOT include "activitytype".
+ // Build an allowed set that does NOT include "activitytype".
         let mut allowed: BTreeSet<String> = BTreeSet::new();
         allowed.insert("sometable".to_string());
 
@@ -1084,7 +1412,7 @@ mod tests {
     #[test]
     fn load_execution_db_parquet_skips_table_not_in_allowed_set() {
         let (dir, _snap) = make_execdb_snapshot();
-        // Remove bundle to force Parquet path.
+ // Remove bundle to force Parquet path.
         let bundle_path = dir.path().join("tables").join("execution-db.bundle");
         std::fs::remove_file(&bundle_path).unwrap();
 
@@ -1126,7 +1454,7 @@ mod tests {
         use moves_snapshot::table::{TableBuilder, Value};
         use moves_snapshot::Snapshot;
 
-        // Build a snapshot with two process/year-indexed baserate variants.
+ // Build a snapshot with two process/year-indexed baserate variants.
         let make_table = |name: &str, id_val: i64| {
             let mut tb = TableBuilder::new(
                 name,
@@ -1151,11 +1479,11 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         snap.write(dir.path()).unwrap();
 
-        // Remove bundle to force Parquet path.
+ // Remove bundle to force Parquet path.
         let bundle_path = dir.path().join("tables").join("execution-db.bundle");
         std::fs::remove_file(&bundle_path).unwrap();
 
-        // Allowed set contains only the canonical base name.
+ // Allowed set contains only the canonical base name.
         let mut allowed: BTreeSet<String> = BTreeSet::new();
         allowed.insert("baserate".to_string());
 
@@ -1163,7 +1491,7 @@ mod tests {
         let store = load_execution_db(dir.path(), &filter, Some(&allowed))
             .expect("indexed Parquet load must succeed");
 
-        // The canonical "baserate" must exist and have 2 merged rows.
+ // The canonical "baserate" must exist and have 2 merged rows.
         assert!(
             store.contains("baserate"),
             "canonical baserate must exist after merge"
@@ -1182,7 +1510,7 @@ mod tests {
         use moves_snapshot::table::{TableBuilder, Value};
         use moves_snapshot::Snapshot;
 
-        // Build a snapshot with a year-suffixed table (stmytvvcoeffs2020).
+ // Build a snapshot with a year-suffixed table (stmytvvcoeffs2020).
         let mut tb = TableBuilder::new(
             "db__movesexecution1__stmytvvcoeffs2020",
             [
@@ -1201,11 +1529,11 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         snap.write(dir.path()).unwrap();
 
-        // Remove bundle to force Parquet path.
+ // Remove bundle to force Parquet path.
         let bundle_path = dir.path().join("tables").join("execution-db.bundle");
         std::fs::remove_file(&bundle_path).unwrap();
 
-        // Allowed set contains only the base name — no year suffix.
+ // Allowed set contains only the base name — no year suffix.
         let mut allowed: BTreeSet<String> = BTreeSet::new();
         allowed.insert("stmytvvcoeffs".to_string());
 
@@ -1244,7 +1572,7 @@ mod tests {
     fn strip_numeric_index_suffix_no_change_plain_name() {
         assert_eq!(strip_numeric_index_suffix("baserate"), "baserate");
         assert_eq!(strip_numeric_index_suffix("activitytype"), "activitytype");
-        // year-only suffix (no underscore separator) is unchanged
+ // year-only suffix (no underscore separator) is unchanged
         assert_eq!(
             strip_numeric_index_suffix("stmytvvcoeffs2020"),
             "stmytvvcoeffs2020"
@@ -1262,19 +1590,19 @@ mod tests {
         };
 
         let mut store = InMemoryStore::new();
-        // Two variants for "baserate", plus an empty canonical stub.
+ // Two variants for "baserate", plus an empty canonical stub.
         store.insert("baserate", DataFrame::default());
         store.insert("baserate_1_2001", make_df(1));
         store.insert("baserate_2_2001", make_df(2));
-        // Unrelated table that must not be touched.
+ // Unrelated table that must not be touched.
         store.insert("activitytype", make_df(99));
 
         merge_process_year_variants(&mut store).expect("merge must succeed");
 
-        // Canonical "baserate" must now have 2 rows (union of the two variants).
+ // Canonical "baserate" must now have 2 rows (union of the two variants).
         let merged = store.get("baserate").expect("baserate must exist");
         assert_eq!(merged.height(), 2, "merged baserate must have 2 rows");
-        // Unrelated table must be untouched.
+ // Unrelated table must be untouched.
         assert_eq!(
             store.get("activitytype").unwrap().height(),
             1,
@@ -1352,20 +1680,20 @@ mod tests {
 
         let sho_df = store.get("SHO").expect("SHO table missing");
         let dist = sho_df.column("distance").unwrap().f64().unwrap();
-        // link 1001 (road 2): 10.0 * 55.0 = 550.0
+ // link 1001 (road 2): 10.0 * 55.0 = 550.0
         assert!(
             (dist.get(0).unwrap() - 550.0).abs() < 1e-9,
             "dist[0]={}",
             dist.get(0).unwrap()
         );
-        // link 1000 (road 1, off-network): no AverageSpeed → 0.0
+ // link 1000 (road 1, off-network): no AverageSpeed → 0.0
         assert_eq!(dist.get(1).unwrap(), 0.0);
     }
 
     #[test]
     fn populate_sho_distances_skips_when_already_set() {
         let mut store = make_sho_store();
-        // Pre-populate distance on the first row.
+ // Pre-populate distance on the first row.
         {
             let sho_mut = store.get_mut("SHO").unwrap();
             sho_mut
@@ -1375,7 +1703,7 @@ mod tests {
                 .unwrap();
         }
         populate_sho_distances(&mut store).expect("populate_sho_distances failed");
-        // Distance should be unchanged because at least one was non-zero.
+ // Distance should be unchanged because at least one was non-zero.
         let dist = store
             .get("SHO")
             .unwrap()
@@ -1393,8 +1721,8 @@ mod tests {
         populate_sho_distances(&mut store).expect("should be noop");
     }
 
-    /// Build a one-row `sourceUseTypePhysics` DataFrame mirroring the snapshot
-    /// schema (int64 IDs, string road-load terms).
+ /// Build a one-row `sourceUseTypePhysics` DataFrame mirroring the snapshot
+ /// schema (int64 IDs, string road-load terms).
     fn make_physics_df() -> polars::prelude::DataFrame {
         use polars::prelude::*;
         df!(
@@ -1420,7 +1748,7 @@ mod tests {
         let df = store
             .get("sourceUseTypePhysicsMapping")
             .expect("mapping table must be synthesised");
-        // All 11 mapping columns present.
+ // All 11 mapping columns present.
         for col in [
             "realSourceTypeID",
             "tempSourceTypeID",
@@ -1436,14 +1764,14 @@ mod tests {
         ] {
             assert!(df.column(col).is_ok(), "missing column {col}");
         }
-        // Identity mapping: real == temp == sourceTypeID, offset 0.
+ // Identity mapping: real == temp == sourceTypeID, offset 0.
         let real = df.column("realSourceTypeID").unwrap().i64().unwrap();
         let temp = df.column("tempSourceTypeID").unwrap().i64().unwrap();
         let offset = df.column("opModeIDOffset").unwrap().i64().unwrap();
         assert_eq!(real.get(0), Some(21));
         assert_eq!(temp.get(0), Some(21));
         assert_eq!(offset.get(0), Some(0));
-        // The original sourceTypeID column is renamed, not duplicated.
+ // The original sourceTypeID column is renamed, not duplicated.
         assert!(df.column("sourceTypeID").is_err());
     }
 
@@ -1451,7 +1779,7 @@ mod tests {
     fn physics_mapping_synthesis_is_noop_when_mapping_present() {
         let mut store = InMemoryStore::new();
         store.insert("sourceUseTypePhysics".to_string(), make_physics_df());
-        // Pre-existing mapping (single sentinel column) must be left untouched.
+ // Pre-existing mapping (single sentinel column) must be left untouched.
         let sentinel = polars::prelude::df!("realSourceTypeID" => &[99i64]).unwrap();
         store.insert("sourceUseTypePhysicsMapping".to_string(), sentinel);
         populate_source_use_type_physics_mapping(&mut store).expect("noop");
@@ -1470,8 +1798,8 @@ mod tests {
         assert!(!store.contains("sourceUseTypePhysicsMapping"));
     }
 
-    /// One-row `ZoneMonthHour` with the three derived columns left NULL, plus
-    /// the `Zone`/`County` rows meteorology needs to resolve pressure.
+ /// One-row `ZoneMonthHour` with the three derived columns left NULL, plus
+ /// the `Zone`/`County` rows meteorology needs to resolve pressure.
     fn make_raw_meteorology_store() -> InMemoryStore {
         use polars::prelude::*;
         let mut store = InMemoryStore::new();
@@ -1504,9 +1832,9 @@ mod tests {
         let mut store = make_raw_meteorology_store();
         populate_zone_month_hour_meteorology(&mut store).expect("fill should succeed");
         let df = store.get("ZoneMonthHour").unwrap();
-        // 90 °F / 60 % RH is above the 78 °F threshold, so the regression makes
-        // heatIndex exceed the dry-bulb temperature, and the humidity terms are
-        // populated (non-null).
+ // 90 °F / 60 % RH is above the 78 °F threshold, so the regression makes
+ // heatIndex exceed the dry-bulb temperature, and the humidity terms are
+ // populated (non-null).
         let hi = df
             .column("heatIndex")
             .unwrap()
@@ -1565,9 +1893,9 @@ mod tests {
 
     #[test]
     fn populate_sho_distances_handles_str_sho_column() {
-        // Regression: snapshots from canonical MOVES sometimes serialize the
-        // SHO column as Utf8/String rather than Float64. Verify the cast path
-        // handles this without error and produces correct distances.
+ // Regression: snapshots from canonical MOVES sometimes serialize the
+ // SHO column as Utf8/String rather than Float64. Verify the cast path
+ // handles this without error and produces correct distances.
         let mut store = make_sho_store();
         {
             let df = store.get_mut("SHO").unwrap();
@@ -1593,7 +1921,7 @@ mod tests {
     #[test]
     fn embedded_dag_parses_into_a_registry() {
         let registry = load_registry(None, false).expect("embedded DAG should parse");
-        // The Phase 1 reconstruction recovers ~63 calculator-graph modules.
+ // The reconstruction recovers ~63 calculator-graph modules.
         assert!(
             registry.dag().modules.len() >= 60,
             "expected ~63 modules, got {}",
@@ -1628,7 +1956,7 @@ mod tests {
         );
     }
 
-    // ---- SnapshotFilter and table_filter_expr tests ----
+ // ---- SnapshotFilter and table_filter_expr tests ----
 
     fn county_run_spec(county_id: u32, year: u32, month: u32) -> moves_runspec::RunSpec {
         use moves_runspec::{GeoKind, GeographicSelection, Timespan};
@@ -1714,7 +2042,7 @@ mod tests {
         use moves_snapshot::table::{TableBuilder, Value};
         use moves_snapshot::Snapshot;
 
-        // Build a snapshot with a small ZoneMonthHour table: 3 zones × 2 months × 1 hour.
+ // Build a snapshot with a small ZoneMonthHour table: 3 zones × 2 months × 1 hour.
         let mut tb = TableBuilder::new(
             "db__movesexecution1__zonemonthhour",
             [
@@ -1727,7 +2055,7 @@ mod tests {
         .unwrap()
         .with_natural_key(["monthID", "zoneID", "hourID"])
         .unwrap();
-        // zone 100 (county 10), month 7
+ // zone 100 (county 10), month 7
         tb.push_row([
             Value::Int64(7),
             Value::Int64(100),
@@ -1735,7 +2063,7 @@ mod tests {
             Value::Float64(75.0),
         ])
         .unwrap();
-        // zone 100, month 8
+ // zone 100, month 8
         tb.push_row([
             Value::Int64(8),
             Value::Int64(100),
@@ -1743,7 +2071,7 @@ mod tests {
             Value::Float64(80.0),
         ])
         .unwrap();
-        // zone 200 (different county), month 7
+ // zone 200 (different county), month 7
         tb.push_row([
             Value::Int64(7),
             Value::Int64(200),
@@ -1756,13 +2084,13 @@ mod tests {
         snap.add_table(table).unwrap();
         let dir = tempfile::tempdir().unwrap();
         snap.write(dir.path()).unwrap();
-        // Remove bundle to force Parquet fallback.
+ // Remove bundle to force Parquet fallback.
         let bundle = dir.path().join("tables").join("execution-db.bundle");
         if bundle.exists() {
             std::fs::remove_file(&bundle).unwrap();
         }
 
-        // Filter: county 10 → zone 100, month 7.
+ // Filter: county 10 → zone 100, month 7.
         use moves_runspec::{GeoKind, GeographicSelection, Timespan};
         let rs = moves_runspec::RunSpec {
             geographic_selections: vec![GeographicSelection {
@@ -1780,7 +2108,7 @@ mod tests {
         let store = load_execution_db_from_parquet(dir.path(), &filter, None)
             .expect("filtered load must succeed");
         let df = store.get("zonemonthhour").unwrap();
-        // Only the row for zone=100, month=7 should survive.
+ // Only the row for zone=100, month=7 should survive.
         assert_eq!(df.height(), 1, "filter should keep only 1 matching row");
         let zone_col = df
             .column("zoneID")
@@ -1791,6 +2119,261 @@ mod tests {
             zone_col.i64().unwrap().get(0).unwrap(),
             100,
             "surviving row must be zone 100"
+        );
+    }
+
+    // ---- populate_link_from_zone_road_type tests ----
+
+    fn make_zone_road_type_store() -> InMemoryStore {
+        use polars::prelude::*;
+        let mut store = InMemoryStore::new();
+        let zrt = df!(
+            "zoneID"       => &[261610i32, 261610i32, 261610i32],
+            "roadTypeID"   => &[2i32, 4i32, 5i32],
+            "SHOAllocFactor" => &[0.5f64, 0.3f64, 0.2f64],
+        )
+        .unwrap();
+        store.insert("ZoneRoadType".to_string(), zrt);
+        store
+    }
+
+    #[test]
+    fn link_synthesised_from_zone_road_type() {
+        let mut store = make_zone_road_type_store();
+        populate_link_from_zone_road_type(&mut store).expect("should succeed");
+
+        let link = store.get("link").expect("Link must be in store");
+        assert_eq!(link.height(), 3, "one Link row per (zone, road-type) pair");
+
+        let link_ids: Vec<i32> = link
+            .column("linkID")
+            .unwrap()
+            .i32()
+            .unwrap()
+            .into_no_null_iter()
+            .collect();
+        // linkID = zoneID * 10 + roadTypeID
+        assert!(link_ids.contains(&(261610 * 10 + 2)), "linkID for road 2");
+        assert!(link_ids.contains(&(261610 * 10 + 4)), "linkID for road 4");
+        assert!(link_ids.contains(&(261610 * 10 + 5)), "linkID for road 5");
+
+        let county_ids: Vec<i32> = link
+            .column("countyID")
+            .unwrap()
+            .i32()
+            .unwrap()
+            .into_no_null_iter()
+            .collect();
+        // countyID = zoneID / 10
+        assert!(county_ids.iter().all(|&c| c == 26161), "countyID = zoneID/10");
+    }
+
+    #[test]
+    fn link_synthesis_noop_when_zone_road_type_absent() {
+        let mut store = InMemoryStore::new();
+        populate_link_from_zone_road_type(&mut store).expect("noop");
+        assert!(!store.contains("link"), "no Link should be created");
+    }
+
+    #[test]
+    fn link_synthesis_noop_when_link_already_populated() {
+        use polars::prelude::*;
+        let mut store = make_zone_road_type_store();
+        // Pre-populate a Link row — synthesis must not overwrite it.
+        let existing_link =
+            df!("linkID" => &[999i32], "countyID" => &[99i32], "zoneID" => &[990i32], "roadTypeID" => &[1i32]).unwrap();
+        store.insert("Link".to_string(), existing_link);
+        populate_link_from_zone_road_type(&mut store).expect("noop");
+        let link = store.get("link").unwrap();
+        assert_eq!(link.height(), 1, "pre-existing Link must be preserved");
+        assert_eq!(
+            link.column("linkID").unwrap().i32().unwrap().get(0).unwrap(),
+            999
+        );
+    }
+
+    #[test]
+    fn link_synthesis_deduplicates_zone_road_type_pairs() {
+        use polars::prelude::*;
+        let mut store = InMemoryStore::new();
+        // Duplicate rows — should produce only 1 unique link.
+        let zrt = df!(
+            "zoneID"       => &[100i32, 100i32],
+            "roadTypeID"   => &[2i32, 2i32],
+            "SHOAllocFactor" => &[0.5f64, 0.5f64],
+        )
+        .unwrap();
+        store.insert("ZoneRoadType".to_string(), zrt);
+        populate_link_from_zone_road_type(&mut store).expect("should succeed");
+        let link = store.get("link").unwrap();
+        assert_eq!(link.height(), 1, "duplicates must be merged");
+    }
+
+    // ---- build_runspec_tables tests ----
+
+    fn fixture_runspec() -> RunSpec {
+        use moves_runspec::{
+            GeoKind, GeographicSelection, OnroadVehicleSelection, PollutantProcessAssociation,
+            RoadType, Timespan,
+        };
+        RunSpec {
+            geographic_selections: vec![GeographicSelection {
+                kind: GeoKind::County,
+                key: 26161,
+                description: String::new(),
+            }],
+            timespan: Timespan {
+                years: vec![2020],
+                months: vec![7],
+                days: vec![5],
+                begin_hour: Some(6),
+                end_hour: Some(6),
+                ..Default::default()
+            },
+            onroad_vehicle_selections: vec![OnroadVehicleSelection {
+                fuel_type_id: 1,
+                fuel_type_name: "Gasoline".into(),
+                source_type_id: 21,
+                source_type_name: "Passenger Car".into(),
+            }],
+            road_types: vec![RoadType {
+                road_type_id: 4,
+                road_type_name: "Urban Restricted Access".into(),
+                model_combination: None,
+            }],
+            pollutant_process_associations: vec![PollutantProcessAssociation {
+                pollutant_id: 3,
+                pollutant_name: "NOx".into(),
+                process_id: 1,
+                process_name: "Running Exhaust".into(),
+            }],
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn build_runspec_tables_produces_all_tables() {
+        let runspec = fixture_runspec();
+        let mut store = InMemoryStore::new();
+        build_runspec_tables(&runspec, &mut store).expect("should succeed");
+
+        for table in &[
+            "RunSpecSourceType",
+            "RunSpecPollutantProcess",
+            "RunSpecDay",
+            "RunSpecHour",
+            "RunSpecHourDay",
+            "RunSpecMonth",
+            "RunSpecYear",
+            "RunSpecRoadType",
+            "RunSpecMonthGroup",
+            "RunSpecSourceFuelType",
+        ] {
+            assert!(
+                store.contains(table),
+                "table '{table}' must be present after build_runspec_tables"
+            );
+        }
+    }
+
+    #[test]
+    fn build_runspec_tables_source_type_values() {
+        let runspec = fixture_runspec();
+        let mut store = InMemoryStore::new();
+        build_runspec_tables(&runspec, &mut store).expect("should succeed");
+
+        let df = store.get("runspecsourcetype").unwrap();
+        assert_eq!(df.height(), 1);
+        assert_eq!(
+            df.column("sourceTypeID").unwrap().i32().unwrap().get(0),
+            Some(21)
+        );
+    }
+
+    #[test]
+    fn build_runspec_tables_hour_day_packed_key() {
+        // hourID=6, dayID=5 → hourDayID = 6*10+5 = 65
+        let runspec = fixture_runspec();
+        let mut store = InMemoryStore::new();
+        build_runspec_tables(&runspec, &mut store).expect("should succeed");
+
+        let df = store.get("runspechourday").unwrap();
+        assert_eq!(df.height(), 1, "one hourDay for (hour=6, day=5)");
+        assert_eq!(
+            df.column("hourDayID").unwrap().i32().unwrap().get(0),
+            Some(65),
+            "hourDayID = 6*10+5 = 65"
+        );
+    }
+
+    #[test]
+    fn build_runspec_tables_pol_process_id() {
+        // pollutant=3, process=1 → polProcessID = 301
+        let runspec = fixture_runspec();
+        let mut store = InMemoryStore::new();
+        build_runspec_tables(&runspec, &mut store).expect("should succeed");
+
+        let df = store.get("runspecpollutantprocess").unwrap();
+        assert_eq!(df.height(), 1);
+        assert_eq!(
+            df.column("polProcessID").unwrap().i32().unwrap().get(0),
+            Some(301)
+        );
+    }
+
+    #[test]
+    fn build_runspec_tables_source_fuel_type_int64() {
+        // RunSpecSourceFuelType uses Int64 per SourceBinDistributionGenerator schema.
+        let runspec = fixture_runspec();
+        let mut store = InMemoryStore::new();
+        build_runspec_tables(&runspec, &mut store).expect("should succeed");
+
+        let df = store.get("runspecsourcefueltype").unwrap();
+        assert_eq!(df.height(), 1);
+        assert_eq!(
+            df.column("sourceTypeID").unwrap().i64().unwrap().get(0),
+            Some(21)
+        );
+        assert_eq!(
+            df.column("fuelTypeID").unwrap().i64().unwrap().get(0),
+            Some(1)
+        );
+    }
+
+    #[test]
+    fn build_runspec_tables_month_group_fallback_to_month_id() {
+        // No MonthGroupOfAnyYear in store → monthGroupID == monthID.
+        let runspec = fixture_runspec();
+        let mut store = InMemoryStore::new();
+        build_runspec_tables(&runspec, &mut store).expect("should succeed");
+
+        let df = store.get("runspecmonthgroup").unwrap();
+        assert_eq!(df.height(), 1);
+        assert_eq!(
+            df.column("monthGroupID").unwrap().i32().unwrap().get(0),
+            Some(7), // same as monthID
+        );
+    }
+
+    #[test]
+    fn build_runspec_tables_month_group_from_lookup_table() {
+        use polars::prelude::*;
+        let runspec = fixture_runspec(); // month=7
+        let mut store = InMemoryStore::new();
+        // MonthGroupOfAnyYear: monthID=7 → monthGroupID=3 (synthetic mapping).
+        let mgoay = df!(
+            "monthID"      => &[7i32, 8i32],
+            "monthGroupID" => &[3i32, 4i32],
+        )
+        .unwrap();
+        store.insert("MonthGroupOfAnyYear".to_string(), mgoay);
+        build_runspec_tables(&runspec, &mut store).expect("should succeed");
+
+        let df = store.get("runspecmonthgroup").unwrap();
+        assert_eq!(df.height(), 1);
+        assert_eq!(
+            df.column("monthGroupID").unwrap().i32().unwrap().get(0),
+            Some(3), // looked up from MonthGroupOfAnyYear
         );
     }
 }

@@ -55,31 +55,31 @@ impl FromStr for SourceTypeId {
 /// Canonical identity of a MOVES on-road source type (HPMS vehicle category).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SourceType {
-    /// Database key (`sourceTypeID`).
+ /// Database key (`sourceTypeID`).
     pub id: SourceTypeId,
-    /// Display name (`sourceTypeName` in the default DB).
+ /// Display name (`sourceTypeName` in the default DB).
     pub name: &'static str,
 }
 
 impl SourceType {
-    /// Look up the canonical source type with the given id.
+ /// Look up the canonical source type with the given id.
     #[must_use]
     pub fn find_by_id(id: SourceTypeId) -> Option<Self> {
         BY_ID.get(&id.0).copied()
     }
 
-    /// Look up the canonical source type by name (case-insensitive ASCII).
-    ///
-    /// Java MOVES doesn't ship a `SourceType.findByName` to mirror, so we
-    /// follow the [`RoadType::find_by_name`](crate::RoadType::find_by_name)
-    /// pattern: pure name matching, no numeric-id fallback.
+ /// Look up the canonical source type by name (case-insensitive ASCII).
+ ///
+ /// Java MOVES doesn't ship a `SourceType.findByName` to mirror, so we
+ /// follow the [`RoadType::find_by_name`](crate::RoadType::find_by_name)
+ /// pattern: pure name matching, no numeric-id fallback.
     #[must_use]
     pub fn find_by_name(name: &str) -> Option<Self> {
         let key = name.to_ascii_lowercase();
         BY_NAME_LOWER.get(key.as_str()).copied()
     }
 
-    /// Iterate every canonical source type in ascending-id order.
+ /// Iterate every canonical source type in ascending-id order.
     pub fn all() -> impl Iterator<Item = Self> {
         ALL_SOURCE_TYPES.iter().copied()
     }
@@ -207,7 +207,7 @@ mod tests {
 
     #[test]
     fn find_by_name_does_not_accept_numeric_id() {
-        // Matches the RoadType / Java convention: name-only lookup.
+ // Matches the RoadType / Java convention: name-only lookup.
         assert!(SourceType::find_by_name("21").is_none());
     }
 

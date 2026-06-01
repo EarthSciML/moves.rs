@@ -4,11 +4,11 @@
 //!
 //! ```sql
 //! CREATE TABLE NRBaseYearEquipPopulation (
-//!   sourceTypeID smallint(6) NOT NULL,
-//!   stateID      smallint(6) NOT NULL,
-//!   population   float       DEFAULT NULL,
-//!   NRBaseYearID smallint(6) NOT NULL,
-//!   PRIMARY KEY (sourceTypeID, stateID)
+//! sourceTypeID smallint(6) NOT NULL,
+//! stateID smallint(6) NOT NULL,
+//! population float DEFAULT NULL,
+//! NRBaseYearID smallint(6) NOT NULL,
+//! PRIMARY KEY (sourceTypeID, stateID)
 //! )
 //! ```
 //!
@@ -16,10 +16,10 @@
 //!
 //! * `sourceTypeID`, `stateID`, `NRBaseYearID` are NOT NULL.
 //! * `stateID` falls in `[1, 99]` (FIPS state codes; NEIQA's per-state
-//!   joins reject values outside this range).
+//! joins reject values outside this range).
 //! * `population` is nullable (`DEFAULT NULL`); when present it must be
-//!   ≥ 0. Java MOVES treats NULL and 0 differently downstream, so we
-//!   preserve NULL rather than coercing to 0.
+//! ≥ 0. Java MOVES treats NULL and 0 differently downstream, so we
+//! preserve NULL rather than coercing to 0.
 
 use arrow::datatypes::DataType;
 

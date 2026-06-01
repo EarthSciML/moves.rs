@@ -1,6 +1,6 @@
 //! Port of `calc/airtoxics/airtoxics.go` — the onroad `AirToxicsCalculator`.
 //!
-//! Migration plan: Phase 3, Task 50. The Nonroad sibling (Task 52,
+//! The Nonroad sibling (,
 //! `NRAirToxicsCalculator`) is the [`super::nrairtoxics`] module.
 //!
 //! # What this calculator does
@@ -28,14 +28,14 @@
 //! output pollutants and is gated by an [`ModuleFlags`] flag:
 //!
 //! ```text
-//! path             input pollutant     ratio table           lookup key
+//! path input pollutant ratio table lookup key
 //! ---------------- ------------------- ---------------------- --------------------------------
-//! MinorHAPRatio    VOC (87)            minorHAPRatio          process, emission fuel subtype, model year
-//! PAHGasRatio      VOC (87)            pahGasRatio            process, block fuel type, model year
-//! PAHParticleRatio Organic Carbon(111) pahParticleRatio       process, block fuel type, model year
-//! ATRatioGas1      any (chained)       ATRatio                emission fuel formulation, month, model year, output polProcess
-//! ATRatioGas2      any (chained)       ATRatioGas2            output polProcess, source type, emission fuel subtype
-//! ATRatioNonGas    any (chained)       ATRatioNonGas          output polProcess, source type, emission fuel subtype, model year
+//! MinorHAPRatio VOC (87) minorHAPRatio process, emission fuel subtype, model year
+//! PAHGasRatio VOC (87) pahGasRatio process, block fuel type, model year
+//! PAHParticleRatio Organic Carbon(111) pahParticleRatio process, block fuel type, model year
+//! ATRatioGas1 any (chained) ATRatio emission fuel formulation, month, model year, output polProcess
+//! ATRatioGas2 any (chained) ATRatioGas2 output polProcess, source type, emission fuel subtype
+//! ATRatioNonGas any (chained) ATRatioNonGas output polProcess, source type, emission fuel subtype, model year
 //! ```
 //!
 //! The first three paths scale by a ratio directly: `output = input * atRatio`.
@@ -50,13 +50,13 @@
 //! # The nine lookup tables
 //!
 //! * `minorHAPRatio`, `pahGasRatio`, `pahParticleRatio` — each maps a key to a
-//!   *list* of `RatioDetail` (output pollutant + ratio); a key can carry one
-//!   detail per output pollutant;
+//! *list* of `RatioDetail` (output pollutant + ratio); a key can carry one
+//! detail per output pollutant;
 //! * `ATRatioGas1ChainedTo`, `ATRatioGas2ChainedTo`, `ATRatioNonGasChainedTo`
-//!   — `RunSpecChainedTo` extracts mapping an input `polProcessID` to a list of
-//!   `ChainedToDetail`;
+//! `RunSpecChainedTo` extracts mapping an input `polProcessID` to a list of
+//! `ChainedToDetail`;
 //! * `ATRatio`, `ATRatioGas2`, `ATRatioNonGas` — each maps a key to a single
-//!   `f64` ratio.
+//! `f64` ratio.
 //!
 //! # `ModuleFlags` — the `ATC_Use*` modules
 //!
@@ -74,14 +74,14 @@
 //! section and the Go diverge in *shape*, not in result:
 //!
 //! * The SQL multiplies the `ATRatio*` paths by `AT*FuelSupply.marketShare`;
-//!   the Go does not. This is not a numerical divergence: a Go `MWOEmission`
-//!   is already a per-fuel-formulation slice, so the market-share split the
-//!   SQL performs is already embodied in the input emission.
+//! the Go does not. This is not a numerical divergence: a Go `MWOEmission`
+//! is already a per-fuel-formulation slice, so the market-share split the
+//! SQL performs is already embodied in the input emission.
 //! * The SQL `Processing` section reads `minorHAPRatio` (market-weighted, keyed
-//!   on fuel *type* and month); the Go reads the separate `minorHAPRatioGo`
-//!   extract (raw ratio, keyed on fuel *subtype*, no month). The two extracts
-//!   of the same source table are designed to give equivalent results given
-//!   the Go's per-formulation emission decomposition. This port mirrors the Go.
+//! on fuel *type* and month); the Go reads the separate `minorHAPRatioGo`
+//! extract (raw ratio, keyed on fuel *subtype*, no month). The two extracts
+//! of the same source table are designed to give equivalent results given
+//! the Go's per-formulation emission decomposition. This port mirrors the Go.
 //!
 //! The Go also tabulates `ATRatioGas2` from a default-DB `float` (32-bit)
 //! column; the value is f32-precision once extracted, then carried as `f64`
@@ -103,19 +103,19 @@
 //! # Fidelity notes
 //!
 //! * **Append, not overwrite.** The Go's `addEmission` appends each scaled
-//!   emission to the output block's `Emissions` slice. When two ratio rows
-//!   name the same output pollutant, *both* scaled emissions are kept. This
-//!   port pushes to [`ToxicFuelBlock::emissions`] and does not deduplicate.
+//! emission to the output block's `Emissions` slice. When two ratio rows
+//! name the same output pollutant, *both* scaled emissions are kept. This
+//! port pushes to [`ToxicFuelBlock::emissions`] and does not deduplicate.
 //! * **Output process equals input process for the direct paths.** The Go
-//!   `addEmission` copies the input block's key and overrides only
-//!   `pollutantID` / `polProcessID`, so a `minorHAPRatio` / `pahGasRatio` /
-//!   `pahParticleRatio` output keeps the *input* block's process. The
-//!   `ATRatio*` paths instead take the process from the chained-to row.
+//! `addEmission` copies the input block's key and overrides only
+//! `pollutantID` / `polProcessID`, so a `minorHAPRatio` / `pahGasRatio` /
+//! `pahParticleRatio` output keeps the *input* block's process. The
+//! `ATRatio*` paths instead take the process from the chained-to row.
 //! * **Output order.** The Go grouped output blocks in a Go `map` keyed by
-//!   `polProcessID`, whose iteration order is randomised.
-//!   [`air_toxics_block`](AirToxics::air_toxics_block) returns the blocks in
-//!   ascending `polProcessID` order so the output is deterministic; a
-//!   fuel-block set is unordered, so this is a presentation choice only.
+//! `polProcessID`, whose iteration order is randomised.
+//! [`air_toxics_block`](AirToxics::air_toxics_block) returns the blocks in
+//! ascending `polProcessID` order so the output is deterministic; a
+//! fuel-block set is unordered, so this is a presentation choice only.
 //!
 //! # Data plane
 //!
@@ -157,21 +157,21 @@ const ORGANIC_CARBON_POLLUTANT_ID: i32 = 111;
 /// emission derived from this one.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Emission {
-    /// `fuelSubTypeID` — the emission's fuel subtype.
+ /// `fuelSubTypeID` — the emission's fuel subtype.
     pub fuel_sub_type_id: i32,
-    /// `fuelFormulationID` — the emission's fuel formulation.
+ /// `fuelFormulationID` — the emission's fuel formulation.
     pub fuel_formulation_id: i32,
-    /// `emissionQuant` — the emission quantity (mass).
+ /// `emissionQuant` — the emission quantity (mass).
     pub emission_quant: f64,
-    /// `emissionRate` — the emission rate.
+ /// `emissionRate` — the emission rate.
     pub emission_rate: f64,
 }
 
 impl Emission {
-    /// A linearly scaled copy — the Go `mwo.NewEmissionScaled`.
-    ///
-    /// Both the quantity and the rate are multiplied by `factor`; the fuel
-    /// subtype and formulation ids are copied unchanged.
+ /// A linearly scaled copy — the Go `mwo.NewEmissionScaled`.
+ ///
+ /// Both the quantity and the rate are multiplied by `factor`; the fuel
+ /// subtype and formulation ids are copied unchanged.
     #[must_use]
     pub fn scaled(&self, factor: f64) -> Emission {
         Emission {
@@ -183,8 +183,7 @@ impl Emission {
     }
 }
 
-/// The key fields of an MWO `FuelBlock` that the air-toxics calculator reads —
-/// a subset of the Go `mwo.MWOKey`.
+/// The key fields of an MWO `FuelBlock` that the air-toxics calculator reads/// a subset of the Go `mwo.MWOKey`.
 ///
 /// The Go `calculate` reads only these seven fields of the input block's key;
 /// the rest of `MWOKey` (geography, time-of-day, source-use type detail, …)
@@ -192,22 +191,22 @@ impl Emission {
 /// output blocks, so it is not modeled here.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FuelBlockKey {
-    /// `pollutantID` — gates the direct paths: `minorHAPRatio` / `pahGasRatio`
-    /// consume VOC (87), `pahParticleRatio` consumes Organic Carbon (111).
+ /// `pollutantID` — gates the direct paths: `minorHAPRatio` / `pahGasRatio`
+ /// consume VOC (87), `pahParticleRatio` consumes Organic Carbon (111).
     pub pollutant_id: i32,
-    /// `processID` — keys the three direct ratio tables and is the output
-    /// process of every emission they produce.
+ /// `processID` — keys the three direct ratio tables and is the output
+ /// process of every emission they produce.
     pub process_id: i32,
-    /// `polProcessID` — keys the three `ATRatio*ChainedTo` lookups.
+ /// `polProcessID` — keys the three `ATRatio*ChainedTo` lookups.
     pub pol_process_id: i32,
-    /// `modelYearID` — part of the `minorHAPRatio` / `pahGasRatio` /
-    /// `pahParticleRatio` / `ATRatio` / `ATRatioNonGas` keys.
+ /// `modelYearID` — part of the `minorHAPRatio` / `pahGasRatio` /
+ /// `pahParticleRatio` / `ATRatio` / `ATRatioNonGas` keys.
     pub model_year_id: i32,
-    /// `fuelTypeID` — part of the `pahGasRatio` / `pahParticleRatio` keys.
+ /// `fuelTypeID` — part of the `pahGasRatio` / `pahParticleRatio` keys.
     pub fuel_type_id: i32,
-    /// `monthID` — part of the `ATRatio` key.
+ /// `monthID` — part of the `ATRatio` key.
     pub month_id: i32,
-    /// `sourceTypeID` — part of the `ATRatioGas2` / `ATRatioNonGas` keys.
+ /// `sourceTypeID` — part of the `ATRatioGas2` / `ATRatioNonGas` keys.
     pub source_type_id: i32,
 }
 
@@ -215,9 +214,9 @@ pub struct FuelBlockKey {
 /// and emissions the calculator consumes.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FuelBlock {
-    /// The block's key fields.
+ /// The block's key fields.
     pub key: FuelBlockKey,
-    /// The per-fuel-formulation emissions in the block.
+ /// The per-fuel-formulation emissions in the block.
     pub emissions: Vec<Emission>,
 }
 
@@ -230,17 +229,17 @@ pub struct FuelBlock {
 /// caller handles.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ToxicFuelBlock {
-    /// `pollutantID` of the derived toxic.
+ /// `pollutantID` of the derived toxic.
     pub pollutant_id: i32,
-    /// `processID` of the derived toxic — the input block's process for the
-    /// direct paths, the chained-to row's process for the `ATRatio*` paths.
+ /// `processID` of the derived toxic — the input block's process for the
+ /// direct paths, the chained-to row's process for the `ATRatio*` paths.
     pub process_id: i32,
-    /// `polProcessID` — `pollutantID * 100 + processID` for the direct paths,
-    /// the chained-to row's `outputPolProcessID` for the `ATRatio*` paths.
+ /// `polProcessID` — `pollutantID * 100 + processID` for the direct paths,
+ /// the chained-to row's `outputPolProcessID` for the `ATRatio*` paths.
     pub pol_process_id: i32,
-    /// The derived emissions — one per `(input emission × applicable ratio
-    /// row)` that produced this `(pollutant, process)`, in the order the Go
-    /// appended them.
+ /// The derived emissions — one per `(input emission × applicable ratio
+ /// row)` that produced this `(pollutant, process)`, in the order the Go
+ /// appended them.
     pub emissions: Vec<Emission>,
 }
 
@@ -251,15 +250,15 @@ pub struct ToxicFuelBlock {
 /// order): `processID, outputPollutantID, fuelSubTypeID, modelYearID, atRatio`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MinorHapRatioRow {
-    /// `processID`.
+ /// `processID`.
     pub process_id: i32,
-    /// `outputPollutantID` — the toxic this row produces.
+ /// `outputPollutantID` — the toxic this row produces.
     pub output_pollutant_id: i32,
-    /// `fuelSubTypeID`.
+ /// `fuelSubTypeID`.
     pub fuel_sub_type_id: i32,
-    /// `modelYearID`.
+ /// `modelYearID`.
     pub model_year_id: i32,
-    /// `atRatio` — the toxic-to-VOC ratio.
+ /// `atRatio` — the toxic-to-VOC ratio.
     pub at_ratio: f64,
 }
 
@@ -271,15 +270,15 @@ pub struct MinorHapRatioRow {
 /// outputPollutantID, fuelTypeID, modelYearID, atRatio`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PahRatioRow {
-    /// `processID`.
+ /// `processID`.
     pub process_id: i32,
-    /// `outputPollutantID` — the PAH species this row produces.
+ /// `outputPollutantID` — the PAH species this row produces.
     pub output_pollutant_id: i32,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `modelYearID`.
+ /// `modelYearID`.
     pub model_year_id: i32,
-    /// `atRatio` — the toxic-to-input ratio.
+ /// `atRatio` — the toxic-to-input ratio.
     pub at_ratio: f64,
 }
 
@@ -293,20 +292,20 @@ pub struct PahRatioRow {
 /// `input_process_id` are carried for column fidelity but not consumed.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ChainedToRow {
-    /// `outputPolProcessID` — the toxic `polProcessID` this row produces.
+ /// `outputPolProcessID` — the toxic `polProcessID` this row produces.
     pub output_pol_process_id: i32,
-    /// `outputPollutantID` — the toxic pollutant.
+ /// `outputPollutantID` — the toxic pollutant.
     pub output_pollutant_id: i32,
-    /// `outputProcessID` — the toxic process.
+ /// `outputProcessID` — the toxic process.
     pub output_process_id: i32,
-    /// `inputPolProcessID` — the source emission's `polProcessID`; this is the
-    /// lookup key.
+ /// `inputPolProcessID` — the source emission's `polProcessID`; this is the
+ /// lookup key.
     pub input_pol_process_id: i32,
-    /// `inputPollutantID` — the source pollutant. Not consumed by the Go's
-    /// `calculate`.
+ /// `inputPollutantID` — the source pollutant. Not consumed by the Go's
+ /// `calculate`.
     pub input_pollutant_id: i32,
-    /// `inputProcessID` — the source process. Not consumed by the Go's
-    /// `calculate`.
+ /// `inputProcessID` — the source process. Not consumed by the Go's
+ /// `calculate`.
     pub input_process_id: i32,
 }
 
@@ -324,24 +323,24 @@ pub struct ChainedToRow {
 /// but not consumed.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AtRatioRow {
-    /// `fuelTypeID`. Not consumed by `calculate`.
+ /// `fuelTypeID`. Not consumed by `calculate`.
     pub fuel_type_id: i32,
-    /// `fuelFormulationID`.
+ /// `fuelFormulationID`.
     pub fuel_formulation_id: i32,
-    /// `polProcessID` — the *output* toxic `polProcessID`; matched against a
-    /// chained-to row's `outputPolProcessID`.
+ /// `polProcessID` — the *output* toxic `polProcessID`; matched against a
+ /// chained-to row's `outputPolProcessID`.
     pub pol_process_id: i32,
-    /// `minModelYearID`. Not consumed by `calculate`.
+ /// `minModelYearID`. Not consumed by `calculate`.
     pub min_model_year_id: i32,
-    /// `maxModelYearID`. Not consumed by `calculate`.
+ /// `maxModelYearID`. Not consumed by `calculate`.
     pub max_model_year_id: i32,
-    /// `ageID`. Not consumed by `calculate`.
+ /// `ageID`. Not consumed by `calculate`.
     pub age_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `atRatio` — the toxic-to-input ratio.
+ /// `atRatio` — the toxic-to-input ratio.
     pub at_ratio: f64,
-    /// `modelYearID`.
+ /// `modelYearID`.
     pub model_year_id: i32,
 }
 
@@ -356,13 +355,13 @@ pub struct AtRatioRow {
 /// Go's text-file parse does.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AtRatioGas2Row {
-    /// `polProcessID` — the *output* toxic `polProcessID`.
+ /// `polProcessID` — the *output* toxic `polProcessID`.
     pub pol_process_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `fuelSubTypeID`.
+ /// `fuelSubTypeID`.
     pub fuel_sub_type_id: i32,
-    /// `atRatio` — the toxic-to-input ratio.
+ /// `atRatio` — the toxic-to-input ratio.
     pub at_ratio: f64,
 }
 
@@ -373,15 +372,15 @@ pub struct AtRatioGas2Row {
 /// fuelSubTypeID, modelYearID, ATRatio`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AtRatioNonGasRow {
-    /// `polProcessID` — the *output* toxic `polProcessID`.
+ /// `polProcessID` — the *output* toxic `polProcessID`.
     pub pol_process_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `fuelSubTypeID`.
+ /// `fuelSubTypeID`.
     pub fuel_sub_type_id: i32,
-    /// `modelYearID`.
+ /// `modelYearID`.
     pub model_year_id: i32,
-    /// `atRatio` — the toxic-to-input ratio.
+ /// `atRatio` — the toxic-to-input ratio.
     pub at_ratio: f64,
 }
 
@@ -394,23 +393,23 @@ pub struct AtRatioNonGasRow {
 /// `AirToxicsExtracts { at_ratio: …, ..Default::default() }`.
 #[derive(Debug, Clone, Default)]
 pub struct AirToxicsExtracts {
-    /// `minorHAPRatio` rows (the `minorHAPRatioGo` extract).
+ /// `minorHAPRatio` rows (the `minorHAPRatioGo` extract).
     pub minor_hap_ratio: Vec<MinorHapRatioRow>,
-    /// `pahGasRatio` rows.
+ /// `pahGasRatio` rows.
     pub pah_gas_ratio: Vec<PahRatioRow>,
-    /// `pahParticleRatio` rows.
+ /// `pahParticleRatio` rows.
     pub pah_particle_ratio: Vec<PahRatioRow>,
-    /// `ATRatioGas1ChainedTo` rows.
+ /// `ATRatioGas1ChainedTo` rows.
     pub at_ratio_gas1_chained_to: Vec<ChainedToRow>,
-    /// `ATRatioGas2ChainedTo` rows.
+ /// `ATRatioGas2ChainedTo` rows.
     pub at_ratio_gas2_chained_to: Vec<ChainedToRow>,
-    /// `ATRatioNonGasChainedTo` rows.
+ /// `ATRatioNonGasChainedTo` rows.
     pub at_ratio_non_gas_chained_to: Vec<ChainedToRow>,
-    /// `ATRatio` rows.
+ /// `ATRatio` rows.
     pub at_ratio: Vec<AtRatioRow>,
-    /// `ATRatioGas2` rows.
+ /// `ATRatioGas2` rows.
     pub at_ratio_gas2: Vec<AtRatioGas2Row>,
-    /// `ATRatioNonGas` rows.
+ /// `ATRatioNonGas` rows.
     pub at_ratio_non_gas: Vec<AtRatioNonGasRow>,
 }
 
@@ -423,17 +422,17 @@ pub struct AirToxicsExtracts {
 /// mwo.NeedsModule("ATC_UseX")`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ModuleFlags {
-    /// `ATC_UseMinorHAPRatio`.
+ /// `ATC_UseMinorHAPRatio`.
     pub minor_hap_ratio: bool,
-    /// `ATC_UsePAHGasRatio`.
+ /// `ATC_UsePAHGasRatio`.
     pub pah_gas_ratio: bool,
-    /// `ATC_UsePAHParticleRatio`.
+ /// `ATC_UsePAHParticleRatio`.
     pub pah_particle_ratio: bool,
-    /// `ATC_UseATRatioGas1`.
+ /// `ATC_UseATRatioGas1`.
     pub at_ratio_gas1: bool,
-    /// `ATC_UseATRatioGas2`.
+ /// `ATC_UseATRatioGas2`.
     pub at_ratio_gas2: bool,
-    /// `ATC_UseATRatioNonGas`.
+ /// `ATC_UseATRatioNonGas`.
     pub at_ratio_non_gas: bool,
 }
 
@@ -444,9 +443,9 @@ pub struct ModuleFlags {
 /// of these: one detail per output pollutant the key produces.
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct RatioDetail {
-    /// `outputPollutantID` — the output toxic pollutant.
+ /// `outputPollutantID` — the output toxic pollutant.
     output_pollutant_id: i32,
-    /// `atRatio` — the multiplier applied to the input emission.
+ /// `atRatio` — the multiplier applied to the input emission.
     at_ratio: f64,
 }
 
@@ -457,22 +456,22 @@ struct RatioDetail {
 /// produces.
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct ChainedToDetail {
-    /// `outputPolProcessID`.
+ /// `outputPolProcessID`.
     output_pol_process_id: i32,
-    /// `outputPollutantID`.
+ /// `outputPollutantID`.
     output_pollutant_id: i32,
-    /// `outputProcessID`.
+ /// `outputProcessID`.
     output_process_id: i32,
 }
 
 /// Key of the `minorHAPRatio` lookup — the Go `minorHAPRatioKey`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct MinorHapRatioKey {
-    /// `processID` — the input block's process.
+ /// `processID` — the input block's process.
     process_id: i32,
-    /// `fuelSubTypeID` — the *emission's* fuel subtype.
+ /// `fuelSubTypeID` — the *emission's* fuel subtype.
     fuel_sub_type_id: i32,
-    /// `modelYearID` — the input block's model year.
+ /// `modelYearID` — the input block's model year.
     model_year_id: i32,
 }
 
@@ -480,48 +479,48 @@ struct MinorHapRatioKey {
 /// `PAHGasRatioKey` / `PAHParticleRatioKey` (structurally identical).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct PahRatioKey {
-    /// `processID` — the input block's process.
+ /// `processID` — the input block's process.
     process_id: i32,
-    /// `fuelTypeID` — the *block's* fuel type.
+ /// `fuelTypeID` — the *block's* fuel type.
     fuel_type_id: i32,
-    /// `modelYearID` — the input block's model year.
+ /// `modelYearID` — the input block's model year.
     model_year_id: i32,
 }
 
 /// Key of the `ATRatio` lookup — the Go `ATRatioKey`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct AtRatioKey {
-    /// `fuelFormulationID` — the *emission's* fuel formulation.
+ /// `fuelFormulationID` — the *emission's* fuel formulation.
     fuel_formulation_id: i32,
-    /// `monthID` — the input block's month.
+ /// `monthID` — the input block's month.
     month_id: i32,
-    /// `modelYearID` — the input block's model year.
+ /// `modelYearID` — the input block's model year.
     model_year_id: i32,
-    /// `outputPolProcessID` — the chained-to row's output `polProcessID`.
+ /// `outputPolProcessID` — the chained-to row's output `polProcessID`.
     output_pol_process_id: i32,
 }
 
 /// Key of the `ATRatioGas2` lookup — the Go `ATRatioGas2Key`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct AtRatioGas2Key {
-    /// `outputPolProcessID` — the chained-to row's output `polProcessID`.
+ /// `outputPolProcessID` — the chained-to row's output `polProcessID`.
     output_pol_process_id: i32,
-    /// `sourceTypeID` — the input block's source type.
+ /// `sourceTypeID` — the input block's source type.
     source_type_id: i32,
-    /// `fuelSubTypeID` — the *emission's* fuel subtype.
+ /// `fuelSubTypeID` — the *emission's* fuel subtype.
     fuel_sub_type_id: i32,
 }
 
 /// Key of the `ATRatioNonGas` lookup — the Go `ATRatioNonGasKey`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct AtRatioNonGasKey {
-    /// `outputPolProcessID` — the chained-to row's output `polProcessID`.
+ /// `outputPolProcessID` — the chained-to row's output `polProcessID`.
     output_pol_process_id: i32,
-    /// `sourceTypeID` — the input block's source type.
+ /// `sourceTypeID` — the input block's source type.
     source_type_id: i32,
-    /// `fuelSubTypeID` — the *emission's* fuel subtype.
+ /// `fuelSubTypeID` — the *emission's* fuel subtype.
     fuel_sub_type_id: i32,
-    /// `modelYearID` — the input block's model year.
+ /// `modelYearID` — the input block's model year.
     model_year_id: i32,
 }
 
@@ -529,39 +528,39 @@ struct AtRatioNonGasKey {
 /// in-memory state and `calculate` body of the Go `airtoxics` package.
 #[derive(Debug, Clone, Default)]
 pub struct AirToxics {
-    /// `minorHAPRatio` — minor-HAP ratios, keyed by process / emission fuel
-    /// subtype / model year.
+ /// `minorHAPRatio` — minor-HAP ratios, keyed by process / emission fuel
+ /// subtype / model year.
     minor_hap_ratio: HashMap<MinorHapRatioKey, Vec<RatioDetail>>,
-    /// `pahGasRatio` — gaseous-PAH ratios, keyed by process / block fuel type
-    /// / model year.
+ /// `pahGasRatio` — gaseous-PAH ratios, keyed by process / block fuel type
+ /// / model year.
     pah_gas_ratio: HashMap<PahRatioKey, Vec<RatioDetail>>,
-    /// `pahParticleRatio` — particulate-PAH ratios, keyed by process / block
-    /// fuel type / model year.
+ /// `pahParticleRatio` — particulate-PAH ratios, keyed by process / block
+ /// fuel type / model year.
     pah_particle_ratio: HashMap<PahRatioKey, Vec<RatioDetail>>,
-    /// `ATRatioGas1ChainedTo` — input `polProcessID` → toxic chained-to rows.
+ /// `ATRatioGas1ChainedTo` — input `polProcessID` → toxic chained-to rows.
     at_ratio_gas1_chained_to: HashMap<i32, Vec<ChainedToDetail>>,
-    /// `ATRatioGas2ChainedTo` — input `polProcessID` → toxic chained-to rows.
+ /// `ATRatioGas2ChainedTo` — input `polProcessID` → toxic chained-to rows.
     at_ratio_gas2_chained_to: HashMap<i32, Vec<ChainedToDetail>>,
-    /// `ATRatioNonGasChainedTo` — input `polProcessID` → toxic chained-to rows.
+ /// `ATRatioNonGasChainedTo` — input `polProcessID` → toxic chained-to rows.
     at_ratio_non_gas_chained_to: HashMap<i32, Vec<ChainedToDetail>>,
-    /// `ATRatio` — the `ATRatioGas1`-path ratios.
+ /// `ATRatio` — the `ATRatioGas1`-path ratios.
     at_ratio: HashMap<AtRatioKey, f64>,
-    /// `ATRatioGas2` — the `ATRatioGas2`-path ratios.
+ /// `ATRatioGas2` — the `ATRatioGas2`-path ratios.
     at_ratio_gas2: HashMap<AtRatioGas2Key, f64>,
-    /// `ATRatioNonGas` — the `ATRatioNonGas`-path ratios.
+ /// `ATRatioNonGas` — the `ATRatioNonGas`-path ratios.
     at_ratio_non_gas: HashMap<AtRatioNonGasKey, f64>,
 }
 
 impl AirToxics {
-    /// Build the lookup tables from the nine table extracts — the in-memory
-    /// `StartSetup` of the Go `airtoxics` package.
-    ///
-    /// The `minorHAPRatio` / `pahGasRatio` / `pahParticleRatio` tables map a
-    /// key to a list of `RatioDetail`, and the three `ATRatio*ChainedTo`
-    /// tables map an input `polProcessID` to a list of `ChainedToDetail`;
-    /// rows sharing a key are appended in extract (file) order. The `ATRatio`
-    /// / `ATRatioGas2` / `ATRatioNonGas` tables map a key to a single `f64`;
-    /// on a duplicate key the last row wins, matching the Go map assignment.
+ /// Build the lookup tables from the nine table extracts — the in-memory
+ /// `StartSetup` of the Go `airtoxics` package.
+ ///
+ /// The `minorHAPRatio` / `pahGasRatio` / `pahParticleRatio` tables map a
+ /// key to a list of `RatioDetail`, and the three `ATRatio*ChainedTo`
+ /// tables map an input `polProcessID` to a list of `ChainedToDetail`;
+ /// rows sharing a key are appended in extract (file) order. The `ATRatio`
+ /// / `ATRatioGas2` / `ATRatioNonGas` tables map a key to a single `f64`;
+ /// on a duplicate key the last row wins, matching the Go map assignment.
     #[must_use]
     pub fn build(extracts: AirToxicsExtracts) -> AirToxics {
         let mut minor_hap_ratio: HashMap<MinorHapRatioKey, Vec<RatioDetail>> = HashMap::new();
@@ -637,29 +636,29 @@ impl AirToxics {
         }
     }
 
-    /// Derive the air-toxics output blocks from one input fuel block — the Go
-    /// `calculate`'s per-`FuelBlock` body.
-    ///
-    /// The Go worker drains a channel of `MWOBlock`s, each holding several
-    /// `FuelBlock`s; this method handles one fuel block and the data-plane
-    /// integration iterates the rest.
-    ///
-    /// Each of the six paths runs only when its [`ModuleFlags`] flag is set
-    /// *and* its ratio table is non-empty (the Go `useX := len(table) > 0 &&
-    /// mwo.NeedsModule(…)`). The direct paths additionally require the input
-    /// block's pollutant to be VOC (87) or Organic Carbon (111); the
-    /// `ATRatio*` paths apply to any input whose `polProcessID` has a
-    /// chained-to row.
-    ///
-    /// Output blocks are returned in ascending `polProcessID` order (see the
-    /// module-level fidelity note on output order); a block whose
-    /// `polProcessID` is produced by more than one path carries every path's
-    /// emissions, in path order.
+ /// Derive the air-toxics output blocks from one input fuel block — the Go
+ /// `calculate`'s per-`FuelBlock` body.
+ ///
+ /// The Go worker drains a channel of `MWOBlock`s, each holding several
+ /// `FuelBlock`s; this method handles one fuel block and the data-plane
+ /// integration iterates the rest.
+ ///
+ /// Each of the six paths runs only when its [`ModuleFlags`] flag is set
+ /// *and* its ratio table is non-empty (the Go `useX := len(table) > 0 &&
+ /// mwo.NeedsModule(…)`). The direct paths additionally require the input
+ /// block's pollutant to be VOC (87) or Organic Carbon (111); the
+ /// `ATRatio*` paths apply to any input whose `polProcessID` has a
+ /// chained-to row.
+ ///
+ /// Output blocks are returned in ascending `polProcessID` order (see the
+ /// module-level fidelity note on output order); a block whose
+ /// `polProcessID` is produced by more than one path carries every path's
+ /// emissions, in path order.
     #[must_use]
     pub fn air_toxics_block(&self, block: &FuelBlock, modules: ModuleFlags) -> Vec<ToxicFuelBlock> {
-        // Output blocks keyed by polProcessID — a BTreeMap both reproduces the
-        // Go's get-or-create-by-polProcessID grouping and keeps the result in
-        // ascending polProcessID order.
+ // Output blocks keyed by polProcessID — a BTreeMap both reproduces the
+ // Go's get-or-create-by-polProcessID grouping and keeps the result in
+ // ascending polProcessID order.
         let mut blocks: BTreeMap<i32, ToxicFuelBlock> = BTreeMap::new();
 
         if modules.minor_hap_ratio && !self.minor_hap_ratio.is_empty() {
@@ -684,12 +683,12 @@ impl AirToxics {
         blocks.into_values().collect()
     }
 
-    /// The `minorHAPRatio` path — the Go `if fb.Key.PollutantID == 87 &&
-    /// useMinorHAPRatio` branch.
-    ///
-    /// Applies only to a VOC (87) block. The lookup key is rebuilt per
-    /// emission because it carries the *emission's* `fuelSubTypeID`; the output
-    /// process is the input block's process.
+ /// The `minorHAPRatio` path — the Go `if fb.Key.PollutantID == 87 &&
+ /// useMinorHAPRatio` branch.
+ ///
+ /// Applies only to a VOC (87) block. The lookup key is rebuilt per
+ /// emission because it carries the *emission's* `fuelSubTypeID`; the output
+ /// process is the input block's process.
     fn apply_minor_hap_ratio(&self, block: &FuelBlock, blocks: &mut BTreeMap<i32, ToxicFuelBlock>) {
         if block.key.pollutant_id != VOC_POLLUTANT_ID {
             return;
@@ -714,11 +713,11 @@ impl AirToxics {
         }
     }
 
-    /// The `pahGasRatio` path — the Go `if fb.Key.PollutantID == 87 &&
-    /// usePAHGasRatio` branch.
-    ///
-    /// Applies only to a VOC (87) block. The lookup key carries the *block's*
-    /// `fuelTypeID`, so it is built once; every detail scales every emission.
+ /// The `pahGasRatio` path — the Go `if fb.Key.PollutantID == 87 &&
+ /// usePAHGasRatio` branch.
+ ///
+ /// Applies only to a VOC (87) block. The lookup key carries the *block's*
+ /// `fuelTypeID`, so it is built once; every detail scales every emission.
     fn apply_pah_gas_ratio(&self, block: &FuelBlock, blocks: &mut BTreeMap<i32, ToxicFuelBlock>) {
         if block.key.pollutant_id != VOC_POLLUTANT_ID {
             return;
@@ -743,11 +742,11 @@ impl AirToxics {
         }
     }
 
-    /// The `pahParticleRatio` path — the Go `if fb.Key.PollutantID == 111 &&
-    /// usePAHParticleRatio` branch.
-    ///
-    /// Applies only to an Organic Carbon (111) block. Otherwise identical in
-    /// shape to the `pahGasRatio` path.
+ /// The `pahParticleRatio` path — the Go `if fb.Key.PollutantID == 111 &&
+ /// usePAHParticleRatio` branch.
+ ///
+ /// Applies only to an Organic Carbon (111) block. Otherwise identical in
+ /// shape to the `pahGasRatio` path.
     fn apply_pah_particle_ratio(
         &self,
         block: &FuelBlock,
@@ -776,13 +775,13 @@ impl AirToxics {
         }
     }
 
-    /// The `ATRatioGas1` path — the Go `if useATRatioGas1` branch.
-    ///
-    /// For each chained-to row of the input block's `polProcessID`, each
-    /// emission is scaled by the `ATRatio` keyed on the emission's fuel
-    /// formulation, the block's month and model year, and the chained-to row's
-    /// output `polProcessID`. An emission with no matching `ATRatio` row is
-    /// skipped.
+ /// The `ATRatioGas1` path — the Go `if useATRatioGas1` branch.
+ ///
+ /// For each chained-to row of the input block's `polProcessID`, each
+ /// emission is scaled by the `ATRatio` keyed on the emission's fuel
+ /// formulation, the block's month and model year, and the chained-to row's
+ /// output `polProcessID`. An emission with no matching `ATRatio` row is
+ /// skipped.
     fn apply_at_ratio_gas1(&self, block: &FuelBlock, blocks: &mut BTreeMap<i32, ToxicFuelBlock>) {
         let Some(chained) = self.at_ratio_gas1_chained_to.get(&block.key.pol_process_id) else {
             return;
@@ -802,12 +801,12 @@ impl AirToxics {
         }
     }
 
-    /// The `ATRatioGas2` path — the Go `if useATRatioGas2` branch.
-    ///
-    /// For each chained-to row of the input block's `polProcessID`, each
-    /// emission is scaled by the `ATRatioGas2` keyed on the chained-to row's
-    /// output `polProcessID`, the block's source type and the emission's fuel
-    /// subtype.
+ /// The `ATRatioGas2` path — the Go `if useATRatioGas2` branch.
+ ///
+ /// For each chained-to row of the input block's `polProcessID`, each
+ /// emission is scaled by the `ATRatioGas2` keyed on the chained-to row's
+ /// output `polProcessID`, the block's source type and the emission's fuel
+ /// subtype.
     fn apply_at_ratio_gas2(&self, block: &FuelBlock, blocks: &mut BTreeMap<i32, ToxicFuelBlock>) {
         let Some(chained) = self.at_ratio_gas2_chained_to.get(&block.key.pol_process_id) else {
             return;
@@ -826,12 +825,12 @@ impl AirToxics {
         }
     }
 
-    /// The `ATRatioNonGas` path — the Go `if useATRatioNonGas` branch.
-    ///
-    /// For each chained-to row of the input block's `polProcessID`, each
-    /// emission is scaled by the `ATRatioNonGas` keyed on the chained-to row's
-    /// output `polProcessID`, the block's source type, the emission's fuel
-    /// subtype and the block's model year.
+ /// The `ATRatioNonGas` path — the Go `if useATRatioNonGas` branch.
+ ///
+ /// For each chained-to row of the input block's `polProcessID`, each
+ /// emission is scaled by the `ATRatioNonGas` keyed on the chained-to row's
+ /// output `polProcessID`, the block's source type, the emission's fuel
+ /// subtype and the block's model year.
     fn apply_at_ratio_non_gas(
         &self,
         block: &FuelBlock,
@@ -1795,28 +1794,28 @@ const IDLE_EXHAUST_TOXICS: &[u16] = &[
 /// rows and `registrations_count: 195` for `AirToxicsCalculator` in
 /// `characterization/calculator-chains/calculator-dag.json`.
 ///
-/// The metallic toxics and dioxins/furans the migration plan mentions for
-/// Task 50 are produced by the same generic ratio engine but are *not* in the
+/// The metallic toxics and dioxins/furans the mentions for
+/// are produced by the same generic ratio engine but are *not* in the
 /// onroad `AirToxicsCalculator`'s own registration set — the registered
 /// pollutants are the organic toxics 20–46 and the PAH species 68–84 / 168–185.
 const REGISTRATION_GROUPS: &[(u16, &[u16])] = &[
-    // Running Exhaust (1) and Start Exhaust (2).
+ // Running Exhaust (1) and Start Exhaust (2).
     (1, EXHAUST_TOXICS),
     (2, EXHAUST_TOXICS),
-    // Evap Permeation (11), Evap Fuel Vapor Venting (12), Evap Fuel Leaks (13),
-    // Refueling Displacement Vapor Loss (18), Refueling Spillage Loss (19).
+ // Evap Permeation (11), Evap Fuel Vapor Venting (12), Evap Fuel Leaks (13),
+ // Refueling Displacement Vapor Loss (18), Refueling Spillage Loss (19).
     (11, EVAP_REFUELING_TOXICS),
     (12, EVAP_REFUELING_TOXICS),
     (13, EVAP_REFUELING_TOXICS),
     (18, EVAP_REFUELING_TOXICS),
     (19, EVAP_REFUELING_TOXICS),
-    // Extended Idle Exhaust (90) and Auxiliary Power Exhaust (91).
+ // Extended Idle Exhaust (90) and Auxiliary Power Exhaust (91).
     (90, IDLE_EXHAUST_TOXICS),
     (91, IDLE_EXHAUST_TOXICS),
 ];
 
 /// The number of `(pollutant, process)` pairs across [`REGISTRATION_GROUPS`]
-/// — the length of [`REGISTRATIONS`]. Expected to be 195.
+/// the length of [`REGISTRATIONS`]. Expected to be 195.
 const REGISTRATION_COUNT: usize = {
     let mut count = 0;
     let mut i = 0;
@@ -1828,7 +1827,7 @@ const REGISTRATION_COUNT: usize = {
 };
 
 /// The flattened `(pollutant, process)` pairs `AirToxicsCalculator` registers
-/// — [`REGISTRATION_GROUPS`] expanded so [`Calculator::registrations`] can hand
+/// [`REGISTRATION_GROUPS`] expanded so [`Calculator::registrations`] can hand
 /// back one contiguous slice.
 static REGISTRATIONS: [PollutantProcessAssociation; REGISTRATION_COUNT] = {
     let mut regs = [reg(0, 0); REGISTRATION_COUNT];
@@ -1881,11 +1880,11 @@ static INPUT_TABLES: &[&str] = &[
 pub struct AirToxicsCalculator;
 
 impl AirToxicsCalculator {
-    /// Chain-DAG name — matches the Java class / Go package and the
-    /// `calculator-dag.json` entry.
+ /// Chain-DAG name — matches the Java class / Go package and the
+ /// `calculator-dag.json` entry.
     pub const NAME: &'static str = "AirToxicsCalculator";
 
-    /// Construct the calculator.
+ /// Construct the calculator.
     #[must_use]
     pub fn new() -> Self {
         Self
@@ -1897,21 +1896,21 @@ impl Calculator for AirToxicsCalculator {
         Self::NAME
     }
 
-    /// `AirToxicsCalculator` carries no master-loop subscription of its own:
-    /// `calculator-dag.json` records `subscribes_directly: false` and the Java
-    /// `subscribeToMe` calls `chainCalculator` instead of `targetLoop.subscribe`.
-    /// It is a chained calculator — it runs when the calculators it chains to
-    /// (its [`upstream`](Calculator::upstream) modules) run, deriving the
-    /// toxics from their output.
+ /// `AirToxicsCalculator` carries no master-loop subscription of its own:
+ /// `calculator-dag.json` records `subscribes_directly: false` and the Java
+ /// `subscribeToMe` calls `chainCalculator` instead of `targetLoop.subscribe`.
+ /// It is a chained calculator — it runs when the calculators it chains to
+ /// (its [`upstream`](Calculator::upstream) modules) run, deriving the
+ /// toxics from their output.
     fn subscriptions(&self) -> &[CalculatorSubscription] {
         NO_SUBSCRIPTIONS
     }
 
-    /// The 195 `(pollutant, process)` pairs from the `Registration` directives
-    /// for `AirToxicsCalculator` in `CalculatorInfo.txt` — see
-    /// `REGISTRATION_GROUPS`. The onroad calculator registers the organic
-    /// toxics (20–46) and the gaseous / particulate PAH species (68–84,
-    /// 168–185); the metals and dioxins/furans are not in its own set.
+ /// The 195 `(pollutant, process)` pairs from the `Registration` directives
+ /// for `AirToxicsCalculator` in `CalculatorInfo.txt` — see
+ /// `REGISTRATION_GROUPS`. The onroad calculator registers the organic
+ /// toxics (20–46) and the gaseous / particulate PAH species (68–84,
+ /// 168–185); the metals and dioxins/furans are not in its own set.
     fn registrations(&self) -> &[PollutantProcessAssociation] {
         &REGISTRATIONS
     }
@@ -1924,17 +1923,17 @@ impl Calculator for AirToxicsCalculator {
         INPUT_TABLES
     }
 
-    /// Run the calculator for the current master-loop iteration.
-    ///
-    /// **Data plane pending.** [`CalculatorContext`] exposes only
-    /// placeholder `ExecutionTables` / `ScratchNamespace` today, so this body
-    /// cannot read the nine air-toxics tables nor the upstream emission fuel
-    /// blocks, nor write the toxic blocks back. The faithful algorithm is
-    /// ported and tested on [`AirToxics`]; once the `DataFrameStore` lands,
-    /// `execute` builds an [`AirToxics`] from `ctx.tables()`, reads the input
-    /// [`FuelBlock`]s, applies
-    /// [`air_toxics_block`](AirToxics::air_toxics_block), and stores the
-    /// resulting [`ToxicFuelBlock`]s.
+ /// Run the calculator for the current master-loop iteration.
+ ///
+ /// **Data plane pending.** [`CalculatorContext`] exposes only
+ /// placeholder `ExecutionTables` / `ScratchNamespace` today, so this body
+ /// cannot read the nine air-toxics tables nor the upstream emission fuel
+ /// blocks, nor write the toxic blocks back. The faithful algorithm is
+ /// ported and tested on [`AirToxics`]; once the `DataFrameStore` lands,
+ /// `execute` builds an [`AirToxics`] from `ctx.tables()`, reads the input
+ /// [`FuelBlock`]s, applies
+ /// [`air_toxics_block`](AirToxics::air_toxics_block), and stores the
+ /// resulting [`ToxicFuelBlock`]s.
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let tables = ctx.tables();
         let chained_to: Vec<ChainedToRow> = tables.iter_typed("RunSpecChainedTo")?;
@@ -2019,7 +2018,7 @@ pub fn factory() -> Box<dyn Calculator> {
 mod tests {
     use super::*;
 
-    /// A `minorHAPRatio` row helper.
+ /// A `minorHAPRatio` row helper.
     fn minor_hap_row(
         process_id: i32,
         output_pollutant_id: i32,
@@ -2036,7 +2035,7 @@ mod tests {
         }
     }
 
-    /// A `pahGasRatio` / `pahParticleRatio` row helper.
+ /// A `pahGasRatio` / `pahParticleRatio` row helper.
     fn pah_row(
         process_id: i32,
         output_pollutant_id: i32,
@@ -2053,8 +2052,8 @@ mod tests {
         }
     }
 
-    /// A `RunSpecChainedTo` row helper. `output_pol_process_id` is set to
-    /// `output_pollutant_id * 100 + output_process_id`, as the real table is.
+ /// A `RunSpecChainedTo` row helper. `output_pol_process_id` is set to
+ /// `output_pollutant_id * 100 + output_process_id`, as the real table is.
     fn chained_row(
         output_pollutant_id: i32,
         output_process_id: i32,
@@ -2070,9 +2069,9 @@ mod tests {
         }
     }
 
-    /// An `ATRatio` row helper. Only `fuel_formulation_id`, `month_id`,
-    /// `model_year_id`, `pol_process_id` and `at_ratio` are consumed; the
-    /// extract's other columns are filled with placeholders.
+ /// An `ATRatio` row helper. Only `fuel_formulation_id`, `month_id`,
+ /// `model_year_id`, `pol_process_id` and `at_ratio` are consumed; the
+ /// extract's other columns are filled with placeholders.
     fn at_ratio_row(
         fuel_formulation_id: i32,
         month_id: i32,
@@ -2093,7 +2092,7 @@ mod tests {
         }
     }
 
-    /// An [`Emission`] helper.
+ /// An [`Emission`] helper.
     fn emission(
         quant: f64,
         rate: f64,
@@ -2108,13 +2107,13 @@ mod tests {
         }
     }
 
-    /// `polProcessID` for a `(pollutant, process)` pair.
+ /// `polProcessID` for a `(pollutant, process)` pair.
     fn ppid(pollutant: i32, process: i32) -> i32 {
         pollutant * 100 + process
     }
 
-    /// A VOC (87) fuel-block key: process 1, fuel type 1, model year 2020,
-    /// month 6, source type 21. `pol_process_id` is `87 * 100 + 1`.
+ /// A VOC (87) fuel-block key: process 1, fuel type 1, model year 2020,
+ /// month 6, source type 21. `pol_process_id` is `87 * 100 + 1`.
     fn voc_key() -> FuelBlockKey {
         FuelBlockKey {
             pollutant_id: VOC_POLLUTANT_ID,
@@ -2127,8 +2126,8 @@ mod tests {
         }
     }
 
-    /// [`ModuleFlags`] with every flag set — used when a test wants the path
-    /// it is exercising to be the only one with a populated table.
+ /// [`ModuleFlags`] with every flag set — used when a test wants the path
+ /// it is exercising to be the only one with a populated table.
     fn all_modules() -> ModuleFlags {
         ModuleFlags {
             minor_hap_ratio: true,
@@ -2190,7 +2189,7 @@ mod tests {
 
     #[test]
     fn build_keeps_file_order_on_a_shared_ratio_key() {
-        // Two minorHAPRatio rows share a key — both details are kept, in order.
+ // Two minorHAPRatio rows share a key — both details are kept, in order.
         let toxics = AirToxics::build(AirToxicsExtracts {
             minor_hap_ratio: vec![
                 minor_hap_row(1, 20, 10, 2020, 0.5),
@@ -2213,7 +2212,7 @@ mod tests {
 
     #[test]
     fn build_last_write_wins_on_a_duplicate_at_ratio_key() {
-        // Two ATRatio rows share a key — the Go map assignment keeps the last.
+ // Two ATRatio rows share a key — the Go map assignment keeps the last.
         let toxics = AirToxics::build(AirToxicsExtracts {
             at_ratio: vec![
                 at_ratio_row(100, 6, 2020, 4001, 2.0),
@@ -2267,7 +2266,7 @@ mod tests {
 
     #[test]
     fn minor_hap_ratio_keys_on_emission_fuel_sub_type() {
-        // The row keys on fuel subtype 10; only the subtype-10 emission hits.
+ // The row keys on fuel subtype 10; only the subtype-10 emission hits.
         let toxics = AirToxics::build(AirToxicsExtracts {
             minor_hap_ratio: vec![minor_hap_row(1, 20, 10, 2020, 0.5)],
             ..Default::default()
@@ -2278,7 +2277,7 @@ mod tests {
         };
         let out = toxics.air_toxics_block(&block, all_modules());
         assert_eq!(out.len(), 1);
-        // Only the subtype-10 emission produced a toxic.
+ // Only the subtype-10 emission produced a toxic.
         assert_eq!(out[0].emissions, vec![emission(4.0, 2.0, 10, 100)]);
     }
 
@@ -2288,7 +2287,7 @@ mod tests {
             minor_hap_ratio: vec![minor_hap_row(1, 20, 10, 2020, 0.5)],
             ..Default::default()
         });
-        // Organic Carbon (111) block — minorHAPRatio applies only to VOC.
+ // Organic Carbon (111) block — minorHAPRatio applies only to VOC.
         let block = FuelBlock {
             key: FuelBlockKey {
                 pollutant_id: ORGANIC_CARBON_POLLUTANT_ID,
@@ -2301,7 +2300,7 @@ mod tests {
 
     #[test]
     fn pah_gas_ratio_scales_all_voc_emissions() {
-        // pahGasRatio keys on the block's fuel type, so every emission is hit.
+ // pahGasRatio keys on the block's fuel type, so every emission is hit.
         let toxics = AirToxics::build(AirToxicsExtracts {
             pah_gas_ratio: vec![pah_row(1, 168, 1, 2020, 0.5)],
             ..Default::default()
@@ -2313,7 +2312,7 @@ mod tests {
         let out = toxics.air_toxics_block(&block, all_modules());
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].pollutant_id, 168);
-        // Both emissions scaled, in input order.
+ // Both emissions scaled, in input order.
         assert_eq!(
             out[0].emissions,
             vec![emission(4.0, 2.0, 10, 100), emission(1.0, 0.5, 99, 200)],
@@ -2322,7 +2321,7 @@ mod tests {
 
     #[test]
     fn pah_gas_ratio_keys_on_block_fuel_type() {
-        // The row is for fuel type 2; a fuel-type-1 block does not match.
+ // The row is for fuel type 2; a fuel-type-1 block does not match.
         let toxics = AirToxics::build(AirToxicsExtracts {
             pah_gas_ratio: vec![pah_row(1, 168, 2, 2020, 0.5)],
             ..Default::default()
@@ -2375,7 +2374,7 @@ mod tests {
             pah_particle_ratio: vec![pah_row(1, 68, 1, 2020, 0.25)],
             ..Default::default()
         });
-        // VOC (87) block — pahParticleRatio applies only to Organic Carbon.
+ // VOC (87) block — pahParticleRatio applies only to Organic Carbon.
         let block = FuelBlock {
             key: voc_key(),
             emissions: vec![emission(8.0, 4.0, 10, 100)],
@@ -2385,7 +2384,7 @@ mod tests {
 
     #[test]
     fn direct_path_output_process_equals_input_process() {
-        // A VOC block on process 2 produces a toxic on process 2.
+ // A VOC block on process 2 produces a toxic on process 2.
         let toxics = AirToxics::build(AirToxicsExtracts {
             minor_hap_ratio: vec![minor_hap_row(2, 20, 10, 2020, 0.5)],
             ..Default::default()
@@ -2406,7 +2405,7 @@ mod tests {
 
     #[test]
     fn at_ratio_gas1_scales_via_chained_to() {
-        // VOC running (8701) chains to toxic 40 on process 1.
+ // VOC running (8701) chains to toxic 40 on process 1.
         let toxics = AirToxics::build(AirToxicsExtracts {
             at_ratio_gas1_chained_to: vec![chained_row(40, 1, ppid(VOC_POLLUTANT_ID, 1))],
             at_ratio: vec![at_ratio_row(100, 6, 2020, ppid(40, 1), 2.0)],
@@ -2426,7 +2425,7 @@ mod tests {
 
     #[test]
     fn at_ratio_gas1_keys_on_emission_fuel_formulation() {
-        // The ATRatio row is for fuel formulation 100; only that emission hits.
+ // The ATRatio row is for fuel formulation 100; only that emission hits.
         let toxics = AirToxics::build(AirToxicsExtracts {
             at_ratio_gas1_chained_to: vec![chained_row(40, 1, ppid(VOC_POLLUTANT_ID, 1))],
             at_ratio: vec![at_ratio_row(100, 6, 2020, ppid(40, 1), 2.0)],
@@ -2438,13 +2437,13 @@ mod tests {
         };
         let out = toxics.air_toxics_block(&block, all_modules());
         assert_eq!(out.len(), 1);
-        // Only the formulation-100 emission produced a toxic.
+ // Only the formulation-100 emission produced a toxic.
         assert_eq!(out[0].emissions, vec![emission(16.0, 8.0, 10, 100)]);
     }
 
     #[test]
     fn at_ratio_gas1_output_uses_chained_to_process() {
-        // The chained-to row sends a process-1 input to a process-2 toxic.
+ // The chained-to row sends a process-1 input to a process-2 toxic.
         let toxics = AirToxics::build(AirToxicsExtracts {
             at_ratio_gas1_chained_to: vec![chained_row(40, 2, ppid(VOC_POLLUTANT_ID, 1))],
             at_ratio: vec![at_ratio_row(100, 6, 2020, ppid(40, 2), 2.0)],
@@ -2462,7 +2461,7 @@ mod tests {
 
     #[test]
     fn at_ratio_gas1_skips_emission_without_a_ratio() {
-        // The chained-to row exists but no ATRatio matches — nothing produced.
+ // The chained-to row exists but no ATRatio matches — nothing produced.
         let toxics = AirToxics::build(AirToxicsExtracts {
             at_ratio_gas1_chained_to: vec![chained_row(40, 1, ppid(VOC_POLLUTANT_ID, 1))],
             at_ratio: vec![at_ratio_row(100, 6, 2020, ppid(99, 1), 2.0)],
@@ -2489,7 +2488,7 @@ mod tests {
         });
         let block = FuelBlock {
             key: voc_key(),
-            // Only the subtype-10 emission matches the gas2 row.
+ // Only the subtype-10 emission matches the gas2 row.
             emissions: vec![emission(8.0, 4.0, 10, 100), emission(2.0, 1.0, 99, 100)],
         };
         let out = toxics.air_toxics_block(&block, all_modules());
@@ -2530,7 +2529,7 @@ mod tests {
             }],
             ..Default::default()
         });
-        // Matching model year 2020.
+ // Matching model year 2020.
         let block = FuelBlock {
             key: voc_key(),
             emissions: vec![emission(8.0, 4.0, 10, 100)],
@@ -2539,7 +2538,7 @@ mod tests {
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].emissions, vec![emission(2.0, 1.0, 10, 100)]);
 
-        // Non-matching model year 2010 — nothing produced.
+ // Non-matching model year 2010 — nothing produced.
         let block = FuelBlock {
             key: FuelBlockKey {
                 model_year_id: 2010,
@@ -2560,7 +2559,7 @@ mod tests {
             key: voc_key(),
             emissions: vec![emission(8.0, 4.0, 10, 100)],
         };
-        // minor_hap_ratio flag cleared — the table is non-empty but unused.
+ // minor_hap_ratio flag cleared — the table is non-empty but unused.
         let modules = ModuleFlags {
             minor_hap_ratio: false,
             ..all_modules()
@@ -2570,7 +2569,7 @@ mod tests {
 
     #[test]
     fn empty_table_disables_a_path() {
-        // The flag is set but the table is empty — the Go's len(table) > 0 gate.
+ // The flag is set but the table is empty — the Go's len(table) > 0 gate.
         let toxics = AirToxics::build(AirToxicsExtracts::default());
         let block = FuelBlock {
             key: voc_key(),
@@ -2581,9 +2580,9 @@ mod tests {
 
     #[test]
     fn paths_accumulate_into_a_shared_output_block() {
-        // Both the minorHAPRatio path and the ATRatioGas1 path produce
-        // pollutant 40 on process 1 — they share polProcessID 4001 and the
-        // output block carries both paths' emissions, in path order.
+ // Both the minorHAPRatio path and the ATRatioGas1 path produce
+ // pollutant 40 on process 1 — they share polProcessID 4001 and the
+ // output block carries both paths' emissions, in path order.
         let toxics = AirToxics::build(AirToxicsExtracts {
             minor_hap_ratio: vec![minor_hap_row(1, 40, 10, 2020, 0.5)],
             at_ratio_gas1_chained_to: vec![chained_row(40, 1, ppid(VOC_POLLUTANT_ID, 1))],
@@ -2597,7 +2596,7 @@ mod tests {
         let out = toxics.air_toxics_block(&block, all_modules());
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].pol_process_id, ppid(40, 1));
-        // minorHAPRatio (×0.5) runs before ATRatioGas1 (×3.0).
+ // minorHAPRatio (×0.5) runs before ATRatioGas1 (×3.0).
         assert_eq!(
             out[0].emissions,
             vec![emission(4.0, 2.0, 10, 100), emission(24.0, 12.0, 10, 100)],
@@ -2606,8 +2605,8 @@ mod tests {
 
     #[test]
     fn output_blocks_sorted_by_pol_process_id() {
-        // Three minorHAPRatio details produce pollutants 46, 20, 40 — the
-        // output blocks come back in ascending polProcessID order.
+ // Three minorHAPRatio details produce pollutants 46, 20, 40 — the
+ // output blocks come back in ascending polProcessID order.
         let toxics = AirToxics::build(AirToxicsExtracts {
             minor_hap_ratio: vec![
                 minor_hap_row(1, 46, 10, 2020, 0.5),
@@ -2627,7 +2626,7 @@ mod tests {
 
     #[test]
     fn chained_to_with_multiple_outputs() {
-        // One input polProcessID chains to two toxics.
+ // One input polProcessID chains to two toxics.
         let toxics = AirToxics::build(AirToxicsExtracts {
             at_ratio_gas1_chained_to: vec![
                 chained_row(40, 1, ppid(VOC_POLLUTANT_ID, 1)),
@@ -2668,7 +2667,7 @@ mod tests {
     fn calculator_metadata() {
         let calc = AirToxicsCalculator::new();
         assert_eq!(calc.name(), "AirToxicsCalculator");
-        // Chained calculator — no direct master-loop subscription.
+ // Chained calculator — no direct master-loop subscription.
         assert!(calc.subscriptions().is_empty());
         assert_eq!(
             calc.upstream(),
@@ -2694,25 +2693,25 @@ mod tests {
         let regs = calc.registrations();
         assert_eq!(regs.len(), 195);
 
-        // Spot-check a registration from each of the irregular process groups:
-        // benzene (20) in running (1) and start (2) exhaust, naphthalene gas
-        // (185) in evap permeation (11), benzene in extended-idle exhaust (90).
+ // Spot-check a registration from each of the irregular process groups:
+ // benzene (20) in running (1) and start (2) exhaust, naphthalene gas
+ // (185) in evap permeation (11), benzene in extended-idle exhaust (90).
         assert!(regs.contains(&reg(20, 1)));
         assert!(regs.contains(&reg(20, 2)));
         assert!(regs.contains(&reg(185, 11)));
         assert!(regs.contains(&reg(20, 90)));
 
-        // The particulate PAH species (68–84) are exhaust-only — running and
-        // start, never the evaporative or idle processes.
+ // The particulate PAH species (68–84) are exhaust-only — running and
+ // start, never the evaporative or idle processes.
         assert!(regs.contains(&reg(68, 1)));
         assert!(!regs.contains(&reg(68, 11)));
         assert!(!regs.contains(&reg(68, 90)));
 
-        // Ethanol (21) and MTBE (22) are not registered for idle exhaust (90).
+ // Ethanol (21) and MTBE (22) are not registered for idle exhaust (90).
         assert!(!regs.contains(&reg(21, 90)));
         assert!(!regs.contains(&reg(22, 90)));
 
-        // No registration is duplicated.
+ // No registration is duplicated.
         let mut seen = std::collections::HashSet::new();
         for r in regs {
             assert!(
@@ -2727,12 +2726,12 @@ mod tests {
         use moves_framework::DataFrameStore;
         let calc = AirToxicsCalculator::new();
         let mut store = moves_framework::InMemoryStore::new();
-        // minorHAPRatio: VOC (87), process 1, sub-type 10, MY 2020 → pollutant 20, ratio 0.5.
+ // minorHAPRatio: VOC (87), process 1, sub-type 10, MY 2020 → pollutant 20, ratio 0.5.
         store.insert(
             "minorHAPRatio",
             MinorHapRatioRow::into_dataframe(vec![minor_hap_row(1, 20, 10, 2020, 0.5)]).unwrap(),
         );
-        // Empty tables for unexercised paths.
+ // Empty tables for unexercised paths.
         store.insert("pahGasRatio", PahRatioRow::into_dataframe(vec![]).unwrap());
         store.insert(
             "pahParticleRatio",
@@ -2751,7 +2750,7 @@ mod tests {
             "ATRatioNonGas",
             AtRatioNonGasRow::into_dataframe(vec![]).unwrap(),
         );
-        // Input: one VOC (87) row matching the minorHAPRatio entry above.
+ // Input: one VOC (87) row matching the minorHAPRatio entry above.
         store.insert(
             "MOVESWorkerOutput",
             AirToxicsMwoRow::into_dataframe(vec![AirToxicsMwoRow {
@@ -2780,7 +2779,7 @@ mod tests {
         let ctx = CalculatorContext::with_tables(store);
         let out = calc.execute(&ctx).expect("execute ok");
         let df = out.dataframe().expect("output should contain a DataFrame");
-        // minorHAPRatio fires: VOC 87 * 0.5 → pollutant 20.
+ // minorHAPRatio fires: VOC 87 * 0.5 → pollutant 20.
         assert_eq!(
             df.height(),
             1,
@@ -2806,7 +2805,7 @@ mod tests {
 
     #[test]
     fn calculator_is_object_safe() {
-        // The registry stores calculators as Box<dyn Calculator>.
+ // The registry stores calculators as Box<dyn Calculator>.
         let calc: Box<dyn Calculator> = Box::new(AirToxicsCalculator::new());
         assert_eq!(calc.name(), "AirToxicsCalculator");
         assert_eq!(calc.registrations().len(), 195);

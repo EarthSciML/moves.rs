@@ -22,15 +22,15 @@ pub struct InMemoryStore {
 }
 
 impl InMemoryStore {
-    /// Construct an empty store.
+ /// Construct an empty store.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Return a mutable reference to the DataFrame stored under `name`, or
-    /// `None` if absent. Uses `Arc::make_mut` to ensure exclusive ownership;
-    /// if the Arc has multiple owners the value is cloned first.
+ /// Return a mutable reference to the DataFrame stored under `name`, or
+ /// `None` if absent. Uses `Arc::make_mut` to ensure exclusive ownership;
+ /// if the Arc has multiple owners the value is cloned first.
     pub fn get_mut(&mut self, name: &str) -> Option<&mut DataFrame> {
         let lower = name.to_ascii_lowercase();
         self.map.get_mut(lower.as_str()).map(Arc::make_mut)
@@ -95,7 +95,7 @@ mod tests {
         store.insert("t", one_col_df("a"));
         store.insert("t", one_col_df("b"));
         let got = store.get("t").unwrap();
-        // The second insert replaced the first: column name is "b".
+ // The second insert replaced the first: column name is "b".
         assert_eq!(got.get_column_names(), vec!["b"]);
     }
 
@@ -143,7 +143,7 @@ mod tests {
             DataFrame::new(2, vec![Series::new("hourDayID".into(), [85i32, 86]).into()]).unwrap();
         store.insert("SHO", df);
 
-        // Request with lowercase; should find the mixed-case column.
+ // Request with lowercase; should find the mixed-case column.
         let views = store
             .column_views("SHO", &["hourdayid"])
             .expect("column_views failed");

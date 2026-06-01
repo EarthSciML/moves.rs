@@ -3,14 +3,14 @@
 //! Two formats are handled:
 //!
 //! 1. **MariaDB-dumped tables** — written by `mariadb -B -N -e "SELECT ..."`.
-//!    Each row is tab-separated; embedded tabs/newlines are escaped via
-//!    `\t`, `\n`, etc. NULL renders as the literal four-character string
-//!    `NULL`. A sidecar `<table>.schema.tsv` carries column types.
+//! Each row is tab-separated; embedded tabs/newlines are escaped via
+//! `\t`, `\n`, etc. NULL renders as the literal four-character string
+//! `NULL`. A sidecar `<table>.schema.tsv` carries column types.
 //!
 //! 2. **Worker bundle `.tbl` files** — written by MOVES Java/Go worker code.
-//!    Tab-separated, no schema sidecar, no escape encoding. We treat every
-//!    column as `Utf8` (literal-byte preservation); type-aware normalization
-//!    applies only to (1).
+//! Tab-separated, no schema sidecar, no escape encoding. We treat every
+//! column as `Utf8` (literal-byte preservation); type-aware normalization
+//! applies only to (1).
 //!
 //! ## Determinism
 //!
@@ -35,7 +35,7 @@ use crate::error::{Error, Result};
 pub struct ColumnHint {
     pub name: String,
     pub kind: ColumnKind,
-    /// Whether this column is part of the table's PRIMARY KEY (any position).
+ /// Whether this column is part of the table's PRIMARY KEY (any position).
     pub primary_key: bool,
 }
 
@@ -91,14 +91,14 @@ pub fn parse_schema_tsv(path: &Path, bytes: &[u8]) -> Result<Vec<ColumnHint>> {
 pub fn mysql_type_to_kind(mysql_type: &str) -> ColumnKind {
     let t = mysql_type.trim().to_ascii_lowercase();
     match t.as_str() {
-        // Integer family.
+ // Integer family.
         "tinyint" | "smallint" | "mediumint" | "int" | "integer" | "bigint" => ColumnKind::Int64,
         "year" => ColumnKind::Int64,
-        // Float family — anything that prints with a decimal point.
+ // Float family — anything that prints with a decimal point.
         "decimal" | "numeric" | "float" | "double" | "real" => ColumnKind::Float64,
-        // Boolean (rare in MOVES tables, but supported defensively).
+ // Boolean (rare in MOVES tables, but supported defensively).
         "bool" | "boolean" => ColumnKind::Boolean,
-        // Everything else — strings, blobs, dates, enums — captured as utf8.
+ // Everything else — strings, blobs, dates, enums — captured as utf8.
         _ => ColumnKind::Utf8,
     }
 }
@@ -171,8 +171,8 @@ pub fn parse_mariadb_table(
     }
 
     for (i, line) in text.split_inclusive('\n').enumerate() {
-        // Strip the trailing \n that split_inclusive preserves so the final
-        // line (which may not have a trailing \n) is processed identically.
+ // Strip the trailing \n that split_inclusive preserves so the final
+ // line (which may not have a trailing \n) is processed identically.
         let line = line.strip_suffix('\n').unwrap_or(line);
         let line = line.strip_suffix('\r').unwrap_or(line);
         if line.is_empty() {
@@ -254,8 +254,7 @@ fn field_to_value(path: &Path, line: usize, col: &ColumnHint, raw: &str) -> Resu
 /// preserved verbatim so a regression in the worker output's text format is
 /// detected as a content change rather than silently absorbed.
 ///
-/// Empty files produce an empty table with a single `col_0` Utf8 column —
-/// MOVES sometimes writes a stub `.tbl` to flag "this stage ran but produced
+/// Empty files produce an empty table with a single `col_0` Utf8 column/// MOVES sometimes writes a stub `.tbl` to flag "this stage ran but produced
 /// no rows," and we want that to surface as an entry with row_count=0.
 pub fn parse_worker_tbl(path: &Path, table_name: &str, body: &[u8]) -> Result<Table> {
     let text = std::str::from_utf8(body).map_err(|source| Error::Parse {
@@ -275,7 +274,7 @@ pub fn parse_worker_tbl(path: &Path, table_name: &str, body: &[u8]) -> Result<Ta
                 .strip_suffix('\r')
                 .unwrap_or_else(|| first.strip_suffix('\n').unwrap_or(first));
             if first_clean.is_empty() {
-                // Empty file — single stub column, no rows.
+ // Empty file — single stub column, no rows.
                 (vec!["col_0".to_string()], Vec::new())
             } else if looks_like_header(first_clean) {
                 let header = first_clean
@@ -286,7 +285,7 @@ pub fn parse_worker_tbl(path: &Path, table_name: &str, body: &[u8]) -> Result<Ta
                 let data: Vec<&str> = lines.collect();
                 (header, data)
             } else {
-                // Generate names from the first row's column count.
+ // Generate names from the first row's column count.
                 let n = first_clean.split('\t').count();
                 let header: Vec<String> = (0..n).map(|i| format!("col_{i}")).collect();
                 let data: Vec<&str> = lines.collect();
@@ -296,9 +295,9 @@ pub fn parse_worker_tbl(path: &Path, table_name: &str, body: &[u8]) -> Result<Ta
         None => (vec!["col_0".to_string()], Vec::new()),
     };
 
-    // Defensive: if any data line has more columns than the header, widen
-    // the header so we don't lose data. This shouldn't happen with
-    // well-formed worker output but surfaces malformed input clearly.
+ // Defensive: if any data line has more columns than the header, widen
+ // the header so we don't lose data. This shouldn't happen with
+ // well-formed worker output but surfaces malformed input clearly.
     let mut max_cols = header.len();
     for line in &data_lines {
         let line = line
@@ -322,7 +321,7 @@ pub fn parse_worker_tbl(path: &Path, table_name: &str, body: &[u8]) -> Result<Ta
         .collect();
     let mut tb = TableBuilder::new(table_name.to_string(), schema)?;
 
-    // Drop trailing empty lines so a final \n doesn't appear as a row.
+ // Drop trailing empty lines so a final \n doesn't appear as a row.
     while let Some(last) = data_lines.last() {
         let trimmed = last.strip_suffix('\n').unwrap_or(last);
         let trimmed = trimmed.strip_suffix('\r').unwrap_or(trimmed);
@@ -441,9 +440,9 @@ mod tests {
         assert_eq!(decode_mariadb_field("a\\\\b"), "a\\b");
         assert_eq!(decode_mariadb_field("a\\0b"), "a\0b");
         assert_eq!(decode_mariadb_field("a\\Zb"), "a\u{001A}b");
-        // Unknown escape → preserved
+ // Unknown escape → preserved
         assert_eq!(decode_mariadb_field("a\\xb"), "a\\xb");
-        // Trailing backslash → preserved
+ // Trailing backslash → preserved
         assert_eq!(decode_mariadb_field("a\\"), "a\\");
     }
 
@@ -488,7 +487,7 @@ mod tests {
         ];
         let body = b"3\t3.0\tthree\n1\t1.0\tone\n2\tNULL\ttwo\n";
         let table = parse_mariadb_table(Path::new("t.tsv"), "t", &schema, body).unwrap();
-        // Sorted by `id` (the natural key from PRI).
+ // Sorted by `id` (the natural key from PRI).
         assert_eq!(table.row_count(), 3);
         let NormalizedColumn::Int64(ids) = &table.columns()[0] else {
             panic!()
@@ -534,7 +533,7 @@ mod tests {
         let NormalizedColumn::Utf8(vs) = &table.columns()[0] else {
             panic!()
         };
-        // Sorted lexicographically (no natural key on this schema).
+ // Sorted lexicographically (no natural key on this schema).
         assert_eq!(vs[0].as_deref(), Some("a\tb"));
         assert_eq!(vs[1].as_deref(), Some("c\nd"));
     }
@@ -550,7 +549,7 @@ mod tests {
 
     #[test]
     fn parse_worker_tbl_without_header() {
-        // First row contains a numeric/punctuation cell — not header-like.
+ // First row contains a numeric/punctuation cell — not header-like.
         let body = b"1.5\thello world\n2.5\tfoo\n";
         let table = parse_worker_tbl(Path::new("t.tbl"), "t", body).unwrap();
         assert_eq!(table.schema().len(), 2);
@@ -568,7 +567,7 @@ mod tests {
 
     #[test]
     fn parse_worker_tbl_widens_short_rows() {
-        // Header has 2 cols, second row has 3.
+ // Header has 2 cols, second row has 3.
         let body = b"a\tb\n1\t2\n3\t4\t5\n";
         let table = parse_worker_tbl(Path::new("t.tbl"), "t", body).unwrap();
         assert_eq!(table.schema().len(), 3);

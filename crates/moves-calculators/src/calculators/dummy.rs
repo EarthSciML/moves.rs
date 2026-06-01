@@ -1,5 +1,4 @@
-//! Port of `DummyCalculator.java` — migration plan Phase 3, Task 78
-//! (Phase 3 closing checkpoint).
+//! Port of `DummyCalculator.java`//! (closing checkpoint).
 //!
 //! `DummyCalculator` is a no-op placeholder that lives in MOVES's production
 //! `implementation/ghg/` package but performs no computation. In canonical
@@ -24,7 +23,7 @@ use moves_framework::{
 /// Subscriptions and registrations are both empty; `execute` always returns
 /// an empty output. Exists to satisfy the "every module in
 /// `CalculatorInfo.txt` is represented in the Rust crate" completeness
-/// criterion of Task 78.
+/// criterion of.
 #[derive(Debug)]
 pub struct DummyCalculator;
 
@@ -42,7 +41,7 @@ impl Calculator for DummyCalculator {
     }
 
     fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
-        // no-wiring-audit: permanently no-op — not a data-plane shell; exclude from execute-shell wiring inventory.
+ // no-wiring-audit: permanently no-op — not a data-plane shell; exclude from execute-shell wiring inventory.
         Ok(CalculatorOutput::empty())
     }
 }

@@ -1,4 +1,4 @@
-# WASM Multi-Threading (Task 134)
+# WASM Multi-Threading
 
 The `moves-wasm` crate ships in two build variants:
 
@@ -53,22 +53,22 @@ rustup target add --toolchain nightly wasm32-unknown-unknown
 
 ```bash
 RUSTFLAGS="-C target-feature=+atomics,+bulk-memory,+mutable-globals" \
-  cargo +nightly build \
-    -Z build-std=std,panic_abort \
-    -Z build-std-features=panic_immediate_abort \
-    --target wasm32-unknown-unknown \
-    --package moves-wasm \
-    --features wasm-threads \
-    --release
+ cargo +nightly build \
+ -Z build-std=std,panic_abort \
+ -Z build-std-features=panic_immediate_abort \
+ --target wasm32-unknown-unknown \
+ --package moves-wasm \
+ --features wasm-threads \
+ --release
 ```
 
 Then run `wasm-bindgen` to generate the JS glue:
 
 ```bash
 wasm-bindgen \
-  --target web \
-  --out-dir pkg/ \
-  target/wasm32-unknown-unknown/release/moves_wasm.wasm
+ --target web \
+ --out-dir pkg/ \
+ target/wasm32-unknown-unknown/release/moves_wasm.wasm
 ```
 
 The `+atomics,+bulk-memory,+mutable-globals` LLVM target features and
@@ -96,21 +96,21 @@ import init, { init_thread_pool, run_simulation } from "./pkg/moves_wasm.js";
 await init();
 
 // Step 2: spin up the rayon Web Worker pool.
-//   init_thread_pool returns a Promise that resolves when all workers are
-//   ready. Call it once per Worker lifetime.
+// init_thread_pool returns a Promise that resolves when all workers are
+// ready. Call it once per Worker lifetime.
 await init_thread_pool(navigator.hardwareConcurrency);
 
 // Step 3: run a simulation with full parallelism.
-//   max_parallel_chunks=0 → auto (equals navigator.hardwareConcurrency after
-//   init_thread_pool has been called).
+// max_parallel_chunks=0 → auto (equals navigator.hardwareConcurrency after
+// init_thread_pool has been called).
 self.onmessage = async (event) => {
-  const { runspecXml } = event.data;
-  try {
-    const result = run_simulation(runspecXml, navigator.hardwareConcurrency);
-    self.postMessage({ ok: true, result });
-  } catch (err) {
-    self.postMessage({ ok: false, error: err.message });
-  }
+ const { runspecXml } = event.data;
+ try {
+ const result = run_simulation(runspecXml, navigator.hardwareConcurrency);
+ self.postMessage({ ok: true, result });
+ } catch (err) {
+ self.postMessage({ ok: false, error: err.message });
+ }
 };
 ```
 
@@ -122,11 +122,11 @@ const worker = new Worker("./worker.js", { type: "module" });
 worker.postMessage({ runspecXml: await runspecFile.text() });
 
 worker.onmessage = ({ data }) => {
-  if (data.ok) {
-    for (const [path, bytes] of Object.entries(data.result)) {
-      console.log(path, bytes.byteLength, "bytes");
-    }
-  }
+ if (data.ok) {
+ for (const [path, bytes] of Object.entries(data.result)) {
+ console.log(path, bytes.byteLength, "bytes");
+ }
+ }
 };
 ```
 
@@ -179,8 +179,8 @@ add_header Cross-Origin-Embedder-Policy "require-corp";
 
 ```caddyfile
 header {
-    Cross-Origin-Opener-Policy "same-origin"
-    Cross-Origin-Embedder-Policy "require-corp"
+ Cross-Origin-Opener-Policy "same-origin"
+ Cross-Origin-Embedder-Policy "require-corp"
 }
 ```
 
@@ -188,11 +188,11 @@ header {
 
 ```ts
 export default {
-  server: {
-    headers: {
-      "Cross-Origin-Opener-Policy": "same-origin",
-      "Cross-Origin-Embedder-Policy": "require-corp",
-    },
-  },
+ server: {
+ headers: {
+ "Cross-Origin-Opener-Policy": "same-origin",
+ "Cross-Origin-Embedder-Policy": "require-corp",
+ },
+ },
 };
 ```

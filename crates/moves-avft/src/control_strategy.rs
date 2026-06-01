@@ -16,13 +16,13 @@
 //! # Constructors
 //!
 //! * [`AvftControlStrategy::from_tool_inputs`] — builds the completed table
-//!   from raw user AVFT + defaults + spec by running the gap-fill and
-//!   projection logic (crate `moves-avft::tool`, Task 86) at construction
-//!   time. Use this when the completed table is not cached on disk.
+//! from raw user AVFT + defaults + spec by running the gap-fill and
+//! projection logic (crate `moves-avft::tool`,) at construction
+//! time. Use this when the completed table is not cached on disk.
 //! * [`AvftControlStrategy::from_completed`] — accepts an already-built
-//!   table (e.g. loaded from a Parquet file via
-//!   [`crate::parquet_io::read_parquet`]). Use this when the AVFT CLI has
-//!   been run separately and its Parquet output is available.
+//! table (e.g. loaded from a Parquet file via
+//! [`crate::parquet_io::read_parquet`]). Use this when the AVFT CLI has
+//! been run separately and its Parquet output is available.
 //!
 //! # Data plane
 //!
@@ -160,22 +160,22 @@ pub struct AvftControlStrategy {
 }
 
 impl AvftControlStrategy {
-    /// Build by running the AVFT Tool on raw user inputs.
-    ///
-    /// Runs the gap-fill and projection steps defined in `spec` over
-    /// `input` (the user-authored AVFT table) and `default` (the
-    /// model-default AVFT). The resulting completed table is stored and
-    /// applied in [`pre_run`](Self::pre_run).
-    ///
-    /// `known_fractions` is consulted only when at least one source type
-    /// uses [`crate::spec::ProjectionMethod::KnownFractions`]; pass
-    /// `&AvftTable::new()` if no source type needs it.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`crate::error::Error::ToolSpec`] if `spec` fails validation, or
-    /// [`crate::error::Error::ToolFailure`] if the tool cannot produce a valid output
-    /// for any enabled source type.
+ /// Build by running the AVFT Tool on raw user inputs.
+ ///
+ /// Runs the gap-fill and projection steps defined in `spec` over
+ /// `input` (the user-authored AVFT table) and `default` (the
+ /// model-default AVFT). The resulting completed table is stored and
+ /// applied in [`pre_run`](Self::pre_run).
+ ///
+ /// `known_fractions` is consulted only when at least one source type
+ /// uses [`crate::spec::ProjectionMethod::KnownFractions`]; pass
+ /// `&AvftTable::new()` if no source type needs it.
+ ///
+ /// # Errors
+ ///
+ /// Returns [`crate::error::Error::ToolSpec`] if `spec` fails validation, or
+ /// [`crate::error::Error::ToolFailure`] if the tool cannot produce a valid output
+ /// for any enabled source type.
     pub fn from_tool_inputs(
         spec: &ToolSpec,
         input: &AvftTable,
@@ -194,17 +194,17 @@ impl AvftControlStrategy {
         })
     }
 
-    /// Build from an already-completed AVFT table.
-    ///
-    /// Useful when the AVFT Tool has been run offline and its Parquet
-    /// output loaded via [`crate::parquet_io::read_parquet`], or in tests
-    /// that construct the table directly.
+ /// Build from an already-completed AVFT table.
+ ///
+ /// Useful when the AVFT Tool has been run offline and its Parquet
+ /// output loaded via [`crate::parquet_io::read_parquet`], or in tests
+ /// that construct the table directly.
     pub fn from_completed(table: AvftTable) -> Self {
         Self { completed: table }
     }
 
-    /// The completed AVFT table that will be applied in
-    /// [`pre_run`](Self::pre_run).
+ /// The completed AVFT table that will be applied in
+ /// [`pre_run`](Self::pre_run).
     pub fn completed_table(&self) -> &AvftTable {
         &self.completed
     }
@@ -312,7 +312,7 @@ mod tests {
 
     #[test]
     fn from_tool_inputs_produces_complete_table() {
-        // Single source type, single model year, defaults fully cover the gap.
+ // Single source type, single model year, defaults fully cover the gap.
         let default_t = small_table(&[(11, 2020, 1, 1, 0.8), (11, 2020, 2, 1, 0.2)]);
         let user_t = small_table(&[]);
         let known = AvftTable::new();

@@ -1,7 +1,7 @@
 //! The general-fuel-ratio compute core — a port of
 //! `FuelEffectsGenerator.doGeneralFuelRatio`.
 //!
-//! This is the headline path called out in the migration plan: it
+//! This is the headline path called out in the : it
 //! "apportions emission rates across the fuel-formulation distribution,
 //! applying fuel adjustments via `generalFuelRatioExpression` table
 //! entries". Each `generalFuelRatioExpression` row carries two SQL
@@ -23,19 +23,19 @@
 //! Two Java steps drop out of this port:
 //!
 //! * `changeFuelFormulationNulls` (`ifnull(col, 0)` over every property
-//!   column) is a no-op — a [`FuelFormulation`]'s `f32` fields are already
-//!   concrete, never null.
+//! column) is a no-op — a [`FuelFormulation`]'s `f32` fields are already
+//! concrete, never null.
 //! * The `executeLoop` post-step that deletes `generalFuelRatio` rows whose
-//!   ratio is exactly `1` belongs to the master-loop driver, not
-//!   `doGeneralFuelRatio`, and `FuelEffectsGeneratorTest.testDoGeneralFuelRatio`
-//!   calls `doGeneralFuelRatio` directly — so it is intentionally excluded.
+//! ratio is exactly `1` belongs to the master-loop driver, not
+//! `doGeneralFuelRatio`, and `FuelEffectsGeneratorTest.testDoGeneralFuelRatio`
+//! calls `doGeneralFuelRatio` directly — so it is intentionally excluded.
 //!
 //! # Data-plane status
 //!
 //! [`do_general_fuel_ratio`] is the numerical entry point and is fully
 //! exercised by the crate's tests. Wiring it into the master loop — reading
 //! `generalFuelRatioExpression` / `fuelFormulation` / `fuelSupply` from the
-//! execution context and writing `generalFuelRatio` back — waits on Task 50
+//! execution context and writing `generalFuelRatio` back — waits on
 //! (`DataFrameStore`); see [`super`] for the generator-trait shell.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -60,22 +60,21 @@ const E85_FUEL_SUBTYPES: [i32; 2] = [51, 52];
 /// Materialised inputs for [`do_general_fuel_ratio`].
 ///
 /// Each field stands in for a query the Java method ran against the
-/// execution database; Task 50 will populate them from the execution
+/// execution database; will populate them from the execution
 /// context instead.
 #[derive(Debug, Clone, Default)]
 pub struct GeneralFuelRatioInputs {
-    /// The `generalFuelRatioExpression` table.
+ /// The `generalFuelRatioExpression` table.
     pub expressions: Vec<GeneralFuelRatioExpression>,
-    /// Fuel formulations grouped by fuel type — the
-    /// `getFuelFormulations(fuelTypeID)` result, carrying each
-    /// formulation's column values so expressions can be evaluated.
+ /// Fuel formulations grouped by fuel type — the
+ /// `getFuelFormulations(fuelTypeID)` result, carrying each
+ /// formulation's column values so expressions can be evaluated.
     pub formulations_by_fuel_type: BTreeMap<i32, Vec<FuelFormulation>>,
-    /// `fuelFormulationID`s present in the fuel supply, per fuel type —
-    /// the `getFuelSupplyFormulations(fuelTypeID)` result.
+ /// `fuelFormulationID`s present in the fuel supply, per fuel type /// the `getFuelSupplyFormulations(fuelTypeID)` result.
     pub supplied_by_fuel_type: BTreeMap<i32, BTreeSet<i32>>,
-    /// `(fuelFormulationID, polProcessID)` pairs already present in
-    /// `generalFuelRatio` — the `getIntegerPairSet(...)` result. A
-    /// formulation already ratioed for a `polProcessID` is skipped.
+ /// `(fuelFormulationID, polProcessID)` pairs already present in
+ /// `generalFuelRatio` — the `getIntegerPairSet(...)` result. A
+ /// formulation already ratioed for a `polProcessID` is skipped.
     pub already_ratioed: BTreeSet<IntegerPair>,
 }
 
@@ -109,13 +108,13 @@ pub fn derive_pseudo_thc_expressions(
         }
         let mut n = exp.clone();
         n.pollutant_id = PSEUDO_THC_POLLUTANT_ID;
-        // Java: n.polProcessID = n.pollutantID * 100 + n.processID.
+ // Java: n.polProcessID = n.pollutantID * 100 + n.processID.
         n.pol_process_id = PSEUDO_THC_POLLUTANT_ID * 100 + n.process_id;
         n.fuel_subtypes = Some(E85_FUEL_SUBTYPES.to_vec());
         n.min_model_year_id = exp.min_model_year_id.max(E85_MIN_MODEL_YEAR);
-        // Java guards a re-scanning `StringUtilities.replace` with a
-        // placeholder; Rust's `str::replace` never re-scans its own
-        // output, so a direct case-sensitive replace is equivalent.
+ // Java guards a re-scanning `StringUtilities.replace` with a
+ // placeholder; Rust's `str::replace` never re-scans its own
+ // output, so a direct case-sensitive replace is equivalent.
         n.fuel_effect_ratio_expression = exp.fuel_effect_ratio_expression.replace("RVP", "altRVP");
         n.fuel_effect_ratio_gpa_expression = exp
             .fuel_effect_ratio_gpa_expression
@@ -147,16 +146,16 @@ pub fn derive_pseudo_thc_expressions(
 pub fn do_general_fuel_ratio(
     inputs: &GeneralFuelRatioInputs,
 ) -> Result<Vec<GeneralFuelRatioRow>, ExpressionError> {
-    // Original expressions plus the derived E85 Pseudo-THC ones.
+ // Original expressions plus the derived E85 Pseudo-THC ones.
     let mut expressions = inputs.expressions.clone();
     expressions.extend(derive_pseudo_thc_expressions(&inputs.expressions));
 
-    // Distinct fuel types, ascending — Java reads them into a TreeSet.
+ // Distinct fuel types, ascending — Java reads them into a TreeSet.
     let fuel_type_ids: BTreeSet<i32> = inputs.expressions.iter().map(|e| e.fuel_type_id).collect();
 
     let mut rows = Vec::new();
     for &fuel_type_id in &fuel_type_ids {
-        // fuelFormulationsToUse = getFuelFormulations ∩ getFuelSupplyFormulations.
+ // fuelFormulationsToUse = getFuelFormulations ∩ getFuelSupplyFormulations.
         let Some(formulations) = inputs.formulations_by_fuel_type.get(&fuel_type_id) else {
             continue;
         };
@@ -165,8 +164,8 @@ pub fn do_general_fuel_ratio(
             .iter()
             .filter(|f| supplied.is_some_and(|s| s.contains(&f.fuel_formulation_id)))
             .collect();
-        // `getFuelFormulations` returns a `TreeSet<Integer>`: sorted and
-        // unique. Sort by ID and drop duplicates to match.
+ // `getFuelFormulations` returns a `TreeSet<Integer>`: sorted and
+ // unique. Sort by ID and drop duplicates to match.
         to_use.sort_by_key(|f| f.fuel_formulation_id);
         to_use.dedup_by_key(|f| f.fuel_formulation_id);
         if to_use.is_empty() {
@@ -178,8 +177,8 @@ pub fn do_general_fuel_ratio(
                 continue;
             }
 
-            // Formulations not yet ratioed for this polProcessID — the
-            // `formulationIDsCSV` the Java builds before the INSERT.
+ // Formulations not yet ratioed for this polProcessID — the
+ // `formulationIDsCSV` the Java builds before the INSERT.
             let candidates: Vec<&FuelFormulation> = to_use
                 .iter()
                 .copied()
@@ -195,15 +194,15 @@ pub fn do_general_fuel_ratio(
                 continue;
             }
 
-            // An empty expression string defaults to "1".
+ // An empty expression string defaults to "1".
             let ratio_text = non_empty_or_one(&exp.fuel_effect_ratio_expression);
             let gpa_text = non_empty_or_one(&exp.fuel_effect_ratio_gpa_expression);
             let ratio_expr = Expression::parse(ratio_text)?;
             let gpa_expr = Expression::parse(gpa_text)?;
 
             for fuel in candidates {
-                // The Java SQL adds `and fuelSubtypeID in (fuelSubtypes)`
-                // when the expression carries a subtype restriction.
+ // The Java SQL adds `and fuelSubtypeID in (fuelSubtypes)`
+ // when the expression carries a subtype restriction.
                 if let Some(subtypes) = &exp.fuel_subtypes {
                     if !subtypes.contains(&fuel.fuel_subtype_id) {
                         continue;
@@ -243,7 +242,7 @@ fn non_empty_or_one(text: &str) -> &str {
 mod tests {
     use super::*;
 
-    /// A fuel formulation with the given ID, subtype and MTBE volume.
+ /// A fuel formulation with the given ID, subtype and MTBE volume.
     fn fuel(id: i32, subtype: i32, mtbe: f32) -> FuelFormulation {
         FuelFormulation {
             fuel_formulation_id: id,
@@ -255,7 +254,7 @@ mod tests {
 
     #[test]
     fn evaluates_one_expression_against_one_formulation() {
-        // The shape of testDoGeneralFuelRatio: one expression, one fuel.
+ // The shape of testDoGeneralFuelRatio: one expression, one fuel.
         let exp = GeneralFuelRatioExpression::new(
             1,
             -101,
@@ -302,7 +301,7 @@ mod tests {
         let inputs = GeneralFuelRatioInputs {
             expressions: vec![exp],
             formulations_by_fuel_type: BTreeMap::from([(1, vec![fuel(100, 10, 5.0)])]),
-            // Formulation 100 exists but is not supplied.
+ // Formulation 100 exists but is not supplied.
             supplied_by_fuel_type: BTreeMap::from([(1, BTreeSet::new())]),
             already_ratioed: BTreeSet::new(),
         };
@@ -318,7 +317,7 @@ mod tests {
             expressions: vec![exp],
             formulations_by_fuel_type: BTreeMap::from([(1, vec![fuel(100, 10, 5.0)])]),
             supplied_by_fuel_type: BTreeMap::from([(1, BTreeSet::from([100]))]),
-            // (formulation 100, polProcessID 201) already ratioed.
+ // (formulation 100, polProcessID 201) already ratioed.
             already_ratioed: BTreeSet::from([IntegerPair::new(Some(100), Some(201))]),
         };
         assert!(do_general_fuel_ratio(&inputs)
@@ -342,7 +341,7 @@ mod tests {
 
     #[test]
     fn derives_pseudo_thc_expression_for_e85_thc() {
-        // Ethanol (5), THC (pollutant 1), Running (process 1), through 2010.
+ // Ethanol (5), THC (pollutant 1), Running (process 1), through 2010.
         let exp = GeneralFuelRatioExpression::new(
             ETHANOL_FUEL_TYPE_ID,
             101, // pollutant 1, process 1
@@ -361,24 +360,24 @@ mod tests {
         assert_eq!(n.process_id, 1);
         assert_eq!(n.pol_process_id, PSEUDO_THC_POLLUTANT_ID * 100 + 1);
         assert_eq!(n.fuel_subtypes.as_deref(), Some(&[51, 52][..]));
-        // minModelYearID is lifted to 2001.
+ // minModelYearID is lifted to 2001.
         assert_eq!(n.min_model_year_id, 2001);
-        // RVP is rewritten to altRVP in both expressions.
+ // RVP is rewritten to altRVP in both expressions.
         assert_eq!(n.fuel_effect_ratio_expression, "altRVP*0.5");
         assert_eq!(n.fuel_effect_ratio_gpa_expression, "altRVP+1");
     }
 
     #[test]
     fn no_pseudo_thc_expression_for_non_ethanol() {
-        // Gasoline (1) THC must not spawn a Pseudo-THC expression.
+ // Gasoline (1) THC must not spawn a Pseudo-THC expression.
         let exp = GeneralFuelRatioExpression::new(1, 101, 1990, 2010, 0, 30, 0, "RVP*0.5", "RVP+1");
         assert!(derive_pseudo_thc_expressions(&[exp]).is_empty());
     }
 
     #[test]
     fn pseudo_thc_expression_filters_to_e85_subtypes() {
-        // Ethanol THC expression — the derived Pseudo-THC row applies only
-        // to fuel subtypes 51/52; a formulation with subtype 10 misses it.
+ // Ethanol THC expression — the derived Pseudo-THC row applies only
+ // to fuel subtypes 51/52; a formulation with subtype 10 misses it.
         let exp = GeneralFuelRatioExpression::new(
             ETHANOL_FUEL_TYPE_ID,
             101,
@@ -403,8 +402,8 @@ mod tests {
             already_ratioed: BTreeSet::new(),
         };
         let rows = do_general_fuel_ratio(&inputs).expect("evaluates");
-        // Original expression: both formulations (no subtype filter) -> 2.
-        // Derived Pseudo-THC expression: subtype 51 only -> 1. Total 3.
+ // Original expression: both formulations (no subtype filter) -> 2.
+ // Derived Pseudo-THC expression: subtype 51 only -> 1. Total 3.
         assert_eq!(rows.len(), 3);
         let pseudo: Vec<_> = rows
             .iter()

@@ -1,33 +1,33 @@
-//! Calculator-chain reconstruction for the MOVES → Rust port (Phase 1 Task 10).
+//! Calculator-chain reconstruction for the MOVES → Rust port.
 //!
 //! Parses three families of input:
 //!
 //! 1. **`CalculatorInfo.txt`** — the runtime log MOVES writes via
-//!    `InterconnectionTracker` when `CompilationFlags.GENERATE_CALCULATOR_INFO_DOCUMENTATION`
-//!    is set. Three directive shapes, tab-separated:
+//! `InterconnectionTracker` when `CompilationFlags.GENERATE_CALCULATOR_INFO_DOCUMENTATION`
+//! is set. Three directive shapes, tab-separated:
 //!
-//!    | Prefix         | Meaning                                                          |
-//!    |----------------|------------------------------------------------------------------|
-//!    | `Registration` | A calculator advertised that it produces `(pollutant, process)`. |
-//!    | `Subscribe`    | A module hooked into the MasterLoop at `(granularity, priority)`.|
-//!    | `Chain`        | The first module's output depends on the second module's output. |
+//! | Prefix | Meaning |
+//! |----------------|------------------------------------------------------------------|
+//! | `Registration` | A calculator advertised that it produces `(pollutant, process)`. |
+//! | `Subscribe` | A module hooked into the MasterLoop at `(granularity, priority)`.|
+//! | `Chain` | The first module's output depends on the second module's output. |
 //!
 //! 2. **`MasterLoopGranularity.java` / `MasterLoopPriority.java`** — the enum
-//!    constants the runtime log textualises. Encoded into the crate as
-//!    [`Granularity`] and [`Priority`] so consumers downstream don't need to
-//!    re-derive the numeric ordering.
+//! constants the runtime log textualises. Encoded into the crate as
+//! [`Granularity`] and [`Priority`] so consumers downstream don't need to
+//! re-derive the numeric ordering.
 //!
 //! 3. **Calculator `.java` files** (optional) — used to fill in granularities
-//!    for direct-subscriber calculators that didn't fire during the run that
-//!    produced `CalculatorInfo.txt`. Two patterns are recognised:
+//! for direct-subscriber calculators that didn't fire during the run that
+//! produced `CalculatorInfo.txt`. Two patterns are recognised:
 //!
-//!    * Direct `targetLoop.subscribe(this, process, MasterLoopGranularity.X,
-//!      MasterLoopPriority.Y)` calls inside `subscribeToMe()`.
-//!    * `extends GenericCalculatorBase` subclasses whose constructor passes
-//!      `MasterLoopGranularity.X, N` (priority adjustment) to `super(...)`.
+//! * Direct `targetLoop.subscribe(this, process, MasterLoopGranularity.X,
+//! MasterLoopPriority.Y)` calls inside `subscribeToMe()`.
+//! * `extends GenericCalculatorBase` subclasses whose constructor passes
+//! `MasterLoopGranularity.X, N` (priority adjustment) to `super(...)`.
 //!
 //! The output ([`CalculatorDag`]) is a single self-contained JSON document
-//! that Phase 2 Task 19 (`CalculatorRegistry`) consumes to wire up the
+//! that (`CalculatorRegistry`) consumes to wire up the
 //! Rust calculator graph. Two runs against the same inputs produce a
 //! byte-identical file.
 //!

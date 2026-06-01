@@ -18,29 +18,29 @@ fn sample_fixture_expands_to_expected_sql() {
     let script = std::fs::read_to_string(fixtures_dir().join("sample.sql")).unwrap();
     let raw_lines: Vec<String> = script.lines().map(|s| s.to_string()).collect();
 
-    // Stage 1: macro-expand each line.
+ // Stage 1: macro-expand each line.
     let mut macro_expanded = Vec::with_capacity(raw_lines.len());
     for line in &raw_lines {
         expander.expand_and_add(line, &mut macro_expanded);
     }
 
-    // Stage 2: section-filter with the configured enabled sections + the
-    // configured replacements.
+ // Stage 2: section-filter with the configured enabled sections + the
+ // configured replacements.
     let enabled: Vec<&str> = cfg.enabled_sections.iter().map(String::as_str).collect();
     let repl = cfg.replacement_pairs();
     let out = process_sections(&macro_expanded, &enabled, &repl);
 
-    // Expected output, traced by hand from the fixture + config:
-    // * Top-level (non-section) comment lines pass through as-is — they
-    //   are not section markers, and the outermost section state is
-    //   enabled.
-    // * "Create Remote Tables for Extracted Data" is enabled.
-    //   * "Inventory" is enabled -> kept (year=2030).
-    //   * "Rates" is NOT enabled -> dropped.
-    //   * `bar##macro.sourceTypeID##` expands to 2 lines (21, 31).
-    // * "Extract Data" enabled -> kept. hourID values sort
-    //   lexicographically per Java's `TreeSet<String>`: ["10","7","8","9"].
-    // * "Cleanup" enabled -> kept, fuelTypeID expands to 1,2,9.
+ // Expected output, traced by hand from the fixture + config:
+ // * Top-level (non-section) comment lines pass through as-is — they
+ // are not section markers, and the outermost section state is
+ // enabled.
+ // * "Create Remote Tables for Extracted Data" is enabled.
+ // * "Inventory" is enabled -> kept (year=2030).
+ // * "Rates" is NOT enabled -> dropped.
+ // * `bar##macro.sourceTypeID##` expands to 2 lines (21, 31).
+ // * "Extract Data" enabled -> kept. hourID values sort
+ // lexicographically per Java's `TreeSet<String>`: ["10","7","8","9"].
+ // * "Cleanup" enabled -> kept, fuelTypeID expands to 1,2,9.
     let expected = vec![
         "-- Synthetic MOVES-style SQL fixture exercising the macro expander and".to_string(),
         "-- section-marker preprocessor end-to-end. The shape is modelled on".to_string(),
@@ -63,7 +63,7 @@ fn sample_fixture_expands_to_expected_sql() {
     ];
 
     assert_eq!(out.lines, expected);
-    // Five `-- Section` markers in the fixture, one (Rates) disabled.
+ // Five `-- Section` markers in the fixture, one (Rates) disabled.
     assert_eq!(out.sections_seen, 5);
     assert_eq!(out.sections_kept, 4);
     assert_eq!(out.sections_dropped, 1);
@@ -71,7 +71,7 @@ fn sample_fixture_expands_to_expected_sql() {
 
 #[test]
 fn fixture_is_deterministic_across_runs() {
-    // Determinism: same fixture + same config -> byte-identical output.
+ // Determinism: same fixture + same config -> byte-identical output.
     let cfg = ExpandConfig::load(&fixtures_dir().join("sample.toml")).unwrap();
     let script = std::fs::read_to_string(fixtures_dir().join("sample.sql")).unwrap();
     let raw_lines: Vec<String> = script.lines().map(|s| s.to_string()).collect();

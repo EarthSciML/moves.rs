@@ -1,5 +1,5 @@
-//! Calculator and Generator base traits — the contract Phase 3
-//! calculators and Phase 2 generators implement.
+//! Calculator and Generator base traits — the contract
+//! calculators and generators implement.
 //!
 //! Ports `EmissionCalculator.java`, `Generator.java`, and the abstract base
 //! `GenericCalculatorBase.java` from `gov.epa.otaq.moves.master.framework`.
@@ -10,23 +10,22 @@
 //! shape:
 //!
 //! * Both expose **metadata methods** — [`name`](Calculator::name),
-//!   [`subscriptions`](Calculator::subscriptions),
-//!   [`upstream`](Calculator::upstream),
-//!   [`input_tables`](Calculator::input_tables). Task 19's
-//!   `CalculatorRegistry` reads these to wire the MasterLoop without
-//!   running any calculator body.
-//! * Both expose a **work method** —
-//!   `execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput>`.
-//!   Task 21's loop notifier invokes this once per iteration at the
-//!   registered granularity.
+//! [`subscriptions`](Calculator::subscriptions),
+//! [`upstream`](Calculator::upstream),
+//! [`input_tables`](Calculator::input_tables).'s
+//! `CalculatorRegistry` reads these to wire the MasterLoop without
+//! running any calculator body.
+//! * Both expose a **work method**//! `execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput>`.
+//! loop notifier invokes this once per iteration at the
+//! registered granularity.
 //!
 //! Calculator-specific:
 //! * [`Calculator::registrations`] — the `(pollutant, process)` pairs the
-//!   calculator advertises in `Registration` directives.
+//! calculator advertises in `Registration` directives.
 //!
 //! Generator-specific:
 //! * [`Generator::output_tables`] — scratch-namespace tables this generator
-//!   writes for downstream calculators.
+//! writes for downstream calculators.
 //!
 //! # Relationship to [`MasterLoopable`](crate::MasterLoopable)
 //!
@@ -35,33 +34,32 @@
 //! default `execute_at_granularity` body, but the
 //! [`MasterLoopContext`](crate::MasterLoopContext) the trait method receives
 //! does not yet hold a [`CalculatorContext`] — that pairing is owned by
-//! Task 19's registry, which holds the per-run state needed to materialise
+//! registry, which holds the per-run state needed to materialise
 //! the calculator context from a master-loop callback.
 //!
-//! Phase 2 Task 19 will instead provide an adapter (`CalculatorMasterLoopable`
+//! will instead provide an adapter (`CalculatorMasterLoopable`
 //! or a generic equivalent) that wraps a [`Calculator`]/[`Generator`] plus a
 //! handle to the run state, implements [`MasterLoopable`](crate::MasterLoopable)
 //! for that wrapper, and translates each loop callback into a
 //! [`Calculator::execute`] / [`Generator::execute`] invocation against a
 //! freshly built [`CalculatorContext`].
 //!
-//! Keeping `Calculator` decoupled from `MasterLoopable` means Phase 3
+//! Keeping `Calculator` decoupled from `MasterLoopable` means
 //! calculator authors only need to think about "given this context, produce
 //! this output" — the dispatch plumbing stays inside the framework.
 //!
 //! # Context shape
 //!
-//! [`CalculatorContext`] is the runtime view of a calculator's inputs —
-//! per-run filtered default-DB tables ([`crate::data::InMemoryStore`]), inter-calculator
+//! [`CalculatorContext`] is the runtime view of a calculator's inputs//! per-run filtered default-DB tables ([`crate::data::InMemoryStore`]), inter-calculator
 //! scratch ([`ScratchNamespace`]), and the master loop's current
 //! [`IterationPosition`] (process, location, time). The component types
 //! live in [`crate::execution::execution_db`]; this module re-binds them onto the
 //! trait signatures.
 //!
-//! [`CalculatorOutput`] is the per-invocation result type. **Phase 2
-//! skeleton.** Task 50 (`DataFrameStore`) replaces it with a Polars
+//! [`CalculatorOutput`] is the per-invocation result type. 
+//! skeleton.** (`DataFrameStore`) replaces it with a Polars
 //! `DataFrame` once the data plane lands. Sealing the trait signature
-//! around the named placeholder type lets Phase 3 calculators start
+//! around the named placeholder type lets calculators start
 //! porting against a stable API today; widening the placeholder later
 //! does not break implementors.
 
@@ -79,33 +77,33 @@ use crate::execution::execution_db::{IterationPosition, ScratchNamespace};
 /// Runtime view of a calculator's inputs and scratch space — the in-memory
 /// equivalent of MOVES's MariaDB execution database.
 ///
-/// Owns the three pieces Task 23 specifies:
+/// Owns the three pieces specifies:
 ///
 /// * [`tables`](Self::tables) — per-run filtered default-DB tables,
-///   loaded once per run (slow tier).
+/// loaded once per run (slow tier).
 /// * [`scratch`](Self::scratch) — name-keyed inter-calculator scratch
-///   space (fast tier).
+/// space (fast tier).
 /// * [`position`](Self::position) — the current MasterLoop iteration /
-///   location / time triple.
+/// location / time triple.
 ///
-/// Calculators don't construct [`CalculatorContext`] themselves; Task 19's
+/// Calculators don't construct [`CalculatorContext`] themselves;'s
 /// registry materialises a fresh one on each
 /// [`MasterLoopable::execute_at_granularity`](crate::MasterLoopable::execute_at_granularity)
 /// callback and passes it by reference to [`Calculator::execute`] /
 /// [`Generator::execute`].
 ///
-/// The slow and scratch tiers are backed by [`InMemoryStore`] (Task 50). Phase 3
+/// The slow and scratch tiers are backed by [`InMemoryStore`].
 /// authors read `ctx.tables()`, write scratch via `ctx.scratch_mut()`, and
 /// read `ctx.position().location.county_id`, `ctx.position().time.hour`, etc.
 #[derive(Debug, Default)]
 pub struct CalculatorContext {
-    /// Shared, read-only slow-tier tables loaded once per run by
-    /// `InputDataManager`. The `Arc` allows all chunks in a run to share
-    /// the same loaded store without copying.
+ /// Shared, read-only slow-tier tables loaded once per run by
+ /// `InputDataManager`. The `Arc` allows all chunks in a run to share
+ /// the same loaded store without copying.
     slow: Arc<InMemoryStore>,
-    /// Per-chunk scratch namespace. Generators write here; downstream
-    /// calculators in the same chunk read. Each chunk owns an independent
-    /// `ScratchNamespace` so there is no cross-chunk scratch leakage.
+ /// Per-chunk scratch namespace. Generators write here; downstream
+ /// calculators in the same chunk read. Each chunk owns an independent
+ /// `ScratchNamespace` so there is no cross-chunk scratch leakage.
     scratch: ScratchNamespace,
     position: IterationPosition,
     /// The run's [`ModelScale`] (`targetRunSpec.scale`). `None` in the
@@ -118,15 +116,15 @@ pub struct CalculatorContext {
 }
 
 impl CalculatorContext {
-    /// Construct an empty context with start-of-run position.
+ /// Construct an empty context with start-of-run position.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Construct a context with the given position, leaving tables and
-    /// scratch empty. Convenient for tests that exercise position-aware
-    /// logic without touching the data plane.
+ /// Construct a context with the given position, leaving tables and
+ /// scratch empty. Convenient for tests that exercise position-aware
+ /// logic without touching the data plane.
     #[must_use]
     pub fn with_position(position: IterationPosition) -> Self {
         Self {
@@ -137,9 +135,9 @@ impl CalculatorContext {
         }
     }
 
-    /// Construct a context with pre-populated slow-tier store and
-    /// start-of-run position. Convenient for tests that seed the slow
-    /// tier before exercising a calculator body.
+ /// Construct a context with pre-populated slow-tier store and
+ /// start-of-run position. Convenient for tests that seed the slow
+ /// tier before exercising a calculator body.
     #[must_use]
     pub fn with_tables(store: InMemoryStore) -> Self {
         Self {
@@ -150,8 +148,8 @@ impl CalculatorContext {
         }
     }
 
-    /// Construct a context with the given position and pre-populated
-    /// slow-tier store.
+ /// Construct a context with the given position and pre-populated
+ /// slow-tier store.
     #[must_use]
     pub fn with_position_and_tables(position: IterationPosition, store: InMemoryStore) -> Self {
         Self {
@@ -162,9 +160,9 @@ impl CalculatorContext {
         }
     }
 
-    /// Construct a context sharing an existing slow-tier `Arc<InMemoryStore>`.
-    /// Used by the engine to give each chunk access to the run-level slow
-    /// store without cloning the data.
+ /// Construct a context sharing an existing slow-tier `Arc<InMemoryStore>`.
+ /// Used by the engine to give each chunk access to the run-level slow
+ /// store without cloning the data.
     #[must_use]
     pub fn with_slow(slow: Arc<InMemoryStore>) -> Self {
         Self {
@@ -175,42 +173,42 @@ impl CalculatorContext {
         }
     }
 
-    /// Per-run filtered default-DB tables. Calculators read from this in
-    /// their [`Calculator::execute`] body, indexing by the canonical
-    /// table names declared in [`Calculator::input_tables`].
+ /// Per-run filtered default-DB tables. Calculators read from this in
+ /// their [`Calculator::execute`] body, indexing by the canonical
+ /// table names declared in [`Calculator::input_tables`].
     #[must_use]
     pub fn tables(&self) -> &InMemoryStore {
         &self.slow
     }
 
-    /// Mutable access to the slow-tier store. Uses `Arc::make_mut` so the
-    /// store is cloned only when the `Arc` has multiple owners.
+ /// Mutable access to the slow-tier store. Uses `Arc::make_mut` so the
+ /// store is cloned only when the `Arc` has multiple owners.
     pub fn tables_mut(&mut self) -> &mut InMemoryStore {
         Arc::make_mut(&mut self.slow)
     }
 
-    /// Inter-calculator scratch namespace. Calculators read from here.
+ /// Inter-calculator scratch namespace. Calculators read from here.
     #[must_use]
     pub fn scratch(&self) -> &ScratchNamespace {
         &self.scratch
     }
 
-    /// Mutable scratch namespace. Generators write here in their
-    /// [`Generator::execute`] body; downstream calculators in the same
-    /// chunk read via [`scratch`](Self::scratch).
+ /// Mutable scratch namespace. Generators write here in their
+ /// [`Generator::execute`] body; downstream calculators in the same
+ /// chunk read via [`scratch`](Self::scratch).
     pub fn scratch_mut(&mut self) -> &mut ScratchNamespace {
         &mut self.scratch
     }
 
-    /// Current MasterLoop iteration / location / time triple.
+ /// Current MasterLoop iteration / location / time triple.
     #[must_use]
     pub fn position(&self) -> &IterationPosition {
         &self.position
     }
 
-    /// Update the iteration position. Called by the engine adapter before
-    /// each module invocation so the context reflects the loop's current
-    /// position without replacing the shared slow tier or scratch.
+ /// Update the iteration position. Called by the engine adapter before
+ /// each module invocation so the context reflects the loop's current
+ /// position without replacing the shared slow tier or scratch.
     pub fn set_position(&mut self, position: IterationPosition) {
         self.position = position;
     }
@@ -241,15 +239,15 @@ pub struct CalculatorOutput {
 }
 
 impl CalculatorOutput {
-    /// Construct an output carrying no DataFrame — for calculators that write
-    /// only to scratch or produce no direct output.
+ /// Construct an output carrying no DataFrame — for calculators that write
+ /// only to scratch or produce no direct output.
     #[must_use]
     pub fn empty() -> Self {
         Self { dataframe: None }
     }
 
-    /// Construct an output wrapping `df` — for calculators that return a
-    /// result table (e.g. `MOVESWorkerActivityOutput`).
+ /// Construct an output wrapping `df` — for calculators that return a
+ /// result table (e.g. `MOVESWorkerActivityOutput`).
     #[must_use]
     pub fn with_dataframe(df: DataFrame) -> Self {
         Self {
@@ -257,21 +255,20 @@ impl CalculatorOutput {
         }
     }
 
-    /// Borrow the contained DataFrame, if any.
+ /// Borrow the contained DataFrame, if any.
     #[must_use]
     pub fn dataframe(&self) -> Option<&DataFrame> {
         self.dataframe.as_ref()
     }
 
-    /// Consume `self` and return the owned DataFrame, if any.
+ /// Consume `self` and return the owned DataFrame, if any.
     #[must_use]
     pub fn into_dataframe(self) -> Option<DataFrame> {
         self.dataframe
     }
 }
 
-/// One MasterLoop subscription declared by a calculator or generator —
-/// the Rust analogue of one `Subscribe` directive in `CalculatorInfo.txt`.
+/// One MasterLoop subscription declared by a calculator or generator/// the Rust analogue of one `Subscribe` directive in `CalculatorInfo.txt`.
 ///
 /// A single module may carry multiple subscriptions: e.g. a calculator that
 /// covers both running and start exhaust processes at the same granularity
@@ -279,20 +276,20 @@ impl CalculatorOutput {
 ///
 /// Priority is stored as the rich [`Priority`] type so the source reads as
 /// `Priority::parse("EMISSION_CALCULATOR+1").unwrap()` rather than as a
-/// magic-number `11`. Task 19's registry calls [`Priority::value`] when
+/// magic-number `11`. registry calls [`Priority::value`] when
 /// composing the underlying [`MasterLoopableSubscription`](crate::MasterLoopableSubscription).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CalculatorSubscription {
-    /// MOVES process this subscription is gated to.
+ /// MOVES process this subscription is gated to.
     pub process_id: ProcessId,
-    /// Granularity bucket the subscription fires in.
+ /// Granularity bucket the subscription fires in.
     pub granularity: Granularity,
-    /// Priority within the granularity bucket.
+ /// Priority within the granularity bucket.
     pub priority: Priority,
 }
 
 impl CalculatorSubscription {
-    /// Construct a subscription from its three components.
+ /// Construct a subscription from its three components.
     #[must_use]
     pub fn new(process_id: ProcessId, granularity: Granularity, priority: Priority) -> Self {
         Self {
@@ -306,60 +303,59 @@ impl CalculatorSubscription {
 /// Contract every MOVES emission calculator implements.
 ///
 /// Ports `EmissionCalculator.java` plus the metadata stubs in
-/// `GenericCalculatorBase.java`. Phase 3 (Tasks 30–88) lands one
+/// `GenericCalculatorBase.java`. lands one
 /// implementor per Java calculator class.
 ///
-/// A `Calculator` is a value type that owns no per-run state — Task 19's
+/// A `Calculator` is a value type that owns no per-run state —'s
 /// registry instantiates one per chain-DAG entry and reuses it across the
 /// run. All run-varying inputs flow through the [`CalculatorContext`]
 /// argument to [`execute`](Self::execute).
 pub trait Calculator: Send + Sync + std::fmt::Debug {
-    /// Stable identifier matching the calculator's name in the chain DAG
-    /// (the `ModuleEntry::name` from
-    /// [`moves_calculator_info::CalculatorDag::modules`]).
-    /// Used by the registry to wire chain edges between calculators.
+ /// Stable identifier matching the calculator's name in the chain DAG
+ /// (the `ModuleEntry::name` from
+ /// [`moves_calculator_info::CalculatorDag::modules`]).
+ /// Used by the registry to wire chain edges between calculators.
     fn name(&self) -> &'static str;
 
-    /// `(process, granularity, priority)` triples this calculator subscribes
-    /// to. Most calculators return a single-entry slice; a few subscribe
-    /// at multiple granularities for different processes — those return one
-    /// row per `Subscribe` directive recorded in `CalculatorInfo.txt`.
+ /// `(process, granularity, priority)` triples this calculator subscribes
+ /// to. Most calculators return a single-entry slice; a few subscribe
+ /// at multiple granularities for different processes — those return one
+ /// row per `Subscribe` directive recorded in `CalculatorInfo.txt`.
     fn subscriptions(&self) -> &[CalculatorSubscription];
 
-    /// `(pollutant, process)` pairs this calculator produces output for —
-    /// the `Registration` directives in `CalculatorInfo.txt`.
-    ///
-    /// Returned slice is allowed to be empty for the rare calculator that
-    /// only produces intermediate scratch data and registers nothing for
-    /// direct output. Most calculators register at least one pair.
+ /// `(pollutant, process)` pairs this calculator produces output for /// the `Registration` directives in `CalculatorInfo.txt`.
+ ///
+ /// Returned slice is allowed to be empty for the rare calculator that
+ /// only produces intermediate scratch data and registers nothing for
+ /// direct output. Most calculators register at least one pair.
     fn registrations(&self) -> &[PollutantProcessAssociation];
 
-    /// Names of upstream calculators/generators whose output this
-    /// calculator's chain consumes. Each name matches a `ModuleEntry::name`
-    /// elsewhere in the registry — the registry validates closure during
-    /// startup.
-    ///
-    /// Default empty: root subscribers don't depend on anything upstream.
+ /// Names of upstream calculators/generators whose output this
+ /// calculator's chain consumes. Each name matches a `ModuleEntry::name`
+ /// elsewhere in the registry — the registry validates closure during
+ /// startup.
+ ///
+ /// Default empty: root subscribers don't depend on anything upstream.
     fn upstream(&self) -> &[&'static str] {
         &[]
     }
 
-    /// Default-DB / per-run scratch tables this calculator reads from
-    /// [`CalculatorContext`]. Task 24 (`InputDataManager`) uses these to
-    /// drive lazy loading and dependency analysis.
-    ///
-    /// Names are the canonical default-DB table names (e.g.
-    /// `"sourceUseTypePopulation"`); the registry maps them onto Parquet
-    /// snapshot files when materialising the context.
-    ///
-    /// Default empty: calculator authors fill this in as they port.
+ /// Default-DB / per-run scratch tables this calculator reads from
+ /// [`CalculatorContext`]. (`InputDataManager`) uses these to
+ /// drive lazy loading and dependency analysis.
+ ///
+ /// Names are the canonical default-DB table names (e.g.
+ /// `"sourceUseTypePopulation"`); the registry maps them onto Parquet
+ /// snapshot files when materialising the context.
+ ///
+ /// Default empty: calculator authors fill this in as they port.
     fn input_tables(&self) -> &[&'static str] {
         &[]
     }
 
-    /// Run the calculator. Called once per iteration at the registered
-    /// granularity. Returns a [`CalculatorOutput`] (Task 50: a Polars
-    /// `DataFrame`) of emission rows ready to merge into the master output.
+ /// Run the calculator. Called once per iteration at the registered
+ /// granularity. Returns a [`CalculatorOutput`] (: a Polars
+ /// `DataFrame`) of emission rows ready to merge into the master output.
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error>;
 }
 
@@ -371,45 +367,45 @@ pub trait Calculator: Send + Sync + std::fmt::Debug {
 /// register `(pollutant, process)` pairs — their output is intermediate,
 /// not part of the emission tally.
 ///
-/// Phase 3 generator implementations live in `moves-calculators` alongside
+/// generator implementations live in `moves-calculators` alongside
 /// the calculators (the chain DAG groups them together).
 pub trait Generator: Send + Sync + std::fmt::Debug {
-    /// Stable identifier matching the generator's name in the chain DAG.
+ /// Stable identifier matching the generator's name in the chain DAG.
     fn name(&self) -> &'static str;
 
-    /// `(process, granularity, priority)` triples this generator subscribes
-    /// to. Generators typically subscribe at a coarser granularity than the
-    /// calculators that consume their output (e.g. PROCESS or COUNTY), so
-    /// the generated tables are reused across many inner-loop iterations.
+ /// `(process, granularity, priority)` triples this generator subscribes
+ /// to. Generators typically subscribe at a coarser granularity than the
+ /// calculators that consume their output (e.g. PROCESS or COUNTY), so
+ /// the generated tables are reused across many inner-loop iterations.
     fn subscriptions(&self) -> &[CalculatorSubscription];
 
-    /// Names of upstream generators/calculators this generator depends on.
-    /// Defaults to empty.
+ /// Names of upstream generators/calculators this generator depends on.
+ /// Defaults to empty.
     fn upstream(&self) -> &[&'static str] {
         &[]
     }
 
-    /// Default-DB / per-run scratch tables this generator reads from
-    /// [`CalculatorContext`]. Defaults to empty.
+ /// Default-DB / per-run scratch tables this generator reads from
+ /// [`CalculatorContext`]. Defaults to empty.
     fn input_tables(&self) -> &[&'static str] {
         &[]
     }
 
-    /// Scratch-namespace tables this generator writes. Downstream
-    /// calculators name these in their own [`Calculator::input_tables`] to
-    /// declare the dependency. Defaults to empty.
+ /// Scratch-namespace tables this generator writes. Downstream
+ /// calculators name these in their own [`Calculator::input_tables`] to
+ /// declare the dependency. Defaults to empty.
     fn output_tables(&self) -> &[&'static str] {
         &[]
     }
 
-    /// Run the generator. Called once per iteration at the registered
-    /// granularity. The returned [`CalculatorOutput`] is stored under the
-    /// generator's [`output_tables`](Self::output_tables) names by the
-    /// registry (Task 19).
-    ///
-    /// Receives `&mut CalculatorContext` so the generator can write to
-    /// [`CalculatorContext::scratch_mut`]. The mutable borrow is
-    /// exclusive within the chunk's sequential execution — no aliasing.
+ /// Run the generator. Called once per iteration at the registered
+ /// granularity. The returned [`CalculatorOutput`] is stored under the
+ /// generator's [`output_tables`](Self::output_tables) names by the
+ /// registry.
+ ///
+ /// Receives `&mut CalculatorContext` so the generator can write to
+ /// [`CalculatorContext::scratch_mut`]. The mutable borrow is
+ /// exclusive within the chunk's sequential execution — no aliasing.
     fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error>;
 }
 
@@ -418,10 +414,9 @@ mod tests {
     use super::*;
     use moves_data::PollutantId;
 
-    /// Minimal `Calculator` implementor exercising every trait method —
-    /// shape check for the API. The body returns
-    /// [`CalculatorOutput::empty`] so this is a compile-and-call smoke test,
-    /// not a numerical check.
+ /// Minimal `Calculator` implementor exercising every trait method /// shape check for the API. The body returns
+ /// [`CalculatorOutput::empty`] so this is a compile-and-call smoke test,
+ /// not a numerical check.
     #[derive(Debug)]
     struct DummyCalculator;
 
@@ -451,7 +446,7 @@ mod tests {
         }
     }
 
-    /// Minimal `Generator` implementor exercising every trait method.
+ /// Minimal `Generator` implementor exercising every trait method.
     #[derive(Debug)]
     struct DummyGenerator;
 
@@ -490,7 +485,7 @@ mod tests {
         let gen = DummyGenerator;
         assert_eq!(gen.name(), "DummyGenerator");
         assert!(gen.subscriptions().is_empty());
-        // Default-impl defaults exercise — upstream + input_tables not overridden.
+ // Default-impl defaults exercise — upstream + input_tables not overridden.
         assert!(gen.upstream().is_empty());
         assert!(gen.input_tables().is_empty());
         assert_eq!(gen.output_tables(), &["sourceBinDistribution"]);
@@ -500,8 +495,8 @@ mod tests {
 
     #[test]
     fn calculator_can_be_held_as_trait_object() {
-        // The registry (Task 19) will store calculators as `Box<dyn Calculator>`;
-        // verify the trait is object-safe and a calculator value can be coerced.
+ // The registry will store calculators as `Box<dyn Calculator>`;
+ // verify the trait is object-safe and a calculator value can be coerced.
         let calcs: Vec<Box<dyn Calculator>> = vec![Box::new(DummyCalculator)];
         assert_eq!(calcs[0].name(), "DummyCalculator");
     }
@@ -514,8 +509,8 @@ mod tests {
 
     #[test]
     fn calculator_subscription_round_trip() {
-        // Build a subscription with realistic process + granularity + priority
-        // and assert the components stick.
+ // Build a subscription with realistic process + granularity + priority
+ // and assert the components stick.
         let sub = CalculatorSubscription::new(
             ProcessId(1), // Running Exhaust
             Granularity::Hour,
@@ -528,8 +523,8 @@ mod tests {
 
     #[test]
     fn calculator_subscription_is_copy_and_eq() {
-        // Subscriptions need `Copy` for the slice-returning trait method API:
-        // calculator structs hold them in `static` arrays without `Clone` boilerplate.
+ // Subscriptions need `Copy` for the slice-returning trait method API:
+ // calculator structs hold them in `static` arrays without `Clone` boilerplate.
         let a = CalculatorSubscription::new(
             ProcessId(2),
             Granularity::Hour,
@@ -539,10 +534,10 @@ mod tests {
         assert_eq!(a, b);
     }
 
-    /// Realistic shape test: a calculator with non-empty registrations
-    /// and a multi-process subscription set, mirroring how Phase 3
-    /// calculators will look once they land. Uses canonical `Pollutant` /
-    /// `Process` ids from the MOVES default DB.
+ /// Realistic shape test: a calculator with non-empty registrations
+ /// and a multi-process subscription set, mirroring how
+ /// calculators will look once they land. Uses canonical `Pollutant` /
+ /// `Process` ids from the MOVES default DB.
     #[derive(Debug)]
     struct ExampleRealisticCalculator;
 
@@ -595,8 +590,8 @@ mod tests {
 
     #[test]
     fn context_default_position_is_start_of_run() {
-        // The default-constructed context puts the master loop at the
-        // pre-iteration state — no process, no location, no time.
+ // The default-constructed context puts the master loop at the
+ // pre-iteration state — no process, no location, no time.
         let ctx = CalculatorContext::new();
         let pos = ctx.position();
         assert_eq!(pos.iteration, 0);
@@ -607,9 +602,9 @@ mod tests {
 
     #[test]
     fn context_with_position_carries_through_execute() {
-        // Calculators reach the position through `ctx.position()`. Build a
-        // context at HOUR granularity and verify a Calculator body can
-        // read each component from the accessor chain.
+ // Calculators reach the position through `ctx.position()`. Build a
+ // context at HOUR granularity and verify a Calculator body can
+ // read each component from the accessor chain.
         use crate::execution::execution_db::{ExecutionLocation, ExecutionTime, IterationPosition};
         let pos = IterationPosition {
             iteration: 0,
@@ -619,11 +614,11 @@ mod tests {
         };
         let ctx = CalculatorContext::with_position(pos);
         let calc = DummyCalculator;
-        // Calculator body doesn't read the context — just verify it can
-        // be called with the populated context.
+ // Calculator body doesn't read the context — just verify it can
+ // be called with the populated context.
         let _out = calc.execute(&ctx).expect("execute ok");
-        // And verify the position is readable through the public accessor
-        // (matches what Phase 3 calculator bodies will do).
+ // And verify the position is readable through the public accessor
+ // (matches what calculator bodies will do).
         assert_eq!(ctx.position().process_id, Some(ProcessId(1)));
         assert_eq!(ctx.position().location.state_id, Some(40));
         assert_eq!(ctx.position().location.link_id, Some(4_000_111));

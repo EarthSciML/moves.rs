@@ -10,30 +10,30 @@
 //!
 //! | File | Lines | Role | Task |
 //! |---|---|---|---|
-//! | `prccty.f` |   790 | County-level processing       | 109 |
-//! | `prcsta.f` | 1,034 | State-level processing        | 110 |
-//! | `prcsub.f` |   829 | Subcounty-level processing    | 109 |
-//! | `prcus.f`  |   775 | US-total processing           | 111 |
-//! | `prc1st.f` |   785 | State-from-national derivation | 110 |
-//! | `prcnat.f` |   943 | National-level processing     | 111 |
+//! | `prccty.f` | 790 | County-level processing | 109 |
+//! | `prcsta.f` | 1,034 | State-level processing | 110 |
+//! | `prcsub.f` | 829 | Subcounty-level processing | 109 |
+//! | `prcus.f` | 775 | US-total processing | 111 |
+//! | `prc1st.f` | 785 | State-from-national derivation | 110 |
+//! | `prcnat.f` | 943 | National-level processing | 111 |
 //!
-//! Tasks 109–111 port the routines as separate functions for
-//! fidelity. Task 112 then refactors them into a single parameterised
+//! port the routines as separate functions for
+//! fidelity. then refactors them into a single parameterised
 //! routine, removing ~3,000 lines of duplication. The refactor is
-//! gated on characterization-fixture parity (Phase 0).
+//! gated on characterization-fixture parity.
 //!
 //! # Status
 //!
-//! - Task 109 ([`county`], [`subcounty`]) — ported, then merged by
-//!   Task 112: `prccty.f` and `prcsub.f` now share the single
-//!   parameterised [`process_geography`] routine (in the private
-//!   `process` submodule). The [`county`] and [`subcounty`]
-//!   submodules hold thin wrappers that pick a [`ProcessLevel`];
-//!   both still share types/helpers via the private `common`
-//!   submodule.
-//! - Task 111 ([`prcnat`], [`prcus`]) — ported. National and US-total
-//!   processing.
-//! - Task 110 — pending; its submodule will sit beside these.
+//! - ([`county`], [`subcounty`]) — ported, then merged by
+//! : `prccty.f` and `prcsub.f` now share the single
+//! parameterised [`process_geography`] routine (in the private
+//! `process` submodule). The [`county`] and [`subcounty`]
+//! submodules hold thin wrappers that pick a [`ProcessLevel`];
+//! both still share types/helpers via the private `common`
+//! submodule.
+//! - ([`prcnat`], [`prcus`]) — ported. National and US-total
+//! processing.
+//! - — pending; its submodule will sit beside these.
 //!
 //! # Design overview
 //!
@@ -44,17 +44,17 @@
 //! but:
 //!
 //! 1. Replaces COMMON-block reads with explicit fields on the
-//!    per-record [`EquipmentRecord`] and per-run [`RunOptions`] inputs.
+//! per-record [`EquipmentRecord`] and per-run [`RunOptions`] inputs.
 //! 2. Replaces dynamic lookup-and-table state with caller-supplied
-//!    callback closures (`find_*`, `growth_factor_fn`, etc.) so the
-//!    routines stay testable without dragging in every input parser.
+//! callback closures (`find_*`, `growth_factor_fn`, etc.) so the
+//! routines stay testable without dragging in every input parser.
 //! 3. Replaces Fortran-style `IOWSTD`/`IOWMSG` writes plus the
-//!    `wrtdat`/`wrtbmy`/`sitot` output routines with structured
-//!    [`StateOutput`], [`ByModelYearOutput`], and [`SiAggregate`]
-//!    records returned in [`GeographyOutput`]. Task 114 owns the
-//!    actual writers; this module is format-agnostic.
+//! `wrtdat`/`wrtbmy`/`sitot` output routines with structured
+//! [`StateOutput`], [`ByModelYearOutput`], and [`SiAggregate`]
+//! records returned in [`GeographyOutput`]. owns the
+//! actual writers; this module is format-agnostic.
 //! 4. Replaces `chkwrn` non-fatal-warning side effects with explicit
-//!    [`GeographyWarning`] entries on the output.
+//! [`GeographyWarning`] entries on the output.
 //!
 //! The numerical core (deterioration, EF lookup, emission
 //! accumulation, retrofit reduction) lives in the existing
@@ -98,37 +98,37 @@ use crate::emissions::exhaust::{ActivityUnit, FuelKind};
 /// isolation.
 #[derive(Debug, Clone, Copy)]
 pub struct RunOptions {
-    /// Episode year — `iepyr` in `nonrdusr.inc`. Anchors the
-    /// MXAGYR-deep model-year loop.
+ /// Episode year — `iepyr` in `nonrdusr.inc`. Anchors the
+ /// MXAGYR-deep model-year loop.
     pub episode_year: i32,
-    /// Growth year — `igryr` in `nonrdusr.inc`. Used by
-    /// [`crate::population::age_distribution`].
+ /// Growth year — `igryr` in `nonrdusr.inc`. Used by
+ /// [`crate::population::age_distribution`].
     pub growth_year: i32,
-    /// Technology year — `itchyr` in `nonrdusr.inc`. Capped via
-    /// `min(model_year, itchyr)` when looking up tech-type data.
+ /// Technology year — `itchyr` in `nonrdusr.inc`. Capped via
+ /// `min(model_year, itchyr)` when looking up tech-type data.
     pub tech_year: i32,
-    /// Fuel kind of the current equipment record — `ifuel` from
-    /// `nonrdeqp.inc`.
+ /// Fuel kind of the current equipment record — `ifuel` from
+ /// `nonrdeqp.inc`.
     pub fuel: FuelKind,
-    /// `true` when the run is in "total" mode (`ismtyp == IDXTOT`);
-    /// `false` when in typical-day mode.
+ /// `true` when the run is in "total" mode (`ismtyp == IDXTOT`);
+ /// `false` when in typical-day mode.
     pub total_mode: bool,
-    /// `true` when day-of-year output is requested (`ldayfl`).
+ /// `true` when day-of-year output is requested (`ldayfl`).
     pub daily_output: bool,
-    /// `true` when by-model-year exhaust output is requested
-    /// (`lbmyfl`).
+ /// `true` when by-model-year exhaust output is requested
+ /// (`lbmyfl`).
     pub emit_bmy: bool,
-    /// `true` when by-model-year evap output is requested
-    /// (`levbmyfl`).
+ /// `true` when by-model-year evap output is requested
+ /// (`levbmyfl`).
     pub emit_bmy_evap: bool,
-    /// `true` when the SI report is requested (`lsifl`).
+ /// `true` when the SI report is requested (`lsifl`).
     pub emit_si: bool,
-    /// `true` when the growth-file packet was loaded (`lgrwfl`).
+ /// `true` when the growth-file packet was loaded (`lgrwfl`).
     pub growth_loaded: bool,
-    /// `true` when retrofit records were loaded (`lrtrftfl`).
+ /// `true` when retrofit records were loaded (`lrtrftfl`).
     pub retrofit_loaded: bool,
-    /// `true` when the spillage / refueling-mode packet was loaded
-    /// (`lfacfl(IDXSPL)`). Drives evap setup.
+ /// `true` when the spillage / refueling-mode packet was loaded
+ /// (`lfacfl(IDXSPL)`). Drives evap setup.
     pub spillage_loaded: bool,
 }
 
@@ -136,14 +136,14 @@ pub struct RunOptions {
 /// `statcd`/`lstacd`/`lstlev` parallel COMMON arrays.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StateDescriptor {
-    /// 5-character state FIPS code (`statcd(i)`).
+ /// 5-character state FIPS code (`statcd(i)`).
     pub fips: String,
-    /// `true` iff the state is requested for the current run
-    /// (`lstacd(i)`).
+ /// `true` iff the state is requested for the current run
+ /// (`lstacd(i)`).
     pub selected: bool,
-    /// `true` iff the state has its own state-level population
-    /// records and should not be allocated from the national total
-    /// (`lstlev(i)`).
+ /// `true` iff the state has its own state-level population
+ /// records and should not be allocated from the national total
+ /// (`lstlev(i)`).
     pub has_state_records: bool,
 }
 
@@ -151,23 +151,23 @@ pub struct StateDescriptor {
 /// `prcus.f` read from `nonrdeqp.inc` arrays indexed by `icurec`.
 #[derive(Debug, Clone, Copy)]
 pub struct EquipmentRecord {
-    /// HP-range minimum (`hprang(1, icurec)`).
+ /// HP-range minimum (`hprang(1, icurec)`).
     pub hp_range_min: f32,
-    /// HP-range maximum (`hprang(2, icurec)`).
+ /// HP-range maximum (`hprang(2, icurec)`).
     pub hp_range_max: f32,
-    /// Average HP for this HP category (`avghpc(icurec)`).
+ /// Average HP for this HP category (`avghpc(icurec)`).
     pub hp_avg: f32,
-    /// Equipment population for the record (`popeqp(icurec)`).
+ /// Equipment population for the record (`popeqp(icurec)`).
     pub population: f32,
-    /// Population-input year (`ipopyr(icurec)`).
+ /// Population-input year (`ipopyr(icurec)`).
     pub pop_year: i32,
-    /// Average use-hours from population input (`usehrs(icurec)`).
+ /// Average use-hours from population input (`usehrs(icurec)`).
     pub use_hours: f32,
-    /// Discharge / scrappage code (`discod(icurec)`).
+ /// Discharge / scrappage code (`discod(icurec)`).
     pub discharge_code: i32,
-    /// Starts hours from population input (`starts(idxact)` is
-    /// independent, but the population record carries it
-    /// alongside).
+ /// Starts hours from population input (`starts(idxact)` is
+ /// independent, but the population record carries it
+ /// alongside).
     pub starts_hours: f32,
 }
 
@@ -177,47 +177,47 @@ pub struct EquipmentRecord {
 /// `actlev(idxact)`, `starts(idxact)`).
 #[derive(Debug, Clone)]
 pub struct ActivityLookup {
-    /// `faclod(idxact)`.
+ /// `faclod(idxact)`.
     pub load_factor: f32,
-    /// `iactun(idxact)`.
+ /// `iactun(idxact)`.
     pub units: ActivityUnit,
-    /// `actlev(idxact)`.
+ /// `actlev(idxact)`.
     pub activity_level: f32,
-    /// `starts(idxact)` — supplied via the activity-file's parallel
-    /// stream (the Fortran source loads it from `actrcd` extension
-    /// arrays).
+ /// `starts(idxact)` — supplied via the activity-file's parallel
+ /// stream (the Fortran source loads it from `actrcd` extension
+ /// arrays).
     pub starts_value: f32,
-    /// `actage(idxact)` — the alternate-curve identifier.
+ /// `actage(idxact)` — the alternate-curve identifier.
     pub age_curve_id: String,
 }
 
 /// Per-call output records. Replaces the Fortran routines'
 /// `wrtdat`/`wrtbmy`/`sitot` side effects with a structured
-/// collection the driver (Task 113) can hand to the writer (Task 114).
+/// collection the driver can hand to the writer.
 #[derive(Debug, Default, Clone)]
 pub struct GeographyOutput {
-    /// One [`StateOutput`] per state / FIPS the routine produced.
-    /// `prcnat` produces one per state in `NSTATE`; `prcus`
-    /// produces one with `fips == "00000"`.
+ /// One [`StateOutput`] per state / FIPS the routine produced.
+ /// `prcnat` produces one per state in `NSTATE`; `prcus`
+ /// produces one with `fips == "00000"`.
     pub state_outputs: Vec<StateOutput>,
-    /// One [`ByModelYearOutput`] entry per `(state, model_year,
-    /// tech_type, channel)` tuple the run requested. Empty when
-    /// `emit_bmy`/`emit_bmy_evap` are both false.
+ /// One [`ByModelYearOutput`] entry per `(state, model_year,
+ /// tech_type, channel)` tuple the run requested. Empty when
+ /// `emit_bmy`/`emit_bmy_evap` are both false.
     pub bmy_outputs: Vec<ByModelYearOutput>,
-    /// One [`SiAggregate`] entry per `(state, tech_type, channel)`
-    /// tuple. Empty when `emit_si` is false.
+ /// One [`SiAggregate`] entry per `(state, tech_type, channel)`
+ /// tuple. Empty when `emit_si` is false.
     pub si_aggregates: Vec<SiAggregate>,
-    /// Non-fatal warnings emitted during the call. Mirrors the
-    /// `chkwrn` warning channel.
+ /// Non-fatal warnings emitted during the call. Mirrors the
+ /// `chkwrn` warning channel.
     pub warnings: Vec<GeographyWarning>,
-    /// Number of national-level records the routine processed
-    /// (Fortran `nnatrc`, incremented once per `prcnat` call where
-    /// the state index is national). Returned for parity with the
-    /// Fortran counter; the driver typically aggregates these.
+ /// Number of national-level records the routine processed
+ /// (Fortran `nnatrc`, incremented once per `prcnat` call where
+ /// the state index is national). Returned for parity with the
+ /// Fortran counter; the driver typically aggregates these.
     pub national_record_count: i32,
-    /// Per-state national-allocation record counts (Fortran
-    /// `nstarc(idx)`). Same length as `state_outputs`; ordered to
-    /// match.
+ /// Per-state national-allocation record counts (Fortran
+ /// `nstarc(idx)`). Same length as `state_outputs`; ordered to
+ /// match.
     pub state_record_counts: Vec<i32>,
 }
 
@@ -227,75 +227,75 @@ pub struct GeographyOutput {
 /// scaling).
 #[derive(Debug, Clone, PartialEq)]
 pub struct StateOutput {
-    /// 5-character FIPS code (state for `prcnat`; `"00000"` for
-    /// `prcus`).
+ /// 5-character FIPS code (state for `prcnat`; `"00000"` for
+ /// `prcus`).
     pub fips: String,
-    /// 5-character subcounty code (blank `"     "` at the
-    /// state / national level).
+ /// 5-character subcounty code (blank `" "` at the
+ /// state / national level).
     pub subcounty: String,
-    /// 10-character SCC code.
+ /// 10-character SCC code.
     pub scc: String,
-    /// HP-level representative (`hplev` in the Fortran source).
+ /// HP-level representative (`hplev` in the Fortran source).
     pub hp_level: f32,
-    /// Total population over all model years
-    /// (`poptot * modfrc(...)` sum).
+ /// Total population over all model years
+ /// (`poptot * modfrc(...)` sum).
     pub population: f32,
-    /// Total activity (`acttot`).
+ /// Total activity (`acttot`).
     pub activity: f32,
-    /// Total fuel consumption (`fulcsm`).
+ /// Total fuel consumption (`fulcsm`).
     pub fuel_consumption: f32,
-    /// Load factor (`faclod(idxact)`).
+ /// Load factor (`faclod(idxact)`).
     pub load_factor: f32,
-    /// HP average (`hpval`).
+ /// HP average (`hpval`).
     pub hp_avg: f32,
-    /// Fraction of fleet that's retrofitted (`fracretro`).
+ /// Fraction of fleet that's retrofitted (`fracretro`).
     pub frac_retrofitted: f32,
-    /// Units retrofitted (`unitsretro`).
+ /// Units retrofitted (`unitsretro`).
     pub units_retrofitted: f32,
-    /// Per-pollutant daily totals (`emsday`). Length [`MXPOL`].
-    /// Set to all `RMISS` when no activity record was found for the
-    /// state — preserves the Fortran missing-data semantics.
+ /// Per-pollutant daily totals (`emsday`). Length [`MXPOL`].
+ /// Set to all `RMISS` when no activity record was found for the
+ /// state — preserves the Fortran missing-data semantics.
     pub emissions_day: Vec<f32>,
-    /// `true` when the routine had to emit a "missing data"
-    /// (all-`RMISS`) record for this state.
+ /// `true` when the routine had to emit a "missing data"
+ /// (all-`RMISS`) record for this state.
     pub missing: bool,
 }
 
 /// Structured equivalent of one `wrtbmy` call (`output/bmy` writer).
 #[derive(Debug, Clone, PartialEq)]
 pub struct ByModelYearOutput {
-    /// State or national FIPS code.
+ /// State or national FIPS code.
     pub fips: String,
-    /// Subcounty code (`"     "` at state / national level).
+ /// Subcounty code (`" "` at state / national level).
     pub subcounty: String,
-    /// SCC.
+ /// SCC.
     pub scc: String,
-    /// HP level representative.
+ /// HP level representative.
     pub hp_level: f32,
-    /// Technology type identifier.
+ /// Technology type identifier.
     pub tech_type: String,
-    /// Model year.
+ /// Model year.
     pub model_year: i32,
-    /// Population for this `(model_year, tech)` bucket.
+ /// Population for this `(model_year, tech)` bucket.
     pub population: f32,
-    /// Per-pollutant emissions for this bucket. Length [`MXPOL`].
+ /// Per-pollutant emissions for this bucket. Length [`MXPOL`].
     pub emissions: Vec<f32>,
-    /// Fuel consumption for this bucket.
+ /// Fuel consumption for this bucket.
     pub fuel_consumption: f32,
-    /// Activity for this bucket.
+ /// Activity for this bucket.
     pub activity: f32,
-    /// Load factor (`faclod(idxact)`) or [`crate::common::consts::RMISS`]
-    /// for evap bucket — the Fortran source passes `RMISS` to the
-    /// evap branch of `wrtbmy`.
+ /// Load factor (`faclod(idxact)`) or [`crate::common::consts::RMISS`]
+ /// for evap bucket — the Fortran source passes `RMISS` to the
+ /// evap branch of `wrtbmy`.
     pub load_factor: f32,
-    /// HP average or `RMISS` for evap bucket (same convention).
+ /// HP average or `RMISS` for evap bucket (same convention).
     pub hp_avg: f32,
-    /// Fraction retrofitted for this bucket, or `RMISS` for evap.
+ /// Fraction retrofitted for this bucket, or `RMISS` for evap.
     pub frac_retrofitted: f32,
-    /// Units retrofitted for this bucket, or `RMISS` for evap.
+ /// Units retrofitted for this bucket, or `RMISS` for evap.
     pub units_retrofitted: f32,
-    /// 1 for exhaust, 2 for evap. Matches the Fortran `iexev`
-    /// argument of `wrtbmy`.
+ /// 1 for exhaust, 2 for evap. Matches the Fortran `iexev`
+ /// argument of `wrtbmy`.
     pub channel: u8,
 }
 
@@ -303,21 +303,21 @@ pub struct ByModelYearOutput {
 /// report. Mirrors one `sitot` call.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SiAggregate {
-    /// FIPS for the geographic bucket.
+ /// FIPS for the geographic bucket.
     pub fips: String,
-    /// SCC for the bucket.
+ /// SCC for the bucket.
     pub scc: String,
-    /// Technology type.
+ /// Technology type.
     pub tech_type: String,
-    /// Bucket's accumulated population.
+ /// Bucket's accumulated population.
     pub population: f32,
-    /// Bucket's accumulated activity.
+ /// Bucket's accumulated activity.
     pub activity: f32,
-    /// Bucket's accumulated fuel consumption.
+ /// Bucket's accumulated fuel consumption.
     pub fuel_consumption: f32,
-    /// Bucket's accumulated emissions (one slot per pollutant).
+ /// Bucket's accumulated emissions (one slot per pollutant).
     pub emissions: Vec<f32>,
-    /// 1 for exhaust, 2 for evap.
+ /// 1 for exhaust, 2 for evap.
     pub channel: u8,
 }
 
@@ -327,25 +327,25 @@ pub struct SiAggregate {
 /// Fortran source. The variant payload carries the context needed to
 /// reproduce the corresponding Fortran log entry; formatting itself
 /// is up to the caller (the writers in `output/` will format them in
-/// Task 114).
+///).
 #[derive(Debug, Clone, PartialEq)]
 pub enum GeographyWarning {
-    /// No exhaust technology fractions for `(SCC, HP, year)`.
-    /// `chkwrn(*, IDXWTC)`.
+ /// No exhaust technology fractions for `(SCC, HP, year)`.
+ /// `chkwrn(*, IDXWTC)`.
     MissingExhaustTech { scc: String, hp_avg: f32, year: i32 },
-    /// No evap technology fractions for `(SCC, HP, year)`.
-    /// `chkwrn(*, IDXWTC)`.
+ /// No evap technology fractions for `(SCC, HP, year)`.
+ /// `chkwrn(*, IDXWTC)`.
     MissingEvapTech { scc: String, hp_avg: f32, year: i32 },
-    /// No activity records for `(SCC, FIPS, HP range)`.
-    /// `chkwrn(*, IDXWAC)`.
+ /// No activity records for `(SCC, FIPS, HP range)`.
+ /// `chkwrn(*, IDXWAC)`.
     MissingActivity {
         scc: String,
         fips: String,
         hp_min: f32,
         hp_max: f32,
     },
-    /// No spillage data for `(SCC, HP, tech_type, evap_tech_type)`.
-    /// `chkwrn(*, IDXWEM)`.
+ /// No spillage data for `(SCC, HP, tech_type, evap_tech_type)`.
+ /// `chkwrn(*, IDXWEM)`.
     MissingSpillage {
         scc: String,
         hp_avg: f32,
@@ -359,11 +359,11 @@ pub enum GeographyWarning {
 /// tests can match on them without parsing message strings.
 #[derive(Debug, Clone, PartialEq)]
 pub enum GeographyError {
-    /// `prcnat.f` :7000 — couldn't find any allocation coefficients
-    /// for the SCC code while doing a national-to-state allocation.
+ /// `prcnat.f` :7000 — couldn't find any allocation coefficients
+ /// for the SCC code while doing a national-to-state allocation.
     AllocationNotFound { scc: String },
-    /// `prcus.f` / `prcnat.f` :7001 — couldn't find a growth indicator
-    /// cross-reference match for `(FIPS, SCC, HP)`.
+ /// `prcus.f` / `prcnat.f` :7001 — couldn't find a growth indicator
+ /// cross-reference match for `(FIPS, SCC, HP)`.
     GrowthIndicatorNotFound {
         fips: String,
         scc: String,
@@ -371,8 +371,8 @@ pub enum GeographyError {
         hp_min: f32,
         hp_max: f32,
     },
-    /// `prcus.f` / `prcnat.f` :7003 — growth-file packet missing
-    /// from the options file (gated by `lgrwfl`).
+ /// `prcus.f` / `prcnat.f` :7003 — growth-file packet missing
+ /// from the options file (gated by `lgrwfl`).
     GrowthFileMissing,
 }
 
@@ -493,7 +493,7 @@ pub fn missing_emissions() -> Vec<f32> {
 /// into a 5-space [`String`]. Both `prcnat.f` :246 and `prcus.f` :200
 /// initialise `subcur = ' '` (Fortran's blank-padded character
 /// variables; a single blank in source padded out to length 5). The
-/// Rust port uses `"     "` consistently — five spaces — so callers
+/// Rust port uses `" "` consistently — five spaces — so callers
 /// matching against the output can do byte-for-byte equality with
 /// the Fortran writer.
 pub fn blank_subcounty() -> String {
@@ -520,10 +520,10 @@ mod tests {
     #[test]
     fn hp_level_picks_first_exceeding() {
         let levels = [11.0, 25.0, 50.0, 100.0];
-        // midpoint 30 is > 11 (first), so we go to the "found" loop.
-        // First `lvl > 30` from `levels[1..]` is 50.
+ // midpoint 30 is > 11 (first), so we go to the "found" loop.
+ // First `lvl > 30` from `levels[1..]` is 50.
         assert_eq!(hp_level_for_midpoint(30.0, &levels), 50.0);
-        // midpoint 24 — first lvl > 24 is 25.
+ // midpoint 24 — first lvl > 24 is 25.
         assert_eq!(hp_level_for_midpoint(24.0, &levels), 25.0);
     }
 

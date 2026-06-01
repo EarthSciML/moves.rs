@@ -14,11 +14,11 @@
 //!
 //! TSV cells are `Option<String>`. We coerce per column:
 //!
-//! * `Int64`  — `String::parse::<i64>` → returns [`Error::Parse`] on miss.
+//! * `Int64` — `String::parse::<i64>` → returns [`Error::Parse`] on miss.
 //! * `Float64` — `String::parse::<f64>` → likewise.
 //! * `Boolean` — `0`/`1`/`true`/`false` (case-insensitive); other values
-//!   error.
-//! * `Utf8`   — passthrough.
+//! error.
+//! * `Utf8` — passthrough.
 //!
 //! Nulls (TSV `NULL` literal) flow through every kind as Arrow null.
 

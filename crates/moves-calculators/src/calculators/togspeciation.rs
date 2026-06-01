@@ -1,5 +1,5 @@
 //! Port of `TOGSpeciationCalculator.java` and
-//! `database/TOGSpeciationCalculator.sql` — migration plan Phase 3, Task 70.
+//! `database/TOGSpeciationCalculator.sql` — .
 //!
 //! `TOGSpeciationCalculator` completes a requested **chemical-mechanism
 //! speciation** of organic-gas emissions by computing the **NonHAPTOG**
@@ -7,12 +7,11 @@
 //! modelled mechanism species have been subtracted out.
 //!
 //! It is the third member of the speciation family. The
-//! [`hcspeciation`](super::hcspeciation) calculator (Task 48) and its Nonroad
-//! counterpart [`nrhcspeciation`](super::nrhcspeciation) (Task 49) split total
+//! [`hcspeciation`](super::hcspeciation) calculator and its Nonroad
+//! counterpart [`nrhcspeciation`](super::nrhcspeciation) split total
 //! hydrocarbons into the five gross categories MOVES always reports (methane,
 //! NMHC, NMOG, TOG, VOC). This calculator works one level finer: it closes a
-//! mechanism speciation into individual hydrocarbon species (the CB05 set —
-//! `CB05_PAR`, `CB05_ALD2`, `CB05_OLE`, …).
+//! mechanism speciation into individual hydrocarbon species (the CB05 set//! `CB05_PAR`, `CB05_ALD2`, `CB05_OLE`, …).
 //!
 //! # Chained calculator
 //!
@@ -32,11 +31,11 @@
 //! A chemical mechanism (e.g. CB05) assigns the organic-gas mass of an
 //! emission to a fixed set of named species. MOVES models the individually
 //! named species upstream; this calculator produces the leftover — `NonHAPTOG`
-//! — so that the named species plus the residual reconstitute the whole. For
+//! so that the named species plus the residual reconstitute the whole. For
 //! one mechanism's *integrated species set* and one output dimensional cell:
 //!
 //! ```text
-//! NonHAPTOG = NMOG − Σ (integrated-species emission),   clamped to ≥ 0
+//! NonHAPTOG = NMOG − Σ (integrated-species emission), clamped to ≥ 0
 //! ```
 //!
 //! `NMOG` (non-methane organic gas, pollutant 80) is the organic-gas total the
@@ -54,29 +53,29 @@
 //! algorithm-bearing statements into one accumulation pass:
 //!
 //! 1. **Synthesise NMOG** (SQL `insert ignore … select distinct … 80 …`).
-//!    Every distinct `(mechanismID, integratedSpeciesSetID)` that lists any
-//!    non-NMOG pollutant gains an NMOG (80) row if it lacks one. NMOG is the
-//!    positive term of the integration, so it must belong to every set.
-//!    `insert ignore` skips on the `(mechanism, set, pollutant)` primary key,
-//!    so an already-present NMOG row is never duplicated.
+//! Every distinct `(mechanismID, integratedSpeciesSetID)` that lists any
+//! non-NMOG pollutant gains an NMOG (80) row if it lacks one. NMOG is the
+//! positive term of the integration, so it must belong to every set.
+//! `insert ignore` skips on the `(mechanism, set, pollutant)` primary key,
+//! so an already-present NMOG row is never duplicated.
 //! 2. **Sign and fan out** (SQL stages the input pool as `mechanismID = 0`
-//!    rows, then `inner join integratedSpeciesSet using (pollutantID)`). Each
-//!    `MOVESWorkerOutput` row whose pollutant appears in `integratedSpeciesSet`
-//!    contributes to *every* `(mechanism, set)` that lists that pollutant. The
-//!    contribution is `+emission` when the pollutant is NMOG (80) and
-//!    `−emission` for any other (integrated-species) pollutant.
+//! rows, then `inner join integratedSpeciesSet using (pollutantID)`). Each
+//! `MOVESWorkerOutput` row whose pollutant appears in `integratedSpeciesSet`
+//! contributes to *every* `(mechanism, set)` that lists that pollutant. The
+//! contribution is `+emission` when the pollutant is NMOG (80) and
+//! `−emission` for any other (integrated-species) pollutant.
 //! 3. **Sum and clamp** (SQL `insert into MOVESWorkerOutput … select …
-//!    greatest(sum(…), 0) … group by …`). The signed contributions are grouped
-//!    by `(mechanism, set)` and the output dimensional cell, summed, and
-//!    clamped to `≥ 0`. Each grouped result is one `NonHAPTOG` (88)
-//!    `MOVESWorkerOutput` row.
+//! greatest(sum(…), 0) … group by …`). The signed contributions are grouped
+//! by `(mechanism, set)` and the output dimensional cell, summed, and
+//! clamped to `≥ 0`. Each grouped result is one `NonHAPTOG` (88)
+//! `MOVESWorkerOutput` row.
 //!
 //! The SQL's `mechanismID = 0` is an internal staging sentinel; its final sum
 //! filters `where mechanismID <> 0` to drop the staged input pool. The
 //! extracted `integratedSpeciesSet` only ever carries real mechanism ids (the
 //! Java derives `mechanismID = 1 + (databaseKey − 1000) / 500`, always `≥ 1`),
 //! so the port — which stages nothing and accumulates only the signed fan-out
-//! — needs no equivalent of that filter.
+//! needs no equivalent of that filter.
 //!
 //! # Registrations vs. computed output
 //!
@@ -102,23 +101,23 @@
 //! SQL consumes: the extracted `integratedSpeciesSet` (the SQL's "Extract
 //! Data" section, filtered to the run's mechanisms) and the `MOVESWorkerOutput`
 //! rows the upstream calculators have already produced on the worker. A future
-//! Task 50 (`DataFrameStore`) wiring populates [`TogInputs`] from the run
+//! (`DataFrameStore`) wiring populates [`TogInputs`] from the run
 //! context.
 //!
 //! Three things the Java/SQL do are execution wiring, not the algorithm, and
 //! are left to that wiring:
 //!
 //! * The Java constructor and `subscribeToMe` query `pollutant`,
-//!   `rocspeciation` and `integratedSpeciesSet` to decide which
-//!   `(pollutant, process)` pairs to register and which calculators to chain
-//!   off. Those decisions are pre-resolved in `CalculatorInfo.txt` and
-//!   `calculator-dag.json`; this port reads its metadata methods from there.
+//! `rocspeciation` and `integratedSpeciesSet` to decide which
+//! `(pollutant, process)` pairs to register and which calculators to chain
+//! off. Those decisions are pre-resolved in `CalculatorInfo.txt` and
+//! `calculator-dag.json`; this port reads its metadata methods from there.
 //! * `doExecute` builds the `##mechanismIDs##` filter that narrows the
-//!   `integratedSpeciesSet` extract to the run's requested mechanisms — the
-//!   inputs reach `calculate` already filtered.
+//! `integratedSpeciesSet` extract to the run's requested mechanisms — the
+//! inputs reach `calculate` already filtered.
 //! * `needsFinalAggregation` flags whether a context was processed twice and a
-//!   final re-aggregation pass is owed. That is master-loop orchestration; one
-//!   `calculate` invocation already sums within itself.
+//! final re-aggregation pass is owed. That is master-loop orchestration; one
+//! `calculate` invocation already sums within itself.
 //!
 //! The `integratedSpeciesSet.useISSyn` column is **not** consulted by the
 //! `Section Processing` SQL — its `inner join … using (pollutantID)` carries
@@ -129,14 +128,14 @@
 //!
 //! `MOVESWorkerOutput.emissionQuant` / `.emissionRate` are `FLOAT` (32-bit)
 //! columns, so the worker-output rows `calculate` consumes are already
-//! `f32`-quantised — the Task 50 wiring widens them to `f64`. The intermediate
+//! `f32`-quantised — the wiring widens them to `f64`. The intermediate
 //! `TOGWorkerOutput` table is `DOUBLE`, which the port's `f64` accumulation
 //! matches exactly. The final `insert into MOVESWorkerOutput` truncates the
 //! `DOUBLE` group sum back to `FLOAT`; the port returns the un-truncated `f64`
 //! result and leaves that store-time truncation — a sub-`1e-7` relative drift
-//! — to the output wiring, matching the `SO2Calculator` / Task 41 / Task 33
+//! to the output wiring, matching the `SO2Calculator` / /
 //! precedent. Whether to reproduce it bug-for-bug is the calculator
-//! integration validation call (Task 73, `mo-fvuf`).
+//! integration validation call.
 //!
 //! The SQL's final `group by` lists 19 columns but its `select` also carries
 //! `iterationID`, `engTechID`, `sectorID` and `hpID`, which are *not* grouping
@@ -153,11 +152,11 @@
 //! is relabelled to `NonHAPTOG` (88) before grouping, so it is constant across
 //! the whole result and is not part of the port's group key.
 //!
-//! # Data plane (Task 50)
+//! # Data plane
 //!
 //! [`Calculator::execute`] receives a [`CalculatorContext`] whose
-//! `ExecutionTables` / `ScratchNamespace` are Phase 2 placeholders until the
-//! `DataFrameStore` lands (migration-plan Task 50), so `execute` cannot yet
+//! `ExecutionTables` / `ScratchNamespace` are placeholders until the
+//! `DataFrameStore` lands (), so `execute` cannot yet
 //! read `integratedSpeciesSet` / `MOVESWorkerOutput` nor write the residual
 //! rows back. The numeric algorithm is fully ported and unit-tested on
 //! [`calculate`](TogSpeciationCalculator::calculate); `execute` is a documented
@@ -191,7 +190,7 @@ const NONHAP_TOG_POLLUTANT_ID: i32 = 88;
 
 // ===========================================================================
 // Input tables — plain Rust mirrors of the tables `TOGSpeciationCalculator.sql`
-// reads. Following the Phase 3 convention, every `INT`/`SMALLINT` identifier is
+// reads. Following the convention, every `INT`/`SMALLINT` identifier is
 // an `i32`; `SCC` is a `CHAR(10)` code, modelled as a `String`. Only the
 // columns the algorithm reads are modelled.
 // ===========================================================================
@@ -205,13 +204,13 @@ const NONHAP_TOG_POLLUTANT_ID: i32 = 88;
 /// SQL, so it is not modelled (see the [module documentation](self)).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct IntegratedSpeciesRow {
-    /// `mechanismID` — the chemical mechanism this membership belongs to.
+ /// `mechanismID` — the chemical mechanism this membership belongs to.
     pub mechanism_id: i32,
-    /// `integratedSpeciesSetID` — the species set within the mechanism. A
-    /// mechanism may carry more than one set; each is integrated separately.
+ /// `integratedSpeciesSetID` — the species set within the mechanism. A
+ /// mechanism may carry more than one set; each is integrated separately.
     pub integrated_species_set_id: i32,
-    /// `pollutantID` — a member pollutant of the set. NMOG (80) is the positive
-    /// integration term; every other member is an integrated species.
+ /// `pollutantID` — a member pollutant of the set. NMOG (80) is the positive
+ /// integration term; every other member is an integrated species.
     pub pollutant_id: i32,
 }
 
@@ -225,76 +224,76 @@ pub struct IntegratedSpeciesRow {
 /// [module documentation](self)) and modelled as `f64`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct WorkerOutputRow {
-    /// `MOVESRunID` — a grouping key of the residual sum.
+ /// `MOVESRunID` — a grouping key of the residual sum.
     pub moves_run_id: i32,
-    /// `iterationID` — the uncertainty iteration. Carried through but *not* a
-    /// grouping key (see the [module documentation](self)).
+ /// `iterationID` — the uncertainty iteration. Carried through but *not* a
+ /// grouping key (see the [module documentation](self)).
     pub iteration_id: i32,
-    /// `yearID`.
+ /// `yearID`.
     pub year_id: i32,
-    /// `monthID`.
+ /// `monthID`.
     pub month_id: i32,
-    /// `dayID`.
+ /// `dayID`.
     pub day_id: i32,
-    /// `hourID`.
+ /// `hourID`.
     pub hour_id: i32,
-    /// `stateID`.
+ /// `stateID`.
     pub state_id: i32,
-    /// `countyID`.
+ /// `countyID`.
     pub county_id: i32,
-    /// `zoneID`.
+ /// `zoneID`.
     pub zone_id: i32,
-    /// `linkID`.
+ /// `linkID`.
     pub link_id: i32,
-    /// `pollutantID` — the emission's pollutant. On an input row this selects
-    /// whether the row joins a species set and its integration sign; on an
-    /// output row it is always `NonHAPTOG` (88).
+ /// `pollutantID` — the emission's pollutant. On an input row this selects
+ /// whether the row joins a species set and its integration sign; on an
+ /// output row it is always `NonHAPTOG` (88).
     pub pollutant_id: i32,
-    /// `processID` — the emission process.
+ /// `processID` — the emission process.
     pub process_id: i32,
-    /// `sourceTypeID`.
+ /// `sourceTypeID`.
     pub source_type_id: i32,
-    /// `regClassID`.
+ /// `regClassID`.
     pub reg_class_id: i32,
-    /// `fuelTypeID`.
+ /// `fuelTypeID`.
     pub fuel_type_id: i32,
-    /// `modelYearID`.
+ /// `modelYearID`.
     pub model_year_id: i32,
-    /// `roadTypeID`.
+ /// `roadTypeID`.
     pub road_type_id: i32,
-    /// `SCC` — the source-classification code; a grouping key of the sum.
+ /// `SCC` — the source-classification code; a grouping key of the sum.
     pub scc: String,
-    /// `engTechID` — Nonroad engine-technology key. Carried through but *not* a
-    /// grouping key.
+ /// `engTechID` — Nonroad engine-technology key. Carried through but *not* a
+ /// grouping key.
     pub eng_tech_id: i32,
-    /// `sectorID` — Nonroad sector key. Carried through but *not* a grouping
-    /// key.
+ /// `sectorID` — Nonroad sector key. Carried through but *not* a grouping
+ /// key.
     pub sector_id: i32,
-    /// `hpID` — Nonroad horsepower key. Carried through but *not* a grouping
-    /// key.
+ /// `hpID` — Nonroad horsepower key. Carried through but *not* a grouping
+ /// key.
     pub hp_id: i32,
-    /// `emissionQuant` — the emission quantity (mass).
+ /// `emissionQuant` — the emission quantity (mass).
     pub emission_quant: f64,
-    /// `emissionRate` — the emission rate.
+ /// `emissionRate` — the emission rate.
     pub emission_rate: f64,
 }
 
 /// Inputs to [`TogSpeciationCalculator::calculate`] — the two tables the SQL's
 /// `Section Processing` reads.
 ///
-/// A future Task 50 (`DataFrameStore`) wiring populates this from the per-run
+/// A future (`DataFrameStore`) wiring populates this from the per-run
 /// execution database; until then it is the explicit data-plane contract the
 /// unit tests build directly.
 #[derive(Debug, Clone, Default)]
 pub struct TogInputs {
-    /// The `integratedSpeciesSet` rows, already filtered to the run's
-    /// mechanisms by the SQL's `where mechanismID in (##mechanismIDs##)`
-    /// extract.
+ /// The `integratedSpeciesSet` rows, already filtered to the run's
+ /// mechanisms by the SQL's `where mechanismID in (##mechanismIDs##)`
+ /// extract.
     pub integrated_species_set: Vec<IntegratedSpeciesRow>,
-    /// The `MOVESWorkerOutput` rows the upstream calculators have produced.
-    /// `calculate` reads only the rows whose pollutant belongs to a species
-    /// set; any other row is ignored, exactly as the SQL's
-    /// `where pollutantID in (select … integratedSpeciesSet)` filter does.
+ /// The `MOVESWorkerOutput` rows the upstream calculators have produced.
+ /// `calculate` reads only the rows whose pollutant belongs to a species
+ /// set; any other row is ignored, exactly as the SQL's
+ /// `where pollutantID in (select … integratedSpeciesSet)` filter does.
     pub worker_output: Vec<WorkerOutputRow>,
 }
 
@@ -328,7 +327,7 @@ struct GroupKey {
 }
 
 impl GroupKey {
-    /// The group a `(mechanism, set)` fan-out of `raw` belongs to.
+ /// The group a `(mechanism, set)` fan-out of `raw` belongs to.
     fn for_row(mechanism_id: i32, integrated_species_set_id: i32, raw: &WorkerOutputRow) -> Self {
         Self {
             year_id: raw.year_id,
@@ -357,13 +356,13 @@ impl GroupKey {
 /// totals plus the first-encountered row that fixes the non-grouped columns.
 #[derive(Debug, Clone)]
 struct Accumulator {
-    /// The first worker-output row that landed in this group, with its
-    /// pollutant relabelled to `NonHAPTOG`. Supplies every output column except
-    /// the two emission values.
+ /// The first worker-output row that landed in this group, with its
+ /// pollutant relabelled to `NonHAPTOG`. Supplies every output column except
+ /// the two emission values.
     template: WorkerOutputRow,
-    /// Running `Σ ± emissionQuant`.
+ /// Running `Σ ± emissionQuant`.
     emission_quant: f64,
-    /// Running `Σ ± emissionRate`.
+ /// Running `Σ ± emissionRate`.
     emission_rate: f64,
 }
 
@@ -376,35 +375,35 @@ struct Accumulator {
 pub struct TogSpeciationCalculator;
 
 impl TogSpeciationCalculator {
-    /// Stable module name — matches the Java class and the chain-DAG entry.
+ /// Stable module name — matches the Java class and the chain-DAG entry.
     pub const NAME: &'static str = CALCULATOR_NAME;
 
-    /// Compute the `NonHAPTOG` (88) residual rows — the port of the
-    /// `TOGSpeciationCalculator.sql` `Section Processing`.
-    ///
-    /// Returns no rows when no worker-output pollutant belongs to a species
-    /// set: the SQL's `inner join integratedSpeciesSet using (pollutantID)`
-    /// drops every row that fails to join. The result is sorted by the
-    /// `GroupKey` ordering — the dimensional cell, then `(mechanism, set)` — so
-    /// the output is deterministic; MOVES leaves `MOVESWorkerOutput` physically
-    /// unordered (the SQL `INSERT … SELECT` carries `order by null`).
+ /// Compute the `NonHAPTOG` (88) residual rows — the port of the
+ /// `TOGSpeciationCalculator.sql` `Section Processing`.
+ ///
+ /// Returns no rows when no worker-output pollutant belongs to a species
+ /// set: the SQL's `inner join integratedSpeciesSet using (pollutantID)`
+ /// drops every row that fails to join. The result is sorted by the
+ /// `GroupKey` ordering — the dimensional cell, then `(mechanism, set)` — so
+ /// the output is deterministic; MOVES leaves `MOVESWorkerOutput` physically
+ /// unordered (the SQL `INSERT … SELECT` carries `order by null`).
     #[must_use]
     pub fn calculate(&self, inputs: &TogInputs) -> Vec<WorkerOutputRow> {
-        // Step 1: synthesise the NMOG (80) membership row into every set.
+ // Step 1: synthesise the NMOG (80) membership row into every set.
         let species = Self::with_synthesized_nmog(&inputs.integrated_species_set);
-        // The step-2 fan-out index: pollutantID → the (mechanism, set) pairs
-        // that list it. One worker-output row fans to every such pair.
+ // The step-2 fan-out index: pollutantID → the (mechanism, set) pairs
+ // that list it. One worker-output row fans to every such pair.
         let sets_by_pollutant = Self::index_sets_by_pollutant(&species);
 
-        // Steps 2 and 3: sign each worker-output row, fan it across its sets,
-        // and accumulate the per-group residual sum.
+ // Steps 2 and 3: sign each worker-output row, fan it across its sets,
+ // and accumulate the per-group residual sum.
         let mut groups: HashMap<GroupKey, Accumulator> = HashMap::new();
         for raw in &inputs.worker_output {
             let Some(sets) = sets_by_pollutant.get(&raw.pollutant_id) else {
                 continue;
             };
-            // NMOG is the positive integration term; every other set member is
-            // an integrated species and is subtracted.
+ // NMOG is the positive integration term; every other set member is
+ // an integrated species and is subtracted.
             let sign = if raw.pollutant_id == NMOG_POLLUTANT_ID {
                 1.0
             } else {
@@ -427,8 +426,8 @@ impl TogSpeciationCalculator {
             }
         }
 
-        // Sort by GroupKey for a deterministic result, then materialise each
-        // group: the SQL clamps the sum to non-negative with `greatest(…, 0)`.
+ // Sort by GroupKey for a deterministic result, then materialise each
+ // group: the SQL clamps the sum to non-negative with `greatest(…, 0)`.
         let mut entries: Vec<(GroupKey, Accumulator)> = groups.into_iter().collect();
         entries.sort_by(|a, b| a.0.cmp(&b.0));
         entries
@@ -441,14 +440,14 @@ impl TogSpeciationCalculator {
             .collect()
     }
 
-    /// Port of the SQL's NMOG synthesis (`insert ignore … select distinct
-    /// mechanismID, integratedSpeciesSetID, 80 … where pollutantID <> 80`).
-    ///
-    /// Every distinct `(mechanismID, integratedSpeciesSetID)` carrying a
-    /// non-NMOG pollutant gains an NMOG (80) row, unless it already has one.
-    /// `insert ignore` skips on the `(mechanism, set, pollutant)` primary key;
-    /// the `HashSet` of present `(mechanism, set, pollutant)` triples
-    /// reproduces that, so an explicit NMOG row is never duplicated.
+ /// Port of the SQL's NMOG synthesis (`insert ignore … select distinct
+ /// mechanismID, integratedSpeciesSetID, 80 … where pollutantID <> 80`).
+ ///
+ /// Every distinct `(mechanismID, integratedSpeciesSetID)` carrying a
+ /// non-NMOG pollutant gains an NMOG (80) row, unless it already has one.
+ /// `insert ignore` skips on the `(mechanism, set, pollutant)` primary key;
+ /// the `HashSet` of present `(mechanism, set, pollutant)` triples
+ /// reproduces that, so an explicit NMOG row is never duplicated.
     fn with_synthesized_nmog(extracted: &[IntegratedSpeciesRow]) -> Vec<IntegratedSpeciesRow> {
         let mut species = extracted.to_vec();
         let mut present: HashSet<(i32, i32, i32)> = species
@@ -475,14 +474,14 @@ impl TogSpeciationCalculator {
         species
     }
 
-    /// Index the species set by pollutant — the lookup side of the SQL's
-    /// `inner join integratedSpeciesSet using (pollutantID)`.
-    ///
-    /// A pollutant maps to every `(mechanism, set)` that lists it, in
-    /// first-seen order, so the fan-out — and therefore the first-encountered
-    /// row each group keeps — is deterministic for a given input order. The
-    /// `integratedSpeciesSet` primary key guarantees one row per
-    /// `(mechanism, set, pollutant)`, so no `(mechanism, set)` repeats.
+ /// Index the species set by pollutant — the lookup side of the SQL's
+ /// `inner join integratedSpeciesSet using (pollutantID)`.
+ ///
+ /// A pollutant maps to every `(mechanism, set)` that lists it, in
+ /// first-seen order, so the fan-out — and therefore the first-encountered
+ /// row each group keeps — is deterministic for a given input order. The
+ /// `integratedSpeciesSet` primary key guarantees one row per
+ /// `(mechanism, set, pollutant)`, so no `(mechanism, set)` repeats.
     fn index_sets_by_pollutant(species: &[IntegratedSpeciesRow]) -> HashMap<i32, Vec<(i32, i32)>> {
         let mut index: HashMap<i32, Vec<(i32, i32)>> = HashMap::new();
         for row in species {
@@ -820,7 +819,7 @@ const REGISTRATION_COUNT: usize = 184;
 /// pollutants a given process does not carry — hence 13–17 pairs per process.
 /// Built into [`REGISTRATIONS`] by [`build_registrations`].
 const REGISTRATION_PAIRS: [(u16, u16); REGISTRATION_COUNT] = [
-    // Running Exhaust (1) — 17 pollutants
+ // Running Exhaust (1) — 17 pollutants
     (1000, 1),
     (88, 1),
     (1001, 1),
@@ -838,7 +837,7 @@ const REGISTRATION_PAIRS: [(u16, u16); REGISTRATION_COUNT] = [
     (1011, 1),
     (1014, 1),
     (1016, 1),
-    // Start Exhaust (2) — 17 pollutants
+ // Start Exhaust (2) — 17 pollutants
     (1000, 2),
     (88, 2),
     (1001, 2),
@@ -856,7 +855,7 @@ const REGISTRATION_PAIRS: [(u16, u16); REGISTRATION_COUNT] = [
     (1011, 2),
     (1014, 2),
     (1016, 2),
-    // Evap Permeation (11) — 16 pollutants
+ // Evap Permeation (11) — 16 pollutants
     (1000, 11),
     (88, 11),
     (1001, 11),
@@ -873,7 +872,7 @@ const REGISTRATION_PAIRS: [(u16, u16); REGISTRATION_COUNT] = [
     (1017, 11),
     (1018, 11),
     (1006, 11),
-    // Evap Fuel Vapor Venting (12) — 13 pollutants
+ // Evap Fuel Vapor Venting (12) — 13 pollutants
     (1000, 12),
     (88, 12),
     (1001, 12),
@@ -887,7 +886,7 @@ const REGISTRATION_PAIRS: [(u16, u16); REGISTRATION_COUNT] = [
     (1017, 12),
     (1018, 12),
     (1014, 12),
-    // Evap Fuel Leaks (13) — 13 pollutants
+ // Evap Fuel Leaks (13) — 13 pollutants
     (1000, 13),
     (88, 13),
     (1001, 13),
@@ -901,7 +900,7 @@ const REGISTRATION_PAIRS: [(u16, u16); REGISTRATION_COUNT] = [
     (1017, 13),
     (1018, 13),
     (1014, 13),
-    // Crankcase Running Exhaust (15) — 17 pollutants
+ // Crankcase Running Exhaust (15) — 17 pollutants
     (1000, 15),
     (88, 15),
     (1001, 15),
@@ -919,7 +918,7 @@ const REGISTRATION_PAIRS: [(u16, u16); REGISTRATION_COUNT] = [
     (1011, 15),
     (1014, 15),
     (1016, 15),
-    // Crankcase Start Exhaust (16) — 17 pollutants
+ // Crankcase Start Exhaust (16) — 17 pollutants
     (1000, 16),
     (88, 16),
     (1001, 16),
@@ -937,7 +936,7 @@ const REGISTRATION_PAIRS: [(u16, u16); REGISTRATION_COUNT] = [
     (1011, 16),
     (1014, 16),
     (1016, 16),
-    // Crankcase Extended Idle Exhaust (17) — 16 pollutants
+ // Crankcase Extended Idle Exhaust (17) — 16 pollutants
     (1000, 17),
     (88, 17),
     (1001, 17),
@@ -954,7 +953,7 @@ const REGISTRATION_PAIRS: [(u16, u16); REGISTRATION_COUNT] = [
     (1016, 17),
     (1017, 17),
     (1018, 17),
-    // Refueling Displacement Vapor Loss (18) — 13 pollutants
+ // Refueling Displacement Vapor Loss (18) — 13 pollutants
     (1000, 18),
     (88, 18),
     (1001, 18),
@@ -968,7 +967,7 @@ const REGISTRATION_PAIRS: [(u16, u16); REGISTRATION_COUNT] = [
     (1015, 18),
     (1017, 18),
     (1018, 18),
-    // Refueling Spillage Loss (19) — 13 pollutants
+ // Refueling Spillage Loss (19) — 13 pollutants
     (1000, 19),
     (88, 19),
     (1001, 19),
@@ -982,7 +981,7 @@ const REGISTRATION_PAIRS: [(u16, u16); REGISTRATION_COUNT] = [
     (1017, 19),
     (1018, 19),
     (1014, 19),
-    // Extended Idle Exhaust (90) — 16 pollutants
+ // Extended Idle Exhaust (90) — 16 pollutants
     (1000, 90),
     (88, 90),
     (1001, 90),
@@ -999,7 +998,7 @@ const REGISTRATION_PAIRS: [(u16, u16); REGISTRATION_COUNT] = [
     (1016, 90),
     (1017, 90),
     (1018, 90),
-    // Auxiliary Power Exhaust (91) — 16 pollutants
+ // Auxiliary Power Exhaust (91) — 16 pollutants
     (1000, 91),
     (88, 91),
     (1001, 91),
@@ -1063,10 +1062,10 @@ impl Calculator for TogSpeciationCalculator {
         Self::NAME
     }
 
-    /// `TOGSpeciationCalculator` is a chained calculator: it does not subscribe
-    /// to the MasterLoop directly but fires when its upstream calculators do.
-    /// `calculator-dag.json` records `subscribes_directly: false` and an empty
-    /// `subscriptions` list.
+ /// `TOGSpeciationCalculator` is a chained calculator: it does not subscribe
+ /// to the MasterLoop directly but fires when its upstream calculators do.
+ /// `calculator-dag.json` records `subscribes_directly: false` and an empty
+ /// `subscriptions` list.
     fn subscriptions(&self) -> &[CalculatorSubscription] {
         NO_SUBSCRIPTIONS
     }
@@ -1075,9 +1074,8 @@ impl Calculator for TogSpeciationCalculator {
         &REGISTRATIONS
     }
 
-    /// `TOGSpeciationCalculator` chains off `AirToxicsCalculator`,
-    /// `CrankcaseEmissionCalculatorNonPM` and `HCSpeciationCalculator` —
-    /// `calculator-dag.json` records them as `depends_on`.
+ /// `TOGSpeciationCalculator` chains off `AirToxicsCalculator`,
+ /// `CrankcaseEmissionCalculatorNonPM` and `HCSpeciationCalculator` /// `calculator-dag.json` records them as `depends_on`.
     fn upstream(&self) -> &[&'static str] {
         UPSTREAM
     }
@@ -1108,10 +1106,10 @@ pub fn factory() -> Box<dyn Calculator> {
 mod tests {
     use super::*;
 
-    /// A worker-output row for the canonical test dimensional cell, carrying
-    /// `pollutant_id` and the emission `quant` / `rate`. Tests override
-    /// individual dimension fields with struct-update syntax to move a row to a
-    /// different cell.
+ /// A worker-output row for the canonical test dimensional cell, carrying
+ /// `pollutant_id` and the emission `quant` / `rate`. Tests override
+ /// individual dimension fields with struct-update syntax to move a row to a
+ /// different cell.
     fn raw(pollutant_id: i32, quant: f64, rate: f64) -> WorkerOutputRow {
         WorkerOutputRow {
             moves_run_id: 1,
@@ -1140,7 +1138,7 @@ mod tests {
         }
     }
 
-    /// One `integratedSpeciesSet` membership row.
+ /// One `integratedSpeciesSet` membership row.
     fn iss(mechanism_id: i32, set_id: i32, pollutant_id: i32) -> IntegratedSpeciesRow {
         IntegratedSpeciesRow {
             mechanism_id,
@@ -1149,7 +1147,7 @@ mod tests {
         }
     }
 
-    /// Assert `actual` matches `expected` within `f64` slack.
+ /// Assert `actual` matches `expected` within `f64` slack.
     fn assert_close(actual: f64, expected: f64) {
         assert!(
             (actual - expected).abs() < 1e-9,
@@ -1159,8 +1157,8 @@ mod tests {
 
     #[test]
     fn calculate_integrates_nmog_minus_the_species() {
-        // One mechanism, one set with two integrated species (ALD2, PAR).
-        // NonHAPTOG = NMOG − ALD2 − PAR = 100 − 20 − 30 = 50, on both channels.
+ // One mechanism, one set with two integrated species (ALD2, PAR).
+ // NonHAPTOG = NMOG − ALD2 − PAR = 100 − 20 − 30 = 50, on both channels.
         let inputs = TogInputs {
             integrated_species_set: vec![iss(1, 1, 1001), iss(1, 1, 1013)],
             worker_output: vec![
@@ -1178,7 +1176,7 @@ mod tests {
 
     #[test]
     fn calculate_clamps_a_negative_residual_to_zero() {
-        // Integrated species outweigh NMOG: 40 − 30 − 30 = −20 → clamped to 0.
+ // Integrated species outweigh NMOG: 40 − 30 − 30 = −20 → clamped to 0.
         let inputs = TogInputs {
             integrated_species_set: vec![iss(1, 1, 1001), iss(1, 1, 1013)],
             worker_output: vec![
@@ -1195,9 +1193,9 @@ mod tests {
 
     #[test]
     fn calculate_synthesises_nmog_when_the_set_omits_it() {
-        // The set lists only a species. The SQL synthesises an NMOG (80)
-        // membership row, so an NMOG worker row still joins and is added.
-        // NonHAPTOG = 100 − 20 = 80.
+ // The set lists only a species. The SQL synthesises an NMOG (80)
+ // membership row, so an NMOG worker row still joins and is added.
+ // NonHAPTOG = 100 − 20 = 80.
         let inputs = TogInputs {
             integrated_species_set: vec![iss(1, 1, 1001)],
             worker_output: vec![raw(NMOG_POLLUTANT_ID, 100.0, 0.0), raw(1001, 20.0, 0.0)],
@@ -1209,8 +1207,8 @@ mod tests {
 
     #[test]
     fn calculate_does_not_double_count_an_explicit_nmog_membership() {
-        // The set already lists NMOG explicitly; the `insert ignore` must not
-        // add a second one. NonHAPTOG = 100 − 20 = 80, not 100 + 100 − 20.
+ // The set already lists NMOG explicitly; the `insert ignore` must not
+ // add a second one. NonHAPTOG = 100 − 20 = 80, not 100 + 100 − 20.
         let inputs = TogInputs {
             integrated_species_set: vec![iss(1, 1, NMOG_POLLUTANT_ID), iss(1, 1, 1001)],
             worker_output: vec![raw(NMOG_POLLUTANT_ID, 100.0, 0.0), raw(1001, 20.0, 0.0)],
@@ -1222,8 +1220,8 @@ mod tests {
 
     #[test]
     fn calculate_ignores_a_pollutant_absent_from_every_set() {
-        // A CO (2) worker row joins no species set — the SQL's
-        // `where pollutantID in (select … integratedSpeciesSet)` drops it.
+ // A CO (2) worker row joins no species set — the SQL's
+ // `where pollutantID in (select … integratedSpeciesSet)` drops it.
         let inputs = TogInputs {
             integrated_species_set: vec![iss(1, 1, 1001)],
             worker_output: vec![
@@ -1242,8 +1240,8 @@ mod tests {
 
     #[test]
     fn calculate_fans_one_mechanism_across_its_species_sets() {
-        // Mechanism 1 has two sets: set 1 = {ALD2}, set 2 = {PAR}. NMOG is
-        // synthesised into both. Each set yields its own NonHAPTOG row.
+ // Mechanism 1 has two sets: set 1 = {ALD2}, set 2 = {PAR}. NMOG is
+ // synthesised into both. Each set yields its own NonHAPTOG row.
         let inputs = TogInputs {
             integrated_species_set: vec![iss(1, 1, 1001), iss(1, 2, 1013)],
             worker_output: vec![
@@ -1254,8 +1252,8 @@ mod tests {
         };
         let rows = TogSpeciationCalculator.calculate(&inputs);
         assert_eq!(rows.len(), 2);
-        // Both rows share the dimensional cell; they differ only by the
-        // (now-dropped) mechanism/set. Set 1: 100 − 20; set 2: 100 − 30.
+ // Both rows share the dimensional cell; they differ only by the
+ // (now-dropped) mechanism/set. Set 1: 100 − 20; set 2: 100 − 30.
         let mut quants: Vec<f64> = rows.iter().map(|r| r.emission_quant).collect();
         quants.sort_by(|a, b| a.partial_cmp(b).unwrap());
         assert_close(quants[0], 70.0);
@@ -1264,8 +1262,8 @@ mod tests {
 
     #[test]
     fn calculate_fans_a_species_shared_by_two_sets() {
-        // ALD2 (1001) belongs to two sets of mechanism 1. One ALD2 worker row
-        // is subtracted from both sets' residuals.
+ // ALD2 (1001) belongs to two sets of mechanism 1. One ALD2 worker row
+ // is subtracted from both sets' residuals.
         let inputs = TogInputs {
             integrated_species_set: vec![iss(1, 1, 1001), iss(1, 2, 1001)],
             worker_output: vec![raw(NMOG_POLLUTANT_ID, 100.0, 0.0), raw(1001, 20.0, 0.0)],
@@ -1279,9 +1277,9 @@ mod tests {
 
     #[test]
     fn calculate_sums_repeated_rows_and_keeps_the_first_non_grouped_columns() {
-        // Two NMOG rows in one cell, differing only in engTechID/iterationID
-        // (not grouping keys): they sum, and the output carries the first
-        // row's non-grouped columns. NonHAPTOG = (100 + 40) − 20 = 120.
+ // Two NMOG rows in one cell, differing only in engTechID/iterationID
+ // (not grouping keys): they sum, and the output carries the first
+ // row's non-grouped columns. NonHAPTOG = (100 + 40) − 20 = 120.
         let first_nmog = WorkerOutputRow {
             eng_tech_id: 7,
             iteration_id: 3,
@@ -1305,8 +1303,8 @@ mod tests {
 
     #[test]
     fn calculate_separates_distinct_dimensional_cells() {
-        // Two NMOG rows differing in a grouping key (linkID, then SCC) stay in
-        // separate residual rows.
+ // Two NMOG rows differing in a grouping key (linkID, then SCC) stay in
+ // separate residual rows.
         let inputs = TogInputs {
             integrated_species_set: vec![iss(1, 1, 1001)],
             worker_output: vec![
@@ -1322,7 +1320,7 @@ mod tests {
             ],
         };
         let rows = TogSpeciationCalculator.calculate(&inputs);
-        // Three NMOG cells, no species rows → three residuals (each = NMOG).
+ // Three NMOG cells, no species rows → three residuals (each = NMOG).
         assert_eq!(rows.len(), 3);
         let mut quants: Vec<f64> = rows.iter().map(|r| r.emission_quant).collect();
         quants.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -1360,7 +1358,7 @@ mod tests {
 
     #[test]
     fn calculate_yields_no_rows_without_a_species_set() {
-        // Worker rows but no integratedSpeciesSet → nothing joins.
+ // Worker rows but no integratedSpeciesSet → nothing joins.
         let inputs = TogInputs {
             integrated_species_set: vec![],
             worker_output: vec![raw(NMOG_POLLUTANT_ID, 100.0, 0.0), raw(1001, 20.0, 0.0)],
@@ -1377,8 +1375,8 @@ mod tests {
 
     #[test]
     fn calculate_output_is_sorted_and_deterministic() {
-        // Input rows in an unsorted order across two cells and two mechanisms;
-        // the result must be byte-identical across runs and dimension-sorted.
+ // Input rows in an unsorted order across two cells and two mechanisms;
+ // the result must be byte-identical across runs and dimension-sorted.
         let inputs = TogInputs {
             integrated_species_set: vec![iss(2, 1, 1001), iss(1, 1, 1001)],
             worker_output: vec![
@@ -1407,20 +1405,20 @@ mod tests {
 
     #[test]
     fn calculator_is_chained_with_no_subscriptions() {
-        // calculator-dag.json: subscribes_directly false, subscriptions [].
+ // calculator-dag.json: subscribes_directly false, subscriptions [].
         assert!(TogSpeciationCalculator.subscriptions().is_empty());
     }
 
     #[test]
     fn registrations_match_the_calculator_info_directives() {
-        // calculator-dag.json records registrations_count 184.
+ // calculator-dag.json records registrations_count 184.
         let regs = TogSpeciationCalculator.registrations();
         assert_eq!(regs.len(), 184);
 
-        // Twelve organic-gas processes, each registering NonHAPTOG (88).
+ // Twelve organic-gas processes, each registering NonHAPTOG (88).
         let mut counts: HashMap<u16, usize> = HashMap::new();
         for r in regs {
-            *counts.entry(r.process_id.0).or_default() += 1;
+ *counts.entry(r.process_id.0).or_default() += 1;
         }
         let mut processes: Vec<u16> = counts.keys().copied().collect();
         processes.sort_unstable();
@@ -1428,15 +1426,15 @@ mod tests {
             processes,
             vec![1, 2, 11, 12, 13, 15, 16, 17, 18, 19, 90, 91]
         );
-        // Per-process pollutant counts, in the same process order.
+ // Per-process pollutant counts, in the same process order.
         let per_process: Vec<usize> = processes.iter().map(|p| counts[p]).collect();
         assert_eq!(
             per_process,
             vec![17, 17, 16, 13, 13, 17, 17, 16, 13, 13, 16, 16]
         );
 
-        // Every process registers NonHAPTOG (88) — the pollutant the algorithm
-        // actually produces.
+ // Every process registers NonHAPTOG (88) — the pollutant the algorithm
+ // actually produces.
         for p in processes {
             assert!(
                 regs.iter()
@@ -1444,7 +1442,7 @@ mod tests {
                 "process {p} does not register NonHAPTOG",
             );
         }
-        // Pollutants are the mechanism pseudo-pollutants plus NonHAPTOG.
+ // Pollutants are the mechanism pseudo-pollutants plus NonHAPTOG.
         let allowed: HashSet<u16> = [
             88, 1000, 1001, 1002, 1005, 1006, 1008, 1009, 1010, 1011, 1012, 1013, 1014, 1015, 1016,
             1017, 1018,
@@ -1456,7 +1454,7 @@ mod tests {
 
     #[test]
     fn calculator_chains_off_the_three_upstream_calculators() {
-        // calculator-dag.json records the depends_on triple.
+ // calculator-dag.json records the depends_on triple.
         assert_eq!(
             TogSpeciationCalculator.upstream(),
             &[
@@ -1478,8 +1476,8 @@ mod tests {
     #[test]
     fn execute_wires_through_data_plane() {
         use moves_framework::DataFrameStore;
-        // One NMOG (80) row and one integrated species (ALD2=1001) in mechanism 1,
-        // set 1. NonHAPTOG = 100 - 20 = 80.
+ // One NMOG (80) row and one integrated species (ALD2=1001) in mechanism 1,
+ // set 1. NonHAPTOG = 100 - 20 = 80.
         let worker_rows = vec![raw(NMOG_POLLUTANT_ID, 100.0, 10.0), raw(1001, 20.0, 2.0)];
         let iss_rows = vec![iss(1, 1, 1001)];
         let mut store = moves_framework::InMemoryStore::new();
@@ -1532,7 +1530,7 @@ mod tests {
 
     #[test]
     fn calculator_is_object_safe() {
-        // The registry stores calculators as Box<dyn Calculator>.
+ // The registry stores calculators as Box<dyn Calculator>.
         let calc: Box<dyn Calculator> = Box::new(TogSpeciationCalculator);
         assert_eq!(calc.name(), "TOGSpeciationCalculator");
     }

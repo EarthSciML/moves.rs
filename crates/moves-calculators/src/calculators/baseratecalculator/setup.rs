@@ -5,7 +5,7 @@
 //! maps; the pure port instead takes a [`BaseRateCalculatorInputs`] holding
 //! those tables as plain row vectors and derives a [`PreparedTables`] from it.
 //!
-//! [`BaseRateCalculatorInputs`] is the data-plane contract: a future Task 50
+//! [`BaseRateCalculatorInputs`] is the data-plane contract: a future
 //! (`DataFrameStore`) wiring populates it from the scratch / default-DB
 //! `DataFrame`s. [`PreparedTables::from_inputs`] reproduces the keying, the
 //! `TemperatureAdjustment` model-year expansion, and the `IMCoverage` join
@@ -33,7 +33,7 @@ use super::model::{
 };
 
 /// One `BaseRate` / `BaseRateByAge` file row — the rates the Base Rate
-/// Generator (Task 42) produced for this calculator to adjust.
+/// Generator produced for this calculator to adjust.
 ///
 /// The Go `streamBaseRateByAge` reads a 22-column row and `streamBaseRate` a
 /// 21-column row; the only difference is an `ageGroupID` column the Go reads
@@ -42,92 +42,92 @@ use super::model::{
 /// is not.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct BaseRateRow {
-    /// Source type id.
+ /// Source type id.
     pub source_type_id: i32,
-    /// Road type id.
+ /// Road type id.
     pub road_type_id: i32,
-    /// Average-speed bin id.
+ /// Average-speed bin id.
     pub avg_speed_bin_id: i32,
-    /// Hour/day id.
+ /// Hour/day id.
     pub hour_day_id: i32,
-    /// Pollutant id.
+ /// Pollutant id.
     pub pollutant_id: i32,
-    /// Process id.
+ /// Process id.
     pub process_id: i32,
-    /// Model year id.
+ /// Model year id.
     pub model_year_id: i32,
-    /// Fuel type id.
+ /// Fuel type id.
     pub fuel_type_id: i32,
-    /// Regulatory class id.
+ /// Regulatory class id.
     pub reg_class_id: i32,
-    /// Operating-mode id.
+ /// Operating-mode id.
     pub op_mode_id: i32,
-    /// Mean base rate.
+ /// Mean base rate.
     pub mean_base_rate: f64,
-    /// Mean base rate, I/M adjusted.
+ /// Mean base rate, I/M adjusted.
     pub mean_base_rate_im: f64,
-    /// Emission rate.
+ /// Emission rate.
     pub emission_rate: f64,
-    /// Emission rate, I/M adjusted.
+ /// Emission rate, I/M adjusted.
     pub emission_rate_im: f64,
-    /// Mean base rate, air-conditioning adjusted.
+ /// Mean base rate, air-conditioning adjusted.
     pub mean_base_rate_ac_adj: f64,
-    /// Mean base rate, I/M and air-conditioning adjusted.
+ /// Mean base rate, I/M and air-conditioning adjusted.
     pub mean_base_rate_im_ac_adj: f64,
-    /// Emission rate, air-conditioning adjusted.
+ /// Emission rate, air-conditioning adjusted.
     pub emission_rate_ac_adj: f64,
-    /// Emission rate, I/M and air-conditioning adjusted.
+ /// Emission rate, I/M and air-conditioning adjusted.
     pub emission_rate_im_ac_adj: f64,
-    /// Operating-mode fraction (inventory weighting).
+ /// Operating-mode fraction (inventory weighting).
     pub op_mode_fraction: f64,
-    /// Operating-mode fraction (rate weighting).
+ /// Operating-mode fraction (rate weighting).
     pub op_mode_fraction_rate: f64,
 }
 
 /// One row of an extended-idle / APU / shorepower hourly-fraction table.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct ModelYearFuelFractionRow {
-    /// Model year id.
+ /// Model year id.
     pub model_year_id: i32,
-    /// Fuel type id.
+ /// Fuel type id.
     pub fuel_type_id: i32,
-    /// Hourly operating-mode fraction adjustment.
+ /// Hourly operating-mode fraction adjustment.
     pub hour_fraction_adjust: f64,
 }
 
 /// One `ZoneMonthHour` meteorology row.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct ZoneMonthHourRow {
-    /// Month id.
+ /// Month id.
     pub month_id: i32,
-    /// Zone id.
+ /// Zone id.
     pub zone_id: i32,
-    /// Hour id.
+ /// Hour id.
     pub hour_id: i32,
-    /// Temperature (°F).
+ /// Temperature (°F).
     pub temperature: f64,
-    /// Relative humidity (%).
+ /// Relative humidity (%).
     pub rel_humidity: f64,
-    /// Heat index (°F).
+ /// Heat index (°F).
     pub heat_index: f64,
-    /// Specific humidity (g H₂O per kg dry air).
+ /// Specific humidity (g H₂O per kg dry air).
     pub specific_humidity: f64,
-    /// Water mole fraction.
+ /// Water mole fraction.
     pub mol_water_fraction: f64,
 }
 
 /// One `PollutantProcessMappedModelYear` row.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct PollutantProcessMappedModelYearRow {
-    /// Pollutant/process id.
+ /// Pollutant/process id.
     pub pol_process_id: i32,
-    /// Model year id.
+ /// Model year id.
     pub model_year_id: i32,
-    /// Model year group id.
+ /// Model year group id.
     pub model_year_group_id: i32,
-    /// Fuel model year group id.
+ /// Fuel model year group id.
     pub fuel_my_group_id: i32,
-    /// I/M model year group id.
+ /// I/M model year group id.
     pub im_model_year_group_id: i32,
 }
 
@@ -137,21 +137,21 @@ pub struct PollutantProcessMappedModelYearRow {
 /// …); the Go does not read them and neither does the port.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StartTempAdjustmentRow {
-    /// Fuel type id.
+ /// Fuel type id.
     pub fuel_type_id: i32,
-    /// Pollutant/process id.
+ /// Pollutant/process id.
     pub pol_process_id: i32,
-    /// Model year group id.
+ /// Model year group id.
     pub model_year_group_id: i32,
-    /// Operating-mode id.
+ /// Operating-mode id.
     pub op_mode_id: i32,
-    /// Term `A`.
+ /// Term `A`.
     pub term_a: f64,
-    /// Term `B`.
+ /// Term `B`.
     pub term_b: f64,
-    /// Term `C`.
+ /// Term `C`.
     pub term_c: f64,
-    /// `startTempEquationType` — `"LOG"`, `"POLY"`, or other.
+ /// `startTempEquationType` — `"LOG"`, `"POLY"`, or other.
     pub equation_type: String,
 }
 
@@ -159,55 +159,55 @@ pub struct StartTempAdjustmentRow {
 /// read by the Go.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct CountyRow {
-    /// County id.
+ /// County id.
     pub county_id: i32,
-    /// Geographic-phase-in area fraction.
+ /// Geographic-phase-in area fraction.
     pub gpa_fract: f64,
-    /// Barometric pressure.
+ /// Barometric pressure.
     pub barometric_pressure: f64,
 }
 
 /// One `GeneralFuelRatio` row.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct GeneralFuelRatioRow {
-    /// Fuel formulation id.
+ /// Fuel formulation id.
     pub fuel_formulation_id: i32,
-    /// Pollutant/process id.
+ /// Pollutant/process id.
     pub pol_process_id: i32,
-    /// Source type id.
+ /// Source type id.
     pub source_type_id: i32,
-    /// First model year the ratio applies to.
+ /// First model year the ratio applies to.
     pub min_model_year_id: i32,
-    /// Last model year the ratio applies to.
+ /// Last model year the ratio applies to.
     pub max_model_year_id: i32,
-    /// First age the ratio applies to.
+ /// First age the ratio applies to.
     pub min_age_id: i32,
-    /// Last age the ratio applies to.
+ /// Last age the ratio applies to.
     pub max_age_id: i32,
-    /// Fuel effect ratio (normal area).
+ /// Fuel effect ratio (normal area).
     pub fuel_effect_ratio: f64,
-    /// Fuel effect ratio (geographic-phase-in area).
+ /// Fuel effect ratio (geographic-phase-in area).
     pub fuel_effect_ratio_gpa: f64,
 }
 
 /// One `CriteriaRatio` / `AltCriteriaRatio` row.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct CriteriaRatioRow {
-    /// Fuel formulation id.
+ /// Fuel formulation id.
     pub fuel_formulation_id: i32,
-    /// Pollutant/process id.
+ /// Pollutant/process id.
     pub pol_process_id: i32,
-    /// Source type id.
+ /// Source type id.
     pub source_type_id: i32,
-    /// Model year id.
+ /// Model year id.
     pub model_year_id: i32,
-    /// Age id.
+ /// Age id.
     pub age_id: i32,
-    /// Ratio (normal area).
+ /// Ratio (normal area).
     pub ratio: f64,
-    /// Ratio (geographic-phase-in area).
+ /// Ratio (geographic-phase-in area).
     pub ratio_gpa: f64,
-    /// Ratio with no sulfur effect.
+ /// Ratio with no sulfur effect.
     pub ratio_no_sulfur: f64,
 }
 
@@ -215,74 +215,74 @@ pub struct CriteriaRatioRow {
 /// model-year range `[minModelYearID, maxModelYearID]`.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct TemperatureAdjustmentRow {
-    /// Pollutant/process id.
+ /// Pollutant/process id.
     pub pol_process_id: i32,
-    /// Fuel type id.
+ /// Fuel type id.
     pub fuel_type_id: i32,
-    /// Regulatory class id (`0` is the wildcard).
+ /// Regulatory class id (`0` is the wildcard).
     pub reg_class_id: i32,
-    /// First model year the row applies to (clamped up to `1950`).
+ /// First model year the row applies to (clamped up to `1950`).
     pub min_model_year_id: i32,
-    /// Last model year the row applies to (clamped down to `2060`).
+ /// Last model year the row applies to (clamped down to `2060`).
     pub max_model_year_id: i32,
-    /// Term `A`.
+ /// Term `A`.
     pub term_a: f64,
-    /// Term `B`.
+ /// Term `B`.
     pub term_b: f64,
-    /// Term `C` — nullable in MOVES; `None` (SQL NULL) coalesces to `0.0`.
+ /// Term `C` — nullable in MOVES; `None` (SQL NULL) coalesces to `0.0`.
     pub term_c: Option<f64>,
 }
 
 /// One `NOxHumidityAdjust` row, keyed by fuel type.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct NoxHumidityAdjustRow {
-    /// Fuel type id.
+ /// Fuel type id.
     pub fuel_type_id: i32,
-    /// Equation name.
+ /// Equation name.
     pub humidity_nox_eq: String,
-    /// Term `A`.
+ /// Term `A`.
     pub humidity_term_a: f64,
-    /// Term `B` — nullable in MOVES; `None` (SQL NULL) coalesces to `0.0`.
+ /// Term `B` — nullable in MOVES; `None` (SQL NULL) coalesces to `0.0`.
     pub humidity_term_b: Option<f64>,
-    /// Lower bound on the humidity input.
+ /// Lower bound on the humidity input.
     pub humidity_low_bound: f64,
-    /// Upper bound on the humidity input.
+ /// Upper bound on the humidity input.
     pub humidity_up_bound: f64,
-    /// Humidity units label.
+ /// Humidity units label.
     pub humidity_units: String,
 }
 
 /// One `zoneACFactor` row.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct ZoneAcFactorRow {
-    /// Hour id.
+ /// Hour id.
     pub hour_id: i32,
-    /// Source type id.
+ /// Source type id.
     pub source_type_id: i32,
-    /// Model year id.
+ /// Model year id.
     pub model_year_id: i32,
-    /// Air-conditioning factor.
+ /// Air-conditioning factor.
     pub ac_factor: f64,
 }
 
 /// One `IMFactor` row.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct ImFactorRow {
-    /// Pollutant/process id.
+ /// Pollutant/process id.
     pub pol_process_id: i32,
-    /// Inspection frequency.
+ /// Inspection frequency.
     pub inspect_freq: i32,
-    /// Test standards id.
+ /// Test standards id.
     pub test_standards_id: i32,
-    /// Source type id.
+ /// Source type id.
     pub source_type_id: i32,
-    /// Fuel type id.
+ /// Fuel type id.
     pub fuel_type_id: i32,
-    /// I/M model year group id.
+ /// I/M model year group id.
     pub im_model_year_group_id: i32,
-    /// Age group id.
+ /// Age group id.
     pub age_group_id: i32,
-    /// I/M factor.
+ /// I/M factor.
     pub im_factor: f64,
 }
 
@@ -291,87 +291,87 @@ pub struct ImFactorRow {
 /// `PollutantProcessMappedModelYear`, `AgeCategory`, and `IMFactor`.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct ImCoverageRow {
-    /// Pollutant/process id.
+ /// Pollutant/process id.
     pub pol_process_id: i32,
-    /// Source type id.
+ /// Source type id.
     pub source_type_id: i32,
-    /// Fuel type id.
+ /// Fuel type id.
     pub fuel_type_id: i32,
-    /// First model year of the program (clamped up to `1950`).
+ /// First model year of the program (clamped up to `1950`).
     pub beg_model_year_id: i32,
-    /// Last model year of the program (clamped down to `2060`).
+ /// Last model year of the program (clamped down to `2060`).
     pub end_model_year_id: i32,
-    /// Inspection frequency.
+ /// Inspection frequency.
     pub inspect_freq: i32,
-    /// Test standards id.
+ /// Test standards id.
     pub test_standards_id: i32,
-    /// Compliance factor, as a percentage (the Go scales it by `0.01`).
+ /// Compliance factor, as a percentage (the Go scales it by `0.01`).
     pub compliance_factor: f64,
 }
 
 /// One `EmissionRateAdjustmentWorker` row.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct EmissionRateAdjustmentRow {
-    /// Pollutant/process id.
+ /// Pollutant/process id.
     pub pol_process_id: i32,
-    /// Source type id.
+ /// Source type id.
     pub source_type_id: i32,
-    /// Regulatory class id.
+ /// Regulatory class id.
     pub reg_class_id: i32,
-    /// Fuel type id.
+ /// Fuel type id.
     pub fuel_type_id: i32,
-    /// First model year the row applies to (inclusive).
+ /// First model year the row applies to (inclusive).
     pub begin_model_year_id: i32,
-    /// Last model year the row applies to (inclusive).
+ /// Last model year the row applies to (inclusive).
     pub end_model_year_id: i32,
-    /// Emission rate adjustment factor.
+ /// Emission rate adjustment factor.
     pub emission_rate_adjustment: f64,
 }
 
 /// One `evefficiencyWorker` row.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct EvEfficiencyRow {
-    /// Pollutant/process id.
+ /// Pollutant/process id.
     pub pol_process_id: i32,
-    /// Source type id.
+ /// Source type id.
     pub source_type_id: i32,
-    /// Regulatory class id.
+ /// Regulatory class id.
     pub reg_class_id: i32,
-    /// Fuel type id.
+ /// Fuel type id.
     pub fuel_type_id: i32,
-    /// Model year id.
+ /// Model year id.
     pub model_year_id: i32,
-    /// Battery efficiency.
+ /// Battery efficiency.
     pub battery_efficiency: f64,
-    /// Charging efficiency.
+ /// Charging efficiency.
     pub charging_efficiency: f64,
 }
 
 /// One `universalActivity` row.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct UniversalActivityRow {
-    /// Hour/day id.
+ /// Hour/day id.
     pub hour_day_id: i32,
-    /// Model year id.
+ /// Model year id.
     pub model_year_id: i32,
-    /// Source type id.
+ /// Source type id.
     pub source_type_id: i32,
-    /// Activity.
+ /// Activity.
     pub activity: f64,
 }
 
 /// One `smfrSBDSummary` row — a source-bin-distribution total.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct SmfrSbdSummaryRow {
-    /// Source type id.
+ /// Source type id.
     pub source_type_id: i32,
-    /// Model year id.
+ /// Model year id.
     pub model_year_id: i32,
-    /// Fuel type id.
+ /// Fuel type id.
     pub fuel_type_id: i32,
-    /// Regulatory class id.
+ /// Regulatory class id.
     pub reg_class_id: i32,
-    /// Source-bin distribution total.
+ /// Source-bin distribution total.
     pub sbd_total: f64,
 }
 
@@ -379,9 +379,9 @@ pub struct SmfrSbdSummaryRow {
 /// package keeps in its `AgeGroups` global.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct AgeCategoryRow {
-    /// Age id.
+ /// Age id.
     pub age_id: i32,
-    /// Age group id.
+ /// Age group id.
     pub age_group_id: i32,
 }
 
@@ -390,9 +390,9 @@ pub struct AgeCategoryRow {
 /// `fuelSubTypeID` (in the E85 THC step).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct FuelFormulationRow {
-    /// Fuel formulation id.
+ /// Fuel formulation id.
     pub fuel_formulation_id: i32,
-    /// Fuel subtype id.
+ /// Fuel subtype id.
     pub fuel_sub_type_id: i32,
 }
 
@@ -400,26 +400,26 @@ pub struct FuelFormulationRow {
 /// `(county, year, month, fuelType)` cell with its market share.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct FuelSupplyRow {
-    /// County id.
+ /// County id.
     pub county_id: i32,
-    /// Calendar year id.
+ /// Calendar year id.
     pub year_id: i32,
-    /// Month id.
+ /// Month id.
     pub month_id: i32,
-    /// Fuel type id.
+ /// Fuel type id.
     pub fuel_type_id: i32,
-    /// Fuel subtype id.
+ /// Fuel subtype id.
     pub fuel_sub_type_id: i32,
-    /// Fuel formulation id.
+ /// Fuel formulation id.
     pub fuel_formulation_id: i32,
-    /// Market share of this formulation within the fuel type.
+ /// Market share of this formulation within the fuel type.
     pub market_share: f64,
 }
 
 /// One `FuelType` row — a valid fuel-type id.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct FuelTypeRow {
-    /// Fuel type id.
+ /// Fuel type id.
     pub fuel_type_id: i32,
 }
 
@@ -433,7 +433,7 @@ pub struct FuelTypeRow {
 /// these ids.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RunSpecRoadTypeRow {
-    /// Road type id the RunSpec selected.
+ /// Road type id the RunSpec selected.
     pub road_type_id: i32,
 }
 
@@ -1491,7 +1491,7 @@ impl TableRow for TemperatureAdjustmentRow {
                         .get(i)
                         .ok_or_else(|| null("maxModelYearID"))?,
                     term_a: term_a.get(i).ok_or_else(|| null("tempAdjustTermA"))?,
-                    // nullable: SQL NULL coalesces to 0.0 (ifnull), like term_c.
+ // nullable: SQL NULL coalesces to 0.0 (ifnull), like term_c.
                     term_b: term_b.get(i).unwrap_or(0.0),
                     term_c: term_c.get(i), // nullable: SQL NULL coalesces to 0.0
                 })
@@ -2041,11 +2041,11 @@ impl TableRow for EvEfficiencyRow {
         "EVEfficiency"
     }
     fn polars_schema() -> Schema {
-        // DB schema: polProcessID, sourceTypeID, regClassID, ageGroupID,
-        // beginModelYearID, endModelYearID, batteryEfficiency, chargingEfficiency.
-        // ageGroupID maps to fuel_type_id and beginModelYearID to model_year_id
-        // as a placeholder; the ev_efficiency flag defaults to false so the
-        // look-up is never applied in standard runs.
+ // DB schema: polProcessID, sourceTypeID, regClassID, ageGroupID,
+ // beginModelYearID, endModelYearID, batteryEfficiency, chargingEfficiency.
+ // ageGroupID maps to fuel_type_id and beginModelYearID to model_year_id
+ // as a placeholder; the ev_efficiency flag defaults to false so the
+ // look-up is never applied in standard runs.
         Schema::from_iter([
             ("polProcessID".into(), DataType::Int32),
             ("sourceTypeID".into(), DataType::Int32),
@@ -2624,13 +2624,13 @@ impl TableRow for FuelSupplyRow {
 /// Key for the [`PreparedTables::fuel_supply`] lookup.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct FuelSupplyKey {
-    /// County id.
+ /// County id.
     pub county_id: i32,
-    /// Calendar year id.
+ /// Calendar year id.
     pub year_id: i32,
-    /// Month id.
+ /// Month id.
     pub month_id: i32,
-    /// Fuel type id.
+ /// Fuel type id.
     pub fuel_type_id: i32,
 }
 
@@ -2642,55 +2642,55 @@ pub struct FuelSupplyKey {
 /// Base Rate Generator's output — the rows this calculator adjusts.
 #[derive(Debug, Clone, Default)]
 pub struct BaseRateCalculatorInputs {
-    /// `BaseRateByAge` rows (age-based pass).
+ /// `BaseRateByAge` rows (age-based pass).
     pub base_rate_by_age: Vec<BaseRateRow>,
-    /// `BaseRate` rows (non-age-based pass).
+ /// `BaseRate` rows (non-age-based pass).
     pub base_rate: Vec<BaseRateRow>,
-    /// `ExtendedIdleEmissionRateFraction` rows.
+ /// `ExtendedIdleEmissionRateFraction` rows.
     pub extended_idle_emission_rate_fraction: Vec<ModelYearFuelFractionRow>,
-    /// `apuEmissionRateFraction` rows.
+ /// `apuEmissionRateFraction` rows.
     pub apu_emission_rate_fraction: Vec<ModelYearFuelFractionRow>,
-    /// `ShorepowerEmissionRateFraction` rows.
+ /// `ShorepowerEmissionRateFraction` rows.
     pub shorepower_emission_rate_fraction: Vec<ModelYearFuelFractionRow>,
-    /// `ZoneMonthHour` meteorology rows.
+ /// `ZoneMonthHour` meteorology rows.
     pub zone_month_hour: Vec<ZoneMonthHourRow>,
-    /// `PollutantProcessMappedModelYear` rows.
+ /// `PollutantProcessMappedModelYear` rows.
     pub pollutant_process_mapped_model_year: Vec<PollutantProcessMappedModelYearRow>,
-    /// `StartTempAdjustment` rows.
+ /// `StartTempAdjustment` rows.
     pub start_temp_adjustment: Vec<StartTempAdjustmentRow>,
-    /// `County` rows.
+ /// `County` rows.
     pub county: Vec<CountyRow>,
-    /// `GeneralFuelRatio` rows.
+ /// `GeneralFuelRatio` rows.
     pub general_fuel_ratio: Vec<GeneralFuelRatioRow>,
-    /// `CriteriaRatio` rows.
+ /// `CriteriaRatio` rows.
     pub criteria_ratio: Vec<CriteriaRatioRow>,
-    /// `AltCriteriaRatio` rows.
+ /// `AltCriteriaRatio` rows.
     pub alt_criteria_ratio: Vec<CriteriaRatioRow>,
-    /// `TemperatureAdjustment` rows.
+ /// `TemperatureAdjustment` rows.
     pub temperature_adjustment: Vec<TemperatureAdjustmentRow>,
-    /// `NOxHumidityAdjust` rows.
+ /// `NOxHumidityAdjust` rows.
     pub nox_humidity_adjust: Vec<NoxHumidityAdjustRow>,
-    /// `zoneACFactor` rows.
+ /// `zoneACFactor` rows.
     pub zone_ac_factor: Vec<ZoneAcFactorRow>,
-    /// `IMFactor` rows.
+ /// `IMFactor` rows.
     pub im_factor: Vec<ImFactorRow>,
-    /// `IMCoverage` rows.
+ /// `IMCoverage` rows.
     pub im_coverage: Vec<ImCoverageRow>,
-    /// `EmissionRateAdjustmentWorker` rows.
+ /// `EmissionRateAdjustmentWorker` rows.
     pub emission_rate_adjustment: Vec<EmissionRateAdjustmentRow>,
-    /// `evefficiencyWorker` rows.
+ /// `evefficiencyWorker` rows.
     pub ev_efficiency: Vec<EvEfficiencyRow>,
-    /// `universalActivity` rows.
+ /// `universalActivity` rows.
     pub universal_activity: Vec<UniversalActivityRow>,
-    /// `smfrSBDSummary` rows.
+ /// `smfrSBDSummary` rows.
     pub smfr_sbd_summary: Vec<SmfrSbdSummaryRow>,
-    /// `AgeCategory` rows (the `mwo.AgeGroups` source).
+ /// `AgeCategory` rows (the `mwo.AgeGroups` source).
     pub age_category: Vec<AgeCategoryRow>,
-    /// Valid fuel-type ids (the Go `mwo.FuelTypes` keys).
+ /// Valid fuel-type ids (the Go `mwo.FuelTypes` keys).
     pub fuel_types: Vec<i32>,
-    /// `FuelFormulation` rows.
+ /// `FuelFormulation` rows.
     pub fuel_formulations: Vec<FuelFormulationRow>,
-    /// `FuelSupply` rows.
+ /// `FuelSupply` rows.
     pub fuel_supply: Vec<FuelSupplyRow>,
 }
 
@@ -2701,68 +2701,68 @@ pub struct BaseRateCalculatorInputs {
 /// (see the module docs of [`super::model`]).
 #[derive(Debug, Clone, Default)]
 pub struct PreparedTables {
-    /// `ExtendedIdleEmissionRateFraction` — opMode-200 usage fraction.
+ /// `ExtendedIdleEmissionRateFraction` — opMode-200 usage fraction.
     pub extended_idle_emission_rate_fraction: BTreeMap<ModelYearFuelKey, f64>,
-    /// `apuEmissionRateFraction` — opMode-201 usage fraction.
+ /// `apuEmissionRateFraction` — opMode-201 usage fraction.
     pub apu_emission_rate_fraction: BTreeMap<ModelYearFuelKey, f64>,
-    /// `ShorepowerEmissionRateFraction` — opMode-203 usage fraction.
+ /// `ShorepowerEmissionRateFraction` — opMode-203 usage fraction.
     pub shorepower_emission_rate_fraction: BTreeMap<ModelYearFuelKey, f64>,
-    /// `ZoneMonthHour` meteorology.
+ /// `ZoneMonthHour` meteorology.
     pub zone_month_hour: BTreeMap<ZoneMonthHourKey, ZoneMonthHourDetail>,
-    /// `PollutantProcessMappedModelYear`.
+ /// `PollutantProcessMappedModelYear`.
     pub pollutant_process_mapped_model_year:
         BTreeMap<PollutantProcessMappedModelYearKey, PollutantProcessMappedModelYearDetail>,
-    /// `StartTempAdjustment`.
+ /// `StartTempAdjustment`.
     pub start_temp_adjustment: BTreeMap<StartTempAdjustmentKey, StartTempAdjustmentDetail>,
-    /// `County`, keyed by county id.
+ /// `County`, keyed by county id.
     pub county: BTreeMap<i32, CountyDetail>,
-    /// `GeneralFuelRatio`.
+ /// `GeneralFuelRatio`.
     pub general_fuel_ratio: BTreeMap<super::model::GeneralFuelRatioKey, GeneralFuelRatioDetail>,
-    /// `CriteriaRatio`.
+ /// `CriteriaRatio`.
     pub criteria_ratio: BTreeMap<CriteriaRatioKey, CriteriaRatioDetail>,
-    /// `AltCriteriaRatio`.
+ /// `AltCriteriaRatio`.
     pub alt_criteria_ratio: BTreeMap<CriteriaRatioKey, CriteriaRatioDetail>,
-    /// `TemperatureAdjustment` (model-year-expanded).
+ /// `TemperatureAdjustment` (model-year-expanded).
     pub temperature_adjustment: BTreeMap<TemperatureAdjustmentKey, TemperatureAdjustmentDetail>,
-    /// `NOxHumidityAdjust`, keyed by fuel type id.
+ /// `NOxHumidityAdjust`, keyed by fuel type id.
     pub nox_humidity_adjust: BTreeMap<i32, NoxHumidityAdjustDetail>,
-    /// `zoneACFactor`.
+ /// `zoneACFactor`.
     pub zone_ac_factor: BTreeMap<ZoneAcFactorKey, f64>,
-    /// `IMFactor`.
+ /// `IMFactor`.
     pub im_factor: BTreeMap<ImFactorKey, f64>,
-    /// `IMCoverage` (built by the model-year-expanding join).
+ /// `IMCoverage` (built by the model-year-expanding join).
     pub im_coverage: BTreeMap<ImCoverageKey, f64>,
-    /// `EmissionRateAdjustment`.
+ /// `EmissionRateAdjustment`.
     pub emission_rate_adjustment: BTreeMap<PolProcSourceRegFuelMyKey, f64>,
-    /// `EVEfficiency`.
+ /// `EVEfficiency`.
     pub ev_efficiency: BTreeMap<PolProcSourceRegFuelMyKey, EvEfficiencyDetail>,
-    /// `universalActivity`.
+ /// `universalActivity`.
     pub universal_activity: BTreeMap<UniversalActivityKey, f64>,
-    /// All `hourDayID` values seen in `universalActivity`.
+ /// All `hourDayID` values seen in `universalActivity`.
     pub universal_activity_hour_day_ids: BTreeSet<i32>,
-    /// `AgeGroups` — age id → age group id.
+ /// `AgeGroups` — age id → age group id.
     pub age_groups: BTreeMap<i32, i32>,
-    /// Valid fuel-type ids.
+ /// Valid fuel-type ids.
     pub fuel_types: BTreeSet<i32>,
-    /// `FuelFormulation` — formulation id → fuel subtype id.
+ /// `FuelFormulation` — formulation id → fuel subtype id.
     pub fuel_formulations: BTreeMap<i32, i32>,
-    /// `FuelSupply`, keyed by county / year / month / fuel type.
+ /// `FuelSupply`, keyed by county / year / month / fuel type.
     pub fuel_supply: BTreeMap<FuelSupplyKey, Vec<FuelSupplyDetail>>,
 }
 
 impl PreparedTables {
-    /// Build the prepared tables from raw [`BaseRateCalculatorInputs`].
-    ///
-    /// Ports the Go `StartSetup`. `constants` supplies `Constants.YearID`,
-    /// which the `IMCoverage` join needs to compute an age from each model
-    /// year. Maps are built in dependency order: `PollutantProcessMappedModelYear`,
-    /// `IMFactor` and `AgeGroups` before `IMCoverage`.
+ /// Build the prepared tables from raw [`BaseRateCalculatorInputs`].
+ ///
+ /// Ports the Go `StartSetup`. `constants` supplies `Constants.YearID`,
+ /// which the `IMCoverage` join needs to compute an age from each model
+ /// year. Maps are built in dependency order: `PollutantProcessMappedModelYear`,
+ /// `IMFactor` and `AgeGroups` before `IMCoverage`.
     #[must_use]
     #[allow(clippy::too_many_lines)] // One straight-line port of the ~20-table Go `StartSetup`.
     pub fn from_inputs(inputs: BaseRateCalculatorInputs, constants: &RunConstants) -> Self {
         let mut prepared = PreparedTables::default();
 
-        // The three hourly-fraction tables share a key shape.
+ // The three hourly-fraction tables share a key shape.
         for row in inputs.extended_idle_emission_rate_fraction {
             prepared.extended_idle_emission_rate_fraction.insert(
                 ModelYearFuelKey {
@@ -2850,11 +2850,11 @@ impl PreparedTables {
             );
         }
 
-        // GeneralFuelRatio — fidelity note: the Go declares `details` as a
-        // slice but each file row overwrites the map entry with a fresh
-        // single-element detail (`GeneralFuelRatio[k] = v`), so the last row
-        // for a key wins and `details` always holds exactly one range. The
-        // port reproduces that; Task 44 decides whether it must accumulate.
+ // GeneralFuelRatio — fidelity note: the Go declares `details` as a
+ // slice but each file row overwrites the map entry with a fresh
+ // single-element detail (`GeneralFuelRatio[k] = v`), so the last row
+ // for a key wins and `details` always holds exactly one range. The
+ // port reproduces that; decides whether it must accumulate.
         for row in inputs.general_fuel_ratio {
             prepared.general_fuel_ratio.insert(
                 super::model::GeneralFuelRatioKey {
@@ -2908,8 +2908,8 @@ impl PreparedTables {
             );
         }
 
-        // TemperatureAdjustment — one file row expands across its (clamped)
-        // model-year range, one map entry per year.
+ // TemperatureAdjustment — one file row expands across its (clamped)
+ // model-year range, one map entry per year.
         for row in inputs.temperature_adjustment {
             let min_my = row.min_model_year_id.max(1950);
             let max_my = row.max_model_year_id.min(2060);
@@ -2974,10 +2974,10 @@ impl PreparedTables {
             prepared.age_groups.insert(row.age_id, row.age_group_id);
         }
 
-        // IMCoverage — depends on the three maps above. For each program row
-        // and each model year it covers, join through
-        // PollutantProcessMappedModelYear → AgeGroups → IMFactor, then
-        // accumulate `IMFactor * complianceFactor` into the coverage entry.
+ // IMCoverage — depends on the three maps above. For each program row
+ // and each model year it covers, join through
+ // PollutantProcessMappedModelYear → AgeGroups → IMFactor, then
+ // accumulate `IMFactor * complianceFactor` into the coverage entry.
         for row in inputs.im_coverage {
             let beg_my = row.beg_model_year_id.max(1950);
             let end_my = row.end_model_year_id.min(2060);
@@ -3014,7 +3014,7 @@ impl PreparedTables {
                     fuel_type_id: row.fuel_type_id,
                 };
                 let entry = prepared.im_coverage.entry(imk).or_insert(0.0);
-                *entry += imf * compliance_factor;
+ *entry += imf * compliance_factor;
             }
         }
 
@@ -3117,7 +3117,7 @@ mod tests {
             ..BaseRateCalculatorInputs::default()
         };
         let prepared = PreparedTables::from_inputs(inputs, &RunConstants::default());
-        // 1950..=1953 -> four entries; 1940..1949 clamped away.
+ // 1950..=1953 -> four entries; 1940..1949 clamped away.
         assert_eq!(prepared.temperature_adjustment.len(), 4);
         assert!(prepared
             .temperature_adjustment
@@ -3139,9 +3139,9 @@ mod tests {
 
     #[test]
     fn im_coverage_join_accumulates_factor_times_compliance() {
-        // One IM program covering model years 2018..=2019, joined through
-        // PPMMY (-> IMModelYearGroupID 7) and AgeGroups, summing IMFactor *
-        // 0.01 * complianceFactor.
+ // One IM program covering model years 2018..=2019, joined through
+ // PPMMY (-> IMModelYearGroupID 7) and AgeGroups, summing IMFactor *
+ // 0.01 * complianceFactor.
         let constants = RunConstants {
             year_id: 2020,
             ..RunConstants::default()
@@ -3196,8 +3196,8 @@ mod tests {
             ..BaseRateCalculatorInputs::default()
         };
         let prepared = PreparedTables::from_inputs(inputs, &constants);
-        // model year 2018 -> age 2 -> age group 4; 2019 -> age 1 -> age group 4.
-        // Each: 0.5 * (0.01 * 80) = 0.4.
+ // model year 2018 -> age 2 -> age group 4; 2019 -> age 1 -> age group 4.
+ // Each: 0.5 * (0.01 * 80) = 0.4.
         assert_eq!(
             prepared.im_coverage.get(&ImCoverageKey {
                 pol_process_id: 301,

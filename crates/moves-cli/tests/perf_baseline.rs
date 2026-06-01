@@ -1,12 +1,12 @@
-//! Performance-baseline integration test — Task 75 (`mo-85wl`).
+//! Performance-baseline integration test — ().
 //!
 //! Runs every onroad fixture through the Rust engine and reports per-fixture
 //! wall time, planning time, execution time, and peak RSS. The test asserts
 //! correctness (runs must not error) and a loose wall-time upper bound per
-//! fixture so CI catches regressions. The printed table is the Task 75
+//! fixture so CI catches regressions. The printed table is the
 //! baseline record.
 //!
-//! # What this measures today (Phase 3, pre-data-plane)
+//! # What this measures today (pre-data-plane)
 //!
 //! Calculators return `CalculatorOutput::empty()` — the compute cores are
 //! ported but the data plane that feeds real row data is not yet wired in.
@@ -27,8 +27,8 @@
 //!
 //! ```text
 //! perf stat -e cache-misses,cache-references,L1-dcache-loads \
-//!     target/release/moves run --runspec characterization/fixtures/process-airtoxics.xml \
-//!     --output /tmp/out
+//! target/release/moves run --runspec characterization/fixtures/process-airtoxics.xml \
+//! --output /tmp/out
 //! ```
 
 use std::path::{Path, PathBuf};
@@ -129,6 +129,7 @@ fn perf_baseline_all_onroad_fixtures() {
             run_date_time: None,
             snapshot: None,
             scale_input: None,
+            default_db: None,
         };
 
         match run_simulation(&opts) {
@@ -166,7 +167,7 @@ fn perf_baseline_all_onroad_fixtures() {
         }
     }
 
-    // Summary row.
+ // Summary row.
     println!("{}", "-".repeat(92));
     println!(
         "{:<38} {:>10.1} {:>10.1} {:>10.1}",
@@ -201,6 +202,7 @@ fn single_fixture_timing_fields_are_populated() {
         run_date_time: None,
         snapshot: None,
         scale_input: None,
+            default_db: None,
     })
     .expect("run must succeed");
 

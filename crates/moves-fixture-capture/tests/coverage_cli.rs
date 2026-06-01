@@ -4,7 +4,7 @@
 //!
 //! The unit tests in `crate::coverage` cover the aggregation logic;
 //! this file covers the CLI's directory-walking, exit-code behavior, and
-//! end-to-end determinism contract that Phase 1 Task 9 (bead `mo-55l0`)
+//! end-to-end determinism contract that (work item )
 //! depends on.
 
 use std::fs;
@@ -36,9 +36,9 @@ fn write_trace(snapshot_root: &Path, fixture: &str, body: serde_json::Value) {
 }
 
 fn sample_trace(fixture: &str) -> serde_json::Value {
-    // Mirrors the `moves-fixture-capture/v1` schema closely enough that
-    // the loader is exercised; only the fields the aggregator reads need
-    // to round-trip.
+ // Mirrors the `moves-fixture-capture/v1` schema closely enough that
+ // the loader is exercised; only the fields the aggregator reads need
+ // to round-trip.
     json!({
         "trace_version": "moves-fixture-capture/v1",
         "fixture_name": fixture,
@@ -71,7 +71,7 @@ fn coverage_cli_aggregates_two_fixture_traces() {
     let snapshots = tempdir().unwrap();
     write_trace(snapshots.path(), "alpha", sample_trace("alpha"));
     write_trace(snapshots.path(), "beta", sample_trace("beta"));
-    // A snapshot subdir with no trace file must be skipped silently.
+ // A snapshot subdir with no trace file must be skipped silently.
     fs::create_dir_all(snapshots.path().join("notraces")).unwrap();
 
     let out = tempdir().unwrap();
@@ -95,7 +95,7 @@ fn coverage_cli_aggregates_two_fixture_traces() {
     assert_eq!(java[0]["score"], 1.0);
 
     let hot = v["hot_paths"].as_array().unwrap();
-    // One java class + one SQL file + one Go calc, all score 1.0.
+ // One java class + one SQL file + one Go calc, all score 1.0.
     assert_eq!(hot.len(), 3);
 }
 
@@ -121,7 +121,7 @@ fn coverage_cli_is_byte_identical_across_runs() {
 #[test]
 fn coverage_cli_emits_empty_map_for_no_traces() {
     let snapshots = tempdir().unwrap();
-    // No subdirectories at all — a fresh fixture suite before any captures.
+ // No subdirectories at all — a fresh fixture suite before any captures.
     let out = tempdir().unwrap();
     let status = run_cli(snapshots.path(), out.path());
     assert!(status.success(), "CLI failed with {status:?}");

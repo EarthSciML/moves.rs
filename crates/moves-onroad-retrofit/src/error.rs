@@ -5,7 +5,7 @@ use thiserror::Error;
 /// Errors returned by the OnRoadRetrofit control strategy.
 #[derive(Debug, Error)]
 pub enum Error {
-    /// A `cumulativeRetrofitFraction` value is outside `[0.0, 1.0]`.
+ /// A `cumulativeRetrofitFraction` value is outside `[0.0, 1.0]`.
     #[error(
         "retrofit record (sourceType={source_type_id}, modelYear={start_model_year}..={end_model_year}, \
          retrofitYear={retrofit_year_id}, pollutant={pollutant_id}, process={process_id}) \
@@ -21,7 +21,7 @@ pub enum Error {
         fraction: f64,
     },
 
-    /// A `retrofitEffectiveness` value is outside `[0.0, 1.0]`.
+ /// A `retrofitEffectiveness` value is outside `[0.0, 1.0]`.
     #[error(
         "retrofit record (sourceType={source_type_id}, modelYear={start_model_year}..={end_model_year}, \
          retrofitYear={retrofit_year_id}, pollutant={pollutant_id}, process={process_id}) \

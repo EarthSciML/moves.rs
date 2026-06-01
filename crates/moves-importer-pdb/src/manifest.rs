@@ -6,7 +6,7 @@
 //! `manifest.json` listing every table that was loaded, the source
 //! CSV path, the output Parquet path, the SHA-256, the row count,
 //! and any warnings emitted. Downstream tooling (the importer
-//! validation suite at Task 88) reads it to compare against the
+//! validation suite at) reads it to compare against the
 //! canonical-MOVES MariaDB dump.
 
 use std::path::PathBuf;
@@ -25,7 +25,7 @@ pub const MANIFEST_FILENAME: &str = "manifest.json";
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Manifest {
     pub schema_version: String,
-    /// One entry per loaded table.
+ /// One entry per loaded table.
     pub tables: Vec<TableManifest>,
 }
 
@@ -41,18 +41,18 @@ impl Manifest {
 /// Per-table manifest entry.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TableManifest {
-    /// MOVES table name (e.g. "Link", "OpModeDistribution").
+ /// MOVES table name (e.g. "Link", "OpModeDistribution").
     pub name: String,
-    /// CSV file the importer read from.
+ /// CSV file the importer read from.
     pub source_path: PathBuf,
-    /// Parquet file the importer wrote to (relative to the manifest's
-    /// directory if the writer placed it under the same root).
+ /// Parquet file the importer wrote to (relative to the manifest's
+ /// directory if the writer placed it under the same root).
     pub output_path: PathBuf,
-    /// Hex SHA-256 of the Parquet bytes.
+ /// Hex SHA-256 of the Parquet bytes.
     pub sha256: String,
-    /// Number of rows imported.
+ /// Number of rows imported.
     pub row_count: u64,
-    /// Filter-rejected cells (Java-style WARNING entries).
+ /// Filter-rejected cells (Java-style WARNING entries).
     pub warnings: Vec<ImportWarning>,
 }
 

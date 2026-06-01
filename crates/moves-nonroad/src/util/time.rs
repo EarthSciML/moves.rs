@@ -1,6 +1,6 @@
 //! Date/time formatting helper (`getime.f`).
 //!
-//! Task 99. The Fortran `getime.f` writes the current local
+//!The Fortran `getime.f` writes the current local
 //! date/time into a Fortran character variable using the format
 //! `"Mon DD HH:MM:SS: YYYY"` (3-letter month, day-of-month, 24-hour
 //! time, year — all separated by single spaces). The Rust port
@@ -96,7 +96,7 @@ mod tests {
 
     #[test]
     fn formats_canonical_example() {
-        // Mar 14 12:34:56:  2025 — straightforward case.
+ // Mar 14 12:34:56: 2025 — straightforward case.
         let s = format_components(2025, 3, 14, 12, 34, 56);
         assert_eq!(s, "Mar 14 12:34:56: 2025");
     }
@@ -110,7 +110,7 @@ mod tests {
     #[test]
     fn pads_short_year() {
         let s = format_components(99, 12, 31, 23, 59, 59);
-        // Fortran I4 right-justifies on width 4 with leading spaces.
+ // Fortran I4 right-justifies on width 4 with leading spaces.
         assert_eq!(s, "Dec 31 23:59:59:   99");
     }
 
@@ -122,16 +122,16 @@ mod tests {
 
     #[test]
     fn epoch_civil_conversion_matches_known_points() {
-        // 1970-01-01T00:00:00Z
+ // 1970-01-01T00:00:00Z
         assert_eq!(unix_seconds_to_civil(0), (1970, 1, 1, 0, 0, 0));
-        // 2000-01-01T00:00:00Z = 946_684_800
+ // 2000-01-01T00:00:00Z = 946_684_800
         assert_eq!(unix_seconds_to_civil(946_684_800), (2000, 1, 1, 0, 0, 0));
-        // 2020-02-29T12:34:56Z = 1_582_979_696
+ // 2020-02-29T12:34:56Z = 1_582_979_696
         assert_eq!(
             unix_seconds_to_civil(1_582_979_696),
             (2020, 2, 29, 12, 34, 56)
         );
-        // 2024-12-31T23:59:59Z = 1_735_689_599
+ // 2024-12-31T23:59:59Z = 1_735_689_599
         assert_eq!(
             unix_seconds_to_civil(1_735_689_599),
             (2024, 12, 31, 23, 59, 59)

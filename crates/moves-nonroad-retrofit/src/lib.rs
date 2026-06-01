@@ -1,14 +1,14 @@
 //! `moves-nonroad-retrofit` — NonRoadRetrofit internal control strategy
-//! (Phase 6 Task 123).
+//!.
 //!
 //! Wires NONROAD's existing retrofit support (ported from `clcrtrft.f` in
-//! Task 108) into the unified control-strategy framework so that a single
+//!) into the unified control-strategy framework so that a single
 //! RunSpec retrofit declaration can drive both the onroad and nonroad
 //! calculators where applicable.
 //!
 //! # What this does
 //!
-//! The NONROAD model has its own retrofit calculation (ported in Task 108)
+//! The NONROAD model has its own retrofit calculation (ported in)
 //! that applies emission-reduction factors based on:
 //!
 //! - SCC code (or the `ALL` wildcard)

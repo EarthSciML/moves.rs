@@ -1,4 +1,4 @@
-//! `moves-control-strategy-validation` — Phase 6 Task 124 validation gate.
+//! `moves-control-strategy-validation` — validation gate.
 //!
 //! Exercises each control strategy with non-trivial fixture parameters and
 //! validates that the Rust port's computation matches the canonical Java
