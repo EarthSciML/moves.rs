@@ -9,49 +9,46 @@
 //! 2. **Module plan is non-empty** — every fixture exercises at least one
 //!    calculator-graph module, confirming the RunSpec parses and the DAG
 //!    filters correctly for both the onroad and NONROAD model paths.
-//! 3. **Canonical-snapshot diff (gated)** — when [`SNAPSHOTS_DIR_ENV`] is
-//!    set to a directory containing Phase 0 canonical-MOVES snapshots, each
-//!    fixture's port output snapshot is diffed against the corresponding
-//!    canonical snapshot within the tolerance budget from
-//!    `characterization/tolerance.toml`. Divergences beyond the budget fail
-//!    the test; within-budget divergences are recorded in the output. This
-//!    gate is dormant until canonical snapshots and real calculator output
-//!    both exist — see `docs/known-divergences.md`.
+//! 3. **Canonical-snapshot diff (active)** — [`canonical_snapshot_diff`] runs
+//!    each fixture with `--snapshot` (so the calculators execute against the
+//!    captured execution DB and the engine writes the real `MOVESOutput/`
+//!    tree), then compares the port's per-pollutant `emissionQuant` totals
+//!    against the canonical `MOVESOutput` table. It hard-asserts on the
+//!    fixtures whose data plane matches canonical within a documented
+//!    precision-only tolerance and prints — without asserting — the divergence
+//!    for fixtures with a known, reported data-plane bug. See the catalogue in
+//!    `docs/known-divergences.md`.
 //!
-//! # Current state (Phase 7 entry)
+//! # Why per-pollutant sums, not a cell diff
 //!
-//! All 34 fixtures report 0 modules executed and all planned modules
-//! unimplemented. This is expected: calculator `execute()` methods return
-//! `CalculatorOutput::empty()` until the data plane is wired in. The test
-//! still exercises RunSpec parsing, DAG filtering, engine orchestration, and
-//! `MOVESRun.parquet` output shape for both model paths.
+//! Even where the port reproduces canonical to `f64` precision, the two
+//! `MOVESOutput` tables disagree on metadata/labeling columns that do not
+//! affect emitted mass (`iterationID`, `roadTypeID`, the `SCC` road-type
+//! subfield) and on which uncertainty columns are present. A cell-level
+//! [`moves_snapshot::diff_snapshots`] therefore fails on every fixture; the
+//! per-pollutant `emissionQuant` total is the quantity that must agree and is
+//! the same metric `characterization/audit/regression_gate.sh` uses.
 //!
-//! # Enabling the canonical-diff gate
+//! # Running the gate explicitly
 //!
-//! 1. Generate canonical-MOVES snapshots on an HPC node with Apptainer
-//!    (see `characterization/apptainer/README.md`):
-//!    ```sh
-//!    characterization/run-all-fixtures.sh --fakeroot --keep-going
-//!    ```
+//! ```sh
+//! cargo test --test full_suite_regression canonical_snapshot_diff -- --nocapture
+//! ```
 //!
-//! 2. Wire the data plane so calculator `execute()` methods produce real
-//!    output (Phase 4 `DataFrameStore` deliverables).
-//!
-//! 3. Run with the snapshot directory set:
-//!    ```sh
-//!    REGRESSION_SNAPSHOTS_DIR=characterization/snapshots \
-//!        cargo test --test full_suite_regression -- --nocapture
-//!    ```
+//! Point it at a different snapshot tree with
+//! `REGRESSION_SNAPSHOTS_DIR=<path>`.
 
 use std::path::{Path, PathBuf};
 
 use moves_cli::{run_simulation, RunOptions};
-use moves_snapshot::{diff_snapshots, DiffOptions, Snapshot, ToleranceConfig};
+use moves_snapshot::{
+    compare_pollutant_sums, pollutant_sums_from_output_dir, pollutant_sums_from_snapshot, Snapshot,
+};
 use tempfile::tempdir;
 
 /// Environment variable naming the directory of Phase 0 canonical-MOVES
-/// snapshots. Unset → the in-repo `characterization/snapshots/` tree (which
-/// currently contains only a README, keeping the diff gate dormant).
+/// snapshots. Unset → the in-repo `characterization/snapshots/` tree, which is
+/// populated (all 34 non-scale fixtures), so the diff gate is active.
 pub const SNAPSHOTS_DIR_ENV: &str = "REGRESSION_SNAPSHOTS_DIR";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -66,10 +63,6 @@ fn workspace_root() -> PathBuf {
 
 fn fixtures_dir() -> PathBuf {
     workspace_root().join("characterization/fixtures")
-}
-
-fn tolerance_config_path() -> PathBuf {
-    workspace_root().join("characterization/tolerance.toml")
 }
 
 /// The canonical snapshot root, overridable by [`SNAPSHOTS_DIR_ENV`].
@@ -105,17 +98,6 @@ fn fixture_name(path: &Path) -> &str {
 
 fn canonical_present(snapshots_root: &Path, name: &str) -> bool {
     snapshots_root.join(name).join("manifest.json").is_file()
-}
-
-fn tolerance_opts() -> DiffOptions {
-    let path = tolerance_config_path();
-    if path.is_file() {
-        ToleranceConfig::from_file(&path)
-            .map(Into::into)
-            .unwrap_or_default()
-    } else {
-        DiffOptions::default()
-    }
 }
 
 // ── fixture catalogue ─────────────────────────────────────────────────────────
@@ -251,21 +233,120 @@ fn nonroad_fixtures_plan_modules() {
 
 // ── canonical-diff gate ───────────────────────────────────────────────────────
 
-/// Diff each fixture's port output against its canonical-MOVES snapshot.
+/// Per-pollutant relative-difference tolerance for **onroad** fixtures whose
+/// data plane is wired and matches canonical. The float-summation order differs
+/// between canonical MOVES (MariaDB) and the Rust port (`f64` Polars), producing
+/// sub-`1e-4` relative drift on the `emissionQuant` totals. See
+/// `docs/known-divergences.md` §4.2.
+const ONROAD_REL_TOL: f64 = 1e-3;
+
+/// Per-pollutant relative-difference tolerance for **NONROAD** fixtures. NONROAD
+/// arithmetic is Fortran single-precision (`real*4`) in canonical MOVES; the
+/// Rust port uses `f64` throughout, so the totals differ by a documented
+/// half-percent-scale amount even when the physics is reproduced exactly. See
+/// `docs/known-divergences.md` §4.2.
+const NONROAD_REL_TOL: f64 = 1e-2;
+
+/// Floor on the relative-difference denominator so a pollutant that is exactly
+/// zero in canonical does not yield an infinite relative difference.
+const REL_DIFF_FLOOR: f64 = 1e-30;
+
+/// Fixtures whose `MOVESOutput` matches canonical within tolerance and which the
+/// gate therefore **hard-asserts**. A regression that pushes any of these out of
+/// tolerance fails the test.
 ///
-/// **Dormant** unless [`SNAPSHOTS_DIR_ENV`] points at a populated snapshot
-/// tree AND the fixture's snapshot sub-directory contains a `manifest.json`.
-/// When a snapshot is found, the test:
+/// `vacuous` marks fixtures whose canonical snapshot has no `MOVESOutput` rows
+/// (the selected process is not materialised in the capture); the port likewise
+/// emits nothing, so there is no divergence to measure. They are pinned here so
+/// that if either side starts producing rows the asymmetry is caught.
+fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
+    &[
+        // (fixture, per-pollutant relative tolerance, vacuous)
+        ("process-evap-fvv", ONROAD_REL_TOL, false), // ~8.2e-5
+        ("process-evap-leaks", ONROAD_REL_TOL, false), // ~1.6e-7
+        ("process-evap-permeation", ONROAD_REL_TOL, false), // ~2.1e-7
+        ("nr-commercial-nation", NONROAD_REL_TOL, false), // ~3.5e-3 (real*4)
+        ("process-apu", ONROAD_REL_TOL, true),
+        ("process-crankcase-extidle", ONROAD_REL_TOL, true),
+        ("process-crankcase-start", ONROAD_REL_TOL, true),
+        ("process-extended-idle", ONROAD_REL_TOL, true),
+    ]
+}
+
+/// Fixtures with a **known, reported data-plane bug** whose `MOVESOutput`
+/// diverges from canonical far beyond any precision budget. They are run and
+/// their divergence is printed for visibility, but the gate does **not** assert
+/// on them — masking the bug with a widened tolerance would be worse than no
+/// gate (a real-bug divergence must be fixed in the data plane, never hidden).
+/// Each entry is catalogued in `docs/known-divergences.md` §4.4. As a fixture's
+/// data plane is fixed it should graduate from this list into
+/// [`asserted_fixtures`].
+const QUARANTINED_FIXTURES: &[&str] = &[
+    // Onroad-exhaust path emits a fixed ~8,632-row block of NONROAD-coded rows
+    // (SCC 2260/2265/2282/2285) regardless of the RunSpec — identical bytes
+    // across every onroad fixture. Emitted mass is ~7 orders of magnitude high.
+    "chain-nonhaptog",
+    "chain-tog-speciation",
+    "expand-counties",
+    "expand-criteria",
+    "expand-day",
+    "expand-fueltype-diesel",
+    "expand-month",
+    "expand-sourcetype",
+    "mixed-onroad-nonroad",
+    "process-airtoxics",
+    "process-brakewear",
+    "process-crankcase-running",
+    "process-nox-speciation",
+    "process-pm-exhaust",
+    "process-refueling",
+    "process-tirewear",
+    "sample-runspec",
+    // NONROAD fixtures that emit nothing (port row count 0 vs a populated
+    // canonical) or a wrong row count — population/sector-coverage gaps.
+    "nr-agriculture-state",
+    "nr-airport-support-county",
+    "nr-construction-state",
+    "nr-industrial-county",
+    "nr-lawn-garden-county",
+    "nr-logging-county",
+    "nr-pleasure-craft-state",
+    "nr-railroad-support-nation",
+    "nr-recreational-county",
+];
+
+fn is_quarantined(name: &str) -> bool {
+    QUARANTINED_FIXTURES.contains(&name)
+}
+
+/// Compare each fixture's **real `MOVESOutput`** against its canonical-MOVES
+/// snapshot, per-pollutant, with `--snapshot` active.
 ///
-/// 1. Runs the port to get output.
-/// 2. Loads the port output as a `moves_snapshot`-format snapshot (available
-///    once the data plane writes output in that format).
-/// 3. Diffs port vs canonical within the tolerance budget.
-/// 4. Fails only when differences exceed the budget.
+/// **Dormant** unless [`SNAPSHOTS_DIR_ENV`] points at a populated snapshot tree
+/// (or the in-repo `characterization/snapshots/` tree is populated, which it is)
+/// AND the fixture's snapshot sub-directory contains a `manifest.json`.
 ///
-/// Differences within the budget (known artifacts) are printed but not
-/// failing. Update `characterization/tolerance.toml` to widen a budget for
-/// a characterised artifact, and add a comment documenting why.
+/// For every covered fixture the test:
+/// 1. Runs the port with `snapshot: Some(<canonical-dir>)`, so the calculators
+///    execute against the captured execution database and the engine writes the
+///    real `MOVESOutput/` partitioned Parquet tree (not just `MOVESRun.parquet`).
+/// 2. Sums `emissionQuant` per `pollutantID` from both the canonical
+///    `MOVESOutput` table and the port's `MOVESOutput/` tree.
+/// 3. Compares the per-pollutant totals.
+///
+/// Why per-pollutant sums rather than a cell-level [`diff_snapshots`]? Even where
+/// the port reproduces canonical to `f64` precision, the two `MOVESOutput` tables
+/// disagree on metadata/labeling columns that do not affect emitted mass
+/// (`iterationID` NULL vs 1, `roadTypeID` 0 vs the link road type, and the `SCC`
+/// road-type subfield), and canonical carries `emissionQuantMean`/`Sigma` where
+/// the port carries `emissionRate`/`runHash`. A cell diff fails on those for
+/// every fixture; the per-pollutant `emissionQuant` total is the quantity that
+/// must agree and cleanly isolates real divergences in emitted mass. This is the
+/// same metric as `characterization/audit/regression_gate.sh`.
+///
+/// The gate hard-asserts on [`asserted_fixtures`] and prints — without asserting
+/// — the divergence for [`QUARANTINED_FIXTURES`] (known, reported data-plane
+/// bugs; see `docs/known-divergences.md` §4.4).
 #[test]
 fn canonical_snapshot_diff() {
     let root = snapshots_root();
@@ -287,15 +368,20 @@ fn canonical_snapshot_diff() {
         return;
     }
 
-    let opts = tolerance_opts();
     println!(
         "\n[canonical_snapshot_diff] {} fixture(s) against {}",
         covered.len(),
         root.display()
     );
+    println!(
+        "{:<28} {:>10} {:>10} {:>14} {:>10}",
+        "fixture", "canon_rows", "port_rows", "max_rel_diff", "verdict"
+    );
+    println!("{}", "-".repeat(78));
 
-    let mut ok: Vec<&str> = Vec::new();
     let mut failures: Vec<String> = Vec::new();
+    let mut passed = 0usize;
+    let mut quarantined = 0usize;
 
     for fixture_path in covered {
         let name = fixture_name(fixture_path);
@@ -307,68 +393,85 @@ fn canonical_snapshot_diff() {
             max_parallel_chunks: 1,
             calculator_dag: None,
             run_date_time: Some("2026-05-21T00:00:00".to_string()),
-            snapshot: None,
+            // Activate the data plane: calculators execute against the captured
+            // execution DB and the engine writes the real MOVESOutput tree.
+            snapshot: Some(root.join(name)),
         })
         .unwrap_or_else(|e| panic!("{name}: run error — {e}"));
 
-        // Load canonical snapshot.
         let canonical = match Snapshot::load(&root.join(name)) {
-            Ok(s) => s,
+            Ok(s) => pollutant_sums_from_snapshot(&s),
             Err(e) => {
-                println!("{name}: SKIP — canonical load error: {e}");
+                println!("{name:<28} canonical load error: {e}");
+                failures.push(format!("{name}: canonical load error: {e}"));
                 continue;
             }
         };
+        let port = pollutant_sums_from_output_dir(outcome.output_root.as_path())
+            .unwrap_or_else(|e| panic!("{name}: reading port MOVESOutput — {e}"));
 
-        // Load port output as a snapshot. Currently the engine writes only
-        // MOVESRun.parquet (no manifest.json), so this will fail until the
-        // data plane is wired and the output processor writes in
-        // moves-snapshot format. The error is handled gracefully.
-        let port = match Snapshot::load(outcome.output_root.as_path()) {
-            Ok(s) => s,
-            Err(e) => {
-                println!("{name}: SKIP diff — port output not in snapshot format: {e}");
-                continue;
+        let cmp = compare_pollutant_sums(&canonical, &port, REL_DIFF_FLOOR);
+
+        let asserted = asserted_fixtures().iter().find(|(n, _, _)| *n == name);
+        let verdict = if let Some((_, tol, vacuous)) = asserted {
+            // Hard-asserted fixture.
+            let row_mismatch = canonical.row_count != port.row_count;
+            let within = cmp.within(*tol);
+            if *vacuous {
+                if canonical.row_count == 0 && port.row_count == 0 {
+                    passed += 1;
+                    "PASS(empty)"
+                } else {
+                    failures.push(format!(
+                        "{name}: expected vacuous (0 rows both) but canon={} port={}",
+                        canonical.row_count, port.row_count
+                    ));
+                    "FAIL"
+                }
+            } else if within && !row_mismatch {
+                passed += 1;
+                "PASS"
+            } else {
+                failures.push(format!(
+                    "{name}: max_rel_diff={:.3e} (tol {:.0e}), canon_rows={} port_rows={}",
+                    cmp.max_rel_diff, tol, canonical.row_count, port.row_count
+                ));
+                "FAIL"
             }
-        };
-
-        let diff = diff_snapshots(&canonical, &port, &opts);
-        let s = diff.summary();
-
-        if diff.is_empty() {
-            ok.push(name);
+        } else if is_quarantined(name) {
+            quarantined += 1;
+            "BUG(quar)"
         } else {
+            // A covered fixture that is neither asserted nor quarantined is an
+            // unclassified divergence: fail loudly so it gets triaged rather
+            // than silently ignored.
             failures.push(format!(
-                "{name}: tables_added={} tables_removed={} tables_changed={} \
-                 schema_diffs={} rows_added={} rows_removed={} cells_changed={}",
-                s.tables_added,
-                s.tables_removed,
-                s.tables_changed,
-                s.schema_diffs,
-                s.rows_added,
-                s.rows_removed,
-                s.cells_changed,
+                "{name}: UNCLASSIFIED max_rel_diff={:.3e}, canon_rows={} port_rows={} — \
+                 add to asserted_fixtures (with a documented precision-only tolerance) \
+                 or QUARANTINED_FIXTURES (with a docs/known-divergences.md bug entry)",
+                cmp.max_rel_diff, canonical.row_count, port.row_count
             ));
-        }
+            "UNCLASS"
+        };
+
+        println!(
+            "{name:<28} {:>10} {:>10} {:>14.3e} {:>10}",
+            canonical.row_count, port.row_count, cmp.max_rel_diff, verdict
+        );
     }
 
-    if !ok.is_empty() {
-        println!("within tolerance ({}):", ok.len());
-        for name in &ok {
-            println!("  ✓ {name}");
-        }
-    }
-    if !failures.is_empty() {
-        println!("beyond tolerance ({}):", failures.len());
-        for f in &failures {
-            println!("  ✗ {f}");
-        }
-    }
+    println!("{}", "-".repeat(78));
+    println!(
+        "{passed} asserted-pass, {quarantined} quarantined (reported bugs), \
+         {} failure(s)",
+        failures.len()
+    );
 
     assert!(
         failures.is_empty(),
-        "canonical-snapshot divergences beyond budget — \
-         update characterization/tolerance.toml to accept known artifacts:\n  {}",
+        "canonical-snapshot gate failures (these are regressions in the \
+         asserted set or unclassified divergences — fix the data plane, do not \
+         widen tolerances to mask a real bug):\n  {}",
         failures.join("\n  ")
     );
 }
