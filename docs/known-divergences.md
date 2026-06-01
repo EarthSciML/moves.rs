@@ -32,23 +32,98 @@ It has two layers:
 - `MOVESRun.parquet` must be produced.
 - At least one calculator-graph module must be planned.
 
-**Canonical-diff gate** — activated by `REGRESSION_SNAPSHOTS_DIR=<path>`:
-- Loads Phase 0 canonical-MOVES snapshots from the supplied path.
-- Diffs each fixture's port output against the canonical snapshot using
-  `moves_snapshot::diff_snapshots`.
-- Applies the per-(table, column) tolerance budget from
-  `characterization/tolerance.toml`.
-- Differences within tolerance are reported but not failing.
-- Differences beyond tolerance fail the test.
+**Canonical-diff gate** — `canonical_snapshot_diff`, **active** (the in-repo
+`characterization/snapshots/` tree is populated for all 34 non-scale fixtures;
+override the tree with `REGRESSION_SNAPSHOTS_DIR=<path>`):
+- Runs each fixture with `--snapshot`, so the calculators execute against the
+  captured execution DB and the engine writes the real `MOVESOutput/` tree
+  (not just `MOVESRun.parquet`).
+- Sums `emissionQuant` per `pollutantID` from both the canonical `MOVESOutput`
+  table and the port's `MOVESOutput/` tree, then compares the per-pollutant
+  totals (`moves_snapshot::compare_pollutant_sums`).
+- **Hard-asserts** on the fixtures whose data plane matches canonical within a
+  documented precision-only tolerance (§4.2 below).
+- **Hard-fails** (operator decision) on fixtures with a known, reported
+  data-plane bug (§4.4 below) — it is OK for CI to be red while results are
+  wrong. Masking a divergence with a widened tolerance is worse than no gate,
+  so a quarantined fixture stays in the gate (failing CI) and graduates to the
+  asserted set only once its data plane is actually fixed.
 
-The gate is currently **dormant** — see §3 for what is needed to activate it.
+### Why per-pollutant sums, not a cell-level diff
+
+A byte/cell-level `moves_snapshot::diff_snapshots` of `MOVESOutput` is unusable
+here: even when the port reproduces canonical to `f64` precision, the two tables
+disagree on metadata/labeling columns that do **not** affect emitted mass —
+`iterationID` (port NULL vs canonical 1), `roadTypeID` (port 0 vs the link road
+type), and the `SCC` road-type subfield (which therefore differs, e.g.
+`2201210412` vs `2201210012`) — and canonical carries
+`emissionQuantMean`/`emissionQuantSigma` (always NULL with uncertainty off)
+where the port carries `emissionRate`/`runHash`. A cell diff fails on those for
+*every* fixture. The per-pollutant `emissionQuant` total is the quantity that
+must agree and cleanly isolates real divergences in emitted mass; it is the same
+metric `characterization/audit/regression_gate.sh` uses.
 
 ### Tolerance budget
 
-`characterization/tolerance.toml` governs what counts as a "within tolerance"
-divergence. The Phase 0 default is `default_float_tolerance = 0.0` (strict
-byte-identity). As divergences are triaged in the canonical-diff phase, the
-budget file grows per-column overrides with explanatory comments.
+The per-pollutant relative tolerances live in the gate
+(`crates/moves-cli/tests/full_suite_regression.rs`): `ONROAD_REL_TOL = 1e-3`
+and `NONROAD_REL_TOL = 1e-2`, justified in §4.2. (`characterization/tolerance.toml`
+remains the per-(table, column) budget for `moves_snapshot diff` of the full
+snapshot, unchanged at `default_float_tolerance = 0.0`.)
+
+---
+
+## 1b. Canonical-diff gate state (2026-05-31)
+
+The gate was activated against the re-captured snapshots (commit `a1d4314`,
+onroad Go calculators). Of the 34 non-scale fixtures, **8 are asserted** and
+**26 are known data-plane bugs that hard-fail CI** (operator decision: it is OK
+for CI to be red while results are wrong). The gate pins the 8 working fixtures
+against regression and keeps the 26 bugs failing on the record (never masked by
+a tolerance); each graduates to the asserted set once its data plane is fixed.
+
+### Triage table
+
+| Fixture(s) | canon→port rows | max rel. diff | Verdict |
+|---|---|---|---|
+| `process-evap-fvv` | 128→128 | 8.2e-5 | **precision-only — asserted** (`ONROAD_REL_TOL`) |
+| `process-evap-leaks` | 128→128 | 1.6e-7 | **precision-only — asserted** |
+| `process-evap-permeation` | 128→128 | 2.1e-7 | **precision-only — asserted** |
+| `nr-commercial-nation` | 908→908 | 3.5e-3 | **precision-only (real\*4) — asserted** (`NONROAD_REL_TOL`) |
+| `process-apu`, `process-crankcase-extidle`, `process-crankcase-start`, `process-extended-idle` | 0→0 | — | **vacuous — asserted** (canonical has no `MOVESOutput`; port emits none either) |
+| `chain-nonhaptog`, `chain-tog-speciation`, `expand-counties`, `expand-criteria`, `expand-day`, `expand-fueltype-diesel`, `expand-month`, `expand-sourcetype`, `mixed-onroad-nonroad`, `process-airtoxics`, `process-brakewear`, `process-crankcase-running`, `process-nox-speciation`, `process-pm-exhaust`, `process-refueling`, `process-tirewear`, `sample-runspec` | →8,632 (fixed) | ~1e40–1e43 % | **reported bug (onroad-exhaust) — quarantined** |
+| `nr-agriculture-state`, `nr-airport-support-county`, `nr-industrial-county`, `nr-railroad-support-nation` | N→0 | −100 % | **reported bug (NONROAD emits nothing) — quarantined** |
+| `nr-construction-state`, `nr-lawn-garden-county`, `nr-logging-county`, `nr-pleasure-craft-state`, `nr-recreational-county` | mismatched | 1e3–1e6 % | **reported bug (NONROAD population/coverage) — quarantined** |
+
+No tolerance was widened to absorb a bug. The only tolerances applied
+(`ONROAD_REL_TOL = 1e-3`, `NONROAD_REL_TOL = 1e-2`) cover the four genuinely
+matching fixtures, whose divergences are sub-tolerance float-accumulation /
+`real*4` artifacts (§4.2).
+
+### Reported bug 1 — onroad-exhaust path emits fixed NONROAD-coded garbage
+
+Every onroad fixture, run against its own snapshot, writes a **byte-identical**
+~8,632-row `MOVESOutput` block regardless of the RunSpec (verified: the part
+files for `expand-criteria`, `chain-nonhaptog`, and `expand-fueltype-diesel` are
+identical, `Σ emissionQuant = 43520901035.30757`). The rows carry NONROAD SCC
+codes (`2260…/2265…/2282…/2285…`) with `sourceTypeID`/`fuelTypeID`/`sectorID`
+all NULL, and emit ~7 orders of magnitude more mass than canonical. The onroad
+emission data plane is not actually driven by the RunSpec or the snapshot's
+`baserateoutput` (which holds the correct onroad SCC `2201…` rows). This must be
+fixed in the onroad calculator/output wiring; it is **not** a tolerance matter.
+
+### Reported bug 2 — several NONROAD fixtures emit nothing or a wrong row count
+
+`nr-agriculture-state`, `nr-airport-support-county`, `nr-industrial-county`,
+and `nr-railroad-support-nation` produce **0** `MOVESOutput` rows against a
+populated canonical (−100 %). `nr-construction-state`, `nr-lawn-garden-county`,
+`nr-logging-county`, `nr-pleasure-craft-state`, and `nr-recreational-county`
+produce the wrong row count and diverge by 10³–10⁶ %. These are NONROAD
+population / sector-coverage gaps in the data plane, to be fixed there. Only
+`nr-commercial-nation` reproduces canonical (all four pollutants within 0.35 %).
+
+As each fixture's data plane is fixed it should graduate from
+`QUARANTINED_FIXTURES` into `asserted_fixtures` in the gate.
 
 ---
 
@@ -109,9 +184,9 @@ emission outputs.
 
 ---
 
-## 3. Activating the canonical-diff gate
+## 3. How the canonical-diff gate was activated
 
-The canonical-diff gate requires two inputs that do not yet exist:
+The gate is now active (§1b). It required two inputs, both of which now exist:
 
 ### Input 1: Canonical MOVES snapshots
 
@@ -133,17 +208,16 @@ The snapshot format (`manifest.json` + `tables/*.parquet`) is defined in
 
 ### Input 2: Real calculator output from the Rust port
 
-The port currently writes only `MOVESRun.parquet` (run metadata). Real
-emission output tables appear once:
-1. The Phase 4 `DataFrameStore` is wired into `CalculatorContext`.
-2. The `OutputProcessor` writes output tables in `moves-snapshot` format
-   alongside `MOVESRun.parquet`.
+Running with `--snapshot` wires the captured execution DB into the calculators,
+so the engine writes the real `MOVESOutput/` partitioned Parquet tree (Hive
+layout) alongside `MOVESRun.parquet`. The gate reads that tree directly (it does
+**not** require the port to write `moves-snapshot` format), summing
+`emissionQuant` per `pollutantID`.
 
-When both inputs exist, enable the diff gate:
+Run the gate:
 
 ```sh
-REGRESSION_SNAPSHOTS_DIR=characterization/snapshots \
-    cargo test --test full_suite_regression -- --nocapture
+cargo test --test full_suite_regression canonical_snapshot_diff -- --nocapture
 ```
 
 ---
@@ -180,9 +254,12 @@ accurate but differ numerically from the canonical captures. The
 budgets for the intermediate NONROAD quantities; those budgets carry over to
 the end-to-end output tables.
 
-**Resolution:** widen per-column tolerances in `characterization/tolerance.toml`
-for columns where the Rust port's higher-precision arithmetic produces
-documented, acceptable differences.
+**Resolution:** the gate's per-pollutant relative tolerances absorb this drift
+on the matching fixtures: `ONROAD_REL_TOL = 1e-3` (the three onroad evap
+fixtures land at 1.6e-7 … 8.2e-5) and `NONROAD_REL_TOL = 1e-2`
+(`nr-commercial-nation`'s `real*4`-vs-`f64` totals land at ≤ 3.5e-3 across all
+four pollutants). These are the only tolerances applied; they cover precision
+artifacts only, never a structural/wiring divergence (§4.4).
 
 ### 4.3 Within tolerance: log-message and metadata format differences
 

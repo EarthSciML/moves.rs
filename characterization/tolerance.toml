@@ -27,3 +27,14 @@ default_float_tolerance = 0.0
 # [tables."db__movesoutput__movesoutput"]
 # emissionQuant = 1e-9
 # emissionRate  = 1e-9
+
+# NOTE — the full-suite regression gate (`canonical_snapshot_diff` in
+# crates/moves-cli/tests/full_suite_regression.rs) does NOT use this file. A
+# cell-level `moves_snapshot diff` of MOVESOutput is unusable for canonical-vs-
+# port comparison because the two tables disagree on metadata/labeling columns
+# that don't affect emitted mass (iterationID, roadTypeID, the SCC road-type
+# subfield) and on which uncertainty columns are present. That gate instead
+# compares per-pollutant `emissionQuant` sums with relative tolerances defined
+# in-test (ONROAD_REL_TOL = 1e-3, NONROAD_REL_TOL = 1e-2), justified per fixture
+# in docs/known-divergences.md §1b/§4.2. This file keeps the strict
+# byte-identity contract for direct `moves_snapshot diff` use.
