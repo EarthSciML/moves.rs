@@ -242,6 +242,7 @@ fn all_fixtures_run_without_error() {
             run_date_time: Some("2026-05-21T00:00:00".to_string()),
             snapshot: None,
             scale_input: None,
+            default_db: None,
         });
 
         match result {
@@ -297,6 +298,7 @@ fn nonroad_fixtures_plan_modules() {
             run_date_time: Some("2026-05-21T00:00:00".to_string()),
             snapshot: None,
             scale_input: None,
+            default_db: None,
         })
         .unwrap_or_else(|e| panic!("{name}: {e}"));
         assert!(
@@ -357,6 +359,7 @@ fn error_fixtures_return_expected_errors() {
             run_date_time: Some("2026-05-21T00:00:00".to_string()),
             snapshot: None,
             scale_input: None,
+            default_db: None,
         });
 
         match result {
@@ -604,6 +607,7 @@ fn canonical_snapshot_diff() {
             // execution DB and the engine writes the real MOVESOutput tree.
             snapshot: Some(root.join(name)),
             scale_input: None,
+            default_db: None,
         })
         .unwrap_or_else(|e| panic!("{name}: run error — {e}"));
 
@@ -766,6 +770,7 @@ fn scale_fixtures_run_without_error() {
             run_date_time: Some("2026-05-21T00:00:00".to_string()),
             snapshot: None,
             scale_input: Some(scale_input_dir),
+            default_db: None,
         });
 
         match result {
@@ -879,6 +884,7 @@ fn scale_canonical_snapshot_diff() {
             run_date_time: Some("2026-05-21T00:00:00".to_string()),
             snapshot: None,
             scale_input: Some(scale_input_dir),
+            default_db: None,
         })
         .unwrap_or_else(|e| panic!("{fixture_name}: run error — {e}"));
 

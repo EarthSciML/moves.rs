@@ -80,6 +80,15 @@ enum Command {
         /// `<modeldomain>` to `SINGLE` (County) or `PROJECT`.
         #[arg(long, value_name = "DIR")]
         scale_input: Option<PathBuf>,
+
+        /// Path to a converted default-DB Parquet tree produced by
+        /// `moves-default-db-convert`. When present, the default database
+        /// tables are loaded and filtered to the RunSpec, providing the
+        /// execution-database slow tier without a canonical snapshot.
+        /// Use this flag for county-scale runs that do not yet have a
+        /// captured snapshot.
+        #[arg(long, value_name = "DIR")]
+        default_db: Option<PathBuf>,
     },
 
     /// Import County-database (CDB) input CSV files into Parquet.
@@ -131,6 +140,7 @@ fn dispatch(command: Command) -> anyhow::Result<ExitCode> {
             run_date_time,
             snapshot,
             scale_input,
+            default_db,
         } => cmd_run(RunOptions {
             runspec,
             output,
@@ -139,6 +149,7 @@ fn dispatch(command: Command) -> anyhow::Result<ExitCode> {
             run_date_time,
             snapshot,
             scale_input,
+            default_db,
         }),
         Command::ImportCdb {
             input,

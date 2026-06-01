@@ -26,10 +26,11 @@ use moves_calculators::generators::totalactivitygenerator::inputs::{
     HourDayRow, LinkRow as ShoLinkRow,
 };
 use moves_calculators::generators::totalactivitygenerator::model::AverageSpeedRow;
+use moves_data_default::DefaultDb;
 use moves_framework::{
-    read_execution_bundle, read_execution_bundle_filtered, CalculatorRegistry, CountyRow,
-    DataFrameStore, DataFrameStoreTyped, EngineConfig, EngineOutcome, GeographyTables,
-    InMemoryStore, LinkRow, MOVESEngine,
+    default_tables, read_execution_bundle, read_execution_bundle_filtered, CalculatorRegistry,
+    CountyRow, DataFrameStore, DataFrameStoreTyped, EngineConfig, EngineOutcome, GeographyTables,
+    InMemoryStore, InputDataManager, LinkRow, MOVESEngine, RunSpecFilters,
 };
 use moves_runspec::{GeoKind, RunSpec};
 use polars::prelude::{
@@ -176,6 +177,13 @@ pub struct RunOptions {
     /// Applies when the RunSpec sets `<modeldomain>` to `SINGLE` (County)
     /// or `PROJECT`.
     pub scale_input: Option<PathBuf>,
+    /// Path to a converted default-DB Parquet tree (as written by
+    /// `moves-default-db-convert`). When present, the default database is
+    /// loaded and filtered to the RunSpec's geography/time/pollutant/process
+    /// dimensions, providing the execution-database slow tier without a
+    /// captured snapshot. The `Link` table and all `RunSpec*` tables are
+    /// synthesised from the RunSpec and the loaded default-DB tables.
+    pub default_db: Option<PathBuf>,
 }
 
 /// Run a MOVES simulation: parse the RunSpec, build the calculator
@@ -188,7 +196,8 @@ pub struct RunOptions {
 /// output.
 pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
     let run_spec = load_run_spec(&opts.runspec)?;
-    let has_slow_store = opts.snapshot.is_some() || opts.scale_input.is_some();
+    let has_slow_store =
+        opts.snapshot.is_some() || opts.scale_input.is_some() || opts.default_db.is_some();
     let registry = load_registry(opts.calculator_dag.as_deref(), has_slow_store)?;
     let config = EngineConfig {
         output_root: opts.output.clone(),
@@ -226,7 +235,7 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
     } else {
         None
     };
-    let mut engine = MOVESEngine::new(run_spec, registry, config);
+    let mut engine = MOVESEngine::new(run_spec.clone(), registry, config);
     if let Some(snapshot_dir) = &opts.snapshot {
         let filter = snap_filter
             .as_ref()
@@ -252,6 +261,41 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
             .with_context(|| format!("loading scale-input DB from {}", scale_dir.display()))?;
         let geography = load_geography_from_store(&store)
             .with_context(|| format!("building geography from {}", scale_dir.display()))?;
+        engine = engine.with_slow_store(store);
+        engine
+            .execution_run_spec_mut()
+            .build_execution_locations(&geography);
+    } else if let Some(default_db_path) = &opts.default_db {
+        // Default-DB path: load the Parquet default database, synthesise the Link
+        // table from ZoneRoadType, build RunSpec* tables from the RunSpec, and
+        // optionally overlay CDB/PDB tables on top before wiring into the engine.
+        let db = DefaultDb::open(default_db_path)
+            .with_context(|| format!("opening default DB at {}", default_db_path.display()))?;
+        let filters = RunSpecFilters::from_runspec(&run_spec);
+        let plan = InputDataManager::plan(&filters, &default_tables());
+        let mut store = InputDataManager::execute(&plan, &db)
+            .map_err(|e| anyhow::anyhow!("loading default DB: {e}"))?;
+        if let Some(scale_dir) = &opts.scale_input {
+            overlay_scale_input_db(&mut store, scale_dir).with_context(|| {
+                format!("loading scale-input DB from {}", scale_dir.display())
+            })?;
+        }
+        populate_link_from_zone_road_type(&mut store)
+            .context("synthesising Link from ZoneRoadType")?;
+        build_runspec_tables(&run_spec, &mut store)
+            .context("building RunSpec tables from RunSpec")?;
+        populate_source_use_type_physics_mapping(&mut store)
+            .context("synthesising sourceUseTypePhysicsMapping")?;
+        populate_zone_month_hour_meteorology(&mut store)
+            .context("populating ZoneMonthHour meteorology")?;
+        merge_process_year_variants(&mut store)
+            .context("merging process/year-indexed table variants")?;
+        let geography = load_geography_from_store(&store).with_context(|| {
+            format!(
+                "building geography from default DB at {}",
+                default_db_path.display()
+            )
+        })?;
         engine = engine.with_slow_store(store);
         engine
             .execution_run_spec_mut()
@@ -943,6 +987,290 @@ fn load_geography_from_store(store: &InMemoryStore) -> Result<GeographyTables> {
     };
 
     Ok(GeographyTables::new(links, counties))
+}
+
+/// Synthesise the `Link` table from `ZoneRoadType` + `RoadType` when the
+/// default DB provides no Link rows.
+///
+/// The default DB ships `Link` as schema-only (zero rows). For county-scale
+/// runs the engine needs at least one `LinkRow` per (zone, road-type) to
+/// iterate over execution locations. This function reads the `ZoneRoadType`
+/// table (which does have rows — one per zone × road-type combination) and
+/// constructs synthetic `Link` rows using the MOVES county-scale convention:
+///
+/// * `countyID  = zoneID / 10`  (default zone = county × 10)
+/// * `linkID    = zoneID * 10 + roadTypeID`
+///
+/// The result is inserted into the store under the canonical name `"Link"`.
+/// The function is a no-op when `ZoneRoadType` is absent from the store, or
+/// when a non-empty `Link` table is already present (user-supplied CDB/PDB
+/// data takes precedence).
+fn populate_link_from_zone_road_type(store: &mut InMemoryStore) -> Result<()> {
+    use polars::prelude::{DataType, DataFrame, NamedFrom, Series};
+
+    if !store.contains("ZoneRoadType") {
+        return Ok(());
+    }
+    // Respect user-supplied Link table (e.g. from a CDB/PDB overlay).
+    if store.get("link").is_some_and(|df| df.height() > 0) {
+        return Ok(());
+    }
+
+    let (zone_ids, road_type_ids) = {
+        let arc = store
+            .get("ZoneRoadType")
+            .expect("ZoneRoadType present after contains check");
+        let df = &*arc;
+        let find = |want: &str| -> Result<polars::prelude::Column> {
+            let lower = want.to_ascii_lowercase();
+            df.columns()
+                .iter()
+                .find(|c| c.name().to_ascii_lowercase() == lower)
+                .cloned()
+                .with_context(|| format!("ZoneRoadType column '{want}' not found"))
+        };
+        let zone_col = find("zoneID")?
+            .cast(&DataType::Int32)
+            .map_err(|e| anyhow::anyhow!("ZoneRoadType.zoneID cast: {e}"))?;
+        let road_col = find("roadTypeID")?
+            .cast(&DataType::Int32)
+            .map_err(|e| anyhow::anyhow!("ZoneRoadType.roadTypeID cast: {e}"))?;
+        let zids: Vec<i32> = zone_col
+            .i32()
+            .map_err(|e| anyhow::anyhow!("{e}"))?
+            .into_iter()
+            .map(|v| v.unwrap_or(0))
+            .collect();
+        let rids: Vec<i32> = road_col
+            .i32()
+            .map_err(|e| anyhow::anyhow!("{e}"))?
+            .into_iter()
+            .map(|v| v.unwrap_or(0))
+            .collect();
+        (zids, rids)
+    };
+
+    // Deduplicate (zoneID, roadTypeID) pairs; synthesise linkID and countyID.
+    let mut seen: BTreeSet<(i32, i32)> = BTreeSet::new();
+    let mut link_ids: Vec<i32> = Vec::new();
+    let mut county_ids: Vec<i32> = Vec::new();
+    let mut out_zone_ids: Vec<i32> = Vec::new();
+    let mut out_road_type_ids: Vec<i32> = Vec::new();
+    for (&zone_id, &road_type_id) in zone_ids.iter().zip(road_type_ids.iter()) {
+        if seen.insert((zone_id, road_type_id)) {
+            link_ids.push(zone_id * 10 + road_type_id);
+            county_ids.push(zone_id / 10);
+            out_zone_ids.push(zone_id);
+            out_road_type_ids.push(road_type_id);
+        }
+    }
+    if link_ids.is_empty() {
+        return Ok(());
+    }
+
+    let n = link_ids.len();
+    let link_df = DataFrame::new(
+        n,
+        vec![
+            Series::new("linkID".into(), link_ids).into(),
+            Series::new("countyID".into(), county_ids).into(),
+            Series::new("zoneID".into(), out_zone_ids).into(),
+            Series::new("roadTypeID".into(), out_road_type_ids).into(),
+        ],
+    )
+    .map_err(|e| anyhow::anyhow!("building Link DataFrame: {e}"))?;
+    store.insert("Link".to_string(), link_df);
+    Ok(())
+}
+
+/// Build the `RunSpec*` tables that generators read from the execution-DB
+/// slow tier, synthesising them from the parsed [`RunSpec`] and the already-
+/// loaded default-DB tables in `store`.
+///
+/// The default DB does not contain RunSpec-specific selection tables — they
+/// are normally written by Java MOVES into `MOVESExecution` just before the
+/// generators run. This function replicates that step in pure Rust, producing:
+///
+/// | Table | Column | Source |
+/// |-------|--------|--------|
+/// | `RunSpecSourceType` | `sourceTypeID` (i32) | `onroad_vehicle_selections` |
+/// | `RunSpecPollutantProcess` | `polProcessID` (i32) | `pollutant_process_associations` |
+/// | `RunSpecDay` | `dayID` (i32) | `timespan.days` |
+/// | `RunSpecHour` | `hourID` (i32) | `timespan.begin_hour..=end_hour` |
+/// | `RunSpecHourDay` | `hourDayID` (i32) | hours × days cross-product |
+/// | `RunSpecMonth` | `monthID` (i32) | `timespan.months` |
+/// | `RunSpecYear` | `yearID` (i32) | `timespan.years` |
+/// | `RunSpecRoadType` | `roadTypeID` (i32) | `road_types` |
+/// | `RunSpecMonthGroup` | `monthGroupID` (i32) | `MonthGroupOfAnyYear` join |
+/// | `RunSpecSourceFuelType` | `sourceTypeID`, `fuelTypeID` (i64) | onroad selections |
+///
+/// `RunSpecHourDay` uses the MOVES packed-key formula `hourDayID = hourID × 10 + dayID`.
+///
+/// `RunSpecMonthGroup` is derived by joining the RunSpec months against the
+/// `MonthGroupOfAnyYear` table in the store; if that table is absent the
+/// month ID is used as the month group ID directly (safe fallback — in the
+/// default MOVES configuration each month belongs to its own group).
+fn build_runspec_tables(runspec: &RunSpec, store: &mut InMemoryStore) -> Result<()> {
+    use polars::prelude::{DataFrame, DataType, NamedFrom, Series};
+
+    // Helper: insert a single-column Int32 table.
+    let insert_i32 = |store: &mut InMemoryStore, name: &str, col: &str, vals: Vec<i32>| {
+        let n = vals.len();
+        let df = DataFrame::new(n, vec![Series::new(col.into(), vals).into()])
+            .expect("single-column DataFrame should never fail");
+        store.insert(name.to_string(), df);
+    };
+
+    // RunSpecSourceType.
+    let source_type_ids: Vec<i32> = {
+        let mut ids: BTreeSet<i32> = BTreeSet::new();
+        for sel in &runspec.onroad_vehicle_selections {
+            ids.insert(sel.source_type_id as i32);
+        }
+        ids.into_iter().collect()
+    };
+    insert_i32(store, "RunSpecSourceType", "sourceTypeID", source_type_ids.clone());
+
+    // RunSpecPollutantProcess (single column: polProcessID).
+    let pol_process_ids: Vec<i32> = {
+        let mut ids: BTreeSet<i32> = BTreeSet::new();
+        for assoc in &runspec.pollutant_process_associations {
+            ids.insert((assoc.pollutant_id * 100 + assoc.process_id) as i32);
+        }
+        ids.into_iter().collect()
+    };
+    insert_i32(store, "RunSpecPollutantProcess", "polProcessID", pol_process_ids);
+
+    // RunSpecDay.
+    let day_ids: Vec<i32> = {
+        let mut ids: BTreeSet<i32> = BTreeSet::new();
+        for &d in &runspec.timespan.days {
+            ids.insert(d as i32);
+        }
+        ids.into_iter().collect()
+    };
+    insert_i32(store, "RunSpecDay", "dayID", day_ids.clone());
+
+    // RunSpecHour.
+    let hour_ids: Vec<i32> = match (runspec.timespan.begin_hour, runspec.timespan.end_hour) {
+        (Some(b), Some(e)) if b <= e => (b..=e).map(|h| h as i32).collect(),
+        (Some(h), _) | (_, Some(h)) => vec![h as i32],
+        (None, None) => Vec::new(),
+    };
+    insert_i32(store, "RunSpecHour", "hourID", hour_ids.clone());
+
+    // RunSpecHourDay: cross-product, packed key = hourID * 10 + dayID.
+    let hour_day_ids: Vec<i32> = {
+        let mut ids: BTreeSet<i32> = BTreeSet::new();
+        for &h in &hour_ids {
+            for &d in &day_ids {
+                ids.insert(h * 10 + d);
+            }
+        }
+        ids.into_iter().collect()
+    };
+    insert_i32(store, "RunSpecHourDay", "hourDayID", hour_day_ids);
+
+    // RunSpecMonth.
+    // Month values from the RunSpec are used as-is (matching RunSpecFilters::from_runspec
+    // which also passes them through without adjustment).
+    let month_ids: Vec<i32> = {
+        let mut ids: BTreeSet<i32> = BTreeSet::new();
+        for &m in &runspec.timespan.months {
+            ids.insert(m as i32);
+        }
+        ids.into_iter().collect()
+    };
+    insert_i32(store, "RunSpecMonth", "monthID", month_ids.clone());
+
+    // RunSpecYear.
+    let year_ids: Vec<i32> = {
+        let mut ids: BTreeSet<i32> = BTreeSet::new();
+        for &y in &runspec.timespan.years {
+            ids.insert(y as i32);
+        }
+        ids.into_iter().collect()
+    };
+    insert_i32(store, "RunSpecYear", "yearID", year_ids);
+
+    // RunSpecRoadType (note: generators access this as "runSpecRoadType" or
+    // "RunSpecRoadType" — InMemoryStore uses case-insensitive lookup).
+    let road_type_ids: Vec<i32> = {
+        let mut ids: BTreeSet<i32> = BTreeSet::new();
+        for rt in &runspec.road_types {
+            ids.insert(rt.road_type_id as i32);
+        }
+        ids.into_iter().collect()
+    };
+    insert_i32(store, "RunSpecRoadType", "roadTypeID", road_type_ids);
+
+    // RunSpecMonthGroup: derive monthGroupID from MonthGroupOfAnyYear if present.
+    let month_group_ids: Vec<i32> = if store.contains("MonthGroupOfAnyYear") {
+        let arc = store
+            .get("MonthGroupOfAnyYear")
+            .expect("MonthGroupOfAnyYear present after contains check");
+        let df = &*arc;
+        let find = |want: &str| {
+            let lower = want.to_ascii_lowercase();
+            df.columns()
+                .iter()
+                .find(|c| c.name().to_ascii_lowercase() == lower)
+                .cloned()
+        };
+        let mut month_to_group: BTreeMap<i32, i32> = BTreeMap::new();
+        if let (Some(mid_col), Some(mgid_col)) =
+            (find("monthID"), find("monthGroupID"))
+        {
+            let mids = mid_col
+                .cast(&DataType::Int32)
+                .ok()
+                .and_then(|c| c.i32().ok().cloned());
+            let mgids = mgid_col
+                .cast(&DataType::Int32)
+                .ok()
+                .and_then(|c| c.i32().ok().cloned());
+            if let (Some(mids), Some(mgids)) = (mids, mgids) {
+                for i in 0..df.height() {
+                    if let (Some(mid), Some(mgid)) = (mids.get(i), mgids.get(i)) {
+                        month_to_group.insert(mid, mgid);
+                    }
+                }
+            }
+        }
+        let mut groups: BTreeSet<i32> = BTreeSet::new();
+        for &m in &month_ids {
+            groups.insert(*month_to_group.get(&m).unwrap_or(&m));
+        }
+        groups.into_iter().collect()
+    } else {
+        // Fallback: each month is its own month group.
+        month_ids.clone()
+    };
+    insert_i32(store, "RunSpecMonthGroup", "monthGroupID", month_group_ids);
+
+    // RunSpecSourceFuelType: unique (sourceTypeID, fuelTypeID) pairs, Int64 per
+    // SourceBinDistributionGenerator's RunSpecSourceFuelTypeRow schema.
+    let source_fuel_pairs: Vec<(i64, i64)> = {
+        let mut pairs: BTreeSet<(i64, i64)> = BTreeSet::new();
+        for sel in &runspec.onroad_vehicle_selections {
+            pairs.insert((sel.source_type_id as i64, sel.fuel_type_id as i64));
+        }
+        pairs.into_iter().collect()
+    };
+    let (sf_source_ids, sf_fuel_ids): (Vec<i64>, Vec<i64>) =
+        source_fuel_pairs.into_iter().unzip();
+    let n = sf_source_ids.len();
+    let sf_df = DataFrame::new(
+        n,
+        vec![
+            Series::new("sourceTypeID".into(), sf_source_ids).into(),
+            Series::new("fuelTypeID".into(), sf_fuel_ids).into(),
+        ],
+    )
+    .map_err(|e| anyhow::anyhow!("building RunSpecSourceFuelType: {e}"))?;
+    store.insert("RunSpecSourceFuelType".to_string(), sf_df);
+
+    Ok(())
 }
 
 fn load_registry(path: Option<&Path>, with_calculators: bool) -> Result<CalculatorRegistry> {
@@ -1791,6 +2119,261 @@ mod tests {
             zone_col.i64().unwrap().get(0).unwrap(),
             100,
             "surviving row must be zone 100"
+        );
+    }
+
+    // ---- populate_link_from_zone_road_type tests ----
+
+    fn make_zone_road_type_store() -> InMemoryStore {
+        use polars::prelude::*;
+        let mut store = InMemoryStore::new();
+        let zrt = df!(
+            "zoneID"       => &[261610i32, 261610i32, 261610i32],
+            "roadTypeID"   => &[2i32, 4i32, 5i32],
+            "SHOAllocFactor" => &[0.5f64, 0.3f64, 0.2f64],
+        )
+        .unwrap();
+        store.insert("ZoneRoadType".to_string(), zrt);
+        store
+    }
+
+    #[test]
+    fn link_synthesised_from_zone_road_type() {
+        let mut store = make_zone_road_type_store();
+        populate_link_from_zone_road_type(&mut store).expect("should succeed");
+
+        let link = store.get("link").expect("Link must be in store");
+        assert_eq!(link.height(), 3, "one Link row per (zone, road-type) pair");
+
+        let link_ids: Vec<i32> = link
+            .column("linkID")
+            .unwrap()
+            .i32()
+            .unwrap()
+            .into_no_null_iter()
+            .collect();
+        // linkID = zoneID * 10 + roadTypeID
+        assert!(link_ids.contains(&(261610 * 10 + 2)), "linkID for road 2");
+        assert!(link_ids.contains(&(261610 * 10 + 4)), "linkID for road 4");
+        assert!(link_ids.contains(&(261610 * 10 + 5)), "linkID for road 5");
+
+        let county_ids: Vec<i32> = link
+            .column("countyID")
+            .unwrap()
+            .i32()
+            .unwrap()
+            .into_no_null_iter()
+            .collect();
+        // countyID = zoneID / 10
+        assert!(county_ids.iter().all(|&c| c == 26161), "countyID = zoneID/10");
+    }
+
+    #[test]
+    fn link_synthesis_noop_when_zone_road_type_absent() {
+        let mut store = InMemoryStore::new();
+        populate_link_from_zone_road_type(&mut store).expect("noop");
+        assert!(!store.contains("link"), "no Link should be created");
+    }
+
+    #[test]
+    fn link_synthesis_noop_when_link_already_populated() {
+        use polars::prelude::*;
+        let mut store = make_zone_road_type_store();
+        // Pre-populate a Link row — synthesis must not overwrite it.
+        let existing_link =
+            df!("linkID" => &[999i32], "countyID" => &[99i32], "zoneID" => &[990i32], "roadTypeID" => &[1i32]).unwrap();
+        store.insert("Link".to_string(), existing_link);
+        populate_link_from_zone_road_type(&mut store).expect("noop");
+        let link = store.get("link").unwrap();
+        assert_eq!(link.height(), 1, "pre-existing Link must be preserved");
+        assert_eq!(
+            link.column("linkID").unwrap().i32().unwrap().get(0).unwrap(),
+            999
+        );
+    }
+
+    #[test]
+    fn link_synthesis_deduplicates_zone_road_type_pairs() {
+        use polars::prelude::*;
+        let mut store = InMemoryStore::new();
+        // Duplicate rows — should produce only 1 unique link.
+        let zrt = df!(
+            "zoneID"       => &[100i32, 100i32],
+            "roadTypeID"   => &[2i32, 2i32],
+            "SHOAllocFactor" => &[0.5f64, 0.5f64],
+        )
+        .unwrap();
+        store.insert("ZoneRoadType".to_string(), zrt);
+        populate_link_from_zone_road_type(&mut store).expect("should succeed");
+        let link = store.get("link").unwrap();
+        assert_eq!(link.height(), 1, "duplicates must be merged");
+    }
+
+    // ---- build_runspec_tables tests ----
+
+    fn fixture_runspec() -> RunSpec {
+        use moves_runspec::{
+            GeoKind, GeographicSelection, OnroadVehicleSelection, PollutantProcessAssociation,
+            RoadType, Timespan,
+        };
+        RunSpec {
+            geographic_selections: vec![GeographicSelection {
+                kind: GeoKind::County,
+                key: 26161,
+                description: String::new(),
+            }],
+            timespan: Timespan {
+                years: vec![2020],
+                months: vec![7],
+                days: vec![5],
+                begin_hour: Some(6),
+                end_hour: Some(6),
+                ..Default::default()
+            },
+            onroad_vehicle_selections: vec![OnroadVehicleSelection {
+                fuel_type_id: 1,
+                fuel_type_name: "Gasoline".into(),
+                source_type_id: 21,
+                source_type_name: "Passenger Car".into(),
+            }],
+            road_types: vec![RoadType {
+                road_type_id: 4,
+                road_type_name: "Urban Restricted Access".into(),
+                model_combination: None,
+            }],
+            pollutant_process_associations: vec![PollutantProcessAssociation {
+                pollutant_id: 3,
+                pollutant_name: "NOx".into(),
+                process_id: 1,
+                process_name: "Running Exhaust".into(),
+            }],
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn build_runspec_tables_produces_all_tables() {
+        let runspec = fixture_runspec();
+        let mut store = InMemoryStore::new();
+        build_runspec_tables(&runspec, &mut store).expect("should succeed");
+
+        for table in &[
+            "RunSpecSourceType",
+            "RunSpecPollutantProcess",
+            "RunSpecDay",
+            "RunSpecHour",
+            "RunSpecHourDay",
+            "RunSpecMonth",
+            "RunSpecYear",
+            "RunSpecRoadType",
+            "RunSpecMonthGroup",
+            "RunSpecSourceFuelType",
+        ] {
+            assert!(
+                store.contains(table),
+                "table '{table}' must be present after build_runspec_tables"
+            );
+        }
+    }
+
+    #[test]
+    fn build_runspec_tables_source_type_values() {
+        let runspec = fixture_runspec();
+        let mut store = InMemoryStore::new();
+        build_runspec_tables(&runspec, &mut store).expect("should succeed");
+
+        let df = store.get("runspecsourcetype").unwrap();
+        assert_eq!(df.height(), 1);
+        assert_eq!(
+            df.column("sourceTypeID").unwrap().i32().unwrap().get(0),
+            Some(21)
+        );
+    }
+
+    #[test]
+    fn build_runspec_tables_hour_day_packed_key() {
+        // hourID=6, dayID=5 → hourDayID = 6*10+5 = 65
+        let runspec = fixture_runspec();
+        let mut store = InMemoryStore::new();
+        build_runspec_tables(&runspec, &mut store).expect("should succeed");
+
+        let df = store.get("runspechourday").unwrap();
+        assert_eq!(df.height(), 1, "one hourDay for (hour=6, day=5)");
+        assert_eq!(
+            df.column("hourDayID").unwrap().i32().unwrap().get(0),
+            Some(65),
+            "hourDayID = 6*10+5 = 65"
+        );
+    }
+
+    #[test]
+    fn build_runspec_tables_pol_process_id() {
+        // pollutant=3, process=1 → polProcessID = 301
+        let runspec = fixture_runspec();
+        let mut store = InMemoryStore::new();
+        build_runspec_tables(&runspec, &mut store).expect("should succeed");
+
+        let df = store.get("runspecpollutantprocess").unwrap();
+        assert_eq!(df.height(), 1);
+        assert_eq!(
+            df.column("polProcessID").unwrap().i32().unwrap().get(0),
+            Some(301)
+        );
+    }
+
+    #[test]
+    fn build_runspec_tables_source_fuel_type_int64() {
+        // RunSpecSourceFuelType uses Int64 per SourceBinDistributionGenerator schema.
+        let runspec = fixture_runspec();
+        let mut store = InMemoryStore::new();
+        build_runspec_tables(&runspec, &mut store).expect("should succeed");
+
+        let df = store.get("runspecsourcefueltype").unwrap();
+        assert_eq!(df.height(), 1);
+        assert_eq!(
+            df.column("sourceTypeID").unwrap().i64().unwrap().get(0),
+            Some(21)
+        );
+        assert_eq!(
+            df.column("fuelTypeID").unwrap().i64().unwrap().get(0),
+            Some(1)
+        );
+    }
+
+    #[test]
+    fn build_runspec_tables_month_group_fallback_to_month_id() {
+        // No MonthGroupOfAnyYear in store → monthGroupID == monthID.
+        let runspec = fixture_runspec();
+        let mut store = InMemoryStore::new();
+        build_runspec_tables(&runspec, &mut store).expect("should succeed");
+
+        let df = store.get("runspecmonthgroup").unwrap();
+        assert_eq!(df.height(), 1);
+        assert_eq!(
+            df.column("monthGroupID").unwrap().i32().unwrap().get(0),
+            Some(7), // same as monthID
+        );
+    }
+
+    #[test]
+    fn build_runspec_tables_month_group_from_lookup_table() {
+        use polars::prelude::*;
+        let runspec = fixture_runspec(); // month=7
+        let mut store = InMemoryStore::new();
+        // MonthGroupOfAnyYear: monthID=7 → monthGroupID=3 (synthetic mapping).
+        let mgoay = df!(
+            "monthID"      => &[7i32, 8i32],
+            "monthGroupID" => &[3i32, 4i32],
+        )
+        .unwrap();
+        store.insert("MonthGroupOfAnyYear".to_string(), mgoay);
+        build_runspec_tables(&runspec, &mut store).expect("should succeed");
+
+        let df = store.get("runspecmonthgroup").unwrap();
+        assert_eq!(df.height(), 1);
+        assert_eq!(
+            df.column("monthGroupID").unwrap().i32().unwrap().get(0),
+            Some(3), // looked up from MonthGroupOfAnyYear
         );
     }
 }
