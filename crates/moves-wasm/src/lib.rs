@@ -194,7 +194,7 @@ pub fn run_simulation(runspec_xml: &str, max_parallel_chunks: u32) -> Result<JsV
         .run()
         .map_err(|e| JsValue::from_str(&format!("Engine error: {e}")))?;
 
- // Convert the collected (path, bytes) pairs into a JS object.
+    // Convert the collected (path, bytes) pairs into a JS object.
     let obj = js_sys::Object::new();
     for (path, bytes) in outcome.output_bytes {
         let key = JsValue::from_str(
@@ -250,8 +250,8 @@ pub fn run_simulation_from_bundle(
     let geography = default_db::load_geography_from_store(&store)
         .map_err(|e| JsValue::from_str(&format!("Geography error: {e}")))?;
 
-    let registry = build_registry()
-        .map_err(|e| JsValue::from_str(&format!("Registry build error: {e}")))?;
+    let registry =
+        build_registry().map_err(|e| JsValue::from_str(&format!("Registry build error: {e}")))?;
 
     let config = EngineConfig {
         output_root: std::path::PathBuf::from(""),
@@ -491,8 +491,8 @@ pub fn run_simulation_from_partitions(
     let geography = default_db::load_geography_from_store(&store)
         .map_err(|e| JsValue::from_str(&format!("Geography error: {e}")))?;
 
-    let registry = build_registry()
-        .map_err(|e| JsValue::from_str(&format!("Registry build error: {e}")))?;
+    let registry =
+        build_registry().map_err(|e| JsValue::from_str(&format!("Registry build error: {e}")))?;
 
     let config = EngineConfig {
         output_root: std::path::PathBuf::from(""),
@@ -625,18 +625,18 @@ pub fn run_nonroad_simulation(options_json: &str, pop_bytes: &[u8]) -> Result<Js
         })
         .unwrap_or_default();
 
- // Parse population data from browser-supplied bytes using an in-memory
- // reader — the WASM-compatible path that replaces std::fs::File::open.
+    // Parse population data from browser-supplied bytes using an in-memory
+    // reader — the WASM-compatible path that replaces std::fs::File::open.
     let pop_records = read_pop(std::io::Cursor::new(pop_bytes))
         .map_err(|e| JsValue::from_str(&format!("population file parse error: {e}")))?;
 
- // Group population records by SCC (file order) into NonroadInputs.
+    // Group population records by SCC (file order) into NonroadInputs.
     let inputs = nonroad_inputs_from_pop(pop_records, selected_counties);
 
- // Run via PlanRecordingExecutor — exercises the full driver loop
- // (SCC dispatch decisions, region filtering, growth-pair detection)
- // without the numerical geography-routine evaluation, which the
- // native orchestrator handles and will be wired into WASM later.
+    // Run via PlanRecordingExecutor — exercises the full driver loop
+    // (SCC dispatch decisions, region filtering, growth-pair detection)
+    // without the numerical geography-routine evaluation, which the
+    // native orchestrator handles and will be wired into WASM later.
     let mut executor = PlanRecordingExecutor::new();
     let outputs = nonroad_run_simulation(&options, &inputs, &mut executor)
         .map_err(|e| JsValue::from_str(&format!("simulation error: {e}")))?;
@@ -704,10 +704,10 @@ fn nonroad_inputs_from_pop(
             hp_avg,
             population,
             pop_year: year,
- // The .POP demo input carries no source-use-type table, so there is
- // no medianLifeFullLoad to supply. 0.0 is the documented sentinel:
- // the geography routines fall back to a neutral lifespan when
- // median_life is non-positive (see DriverRecord::median_life).
+            // The .POP demo input carries no source-use-type table, so there is
+            // no medianLifeFullLoad to supply. 0.0 is the documented sentinel:
+            // the geography routines fall back to a neutral lifespan when
+            // median_life is non-positive (see DriverRecord::median_life).
             median_life: 0.0,
         };
         if let Some(&idx) = scc_to_idx.get(&scc) {
@@ -847,9 +847,7 @@ mod tests {
     /// `required_partition_paths` returns county-filtered paths for a minimal manifest.
     #[test]
     fn required_partition_paths_filters_by_county() {
-        let runspec_xml = include_str!(
-            "../../../characterization/fixtures/sample-runspec.xml"
-        );
+        let runspec_xml = include_str!("../../../characterization/fixtures/sample-runspec.xml");
         // Minimal manifest with one monolithic table and one county-partitioned table.
         let manifest_json = r#"{
             "schema_version": "moves-default-db-manifest/v1",
@@ -904,29 +902,52 @@ mod tests {
         // Build the path list using the pure-Rust helper.
         let mut county_ids = std::collections::BTreeSet::new();
         county_ids.insert(county_id);
-        let zone_ids: std::collections::BTreeSet<i64> = county_ids.iter().map(|&c| c * 10).collect();
-        let state_ids: std::collections::BTreeSet<i64> = county_ids.iter().map(|&c| c / 1000).collect();
-        let year_ids: std::collections::BTreeSet<i64> = run_spec.timespan.years.iter().map(|&y| y as i64).collect();
+        let zone_ids: std::collections::BTreeSet<i64> =
+            county_ids.iter().map(|&c| c * 10).collect();
+        let state_ids: std::collections::BTreeSet<i64> =
+            county_ids.iter().map(|&c| c / 1000).collect();
+        let year_ids: std::collections::BTreeSet<i64> =
+            run_spec.timespan.years.iter().map(|&y| y as i64).collect();
 
         let manifest: serde_json::Value = serde_json::from_str(manifest_json).unwrap();
         let mut paths: Vec<String> = Vec::new();
         for table in manifest["tables"].as_array().unwrap() {
             let strategy = table["partition_strategy"].as_str().unwrap_or("");
-            if strategy == "schema_only" { continue; }
-            let cols: Vec<String> = table["partition_columns"].as_array().unwrap_or(&vec![])
-                .iter().filter_map(|v| v.as_str().map(|s| s.to_ascii_lowercase())).collect();
+            if strategy == "schema_only" {
+                continue;
+            }
+            let cols: Vec<String> = table["partition_columns"]
+                .as_array()
+                .unwrap_or(&vec![])
+                .iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_ascii_lowercase()))
+                .collect();
             for partition in table["partitions"].as_array().unwrap_or(&vec![]) {
                 let path = partition["path"].as_str().unwrap_or("");
-                let values: Vec<String> = partition["values"].as_array().unwrap_or(&vec![])
-                    .iter().filter_map(|v| v.as_str().map(str::to_string)).collect();
-                if partition_path_needed(&cols, &values, &county_ids, &zone_ids, &state_ids, &year_ids) {
+                let values: Vec<String> = partition["values"]
+                    .as_array()
+                    .unwrap_or(&vec![])
+                    .iter()
+                    .filter_map(|v| v.as_str().map(str::to_string))
+                    .collect();
+                if partition_path_needed(
+                    &cols,
+                    &values,
+                    &county_ids,
+                    &zone_ids,
+                    &state_ids,
+                    &year_ids,
+                ) {
                     paths.push(path.to_string());
                 }
             }
         }
 
         // Monolithic table must always be included.
-        assert!(paths.contains(&"County.parquet".to_string()), "County must be included");
+        assert!(
+            paths.contains(&"County.parquet".to_string()),
+            "County must be included"
+        );
         // The matching county=26161 partition must be included.
         assert!(
             paths.contains(&"IMCoverage/year=2001/county=26161/part.parquet".to_string()),
@@ -938,7 +959,10 @@ mod tests {
             "county=99999 partition must be excluded"
         );
         // schema_only table must not appear.
-        assert!(!paths.iter().any(|p| p.contains("Link")), "Link (schema_only) must be excluded");
+        assert!(
+            !paths.iter().any(|p| p.contains("Link")),
+            "Link (schema_only) must be excluded"
+        );
     }
 
     /// `run_simulation_from_bundle` runs the default-db pipeline on a minimal
@@ -958,8 +982,7 @@ mod tests {
         use arrow::record_batch::RecordBatch;
         use std::sync::Arc;
 
-        let runspec_xml =
-            include_str!("../../../characterization/fixtures/sample-runspec.xml");
+        let runspec_xml = include_str!("../../../characterization/fixtures/sample-runspec.xml");
 
         // Build a minimal ZoneRoadType IPC table (one row: zone 19131960, road 2).
         let make_ipc = |schema: &Arc<Schema>, batch: RecordBatch| {
@@ -1038,11 +1061,7 @@ mod tests {
         bundle.extend_from_slice(&(tables.len() as u32).to_le_bytes());
 
         // TOC size = 12 (header) + sum of (2 + name_len + 16) for each entry.
-        let toc_size: usize = 12
-            + tables
-                .iter()
-                .map(|(n, _)| 2 + n.len() + 16)
-                .sum::<usize>();
+        let toc_size: usize = 12 + tables.iter().map(|(n, _)| 2 + n.len() + 16).sum::<usize>();
         let mut cur_offset = toc_size as u64;
         for (name, ipc) in tables {
             let name_bytes = name.as_bytes();
@@ -1091,8 +1110,8 @@ mod tests {
         Ok(("ok".to_string(), output))
     }
 
- /// Build a 130-char fixed-width `.POP` record, matching the column layout
- /// in `rdpop.f` / `getpop.f`. Right-justifies HP fields and population.
+    /// Build a 130-char fixed-width `.POP` record, matching the column layout
+    /// in `rdpop.f` / `getpop.f`. Right-justifies HP fields and population.
     #[allow(clippy::too_many_arguments)]
     fn build_pop_record(
         fips: &str,

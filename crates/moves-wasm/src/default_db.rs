@@ -13,12 +13,12 @@
 //! functions in `moves-cli/src/run.rs`.  All polars operations are
 //! polars-core only (no lazy / parquet → no mio chain).
 
-use std::collections::{BTreeMap, BTreeSet};
-use std::io::Cursor;
 use arrow::array::{Array, ArrayRef};
 use arrow::datatypes::DataType as ArrowDT;
 use arrow::ipc::reader::FileReader as ArrowFileReader;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+use std::collections::{BTreeMap, BTreeSet};
+use std::io::Cursor;
 
 use moves_calculators::generators::meteorology::{build_meteorology_table, MeteorologyInputs};
 use moves_framework::{
@@ -47,9 +47,12 @@ pub fn parse_bundle_to_store(bundle_bytes: &[u8]) -> Result<InMemoryStore, Strin
     if &bundle_bytes[0..8] != BUNDLE_MAGIC {
         return Err("unrecognised bundle magic bytes".to_string());
     }
-    let count =
-        u32::from_le_bytes([bundle_bytes[8], bundle_bytes[9], bundle_bytes[10], bundle_bytes[11]])
-            as usize;
+    let count = u32::from_le_bytes([
+        bundle_bytes[8],
+        bundle_bytes[9],
+        bundle_bytes[10],
+        bundle_bytes[11],
+    ]) as usize;
 
     // Parse TOC.
     let mut cursor = 12usize;
@@ -79,13 +82,11 @@ pub fn parse_bundle_to_store(bundle_bytes: &[u8]) -> Result<InMemoryStore, Strin
     // Decode tables.
     let mut store = InMemoryStore::new();
     for (full_name, offset, length) in toc {
-        let end = offset.checked_add(length).ok_or_else(|| {
-            format!("overflow in data range for {full_name:?}")
-        })?;
+        let end = offset
+            .checked_add(length)
+            .ok_or_else(|| format!("overflow in data range for {full_name:?}"))?;
         if end > bundle_bytes.len() {
-            return Err(format!(
-                "data for {full_name:?} extends beyond bundle end"
-            ));
+            return Err(format!("data for {full_name:?} extends beyond bundle end"));
         }
         let ipc_bytes = &bundle_bytes[offset..end];
 
@@ -115,10 +116,7 @@ pub fn parse_bundle_to_store(bundle_bytes: &[u8]) -> Result<InMemoryStore, Strin
 ///
 /// Pair with [`load_geography_from_store`] to get the [`GeographyTables`] the
 /// engine needs.
-pub fn setup_execution_store(
-    runspec: &RunSpec,
-    store: &mut InMemoryStore,
-) -> Result<(), String> {
+pub fn setup_execution_store(runspec: &RunSpec, store: &mut InMemoryStore) -> Result<(), String> {
     merge_store_variants_eager(store)?;
     populate_source_use_type_physics_mapping(store)?;
     populate_zone_month_hour_meteorology(store)?;
@@ -334,11 +332,7 @@ fn ipc_bytes_to_polars_df(ipc_bytes: &[u8]) -> Result<DataFrame, String> {
 
     let schema = reader.schema();
     let n_cols = schema.fields().len();
-    let col_names: Vec<String> = schema
-        .fields()
-        .iter()
-        .map(|f| f.name().clone())
-        .collect();
+    let col_names: Vec<String> = schema.fields().iter().map(|f| f.name().clone()).collect();
     let col_types: Vec<ArrowDT> = schema
         .fields()
         .iter()
@@ -349,7 +343,9 @@ fn ipc_bytes_to_polars_df(ipc_bytes: &[u8]) -> Result<DataFrame, String> {
     struct ColumnAccum {
         arrays: Vec<ArrayRef>,
     }
-    let mut cols: Vec<ColumnAccum> = (0..n_cols).map(|_| ColumnAccum { arrays: Vec::new() }).collect();
+    let mut cols: Vec<ColumnAccum> = (0..n_cols)
+        .map(|_| ColumnAccum { arrays: Vec::new() })
+        .collect();
     let mut total_rows = 0usize;
 
     for batch_result in reader {
@@ -367,8 +363,7 @@ fn ipc_bytes_to_polars_df(ipc_bytes: &[u8]) -> Result<DataFrame, String> {
         series_vec.push(s.into());
     }
 
-    DataFrame::new_infer_height(series_vec)
-        .map_err(|e| format!("building DataFrame: {e}"))
+    DataFrame::new_infer_height(series_vec).map_err(|e| format!("building DataFrame: {e}"))
 }
 
 /// Convert a list of same-typed arrow arrays (one per batch) into a polars [`Series`].
@@ -638,7 +633,12 @@ fn build_runspec_tables(runspec: &RunSpec, store: &mut InMemoryStore) -> Result<
         }
         ids.into_iter().collect()
     };
-    insert_i32(store, "RunSpecSourceType", "sourceTypeID", source_type_ids.clone());
+    insert_i32(
+        store,
+        "RunSpecSourceType",
+        "sourceTypeID",
+        source_type_ids.clone(),
+    );
 
     // RunSpecPollutantProcess.
     let pol_process_ids: Vec<i32> = {
@@ -648,7 +648,12 @@ fn build_runspec_tables(runspec: &RunSpec, store: &mut InMemoryStore) -> Result<
         }
         ids.into_iter().collect()
     };
-    insert_i32(store, "RunSpecPollutantProcess", "polProcessID", pol_process_ids);
+    insert_i32(
+        store,
+        "RunSpecPollutantProcess",
+        "polProcessID",
+        pol_process_ids,
+    );
 
     // RunSpecDay.
     let day_ids: Vec<i32> = {
@@ -725,8 +730,14 @@ fn build_runspec_tables(runspec: &RunSpec, store: &mut InMemoryStore) -> Result<
         };
         let mut month_to_group: BTreeMap<i32, i32> = BTreeMap::new();
         if let (Some(mid_col), Some(mgid_col)) = (find("monthID"), find("monthGroupID")) {
-            let mids = mid_col.cast(&DataType::Int32).ok().and_then(|c| c.i32().ok().cloned());
-            let mgids = mgid_col.cast(&DataType::Int32).ok().and_then(|c| c.i32().ok().cloned());
+            let mids = mid_col
+                .cast(&DataType::Int32)
+                .ok()
+                .and_then(|c| c.i32().ok().cloned());
+            let mgids = mgid_col
+                .cast(&DataType::Int32)
+                .ok()
+                .and_then(|c| c.i32().ok().cloned());
             if let (Some(mids), Some(mgids)) = (mids, mgids) {
                 for i in 0..df.height() {
                     if let (Some(mid), Some(mgid)) = (mids.get(i), mgids.get(i)) {
@@ -877,11 +888,14 @@ fn populate_zone_month_hour_meteorology(store: &mut InMemoryStore) -> Result<(),
             .cloned()
             .ok_or_else(|| format!("ZoneMonthHour column '{want}' not found"))
     };
-    let zone_ids_col = find("zoneID")?.cast(&DataType::Int32)
+    let zone_ids_col = find("zoneID")?
+        .cast(&DataType::Int32)
         .map_err(|e| format!("zoneID cast: {e}"))?;
-    let month_ids_col = find("monthID")?.cast(&DataType::Int32)
+    let month_ids_col = find("monthID")?
+        .cast(&DataType::Int32)
         .map_err(|e| format!("monthID cast: {e}"))?;
-    let hour_ids_col = find("hourID")?.cast(&DataType::Int32)
+    let hour_ids_col = find("hourID")?
+        .cast(&DataType::Int32)
         .map_err(|e| format!("hourID cast: {e}"))?;
 
     let zids = zone_ids_col.i32().map_err(|e| format!("{e}"))?;
@@ -915,9 +929,7 @@ fn populate_zone_month_hour_meteorology(store: &mut InMemoryStore) -> Result<(),
         .with_column(Series::new("specificHumidity".into(), specific_humidity).into())
         .map_err(|e| format!("writing specificHumidity: {e}"))?;
     updated
-        .with_column(
-            Series::new("molWaterFraction".into(), mol_water_fraction).into(),
-        )
+        .with_column(Series::new("molWaterFraction".into(), mol_water_fraction).into())
         .map_err(|e| format!("writing molWaterFraction: {e}"))?;
     store.insert("ZoneMonthHour".to_string(), updated);
     Ok(())
@@ -986,7 +998,10 @@ mod tests {
         let bundle = make_minimal_bundle("db__test__mytable", &ipc);
 
         let store = parse_bundle_to_store(&bundle).expect("parse must succeed");
-        assert!(store.contains("mytable"), "short name 'mytable' must be in store");
+        assert!(
+            store.contains("mytable"),
+            "short name 'mytable' must be in store"
+        );
 
         let df = store.get("mytable").unwrap();
         assert_eq!(df.height(), 3);
