@@ -642,11 +642,27 @@ impl MOVESEngine {
         // inline during execution) and write the rolled-up emission rows.
         // Drop the local ref clones first so Arc::try_unwrap sees count == 1.
         drop(streaming_agg_ref);
-        let aggregated_records = Arc::try_unwrap(streaming_agg)
+        let mut aggregated_records = Arc::try_unwrap(streaming_agg)
             .expect("streaming_agg still has owners after executor finished")
             .into_inner()
             .expect("streaming_agg mutex poisoned")
             .finalize();
+
+        // Mass & energy unit conversion (canonical `OutputProcessor` step 1).
+        // MOVES' worker output is in grams (mass) and kilojoules (energy); the
+        // run's `outputFactors` rebase that to the chosen units. Mass output is
+        // already grams for every fixture, but energy pollutants (91/92/93) must
+        // be rebased from kJ to the run's `energyUnits` (e.g. Million BTU).
+        let energy_factor = self
+            .execution
+            .run_spec
+            .output_factors
+            .mass
+            .energy_units
+            .factor_from_kilojoules();
+        if (energy_factor - 1.0).abs() > f64::EPSILON {
+            apply_energy_unit_conversion(&mut aggregated_records, energy_factor);
+        }
         drop(activity_acc_ref);
         let activity_records = Arc::try_unwrap(activity_acc)
             .expect("activity_acc still has owners after executor finished")
@@ -842,6 +858,31 @@ fn run_hash(run_spec: &RunSpec) -> String {
         serde_json::to_vec(run_spec).expect("RunSpec is plain data and always serializes to JSON");
     let digest = Sha256::digest(&json);
     digest.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+/// MOVES energy pollutants (`Pollutant.energyOrMass = 'energy'`): Total Energy
+/// Consumption (91), Petroleum Energy (92), Fossil Fuel Energy (93). Their
+/// `emissionQuant` is produced in kilojoules and rebased to the run's
+/// `energyUnits`; mass pollutants are unaffected.
+const ENERGY_POLLUTANT_IDS: [i16; 3] = [91, 92, 93];
+
+/// Rebase energy-pollutant `emissionQuant`/`emissionRate` from MOVES' base unit
+/// (kilojoules) to the run's output energy unit — the energy half of the
+/// canonical `OutputProcessor` "Mass & Energy unit conversion" step. `factor`
+/// is [`EnergyUnit::factor_from_kilojoules`]; mass pollutants are left as-is.
+fn apply_energy_unit_conversion(records: &mut [EmissionRecord], factor: f64) {
+    for r in records.iter_mut() {
+        if r.pollutant_id
+            .is_some_and(|p| ENERGY_POLLUTANT_IDS.contains(&p))
+        {
+            if let Some(q) = r.emission_quant.as_mut() {
+                *q *= factor;
+            }
+            if let Some(rate) = r.emission_rate.as_mut() {
+                *rate *= factor;
+            }
+        }
+    }
 }
 
 /// Build an [`AggregationInputs`] from a [`RunSpec`].

@@ -207,16 +207,25 @@ causes — one structural (now fixed) and one numerical (still open):
    ≈4.3× over-emit). With this, `expand-criteria` matches canonical to f64
    precision (`max_rel_diff` ≈ 8.5e-8) and has graduated to `asserted_fixtures`.
 
-   *Still open — energy-unit conversion.* The sibling `expand-*` fixtures select
-   **energy** (pollutant 91). Their base rate is in KJ and the runspec asks for
-   `energyunits="Million BTU"`, but the onroad output path applies no energy-unit
-   conversion (canonical: KJ ÷ `1055.0559 × 1e6`). `max_rel_diff` ≈ 1.055e6 — a
-   clean constant unit factor, the sole remaining blocker for `expand-day`,
-   `expand-month`, `expand-counties`, `expand-sourcetype`, `expand-fueltype-diesel`.
+   *Energy-unit conversion (FIXED).* The sibling `expand-*` fixtures select
+   **energy** (pollutant 91). Their base rate is in kJ and the runspec asks for
+   `energyunits="Million BTU"`, but the onroad output path applied no energy-unit
+   conversion (`max_rel_diff` ≈ 1.055e6). The engine now rebases energy-pollutant
+   `emissionQuant` from the base kJ to the run's `energyUnits`
+   (`EnergyUnit::factor_from_kilojoules`, kJ → MMBTU = `1000 / (1055.0559×1e6)`),
+   the energy half of canonical `OutputProcessor`'s "Mass & Energy unit
+   conversion". Energy **totals** now match canonical (port/canon ≈ 0.9997–1.0).
 
-Until the energy-unit conversion lands the energy-selecting fixtures stay in
-`QUARANTINED_FIXTURES`: the row *shape* matches canonical and criteria mass now
-matches, but energy *mass* is off by the missing unit factor.
+   *Still open — two narrower residuals on the energy fixtures.*
+   - **E85 (fuelType 9):** every non-E85 fuel matches; fuelType-9 energy cells
+     are off ≈ 20 % (an ethanol energy-content / fuel-effects gap). Small absolute
+     mass, but above the 1e-3 gate.
+   - **`expand-counties`:** a uniform **≈3× over-emit across all fuel types** — a
+     multi-county expansion bug, orthogonal to energy (port/canon = 2.999).
+
+Until those land the energy-selecting fixtures stay in `QUARANTINED_FIXTURES`:
+row *shape* and criteria mass match, energy totals match, but the E85 slice and
+the county-expansion factor remain.
 
 **`process-apu`** is the same gap surfacing through a fixture that *was*
 asserted-vacuous only because the month bug suppressed its output. Its
