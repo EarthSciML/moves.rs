@@ -35,18 +35,15 @@
 #                      only its shard, and diffs against baseline. Fails on
 #                      any drift beyond tolerance.toml.
 #
-#   nonroad-fidelity — NONROAD numerical-fidelity check. UNCHANGED from the
-#                      self-hosted design: it builds an instrumented
-#                      gfortran NONROAD binary and runs against the
-#                      canonical SIF with NRDBG_FILE set. This cannot run on
-#                      GitHub-hosted runners (it needs gfortran + builds a
-#                      Fortran binary against the pinned MOVES tree), so it
-#                      stays on the self-hosted [apptainer, fakeroot,
-#                      gfortran] labels and builds its own canonical SIF
-#                      (cache-first). It is independent of the two
-#                      GitHub-hosted jobs above (no `needs:`), because a
-#                      self-hosted job must not gate on GitHub-hosted runner
-#                      availability or on the 1-day fixture-SIF artifact.
+#   nonroad-fidelity — NONROAD numerical-fidelity check, also GitHub-hosted
+#                      (ubuntu-24.04). gfortran is preinstalled on the runner;
+#                      it builds an instrumented gfortran NONROAD binary and
+#                      runs each nr-* fixture through the canonical SIF with
+#                      NRDBG_FILE set, then diffs port-vs-gfortran. It gets the
+#                      SIF the same way as everything else (`needs: build-sif`
+#                      + the shared composite action / cache), so there is no
+#                      second cold build; bind/scratch dirs live under
+#                      $GITHUB_WORKSPACE (the roomy root disk).
 #
 # Disk note (GitHub-hosted jobs): Apptainer scratch (APPTAINER_TMPDIR /
 # APPTAINER_CACHEDIR) is placed on the roomy root disk (GITHUB_WORKSPACE,
@@ -256,16 +253,14 @@ jobs:
   # emissions), then exercises the Rust port's fidelity harness against
   # those captures.
   #
-  # The job needs gfortran for the instrumented NONROAD build, so it
-  # carries the extra `gfortran` label. If a runner without gfortran picks
-  # up the job it will fail the prerequisite check clearly rather than
-  # silently skipping.
+  # The job needs gfortran for the instrumented NONROAD build; it is
+  # preinstalled on ubuntu-24.04 runners (and installed if a future image
+  # drops it).
   #
-  # This job stays on self-hosted runners (it cannot run on GitHub-hosted
-  # ones) and is INDEPENDENT of the GitHub-hosted build-sif / fixture-suite
-  # jobs: it builds its own canonical SIF (cache-first; build-sif.sh no-ops
-  # when characterization/canonical-image.lock already matches on the
-  # runner) rather than consuming the 1-day fixture-suite artifact.
+  # GitHub-hosted (ubuntu-24.04), `needs: build-sif` so it restores the same
+  # cached canonical SIF the build-sif job produced via the shared composite
+  # action (no second cold build), then runs the gfortran reference binary +
+  # `apptainer exec --fakeroot` against that SIF.
   #
   # When to expect failures:
   #   * A new divergence between the Rust port and gfortran reference that
@@ -277,7 +272,8 @@ jobs:
   #     with pinned SHAs, but validate if gfortran build fails).
   nonroad-fidelity:
     name: NONROAD fidelity (gfortran reference)
-    runs-on: [self-hosted, apptainer, fakeroot, gfortran]
+    runs-on: ubuntu-24.04
+    needs: build-sif
     timeout-minutes: 240
     if: ${{ github.event.inputs.skip_nonroad_fidelity != 'true' }}
 
@@ -292,18 +288,21 @@ jobs:
         with:
           key: nonroad-fidelity
 
-      # Build the canonical SIF on this self-hosted runner (cache-first).
-      # build-sif.sh is a no-op when canonical-image.lock already points at
-      # a built image, so this is fast on a warm runner. Required because
-      # this job no longer depends on a job that builds the SIF for it.
-      - name: Build canonical SIF (cache-first)
-        run: characterization/apptainer/build-sif.sh
+      # Install Apptainer + lift the ubuntu-24.04 AppArmor userns restriction +
+      # build/restore the canonical SIF (cache-first), all via the shared
+      # composite action — the same SIF build path as the build-sif job. The
+      # shared actions/cache key restores the image the build-sif job produced
+      # (or builds it if this job wins the cache race). Apptainer is then on
+      # PATH for the `apptainer exec --fakeroot` calls below.
+      - uses: ./.github/actions/build-sif
 
-      # The gfortran label on the runner guarantees gfortran is on PATH.
-      # This step verifies the version so it appears in the log for
-      # debugging flag-regression issues.
-      - name: Verify gfortran availability
-        run: gfortran --version
+      # gfortran is preinstalled on ubuntu-24.04 runners; install it if a
+      # future image drops it. The version is logged for debugging
+      # flag-regression issues (gfortran flags affect the captured reference).
+      - name: Ensure gfortran
+        run: |
+          command -v gfortran || { sudo apt-get update && sudo apt-get install -y gfortran; }
+          gfortran --version
 
       # Shallow-clone the MOVES source at the pinned commit so build.sh
       # can compile the instrumented NONROAD binary on the host.
@@ -347,7 +346,7 @@ jobs:
           fail=0
           for fixture in "${FIXTURES_DIR}"/nr-*.xml; do
               name="$(basename "${fixture}" .xml)"
-              WORKDIR="/scratch/${USER}/moves-nonroad-cap/${name}"
+              WORKDIR="${GITHUB_WORKSPACE}/nonroad-cap/${name}"
               NRDBG_DIR="${WORKDIR}/nrdbg-out"
               mkdir -p "${WORKDIR}/mariadb-data" \
                        "${WORKDIR}/run-mysqld" \
