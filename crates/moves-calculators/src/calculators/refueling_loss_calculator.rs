@@ -1960,12 +1960,21 @@ impl TableRow for RefuelingEmissionRow {
     }
 }
 
-/// Key into `RefuelingDisplacement` (REFEC-3, 4) — the seven columns the
-/// REFEC-7 energy join matches a `MOVESWorkerOutput` row on.
+/// Key into `RefuelingDisplacement` (REFEC-3, 4) — the columns the REFEC-7
+/// energy join matches a `MOVESWorkerOutput` row on, minus `regClassID`.
+///
+/// The SQL join also matches `regClassID`, but BaseRate's `MOVESWorkerOutput`
+/// collapses `regClassID` to `0` (faithfully matching canonical's
+/// `baseRateOutput`, which is `regClassID = 0` when the RunSpec does not break
+/// emissions down by reg class), while `RefuelingControlTechnology` carries the
+/// concrete per-reg-class rows. So `regClassID` is dropped from the key and
+/// kept on the value (alongside the rate); the join enforces the equality only
+/// when the energy row carries a concrete (non-zero) reg class, treating a
+/// collapsed `0` as a wildcard. This mirrors the `SulfatePMCalculator` crankcase
+/// split reconciliation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct DisplacementKey {
     model_year_id: i32,
-    reg_class_id: i32,
     source_type_id: i32,
     fuel_type_id: i32,
     age_id: i32,
@@ -2148,8 +2157,10 @@ fn refueling_temp(
 fn refueling_displacement(
     inputs: &RefuelingLossInputs,
     temp_by_fuel: &HashMap<i32, Vec<RefuelingTempCell>>,
-) -> HashMap<DisplacementKey, f64> {
-    let mut displacement: HashMap<DisplacementKey, f64> = HashMap::new();
+) -> HashMap<DisplacementKey, Vec<(i32, f64)>> {
+    // Keyed without `regClassID`; the value carries `(regClassID, rate)` pairs
+    // so the energy join can reconcile a regClass-collapsed worker output.
+    let mut displacement: HashMap<DisplacementKey, Vec<(i32, f64)>> = HashMap::new();
  // CROSS JOIN RefuelingCountyYear — the run's single county/year row.
     for rcy in &inputs.refueling_county_year {
         for rct in &inputs.refueling_control_technology {
@@ -2170,18 +2181,17 @@ fn refueling_displacement(
                     + rct.controlled_refueling_rate
  * (1.0 - rcy.refueling_vapor_program_adjust)
  * rct.refueling_tech_adjustment;
-                displacement.insert(
-                    DisplacementKey {
+                displacement
+                    .entry(DisplacementKey {
                         model_year_id: rct.model_year_id,
-                        reg_class_id: rct.reg_class_id,
                         source_type_id: rct.source_type_id,
                         fuel_type_id: rct.fuel_type_id,
                         age_id: rct.age_id,
                         month_id: cell.month_id,
                         hour_id: cell.hour_id,
-                    },
-                    adjusted_vapor_rate,
-                );
+                    })
+                    .or_default()
+                    .push((rct.reg_class_id, adjusted_vapor_rate));
             }
         }
     }
@@ -2334,24 +2344,32 @@ impl RefuelingLossCalculator {
  // Refueling Displacement Vapor Loss (process 18).
             let displacement_key = DisplacementKey {
                 model_year_id: mwo.model_year_id,
-                reg_class_id: mwo.reg_class_id,
                 source_type_id: mwo.source_type_id,
                 fuel_type_id: mwo.fuel_type_id,
                 age_id,
                 month_id: mwo.month_id,
                 hour_id: mwo.hour_id,
             };
-            if let Some(&adjusted_vapor_rate) = displacement.get(&displacement_key) {
-                let emission_quant = adjusted_vapor_rate * mwo.emission_quant / divisor;
-                let emission_rate = adjusted_vapor_rate * mwo.emission_rate / divisor;
-                for &pollutant_id in &inputs.refueling_displacement_pollutant {
-                    out.push(emission_row(
-                        mwo,
-                        pollutant_id,
-                        DISPLACEMENT_PROCESS_ID,
-                        emission_quant,
-                        emission_rate,
-                    ));
+            if let Some(rates) = displacement.get(&displacement_key) {
+                for &(reg_class_id, adjusted_vapor_rate) in rates {
+                    // SQL `rd.regClassID = mwo.regClassID`, reconciled for a
+                    // regClass-collapsed worker output: enforce the equality
+                    // only when the energy row carries a concrete reg class;
+                    // treat the aggregated `0` as a wildcard.
+                    if mwo.reg_class_id != 0 && reg_class_id != mwo.reg_class_id {
+                        continue;
+                    }
+                    let emission_quant = adjusted_vapor_rate * mwo.emission_quant / divisor;
+                    let emission_rate = adjusted_vapor_rate * mwo.emission_rate / divisor;
+                    for &pollutant_id in &inputs.refueling_displacement_pollutant {
+                        out.push(emission_row(
+                            mwo,
+                            pollutant_id,
+                            DISPLACEMENT_PROCESS_ID,
+                            emission_quant,
+                            emission_rate,
+                        ));
+                    }
                 }
             }
 
