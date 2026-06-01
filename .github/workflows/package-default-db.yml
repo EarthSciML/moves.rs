@@ -207,3 +207,22 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # Trigger the ci.yml docs + Pages deploy on main so the newly published
+  # default-DB Parquet tree appears in the GitHub Pages demo immediately,
+  # without waiting for the next code push to main.
+  refresh-pages:
+    name: Refresh GitHub Pages with new default-DB
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch ci.yml on main to rebuild Pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run ci.yml \
+            --repo "${{ github.repository }}" \
+            --ref main
+          echo "Dispatched ci.yml on main — Pages will include default-db-${{ github.event.inputs.db_version }} within ~5 minutes"
+

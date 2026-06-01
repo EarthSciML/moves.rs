@@ -32,6 +32,10 @@ on:
   push:
     branches: ["**"]
   pull_request:
+  # Allow package-default-db.yml (and maintainers) to trigger the docs+Pages
+  # job directly — e.g. to immediately publish a newly packaged default-DB
+  # Parquet tree without waiting for the next code push.
+  workflow_dispatch:
 
 # Cancel earlier runs on the same ref so we always test the latest commit.
 concurrency:
@@ -157,6 +161,8 @@ jobs:
   docs:
     name: cargo doc
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -197,6 +203,51 @@ jobs:
           cp crates/moves-wasm/pkg/moves_wasm.js      target/doc/demo/pkg/
           cp crates/moves-wasm/pkg/moves_wasm_bg.wasm target/doc/demo/pkg/
 
+      # Download the most recent default-DB Parquet tree from GitHub Releases
+      # and extract it into target/doc/demo/data/<db_version>/ so the WASM
+      # demo (served at /demo/) can fetch individual partitions same-origin at
+      # predictable URLs like /demo/data/<db_version>/manifest.json or
+      # /demo/data/<db_version>/IMCoverage/year=2020/county=06037/part.parquet.
+      #
+      # The release archive includes an intermediate _tsv/ dump directory that
+      # is only needed for validation and is excluded here to avoid bloating the
+      # Pages artifact (~390 MB total without _tsv/).
+      #
+      # Skips gracefully when no release with a default-db asset exists yet
+      # (first deployment before package-default-db has ever been run).
+      - name: Download latest default-DB Parquet tree for Pages
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RELEASE_JSON=$(gh release list --json tagName,assets --limit 20)
+          TAG=$(echo "$RELEASE_JSON" | jq -r '
+            map(select(
+              .assets | map(select(.name | test("^default-db-.*\\.tar\\.gz$"))) | length > 0
+            )) | .[0].tagName // empty
+          ')
+          if [ -z "$TAG" ]; then
+            echo "No default-DB release found — skipping (run package-default-db first)"
+            exit 0
+          fi
+          ARCHIVE=$(echo "$RELEASE_JSON" | jq -r --arg tag "$TAG" '
+            map(select(.tagName == $tag)) |
+            .[0].assets[] |
+            select(.name | test("^default-db-.*\\.tar\\.gz$")) |
+            .name
+          ' | head -1)
+          DB_VERSION="${ARCHIVE#default-db-}"
+          DB_VERSION="${DB_VERSION%.tar.gz}"
+          echo "Downloading ${ARCHIVE} from release ${TAG}..."
+          gh release download "${TAG}" -p "${ARCHIVE}" -D /tmp/
+          mkdir -p target/doc/demo/data
+          tar -xzf "/tmp/${ARCHIVE}" \
+            --exclude="${DB_VERSION}/_tsv" \
+            -C target/doc/demo/data/
+          rm -f "/tmp/${ARCHIVE}"
+          echo "Published default-DB ${DB_VERSION} at demo/data/${DB_VERSION}/"
+          du -sh "target/doc/demo/data/${DB_VERSION}/"
+
       - name: Upload docs artifact
         if: github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
@@ -206,7 +257,7 @@ jobs:
   deploy-pages:
     name: Deploy to GitHub Pages
     needs: docs
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:
       pages: write
