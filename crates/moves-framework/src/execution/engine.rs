@@ -51,7 +51,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use crate::data::InMemoryStore;
+use crate::data::{DataFrameStore, InMemoryStore};
 
 use moves_data::output_schema::{ActivityRecord, EmissionRecord, MovesRunRecord, OutputTable};
 use moves_data::{PollutantId, ProcessId};
@@ -284,6 +284,12 @@ struct CalculatorMasterLoopable {
     /// never reach the final output. An empty set imposes no filter (the
     /// unit-test contexts that drive a stub calculator with no selections).
     selected_pol_proc: Arc<BTreeSet<(u16, u16)>>,
+    /// Per-chunk `MOVESWorkerOutput` accumulator — the *unfiltered* emission
+    /// rows (including chain-prerequisite intermediates like BaseRate energy)
+    /// the chunk's chained calculators read after the master loop completes.
+    /// `None` for chunks with no chained calculators, so the accumulation cost
+    /// is paid only where it is needed.
+    worker_acc: Option<Arc<Mutex<Vec<EmissionRecord>>>>,
 }
 
 impl MasterLoopable for CalculatorMasterLoopable {
@@ -306,6 +312,14 @@ impl MasterLoopable for CalculatorMasterLoopable {
                     // Emission output: stream into the running group-by aggregator.
                     let mut records = frame_to_emission_records(&df, &self.run_hash);
                     drop(df);
+                    // Feed the per-chunk MOVESWorkerOutput accumulator the
+                    // *unfiltered* rows so chained calculators see the
+                    // chain-prerequisite intermediates (e.g. BaseRate energy).
+                    if let Some(acc) = &self.worker_acc {
+                        acc.lock()
+                            .expect("worker accumulator poisoned")
+                            .extend(records.iter().cloned());
+                    }
                     // Drop intermediate pollutants the RunSpec never selected
                     // (chain prerequisites such as BaseRate energy 91/1) before
                     // they reach the aggregator — the worker-level filter
@@ -622,23 +636,40 @@ impl MOVESEngine {
                 ctx.set_model_scale(run_scale);
                 ctx
             }));
-            for name in chunk.modules() {
-                let Some(instance) = instantiate(registry, name) else {
-                    continue;
-                };
-                let module = Arc::new(instance);
- // One MasterLoop subscription per declared calculator
- // subscription, all sharing the single module instance and
- // the chunk's CalculatorContext.
+            // Instantiate the chunk's modules (topologically ordered, upstream
+            // first). A module that declares MasterLoop subscriptions is a
+            // *producer*, driven by the loop; one with no subscriptions is a
+            // *chained* calculator (the canonical `subscribeToMe` chaining),
+            // run after the loop against the accumulated `MOVESWorkerOutput`.
+            let chunk_modules: Vec<Arc<ModuleInstance>> = chunk
+                .modules()
+                .iter()
+                .filter_map(|name| instantiate(registry, name).map(Arc::new))
+                .collect();
+            let chained: Vec<Arc<ModuleInstance>> = chunk_modules
+                .iter()
+                .filter(|m| m.subscriptions().is_empty())
+                .cloned()
+                .collect();
+            // Only accumulate the worker output when the chunk has chained
+            // calculators that will read it.
+            let worker_acc: Option<Arc<Mutex<Vec<EmissionRecord>>>> =
+                (!chained.is_empty()).then(|| Arc::new(Mutex::new(Vec::new())));
+
+            for module in &chunk_modules {
+                // One MasterLoop subscription per declared calculator
+                // subscription, all sharing the single module instance and
+                // the chunk's CalculatorContext.
                 for sub in module.subscriptions() {
                     let adapter = Arc::new(CalculatorMasterLoopable {
-                        module: Arc::clone(&module),
+                        module: Arc::clone(module),
                         gate_process: sub.process_id,
                         ctx: Arc::clone(&chunk_ctx),
                         streaming_agg: Arc::clone(&streaming_agg_ref),
                         activity_acc: Arc::clone(&activity_acc_ref),
                         run_hash: Arc::clone(&run_hash_str),
                         selected_pol_proc: Arc::clone(&selected_pol_proc),
+                        worker_acc: worker_acc.clone(),
                     });
                     master.subscribe(MasterLoopableSubscription::new(
                         sub.granularity,
@@ -648,6 +679,65 @@ impl MOVESEngine {
                 }
             }
             master.run()?;
+
+            // Chained-calculator execution — the canonical `chainCalculator`
+            // step the MasterLoop cannot drive (chained calculators declare no
+            // subscriptions). After the producers populate the per-chunk
+            // `MOVESWorkerOutput`, run each chained calculator in topological
+            // order: it reads the accumulated worker output, emits its rows
+            // (accumulated for the next chained calculator and folded into the
+            // aggregator under the same RunSpec-selection filter the producers
+            // use).
+            if let Some(acc) = &worker_acc {
+                for module in &chained {
+                    let worker_df = {
+                        let recs = acc.lock().expect("worker accumulator poisoned");
+                        emission_records_to_worker_df(&recs)?
+                    };
+                    // A chained calculator whose inputs the run does not supply
+                    // (e.g. a computed extract absent from the snapshot, or a
+                    // calculator pulled in by the chain closure but not relevant
+                    // to this RunSpec's selections) produces nothing rather than
+                    // aborting the run — its `execute` error is treated as an
+                    // empty contribution. Its rows, if any, are dropped by the
+                    // RunSpec-selection filter anyway when not selected.
+                    let out = {
+                        let mut ctx = chunk_ctx.lock().expect("CalculatorContext mutex poisoned");
+                        ctx.tables_mut().insert("MOVESWorkerOutput", worker_df);
+                        module.execute(&mut ctx)
+                    };
+                    let out = match out {
+                        Ok(out) => out,
+                        Err(_) => continue,
+                    };
+                    let Some(df) = out else { continue };
+                    if df.height() == 0 || df.column("pollutantID").is_err() {
+                        continue;
+                    }
+                    let records = frame_to_emission_records(&df, &run_hash_str);
+                    acc.lock()
+                        .expect("worker accumulator poisoned")
+                        .extend(records.iter().cloned());
+                    let filtered: Vec<EmissionRecord> = if selected_pol_proc.is_empty() {
+                        records
+                    } else {
+                        records
+                            .into_iter()
+                            .filter(|r| match (r.pollutant_id, r.process_id) {
+                                (Some(p), Some(proc)) => u16::try_from(p)
+                                    .ok()
+                                    .zip(u16::try_from(proc).ok())
+                                    .is_some_and(|pair| selected_pol_proc.contains(&pair)),
+                                _ => true,
+                            })
+                            .collect()
+                    };
+                    streaming_agg_ref
+                        .lock()
+                        .expect("output accumulator poisoned")
+                        .extend(&filtered, &UnitScaling)?;
+                }
+            }
             let elapsed = t_chunk.elapsed();
  // Find the slot that corresponds to this chunk by pointer identity.
  // Safe: `chunk` is a reference into the `chunks` slice that was
@@ -927,6 +1017,76 @@ fn apply_energy_unit_conversion(records: &mut [EmissionRecord], factor: f64) {
             }
         }
     }
+}
+
+/// Materialise the accumulated chunk emissions as a `MOVESWorkerOutput`
+/// `DataFrame` for chained calculators to read.
+///
+/// Chained calculators (refueling, PM/TOG/airtoxics speciation, …) read their
+/// inputs from the `MOVESWorkerOutput` table the upstream producers populate.
+/// The port routes producer emissions only into the streaming aggregator, so
+/// this rebuilds the table from the per-chunk accumulator. The 24 columns are
+/// 1:1 with [`EmissionRecord`]; downstream `iter_typed` readers project and cast
+/// the subset they need.
+fn emission_records_to_worker_df(records: &[EmissionRecord]) -> Result<DataFrame> {
+    use polars::prelude::{Column, NamedFrom, Series};
+    // Canonical `MOVESWorkerOutput` carries non-null id columns (0 = "aggregated
+    // away"); the port's `EmissionRecord` uses `None` for the same. Coalesce
+    // `None → 0` so chained readers (which require non-null ids) succeed.
+    let i32_col = |name: &str, f: &dyn Fn(&EmissionRecord) -> Option<i32>| -> Column {
+        Series::new(
+            name.into(),
+            records
+                .iter()
+                .map(|r| f(r).unwrap_or(0))
+                .collect::<Vec<i32>>(),
+        )
+        .into()
+    };
+    let f64_col = |name: &str, f: &dyn Fn(&EmissionRecord) -> Option<f64>| -> Column {
+        Series::new(
+            name.into(),
+            records
+                .iter()
+                .map(|r| f(r).unwrap_or(0.0))
+                .collect::<Vec<f64>>(),
+        )
+        .into()
+    };
+    let cols = vec![
+        i32_col("MOVESRunID", &|r| Some(i32::from(r.moves_run_id))),
+        i32_col("iterationID", &|r| r.iteration_id.map(i32::from)),
+        i32_col("yearID", &|r| r.year_id.map(i32::from)),
+        i32_col("monthID", &|r| r.month_id.map(i32::from)),
+        i32_col("dayID", &|r| r.day_id.map(i32::from)),
+        i32_col("hourID", &|r| r.hour_id.map(i32::from)),
+        i32_col("stateID", &|r| r.state_id.map(i32::from)),
+        i32_col("countyID", &|r| r.county_id),
+        i32_col("zoneID", &|r| r.zone_id),
+        i32_col("linkID", &|r| r.link_id),
+        i32_col("pollutantID", &|r| r.pollutant_id.map(i32::from)),
+        i32_col("processID", &|r| r.process_id.map(i32::from)),
+        i32_col("sourceTypeID", &|r| r.source_type_id.map(i32::from)),
+        i32_col("regClassID", &|r| r.reg_class_id.map(i32::from)),
+        i32_col("fuelTypeID", &|r| r.fuel_type_id.map(i32::from)),
+        i32_col("fuelSubTypeID", &|r| r.fuel_sub_type_id.map(i32::from)),
+        i32_col("modelYearID", &|r| r.model_year_id.map(i32::from)),
+        i32_col("roadTypeID", &|r| r.road_type_id.map(i32::from)),
+        Series::new(
+            "SCC".into(),
+            records
+                .iter()
+                .map(|r| r.scc.clone())
+                .collect::<Vec<Option<String>>>(),
+        )
+        .into(),
+        i32_col("engTechID", &|r| r.eng_tech_id.map(i32::from)),
+        i32_col("sectorID", &|r| r.sector_id.map(i32::from)),
+        i32_col("hpID", &|r| r.hp_id.map(i32::from)),
+        f64_col("emissionQuant", &|r| r.emission_quant),
+        f64_col("emissionRate", &|r| r.emission_rate),
+    ];
+    DataFrame::new(records.len(), cols).map_err(|e| crate::Error::Polars(e.to_string()))
 }
 
 /// Build an [`AggregationInputs`] from a [`RunSpec`].
@@ -1517,6 +1677,7 @@ mod tests {
             activity_acc: Arc::new(Mutex::new(Vec::new())),
             run_hash: Arc::from("test"),
             selected_pol_proc: Arc::new(std::collections::BTreeSet::new()),
+            worker_acc: None,
         };
 
         let mut ctx = MasterLoopContext::default();
@@ -1552,6 +1713,7 @@ mod tests {
             activity_acc: Arc::new(Mutex::new(Vec::new())),
             run_hash: Arc::from("test"),
             selected_pol_proc: Arc::new(std::collections::BTreeSet::new()),
+            worker_acc: None,
         };
         let mut ctx = MasterLoopContext::default();
         ctx.position.process_id = Some(ProcessId(1));
