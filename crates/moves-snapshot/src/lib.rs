@@ -28,6 +28,7 @@ pub mod diff;
 pub mod error;
 pub mod format;
 pub mod manifest;
+pub mod output_compare;
 pub mod snapshot;
 pub mod table;
 pub mod tolerance;
@@ -37,6 +38,10 @@ pub use diff::{diff_snapshots, Diff, DiffOptions, DiffSummary, RowDiff, SchemaDi
 pub use error::{Error, Result};
 pub use format::{ColumnKind, ColumnSpec, FLOAT_DECIMALS, FORMAT_VERSION};
 pub use manifest::{compute_aggregate_hash, sha256_hex, Manifest, ManifestEntry, TableMetadata};
+pub use output_compare::{
+    compare_pollutant_sums, pollutant_sums_from_output_dir, pollutant_sums_from_snapshot,
+    PollutantComparison, PollutantRow, PollutantSums,
+};
 pub use snapshot::Snapshot;
 pub use table::{NormalizedColumn, Table, TableBuilder, Value};
 pub use tolerance::{ToleranceConfig, ToleranceError};

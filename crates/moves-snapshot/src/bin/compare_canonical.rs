@@ -19,18 +19,16 @@
 //!
 //! Exit codes: 0 = success, 2 = error.
 
-use std::collections::BTreeMap;
-use std::fs::File;
 use std::io::{self, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitCode;
 
-use arrow::array::{Array, Float64Array, Int16Array};
 use clap::{Parser, ValueEnum};
-use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use serde::Serialize;
 
-use moves_snapshot::Snapshot;
+use moves_snapshot::{
+    compare_pollutant_sums, pollutant_sums_from_output_dir, pollutant_sums_from_snapshot, Snapshot,
+};
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
 
@@ -125,16 +123,23 @@ fn main() -> ExitCode {
 }
 
 fn run(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
-    let (canonical, canonical_row_count) = read_canonical(&args.canonical)?;
-    let (moves_rs, moves_rs_row_count) = read_moves_rs(&args.moves_rs)?;
+    let canonical = if args.canonical.exists() {
+        match Snapshot::load(&args.canonical) {
+            Ok(s) => pollutant_sums_from_snapshot(&s),
+            Err(e) => {
+                eprintln!(
+                    "warning: could not load canonical snapshot at {}: {e}",
+                    args.canonical.display()
+                );
+                Default::default()
+            }
+        }
+    } else {
+        Default::default()
+    };
+    let moves_rs = pollutant_sums_from_output_dir(&args.moves_rs)?;
 
-    let result = build_result(
-        args,
-        canonical,
-        canonical_row_count,
-        moves_rs,
-        moves_rs_row_count,
-    );
+    let result = build_result(args, &canonical, &moves_rs);
 
     let stdout = io::stdout();
     let mut out = stdout.lock();
@@ -150,216 +155,33 @@ fn run(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-// ── Reading canonical snapshot ────────────────────────────────────────────────
-
-/// `pollutantID → emissionQuant sum` and total row count from the canonical snapshot.
-fn read_canonical(dir: &Path) -> Result<(BTreeMap<i64, f64>, usize), Box<dyn std::error::Error>> {
-    let mut sums: BTreeMap<i64, f64> = BTreeMap::new();
-
-    if !dir.exists() {
-        return Ok((sums, 0));
-    }
-
-    let snap = match Snapshot::load(dir) {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!(
-                "warning: could not load canonical snapshot at {}: {e}",
-                dir.display()
-            );
-            return Ok((sums, 0));
-        }
-    };
-
-    // The output DB name varies per fixture (e.g. `db__out_expand_counties`,
-    // `db__junittestoutput`). Find the table by its suffix rather than its
-    // full name.  Primary suffix first; fall back to activity-output tables
-    // for fixtures that only produce `movesactivityoutput`.
-    let table_name = snap
-        .table_names()
-        .find(|n| n.ends_with("__movesoutput"))
-        .map(str::to_string)
-        .or_else(|| {
-            snap.table_names()
-                .find(|n| n.ends_with("__movesactivityoutput"))
-                .map(str::to_string)
-        });
-    let table = match table_name.as_deref().and_then(|name| snap.table(name)) {
-        Some(t) => t,
-        None => return Ok((sums, 0)),
-    };
-
-    let row_count = table.row_count();
-
-    let pid_idx = match table.column_index("pollutantID") {
-        Some(i) => i,
-        None => return Ok((sums, row_count)),
-    };
-    let eq_idx = match table.column_index("emissionQuant") {
-        Some(i) => i,
-        None => return Ok((sums, row_count)),
-    };
-
-    let cols = table.columns();
-    let pid_col = &cols[pid_idx];
-    let eq_col = &cols[eq_idx];
-
-    use moves_snapshot::NormalizedColumn;
-    for row in 0..row_count {
-        let pid = match pid_col {
-            NormalizedColumn::Int64(v) => match v[row] {
-                Some(n) => n,
-                None => continue,
-            },
-            _ => continue,
-        };
-        let eq_str = match eq_col {
-            NormalizedColumn::Float64String(v) => match &v[row] {
-                Some(s) => s.clone(),
-                None => continue,
-            },
-            _ => continue,
-        };
-        let eq: f64 = match eq_str.parse() {
-            Ok(v) => v,
-            Err(_) => continue,
-        };
-        if eq.is_finite() {
-            *sums.entry(pid).or_insert(0.0) += eq;
-        }
-    }
-
-    Ok((sums, row_count))
-}
-
-// ── Reading moves.rs output ───────────────────────────────────────────────────
-
-/// `pollutantID → emissionQuant sum` and total row count from the moves.rs MOVESOutput Parquet tree.
-fn read_moves_rs(
-    output_dir: &Path,
-) -> Result<(BTreeMap<i64, f64>, usize), Box<dyn std::error::Error>> {
-    let mut sums: BTreeMap<i64, f64> = BTreeMap::new();
-
-    let moves_output_dir = output_dir.join("MOVESOutput");
-    if !moves_output_dir.exists() {
-        return Ok((sums, 0));
-    }
-
-    let parquet_files = collect_parquet_files(&moves_output_dir);
-    let mut total_rows: usize = 0;
-    for path in &parquet_files {
-        total_rows += accumulate_parquet_file(path, &mut sums)?;
-    }
-
-    Ok((sums, total_rows))
-}
-
-fn collect_parquet_files(dir: &Path) -> Vec<PathBuf> {
-    let mut files = Vec::new();
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                files.extend(collect_parquet_files(&path));
-            } else if path.extension().is_some_and(|e| e == "parquet") {
-                files.push(path);
-            }
-        }
-    }
-    files.sort();
-    files
-}
-
-fn accumulate_parquet_file(
-    path: &Path,
-    sums: &mut BTreeMap<i64, f64>,
-) -> Result<usize, Box<dyn std::error::Error>> {
-    let file = File::open(path)?;
-    let reader = ParquetRecordBatchReaderBuilder::try_new(file)?.build()?;
-
-    let mut total_rows: usize = 0;
-    for batch in reader {
-        let batch = batch?;
-        let schema = batch.schema();
-        total_rows += batch.num_rows();
-
-        let pid_idx = match schema.index_of("pollutantID") {
-            Ok(i) => i,
-            Err(_) => continue,
-        };
-        let eq_idx = match schema.index_of("emissionQuant") {
-            Ok(i) => i,
-            Err(_) => continue,
-        };
-
-        let pid_arr = batch.column(pid_idx);
-        let eq_arr = batch.column(eq_idx);
-
-        let pids = pid_arr
-            .as_any()
-            .downcast_ref::<Int16Array>()
-            .ok_or("pollutantID column is not Int16")?;
-        let eqs = eq_arr
-            .as_any()
-            .downcast_ref::<Float64Array>()
-            .ok_or("emissionQuant column is not Float64")?;
-
-        for i in 0..batch.num_rows() {
-            if pids.is_null(i) || eqs.is_null(i) {
-                continue;
-            }
-            let pid = pids.value(i) as i64;
-            let eq = eqs.value(i);
-            if eq.is_finite() {
-                *sums.entry(pid).or_insert(0.0) += eq;
-            }
-        }
-    }
-
-    Ok(total_rows)
-}
-
 // ── Building the result ───────────────────────────────────────────────────────
 
 fn build_result(
     args: &Args,
-    canonical: BTreeMap<i64, f64>,
-    canonical_row_count: usize,
-    moves_rs: BTreeMap<i64, f64>,
-    moves_rs_row_count: usize,
+    canonical: &moves_snapshot::PollutantSums,
+    moves_rs: &moves_snapshot::PollutantSums,
 ) -> FixtureResult {
-    // Union of all pollutant IDs from both sources.
-    let mut all_ids: std::collections::BTreeSet<i64> = BTreeSet::new();
-    all_ids.extend(canonical.keys().copied());
-    all_ids.extend(moves_rs.keys().copied());
-
     let eps: f64 = 1e-30;
-    let mut rows = Vec::new();
-    let mut max_abs_delta: f64 = 0.0;
-    let mut max_pct_diff: f64 = 0.0;
+    let cmp = compare_pollutant_sums(canonical, moves_rs, eps);
 
-    for pid in all_ids {
-        let can = canonical.get(&pid).copied().unwrap_or(0.0);
-        let mrs = moves_rs.get(&pid).copied().unwrap_or(0.0);
-        let delta = mrs - can;
-        let pct_diff = delta / can.abs().max(eps);
+    let canonical_row_count = canonical.row_count;
+    let moves_rs_row_count = moves_rs.row_count;
 
-        if delta.abs() > max_abs_delta {
-            max_abs_delta = delta.abs();
-        }
-        if pct_diff.abs() > max_pct_diff.abs() {
-            max_pct_diff = pct_diff;
-        }
-
-        rows.push(PollutantRow {
-            pollutant_id: pid,
-            name: pollutant_name(pid),
-            canonical_emission_quant: can,
-            moves_rs_emission_quant: mrs,
-            delta,
-            pct_diff,
-        });
-    }
+    let rows: Vec<PollutantRow> = cmp
+        .rows
+        .iter()
+        .map(|r| PollutantRow {
+            pollutant_id: r.pollutant_id,
+            name: pollutant_name(r.pollutant_id),
+            canonical_emission_quant: r.canonical,
+            moves_rs_emission_quant: r.port,
+            delta: r.delta,
+            pct_diff: r.rel_diff,
+        })
+        .collect();
+    let max_abs_delta = cmp.max_abs_delta;
+    let max_pct_diff = cmp.max_rel_diff;
 
     let speedup = match (args.canonical_wall, args.moves_rs_wall) {
         (Some(c), Some(m)) if m > 0.0 => Some(c / m),
@@ -388,8 +210,6 @@ fn build_result(
         rows,
     }
 }
-
-use std::collections::BTreeSet;
 
 // ── Markdown renderer ─────────────────────────────────────────────────────────
 
