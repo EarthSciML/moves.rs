@@ -31,6 +31,18 @@
   .note { color: #888; font-size: 0.8rem; margin-top: 0.4rem; }
   section { margin-bottom: 2.5rem; }
   .status-ok { color: #7f7; } .status-err { color: #f77; }
+  details.sb { border: 1px solid #444; border-radius: 2px; padding: 0.5rem 0.75rem 0.75rem; margin-bottom: 1rem; }
+  details.sb summary { cursor: pointer; color: #7af; font-size: 0.95rem; user-select: none; }
+  fieldset.sb-fs { border: 1px solid #444; border-radius: 2px; padding: 0.3rem 0.6rem 0.5rem; margin-top: 0.65rem; }
+  fieldset.sb-fs legend { color: #adf; padding: 0 0.2rem; font-size: 0.82rem; }
+  .sb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 0.15rem 0.75rem; margin-top: 0.3rem; }
+  .sb-grid label { color: #ccc; margin: 0; display: flex; align-items: baseline; gap: 0.35rem; font-size: 0.88rem; }
+  .sb-grid label input[type="checkbox"] { width: auto; margin: 0; flex-shrink: 0; }
+  .sb-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 0.6rem; }
+  .sb-row label { flex: 1; min-width: 9rem; }
+  #sb-preview-xml { width: 100%; height: 130px; background: #080808; border: 1px solid #444; color: #8b8; font-size: 0.73rem; padding: 0.35rem; box-sizing: border-box; margin-top: 0.35rem; resize: vertical; font-family: monospace; }
+  #generate-runspec-btn { margin-top: 0.8rem; padding: 0.35rem 1.1rem; background: #163; color: #7f7; border: 1px solid #5b5; cursor: pointer; font-family: monospace; font-size: 0.9rem; }
+  #generate-runspec-btn:hover { background: #1a4; }
 </style>
 </head>
 <body>
@@ -82,10 +94,10 @@
 <section id="defaultdb-section">
   <h2>Default-DB simulation (arbitrary RunSpec)</h2>
   <p>
-    Upload <em>any</em> RunSpec XML.  The demo fetches only the default-DB
-    partitions your RunSpec needs from this site, builds an execution store
-    in-browser, and runs the onroad calculator chain — no pre-packaged
-    snapshot required.
+    Build a scenario with the form below, or upload <em>any</em> RunSpec XML.
+    The demo fetches only the default-DB partitions your RunSpec needs from
+    this site, builds an execution store in-browser, and runs the onroad
+    calculator chain — no pre-packaged snapshot required.
   </p>
   <p class="note" id="defaultdb-unavail" style="display:none">
     Default-DB not yet published.  Run <code>package-default-db</code> and
@@ -95,8 +107,69 @@
     <p class="note">
       DB version: <code id="db-version-label">loading…</code>
     </p>
+
+    <!-- Scenario builder ------------------------------------------------ -->
+    <details class="sb" id="scenario-builder">
+      <summary>Build a scenario (no XML required) ▸</summary>
+
+      <div class="sb-row">
+        <label>County FIPS (5-digit)
+          <input type="text" id="sb-fips" placeholder="e.g. 06037" maxlength="5" pattern="\d{5}" style="width:7rem">
+        </label>
+        <label style="flex:3">County description (optional)
+          <input type="text" id="sb-desc" placeholder="e.g. Los Angeles, CA">
+        </label>
+      </div>
+
+      <div class="sb-row">
+        <label>Year
+          <input type="number" id="sb-year" value="2020" min="1990" max="2060" style="width:5rem">
+        </label>
+        <label>Month
+          <select id="sb-month" style="background:#222;border:1px solid #555;color:#eee;padding:0.3rem;margin-top:0.25rem;display:block">
+            <option value="1">January</option>
+            <option value="2">February</option>
+            <option value="3">March</option>
+            <option value="4">April</option>
+            <option value="5">May</option>
+            <option value="6">June</option>
+            <option value="7" selected>July</option>
+            <option value="8">August</option>
+            <option value="9">September</option>
+            <option value="10">October</option>
+            <option value="11">November</option>
+            <option value="12">December</option>
+          </select>
+        </label>
+      </div>
+
+      <fieldset class="sb-fs">
+        <legend>Pollutants &amp; Processes</legend>
+        <div class="sb-grid" id="sb-pp-grid"></div>
+      </fieldset>
+
+      <fieldset class="sb-fs">
+        <legend>Vehicle types</legend>
+        <div class="sb-grid" id="sb-vt-grid"></div>
+      </fieldset>
+
+      <fieldset class="sb-fs">
+        <legend>Road types</legend>
+        <div class="sb-grid" id="sb-rt-grid"></div>
+      </fieldset>
+
+      <button id="generate-runspec-btn">Generate RunSpec XML</button>
+      <p id="sb-error" class="note status-err" style="display:none"></p>
+
+      <div id="sb-preview" style="display:none">
+        <p class="note" style="margin-top:0.5rem">Generated RunSpec (read-only — click Run below to execute):</p>
+        <textarea id="sb-preview-xml" readonly></textarea>
+      </div>
+    </details>
+    <!-- End scenario builder ------------------------------------------- -->
+
     <label>
-      RunSpec XML
+      RunSpec XML (or use the builder above)
       <input type="file" id="defaultdb-runspec-file" accept=".xml">
     </label>
     <label>
@@ -104,7 +177,7 @@
       <input type="number" id="defaultdb-max-parallel-chunks" value="0" min="0" max="128" style="width:6rem">
     </label>
     <button id="run-defaultdb-btn" disabled>Run default-DB simulation</button>
-    <p class="note">Select a RunSpec XML file to enable the button.</p>
+    <p class="note">Generate a scenario above or select a RunSpec XML file to enable the button.</p>
 
     <div id="defaultdb-log-wrapper">
       <div id="defaultdb-log" style="display:none">
@@ -194,6 +267,204 @@ function appendLog(logEl, msg) {
 }
 
 // -----------------------------------------------------------------------
+// Scenario builder
+// -----------------------------------------------------------------------
+const SB_POLLUTANT_PROCESSES = [
+    { pid: 3,   pname: "Oxides of Nitrogen (NOx)",          rid: 1,  rname: "Running Exhaust",  on: true  },
+    { pid: 3,   pname: "Oxides of Nitrogen (NOx)",          rid: 2,  rname: "Start Exhaust",    on: true  },
+    { pid: 2,   pname: "Carbon Monoxide (CO)",               rid: 1,  rname: "Running Exhaust",  on: true  },
+    { pid: 2,   pname: "Carbon Monoxide (CO)",               rid: 2,  rname: "Start Exhaust",    on: true  },
+    { pid: 1,   pname: "Total Gaseous Hydrocarbons",        rid: 1,  rname: "Running Exhaust",  on: true  },
+    { pid: 1,   pname: "Total Gaseous Hydrocarbons",        rid: 2,  rname: "Start Exhaust",    on: true  },
+    { pid: 31,  pname: "Sulfur Dioxide (SO2)",              rid: 1,  rname: "Running Exhaust",  on: false },
+    { pid: 31,  pname: "Sulfur Dioxide (SO2)",              rid: 2,  rname: "Start Exhaust",    on: false },
+    { pid: 110, pname: "Primary Exhaust PM2.5 - Total",     rid: 1,  rname: "Running Exhaust",  on: true  },
+    { pid: 116, pname: "Primary PM2.5 - Brakewear",         rid: 9,  rname: "Brakewear",        on: false },
+    { pid: 117, pname: "Primary PM2.5 - Tirewear",          rid: 10, rname: "Tirewear",         on: false },
+    { pid: 100, pname: "Primary Exhaust PM10 - Total",      rid: 1,  rname: "Running Exhaust",  on: false },
+    { pid: 106, pname: "Primary PM10 - Brakewear",          rid: 9,  rname: "Brakewear",        on: false },
+    { pid: 107, pname: "Primary PM10 - Tirewear",           rid: 10, rname: "Tirewear",         on: false },
+    { pid: 91,  pname: "Total Energy Consumption",          rid: 1,  rname: "Running Exhaust",  on: false },
+    { pid: 91,  pname: "Total Energy Consumption",          rid: 2,  rname: "Start Exhaust",    on: false },
+];
+
+const SB_VEHICLE_TYPES = [
+    { fid: 1, fname: "Gasoline",                     sid: 11, sname: "Motorcycle",                  on: false },
+    { fid: 1, fname: "Gasoline",                     sid: 21, sname: "Passenger Car",               on: true  },
+    { fid: 1, fname: "Gasoline",                     sid: 31, sname: "Passenger Truck",             on: false },
+    { fid: 1, fname: "Gasoline",                     sid: 32, sname: "Light Commercial Truck",      on: false },
+    { fid: 1, fname: "Gasoline",                     sid: 51, sname: "Refuse Truck",                on: false },
+    { fid: 2, fname: "Diesel Fuel",                  sid: 21, sname: "Passenger Car",               on: false },
+    { fid: 2, fname: "Diesel Fuel",                  sid: 32, sname: "Light Commercial Truck",      on: false },
+    { fid: 2, fname: "Diesel Fuel",                  sid: 62, sname: "Combination Long-haul Truck", on: false },
+    { fid: 3, fname: "Compressed Natural Gas (CNG)", sid: 21, sname: "Passenger Car",               on: false },
+    { fid: 9, fname: "Electricity",                  sid: 21, sname: "Passenger Car",               on: false },
+];
+
+const SB_ROAD_TYPES = [
+    { id: 1, name: "Off-Network",               on: true },
+    { id: 2, name: "Rural Unrestricted Access", on: true },
+    { id: 3, name: "Rural Restricted Access",   on: true },
+    { id: 4, name: "Urban Unrestricted Access", on: true },
+    { id: 5, name: "Urban Restricted Access",   on: true },
+];
+
+function sbRenderGrid(containerId, items, prefix, labelFn) {
+    const el = document.getElementById(containerId);
+    items.forEach((item, i) => {
+        const label = document.createElement("label");
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.id = `${prefix}-${i}`;
+        cb.checked = item.on;
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(" " + labelFn(item)));
+        el.appendChild(label);
+    });
+}
+
+sbRenderGrid("sb-pp-grid", SB_POLLUTANT_PROCESSES, "sb-pp",
+    r => `${r.pname} — ${r.rname}`);
+sbRenderGrid("sb-vt-grid", SB_VEHICLE_TYPES, "sb-vt",
+    r => `${r.fname} ${r.sname}`);
+sbRenderGrid("sb-rt-grid", SB_ROAD_TYPES, "sb-rt",
+    r => r.name);
+
+function sbXmlEsc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function sbBuildXml(fips, desc, year, month, ppSel, vtSel, rtSel) {
+    const geoXml = fips
+        ? `\t\t<geographicselection type="COUNTY" key="${parseInt(fips, 10)}" description="${sbXmlEsc(desc || fips)}"/>`
+        : "";
+    const vtXml = vtSel.map(v =>
+        `\t\t<onroadvehicleselection fueltypeid="${v.fid}" fueltypedesc="${sbXmlEsc(v.fname)}" sourcetypeid="${v.sid}" sourcetypename="${sbXmlEsc(v.sname)}"/>`
+    ).join("\n");
+    const rtXml = rtSel.map(r =>
+        `\t\t<roadtype roadtypeid="${r.id}" roadtypename="${sbXmlEsc(r.name)}" modelCombination="M1"/>`
+    ).join("\n");
+    const ppXml = ppSel.map(p =>
+        `\t\t<pollutantprocessassociation pollutantkey="${p.pid}" pollutantname="${sbXmlEsc(p.pname)}" processkey="${p.rid}" processname="${sbXmlEsc(p.rname)}"/>`
+    ).join("\n");
+
+    return `<runspec version="MOVES5.0.1">
+\t<description><![CDATA[Generated by moves.rs demo scenario builder]]></description>
+\t<models>
+\t\t<model value="ONROAD"/>
+\t</models>
+\t<modelscale value="Inv"/>
+\t<modeldomain value="DEFAULT"/>
+\t<geographicselections>
+${geoXml}
+\t</geographicselections>
+\t<timespan>
+\t\t<year key="${year}"/>
+\t\t<month key="${month}"/>
+\t\t<day key="5"/>
+\t\t<beginhour key="1"/>
+\t\t<endhour key="24"/>
+\t</timespan>
+\t<onroadvehicleselections>
+${vtXml}
+\t</onroadvehicleselections>
+\t<offroadvehicleselections>
+\t</offroadvehicleselections>
+\t<offroadvehiclesccs>
+\t</offroadvehiclesccs>
+\t<roadtypes>
+${rtXml}
+\t</roadtypes>
+\t<pollutantprocessassociations>
+${ppXml}
+\t</pollutantprocessassociations>
+\t<databaseselections>
+\t</databaseselections>
+\t<internalcontrolstrategies>
+\t</internalcontrolstrategies>
+\t<inputdatabase servername="" databasename="" description=""/>
+\t<uncertaintyparameters uncertaintymodeenabled="false" numberofrunspersimulation="0" numberofsimulations="0"/>
+\t<geographicoutputdetail description="COUNTY"/>
+\t<outputemissionsbreakdownselection>
+\t    <modelyear selected="true"/>
+\t    <fueltype selected="true"/>
+\t    <emissionprocess selected="true"/>
+\t    <distinguishparticulates selected="true"/>
+\t    <onroadoffroad selected="true"/>
+\t    <roadtype selected="true"/>
+\t    <sourceusetype selected="false"/>
+\t    <movesvehicletype selected="false"/>
+\t    <onroadscc selected="true"/>
+\t    <offroadscc selected="false"/>
+\t    <estimateuncertainty selected="false"/>
+\t    <segment selected="false"/>
+\t    <hpclass selected="false"/>
+\t</outputemissionsbreakdownselection>
+\t<outputdatabase servername="" databasename="" description=""/>
+\t<outputtimestep value="Hour"/>
+\t<outputvmtdata value="false"/>
+\t<outputsho value="false"/>
+\t<outputsh value="false"/>
+\t<outputshp value="false"/>
+\t<outputshidling value="false"/>
+\t<outputstarts value="false"/>
+\t<outputpopulation value="false"/>
+\t<scaleinputdatabase servername="" databasename="" description=""/>
+\t<pmsize value="0"/>
+\t<outputfactors>
+\t\t<timefactors selected="true" units="Seconds"/>
+\t\t<distancefactors selected="true" units="Miles"/>
+\t\t<massfactors selected="true" units="Grams" energyunits="Million BTU"/>
+\t</outputfactors>
+</runspec>`;
+}
+
+let builtRunspecXml = null;
+
+document.getElementById("generate-runspec-btn").addEventListener("click", () => {
+    const errEl     = document.getElementById("sb-error");
+    const previewEl = document.getElementById("sb-preview");
+    const xmlEl     = document.getElementById("sb-preview-xml");
+    errEl.style.display = "none";
+
+    const fips  = document.getElementById("sb-fips").value.trim();
+    const desc  = document.getElementById("sb-desc").value.trim();
+    const year  = parseInt(document.getElementById("sb-year").value, 10);
+    const month = parseInt(document.getElementById("sb-month").value, 10);
+
+    if (!fips || !/^\d{5}$/.test(fips)) {
+        errEl.textContent = "Enter a 5-digit county FIPS code (e.g. 06037 for Los Angeles, CA).";
+        errEl.style.display = "block";
+        return;
+    }
+
+    const ppSel = SB_POLLUTANT_PROCESSES.filter((_, i) => document.getElementById(`sb-pp-${i}`).checked);
+    const vtSel = SB_VEHICLE_TYPES.filter((_, i) => document.getElementById(`sb-vt-${i}`).checked);
+    const rtSel = SB_ROAD_TYPES.filter((_, i) => document.getElementById(`sb-rt-${i}`).checked);
+
+    if (!ppSel.length) {
+        errEl.textContent = "Select at least one pollutant/process combination.";
+        errEl.style.display = "block";
+        return;
+    }
+    if (!vtSel.length) {
+        errEl.textContent = "Select at least one vehicle type.";
+        errEl.style.display = "block";
+        return;
+    }
+    if (!rtSel.length) {
+        errEl.textContent = "Select at least one road type.";
+        errEl.style.display = "block";
+        return;
+    }
+
+    builtRunspecXml = sbBuildXml(fips, desc, year, month, ppSel, vtSel, rtSel);
+    xmlEl.value = builtRunspecXml;
+    previewEl.style.display = "block";
+    runDefaultdbBtn.disabled = !dbVersion;
+});
+
+// -----------------------------------------------------------------------
 // Default-DB section — discover the published DB version on page load.
 // -----------------------------------------------------------------------
 let dbVersion = null;
@@ -205,6 +476,10 @@ let dbVersion = null;
         const data = await resp.json();
         dbVersion = data.db_version;
         document.getElementById("db-version-label").textContent = dbVersion;
+        // Re-enable run button if builder or file was already populated.
+        if (builtRunspecXml || defaultdbRunspecInput.files.length) {
+            runDefaultdbBtn.disabled = false;
+        }
     } catch (_) {
         document.getElementById("defaultdb-unavail").style.display = "";
         document.getElementById("defaultdb-available").style.display = "none";
@@ -223,12 +498,12 @@ const defaultdbResults      = document.getElementById("defaultdb-results");
 const defaultdbFileList     = document.getElementById("defaultdb-file-list");
 
 defaultdbRunspecInput.addEventListener("change", () => {
-    runDefaultdbBtn.disabled = !defaultdbRunspecInput.files.length || !dbVersion;
+    runDefaultdbBtn.disabled = (!defaultdbRunspecInput.files.length && !builtRunspecXml) || !dbVersion;
 });
 
 runDefaultdbBtn.addEventListener("click", async () => {
     const file = defaultdbRunspecInput.files[0];
-    if (!file || !dbVersion) return;
+    if ((!file && !builtRunspecXml) || !dbVersion) return;
 
     runDefaultdbBtn.disabled = true;
     defaultdbLogEl.style.display = "block";
@@ -237,10 +512,16 @@ runDefaultdbBtn.addEventListener("click", async () => {
     defaultdbLogContent.textContent = "";
     defaultdbFileList.innerHTML = "";
 
-    const runspecXml = await file.text();
+    let runspecXml;
+    if (file) {
+        runspecXml = await file.text();
+        appendLog(defaultdbLogContent, `RunSpec: ${file.name} (${file.size} bytes)`);
+    } else {
+        runspecXml = builtRunspecXml;
+        appendLog(defaultdbLogContent, "RunSpec: (generated by scenario builder)");
+    }
     const maxParallelChunks = parseInt(defaultdbMaxChunks.value, 10) || 0;
 
-    appendLog(defaultdbLogContent, `RunSpec: ${file.name} (${file.size} bytes)`);
     appendLog(defaultdbLogContent, `DB version: ${dbVersion}`);
 
     // The data directory is served at ./data/<dbVersion>/ relative to this page.
