@@ -10,6 +10,11 @@
 //! - every link with `roadTypeID != 1` MUST appear
 //! * `LinkOpmodeDistributionImporter.getProjectDataStatus`
 //! (lines 254-300 of `LinkOpmodeDistributionImporter.java`):
+//! - `sum(opModeFraction) by (sourceTypeID,hourDayID,linkID,
+//! polProcessID) = 1.0` (rounded 4 dp). This is enforced by the
+//! `spCheckOpModeDistributionImporter` procedure in
+//! `OpModeDistributionImporter.sql` that Java runs via
+//! `getImporterDataStatusCore`.
 //! - if any off-network link present (`roadTypeID == 1`),
 //! OpModeDistribution must cover every selected source type
 //! and hour-day. (We expose a helper that callers can use to
@@ -55,8 +60,21 @@ pub fn validate_link_source_type_hour(
     let frac = column_f64(link_source_type_hour, "sourceTypeHourFraction")?;
     let mut sums: BTreeMap<i64, f64> = BTreeMap::new();
     for i in 0..link_source_type_hour.num_rows() {
+        // `linkID` and `sourceTypeHourFraction` are both NOT NULL in
+        // the schema (enforced at CSV read time). A null here means
+        // upstream data corruption, so we surface it explicitly rather
+        // than silently dropping the row from the sum — a dropped row
+        // would let the remaining rows still total 1.0 and hide the
+        // missing data that should fail the importer.
         if link_id.is_null(i) || frac.is_null(i) {
-            continue;
+            return Err(Error::Validation {
+                table: "linkSourceTypeHour".into(),
+                message: format!(
+                    "null value in a NOT NULL column on row {i}; \
+                     linkSourceTypeHour requires linkID and \
+                     sourceTypeHourFraction to be present"
+                ),
+            });
         }
  *sums.entry(link_id.value(i)).or_insert(0.0) += frac.value(i);
     }
@@ -182,10 +200,18 @@ pub fn validate_off_network_link(
     )
 }
 
-/// `OpModeDistribution` invariant: when an off-network link is
-/// present in the RunSpec, the table must cover every selected source
-/// type and hour-day. Mirrors `LinkOpmodeDistributionImporter.getProjectDataStatus`
-/// (lines 286-298 of `LinkOpmodeDistributionImporter.java`).
+/// `OpModeDistribution` invariants:
+///
+/// 1. `sum(opModeFraction) by (sourceTypeID, hourDayID, linkID,
+///    polProcessID) = 1.0` (rounded 4 dp). Mirrors
+///    `OpModeDistributionImporter.sql` (the `spCheckOpModeDistributionImporter`
+///    procedure run by `getImporterDataStatusCore`), which raises
+///    `ERROR: ... opmodeFraction is not 1.0 but instead ...` for any
+///    key whose `round(sum(opModeFraction),4) <> 1.0000`.
+/// 2. When an off-network link is present in the RunSpec, the table
+///    must cover every selected source type and hour-day. Mirrors
+///    `LinkOpmodeDistributionImporter.getProjectDataStatus`
+///    (lines 286-298 of `LinkOpmodeDistributionImporter.java`).
 pub fn validate_op_mode_distribution(
     op_mode_distribution: &RecordBatch,
     expected_source_types: &BTreeSet<i64>,
@@ -193,16 +219,59 @@ pub fn validate_op_mode_distribution(
 ) -> Result<()> {
     let source_type = column_i64(op_mode_distribution, "sourceTypeID")?;
     let hour_day = column_i64(op_mode_distribution, "hourDayID")?;
+    let link_id = column_i64(op_mode_distribution, "linkID")?;
+    let pol_process = column_i64(op_mode_distribution, "polProcessID")?;
+    let frac = column_f64(op_mode_distribution, "opModeFraction")?;
+
+    // ----- per-key fraction-sum invariant -----
+    // `sourceTypeID`, `hourDayID`, `linkID`, `polProcessID`, and
+    // `opModeFraction` are all NOT NULL in the schema (enforced at CSV
+    // read time). A null here means upstream data corruption, so we
+    // surface it explicitly rather than silently dropping the row from
+    // the sum and masking a real coverage/sum gap.
+    let mut sums: BTreeMap<(i64, i64, i64, i64), f64> = BTreeMap::new();
     let mut seen_st = BTreeSet::new();
     let mut seen_hd = BTreeSet::new();
     for i in 0..op_mode_distribution.num_rows() {
-        if !source_type.is_null(i) {
-            seen_st.insert(source_type.value(i));
+        if source_type.is_null(i)
+            || hour_day.is_null(i)
+            || link_id.is_null(i)
+            || pol_process.is_null(i)
+            || frac.is_null(i)
+        {
+            return Err(Error::Validation {
+                table: "OpModeDistribution".into(),
+                message: format!(
+                    "null value in a NOT NULL column on row {i}; \
+                     OpModeDistribution requires sourceTypeID, hourDayID, \
+                     linkID, polProcessID, and opModeFraction to be present"
+                ),
+            });
         }
-        if !hour_day.is_null(i) {
-            seen_hd.insert(hour_day.value(i));
+        seen_st.insert(source_type.value(i));
+        seen_hd.insert(hour_day.value(i));
+        let key = (
+            source_type.value(i),
+            hour_day.value(i),
+            link_id.value(i),
+            pol_process.value(i),
+        );
+        *sums.entry(key).or_insert(0.0) += frac.value(i);
+    }
+    for ((st, hd, lid, ppid), total) in sums {
+        // Java rounds to 4 dp and compares against 1.0000; match that
+        // 4-dp tolerance (FRACTION_SUM_TOLERANCE == 5e-5).
+        if (total - 1.0).abs() > FRACTION_SUM_TOLERANCE {
+            return Err(Error::Validation {
+                table: "OpModeDistribution".into(),
+                message: format!(
+                    "Source type {st}, hourDayID {hd}, link {lid}, polProcessID {ppid} \
+                     opModeFraction is not 1.0 but instead {total}"
+                ),
+            });
         }
     }
+
     coverage_check(
         "OpModeDistribution",
         "sourceTypeID",

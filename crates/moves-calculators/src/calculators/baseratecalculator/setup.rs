@@ -227,7 +227,8 @@ pub struct TemperatureAdjustmentRow {
     pub max_model_year_id: i32,
  /// Term `A`.
     pub term_a: f64,
- /// Term `B`.
+ /// Term `B` — nullable in MOVES; SQL NULL coalesces to `0.0` (the Go reads
+ /// it with `parse.GetFloat`, which yields `0.0` for an empty/NULL field).
     pub term_b: f64,
  /// Term `C` — nullable in MOVES; `None` (SQL NULL) coalesces to `0.0`.
     pub term_c: Option<f64>,
@@ -328,7 +329,18 @@ pub struct EmissionRateAdjustmentRow {
     pub emission_rate_adjustment: f64,
 }
 
-/// One `evefficiencyWorker` row.
+/// One raw `evefficiency` row.
+///
+/// The MOVES `evefficiency` table is keyed by
+/// `{polProcessID, sourceTypeID, regClassID, ageGroupID, beginModelYearID,
+/// endModelYearID}`. The `BaseRateCalculator.sql` `evefficiencyWorker` query
+/// (lines 205-225) turns each row into one worker row per covered model year:
+/// it forces `fuelTypeID = 9` (electricity), expands
+/// `[beginModelYearID, endModelYearID]` over model years in the
+/// `[year-40, year]` window, and keeps only the model years whose age
+/// (`ageCategory[year - modelYearID]`) matches the row's `ageGroupID`. That
+/// expansion is performed in [`PreparedTables::from_inputs`], mirroring the
+/// `EmissionRateAdjustment` / `IMCoverage` range expansions.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct EvEfficiencyRow {
  /// Pollutant/process id.
@@ -337,10 +349,12 @@ pub struct EvEfficiencyRow {
     pub source_type_id: i32,
  /// Regulatory class id.
     pub reg_class_id: i32,
- /// Fuel type id.
-    pub fuel_type_id: i32,
- /// Model year id.
-    pub model_year_id: i32,
+ /// Age group id (used to select matching model years via `ageCategory`).
+    pub age_group_id: i32,
+ /// First model year the row applies to (inclusive).
+    pub begin_model_year_id: i32,
+ /// Last model year the row applies to (inclusive).
+    pub end_model_year_id: i32,
  /// Battery efficiency.
     pub battery_efficiency: f64,
  /// Charging efficiency.
@@ -2041,17 +2055,18 @@ impl TableRow for EvEfficiencyRow {
         "EVEfficiency"
     }
     fn polars_schema() -> Schema {
- // DB schema: polProcessID, sourceTypeID, regClassID, ageGroupID,
- // beginModelYearID, endModelYearID, batteryEfficiency, chargingEfficiency.
- // ageGroupID maps to fuel_type_id and beginModelYearID to model_year_id
- // as a placeholder; the ev_efficiency flag defaults to false so the
- // look-up is never applied in standard runs.
+ // Raw `evefficiency` DB schema: polProcessID, sourceTypeID, regClassID,
+ // ageGroupID, beginModelYearID, endModelYearID, batteryEfficiency,
+ // chargingEfficiency. The model-year expansion and fuelTypeID=9 mapping
+ // performed by BaseRateCalculator.sql:205-225 happens in
+ // `PreparedTables::from_inputs`.
         Schema::from_iter([
             ("polProcessID".into(), DataType::Int32),
             ("sourceTypeID".into(), DataType::Int32),
             ("regClassID".into(), DataType::Int32),
             ("ageGroupID".into(), DataType::Int32),
             ("beginModelYearID".into(), DataType::Int32),
+            ("endModelYearID".into(), DataType::Int32),
             ("batteryEfficiency".into(), DataType::Float64),
             ("chargingEfficiency".into(), DataType::Float64),
         ])
@@ -2078,12 +2093,21 @@ impl TableRow for EvEfficiencyRow {
                 .into(),
                 Series::new(
                     "ageGroupID".into(),
-                    rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>(),
+                    rows.iter().map(|r| r.age_group_id).collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
                     "beginModelYearID".into(),
-                    rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.begin_model_year_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "endModelYearID".into(),
+                    rows.iter()
+                        .map(|r| r.end_model_year_id)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -2120,8 +2144,9 @@ impl TableRow for EvEfficiencyRow {
         let pol_process_id = get_i32("polProcessID")?;
         let source_type_id = get_i32("sourceTypeID")?;
         let reg_class_id = get_i32("regClassID")?;
-        let age_group_id = get_i32("ageGroupID")?; // stored as fuel_type_id placeholder
-        let begin_model_year_id = get_i32("beginModelYearID")?; // stored as model_year_id
+        let age_group_id = get_i32("ageGroupID")?;
+        let begin_model_year_id = get_i32("beginModelYearID")?;
+        let end_model_year_id = get_i32("endModelYearID")?;
         let battery_efficiency = get_f64("batteryEfficiency")?;
         let charging_efficiency = get_f64("chargingEfficiency")?;
         (0..df.height())
@@ -2131,10 +2156,13 @@ impl TableRow for EvEfficiencyRow {
                     pol_process_id: pol_process_id.get(i).ok_or_else(|| null("polProcessID"))?,
                     source_type_id: source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))?,
                     reg_class_id: reg_class_id.get(i).ok_or_else(|| null("regClassID"))?,
-                    fuel_type_id: age_group_id.get(i).ok_or_else(|| null("ageGroupID"))?,
-                    model_year_id: begin_model_year_id
+                    age_group_id: age_group_id.get(i).ok_or_else(|| null("ageGroupID"))?,
+                    begin_model_year_id: begin_model_year_id
                         .get(i)
                         .ok_or_else(|| null("beginModelYearID"))?,
+                    end_model_year_id: end_model_year_id
+                        .get(i)
+                        .ok_or_else(|| null("endModelYearID"))?,
                     battery_efficiency: battery_efficiency
                         .get(i)
                         .ok_or_else(|| null("batteryEfficiency"))?,
@@ -3033,20 +3061,40 @@ impl PreparedTables {
             }
         }
 
+ // EVEfficiency — mirrors the `evefficiencyWorker` query in
+ // BaseRateCalculator.sql:205-225. Each raw `evefficiency` row is expanded
+ // into one worker entry per covered model year: fuelTypeID is forced to 9
+ // (electricity), the model-year range is restricted to the
+ // `[year-40, year]` window, and only model years whose age
+ // (`ageCategory[year - modelYearID]`) matches the row's ageGroupID are
+ // kept. The lookup key (`PolProcSourceRegFuelMyKey`) then matches the Go
+ // `EVEfficiencyKey{polProcessID, sourceTypeID, regClassID, fuelTypeID,
+ // modelYearID}`.
         for row in inputs.ev_efficiency {
-            prepared.ev_efficiency.insert(
-                PolProcSourceRegFuelMyKey {
-                    pol_process_id: row.pol_process_id,
-                    source_type_id: row.source_type_id,
-                    reg_class_id: row.reg_class_id,
-                    fuel_type_id: row.fuel_type_id,
-                    model_year_id: row.model_year_id,
-                },
-                EvEfficiencyDetail {
-                    battery_efficiency: row.battery_efficiency,
-                    charging_efficiency: row.charging_efficiency,
-                },
-            );
+            let beg_my = row.begin_model_year_id.max(constants.year_id - 40);
+            let end_my = row.end_model_year_id.min(constants.year_id);
+            for model_year_id in beg_my..=end_my {
+ // agecategory join: ageID = year - modelYearID must map to the
+ // row's ageGroupID, otherwise this model year is filtered out.
+                if prepared.age_groups.get(&(constants.year_id - model_year_id))
+                    != Some(&row.age_group_id)
+                {
+                    continue;
+                }
+                prepared.ev_efficiency.insert(
+                    PolProcSourceRegFuelMyKey {
+                        pol_process_id: row.pol_process_id,
+                        source_type_id: row.source_type_id,
+                        reg_class_id: row.reg_class_id,
+                        fuel_type_id: 9,
+                        model_year_id,
+                    },
+                    EvEfficiencyDetail {
+                        battery_efficiency: row.battery_efficiency,
+                        charging_efficiency: row.charging_efficiency,
+                    },
+                );
+            }
         }
 
         for row in inputs.universal_activity {

@@ -28,11 +28,17 @@
 //! # Data-plane status
 //!
 //! The computed adjustment factors would normally be written into the
-//! `emissionRateAdjustment` table in the execution database so downstream
-//! emission calculators consume them. That write is deferred until
-//! `moves-framework`'s `ExecutionTables` gains a mutable write API (
-//! / `DataFrameStore`). The `modified_tables` declaration already signals the
-//! engine which table will be modified.
+//! `EmissionRateAdjustment` table in the execution database so the Base Rate
+//! Calculator scales rates by them (canonical Java multiplies
+//! `emissionQuant`/`emissionRate` by `retrofitFactor + nonRetrofitFactor`).
+//! That write is **not yet ported**: it needs the run's analysis years and the
+//! `EmissionRateAdjustment` key columns (`polProcessID`, `regClassID`,
+//! `fuelTypeID`) that [`RetrofitRecord`](crate::model::RetrofitRecord) does not
+//! carry. Until it is ported, [`pre_run`](OnRoadRetrofitStrategy::pre_run)
+//! returns [`moves_framework::Error::NotImplemented`] when any programs are
+//! present rather than silently returning success and dropping the entire
+//! retrofit effect. An empty program table remains a clean no-op, matching the
+//! canonical `subscribeToMe` early-return when no `onRoadRetrofit` rows exist.
 
 use moves_framework::{InMemoryStore, InternalControlStrategy};
 
@@ -71,13 +77,26 @@ impl InternalControlStrategy for OnRoadRetrofitStrategy {
         &self,
         _tables: &mut InMemoryStore,
     ) -> std::result::Result<(), moves_framework::Error> {
- // TODO: compute combined adjustment factors from `self.programs` and
- // write them into `_tables` as `"emissionRateAdjustment"`. Requires
- // iterating `(sourceType, modelYear, pollutant, process)` combinations
- // present in the execution database and calling
- // `self.programs.combined_factor(...)` for the run's analysis year.
- // Deferred to a follow-on work item; `modified_tables` already signals the engine.
-        Ok(())
+ // The canonical `OnRoadRetrofitStrategy.subscribeToMe` early-returns
+ // when there are no `onRoadRetrofit` rows (`dbLines.size() <= 0`); with
+ // no programs there is genuinely nothing to apply, so an empty table is
+ // a clean no-op.
+        if self.programs.is_empty() {
+            return Ok(());
+        }
+
+ // When programs ARE present the canonical code multiplies emission
+ // rates/quantities by the combined retrofit factor (Java
+ // `CompiledLine.buildSQL`: `emissionQuant=emissionQuant*(retrofitFactor
+ // +nonRetrofitFactor)`, applied per pollutant/process/fuel/source/year/
+ // modelYear). The data-plane write of that adjustment is not yet ported:
+ // it requires the run's analysis years and the model-year / regClass /
+ // fuelType universe (none of which reach `pre_run`), plus the
+ // `EmissionRateAdjustment` key columns (`polProcessID`, `regClassID`,
+ // `fuelTypeID`) that `RetrofitRecord` does not carry. Returning `Ok(())`
+ // here would silently drop the entire retrofit effect while the engine
+ // reports success, so surface the unported live path explicitly instead.
+        Err(moves_framework::Error::NotImplemented)
     }
 }
 
@@ -133,13 +152,20 @@ mod tests {
     }
 
     #[test]
-    fn pre_run_succeeds_with_populated_programs() {
+    fn pre_run_errors_with_populated_programs_until_data_plane_ported() {
+        // The retrofit adjustment write-out is not yet ported (it needs the
+        // run's analysis years and the EmissionRateAdjustment key columns that
+        // `RetrofitRecord` does not carry). Until then, applying real retrofit
+        // programs must fail loudly rather than silently drop the reduction.
         let programs: RetrofitTable = [make_record(11, 2005, 2015, 2020, 98, 1, 0.5, 0.8)]
             .into_iter()
             .collect();
         let s = OnRoadRetrofitStrategy::new(programs);
         let mut store = InMemoryStore::new();
-        s.pre_run(&mut store).expect("pre_run must not fail");
+        let err = s
+            .pre_run(&mut store)
+            .expect_err("pre_run must surface the unported retrofit data plane");
+        assert!(matches!(err, moves_framework::Error::NotImplemented));
     }
 
     #[test]

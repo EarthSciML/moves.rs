@@ -11,39 +11,39 @@
 //! is reduced, and how effective the device is.
 //!
 //! This strategy holds the set of [`RetrofitRecord`]s parsed from an `.RTR`
-//! input file and makes them available to the framework. The per-SCC
-//! reduction computation is performed by
-//! [`moves_nonroad::emissions::retrofit::calculate_retrofit_reduction`] during
-//! the nonroad geography loops; this adapter registers the strategy with the
-//! framework so it participates in the unified lifecycle.
+//! input file. In canonical NONROAD (`clcrtrft.f`) these records are always
+//! applied to the per-SCC emissions; the reduction computation is ported to
+//! [`moves_nonroad::emissions::retrofit::calculate_retrofit_reduction`].
 //!
-//! # Lifecycle
+//! # Data-plane status (IMPORTANT)
 //!
-//! The strategy runs entirely in [`pre_run`](NonRoadRetrofitStrategy::pre_run).
-//! Per-iteration subscriptions are not needed because the retrofit records are
-//! indexed by model year and retrofit year and do not vary across counties or
-//! months within a single run. The framework's post-`pre_run` table
-//! invalidation is signalled via `modified_tables`.
+//! The live nonroad emission path reads its retrofit records from
+//! `moves_nonroad`'s `ReferenceData::retrofit_records` (populated by the
+//! nonroad input loader from the `.RTR` file). It does **not** read this
+//! strategy object. The framework has no mutable write API that would let
+//! `pre_run` feed the records held here into `ReferenceData::retrofit_records`.
 //!
-//! # Data-plane status
-//!
-//! Writing computed reduction fractions into the execution database is deferred
-//! until `moves-framework`'s `ExecutionTables` gains a mutable write API
-//!The `modified_tables` declaration already
-//! signals the engine which tables will be modified.
+//! Because of that gap, this adapter cannot yet apply retrofits through the
+//! unified framework. To avoid silently dropping a reduction that canonical
+//! NONROAD would apply, [`pre_run`](NonRoadRetrofitStrategy::pre_run) returns
+//! an error when the strategy actually holds records — registering a non-empty
+//! retrofit strategy must fail loudly rather than no-op. An empty strategy is
+//! a harmless no-op (nothing to apply). Once `moves-framework` gains a way to
+//! write into the nonroad reference data, `pre_run` should be wired to perform
+//! that write and the guard removed.
 
 use moves_framework::{InMemoryStore, InternalControlStrategy};
 use moves_nonroad::population::retrofit::RetrofitRecord;
 
 /// NonRoadRetrofit internal control strategy.
 ///
-/// Holds the retrofit records parsed from a NONROAD `.RTR` input file and
-/// exposes them to the unified control-strategy framework. The records are
-/// consumed by the nonroad emission calculator
-/// ([`moves_nonroad::emissions::retrofit::calculate_retrofit_reduction`])
-/// during the per-SCC geography loop.
+/// Holds the retrofit records parsed from a NONROAD `.RTR` input file.
 ///
-/// See the [module docs](self) for a full description.
+/// The live nonroad calculator does **not** read these records from this
+/// object — it reads `ReferenceData::retrofit_records`. Until the framework
+/// gains a write API to feed the records held here into that reference data,
+/// [`pre_run`](Self::pre_run) fails for any non-empty record set so retrofits
+/// are never silently dropped. See the [module docs](self) for details.
 #[derive(Debug)]
 pub struct NonRoadRetrofitStrategy {
     records: Vec<RetrofitRecord>,
@@ -80,8 +80,24 @@ impl InternalControlStrategy for NonRoadRetrofitStrategy {
         &self,
         _tables: &mut InMemoryStore,
     ) -> std::result::Result<(), moves_framework::Error> {
- // Retrofit records are accessed via `records()` by the nonroad
- // geography loop directly — no execution-database write needed here.
+ // The live nonroad calculator reads its retrofit records from
+ // `ReferenceData::retrofit_records`, NOT from this strategy object, and
+ // the framework has no write API to bridge the two. If we hold records
+ // here, succeeding silently would drop a reduction that canonical
+ // NONROAD (`clcrtrft.f`) always applies. Fail loudly instead so a
+ // non-empty retrofit registration cannot become an accidental no-op.
+ // An empty strategy has nothing to apply and is a harmless no-op.
+        if !self.records.is_empty() {
+            return Err(moves_framework::Error::Nonroad(format!(
+                "NonRoadRetrofitStrategy holds {} retrofit record(s) but cannot \
+                 apply them through the framework: the nonroad calculator reads \
+                 ReferenceData::retrofit_records, and no framework write API \
+                 exists to populate it from this strategy. Load retrofit records \
+                 via moves_nonroad's .RTR input loader instead of registering \
+                 this strategy, or wire pre_run once a write API is available.",
+                self.records.len()
+            )));
+        }
         Ok(())
     }
 }
@@ -130,10 +146,16 @@ mod tests {
     }
 
     #[test]
-    fn pre_run_succeeds_with_populated_records() {
+    fn pre_run_fails_with_populated_records() {
+ // A non-empty retrofit strategy cannot be applied through the framework
+ // yet, so pre_run must fail rather than silently drop the reduction that
+ // canonical NONROAD (`clcrtrft.f`) would apply.
         let s = NonRoadRetrofitStrategy::new(vec![make_record(1), make_record(2)]);
         let mut store = InMemoryStore::new();
-        s.pre_run(&mut store).expect("pre_run must not fail");
+        let err = s
+            .pre_run(&mut store)
+            .expect_err("pre_run must fail when records cannot be applied");
+        assert!(matches!(err, moves_framework::Error::Nonroad(_)));
     }
 
     #[test]

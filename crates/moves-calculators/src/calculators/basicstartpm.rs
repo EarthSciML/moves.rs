@@ -2377,13 +2377,38 @@ impl Calculator for BasicStartPmEmissionCalculator {
         let tables = ctx.tables();
         let pos = ctx.position();
         let link_rows: Vec<LinkRow> = tables.iter_typed("Link")?;
-        let road_type_id = link_rows.first().map(|r| r.road_type_id).unwrap_or(0);
+ // `BasicStartPM25Calculator.sql:112-113` extracts the link via
+ // `FROM Link WHERE linkID = ##context.iterLocation.linkRecordID##`, a single
+ // guaranteed row supplying `roadTypeID` (written to every output row at SQL
+ // line 442/447). An empty Link extract would fabricate `roadTypeID = 0`, an
+ // invalid road type, into every emitted MOVESWorkerOutput row; an absent Link
+ // is a fatal data error.
+        let road_type_id = link_rows
+            .first()
+            .map(|r| r.road_type_id)
+            .ok_or_else(|| row_err("Link", 0, "roadTypeID", "Link extract is empty".into()))?;
+ // `##context.year##` and the `##context.iterLocation.*RecordID##` IDs are
+ // concrete run constants substituted into every SQL iteration (e.g.
+ // `stmy.modelYearID = ##context.year## - ageID`, SQL line 354). A `None` here
+ // is a framework/context bug. Defaulting to 0 would corrupt the
+ // model-year/age arithmetic (yielding silent empty output) or misplace
+ // emissions at location 0, so surface the missing context value instead.
         let constants = RunConstants {
-            year: pos.time.year.map(|y| y as i32).unwrap_or(0),
-            state_id: pos.location.state_id.map(|s| s as i32).unwrap_or(0),
-            county_id: pos.location.county_id.map(|c| c as i32).unwrap_or(0),
-            zone_id: pos.location.zone_id.map(|z| z as i32).unwrap_or(0),
-            link_id: pos.location.link_id.map(|l| l as i32).unwrap_or(0),
+            year: pos.time.year.map(|y| y as i32).ok_or_else(|| {
+                row_err("Link", 0, "yearID", "context year is missing".into())
+            })?,
+            state_id: pos.location.state_id.map(|s| s as i32).ok_or_else(|| {
+                row_err("Link", 0, "stateID", "context state record ID is missing".into())
+            })?,
+            county_id: pos.location.county_id.map(|c| c as i32).ok_or_else(|| {
+                row_err("Link", 0, "countyID", "context county record ID is missing".into())
+            })?,
+            zone_id: pos.location.zone_id.map(|z| z as i32).ok_or_else(|| {
+                row_err("Link", 0, "zoneID", "context zone record ID is missing".into())
+            })?,
+            link_id: pos.location.link_id.map(|l| l as i32).ok_or_else(|| {
+                row_err("Link", 0, "linkID", "context link record ID is missing".into())
+            })?,
             road_type_id,
         };
         let inputs = BasicStartPmInputs {

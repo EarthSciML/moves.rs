@@ -1094,11 +1094,12 @@ pub fn calculate_exhaust_emissions(
  // --- SOx: rewrite EF and recompute emstmp. ---
  // clcems.f :213–232.
             if pollutant == PollutantIndex::Sox && inputs.tech_fraction > 0.0 {
-                let cvtbck = if inputs.hp_avg * inputs.load_factor == 0.0 {
-                    0.0
-                } else {
-                    1.0 / (inputs.hp_avg * inputs.load_factor)
-                };
+ // clcems.f :214 computes cvtbck = 1.0 / (hpval * faclod(iact))
+ // unconditionally. We match that: a degenerate hp*load == 0
+ // yields a non-finite cvtbck that propagates into the EF
+ // (surfacing the bad input) rather than fabricating a 0.0
+ // guard that would silently zero the SOx EF.
+                let cvtbck = 1.0 / (inputs.hp_avg * inputs.load_factor);
                 let mut soxcnv = sox_conv_base;
                 if let Some(alt) = inputs.sulfur_alternate {
                     if alt.alternate_conversion >= 0.0 {
@@ -1135,11 +1136,11 @@ pub fn calculate_exhaust_emissions(
  // --- CO2: rewrite EF as a function of BSFC. ---
  // clcems.f :245–261.
             if pollutant == PollutantIndex::Co2 && inputs.tech_fraction > 0.0 {
-                let cvtbck = if inputs.hp_avg * inputs.load_factor == 0.0 {
-                    0.0
-                } else {
-                    1.0 / (inputs.hp_avg * inputs.load_factor)
-                };
+ // clcems.f :246 computes cvtbck = 1.0 / (hpval * faclod(iact))
+ // unconditionally. Match that rather than fabricating a 0.0
+ // guard that would silently zero the CO2 EF on degenerate
+ // hp*load == 0 input.
+                let cvtbck = 1.0 / (inputs.hp_avg * inputs.load_factor);
                 let new_ef = inputs.hp_avg
  * inputs.load_factor
  * (inputs.bsfc * GRMLB as f32 - ems_thc * cvtbck)

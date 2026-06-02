@@ -100,14 +100,23 @@
 //!
 //! # Data plane
 //!
-//! [`Calculator::execute`] receives a [`CalculatorContext`] whose
-//! `ExecutionTables` / `ScratchNamespace` are placeholders until the
-//! `DataFrameStore` lands (), so `execute` cannot yet
-//! read the input tables nor emit `MOVESWorkerOutput`. The numeric
-//! algorithm is fully ported and unit-tested on
-//! [`calculate_running`](Ch4N2oRunningStartCalculator::calculate_running)
-//! and [`calculate_start`](Ch4N2oRunningStartCalculator::calculate_start);
-//! `execute` is a documented shell returning an empty [`CalculatorOutput`].
+//! [`Calculator::execute`] is fully wired: it reads the input tables from the
+//! [`CalculatorContext`]'s `DataFrameStore` (via `build_running_inputs` /
+//! `build_start_inputs`), runs
+//! [`calculate_running`](Ch4N2oRunningStartCalculator::calculate_running) or
+//! [`calculate_start`](Ch4N2oRunningStartCalculator::calculate_start)
+//! according to the master-loop process, and emits the computed
+//! `MOVESWorkerOutput` rows through `crate::wiring::emit_rows`. The numeric
+//! algorithm is additionally unit-tested directly on those two methods.
+//!
+//! What keeps this calculator off the live path is **registration-gating**,
+//! not a stubbed `execute`: [`registrations`](Calculator::registrations)
+//! returns an empty slice because `CalculatorInfo.txt` routes N2O Running
+//! Exhaust `(6, 1)` and Start Exhaust `(6, 2)` to `BaseRateCalculator`
+//! (lines 505–506). With no `(pollutant, process)` registration, the engine
+//! never drives `execute` for this module in the pinned runtime; the wired
+//! `execute` exists so the port can be cross-validated against
+//! `BaseRateCalculator` should it ever be registered.
 
 use rustc_hash::FxHashMap;
 use std::collections::HashSet;

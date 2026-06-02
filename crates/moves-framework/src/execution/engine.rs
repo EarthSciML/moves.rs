@@ -759,10 +759,16 @@ impl MOVESEngine {
                     // A chained calculator whose inputs the run does not supply
                     // (e.g. a computed extract absent from the snapshot, or a
                     // calculator pulled in by the chain closure but not relevant
-                    // to this RunSpec's selections) produces nothing rather than
-                    // aborting the run — its `execute` error is treated as an
-                    // empty contribution. Its rows, if any, are dropped by the
-                    // RunSpec-selection filter anyway when not selected.
+                    // to this RunSpec's selections, or dispatched at a context
+                    // granularity it does not run at — e.g. a year-less position)
+                    // produces nothing rather than aborting the run — its
+                    // `execute` error is treated as an empty contribution. Its
+                    // rows, if any, are dropped by the RunSpec-selection filter
+                    // anyway when not selected. (The audit hardened this to
+                    // propagate via `?`, which aborted every vacuous run whose
+                    // chained AirToxicsCalculator hit a year-less position;
+                    // surfacing genuinely-relevant chained failures is a separate
+                    // pre-existing concern, deferred.)
                     let out = {
                         let mut ctx = chunk_ctx.lock().expect("CalculatorContext mutex poisoned");
                         ctx.tables_mut().insert("MOVESWorkerOutput", worker_df);
@@ -772,10 +778,7 @@ impl MOVESEngine {
                         Ok(out) => out,
                         Err(e) => {
                             if std::env::var_os("MOVES_DEBUG_CHAINED").is_some() {
-                                eprintln!(
-                                    "[chained-skip] {} error: {e}",
-                                    module.name()
-                                );
+                                eprintln!("[chained-skip] {} error: {e}", module.name());
                             }
                             continue;
                         }
@@ -1184,11 +1187,21 @@ fn aggregation_inputs_from_run_spec(run_spec: &RunSpec) -> AggregationInputs<'_>
         domain: run_spec.domain,
         models: &run_spec.models,
         breakdown: &run_spec.output_breakdown,
-        output_population: false,
+        // `outputPopulation` (canonical `ExecutionRunSpec.getRunSpec().outputPopulation`,
+        // RunSpecXML `<outputpopulation>`). In the Rust model this is the
+        // Nonroad output flag `population`; absent => false.
+        output_population: run_spec.output_nonroad.population.unwrap_or(false),
+        // Canonical `OutputEmissionsBreakdownSelection.sector`, parsed from the
+        // `<sector>`/`<segment>` element (RunSpecXML.java:1206 treats them as the
+        // same flag). The Rust model surfaces it as `output_breakdown.segment`.
+        sector: run_spec.output_breakdown.segment,
+        // The canonical `regClassID`, `fuelSubType`, and `engTechID` breakdown
+        // flags (`<regclassid>`/`<fuelsubtype>`/`<engtechid>`) are not yet
+        // captured by the Rust RunSpec model (`OutputBreakdown` lacks these
+        // fields), so they cannot be wired here without extending moves-runspec.
         reg_class_id: false,
         fuel_sub_type: false,
         eng_tech_id: false,
-        sector: false,
     }
 }
 

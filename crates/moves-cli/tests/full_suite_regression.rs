@@ -668,19 +668,57 @@ fn canonical_snapshot_diff() {
         let name = fixture_name(fixture_path);
         let out = tempdir().expect("tempdir");
 
-        let outcome = run_simulation(&RunOptions {
-            runspec: fixture_path.to_path_buf(),
-            output: out.path().to_path_buf(),
-            max_parallel_chunks: 1,
-            calculator_dag: None,
-            run_date_time: Some("2026-05-21T00:00:00".to_string()),
+        // A fixture whose data plane is unported may now *panic* (the audit
+        // hardened several fabricated-neutral-value paths into `panic!`, per the
+        // operator decision that an honest crash beats wrong numbers). Catch it
+        // per-fixture so one unported nonroad fixture cannot abort the whole
+        // gate before the asserted (previously-correct) fixtures are verified.
+        // A caught panic/run-error is recorded as a failure and the fixture is
+        // skipped: an *asserted* fixture that does so simply never increments
+        // `passed`, surfacing the regression in the summary; a *quarantined*
+        // fixture is expected to be red anyway.
+        let run = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            run_simulation(&RunOptions {
+                runspec: fixture_path.to_path_buf(),
+                output: out.path().to_path_buf(),
+                max_parallel_chunks: 1,
+                calculator_dag: None,
+                run_date_time: Some("2026-05-21T00:00:00".to_string()),
  // Activate the data plane: calculators execute against the captured
  // execution DB and the engine writes the real MOVESOutput tree.
-            snapshot: Some(root.join(name)),
-            scale_input: None,
-            default_db: None,
-        })
-        .unwrap_or_else(|e| panic!("{name}: run error — {e}"));
+                snapshot: Some(root.join(name)),
+                scale_input: None,
+                default_db: None,
+            })
+        }));
+        let outcome = match run {
+            Ok(Ok(o)) => o,
+            Ok(Err(e)) => {
+                let tag = if asserted_fixtures().iter().any(|(n, _, _)| *n == name) {
+                    "RUN-ERROR(ASSERTED-REGRESSION)"
+                } else {
+                    "RUN-ERROR"
+                };
+                println!("{name:<28} {:>10} {:>10} {:>14} {tag}", "-", "-", "-");
+                failures.push(format!("{name}: run error — {e:#}"));
+                continue;
+            }
+            Err(panic) => {
+                let msg = panic
+                    .downcast_ref::<&str>()
+                    .map(|s| s.to_string())
+                    .or_else(|| panic.downcast_ref::<String>().cloned())
+                    .unwrap_or_else(|| "<non-string panic payload>".to_string());
+                let tag = if asserted_fixtures().iter().any(|(n, _, _)| *n == name) {
+                    "PANIC(ASSERTED-REGRESSION)"
+                } else {
+                    "PANIC"
+                };
+                println!("{name:<28} {:>10} {:>10} {:>14} {tag}", "-", "-", "-");
+                failures.push(format!("{name}: panicked — {msg}"));
+                continue;
+            }
+        };
 
         let canonical = match Snapshot::load(&root.join(name)) {
             Ok(s) => {

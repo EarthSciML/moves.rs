@@ -278,7 +278,11 @@ pub fn vmt_by_age_roadway_day(
         .filter(|r| r.road_type_id == 2 || r.road_type_id == 4)
         .map(|r| r.hotelling_hours)
         .sum();
-    let keep_other_roads = restricted_hotelling == 0.0 && has_hotelling_hours_per_day_input;
+ // The Java DELETE keeps non-2/4 roads only when the restricted-access
+ // hotelling SUM is NOT `> 0` (i.e. `<= 0`) and `count(hotellingHoursPerDay)`
+ // is nonzero. Use `<= 0.0` to mirror the complement of the reference's `> 0`
+ // aggregate test, rather than exact `== 0.0` float equality.
+    let keep_other_roads = restricted_hotelling <= 0.0 && has_hotelling_hours_per_day_input;
     if !keep_other_roads {
         rows.retain(|r| r.road_type_id == 2 || r.road_type_id == 4);
     }

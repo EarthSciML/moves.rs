@@ -1787,18 +1787,38 @@ impl Generator for SourceBinDistributionGenerator {
  // Max ageID for model-year-range calculation.
         let max_age_id: i64 = age_cat.iter().map(|r| r.age_id).max().unwrap_or(0);
 
- // Fuel year for the current calendar year.
+ // Fuel year for the current calendar year. The Java doCountyYear resolves
+ // this via `(select fuelYearID from year where yearID=year)` (line 651).
+ // fuelYearID is a distinct identifier from the calendar yearID, so a
+ // missing Year row must surface as an error rather than silently
+ // substituting the calendar year — the latter would almost never match
+ // the real fuelYearID stored in fuelUsageFraction and would yield an
+ // empty (no-fuel-switching) county-year distribution.
         let year_i64 = i64::from(year);
         let fuel_year_id: i64 = years
             .iter()
             .find(|r| r.year_id == year_i64)
             .map(|r| r.fuel_year_id)
-            .unwrap_or(year_i64);
+            .ok_or_else(|| {
+                Error::Polars(format!(
+                    "Year table has no row for calendar year {year_i64}; cannot resolve fuelYearID"
+                ))
+            })?;
 
  // Model-year range from the set of all calendar years in Year table.
+ // NOTE: the Java doFirstTime derives first/lastModelYearNeeded from
+ // `ExecutionRunSpec.years` (the RunSpec-selected run years), not from the
+ // Year table; see the cross-file follow-up. The Java fallback to
+ // 1966/2060 fires only from the SQL `catch` block — never on an empty
+ // year set (an empty TreeSet would throw on `yrs.first()`). So an empty
+ // Year table here is a data-load fault and must error, not silently
+ // install the catch-block fallback range.
         let run_spec_years: Vec<i64> = years.iter().map(|r| r.year_id).collect();
-        let year_range =
-            model_year_range(&run_spec_years, max_age_id).unwrap_or(FALLBACK_MODEL_YEAR_RANGE);
+        let year_range = model_year_range(&run_spec_years, max_age_id).ok_or_else(|| {
+            Error::Polars(
+                "Year table is empty; cannot derive the model-year range needed".into(),
+            )
+        })?;
 
  // Fuels by source type.
         let fuels_by_source_type = fuel_types_by_source_type(&rsft);

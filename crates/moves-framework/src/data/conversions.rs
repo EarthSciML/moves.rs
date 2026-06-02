@@ -165,8 +165,9 @@ pub trait DataFrameStoreTyped: DataFrameStore {
                 }
                 let actual_dtype = arc_df
                     .column(actual.as_str())
-                    .map(|s| s.dtype().clone())
-                    .unwrap_or(DataType::Null);
+                    .map_err(|e| Error::Polars(e.to_string()))?
+                    .dtype()
+                    .clone();
                 if let Some(expected_dtype) = canonical_to_dtype.get(canonical) {
                     if &actual_dtype != expected_dtype {
                         casts.push((canonical.clone(), expected_dtype.clone()));
@@ -184,6 +185,19 @@ pub trait DataFrameStoreTyped: DataFrameStore {
  // metadata, not the underlying Arrow buffers). This replaces the old
  // `(*arc_df).clone()` which copied every Arrow buffer in the table.
         let height = arc_df.height();
+        // Project the stored table down to the canonical schema, keeping only
+        // the columns the store actually carries. The schema registry declares
+        // the full canonical column set for a table, but a stored snapshot
+        // legitimately carries a subset: e.g. `ZoneRoadType` stores only
+        // `SHOAllocFactor` (its `SHPAllocFactor` lives on the `Zone` table), and
+        // its `from_dataframe` deliberately handles the absent column (see
+        // totalactivitygenerator/mod.rs: `match df.column("SHPAllocFactor")`).
+        // `from_dataframe` — the analogue of the SQL SELECT column list — is the
+        // authority on which columns are *required*; it errors via `df.column()`
+        // on a genuinely-needed missing column. So drop (not error on) a
+        // schema-declared column absent from the store and let `from_dataframe`
+        // be the arbiter; erroring here would over-reject every table that
+        // stores a faithful subset of its canonical schema.
         let new_cols: Vec<Column> = expected_schema
             .iter()
             .filter_map(|(canonical, _)| {
@@ -221,10 +235,27 @@ pub trait DataFrameStoreTyped: DataFrameStore {
  // MySQL stores BOOLEAN as "Y"/"N" or "1"/"0" strings; Polars
  // cannot cast String → Boolean directly.
                     let ca = col.str().map_err(|e| Error::Polars(e.to_string()))?;
-                    let bool_ca: polars::prelude::BooleanChunked = ca
-                        .iter()
-                        .map(|opt_s| opt_s.map(|s| s == "Y" || s == "1"))
-                        .collect();
+                    let mut bool_vals: Vec<Option<bool>> = Vec::with_capacity(ca.len());
+                    for opt_s in ca.iter() {
+                        match opt_s {
+                            None => bool_vals.push(None),
+                            Some(s) => {
+                                let v = match s.trim().to_ascii_lowercase().as_str() {
+                                    "1" | "true" | "y" | "yes" => true,
+                                    "0" | "false" | "n" | "no" => false,
+                                    _ => {
+                                        return Err(Error::Polars(format!(
+                                            "column '{col_name}' value '{s}' in table '{name}' \
+                                             is not a recognized boolean \
+                                             (expected Y/N, 1/0, true/false, yes/no)"
+                                        )))
+                                    }
+                                };
+                                bool_vals.push(Some(v));
+                            }
+                        }
+                    }
+                    let bool_ca: polars::prelude::BooleanChunked = bool_vals.into_iter().collect();
                     Column::from(bool_ca.with_name(col_name.as_str().into()).into_series())
                 } else {
                     col.cast(expected_dtype)

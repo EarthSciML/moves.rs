@@ -1031,9 +1031,16 @@ impl TableRow for RatesOpModeDistributionRow {
                     op_mode_fraction: op_mode_fraction
                         .get(i)
                         .ok_or_else(|| null("opModeFraction"))?,
- // MOVES leaves avgBinSpeed NULL in RatesOpModeDistribution
- // (default 0.0); treat a NULL as 0.0 rather than erroring.
-                    avg_bin_speed: avg_bin_speed.get(i).unwrap_or(0.0),
+ // This generator always populates avgBinSpeed in its
+ // `insert ignore ... avgBinSpeed` statements (Java
+ // AverageSpeedOperatingModeDistributionGenerator.java lines
+ // 171-177, 283-286, 309-312) from the speed bin / link speed,
+ // and CreateExecutionRates.sql declares the column `FLOAT NULL`
+ // with no DEFAULT. A NULL read-back is a genuine data gap that
+ // downstream rate aggregation divides by
+ // (baserategenerator/aggregate.rs), so error loudly like every
+ // sibling column rather than fabricate a 0.0 mph speed.
+                    avg_bin_speed: avg_bin_speed.get(i).ok_or_else(|| null("avgBinSpeed"))?,
                 })
             })
             .collect()

@@ -283,6 +283,33 @@ pub fn validate_table(
     Ok(messages)
 }
 
+/// Build a whole-column type-mismatch error.
+///
+/// The reader pins each column's Arrow type from its [`Filter`], so a
+/// downcast failure here means the read/typing pipeline has drifted
+/// from what the validator expects. Rather than silently skipping the
+/// column's range / FK / Y-N checks (which would let malformed values
+/// pass validation undetected and reach Parquet), we surface the
+/// mismatch as a fatal [`Severity::Error`] — consistent with
+/// [`series_to_i64_vec`], which refuses to silently truncate on the same
+/// class of drift.
+fn type_mismatch(
+    table: &'static str,
+    column: &'static str,
+    expected: &str,
+    actual: &arrow::datatypes::DataType,
+) -> ValidationMessage {
+    ValidationMessage::error(
+        table,
+        Some(column),
+        None,
+        format!(
+            "column '{column}' has Arrow type {actual:?} but validation expected {expected}; \
+             type-dependent checks were skipped"
+        ),
+    )
+}
+
 fn check_nulls(
     table: &'static str,
     column: &'static str,
@@ -319,7 +346,10 @@ fn check_numeric_range(
     }
     let arr = match arr.as_any().downcast_ref::<Float64Array>() {
         Some(a) => a,
-        None => return,
+        None => {
+            out.push(type_mismatch(table, column, "Float64", arr.data_type()));
+            return;
+        }
     };
     for row in 0..arr.len() {
         if arr.is_null(row) {
@@ -370,7 +400,10 @@ fn check_road_type_narrowing(
     }
     let arr = match arr.as_any().downcast_ref::<Int64Array>() {
         Some(a) => a,
-        None => return,
+        None => {
+            out.push(type_mismatch(table, column, "Int64", arr.data_type()));
+            return;
+        }
     };
     for row in 0..arr.len() {
         if arr.is_null(row) {
@@ -401,7 +434,10 @@ fn check_year_range(
     }
     let arr = match arr.as_any().downcast_ref::<Int64Array>() {
         Some(a) => a,
-        None => return,
+        None => {
+            out.push(type_mismatch(table, column, "Int64", arr.data_type()));
+            return;
+        }
     };
     for row in 0..arr.len() {
         if arr.is_null(row) {
@@ -431,7 +467,10 @@ fn check_model_year_range(
     }
     let arr = match arr.as_any().downcast_ref::<Int64Array>() {
         Some(a) => a,
-        None => return,
+        None => {
+            out.push(type_mismatch(table, column, "Int64", arr.data_type()));
+            return;
+        }
     };
     for row in 0..arr.len() {
         if arr.is_null(row) {
@@ -459,7 +498,10 @@ fn check_fk(
 ) {
     let arr = match arr.as_any().downcast_ref::<Int64Array>() {
         Some(a) => a,
-        None => return,
+        None => {
+            out.push(type_mismatch(table, column, "Int64", arr.data_type()));
+            return;
+        }
     };
     for row in 0..arr.len() {
         if arr.is_null(row) {
@@ -489,7 +531,10 @@ fn check_yesno(
     }
     let arr = match arr.as_any().downcast_ref::<StringArray>() {
         Some(a) => a,
-        None => return,
+        None => {
+            out.push(type_mismatch(table, column, "Utf8 (String)", arr.data_type()));
+            return;
+        }
     };
     for row in 0..arr.len() {
         if arr.is_null(row) {

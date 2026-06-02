@@ -1716,17 +1716,24 @@ impl TableRow for AirToxicsMwoRow {
         let model_year = get_i32("modelYearID")?;
         let road_type = get_i32("roadTypeID")?;
         // `MOVESWorkerOutput` (rebuilt from the engine's EmissionRecord) carries
-        // no `fuelFormulationID`, and `fuelSubTypeID` may also be absent. Read
-        // them tolerantly (→ 0); `execute` re-derives both per emission from the
-        // county-year fuel supply (the canonical `AT*FuelSupply` join).
-        let fuel_sub_type = df
-            .column("fuelSubTypeID")
-            .ok()
-            .and_then(|c| c.i32().ok().cloned());
-        let fuel_formulation = df
-            .column("fuelFormulationID")
-            .ok()
-            .and_then(|c| c.i32().ok().cloned());
+        // no `fuelFormulationID`, and `fuelSubTypeID` may also be absent. An
+        // *absent* column is expected — `execute` re-derives both per emission
+        // from the county-year fuel supply (the canonical `AT*FuelSupply`
+        // join), so a missing column reads as `None` (→ 0 per row). But a
+        // *present* column that is not i32 is a schema drift, not an absence:
+        // surface it like every other column rather than silently coercing to
+        // 0 (which would make every fuel-keyed ratio lookup miss).
+        let opt_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            match df.column(col) {
+                Ok(c) => c
+                    .i32()
+                    .map(|s| Some(s.clone()))
+                    .map_err(|e| row_err(t, 0, col, e.to_string())),
+                Err(_) => Ok(None),
+            }
+        };
+        let fuel_sub_type = opt_i32("fuelSubTypeID")?;
+        let fuel_formulation = opt_i32("fuelFormulationID")?;
         let emission_quant = get_f64("emissionQuant")?;
         let emission_rate = get_f64("emissionRate")?;
         (0..df.height())
@@ -2382,10 +2389,20 @@ impl Calculator for AirToxicsCalculator {
         // The snapshot ships the raw default-DB ratio tables; reproduce the
         // master's `Section Extract Data` transforms (PollutantProcessAssoc
         // join + modelYearGroupID expansion + the ATRatio FuelSupply join) so
-        // the calculator runs from them. A `year`-less position (unit-test
-        // contexts) cannot resolve `modelYearID = year - ageID`, so default to
-        // 0 there — those contexts seed the extracts directly via tests.
-        let year = crate::wiring::position_filter(ctx).year.unwrap_or(0);
+        // the calculator runs from them. Every extract resolves
+        // `modelYearID = year - ageID` against the run year and bounds the
+        // model-year windows by `[year-40, year]`; the canonical SQL binds
+        // `##context.year##` for every real run, so an absent year is a
+        // missing-context bug, not a zero-emission success. Surface it rather
+        // than silently collapsing every model-year window to empty.
+        let year = crate::wiring::position_filter(ctx).year.ok_or_else(|| {
+            Error::Polars(
+                "AirToxicsCalculator.execute: iteration position has no year; \
+                 cannot resolve modelYearID = year - ageID (context.year is \
+                 always bound in a real run)"
+                    .to_string(),
+            )
+        })?;
         let ppa = pollutant_process_map(ctx)?;
         let extracts = AirToxicsExtracts {
             minor_hap_ratio: synthesize_minor_hap_ratio(ctx, &ppa, year)?,
@@ -2410,32 +2427,42 @@ impl Calculator for AirToxicsCalculator {
         // `MOVESWorkerOutput` carries no `fuelFormulationID`; expand each input
         // row across the formulations of its fuel type, market-share-weighted,
         // so the ATRatioGas1 path can key on a concrete formulation (the
-        // canonical `AT*FuelSupply` join). A row that already carries a
-        // formulation, or whose fuel-type cell has no supply, passes through
-        // unchanged.
+        // canonical `AT*FuelSupply` join). Matches the NONROAD/onroad MWO reader
+        // (`calc/mwo/mworeader.go`, `readMOVESWorkerOutput`): each block is split
+        // over `FuelSupply[county,year,month,fuelType]`, and a block whose
+        // fuel-type cell has *no* supply entry (`fsDetail == nil`) is dropped
+        // (`continue`) — it emits no toxics, rather than passing through with a
+        // fabricated formulation 0. A row that already carries a concrete
+        // formulation (the engine never produces one, but keep it robust) is
+        // taken verbatim.
         let fuel_supply = synthesize_fuel_supply(ctx)?;
         let input_rows: Vec<AirToxicsMwoRow> = tables.iter_typed("MOVESWorkerOutput")?;
         let mut output_rows: Vec<AirToxicsMwoRow> = Vec::new();
         for row in &input_rows {
-            let emissions: Vec<Emission> = match fuel_supply
-                .get(&(row.year_id, row.month_id, row.fuel_type_id))
-                .filter(|_| row.fuel_formulation_id == 0)
-            {
-                Some(supply) => supply
-                    .iter()
-                    .map(|&(fuel_sub_type_id, fuel_formulation_id, market_share)| Emission {
-                        fuel_sub_type_id,
-                        fuel_formulation_id,
-                        emission_quant: row.emission_quant * market_share,
-                        emission_rate: row.emission_rate * market_share,
-                    })
-                    .collect(),
-                None => vec![Emission {
+            let emissions: Vec<Emission> = if row.fuel_formulation_id != 0 {
+                vec![Emission {
                     fuel_sub_type_id: row.fuel_sub_type_id,
                     fuel_formulation_id: row.fuel_formulation_id,
                     emission_quant: row.emission_quant,
                     emission_rate: row.emission_rate,
-                }],
+                }]
+            } else {
+                match fuel_supply.get(&(row.year_id, row.month_id, row.fuel_type_id)) {
+                    Some(supply) => supply
+                        .iter()
+                        .map(|&(fuel_sub_type_id, fuel_formulation_id, market_share)| Emission {
+                            fuel_sub_type_id,
+                            fuel_formulation_id,
+                            emission_quant: row.emission_quant * market_share,
+                            emission_rate: row.emission_rate * market_share,
+                        })
+                        .collect(),
+                    // No supply for this (year, month, fuelType) cell: the
+                    // canonical reader drops the block. Skipping it here keeps
+                    // the fuelType-keyed PAH paths from emitting toxics off a
+                    // block canonical MOVES would have produced nothing for.
+                    None => continue,
+                }
             };
             let block = FuelBlock {
                 key: FuelBlockKey {

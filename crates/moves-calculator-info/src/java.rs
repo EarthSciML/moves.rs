@@ -493,8 +493,12 @@ fn parse_priority_expr(arg: &str) -> Option<Priority> {
         .unwrap_or(after_sign.len());
     if digit_end == 0 {
  // Symbolic offset (e.g. `+priorityAdjustment`) — we can't resolve
- // it statically. Treat as the unadjusted base.
-        return Some(Priority { base, offset: 0 });
+ // it statically, and the actual value (passed via the constructor /
+ // RunSpec at runtime) may be nonzero (e.g. EvaporativePermeationCalculator
+ // uses +1). Fabricating offset 0 here would silently misorder the
+ // calculator within its granularity bucket, so decline to produce a
+ // priority and let the caller skip this subscribe record instead.
+        return None;
     }
     let n: i32 = after_sign[..digit_end].parse().ok()?;
     let offset = if sign == '+' { n } else { -n };

@@ -419,21 +419,35 @@ impl CrankcaseEmissionCalculator {
  // regClassID, fuelTypeID) → ratio rows. The table's primary key
  // includes the model-year range, so a cell may carry several rows;
  // the per-row model-year test below picks the matching one(s).
-        // Index by (polProcessID, sourceTypeID, fuelTypeID) — regClassID is
-        // reconciled at the join site below rather than baked into the key.
-        // BaseRate collapses `regClassID` to 0 in `MOVESWorkerOutput` when the
-        // RunSpec does not break output down by reg class (canonical
-        // `baseRateOutput` / `MOVESOutput` carry NULL regClass too), but the
-        // `CrankcaseEmissionRatio` table carries concrete per-reg-class rows.
-        // A literal regClass-equality join would therefore never match a
-        // collapsed worker row. Mirroring the RefuelingLoss / SulfatePM
-        // reconciliation, the regClass is carried on the value and enforced
-        // only when the worker row's regClass is itself non-zero.
-        let mut ratio_index: HashMap<(i32, i32, i32), Vec<&CrankcaseEmissionRatioRow>> =
+        // Index by (polProcessID, sourceTypeID, regClassID, fuelTypeID) — the
+        // exact equality join key the SQL uses (CrankcaseEmissionCalculator.sql
+        // lines 212-219):
+        //   r.polProcessID = ppa.polProcessID
+        //   and r.sourceTypeID = mwo.sourceTypeID
+        //   and r.regClassID  = mwo.regClassID
+        //   and r.fuelTypeID  = mwo.fuelTypeID
+        // The crankcase calculator runs only on the running / start /
+        // extended-idle exhaust processes (1, 2, 90), whose `MOVESWorkerOutput`
+        // rows carry a concrete `regClassID` straight from
+        // `BaseRateCalculator.sql`'s
+        // `insert into MOVESWorkerOutput (... regClassID ...) select ...
+        // regClassID from BaseRateOutput` (lines 1513-1538) — there is no
+        // collapse to 0 on this exhaust path (the `0 as regClassID` collapse
+        // lives only in the evaporative calculators, which feed other
+        // processes). A `regClassID = 0` wildcard would let one worker row match
+        // every per-regClass ratio row in its cell, emitting extra crankcase
+        // rows the reference INNER JOIN never would; the literal equality is the
+        // faithful behavior.
+        let mut ratio_index: HashMap<(i32, i32, i32, i32), Vec<&CrankcaseEmissionRatioRow>> =
             HashMap::new();
         for r in &inputs.crankcase_emission_ratio {
             ratio_index
-                .entry((r.pol_process_id, r.source_type_id, r.fuel_type_id))
+                .entry((
+                    r.pol_process_id,
+                    r.source_type_id,
+                    r.reg_class_id,
+                    r.fuel_type_id,
+                ))
                 .or_default()
                 .push(r);
         }
@@ -453,18 +467,16 @@ impl CrankcaseEmissionCalculator {
                 continue;
             };
  // INNER JOIN r ON polProcessID, sourceTypeID, regClassID,
- // fuelTypeID.
-            let Some(ratios) =
-                ratio_index.get(&(pol_process_id, mwo.source_type_id, mwo.fuel_type_id))
-            else {
+ // fuelTypeID — a literal equality on all four keys.
+            let Some(ratios) = ratio_index.get(&(
+                pol_process_id,
+                mwo.source_type_id,
+                mwo.reg_class_id,
+                mwo.fuel_type_id,
+            )) else {
                 continue;
             };
             for r in ratios {
- // regClass reconciliation: a non-zero worker regClass must match the
- // ratio row's; a zero (collapsed) worker regClass is a wildcard.
-                if mwo.reg_class_id != 0 && r.reg_class_id != mwo.reg_class_id {
-                    continue;
-                }
  // … and r.minModelYearID <= mwo.modelYearID <= r.maxModelYearID.
                 if mwo.model_year_id < r.min_model_year_id
                     || mwo.model_year_id > r.max_model_year_id

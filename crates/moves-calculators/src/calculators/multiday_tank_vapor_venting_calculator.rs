@@ -4822,10 +4822,13 @@ fn operating_mode_base_rates(
             continue;
         }
  // When AverageTankGasoline is absent (empty execution DB), canonical
- // MOVES defaults rvpAdjustment to 1.0 for all modes. The canonical
- // SQL inner-joins on ATG but the worker ATG table is always empty at
+ // MOVES defaults rvpAdjustment to 1.0 for all modes. The canonical SQL
+ // inner-joins on ATG but the worker ATG table is always empty at
  // Processing time — TankFuelGenerator is a master-side year-level
- // generator whose output is not transferred to SQL workers.
+ // generator whose output is not transferred to SQL workers. (The audit's
+ // INNER-JOIN reading missed this: dropping the row instead of keeping the
+ // unit adjustment emits zero TVV rows and regressed process-evap-fvv from
+ // 128 rows to 0.)
         let rvp = rvp_terms
             .get(&sb.fuel_type_id)
             .copied()

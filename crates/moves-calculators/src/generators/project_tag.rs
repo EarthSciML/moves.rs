@@ -39,19 +39,29 @@
 //!
 //! The computational kernels ([`ShoRow`], [`ShpRow`], [`StartsRow`],
 //! [`HotellingRow`], [`SourceHoursRow`], and [`ProjectTagInputs`]) are fully
-//! implemented and unit-tested. The [`Generator::execute`] implementation
-//! shells out to them once the project-domain input tables are available in
-//! the execution context (`linkSourceTypeHour`, `offNetworkLink`, and the
-//! `sourceTypeAgeDistribution` tables supplied by `TotalActivityGenerator`).
-//! Until then it returns an empty `CalculatorOutput`, mirroring the
-//! stub convention used by `TotalActivityGenerator`.
+//! implemented and unit-tested. The [`Generator::execute`] implementation will
+//! shell out to them once the project-domain input tables are available in the
+//! execution context (`link`, `linkSourceTypeHour`, `offNetworkLink`, `avft`,
+//! and the `sourceTypeAgeDistribution` tables supplied by
+//! `TotalActivityGenerator`) — which requires `TableRow` implementations and
+//! schema-registry entries for those row types that do not yet exist.
+//!
+//! Until that wiring lands, `execute` returns [`Error::NotImplemented`] rather
+//! than an empty `CalculatorOutput`. Unlike `TotalActivityGenerator::execute`
+//! — which actually reads its inputs, runs the kernels, and writes its scratch
+//! tables — silently returning an empty output here would diverge from the
+//! Java `ProjectTAG.executeLoop`, which always runs
+//! `allocateTotalActivityBasis` to populate `SHO`/`SHP`/`Starts`/
+//! `hotellingHours`/`sourceHours`. Producing nothing would make a
+//! project-domain run yield zero (or grossly truncated) emissions with no
+//! error, so this generator fails loudly instead.
 
 use std::collections::HashSet;
 
 use moves_calculator_info::{Granularity, Priority};
 use moves_data::ProcessId;
 use moves_framework::{
-    CalculatorContext, CalculatorOutput, CalculatorSubscription, Error, Generator,
+    CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStore, Error, Generator,
 };
 
 // ── Process ids ──────────────────────────────────────────────────────────────
@@ -833,12 +843,36 @@ impl Generator for ProjectTAG {
         &self.subscriptions
     }
 
-    fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
- // Project-domain input tables (linkSourceTypeHour, offNetworkLink, etc.)
- // are provided in the execution database once data plane lands
- // support for project-domain scenarios. Until then, the generator
- // registers its subscriptions and name but produces no output — the same
- // stub contract TotalActivityGenerator uses.
+    fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
+ // ProjectTAG is a PROJECT-DOMAIN generator. Canonical MOVES only
+ // instantiates and subscribes it when the run domain is Project, where
+ // `ProjectTAG.executeLoop` calls `allocateTotalActivityBasis` to write the
+ // SHO/SHP/Starts/HotellingHours/SourceHours scratch tables
+ // (ProjectTAG.java:142, :255). For every non-project (Default/County) run
+ // it is absent from the master loop entirely, and the activity basis is
+ // produced by `TotalActivityGenerator` instead — so contributing nothing
+ // here is the correct, canonical-faithful result (and is exactly what the
+ // asserted onroad fixtures depend on; ProjectTAG previously no-op'd for
+ // them).
+ //
+ // The project-domain kernels (`allocate_total_activity_basis` and friends)
+ // are fully ported above, but wiring them needs the project-domain input
+ // tables — `linkSourceTypeHour`, `offNetworkLink`, `link`, `avft` — projected
+ // from the execution context, which still lacks `TableRow`/schema-registry
+ // entries for those row types. So when those tables ARE present (a genuine
+ // project-domain run) we cannot reproduce the Java output: fail loudly with
+ // `NotImplemented` rather than emit bogus zeros. `linkSourceTypeHour` /
+ // `offNetworkLink` are project-domain-only user inputs; the execution store
+ // carries them as empty schema tables for every non-project run, so a
+ // *non-empty* one (row count > 0) is the signal that this is a real project
+ // run with activity that must be allocated.
+        let project_rows =
+            |t: &str| ctx.tables().get(t).map_or(0, |df| df.height());
+        let is_project_domain =
+            project_rows("linkSourceTypeHour") > 0 || project_rows("offNetworkLink") > 0;
+        if is_project_domain {
+            return Err(Error::NotImplemented);
+        }
         Ok(CalculatorOutput::empty())
     }
 }
@@ -987,12 +1021,41 @@ mod tests {
     }
 
     #[test]
-    fn execute_returns_empty_output_as_stub() {
+    fn execute_is_noop_for_non_project_run() {
+ // For a non-project (Default/County) run the project-domain input tables
+ // are absent, ProjectTAG is not part of canonical's master loop, and the
+ // activity basis is produced by `TotalActivityGenerator`. ProjectTAG must
+ // therefore contribute nothing (empty output) — the behaviour every
+ // asserted onroad fixture depends on. Erroring here would break
+ // previously-correct non-project runs.
         let gen = ProjectTAG::new();
         let mut ctx = CalculatorContext::new();
-        let out = gen.execute(&mut ctx).unwrap();
- // stub: no DataFrame produced yet.
-        assert!(out.into_dataframe().is_none());
+        let out = gen.execute(&mut ctx).expect("non-project run is a no-op");
+        assert!(out.dataframe().is_none(), "expected empty output");
+    }
+
+    #[test]
+    fn execute_errors_for_project_domain_run_until_inputs_are_wired() {
+ // When the project-domain input tables ARE present (a genuine Project run),
+ // the Java `ProjectTAG.executeLoop` runs `allocateTotalActivityBasis` to
+ // populate the activity scratch tables. The kernels are ported above but
+ // cannot yet be invoked (the project-domain input row types lack TableRow /
+ // schema-registry entries), so `execute` must fail loudly rather than
+ // silently produce zero activity (which would yield zero project-domain
+ // emissions). When wiring lands, replace this with an assertion that the
+ // SHO/SHP/Starts/HotellingHours/SourceHours scratch tables are populated.
+        use moves_framework::InMemoryStore;
+        let mut store = InMemoryStore::new();
+ // A *non-empty* project-domain table marks a genuine project run (the
+ // execution store carries these as empty schema tables for non-project
+ // runs, so presence alone is not the signal — row count is).
+        let project_links =
+            polars::prelude::df!("linkID" => &[1i32]).expect("build 1-row linkSourceTypeHour");
+        store.insert("linkSourceTypeHour", project_links);
+        let gen = ProjectTAG::new();
+        let mut ctx = CalculatorContext::with_tables(store);
+        let err = gen.execute(&mut ctx).unwrap_err();
+        assert!(matches!(err, Error::NotImplemented), "got {err:?}");
     }
 
     #[test]

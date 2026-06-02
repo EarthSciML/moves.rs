@@ -641,6 +641,8 @@ pub fn run_simulation_from_partitions(
 /// ```json
 /// {
 /// "completion_message": "Successful completion — no warnings",
+/// "emission_rows": 0,
+/// "produces_emissions": false,
 /// "counters": {
 /// "scc_groups_planned": 12,
 /// "scc_groups_skipped": 0,
@@ -653,11 +655,17 @@ pub fn run_simulation_from_partitions(
 /// }
 /// ```
 ///
-/// Emission rows are not yet included in the WASM result — the production
-/// `GeographyExecutor` that evaluates the geography routines numerically
-/// lives in the native orchestrator and will be wired into the WASM build
-/// in a following task. The counters confirm that the driver loop ran
-/// correctly over the supplied population data.
+/// Emission rows are not yet computed in this WASM build. The driver loop
+/// runs with `PlanRecordingExecutor`, which records every geography-routine
+/// dispatch but evaluates none of them, so `emission_rows` is `0` and
+/// `produces_emissions` is `false`. (The native CLI `main.rs` is likewise a
+/// dry run.) The numerical `ProductionExecutor` requires a fully loaded
+/// `ReferenceData` bundle — temporal-factor, emission-factor, spillage, and
+/// allocation file loaders that are not yet portable to the `.POP`-only WASM
+/// input — and wiring it in is tracked as remaining work. Callers MUST check
+/// `produces_emissions` before treating the result as a numerical run: the
+/// counters confirm the loop ran over the supplied population data, not that
+/// emissions were produced.
 ///
 /// # Errors
 ///
@@ -724,6 +732,27 @@ pub fn run_nonroad_simulation(options_json: &str, pop_bytes: &[u8]) -> Result<Js
     let result = js_sys::Object::new();
     js_set_str(&result, "completion_message", &outputs.completion_message)?;
 
+ // Surface the emission-row count explicitly so a browser caller is
+ // not misled by the "Successful completion" banner. This WASM build
+ // drives the NONROAD loop with `PlanRecordingExecutor`, which records
+ // every dispatch but evaluates no geography routines, so `outputs.rows`
+ // is always empty (see `run_simulation` docs and the native CLI
+ // `main.rs`, which is likewise a dry run). The numerical
+ // `ProductionExecutor` needs a fully loaded `ReferenceData` bundle
+ // (temporal-factor / emission-factor / spillage / allocation file
+ // loaders) that is not yet portable to the `.POP`-only WASM input, so
+ // wiring it in is tracked as remaining work. Reporting the row count
+ // (and a `produces_emissions` flag) makes the dry-run nature of this
+ // result explicit instead of silently implying emissions were computed.
+    let emission_rows = outputs.rows.len();
+    js_set_num(&result, "emission_rows", emission_rows as f64)?;
+    js_sys::Reflect::set(
+        &result,
+        &JsValue::from_str("produces_emissions"),
+        &JsValue::from_bool(emission_rows > 0),
+    )
+    .map_err(|_| JsValue::from_str("failed to set produces_emissions"))?;
+
     let counters_obj = js_sys::Object::new();
     let c = &outputs.counters;
     js_set_num(
@@ -776,6 +805,7 @@ fn nonroad_inputs_from_pop(
         hp_avg,
         population,
         year,
+        usage,
         ..
     } in records
     {
@@ -784,11 +814,14 @@ fn nonroad_inputs_from_pop(
             hp_avg,
             population,
             pop_year: year,
- // The .POP demo input carries no source-use-type table, so there is
- // no medianLifeFullLoad to supply. 0.0 is the documented sentinel:
- // the geography routines fall back to a neutral lifespan when
- // median_life is non-positive (see DriverRecord::median_life).
-            median_life: 0.0,
+ // Median life at full load comes straight from the `.POP`
+ // record's usage field (cols 88–92, Fortran `usehrs(icurec)` set
+ // in `getpop.f` :127/:221) — it is NOT a fabricated default. It is
+ // passed through to `scrptime` as `uselif` (`modyr.f` :153), which
+ // applies the canonical `uselif .LE. 0 => 1.0` fallback itself
+ // (`modyr.f` :165). Forwarding the parsed value preserves the real
+ // per-record lifespan instead of forcing every record to 0.0.
+            median_life: usage,
         };
         if let Some(&idx) = scc_to_idx.get(&scc) {
             groups[idx].1.push(driver_rec);

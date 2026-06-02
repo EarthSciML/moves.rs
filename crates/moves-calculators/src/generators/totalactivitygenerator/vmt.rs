@@ -302,12 +302,16 @@ fn expand_daily_vmt(
 /// The Java joins `hourVMTFraction` on `(hourID, roadTypeID, sourceTypeID)`
 /// **without** a `dayID` predicate, so every day type's hourly profile
 /// matches and the `insert ignore` resolves the resulting same-key collision
-/// in MySQL's (unordered) result-set order. This port constrains
-/// `hourVMTFraction.dayID` to the cell's `dayID` — the deterministic,
-/// evidently intended reading, since the output row's `dayID` is the
-/// `SourceTypeDayVMT` day. Standard runs supply VMT by HPMS annual VMT
-/// (the [`hourly_vmt_from_annual`] path), so the daily-VMT paths do not
-/// reach the characterization fixtures; the choice is flagged for's
+/// in MySQL's (unordered) result-set order — so the Java daily-VMT result is
+/// itself non-deterministic and self-inconsistent with its own annual-VMT
+/// path. This port constrains `hourVMTFraction.dayID` to the cell's `dayID`,
+/// the deterministic reading: the output row's `dayID` is the
+/// `SourceTypeDayVMT` day, and MOVES's primary annual-VMT insert keys
+/// `HourVMTFraction` by the cell's day too — `TotalActivityGenerator.java`
+/// line 1538-1539 joins `HourVMTFraction USING(sourceTypeID, roadTypeID,
+/// dayID)`, the convention [`hourly_vmt_from_annual`] mirrors. Standard runs
+/// supply VMT by HPMS annual VMT (that annual path), so the daily-VMT paths
+/// do not reach the characterization fixtures; the choice is flagged for
 /// generator-integration validation.
 #[must_use]
 pub fn hourly_vmt_from_source_type_day(

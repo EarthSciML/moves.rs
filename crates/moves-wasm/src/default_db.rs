@@ -128,46 +128,95 @@ pub fn setup_execution_store(
     // in FuelSupply with NULL market-share columns. Real fuel supplies always
     // carry a value; the placeholder never joins real data, so fill its NULLs
     // with 0.0 rather than have the strict per-row extractors error on it.
-    fill_f64_nulls(store, "FuelSupply", &["marketShare", "marketShareCV"]);
+    fill_fuel_supply_placeholder_nulls(store)?;
     build_runspec_tables(runspec, store)?;
     Ok(())
 }
 
-/// Replace NULLs with 0.0 in the named Float64-castable columns of `table`,
-/// in place. No-op if the table or a column is absent. Uses polars-core only.
-fn fill_f64_nulls(store: &mut InMemoryStore, table: &str, columns: &[&str]) {
-    let Some(arc) = store.get(table) else {
-        return;
+/// Zero-fill the NULL `marketShare`/`marketShareCV` of the FuelSupply
+/// `fuelFormulationID = 0` placeholder row(s) only, in place.
+///
+/// The default DB ships a single all-zero placeholder row (fuelFormulationID=0)
+/// whose market-share columns are NULL and that never joins real data; that row
+/// is the only legitimate NULL. A NULL `marketShare` on any *real*
+/// (fuelFormulationID != 0) row is a genuine data gap — the native strict
+/// per-row extractor (criteria_running_calculator.rs `FuelSupplyRow::extract`
+/// errors via `ok_or_else(|| null("marketShare"))`), so we must surface it as an
+/// error here rather than coerce it to 0.0 and silently zero out that
+/// formulation's blend-weighted contribution. No-op if the table is absent.
+/// Uses polars-core only.
+fn fill_fuel_supply_placeholder_nulls(store: &mut InMemoryStore) -> Result<(), String> {
+    const TABLE: &str = "FuelSupply";
+    const COLS: &[&str] = &["marketShare", "marketShareCV"];
+
+    let Some(arc) = store.get(TABLE) else {
+        return Ok(());
     };
     let mut df = (*arc).clone();
     drop(arc);
+
+    // Locate the fuelFormulationID column so the NULL fill can be restricted to
+    // the placeholder row(s). If it is missing we cannot distinguish placeholder
+    // from real rows, so leave the data untouched and let the strict extractor
+    // decide.
+    let ffid_name = df
+        .columns()
+        .iter()
+        .find(|c| c.name().eq_ignore_ascii_case("fuelFormulationID"))
+        .map(|c| c.name().to_string());
+    let Some(ffid_name) = ffid_name else {
+        return Ok(());
+    };
+    let ffid = df
+        .column(&ffid_name)
+        .and_then(|c| c.cast(&DataType::Int32))
+        .map_err(|e| format!("FuelSupply.fuelFormulationID cast: {e}"))?;
+    let ffid = ffid.i32().map_err(|e| format!("{e}"))?.clone();
+    let is_placeholder = |i: usize| ffid.get(i) == Some(0);
+
     let mut changed = false;
-    for &want in columns {
+    for &want in COLS {
         let actual = df
             .columns()
             .iter()
             .find(|c| c.name().to_ascii_lowercase() == want.to_ascii_lowercase())
             .map(|c| c.name().to_string());
         let Some(name) = actual else { continue };
-        let Ok(casted) = df
+        let casted = df
             .column(&name)
             .and_then(|c| c.cast(&DataType::Float64))
-        else {
-            continue;
-        };
-        let Ok(ca) = casted.f64() else { continue };
+            .map_err(|e| format!("FuelSupply.{want} cast: {e}"))?;
+        let ca = casted.f64().map_err(|e| format!("{e}"))?;
         if ca.null_count() == 0 {
             continue;
         }
-        let filled: Vec<f64> = (0..ca.len()).map(|i| ca.get(i).unwrap_or(0.0)).collect();
+        let mut filled: Vec<f64> = Vec::with_capacity(ca.len());
+        for i in 0..ca.len() {
+            match ca.get(i) {
+                Some(v) => filled.push(v),
+                // A NULL on a real row is a data gap the native path would
+                // surface; only the fuelFormulationID=0 placeholder may be 0.0.
+                None if is_placeholder(i) => filled.push(0.0),
+                None => {
+                    return Err(format!(
+                        "FuelSupply.{want} is NULL for fuelFormulationID={} (row {i}): \
+                         a real fuel-supply row is missing its market share",
+                        ffid.get(i)
+                            .map(|v| v.to_string())
+                            .unwrap_or_else(|| "NULL".to_string()),
+                    ));
+                }
+            }
+        }
         let series: Column = Series::new(name.as_str().into(), filled).into();
         if df.with_column(series).is_ok() {
             changed = true;
         }
     }
     if changed {
-        store.insert(table.to_string(), df);
+        store.insert(TABLE.to_string(), df);
     }
+    Ok(())
 }
 
 /// Build [`GeographyTables`] from `Link` and `County` tables in the store.
@@ -961,6 +1010,15 @@ fn populate_zone_month_hour_meteorology(store: &mut InMemoryStore) -> Result<(),
     let hour_ids_col = find("hourID")?.cast(&DataType::Int32)
         .map_err(|e| format!("hourID cast: {e}"))?;
 
+    // temperature is the heatIndex fallback for unmatched rows. Canonical MOVES
+    // (MeteorologyGenerator.java:151-156) sets `heatIndex = temperature` when
+    // temperature < 78F (the no-humidity-polynomial path), so an unmatched
+    // ZoneMonthHour row must inherit its own ambient temperature, NOT 0.0.
+    // (matches the CLI port: moves-cli/src/run.rs uses `heat.push(temps[i])`.)
+    let temps_col = find("temperature")?.cast(&DataType::Float64)
+        .map_err(|e| format!("temperature cast: {e}"))?;
+    let temps_ca = temps_col.f64().map_err(|e| format!("{e}"))?;
+
     let zids = zone_ids_col.i32().map_err(|e| format!("{e}"))?;
     let mids = month_ids_col.i32().map_err(|e| format!("{e}"))?;
     let hids = hour_ids_col.i32().map_err(|e| format!("{e}"))?;
@@ -976,10 +1034,18 @@ fn populate_zone_month_hour_meteorology(store: &mut InMemoryStore) -> Result<(),
             mids.get(i).unwrap_or(0),
             hids.get(i).unwrap_or(0),
         );
-        let (hi, sh, mwf) = by_key.get(&key).copied().unwrap_or((0.0, 0.0, 0.0));
-        heat_index.push(hi);
-        specific_humidity.push(sh);
-        mol_water_fraction.push(mwf);
+        match by_key.get(&key).copied() {
+            Some((hi, sh, mwf)) => {
+                heat_index.push(hi);
+                specific_humidity.push(sh);
+                mol_water_fraction.push(mwf);
+            }
+            None => {
+                heat_index.push(temps_ca.get(i).unwrap_or(0.0));
+                specific_humidity.push(0.0);
+                mol_water_fraction.push(0.0);
+            }
+        }
     }
 
     let mut updated = zmh.clone();

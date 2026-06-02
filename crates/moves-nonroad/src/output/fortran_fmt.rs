@@ -53,12 +53,22 @@ pub fn fortran_e(value: f32, width: usize, decimals: usize) -> String {
     let negative = value < 0.0;
     let magnitude = f64::from(value).abs();
 
+ // A non-finite value cannot occur in a valid emissions record;
+ // if one ever reaches a writer it signals an upstream
+ // computational error (a divide-by-zero, log of a negative
+ // quantity, etc.). A Fortran `Ew.d` WRITE of such a value never
+ // produces a legitimate-looking `0.0E+00` — it emits a visible
+ // failure indicator. Reproduce that with the same field-overflow
+ // asterisk fill this descriptor already uses, so the corrupt
+ // value is not silently reported as a zero inventory.
+    if !magnitude.is_finite() {
+        return "*".repeat(width);
+    }
+
  // Decompose into a `d`-digit integer mantissa and an exponent so
  // that `value ≈ ± 0.<digits> × 10^exp`.
-    let (digits, exp): (i64, i32) = if magnitude == 0.0 || !magnitude.is_finite() {
- // Zero prints as `0.0…0E+00`. A non-finite value cannot occur
- // in a valid emissions record; format it as zero defensively
- // rather than panicking inside a writer.
+    let (digits, exp): (i64, i32) = if magnitude == 0.0 {
+ // Zero prints as `0.0…0E+00`.
         (0, 0)
     } else {
  // Normalise the mantissa to `0.1 ≤ m < 1.0`. `log10` can land

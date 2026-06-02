@@ -578,9 +578,8 @@ impl HcSpeciation {
  /// emission's own subtype on the THC path, the E10 subtype (12) on the
  /// `altTHC` path. With a row found, the output is `operand` (NMHC or
  /// `altNMHC`) scaled by `speciationConstant + oxySpeciation *
- /// volToWtPercentOxy * totalOxygenate`; with no row found, it is the
- /// original THC emission scaled by zero (a zero emission still tagged
- /// with the THC fuel ids, the Go `NewEmissionScaled(e, 0)`).
+ /// volToWtPercentOxy * totalOxygenate`; with no profile row found, the
+ /// result is `None` (the row is dropped, matching canonical's INNER JOIN).
     #[allow(clippy::too_many_arguments)]
     fn speciate_nmog_or_voc(
         &self,
@@ -610,7 +609,9 @@ impl HcSpeciation {
         // zero rows canonical never writes. Returning `None` here drops those
         // rows, matching canonical. Exhaust processes always carry profile rows
         // (real or the SQL's speciationConstant=0 fill), so this branch is not
-        // taken there and their non-zero NMOG/VOC are unaffected.
+        // taken there and their non-zero NMOG/VOC are unaffected. (The audit's
+        // FINDING 1 reintroduced the Go zero-emit; it regressed process-refueling
+        // — see [[process-refueling-false-graduation]] — so it is reverted here.)
         let detail = self.speciation_detail(&key)?;
         let factor = detail.speciation_constant
             + detail.oxy_speciation * formulation.vol_to_wt_percent_oxy * total_oxygenate;
@@ -1209,12 +1210,26 @@ impl TableRow for ThcWorkerRow {
         // accumulated `MOVESWorkerOutput` (the standard worker schema carries
         // `fuelSubTypeID` only, and never `fuelFormulationID`). The HCFuelSupply
         // expansion in `execute` joins each THC row to the fuel supply and
-        // overwrites both, so read them when present and default to 0 otherwise.
-        let fuel_sub_type = df.column("fuelSubTypeID").ok().and_then(|c| c.i32().ok().cloned());
-        let fuel_formulation = df
-            .column("fuelFormulationID")
-            .ok()
-            .and_then(|c| c.i32().ok().cloned());
+        // overwrites both, so a *missing column* is acceptable (default 0). But
+        // a column that *is* present must obey the same contract as every other
+        // column in this loader: a wrong dtype or a null cell is a data error,
+        // not a silently-fabricated key `0` (which would mis-key or miss the
+        // methaneTHCRatio / HCSpeciation lookups). Distinguish the two: probe
+        // the column, and if present require `i32` (propagating a dtype error);
+        // null cells are then rejected per-row below.
+        let get_opt_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            match df.column(col) {
+                // Column absent by design: tolerated, defaults to 0 per row.
+                Err(_) => Ok(None),
+                // Column present: enforce dtype like the rest of the loader.
+                Ok(c) => c
+                    .i32()
+                    .map(|c| Some(c.clone()))
+                    .map_err(|e| row_err(t, 0, col, e.to_string())),
+            }
+        };
+        let fuel_sub_type = get_opt_i32("fuelSubTypeID")?;
+        let fuel_formulation = get_opt_i32("fuelFormulationID")?;
         let emission_quant = get_f64("emissionQuant")?;
         let emission_rate = get_f64("emissionRate")?;
         (0..df.height())
@@ -1236,11 +1251,17 @@ impl TableRow for ThcWorkerRow {
                     fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
                     model_year_id: model_year.get(i).ok_or_else(|| null("modelYearID"))?,
                     road_type_id: road_type.get(i).ok_or_else(|| null("roadTypeID"))?,
-                    fuel_sub_type_id: fuel_sub_type.as_ref().and_then(|c| c.get(i)).unwrap_or(0),
-                    fuel_formulation_id: fuel_formulation
-                        .as_ref()
-                        .and_then(|c| c.get(i))
-                        .unwrap_or(0),
+                    // Column absent → 0 (overwritten by HCFuelSupply expansion);
+                    // column present but this cell null → error like every other
+                    // column, rather than fabricating the invalid key 0.
+                    fuel_sub_type_id: match fuel_sub_type.as_ref() {
+                        Some(c) => c.get(i).ok_or_else(|| null("fuelSubTypeID"))?,
+                        None => 0,
+                    },
+                    fuel_formulation_id: match fuel_formulation.as_ref() {
+                        Some(c) => c.get(i).ok_or_else(|| null("fuelFormulationID"))?,
+                        None => 0,
+                    },
                     emission_quant: emission_quant.get(i).ok_or_else(|| null("emissionQuant"))?,
                     emission_rate: emission_rate.get(i).ok_or_else(|| null("emissionRate"))?,
                 })
