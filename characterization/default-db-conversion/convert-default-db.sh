@@ -129,7 +129,18 @@ if [ -z "${TSV_DIR}" ]; then
     MARIADB_DATA="${MARIADB_RT}/data"
     MARIADB_SOCK_DIR="${MARIADB_RT}/run"
     mkdir -p "${MARIADB_DATA}" "${MARIADB_SOCK_DIR}"
-    trap 'rm -rf "${MARIADB_RT}"' EXIT
+
+    # Cleanup: the datadir is seeded/written from inside the fakeroot user
+    # namespace, so its files are owned by mapped-root and the host user often
+    # cannot delete them directly ("Permission denied"). Fall back to removing
+    # them from inside the SIF (where we are root) before the final rmdir.
+    cleanup_mariadb_rt() {
+        rm -rf "${MARIADB_RT}" 2>/dev/null && return 0
+        apptainer exec "${FAKEROOT_FLAG[@]}" --bind "${MARIADB_RT}:/rt" "${SIF}" \
+            rm -rf /rt/data /rt/run >/dev/null 2>&1 || true
+        rm -rf "${MARIADB_RT}" 2>/dev/null || true
+    }
+    trap cleanup_mariadb_rt EXIT
 
     apptainer exec \
         "${FAKEROOT_FLAG[@]}" \
@@ -152,7 +163,7 @@ EXTRA=()
 if [ "${STRICT}" -eq 1 ]; then
     EXTRA+=(--require-every-table)
 fi
-cargo run --quiet --release -p moves-default-db-convert -- \
+cargo run --quiet --release --bin moves-default-db-convert -p moves-default-db-convert -- \
     --tsv-dir "${TSV_DIR}" \
     --plan "${PLAN}" \
     --output "${OUTPUT_DIR}" \
