@@ -1581,6 +1581,22 @@ impl Calculator for HcSpeciationCalculator {
             if row.pollutant_id != THC_POLLUTANT_ID && row.pollutant_id != ALT_THC_POLLUTANT_ID {
                 continue;
             }
+            // Canonical speciates only THC carrying a concrete fuel formulation.
+            // BaseRate's exhaust THC is emitted per fuel-subtype/formulation, so
+            // `MOVESWorkerOutput` keeps a concrete `fuelSubTypeID`; the Go reads
+            // `e.FuelFormulationID` and speciates. The evaporative producers
+            // (TankVaporVenting/Permeation/LiquidLeaking) write `MOVESWorkerOutput`
+            // with no `fuelSubTypeID`/`fuelFormulationID` — the multiday TVV-9
+            // `INSERT … SELECT` carries `regClassID` but neither fuel column — so
+            // their THC arrives with `fuelSubTypeID = 0`. Canonical then finds no
+            // fuel formulation (`mwo.FuelFormulations[0]` is nil) and skips the
+            // emission, emitting THC alone. The `HCFuelSupply` expansion below
+            // would instead synthesize a formulation from the fuel type and emit
+            // spurious NMOG/VOC/TOG (pol 80/86/87) that canonical never writes, so
+            // skip rows with no concrete subtype to match canonical's INNER JOIN.
+            if row.fuel_sub_type_id == 0 {
+                continue;
+            }
             // HCFuelSupply join on (countyID, monthID, fuelTypeID, yearID) —
             // countyID is a run constant, so key on (yearID, monthID, fuelType).
             let Some(supply) =
