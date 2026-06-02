@@ -2222,7 +2222,18 @@ fn build_inputs(ctx: &CalculatorContext) -> Result<SulfatePmInputs, Error> {
         sulfate_fractions: tables.iter_typed("sulfateFractions")?,
         month_of_any_year: tables.iter_typed("MonthOfAnyYear")?,
         run_spec_model_years,
-        general_fuel_ratio: tables.iter_typed("generalFuelRatio")?,
+        // Canonical's `sPMOneCountyYearGeneralFuelRatio` extract joins
+        // `generalFuelRatio` with `gfr.pollutantID in (120)` (SulfatePMCalculator.sql
+        // §75): only the NonECNonSO4PM residue (120) is fuel-ratio adjusted. The
+        // snapshot ships the RAW `generalFuelRatio`, which also carries EC (112)
+        // rows; applying those would wrongly rescale EC (and the PM2.5 total that
+        // sums it) — e.g. process-pm-exhaust EC by ~1.09x on fuelType 1. Restrict
+        // to pollutant 120 to match the extract.
+        general_fuel_ratio: tables
+            .iter_typed::<GeneralFuelRatioRow>("generalFuelRatio")?
+            .into_iter()
+            .filter(|r| r.pollutant_id == NON_EC_NON_SO4_PM_POLLUTANT)
+            .collect(),
         // The crankcase split join does not constrain process, so the canonical
         // extract pre-filters `crankcaseEmissionRatio` to the iteration's
         // primary process and its crankcase counterpart
@@ -2277,39 +2288,66 @@ impl Calculator for SulfatePMCalculator {
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let inputs = build_inputs(ctx)?;
         // `calculate` ports the SQL's in-place mutation of `MOVESWorkerOutput`, so
-        // it returns the **full final state**: every pass-through row plus the new
-        // and adjusted PM species (see the module docs). The chained-calculator
-        // engine, however, *adds* a calculator's emitted rows to the already
-        // accumulated worker output (the upstream BaseRate rows are already
-        // present). Emitting the full state would therefore double-count every
-        // pass-through row — e.g. a TOG/HC fixture with no PM input would re-emit
-        // all of BaseRate's THC, doubling it. Emit only the **delta**: rows that
-        // are new or whose value differs from the input. A row identical (same
-        // dimensions and bit-identical quant/rate) to an input row is dropped,
-        // since the upstream calculator already contributed it. This matches the
-        // delta-emitting model the other chained calculators (HCSpeciation) follow.
-        let input_keys: std::collections::HashSet<([i32; 15], u64, u64)> = inputs
-            .worker_output
-            .iter()
-            .map(|r| {
-                (
-                    r.dimension_key(),
-                    r.emission_quant.to_bits(),
-                    r.emission_rate.to_bits(),
-                )
+        // it returns the **full desired final state** F: the input minus the
+        // consumed EC (112) and NonECPM (118), plus the adjusted/split PM species
+        // (see the module docs). The chained-calculator engine, however, *adds* a
+        // calculator's emitted rows to the already-accumulated worker output I —
+        // BaseRate's rows, which still include the base 112/118. Emitting F
+        // directly would double-count the base EC and NonECPM; canonical instead
+        // DELETEs them (SulfatePMCalculator.sql §174/§334) before re-inserting the
+        // adjusted values, so `base + adjusted` over-states EC ~1.68x and
+        // NonECPM ~2.0x.
+        //
+        // Emit the true per-key delta F − I so that `accumulator(I) + delta == F`:
+        // a key F raises or adds is positive; a key F lowered or deleted is
+        // negative, cancelling the stale base contribution. Both sides are summed
+        // per full dimension key first (each may carry several rows per key, and
+        // the engine group-aggregates the emitted rows anyway). Net-zero keys —
+        // every untouched pass-through row, and an EC value copied through
+        // unchanged — drop out, leaving BaseRate's own contribution intact. A
+        // no-PM fixture has F == I, so the delta is empty (the previous
+        // bit-identical filter behaved identically there).
+        // Per-key accumulator: (template row, Σquant, Σrate, in_input, in_calc).
+        let calc = self.calculate(&inputs);
+        let mut net: FxHashMap<[i32; 15], (EmissionRow, f64, f64, bool, bool)> =
+            FxHashMap::default();
+        for row in &inputs.worker_output {
+            let entry = net
+                .entry(row.dimension_key())
+                .or_insert((*row, 0.0, 0.0, false, false));
+            entry.1 -= row.emission_quant;
+            entry.2 -= row.emission_rate;
+            entry.3 = true;
+        }
+        for row in &calc {
+            let entry = net
+                .entry(row.dimension_key())
+                .or_insert((*row, 0.0, 0.0, false, false));
+            entry.0 = *row;
+            entry.1 += row.emission_quant;
+            entry.2 += row.emission_rate;
+            entry.4 = true;
+        }
+        // Keep a row when:
+        //  * it exists only in F (a freshly-inserted species, e.g. zero-valued
+        //    water 119 — canonical emits the row even at zero), or
+        //  * it exists only in I (a base row F deleted — emit the negative to
+        //    cancel BaseRate's stale contribution), or
+        //  * it shifted value (an adjusted 118/EC — emit the delta).
+        // Drop only an unchanged pass-through (in both, net zero): BaseRate's
+        // own row already carries it.
+        let mut rows: Vec<EmissionRow> = net
+            .into_values()
+            .filter(|(_, quant, rate, in_input, in_calc)| {
+                !(*in_input && *in_calc && *quant == 0.0 && *rate == 0.0)
+            })
+            .map(|(template, quant, rate, _, _)| EmissionRow {
+                emission_quant: quant,
+                emission_rate: rate,
+                ..template
             })
             .collect();
-        let rows: Vec<EmissionRow> = self
-            .calculate(&inputs)
-            .into_iter()
-            .filter(|r| {
-                !input_keys.contains(&(
-                    r.dimension_key(),
-                    r.emission_quant.to_bits(),
-                    r.emission_rate.to_bits(),
-                ))
-            })
-            .collect();
+        rows.sort_unstable_by_key(EmissionRow::dimension_key);
         crate::wiring::emit_rows(rows)
     }
 }
