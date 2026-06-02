@@ -124,8 +124,50 @@ pub fn setup_execution_store(
     populate_pollutant_process_mapped_model_year(store)?;
     populate_zone_month_hour_meteorology(store)?;
     populate_link_from_zone_road_type(store)?;
+    // The default DB ships an all-zero "placeholder" row (fuelFormulationID=0)
+    // in FuelSupply with NULL market-share columns. Real fuel supplies always
+    // carry a value; the placeholder never joins real data, so fill its NULLs
+    // with 0.0 rather than have the strict per-row extractors error on it.
+    fill_f64_nulls(store, "FuelSupply", &["marketShare", "marketShareCV"]);
     build_runspec_tables(runspec, store)?;
     Ok(())
+}
+
+/// Replace NULLs with 0.0 in the named Float64-castable columns of `table`,
+/// in place. No-op if the table or a column is absent. Uses polars-core only.
+fn fill_f64_nulls(store: &mut InMemoryStore, table: &str, columns: &[&str]) {
+    let Some(arc) = store.get(table) else {
+        return;
+    };
+    let mut df = (*arc).clone();
+    drop(arc);
+    let mut changed = false;
+    for &want in columns {
+        let actual = df
+            .columns()
+            .iter()
+            .find(|c| c.name().to_ascii_lowercase() == want.to_ascii_lowercase())
+            .map(|c| c.name().to_string());
+        let Some(name) = actual else { continue };
+        let Ok(casted) = df
+            .column(&name)
+            .and_then(|c| c.cast(&DataType::Float64))
+        else {
+            continue;
+        };
+        let Ok(ca) = casted.f64() else { continue };
+        if ca.null_count() == 0 {
+            continue;
+        }
+        let filled: Vec<f64> = (0..ca.len()).map(|i| ca.get(i).unwrap_or(0.0)).collect();
+        let series: Column = Series::new(name.as_str().into(), filled).into();
+        if df.with_column(series).is_ok() {
+            changed = true;
+        }
+    }
+    if changed {
+        store.insert(table.to_string(), df);
+    }
 }
 
 /// Build [`GeographyTables`] from `Link` and `County` tables in the store.
