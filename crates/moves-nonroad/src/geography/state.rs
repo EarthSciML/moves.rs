@@ -464,13 +464,21 @@ pub fn compute_state_aggregate(
 
  // --- bookkeeping (prcsta.f :620–:635 / prc1st.f :522–:535) ---
             let actbmy = actadj * popsta * modfrc * tplful * tfrac * adjtime;
-            let fulbmy = tplful
- * popsta
- * actadj
- * modfrc
- * tfrac
- * (hpval * activity.load_factor * 1.0 / denful.max(f32::MIN_POSITIVE))
- * adjtime;
+ // `fulbmy` requires the real per-(year, tech) BSFC: canonical
+ // `prcsta.f:623-625` / `prc1st.f:524-526` multiply by `bsfc(idxyr,i)`,
+ // the array that `emfclc.f` (NR*.EMF packet) populates. The state-path
+ // `calculate_exhaust` callback returns only `ExhaustResult` and does
+ // NOT thread `bsfc` back here, so the prior literal `1.0` fabricated
+ // fuel consumption (overstated by ~1/bsfc, i.e. ~2x for bsfc≈0.4-0.6).
+ // BSFC is required data, not a defaultable 1.0, so fail loudly until
+ // the exhaust calculator surfaces the loaded BSFC on this path (the
+ // county path reads `factors.bsfc` directly; see `process.rs`).
+            let fulbmy: f32 = panic!(
+                "prcsta.f/prc1st.f fulbmy requires bsfc(idxyr,i) from the NR*.EMF \
+                 emfclc.f packet, but the state-path exhaust calculator does not return \
+                 BSFC; a literal 1.0 cannot be fabricated in its place (it overstates \
+                 fuel consumption by ~1/bsfc). SCC {scc} model year {iyr} tech {tech_name}."
+            );
 
             fulcsm += fulbmy;
             fulbmytot += fulbmy;

@@ -613,16 +613,22 @@ pub fn process_us_total_record(
 
  // --- bookkeeping (prcus.f :512–:520) ---
             let actbmy = actadj * popus * modfrc * tplful * tfrac * adjtime;
-            let fulbmy = tplful
- * popus
- * actadj
- * modfrc
- * tfrac
- * (hpval * activity.load_factor * 1.0 / denful.max(f32::MIN_POSITIVE))
- * adjtime;
- // Note: the Fortran source uses `bsfc(idxyr, i)`, which is
- // looked up inside `emfclc`. The Rust port treats the bsfc
- // as an output of the exhaust calculator's bookkeeping // see `ExhaustCallInputs` doc.
+ // `fulbmy` requires the real per-(year, tech) BSFC: canonical
+ // `prcus.f:514-516` multiplies by `bsfc(idxyr,i)`, the array that
+ // `emfclc.f` (NR*.EMF packet) populates. The state-path
+ // `calculate_exhaust` callback returns only `ExhaustResult` and does
+ // NOT thread `bsfc` back here, so the prior literal `1.0` fabricated
+ // fuel consumption (overstated by ~1/bsfc, i.e. ~2x for
+ // bsfc≈0.4-0.6). BSFC is required data, not a defaultable 1.0, so
+ // fail loudly until the exhaust calculator surfaces the loaded BSFC
+ // on this path (the county path reads `factors.bsfc` directly; see
+ // `process.rs`).
+            let fulbmy: f32 = panic!(
+                "prcus.f fulbmy requires bsfc(idxyr,i) from the NR*.EMF emfclc.f \
+                 packet, but the state-path exhaust calculator does not return BSFC; \
+                 a literal 1.0 cannot be fabricated in its place (it overstates fuel \
+                 consumption by ~1/bsfc). SCC {scc} model year {iyr} tech {tech_name}."
+            );
 
             fulcsm += fulbmy;
             fulbmytot += fulbmy;
