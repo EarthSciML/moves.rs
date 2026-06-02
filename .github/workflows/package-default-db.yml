@@ -101,7 +101,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.tag }}
+          # TEMP (revert before merge): check out the dispatched branch instead
+          # of the tag so the fix can be validated before the tag is moved.
+          # Production value: ref: ${{ github.event.inputs.tag }}
+          ref: ${{ github.ref_name }}
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
