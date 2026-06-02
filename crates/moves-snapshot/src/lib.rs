@@ -40,7 +40,7 @@ pub use format::{ColumnKind, ColumnSpec, FLOAT_DECIMALS, FORMAT_VERSION};
 pub use manifest::{compute_aggregate_hash, sha256_hex, Manifest, ManifestEntry, TableMetadata};
 pub use output_compare::{
     compare_pollutant_sums, pollutant_sums_from_output_dir, pollutant_sums_from_snapshot,
-    PollutantComparison, PollutantRow, PollutantSums,
+    zero_valued_replaced_rows, PollutantComparison, PollutantRow, PollutantSums,
 };
 pub use snapshot::Snapshot;
 pub use table::{NormalizedColumn, Table, TableBuilder, Value};

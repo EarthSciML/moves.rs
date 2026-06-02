@@ -95,6 +95,13 @@ pub struct CalculatorRegistry {
  /// Per-module output (scratch) tables (lowercased), captured at
  /// registration. The producer side of the table-dependency edges.
     module_outputs: BTreeMap<String, BTreeSet<String>>,
+ /// Union of every registered calculator's
+ /// [`replaced_pollutants`](crate::Calculator::replaced_pollutants) —
+ /// pollutants a chained calculator consumes and replaces (e.g. SulfatePM's
+ /// EC 112 / NonECPM 118). Producers drop their zero-valued rows for these
+ /// before the output aggregator; the canonical-snapshot gate uses this set
+ /// to assert canonical never emits a zero row for a replaced pollutant.
+    replaced_pollutants: BTreeSet<i32>,
 }
 
 impl CalculatorRegistry {
@@ -122,6 +129,7 @@ impl CalculatorRegistry {
             module_input_tables: BTreeSet::new(),
             module_inputs: BTreeMap::new(),
             module_outputs: BTreeMap::new(),
+            replaced_pollutants: BTreeSet::new(),
         }
     }
 
@@ -158,11 +166,14 @@ impl CalculatorRegistry {
         if !self.module_index.contains_key(name) {
             return Err(Error::UnknownModule(name.to_string()));
         }
-        let inputs: BTreeSet<String> = factory()
+        let instance = factory();
+        let inputs: BTreeSet<String> = instance
             .input_tables()
             .iter()
             .map(|t| t.to_ascii_lowercase())
             .collect();
+        self.replaced_pollutants
+            .extend(instance.replaced_pollutants().iter().copied());
         self.module_input_tables.extend(inputs.iter().cloned());
         self.module_inputs.insert(name.to_string(), inputs);
         // Calculators emit emission/activity output, not scratch tables, so
@@ -214,6 +225,19 @@ impl CalculatorRegistry {
     #[must_use]
     pub fn required_input_tables(&self) -> BTreeSet<String> {
         self.module_input_tables.clone()
+    }
+
+ /// Union of every registered calculator's
+ /// [`replaced_pollutants`](crate::Calculator::replaced_pollutants) — the
+ /// pollutants a chained calculator consumes and replaces (e.g. SulfatePM's
+ /// EC 112 / NonECPM 118), whose zero-valued producer rows the engine drops.
+ ///
+ /// Exposed so the canonical-snapshot regression gate can assert canonical
+ /// never emits a zero row for one of these (the premise that makes the drop
+ /// safe). Empty when no factories are registered.
+    #[must_use]
+    pub fn replaced_pollutants(&self) -> &BTreeSet<i32> {
+        &self.replaced_pollutants
     }
 
  /// The (lowercased) scratch input tables a registered module reads, or

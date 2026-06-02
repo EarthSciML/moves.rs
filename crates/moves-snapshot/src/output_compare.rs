@@ -133,6 +133,65 @@ pub fn pollutant_sums_from_snapshot(snap: &Snapshot) -> PollutantSums {
     out
 }
 
+/// For each pollutant in `pollutants`, count the canonical `MOVESOutput` rows
+/// whose `emissionQuant` is exactly zero.
+///
+/// The engine drops an upstream producer's zero-valued row for any pollutant a
+/// chained calculator consumes and replaces (e.g. SulfatePM's EC 112 / NonECPM
+/// 118), because canonical's `delete from MOVESWorkerOutput` removed it and the
+/// additive chained delta cannot. That is exact only while canonical itself
+/// never emits a zero row for such a pollutant. The canonical-snapshot gate
+/// calls this to assert the premise holds for every captured snapshot — a
+/// non-empty result means the drop heuristic is invalid for that fixture and
+/// must be revisited, rather than silently producing a row-count divergence.
+#[must_use]
+pub fn zero_valued_replaced_rows(
+    snap: &Snapshot,
+    pollutants: &BTreeSet<i64>,
+) -> BTreeMap<i64, usize> {
+    let mut counts: BTreeMap<i64, usize> = BTreeMap::new();
+    if pollutants.is_empty() {
+        return counts;
+    }
+    let table = match find_output_table_name(snap).and_then(|name| snap.table(&name).cloned()) {
+        Some(t) => t,
+        None => return counts,
+    };
+    let (pid_idx, eq_idx) = match (
+        table.column_index("pollutantID"),
+        table.column_index("emissionQuant"),
+    ) {
+        (Some(p), Some(e)) => (p, e),
+        _ => return counts,
+    };
+    let cols = table.columns();
+    let pid_col = &cols[pid_idx];
+    let eq_col = &cols[eq_idx];
+    for row in 0..table.row_count() {
+        let pid = match pid_col {
+            NormalizedColumn::Int64(v) => match v[row] {
+                Some(n) => n,
+                None => continue,
+            },
+            _ => continue,
+        };
+        if !pollutants.contains(&pid) {
+            continue;
+        }
+        let eq = match eq_col {
+            NormalizedColumn::Float64String(v) => match &v[row] {
+                Some(s) => s.parse::<f64>().ok(),
+                None => Some(0.0),
+            },
+            _ => continue,
+        };
+        if eq == Some(0.0) {
+            *counts.entry(pid).or_insert(0) += 1;
+        }
+    }
+    counts
+}
+
 /// Accumulate `pollutantID → Σ emissionQuant` from a moves.rs run's
 /// `MOVESOutput/` partitioned Parquet tree (`<output_dir>/MOVESOutput/**/*.parquet`).
 /// Returns empty sums when the directory does not exist.
@@ -289,6 +348,29 @@ mod tests {
     fn empty_snapshot_yields_no_sums() {
         let sums = pollutant_sums_from_snapshot(&Snapshot::new());
         assert_eq!(sums, PollutantSums::default());
+    }
+
+    #[test]
+    fn zero_valued_replaced_rows_counts_only_replaced_zeros() {
+        // pollutant 112 has one zero row; 118 has none; 119 (not replaced) has
+        // a zero row that must be ignored.
+        let s = snap_with_output(&[
+            (112, "5.0"),
+            (112, "0.0"),
+            (118, "3.0"),
+            (119, "0.0"),
+        ]);
+        let replaced: BTreeSet<i64> = [112, 118].into_iter().collect();
+        let zeros = zero_valued_replaced_rows(&s, &replaced);
+        assert_eq!(zeros.get(&112).copied(), Some(1));
+        assert!(!zeros.contains_key(&118), "118 has no zero row");
+        assert!(!zeros.contains_key(&119), "119 is not a replaced pollutant");
+    }
+
+    #[test]
+    fn zero_valued_replaced_rows_empty_set_short_circuits() {
+        let s = snap_with_output(&[(112, "0.0")]);
+        assert!(zero_valued_replaced_rows(&s, &BTreeSet::new()).is_empty());
     }
 
     #[test]

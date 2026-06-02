@@ -1318,6 +1318,23 @@ pub fn build_default_db_store(
     Ok(store)
 }
 
+/// The pollutants the default (embedded-DAG) calculator set consumes and
+/// replaces — the union of every registered calculator's
+/// [`Calculator::replaced_pollutants`](moves_framework::Calculator::replaced_pollutants)
+/// (e.g. SulfatePM's EC 112 / NonECPM 118).
+///
+/// Exposed for the canonical-snapshot regression gate, which asserts canonical
+/// never emits a zero-valued row for one of these — the premise that makes the
+/// engine's zero-row drop for replaced pollutants safe.
+///
+/// # Errors
+///
+/// Propagates a failure to parse the embedded DAG or register the default
+/// calculator factories.
+pub fn default_replaced_pollutants() -> Result<std::collections::BTreeSet<i32>> {
+    Ok(load_registry(None, true)?.replaced_pollutants().clone())
+}
+
 fn load_registry(path: Option<&Path>, with_calculators: bool) -> Result<CalculatorRegistry> {
     let mut registry = match path {
         Some(path) => CalculatorRegistry::load_from_json(path)

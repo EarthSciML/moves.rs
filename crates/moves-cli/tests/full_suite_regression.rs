@@ -65,12 +65,16 @@
 //! Point it at a different snapshot tree with
 //! `REGRESSION_SNAPSHOTS_DIR=<path>`.
 
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use moves_cli::{build_default_db_store, load_run_spec, run_simulation, RunOptions};
+use moves_cli::{
+    build_default_db_store, default_replaced_pollutants, load_run_spec, run_simulation, RunOptions,
+};
 use moves_snapshot::{
     compare_pollutant_sums, diff_snapshots, pollutant_sums_from_output_dir,
-    pollutant_sums_from_snapshot, DiffOptions, Snapshot, ToleranceConfig,
+    pollutant_sums_from_snapshot, zero_valued_replaced_rows, DiffOptions, Snapshot,
+    ToleranceConfig,
 };
 use tempfile::tempdir;
 
@@ -648,6 +652,18 @@ fn canonical_snapshot_diff() {
     let mut passed = 0usize;
     let mut quarantined = 0usize;
 
+    // Pollutants a chained calculator consumes and replaces (SulfatePM's EC 112
+    // / NonECPM 118). The engine drops an upstream producer's zero-valued row
+    // for these — exact only while canonical never emits a zero row for one of
+    // them. The per-fixture guard below asserts that premise against every
+    // captured snapshot so a future violation fails loudly here instead of as
+    // an opaque row-count divergence.
+    let replaced_pollutants: BTreeSet<i64> = default_replaced_pollutants()
+        .expect("default replaced-pollutant set")
+        .into_iter()
+        .map(i64::from)
+        .collect();
+
     for fixture_path in covered {
         let name = fixture_name(fixture_path);
         let out = tempdir().expect("tempdir");
@@ -667,7 +683,21 @@ fn canonical_snapshot_diff() {
         .unwrap_or_else(|e| panic!("{name}: run error — {e}"));
 
         let canonical = match Snapshot::load(&root.join(name)) {
-            Ok(s) => pollutant_sums_from_snapshot(&s),
+            Ok(s) => {
+                // Guard the consume/replace zero-drop premise: canonical must
+                // not carry a zero-valued row for a replaced pollutant.
+                let zeros = zero_valued_replaced_rows(&s, &replaced_pollutants);
+                if !zeros.is_empty() {
+                    failures.push(format!(
+                        "{name}: canonical has zero-valued rows for replaced \
+                         pollutant(s) {zeros:?} — the engine drops producer zero \
+                         rows for these (SulfatePM consume/replace), so this \
+                         snapshot violates the premise and the drop must be \
+                         revisited (see Calculator::replaced_pollutants)"
+                    ));
+                }
+                pollutant_sums_from_snapshot(&s)
+            }
             Err(e) => {
                 println!("{name:<28} canonical load error: {e}");
                 failures.push(format!("{name}: canonical load error: {e}"));
@@ -1117,6 +1147,13 @@ fn default_db_snapshot_diff() {
     let mut passed = 0usize;
     let mut quarantined = 0usize;
 
+    // Same consume/replace zero-drop premise guard as `canonical_snapshot_diff`.
+    let replaced_pollutants: BTreeSet<i64> = default_replaced_pollutants()
+        .expect("default replaced-pollutant set")
+        .into_iter()
+        .map(i64::from)
+        .collect();
+
     for fixture_path in covered {
         let name = fixture_name(fixture_path);
         let out = tempdir().expect("tempdir");
@@ -1134,7 +1171,17 @@ fn default_db_snapshot_diff() {
         .unwrap_or_else(|e| panic!("{name}: run error — {e}"));
 
         let canonical = match Snapshot::load(&snap_root.join(name)) {
-            Ok(s) => pollutant_sums_from_snapshot(&s),
+            Ok(s) => {
+                let zeros = zero_valued_replaced_rows(&s, &replaced_pollutants);
+                if !zeros.is_empty() {
+                    failures.push(format!(
+                        "{name}: canonical has zero-valued rows for replaced \
+                         pollutant(s) {zeros:?} — violates the consume/replace \
+                         zero-drop premise (see Calculator::replaced_pollutants)"
+                    ));
+                }
+                pollutant_sums_from_snapshot(&s)
+            }
             Err(e) => {
                 println!("{name:<28} canonical load error: {e}");
                 failures.push(format!("{name}: canonical load error: {e}"));
