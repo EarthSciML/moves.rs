@@ -51,8 +51,12 @@ for _ in $(seq 1 60); do
     sleep 1
 done
 
+# Connect as moves/moves, not root. mariadbd runs as the calling (non-root)
+# user under Apptainer without fakeroot, so root's unix_socket auth maps to a
+# non-existent OS user and fails; the moves account uses password auth and is
+# OS-user-independent (see start-mariadb-bg.sh's readiness probe).
 mq() {
-    mariadb -B -N -uroot "$@"
+    mariadb -B -N --socket=/var/run/mysqld/mysqld.sock -umoves -pmoves "$@"
 }
 
 # Verify the target database exists.
@@ -61,7 +65,7 @@ EXISTS=$(mq -e "
 ")
 if [ "${EXISTS}" -eq 0 ]; then
     echo "[dump-default-db] database '${DEFAULT_DB}' not found in MariaDB" >&2
-    mariadb-admin --socket=/var/run/mysqld/mysqld.sock -uroot shutdown 2>/dev/null \
+    mariadb-admin --socket=/var/run/mysqld/mysqld.sock -umoves -pmoves shutdown 2>/dev/null \
         || kill "$(cat /var/run/mysqld/mariadbd.pid 2>/dev/null)" 2>/dev/null \
         || true
     exit 1
@@ -154,7 +158,7 @@ done
 } >> "${MANIFEST}"
 
 # Stop MariaDB cleanly.
-mariadb-admin --socket=/var/run/mysqld/mysqld.sock -uroot shutdown 2>/dev/null \
+mariadb-admin --socket=/var/run/mysqld/mysqld.sock -umoves -pmoves shutdown 2>/dev/null \
     || kill "$(cat /var/run/mysqld/mariadbd.pid 2>/dev/null)" 2>/dev/null \
     || true
 

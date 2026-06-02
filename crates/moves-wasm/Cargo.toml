@@ -52,6 +52,9 @@ polars = { workspace = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 polars = { version = "0.53", default-features = false }
+# Route Rust panics to console.error with a readable message + stack, so a
+# panic surfaces its real cause instead of an opaque "RuntimeError: unreachable".
+console_error_panic_hook = "0.1"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"

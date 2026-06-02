@@ -132,6 +132,16 @@ use wasm_bindgen::JsCast;
 #[cfg(feature = "wasm-threads")]
 pub use wasm_bindgen_rayon::init_thread_pool;
 
+/// Install a panic hook (once, at module load) that forwards Rust panics to
+/// `console.error` with the full message and a JS stack trace. Without it a
+/// panic compiles to a bare `unreachable` trap that JavaScript only sees as
+/// `RuntimeError: unreachable`, hiding the real cause.
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(start)]
+pub fn __install_panic_hook() {
+    console_error_panic_hook::set_once();
+}
+
 /// The calculator-chain DAG, embedded at compile time.
 const EMBEDDED_CALCULATOR_DAG: &str =
     include_str!("../../../characterization/calculator-chains/calculator-dag.json");
@@ -180,6 +190,21 @@ pub fn run_simulation(runspec_xml: &str, max_parallel_chunks: u32) -> Result<JsV
 
     let registry =
         build_registry().map_err(|e| JsValue::from_str(&format!("Registry build error: {e}")))?;
+
+    // This entry point runs without an execution database (no slow store), so
+    // the calculator chain has no source for its input tables. Every real
+    // onroad RunSpec needs at least one input table, so fail fast with an
+    // actionable message rather than letting the engine trap deep in execution
+    // — which surfaces in the browser as an opaque "RuntimeError: unreachable".
+    if !registry.required_input_tables().is_empty() {
+        return Err(JsValue::from_str(
+            "run_simulation has no execution database, so the onroad calculator \
+             chain cannot resolve its input tables. Use the default-DB flow \
+             (run_simulation_from_partitions) instead — in the demo, the \
+             \"Default-DB simulation\" section, which fetches the required \
+             default-DB partitions before running.",
+        ));
+    }
 
     let config = EngineConfig {
         output_root: std::path::PathBuf::from(""),
