@@ -1161,6 +1161,19 @@ fn frame_to_emission_records(df: &DataFrame, run_hash: &str) -> Vec<EmissionReco
     let model_year_ca = df.column("modelYearID").ok().and_then(|s| s.i32().ok());
     let fuel_type_ca = df.column("fuelTypeID").ok().and_then(|s| s.i32().ok());
     let road_type_ca = df.column("roadTypeID").ok().and_then(|s| s.i32().ok());
+    // Worker-output dimension columns that the chained calculators
+    // (HCSpeciation, AirToxics, Crankcase) join their ratio tables on. The
+    // producing calculators (BaseRate) emit a concrete `regClassID` /
+    // `fuelSubTypeID`; preserve them through the accumulator so the
+    // post-master-loop chained calculators see them. The final-output
+    // aggregation collapses these away by its breakdown flags regardless of the
+    // record value, so reading them here does not change the user-facing output
+    // (but does make a `regClassID`-breakdown RunSpec emit the right value).
+    let reg_class_ca = df.column("regClassID").ok().and_then(|s| s.i32().ok());
+    let fuel_sub_type_ca = df.column("fuelSubTypeID").ok().and_then(|s| s.i32().ok());
+    let eng_tech_ca = df.column("engTechID").ok().and_then(|s| s.i32().ok());
+    let sector_ca = df.column("sectorID").ok().and_then(|s| s.i32().ok());
+    let hp_ca = df.column("hpID").ok().and_then(|s| s.i32().ok());
     let emission_ca = df.column("emissionQuant").ok().and_then(|s| s.f64().ok());
  // Optional explicit SCC column (nonroad emits its own 10-digit SCC, which
  // the onroad dimension-formula below cannot reconstruct).
@@ -1208,15 +1221,15 @@ fn frame_to_emission_records(df: &DataFrame, run_hash: &str) -> Vec<EmissionReco
                 pollutant_id: pollutant_ca.and_then(|c| c.get(i)).map(|v| v as i16),
                 process_id: process_v.map(|v| v as i16),
                 source_type_id: source_type_v.map(|v| v as i16),
-                reg_class_id: None,
+                reg_class_id: reg_class_ca.and_then(|c| c.get(i)).map(|v| v as i16),
                 fuel_type_id: fuel_type_v.map(|v| v as i16),
-                fuel_sub_type_id: None,
+                fuel_sub_type_id: fuel_sub_type_ca.and_then(|c| c.get(i)).map(|v| v as i16),
                 model_year_id: model_year_ca.and_then(|c| c.get(i)).map(|v| v as i16),
                 road_type_id: road_type_v.map(|v| v as i16),
                 scc,
-                eng_tech_id: None,
-                sector_id: None,
-                hp_id: None,
+                eng_tech_id: eng_tech_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+                sector_id: sector_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+                hp_id: hp_ca.and_then(|c| c.get(i)).map(|v| v as i16),
                 emission_quant: emission_ca.and_then(|c| c.get(i)),
                 emission_rate: None,
                 run_hash: run_hash.to_string(),

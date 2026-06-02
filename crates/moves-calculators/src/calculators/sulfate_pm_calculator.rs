@@ -2276,7 +2276,40 @@ impl Calculator for SulfatePMCalculator {
 
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let inputs = build_inputs(ctx)?;
-        let rows = self.calculate(&inputs);
+        // `calculate` ports the SQL's in-place mutation of `MOVESWorkerOutput`, so
+        // it returns the **full final state**: every pass-through row plus the new
+        // and adjusted PM species (see the module docs). The chained-calculator
+        // engine, however, *adds* a calculator's emitted rows to the already
+        // accumulated worker output (the upstream BaseRate rows are already
+        // present). Emitting the full state would therefore double-count every
+        // pass-through row — e.g. a TOG/HC fixture with no PM input would re-emit
+        // all of BaseRate's THC, doubling it. Emit only the **delta**: rows that
+        // are new or whose value differs from the input. A row identical (same
+        // dimensions and bit-identical quant/rate) to an input row is dropped,
+        // since the upstream calculator already contributed it. This matches the
+        // delta-emitting model the other chained calculators (HCSpeciation) follow.
+        let input_keys: std::collections::HashSet<([i32; 15], u64, u64)> = inputs
+            .worker_output
+            .iter()
+            .map(|r| {
+                (
+                    r.dimension_key(),
+                    r.emission_quant.to_bits(),
+                    r.emission_rate.to_bits(),
+                )
+            })
+            .collect();
+        let rows: Vec<EmissionRow> = self
+            .calculate(&inputs)
+            .into_iter()
+            .filter(|r| {
+                !input_keys.contains(&(
+                    r.dimension_key(),
+                    r.emission_quant.to_bits(),
+                    r.emission_rate.to_bits(),
+                ))
+            })
+            .collect();
         crate::wiring::emit_rows(rows)
     }
 }
@@ -2893,14 +2926,19 @@ mod tests {
         let df = out.dataframe().expect("output should contain a DataFrame");
         // Iterating process 1 (rather than the previous position-less degenerate
         // primaryProcessID = 0) enables the NonECPM (118) re-sum and the
-        // PM2.5-Total (110) roll-up for the running process, so the minimal
-        // scenario now yields eight species rows: EC (112), Sulfate (115), H2O
-        // (119), Organic Carbon (111), the NonECNonSO4NonOM residue, Total
-        // Organic Matter, the re-summed NonECPM (118), and PM2.5 Total (110).
+        // PM2.5-Total (110) roll-up for the running process. `calculate` produces
+        // eight species rows: EC (112), Sulfate (115), H2O (119), Organic Carbon
+        // (111), the NonECNonSO4NonOM residue, Total Organic Matter, the re-summed
+        // NonECPM (118), and PM2.5 Total (110). `execute` then emits only the
+        // **delta** versus its input (the chained engine adds emitted rows to the
+        // already-accumulated worker output). The crankcase split here is the
+        // identity, so the EC (112) output is bit-identical to the input EC row
+        // and is dropped as a pass-through the upstream calculator already
+        // contributed — leaving seven emitted rows.
         assert_eq!(
             df.height(),
-            8,
-            "minimal inputs produce exactly eight species rows"
+            7,
+            "execute emits the seven delta rows (EC pass-through dropped)"
         );
         let sulfate_quant = df
             .column("emissionQuant")

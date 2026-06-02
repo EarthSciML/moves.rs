@@ -466,6 +466,16 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
         // (pollutant 91) and stay quarantined on the separate KJ→Million-BTU
         // output-unit conversion. See docs/known-divergences.md §4.4.
         ("expand-criteria", ONROAD_REL_TOL, false), // ~8.5e-8
+        // Speciation / chained-calculator fixtures graduated once the regClass
+        // collapse, SulfatePM pass-through doubling and NO/NO2 species doubling
+        // were fixed (see QUARANTINED_FIXTURES for the three root causes). Each
+        // now matches canonical to f64 summation drift.
+        ("chain-tog-speciation", ONROAD_REL_TOL, false), // HCSpeciation: 1/5/79/80/86 exact
+        ("chain-nonhaptog", ONROAD_REL_TOL, false),      // HCSpeciation: 1/5/79/80/86 exact
+        ("process-nox-speciation", ONROAD_REL_TOL, false), // NO/NO2/HONO: 3/32/33/34 exact
+        ("process-crankcase-running", ONROAD_REL_TOL, false), // crankcase THC: 1/2/3 exact
+        ("process-brakewear", ONROAD_REL_TOL, false),    // 91/106/116 exact
+        ("process-tirewear", ONROAD_REL_TOL, false),     // 91/107/117 exact
         // process-apu was asserted-vacuous (canon 0 / port 0) only because the
         // month off-by-one blocked all BaseRate output. With that fixed the
         // BaseRate path now emits the process-91 / opMode-201,203 (APU /
@@ -515,27 +525,34 @@ const QUARANTINED_FIXTURES: &[&str] = &[
  // legitimate rows (separate/known). See docs/known-divergences.md §4.4.
     "process-apu",
     "mixed-onroad-nonroad",
- // UNDER-emit class — calculator-chain coverage gaps (a DIFFERENT bug from
- // the over-emit above): downstream speciation / chained calculators fire but
- // produce no rows for several pollutants/processes, so the port emits FEWER
- // rows than canonical. process-airtoxics / process-nox-speciation / chain-*
- // emit one base process's worth where canonical has the full speciated set;
- // brakewear / tirewear / crankcase-running under-emit a whole slice.
- // process-pm-exhaust now emits all seven PM species (100/110/111/112/115/118/
- // 119) — SulfatePMCalculator runs and the crankcase split reconciles the
- // regClass-collapsed worker output — and 111/115 match canonical exactly with
- // 100/110 within ~1.2%; it stays quarantined only because the upstream
- // BaseRate emits spurious fuelType-9 (electricity) exhaust PM that canonical
- // excludes, doubling EC (112) and NonECPM (118). See
- // docs/known-divergences.md §4.4.
-    "chain-nonhaptog",
-    "chain-tog-speciation",
+ // Speciation / chained-calculator class. Three engine/calculator bugs in this
+ // class were FOUND and FIXED, GRADUATING chain-nonhaptog, chain-tog-speciation,
+ // process-crankcase-running, process-nox-speciation, process-brakewear and
+ // process-tirewear to asserted_fixtures (all exact to f64 drift):
+ //   (1) regClass collapse — the engine's `frame_to_emission_records` dropped
+ //       `regClassID` (and fuelSubType/engTech/sector/hp) when round-tripping a
+ //       calculator's output through the per-chunk MOVESWorkerOutput
+ //       accumulator, so chained speciators (HCSpeciation) keyed their ratio
+ //       lookups on regClass 0 and emitted nothing. Now preserved.
+ //   (2) SulfatePMCalculator re-emitted every pass-through row (its `calculate`
+ //       ports the SQL's in-place mutation and returns the full final state);
+ //       the chained engine ADDS emitted rows, so the upstream THC/NOx was
+ //       doubled. `execute` now emits only the delta versus its input.
+ //   (3) NOCalculator and NO2Calculator shared `build_inputs` and both resolved
+ //       every NO/NO2/HONO species, doubling 32/33/34. Each now filters
+ //       PollutantProcessAssoc to its own species, matching the per-calculator
+ //       canonical extract.
+ // Still quarantined for SEPARATE, unrelated reasons:
+ // - process-airtoxics: the AirToxicsCalculator port is not started, so the
+ //   minor-HAP species (20/24/25) are absent (base 1/79/87 now match exactly).
+ // - process-pm-exhaust: 111/115 match exactly and 100/110 within ~1.2%, but
+ //   EC (112) / NonECPM (118) remain high because (a) the upstream BaseRate
+ //   emits spurious fuelType-9 (electricity) exhaust PM canonical excludes and
+ //   (b) SulfatePM's in-place consume/replace of 112/118 needs the engine to
+ //   REMOVE the consumed input rows, which the additive chained model cannot yet
+ //   express. See docs/known-divergences.md §4.4.
     "process-airtoxics",
-    "process-brakewear",
-    "process-crankcase-running",
-    "process-nox-speciation",
     "process-pm-exhaust",
-    "process-tirewear",
  // NONROAD fixtures that emit nothing (port row count 0 vs a populated
  // canonical) or a wrong row count — population/sector-coverage gaps.
     "nr-agriculture-state",
