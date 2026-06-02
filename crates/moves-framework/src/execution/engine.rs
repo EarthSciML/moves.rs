@@ -516,7 +516,8 @@ impl MOVESEngine {
     pub fn planned_chunks(&self) -> Result<Vec<Chunk>> {
         let modules = self.planned_modules()?;
         let refs: Vec<&str> = modules.iter().map(String::as_str).collect();
-        chunk_chains(&self.registry, &refs)
+        let provided: BTreeSet<&str> = self.slow_store.names().into_iter().collect();
+        chunk_chains(&self.registry, &refs, &provided)
     }
 
  /// Execute the run: plan and chunk the calculator graph, drive one
@@ -538,7 +539,8 @@ impl MOVESEngine {
         let t_plan_start = Instant::now();
         let modules_planned = self.planned_modules()?;
         let module_refs: Vec<&str> = modules_planned.iter().map(String::as_str).collect();
-        let chunks = chunk_chains(&self.registry, &module_refs)?;
+        let provided_tables: BTreeSet<&str> = self.slow_store.names().into_iter().collect();
+        let chunks = chunk_chains(&self.registry, &module_refs, &provided_tables)?;
         let planning_time = t_plan_start.elapsed();
 
  // Shared, immutable per-run iteration plan handed to every chunk's
