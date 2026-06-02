@@ -592,22 +592,29 @@ impl HcSpeciation {
         formulation: &FuelFormulation,
         total_oxygenate: f64,
         operand: &Emission,
-        thc_emission: &Emission,
-    ) -> Emission {
+        _thc_emission: &Emission,
+    ) -> Option<Emission> {
         let key = HcSpeciationKey {
             pol_process_id: output_pollutant_id * 100 + process_id,
             fuel_sub_type_id: speciation_fuel_sub_type_id,
             reg_class_id,
             model_year_id,
         };
-        match self.speciation_detail(&key) {
-            Some(detail) => {
-                let factor = detail.speciation_constant
-                    + detail.oxy_speciation * formulation.vol_to_wt_percent_oxy * total_oxygenate;
-                operand.scaled(factor)
-            }
-            None => thc_emission.scaled(0.0),
-        }
+        // Canonical computes NMOG/VOC via an INNER JOIN to the HCSpeciation
+        // profile table: a (polProc, fuelSubType, regClass, modelYear) with no
+        // profile row produces NO output row. The Go reference instead emits a
+        // zero (`NewEmissionScaled(e, 0)`), which diverges from the canonical
+        // SQL — for processes with no profile rows at all (e.g. refueling
+        // 18/19, whose HCSpeciation table is empty) the Go/port path emits
+        // spurious zero NMOG/VOC, and the downstream TOG (86) inherits them as
+        // zero rows canonical never writes. Returning `None` here drops those
+        // rows, matching canonical. Exhaust processes always carry profile rows
+        // (real or the SQL's speciationConstant=0 fill), so this branch is not
+        // taken there and their non-zero NMOG/VOC are unaffected.
+        let detail = self.speciation_detail(&key)?;
+        let factor = detail.speciation_constant
+            + detail.oxy_speciation * formulation.vol_to_wt_percent_oxy * total_oxygenate;
+        Some(operand.scaled(factor))
     }
 
  /// Speciate one input [`Emission`] into its methane / NMHC / `altNMHC` /
@@ -675,7 +682,7 @@ impl HcSpeciation {
 
                 if !is_ethanol_alt_case {
                     if tables.is_needed(NMOG_POLLUTANT_ID, process_id) {
-                        result.nmog = Some(self.speciate_nmog_or_voc(
+                        result.nmog = self.speciate_nmog_or_voc(
                             NMOG_POLLUTANT_ID,
                             process_id,
                             emission.fuel_sub_type_id,
@@ -685,10 +692,10 @@ impl HcSpeciation {
                             total_oxygenate,
                             &nmhc,
                             emission,
-                        ));
+                        );
                     }
                     if tables.is_needed(VOC_POLLUTANT_ID, process_id) {
-                        result.voc = Some(self.speciate_nmog_or_voc(
+                        result.voc = self.speciate_nmog_or_voc(
                             VOC_POLLUTANT_ID,
                             process_id,
                             emission.fuel_sub_type_id,
@@ -698,7 +705,7 @@ impl HcSpeciation {
                             total_oxygenate,
                             &nmhc,
                             emission,
-                        ));
+                        );
                     }
                 }
             }
@@ -724,7 +731,7 @@ impl HcSpeciation {
  // The HCSpeciation lookup keys on the E10 subtype (12); the
  // oxygenate term still uses the actual emission's formulation.
                 if tables.is_needed(NMOG_POLLUTANT_ID, process_id) {
-                    result.nmog = Some(self.speciate_nmog_or_voc(
+                    result.nmog = self.speciate_nmog_or_voc(
                         NMOG_POLLUTANT_ID,
                         process_id,
                         E10_FUEL_SUBTYPE_ID,
@@ -734,10 +741,10 @@ impl HcSpeciation {
                         total_oxygenate,
                         &alt_nmhc,
                         emission,
-                    ));
+                    );
                 }
                 if tables.is_needed(VOC_POLLUTANT_ID, process_id) {
-                    result.voc = Some(self.speciate_nmog_or_voc(
+                    result.voc = self.speciate_nmog_or_voc(
                         VOC_POLLUTANT_ID,
                         process_id,
                         E10_FUEL_SUBTYPE_ID,
@@ -747,7 +754,7 @@ impl HcSpeciation {
                         total_oxygenate,
                         &alt_nmhc,
                         emission,
-                    ));
+                    );
                 }
             }
         }
@@ -2001,19 +2008,24 @@ mod tests {
     }
 
     #[test]
-    fn speciate_emission_nmog_and_voc_are_zero_without_a_speciation_row() {
+    fn speciate_emission_nmog_and_voc_are_omitted_without_a_speciation_row() {
  // Lookup tables with the methane ratio but no HCSpeciation rows.
         let speciation = HcSpeciation::build([methane_row(1, 20, 0, 2000, 2010, 0.25)], []);
         let (_, tables, key) = fixture();
         let speciated = speciation
             .speciate_emission(&key, &emission(8.0, 4.0, 20, 100), &tables)
             .expect("speciation produced");
- // No row -> NMOG/VOC fall back to the original THC emission scaled by
- // zero, still tagged with the THC fuel ids.
-        assert_eq!(speciated.nmog, Some(emission(0.0, 0.0, 20, 100)));
-        assert_eq!(speciated.voc, Some(emission(0.0, 0.0, 20, 100)));
+ // No HCSpeciation profile row -> NMOG/VOC are OMITTED, matching
+ // canonical's inner join (it produces no row, not a zero row). The Go
+ // reference's `NewEmissionScaled(e, 0)` zero-emit diverges from the
+ // canonical SQL and produced spurious zero rows downstream (e.g.
+ // refueling TOG 86 — see [[process-refueling-false-graduation]]).
+        assert_eq!(speciated.nmog, None);
+        assert_eq!(speciated.voc, None);
  // NMHC is unaffected — it needs no speciation row.
         assert_eq!(speciated.nmhc, Some(emission(6.0, 3.0, 20, 100)));
+ // TOG (= NMOG + methane) is therefore methane alone here.
+        assert_eq!(speciated.tog, Some(emission(2.0, 1.0, 20, 100)));
     }
 
     #[test]
