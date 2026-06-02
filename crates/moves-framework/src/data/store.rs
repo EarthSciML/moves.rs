@@ -35,6 +35,22 @@ impl InMemoryStore {
         let lower = name.to_ascii_lowercase();
         self.map.get_mut(lower.as_str()).map(Arc::make_mut)
     }
+
+ /// Whether the store holds no tables.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
+    }
+
+ /// Copy every table into `dest` (cheap `Arc` clones — no DataFrame deep
+ /// copy), replacing any same-named entry. Used to promote generator
+ /// scratch output into the slow tier so calculators that read via
+ /// [`crate::CalculatorContext::tables`] observe it.
+    pub fn copy_into(&self, dest: &mut InMemoryStore) {
+        for (name, df) in &self.map {
+            dest.map.insert(name.clone(), Arc::clone(df));
+        }
+    }
 }
 
 impl DataFrameStore for InMemoryStore {

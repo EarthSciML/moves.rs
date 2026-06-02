@@ -88,6 +88,13 @@ pub struct CalculatorRegistry {
  /// calculators and generators — union of each module's `input_tables()`.
  /// Populated at registration time so callers can filter snapshot loads.
     module_input_tables: BTreeSet<String>,
+ /// Per-module input tables (lowercased), captured at registration. Used by
+ /// [`chunk_chains`](crate::execution::executor::chunk_chains) to connect a
+ /// consumer to the producers of the scratch tables it reads.
+    module_inputs: BTreeMap<String, BTreeSet<String>>,
+ /// Per-module output (scratch) tables (lowercased), captured at
+ /// registration. The producer side of the table-dependency edges.
+    module_outputs: BTreeMap<String, BTreeSet<String>>,
 }
 
 impl CalculatorRegistry {
@@ -113,6 +120,8 @@ impl CalculatorRegistry {
             module_index,
             template_index,
             module_input_tables: BTreeSet::new(),
+            module_inputs: BTreeMap::new(),
+            module_outputs: BTreeMap::new(),
         }
     }
 
@@ -149,10 +158,16 @@ impl CalculatorRegistry {
         if !self.module_index.contains_key(name) {
             return Err(Error::UnknownModule(name.to_string()));
         }
-        for t in factory().input_tables() {
-            self.module_input_tables
-                .insert(t.to_ascii_lowercase().to_string());
-        }
+        let inputs: BTreeSet<String> = factory()
+            .input_tables()
+            .iter()
+            .map(|t| t.to_ascii_lowercase())
+            .collect();
+        self.module_input_tables.extend(inputs.iter().cloned());
+        self.module_inputs.insert(name.to_string(), inputs);
+        // Calculators emit emission/activity output, not scratch tables, so
+        // they have no producer-side table edges.
+        self.module_outputs.insert(name.to_string(), BTreeSet::new());
         self.factories
             .insert(name.to_string(), ModuleFactory::Calculator(factory));
         Ok(())
@@ -167,10 +182,20 @@ impl CalculatorRegistry {
         if !self.module_index.contains_key(name) {
             return Err(Error::UnknownModule(name.to_string()));
         }
-        for t in factory().input_tables() {
-            self.module_input_tables
-                .insert(t.to_ascii_lowercase().to_string());
-        }
+        let instance = factory();
+        let inputs: BTreeSet<String> = instance
+            .input_tables()
+            .iter()
+            .map(|t| t.to_ascii_lowercase())
+            .collect();
+        let outputs: BTreeSet<String> = instance
+            .output_tables()
+            .iter()
+            .map(|t| t.to_ascii_lowercase())
+            .collect();
+        self.module_input_tables.extend(inputs.iter().cloned());
+        self.module_inputs.insert(name.to_string(), inputs);
+        self.module_outputs.insert(name.to_string(), outputs);
         self.factories
             .insert(name.to_string(), ModuleFactory::Generator(factory));
         Ok(())
@@ -189,6 +214,23 @@ impl CalculatorRegistry {
     #[must_use]
     pub fn required_input_tables(&self) -> BTreeSet<String> {
         self.module_input_tables.clone()
+    }
+
+ /// The (lowercased) scratch input tables a registered module reads, or
+ /// `None` if the module has no registered factory. The consumer side of
+ /// the producer→consumer table-dependency edges used by chunking.
+    #[must_use]
+    pub fn module_input_tables_of(&self, name: &str) -> Option<&BTreeSet<String>> {
+        self.module_inputs.get(name)
+    }
+
+ /// The (lowercased) scratch output tables a registered module produces, or
+ /// `None` if the module has no registered factory. Calculators produce no
+ /// scratch tables, so their set is empty; generators list their
+ /// [`Generator::output_tables`](crate::calculator::Generator::output_tables).
+    #[must_use]
+    pub fn module_output_tables_of(&self, name: &str) -> Option<&BTreeSet<String>> {
+        self.module_outputs.get(name)
     }
 
  /// Borrow the DAG the registry was constructed with.

@@ -921,8 +921,14 @@ impl TableRow for FuelFormulationRow {
                     fuel_subtype_id: fuel_subtype_id_col
                         .get(i)
                         .ok_or_else(|| null("fuelSubtypeID"))?,
-                    rvp: rvp_col.get(i).ok_or_else(|| null("RVP"))?,
-                    etoh_volume: etoh_volume_col.get(i).ok_or_else(|| null("ETOHVolume"))?,
+                    // RVP / ETOHVolume are NULL in the default DB for non-gasoline
+                    // formulations (diesel, electric, and the formulation-0
+                    // placeholder), which carry no Reid vapor pressure or ethanol
+                    // content. MOVES excludes those rows from RVP/ETOH-based
+                    // calculations via fuel-type joins, so a missing value is
+                    // semantically zero here rather than a data error.
+                    rvp: rvp_col.get(i).unwrap_or(0.0),
+                    etoh_volume: etoh_volume_col.get(i).unwrap_or(0.0),
                 })
             })
             .collect()

@@ -121,10 +121,53 @@ pub fn setup_execution_store(
 ) -> Result<(), String> {
     merge_store_variants_eager(store)?;
     populate_source_use_type_physics_mapping(store)?;
+    populate_pollutant_process_mapped_model_year(store)?;
     populate_zone_month_hour_meteorology(store)?;
     populate_link_from_zone_road_type(store)?;
+    // The default DB ships an all-zero "placeholder" row (fuelFormulationID=0)
+    // in FuelSupply with NULL market-share columns. Real fuel supplies always
+    // carry a value; the placeholder never joins real data, so fill its NULLs
+    // with 0.0 rather than have the strict per-row extractors error on it.
+    fill_f64_nulls(store, "FuelSupply", &["marketShare", "marketShareCV"]);
     build_runspec_tables(runspec, store)?;
     Ok(())
+}
+
+/// Replace NULLs with 0.0 in the named Float64-castable columns of `table`,
+/// in place. No-op if the table or a column is absent. Uses polars-core only.
+fn fill_f64_nulls(store: &mut InMemoryStore, table: &str, columns: &[&str]) {
+    let Some(arc) = store.get(table) else {
+        return;
+    };
+    let mut df = (*arc).clone();
+    drop(arc);
+    let mut changed = false;
+    for &want in columns {
+        let actual = df
+            .columns()
+            .iter()
+            .find(|c| c.name().to_ascii_lowercase() == want.to_ascii_lowercase())
+            .map(|c| c.name().to_string());
+        let Some(name) = actual else { continue };
+        let Ok(casted) = df
+            .column(&name)
+            .and_then(|c| c.cast(&DataType::Float64))
+        else {
+            continue;
+        };
+        let Ok(ca) = casted.f64() else { continue };
+        if ca.null_count() == 0 {
+            continue;
+        }
+        let filled: Vec<f64> = (0..ca.len()).map(|i| ca.get(i).unwrap_or(0.0)).collect();
+        let series: Column = Series::new(name.as_str().into(), filled).into();
+        if df.with_column(series).is_ok() {
+            changed = true;
+        }
+    }
+    if changed {
+        store.insert(table.to_string(), df);
+    }
 }
 
 /// Build [`GeographyTables`] from `Link` and `County` tables in the store.
@@ -765,6 +808,40 @@ fn build_runspec_tables(runspec: &RunSpec, store: &mut InMemoryStore) -> Result<
     .map_err(|e| format!("building RunSpecSourceFuelType: {e}"))?;
     store.insert("RunSpecSourceFuelType".to_string(), sf_df);
 
+    Ok(())
+}
+
+/// Synthesise `PollutantProcessMappedModelYear` from `PollutantProcessModelYear`.
+///
+/// MOVES builds this table during execution-DB setup by mapping each
+/// `(polProcessID, modelYearID)` through `modelYearMapping` (a user→standard
+/// model-year remap). The default DB ships an empty `modelYearMapping`, so the
+/// mapping is the identity and the result is a direct projection of
+/// `PollutantProcessModelYear`'s `(polProcessID, modelYearID, IMModelYearGroupID)`
+/// columns. Calculators (BaseRate, criteria, NOx, …) read this table to expand
+/// per-pollutant-process ratios across model years; without it they fail with
+/// "table 'PollutantProcessMappedModelYear' not found in store".
+///
+/// No-op when the table already exists or the source table is absent. Uses
+/// polars-core only (wasm32-compatible).
+fn populate_pollutant_process_mapped_model_year(
+    store: &mut InMemoryStore,
+) -> Result<(), String> {
+    if store.contains("PollutantProcessMappedModelYear")
+        || !store.contains("PollutantProcessModelYear")
+    {
+        return Ok(());
+    }
+
+    // With an identity model-year mapping the mapped table carries exactly the
+    // source table's columns (polProcessID, modelYearID, modelYearGroupID,
+    // fuelMYGroupID, IMModelYearGroupID) — different calculators read different
+    // subsets — so copy the source wholesale under the mapped name.
+    let mapped: DataFrame = (*store
+        .get("PollutantProcessModelYear")
+        .expect("present after contains check"))
+    .clone();
+    store.insert("PollutantProcessMappedModelYear".to_string(), mapped);
     Ok(())
 }
 
