@@ -311,7 +311,15 @@ impl MasterLoopable for CalculatorMasterLoopable {
         let df = {
             let mut ctx = self.ctx.lock().expect("CalculatorContext mutex poisoned");
             ctx.set_position(context.position);
-            self.module.execute(&mut ctx)?
+            let out = self.module.execute(&mut ctx)?;
+ // A generator writes its output tables to scratch; promote them into the
+ // slow tier so downstream calculators in this chunk — which read every
+ // input through `ctx.tables()` — observe them. (Calculators write no
+ // scratch, so this is skipped for them.)
+            if matches!(*self.module, ModuleInstance::Generator(_)) {
+                ctx.promote_scratch();
+            }
+            out
  // ctx lock released here — conversion and accumulator write happen outside
         };
         if let Some(df) = df {

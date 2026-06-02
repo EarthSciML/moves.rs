@@ -239,6 +239,44 @@ pub fn chunk_chains(registry: &CalculatorRegistry, names: &[&str]) -> Result<Vec
         }
     }
 
+ // Producer→consumer table-dependency edges. The chain DAG (`depends_on`)
+ // only links calculator-to-calculator chains; it does NOT connect a
+ // generator to the calculators that read the scratch tables it produces.
+ // Without these edges a generator lands in its own singleton chunk, and
+ // because scratch is per-chunk-isolated, its output never reaches the
+ // consumer — the consumer then fails with "table not found in store".
+ //
+ // Connect any consumer whose `input_tables()` intersect a producer's
+ // `output_tables()` so producer and consumer share a chunk (and thus a
+ // `CalculatorContext`). Execution order within the chunk is handled by the
+ // MasterLoop's (granularity, priority) sort — generators fire before the
+ // emission calculators — so the undirected grouping is all chunking needs.
+    let mut producers_by_table: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+    for &name in &members {
+        if let Some(outputs) = registry.module_output_tables_of(name) {
+            for table in outputs {
+                producers_by_table.entry(table.as_str()).or_default().push(name);
+            }
+        }
+    }
+    for &name in &members {
+        let Some(inputs) = registry.module_input_tables_of(name) else {
+            continue;
+        };
+        for table in inputs {
+            let Some(producers) = producers_by_table.get(table.as_str()) else {
+                continue;
+            };
+            for &producer in producers {
+                if producer == name {
+                    continue;
+                }
+                adjacency.entry(name).or_default().insert(producer);
+                adjacency.entry(producer).or_default().insert(name);
+            }
+        }
+    }
+
  // Connected components via BFS. Iterating `members` in sorted order
  // and starting each component at the first not-yet-seen member means
  // components are discovered — and therefore returned — ordered by

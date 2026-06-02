@@ -121,6 +121,7 @@ pub fn setup_execution_store(
 ) -> Result<(), String> {
     merge_store_variants_eager(store)?;
     populate_source_use_type_physics_mapping(store)?;
+    populate_pollutant_process_mapped_model_year(store)?;
     populate_zone_month_hour_meteorology(store)?;
     populate_link_from_zone_road_type(store)?;
     build_runspec_tables(runspec, store)?;
@@ -765,6 +766,40 @@ fn build_runspec_tables(runspec: &RunSpec, store: &mut InMemoryStore) -> Result<
     .map_err(|e| format!("building RunSpecSourceFuelType: {e}"))?;
     store.insert("RunSpecSourceFuelType".to_string(), sf_df);
 
+    Ok(())
+}
+
+/// Synthesise `PollutantProcessMappedModelYear` from `PollutantProcessModelYear`.
+///
+/// MOVES builds this table during execution-DB setup by mapping each
+/// `(polProcessID, modelYearID)` through `modelYearMapping` (a user→standard
+/// model-year remap). The default DB ships an empty `modelYearMapping`, so the
+/// mapping is the identity and the result is a direct projection of
+/// `PollutantProcessModelYear`'s `(polProcessID, modelYearID, IMModelYearGroupID)`
+/// columns. Calculators (BaseRate, criteria, NOx, …) read this table to expand
+/// per-pollutant-process ratios across model years; without it they fail with
+/// "table 'PollutantProcessMappedModelYear' not found in store".
+///
+/// No-op when the table already exists or the source table is absent. Uses
+/// polars-core only (wasm32-compatible).
+fn populate_pollutant_process_mapped_model_year(
+    store: &mut InMemoryStore,
+) -> Result<(), String> {
+    if store.contains("PollutantProcessMappedModelYear")
+        || !store.contains("PollutantProcessModelYear")
+    {
+        return Ok(());
+    }
+
+    // With an identity model-year mapping the mapped table carries exactly the
+    // source table's columns (polProcessID, modelYearID, modelYearGroupID,
+    // fuelMYGroupID, IMModelYearGroupID) — different calculators read different
+    // subsets — so copy the source wholesale under the mapped name.
+    let mapped: DataFrame = (*store
+        .get("PollutantProcessModelYear")
+        .expect("present after contains check"))
+    .clone();
+    store.insert("PollutantProcessMappedModelYear".to_string(), mapped);
     Ok(())
 }
 

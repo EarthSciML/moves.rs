@@ -200,6 +200,25 @@ impl CalculatorContext {
         &mut self.scratch
     }
 
+ /// Make generator scratch output visible to calculators that read the slow
+ /// tier through [`tables`](Self::tables).
+ ///
+ /// Generators write their output tables (SHO, BaseRateByAge, …) to
+ /// [`scratch_mut`](Self::scratch_mut), but most calculators read every
+ /// input — default-DB and generator-produced alike — through
+ /// `ctx.tables()`. This copies the scratch tables into the slow store
+ /// (cheap `Arc` clones; `Arc::make_mut` clones the chunk's slow store only
+ /// on first write) so both read paths resolve generator output. Scratch is
+ /// left intact, so the calculators that read `ctx.scratch()` directly keep
+ /// working.
+    pub fn promote_scratch(&mut self) {
+        if self.scratch.store.is_empty() {
+            return;
+        }
+        let slow = std::sync::Arc::make_mut(&mut self.slow);
+        self.scratch.store.copy_into(slow);
+    }
+
  /// Current MasterLoop iteration / location / time triple.
     #[must_use]
     pub fn position(&self) -> &IterationPosition {
