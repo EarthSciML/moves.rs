@@ -274,10 +274,12 @@ pub trait DataFrameStoreTyped: DataFrameStore {
                     .ok_or_else(|| {
                         Error::Polars(format!("column '{want}' not found in table '{name}'"))
                     })?;
- // Clone the Series behind the Column (Arc refcount bump — O(1)).
-                col.as_series()
-                    .cloned()
-                    .ok_or_else(|| Error::Polars(format!("column '{want}' is not a Series")))
+ // Materialize the Series behind the Column. `as_materialized_series`
+ // (unlike `as_series`) also handles a `ScalarColumn` — e.g. a
+ // length-1 table whose column Polars stores as a broadcast scalar —
+ // by expanding it to a full Series, so single-row input tables read
+ // correctly.
+                Ok(col.as_materialized_series().clone())
             })
             .collect()
     }
