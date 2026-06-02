@@ -419,3 +419,34 @@ variants, RunSpec/model fields) and were intentionally NOT applied this pass.
 - **crates/moves-rate-of-progress/src/control_strategy.rs**: The crate's data model (crates/moves-rate-of-progress/src/model.rs: RopRecord with reductionFraction keyed by pollutantID/sourceTypeID/regClassID/modelYearID, plus emission_scale_factor/scale_factor) and its csv_io parser do not correspond to any field in canonical MOVES RateOfProgress, which uses a single useParameters boolean and the spDoRateOfProgress SQL. This whole data model likely needs redesign (or removal) to match canonical behavior; assess separately.
 - **crates/moves-rate-of-progress/src/control_strategy.rs**: A faithful port of RateOfProgressControlStrategy::pre_run requires the moves-framework / execution-DB data plane to expose default-DB tables (modelYearCutPoints, modelYearGroup, year, and the ~25 rate/fuel/ratio tables) and a model-year-group decode step so spDoRateOfProgress can be reimplemented; track as a framework data-plane work item.
 - **crates/moves-nonroad/tests/nonroad_fidelity.rs**: When the NONROAD fixture-data loaders (NR*.ACT, NR*.GRW, …) are ported and NonroadInputs is populated for fixtures in reference_corpus_validates_when_present, replace the eprintln of report.summary() at crates/moves-nonroad/tests/nonroad_fidelity.rs:348-352 with `assert!(report.passed(), "...")` (or an explicit, justified per-fixture divergence budget) so a numerical fidelity regression fails the test. Also update the now-stale contract note in crates/moves-nonroad/tests/fidelity/mod.rs:40-44.
+
+---
+
+# Investigation: consistency of applied changes + deferred cross-file items
+
+## A. Are the applied changes consistent?
+
+**Direction — consistent.** Across the 79 files the fixes pull one way: 83 `unwrap_or`/`unwrap_or_default`/`unwrap_or(0.0)` call sites were removed and replaced with `ok_or`/`ok_or_else` (73) and explicit `?`/`return Err` (41). "Surface the gap, don't fabricate" was applied uniformly. No `todo!`/`unimplemented!` were *introduced*; 9 silent stubs were converted to explicit `Error::NotImplemented` (project_tag, onroad-retrofit, rate-of-progress).
+
+**Policy on missing data — consistent.** Every agent that hit "missing context year" agreed it must not be defaulted (airtoxics, welltopump/co2_atmospheric, nonroad_emission all removed the fabricated year). Stale "this is an empty stub" docstrings on fully-wired code were corrected the same way in several files; misleading tests that pinned wrong values were corrected in the same commit as the code (month off-by-one, sourceTypeID rollup, project_tag).
+
+**Mechanism — inconsistent (4 real inconsistencies for human review):**
+
+1. **error vs skip for the *same* condition.** Missing context year → hard error in `airtoxics.rs`, but a **silent record-skip** (`CalculatorOutput::empty()`) in `nonroad_emission.rs`. These are opposite policies; only one can be right, and it depends on whether the master loop guarantees a bound year (which the agents couldn't see consistently). **Needs a single decision.**
+2. **error-variant choice is ad hoc.** The same "required context value absent" maps to `Error::Polars(String)` (airtoxics — a polars catch-all misused), `Error::RowExtraction{column}` (co2_atmospheric), and `Error::Config`/`Error::Parse` elsewhere. There is no shared `MissingContext`/`MissingData` variant, so agents reached for whatever existed. Recommend adding one variant and normalising.
+3. **error vs panic is signature-driven, not policy-driven.** Where a fn returned `Result`, agents returned `Err` (41×). Where the signature was infallible (`nonroad_loader` builder chain), they `panic!`ed (5×, each with a canonical-source-cited message, e.g. `rdscrp.f`/`rdemfc.f`). The panics are individually justified but the loader chain should be made fallible so they become `Err`.
+4. **hardening coverage is uneven.** Calculator paths (which return `Result`) got hardened; the NONROAD geography-trait paths (`day_month_factor`, `emission_adjustments` return plain values) could **not** be hardened and still fabricate neutral values — left deferred. So error-surfacing is good in calculators, absent in geography.
+
+## B. The 17 deferred cross-file items — grouped, verified, prioritised
+
+| # | Theme | Items | Verified | Impact |
+|---|---|---|---|---|
+| 1 | **NONROAD `bsfc=1.0` fuel-consumption error** | 15, 17 (+prcnat:557) | ✅ `prcus.rs:621` `* 1.0 /`; `process.rs:646` faithful | Overstates US-total & national fuel by ~1/bsfc (≈2×). **Latent** — exhaust adapters stub-`Err` today. Contained fix: add `bsfc` to `ExhaustResult`, populate in every `calculate_exhaust`, use in `fulbmy`. |
+| 2 | **NONROAD production loaders unported** | 1(ALO),2(EMF-evap),3(TMF),4(emsadj/temp),5(SCO),6(EMF-BSFC),7,8 | partial | Executor fabricates uniform population, `mthf=dayf=ndays=1` (TMF `ndays=1` collapses an annual run ~365×), 75 °F, zero BSFC. Several consuming paths now `Err`; geography-trait ones cannot. Biggest gap: the NONROAD production numeric path is largely a skeleton. |
+| 3 | **Signatures block correctness** | 3,4,9,10,16 | ✅ traits return non-`Result`; `CalculatorContext` lacks domain/params | Geography traits can't surface errors; context can't reach run domain / `-parameters=` list / PPA `isAffectedByOnroad/Nonroad` / ROP strategy. Needs accessors in moves-framework / moves-data / moves-runspec. |
+| 4 | **BaseRate collapses regClassID too early** | 11 | ✅ `aggregate.rs:58` `key.reg_class_id = 0;` | Canonical discards regClass only at final output aggregation; collapsing it before speciation makes `methaneTHCRatio`/`HCSpeciation` (keyed on regClass) silently emit nothing. Upstream bug breaking hcspeciation. |
+| 5 | **fuel-supply missing: drop vs panic** | 13 | — | Go `streamBaseRate` panics on the non-age path; port drops on both, silently zeroing emissions. Needs a `panic_on_missing` flag threaded through `mod.rs`. |
+| 6 | **RunSpec fuel_year/region filters dropped** | 14 | — | `fuel_years`/`region_ids` left empty → fuelSupply loaded unfiltered → wrong-region/year formulations. Needs DB-derived two-phase merge. |
+| 7 | **roadTypeID=0 placeholder** | 12 | — | Multiday TVV stamps `road_type_id:0`; canonical uses `iterLocation.roadTypeRecordID`. Needs road_type on `ExecutionLocation`. |
+
+**Most contained / highest-value to do next:** #4 (regClassID, single-crate), #1 (bsfc, ~4 files, well-specified), #5 (drop-vs-panic). #2/#3 are large (loader ports + architectural accessors).
