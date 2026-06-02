@@ -100,13 +100,30 @@ if [ -z "${TSV_DIR}" ]; then
 
     echo "[convert-default-db] stage 1: dumping ${DB} to ${TSV_DIR}"
     DUMP_SCRIPT="${REPO_ROOT}/characterization/default-db-conversion/dump-default-db.sh"
+
+    # The SIF image is read-only at runtime, so MariaDB cannot write into the
+    # baked-in /var/lib/mysql (datadir) or /var/run/mysqld (socket/pid/error
+    # log). Mirror the writable setup that run-moves.sh uses: bind writable
+    # host scratch dirs over both paths, add a tmpfs overlay for any other
+    # in-image writes (e.g. /tmp), and seed the datadir from the read-only
+    # /var/lib/mysql-seed via init-mariadb.sh before starting mariadbd.
+    # Without this, mariadbd aborts with "Read-only file system".
+    MARIADB_RT="$(mktemp -d "${TMPDIR:-/tmp}/moves-mariadb-rt.XXXXXX")"
+    MARIADB_DATA="${MARIADB_RT}/data"
+    MARIADB_SOCK_DIR="${MARIADB_RT}/run"
+    mkdir -p "${MARIADB_DATA}" "${MARIADB_SOCK_DIR}"
+    trap 'rm -rf "${MARIADB_RT}"' EXIT
+
     apptainer exec \
+        --writable-tmpfs \
+        --bind "${MARIADB_DATA}:/var/lib/mysql" \
+        --bind "${MARIADB_SOCK_DIR}:/var/run/mysqld" \
         --bind "${TSV_DIR}:/captures" \
         --bind "${DUMP_SCRIPT}:/opt/moves-bin/dump-default-db.sh:ro" \
         --env "DEFAULT_DB=${DB}" \
         --env "SOURCE_DUMP_SHA=${SOURCE_DUMP_SHA}" \
         "${SIF}" \
-        bash /opt/moves-bin/dump-default-db.sh
+        bash -c 'set -eu; /opt/moves-bin/init-mariadb.sh; bash /opt/moves-bin/dump-default-db.sh'
 else
     echo "[convert-default-db] stage 1 skipped (using --tsv-dir=${TSV_DIR})"
 fi
