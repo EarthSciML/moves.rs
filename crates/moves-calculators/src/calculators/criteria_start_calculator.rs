@@ -558,6 +558,16 @@ pub struct RunContext {
  /// `##context.iterLocation.stateRecordID##` — the run's state. Stamped as
  /// `stateID` on the worker output.
     pub state_id: i32,
+ /// `##context.iterLocation.zoneRecordID##` — the run's zone. The canonical
+ /// extract scopes `ZoneMonthHour` to the context (its worker DB holds only
+ /// the running zone's rows); the replayed execution-DB snapshot carries
+ /// *every* zone's `ZoneMonthHour` (930 816 at national scale = ~3232 zones
+ /// × 12 months × 24 hours), so `met_start_adjustment` filters to this zone.
+ /// Looping the whole table would multiply CSEC-3 by the zone count — the
+ /// source of the observed `mixed-onroad-nonroad` memory blow-up — and the
+ /// extra zones are inner-joined away downstream against the context-scoped
+ /// `Starts2` anyway, so the filter is result-preserving.
+    pub zone_id: i32,
  /// `##pollutantProcessIDs##` — the run's `polProcessID`s, the
  /// RunSpec-intersected subset of the calculator's `{102, 202, 302}`
  /// capability. CSEC 2-a filters `PollutantProcessAssoc` to this set (the
@@ -2893,7 +2903,24 @@ fn fuel_supply_adjustment(
 /// Year × ZoneMonthHour` with the start-temperature equation applied per
 /// `startTempEquationType`. `ZoneMonthHour` is extract-filtered to the run's
 /// zone.
-fn met_start_adjustment(inputs: &CriteriaStartInputs) -> Vec<MetStartAdjustment> {
+fn met_start_adjustment(
+    inputs: &CriteriaStartInputs,
+    ctx: &RunContext,
+) -> Vec<MetStartAdjustment> {
+ // Scope `ZoneMonthHour` to the context zone. The canonical extract's worker
+ // DB holds only the running zone; the replayed snapshot carries every zone
+ // (930 816 rows at national scale), and the `sta × ppmy × ZoneMonthHour`
+ // product over all of them is the `mixed-onroad-nonroad` 41 GB blow-up. The
+ // non-context zones are inner-joined away downstream against `Starts2`
+ // anyway (the (zone, month, hour, …) join in `assemble_emission_output`),
+ // so this filter is result-preserving. `zone_id == 0` (an unset context,
+ // e.g. unit tests) imposes no filter.
+    let zmh_rows: Vec<&ZoneMonthHourRow> = inputs
+        .zone_month_hour
+        .iter()
+        .filter(|zmh| ctx.zone_id == 0 || zmh.zone_id == ctx.zone_id)
+        .collect();
+
  // PollutantProcessMappedModelYear indexed for the `(polProcessID,
  // modelYearGroupID)` join — a group spans several model years.
     let mut ppmy_by_key: FxHashMap<(i32, i32), Vec<&PollutantProcessMappedModelYearRow>> =
@@ -2916,7 +2943,7 @@ fn met_start_adjustment(inputs: &CriteriaStartInputs) -> Vec<MetStartAdjustment>
             continue;
         };
         for ppmy in ppmys {
-            for zmh in &inputs.zone_month_hour {
+            for zmh in &zmh_rows {
                 let delta = zmh.temperature.min(START_TEMP_REFERENCE_F) - START_TEMP_REFERENCE_F;
                 let temperature_adjustment = if sta.equation_type.eq_ignore_ascii_case("LOG") {
                     sta.term_b * (sta.term_a * delta).exp() + sta.term_c
@@ -3501,7 +3528,7 @@ impl CriteriaStartCalculator {
             },
             || {
                 join(
-                    || met_start_adjustment(inputs),
+                    || met_start_adjustment(inputs, ctx),
                     || build_starts2(inputs, ctx),
                 )
             },
@@ -3612,6 +3639,7 @@ impl Calculator for CriteriaStartCalculator {
             county_id: pos.location.county_id.map(|c| c as i32).unwrap_or(0),
             link_id: pos.location.link_id.map(|l| l as i32).unwrap_or(0),
             state_id: pos.location.state_id.map(|s| s as i32).unwrap_or(0),
+            zone_id: pos.location.zone_id.map(|z| z as i32).unwrap_or(0),
             pol_process_ids,
         };
         let inputs = CriteriaStartInputs {
@@ -3667,6 +3695,7 @@ mod tests {
             county_id: 26_161,
             link_id: 5001,
             state_id: 26,
+            zone_id: 90,
             pol_process_ids: vec![CO_START_POL_PROCESS],
         }
     }

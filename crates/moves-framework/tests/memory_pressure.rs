@@ -96,7 +96,7 @@ fn peak_rss_grows_with_the_parallelism_limit() {
     let registry = synthetic_registry();
     let names: Vec<String> = (0..MODULE_COUNT).map(|i| format!("mod{i:02}")).collect();
     let refs: Vec<&str> = names.iter().map(String::as_str).collect();
-    let chunks = chunk_chains(&registry, &refs).unwrap();
+    let chunks = chunk_chains(&registry, &refs, &std::collections::BTreeSet::new()).unwrap();
     assert_eq!(
         chunks.len(),
         MODULE_COUNT,
