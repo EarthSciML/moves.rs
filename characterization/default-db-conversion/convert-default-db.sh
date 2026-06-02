@@ -131,6 +131,31 @@ if [ -z "${TSV_DIR}" ]; then
     mkdir -p "${MARIADB_DATA}" "${MARIADB_SOCK_DIR}"
     trap 'rm -rf "${MARIADB_RT}"' EXIT
 
+    # >>> TEMP BIND DIAGNOSTIC (remove before merge) <<<
+    echo "=== BIND DIAGNOSTIC ==="
+    apptainer --version || true
+    echo "fakeroot flag: ${FAKEROOT_FLAG[*]:-<none>}"
+    echo "host MARIADB_DATA=${MARIADB_DATA}"
+    apptainer exec \
+        "${FAKEROOT_FLAG[@]}" \
+        --writable-tmpfs \
+        --bind "${MARIADB_DATA}:/var/lib/mysql" \
+        --bind "${MARIADB_SOCK_DIR}:/var/run/mysqld" \
+        "${SIF}" \
+        bash -c '
+            set +e
+            echo "id: $(id)"
+            echo "--- mounts (mysql/overlay/tmpfs) ---"
+            { findmnt -no SOURCE,TARGET,FSTYPE /var/lib/mysql 2>/dev/null; mount 2>/dev/null | grep -Ei "mysql|overlay|tmpfs"; } | head -20
+            echo "--- ls /var/lib/mysql ---"; ls -la /var/lib/mysql 2>&1 | head -6
+            echo "--- ls /var/lib/mysql-seed ---"; ls -la /var/lib/mysql-seed 2>&1 | head -6
+            touch /var/lib/mysql/__wt 2>&1 && echo "MYSQL_WRITABLE=yes" || echo "MYSQL_WRITABLE=no"
+            touch /var/run/mysqld/__wt 2>&1 && echo "RUN_WRITABLE=yes" || echo "RUN_WRITABLE=no"
+            echo "--- baked init-mariadb.sh (head) ---"; head -40 /opt/moves-bin/init-mariadb.sh 2>&1
+        ' || true
+    echo "=== END DIAGNOSTIC ==="
+    # >>> END TEMP DIAGNOSTIC <<<
+
     apptainer exec \
         "${FAKEROOT_FLAG[@]}" \
         --writable-tmpfs \
