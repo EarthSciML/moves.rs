@@ -46,9 +46,15 @@
 //! values (weeks per calendar month, weekday/weekend portion-of-week
 //! split) come from the `monthOfAnyYear` / `dayOfAnyWeek` reference tables
 //! the framework reads at run time. [`UnitScaling`] is the identity
-//! implementation — correct for any [`TemporalScaling::None`] plan and a
-//! placeholder until the reference-table-backed factors are wired in Task
-//! 27 (`MOVESEngine`).
+//! implementation — correct only for a [`TemporalScaling::None`] plan. A plan
+//! whose `SUM` carries any other [`TemporalScaling`] is *rejected* (rather
+//! than silently scaled by `1.0`) unless the supplied
+//! [`TemporalScalingFactors`] reports real, reference-table-backed factors via
+//! [`TemporalScalingFactors::supplies_temporal_factors`]; see that method for
+//! why. Until those factors are wired into `MOVESEngine`, every onroad
+//! emission/activity aggregation (which carries `WeeksPerMonth` /
+//! `PortionOfWeekPerDay` scaling) therefore errors loudly instead of producing
+//! numbers that diverge from the reference.
 //!
 //! # Determinism
 //!
@@ -107,14 +113,40 @@ pub trait TemporalScalingFactors {
  /// `day_id` when the plan's [`TemporalScaling`] is
  /// [`TemporalScaling::PortionOfWeekPerDay`].
     fn portion_of_week_per_day(&self, day_id: Option<i16>) -> f64;
+
+ /// Whether this implementation supplies real, reference-table-backed
+ /// temporal factors (as opposed to the [`UnitScaling`] identity
+ /// placeholder).
+ ///
+ /// Aggregation of a plan whose `SUM` carries a [`TemporalScaling`] other
+ /// than [`TemporalScaling::None`] requires real `weeksPerMonth` /
+ /// `portionOfWeekPerDay` factors from the `monthOfAnyYear` /
+ /// `dayOfAnyWeek` reference tables (see
+ /// `AggregationSQLGenerator.generateSQLsForWorker`, which multiplies the
+ /// metric by `getWeeksPerMonthSQLClause` / `getPortionOfWeekPerDayClause`
+ /// at AggregationSQLGenerator.java:1576-1600). An identity provider would
+ /// silently report a single sample week/day as if it were a whole month —
+ /// numbers that diverge from the reference with no error. The aggregation
+ /// entry points reject that combination by checking this flag, so the
+ /// missing factor surfaces as an [`Error::AggregationPlanMismatch`] rather
+ /// than a silent `1.0`.
+ ///
+ /// Defaults to `false`; the identity [`UnitScaling`] keeps the default.
+    fn supplies_temporal_factors(&self) -> bool {
+        false
+    }
 }
 
 /// A [`TemporalScalingFactors`] that always returns `1.0`.
 ///
-/// Use this for any plan whose `SUM` carries [`TemporalScaling::None`]
-/// (where no factor is consulted at all) and as the placeholder
-/// until the `monthOfAnyYear` / `dayOfAnyWeek`-backed factors are wired in
-/// by (`MOVESEngine`).
+/// Use this only for a plan whose `SUM` carries [`TemporalScaling::None`]
+/// (where no factor is consulted at all). It reports
+/// [`supplies_temporal_factors`](TemporalScalingFactors::supplies_temporal_factors)
+/// `== false`, so the aggregation entry points *reject* it for any plan that
+/// demands `WeeksPerMonth` / `PortionOfWeekPerDay` rescaling rather than
+/// silently applying the identity `1.0` — those plans must wait until the
+/// `monthOfAnyYear` / `dayOfAnyWeek`-backed factors are wired into
+/// `MOVESEngine`.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct UnitScaling;
 
@@ -148,8 +180,11 @@ impl TemporalScalingFactors for UnitScaling {
 ///
 /// Returns [`Error::AggregationPlanMismatch`] if `plan` does not target
 /// [`AggregationTable::Emission`], if it does not `SUM` exactly the
-/// `emissionQuant` column, or if a group-by key names a column that is not
-/// part of the `MOVESOutput` schema.
+/// `emissionQuant` column, if a group-by key names a column that is not part
+/// of the `MOVESOutput` schema, or if the plan's `SUM` carries a
+/// [`TemporalScaling`] other than [`TemporalScaling::None`] while `factors`
+/// does not supply real reference-table-backed factors (see
+/// [`TemporalScalingFactors::supplies_temporal_factors`]).
 pub fn aggregate_emissions(
     plan: &AggregationPlan,
     records: &[EmissionRecord],
@@ -162,6 +197,7 @@ pub fn aggregate_emissions(
         )));
     }
     let scaling = plan_sum_scaling(plan, "emissionQuant")?;
+    require_real_factors(scaling, factors)?;
     let keys = plan.group_by();
 
     let mut groups: BTreeMap<Vec<KeyValue>, Accum<'_, EmissionRecord>> = BTreeMap::new();
@@ -197,8 +233,11 @@ pub fn aggregate_emissions(
 ///
 /// Returns [`Error::AggregationPlanMismatch`] if `plan` does not target
 /// [`AggregationTable::Activity`], if it does not `SUM` exactly the
-/// `activity` column, or if a group-by key names a column that is not part
-/// of the `MOVESActivityOutput` schema.
+/// `activity` column, if a group-by key names a column that is not part
+/// of the `MOVESActivityOutput` schema, or if the plan's `SUM` carries a
+/// [`TemporalScaling`] other than [`TemporalScaling::None`] while `factors`
+/// does not supply real reference-table-backed factors (see
+/// [`TemporalScalingFactors::supplies_temporal_factors`]).
 pub fn aggregate_activity(
     plan: &AggregationPlan,
     records: &[ActivityRecord],
@@ -211,6 +250,7 @@ pub fn aggregate_activity(
         )));
     }
     let scaling = plan_sum_scaling(plan, "activity")?;
+    require_real_factors(scaling, factors)?;
     let keys = plan.group_by();
 
     let mut groups: BTreeMap<Vec<KeyValue>, Accum<'_, ActivityRecord>> = BTreeMap::new();
@@ -307,13 +347,18 @@ impl StreamingEmissionAgg {
  /// # Errors
  ///
  /// Returns [`Error::AggregationPlanMismatch`] if a group-by column name
- /// in the plan is not a recognised `MOVESOutput` column. In practice
- /// this cannot happen when the plan is built from a valid RunSpec.
+ /// in the plan is not a recognised `MOVESOutput` column (in practice this
+ /// cannot happen when the plan is built from a valid RunSpec), or if the
+ /// plan's `SUM` carries a [`TemporalScaling`] other than
+ /// [`TemporalScaling::None`] while `factors` does not supply real
+ /// reference-table-backed factors (see
+ /// [`TemporalScalingFactors::supplies_temporal_factors`]).
     pub fn extend(
         &mut self,
         records: &[EmissionRecord],
         factors: &impl TemporalScalingFactors,
     ) -> Result<()> {
+        require_real_factors(self.scaling, factors)?;
         for rec in records {
  // Drop MOVES' synthetic, output-internal pollutants (altTHC 10001,
  // altNMHC 10079): they are produced only to feed HC speciation via
@@ -435,6 +480,33 @@ fn plan_sum_scaling(plan: &AggregationPlan, metric: &str) -> Result<TemporalScal
     }
 }
 
+/// Reject a plan that demands temporal rescaling while only an identity
+/// factor provider is available.
+///
+/// When the plan's `SUM` carries a [`TemporalScaling`] other than
+/// [`TemporalScaling::None`], the MOVES Worker SQL multiplies the metric by a
+/// real `weeksPerMonth` / `portionOfWeekPerDay` factor drawn from the
+/// `monthOfAnyYear` / `dayOfAnyWeek` reference tables
+/// (`AggregationSQLGenerator.java:1576-1600`). Applying the [`UnitScaling`]
+/// identity `1.0` instead would silently report a single sample week or day as
+/// if it were a whole month — a successful-looking run whose numbers diverge
+/// from the reference. Until the reference-table-backed factors are wired into
+/// the engine, surface that as an error rather than fabricate the wrong total.
+fn require_real_factors(
+    scaling: TemporalScaling,
+    factors: &impl TemporalScalingFactors,
+) -> Result<()> {
+    if scaling != TemporalScaling::None && !factors.supplies_temporal_factors() {
+        return Err(Error::AggregationPlanMismatch(format!(
+            "plan SUM requires {scaling:?} temporal rescaling, but the supplied \
+             TemporalScalingFactors is the identity placeholder (UnitScaling); \
+             reference-table-backed weeksPerMonth/portionOfWeekPerDay factors \
+             must be wired in before aggregating this plan"
+        )));
+    }
+    Ok(())
+}
+
 /// `value` when `keep` is set, `None` otherwise — the per-column rule for a
 /// dimension that may or may not survive aggregation.
 fn keep_opt<T>(keep: bool, value: Option<T>) -> Option<T> {
@@ -535,12 +607,15 @@ fn build_emission_output(
         link_id: keep_opt(kept("linkID"), rep.link_id),
         pollutant_id: keep_opt(kept("pollutantID"), rep.pollutant_id),
         process_id: keep_opt(kept("processID"), rep.process_id),
- // sourceTypeID uses MySQL ANY_VALUE semantics: the representative
- // record's value is always carried through regardless of whether
- // sourceTypeID is a GROUP BY key. This matches canonical MOVES,
- // where MySQL returns an arbitrary (but non-NULL) value for non-grouped
- // columns when all rows in the group share the same source type.
-        source_type_id: rep.source_type_id,
+ // sourceTypeID collapses to NULL when it is not a GROUP BY key, like
+ // every other non-key dimension. AggregationSQLGenerator.java emits
+ // `null as sourceTypeID` for the master/worker/activity SELECTs when
+ // `!outputEmissionsBreakdownSelection.sourceUseType`
+ // (AggregationSQLGenerator.java:1353-1366); only when sourceUseType is
+ // true does sourceTypeID join the GROUP BY. Carrying the representative
+ // row's value through would mislabel summed emissions whenever rows of
+ // different source types merge into one group.
+        source_type_id: keep_opt(kept("sourceTypeID"), rep.source_type_id),
         reg_class_id: keep_opt(kept("regClassID"), rep.reg_class_id),
         fuel_type_id: keep_opt(kept("fuelTypeID"), rep.fuel_type_id),
         fuel_sub_type_id: keep_opt(kept("fuelSubTypeID"), rep.fuel_sub_type_id),
@@ -578,7 +653,11 @@ fn build_activity_output(
         county_id: keep_opt(kept("countyID"), rep.county_id),
         zone_id: keep_opt(kept("zoneID"), rep.zone_id),
         link_id: keep_opt(kept("linkID"), rep.link_id),
-        source_type_id: rep.source_type_id,
+        // sourceTypeID collapses to NULL unless it is a GROUP BY key, matching
+        // AggregationSQLGenerator.java's `null as sourceTypeID` for the
+        // activity SELECT when `!outputEmissionsBreakdownSelection.sourceUseType`
+        // (AggregationSQLGenerator.java:1353-1366).
+        source_type_id: keep_opt(kept("sourceTypeID"), rep.source_type_id),
         reg_class_id: keep_opt(kept("regClassID"), rep.reg_class_id),
         fuel_type_id: keep_opt(kept("fuelTypeID"), rep.fuel_type_id),
         fuel_sub_type_id: keep_opt(kept("fuelSubTypeID"), rep.fuel_sub_type_id),
@@ -614,6 +693,29 @@ mod tests {
         }
         fn portion_of_week_per_day(&self, day_id: Option<i16>) -> f64 {
             f64::from(day_id.unwrap_or(1))
+        }
+        fn supplies_temporal_factors(&self) -> bool {
+            true
+        }
+    }
+
+    /// A *real* (engine-supplied) factor provider whose factors all happen to
+    /// evaluate to `1.0` — e.g. a month whose `weeksPerMonth` is exactly 1.
+    /// Distinct from [`UnitScaling`] in that it reports
+    /// `supplies_temporal_factors() == true`, so the aggregation entry points
+    /// accept a `WeeksPerMonth` / `PortionOfWeekPerDay` plan. Used where a
+    /// test exercises a sub-year timestep but wants clean (un-rescaled) sums.
+    struct IdentityRealFactors;
+
+    impl TemporalScalingFactors for IdentityRealFactors {
+        fn weeks_per_month(&self, _year_id: Option<i16>, _month_id: Option<i16>) -> f64 {
+            1.0
+        }
+        fn portion_of_week_per_day(&self, _day_id: Option<i16>) -> f64 {
+            1.0
+        }
+        fn supplies_temporal_factors(&self) -> bool {
+            true
         }
     }
 
@@ -726,7 +828,7 @@ mod tests {
             emission(2, 7, Some(2.0)),
             emission(3, 1, Some(4.0)),
         ];
-        let out = aggregate_emissions(&plan, &rows, &UnitScaling).unwrap();
+        let out = aggregate_emissions(&plan, &rows, &IdentityRealFactors).unwrap();
 
         assert_eq!(out.len(), 2, "one row per distinct pollutantID");
  // BTreeMap key order: pollutantID 2 before 3.
@@ -747,7 +849,8 @@ mod tests {
             &[Model::Onroad],
             &b,
         ));
-        let out = aggregate_emissions(&plan, &[emission(2, 7, Some(5.0))], &UnitScaling).unwrap();
+        let out =
+            aggregate_emissions(&plan, &[emission(2, 7, Some(5.0))], &IdentityRealFactors).unwrap();
         let row = &out[0];
 
  // Surviving keys.
@@ -760,7 +863,7 @@ mod tests {
         assert_eq!(row.day_id, None);
         assert_eq!(row.hour_id, None);
         assert_eq!(row.county_id, None);
-        assert_eq!(row.source_type_id, Some(21)); // ANY_VALUE from representative record
+        assert_eq!(row.source_type_id, None);
         assert_eq!(row.scc, None);
  // emissionRate is always dropped; runHash always flows through.
         assert_eq!(row.emission_rate, None);
@@ -783,7 +886,7 @@ mod tests {
             emission(2, 1, Some(2.0)),
             emission(2, 3, Some(8.0)),
         ];
-        let out = aggregate_emissions(&plan, &rows, &UnitScaling).unwrap();
+        let out = aggregate_emissions(&plan, &rows, &IdentityRealFactors).unwrap();
         assert_eq!(out.len(), 2);
         assert_eq!(out[0].month_id, Some(1));
         assert_eq!(out[0].emission_quant, Some(3.0));
@@ -806,7 +909,7 @@ mod tests {
             emission(2, 1, None),
             emission(2, 1, Some(5.0)),
         ];
-        let out = aggregate_emissions(&plan, &rows, &UnitScaling).unwrap();
+        let out = aggregate_emissions(&plan, &rows, &IdentityRealFactors).unwrap();
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].emission_quant, Some(15.0));
     }
@@ -821,7 +924,7 @@ mod tests {
             &b,
         ));
         let rows = vec![emission(2, 1, None), emission(2, 1, None)];
-        let out = aggregate_emissions(&plan, &rows, &UnitScaling).unwrap();
+        let out = aggregate_emissions(&plan, &rows, &IdentityRealFactors).unwrap();
         assert_eq!(out.len(), 1);
         assert_eq!(
             out[0].emission_quant, None,
@@ -876,6 +979,97 @@ mod tests {
     }
 
     #[test]
+    fn scaling_plan_with_identity_placeholder_is_rejected() {
+ // A plan whose SUM carries WeeksPerMonth scaling (any onroad
+ // sub-year/year timestep) must NOT be silently aggregated with the
+ // UnitScaling identity placeholder: that would report a single sample
+ // week as if it were a whole month. The aggregation entry points must
+ // surface the missing reference-table-backed factors as an error.
+        let b = breakdown_all_false();
+        let plan = emission_aggregation(&inputs(
+            OutputTimestep::Year,
+            GeographicOutputDetail::Nation,
+            &[Model::Onroad],
+            &b,
+        ));
+        assert_eq!(
+            plan.sum_columns(),
+            vec![("emissionQuant", TemporalScaling::WeeksPerMonth)]
+        );
+        let err = aggregate_emissions(&plan, &[emission(2, 1, Some(1.0))], &UnitScaling)
+            .unwrap_err();
+        assert!(
+            matches!(err, Error::AggregationPlanMismatch(_)),
+            "got {err:?}"
+        );
+
+ // The streaming accumulator guards the same condition on extend.
+        let mut agg = StreamingEmissionAgg::new(emission_aggregation(&inputs(
+            OutputTimestep::Year,
+            GeographicOutputDetail::Nation,
+            &[Model::Onroad],
+            &b,
+        )))
+        .unwrap();
+        let stream_err = agg
+            .extend(&[emission(2, 1, Some(1.0))], &UnitScaling)
+            .unwrap_err();
+        assert!(
+            matches!(stream_err, Error::AggregationPlanMismatch(_)),
+            "got {stream_err:?}"
+        );
+    }
+
+    #[test]
+    fn source_type_collapses_to_null_when_not_grouped() {
+ // source_use_type is off, so sourceTypeID is NOT a GROUP BY key and
+ // rows of different source types merge into one group. The rolled-up
+ // sourceTypeID must be NULL (matching AggregationSQLGenerator's
+ // `null as sourceTypeID`), not an arbitrary carried-through value.
+        let b = breakdown_all_false();
+        assert!(!b.source_use_type);
+        let plan = emission_aggregation(&inputs(
+            OutputTimestep::Year,
+            GeographicOutputDetail::Nation,
+            &[Model::Onroad],
+            &b,
+        ));
+        let mut r1 = emission(2, 1, Some(1.0));
+        r1.source_type_id = Some(21);
+        let mut r2 = emission(2, 1, Some(2.0));
+        r2.source_type_id = Some(31);
+        let out = aggregate_emissions(&plan, &[r1, r2], &IdentityRealFactors).unwrap();
+        assert_eq!(out.len(), 1, "different source types merge into one group");
+        assert_eq!(out[0].emission_quant, Some(3.0));
+        assert_eq!(
+            out[0].source_type_id, None,
+            "non-grouped sourceTypeID must collapse to NULL"
+        );
+    }
+
+    #[test]
+    fn source_type_kept_when_source_use_type_breakdown_on() {
+ // With source_use_type on, sourceTypeID is a GROUP BY key: rows of
+ // different source types stay distinct and the value flows through.
+        let mut b = breakdown_all_false();
+        b.source_use_type = true;
+        let plan = emission_aggregation(&inputs(
+            OutputTimestep::Year,
+            GeographicOutputDetail::Nation,
+            &[Model::Onroad],
+            &b,
+        ));
+        let mut r1 = emission(2, 1, Some(1.0));
+        r1.source_type_id = Some(21);
+        let mut r2 = emission(2, 1, Some(2.0));
+        r2.source_type_id = Some(31);
+        let out = aggregate_emissions(&plan, &[r1, r2], &IdentityRealFactors).unwrap();
+        assert_eq!(out.len(), 2, "source types stay separated when grouped");
+        assert_eq!(out[0].source_type_id, Some(21));
+        assert_eq!(out[1].source_type_id, Some(31));
+    }
+
+    #[test]
     fn scc_text_key_groups_distinctly() {
  // onroad_scc keeps the SCC text column as a group key.
         let mut b = breakdown_all_false();
@@ -893,7 +1087,7 @@ mod tests {
         let mut c = emission(2, 1, Some(7.0));
         c.scc = Some("ZZZ".to_string());
 
-        let out = aggregate_emissions(&plan, &[c, a, a2], &UnitScaling).unwrap();
+        let out = aggregate_emissions(&plan, &[c, a, a2], &IdentityRealFactors).unwrap();
         assert_eq!(out.len(), 2);
  // Group-key sort: "AAA" before "ZZZ".
         assert_eq!(out[0].scc.as_deref(), Some("AAA"));
@@ -922,8 +1116,8 @@ mod tests {
         let mut reversed = forward.clone();
         reversed.reverse();
 
-        let a = aggregate_emissions(&plan, &forward, &UnitScaling).unwrap();
-        let b = aggregate_emissions(&plan, &reversed, &UnitScaling).unwrap();
+        let a = aggregate_emissions(&plan, &forward, &IdentityRealFactors).unwrap();
+        let b = aggregate_emissions(&plan, &reversed, &IdentityRealFactors).unwrap();
         assert_eq!(a, b, "aggregation output must not depend on input order");
         assert_eq!(a.len(), 4);
     }
@@ -944,7 +1138,7 @@ mod tests {
             activity(1, 7, Some(200.0)),
             activity(2, 1, Some(50.0)),
         ];
-        let out = aggregate_activity(&plan, &rows, &UnitScaling).unwrap();
+        let out = aggregate_activity(&plan, &rows, &IdentityRealFactors).unwrap();
         assert_eq!(out.len(), 2);
         assert_eq!(out[0].activity_type_id, Some(1));
         assert_eq!(out[0].activity, Some(300.0));
@@ -963,7 +1157,7 @@ mod tests {
             &[Model::Onroad],
             &b,
         ));
-        assert!(aggregate_emissions(&plan, &[], &UnitScaling)
+        assert!(aggregate_emissions(&plan, &[], &IdentityRealFactors)
             .unwrap()
             .is_empty());
     }
@@ -1082,7 +1276,7 @@ mod tests {
             emission(3, 1, Some(4.0)),
         ];
 
-        let batch = aggregate_emissions(&plan, &rows, &UnitScaling).unwrap();
+        let batch = aggregate_emissions(&plan, &rows, &IdentityRealFactors).unwrap();
 
         let stream_plan = emission_aggregation(&inputs(
             OutputTimestep::Year,
@@ -1091,7 +1285,7 @@ mod tests {
             &b,
         ));
         let mut agg = StreamingEmissionAgg::new(stream_plan).unwrap();
-        agg.extend(&rows, &UnitScaling).unwrap();
+        agg.extend(&rows, &IdentityRealFactors).unwrap();
         let stream = agg.finalize();
 
         assert_eq!(batch, stream, "streaming and batch results must match");
@@ -1116,7 +1310,7 @@ mod tests {
             emission(79, 1, Some(8.0)),    // NMHC — kept
         ];
         let mut agg = StreamingEmissionAgg::new(plan).unwrap();
-        agg.extend(&rows, &UnitScaling).unwrap();
+        agg.extend(&rows, &IdentityRealFactors).unwrap();
         let out = agg.finalize();
         let pollutants: Vec<_> = out.iter().filter_map(|r| r.pollutant_id).collect();
         assert_eq!(
@@ -1146,13 +1340,13 @@ mod tests {
         };
 
         let mut single = StreamingEmissionAgg::new(make_plan()).unwrap();
-        single.extend(&rows, &UnitScaling).unwrap();
+        single.extend(&rows, &IdentityRealFactors).unwrap();
         let single_out = single.finalize();
 
         let mut incremental = StreamingEmissionAgg::new(make_plan()).unwrap();
         for row in &rows {
             incremental
-                .extend(std::slice::from_ref(row), &UnitScaling)
+                .extend(std::slice::from_ref(row), &IdentityRealFactors)
                 .unwrap();
         }
         let incremental_out = incremental.finalize();
@@ -1163,8 +1357,11 @@ mod tests {
     #[test]
     fn streaming_agg_all_null_metric_yields_null() {
         let mut agg = StreamingEmissionAgg::new(year_nation_plan()).unwrap();
-        agg.extend(&[emission(2, 1, None), emission(2, 7, None)], &UnitScaling)
-            .unwrap();
+        agg.extend(
+            &[emission(2, 1, None), emission(2, 7, None)],
+            &IdentityRealFactors,
+        )
+        .unwrap();
         let out = agg.finalize();
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].emission_quant, None);

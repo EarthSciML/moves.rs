@@ -165,8 +165,9 @@ pub trait DataFrameStoreTyped: DataFrameStore {
                 }
                 let actual_dtype = arc_df
                     .column(actual.as_str())
-                    .map(|s| s.dtype().clone())
-                    .unwrap_or(DataType::Null);
+                    .map_err(|e| Error::Polars(e.to_string()))?
+                    .dtype()
+                    .clone();
                 if let Some(expected_dtype) = canonical_to_dtype.get(canonical) {
                     if &actual_dtype != expected_dtype {
                         casts.push((canonical.clone(), expected_dtype.clone()));
@@ -184,21 +185,36 @@ pub trait DataFrameStoreTyped: DataFrameStore {
  // metadata, not the underlying Arrow buffers). This replaces the old
  // `(*arc_df).clone()` which copied every Arrow buffer in the table.
         let height = arc_df.height();
+        // Project the stored table down to the canonical schema. A column the
+        // schema declares but the store lacks is a real data gap (e.g. a
+        // snapshot exported without an expected rate/coefficient column); a
+        // faithful port reading the MOVES execution DB would fail loudly with a
+        // SQL "column not found", so surface it here rather than silently
+        // dropping the column and depending on `from_dataframe` to maybe catch
+        // it. This also keeps the normalize path consistent with the
+        // non-normalize fast path above, which hands the full frame to
+        // `from_dataframe` and lets it error on the missing column.
         let new_cols: Vec<Column> = expected_schema
             .iter()
-            .filter_map(|(canonical, _)| {
+            .map(|(canonical, _)| {
                 let lower = canonical.to_ascii_lowercase();
                 let actual = arc_df
                     .columns()
                     .iter()
-                    .find(|c| c.name().to_ascii_lowercase() == lower)?;
+                    .find(|c| c.name().to_ascii_lowercase() == lower)
+                    .ok_or_else(|| {
+                        Error::Polars(format!(
+                            "column '{canonical}' declared by schema for table '{name}' \
+                             is not present in the stored table"
+                        ))
+                    })?;
                 let mut col = actual.clone(); // O(1): Arc refcount increment
                 if col.name() != canonical.as_str() {
                     col.rename(canonical.as_str().into()); // cheap: clones column metadata
                 }
-                Some(col)
+                Ok(col)
             })
-            .collect();
+            .collect::<Result<Vec<Column>>>()?;
 
         if casts.is_empty() {
             let df = DataFrame::new(height, new_cols).map_err(|e| Error::Polars(e.to_string()))?;
@@ -221,10 +237,27 @@ pub trait DataFrameStoreTyped: DataFrameStore {
  // MySQL stores BOOLEAN as "Y"/"N" or "1"/"0" strings; Polars
  // cannot cast String → Boolean directly.
                     let ca = col.str().map_err(|e| Error::Polars(e.to_string()))?;
-                    let bool_ca: polars::prelude::BooleanChunked = ca
-                        .iter()
-                        .map(|opt_s| opt_s.map(|s| s == "Y" || s == "1"))
-                        .collect();
+                    let mut bool_vals: Vec<Option<bool>> = Vec::with_capacity(ca.len());
+                    for opt_s in ca.iter() {
+                        match opt_s {
+                            None => bool_vals.push(None),
+                            Some(s) => {
+                                let v = match s.trim().to_ascii_lowercase().as_str() {
+                                    "1" | "true" | "y" | "yes" => true,
+                                    "0" | "false" | "n" | "no" => false,
+                                    _ => {
+                                        return Err(Error::Polars(format!(
+                                            "column '{col_name}' value '{s}' in table '{name}' \
+                                             is not a recognized boolean \
+                                             (expected Y/N, 1/0, true/false, yes/no)"
+                                        )))
+                                    }
+                                };
+                                bool_vals.push(Some(v));
+                            }
+                        }
+                    }
+                    let bool_ca: polars::prelude::BooleanChunked = bool_vals.into_iter().collect();
                     Column::from(bool_ca.with_name(col_name.as_str().into()).into_series())
                 } else {
                     col.cast(expected_dtype)

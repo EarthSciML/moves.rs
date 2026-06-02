@@ -521,13 +521,35 @@ impl BaseRateCalculator {
         constants: &RunConstants,
         flags: &ModuleFlags,
     ) -> BaseRateCalculatorOutput {
- // The Go indexes `County[CountyID]` per row; the run processes a
- // single county, so the GPA fraction is resolved once. A county
- // absent from the table yields `0.0` (the Go would have panicked // the county table always holds the run's one county).
-        let gpa_fract = prepared
-            .county
-            .get(&constants.county_id)
-            .map_or(0.0, |c| c.gpa_fract);
+ // The Go indexes `County[CountyID]` per row (`County map[int]*CountyDetail`,
+ // baseratecalculator.go:97/1079/1102/1234); for a county absent from the
+ // table the pointer is nil and `.GPAFract` panics — the calculator fails
+ // fast on the broken invariant that the run's one county is always loaded.
+ // Mirror that fail-fast: a missing county only matters when GPA blending is
+ // actually live (there is fuel-effect / criteria-ratio data to blend the
+ // fraction against). If the county is missing while any of those tables
+ // carry rows, defaulting `gpa_fract` to 0.0 would silently disable the
+ // entire GPA fuel-effect/criteria adjustment and corrupt the rates, so
+ // surface it loudly instead. With all ratio tables empty (the rates-only /
+ // no-county fixtures) `gpa_fract` is never blended against anything, so the
+ // historical 0.0 default is preserved.
+        let gpa_fract = match prepared.county.get(&constants.county_id) {
+            Some(c) => c.gpa_fract,
+            None => {
+                let gpa_blending_live = !prepared.general_fuel_ratio.is_empty()
+                    || !prepared.criteria_ratio.is_empty()
+                    || !prepared.alt_criteria_ratio.is_empty();
+                assert!(
+                    !gpa_blending_live,
+                    "BaseRateCalculator: county {} is absent from the County table while \
+                     fuel-effect / criteria-ratio data is present; the GPA fraction cannot be \
+                     resolved and defaulting it to 0.0 would silently disable GPA blending \
+                     (canonical baseratecalculator.go panics on the missing County[countyID])",
+                    constants.county_id,
+                );
+                0.0
+            }
+        };
 
  // calculateActivityWeight runs once, ahead of the aggregation tail.
         let activity_weights = calculate_activity_weight(&smfr_sbd_summary, prepared, flags);
@@ -1472,11 +1494,23 @@ fn build_universal_activity(
         .into_iter()
         .filter_map(|r| day_real_days.get(&r.day_id).map(|n| (r.hour_day_id, *n)))
         .collect();
-    // A missing or zero divisor leaves the activity unscaled (divisor 1.0).
-    let divisor = |hour_day_id: i32| -> f64 {
+    // The per-day-type divisor (`noOfRealDays`: weekday 5, weekend 2) must be
+    // resolvable for every activity row. `DayOfAnyWeek` is a fixed MOVES
+    // reference table that is always populated, and `HourDay` maps every
+    // selected `hourDayID` to its `dayID`; a missing or zero divisor for a
+    // row that carries activity is a real data/wiring defect (a missing
+    // `DayOfAnyWeek`/`HourDay` snapshot, or a `hourDayID` whose `dayID` is
+    // absent). Defaulting to 1.0 here would silently leave the activity
+    // un-divided — exactly the constant ~4.3× inventory over-emit the
+    // doc comment warns about — so surface it as an error instead.
+    let divisor = |hour_day_id: i32| -> moves_framework::Result<f64> {
         match hour_day_real_days.get(&hour_day_id).copied() {
-            Some(n) if n != 0.0 => n,
-            _ => 1.0,
+            Some(n) if n != 0.0 => Ok(n),
+            _ => Err(moves_framework::Error::AggregationPlanMismatch(format!(
+                "build_universal_activity: no noOfRealDays divisor for hourDayID {hour_day_id} \
+                 (missing DayOfAnyWeek/HourDay mapping); applying the raw activity would \
+                 double-count the day weighting and over-emit the inventory ~4.3×"
+            ))),
         }
     };
 
@@ -1491,13 +1525,15 @@ fn build_universal_activity(
                     && r.link_id == constants.link_id
                     && in_run(r.hour_day_id)
             })
-            .map(|r| setup::UniversalActivityRow {
-                hour_day_id: r.hour_day_id,
-                model_year_id: constants.year_id - r.age_id,
-                source_type_id: r.source_type_id,
-                activity: r.sho / divisor(r.hour_day_id),
+            .map(|r| {
+                Ok(setup::UniversalActivityRow {
+                    hour_day_id: r.hour_day_id,
+                    model_year_id: constants.year_id - r.age_id,
+                    source_type_id: r.source_type_id,
+                    activity: r.sho / divisor(r.hour_day_id)?,
+                })
             })
-            .collect(),
+            .collect::<moves_framework::Result<Vec<_>>>()?,
         // Starts: activity = starts (per zone).
         2 => tables
             .iter_typed_or_empty::<RawStartsRow>("Starts")?
@@ -1508,13 +1544,15 @@ fn build_universal_activity(
                     && r.zone_id == constants.zone_id
                     && in_run(r.hour_day_id)
             })
-            .map(|r| setup::UniversalActivityRow {
-                hour_day_id: r.hour_day_id,
-                model_year_id: constants.year_id - r.age_id,
-                source_type_id: r.source_type_id,
-                activity: r.starts / divisor(r.hour_day_id),
+            .map(|r| {
+                Ok(setup::UniversalActivityRow {
+                    hour_day_id: r.hour_day_id,
+                    model_year_id: constants.year_id - r.age_id,
+                    source_type_id: r.source_type_id,
+                    activity: r.starts / divisor(r.hour_day_id)?,
+                })
             })
-            .collect(),
+            .collect::<moves_framework::Result<Vec<_>>>()?,
         _ => Vec::new(),
     };
     Ok(rows)

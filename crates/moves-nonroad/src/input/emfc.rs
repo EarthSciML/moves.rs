@@ -309,11 +309,37 @@ fn parse_header(
     }
 
  // For BSFC, units may be absent if we broke on a blank
- // tech-type column. The Fortran leaves `idxunt`/`iuntmp` with
- // their previous (undefined) values; we default to `MULT`
- // because BSFC data is unitless in practice. Callers that care
- // can re-validate downstream.
-    let units = units.unwrap_or(EmissionUnits::Multiplier);
+ // tech-type column (`rdemfc.f` :150 — `goto 444` when
+ // `iounit .EQ. IORBSF`). In that path the Fortran's `idxunt`
+ // (and therefore `iuntmp`) is left undefined, but it is never
+ // propagated anywhere: `ntch == 0`, so the data-line loop
+ // (`do 20 itch = 1,ntch`) and the record-store loop
+ // (`do 30 itch = 1,ntch`) both run zero times and no
+ // `iarhun(...)` entry is ever written. We therefore do NOT
+ // fabricate a units keyword (`MULT` is `IDXMLT` = 7, not the
+ // undefined value the Fortran carries). If, on the other hand,
+ // tech-type columns WERE collected, then a units keyword was
+ // mandatory and we must surface its absence as an error rather
+ // than substituting one.
+    let units = match units {
+        Some(u) => u,
+        None => {
+            if !tech_types.is_empty() {
+                return Err(Error::Parse {
+                    file: path.to_path_buf(),
+                    line: line_num,
+                    message: "missing units keyword after tech-type columns on header line"
+                        .to_string(),
+                });
+            }
+ // Unreachable for record output: `tech_types` is empty, so
+ // `parse_data_line` (one record per tech-type) emits nothing
+ // and this value is never copied into an
+ // `EmissionFactorRecord`. Mirrors the Fortran, which leaves
+ // the unit undefined-but-unused on this branch.
+            EmissionUnits::Multiplier
+        }
+    };
 
  // Pollutant code, 10-char field at `start`, then `lftjst` +
  // `low2up` and compared against `polin`.

@@ -1097,15 +1097,25 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         activity_index: usize,
     ) -> Result<EmissionsIterationResult> {
  // Look up load factor and activity unit from the activity entry.
- // The entry was already validated by model_year_and_agedist, so
- // unwrap_or is a safe fallback.
+ // The reference NONROAD reads `faclod` / `iactun` directly from the
+ // validated activity record (there is no default load factor). The
+ // index was already validated by `model_year_and_agedist`, so an
+ // out-of-range index here is an invariant violation, not a
+ // legitimate "use a default" condition: surface it as an error
+ // (matching `model_year_and_agedist`) rather than fabricating a
+ // 0.5 load factor that would silently scale emissions wrong.
         let (load_factor, activity_unit_geo) = self
             .executor
             .reference
             .activity_entries
             .get(activity_index)
             .map(|e| (e.load_factor, e.activity_unit))
-            .unwrap_or((0.5, ActivityUnit::HoursPerYear));
+            .ok_or_else(|| {
+                Error::Config(format!(
+                    "CountyAdapter: activity index {activity_index} out of range \
+                     in compute_exhaust_iteration"
+                ))
+            })?;
 
         let activity_unit = match activity_unit_geo {
             ActivityUnit::HoursPerYear => ExhaustActivityUnit::HoursPerYear,
@@ -1248,10 +1258,19 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         _n_days: i32,
         _fulbmy: f32,
     ) -> Result<EmissionsIterationResult> {
-        todo!(
-            "compute_evap_iteration: wire to calculate_evaporative_emissions \
-             once NR*.EMF evap tables are loaded"
-        )
+ // The evaporative emission-factor (NR*.EMF evap) loader is not yet
+ // ported, so there is no factor table to drive
+ // `calculate_evaporative_emissions`. Rather than panic on the live
+ // county path (any gasoline SCC carries non-zero evap tech
+ // fractions), surface the unloaded-table condition as an explicit
+ // error so the run fails loudly instead of producing wrong
+ // (or zero) evaporative emissions silently.
+        Err(Error::Config(
+            "compute_evap_iteration: evaporative emission-factor (NR*.EMF) tables \
+             are not yet loadable; cannot compute evaporative emissions for a \
+             record with a non-zero evap tech fraction"
+                .to_string(),
+        ))
     }
 }
 
@@ -1375,8 +1394,19 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
                 .cloned()
                 .collect();
         if selected.is_empty() {
- // No growth data loaded; return zero (no growth).
-            return Ok(0.0);
+ // `growth_factor` is only invoked when `growth_loaded` is true,
+ // so an indicator that resolves to no growth records is a
+ // missing-data error, not a legitimate "no growth". The Fortran
+ // `grwfac` writes the 7000 fatal error ("Could not find any
+ // valid growth data") in this case rather than returning a
+ // neutral factor. Surface it explicitly instead of fabricating
+ // a 0.0 factor (which would scale the grown population wrong).
+            return Err(Error::IndicatorMissing {
+                code: indicator,
+                fips: fips.to_string(),
+                subcounty: String::new(),
+                year: year2,
+            });
         }
         let refs: Vec<&GrowthIndicatorRecord> = selected.iter().collect();
         growth_factor(&refs, year1, year2, fips).map(|gf| gf.factor)
@@ -1500,23 +1530,41 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
         _model_year: i32,
         _tech: &str,
     ) -> Result<RetrofitResult> {
-        Ok(RetrofitResult::default())
+ // `clcrtrft` is only invoked when `retrofit_loaded` is true, in
+ // which case the surviving retrofit records must drive a real
+ // per-pollutant reduction. Returning the all-zero default here
+ // would silently drop the retrofit reduction (emissions biased
+ // high). The state-class exhaust/evap calculators below are not
+ // yet wired, so surface the unimplemented retrofit path as an
+ // explicit error rather than fabricating a zero reduction.
+        Err(Error::Config(
+            "StateAdapter::calculate_retrofit: retrofit reduction (clcrtrft) is not \
+             yet wired for the state path; cannot apply retrofit records that \
+             survived the type-3 filter"
+                .to_string(),
+        ))
     }
 
     fn calculate_exhaust(&mut self, _inputs: &ExhaustCallInputs<'_>) -> Result<ExhaustResult> {
- // Emission-factor tables not yet loaded; return zero-emission result.
- // Only reached when tech_fraction > 0; tests use zero fractions.
-        todo!(
-            "StateAdapter::calculate_exhaust: wire to calculate_exhaust_emissions \
-             once NR*.EMF tables are loaded"
-        )
+ // Emission-factor (NR*.EMF) tables not yet loadable. This is only
+ // reached when a tech fraction is > 0; surface the unloaded-table
+ // condition as an error instead of panicking on the live state
+ // path.
+        Err(Error::Config(
+            "StateAdapter::calculate_exhaust: exhaust emission-factor (NR*.EMF) tables \
+             are not yet loadable; cannot compute exhaust emissions (clcems) for a \
+             record with a non-zero exhaust tech fraction"
+                .to_string(),
+        ))
     }
 
     fn calculate_evap(&mut self, _inputs: &EvapCallInputs<'_>) -> Result<EvapResult> {
-        todo!(
-            "StateAdapter::calculate_evap: wire to calculate_evaporative_emissions \
-             once NR*.EMF evap tables are loaded"
-        )
+        Err(Error::Config(
+            "StateAdapter::calculate_evap: evaporative emission-factor (NR*.EMF) tables \
+             are not yet loadable; cannot compute evaporative emissions (clcevems) for \
+             a record with a non-zero evap tech fraction"
+                .to_string(),
+        ))
     }
 }
 
@@ -1680,7 +1728,15 @@ impl<'a> NationalCallbacks for NationalAdapter<'a> {
                 .cloned()
                 .collect();
         if selected.is_empty() {
-            return Ok(0.0);
+ // Only reached when `growth_loaded` is true; an indicator that
+ // resolves to no growth records is the Fortran `grwfac` 7000
+ // fatal error path, not a neutral "no growth". Surface it.
+            return Err(Error::IndicatorMissing {
+                code: indicator,
+                fips: fips.to_string(),
+                subcounty: String::new(),
+                year: year2,
+            });
         }
         let refs: Vec<&GrowthIndicatorRecord> = selected.iter().collect();
         growth_factor(&refs, year1, year2, fips).map(|gf| gf.factor)
@@ -1803,21 +1859,33 @@ impl<'a> NationalCallbacks for NationalAdapter<'a> {
         _model_year: i32,
         _tech: &str,
     ) -> Result<RetrofitResult> {
-        Ok(RetrofitResult::default())
+ // See `StateAdapter::calculate_retrofit`: returning the all-zero
+ // default would silently drop the retrofit reduction. Surface the
+ // unimplemented retrofit path explicitly.
+        Err(Error::Config(
+            "NationalAdapter::calculate_retrofit: retrofit reduction (clcrtrft) is not \
+             yet wired for the national path; cannot apply retrofit records that \
+             survived the type-3 filter"
+                .to_string(),
+        ))
     }
 
     fn calculate_exhaust(&mut self, _inputs: &ExhaustCallInputs<'_>) -> Result<ExhaustResult> {
-        todo!(
-            "NationalAdapter::calculate_exhaust: wire to calculate_exhaust_emissions \
-             once NR*.EMF tables are loaded"
-        )
+        Err(Error::Config(
+            "NationalAdapter::calculate_exhaust: exhaust emission-factor (NR*.EMF) tables \
+             are not yet loadable; cannot compute exhaust emissions (clcems) for a \
+             record with a non-zero exhaust tech fraction"
+                .to_string(),
+        ))
     }
 
     fn calculate_evap(&mut self, _inputs: &EvapCallInputs<'_>) -> Result<EvapResult> {
-        todo!(
-            "NationalAdapter::calculate_evap: wire to calculate_evaporative_emissions \
-             once NR*.EMF evap tables are loaded"
-        )
+        Err(Error::Config(
+            "NationalAdapter::calculate_evap: evaporative emission-factor (NR*.EMF) tables \
+             are not yet loadable; cannot compute evaporative emissions (clcevems) for \
+             a record with a non-zero evap tech fraction"
+                .to_string(),
+        ))
     }
 }
 
@@ -1938,7 +2006,15 @@ impl<'a> UsTotalCallbacks for UsTotalAdapter<'a> {
                 .cloned()
                 .collect();
         if selected.is_empty() {
-            return Ok(0.0);
+ // Only reached when `growth_loaded` is true; an indicator that
+ // resolves to no growth records is the Fortran `grwfac` 7000
+ // fatal error path, not a neutral "no growth". Surface it.
+            return Err(Error::IndicatorMissing {
+                code: indicator,
+                fips: fips.to_string(),
+                subcounty: String::new(),
+                year: year2,
+            });
         }
         let refs: Vec<&GrowthIndicatorRecord> = selected.iter().collect();
         growth_factor(&refs, year1, year2, fips).map(|gf| gf.factor)
@@ -2061,21 +2137,33 @@ impl<'a> UsTotalCallbacks for UsTotalAdapter<'a> {
         _model_year: i32,
         _tech: &str,
     ) -> Result<RetrofitResult> {
-        Ok(RetrofitResult::default())
+ // See `StateAdapter::calculate_retrofit`: returning the all-zero
+ // default would silently drop the retrofit reduction. Surface the
+ // unimplemented retrofit path explicitly.
+        Err(Error::Config(
+            "UsTotalAdapter::calculate_retrofit: retrofit reduction (clcrtrft) is not \
+             yet wired for the US-total path; cannot apply retrofit records that \
+             survived the type-3 filter"
+                .to_string(),
+        ))
     }
 
     fn calculate_exhaust(&mut self, _inputs: &ExhaustCallInputs<'_>) -> Result<ExhaustResult> {
-        todo!(
-            "UsTotalAdapter::calculate_exhaust: wire to calculate_exhaust_emissions \
-             once NR*.EMF tables are loaded"
-        )
+        Err(Error::Config(
+            "UsTotalAdapter::calculate_exhaust: exhaust emission-factor (NR*.EMF) tables \
+             are not yet loadable; cannot compute exhaust emissions (clcems) for a \
+             record with a non-zero exhaust tech fraction"
+                .to_string(),
+        ))
     }
 
     fn calculate_evap(&mut self, _inputs: &EvapCallInputs<'_>) -> Result<EvapResult> {
-        todo!(
-            "UsTotalAdapter::calculate_evap: wire to calculate_evaporative_emissions \
-             once NR*.EMF evap tables are loaded"
-        )
+        Err(Error::Config(
+            "UsTotalAdapter::calculate_evap: evaporative emission-factor (NR*.EMF) tables \
+             are not yet loadable; cannot compute evaporative emissions (clcevems) for \
+             a record with a non-zero evap tech fraction"
+                .to_string(),
+        ))
     }
 }
 
@@ -2272,7 +2360,16 @@ fn build_national_context<'a>(
         hp_avg: ctx.record.hp_avg,
         population: ctx.record.population,
         pop_year: ctx.record.pop_year,
-        use_hours: 1000.0,
+ // Median life (scrptime's `mdlfhrs`) from the driver record's
+ // `.POP` usage field, matching the county/subcounty paths; fall
+ // back to a neutral 1000.0 only when the record carries none.
+ // Previously this hardcoded 1000.0, silently ignoring any real
+ // median life on the record.
+        use_hours: if ctx.record.median_life > 0.0 {
+            ctx.record.median_life
+        } else {
+            1000.0
+        },
         discharge_code: 0,
         starts_hours: 1.0,
     };
@@ -2313,7 +2410,16 @@ fn build_us_total_context<'a>(
         hp_avg: ctx.record.hp_avg,
         population: ctx.record.population,
         pop_year: ctx.record.pop_year,
-        use_hours: 1000.0,
+ // Median life (scrptime's `mdlfhrs`) from the driver record's
+ // `.POP` usage field, matching the county/subcounty paths; fall
+ // back to a neutral 1000.0 only when the record carries none.
+ // Previously this hardcoded 1000.0, silently ignoring any real
+ // median life on the record.
+        use_hours: if ctx.record.median_life > 0.0 {
+            ctx.record.median_life
+        } else {
+            1000.0
+        },
         discharge_code: 0,
         starts_hours: 1.0,
     };
@@ -2351,7 +2457,16 @@ fn build_state_context<'a>(
         hp_avg: ctx.record.hp_avg,
         population: ctx.record.population,
         pop_year: ctx.record.pop_year,
-        use_hours: 1000.0,
+ // Median life (scrptime's `mdlfhrs`) from the driver record's
+ // `.POP` usage field, matching the county/subcounty paths; fall
+ // back to a neutral 1000.0 only when the record carries none.
+ // Previously this hardcoded 1000.0, silently ignoring any real
+ // median life on the record.
+        use_hours: if ctx.record.median_life > 0.0 {
+            ctx.record.median_life
+        } else {
+            1000.0
+        },
         discharge_code: 0,
         starts_hours: 1.0,
     };
@@ -2845,7 +2960,28 @@ mod production {
                     hp_max: 100.0,
                     indicator: "GDP".into(),
                 }],
-                growth_records: vec![],
+ // Two flat national indicator rows (value 1.0 in both years)
+ // make `growth_factor(2020, 2021, ..)` resolve to 0.0 — the same
+ // neutral factor these state-class paths previously fabricated —
+ // while keeping the data consistent with `growth_loaded = true`.
+ // (The state/national/US-total `growth_factor` now errors on an
+ // empty indicator selection, matching grwfac's 7000 fatal path.)
+                growth_records: vec![
+                    GrowthIndicatorRecord {
+                        indicator: "GDP".into(),
+                        fips: "00000".into(),
+                        subregion: String::new(),
+                        year: 2020,
+                        value: 1.0,
+                    },
+                    GrowthIndicatorRecord {
+                        indicator: "GDP".into(),
+                        fips: "00000".into(),
+                        subregion: String::new(),
+                        year: 2021,
+                        value: 1.0,
+                    },
+                ],
                 activity_entries: vec![ActivityTableEntry {
                     scc: "2270001010".into(),
                     fips: "06000".into(),
@@ -2926,7 +3062,28 @@ mod production {
                     hp_max: 100.0,
                     indicator: "GDP".into(),
                 }],
-                growth_records: vec![],
+ // Two flat national indicator rows (value 1.0 in both years)
+ // make `growth_factor(2020, 2021, ..)` resolve to 0.0 — the same
+ // neutral factor these state-class paths previously fabricated —
+ // while keeping the data consistent with `growth_loaded = true`.
+ // (The state/national/US-total `growth_factor` now errors on an
+ // empty indicator selection, matching grwfac's 7000 fatal path.)
+                growth_records: vec![
+                    GrowthIndicatorRecord {
+                        indicator: "GDP".into(),
+                        fips: "00000".into(),
+                        subregion: String::new(),
+                        year: 2020,
+                        value: 1.0,
+                    },
+                    GrowthIndicatorRecord {
+                        indicator: "GDP".into(),
+                        fips: "00000".into(),
+                        subregion: String::new(),
+                        year: 2021,
+                        value: 1.0,
+                    },
+                ],
                 activity_entries: vec![ActivityTableEntry {
                     scc: "2270001010".into(),
                     fips: "06000".into(),
@@ -3017,7 +3174,28 @@ mod production {
                     hp_max: 100.0,
                     indicator: "GDP".into(),
                 }],
-                growth_records: vec![],
+ // Two flat national indicator rows (value 1.0 in both years)
+ // make `growth_factor(2020, 2021, ..)` resolve to 0.0 — the same
+ // neutral factor these state-class paths previously fabricated —
+ // while keeping the data consistent with `growth_loaded = true`.
+ // (The state/national/US-total `growth_factor` now errors on an
+ // empty indicator selection, matching grwfac's 7000 fatal path.)
+                growth_records: vec![
+                    GrowthIndicatorRecord {
+                        indicator: "GDP".into(),
+                        fips: "00000".into(),
+                        subregion: String::new(),
+                        year: 2020,
+                        value: 1.0,
+                    },
+                    GrowthIndicatorRecord {
+                        indicator: "GDP".into(),
+                        fips: "00000".into(),
+                        subregion: String::new(),
+                        year: 2021,
+                        value: 1.0,
+                    },
+                ],
                 activity_entries: vec![ActivityTableEntry {
                     scc: "2270001010".into(),
                     fips: "".into(),
@@ -3102,7 +3280,28 @@ mod production {
                     hp_max: 100.0,
                     indicator: "GDP".into(),
                 }],
-                growth_records: vec![],
+ // Two flat national indicator rows (value 1.0 in both years)
+ // make `growth_factor(2020, 2021, ..)` resolve to 0.0 — the same
+ // neutral factor these state-class paths previously fabricated —
+ // while keeping the data consistent with `growth_loaded = true`.
+ // (The state/national/US-total `growth_factor` now errors on an
+ // empty indicator selection, matching grwfac's 7000 fatal path.)
+                growth_records: vec![
+                    GrowthIndicatorRecord {
+                        indicator: "GDP".into(),
+                        fips: "00000".into(),
+                        subregion: String::new(),
+                        year: 2020,
+                        value: 1.0,
+                    },
+                    GrowthIndicatorRecord {
+                        indicator: "GDP".into(),
+                        fips: "00000".into(),
+                        subregion: String::new(),
+                        year: 2021,
+                        value: 1.0,
+                    },
+                ],
                 activity_entries: vec![ActivityTableEntry {
                     scc: "2270001010".into(),
                     fips: "".into(),

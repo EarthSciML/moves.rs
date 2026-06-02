@@ -111,8 +111,13 @@ pub fn update_execution_bundle_from_parquets(snapshot_dir: &Path) -> Result<usiz
             path: tables_dir.clone(),
             source,
         })?
-        .filter_map(|r| r.ok())
-        .collect();
+        .map(|r| {
+            r.map_err(|source| Error::Io {
+                path: tables_dir.clone(),
+                source,
+            })
+        })
+        .collect::<Result<_>>()?;
  // Sort so the bundle is in deterministic order.
     dir_entries.sort_by_key(|e| e.file_name());
 

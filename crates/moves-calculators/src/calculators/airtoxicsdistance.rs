@@ -1952,10 +1952,15 @@ impl TableRow for LocalPpmyRow {
 const KM_PER_MILE: f64 = 1.609_344;
 
 fn unit_factor(units: &str) -> f64 {
-    if units.contains("/km") {
-        KM_PER_MILE
-    } else {
-        1.0
+    // Mirrors the `case units when ... else 1.0 end` in
+    // database/AirToxicsDistanceCalculator.sql (sections UseDioxinEmissionRate
+    // / UseMetalEmissionRate). Native distance units are miles; only the exact
+    // per-km strings are scaled by KM_PER_MILE, and every other value (the SQL
+    // `else`) is treated as already-per-mile (factor 1.0).
+    match units {
+        "g/mile" | "TEQ/mile" => 1.0,
+        "g/km" | "TEQ/km" => KM_PER_MILE,
+        _ => 1.0,
     }
 }
 

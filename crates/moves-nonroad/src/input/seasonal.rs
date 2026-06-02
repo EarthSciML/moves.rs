@@ -209,7 +209,13 @@ pub fn read_dat_records<R: BufRead>(reader: R) -> Result<Vec<SeasonalRecord>> {
     }
 
  // Read seasonal factor records
+    // `rdseas.f` parses each record with a fixed-format `read(...,ERR=7003)`
+    // and aborts (`ierr = IFAIL`) on any malformed record or non-numeric
+    // field; it never skips a line or substitutes a default factor. Match
+    // that by surfacing every malformed record as `Error::Parse` rather than
+    // dropping it or filling individual months with `1.0`.
     for line_result in lines {
+        line_num += 1;
         let line = line_result.map_err(|e| Error::Io {
             path: PathBuf::from(".DAT"),
             source: e,
@@ -222,12 +228,25 @@ pub fn read_dat_records<R: BufRead>(reader: R) -> Result<Vec<SeasonalRecord>> {
 
         let parts: Vec<&str> = line.split_whitespace().collect();
         if parts.len() < 13 {
-            continue; // Skip malformed lines
+            return Err(Error::Parse {
+                file: PathBuf::from(".DAT"),
+                line: line_num,
+                message: format!(
+                    "invalid record: expected 13 values (idx + 12 months), got {}",
+                    parts.len()
+                ),
+            });
         }
 
         let equipment_idx: usize = match parts[0].parse::<usize>() {
             Ok(v) => v - 1,
-            Err(_) => continue,
+            Err(_) => {
+                return Err(Error::Parse {
+                    file: PathBuf::from(".DAT"),
+                    line: line_num,
+                    message: format!("invalid equipment index: {}", parts[0]),
+                });
+            }
         };
 
         let mut monthly_factors = [1.0; 12];
@@ -235,7 +254,16 @@ pub fn read_dat_records<R: BufRead>(reader: R) -> Result<Vec<SeasonalRecord>> {
             if month_idx >= 12 {
                 break;
             }
-            monthly_factors[month_idx] = val_str.parse().unwrap_or(1.0);
+            monthly_factors[month_idx] = match val_str.parse::<f64>() {
+                Ok(v) => v,
+                Err(_) => {
+                    return Err(Error::Parse {
+                        file: PathBuf::from(".DAT"),
+                        line: line_num,
+                        message: format!("invalid seasonal factor: {}", val_str),
+                    });
+                }
+            };
         }
 
         records.push(SeasonalRecord {

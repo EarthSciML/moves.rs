@@ -27,6 +27,7 @@
 //!
 //! ```text
 //! emissionQuant = weightedMeanBaseRate × sourceHours × opModeFraction
+//!                 ÷ noOfRealDays
 //! ```
 //!
 //! then, where an inspection-and-maintenance (I/M) program covers the cell,
@@ -62,8 +63,9 @@
 //! LL-8 sums `sourceBinActivityFraction × meanBaseRate` (and the `…IM`
 //! variant) over the source bins of each dimension cell, then cross-joins the
 //! run's months and hour/day combinations. LL-9 multiplies the weighted rate
-//! by `sourceHours` and `opModeFraction`; the trailing `UPDATE` blends in the
-//! I/M rate where an `IMCoverageMergedUngrouped` cell matches the row.
+//! by `sourceHours` and `opModeFraction`, then divides by `noOfRealDays`; the
+//! trailing `UPDATE` blends in the I/M rate where an
+//! `IMCoverageMergedUngrouped` cell matches the row.
 //!
 //! Every SQL join is an `INNER JOIN`, so a row with no match on the join key
 //! is dropped; the port reproduces that with map lookups that skip on a miss.
@@ -2589,12 +2591,38 @@ impl Calculator for LiquidLeakingCalculator {
             let year_i64 = pos.time.year.map(i64::from).unwrap_or(0);
             format!("sourceBinDistributionFuelUsage_{process_id_i64}_{county_id_i64}_{year_i64}")
         };
+ // The MOVES `##context.year##` / `##context.iterLocation.*##` macros are
+ // always substituted from the active master-loop iteration; they are never
+ // absent when an emission calculator runs (see `LiquidLeakingCalculator.sql`
+ // LL-9, which stamps these directly onto every `MOVESWorkerOutput` row and
+ // joins SourceHours on `ageID = ##context.year## - modelYearID`). An absent
+ // field here is an internal master-loop wiring error, not a 0-valued
+ // iteration; surface it rather than fabricating 0 and silently emitting
+ // location-0 / empty output.
+        let missing_field = |field: &str| {
+            Error::InvalidBundle(format!(
+                "{CALCULATOR_NAME}: master-loop iteration position is missing {field}; \
+                 every evap-fuel-leaks iteration must carry a year and location"
+            ))
+        };
         let liquid_ctx = LiquidLeakingContext {
-            year: pos.time.year.map(|y| y as i32).unwrap_or(0),
-            state_id: pos.location.state_id.map(|s| s as i32).unwrap_or(0),
-            county_id: pos.location.county_id.map(|c| c as i32).unwrap_or(0),
-            zone_id: pos.location.zone_id.map(|z| z as i32).unwrap_or(0),
-            link_id: pos.location.link_id.map(|l| l as i32).unwrap_or(0),
+            year: pos.time.year.ok_or_else(|| missing_field("year"))? as i32,
+            state_id: pos
+                .location
+                .state_id
+                .ok_or_else(|| missing_field("stateID"))? as i32,
+            county_id: pos
+                .location
+                .county_id
+                .ok_or_else(|| missing_field("countyID"))? as i32,
+            zone_id: pos
+                .location
+                .zone_id
+                .ok_or_else(|| missing_field("zoneID"))? as i32,
+            link_id: pos
+                .location
+                .link_id
+                .ok_or_else(|| missing_field("linkID"))? as i32,
         };
         let inputs = LiquidLeakingInputs {
             context: liquid_ctx,

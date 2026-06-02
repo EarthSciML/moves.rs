@@ -53,16 +53,17 @@
 //! generator-integration validation decides, against canonical captures,
 //! whether any step must instead be made bit-compatible.
 //!
-//! # Data-plane deferral
+//! # Data-plane wiring
 //!
-//! The framework data plane (`ExecutionTables` / `ScratchNamespace`,
-//! `DataFrameStore`) is still a placeholder, so [`TankTemperatureGenerator`]'s
-//! `Generator::execute` returns an empty output — the established/3
-//! pattern. The ported computation lives in the pure
-//! [`generate_tank_temperatures`] function and is fully exercised by the
-//! crate tests; wiring will read the input tables from the
-//! [`CalculatorContext`], call it per `zone`, and write the four output
-//! tables into the scratch namespace.
+//! `Generator::execute` is fully wired: it reads the input tables from the
+//! [`CalculatorContext`] (including the pre-existing user-input override
+//! rows on `AverageTankTemperature` / `SoakActivityFraction` /
+//! `ColdSoakInitialHourFraction`, whose `isUserInput='Y'` keys TTG-5/6/7
+//! exclude from regeneration), calls [`generate_tank_temperatures`] for the
+//! iteration `zone`, and writes the four output tables into the scratch
+//! namespace. The numeric computation lives in the pure
+//! [`generate_tank_temperatures`] function and is also exercised directly by
+//! the crate tests.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 
@@ -2763,6 +2764,15 @@ static INPUT_TABLES: &[&str] = &[
     "TankTemperatureGroup",
     "RunSpecMonth",
     "RunSpecHourDay",
+ // Pre-existing user-input override tables: TTG-5/6/7 read the
+ // `isUserInput='Y'` rows already merged into the execution DB and
+ // exclude those keys from regeneration (Java
+ // `AverageTankTemperatureKeys` / `SoakActivityFractionKeys` /
+ // `ColdSoakInitialHourFractionKeys`). May be absent when the user
+ // supplied no overrides.
+    "AverageTankTemperature",
+    "SoakActivityFraction",
+    "ColdSoakInitialHourFraction",
 ];
 
 /// Scratch tables [`TankTemperatureGenerator`] writes.
@@ -2779,8 +2789,9 @@ static OUTPUT_TABLES: &[&str] = &[
 /// Ports the master-loop surface of `TankTemperatureGenerator.java`: it
 /// subscribes for *Evap Permeation*, *Evap Fuel Vapor Venting* and *Evap Fuel
 /// Leaks* at `ZONE` granularity, `GENERATOR` priority, and declares the four
-/// scratch tables it produces. `Generator::execute` is an empty stand-in
-/// until the data plane lands — see the module docs.
+/// scratch tables it produces. `Generator::execute` reads the input tables
+/// from the [`CalculatorContext`], runs [`generate_tank_temperatures`] per
+/// `zone`, and writes the outputs — see the module docs.
 #[derive(Debug, Clone)]
 pub struct TankTemperatureGenerator {
     subscriptions: Vec<CalculatorSubscription>,
@@ -2871,11 +2882,25 @@ impl Generator for TankTemperatureGenerator {
                 .into_iter()
                 .map(|r| r.hour_day_id)
                 .collect(),
- // User-input override tables are empty by default; the registry
- // would supply them when available.
-            prior_average_tank_temperature: Vec::new(),
-            prior_soak_activity_fraction: Vec::new(),
-            prior_cold_soak_initial_hour_fraction: Vec::new(),
+ // Pre-existing user-input override rows. MOVES merges any
+ // user-supplied AverageTankTemperature / SoakActivityFraction /
+ // ColdSoakInitialHourFraction rows (isUserInput='Y') into the
+ // execution DB before this generator runs, and TTG-5/6/7 exclude
+ // those keys from regeneration so the user values survive
+ // (Java `*Keys` LEFT JOIN ... IS NULL). The blocking logic in
+ // calculate_average_tank_temperature / calculate_soak_activity_fraction
+ // / calculate_cold_soak_initial_hour_fractions filters on
+ // `is_user_input`, so loading the full merged tables here (which
+ // may be absent when the user supplied no overrides) is faithful.
+            prior_average_tank_temperature: ctx
+                .tables()
+                .iter_typed_or_empty("AverageTankTemperature")?,
+            prior_soak_activity_fraction: ctx
+                .tables()
+                .iter_typed_or_empty("SoakActivityFraction")?,
+            prior_cold_soak_initial_hour_fraction: ctx
+                .tables()
+                .iter_typed_or_empty("ColdSoakInitialHourFraction")?,
         };
 
         let out = generate_tank_temperatures(&inputs, zone_id);

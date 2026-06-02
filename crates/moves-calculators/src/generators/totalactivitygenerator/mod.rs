@@ -1613,8 +1613,20 @@ impl TableRow for inputs::ZoneRoadTypeRow {
         let zone_id = get_i32("zoneID")?;
         let road_type_id = get_i32("roadTypeID")?;
         let sho_alloc_factor = get_f64("SHOAllocFactor")?;
- // SHPAllocFactor absent in snapshots captured without hotelling — default to 0.0.
-        let shp_opt = df.column("SHPAllocFactor").ok().and_then(|s| s.f64().ok());
+ // Canonical MOVES `ZoneRoadType` (CreateDefault.sql: zoneID, roadTypeID,
+        // SHOAllocFactor only) has no SHPAllocFactor column; SHPAllocFactor lives on the
+        // `Zone` table and is read from ZoneRow at allocation time (allocation.rs SHP
+        // step, matching TotalActivityGenerator.java step 190 `INNER JOIN Zone z`). This
+        // ZoneRoadType field is vestigial, so an absent column is faithful and defaults to
+        // 0.0; but if the column is present it must be the correct type — surface a
+        // mistyped column rather than silently zeroing every row.
+        let shp_opt = match df.column("SHPAllocFactor") {
+            Ok(s) => Some(
+                s.f64()
+                    .map_err(|e| row_err(T, 0, "SHPAllocFactor", e.to_string()))?,
+            ),
+            Err(_) => None,
+        };
         (0..df.height())
             .map(|i| {
                 let null = |col: &'static str| row_err(T, i, col, "null value".into());

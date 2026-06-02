@@ -178,14 +178,22 @@ pub fn zero_valued_replaced_rows(
         if !pollutants.contains(&pid) {
             continue;
         }
+        // Mirror `pollutant_sums_from_snapshot`'s view of the same column: a NULL
+        // or unparseable/non-finite `emissionQuant` is skipped there, so it must
+        // not be counted as a zero-valued row here either, or the premise guard
+        // and the emission-sum comparison would disagree on which rows count. A
+        // row is a genuine zero only when it parses to a finite `0.0`.
         let eq = match eq_col {
             NormalizedColumn::Float64String(v) => match &v[row] {
-                Some(s) => s.parse::<f64>().ok(),
-                None => Some(0.0),
+                Some(s) => match s.parse::<f64>() {
+                    Ok(v) if v.is_finite() => v,
+                    _ => continue,
+                },
+                None => continue,
             },
             _ => continue,
         };
-        if eq == Some(0.0) {
+        if eq == 0.0 {
             *counts.entry(pid).or_insert(0) += 1;
         }
     }

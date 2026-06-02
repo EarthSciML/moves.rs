@@ -73,7 +73,19 @@ pub enum Filter {
  /// which surfaces an ERROR on missing values), so the framework
  /// treats null as a validation error here.
     NonNegative,
- /// Non-negative float, default 1.0 when null is allowed.
+ /// Non-negative float whose canonical missing-value default is 1.0
+    /// (`ImporterManager.FILTER_NON_NEGATIVE_DEFAULT_1`, seeded with the
+    /// value set `{1.0}`). Used by the Idle (`idleMonthAdjust`,
+    /// `idleDayAdjust`) and Hotelling (`monthAdjustment`) importers, where
+    /// a blank cell means "no adjustment", i.e. a multiplier of 1.0.
+    ///
+    /// NOTE: this port does not yet adopt this filter on any descriptor,
+    /// and the framework does NOT currently materialize the 1.0 default —
+    /// [`Filter::nullable`] returns `true`, so a blank cell is written to
+    /// Parquet as an Arrow null rather than 1.0. Any importer that adopts
+    /// this filter MUST have the reader/validator substitute 1.0 for null
+    /// before the column is consumed by emission math, or downstream
+    /// multipliers will see NULL instead of the canonical 1.0.
     NonNegativeDefault1,
  /// Fraction in `[0.0, 1.0]` inclusive.
     ZeroToOne,
@@ -178,8 +190,16 @@ impl Filter {
     }
 
  /// Whether null values are permitted. Most filters reject null; the
- /// `*Default1` variant allows null because the importer fills in
- /// 1.0 on its behalf.
+ /// `*Default1` variant permits null because in canonical MOVES the
+    /// missing value carries a default of 1.0 (a blank adjustment factor
+    /// means "no adjustment").
+    ///
+    /// WARNING: returning `true` here only suppresses the null check — it
+    /// does NOT cause 1.0 to be substituted. The reader/validator must
+    /// materialize the 1.0 default for any column carrying
+    /// [`Filter::NonNegativeDefault1`]; until they do, such a column is
+ /// emitted as a NULL rather than 1.0. No descriptor currently adopts
+    /// this filter, so the gap is latent.
     pub fn nullable(&self) -> bool {
         matches!(self, Filter::NonNegativeDefault1 | Filter::Text)
     }

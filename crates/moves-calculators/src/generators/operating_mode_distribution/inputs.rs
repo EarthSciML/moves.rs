@@ -348,12 +348,21 @@ impl TableRow for DriveScheduleAssocRow {
             .map_err(|e| row_err(t, 0, "driveScheduleID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "driveScheduleID", e.to_string()))?;
- // `isRamp` defaults to 'N' (non-ramp) in MOVES, and some snapshots omit
- // the column entirely. Treat an absent column — and any NULL within it // as non-ramp, matching the MOVES default rather than erroring.
+ // `isRamp` is a required column: it drives
+ // `validate_drive_schedule_distribution`, which guarantees every
+ // `(sourceType, roadType)` has at least one non-ramp cycle. In canonical
+ // MOVES (`OperatingModeDistributionGenerator.validateDriveScheduleDistribution`),
+ // a missing column raises a SQL error and a NULL cell makes
+ // `result.getString(3).equalsIgnoreCase("N")` throw an NPE — both caught
+ // and turned into a validation failure (`return false`). So neither an
+ // absent column nor a NULL cell may be silently coerced to non-ramp:
+ // doing so would mask the very data gap this validation exists to catch.
+ // Surface both as errors here, mirroring every other column below.
         let is_ramp = df
             .column("isRamp")
-            .ok()
-            .and_then(|c| c.bool().ok().cloned());
+            .map_err(|e| row_err(t, 0, "isRamp", e.to_string()))?
+            .bool()
+            .map_err(|e| row_err(t, 0, "isRamp", e.to_string()))?;
         (0..df.height())
             .map(|i| {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
@@ -368,7 +377,7 @@ impl TableRow for DriveScheduleAssocRow {
                         .get(i)
                         .ok_or_else(|| null("driveScheduleID"))?
                         as i16,
-                    is_ramp: is_ramp.as_ref().and_then(|c| c.get(i)).unwrap_or(false),
+                    is_ramp: is_ramp.get(i).ok_or_else(|| null("isRamp"))?,
                 })
             })
             .collect()

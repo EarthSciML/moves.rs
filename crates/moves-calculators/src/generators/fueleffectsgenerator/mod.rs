@@ -167,7 +167,14 @@ impl Generator for FuelEffectsGenerator {
         let ff_rows: Vec<FuelFormulationRow> = ctx.tables().iter_typed("FuelFormulation")?;
         let mut formulations_by_fuel_type: BTreeMap<i32, Vec<FuelFormulation>> = BTreeMap::new();
         for r in ff_rows {
-            let fuel_type_id = *subtype_to_type.get(&r.fuel_subtype_id).unwrap_or(&0);
+ // Java `getFuelFormulations` joins fuelFormulation to fuelSubtype with an
+ // INNER JOIN (FuelEffectsGenerator.java:1356-1363), so a formulation whose
+ // fuelSubtypeID has no matching FuelSubtype row contributes to no fuel
+ // type. Drop such rows to match inner-join semantics rather than inventing
+ // a phantom fuelTypeID 0 bucket.
+            let Some(&fuel_type_id) = subtype_to_type.get(&r.fuel_subtype_id) else {
+                continue;
+            };
             formulations_by_fuel_type
                 .entry(fuel_type_id)
                 .or_default()

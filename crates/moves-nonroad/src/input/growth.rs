@@ -118,7 +118,14 @@ pub fn read_grw<R: BufRead>(reader: R) -> Result<Array2<f64>> {
 
         let parts: Vec<&str> = line.split_whitespace().collect();
         if parts.len() < 3 {
-            continue; // Skip malformed lines
+            return Err(Error::Parse {
+                file: PathBuf::from(".GRW"),
+                line: line_num,
+                message: format!(
+                    "malformed growth record: expected 3 fields, got {}",
+                    parts.len()
+                ),
+            });
         }
 
         let county_idx: usize = match parts[0].parse::<usize>() {
@@ -205,6 +212,7 @@ pub fn read_grw_records<R: BufRead>(reader: R) -> Result<Vec<GrowthRecord>> {
 
  // Read growth factor records
     for line_result in lines {
+        line_num += 1;
         let line = line_result.map_err(|e| Error::Io {
             path: PathBuf::from(".GRW"),
             source: e,
@@ -217,20 +225,48 @@ pub fn read_grw_records<R: BufRead>(reader: R) -> Result<Vec<GrowthRecord>> {
 
         let parts: Vec<&str> = line.split_whitespace().collect();
         if parts.len() < 3 {
-            continue; // Skip malformed lines
+            return Err(Error::Parse {
+                file: PathBuf::from(".GRW"),
+                line: line_num,
+                message: format!(
+                    "malformed growth record: expected 3 fields, got {}",
+                    parts.len()
+                ),
+            });
         }
 
         let county_idx: usize = match parts[0].parse::<usize>() {
             Ok(v) => v - 1,
-            Err(_) => continue,
+            Err(_) => {
+                return Err(Error::Parse {
+                    file: PathBuf::from(".GRW"),
+                    line: line_num,
+                    message: format!("invalid county index: {}", parts[0]),
+                });
+            }
         };
 
         let equipment_idx: usize = match parts[1].parse::<usize>() {
             Ok(v) => v - 1,
-            Err(_) => continue,
+            Err(_) => {
+                return Err(Error::Parse {
+                    file: PathBuf::from(".GRW"),
+                    line: line_num,
+                    message: format!("invalid equipment index: {}", parts[1]),
+                });
+            }
         };
 
-        let growth_factor: f64 = parts[2].parse().unwrap_or(1.0);
+        let growth_factor: f64 = match parts[2].parse::<f64>() {
+            Ok(v) => v,
+            Err(_) => {
+                return Err(Error::Parse {
+                    file: PathBuf::from(".GRW"),
+                    line: line_num,
+                    message: format!("invalid growth factor: {}", parts[2]),
+                });
+            }
+        };
 
         records.push(GrowthRecord {
             county_idx,

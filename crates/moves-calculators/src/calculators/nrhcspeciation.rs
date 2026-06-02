@@ -862,6 +862,57 @@ impl TableRow for NrHpCategoryRow {
     }
 }
 
+/// One `NeededPolProcessIDs` row — a `polProcessID` the run needs output for.
+///
+/// The Go `calculate` gates each speciated pollutant on
+/// `mwo.NeededPolProcessIDs[ppid]`, the run's actual needed set assembled by
+/// the engine — not on the calculator's own static registration list.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct NrNeededPolProcessRow {
+ /// `polProcessID` = `pollutantID * 100 + processID`.
+    pub pol_process_id: i32,
+}
+
+impl TableRow for NrNeededPolProcessRow {
+    fn table_name() -> &'static str {
+        "NeededPolProcessIDs"
+    }
+
+    fn polars_schema() -> Schema {
+        Schema::from_iter([("polProcessID".into(), DataType::Int32)])
+    }
+
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![Series::new(
+                "polProcessID".into(),
+                rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>(),
+            )
+            .into()],
+        )
+    }
+
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "NeededPolProcessIDs";
+        let ppid = df
+            .column("polProcessID")
+            .map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                Ok(NrNeededPolProcessRow {
+                    pol_process_id: ppid
+                        .get(i)
+                        .ok_or_else(|| row_err(t, i, "polProcessID", "null value".into()))?,
+                })
+            })
+            .collect()
+    }
+}
+
 /// One `MOVESWorkerOutput` input or output row for the NR HC speciation
 /// calculator.
 #[derive(Debug, Clone, PartialEq)]
@@ -1352,9 +1403,15 @@ impl Calculator for NrHcSpeciationCalculator {
             .iter_typed::<NrHpCategoryRow>("nrHPCategory")?
             .into_iter()
             .map(|r| ((r.hp_id, r.eng_tech_id), r.nr_hp_category as u8));
-        let needed_pol_process_ids = REGISTRATIONS
-            .iter()
-            .map(|r| i32::from(r.pollutant_id.0) * 100 + i32::from(r.process_id.0));
+        // The needed set is the run's actual `NeededPolProcessIDs` (Go:
+        // `mwo.NeededPolProcessIDs[ppid]`), not this calculator's static
+        // `REGISTRATIONS`. Sourcing it from the static list would make every
+        // species always "needed" and over-produce output the run did not
+        // request. Mirrors `NRAirToxicsCalculator::execute`.
+        let needed_pol_process_ids = tables
+            .iter_typed::<NrNeededPolProcessRow>("NeededPolProcessIDs")?
+            .into_iter()
+            .map(|r| r.pol_process_id);
         let worker_tables =
             NonroadWorkerTables::new(fuel_formulations, hp_categories, needed_pol_process_ids);
 

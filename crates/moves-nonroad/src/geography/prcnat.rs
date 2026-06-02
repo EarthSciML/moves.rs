@@ -48,7 +48,7 @@ use super::{
     EquipmentRecord, GeographyError, GeographyOutput, GeographyWarning, RunOptions, SiAggregate,
     StateDescriptor, StateOutput,
 };
-use crate::common::consts::{MXPOL, RMISS};
+use crate::common::consts::{MXAGYR, MXPOL, RMISS};
 use crate::{Error, Result};
 
 /// Output of one `alosta` step. Mirrors the
@@ -302,6 +302,38 @@ pub fn process_national_record(
         return Err(Error::Config(GeographyError::GrowthFileMissing.to_string()));
     }
 
+ // --- pre-calc per-model-year tech availability (prcnat.f :363–:394, :412) ---
+ // The Fortran source resolves the exhaust (and evap) tech index for
+ // every model year in the full `iepyr - MXAGYR + 1 .. iepyr` range
+ // in a loop that runs *before* the state loop. A miss on any year
+ // there sets `ierr = ISKIP; goto 9999`, which the caller (nonroad.f
+ // :274) turns into `goto 333` — the entire record is skipped and no
+ // state output is written. Because the lookup depends only on
+ // (scc, hpval, tchmdyr) and not on the state, doing it here matches
+ // the Fortran's record-level skip exactly: a per-year data gap aborts
+ // the whole record up front rather than truncating the state loop
+ // mid-stream and emitting a partial record as if it were complete.
+    let iepyr = opt.episode_year;
+    for iyr in (iepyr - MXAGYR as i32 + 1)..=iepyr {
+        let tchmdyr = iyr.min(opt.tech_year);
+        if callbacks.find_exhaust_tech(scc, hpval, tchmdyr).is_none() {
+            output.warnings.push(GeographyWarning::MissingExhaustTech {
+                scc: scc.to_string(),
+                hp_avg: hpval,
+                year: tchmdyr,
+            });
+            return Ok(output);
+        }
+        if callbacks.find_evap_tech(scc, hpval, tchmdyr).is_none() {
+            output.warnings.push(GeographyWarning::MissingEvapTech {
+                scc: scc.to_string(),
+                hp_avg: hpval,
+                year: tchmdyr,
+            });
+            return Ok(output);
+        }
+    }
+
  // --- state loop (prcnat.f :482–:889) ---
     for (idx, state) in ctx.states.iter().enumerate() {
  // Skip if state not selected, or if doing national record
@@ -437,7 +469,7 @@ pub fn process_national_record(
         }
 
  // --- model-year loop (prcnat.f :625–:866) ---
-        let iepyr = opt.episode_year;
+ // `iepyr` is the episode year resolved before the pre-calc tech loop.
         let lo = iepyr - (nyrlif as i32) + 1;
         let hi = iepyr;
         for iyr in lo..=hi {
@@ -455,13 +487,18 @@ pub fn process_national_record(
             let tchmdyr = iyr.min(opt.tech_year);
 
  // --- exhaust tech for this model year (prcnat.f :377–:399 / :659) ---
+ // Availability for every model year was already validated in the
+ // pre-calc loop above (mirroring prcnat.f :363–:394, which runs
+ // before the state loop). A miss here would mean `find_exhaust_tech`
+ // returned inconsistent results for the same (scc, hpval, tchmdyr) —
+ // a callback bug. Surface it explicitly rather than silently
+ // truncating the state loop and emitting a partial record as Success.
             let Some(tech) = callbacks.find_exhaust_tech(scc, hpval, tchmdyr) else {
-                output.warnings.push(GeographyWarning::MissingExhaustTech {
-                    scc: scc.to_string(),
-                    hp_avg: hpval,
-                    year: tchmdyr,
-                });
-                return Ok(output);
+                return Err(Error::Config(format!(
+                    "find_exhaust_tech returned no tech for scc={scc} hp={hpval} \
+                     year={tchmdyr} inside the model-year loop after pre-validation \
+                     succeeded (non-deterministic callback)"
+                )));
             };
 
  // --- filter retrofits by model year (prcnat.f :650–:655) ---
@@ -564,13 +601,16 @@ pub fn process_national_record(
             strtot += stradj * pop_state * modfrc * tplful * adjtime;
 
  // --- evap tech for this model year (prcnat.f :412 / :774) ---
+ // As with the exhaust lookup above, evap-tech availability for every
+ // model year was already validated in the pre-calc loop. A miss here
+ // is a non-deterministic-callback bug; surface it rather than
+ // truncating the state loop and emitting a partial record as Success.
             let Some(evtech) = callbacks.find_evap_tech(scc, hpval, tchmdyr) else {
-                output.warnings.push(GeographyWarning::MissingEvapTech {
-                    scc: scc.to_string(),
-                    hp_avg: hpval,
-                    year: tchmdyr,
-                });
-                return Ok(output);
+                return Err(Error::Config(format!(
+                    "find_evap_tech returned no tech for scc={scc} hp={hpval} \
+                     year={tchmdyr} inside the model-year loop after pre-validation \
+                     succeeded (non-deterministic callback)"
+                )));
             };
 
  // --- evap tech-type loop (prcnat.f :774–:854) ---

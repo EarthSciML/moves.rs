@@ -116,14 +116,19 @@
 //!
 //! # Data plane
 //!
-//! [`Calculator::execute`] receives a [`CalculatorContext`] whose execution
-//! tables and scratch namespace are placeholders until the
-//! `DataFrameStore` lands (), so `execute` cannot yet
-//! read `MOVESWorkerOutput` nor write the CO2 rows back. The numeric algorithm
-//! is fully ported and unit-tested on `calculate`; `execute` is a documented
-//! shell returning an empty [`CalculatorOutput`]. Once the data plane exists,
-//! `execute` materialises a [`Co2aeInputs`] from `ctx`, calls `calculate`, and
-//! writes the [`Co2aeOutput`] rows into `MOVESWorkerOutput`.
+//! [`Calculator::execute`] is fully wired and on the live execution path. It
+//! reads `RunSpecPollutantProcess` from the [`CalculatorContext`] tables to
+//! derive the Step 1a / Step 2 process filters (the Java `##CO2Step1AprocessIDs##`
+//! / `##CO2Step2processIDs##` macros), reads the SQL's extracted input tables
+//! (`FuelSupply`, `FuelFormulation`, `FuelSubtype`, `Year`, `MonthOfAnyYear`,
+//! `Pollutant`, and `MOVESWorkerOutput`) via [`CalculatorContext::tables`],
+//! materialises a [`Co2aeInputs`], calls [`calculate`](CO2AERunningStartExtendedIdleCalculator::calculate),
+//! and emits the produced Atmospheric CO2 and CO2 Equivalent rows back into
+//! `MOVESWorkerOutput` via the shared `wiring::emit_rows` helper. The SQL's
+//! two-step insert-then-read-back ordering is preserved inside `calculate`,
+//! which feeds the Step 1a Atmospheric CO2 rows into Step 2 before they are
+//! returned. The numeric algorithm is also independently unit-tested on
+//! `calculate`.
 
 use rustc_hash::FxHashMap;
 

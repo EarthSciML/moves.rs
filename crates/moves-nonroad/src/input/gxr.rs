@@ -124,7 +124,18 @@ pub fn read_gxr<R: BufRead>(reader: R) -> Result<Array3<f64>> {
 
         let parts: Vec<&str> = line.split_whitespace().collect();
         if parts.len() < 3 {
-            continue; // Skip malformed lines
+            // rdgxrf.f treats a short/garbled record as a hard read
+            // error (ERR=7001 -> ierr=IFAIL), not a row to skip.
+            // Silently skipping would leave the pre-filled 1.0 in place
+            // and corrupt the projection without surfacing the problem.
+            return Err(Error::Parse {
+                file: PathBuf::from(".GXR"),
+                line: line_num,
+                message: format!(
+                    "malformed record: expected at least 3 fields, got {}",
+                    parts.len()
+                ),
+            });
         }
 
         let county_idx: usize = match parts[0].parse::<usize>() {
@@ -216,6 +227,7 @@ pub fn read_gxr_records<R: BufRead>(reader: R) -> Result<Vec<GrowthExtrapolation
 
  // Read growth extrapolation records
     for line_result in lines {
+        line_num += 1;
         let line = line_result.map_err(|e| Error::Io {
             path: PathBuf::from(".GXR"),
             source: e,
@@ -228,22 +240,50 @@ pub fn read_gxr_records<R: BufRead>(reader: R) -> Result<Vec<GrowthExtrapolation
 
         let parts: Vec<&str> = line.split_whitespace().collect();
         if parts.len() < 3 {
-            continue; // Skip malformed lines
+            // rdgxrf.f treats a short/garbled record as a hard read
+            // error (ERR=7001 -> ierr=IFAIL), not a row to skip.
+            return Err(Error::Parse {
+                file: PathBuf::from(".GXR"),
+                line: line_num,
+                message: format!(
+                    "malformed record: expected at least 3 fields, got {}",
+                    parts.len()
+                ),
+            });
         }
 
         let county_idx: usize = match parts[0].parse::<usize>() {
             Ok(v) => v - 1,
-            Err(_) => continue,
+            Err(_) => {
+                return Err(Error::Parse {
+                    file: PathBuf::from(".GXR"),
+                    line: line_num,
+                    message: format!("invalid county index: {}", parts[0]),
+                });
+            }
         };
 
         let equipment_idx: usize = match parts[1].parse::<usize>() {
             Ok(v) => v - 1,
-            Err(_) => continue,
+            Err(_) => {
+                return Err(Error::Parse {
+                    file: PathBuf::from(".GXR"),
+                    line: line_num,
+                    message: format!("invalid equipment index: {}", parts[1]),
+                });
+            }
         };
 
         let mut year_factors = Vec::new();
         for val_str in parts[2..].iter() {
-            let factor: f64 = val_str.parse().unwrap_or(1.0);
+            // A non-numeric factor is a corrupt record in rdgxrf.f
+            // (the F5.0 read jumps to ERR=7001). Fabricating 1.0 here
+            // would silently turn corrupt data into "no growth".
+            let factor: f64 = val_str.parse().map_err(|_| Error::Parse {
+                file: PathBuf::from(".GXR"),
+                line: line_num,
+                message: format!("invalid year factor: {}", val_str),
+            })?;
             year_factors.push(factor);
         }
 
@@ -264,14 +304,28 @@ pub fn read_gxr_records<R: BufRead>(reader: R) -> Result<Vec<GrowthExtrapolation
 /// * `county_idx` - 0-based county index
 /// * `equipment_idx` - 0-based equipment index
 /// * `year_idx` - 0-based year index
+///
+/// An out-of-range index is a coverage/indexing bug (the Fortran
+/// indexes a fixed array dimensioned for full coverage); surface it as
+/// an error rather than fabricating a "no growth" factor of 1.0 that
+/// would silently mask the missing data.
 pub fn get_gxr_factor(
     gxr: &Array3<f64>,
     county_idx: usize,
     equipment_idx: usize,
     year_idx: usize,
-) -> f64 {
- *gxr.get([county_idx, equipment_idx, year_idx])
-        .unwrap_or(&1.0)
+) -> Result<f64> {
+    gxr.get([county_idx, equipment_idx, year_idx])
+        .copied()
+        .ok_or_else(|| Error::Parse {
+            file: PathBuf::from(".GXR"),
+            line: 0,
+            message: format!(
+                "growth-extrapolation index out of bounds: \
+                 county={} equipment={} year={} (shape: {:?})",
+                county_idx, equipment_idx, year_idx, gxr.shape()
+            ),
+        })
 }
 
 #[cfg(test)]

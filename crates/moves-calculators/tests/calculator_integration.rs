@@ -212,7 +212,6 @@ fn canonical_snapshots_dormant_or_validate() {
     let loaded_fixtures = fixtures::load_all_fixtures().expect("the 26 onroad fixtures must load");
 
     let mut dormant_count = 0usize;
-    let mut validated_count = 0usize;
     let mut failed: Vec<String> = Vec::new();
 
     for fixture in &loaded_fixtures {
@@ -220,6 +219,17 @@ fn canonical_snapshots_dormant_or_validate() {
             dormant_count += 1;
             continue;
         }
+        // A canonical snapshot is present for this fixture, so the gate is no
+        // longer dormant for it: the numeric port-vs-canonical diff MUST run.
+        // It cannot run yet, because the produced-output side does not exist
+        // — every `Calculator::execute` returns `CalculatorOutput::empty()`
+        // until the data plane lands per-fixture row storage (see
+        // `tests/calculator_validation/mod.rs`). A structural-only check
+        // (`table_count != 0`) would let a present snapshot pass without any
+        // emission number ever being compared, which would silently advertise
+        // fidelity coverage that does not exist. Surface that gap explicitly
+        // instead of swallowing it: a present snapshot is a hard failure here
+        // until the produced-output side is wired through `compare::compare_table`.
         let snap_dir = snapshots.join(&fixture.name);
         match moves_snapshot::Snapshot::load(&snap_dir) {
             Ok(snap) => {
@@ -230,7 +240,13 @@ fn canonical_snapshots_dormant_or_validate() {
                         fixture.name
                     ));
                 } else {
-                    validated_count += 1;
+                    failed.push(format!(
+                        "{}: canonical snapshot present ({table_count} table(s)) but the \
+                         port-vs-canonical numeric diff is not wired — calculators still \
+                         return empty output (no data plane). Wire produced output through \
+                         compare::compare_table before landing snapshots.",
+                        fixture.name
+                    ));
                 }
             }
             Err(e) => {
@@ -246,7 +262,7 @@ fn canonical_snapshots_dormant_or_validate() {
         failed.join("\n")
     );
 
-    let _ = (dormant_count, validated_count);
+    let _ = dormant_count;
 }
 
 #[test]

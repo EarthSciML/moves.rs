@@ -4821,20 +4821,18 @@ fn operating_mode_base_rates(
         if !evap_ok(sb.fuel_type_id) {
             continue;
         }
- // When AverageTankGasoline is absent (empty execution DB), canonical
- // MOVES defaults rvpAdjustment to 1.0 for all modes. The canonical
- // SQL inner-joins on ATG but the worker ATG table is always empty at
- // Processing time — TankFuelGenerator is a master-side year-level
- // generator whose output is not transferred to SQL workers.
-        let rvp = rvp_terms
-            .get(&sb.fuel_type_id)
-            .copied()
-            .unwrap_or(AdjustTerms {
-                term3: 0.0,
-                term2: 0.0,
-                term1: 0.0,
-                constant: 1.0,
-            });
+ // TVV-8's operating / hot-soak insert `INNER JOIN`s the rebuilt
+ // `averageTankGasoline atg on (atg.fuelTypeID = FuelType.fuelTypeID)`
+ // for every op mode (MultidayTankVaporVentingCalculator.sql lines
+ // 1870 / 1949). A fuel type with no `averageTankGasoline` row — which
+ // includes any fuel type with no `evapRVPTemperatureAdjustment` knot,
+ // since the ATG rebuild itself inner-joins those knots — drops out of
+ // the insert entirely. Match that: when `rvp_adjustment_terms` has no
+ // entry for this fuel type, skip the row rather than fabricating a unit
+ // (1.0) adjustment that would keep it.
+        let Some(rvp) = rvp_terms.get(&sb.fuel_type_id).copied() else {
+            continue;
+        };
         let Some(ages) = age_by_group.get(&er.age_group_id) else {
             continue;
         };

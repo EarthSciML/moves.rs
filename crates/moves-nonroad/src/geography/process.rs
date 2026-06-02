@@ -518,11 +518,29 @@ fn run_exhaust_block<C: GeographyCallbacks + ?Sized>(
  // ---- prccty.f :440–:445 — re-resolve idxtch for tchmdyr. ----
     let exhaust_tech = match callbacks.find_exhaust_tech(record.scc, record.hp_avg, tchmdyr) {
         Some(t) => t,
- // Fortran source does not error on a per-year miss — it would
- // silently fall through. The up-front lookup already accepted
- // the SCC, so a miss here is a data bug; we still skip the
- // year to avoid a hard crash.
-        None => return Ok(()),
+ // `prccty.f` :440 re-resolves `idxtch = fndtch(asccod,hpval,tchmdyr)`
+ // with no `idxtch .LE. 0` guard before line 442's `ntech(idxtch)`,
+ // so a per-year miss in the Fortran source reads `ntech(0)`
+ // out-of-bounds rather than cleanly skipping the year. A miss can
+ // happen legitimately when the tech-fraction data for this SCC/HP
+ // starts at a model year later than `tchmdyr` (the up-front lookup
+ // at the larger `itchyr` matched it); it can equally be a data bug.
+ // Either way, dropping the whole model year's exhaust contribution
+ // silently understates emissions, so we surface a warning (matching
+ // the per-year MissingExhaustTech warning the prcnat/prcus/state
+ // ports record) before skipping rather than vanishing the year.
+        None => {
+            output.warnings.push(ProcessWarning {
+                kind: WarningKind::MissingTechType,
+                message: format!(
+                    "WARNING:  Could not find any exhaust technology fractions for equipment: \
+                     SCC code {scc} Average HP {hp:7.1} model year {iyr} Skipping model year...",
+                    scc = record.scc,
+                    hp = record.hp_avg,
+                ),
+            });
+            return Ok(());
+        }
     };
 
     let n_tech = exhaust_tech.tech_names.len();
@@ -617,19 +635,28 @@ fn run_exhaust_block<C: GeographyCallbacks + ?Sized>(
  * tplful
  * tchfrc
  * adjtime;
+        // Fortran `bsfc(idxyr,i)` (`prccty.f` :523) indexes a fully
+        // preallocated `bsfc(MXAGYR,MXTECH)` that `emfclc.f` populates
+        // for every (year, tech) this loop visits, so a missing entry
+        // here is a table/shape mismatch between the emfclc output and
+        // this loop's indexing — never a legitimate 0.0. Surface it
+        // instead of silently zeroing fuel (and the bsfc-derived
+        // CO2/SO2 chemistry that depends on it).
+        let bsfc_idx = idxyr0 * exhaust_tech.tech_names.len() + tech_idx;
+        let bsfc = *factors.bsfc.get(bsfc_idx).ok_or_else(|| {
+            Error::Config(format!(
+                "ERROR: bsfc index {bsfc_idx} out of bounds (len {len}) for \
+                 SCC {scc} model year {iyr} tech index {tech_idx} — emfclc/bsfc shape mismatch",
+                len = factors.bsfc.len(),
+                scc = record.scc,
+            ))
+        })?;
         let fulbmy = tplful
  * population
  * modyr_agedist.actadj[idxyr0]
  * modyr_agedist.modfrc[idxyr0]
  * tchfrc
- * (record.hp_avg
- * activity.load_factor
- * factors
-                    .bsfc
-                    .get(idxyr0 * exhaust_tech.tech_names.len() + tech_idx)
-                    .copied()
-                    .unwrap_or(0.0)
-                / denful)
+ * (record.hp_avg * activity.load_factor * bsfc / denful)
  * adjtime;
  *fulcsm += fulbmy;
  *fulbmytot += fulbmy;
@@ -711,9 +738,26 @@ fn run_evap_block<C: GeographyCallbacks + ?Sized>(
     output: &mut ProcessOutput,
 ) -> Result<()> {
  // ---- prccty.f :573 — evap tech-type for tchmdyr. ----
+ // As on the exhaust side (`prccty.f` :440/:442), `idxevtch =
+ // fndevtch(asccod,hpval,tchmdyr)` is used at line 575's
+ // `nevtech(idxevtch)` with no `.LE. 0` guard, so a per-year miss
+ // reads out-of-bounds in Fortran rather than cleanly skipping.
+ // Surface a warning before skipping so the dropped model year is
+ // auditable instead of silently vanishing.
     let evap_tech = match callbacks.find_evap_tech(record.scc, record.hp_avg, tchmdyr) {
         Some(t) => t,
-        None => return Ok(()),
+        None => {
+            output.warnings.push(ProcessWarning {
+                kind: WarningKind::MissingTechType,
+                message: format!(
+                    "WARNING:  Could not find any evap technology fractions for equipment: \
+                     SCC code {scc} Average HP {hp:7.1} model year {iyr} Skipping model year...",
+                    scc = record.scc,
+                    hp = record.hp_avg,
+                ),
+            });
+            return Ok(());
+        }
     };
 
     let n_evtech = evap_tech.tech_names.len();

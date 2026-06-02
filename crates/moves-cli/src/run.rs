@@ -94,13 +94,14 @@ impl SnapshotFilter {
                 .collect::<BTreeSet<_>>()
                 .into_iter()
                 .collect(),
- // MOVES XML months are 0-indexed (key=7 → monthID=8 / August);
- // add 1 to convert from RunSpec key to MOVES internal monthID.
+ // RunSpec `<month key="N"/>` carries the literal MOVES monthID (1-12,
+ // e.g. key=7 = July); it is NOT 0-indexed. Pass it through unchanged,
+ // matching RunSpecFilters::from_runspec and build_runspec_tables.
             month_ids: run_spec
                 .timespan
                 .months
                 .iter()
-                .map(|&m| i64::from(m) + 1)
+                .map(|&m| i64::from(m))
                 .collect::<BTreeSet<_>>()
                 .into_iter()
                 .collect(),
@@ -827,18 +828,29 @@ fn populate_zone_month_hour_meteorology(store: &mut InMemoryStore) -> Result<()>
                 .cloned()
                 .with_context(|| format!("ZoneMonthHour column '{want}' not found"))
         };
-        let to_i32 = |c: polars::prelude::Column| -> Result<Vec<i32>> {
-            Ok(c.cast(&DataType::Int32)
+        // Key columns must not be NULL: a NULL zoneID/monthID/hourID could
+        // never match a generator-computed (zone,month,hour) key, so coercing
+        // it to 0 would silently route the row into the unmatched-fallback
+        // branch and fabricate meteorology. Canonical MOVES keys ZoneMonthHour
+        // on non-null (monthID, zoneID, hourID); surface the corrupt input
+        // instead of hiding it. (populate_sho_distances treats its key columns
+        // the same way, via into_no_null_iter.)
+        let to_i32 = |c: polars::prelude::Column, name: &str| -> Result<Vec<i32>> {
+            c.cast(&DataType::Int32)
                 .map_err(|e| anyhow::anyhow!("{e}"))?
                 .i32()
                 .map_err(|e| anyhow::anyhow!("{e}"))?
                 .into_iter()
-                .map(|v| v.unwrap_or(0))
-                .collect())
+                .map(|v| {
+                    v.ok_or_else(|| {
+                        anyhow::anyhow!("ZoneMonthHour.{name} contains a NULL key value")
+                    })
+                })
+                .collect()
         };
-        let zone = to_i32(find("zoneID")?)?;
-        let month = to_i32(find("monthID")?)?;
-        let hour = to_i32(find("hourID")?)?;
+        let zone = to_i32(find("zoneID")?, "zoneID")?;
+        let month = to_i32(find("monthID")?, "monthID")?;
+        let hour = to_i32(find("hourID")?, "hourID")?;
         let temps: Vec<f64> = find("temperature")?
             .cast(&DataType::Float64)
             .map_err(|e| anyhow::anyhow!("{e}"))?
@@ -2046,8 +2058,8 @@ mod tests {
         assert_eq!(f.year_ids, vec![2020i64]);
         assert_eq!(
             f.month_ids,
-            vec![8i64],
-            "month key=7 → monthID=8 (MOVES XML months are 0-indexed)"
+            vec![7i64],
+            "month key=7 = monthID 7 (July); RunSpec months are 1-indexed and passed through unchanged"
         );
     }
 

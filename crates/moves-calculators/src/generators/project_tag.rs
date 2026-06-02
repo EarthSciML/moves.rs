@@ -39,12 +39,22 @@
 //!
 //! The computational kernels ([`ShoRow`], [`ShpRow`], [`StartsRow`],
 //! [`HotellingRow`], [`SourceHoursRow`], and [`ProjectTagInputs`]) are fully
-//! implemented and unit-tested. The [`Generator::execute`] implementation
-//! shells out to them once the project-domain input tables are available in
-//! the execution context (`linkSourceTypeHour`, `offNetworkLink`, and the
-//! `sourceTypeAgeDistribution` tables supplied by `TotalActivityGenerator`).
-//! Until then it returns an empty `CalculatorOutput`, mirroring the
-//! stub convention used by `TotalActivityGenerator`.
+//! implemented and unit-tested. The [`Generator::execute`] implementation will
+//! shell out to them once the project-domain input tables are available in the
+//! execution context (`link`, `linkSourceTypeHour`, `offNetworkLink`, `avft`,
+//! and the `sourceTypeAgeDistribution` tables supplied by
+//! `TotalActivityGenerator`) — which requires `TableRow` implementations and
+//! schema-registry entries for those row types that do not yet exist.
+//!
+//! Until that wiring lands, `execute` returns [`Error::NotImplemented`] rather
+//! than an empty `CalculatorOutput`. Unlike `TotalActivityGenerator::execute`
+//! — which actually reads its inputs, runs the kernels, and writes its scratch
+//! tables — silently returning an empty output here would diverge from the
+//! Java `ProjectTAG.executeLoop`, which always runs
+//! `allocateTotalActivityBasis` to populate `SHO`/`SHP`/`Starts`/
+//! `hotellingHours`/`sourceHours`. Producing nothing would make a
+//! project-domain run yield zero (or grossly truncated) emissions with no
+//! error, so this generator fails loudly instead.
 
 use std::collections::HashSet;
 
@@ -834,12 +844,23 @@ impl Generator for ProjectTAG {
     }
 
     fn execute(&self, _ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
- // Project-domain input tables (linkSourceTypeHour, offNetworkLink, etc.)
- // are provided in the execution database once data plane lands
- // support for project-domain scenarios. Until then, the generator
- // registers its subscriptions and name but produces no output — the same
- // stub contract TotalActivityGenerator uses.
-        Ok(CalculatorOutput::empty())
+ // The Java `ProjectTAG.executeLoop` calls `allocateTotalActivityBasis`,
+ // which writes the SHO/SHP/Starts/HotellingHours/SourceHours scratch
+ // tables that `BaseRateCalculator` and the emission calculators consume
+ // (ProjectTAG.java:142, :255). The computational kernels are fully ported
+ // above (`allocate_total_activity_basis` and friends), but wiring them
+ // here requires the project-domain input tables — `link`,
+ // `linkSourceTypeHour`, `offNetworkLink`, `avft`, etc. — to be projected
+ // from the execution context, which in turn needs `TableRow`
+ // implementations and schema-registry entries for those row types.
+ //
+ // Those do not yet exist, so this generator cannot reproduce the Java
+ // behaviour. Returning an empty output here would silently yield zero
+ // project-domain activity (and therefore zero emissions) instead of the
+ // values `allocateTotalActivityBasis` produces — a silent
+ // divergence from canonical MOVES. Fail loudly instead, so a
+ // project-domain run errors rather than emitting bogus zeros.
+        Err(Error::NotImplemented)
     }
 }
 
@@ -987,12 +1008,19 @@ mod tests {
     }
 
     #[test]
-    fn execute_returns_empty_output_as_stub() {
+    fn execute_errors_until_project_domain_inputs_are_wired() {
+ // The Java `ProjectTAG.executeLoop` always runs
+ // `allocateTotalActivityBasis` to populate the activity scratch tables.
+ // Until the project-domain input tables are projected into the
+ // execution context and the kernels are invoked here, `execute` must
+ // fail loudly rather than silently produce zero activity (which would
+ // yield zero project-domain emissions). When wiring lands, replace this
+ // with an assertion that the SHO/SHP/Starts/HotellingHours/SourceHours
+ // scratch tables are populated with the expected rows.
         let gen = ProjectTAG::new();
         let mut ctx = CalculatorContext::new();
-        let out = gen.execute(&mut ctx).unwrap();
- // stub: no DataFrame produced yet.
-        assert!(out.into_dataframe().is_none());
+        let err = gen.execute(&mut ctx).unwrap_err();
+        assert!(matches!(err, Error::NotImplemented), "got {err:?}");
     }
 
     #[test]

@@ -370,12 +370,28 @@ impl Calculator for Co2AtmosphericWtpCalculator {
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let tables = ctx.tables();
         let year: Vec<YearRow> = tables.iter_typed("Year")?;
-        let target_year = ctx
-            .position()
+        // `CO2AtmosphericWTPCalculator.sql` substitutes the MasterLoop
+        // `##context.year##` directly into `gwtp.yearID = ##context.year##`
+        // and `y.yearID = ##context.year##` with no documented fallback. An
+        // absent context year is a configuration error, not a defaultable
+        // condition: substituting `0` (or an arbitrary `Year`-table row)
+        // would silently weight emissions on the wrong GREET rate and fuel
+        // supply, or hide a missing-year data gap as an empty result.
+        // Propagate instead. `IterationPosition` has no dedicated error
+        // variant; reuse `RowExtraction` (its documented "value was null
+        // where a non-null value is required" case) keyed to a synthetic
+        // table, matching the sibling WTP calculators.
+        let pos = ctx.position();
+        let target_year = pos
             .time
             .year
             .map(i32::from)
-            .unwrap_or_else(|| year.first().map(|y| y.year_id).unwrap_or(0));
+            .ok_or_else(|| Error::RowExtraction {
+                table: "IterationPosition".into(),
+                row: pos.iteration as usize,
+                column: "year".into(),
+                message: "required run-context year is unresolved (None)".into(),
+            })?;
         let inputs = WtpInputs {
             greet: tables.iter_typed::<GreetWellToPumpRow>("GREETWellToPump")?,
             fuel_supply: tables.iter_typed::<FuelSupplyRow>("FuelSupply")?,
@@ -656,6 +672,7 @@ mod tests {
 
     #[test]
     fn execute_returns_nonempty_dataframe_for_minimal_inputs() {
+        use moves_framework::execution::execution_db::{ExecutionTime, IterationPosition};
         use moves_framework::{DataFrameStore, InMemoryStore, TableRow};
         let inputs = minimal_inputs();
         let mut store = InMemoryStore::new();
@@ -684,7 +701,14 @@ mod tests {
             "MOVESWorkerOutput",
             WorkerOutputRow::into_dataframe(inputs.worker_output).unwrap(),
         );
-        let ctx = CalculatorContext::with_tables(store);
+        // `execute` requires the MasterLoop `##context.year##`; supply it
+        // through the position (the default `with_tables` context leaves it
+        // `None`, which `execute` now rejects).
+        let pos = IterationPosition {
+            time: ExecutionTime::year(2020),
+            ..IterationPosition::default()
+        };
+        let ctx = CalculatorContext::with_position_and_tables(pos, store);
         let out = Co2AtmosphericWtpCalculator
             .execute(&ctx)
             .expect("execute ok");

@@ -83,16 +83,32 @@ impl Importer for AgeDistributionImporter {
         let mut sums: std::collections::BTreeMap<(i64, i64), f64> =
             std::collections::BTreeMap::new();
         for row in 0..batch.num_rows() {
-            if source_type.is_null(row) || year.is_null(row) || fraction.is_null(row) {
+            if source_type.is_null(row) || year.is_null(row) {
                 continue;
             }
             let s = source_type.value(row);
             let y = year.value(row);
-            let f = fraction.value(row);
- *sums.entry((s, y)).or_insert(0.0) += f;
+            // Mirrors canonical SQL `sum(ageFraction)`: a NULL fraction
+            // contributes nothing to the sum but the (sourceTypeID,
+            // yearID) tuple still appears in the GROUP BY, so register
+            // the tuple regardless rather than dropping the row.
+            let entry = sums.entry((s, y)).or_insert(0.0);
+            if !fraction.is_null(row) {
+                *entry += fraction.value(row);
+            }
         }
 
         let mut out = Vec::new();
+        // Mirrors AgeDistributionImporter.sql lines 83-88: any NULL
+        // ageFraction is a hard error, emitted once (the SQL `LIMIT 1`).
+        if (0..batch.num_rows()).any(|row| fraction.is_null(row)) {
+            out.push(ValidationMessage::error(
+                "SourceTypeAgeDistribution",
+                Some("ageFraction"),
+                None,
+                "found a NULL ageFraction value".to_string(),
+            ));
+        }
         for ((source_type_id, year_id), sum) in sums {
             let rounded = (sum * 10_000.0).round() / 10_000.0;
             if (rounded - 1.0).abs() > f64::EPSILON {

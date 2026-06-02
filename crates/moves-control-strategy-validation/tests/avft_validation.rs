@@ -12,6 +12,8 @@
 
 use std::path::Path;
 
+use std::collections::BTreeSet;
+
 use moves_avft::{
     csv_io as avft_csv,
     model::AvftTable,
@@ -84,8 +86,9 @@ fn from_completed_preserves_table() {
 #[test]
 fn from_completed_fractions_sum_to_one_per_group() {
     let t = load_user_table();
+    let expected = groups_in(&t);
     let strategy = AvftControlStrategy::from_completed(t);
-    check_fractions_sum_to_one(strategy.completed_table());
+    check_fractions_sum_to_one(strategy.completed_table(), &expected);
 }
 
 // ---------------------------------------------------------------------------
@@ -116,7 +119,11 @@ fn from_tool_inputs_fractions_sum_to_one_per_group() {
 
     let strategy = AvftControlStrategy::from_tool_inputs(&spec, &user, &default, &known)
         .expect("tool must succeed");
-    check_fractions_sum_to_one(strategy.completed_table());
+    // Pin the required (sourceType, modelYear) group set from the spec +
+    // default table so a silently-dropped group fails the test rather than
+    // passing vacuously.
+    let expected = expected_tool_groups(&spec, &default);
+    check_fractions_sum_to_one(strategy.completed_table(), &expected);
 }
 
 #[test]
@@ -207,20 +214,81 @@ fn avft_csv_round_trip() {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Assert fractions sum to 1.0 ± 1e-9 for every (sourceTypeID, modelYearID) group.
-fn check_fractions_sum_to_one(t: &AvftTable) {
+/// Assert fractions sum to 1.0 ± 1e-9 for every `(sourceTypeID, modelYearID)`
+/// group in `expected_groups`.
+///
+/// `expected_groups` is the set of groups the table is *required* to contain
+/// (in the canonical AVFTTool, every analysis model year up to and including
+/// `last_complete_model_year` plus the projection years must be present and
+/// sum to 1.0). Asserting against this explicit set — rather than only the
+/// groups that happen to be present in `t` — prevents a vacuous pass when a
+/// required group was silently dropped by gap-fill/projection.
+fn check_fractions_sum_to_one(t: &AvftTable, expected_groups: &BTreeSet<(i32, i32)>) {
     use std::collections::BTreeMap;
+
+    assert!(
+        !expected_groups.is_empty(),
+        "expected_groups must be non-empty — a sum check over an empty group set passes vacuously"
+    );
 
     let mut sums: BTreeMap<(i32, i32), f64> = BTreeMap::new();
     for rec in t.to_vec() {
- *sums
+        *sums
             .entry((rec.source_type_id, rec.model_year_id))
             .or_insert(0.0) += rec.fuel_eng_fraction;
     }
-    for ((st, my), sum) in &sums {
+
+    // Every required group must actually be present in the produced table.
+    for (st, my) in expected_groups {
+        assert!(
+            sums.contains_key(&(*st, *my)),
+            "sourceType={st} modelYear={my}: required group is missing from the \
+             produced table (gap-fill/projection dropped it)"
+        );
+    }
+
+    for (st, my) in expected_groups {
+        let sum = sums[&(*st, *my)];
         assert!(
             (sum - 1.0).abs() < 1e-9,
             "sourceType={st} modelYear={my}: fractions sum to {sum:.9}, expected 1.0"
         );
     }
+}
+
+/// The set of `(sourceTypeID, modelYearID)` groups present in `t`. Used to pin
+/// the expectation for the `from_completed` path, where the produced groups
+/// match the input table exactly and the canonical property is that every
+/// group present sums to 1.0.
+fn groups_in(t: &AvftTable) -> BTreeSet<(i32, i32)> {
+    t.to_vec()
+        .into_iter()
+        .map(|r| (r.source_type_id, r.model_year_id))
+        .collect()
+}
+
+/// Derive the `(sourceTypeID, modelYearID)` groups the AVFT Tool is required
+/// to produce for the given spec and default table.
+///
+/// Mirrors `AVFTTool.sql`: gap-fill emits every default `(sourceTypeID,
+/// modelYearID)` in `1950..=lastCompleteModelYear` for each enabled source
+/// type, and projection emits years `lastCompleteModelYear+1..=analysisYear`
+/// (from the default skeleton). Disabled source types produce no output.
+fn expected_tool_groups(spec: &ToolSpec, default: &AvftTable) -> BTreeSet<(i32, i32)> {
+    let mut groups = BTreeSet::new();
+    for method in &spec.methods {
+        if !method.enabled {
+            continue;
+        }
+        for rec in default.rows_for_source_type(method.source_type_id) {
+            let my = rec.model_year_id;
+            let in_gap_fill = (1950..=spec.last_complete_model_year).contains(&my);
+            let in_projection =
+                my > spec.last_complete_model_year && my <= spec.analysis_year;
+            if in_gap_fill || in_projection {
+                groups.insert((method.source_type_id, my));
+            }
+        }
+    }
+    groups
 }

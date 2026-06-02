@@ -90,11 +90,24 @@ fn resolve<'a>(df: &'a DataFrame, name: &str) -> Option<&'a str> {
 }
 
 /// Extract an integer column as `Vec<i64>`, tolerating either a true
-/// integer physical type or a string-encoded integer. Missing/unparseable
-/// cells become `0`.
+/// integer physical type or a string-encoded integer.
+///
+/// A structurally *missing* column is a schema/naming mismatch, not a data
+/// value: these columns (`polProcessID`, `engTechID`, `sourceTypeID`,
+/// `hpMin`/`hpMax`, `modelYearID`, `monthID`, …) are mandatory join/lookup
+/// keys. Silently substituting `0` would collapse every key and mis-build the
+/// reference tables (e.g. every row maps to `sourceTypeID 0`). So a missing
+/// column panics rather than zeroing the key. Individual unparseable *cells*
+/// still tolerate the snapshot's mixed numeric/string-decimal storage and fall
+/// back to `0`.
 fn int_col(df: &DataFrame, name: &str) -> Vec<i64> {
     let Some(actual) = resolve(df, name) else {
-        return vec![0; df.height()];
+        panic!(
+            "required integer column {name:?} is absent from the snapshot table \
+             (columns present: {:?}); this is a schema/naming mismatch, not a \
+             zero value",
+            df.get_column_names()
+        );
     };
     let Ok(col) = df.column(actual) else {
         return vec![0; df.height()];
@@ -122,10 +135,24 @@ fn int_col(df: &DataFrame, name: &str) -> Vec<i64> {
 
 /// Extract a decimal column as `Vec<f64>`, tolerating a string-encoded
 /// decimal (the snapshot's storage form), a native float, or an integer.
-/// Missing/unparseable cells become `0.0`.
+///
+/// A structurally *missing* column is a schema/naming mismatch, not a `0.0`
+/// value: these columns carry every numeric quantity the engine consumes
+/// (`meanBaseRate`, `population`, deterioration coefficients, `marketShare`,
+/// `monthFraction`/`dayFraction`, `hpAvg`, `loadFactor`, `temperature`). A
+/// silent `0.0` rate or `0.0` population would zero emissions for that
+/// equipment with no diagnostic — canonical NONROAD treats a missing rate in a
+/// fixed-format input file as a hard error. So a missing column panics rather
+/// than fabricating zeros. Individual unparseable *cells* still fall back to
+/// `0.0` to tolerate the snapshot's mixed numeric/string-decimal storage.
 fn float_col(df: &DataFrame, name: &str) -> Vec<f64> {
     let Some(actual) = resolve(df, name) else {
-        return vec![0.0; df.height()];
+        panic!(
+            "required numeric column {name:?} is absent from the snapshot table \
+             (columns present: {:?}); this is a schema/naming mismatch, not a \
+             zero value",
+            df.get_column_names()
+        );
     };
     let Ok(col) = df.column(actual) else {
         return vec![0.0; df.height()];
@@ -178,17 +205,28 @@ fn str_col(df: &DataFrame, name: &str) -> Vec<String> {
 }
 
 /// Map a nonroad emission-rate `units` string to the engine's
-/// [`EmissionUnitCode`]. Unknown/blank units default to `g/HP-hr`, the
-/// dominant nonroad exhaust unit.
+/// [`EmissionUnitCode`].
+///
+/// The units field selects the activity basis (HP-hours vs gallons vs hours
+/// vs starts vs a multiplier), so a blank or unrecognized value is *not* a
+/// safe default — canonical NONROAD aborts on it. `rdemfc.f:159-160` looks the
+/// units keyword up via `fndchr`; an unmatched keyword falls through to error
+/// label 7005 ("Missing or invalid tech type or units type"). We mirror that
+/// hard failure rather than silently assuming `g/HP-hr` and applying the wrong
+/// activity multiplier.
 fn unit_code_for(units: &str) -> EmissionUnitCode {
     match units.trim().to_ascii_lowercase().as_str() {
-        "g/hp-hr" | "g/hphr" | "" => EmissionUnitCode::GramsPerHpHour,
+        "g/hp-hr" | "g/hphr" => EmissionUnitCode::GramsPerHpHour,
         "g/gallon" | "g/gal" => EmissionUnitCode::GramsPerGallon,
         "g/hr" => EmissionUnitCode::GramsPerHour,
         "g/day" => EmissionUnitCode::GramsPerDay,
         "g/start" => EmissionUnitCode::GramsPerStart,
         "mult" => EmissionUnitCode::Multiplier,
-        _ => EmissionUnitCode::GramsPerHpHour,
+        other => panic!(
+            "nremissionrate: missing or invalid emission-rate units {other:?} \
+             (canonical rdemfc.f errors on an unrecognized units keyword); \
+             the units field determines the activity basis and cannot be defaulted"
+        ),
     }
 }
 
@@ -1013,21 +1051,22 @@ fn build_growth<S: DataFrameStore + ?Sized>(
 
 /// Build the global scrappage curve from `nrscrappagecurve` — the default
 /// `NREquipTypeID = 0` curve, matching canonical (`NonroadDataFileHelper`
-/// writes only `WHERE NREquipTypeID = 0`; alternates are deferred). Falls
-/// back to a degenerate 0→100% curve when absent so `scrptime` always has
-/// points.
+/// writes only `WHERE NREquipTypeID = 0`; alternates are deferred).
+///
+/// The scrappage curve is a *required* input: canonical NONROAD reads it from
+/// the mandatory `/SCRAPPAGE/` packet and aborts if the packet is missing
+/// (`rdscrp.f:80-86 goto 7000`), and the EPA default database always ships the
+/// `NREquipTypeID = 0` curve. A degenerate fabricated `0→100%` line is *not*
+/// the canonical default curve (which is a sigmoid-like shape) and would
+/// mis-age the fleet, so an absent/empty curve is surfaced as a hard error
+/// rather than silently substituting points.
 pub fn build_scrappage_curve<S: DataFrameStore + ?Sized>(store: &S) -> Vec<ScrappagePoint> {
     let Some(df) = store.get("nrscrappagecurve") else {
-        return vec![
-            ScrappagePoint {
-                bin: 0.0,
-                percent: 0.0,
-            },
-            ScrappagePoint {
-                bin: 1.0,
-                percent: 100.0,
-            },
-        ];
+        panic!(
+            "required table nrscrappagecurve is absent; canonical NONROAD aborts \
+             when the /SCRAPPAGE/ packet is missing (rdscrp.f). The fleet-aging \
+             scrappage curve cannot be fabricated."
+        );
     };
     let equip = int_col(&df, "NREquipTypeID");
     let frac = float_col(&df, "fractionLifeUsed");
@@ -1041,7 +1080,7 @@ pub fn build_scrappage_curve<S: DataFrameStore + ?Sized>(store: &S) -> Vec<Scrap
         let key = (frac[i] * 1.0e6).round() as i64;
         acc.insert(key, pct[i]);
     }
-    let mut points: Vec<ScrappagePoint> = acc
+    let points: Vec<ScrappagePoint> = acc
         .into_iter()
         .map(|(k, pct)| ScrappagePoint {
             bin: (k as f64 / 1.0e6) as f32,
@@ -1049,16 +1088,11 @@ pub fn build_scrappage_curve<S: DataFrameStore + ?Sized>(store: &S) -> Vec<Scrap
         })
         .collect();
     if points.is_empty() {
-        points = vec![
-            ScrappagePoint {
-                bin: 0.0,
-                percent: 0.0,
-            },
-            ScrappagePoint {
-                bin: 1.0,
-                percent: 100.0,
-            },
-        ];
+        panic!(
+            "nrscrappagecurve has no default (NREquipTypeID = 0) rows; canonical \
+             NONROAD requires the default scrappage curve (rdscrp.f). The \
+             fleet-aging curve cannot be fabricated."
+        );
     }
     points
 }
@@ -1370,7 +1404,9 @@ fn days_in_month(month: i32) -> f64 {
 ///
 /// `monthFraction` is keyed `(SCC, stateID, monthID)` in `nrmonthallocation`;
 /// `dayFraction` is keyed `(scc, dayID)` in `nrdayallocation` (lowercase
-/// column). Missing dimensions default to 1.0 (family-root fallback first).
+/// column). A missing dimension (after family-root fallback) defaults to its
+/// canonical seasonality default — `monthFraction = 1/12`, `dayFraction = 1/7`
+/// (`daymthf.f` / `rdseas.f`) — not a neutral 1.0.
 pub fn build_temporal_factors<S: DataFrameStore + ?Sized>(
     store: &S,
     month: i32,
@@ -1399,11 +1435,18 @@ pub fn build_temporal_factors<S: DataFrameStore + ?Sized>(
         }
     }
 
-    let lookup = |map: &BTreeMap<String, f64>, scc: &str| -> f64 {
+    // Canonical NONROAD loads the *default* seasonality factors for an SCC
+    // with no allocation match, not 1.0: `defmth = 1/12` and `defday = 1/7`
+    // (`daymthf.f:99-119` loads `defmth`/`defday`; `rdseas.f:215-221` sets
+    // them to `1.0/12.0` and `1./7.`). A neutral 1.0 here would over-allocate
+    // (monthFraction 1.0 dumps the whole year into one month; dayFraction 1.0
+    // makes `7 × dayFraction = 7`), so default each dimension to its canonical
+    // value instead.
+    let lookup = |map: &BTreeMap<String, f64>, scc: &str, default: f64| -> f64 {
         map.get(scc)
             .or_else(|| map.get(&family_root(scc)))
             .copied()
-            .unwrap_or(1.0)
+            .unwrap_or(default)
     };
 
     let ndays = days_in_month(month);
@@ -1412,7 +1455,9 @@ pub fn build_temporal_factors<S: DataFrameStore + ?Sized>(
         month_by_scc.keys().chain(day_by_scc.keys()).collect();
     for scc in sccs {
  // monthFraction × (7 × dayFraction) ÷ ndays (canonical typical-day).
-        let f = lookup(&month_by_scc, scc) * (7.0 * lookup(&day_by_scc, scc)) / ndays;
+        let f = lookup(&month_by_scc, scc, 1.0 / 12.0)
+            * (7.0 * lookup(&day_by_scc, scc, 1.0 / 7.0))
+            / ndays;
         factors.insert(scc.clone(), f);
     }
     factors

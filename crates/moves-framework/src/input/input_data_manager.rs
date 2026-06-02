@@ -891,13 +891,16 @@ impl InputDataManager {
  /// [`polars::prelude::DataFrame`] into an [`InMemoryStore`] keyed by
  /// the canonical table name.
  ///
- /// Tables that are schema-only or absent from the snapshot are skipped
- /// silently — they are either populated at runtime (schema-only) or not
- /// present in this snapshot version.
+ /// Schema-only tables are skipped silently — they are populated at
+ /// runtime, mirroring the optional/runtime-loaded tables in MOVES.
+ /// A table that is entirely absent from the snapshot is a hard error,
+ /// matching the default-DB merge in Java (`allowMissingTables == false`
+ /// for the pristine default database; InputDataManager.java:3573).
  ///
  /// # Errors
  ///
- /// Returns [`crate::Error::Polars`] if Polars fails to collect a frame.
+ /// Returns [`crate::Error::Polars`] if Polars fails to collect a frame,
+ /// or if a planned table is missing from the default-DB snapshot.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn execute(plan: &MergePlan, db: &DefaultDb) -> Result<InMemoryStore> {
         use rayon::prelude::*;
@@ -909,7 +912,22 @@ impl InputDataManager {
                 let lf = match db.scan(table_plan.table_name, &TableFilter::new()) {
                     Ok(lf) => lf,
                     Err(DefaultDbError::SchemaOnly { .. }) => return None,
-                    Err(DefaultDbError::UnknownTable(_)) => return None,
+ // A table missing entirely from the default-DB snapshot is a
+ // hard error, matching `InputDataManager.merge` (Java
+ // InputDataManager.java:3573-3578): when copying from the
+ // pristine default database `allowMissingTables` is `false`,
+ // so a source table that does not exist cancels the merge
+ // rather than being silently dropped. (The `continue`/skip
+ // path applies only to optional *user* databases, which this
+ // is not.) Swallowing this here would let a run "succeed"
+ // while a calculator-required input table is absent, silently
+ // zeroing or corrupting emission results.
+                    Err(DefaultDbError::UnknownTable(name)) => {
+                        return Some(Err(Error::Polars(format!(
+                            "table '{name}' does not exist in the default-DB snapshot; \
+                             the merge is canceled"
+                        ))))
+                    }
                     Err(e) => return Some(Err(Error::Polars(e.to_string()))),
                 };
                 let lf = apply_where_clauses(lf, &table_plan.clauses);

@@ -325,15 +325,31 @@ fn reference_corpus_validates_when_present() {
             let prod = ProductionExecutor::new(&ref_data);
             let mut instr = InstrumentingExecutor::new(prod);
             let inputs = NonroadInputs::new();
-            match run_simulation(&options, &inputs, &mut instr) {
-                Ok(_) => {
-                    let report = compare_runs(&entry.name, &records, &instr.captured);
-                    eprintln!("  {} · port-vs-reference: {}", entry.name, report.summary());
-                }
-                Err(e) => {
-                    eprintln!("  {} · port run skipped: {e}", entry.name);
-                }
-            }
+
+ // A simulation that *errors* is never acceptable: the port
+ // must run to completion on every fixture. Surface it as a
+ // test failure rather than an eprintln (a swallowed Err here
+ // previously let `validated += 1` count the fixture anyway).
+            let _ = run_simulation(&options, &inputs, &mut instr).unwrap_or_else(|e| {
+                panic!("{}: port run_simulation failed: {e}", entry.name)
+            });
+
+            let report = compare_runs(&entry.name, &records, &instr.captured);
+ // NOTE: this report is NOT yet asserted. Until the fixture-data
+ // loaders (NR*.ACT, NR*.GRW, …) are ported, `NonroadInputs::new()`
+ // is an empty bundle, so the port produces an empty output and
+ // every reference record shows as "missing from port" — a diff
+ // that cannot pass by construction (see tests/fidelity/mod.rs).
+ // This is therefore a structural/plumbing exercise, not a
+ // numerical fidelity gate. When loaders land and `NonroadInputs`
+ // is populated, replace the eprintln below with
+ // `assert!(report.passed(), ...)` (or an explicit, justified
+ // divergence budget) so a fidelity regression fails the test.
+            eprintln!(
+                "  {} · port-vs-reference (NOT asserted — empty input bundle): {}",
+                entry.name,
+                report.summary()
+            );
         }
 
         validated += 1;

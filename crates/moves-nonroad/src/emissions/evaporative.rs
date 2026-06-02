@@ -368,19 +368,39 @@ pub enum Meteorology<'a> {
 
 impl Meteorology<'_> {
  /// Resolve the (max, min, ambient, rvp) tuple for one day.
-    fn for_day(&self, day: i32) -> (f32, f32, f32, f32) {
+    fn for_day(&self, day: i32) -> Result<(f32, f32, f32, f32)> {
         match self {
             Self::Static {
                 max_temp,
                 min_temp,
                 ambient_temp,
                 rvp,
-            } => (*max_temp, *min_temp, *ambient_temp, *rvp),
+            } => Ok((*max_temp, *min_temp, *ambient_temp, *rvp)),
             Self::Daily { temps, rvps } => {
                 let idx = (day - 1).max(0) as usize;
-                let temps_row = temps.get(idx).copied().unwrap_or([0.0, 0.0, 0.0]);
-                let rvp = rvps.get(idx).copied().unwrap_or(0.0);
-                (temps_row[0], temps_row[1], temps_row[2], rvp)
+ // clcevems.f :225-228 reads `daytmp(jday,kind,ireg)` /
+ // `dayrvp(jday,ireg)` from COMMON arrays fully populated
+ // to MXDAYS by rddaily; a missing day is a load-time
+ // error, never an in-loop default. A short daily slice
+ // here means a truncated .tmp/.rvp file, so surface it as
+ // a config error rather than fabricating 0.0 meteorology
+ // (zero temps silently disable the diurnal branch and
+ // zero RVP corrupts displacement/diurnal vapor terms).
+                let temps_row = temps.get(idx).copied().ok_or_else(|| {
+                    Error::Config(format!(
+                        "daily meteorology: temperature data missing for day {day} \
+                         (index {idx} of {} available)",
+                        temps.len()
+                    ))
+                })?;
+                let rvp = rvps.get(idx).copied().ok_or_else(|| {
+                    Error::Config(format!(
+                        "daily meteorology: RVP data missing for day {day} \
+                         (index {idx} of {} available)",
+                        rvps.len()
+                    ))
+                })?;
+                Ok((temps_row[0], temps_row[1], temps_row[2], rvp))
             }
         }
     }
@@ -643,6 +663,18 @@ pub fn calculate_evaporative_emissions(
             "evap input slices must have length >= MXPOL ({MXPOL}); got {pol_len}"
         )));
     }
+ // `adjems(idxspc,day)` is a fully-populated COMMON array in
+ // clcevems.f (MXPOL × MXDAYS); a short slice here is a real data
+ // gap. Validate up front so a missing day-adjustment surfaces as a
+ // config error instead of silently defaulting to a no-op factor of
+ // 1.0 in the per-species / displacement lookups below.
+    let adjems_required = MXPOL * crate::common::consts::MXDAYS;
+    if ctx.day_adjustment.len() < adjems_required {
+        return Err(Error::Config(format!(
+            "day_adjustment must have length >= MXPOL * MXDAYS ({adjems_required}); got {}",
+            ctx.day_adjustment.len()
+        )));
+    }
 
     let mut outcome = EvapEmissionsOutcome::default();
 
@@ -671,7 +703,7 @@ pub fn calculate_evaporative_emissions(
                     ctx.fips_code
                 )));
             }
-            ctx.meteorology.for_day(jday)
+            ctx.meteorology.for_day(jday)?
         } else {
  // Single-day mode (the `else` branch in clcevems.f :235);
  // the day index is irrelevant.
@@ -712,7 +744,7 @@ pub fn calculate_evaporative_emissions(
 
             let temiss = match species {
                 EvapSpecies::Spillage => spillage_branch(ctx),
-                EvapSpecies::Displacement => displacement_branch(ctx, tamb, trvp),
+                EvapSpecies::Displacement => displacement_branch(ctx, tamb, trvp, adjems),
                 EvapSpecies::TankPermeation => tank_branch(ctx, emstmp, adjems, det_ratio),
                 EvapSpecies::HosePermeation => hose_branch(ctx, emstmp, adjems, det_ratio),
                 EvapSpecies::NeckPermeation => neck_branch(ctx, emstmp, adjems, det_ratio),
@@ -786,7 +818,12 @@ fn spillage_branch(ctx: &EvapEmissionsCalcContext<'_>) -> f32 {
     temiss
 }
 
-fn displacement_branch(ctx: &EvapEmissionsCalcContext<'_>, tamb: f32, trvp: f32) -> f32 {
+fn displacement_branch(
+    ctx: &EvapEmissionsCalcContext<'_>,
+    tamb: f32,
+    trvp: f32,
+    adjems: f32,
+) -> f32 {
     let spillage_slot = EvapSpecies::Spillage.slot();
     let emiss = if ctx.has_factor_file[spillage_slot] {
         match ctx.refueling.mode {
@@ -812,13 +849,11 @@ fn displacement_branch(ctx: &EvapEmissionsCalcContext<'_>, tamb: f32, trvp: f32)
     if ctx.daily_mode {
         if matches!(ctx.period_type, PeriodType::Annual) {
  // Annual + daily mode: scale by the day's adjustment
- // (clcevems.f :322-324). Note: the Fortran indexes the
- // adjustment by the current `jday`, but the displacement
- // branch is called once per day at row offset
- // `slot*MXDAYS + (jday-1)`; we mirror that here.
-            let dis_slot = EvapSpecies::Displacement.slot();
-            let adjems_idx = dis_slot * crate::common::consts::MXDAYS;
-            let adjems = ctx.day_adjustment.get(adjems_idx).copied().unwrap_or(1.0);
+ // (clcevems.f :322-324 — `temiss * adjems(idxspc,jday)`).
+ // `adjems` is the caller's per-day factor for the
+ // Displacement slot, already indexed by the current
+ // `jday` at `slot*MXDAYS + (jday-1)` in the main loop, so
+ // each day uses its own adjustment rather than day 1's.
             temiss *= adjems;
         } else {
  // Mirrors `clcevems.f` :326 — divides by `ndays` to spread
@@ -1200,6 +1235,18 @@ fn apply_ethanol_correction(
     }
     let mut e10fac = e10_factor_raw;
     if let Some(slot_idx) = species.tech_code_slot() {
+ // clcevems.f indexes a fixed-width `evtectyp` string
+ // (`E` + 8 digits); a code too short to hold this species'
+ // control-tech slot is a malformed input that has no Fortran
+ // equivalent. Assert the invariant so it is caught in debug/test
+ // builds rather than being silently treated as uncontrolled (which
+ // would skip the E10-factor inflation and change the result).
+        debug_assert!(
+            ctx.tech_type_code.len() > slot_idx,
+            "evap tech-type code {:?} too short for control-tech slot {slot_idx} \
+             (expected fixed-width E + 8 digits)",
+            ctx.tech_type_code
+        );
         let ch = ctx
             .tech_type_code
             .as_bytes()

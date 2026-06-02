@@ -440,13 +440,22 @@ fn build_subscription_entries(
             .filter(|j| j.calculator == module && j.style != SubscribeStyle::ChainedOnly)
         {
             if let (Some(g), Some(p)) = (j.granularity, j.priority) {
- // For GenericBase style the constructor declares ONE
- // granularity that covers every process the calc handles;
- // we can't know the per-process breakdown without a deeper
- // scan, so we emit a single entry with process_id=0 as a
- // sentinel for "all registered processes."
+ // The static Java scan cannot recover the real numeric
+ // process id(s) this subscription fires for: for GenericBase
+ // the constructor passes a `pollutantProcessIDs` String[] that
+ // GenericCalculatorBase.subscribeToMe resolves against the
+ // execution DB and subscribes once per real EmissionProcess
+ // (see framework/GenericCalculatorBase.java:256-284 — never
+ // process id 0); for an explicit `targetLoop.subscribe(this,
+ // <expr>, ...)` the process arg is a runtime variable, not a
+ // literal. Canonical MOVES has NO process-id-0 "all processes"
+ // subscription, so we emit process_id=0 strictly as an
+ // unresolved marker (paired with source=JavaSource) and make
+ // process_name self-describing so a consumer of the JSON cannot
+ // silently mistake the 0 for a real, named process.
                 let (pid, pname): (u32, &str) = match j.style {
-                    SubscribeStyle::GenericBase => (0, ""),
+                    SubscribeStyle::GenericBase => (0, "<unresolved: all RunSpec processes>"),
+                    _ if j.process_expr.is_empty() => (0, "<unresolved process>"),
                     _ => (0, j.process_expr.as_str()),
                 };
                 let key = (pid, g, p);
@@ -556,6 +565,19 @@ fn build_execution_chains(
         } else {
             find_subscriber_roots(reg, module_index, chains_out)
         };
+        // A registered calculator with no path to any direct subscriber will
+        // never fire, so its (process, pollutant) output is silently absent.
+        // Canonical MOVES (MOVESInstantiator.instantiate) does not abort on
+        // this — it instantiates/registers but simply never calls a fire path
+        // for an un-subscribed, un-chained calculator — so we mirror that
+        // log-and-continue behavior rather than returning an Err. We still
+        // surface the data-gap on stderr (the doc on find_subscriber_roots
+        // promises these are flagged).
+        if roots.is_empty() {
+            eprintln!(
+                "[moves-chain-reconstruct] warning: registered calculator {reg} has no path to any direct subscriber; its emission output will not be produced (broken chain or a calculator that registers without ever running)"
+            );
+        }
         roots_for_registered.insert(reg.clone(), roots.clone());
         for root in roots {
             if templates.contains_key(&root) {
@@ -635,7 +657,10 @@ fn template_execution_index(template: Option<&ChainTemplate>) -> ExecutionIndex 
 /// one root if the chain DAG terminates in a direct subscriber; the empty
 /// list means the registered calculator has no path to any subscriber
 /// (which would indicate a broken DAG or a calculator that registers
-/// without ever running — should flag these).
+/// without ever running). The caller (`build_execution_chains`) flags an
+/// empty result on stderr; the DAG still records the orphan with empty
+/// `roots`, mirroring canonical MOVES which instantiates/registers such a
+/// calculator but never fires it rather than aborting.
 fn find_subscriber_roots(
     start: &str,
     module_index: &BTreeMap<String, &ModuleEntry>,
