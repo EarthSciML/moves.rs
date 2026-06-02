@@ -476,6 +476,9 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
         ("process-crankcase-running", ONROAD_REL_TOL, false), // crankcase THC: 1/2/3 exact
         ("process-brakewear", ONROAD_REL_TOL, false),    // 91/106/116 exact
         ("process-tirewear", ONROAD_REL_TOL, false),     // 91/107/117 exact
+        // AirToxics: extracts synthesized from the raw ratio tables + per-row
+        // formulation expansion (AT*FuelSupply). 1/20/24/25/79/87 exact.
+        ("process-airtoxics", ONROAD_REL_TOL, false),
         // process-apu was asserted-vacuous (canon 0 / port 0) only because the
         // month off-by-one blocked all BaseRate output. With that fixed the
         // BaseRate path now emits the process-91 / opMode-201,203 (APU /
@@ -542,16 +545,19 @@ const QUARANTINED_FIXTURES: &[&str] = &[
  //       every NO/NO2/HONO species, doubling 32/33/34. Each now filters
  //       PollutantProcessAssoc to its own species, matching the per-calculator
  //       canonical extract.
- // Still quarantined for SEPARATE, unrelated reasons:
- // - process-airtoxics: the AirToxicsCalculator port is not started, so the
- //   minor-HAP species (20/24/25) are absent (base 1/79/87 now match exactly).
+ // process-airtoxics also GRADUATED: its AirToxicsCalculator extracts are now
+ // synthesized from the raw default-DB ratio tables (PollutantProcessAssoc join
+ // + modelYearGroupID expansion + the ATRatio FuelSupply join), and each worker
+ // row is expanded across its fuel type's formulations (the AT*FuelSupply join)
+ // so the ATRatioGas1 path keys on a concrete fuelFormulationID. The minor-HAP
+ // toxics 20/24/25 now match canonical to f64 drift (base 1/79/87 too).
+ // Still quarantined for a SEPARATE, unrelated reason:
  // - process-pm-exhaust: 111/115 match exactly and 100/110 within ~1.2%, but
  //   EC (112) / NonECPM (118) remain high because (a) the upstream BaseRate
  //   emits spurious fuelType-9 (electricity) exhaust PM canonical excludes and
  //   (b) SulfatePM's in-place consume/replace of 112/118 needs the engine to
  //   REMOVE the consumed input rows, which the additive chained model cannot yet
  //   express. See docs/known-divergences.md §4.4.
-    "process-airtoxics",
     "process-pm-exhaust",
  // NONROAD fixtures that emit nothing (port row count 0 vs a populated
  // canonical) or a wrong row count — population/sector-coverage gaps.
