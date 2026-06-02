@@ -479,6 +479,16 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
         // AirToxics: extracts synthesized from the raw ratio tables + per-row
         // formulation expansion (AT*FuelSupply). 1/20/24/25/79/87 exact.
         ("process-airtoxics", ONROAD_REL_TOL, false),
+        // process-pm-exhaust: SulfatePM consume/replace of EC (112) / NonECPM
+        // (118). Three fixes: (1) execute emits the true per-key delta F − I so
+        // the additive engine reproduces canonical's DELETE+reinsert without
+        // double-counting; (2) the general fuel ratio is restricted to
+        // pollutant 120 (the sPMOneCountyYearGeneralFuelRatio extract filter),
+        // so EC is no longer wrongly rescaled; (3) the engine's
+        // `replaced_pollutants` mechanism drops BaseRate's zero-valued
+        // fuelType-9 (electricity) 112/118 rows the additive delta cannot
+        // cancel. 100/110/111/112/115/118/119 all exact to f64 drift.
+        ("process-pm-exhaust", ONROAD_REL_TOL, false),
         // process-apu was asserted-vacuous (canon 0 / port 0) only because the
         // month off-by-one blocked all BaseRate output. With that fixed the
         // BaseRate path now emits the process-91 / opMode-201,203 (APU /
@@ -551,14 +561,10 @@ const QUARANTINED_FIXTURES: &[&str] = &[
  // row is expanded across its fuel type's formulations (the AT*FuelSupply join)
  // so the ATRatioGas1 path keys on a concrete fuelFormulationID. The minor-HAP
  // toxics 20/24/25 now match canonical to f64 drift (base 1/79/87 too).
- // Still quarantined for a SEPARATE, unrelated reason:
- // - process-pm-exhaust: 111/115 match exactly and 100/110 within ~1.2%, but
- //   EC (112) / NonECPM (118) remain high because (a) the upstream BaseRate
- //   emits spurious fuelType-9 (electricity) exhaust PM canonical excludes and
- //   (b) SulfatePM's in-place consume/replace of 112/118 needs the engine to
- //   REMOVE the consumed input rows, which the additive chained model cannot yet
- //   express. See docs/known-divergences.md §4.4.
-    "process-pm-exhaust",
+ // process-pm-exhaust ALSO GRADUATED: SulfatePM's consume/replace of EC (112)
+ // and NonECPM (118) is now exact via the true per-key delta emit, the general
+ // fuel ratio restricted to pollutant 120, and the engine's
+ // `replaced_pollutants` drop of BaseRate's zero fuelType-9 electricity rows.
  // NONROAD fixtures that emit nothing (port row count 0 vs a populated
  // canonical) or a wrong row count — population/sector-coverage gaps.
     "nr-agriculture-state",

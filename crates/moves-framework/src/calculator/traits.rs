@@ -372,6 +372,28 @@ pub trait Calculator: Send + Sync + std::fmt::Debug {
         &[]
     }
 
+ /// Pollutants this (chained) calculator **consumes and replaces** in the
+ /// worker output — the canonical `delete from MOVESWorkerOutput where
+ /// pollutantID = …` that a speciation calculator runs before re-inserting
+ /// its adjusted/split values (e.g. `SulfatePMCalculator` deletes EC 112 and
+ /// NonECPM 118).
+ ///
+ /// The additive chained engine cannot delete a row, so an upstream
+ /// producer's *zero-valued* row for such a pollutant — which the chained
+ /// calculator's per-key delta cannot cancel (`0 − 0 = 0`) — would survive
+ /// into the final output where canonical removed it (e.g. BaseRate's
+ /// fuelType-9 electricity EC/NonECPM zeros). The engine therefore drops a
+ /// producer's zero-valued row for any replaced pollutant before it reaches
+ /// the output aggregator; it still reaches the per-chunk worker accumulator
+ /// the chained calculator reads, and non-zero rows are kept and corrected by
+ /// the chained calculator's delta. Canonical never emits a zero row for a
+ /// replaced pollutant, so this is exact.
+ ///
+ /// Default empty: only consume/replace speciation calculators override it.
+    fn replaced_pollutants(&self) -> &[i32] {
+        &[]
+    }
+
  /// Run the calculator. Called once per iteration at the registered
  /// granularity. Returns a [`CalculatorOutput`] (: a Polars
  /// `DataFrame`) of emission rows ready to merge into the master output.

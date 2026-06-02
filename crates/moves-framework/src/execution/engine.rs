@@ -228,6 +228,15 @@ impl ModuleInstance {
         }
     }
 
+    /// Pollutants this module consumes/replaces (calculators only; generators
+    /// produce no emission rows and replace nothing).
+    fn replaced_pollutants(&self) -> &[i32] {
+        match self {
+            ModuleInstance::Calculator(c) => c.replaced_pollutants(),
+            ModuleInstance::Generator(_) => &[],
+        }
+    }
+
     /// Run the module against `ctx`. Returns the calculator's emission
     /// DataFrame if any, or `None` for generators and empty outputs.
     ///
@@ -292,6 +301,13 @@ struct CalculatorMasterLoopable {
     /// never reach the final output. An empty set imposes no filter (the
     /// unit-test contexts that drive a stub calculator with no selections).
     selected_pol_proc: Arc<BTreeSet<(u16, u16)>>,
+    /// Pollutants a chained calculator in this chunk consumes and replaces
+    /// (e.g. SulfatePM's EC 112 / NonECPM 118). A producer's *zero-valued* row
+    /// for one of these is dropped before the output aggregator — the chained
+    /// calculator's delta cannot cancel it, and canonical's delete removed it.
+    /// Still fed to `worker_acc` so the chained calculator sees the full input.
+    /// Empty imposes no filter.
+    replaced_pol: Arc<BTreeSet<i32>>,
     /// Per-chunk `MOVESWorkerOutput` accumulator — the *unfiltered* emission
     /// rows (including chain-prerequisite intermediates like BaseRate energy)
     /// the chunk's chained calculators read after the master loop completes.
@@ -350,6 +366,23 @@ impl MasterLoopable for CalculatorMasterLoopable {
                                 .zip(u16::try_from(proc).ok())
                                 .is_some_and(|pair| self.selected_pol_proc.contains(&pair)),
                             _ => true,
+                        });
+                    }
+                    // Drop a producer's zero-valued row for any pollutant a
+                    // chained calculator in this chunk consumes and replaces
+                    // (e.g. SulfatePM's EC 112 / NonECPM 118). The chained delta
+                    // cannot cancel a 0 (0 − 0 = 0); canonical's `delete …`
+                    // removed it. The row already reached `worker_acc` above, so
+                    // the chained calculator still sees the full input. Canonical
+                    // never emits a zero row for a replaced pollutant.
+                    if !self.replaced_pol.is_empty() {
+                        records.retain(|r| {
+                            let is_replaced = r
+                                .pollutant_id
+                                .is_some_and(|p| self.replaced_pol.contains(&i32::from(p)));
+                            let is_zero = r.emission_quant.unwrap_or(0.0) == 0.0
+                                && r.emission_rate.unwrap_or(0.0) == 0.0;
+                            !(is_replaced && is_zero)
                         });
                     }
                     self.streaming_agg
@@ -674,6 +707,16 @@ impl MOVESEngine {
             let worker_acc: Option<Arc<Mutex<Vec<EmissionRecord>>>> =
                 (!chained.is_empty()).then(|| Arc::new(Mutex::new(Vec::new())));
 
+            // Pollutants any chained calculator in this chunk consumes and
+            // replaces (SulfatePM's EC 112 / NonECPM 118). Producers drop their
+            // zero-valued rows for these before the output aggregator.
+            let replaced_pol: Arc<BTreeSet<i32>> = Arc::new(
+                chained
+                    .iter()
+                    .flat_map(|m| m.replaced_pollutants().iter().copied())
+                    .collect(),
+            );
+
             for module in &chunk_modules {
                 // One MasterLoop subscription per declared calculator
                 // subscription, all sharing the single module instance and
@@ -687,6 +730,7 @@ impl MOVESEngine {
                         activity_acc: Arc::clone(&activity_acc_ref),
                         run_hash: Arc::clone(&run_hash_str),
                         selected_pol_proc: Arc::clone(&selected_pol_proc),
+                        replaced_pol: Arc::clone(&replaced_pol),
                         worker_acc: worker_acc.clone(),
                     });
                     master.subscribe(MasterLoopableSubscription::new(
@@ -1732,6 +1776,7 @@ mod tests {
             activity_acc: Arc::new(Mutex::new(Vec::new())),
             run_hash: Arc::from("test"),
             selected_pol_proc: Arc::new(std::collections::BTreeSet::new()),
+            replaced_pol: Arc::new(std::collections::BTreeSet::new()),
             worker_acc: None,
         };
 
@@ -1768,6 +1813,7 @@ mod tests {
             activity_acc: Arc::new(Mutex::new(Vec::new())),
             run_hash: Arc::from("test"),
             selected_pol_proc: Arc::new(std::collections::BTreeSet::new()),
+            replaced_pol: Arc::new(std::collections::BTreeSet::new()),
             worker_acc: None,
         };
         let mut ctx = MasterLoopContext::default();

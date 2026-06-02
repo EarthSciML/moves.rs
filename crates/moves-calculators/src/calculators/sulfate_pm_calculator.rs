@@ -2285,6 +2285,14 @@ impl Calculator for SulfatePMCalculator {
         INPUT_TABLES
     }
 
+    /// SulfatePM consumes and replaces EC (112) and NonECPM (118) — canonical
+    /// `delete from MOVESWorkerOutput where pollutantID = 112 / 118`. The engine
+    /// drops a producer's zero-valued 112/118 rows (e.g. BaseRate's fuelType-9
+    /// electricity zeros) that this calculator's per-key delta cannot cancel.
+    fn replaced_pollutants(&self) -> &[i32] {
+        &[EC_POLLUTANT, NON_EC_PM_POLLUTANT]
+    }
+
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let inputs = build_inputs(ctx)?;
         // `calculate` ports the SQL's in-place mutation of `MOVESWorkerOutput`, so
@@ -2328,18 +2336,20 @@ impl Calculator for SulfatePMCalculator {
             entry.2 += row.emission_rate;
             entry.4 = true;
         }
-        // Keep a row when:
-        //  * it exists only in F (a freshly-inserted species, e.g. zero-valued
-        //    water 119 — canonical emits the row even at zero), or
-        //  * it exists only in I (a base row F deleted — emit the negative to
-        //    cancel BaseRate's stale contribution), or
-        //  * it shifted value (an adjusted 118/EC — emit the delta).
-        // Drop only an unchanged pass-through (in both, net zero): BaseRate's
-        // own row already carries it.
+        // Emit the per-key delta, dropping any net-zero row that was present in
+        // the input. Such a row is either an unchanged pass-through (BaseRate's
+        // own row already carries it) or a base row `calculate` deleted and did
+        // not re-add at a non-zero value (e.g. fuelType-9 EC/NonECPM, which has
+        // no crankcase split). For a deleted *consumed* pollutant the matching
+        // producer zero row is dropped by the engine's `replaced_pollutants`
+        // filter, so emitting a `0 − 0 = 0` here would needlessly re-introduce
+        // the row canonical removed. A freshly-inserted species that is
+        // genuinely zero (in F only — e.g. water 119, which canonical keeps) is
+        // NOT in the input, so it is preserved. Non-zero deltas are always kept.
         let mut rows: Vec<EmissionRow> = net
             .into_values()
-            .filter(|(_, quant, rate, in_input, in_calc)| {
-                !(*in_input && *in_calc && *quant == 0.0 && *rate == 0.0)
+            .filter(|(_, quant, rate, in_input, _in_calc)| {
+                !(*quant == 0.0 && *rate == 0.0 && *in_input)
             })
             .map(|(template, quant, rate, _, _)| EmissionRow {
                 emission_quant: quant,
