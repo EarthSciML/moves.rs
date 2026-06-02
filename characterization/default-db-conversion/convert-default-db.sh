@@ -108,13 +108,31 @@ if [ -z "${TSV_DIR}" ]; then
     # in-image writes (e.g. /tmp), and seed the datadir from the read-only
     # /var/lib/mysql-seed via init-mariadb.sh before starting mariadbd.
     # Without this, mariadbd aborts with "Read-only file system".
-    MARIADB_RT="$(mktemp -d "${TMPDIR:-/tmp}/moves-mariadb-rt.XXXXXX")"
+    #
+    # --fakeroot: GitHub-hosted runners have no setuid apptainer, so binds
+    # over existing image directories only take effect inside a fakeroot
+    # user namespace (the same mode build-sif.sh uses; the apparmor userns
+    # restriction is already lifted by the build-sif action earlier in the
+    # job). Without it the binds are silently dropped and mariadbd still sees
+    # the read-only image paths. Skippable via MOVES_NO_FAKEROOT=1 on hosts
+    # with a setuid install (e.g. HPC), where plain binds already work.
+    FAKEROOT_FLAG=()
+    if [ "${MOVES_NO_FAKEROOT:-0}" != "1" ]; then
+        FAKEROOT_FLAG=( --fakeroot )
+    fi
+
+    # Scratch on the same (roomy) filesystem as the output, not $TMPDIR:
+    # init-mariadb.sh copies the multi-GB seed datadir here, which would
+    # overflow a small /tmp or the cramped /mnt RUNNER_TEMP volume. Placed
+    # beside (not under) ${DB_VERSION} so it is excluded from the tarball.
+    MARIADB_RT="$(mktemp -d "${OUTPUT_ROOT}/.mariadb-rt.XXXXXX")"
     MARIADB_DATA="${MARIADB_RT}/data"
     MARIADB_SOCK_DIR="${MARIADB_RT}/run"
     mkdir -p "${MARIADB_DATA}" "${MARIADB_SOCK_DIR}"
     trap 'rm -rf "${MARIADB_RT}"' EXIT
 
     apptainer exec \
+        "${FAKEROOT_FLAG[@]}" \
         --writable-tmpfs \
         --bind "${MARIADB_DATA}:/var/lib/mysql" \
         --bind "${MARIADB_SOCK_DIR}:/var/run/mysqld" \
