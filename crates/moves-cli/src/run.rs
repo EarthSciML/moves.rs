@@ -2758,10 +2758,7 @@ mod tests {
             .unwrap()
             .get(0)
             .unwrap();
-        assert_eq!(
-            pop, 999,
-            "CDB population (999) must override default (100)"
-        );
+        assert_eq!(pop, 999, "CDB population (999) must override default (100)");
     }
 
     #[test]
@@ -2811,8 +2808,7 @@ mod tests {
 
         // Build a minimal RunSpec matching scale-county.xml.
         use moves_runspec::{
-            GeoKind, GeographicSelection, ModelDomain, OnroadVehicleSelection, RunSpec,
-            Timespan,
+            GeoKind, GeographicSelection, ModelDomain, OnroadVehicleSelection, RunSpec, Timespan,
         };
         let run_spec = RunSpec {
             domain: Some(ModelDomain::Single),
@@ -2845,9 +2841,16 @@ mod tests {
         build_runspec_tables(&run_spec, &mut store).expect("runspec tables");
 
         // Link must have been synthesised from ZoneRoadType.
-        assert!(store.contains("link"), "Link must be synthesised from ZoneRoadType");
+        assert!(
+            store.contains("link"),
+            "Link must be synthesised from ZoneRoadType"
+        );
         let link = store.get("link").unwrap();
-        assert_eq!(link.height(), 1, "one link row for zone 261610 + road type 4");
+        assert_eq!(
+            link.height(),
+            1,
+            "one link row for zone 261610 + road type 4"
+        );
 
         // RunSpec* tables must be present (calculators read these from the slow tier).
         assert!(
