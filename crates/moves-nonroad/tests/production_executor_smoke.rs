@@ -87,7 +87,7 @@ fn make_executor() -> ProductionExecutor {
                 scc: "2270001010".into(),
                 hp_min: 0.0,
                 hp_max: 50.0,
-                indicator: "GDP".into(),
+                indicator: Some("GDP".into()),
             }],
             growth_records: vec![],
             activity_entries: vec![ActivityTableEntry {
@@ -141,7 +141,7 @@ fn state_level_reference(fips: &str) -> ReferenceData {
             scc: "2270001010".into(),
             hp_min: 0.0,
             hp_max: 50.0,
-            indicator: "GDP".into(),
+            indicator: Some("GDP".into()),
         }],
         growth_records: vec![],
         activity_entries: vec![ActivityTableEntry {
@@ -220,7 +220,7 @@ fn national_reference(state_fips: &str, scc: &str) -> ReferenceData {
             scc: scc.into(),
             hp_min: 0.0,
             hp_max: 50.0,
-            indicator: "GDP".into(),
+            indicator: Some("GDP".into()),
         }],
         growth_records: vec![],
         activity_entries: vec![ActivityTableEntry {
@@ -267,7 +267,7 @@ fn us_total_reference(scc: &str) -> ReferenceData {
             scc: scc.into(),
             hp_min: 0.0,
             hp_max: 50.0,
-            indicator: "GDP".into(),
+            indicator: Some("GDP".into()),
         }],
         growth_records: vec![],
         activity_entries: vec![ActivityTableEntry {

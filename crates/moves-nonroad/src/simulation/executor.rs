@@ -963,7 +963,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         base_population: f32,
     ) -> Result<ModelYearAgedistResult> {
         // 1. Growth indicator from cross-reference.
-        let indicator = self
+        let indicator_opt = self
             .executor
             .reference
             .growth_xref_entries
@@ -974,6 +974,21 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
                     "CountyAdapter: growth_xref index {growth_index} out of range"
                 ))
             })?;
+        // Canonical prccty.f:327-328 / fndgxf: no cross-reference match
+        // (idxgrw <= 0) → label 7001 (fatal error) when growth is active.
+        // Base-year runs (growth_year == base_pop_year) are exempt because
+        // age_distribution never calls growth_fn in that case, so an empty
+        // selected set is harmless.
+        if indicator_opt.is_none() && growth_year != record.base_pop_year {
+            return Err(Error::Config(format!(
+                "ERROR: Could not find match in growth indicator cross reference for: \
+                 County {fips} SCC {scc} HP range {lo:6.1} {hi:6.1}",
+                scc = record.scc,
+                lo = record.hp_range.0,
+                hi = record.hp_range.1,
+            )));
+        }
+        let indicator = indicator_opt.unwrap_or_default();
 
         // 2. Select growth records for this indicator (clone to avoid
         // borrow-checker conflict with the scrptime closure below).
@@ -1647,6 +1662,12 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
                 Error::Config(format!(
                     "StateAdapter: growth_xref index {indcod} out of range"
                 ))
+            })?
+            .ok_or_else(|| Error::IndicatorMissing {
+                code: String::new(),
+                fips: fips.to_string(),
+                subcounty: String::new(),
+                year: year2,
             })?;
         let selected: Vec<GrowthIndicatorRecord> =
             select_for_indicator(&self.executor.reference.growth_records, &indicator)
@@ -1728,6 +1749,12 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
                 Error::Config(format!(
                     "StateAdapter: growth_xref index {indcod} out of range"
                 ))
+            })?
+            .ok_or_else(|| Error::IndicatorMissing {
+                code: String::new(),
+                fips: fips.to_string(),
+                subcounty: String::new(),
+                year: growth_year,
             })?;
         let selected: Vec<GrowthIndicatorRecord> =
             select_for_indicator(&self.executor.reference.growth_records, &indicator)
@@ -2011,6 +2038,12 @@ impl<'a> NationalCallbacks for NationalAdapter<'a> {
                 Error::Config(format!(
                     "NationalAdapter: growth_xref index {indcod} out of range"
                 ))
+            })?
+            .ok_or_else(|| Error::IndicatorMissing {
+                code: String::new(),
+                fips: fips.to_string(),
+                subcounty: String::new(),
+                year: year2,
             })?;
         let selected: Vec<GrowthIndicatorRecord> =
             select_for_indicator(&self.executor.reference.growth_records, &indicator)
@@ -2087,6 +2120,12 @@ impl<'a> NationalCallbacks for NationalAdapter<'a> {
                 Error::Config(format!(
                     "NationalAdapter: growth_xref index {indcod} out of range"
                 ))
+            })?
+            .ok_or_else(|| Error::IndicatorMissing {
+                code: String::new(),
+                fips: fips.to_string(),
+                subcounty: String::new(),
+                year: growth_year,
             })?;
         let selected: Vec<GrowthIndicatorRecord> =
             select_for_indicator(&self.executor.reference.growth_records, &indicator)
@@ -2288,6 +2327,12 @@ impl<'a> UsTotalCallbacks for UsTotalAdapter<'a> {
                 Error::Config(format!(
                     "UsTotalAdapter: growth_xref index {indcod} out of range"
                 ))
+            })?
+            .ok_or_else(|| Error::IndicatorMissing {
+                code: String::new(),
+                fips: fips.to_string(),
+                subcounty: String::new(),
+                year: year2,
             })?;
         let selected: Vec<GrowthIndicatorRecord> =
             select_for_indicator(&self.executor.reference.growth_records, &indicator)
@@ -2364,6 +2409,12 @@ impl<'a> UsTotalCallbacks for UsTotalAdapter<'a> {
                 Error::Config(format!(
                     "UsTotalAdapter: growth_xref index {indcod} out of range"
                 ))
+            })?
+            .ok_or_else(|| Error::IndicatorMissing {
+                code: String::new(),
+                fips: fips.to_string(),
+                subcounty: String::new(),
+                year: growth_year,
             })?;
         let selected: Vec<GrowthIndicatorRecord> =
             select_for_indicator(&self.executor.reference.growth_records, &indicator)
@@ -3457,7 +3508,7 @@ mod production {
                     scc: "2270001010".into(),
                     hp_min: 0.0,
                     hp_max: 100.0,
-                    indicator: "GDP".into(),
+                    indicator: Some("GDP".into()),
                 }],
                 // growth_records empty: growth_year == episode_year == pop_year
                 // (2020), so age_distribution never calls growth_factor.
@@ -3509,6 +3560,183 @@ mod production {
         assert_eq!(row.channel, EmissionChannel::Exhaust);
     }
 
+    /// (b2) Future-year county run with an unmatched growth indicator
+    /// (indicator=None) errors with the canonical prccty.f 7001 message
+    /// instead of silently under-projecting.
+    #[test]
+    fn county_unmatched_growth_indicator_errors_for_future_year() {
+        let mut exec = ProductionExecutor {
+            county_fips: vec!["06037".into()],
+            hp_levels: default_hp_levels(),
+            reference: ReferenceData {
+                ambient_temp_f: 75.0,
+                exhaust_tech_entries: vec![ExhaustTechEntry {
+                    scc: "2270001010".into(),
+                    hp_min: 0.0,
+                    hp_max: 100.0,
+                    tech_names: vec!["T1".into()],
+                    tech_fractions: vec![0.0],
+                    bsfc: vec![],
+                    ..Default::default()
+                }],
+                evap_tech_entries: vec![EvapTechEntry {
+                    scc: "2270001010".into(),
+                    hp_min: 0.0,
+                    hp_max: 100.0,
+                    tech_names: vec!["EV1".into()],
+                    tech_fractions: vec![0.0],
+                    ..Default::default()
+                }],
+                // indicator=None: SCC has no growth-pattern cross-reference match.
+                growth_xref_entries: vec![GrowthXrefEntry {
+                    fips: "06037".into(),
+                    scc: "2270001010".into(),
+                    hp_min: 0.0,
+                    hp_max: 100.0,
+                    indicator: None,
+                }],
+                growth_records: vec![],
+                activity_entries: vec![ActivityTableEntry {
+                    scc: "2270001010".into(),
+                    fips: "06037".into(),
+                    starts: 0.0,
+                    activity_level: 100.0,
+                    activity_unit: ActivityUnit::HoursPerYear,
+                    load_factor: 0.5,
+                    age_code: "DEFAULT".into(),
+                }],
+                scrappage_curve: vec![
+                    ScrappagePoint {
+                        bin: 0.0,
+                        percent: 0.0,
+                    },
+                    ScrappagePoint {
+                        bin: 100.0,
+                        percent: 100.0,
+                    },
+                ],
+                age_adjustment_table: AgeAdjustmentTable::default(),
+                ..ReferenceData::default()
+            },
+            ..ProductionExecutor::default()
+        };
+
+        // Future-year run: growth_year (2025) != pop_year (2020).
+        let mut opts = test_opts();
+        opts.growth_year = 2025;
+        // pop_year=2020 differs from growth_year=2025 → engine must error.
+        let record = DriverRecord {
+            region_code: "06037".into(),
+            hp_avg: 25.0,
+            population: 100.0,
+            pop_year: 2020,
+            median_life: 0.0,
+        };
+        let ctx = DispatchContext {
+            dispatch: Dispatch::County,
+            scc: "2270001010",
+            fuel: Some(FuelKind::Diesel),
+            record: &record,
+            growth: None,
+        };
+
+        let err = exec.execute(&ctx, &opts).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("growth indicator cross reference"),
+            "expected canonical fndgxf error, got: {msg}"
+        );
+        assert!(
+            msg.contains("2270001010"),
+            "error must name the SCC, got: {msg}"
+        );
+    }
+
+    /// (b3) Base-year county run with an unmatched growth indicator
+    /// (indicator=None) is unaffected — age_distribution never calls
+    /// growth_fn when growth_year == base_pop_year.
+    #[test]
+    fn county_unmatched_growth_indicator_ok_for_base_year() {
+        let mut exec = ProductionExecutor {
+            county_fips: vec!["06037".into()],
+            hp_levels: default_hp_levels(),
+            reference: ReferenceData {
+                ambient_temp_f: 75.0,
+                exhaust_tech_entries: vec![ExhaustTechEntry {
+                    scc: "2270001010".into(),
+                    hp_min: 0.0,
+                    hp_max: 100.0,
+                    tech_names: vec!["T1".into()],
+                    tech_fractions: vec![0.0],
+                    bsfc: vec![],
+                    ..Default::default()
+                }],
+                evap_tech_entries: vec![EvapTechEntry {
+                    scc: "2270001010".into(),
+                    hp_min: 0.0,
+                    hp_max: 100.0,
+                    tech_names: vec!["EV1".into()],
+                    tech_fractions: vec![0.0],
+                    ..Default::default()
+                }],
+                // indicator=None: SCC has no growth-pattern cross-reference match.
+                growth_xref_entries: vec![GrowthXrefEntry {
+                    fips: "06037".into(),
+                    scc: "2270001010".into(),
+                    hp_min: 0.0,
+                    hp_max: 100.0,
+                    indicator: None,
+                }],
+                growth_records: vec![],
+                activity_entries: vec![ActivityTableEntry {
+                    scc: "2270001010".into(),
+                    fips: "06037".into(),
+                    starts: 0.0,
+                    activity_level: 100.0,
+                    activity_unit: ActivityUnit::HoursPerYear,
+                    load_factor: 0.5,
+                    age_code: "DEFAULT".into(),
+                }],
+                scrappage_curve: vec![
+                    ScrappagePoint {
+                        bin: 0.0,
+                        percent: 0.0,
+                    },
+                    ScrappagePoint {
+                        bin: 100.0,
+                        percent: 100.0,
+                    },
+                ],
+                age_adjustment_table: AgeAdjustmentTable::default(),
+                ..ReferenceData::default()
+            },
+            ..ProductionExecutor::default()
+        };
+
+        // Base-year run: growth_year == pop_year == episode_year == 2020.
+        let opts = test_opts();
+        let record = DriverRecord {
+            region_code: "06037".into(),
+            hp_avg: 25.0,
+            population: 100.0,
+            pop_year: 2020,
+            median_life: 0.0,
+        };
+        let ctx = DispatchContext {
+            dispatch: Dispatch::County,
+            scc: "2270001010",
+            fuel: Some(FuelKind::Diesel),
+            record: &record,
+            growth: None,
+        };
+
+        let result = exec.execute(&ctx, &opts).unwrap();
+        assert!(
+            !result.skipped,
+            "base-year with no indicator must not error"
+        );
+    }
+
     /// (c) StateToCounty dispatch with two counties in the state →
     /// two `SimEmissionRow`s (one per county).
     ///
@@ -3544,7 +3772,7 @@ mod production {
                     scc: "2270001010".into(),
                     hp_min: 0.0,
                     hp_max: 100.0,
-                    indicator: "GDP".into(),
+                    indicator: Some("GDP".into()),
                 }],
                 // Two flat national indicator rows (value 1.0 in both years)
                 // make `growth_factor(2020, 2021, ..)` resolve to 0.0 — the same
@@ -3647,7 +3875,7 @@ mod production {
                     scc: "2270001010".into(),
                     hp_min: 0.0,
                     hp_max: 100.0,
-                    indicator: "GDP".into(),
+                    indicator: Some("GDP".into()),
                 }],
                 // Two flat national indicator rows (value 1.0 in both years)
                 // make `growth_factor(2020, 2021, ..)` resolve to 0.0 — the same
@@ -3785,7 +4013,7 @@ mod production {
                     scc: "2270001010".into(),
                     hp_min: 0.0,
                     hp_max: 100.0,
-                    indicator: "GDP".into(),
+                    indicator: Some("GDP".into()),
                 }],
                 // Two flat national indicator rows (value 1.0 in both years)
                 // make `growth_factor(2020, 2021, ..)` resolve to 0.0 — the same
@@ -3891,7 +4119,7 @@ mod production {
                     scc: "2270001010".into(),
                     hp_min: 0.0,
                     hp_max: 100.0,
-                    indicator: "GDP".into(),
+                    indicator: Some("GDP".into()),
                 }],
                 // Two flat national indicator rows (value 1.0 in both years)
                 // make `growth_factor(2020, 2021, ..)` resolve to 0.0 — the same
