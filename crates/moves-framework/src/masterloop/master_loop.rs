@@ -367,11 +367,17 @@ impl MasterLoop {
                         county_id: Some(county_id),
                         zone_id: Some(zone_id),
                         link_id: None,
+                        road_type_id: None,
                     };
                     self.notify_at(Granularity::Zone, ctx)?;
-                    for &link_id in links {
-                        ctx.position.location =
-                            ExecutionLocation::link(state_id, county_id, zone_id, link_id);
+                    for &(link_id, road_type_id) in links {
+                        ctx.position.location = ExecutionLocation {
+                            state_id: Some(state_id),
+                            county_id: Some(county_id),
+                            zone_id: Some(zone_id),
+                            link_id: Some(link_id),
+                            road_type_id,
+                        };
                         self.notify_at(Granularity::Link, ctx)?;
                         self.run_times(time_groups, depth, ctx)?;
                         self.cleanup_at(Granularity::Link, ctx)?;
@@ -564,8 +570,10 @@ enum TimeNestDepth {
 /// `state_id → county_id → zone_id → [link_id]` nest produced by
 /// [`group_locations`]. Outer-to-inner `BTreeMap` keys give deterministic
 /// per-run iteration order; the leaf `Vec` preserves insertion order so
-/// repeated link IDs fire repeated iterations.
-type LocationGroups = BTreeMap<u32, BTreeMap<u32, BTreeMap<u32, Vec<u32>>>>;
+/// repeated link IDs fire repeated iterations. Each leaf entry carries
+/// `(link_id, road_type_id)` so `run_locations` can stamp `road_type_id`
+/// on the LINK-granularity position.
+type LocationGroups = BTreeMap<u32, BTreeMap<u32, BTreeMap<u32, Vec<(u32, Option<u32>)>>>>;
 
 /// `year → month → day_id → [hour]` nest produced by [`group_times`].
 type TimeGroups = BTreeMap<u16, BTreeMap<u8, BTreeMap<u8, Vec<u8>>>>;
@@ -586,7 +594,7 @@ fn group_locations(locations: &[ExecutionLocation]) -> LocationGroups {
             .or_default()
             .entry(z)
             .or_default()
-            .push(k);
+            .push((k, l.road_type_id));
     }
     out
 }

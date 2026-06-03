@@ -5316,7 +5316,7 @@ impl Calculator for MultidayTankVaporVentingCalculator {
             county_id: pos.location.county_id.map(|c| c as i32).unwrap_or(0),
             zone_id: pos.location.zone_id.map(|z| z as i32).unwrap_or(0),
             link_id: pos.location.link_id.map(|l| l as i32).unwrap_or(0),
-            road_type_id: 0, // road_type_id not yet exposed in ExecutionLocation
+            road_type_id: pos.location.road_type_id.map(|r| r as i32).unwrap_or(0),
         };
         let inputs = MultidayTankVaporVentingInputs {
             age_category: tables.iter_typed::<AgeCategoryRow>("AgeCategory")?,
@@ -6172,16 +6172,24 @@ mod tests {
         let position = IterationPosition {
             iteration: 0,
             process_id: None,
-            location: ExecutionLocation::link(26, 26_161, 90, 5001),
+            location: ExecutionLocation::link_with_road_type_id(26, 26_161, 90, 5001, 5),
             time: ExecutionTime::year(2020),
         };
         let ctx = CalculatorContext::with_position_and_tables(position, store);
         let calc = MultidayTankVaporVentingCalculator::new();
         let out = calc.execute(&ctx).expect("execute ok");
         assert!(out.dataframe().is_some(), "expected non-empty DataFrame");
+        let df = out.dataframe().unwrap();
+        assert!(df.height() > 0, "expected at least one row");
+ // Verify the iteration road type ID flows through to every output row.
+        let road_type_col = df
+            .column("roadTypeID")
+            .expect("roadTypeID column")
+            .i32()
+            .expect("i32");
         assert!(
-            out.dataframe().unwrap().height() > 0,
-            "expected at least one row"
+            road_type_col.into_iter().all(|v| v == Some(5)),
+            "every output row should carry road_type_id 5 from the iteration position"
         );
     }
 

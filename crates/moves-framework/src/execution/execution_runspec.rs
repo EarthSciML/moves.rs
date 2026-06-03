@@ -1728,8 +1728,8 @@ mod tests {
         assert_eq!(
             er.execution_locations.iter().copied().collect::<Vec<_>>(),
             vec![
-                ExecutionLocation::link(24, 24001, 240010, 2400100),
-                ExecutionLocation::link(24, 24001, 240011, 2400110),
+                ExecutionLocation::link_with_road_type_id(24, 24001, 240010, 2400100, 2),
+                ExecutionLocation::link_with_road_type_id(24, 24001, 240011, 2400110, 3),
             ]
         );
         // `extract_location_details_from_execution_locations` ran.

@@ -37,8 +37,9 @@ use moves_data::ProcessId;
 
 use crate::data::{DataFrameStore, InMemoryStore};
 
-/// `(state, county, zone, link)` quadruple identifying the current spatial
-/// location in the master loop. Rust equivalent of `ExecutionLocation.java`.
+/// `(state, county, zone, link, road_type)` quintuple identifying the current
+/// spatial location in the master loop. Rust equivalent of
+/// `ExecutionLocation.java`.
 ///
 /// MOVES geography is hierarchical: each state owns one or more counties,
 /// each county owns one or more zones, and each zone owns one or more
@@ -47,20 +48,22 @@ use crate::data::{DataFrameStore, InMemoryStore};
 /// read the coarser id directly from the same struct rather than chasing
 /// back-references.
 ///
-/// All four ids are stored as raw integers matching the default-DB primary
-/// keys (`State.stateID`, `County.countyID`, `Zone.zoneID`, `Link.linkID`).
+/// All ids are stored as raw integers matching the default-DB primary
+/// keys (`State.stateID`, `County.countyID`, `Zone.zoneID`, `Link.linkID`,
+/// `Link.roadTypeID`). `road_type_id` is populated at LINK granularity from
+/// `Link.roadTypeID` via [`ExecutionLocationProducer`].
 ///
 /// `None` means "the loop has not yet entered iteration at that
 /// granularity." A subscription firing at PROCESS granularity sees all
-/// four ids as `None`; a subscription firing at LINK granularity sees all
-/// four populated.
+/// five ids as `None`; a subscription firing at LINK granularity sees all
+/// five populated.
 ///
 /// (`ExecutionLocationProducer`) will introduce the iterator that
 /// emits a sequence of populated values; this type is the per-step record.
 ///
 /// `Ord`/`PartialOrd`/`Hash` derive in declaration order
-/// (state, county, zone, link). That matches Java's `compareTo` and is the
-/// contract `BTreeSet<ExecutionLocation>` relies on — e.g.'s
+/// (state, county, zone, link, road_type). That matches Java's `compareTo`
+/// and is the contract `BTreeSet<ExecutionLocation>` relies on — e.g.'s
 /// `ExecutionRunSpec::execution_locations` set, which holds the full
 /// sweep of link-granularity targets the MasterLoop visits and projects
 /// out the per-component sets used by the filter tables.
@@ -78,6 +81,10 @@ pub struct ExecutionLocation {
     /// `Link.linkID` of the link currently iterating. `None` outside LINK
     /// granularity scopes.
     pub link_id: Option<u32>,
+ /// `Link.roadTypeID` — the road type of the current link. `None` outside
+ /// LINK granularity scopes. Populated from the `Link` table by
+ /// [`ExecutionLocationProducer`] and propagated by the MasterLoop.
+    pub road_type_id: Option<u32>,
 }
 
 impl ExecutionLocation {
@@ -90,6 +97,7 @@ impl ExecutionLocation {
             county_id: None,
             zone_id: None,
             link_id: None,
+            road_type_id: None,
         }
     }
 
@@ -101,6 +109,7 @@ impl ExecutionLocation {
             county_id: None,
             zone_id: None,
             link_id: None,
+            road_type_id: None,
         }
     }
 
@@ -112,10 +121,13 @@ impl ExecutionLocation {
             county_id: Some(county_id),
             zone_id: None,
             link_id: None,
+            road_type_id: None,
         }
     }
 
-    /// Construct a fully-populated `(state, county, zone, link)` location.
+    /// Construct a fully-populated `(state, county, zone, link)` location with
+    /// `road_type_id` left as `None`. Use [`Self::link_with_road_type_id`] when
+    /// the road type is known (production path via `ExecutionLocationProducer`).
     #[must_use]
     pub const fn link(state_id: u32, county_id: u32, zone_id: u32, link_id: u32) -> Self {
         Self {
@@ -123,6 +135,28 @@ impl ExecutionLocation {
             county_id: Some(county_id),
             zone_id: Some(zone_id),
             link_id: Some(link_id),
+            road_type_id: None,
+        }
+    }
+
+ /// Construct a fully-populated location including `road_type_id`.
+ ///
+ /// Used by [`ExecutionLocationProducer`] and the MasterLoop to carry the
+ /// `Link.roadTypeID` from the geography tables through to calculators.
+    #[must_use]
+    pub const fn link_with_road_type_id(
+        state_id: u32,
+        county_id: u32,
+        zone_id: u32,
+        link_id: u32,
+        road_type_id: u32,
+    ) -> Self {
+        Self {
+            state_id: Some(state_id),
+            county_id: Some(county_id),
+            zone_id: Some(zone_id),
+            link_id: Some(link_id),
+            road_type_id: Some(road_type_id),
         }
     }
 }
@@ -458,6 +492,7 @@ mod tests {
         assert!(loc.county_id.is_none());
         assert!(loc.zone_id.is_none());
         assert!(loc.link_id.is_none());
+        assert!(loc.road_type_id.is_none());
         // Default matches none() for ergonomics in test fixtures.
         assert_eq!(loc, ExecutionLocation::default());
     }
@@ -479,12 +514,23 @@ mod tests {
     }
 
     #[test]
-    fn execution_location_link_populates_all_four() {
+    fn execution_location_link_populates_four_road_type_none() {
         let loc = ExecutionLocation::link(40, 40_001, 400_011, 4_000_111);
         assert_eq!(loc.state_id, Some(40));
         assert_eq!(loc.county_id, Some(40_001));
         assert_eq!(loc.zone_id, Some(400_011));
         assert_eq!(loc.link_id, Some(4_000_111));
+        assert!(loc.road_type_id.is_none());
+    }
+
+    #[test]
+    fn execution_location_link_with_road_type_id_populates_all_five() {
+        let loc = ExecutionLocation::link_with_road_type_id(40, 40_001, 400_011, 4_000_111, 5);
+        assert_eq!(loc.state_id, Some(40));
+        assert_eq!(loc.county_id, Some(40_001));
+        assert_eq!(loc.zone_id, Some(400_011));
+        assert_eq!(loc.link_id, Some(4_000_111));
+        assert_eq!(loc.road_type_id, Some(5));
     }
 
     #[test]
