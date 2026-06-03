@@ -81,9 +81,9 @@ pub struct ExecutionLocation {
     /// `Link.linkID` of the link currently iterating. `None` outside LINK
     /// granularity scopes.
     pub link_id: Option<u32>,
- /// `Link.roadTypeID` — the road type of the current link. `None` outside
- /// LINK granularity scopes. Populated from the `Link` table by
- /// [`ExecutionLocationProducer`] and propagated by the MasterLoop.
+    /// `Link.roadTypeID` — the road type of the current link. `None` outside
+    /// LINK granularity scopes. Populated from the `Link` table by
+    /// [`ExecutionLocationProducer`] and propagated by the MasterLoop.
     pub road_type_id: Option<u32>,
 }
 
@@ -139,10 +139,10 @@ impl ExecutionLocation {
         }
     }
 
- /// Construct a fully-populated location including `road_type_id`.
- ///
- /// Used by [`ExecutionLocationProducer`] and the MasterLoop to carry the
- /// `Link.roadTypeID` from the geography tables through to calculators.
+    /// Construct a fully-populated location including `road_type_id`.
+    ///
+    /// Used by [`ExecutionLocationProducer`] and the MasterLoop to carry the
+    /// `Link.roadTypeID` from the geography tables through to calculators.
     #[must_use]
     pub const fn link_with_road_type_id(
         state_id: u32,

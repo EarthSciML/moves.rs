@@ -682,7 +682,9 @@ mod tests {
         let locs = producer.build_execution_locations(&sample_geography());
         assert_eq!(
             locs.into_iter().collect::<Vec<_>>(),
-            vec![ExecutionLocation::link_with_road_type_id(24, 24001, 240010, 2400100, 2)]
+            vec![ExecutionLocation::link_with_road_type_id(
+                24, 24001, 240010, 2400100, 2
+            )]
         );
     }
 
@@ -694,7 +696,9 @@ mod tests {
         let locs = producer.build_execution_locations(&sample_geography());
         assert_eq!(
             locs.into_iter().collect::<Vec<_>>(),
-            vec![ExecutionLocation::link_with_road_type_id(24, 24001, 240010, 2400100, 2)]
+            vec![ExecutionLocation::link_with_road_type_id(
+                24, 24001, 240010, 2400100, 2
+            )]
         );
     }
 
@@ -760,7 +764,9 @@ mod tests {
         let locs = producer.build_execution_locations(&sample_geography());
         assert_eq!(
             locs.into_iter().collect::<Vec<_>>(),
-            vec![ExecutionLocation::link_with_road_type_id(24, 24001, 240010, 2400100, 2)]
+            vec![ExecutionLocation::link_with_road_type_id(
+                24, 24001, 240010, 2400100, 2
+            )]
         );
     }
 
@@ -944,7 +950,9 @@ mod tests {
         let locs = producer.build_execution_locations(&sample_geography());
         assert_eq!(
             locs.into_iter().collect::<Vec<_>>(),
-            vec![ExecutionLocation::link_with_road_type_id(24, 24003, 240030, 2400300, 5)]
+            vec![ExecutionLocation::link_with_road_type_id(
+                24, 24003, 240030, 2400300, 5
+            )]
         );
     }
 
@@ -999,7 +1007,13 @@ mod tests {
         // NONROAD synthesis: county id stands in as zone and link; road type 100.
         assert_eq!(
             county.nonroad_location(),
-            ExecutionLocation::link_with_road_type_id(24, 24001, 24001, 24001, NONROAD_ROAD_TYPE_ID)
+            ExecutionLocation::link_with_road_type_id(
+                24,
+                24001,
+                24001,
+                24001,
+                NONROAD_ROAD_TYPE_ID
+            )
         );
     }
 

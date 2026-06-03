@@ -6181,7 +6181,7 @@ mod tests {
         assert!(out.dataframe().is_some(), "expected non-empty DataFrame");
         let df = out.dataframe().unwrap();
         assert!(df.height() > 0, "expected at least one row");
- // Verify the iteration road type ID flows through to every output row.
+        // Verify the iteration road type ID flows through to every output row.
         let road_type_col = df
             .column("roadTypeID")
             .expect("roadTypeID column")
