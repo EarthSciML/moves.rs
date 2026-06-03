@@ -1097,19 +1097,11 @@ pub fn build_scrappage_curve<S: DataFrameStore + ?Sized>(store: &S) -> Vec<Scrap
     points
 }
 
-/// Average ambient temperature (°F) for the runspec month from
+/// Average ambient temperature (°F) for the given month from
 /// `zonemonthhour`, for the `emsadj.f` exhaust temperature correction.
-/// `0.0` ⇒ no meteorology (temperature correction treated as neutral 75°F).
-fn build_ambient_temp<S: DataFrameStore + ?Sized>(store: &S) -> f32 {
-    let month = store
-        .get("runspecmonth")
-        .map(|df| {
-            int_col(&df, "monthID")
-                .into_iter()
-                .find(|&m| m > 0)
-                .unwrap_or(0)
-        })
-        .unwrap_or(0);
+/// `month = 0` averages all rows (snapshot-loaded tables are already
+/// pre-filtered to the execution month). `0.0` ⇒ absent meteorology.
+fn build_ambient_temp<S: DataFrameStore + ?Sized>(store: &S, month: i64) -> f32 {
     let Some(df) = store.get("zonemonthhour") else {
         return 0.0;
     };
@@ -1143,17 +1135,11 @@ fn build_ambient_temp<S: DataFrameStore + ?Sized>(store: &S) -> f32 {
 /// SCC → `NREquipTypeID` (`nrscc`) → hour pattern (`nrhourpatternfinder`) →
 /// hour fractions (`nrhourallocation`); the weight is folded against the
 /// runspec-month hourly mean temperature from `zonemonthhour`.
-fn build_ambient_temp_by_scc<S: DataFrameStore + ?Sized>(store: &S) -> BTreeMap<String, f32> {
+fn build_ambient_temp_by_scc<S: DataFrameStore + ?Sized>(
+    store: &S,
+    month: i64,
+) -> BTreeMap<String, f32> {
     let mut out = BTreeMap::new();
-    let month = store
-        .get("runspecmonth")
-        .map(|df| {
-            int_col(&df, "monthID")
-                .into_iter()
-                .find(|&m| m > 0)
-                .unwrap_or(0)
-        })
-        .unwrap_or(0);
     let (Some(zmh), Some(alloc), Some(finder), Some(scc_tbl)) = (
         store.get("zonemonthhour"),
         store.get("nrhourallocation"),
@@ -1283,6 +1269,7 @@ fn build_fuel_oxygenate<S: DataFrameStore + ?Sized>(store: &S) -> (f32, bool) {
 pub fn load_nonroad_reference<S: DataFrameStore + ?Sized>(
     store: &S,
     analysis_year: i32,
+    month: i64,
 ) -> ReferenceData {
     let mut exhaust_tech_entries = build_exhaust_tech_entries(store);
     fill_tech_fractions(&mut exhaust_tech_entries, store, analysis_year);
@@ -1334,18 +1321,22 @@ pub fn load_nonroad_reference<S: DataFrameStore + ?Sized>(
  // emsadj.f oxygenate + temperature corrections.
         fuel_oxygen_pct,
         fuel_rfg,
-        ambient_temp_f: build_ambient_temp(store),
-        ambient_temp_by_scc: build_ambient_temp_by_scc(store),
+        ambient_temp_f: build_ambient_temp(store, month),
+        ambient_temp_by_scc: build_ambient_temp_by_scc(store, month),
         ..ReferenceData::default()
     }
 }
 
 /// Build the [`ProductionExecutor`] for the national pseudo-county run.
+///
+/// `month` is the master-loop month (1–12) used to select the correct
+/// `zonemonthhour` temperature rows. Pass `0` to average all available rows.
 pub fn build_production_executor<S: DataFrameStore + ?Sized>(
     store: &S,
     analysis_year: i32,
+    month: i64,
 ) -> ProductionExecutor {
-    let reference = load_nonroad_reference(store, analysis_year);
+    let reference = load_nonroad_reference(store, analysis_year, month);
     ProductionExecutor {
         county_fips: vec![PSEUDO_COUNTY.to_string()],
         hp_levels: HP_LEVELS,
@@ -1627,7 +1618,7 @@ mod tests {
 
  // Reproduce the engine run in-process.
         let options = build_options(2020);
-        let mut executor = build_production_executor(&store, 2020);
+        let mut executor = build_production_executor(&store, 2020, 0);
         eprintln!("executor.county_fips = {:?}", executor.county_fips);
         eprintln!(
             "inputs.regions.selected_counties = {:?}",

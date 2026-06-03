@@ -1000,7 +1000,7 @@ impl TableRow for AtRatioRow {
             ("processID".into(), DataType::Int32),
             ("engTechID".into(), DataType::Int32),
             ("fuelSubtypeID".into(), DataType::Int32),
-            ("nrHPCategory".into(), DataType::Int32),
+            ("nrHPCategory".into(), DataType::String),
             ("atRatio".into(), DataType::Float64),
         ])
     }
@@ -1035,8 +1035,8 @@ impl TableRow for AtRatioRow {
                 Series::new(
                     "nrHPCategory".into(),
                     rows.iter()
-                        .map(|r| r.nr_hp_category as i32)
-                        .collect::<Vec<i32>>(),
+                        .map(|r| char::from(r.nr_hp_category).to_string())
+                        .collect::<Vec<String>>(),
                 )
                 .into(),
                 Series::new(
@@ -1062,21 +1062,33 @@ impl TableRow for AtRatioRow {
                 .f64()
                 .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
+        let get_str = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .str()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
         let pollutant = get_i32("pollutantID")?;
         let process = get_i32("processID")?;
         let eng_tech = get_i32("engTechID")?;
         let fuel_sub = get_i32("fuelSubtypeID")?;
-        let hp_cat = get_i32("nrHPCategory")?;
+        let hp_cat = get_str("nrHPCategory")?;
         let ratio = get_f64("atRatio")?;
         (0..df.height())
             .map(|i| {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                let cat_str = hp_cat.get(i).ok_or_else(|| null("nrHPCategory"))?;
+                let cat_byte = cat_str
+                    .as_bytes()
+                    .first()
+                    .copied()
+                    .ok_or_else(|| row_err(t, i, "nrHPCategory", "empty string".into()))?;
                 Ok(AtRatioRow {
                     pollutant_id: pollutant.get(i).ok_or_else(|| null("pollutantID"))?,
                     process_id: process.get(i).ok_or_else(|| null("processID"))?,
                     eng_tech_id: eng_tech.get(i).ok_or_else(|| null("engTechID"))?,
                     fuel_sub_type_id: fuel_sub.get(i).ok_or_else(|| null("fuelSubtypeID"))?,
-                    nr_hp_category: hp_cat.get(i).ok_or_else(|| null("nrHPCategory"))? as u8,
+                    nr_hp_category: cat_byte,
                     at_ratio: ratio.get(i).ok_or_else(|| null("atRatio"))?,
                 })
             })
@@ -1095,7 +1107,7 @@ impl TableRow for ProcFuelEngHpRow {
             ("processID".into(), DataType::Int32),
             ("fuelTypeID".into(), DataType::Int32),
             ("engTechID".into(), DataType::Int32),
-            ("nrHPCategory".into(), DataType::Int32),
+            ("nrHPCategory".into(), DataType::String),
             ("ratio".into(), DataType::Float64),
         ])
     }
@@ -1128,8 +1140,8 @@ impl TableRow for ProcFuelEngHpRow {
                 Series::new(
                     "nrHPCategory".into(),
                     rows.iter()
-                        .map(|r| r.nr_hp_category as i32)
-                        .collect::<Vec<i32>>(),
+                        .map(|r| char::from(r.nr_hp_category).to_string())
+                        .collect::<Vec<String>>(),
                 )
                 .into(),
                 Series::new(
@@ -1155,22 +1167,43 @@ impl TableRow for ProcFuelEngHpRow {
                 .f64()
                 .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
+        let get_str = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .str()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
         let pollutant = get_i32("pollutantID")?;
         let process = get_i32("processID")?;
         let fuel_type = get_i32("fuelTypeID")?;
         let eng_tech = get_i32("engTechID")?;
-        let hp_cat = get_i32("nrHPCategory")?;
-        let ratio = get_f64("ratio")?;
+        let hp_cat = get_str("nrHPCategory")?;
+        // The ratio column is named differently across the four tables this row type
+        // covers: "ratio" (canonical in into_dataframe), "atRatio"/"atratio" (PAH gas/
+        // particle snapshots), "meanBaseRate" (dioxin/metal snapshots). String-encoded
+        // decimals (snapshot DECIMAL columns) are parsed via the get_f64 closure.
+        // Absent columns default to 0.0 per row (causes the lookup to return None →
+        // skip the emission), which is correct for empty/mis-named snapshot tables.
+        let ratio_col = get_f64("ratio")
+            .ok()
+            .or_else(|| get_f64("atRatio").ok())
+            .or_else(|| get_f64("meanBaseRate").ok());
         (0..df.height())
             .map(|i| {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                let cat_str = hp_cat.get(i).ok_or_else(|| null("nrHPCategory"))?;
+                let cat_byte = cat_str
+                    .as_bytes()
+                    .first()
+                    .copied()
+                    .ok_or_else(|| row_err(t, i, "nrHPCategory", "empty string".into()))?;
                 Ok(ProcFuelEngHpRow {
                     pollutant_id: pollutant.get(i).ok_or_else(|| null("pollutantID"))?,
                     process_id: process.get(i).ok_or_else(|| null("processID"))?,
                     fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
                     eng_tech_id: eng_tech.get(i).ok_or_else(|| null("engTechID"))?,
-                    nr_hp_category: hp_cat.get(i).ok_or_else(|| null("nrHPCategory"))? as u8,
-                    ratio: ratio.get(i).ok_or_else(|| null("ratio"))?,
+                    nr_hp_category: cat_byte,
+                    ratio: ratio_col.as_ref().and_then(|ca| ca.get(i)).unwrap_or(0.0),
                 })
             })
             .collect()
@@ -1286,8 +1319,9 @@ impl TableRow for FuelFormulationRow {
     }
 }
 
-/// One `NRHPCategory` row — maps `(hpID, engTechID)` to a horse-power
-/// category byte.
+/// One `NRHPCategory` row — maps `(nrHPRangeBinID, engTechID)` to a horse-power
+/// category byte. The MySQL column is `nrHPRangeBinID`; the Go model calls it
+/// `HPID`, which is the same value that appears as `hpID` in `MOVESWorkerOutput`.
 struct NrHpCategoryRow {
     hp_id: i32,
     eng_tech_id: i32,
@@ -1301,9 +1335,9 @@ impl TableRow for NrHpCategoryRow {
 
     fn polars_schema() -> Schema {
         Schema::from_iter([
-            ("hpID".into(), DataType::Int32),
+            ("nrHPRangeBinID".into(), DataType::Int32),
             ("engTechID".into(), DataType::Int32),
-            ("nrHPCategory".into(), DataType::Int32),
+            ("nrHPCategory".into(), DataType::String),
         ])
     }
 
@@ -1313,7 +1347,7 @@ impl TableRow for NrHpCategoryRow {
             n,
             vec![
                 Series::new(
-                    "hpID".into(),
+                    "nrHPRangeBinID".into(),
                     rows.iter().map(|r| r.hp_id).collect::<Vec<i32>>(),
                 )
                 .into(),
@@ -1324,7 +1358,9 @@ impl TableRow for NrHpCategoryRow {
                 .into(),
                 Series::new(
                     "nrHPCategory".into(),
-                    rows.iter().map(|r| r.nr_hp_category).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| char::from(r.nr_hp_category as u8).to_string())
+                        .collect::<Vec<String>>(),
                 )
                 .into(),
             ],
@@ -1339,16 +1375,28 @@ impl TableRow for NrHpCategoryRow {
                 .i32()
                 .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
-        let hp = get_i32("hpID")?;
+        let get_str = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .str()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let hp = get_i32("nrHPRangeBinID")?;
         let eng = get_i32("engTechID")?;
-        let cat = get_i32("nrHPCategory")?;
+        let cat = get_str("nrHPCategory")?;
         (0..df.height())
             .map(|i| {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                let cat_str = cat.get(i).ok_or_else(|| null("nrHPCategory"))?;
+                let cat_byte = cat_str
+                    .as_bytes()
+                    .first()
+                    .copied()
+                    .ok_or_else(|| row_err(t, i, "nrHPCategory", "empty string".into()))?;
                 Ok(NrHpCategoryRow {
-                    hp_id: hp.get(i).ok_or_else(|| null("hpID"))?,
+                    hp_id: hp.get(i).ok_or_else(|| null("nrHPRangeBinID"))?,
                     eng_tech_id: eng.get(i).ok_or_else(|| null("engTechID"))?,
-                    nr_hp_category: cat.get(i).ok_or_else(|| null("nrHPCategory"))?,
+                    nr_hp_category: i32::from(cat_byte),
                 })
             })
             .collect()
@@ -1597,7 +1645,10 @@ impl TableRow for NrAirToxicsMwoRow {
         let eng_tech = get_i32("engTechID")?;
         let hp = get_i32("hpID")?;
         let fuel_sub_type = get_i32("fuelSubTypeID")?;
-        let fuel_formulation = get_i32("fuelFormulationID")?;
+        // fuelFormulationID is absent from nonroad MOVESWorkerOutput. Default to 0,
+        // which causes the fuel-formulation lookup to return None → emission skipped.
+        // This produces empty air-toxics output for nonroad, matching canonical.
+        let fuel_formulation = df.column("fuelFormulationID").ok().and_then(|c| c.i32().ok());
         let model_year = get_i32("modelYearID")?;
         let road_type = get_i32("roadTypeID")?;
         let emission_quant = get_f64("emissionQuant")?;
@@ -1624,8 +1675,9 @@ impl TableRow for NrAirToxicsMwoRow {
                         .get(i)
                         .ok_or_else(|| null("fuelSubTypeID"))?,
                     fuel_formulation_id: fuel_formulation
-                        .get(i)
-                        .ok_or_else(|| null("fuelFormulationID"))?,
+                        .as_ref()
+                        .and_then(|ca| ca.get(i))
+                        .unwrap_or(0),
                     model_year_id: model_year.get(i).ok_or_else(|| null("modelYearID"))?,
                     road_type_id: road_type.get(i).ok_or_else(|| null("roadTypeID"))?,
                     emission_quant: emission_quant.get(i).ok_or_else(|| null("emissionQuant"))?,
@@ -1706,7 +1758,7 @@ impl Calculator for NrAirToxicsCalculator {
                 .into_iter()
                 .map(|r| ((r.hp_id, r.eng_tech_id), r.nr_hp_category as u8)),
             tables
-                .iter_typed::<NrNeededPolProcessRow>("NeededPolProcessIDs")?
+                .iter_typed_or_empty::<NrNeededPolProcessRow>("NeededPolProcessIDs")?
                 .into_iter()
                 .map(|r| r.pol_process_id),
         );
