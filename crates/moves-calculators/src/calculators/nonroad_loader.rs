@@ -1504,7 +1504,7 @@ fn build_temporal_profiles_for_period<S: DataFrameStore + ?Sized>(
         let frac = float_col(&df, "monthFraction");
         for i in 0..df.height() {
             let m = month[i] as usize;
-            if m >= 1 && m <= 12 {
+            if (1..=12).contains(&m) {
                 monthly_by_scc.entry(scc[i].clone()).or_insert([0.0; 12])[m - 1] = frac[i] as f32;
             }
         }
