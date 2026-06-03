@@ -906,10 +906,10 @@ mod tests {
 
     #[test]
     fn source_type_collapses_to_null_when_not_grouped() {
- // When source_use_type is false, sourceTypeID is not a GROUP BY key.
- // Rows with different source types must merge into one group and the
- // output field must be NULL — matching AggregationSQLGenerator.java:1353-1366
- // which emits `null as sourceTypeID` for the non-sourceUseType case.
+        // When source_use_type is false, sourceTypeID is not a GROUP BY key.
+        // Rows with different source types must merge into one group and the
+        // output field must be NULL — matching AggregationSQLGenerator.java:1353-1366
+        // which emits `null as sourceTypeID` for the non-sourceUseType case.
         let b = breakdown_all_false();
         let plan = emission_aggregation(&inputs(
             OutputTimestep::Year,
@@ -932,8 +932,8 @@ mod tests {
 
     #[test]
     fn source_type_kept_when_source_use_type_breakdown_on() {
- // When source_use_type is true, sourceTypeID is a GROUP BY key: rows of
- // different source types stay distinct and the value flows through.
+        // When source_use_type is true, sourceTypeID is a GROUP BY key: rows of
+        // different source types stay distinct and the value flows through.
         let mut b = breakdown_all_false();
         b.source_use_type = true;
         let plan = emission_aggregation(&inputs(
