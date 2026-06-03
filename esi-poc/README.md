@@ -1,21 +1,44 @@
-# ESI proof-of-concept: CriteriaRunningCalculator
+# ESI proof-of-concept: re-implementing MOVES calculators
 
-Can a real moves.rs calculator — one with genuine math — be re-expressed in the
+Can real moves.rs calculators — ones with genuine math — be re-expressed in the
 [ESI format](https://github.com/EarthSciML/EarthSciInventory) and still reproduce
-moves.rs's own tests? This is that experiment.
+moves.rs's own tests? This is that experiment, on two calculators chosen to
+exercise *different* capabilities of the format.
 
 ## What's here
 
-- **`criteria_running.esi`** — the computational core of
-  `crates/moves-calculators/src/calculators/criteria_running_calculator.rs`,
-  expressed as an ESI pipeline.
-- **`run_poc.py`** — re-runs the calculator's eight Rust `#[test]` cases through
-  the ESI engine and checks each reproduces the asserted `emission_quant`.
+| Calculator | ESI file | Harness | Reproduced |
+|---|---|---|---|
+| `criteria_running_calculator.rs` | `criteria_running.esi` | `run_poc.py` | 8/8 |
+| `evaporative_permeation_calculator.rs` | `permeation.esi` | `run_permeation.py` | 9/9 |
+
+Each harness re-runs the calculator's Rust `#[test]` cases — same fixture
+values, same per-test tweaks — through the pure-Python ESI reference engine and
+checks each reproduces the asserted `emission_quant` (or, for the filter cases,
+the empty result).
+
+## Capabilities exercised (the point of picking two)
+
+| ESI capability | CriteriaRunning | Permeation |
+|---|:--:|:--:|
+| `join` (equi) + cartesian cross-join | ✅ | ✅ |
+| weighted `aggregate` (sum) | ✅ | ✅ |
+| `derive` polynomial — quadratic `1+(T−75)(A+(T−75)B)` | ✅ | |
+| `min`/`max` clamp | ✅ | |
+| **`exp`** — Arrhenius `A·exp(B·tankTemp)` | | ✅ |
+| **`filter`** — interval predicates (model-year range, ethanol bin) | | ✅ |
+| **`coalesce`** — null ETOH volume → 0 | | ✅ |
+
+CriteriaRunning is the multiplicative adjustment chain with an I/M blend;
+Permeation adds genuine exponential physics and conditional/interval logic.
+Together they cover the relational core plus polynomial, exponential, clamp,
+filter, and null-handling math.
 
 ## Result
 
 ```
 8/8 CriteriaRunning tests reproduced through ESI
+9/9 Permeation tests reproduced through ESI
 ```
 
 | Rust test (`criteria_running_calculator.rs`) | expected `emission_quant` | ESI |
@@ -72,9 +95,17 @@ Rust tests use. To keep the POC focused on the math:
 ## Run it
 
 ```bash
-python3 esi-poc/run_poc.py          # needs the EarthSciInventory repo beside moves.rs
-cargo test -p moves-calculators --lib criteria_running::   # the Rust baseline
+# ESI re-implementations (need the EarthSciInventory repo beside moves.rs)
+python3 esi-poc/run_poc.py
+python3 esi-poc/run_permeation.py
+
+# The Rust baselines
+cargo test -p moves-calculators --lib criteria_running_calculator
+cargo test -p moves-calculators --lib evaporative_permeation_calculator
 ```
 
-`run_poc.py` imports the pure-Python ESI reference engine from
-`../EarthSciInventory/implementations/python`.
+Both harnesses import the pure-Python ESI reference engine from
+`../EarthSciInventory/implementations/python`. The `Scope / honesty` notes below
+apply to both: the surrogate-key resolution joins are pre-applied in the
+supplied inputs, single-valued output dimensions are held constant, and the math
+chain + weighting + filters are what the pipelines reproduce.
