@@ -216,26 +216,39 @@ impl Generator for BaseRateGenerator {
 
         // Derive behavioral flags — mirrors Java BaseRateGenerator.generateBaseRates().
         //
-        // applyAvgSpeedDistribution: Inventory scale for processes 1/9/10 in non-Project
-        // domain. This is what the Java calls "applyAvgSpeedDistribution".
+        // Scale mapping (Java ModelScale → Rust ModelScale):
+        //   Java MACROSCALE (description="Inv")     → Rust ModelScale::Inventory
+        //   Java MESOSCALE_LOOKUP (description="Rates") → Rust ModelScale::Rates
+        //
+        // applyAvgSpeedDistribution: Inventory (Java MACROSCALE) scale for processes 1/9/10.
+        // Project domain overrides it to false later (handled via the !is_project gate on
+        // use_avg_speed_bin rather than mutating the intermediate).
         let apply_avg_speed_distribution = matches!(scale, Some(ModelScale::Inventory))
-            && !is_project
             && matches!(process_id, 1 | 9 | 10);
+        // Net after Project-domain override (Java: if isProjectDomain && proc∈{1,9,10} then false):
+        let apply_avg_speed_distribution = apply_avg_speed_distribution && !is_project;
 
-        // keepOpModeID: process 2 (Start Exhaust) unless Project domain overrides.
-        let keep_op_mode_id = process_id == 2 && !is_project;
+        // keepOpModeID: process 2 (Start Exhaust). The Java Project-domain override only
+        // fires for processes 1/9/10, so process 2 keeps keepOpModeID=true even in Project domain.
+        let keep_op_mode_id = process_id == 2;
 
-        // useAvgSpeedBin: Rates-path processes 1/9/10 (non-Project). In Project domain or
-        // when applyAvgSpeedDistribution is true, avgSpeedBin is collapsed to 0.
+        // useAvgSpeedBin: Rates-path processes 1/9/10 (non-Project). Collapsed to 0 when
+        // applyAvgSpeedDistribution is active or in Project domain.
         let use_avg_speed_bin =
             !apply_avg_speed_distribution && !is_project && matches!(process_id, 1 | 9 | 10);
 
-        // useAvgSpeedFraction / useSumSBD: active on the Inventory (applyAvgSpeedDistribution) path.
+        // useAvgSpeedFraction: active on the applyAvgSpeedDistribution (Inventory) path.
         let use_avg_speed_fraction = apply_avg_speed_distribution;
-        let use_sum_sbd = apply_avg_speed_distribution;
 
-        // useSumSBDRaw: processes 2, 90, 91 (Start Exhaust, Extended Idle, APU).
-        let use_sum_sbd_raw = matches!(process_id, 2 | 90 | 91);
+        // useSumSBD (applySourceBinDistribution in Java): Inventory scale or processes 2/90/91.
+        // Java: applySourceBinDistribution = (scale == MACROSCALE); if process ∈ {2,90,91} →
+        // applySourceBinDistribution = true. No Project-domain override for this flag.
+        let use_sum_sbd = matches!(scale, Some(ModelScale::Inventory))
+            || matches!(process_id, 2 | 90 | 91);
+
+        // useSumSBDRaw: Rates (Java MESOSCALE_LOOKUP) scale AND processes 2/90/91.
+        let use_sum_sbd_raw =
+            matches!(scale, Some(ModelScale::Rates)) && matches!(process_id, 2 | 90 | 91);
 
         // Build the 8-token parameter list that ExternalFlags::from_parameters expects,
         // mirroring brbaFlags.getCSVForExternalGenerator() + ",processID,yearID,roadTypeID".
@@ -2110,9 +2123,11 @@ mod tests {
     }
 
     /// execute() sets ExternalFlags.keep_op_mode_id=true for process 2 (Start Exhaust)
-    /// on a non-Project Rates run — mirrors Java BaseRateGenerator.generateBaseRates().
+    /// and useSumSBDRaw=true on a Rates run — mirrors Java BaseRateGenerator.generateBaseRates().
+    /// keepOpModeID is process 2 regardless of domain (the Java Project-domain override only
+    /// applies to processes 1/9/10).
     #[test]
-    fn execute_flags_process2_rates_keep_op_mode_id() {
+    fn execute_flags_process2_rates_keep_op_mode_id_and_sum_sbd_raw() {
         use moves_framework::{ExecutionLocation, ExecutionTime, IterationPosition, ModelScale};
 
         let store = minimal_store_for_process(2);
@@ -2128,8 +2143,7 @@ mod tests {
         let result = generator.execute(&mut ctx);
         assert!(result.is_ok(), "execute failed: {:?}", result.err());
         // With process 2 on a Rates run, keepOpModeID=true and useSumSBDRaw=true.
-        // The test verifies execute() succeeds and produces output (flag correctness
-        // is validated in the numerical baserategenerator.rs integration tests).
+        // Flag correctness is validated in the numerical baserategenerator.rs integration tests.
         assert!(ctx.scratch().store.contains("BaseRate"));
     }
 
