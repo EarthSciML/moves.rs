@@ -790,14 +790,20 @@ impl TableRow for NrFuelFormulationRow {
     }
 }
 
-/// One `nrHPCategory` row — the `(hpID, engTechID)` → hp-category mapping.
+/// One `nrHPCategory` row — the `(nrHPRangeBinID, engTechID)` → hp-category mapping.
+///
+/// The MySQL table column is `nrHPRangeBinID` (not `hpID`); the Go model names
+/// the same field `HPID`. Both refer to the NR HP range-bin identifier that also
+/// appears as `hpID` in `MOVESWorkerOutput`, so the lookup by `(hp_id, eng_tech_id)`
+/// is correct. `nrHPCategory` is a single ASCII character ("S", "L", …) stored as
+/// its byte value in `nr_hp_category`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct NrHpCategoryRow {
- /// `hpID`.
+ /// `nrHPRangeBinID` — the NR HP range bin, also called `hpID` in worker output.
     pub hp_id: i32,
  /// `engTechID`.
     pub eng_tech_id: i32,
- /// `nrHPCategory` — stored as `i32`; converted to `u8` at use.
+ /// `nrHPCategory` — ASCII byte value of the single-char category code ("S" → 83).
     pub nr_hp_category: i32,
 }
 
@@ -808,9 +814,9 @@ impl TableRow for NrHpCategoryRow {
 
     fn polars_schema() -> Schema {
         Schema::from_iter([
-            ("hpID".into(), DataType::Int32),
+            ("nrHPRangeBinID".into(), DataType::Int32),
             ("engTechID".into(), DataType::Int32),
-            ("nrHPCategory".into(), DataType::Int32),
+            ("nrHPCategory".into(), DataType::String),
         ])
     }
 
@@ -820,7 +826,7 @@ impl TableRow for NrHpCategoryRow {
             n,
             vec![
                 Series::new(
-                    "hpID".into(),
+                    "nrHPRangeBinID".into(),
                     rows.iter().map(|r| r.hp_id).collect::<Vec<i32>>(),
                 )
                 .into(),
@@ -831,7 +837,9 @@ impl TableRow for NrHpCategoryRow {
                 .into(),
                 Series::new(
                     "nrHPCategory".into(),
-                    rows.iter().map(|r| r.nr_hp_category).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| char::from(r.nr_hp_category as u8).to_string())
+                        .collect::<Vec<String>>(),
                 )
                 .into(),
             ],
@@ -846,16 +854,28 @@ impl TableRow for NrHpCategoryRow {
                 .i32()
                 .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
-        let hp = get_i32("hpID")?;
+        let get_str = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .str()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let hp = get_i32("nrHPRangeBinID")?;
         let eng_tech = get_i32("engTechID")?;
-        let category = get_i32("nrHPCategory")?;
+        let category = get_str("nrHPCategory")?;
         (0..df.height())
             .map(|i| {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                let cat_str = category.get(i).ok_or_else(|| null("nrHPCategory"))?;
+                let cat_byte = cat_str
+                    .as_bytes()
+                    .first()
+                    .copied()
+                    .ok_or_else(|| row_err(t, i, "nrHPCategory", "empty string".into()))?;
                 Ok(NrHpCategoryRow {
-                    hp_id: hp.get(i).ok_or_else(|| null("hpID"))?,
+                    hp_id: hp.get(i).ok_or_else(|| null("nrHPRangeBinID"))?,
                     eng_tech_id: eng_tech.get(i).ok_or_else(|| null("engTechID"))?,
-                    nr_hp_category: category.get(i).ok_or_else(|| null("nrHPCategory"))?,
+                    nr_hp_category: i32::from(cat_byte),
                 })
             })
             .collect()
@@ -1054,7 +1074,15 @@ impl TableRow for NrThcWorkerRow {
         let eng_tech = get_i32("engTechID")?;
         let hp = get_i32("hpID")?;
         let fuel_sub_type = get_i32("fuelSubTypeID")?;
-        let fuel_formulation = get_i32("fuelFormulationID")?;
+        // fuelFormulationID is absent from nonroad MOVESWorkerOutput (the nonroad
+        // engine does not expand emissions per formulation). Treat as optional: 0
+        // causes speciate_emission to return None (unknown formulation → skip),
+        // producing empty speciation for nonroad — the canonical nonroad output
+        // contains no HC-speciated rows, so this is the correct behavior.
+        let fuel_formulation = df
+            .column("fuelFormulationID")
+            .ok()
+            .and_then(|c| c.i32().ok());
         let emission_quant = get_f64("emissionQuant")?;
         let emission_rate = get_f64("emissionRate")?;
         (0..df.height())
@@ -1078,8 +1106,9 @@ impl TableRow for NrThcWorkerRow {
                     hp_id: hp.get(i).ok_or_else(|| null("hpID"))?,
                     fuel_sub_type_id: fuel_sub_type.get(i).ok_or_else(|| null("fuelSubTypeID"))?,
                     fuel_formulation_id: fuel_formulation
-                        .get(i)
-                        .ok_or_else(|| null("fuelFormulationID"))?,
+                        .as_ref()
+                        .and_then(|ca| ca.get(i))
+                        .unwrap_or(0),
                     emission_quant: emission_quant.get(i).ok_or_else(|| null("emissionQuant"))?,
                     emission_rate: emission_rate.get(i).ok_or_else(|| null("emissionRate"))?,
                 })
@@ -1098,7 +1127,7 @@ impl TableRow for MethaneThcRatioRow {
             ("processID".into(), DataType::Int32),
             ("engTechID".into(), DataType::Int32),
             ("fuelSubtypeID".into(), DataType::Int32),
-            ("nrHPCategory".into(), DataType::Int32),
+            ("nrHPCategory".into(), DataType::String),
             ("CH4THCRatio".into(), DataType::Float64),
         ])
     }
@@ -1128,8 +1157,8 @@ impl TableRow for MethaneThcRatioRow {
                 Series::new(
                     "nrHPCategory".into(),
                     rows.iter()
-                        .map(|r| i32::from(r.nr_hp_category))
-                        .collect::<Vec<i32>>(),
+                        .map(|r| char::from(r.nr_hp_category).to_string())
+                        .collect::<Vec<String>>(),
                 )
                 .into(),
                 Series::new(
@@ -1155,19 +1184,31 @@ impl TableRow for MethaneThcRatioRow {
                 .f64()
                 .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
+        let get_str = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .str()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
         let process = get_i32("processID")?;
         let eng_tech = get_i32("engTechID")?;
         let fuel_sub = get_i32("fuelSubtypeID")?;
-        let category = get_i32("nrHPCategory")?;
+        let category = get_str("nrHPCategory")?;
         let ratio = get_f64("CH4THCRatio")?;
         (0..df.height())
             .map(|i| {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                let cat_str = category.get(i).ok_or_else(|| null("nrHPCategory"))?;
+                let cat_byte = cat_str
+                    .as_bytes()
+                    .first()
+                    .copied()
+                    .ok_or_else(|| row_err(t, i, "nrHPCategory", "empty string".into()))?;
                 Ok(MethaneThcRatioRow {
                     process_id: process.get(i).ok_or_else(|| null("processID"))?,
                     eng_tech_id: eng_tech.get(i).ok_or_else(|| null("engTechID"))?,
                     fuel_sub_type_id: fuel_sub.get(i).ok_or_else(|| null("fuelSubtypeID"))?,
-                    nr_hp_category: category.get(i).ok_or_else(|| null("nrHPCategory"))? as u8,
+                    nr_hp_category: cat_byte,
                     ch4_thc_ratio: ratio.get(i).ok_or_else(|| null("CH4THCRatio"))?,
                 })
             })
@@ -1186,7 +1227,7 @@ impl TableRow for NrHcSpeciationRow {
             ("processID".into(), DataType::Int32),
             ("engTechID".into(), DataType::Int32),
             ("fuelSubTypeID".into(), DataType::Int32),
-            ("nrHPCategory".into(), DataType::Int32),
+            ("nrHPCategory".into(), DataType::String),
             ("speciationConstant".into(), DataType::Float64),
         ])
     }
@@ -1221,8 +1262,8 @@ impl TableRow for NrHcSpeciationRow {
                 Series::new(
                     "nrHPCategory".into(),
                     rows.iter()
-                        .map(|r| i32::from(r.nr_hp_category))
-                        .collect::<Vec<i32>>(),
+                        .map(|r| char::from(r.nr_hp_category).to_string())
+                        .collect::<Vec<String>>(),
                 )
                 .into(),
                 Series::new(
@@ -1250,21 +1291,33 @@ impl TableRow for NrHcSpeciationRow {
                 .f64()
                 .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
+        let get_str = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .str()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
         let pollutant = get_i32("pollutantID")?;
         let process = get_i32("processID")?;
         let eng_tech = get_i32("engTechID")?;
         let fuel_sub = get_i32("fuelSubTypeID")?;
-        let category = get_i32("nrHPCategory")?;
+        let category = get_str("nrHPCategory")?;
         let spec_const = get_f64("speciationConstant")?;
         (0..df.height())
             .map(|i| {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                let cat_str = category.get(i).ok_or_else(|| null("nrHPCategory"))?;
+                let cat_byte = cat_str
+                    .as_bytes()
+                    .first()
+                    .copied()
+                    .ok_or_else(|| row_err(t, i, "nrHPCategory", "empty string".into()))?;
                 Ok(NrHcSpeciationRow {
                     pollutant_id: pollutant.get(i).ok_or_else(|| null("pollutantID"))?,
                     process_id: process.get(i).ok_or_else(|| null("processID"))?,
                     eng_tech_id: eng_tech.get(i).ok_or_else(|| null("engTechID"))?,
                     fuel_sub_type_id: fuel_sub.get(i).ok_or_else(|| null("fuelSubTypeID"))?,
-                    nr_hp_category: category.get(i).ok_or_else(|| null("nrHPCategory"))? as u8,
+                    nr_hp_category: cat_byte,
                     speciation_constant: spec_const
                         .get(i)
                         .ok_or_else(|| null("speciationConstant"))?,

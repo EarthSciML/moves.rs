@@ -207,13 +207,14 @@ impl Calculator for NonroadEmissionCalculator {
         let year = time
             .year
             .ok_or_else(|| Error::MissingContext { what: "context.year".into() })?;
-        let _ = time
+        let month_present = time
             .month
             .ok_or_else(|| Error::MissingContext { what: "context.month".into() })?;
         let _ = time
             .day_id
             .ok_or_else(|| Error::MissingContext { what: "context.day_id".into() })?;
         let year = i32::from(year);
+        let month_id = i64::from(month_present);
 
  // Build the NONROAD engine inputs from the nr* execution-DB tables
  // (the in-process replacement for the Java input-file generator).
@@ -269,7 +270,7 @@ impl Calculator for NonroadEmissionCalculator {
  // Tables present but empty population — a genuine nonroad-free slice.
             return Ok(CalculatorOutput::empty());
         }
-        let mut executor = nonroad_loader::build_production_executor(store, year);
+        let mut executor = nonroad_loader::build_production_executor(store, year, month_id);
 
         let outputs = moves_nonroad::run_simulation(&options, &inputs, &mut executor)
             .map_err(|e| Error::Nonroad(e.to_string()))?;
