@@ -37,9 +37,10 @@
 
 use crate::allocation::{allocate_county, allocate_state, CountyDescriptor};
 use crate::common::consts::{
-    CVTTON, MXAGYR, MXEVTECH, MXPOL, MXTECH, RMISS, SWTCNG, SWTDSL, SWTGS2, SWTGS4, SWTLPG,
+    CVTTON, MXAGYR, MXDAYS, MXEVTECH, MXPOL, MXTECH, RMISS, SWTCNG, SWTDSL, SWTGS2, SWTGS4, SWTLPG,
 };
 use crate::driver::scrptime;
+use crate::driver::{day_month_factors as daymthf, DayMonthFactors};
 use crate::driver::{fuel_for_scc, Dispatch, DriverRecord};
 use crate::emissions::exhaust::{
     calculate_emission_adjustments, calculate_exhaust_emissions,
@@ -437,6 +438,16 @@ pub struct ProductionExecutor {
     /// temporal factors. Built once per run by the orchestrator and
     /// passed to [`ProductionExecutor::new`].
     pub reference: ReferenceData,
+    /// Which months are active — Fortran `lmonth(12)` from `/perdat/`.
+    /// Index 0 = January. Set from [`NonroadOptions::selected_month`].
+    /// When all `false`, defaults are used (flat temporal profile).
+    pub months_selected: [bool; 12],
+    /// `true` when weekday is selected — Fortran `ldays(IDXWKD)`.
+    pub weekday_selected: bool,
+    /// `true` for period-total runs — Fortran `ismtyp == IDXTOT`.
+    /// Mirrors [`NonroadOptions::total_mode`] on the executor so the
+    /// temporal callbacks can access it without receiving the options.
+    pub total_mode: bool,
 }
 
 impl ProductionExecutor {
@@ -462,6 +473,48 @@ impl ProductionExecutor {
             reference: ref_data.clone(),
             ..Self::default()
         }
+    }
+
+    /// Resolve the temporal profile for `scc`, falling back through the
+    /// SCC family root then the canonical defaults (`defmth`, `defday`).
+    ///
+    /// Returns `(monthly[12], daily[2])` ready to pass to
+    /// [`crate::driver::day_month_factors`].
+    fn resolve_temporal_profile(&self, scc: &str) -> ([f32; 12], [f32; 2]) {
+        let def_monthly = [1.0_f32 / 12.0; 12];
+        let def_daily = [1.0_f32 / 7.0; 2];
+        if let Some(p) = self.reference.temporal_profiles.get(scc) {
+            return (p.monthly, p.daily);
+        }
+        // Family-root fallback: first 7 chars then first 4 chars (mirrors fndtpm.f).
+        if scc.len() >= 7 {
+            let root7 = format!("{:0<10}", &scc[..7]);
+            if let Some(p) = self.reference.temporal_profiles.get(&root7) {
+                return (p.monthly, p.daily);
+            }
+        }
+        if scc.len() >= 4 {
+            let root4 = format!("{:0<10}", &scc[..4]);
+            if let Some(p) = self.reference.temporal_profiles.get(&root4) {
+                return (p.monthly, p.daily);
+            }
+        }
+        (def_monthly, def_daily)
+    }
+
+    /// Compute [`DayMonthFactors`] for `scc` using the executor's period
+    /// flags and temporal profiles — the in-process equivalent of the
+    /// Fortran `daymthf(asccod, fipin, daymthfac, mthf, dayf, ndays)` call.
+    fn day_month_factors_for(&self, scc: &str) -> DayMonthFactors {
+        let (monthly, daily) = self.resolve_temporal_profile(scc);
+        daymthf(
+            &monthly,
+            &daily,
+            &self.months_selected,
+            self.weekday_selected,
+            false, // ldayfl: no daily-temp file in MOVES runs
+            self.total_mode,
+        )
     }
 
     fn execute_county(
@@ -851,23 +904,16 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
 
     // ---- Temporal factors -----------------------------------------------
 
-    fn day_month_factors(
-        &self,
-        _scc: &str,
-        _fips: &str,
-    ) -> Result<([f32; crate::common::consts::MXDAYS], f32, f32, i32)> {
-        // Temporal-factor file not yet loaded. Return a neutral
-        // single-day factor: mthf=1, dayf=1, ndays=1. This collapses
-        // the emission period to one day (adjtime=1 in total mode).
-        //
-        // The audit replaced this with a `panic!`, reasoning that a neutral
-        // factor understates an annual total-mode run by ~365x. But the only
-        // currently-correct nonroad fixture (nr-commercial-nation) passes at
-        // 908/908 (3.5e-3) with this neutral factor — its canonical snapshot is
-        // consistent with ndays=1 — so the panic broke a previously-correct
-        // fixture. The other nonroad fixtures remain quarantined either way.
-        // Porting the real NR*.TMF loader is a pre-existing, deferred concern.
-        Ok(([0.0; crate::common::consts::MXDAYS], 1.0, 1.0, 1))
+    fn day_month_factors(&self, scc: &str, _fips: &str) -> Result<([f32; MXDAYS], f32, f32, i32)> {
+        // Canonical `daymthf.f`: look up the per-SCC monthly/daily profile,
+        // accumulate mthf and ndays over the selected months (lmonth), then
+        // set dayf from the day-of-week factor (ismtyp / ldays).
+        let dmf = self.executor.day_month_factors_for(scc);
+        let mut arr = [0.0_f32; MXDAYS];
+        arr.iter_mut()
+            .zip(dmf.day_factors.iter())
+            .for_each(|(a, b)| *a = *b);
+        Ok((arr, dmf.month_factor, dmf.day_of_week_factor, dmf.n_days))
     }
 
     fn emission_adjustments(
@@ -1633,22 +1679,16 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
         })
     }
 
-    fn day_month_factor(&mut self, _scc: &str, _fips: &str) -> Result<DayMonthFactor> {
-        // Canonical `daymthf.f` reads the per-SCC month/day temporal
-        // fractions from the NR*.TMF temporal-factor packet and returns the
-        // real `(day_month_fac, mthf, dayf, n_days)`. The prior code
-        // fabricated a neutral single-day factor (mthf=1, dayf=1, n_days=1),
-        // which collapses an annual total-mode run to a single day —
-        // understating the annual total by ~365x. The NR*.TMF temporal-factor
-        // loader is not ported, so the real factors cannot be obtained and a
-        // neutral single-day value cannot be fabricated.
-        Err(crate::Error::Config(
-            "day_month_factor: NR*.TMF temporal-factor loader (daymthf.f) is not \
-             ported; the month/day fractions and n_days cannot be obtained. A neutral \
-             mthf=dayf=n_days=1 cannot be fabricated (it collapses an annual run by \
-             ~365x)."
-                .into(),
-        ))
+    fn day_month_factor(&mut self, scc: &str, _fips: &str) -> Result<DayMonthFactor> {
+        // Canonical `daymthf.f`: accumulate mthf/ndays over selected months,
+        // set dayf from day-of-week mode.
+        let dmf = self.executor.day_month_factors_for(scc);
+        Ok(DayMonthFactor {
+            day_month_fac: dmf.day_factors,
+            mthf: dmf.month_factor,
+            dayf: dmf.day_of_week_factor,
+            n_days: dmf.n_days,
+        })
     }
 
     fn growth_factor(&mut self, year1: i32, year2: i32, fips: &str, indcod: i32) -> Result<f32> {
@@ -2009,22 +2049,16 @@ impl<'a> NationalCallbacks for NationalAdapter<'a> {
         })
     }
 
-    fn day_month_factor(&mut self, _scc: &str, _fips: &str) -> Result<DayMonthFactor> {
-        // Canonical `daymthf.f` reads the per-SCC month/day temporal
-        // fractions from the NR*.TMF temporal-factor packet and returns the
-        // real `(day_month_fac, mthf, dayf, n_days)`. The prior code
-        // fabricated a neutral single-day factor (mthf=1, dayf=1, n_days=1),
-        // which collapses an annual total-mode run to a single day —
-        // understating the annual total by ~365x. The NR*.TMF temporal-factor
-        // loader is not ported, so the real factors cannot be obtained and a
-        // neutral single-day value cannot be fabricated.
-        Err(crate::Error::Config(
-            "day_month_factor: NR*.TMF temporal-factor loader (daymthf.f) is not \
-             ported; the month/day fractions and n_days cannot be obtained. A neutral \
-             mthf=dayf=n_days=1 cannot be fabricated (it collapses an annual run by \
-             ~365x)."
-                .into(),
-        ))
+    fn day_month_factor(&mut self, scc: &str, _fips: &str) -> Result<DayMonthFactor> {
+        // Canonical `daymthf.f`: accumulate mthf/ndays over selected months,
+        // set dayf from day-of-week mode.
+        let dmf = self.executor.day_month_factors_for(scc);
+        Ok(DayMonthFactor {
+            day_month_fac: dmf.day_factors,
+            mthf: dmf.month_factor,
+            dayf: dmf.day_of_week_factor,
+            n_days: dmf.n_days,
+        })
     }
 
     fn growth_factor(&mut self, year1: i32, year2: i32, fips: &str, indcod: i32) -> Result<f32> {
@@ -2298,22 +2332,16 @@ impl<'a> UsTotalCallbacks for UsTotalAdapter<'a> {
         })
     }
 
-    fn day_month_factor(&mut self, _scc: &str, _fips: &str) -> Result<DayMonthFactor> {
-        // Canonical `daymthf.f` reads the per-SCC month/day temporal
-        // fractions from the NR*.TMF temporal-factor packet and returns the
-        // real `(day_month_fac, mthf, dayf, n_days)`. The prior code
-        // fabricated a neutral single-day factor (mthf=1, dayf=1, n_days=1),
-        // which collapses an annual total-mode run to a single day —
-        // understating the annual total by ~365x. The NR*.TMF temporal-factor
-        // loader is not ported, so the real factors cannot be obtained and a
-        // neutral single-day value cannot be fabricated.
-        Err(crate::Error::Config(
-            "day_month_factor: NR*.TMF temporal-factor loader (daymthf.f) is not \
-             ported; the month/day fractions and n_days cannot be obtained. A neutral \
-             mthf=dayf=n_days=1 cannot be fabricated (it collapses an annual run by \
-             ~365x)."
-                .into(),
-        ))
+    fn day_month_factor(&mut self, scc: &str, _fips: &str) -> Result<DayMonthFactor> {
+        // Canonical `daymthf.f`: accumulate mthf/ndays over selected months,
+        // set dayf from day-of-week mode.
+        let dmf = self.executor.day_month_factors_for(scc);
+        Ok(DayMonthFactor {
+            day_month_fac: dmf.day_factors,
+            mthf: dmf.month_factor,
+            dayf: dmf.day_of_week_factor,
+            n_days: dmf.n_days,
+        })
     }
 
     fn growth_factor(&mut self, year1: i32, year2: i32, fips: &str, indcod: i32) -> Result<f32> {
@@ -3940,13 +3968,10 @@ mod production {
             growth: None,
         };
 
-        // NR*.TMF temporal-factor loader not ported — returns Err (mo-2v1).
-        let err = exec.execute(&ctx, &opts).unwrap_err();
-        let msg = err.to_string();
-        assert!(
-            msg.contains("TMF") || msg.contains("temporal") || msg.contains("daymthf"),
-            "expected TMF error, got: {msg}"
-        );
+        // Temporal factors now ported (mo-cdo): StateFromNational execution succeeds.
+        let result = exec.execute(&ctx, &opts).unwrap();
+        assert!(!result.skipped, "expected non-skipped execution");
+        assert_eq!(result.rows.len(), 1, "expected exactly one SimEmissionRow");
     }
 
     /// (e) National dispatch with one state and one allocation entry →
@@ -4184,13 +4209,10 @@ mod production {
             growth: None,
         };
 
-        // NR*.TMF temporal-factor loader not ported — returns Err (mo-2v1).
-        let err = exec.execute(&ctx, &opts).unwrap_err();
-        let msg = err.to_string();
-        assert!(
-            msg.contains("TMF") || msg.contains("temporal") || msg.contains("daymthf"),
-            "expected TMF error, got: {msg}"
-        );
+        // Temporal factors now ported (mo-cdo): UsTotal execution succeeds.
+        let result = exec.execute(&ctx, &opts).unwrap();
+        assert!(!result.skipped, "expected non-skipped execution");
+        assert_eq!(result.rows.len(), 1, "expected exactly one SimEmissionRow");
     }
 
     /// (g) National dispatch with no allocation entry for the SCC →
@@ -4301,6 +4323,107 @@ mod production {
         assert!(
             msg.contains("GROWTH") || msg.contains("growth"),
             "expected GrowthFileMissing error, got: {msg}"
+        );
+    }
+
+    // ---- day_month_factors_for (daymthf.f port) -------------------------
+
+    /// Annual run (selected_month=0): all months selected, total_mode=true.
+    /// Canonical daymthf.f for annual total: mthf = sum(monthly) = 1.0,
+    /// ndays = 365, dayf = 1.0 (total mode forces dayf=1).
+    #[test]
+    fn annual_total_mode_returns_365_days_and_unit_factors() {
+        use crate::simulation::inputs::TemporalProfile;
+        let mut ref_data = ReferenceData::default();
+        ref_data.temporal_profiles.insert(
+            "2270001010".to_string(),
+            TemporalProfile {
+                monthly: [1.0 / 12.0; 12], // uniform monthly
+                daily: [1.0 / 7.0; 2],
+            },
+        );
+        let mut exec = ProductionExecutor {
+            reference: ref_data,
+            months_selected: [true; 12], // annual = all months
+            weekday_selected: true,
+            total_mode: true,
+            ..Default::default()
+        };
+        let dmf = exec.day_month_factors_for("2270001010");
+        assert_eq!(dmf.n_days, 365, "annual run must span all 365 days");
+        assert!(
+            (dmf.month_factor - 1.0).abs() < 1e-5,
+            "mthf for uniform annual profile must be 1.0, got {}",
+            dmf.month_factor
+        );
+        assert_eq!(dmf.day_of_week_factor, 1.0, "total mode must give dayf=1.0");
+    }
+
+    /// Monthly typical-day run (August, weekday).
+    /// mthf = august_fraction, ndays = 31, dayf = 7 × weekday_fraction.
+    #[test]
+    fn monthly_typical_day_august_weekday_returns_correct_factors() {
+        use crate::simulation::inputs::TemporalProfile;
+        let august_fraction = 0.101_f32; // typical summer value from SEASON.DAT
+        let weekday_fraction = 0.111111_f32; // 1 of 5 weekdays weighted
+        let mut monthly = [0.0_f32; 12];
+        monthly[7] = august_fraction; // index 7 = August
+        let mut ref_data = ReferenceData::default();
+        ref_data.temporal_profiles.insert(
+            "2260001000".to_string(),
+            TemporalProfile {
+                monthly,
+                daily: [weekday_fraction, 0.222222],
+            },
+        );
+        let mut months = [false; 12];
+        months[7] = true; // August only
+        let mut exec = ProductionExecutor {
+            reference: ref_data,
+            months_selected: months,
+            weekday_selected: true,
+            total_mode: false,
+            ..Default::default()
+        };
+        let dmf = exec.day_month_factors_for("2260001000");
+        assert_eq!(dmf.n_days, 31, "August has 31 days");
+        assert!(
+            (dmf.month_factor - august_fraction).abs() < 1e-6,
+            "mthf must equal august_fraction, got {}",
+            dmf.month_factor
+        );
+        let expected_dayf = 7.0 * weekday_fraction;
+        assert!(
+            (dmf.day_of_week_factor - expected_dayf).abs() < 1e-5,
+            "dayf must be 7×weekday_fraction={expected_dayf}, got {}",
+            dmf.day_of_week_factor
+        );
+    }
+
+    /// SCC with no temporal profile falls back to canonical defaults:
+    /// defmth = 1/12 each, defday = 1/7 each.
+    #[test]
+    fn missing_scc_falls_back_to_canonical_defaults() {
+        let mut months = [false; 12];
+        months[7] = true; // August
+        let exec = ProductionExecutor {
+            months_selected: months,
+            weekday_selected: true,
+            total_mode: false,
+            ..Default::default()
+        };
+        let dmf = exec.day_month_factors_for("9999999999");
+        assert_eq!(dmf.n_days, 31);
+        assert!(
+            (dmf.month_factor - 1.0 / 12.0).abs() < 1e-6,
+            "default mthf must be 1/12, got {}",
+            dmf.month_factor
+        );
+        let expected_dayf = 7.0 * (1.0 / 7.0);
+        assert!(
+            (dmf.day_of_week_factor - expected_dayf).abs() < 1e-5,
+            "default dayf must be 7×(1/7)=1.0, got {}",
+            dmf.day_of_week_factor
         );
     }
 }

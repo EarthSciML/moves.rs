@@ -723,6 +723,8 @@ pub fn run_nonroad_simulation(options_json: &str, pop_bytes: &[u8]) -> Result<Js
         growth_year,
         tech_year,
         total_mode: v["total_mode"].as_bool().unwrap_or(false),
+        selected_month: v["selected_month"].as_u64().unwrap_or(0) as u8,
+        weekday_selected: v["weekday_selected"].as_bool().unwrap_or(true),
         daily_output: v["daily_output"].as_bool().unwrap_or(false),
         emit_bmy_exhaust: v["emit_bmy_exhaust"].as_bool().unwrap_or(false),
         emit_bmy_evap: v["emit_bmy_evap"].as_bool().unwrap_or(false),
