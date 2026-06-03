@@ -1618,10 +1618,16 @@ pub fn load_nonroad_reference<S: DataFrameStore + ?Sized>(
         months_selected,
         weekday_selected,
         // emsadj.f oxygenate + temperature corrections.
+        // `selected_month` is the RunSpec 0-indexed key; MOVES monthID = key + 1.
+        // When loaded from a snapshot, `zonemonthhour` is already pre-filtered to
+        // the execution monthID by `SnapshotFilter`, so passing `month = 0` averages
+        // all available rows (the correct month's rows only). In default-DB mode all
+        // months are present and `month = 0` gives the annual mean, which is
+        // acceptable pending a full default-DB canonical gate.
         fuel_oxygen_pct,
         fuel_rfg,
-        ambient_temp_f: build_ambient_temp(store, selected_month as i64),
-        ambient_temp_by_scc: build_ambient_temp_by_scc(store, selected_month as i64),
+        ambient_temp_f: build_ambient_temp(store, 0),
+        ambient_temp_by_scc: build_ambient_temp_by_scc(store, 0),
         ..ReferenceData::default()
     }
 }
