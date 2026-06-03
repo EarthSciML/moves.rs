@@ -151,6 +151,7 @@ pub const KNOWN_CALCULATOR_INPUT_TABLES: &[&str] = &[
     "ZoneMonthHour",
     "ZoneRoadType",
     // ── camelCase scratch / generator output tables ──────────────────────────
+    "avft",
     "altCriteriaRatio",
     "apuEmissionRateFraction",
     "avgSpeedBin",
@@ -290,6 +291,56 @@ fn link_schema() -> Schema {
         ("countyID".into(), DataType::Int32),
         ("zoneID".into(), DataType::Int32),
         ("roadTypeID".into(), DataType::Int32),
+    ])
+}
+
+/// Project-domain `link` table — per-link traffic data supplied by the user.
+/// Distinct from the county-domain `Link` (PascalCase) table.
+fn project_link_schema() -> Schema {
+    Schema::from_iter([
+        ("linkID".into(), DataType::Int32),
+        ("linkVolume".into(), DataType::Float64),
+        ("linkLength".into(), DataType::Float64),
+        ("linkAvgSpeed".into(), DataType::Float64),
+        ("roadTypeID".into(), DataType::Int32),
+        ("zoneID".into(), DataType::Int32),
+    ])
+}
+
+fn link_source_type_hour_schema() -> Schema {
+    Schema::from_iter([
+        ("linkID".into(), DataType::Int32),
+        ("sourceTypeID".into(), DataType::Int32),
+        ("sourceTypeHourFraction".into(), DataType::Float64),
+    ])
+}
+
+fn off_network_link_schema() -> Schema {
+    Schema::from_iter([
+        ("zoneID".into(), DataType::Int32),
+        ("sourceTypeID".into(), DataType::Int32),
+        ("vehiclePopulation".into(), DataType::Float64),
+        ("parkedVehicleFraction".into(), DataType::Float64),
+        ("startFraction".into(), DataType::Float64),
+        ("extendedIdleFraction".into(), DataType::Float64),
+    ])
+}
+
+fn avft_schema() -> Schema {
+    Schema::from_iter([
+        ("sourceTypeID".into(), DataType::Int32),
+        ("modelYearID".into(), DataType::Int32),
+        ("fuelTypeID".into(), DataType::Int32),
+        ("fuelEngFraction".into(), DataType::Float64),
+    ])
+}
+
+fn drive_schedule_second_link_schema() -> Schema {
+    Schema::from_iter([
+        ("linkID".into(), DataType::Int32),
+        ("secondID".into(), DataType::Int32),
+        ("speed".into(), DataType::Float64),
+        ("grade".into(), DataType::Float64),
     ])
 }
 
@@ -636,7 +687,11 @@ fn build_registry() -> HashMap<&'static str, fn() -> Schema> {
     m.insert("HourDay", hour_day_schema);
     m.insert("hourDay", hour_day_schema);
     m.insert("Link", link_schema);
-    m.insert("link", link_schema);
+    m.insert("link", project_link_schema);
+    m.insert("linkSourceTypeHour", link_source_type_hour_schema);
+    m.insert("offNetworkLink", off_network_link_schema);
+    m.insert("avft", avft_schema);
+    m.insert("driveScheduleSecondLink", drive_schedule_second_link_schema);
     m.insert("County", county_schema);
     m.insert("Zone", zone_schema);
     m.insert("ZoneMonthHour", zone_month_hour_schema);
