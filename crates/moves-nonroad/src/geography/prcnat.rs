@@ -456,9 +456,9 @@ pub fn process_national_record(
         let mut poptot: f32 = 0.0;
         let mut acttot: f32 = 0.0;
         let mut strtot: f32 = 0.0;
-        let mut fulcsm: f32 = 0.0;
+        let fulcsm: f32 = 0.0;
         let mut fracretro: f32 = 0.0;
-        let mut unitsretro: f32 = 0.0;
+        let unitsretro: f32 = 0.0;
         let mut evpoptot: f32 = 0.0;
         let mut evacttot: f32 = 0.0;
         let mut evstrtot: f32 = 0.0;
@@ -506,7 +506,7 @@ pub fn process_national_record(
                 callbacks.filter_retrofits_by_year(iyr)?;
             }
 
-            let mut fulbmytot: f32 = 0.0;
+            let fulbmytot: f32 = 0.0;
 
             // --- exhaust tech-type loop (prcnat.f :659–:757) ---
             for (tech_i, tech_name) in tech.tech_names.iter().enumerate() {
@@ -517,14 +517,11 @@ pub fn process_national_record(
 
                 let popbmy = pop_state * modfrc * tfrac;
 
-                let mut frac_retro_bmy = 0.0_f32;
-                let mut units_retro_bmy = 0.0_f32;
                 if opt.retrofit_loaded {
                     callbacks.filter_retrofits_by_tech(tech_name)?;
-                    let r = callbacks.calculate_retrofit(popbmy, scc, hpval, iyr, tech_name)?;
-                    frac_retro_bmy = r.frac_retro;
-                    units_retro_bmy = r.units_retro;
-                    unitsretro += units_retro_bmy;
+                    // Retrofit fracs (fracretrobmy / unitsretrobmy in prcnat.f:674-695)
+                    // will be accumulated into unitsretro once BSFC is available (mo-2v1).
+                    let _r = callbacks.calculate_retrofit(popbmy, scc, hpval, iyr, tech_name)?;
                 }
 
                 let tpltmp = temporal_adjustment_for_unit(activity.units, tplfac);
@@ -550,61 +547,17 @@ pub fn process_national_record(
 
                 accumulate_emissions(&mut emsday, &er.ems_day_delta);
 
-                let actbmy = actadj * pop_state * modfrc * tplful * tfrac * adjtime;
-                // `fulbmy` requires the real per-(year, tech) BSFC: canonical
-                // `prcnat.f:723-726` multiplies by `bsfc(idxyr,i)`, the array that
-                // `emfclc.f` (NR*.EMF packet) populates. The national-path
-                // `calculate_exhaust` callback returns only `ExhaustResult` and does
-                // NOT thread `bsfc` back here, so the prior product simply OMITTED
-                // the bsfc factor (equivalent to a literal 1.0), overstating fuel
-                // consumption by ~1/bsfc. BSFC is required data, not a defaultable
-                // 1.0, so fail loudly until the exhaust calculator surfaces the
-                // loaded BSFC on this path (the county path reads `factors.bsfc`
-                // directly; see `process.rs`).
-                let fulbmy: f32 = {
-                    return Err(Error::Config(format!(
-                        "prcnat.f fulbmy requires bsfc(idxyr,i) from the NR*.EMF emfclc.f \
-                         packet, but the national-path exhaust calculator does not return \
-                         BSFC; the bsfc factor cannot be fabricated (omitting it / using 1.0 \
-                         overstates fuel consumption by ~1/bsfc). SCC {scc} model year {iyr} \
-                         tech {tech_name}."
-                    )));
-                };
-
-                fulcsm += fulbmy;
-                fulbmytot += fulbmy;
-
-                if opt.emit_bmy {
-                    output.bmy_outputs.push(ByModelYearOutput {
-                        fips: fips.to_string(),
-                        subcounty: subcur.clone(),
-                        scc: scc.to_string(),
-                        hp_level: hplev,
-                        tech_type: tech_name.clone(),
-                        model_year: iyr,
-                        population: popbmy,
-                        emissions: er.ems_bmy.clone(),
-                        fuel_consumption: fulbmy,
-                        activity: actbmy,
-                        load_factor: activity.load_factor,
-                        hp_avg: hpval,
-                        frac_retrofitted: frac_retro_bmy,
-                        units_retrofitted: units_retro_bmy,
-                        channel: 1,
-                    });
-                }
-                if opt.emit_si {
-                    output.si_aggregates.push(SiAggregate {
-                        fips: fips.to_string(),
-                        scc: scc.to_string(),
-                        tech_type: tech_name.clone(),
-                        population: popbmy,
-                        activity: actbmy,
-                        fuel_consumption: fulbmy,
-                        emissions: er.ems_bmy,
-                        channel: 1,
-                    });
-                }
+                // Cannot compute fulbmy: BSFC from NR*.EMF not yet threaded through
+                // ExhaustResult on the national path (prcnat.f:723-726). TODO(mo-2v1):
+                // surface bsfc from ExhaustResult, then compute actbmy/fulbmy and emit
+                // BMY/SI outputs here.
+                return Err(Error::Config(format!(
+                    "prcnat.f fulbmy requires bsfc(idxyr,i) from the NR*.EMF emfclc.f \
+                     packet, but the national-path exhaust calculator does not return \
+                     BSFC; the bsfc factor cannot be fabricated (omitting it / using 1.0 \
+                     overstates fuel consumption by ~1/bsfc). SCC {scc} model year {iyr} \
+                     tech {tech_name}."
+                )));
             }
 
             // --- population / activity / starts totals (prcnat.f :761–:765) ---
