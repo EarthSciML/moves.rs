@@ -1336,11 +1336,61 @@ static NO_SUBSCRIPTIONS: &[CalculatorSubscription] = &[];
 /// (`depends_on` in `calculator-dag.json`).
 static UPSTREAM: &[&str] = &["NonroadEmissionCalculator"];
 
+/// One `NeededPolProcessIDs` row — a `polProcessID` the run needs output for.
+///
+/// The Go `calculate` gates each speciated pollutant on
+/// `mwo.NeededPolProcessIDs[ppid]`, the run's actual needed set assembled by
+/// the engine — not on the calculator's own static registration list.
+/// Mirrors the identical struct in `NRAirToxicsCalculator`.
+struct NrNeededPolProcessRow {
+    pol_process_id: i32,
+}
+
+impl TableRow for NrNeededPolProcessRow {
+    fn table_name() -> &'static str {
+        "NeededPolProcessIDs"
+    }
+
+    fn polars_schema() -> Schema {
+        Schema::from_iter([("polProcessID".into(), DataType::Int32)])
+    }
+
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![Series::new(
+                "polProcessID".into(),
+                rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>(),
+            )
+            .into()],
+        )
+    }
+
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "NeededPolProcessIDs";
+        let ppid = df
+            .column("polProcessID")
+            .map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                Ok(NrNeededPolProcessRow {
+                    pol_process_id: ppid
+                        .get(i)
+                        .ok_or_else(|| row_err(t, i, "polProcessID", "null value".into()))?,
+                })
+            })
+            .collect()
+    }
+}
+
 /// Default-DB tables the calculator's SQL extracts: `nrHCSpeciation` (the
 /// NMOG/VOC speciation constants) and `nrMethaneTHCRatio` (the methane-to-THC
 /// ratios). The speciation pass also consults the shared nonroad worker
-/// tables `FuelFormulation` and `nrHPCategory`, which other calculators load.
-static INPUT_TABLES: &[&str] = &["nrHCSpeciation", "nrMethaneTHCRatio"];
+/// tables `FuelFormulation`, `nrHPCategory`, and `NeededPolProcessIDs`.
+static INPUT_TABLES: &[&str] = &["nrHCSpeciation", "nrMethaneTHCRatio", "NeededPolProcessIDs"];
 
 /// `NRHCSpeciationCalculator` as a chain-DAG [`Calculator`].
 ///
@@ -1405,9 +1455,18 @@ impl Calculator for NrHcSpeciationCalculator {
             .iter_typed::<NrHpCategoryRow>("nrHPCategory")?
             .into_iter()
             .map(|r| ((r.hp_id, r.eng_tech_id), r.nr_hp_category as u8));
-        let needed_pol_process_ids = REGISTRATIONS
-            .iter()
-            .map(|r| i32::from(r.pollutant_id.0) * 100 + i32::from(r.process_id.0));
+        // The needed set is the run's actual `NeededPolProcessIDs` (Go:
+        // `mwo.NeededPolProcessIDs[ppid]`), not this calculator's static
+        // `REGISTRATIONS`. Sourcing it from the static list makes every species
+        // always "needed" — a no-op gate that over-produces output the run did
+        // not request. Mirrors `NRAirToxicsCalculator::execute`.
+        // `NeededPolProcessIDs` is runtime-synthesised and absent from nonroad
+        // snapshots; `iter_typed_or_empty` returns an empty set in that case,
+        // producing no speciated rows — which matches canonical nonroad output.
+        let needed_pol_process_ids = tables
+            .iter_typed_or_empty::<NrNeededPolProcessRow>("NeededPolProcessIDs")?
+            .into_iter()
+            .map(|r| r.pol_process_id);
         let worker_tables =
             NonroadWorkerTables::new(fuel_formulations, hp_categories, needed_pol_process_ids);
 
@@ -2004,6 +2063,25 @@ mod tests {
         store.insert(
             "nrHPCategory",
             NrHpCategoryRow::into_dataframe(hp_rows).unwrap(),
+        );
+        // Seed NeededPolProcessIDs: all 5 speciated species for process 1.
+        // Without this, iter_typed_or_empty returns an empty set and
+        // execute produces no output (all species gated out).
+        let needed_rows: Vec<NrNeededPolProcessRow> = [
+            METHANE_POLLUTANT_ID,
+            NMHC_POLLUTANT_ID,
+            NMOG_POLLUTANT_ID,
+            TOG_POLLUTANT_ID,
+            VOC_POLLUTANT_ID,
+        ]
+        .iter()
+        .map(|&p| NrNeededPolProcessRow {
+            pol_process_id: p * 100 + 1,
+        })
+        .collect();
+        store.insert(
+            "NeededPolProcessIDs",
+            NrNeededPolProcessRow::into_dataframe(needed_rows).unwrap(),
         );
         let ctx = CalculatorContext::with_tables(store);
         let out = NrHcSpeciationCalculator::new()
