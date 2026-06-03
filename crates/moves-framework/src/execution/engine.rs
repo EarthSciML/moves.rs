@@ -49,7 +49,34 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Duration;
+
+// `std::time::Instant::now()` panics on `wasm32-unknown-unknown` ("time not
+// implemented on this platform") — there is no system clock without JS bindings.
+// The engine uses `Instant` only for diagnostic run-timing, so on wasm we swap
+// in a zero-duration stub. Native builds use the real `std::time::Instant`.
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::Instant;
+#[cfg(target_arch = "wasm32")]
+use wasm_instant::Instant;
+
+#[cfg(target_arch = "wasm32")]
+mod wasm_instant {
+    /// Minimal `std::time::Instant` stand-in for wasm: `now()` is a no-op and
+    /// `elapsed()` always reports zero. Timing fields are diagnostic only, so a
+    /// zero duration in the browser is acceptable.
+    #[derive(Clone, Copy)]
+    pub struct Instant;
+
+    impl Instant {
+        pub fn now() -> Self {
+            Instant
+        }
+        pub fn elapsed(&self) -> std::time::Duration {
+            std::time::Duration::ZERO
+        }
+    }
+}
 
 use crate::data::{DataFrameStore, InMemoryStore};
 

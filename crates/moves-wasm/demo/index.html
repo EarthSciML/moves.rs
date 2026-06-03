@@ -60,11 +60,15 @@
 
 <!-- ------------------------------------------------------------------ -->
 <section id="onroad-section">
-  <h2>Onroad simulation</h2>
+  <h2>Onroad simulation (bundled execution database)</h2>
   <p>
-    Upload a RunSpec XML file.  The engine runs the onroad emission
-    calculator chain and returns one or more Parquet output files matching
-    the canonical MOVES output schema.
+    Runs the onroad emission calculator chain directly from a RunSpec XML,
+    <em>without</em> fetching any database. This entry point only succeeds when
+    the calculators need no external input tables — which no real RunSpec
+    satisfies — so for an actual run use the
+    <a href="#defaultdb-section" style="color:#7af">Default-DB simulation</a>
+    section below, which fetches the required default-DB partitions first.
+    Output is returned as Parquet files.
   </p>
   <label>
     RunSpec XML
@@ -246,7 +250,7 @@
   </div>
 </section>
 
-<script>
+<script type="module">
 // -----------------------------------------------------------------------
 // Shared worker setup
 // -----------------------------------------------------------------------

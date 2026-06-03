@@ -132,6 +132,16 @@ use wasm_bindgen::JsCast;
 #[cfg(feature = "wasm-threads")]
 pub use wasm_bindgen_rayon::init_thread_pool;
 
+/// Install a panic hook (once, at module load) that forwards Rust panics to
+/// `console.error` with the full message and a JS stack trace. Without it a
+/// panic compiles to a bare `unreachable` trap that JavaScript only sees as
+/// `RuntimeError: unreachable`, hiding the real cause.
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(start)]
+pub fn __install_panic_hook() {
+    console_error_panic_hook::set_once();
+}
+
 /// The calculator-chain DAG, embedded at compile time.
 const EMBEDDED_CALCULATOR_DAG: &str =
     include_str!("../../../characterization/calculator-chains/calculator-dag.json");
@@ -181,6 +191,21 @@ pub fn run_simulation(runspec_xml: &str, max_parallel_chunks: u32) -> Result<JsV
     let registry =
         build_registry().map_err(|e| JsValue::from_str(&format!("Registry build error: {e}")))?;
 
+    // This entry point runs without an execution database (no slow store), so
+    // the calculator chain has no source for its input tables. Every real
+    // onroad RunSpec needs at least one input table, so fail fast with an
+    // actionable message rather than letting the engine trap deep in execution
+    // — which surfaces in the browser as an opaque "RuntimeError: unreachable".
+    if !registry.required_input_tables().is_empty() {
+        return Err(JsValue::from_str(
+            "run_simulation has no execution database, so the onroad calculator \
+             chain cannot resolve its input tables. Use the default-DB flow \
+             (run_simulation_from_partitions) instead — in the demo, the \
+             \"Default-DB simulation\" section, which fetches the required \
+             default-DB partitions before running.",
+        ));
+    }
+
     let config = EngineConfig {
         output_root: std::path::PathBuf::from(""),
         max_parallel_chunks: max_parallel_chunks as usize,
@@ -194,7 +219,7 @@ pub fn run_simulation(runspec_xml: &str, max_parallel_chunks: u32) -> Result<JsV
         .run()
         .map_err(|e| JsValue::from_str(&format!("Engine error: {e}")))?;
 
- // Convert the collected (path, bytes) pairs into a JS object.
+    // Convert the collected (path, bytes) pairs into a JS object.
     let obj = js_sys::Object::new();
     for (path, bytes) in outcome.output_bytes {
         let key = JsValue::from_str(
@@ -250,8 +275,8 @@ pub fn run_simulation_from_bundle(
     let geography = default_db::load_geography_from_store(&store)
         .map_err(|e| JsValue::from_str(&format!("Geography error: {e}")))?;
 
-    let registry = build_registry()
-        .map_err(|e| JsValue::from_str(&format!("Registry build error: {e}")))?;
+    let registry =
+        build_registry().map_err(|e| JsValue::from_str(&format!("Registry build error: {e}")))?;
 
     let config = EngineConfig {
         output_root: std::path::PathBuf::from(""),
@@ -571,8 +596,8 @@ pub fn run_simulation_from_partitions(
     let geography = default_db::load_geography_from_store(&store)
         .map_err(|e| JsValue::from_str(&format!("Geography error: {e}")))?;
 
-    let registry = build_registry()
-        .map_err(|e| JsValue::from_str(&format!("Registry build error: {e}")))?;
+    let registry =
+        build_registry().map_err(|e| JsValue::from_str(&format!("Registry build error: {e}")))?;
 
     let config = EngineConfig {
         output_root: std::path::PathBuf::from(""),
@@ -713,18 +738,18 @@ pub fn run_nonroad_simulation(options_json: &str, pop_bytes: &[u8]) -> Result<Js
         })
         .unwrap_or_default();
 
- // Parse population data from browser-supplied bytes using an in-memory
- // reader — the WASM-compatible path that replaces std::fs::File::open.
+    // Parse population data from browser-supplied bytes using an in-memory
+    // reader — the WASM-compatible path that replaces std::fs::File::open.
     let pop_records = read_pop(std::io::Cursor::new(pop_bytes))
         .map_err(|e| JsValue::from_str(&format!("population file parse error: {e}")))?;
 
- // Group population records by SCC (file order) into NonroadInputs.
+    // Group population records by SCC (file order) into NonroadInputs.
     let inputs = nonroad_inputs_from_pop(pop_records, selected_counties);
 
- // Run via PlanRecordingExecutor — exercises the full driver loop
- // (SCC dispatch decisions, region filtering, growth-pair detection)
- // without the numerical geography-routine evaluation, which the
- // native orchestrator handles and will be wired into WASM later.
+    // Run via PlanRecordingExecutor — exercises the full driver loop
+    // (SCC dispatch decisions, region filtering, growth-pair detection)
+    // without the numerical geography-routine evaluation, which the
+    // native orchestrator handles and will be wired into WASM later.
     let mut executor = PlanRecordingExecutor::new();
     let outputs = nonroad_run_simulation(&options, &inputs, &mut executor)
         .map_err(|e| JsValue::from_str(&format!("simulation error: {e}")))?;
@@ -960,9 +985,7 @@ mod tests {
     /// `required_partition_paths` returns county-filtered paths for a minimal manifest.
     #[test]
     fn required_partition_paths_filters_by_county() {
-        let runspec_xml = include_str!(
-            "../../../characterization/fixtures/sample-runspec.xml"
-        );
+        let runspec_xml = include_str!("../../../characterization/fixtures/sample-runspec.xml");
         // Minimal manifest with one monolithic table and one county-partitioned table.
         let manifest_json = r#"{
             "schema_version": "moves-default-db-manifest/v1",
@@ -1019,7 +1042,10 @@ mod tests {
             .expect("partition selection must succeed");
 
         // Monolithic table must always be included.
-        assert!(paths.contains(&"County.parquet".to_string()), "County must be included");
+        assert!(
+            paths.contains(&"County.parquet".to_string()),
+            "County must be included"
+        );
         // The matching county=26161 partition must be included.
         assert!(
             paths.contains(&"IMCoverage/year=2001/county=26161/part.parquet".to_string()),
@@ -1031,7 +1057,10 @@ mod tests {
             "county=99999 partition must be excluded"
         );
         // schema_only table must not appear.
-        assert!(!paths.iter().any(|p| p.contains("Link")), "Link (schema_only) must be excluded");
+        assert!(
+            !paths.iter().any(|p| p.contains("Link")),
+            "Link (schema_only) must be excluded"
+        );
     }
 
     /// `run_simulation_from_bundle` runs the default-db pipeline on a minimal
@@ -1051,8 +1080,7 @@ mod tests {
         use arrow::record_batch::RecordBatch;
         use std::sync::Arc;
 
-        let runspec_xml =
-            include_str!("../../../characterization/fixtures/sample-runspec.xml");
+        let runspec_xml = include_str!("../../../characterization/fixtures/sample-runspec.xml");
 
         // Build a minimal ZoneRoadType IPC table (one row: zone 19131960, road 2).
         let make_ipc = |schema: &Arc<Schema>, batch: RecordBatch| {
@@ -1131,11 +1159,7 @@ mod tests {
         bundle.extend_from_slice(&(tables.len() as u32).to_le_bytes());
 
         // TOC size = 12 (header) + sum of (2 + name_len + 16) for each entry.
-        let toc_size: usize = 12
-            + tables
-                .iter()
-                .map(|(n, _)| 2 + n.len() + 16)
-                .sum::<usize>();
+        let toc_size: usize = 12 + tables.iter().map(|(n, _)| 2 + n.len() + 16).sum::<usize>();
         let mut cur_offset = toc_size as u64;
         for (name, ipc) in tables {
             let name_bytes = name.as_bytes();

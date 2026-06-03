@@ -220,22 +220,20 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          RELEASE_JSON=$(gh release list --json tagName,assets --limit 20)
-          TAG=$(echo "$RELEASE_JSON" | jq -r '
-            map(select(
-              .assets | map(select(.name | test("^default-db-.*\\.tar\\.gz$"))) | length > 0
-            )) | .[0].tagName // empty
-          ')
+          # gh release list does not expose an "assets" field, so query each
+          # release's assets via `gh release view`. Find the most recent release
+          # carrying a default-db-*.tar.gz asset; skip gracefully if none.
+          TAG=""
+          ARCHIVE=""
+          for t in $(gh release list --limit 20 --json tagName --jq '.[].tagName' 2>/dev/null || true); do
+            a=$(gh release view "$t" --json assets --jq '.assets[].name' 2>/dev/null \
+                | grep -E '^default-db-.*\.tar\.gz$' | head -1) || true
+            if [ -n "$a" ]; then TAG="$t"; ARCHIVE="$a"; break; fi
+          done
           if [ -z "$TAG" ]; then
             echo "No default-DB release found — skipping (run package-default-db first)"
             exit 0
           fi
-          ARCHIVE=$(echo "$RELEASE_JSON" | jq -r --arg tag "$TAG" '
-            map(select(.tagName == $tag)) |
-            .[0].assets[] |
-            select(.name | test("^default-db-.*\\.tar\\.gz$")) |
-            .name
-          ' | head -1)
           DB_VERSION="${ARCHIVE#default-db-}"
           DB_VERSION="${DB_VERSION%.tar.gz}"
           echo "Downloading ${ARCHIVE} from release ${TAG}..."

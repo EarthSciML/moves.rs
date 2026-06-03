@@ -100,13 +100,59 @@ if [ -z "${TSV_DIR}" ]; then
 
     echo "[convert-default-db] stage 1: dumping ${DB} to ${TSV_DIR}"
     DUMP_SCRIPT="${REPO_ROOT}/characterization/default-db-conversion/dump-default-db.sh"
+
+    # The SIF image is read-only at runtime, so MariaDB cannot write into the
+    # baked-in /var/lib/mysql (datadir) or /var/run/mysqld (socket/pid/error
+    # log). Mirror the writable setup that run-moves.sh uses: bind writable
+    # host scratch dirs over both paths, add a tmpfs overlay for any other
+    # in-image writes (e.g. /tmp), and seed the datadir from the read-only
+    # /var/lib/mysql-seed via init-mariadb.sh before starting mariadbd.
+    # Without this, mariadbd aborts with "Read-only file system".
+    #
+    # --fakeroot: GitHub-hosted runners have no setuid apptainer, so binds
+    # over existing image directories only take effect inside a fakeroot
+    # user namespace (the same mode build-sif.sh uses; the apparmor userns
+    # restriction is already lifted by the build-sif action earlier in the
+    # job). Without it the binds are silently dropped and mariadbd still sees
+    # the read-only image paths. Skippable via MOVES_NO_FAKEROOT=1 on hosts
+    # with a setuid install (e.g. HPC), where plain binds already work.
+    FAKEROOT_FLAG=()
+    if [ "${MOVES_NO_FAKEROOT:-0}" != "1" ]; then
+        FAKEROOT_FLAG=( --fakeroot )
+    fi
+
+    # Scratch on the same (roomy) filesystem as the output, not $TMPDIR:
+    # init-mariadb.sh copies the multi-GB seed datadir here, which would
+    # overflow a small /tmp or the cramped /mnt RUNNER_TEMP volume. Placed
+    # beside (not under) ${DB_VERSION} so it is excluded from the tarball.
+    MARIADB_RT="$(mktemp -d "${OUTPUT_ROOT}/.mariadb-rt.XXXXXX")"
+    MARIADB_DATA="${MARIADB_RT}/data"
+    MARIADB_SOCK_DIR="${MARIADB_RT}/run"
+    mkdir -p "${MARIADB_DATA}" "${MARIADB_SOCK_DIR}"
+
+    # Cleanup: the datadir is seeded/written from inside the fakeroot user
+    # namespace, so its files are owned by mapped-root and the host user often
+    # cannot delete them directly ("Permission denied"). Fall back to removing
+    # them from inside the SIF (where we are root) before the final rmdir.
+    cleanup_mariadb_rt() {
+        rm -rf "${MARIADB_RT}" 2>/dev/null && return 0
+        apptainer exec "${FAKEROOT_FLAG[@]}" --bind "${MARIADB_RT}:/rt" "${SIF}" \
+            rm -rf /rt/data /rt/run >/dev/null 2>&1 || true
+        rm -rf "${MARIADB_RT}" 2>/dev/null || true
+    }
+    trap cleanup_mariadb_rt EXIT
+
     apptainer exec \
+        "${FAKEROOT_FLAG[@]}" \
+        --writable-tmpfs \
+        --bind "${MARIADB_DATA}:/var/lib/mysql" \
+        --bind "${MARIADB_SOCK_DIR}:/var/run/mysqld" \
         --bind "${TSV_DIR}:/captures" \
         --bind "${DUMP_SCRIPT}:/opt/moves-bin/dump-default-db.sh:ro" \
         --env "DEFAULT_DB=${DB}" \
         --env "SOURCE_DUMP_SHA=${SOURCE_DUMP_SHA}" \
         "${SIF}" \
-        bash /opt/moves-bin/dump-default-db.sh
+        bash -c 'set -eu; /opt/moves-bin/init-mariadb.sh; bash /opt/moves-bin/dump-default-db.sh'
 else
     echo "[convert-default-db] stage 1 skipped (using --tsv-dir=${TSV_DIR})"
 fi
@@ -117,7 +163,7 @@ EXTRA=()
 if [ "${STRICT}" -eq 1 ]; then
     EXTRA+=(--require-every-table)
 fi
-cargo run --quiet --release -p moves-default-db-convert -- \
+cargo run --quiet --release --bin moves-default-db-convert -p moves-default-db-convert -- \
     --tsv-dir "${TSV_DIR}" \
     --plan "${PLAN}" \
     --output "${OUTPUT_DIR}" \
