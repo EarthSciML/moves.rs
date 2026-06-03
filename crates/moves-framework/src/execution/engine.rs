@@ -756,32 +756,38 @@ impl MOVESEngine {
                         let recs = acc.lock().expect("worker accumulator poisoned");
                         emission_records_to_worker_df(&recs)?
                     };
-                    // A chained calculator whose inputs the run does not supply
-                    // (e.g. a computed extract absent from the snapshot, or a
-                    // calculator pulled in by the chain closure but not relevant
-                    // to this RunSpec's selections, or dispatched at a context
-                    // granularity it does not run at — e.g. a year-less position)
-                    // produces nothing rather than aborting the run — its
-                    // `execute` error is treated as an empty contribution. Its
-                    // rows, if any, are dropped by the RunSpec-selection filter
-                    // anyway when not selected. (The audit hardened this to
-                    // propagate via `?`, which aborted every vacuous run whose
-                    // chained AirToxicsCalculator hit a year-less position;
-                    // surfacing genuinely-relevant chained failures is a separate
-                    // pre-existing concern, deferred.)
+                    // Relevance gate. A chained calculator transforms the
+                    // accumulated `MOVESWorkerOutput`. With no accumulated input
+                    // the chunk is vacuous — the producers emitted nothing (a
+                    // legitimately empty slice), or the loop never descended to a
+                    // real year/location iteration. There is genuinely no work to
+                    // do, so skip rather than dispatch into a context the
+                    // calculator cannot resolve (a year-less position makes
+                    // AirToxics / criteria calculators fail on `modelYearID =
+                    // year - ageID`). This is not hiding a fault: a producer that
+                    // *should* have emitted but did not surfaces as a row-count
+                    // divergence in the gate, not here.
+                    //
+                    // When input IS present, run the calculator and propagate any
+                    // `execute` error. A failure here means a real data/logic
+                    // problem (e.g. a NULL in a ratio table, a missing column, a
+                    // type mismatch) — it must surface as an error even if this
+                    // run does not select the calculator's output, rather than be
+                    // silently swallowed and masked until some later run depends
+                    // on it. The underlying data problem is the thing to fix.
+                    if worker_df.height() == 0 {
+                        if std::env::var_os("MOVES_DEBUG_CHAINED").is_some() {
+                            eprintln!(
+                                "[chained-skip] {} — no accumulated worker input (vacuous chunk)",
+                                module.name()
+                            );
+                        }
+                        continue;
+                    }
                     let out = {
                         let mut ctx = chunk_ctx.lock().expect("CalculatorContext mutex poisoned");
                         ctx.tables_mut().insert("MOVESWorkerOutput", worker_df);
-                        module.execute(&mut ctx)
-                    };
-                    let out = match out {
-                        Ok(out) => out,
-                        Err(e) => {
-                            if std::env::var_os("MOVES_DEBUG_CHAINED").is_some() {
-                                eprintln!("[chained-skip] {} error: {e}", module.name());
-                            }
-                            continue;
-                        }
+                        module.execute(&mut ctx)?
                     };
                     let Some(df) = out else {
                         if std::env::var_os("MOVES_DEBUG_CHAINED").is_some() {
