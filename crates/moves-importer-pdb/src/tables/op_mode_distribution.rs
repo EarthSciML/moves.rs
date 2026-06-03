@@ -109,7 +109,7 @@ mod tests {
 1,26161,261610,4,1,1,55,a,
 ",
         );
- // hourDayID set asks for 75 — but no off-network link, so check skips.
+        // hourDayID set asks for 75 — but no off-network link, so check skips.
         validate_against_runspec(
             &report.batch,
             &onnet,

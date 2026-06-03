@@ -159,7 +159,7 @@ fn renormalise(groups: &mut [EvapTechFractionGroup]) {
         let sum: f32 = group.fractions.iter().map(|(_, f)| *f).sum();
         if sum > 0.0 {
             for (_, f) in group.fractions.iter_mut() {
- *f /= sum;
+                *f /= sum;
             }
         }
     }

@@ -79,34 +79,34 @@ pub enum ModuleFactory {
 pub struct CalculatorRegistry {
     dag: CalculatorDag,
     factories: BTreeMap<String, ModuleFactory>,
- /// Reverse index: `module_name → index into dag.modules`. Built once at
- /// construction so [`module`](Self::module) is O(log n).
+    /// Reverse index: `module_name → index into dag.modules`. Built once at
+    /// construction so [`module`](Self::module) is O(log n).
     module_index: BTreeMap<String, usize>,
- /// Reverse index: `root_name → index into dag.chain_templates`.
+    /// Reverse index: `root_name → index into dag.chain_templates`.
     template_index: BTreeMap<String, usize>,
- /// Slow-store table names (lowercased) required by all registered
- /// calculators and generators — union of each module's `input_tables()`.
- /// Populated at registration time so callers can filter snapshot loads.
+    /// Slow-store table names (lowercased) required by all registered
+    /// calculators and generators — union of each module's `input_tables()`.
+    /// Populated at registration time so callers can filter snapshot loads.
     module_input_tables: BTreeSet<String>,
- /// Per-module input tables (lowercased), captured at registration. Used by
- /// [`chunk_chains`](crate::execution::executor::chunk_chains) to connect a
- /// consumer to the producers of the scratch tables it reads.
+    /// Per-module input tables (lowercased), captured at registration. Used by
+    /// [`chunk_chains`](crate::execution::executor::chunk_chains) to connect a
+    /// consumer to the producers of the scratch tables it reads.
     module_inputs: BTreeMap<String, BTreeSet<String>>,
- /// Per-module output (scratch) tables (lowercased), captured at
- /// registration. The producer side of the table-dependency edges.
+    /// Per-module output (scratch) tables (lowercased), captured at
+    /// registration. The producer side of the table-dependency edges.
     module_outputs: BTreeMap<String, BTreeSet<String>>,
- /// Union of every registered calculator's
- /// [`replaced_pollutants`](crate::Calculator::replaced_pollutants) —
- /// pollutants a chained calculator consumes and replaces (e.g. SulfatePM's
- /// EC 112 / NonECPM 118). Producers drop their zero-valued rows for these
- /// before the output aggregator; the canonical-snapshot gate uses this set
- /// to assert canonical never emits a zero row for a replaced pollutant.
+    /// Union of every registered calculator's
+    /// [`replaced_pollutants`](crate::Calculator::replaced_pollutants) —
+    /// pollutants a chained calculator consumes and replaces (e.g. SulfatePM's
+    /// EC 112 / NonECPM 118). Producers drop their zero-valued rows for these
+    /// before the output aggregator; the canonical-snapshot gate uses this set
+    /// to assert canonical never emits a zero row for a replaced pollutant.
     replaced_pollutants: BTreeSet<i32>,
 }
 
 impl CalculatorRegistry {
- /// Wrap an in-memory [`CalculatorDag`] in a registry with no factory
- /// bindings yet.
+    /// Wrap an in-memory [`CalculatorDag`] in a registry with no factory
+    /// bindings yet.
     #[must_use]
     pub fn new(dag: CalculatorDag) -> Self {
         let module_index = dag
@@ -133,10 +133,10 @@ impl CalculatorRegistry {
         }
     }
 
- /// Load a [`CalculatorDag`] from a JSON file written by the
- /// `moves-chain-reconstruct` binary.
- ///
- /// Returns [`Error::DagLoad`] for IO or JSON errors.
+    /// Load a [`CalculatorDag`] from a JSON file written by the
+    /// `moves-chain-reconstruct` binary.
+    ///
+    /// Returns [`Error::DagLoad`] for IO or JSON errors.
     pub fn load_from_json(path: &Path) -> Result<Self> {
         let bytes = fs::read(path).map_err(|source| Error::DagLoad {
             path: path.to_path_buf(),
@@ -150,18 +150,18 @@ impl CalculatorRegistry {
         Ok(Self::new(dag))
     }
 
- /// Register a calculator factory under the given DAG name. The name
- /// must match a [`ModuleEntry::name`] in the DAG; otherwise the binding
- /// is unreachable.
- ///
- /// Returns [`Error::UnknownModule`] if `name` is not in the DAG. A duplicate
- /// binding overwrites the previous one — should never register
- /// the same name twice, so this is treated as the caller's bug to surface
- /// loudly via an assertion when needed rather than as a typed error.
- ///
- /// The factory is called once at registration to read `input_tables()` so
- /// [`required_input_tables`](Self::required_input_tables) can answer without
- /// instantiating again later.
+    /// Register a calculator factory under the given DAG name. The name
+    /// must match a [`ModuleEntry::name`] in the DAG; otherwise the binding
+    /// is unreachable.
+    ///
+    /// Returns [`Error::UnknownModule`] if `name` is not in the DAG. A duplicate
+    /// binding overwrites the previous one — should never register
+    /// the same name twice, so this is treated as the caller's bug to surface
+    /// loudly via an assertion when needed rather than as a typed error.
+    ///
+    /// The factory is called once at registration to read `input_tables()` so
+    /// [`required_input_tables`](Self::required_input_tables) can answer without
+    /// instantiating again later.
     pub fn register_calculator(&mut self, name: &str, factory: CalculatorFactory) -> Result<()> {
         if !self.module_index.contains_key(name) {
             return Err(Error::UnknownModule(name.to_string()));
@@ -178,17 +178,18 @@ impl CalculatorRegistry {
         self.module_inputs.insert(name.to_string(), inputs);
         // Calculators emit emission/activity output, not scratch tables, so
         // they have no producer-side table edges.
-        self.module_outputs.insert(name.to_string(), BTreeSet::new());
+        self.module_outputs
+            .insert(name.to_string(), BTreeSet::new());
         self.factories
             .insert(name.to_string(), ModuleFactory::Calculator(factory));
         Ok(())
     }
 
- /// Register a generator factory under the given DAG name.
- ///
- /// Like [`register_calculator`](Self::register_calculator), the factory is
- /// called once to harvest `input_tables()` for
- /// [`required_input_tables`](Self::required_input_tables).
+    /// Register a generator factory under the given DAG name.
+    ///
+    /// Like [`register_calculator`](Self::register_calculator), the factory is
+    /// called once to harvest `input_tables()` for
+    /// [`required_input_tables`](Self::required_input_tables).
     pub fn register_generator(&mut self, name: &str, factory: GeneratorFactory) -> Result<()> {
         if !self.module_index.contains_key(name) {
             return Err(Error::UnknownModule(name.to_string()));
@@ -212,94 +213,94 @@ impl CalculatorRegistry {
         Ok(())
     }
 
- /// The set of slow-store table names (lowercased) that at least one
- /// registered calculator or generator declares in its `input_tables()`.
- ///
- /// Use this to filter a snapshot load so only tables that any registered
- /// module actually needs are materialised in memory — tables consumed
- /// exclusively by unregistered (not-yet-ported) calculators are skipped,
- /// reducing peak RSS.
- ///
- /// Returns an empty set when no factories have been registered (e.g.
- /// when running without a snapshot).
+    /// The set of slow-store table names (lowercased) that at least one
+    /// registered calculator or generator declares in its `input_tables()`.
+    ///
+    /// Use this to filter a snapshot load so only tables that any registered
+    /// module actually needs are materialised in memory — tables consumed
+    /// exclusively by unregistered (not-yet-ported) calculators are skipped,
+    /// reducing peak RSS.
+    ///
+    /// Returns an empty set when no factories have been registered (e.g.
+    /// when running without a snapshot).
     #[must_use]
     pub fn required_input_tables(&self) -> BTreeSet<String> {
         self.module_input_tables.clone()
     }
 
- /// Union of every registered calculator's
- /// [`replaced_pollutants`](crate::Calculator::replaced_pollutants) — the
- /// pollutants a chained calculator consumes and replaces (e.g. SulfatePM's
- /// EC 112 / NonECPM 118), whose zero-valued producer rows the engine drops.
- ///
- /// Exposed so the canonical-snapshot regression gate can assert canonical
- /// never emits a zero row for one of these (the premise that makes the drop
- /// safe). Empty when no factories are registered.
+    /// Union of every registered calculator's
+    /// [`replaced_pollutants`](crate::Calculator::replaced_pollutants) — the
+    /// pollutants a chained calculator consumes and replaces (e.g. SulfatePM's
+    /// EC 112 / NonECPM 118), whose zero-valued producer rows the engine drops.
+    ///
+    /// Exposed so the canonical-snapshot regression gate can assert canonical
+    /// never emits a zero row for one of these (the premise that makes the drop
+    /// safe). Empty when no factories are registered.
     #[must_use]
     pub fn replaced_pollutants(&self) -> &BTreeSet<i32> {
         &self.replaced_pollutants
     }
 
- /// The (lowercased) scratch input tables a registered module reads, or
- /// `None` if the module has no registered factory. The consumer side of
- /// the producer→consumer table-dependency edges used by chunking.
+    /// The (lowercased) scratch input tables a registered module reads, or
+    /// `None` if the module has no registered factory. The consumer side of
+    /// the producer→consumer table-dependency edges used by chunking.
     #[must_use]
     pub fn module_input_tables_of(&self, name: &str) -> Option<&BTreeSet<String>> {
         self.module_inputs.get(name)
     }
 
- /// The (lowercased) scratch output tables a registered module produces, or
- /// `None` if the module has no registered factory. Calculators produce no
- /// scratch tables, so their set is empty; generators list their
- /// [`Generator::output_tables`](crate::calculator::Generator::output_tables).
+    /// The (lowercased) scratch output tables a registered module produces, or
+    /// `None` if the module has no registered factory. Calculators produce no
+    /// scratch tables, so their set is empty; generators list their
+    /// [`Generator::output_tables`](crate::calculator::Generator::output_tables).
     #[must_use]
     pub fn module_output_tables_of(&self, name: &str) -> Option<&BTreeSet<String>> {
         self.module_outputs.get(name)
     }
 
- /// Borrow the DAG the registry was constructed with.
+    /// Borrow the DAG the registry was constructed with.
     #[must_use]
     pub fn dag(&self) -> &CalculatorDag {
         &self.dag
     }
 
- /// Look up a module entry by name. `None` if absent.
+    /// Look up a module entry by name. `None` if absent.
     #[must_use]
     pub fn module(&self, name: &str) -> Option<&ModuleEntry> {
         let idx = *self.module_index.get(name)?;
         Some(&self.dag.modules[idx])
     }
 
- /// Look up the chain template rooted at the named subscriber. `None`
- /// if the module isn't a chain-template root (e.g. it isn't a direct
- /// subscriber, or it's a subscriber with no registrations that drives
- /// no chain).
+    /// Look up the chain template rooted at the named subscriber. `None`
+    /// if the module isn't a chain-template root (e.g. it isn't a direct
+    /// subscriber, or it's a subscriber with no registrations that drives
+    /// no chain).
     #[must_use]
     pub fn chain_template(&self, root: &str) -> Option<&ChainTemplate> {
         let idx = *self.template_index.get(root)?;
         Some(&self.dag.chain_templates[idx])
     }
 
- /// Iterate the execution chains keyed by `(process_id, pollutant_id)`.
- /// Useful for diagnostic dumps and Phase-2 testing.
+    /// Iterate the execution chains keyed by `(process_id, pollutant_id)`.
+    /// Useful for diagnostic dumps and Phase-2 testing.
     pub fn execution_chains(&self) -> impl Iterator<Item = &ExecutionChain> {
         self.dag.execution_chains.iter()
     }
 
- /// Names of every module the registry has a factory for, in DAG order.
+    /// Names of every module the registry has a factory for, in DAG order.
     pub fn registered_names(&self) -> impl Iterator<Item = &str> {
         self.factories.keys().map(String::as_str)
     }
 
- /// True iff a factory has been registered under `name`.
+    /// True iff a factory has been registered under `name`.
     #[must_use]
     pub fn has_factory(&self, name: &str) -> bool {
         self.factories.contains_key(name)
     }
 
- /// Instantiate the calculator registered under `name`. `None` if no
- /// factory is registered, or if a generator factory was registered
- /// under the name (caller should use [`instantiate_generator`](Self::instantiate_generator)).
+    /// Instantiate the calculator registered under `name`. `None` if no
+    /// factory is registered, or if a generator factory was registered
+    /// under the name (caller should use [`instantiate_generator`](Self::instantiate_generator)).
     #[must_use]
     pub fn instantiate_calculator(&self, name: &str) -> Option<Box<dyn Calculator>> {
         match self.factories.get(name)? {
@@ -308,9 +309,9 @@ impl CalculatorRegistry {
         }
     }
 
- /// Instantiate the generator registered under `name`. `None` if no
- /// factory is registered, or if a calculator factory was registered
- /// under the name.
+    /// Instantiate the generator registered under `name`. `None` if no
+    /// factory is registered, or if a calculator factory was registered
+    /// under the name.
     #[must_use]
     pub fn instantiate_generator(&self, name: &str) -> Option<Box<dyn Generator>> {
         match self.factories.get(name)? {
@@ -319,9 +320,9 @@ impl CalculatorRegistry {
         }
     }
 
- /// Compute the set of modules that participate in a run with the given
- /// `(pollutant, process)` selections. See module docs for the algorithm.
- /// Returned names are sorted lexicographically for determinism.
+    /// Compute the set of modules that participate in a run with the given
+    /// `(pollutant, process)` selections. See module docs for the algorithm.
+    /// Returned names are sorted lexicographically for determinism.
     #[must_use]
     pub fn modules_for_runspec(&self, selections: &[(PollutantId, ProcessId)]) -> Vec<String> {
         let pair_set: BTreeSet<(u32, u32)> = selections
@@ -332,9 +333,9 @@ impl CalculatorRegistry {
 
         let mut keep: BTreeSet<String> = BTreeSet::new();
 
- // (a) Calculators registered for any selected (pollutant, process)
- // plus the roots driving them and every step in those roots'
- // chain templates.
+        // (a) Calculators registered for any selected (pollutant, process)
+        // plus the roots driving them and every step in those roots'
+        // chain templates.
         for ec in &self.dag.execution_chains {
             if !pair_set.contains(&(ec.pollutant_id, ec.process_id)) {
                 continue;
@@ -348,18 +349,18 @@ impl CalculatorRegistry {
                         keep.insert(step.module.clone());
                     }
                 } else {
- // Root listed in execution_chain but no template — fall
- // back to keeping just the root name.
+                    // Root listed in execution_chain but no template — fall
+                    // back to keeping just the root name.
                     keep.insert(root.clone());
                 }
             }
         }
 
- // (b) Direct subscribers with no registrations (generators and
- // similar) whose subscription targets a selected process.
- // process_id == 0 from JavaSource fallback means "we don't know
- // which process" — we conservatively include the module if any
- // process is selected, matching the Java fallback semantics.
+        // (b) Direct subscribers with no registrations (generators and
+        // similar) whose subscription targets a selected process.
+        // process_id == 0 from JavaSource fallback means "we don't know
+        // which process" — we conservatively include the module if any
+        // process is selected, matching the Java fallback semantics.
         for m in &self.dag.modules {
             if !m.subscribes_directly || m.registrations_count > 0 {
                 continue;
@@ -372,7 +373,7 @@ impl CalculatorRegistry {
             }
         }
 
- // (c) Transitive upstream closure through `depends_on`.
+        // (c) Transitive upstream closure through `depends_on`.
         let mut frontier: Vec<String> = keep.iter().cloned().collect();
         while let Some(n) = frontier.pop() {
             if let Some(m) = self.module(&n) {
@@ -387,22 +388,22 @@ impl CalculatorRegistry {
         keep.into_iter().collect()
     }
 
- /// Topologically order the given module names so that every module in
- /// the result appears after every other module it `depends_on`. Names
- /// not present in the DAG are returned in lexicographic order at the
- /// end (no dependency edges to honour).
- ///
- /// Returns [`Error::CyclicChain`] if the chain DAG restricted to
- /// `names` contains a cycle (which would indicate the input data was
- /// malformed; the calculator chain in MOVES is acyclic by construction).
+    /// Topologically order the given module names so that every module in
+    /// the result appears after every other module it `depends_on`. Names
+    /// not present in the DAG are returned in lexicographic order at the
+    /// end (no dependency edges to honour).
+    ///
+    /// Returns [`Error::CyclicChain`] if the chain DAG restricted to
+    /// `names` contains a cycle (which would indicate the input data was
+    /// malformed; the calculator chain in MOVES is acyclic by construction).
     pub fn topological_order(&self, names: &[&str]) -> Result<Vec<String>> {
         let kept: BTreeSet<String> = names.iter().map(|s| (*s).to_string()).collect();
 
- // Build the dependency edges and in-degree counts limited to `kept`.
- // `incoming[n] = number of upstream producers of n that are also in
- // `kept`. We emit a module once every upstream producer has been
- // emitted. Sort the work queue lexicographically so tie-breaks are
- // deterministic.
+        // Build the dependency edges and in-degree counts limited to `kept`.
+        // `incoming[n] = number of upstream producers of n that are also in
+        // `kept`. We emit a module once every upstream producer has been
+        // emitted. Sort the work queue lexicographically so tie-breaks are
+        // deterministic.
         let mut incoming: BTreeMap<String, usize> = BTreeMap::new();
         for n in &kept {
             let upstream_in_set = self
@@ -421,16 +422,16 @@ impl CalculatorRegistry {
         while let Some(n) = ready.iter().next().cloned() {
             ready.remove(&n);
             out.push(n.clone());
- // Visit downstream consumers (those who list `n` in their
- // `depends_on`). The DAG records this as `dependents` on the
- // upstream module. Decrement their in-degree.
+            // Visit downstream consumers (those who list `n` in their
+            // `depends_on`). The DAG records this as `dependents` on the
+            // upstream module. Decrement their in-degree.
             if let Some(m) = self.module(&n) {
                 for d in &m.dependents {
                     if !kept.contains(d) {
                         continue;
                     }
                     if let Some(c) = incoming.get_mut(d) {
- *c -= 1;
+                        *c -= 1;
                         if *c == 0 {
                             ready.insert(d.clone());
                         }
@@ -440,7 +441,7 @@ impl CalculatorRegistry {
         }
 
         if out.len() != kept.len() {
- // Some node still has positive in-degree → cycle exists.
+            // Some node still has positive in-degree → cycle exists.
             let unresolved: Vec<String> = incoming
                 .iter()
                 .filter(|(_, &c)| c > 0)
@@ -451,25 +452,25 @@ impl CalculatorRegistry {
         Ok(out)
     }
 
- /// The set of NONROAD-only module names: every module the MOVES NONROAD
- /// model owns, which must **not** run for a RunSpec that does not select
- /// the NONROAD model.
- ///
- /// The NONROAD emission processes (1, 15, 18–21, 30–32) share the
- /// process-ID namespace with onroad, so the bare `(pollutant, process)`
- /// filter in [`modules_for_runspec`](Self::modules_for_runspec) pulls
- /// `NonroadEmissionCalculator`
- /// (and its NONROAD-only chained downstream — `NRHCSpeciationCalculator`,
- /// `NRAirToxicsCalculator`) into the plan for an onroad-only run. Canonical
- /// MOVES gates these on the model selection (`Models.evaluateModels`);
- /// [`execution_order_for_models`](Self::execution_order_for_models) drops
- /// this set when NONROAD is not selected.
- ///
- /// The set is computed from the DAG, not hard-coded: a module is in it iff
- /// its Java source lives under the `.../master/nonroad/` package (only
- /// `NonroadEmissionCalculator` does), together with the transitive
- /// `chained_downstream` closure of every such module (the NR speciation /
- /// air-toxics calculators, whose only upstream is the nonroad calculator).
+    /// The set of NONROAD-only module names: every module the MOVES NONROAD
+    /// model owns, which must **not** run for a RunSpec that does not select
+    /// the NONROAD model.
+    ///
+    /// The NONROAD emission processes (1, 15, 18–21, 30–32) share the
+    /// process-ID namespace with onroad, so the bare `(pollutant, process)`
+    /// filter in [`modules_for_runspec`](Self::modules_for_runspec) pulls
+    /// `NonroadEmissionCalculator`
+    /// (and its NONROAD-only chained downstream — `NRHCSpeciationCalculator`,
+    /// `NRAirToxicsCalculator`) into the plan for an onroad-only run. Canonical
+    /// MOVES gates these on the model selection (`Models.evaluateModels`);
+    /// [`execution_order_for_models`](Self::execution_order_for_models) drops
+    /// this set when NONROAD is not selected.
+    ///
+    /// The set is computed from the DAG, not hard-coded: a module is in it iff
+    /// its Java source lives under the `.../master/nonroad/` package (only
+    /// `NonroadEmissionCalculator` does), together with the transitive
+    /// `chained_downstream` closure of every such module (the NR speciation /
+    /// air-toxics calculators, whose only upstream is the nonroad calculator).
     #[must_use]
     pub fn nonroad_only_modules(&self) -> BTreeSet<String> {
         let mut set: BTreeSet<String> = BTreeSet::new();
@@ -488,8 +489,8 @@ impl CalculatorRegistry {
         set
     }
 
- /// Convenience: filter + topo-sort in one call. Returns the modules
- /// relevant to `selections`, in execution-safe order.
+    /// Convenience: filter + topo-sort in one call. Returns the modules
+    /// relevant to `selections`, in execution-safe order.
     pub fn execution_order_for_runspec(
         &self,
         selections: &[(PollutantId, ProcessId)],
@@ -499,21 +500,21 @@ impl CalculatorRegistry {
         self.topological_order(&refs)
     }
 
- /// Like [`execution_order_for_runspec`](Self::execution_order_for_runspec)
- /// but gated on the RunSpec's model selection.
- ///
- /// When `nonroad` is `false`, every module in
- /// [`nonroad_only_modules`](Self::nonroad_only_modules) is dropped from the
- /// plan before topological ordering — so an onroad-only RunSpec never runs
- /// `NonroadEmissionCalculator` (which would otherwise emit a fixed block of
- /// NONROAD-coded `MOVESOutput` rows against the `nr*` execution-DB tables
- /// present in every snapshot, regardless of the onroad RunSpec). This
- /// mirrors canonical MOVES, where the NONROAD calculator chain only
- /// subscribes when the NONROAD model is selected.
- ///
- /// `onroad` is accepted for symmetry and forward use; it does not currently
- /// drop any modules (the onroad calculators live in the shared `ghg`
- /// package and are filtered by `(pollutant, process)` alone).
+    /// Like [`execution_order_for_runspec`](Self::execution_order_for_runspec)
+    /// but gated on the RunSpec's model selection.
+    ///
+    /// When `nonroad` is `false`, every module in
+    /// [`nonroad_only_modules`](Self::nonroad_only_modules) is dropped from the
+    /// plan before topological ordering — so an onroad-only RunSpec never runs
+    /// `NonroadEmissionCalculator` (which would otherwise emit a fixed block of
+    /// NONROAD-coded `MOVESOutput` rows against the `nr*` execution-DB tables
+    /// present in every snapshot, regardless of the onroad RunSpec). This
+    /// mirrors canonical MOVES, where the NONROAD calculator chain only
+    /// subscribes when the NONROAD model is selected.
+    ///
+    /// `onroad` is accepted for symmetry and forward use; it does not currently
+    /// drop any modules (the onroad calculators live in the shared `ghg`
+    /// package and are filtered by `(pollutant, process)` alone).
     pub fn execution_order_for_models(
         &self,
         selections: &[(PollutantId, ProcessId)],
@@ -530,10 +531,10 @@ impl CalculatorRegistry {
         self.topological_order(&refs)
     }
 
- /// Verify every registered factory's name is in the DAG. The
- /// `register_*` methods already enforce this on insertion, but this
- /// method is useful when factories were registered by code paths that
- /// bypass type-checking (e.g. via a builder consuming external data).
+    /// Verify every registered factory's name is in the DAG. The
+    /// `register_*` methods already enforce this on insertion, but this
+    /// method is useful when factories were registered by code paths that
+    /// bypass type-checking (e.g. via a builder consuming external data).
     pub fn validate_factories(&self) -> Result<()> {
         for name in self.factories.keys() {
             if !self.module_index.contains_key(name) {
@@ -545,9 +546,9 @@ impl CalculatorRegistry {
 }
 
 fn subscription_matches(sub: &SubscriptionEntry, process_set: &BTreeSet<u32>) -> bool {
- // Sentinel from the Java-source fallback: process unknown, treat as
- // "matches if any process is in the RunSpec." For runtime-log subscriptions
- // process_id is always >= 1.
+    // Sentinel from the Java-source fallback: process unknown, treat as
+    // "matches if any process is in the RunSpec." For runtime-log subscriptions
+    // process_id is always >= 1.
     if sub.process_id == 0 {
         return !process_set.is_empty();
     }
@@ -568,8 +569,8 @@ mod tests {
         parse_calculator_info_str(text, Path::new("test")).unwrap()
     }
 
- /// Tiny minimal DAG: one direct-subscriber calculator with one
- /// registration.
+    /// Tiny minimal DAG: one direct-subscriber calculator with one
+    /// registration.
     fn single_calc_dag() -> CalculatorDag {
         let info = parse(
             "Registration\tCO\t2\tRunning Exhaust\t1\tBaseRateCalculator\n\
@@ -578,8 +579,8 @@ mod tests {
         build_dag(&info, &[]).unwrap()
     }
 
- /// DAG with a chained downstream calc: BaseRateCalculator (subscriber)
- /// drives HCSpeciationCalculator (chained). Both register for (CO, 1).
+    /// DAG with a chained downstream calc: BaseRateCalculator (subscriber)
+    /// drives HCSpeciationCalculator (chained). Both register for (CO, 1).
     fn chained_calc_dag() -> CalculatorDag {
         let info = parse(
             "Registration\tCO\t2\tRunning Exhaust\t1\tBaseRateCalculator\n\
@@ -644,7 +645,7 @@ mod tests {
         let reg = CalculatorRegistry::new(single_calc_dag());
         assert!(reg.module("BaseRateCalculator").is_some());
         assert!(reg.module("Nonexistent").is_none());
- // Single subscriber drives a one-step chain template.
+        // Single subscriber drives a one-step chain template.
         let template = reg.chain_template("BaseRateCalculator").expect("template");
         assert_eq!(template.root, "BaseRateCalculator");
         assert_eq!(template.steps.len(), 1);
@@ -669,11 +670,11 @@ mod tests {
     #[test]
     fn register_generator_requires_module_in_dag() {
         let mut reg = CalculatorRegistry::new(single_calc_dag());
- // BaseRateCalculator is in the DAG but is a Calculator — registering
- // as a generator is *allowed* at the DAG level (the registry doesn't
- // verify ModuleKind because the DAG infers it from name heuristics
- // which may override). Instead, instantiate_generator
- // returns Some only when the factory was registered as a generator.
+        // BaseRateCalculator is in the DAG but is a Calculator — registering
+        // as a generator is *allowed* at the DAG level (the registry doesn't
+        // verify ModuleKind because the DAG infers it from name heuristics
+        // which may override). Instead, instantiate_generator
+        // returns Some only when the factory was registered as a generator.
         assert!(reg
             .register_generator("BaseRateCalculator", average_speed_gen)
             .is_ok());
@@ -695,12 +696,12 @@ mod tests {
             .unwrap();
         reg.register_generator("HCSpeciationCalculator", average_speed_gen)
             .unwrap();
- // BaseRateCalculator is a calculator — instantiate_generator returns
- // None even though has_factory returns true.
+        // BaseRateCalculator is a calculator — instantiate_generator returns
+        // None even though has_factory returns true.
         assert!(reg.has_factory("BaseRateCalculator"));
         assert!(reg.instantiate_calculator("BaseRateCalculator").is_some());
         assert!(reg.instantiate_generator("BaseRateCalculator").is_none());
- // And vice versa for the generator binding.
+        // And vice versa for the generator binding.
         assert!(reg
             .instantiate_generator("HCSpeciationCalculator")
             .is_some());
@@ -724,11 +725,11 @@ mod tests {
         assert!(reg.modules_for_runspec(&selections).is_empty());
     }
 
- /// DAG where an onroad calculator and a NONROAD calculator both register
- /// for the same shared `(pollutant, process)` pair, and the NONROAD
- /// calculator drives a chained NONROAD downstream. The NONROAD calculator's
- /// Java source lives under `.../master/nonroad/`, which is how
- /// `nonroad_only_modules` discriminates it from the shared `ghg` package.
+    /// DAG where an onroad calculator and a NONROAD calculator both register
+    /// for the same shared `(pollutant, process)` pair, and the NONROAD
+    /// calculator drives a chained NONROAD downstream. The NONROAD calculator's
+    /// Java source lives under `.../master/nonroad/`, which is how
+    /// `nonroad_only_modules` discriminates it from the shared `ghg` package.
     fn shared_process_onroad_nonroad_dag() -> CalculatorDag {
         let info = parse(
             "Registration\tCO\t2\tRunning Exhaust\t1\tBaseRateCalculator\n\
@@ -738,8 +739,8 @@ mod tests {
              Subscribe\tNonroadEmissionCalculator\tRunning Exhaust\t1\tDAY\tEMISSION_CALCULATOR\n\
              Chain\tNRHCSpeciationCalculator\tNonroadEmissionCalculator\n",
         );
- // The source-dir scan supplies the Java package path; only the nonroad
- // calculator lives under `.../master/nonroad/`.
+        // The source-dir scan supplies the Java package path; only the nonroad
+        // calculator lives under `.../master/nonroad/`.
         let java = vec![
             JavaSubscription {
                 calculator: "BaseRateCalculator".to_string(),
@@ -788,8 +789,8 @@ mod tests {
         let reg = CalculatorRegistry::new(shared_process_onroad_nonroad_dag());
         let selections = vec![(PollutantId(2), ProcessId(1))];
 
- // ONROAD only: NONROAD calculator chain must be excluded even though it
- // registered for the selected (pollutant, process) pair.
+        // ONROAD only: NONROAD calculator chain must be excluded even though it
+        // registered for the selected (pollutant, process) pair.
         let onroad = reg
             .execution_order_for_models(&selections, true, false)
             .unwrap();
@@ -803,7 +804,7 @@ mod tests {
             "onroad-only plan must not include the NONROAD chained downstream"
         );
 
- // NONROAD selected: the NONROAD chain is included.
+        // NONROAD selected: the NONROAD chain is included.
         let with_nr = reg
             .execution_order_for_models(&selections, true, true)
             .unwrap();
@@ -825,12 +826,12 @@ mod tests {
 
     #[test]
     fn modules_for_runspec_includes_transitive_depends_on() {
- // Chain: Generator → Root → Leaf. Root registers for (CO, 1); Leaf
- // is chained from Root. Generator is upstream of Root (a chain edge
- // Generator → Root means Root depends_on Generator).
- //
- // Selecting (CO, 1) should pull in Generator transitively even though
- // it has no registration for (CO, 1) itself.
+        // Chain: Generator → Root → Leaf. Root registers for (CO, 1); Leaf
+        // is chained from Root. Generator is upstream of Root (a chain edge
+        // Generator → Root means Root depends_on Generator).
+        //
+        // Selecting (CO, 1) should pull in Generator transitively even though
+        // it has no registration for (CO, 1) itself.
         let info = parse(
             "Registration\tCO\t2\tRunning Exhaust\t1\tRoot\n\
              Subscribe\tRoot\tRunning Exhaust\t1\tMONTH\tEMISSION_CALCULATOR\n\
@@ -842,16 +843,16 @@ mod tests {
         let reg = CalculatorRegistry::new(dag);
         let selections = vec![(PollutantId(2), ProcessId(1))];
         let modules = reg.modules_for_runspec(&selections);
- // Root + Leaf (from chain template) + UpstreamGen (transitive
- // depends_on, since Root depends_on UpstreamGen). Alphabetical.
+        // Root + Leaf (from chain template) + UpstreamGen (transitive
+        // depends_on, since Root depends_on UpstreamGen). Alphabetical.
         assert_eq!(modules, vec!["Leaf", "Root", "UpstreamGen"]);
     }
 
     #[test]
     fn modules_for_runspec_includes_generator_subscribed_to_process() {
- // Standalone generator subscribes to process 1, no registrations,
- // no chain edges. A RunSpec selecting any (pollutant, 1) pair
- // should pull it in.
+        // Standalone generator subscribes to process 1, no registrations,
+        // no chain edges. A RunSpec selecting any (pollutant, 1) pair
+        // should pull it in.
         let info = parse(
             "Registration\tCO\t2\tRunning Exhaust\t1\tBaseRateCalculator\n\
              Subscribe\tBaseRateCalculator\tRunning Exhaust\t1\tMONTH\tEMISSION_CALCULATOR\n\
@@ -873,8 +874,8 @@ mod tests {
         );
         let dag = build_dag(&info, &[]).unwrap();
         let reg = CalculatorRegistry::new(dag);
- // RunSpec selects (CO, Running Exhaust=1) only; StartGen subscribes
- // to process 2 and isn't chain-linked to BaseRateCalculator.
+        // RunSpec selects (CO, Running Exhaust=1) only; StartGen subscribes
+        // to process 2 and isn't chain-linked to BaseRateCalculator.
         let selections = vec![(PollutantId(2), ProcessId(1))];
         let modules = reg.modules_for_runspec(&selections);
         assert_eq!(modules, vec!["BaseRateCalculator"]);
@@ -882,7 +883,7 @@ mod tests {
 
     #[test]
     fn topological_order_returns_upstream_before_downstream() {
- // Generator → Root → Leaf
+        // Generator → Root → Leaf
         let info = parse(
             "Registration\tCO\t2\tRunning Exhaust\t1\tRoot\n\
              Subscribe\tRoot\tRunning Exhaust\t1\tMONTH\tEMISSION_CALCULATOR\n\
@@ -899,7 +900,7 @@ mod tests {
 
     #[test]
     fn topological_order_independent_modules_in_lexicographic_order() {
- // Three direct subscribers with no chain edges between them.
+        // Three direct subscribers with no chain edges between them.
         let info = parse(
             "Subscribe\tApple\tRunning Exhaust\t1\tMONTH\tEMISSION_CALCULATOR\n\
              Subscribe\tBanana\tRunning Exhaust\t1\tMONTH\tEMISSION_CALCULATOR\n\
@@ -914,8 +915,8 @@ mod tests {
 
     #[test]
     fn topological_order_with_names_not_in_dag_appends_them() {
- // Unknown names have no edges; they should still appear in the
- // output. We place them lexicographically among the rest.
+        // Unknown names have no edges; they should still appear in the
+        // output. We place them lexicographically among the rest.
         let reg = CalculatorRegistry::new(single_calc_dag());
         let names = vec!["UnknownA", "BaseRateCalculator", "UnknownB"];
         let order = reg.topological_order(&names).unwrap();
@@ -941,8 +942,8 @@ mod tests {
 
     #[test]
     fn load_from_json_round_trips_through_real_fixture() {
- // Locate the calculator-chains fixture relative to the workspace
- // root so the test passes regardless of which worktree it runs in.
+        // Locate the calculator-chains fixture relative to the workspace
+        // root so the test passes regardless of which worktree it runs in.
         let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
         let fixture = manifest
             .parent()
@@ -959,15 +960,15 @@ mod tests {
             dag.modules.len()
         );
         assert!(reg.module("BaseRateCalculator").is_some());
- // A characterization-level smoke check: filter on (CO, Running Exhaust)
- // and confirm the resulting set is non-trivial and is topologically
- // orderable (no cycles).
+        // A characterization-level smoke check: filter on (CO, Running Exhaust)
+        // and confirm the resulting set is non-trivial and is topologically
+        // orderable (no cycles).
         let order = reg
             .execution_order_for_runspec(&[(PollutantId(2), ProcessId(1))])
             .unwrap();
         assert!(order.contains(&"BaseRateCalculator".to_string()));
- // BaseRateCalculator has no upstream chain edges, so any chained
- // calculator it produces should sort AFTER it.
+        // BaseRateCalculator has no upstream chain edges, so any chained
+        // calculator it produces should sort AFTER it.
         let base_pos = order
             .iter()
             .position(|n| n == "BaseRateCalculator")
@@ -1023,9 +1024,9 @@ mod tests {
 
     #[test]
     fn process_id_zero_subscription_is_included_when_any_process_selected() {
- // Modules whose Java-source fallback yielded process_id 0 should be
- // pulled in conservatively: as long as the RunSpec selects at least
- // one process, the unknown-process generator is included.
+        // Modules whose Java-source fallback yielded process_id 0 should be
+        // pulled in conservatively: as long as the RunSpec selects at least
+        // one process, the unknown-process generator is included.
         use moves_calculator_info::{JavaSubscription, SubscribeStyle};
         let info = parse("Registration\tCO\t2\tRunning Exhaust\t1\tBaseRateCalculator\n");
         let java = vec![JavaSubscription {
@@ -1039,14 +1040,14 @@ mod tests {
         let dag = build_dag(&info, &java).unwrap();
         let reg = CalculatorRegistry::new(dag);
         let modules = reg.modules_for_runspec(&[(PollutantId(2), ProcessId(1))]);
- // UnknownProcessGen has no registrations and process_id 0; under
- // the "matches any process" rule it should be included.
+        // UnknownProcessGen has no registrations and process_id 0; under
+        // the "matches any process" rule it should be included.
         assert!(modules.contains(&"UnknownProcessGen".to_string()));
     }
 
- // ---- required_input_tables tests ----
+    // ---- required_input_tables tests ----
 
- // Stubs that declare named input tables so required_input_tables can be tested.
+    // Stubs that declare named input tables so required_input_tables can be tested.
     #[derive(Debug, Default)]
     struct CalcWithTables;
     static CALC_TABLES: &[&str] = &["emissionRate", "SomeTable"];
@@ -1115,8 +1116,8 @@ mod tests {
         reg.register_generator("HCSpeciationCalculator", gen_with_tables)
             .unwrap();
         let tables = reg.required_input_tables();
- // CalcWithTables: "emissionRate" → "emissionrate", "SomeTable" → "sometable"
- // GenWithTables: "GenTable" → "gentable", "SharedTable" → "sharedtable"
+        // CalcWithTables: "emissionRate" → "emissionrate", "SomeTable" → "sometable"
+        // GenWithTables: "GenTable" → "gentable", "SharedTable" → "sharedtable"
         assert!(
             tables.contains("emissionrate"),
             "calc tables must be present"
@@ -1133,7 +1134,7 @@ mod tests {
         reg.register_calculator("BaseRateCalculator", calc_with_tables)
             .unwrap();
         let tables = reg.required_input_tables();
- // CalcWithTables returns "emissionRate" and "SomeTable"; both must be stored lowercase.
+        // CalcWithTables returns "emissionRate" and "SomeTable"; both must be stored lowercase.
         assert!(
             tables.contains("emissionrate"),
             "mixed-case name must be lowercased"
@@ -1147,9 +1148,9 @@ mod tests {
     #[test]
     fn required_input_tables_adding_new_calculator_auto_includes_its_tables() {
         let mut reg = CalculatorRegistry::new(chained_calc_dag());
- // Start with an empty set.
+        // Start with an empty set.
         assert!(reg.required_input_tables().is_empty());
- // Register one calculator — its tables should appear.
+        // Register one calculator — its tables should appear.
         reg.register_calculator("BaseRateCalculator", calc_with_tables)
             .unwrap();
         let after_first = reg.required_input_tables();
@@ -1157,7 +1158,7 @@ mod tests {
             after_first.contains("emissionrate"),
             "tables from newly registered calculator must appear"
         );
- // Register another — its tables should be added too.
+        // Register another — its tables should be added too.
         reg.register_generator("HCSpeciationCalculator", gen_with_tables)
             .unwrap();
         let after_second = reg.required_input_tables();

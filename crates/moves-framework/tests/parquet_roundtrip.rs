@@ -188,22 +188,22 @@ fn sha256_bytes(data: &[u8]) -> [u8; 32] {
 fn vec_round_trips_element_for_element() {
     let rows = make_rows(100);
 
- // IntoDataFrame: Vec<ShoRow> → DataFrame
+    // IntoDataFrame: Vec<ShoRow> → DataFrame
     let df = rows.clone().into_dataframe().expect("into_dataframe");
 
- // write_parquet: store DataFrame → Parquet bytes
+    // write_parquet: store DataFrame → Parquet bytes
     let mut store = InMemoryStore::new();
     store.insert("SHO", df);
     let mut buf = Vec::new();
     store.write_parquet("SHO", &mut buf).expect("write_parquet");
 
- // read_parquet: Parquet bytes → DataFrame in store
+    // read_parquet: Parquet bytes → DataFrame in store
     let mut store2 = InMemoryStore::new();
     store2
         .read_parquet("SHO", Cursor::new(&buf))
         .expect("read_parquet");
 
- // iter_typed: DataFrame → Vec<ShoRow>
+    // iter_typed: DataFrame → Vec<ShoRow>
     let recovered: Vec<ShoRow> = store2.iter_typed("SHO").expect("iter_typed");
 
     assert_eq!(recovered.len(), rows.len(), "row count must be preserved");

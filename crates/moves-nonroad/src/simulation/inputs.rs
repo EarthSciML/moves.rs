@@ -41,17 +41,17 @@ use crate::population::{AgeAdjustmentTable, GrowthIndicatorRecord, ScrappageCurv
 /// iterates [`NonroadInputs::scc_groups`] in the same way.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SccGroup {
- /// The 10-character SCC shared by every record in [`records`](Self::records).
+    /// The 10-character SCC shared by every record in [`records`](Self::records).
     pub scc: String,
- /// The group's population records, in `.POP`-file order. Growth
- /// pairs (a base record immediately followed by its projection
- /// record) must stay adjacent — the inner loop's lookahead
- /// ([`growth_pair`](crate::driver::growth_pair)) depends on it.
+    /// The group's population records, in `.POP`-file order. Growth
+    /// pairs (a base record immediately followed by its projection
+    /// record) must stay adjacent — the inner loop's lookahead
+    /// ([`growth_pair`](crate::driver::growth_pair)) depends on it.
     pub records: Vec<DriverRecord>,
 }
 
 impl SccGroup {
- /// Bundle `records` under their shared `scc`.
+    /// Bundle `records` under their shared `scc`.
     pub fn new(scc: impl Into<String>, records: Vec<DriverRecord>) -> Self {
         Self {
             scc: scc.into(),
@@ -59,13 +59,13 @@ impl SccGroup {
         }
     }
 
- /// Number of population records in the group.
+    /// Number of population records in the group.
     pub fn len(&self) -> usize {
         self.records.len()
     }
 
- /// `true` when the group carries no records. A no-op group: the
- /// driver still classifies its fuel but the record loop is empty.
+    /// `true` when the group carries no records. A no-op group: the
+    /// driver still classifies its fuel but the record loop is empty.
     pub fn is_empty(&self) -> bool {
         self.records.is_empty()
     }
@@ -79,45 +79,45 @@ impl SccGroup {
 /// reference tables to the [`GeographyExecutor`](super::GeographyExecutor).
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct NonroadInputs {
- /// Population records grouped by SCC — one [`SccGroup`] per outer-
- /// loop pass. Order is preserved into the output; sort upstream if
- /// a particular SCC order is wanted.
+    /// Population records grouped by SCC — one [`SccGroup`] per outer-
+    /// loop pass. Order is preserved into the output; sort upstream if
+    /// a particular SCC order is wanted.
     pub scc_groups: Vec<SccGroup>,
- /// The run's state / county selection and the subcounty region
- /// list — Fortran `statcd`/`fipcod`/`reglst`. The inner record
- /// loop filters every record against these.
+    /// The run's state / county selection and the subcounty region
+    /// list — Fortran `statcd`/`fipcod`/`reglst`. The inner record
+    /// loop filters every record against these.
     pub regions: RunRegions,
 }
 
 impl NonroadInputs {
- /// Create an empty input bundle — no SCC groups, no region
- /// selection. A [`run_simulation`](super::run_simulation) over this
- /// produces an empty [`NonroadOutputs`](super::NonroadOutputs) with
- /// a successful completion message.
+    /// Create an empty input bundle — no SCC groups, no region
+    /// selection. A [`run_simulation`](super::run_simulation) over this
+    /// produces an empty [`NonroadOutputs`](super::NonroadOutputs) with
+    /// a successful completion message.
     pub fn new() -> Self {
         Self::default()
     }
 
- /// Append an [`SccGroup`] built from `scc` and `records`.
- ///
- /// Returns `&mut Self` so groups can be chained onto a freshly
- /// constructed bundle.
+    /// Append an [`SccGroup`] built from `scc` and `records`.
+    ///
+    /// Returns `&mut Self` so groups can be chained onto a freshly
+    /// constructed bundle.
     pub fn push_group(&mut self, scc: impl Into<String>, records: Vec<DriverRecord>) -> &mut Self {
         self.scc_groups.push(SccGroup::new(scc, records));
         self
     }
 
- /// Total population records across every SCC group.
+    /// Total population records across every SCC group.
     pub fn record_count(&self) -> usize {
         self.scc_groups.iter().map(SccGroup::len).sum()
     }
 
- /// Number of SCC groups in the bundle.
+    /// Number of SCC groups in the bundle.
     pub fn group_count(&self) -> usize {
         self.scc_groups.len()
     }
 
- /// `true` when the bundle has no SCC groups at all.
+    /// `true` when the bundle has no SCC groups at all.
     pub fn is_empty(&self) -> bool {
         self.scc_groups.is_empty()
     }
@@ -136,60 +136,60 @@ impl NonroadInputs {
 /// loader is ported.
 #[derive(Debug, Clone, Default)]
 pub struct ExhaustTechEntry {
- /// 10-character SCC code.
+    /// 10-character SCC code.
     pub scc: String,
- /// Lower bound of the HP range (inclusive).
+    /// Lower bound of the HP range (inclusive).
     pub hp_min: f32,
- /// Upper bound of the HP range (inclusive).
+    /// Upper bound of the HP range (inclusive).
     pub hp_max: f32,
- /// Per-tech-slot names (`tectyp(idxtch, 1..n)`).
+    /// Per-tech-slot names (`tectyp(idxtch, 1..n)`).
     pub tech_names: Vec<String>,
- /// Per-tech-slot fractions (`tchfrc(idxtch, 1..n)`). Must be the
- /// same length as `tech_names`.
+    /// Per-tech-slot fractions (`tchfrc(idxtch, 1..n)`). Must be the
+    /// same length as `tech_names`.
     pub tech_fractions: Vec<f32>,
- /// BSFC (brake-specific fuel consumption) in lb/HP-hr per tech slot.
- /// Used by `compute_exhaust_factors` to populate the BSFC array for
- /// CO2 and SOx calculations. Must be the same length as `tech_names`.
+    /// BSFC (brake-specific fuel consumption) in lb/HP-hr per tech slot.
+    /// Used by `compute_exhaust_factors` to populate the BSFC array for
+    /// CO2 and SOx calculations. Must be the same length as `tech_names`.
     pub bsfc: Vec<f32>,
- /// Per-`(pollutant slot, tech slot)` exhaust emission factors, row-
- /// major as `[pollutant_slot * tech_names.len() + tech]` (Fortran
- /// `emsfac` / `emfac`, sourced from NR\*.EMF — here from the MOVES
- /// `nremissionrate` table). The base rate is constant across calendar
- /// years; the model-year/age variation enters through deterioration.
- ///
- /// Empty ⇒ all factors zero, preserving the legacy behaviour where
- /// only the BSFC-derived CO2/SOx pollutants are produced. When
- /// non-empty its length is `MXPOL * tech_names.len()`.
+    /// Per-`(pollutant slot, tech slot)` exhaust emission factors, row-
+    /// major as `[pollutant_slot * tech_names.len() + tech]` (Fortran
+    /// `emsfac` / `emfac`, sourced from NR\*.EMF — here from the MOVES
+    /// `nremissionrate` table). The base rate is constant across calendar
+    /// years; the model-year/age variation enters through deterioration.
+    ///
+    /// Empty ⇒ all factors zero, preserving the legacy behaviour where
+    /// only the BSFC-derived CO2/SOx pollutants are produced. When
+    /// non-empty its length is `MXPOL * tech_names.len()`.
     pub emission_factors: Vec<f32>,
- /// Per-`(pollutant slot, tech slot)` EF unit codes, same layout as
- /// [`emission_factors`](Self::emission_factors). Empty ⇒ every slot
- /// defaults to g/HP-hr.
+    /// Per-`(pollutant slot, tech slot)` EF unit codes, same layout as
+    /// [`emission_factors`](Self::emission_factors). Empty ⇒ every slot
+    /// defaults to g/HP-hr.
     pub emission_units: Vec<EmissionUnitCode>,
- /// Per-`(pollutant slot, tech slot)` deterioration A coefficient
- /// (`adetcf`), same layout as [`emission_factors`](Self::emission_factors).
+    /// Per-`(pollutant slot, tech slot)` deterioration A coefficient
+    /// (`adetcf`), same layout as [`emission_factors`](Self::emission_factors).
     pub det_a: Vec<f32>,
- /// Per-`(pollutant slot, tech slot)` deterioration B (age-exponent)
- /// coefficient (`bdetcf`), same layout.
+    /// Per-`(pollutant slot, tech slot)` deterioration B (age-exponent)
+    /// coefficient (`bdetcf`), same layout.
     pub det_b: Vec<f32>,
- /// Per-`(pollutant slot, tech slot)` deterioration age cap
- /// (`detcap`), same layout.
+    /// Per-`(pollutant slot, tech slot)` deterioration age cap
+    /// (`detcap`), same layout.
     pub det_cap: Vec<f32>,
- /// Per-model-year tech fractions: `model_year → fractions` aligned to
- /// [`tech_names`](Self::tech_names). The base emission rates are model-
- /// year independent, but the tech mix phases cleaner technology in over
- /// model years (`tchfrc` is read at the per-model-year `tchmdyr`).
- /// Empty ⇒ the single [`tech_fractions`](Self::tech_fractions) vector
- /// is used for every model year (legacy behaviour).
+    /// Per-model-year tech fractions: `model_year → fractions` aligned to
+    /// [`tech_names`](Self::tech_names). The base emission rates are model-
+    /// year independent, but the tech mix phases cleaner technology in over
+    /// model years (`tchfrc` is read at the per-model-year `tchmdyr`).
+    /// Empty ⇒ the single [`tech_fractions`](Self::tech_fractions) vector
+    /// is used for every model year (legacy behaviour).
     pub tech_fractions_by_year: BTreeMap<i32, Vec<f32>>,
 }
 
 impl ExhaustTechEntry {
- /// Tech fractions to use for model year `year`. Resolves
- /// [`tech_fractions_by_year`](Self::tech_fractions_by_year) by exact
- /// match, then the nearest earlier year, then the earliest available;
- /// falls back to the model-year-independent
- /// [`tech_fractions`](Self::tech_fractions) when no per-year data is
- /// loaded.
+    /// Tech fractions to use for model year `year`. Resolves
+    /// [`tech_fractions_by_year`](Self::tech_fractions_by_year) by exact
+    /// match, then the nearest earlier year, then the earliest available;
+    /// falls back to the model-year-independent
+    /// [`tech_fractions`](Self::tech_fractions) when no per-year data is
+    /// loaded.
     pub fn fractions_for_year(&self, year: i32) -> &[f32] {
         if self.tech_fractions_by_year.is_empty() {
             return &self.tech_fractions;
@@ -212,15 +212,15 @@ impl ExhaustTechEntry {
 /// Same key and lookup semantics as [`ExhaustTechEntry`].
 #[derive(Debug, Clone, Default)]
 pub struct EvapTechEntry {
- /// 10-character SCC code.
+    /// 10-character SCC code.
     pub scc: String,
- /// Lower bound of the HP range (inclusive).
+    /// Lower bound of the HP range (inclusive).
     pub hp_min: f32,
- /// Upper bound of the HP range (inclusive).
+    /// Upper bound of the HP range (inclusive).
     pub hp_max: f32,
- /// Per-evap-tech-slot names (`evtecnam(idxtch, 1..n)`).
+    /// Per-evap-tech-slot names (`evtecnam(idxtch, 1..n)`).
     pub tech_names: Vec<String>,
- /// Per-evap-tech-slot fractions (`evtchfrc(idxtch, 1..n)`).
+    /// Per-evap-tech-slot fractions (`evtchfrc(idxtch, 1..n)`).
     pub tech_fractions: Vec<f32>,
 }
 
@@ -229,15 +229,15 @@ pub struct EvapTechEntry {
 /// Maps `(fips, scc, hp range)` → growth indicator code.
 #[derive(Debug, Clone, Default)]
 pub struct GrowthXrefEntry {
- /// 5-character county FIPS (`fipin`).
+    /// 5-character county FIPS (`fipin`).
     pub fips: String,
- /// 10-character SCC code (`asccod`).
+    /// 10-character SCC code (`asccod`).
     pub scc: String,
- /// Lower bound of the HP range (inclusive).
+    /// Lower bound of the HP range (inclusive).
     pub hp_min: f32,
- /// Upper bound of the HP range (inclusive).
+    /// Upper bound of the HP range (inclusive).
     pub hp_max: f32,
- /// 4-character growth indicator code (`indcod`).
+    /// 4-character growth indicator code (`indcod`).
     pub indicator: String,
 }
 
@@ -247,19 +247,19 @@ pub struct GrowthXrefEntry {
 /// the first matching activity record.
 #[derive(Debug, Clone)]
 pub struct ActivityTableEntry {
- /// 10-character SCC code.
+    /// 10-character SCC code.
     pub scc: String,
- /// 5-character county FIPS, or empty to match any FIPS.
+    /// 5-character county FIPS, or empty to match any FIPS.
     pub fips: String,
- /// Starts per period (`starts(idxact)`).
+    /// Starts per period (`starts(idxact)`).
     pub starts: f32,
- /// Activity level (`actlev(idxact)`).
+    /// Activity level (`actlev(idxact)`).
     pub activity_level: f32,
- /// Activity-units indicator (`iactun(idxact)`).
+    /// Activity-units indicator (`iactun(idxact)`).
     pub activity_unit: ActivityUnit,
- /// Load factor (`faclod(idxact)`).
+    /// Load factor (`faclod(idxact)`).
     pub load_factor: f32,
- /// Age-curve code (`actage(idxact)`).
+    /// Age-curve code (`actage(idxact)`).
     pub age_code: String,
 }
 
@@ -271,7 +271,7 @@ pub struct ActivityTableEntry {
 /// uniform placeholder until NR*.ALO loaders are ported.
 #[derive(Debug, Clone, Default)]
 pub struct NationalAllocationEntry {
- /// 10-character SCC code.
+    /// 10-character SCC code.
     pub scc: String,
 }
 
@@ -290,71 +290,71 @@ pub struct NationalAllocationEntry {
 /// placeholder signals intent without blocking compilation.
 #[derive(Debug, Clone, Default)]
 pub struct ReferenceData {
- /// Exhaust tech-type fractions and names — one entry per
- /// `(SCC, HP range)` bucket. Fortran: `TCHFRC`, `TECTYP` from
- /// NR*.EF emission-factor files (`rdtech.f`).
+    /// Exhaust tech-type fractions and names — one entry per
+    /// `(SCC, HP range)` bucket. Fortran: `TCHFRC`, `TECTYP` from
+    /// NR*.EF emission-factor files (`rdtech.f`).
     pub exhaust_tech_entries: Vec<ExhaustTechEntry>,
- /// Evap tech-type fractions and names — same structure as
- /// [`exhaust_tech_entries`](Self::exhaust_tech_entries). Fortran:
- /// `EVTCHFRC`, `EVTECTYP` from NR*.EF files (`rdevtech.f`).
+    /// Evap tech-type fractions and names — same structure as
+    /// [`exhaust_tech_entries`](Self::exhaust_tech_entries). Fortran:
+    /// `EVTCHFRC`, `EVTECTYP` from NR*.EF files (`rdevtech.f`).
     pub evap_tech_entries: Vec<EvapTechEntry>,
- /// Emission-factor records from NR*.EMF files. Fortran: emission-
- /// factor arrays `EMFAC`, `EMIYR` from `rdemfac.f`.
- /// **⚠ NOT YET LOADABLE.**
+    /// Emission-factor records from NR*.EMF files. Fortran: emission-
+    /// factor arrays `EMFAC`, `EMIYR` from `rdemfac.f`.
+    /// **⚠ NOT YET LOADABLE.**
     pub emission_factors: Vec<u8>,
- /// Activity lookup entries — one per `(SCC, FIPS)` bucket. Fortran:
- /// `ACTLEV`, `FACLOD`, `IACTUN`, `ACTAGE`, `STARTS` from NR*.ACT
- /// files (`rdact.f`).
+    /// Activity lookup entries — one per `(SCC, FIPS)` bucket. Fortran:
+    /// `ACTLEV`, `FACLOD`, `IACTUN`, `ACTAGE`, `STARTS` from NR*.ACT
+    /// files (`rdact.f`).
     pub activity_entries: Vec<ActivityTableEntry>,
- /// Growth cross-reference entries — one per `(FIPS, SCC, HP range)`.
- /// Fortran: `GXFDAT` table from NR*.GRW indicator files (`rdgrow.f`).
+    /// Growth cross-reference entries — one per `(FIPS, SCC, HP range)`.
+    /// Fortran: `GXFDAT` table from NR*.GRW indicator files (`rdgrow.f`).
     pub growth_xref_entries: Vec<GrowthXrefEntry>,
- /// Growth indicator records for every indicator code referenced in
- /// [`growth_xref_entries`](Self::growth_xref_entries). Fortran:
- /// growth-factor arrays `GRWFAC`, `GRWFIP` from NR*.GRW files
- /// (`rdgrow.f`).
+    /// Growth indicator records for every indicator code referenced in
+    /// [`growth_xref_entries`](Self::growth_xref_entries). Fortran:
+    /// growth-factor arrays `GRWFAC`, `GRWFIP` from NR*.GRW files
+    /// (`rdgrow.f`).
     pub growth_records: Vec<GrowthIndicatorRecord>,
- /// Scrappage curve (`getscrp`-resolved). Fortran: `SCRPFRC` array
- /// from NR*.POP scrappage data.
+    /// Scrappage curve (`getscrp`-resolved). Fortran: `SCRPFRC` array
+    /// from NR*.POP scrappage data.
     pub scrappage_curve: ScrappageCurve,
- /// Alternate age-adjustment table. Fortran: `AGEADJ` from the
- /// `/AGE ADJUSTMENT/` packet in NR*.ACT files (`rdact.f`). Defaults
- /// to an empty table (DEFAULT curve only).
+    /// Alternate age-adjustment table. Fortran: `AGEADJ` from the
+    /// `/AGE ADJUSTMENT/` packet in NR*.ACT files (`rdact.f`). Defaults
+    /// to an empty table (DEFAULT curve only).
     pub age_adjustment_table: AgeAdjustmentTable,
- /// Day/month temporal factors from NR*.TMF files. Fortran:
- /// `DAYMTHFAC`, `MTHF`, `DAYF`, `NDAYS` from `rdtmfac.f`.
- /// **⚠ NOT YET LOADABLE.**
+    /// Day/month temporal factors from NR*.TMF files. Fortran:
+    /// `DAYMTHFAC`, `MTHF`, `DAYF`, `NDAYS` from `rdtmfac.f`.
+    /// **⚠ NOT YET LOADABLE.**
     pub temporal_factors: Vec<u8>,
- /// Refueling/spillage-mode records from NR*.SPL files. Fortran:
- /// `MODSPL`, `VOLSPL`, `VOLRFL` from `rdspl.f`.
- /// **⚠ NOT YET LOADABLE.**
+    /// Refueling/spillage-mode records from NR*.SPL files. Fortran:
+    /// `MODSPL`, `VOLSPL`, `VOLRFL` from `rdspl.f`.
+    /// **⚠ NOT YET LOADABLE.**
     pub spillage_records: Vec<u8>,
- /// National-to-state allocation entries keyed by SCC. Fortran:
- /// `ALOSTA` allocation data from NR*.ALO files (`rdalo.f`).
+    /// National-to-state allocation entries keyed by SCC. Fortran:
+    /// `ALOSTA` allocation data from NR*.ALO files (`rdalo.f`).
     pub national_allocation: Vec<NationalAllocationEntry>,
- /// Subcounty allocation coefficients from NR*.SCO files. Fortran:
- /// `ALOSUB` from `rdsco.f`. **⚠ NOT YET LOADABLE.**
+    /// Subcounty allocation coefficients from NR*.SCO files. Fortran:
+    /// `ALOSUB` from `rdsco.f`. **⚠ NOT YET LOADABLE.**
     pub subcounty_allocation: Vec<u8>,
- /// Retrofit records from NR*.RFT files. Fortran: `RTRFTDAT` from
- /// `rdrft.f` (`population::retrofit::RetrofitRecord`).
+    /// Retrofit records from NR*.RFT files. Fortran: `RTRFTDAT` from
+    /// `rdrft.f` (`population::retrofit::RetrofitRecord`).
     pub retrofit_records: Vec<RetrofitRecord>,
- /// Fuel oxygen content (weight %) for the gasoline exhaust oxygenate
- /// correction (`emsadj.f` :228–256). `0.0` ⇒ no oxygenate correction.
+    /// Fuel oxygen content (weight %) for the gasoline exhaust oxygenate
+    /// correction (`emsadj.f` :228–256). `0.0` ⇒ no oxygenate correction.
     pub fuel_oxygen_pct: f32,
- /// `true` when the gasoline supply is reformulated (RFG); RFG fuel skips
- /// the oxygenate / sulfur corrections and takes the RFG-bin path instead.
+    /// `true` when the gasoline supply is reformulated (RFG); RFG fuel skips
+    /// the oxygenate / sulfur corrections and takes the RFG-bin path instead.
     pub fuel_rfg: bool,
- /// Ambient temperature (°F) for the exhaust temperature corrections
- /// (`emsadj.f` :167–220). `0.0` ⇒ neutral (treated as 75 °F). Used as
- /// the fallback when an SCC has no entry in `ambient_temp_by_scc`.
+    /// Ambient temperature (°F) for the exhaust temperature corrections
+    /// (`emsadj.f` :167–220). `0.0` ⇒ neutral (treated as 75 °F). Used as
+    /// the fallback when an SCC has no entry in `ambient_temp_by_scc`.
     pub ambient_temp_f: f32,
- /// Per-SCC ambient temperature (°F) for the exhaust temperature
- /// corrections, activity-weighted by the equipment's hour-allocation
- /// pattern (`nrhourpatternfinder` → `nrhourallocation`). The temperature
- /// correction is non-linear (`exp`), so the activity-weighted mean (which
- /// favours warm daytime hours for daylight-use equipment) is what the
- /// canonical reproduces — a flat 24-hour mean biases NOx high and CO/THC
- /// low. Empty ⇒ fall back to the scalar `ambient_temp_f`.
+    /// Per-SCC ambient temperature (°F) for the exhaust temperature
+    /// corrections, activity-weighted by the equipment's hour-allocation
+    /// pattern (`nrhourpatternfinder` → `nrhourallocation`). The temperature
+    /// correction is non-linear (`exp`), so the activity-weighted mean (which
+    /// favours warm daytime hours for daylight-use equipment) is what the
+    /// canonical reproduces — a flat 24-hour mean biases NOx high and CO/THC
+    /// low. Empty ⇒ fall back to the scalar `ambient_temp_f`.
     pub ambient_temp_by_scc: std::collections::BTreeMap<String, f32>,
 }
 

@@ -167,7 +167,7 @@ fn perf_baseline_all_onroad_fixtures() {
         }
     }
 
- // Summary row.
+    // Summary row.
     println!("{}", "-".repeat(92));
     println!(
         "{:<38} {:>10.1} {:>10.1} {:>10.1}",

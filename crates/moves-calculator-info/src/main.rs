@@ -37,22 +37,22 @@ use moves_calculator_info::{
     version
 )]
 struct Args {
- /// Path to `CalculatorInfo.txt` (the runtime log emitted by
- /// `InterconnectionTracker` when MOVES is built with
- /// `GENERATE_CALCULATOR_INFO_DOCUMENTATION`).
+    /// Path to `CalculatorInfo.txt` (the runtime log emitted by
+    /// `InterconnectionTracker` when MOVES is built with
+    /// `GENERATE_CALCULATOR_INFO_DOCUMENTATION`).
     #[arg(long, value_name = "FILE")]
     calculator_info: PathBuf,
 
- /// Optional path to the MOVES source tree
- /// (e.g. a clone of `https://github.com/USEPA/EPA_MOVES_Model`).
- /// When supplied, the tool scans `.java` files under it to fill in
- /// subscription metadata for calculators that didn't fire during the
- /// run that produced `CalculatorInfo.txt`.
+    /// Optional path to the MOVES source tree
+    /// (e.g. a clone of `https://github.com/USEPA/EPA_MOVES_Model`).
+    /// When supplied, the tool scans `.java` files under it to fill in
+    /// subscription metadata for calculators that didn't fire during the
+    /// run that produced `CalculatorInfo.txt`.
     #[arg(long, value_name = "DIR")]
     source_dir: Option<PathBuf>,
 
- /// Output directory. Will be created if absent. The file is written
- /// as `<output-dir>/calculator-dag.json`.
+    /// Output directory. Will be created if absent. The file is written
+    /// as `<output-dir>/calculator-dag.json`.
     #[arg(long, value_name = "DIR")]
     output_dir: PathBuf,
 }

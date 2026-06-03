@@ -55,7 +55,7 @@ pub fn validate_link_source_type_hour(
     link_source_type_hour: &RecordBatch,
     link: Option<&RecordBatch>,
 ) -> Result<()> {
- // ----- fraction-sum invariant -----
+    // ----- fraction-sum invariant -----
     let link_id = column_i64(link_source_type_hour, "linkID")?;
     let frac = column_f64(link_source_type_hour, "sourceTypeHourFraction")?;
     let mut sums: BTreeMap<i64, f64> = BTreeMap::new();
@@ -76,7 +76,7 @@ pub fn validate_link_source_type_hour(
                 ),
             });
         }
- *sums.entry(link_id.value(i)).or_insert(0.0) += frac.value(i);
+        *sums.entry(link_id.value(i)).or_insert(0.0) += frac.value(i);
     }
     for (lid, total) in sums {
         if (total - 1.0).abs() > FRACTION_SUM_TOLERANCE {
@@ -87,12 +87,12 @@ pub fn validate_link_source_type_hour(
         }
     }
 
- // The off-network and missing-link checks need the Link table.
+    // The off-network and missing-link checks need the Link table.
     let Some(link) = link else { return Ok(()) };
     let link_link_id = column_i64(link, "linkID")?;
     let link_road_type = column_i64(link, "roadTypeID")?;
 
- // Map linkID -> roadTypeID for the Link table.
+    // Map linkID -> roadTypeID for the Link table.
     let mut link_road_types: BTreeMap<i64, i64> = BTreeMap::new();
     for i in 0..link.num_rows() {
         if link_link_id.is_null(i) || link_road_type.is_null(i) {
@@ -101,7 +101,7 @@ pub fn validate_link_source_type_hour(
         link_road_types.insert(link_link_id.value(i), link_road_type.value(i));
     }
 
- // ----- off-network link should NOT be in linkSourceTypeHour -----
+    // ----- off-network link should NOT be in linkSourceTypeHour -----
     let mut seen_lsth_links: BTreeSet<i64> = BTreeSet::new();
     for i in 0..link_source_type_hour.num_rows() {
         if link_id.is_null(i) {
@@ -119,7 +119,7 @@ pub fn validate_link_source_type_hour(
         }
     }
 
- // ----- every non-off-network link MUST appear in linkSourceTypeHour -----
+    // ----- every non-off-network link MUST appear in linkSourceTypeHour -----
     for (lid, road_type) in &link_road_types {
         if *road_type == 1 {
             continue;
@@ -449,7 +449,7 @@ mod tests {
             "linkID,sourceTypeID,sourceTypeHourFraction\n1,21,1.0\n",
             &LINK_SOURCE_TYPE_HOUR,
         );
- // off-network link 99 is excluded from lsth; that's correct.
+        // off-network link 99 is excluded from lsth; that's correct.
         validate_link_source_type_hour(&lsth, Some(&link)).unwrap();
     }
 

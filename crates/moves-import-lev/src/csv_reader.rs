@@ -35,10 +35,10 @@ pub struct Csv {
 /// One body row of the CSV.
 #[derive(Debug, Clone)]
 pub struct CsvRow {
- /// 1-based line number in the source file.
+    /// 1-based line number in the source file.
     pub line: usize,
- /// Cells in the order they appeared. `None` represents an empty cell
- /// (blank, `NULL`, or whitespace-only).
+    /// Cells in the order they appeared. `None` represents an empty cell
+    /// (blank, `NULL`, or whitespace-only).
     pub cells: Vec<Option<String>>,
 }
 
@@ -179,7 +179,7 @@ mod tests {
         let csv = parse(p(), body).unwrap();
         assert_eq!(csv.header[0], "sourceBinID");
         assert_eq!(csv.rows.len(), 1);
- // Line 6 in the file is the data row.
+        // Line 6 in the file is the data row.
         assert_eq!(csv.rows[0].line, 6);
     }
 
@@ -244,7 +244,7 @@ mod tests {
 
     #[test]
     fn rejects_non_utf8_input() {
- // 0xFF is not a valid UTF-8 start byte.
+        // 0xFF is not a valid UTF-8 start byte.
         let body: Vec<u8> = vec![b'a', b',', b'b', 0xFF, b'\n'];
         let err = parse(p(), &body).unwrap_err();
         assert!(matches!(err, Error::Io { .. }));

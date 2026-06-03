@@ -26,14 +26,14 @@ fn scc_matches(scc: &str, code: &str) -> bool {
     if scc == code {
         return true;
     }
- // chkasc.f :89 — a 4-digit global SCC ends in six zeros.
+    // chkasc.f :89 — a 4-digit global SCC ends in six zeros.
     if scc.get(4..10) == Some("000000") {
         return match (scc.get(..4), code.get(..4)) {
             (Some(a), Some(b)) => a == b,
             _ => false,
         };
     }
- // chkasc.f :94 — a 7-digit global SCC ends in three zeros.
+    // chkasc.f :94 — a 7-digit global SCC ends in three zeros.
     if scc.get(7..10) == Some("000") {
         return match (scc.get(..7), code.get(..7)) {
             (Some(a), Some(b)) => a == b,
@@ -66,7 +66,7 @@ pub fn chkasc(
     skip_unrequested: bool,
 ) -> bool {
     for (i, &code) in equipment_codes.iter().enumerate() {
- // chkasc.f :78 — skip an unrequested code when filtering.
+        // chkasc.f :78 — skip an unrequested code when filtering.
         if skip_unrequested && !requested.get(i).copied().unwrap_or(false) {
             continue;
         }
@@ -90,17 +90,17 @@ pub const MXWARN: i32 = 5_000_000;
 /// `IDXWEM..IDXWSE` indices of `nonrdprm.inc` (:109–114).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WarningKind {
- /// `IDXWEM` — emissions warnings.
+    /// `IDXWEM` — emissions warnings.
     Emissions = 1,
- /// `IDXWAL` — allocation warnings.
+    /// `IDXWAL` — allocation warnings.
     Allocation = 2,
- /// `IDXWTC` — technology-fraction warnings.
+    /// `IDXWTC` — technology-fraction warnings.
     TechFraction = 3,
- /// `IDXWAC` — activity warnings.
+    /// `IDXWAC` — activity warnings.
     Activity = 4,
- /// `IDXWPP` — population warnings.
+    /// `IDXWPP` — population warnings.
     Population = 5,
- /// `IDXWSE` — seasonality warnings.
+    /// `IDXWSE` — seasonality warnings.
     Seasonality = 6,
 }
 
@@ -108,12 +108,12 @@ pub enum WarningKind {
 /// return codes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WarningOutcome {
- /// The warning was counted and no class is over [`MXWARN`]
- /// (`ISUCES`).
+    /// The warning was counted and no class is over [`MXWARN`]
+    /// (`ISUCES`).
     WithinLimit,
- /// The warning was counted and its class has now exceeded
- /// [`MXWARN`] — the run's input data is suspect (`IFAIL`,
- /// `chkwrn.f`'s `7000` path).
+    /// The warning was counted and its class has now exceeded
+    /// [`MXWARN`] — the run's input data is suspect (`IFAIL`,
+    /// `chkwrn.f`'s `7000` path).
     LimitExceeded,
 }
 
@@ -121,22 +121,22 @@ pub enum WarningOutcome {
 /// counters (`nonrdio.inc`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct WarningCounters {
- /// Total warnings across every class (Fortran `nwarn`).
+    /// Total warnings across every class (Fortran `nwarn`).
     pub total: i32,
- /// Per-class warning counts (Fortran `nwrnct`), indexed by
- /// `WarningKind as usize - 1`.
+    /// Per-class warning counts (Fortran `nwrnct`), indexed by
+    /// `WarningKind as usize - 1`.
     pub by_kind: [i32; 6],
 }
 
 impl WarningCounters {
- /// Record one warning of `kind` — `chkwrn.f`.
- ///
- /// Increments the overall counter and the per-class counter, then
- /// reports whether that class has passed [`MXWARN`]. The Fortran
- /// `chkwrn` also writes a diagnostic to the message and standard
- /// output files when the cap is exceeded; emitting that message
- /// is left to the caller, which owns the output streams (the I/O
- /// policy of `ARCHITECTURE.md` § 4.3).
+    /// Record one warning of `kind` — `chkwrn.f`.
+    ///
+    /// Increments the overall counter and the per-class counter, then
+    /// reports whether that class has passed [`MXWARN`]. The Fortran
+    /// `chkwrn` also writes a diagnostic to the message and standard
+    /// output files when the cap is exceeded; emitting that message
+    /// is left to the caller, which owns the output streams (the I/O
+    /// policy of `ARCHITECTURE.md` § 4.3).
     pub fn record(&mut self, kind: WarningKind) -> WarningOutcome {
         self.total += 1;
         let slot = kind as usize - 1;
@@ -173,7 +173,7 @@ pub fn close_nonroad_files() {}
 mod tests {
     use super::*;
 
- // ---- chkasc ----
+    // ---- chkasc ----
 
     const CODES: [&str; 3] = ["2260001010", "2260001020", "2265001010"];
 
@@ -191,41 +191,41 @@ mod tests {
 
     #[test]
     fn chkasc_four_digit_global_matches_prefix() {
- // "2260000000" — six trailing zeros — matches any "2260…".
+        // "2260000000" — six trailing zeros — matches any "2260…".
         let requested = [true, true, true];
         assert!(chkasc("2260000000", &CODES, &requested, true));
- // "2280000000" matches none of the codes.
+        // "2280000000" matches none of the codes.
         assert!(!chkasc("2280000000", &CODES, &requested, true));
     }
 
     #[test]
     fn chkasc_seven_digit_global_matches_prefix() {
- // "2260001000" — three trailing zeros — matches "2260001…".
+        // "2260001000" — three trailing zeros — matches "2260001…".
         let requested = [true, true, true];
         assert!(chkasc("2260001000", &CODES, &requested, true));
- // "2265002000" shares no 7-digit prefix with the codes.
+        // "2265002000" shares no 7-digit prefix with the codes.
         assert!(!chkasc("2265002000", &CODES, &requested, true));
     }
 
     #[test]
     fn chkasc_skips_unrequested_codes_when_filtering() {
- // Only the third code is requested.
+        // Only the third code is requested.
         let requested = [false, false, true];
- // The 2265 code is requested ⇒ matches.
+        // The 2265 code is requested ⇒ matches.
         assert!(chkasc("2265001010", &CODES, &requested, true));
- // The 2260 codes are not requested ⇒ no match when filtering.
+        // The 2260 codes are not requested ⇒ no match when filtering.
         assert!(!chkasc("2260001010", &CODES, &requested, true));
     }
 
     #[test]
     fn chkasc_validation_mode_ignores_requested_flags() {
- // skip_unrequested = false ⇒ every code is considered even
- // though `requested` is empty.
+        // skip_unrequested = false ⇒ every code is considered even
+        // though `requested` is empty.
         assert!(chkasc("2260001010", &CODES, &[], false));
         assert!(!chkasc("9999999999", &CODES, &[], false));
     }
 
- // ---- chkwrn ----
+    // ---- chkwrn ----
 
     #[test]
     fn warning_counters_tally_total_and_per_kind() {
@@ -245,7 +245,7 @@ mod tests {
     #[test]
     fn warning_counters_flag_the_class_cap() {
         let mut counters = WarningCounters::default();
- // Seed the class to one below the cap, then trip it.
+        // Seed the class to one below the cap, then trip it.
         counters.by_kind[WarningKind::Activity as usize - 1] = MXWARN - 1;
         assert_eq!(
             counters.record(WarningKind::Activity),
@@ -257,11 +257,11 @@ mod tests {
         );
     }
 
- // ---- clsnon ----
+    // ---- clsnon ----
 
     #[test]
     fn close_nonroad_files_is_a_noop() {
- // Documented no-op; the call simply must compile and return.
+        // Documented no-op; the call simply must compile and return.
         close_nonroad_files();
     }
 }

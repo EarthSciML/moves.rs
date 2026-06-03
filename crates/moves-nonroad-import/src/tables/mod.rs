@@ -23,7 +23,7 @@ use crate::schema::TableSchema;
 pub struct ImporterEntry {
     pub schema: &'static TableSchema,
     pub csv_filename: &'static str,
- /// Output Parquet filename (relative to the manifest's root).
+    /// Output Parquet filename (relative to the manifest's root).
     pub parquet_filename: &'static str,
 }
 

@@ -24,56 +24,56 @@ use super::expression::VariableSource;
 /// `altRVP`, so the column must be addressable by expressions.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct FuelFormulation {
- /// `fuelFormulationID` — primary key.
+    /// `fuelFormulationID` — primary key.
     pub fuel_formulation_id: i32,
- /// `fuelSubtypeID` — links to `fuelSubtype`/`fuelType`.
+    /// `fuelSubtypeID` — links to `fuelSubtype`/`fuelType`.
     pub fuel_subtype_id: i32,
- /// `RVP` — Reid vapor pressure.
+    /// `RVP` — Reid vapor pressure.
     pub rvp: f32,
- /// `sulfurLevel` — sulfur content, ppm.
+    /// `sulfurLevel` — sulfur content, ppm.
     pub sulfur_level: f32,
- /// `ETOHVolume` — ethanol volume percent.
+    /// `ETOHVolume` — ethanol volume percent.
     pub etoh_volume: f32,
- /// `MTBEVolume` — methyl tert-butyl ether volume percent.
+    /// `MTBEVolume` — methyl tert-butyl ether volume percent.
     pub mtbe_volume: f32,
- /// `ETBEVolume` — ethyl tert-butyl ether volume percent.
+    /// `ETBEVolume` — ethyl tert-butyl ether volume percent.
     pub etbe_volume: f32,
- /// `TAMEVolume` — tert-amyl methyl ether volume percent.
+    /// `TAMEVolume` — tert-amyl methyl ether volume percent.
     pub tame_volume: f32,
- /// `aromaticContent` — aromatics volume percent.
+    /// `aromaticContent` — aromatics volume percent.
     pub aromatic_content: f32,
- /// `olefinContent` — olefins volume percent.
+    /// `olefinContent` — olefins volume percent.
     pub olefin_content: f32,
- /// `benzeneContent` — benzene volume percent.
+    /// `benzeneContent` — benzene volume percent.
     pub benzene_content: f32,
- /// `e200` — percent evaporated at 200 °F.
+    /// `e200` — percent evaporated at 200 °F.
     pub e200: f32,
- /// `e300` — percent evaporated at 300 °F.
+    /// `e300` — percent evaporated at 300 °F.
     pub e300: f32,
- /// `volToWtPercentOxy` — volume-to-weight oxygen conversion factor.
+    /// `volToWtPercentOxy` — volume-to-weight oxygen conversion factor.
     pub vol_to_wt_percent_oxy: f32,
- /// `BioDieselEsterVolume` — biodiesel ester volume percent.
+    /// `BioDieselEsterVolume` — biodiesel ester volume percent.
     pub bio_diesel_ester_volume: f32,
- /// `CetaneIndex` — diesel cetane index.
+    /// `CetaneIndex` — diesel cetane index.
     pub cetane_index: f32,
- /// `PAHContent` — polycyclic aromatic hydrocarbon content.
+    /// `PAHContent` — polycyclic aromatic hydrocarbon content.
     pub pah_content: f32,
- /// `T50` — 50%-distillation temperature.
+    /// `T50` — 50%-distillation temperature.
     pub t50: f32,
- /// `T90` — 90%-distillation temperature.
+    /// `T90` — 90%-distillation temperature.
     pub t90: f32,
- /// `altRVP` — alternate RVP used by the E85 high-ethanol adjustment.
+    /// `altRVP` — alternate RVP used by the E85 high-ethanol adjustment.
     pub alt_rvp: f32,
 }
 
 impl VariableSource for FuelFormulation {
- /// Resolve a `fuelFormulation` column by name, case-insensitively.
- ///
- /// MariaDB identifiers are case-insensitive, and `fuelEffectRatio`
- /// expressions reference these columns in whatever casing the data
- /// author used (`MTBEVolume`, `mtbevolume`, …), so the match folds
- /// case. An unknown name returns `None`, which the evaluator surfaces
- /// as an [`UnknownVariable`](super::expression::ExpressionError).
+    /// Resolve a `fuelFormulation` column by name, case-insensitively.
+    ///
+    /// MariaDB identifiers are case-insensitive, and `fuelEffectRatio`
+    /// expressions reference these columns in whatever casing the data
+    /// author used (`MTBEVolume`, `mtbevolume`, …), so the match folds
+    /// case. An unknown name returns `None`, which the evaluator surfaces
+    /// as an [`UnknownVariable`](super::expression::ExpressionError).
     fn variable(&self, name: &str) -> Option<f64> {
         let value = match name.to_ascii_lowercase().as_str() {
             "fuelformulationid" => f64::from(self.fuel_formulation_id),
@@ -112,37 +112,37 @@ impl VariableSource for FuelFormulation {
 /// `testDoGeneralFuelRatio` fixture uses `-101`) decompose identically.
 #[derive(Debug, Clone, PartialEq)]
 pub struct GeneralFuelRatioExpression {
- /// `fuelTypeID` the expression applies to.
+    /// `fuelTypeID` the expression applies to.
     pub fuel_type_id: i32,
- /// `polProcessID` — combined pollutant/process key.
+    /// `polProcessID` — combined pollutant/process key.
     pub pol_process_id: i32,
- /// `pollutantID`, derived as `pol_process_id / 100`.
+    /// `pollutantID`, derived as `pol_process_id / 100`.
     pub pollutant_id: i32,
- /// `processID`, derived as `pol_process_id % 100`.
+    /// `processID`, derived as `pol_process_id % 100`.
     pub process_id: i32,
- /// First model year the expression covers.
+    /// First model year the expression covers.
     pub min_model_year_id: i32,
- /// Last model year the expression covers.
+    /// Last model year the expression covers.
     pub max_model_year_id: i32,
- /// First age the expression covers.
+    /// First age the expression covers.
     pub min_age_id: i32,
- /// Last age the expression covers.
+    /// Last age the expression covers.
     pub max_age_id: i32,
- /// `sourceTypeID` the expression applies to (`0` = all).
+    /// `sourceTypeID` the expression applies to (`0` = all).
     pub source_type_id: i32,
- /// SQL arithmetic for the standard fuel-effect ratio.
+    /// SQL arithmetic for the standard fuel-effect ratio.
     pub fuel_effect_ratio_expression: String,
- /// SQL arithmetic for the geographic-phase-in (GPA) ratio.
+    /// SQL arithmetic for the geographic-phase-in (GPA) ratio.
     pub fuel_effect_ratio_gpa_expression: String,
- /// When set, restricts the expression to these `fuelSubtypeID`s — used
- /// by the derived E85 "Pseudo-THC" expressions, which target only the
- /// E70/E85 subtypes `51` and `52`.
+    /// When set, restricts the expression to these `fuelSubtypeID`s — used
+    /// by the derived E85 "Pseudo-THC" expressions, which target only the
+    /// E70/E85 subtypes `51` and `52`.
     pub fuel_subtypes: Option<Vec<i32>>,
 }
 
 impl GeneralFuelRatioExpression {
- /// Build an expression row, deriving `pollutant_id`/`process_id` from
- /// `pol_process_id` exactly as the Java result-set constructor does.
+    /// Build an expression row, deriving `pollutant_id`/`process_id` from
+    /// `pol_process_id` exactly as the Java result-set constructor does.
     #[must_use]
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -181,29 +181,29 @@ impl GeneralFuelRatioExpression {
 /// evaluating the two expression columns against one fuel formulation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct GeneralFuelRatioRow {
- /// `fuelTypeID`.
+    /// `fuelTypeID`.
     pub fuel_type_id: i32,
- /// `fuelFormulationID` the ratio was computed for.
+    /// `fuelFormulationID` the ratio was computed for.
     pub fuel_formulation_id: i32,
- /// `polProcessID`.
+    /// `polProcessID`.
     pub pol_process_id: i32,
- /// `pollutantID`.
+    /// `pollutantID`.
     pub pollutant_id: i32,
- /// `processID`.
+    /// `processID`.
     pub process_id: i32,
- /// First model year the row covers.
+    /// First model year the row covers.
     pub min_model_year_id: i32,
- /// Last model year the row covers.
+    /// Last model year the row covers.
     pub max_model_year_id: i32,
- /// First age the row covers.
+    /// First age the row covers.
     pub min_age_id: i32,
- /// Last age the row covers.
+    /// Last age the row covers.
     pub max_age_id: i32,
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: i32,
- /// Evaluated standard fuel-effect ratio.
+    /// Evaluated standard fuel-effect ratio.
     pub fuel_effect_ratio: f64,
- /// Evaluated geographic-phase-in fuel-effect ratio.
+    /// Evaluated geographic-phase-in fuel-effect ratio.
     pub fuel_effect_ratio_gpa: f64,
 }
 
@@ -216,14 +216,14 @@ pub struct GeneralFuelRatioRow {
 /// therefore reproduces the Java comparator without a hand-written `cmp`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct IntegerPair {
- /// First component.
+    /// First component.
     pub a: Option<i32>,
- /// Second component.
+    /// Second component.
     pub b: Option<i32>,
 }
 
 impl IntegerPair {
- /// Construct a pair from its two (possibly null) components.
+    /// Construct a pair from its two (possibly null) components.
     #[must_use]
     pub fn new(a: Option<i32>, b: Option<i32>) -> Self {
         Self { a, b }
@@ -262,7 +262,7 @@ mod tests {
         assert_eq!(exp.pollutant_id, 2);
         assert_eq!(exp.process_id, 1);
 
- // Negative polProcessID (the testDoGeneralFuelRatio fixture).
+        // Negative polProcessID (the testDoGeneralFuelRatio fixture).
         let exp = GeneralFuelRatioExpression::new(1, -101, 1960, 2060, 0, 30, 0, "", "");
         assert_eq!(exp.pollutant_id, -1);
         assert_eq!(exp.process_id, -1);
@@ -270,7 +270,7 @@ mod tests {
 
     #[test]
     fn integer_pair_orders_null_before_value() {
- // Java's compareTo: a null component sorts first.
+        // Java's compareTo: a null component sorts first.
         assert!(IntegerPair::new(None, Some(1)) < IntegerPair::new(Some(0), Some(0)));
         assert!(IntegerPair::new(Some(1), None) < IntegerPair::new(Some(1), Some(0)));
         assert!(IntegerPair::new(Some(1), Some(2)) < IntegerPair::new(Some(1), Some(3)));

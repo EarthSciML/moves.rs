@@ -27,13 +27,13 @@ use std::path::PathBuf;
 /// One SCC selector from the packet.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceSelector {
- /// 10-character SCC code (digits, may have trailing zeros).
+    /// 10-character SCC code (digits, may have trailing zeros).
     pub scc: String,
 }
 
 impl SourceSelector {
- /// Whether `equipment_code` matches this selector under the
- /// rules of `rdnrsrc.f` (exact / 4-digit / 7-digit prefix).
+    /// Whether `equipment_code` matches this selector under the
+    /// rules of `rdnrsrc.f` (exact / 4-digit / 7-digit prefix).
     pub fn matches(&self, equipment_code: &str) -> bool {
         if self.scc.len() != 10 || equipment_code.len() != 10 {
             return self.scc == equipment_code;
@@ -54,14 +54,14 @@ impl SourceSelector {
 /// Outcome of parsing a `/SOURCE CATEGORY/` packet.
 #[derive(Debug, Clone)]
 pub enum SourceCategorySelection {
- /// Packet absent — all sources are active.
+    /// Packet absent — all sources are active.
     AllSources,
- /// Explicit list of SCC selectors.
+    /// Explicit list of SCC selectors.
     Selected(Vec<SourceSelector>),
 }
 
 impl SourceCategorySelection {
- /// Whether `equipment_code` is selected.
+    /// Whether `equipment_code` is selected.
     pub fn includes(&self, equipment_code: &str) -> bool {
         match self {
             Self::AllSources => true,
@@ -166,12 +166,12 @@ Source             : 2270001000
 /END/
 ";
         let sel = read_source_category(input.as_bytes()).unwrap();
- // 4-digit prefix 2265 matches anything starting with 2265
+        // 4-digit prefix 2265 matches anything starting with 2265
         assert!(sel.includes("2265001000"));
         assert!(sel.includes("2265010050"));
- // exact match
+        // exact match
         assert!(sel.includes("2270001000"));
- // doesn't match 2270002000 (which is not a prefix-zero entry)
+        // doesn't match 2270002000 (which is not a prefix-zero entry)
         assert!(!sel.includes("2270002000"));
     }
 

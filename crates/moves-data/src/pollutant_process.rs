@@ -40,32 +40,32 @@ use crate::process::{EmissionProcess, ProcessId};
 pub struct PolProcessId(pub u32);
 
 impl PolProcessId {
- /// Compose a `polProcessID` from its pollutant and process parts.
- ///
- /// Matches `PollutantProcessAssociation.getDatabaseKey()` exactly:
- /// `id = pollutantID * 100 + processID`. The Java code constrains
- /// `processID` to two digits; we do not re-check here, since callers
- /// build a [`ProcessId`] from a constrained id source upstream.
+    /// Compose a `polProcessID` from its pollutant and process parts.
+    ///
+    /// Matches `PollutantProcessAssociation.getDatabaseKey()` exactly:
+    /// `id = pollutantID * 100 + processID`. The Java code constrains
+    /// `processID` to two digits; we do not re-check here, since callers
+    /// build a [`ProcessId`] from a constrained id source upstream.
     #[must_use]
     pub const fn new(pollutant_id: PollutantId, process_id: ProcessId) -> Self {
         Self(pollutant_id.0 as u32 * 100 + process_id.0 as u32)
     }
 
- /// Extract the pollutant id half of the composite.
- ///
- /// Java reads this as `polProcessID / 100`; we mirror that, returning
- /// the upper digits as a [`PollutantId`]. For canonical inputs the
- /// quotient fits in `u16`; if a hostile caller passes a `u32` outside
- /// that range, the high bits are truncated (matching Java's silent
- /// `int` cast).
+    /// Extract the pollutant id half of the composite.
+    ///
+    /// Java reads this as `polProcessID / 100`; we mirror that, returning
+    /// the upper digits as a [`PollutantId`]. For canonical inputs the
+    /// quotient fits in `u16`; if a hostile caller passes a `u32` outside
+    /// that range, the high bits are truncated (matching Java's silent
+    /// `int` cast).
     #[must_use]
     pub const fn pollutant_id(self) -> PollutantId {
         PollutantId((self.0 / 100) as u16)
     }
 
- /// Extract the process id half of the composite.
- ///
- /// Java reads this as `polProcessID % 100`; always two digits.
+    /// Extract the process id half of the composite.
+    ///
+    /// Java reads this as `polProcessID % 100`; always two digits.
     #[must_use]
     pub const fn process_id(self) -> ProcessId {
         ProcessId((self.0 % 100) as u16)
@@ -113,46 +113,46 @@ impl FromStr for PolProcessId {
 /// `nrChainedTo1`, `nrChainedTo2`) and the IM flags remain in the data plane.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PollutantProcessAssociation {
- /// Pollutant id half of the composite key.
+    /// Pollutant id half of the composite key.
     pub pollutant_id: PollutantId,
- /// Process id half of the composite key.
+    /// Process id half of the composite key.
     pub process_id: ProcessId,
 }
 
 impl PollutantProcessAssociation {
- /// Compose the `polProcessID` for this association.
+    /// Compose the `polProcessID` for this association.
     #[must_use]
     pub const fn polproc_id(self) -> PolProcessId {
         PolProcessId::new(self.pollutant_id, self.process_id)
     }
 
- /// Look up the canonical association with the given composite id.
- ///
- /// Mirrors `PollutantProcessAssociation.createByID(int polProcessID)`
- /// — except this returns `None` for ids that are not legal pairings
- /// in the MOVES default DB, where the Java factory eagerly fabricates
- /// an association from any decomposable pair.
+    /// Look up the canonical association with the given composite id.
+    ///
+    /// Mirrors `PollutantProcessAssociation.createByID(int polProcessID)`
+    /// — except this returns `None` for ids that are not legal pairings
+    /// in the MOVES default DB, where the Java factory eagerly fabricates
+    /// an association from any decomposable pair.
     #[must_use]
     pub fn find_by_polproc_id(id: PolProcessId) -> Option<Self> {
         BY_POLPROC_ID.get(&id.0).copied()
     }
 
- /// Look up the canonical association for the given `(pollutant, process)`
- /// ids.
- ///
- /// Mirrors `PollutantProcessAssociation.createByID(int, int)`.
+    /// Look up the canonical association for the given `(pollutant, process)`
+    /// ids.
+    ///
+    /// Mirrors `PollutantProcessAssociation.createByID(int, int)`.
     #[must_use]
     pub fn find_by_ids(pollutant_id: PollutantId, process_id: ProcessId) -> Option<Self> {
         Self::find_by_polproc_id(PolProcessId::new(pollutant_id, process_id))
     }
 
- /// Look up the canonical association for the given `(pollutant, process)`
- /// names.
- ///
- /// Mirrors `PollutantProcessAssociation.findByName(...)`. Resolves both
- /// names case-insensitively (with the numeric-id fallback from
- /// [`Pollutant::find_by_name`] / [`EmissionProcess::find_by_name`]),
- /// then checks the canonical pair table.
+    /// Look up the canonical association for the given `(pollutant, process)`
+    /// names.
+    ///
+    /// Mirrors `PollutantProcessAssociation.findByName(...)`. Resolves both
+    /// names case-insensitively (with the numeric-id fallback from
+    /// [`Pollutant::find_by_name`] / [`EmissionProcess::find_by_name`]),
+    /// then checks the canonical pair table.
     #[must_use]
     pub fn find_by_names(pollutant_name: &str, process_name: &str) -> Option<Self> {
         let pollutant = Pollutant::find_by_name(pollutant_name)?;
@@ -160,34 +160,38 @@ impl PollutantProcessAssociation {
         Self::find_by_ids(pollutant.id, process.id)
     }
 
- /// Iterate every canonical association in `(pollutant_id, process_id)`
- /// order.
+    /// Iterate every canonical association in `(pollutant_id, process_id)`
+    /// order.
     pub fn all() -> impl Iterator<Item = Self> {
         ALL_ASSOCIATIONS.iter().copied()
     }
 
- /// Whether this `(pollutant, process)` pair is affected by onroad
- /// vehicle activity.
- ///
- /// Ports `PollutantProcessAssociation.isAffectedByOnroad`. Values are
- /// extracted from the `PollutantProcessAssoc` default-DB table via the
- /// static [`PPA_FLAGS`] map. Returns `false` for pairs that are not in
- /// the canonical set (should not occur in practice).
+    /// Whether this `(pollutant, process)` pair is affected by onroad
+    /// vehicle activity.
+    ///
+    /// Ports `PollutantProcessAssociation.isAffectedByOnroad`. Values are
+    /// extracted from the `PollutantProcessAssoc` default-DB table via the
+    /// static [`PPA_FLAGS`] map. Returns `false` for pairs that are not in
+    /// the canonical set (should not occur in practice).
     #[must_use]
     pub fn is_affected_by_onroad(self) -> bool {
-        PPA_FLAGS.get(&self.polproc_id().0).map_or(false, |&f| f & 1 != 0)
+        PPA_FLAGS
+            .get(&self.polproc_id().0)
+            .map_or(false, |&f| f & 1 != 0)
     }
 
- /// Whether this `(pollutant, process)` pair is affected by nonroad
- /// equipment activity.
- ///
- /// Ports `PollutantProcessAssociation.isAffectedByNonroad`. Values are
- /// extracted from the `PollutantProcessAssoc` default-DB table via the
- /// static [`PPA_FLAGS`] map. Returns `false` for pairs that are not in
- /// the canonical set.
+    /// Whether this `(pollutant, process)` pair is affected by nonroad
+    /// equipment activity.
+    ///
+    /// Ports `PollutantProcessAssociation.isAffectedByNonroad`. Values are
+    /// extracted from the `PollutantProcessAssoc` default-DB table via the
+    /// static [`PPA_FLAGS`] map. Returns `false` for pairs that are not in
+    /// the canonical set.
     #[must_use]
     pub fn is_affected_by_nonroad(self) -> bool {
-        PPA_FLAGS.get(&self.polproc_id().0).map_or(false, |&f| f & 2 != 0)
+        PPA_FLAGS
+            .get(&self.polproc_id().0)
+            .map_or(false, |&f| f & 2 != 0)
     }
 }
 
@@ -5982,7 +5986,7 @@ static PPA_FLAGS: phf::Map<u32, u8> = phf::phf_map! {
 mod tests {
     use super::*;
 
- // Ports the spirit of PollutantProcessAssociationTest.java.
+    // Ports the spirit of PollutantProcessAssociationTest.java.
 
     #[test]
     fn polproc_id_roundtrips_through_compose_and_decompose() {
@@ -5994,8 +5998,8 @@ mod tests {
 
     #[test]
     fn polproc_id_handles_four_digit_pollutants() {
- // The CB05 mechanism + Auxiliary Power Exhaust composes to 101891,
- // which exceeds u16::MAX (65535). Verify we don't truncate.
+        // The CB05 mechanism + Auxiliary Power Exhaust composes to 101891,
+        // which exceeds u16::MAX (65535). Verify we don't truncate.
         let id = PolProcessId::new(PollutantId(1018), ProcessId(91));
         assert_eq!(id.0, 101891);
         assert_eq!(id.pollutant_id(), PollutantId(1018));
@@ -6004,7 +6008,7 @@ mod tests {
 
     #[test]
     fn find_by_polproc_id_returns_canonical_match() {
- // THC + Running Exhaust = 101 is a canonical pair.
+        // THC + Running Exhaust = 101 is a canonical pair.
         let assoc = PollutantProcessAssociation::find_by_polproc_id(PolProcessId(101))
             .expect("THC + Running Exhaust is canonical");
         assert_eq!(assoc.pollutant_id, PollutantId(1));
@@ -6013,7 +6017,7 @@ mod tests {
 
     #[test]
     fn find_by_polproc_id_returns_none_for_illegal_pair() {
- // CO (id 2) + Evap Permeation (id 11) doesn't exist in MOVES // CO is exhaust-only.
+        // CO (id 2) + Evap Permeation (id 11) doesn't exist in MOVES // CO is exhaust-only.
         assert!(PollutantProcessAssociation::find_by_polproc_id(PolProcessId(211)).is_none());
     }
 
@@ -6050,7 +6054,7 @@ mod tests {
 
     #[test]
     fn find_by_names_returns_none_for_illegal_pair() {
- // Component names resolve, but the pair is not canonical.
+        // Component names resolve, but the pair is not canonical.
         assert!(PollutantProcessAssociation::find_by_names(
             "Carbon Monoxide (CO)",
             "Evap Permeation"
@@ -6080,8 +6084,8 @@ mod tests {
 
     #[test]
     fn all_canonical_polproc_ids_decompose_round_trip() {
- // Every canonical pair must survive `polproc_id().pollutant_id()` /
- // `.process_id()` round-trips with no loss.
+        // Every canonical pair must survive `polproc_id().pollutant_id()` /
+        // `.process_id()` round-trips with no loss.
         for assoc in PollutantProcessAssociation::all() {
             let id = assoc.polproc_id();
             assert_eq!(id.pollutant_id(), assoc.pollutant_id);
@@ -6102,19 +6106,19 @@ mod tests {
     #[test]
     fn display_renders_process_then_pollutant() {
         let assoc = PollutantProcessAssociation::find_by_ids(PollutantId(1), ProcessId(1)).unwrap();
- // Java's toString: `emissionProcess.toString() + " " + pollutant.toString()`.
+        // Java's toString: `emissionProcess.toString() + " " + pollutant.toString()`.
         assert_eq!(
             assoc.to_string(),
             "Running Exhaust Total Gaseous Hydrocarbons"
         );
     }
 
- // ---- isAffectedByOnroad / isAffectedByNonroad flags ------------------
+    // ---- isAffectedByOnroad / isAffectedByNonroad flags ------------------
 
     #[test]
     fn thc_running_exhaust_is_onroad_and_nonroad() {
- // PPA (pollutant 1 / process 1) = THC + Running Exhaust.
- // Canonical default-DB data: isAffectedByOnroad=1, isAffectedByNonroad=1.
+        // PPA (pollutant 1 / process 1) = THC + Running Exhaust.
+        // Canonical default-DB data: isAffectedByOnroad=1, isAffectedByNonroad=1.
         let assoc = PollutantProcessAssociation::find_by_ids(PollutantId(1), ProcessId(1)).unwrap();
         assert!(assoc.is_affected_by_onroad());
         assert!(assoc.is_affected_by_nonroad());
@@ -6122,8 +6126,8 @@ mod tests {
 
     #[test]
     fn total_energy_running_exhaust_is_onroad_not_nonroad() {
- // PPA (pollutant 91 / process 1) = Total Energy Consumption + Running Exhaust.
- // Canonical: isAffectedByOnroad=1, isAffectedByNonroad=0.
+        // PPA (pollutant 91 / process 1) = Total Energy Consumption + Running Exhaust.
+        // Canonical: isAffectedByOnroad=1, isAffectedByNonroad=0.
         let assoc =
             PollutantProcessAssociation::find_by_ids(PollutantId(91), ProcessId(1)).unwrap();
         assert!(assoc.is_affected_by_onroad());
@@ -6132,8 +6136,8 @@ mod tests {
 
     #[test]
     fn nonroad_running_loss_is_nonroad_not_onroad() {
- // PPA (pollutant 1 / process 20) = THC + Evap Running Loss (NONROAD).
- // Canonical: isAffectedByOnroad=0, isAffectedByNonroad=1.
+        // PPA (pollutant 1 / process 20) = THC + Evap Running Loss (NONROAD).
+        // Canonical: isAffectedByOnroad=0, isAffectedByNonroad=1.
         let assoc =
             PollutantProcessAssociation::find_by_ids(PollutantId(1), ProcessId(20)).unwrap();
         assert!(!assoc.is_affected_by_onroad());
@@ -6142,8 +6146,8 @@ mod tests {
 
     #[test]
     fn nmhc_running_exhaust_is_nonroad_only() {
- // PPA (pollutant 88 / process 1) — NMHC is a NONROAD-only pollutant for
- // Running Exhaust: isAffectedByOnroad=0, isAffectedByNonroad=1.
+        // PPA (pollutant 88 / process 1) — NMHC is a NONROAD-only pollutant for
+        // Running Exhaust: isAffectedByOnroad=0, isAffectedByNonroad=1.
         let assoc =
             PollutantProcessAssociation::find_by_ids(PollutantId(88), ProcessId(1)).unwrap();
         assert!(!assoc.is_affected_by_onroad());
@@ -6152,7 +6156,7 @@ mod tests {
 
     #[test]
     fn flags_cover_all_canonical_associations() {
- // Every association in ALL_ASSOCIATIONS must be in PPA_FLAGS.
+        // Every association in ALL_ASSOCIATIONS must be in PPA_FLAGS.
         for assoc in PollutantProcessAssociation::all() {
             let id = assoc.polproc_id().0;
             assert!(

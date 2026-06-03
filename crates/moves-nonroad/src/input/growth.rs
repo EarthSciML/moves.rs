@@ -34,11 +34,11 @@ use std::path::PathBuf;
 /// Growth factor record.
 #[derive(Debug, Clone)]
 pub struct GrowthRecord {
- /// County index (0-based).
+    /// County index (0-based).
     pub county_idx: usize,
- /// Equipment index (0-based).
+    /// Equipment index (0-based).
     pub equipment_idx: usize,
- /// Growth factor (multiplicative).
+    /// Growth factor (multiplicative).
     pub growth_factor: f64,
 }
 
@@ -51,7 +51,7 @@ pub fn read_grw<R: BufRead>(reader: R) -> Result<Array2<f64>> {
     let mut lines = reader.lines();
     let mut line_num = 0;
 
- // Read header (skip blank and comment lines)
+    // Read header (skip blank and comment lines)
     let header_line = loop {
         line_num += 1;
         let line = lines
@@ -103,7 +103,7 @@ pub fn read_grw<R: BufRead>(reader: R) -> Result<Array2<f64>> {
     let mut growth = Array2::from_elem((n_counties, n_equipment), 1.0);
     line_num = 1;
 
- // Read growth factor records
+    // Read growth factor records
     for line_result in lines {
         line_num += 1;
         let line = line_result.map_err(|e| Error::Io {
@@ -190,7 +190,7 @@ pub fn read_grw_records<R: BufRead>(reader: R) -> Result<Vec<GrowthRecord>> {
     let mut lines = reader.lines();
     let mut line_num = 0;
 
- // Skip header (the first non-blank, non-comment line)
+    // Skip header (the first non-blank, non-comment line)
     loop {
         line_num += 1;
         let line = lines
@@ -210,7 +210,7 @@ pub fn read_grw_records<R: BufRead>(reader: R) -> Result<Vec<GrowthRecord>> {
         }
     }
 
- // Read growth factor records
+    // Read growth factor records
     for line_result in lines {
         line_num += 1;
         let line = line_result.map_err(|e| Error::Io {

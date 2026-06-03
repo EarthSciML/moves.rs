@@ -63,19 +63,19 @@ pub const US_TOTAL_FIPS: &str = "00000";
 /// COMMON-block fetches.
 #[derive(Debug, Clone)]
 pub struct ExhaustTechLookup {
- /// Exhaust tech-type names, one entry per used slot.
+    /// Exhaust tech-type names, one entry per used slot.
     pub tech_names: Vec<String>,
- /// Exhaust tech-type fractions in the same order. `tech_names.len()
- /// == fractions.len()`.
+    /// Exhaust tech-type fractions in the same order. `tech_names.len()
+    /// == fractions.len()`.
     pub fractions: Vec<f32>,
 }
 
 /// Result of an evap tech-fraction lookup.
 #[derive(Debug, Clone)]
 pub struct EvapTechLookup {
- /// Evap tech-type names, one entry per used slot.
+    /// Evap tech-type names, one entry per used slot.
     pub tech_names: Vec<String>,
- /// Evap tech-type fractions in the same order.
+    /// Evap tech-type fractions in the same order.
     pub fractions: Vec<f32>,
 }
 
@@ -84,43 +84,43 @@ pub struct EvapTechLookup {
 /// values.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ExhaustResult {
- /// Per-pollutant daily emissions for this `(model_year, tech)`
- /// tuple, length [`MXPOL`].
+    /// Per-pollutant daily emissions for this `(model_year, tech)`
+    /// tuple, length [`MXPOL`].
     pub ems_day_delta: Vec<f32>,
- /// Per-pollutant by-model-year emissions, length [`MXPOL`].
+    /// Per-pollutant by-model-year emissions, length [`MXPOL`].
     pub ems_bmy: Vec<f32>,
 }
 
 /// Output of one `clcevems`-equivalent call.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct EvapResult {
- /// Per-pollutant daily emissions delta for this evap iteration,
- /// length [`MXPOL`].
+    /// Per-pollutant daily emissions delta for this evap iteration,
+    /// length [`MXPOL`].
     pub ems_day_delta: Vec<f32>,
- /// Per-pollutant by-model-year evap emissions, length [`MXPOL`].
+    /// Per-pollutant by-model-year evap emissions, length [`MXPOL`].
     pub ems_bmy: Vec<f32>,
 }
 
 /// Output of one `clcrtrft`-equivalent call.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct RetrofitResult {
- /// Fraction of the iteration's population that's retrofitted.
- /// Clamped to `[0, 1]`.
+    /// Fraction of the iteration's population that's retrofitted.
+    /// Clamped to `[0, 1]`.
     pub frac_retro: f32,
- /// Number of engines retrofitted (`pop * frac_retro`).
+    /// Number of engines retrofitted (`pop * frac_retro`).
     pub units_retro: f32,
 }
 
 /// Output of the day-month-fraction (`daymthf.f`) lookup.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DayMonthFactor {
- /// Per-Julian-day month-fraction `daymthfac(jday)`.
+    /// Per-Julian-day month-fraction `daymthfac(jday)`.
     pub day_month_fac: Vec<f32>,
- /// Single month-fraction `mthf` (used for `tplful` etc.).
+    /// Single month-fraction `mthf` (used for `tplful` etc.).
     pub mthf: f32,
- /// Day-fraction `dayf`.
+    /// Day-fraction `dayf`.
     pub dayf: f32,
- /// Number of days in the period (`ndays`).
+    /// Number of days in the period (`ndays`).
     pub n_days: i32,
 }
 
@@ -131,37 +131,37 @@ pub struct DayMonthFactor {
 ///
 /// Method names mirror the Fortran routines they replace.
 pub trait UsTotalCallbacks {
- /// `fndtch(scc, hp_avg, tech_year)`. `None` when no tech rows
- /// match.
+    /// `fndtch(scc, hp_avg, tech_year)`. `None` when no tech rows
+    /// match.
     fn find_exhaust_tech(&mut self, scc: &str, hp_avg: f32, year: i32)
         -> Option<ExhaustTechLookup>;
- /// `fndevtch(scc, hp_avg, tech_year)`. `None` when no evap-tech
- /// rows match.
+    /// `fndevtch(scc, hp_avg, tech_year)`. `None` when no evap-tech
+    /// rows match.
     fn find_evap_tech(&mut self, scc: &str, hp_avg: f32, year: i32) -> Option<EvapTechLookup>;
- /// `fndgxf(fips, scc, hp_avg)` — returns the growth-indicator
- /// code if a match exists; `None` triggers
- /// [`GeographyError::GrowthIndicatorNotFound`].
+    /// `fndgxf(fips, scc, hp_avg)` — returns the growth-indicator
+    /// code if a match exists; `None` triggers
+    /// [`GeographyError::GrowthIndicatorNotFound`].
     fn find_growth_xref(&mut self, fips: &str, scc: &str, hp_avg: f32) -> Option<i32>;
- /// `fndact(scc, fips, hp_avg)` — `None` when no activity row
- /// matches. Triggers the missing-activity branch of `prcus.f`.
+    /// `fndact(scc, fips, hp_avg)` — `None` when no activity row
+    /// matches. Triggers the missing-activity branch of `prcus.f`.
     fn find_activity(&mut self, scc: &str, fips: &str, hp_avg: f32) -> Option<ActivityLookup>;
- /// `daymthf(scc, fips)` — month/day factor lookup.
+    /// `daymthf(scc, fips)` — month/day factor lookup.
     fn day_month_factor(&mut self, scc: &str, fips: &str) -> Result<DayMonthFactor>;
- /// `getgrw(indcod)` — preload the growth-factor stream for this
- /// indicator. The Fortran source caches the stream into the
- /// `grwfac` COMMON block; the Rust callback is a no-op for
- /// stateless implementations.
+    /// `getgrw(indcod)` — preload the growth-factor stream for this
+    /// indicator. The Fortran source caches the stream into the
+    /// `grwfac` COMMON block; the Rust callback is a no-op for
+    /// stateless implementations.
     fn load_growth(&mut self, _indcod: i32) -> Result<()> {
         Ok(())
     }
- /// `grwfac(year1, year2, fips, indcod)` — annualised growth
- /// factor between `year1` and `year2`.
+    /// `grwfac(year1, year2, fips, indcod)` — annualised growth
+    /// factor between `year1` and `year2`.
     fn growth_factor(&mut self, year1: i32, year2: i32, fips: &str, indcod: i32) -> Result<f32>;
- /// `modyr(..)` — initial age-distribution computation.
- /// Returns `(yryrfrcscrp, modfrc, stradj, actadj, detage, nyrlif)`
- /// with each slice of length `MXAGYR` (except `nyrlif` which is
- /// a scalar). The Rust port has [`crate::population::model_year`]
- /// available; the caller marshals between forms.
+    /// `modyr(..)` — initial age-distribution computation.
+    /// Returns `(yryrfrcscrp, modfrc, stradj, actadj, detage, nyrlif)`
+    /// with each slice of length `MXAGYR` (except `nyrlif` which is
+    /// a scalar). The Rust port has [`crate::population::model_year`]
+    /// available; the caller marshals between forms.
     #[allow(clippy::type_complexity)]
     fn model_year(
         &mut self,
@@ -169,7 +169,7 @@ pub trait UsTotalCallbacks {
         activity: &ActivityLookup,
         growth_factor: f32,
     ) -> Result<ModelYearOutput>;
- /// `agedist(..)` — grow the age distribution to the growth year.
+    /// `agedist(..)` — grow the age distribution to the growth year.
     #[allow(clippy::too_many_arguments)]
     fn age_distribution(
         &mut self,
@@ -181,17 +181,17 @@ pub trait UsTotalCallbacks {
         fips: &str,
         indcod: i32,
     ) -> Result<f32>;
- /// `fndrtrft(filter_type, scc, hp, year, tech)` /// `filter_type=1`: filter by (scc, hp); `=2`: filter by year;
- /// `=3`: filter by tech. The Fortran source threads filter state
- /// across calls; the callback owns that state.
+    /// `fndrtrft(filter_type, scc, hp, year, tech)` /// `filter_type=1`: filter by (scc, hp); `=2`: filter by year;
+    /// `=3`: filter by tech. The Fortran source threads filter state
+    /// across calls; the callback owns that state.
     fn filter_retrofits_by_scc_hp(&mut self, scc: &str, hp_avg: f32) -> Result<()>;
- /// `fndrtrft(filter_type=2, year)`.
+    /// `fndrtrft(filter_type=2, year)`.
     fn filter_retrofits_by_year(&mut self, year: i32) -> Result<()>;
- /// `fndrtrft(filter_type=3, tech)`.
+    /// `fndrtrft(filter_type=3, tech)`.
     fn filter_retrofits_by_tech(&mut self, tech: &str) -> Result<()>;
- /// `clcrtrft(..)` — retrofit reduction. The Fortran source also
- /// mutates the per-pollutant `rtrftplltntrdfrc` array shared with
- /// the emission calculators; the callback owns that state.
+    /// `clcrtrft(..)` — retrofit reduction. The Fortran source also
+    /// mutates the per-pollutant `rtrftplltntrdfrc` array shared with
+    /// the emission calculators; the callback owns that state.
     fn calculate_retrofit(
         &mut self,
         pop: f32,
@@ -200,14 +200,14 @@ pub trait UsTotalCallbacks {
         model_year: i32,
         tech: &str,
     ) -> Result<RetrofitResult>;
- /// `clcems(..)` — exhaust emission computation for one
- /// `(model_year, tech)` tuple. Inputs encoded as
- /// [`ExhaustCallInputs`] so callers can wire it to
- /// [`crate::emissions::calculate_exhaust_emissions`].
+    /// `clcems(..)` — exhaust emission computation for one
+    /// `(model_year, tech)` tuple. Inputs encoded as
+    /// [`ExhaustCallInputs`] so callers can wire it to
+    /// [`crate::emissions::calculate_exhaust_emissions`].
     fn calculate_exhaust(&mut self, inputs: &ExhaustCallInputs<'_>) -> Result<ExhaustResult>;
- /// `clcevems(..)` — evap emission computation for one
- /// `(model_year, evap_tech)` tuple. Inputs as
- /// [`EvapCallInputs`].
+    /// `clcevems(..)` — evap emission computation for one
+    /// `(model_year, evap_tech)` tuple. Inputs as
+    /// [`EvapCallInputs`].
     fn calculate_evap(&mut self, inputs: &EvapCallInputs<'_>) -> Result<EvapResult>;
 }
 
@@ -216,17 +216,17 @@ pub trait UsTotalCallbacks {
 /// routine actually consumes.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelYearOutput {
- /// Year-to-year fraction scrapped (length MXAGYR).
+    /// Year-to-year fraction scrapped (length MXAGYR).
     pub yryrfrcscrp: Vec<f32>,
- /// Initial model-year fractions (length MXAGYR).
+    /// Initial model-year fractions (length MXAGYR).
     pub modfrc: Vec<f32>,
- /// Starts adjustment per year (length `nyrlif`).
+    /// Starts adjustment per year (length `nyrlif`).
     pub stradj: Vec<f32>,
- /// Activity adjustment per year (length `nyrlif`).
+    /// Activity adjustment per year (length `nyrlif`).
     pub actadj: Vec<f32>,
- /// Deterioration age per year (length `nyrlif`).
+    /// Deterioration age per year (length `nyrlif`).
     pub detage: Vec<f32>,
- /// Lifetime in years.
+    /// Lifetime in years.
     pub nyrlif: usize,
 }
 
@@ -236,79 +236,79 @@ pub struct ModelYearOutput {
 /// COMMON-block-derived input made explicit.
 #[derive(Debug, Clone)]
 pub struct ExhaustCallInputs<'a> {
- /// 10-character SCC.
+    /// 10-character SCC.
     pub scc: &'a str,
- /// Activity lookup result (load factor, units, etc.).
+    /// Activity lookup result (load factor, units, etc.).
     pub activity: &'a ActivityLookup,
- /// Average HP.
+    /// Average HP.
     pub hp_avg: f32,
- /// Fuel density (`denful`).
+    /// Fuel density (`denful`).
     pub fuel_density: f32,
- /// 0-based year index (`idxyr` in Fortran; `iepyr - iyr` in 0-based).
+    /// 0-based year index (`idxyr` in Fortran; `iepyr - iyr` in 0-based).
     pub year_index: usize,
- /// 0-based tech-type slot within the SCC's tech rows.
+    /// 0-based tech-type slot within the SCC's tech rows.
     pub tech_index: usize,
- /// Tech-type name for this slot (for the inner `tchfrc` lookup
- /// the calculator does).
+    /// Tech-type name for this slot (for the inner `tchfrc` lookup
+    /// the calculator does).
     pub tech_name: &'a str,
- /// `tchfrc(idxtch, tech_index)` for this slot.
+    /// `tchfrc(idxtch, tech_index)` for this slot.
     pub tech_fraction: f32,
- /// Population for the current iteration (`popus`).
+    /// Population for the current iteration (`popus`).
     pub population: f32,
- /// `modfrc(idxyr)` — model-year fraction.
+    /// `modfrc(idxyr)` — model-year fraction.
     pub model_year_fraction: f32,
- /// `actadj(idxyr)` — activity adjustment.
+    /// `actadj(idxyr)` — activity adjustment.
     pub activity_adjustment: f32,
- /// `stradj(idxyr)` — starts adjustment.
+    /// `stradj(idxyr)` — starts adjustment.
     pub starts_adjustment: f32,
- /// `detage(idxyr)` — deterioration age.
+    /// `detage(idxyr)` — deterioration age.
     pub deterioration_age: f32,
- /// Temporal adjustment factor (`tpltmp`).
+    /// Temporal adjustment factor (`tpltmp`).
     pub temporal_adjustment: f32,
- /// Time-period adjustment (`adjtime`, `1.0` or `1/ndays`).
+    /// Time-period adjustment (`adjtime`, `1.0` or `1/ndays`).
     pub adjustment_time: f32,
- /// Period day count (`ndays`).
+    /// Period day count (`ndays`).
     pub n_days: i32,
 }
 
 /// Inputs to [`UsTotalCallbacks::calculate_evap`].
 #[derive(Debug, Clone)]
 pub struct EvapCallInputs<'a> {
- /// 10-character SCC.
+    /// 10-character SCC.
     pub scc: &'a str,
- /// Activity lookup result.
+    /// Activity lookup result.
     pub activity: &'a ActivityLookup,
- /// Average HP.
+    /// Average HP.
     pub hp_avg: f32,
- /// 0-based year index.
+    /// 0-based year index.
     pub year_index: usize,
- /// 0-based evap-tech slot.
+    /// 0-based evap-tech slot.
     pub evap_tech_index: usize,
- /// Evap tech-type name.
+    /// Evap tech-type name.
     pub evap_tech_name: &'a str,
- /// `evtchfrc(idxevtch, evap_tech_index)` for this slot.
+    /// `evtchfrc(idxevtch, evap_tech_index)` for this slot.
     pub evap_tech_fraction: f32,
- /// Population (`popus`).
+    /// Population (`popus`).
     pub population: f32,
- /// `modfrc(idxyr)`.
+    /// `modfrc(idxyr)`.
     pub model_year_fraction: f32,
- /// `actadj(idxyr)`.
+    /// `actadj(idxyr)`.
     pub activity_adjustment: f32,
- /// `stradj(idxyr)`.
+    /// `stradj(idxyr)`.
     pub starts_adjustment: f32,
- /// `detage(idxyr)`.
+    /// `detage(idxyr)`.
     pub deterioration_age: f32,
- /// Temporal adjustment factor.
+    /// Temporal adjustment factor.
     pub temporal_adjustment: f32,
- /// Time-period adjustment.
+    /// Time-period adjustment.
     pub adjustment_time: f32,
- /// Period day count.
+    /// Period day count.
     pub n_days: i32,
- /// FIPS code for the iteration (passed through so the evap
- /// calculator can pick the right diurnal table).
+    /// FIPS code for the iteration (passed through so the evap
+    /// calculator can pick the right diurnal table).
     pub fips: &'a str,
- /// Estimated fuel consumption for the current model year × tech
- /// (`fulbmy = fulbmytot * evtchfrc(idxevtch, i)`).
+    /// Estimated fuel consumption for the current model year × tech
+    /// (`fulbmy = fulbmytot * evtchfrc(idxevtch, i)`).
     pub fuel_consumption: f32,
 }
 
@@ -316,13 +316,13 @@ pub struct EvapCallInputs<'a> {
 /// the inputs that don't depend on per-iteration state.
 #[derive(Debug, Clone)]
 pub struct UsTotalContext<'a> {
- /// Per-record equipment data.
+    /// Per-record equipment data.
     pub equipment: EquipmentRecord,
- /// Run-time options.
+    /// Run-time options.
     pub run_options: RunOptions,
- /// 10-character SCC for the current iteration.
+    /// 10-character SCC for the current iteration.
     pub scc: &'a str,
- /// HP-level table (`hpclev`).
+    /// HP-level table (`hpclev`).
     pub hp_levels: &'a [f32],
 }
 
@@ -353,15 +353,15 @@ pub fn process_us_total_record(
 
     let mut output = GeographyOutput::default();
 
- // --- HP level (prcus.f :205–:216) ---
+    // --- HP level (prcus.f :205–:216) ---
     let hpmid = (eq.hp_range_min + eq.hp_range_max) / 2.0;
     let hplev = hp_level_for_midpoint(hpmid, ctx.hp_levels);
     let hpval = eq.hp_avg;
 
- // --- emsday(MXPOL) := 0 (prcus.f :221–:223) ---
+    // --- emsday(MXPOL) := 0 (prcus.f :221–:223) ---
     let mut emsday = zero_emissions();
 
- // --- zero-population early return (prcus.f :227–:233) ---
+    // --- zero-population early return (prcus.f :227–:233) ---
     if eq.population <= 0.0 {
         output.state_outputs.push(StateOutput {
             fips: fipus.to_string(),
@@ -383,8 +383,8 @@ pub fn process_us_total_record(
 
     let popus = eq.population;
 
- // --- find exhaust + evap tech for tech_year; warn & skip if missing
- // (prcus.f :243–:270) ---
+    // --- find exhaust + evap tech for tech_year; warn & skip if missing
+    // (prcus.f :243–:270) ---
     let tech_at_tech_year = callbacks.find_exhaust_tech(scc, hpval, opt.tech_year);
     if tech_at_tech_year.is_none() {
         output.warnings.push(GeographyWarning::MissingExhaustTech {
@@ -404,18 +404,18 @@ pub fn process_us_total_record(
         return Ok(output);
     }
 
- // --- fuel density (prcus.f :274–:283) ---
+    // --- fuel density (prcus.f :274–:283) ---
     let denful = fuel_density(opt.fuel);
 
- // --- growth-file packet must be loaded (prcus.f :318 / :7003) ---
- // Checked before daymthf so the growth-missing error is returned when
- // the daymthf loader is also absent (its Err would otherwise shadow the
- // growth-file error and make the growth-missing test unreachable).
+    // --- growth-file packet must be loaded (prcus.f :318 / :7003) ---
+    // Checked before daymthf so the growth-missing error is returned when
+    // the daymthf loader is also absent (its Err would otherwise shadow the
+    // growth-file error and make the growth-missing test unreachable).
     if !opt.growth_loaded {
         return Err(Error::Config(GeographyError::GrowthFileMissing.to_string()));
     }
 
- // --- daymthf, tplfac, tplful, adjtime (prcus.f :289–:309) ---
+    // --- daymthf, tplfac, tplful, adjtime (prcus.f :289–:309) ---
     let dmf = callbacks.day_month_factor(scc, fipus)?;
     let ndays = dmf.n_days;
     let adjtime: f32 = if opt.total_mode {
@@ -432,7 +432,7 @@ pub fn process_us_total_record(
     };
     let tplful: f32 = dmf.mthf * dmf.dayf;
 
- // --- growth Xref / activity / missing-activity branch (prcus.f :319–:344) ---
+    // --- growth Xref / activity / missing-activity branch (prcus.f :319–:344) ---
     let Some(indcod) = callbacks.find_growth_xref(fipus, scc, hpval) else {
         return Err(Error::Config(
             GeographyError::GrowthIndicatorNotFound {
@@ -452,7 +452,7 @@ pub fn process_us_total_record(
             hp_min: eq.hp_range_min,
             hp_max: eq.hp_range_max,
         });
- // Construct the "missing data" output (prcus.f :336–:341).
+        // Construct the "missing data" output (prcus.f :336–:341).
         output.state_outputs.push(StateOutput {
             fips: fipus.to_string(),
             subcounty: subcur.clone(),
@@ -471,18 +471,18 @@ pub fn process_us_total_record(
         return Ok(output);
     };
 
- // --- load growth + compute the ipopyr → ipopyr+1 growth factor
- // (prcus.f :348–:360) ---
+    // --- load growth + compute the ipopyr → ipopyr+1 growth factor
+    // (prcus.f :348–:360) ---
     callbacks.load_growth(indcod)?;
     let grwus = callbacks.growth_factor(eq.pop_year, eq.pop_year + 1, fipus, indcod)?;
 
- // --- modyr -> initial age distribution (prcus.f :365–:369) ---
+    // --- modyr -> initial age distribution (prcus.f :365–:369) ---
     let my_out = callbacks.model_year(eq, &activity, grwus)?;
     let nyrlif = my_out.nyrlif;
 
- // --- agedist -> backwards/forwards grown population + modfrc
- // (prcus.f :375–:377). The callback receives the
- // base-year inputs and returns the (possibly grown) pop. ---
+    // --- agedist -> backwards/forwards grown population + modfrc
+    // (prcus.f :375–:377). The callback receives the
+    // base-year inputs and returns the (possibly grown) pop. ---
     let popus = callbacks.age_distribution(
         popus,
         &my_out.modfrc,
@@ -492,19 +492,19 @@ pub fn process_us_total_record(
         fipus,
         indcod,
     )?;
- // NOTE: agedist also grows modfrc; the callback's contract is to
- // mutate `my_out.modfrc` in place. The trait method returns just
- // the new base population; modfrc updates flow through the
- // callback's internal state. Implementers must ensure modfrc is
- // updated for the subsequent reads.
- //
- // For simplicity in this initial port, the callback contract is
- // that `my_out` already reflects any agedist growth; the caller
- // wires the modyr → agedist composition together.
+    // NOTE: agedist also grows modfrc; the callback's contract is to
+    // mutate `my_out.modfrc` in place. The trait method returns just
+    // the new base population; modfrc updates flow through the
+    // callback's internal state. Implementers must ensure modfrc is
+    // updated for the subsequent reads.
+    //
+    // For simplicity in this initial port, the callback contract is
+    // that `my_out` already reflects any agedist growth; the caller
+    // wires the modyr → agedist composition together.
     let _ = popus; // shadow eq.population for the rest of the routine
     let popus = popus.max(0.0);
 
- // --- initialise totals (prcus.f :382–:388, :398–:400) ---
+    // --- initialise totals (prcus.f :382–:388, :398–:400) ---
     let mut poptot: f32 = 0.0;
     let mut acttot: f32 = 0.0;
     let mut strtot: f32 = 0.0;
@@ -515,12 +515,12 @@ pub fn process_us_total_record(
     let mut evacttot: f32 = 0.0;
     let mut evstrtot: f32 = 0.0;
 
- // --- filter retrofits to (SCC, HP) (prcus.f :391–:394) ---
+    // --- filter retrofits to (SCC, HP) (prcus.f :391–:394) ---
     if opt.retrofit_loaded {
         callbacks.filter_retrofits_by_scc_hp(scc, hpval)?;
     }
 
- // --- model-year loop (prcus.f :404–:707) ---
+    // --- model-year loop (prcus.f :404–:707) ---
     let iepyr = opt.episode_year;
     let lo = iepyr - (nyrlif as i32) + 1;
     let hi = iepyr;
@@ -538,13 +538,13 @@ pub fn process_us_total_record(
 
         let tchmdyr = iyr.min(opt.tech_year);
 
- // --- exhaust tech for this model year (prcus.f :432–:437) ---
+        // --- exhaust tech for this model year (prcus.f :432–:437) ---
         let Some(tech) = callbacks.find_exhaust_tech(scc, hpval, tchmdyr) else {
- // The Fortran source's outer `fndtch(itchyr)` already
- // succeeded; if this per-year lookup fails we follow the
- // Fortran warning path (prcus.f :382–:394 idiom — though
- // prcus.f itself doesn't have the per-year warning that
- // prcnat.f does, the Rust port treats them symmetrically).
+            // The Fortran source's outer `fndtch(itchyr)` already
+            // succeeded; if this per-year lookup fails we follow the
+            // Fortran warning path (prcus.f :382–:394 idiom — though
+            // prcus.f itself doesn't have the per-year warning that
+            // prcnat.f does, the Rust port treats them symmetrically).
             output.warnings.push(GeographyWarning::MissingExhaustTech {
                 scc: scc.to_string(),
                 hp_avg: hpval,
@@ -553,31 +553,31 @@ pub fn process_us_total_record(
             return Ok(output);
         };
 
- // --- emfclc-equivalent runs inside the callback's
- // `calculate_exhaust` (we don't precompute the EF table
- // here; the Fortran source's `emfclc` writes to scratch
- // arrays that the same routine then reads in `clcems`).
- // The callback owns the EF lifecycle. ---
+        // --- emfclc-equivalent runs inside the callback's
+        // `calculate_exhaust` (we don't precompute the EF table
+        // here; the Fortran source's `emfclc` writes to scratch
+        // arrays that the same routine then reads in `clcems`).
+        // The callback owns the EF lifecycle. ---
 
- // --- filter retrofits by model year (prcus.f :449–:452) ---
+        // --- filter retrofits by model year (prcus.f :449–:452) ---
         if opt.retrofit_loaded {
             callbacks.filter_retrofits_by_year(iyr)?;
         }
 
         let mut fulbmytot: f32 = 0.0;
 
- // --- exhaust tech-type loop (prcus.f :456–:546) ---
+        // --- exhaust tech-type loop (prcus.f :456–:546) ---
         for (tech_i, tech_name) in tech.tech_names.iter().enumerate() {
             let tfrac = tech.fractions[tech_i];
             if tfrac <= 0.0 {
                 continue;
             }
 
- // --- population for this tech (prcus.f :474) ---
+            // --- population for this tech (prcus.f :474) ---
             let popbmy = popus * modfrc * tfrac;
 
- // --- filter retrofits by tech type + retrofit calc
- // (prcus.f :480–:488) ---
+            // --- filter retrofits by tech type + retrofit calc
+            // (prcus.f :480–:488) ---
             let mut frac_retro_bmy = 0.0_f32;
             let mut units_retro_bmy = 0.0_f32;
             if opt.retrofit_loaded {
@@ -588,10 +588,10 @@ pub fn process_us_total_record(
                 unitsretro += units_retro_bmy;
             }
 
- // --- temporal adjustment factor (prcus.f :492–:498) ---
+            // --- temporal adjustment factor (prcus.f :492–:498) ---
             let tpltmp = temporal_adjustment_for_unit(activity.units, tplfac);
 
- // --- clcems-equivalent (prcus.f :502–:508) ---
+            // --- clcems-equivalent (prcus.f :502–:508) ---
             let er = callbacks.calculate_exhaust(&ExhaustCallInputs {
                 scc,
                 activity: &activity,
@@ -611,21 +611,21 @@ pub fn process_us_total_record(
                 n_days: ndays,
             })?;
 
- // --- accumulate emsday (prcus.f :502–:508 side effects) ---
+            // --- accumulate emsday (prcus.f :502–:508 side effects) ---
             accumulate_emissions(&mut emsday, &er.ems_day_delta);
 
- // --- bookkeeping (prcus.f :512–:520) ---
+            // --- bookkeeping (prcus.f :512–:520) ---
             let actbmy = actadj * popus * modfrc * tplful * tfrac * adjtime;
- // `fulbmy` requires the real per-(year, tech) BSFC: canonical
- // `prcus.f:514-516` multiplies by `bsfc(idxyr,i)`, the array that
- // `emfclc.f` (NR*.EMF packet) populates. The state-path
- // `calculate_exhaust` callback returns only `ExhaustResult` and does
- // NOT thread `bsfc` back here, so the prior literal `1.0` fabricated
- // fuel consumption (overstated by ~1/bsfc, i.e. ~2x for
- // bsfc≈0.4-0.6). BSFC is required data, not a defaultable 1.0, so
- // fail loudly until the exhaust calculator surfaces the loaded BSFC
- // on this path (the county path reads `factors.bsfc` directly; see
- // `process.rs`).
+            // `fulbmy` requires the real per-(year, tech) BSFC: canonical
+            // `prcus.f:514-516` multiplies by `bsfc(idxyr,i)`, the array that
+            // `emfclc.f` (NR*.EMF packet) populates. The state-path
+            // `calculate_exhaust` callback returns only `ExhaustResult` and does
+            // NOT thread `bsfc` back here, so the prior literal `1.0` fabricated
+            // fuel consumption (overstated by ~1/bsfc, i.e. ~2x for
+            // bsfc≈0.4-0.6). BSFC is required data, not a defaultable 1.0, so
+            // fail loudly until the exhaust calculator surfaces the loaded BSFC
+            // on this path (the county path reads `factors.bsfc` directly; see
+            // `process.rs`).
             let fulbmy: f32 = {
                 return Err(Error::Config(format!(
                     "prcus.f fulbmy requires bsfc(idxyr,i) from the NR*.EMF emfclc.f \
@@ -638,7 +638,7 @@ pub fn process_us_total_record(
             fulcsm += fulbmy;
             fulbmytot += fulbmy;
 
- // --- wrtbmy(1=exhaust) (prcus.f :527–:535) ---
+            // --- wrtbmy(1=exhaust) (prcus.f :527–:535) ---
             if opt.emit_bmy {
                 output.bmy_outputs.push(ByModelYearOutput {
                     fips: fipus.to_string(),
@@ -658,7 +658,7 @@ pub fn process_us_total_record(
                     channel: 1,
                 });
             }
- // --- sitot (prcus.f :539–:542) ---
+            // --- sitot (prcus.f :539–:542) ---
             if opt.emit_si {
                 output.si_aggregates.push(SiAggregate {
                     fips: fipus.to_string(),
@@ -673,12 +673,12 @@ pub fn process_us_total_record(
             }
         }
 
- // --- population / activity / starts totals (prcus.f :550–:554) ---
+        // --- population / activity / starts totals (prcus.f :550–:554) ---
         poptot += popus * modfrc;
         acttot += actadj * popus * modfrc * tplful * adjtime;
         strtot += stradj * popus * modfrc * tplful * adjtime;
 
- // --- evap tech for this tech_year-capped year (prcus.f :564) ---
+        // --- evap tech for this tech_year-capped year (prcus.f :564) ---
         let Some(evtech) = callbacks.find_evap_tech(scc, hpval, tchmdyr) else {
             output.warnings.push(GeographyWarning::MissingEvapTech {
                 scc: scc.to_string(),
@@ -688,21 +688,21 @@ pub fn process_us_total_record(
             return Ok(output);
         };
 
- // --- evap tech-type loop (prcus.f :629–:695) ---
+        // --- evap tech-type loop (prcus.f :629–:695) ---
         for (evtech_i, evtech_name) in evtech.tech_names.iter().enumerate() {
             let evfrac = evtech.fractions[evtech_i];
             if evfrac <= 0.0 {
                 continue;
             }
 
- // --- temporal adjustment factor (prcus.f :641–:647) ---
+            // --- temporal adjustment factor (prcus.f :641–:647) ---
             let tpltmp = temporal_adjustment_for_unit(activity.units, tplfac);
 
- // --- fuel consumption attributed to this evap tech
- // (prcus.f :651) ---
+            // --- fuel consumption attributed to this evap tech
+            // (prcus.f :651) ---
             let fulbmy_evap = fulbmytot * evfrac;
 
- // --- clcevems-equivalent (prcus.f :655–:666) ---
+            // --- clcevems-equivalent (prcus.f :655–:666) ---
             let er = callbacks.calculate_evap(&EvapCallInputs {
                 scc,
                 activity: &activity,
@@ -728,7 +728,7 @@ pub fn process_us_total_record(
             let popbmy = popus * modfrc * evfrac;
             let actbmy = actadj * popus * modfrc * tplful * evfrac * adjtime;
 
- // --- wrtbmy(2=evap) (prcus.f :676–:684) ---
+            // --- wrtbmy(2=evap) (prcus.f :676–:684) ---
             if opt.emit_bmy_evap {
                 output.bmy_outputs.push(ByModelYearOutput {
                     fips: fipus.to_string(),
@@ -741,8 +741,8 @@ pub fn process_us_total_record(
                     emissions: er.ems_bmy.clone(),
                     fuel_consumption: fulbmy_evap,
                     activity: actbmy,
- // Fortran passes RMISS for these four fields when
- // writing the evap bmy record (prcus.f :680–:682).
+                    // Fortran passes RMISS for these four fields when
+                    // writing the evap bmy record (prcus.f :680–:682).
                     load_factor: RMISS,
                     hp_avg: RMISS,
                     frac_retrofitted: RMISS,
@@ -764,18 +764,18 @@ pub fn process_us_total_record(
             }
         }
 
- // --- evap totals (prcus.f :699–:703) ---
+        // --- evap totals (prcus.f :699–:703) ---
         evpoptot += popus * modfrc;
         evacttot += actadj * popus * modfrc * tplful * adjtime;
         evstrtot += stradj * popus * modfrc * tplful * adjtime;
     }
 
- // --- fraction retrofitted (prcus.f :720) ---
+    // --- fraction retrofitted (prcus.f :720) ---
     if poptot > 0.0 {
         fracretro = unitsretro / poptot;
     }
 
- // --- wrtdat (prcus.f :724–:726) ---
+    // --- wrtdat (prcus.f :724–:726) ---
     output.state_outputs.push(StateOutput {
         fips: fipus.to_string(),
         subcounty: subcur,
@@ -792,9 +792,9 @@ pub fn process_us_total_record(
         missing: false,
     });
 
- // Suppress unused warnings — these counters are reported in the
- // Fortran SI report (see `wrtsi.f`) but not emitted here; the
- // plan defers their use to.
+    // Suppress unused warnings — these counters are reported in the
+    // Fortran SI report (see `wrtsi.f`) but not emitted here; the
+    // plan defers their use to.
     let _ = (grwus, fracretro, strtot, evpoptot, evacttot, evstrtot);
 
     Ok(output)
@@ -812,8 +812,8 @@ mod tests {
     use super::*;
     use crate::emissions::exhaust::{ActivityUnit, FuelKind};
 
- /// Minimal stub callbacks that simulate a zero-population
- /// short-circuit. Used to exercise the entry-point branches.
+    /// Minimal stub callbacks that simulate a zero-population
+    /// short-circuit. Used to exercise the entry-point branches.
     struct StubCallbacks;
 
     impl UsTotalCallbacks for StubCallbacks {
@@ -980,10 +980,10 @@ mod tests {
         assert!(out.state_outputs.is_empty());
     }
 
- /// Stub callbacks that simulate a full happy-path run. Tech rows
- /// are present, activity is present, retrofits are off, no
- /// emissions added (calculators return zero), so the output is a
- /// single zero `StateOutput`.
+    /// Stub callbacks that simulate a full happy-path run. Tech rows
+    /// are present, activity is present, retrofits are off, no
+    /// emissions added (calculators return zero), so the output is a
+    /// single zero `StateOutput`.
     struct HappyPathCallbacks {
         exhaust_calls: usize,
         evap_calls: usize,
@@ -1101,9 +1101,9 @@ mod tests {
 
     #[test]
     fn happy_path_errors_on_missing_bsfc() {
- // The US-total path requires BSFC from the NR*.EMF packet to compute
- // fuel consumption. Until ExhaustResult carries BSFC, the function
- // returns Err instead of panicking (mo-2v1).
+        // The US-total path requires BSFC from the NR*.EMF packet to compute
+        // fuel consumption. Until ExhaustResult carries BSFC, the function
+        // returns Err instead of panicking (mo-2v1).
         let ctx = UsTotalContext {
             equipment: sample_equipment(1000.0),
             run_options: sample_options(),

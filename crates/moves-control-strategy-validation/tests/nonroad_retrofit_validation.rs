@@ -87,8 +87,8 @@ fn wildcard_scc_all_accepted() {
 
 #[test]
 fn modified_tables_is_empty_nonroad_inline() {
- // NONROAD does not write into the onroad emissionRateAdjustment table;
- // reduction is applied inline during the geography loop.
+    // NONROAD does not write into the onroad emissionRateAdjustment table;
+    // reduction is applied inline during the geography loop.
     let strategy = NonRoadRetrofitStrategy::new(vec![]);
     assert!(
         strategy.modified_tables().is_empty(),

@@ -234,19 +234,19 @@ fn unit_code_for(units: &str) -> EmissionUnitCode {
 /// exhaust rates, accumulated while scanning `nremissionrate`.
 #[derive(Default)]
 struct RateBucket {
- /// Distinct engine-tech IDs in first-seen order; defines the tech-slot
- /// ordering for every parallel array on the emitted entry.
+    /// Distinct engine-tech IDs in first-seen order; defines the tech-slot
+    /// ordering for every parallel array on the emitted entry.
     tech_ids: Vec<i64>,
- /// `(pollutant_slot, tech_slot) -> base rate`.
+    /// `(pollutant_slot, tech_slot) -> base rate`.
     rates: BTreeMap<(usize, usize), f32>,
- /// `(pollutant_slot, tech_slot) -> unit code`.
+    /// `(pollutant_slot, tech_slot) -> unit code`.
     units: BTreeMap<(usize, usize), EmissionUnitCode>,
- /// `tech_slot -> BSFC (from polProcessID 9901)`.
+    /// `tech_slot -> BSFC (from polProcessID 9901)`.
     bsfc: BTreeMap<usize, f32>,
 }
 
 impl RateBucket {
- /// Index of `tech_id`, inserting it if new.
+    /// Index of `tech_id`, inserting it if new.
     fn tech_slot(&mut self, tech_id: i64) -> usize {
         if let Some(i) = self.tech_ids.iter().position(|&t| t == tech_id) {
             i
@@ -286,9 +286,9 @@ type HpBinnedRates = Vec<(i64, i64, (f32, EmissionUnitCode))>;
 /// fallback applied by the caller.
 #[derive(Default, Clone)]
 struct TechRate {
- /// `pollutant_slot -> [(hp_min, hp_max, (rate, unit))]`.
+    /// `pollutant_slot -> [(hp_min, hp_max, (rate, unit))]`.
     by_pollutant: BTreeMap<usize, HpBinnedRates>,
- /// `[(hp_min, hp_max, bsfc)]` from polProcessID 9901.
+    /// `[(hp_min, hp_max, bsfc)]` from polProcessID 9901.
     bsfc: Vec<(i64, i64, f32)>,
 }
 
@@ -380,7 +380,7 @@ fn build_entries_from_mix<S: DataFrameStore + ?Sized>(store: &S) -> Vec<ExhaustT
     let Some(sut) = store.get("nrsourceusetype") else {
         return Vec::new();
     };
- // Distinct (SCC, hpAvg) equipment points.
+    // Distinct (SCC, hpAvg) equipment points.
     let su_scc = str_col(&sut, "SCC");
     let su_hp = float_col(&sut, "hpAvg");
     let mut pairs: std::collections::BTreeSet<(String, i64)> = std::collections::BTreeSet::new();
@@ -393,15 +393,15 @@ fn build_entries_from_mix<S: DataFrameStore + ?Sized>(store: &S) -> Vec<ExhaustT
     for (scc, hp_milli) in pairs {
         let hp_avg = hp_milli as f32 / 1.0e3;
         let root = family_root(&scc);
- // The tech-mix hp bin containing hp_avg. NONROAD's .TECH lookup uses
- // the most-specific SCC that has a bin covering this hp, then falls
- // back to the family-root (default) tech file. A specific SCC's tech
- // rows need not span every hp bin its population uses: e.g.
- // 2265006010 has tech rows only for 0-25 hp, but its population
- // extends to 175 hp — those high-hp points are served by the
- // 2265000000 root's 25-9999 bin. Without the root fallback those
- // long-lived (~20 yr) high-hp points are dropped, truncating the
- // model-year span (and losing ~30 old model years for that SCC).
+        // The tech-mix hp bin containing hp_avg. NONROAD's .TECH lookup uses
+        // the most-specific SCC that has a bin covering this hp, then falls
+        // back to the family-root (default) tech file. A specific SCC's tech
+        // rows need not span every hp bin its population uses: e.g.
+        // 2265006010 has tech rows only for 0-25 hp, but its population
+        // extends to 175 hp — those high-hp points are served by the
+        // 2265000000 root's 25-9999 bin. Without the root fallback those
+        // long-lived (~20 yr) high-hp points are dropped, truncating the
+        // model-year span (and losing ~30 old model years for that SCC).
         let find_bin = |target: &str| {
             mix.iter().find(|((s, lo, hi), _)| {
                 s.as_str() == target && (*lo as f32) <= hp_avg && hp_avg <= (*hi as f32)
@@ -429,7 +429,7 @@ fn build_entries_from_mix<S: DataFrameStore + ?Sized>(store: &S) -> Vec<ExhaustT
         let mut by_year: BTreeMap<i32, Vec<f32>> = BTreeMap::new();
 
         for (t, &tid) in tech_ids.iter().enumerate() {
- // BSFC: rate lookup, specific SCC then family root.
+            // BSFC: rate lookup, specific SCC then family root.
             bsfc[t] = rates
                 .get(&(scc.clone(), tid))
                 .and_then(|tr| hp_pick(&tr.bsfc, hp_avg).copied())
@@ -463,7 +463,7 @@ fn build_entries_from_mix<S: DataFrameStore + ?Sized>(store: &S) -> Vec<ExhaustT
                 }
             }
 
- // Per-model-year fractions for this tech.
+            // Per-model-year fractions for this tech.
             for (&yr, &f) in &tech_map[&tid] {
                 by_year
                     .entry(yr as i32)
@@ -471,7 +471,7 @@ fn build_entries_from_mix<S: DataFrameStore + ?Sized>(store: &S) -> Vec<ExhaustT
             }
         }
 
- // Scalar fallback = the latest model-year mix.
+        // Scalar fallback = the latest model-year mix.
         let tech_fractions = by_year
             .iter()
             .next_back()
@@ -523,8 +523,8 @@ pub fn build_exhaust_tech_entries<S: DataFrameStore + ?Sized>(store: &S) -> Vec<
     let rate = float_col(&df, "meanBaseRate");
     let units = str_col(&df, "units");
 
- // Group rate rows by (SCC, hpMin, hpMax). BTreeMap keeps a stable
- // deterministic order for reproducible output.
+    // Group rate rows by (SCC, hpMin, hpMax). BTreeMap keeps a stable
+    // deterministic order for reproducible output.
     let mut buckets: BTreeMap<(String, i64, i64), RateBucket> = BTreeMap::new();
     for i in 0..df.height() {
         let key = (scc[i].clone(), hp_min[i], hp_max[i]);
@@ -543,8 +543,8 @@ pub fn build_exhaust_tech_entries<S: DataFrameStore + ?Sized>(store: &S) -> Vec<
             .insert((pslot, tslot), unit_code_for(&units[i]));
     }
 
- // Index the rate buckets by their rate SCC so a population SCC can be
- // resolved to its most-specific available rate SCC.
+    // Index the rate buckets by their rate SCC so a population SCC can be
+    // resolved to its most-specific available rate SCC.
     let mut hp_bins_by_scc: BTreeMap<String, Vec<(i64, i64)>> = BTreeMap::new();
     for (scc, hp_min, hp_max) in buckets.keys() {
         hp_bins_by_scc
@@ -553,16 +553,16 @@ pub fn build_exhaust_tech_entries<S: DataFrameStore + ?Sized>(store: &S) -> Vec<
             .push((*hp_min, *hp_max));
     }
 
- // The SCCs the population (and driver records) actually use are the
- // full 10-digit codes in `nrsourceusetype`. Emission rates, however,
- // are keyed at a coarser level: some 10-digit SCCs have specific rows,
- // the rest fall back to the engine-family root `22XX000000`. Emit one
- // entry per (population SCC, HP bin) drawing on the resolved rate SCC,
- // so `find_exhaust_tech(full_scc, hp)` matches.
+    // The SCCs the population (and driver records) actually use are the
+    // full 10-digit codes in `nrsourceusetype`. Emission rates, however,
+    // are keyed at a coarser level: some 10-digit SCCs have specific rows,
+    // the rest fall back to the engine-family root `22XX000000`. Emit one
+    // entry per (population SCC, HP bin) drawing on the resolved rate SCC,
+    // so `find_exhaust_tech(full_scc, hp)` matches.
     let mut target_sccs = population_sccs(store);
     if target_sccs.is_empty() {
- // No source-use-type table (e.g. unit tests): key entries by the
- // rate SCCs directly.
+        // No source-use-type table (e.g. unit tests): key entries by the
+        // rate SCCs directly.
         target_sccs = hp_bins_by_scc.keys().cloned().collect();
     }
 
@@ -648,8 +648,8 @@ fn make_exhaust_entry(
     bucket: &RateBucket,
     det: &DetMap,
 ) -> ExhaustTechEntry {
- // The engine indexes per-tech arrays with an `MXTECH` stride and caps
- // the tech dimension at `MXTECH`; never emit more tech slots than that.
+    // The engine indexes per-tech arrays with an `MXTECH` stride and caps
+    // the tech dimension at `MXTECH`; never emit more tech slots than that.
     let n_tech = bucket.tech_ids.len().clamp(1, MXTECH);
     let mut emission_factors = vec![0.0_f32; MXPOL * n_tech];
     let mut emission_units = vec![EmissionUnitCode::GramsPerHpHour; MXPOL * n_tech];
@@ -667,8 +667,8 @@ fn make_exhaust_entry(
         if let Some(u) = bucket.units.get(&(pslot, tslot)) {
             emission_units[idx] = *u;
         }
- // Deterioration is keyed by (polProcessID, engTechID). Recover the
- // polProcessID from the pollutant slot.
+        // Deterioration is keyed by (polProcessID, engTechID). Recover the
+        // polProcessID from the pollutant slot.
         let pp_for_slot = match pslot {
             0 => PP_THC,
             1 => PP_CO,
@@ -699,8 +699,8 @@ fn make_exhaust_entry(
             .take(n_tech)
             .map(|t| t.to_string())
             .collect(),
- // Filled by the tech-fraction builder; the rates above are
- // model-year independent but the tech mix is not.
+        // Filled by the tech-fraction builder; the rates above are
+        // model-year independent but the tech mix is not.
         tech_fractions: vec![0.0; n_tech],
         bsfc,
         emission_factors,
@@ -720,8 +720,8 @@ struct SourceUnit {
     hours_used_per_year: f32,
     load_factor: f32,
     population: f32,
- /// `nrsourceusetype.medianLifeFullLoad` — the NONROAD `.POP` "usage"
- /// field that drives scrptime's equipment lifespan.
+    /// `nrsourceusetype.medianLifeFullLoad` — the NONROAD `.POP` "usage"
+    /// field that drives scrptime's equipment lifespan.
     median_life: f32,
 }
 
@@ -811,13 +811,13 @@ fn load_source_units<S: DataFrameStore + ?Sized>(store: &S) -> Vec<SourceUnit> {
         BTreeMap::new()
     };
 
- // population by sourceTypeID (summed across any state rows; the fixture
- // carries a single national stateID = 0).
+    // population by sourceTypeID (summed across any state rows; the fixture
+    // carries a single national stateID = 0).
     let pop_src = int_col(&pop, "sourceTypeID");
     let pop_val = float_col(&pop, "population");
     let mut pop_by_src: BTreeMap<i64, f64> = BTreeMap::new();
     for i in 0..pop.height() {
- *pop_by_src.entry(pop_src[i]).or_default() += pop_val[i];
+        *pop_by_src.entry(pop_src[i]).or_default() += pop_val[i];
     }
 
     let src = int_col(&sut, "sourceTypeID");
@@ -833,14 +833,14 @@ fn load_source_units<S: DataFrameStore + ?Sized>(store: &S) -> Vec<SourceUnit> {
         if population <= 0.0 {
             continue;
         }
- // Skip equipment outside the runspec's selected sectors.
+        // Skip equipment outside the runspec's selected sectors.
         if let Some(sel) = &sectors {
             match scc_sector.get(&scc[i]) {
                 Some(sec) if sel.contains(sec) => {}
                 _ => continue,
             }
         }
- // Skip equipment whose fuel is not in the runspec's fuel selection.
+        // Skip equipment whose fuel is not in the runspec's fuel selection.
         if let Some(sel) = &fuels {
             match scc_fuel.get(&scc[i]) {
                 Some(fuel) if sel.contains(fuel) => {}
@@ -875,10 +875,10 @@ pub fn build_nonroad_inputs<S: DataFrameStore + ?Sized>(
             region_code: PSEUDO_COUNTY.to_string(),
             hp_avg: u.hp_avg,
             population: u.population,
- // Base-year (e.g. 1990) population; the engine grows it to the
- // analysis/growth year via the growth records.
+            // Base-year (e.g. 1990) population; the engine grows it to the
+            // analysis/growth year via the growth records.
             pop_year: base,
- // Median life at full load drives scrptime's lifespan.
+            // Median life at full load drives scrptime's lifespan.
             median_life: u.median_life,
         });
     }
@@ -932,8 +932,8 @@ pub fn fill_tech_fractions<S: DataFrameStore + ?Sized>(
     store: &S,
     analysis_year: i32,
 ) {
- // (scc, hpMin, hpMax, modelYear) -> { engTechID -> fraction }, exhaust
- // process group only.
+    // (scc, hpMin, hpMax, modelYear) -> { engTechID -> fraction }, exhaust
+    // process group only.
     let mut by_key: BTreeMap<(String, i64, i64, i64), BTreeMap<i64, f32>> = BTreeMap::new();
     if let Some(df) = store.get("nrengtechfraction") {
         let scc = str_col(&df, "SCC");
@@ -957,8 +957,8 @@ pub fn fill_tech_fractions<S: DataFrameStore + ?Sized>(
         by_key.keys().map(|(s, _, _, _)| s).collect();
 
     for e in entries.iter_mut() {
- // Entries from the canonical mix-driven builder already carry their
- // per-model-year fractions; don't overwrite them.
+        // Entries from the canonical mix-driven builder already carry their
+        // per-model-year fractions; don't overwrite them.
         if !e.tech_fractions_by_year.is_empty() {
             continue;
         }
@@ -968,7 +968,7 @@ pub fn fill_tech_fractions<S: DataFrameStore + ?Sized>(
         }
         let tech_ids: Vec<Option<i64>> =
             e.tech_names.iter().map(|n| n.parse::<i64>().ok()).collect();
- // Tech fractions may be keyed at the family-root SCC.
+        // Tech fractions may be keyed at the family-root SCC.
         let eff_scc = if present_sccs.contains(&e.scc) {
             e.scc.clone()
         } else {
@@ -1071,7 +1071,7 @@ pub fn build_scrappage_curve<S: DataFrameStore + ?Sized>(store: &S) -> Vec<Scrap
     let equip = int_col(&df, "NREquipTypeID");
     let frac = float_col(&df, "fractionLifeUsed");
     let pct = float_col(&df, "percentageScrapped");
- // Default curve only (NREquipTypeID = 0); dedupe by fraction breakpoint.
+    // Default curve only (NREquipTypeID = 0); dedupe by fraction breakpoint.
     let mut acc: BTreeMap<i64, f64> = BTreeMap::new();
     for i in 0..df.height() {
         if equip[i] != 0 {
@@ -1149,7 +1149,7 @@ fn build_ambient_temp_by_scc<S: DataFrameStore + ?Sized>(
         return out;
     };
 
- // Runspec-month hourly mean temperature (averaged over zones).
+    // Runspec-month hourly mean temperature (averaged over zones).
     let zm = int_col(&zmh, "monthID");
     let zh = int_col(&zmh, "hourID");
     let zt = float_col(&zmh, "temperature");
@@ -1166,7 +1166,7 @@ fn build_ambient_temp_by_scc<S: DataFrameStore + ?Sized>(
         .map(|(h, (s, n))| (h, if n > 0 { s / n as f64 } else { 0.0 }))
         .collect();
 
- // Hour-allocation pattern → { hourID → fraction }.
+    // Hour-allocation pattern → { hourID → fraction }.
     let ap = int_col(&alloc, "NRHourAllocPatternID");
     let ah = int_col(&alloc, "hourID");
     let af = float_col(&alloc, "hourFraction");
@@ -1175,7 +1175,7 @@ fn build_ambient_temp_by_scc<S: DataFrameStore + ?Sized>(
         pattern_frac.entry(ap[i]).or_default().push((ah[i], af[i]));
     }
 
- // Activity-weighted temperature per pattern.
+    // Activity-weighted temperature per pattern.
     let pattern_temp: BTreeMap<i64, f32> = pattern_frac
         .iter()
         .map(|(&pat, hours)| {
@@ -1190,7 +1190,7 @@ fn build_ambient_temp_by_scc<S: DataFrameStore + ?Sized>(
         })
         .collect();
 
- // NREquipTypeID → pattern.
+    // NREquipTypeID → pattern.
     let fe = int_col(&finder, "NREquipTypeID");
     let fp = int_col(&finder, "NRHourAllocPatternID");
     let mut equip_pattern: BTreeMap<i64, i64> = BTreeMap::new();
@@ -1198,7 +1198,7 @@ fn build_ambient_temp_by_scc<S: DataFrameStore + ?Sized>(
         equip_pattern.insert(fe[i], fp[i]);
     }
 
- // SCC → NREquipTypeID → pattern → temperature.
+    // SCC → NREquipTypeID → pattern → temperature.
     let sc = str_col(&scc_tbl, "SCC");
     let se = int_col(&scc_tbl, "NREquipTypeID");
     for i in 0..scc_tbl.height() {
@@ -1275,11 +1275,11 @@ pub fn load_nonroad_reference<S: DataFrameStore + ?Sized>(
     fill_tech_fractions(&mut exhaust_tech_entries, store, analysis_year);
     let activity_entries = build_activity_entries(store);
 
- // The county routine requires an *evap* tech lookup to succeed before
- // it computes exhaust (it skips the record otherwise). We don't yet
- // compute evaporative emissions, so mirror each exhaust (SCC, HP bin)
- // with a zero-fraction evap entry: the lookup succeeds and the per-tech
- // loop contributes nothing.
+    // The county routine requires an *evap* tech lookup to succeed before
+    // it computes exhaust (it skips the record otherwise). We don't yet
+    // compute evaporative emissions, so mirror each exhaust (SCC, HP bin)
+    // with a zero-fraction evap entry: the lookup succeeds and the per-tech
+    // loop contributes nothing.
     let evap_tech_entries = exhaust_tech_entries
         .iter()
         .map(|e| EvapTechEntry {
@@ -1291,9 +1291,9 @@ pub fn load_nonroad_reference<S: DataFrameStore + ?Sized>(
         })
         .collect();
 
- // Growth cross-reference per (SCC, HP bin): indicator = the SCC's
- // growth-pattern id (most-specific match). Unmatched SCCs get "DEF",
- // which selects no growth record ⇒ no growth for that SCC.
+    // Growth cross-reference per (SCC, HP bin): indicator = the SCC's
+    // growth-pattern id (most-specific match). Unmatched SCCs get "DEF",
+    // which selects no growth record ⇒ no growth for that SCC.
     let (scc_pattern, growth_records) = build_growth(store);
     let growth_xref_entries = exhaust_tech_entries
         .iter()
@@ -1318,7 +1318,7 @@ pub fn load_nonroad_reference<S: DataFrameStore + ?Sized>(
         growth_records,
         scrappage_curve: build_scrappage_curve(store),
         age_adjustment_table: AgeAdjustmentTable::default(),
- // emsadj.f oxygenate + temperature corrections.
+        // emsadj.f oxygenate + temperature corrections.
         fuel_oxygen_pct,
         fuel_rfg,
         ambient_temp_f: build_ambient_temp(store, month),
@@ -1350,10 +1350,10 @@ pub fn build_production_executor<S: DataFrameStore + ?Sized>(
 pub fn build_options(analysis_year: i32) -> NonroadOptions {
     let mut opts = NonroadOptions::new(RegionLevel::County, analysis_year);
     opts.growth_loaded = true;
- // Emit by-model-year exhaust rows so the output matches canonical's
- // per-(SCC, modelYear) structure. `emissions_to_dataframe` uses only the
- // by-model-year rows (model_year = Some) to avoid double-counting the
- // per-record totals the engine also emits.
+    // Emit by-model-year exhaust rows so the output matches canonical's
+    // per-(SCC, modelYear) structure. `emissions_to_dataframe` uses only the
+    // by-model-year rows (model_year = Some) to avoid double-counting the
+    // per-record totals the engine also emits.
     opts.emit_bmy_exhaust = true;
     opts
 }
@@ -1445,7 +1445,7 @@ pub fn build_temporal_factors<S: DataFrameStore + ?Sized>(
     let sccs: std::collections::BTreeSet<&String> =
         month_by_scc.keys().chain(day_by_scc.keys()).collect();
     for scc in sccs {
- // monthFraction × (7 × dayFraction) ÷ ndays (canonical typical-day).
+        // monthFraction × (7 × dayFraction) ÷ ndays (canonical typical-day).
         let f = lookup(&month_by_scc, scc, 1.0 / 12.0)
             * (7.0 * lookup(&day_by_scc, scc, 1.0 / 7.0))
             / ndays;
@@ -1478,10 +1478,10 @@ pub fn emissions_to_dataframe(
     let mut scc_out: Vec<String> = Vec::new();
     let mut quant = Vec::new();
 
- // When by-model-year output is on, the engine emits BOTH per-record-total
- // rows (model_year = None) and per-model-year rows (model_year = Some).
- // Use only the by-model-year rows to avoid double-counting — they carry
- // the SCC × modelYear structure that matches canonical's output.
+    // When by-model-year output is on, the engine emits BOTH per-record-total
+    // rows (model_year = None) and per-model-year rows (model_year = Some).
+    // Use only the by-model-year rows to avoid double-counting — they carry
+    // the SCC × modelYear structure that matches canonical's output.
     let has_bmy = rows.iter().any(|r| r.model_year.is_some());
 
     for row in rows {
@@ -1528,9 +1528,9 @@ mod tests {
     use super::*;
     use moves_framework::data::InMemoryStore;
 
- /// Diagnostic against the real nr-commercial-nation snapshot. Ignored
- /// by default (depends on the checked-in Parquet snapshot); run with
- /// `cargo test -p moves-calculators diag_snapshot -- --ignored --nocapture`.
+    /// Diagnostic against the real nr-commercial-nation snapshot. Ignored
+    /// by default (depends on the checked-in Parquet snapshot); run with
+    /// `cargo test -p moves-calculators diag_snapshot -- --ignored --nocapture`.
     #[test]
     #[ignore]
     fn diag_snapshot_exhaust_coverage() {
@@ -1598,7 +1598,7 @@ mod tests {
             inputs.group_count(),
             inputs.record_count()
         );
- // For the first few driver records, does an entry match by SCC+hp?
+        // For the first few driver records, does an entry match by SCC+hp?
         let mut matched = 0;
         let mut total = 0;
         for g in &inputs.scc_groups {
@@ -1616,7 +1616,7 @@ mod tests {
         }
         eprintln!("driver records matched-by-exhaust-entry: {matched}/{total}");
 
- // Reproduce the engine run in-process.
+        // Reproduce the engine run in-process.
         let options = build_options(2020);
         let mut executor = build_production_executor(&store, 2020, 0);
         eprintln!("executor.county_fips = {:?}", executor.county_fips);
@@ -1632,7 +1632,7 @@ mod tests {
                 );
             }
         }
- // Growth diagnostics: is growth actually matching/applying?
+        // Growth diagnostics: is growth actually matching/applying?
         eprintln!(
             "growth_records={} growth_xref[0].indicator={:?} options(epi={},grw={},tech={})",
             executor.reference.growth_records.len(),
@@ -1647,7 +1647,7 @@ mod tests {
         );
         {
             use moves_nonroad::population::growth::{growth_factor, select_for_indicator};
- // 2265006030 -> growthPatternID 1063.
+            // 2265006030 -> growthPatternID 1063.
             let recs = select_for_indicator(&executor.reference.growth_records, "1063");
             match growth_factor(&recs, 1990, 2020, "00001") {
                 Ok(gf) => eprintln!(
@@ -1657,7 +1657,7 @@ mod tests {
                 Err(e) => eprintln!("growth_factor ERR: {e:?}"),
             }
         }
- // Sample exhaust entry: nyrlif span proxy + per-MY tech presence.
+        // Sample exhaust entry: nyrlif span proxy + per-MY tech presence.
         if let Some(e) = executor
             .reference
             .exhaust_tech_entries
@@ -1714,9 +1714,9 @@ mod tests {
         );
         eprintln!("canonical     grams: THC=1.414e8 CO=6.508e9 NOx=4.947e7 PM=7.818e6");
 
- // Per-SCC NOx breakdown with fuel type, to test whether NOx is
- // dominated by diesel commercial equipment (canonical output is
- // gasoline-only, fuelTypeID=1).
+        // Per-SCC NOx breakdown with fuel type, to test whether NOx is
+        // dominated by diesel commercial equipment (canonical output is
+        // gasoline-only, fuelTypeID=1).
         let fuel_df = load("nrscc").unwrap();
         let fscc = str_col(&fuel_df, "SCC");
         let ftype = int_col(&fuel_df, "fuelTypeID");
@@ -1729,8 +1729,8 @@ mod tests {
             e.0 += r.emissions[2] as f64 * tf * g;
             e.1 += r.emissions[1] as f64 * tf * g;
         }
- // Per-SCC ratio vs canonical (CO, NOx) — is the under-prediction
- // uniform (global per-unit factor) or distributional?
+        // Per-SCC ratio vs canonical (CO, NOx) — is the under-prediction
+        // uniform (global per-unit factor) or distributional?
         let can_co: BTreeMap<&str, f64> = [
             ("2260006005", 1.3237e7),
             ("2260006010", 8.5710e7),
@@ -1768,7 +1768,7 @@ mod tests {
             eprintln!("  {scc}  CO {:.3}   NOx {:.3}", co / cc, nox / cn);
         }
 
- // Per-model-year CO for 2265006030 vs canonical (recent years dominate).
+        // Per-model-year CO for 2265006030 vs canonical (recent years dominate).
         let can_my_co: BTreeMap<i32, f64> = [
             (2015, 4.37054e7),
             (2016, 1.22951e8),
@@ -1787,7 +1787,7 @@ mod tests {
         for r in &out.rows {
             if r.scc == "2265006030" {
                 if let Some(my) = r.model_year {
- *my_co.entry(my).or_default() += r.emissions[1] as f64 * tf * g;
+                    *my_co.entry(my).or_default() += r.emissions[1] as f64 * tf * g;
                 }
             }
         }
@@ -1800,7 +1800,7 @@ mod tests {
         eprintln!("2265006030 distinct model years emitted: {}", my_co.len());
     }
 
- /// Build a tiny in-memory store mimicking the nr* rate tables.
+    /// Build a tiny in-memory store mimicking the nr* rate tables.
     fn store_with(emission: DataFrame, deterioration: Option<DataFrame>) -> InMemoryStore {
         let mut store = InMemoryStore::new();
         store.insert("nremissionrate", emission);
@@ -1810,8 +1810,8 @@ mod tests {
         store
     }
 
- /// Emission rates stored as strings (the snapshot's physical form),
- /// keys as int64 — the loader must parse both.
+    /// Emission rates stored as strings (the snapshot's physical form),
+    /// keys as int64 — the loader must parse both.
     fn emission_df() -> DataFrame {
         df!(
             "polProcessID" => [101i64, 201, 301, 10001, 9901, 101],
@@ -1841,25 +1841,25 @@ mod tests {
     fn reads_base_rate_into_thc_slot() {
         let store = store_with(emission_df(), Some(deterioration_df()));
         let entries = build_exhaust_tech_entries(&store);
- // Two HP bins -> two entries.
+        // Two HP bins -> two entries.
         assert_eq!(entries.len(), 2);
 
         let bin0 = entries
             .iter()
             .find(|e| e.hp_min == 0.0 && e.hp_max == 1.0)
             .expect("hp (0,1] entry");
- // One engine tech (105).
+        // One engine tech (105).
         assert_eq!(bin0.tech_names, vec!["105".to_string()]);
         let n_tech = 1;
- // THC (slot 0) base rate.
+        // THC (slot 0) base rate.
         assert_eq!(bin0.emission_factors[0], 261.0);
- // CO (slot 1), NOx (slot 2), PM (slot 5).
+        // CO (slot 1), NOx (slot 2), PM (slot 5).
         assert_eq!(bin0.emission_factors[n_tech], 733.0);
         assert_eq!(bin0.emission_factors[2 * n_tech], 4.5);
         assert_eq!(bin0.emission_factors[5 * n_tech], 1.25);
- // BSFC (polProcess 9901) lands in the per-tech bsfc array, not EF.
+        // BSFC (polProcess 9901) lands in the per-tech bsfc array, not EF.
         assert_eq!(bin0.bsfc, vec![0.66_f32]);
- // Units parsed.
+        // Units parsed.
         assert_eq!(bin0.emission_units[0], EmissionUnitCode::GramsPerHpHour);
     }
 
@@ -1871,11 +1871,11 @@ mod tests {
             .iter()
             .find(|e| e.hp_min == 0.0 && e.hp_max == 1.0)
             .unwrap();
- // THC deterioration A = 0.201, B = 1.0, cap = 1.
+        // THC deterioration A = 0.201, B = 1.0, cap = 1.
         assert!((bin0.det_a[0] - 0.201).abs() < 1e-6);
         assert!((bin0.det_b[0] - 1.0).abs() < 1e-6);
         assert!((bin0.det_cap[0] - 1.0).abs() < 1e-6);
- // NOx deterioration A = 0.024 at slot 2.
+        // NOx deterioration A = 0.024 at slot 2.
         assert!((bin0.det_a[2] - 0.024).abs() < 1e-6);
     }
 
@@ -1889,7 +1889,7 @@ mod tests {
             .expect("hp (1,3] entry");
         assert_eq!(bin1.tech_names, vec!["112".to_string()]);
         assert_eq!(bin1.emission_factors[0], 180.0);
- // No deterioration table -> zeros (no deterioration).
+        // No deterioration table -> zeros (no deterioration).
         assert_eq!(bin1.det_a[0], 0.0);
     }
 

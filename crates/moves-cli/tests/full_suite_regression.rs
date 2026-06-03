@@ -381,14 +381,14 @@ fn error_fixtures_return_expected_errors() {
                 ));
             }
             Err(e) => {
- // Collect the full error chain so we see the root cause, not
- // just the outermost `anyhow` context frame.
+                // Collect the full error chain so we see the root cause, not
+                // just the outermost `anyhow` context frame.
                 let msg: String = e
                     .chain()
                     .map(|c| c.to_string())
                     .collect::<Vec<_>>()
                     .join(": ");
- // Require a non-panic, human-readable message.
+                // Require a non-panic, human-readable message.
                 if msg.contains("panicked at") || msg.contains("thread 'main' panicked") {
                     failures.push(format!(
                         "{name}: got a panic instead of a clean error: {msg}"
@@ -406,7 +406,7 @@ fn error_fixtures_return_expected_errors() {
                         println!("{name}: ok — {msg}");
                     }
                 } else {
- // Unknown error fixture — just require it returns an error.
+                    // Unknown error fixture — just require it returns an error.
                     println!("{name}: ok (unknown fixture, got error) — {msg}");
                 }
             }
@@ -450,7 +450,7 @@ const REL_DIFF_FLOOR: f64 = 1e-30;
 /// that if either side starts producing rows the asymmetry is caught.
 fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
     &[
- // (fixture, per-pollutant relative tolerance, vacuous)
+        // (fixture, per-pollutant relative tolerance, vacuous)
         ("process-evap-fvv", ONROAD_REL_TOL, false), // ~8.2e-5
         ("process-evap-leaks", ONROAD_REL_TOL, false), // ~1.6e-7
         ("process-evap-permeation", ONROAD_REL_TOL, false), // ~2.1e-7
@@ -535,42 +535,42 @@ const QUARANTINED_FIXTURES: &[&str] = &[
     "expand-month",
     "expand-sourcetype",
     "sample-runspec",
- // process-apu: BaseRate emits the process-91 / op-mode-201,203 (APU /
- // shorepower) energy rates canonical activity-gates to 0 in baseRateOutput;
- // same missing-activity-weighting gap. mixed-onroad-nonroad: canonical
- // MOVESOutput is empty (0 rows) while the port's NONROAD half emits ~8,632
- // legitimate rows (separate/known). See docs/known-divergences.md §4.4.
+    // process-apu: BaseRate emits the process-91 / op-mode-201,203 (APU /
+    // shorepower) energy rates canonical activity-gates to 0 in baseRateOutput;
+    // same missing-activity-weighting gap. mixed-onroad-nonroad: canonical
+    // MOVESOutput is empty (0 rows) while the port's NONROAD half emits ~8,632
+    // legitimate rows (separate/known). See docs/known-divergences.md §4.4.
     "process-apu",
     "mixed-onroad-nonroad",
- // Speciation / chained-calculator class. Three engine/calculator bugs in this
- // class were FOUND and FIXED, GRADUATING chain-nonhaptog, chain-tog-speciation,
- // process-crankcase-running, process-nox-speciation, process-brakewear and
- // process-tirewear to asserted_fixtures (all exact to f64 drift):
- //   (1) regClass collapse — the engine's `frame_to_emission_records` dropped
- //       `regClassID` (and fuelSubType/engTech/sector/hp) when round-tripping a
- //       calculator's output through the per-chunk MOVESWorkerOutput
- //       accumulator, so chained speciators (HCSpeciation) keyed their ratio
- //       lookups on regClass 0 and emitted nothing. Now preserved.
- //   (2) SulfatePMCalculator re-emitted every pass-through row (its `calculate`
- //       ports the SQL's in-place mutation and returns the full final state);
- //       the chained engine ADDS emitted rows, so the upstream THC/NOx was
- //       doubled. `execute` now emits only the delta versus its input.
- //   (3) NOCalculator and NO2Calculator shared `build_inputs` and both resolved
- //       every NO/NO2/HONO species, doubling 32/33/34. Each now filters
- //       PollutantProcessAssoc to its own species, matching the per-calculator
- //       canonical extract.
- // process-airtoxics also GRADUATED: its AirToxicsCalculator extracts are now
- // synthesized from the raw default-DB ratio tables (PollutantProcessAssoc join
- // + modelYearGroupID expansion + the ATRatio FuelSupply join), and each worker
- // row is expanded across its fuel type's formulations (the AT*FuelSupply join)
- // so the ATRatioGas1 path keys on a concrete fuelFormulationID. The minor-HAP
- // toxics 20/24/25 now match canonical to f64 drift (base 1/79/87 too).
- // process-pm-exhaust ALSO GRADUATED: SulfatePM's consume/replace of EC (112)
- // and NonECPM (118) is now exact via the true per-key delta emit, the general
- // fuel ratio restricted to pollutant 120, and the engine's
- // `replaced_pollutants` drop of BaseRate's zero fuelType-9 electricity rows.
- // NONROAD fixtures that emit nothing (port row count 0 vs a populated
- // canonical) or a wrong row count — population/sector-coverage gaps.
+    // Speciation / chained-calculator class. Three engine/calculator bugs in this
+    // class were FOUND and FIXED, GRADUATING chain-nonhaptog, chain-tog-speciation,
+    // process-crankcase-running, process-nox-speciation, process-brakewear and
+    // process-tirewear to asserted_fixtures (all exact to f64 drift):
+    //   (1) regClass collapse — the engine's `frame_to_emission_records` dropped
+    //       `regClassID` (and fuelSubType/engTech/sector/hp) when round-tripping a
+    //       calculator's output through the per-chunk MOVESWorkerOutput
+    //       accumulator, so chained speciators (HCSpeciation) keyed their ratio
+    //       lookups on regClass 0 and emitted nothing. Now preserved.
+    //   (2) SulfatePMCalculator re-emitted every pass-through row (its `calculate`
+    //       ports the SQL's in-place mutation and returns the full final state);
+    //       the chained engine ADDS emitted rows, so the upstream THC/NOx was
+    //       doubled. `execute` now emits only the delta versus its input.
+    //   (3) NOCalculator and NO2Calculator shared `build_inputs` and both resolved
+    //       every NO/NO2/HONO species, doubling 32/33/34. Each now filters
+    //       PollutantProcessAssoc to its own species, matching the per-calculator
+    //       canonical extract.
+    // process-airtoxics also GRADUATED: its AirToxicsCalculator extracts are now
+    // synthesized from the raw default-DB ratio tables (PollutantProcessAssoc join
+    // + modelYearGroupID expansion + the ATRatio FuelSupply join), and each worker
+    // row is expanded across its fuel type's formulations (the AT*FuelSupply join)
+    // so the ATRatioGas1 path keys on a concrete fuelFormulationID. The minor-HAP
+    // toxics 20/24/25 now match canonical to f64 drift (base 1/79/87 too).
+    // process-pm-exhaust ALSO GRADUATED: SulfatePM's consume/replace of EC (112)
+    // and NonECPM (118) is now exact via the true per-key delta emit, the general
+    // fuel ratio restricted to pollutant 120, and the engine's
+    // `replaced_pollutants` drop of BaseRate's zero fuelType-9 electricity rows.
+    // NONROAD fixtures that emit nothing (port row count 0 vs a populated
+    // canonical) or a wrong row count — population/sector-coverage gaps.
     "nr-agriculture-state",
     "nr-airport-support-county",
     "nr-construction-state",
@@ -684,8 +684,8 @@ fn canonical_snapshot_diff() {
                 max_parallel_chunks: 1,
                 calculator_dag: None,
                 run_date_time: Some("2026-05-21T00:00:00".to_string()),
- // Activate the data plane: calculators execute against the captured
- // execution DB and the engine writes the real MOVESOutput tree.
+                // Activate the data plane: calculators execute against the captured
+                // execution DB and the engine writes the real MOVESOutput tree.
                 snapshot: Some(root.join(name)),
                 scale_input: None,
                 default_db: None,
@@ -749,7 +749,7 @@ fn canonical_snapshot_diff() {
 
         let asserted = asserted_fixtures().iter().find(|(n, _, _)| *n == name);
         let verdict = if let Some((_, tol, vacuous)) = asserted {
- // Hard-asserted fixture.
+            // Hard-asserted fixture.
             let row_mismatch = canonical.row_count != port.row_count;
             let within = cmp.within(*tol);
             if *vacuous {
@@ -775,9 +775,9 @@ fn canonical_snapshot_diff() {
             }
         } else if is_quarantined(name) {
             quarantined += 1;
- // HARD-FAIL (operator decision): known data-plane bugs turn CI red // it is OK for CI to be red while results are wrong. Each fixture
- // graduates out of QUARANTINED_FIXTURES into asserted_fixtures once
- // its data plane is fixed. See docs/known-divergences.md §4.4.
+            // HARD-FAIL (operator decision): known data-plane bugs turn CI red // it is OK for CI to be red while results are wrong. Each fixture
+            // graduates out of QUARANTINED_FIXTURES into asserted_fixtures once
+            // its data plane is fixed. See docs/known-divergences.md §4.4.
             failures.push(format!(
                 "{name}: KNOWN DATA-PLANE BUG — max_rel_diff={:.3e}, canon_rows={} \
                  port_rows={} — see docs/known-divergences.md §4.4",
@@ -785,9 +785,9 @@ fn canonical_snapshot_diff() {
             ));
             "BUG(FAIL)"
         } else {
- // A covered fixture that is neither asserted nor quarantined is an
- // unclassified divergence: fail loudly so it gets triaged rather
- // than silently ignored.
+            // A covered fixture that is neither asserted nor quarantined is an
+            // unclassified divergence: fail loudly so it gets triaged rather
+            // than silently ignored.
             failures.push(format!(
                 "{name}: UNCLASSIFIED max_rel_diff={:.3e}, canon_rows={} port_rows={} — \
                  add to asserted_fixtures (with a documented precision-only tolerance) \

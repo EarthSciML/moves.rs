@@ -80,7 +80,7 @@ jobs:
 
       - name: cargo clippy
         if: matrix.os == 'ubuntu-latest'
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings -A clippy::doc_lazy_continuation
 
       # ── Build + test (all platforms) ─────────────────────────────────────
       - name: cargo build

@@ -59,11 +59,11 @@ use crate::{Error, Result};
 /// populations.
 #[derive(Debug, Clone)]
 pub struct CountyInput {
- /// 5-character county FIPS code (`fipcod`).
+    /// 5-character county FIPS code (`fipcod`).
     pub fips: String,
- /// `true` iff the county is in the run (`lfipcd`).
+    /// `true` iff the county is in the run (`lfipcd`).
     pub selected: bool,
- /// County population from `alocty.f` (`popcty(idxfip)`).
+    /// County population from `alocty.f` (`popcty(idxfip)`).
     pub population: f32,
 }
 
@@ -72,15 +72,15 @@ pub struct CountyInput {
 /// don't depend on per-iteration state.
 #[derive(Debug, Clone)]
 pub struct StateContext<'a> {
- /// Per-record equipment data.
+    /// Per-record equipment data.
     pub equipment: EquipmentRecord,
- /// Run-time options.
+    /// Run-time options.
     pub run_options: RunOptions,
- /// 10-character SCC for the current iteration.
+    /// 10-character SCC for the current iteration.
     pub scc: &'a str,
- /// 5-character state FIPS code (`fipsta`).
+    /// 5-character state FIPS code (`fipsta`).
     pub state_fips: &'a str,
- /// HP-level table (`hpclev`).
+    /// HP-level table (`hpclev`).
     pub hp_levels: &'a [f32],
 }
 
@@ -89,31 +89,31 @@ pub struct StateContext<'a> {
 /// [`super::prcus::UsTotalCallbacks`]; trait separation keeps the
 /// per-routine Fortran provenance explicit.
 pub trait StateCallbacks {
- /// `fndtch(scc, hp_avg, tech_year)`.
+    /// `fndtch(scc, hp_avg, tech_year)`.
     fn find_exhaust_tech(&mut self, scc: &str, hp_avg: f32, year: i32)
         -> Option<ExhaustTechLookup>;
- /// `fndevtch(scc, hp_avg, tech_year)`.
+    /// `fndevtch(scc, hp_avg, tech_year)`.
     fn find_evap_tech(&mut self, scc: &str, hp_avg: f32, year: i32) -> Option<EvapTechLookup>;
- /// `fndgxf(fips, scc, hp_avg)`.
+    /// `fndgxf(fips, scc, hp_avg)`.
     fn find_growth_xref(&mut self, fips: &str, scc: &str, hp_avg: f32) -> Option<i32>;
- /// `fndact(scc, fips, hp_avg)`.
+    /// `fndact(scc, fips, hp_avg)`.
     fn find_activity(&mut self, scc: &str, fips: &str, hp_avg: f32) -> Option<ActivityLookup>;
- /// `daymthf(scc, fips)`.
+    /// `daymthf(scc, fips)`.
     fn day_month_factor(&mut self, scc: &str, fips: &str) -> Result<DayMonthFactor>;
- /// `getgrw(indcod)`.
+    /// `getgrw(indcod)`.
     fn load_growth(&mut self, _indcod: i32) -> Result<()> {
         Ok(())
     }
- /// `grwfac(year1, year2, fips, indcod)`.
+    /// `grwfac(year1, year2, fips, indcod)`.
     fn growth_factor(&mut self, year1: i32, year2: i32, fips: &str, indcod: i32) -> Result<f32>;
- /// `modyr(..)`.
+    /// `modyr(..)`.
     fn model_year(
         &mut self,
         eq: &EquipmentRecord,
         activity: &ActivityLookup,
         growth_factor: f32,
     ) -> Result<ModelYearOutput>;
- /// `agedist(..)`.
+    /// `agedist(..)`.
     #[allow(clippy::too_many_arguments)]
     fn age_distribution(
         &mut self,
@@ -125,13 +125,13 @@ pub trait StateCallbacks {
         fips: &str,
         indcod: i32,
     ) -> Result<f32>;
- /// `fndrtrft(filter_type=1, scc, hp)`.
+    /// `fndrtrft(filter_type=1, scc, hp)`.
     fn filter_retrofits_by_scc_hp(&mut self, scc: &str, hp_avg: f32) -> Result<()>;
- /// `fndrtrft(filter_type=2, year)`.
+    /// `fndrtrft(filter_type=2, year)`.
     fn filter_retrofits_by_year(&mut self, year: i32) -> Result<()>;
- /// `fndrtrft(filter_type=3, tech)`.
+    /// `fndrtrft(filter_type=3, tech)`.
     fn filter_retrofits_by_tech(&mut self, tech: &str) -> Result<()>;
- /// `clcrtrft(..)`.
+    /// `clcrtrft(..)`.
     fn calculate_retrofit(
         &mut self,
         pop: f32,
@@ -140,9 +140,9 @@ pub trait StateCallbacks {
         model_year: i32,
         tech: &str,
     ) -> Result<RetrofitResult>;
- /// `clcems(..)`.
+    /// `clcems(..)`.
     fn calculate_exhaust(&mut self, inputs: &ExhaustCallInputs<'_>) -> Result<ExhaustResult>;
- /// `clcevems(..)`.
+    /// `clcevems(..)`.
     fn calculate_evap(&mut self, inputs: &EvapCallInputs<'_>) -> Result<EvapResult>;
 }
 
@@ -157,30 +157,30 @@ pub trait StateCallbacks {
 /// variant rather than mutating an output buffer.
 #[derive(Debug, Clone)]
 pub enum StateAggregateOutcome {
- /// Full state-level computation succeeded.
+    /// Full state-level computation succeeded.
     Ok(StateAggregate),
- /// State population was zero (`popeqp(icurec) <= 0`). Caller
- /// emits the zero-record output and returns.
+    /// State population was zero (`popeqp(icurec) <= 0`). Caller
+    /// emits the zero-record output and returns.
     ZeroPopulation { hp_level: f32 },
- /// `fndtch` or `fndevtch` returned 0 at the tech-year probe.
- /// Caller adds a [`GeographyWarning::MissingExhaustTech`] /
- /// [`GeographyWarning::MissingEvapTech`] and bails.
+    /// `fndtch` or `fndevtch` returned 0 at the tech-year probe.
+    /// Caller adds a [`GeographyWarning::MissingExhaustTech`] /
+    /// [`GeographyWarning::MissingEvapTech`] and bails.
     MissingTech {
         hp_level: f32,
         side: TechMissingSide,
     },
- /// `fndact` returned 0. Caller adds a
- /// [`GeographyWarning::MissingActivity`] and emits one
- /// `RMISS`-filled record per output unit.
+    /// `fndact` returned 0. Caller adds a
+    /// [`GeographyWarning::MissingActivity`] and emits one
+    /// `RMISS`-filled record per output unit.
     MissingActivity { hp_level: f32 },
 }
 
 /// Which side of the tech lookup failed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TechMissingSide {
- /// `fndtch` returned 0.
+    /// `fndtch` returned 0.
     Exhaust,
- /// `fndevtch` returned 0.
+    /// `fndevtch` returned 0.
     Evap,
 }
 
@@ -192,33 +192,33 @@ pub enum TechMissingSide {
 /// county-allocation step can scale them by `popcty / popsta`.
 #[derive(Debug, Clone)]
 pub struct StateAggregate {
- /// HP-category level (`hplev`).
+    /// HP-category level (`hplev`).
     pub hp_level: f32,
- /// State population after `agedist` (`popsta` post-growth).
+    /// State population after `agedist` (`popsta` post-growth).
     pub state_population: f32,
- /// Activity-record fields the writer needs (load_factor, hp_avg).
+    /// Activity-record fields the writer needs (load_factor, hp_avg).
     pub activity: ActivityLookup,
- /// Per-pollutant daily emission totals (`emsday`). Length [`MXPOL`].
+    /// Per-pollutant daily emission totals (`emsday`). Length [`MXPOL`].
     pub emissions_day: Vec<f32>,
- /// Aggregate population (`poptot`).
+    /// Aggregate population (`poptot`).
     pub population_total: f32,
- /// Aggregate activity (`acttot`).
+    /// Aggregate activity (`acttot`).
     pub activity_total: f32,
- /// Aggregate fuel consumption (`fulcsm`).
+    /// Aggregate fuel consumption (`fulcsm`).
     pub fuel_consumption: f32,
- /// Aggregate fraction retrofitted (`fracretro`).
+    /// Aggregate fraction retrofitted (`fracretro`).
     pub fraction_retrofitted: f32,
- /// Aggregate units retrofitted (`unitsretro`).
+    /// Aggregate units retrofitted (`unitsretro`).
     pub units_retrofitted: f32,
- /// Per-(model-year, exhaust-tech) BMY records collected during
- /// the loop. Empty when `RunOptions::emit_bmy` is false.
+    /// Per-(model-year, exhaust-tech) BMY records collected during
+    /// the loop. Empty when `RunOptions::emit_bmy` is false.
     pub exhaust_bmy: Vec<StateBmyCell>,
- /// Per-(model-year, evap-tech) BMY records. Empty when
- /// `RunOptions::emit_bmy_evap` is false.
+    /// Per-(model-year, evap-tech) BMY records. Empty when
+    /// `RunOptions::emit_bmy_evap` is false.
     pub evap_bmy: Vec<StateBmyCell>,
- /// Per-(model-year, tech) SI accumulations. Empty when
- /// `RunOptions::emit_si` is false. The `channel` field of
- /// [`StateBmyCell`] distinguishes exhaust (1) vs evap (2).
+    /// Per-(model-year, tech) SI accumulations. Empty when
+    /// `RunOptions::emit_si` is false. The `channel` field of
+    /// [`StateBmyCell`] distinguishes exhaust (1) vs evap (2).
     pub si_cells: Vec<StateBmyCell>,
 }
 
@@ -227,24 +227,24 @@ pub struct StateAggregate {
 /// [`super::SiAggregate`] after county allocation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct StateBmyCell {
- /// Absolute model year.
+    /// Absolute model year.
     pub model_year: i32,
- /// Technology code.
+    /// Technology code.
     pub tech_code: String,
- /// Population for this cell at the state level.
+    /// Population for this cell at the state level.
     pub population: f32,
- /// Activity for this cell at the state level.
+    /// Activity for this cell at the state level.
     pub activity: f32,
- /// Fuel consumption for this cell at the state level.
+    /// Fuel consumption for this cell at the state level.
     pub fuel_consumption: f32,
- /// Per-pollutant emissions for this cell at the state level.
+    /// Per-pollutant emissions for this cell at the state level.
     pub emissions: Vec<f32>,
- /// Fraction retrofitted for this cell (1 for exhaust; `RMISS`
- /// for evap — see the Fortran `wrtbmy` evap branch).
+    /// Fraction retrofitted for this cell (1 for exhaust; `RMISS`
+    /// for evap — see the Fortran `wrtbmy` evap branch).
     pub frac_retrofitted: f32,
- /// Units retrofitted for this cell (or `RMISS` for evap).
+    /// Units retrofitted for this cell (or `RMISS` for evap).
     pub units_retrofitted: f32,
- /// 1 for exhaust, 2 for evap.
+    /// 1 for exhaust, 2 for evap.
     pub channel: u8,
 }
 
@@ -271,16 +271,16 @@ pub fn compute_state_aggregate(
     let fipsta = ctx.state_fips;
     let hpval = eq.hp_avg;
 
- // --- HP level (prcsta.f :273–:285 / prc1st.f :222–:234) ---
+    // --- HP level (prcsta.f :273–:285 / prc1st.f :222–:234) ---
     let hpmid = (eq.hp_range_min + eq.hp_range_max) / 2.0;
     let hplev = hp_level_for_midpoint(hpmid, ctx.hp_levels);
 
- // --- zero-population early return (prcsta.f :300–:311 / prc1st.f :239–:246) ---
+    // --- zero-population early return (prcsta.f :300–:311 / prc1st.f :239–:246) ---
     if eq.population <= 0.0 {
         return Ok(StateAggregateOutcome::ZeroPopulation { hp_level: hplev });
     }
 
- // --- tech presence checks at tech_year (prcsta.f :335–:360 / prc1st.f :251–:278) ---
+    // --- tech presence checks at tech_year (prcsta.f :335–:360 / prc1st.f :251–:278) ---
     if callbacks
         .find_exhaust_tech(scc, hpval, opt.tech_year)
         .is_none()
@@ -300,10 +300,10 @@ pub fn compute_state_aggregate(
         });
     }
 
- // --- fuel density (prcsta.f :364–:373 / prc1st.f :282–:291) ---
+    // --- fuel density (prcsta.f :364–:373 / prc1st.f :282–:291) ---
     let denful = fuel_density(opt.fuel);
 
- // --- daymthf, tplfac, tplful, adjtime (prcsta.f :390–:405 / prc1st.f :303–:318) ---
+    // --- daymthf, tplfac, tplful, adjtime (prcsta.f :390–:405 / prc1st.f :303–:318) ---
     let dmf = callbacks.day_month_factor(scc, fipsta)?;
     let ndays = dmf.n_days;
     let adjtime: f32 = if opt.total_mode {
@@ -320,12 +320,12 @@ pub fn compute_state_aggregate(
     };
     let tplful: f32 = dmf.mthf * dmf.dayf;
 
- // --- growth-file packet must be loaded (prcsta.f :419 / prc1st.f :332) ---
+    // --- growth-file packet must be loaded (prcsta.f :419 / prc1st.f :332) ---
     if !opt.growth_loaded {
         return Err(Error::Config(GeographyError::GrowthFileMissing.to_string()));
     }
 
- // --- growth Xref / activity (prcsta.f :420–:444 / prc1st.f :333–:354) ---
+    // --- growth Xref / activity (prcsta.f :420–:444 / prc1st.f :333–:354) ---
     let Some(indcod) = callbacks.find_growth_xref(fipsta, scc, hpval) else {
         return Err(Error::Config(
             GeographyError::GrowthIndicatorNotFound {
@@ -342,15 +342,15 @@ pub fn compute_state_aggregate(
         return Ok(StateAggregateOutcome::MissingActivity { hp_level: hplev });
     };
 
- // --- load growth + per-state growth factor (prcsta.f :449–:460 / prc1st.f :358–:369) ---
+    // --- load growth + per-state growth factor (prcsta.f :449–:460 / prc1st.f :358–:369) ---
     callbacks.load_growth(indcod)?;
     let grwsta = callbacks.growth_factor(eq.pop_year, eq.pop_year + 1, fipsta, indcod)?;
 
- // --- modyr (prcsta.f :466–:469 / prc1st.f :374–:377) ---
+    // --- modyr (prcsta.f :466–:469 / prc1st.f :374–:377) ---
     let my_out = callbacks.model_year(eq, &activity, grwsta)?;
     let nyrlif = my_out.nyrlif;
 
- // --- agedist (prcsta.f :475–:477 / prc1st.f :383–:385) ---
+    // --- agedist (prcsta.f :475–:477 / prc1st.f :383–:385) ---
     let popsta = callbacks.age_distribution(
         eq.population,
         &my_out.modfrc,
@@ -362,7 +362,7 @@ pub fn compute_state_aggregate(
     )?;
     let popsta = popsta.max(0.0);
 
- // --- accumulators (prcsta.f :381–:500 / prc1st.f :295–:408) ---
+    // --- accumulators (prcsta.f :381–:500 / prc1st.f :295–:408) ---
     let mut emsday = zero_emissions();
     let mut poptot: f32 = 0.0;
     let mut acttot: f32 = 0.0;
@@ -377,12 +377,12 @@ pub fn compute_state_aggregate(
     let mut evap_bmy: Vec<StateBmyCell> = Vec::new();
     let mut si_cells: Vec<StateBmyCell> = Vec::new();
 
- // --- filter retrofits to (SCC, HP) (prcsta.f :491–:494 / prc1st.f :399–:402) ---
+    // --- filter retrofits to (SCC, HP) (prcsta.f :491–:494 / prc1st.f :399–:402) ---
     if opt.retrofit_loaded {
         callbacks.filter_retrofits_by_scc_hp(scc, hpval)?;
     }
 
- // --- model-year loop (prcsta.f :504–:790 / prc1st.f :412–:719) ---
+    // --- model-year loop (prcsta.f :504–:790 / prc1st.f :412–:719) ---
     let iepyr = opt.episode_year;
     let lo = iepyr - (nyrlif as i32) + 1;
     let hi = iepyr;
@@ -400,25 +400,25 @@ pub fn compute_state_aggregate(
 
         let tchmdyr = iyr.min(opt.tech_year);
 
- // --- exhaust tech for this model year (prcsta.f :532 / prc1st.f :440) ---
+        // --- exhaust tech for this model year (prcsta.f :532 / prc1st.f :440) ---
         let Some(tech) = callbacks.find_exhaust_tech(scc, hpval, tchmdyr) else {
- // The Fortran source's outer `fndtch(itchyr)` already
- // succeeded; per-year miss is rare but possible. Match
- // prcus.f's symmetric warning + early-return.
+            // The Fortran source's outer `fndtch(itchyr)` already
+            // succeeded; per-year miss is rare but possible. Match
+            // prcus.f's symmetric warning + early-return.
             return Ok(StateAggregateOutcome::MissingTech {
                 hp_level: hplev,
                 side: TechMissingSide::Exhaust,
             });
         };
 
- // --- filter retrofits by model year (prcsta.f :549–:552 / prc1st.f :457–:460) ---
+        // --- filter retrofits by model year (prcsta.f :549–:552 / prc1st.f :457–:460) ---
         if opt.retrofit_loaded {
             callbacks.filter_retrofits_by_year(iyr)?;
         }
 
         let mut fulbmytot: f32 = 0.0;
 
- // --- exhaust tech-type loop (prcsta.f :556–:639 / prc1st.f :464–:556) ---
+        // --- exhaust tech-type loop (prcsta.f :556–:639 / prc1st.f :464–:556) ---
         for (tech_i, tech_name) in tech.tech_names.iter().enumerate() {
             let tfrac = tech.fractions[tech_i];
             if tfrac <= 0.0 {
@@ -427,7 +427,7 @@ pub fn compute_state_aggregate(
 
             let popbmy = popsta * modfrc * tfrac;
 
- // --- retrofit reduction (prcsta.f :583–:593 / prc1st.f :490–:498) ---
+            // --- retrofit reduction (prcsta.f :583–:593 / prc1st.f :490–:498) ---
             let mut frac_retro_bmy = 0.0_f32;
             let mut units_retro_bmy = 0.0_f32;
             if opt.retrofit_loaded {
@@ -440,7 +440,7 @@ pub fn compute_state_aggregate(
 
             let tpltmp = temporal_adjustment_for_unit(activity.units, tplfac);
 
- // --- clcems (prcsta.f :607–:613 / prc1st.f :512–:518) ---
+            // --- clcems (prcsta.f :607–:613 / prc1st.f :512–:518) ---
             let er = callbacks.calculate_exhaust(&ExhaustCallInputs {
                 scc,
                 activity: &activity,
@@ -462,17 +462,17 @@ pub fn compute_state_aggregate(
 
             accumulate_emissions(&mut emsday, &er.ems_day_delta);
 
- // --- bookkeeping (prcsta.f :620–:635 / prc1st.f :522–:535) ---
+            // --- bookkeeping (prcsta.f :620–:635 / prc1st.f :522–:535) ---
             let actbmy = actadj * popsta * modfrc * tplful * tfrac * adjtime;
- // `fulbmy` requires the real per-(year, tech) BSFC: canonical
- // `prcsta.f:623-625` / `prc1st.f:524-526` multiply by `bsfc(idxyr,i)`,
- // the array that `emfclc.f` (NR*.EMF packet) populates. The state-path
- // `calculate_exhaust` callback returns only `ExhaustResult` and does
- // NOT thread `bsfc` back here, so the prior literal `1.0` fabricated
- // fuel consumption (overstated by ~1/bsfc, i.e. ~2x for bsfc≈0.4-0.6).
- // BSFC is required data, not a defaultable 1.0, so fail loudly until
- // the exhaust calculator surfaces the loaded BSFC on this path (the
- // county path reads `factors.bsfc` directly; see `process.rs`).
+            // `fulbmy` requires the real per-(year, tech) BSFC: canonical
+            // `prcsta.f:623-625` / `prc1st.f:524-526` multiply by `bsfc(idxyr,i)`,
+            // the array that `emfclc.f` (NR*.EMF packet) populates. The state-path
+            // `calculate_exhaust` callback returns only `ExhaustResult` and does
+            // NOT thread `bsfc` back here, so the prior literal `1.0` fabricated
+            // fuel consumption (overstated by ~1/bsfc, i.e. ~2x for bsfc≈0.4-0.6).
+            // BSFC is required data, not a defaultable 1.0, so fail loudly until
+            // the exhaust calculator surfaces the loaded BSFC on this path (the
+            // county path reads `factors.bsfc` directly; see `process.rs`).
             let fulbmy: f32 = {
                 return Err(Error::Config(format!(
                     "prcsta.f/prc1st.f fulbmy requires bsfc(idxyr,i) from the NR*.EMF \
@@ -485,7 +485,7 @@ pub fn compute_state_aggregate(
             fulcsm += fulbmy;
             fulbmytot += fulbmy;
 
- // --- collect BMY / SI cells (prcsta.f :880–:894 / prc1st.f :539–:551) ---
+            // --- collect BMY / SI cells (prcsta.f :880–:894 / prc1st.f :539–:551) ---
             if opt.emit_bmy {
                 exhaust_bmy.push(StateBmyCell {
                     model_year: iyr,
@@ -514,12 +514,12 @@ pub fn compute_state_aggregate(
             }
         }
 
- // --- per-model-year exhaust totals (prcsta.f :643–:647 / prc1st.f :560–:564) ---
+        // --- per-model-year exhaust totals (prcsta.f :643–:647 / prc1st.f :560–:564) ---
         poptot += popsta * modfrc;
         acttot += actadj * popsta * modfrc * tplful * adjtime;
         strtot += stradj * popsta * modfrc * tplful * adjtime;
 
- // --- evap tech for this tech-year-capped year (prcsta.f :657 / prc1st.f :574) ---
+        // --- evap tech for this tech-year-capped year (prcsta.f :657 / prc1st.f :574) ---
         let Some(evtech) = callbacks.find_evap_tech(scc, hpval, tchmdyr) else {
             return Ok(StateAggregateOutcome::MissingTech {
                 hp_level: hplev,
@@ -527,7 +527,7 @@ pub fn compute_state_aggregate(
             });
         };
 
- // --- evap tech-type loop (prcsta.f :722–:778 / prc1st.f :639–:707) ---
+        // --- evap tech-type loop (prcsta.f :722–:778 / prc1st.f :639–:707) ---
         for (evtech_i, evtech_name) in evtech.tech_names.iter().enumerate() {
             let evfrac = evtech.fractions[evtech_i];
             if evfrac <= 0.0 {
@@ -537,7 +537,7 @@ pub fn compute_state_aggregate(
             let tpltmp = temporal_adjustment_for_unit(activity.units, tplfac);
             let fulbmy_evap = fulbmytot * evfrac;
 
- // --- clcevems (prcsta.f :751–:761 / prc1st.f :667–:677) ---
+            // --- clcevems (prcsta.f :751–:761 / prc1st.f :667–:677) ---
             let er = callbacks.calculate_evap(&EvapCallInputs {
                 scc,
                 activity: &activity,
@@ -571,7 +571,7 @@ pub fn compute_state_aggregate(
                     activity: actbmy,
                     fuel_consumption: fulbmy_evap,
                     emissions: er.ems_bmy.clone(),
- // RMISS for evap per prcsta.f :928 / prc1st.f :694.
+                    // RMISS for evap per prcsta.f :928 / prc1st.f :694.
                     frac_retrofitted: RMISS,
                     units_retrofitted: RMISS,
                     channel: 2,
@@ -592,22 +592,22 @@ pub fn compute_state_aggregate(
             }
         }
 
- // --- per-model-year evap totals (prcsta.f :782–:786 / prc1st.f :711–:715) ---
+        // --- per-model-year evap totals (prcsta.f :782–:786 / prc1st.f :711–:715) ---
         evpoptot += popsta * modfrc;
         evacttot += actadj * popsta * modfrc * tplful * adjtime;
         evstrtot += stradj * popsta * modfrc * tplful * adjtime;
     }
 
- // --- fraction retrofitted (prcsta.f :803 / prc1st.f :732) ---
+    // --- fraction retrofitted (prcsta.f :803 / prc1st.f :732) ---
     let fracretro = if poptot > 0.0 {
         unitsretro / poptot
     } else {
         0.0
     };
 
- // Suppress unused warnings; the strtot / evpoptot / evacttot /
- // evstrtot counters mirror the Fortran tallies kept for the SI
- // report, but `wrtsi` consumes them separately.
+    // Suppress unused warnings; the strtot / evpoptot / evacttot /
+    // evstrtot counters mirror the Fortran tallies kept for the SI
+    // report, but `wrtsi` consumes them separately.
     let _ = (grwsta, strtot, evpoptot, evacttot, evstrtot);
 
     Ok(StateAggregateOutcome::Ok(StateAggregate {
@@ -721,7 +721,7 @@ pub fn process_state_from_national_record(
             });
         }
         StateAggregateOutcome::Ok(agg) => {
- // BMY exhaust + evap emit (prc1st.f :539–:545, :688–:694).
+            // BMY exhaust + evap emit (prc1st.f :539–:545, :688–:694).
             for cell in &agg.exhaust_bmy {
                 output.bmy_outputs.push(ByModelYearOutput {
                     fips: fipsta.to_string(),
@@ -772,7 +772,7 @@ pub fn process_state_from_national_record(
                     channel: cell.channel,
                 });
             }
- // Final wrtdat (prc1st.f :736–:737).
+            // Final wrtdat (prc1st.f :736–:737).
             output.state_outputs.push(StateOutput {
                 fips: fipsta.to_string(),
                 subcounty: subcur,
@@ -824,8 +824,8 @@ pub fn process_state_to_county_record(
 
     match outcome {
         StateAggregateOutcome::ZeroPopulation { hp_level } => {
- // Emit a zero record for each selected county
- // (prcsta.f :300–:311).
+            // Emit a zero record for each selected county
+            // (prcsta.f :300–:311).
             for county in counties.iter().filter(|c| c.selected) {
                 output.state_outputs.push(StateOutput {
                     fips: county.fips.clone(),
@@ -866,8 +866,8 @@ pub fn process_state_to_county_record(
                 hp_min: eq.hp_range_min,
                 hp_max: eq.hp_range_max,
             });
- // Emit one RMISS-filled record per selected county
- // (prcsta.f :430–:444).
+            // Emit one RMISS-filled record per selected county
+            // (prcsta.f :430–:444).
             for county in counties.iter().filter(|c| c.selected) {
                 output.state_outputs.push(StateOutput {
                     fips: county.fips.clone(),
@@ -887,14 +887,14 @@ pub fn process_state_to_county_record(
             }
         }
         StateAggregateOutcome::Ok(agg) => {
- // Loop over counties allocating proportionally
- // (prcsta.f :811–:980).
+            // Loop over counties allocating proportionally
+            // (prcsta.f :811–:980).
             for county in counties {
                 if !county.selected {
                     continue;
                 }
                 if county.population <= 0.0 {
- // Zero-pop county — emit zero record but no BMY.
+                    // Zero-pop county — emit zero record but no BMY.
                     output.state_outputs.push(StateOutput {
                         fips: county.fips.clone(),
                         subcounty: subcur.clone(),
@@ -919,7 +919,7 @@ pub fn process_state_to_county_record(
                     0.0
                 };
 
- // BMY exhaust + evap records, scaled per county.
+                // BMY exhaust + evap records, scaled per county.
                 for cell in &agg.exhaust_bmy {
                     let mut emissions = Vec::with_capacity(MXPOL);
                     for e in cell.emissions.iter().take(MXPOL) {
@@ -938,7 +938,7 @@ pub fn process_state_to_county_record(
                         activity: cell.activity * popctyfrac,
                         load_factor: agg.activity.load_factor,
                         hp_avg: eq.hp_avg,
- // Retrofit fraction is state-level (unscaled).
+                        // Retrofit fraction is state-level (unscaled).
                         frac_retrofitted: cell.frac_retrofitted,
                         units_retrofitted: cell.units_retrofitted * popctyfrac,
                         channel: 1,
@@ -984,8 +984,8 @@ pub fn process_state_to_county_record(
                     });
                 }
 
- // Allocated state-level record for this county
- // (prcsta.f :962–:964).
+                // Allocated state-level record for this county
+                // (prcsta.f :962–:964).
                 let mut emsday_cty = Vec::with_capacity(MXPOL);
                 for e in agg.emissions_day.iter().take(MXPOL) {
                     emsday_cty.push(*e * popctyfrac);
@@ -1000,7 +1000,7 @@ pub fn process_state_to_county_record(
                     fuel_consumption: agg.fuel_consumption * popctyfrac,
                     load_factor: agg.activity.load_factor,
                     hp_avg: eq.hp_avg,
- // Retrofit fraction same for state and county.
+                    // Retrofit fraction same for state and county.
                     frac_retrofitted: agg.fraction_retrofitted,
                     units_retrofitted: agg.units_retrofitted * popctyfrac,
                     emissions_day: emsday_cty,
@@ -1058,10 +1058,10 @@ mod tests {
         }
     }
 
- // ---------- Stub callbacks ----------
+    // ---------- Stub callbacks ----------
 
- /// A simple stub `StateCallbacks` impl. Configure fields to
- /// drive different test paths.
+    /// A simple stub `StateCallbacks` impl. Configure fields to
+    /// drive different test paths.
     struct StubCallbacks {
         exhaust_tech: Option<ExhaustTechLookup>,
         evap_tech: Option<EvapTechLookup>,
@@ -1076,9 +1076,9 @@ mod tests {
         yryrfrcscrp: Vec<f32>,
         exhaust_calls: std::cell::Cell<i32>,
         evap_calls: std::cell::Cell<i32>,
- /// THC emission delta produced by each exhaust call.
+        /// THC emission delta produced by each exhaust call.
         exhaust_thc: f32,
- /// Diurnal emission delta per evap call.
+        /// Diurnal emission delta per evap call.
         evap_diurnal: f32,
     }
 
@@ -1231,7 +1231,7 @@ mod tests {
         }
     }
 
- // ---------- prc1st.f path ----------
+    // ---------- prc1st.f path ----------
 
     #[test]
     fn prc1st_zero_population_emits_zero_record() {
@@ -1315,8 +1315,8 @@ mod tests {
 
     #[test]
     fn prc1st_full_path_errors_on_missing_bsfc() {
- // State path requires BSFC from NR*.EMF to compute fuel. Returns Err
- // until ExhaustResult carries BSFC (mo-2v1).
+        // State path requires BSFC from NR*.EMF to compute fuel. Returns Err
+        // until ExhaustResult carries BSFC (mo-2v1).
         let hp = [1.0, 11.0, 25.0, 50.0];
         let ctx = default_ctx("06000", &hp);
         let mut cb = StubCallbacks::ok_single_year();
@@ -1328,7 +1328,7 @@ mod tests {
         );
     }
 
- // ---------- prcsta.f path ----------
+    // ---------- prcsta.f path ----------
 
     #[test]
     fn prcsta_zero_population_emits_zero_record_per_selected_county() {
@@ -1354,7 +1354,7 @@ mod tests {
         ];
         let mut cb = StubCallbacks::ok_single_year();
         let out = process_state_to_county_record(&ctx, &counties, &mut cb).unwrap();
- // 2 zero records for the 2 selected counties.
+        // 2 zero records for the 2 selected counties.
         assert_eq!(out.state_outputs.len(), 2);
         assert_eq!(out.state_outputs[0].fips, "06001");
         assert_eq!(out.state_outputs[1].fips, "06059");
@@ -1384,8 +1384,8 @@ mod tests {
 
     #[test]
     fn prcsta_full_path_errors_on_missing_bsfc() {
- // State path requires BSFC from NR*.EMF to compute fuel. Returns Err
- // until ExhaustResult carries BSFC (mo-2v1).
+        // State path requires BSFC from NR*.EMF to compute fuel. Returns Err
+        // until ExhaustResult carries BSFC (mo-2v1).
         let hp = [1.0, 11.0, 25.0, 50.0];
         let ctx = default_ctx("06000", &hp);
         let counties = vec![
@@ -1411,8 +1411,8 @@ mod tests {
 
     #[test]
     fn prcsta_skips_unselected_counties() {
- // State path requires BSFC from NR*.EMF (mo-2v1) — returns Err before
- // the county loop, so we can't observe the skip in the Ok path.
+        // State path requires BSFC from NR*.EMF (mo-2v1) — returns Err before
+        // the county loop, so we can't observe the skip in the Ok path.
         let hp = [1.0, 11.0, 25.0, 50.0];
         let ctx = default_ctx("06000", &hp);
         let counties = vec![
@@ -1438,8 +1438,8 @@ mod tests {
 
     #[test]
     fn prcsta_emits_zero_record_for_zero_pop_county() {
- // State path requires BSFC from NR*.EMF (mo-2v1) — returns Err before
- // the county loop, so we can't observe zero-pop county handling in the Ok path.
+        // State path requires BSFC from NR*.EMF (mo-2v1) — returns Err before
+        // the county loop, so we can't observe zero-pop county handling in the Ok path.
         let hp = [1.0, 11.0, 25.0, 50.0];
         let ctx = default_ctx("06000", &hp);
         let counties = vec![
@@ -1463,12 +1463,12 @@ mod tests {
         );
     }
 
- // ---------- compute_state_aggregate ----------
+    // ---------- compute_state_aggregate ----------
 
     #[test]
     fn aggregate_multi_year_multi_tech_accumulates() {
- // State path requires BSFC from NR*.EMF to compute fuel. Returns Err
- // until ExhaustResult carries BSFC (mo-2v1).
+        // State path requires BSFC from NR*.EMF to compute fuel. Returns Err
+        // until ExhaustResult carries BSFC (mo-2v1).
         let hp = [1.0, 11.0, 25.0, 50.0];
         let ctx = default_ctx("06000", &hp);
         let mut cb = StubCallbacks::ok_single_year();

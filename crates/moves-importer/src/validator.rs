@@ -34,9 +34,9 @@ use crate::filter::Filter;
 /// Fatal vs. informational.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Severity {
- /// Block the import; output Parquet must not be written.
+    /// Block the import; output Parquet must not be written.
     Error,
- /// Surface to the user but don't block.
+    /// Surface to the user but don't block.
     Warning,
 }
 
@@ -44,19 +44,19 @@ pub enum Severity {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ValidationMessage {
     pub severity: Severity,
- /// Table name (matches the descriptor's `name`).
+    /// Table name (matches the descriptor's `name`).
     pub table: &'static str,
- /// Column name. `None` for cross-row / cross-table messages.
+    /// Column name. `None` for cross-row / cross-table messages.
     pub column: Option<&'static str>,
- /// 1-based row in the user's CSV (header is row 1, first data row is row 2).
- /// `None` for whole-column or cross-row messages.
+    /// 1-based row in the user's CSV (header is row 1, first data row is row 2).
+    /// `None` for whole-column or cross-row messages.
     pub row: Option<usize>,
- /// Human-readable description.
+    /// Human-readable description.
     pub message: String,
 }
 
 impl ValidationMessage {
- /// Construct an error.
+    /// Construct an error.
     pub fn error(
         table: &'static str,
         column: Option<&'static str>,
@@ -72,7 +72,7 @@ impl ValidationMessage {
         }
     }
 
- /// Construct a warning.
+    /// Construct a warning.
     pub fn warning(
         table: &'static str,
         column: Option<&'static str>,
@@ -88,7 +88,7 @@ impl ValidationMessage {
         }
     }
 
- /// True if [`Self::severity`] is [`Severity::Error`].
+    /// True if [`Self::severity`] is [`Severity::Error`].
     pub fn is_error(&self) -> bool {
         matches!(self.severity, Severity::Error)
     }
@@ -126,16 +126,16 @@ impl<'a> ImportedTable<'a> {
 /// CLI in `moves-cli` always wires a real `DefaultDb`.
 pub struct ValidationContext<'a> {
     default_db: Option<&'a moves_data_default::DefaultDb>,
- /// Cached id sets: `decode_table_name → set of valid ids`.
- /// `Vec` is cheap to construct and we use it for membership via a
- /// linear scan — decode tables are small (<200 rows for the ones
- /// we touch), so a `HashSet` would be overkill.
+    /// Cached id sets: `decode_table_name → set of valid ids`.
+    /// `Vec` is cheap to construct and we use it for membership via a
+    /// linear scan — decode tables are small (<200 rows for the ones
+    /// we touch), so a `HashSet` would be overkill.
     cache: std::cell::RefCell<HashMap<&'static str, Vec<i64>>>,
 }
 
 impl<'a> ValidationContext<'a> {
- /// Build a context bound to a default-DB handle. The handle must
- /// be alive for the lifetime of the context.
+    /// Build a context bound to a default-DB handle. The handle must
+    /// be alive for the lifetime of the context.
     pub fn new(default_db: &'a moves_data_default::DefaultDb) -> Self {
         Self {
             default_db: Some(default_db),
@@ -143,9 +143,9 @@ impl<'a> ValidationContext<'a> {
         }
     }
 
- /// Build a context with no default-DB handle — FK filters degrade
- /// to warnings. Intended for unit tests that only exercise
- /// numeric-range or cross-row validation.
+    /// Build a context with no default-DB handle — FK filters degrade
+    /// to warnings. Intended for unit tests that only exercise
+    /// numeric-range or cross-row validation.
     pub fn without_default_db() -> Self {
         Self {
             default_db: None,
@@ -153,9 +153,9 @@ impl<'a> ValidationContext<'a> {
         }
     }
 
- /// Fetch (and cache) the set of valid ids for a decode-table /
- /// column pair. Returns `Ok(None)` if no default-DB handle is
- /// attached.
+    /// Fetch (and cache) the set of valid ids for a decode-table /
+    /// column pair. Returns `Ok(None)` if no default-DB handle is
+    /// attached.
     fn decode_table_ids(&self, table: &'static str, column: &str) -> Result<Option<Vec<i64>>> {
         if let Some(cached) = self.cache.borrow().get(table) {
             return Ok(Some(cached.clone()));
@@ -173,13 +173,13 @@ impl<'a> ValidationContext<'a> {
 }
 
 fn series_to_i64_vec(series: &polars::prelude::Series) -> Result<Vec<i64>> {
- // The `moves-default-db-convert` pipeline widens every MariaDB
- // integer flavor (`tinyint`, `smallint`, `int`, `bigint`) to
- // `Int64` per `crates/moves-default-db-convert/src/types.rs`. The
- // `moves-data-default` reader preserves that. So decode-table id
- // columns are always `Int64` here; if Polars reports otherwise the
- // pipeline has drifted and the validator should surface the
- // mismatch rather than silently truncate.
+    // The `moves-default-db-convert` pipeline widens every MariaDB
+    // integer flavor (`tinyint`, `smallint`, `int`, `bigint`) to
+    // `Int64` per `crates/moves-default-db-convert/src/types.rs`. The
+    // `moves-data-default` reader preserves that. So decode-table id
+    // columns are always `Int64` here; if Polars reports otherwise the
+    // pipeline has drifted and the validator should surface the
+    // mismatch rather than silently truncate.
     let ca = series.i64().map_err(|e| crate::Error::DefaultDb {
         table: series.name().to_string(),
         message: format!(
@@ -206,7 +206,7 @@ pub fn validate_table(
         let arr = batch
             .column_by_name(col_desc.name)
             .expect("reader populates every descriptor column");
- // 1. Null check.
+        // 1. Null check.
         check_nulls(
             descriptor.name,
             col_desc.name,
@@ -214,7 +214,7 @@ pub fn validate_table(
             arr,
             &mut messages,
         );
- // 2. Numeric range check (skipped for non-numeric filters).
+        // 2. Numeric range check (skipped for non-numeric filters).
         check_numeric_range(
             descriptor.name,
             col_desc.name,
@@ -222,7 +222,7 @@ pub fn validate_table(
             arr,
             &mut messages,
         );
- // 3. RoadType narrowing (specific to RoadTypeNotOffNetwork).
+        // 3. RoadType narrowing (specific to RoadTypeNotOffNetwork).
         check_road_type_narrowing(
             descriptor.name,
             col_desc.name,
@@ -230,7 +230,7 @@ pub fn validate_table(
             arr,
             &mut messages,
         );
- // 4. Year-range check (1990-2060 per SourceTypePopulationImporter.sql).
+        // 4. Year-range check (1990-2060 per SourceTypePopulationImporter.sql).
         check_year_range(
             descriptor.name,
             col_desc.name,
@@ -238,7 +238,7 @@ pub fn validate_table(
             arr,
             &mut messages,
         );
- // 5. Model-year range check (1950-2060 per ImporterManager FILTER_MODELYEARID).
+        // 5. Model-year range check (1950-2060 per ImporterManager FILTER_MODELYEARID).
         check_model_year_range(
             descriptor.name,
             col_desc.name,
@@ -246,7 +246,7 @@ pub fn validate_table(
             arr,
             &mut messages,
         );
- // 6. Foreign-key membership.
+        // 6. Foreign-key membership.
         if let Some(decode_table) = col_desc.filter.decode_table() {
             if let Some(decode_column) = col_desc.filter.decode_column() {
                 let ids = ctx.decode_table_ids(decode_table, decode_column)?;
@@ -270,7 +270,7 @@ pub fn validate_table(
                 }
             }
         }
- // 7. YesNo flag check.
+        // 7. YesNo flag check.
         check_yesno(
             descriptor.name,
             col_desc.name,
@@ -410,7 +410,7 @@ fn check_road_type_narrowing(
             continue;
         }
         let v = arr.value(row);
- // Off-network is roadTypeID 1; valid not-off-network are 2-5.
+        // Off-network is roadTypeID 1; valid not-off-network are 2-5.
         if v == 1 {
             out.push(ValidationMessage::error(
                 table,
@@ -532,7 +532,12 @@ fn check_yesno(
     let arr = match arr.as_any().downcast_ref::<StringArray>() {
         Some(a) => a,
         None => {
-            out.push(type_mismatch(table, column, "Utf8 (String)", arr.data_type()));
+            out.push(type_mismatch(
+                table,
+                column,
+                "Utf8 (String)",
+                arr.data_type(),
+            ));
             return;
         }
     };
@@ -637,8 +642,8 @@ mod tests {
         );
         let ctx = ValidationContext::without_default_db();
         let msgs = validate_table(&t, &ctx).unwrap();
- // Three FK columns (sourceTypeID, yearID, ageID) — each emits
- // one column-level warning.
+        // Three FK columns (sourceTypeID, yearID, ageID) — each emits
+        // one column-level warning.
         let warnings: Vec<_> = msgs
             .iter()
             .filter(|m| matches!(m.severity, Severity::Warning))

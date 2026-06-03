@@ -119,8 +119,8 @@ fn split_line(path: &Path, line_no: usize, line: &str) -> Result<Vec<Option<Stri
     let mut i = 0;
     loop {
         if i >= n {
- // Either the line is empty or we just consumed a trailing ','.
- // Either way, the implicit final cell is empty.
+            // Either the line is empty or we just consumed a trailing ','.
+            // Either way, the implicit final cell is empty.
             out.push(None);
             return Ok(out);
         }
@@ -180,7 +180,7 @@ fn split_line(path: &Path, line_no: usize, line: &str) -> Result<Vec<Option<Stri
         if i >= n {
             return Ok(out);
         }
- // Consume the field separator.
+        // Consume the field separator.
         debug_assert_eq!(bytes[i], b',');
         i += 1;
     }

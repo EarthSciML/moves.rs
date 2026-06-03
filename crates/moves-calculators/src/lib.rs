@@ -106,12 +106,12 @@ pub fn register_all(
         crankcase_emission::CrankcaseEmissionCalculatorNonPM::NAME,
         crankcase_emission::nonpm_factory,
     )?;
- // multiday_tank_vapor_venting_calculator is intentionally not registered:
- // it has no DAG entry — "MultidayTankVaporVentingCalculator" is not in
- // calculator-dag.json. The live TankVaporVentingCalculator DAG entry and
- // its (THC × process 12) registration belong to tank_vapor_venting_calculator
- // (already registered above). The multiday module is the algorithm body a
- // future runtime would dispatch to via USE_MULTIDAY_DIURNALS.
+    // multiday_tank_vapor_venting_calculator is intentionally not registered:
+    // it has no DAG entry — "MultidayTankVaporVentingCalculator" is not in
+    // calculator-dag.json. The live TankVaporVentingCalculator DAG entry and
+    // its (THC × process 12) registration belong to tank_vapor_venting_calculator
+    // (already registered above). The multiday module is the algorithm body a
+    // future runtime would dispatch to via USE_MULTIDAY_DIURNALS.
     registry.register_calculator(
         nitrogen_oxide::NOCalculator::NAME,
         nitrogen_oxide::no_factory,
@@ -299,7 +299,7 @@ pub fn register_all(
 /// strategy wiring work item lands (see ).
 pub fn register_strategies(registry: &mut moves_framework::ControlStrategyRegistry) {
     registry.register(|| Box::new(moves_fuel_control::FuelControlStrategy::new()));
- // AVFT uses polars+parquet and is not available on wasm32 (mio linkage issue).
+    // AVFT uses polars+parquet and is not available on wasm32 (mio linkage issue).
     #[cfg(not(target_arch = "wasm32"))]
     registry.register(|| {
         Box::new(moves_avft::AvftControlStrategy::from_completed(

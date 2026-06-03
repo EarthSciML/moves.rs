@@ -30,11 +30,11 @@ pub const SULFUR_MISSING: f32 = f32::NAN;
 /// One `/PM BASE SULFUR/` record.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SulfurRecord {
- /// Technology type (10-character key, upper-cased).
+    /// Technology type (10-character key, upper-cased).
     pub tech_type: String,
- /// Alternate base sulfur fraction (`0..=1`, or NaN if blank).
+    /// Alternate base sulfur fraction (`0..=1`, or NaN if blank).
     pub base_sulfur: f32,
- /// Sulfate conversion ratio (`0..=1`, or NaN if blank).
+    /// Sulfate conversion ratio (`0..=1`, or NaN if blank).
     pub conversion: f32,
 }
 
@@ -134,7 +134,7 @@ ADV  0.03 0.01
 
     #[test]
     fn allows_missing_packet() {
- // No packet at all — empty result.
+        // No packet at all — empty result.
         let records = read_sulf(b"" as &[u8]).unwrap();
         assert!(records.is_empty());
     }

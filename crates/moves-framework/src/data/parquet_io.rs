@@ -32,16 +32,16 @@ use crate::error::{Error, Result};
 /// need `use crate::data::DataFrameStoreParquet` (or the re-exported path
 /// from `crate::data`).
 pub trait DataFrameStoreParquet: DataFrameStore {
- /// Serialize the DataFrame stored under `name` to `dest` as Parquet.
- ///
- /// The writer is configured for byte-deterministic output: UNCOMPRESSED,
- /// statistics off. Two calls with the same [`DataFrame`] always produce
- /// byte-identical files.
- ///
- /// # Errors
- ///
- /// Returns [`Error::Polars`] when `name` is absent from the store or when
- /// the Parquet encoder fails.
+    /// Serialize the DataFrame stored under `name` to `dest` as Parquet.
+    ///
+    /// The writer is configured for byte-deterministic output: UNCOMPRESSED,
+    /// statistics off. Two calls with the same [`DataFrame`] always produce
+    /// byte-identical files.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Polars`] when `name` is absent from the store or when
+    /// the Parquet encoder fails.
     fn write_parquet<W: Write>(&self, name: &str, dest: W) -> Result<()> {
         let arc_df = self
             .get(name)
@@ -55,18 +55,18 @@ pub trait DataFrameStoreParquet: DataFrameStore {
         Ok(())
     }
 
- /// Read Parquet data from `src` and insert the resulting [`DataFrame`]
- /// into this store under `name`.
- ///
- /// `src` can be any [`MmapBytesReader`] — a `BufReader<File>` for
- /// streaming file reads or a `Cursor<&[u8]>` for in-memory bytes.
- /// Prefer the file-backed form so raw bytes are released as they decode
- /// rather than holding a full copy alongside the decoded buffers.
- ///
- /// # Errors
- ///
- /// Returns [`Error::Polars`] when `src` is not valid Parquet or when
- /// type inference fails.
+    /// Read Parquet data from `src` and insert the resulting [`DataFrame`]
+    /// into this store under `name`.
+    ///
+    /// `src` can be any [`MmapBytesReader`] — a `BufReader<File>` for
+    /// streaming file reads or a `Cursor<&[u8]>` for in-memory bytes.
+    /// Prefer the file-backed form so raw bytes are released as they decode
+    /// rather than holding a full copy alongside the decoded buffers.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Polars`] when `src` is not valid Parquet or when
+    /// type inference fails.
     fn read_parquet(&mut self, name: &str, src: impl MmapBytesReader) -> Result<()> {
         let df = ParquetReader::new(src)
             .finish()

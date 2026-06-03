@@ -69,8 +69,8 @@ pub fn write_execution_bundle(snapshot_dir: &Path, tables: &BTreeMap<String, Tab
 pub fn build_bundle_bytes<'a>(entries: impl IntoIterator<Item = (&'a str, &'a [u8])>) -> Vec<u8> {
     let entries: Vec<(&str, &[u8])> = entries.into_iter().collect();
 
- // header_size = magic (8) + count (4) = 12
- // toc_entry_size per entry = name_len (2) + name (n) + offset (8) + length (8)
+    // header_size = magic (8) + count (4) = 12
+    // toc_entry_size per entry = name_len (2) + name (n) + offset (8) + length (8)
     let toc_size: usize = entries.iter().map(|(name, _)| 2 + name.len() + 16).sum();
     let data_start: usize = 12 + toc_size;
     let total_data: usize = entries.iter().map(|(_, b)| b.len()).sum();
@@ -118,7 +118,7 @@ pub fn update_execution_bundle_from_parquets(snapshot_dir: &Path) -> Result<usiz
             })
         })
         .collect::<Result<_>>()?;
- // Sort so the bundle is in deterministic order.
+    // Sort so the bundle is in deterministic order.
     dir_entries.sort_by_key(|e| e.file_name());
 
     let mut entries: Vec<(String, Vec<u8>)> = Vec::new();
@@ -128,7 +128,7 @@ pub fn update_execution_bundle_from_parquets(snapshot_dir: &Path) -> Result<usiz
         if !name_str.starts_with(EXECDB_PREFIX) || !name_str.ends_with(".parquet") {
             continue;
         }
- // Full snapshot table name: strip `.parquet`.
+        // Full snapshot table name: strip `.parquet`.
         let table_name = name_str.trim_end_matches(".parquet").to_string();
         let parquet_bytes = std::fs::read(entry.path()).map_err(|source| Error::Io {
             path: entry.path(),
@@ -204,14 +204,14 @@ mod tests {
         let data_b: Vec<u8> = vec![0xDD];
         let buf = build_bundle_bytes([("alpha", data_a.as_slice()), ("beta", data_b.as_slice())]);
 
- // Magic.
+        // Magic.
         assert_eq!(&buf[0..8], BUNDLE_MAGIC);
 
- // Count.
+        // Count.
         let count = u32::from_le_bytes(buf[8..12].try_into().unwrap());
         assert_eq!(count, 2);
 
- // First TOC entry.
+        // First TOC entry.
         let name_len_a = u16::from_le_bytes(buf[12..14].try_into().unwrap()) as usize;
         assert_eq!(name_len_a, 5); // "alpha"
         let name_a = std::str::from_utf8(&buf[14..14 + 5]).unwrap();
@@ -220,7 +220,7 @@ mod tests {
         let length_a = u64::from_le_bytes(buf[27..35].try_into().unwrap());
         assert_eq!(length_a, 3);
 
- // Second TOC entry.
+        // Second TOC entry.
         let name_len_b = u16::from_le_bytes(buf[35..37].try_into().unwrap()) as usize;
         assert_eq!(name_len_b, 4); // "beta"
         let name_b = std::str::from_utf8(&buf[37..41]).unwrap();
@@ -229,7 +229,7 @@ mod tests {
         let length_b = u64::from_le_bytes(buf[49..57].try_into().unwrap());
         assert_eq!(length_b, 1);
 
- // Data section.
+        // Data section.
         assert_eq!(
             &buf[offset_a as usize..offset_a as usize + 3],
             &[0xAA, 0xBB, 0xCC]
@@ -242,7 +242,7 @@ mod tests {
         let table = make_table("test");
         let ipc = encode_ipc(&table).unwrap();
         assert!(!ipc.is_empty());
- // IPC file starts with the Arrow magic.
+        // IPC file starts with the Arrow magic.
         assert_eq!(&ipc[0..6], b"ARROW1");
     }
 

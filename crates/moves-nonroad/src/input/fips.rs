@@ -29,23 +29,23 @@ use std::path::PathBuf;
 /// One county record from the FIPS file.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FipsRecord {
- /// 5-digit FIPS code (zero-padded).
+    /// 5-digit FIPS code (zero-padded).
     pub fips: String,
- /// Start year, or `None` if `0` in the file (open-ended).
+    /// Start year, or `None` if `0` in the file (open-ended).
     pub year_start: Option<i32>,
- /// End year, or `None` if `0` in the file (open-ended).
+    /// End year, or `None` if `0` in the file (open-ended).
     pub year_end: Option<i32>,
- /// County name.
+    /// County name.
     pub name: String,
 }
 
 impl FipsRecord {
- /// Two-character state-FIPS prefix.
+    /// Two-character state-FIPS prefix.
     pub fn state_prefix(&self) -> &str {
         &self.fips[..2]
     }
 
- /// Whether this record applies in `episode_year`.
+    /// Whether this record applies in `episode_year`.
     pub fn applies_in(&self, episode_year: i32) -> bool {
         if let Some(start) = self.year_start {
             if episode_year < start {
@@ -107,9 +107,9 @@ pub fn read_fips<R: BufRead>(reader: R) -> Result<Vec<FipsRecord>> {
             line: line_num,
             message: "expected yr_end field".to_string(),
         })?;
- // The remainder of the line (after the third whitespace run) is the name.
- // Reconstruct it from the remaining iterator collected verbatim — the
- // Fortran reads `A50` so internal whitespace is preserved.
+        // The remainder of the line (after the third whitespace run) is the name.
+        // Reconstruct it from the remaining iterator collected verbatim — the
+        // Fortran reads `A50` so internal whitespace is preserved.
         let name_remainder: String = tokens.collect::<Vec<_>>().join(" ");
         let fips = match fips_raw.len() {
             5 => fips_raw.to_string(),

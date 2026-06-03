@@ -83,16 +83,16 @@ use crate::{Error, Result};
 /// `fipgrw`/`subgrw`/`iyrgrw`/`valgrw` in `nonrdgrw.inc`).
 #[derive(Debug, Clone, PartialEq)]
 pub struct GrowthIndicatorRecord {
- /// 4-character indicator code.
+    /// 4-character indicator code.
     pub indicator: String,
- /// 5-character FIPS region (`00000` for national, `XX000` for
- /// state, `XXYYY` for county).
+    /// 5-character FIPS region (`00000` for national, `XX000` for
+    /// state, `XXYYY` for county).
     pub fips: String,
- /// 5-character subregion (often blank when not subcounty).
+    /// 5-character subregion (often blank when not subcounty).
     pub subregion: String,
- /// Calendar year.
+    /// Calendar year.
     pub year: i32,
- /// Indicator value.
+    /// Indicator value.
     pub value: f32,
 }
 
@@ -105,30 +105,30 @@ pub struct GrowthIndicatorRecord {
 /// `WarningMessage` accumulator.
 #[derive(Debug, Clone, PartialEq)]
 pub struct GrowthFactorWarning {
- /// Base population year that was passed in.
+    /// Base population year that was passed in.
     pub base_year: i32,
- /// The interpolated base-year indicator value (zero, in this case).
+    /// The interpolated base-year indicator value (zero, in this case).
     pub base_indicator: f32,
- /// The adjusted indicator used to avoid divide-by-zero
- /// ([`MINGRWIND`]).
+    /// The adjusted indicator used to avoid divide-by-zero
+    /// ([`MINGRWIND`]).
     pub adjusted_base_indicator: f32,
- /// Growth (target) year that was passed in.
+    /// Growth (target) year that was passed in.
     pub growth_year: i32,
- /// Interpolated growth-year indicator value.
+    /// Interpolated growth-year indicator value.
     pub growth_indicator: f32,
 }
 
 /// Result of a successful [`growth_factor`] call.
 #[derive(Debug, Clone, PartialEq)]
 pub struct GrowthFactor {
- /// The annualized year-to-year fractional change between base
- /// and growth years.
+    /// The annualized year-to-year fractional change between base
+    /// and growth years.
     pub factor: f32,
- /// Indicator value used for the base population year.
+    /// Indicator value used for the base population year.
     pub base_indicator: f32,
- /// Indicator value used for the growth (target) year.
+    /// Indicator value used for the growth (target) year.
     pub growth_indicator: f32,
- /// Set when the base indicator was bumped to [`MINGRWIND`].
+    /// Set when the base indicator was bumped to [`MINGRWIND`].
     pub warning: Option<GrowthFactorWarning>,
 }
 
@@ -171,7 +171,7 @@ pub fn growth_factor(
     growth_year: i32,
     fips: &str,
 ) -> Result<GrowthFactor> {
- // --- if episode year equals base year, no growth (grwfac.f :95) ---
+    // --- if episode year equals base year, no growth (grwfac.f :95) ---
     if growth_year == base_year {
         return Ok(GrowthFactor {
             factor: 0.0,
@@ -181,13 +181,13 @@ pub fn growth_factor(
         });
     }
 
- // grwfac.f :113 forms the state key from `infips(1:2)`, where
- // `infips` is a fixed-width `character*5` and therefore always has
- // at least two characters. The Rust port takes a `&str` that could
- // be malformed; rather than fabricate a "00" prefix (which would
- // collide with the "00000" national sentinel and silently return
- // national growth data for a bad FIPS), treat a sub-2-char FIPS as
- // a data error.
+    // grwfac.f :113 forms the state key from `infips(1:2)`, where
+    // `infips` is a fixed-width `character*5` and therefore always has
+    // at least two characters. The Rust port takes a `&str` that could
+    // be malformed; rather than fabricate a "00" prefix (which would
+    // collide with the "00000" national sentinel and silently return
+    // national growth data for a bad FIPS), treat a sub-2-char FIPS as
+    // a data error.
     let state_prefix = fips.get(..2).ok_or_else(|| {
         Error::Config(format!(
             "growth-factor FIPS {:?} is shorter than 2 characters; cannot form state key",
@@ -196,8 +196,8 @@ pub fn growth_factor(
     })?;
     let st_fips = format!("{state_prefix}000");
 
- // --- loop looking for national, state, or county match — keep
- // the last (most-specific) hit (grwfac.f :115–119) ---
+    // --- loop looking for national, state, or county match — keep
+    // the last (most-specific) hit (grwfac.f :115–119) ---
     let mut iend: Option<usize> = None;
     for (i, r) in records.iter().enumerate() {
         if r.fips == "00000" || r.fips == st_fips || r.fips == fips {
@@ -214,7 +214,7 @@ pub fn growth_factor(
         }
     };
 
- // --- back up to the first occurrence of records.fips[iend] (grwfac.f :128–133) ---
+    // --- back up to the first occurrence of records.fips[iend] (grwfac.f :128–133) ---
     let target_fips = &records[iend].fips;
     let mut ibeg = 0usize;
     if iend > 0 {
@@ -229,7 +229,7 @@ pub fn growth_factor(
         }
     }
 
- // --- need at least two years to compute a slope (grwfac.f :143) ---
+    // --- need at least two years to compute a slope (grwfac.f :143) ---
     if ibeg == iend || records[ibeg].year == records[iend].year {
         return Err(Error::Config(format!(
             "growth indicator data for FIPS {} growth_year {} has fewer than two distinct years; \
@@ -238,7 +238,7 @@ pub fn growth_factor(
         )));
     }
 
- // --- boundary year-to-year change for extrapolation (grwfac.f :148–157) ---
+    // --- boundary year-to-year change for extrapolation (grwfac.f :148–157) ---
     let lower_change = if base_year < records[ibeg].year || growth_year < records[ibeg].year {
         Some(
             (records[ibeg + 1].value - records[ibeg].value)
@@ -261,7 +261,7 @@ pub fn growth_factor(
     let growth_indicator =
         interpolate_indicator(records, ibeg, iend, growth_year, lower_change, upper_change);
 
- // --- if both indicators are zero, default growth factor of zero (grwfac.f :224) ---
+    // --- if both indicators are zero, default growth factor of zero (grwfac.f :224) ---
     if base_indicator == 0.0 && growth_indicator == 0.0 {
         return Ok(GrowthFactor {
             factor: 0.0,
@@ -271,11 +271,11 @@ pub fn growth_factor(
         });
     }
 
- // --- warn (and clamp for the message only) when the base-year
- // indicator is zero (grwfac.f :230–241). The Fortran computes
- // `tmpbaseyearind = max(MINGRWIND, baseyearind)` *solely* to format
- // the warning message and to bump `nwarn`; it does NOT use the
- // clamped value in the factor calculation. ---
+    // --- warn (and clamp for the message only) when the base-year
+    // indicator is zero (grwfac.f :230–241). The Fortran computes
+    // `tmpbaseyearind = max(MINGRWIND, baseyearind)` *solely* to format
+    // the warning message and to bump `nwarn`; it does NOT use the
+    // clamped value in the factor calculation. ---
     let mut warning = None;
     if base_indicator == 0.0 {
         let adjusted = MINGRWIND.max(base_indicator);
@@ -288,12 +288,12 @@ pub fn growth_factor(
         });
     }
 
- // grwfac.f :244–245. The Fortran divides by the *raw* `baseyearind`,
- // not the clamped `tmpbaseyearind`. A zero base indicator therefore
- // yields `growthyearind / 0` → `±Inf`, which propagates downstream
- // (agedist.f :132). We match that behavior for fidelity rather than
- // substituting the MINGRWIND clamp (which would silently produce a
- // finite factor the Fortran never computes).
+    // grwfac.f :244–245. The Fortran divides by the *raw* `baseyearind`,
+    // not the clamped `tmpbaseyearind`. A zero base indicator therefore
+    // yields `growthyearind / 0` → `±Inf`, which propagates downstream
+    // (agedist.f :132). We match that behavior for fidelity rather than
+    // substituting the MINGRWIND clamp (which would silently produce a
+    // finite factor the Fortran never computes).
     let factor =
         (growth_indicator - base_indicator) / (base_indicator * (growth_year - base_year) as f32);
 
@@ -317,18 +317,18 @@ fn interpolate_indicator(
     upper_change: Option<f32>,
 ) -> f32 {
     if year < records[ibeg].year {
- // extrapolate backward (grwfac.f :160–164)
+        // extrapolate backward (grwfac.f :160–164)
         let slope = lower_change.expect("lower_change is Some when year < records[ibeg].year");
         (records[ibeg].value + slope * (year - records[ibeg].year) as f32).max(0.0)
     } else if year > records[iend].year {
- // extrapolate forward (grwfac.f :165–169)
+        // extrapolate forward (grwfac.f :165–169)
         let slope = upper_change.expect("upper_change is Some when year > records[iend].year");
         (records[iend].value + slope * (year - records[iend].year) as f32).max(0.0)
     } else if year == records[iend].year {
- // matched last (grwfac.f :170–172)
+        // matched last (grwfac.f :170–172)
         records[iend].value
     } else {
- // interior — find bracket and interpolate (grwfac.f :174–188)
+        // interior — find bracket and interpolate (grwfac.f :174–188)
         for i in ibeg..iend {
             if year == records[i].year {
                 return records[i].value;
@@ -338,7 +338,7 @@ fn interpolate_indicator(
                 return records[i].value + slope * (year - records[i].year) as f32;
             }
         }
- // Unreachable given ibeg <= iend invariants; fall back to last.
+        // Unreachable given ibeg <= iend invariants; fall back to last.
         records[iend].value
     }
 }
@@ -394,8 +394,8 @@ mod tests {
 
     #[test]
     fn interpolation_within_range() {
- // Base 2010 -> 100; growth 2020 -> 120. Target base=2010, growth=2020.
- // factor = (120 - 100) / (100 * (2020 - 2010)) = 0.02 per year.
+        // Base 2010 -> 100; growth 2020 -> 120. Target base=2010, growth=2020.
+        // factor = (120 - 100) / (100 * (2020 - 2010)) = 0.02 per year.
         let records = vec![
             rec("POP", "06000", 2010, 100.0),
             rec("POP", "06000", 2020, 120.0),
@@ -408,7 +408,7 @@ mod tests {
 
     #[test]
     fn interpolation_between_years() {
- // Linear between 2010=100 and 2020=120 → 2015 = 110.
+        // Linear between 2010=100 and 2020=120 → 2015 = 110.
         let records = vec![
             rec("POP", "06000", 2010, 100.0),
             rec("POP", "06000", 2020, 120.0),
@@ -416,16 +416,16 @@ mod tests {
         let r = growth_factor(&refs(&records), 2015, 2020, "06000").unwrap();
         assert!((r.base_indicator - 110.0).abs() < 1e-4);
         assert_eq!(r.growth_indicator, 120.0);
- // factor = (120 - 110) / (110 * (2020 - 2015)) = 10 / 550 ≈ 0.01818
+        // factor = (120 - 110) / (110 * (2020 - 2015)) = 10 / 550 ≈ 0.01818
         assert!((r.factor - 10.0 / 550.0).abs() < 1e-6);
     }
 
     #[test]
     fn county_match_wins_over_state_and_national() {
- // National POP for fips 00000: 100→120 over 2010→2020
- // State (06000): 200→240
- // County (06037): 300→360
- // Lookup for 06037 should use county data.
+        // National POP for fips 00000: 100→120 over 2010→2020
+        // State (06000): 200→240
+        // County (06037): 300→360
+        // Lookup for 06037 should use county data.
         let records = vec![
             rec("POP", "00000", 2010, 100.0),
             rec("POP", "00000", 2020, 120.0),
@@ -465,8 +465,8 @@ mod tests {
 
     #[test]
     fn forward_extrapolation_clamps_at_zero() {
- // Linear extrapolation 2010→2020: 100→50 (slope -5/yr).
- // base=2020 → 50; growth=2030 → 0 (clamped, not -5).
+        // Linear extrapolation 2010→2020: 100→50 (slope -5/yr).
+        // base=2020 → 50; growth=2030 → 0 (clamped, not -5).
         let records = vec![
             rec("POP", "06000", 2010, 100.0),
             rec("POP", "06000", 2020, 50.0),
@@ -478,8 +478,8 @@ mod tests {
 
     #[test]
     fn backward_extrapolation_clamps_at_zero() {
- // 2010→2020: 100→150, slope +5/yr → backward to 1980 gives -50,
- // clamped to 0.
+        // 2010→2020: 100→150, slope +5/yr → backward to 1980 gives -50,
+        // clamped to 0.
         let records = vec![
             rec("POP", "06000", 2010, 100.0),
             rec("POP", "06000", 2020, 150.0),
@@ -487,7 +487,7 @@ mod tests {
         let r = growth_factor(&refs(&records), 1980, 2010, "06000").unwrap();
         assert_eq!(r.base_indicator, 0.0); // clamped
         assert_eq!(r.growth_indicator, 100.0);
- // base==0 and growth!=0 → warning + adjustment
+        // base==0 and growth!=0 → warning + adjustment
         assert!(r.warning.is_some());
     }
 
@@ -535,27 +535,30 @@ mod tests {
         assert!(r.warning.is_some());
         let w = r.warning.unwrap();
         assert_eq!(w.base_indicator, 0.0);
- // The warning still reports the MINGRWIND value the Fortran
- // formats into its message (grwfac.f :233).
+        // The warning still reports the MINGRWIND value the Fortran
+        // formats into its message (grwfac.f :233).
         assert_eq!(w.adjusted_base_indicator, MINGRWIND);
- // grwfac.f :244 divides by the *raw* zero base indicator, so the
- // factor is +Inf — not the MINGRWIND-clamped finite value.
+        // grwfac.f :244 divides by the *raw* zero base indicator, so the
+        // factor is +Inf — not the MINGRWIND-clamped finite value.
         assert!(r.factor.is_infinite() && r.factor > 0.0);
     }
 
     #[test]
     fn zero_base_indicator_matches_fortran_inf() {
- // Fidelity: `grwfac.f` :244 divides by the un-clamped
- // `baseyearind`, so a zero base indicator gives `growthyearind /
- // 0` → `+Inf`. The port reproduces this exactly, while still
- // surfacing the warning the Fortran writes to IOWMSG. See the
- // module-level "Zero base-year indicator" note.
+        // Fidelity: `grwfac.f` :244 divides by the un-clamped
+        // `baseyearind`, so a zero base indicator gives `growthyearind /
+        // 0` → `+Inf`. The port reproduces this exactly, while still
+        // surfacing the warning the Fortran writes to IOWMSG. See the
+        // module-level "Zero base-year indicator" note.
         let records = vec![
             rec("POP", "06000", 2010, 0.0),
             rec("POP", "06000", 2020, 50.0),
         ];
         let r = growth_factor(&refs(&records), 2010, 2020, "06000").unwrap();
-        assert!(r.factor.is_infinite(), "port matches the Fortran divide-by-zero");
+        assert!(
+            r.factor.is_infinite(),
+            "port matches the Fortran divide-by-zero"
+        );
         assert!(r.factor > 0.0);
         assert!(r.warning.is_some(), "the MINGRWIND clamp is still flagged");
     }

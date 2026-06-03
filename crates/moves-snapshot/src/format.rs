@@ -71,15 +71,15 @@ pub fn float_to_fixed_decimal(x: f64, decimals: u32) -> String {
         };
     }
 
- // Round at the requested precision. Multiplying by 10^decimals can lose
- // precision for very large values, but for any value within the f64
- // representable range the resulting string is well-defined and
- // deterministic — which is what byte-identical round-trip requires.
+    // Round at the requested precision. Multiplying by 10^decimals can lose
+    // precision for very large values, but for any value within the f64
+    // representable range the resulting string is well-defined and
+    // deterministic — which is what byte-identical round-trip requires.
     let scale = 10f64.powi(decimals as i32);
     let rounded = (x * scale).round() / scale;
 
- // Canonicalize -0.0 to 0.0 so the leading sign doesn't depend on the
- // sign of zero.
+    // Canonicalize -0.0 to 0.0 so the leading sign doesn't depend on the
+    // sign of zero.
     let canonical = if rounded == 0.0 { 0.0 } else { rounded };
 
     format!("{:.*}", decimals as usize, canonical)
@@ -113,7 +113,7 @@ mod tests {
 
     #[test]
     fn float_rounds_to_precision() {
- // 1e-13 perturbation should round away.
+        // 1e-13 perturbation should round away.
         let lhs = float_to_fixed_decimal(1.0, 12);
         let rhs = float_to_fixed_decimal(1.0 + 1e-13, 12);
         assert_eq!(lhs, rhs);

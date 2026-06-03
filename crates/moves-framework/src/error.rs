@@ -12,133 +12,133 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// added as the framework crate fills out.
 #[derive(Debug, Error)]
 pub enum Error {
- /// Returned by trait impls whose body hasn't been ported yet.
+    /// Returned by trait impls whose body hasn't been ported yet.
     #[error("master loopable not yet implemented")]
     NotImplemented,
 
- /// Failed to load a [`CalculatorDag`](moves_calculator_info::CalculatorDag)
- /// from disk — either the file was missing/unreadable or the JSON did
- /// not deserialize. `message` includes the underlying cause; the path
- /// is split out so callers can present it independently.
+    /// Failed to load a [`CalculatorDag`](moves_calculator_info::CalculatorDag)
+    /// from disk — either the file was missing/unreadable or the JSON did
+    /// not deserialize. `message` includes the underlying cause; the path
+    /// is split out so callers can present it independently.
     #[error("failed to load calculator DAG from {path}: {message}")]
     DagLoad { path: PathBuf, message: String },
 
- /// A factory registration named a module that doesn't exist in the
- /// loaded DAG. Almost always a typo in a calculator's
- /// `register_*` call.
+    /// A factory registration named a module that doesn't exist in the
+    /// loaded DAG. Almost always a typo in a calculator's
+    /// `register_*` call.
     #[error("module {0} is not present in the calculator DAG")]
     UnknownModule(String),
 
- /// The chain-DAG restricted to a topological-sort input has a cycle.
- /// `unresolved` lists the modules whose dependencies could not be
- /// emitted — useful for diagnostic dumps.
+    /// The chain-DAG restricted to a topological-sort input has a cycle.
+    /// `unresolved` lists the modules whose dependencies could not be
+    /// emitted — useful for diagnostic dumps.
     #[error("calculator chain has a cycle; unresolved modules: {unresolved:?}")]
     CyclicChain { unresolved: Vec<String> },
 
- /// I/O failure while writing output files. The path identifies the
- /// target (parquet file, partition directory, temporary sibling).
+    /// I/O failure while writing output files. The path identifies the
+    /// target (parquet file, partition directory, temporary sibling).
     #[error("output i/o error at {path}: {source}")]
     Io {
- /// Path the writer was operating on.
+        /// Path the writer was operating on.
         path: PathBuf,
- /// Underlying OS error.
+        /// Underlying OS error.
         #[source]
         source: std::io::Error,
     },
 
- /// Arrow record-batch construction failure — almost always indicates
- /// a mismatch between the declared schema and the columns the writer
- /// built.
+    /// Arrow record-batch construction failure — almost always indicates
+    /// a mismatch between the declared schema and the columns the writer
+    /// built.
     #[error("arrow: {0}")]
     Arrow(#[source] arrow::error::ArrowError),
 
- /// Parquet encoder failure.
+    /// Parquet encoder failure.
     #[error("parquet: {0}")]
     Parquet(#[source] parquet::errors::ParquetError),
 
- /// The writer encountered a column name not in the static output
- /// schema — should be unreachable in correct code, but a diagnosable
- /// failure mode is better than a panic if a schema constant drifts
- /// out of sync with the record-batch builder.
+    /// The writer encountered a column name not in the static output
+    /// schema — should be unreachable in correct code, but a diagnosable
+    /// failure mode is better than a panic if a schema constant drifts
+    /// out of sync with the record-batch builder.
     #[error("output schema mismatch: unknown column '{0}'")]
     OutputSchemaMismatch(String),
 
- /// An [`AggregationPlan`](crate::AggregationPlan) handed to the output
- /// aggregator does not match the table being rolled up: wrong target
- /// table, an unexpected `SUM`-column shape, or a group-by key that
- /// names a column absent from the output schema. The message names the
- /// specific inconsistency.
+    /// An [`AggregationPlan`](crate::AggregationPlan) handed to the output
+    /// aggregator does not match the table being rolled up: wrong target
+    /// table, an unexpected `SUM`-column shape, or a group-by key that
+    /// names a column absent from the output schema. The message names the
+    /// specific inconsistency.
     #[error("aggregation plan mismatch: {0}")]
     AggregationPlanMismatch(String),
 
- /// The bounded-concurrency executor could not build its
- /// `rayon::ThreadPool` — typically a zero thread count or an OS-level
- /// thread-spawn failure. `message` carries the underlying
- /// `rayon::ThreadPoolBuildError` text.
+    /// The bounded-concurrency executor could not build its
+    /// `rayon::ThreadPool` — typically a zero thread count or an OS-level
+    /// thread-spawn failure. `message` carries the underlying
+    /// `rayon::ThreadPoolBuildError` text.
     #[error("failed to build the bounded-concurrency thread pool: {0}")]
     ThreadPool(String),
 
- /// `DataFrameStore::insert_typed` was called for a table whose schema
- /// is registered, but the row type's declared schema does not match the
- /// registry schema. `expected` lists the registry column names in order;
- /// `actual` lists the row type's declared column names.
+    /// `DataFrameStore::insert_typed` was called for a table whose schema
+    /// is registered, but the row type's declared schema does not match the
+    /// registry schema. `expected` lists the registry column names in order;
+    /// `actual` lists the row type's declared column names.
     #[error(
         "schema mismatch for table '{table}': \
          expected columns {expected:?} but row type declares {actual:?}"
     )]
     SchemaMismatch {
- /// Canonical table name.
+        /// Canonical table name.
         table: String,
- /// Column names from the registry schema.
+        /// Column names from the registry schema.
         expected: Vec<String>,
- /// Column names from the row type's `polars_schema()`.
+        /// Column names from the row type's `polars_schema()`.
         actual: Vec<String>,
     },
 
- /// A DataFrame column could not be cast to the expected type, or a value
- /// was `null` where the row type requires a non-null value.
+    /// A DataFrame column could not be cast to the expected type, or a value
+    /// was `null` where the row type requires a non-null value.
     #[error("failed to extract row {row} from '{table}' column '{column}': {message}")]
     RowExtraction {
- /// Canonical table name.
+        /// Canonical table name.
         table: String,
- /// Zero-based row index.
+        /// Zero-based row index.
         row: usize,
- /// Column where extraction failed.
+        /// Column where extraction failed.
         column: String,
- /// Human-readable description of the failure.
+        /// Human-readable description of the failure.
         message: String,
     },
 
- /// A required master-loop context value was absent when the calculator
- /// executed. The master loop guarantees that fields at the subscribed
- /// granularity are `Some` before dispatch, so `None` here is a
- /// programming error — either a calculator is subscribed at a granularity
- /// coarser than the context field it requires, or the engine failed to
- /// populate the position before calling `execute`.
- ///
- /// `what` identifies the missing field (e.g. `"context.year"`).
+    /// A required master-loop context value was absent when the calculator
+    /// executed. The master loop guarantees that fields at the subscribed
+    /// granularity are `Some` before dispatch, so `None` here is a
+    /// programming error — either a calculator is subscribed at a granularity
+    /// coarser than the context field it requires, or the engine failed to
+    /// populate the position before calling `execute`.
+    ///
+    /// `what` identifies the missing field (e.g. `"context.year"`).
     #[error("missing required context value: {what}")]
     MissingContext {
- /// Human-readable name of the missing field.
+        /// Human-readable name of the missing field.
         what: String,
     },
 
- /// A Polars operation failed.
+    /// A Polars operation failed.
     #[error("polars: {0}")]
     Polars(String),
 
- /// The execution-DB bundle file is malformed (wrong magic, truncated TOC,
- /// or out-of-bounds data offset).
+    /// The execution-DB bundle file is malformed (wrong magic, truncated TOC,
+    /// or out-of-bounds data offset).
     #[error("invalid execution-DB bundle: {0}")]
     InvalidBundle(String),
 
- /// A `moves-nonroad` simulation call failed.
- ///
- /// Wraps the `moves_nonroad::Error` string for reporting through the
- /// `moves-framework` error surface. The `NonroadEmissionCalculator`
- /// adapter uses this to propagate `moves_nonroad::run_simulation`
- /// failures (year out of range, geography-executor errors, etc.) to
- /// the master loop.
+    /// A `moves-nonroad` simulation call failed.
+    ///
+    /// Wraps the `moves_nonroad::Error` string for reporting through the
+    /// `moves-framework` error surface. The `NonroadEmissionCalculator`
+    /// adapter uses this to propagate `moves_nonroad::run_simulation`
+    /// failures (year out of range, geography-executor errors, etc.) to
+    /// the master loop.
     #[error("nonroad simulation error: {0}")]
     Nonroad(String),
 }

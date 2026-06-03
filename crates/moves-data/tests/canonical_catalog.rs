@@ -37,15 +37,15 @@ fn polproc_id_round_trips_through_compose_and_decompose() {
         let id = assoc.polproc_id();
         assert_eq!(id.pollutant_id(), assoc.pollutant_id);
         assert_eq!(id.process_id(), assoc.process_id);
- // And `new` agrees with `polproc_id`.
+        // And `new` agrees with `polproc_id`.
         assert_eq!(PolProcessId::new(assoc.pollutant_id, assoc.process_id), id);
     }
 }
 
 #[test]
 fn road_and_source_type_catalogs_are_non_empty() {
- // Sanity floors so a future generator that empties these tables fails
- // loudly.
+    // Sanity floors so a future generator that empties these tables fails
+    // loudly.
     assert!(RoadType::all().count() >= 5);
     assert!(SourceType::all().count() >= 13);
 }

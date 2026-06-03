@@ -52,7 +52,7 @@ fn imports_lev_csv_to_parquet_round_trip() {
     assert_eq!(report.sha256.len(), 64);
     assert!(report.sha256.chars().all(|c| c.is_ascii_hexdigit()));
 
- // Round-trip: read Parquet back and verify all columns survived.
+    // Round-trip: read Parquet back and verify all columns survived.
     let batch = read_parquet(&report.output_path);
     assert_eq!(batch.num_rows(), 4);
     assert_eq!(batch.num_columns(), COLUMNS.len());
@@ -87,7 +87,7 @@ fn imports_lev_csv_to_parquet_round_trip() {
         .downcast_ref::<Float64Array>()
         .unwrap();
     assert_eq!(mean_base_rate_cv.value(0), 0.05);
- // Row 2 (index 2) has blank optional cells → null.
+    // Row 2 (index 2) has blank optional cells → null.
     assert!(mean_base_rate_cv.is_null(2));
 
     let data_source = batch
@@ -96,7 +96,7 @@ fn imports_lev_csv_to_parquet_round_trip() {
         .downcast_ref::<Int64Array>()
         .unwrap();
     assert_eq!(data_source.value(0), 1);
- // Row 2 has blank dataSourceId.
+    // Row 2 has blank dataSourceId.
     assert!(data_source.is_null(2));
     assert_eq!(data_source.value(3), 99);
 }
@@ -121,8 +121,8 @@ fn imports_nlev_csv_writes_to_nlev_table_path() {
 
 #[test]
 fn lev_and_nlev_with_same_csv_produce_same_hash() {
- // The Parquet content is independent of which kind it represents;
- // both reuse the same writer settings.
+    // The Parquet content is independent of which kind it represents;
+    // both reuse the same writer settings.
     let tmp = tempfile::tempdir().unwrap();
     let csv_path = write_fixture(tmp.path(), "shared.csv");
     let out_dir = tmp.path().join("parquet");
@@ -159,7 +159,7 @@ fn missing_csv_returns_io_error() {
 fn malformed_csv_surfaces_validation_error() {
     let tmp = tempfile::tempdir().unwrap();
     let csv_path = tmp.path().join("bad.csv");
- // Missing ageGroupID (required).
+    // Missing ageGroupID (required).
     std::fs::write(
         &csv_path,
         b"sourceBinID,polProcessID,opModeID,meanBaseRate\n1000,101,1,0.5\n",

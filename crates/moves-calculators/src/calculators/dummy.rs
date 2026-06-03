@@ -41,7 +41,7 @@ impl Calculator for DummyCalculator {
     }
 
     fn execute(&self, _ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
- // no-wiring-audit: permanently no-op — not a data-plane shell; exclude from execute-shell wiring inventory.
+        // no-wiring-audit: permanently no-op — not a data-plane shell; exclude from execute-shell wiring inventory.
         Ok(CalculatorOutput::empty())
     }
 }

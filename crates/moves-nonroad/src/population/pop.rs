@@ -46,25 +46,25 @@ use crate::input::pop::PopulationRecord;
 /// `regncd` arrays.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SelectedPopulation {
- /// FIPS region (5 chars, left-justified).
+    /// FIPS region (5 chars, left-justified).
     pub fips: String,
- /// Subregion (5 chars, upper-cased per `getpop.f` :139).
+    /// Subregion (5 chars, upper-cased per `getpop.f` :139).
     pub subregion: String,
- /// Year of this population record.
+    /// Year of this population record.
     pub year: i32,
- /// HP-category midpoint.
+    /// HP-category midpoint.
     pub hp_avg: f32,
- /// HP-category lower bound.
+    /// HP-category lower bound.
     pub hp_min: f32,
- /// HP-category upper bound.
+    /// HP-category upper bound.
     pub hp_max: f32,
- /// Usage factor (annual hours).
+    /// Usage factor (annual hours).
     pub usage: f32,
- /// Technology/distribution code (10 chars, left-justified,
- /// upper-cased per `getpop.f` :141).
+    /// Technology/distribution code (10 chars, left-justified,
+    /// upper-cased per `getpop.f` :141).
     pub tech_code: String,
- /// Equipment population. `f32` to match `getpop.f`'s `real*4`
- /// `popeqp` — see `PopulationRecord::population`.
+    /// Equipment population. `f32` to match `getpop.f`'s `real*4`
+    /// `popeqp` — see `PopulationRecord::population`.
     pub population: f32,
 }
 
@@ -87,9 +87,9 @@ pub fn select_for_scc(
 
     for record in records {
         if record.scc.trim() != scc.trim() {
- // Records outside our SCC are skipped — caller-supplied
- // ordering ensures matching records are contiguous, but
- // we don't assume; we just filter.
+            // Records outside our SCC are skipped — caller-supplied
+            // ordering ensures matching records are contiguous, but
+            // we don't assume; we just filter.
             continue;
         }
 
@@ -105,7 +105,7 @@ pub fn select_for_scc(
             && !out.is_empty();
 
         if !same_group {
- // New group: emit the record, reset the latch.
+            // New group: emit the record, reset the latch.
             group_region = Some(region);
             group_hp_int = Some(hp_int);
             group_locked = record.year >= target_year;
@@ -114,14 +114,14 @@ pub fn select_for_scc(
         }
 
         if group_locked {
- // Already captured a year >= target_year for this group.
+            // Already captured a year >= target_year for this group.
             continue;
         }
 
         if record.year > target_year {
- // Either we already have an exact-year slot (skip the
- // newer record) or we push a new slot for the post-year
- // bracket and lock the latch.
+            // Either we already have an exact-year slot (skip the
+            // newer record) or we push a new slot for the post-year
+            // bracket and lock the latch.
             let last = out.last().expect("same_group implies out is non-empty");
             if last.year == target_year {
                 group_locked = true;
@@ -130,11 +130,11 @@ pub fn select_for_scc(
             out.push(slot_from(record));
             group_locked = true;
         } else {
- // year <= target_year: overwrite the current slot. The
- // Fortran `goto 111` after the lupper block falls through
- // to load the same `npoprc` index.
+            // year <= target_year: overwrite the current slot. The
+            // Fortran `goto 111` after the lupper block falls through
+            // to load the same `npoprc` index.
             let last = out.last_mut().expect("same_group implies out is non-empty");
- *last = slot_from(record);
+            *last = slot_from(record);
         }
     }
 
@@ -176,9 +176,9 @@ mod tests {
 
     #[test]
     fn picks_latest_year_le_target_when_no_exact_match() {
- // Sorted by (scc, hp, fips, sub, year). Same group at
- // (SCC1, hp=11, 06000, 00000). Years 2015, 2018, 2025.
- // Target 2020 → keep 2018 (latest <=), then add 2025 (next >).
+        // Sorted by (scc, hp, fips, sub, year). Same group at
+        // (SCC1, hp=11, 06000, 00000). Years 2015, 2018, 2025.
+        // Target 2020 → keep 2018 (latest <=), then add 2025 (next >).
         let records = vec![
             rec("SCC1", "06000", "00000", 11.0, 2015, 100.0),
             rec("SCC1", "06000", "00000", 11.0, 2018, 200.0),
@@ -207,8 +207,8 @@ mod tests {
 
     #[test]
     fn keeps_first_post_target_when_no_pre_target_data() {
- // Only post-target records exist for the group: the first
- // becomes the slot, the next is dropped (lupper latch).
+        // Only post-target records exist for the group: the first
+        // becomes the slot, the next is dropped (lupper latch).
         let records = vec![
             rec("SCC1", "06000", "00000", 11.0, 2025, 300.0),
             rec("SCC1", "06000", "00000", 11.0, 2030, 400.0),
@@ -239,14 +239,14 @@ mod tests {
 
     #[test]
     fn hp_grouping_uses_rounded_int() {
- // hp_avg 11.4 and 10.7 both round to 11 (nint) and 11.5 rounds to 12.
- // f32 banker's rounding nuance: use values away from .5.
+        // hp_avg 11.4 and 10.7 both round to 11 (nint) and 11.5 rounds to 12.
+        // f32 banker's rounding nuance: use values away from .5.
         let records = vec![
             rec("SCC1", "06000", "00000", 10.7, 2018, 100.0),
             rec("SCC1", "06000", "00000", 11.4, 2025, 200.0),
         ];
         let out = select_for_scc(&records, "SCC1", 2020);
- // Both round to 11 → same group. Latest pre is 2018, post is 2025.
+        // Both round to 11 → same group. Latest pre is 2018, post is 2025.
         assert_eq!(out.len(), 2);
         assert_eq!(out[0].year, 2018);
         assert_eq!(out[1].year, 2025);

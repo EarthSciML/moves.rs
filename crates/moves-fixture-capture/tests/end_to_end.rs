@@ -30,7 +30,7 @@ const CAPTURE_FILES: &[(&str, &[u8])] = &[
         "databases/movesoutput/movesoutput.tsv",
         b"1\t0.001\n2\t0.002\n",
     ),
- // Default DB — should be excluded based on the RunSpec's <scaleinputdatabase>.
+    // Default DB — should be excluded based on the RunSpec's <scaleinputdatabase>.
     (
         "databases/movesdb20241112/sourceusetype.schema.tsv",
         b"sourcetypeid\tint\tPRI\nname\tvarchar\t\n",
@@ -71,7 +71,7 @@ fn populate_captures(root: &Path) {
 }
 
 fn cli_binary() -> PathBuf {
- // CARGO_BIN_EXE_<name> is set by Cargo for integration tests.
+    // CARGO_BIN_EXE_<name> is set by Cargo for integration tests.
     PathBuf::from(env!("CARGO_BIN_EXE_moves-fixture-capture"))
 }
 
@@ -167,13 +167,13 @@ fn cli_includes_provenance_with_sif_and_runspec_hashes() {
     );
     assert_eq!(prov["output_database"], "movesoutput");
     assert_eq!(prov["scale_input_database"], "movesdb20241112");
- // RunSpec sha256 must be a 64-char lowercase hex string.
+    // RunSpec sha256 must be a 64-char lowercase hex string.
     let rs_sha = prov["runspec_sha256"].as_str().unwrap();
     assert_eq!(rs_sha.len(), 64);
     assert!(rs_sha
         .chars()
         .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
- // Aggregate hash matches the manifest.
+    // Aggregate hash matches the manifest.
     let manifest_bytes = fs::read(out.path().join("manifest.json")).unwrap();
     let manifest: serde_json::Value = serde_json::from_slice(&manifest_bytes).unwrap();
     assert_eq!(
@@ -209,16 +209,16 @@ fn cli_excludes_default_db_from_snapshot() {
 
 #[test]
 fn cli_emits_execution_trace_alongside_snapshot() {
- // (): the CLI must produce execution-trace.json
- // next to provenance.json. Populate a captures dir with a worker.sql
- // that names a calculator + an SQL file, plus a JVM class-load log
- // under moves-temporary/instrumentation/, and verify the resulting
- // trace lists each.
+    // (): the CLI must produce execution-trace.json
+    // next to provenance.json. Populate a captures dir with a worker.sql
+    // that names a calculator + an SQL file, plus a JVM class-load log
+    // under moves-temporary/instrumentation/, and verify the resulting
+    // trace lists each.
     let captures = tempdir().unwrap();
     populate_captures(captures.path());
 
- // worker.sql in WorkerTemp00 (replacing the bare Output.tbl-only
- // bundle the canonical population creates).
+    // worker.sql in WorkerTemp00 (replacing the bare Output.tbl-only
+    // bundle the canonical population creates).
     fs::write(
         captures
             .path()
@@ -228,7 +228,7 @@ fn cli_emits_execution_trace_alongside_snapshot() {
           SELECT 1;\n",
     )
     .unwrap();
- // A Go calculator artifact dropped into the same bundle.
+    // A Go calculator artifact dropped into the same bundle.
     fs::write(
         captures
             .path()
@@ -236,7 +236,7 @@ fn cli_emits_execution_trace_alongside_snapshot() {
         b"go-calc input\n",
     )
     .unwrap();
- // JVM class-load log under moves-temporary/instrumentation/.
+    // JVM class-load log under moves-temporary/instrumentation/.
     let instr_dir = captures.path().join("moves-temporary/instrumentation");
     fs::create_dir_all(&instr_dir).unwrap();
     fs::write(
@@ -265,7 +265,7 @@ fn cli_emits_execution_trace_alongside_snapshot() {
     );
     assert_eq!(trace["trace_version"], "moves-fixture-capture/v1");
 
- // Java classes from both worker.sql and the JVM log, sorted.
+    // Java classes from both worker.sql and the JVM log, sorted.
     let class_names: Vec<&str> = trace["java_classes"]
         .as_array()
         .unwrap()
@@ -280,7 +280,7 @@ fn cli_emits_execution_trace_alongside_snapshot() {
         ]
     );
 
- // SQL file from worker.sql attributed to WorkerTemp00.
+    // SQL file from worker.sql attributed to WorkerTemp00.
     let sql_files = trace["sql_files"].as_array().unwrap();
     assert_eq!(sql_files.len(), 1);
     assert_eq!(
@@ -295,17 +295,17 @@ fn cli_emits_execution_trace_alongside_snapshot() {
         .collect();
     assert_eq!(consumers, vec!["WorkerTemp00"]);
 
- // Go calc detected from the BaseRateCalculator.go.input filename.
+    // Go calc detected from the BaseRateCalculator.go.input filename.
     let go = trace["go_calculators"].as_array().unwrap();
     assert_eq!(go.len(), 1);
     assert_eq!(go[0]["name"], "BaseRateCalculator");
 
- // Source counts.
+    // Source counts.
     assert_eq!(trace["sources"]["worker_sql_files"], 1);
     assert_eq!(trace["sources"]["class_load_log_files"], 1);
 
- // The trace file must be byte-stable across re-runs of the same
- // captures (same determinism contract as snapshot + provenance).
+    // The trace file must be byte-stable across re-runs of the same
+    // captures (same determinism contract as snapshot + provenance).
     let out2 = tempdir().unwrap();
     run_cli(captures.path(), &runspec, &lock, out2.path());
     let trace_bytes2 = fs::read(out2.path().join("execution-trace.json")).unwrap();
@@ -314,10 +314,10 @@ fn cli_emits_execution_trace_alongside_snapshot() {
 
 #[test]
 fn cli_emits_empty_but_valid_trace_when_no_worker_or_instrumentation() {
- // A capture dir with only databases (no worker bundles, no
- // instrumentation log) must still produce a syntactically valid
- // trace — an empty trace, but parseable. consumers can rely
- // on the file existing.
+    // A capture dir with only databases (no worker bundles, no
+    // instrumentation log) must still produce a syntactically valid
+    // trace — an empty trace, but parseable. consumers can rely
+    // on the file existing.
     let captures = tempdir().unwrap();
     populate_captures(captures.path());
 
@@ -334,16 +334,16 @@ fn cli_emits_empty_but_valid_trace_when_no_worker_or_instrumentation() {
     let trace: serde_json::Value = serde_json::from_slice(&trace_bytes).unwrap();
     assert!(trace["java_classes"].as_array().unwrap().is_empty());
     assert!(trace["sql_files"].as_array().unwrap().is_empty());
- // The fixture identity fields must still be populated.
+    // The fixture identity fields must still be populated.
     assert_eq!(trace["fixture_name"], "samplerunspec");
     assert_eq!(trace["sources"]["worker_sql_files"], 0);
 }
 
 #[test]
 fn cli_handles_pending_first_build_lockfile() {
- // A lockfile that hasn't been refreshed by build-fixture-sif.sh should
- // not abort the capture — the snapshot is still valid, it just records
- // the pending state for downstream tooling to flag.
+    // A lockfile that hasn't been refreshed by build-fixture-sif.sh should
+    // not abort the capture — the snapshot is still valid, it just records
+    // the pending state for downstream tooling to flag.
     let captures = tempdir().unwrap();
     populate_captures(captures.path());
     let scratch = tempdir().unwrap();

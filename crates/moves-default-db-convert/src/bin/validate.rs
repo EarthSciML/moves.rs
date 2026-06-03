@@ -28,27 +28,27 @@ use moves_default_db_convert::{validate, ValidateOptions};
     version
 )]
 struct Args {
- /// Path to the converted output root (contains `manifest.json`).
+    /// Path to the converted output root (contains `manifest.json`).
     #[arg(long, value_name = "DIR")]
     output_root: PathBuf,
 
- /// Path to the source TSV dump directory (contains `<Table>.tsv` and
- /// `<Table>.schema.tsv` pairs). Typically `<output>/_tsv`.
+    /// Path to the source TSV dump directory (contains `<Table>.tsv` and
+    /// `<Table>.schema.tsv` pairs). Typically `<output>/_tsv`.
     #[arg(long, value_name = "DIR")]
     tsv_dir: PathBuf,
 
- /// Per-table row count above which we skip the aggregate cross-check.
- /// `0` disables aggregate validation entirely (row counts + schema
- /// only). Omit to validate every row regardless of table size.
+    /// Per-table row count above which we skip the aggregate cross-check.
+    /// `0` disables aggregate validation entirely (row counts + schema
+    /// only). Omit to validate every row regardless of table size.
     #[arg(long, value_name = "ROWS")]
     aggregate_row_cap: Option<u64>,
 
- /// Emit findings as JSON instead of pretty-printed text.
+    /// Emit findings as JSON instead of pretty-printed text.
     #[arg(long, default_value_t = false)]
     json: bool,
 
- /// Maximum number of findings to print per kind before truncating.
- /// Default 20. Does not affect the JSON output.
+    /// Maximum number of findings to print per kind before truncating.
+    /// Default 20. Does not affect the JSON output.
     #[arg(long, default_value_t = 20, value_name = "N")]
     max_findings_per_kind: usize,
 }
@@ -130,7 +130,7 @@ fn emit_text(report: &moves_default_db_convert::ValidationReport, max_per_kind: 
 }
 
 fn emit_json(report: &moves_default_db_convert::ValidationReport) {
- // Roll our own simple JSON to keep the dependency surface tiny.
+    // Roll our own simple JSON to keep the dependency surface tiny.
     let summary = &report.summary;
     let mut s = String::new();
     s.push_str("{\n");

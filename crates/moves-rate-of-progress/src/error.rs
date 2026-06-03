@@ -7,7 +7,7 @@ use thiserror::Error;
 /// Errors returned by the I/O and construction paths.
 #[derive(Debug, Error)]
 pub enum Error {
- /// File I/O problem (open, read, write).
+    /// File I/O problem (open, read, write).
     #[error("io error at {path}: {source}")]
     Io {
         path: PathBuf,
@@ -15,8 +15,8 @@ pub enum Error {
         source: std::io::Error,
     },
 
- /// The input CSV file is missing a required header column or has
- /// an unrecognised column set.
+    /// The input CSV file is missing a required header column or has
+    /// an unrecognised column set.
     #[error("CSV at {path} has malformed header (got {got:?}, want a permutation of {want:?})")]
     BadCsvHeader {
         path: PathBuf,
@@ -24,7 +24,7 @@ pub enum Error {
         want: Vec<&'static str>,
     },
 
- /// CSV parse failure (missing field, unparseable number, ragged row).
+    /// CSV parse failure (missing field, unparseable number, ragged row).
     #[error("CSV at {path} line {line}: {message}")]
     CsvParse {
         path: PathBuf,
@@ -32,7 +32,7 @@ pub enum Error {
         message: String,
     },
 
- /// A `reductionFraction` value is outside the valid range [0.0, 1.0].
+    /// A `reductionFraction` value is outside the valid range [0.0, 1.0].
     #[error(
         "ROP row (pollutant={pollutant_id}, sourceType={source_type_id}, \
         regClass={reg_class_id}, modelYear={model_year_id}) has \

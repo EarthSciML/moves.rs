@@ -62,14 +62,14 @@ fn writes_dag_json_for_minimal_input() {
     assert_eq!(body["counts"]["subscriptions"], 1);
     assert_eq!(body["counts"]["chains"], 1);
     assert_eq!(body["counts"]["modules"], 2);
- // BaseRateCalculator subscribes, HCSpeciation chains.
+    // BaseRateCalculator subscribes, HCSpeciation chains.
     let modules = body["modules"].as_array().unwrap();
     let names: Vec<&str> = modules
         .iter()
         .map(|m| m["name"].as_str().unwrap())
         .collect();
     assert_eq!(names, vec!["BaseRateCalculator", "HCSpeciationCalculator"]);
- // chain_templates rolls up BaseRateCalculator's chain into one entry.
+    // chain_templates rolls up BaseRateCalculator's chain into one entry.
     assert_eq!(body["chain_templates"].as_array().unwrap().len(), 1);
 }
 
@@ -110,9 +110,9 @@ fn malformed_directive_is_error_exit() {
 
 #[test]
 fn source_dir_fills_in_missing_subscription() {
- // Build a tiny "MOVES source" tree with a calculator that registers
- // but does NOT appear in CalculatorInfo.txt's Subscribe directives.
- // The Java scan should fill in the missing subscription.
+    // Build a tiny "MOVES source" tree with a calculator that registers
+    // but does NOT appear in CalculatorInfo.txt's Subscribe directives.
+    // The Java scan should fill in the missing subscription.
     let dir = tempdir().unwrap();
     let info_path = dir.path().join("CalculatorInfo.txt");
     fs::write(
@@ -158,7 +158,7 @@ public class BasicStartCalc extends GenericCalculatorBase {
     assert_eq!(subs[0]["granularity"], "YEAR");
     assert_eq!(subs[0]["priority"], "EMISSION_CALCULATOR");
     assert_eq!(subs[0]["source"], "JavaSource");
- // Path is relative to source-dir.
+    // Path is relative to source-dir.
     assert_eq!(
         basic["java_path"],
         "gov/epa/otaq/moves/master/implementation/ghg/BasicStartCalc.java"
@@ -170,7 +170,7 @@ fn output_dir_is_created_if_missing() {
     let dir = tempdir().unwrap();
     let info_path = dir.path().join("CalculatorInfo.txt");
     fs::write(&info_path, SAMPLE_INFO).unwrap();
- // Three levels deep, no parent dirs exist yet.
+    // Three levels deep, no parent dirs exist yet.
     let nested = dir.path().join("a/b/c");
     let status = run_cli(&info_path, None, &nested);
     assert!(status.success());

@@ -103,26 +103,26 @@ const FIRST_INTERNAL_POLLUTANT_ID: i16 = 10_000;
 /// distinguishes the real-table-backed [`MonthDayScaling`] implementation from
 /// the identity placeholder [`UnitScaling`] so the aggregator can gate on it.
 pub trait TemporalScalingFactors {
- /// Weeks-per-month factor applied to a row landing in
- /// (`year_id`, `month_id`) when the plan's [`TemporalScaling`] is
- /// [`TemporalScaling::WeeksPerMonth`].
+    /// Weeks-per-month factor applied to a row landing in
+    /// (`year_id`, `month_id`) when the plan's [`TemporalScaling`] is
+    /// [`TemporalScaling::WeeksPerMonth`].
     fn weeks_per_month(&self, year_id: Option<i16>, month_id: Option<i16>) -> f64;
 
- /// Portion-of-week-per-day factor applied to a row with day key
- /// `day_id` when the plan's [`TemporalScaling`] is
- /// [`TemporalScaling::PortionOfWeekPerDay`].
+    /// Portion-of-week-per-day factor applied to a row with day key
+    /// `day_id` when the plan's [`TemporalScaling`] is
+    /// [`TemporalScaling::PortionOfWeekPerDay`].
     fn portion_of_week_per_day(&self, day_id: Option<i16>) -> f64;
 
- /// Returns `true` when this implementation is backed by the real reference
- /// tables rather than being the identity placeholder.
- ///
- /// The default is `false`. Override to `true` in any implementation that
- /// actually reads `monthOfAnyYear` / `dayOfAnyWeek` data (e.g.
- /// [`MonthDayScaling`]). The aggregator gates on this flag: if a plan
- /// carries [`TemporalScaling::WeeksPerMonth`] or
- /// [`TemporalScaling::PortionOfWeekPerDay`] but the supplied factors report
- /// `false` here, the call returns [`crate::Error::AggregationPlanMismatch`]
- /// rather than silently applying an identity factor.
+    /// Returns `true` when this implementation is backed by the real reference
+    /// tables rather than being the identity placeholder.
+    ///
+    /// The default is `false`. Override to `true` in any implementation that
+    /// actually reads `monthOfAnyYear` / `dayOfAnyWeek` data (e.g.
+    /// [`MonthDayScaling`]). The aggregator gates on this flag: if a plan
+    /// carries [`TemporalScaling::WeeksPerMonth`] or
+    /// [`TemporalScaling::PortionOfWeekPerDay`] but the supplied factors report
+    /// `false` here, the call returns [`crate::Error::AggregationPlanMismatch`]
+    /// rather than silently applying an identity factor.
     fn supplies_temporal_factors(&self) -> bool {
         false
     }
@@ -170,13 +170,13 @@ pub struct MonthDayScaling {
 }
 
 impl MonthDayScaling {
- /// Build the scaling table from an execution-DB store.
- ///
- /// Reads `MonthOfAnyYear` columns `monthID` and `noOfDays`. Rows whose
- /// `noOfDays` is zero or negative are skipped (matching the Java fallback
- /// "month not found ⇒ 1.0"). Silently returns an empty (identity) mapping
- /// when the table is absent — correct for the Nonroad-only path, which
- /// does not use temporal scaling.
+    /// Build the scaling table from an execution-DB store.
+    ///
+    /// Reads `MonthOfAnyYear` columns `monthID` and `noOfDays`. Rows whose
+    /// `noOfDays` is zero or negative are skipped (matching the Java fallback
+    /// "month not found ⇒ 1.0"). Silently returns an empty (identity) mapping
+    /// when the table is absent — correct for the Nonroad-only path, which
+    /// does not use temporal scaling.
     pub fn new(store: &impl DataFrameStore) -> Self {
         let mut month_to_weeks = HashMap::new();
         if let Some(df) = store.get("MonthOfAnyYear") {
@@ -378,12 +378,12 @@ pub struct StreamingEmissionAgg {
 }
 
 impl StreamingEmissionAgg {
- /// Create a streaming accumulator from an emission [`AggregationPlan`].
- ///
- /// # Errors
- ///
- /// Returns [`Error::AggregationPlanMismatch`] if `plan` does not target
- /// [`AggregationTable::Emission`] or does not `SUM` exactly `emissionQuant`.
+    /// Create a streaming accumulator from an emission [`AggregationPlan`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::AggregationPlanMismatch`] if `plan` does not target
+    /// [`AggregationTable::Emission`] or does not `SUM` exactly `emissionQuant`.
     pub fn new(plan: AggregationPlan) -> Result<Self> {
         if plan.table != AggregationTable::Emission {
             return Err(Error::AggregationPlanMismatch(format!(
@@ -400,27 +400,27 @@ impl StreamingEmissionAgg {
         })
     }
 
- /// Returns `true` when no records have been accumulated yet.
+    /// Returns `true` when no records have been accumulated yet.
     pub fn is_empty(&self) -> bool {
         self.groups.is_empty()
     }
 
- /// Fold a batch of emission records into the running aggregate.
- ///
- /// Each record is classified into its group key and its `emissionQuant`
- /// is added to the group's running sum (with the plan's temporal scaling
- /// applied). The first record seen for a group becomes its representative
- /// (source of key-column values for [`finalize`](Self::finalize)).
- ///
- /// Records carrying a synthetic, output-internal pollutant
- /// (`pollutantID >= 10000` — `altTHC`/`altNMHC`) are skipped: they exist
- /// only to drive HC speciation and never reach `MOVESOutput`.
- ///
- /// # Errors
- ///
- /// Returns [`Error::AggregationPlanMismatch`] if a group-by column name
- /// in the plan is not a recognised `MOVESOutput` column. In practice
- /// this cannot happen when the plan is built from a valid RunSpec.
+    /// Fold a batch of emission records into the running aggregate.
+    ///
+    /// Each record is classified into its group key and its `emissionQuant`
+    /// is added to the group's running sum (with the plan's temporal scaling
+    /// applied). The first record seen for a group becomes its representative
+    /// (source of key-column values for [`finalize`](Self::finalize)).
+    ///
+    /// Records carrying a synthetic, output-internal pollutant
+    /// (`pollutantID >= 10000` — `altTHC`/`altNMHC`) are skipped: they exist
+    /// only to drive HC speciation and never reach `MOVESOutput`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::AggregationPlanMismatch`] if a group-by column name
+    /// in the plan is not a recognised `MOVESOutput` column. In practice
+    /// this cannot happen when the plan is built from a valid RunSpec.
     pub fn extend(
         &mut self,
         records: &[EmissionRecord],
@@ -428,9 +428,9 @@ impl StreamingEmissionAgg {
     ) -> Result<()> {
         require_real_factors(self.scaling, factors)?;
         for rec in records {
- // Drop MOVES' synthetic, output-internal pollutants (altTHC 10001,
- // altNMHC 10079): they are produced only to feed HC speciation via
- // the worker stream and never appear in canonical `MOVESOutput`.
+            // Drop MOVES' synthetic, output-internal pollutants (altTHC 10001,
+            // altNMHC 10079): they are produced only to feed HC speciation via
+            // the worker stream and never appear in canonical `MOVESOutput`.
             if rec
                 .pollutant_id
                 .is_some_and(|p| p >= FIRST_INTERNAL_POLLUTANT_ID)
@@ -455,9 +455,9 @@ impl StreamingEmissionAgg {
         Ok(())
     }
 
- /// Consume the accumulator and return the finalized aggregated rows in
- /// group-key sort order, matching the output of [`aggregate_emissions`]
- /// for the same plan and records.
+    /// Consume the accumulator and return the finalized aggregated rows in
+    /// group-key sort order, matching the output of [`aggregate_emissions`]
+    /// for the same plan and records.
     pub fn finalize(self) -> Vec<EmissionRecord> {
         let StreamingEmissionAgg {
             keys,
@@ -505,8 +505,8 @@ impl<'a, R> Accum<'a, R> {
         }
     }
 
- /// Fold one row's metric into the group. `None` (SQL `NULL`) is
- /// skipped; `factor` carries the per-row temporal rescaling.
+    /// Fold one row's metric into the group. `None` (SQL `NULL`) is
+    /// skipped; `factor` carries the per-row temporal rescaling.
     fn add(&mut self, metric: Option<f64>, factor: f64) {
         if let Some(value) = metric {
             self.sum += value * factor;
@@ -514,7 +514,7 @@ impl<'a, R> Accum<'a, R> {
         }
     }
 
- /// SQL-`SUM` result: `None` when the group held no non-`NULL` input.
+    /// SQL-`SUM` result: `None` when the group held no non-`NULL` input.
     fn metric(&self) -> Option<f64> {
         self.saw_value.then_some(self.sum)
     }
@@ -648,11 +648,11 @@ fn build_emission_output(
         link_id: keep_opt(kept("linkID"), rep.link_id),
         pollutant_id: keep_opt(kept("pollutantID"), rep.pollutant_id),
         process_id: keep_opt(kept("processID"), rep.process_id),
- // sourceTypeID uses MySQL ANY_VALUE semantics: the representative
- // record's value is always carried through regardless of whether
- // sourceTypeID is a GROUP BY key. This matches canonical MOVES,
- // where MySQL returns an arbitrary (but non-NULL) value for non-grouped
- // columns when all rows in the group share the same source type.
+        // sourceTypeID uses MySQL ANY_VALUE semantics: the representative
+        // record's value is always carried through regardless of whether
+        // sourceTypeID is a GROUP BY key. This matches canonical MOVES,
+        // where MySQL returns an arbitrary (but non-NULL) value for non-grouped
+        // columns when all rows in the group share the same source type.
         source_type_id: rep.source_type_id,
         reg_class_id: keep_opt(kept("regClassID"), rep.reg_class_id),
         fuel_type_id: keep_opt(kept("fuelTypeID"), rep.fuel_type_id),
@@ -664,8 +664,8 @@ fn build_emission_output(
         sector_id: keep_opt(kept("sectorID"), rep.sector_id),
         hp_id: keep_opt(kept("hpID"), rep.hp_id),
         emission_quant: metric,
- // emissionRate is not a metric the emission plan tracks; the
- // rolled-up row drops it (rate-mode output goes to BaseRateOutput).
+        // emissionRate is not a metric the emission plan tracks; the
+        // rolled-up row drops it (rate-mode output goes to BaseRateOutput).
         emission_rate: None,
         run_hash: rep.run_hash.clone(),
     }
@@ -717,8 +717,8 @@ mod tests {
         GeographicOutputDetail, Model, ModelScale, OutputBreakdown, OutputTimestep,
     };
 
- /// `weeks_per_month` returns the `monthID` itself as the factor, so a
- /// test can read the scaling back off the summed metric.
+    /// `weeks_per_month` returns the `monthID` itself as the factor, so a
+    /// test can read the scaling back off the summed metric.
     struct MonthAsFactor;
 
     impl TemporalScalingFactors for MonthAsFactor {
@@ -800,8 +800,8 @@ mod tests {
             sector_id: None,
             hp_id: None,
             emission_quant: quant,
- // A non-null rate so the "rate is dropped on aggregation"
- // assertion is meaningful.
+            // A non-null rate so the "rate is dropped on aggregation"
+            // assertion is meaningful.
             emission_rate: Some(99.0),
             run_hash: "run-hash".to_string(),
         }
@@ -845,8 +845,8 @@ mod tests {
 
     #[test]
     fn emission_year_nation_collapses_to_one_row_per_pollutant() {
- // Year + Nation + empty breakdown: only MOVESRunID, iterationID,
- // yearID, pollutantID survive. Rows that share a pollutant collapse.
+        // Year + Nation + empty breakdown: only MOVESRunID, iterationID,
+        // yearID, pollutantID survive. Rows that share a pollutant collapse.
         let b = breakdown_all_false();
         let plan = emission_aggregation(&inputs(
             OutputTimestep::Year,
@@ -862,7 +862,7 @@ mod tests {
         let out = aggregate_emissions(&plan, &rows, &IdentityRealFactors).unwrap();
 
         assert_eq!(out.len(), 2, "one row per distinct pollutantID");
- // BTreeMap key order: pollutantID 2 before 3.
+        // BTreeMap key order: pollutantID 2 before 3.
         assert_eq!(out[0].pollutant_id, Some(2));
         assert_eq!(out[0].emission_quant, Some(3.0), "1.0 + 2.0");
         assert_eq!(out[1].pollutant_id, Some(3));
@@ -871,8 +871,8 @@ mod tests {
 
     #[test]
     fn non_key_dimensions_collapse_to_null() {
- // Year + Nation drops month/day/hour, all geography, and every
- // breakdown dimension. yearID + pollutantID stay.
+        // Year + Nation drops month/day/hour, all geography, and every
+        // breakdown dimension. yearID + pollutantID stay.
         let b = breakdown_all_false();
         let plan = emission_aggregation(&inputs(
             OutputTimestep::Year,
@@ -880,30 +880,31 @@ mod tests {
             &[Model::Onroad],
             &b,
         ));
-        let out = aggregate_emissions(&plan, &[emission(2, 7, Some(5.0))], &IdentityRealFactors).unwrap();
+        let out =
+            aggregate_emissions(&plan, &[emission(2, 7, Some(5.0))], &IdentityRealFactors).unwrap();
         let row = &out[0];
 
- // Surviving keys.
+        // Surviving keys.
         assert_eq!(row.moves_run_id, 1);
         assert_eq!(row.iteration_id, Some(1));
         assert_eq!(row.year_id, Some(2020));
         assert_eq!(row.pollutant_id, Some(2));
- // Collapsed dimensions.
+        // Collapsed dimensions.
         assert_eq!(row.month_id, None);
         assert_eq!(row.day_id, None);
         assert_eq!(row.hour_id, None);
         assert_eq!(row.county_id, None);
         assert_eq!(row.source_type_id, Some(21)); // ANY_VALUE from representative record
         assert_eq!(row.scc, None);
- // emissionRate is always dropped; runHash always flows through.
+        // emissionRate is always dropped; runHash always flows through.
         assert_eq!(row.emission_rate, None);
         assert_eq!(row.run_hash, "run-hash");
     }
 
     #[test]
     fn month_timestep_keeps_month_key() {
- // Month timestep keeps monthID, so rows in different months stay
- // distinct even though everything else aggregates away.
+        // Month timestep keeps monthID, so rows in different months stay
+        // distinct even though everything else aggregates away.
         let b = breakdown_all_false();
         let plan = emission_aggregation(&inputs(
             OutputTimestep::Month,
@@ -933,7 +934,7 @@ mod tests {
             &[Model::Onroad],
             &b,
         ));
- // One NULL row in the group — SQL SUM ignores it.
+        // One NULL row in the group — SQL SUM ignores it.
         let rows = vec![
             emission(2, 1, Some(10.0)),
             emission(2, 1, None),
@@ -964,7 +965,7 @@ mod tests {
 
     #[test]
     fn temporal_scaling_multiplies_each_row_before_summing() {
- // Month timestep on an onroad run carries WeeksPerMonth scaling.
+        // Month timestep on an onroad run carries WeeksPerMonth scaling.
         let b = breakdown_all_false();
         let plan = emission_aggregation(&inputs(
             OutputTimestep::Month,
@@ -976,8 +977,8 @@ mod tests {
             plan.sum_columns(),
             vec![("emissionQuant", TemporalScaling::WeeksPerMonth)]
         );
- // MonthAsFactor: factor == monthID. Both rows are month 3, so each
- // metric is tripled: (1.0 + 2.0) * 3 = 9.0.
+        // MonthAsFactor: factor == monthID. Both rows are month 3, so each
+        // metric is tripled: (1.0 + 2.0) * 3 = 9.0.
         let rows = vec![emission(2, 3, Some(1.0)), emission(2, 3, Some(2.0))];
         let out = aggregate_emissions(&plan, &rows, &MonthAsFactor).unwrap();
         assert_eq!(out.len(), 1);
@@ -986,9 +987,9 @@ mod tests {
 
     #[test]
     fn temporal_scaling_uses_each_rows_own_month_factor() {
- // Year timestep collapses monthID, so rows from different months
- // land in one group — each must still be scaled by its OWN month's
- // factor before the sum, not by a single group-wide factor.
+        // Year timestep collapses monthID, so rows from different months
+        // land in one group — each must still be scaled by its OWN month's
+        // factor before the sum, not by a single group-wide factor.
         let b = breakdown_all_false();
         let plan = emission_aggregation(&inputs(
             OutputTimestep::Year,
@@ -1000,7 +1001,7 @@ mod tests {
             plan.sum_columns(),
             vec![("emissionQuant", TemporalScaling::WeeksPerMonth)]
         );
- // MonthAsFactor: factor == monthID. 2.0 * 1 + 3.0 * 7 = 23.0.
+        // MonthAsFactor: factor == monthID. 2.0 * 1 + 3.0 * 7 = 23.0.
         let rows = vec![emission(2, 1, Some(2.0)), emission(2, 7, Some(3.0))];
         let out = aggregate_emissions(&plan, &rows, &MonthAsFactor).unwrap();
         assert_eq!(out.len(), 1, "Year collapses both months into one row");
@@ -1010,7 +1011,7 @@ mod tests {
 
     #[test]
     fn scc_text_key_groups_distinctly() {
- // onroad_scc keeps the SCC text column as a group key.
+        // onroad_scc keeps the SCC text column as a group key.
         let mut b = breakdown_all_false();
         b.onroad_scc = true;
         let plan = emission_aggregation(&inputs(
@@ -1028,7 +1029,7 @@ mod tests {
 
         let out = aggregate_emissions(&plan, &[c, a, a2], &IdentityRealFactors).unwrap();
         assert_eq!(out.len(), 2);
- // Group-key sort: "AAA" before "ZZZ".
+        // Group-key sort: "AAA" before "ZZZ".
         assert_eq!(out[0].scc.as_deref(), Some("AAA"));
         assert_eq!(out[0].emission_quant, Some(4.0));
         assert_eq!(out[1].scc.as_deref(), Some("ZZZ"));
@@ -1045,7 +1046,7 @@ mod tests {
             &[Model::Onroad],
             &b,
         ));
- // Powers of two so the sum is exact regardless of fold order.
+        // Powers of two so the sum is exact regardless of fold order.
         let forward = vec![
             emission(2, 1, Some(1.0)),
             emission(2, 2, Some(2.0)),
@@ -1071,7 +1072,7 @@ mod tests {
             &b,
         ));
         assert_eq!(plan.table, AggregationTable::Activity);
- // activityTypeID is always a key — types stay separated.
+        // activityTypeID is always a key — types stay separated.
         let rows = vec![
             activity(1, 1, Some(100.0)),
             activity(1, 7, Some(200.0)),
@@ -1083,7 +1084,7 @@ mod tests {
         assert_eq!(out[0].activity, Some(300.0));
         assert_eq!(out[1].activity_type_id, Some(2));
         assert_eq!(out[1].activity, Some(50.0));
- // Geography collapsed away.
+        // Geography collapsed away.
         assert_eq!(out[0].county_id, None);
     }
 
@@ -1135,9 +1136,9 @@ mod tests {
 
     #[test]
     fn plan_with_wrong_sum_column_is_rejected() {
- // Hand-build an Emission-tabled plan whose SUM names the wrong
- // metric — the writer must refuse it rather than silently sum the
- // wrong column.
+        // Hand-build an Emission-tabled plan whose SUM names the wrong
+        // metric — the writer must refuse it rather than silently sum the
+        // wrong column.
         let bad = AggregationPlan {
             table: AggregationTable::Emission,
             columns: vec![
@@ -1158,8 +1159,8 @@ mod tests {
 
     #[test]
     fn unknown_group_by_column_is_rejected() {
- // A plan whose group-by names a column absent from the MOVESOutput
- // schema must fail loudly rather than panic.
+        // A plan whose group-by names a column absent from the MOVESOutput
+        // schema must fail loudly rather than panic.
         let bad = AggregationPlan {
             table: AggregationTable::Emission,
             columns: vec![
@@ -1179,7 +1180,7 @@ mod tests {
         );
     }
 
- // ---- StreamingEmissionAgg tests ----------------------------------------
+    // ---- StreamingEmissionAgg tests ----------------------------------------
 
     fn year_nation_plan() -> AggregationPlan {
         let b = breakdown_all_false();
@@ -1200,8 +1201,8 @@ mod tests {
 
     #[test]
     fn streaming_agg_matches_batch_aggregate_emissions() {
- // Streaming accumulator must produce the same rolled-up rows as the
- // batch `aggregate_emissions` function for the same input records.
+        // Streaming accumulator must produce the same rolled-up rows as the
+        // batch `aggregate_emissions` function for the same input records.
         let b = breakdown_all_false();
         let plan = emission_aggregation(&inputs(
             OutputTimestep::Year,
@@ -1232,9 +1233,9 @@ mod tests {
 
     #[test]
     fn streaming_agg_drops_internal_synthetic_pollutants() {
- // altTHC (10001) / altNMHC (10079) feed HC speciation through the
- // worker stream but must never reach MOVESOutput. The streaming
- // accumulator drops every pollutantID >= 10000.
+        // altTHC (10001) / altNMHC (10079) feed HC speciation through the
+        // worker stream but must never reach MOVESOutput. The streaming
+        // accumulator drops every pollutantID >= 10000.
         let b = breakdown_all_false();
         let plan = emission_aggregation(&inputs(
             OutputTimestep::Year,
@@ -1261,7 +1262,7 @@ mod tests {
 
     #[test]
     fn streaming_agg_incremental_extend_matches_single_extend() {
- // Multiple extend calls produce the same result as one big extend.
+        // Multiple extend calls produce the same result as one big extend.
         let b = breakdown_all_false();
         let rows = vec![
             emission(2, 1, Some(1.0)),
@@ -1296,8 +1297,11 @@ mod tests {
     #[test]
     fn streaming_agg_all_null_metric_yields_null() {
         let mut agg = StreamingEmissionAgg::new(year_nation_plan()).unwrap();
-        agg.extend(&[emission(2, 1, None), emission(2, 7, None)], &IdentityRealFactors)
-            .unwrap();
+        agg.extend(
+            &[emission(2, 1, None), emission(2, 7, None)],
+            &IdentityRealFactors,
+        )
+        .unwrap();
         let out = agg.finalize();
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].emission_quant, None);
@@ -1337,14 +1341,12 @@ mod tests {
             "UnitScaling must be rejected for non-None scaling plans; got {err:?}"
         );
 
-        let mut agg = StreamingEmissionAgg::new(
-            emission_aggregation(&inputs(
-                OutputTimestep::Year,
-                GeographicOutputDetail::Nation,
-                &[Model::Onroad],
-                &b,
-            )),
-        )
+        let mut agg = StreamingEmissionAgg::new(emission_aggregation(&inputs(
+            OutputTimestep::Year,
+            GeographicOutputDetail::Nation,
+            &[Model::Onroad],
+            &b,
+        )))
         .unwrap();
         let err = agg
             .extend(&[emission(2, 1, Some(1.0))], &UnitScaling)
@@ -1376,8 +1378,16 @@ mod tests {
         let eps = 1e-10;
         assert!((scaling.weeks_per_month(Some(2020), Some(1)) - expected_jan).abs() < eps);
         assert!((scaling.weeks_per_month(Some(2020), Some(7)) - expected_jul).abs() < eps);
-        assert_eq!(scaling.weeks_per_month(Some(2020), None), 1.0, "None month → 1.0");
-        assert_eq!(scaling.weeks_per_month(Some(2020), Some(99)), 1.0, "unknown month → 1.0");
+        assert_eq!(
+            scaling.weeks_per_month(Some(2020), None),
+            1.0,
+            "None month → 1.0"
+        );
+        assert_eq!(
+            scaling.weeks_per_month(Some(2020), Some(99)),
+            1.0,
+            "unknown month → 1.0"
+        );
 
         // portionOfWeekPerDay is always 1.0 (calculators handle noOfRealDays).
         assert_eq!(scaling.portion_of_week_per_day(Some(5)), 1.0);

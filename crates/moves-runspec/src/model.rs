@@ -71,12 +71,12 @@ pub enum Model {
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ModelScale {
- /// Legacy onroad inventory scale (`MACROSCALE`).
+    /// Legacy onroad inventory scale (`MACROSCALE`).
     #[default]
     Macro,
- /// Inventory output (`Inv`) — the standard NONROAD/onroad inventory mode.
+    /// Inventory output (`Inv`) — the standard NONROAD/onroad inventory mode.
     Inventory,
- /// Emission-rates output (`Rates`).
+    /// Emission-rates output (`Rates`).
     Rates,
 }
 
@@ -249,20 +249,20 @@ pub struct DatabaseSelection {}
 /// captured in the [`InternalControlStrategy::Other`] variant.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum InternalControlStrategy {
- /// `RateOfProgressStrategy` with its `useParameters` flag.
- ///
- /// Ports `gov.epa.otaq.moves.master.implementation.ghg
- ///       .internalcontrolstrategies.rateofprogress
- ///       .RateOfProgressStrategy.useParameters`.
- /// `hasRateOfProgress()` returns `true` when this variant is present
- /// with `use_parameters: true`.
+    /// `RateOfProgressStrategy` with its `useParameters` flag.
+    ///
+    /// Ports `gov.epa.otaq.moves.master.implementation.ghg
+    ///       .internalcontrolstrategies.rateofprogress
+    ///       .RateOfProgressStrategy.useParameters`.
+    /// `hasRateOfProgress()` returns `true` when this variant is present
+    /// with `use_parameters: true`.
     RateOfProgress {
- /// Whether the strategy's parameter file is active (`useParameters Yes`).
+        /// Whether the strategy's parameter file is active (`useParameters Yes`).
         use_parameters: bool,
     },
- /// Any other class name — content preserved but not interpreted.
+    /// Any other class name — content preserved but not interpreted.
     Other {
- /// Fully-qualified Java class name from the `@classname` attribute.
+        /// Fully-qualified Java class name from the `@classname` attribute.
         class_name: String,
     },
 }
@@ -479,9 +479,9 @@ pub enum MassUnit {
     Kilograms,
     #[default]
     Grams,
- /// Short tons (US, 2000 lb). XML: `Tons (short)`.
+    /// Short tons (US, 2000 lb). XML: `Tons (short)`.
     TonsShort,
- /// Metric tonnes (1000 kg). XML: `Tons (metric)`.
+    /// Metric tonnes (1000 kg). XML: `Tons (metric)`.
     TonsMetric,
 }
 

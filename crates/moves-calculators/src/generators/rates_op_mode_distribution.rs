@@ -140,23 +140,23 @@ const EXTENDED_IDLE_OP_MODE: i16 = 200;
 /// roadTypeID, hourDayID, opModeID, avgSpeedBinID)`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RatesOpModeDistributionRow {
- /// `sourceTypeID` — always source type 62 (combination long-haul
- /// truck), the only hotelling source type.
+    /// `sourceTypeID` — always source type 62 (combination long-haul
+    /// truck), the only hotelling source type.
     pub source_type_id: SourceTypeId,
- /// `roadTypeID` — always road type 1 (Off-Network).
+    /// `roadTypeID` — always road type 1 (Off-Network).
     pub road_type_id: RoadTypeId,
- /// `avgSpeedBinID` — always `0` for hotelling rows.
+    /// `avgSpeedBinID` — always `0` for hotelling rows.
     pub avg_speed_bin_id: i16,
- /// `avgBinSpeed` — always `0.0` for hotelling rows.
+    /// `avgBinSpeed` — always `0.0` for hotelling rows.
     pub avg_bin_speed: f64,
- /// `polProcessID` — the pollutant/process this fraction applies to.
+    /// `polProcessID` — the pollutant/process this fraction applies to.
     pub pol_process_id: PolProcessId,
- /// `hourDayID` — one of the RunSpec's selected hour/day combinations.
+    /// `hourDayID` — one of the RunSpec's selected hour/day combinations.
     pub hour_day_id: i16,
- /// `opModeID` — the operating mode this fraction applies to.
+    /// `opModeID` — the operating mode this fraction applies to.
     pub op_mode_id: i16,
- /// `opModeFraction` — always `1.0` for these degenerate hotelling
- /// distributions.
+    /// `opModeFraction` — always `1.0` for these degenerate hotelling
+    /// distributions.
     pub op_mode_fraction: f64,
 }
 
@@ -165,8 +165,8 @@ pub struct RatesOpModeDistributionRow {
 type RowKey = (SourceTypeId, PolProcessId, RoadTypeId, i16, i16, i16);
 
 impl RatesOpModeDistributionRow {
- /// The primary-key projection used both to de-duplicate `INSERT IGNORE`
- /// collisions and to give the output a deterministic order.
+    /// The primary-key projection used both to de-duplicate `INSERT IGNORE`
+    /// collisions and to give the output a deterministic order.
     fn key(&self) -> RowKey {
         (
             self.source_type_id,
@@ -184,9 +184,9 @@ impl RatesOpModeDistributionRow {
 /// the source type to 62.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SourceTypePolProcess {
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: SourceTypeId,
- /// `polProcessID`.
+    /// `polProcessID`.
     pub pol_process_id: PolProcessId,
 }
 
@@ -195,9 +195,9 @@ pub struct SourceTypePolProcess {
 /// from this table.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OpModePolProcAssoc {
- /// `polProcessID`.
+    /// `polProcessID`.
     pub pol_process_id: PolProcessId,
- /// `opModeID`.
+    /// `opModeID`.
     pub op_mode_id: i16,
 }
 
@@ -209,24 +209,24 @@ pub struct OpModePolProcAssoc {
 /// [`Generator::execute`] builds this view from `ctx.tables()`.
 #[derive(Debug, Clone, Copy)]
 pub struct OpModeFractionInputs<'a> {
- /// `pollutantProcessAssoc` — every modeled `(pollutant, process)` pair.
- /// The steps filter it by `processID`.
+    /// `pollutantProcessAssoc` — every modeled `(pollutant, process)` pair.
+    /// The steps filter it by `processID`.
     pub pollutant_process_assoc: &'a [PollutantProcessAssociation],
- /// `sourceTypePolProcess` — which `(sourceType, polProcess)` pairs are
- /// modeled.
+    /// `sourceTypePolProcess` — which `(sourceType, polProcess)` pairs are
+    /// modeled.
     pub source_type_pol_process: &'a [SourceTypePolProcess],
- /// `opModePolProcAssoc` — operating modes per pollutant/process.
+    /// `opModePolProcAssoc` — operating modes per pollutant/process.
     pub op_mode_pol_proc_assoc: &'a [OpModePolProcAssoc],
- /// `runSpecHourDay.hourDayID` — the hour/day combinations the RunSpec
- /// selects. Every emitted row is crossed with this set.
+    /// `runSpecHourDay.hourDayID` — the hour/day combinations the RunSpec
+    /// selects. Every emitted row is crossed with this set.
     pub run_spec_hour_day: &'a [i16],
- /// `runSpecSourceType.sourceTypeID` — the source types the RunSpec
- /// selects. Steps 200/210 SQL 2 emit nothing unless 62 is present.
+    /// `runSpecSourceType.sourceTypeID` — the source types the RunSpec
+    /// selects. Steps 200/210 SQL 2 emit nothing unless 62 is present.
     pub run_spec_source_type: &'a [SourceTypeId],
- /// `hotellingActivityDistribution.opModeID` — the hotelling operating
- /// modes; consumed by step 210 SQL 2. Duplicates are harmless (the
- /// Java uses `SELECT DISTINCT`; the primary-key de-duplication here
- /// has the same effect).
+    /// `hotellingActivityDistribution.opModeID` — the hotelling operating
+    /// modes; consumed by step 210 SQL 2. Duplicates are harmless (the
+    /// Java uses `SELECT DISTINCT`; the primary-key de-duplication here
+    /// has the same effect).
     pub hotelling_op_modes: &'a [i16],
 }
 
@@ -696,9 +696,9 @@ impl TableRow for RatesOpModeDistributionRow {
                         .get(i)
                         .ok_or_else(|| null("avgSpeedBinID"))?
                         as i16,
- // MOVES leaves avgBinSpeed NULL in RatesOpModeDistribution
- // (the rates path does not populate it; the default is 0.0).
- // Treat a NULL as 0.0 rather than erroring.
+                    // MOVES leaves avgBinSpeed NULL in RatesOpModeDistribution
+                    // (the rates path does not populate it; the default is 0.0).
+                    // Treat a NULL as 0.0 rather than erroring.
                     avg_bin_speed: avg_bin_speed.get(i).unwrap_or(0.0),
                     pol_process_id: PolProcessId(
                         pol_process_id.get(i).ok_or_else(|| null("polProcessID"))? as u32,
@@ -782,8 +782,8 @@ pub fn extended_idle_op_mode_fractions(
     let process_90 = polprocs_for_process(inputs.pollutant_process_assoc, EXTENDED_IDLE_EXHAUST);
     let mut rows: Vec<RatesOpModeDistributionRow> = Vec::new();
 
- // @step 200, SQL 1: opModePolProcAssoc op modes for (source type 62,
- // process-90 polProcess), crossed with runSpecHourDay.
+    // @step 200, SQL 1: opModePolProcAssoc op modes for (source type 62,
+    // process-90 polProcess), crossed with runSpecHourDay.
     for stpp in inputs.source_type_pol_process {
         if stpp.source_type_id != HOTELLING_SOURCE_TYPE
             || !process_90.contains(&stpp.pol_process_id)
@@ -804,8 +804,8 @@ pub fn extended_idle_op_mode_fractions(
         }
     }
 
- // @step 200, SQL 2: op-mode-200 row for every process-90 polProcess,
- // crossed with runSpecHourDay — only when source type 62 is selected.
+    // @step 200, SQL 2: op-mode-200 row for every process-90 polProcess,
+    // crossed with runSpecHourDay — only when source type 62 is selected.
     if inputs.run_spec_source_type.contains(&HOTELLING_SOURCE_TYPE) {
         for ppa in inputs.pollutant_process_assoc {
             if ppa.process_id != EXTENDED_IDLE_EXHAUST {
@@ -842,8 +842,8 @@ pub fn auxiliary_power_op_mode_fractions(
     let process_91 = polprocs_for_process(inputs.pollutant_process_assoc, AUXILIARY_POWER_EXHAUST);
     let mut rows: Vec<RatesOpModeDistributionRow> = Vec::new();
 
- // @step 210, SQL 1: opModePolProcAssoc op modes (excluding 200) for
- // (source type 62, process-91 polProcess), crossed with runSpecHourDay.
+    // @step 210, SQL 1: opModePolProcAssoc op modes (excluding 200) for
+    // (source type 62, process-91 polProcess), crossed with runSpecHourDay.
     for stpp in inputs.source_type_pol_process {
         if stpp.source_type_id != HOTELLING_SOURCE_TYPE
             || !process_91.contains(&stpp.pol_process_id)
@@ -866,9 +866,9 @@ pub fn auxiliary_power_op_mode_fractions(
         }
     }
 
- // @step 210, SQL 2: every hotelling op mode (excluding 200) for every
- // process-91 polProcess, crossed with runSpecHourDay — only when
- // source type 62 is selected.
+    // @step 210, SQL 2: every hotelling op mode (excluding 200) for every
+    // process-91 polProcess, crossed with runSpecHourDay — only when
+    // source type 62 is selected.
     if inputs.run_spec_source_type.contains(&HOTELLING_SOURCE_TYPE) {
         for ppa in inputs.pollutant_process_assoc {
             if ppa.process_id != AUXILIARY_POWER_EXHAUST {
@@ -894,25 +894,25 @@ pub fn auxiliary_power_op_mode_fractions(
 /// documentation for the scope of the port.
 #[derive(Debug, Clone)]
 pub struct RatesOperatingModeDistributionGenerator {
- /// The three master-loop subscriptions, built once in [`Self::new`].
+    /// The three master-loop subscriptions, built once in [`Self::new`].
     subscriptions: [CalculatorSubscription; 3],
 }
 
 impl RatesOperatingModeDistributionGenerator {
- /// Chain-DAG name — matches the Java class name.
+    /// Chain-DAG name — matches the Java class name.
     pub const NAME: &'static str = "RatesOperatingModeDistributionGenerator";
 
- /// Construct the generator with its master-loop subscriptions.
- ///
- /// Mirrors `subscribeToMe`: Running Exhaust, Extended Idle Exhaust and
- /// Auxiliary Power Exhaust, all at `YEAR` granularity (year level for
- /// source bins from the SourceBinDistributionGenerator), `GENERATOR`
- /// priority.
- ///
- /// The Java `subscribeToMe` drops Running Exhaust in the Project
- /// domain; that is a runtime RunSpec decision the registry / engine
- /// applies, so the static subscription metadata here always lists all
- /// three processes.
+    /// Construct the generator with its master-loop subscriptions.
+    ///
+    /// Mirrors `subscribeToMe`: Running Exhaust, Extended Idle Exhaust and
+    /// Auxiliary Power Exhaust, all at `YEAR` granularity (year level for
+    /// source bins from the SourceBinDistributionGenerator), `GENERATOR`
+    /// priority.
+    ///
+    /// The Java `subscribeToMe` drops Running Exhaust in the Project
+    /// domain; that is a runtime RunSpec decision the registry / engine
+    /// applies, so the static subscription metadata here always lists all
+    /// three processes.
     #[must_use]
     pub fn new() -> Self {
         let priority =
@@ -927,18 +927,18 @@ impl RatesOperatingModeDistributionGenerator {
         }
     }
 
- /// Compute the `RatesOpModeDistribution` rows this generator
- /// contributes for `process_id`, given the projected input tables.
- ///
- /// This is the port of the Java `calculateOpModeFractions` process
- /// dispatcher:
- ///
- /// * Extended Idle Exhaust (90) → [`extended_idle_op_mode_fractions`];
- /// * Auxiliary Power Exhaust (91) → [`auxiliary_power_op_mode_fractions`];
- /// * Running Exhaust (1) and anything else → no rows. Running
- /// Exhaust's op-mode distribution is produced by the external
- /// generator's `SourceTypePhysics.updateOperatingModeDistribution`
- /// step (), not by this class.
+    /// Compute the `RatesOpModeDistribution` rows this generator
+    /// contributes for `process_id`, given the projected input tables.
+    ///
+    /// This is the port of the Java `calculateOpModeFractions` process
+    /// dispatcher:
+    ///
+    /// * Extended Idle Exhaust (90) → [`extended_idle_op_mode_fractions`];
+    /// * Auxiliary Power Exhaust (91) → [`auxiliary_power_op_mode_fractions`];
+    /// * Running Exhaust (1) and anything else → no rows. Running
+    /// Exhaust's op-mode distribution is produced by the external
+    /// generator's `SourceTypePhysics.updateOperatingModeDistribution`
+    /// step (), not by this class.
     #[must_use]
     pub fn op_mode_fractions(
         &self,
@@ -1001,20 +1001,20 @@ impl Generator for RatesOperatingModeDistributionGenerator {
         OUTPUT_TABLES
     }
 
- /// Run the generator for the current master-loop iteration.
- ///
- /// Reads the six input tables from `ctx.tables()`, builds an
- /// [`OpModeFractionInputs`] view, dispatches through
- /// [`op_mode_fractions`](Self::op_mode_fractions) on
- /// `ctx.position().process_id`, and writes the result to
- /// `ctx.scratch()` under `"RatesOpModeDistribution"`.
+    /// Run the generator for the current master-loop iteration.
+    ///
+    /// Reads the six input tables from `ctx.tables()`, builds an
+    /// [`OpModeFractionInputs`] view, dispatches through
+    /// [`op_mode_fractions`](Self::op_mode_fractions) on
+    /// `ctx.position().process_id`, and writes the result to
+    /// `ctx.scratch()` under `"RatesOpModeDistribution"`.
     fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
         let process_id = ctx
             .position()
             .process_id
             .ok_or_else(|| Error::Polars("no process_id in iteration position".into()))?;
 
- // Read the six input tables.
+        // Read the six input tables.
         let ppa_raw: Vec<RatesPollutantProcessAssocRow> =
             ctx.tables().iter_typed("pollutantProcessAssoc")?;
         let stpp_raw: Vec<RatesSourceTypePolProcessRow> =
@@ -1028,7 +1028,7 @@ impl Generator for RatesOperatingModeDistributionGenerator {
         let hotelling_raw: Vec<RatesHotellingActivityDistributionRow> =
             ctx.tables().iter_typed("hotellingActivityDistribution")?;
 
- // Convert wrapper rows to the algorithm's input types.
+        // Convert wrapper rows to the algorithm's input types.
         let pollutant_process_assoc: Vec<PollutantProcessAssociation> = ppa_raw
             .iter()
             .map(|r| PollutantProcessAssociation {
@@ -1083,7 +1083,7 @@ mod tests {
     use super::*;
     use moves_data::PollutantId;
 
- /// `(pollutant, process)` association helper for test inputs.
+    /// `(pollutant, process)` association helper for test inputs.
     fn ppa(pollutant: u16, process: u16) -> PollutantProcessAssociation {
         PollutantProcessAssociation {
             pollutant_id: PollutantId(pollutant),
@@ -1091,12 +1091,12 @@ mod tests {
         }
     }
 
- /// `polProcessID` for a `(pollutant, process)` pair.
+    /// `polProcessID` for a `(pollutant, process)` pair.
     fn polproc(pollutant: u16, process: u16) -> PolProcessId {
         PolProcessId::new(PollutantId(pollutant), ProcessId(process))
     }
 
- /// `sourceTypePolProcess` row helper.
+    /// `sourceTypePolProcess` row helper.
     fn stpp(source_type: u16, pol_process: PolProcessId) -> SourceTypePolProcess {
         SourceTypePolProcess {
             source_type_id: SourceTypeId(source_type),
@@ -1104,7 +1104,7 @@ mod tests {
         }
     }
 
- /// `opModePolProcAssoc` row helper.
+    /// `opModePolProcAssoc` row helper.
     fn omppa(pol_process: PolProcessId, op_mode: i16) -> OpModePolProcAssoc {
         OpModePolProcAssoc {
             pol_process_id: pol_process,
@@ -1114,8 +1114,8 @@ mod tests {
 
     #[test]
     fn extended_idle_emits_assoc_op_modes_crossed_with_hour_days() {
- // One process-90 polProcess modeled for source type 62, with two
- // operating modes, crossed with two hour/day combinations.
+        // One process-90 polProcess modeled for source type 62, with two
+        // operating modes, crossed with two hour/day combinations.
         let pp = polproc(91, 90);
         let inputs = OpModeFractionInputs {
             pollutant_process_assoc: &[ppa(91, 90)],
@@ -1126,8 +1126,8 @@ mod tests {
             hotelling_op_modes: &[],
         };
         let rows = extended_idle_op_mode_fractions(&inputs);
- // 2 op modes × 2 hour/days = 4 rows; SQL 2's op-mode-200 rows
- // collide with SQL 1's and are ignored.
+        // 2 op modes × 2 hour/days = 4 rows; SQL 2's op-mode-200 rows
+        // collide with SQL 1's and are ignored.
         assert_eq!(rows.len(), 4);
         for r in &rows {
             assert_eq!(r.source_type_id, SourceTypeId(62));
@@ -1137,8 +1137,8 @@ mod tests {
             assert_eq!(r.pol_process_id, pp);
             assert_eq!(r.op_mode_fraction, 1.0);
         }
- // Output is primary-key sorted, and hourDayID precedes opModeID in
- // the key — so the op modes alternate per hour/day, not per mode.
+        // Output is primary-key sorted, and hourDayID precedes opModeID in
+        // the key — so the op modes alternate per hour/day, not per mode.
         let op_modes: Vec<i16> = rows.iter().map(|r| r.op_mode_id).collect();
         assert_eq!(op_modes, vec![200, 201, 200, 201]);
         let hour_days: Vec<i16> = rows.iter().map(|r| r.hour_day_id).collect();
@@ -1147,8 +1147,8 @@ mod tests {
 
     #[test]
     fn extended_idle_sql2_adds_op_mode_200_when_assoc_lacks_it() {
- // opModePolProcAssoc only lists op-mode 150; SQL 2 must still add
- // an op-mode-200 row for the process-90 polProcess.
+        // opModePolProcAssoc only lists op-mode 150; SQL 2 must still add
+        // an op-mode-200 row for the process-90 polProcess.
         let pp = polproc(91, 90);
         let inputs = OpModeFractionInputs {
             pollutant_process_assoc: &[ppa(91, 90)],
@@ -1165,8 +1165,8 @@ mod tests {
 
     #[test]
     fn extended_idle_sql2_skipped_when_source_type_62_not_selected() {
- // Source type 62 absent from runSpecSourceType: SQL 2 produces
- // nothing, leaving only SQL 1's assoc-driven rows.
+        // Source type 62 absent from runSpecSourceType: SQL 2 produces
+        // nothing, leaving only SQL 1's assoc-driven rows.
         let pp = polproc(91, 90);
         let inputs = OpModeFractionInputs {
             pollutant_process_assoc: &[ppa(91, 90)],
@@ -1183,8 +1183,8 @@ mod tests {
 
     #[test]
     fn extended_idle_empty_without_any_source_type_62() {
- // No (62, ·) rows in sourceTypePolProcess and 62 not selected:
- // both statements produce nothing.
+        // No (62, ·) rows in sourceTypePolProcess and 62 not selected:
+        // both statements produce nothing.
         let pp = polproc(91, 90);
         let inputs = OpModeFractionInputs {
             pollutant_process_assoc: &[ppa(91, 90)],
@@ -1199,8 +1199,8 @@ mod tests {
 
     #[test]
     fn extended_idle_insert_ignore_collapses_op_mode_200_collision() {
- // opModePolProcAssoc lists op-mode 200, and SQL 2 also emits a
- // 200 row: the single output row proves INSERT IGNORE de-dups.
+        // opModePolProcAssoc lists op-mode 200, and SQL 2 also emits a
+        // 200 row: the single output row proves INSERT IGNORE de-dups.
         let pp = polproc(91, 90);
         let inputs = OpModeFractionInputs {
             pollutant_process_assoc: &[ppa(91, 90)],
@@ -1217,8 +1217,8 @@ mod tests {
 
     #[test]
     fn extended_idle_skips_polproc_not_modeled_for_source_type_62() {
- // sourceTypePolProcess models the polProcess for source type 21,
- // not 62: SQL 1 contributes nothing, only SQL 2's op-mode 200.
+        // sourceTypePolProcess models the polProcess for source type 21,
+        // not 62: SQL 1 contributes nothing, only SQL 2's op-mode 200.
         let pp = polproc(91, 90);
         let inputs = OpModeFractionInputs {
             pollutant_process_assoc: &[ppa(91, 90)],
@@ -1246,7 +1246,7 @@ mod tests {
         };
         let rows = auxiliary_power_op_mode_fractions(&inputs);
         let op_modes: Vec<i16> = rows.iter().map(|r| r.op_mode_id).collect();
- // op-mode 200 (extended idling) is excluded from Auxiliary Power.
+        // op-mode 200 (extended idling) is excluded from Auxiliary Power.
         assert_eq!(op_modes, vec![201, 203]);
         for r in &rows {
             assert_eq!(r.source_type_id, SourceTypeId(62));
@@ -1256,7 +1256,7 @@ mod tests {
 
     #[test]
     fn auxiliary_power_sql1_excludes_op_mode_200() {
- // opModePolProcAssoc lists op-mode 200; step 210 SQL 1 must drop it.
+        // opModePolProcAssoc lists op-mode 200; step 210 SQL 1 must drop it.
         let pp = polproc(91, 91);
         let inputs = OpModeFractionInputs {
             pollutant_process_assoc: &[ppa(91, 91)],
@@ -1287,9 +1287,9 @@ mod tests {
 
     #[test]
     fn auxiliary_power_distinct_collapses_repeated_hotelling_op_modes() {
- // hotellingActivityDistribution repeats op-mode 201; the result
- // has a single 201 row per (polProcess, hourDay) — Java SELECT
- // DISTINCT / primary-key de-duplication.
+        // hotellingActivityDistribution repeats op-mode 201; the result
+        // has a single 201 row per (polProcess, hourDay) — Java SELECT
+        // DISTINCT / primary-key de-duplication.
         let inputs = OpModeFractionInputs {
             pollutant_process_assoc: &[ppa(91, 91)],
             source_type_pol_process: &[],
@@ -1325,14 +1325,14 @@ mod tests {
             gen.op_mode_fractions(ProcessId(91), &inputs),
             auxiliary_power_op_mode_fractions(&inputs),
         );
- // Running Exhaust and unrelated processes contribute no rows here.
+        // Running Exhaust and unrelated processes contribute no rows here.
         assert!(gen.op_mode_fractions(ProcessId(1), &inputs).is_empty());
         assert!(gen.op_mode_fractions(ProcessId(2), &inputs).is_empty());
     }
 
     #[test]
     fn output_is_sorted_by_primary_key() {
- // Inputs deliberately out of key order; output must be sorted.
+        // Inputs deliberately out of key order; output must be sorted.
         let pp = polproc(91, 90);
         let inputs = OpModeFractionInputs {
             pollutant_process_assoc: &[ppa(91, 90)],
@@ -1376,13 +1376,13 @@ mod tests {
             IterationPosition,
         };
 
- // One process-90 (Extended Idle) polProcess modeled for source type 62,
- // with op-mode 201 in opModePolProcAssoc and one hour/day (51).
+        // One process-90 (Extended Idle) polProcess modeled for source type 62,
+        // with op-mode 201 in opModePolProcAssoc and one hour/day (51).
         let pp = polproc(91, 90);
 
         let mut store = InMemoryStore::default();
 
- // pollutantProcessAssoc
+        // pollutantProcessAssoc
         store.insert(
             "pollutantProcessAssoc",
             RatesPollutantProcessAssocRow::into_dataframe(vec![RatesPollutantProcessAssocRow {
@@ -1391,7 +1391,7 @@ mod tests {
             }])
             .unwrap(),
         );
- // sourceTypePolProcess
+        // sourceTypePolProcess
         store.insert(
             "sourceTypePolProcess",
             RatesSourceTypePolProcessRow::into_dataframe(vec![RatesSourceTypePolProcessRow {
@@ -1400,7 +1400,7 @@ mod tests {
             }])
             .unwrap(),
         );
- // opModePolProcAssoc
+        // opModePolProcAssoc
         store.insert(
             "opModePolProcAssoc",
             RatesOpModePolProcAssocRow::into_dataframe(vec![RatesOpModePolProcAssocRow {
@@ -1409,7 +1409,7 @@ mod tests {
             }])
             .unwrap(),
         );
- // runSpecHourDay
+        // runSpecHourDay
         store.insert(
             "runSpecHourDay",
             RatesRunSpecHourDayRow::into_dataframe(vec![RatesRunSpecHourDayRow {
@@ -1417,7 +1417,7 @@ mod tests {
             }])
             .unwrap(),
         );
- // runSpecSourceType: source type 62 is selected.
+        // runSpecSourceType: source type 62 is selected.
         store.insert(
             "runSpecSourceType",
             RatesRunSpecSourceTypeRow::into_dataframe(vec![RatesRunSpecSourceTypeRow {
@@ -1425,7 +1425,7 @@ mod tests {
             }])
             .unwrap(),
         );
- // hotellingActivityDistribution: empty (not used by process 90).
+        // hotellingActivityDistribution: empty (not used by process 90).
         store.insert(
             "hotellingActivityDistribution",
             RatesHotellingActivityDistributionRow::into_dataframe(vec![]).unwrap(),
@@ -1453,9 +1453,9 @@ mod tests {
             .iter_typed("RatesOpModeDistribution")
             .unwrap();
 
- // Extended idle (process 90): SQL 1 emits op-mode 201 for hour-day 51;
- // SQL 2 emits op-mode 200 (the guarantee). INSERT IGNORE de-duplication
- // leaves two distinct rows.
+        // Extended idle (process 90): SQL 1 emits op-mode 201 for hour-day 51;
+        // SQL 2 emits op-mode 200 (the guarantee). INSERT IGNORE de-duplication
+        // leaves two distinct rows.
         assert_eq!(out.len(), 2, "expected op-mode 200 and 201 rows");
         for r in &out {
             assert_eq!(r.source_type_id, SourceTypeId(62));
@@ -1472,7 +1472,7 @@ mod tests {
 
     #[test]
     fn generator_is_object_safe() {
- // The registry stores generators as Box<dyn Generator>.
+        // The registry stores generators as Box<dyn Generator>.
         let gen: Box<dyn Generator> = Box::new(RatesOperatingModeDistributionGenerator::new());
         assert_eq!(gen.name(), "RatesOperatingModeDistributionGenerator");
     }

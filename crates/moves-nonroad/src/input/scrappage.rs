@@ -25,9 +25,9 @@ use std::path::PathBuf;
 /// One discretized scrappage point.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ScrappagePoint {
- /// Useful-life bin (e.g., 25.0 = 25% of useful life).
+    /// Useful-life bin (e.g., 25.0 = 25% of useful life).
     pub bin: f32,
- /// Percent of equipment scrapped at this bin.
+    /// Percent of equipment scrapped at this bin.
     pub percent: f32,
 }
 

@@ -23,14 +23,14 @@ use std::path::PathBuf;
 /// Stage-II VOC reduction outcome.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Stage2Factor {
- /// Reduction percentage as written in the file (`0..=100`).
+    /// Reduction percentage as written in the file (`0..=100`).
     pub reduction_pct: f32,
- /// Retention multiplier applied to VOC emissions (`1 - pct/100`).
+    /// Retention multiplier applied to VOC emissions (`1 - pct/100`).
     pub retention_factor: f32,
 }
 
 impl Stage2Factor {
- /// Default factor when the packet is absent (no reduction).
+    /// Default factor when the packet is absent (no reduction).
     pub const PASSTHROUGH: Self = Self {
         reduction_pct: 0.0,
         retention_factor: 1.0,
@@ -58,8 +58,8 @@ pub fn read_stg2<R: BufRead>(reader: R) -> Result<Stage2Factor> {
         let upper = trimmed.to_ascii_uppercase();
         if upper.starts_with("/STAGE II/") {
             found = true;
- // The Fortran source reads format `(20x,F7.0)` from the same line.
- // Take the first numeric token after the keyword.
+            // The Fortran source reads format `(20x,F7.0)` from the same line.
+            // Take the first numeric token after the keyword.
             let after = trimmed
                 .split_once(|c: char| c.is_ascii_whitespace())
                 .map(|(_, rest)| rest.trim())
@@ -73,7 +73,7 @@ pub fn read_stg2<R: BufRead>(reader: R) -> Result<Stage2Factor> {
             continue;
         }
         if found && value.is_none() {
- // Value may appear on the next non-blank line.
+            // Value may appear on the next non-blank line.
             for tok in trimmed.split_whitespace() {
                 if let Ok(v) = tok.parse::<f32>() {
                     value = Some(v);

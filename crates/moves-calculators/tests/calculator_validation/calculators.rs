@@ -92,74 +92,74 @@ pub const CALCULATOR_COUNT: usize = 39;
 /// `moves-calculators` crate, not a description of them.
 pub fn all_calculators() -> Vec<Box<dyn Calculator>> {
     vec![
- //
+        //
         Box::new(BaseRateCalculator::default()),
- //
+        //
         Box::new(CriteriaRunningCalculator::new()),
- //
+        //
         Box::new(CriteriaStartCalculator::new()),
- //
+        //
         Box::new(HcSpeciationCalculator::new()),
- //
+        //
         Box::new(NrHcSpeciationCalculator::new()),
- //
+        //
         Box::new(AirToxicsCalculator::new()),
- //
+        //
         Box::new(AirToxicsDistanceCalculator::new()),
- //
+        //
         Box::new(NrAirToxicsCalculator::new()),
- //
+        //
         Box::new(PmTotalExhaustCalculator::new()),
         Box::new(BasicRunningPmEmissionCalculator::new()),
- //
+        //
         Box::new(BasicStartPmEmissionCalculator::new()),
- //
+        //
         Box::new(PM10EmissionCalculator::new()),
         Box::new(PM10BrakeTireCalculator::new()),
- //
+        //
         Box::new(BasicBrakeWearPmEmissionCalculator::new()),
         Box::new(BasicTireWearPmEmissionCalculator::new()),
- //
+        //
         Box::new(SulfatePMCalculator),
- //
+        //
         Box::new(EvaporativePermeationCalculator::new()),
- //
+        //
         Box::new(TankVaporVentingCalculator::new()),
- //
+        //
         Box::new(MultidayTankVaporVentingCalculator::new()),
- //
+        //
         Box::new(LiquidLeakingCalculator::new()),
- //
+        //
         Box::new(RefuelingLossCalculator),
- //
+        //
         Box::new(CrankcaseEmissionCalculatorNonPM),
         Box::new(CrankcaseEmissionCalculatorPM),
- //
+        //
         Box::new(CO2AERunningStartExtendedIdleCalculator),
- //
+        //
         Box::new(Ch4N2oRunningStartCalculator::new()),
- //
+        //
         Box::new(Nh3RunningCalculator::new()),
         Box::new(Nh3StartCalculator::new()),
- //
+        //
         Box::new(SO2Calculator),
- //
+        //
         Box::new(NOCalculator::new()),
         Box::new(NO2Calculator::new()),
- //
+        //
         Box::new(WellToPumpProcessor),
         Box::new(Co2AtmosphericWtpCalculator),
         Box::new(Ch4N2oWtpCalculator),
         Box::new(Co2EquivalentWtpCalculator),
- //
+        //
         Box::new(TogSpeciationCalculator),
- //
+        //
         Box::new(ActivityCalculator),
- //
+        //
         Box::new(DistanceCalculator::new()),
- // — DummyCalculator (no-op completeness entry)
+        // — DummyCalculator (no-op completeness entry)
         Box::new(DummyCalculator),
- // () — NonroadEmissionCalculator adapter
+        // () — NonroadEmissionCalculator adapter
         Box::new(NonroadEmissionCalculator::new()),
     ]
 }
@@ -233,7 +233,7 @@ mod tests {
     fn registered_ppa_ids_are_pairs_of_u32() {
         for calc in all_calculators() {
             let ppa_ids = registered_ppa_ids(calc.as_ref());
- // All returned pairs must have positive IDs — MOVES IDs are 1-based.
+            // All returned pairs must have positive IDs — MOVES IDs are 1-based.
             for &(pollutant_id, process_id) in &ppa_ids {
                 assert!(pollutant_id > 0, "{}: zero pollutant_id", calc.name());
                 assert!(process_id > 0, "{}: zero process_id", calc.name());

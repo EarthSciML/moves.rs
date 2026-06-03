@@ -106,24 +106,24 @@ const HOT_SOAK_ENDED_SENTINEL: f64 = -1000.0;
 /// One `ZoneMonthHour` row — hourly ambient temperature for a zone.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ZoneMonthHourRow {
- /// `zoneID`.
+    /// `zoneID`.
     pub zone_id: i32,
- /// `monthID`.
+    /// `monthID`.
     pub month_id: i32,
- /// `hourID` — 1‥=24.
+    /// `hourID` — 1‥=24.
     pub hour_id: i32,
- /// `temperature` — hourly ambient temperature (°F).
+    /// `temperature` — hourly ambient temperature (°F).
     pub temperature: f64,
 }
 
 /// One `HourDay` row — maps a packed `hourDayID` to its hour and day.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HourDayRow {
- /// `hourDayID` — the packed `hourID`/`dayID` key.
+    /// `hourDayID` — the packed `hourID`/`dayID` key.
     pub hour_day_id: i32,
- /// `hourID` — 1‥=24.
+    /// `hourID` — 1‥=24.
     pub hour_id: i32,
- /// `dayID`.
+    /// `dayID`.
     pub day_id: i32,
 }
 
@@ -131,11 +131,11 @@ pub struct HourDayRow {
 /// `vehID` is unique within the table (the Java relies on this).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SampleVehicleDayRow {
- /// `vehID`.
+    /// `vehID`.
     pub veh_id: i32,
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: i32,
- /// `dayID`.
+    /// `dayID`.
     pub day_id: i32,
 }
 
@@ -146,20 +146,20 @@ pub struct SampleVehicleDayRow {
 /// trips that referenced it as first-of-day trips.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SampleVehicleTripRow {
- /// `vehID`.
+    /// `vehID`.
     pub veh_id: i32,
- /// `dayID`.
+    /// `dayID`.
     pub day_id: i32,
- /// `tripID`.
+    /// `tripID`.
     pub trip_id: i32,
- /// `hourID` — the hour the trip starts.
+    /// `hourID` — the hour the trip starts.
     pub hour_id: i32,
- /// `priorTripID` — `None` for a trip with no recorded predecessor.
+    /// `priorTripID` — `None` for a trip with no recorded predecessor.
     pub prior_trip_id: Option<i32>,
- /// `keyOnTime` — start minute-of-day; `None` for a marker trip or a trip
- /// continued without a key-on event.
+    /// `keyOnTime` — start minute-of-day; `None` for a marker trip or a trip
+    /// continued without a key-on event.
     pub key_on_time: Option<i32>,
- /// `keyOffTime` — end minute-of-day.
+    /// `keyOffTime` — end minute-of-day.
     pub key_off_time: i32,
 }
 
@@ -167,9 +167,9 @@ pub struct SampleVehicleTripRow {
 /// mapping a source type to a tank-temperature group.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SourceTypeModelYearGroupRow {
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: i32,
- /// `tankTemperatureGroupID`.
+    /// `tankTemperatureGroupID`.
     pub tank_temperature_group_id: i32,
 }
 
@@ -177,11 +177,11 @@ pub struct SourceTypeModelYearGroupRow {
 /// coefficients TTG-4a applies.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TankTemperatureRiseRow {
- /// `tankTemperatureGroupID`.
+    /// `tankTemperatureGroupID`.
     pub tank_temperature_group_id: i32,
- /// `tankTemperatureRiseTermA`.
+    /// `tankTemperatureRiseTermA`.
     pub tank_temperature_rise_term_a: f64,
- /// `tankTemperatureRiseTermB`.
+    /// `tankTemperatureRiseTermB`.
     pub tank_temperature_rise_term_b: f64,
 }
 
@@ -193,13 +193,13 @@ pub struct TankTemperatureRiseRow {
 /// temperature for a zone.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ColdSoakTankTemperatureRow {
- /// `zoneID`.
+    /// `zoneID`.
     pub zone_id: i32,
- /// `monthID`.
+    /// `monthID`.
     pub month_id: i32,
- /// `hourID` — 1‥=24.
+    /// `hourID` — 1‥=24.
     pub hour_id: i32,
- /// `coldSoakTankTemperature` — the hourly cold-soak tank temperature (°F).
+    /// `coldSoakTankTemperature` — the hourly cold-soak tank temperature (°F).
     pub cold_soak_tank_temperature: f64,
 }
 
@@ -212,19 +212,19 @@ pub struct ColdSoakTankTemperatureRow {
 /// `(tank-temperature group, zone, month)`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AverageTankTemperatureRow {
- /// `zoneID`.
+    /// `zoneID`.
     pub zone_id: i32,
- /// `monthID`.
+    /// `monthID`.
     pub month_id: i32,
- /// `hourDayID`.
+    /// `hourDayID`.
     pub hour_day_id: i32,
- /// `tankTemperatureGroupID`.
+    /// `tankTemperatureGroupID`.
     pub tank_temperature_group_id: i32,
- /// `opModeID` — 150 hot soaking, 151 cold soaking, 300 all running.
+    /// `opModeID` — 150 hot soaking, 151 cold soaking, 300 all running.
     pub op_mode_id: i32,
- /// `averageTankTemperature` (°F).
+    /// `averageTankTemperature` (°F).
     pub average_tank_temperature: f64,
- /// `isUserInput` — `false` (`'N'`) for generated rows.
+    /// `isUserInput` — `false` (`'N'`) for generated rows.
     pub is_user_input: bool,
 }
 
@@ -236,19 +236,19 @@ pub struct AverageTankTemperatureRow {
 /// generated row sharing its `(source type, zone, month)`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SoakActivityFractionRow {
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: i32,
- /// `zoneID`.
+    /// `zoneID`.
     pub zone_id: i32,
- /// `monthID`.
+    /// `monthID`.
     pub month_id: i32,
- /// `hourDayID`.
+    /// `hourDayID`.
     pub hour_day_id: i32,
- /// `opModeID` — 150 hot soaking, 151 cold soaking.
+    /// `opModeID` — 150 hot soaking, 151 cold soaking.
     pub op_mode_id: i32,
- /// `soakActivityFraction`.
+    /// `soakActivityFraction`.
     pub soak_activity_fraction: f64,
- /// `isUserInput` — `false` (`'N'`) for generated rows.
+    /// `isUserInput` — `false` (`'N'`) for generated rows.
     pub is_user_input: bool,
 }
 
@@ -260,19 +260,19 @@ pub struct SoakActivityFractionRow {
 /// every generated row sharing its `(source type, zone, month)`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ColdSoakInitialHourFractionRow {
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: i32,
- /// `zoneID`.
+    /// `zoneID`.
     pub zone_id: i32,
- /// `monthID`.
+    /// `monthID`.
     pub month_id: i32,
- /// `hourDayID`.
+    /// `hourDayID`.
     pub hour_day_id: i32,
- /// `initialHourDayID` — the hour-day the cold soak began in.
+    /// `initialHourDayID` — the hour-day the cold soak began in.
     pub initial_hour_day_id: i32,
- /// `coldSoakInitialHourFraction`.
+    /// `coldSoakInitialHourFraction`.
     pub cold_soak_initial_hour_fraction: f64,
- /// `isUserInput` — `false` (`'N'`) for generated rows.
+    /// `isUserInput` — `false` (`'N'`) for generated rows.
     pub is_user_input: bool,
 }
 
@@ -286,29 +286,29 @@ pub struct ColdSoakInitialHourFractionRow {
 /// internally, so the same value is reused across every `zone` of a run.
 #[derive(Debug, Clone, Default)]
 pub struct TankTemperatureInputs {
- /// `ZoneMonthHour`.
+    /// `ZoneMonthHour`.
     pub zone_month_hour: Vec<ZoneMonthHourRow>,
- /// `HourDay`.
+    /// `HourDay`.
     pub hour_day: Vec<HourDayRow>,
- /// `SampleVehicleDay`.
+    /// `SampleVehicleDay`.
     pub sample_vehicle_day: Vec<SampleVehicleDayRow>,
- /// `SampleVehicleTrip`.
+    /// `SampleVehicleTrip`.
     pub sample_vehicle_trip: Vec<SampleVehicleTripRow>,
- /// `SourceTypeModelYearGroup`.
+    /// `SourceTypeModelYearGroup`.
     pub source_type_model_year_group: Vec<SourceTypeModelYearGroupRow>,
- /// `TankTemperatureRise`.
+    /// `TankTemperatureRise`.
     pub tank_temperature_rise: Vec<TankTemperatureRiseRow>,
- /// `TankTemperatureGroup` — the full set of tank-temperature group ids.
+    /// `TankTemperatureGroup` — the full set of tank-temperature group ids.
     pub tank_temperature_group_ids: Vec<i32>,
- /// `RunSpecMonth` — months selected by the RunSpec.
+    /// `RunSpecMonth` — months selected by the RunSpec.
     pub runspec_month_ids: Vec<i32>,
- /// `RunSpecHourDay` — hour-days selected by the RunSpec.
+    /// `RunSpecHourDay` — hour-days selected by the RunSpec.
     pub runspec_hour_day_ids: Vec<i32>,
- /// Pre-existing user-input `AverageTankTemperature` rows.
+    /// Pre-existing user-input `AverageTankTemperature` rows.
     pub prior_average_tank_temperature: Vec<AverageTankTemperatureRow>,
- /// Pre-existing user-input `SoakActivityFraction` rows.
+    /// Pre-existing user-input `SoakActivityFraction` rows.
     pub prior_soak_activity_fraction: Vec<SoakActivityFractionRow>,
- /// Pre-existing user-input `ColdSoakInitialHourFraction` rows.
+    /// Pre-existing user-input `ColdSoakInitialHourFraction` rows.
     pub prior_cold_soak_initial_hour_fraction: Vec<ColdSoakInitialHourFractionRow>,
 }
 
@@ -316,13 +316,13 @@ pub struct TankTemperatureInputs {
 /// one `zone`.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct TankTemperatureOutput {
- /// `ColdSoakTankTemperature` (TTG-1).
+    /// `ColdSoakTankTemperature` (TTG-1).
     pub cold_soak_tank_temperature: Vec<ColdSoakTankTemperatureRow>,
- /// `AverageTankTemperature` (TTG-5).
+    /// `AverageTankTemperature` (TTG-5).
     pub average_tank_temperature: Vec<AverageTankTemperatureRow>,
- /// `SoakActivityFraction` (TTG-6).
+    /// `SoakActivityFraction` (TTG-6).
     pub soak_activity_fraction: Vec<SoakActivityFractionRow>,
- /// `ColdSoakInitialHourFraction` (TTG-7).
+    /// `ColdSoakInitialHourFraction` (TTG-7).
     pub cold_soak_initial_hour_fraction: Vec<ColdSoakInitialHourFractionRow>,
 }
 
@@ -658,7 +658,7 @@ impl TableRow for SampleVehicleTripRow {
                     day_id: day_id_col.get(i).ok_or_else(|| null("dayID"))?,
                     trip_id: trip_id_col.get(i).ok_or_else(|| null("tripID"))?,
                     hour_id: hour_id_col.get(i).ok_or_else(|| null("hourID"))?,
- // priorTripID and keyOnTime are nullable — None maps to SQL NULL.
+                    // priorTripID and keyOnTime are nullable — None maps to SQL NULL.
                     prior_trip_id: prior_trip_id_col.get(i),
                     key_on_time: key_on_time_col.get(i),
                     key_off_time: key_off_time_col.get(i).ok_or_else(|| null("keyOffTime"))?,
@@ -1392,7 +1392,7 @@ struct SvthRow {
     day_id: i32,
     hour_day_id: i32,
     hour_id: i32,
- /// Resolved `priorTripID`: `0` for a first-of-day trip.
+    /// Resolved `priorTripID`: `0` for a first-of-day trip.
     prior_trip_id: i32,
     key_on_time: i32,
     key_off_time: i32,
@@ -1484,7 +1484,7 @@ pub fn calculate_cold_soak_tank_temperature(
     zone_month_hour: &[ZoneMonthHourRow],
     zone_id: i32,
 ) -> Vec<ColdSoakTankTemperatureRow> {
- // (monthID, hourID) -> temperature, for this zone.
+    // (monthID, hourID) -> temperature, for this zone.
     let mut temp: BTreeMap<(i32, i32), f64> = BTreeMap::new();
     for zmh in zone_month_hour {
         if zmh.zone_id == zone_id {
@@ -1495,7 +1495,7 @@ pub fn calculate_cold_soak_tank_temperature(
 
     let mut output: Vec<ColdSoakTankTemperatureRow> = Vec::new();
     for month in months {
- // TTG-1a: quarter-hour temperatures, keyed (hourID, timeStepID).
+        // TTG-1a: quarter-hour temperatures, keyed (hourID, timeStepID).
         let mut quarter_hour_temp: BTreeMap<(i32, i32), f64> = BTreeMap::new();
         for hour in 1..=24 {
             let next_hour = if hour == 24 { 1 } else { hour + 1 };
@@ -1509,20 +1509,20 @@ pub fn calculate_cold_soak_tank_temperature(
                 quarter_hour_temp.insert((hour, time_step), q);
             }
         }
- // TTG-1b: the smoothing recurrence. With no (hour 1, step 1) entry the
- // Java skips the month entirely.
+        // TTG-1b: the smoothing recurrence. With no (hour 1, step 1) entry the
+        // Java skips the month entirely.
         let Some(&first_quarter_hour_tank_temp) = quarter_hour_temp.get(&(1, 1)) else {
             continue;
         };
         let mut sum_temp_delta = 0.0_f64;
- // The BTreeMap iterates (hour, step)-ascending — the Java
- // `ORDER BY hourID, timeStepID`.
+        // The BTreeMap iterates (hour, step)-ascending — the Java
+        // `ORDER BY hourID, timeStepID`.
         for (&(hour, time_step), &quarter_hour_temperature) in &quarter_hour_temp {
             let quarter_hour_tank_temp =
                 TANK_TEMP_SMOOTHING * sum_temp_delta + first_quarter_hour_tank_temp;
             let temp_delta = quarter_hour_temperature - quarter_hour_tank_temp;
             sum_temp_delta += temp_delta;
- // TTG-1c: the step-1 value is the cold-soak tank temperature.
+            // TTG-1c: the step-1 value is the cold-soak tank temperature.
             if time_step == 1 {
                 output.push(ColdSoakTankTemperatureRow {
                     zone_id,
@@ -1561,15 +1561,15 @@ fn flag_and_split_trips(trips: &[SampleVehicleTripRow], hour_day: &[HourDayRow])
         .map(|hd| ((hd.hour_id, hd.day_id), hd.hour_day_id))
         .collect();
 
- // flagMarkerTrips: a marker trip has neither a keyOnTime nor a priorTripID.
+    // flagMarkerTrips: a marker trip has neither a keyOnTime nor a priorTripID.
     let marker_trips: HashSet<(i32, i32, i32)> = trips
         .iter()
         .filter(|t| t.key_on_time.is_none() && t.prior_trip_id.is_none())
         .map(|t| (t.veh_id, t.day_id, t.trip_id))
         .collect();
 
- // TTG-2 processes non-marker trips in (vehID, dayID, tripID, keyOnTime)
- // order.
+    // TTG-2 processes non-marker trips in (vehID, dayID, tripID, keyOnTime)
+    // order.
     let mut sorted: Vec<&SampleVehicleTripRow> = trips
         .iter()
         .filter(|t| !marker_trips.contains(&(t.veh_id, t.day_id, t.trip_id)))
@@ -1578,9 +1578,9 @@ fn flag_and_split_trips(trips: &[SampleVehicleTripRow], hour_day: &[HourDayRow])
 
     let mut svth: Vec<SvthRow> = Vec::new();
     for &t in &sorted {
- // Resolve priorTripID. A marker predecessor, or no predecessor at all,
- // marks a first-of-day trip — flagMarkerTrips sets its priorTripID to
- // NULL, which `getInt` reads back as 0.
+        // Resolve priorTripID. A marker predecessor, or no predecessor at all,
+        // marks a first-of-day trip — flagMarkerTrips sets its priorTripID to
+        // NULL, which `getInt` reads back as 0.
         let prior_is_marker = t
             .prior_trip_id
             .is_some_and(|p| marker_trips.contains(&(t.veh_id, t.day_id, p)));
@@ -1613,7 +1613,7 @@ fn flag_and_split_trips(trips: &[SampleVehicleTripRow], hour_day: &[HourDayRow])
         };
 
         if key_off_time <= end_of_hour {
- // The whole trip fits within its starting hour.
+            // The whole trip fits within its starting hour.
             emit(hour, key_on_time, key_off_time, end_of_hour, true, true);
         } else {
             emit(hour, key_on_time, end_of_hour, end_of_hour, true, false);
@@ -1655,7 +1655,7 @@ fn build_hot_soak_events(svth: &[SvthRow], hour_day: &[HourDayRow]) -> Vec<HotSo
         .map(|hd| ((hd.hour_id, hd.day_id), hd.hour_day_id))
         .collect();
 
- // keyOnTime of the first segment of the trip that follows the keyed trip.
+    // keyOnTime of the first segment of the trip that follows the keyed trip.
     let mut next_trip_key_on: HashMap<(i32, i32, i32), i32> = HashMap::new();
     for r in svth {
         if r.start_of_trip {
@@ -1665,7 +1665,7 @@ fn build_hot_soak_events(svth: &[SvthRow], hour_day: &[HourDayRow]) -> Vec<HotSo
         }
     }
 
- // TTG-3 walks the trip-ending segments in (vehID, dayID, tripID) order.
+    // TTG-3 walks the trip-ending segments in (vehID, dayID, tripID) order.
     let mut enders: Vec<&SvthRow> = svth.iter().filter(|r| r.end_of_trip).collect();
     enders.sort_by_key(|r| (r.veh_id, r.day_id, r.trip_id));
 
@@ -1691,7 +1691,7 @@ fn build_hot_soak_events(svth: &[SvthRow], hour_day: &[HourDayRow]) -> Vec<HotSo
         let mut end_of_hour = r.end_of_hour;
         let mut hot_soak_begin = r.key_off_time;
 
- // The next trip bounds the soak; with none, it runs to end of day.
+        // The next trip bounds the soak; with none, it runs to end of day.
         let next_trip = next_trip_key_on
             .get(&(r.veh_id, r.day_id, r.trip_id))
             .copied();
@@ -1792,13 +1792,13 @@ struct WorkItem {
 
 /// The per-zone lookup tables TTG-4b's hot-soak calculation reads.
 struct Ttg4Tables<'a> {
- /// `(monthID, hourID)` → `coldSoakTankTemperature`.
+    /// `(monthID, hourID)` → `coldSoakTankTemperature`.
     cstt: &'a HashMap<(i32, i32), f64>,
- /// `hourDayID` → `hourID`.
+    /// `hourDayID` → `hourID`.
     hour_of_hour_day: HashMap<i32, i32>,
- /// `(monthID, hourID)` → ambient `temperature`, for the active zone.
+    /// `(monthID, hourID)` → ambient `temperature`, for the active zone.
     zone_temp: HashMap<(i32, i32), f64>,
- /// `(vehID, dayID, tripID)` → hot-soak events, sorted by `hotSoakBegin`.
+    /// `(vehID, dayID, tripID)` → hot-soak events, sorted by `hotSoakBegin`.
     events_by_trip: HashMap<(i32, i32, i32), Vec<HotSoakEventRow>>,
 }
 
@@ -1834,7 +1834,7 @@ fn hot_soak_for_trip(
         if done {
             break;
         }
- // Ambient temperature and cold-soak temperature for the event's hour.
+        // Ambient temperature and cold-soak temperature for the event's hour.
         let Some(&hour) = tables.hour_of_hour_day.get(&event.hour_day_id) else {
             continue;
         };
@@ -1855,8 +1855,8 @@ fn hot_soak_for_trip(
                 OP_MODE_COLD_SOAKING
             };
             if op_mode_id == OP_MODE_COLD_SOAKING {
- // The soak has cooled to cold soaking — stop without
- // recording this minute or any that would follow.
+                // The soak has cooled to cold soaking — stop without
+                // recording this minute or any that would follow.
                 soak_tank_temperature = HOT_SOAK_ENDED_SENTINEL;
                 done = true;
                 break;
@@ -1898,13 +1898,13 @@ fn calculate_operating_and_hot_soak_temperatures(
     cstt: &HashMap<(i32, i32), f64>,
     zone_id: i32,
 ) -> (Vec<OperatingTemperatureRow>, Vec<HotSoakTemperatureRow>) {
- // vehID → sourceTypeID.
+    // vehID → sourceTypeID.
     let veh_source: HashMap<i32, i32> = inputs
         .sample_vehicle_day
         .iter()
         .map(|sd| (sd.veh_id, sd.source_type_id))
         .collect();
- // sourceTypeID → tankTemperatureGroupIDs (the `TempVehAndTTG` join).
+    // sourceTypeID → tankTemperatureGroupIDs (the `TempVehAndTTG` join).
     let mut source_ttgs: HashMap<i32, BTreeSet<i32>> = HashMap::new();
     for g in &inputs.source_type_model_year_group {
         source_ttgs
@@ -1912,8 +1912,8 @@ fn calculate_operating_and_hot_soak_temperatures(
             .or_default()
             .insert(g.tank_temperature_group_id);
     }
- // tankTemperatureGroupID → (termA, termB); a group with no rise row drops
- // out of the TTG-4a inner join.
+    // tankTemperatureGroupID → (termA, termB); a group with no rise row drops
+    // out of the TTG-4a inner join.
     let rise: HashMap<i32, (f64, f64)> = inputs
         .tank_temperature_rise
         .iter()
@@ -1927,7 +1927,7 @@ fn calculate_operating_and_hot_soak_temperatures(
             )
         })
         .collect();
- // hourID → [(monthID, coldSoak)] — the `svth.hourID = cstt.hourID` join.
+    // hourID → [(monthID, coldSoak)] — the `svth.hourID = cstt.hourID` join.
     let mut cstt_by_hour: HashMap<i32, Vec<(i32, f64)>> = HashMap::new();
     for (&(month, hour), &cold_soak) in cstt {
         cstt_by_hour
@@ -1939,8 +1939,8 @@ fn calculate_operating_and_hot_soak_temperatures(
         months.sort_by_key(|&(m, _)| m);
     }
 
- // Expand the TTG-4a join: every SVTH segment × its vehicle's groups ×
- // every month sharing the segment's hour.
+    // Expand the TTG-4a join: every SVTH segment × its vehicle's groups ×
+    // every month sharing the segment's hour.
     let mut expanded: Vec<OperatingInput> = Vec::new();
     for r in svth {
         let Some(&source_type) = veh_source.get(&r.veh_id) else {
@@ -1978,8 +1978,8 @@ fn calculate_operating_and_hot_soak_temperatures(
         }
     }
 
- // First-of-day segments, ordered as the TTG-4a first-trip query is;
- // subsequent segments indexed by trip key, ordered by keyOnTime.
+    // First-of-day segments, ordered as the TTG-4a first-trip query is;
+    // subsequent segments indexed by trip key, ordered by keyOnTime.
     let mut first_trip_rows: Vec<&OperatingInput> =
         expanded.iter().filter(|r| r.prior_trip_id == 0).collect();
     first_trip_rows.sort_by_key(|r| {
@@ -2064,7 +2064,7 @@ fn calculate_operating_and_hot_soak_temperatures(
                 .cloned()
                 .unwrap_or_default()
         };
- // The recurrence carries keyOffTemp across a trip's segments.
+        // The recurrence carries keyOffTemp across a trip's segments.
         let mut key_off_temp = p.key_on_temp;
         for r in rows {
             let key_on_temp = if r.start_of_trip {
@@ -2078,7 +2078,7 @@ fn calculate_operating_and_hot_soak_temperatures(
             };
             let mut new_key_off_temp = key_on_temp
                 + ((r.term_a + r.term_b * (95.0 - key_on_temp)) / 1.2)
- * (f64::from(r.key_off_time - r.key_on_time) / 60.0);
+                    * (f64::from(r.key_off_time - r.key_on_time) / 60.0);
             if new_key_off_temp > MAX_OPERATING_TANK_TEMP {
                 new_key_off_temp = MAX_OPERATING_TANK_TEMP;
             }
@@ -2183,7 +2183,7 @@ fn calculate_average_tank_temperature(
 
     let mut output: Vec<AverageTankTemperatureRow> = Vec::new();
 
- // opMode 151 — cold soaking.
+    // opMode 151 — cold soaking.
     let summary: BTreeSet<(i32, i32, i32)> = operating
         .iter()
         .map(|r| (r.month_id, r.hour_day_id, r.tank_temperature_group_id))
@@ -2209,7 +2209,7 @@ fn calculate_average_tank_temperature(
         });
     }
 
- // opMode 300 — all running.
+    // opMode 300 — all running.
     let mut running: BTreeMap<(i32, i32, i32), (f64, i32)> = BTreeMap::new();
     for r in operating {
         let weight = r.key_off_time - r.key_on_time;
@@ -2220,7 +2220,7 @@ fn calculate_average_tank_temperature(
         entry.1 += weight;
     }
     for ((month_id, hour_day_id, ttg), (weighted_sum, weight)) in running {
- // A zero total duration leaves the Java SUM/SUM as NULL — no row.
+        // A zero total duration leaves the Java SUM/SUM as NULL — no row.
         if blocked.contains(&(ttg, month_id)) || weight == 0 {
             continue;
         }
@@ -2235,7 +2235,7 @@ fn calculate_average_tank_temperature(
         });
     }
 
- // opMode 150 — hot soaking.
+    // opMode 150 — hot soaking.
     let mut soaking: BTreeMap<(i32, i32, i32), (f64, i32)> = BTreeMap::new();
     for r in hot_soak {
         let entry = soaking
@@ -2299,7 +2299,7 @@ fn calculate_soak_activity_fraction(
     hot_soak: &[HotSoakTemperatureRow],
     zone_id: i32,
 ) -> Vec<SoakActivityFractionRow> {
- // vehID → (sourceTypeID, dayID); vehID is unique in SampleVehicleDay.
+    // vehID → (sourceTypeID, dayID); vehID is unique in SampleVehicleDay.
     let veh_day: HashMap<i32, (i32, i32)> = inputs
         .sample_vehicle_day
         .iter()
@@ -2311,10 +2311,10 @@ fn calculate_soak_activity_fraction(
         .map(|hd| (hd.hour_day_id, hd.day_id))
         .collect();
 
- // buildTTGeMinutes: eMinutes = 60 · vehicleCount.
+    // buildTTGeMinutes: eMinutes = 60 · vehicleCount.
     let mut vehicle_count: HashMap<(i32, i32), i32> = HashMap::new();
     for sd in &inputs.sample_vehicle_day {
- *vehicle_count
+        *vehicle_count
             .entry((sd.source_type_id, sd.day_id))
             .or_default() += 1;
     }
@@ -2330,7 +2330,7 @@ fn calculate_soak_activity_fraction(
         }
     }
 
- // TTGoMinutes: oMinutes = Σ(keyOffTime − keyOnTime).
+    // TTGoMinutes: oMinutes = Σ(keyOffTime − keyOnTime).
     let mut o_minutes: HashMap<(i32, i32, i32), i32> = HashMap::new();
     for r in svth {
         let Some(&(source_type, day)) = veh_day.get(&r.veh_id) else {
@@ -2340,13 +2340,13 @@ fn calculate_soak_activity_fraction(
             continue;
         }
         for &month in &inputs.runspec_month_ids {
- *o_minutes
+            *o_minutes
                 .entry((source_type, month, r.hour_day_id))
                 .or_default() += r.key_off_time - r.key_on_time;
         }
     }
 
- // HotSoakOpModeCount: count(distinct vehID, hotSoakTime).
+    // HotSoakOpModeCount: count(distinct vehID, hotSoakTime).
     let mut hot_soak_keys: HashMap<(i32, i32, i32), HashSet<(i32, i32)>> = HashMap::new();
     for r in hot_soak {
         let Some(&(source_type, _)) = veh_day.get(&r.veh_id) else {
@@ -2367,7 +2367,7 @@ fn calculate_soak_activity_fraction(
 
     let mut output: Vec<SoakActivityFractionRow> = Vec::new();
 
- // opMode 150 — hot soaking. eMinutes must exist (the Java inner join).
+    // opMode 150 — hot soaking. eMinutes must exist (the Java inner join).
     for (&(source_type, month, hour_day_id), set) in &hot_soak_keys {
         let Some(&e) = e_minutes.get(&(source_type, month, hour_day_id)) else {
             continue;
@@ -2395,7 +2395,7 @@ fn calculate_soak_activity_fraction(
         });
     }
 
- // opMode 151 — cold soaking. Iterates every eMinutes key.
+    // opMode 151 — cold soaking. Iterates every eMinutes key.
     for (&(source_type, month, hour_day_id), &e) in &e_minutes {
         if blocked.contains(&(source_type, month)) {
             continue;
@@ -2463,7 +2463,7 @@ fn calculate_cold_soak_initial_hour_fractions(
     hot_soak: &[HotSoakTemperatureRow],
     zone_id: i32,
 ) -> Vec<ColdSoakInitialHourFractionRow> {
- // --- buildArrays: lookup arrays and value→index maps ---
+    // --- buildArrays: lookup arrays and value→index maps ---
     let mut veh_list: Vec<(i32, i32, i32)> = inputs
         .sample_vehicle_day
         .iter()
@@ -2471,7 +2471,7 @@ fn calculate_cold_soak_initial_hour_fractions(
         .collect();
     veh_list.sort_by_key(|&(veh, _, _)| veh);
 
- // TempVehAndTTG — the distinct (vehID, tankTemperatureGroupID) pairs.
+    // TempVehAndTTG — the distinct (vehID, tankTemperatureGroupID) pairs.
     let mut source_ttgs: HashMap<i32, Vec<i32>> = HashMap::new();
     for g in &inputs.source_type_model_year_group {
         source_ttgs
@@ -2527,8 +2527,8 @@ fn calculate_cold_soak_initial_hour_fractions(
         month_ids.iter().enumerate().map(|(i, &m)| (m, i)).collect();
     let ttg_index: HashMap<i32, usize> = ttg_ids.iter().enumerate().map(|(i, &t)| (t, i)).collect();
 
- // --- cursors: the Java file-backed grouping, done in memory ---
- // svth: (vehID, hourDayID) → (min keyOnTime, Σ(keyOffTime − keyOnTime)).
+    // --- cursors: the Java file-backed grouping, done in memory ---
+    // svth: (vehID, hourDayID) → (min keyOnTime, Σ(keyOffTime − keyOnTime)).
     let mut svth_group: HashMap<(i32, i32), (i32, i32)> = HashMap::new();
     for r in svth {
         let entry = svth_group
@@ -2537,8 +2537,8 @@ fn calculate_cold_soak_initial_hour_fractions(
         entry.0 = entry.0.min(r.key_on_time);
         entry.1 += r.key_off_time - r.key_on_time;
     }
- // hot soak: (vehID, hourDayID) → per (monthIdx, ttgIdx) (min time, count).
- // `HotSoakCells` is `(min hotSoakTime, count)` keyed by `(monthIdx, ttgIdx)`.
+    // hot soak: (vehID, hourDayID) → per (monthIdx, ttgIdx) (min time, count).
+    // `HotSoakCells` is `(min hotSoakTime, count)` keyed by `(monthIdx, ttgIdx)`.
     type HotSoakCells = HashMap<(usize, usize), (i32, i32)>;
     let mut hot_soak_group: HashMap<(i32, i32), HotSoakCells> = HashMap::new();
     for r in hot_soak {
@@ -2562,13 +2562,13 @@ fn calculate_cold_soak_initial_hour_fractions(
     let n_hour_day = hour_day_ids.len();
     let n_ttg = ttg_ids.len();
 
- // coldSoakMinutes[source][month][hour][initialHour] and its per-hour sum.
+    // coldSoakMinutes[source][month][hour][initialHour] and its per-hour sum.
     let mut cold_soak_minutes: Vec<Vec<Vec<Vec<i32>>>> =
         vec![vec![vec![vec![0; n_hour_day]; n_hour_day]; n_month]; n_source];
     let mut cold_soak_minutes_sum: Vec<Vec<Vec<i32>>> =
         vec![vec![vec![0; n_hour_day]; n_month]; n_source];
- // initialHourDayIndex[month][ttg] — persists across vehicles, reset to the
- // first hour-day of each day.
+    // initialHourDayIndex[month][ttg] — persists across vehicles, reset to the
+    // first hour-day of each day.
     let mut initial_hour_day_index: Vec<Vec<usize>> = vec![vec![0; n_ttg]; n_month];
 
     for &(veh_id, source_type, veh_day) in &veh_list {
@@ -2584,11 +2584,11 @@ fn calculate_cold_soak_initial_hour_fractions(
             let (svth_min_key_on, svth_sum) = svth_cell.copied().unwrap_or((0, 0));
             let hot_soak_cell = hot_soak_group.get(&(veh_id, hour_day_ids[h_idx]));
 
- // Reset the initial-hour tracker at the first hour of the day.
+            // Reset the initial-hour tracker at the first hour of the day.
             if hour_of[h_idx] == 1 {
                 for month_row in &mut initial_hour_day_index {
                     for slot in month_row.iter_mut() {
- *slot = h_idx;
+                        *slot = h_idx;
                     }
                 }
             }
@@ -2605,10 +2605,10 @@ fn calculate_cold_soak_initial_hour_fractions(
 
                     let mut should_reset = false;
                     let (from_initial, in_current): (i32, i32) = if !has_svth && !has_hot_soak {
- // No first record because there are no records.
+                        // No first record because there are no records.
                         (60, 0)
                     } else if has_svth && (!has_hot_soak || svth_min_key_on < hot_soak_min_time) {
- // The first record is a vehicle trip.
+                        // The first record is a vehicle trip.
                         should_reset = true;
                         let from_initial = svth_min_key_on % 60;
                         let mut in_current = 60 - from_initial - svth_sum;
@@ -2617,7 +2617,7 @@ fn calculate_cold_soak_initial_hour_fractions(
                         }
                         (from_initial, in_current)
                     } else {
- // The first record is a hot-soak minute.
+                        // The first record is a hot-soak minute.
                         should_reset = true;
                         let mut in_current = 60;
                         if has_hot_soak {
@@ -2642,7 +2642,7 @@ fn calculate_cold_soak_initial_hour_fractions(
         }
     }
 
- // getUserInputKeys — (source type, month) already supplied for the zone.
+    // getUserInputKeys — (source type, month) already supplied for the zone.
     let user_inputs: HashSet<(i32, i32)> = inputs
         .prior_cold_soak_initial_hour_fraction
         .iter()
@@ -2709,22 +2709,22 @@ pub fn generate_tank_temperatures(
     inputs: &TankTemperatureInputs,
     zone_id: i32,
 ) -> TankTemperatureOutput {
- // TTG-1.
+    // TTG-1.
     let cold_soak_tank_temperature =
         calculate_cold_soak_tank_temperature(&inputs.zone_month_hour, zone_id);
- // `TempColdSoakTankTemperature` — (month, hour) → coldSoak, for this zone.
+    // `TempColdSoakTankTemperature` — (month, hour) → coldSoak, for this zone.
     let cstt: HashMap<(i32, i32), f64> = cold_soak_tank_temperature
         .iter()
         .map(|r| ((r.month_id, r.hour_id), r.cold_soak_tank_temperature))
         .collect();
- // flagMarkerTrips + TTG-2.
+    // flagMarkerTrips + TTG-2.
     let svth = flag_and_split_trips(&inputs.sample_vehicle_trip, &inputs.hour_day);
- // TTG-3.
+    // TTG-3.
     let events = build_hot_soak_events(&svth, &inputs.hour_day);
- // TTG-4.
+    // TTG-4.
     let (operating, hot_soak) =
         calculate_operating_and_hot_soak_temperatures(inputs, &svth, &events, &cstt, zone_id);
- // TTG-5.
+    // TTG-5.
     let average_tank_temperature = calculate_average_tank_temperature(
         &operating,
         &hot_soak,
@@ -2733,10 +2733,10 @@ pub fn generate_tank_temperatures(
         &inputs.prior_average_tank_temperature,
         zone_id,
     );
- // buildTTGeMinutes + TTG-6.
+    // buildTTGeMinutes + TTG-6.
     let soak_activity_fraction =
         calculate_soak_activity_fraction(inputs, &svth, &hot_soak, zone_id);
- // TTG-7.
+    // TTG-7.
     let cold_soak_initial_hour_fraction =
         calculate_cold_soak_initial_hour_fractions(inputs, &svth, &hot_soak, zone_id);
 
@@ -2764,12 +2764,12 @@ static INPUT_TABLES: &[&str] = &[
     "TankTemperatureGroup",
     "RunSpecMonth",
     "RunSpecHourDay",
- // Pre-existing user-input override tables: TTG-5/6/7 read the
- // `isUserInput='Y'` rows already merged into the execution DB and
- // exclude those keys from regeneration (Java
- // `AverageTankTemperatureKeys` / `SoakActivityFractionKeys` /
- // `ColdSoakInitialHourFractionKeys`). May be absent when the user
- // supplied no overrides.
+    // Pre-existing user-input override tables: TTG-5/6/7 read the
+    // `isUserInput='Y'` rows already merged into the execution DB and
+    // exclude those keys from regeneration (Java
+    // `AverageTankTemperatureKeys` / `SoakActivityFractionKeys` /
+    // `ColdSoakInitialHourFractionKeys`). May be absent when the user
+    // supplied no overrides.
     "AverageTankTemperature",
     "SoakActivityFraction",
     "ColdSoakInitialHourFraction",
@@ -2798,19 +2798,19 @@ pub struct TankTemperatureGenerator {
 }
 
 impl TankTemperatureGenerator {
- /// Construct the generator with its three master-loop subscriptions.
+    /// Construct the generator with its three master-loop subscriptions.
     #[must_use]
     pub fn new() -> Self {
- // `MasterLoopPriority.GENERATOR` — see `TankTemperatureGenerator.subscribeToMe`.
+        // `MasterLoopPriority.GENERATOR` — see `TankTemperatureGenerator.subscribeToMe`.
         let priority =
             Priority::parse("GENERATOR").expect("\"GENERATOR\" is a canonical MasterLoopPriority");
         Self {
             subscriptions: vec![
- // Evap Permeation (process 11).
+                // Evap Permeation (process 11).
                 CalculatorSubscription::new(ProcessId(11), Granularity::Zone, priority),
- // Evap Fuel Vapor Venting (process 12).
+                // Evap Fuel Vapor Venting (process 12).
                 CalculatorSubscription::new(ProcessId(12), Granularity::Zone, priority),
- // Evap Fuel Leaks (process 13).
+                // Evap Fuel Leaks (process 13).
                 CalculatorSubscription::new(ProcessId(13), Granularity::Zone, priority),
             ],
         }
@@ -2841,7 +2841,7 @@ impl Generator for TankTemperatureGenerator {
     }
 
     fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
- // Extract zone_id from the iteration position (ZONE granularity).
+        // Extract zone_id from the iteration position (ZONE granularity).
         let zone_id = ctx
             .position()
             .location
@@ -2849,7 +2849,7 @@ impl Generator for TankTemperatureGenerator {
             .ok_or_else(|| Error::Polars("no zone_id in iteration position".into()))?
             as i32;
 
- // Read all input tables.
+        // Read all input tables.
         let zone_month_hour: Vec<ZoneMonthHourRow> = ctx.tables().iter_typed("ZoneMonthHour")?;
         let hour_day: Vec<HourDayRow> = ctx.tables().iter_typed("HourDay")?;
         let sample_vehicle_day: Vec<SampleVehicleDayRow> =
@@ -2882,16 +2882,16 @@ impl Generator for TankTemperatureGenerator {
                 .into_iter()
                 .map(|r| r.hour_day_id)
                 .collect(),
- // Pre-existing user-input override rows. MOVES merges any
- // user-supplied AverageTankTemperature / SoakActivityFraction /
- // ColdSoakInitialHourFraction rows (isUserInput='Y') into the
- // execution DB before this generator runs, and TTG-5/6/7 exclude
- // those keys from regeneration so the user values survive
- // (Java `*Keys` LEFT JOIN ... IS NULL). The blocking logic in
- // calculate_average_tank_temperature / calculate_soak_activity_fraction
- // / calculate_cold_soak_initial_hour_fractions filters on
- // `is_user_input`, so loading the full merged tables here (which
- // may be absent when the user supplied no overrides) is faithful.
+            // Pre-existing user-input override rows. MOVES merges any
+            // user-supplied AverageTankTemperature / SoakActivityFraction /
+            // ColdSoakInitialHourFraction rows (isUserInput='Y') into the
+            // execution DB before this generator runs, and TTG-5/6/7 exclude
+            // those keys from regeneration so the user values survive
+            // (Java `*Keys` LEFT JOIN ... IS NULL). The blocking logic in
+            // calculate_average_tank_temperature / calculate_soak_activity_fraction
+            // / calculate_cold_soak_initial_hour_fractions filters on
+            // `is_user_input`, so loading the full merged tables here (which
+            // may be absent when the user supplied no overrides) is faithful.
             prior_average_tank_temperature: ctx
                 .tables()
                 .iter_typed_or_empty("AverageTankTemperature")?,
@@ -2905,7 +2905,7 @@ impl Generator for TankTemperatureGenerator {
 
         let out = generate_tank_temperatures(&inputs, zone_id);
 
- // Write the four output tables into the scratch namespace.
+        // Write the four output tables into the scratch namespace.
         crate::wiring::write_scratch_table(ctx, OUTPUT_TABLES[0], out.cold_soak_tank_temperature)?;
         crate::wiring::write_scratch_table(ctx, OUTPUT_TABLES[1], out.average_tank_temperature)?;
         crate::wiring::write_scratch_table(ctx, OUTPUT_TABLES[2], out.soak_activity_fraction)?;
@@ -2928,10 +2928,10 @@ pub fn factory() -> Box<dyn Generator> {
 mod tests {
     use super::*;
 
- /// Assert two `f64`s agree within a tolerance comfortably tighter than any
- /// platform `libm` discrepancy yet far looser than a real algorithm bug.
- /// Reference values are traced through the TTG steps independently (see
- /// each test's comments).
+    /// Assert two `f64`s agree within a tolerance comfortably tighter than any
+    /// platform `libm` discrepancy yet far looser than a real algorithm bug.
+    /// Reference values are traced through the TTG steps independently (see
+    /// each test's comments).
     fn assert_close(got: f64, expected: f64, what: &str) {
         let diff = (got - expected).abs();
         assert!(
@@ -2940,8 +2940,8 @@ mod tests {
         );
     }
 
- /// 24 `HourDay` rows for one day, with MOVES' `hourDayID = hourID·10 + dayID`
- /// packing — `hourDayID % 10` recovers the day, as TTG-4a relies on.
+    /// 24 `HourDay` rows for one day, with MOVES' `hourDayID = hourID·10 + dayID`
+    /// packing — `hourDayID % 10` recovers the day, as TTG-4a relies on.
     fn hour_days(day_id: i32) -> Vec<HourDayRow> {
         (1..=24)
             .map(|hour_id| HourDayRow {
@@ -2952,13 +2952,13 @@ mod tests {
             .collect()
     }
 
- // --- TTG-1: cold soak tank temperature --------------------------------
+    // --- TTG-1: cold soak tank temperature --------------------------------
 
     #[test]
     fn cold_soak_constant_temperature() {
- // A flat ambient temperature interpolates to a flat quarter-hour
- // series, so every tempDelta is 0, sumTempDelta never moves, and every
- // cold-soak temperature equals the ambient temperature.
+        // A flat ambient temperature interpolates to a flat quarter-hour
+        // series, so every tempDelta is 0, sumTempDelta never moves, and every
+        // cold-soak temperature equals the ambient temperature.
         let zmh: Vec<ZoneMonthHourRow> = (1..=24)
             .map(|hour_id| ZoneMonthHourRow {
                 zone_id: 1,
@@ -2976,18 +2976,18 @@ mod tests {
 
     #[test]
     fn cold_soak_recurrence_traced() {
- // Hours 1‥3 only: hour 1 (→2) and hour 2 (→3) produce quarter-hour
- // temperatures; hour 3 (→4 absent) and hour 24 (→1, 24 absent) do not.
- // temp[1]=50, temp[2]=70, temp[3]=70.
- // qhTemp[1,ts] = 50 + (ts-1)·5 -> 50, 55, 60, 65
- // qhTemp[2,ts] = 70 -> 70, 70, 70, 70
- // Recurrence (first = qhTemp[1,1] = 50), in (hour, step) order:
- // (1,1) qhTT=50.0 delta=0.0 sum=0.0
- // (1,2) qhTT=50.0 delta=5.0 sum=5.0
- // (1,3) qhTT=57.0 delta=3.0 sum=8.0
- // (1,4) qhTT=61.2 delta=3.8 sum=11.8
- // (2,1) qhTT=1.4·11.8+50 = 66.52
- // Cold soak keeps the step-1 values: hour 1 -> 50.0, hour 2 -> 66.52.
+        // Hours 1‥3 only: hour 1 (→2) and hour 2 (→3) produce quarter-hour
+        // temperatures; hour 3 (→4 absent) and hour 24 (→1, 24 absent) do not.
+        // temp[1]=50, temp[2]=70, temp[3]=70.
+        // qhTemp[1,ts] = 50 + (ts-1)·5 -> 50, 55, 60, 65
+        // qhTemp[2,ts] = 70 -> 70, 70, 70, 70
+        // Recurrence (first = qhTemp[1,1] = 50), in (hour, step) order:
+        // (1,1) qhTT=50.0 delta=0.0 sum=0.0
+        // (1,2) qhTT=50.0 delta=5.0 sum=5.0
+        // (1,3) qhTT=57.0 delta=3.0 sum=8.0
+        // (1,4) qhTT=61.2 delta=3.8 sum=11.8
+        // (2,1) qhTT=1.4·11.8+50 = 66.52
+        // Cold soak keeps the step-1 values: hour 1 -> 50.0, hour 2 -> 66.52.
         let zmh = vec![
             ZoneMonthHourRow {
                 zone_id: 7,
@@ -3018,8 +3018,8 @@ mod tests {
 
     #[test]
     fn cold_soak_skips_month_without_hour_one() {
- // With no hour 1, the Java `firstQuarterHourTankTemperature` query
- // returns nothing for the month and it produces no rows.
+        // With no hour 1, the Java `firstQuarterHourTankTemperature` query
+        // returns nothing for the month and it produces no rows.
         let zmh = vec![
             ZoneMonthHourRow {
                 zone_id: 1,
@@ -3035,17 +3035,17 @@ mod tests {
             },
         ];
         assert!(calculate_cold_soak_tank_temperature(&zmh, 1).is_empty());
- // A different zone is not selected.
+        // A different zone is not selected.
         assert!(calculate_cold_soak_tank_temperature(&zmh, 999).is_empty());
     }
 
- // --- flagMarkerTrips + TTG-2: trip splitting --------------------------
+    // --- flagMarkerTrips + TTG-2: trip splitting --------------------------
 
     #[test]
     fn single_hour_trip_is_one_segment() {
- // keyOnTime 65 -> endOfHour = (⌊65/60⌋+1)·60 = 120; keyOffTime 90 ≤ 120,
- // so the whole trip is a single start+end segment. No predecessor
- // resolves priorTripID to 0.
+        // keyOnTime 65 -> endOfHour = (⌊65/60⌋+1)·60 = 120; keyOffTime 90 ≤ 120,
+        // so the whole trip is a single start+end segment. No predecessor
+        // resolves priorTripID to 0.
         let trips = vec![SampleVehicleTripRow {
             veh_id: 1,
             day_id: 5,
@@ -3069,8 +3069,8 @@ mod tests {
 
     #[test]
     fn multi_hour_trip_splits_across_hours() {
- // keyOnTime 100 -> endOfHour 120; keyOffTime 200 spills two hours:
- // [100,120] start, [121,180], [181,200] end.
+        // keyOnTime 100 -> endOfHour 120; keyOffTime 200 spills two hours:
+        // [100,120] start, [121,180], [181,200] end.
         let trips = vec![SampleVehicleTripRow {
             veh_id: 1,
             day_id: 5,
@@ -3091,16 +3091,16 @@ mod tests {
         assert_eq!(svth[2].hour_id, 4);
         assert!(!svth[2].start_of_trip && svth[2].end_of_trip);
         assert_eq!((svth[2].key_on_time, svth[2].key_off_time), (181, 200));
- // No matching marker, so the explicit predecessor is kept.
+        // No matching marker, so the explicit predecessor is kept.
         assert!(svth.iter().all(|r| r.prior_trip_id == 1));
     }
 
     #[test]
     fn marker_trip_excluded_and_successor_becomes_first() {
- // Trip 1 is a marker (no keyOnTime, no priorTripID): excluded, and
- // trip 2 — whose predecessor is that marker — becomes a first trip
- // (priorTripID 0). Trip 3's predecessor is the real trip 2, so it is
- // kept.
+        // Trip 1 is a marker (no keyOnTime, no priorTripID): excluded, and
+        // trip 2 — whose predecessor is that marker — becomes a first trip
+        // (priorTripID 0). Trip 3's predecessor is the real trip 2, so it is
+        // kept.
         let trips = vec![
             SampleVehicleTripRow {
                 veh_id: 1,
@@ -3139,13 +3139,13 @@ mod tests {
         assert_eq!(t3.prior_trip_id, 2, "real predecessor kept");
     }
 
- // --- TTG-3: hot soak events -------------------------------------------
+    // --- TTG-3: hot soak events -------------------------------------------
 
     #[test]
     fn hot_soak_runs_to_next_trip() {
- // Trip 1 ends at keyOffTime 90; the next trip (priorTripID 1) starts
- // its first segment at keyOnTime 110, before endOfHour 120, so the
- // single hot-soak slice runs [90, 110).
+        // Trip 1 ends at keyOffTime 90; the next trip (priorTripID 1) starts
+        // its first segment at keyOnTime 110, before endOfHour 120, so the
+        // single hot-soak slice runs [90, 110).
         let svth = vec![
             SvthRow {
                 veh_id: 1,
@@ -3186,8 +3186,8 @@ mod tests {
 
     #[test]
     fn hot_soak_runs_to_end_of_day() {
- // Trip 1 has no successor, so its hot soak runs to the end of the day:
- // a slice for hour 23 and one for hour 24, then it stops.
+        // Trip 1 has no successor, so its hot soak runs to the end of the day:
+        // a slice for hour 23 and one for hour 24, then it stops.
         let svth = vec![SvthRow {
             veh_id: 1,
             trip_id: 1,
@@ -3209,11 +3209,11 @@ mod tests {
         assert!(!events[1].start_of_hot_soak);
     }
 
- // --- TTG-4: operating and hot-soak tank temperatures ------------------
+    // --- TTG-4: operating and hot-soak tank temperatures ------------------
 
- /// A one-vehicle / one-group fixture: source type 10 → tank-temperature
- /// group 3, with the given rise coefficients, and an ambient temperature
- /// of 0 °F at `(month 1, hour 2)`.
+    /// A one-vehicle / one-group fixture: source type 10 → tank-temperature
+    /// group 3, with the given rise coefficients, and an ambient temperature
+    /// of 0 °F at `(month 1, hour 2)`.
     fn ttg4_inputs(term_a: f64, term_b: f64) -> TankTemperatureInputs {
         TankTemperatureInputs {
             zone_month_hour: vec![ZoneMonthHourRow {
@@ -3243,10 +3243,10 @@ mod tests {
 
     #[test]
     fn operating_temperature_formula() {
- // First trip, single segment: keyOnTemp = coldSoak = 60. With
- // termA 5, termB 0.1 over keyOffTime−keyOnTime = 25 minutes,
- // keyOffTemp = 60 + ((5 + 0.1·(95−60)) / 1.2)·(25/60)
- // = 60 + (8.5/1.2)·(5/12) = 60 + 425/144.
+        // First trip, single segment: keyOnTemp = coldSoak = 60. With
+        // termA 5, termB 0.1 over keyOffTime−keyOnTime = 25 minutes,
+        // keyOffTemp = 60 + ((5 + 0.1·(95−60)) / 1.2)·(25/60)
+        // = 60 + (8.5/1.2)·(5/12) = 60 + 425/144.
         let inputs = ttg4_inputs(5.0, 0.1);
         let svth = vec![SvthRow {
             veh_id: 1,
@@ -3277,7 +3277,7 @@ mod tests {
 
     #[test]
     fn operating_temperature_capped_at_140() {
- // A huge termA drives keyOffTemp past the 140 °F EPA cap.
+        // A huge termA drives keyOffTemp past the 140 °F EPA cap.
         let inputs = ttg4_inputs(100_000.0, 0.0);
         let svth = vec![SvthRow {
             veh_id: 1,
@@ -3302,12 +3302,12 @@ mod tests {
 
     #[test]
     fn operating_temperature_chains_through_trips() {
- // Trip 1 (first) ends and, with no soak events, hands its keyOffTemp
- // straight to its successor trip 2 as the starting keyOnTemp — the
- // work-queue chain.
- // trip 1: keyOnTemp 60, keyOffTemp = 60 + (8.5/1.2)·(30/60) = 1525/24
- // trip 2: keyOnTemp = 1525/24 (carried, not the cold soak),
- // keyOffTemp = 1525/24 + (391/48 / 1.2)·(10/60) = 111755/1728
+        // Trip 1 (first) ends and, with no soak events, hands its keyOffTemp
+        // straight to its successor trip 2 as the starting keyOnTemp — the
+        // work-queue chain.
+        // trip 1: keyOnTemp 60, keyOffTemp = 60 + (8.5/1.2)·(30/60) = 1525/24
+        // trip 2: keyOnTemp = 1525/24 (carried, not the cold soak),
+        // keyOffTemp = 1525/24 + (391/48 / 1.2)·(10/60) = 111755/1728
         let inputs = ttg4_inputs(5.0, 0.1);
         let svth = vec![
             SvthRow {
@@ -3372,11 +3372,11 @@ mod tests {
 
     #[test]
     fn hot_soak_minute_recurrence() {
- // Hot soak from initialTankTemp 100, ambient 0, cold soak 60: every
- // minute stays above 60+3, so all three are recorded.
- // m119: 1.4·0/60 + 100 = 100
- // m120: 1.4·(−100)/60 + 100 = 293/3
- // m121: 1.4·(−593/3)/60 + 100 = 85849/900
+        // Hot soak from initialTankTemp 100, ambient 0, cold soak 60: every
+        // minute stays above 60+3, so all three are recorded.
+        // m119: 1.4·0/60 + 100 = 100
+        // m120: 1.4·(−100)/60 + 100 = 293/3
+        // m121: 1.4·(−593/3)/60 + 100 = 85849/900
         let cstt: HashMap<(i32, i32), f64> = [((1, 2), 60.0)].into_iter().collect();
         let tables = Ttg4Tables {
             cstt: &cstt,
@@ -3418,10 +3418,10 @@ mod tests {
 
     #[test]
     fn hot_soak_terminates_when_cold() {
- // initialTankTemp 64, ambient 0, cold soak 60 (threshold 63):
- // m119: soak 64 > 63 -> hot, recorded
- // m120: 1.4·(−64)/60 + 64 ≈ 62.5 ≤ 63 -> cold soaking, soak ends.
- // Only minute 119 is recorded; the sentinel is returned.
+        // initialTankTemp 64, ambient 0, cold soak 60 (threshold 63):
+        // m119: soak 64 > 63 -> hot, recorded
+        // m120: 1.4·(−64)/60 + 64 ≈ 62.5 ≤ 63 -> cold soaking, soak ends.
+        // Only minute 119 is recorded; the sentinel is returned.
         let cstt: HashMap<(i32, i32), f64> = [((1, 2), 60.0)].into_iter().collect();
         let tables = Ttg4Tables {
             cstt: &cstt,
@@ -3458,10 +3458,10 @@ mod tests {
         assert_close(ended_at, HOT_SOAK_ENDED_SENTINEL, "soak ended cold");
     }
 
- // --- TTG-5: average tank temperature ----------------------------------
+    // --- TTG-5: average tank temperature ----------------------------------
 
- /// An `OperatingTemperature` row with the fields TTG-5 reads; the rest are
- /// placeholders.
+    /// An `OperatingTemperature` row with the fields TTG-5 reads; the rest are
+    /// placeholders.
     fn op_row(
         month_id: i32,
         tank_temperature_group_id: i32,
@@ -3488,8 +3488,8 @@ mod tests {
         }
     }
 
- /// A `HotSoakTemperature` row with the fields TTG-5/6/7 read; the rest are
- /// placeholders.
+    /// A `HotSoakTemperature` row with the fields TTG-5/6/7 read; the rest are
+    /// placeholders.
     fn hs_row(
         month_id: i32,
         tank_temperature_group_id: i32,
@@ -3517,11 +3517,11 @@ mod tests {
 
     #[test]
     fn average_tank_temperature_aggregates() {
- // One operating segment and two hot-soak minutes for (month 1,
- // hour-day 25, group 3):
- // opMode 151 = coldSoak[1, hour 2] = 55
- // opMode 300 = Σ(60·(60+80)/2) / Σ60 = 70
- // opMode 150 = mean(90, 86) = 88
+        // One operating segment and two hot-soak minutes for (month 1,
+        // hour-day 25, group 3):
+        // opMode 151 = coldSoak[1, hour 2] = 55
+        // opMode 300 = Σ(60·(60+80)/2) / Σ60 = 70
+        // opMode 150 = mean(90, 86) = 88
         let operating = vec![op_row(1, 3, 25, 60, 120, 60.0, 80.0)];
         let hot_soak = vec![
             hs_row(1, 3, 1, 1, 25, 119, 90.0),
@@ -3532,7 +3532,7 @@ mod tests {
             calculate_average_tank_temperature(&operating, &hot_soak, &cstt, &hour_days(5), &[], 9);
         assert_eq!(rows.len(), 3);
         let by_mode = |m: i32| {
- *rows
+            *rows
                 .iter()
                 .find(|r| r.op_mode_id == m)
                 .expect("op mode present")
@@ -3561,8 +3561,8 @@ mod tests {
 
     #[test]
     fn user_input_blocks_average_tank_temperature() {
- // A user-input row for (group 3, zone 9, month 1) blocks all three
- // generated op-mode rows for that key.
+        // A user-input row for (group 3, zone 9, month 1) blocks all three
+        // generated op-mode rows for that key.
         let operating = vec![op_row(1, 3, 25, 60, 120, 60.0, 80.0)];
         let cstt: HashMap<(i32, i32), f64> = [((1, 2), 55.0)].into_iter().collect();
         let prior = vec![AverageTankTemperatureRow {
@@ -3579,14 +3579,14 @@ mod tests {
         assert!(rows.is_empty(), "user input blocks generation");
     }
 
- // --- TTG-6: soak activity fraction ------------------------------------
+    // --- TTG-6: soak activity fraction ------------------------------------
 
     #[test]
     fn soak_activity_fraction_split() {
- // One vehicle (source type 10, day 5): eMinutes = 60·1 = 60. One trip
- // segment of 30 minutes: oMinutes = 30. Two hot-soak minutes:
- // opMode 150 = 2 / (60 − 30) = 2/30
- // opMode 151 = (60 − 30 − 2) / (60 − 30) = 28/30
+        // One vehicle (source type 10, day 5): eMinutes = 60·1 = 60. One trip
+        // segment of 30 minutes: oMinutes = 30. Two hot-soak minutes:
+        // opMode 150 = 2 / (60 − 30) = 2/30
+        // opMode 151 = (60 − 30 − 2) / (60 − 30) = 28/30
         let inputs = TankTemperatureInputs {
             hour_day: hour_days(5),
             sample_vehicle_day: vec![SampleVehicleDayRow {
@@ -3618,7 +3618,7 @@ mod tests {
         let rows = calculate_soak_activity_fraction(&inputs, &svth, &hot_soak, 7);
         assert_eq!(rows.len(), 2);
         let by_mode = |m: i32| {
- *rows
+            *rows
                 .iter()
                 .find(|r| r.op_mode_id == m)
                 .expect("op mode present")
@@ -3639,18 +3639,18 @@ mod tests {
         }
     }
 
- // --- TTG-7: cold soak initial hour fractions --------------------------
+    // --- TTG-7: cold soak initial hour fractions --------------------------
 
     #[test]
     fn cold_soak_initial_hour_fraction_apportions_minutes() {
- // One vehicle, one group, one month, two hour-days (hour 1, hour 2).
- // Hour 1 has no activity — 60 minutes carry over from its own initial
- // hour. Hour 2 has a trip: keyOnTime 130 → 130 mod 60 = 10 minutes
- // carry over from the initial hour (hour 1), and 60 − 10 − 20 = 30
- // start in hour 2.
- // hour 1: coldSoakMinutes[initial 1] = 60, sum 60 -> fraction 1.0
- // hour 2: coldSoakMinutes[initial 1] = 10, [initial 2] = 30,
- // sum 40 -> fractions 0.25 and 0.75
+        // One vehicle, one group, one month, two hour-days (hour 1, hour 2).
+        // Hour 1 has no activity — 60 minutes carry over from its own initial
+        // hour. Hour 2 has a trip: keyOnTime 130 → 130 mod 60 = 10 minutes
+        // carry over from the initial hour (hour 1), and 60 − 10 − 20 = 30
+        // start in hour 2.
+        // hour 1: coldSoakMinutes[initial 1] = 60, sum 60 -> fraction 1.0
+        // hour 2: coldSoakMinutes[initial 1] = 10, [initial 2] = 30,
+        // sum 40 -> fractions 0.25 and 0.75
         let inputs = TankTemperatureInputs {
             hour_day: vec![
                 HourDayRow {
@@ -3703,13 +3703,13 @@ mod tests {
         }
     }
 
- // --- end to end + generator -------------------------------------------
+    // --- end to end + generator -------------------------------------------
 
     #[test]
     fn generate_full_chain_is_deterministic() {
- // A constant-75 °F zone with one vehicle making one trip. The cold
- // soak is exactly 75 everywhere; every other table is populated and
- // the whole chain is order-independent.
+        // A constant-75 °F zone with one vehicle making one trip. The cold
+        // soak is exactly 75 everywhere; every other table is populated and
+        // the whole chain is order-independent.
         let zone_month_hour: Vec<ZoneMonthHourRow> = (1..=24)
             .map(|hour_id| ZoneMonthHourRow {
                 zone_id: 1,
@@ -3766,13 +3766,13 @@ mod tests {
             !out.cold_soak_initial_hour_fraction.is_empty(),
             "TTG-7 produced rows"
         );
- // Every cold-soaking average is the constant zone temperature.
+        // Every cold-soaking average is the constant zone temperature.
         for row in &out.average_tank_temperature {
             if row.op_mode_id == OP_MODE_COLD_SOAKING {
                 assert_close(row.average_tank_temperature, 75.0, "151 = cold soak");
             }
         }
- // The chain is deterministic — a second run is bit-identical.
+        // The chain is deterministic — a second run is bit-identical.
         assert!(generate_tank_temperatures(&inputs, 1) == out);
     }
 
@@ -3819,12 +3819,12 @@ mod tests {
         const ZONE: u32 = 90_001;
         const ZONE_I32: i32 = 90_001;
 
- // Build a minimal but complete set of input tables. A constant-75 °F
- // ambient with one vehicle making one trip is enough to produce rows in
- // all four output tables.
+        // Build a minimal but complete set of input tables. A constant-75 °F
+        // ambient with one vehicle making one trip is enough to produce rows in
+        // all four output tables.
         let mut store = InMemoryStore::default();
 
- // ZoneMonthHour — 24 hours at 75 °F for zone 90_001, month 1.
+        // ZoneMonthHour — 24 hours at 75 °F for zone 90_001, month 1.
         let zmh_rows: Vec<ZoneMonthHourRow> = (1..=24)
             .map(|hour_id| ZoneMonthHourRow {
                 zone_id: ZONE_I32,
@@ -3838,7 +3838,7 @@ mod tests {
             ZoneMonthHourRow::into_dataframe(zmh_rows).unwrap(),
         );
 
- // HourDay — 24 hour-days for day 5.
+        // HourDay — 24 hour-days for day 5.
         let hd_rows: Vec<HourDayRow> = (1..=24)
             .map(|hour_id| HourDayRow {
                 hour_day_id: hour_id * 10 + 5,
@@ -3849,7 +3849,7 @@ mod tests {
         let all_hour_day_ids: Vec<i32> = hd_rows.iter().map(|hd| hd.hour_day_id).collect();
         store.insert("HourDay", HourDayRow::into_dataframe(hd_rows).unwrap());
 
- // SampleVehicleDay — one vehicle, source type 10, day 5.
+        // SampleVehicleDay — one vehicle, source type 10, day 5.
         store.insert(
             "SampleVehicleDay",
             SampleVehicleDayRow::into_dataframe(vec![SampleVehicleDayRow {
@@ -3860,7 +3860,7 @@ mod tests {
             .unwrap(),
         );
 
- // SampleVehicleTrip — one trip in hour 2.
+        // SampleVehicleTrip — one trip in hour 2.
         store.insert(
             "SampleVehicleTrip",
             SampleVehicleTripRow::into_dataframe(vec![SampleVehicleTripRow {
@@ -3875,7 +3875,7 @@ mod tests {
             .unwrap(),
         );
 
- // SourceTypeModelYearGroup — source 10 → group 3.
+        // SourceTypeModelYearGroup — source 10 → group 3.
         store.insert(
             "SourceTypeModelYearGroup",
             SourceTypeModelYearGroupRow::into_dataframe(vec![SourceTypeModelYearGroupRow {
@@ -3885,7 +3885,7 @@ mod tests {
             .unwrap(),
         );
 
- // TankTemperatureRise — group 3 coefficients.
+        // TankTemperatureRise — group 3 coefficients.
         store.insert(
             "TankTemperatureRise",
             TankTemperatureRiseRow::into_dataframe(vec![TankTemperatureRiseRow {
@@ -3896,7 +3896,7 @@ mod tests {
             .unwrap(),
         );
 
- // TankTemperatureGroup — just group 3.
+        // TankTemperatureGroup — just group 3.
         store.insert(
             "TankTemperatureGroup",
             TankTemperatureGroupRow::into_dataframe(vec![TankTemperatureGroupRow {
@@ -3905,13 +3905,13 @@ mod tests {
             .unwrap(),
         );
 
- // RunSpecMonth — month 1.
+        // RunSpecMonth — month 1.
         store.insert(
             "RunSpecMonth",
             RunSpecMonthRow::into_dataframe(vec![RunSpecMonthRow { month_id: 1 }]).unwrap(),
         );
 
- // RunSpecHourDay — all 24 hour-days for day 5.
+        // RunSpecHourDay — all 24 hour-days for day 5.
         store.insert(
             "RunSpecHourDay",
             RunSpecHourDayRow::into_dataframe(
@@ -3939,7 +3939,7 @@ mod tests {
         let mut ctx = CalculatorContext::with_position_and_tables(position, store);
         generator.execute(&mut ctx).unwrap();
 
- // ColdSoakTankTemperature: one row per hour for month 1, 24 rows.
+        // ColdSoakTankTemperature: one row per hour for month 1, 24 rows.
         let cstt: Vec<ColdSoakTankTemperatureRow> = ctx
             .scratch()
             .store
@@ -3954,7 +3954,7 @@ mod tests {
             );
         }
 
- // AverageTankTemperature: must be non-empty (TTG-5 produced rows).
+        // AverageTankTemperature: must be non-empty (TTG-5 produced rows).
         let att: Vec<AverageTankTemperatureRow> = ctx
             .scratch()
             .store
@@ -3962,7 +3962,7 @@ mod tests {
             .unwrap();
         assert!(!att.is_empty(), "AverageTankTemperature must be non-empty");
 
- // SoakActivityFraction: must be non-empty (TTG-6 produced rows).
+        // SoakActivityFraction: must be non-empty (TTG-6 produced rows).
         let saf: Vec<SoakActivityFractionRow> = ctx
             .scratch()
             .store
@@ -3973,7 +3973,7 @@ mod tests {
             assert_eq!(row.zone_id, ZONE_I32);
         }
 
- // ColdSoakInitialHourFraction: must be non-empty (TTG-7 produced rows).
+        // ColdSoakInitialHourFraction: must be non-empty (TTG-7 produced rows).
         let csihf: Vec<ColdSoakInitialHourFractionRow> = ctx
             .scratch()
             .store
@@ -3990,7 +3990,7 @@ mod tests {
 
     #[test]
     fn generator_is_object_safe() {
- // The CalculatorRegistry stores generators as `Box<dyn Generator>`.
+        // The CalculatorRegistry stores generators as `Box<dyn Generator>`.
         let generators: Vec<Box<dyn Generator>> = vec![Box::new(TankTemperatureGenerator::new())];
         assert_eq!(generators[0].name(), "TankTemperatureGenerator");
     }

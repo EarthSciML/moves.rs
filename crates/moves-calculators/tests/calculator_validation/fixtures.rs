@@ -32,7 +32,7 @@ use super::repo_root;
 /// three () fixtures that cover the previously
 /// uncovered calculators follow.
 pub const ONROAD_FIXTURE_NAMES: &[&str] = &[
- // hot-path fixtures (23)
+    // hot-path fixtures (23)
     "sample-runspec",
     "expand-day",
     "expand-month",
@@ -56,7 +56,7 @@ pub const ONROAD_FIXTURE_NAMES: &[&str] = &[
     "scale-county",
     "scale-project",
     "scale-rates",
- // fixtures — cover the four previously uncovered calculators (3)
+    // fixtures — cover the four previously uncovered calculators (3)
     "process-nox-speciation", // NOCalculator (32,1), NO2Calculator (33,1)
     "process-extended-idle",  // CO2AERunningStartExtendedIdleCalculator (90,90)
     "chain-nonhaptog",        // TogSpeciationCalculator (88,1)
@@ -99,27 +99,27 @@ impl std::error::Error for FixtureError {}
 /// parsed from the RunSpec XML.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OnroadFixture {
- /// The fixture name (file stem, e.g. `process-brakewear`).
+    /// The fixture name (file stem, e.g. `process-brakewear`).
     pub name: String,
- /// Absolute path to the RunSpec XML.
+    /// Absolute path to the RunSpec XML.
     pub path: PathBuf,
- /// `true` when the RunSpec selects no NONROAD model.
+    /// `true` when the RunSpec selects no NONROAD model.
     pub is_onroad: bool,
- /// `<modelscale>`.
+    /// `<modelscale>`.
     pub scale: ModelScale,
- /// `<modeldomain>`.
+    /// `<modeldomain>`.
     pub domain: Option<ModelDomain>,
- /// First `<timespan>` calendar year, if the RunSpec records one.
+    /// First `<timespan>` calendar year, if the RunSpec records one.
     pub year: Option<u32>,
- /// Distinct process IDs the fixture exercises, ascending.
- /// Subset of `ppa_ids` — retained for compatibility with the
- /// process-based coverage logic.
+    /// Distinct process IDs the fixture exercises, ascending.
+    /// Subset of `ppa_ids` — retained for compatibility with the
+    /// process-based coverage logic.
     pub process_ids: Vec<u32>,
- /// Distinct `(pollutant_id, process_id)` pairs the fixture exercises,
- /// sorted by (process_id, pollutant_id). This is the key the coverage
- /// matrix joins calculator registrations on.
+    /// Distinct `(pollutant_id, process_id)` pairs the fixture exercises,
+    /// sorted by (process_id, pollutant_id). This is the key the coverage
+    /// matrix joins calculator registrations on.
     pub ppa_ids: Vec<(u32, u32)>,
- /// The RunSpec `<description>` CDATA text, if present.
+    /// The RunSpec `<description>` CDATA text, if present.
     pub description: Option<String>,
 }
 
@@ -249,7 +249,7 @@ mod tests {
                 "{} has no (pollutant, process) pairs",
                 fixture.name
             );
- // ppa_ids always at least as large as process_ids
+            // ppa_ids always at least as large as process_ids
             assert!(fixture.ppa_ids.len() >= fixture.process_ids.len());
         }
     }

@@ -34,37 +34,37 @@ use std::path::PathBuf;
 #[derive(Debug, Default, Clone)]
 #[non_exhaustive]
 pub struct NonroadContext {
- /// User options from `.opt` file
+    /// User options from `.opt` file
     pub options: UserOptions,
 
- /// Emission factor tables
+    /// Emission factor tables
     pub emissions: EmissionsState,
 
- /// Population, growth, and age data
+    /// Population, growth, and age data
     pub population: PopulationState,
 
- /// Allocation records
+    /// Allocation records
     pub allocation: AllocationState,
 
- /// Growth factor data
+    /// Growth factor data
     pub growth: GrowthState,
 
- /// Seasonal and day-specific data
+    /// Seasonal and day-specific data
     pub seasonal: SeasonalState,
 
- /// Technology tables
+    /// Technology tables
     pub technology: TechnologyState,
 
- /// Equipment and SCC definitions
+    /// Equipment and SCC definitions
     pub equipment: EquipmentState,
 
- /// Geography and FIPS tables
+    /// Geography and FIPS tables
     pub geography: GeographyState,
 
- /// Retrofit data
+    /// Retrofit data
     pub retrofit: RetrofitState,
 
- /// Runtime state (updated during execution)
+    /// Runtime state (updated during execution)
     pub current_year: i16,
     pub current_month: u8,
     pub current_day: u8,
@@ -72,15 +72,15 @@ pub struct NonroadContext {
     pub current_equipment_idx: usize,
     pub current_fips: i32,
 
- /// Output accumulators
+    /// Output accumulators
     pub emission_outputs: Vec<EmissionOutput>,
 
- /// Warning messages
+    /// Warning messages
     pub warning_messages: Vec<WarningMessage>,
 }
 
 impl NonroadContext {
- /// Create an empty execution context.
+    /// Create an empty execution context.
     pub fn new() -> Self {
         Self::default()
     }
@@ -90,7 +90,7 @@ impl NonroadContext {
 #[derive(Debug, Default, Clone)]
 #[non_exhaustive]
 pub struct UserOptions {
- /// Input file paths
+    /// Input file paths
     pub pop_file: Option<PathBuf>,
     pub alo_file: Option<PathBuf>,
     pub grw_file: Option<PathBuf>,
@@ -99,11 +99,11 @@ pub struct UserOptions {
     pub tch_file: Option<PathBuf>,
     pub rtrft_file: Option<PathBuf>,
 
- /// Output configuration
+    /// Output configuration
     pub output_dir: Option<PathBuf>,
     pub output_format: OutputFormat,
 
- /// Run parameters
+    /// Run parameters
     pub start_year: Option<i16>,
     pub end_year: Option<i16>,
     pub start_month: Option<u8>,
@@ -111,19 +111,19 @@ pub struct UserOptions {
     pub start_day: Option<u8>,
     pub end_day: Option<u8>,
 
- /// Geographic scope
+    /// Geographic scope
     pub geography_level: GeographyLevel,
     pub state_codes: Vec<i32>,
     pub county_codes: Vec<i32>,
 
- /// Pollutant selection
+    /// Pollutant selection
     pub active_pollutants: Vec<i32>,
 
- /// Control strategy flags
+    /// Control strategy flags
     pub retrofit_enabled: bool,
     pub moves_mode: bool,
 
- /// Diagnostic flags
+    /// Diagnostic flags
     pub debug_output: bool,
     pub verbose: bool,
 }
@@ -151,16 +151,16 @@ pub enum GeographyLevel {
 #[derive(Debug, Default, Clone)]
 #[non_exhaustive]
 pub struct EmissionsState {
- /// Exhaust emission factors
+    /// Exhaust emission factors
     pub exhaust_factors: HashMap<SccKey, ExhaustFactorTable>,
 
- /// Evaporative emission factors
+    /// Evaporative emission factors
     pub evaporative_factors: HashMap<SccKey, EvapFactorTable>,
 
- /// Deterioration factors
+    /// Deterioration factors
     pub deterioration_factors: HashMap<SccKey, DetFactorTable>,
 
- /// Unit conversion factors
+    /// Unit conversion factors
     pub unit_conversions: UnitConversionTable,
 }
 
@@ -173,7 +173,7 @@ pub struct SccKey {
 /// Exhaust emission factor table
 #[derive(Debug, Clone)]
 pub struct ExhaustFactorTable {
- /// `[equipment_idx][pollutant_idx][age_idx][operating_mode]`
+    /// `[equipment_idx][pollutant_idx][age_idx][operating_mode]`
     pub rates: Vec<Vec<Vec<Vec<f64>>>>,
 }
 
@@ -200,22 +200,22 @@ pub struct UnitConversionTable {
 #[derive(Debug, Default, Clone)]
 #[non_exhaustive]
 pub struct PopulationState {
- /// Population records
+    /// Population records
     pub populations: Vec<PopulationRecord>,
 
- /// Age distributions
+    /// Age distributions
     pub age_distributions: HashMap<AgeKey, Vec<f64>>,
 
- /// Growth factors
+    /// Growth factors
     pub growth_factors: HashMap<GrowthKey, Vec<f64>>,
 
- /// Base year populations
+    /// Base year populations
     pub base_populations: HashMap<BasePopKey, f64>,
 
- /// Scrappage rates
+    /// Scrappage rates
     pub scrappage_rates: Vec<f64>,
 
- /// Retrofit population adjustments
+    /// Retrofit population adjustments
     pub retrofit_adjustments: Vec<RetrofitPopAdjustment>,
 }
 
@@ -269,16 +269,16 @@ pub struct RetrofitPopAdjustment {
 #[derive(Debug, Default, Clone)]
 #[non_exhaustive]
 pub struct AllocationState {
- /// County allocation factors
+    /// County allocation factors
     pub county_allocations: Vec<CountyAllocation>,
 
- /// State-to-county allocation factors
+    /// State-to-county allocation factors
     pub state_to_county: Vec<StateCountyAllocation>,
 
- /// Subcounty allocation factors
+    /// Subcounty allocation factors
     pub subcounty_allocations: Vec<SubcountyAllocation>,
 
- /// Zone mappings
+    /// Zone mappings
     pub zone_mappings: HashMap<i32, Vec<ZoneRecord>>,
 }
 
@@ -316,13 +316,13 @@ pub struct ZoneRecord {
 #[derive(Debug, Default, Clone)]
 #[non_exhaustive]
 pub struct GrowthState {
- /// Growth factor tables by year
+    /// Growth factor tables by year
     pub growth_table: Vec<GrowthRecord>,
 
- /// Growth adjustment factors
+    /// Growth adjustment factors
     pub adjustment_factors: Vec<GrowthAdjustment>,
 
- /// Year indices
+    /// Year indices
     pub year_indices: Vec<i16>,
 }
 
@@ -348,16 +348,16 @@ pub struct GrowthAdjustment {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct SeasonalState {
- /// Seasonal factors by month
+    /// Seasonal factors by month
     pub monthly_factors: Vec<MonthlyFactor>,
 
- /// Day-specific adjustments
+    /// Day-specific adjustments
     pub day_adjustments: Vec<DayAdjustment>,
 
- /// Day-of-year fractions
+    /// Day-of-year fractions
     pub day_fractions: [f64; 365],
 
- /// Month-to-day mappings
+    /// Month-to-day mappings
     pub month_days: [i32; 12],
 }
 
@@ -390,13 +390,13 @@ pub struct DayAdjustment {
 #[derive(Debug, Default, Clone)]
 #[non_exhaustive]
 pub struct TechnologyState {
- /// Exhaust technology tables
+    /// Exhaust technology tables
     pub exhaust_technologies: Vec<TechnologyRecord>,
 
- /// Evaporative technology tables
+    /// Evaporative technology tables
     pub evaporative_technologies: Vec<EvapTechnologyRecord>,
 
- /// Technology mappings by SCC
+    /// Technology mappings by SCC
     pub scc_technology_map: HashMap<i32, Vec<TechMapping>>,
 }
 
@@ -449,16 +449,16 @@ pub struct TechMapping {
 #[derive(Debug, Default, Clone)]
 #[non_exhaustive]
 pub struct EquipmentState {
- /// Equipment category definitions
+    /// Equipment category definitions
     pub equipment_categories: Vec<EquipmentCategory>,
 
- /// SCC definitions
+    /// SCC definitions
     pub scc_definitions: Vec<SccDefinition>,
 
- /// SCC to equipment mappings
+    /// SCC to equipment mappings
     pub scc_to_equipment: HashMap<i32, Vec<EquipmentMapping>>,
 
- /// Horsepower categories
+    /// Horsepower categories
     pub hp_categories: Vec<HpCategory>,
 }
 
@@ -509,35 +509,35 @@ pub struct HpCategory {
 #[derive(Debug, Default, Clone)]
 #[non_exhaustive]
 pub struct GeographyState {
- /// FIPS code tables
+    /// FIPS code tables
     pub fips_tables: FipsTables,
 
- /// State definitions
+    /// State definitions
     pub states: Vec<StateDefinition>,
 
- /// County definitions
+    /// County definitions
     pub counties: Vec<CountyDefinition>,
 
- /// Subcounty definitions
+    /// Subcounty definitions
     pub subcounties: Vec<SubcountyDefinition>,
 
- /// Geographic allocation tables
+    /// Geographic allocation tables
     pub geo_allocations: Vec<GeoAllocation>,
 }
 
 /// FIPS code tables
 #[derive(Debug, Default, Clone)]
 pub struct FipsTables {
- /// FIPS → state mapping
+    /// FIPS → state mapping
     pub fips_to_state: HashMap<i32, i32>,
 
- /// State → FIPS list
+    /// State → FIPS list
     pub state_to_fips: HashMap<i32, Vec<i32>>,
 
- /// State codes
+    /// State codes
     pub state_codes: Vec<i32>,
 
- /// County codes
+    /// County codes
     pub county_codes: Vec<i32>,
 }
 
@@ -580,16 +580,16 @@ pub struct GeoAllocation {
 #[derive(Debug, Default, Clone)]
 #[non_exhaustive]
 pub struct RetrofitState {
- /// Retrofit records
+    /// Retrofit records
     pub retrofits: Vec<RetrofitRecord>,
 
- /// Retrofit technology mappings
+    /// Retrofit technology mappings
     pub retrofit_tech_map: HashMap<i32, RetrofitTechMapping>,
 
- /// Retrofit effectiveness tables
+    /// Retrofit effectiveness tables
     pub effectiveness: Vec<RetrofitEffectiveness>,
 
- /// Validation flags
+    /// Validation flags
     pub validation_errors: Vec<RetrofitValidationError>,
 }
 

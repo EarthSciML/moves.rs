@@ -28,43 +28,43 @@ use std::path::PathBuf;
 /// Altitude scope flag.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AltitudeFlag {
- /// `HIGH` — high-altitude run.
+    /// `HIGH` — high-altitude run.
     High,
- /// `LOW` — low-altitude run.
+    /// `LOW` — low-altitude run.
     Low,
 }
 
 /// Parsed `/OPTIONS/` packet.
 #[derive(Debug, Clone, PartialEq)]
 pub struct OptionsConfig {
- /// First descriptive title.
+    /// First descriptive title.
     pub title1: String,
- /// Second descriptive title.
+    /// Second descriptive title.
     pub title2: String,
- /// Fuel RVP in psi (`6..=16`).
+    /// Fuel RVP in psi (`6..=16`).
     pub fuel_rvp: f32,
- /// Fuel oxygen weight percent (`0..=5`).
+    /// Fuel oxygen weight percent (`0..=5`).
     pub oxygen_pct: f32,
- /// Sulfur fraction for gasoline (`0..=0.5`).
+    /// Sulfur fraction for gasoline (`0..=0.5`).
     pub sulfur_gasoline: f32,
- /// Sulfur fraction for land-based diesel (`0..=0.5`).
+    /// Sulfur fraction for land-based diesel (`0..=0.5`).
     pub sulfur_diesel_land: f32,
- /// Sulfur fraction for marine diesel (`0..=0.5`); defaults to
- /// `sulfur_diesel_land` when the optional record is absent.
+    /// Sulfur fraction for marine diesel (`0..=0.5`); defaults to
+    /// `sulfur_diesel_land` when the optional record is absent.
     pub sulfur_diesel_marine: f32,
- /// Sulfur fraction for CNG/LPG (`0..=0.5`).
+    /// Sulfur fraction for CNG/LPG (`0..=0.5`).
     pub sulfur_cng: f32,
- /// Minimum daily temperature in °F (`-40..=120`).
+    /// Minimum daily temperature in °F (`-40..=120`).
     pub temp_min: f32,
- /// Maximum daily temperature in °F (`-40..=120`).
+    /// Maximum daily temperature in °F (`-40..=120`).
     pub temp_max: f32,
- /// Representative daily ambient temperature (within `[temp_min, temp_max]`).
+    /// Representative daily ambient temperature (within `[temp_min, temp_max]`).
     pub temp_mean: f32,
- /// Altitude flag.
+    /// Altitude flag.
     pub altitude: AltitudeFlag,
- /// Ethanol market share (`0..=100`); `None` if the optional record is absent.
+    /// Ethanol market share (`0..=100`); `None` if the optional record is absent.
     pub ethanol_market_share: Option<f32>,
- /// Ethanol volume percent (`0..=100`); `None` when the record is absent.
+    /// Ethanol volume percent (`0..=100`); `None` when the record is absent.
     pub ethanol_vol_pct: Option<f32>,
 }
 
@@ -169,7 +169,7 @@ pub fn read_options<R: BufRead>(reader: R) -> Result<OptionsConfig> {
         }
     };
 
- // Optional ethanol records: first label starts with ETOH.
+    // Optional ethanol records: first label starts with ETOH.
     let mut ethanol_share: Option<f32> = None;
     let mut ethanol_vol: Option<f32> = None;
     if let Some((label, value, l)) = iter.next() {
@@ -274,7 +274,7 @@ mod tests {
     use super::*;
 
     fn full_packet() -> &'static str {
- // Minimal complete packet: 11 records + altitude.
+        // Minimal complete packet: 11 records + altitude.
         "\
 /OPTIONS/
 Title 1            : Sample run

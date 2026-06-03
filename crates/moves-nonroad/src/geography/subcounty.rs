@@ -124,7 +124,7 @@ mod tests {
         assert!(outcome.is_skipped());
     }
 
- // ---- Custom callback that finds FIPS but not allocation; should be a fatal Config. ----
+    // ---- Custom callback that finds FIPS but not allocation; should be a fatal Config. ----
     struct FipsButNoAlloc;
     impl GeographyCallbacks for FipsButNoAlloc {
         fn find_fips(&self, _: &str) -> Option<usize> {
@@ -172,7 +172,9 @@ mod tests {
             _: &str,
             _: &[f32; crate::common::consts::MXDAYS],
         ) -> Result<crate::emissions::exhaust::AdjustmentTable> {
-            Ok(crate::emissions::exhaust::AdjustmentTable::new(crate::common::consts::MXDAYS))
+            Ok(crate::emissions::exhaust::AdjustmentTable::new(
+                crate::common::consts::MXDAYS,
+            ))
         }
         fn model_year_and_agedist(
             &mut self,
@@ -262,8 +264,8 @@ mod tests {
                 age_code: String::new(),
             }
         }
- // Default `find_allocation` returns None — this is the
- // 7000-path trigger.
+        // Default `find_allocation` returns None — this is the
+        // 7000-path trigger.
     }
 
     #[test]

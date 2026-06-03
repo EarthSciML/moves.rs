@@ -15,22 +15,22 @@ use crate::filter::Filter;
 /// One column in an importer's table.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ColumnDescriptor {
- /// Column name as it appears in the user's CSV header and in the
- /// default-DB schema (`tables.json`). MOVES is case-sensitive about
- /// some column names (`SHOAllocFactor`, `HPMSVtypeID`) so the
- /// descriptor stores them verbatim.
+    /// Column name as it appears in the user's CSV header and in the
+    /// default-DB schema (`tables.json`). MOVES is case-sensitive about
+    /// some column names (`SHOAllocFactor`, `HPMSVtypeID`) so the
+    /// descriptor stores them verbatim.
     pub name: &'static str,
- /// Per-column validation constraint.
+    /// Per-column validation constraint.
     pub filter: Filter,
 }
 
 impl ColumnDescriptor {
- /// Build a descriptor with name + filter.
+    /// Build a descriptor with name + filter.
     pub const fn new(name: &'static str, filter: Filter) -> Self {
         Self { name, filter }
     }
 
- /// Arrow type derived from the filter.
+    /// Arrow type derived from the filter.
     pub fn arrow_type(&self) -> DataType {
         self.filter.arrow_type()
     }
@@ -41,23 +41,23 @@ impl ColumnDescriptor {
 /// declare two [`TableDescriptor`]s.
 #[derive(Debug, Clone)]
 pub struct TableDescriptor {
- /// Canonical table name (matches `tables.json` casing).
+    /// Canonical table name (matches `tables.json` casing).
     pub name: &'static str,
- /// Columns, in declaration order.
+    /// Columns, in declaration order.
     pub columns: &'static [ColumnDescriptor],
- /// Primary-key column names. Output Parquet is sorted by these for
- /// byte-determinism.
+    /// Primary-key column names. Output Parquet is sorted by these for
+    /// byte-determinism.
     pub primary_key: &'static [&'static str],
 }
 
 impl TableDescriptor {
- /// Look up a column by its descriptor name. Case-sensitive on
- /// purpose: the descriptor encodes the canonical casing.
+    /// Look up a column by its descriptor name. Case-sensitive on
+    /// purpose: the descriptor encodes the canonical casing.
     pub fn column(&self, name: &str) -> Option<&ColumnDescriptor> {
         self.columns.iter().find(|c| c.name == name)
     }
 
- /// Return all columns whose filter is a foreign-key constraint.
+    /// Return all columns whose filter is a foreign-key constraint.
     pub fn foreign_key_columns(&self) -> impl Iterator<Item = &ColumnDescriptor> {
         self.columns
             .iter()

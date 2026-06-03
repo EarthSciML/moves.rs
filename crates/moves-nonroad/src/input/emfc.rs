@@ -56,25 +56,25 @@ use crate::{Error, Result};
 /// the `KEYGHR..KEYMLT` strings recognised by the Fortran parser.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EmissionUnits {
- /// `G/HR` — grams per hour.
+    /// `G/HR` — grams per hour.
     GramsPerHour,
- /// `G/HP-HR` — grams per horsepower-hour.
+    /// `G/HP-HR` — grams per horsepower-hour.
     GramsPerHpHour,
- /// `G/GALLON` — grams per gallon of fuel.
+    /// `G/GALLON` — grams per gallon of fuel.
     GramsPerGallon,
- /// `G/TANK` — grams per tank volume.
+    /// `G/TANK` — grams per tank volume.
     GramsPerTank,
- /// `G/DAY` — grams per day.
+    /// `G/DAY` — grams per day.
     GramsPerDay,
- /// `G/START` — grams per engine start.
+    /// `G/START` — grams per engine start.
     GramsPerStart,
- /// `MULT` — unitless multiplier (used for crankcase HC).
+    /// `MULT` — unitless multiplier (used for crankcase HC).
     Multiplier,
 }
 
 impl EmissionUnits {
- /// Match a left-justified, upper-cased 10-char field against
- /// the keyword set. Returns `None` for tech-type columns.
+    /// Match a left-justified, upper-cased 10-char field against
+    /// the keyword set. Returns `None` for tech-type columns.
     fn from_keyword(field: &str) -> Option<Self> {
         let trimmed = field.trim_end();
         match trimmed {
@@ -95,31 +95,31 @@ impl EmissionUnits {
 /// blank).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Variant {
- /// Regular `.EMF` file. Tech-type columns are required.
+    /// Regular `.EMF` file. Tech-type columns are required.
     Emf,
- /// BSFC file (same syntax, but the units keyword may sit at
- /// col 35 with no tech-types preceding it).
+    /// BSFC file (same syntax, but the units keyword may sit at
+    /// col 35 with no tech-types preceding it).
     Bsfc,
 }
 
 /// One emission-factor record (one tech-type × year × HP-range).
 #[derive(Debug, Clone, PartialEq)]
 pub struct EmissionFactorRecord {
- /// SCC code (10 chars, left-justified, upper-cased).
+    /// SCC code (10 chars, left-justified, upper-cased).
     pub scc: String,
- /// Technology-type code (10 chars, left-justified,
- /// upper-cased). Empty for BSFC records that omit the
- /// tech-type column.
+    /// Technology-type code (10 chars, left-justified,
+    /// upper-cased). Empty for BSFC records that omit the
+    /// tech-type column.
     pub tech_type: String,
- /// Horsepower-range minimum.
+    /// Horsepower-range minimum.
     pub hp_min: f32,
- /// Horsepower-range maximum.
+    /// Horsepower-range maximum.
     pub hp_max: f32,
- /// Model year.
+    /// Model year.
     pub year: i32,
- /// Units keyword (shared per HP-range block).
+    /// Units keyword (shared per HP-range block).
     pub units: EmissionUnits,
- /// Emission-factor value, in [`Self::units`].
+    /// Emission-factor value, in [`Self::units`].
     pub factor: f32,
 }
 
@@ -175,7 +175,7 @@ fn parse<R: BufRead>(
     let mut found_end = false;
     let mut line_num = 0usize;
 
- // Currently-active header block.
+    // Currently-active header block.
     let mut block: Option<HeaderBlock> = None;
 
     for line_result in reader.lines() {
@@ -202,7 +202,7 @@ fn parse<R: BufRead>(
         }
 
         if !column(&line, 6, 15).trim().is_empty() {
- // Header line — new (SCC, HP-range) block.
+            // Header line — new (SCC, HP-range) block.
             block = Some(parse_header(
                 &line,
                 line_num,
@@ -212,7 +212,7 @@ fn parse<R: BufRead>(
                 variant,
             )?);
         } else {
- // Data line — needs an active block.
+            // Data line — needs an active block.
             let Some(block) = block.as_ref() else {
                 return Err(Error::Parse {
                     file: path.clone(),
@@ -270,12 +270,12 @@ fn parse_header(
     loop {
         let field = column(line, start, start + 9);
         if field.trim().is_empty() {
- // Fortran `rdemfc.f` :150 — for BSFC files, a blank
- // field at the current position means "no more tech
- // columns, proceed to units handling". The Fortran's
- // label 444 then advances `istrt += 10` before reading
- // the pollutant code, so we mirror that here.
- // For regular `.EMF`, this is an error (7005).
+            // Fortran `rdemfc.f` :150 — for BSFC files, a blank
+            // field at the current position means "no more tech
+            // columns, proceed to units handling". The Fortran's
+            // label 444 then advances `istrt += 10` before reading
+            // the pollutant code, so we mirror that here.
+            // For regular `.EMF`, this is an error (7005).
             if matches!(variant, Variant::Bsfc) {
                 start += 10;
                 break;
@@ -308,19 +308,19 @@ fn parse_header(
         start += 10;
     }
 
- // For BSFC, units may be absent if we broke on a blank
- // tech-type column (`rdemfc.f` :150 — `goto 444` when
- // `iounit .EQ. IORBSF`). In that path the Fortran's `idxunt`
- // (and therefore `iuntmp`) is left undefined, but it is never
- // propagated anywhere: `ntch == 0`, so the data-line loop
- // (`do 20 itch = 1,ntch`) and the record-store loop
- // (`do 30 itch = 1,ntch`) both run zero times and no
- // `iarhun(...)` entry is ever written. We therefore do NOT
- // fabricate a units keyword (`MULT` is `IDXMLT` = 7, not the
- // undefined value the Fortran carries). If, on the other hand,
- // tech-type columns WERE collected, then a units keyword was
- // mandatory and we must surface its absence as an error rather
- // than substituting one.
+    // For BSFC, units may be absent if we broke on a blank
+    // tech-type column (`rdemfc.f` :150 — `goto 444` when
+    // `iounit .EQ. IORBSF`). In that path the Fortran's `idxunt`
+    // (and therefore `iuntmp`) is left undefined, but it is never
+    // propagated anywhere: `ntch == 0`, so the data-line loop
+    // (`do 20 itch = 1,ntch`) and the record-store loop
+    // (`do 30 itch = 1,ntch`) both run zero times and no
+    // `iarhun(...)` entry is ever written. We therefore do NOT
+    // fabricate a units keyword (`MULT` is `IDXMLT` = 7, not the
+    // undefined value the Fortran carries). If, on the other hand,
+    // tech-type columns WERE collected, then a units keyword was
+    // mandatory and we must surface its absence as an error rather
+    // than substituting one.
     let units = match units {
         Some(u) => u,
         None => {
@@ -332,17 +332,17 @@ fn parse_header(
                         .to_string(),
                 });
             }
- // Unreachable for record output: `tech_types` is empty, so
- // `parse_data_line` (one record per tech-type) emits nothing
- // and this value is never copied into an
- // `EmissionFactorRecord`. Mirrors the Fortran, which leaves
- // the unit undefined-but-unused on this branch.
+            // Unreachable for record output: `tech_types` is empty, so
+            // `parse_data_line` (one record per tech-type) emits nothing
+            // and this value is never copied into an
+            // `EmissionFactorRecord`. Mirrors the Fortran, which leaves
+            // the unit undefined-but-unused on this branch.
             EmissionUnits::Multiplier
         }
     };
 
- // Pollutant code, 10-char field at `start`, then `lftjst` +
- // `low2up` and compared against `polin`.
+    // Pollutant code, 10-char field at `start`, then `lftjst` +
+    // `low2up` and compared against `polin`.
     let pol_field = column(line, start, start + 9);
     let pol_upper = pol_field.trim().to_ascii_uppercase();
     if pol_upper != expected_pollutant_upper {
@@ -459,8 +459,8 @@ fn parse_numeric(field: &str, name: &str, line_num: usize, path: &Path) -> Resul
 mod tests {
     use super::*;
 
- // Helper: build a fixed-width line by placing strings/values at
- // specific 1-based columns. Padded with spaces.
+    // Helper: build a fixed-width line by placing strings/values at
+    // specific 1-based columns. Padded with spaces.
     fn at(spec: &[(usize, &str)]) -> String {
         let mut out = String::new();
         for (col, value) in spec {
@@ -549,8 +549,8 @@ mod tests {
 
     #[test]
     fn crankcase_requires_mult_units() {
- // Header advertises G/HR for a CRA pollutant — should fail
- // when the caller asks us to enforce the CRA→MULT rule.
+        // Header advertises G/HR for a CRA pollutant — should fail
+        // when the caller asks us to enforce the CRA→MULT rule.
         let header = at(&[
             (6, "2270001000"),
             (21, " 25.0"),
@@ -615,27 +615,27 @@ mod tests {
 
     #[test]
     fn bsfc_allows_blank_first_field() {
- // BSFC files put units directly at col 35 (no tech-type
- // column). The parser should accept this — emitting zero
- // tech-types means zero records per data line.
+        // BSFC files put units directly at col 35 (no tech-type
+        // column). The parser should accept this — emitting zero
+        // tech-types means zero records per data line.
         let header = at(&[
             (6, "2270001000"),
             (21, " 25.0"),
             (26, " 50.0"),
- // col 35 left blank
+            // col 35 left blank
             (45, "BSFC      "),
         ]);
         let data = at(&[(1, " 2010")]);
         let body = format!("/EMSFAC/\n{header}\n{data}\n/END/\n");
- // No tech-types -> no factor records produced.
+        // No tech-types -> no factor records produced.
         let records = read_bsfc(body.as_bytes()).unwrap();
         assert!(records.is_empty());
     }
 
     #[test]
     fn bsfc_with_units_at_col_35() {
- // Conventional BSFC layout: units keyword at col 35, BSFC
- // pollutant at col 45, single F10.0 value per data line.
+        // Conventional BSFC layout: units keyword at col 35, BSFC
+        // pollutant at col 45, single F10.0 value per data line.
         let header = at(&[
             (6, "2270001000"),
             (21, " 25.0"),
@@ -645,7 +645,7 @@ mod tests {
         ]);
         let data = at(&[(1, " 2010")]);
         let body = format!("/EMSFAC/\n{header}\n{data}\n/END/\n");
- // With no tech-type column, ntch=0 → no data records emitted.
+        // With no tech-type column, ntch=0 → no data records emitted.
         let records = read_bsfc(body.as_bytes()).unwrap();
         assert!(records.is_empty());
     }

@@ -31,7 +31,7 @@ use moves_framework::InternalControlStrategy;
 pub struct FuelControlStrategy;
 
 impl FuelControlStrategy {
- /// Construct a new `FuelControlStrategy`.
+    /// Construct a new `FuelControlStrategy`.
     #[must_use]
     pub fn new() -> Self {
         Self
@@ -80,9 +80,9 @@ mod tests {
         );
     }
 
- /// Fixture: a store pre-populated with a fuel-supply table is unchanged after
- /// FuelControlStrategy runs — matching the canonical Java no-op behavior with
- /// pct_diff = 0% < 1%.
+    /// Fixture: a store pre-populated with a fuel-supply table is unchanged after
+    /// FuelControlStrategy runs — matching the canonical Java no-op behavior with
+    /// pct_diff = 0% < 1%.
     #[test]
     fn pre_run_leaves_existing_tables_unchanged() {
         let s = FuelControlStrategy::new();

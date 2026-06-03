@@ -33,7 +33,7 @@ use polars::prelude::{DataType, Schema};
 /// by [`schema_registry`]. If the schema has not been catalogued yet, the
 /// entry maps to `fn() -> Schema::default()`.
 pub const KNOWN_CALCULATOR_INPUT_TABLES: &[&str] = &[
- // ── PascalCase canonical default-DB tables ──────────────────────────────
+    // ── PascalCase canonical default-DB tables ──────────────────────────────
     "ATRatio",
     "ATRatioGas2",
     "ATRatioNonGas",
@@ -150,7 +150,7 @@ pub const KNOWN_CALCULATOR_INPUT_TABLES: &[&str] = &[
     "Zone",
     "ZoneMonthHour",
     "ZoneRoadType",
- // ── camelCase scratch / generator output tables ──────────────────────────
+    // ── camelCase scratch / generator output tables ──────────────────────────
     "altCriteriaRatio",
     "apuEmissionRateFraction",
     "avgSpeedBin",
@@ -234,9 +234,9 @@ pub const KNOWN_CALCULATOR_INPUT_TABLES: &[&str] = &[
 // function pointer in the static registry map.
 
 fn sho_schema() -> Schema {
- // Columns read by the ported distance calculator's ShoRow. The full MOVES
- // SHO table also carries a "SHO" activity column (source hours operating),
- // but DistanceCalculator only reads the columns below.
+    // Columns read by the ported distance calculator's ShoRow. The full MOVES
+    // SHO table also carries a "SHO" activity column (source hours operating),
+    // but DistanceCalculator only reads the columns below.
     Schema::from_iter([
         ("hourDayID".into(), DataType::Int32),
         ("monthID".into(), DataType::Int32),
@@ -626,7 +626,7 @@ pub fn schema_registry() -> &'static HashMap<&'static str, fn() -> Schema> {
 fn build_registry() -> HashMap<&'static str, fn() -> Schema> {
     let mut m: HashMap<&'static str, fn() -> Schema> = HashMap::new();
 
- // ── Fully catalogued schemas ─────────────────────────────────────────────
+    // ── Fully catalogued schemas ─────────────────────────────────────────────
     m.insert("SHO", sho_schema);
     m.insert("sho", sho_schema);
     m.insert("SourceBin", source_bin_schema);
@@ -695,7 +695,7 @@ fn build_registry() -> HashMap<&'static str, fn() -> Schema> {
     m.insert("SBWeightedDistanceRate", sb_weighted_distance_rate_schema);
     m.insert("DrivingIdleFraction", driving_idle_fraction_schema);
 
- // ── Stub entries for remaining tables (schema not yet catalogued) ────────
+    // ── Stub entries for remaining tables (schema not yet catalogued) ────────
     for &name in KNOWN_CALCULATOR_INPUT_TABLES {
         m.entry(name).or_insert(stub_schema);
     }
@@ -712,8 +712,8 @@ mod tests {
     use crate::data::store::InMemoryStore;
     use crate::data::DataFrameStoreTyped;
 
- // ── Local ShoRow ─────────────────────────────────────────────────────────
- // Mirrors `ShoRow` in `moves-calculators` without a circular dependency.
+    // ── Local ShoRow ─────────────────────────────────────────────────────────
+    // Mirrors `ShoRow` in `moves-calculators` without a circular dependency.
 
     #[derive(Debug, Clone, PartialEq)]
     struct ShoRow {
@@ -837,7 +837,7 @@ mod tests {
         }
     }
 
- // ── WrongRow: claims to be SHO but has wrong columns ────────────────────
+    // ── WrongRow: claims to be SHO but has wrong columns ────────────────────
 
     #[derive(Debug, Clone)]
     struct WrongRow {
@@ -861,7 +861,7 @@ mod tests {
         }
     }
 
- // ── Tests ────────────────────────────────────────────────────────────────
+    // ── Tests ────────────────────────────────────────────────────────────────
 
     #[test]
     fn registry_has_all_calculator_input_tables() {
@@ -921,7 +921,7 @@ mod tests {
                 actual,
             } => {
                 assert_eq!(table, "SHO");
- // Registry SHO schema has ≥ 7 columns; WrongRow declares 1
+                // Registry SHO schema has ≥ 7 columns; WrongRow declares 1
                 assert!(
                     expected.len() > 1,
                     "expected should list registry SHO columns, got {expected:?}"

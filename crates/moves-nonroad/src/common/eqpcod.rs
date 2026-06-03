@@ -47,7 +47,7 @@
 /// Fortran source's `eqpcod(1)`). Each entry is a 10-character
 /// numeric SCC string.
 pub const EQPCOD: &[&str] = &[
- // --- Recreational Equipment (Fortran indices 1..=30) ---
+    // --- Recreational Equipment (Fortran indices 1..=30) ---
     "2260001010",
     "2260001020",
     "2260001030",
@@ -78,7 +78,7 @@ pub const EQPCOD: &[&str] = &[
     "2270001040",
     "2270001050",
     "2270001060",
- // --- Construction and Mining Equipment (31..=160) ---
+    // --- Construction and Mining Equipment (31..=160) ---
     "2260002003",
     "2260002006",
     "2260002009",
@@ -209,7 +209,7 @@ pub const EQPCOD: &[&str] = &[
     "2270002075",
     "2270002078",
     "2270002081",
- // --- Industrial Equipment (161..=195) ---
+    // --- Industrial Equipment (161..=195) ---
     "2260003010",
     "2260003020",
     "2260003030",
@@ -245,7 +245,7 @@ pub const EQPCOD: &[&str] = &[
     "2270003050",
     "2270003060",
     "2270003070",
- // --- Lawn and Garden Equipment (196..=330) ---
+    // --- Lawn and Garden Equipment (196..=330) ---
     "2260004010",
     "2260004011",
     "2260004015",
@@ -381,7 +381,7 @@ pub const EQPCOD: &[&str] = &[
     "2270004071",
     "2270004075",
     "2270004076",
- // --- Agricultural Equipment (331..=380) ---
+    // --- Agricultural Equipment (331..=380) ---
     "2260005010",
     "2260005015",
     "2260005020",
@@ -432,7 +432,7 @@ pub const EQPCOD: &[&str] = &[
     "2270005045",
     "2270005055",
     "2270005060",
- // --- Commercial Equipment (381..=415) ---
+    // --- Commercial Equipment (381..=415) ---
     "2260006005",
     "2260006010",
     "2260006015",
@@ -468,7 +468,7 @@ pub const EQPCOD: &[&str] = &[
     "2270006025",
     "2270006030",
     "2270006035",
- // --- Logging Equipment (416..=430) ---
+    // --- Logging Equipment (416..=430) ---
     "2260007005",
     "2260007010",
     "2260007015",
@@ -484,7 +484,7 @@ pub const EQPCOD: &[&str] = &[
     "2270007005",
     "2270007010",
     "2270007015",
- // --- Airport Ground Support Equipment (431..=525) ---
+    // --- Airport Ground Support Equipment (431..=525) ---
     "2260008005",
     "2265008005",
     "2265008010",
@@ -580,19 +580,19 @@ pub const EQPCOD: &[&str] = &[
     "2270008109",
     "2270008110",
     "2270008111",
- // --- Other Underground Mining Equipment (526..=530) ---
+    // --- Other Underground Mining Equipment (526..=530) ---
     "2260009010",
     "2265009010",
     "2267009010",
     "2268009010",
     "2270009010",
- // --- Other Oil Field Equipment (531..=535) ---
+    // --- Other Oil Field Equipment (531..=535) ---
     "2260010010",
     "2265010010",
     "2267010010",
     "2268010010",
     "2270010010",
- // --- Marine Vessels (536..=551) ---
+    // --- Marine Vessels (536..=551) ---
     "2280001010",
     "2280001020",
     "2280001030",
@@ -609,14 +609,14 @@ pub const EQPCOD: &[&str] = &[
     "2280004020",
     "2280004030",
     "2280004040",
- // --- Pleasure Craft (552..=557) ---
+    // --- Pleasure Craft (552..=557) ---
     "2282005010",
     "2282005015",
     "2282010005",
     "2282020005",
     "2282020010",
     "2282020025",
- // --- Railroad Locomotives (558..=562) ---
+    // --- Railroad Locomotives (558..=562) ---
     "2285002015",
     "2285003015",
     "2285004015",
@@ -652,7 +652,7 @@ mod tests {
 
     #[test]
     fn category_boundary_codes_match_fortran() {
- // Boundary spot-checks lifted directly from iniasc.f comments.
+        // Boundary spot-checks lifted directly from iniasc.f comments.
         assert_eq!(EQPCOD[29], "2270001060"); // last Recreational
         assert_eq!(EQPCOD[30], "2260002003"); // first Construction
         assert_eq!(EQPCOD[159], "2270002081"); // last Construction
@@ -696,8 +696,8 @@ mod tests {
 
     #[test]
     fn neqnam_matches_fortran_dimension() {
- // The Fortran array dimension exceeds the populated count;
- // confirm we preserved that documentation fact.
+        // The Fortran array dimension exceeds the populated count;
+        // confirm we preserved that documentation fact.
         assert_eq!(NEQNAM, 575);
         assert_eq!(NEQNAM - EQPCOD_LEN, 13);
     }

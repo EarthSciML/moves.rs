@@ -147,9 +147,9 @@ const TOTAL_HYDROCARBONS_POLLUTANT_ID: u16 = 1;
 /// One `AgeCategory` row — the age-group bucket for a vehicle age.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AgeCategoryRow {
- /// `ageID` — vehicle age in years; the unique primary key.
+    /// `ageID` — vehicle age in years; the unique primary key.
     pub age_id: i32,
- /// `ageGroupID` — the age-group bucket the age falls in.
+    /// `ageGroupID` — the age-group bucket the age falls in.
     pub age_group_id: i32,
 }
 
@@ -157,17 +157,17 @@ pub struct AgeCategoryRow {
 /// fuel-tank temperature.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AverageTankTemperatureRow {
- /// `tankTemperatureGroupID` — the tank-temperature group.
+    /// `tankTemperatureGroupID` — the tank-temperature group.
     pub tank_temperature_group_id: i32,
- /// `zoneID`.
+    /// `zoneID`.
     pub zone_id: i32,
- /// `monthID`.
+    /// `monthID`.
     pub month_id: i32,
- /// `hourDayID`.
+    /// `hourDayID`.
     pub hour_day_id: i32,
- /// `opModeID` — the operating mode the temperature applies to.
+    /// `opModeID` — the operating mode the temperature applies to.
     pub op_mode_id: i32,
- /// `averageTankTemperature` — the mean tank temperature (°F).
+    /// `averageTankTemperature` — the mean tank temperature (°F).
     pub average_tank_temperature: f64,
 }
 
@@ -175,12 +175,12 @@ pub struct AverageTankTemperatureRow {
 /// area fraction for a county.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CountyRow {
- /// `countyID` — the county primary key.
+    /// `countyID` — the county primary key.
     pub county_id: i32,
- /// `stateID` — the state the county belongs to.
+    /// `stateID` — the state the county belongs to.
     pub state_id: i32,
- /// `GPAFract` — the fraction of the county inside a geographic phase-in
- /// area; weights the GPA fuel adjustment in PC-3.
+    /// `GPAFract` — the fraction of the county inside a geographic phase-in
+    /// area; weights the GPA fuel adjustment in PC-3.
     pub gpa_fract: f64,
 }
 
@@ -194,48 +194,48 @@ pub struct CountyRow {
 /// rows here.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct EmissionRateByAgeRow {
- /// `sourceBinID` — joins to [`SourceBinRow::source_bin_id`].
+    /// `sourceBinID` — joins to [`SourceBinRow::source_bin_id`].
     pub source_bin_id: i64,
- /// `polProcessID` — `pollutantID * 100 + processID`.
+    /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
- /// `ageGroupID` — the age-group bucket.
+    /// `ageGroupID` — the age-group bucket.
     pub age_group_id: i32,
- /// `meanBaseRate` — the mean emission base rate.
+    /// `meanBaseRate` — the mean emission base rate.
     pub mean_base_rate: f64,
 }
 
 /// One `ETOHBin` row — an ethanol-volume bin and its half-open bounds.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct EtohBinRow {
- /// `etohThreshID` — the bin identifier.
+    /// `etohThreshID` — the bin identifier.
     pub etoh_thresh_id: i32,
- /// `etohThreshLow` — inclusive lower ethanol-volume bound. Schema-nullable;
- /// populated for the reference bins this calculator sees.
+    /// `etohThreshLow` — inclusive lower ethanol-volume bound. Schema-nullable;
+    /// populated for the reference bins this calculator sees.
     pub etoh_thresh_low: f64,
- /// `etohThreshHigh` — exclusive upper ethanol-volume bound.
+    /// `etohThreshHigh` — exclusive upper ethanol-volume bound.
     pub etoh_thresh_high: f64,
 }
 
 /// One `FuelFormulation` row — a fuel blend's ethanol content.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FuelFormulationRow {
- /// `fuelFormulationID` — the formulation primary key.
+    /// `fuelFormulationID` — the formulation primary key.
     pub fuel_formulation_id: i32,
- /// `fuelSubtypeID` — joins to [`FuelSubtypeRow::fuel_subtype_id`].
+    /// `fuelSubtypeID` — joins to [`FuelSubtypeRow::fuel_subtype_id`].
     pub fuel_subtype_id: i32,
- /// `ETOHVolume` — ethanol volume percent. `FLOAT NULL`: the Processing
- /// section opens with `update FuelFormulation set ETOHVolume = 0 where
- /// ETOHVolume is null`, so [`EvaporativePermeationCalculator::calculate`]
- /// treats a `None` here as `0.0`.
+    /// `ETOHVolume` — ethanol volume percent. `FLOAT NULL`: the Processing
+    /// section opens with `update FuelFormulation set ETOHVolume = 0 where
+    /// ETOHVolume is null`, so [`EvaporativePermeationCalculator::calculate`]
+    /// treats a `None` here as `0.0`.
     pub etoh_volume: Option<f64>,
 }
 
 /// One `FuelSubtype` row — resolves a fuel subtype into its fuel type.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FuelSubtypeRow {
- /// `fuelSubtypeID` — the subtype primary key.
+    /// `fuelSubtypeID` — the subtype primary key.
     pub fuel_subtype_id: i32,
- /// `fuelTypeID` — the fuel type the subtype belongs to.
+    /// `fuelTypeID` — the fuel type the subtype belongs to.
     pub fuel_type_id: i32,
 }
 
@@ -243,68 +243,68 @@ pub struct FuelSubtypeRow {
 /// fuel region.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FuelSupplyRow {
- /// `fuelYearID` — the fuel year.
+    /// `fuelYearID` — the fuel year.
     pub fuel_year_id: i32,
- /// `monthGroupID` — the month group.
+    /// `monthGroupID` — the month group.
     pub month_group_id: i32,
- /// `fuelFormulationID` — joins to [`FuelFormulationRow::fuel_formulation_id`].
+    /// `fuelFormulationID` — joins to [`FuelFormulationRow::fuel_formulation_id`].
     pub fuel_formulation_id: i32,
- /// `marketShare` — the formulation's share of the fuel supply.
+    /// `marketShare` — the formulation's share of the fuel supply.
     pub market_share: f64,
 }
 
 /// One `HCPermeationCoeff` row — the permeation fuel-adjustment coefficients.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HcPermeationCoeffRow {
- /// `polProcessID` — `pollutantID * 100 + processID`.
+    /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
- /// `etohThreshID` — the ethanol bin the coefficients apply to.
+    /// `etohThreshID` — the ethanol bin the coefficients apply to.
     pub etoh_thresh_id: i32,
- /// `fuelMYGroupID` — the fuel model-year group.
+    /// `fuelMYGroupID` — the fuel model-year group.
     pub fuel_my_group_id: i32,
- /// `fuelAdjustment` — the base permeation fuel adjustment.
+    /// `fuelAdjustment` — the base permeation fuel adjustment.
     pub fuel_adjustment: f64,
- /// `fuelAdjustmentGPA` — the geographic-phase-in fuel adjustment.
+    /// `fuelAdjustmentGPA` — the geographic-phase-in fuel adjustment.
     pub fuel_adjustment_gpa: f64,
 }
 
 /// One `HourDay` row — the `hourDayID` → `(dayID, hourID)` split.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HourDayRow {
- /// `hourDayID` — the surrogate key.
+    /// `hourDayID` — the surrogate key.
     pub hour_day_id: i32,
- /// `dayID` — day-of-week type.
+    /// `dayID` — day-of-week type.
     pub day_id: i32,
- /// `hourID` — hour of day.
+    /// `hourID` — hour of day.
     pub hour_id: i32,
 }
 
 /// One `DayOfAnyWeek` row — the number of real days a `dayID` represents.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DayOfAnyWeekRow {
- /// `dayID`.
+    /// `dayID`.
     pub day_id: i32,
- /// `noOfRealDays` — count of real days within the week portion.
+    /// `noOfRealDays` — count of real days within the week portion.
     pub no_of_real_days: f64,
 }
 
 /// One `Link` row — a road link's geography and road type.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LinkRow {
- /// `linkID` — the link primary key.
+    /// `linkID` — the link primary key.
     pub link_id: i32,
- /// `countyID` — joins to [`CountyRow::county_id`].
+    /// `countyID` — joins to [`CountyRow::county_id`].
     pub county_id: i32,
- /// `zoneID`. Schema-nullable; populated for the onroad links here.
+    /// `zoneID`. Schema-nullable; populated for the onroad links here.
     pub zone_id: i32,
- /// `roadTypeID` — road type.
+    /// `roadTypeID` — road type.
     pub road_type_id: i32,
 }
 
 /// One `ModelYear` row — a model year in the run's window.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ModelYearRow {
- /// `modelYearID` — the model year.
+    /// `modelYearID` — the model year.
     pub model_year_id: i32,
 }
 
@@ -312,17 +312,17 @@ pub struct ModelYearRow {
 /// `(sourceType, link, hourDay)` activity for one `polProcessID`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OpModeDistributionRow {
- /// `sourceTypeID` — MOVES source (vehicle) type.
+    /// `sourceTypeID` — MOVES source (vehicle) type.
     pub source_type_id: i32,
- /// `hourDayID`.
+    /// `hourDayID`.
     pub hour_day_id: i32,
- /// `linkID`.
+    /// `linkID`.
     pub link_id: i32,
- /// `polProcessID` — `pollutantID * 100 + processID`.
+    /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
- /// `opModeID` — the operating mode.
+    /// `opModeID` — the operating mode.
     pub op_mode_id: i32,
- /// `opModeFraction` — the mode's share of activity.
+    /// `opModeFraction` — the mode's share of activity.
     pub op_mode_fraction: f64,
 }
 
@@ -330,11 +330,11 @@ pub struct OpModeDistributionRow {
 /// `(pollutant, process)` pair.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PollutantProcessAssocRow {
- /// `polProcessID` — `pollutantID * 100 + processID`.
+    /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
- /// `processID`.
+    /// `processID`.
     pub process_id: i32,
- /// `pollutantID`.
+    /// `pollutantID`.
     pub pollutant_id: i32,
 }
 
@@ -342,11 +342,11 @@ pub struct PollutantProcessAssocRow {
 /// onto its model years. Used by PC-3.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PollutantProcessMappedModelYearRow {
- /// `polProcessID` — `pollutantID * 100 + processID`.
+    /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
- /// `modelYearID` — the model year.
+    /// `modelYearID` — the model year.
     pub model_year_id: i32,
- /// `fuelMYGroupID` — the fuel model-year group.
+    /// `fuelMYGroupID` — the fuel model-year group.
     pub fuel_my_group_id: i32,
 }
 
@@ -354,11 +354,11 @@ pub struct PollutantProcessMappedModelYearRow {
 /// model-year group. Used by PC-6.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PollutantProcessModelYearRow {
- /// `polProcessID` — `pollutantID * 100 + processID`.
+    /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
- /// `modelYearID` — the model year.
+    /// `modelYearID` — the model year.
     pub model_year_id: i32,
- /// `modelYearGroupID` — the model-year group.
+    /// `modelYearGroupID` — the model-year group.
     pub model_year_group_id: i32,
 }
 
@@ -366,24 +366,24 @@ pub struct PollutantProcessModelYearRow {
 /// `(fuelType, modelYear, sourceType)` group.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RegClassSourceTypeFractionRow {
- /// `fuelTypeID`.
+    /// `fuelTypeID`.
     pub fuel_type_id: i32,
- /// `modelYearID`.
+    /// `modelYearID`.
     pub model_year_id: i32,
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: i32,
- /// `regClassID` — the regulatory class.
+    /// `regClassID` — the regulatory class.
     pub reg_class_id: i32,
- /// `regClassFraction` — the class's share of the group's activity.
+    /// `regClassFraction` — the class's share of the group's activity.
     pub reg_class_fraction: f64,
 }
 
 /// One `SourceBin` row — supplies the fuel type of a source bin.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceBinRow {
- /// `sourceBinID` — `BIGINT` primary key.
+    /// `sourceBinID` — `BIGINT` primary key.
     pub source_bin_id: i64,
- /// `fuelTypeID` — the source bin's fuel type.
+    /// `fuelTypeID` — the source bin's fuel type.
     pub fuel_type_id: i32,
 }
 
@@ -391,13 +391,13 @@ pub struct SourceBinRow {
 /// `(sourceTypeModelYear)` group's activity for one `polProcessID`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceBinDistributionRow {
- /// `sourceTypeModelYearID` — surrogate key for a `(sourceType, modelYear)`.
+    /// `sourceTypeModelYearID` — surrogate key for a `(sourceType, modelYear)`.
     pub source_type_model_year_id: i32,
- /// `polProcessID` — `pollutantID * 100 + processID`.
+    /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
- /// `sourceBinID` — joins to [`SourceBinRow::source_bin_id`].
+    /// `sourceBinID` — joins to [`SourceBinRow::source_bin_id`].
     pub source_bin_id: i64,
- /// `sourceBinActivityFraction` — the bin's share of the group's activity.
+    /// `sourceBinActivityFraction` — the bin's share of the group's activity.
     pub source_bin_activity_fraction: f64,
 }
 
@@ -405,19 +405,19 @@ pub struct SourceBinDistributionRow {
 /// sourceType)` source operating hours.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceHoursRow {
- /// `hourDayID`.
+    /// `hourDayID`.
     pub hour_day_id: i32,
- /// `monthID`.
+    /// `monthID`.
     pub month_id: i32,
- /// `yearID` — calendar year.
+    /// `yearID` — calendar year.
     pub year_id: i32,
- /// `ageID` — vehicle age in years; `modelYearID = yearID - ageID`.
+    /// `ageID` — vehicle age in years; `modelYearID = yearID - ageID`.
     pub age_id: i32,
- /// `linkID`.
+    /// `linkID`.
     pub link_id: i32,
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: i32,
- /// `sourceHours` — the source operating hours.
+    /// `sourceHours` — the source operating hours.
     pub source_hours: f64,
 }
 
@@ -425,11 +425,11 @@ pub struct SourceHoursRow {
 /// surrogate key into its `(sourceTypeID, modelYearID)` components.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceTypeModelYearRow {
- /// `sourceTypeModelYearID` — the surrogate key.
+    /// `sourceTypeModelYearID` — the surrogate key.
     pub source_type_model_year_id: i32,
- /// `modelYearID` — vehicle model year.
+    /// `modelYearID` — vehicle model year.
     pub model_year_id: i32,
- /// `sourceTypeID` — MOVES source (vehicle) type.
+    /// `sourceTypeID` — MOVES source (vehicle) type.
     pub source_type_id: i32,
 }
 
@@ -437,11 +437,11 @@ pub struct SourceTypeModelYearRow {
 /// `(sourceType, modelYearGroup)`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceTypeModelYearGroupRow {
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: i32,
- /// `modelYearGroupID`.
+    /// `modelYearGroupID`.
     pub model_year_group_id: i32,
- /// `tankTemperatureGroupID` — the tank-temperature group.
+    /// `tankTemperatureGroupID` — the tank-temperature group.
     pub tank_temperature_group_id: i32,
 }
 
@@ -449,26 +449,26 @@ pub struct SourceTypeModelYearGroupRow {
 /// coefficients for a fuel type and model-year range.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TemperatureAdjustmentRow {
- /// `polProcessID` — `pollutantID * 100 + processID`.
+    /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
- /// `fuelTypeID`.
+    /// `fuelTypeID`.
     pub fuel_type_id: i32,
- /// `minModelYearID` — inclusive lower model-year bound.
+    /// `minModelYearID` — inclusive lower model-year bound.
     pub min_model_year_id: i32,
- /// `maxModelYearID` — inclusive upper model-year bound.
+    /// `maxModelYearID` — inclusive upper model-year bound.
     pub max_model_year_id: i32,
- /// `tempAdjustTermA` — the multiplicative term.
+    /// `tempAdjustTermA` — the multiplicative term.
     pub temp_adjust_term_a: f64,
- /// `tempAdjustTermB` — the exponential term.
+    /// `tempAdjustTermB` — the exponential term.
     pub temp_adjust_term_b: f64,
 }
 
 /// One `Year` row — resolves a calendar year into its fuel year.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct YearRow {
- /// `yearID` — calendar year.
+    /// `yearID` — calendar year.
     pub year_id: i32,
- /// `fuelYearID` — the fuel year.
+    /// `fuelYearID` — the fuel year.
     pub fuel_year_id: i32,
 }
 
@@ -480,59 +480,59 @@ pub struct YearRow {
 /// data-plane contract the unit tests build directly.
 #[derive(Debug, Clone, Default)]
 pub struct EvaporativePermeationInputs {
- /// `AgeCategory` rows.
+    /// `AgeCategory` rows.
     pub age_category: Vec<AgeCategoryRow>,
- /// `AverageTankTemperature` rows.
+    /// `AverageTankTemperature` rows.
     pub average_tank_temperature: Vec<AverageTankTemperatureRow>,
- /// `County` rows.
+    /// `County` rows.
     pub county: Vec<CountyRow>,
- /// `EmissionRateByAge` rows.
+    /// `EmissionRateByAge` rows.
     pub emission_rate_by_age: Vec<EmissionRateByAgeRow>,
- /// `ETOHBin` rows.
+    /// `ETOHBin` rows.
     pub etoh_bin: Vec<EtohBinRow>,
- /// `FuelFormulation` rows.
+    /// `FuelFormulation` rows.
     pub fuel_formulation: Vec<FuelFormulationRow>,
- /// `FuelSubtype` rows.
+    /// `FuelSubtype` rows.
     pub fuel_subtype: Vec<FuelSubtypeRow>,
- /// `FuelSupply` rows.
+    /// `FuelSupply` rows.
     pub fuel_supply: Vec<FuelSupplyRow>,
- /// `HCPermeationCoeff` rows.
+    /// `HCPermeationCoeff` rows.
     pub hc_permeation_coeff: Vec<HcPermeationCoeffRow>,
- /// `DayOfAnyWeek` rows.
+    /// `DayOfAnyWeek` rows.
     pub day_of_any_week: Vec<DayOfAnyWeekRow>,
- /// `HourDay` rows.
+    /// `HourDay` rows.
     pub hour_day: Vec<HourDayRow>,
- /// `Link` rows.
+    /// `Link` rows.
     pub link: Vec<LinkRow>,
- /// `ModelYear` rows.
+    /// `ModelYear` rows.
     pub model_year: Vec<ModelYearRow>,
- /// `OpModeDistribution` rows.
+    /// `OpModeDistribution` rows.
     pub op_mode_distribution: Vec<OpModeDistributionRow>,
- /// `PollutantProcessAssoc` rows.
+    /// `PollutantProcessAssoc` rows.
     pub pollutant_process_assoc: Vec<PollutantProcessAssocRow>,
- /// `PollutantProcessMappedModelYear` rows.
+    /// `PollutantProcessMappedModelYear` rows.
     pub pollutant_process_mapped_model_year: Vec<PollutantProcessMappedModelYearRow>,
- /// `PollutantProcessModelYear` rows.
+    /// `PollutantProcessModelYear` rows.
     pub pollutant_process_model_year: Vec<PollutantProcessModelYearRow>,
- /// `RegClassSourceTypeFraction` rows. Consulted only when
- /// [`RunContext::with_reg_class`] is set.
+    /// `RegClassSourceTypeFraction` rows. Consulted only when
+    /// [`RunContext::with_reg_class`] is set.
     pub reg_class_source_type_fraction: Vec<RegClassSourceTypeFractionRow>,
- /// `RunSpecSourceType` — the source types the run processes. Drives the
- /// SQL's `loop ##loop.sourceTypeID##` (see the module docs).
+    /// `RunSpecSourceType` — the source types the run processes. Drives the
+    /// SQL's `loop ##loop.sourceTypeID##` (see the module docs).
     pub run_spec_source_type: Vec<i32>,
- /// `SourceBin` rows.
+    /// `SourceBin` rows.
     pub source_bin: Vec<SourceBinRow>,
- /// `SourceBinDistribution` rows.
+    /// `SourceBinDistribution` rows.
     pub source_bin_distribution: Vec<SourceBinDistributionRow>,
- /// `SourceHours` rows.
+    /// `SourceHours` rows.
     pub source_hours: Vec<SourceHoursRow>,
- /// `SourceTypeModelYear` rows.
+    /// `SourceTypeModelYear` rows.
     pub source_type_model_year: Vec<SourceTypeModelYearRow>,
- /// `SourceTypeModelYearGroup` rows.
+    /// `SourceTypeModelYearGroup` rows.
     pub source_type_model_year_group: Vec<SourceTypeModelYearGroupRow>,
- /// `TemperatureAdjustment` rows.
+    /// `TemperatureAdjustment` rows.
     pub temperature_adjustment: Vec<TemperatureAdjustmentRow>,
- /// `Year` rows.
+    /// `Year` rows.
     pub year: Vec<YearRow>,
 }
 
@@ -541,15 +541,15 @@ pub struct EvaporativePermeationInputs {
 /// section toggle the SQL preprocessor resolves before running the script.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RunContext {
- /// `##context.year##` — the run's calendar year. Used to derive vehicle
- /// age (`year - modelYearID`) in PC-1a and stamped as `yearID` on the
- /// weighted permeation rate in PC-1b.
+    /// `##context.year##` — the run's calendar year. Used to derive vehicle
+    /// age (`year - modelYearID`) in PC-1a and stamped as `yearID` on the
+    /// weighted permeation rate in PC-1b.
     pub year: i32,
- /// `##context.iterLocation.zoneRecordID##` — the run's zone. Stamped as
- /// `zoneID` on the weighted permeation rate in PC-1b.
+    /// `##context.iterLocation.zoneRecordID##` — the run's zone. Stamped as
+    /// `zoneID` on the weighted permeation rate in PC-1b.
     pub zone_id: i32,
- /// Whether the run resolves regulatory classes — selects PC-1b's
- /// `WithRegClassID` (`true`) or `NoRegClassID` (`false`) section.
+    /// Whether the run resolves regulatory classes — selects PC-1b's
+    /// `WithRegClassID` (`true`) or `NoRegClassID` (`false`) section.
     pub with_reg_class: bool,
 }
 
@@ -561,46 +561,46 @@ pub struct RunContext {
 /// carries the computed emission.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PermeationEmissionRow {
- /// `stateID`.
+    /// `stateID`.
     pub state_id: i32,
- /// `countyID`.
+    /// `countyID`.
     pub county_id: i32,
- /// `zoneID`.
+    /// `zoneID`.
     pub zone_id: i32,
- /// `linkID`.
+    /// `linkID`.
     pub link_id: i32,
- /// `roadTypeID`.
+    /// `roadTypeID`.
     pub road_type_id: i32,
- /// `yearID`.
+    /// `yearID`.
     pub year_id: i32,
- /// `monthID`.
+    /// `monthID`.
     pub month_id: i32,
- /// `dayID`.
+    /// `dayID`.
     pub day_id: i32,
- /// `hourID`.
+    /// `hourID`.
     pub hour_id: i32,
- /// `pollutantID`.
+    /// `pollutantID`.
     pub pollutant_id: i32,
- /// `processID`.
+    /// `processID`.
     pub process_id: i32,
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: i32,
- /// `regClassID`.
+    /// `regClassID`.
     pub reg_class_id: i32,
- /// `modelYearID`.
+    /// `modelYearID`.
     pub model_year_id: i32,
- /// `fuelTypeID`.
+    /// `fuelTypeID`.
     pub fuel_type_id: i32,
- /// `emissionQuant` — `weightedTemperatureAdjust × fuelAdjustedEmissionQuant`.
+    /// `emissionQuant` — `weightedTemperatureAdjust × fuelAdjustedEmissionQuant`.
     pub emission_quant: f64,
 }
 
 impl PermeationEmissionRow {
- /// The integer dimension tuple — every column except `emissionQuant`.
- /// Used to sort the output deterministically: MOVES leaves
- /// `MOVESWorkerOutput` physically unordered (the SQL `INSERT … SELECT`
- /// has no `ORDER BY`), so the port sorts purely to make the result
- /// reproducible.
+    /// The integer dimension tuple — every column except `emissionQuant`.
+    /// Used to sort the output deterministically: MOVES leaves
+    /// `MOVESWorkerOutput` physically unordered (the SQL `INSERT … SELECT`
+    /// has no `ORDER BY`), so the port sorts purely to make the result
+    /// reproducible.
     fn dimension_key(&self) -> [i32; 15] {
         [
             self.state_id,
@@ -2590,15 +2590,15 @@ fn source_bin_weighted_permeation_rate(
     ctx: &RunContext,
     source_types: &HashSet<i32>,
 ) -> Vec<SbWeightedPermeationRate> {
- // PC-1a — INNER JOIN SourceTypeModelYear USING (sourceTypeModelYearID),
- // INNER JOIN AgeCategory ON (ageID = year − modelYearID).
+    // PC-1a — INNER JOIN SourceTypeModelYear USING (sourceTypeModelYearID),
+    // INNER JOIN AgeCategory ON (ageID = year − modelYearID).
     let source_type_model_year: HashMap<i32, &SourceTypeModelYearRow> = inputs
         .source_type_model_year
         .iter()
         .map(|r| (r.source_type_model_year_id, r))
         .collect();
- // AgeCategory.ageID is the unique primary key — at most one age group
- // per age.
+    // AgeCategory.ageID is the unique primary key — at most one age group
+    // per age.
     let age_group_by_age: HashMap<i32, i32> = inputs
         .age_category
         .iter()
@@ -2610,8 +2610,8 @@ fn source_bin_weighted_permeation_rate(
         let Some(stmy) = source_type_model_year.get(&sbd.source_type_model_year_id) else {
             continue;
         };
- // PC-1a `WHERE sourceTypeID = ##loop.sourceTypeID##` — the loop ranges
- // over RunSpecSourceType (see the module docs on the source-type loop).
+        // PC-1a `WHERE sourceTypeID = ##loop.sourceTypeID##` — the loop ranges
+        // over RunSpecSourceType (see the module docs on the source-type loop).
         if !source_types.contains(&stmy.source_type_id) {
             continue;
         }
@@ -2628,12 +2628,12 @@ fn source_bin_weighted_permeation_rate(
         });
     }
 
- // PC-1b — INNER JOIN EmissionRateByAge ON (sourceBinID, polProcessID,
- // ageGroupID), INNER JOIN SourceBin USING (sourceBinID), and — in the
- // WithRegClassID section — INNER JOIN RegClassSourceTypeFraction.
- //
- // EmissionRateByAge carries one row per operating mode; the join does not
- // constrain opModeID, so every matching row contributes to the sum.
+    // PC-1b — INNER JOIN EmissionRateByAge ON (sourceBinID, polProcessID,
+    // ageGroupID), INNER JOIN SourceBin USING (sourceBinID), and — in the
+    // WithRegClassID section — INNER JOIN RegClassSourceTypeFraction.
+    //
+    // EmissionRateByAge carries one row per operating mode; the join does not
+    // constrain opModeID, so every matching row contributes to the sum.
     let mut mean_base_rates: HashMap<(i64, i32, i32), Vec<f64>> = HashMap::new();
     for era in &inputs.emission_rate_by_age {
         mean_base_rates
@@ -2654,7 +2654,7 @@ fn source_bin_weighted_permeation_rate(
             .push((stf.reg_class_id, stf.reg_class_fraction));
     }
 
- // GROUP BY (polProcessID, sourceTypeID, regClassID, modelYearID, fuelTypeID).
+    // GROUP BY (polProcessID, sourceTypeID, regClassID, modelYearID, fuelTypeID).
     let mut weighted: HashMap<(i32, i32, i32, i32, i32), f64> = HashMap::new();
     for sbda in &by_age {
         let Some(rates) =
@@ -2676,7 +2676,7 @@ fn source_bin_weighted_permeation_rate(
                     continue;
                 };
                 for &(reg_class_id, reg_class_fraction) in fractions {
- *weighted
+                    *weighted
                         .entry((
                             sbda.pol_process_id,
                             sbda.source_type_id,
@@ -2687,8 +2687,8 @@ fn source_bin_weighted_permeation_rate(
                         .or_default() += weighted_rate * reg_class_fraction;
                 }
             } else {
- // NoRegClassID — regClassID collapses to 0, no fraction.
- *weighted
+                // NoRegClassID — regClassID collapses to 0, no fraction.
+                *weighted
                     .entry((
                         sbda.pol_process_id,
                         sbda.source_type_id,
@@ -2738,7 +2738,7 @@ fn temperature_adjust_by_op_mode(
     for att in &inputs.average_tank_temperature {
         for ta in &inputs.temperature_adjustment {
             let adjust = ta.temp_adjust_term_a
- * (ta.temp_adjust_term_b * att.average_tank_temperature).exp();
+                * (ta.temp_adjust_term_b * att.average_tank_temperature).exp();
             for my in &inputs.model_year {
                 if my.model_year_id < ta.min_model_year_id
                     || my.model_year_id > ta.max_model_year_id
@@ -2796,8 +2796,8 @@ fn weighted_temperature_adjust(
     }
     let link: HashMap<i32, &LinkRow> = inputs.link.iter().map(|l| (l.link_id, l)).collect();
 
- // GROUP BY (linkID, monthID, hourDayID, tankTemperatureGroupID,
- // sourceTypeID, polProcessID, fuelTypeID, modelYearID).
+    // GROUP BY (linkID, monthID, hourDayID, tankTemperatureGroupID,
+    // sourceTypeID, polProcessID, fuelTypeID, modelYearID).
     let mut weighted: HashMap<WeightedTemperatureKey, f64> = HashMap::new();
     for taom in by_op_mode {
         let Some(distributions) =
@@ -2806,18 +2806,18 @@ fn weighted_temperature_adjust(
             continue;
         };
         for omd in distributions {
- // PC-2b `WHERE sourceTypeID = ##loop.sourceTypeID##`.
+            // PC-2b `WHERE sourceTypeID = ##loop.sourceTypeID##`.
             if !source_types.contains(&omd.source_type_id) {
                 continue;
             }
- // INNER JOIN Link ON (linkID, l.zoneID = taom.zoneID).
+            // INNER JOIN Link ON (linkID, l.zoneID = taom.zoneID).
             let Some(link_row) = link.get(&omd.link_id) else {
                 continue;
             };
             if link_row.zone_id != taom.zone_id {
                 continue;
             }
- *weighted
+            *weighted
                 .entry((
                     omd.link_id,
                     taom.month_id,
@@ -2880,7 +2880,7 @@ fn weighted_fuel_adjustment(
     inputs: &EvaporativePermeationInputs,
     ctx: &RunContext,
 ) -> Vec<WeightedFuelAdjustment> {
- // INNER JOIN PollutantProcessMappedModelYear ON (polProcessID, fuelMYGroupID).
+    // INNER JOIN PollutantProcessMappedModelYear ON (polProcessID, fuelMYGroupID).
     let mut mapped_model_year: HashMap<(i32, i32), Vec<i32>> = HashMap::new();
     for ppmy in &inputs.pollutant_process_mapped_model_year {
         mapped_model_year
@@ -2899,10 +2899,10 @@ fn weighted_fuel_adjustment(
         .map(|fst| (fst.fuel_subtype_id, fst.fuel_type_id))
         .collect();
 
- // GROUP BY (countyID, fuelYearID, monthGroupID, polProcessID,
- // modelYearID, fuelTypeID).
+    // GROUP BY (countyID, fuelYearID, monthGroupID, polProcessID,
+    // modelYearID, fuelTypeID).
     let mut weighted: HashMap<(i32, i32, i32, i32, i32, i32), f64> = HashMap::new();
- // FuelSupply × County × HCPermeationCoeff — the three `ON`-less joins.
+    // FuelSupply × County × HCPermeationCoeff — the three `ON`-less joins.
     for fs in &inputs.fuel_supply {
         for county in &inputs.county {
             for fa in &inputs.hc_permeation_coeff {
@@ -2911,9 +2911,9 @@ fn weighted_fuel_adjustment(
                 else {
                     continue;
                 };
- // INNER JOIN Year ON (fuelYearID); WHERE y.yearID = year.
- // `Year.yearID` is the primary key, so this is a single-row
- // existence check.
+                // INNER JOIN Year ON (fuelYearID); WHERE y.yearID = year.
+                // `Year.yearID` is the primary key, so this is a single-row
+                // existence check.
                 if !inputs
                     .year
                     .iter()
@@ -2921,22 +2921,22 @@ fn weighted_fuel_adjustment(
                 {
                     continue;
                 }
- // INNER JOIN FuelFormulation USING (fuelFormulationID).
+                // INNER JOIN FuelFormulation USING (fuelFormulationID).
                 let Some(ff) = fuel_formulation.get(&fs.fuel_formulation_id) else {
                     continue;
                 };
- // `update FuelFormulation set ETOHVolume = 0 where ETOHVolume
- // is null` — the Processing section's opening statement.
+                // `update FuelFormulation set ETOHVolume = 0 where ETOHVolume
+                // is null` — the Processing section's opening statement.
                 let etoh_volume = ff.etoh_volume.unwrap_or(0.0);
- // INNER JOIN FuelSubtype USING (fuelSubtypeID).
+                // INNER JOIN FuelSubtype USING (fuelSubtypeID).
                 let Some(&fuel_type_id) = fuel_type_by_subtype.get(&ff.fuel_subtype_id) else {
                     continue;
                 };
                 let contribution = fs.market_share
- * (fa.fuel_adjustment
+                    * (fa.fuel_adjustment
                         + county.gpa_fract * (fa.fuel_adjustment_gpa - fa.fuel_adjustment));
- // INNER JOIN ETOHBin ON (etohThreshID,
- // etohThreshLow <= ETOHVolume < etohThreshHigh).
+                // INNER JOIN ETOHBin ON (etohThreshID,
+                // etohThreshLow <= ETOHVolume < etohThreshHigh).
                 for ebin in &inputs.etoh_bin {
                     if ebin.etoh_thresh_id != fa.etoh_thresh_id
                         || etoh_volume < ebin.etoh_thresh_low
@@ -2945,7 +2945,7 @@ fn weighted_fuel_adjustment(
                         continue;
                     }
                     for &model_year_id in model_years {
- *weighted
+                        *weighted
                             .entry((
                                 county.county_id,
                                 fs.fuel_year_id,
@@ -3018,8 +3018,8 @@ fn fuel_adjusted_emission_rate(
             continue;
         };
         for wfa in matches {
- // INNER JOIN Year ON (y.yearID = sbwpr.yearID,
- // y.fuelYearID = wfa.fuelYearID).
+            // INNER JOIN Year ON (y.yearID = sbwpr.yearID,
+            // y.fuelYearID = wfa.fuelYearID).
             if !inputs
                 .year
                 .iter()
@@ -3073,17 +3073,17 @@ fn fuel_adjusted_emission_quant(
 
     let mut out = Vec::with_capacity(inputs.source_hours.len());
     for sh in &inputs.source_hours {
- // INNER JOIN FuelAdjustedEmissionRate ON (yearID,
- // modelYearID = yearID − ageID, sourceTypeID).
+        // INNER JOIN FuelAdjustedEmissionRate ON (yearID,
+        // modelYearID = yearID − ageID, sourceTypeID).
         let model_year_id = sh.year_id - sh.age_id;
         let Some(matches) = rate_index.get(&(sh.year_id, model_year_id, sh.source_type_id)) else {
             continue;
         };
- // INNER JOIN Link ON (linkID, l.zoneID = fambr.zoneID).
+        // INNER JOIN Link ON (linkID, l.zoneID = fambr.zoneID).
         let Some(link_row) = link.get(&sh.link_id) else {
             continue;
         };
- // INNER JOIN HourDay → DayOfAnyWeek to get noOfRealDays.
+        // INNER JOIN HourDay → DayOfAnyWeek to get noOfRealDays.
         let Some(&day_id) = day_id_of.get(&sh.hour_day_id) else {
             continue;
         };
@@ -3157,7 +3157,7 @@ fn assemble_emission_output(
             .or_default()
             .push(ppmy.model_year_group_id);
     }
- // SourceTypeModelYearGroup is unique on (sourceTypeID, modelYearGroupID).
+    // SourceTypeModelYearGroup is unique on (sourceTypeID, modelYearGroupID).
     let tank_temperature_group: HashMap<(i32, i32), i32> = inputs
         .source_type_model_year_group
         .iter()
@@ -3182,7 +3182,7 @@ fn assemble_emission_output(
 
     let mut out = Vec::with_capacity(fuel_adjusted_quant.len());
     for faeq in fuel_adjusted_quant {
- // INNER JOIN WeightedTemperatureAdjust on the seven-column key.
+        // INNER JOIN WeightedTemperatureAdjust on the seven-column key.
         let Some(temps) = temp_index.get(&(
             faeq.link_id,
             faeq.hour_day_id,
@@ -3194,17 +3194,17 @@ fn assemble_emission_output(
         )) else {
             continue;
         };
- // INNER JOIN PollutantProcessAssoc USING (polProcessID).
+        // INNER JOIN PollutantProcessAssoc USING (polProcessID).
         let Some(pol_procs) = pollutant_process.get(&faeq.pol_process_id) else {
             continue;
         };
- // INNER JOIN PollutantProcessModelYear ON (polProcessID, modelYearID).
+        // INNER JOIN PollutantProcessModelYear ON (polProcessID, modelYearID).
         let Some(model_year_groups) =
             model_year_group.get(&(faeq.pol_process_id, faeq.model_year_id))
         else {
             continue;
         };
- // INNER JOIN HourDay / Link / County — all 1:1 on a primary key.
+        // INNER JOIN HourDay / Link / County — all 1:1 on a primary key.
         let Some(hd) = hour_day.get(&faeq.hour_day_id) else {
             continue;
         };
@@ -3216,10 +3216,10 @@ fn assemble_emission_output(
         };
         for wta in temps {
             for &model_year_group_id in model_year_groups {
- // INNER JOIN SourceTypeModelYearGroup ON (sourceTypeID,
- // modelYearGroupID, tankTemperatureGroupID): satisfied only
- // when the group's tank-temperature group matches the
- // adjustment's.
+                // INNER JOIN SourceTypeModelYearGroup ON (sourceTypeID,
+                // modelYearGroupID, tankTemperatureGroupID): satisfied only
+                // when the group's tank-temperature group matches the
+                // adjustment's.
                 let Some(&tank_temperature_group_id) =
                     tank_temperature_group.get(&(faeq.source_type_id, model_year_group_id))
                 else {
@@ -3246,7 +3246,7 @@ fn assemble_emission_output(
                         model_year_id: faeq.model_year_id,
                         fuel_type_id: faeq.fuel_type_id,
                         emission_quant: wta.weighted_temperature_adjust
- * faeq.fuel_adjusted_emission_quant,
+                            * faeq.fuel_adjusted_emission_quant,
                     });
                 }
             }
@@ -3263,20 +3263,20 @@ fn assemble_emission_output(
 /// arguments to [`calculate`](Self::calculate).
 #[derive(Debug, Clone)]
 pub struct EvaporativePermeationCalculator {
- /// The single master-loop subscription, built once in [`Self::new`].
+    /// The single master-loop subscription, built once in [`Self::new`].
     subscriptions: [CalculatorSubscription; 1],
 }
 
 impl EvaporativePermeationCalculator {
- /// Stable module name — matches the Java class and the chain-DAG entry.
+    /// Stable module name — matches the Java class and the chain-DAG entry.
     pub const NAME: &'static str = CALCULATOR_NAME;
 
- /// Construct the calculator with its master-loop subscription.
- ///
- /// The Java constructor signs up for the Evap Permeation process (11) at
- /// `MONTH` granularity with `EMISSION_CALCULATOR+1` priority; the
- /// `CalculatorInfo.txt` `Subscribe` directive and the calculator-chain
- /// DAG record the same single subscription.
+    /// Construct the calculator with its master-loop subscription.
+    ///
+    /// The Java constructor signs up for the Evap Permeation process (11) at
+    /// `MONTH` granularity with `EMISSION_CALCULATOR+1` priority; the
+    /// `CalculatorInfo.txt` `Subscribe` directive and the calculator-chain
+    /// DAG record the same single subscription.
     #[must_use]
     pub fn new() -> Self {
         let priority = Priority::parse("EMISSION_CALCULATOR+1")
@@ -3290,24 +3290,24 @@ impl EvaporativePermeationCalculator {
         }
     }
 
- /// Compute the permeation emission rows — the port of the
- /// `EvaporativePermeationCalculator.sql` "Processing" section.
- ///
- /// The six numbered SQL steps run in order: PC-1 weights emission rates
- /// by source bin, PC-2 builds the link-weighted temperature adjustment,
- /// PC-3 the fuel-supply-weighted adjustment, PC-4 the fuel-adjusted rate,
- /// PC-5 the fuel-adjusted quantity, and PC-6 assembles the output. The
- /// result is sorted by its integer dimension columns for deterministic
- /// output — MOVES leaves `MOVESWorkerOutput` physically unordered.
+    /// Compute the permeation emission rows — the port of the
+    /// `EvaporativePermeationCalculator.sql` "Processing" section.
+    ///
+    /// The six numbered SQL steps run in order: PC-1 weights emission rates
+    /// by source bin, PC-2 builds the link-weighted temperature adjustment,
+    /// PC-3 the fuel-supply-weighted adjustment, PC-4 the fuel-adjusted rate,
+    /// PC-5 the fuel-adjusted quantity, and PC-6 assembles the output. The
+    /// result is sorted by its integer dimension columns for deterministic
+    /// output — MOVES leaves `MOVESWorkerOutput` physically unordered.
     #[must_use]
     pub fn calculate(
         &self,
         inputs: &EvaporativePermeationInputs,
         ctx: &RunContext,
     ) -> Vec<PermeationEmissionRow> {
- // The SQL's `loop ##loop.sourceTypeID##` ranges over RunSpecSourceType;
- // the port carries sourceTypeID in the working-table keys and filters
- // to this set where the loop's `WHERE` clauses do.
+        // The SQL's `loop ##loop.sourceTypeID##` ranges over RunSpecSourceType;
+        // the port carries sourceTypeID in the working-table keys and filters
+        // to this set where the loop's `WHERE` clauses do.
         let source_types: HashSet<i32> = inputs.run_spec_source_type.iter().copied().collect();
 
         let sb_weighted = source_bin_weighted_permeation_rate(inputs, ctx, &source_types);
@@ -3380,16 +3380,16 @@ impl Calculator for EvaporativePermeationCalculator {
         &self.subscriptions
     }
 
- /// The one `(pollutant, process)` pair: THC × Evap Permeation. See
- /// `REGISTRATIONS`.
+    /// The one `(pollutant, process)` pair: THC × Evap Permeation. See
+    /// `REGISTRATIONS`.
     fn registrations(&self) -> &[PollutantProcessAssociation] {
         &REGISTRATIONS
     }
 
- // `upstream` keeps the trait default (empty): `calculator-dag.json`
- // records `depends_on: []`. `EvaporativePermeationCalculator` subscribes
- // directly to the master loop; the `Chain` directive makes it an upstream
- // of `HCSpeciationCalculator`, not the reverse.
+    // `upstream` keeps the trait default (empty): `calculator-dag.json`
+    // records `depends_on: []`. `EvaporativePermeationCalculator` subscribes
+    // directly to the master loop; the `Chain` directive makes it an upstream
+    // of `HCSpeciationCalculator`, not the reverse.
 
     fn input_tables(&self) -> &[&'static str] {
         INPUT_TABLES
@@ -3401,11 +3401,11 @@ impl Calculator for EvaporativePermeationCalculator {
         let filter = crate::wiring::position_filter(ctx);
         let year = pos.time.year.map(|y| y as i32).unwrap_or(0);
         let zone_id = pos.location.zone_id.map(|z| z as i32).unwrap_or(0);
- // The SourceBinDistributionGenerator runs before this calculator and writes
- // sourceBinDistributionFuelUsage_{process}_{county}_{year} to scratch with
- // E85→gas fuelUsageFraction remapping applied. Prefer that over the raw
- // slow-tier SourceBinDistribution; fall back when scratch table is absent
- // (tests, stubs, or pre-generator execution).
+        // The SourceBinDistributionGenerator runs before this calculator and writes
+        // sourceBinDistributionFuelUsage_{process}_{county}_{year} to scratch with
+        // E85→gas fuelUsageFraction remapping applied. Prefer that over the raw
+        // slow-tier SourceBinDistribution; fall back when scratch table is absent
+        // (tests, stubs, or pre-generator execution).
         let fuel_usage_table = {
             let process_id_i64 = pos.process_id.map(|p| i64::from(p.0)).unwrap_or(0);
             let county_id_i64 = pos.location.county_id.map(i64::from).unwrap_or(0);
@@ -3513,8 +3513,8 @@ pub fn factory() -> Box<dyn Calculator> {
 mod tests {
     use super::*;
 
- /// The run context the test fixtures use: calendar year 2020, zone 90,
- /// regulatory classes resolved.
+    /// The run context the test fixtures use: calendar year 2020, zone 90,
+    /// regulatory classes resolved.
     fn run_context() -> RunContext {
         RunContext {
             year: 2020,
@@ -3523,17 +3523,17 @@ mod tests {
         }
     }
 
- /// A minimal one-of-everything input that threads exactly one row through
- /// all six PC steps.
- ///
- /// The hand-computed result: PC-1b `meanBaseRate = 1.0 × 2.0 × 1.0 = 2.0`;
- /// PC-2a `adjust = 1.0 × exp(0.0 × 70.0) = 1.0`; PC-2b
- /// `weightedTemperatureAdjust = 1.0 × 1.0 = 1.0`; PC-3
- /// `weightedFuelAdjustment = 1.0 × (3.0 + 0.0 × (9.0 − 3.0)) = 3.0`; PC-4
- /// `fuelAdjustedEmissionRate = 2.0 × 3.0 = 6.0`; PC-5
- /// `fuelAdjustedEmissionQuant = 6.0 × 10.0 = 60.0`; PC-6
- /// `emissionQuant = 1.0 × 60.0 = 60.0`. Every value is exactly
- /// representable in `f64`.
+    /// A minimal one-of-everything input that threads exactly one row through
+    /// all six PC steps.
+    ///
+    /// The hand-computed result: PC-1b `meanBaseRate = 1.0 × 2.0 × 1.0 = 2.0`;
+    /// PC-2a `adjust = 1.0 × exp(0.0 × 70.0) = 1.0`; PC-2b
+    /// `weightedTemperatureAdjust = 1.0 × 1.0 = 1.0`; PC-3
+    /// `weightedFuelAdjustment = 1.0 × (3.0 + 0.0 × (9.0 − 3.0)) = 3.0`; PC-4
+    /// `fuelAdjustedEmissionRate = 2.0 × 3.0 = 6.0`; PC-5
+    /// `fuelAdjustedEmissionQuant = 6.0 × 10.0 = 60.0`; PC-6
+    /// `emissionQuant = 1.0 × 60.0 = 60.0`. Every value is exactly
+    /// representable in `f64`.
     fn minimal_inputs() -> EvaporativePermeationInputs {
         EvaporativePermeationInputs {
             age_category: vec![AgeCategoryRow {
@@ -3679,12 +3679,12 @@ mod tests {
         }
     }
 
- /// Run the calculator over `inputs` with the standard [`run_context`].
+    /// Run the calculator over `inputs` with the standard [`run_context`].
     fn run(inputs: &EvaporativePermeationInputs) -> Vec<PermeationEmissionRow> {
         EvaporativePermeationCalculator::new().calculate(inputs, &run_context())
     }
 
- /// Assert two `emissionQuant`s match within `f64` slack.
+    /// Assert two `emissionQuant`s match within `f64` slack.
     fn assert_quant(actual: f64, expected: f64) {
         assert!(
             (actual - expected).abs() < 1e-9,
@@ -3717,9 +3717,9 @@ mod tests {
 
     #[test]
     fn calculate_without_reg_class_collapses_reg_class_to_zero() {
- // NoRegClassID — RegClassSourceTypeFraction is not consulted, so the
- // base rate is not split: meanBaseRate stays 1.0 × 2.0 = 2.0 and the
- // final emissionQuant is unchanged, but regClassID is 0.
+        // NoRegClassID — RegClassSourceTypeFraction is not consulted, so the
+        // base rate is not split: meanBaseRate stays 1.0 × 2.0 = 2.0 and the
+        // final emissionQuant is unchanged, but regClassID is 0.
         let ctx = RunContext {
             with_reg_class: false,
             ..run_context()
@@ -3732,8 +3732,8 @@ mod tests {
 
     #[test]
     fn calculate_without_reg_class_ignores_missing_reg_class_fraction() {
- // With no RegClassSourceTypeFraction rows at all, the WithRegClassID
- // path drops the row but the NoRegClassID path still produces output.
+        // With no RegClassSourceTypeFraction rows at all, the WithRegClassID
+        // path drops the row but the NoRegClassID path still produces output.
         let mut inputs = minimal_inputs();
         inputs.reg_class_source_type_fraction.clear();
         assert!(run(&inputs).is_empty());
@@ -3749,9 +3749,9 @@ mod tests {
 
     #[test]
     fn calculate_applies_the_exponential_temperature_adjustment() {
- // tempAdjustTermB is non-zero: weightedTemperatureAdjust becomes
- // a × exp(b × T) = 2.0 × exp(0.01 × 70.0). emissionQuant is that
- // times the (unchanged) 60.0 from the fuel-adjusted quantity.
+        // tempAdjustTermB is non-zero: weightedTemperatureAdjust becomes
+        // a × exp(b × T) = 2.0 × exp(0.01 × 70.0). emissionQuant is that
+        // times the (unchanged) 60.0 from the fuel-adjusted quantity.
         let mut inputs = minimal_inputs();
         inputs.temperature_adjustment[0].temp_adjust_term_a = 2.0;
         inputs.temperature_adjustment[0].temp_adjust_term_b = 0.01;
@@ -3763,9 +3763,9 @@ mod tests {
 
     #[test]
     fn calculate_weights_gpa_fuel_adjustment_by_county_fraction() {
- // GPAFract 0.25 blends the base and GPA fuel adjustments:
- // weightedFuelAdjustment = 1.0 × (3.0 + 0.25 × (9.0 − 3.0)) = 4.5.
- // emissionQuant = wta(1.0) × meanBaseRate(2.0) × 4.5 × sourceHours(10).
+        // GPAFract 0.25 blends the base and GPA fuel adjustments:
+        // weightedFuelAdjustment = 1.0 × (3.0 + 0.25 × (9.0 − 3.0)) = 4.5.
+        // emissionQuant = wta(1.0) × meanBaseRate(2.0) × 4.5 × sourceHours(10).
         let mut inputs = minimal_inputs();
         inputs.county[0].gpa_fract = 0.25;
         let rows = run(&inputs);
@@ -3775,9 +3775,9 @@ mod tests {
 
     #[test]
     fn calculate_sums_source_bin_activity_across_bins() {
- // A second source bin on the same (regClass, fuelType) adds its
- // activity-weighted rate: meanBaseRate = 0.5×2.0 + 0.25×4.0 = 2.0.
- // The final emissionQuant is unchanged from the minimal 60.0.
+        // A second source bin on the same (regClass, fuelType) adds its
+        // activity-weighted rate: meanBaseRate = 0.5×2.0 + 0.25×4.0 = 2.0.
+        // The final emissionQuant is unchanged from the minimal 60.0.
         let mut inputs = minimal_inputs();
         inputs.source_bin_distribution[0].source_bin_activity_fraction = 0.5;
         inputs.source_bin.push(SourceBinRow {
@@ -3805,9 +3805,9 @@ mod tests {
 
     #[test]
     fn calculate_sums_emission_rate_across_operating_modes() {
- // EmissionRateByAge carries one row per operating mode; PC-1b's join
- // ignores opModeID, so a second rate row for the same source bin is
- // also summed: meanBaseRate = 1.0 × (2.0 + 1.5) = 3.5.
+        // EmissionRateByAge carries one row per operating mode; PC-1b's join
+        // ignores opModeID, so a second rate row for the same source bin is
+        // also summed: meanBaseRate = 1.0 × (2.0 + 1.5) = 3.5.
         let mut inputs = minimal_inputs();
         inputs.emission_rate_by_age.push(EmissionRateByAgeRow {
             source_bin_id: 5000,
@@ -3822,7 +3822,7 @@ mod tests {
 
     #[test]
     fn calculate_skips_source_type_outside_run_spec() {
- // The only source type, 21, is not in RunSpecSourceType.
+        // The only source type, 21, is not in RunSpecSourceType.
         let mut inputs = minimal_inputs();
         inputs.run_spec_source_type = vec![31];
         assert!(run(&inputs).is_empty());
@@ -3830,8 +3830,8 @@ mod tests {
 
     #[test]
     fn calculate_drops_source_bin_distribution_without_age_category() {
- // ageID = 2020 − 2018 = 2; with no AgeCategory row for age 2 the
- // PC-1a inner join drops the source-bin distribution.
+        // ageID = 2020 − 2018 = 2; with no AgeCategory row for age 2 the
+        // PC-1a inner join drops the source-bin distribution.
         let mut inputs = minimal_inputs();
         inputs.age_category.clear();
         assert!(run(&inputs).is_empty());
@@ -3839,7 +3839,7 @@ mod tests {
 
     #[test]
     fn calculate_drops_distribution_without_emission_rate() {
- // No EmissionRateByAge row for the (sourceBin, polProcess, ageGroup).
+        // No EmissionRateByAge row for the (sourceBin, polProcess, ageGroup).
         let mut inputs = minimal_inputs();
         inputs.emission_rate_by_age.clear();
         assert!(run(&inputs).is_empty());
@@ -3847,7 +3847,7 @@ mod tests {
 
     #[test]
     fn calculate_drops_distribution_without_source_bin() {
- // The SourceBin row supplying the fuel type is absent.
+        // The SourceBin row supplying the fuel type is absent.
         let mut inputs = minimal_inputs();
         inputs.source_bin.clear();
         assert!(run(&inputs).is_empty());
@@ -3855,8 +3855,8 @@ mod tests {
 
     #[test]
     fn calculate_drops_temperature_adjust_outside_model_year_range() {
- // modelYearID 2018 falls outside [2025, 2060], so PC-2a produces no
- // TemperatureAdjustByOpMode row and PC-6 has nothing to join.
+        // modelYearID 2018 falls outside [2025, 2060], so PC-2a produces no
+        // TemperatureAdjustByOpMode row and PC-6 has nothing to join.
         let mut inputs = minimal_inputs();
         inputs.temperature_adjustment[0].min_model_year_id = 2025;
         assert!(run(&inputs).is_empty());
@@ -3864,8 +3864,8 @@ mod tests {
 
     #[test]
     fn calculate_drops_op_mode_distribution_on_zone_mismatch() {
- // The link's zone no longer matches the tank temperature's zone, so
- // the PC-2b Link join fails.
+        // The link's zone no longer matches the tank temperature's zone, so
+        // the PC-2b Link join fails.
         let mut inputs = minimal_inputs();
         inputs.link[0].zone_id = 91;
         assert!(run(&inputs).is_empty());
@@ -3873,7 +3873,7 @@ mod tests {
 
     #[test]
     fn calculate_drops_fuel_adjustment_when_etoh_volume_out_of_bin() {
- // ETOHVolume 5.0 no longer falls in the [10, 100) bin.
+        // ETOHVolume 5.0 no longer falls in the [10, 100) bin.
         let mut inputs = minimal_inputs();
         inputs.etoh_bin[0].etoh_thresh_low = 10.0;
         assert!(run(&inputs).is_empty());
@@ -3881,24 +3881,24 @@ mod tests {
 
     #[test]
     fn calculate_treats_null_etoh_volume_as_zero() {
- // A null ETOHVolume is coerced to 0.0 (the SQL's opening UPDATE); 0.0
- // still falls in the [0, 100) bin, so the row survives.
+        // A null ETOHVolume is coerced to 0.0 (the SQL's opening UPDATE); 0.0
+        // still falls in the [0, 100) bin, so the row survives.
         let mut inputs = minimal_inputs();
         inputs.fuel_formulation[0].etoh_volume = None;
         let rows = run(&inputs);
         assert_eq!(rows.len(), 1);
         assert_quant(rows[0].emission_quant, 60.0);
 
- // ...and with a bin that starts above 0, the null→0 volume is out of
- // range and the fuel adjustment drops.
+        // ...and with a bin that starts above 0, the null→0 volume is out of
+        // range and the fuel adjustment drops.
         inputs.etoh_bin[0].etoh_thresh_low = 1.0;
         assert!(run(&inputs).is_empty());
     }
 
     #[test]
     fn calculate_drops_row_when_year_does_not_match_run_context() {
- // PC-3's `WHERE y.yearID = ##context.year##`: the Year row's calendar
- // year no longer matches the run context.
+        // PC-3's `WHERE y.yearID = ##context.year##`: the Year row's calendar
+        // year no longer matches the run context.
         let mut inputs = minimal_inputs();
         inputs.year[0].year_id = 2019;
         assert!(run(&inputs).is_empty());
@@ -3906,8 +3906,8 @@ mod tests {
 
     #[test]
     fn calculate_drops_source_hours_without_matching_model_year() {
- // ageID 5 in year 2020 gives modelYearID 2015; the fuel-adjusted rate
- // is only built for 2018, so the PC-5 join finds nothing.
+        // ageID 5 in year 2020 gives modelYearID 2015; the fuel-adjusted rate
+        // is only built for 2018, so the PC-5 join finds nothing.
         let mut inputs = minimal_inputs();
         inputs.source_hours[0].age_id = 5;
         assert!(run(&inputs).is_empty());
@@ -3915,8 +3915,8 @@ mod tests {
 
     #[test]
     fn calculate_drops_output_on_tank_temperature_group_mismatch() {
- // SourceTypeModelYearGroup maps (21, 400) to a tank-temperature group
- // that differs from the adjustment's, so the PC-6 join fails.
+        // SourceTypeModelYearGroup maps (21, 400) to a tank-temperature group
+        // that differs from the adjustment's, so the PC-6 join fails.
         let mut inputs = minimal_inputs();
         inputs.source_type_model_year_group[0].tank_temperature_group_id = 99;
         assert!(run(&inputs).is_empty());
@@ -3924,8 +3924,8 @@ mod tests {
 
     #[test]
     fn calculate_drops_output_without_pollutant_process_model_year() {
- // No PollutantProcessModelYear row — the PC-6 model-year-group join
- // fails even though every other table matches.
+        // No PollutantProcessModelYear row — the PC-6 model-year-group join
+        // fails even though every other table matches.
         let mut inputs = minimal_inputs();
         inputs.pollutant_process_model_year.clear();
         assert!(run(&inputs).is_empty());
@@ -3933,9 +3933,9 @@ mod tests {
 
     #[test]
     fn calculate_output_is_sorted_by_dimension_key() {
- // Two source types and two links produce several output rows; the
- // result must come back dimension-key sorted regardless of the
- // hash-map-driven computation order.
+        // Two source types and two links produce several output rows; the
+        // result must come back dimension-key sorted regardless of the
+        // hash-map-driven computation order.
         let mut inputs = minimal_inputs();
         inputs.run_spec_source_type = vec![21, 31];
         inputs.source_type_model_year.push(SourceTypeModelYearRow {
@@ -4023,7 +4023,7 @@ mod tests {
 
     #[test]
     fn calculator_registers_thc_evap_permeation() {
- // One Registration directive: pollutant 1 (THC) × process 11.
+        // One Registration directive: pollutant 1 (THC) × process 11.
         let calc = EvaporativePermeationCalculator::new();
         let regs = calc.registrations();
         assert_eq!(regs.len(), 1);
@@ -4045,7 +4045,7 @@ mod tests {
         ] {
             assert!(tables.contains(&expected), "missing input table {expected}");
         }
- // `calculator-dag.json` records `depends_on: []`.
+        // `calculator-dag.json` records `depends_on: []`.
         assert!(calc.upstream().is_empty());
     }
 
@@ -4184,7 +4184,7 @@ mod tests {
             "Year",
             YearRow::into_dataframe(inputs.year.clone()).unwrap(),
         );
- // Position: year=2020, zone=90, matches run_context() in minimal_inputs
+        // Position: year=2020, zone=90, matches run_context() in minimal_inputs
         let position = IterationPosition {
             iteration: 0,
             process_id: None,
@@ -4201,20 +4201,20 @@ mod tests {
         );
     }
 
- /// Golden row-level test using real values from the
- /// `characterization/snapshots/process-evap-permeation` fixture for
- /// sourceType=21, modelYear=2010, August (month=8), hourDay=72 (weekday
- /// 7 a.m., zone=261610 Washtenaw County MI). OpModeDistribution is
- /// not in the snapshot so a synthetic frac=1.0 row is supplied.
- ///
- /// Hand-derived chain (PC-1b → PC-6):
- /// PC-1b meanBaseRate = 0.935510 × 0.0102 × 1.0 = 0.009542202
- /// PC-2a tempAdj = 0.0625 × exp(0.0385 × 64.8371) = 0.758539524…
- /// PC-2b wTA = 0.758539524… × 1.0 = 0.758539524…
- /// PC-3 wFA = 1.0 × 2.1383 = 2.1383
- /// PC-4 adjRate = 0.009542202 × 2.1383 = 0.020404090…
- /// PC-5 adjQuant = 0.020404090… × 24.1821 / 2.0 = 0.246706878…
- /// PC-6 emitQuant = 0.758539524… × 0.246706878… = 0.187136918…
+    /// Golden row-level test using real values from the
+    /// `characterization/snapshots/process-evap-permeation` fixture for
+    /// sourceType=21, modelYear=2010, August (month=8), hourDay=72 (weekday
+    /// 7 a.m., zone=261610 Washtenaw County MI). OpModeDistribution is
+    /// not in the snapshot so a synthetic frac=1.0 row is supplied.
+    ///
+    /// Hand-derived chain (PC-1b → PC-6):
+    /// PC-1b meanBaseRate = 0.935510 × 0.0102 × 1.0 = 0.009542202
+    /// PC-2a tempAdj = 0.0625 × exp(0.0385 × 64.8371) = 0.758539524…
+    /// PC-2b wTA = 0.758539524… × 1.0 = 0.758539524…
+    /// PC-3 wFA = 1.0 × 2.1383 = 2.1383
+    /// PC-4 adjRate = 0.009542202 × 2.1383 = 0.020404090…
+    /// PC-5 adjQuant = 0.020404090… × 24.1821 / 2.0 = 0.246706878…
+    /// PC-6 emitQuant = 0.758539524… × 0.246706878… = 0.187136918…
     #[test]
     fn calculate_snapshot_golden_sourcetype21_modelyear2010_august_hourday72() {
         let ctx = RunContext {
@@ -4392,7 +4392,7 @@ mod tests {
 
     #[test]
     fn calculator_is_object_safe() {
- // The registry stores calculators as `Box<dyn Calculator>`.
+        // The registry stores calculators as `Box<dyn Calculator>`.
         let calc: Box<dyn Calculator> = Box::new(EvaporativePermeationCalculator::new());
         assert_eq!(calc.name(), "EvaporativePermeationCalculator");
         assert_eq!(calc.registrations().len(), 1);

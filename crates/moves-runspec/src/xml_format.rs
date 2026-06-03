@@ -296,7 +296,10 @@ fn write_internal_control_strategies(
         match item {
             InternalControlStrategy::RateOfProgress { use_parameters } => {
                 let flag = if *use_parameters { "Yes" } else { "No" };
-                writeln!(out, "\t\t<internalcontrolstrategy classname=\"{ROP_CLASS}\"><![CDATA[")?;
+                writeln!(
+                    out,
+                    "\t\t<internalcontrolstrategy classname=\"{ROP_CLASS}\"><![CDATA["
+                )?;
                 writeln!(out, "useParameters\t{flag}")?;
                 writeln!(out, "]]></internalcontrolstrategy>")?;
             }
@@ -967,17 +970,29 @@ impl XmlRunSpec {
             .into_iter()
             .map(|x| {
                 if x.classname == ROP_CLASS {
-                    let use_parameters = x.content.lines().find_map(|line| {
-                        let mut parts = line.splitn(2, '\t');
-                        if parts.next()? == "useParameters" {
-                            Some(parts.next().unwrap_or("").trim().eq_ignore_ascii_case("yes"))
-                        } else {
-                            None
-                        }
-                    }).unwrap_or(false);
+                    let use_parameters = x
+                        .content
+                        .lines()
+                        .find_map(|line| {
+                            let mut parts = line.splitn(2, '\t');
+                            if parts.next()? == "useParameters" {
+                                Some(
+                                    parts
+                                        .next()
+                                        .unwrap_or("")
+                                        .trim()
+                                        .eq_ignore_ascii_case("yes"),
+                                )
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap_or(false);
                     InternalControlStrategy::RateOfProgress { use_parameters }
                 } else {
-                    InternalControlStrategy::Other { class_name: x.classname }
+                    InternalControlStrategy::Other {
+                        class_name: x.classname,
+                    }
                 }
             })
             .collect();

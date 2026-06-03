@@ -38,25 +38,25 @@ use std::collections::BTreeSet;
 /// numeric ranges (`NonNegativeFloat`, `zeroToOneFraction`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Filter {
- /// `ImporterManager.FILTER_COUNTY` — `countyID` must be in the runspec set.
+    /// `ImporterManager.FILTER_COUNTY` — `countyID` must be in the runspec set.
     County,
- /// `ImporterManager.FILTER_ZONE` — `zoneID` must be in the runspec set.
+    /// `ImporterManager.FILTER_ZONE` — `zoneID` must be in the runspec set.
     Zone,
- /// `ImporterManager.FILTER_ROAD_TYPE` — `roadTypeID` must be in the runspec set.
+    /// `ImporterManager.FILTER_ROAD_TYPE` — `roadTypeID` must be in the runspec set.
     RoadType,
- /// `ImporterManager.FILTER_SOURCE` — `sourceTypeID` must be in the runspec set.
+    /// `ImporterManager.FILTER_SOURCE` — `sourceTypeID` must be in the runspec set.
     SourceType,
- /// `ImporterManager.FILTER_HOURDAY` — `hourDayID` must be in the runspec set.
+    /// `ImporterManager.FILTER_HOURDAY` — `hourDayID` must be in the runspec set.
     HourDay,
- /// `ImporterManager.FILTER_OPMODEID` — `opModeID` must be in the runspec set.
+    /// `ImporterManager.FILTER_OPMODEID` — `opModeID` must be in the runspec set.
     OpMode,
- /// `ImporterManager.FILTER_POLPROCESSID` — `polProcessID` must be in the runspec set.
+    /// `ImporterManager.FILTER_POLPROCESSID` — `polProcessID` must be in the runspec set.
     PolProcess,
- /// `ImporterManager.FILTER_NON_NEGATIVE` — accept any finite f64.
- /// Java's `doesInclude` is a no-op here; we additionally reject
- /// NaN/inf because the column's SQL type would reject them too.
+    /// `ImporterManager.FILTER_NON_NEGATIVE` — accept any finite f64.
+    /// Java's `doesInclude` is a no-op here; we additionally reject
+    /// NaN/inf because the column's SQL type would reject them too.
     NonNegativeFloat,
- /// `ImporterManager.FILTER_0_TO_1_FRACTION` — `0.0 ≤ value ≤ 1.0`.
+    /// `ImporterManager.FILTER_0_TO_1_FRACTION` — `0.0 ≤ value ≤ 1.0`.
     ZeroToOneFraction,
 }
 
@@ -99,7 +99,7 @@ impl RunSpecFilter {
         Self::default()
     }
 
- /// Builder helper used by tests and small drivers.
+    /// Builder helper used by tests and small drivers.
     pub fn with_counties<I: IntoIterator<Item = i64>>(mut self, ids: I) -> Self {
         self.county_ids = Some(ids.into_iter().collect());
         self
@@ -171,8 +171,8 @@ impl CellValue {
 }
 
 impl Filter {
- /// Check a cell against this filter using the runspec-derived
- /// allow-lists (where applicable).
+    /// Check a cell against this filter using the runspec-derived
+    /// allow-lists (where applicable).
     pub fn check(&self, value: CellValue, runspec: &RunSpecFilter) -> FilterOutcome {
         match self {
             Filter::County => check_membership("countyID", value, runspec.county_ids.as_ref()),

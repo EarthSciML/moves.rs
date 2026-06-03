@@ -75,9 +75,9 @@ fn run_sample_runspec_walks_the_graph_and_writes_shaped_output() {
     };
     let outcome = run_simulation(&opts).expect("run should succeed");
 
- // The engine walked the real calculator graph: sample-runspec selects
- // energy-consumption pollutants for running / start / extended-idle
- // exhaust, which the DAG registers to BaseRateCalculator.
+    // The engine walked the real calculator graph: sample-runspec selects
+    // energy-consumption pollutants for running / start / extended-idle
+    // exhaust, which the DAG registers to BaseRateCalculator.
     assert!(
         !outcome.modules_planned.is_empty(),
         "expected a non-empty calculator plan"
@@ -92,17 +92,17 @@ fn run_sample_runspec_walks_the_graph_and_writes_shaped_output() {
     );
     assert!(outcome.chunk_count() >= 1);
 
- // (pre-data-plane): every planned module is unimplemented
- // because calculator execute() methods return CalculatorOutput::empty()
- // until the data plane is wired in. This remains the expected state
- // until DataFrameStore lands.
+    // (pre-data-plane): every planned module is unimplemented
+    // because calculator execute() methods return CalculatorOutput::empty()
+    // until the data plane is wired in. This remains the expected state
+    // until DataFrameStore lands.
     assert!(outcome.modules_executed.is_empty());
     assert_eq!(outcome.modules_unimplemented, outcome.modules_planned);
     assert!(!outcome.is_fully_implemented());
     assert_eq!(outcome.iterations, 1);
 
- // The output is empty-but-correctly-shaped: a one-row MOVESRun.parquet
- // carrying the canonical output schema.
+    // The output is empty-but-correctly-shaped: a one-row MOVESRun.parquet
+    // carrying the canonical output schema.
     assert!(outcome.run_record_path.is_file());
     assert_eq!(
         outcome.run_record_path.file_name().unwrap(),
@@ -118,7 +118,7 @@ fn run_sample_runspec_walks_the_graph_and_writes_shaped_output() {
 
 #[test]
 fn run_accepts_a_toml_runspec() {
- // Convert the XML fixture to TOML, then drive a run from the TOML // exercises the `.toml` branch of the RunSpec loader.
+    // Convert the XML fixture to TOML, then drive a run from the TOML // exercises the `.toml` branch of the RunSpec loader.
     let dir = tempfile::tempdir().unwrap();
     let toml = dir.path().join("sample.toml");
     convert_runspec(&ConvertOptions {
@@ -183,7 +183,7 @@ fn convert_runspec_round_trips_xml_through_toml() {
     assert_eq!(to_xml.from, RunSpecFormat::Toml);
     assert_eq!(to_xml.to, RunSpecFormat::Xml);
 
- // The model survives the XML -> TOML -> XML round trip.
+    // The model survives the XML -> TOML -> XML round trip.
     let original = load_run_spec(&sample_runspec()).unwrap();
     let round_tripped = load_run_spec(&back).unwrap();
     assert_eq!(original, round_tripped);
@@ -195,8 +195,8 @@ fn convert_runspec_derives_the_output_path_from_the_target_format() {
     let xml = dir.path().join("spec.xml");
     fs::copy(sample_runspec(), &xml).unwrap();
 
- // No --output: the converter writes alongside the input with the
- // opposite extension.
+    // No --output: the converter writes alongside the input with the
+    // opposite extension.
     let outcome = convert_runspec(&ConvertOptions {
         input: xml.clone(),
         output: None,
@@ -243,15 +243,15 @@ fn import_cdb_validates_and_writes_parquet() {
     let (rows, _columns) = read_parquet(destination);
     assert_eq!(rows, 2);
 
- // The other declared County tables had no CSV, so they are reported
- // missing rather than failing the import.
+    // The other declared County tables had no CSV, so they are reported
+    // missing rather than failing the import.
     assert!(outcome.missing() > 0);
 }
 
 #[test]
 fn import_cdb_rejects_a_table_that_fails_validation() {
     let input = tempfile::tempdir().unwrap();
- // A negative population violates the `NonNegative` column filter.
+    // A negative population violates the `NonNegative` column filter.
     write_file(
         input.path(),
         "SourceTypeYear.csv",
@@ -275,7 +275,7 @@ fn import_cdb_rejects_a_table_that_fails_validation() {
     assert_eq!(rejected.status, ImportStatus::Rejected);
     assert!(!rejected.errors.is_empty());
     assert!(rejected.destination.is_none());
- // A rejected table writes no Parquet.
+    // A rejected table writes no Parquet.
     assert!(!output.path().join("SourceTypeYear.parquet").exists());
 }
 

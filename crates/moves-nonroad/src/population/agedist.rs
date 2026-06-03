@@ -50,16 +50,16 @@ use crate::{Error, Result};
 /// Output of [`age_distribution`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct AgeDistributionResult {
- /// Base-year population. Equal to the input when
- /// `growth_year >= base_year`; otherwise grown backward.
+    /// Base-year population. Equal to the input when
+    /// `growth_year >= base_year`; otherwise grown backward.
     pub base_population: f32,
- /// Model-year fractions grown forward to `growth_year`. Equal
- /// to the input when `growth_year <= base_year`.
+    /// Model-year fractions grown forward to `growth_year`. Equal
+    /// to the input when `growth_year <= base_year`.
     pub mdyrfrc: Vec<f32>,
- /// Per-iteration warnings emitted by `grwfac` when it had to
- /// clamp the base-year indicator to [`MINGRWIND`]. The Fortran
- /// source surfaces these via `IOWMSG` and the global `nwarn`
- /// counter; the Rust port hands them back to the caller.
+    /// Per-iteration warnings emitted by `grwfac` when it had to
+    /// clamp the base-year indicator to [`MINGRWIND`]. The Fortran
+    /// source surfaces these via `IOWMSG` and the global `nwarn`
+    /// counter; the Rust port hands them back to the caller.
     pub warnings: Vec<GrowthFactorWarning>,
 }
 
@@ -126,32 +126,32 @@ where
     let mut warnings: Vec<GrowthFactorWarning> = Vec::new();
 
     if growth_year > base_year {
- // Forward growth (agedist.f :112–146).
+        // Forward growth (agedist.f :112–146).
         let mut totpop = base_population;
         for iyear in (base_year + 1)..=growth_year {
- // Snapshot current fractions (agedist.f :116–118).
+            // Snapshot current fractions (agedist.f :116–118).
             let tmpfrc: Vec<f32> = mdyrfrc_out.clone();
 
- // grwfac(iyear - 1, iyear).
+            // grwfac(iyear - 1, iyear).
             let gf = growth_fn(iyear - 1, iyear)?;
             let grwthfc = gf.factor;
             if let Some(w) = gf.warning {
                 warnings.push(w);
             }
 
- // MINGRWIND clamp on totpop when growth factor non-zero
- // (agedist.f :124–131).
+            // MINGRWIND clamp on totpop when growth factor non-zero
+            // (agedist.f :124–131).
             if grwthfc != 0.0 {
                 totpop = totpop.max(MINGRWIND);
             }
 
- // totpop = max(0, totpop * (1 + grwthfc)) (agedist.f :132).
+            // totpop = max(0, totpop * (1 + grwthfc)) (agedist.f :132).
             totpop = (totpop * (1.0 + grwthfc)).max(0.0);
             let totpopfrc = totpop / base_population;
 
- // Forward-shift fractions, accumulating frcsum
- // (agedist.f :139–143). Ages are 1-indexed in Fortran;
- // here index 0 corresponds to age 1.
+            // Forward-shift fractions, accumulating frcsum
+            // (agedist.f :139–143). Ages are 1-indexed in Fortran;
+            // here index 0 corresponds to age 1.
             let mut frcsum: f32 = 0.0;
             for iage in 1..MXAGYR {
                 let updated = (tmpfrc[iage - 1] * (1.0 - yryrfrcscrp[iage])).max(0.0);
@@ -159,14 +159,14 @@ where
                 frcsum += updated;
             }
 
- // New-year fraction is whatever total-population fraction
- // is left after the existing ages account for theirs
- // (agedist.f :144). May go negative if scrappage left
- // residual; Fortran does not clamp this slot.
+            // New-year fraction is whatever total-population fraction
+            // is left after the existing ages account for theirs
+            // (agedist.f :144). May go negative if scrappage left
+            // residual; Fortran does not clamp this slot.
             mdyrfrc_out[0] = totpopfrc - frcsum;
         }
     } else if growth_year < base_year {
- // Backward growth of the base population (agedist.f :151–170).
+        // Backward growth of the base population (agedist.f :151–170).
         let gf = growth_fn(base_year, growth_year)?;
         let grwthfc = gf.factor;
         if let Some(w) = gf.warning {
@@ -179,7 +179,7 @@ where
         let delta_years = (growth_year - base_year) as f32;
         result_baspop = (result_baspop * (1.0 + delta_years * grwthfc)).max(0.0);
     }
- // growth_year == base_year: untouched (Fortran fall-through).
+    // growth_year == base_year: untouched (Fortran fall-through).
 
     Ok(AgeDistributionResult {
         base_population: result_baspop,
@@ -233,8 +233,8 @@ mod tests {
     fn backward_growth_adjusts_baspop_only() {
         let mdyrfrc = init_mdyrfrc(&[0.5, 0.5]);
         let scrap = zero_scrap();
- // grwfac(base=2025, growth=2020) returns factor=0.1
- // baspop = max(0, baspop * (1 + (2020-2025) * 0.1)) = baspop * 0.5
+        // grwfac(base=2025, growth=2020) returns factor=0.1
+        // baspop = max(0, baspop * (1 + (2020-2025) * 0.1)) = baspop * 0.5
         let res = age_distribution(100.0, &mdyrfrc, 2025, 2020, &scrap, const_growth(0.1)).unwrap();
         assert!((res.base_population - 50.0).abs() < 1e-4);
         assert_eq!(res.mdyrfrc, mdyrfrc);
@@ -244,8 +244,8 @@ mod tests {
     fn backward_growth_clamps_at_zero() {
         let mdyrfrc = init_mdyrfrc(&[0.5, 0.5]);
         let scrap = zero_scrap();
- // Large positive grwthfc with negative delta yields negative product → clamped.
- // baspop * (1 + (-10) * 0.5) = baspop * -4 → max(0, ...) = 0.
+        // Large positive grwthfc with negative delta yields negative product → clamped.
+        // baspop * (1 + (-10) * 0.5) = baspop * -4 → max(0, ...) = 0.
         let res = age_distribution(100.0, &mdyrfrc, 2030, 2020, &scrap, const_growth(0.5)).unwrap();
         assert_eq!(res.base_population, 0.0);
     }
@@ -254,10 +254,10 @@ mod tests {
     fn backward_growth_bumps_below_mingrwind_when_factor_nonzero() {
         let mdyrfrc = init_mdyrfrc(&[0.5, 0.5]);
         let scrap = zero_scrap();
- // baspop tiny → clamped to MINGRWIND first.
+        // baspop tiny → clamped to MINGRWIND first.
         let tiny = MINGRWIND / 10.0;
         let res = age_distribution(tiny, &mdyrfrc, 2025, 2020, &scrap, const_growth(0.1)).unwrap();
- // base_population is bumped to MINGRWIND, then scaled by (1 - 0.5) = 0.5.
+        // base_population is bumped to MINGRWIND, then scaled by (1 - 0.5) = 0.5.
         let expected = MINGRWIND * (1.0 + (2020.0 - 2025.0) * 0.1);
         assert!((res.base_population - expected.max(0.0)).abs() < 1e-9);
     }
@@ -267,22 +267,22 @@ mod tests {
         let mdyrfrc = init_mdyrfrc(&[0.5, 0.5]);
         let scrap = zero_scrap();
         let tiny = MINGRWIND / 10.0;
- // Zero factor → no clamp → baspop unchanged from initial small value.
+        // Zero factor → no clamp → baspop unchanged from initial small value.
         let res = age_distribution(tiny, &mdyrfrc, 2025, 2020, &scrap, const_growth(0.0)).unwrap();
         assert_eq!(res.base_population, tiny);
     }
 
     #[test]
     fn forward_growth_single_year_zero_scrappage() {
- // One year forward, zero scrappage, growth factor 0.10.
- // totpop: 100 → 100 * 1.10 = 110.
- // totpopfrc: 110 / 100 = 1.10.
- // For each age `iage` in 2..MXAGYR (1-based Fortran): mdyrfrc(iage)
- // gets tmpfrc(iage - 1) — i.e. ages shift up by one slot. With initial
- // mdyrfrc = [0.5, 0.5, 0, ...] (Rust 0-indexed: ages 1..2 in Fortran):
- // mdyrfrc[1] = tmpfrc[0] = 0.5 (Fortran age 2 ← age 1)
- // mdyrfrc[2] = tmpfrc[1] = 0.5 (Fortran age 3 ← age 2)
- // frcsum = 1.0; mdyrfrc[0] = totpopfrc - frcsum = 1.10 - 1.0 = 0.10.
+        // One year forward, zero scrappage, growth factor 0.10.
+        // totpop: 100 → 100 * 1.10 = 110.
+        // totpopfrc: 110 / 100 = 1.10.
+        // For each age `iage` in 2..MXAGYR (1-based Fortran): mdyrfrc(iage)
+        // gets tmpfrc(iage - 1) — i.e. ages shift up by one slot. With initial
+        // mdyrfrc = [0.5, 0.5, 0, ...] (Rust 0-indexed: ages 1..2 in Fortran):
+        // mdyrfrc[1] = tmpfrc[0] = 0.5 (Fortran age 2 ← age 1)
+        // mdyrfrc[2] = tmpfrc[1] = 0.5 (Fortran age 3 ← age 2)
+        // frcsum = 1.0; mdyrfrc[0] = totpopfrc - frcsum = 1.10 - 1.0 = 0.10.
         let mdyrfrc = init_mdyrfrc(&[0.5, 0.5]);
         let scrap = zero_scrap();
         let res =
@@ -296,16 +296,16 @@ mod tests {
 
     #[test]
     fn forward_growth_clamps_population_at_zero() {
- // Large negative growth factor → totpop * (1 + grwthfc) goes negative.
- // After max(0, ...), totpop = 0, so totpopfrc = 0.
- // mdyrfrc[0] = 0 - frcsum (which is non-negative); may be negative.
+        // Large negative growth factor → totpop * (1 + grwthfc) goes negative.
+        // After max(0, ...), totpop = 0, so totpopfrc = 0.
+        // mdyrfrc[0] = 0 - frcsum (which is non-negative); may be negative.
         let mdyrfrc = init_mdyrfrc(&[0.5, 0.5]);
         let scrap = zero_scrap();
         let res =
             age_distribution(100.0, &mdyrfrc, 2020, 2021, &scrap, const_growth(-2.0)).unwrap();
- // After the shift: mdyrfrc[1] = tmpfrc[0] = 0.5, mdyrfrc[2] = tmpfrc[1] = 0.5,
- // frcsum = 1.0. mdyrfrc[0] = 0 - 1.0 = -1.0 (Fortran does not clamp the
- // youngest-age slot).
+        // After the shift: mdyrfrc[1] = tmpfrc[0] = 0.5, mdyrfrc[2] = tmpfrc[1] = 0.5,
+        // frcsum = 1.0. mdyrfrc[0] = 0 - 1.0 = -1.0 (Fortran does not clamp the
+        // youngest-age slot).
         assert!((res.mdyrfrc[0] + 1.0).abs() < 1e-6);
         assert!((res.mdyrfrc[1] - 0.5).abs() < 1e-6);
         assert!((res.mdyrfrc[2] - 0.5).abs() < 1e-6);
@@ -313,14 +313,14 @@ mod tests {
 
     #[test]
     fn forward_growth_scrappage_drops_age_fractions() {
- // 100% scrappage at every age → all shifted fractions go to zero.
+        // 100% scrappage at every age → all shifted fractions go to zero.
         let mdyrfrc = init_mdyrfrc(&[0.5, 0.5]);
         let mut scrap = vec![0.0; MXAGYR];
         for s in scrap.iter_mut() {
- *s = 1.0;
+            *s = 1.0;
         }
- // grwthfc 0, totpop=100, totpopfrc=1.0.
- // After shift+scrap, all higher ages are zero; mdyrfrc[0] = 1.0 - 0 = 1.0.
+        // grwthfc 0, totpop=100, totpopfrc=1.0.
+        // After shift+scrap, all higher ages are zero; mdyrfrc[0] = 1.0 - 0 = 1.0.
         let res = age_distribution(100.0, &mdyrfrc, 2020, 2021, &scrap, const_growth(0.0)).unwrap();
         assert!((res.mdyrfrc[0] - 1.0).abs() < 1e-6);
         for v in &res.mdyrfrc[1..] {
@@ -367,11 +367,11 @@ mod tests {
 
     #[test]
     fn forward_growth_iterates_per_year() {
- // 3-year forward span → 3 grwfac calls. Initial mdyrfrc = [1.0, 0, 0, ...].
- // No growth, no scrappage. Each iteration shifts the mass one slot:
- // year 1: [0, 1, 0, 0, ...] (mdyrfrc[0] = 1.0 - 1.0 = 0)
- // year 2: [0, 0, 1, 0, ...]
- // year 3: [0, 0, 0, 1, ...]
+        // 3-year forward span → 3 grwfac calls. Initial mdyrfrc = [1.0, 0, 0, ...].
+        // No growth, no scrappage. Each iteration shifts the mass one slot:
+        // year 1: [0, 1, 0, 0, ...] (mdyrfrc[0] = 1.0 - 1.0 = 0)
+        // year 2: [0, 0, 1, 0, ...]
+        // year 3: [0, 0, 0, 1, ...]
         let mdyrfrc = init_mdyrfrc(&[1.0]);
         let scrap = zero_scrap();
         let mut call_count = 0;
@@ -398,16 +398,16 @@ mod tests {
     fn forward_growth_clamps_small_population_with_nonzero_factor() {
         let mdyrfrc = init_mdyrfrc(&[1.0]);
         let scrap = zero_scrap();
- // baspop is below MINGRWIND. With non-zero factor → clamp totpop to MINGRWIND
- // before multiplying. Without clamp, the next iteration would never recover.
+        // baspop is below MINGRWIND. With non-zero factor → clamp totpop to MINGRWIND
+        // before multiplying. Without clamp, the next iteration would never recover.
         let tiny = MINGRWIND / 100.0;
         let res = age_distribution(tiny, &mdyrfrc, 2020, 2021, &scrap, const_growth(0.10)).unwrap();
- // totpop = max(MINGRWIND, tiny) = MINGRWIND; then * 1.10.
- // totpopfrc = (MINGRWIND * 1.10) / tiny -- a large ratio (~110000).
+        // totpop = max(MINGRWIND, tiny) = MINGRWIND; then * 1.10.
+        // totpopfrc = (MINGRWIND * 1.10) / tiny -- a large ratio (~110000).
         let expected_totpop = MINGRWIND * 1.10;
         let expected_frc = expected_totpop / tiny;
- // mdyrfrc[1] = max(0, 1.0 * (1 - 0)) = 1.0
- // mdyrfrc[0] = expected_frc - 1.0
+        // mdyrfrc[1] = max(0, 1.0 * (1 - 0)) = 1.0
+        // mdyrfrc[0] = expected_frc - 1.0
         assert!((res.mdyrfrc[0] - (expected_frc - 1.0)).abs() / expected_frc < 1e-5);
     }
 

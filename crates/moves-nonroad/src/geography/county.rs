@@ -93,16 +93,16 @@ mod tests {
         let out = outcome.into_output();
         assert_eq!(out.fips, "17001");
         assert_eq!(out.emissions_day.len(), MXPOL);
- // No FIPS, so no emsams fold-in.
+        // No FIPS, so no emsams fold-in.
         assert!(out.emsams_fips_index.is_none());
- // No dat record emitted.
+        // No dat record emitted.
         assert!(out.dat_records.is_empty());
     }
 
     #[test]
     fn process_county_growth_disabled_is_fatal() {
- // Use a callback that DOES find the FIPS so we get past the
- // skip-early-out.
+        // Use a callback that DOES find the FIPS so we get past the
+        // skip-early-out.
         struct OnlyFindFips;
         impl GeographyCallbacks for OnlyFindFips {
             fn find_fips(&self, _: &str) -> Option<usize> {
@@ -158,7 +158,9 @@ mod tests {
                 _: &str,
                 _: &[f32; crate::common::consts::MXDAYS],
             ) -> Result<crate::emissions::exhaust::AdjustmentTable> {
-                Ok(crate::emissions::exhaust::AdjustmentTable::new(crate::common::consts::MXDAYS))
+                Ok(crate::emissions::exhaust::AdjustmentTable::new(
+                    crate::common::consts::MXDAYS,
+                ))
             }
             fn model_year_and_agedist(
                 &mut self,
@@ -309,7 +311,9 @@ mod tests {
                 _: &str,
                 _: &[f32; crate::common::consts::MXDAYS],
             ) -> Result<crate::emissions::exhaust::AdjustmentTable> {
-                Ok(crate::emissions::exhaust::AdjustmentTable::new(crate::common::consts::MXDAYS))
+                Ok(crate::emissions::exhaust::AdjustmentTable::new(
+                    crate::common::consts::MXDAYS,
+                ))
             }
             fn model_year_and_agedist(
                 &mut self,
@@ -413,19 +417,19 @@ mod tests {
                 assert_eq!(dat.population_total, 0.0);
                 assert_eq!(dat.activity_total, 0.0);
                 assert_eq!(dat.fuel_consumption, 0.0);
- // emsday is all zeros — none populated.
+                // emsday is all zeros — none populated.
                 assert!(dat.emissions.iter().all(|&v| v == 0.0));
             }
             other => panic!("expected Success, got {other:?}"),
         }
     }
 
- // -------------------------------------------------------------
- // Happy-path test: stub callback drives the full model-year loop
- // for a single-year, single-tech equipment record and asserts
- // that the per-(year, tech) iteration ran exactly once, with the
- // expected slot values folded into the running totals.
- // -------------------------------------------------------------
+    // -------------------------------------------------------------
+    // Happy-path test: stub callback drives the full model-year loop
+    // for a single-year, single-tech equipment record and asserts
+    // that the per-(year, tech) iteration ran exactly once, with the
+    // expected slot values folded into the running totals.
+    // -------------------------------------------------------------
 
     struct HappyPathCallbacks {
         iter_count: std::cell::RefCell<u32>,
@@ -493,7 +497,9 @@ mod tests {
             _: &str,
             _: &[f32; crate::common::consts::MXDAYS],
         ) -> Result<crate::emissions::exhaust::AdjustmentTable> {
-            Ok(crate::emissions::exhaust::AdjustmentTable::new(crate::common::consts::MXDAYS))
+            Ok(crate::emissions::exhaust::AdjustmentTable::new(
+                crate::common::consts::MXDAYS,
+            ))
         }
         fn model_year_and_agedist(
             &mut self,
@@ -505,7 +511,7 @@ mod tests {
             _: i32,
             pop: f32,
         ) -> Result<ModelYearAgedistResult> {
- // Single-year lifetime: nyrlif=1, all single-element vectors.
+            // Single-year lifetime: nyrlif=1, all single-element vectors.
             Ok(ModelYearAgedistResult {
                 yryrfrcscrp: vec![0.0],
                 modfrc: vec![1.0],
@@ -526,15 +532,15 @@ mod tests {
             _: usize,
             _: usize,
         ) -> Result<ExhaustFactorsLookup> {
- // BSFC for the single year × single tech slot, with 0.4
- // so we can verify the fulbmy multiplication.
+            // BSFC for the single year × single tech slot, with 0.4
+            // so we can verify the fulbmy multiplication.
             let n = tech_names.len();
             Ok(ExhaustFactorsLookup {
                 emission_factors: vec![
                     0.0;
                     crate::common::consts::MXAGYR
- * crate::common::consts::MXPOL
- * crate::common::consts::MXTECH
+                        * crate::common::consts::MXPOL
+                        * crate::common::consts::MXTECH
                 ],
                 bsfc: vec![0.4; n],
                 unit_codes: vec![
@@ -576,10 +582,10 @@ mod tests {
             _: i32,
             _: usize,
         ) -> Result<EmissionsIterationResult> {
- *self.iter_count.borrow_mut() += 1;
- // Emit a known per-pollutant payload: 5.0 in pollutant
- // slot 0 (THC). The orchestrator adds this into
- // output.emissions_day.
+            *self.iter_count.borrow_mut() += 1;
+            // Emit a known per-pollutant payload: 5.0 in pollutant
+            // slot 0 (THC). The orchestrator adds this into
+            // output.emissions_day.
             let mut emsday_delta = vec![0.0_f32; crate::common::consts::MXPOL];
             emsday_delta[0] = 5.0;
             let mut emsbmy = vec![0.0_f32; crate::common::consts::MXPOL];
@@ -611,7 +617,7 @@ mod tests {
             _: i32,
             _: f32,
         ) -> Result<EmissionsIterationResult> {
- // Evap returns zero so we only see exhaust in the totals.
+            // Evap returns zero so we only see exhaust in the totals.
             Ok(EmissionsIterationResult {
                 emsday_delta: vec![0.0; crate::common::consts::MXPOL],
                 emsbmy: vec![0.0; crate::common::consts::MXPOL],
@@ -636,23 +642,23 @@ mod tests {
         let record = default_record();
         let outcome = process_county(&record, &options, &mut cb).unwrap();
         let out = outcome.into_output();
- // FIPS lookup succeeded and we got the index back for the
- // emsams fold-in.
+        // FIPS lookup succeeded and we got the index back for the
+        // emsams fold-in.
         assert_eq!(out.emsams_fips_index, Some(3));
         assert_eq!(out.fips, "17001");
         assert_eq!(out.hp_level, 100.0); // (50+100)/2 = 75 → first boundary > 75 = 100.
- // One exhaust iteration ran (single year × single tech).
+                                         // One exhaust iteration ran (single year × single tech).
         assert_eq!(*cb.iter_count.borrow(), 1);
- // emsday[0] = 5.0 from the exhaust iteration; emsams_delta
- // mirrors it (positive values are folded).
+        // emsday[0] = 5.0 from the exhaust iteration; emsams_delta
+        // mirrors it (positive values are folded).
         assert_eq!(out.emissions_day[0], 5.0);
         assert_eq!(out.emsams_delta[0], 5.0);
- // The final wrtdat record carries the totals.
+        // The final wrtdat record carries the totals.
         assert_eq!(out.dat_records.len(), 1);
         let dat = &out.dat_records[0];
- // poptot = popcty * modfrc(0) = 100 * 1.0 = 100.0.
+        // poptot = popcty * modfrc(0) = 100 * 1.0 = 100.0.
         assert_eq!(dat.population_total, 100.0);
- // fracretro = 0 since retrofit is disabled.
+        // fracretro = 0 since retrofit is disabled.
         assert_eq!(dat.frac_retrofitted, 0.0);
         assert_eq!(dat.units_retrofitted, 0.0);
     }

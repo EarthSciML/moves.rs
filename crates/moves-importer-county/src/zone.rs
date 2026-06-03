@@ -132,8 +132,8 @@ fn check_zone_road_type_table(
     zone_road_type: &ImportedTable<'_>,
     out: &mut Vec<ValidationMessage>,
 ) {
- // Join zoneRoadType.zoneID to Zone.countyID so the per-county sum
- // matches the canonical MOVES check from `DebuggingMOVES.md`.
+    // Join zoneRoadType.zoneID to Zone.countyID so the per-county sum
+    // matches the canonical MOVES check from `DebuggingMOVES.md`.
     let zone_batch = &zone.batch;
     let zrt_batch = &zone_road_type.batch;
     let zid_in_zone = zone_batch
@@ -185,7 +185,7 @@ fn check_zone_road_type_table(
             continue;
         };
         let r = road.value(row);
- *sums.entry((county_id, r)).or_insert(0.0) += factor.value(row);
+        *sums.entry((county_id, r)).or_insert(0.0) += factor.value(row);
     }
 
     for ((county_id, road_type_id), sum) in sums {
@@ -273,8 +273,8 @@ mod tests {
 
     #[test]
     fn balanced_zone_factors_pass() {
- // One county (60371) with one zone (603710) holding all the
- // allocation — the trivial balanced case.
+        // One county (60371) with one zone (603710) holding all the
+        // allocation — the trivial balanced case.
         let z = zone_batch(&[(603710, 60371, 1.0, 1.0, 1.0)]);
         let r = zrt_batch(&[
             (603710, 2, 1.0),
@@ -295,7 +295,7 @@ mod tests {
         let z = zone_batch(&[
             (603710, 60371, 0.5, 1.0, 1.0),
             (603711, 60371, 0.4, 0.0, 0.0),
- // startAllocFactor sums to 0.9 (off) for county 60371
+            // startAllocFactor sums to 0.9 (off) for county 60371
         ]);
         let r = zrt_batch(&[(603710, 2, 1.0)]);
         let imp = ZoneImporter;
@@ -304,10 +304,10 @@ mod tests {
         let ctx = ValidationContext::without_default_db();
         let msgs = imp.validate_imported(&[z_imp, r_imp], &ctx);
         let errors: Vec<_> = msgs.iter().filter(|m| m.is_error()).collect();
- // startAllocFactor over county 60371 sums to 0.9 — fail
- // idleAllocFactor over county 60371 sums to 1.0 — ok
- // SHPAllocFactor over county 60371 sums to 1.0 — ok
- // ZoneRoadType.SHOAllocFactor for (60371, 2) sums to 1.0 — ok
+        // startAllocFactor over county 60371 sums to 0.9 — fail
+        // idleAllocFactor over county 60371 sums to 1.0 — ok
+        // SHPAllocFactor over county 60371 sums to 1.0 — ok
+        // ZoneRoadType.SHOAllocFactor for (60371, 2) sums to 1.0 — ok
         assert_eq!(errors.len(), 1, "got: {errors:?}");
         assert_eq!(errors[0].column, Some("startAllocFactor"));
     }
@@ -317,7 +317,7 @@ mod tests {
         let z = zone_batch(&[(603710, 60371, 1.0, 1.0, 1.0)]);
         let r = zrt_batch(&[
             (603710, 2, 1.0),
- // zoneID 999 not declared in the Zone table
+            // zoneID 999 not declared in the Zone table
             (999, 2, 1.0),
         ]);
         let imp = ZoneImporter;

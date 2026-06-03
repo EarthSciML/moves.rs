@@ -66,23 +66,23 @@ use crate::data::{DataFrameStore, InMemoryStore};
 /// out the per-component sets used by the filter tables.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct ExecutionLocation {
- /// `State.stateID` of the state currently iterating. `None` outside
- /// STATE-or-finer granularity scopes.
+    /// `State.stateID` of the state currently iterating. `None` outside
+    /// STATE-or-finer granularity scopes.
     pub state_id: Option<u32>,
- /// `County.countyID` of the county currently iterating. `None` outside
- /// COUNTY-or-finer granularity scopes.
+    /// `County.countyID` of the county currently iterating. `None` outside
+    /// COUNTY-or-finer granularity scopes.
     pub county_id: Option<u32>,
- /// `Zone.zoneID` of the zone currently iterating. `None` outside
- /// ZONE-or-finer granularity scopes.
+    /// `Zone.zoneID` of the zone currently iterating. `None` outside
+    /// ZONE-or-finer granularity scopes.
     pub zone_id: Option<u32>,
- /// `Link.linkID` of the link currently iterating. `None` outside LINK
- /// granularity scopes.
+    /// `Link.linkID` of the link currently iterating. `None` outside LINK
+    /// granularity scopes.
     pub link_id: Option<u32>,
 }
 
 impl ExecutionLocation {
- /// Construct a location with no ids set — the state when the loop is
- /// firing at PROCESS or coarser granularity.
+    /// Construct a location with no ids set — the state when the loop is
+    /// firing at PROCESS or coarser granularity.
     #[must_use]
     pub const fn none() -> Self {
         Self {
@@ -93,7 +93,7 @@ impl ExecutionLocation {
         }
     }
 
- /// Construct a location with only the state set.
+    /// Construct a location with only the state set.
     #[must_use]
     pub const fn state(state_id: u32) -> Self {
         Self {
@@ -104,7 +104,7 @@ impl ExecutionLocation {
         }
     }
 
- /// Construct a location with state and county set.
+    /// Construct a location with state and county set.
     #[must_use]
     pub const fn county(state_id: u32, county_id: u32) -> Self {
         Self {
@@ -115,7 +115,7 @@ impl ExecutionLocation {
         }
     }
 
- /// Construct a fully-populated `(state, county, zone, link)` location.
+    /// Construct a fully-populated `(state, county, zone, link)` location.
     #[must_use]
     pub const fn link(state_id: u32, county_id: u32, zone_id: u32, link_id: u32) -> Self {
         Self {
@@ -144,20 +144,20 @@ impl ExecutionLocation {
 /// would have to recognise.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ExecutionTime {
- /// Calendar year. `None` only before the loop enters YEAR granularity.
+    /// Calendar year. `None` only before the loop enters YEAR granularity.
     pub year: Option<u16>,
- /// `MonthOfAnyYear.monthID` (1–12). `None` outside MONTH-or-finer scope.
+    /// `MonthOfAnyYear.monthID` (1–12). `None` outside MONTH-or-finer scope.
     pub month: Option<u8>,
- /// `DayOfAnyWeek.dayID` (MOVES5: 2 = weekend, 5 = weekday).
- /// `None` outside DAY-or-finer scope.
+    /// `DayOfAnyWeek.dayID` (MOVES5: 2 = weekend, 5 = weekday).
+    /// `None` outside DAY-or-finer scope.
     pub day_id: Option<u8>,
- /// `HourOfAnyDay.hourID` (1–24). `None` outside HOUR scope.
+    /// `HourOfAnyDay.hourID` (1–24). `None` outside HOUR scope.
     pub hour: Option<u8>,
 }
 
 impl ExecutionTime {
- /// Construct a time with no fields set — the state when the loop is
- /// firing at PROCESS or coarser-than-YEAR granularity.
+    /// Construct a time with no fields set — the state when the loop is
+    /// firing at PROCESS or coarser-than-YEAR granularity.
     #[must_use]
     pub const fn none() -> Self {
         Self {
@@ -168,7 +168,7 @@ impl ExecutionTime {
         }
     }
 
- /// Construct a year-only time (no month / day / hour).
+    /// Construct a year-only time (no month / day / hour).
     #[must_use]
     pub const fn year(year: u16) -> Self {
         Self {
@@ -179,7 +179,7 @@ impl ExecutionTime {
         }
     }
 
- /// Construct a fully-populated `(year, month, day_id, hour)` time.
+    /// Construct a fully-populated `(year, month, day_id, hour)` time.
     #[must_use]
     pub const fn hour(year: u16, month: u8, day_id: u8, hour: u8) -> Self {
         Self {
@@ -211,25 +211,25 @@ impl ExecutionTime {
 /// [`ExecutionTime`] for the field-by-field semantics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct IterationPosition {
- /// MasterLoop outer iteration counter (0-based). Most RunSpecs have a
- /// single iteration.
+    /// MasterLoop outer iteration counter (0-based). Most RunSpecs have a
+    /// single iteration.
     pub iteration: u32,
- /// MOVES process the loop is currently dispatching. Stored as
- /// `Option` so the default-constructed value (used in tests) does not
- /// have to commit to a specific process.
+    /// MOVES process the loop is currently dispatching. Stored as
+    /// `Option` so the default-constructed value (used in tests) does not
+    /// have to commit to a specific process.
     pub process_id: Option<ProcessId>,
- /// Current spatial location. Field-level `None`s identify which
- /// granularity the loop has entered.
+    /// Current spatial location. Field-level `None`s identify which
+    /// granularity the loop has entered.
     pub location: ExecutionLocation,
- /// Current temporal position. Field-level `None`s identify which
- /// granularity the loop has entered.
+    /// Current temporal position. Field-level `None`s identify which
+    /// granularity the loop has entered.
     pub time: ExecutionTime,
 }
 
 impl IterationPosition {
- /// Construct the position at the start of a run — iteration 0, no
- /// process set, no location, no time. Subsequent master-loop levels
- /// fill in the fields one by one as the loop descends.
+    /// Construct the position at the start of a run — iteration 0, no
+    /// process set, no location, no time. Subsequent master-loop levels
+    /// fill in the fields one by one as the loop descends.
     #[must_use]
     pub const fn start() -> Self {
         Self {
@@ -254,12 +254,12 @@ impl IterationPosition {
 /// re-filter on every call.
 #[derive(Debug, Default)]
 pub struct ExecutionTables {
- /// Name-keyed DataFrame store for the slow (default-DB) tier.
+    /// Name-keyed DataFrame store for the slow (default-DB) tier.
     pub store: InMemoryStore,
 }
 
 impl ExecutionTables {
- /// Construct an empty tables container.
+    /// Construct an empty tables container.
     #[must_use]
     pub fn empty() -> Self {
         Self::default()
@@ -295,26 +295,26 @@ impl DataFrameStore for ExecutionTables {
 /// per-iteration lifecycle; this struct is the storage container.
 #[derive(Debug, Default)]
 pub struct ScratchNamespace {
- /// Name-keyed DataFrame store for the scratch (inter-calculator) tier.
+    /// Name-keyed DataFrame store for the scratch (inter-calculator) tier.
     pub store: InMemoryStore,
 }
 
 impl ScratchNamespace {
- /// Construct an empty scratch namespace.
+    /// Construct an empty scratch namespace.
     #[must_use]
     pub fn empty() -> Self {
         Self::default()
     }
 
- /// Insert `df` under `name`, replacing any existing entry.
- /// Called by generators in their [`crate::Generator::execute`] body.
+    /// Insert `df` under `name`, replacing any existing entry.
+    /// Called by generators in their [`crate::Generator::execute`] body.
     pub fn insert(&mut self, name: impl Into<String>, df: polars::prelude::DataFrame) {
         self.store.insert(name, df);
     }
 
- /// Return a mutable reference to the DataFrame stored under `name`, or
- /// `None` if absent. Uses `Arc::make_mut` so the caller gets exclusive
- /// ownership without copying when the Arc has a single owner.
+    /// Return a mutable reference to the DataFrame stored under `name`, or
+    /// `None` if absent. Uses `Arc::make_mut` so the caller gets exclusive
+    /// ownership without copying when the Arc has a single owner.
     pub fn get_mut(&mut self, name: &str) -> Option<&mut polars::prelude::DataFrame> {
         self.store.get_mut(name)
     }
@@ -325,13 +325,13 @@ impl ScratchNamespace {
 /// during the run (the scratch tier).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableSource {
- /// Loaded once from the default database at run start, then read-only.
- /// (`InputDataManager`) drives the load.
+    /// Loaded once from the default database at run start, then read-only.
+    /// (`InputDataManager`) drives the load.
     DefaultDb,
- /// Produced during the run by a generator's
- /// [`crate::Generator::execute`] body. Lifecycle managed per-iteration
- /// by the registry; downstream calculators read via
- /// [`crate::Calculator::input_tables`].
+    /// Produced during the run by a generator's
+    /// [`crate::Generator::execute`] body. Lifecycle managed per-iteration
+    /// by the registry; downstream calculators read via
+    /// [`crate::Calculator::input_tables`].
     Scratch,
 }
 
@@ -345,16 +345,16 @@ pub enum TableSource {
 /// declaration names a known entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ExecutionTableSpec {
- /// Canonical default-DB table name (e.g. `"sourceUseTypePopulation"`).
- /// Names match the casing used in the MOVES default DB so that the
- /// snapshot Parquet files can be located by the same string.
+    /// Canonical default-DB table name (e.g. `"sourceUseTypePopulation"`).
+    /// Names match the casing used in the MOVES default DB so that the
+    /// snapshot Parquet files can be located by the same string.
     pub name: &'static str,
- /// Where the table comes from — default DB or scratch.
+    /// Where the table comes from — default DB or scratch.
     pub source: TableSource,
 }
 
 impl ExecutionTableSpec {
- /// Construct a spec for a table sourced from the default DB.
+    /// Construct a spec for a table sourced from the default DB.
     #[must_use]
     pub const fn default_db(name: &'static str) -> Self {
         Self {
@@ -363,7 +363,7 @@ impl ExecutionTableSpec {
         }
     }
 
- /// Construct a spec for a scratch table produced during the run.
+    /// Construct a spec for a scratch table produced during the run.
     #[must_use]
     pub const fn scratch(name: &'static str) -> Self {
         Self {
@@ -390,45 +390,45 @@ pub struct ExecutionDatabaseSchema {
 }
 
 impl ExecutionDatabaseSchema {
- /// Construct an empty schema. Tests and the registry stub use
- /// this form until lands real population.
+    /// Construct an empty schema. Tests and the registry stub use
+    /// this form until lands real population.
     #[must_use]
     pub fn empty() -> Self {
         Self::default()
     }
 
- /// Append a spec to the schema. Used by as it discovers
- /// per-run table requirements.
+    /// Append a spec to the schema. Used by as it discovers
+    /// per-run table requirements.
     pub fn push(&mut self, spec: ExecutionTableSpec) {
         self.tables.push(spec);
     }
 
- /// All registered table specs, in insertion order.
+    /// All registered table specs, in insertion order.
     #[must_use]
     pub fn tables(&self) -> &[ExecutionTableSpec] {
         &self.tables
     }
 
- /// Total number of registered tables.
+    /// Total number of registered tables.
     #[must_use]
     pub fn len(&self) -> usize {
         self.tables.len()
     }
 
- /// `true` when no tables are registered.
+    /// `true` when no tables are registered.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.tables.is_empty()
     }
 
- /// Look up the first spec with the given name. Case-sensitive — names
- /// must match the casing in the default DB / scratch declarations.
+    /// Look up the first spec with the given name. Case-sensitive — names
+    /// must match the casing in the default DB / scratch declarations.
     #[must_use]
     pub fn find(&self, name: &str) -> Option<&ExecutionTableSpec> {
         self.tables.iter().find(|t| t.name == name)
     }
 
- /// `true` when a spec with the given name is registered.
+    /// `true` when a spec with the given name is registered.
     #[must_use]
     pub fn contains(&self, name: &str) -> bool {
         self.find(name).is_some()
@@ -436,10 +436,10 @@ impl ExecutionDatabaseSchema {
 }
 
 impl FromIterator<ExecutionTableSpec> for ExecutionDatabaseSchema {
- /// Build a schema from any iterable of specs. The caller is
- /// responsible for ensuring names are unique — duplicate entries do
- /// not error here, but [`ExecutionDatabaseSchema::find`] returns the
- /// first match.
+    /// Build a schema from any iterable of specs. The caller is
+    /// responsible for ensuring names are unique — duplicate entries do
+    /// not error here, but [`ExecutionDatabaseSchema::find`] returns the
+    /// first match.
     fn from_iter<I: IntoIterator<Item = ExecutionTableSpec>>(specs: I) -> Self {
         Self {
             tables: specs.into_iter().collect(),
@@ -458,7 +458,7 @@ mod tests {
         assert!(loc.county_id.is_none());
         assert!(loc.zone_id.is_none());
         assert!(loc.link_id.is_none());
- // Default matches none() for ergonomics in test fixtures.
+        // Default matches none() for ergonomics in test fixtures.
         assert_eq!(loc, ExecutionLocation::default());
     }
 
@@ -506,7 +506,7 @@ mod tests {
 
     #[test]
     fn execution_time_hour_populates_all_four() {
- // MOVES5 dayID 5 = weekday, hourID 8 = 7am–8am.
+        // MOVES5 dayID 5 = weekday, hourID 8 = 7am–8am.
         let t = ExecutionTime::hour(2020, 7, 5, 8);
         assert_eq!(t.year, Some(2020));
         assert_eq!(t.month, Some(7));
@@ -526,8 +526,8 @@ mod tests {
 
     #[test]
     fn iteration_position_can_carry_all_fields() {
- // Shape a position as if mid-loop at HOUR granularity for Running
- // Exhaust (process 1) in some state/county/zone/link.
+        // Shape a position as if mid-loop at HOUR granularity for Running
+        // Exhaust (process 1) in some state/county/zone/link.
         let p = IterationPosition {
             iteration: 0,
             process_id: Some(ProcessId(1)),
@@ -542,8 +542,8 @@ mod tests {
 
     #[test]
     fn execution_tables_empty_constructs() {
- // Placeholder until; this is a smoke check that the
- // accessor exists.
+        // Placeholder until; this is a smoke check that the
+        // accessor exists.
         let _t = ExecutionTables::empty();
     }
 
@@ -603,8 +603,8 @@ mod tests {
 
     #[test]
     fn execution_database_schema_find_returns_first_on_duplicate() {
- // We don't error on duplicates; the caller is responsible
- // for de-duplication. Document the actual behaviour: first match wins.
+        // We don't error on duplicates; the caller is responsible
+        // for de-duplication. Document the actual behaviour: first match wins.
         let mut s = ExecutionDatabaseSchema::empty();
         s.push(ExecutionTableSpec::default_db("dup"));
         s.push(ExecutionTableSpec::scratch("dup"));

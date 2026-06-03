@@ -27,14 +27,14 @@ use super::executor::GeographyExecution;
 /// Fortran `iexev` argument (`1` exhaust, `2` evaporative).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EmissionChannel {
- /// Exhaust emissions — `clcems.f`. Fortran `iexev = 1`.
+    /// Exhaust emissions — `clcems.f`. Fortran `iexev = 1`.
     Exhaust,
- /// Evaporative emissions — `clcevems.f`. Fortran `iexev = 2`.
+    /// Evaporative emissions — `clcevems.f`. Fortran `iexev = 2`.
     Evaporative,
 }
 
 impl EmissionChannel {
- /// The Fortran `iexev` integer code (`1` exhaust, `2` evap).
+    /// The Fortran `iexev` integer code (`1` exhaust, `2` evap).
     pub fn iexev(self) -> u8 {
         match self {
             EmissionChannel::Exhaust => 1,
@@ -52,32 +52,32 @@ impl EmissionChannel {
 /// [`MXPOL`](crate::common::consts::MXPOL).
 #[derive(Debug, Clone, PartialEq)]
 pub struct SimEmissionRow {
- /// 5-character FIPS code — state or county for the geography
- /// level, `"00000"` for a US-total row.
+    /// 5-character FIPS code — state or county for the geography
+    /// level, `"00000"` for a US-total row.
     pub fips: String,
- /// 5-character subcounty marker; blank (`" "`) at the county,
- /// state, and national levels.
+    /// 5-character subcounty marker; blank (`" "`) at the county,
+    /// state, and national levels.
     pub subcounty: String,
- /// 10-character SCC code.
+    /// 10-character SCC code.
     pub scc: String,
- /// HP-level representative for the row — Fortran `hplev`.
+    /// HP-level representative for the row — Fortran `hplev`.
     pub hp_level: f32,
- /// Model year for a by-model-year breakdown row; `None` for a
- /// per-record total row (`wrtdat`-shaped).
+    /// Model year for a by-model-year breakdown row; `None` for a
+    /// per-record total row (`wrtdat`-shaped).
     pub model_year: Option<i32>,
- /// Technology-type identifier for a by-model-year breakdown row;
- /// `None` for a per-record total row.
+    /// Technology-type identifier for a by-model-year breakdown row;
+    /// `None` for a per-record total row.
     pub tech_type: Option<String>,
- /// Exhaust or evaporative — see [`EmissionChannel`].
+    /// Exhaust or evaporative — see [`EmissionChannel`].
     pub channel: EmissionChannel,
- /// Equipment population for the row.
+    /// Equipment population for the row.
     pub population: f32,
- /// Activity (hours or gallons, per the activity unit) for the row.
+    /// Activity (hours or gallons, per the activity unit) for the row.
     pub activity: f32,
- /// Fuel consumption for the row.
+    /// Fuel consumption for the row.
     pub fuel_consumption: f32,
- /// Per-pollutant emissions in tons. Length
- /// [`MXPOL`](crate::common::consts::MXPOL).
+    /// Per-pollutant emissions in tons. Length
+    /// [`MXPOL`](crate::common::consts::MXPOL).
     pub emissions: Vec<f32>,
 }
 
@@ -88,27 +88,27 @@ pub struct SimEmissionRow {
 /// at-a-glance summary without re-walking [`NonroadOutputs::rows`].
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct RunCounters {
- /// SCC groups whose record loop the driver planned (`getpop`
- /// returned them and they cleared the record-1 pre-check).
+    /// SCC groups whose record loop the driver planned (`getpop`
+    /// returned them and they cleared the record-1 pre-check).
     pub scc_groups_planned: usize,
- /// SCC groups rejected wholesale by `nonroad.f`'s record-1 region
- /// pre-check (`SccGroupPlan::group_skipped`).
+    /// SCC groups rejected wholesale by `nonroad.f`'s record-1 region
+    /// pre-check (`SccGroupPlan::group_skipped`).
     pub scc_groups_skipped: usize,
- /// Population records the inner loop visited across all planned
- /// groups (one per [`DriverStep`](crate::driver::DriverStep)).
+    /// Population records the inner loop visited across all planned
+    /// groups (one per [`DriverStep`](crate::driver::DriverStep)).
     pub records_visited: usize,
- /// Records skipped by the per-record region-selection filter
- /// (`StepOutcome::NotSelected`).
+    /// Records skipped by the per-record region-selection filter
+    /// (`StepOutcome::NotSelected`).
     pub records_not_selected: usize,
- /// Records whose region shape / run level matched no dispatch
- /// branch (`StepOutcome::Dispatched` with an empty list).
+    /// Records whose region shape / run level matched no dispatch
+    /// branch (`StepOutcome::Dispatched` with an empty list).
     pub records_no_dispatch: usize,
- /// Geography-routine dispatch calls made — one per
- /// `(record, Dispatch)` pair. A subcounty record can dispatch
- /// twice, so this can exceed [`records_visited`](Self::records_visited).
+    /// Geography-routine dispatch calls made — one per
+    /// `(record, Dispatch)` pair. A subcounty record can dispatch
+    /// twice, so this can exceed [`records_visited`](Self::records_visited).
     pub dispatch_calls: usize,
- /// Dispatch calls whose geography routine returned an `ISKIP`
- /// (the executor reported [`GeographyExecution::skipped`]).
+    /// Dispatch calls whose geography routine returned an `ISKIP`
+    /// (the executor reported [`GeographyExecution::skipped`]).
     pub geography_skips: usize,
 }
 
@@ -120,21 +120,21 @@ pub struct RunCounters {
 /// and [`warnings`](Self::warnings) surface non-fatal diagnostics.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct NonroadOutputs {
- /// Every emission row the geography routines produced, in the
- /// order the driver loop dispatched them.
+    /// Every emission row the geography routines produced, in the
+    /// order the driver loop dispatched them.
     pub rows: Vec<SimEmissionRow>,
- /// Non-fatal warnings, in production order. Mirrors the Fortran
- /// `chkwrn` warning channel; the count drives the completion
- /// banner.
+    /// Non-fatal warnings, in production order. Mirrors the Fortran
+    /// `chkwrn` warning channel; the count drives the completion
+    /// banner.
     pub warnings: Vec<String>,
- /// Run-completion banner — [`completion_message`](crate::driver::completion_message)
- /// applied to the warning count. Empty until the run finishes.
+    /// Run-completion banner — [`completion_message`](crate::driver::completion_message)
+    /// applied to the warning count. Empty until the run finishes.
     pub completion_message: String,
- /// Run-level tallies — see [`RunCounters`].
+    /// Run-level tallies — see [`RunCounters`].
     pub counters: RunCounters,
- /// National-level records processed — Fortran `nnatrc`. Summed
- /// from the geography executions; meaningful at the national /
- /// US-total levels and `0` otherwise.
+    /// National-level records processed — Fortran `nnatrc`. Summed
+    /// from the geography executions; meaningful at the national /
+    /// US-total levels and `0` otherwise.
     pub national_record_count: i32,
 }
 
@@ -148,13 +148,13 @@ pub struct NonroadOutputs {
 /// `Vec`s so the test can assert positional equality.
 #[cfg(test)]
 pub trait TestStore {
- /// Append a string value to the named column.
+    /// Append a string value to the named column.
     fn push_str_col(&mut self, col: &str, val: String);
- /// Append an `f32` value to the named column.
+    /// Append an `f32` value to the named column.
     fn push_f32_col(&mut self, col: &str, val: f32);
- /// Append an optional `i32` value to the named column.
+    /// Append an optional `i32` value to the named column.
     fn push_opt_i32_col(&mut self, col: &str, val: Option<i32>);
- /// Append an optional string value to the named column.
+    /// Append an optional string value to the named column.
     fn push_opt_str_col(&mut self, col: &str, val: Option<String>);
 }
 
@@ -195,19 +195,19 @@ impl SimEmissionRow {
 }
 
 impl NonroadOutputs {
- /// Fold one geography-routine execution into the run output:
- /// append its rows and warnings and add its national-record count.
- ///
- /// The `dispatch_calls` / `geography_skips` counters are *not*
- /// touched here — [`run_simulation`](super::run_simulation) owns
- /// them because it alone knows a call was made.
+    /// Fold one geography-routine execution into the run output:
+    /// append its rows and warnings and add its national-record count.
+    ///
+    /// The `dispatch_calls` / `geography_skips` counters are *not*
+    /// touched here — [`run_simulation`](super::run_simulation) owns
+    /// them because it alone knows a call was made.
     pub fn absorb(&mut self, exec: GeographyExecution) {
         self.rows.extend(exec.rows);
         self.warnings.extend(exec.warnings);
         self.national_record_count += exec.national_record_count;
     }
 
- /// Total emission rows produced — a shorthand for `rows.len()`.
+    /// Total emission rows produced — a shorthand for `rows.len()`.
     pub fn row_count(&self) -> usize {
         self.rows.len()
     }
@@ -219,8 +219,8 @@ mod tests {
     use crate::common::consts::MXPOL;
     use std::collections::HashMap;
 
- /// Concrete [`TestStore`] for unit tests — appends values to
- /// per-column `Vec`s keyed by column name.
+    /// Concrete [`TestStore`] for unit tests — appends values to
+    /// per-column `Vec`s keyed by column name.
     #[derive(Default)]
     struct MockStore {
         str_cols: HashMap<String, Vec<String>>,

@@ -30,22 +30,22 @@ use super::fixtures::OnroadFixture;
 /// How a calculator relates to a fixture.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CoverageKind {
- /// The fixture and calculator share at least one (pollutant, process) pair.
+    /// The fixture and calculator share at least one (pollutant, process) pair.
     Exercised {
- /// The shared (pollutant_id, process_id) pairs, sorted.
+        /// The shared (pollutant_id, process_id) pairs, sorted.
         shared_pairs: Vec<(u32, u32)>,
     },
- /// The fixture does not exercise any of the calculator's registered
- /// (pollutant, process) pairs.
+    /// The fixture does not exercise any of the calculator's registered
+    /// (pollutant, process) pairs.
     NotExercised,
- /// The calculator has no registrations — it is chained-only and
- /// runs when its chain parent fires.
+    /// The calculator has no registrations — it is chained-only and
+    /// runs when its chain parent fires.
     ChainedOnly,
 }
 
 impl CoverageKind {
- /// `true` when the calculator is exercised by this fixture
- /// (directly or via chain parent).
+    /// `true` when the calculator is exercised by this fixture
+    /// (directly or via chain parent).
     pub fn is_exercised_or_chained(&self) -> bool {
         matches!(
             self,
@@ -73,7 +73,7 @@ pub struct CoverageMatrix {
 
 #[allow(dead_code)]
 impl CoverageMatrix {
- /// Build the matrix from the fixture and calculator catalogues.
+    /// Build the matrix from the fixture and calculator catalogues.
     pub fn build(fixtures: &[OnroadFixture], calculators: &[Box<dyn Calculator>]) -> Self {
         let calc_ppa_sets: Vec<BTreeSet<(u32, u32)>> = calculators
             .iter()
@@ -113,22 +113,22 @@ impl CoverageMatrix {
         }
     }
 
- /// The fixture names in matrix row order.
+    /// The fixture names in matrix row order.
     pub fn fixture_names(&self) -> &[String] {
         &self.fixture_names
     }
 
- /// The calculator names in matrix column order.
+    /// The calculator names in matrix column order.
     pub fn calculator_names(&self) -> &[String] {
         &self.calculator_names
     }
 
- /// The coverage cell for a given (fixture index, calculator index).
+    /// The coverage cell for a given (fixture index, calculator index).
     pub fn cell(&self, fixture_idx: usize, calc_idx: usize) -> &CoverageCell {
         &self.cells[fixture_idx][calc_idx]
     }
 
- /// Iterator over all (fixture_name, calculator_name, cell) triples.
+    /// Iterator over all (fixture_name, calculator_name, cell) triples.
     pub fn iter(&self) -> impl Iterator<Item = (&str, &str, &CoverageCell)> {
         let fixture_names = self.fixture_names.as_slice();
         let calculator_names = self.calculator_names.as_slice();
@@ -143,16 +143,16 @@ impl CoverageMatrix {
         })
     }
 
- /// `true` when every fixture has at least one exercised or
- /// chained-only calculator.
+    /// `true` when every fixture has at least one exercised or
+    /// chained-only calculator.
     pub fn every_fixture_has_coverage(&self) -> bool {
         self.cells
             .iter()
             .all(|row| row.iter().any(|cell| cell.kind.is_exercised_or_chained()))
     }
 
- /// `true` when every calculator is exercised by at least one fixture,
- /// or is chained-only.
+    /// `true` when every calculator is exercised by at least one fixture,
+    /// or is chained-only.
     pub fn every_calculator_has_coverage(&self) -> bool {
         (0..self.calculator_names.len()).all(|ci| {
             self.cells
@@ -161,12 +161,12 @@ impl CoverageMatrix {
         })
     }
 
- /// Render a human-readable ASCII coverage matrix for `--nocapture` output.
+    /// Render a human-readable ASCII coverage matrix for `--nocapture` output.
     pub fn render(&self) -> String {
         let mut out = String::new();
         out.push_str("Calculator coverage matrix (E=Exercised, C=ChainedOnly, .=Not):\n");
 
- // Column headers (truncated calculator names).
+        // Column headers (truncated calculator names).
         let header_len = 16;
         let col_width = 2;
         let row_label = " ".repeat(header_len);
@@ -199,7 +199,7 @@ impl CoverageMatrix {
             out.push('\n');
         }
 
- // Summary row.
+        // Summary row.
         let total_cells = self.fixture_names.len() * self.calculator_names.len();
         let exercised = self
             .cells

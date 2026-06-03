@@ -56,14 +56,14 @@ pub struct ImportWarning {
 /// Outcome of one CSV → RecordBatch conversion.
 #[derive(Debug)]
 pub struct ImportReport {
- /// The parsed table data, schema-aligned with [`TableSchema::arrow_schema`].
+    /// The parsed table data, schema-aligned with [`TableSchema::arrow_schema`].
     pub batch: RecordBatch,
- /// Filter-rejected cells, in encounter order.
+    /// Filter-rejected cells, in encounter order.
     pub warnings: Vec<ImportWarning>,
- /// Total data rows seen (excluding the header). Useful for the
- /// "Imported N rows" message Java's `BasicDataHandler` writes.
+    /// Total data rows seen (excluding the header). Useful for the
+    /// "Imported N rows" message Java's `BasicDataHandler` writes.
     pub rows_read: u64,
- /// Path of the file that was read (for downstream error context).
+    /// Path of the file that was read (for downstream error context).
     pub source_path: PathBuf,
 }
 
@@ -95,9 +95,9 @@ pub fn read_csv_from_reader<R: Read>(
         .trim(csv::Trim::All)
         .from_reader(reader);
 
- // ------------------------------------------------------------------
- // Header → schema-column-index map.
- // ------------------------------------------------------------------
+    // ------------------------------------------------------------------
+    // Header → schema-column-index map.
+    // ------------------------------------------------------------------
     let headers = csv_reader.headers().map_err(|e| Error::Csv {
         path: source_path.to_path_buf(),
         line: 1,
@@ -112,11 +112,11 @@ pub fn read_csv_from_reader<R: Read>(
         }
         column_to_schema.push(schema.find_column(header_trimmed).map(|(i, _)| i));
     }
- // Java rejects the file if any *required* schema column is missing
- // from the header (line 853 of `BasicDataHandler.java`). Required
- // here = listed in the descriptor — every descriptor column must
- // have a header, even nullable ones, otherwise Java emits
- // `ERROR: Missing column ... for ... table.`
+    // Java rejects the file if any *required* schema column is missing
+    // from the header (line 853 of `BasicDataHandler.java`). Required
+    // here = listed in the descriptor — every descriptor column must
+    // have a header, even nullable ones, otherwise Java emits
+    // `ERROR: Missing column ... for ... table.`
     for (schema_idx, col) in schema.columns.iter().enumerate() {
         if !column_to_schema.contains(&Some(schema_idx)) {
             return Err(Error::MissingColumn {
@@ -127,10 +127,10 @@ pub fn read_csv_from_reader<R: Read>(
         }
     }
 
- // ------------------------------------------------------------------
- // Builders, one per schema column. Pre-grow to a small initial
- // capacity; csv::Reader doesn't expose row count up front.
- // ------------------------------------------------------------------
+    // ------------------------------------------------------------------
+    // Builders, one per schema column. Pre-grow to a small initial
+    // capacity; csv::Reader doesn't expose row count up front.
+    // ------------------------------------------------------------------
     let mut builders: Vec<ColumnBuilder> = schema
         .columns
         .iter()
@@ -148,9 +148,9 @@ pub fn read_csv_from_reader<R: Read>(
             message: format!("could not read row: {e}"),
         })?
     {
- // Java skips blank lines silently (lines 862-866). The csv
- // crate already drops fully-empty records, but a row that's
- // all-comma still arrives as a record of N empty fields // detect that here.
+        // Java skips blank lines silently (lines 862-866). The csv
+        // crate already drops fully-empty records, but a row that's
+        // all-comma still arrives as a record of N empty fields // detect that here.
         if record.iter().all(|f| f.trim().is_empty()) {
             continue;
         }
@@ -158,11 +158,11 @@ pub fn read_csv_from_reader<R: Read>(
         rows_read += 1;
         let line_no = record.position().map(|p| p.line()).unwrap_or(rows_read + 1);
 
- // Per-row scratch: parsed cell values for filter checks.
+        // Per-row scratch: parsed cell values for filter checks.
         let mut parsed: Vec<Option<CellValue>> = vec![None; schema.columns.len()];
 
- // Walk the file's columns in declared order so unmapped
- // columns stay skipped without disturbing index alignment.
+        // Walk the file's columns in declared order so unmapped
+        // columns stay skipped without disturbing index alignment.
         for (file_col_idx, raw) in record.iter().enumerate() {
             let Some(schema_idx) = column_to_schema.get(file_col_idx).copied().flatten() else {
                 continue;
@@ -183,10 +183,10 @@ pub fn read_csv_from_reader<R: Read>(
             }
             match &col.data_type {
                 DataType::Int64 => {
- // Java accepts strings like "1.0" for integer
- // columns by going through `readDoubleCell` →
- // toString → parseInt; mirror that by trying
- // parse::<i64> first, then float-then-truncate.
+                    // Java accepts strings like "1.0" for integer
+                    // columns by going through `readDoubleCell` →
+                    // toString → parseInt; mirror that by trying
+                    // parse::<i64> first, then float-then-truncate.
                     let parsed_i64 = raw
                         .parse::<i64>()
                         .or_else(|_| raw.parse::<f64>().map(|f| f as i64))
@@ -229,9 +229,9 @@ pub fn read_csv_from_reader<R: Read>(
             }
         }
 
- // Filter pass — Java keeps the row but emits a warning. We
- // do the same; downstream callers can choose to hard-fail
- // by inspecting `ImportReport::warnings`.
+        // Filter pass — Java keeps the row but emits a warning. We
+        // do the same; downstream callers can choose to hard-fail
+        // by inspecting `ImportReport::warnings`.
         for (idx, col) in schema.columns.iter().enumerate() {
             let Some(filter) = &col.filter else {
                 continue;
@@ -342,7 +342,7 @@ mod tests {
         assert_eq!(report.rows_read, 2);
         assert_eq!(report.batch.num_rows(), 2);
         assert!(report.warnings.is_empty());
- // grade column 8 should have a null on row 1
+        // grade column 8 should have a null on row 1
         assert!(report.batch.column(8).is_null(1));
     }
 
@@ -393,8 +393,8 @@ mod tests {
 
     #[test]
     fn extra_columns_in_file_are_ignored() {
- // CSV has a trailing column the importer doesn't know about.
- // Java's `BasicDataHandler` reads it via `skipCell()` (line 874).
+        // CSV has a trailing column the importer doesn't know about.
+        // Java's `BasicDataHandler` reads it via `skipCell()` (line 874).
         let csv = "linkID,countyID,zoneID,roadTypeID,linkLength,linkVolume,linkAvgSpeed,linkDescription,linkAvgGrade,extraJunk
 1,26161,261610,4,0.5,1000,55,a,0,trailing
 ";

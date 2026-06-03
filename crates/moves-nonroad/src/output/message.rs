@@ -70,17 +70,17 @@ fn labeled_line(label: &str, value: &str) -> String {
 /// branches (`:157–196`).
 #[derive(Debug, Clone, Copy)]
 pub enum RegionOfInterest<'a> {
- /// `reglvl = USTOT` — `wrtmsg.f` has no branch for the US-total
- /// level, so only the section header is written.
+    /// `reglvl = USTOT` — `wrtmsg.f` has no branch for the US-total
+    /// level, so only the section header is written.
     UsTotal,
- /// `reglvl = NATION`, or `STATE` with `reglst(1) = "00000"` /// state-level estimates for all 50 states.
+    /// `reglvl = NATION`, or `STATE` with `reglst(1) = "00000"` /// state-level estimates for all 50 states.
     AllStates,
- /// `reglvl = STATE` with an explicit list of states.
+    /// `reglvl = STATE` with an explicit list of states.
     States(&'a [StateOfInterest<'a>]),
- /// `reglvl = COUNTY` — an explicit list of counties.
+    /// `reglvl = COUNTY` — an explicit list of counties.
     Counties(&'a [CountyOfInterest<'a>]),
- /// `reglvl = SUBCTY` — an explicit list of sub-county region
- /// codes (Fortran `reglst`).
+    /// `reglvl = SUBCTY` — an explicit list of sub-county region
+    /// codes (Fortran `reglst`).
     Subcounties(&'a [&'a str]),
 }
 
@@ -88,23 +88,23 @@ pub enum RegionOfInterest<'a> {
 /// `statcd(i)` / `statnm(i)`.
 #[derive(Debug, Clone, Copy)]
 pub struct StateOfInterest<'a> {
- /// State code (Fortran `statcd`, `character*5`).
+    /// State code (Fortran `statcd`, `character*5`).
     pub code: &'a str,
- /// State name (Fortran `statnm`).
+    /// State name (Fortran `statnm`).
     pub name: &'a str,
 }
 
 /// A county in the `/REGION/` packet's explicit county list.
 #[derive(Debug, Clone, Copy)]
 pub struct CountyOfInterest<'a> {
- /// County FIPS code (Fortran `fipcod`, `character*5`).
+    /// County FIPS code (Fortran `fipcod`, `character*5`).
     pub fips: &'a str,
- /// County name (Fortran `cntynm`).
+    /// County name (Fortran `cntynm`).
     pub name: &'a str,
- /// Name of the state the county belongs to, when known. The
- /// Fortran resolves this from the FIPS state prefix (`fndchr`
- /// against `statcd`); `Some(name)` appends `", name"`, `None`
- /// reproduces the Fortran's blank fallback.
+    /// Name of the state the county belongs to, when known. The
+    /// Fortran resolves this from the FIPS state prefix (`fndchr`
+    /// against `statcd`); `Some(name)` appends `", name"`, `None`
+    /// reproduces the Fortran's blank fallback.
     pub state_name: Option<&'a str>,
 }
 
@@ -112,10 +112,10 @@ pub struct CountyOfInterest<'a> {
 /// CATEGORY/`-packet branch (`:203–209`).
 #[derive(Debug, Clone, Copy)]
 pub enum EquipmentSelection<'a> {
- /// Fortran `lascal` set — all equipment types are included.
+    /// Fortran `lascal` set — all equipment types are included.
     All,
- /// An explicit list of selected SCC codes (Fortran `eqpcod(i)`
- /// for each `i` with `lascat(i)` set).
+    /// An explicit list of selected SCC codes (Fortran `eqpcod(i)`
+    /// for each `i` with `lascat(i)` set).
     Selected(&'a [&'a str]),
 }
 
@@ -126,56 +126,56 @@ pub enum EquipmentSelection<'a> {
 /// packets.
 #[derive(Debug, Clone, Copy)]
 pub struct MessageReport<'a> {
- // --- /OPTIONS/ packet ---
- /// First run-title line (Fortran `title1`).
+    // --- /OPTIONS/ packet ---
+    /// First run-title line (Fortran `title1`).
     pub title1: &'a str,
- /// Second run-title line (Fortran `title2`).
+    /// Second run-title line (Fortran `title2`).
     pub title2: &'a str,
- /// Fuel RVP, psi (Fortran `fulrvp`).
+    /// Fuel RVP, psi (Fortran `fulrvp`).
     pub fuel_rvp: f32,
- /// Fuel oxygen content, weight % (Fortran `oxypct`).
+    /// Fuel oxygen content, weight % (Fortran `oxypct`).
     pub oxygen_weight_pct: f32,
- /// Gasoline sulfur % (Fortran `soxgas`).
+    /// Gasoline sulfur % (Fortran `soxgas`).
     pub sulfur_gasoline: f32,
- /// Diesel sulfur % (Fortran `soxdsl`).
+    /// Diesel sulfur % (Fortran `soxdsl`).
     pub sulfur_diesel: f32,
- /// Marine-diesel sulfur % (Fortran `soxdsm`).
+    /// Marine-diesel sulfur % (Fortran `soxdsm`).
     pub sulfur_marine_diesel: f32,
- /// LPG/CNG sulfur % (Fortran `soxcng`).
+    /// LPG/CNG sulfur % (Fortran `soxcng`).
     pub sulfur_lpg_cng: f32,
- /// Minimum temperature (Fortran `tempmn`).
+    /// Minimum temperature (Fortran `tempmn`).
     pub temp_min: f32,
- /// Maximum temperature (Fortran `tempmx`).
+    /// Maximum temperature (Fortran `tempmx`).
     pub temp_max: f32,
- /// Average ambient temperature (Fortran `amtemp`).
+    /// Average ambient temperature (Fortran `amtemp`).
     pub temp_ambient: f32,
- /// High-altitude region flag (Fortran `lhigh`).
+    /// High-altitude region flag (Fortran `lhigh`).
     pub high_altitude: bool,
- /// Stage II factor (Fortran `stg2fac`); echoed as the control
- /// percentage `100 - stg2fac * 100`.
+    /// Stage II factor (Fortran `stg2fac`); echoed as the control
+    /// percentage `100 - stg2fac * 100`.
     pub stage2_factor: f32,
- /// Ethanol blend market share % (Fortran `ethmkt`).
+    /// Ethanol blend market share % (Fortran `ethmkt`).
     pub ethanol_market_pct: f32,
- /// Ethanol volume % (Fortran `ethvpct`).
+    /// Ethanol volume % (Fortran `ethvpct`).
     pub ethanol_volume_pct: f32,
- // --- /PERIOD/ packet ---
- /// Inventory year (Fortran `iepyr`).
+    // --- /PERIOD/ packet ---
+    /// Inventory year (Fortran `iepyr`).
     pub year: i32,
- /// Reporting period (Fortran `iprtyp`, with `iseasn`/`imonth`).
+    /// Reporting period (Fortran `iprtyp`, with `iseasn`/`imonth`).
     pub period: PeriodKind,
- /// How emissions are summed (Fortran `ismtyp`).
+    /// How emissions are summed (Fortran `ismtyp`).
     pub summary: SummaryKind,
- /// Typical day, echoed only for [`SummaryKind::TypicalDay`]
- /// (Fortran `iday`).
+    /// Typical day, echoed only for [`SummaryKind::TypicalDay`]
+    /// (Fortran `iday`).
     pub day: DayKind,
- /// Year of the growth calculation (Fortran `igryr`).
+    /// Year of the growth calculation (Fortran `igryr`).
     pub growth_year: i32,
- /// Year of technology selection (Fortran `itchyr`).
+    /// Year of technology selection (Fortran `itchyr`).
     pub tech_year: i32,
- // --- /REGION/ and /SOURCE CATEGORY/ packets ---
- /// The region the run covers (Fortran `reglvl` and its lists).
+    // --- /REGION/ and /SOURCE CATEGORY/ packets ---
+    /// The region the run covers (Fortran `reglvl` and its lists).
     pub region: RegionOfInterest<'a>,
- /// The run's equipment selection (Fortran `lascal`/`lascat`).
+    /// The run's equipment selection (Fortran `lascal`/`lascat`).
     pub equipment: EquipmentSelection<'a>,
 }
 
@@ -281,15 +281,15 @@ fn write_options<W: Write>(w: &mut W, report: &MessageReport<'_>) -> io::Result<
         "{}",
         labeled_line("Average Ambient Temp", &f6(report.temp_ambient))
     )?;
- // wrtmsg.f :96–100 — FLAGHI / FLAGLO are the 5-character
- // 'HIGH ' / 'LOW ' parameters.
+    // wrtmsg.f :96–100 — FLAGHI / FLAGLO are the 5-character
+    // 'HIGH ' / 'LOW ' parameters.
     let altitude = if report.high_altitude {
         "HIGH "
     } else {
         "LOW  "
     };
     writeln!(w, "{}", labeled_line("Altitude of region", altitude))?;
- // wrtmsg.f :101 — the Stage II control percentage.
+    // wrtmsg.f :101 — the Stage II control percentage.
     let stage2 = 100.0_f32 - report.stage2_factor * 100.0;
     writeln!(w, "{}", labeled_line("Stage II Control %", &f6(stage2)))?;
     writeln!(
@@ -321,7 +321,7 @@ fn write_period<W: Write>(w: &mut W, report: &MessageReport<'_>) -> io::Result<(
         SummaryKind::PeriodTotal => "PERIOD TOTAL",
     };
     writeln!(w, "{}", labeled_line("Emissions summed for", summary))?;
- // wrtmsg.f :120–142 — a season or month line, period-dependent.
+    // wrtmsg.f :120–142 — a season or month line, period-dependent.
     match report.period {
         PeriodKind::Seasonal(season) => {
             writeln!(w, "{}", labeled_line("Season", season_name(season)))?;
@@ -331,7 +331,7 @@ fn write_period<W: Write>(w: &mut W, report: &MessageReport<'_>) -> io::Result<(
         }
         PeriodKind::Annual => {}
     }
- // wrtmsg.f :143–148 — the day-of-week line, typical-day runs only.
+    // wrtmsg.f :143–148 — the day-of-week line, typical-day runs only.
     if report.summary == SummaryKind::TypicalDay {
         let day = match report.day {
             DayKind::Weekday => "WEEKDAY",
@@ -386,8 +386,8 @@ fn write_region<W: Write>(w: &mut W, region: &RegionOfInterest<'_>) -> io::Resul
             )?;
             writeln!(w, "{}", label_line("Counties of Interest"))?;
             for county in *counties {
- // wrtmsg.f :181–185 — the state suffix is ", name"
- // when the FIPS prefix resolves, else a single blank.
+                // wrtmsg.f :181–185 — the state suffix is ", name"
+                // when the FIPS prefix resolves, else a single blank.
                 let suffix = match county.state_name {
                     Some(name) => format!(", {name}"),
                     None => " ".to_string(),
@@ -453,11 +453,11 @@ pub fn write_message_report<W: Write>(w: &mut W, report: &MessageReport<'_>) -> 
 /// row (`fipcod(j)`, `cntynm(j)`, `nctyrc(j)`).
 #[derive(Debug, Clone, Copy)]
 pub struct CountyRecordCount<'a> {
- /// County FIPS code (Fortran `fipcod`, `character*5`).
+    /// County FIPS code (Fortran `fipcod`, `character*5`).
     pub fips: &'a str,
- /// County name (Fortran `cntynm`).
+    /// County name (Fortran `cntynm`).
     pub name: &'a str,
- /// Population records found for the county (Fortran `nctyrc`).
+    /// Population records found for the county (Fortran `nctyrc`).
     pub records: i32,
 }
 
@@ -465,14 +465,14 @@ pub struct CountyRecordCount<'a> {
 /// `nstarc(i)`).
 #[derive(Debug, Clone, Copy)]
 pub struct StateRecordCount<'a> {
- /// State code (Fortran `statcd`, `character*5`).
+    /// State code (Fortran `statcd`, `character*5`).
     pub code: &'a str,
- /// State name (Fortran `statnm`).
+    /// State name (Fortran `statnm`).
     pub name: &'a str,
- /// Population records found for the state (Fortran `nstarc`).
+    /// Population records found for the state (Fortran `nstarc`).
     pub records: i32,
- /// The state's counties that have county-specific records — the
- /// rows the Fortran `lfipcd(j) .AND. lctlev(j)` filter keeps.
+    /// The state's counties that have county-specific records — the
+    /// rows the Fortran `lfipcd(j) .AND. lctlev(j)` filter keeps.
     pub counties: &'a [CountyRecordCount<'a>],
 }
 
@@ -515,12 +515,12 @@ pub fn write_population_summary<W: Write>(
     national_records: i32,
     states: &[StateRecordCount<'_>],
 ) -> io::Result<()> {
- // wrtsum.f :57–58 — a blank line, the heading, a blank line.
+    // wrtsum.f :57–58 — a blank line, the heading, a blank line.
     writeln!(w)?;
     writeln!(w, "   **** Number of Population Records Found ****")?;
     writeln!(w)?;
 
- // wrtsum.f :62–65 — the national-record line, T45.
+    // wrtsum.f :62–65 — the national-record line, T45.
     if national_records > 0 {
         writeln!(
             w,
@@ -536,7 +536,7 @@ pub fn write_population_summary<W: Write>(
         )?;
     }
 
- // wrtsum.f :69–86 — per state, then per county, T77.
+    // wrtsum.f :69–86 — per state, then per county, T77.
     for state in states {
         writeln!(
             w,
@@ -595,12 +595,12 @@ mod tests {
         String::from_utf8(buf).expect("writer output is ASCII text")
     }
 
- // ---- line helpers ----
+    // ---- line helpers ----
 
     #[test]
     fn labeled_line_places_label_and_colon() {
         let line = labeled_line("Fuel RVP (psi)", "  8.70");
- // Label from column 10, ':' at column 30, value from 31.
+        // Label from column 10, ':' at column 30, value from 31.
         assert_eq!(&line[0..9], "         ");
         assert_eq!(&line[9..23], "Fuel RVP (psi)");
         assert_eq!(&line[29..30], ":");
@@ -609,8 +609,8 @@ mod tests {
 
     #[test]
     fn labeled_line_long_label_overwrites_at_colon() {
- // "Marine Diesel Sulfur %" is 22 chars: column 10 + 22 runs
- // to column 31, so the T30 ':' overwrites column 30.
+        // "Marine Diesel Sulfur %" is 22 chars: column 10 + 22 runs
+        // to column 31, so the T30 ':' overwrites column 30.
         let line = labeled_line("Marine Diesel Sulfur %", "  0.0500");
         assert_eq!(&line[29..30], ":");
     }
@@ -622,7 +622,7 @@ mod tests {
         assert_eq!(&line[19..], "*** Period Parameters ***");
     }
 
- // ---- wrtmsg ----
+    // ---- wrtmsg ----
 
     #[test]
     fn message_report_has_four_section_headers() {
@@ -637,9 +637,9 @@ mod tests {
     fn message_report_echoes_options_values() {
         let out = rendered(|w| write_message_report(w, &sample_report()));
         assert!(out.contains("Run title one"));
- // Altitude low ⇒ the 'LOW ' flag string.
+        // Altitude low ⇒ the 'LOW ' flag string.
         assert!(out.contains("Altitude of region"));
- // Stage II control % = 100 - 1.0*100 = 0.
+        // Stage II control % = 100 - 1.0*100 = 0.
         let stage2 = out
             .lines()
             .find(|l| l.contains("Stage II Control %"))
@@ -662,7 +662,7 @@ mod tests {
         report.summary = SummaryKind::TypicalDay;
         report.day = DayKind::WeekendDay;
         let out = rendered(|w| write_message_report(w, &report));
- // wrtmsg uses AUTUMN for the fall season.
+        // wrtmsg uses AUTUMN for the fall season.
         assert!(out.contains("AUTUMN"));
         assert!(out.contains("Day of week"));
         assert!(out.contains("WEEKEND"));
@@ -713,7 +713,7 @@ mod tests {
         assert!(out.contains("2265001010"));
     }
 
- // ---- wrtsum ----
+    // ---- wrtsum ----
 
     #[test]
     fn population_summary_heading_and_blank_lines() {
@@ -734,8 +734,8 @@ mod tests {
 
     #[test]
     fn population_summary_national_line_back_tabs_the_colon() {
- // wrtsum.f's T45 tabs back into "National Record": the ':'
- // lands at column 45, overwriting the second 'o' of "Record".
+        // wrtsum.f's T45 tabs back into "National Record": the ':'
+        // lands at column 45, overwriting the second 'o' of "Record".
         let out = rendered(|w| write_population_summary(w, 42, &[]));
         let national = out.lines().find(|l| l.contains("Entire U.S.")).unwrap();
         assert_eq!(&national[44..45], ":");
@@ -759,7 +759,7 @@ mod tests {
         let out = rendered(|w| write_population_summary(w, 0, &states));
         assert!(out.contains("California"));
         assert!(out.contains("Los Angeles"));
- // The state line ends with the I5-formatted record count.
+        // The state line ends with the I5-formatted record count.
         let state_line = out.lines().find(|l| l.contains("California")).unwrap();
         assert!(state_line.ends_with(&fortran_i(30, 5)));
         let county_line = out.lines().find(|l| l.contains("Los Angeles")).unwrap();

@@ -283,8 +283,7 @@ fn expected_tool_groups(spec: &ToolSpec, default: &AvftTable) -> BTreeSet<(i32, 
         for rec in default.rows_for_source_type(method.source_type_id) {
             let my = rec.model_year_id;
             let in_gap_fill = (1950..=spec.last_complete_model_year).contains(&my);
-            let in_projection =
-                my > spec.last_complete_model_year && my <= spec.analysis_year;
+            let in_projection = my > spec.last_complete_model_year && my <= spec.analysis_year;
             if in_gap_fill || in_projection {
                 groups.insert((method.source_type_id, my));
             }

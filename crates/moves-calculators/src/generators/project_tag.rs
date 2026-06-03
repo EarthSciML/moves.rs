@@ -94,23 +94,23 @@ const SUBSCRIBED_PROCESSES: &[ProcessId] = &[
 /// One `link` row — the project-domain per-link traffic data.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LinkRow {
- /// `linkID`.
+    /// `linkID`.
     pub link_id: i32,
- /// `linkVolume` — vehicle count on the link per hour.
+    /// `linkVolume` — vehicle count on the link per hour.
     pub link_volume: f64,
- /// `linkLength` — link length in miles.
+    /// `linkLength` — link length in miles.
     pub link_length: f64,
- /// `linkAvgSpeed` — average speed in miles per hour. `0` or negative
- /// means the link is effectively idle (no movement).
+    /// `linkAvgSpeed` — average speed in miles per hour. `0` or negative
+    /// means the link is effectively idle (no movement).
     pub link_avg_speed: f64,
- /// `roadTypeID` — 1 = off-network, 2–5 = on-road types.
+    /// `roadTypeID` — 1 = off-network, 2–5 = on-road types.
     pub road_type_id: i32,
- /// `zoneID` — the zone the link belongs to.
+    /// `zoneID` — the zone the link belongs to.
     pub zone_id: i32,
 }
 
 impl LinkRow {
- /// Whether this is an off-network (parked / idling) link.
+    /// Whether this is an off-network (parked / idling) link.
     #[must_use]
     pub fn is_off_network(&self) -> bool {
         self.road_type_id == 1
@@ -120,115 +120,115 @@ impl LinkRow {
 /// One `linkSourceTypeHour` row — source-type fraction for a specific link.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LinkSourceTypeHourRow {
- /// `linkID`.
+    /// `linkID`.
     pub link_id: i32,
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: i32,
- /// `sourceTypeHourFraction` — fraction of the link's volume that is
- /// this source type.
+    /// `sourceTypeHourFraction` — fraction of the link's volume that is
+    /// this source type.
     pub source_type_hour_fraction: f64,
 }
 
 /// One `sourceTypeAgeDistribution` row.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceTypeAgeDistributionRow {
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: i32,
- /// `yearID`.
+    /// `yearID`.
     pub year_id: i32,
- /// `ageID`.
+    /// `ageID`.
     pub age_id: i32,
- /// `ageFraction`.
+    /// `ageFraction`.
     pub age_fraction: f64,
 }
 
 /// One `hourDay` row.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HourDayRow {
- /// `hourDayID`.
+    /// `hourDayID`.
     pub hour_day_id: i32,
- /// `dayID`.
+    /// `dayID`.
     pub day_id: i32,
 }
 
 /// One `runSpecHourDay` row — which `hourDayID` values are in the run.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RunSpecHourDayRow {
- /// `hourDayID`.
+    /// `hourDayID`.
     pub hour_day_id: i32,
 }
 
 /// One `runSpecMonth` row.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RunSpecMonthRow {
- /// `monthID`.
+    /// `monthID`.
     pub month_id: i32,
 }
 
 /// One `dayOfAnyWeek` row.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DayOfAnyWeekRow {
- /// `dayID`.
+    /// `dayID`.
     pub day_id: i32,
- /// `noOfRealDays` — number of real calendar days this day type covers.
+    /// `noOfRealDays` — number of real calendar days this day type covers.
     pub no_of_real_days: f64,
 }
 
 /// One `offNetworkLink` row — vehicle population data for off-network idling.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OffNetworkLinkRow {
- /// `zoneID`.
+    /// `zoneID`.
     pub zone_id: i32,
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: i32,
- /// `vehiclePopulation` — total vehicle count in the zone for this source type.
+    /// `vehiclePopulation` — total vehicle count in the zone for this source type.
     pub vehicle_population: f64,
- /// `parkedVehicleFraction` — fraction of population that is parked.
+    /// `parkedVehicleFraction` — fraction of population that is parked.
     pub parked_vehicle_fraction: f64,
- /// `startFraction` — fraction of population that starts in this hour.
+    /// `startFraction` — fraction of population that starts in this hour.
     pub start_fraction: f64,
- /// `extendedIdleFraction` — fraction of population that is extended-idling.
+    /// `extendedIdleFraction` — fraction of population that is extended-idling.
     pub extended_idle_fraction: f64,
 }
 
 /// One `avft` row — alternative vehicle fuel type distribution.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AvftRow {
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: i32,
- /// `modelYearID`.
+    /// `modelYearID`.
     pub model_year_id: i32,
- /// `fuelTypeID`.
+    /// `fuelTypeID`.
     pub fuel_type_id: i32,
- /// `fuelEngFraction` — fraction of this source type / model year that
- /// uses this fuel type.
+    /// `fuelEngFraction` — fraction of this source type / model year that
+    /// uses this fuel type.
     pub fuel_eng_fraction: f64,
 }
 
 /// All input tables `ProjectTAG` consumes for one `(link, year)` computation.
 #[derive(Debug, Clone)]
 pub struct ProjectTagInputs {
- /// All links in the project-domain run.
+    /// All links in the project-domain run.
     pub links: Vec<LinkRow>,
- /// Source-type hour fractions by link.
+    /// Source-type hour fractions by link.
     pub link_source_type_hours: Vec<LinkSourceTypeHourRow>,
- /// Age distribution for the target year.
+    /// Age distribution for the target year.
     pub source_type_age_distributions: Vec<SourceTypeAgeDistributionRow>,
- /// Hour/day dimension table.
+    /// Hour/day dimension table.
     pub hour_days: Vec<HourDayRow>,
- /// Run's selected hour/day combinations.
+    /// Run's selected hour/day combinations.
     pub run_spec_hour_days: Vec<RunSpecHourDayRow>,
- /// Run's selected months.
+    /// Run's selected months.
     pub run_spec_months: Vec<RunSpecMonthRow>,
- /// Day-of-week dimension with real-day counts.
+    /// Day-of-week dimension with real-day counts.
     pub days_of_any_week: Vec<DayOfAnyWeekRow>,
- /// Off-network link populations (for starts, SHP, hotelling).
+    /// Off-network link populations (for starts, SHP, hotelling).
     pub off_network_links: Vec<OffNetworkLinkRow>,
- /// Alternative vehicle fuel type fractions (for hotelling hours).
+    /// Alternative vehicle fuel type fractions (for hotelling hours).
     pub avft: Vec<AvftRow>,
- /// Calendar year being computed.
+    /// Calendar year being computed.
     pub year_id: i32,
- /// Whether the run is Rates-scale (affects starts computation).
+    /// Whether the run is Rates-scale (affects starts computation).
     pub is_rates: bool,
 }
 
@@ -243,9 +243,9 @@ pub struct ShoRow {
     pub age_id: i32,
     pub link_id: i32,
     pub source_type_id: i32,
- /// Source hours operating.
+    /// Source hours operating.
     pub sho: f64,
- /// Distance travelled (miles).
+    /// Distance travelled (miles).
     pub distance: f64,
 }
 
@@ -258,7 +258,7 @@ pub struct ShpRow {
     pub age_id: i32,
     pub zone_id: i32,
     pub source_type_id: i32,
- /// Source hours parked.
+    /// Source hours parked.
     pub shp: f64,
 }
 
@@ -271,7 +271,7 @@ pub struct StartsRow {
     pub age_id: i32,
     pub zone_id: i32,
     pub source_type_id: i32,
- /// Number of starts.
+    /// Number of starts.
     pub starts: f64,
 }
 
@@ -285,7 +285,7 @@ pub struct HotellingRow {
     pub zone_id: i32,
     pub source_type_id: i32,
     pub fuel_type_id: i32,
- /// Hotelling hours.
+    /// Hotelling hours.
     pub hotelling_hours: f64,
 }
 
@@ -298,7 +298,7 @@ pub struct SourceHoursRow {
     pub age_id: i32,
     pub link_id: i32,
     pub source_type_id: i32,
- /// Source hours.
+    /// Source hours.
     pub source_hours: f64,
 }
 
@@ -370,9 +370,9 @@ pub fn compute_sho(
                         continue;
                     }
                     let base = link.link_volume
- * lsth_row.source_type_hour_fraction
- * dow.no_of_real_days
- * stad.age_fraction;
+                        * lsth_row.source_type_hour_fraction
+                        * dow.no_of_real_days
+                        * stad.age_fraction;
                     let (sho, distance) = if link.link_avg_speed > 0.0 {
                         let travel_time = (link.link_length / link.link_avg_speed).min(1.0);
                         let s = base * travel_time;
@@ -446,9 +446,9 @@ pub fn compute_shp(
                         continue;
                     }
                     let shp = onl.vehicle_population
- * onl.parked_vehicle_fraction
- * stad.age_fraction
- * dow.no_of_real_days;
+                        * onl.parked_vehicle_fraction
+                        * stad.age_fraction
+                        * dow.no_of_real_days;
                     rows.push(ShpRow {
                         hour_day_id: hd.hour_day_id,
                         month_id: month.month_id,
@@ -555,7 +555,7 @@ pub fn compute_hotelling(
         .iter()
         .map(|r| r.hour_day_id)
         .collect();
- // Java: `and onl.sourceTypeID=62`
+    // Java: `and onl.sourceTypeID=62`
     let onl_rows: Vec<_> = inputs
         .off_network_links
         .iter()
@@ -599,10 +599,10 @@ pub fn compute_hotelling(
                             continue;
                         }
                         let hotelling_hours = onl.vehicle_population
- * onl.extended_idle_fraction
- * stad.age_fraction
- * dow.no_of_real_days
- * avft.fuel_eng_fraction;
+                            * onl.extended_idle_fraction
+                            * stad.age_fraction
+                            * dow.no_of_real_days
+                            * avft.fuel_eng_fraction;
                         rows.push(HotellingRow {
                             hour_day_id: hd.hour_day_id,
                             month_id: month.month_id,
@@ -671,9 +671,9 @@ pub fn compute_source_hours(
                             continue;
                         }
                         let source_hours = onl.vehicle_population
- * onl.parked_vehicle_fraction
- * stad.age_fraction
- * dow.no_of_real_days;
+                            * onl.parked_vehicle_fraction
+                            * stad.age_fraction
+                            * dow.no_of_real_days;
                         rows.push(SourceHoursRow {
                             hour_day_id: hd.hour_day_id,
                             month_id: month.month_id,
@@ -724,9 +724,9 @@ pub fn compute_source_hours(
                             continue;
                         }
                         let source_hours = link.link_volume
- * lsth_row.source_type_hour_fraction
- * dow.no_of_real_days
- * stad.age_fraction;
+                            * lsth_row.source_type_hour_fraction
+                            * dow.no_of_real_days
+                            * stad.age_fraction;
                         rows.push(SourceHoursRow {
                             hour_day_id: hd.hour_day_id,
                             month_id: month.month_id,
@@ -811,11 +811,11 @@ pub struct ProjectTAG {
 }
 
 impl ProjectTAG {
- /// Chain-DAG name — matches the Java class name.
+    /// Chain-DAG name — matches the Java class name.
     pub const NAME: &'static str = "ProjectTAG";
 
- /// Construct the generator with subscriptions for all nine project-domain
- /// processes at `YEAR` granularity.
+    /// Construct the generator with subscriptions for all nine project-domain
+    /// processes at `YEAR` granularity.
     #[must_use]
     pub fn new() -> Self {
         let priority =
@@ -844,30 +844,29 @@ impl Generator for ProjectTAG {
     }
 
     fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
- // ProjectTAG is a PROJECT-DOMAIN generator. Canonical MOVES only
- // instantiates and subscribes it when the run domain is Project, where
- // `ProjectTAG.executeLoop` calls `allocateTotalActivityBasis` to write the
- // SHO/SHP/Starts/HotellingHours/SourceHours scratch tables
- // (ProjectTAG.java:142, :255). For every non-project (Default/County) run
- // it is absent from the master loop entirely, and the activity basis is
- // produced by `TotalActivityGenerator` instead — so contributing nothing
- // here is the correct, canonical-faithful result (and is exactly what the
- // asserted onroad fixtures depend on; ProjectTAG previously no-op'd for
- // them).
- //
- // The project-domain kernels (`allocate_total_activity_basis` and friends)
- // are fully ported above, but wiring them needs the project-domain input
- // tables — `linkSourceTypeHour`, `offNetworkLink`, `link`, `avft` — projected
- // from the execution context, which still lacks `TableRow`/schema-registry
- // entries for those row types. So when those tables ARE present (a genuine
- // project-domain run) we cannot reproduce the Java output: fail loudly with
- // `NotImplemented` rather than emit bogus zeros. `linkSourceTypeHour` /
- // `offNetworkLink` are project-domain-only user inputs; the execution store
- // carries them as empty schema tables for every non-project run, so a
- // *non-empty* one (row count > 0) is the signal that this is a real project
- // run with activity that must be allocated.
-        let project_rows =
-            |t: &str| ctx.tables().get(t).map_or(0, |df| df.height());
+        // ProjectTAG is a PROJECT-DOMAIN generator. Canonical MOVES only
+        // instantiates and subscribes it when the run domain is Project, where
+        // `ProjectTAG.executeLoop` calls `allocateTotalActivityBasis` to write the
+        // SHO/SHP/Starts/HotellingHours/SourceHours scratch tables
+        // (ProjectTAG.java:142, :255). For every non-project (Default/County) run
+        // it is absent from the master loop entirely, and the activity basis is
+        // produced by `TotalActivityGenerator` instead — so contributing nothing
+        // here is the correct, canonical-faithful result (and is exactly what the
+        // asserted onroad fixtures depend on; ProjectTAG previously no-op'd for
+        // them).
+        //
+        // The project-domain kernels (`allocate_total_activity_basis` and friends)
+        // are fully ported above, but wiring them needs the project-domain input
+        // tables — `linkSourceTypeHour`, `offNetworkLink`, `link`, `avft` — projected
+        // from the execution context, which still lacks `TableRow`/schema-registry
+        // entries for those row types. So when those tables ARE present (a genuine
+        // project-domain run) we cannot reproduce the Java output: fail loudly with
+        // `NotImplemented` rather than emit bogus zeros. `linkSourceTypeHour` /
+        // `offNetworkLink` are project-domain-only user inputs; the execution store
+        // carries them as empty schema tables for every non-project run, so a
+        // *non-empty* one (row count > 0) is the signal that this is a real project
+        // run with activity that must be allocated.
+        let project_rows = |t: &str| ctx.tables().get(t).map_or(0, |df| df.height());
         let is_project_domain =
             project_rows("linkSourceTypeHour") > 0 || project_rows("offNetworkLink") > 0;
         if is_project_domain {
@@ -889,7 +888,7 @@ mod tests {
     use super::*;
     use moves_framework::Generator;
 
- // --- Helper builders ---
+    // --- Helper builders ---
 
     fn link(link_id: i32, volume: f64, length: f64, avg_speed: f64, road_type_id: i32) -> LinkRow {
         LinkRow {
@@ -989,7 +988,7 @@ mod tests {
         }
     }
 
- // --- ProjectTAG struct ---
+    // --- ProjectTAG struct ---
 
     #[test]
     fn project_tag_has_correct_name() {
@@ -1004,7 +1003,7 @@ mod tests {
         for sub in subs {
             assert_eq!(sub.granularity, Granularity::Year);
         }
- // All nine expected processes present.
+        // All nine expected processes present.
         let pids: Vec<ProcessId> = subs.iter().map(|s| s.process_id).collect();
         for &expected in SUBSCRIBED_PROCESSES {
             assert!(
@@ -1022,12 +1021,12 @@ mod tests {
 
     #[test]
     fn execute_is_noop_for_non_project_run() {
- // For a non-project (Default/County) run the project-domain input tables
- // are absent, ProjectTAG is not part of canonical's master loop, and the
- // activity basis is produced by `TotalActivityGenerator`. ProjectTAG must
- // therefore contribute nothing (empty output) — the behaviour every
- // asserted onroad fixture depends on. Erroring here would break
- // previously-correct non-project runs.
+        // For a non-project (Default/County) run the project-domain input tables
+        // are absent, ProjectTAG is not part of canonical's master loop, and the
+        // activity basis is produced by `TotalActivityGenerator`. ProjectTAG must
+        // therefore contribute nothing (empty output) — the behaviour every
+        // asserted onroad fixture depends on. Erroring here would break
+        // previously-correct non-project runs.
         let gen = ProjectTAG::new();
         let mut ctx = CalculatorContext::new();
         let out = gen.execute(&mut ctx).expect("non-project run is a no-op");
@@ -1036,19 +1035,19 @@ mod tests {
 
     #[test]
     fn execute_errors_for_project_domain_run_until_inputs_are_wired() {
- // When the project-domain input tables ARE present (a genuine Project run),
- // the Java `ProjectTAG.executeLoop` runs `allocateTotalActivityBasis` to
- // populate the activity scratch tables. The kernels are ported above but
- // cannot yet be invoked (the project-domain input row types lack TableRow /
- // schema-registry entries), so `execute` must fail loudly rather than
- // silently produce zero activity (which would yield zero project-domain
- // emissions). When wiring lands, replace this with an assertion that the
- // SHO/SHP/Starts/HotellingHours/SourceHours scratch tables are populated.
+        // When the project-domain input tables ARE present (a genuine Project run),
+        // the Java `ProjectTAG.executeLoop` runs `allocateTotalActivityBasis` to
+        // populate the activity scratch tables. The kernels are ported above but
+        // cannot yet be invoked (the project-domain input row types lack TableRow /
+        // schema-registry entries), so `execute` must fail loudly rather than
+        // silently produce zero activity (which would yield zero project-domain
+        // emissions). When wiring lands, replace this with an assertion that the
+        // SHO/SHP/Starts/HotellingHours/SourceHours scratch tables are populated.
         use moves_framework::InMemoryStore;
         let mut store = InMemoryStore::new();
- // A *non-empty* project-domain table marks a genuine project run (the
- // execution store carries these as empty schema tables for non-project
- // runs, so presence alone is not the signal — row count is).
+        // A *non-empty* project-domain table marks a genuine project run (the
+        // execution store carries these as empty schema tables for non-project
+        // runs, so presence alone is not the signal — row count is).
         let project_links =
             polars::prelude::df!("linkID" => &[1i32]).expect("build 1-row linkSourceTypeHour");
         store.insert("linkSourceTypeHour", project_links);
@@ -1064,15 +1063,15 @@ mod tests {
         assert!(!link(1, 0.0, 0.0, 0.0, 2).is_off_network());
     }
 
- // --- compute_sho ---
+    // --- compute_sho ---
 
     #[test]
     fn sho_with_positive_speed_uses_travel_time() {
- // linkVolume=500, hourFrac=1.0, noOfRealDays=2, ageFrac=1.0, length=1.5, speed=30
- // base = 500 * 1.0 * 2 * 1.0 = 1000
- // travel_time = min(1.5/30, 1.0) = 0.05
- // SHO = 1000 * 0.05 = 50
- // distance = 50 * 30 = 1500
+        // linkVolume=500, hourFrac=1.0, noOfRealDays=2, ageFrac=1.0, length=1.5, speed=30
+        // base = 500 * 1.0 * 2 * 1.0 = 1000
+        // travel_time = min(1.5/30, 1.0) = 0.05
+        // SHO = 1000 * 0.05 = 50
+        // distance = 50 * 30 = 1500
         let inputs = minimal_inputs();
         let mut seen = HashSet::new();
         let rows = compute_sho(&inputs.links[0], &inputs, &mut seen);
@@ -1088,13 +1087,13 @@ mod tests {
 
     #[test]
     fn sho_clamps_travel_time_at_one_for_short_slow_links() {
- // length=100, speed=30: length/speed = 3.33 > 1.0 → capped at 1.0
+        // length=100, speed=30: length/speed = 3.33 > 1.0 → capped at 1.0
         let mut inputs = minimal_inputs();
         inputs.links[0].link_length = 100.0;
         let mut seen = HashSet::new();
         let rows = compute_sho(&inputs.links[0], &inputs, &mut seen);
         assert_eq!(rows.len(), 1);
- // base = 500 * 1.0 * 2 * 1.0 = 1000; travel_time = 1.0 (capped)
+        // base = 500 * 1.0 * 2 * 1.0 = 1000; travel_time = 1.0 (capped)
         assert!((rows[0].sho - 1000.0).abs() < 1e-9);
     }
 
@@ -1105,7 +1104,7 @@ mod tests {
         let mut seen = HashSet::new();
         let rows = compute_sho(&inputs.links[0], &inputs, &mut seen);
         assert_eq!(rows.len(), 1);
- // base = 500 * 1.0 * 2 * 1.0 = 1000
+        // base = 500 * 1.0 * 2 * 1.0 = 1000
         assert!((rows[0].sho - 1000.0).abs() < 1e-9);
         assert!((rows[0].distance - 0.0).abs() < 1e-9);
     }
@@ -1116,7 +1115,7 @@ mod tests {
         let mut seen = HashSet::new();
         let first = compute_sho(&inputs.links[0], &inputs, &mut seen);
         let second = compute_sho(&inputs.links[0], &inputs, &mut seen);
- // Second call skips all rows (already in seen).
+        // Second call skips all rows (already in seen).
         assert_eq!(first.len(), 1);
         assert_eq!(second.len(), 0);
     }
@@ -1124,19 +1123,19 @@ mod tests {
     #[test]
     fn sho_skips_links_not_in_lsth() {
         let mut inputs = minimal_inputs();
- // lsth points at link 99, but our link is 100.
+        // lsth points at link 99, but our link is 100.
         inputs.link_source_type_hours = vec![lsth(99, 21, 1.0)];
         let mut seen = HashSet::new();
         let rows = compute_sho(&inputs.links[0], &inputs, &mut seen);
         assert!(rows.is_empty());
     }
 
- // --- compute_shp ---
+    // --- compute_shp ---
 
     #[test]
     fn shp_formula_correct() {
- // vehiclePopulation=1000, parkedVehicleFraction=0.8, ageFraction=1.0, noOfRealDays=2
- // SHP = 1000 * 0.8 * 1.0 * 2 = 1600
+        // vehiclePopulation=1000, parkedVehicleFraction=0.8, ageFraction=1.0, noOfRealDays=2
+        // SHP = 1000 * 0.8 * 1.0 * 2 = 1600
         let mut inputs = minimal_inputs();
         inputs.off_network_links = vec![onl(1, 21, 1000.0, 0.8, 0.1, 0.05)];
         let mut seen = HashSet::new();
@@ -1154,12 +1153,12 @@ mod tests {
         assert!(rows.is_empty());
     }
 
- // --- compute_starts ---
+    // --- compute_starts ---
 
     #[test]
     fn starts_inventory_mode_multiplies_start_fraction() {
- // vehiclePopulation=1000, startFraction=0.5, ageFraction=1.0, noOfRealDays=2
- // starts = 1000 * 0.5 * 1.0 * 2 = 1000
+        // vehiclePopulation=1000, startFraction=0.5, ageFraction=1.0, noOfRealDays=2
+        // starts = 1000 * 0.5 * 1.0 * 2 = 1000
         let mut inputs = minimal_inputs();
         inputs.off_network_links = vec![onl(1, 21, 1000.0, 0.8, 0.5, 0.05)];
         inputs.is_rates = false;
@@ -1171,8 +1170,8 @@ mod tests {
 
     #[test]
     fn starts_rates_mode_omits_start_fraction() {
- // In rates mode, startFraction is NOT multiplied.
- // starts = 1000 * 1.0 * 2 = 2000
+        // In rates mode, startFraction is NOT multiplied.
+        // starts = 1000 * 1.0 * 2 = 2000
         let mut inputs = minimal_inputs();
         inputs.off_network_links = vec![onl(1, 21, 1000.0, 0.8, 0.5, 0.05)];
         inputs.is_rates = true;
@@ -1182,13 +1181,13 @@ mod tests {
         assert!((rows[0].starts - 2000.0).abs() < 1e-9);
     }
 
- // --- compute_hotelling ---
+    // --- compute_hotelling ---
 
     #[test]
     fn hotelling_only_for_source_type_62() {
- // Source type 62 (long-haul combo trucks) contributes; others don't.
+        // Source type 62 (long-haul combo trucks) contributes; others don't.
         let mut inputs = minimal_inputs();
- // Both source type 21 and 62 present; only 62 should appear.
+        // Both source type 21 and 62 present; only 62 should appear.
         inputs.off_network_links = vec![
             onl(1, 21, 1000.0, 0.8, 0.1, 0.05),
             onl(1, 62, 500.0, 0.8, 0.1, 0.3),
@@ -1199,24 +1198,24 @@ mod tests {
         let rows = compute_hotelling(1, &inputs, &mut seen);
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].source_type_id, 62);
- // hotellingHours = 500 * 0.3 * 1.0 * 2 * 0.9 = 270
+        // hotellingHours = 500 * 0.3 * 1.0 * 2 * 0.9 = 270
         assert!((rows[0].hotelling_hours - 270.0).abs() < 1e-9);
     }
 
     #[test]
     fn hotelling_joins_avft_by_model_year() {
- // model_year_id = year_id - age_id = 2020 - 0 = 2020
+        // model_year_id = year_id - age_id = 2020 - 0 = 2020
         let mut inputs = minimal_inputs();
         inputs.off_network_links = vec![onl(1, 62, 100.0, 0.0, 0.0, 1.0)];
         inputs.source_type_age_distributions = vec![stad(62, 2020, 0, 1.0)];
- // avft for wrong model year — no rows produced.
+        // avft for wrong model year — no rows produced.
         inputs.avft = vec![avft_row(62, 1999, 2, 1.0)];
         let mut seen = HashSet::new();
         let rows = compute_hotelling(1, &inputs, &mut seen);
         assert!(rows.is_empty(), "wrong model year should produce no rows");
     }
 
- // --- allocate_total_activity_basis ---
+    // --- allocate_total_activity_basis ---
 
     #[test]
     fn running_exhaust_produces_sho_only() {
@@ -1259,7 +1258,7 @@ mod tests {
             &mut hotelling_seen,
             &mut sh_seen,
         );
- // On-road link: SHO + SourceHours; no SHP (that's for off-network).
+        // On-road link: SHO + SourceHours; no SHP (that's for off-network).
         assert!(!out.sho.is_empty());
         assert!(!out.source_hours.is_empty());
         assert!(out.shp.is_empty());

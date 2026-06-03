@@ -60,7 +60,7 @@ const NAMES: &[&str] = &[
 #[test]
 fn cmp_expression_rewrite_matches_java() {
     for name in NAMES {
- // "(fp.E200-fp_E200.center)" -> "((fp.E200-fp_E200.center)/fp_E200.stddev)"
+        // "(fp.E200-fp_E200.center)" -> "((fp.E200-fp_E200.center)/fp_E200.stddev)"
         let original = format!("(cmp.coeff*(fp.{name}-fp_{name}.center))");
         let expected = format!("(cmp.coeff*((fp.{name}-fp_{name}.center)/fp_{name}.stddev))");
         assert_eq!(
@@ -89,7 +89,7 @@ fn cmp_expression_rewrite_matches_java() {
         );
     }
 
- // The two post-loop assertions: a centered term wrapping an if/and call.
+    // The two post-loop assertions: a centered term wrapping an if/and call.
     let original =
         "(cmp.coeff*(if(and(fp.Oxygen>3.5,maxModelYear<=2001),3.5,fp.Oxygen)-fp_Oxygen.center))";
     let expected = "(cmp.coeff*((if(and(fp.Oxygen>3.5,maxModelYear<=2001),3.5,fp.Oxygen)-fp_Oxygen.center)/fp_Oxygen.stddev))";
@@ -126,7 +126,7 @@ fn pol_process_ids_filtered_against_done_set() {
     let got = get_pol_process_ids_not_already_done("101,102", &mut ids_already_done);
     assert_eq!(got.as_deref(), Some("101,102"));
 
- // Nothing unique on the second pass — Java returns null.
+    // Nothing unique on the second pass — Java returns null.
     let got = get_pol_process_ids_not_already_done("101,102", &mut ids_already_done);
     assert_eq!(got, None);
 
@@ -185,11 +185,11 @@ fn general_fuel_ratio_evaluates_mtbe_expression() {
     let fuel = mtbe_test_fuel();
     let inputs = GeneralFuelRatioInputs {
         expressions: vec![expression],
- // getFuelFormulations(1) -> the test fuel.
+        // getFuelFormulations(1) -> the test fuel.
         formulations_by_fuel_type: BTreeMap::from([(1, vec![fuel.clone()])]),
- // getFuelSupplyFormulations(1) -> the test fuel is in the supply.
+        // getFuelSupplyFormulations(1) -> the test fuel is in the supply.
         supplied_by_fuel_type: BTreeMap::from([(1, BTreeSet::from([fuel.fuel_formulation_id]))]),
- // GeneralFuelRatio starts empty.
+        // GeneralFuelRatio starts empty.
         already_ratioed: BTreeSet::new(),
     };
 
@@ -200,19 +200,19 @@ fn general_fuel_ratio_evaluates_mtbe_expression() {
     assert_eq!(row.fuel_type_id, 1);
     assert_eq!(row.fuel_formulation_id, 100);
     assert_eq!(row.pol_process_id, -101);
- // fuelEffectRatio = MTBEVolume + 7 = 10 + 7.
+    // fuelEffectRatio = MTBEVolume + 7 = 10 + 7.
     assert_eq!(
         row.fuel_effect_ratio, 17.0,
         "fuelEffectRatio does not match"
     );
- // fuelEffectRatioGPA = MTBEVolume * 2 = 10 * 2.
+    // fuelEffectRatioGPA = MTBEVolume * 2 = 10 * 2.
     assert_eq!(
         row.fuel_effect_ratio_gpa, 20.0,
         "fuelEffectRatioGPA does not match"
     );
 
- // Running it again with the row recorded yields nothing new — the
- // Java test's "2nd General run with logic to skip existing ratios".
+    // Running it again with the row recorded yields nothing new — the
+    // Java test's "2nd General run with logic to skip existing ratios".
     let inputs_second_pass = GeneralFuelRatioInputs {
         already_ratioed: BTreeSet::from([IntegerPair::new(
             Some(row.fuel_formulation_id),

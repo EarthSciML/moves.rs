@@ -512,13 +512,17 @@ fn partition_path_needed(
         // unconditionally so their default partition is never dropped.
         let ok = match col.as_str() {
             "countyid" => {
-                !dims.county || county_ids.is_empty() || parsed.map_or(true, |v| county_ids.contains(&v))
+                !dims.county
+                    || county_ids.is_empty()
+                    || parsed.map_or(true, |v| county_ids.contains(&v))
             }
             "zoneid" => {
                 !dims.zone || zone_ids.is_empty() || parsed.map_or(true, |v| zone_ids.contains(&v))
             }
             "stateid" => {
-                !dims.state || state_ids.is_empty() || parsed.map_or(true, |v| state_ids.contains(&v))
+                !dims.state
+                    || state_ids.is_empty()
+                    || parsed.map_or(true, |v| state_ids.contains(&v))
             }
             "yearid" => {
                 !dims.year || year_ids.is_empty() || parsed.map_or(true, |v| year_ids.contains(&v))
@@ -757,18 +761,18 @@ pub fn run_nonroad_simulation(options_json: &str, pop_bytes: &[u8]) -> Result<Js
     let result = js_sys::Object::new();
     js_set_str(&result, "completion_message", &outputs.completion_message)?;
 
- // Surface the emission-row count explicitly so a browser caller is
- // not misled by the "Successful completion" banner. This WASM build
- // drives the NONROAD loop with `PlanRecordingExecutor`, which records
- // every dispatch but evaluates no geography routines, so `outputs.rows`
- // is always empty (see `run_simulation` docs and the native CLI
- // `main.rs`, which is likewise a dry run). The numerical
- // `ProductionExecutor` needs a fully loaded `ReferenceData` bundle
- // (temporal-factor / emission-factor / spillage / allocation file
- // loaders) that is not yet portable to the `.POP`-only WASM input, so
- // wiring it in is tracked as remaining work. Reporting the row count
- // (and a `produces_emissions` flag) makes the dry-run nature of this
- // result explicit instead of silently implying emissions were computed.
+    // Surface the emission-row count explicitly so a browser caller is
+    // not misled by the "Successful completion" banner. This WASM build
+    // drives the NONROAD loop with `PlanRecordingExecutor`, which records
+    // every dispatch but evaluates no geography routines, so `outputs.rows`
+    // is always empty (see `run_simulation` docs and the native CLI
+    // `main.rs`, which is likewise a dry run). The numerical
+    // `ProductionExecutor` needs a fully loaded `ReferenceData` bundle
+    // (temporal-factor / emission-factor / spillage / allocation file
+    // loaders) that is not yet portable to the `.POP`-only WASM input, so
+    // wiring it in is tracked as remaining work. Reporting the row count
+    // (and a `produces_emissions` flag) makes the dry-run nature of this
+    // result explicit instead of silently implying emissions were computed.
     let emission_rows = outputs.rows.len();
     js_set_num(&result, "emission_rows", emission_rows as f64)?;
     js_sys::Reflect::set(
@@ -839,13 +843,13 @@ fn nonroad_inputs_from_pop(
             hp_avg,
             population,
             pop_year: year,
- // Median life at full load comes straight from the `.POP`
- // record's usage field (cols 88–92, Fortran `usehrs(icurec)` set
- // in `getpop.f` :127/:221) — it is NOT a fabricated default. It is
- // passed through to `scrptime` as `uselif` (`modyr.f` :153), which
- // applies the canonical `uselif .LE. 0 => 1.0` fallback itself
- // (`modyr.f` :165). Forwarding the parsed value preserves the real
- // per-record lifespan instead of forcing every record to 0.0.
+            // Median life at full load comes straight from the `.POP`
+            // record's usage field (cols 88–92, Fortran `usehrs(icurec)` set
+            // in `getpop.f` :127/:221) — it is NOT a fabricated default. It is
+            // passed through to `scrptime` as `uselif` (`modyr.f` :153), which
+            // applies the canonical `uselif .LE. 0 => 1.0` fallback itself
+            // (`modyr.f` :165). Forwarding the parsed value preserves the real
+            // per-record lifespan instead of forcing every record to 0.0.
             median_life: usage,
         };
         if let Some(&idx) = scc_to_idx.get(&scc) {

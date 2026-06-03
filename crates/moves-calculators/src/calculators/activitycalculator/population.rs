@@ -49,9 +49,9 @@ pub fn population_non_project(
 ) -> Vec<ActivityRow> {
     let ctx = &inputs.context;
 
- // zoneRoadType, filtered to the iteration zone, indexed by road type.
- // The Extract step already summed SHOAllocFactor over source type and
- // grouped by road type, so there is one factor per road type.
+    // zoneRoadType, filtered to the iteration zone, indexed by road type.
+    // The Extract step already summed SHOAllocFactor over source type and
+    // grouped by road type, so there is one factor per road type.
     let sho_alloc: HashMap<i32, f64> = inputs
         .zone_road_type
         .iter()
@@ -59,7 +59,7 @@ pub fn population_non_project(
         .map(|z| (z.road_type_id, z.sho_alloc_factor))
         .collect();
 
- // roadTypeDistribution indexed by source type.
+    // roadTypeDistribution indexed by source type.
     let mut road_dist: HashMap<i32, Vec<(i32, f64)>> = HashMap::new();
     for r in &inputs.road_type_distribution {
         road_dist
@@ -68,7 +68,7 @@ pub fn population_non_project(
             .push((r.road_type_id, r.road_type_vmt_fraction));
     }
 
- // sourceTypeAgePopulation indexed by source type.
+    // sourceTypeAgePopulation indexed by source type.
     let mut age_population: HashMap<i32, Vec<(i32, f64)>> = HashMap::new();
     for r in &inputs.source_type_age_population {
         age_population
@@ -83,7 +83,7 @@ pub fn population_non_project(
         .map(|r| r.source_type_id)
         .collect();
 
- // Off-network links — the cross join `link l ON l.roadTypeID = 1`.
+    // Off-network links — the cross join `link l ON l.roadTypeID = 1`.
     let off_network_links: Vec<i32> = inputs
         .link
         .iter()
@@ -95,13 +95,13 @@ pub fn population_non_project(
     let mut seen = HashSet::new();
     for sut in &inputs.source_use_type {
         let source_type_id = sut.source_type_id;
- // `GROUP BY sut.sourceTypeID` — process each source type once.
+        // `GROUP BY sut.sourceTypeID` — process each source type once.
         if !seen.insert(source_type_id) {
             continue;
         }
 
- // fractionBySourceTypeTemp: sum over (roadTypeDistribution ⋈
- // zoneRoadType) for this source type.
+        // fractionBySourceTypeTemp: sum over (roadTypeDistribution ⋈
+        // zoneRoadType) for this source type.
         let mut numerator = 0.0;
         let mut denominator = 0.0;
         for &(road_type_id, vmt_fraction) in road_dist
@@ -118,11 +118,11 @@ pub fn population_non_project(
         }
         let sut_fraction = numerator / denominator;
 
- // INNER JOIN runSpecSourceType rsst.
+        // INNER JOIN runSpecSourceType rsst.
         if !run_spec.contains(&source_type_id) {
             continue;
         }
- // INNER JOIN sourceTypeAgePopulation stap.
+        // INNER JOIN sourceTypeAgePopulation stap.
         let Some(ages) = age_population.get(&source_type_id) else {
             continue;
         };
@@ -133,7 +133,7 @@ pub fn population_non_project(
                 continue;
             }
             let population = population * sut_fraction;
- // CROSS JOIN link l ON l.roadTypeID = 1.
+            // CROSS JOIN link l ON l.roadTypeID = 1.
             for &link_id in &off_network_links {
                 let template = RowTemplate {
                     year_id: ctx.year,
@@ -174,7 +174,7 @@ pub fn population_project(
 ) -> Vec<ActivityRow> {
     let ctx = &inputs.context;
 
- // sourceTypeAgeDistribution indexed by source type.
+    // sourceTypeAgeDistribution indexed by source type.
     let mut age_dist: HashMap<i32, Vec<(i32, f64)>> = HashMap::new();
     for r in &inputs.source_type_age_distribution {
         age_dist
@@ -185,7 +185,7 @@ pub fn population_project(
 
     let mut out = Vec::new();
 
- // --- Off-network insert: link ⋈ offNetworkLink USING (zoneID). ---
+    // --- Off-network insert: link ⋈ offNetworkLink USING (zoneID). ---
     let mut off_network: HashMap<i32, Vec<(i32, f64)>> = HashMap::new();
     for r in &inputs.off_network_link {
         off_network
@@ -229,7 +229,7 @@ pub fn population_project(
         }
     }
 
- // --- On-roadway insert: link ⋈ linkSourceTypeHour ON linkID. ---
+    // --- On-roadway insert: link ⋈ linkSourceTypeHour ON linkID. ---
     let mut link_source_type_hour: HashMap<i32, Vec<(i32, f64)>> = HashMap::new();
     for r in &inputs.link_source_type_hour {
         link_source_type_hour
@@ -300,8 +300,8 @@ mod tests {
         }
     }
 
- /// A whole-bin source type 21, model year 2018 (age 2 of analysis year
- /// 2020): one fuel type, one regulatory class, both fraction 1.
+    /// A whole-bin source type 21, model year 2018 (age 2 of analysis year
+    /// 2020): one fuel type, one regulatory class, both fraction 1.
     fn whole_bin() -> (FuelFractionIndex, RegClassIndex) {
         let fuel = FuelFractionIndex::new(&[SourceTypeFuelFractionRow {
             source_type_id: 21,
@@ -325,7 +325,7 @@ mod tests {
         let inputs = ActivityInputs {
             context: ctx(),
             source_use_type: vec![SourceUseTypeRow { source_type_id: 21 }],
- // Source type 21 travels 75% on road 2, 25% on road 4.
+            // Source type 21 travels 75% on road 2, 25% on road 4.
             road_type_distribution: vec![
                 RoadTypeDistributionRow {
                     source_type_id: 21,
@@ -338,7 +338,7 @@ mod tests {
                     road_type_vmt_fraction: 0.25,
                 },
             ],
- // SHOAllocFactor 0.8 on road 2, 0.4 on road 4.
+            // SHOAllocFactor 0.8 on road 2, 0.4 on road 4.
             zone_road_type: vec![
                 ZoneRoadTypeRow {
                     zone_id: 261610,
@@ -367,8 +367,8 @@ mod tests {
         };
         let rows = population_non_project(&inputs, &fuel, &reg);
         assert_eq!(rows.len(), 1);
- // sutFraction = (0.75*0.8 + 0.25*0.4) / (0.75 + 0.25) = 0.7.
- // activity = 1000 * 0.7 * 1.0 * 1.0.
+        // sutFraction = (0.75*0.8 + 0.25*0.4) / (0.75 + 0.25) = 0.7.
+        // activity = 1000 * 0.7 * 1.0 * 1.0.
         assert!((rows[0].activity - 700.0).abs() < 1e-9);
         assert_eq!(rows[0].activity_type_id, 6);
         assert_eq!(rows[0].road_type_id, 1);
@@ -408,7 +408,7 @@ mod tests {
             ..ActivityInputs::default()
         };
         assert_eq!(population_non_project(&inputs, &fuel, &reg).len(), 1);
- // Drop source type 21 from the RunSpec selection.
+        // Drop source type 21 from the RunSpec selection.
         inputs.run_spec_source_type.clear();
         assert!(population_non_project(&inputs, &fuel, &reg).is_empty());
     }
@@ -435,7 +435,7 @@ mod tests {
                 population: 1000.0,
             }],
             run_spec_source_type: vec![RunSpecSourceTypeRow { source_type_id: 21 }],
- // Two off-network links plus one on-roadway link that must not match.
+            // Two off-network links plus one on-roadway link that must not match.
             link: vec![
                 LinkRow {
                     link_id: 9,
@@ -503,11 +503,11 @@ mod tests {
         };
         let rows = population_project(&inputs, &fuel, &reg);
         assert_eq!(rows.len(), 2);
- // Off-network insert runs first: 200 vehicles * 0.3 age fraction.
+        // Off-network insert runs first: 200 vehicles * 0.3 age fraction.
         assert_eq!(rows[0].link_id, 1);
         assert_eq!(rows[0].road_type_id, 1);
         assert!((rows[0].activity - 60.0).abs() < 1e-9);
- // On-roadway insert: 500 linkVolume * 0.5 hour fraction * 0.3 age.
+        // On-roadway insert: 500 linkVolume * 0.5 hour fraction * 0.3 age.
         assert_eq!(rows[1].link_id, 2);
         assert_eq!(rows[1].road_type_id, 4);
         assert!((rows[1].activity - 75.0).abs() < 1e-9);
@@ -517,7 +517,7 @@ mod tests {
     #[test]
     fn project_off_network_ignores_on_roadway_links() {
         let (fuel, reg) = whole_bin();
- // Only an on-roadway link is present; the off-network insert is empty.
+        // Only an on-roadway link is present; the off-network insert is empty.
         let inputs = ActivityInputs {
             context: ctx(),
             link: vec![LinkRow {
@@ -538,7 +538,7 @@ mod tests {
             }],
             ..ActivityInputs::default()
         };
- // No linkSourceTypeHour, so the on-roadway insert is empty too.
+        // No linkSourceTypeHour, so the on-roadway insert is empty too.
         assert!(population_project(&inputs, &fuel, &reg).is_empty());
     }
 }

@@ -12,14 +12,14 @@ use arrow::datatypes::{DataType, Field, Schema as ArrowSchema, SchemaRef};
 /// Which alternative-rate table this row set targets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LevKind {
- /// `EmissionRateByAgeLEV` — Low-Emission Vehicle alternative rates.
+    /// `EmissionRateByAgeLEV` — Low-Emission Vehicle alternative rates.
     Lev,
- /// `EmissionRateByAgeNLEV` — National-LEV alternative rates.
+    /// `EmissionRateByAgeNLEV` — National-LEV alternative rates.
     Nlev,
 }
 
 impl LevKind {
- /// The default-DB table name this kind targets.
+    /// The default-DB table name this kind targets.
     #[must_use]
     pub const fn table_name(self) -> &'static str {
         match self {
@@ -28,8 +28,8 @@ impl LevKind {
         }
     }
 
- /// Parse a user-supplied table name (case-insensitive). Accepts the
- /// canonical names and the short forms `LEV` / `NLEV`.
+    /// Parse a user-supplied table name (case-insensitive). Accepts the
+    /// canonical names and the short forms `LEV` / `NLEV`.
     #[must_use]
     pub fn from_table_name(name: &str) -> Option<Self> {
         let n = name.trim();
@@ -47,13 +47,13 @@ impl LevKind {
 /// One column of the LEV/NLEV row schema.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Column {
- /// Header text as it appears in the CSV (and in the default-DB).
+    /// Header text as it appears in the CSV (and in the default-DB).
     pub name: &'static str,
- /// Logical kind — drives parsing and Arrow encoding.
+    /// Logical kind — drives parsing and Arrow encoding.
     pub kind: ColumnKind,
- /// Required columns must have a non-null value in every row.
+    /// Required columns must have a non-null value in every row.
     pub required: bool,
- /// Primary-key columns participate in the uniqueness check.
+    /// Primary-key columns participate in the uniqueness check.
     pub primary_key: bool,
 }
 
@@ -63,15 +63,15 @@ pub struct Column {
 /// `mysql_to_arrow` mapping in `moves-default-db-convert`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ColumnKind {
- /// Signed 64-bit integer.
+    /// Signed 64-bit integer.
     Integer,
- /// 64-bit float; non-negative for rate columns (enforced by the
- /// validator, not the schema).
+    /// 64-bit float; non-negative for rate columns (enforced by the
+    /// validator, not the schema).
     Float,
 }
 
 impl ColumnKind {
- /// The Arrow [`DataType`] for this kind.
+    /// The Arrow [`DataType`] for this kind.
     #[must_use]
     pub fn arrow_type(self) -> DataType {
         match self {

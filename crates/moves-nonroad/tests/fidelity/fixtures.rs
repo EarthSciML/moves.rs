@@ -53,25 +53,25 @@ pub fn fixtures_dir() -> PathBuf {
 /// scraped from the RunSpec XML.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct NonroadFixture {
- /// The fixture name (file stem, e.g. `nr-construction-state`).
+    /// The fixture name (file stem, e.g. `nr-construction-state`).
     pub name: String,
- /// Absolute path to the RunSpec XML.
+    /// Absolute path to the RunSpec XML.
     pub path: PathBuf,
- /// `true` when the RunSpec selects the NONROAD model.
+    /// `true` when the RunSpec selects the NONROAD model.
     pub is_nonroad: bool,
- /// Geography level — `STATE`, `COUNTY`, or `NATION` — from the
- /// `<geographicselection type="…">` element.
+    /// Geography level — `STATE`, `COUNTY`, or `NATION` — from the
+    /// `<geographicselection type="…">` element.
     pub geography_level: Option<String>,
- /// Calendar year from the RunSpec `<timespan>`.
+    /// Calendar year from the RunSpec `<timespan>`.
     pub year: Option<i32>,
- /// The RunSpec `<description>` CDATA text, if present.
+    /// The RunSpec `<description>` CDATA text, if present.
     pub description: Option<String>,
 }
 
 impl NonroadFixture {
- /// The expected filename of this fixture's gfortran reference
- /// capture within the directory named by the
- /// `NONROAD_FIDELITY_REFERENCE` environment variable.
+    /// The expected filename of this fixture's gfortran reference
+    /// capture within the directory named by the
+    /// `NONROAD_FIDELITY_REFERENCE` environment variable.
     pub fn reference_filename(&self) -> String {
         format!("{}.tsv", self.name)
     }
@@ -160,7 +160,7 @@ mod tests {
     #[test]
     fn attr_of_skips_the_plural_container_element() {
         let xml = r#"<models><model value="NONROAD"/></models>"#;
- // "<model " (trailing space) must not match "<models>".
+        // "<model " (trailing space) must not match "<models>".
         assert_eq!(attr_of(xml, "<model ", "value").as_deref(), Some("NONROAD"));
         let geo = r#"<geographicselections><geographicselection type="STATE" key="26"/>"#;
         assert_eq!(
@@ -192,9 +192,9 @@ mod tests {
         assert_eq!(fixture.reference_filename(), "nr-construction-state.tsv");
     }
 
- /// Verify that `FIXTURE_NAMES` exactly matches the fixture names listed in
- /// `characterization/nonroad-fidelity/FIXTURES`, line for line and in the
- /// same order. Fails at compile-fail granularity when the two lists drift.
+    /// Verify that `FIXTURE_NAMES` exactly matches the fixture names listed in
+    /// `characterization/nonroad-fidelity/FIXTURES`, line for line and in the
+    /// same order. Fails at compile-fail granularity when the two lists drift.
     #[test]
     fn verify_fixture_names_match_corpus_manifest() {
         let fixtures_file = repo_root()

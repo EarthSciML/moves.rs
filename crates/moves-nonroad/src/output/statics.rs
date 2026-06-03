@@ -200,8 +200,8 @@ mod tests {
 
     #[test]
     fn si_index_groups_threes_into_fourteen_bins() {
- // Each consecutive run of three input codes shares one bin,
- // and the bins run 1..=14.
+        // Each consecutive run of three input codes shares one bin,
+        // and the bins run 1..=14.
         for (i, &bin) in SI_INDEX.iter().enumerate() {
             assert_eq!(bin as usize, i / 3 + 1);
         }
@@ -221,10 +221,10 @@ mod tests {
         assert_eq!(POLLUTANT_NAMES.len(), MXPOL);
         assert_eq!(POLLUTANT_AMS_NAMES.len(), MXPOL);
         assert_eq!(POLLUTANT_SAROAD.len(), MXPOL);
- // The hydrocarbon family carries the THC criteria pollutant.
+        // The hydrocarbon family carries the THC criteria pollutant.
         assert_eq!(POLLUTANT_AMS_NAMES[6], "THC"); // crankcase
         assert_eq!(POLLUTANT_SAROAD[6], 43101); // crankcase = ISCTHC
- // CO2 is left uninitialised by blknon.f.
+                                                // CO2 is left uninitialised by blknon.f.
         assert_eq!(POLLUTANT_SAROAD[3], 0);
     }
 }

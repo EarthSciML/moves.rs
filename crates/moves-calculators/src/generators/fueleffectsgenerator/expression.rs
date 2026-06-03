@@ -38,41 +38,41 @@ use thiserror::Error;
 /// Implemented by [`FuelFormulation`](super::model::FuelFormulation), whose
 /// columns are the variables a `fuelEffectRatioExpression` may reference.
 pub trait VariableSource {
- /// Return the value bound to `name`, or `None` if the identifier is
- /// not known. Implementations should match case-insensitively, since
- /// MariaDB column names are case-insensitive.
+    /// Return the value bound to `name`, or `None` if the identifier is
+    /// not known. Implementations should match case-insensitively, since
+    /// MariaDB column names are case-insensitive.
     fn variable(&self, name: &str) -> Option<f64>;
 }
 
 /// A parse or evaluation failure.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ExpressionError {
- /// The expression text held a character the tokenizer does not accept.
+    /// The expression text held a character the tokenizer does not accept.
     #[error("unexpected character {0:?} in fuel-effect expression")]
     UnexpectedChar(char),
- /// A numeric literal did not parse as a number.
+    /// A numeric literal did not parse as a number.
     #[error("malformed number {0:?} in fuel-effect expression")]
     BadNumber(String),
- /// The expression ended while more input was expected.
+    /// The expression ended while more input was expected.
     #[error("unexpected end of fuel-effect expression")]
     UnexpectedEnd,
- /// A token appeared where the grammar did not allow it.
+    /// A token appeared where the grammar did not allow it.
     #[error("unexpected token {0:?} in fuel-effect expression")]
     UnexpectedToken(String),
- /// A function call named a function this evaluator does not implement.
+    /// A function call named a function this evaluator does not implement.
     #[error("unknown function {0:?} in fuel-effect expression")]
     UnknownFunction(String),
- /// A function call had the wrong number of arguments.
+    /// A function call had the wrong number of arguments.
     #[error("function {func}() expects {expected} argument(s), got {got}")]
     ArgCount {
- /// The function name.
+        /// The function name.
         func: String,
- /// A human-readable description of the accepted arity.
+        /// A human-readable description of the accepted arity.
         expected: String,
- /// The number of arguments supplied.
+        /// The number of arguments supplied.
         got: usize,
     },
- /// An identifier was not resolved by the [`VariableSource`].
+    /// An identifier was not resolved by the [`VariableSource`].
     #[error("unknown variable {0:?} in fuel-effect expression")]
     UnknownVariable(String),
 }
@@ -99,7 +99,7 @@ enum Token {
 }
 
 impl Token {
- /// A short label for error messages.
+    /// A short label for error messages.
     fn label(&self) -> String {
         match self {
             Token::Number(n) => n.to_string(),
@@ -138,7 +138,7 @@ fn tokenize(text: &str) -> Result<Vec<Token>, ExpressionError> {
             while i < chars.len() && (chars[i].is_ascii_digit() || chars[i] == '.') {
                 i += 1;
             }
- // Optional exponent: e/E followed by an optional sign and digits.
+            // Optional exponent: e/E followed by an optional sign and digits.
             if i < chars.len() && (chars[i] == 'e' || chars[i] == 'E') {
                 let mut j = i + 1;
                 if j < chars.len() && (chars[j] == '+' || chars[j] == '-') {
@@ -163,7 +163,7 @@ fn tokenize(text: &str) -> Result<Vec<Token>, ExpressionError> {
             }
             tokens.push(Token::Ident(chars[start..i].iter().collect()));
         } else {
- // Operators and punctuation, longest match first.
+            // Operators and punctuation, longest match first.
             let two: Option<Token> = match (c, chars.get(i + 1)) {
                 ('<', Some('=')) => Some(Token::Le),
                 ('>', Some('=')) => Some(Token::Ge),
@@ -201,28 +201,28 @@ fn tokenize(text: &str) -> Result<Vec<Token>, ExpressionError> {
 /// A scalar function recognised in `primary`-position calls.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Func {
- /// `if(cond, then, otherwise)` — only the taken branch is evaluated.
+    /// `if(cond, then, otherwise)` — only the taken branch is evaluated.
     If,
- /// `pow(base, exp)` / `power(base, exp)`.
+    /// `pow(base, exp)` / `power(base, exp)`.
     Pow,
- /// `exp(x)`.
+    /// `exp(x)`.
     Exp,
- /// `log(x)` natural log, or `log(base, x)`.
+    /// `log(x)` natural log, or `log(base, x)`.
     Log,
- /// `ln(x)` natural log.
+    /// `ln(x)` natural log.
     Ln,
- /// `sqrt(x)`.
+    /// `sqrt(x)`.
     Sqrt,
- /// `abs(x)`.
+    /// `abs(x)`.
     Abs,
- /// `least(a, b, …)`.
+    /// `least(a, b, …)`.
     Least,
- /// `greatest(a, b, …)`.
+    /// `greatest(a, b, …)`.
     Greatest,
 }
 
 impl Func {
- /// Resolve a (case-insensitive) function name.
+    /// Resolve a (case-insensitive) function name.
     fn from_name(name: &str) -> Option<Func> {
         Some(match name.to_ascii_lowercase().as_str() {
             "if" => Func::If,
@@ -238,8 +238,8 @@ impl Func {
         })
     }
 
- /// Validate the argument count, returning a description of the
- /// accepted arity on mismatch.
+    /// Validate the argument count, returning a description of the
+    /// accepted arity on mismatch.
     fn check_arity(self, name: &str, got: usize) -> Result<(), ExpressionError> {
         let ok = match self {
             Func::If => got == 3,
@@ -306,12 +306,12 @@ pub struct Expression {
 }
 
 impl Expression {
- /// Parse expression text into a reusable tree.
- ///
- /// # Errors
- ///
- /// Returns an [`ExpressionError`] if the text does not tokenize or does
- /// not parse as a complete expression.
+    /// Parse expression text into a reusable tree.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`ExpressionError`] if the text does not tokenize or does
+    /// not parse as a complete expression.
     pub fn parse(text: &str) -> Result<Expression, ExpressionError> {
         let tokens = tokenize(text)?;
         let mut parser = Parser { tokens, pos: 0 };
@@ -324,13 +324,13 @@ impl Expression {
         Ok(Expression { root })
     }
 
- /// Evaluate the expression against `vars`.
- ///
- /// # Errors
- ///
- /// Returns [`ExpressionError::UnknownVariable`] if the expression
- /// references an identifier `vars` does not resolve, or
- /// [`ExpressionError::ArgCount`] for a defended-against arity mismatch.
+    /// Evaluate the expression against `vars`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ExpressionError::UnknownVariable`] if the expression
+    /// references an identifier `vars` does not resolve, or
+    /// [`ExpressionError::ArgCount`] for a defended-against arity mismatch.
     pub fn evaluate(&self, vars: &impl VariableSource) -> Result<f64, ExpressionError> {
         eval(&self.root, vars)
     }
@@ -355,17 +355,17 @@ impl Parser {
         tok
     }
 
- /// True when the next token is the keyword `word` (case-insensitive).
+    /// True when the next token is the keyword `word` (case-insensitive).
     fn peek_keyword(&self, word: &str) -> bool {
         matches!(self.peek(), Some(Token::Ident(s)) if s.eq_ignore_ascii_case(word))
     }
 
- /// expression := or
+    /// expression := or
     fn parse_expression(&mut self) -> Result<Node, ExpressionError> {
         self.parse_or()
     }
 
- /// or := and ( "or" and )*
+    /// or := and ( "or" and )*
     fn parse_or(&mut self) -> Result<Node, ExpressionError> {
         let mut lhs = self.parse_and()?;
         while self.peek_keyword("or") {
@@ -376,7 +376,7 @@ impl Parser {
         Ok(lhs)
     }
 
- /// and := not ( "and" not )*
+    /// and := not ( "and" not )*
     fn parse_and(&mut self) -> Result<Node, ExpressionError> {
         let mut lhs = self.parse_not()?;
         while self.peek_keyword("and") {
@@ -387,7 +387,7 @@ impl Parser {
         Ok(lhs)
     }
 
- /// not := "not" not | comparison
+    /// not := "not" not | comparison
     fn parse_not(&mut self) -> Result<Node, ExpressionError> {
         if self.peek_keyword("not") {
             self.pos += 1;
@@ -396,7 +396,7 @@ impl Parser {
         self.parse_comparison()
     }
 
- /// comparison := additive ( cmp_op additive )?
+    /// comparison := additive ( cmp_op additive )?
     fn parse_comparison(&mut self) -> Result<Node, ExpressionError> {
         let lhs = self.parse_additive()?;
         let op = match self.peek() {
@@ -413,7 +413,7 @@ impl Parser {
         Ok(Node::Binary(op, Box::new(lhs), Box::new(rhs)))
     }
 
- /// additive := multiplicative ( ("+"|"-") multiplicative )*
+    /// additive := multiplicative ( ("+"|"-") multiplicative )*
     fn parse_additive(&mut self) -> Result<Node, ExpressionError> {
         let mut lhs = self.parse_multiplicative()?;
         loop {
@@ -429,7 +429,7 @@ impl Parser {
         Ok(lhs)
     }
 
- /// multiplicative := unary ( ("*"|"/"|"%") unary )*
+    /// multiplicative := unary ( ("*"|"/"|"%") unary )*
     fn parse_multiplicative(&mut self) -> Result<Node, ExpressionError> {
         let mut lhs = self.parse_unary()?;
         loop {
@@ -446,7 +446,7 @@ impl Parser {
         Ok(lhs)
     }
 
- /// unary := ("-"|"+") unary | primary
+    /// unary := ("-"|"+") unary | primary
     fn parse_unary(&mut self) -> Result<Node, ExpressionError> {
         match self.peek() {
             Some(Token::Minus) => {
@@ -454,7 +454,7 @@ impl Parser {
                 Ok(Node::Neg(Box::new(self.parse_unary()?)))
             }
             Some(Token::Plus) => {
- // Unary plus is a no-op.
+                // Unary plus is a no-op.
                 self.pos += 1;
                 self.parse_unary()
             }
@@ -462,7 +462,7 @@ impl Parser {
         }
     }
 
- /// primary := Number | "(" expression ")" | Ident [ "(" args ")" ]
+    /// primary := Number | "(" expression ")" | Ident [ "(" args ")" ]
     fn parse_primary(&mut self) -> Result<Node, ExpressionError> {
         match self.bump() {
             None => Err(ExpressionError::UnexpectedEnd),
@@ -485,7 +485,7 @@ impl Parser {
                     func.check_arity(&name, args.len())?;
                     Ok(Node::Call(func, args))
                 } else if matches!(name.to_ascii_lowercase().as_str(), "and" | "or" | "not") {
- // A boolean keyword cannot stand as an operand.
+                    // A boolean keyword cannot stand as an operand.
                     Err(ExpressionError::UnexpectedToken(name))
                 } else {
                     Ok(Node::Variable(name))
@@ -495,7 +495,7 @@ impl Parser {
         }
     }
 
- /// args := [ expression ( "," expression )* ] ")"
+    /// args := [ expression ( "," expression )* ] ")"
     fn parse_args(&mut self) -> Result<Vec<Node>, ExpressionError> {
         let mut args = Vec::new();
         if matches!(self.peek(), Some(Token::RParen)) {
@@ -541,7 +541,7 @@ fn eval(node: &Node, vars: &impl VariableSource) -> Result<f64, ExpressionError>
                 BinOp::Add => a + b,
                 BinOp::Sub => a - b,
                 BinOp::Mul => a * b,
- // See the module-level fidelity note on integer division.
+                // See the module-level fidelity note on integer division.
                 BinOp::Div => a / b,
                 BinOp::Rem => a % b,
                 BinOp::Eq => boolean(a == b),
@@ -564,7 +564,7 @@ fn eval_call(
     args: &[Node],
     vars: &impl VariableSource,
 ) -> Result<f64, ExpressionError> {
- // `if` is lazy: only the taken branch is evaluated.
+    // `if` is lazy: only the taken branch is evaluated.
     if func == Func::If {
         let [cond, then, otherwise] = args else {
             return Err(arity_error("if", "3", args.len()));
@@ -590,8 +590,8 @@ fn eval_call(
         (Func::Abs, [x]) => Ok(x.abs()),
         (Func::Least, [first, rest @ ..]) => Ok(rest.iter().fold(*first, |m, v| m.min(*v))),
         (Func::Greatest, [first, rest @ ..]) => Ok(rest.iter().fold(*first, |m, v| m.max(*v))),
- // Arity is checked at parse time; this arm only guards against a
- // future grammar change leaving a malformed `Call` node.
+        // Arity is checked at parse time; this arm only guards against a
+        // future grammar change leaving a malformed `Call` node.
         (other, _) => Err(arity_error(
             func_name(other),
             "a different count",
@@ -629,7 +629,7 @@ mod tests {
     use super::*;
     use std::collections::BTreeMap;
 
- /// A trivial [`VariableSource`] backed by a name→value map.
+    /// A trivial [`VariableSource`] backed by a name→value map.
     struct Vars(BTreeMap<String, f64>);
 
     impl Vars {
@@ -656,7 +656,7 @@ mod tests {
 
     #[test]
     fn evaluates_the_test_fixture_expressions() {
- // The two expressions testDoGeneralFuelRatio inserts, with MTBEVolume=10.
+        // The two expressions testDoGeneralFuelRatio inserts, with MTBEVolume=10.
         let vars = Vars::new(&[("MTBEVolume", 10.0)]);
         assert_eq!(eval_str("MTBEVolume+7", &vars), 17.0);
         assert_eq!(eval_str("MTBEVolume*2", &vars), 20.0);
@@ -711,8 +711,8 @@ mod tests {
         let vars = Vars::new(&[("x", 5.0)]);
         assert_eq!(eval_str("if(x>0, 100, 200)", &vars), 100.0);
         assert_eq!(eval_str("if(x>9, 100, 200)", &vars), 200.0);
- // The untaken branch is not evaluated, so an unknown variable
- // there does not fail the call.
+        // The untaken branch is not evaluated, so an unknown variable
+        // there does not fail the call.
         assert_eq!(eval_str("if(x>0, 1, missing)", &vars), 1.0);
     }
 

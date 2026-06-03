@@ -54,12 +54,12 @@ impl DiffOptions {
 /// Top-level diff result. A snapshot is unchanged iff [`Diff::is_empty`].
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct Diff {
- /// Tables present in `rhs` but not `lhs`, lexicographically sorted.
+    /// Tables present in `rhs` but not `lhs`, lexicographically sorted.
     pub tables_added: Vec<String>,
- /// Tables present in `lhs` but not `rhs`, lexicographically sorted.
+    /// Tables present in `lhs` but not `rhs`, lexicographically sorted.
     pub tables_removed: Vec<String>,
- /// Per-table changes for tables present in both, lexicographically sorted
- /// by table name.
+    /// Per-table changes for tables present in both, lexicographically sorted
+    /// by table name.
     pub table_changes: Vec<TableChange>,
 }
 
@@ -70,7 +70,7 @@ impl Diff {
             && self.table_changes.iter().all(|t| t.is_empty())
     }
 
- /// Aggregate counts. Useful for CI summaries and human-readable output.
+    /// Aggregate counts. Useful for CI summaries and human-readable output.
     pub fn summary(&self) -> DiffSummary {
         let mut s = DiffSummary {
             tables_added: self.tables_added.len(),
@@ -194,7 +194,7 @@ pub fn diff_snapshots(lhs: &Snapshot, rhs: &Snapshot, opts: &DiffOptions) -> Dif
 fn diff_table(lhs: &Table, rhs: &Table, opts: &DiffOptions) -> TableChange {
     let mut schema_diffs = compute_schema_diffs(lhs, rhs);
 
- // Drop the NaturalKeyChanged sentinel before deciding the matching mode // we still want to surface it, but its presence drives the fallback path.
+    // Drop the NaturalKeyChanged sentinel before deciding the matching mode // we still want to surface it, but its presence drives the fallback path.
     let same_key = lhs.natural_key() == rhs.natural_key();
     if !same_key {
         schema_diffs.push(SchemaDiff::NaturalKeyChanged {
@@ -203,7 +203,7 @@ fn diff_table(lhs: &Table, rhs: &Table, opts: &DiffOptions) -> TableChange {
         });
     }
 
- // Cells are only compared for columns present in both with the same kind.
+    // Cells are only compared for columns present in both with the same kind.
     let comparable_columns = comparable_columns(lhs, rhs);
 
     let row_diffs = if same_key && !lhs.natural_key().is_empty() {
@@ -227,7 +227,7 @@ fn compute_schema_diffs(lhs: &Table, rhs: &Table) -> Vec<SchemaDiff> {
     let rhs_by_name: BTreeMap<&str, &ColumnSpec> =
         rhs.schema().iter().map(|c| (c.name.as_str(), c)).collect();
 
- // Iterate by union of names, sorted, so the diff is stable.
+    // Iterate by union of names, sorted, so the diff is stable.
     let names: BTreeSet<&str> = lhs_by_name
         .keys()
         .chain(rhs_by_name.keys())
@@ -438,7 +438,7 @@ fn stringify_key(cells: &[Option<String>]) -> Vec<String> {
 
 fn compare_keys(a: &[Option<String>], b: &[Option<String>]) -> Ordering {
     for (x, y) in a.iter().zip(b.iter()) {
- // None sorts before Some — same convention as the table builder.
+        // None sorts before Some — same convention as the table builder.
         let ord = match (x, y) {
             (None, None) => Ordering::Equal,
             (None, _) => Ordering::Less,
@@ -560,7 +560,7 @@ mod tests {
     fn float_tolerance_suppresses_small_diffs() {
         let mut s1 = Snapshot::new();
         let mut s2 = Snapshot::new();
- // Values differ by 1e-6 — within tolerance only when configured.
+        // Values differ by 1e-6 — within tolerance only when configured.
         s1.add_table(build_simple("t", &[(1, 1.000000)])).unwrap();
         s2.add_table(build_simple("t", &[(1, 1.000001)])).unwrap();
 
@@ -620,7 +620,7 @@ mod tests {
             &change.schema_diffs[0],
             SchemaDiff::ColumnAdded(c) if c.name == "b"
         ));
- // b is not comparable, so no cell diffs.
+        // b is not comparable, so no cell diffs.
         assert!(change.row_diffs.is_empty());
     }
 

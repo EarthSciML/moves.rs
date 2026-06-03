@@ -218,8 +218,8 @@ mod tests {
         std::fs::create_dir_all(dir.path()).unwrap();
         let mut f = std::fs::File::create(&path).unwrap();
         f.write_all(body).unwrap();
- // Leak the tempdir to keep the file alive; tests rely on the path
- // surviving past the helper. Inside #[cfg(test)] this is fine.
+        // Leak the tempdir to keep the file alive; tests rely on the path
+        // surviving past the helper. Inside #[cfg(test)] this is fine.
         std::mem::forget(dir);
         path
     }
@@ -297,13 +297,13 @@ mod tests {
     fn count_rows_matches_iteration() {
         let path = write_tmp("t.tsv", b"a\nb\nc\n");
         assert_eq!(count_rows(&path).unwrap(), 3);
- // No trailing newline
+        // No trailing newline
         let path2 = write_tmp("t2.tsv", b"a\nb\nc");
         assert_eq!(count_rows(&path2).unwrap(), 3);
- // Empty file
+        // Empty file
         let path3 = write_tmp("empty.tsv", b"");
         assert_eq!(count_rows(&path3).unwrap(), 0);
- // Blank lines aren't rows
+        // Blank lines aren't rows
         let path4 = write_tmp("blanks.tsv", b"a\n\nb\n");
         assert_eq!(count_rows(&path4).unwrap(), 2);
     }

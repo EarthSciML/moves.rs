@@ -47,7 +47,7 @@ const LINK_VALID: i32 = 5001; // roadTypeID = 4, produces one output row
 fn build_store() -> InMemoryStore {
     let mut store = InMemoryStore::new();
 
- // Five SHO rows: four off-network (filtered) + one valid.
+    // Five SHO rows: four off-network (filtered) + one valid.
     let sho_rows: Vec<ShoRow> = (0..5)
         .map(|i| ShoRow {
             hour_day_id: HOUR_DAY_ID,
@@ -61,7 +61,7 @@ fn build_store() -> InMemoryStore {
         .collect();
     store.insert("SHO", ShoRow::into_dataframe(sho_rows).unwrap());
 
- // Two links: off-network and a valid urban-unrestricted link.
+    // Two links: off-network and a valid urban-unrestricted link.
     let link_rows = vec![
         LinkRow {
             link_id: LINK_OFF_NETWORK,
@@ -78,14 +78,14 @@ fn build_store() -> InMemoryStore {
     ];
     store.insert("Link", LinkRow::into_dataframe(link_rows).unwrap());
 
- // One county row.
+    // One county row.
     let county_rows = vec![CountyRow {
         county_id: COUNTY_ID,
         state_id: STATE_ID,
     }];
     store.insert("County", CountyRow::into_dataframe(county_rows).unwrap());
 
- // One HourDay row.
+    // One HourDay row.
     let hour_day_rows = vec![HourDayRow {
         hour_day_id: HOUR_DAY_ID,
         day_id: DAY_ID,
@@ -96,7 +96,7 @@ fn build_store() -> InMemoryStore {
         HourDayRow::into_dataframe(hour_day_rows).unwrap(),
     );
 
- // One SourceBin row.
+    // One SourceBin row.
     let source_bin_rows = vec![SourceBinRow {
         source_bin_id: SOURCE_BIN_ID,
         reg_class_id: REG_CLASS_ID,
@@ -107,7 +107,7 @@ fn build_store() -> InMemoryStore {
         SourceBinRow::into_dataframe(source_bin_rows).unwrap(),
     );
 
- // One SourceBinDistribution row (fraction 1.0 so activity == distance).
+    // One SourceBinDistribution row (fraction 1.0 so activity == distance).
     let sbd_rows = vec![SourceBinDistributionRow {
         source_type_model_year_id: SOURCE_TYPE_MODEL_YEAR_ID,
         pol_process_id: POL_PROCESS_ID,
@@ -119,7 +119,7 @@ fn build_store() -> InMemoryStore {
         SourceBinDistributionRow::into_dataframe(sbd_rows).unwrap(),
     );
 
- // One SourceTypeModelYear row.
+    // One SourceTypeModelYear row.
     let stmy_rows = vec![SourceTypeModelYearRow {
         source_type_model_year_id: SOURCE_TYPE_MODEL_YEAR_ID,
         source_type_id: SOURCE_TYPE_ID,

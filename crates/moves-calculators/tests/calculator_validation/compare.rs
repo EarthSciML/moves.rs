@@ -105,15 +105,15 @@ pub fn compare_table(
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ValidationStatus {
- /// No canonical snapshot present — gate is dormant.
+    /// No canonical snapshot present — gate is dormant.
     Dormant,
- /// Canonical snapshot present but no matching table found.
+    /// Canonical snapshot present but no matching table found.
     CanonicalTableMissing,
- /// Produced and canonical tables match within tolerance.
+    /// Produced and canonical tables match within tolerance.
     Matched,
- /// Produced and canonical tables diverge beyond tolerance.
+    /// Produced and canonical tables diverge beyond tolerance.
     Diverged,
- /// Produced and canonical tables have different row counts (join-cardinality bug).
+    /// Produced and canonical tables have different row counts (join-cardinality bug).
     RowCountMismatch { canonical: usize, produced: usize },
 }
 

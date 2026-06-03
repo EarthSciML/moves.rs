@@ -30,14 +30,14 @@ pub struct RopRecord {
     pub reg_class_id: RegClassId,
     #[serde(rename = "modelYearID")]
     pub model_year_id: ModelYearId,
- /// Fraction of emissions to remove: 0.0 = no change, 1.0 = eliminate
- /// entirely. The downstream scaling factor is `1.0 - reductionFraction`.
+    /// Fraction of emissions to remove: 0.0 = no change, 1.0 = eliminate
+    /// entirely. The downstream scaling factor is `1.0 - reductionFraction`.
     #[serde(rename = "reductionFraction")]
     pub reduction_fraction: f64,
 }
 
 impl RopRecord {
- /// Construct a record from typed values.
+    /// Construct a record from typed values.
     pub fn new(
         pollutant_id: PollutantId,
         source_type_id: SourceTypeId,
@@ -54,8 +54,8 @@ impl RopRecord {
         }
     }
 
- /// `(pollutantID, sourceTypeID, regClassID, modelYearID)` — the
- /// canonical primary key.
+    /// `(pollutantID, sourceTypeID, regClassID, modelYearID)` — the
+    /// canonical primary key.
     pub fn key(&self) -> RopKey {
         RopKey {
             pollutant_id: self.pollutant_id,
@@ -65,7 +65,7 @@ impl RopRecord {
         }
     }
 
- /// The emission scale factor `1.0 - reductionFraction`.
+    /// The emission scale factor `1.0 - reductionFraction`.
     pub fn emission_scale_factor(&self) -> f64 {
         1.0 - self.reduction_fraction
     }
@@ -90,38 +90,38 @@ pub struct RopTable {
 }
 
 impl RopTable {
- /// Create an empty table.
+    /// Create an empty table.
     pub fn new() -> Self {
         Self::default()
     }
 
- /// Number of rows in the table.
+    /// Number of rows in the table.
     pub fn len(&self) -> usize {
         self.records.len()
     }
 
- /// `true` if the table has no rows.
+    /// `true` if the table has no rows.
     pub fn is_empty(&self) -> bool {
         self.records.is_empty()
     }
 
- /// Insert a record. If the key already exists the new fraction replaces it
- /// (last-write-wins; callers surface duplicate-key warnings separately).
+    /// Insert a record. If the key already exists the new fraction replaces it
+    /// (last-write-wins; callers surface duplicate-key warnings separately).
     pub fn insert(&mut self, record: RopRecord) {
         self.records.insert(record.key(), record.reduction_fraction);
     }
 
- /// Look up the reduction fraction for the given key, if any.
+    /// Look up the reduction fraction for the given key, if any.
     pub fn get(&self, key: &RopKey) -> Option<f64> {
         self.records.get(key).copied()
     }
 
- /// Whether the table contains an entry for the given key.
+    /// Whether the table contains an entry for the given key.
     pub fn contains_key(&self, key: &RopKey) -> bool {
         self.records.contains_key(key)
     }
 
- /// Iterate the table in canonical key-lexicographic order.
+    /// Iterate the table in canonical key-lexicographic order.
     pub fn iter(&self) -> impl Iterator<Item = RopRecord> + '_ {
         self.records.iter().map(|(k, &v)| RopRecord {
             pollutant_id: k.pollutant_id,
@@ -132,18 +132,18 @@ impl RopTable {
         })
     }
 
- /// Materialize the table as a `Vec<RopRecord>` in canonical order.
+    /// Materialize the table as a `Vec<RopRecord>` in canonical order.
     pub fn to_vec(&self) -> Vec<RopRecord> {
         self.iter().collect()
     }
 
- /// Look up the emission scale factor (`1.0 - reductionFraction`) for the
- /// given key. Returns `1.0` (no change) when no entry is found.
+    /// Look up the emission scale factor (`1.0 - reductionFraction`) for the
+    /// given key. Returns `1.0` (no change) when no entry is found.
     pub fn scale_factor(&self, key: &RopKey) -> f64 {
         self.records.get(key).map(|&r| 1.0 - r).unwrap_or(1.0)
     }
 
- /// Set of distinct `sourceTypeID`s present (ascending order).
+    /// Set of distinct `sourceTypeID`s present (ascending order).
     pub fn source_types(&self) -> Vec<SourceTypeId> {
         self.records
             .keys()
@@ -153,7 +153,7 @@ impl RopTable {
             .collect()
     }
 
- /// Set of distinct `pollutantID`s present (ascending order).
+    /// Set of distinct `pollutantID`s present (ascending order).
     pub fn pollutants(&self) -> Vec<PollutantId> {
         self.records
             .keys()

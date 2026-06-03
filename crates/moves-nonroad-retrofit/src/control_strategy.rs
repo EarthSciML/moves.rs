@@ -50,13 +50,13 @@ pub struct NonRoadRetrofitStrategy {
 }
 
 impl NonRoadRetrofitStrategy {
- /// Build from a list of retrofit records already parsed from an `.RTR`
- /// input file.
+    /// Build from a list of retrofit records already parsed from an `.RTR`
+    /// input file.
     pub fn new(records: Vec<RetrofitRecord>) -> Self {
         Self { records }
     }
 
- /// The retrofit records this strategy will apply.
+    /// The retrofit records this strategy will apply.
     pub fn records(&self) -> &[RetrofitRecord] {
         &self.records
     }
@@ -68,11 +68,11 @@ impl InternalControlStrategy for NonRoadRetrofitStrategy {
     }
 
     fn modified_tables(&self) -> &[&'static str] {
- // NONROAD does not write into the onroad `emissionRateAdjustment`
- // table; instead the per-SCC reduction is applied inline during the
- // geography loop. There is no shared execution-DB table to invalidate.
- // When (DataFrameStore) lands, this will declare the NONROAD
- // output table that receives the adjusted emission totals.
+        // NONROAD does not write into the onroad `emissionRateAdjustment`
+        // table; instead the per-SCC reduction is applied inline during the
+        // geography loop. There is no shared execution-DB table to invalidate.
+        // When (DataFrameStore) lands, this will declare the NONROAD
+        // output table that receives the adjusted emission totals.
         &[]
     }
 
@@ -80,13 +80,13 @@ impl InternalControlStrategy for NonRoadRetrofitStrategy {
         &self,
         _tables: &mut InMemoryStore,
     ) -> std::result::Result<(), moves_framework::Error> {
- // The live nonroad calculator reads its retrofit records from
- // `ReferenceData::retrofit_records`, NOT from this strategy object, and
- // the framework has no write API to bridge the two. If we hold records
- // here, succeeding silently would drop a reduction that canonical
- // NONROAD (`clcrtrft.f`) always applies. Fail loudly instead so a
- // non-empty retrofit registration cannot become an accidental no-op.
- // An empty strategy has nothing to apply and is a harmless no-op.
+        // The live nonroad calculator reads its retrofit records from
+        // `ReferenceData::retrofit_records`, NOT from this strategy object, and
+        // the framework has no write API to bridge the two. If we hold records
+        // here, succeeding silently would drop a reduction that canonical
+        // NONROAD (`clcrtrft.f`) always applies. Fail loudly instead so a
+        // non-empty retrofit registration cannot become an accidental no-op.
+        // An empty strategy has nothing to apply and is a harmless no-op.
         if !self.records.is_empty() {
             return Err(moves_framework::Error::Nonroad(format!(
                 "NonRoadRetrofitStrategy holds {} retrofit record(s) but cannot \
@@ -147,9 +147,9 @@ mod tests {
 
     #[test]
     fn pre_run_fails_with_populated_records() {
- // A non-empty retrofit strategy cannot be applied through the framework
- // yet, so pre_run must fail rather than silently drop the reduction that
- // canonical NONROAD (`clcrtrft.f`) would apply.
+        // A non-empty retrofit strategy cannot be applied through the framework
+        // yet, so pre_run must fail rather than silently drop the reduction that
+        // canonical NONROAD (`clcrtrft.f`) would apply.
         let s = NonRoadRetrofitStrategy::new(vec![make_record(1), make_record(2)]);
         let mut store = InMemoryStore::new();
         let err = s

@@ -111,11 +111,11 @@ static OUTPUT_TABLES: &[&str] = &["BaseRate", "BaseRateByAge", "DrivingIdleFract
 /// table. `driving_idle_fraction` is populated only on the drive-cycle path.
 #[derive(Debug, Clone, Default)]
 pub struct BaseRateOutput {
- /// Rows of the `BaseRate` table.
+    /// Rows of the `BaseRate` table.
     pub base_rate: Vec<BaseRateOutputRecord>,
- /// Rows of the `BaseRateByAge` table.
+    /// Rows of the `BaseRateByAge` table.
     pub base_rate_by_age: Vec<BaseRateOutputRecord>,
- /// Rows of the `DrivingIdleFraction` table (drive-cycle path only).
+    /// Rows of the `DrivingIdleFraction` table (drive-cycle path only).
     pub driving_idle_fraction: Vec<DrivingIdleFractionRow>,
 }
 
@@ -128,20 +128,20 @@ pub struct BaseRateOutput {
 pub struct BaseRateGenerator;
 
 impl BaseRateGenerator {
- /// Run the generator over a fully materialised set of input tables.
- ///
- /// Ports `BaseRateGeneratorFromRatesOpModeDistribution`. The drive-cycle
- /// fast path is taken for non-Project Running Exhaust (`processID == 1`)
- /// and Brakewear (`processID == 9`); every other process, and every
- /// Project-domain run, takes the `RatesOpModeDistribution` core path.
- /// Distance-based rates are always folded into the `BaseRate` output.
+    /// Run the generator over a fully materialised set of input tables.
+    ///
+    /// Ports `BaseRateGeneratorFromRatesOpModeDistribution`. The drive-cycle
+    /// fast path is taken for non-Project Running Exhaust (`processID == 1`)
+    /// and Brakewear (`processID == 9`); every other process, and every
+    /// Project-domain run, takes the `RatesOpModeDistribution` core path.
+    /// Distance-based rates are always folded into the `BaseRate` output.
     #[must_use]
     pub fn run(inputs: &BaseRateInputs, flags: &ExternalFlags) -> BaseRateOutput {
         let prepared = PreparedTables::from_inputs(inputs, flags);
 
- // shouldProcessDriveCycles — EMT-633 added processID 9 (Brakewear)
- // alongside processID 1 (Running Exhaust). ALWAYS_USE_ROMD_TABLE
- // forces the core path; it is `false` in normal operation.
+        // shouldProcessDriveCycles — EMT-633 added processID 9 (Brakewear)
+        // alongside processID 1 (Running Exhaust). ALWAYS_USE_ROMD_TABLE
+        // forces the core path; it is `false` in normal operation.
         let should_process_drive_cycles = !inputs.is_project
             && (flags.process_id == 1 || flags.process_id == 9)
             && !ALWAYS_USE_ROMD_TABLE;
@@ -175,13 +175,13 @@ impl Generator for BaseRateGenerator {
     }
 
     fn subscriptions(&self) -> &[CalculatorSubscription] {
- // Built once: `Priority::parse` is not a `const fn`, so the slice
- // cannot be a plain `static`. The Base Rate Generator subscribes for
- // every exhaust process at YEAR granularity, priority GENERATOR-2 // the rows recorded in `CalculatorInfo.txt`.
+        // Built once: `Priority::parse` is not a `const fn`, so the slice
+        // cannot be a plain `static`. The Base Rate Generator subscribes for
+        // every exhaust process at YEAR granularity, priority GENERATOR-2 // the rows recorded in `CalculatorInfo.txt`.
         static SUBS: OnceLock<Vec<CalculatorSubscription>> = OnceLock::new();
         SUBS.get_or_init(|| {
             let priority = Priority::parse("GENERATOR-2").expect("GENERATOR-2 is a valid priority");
- // Running, Start, Brakewear, Tirewear, Extended Idle, Aux Power.
+            // Running, Start, Brakewear, Tirewear, Extended Idle, Aux Power.
             [1_u16, 2, 9, 10, 90, 91]
                 .into_iter()
                 .map(|process| {
@@ -200,7 +200,7 @@ impl Generator for BaseRateGenerator {
     }
 
     fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
- // Extract process_id and year_id from the iteration position.
+        // Extract process_id and year_id from the iteration position.
         let pos = ctx.position();
         let process_id = pos
             .process_id
@@ -266,7 +266,7 @@ impl Generator for BaseRateGenerator {
 
         let output = BaseRateGenerator::run(&inputs, &flags);
 
- // Write output tables to scratch.
+        // Write output tables to scratch.
         let base_rate_df = output
             .base_rate
             .into_dataframe()
@@ -1064,15 +1064,18 @@ impl TableRow for RatesOpModeDistributionRow {
         let op = get_i32("opModeID")?;
         let omf = get_f64("opModeFraction")?;
         let abs = get_f64("avgBinSpeed")?;
- // `avgSpeedFraction` is part of the canonical RatesOpModeDistribution
- // schema, but the rates-path producer
- // (RatesOperatingModeDistributionGenerator) does not populate it. Its
- // value is only consulted under the `yASF` flag; the engine never sets
- // that flag (BaseRateGenerator::execute leaves ExternalFlags at default,
- // so use_avg_speed_fraction = false and the aggregator substitutes 1.0).
- // A missing column or NULL therefore lowers to 0.0 rather than failing
- // extraction — the value is never read for computation.
-        let asf = df.column("avgSpeedFraction").ok().and_then(|c| c.f64().ok());
+        // `avgSpeedFraction` is part of the canonical RatesOpModeDistribution
+        // schema, but the rates-path producer
+        // (RatesOperatingModeDistributionGenerator) does not populate it. Its
+        // value is only consulted under the `yASF` flag; the engine never sets
+        // that flag (BaseRateGenerator::execute leaves ExternalFlags at default,
+        // so use_avg_speed_fraction = false and the aggregator substitutes 1.0).
+        // A missing column or NULL therefore lowers to 0.0 rather than failing
+        // extraction — the value is never read for computation.
+        let asf = df
+            .column("avgSpeedFraction")
+            .ok()
+            .and_then(|c| c.f64().ok());
         (0..df.height())
             .map(|i| {
                 let null = |c| row_err(t, i, c, "null value".into());
@@ -1084,8 +1087,8 @@ impl TableRow for RatesOpModeDistributionRow {
                     pol_process_id: pol.get(i).ok_or_else(|| null("polProcessID"))?,
                     op_mode_id: op.get(i).ok_or_else(|| null("opModeID"))?,
                     op_mode_fraction: omf.get(i).ok_or_else(|| null("opModeFraction"))?,
- // MOVES leaves avgBinSpeed NULL in RatesOpModeDistribution
- // (default 0.0); treat a NULL as 0.0 rather than erroring.
+                    // MOVES leaves avgBinSpeed NULL in RatesOpModeDistribution
+                    // (default 0.0); treat a NULL as 0.0 rather than erroring.
                     avg_bin_speed: abs.get(i).unwrap_or(0.0),
                     avg_speed_fraction: asf.and_then(|c| c.get(i)).unwrap_or(0.0),
                 })
@@ -1430,10 +1433,10 @@ impl TableRow for SbWeightedRateDetail {
         let op = get_i32("opModeID")?;
         let my = get_i32("modelYearID")?;
         let ft = get_i32("fuelTypeID")?;
- // The non-age `SBWeightedEmissionRate` table is read with this same
- // struct but has no `ageGroupID` column; its rows carry age group 0
- // (see [`SbWeightedRateDetail`]). Treat an absent column — and any NULL
- // within it — as age group 0 rather than erroring.
+        // The non-age `SBWeightedEmissionRate` table is read with this same
+        // struct but has no `ageGroupID` column; its rows carry age group 0
+        // (see [`SbWeightedRateDetail`]). Treat an absent column — and any NULL
+        // within it — as age group 0 rather than erroring.
         let ag = df
             .column("ageGroupID")
             .ok()
@@ -1891,7 +1894,7 @@ mod tests {
         assert!(subs.iter().all(|s| s.granularity == Granularity::Year));
         assert!(subs.iter().all(|s| s.priority.display() == "GENERATOR-2"));
 
- // Generators register no (pollutant, process) output pairs.
+        // Generators register no (pollutant, process) output pairs.
         assert!(generator.upstream().is_empty());
         assert!(generator
             .input_tables()
@@ -1904,7 +1907,7 @@ mod tests {
 
     #[test]
     fn generator_is_object_safe() {
- // The registry stores generators as `Box<dyn Generator>`.
+        // The registry stores generators as `Box<dyn Generator>`.
         let generators: Vec<Box<dyn Generator>> = vec![Box::new(BaseRateGenerator)];
         assert_eq!(generators[0].name(), "BaseRateGenerator");
     }
@@ -1929,10 +1932,10 @@ mod tests {
             DataFrameStore, ExecutionLocation, ExecutionTime, InMemoryStore, IterationPosition,
         };
 
- // Build a minimal InMemoryStore with the required non-optional tables.
+        // Build a minimal InMemoryStore with the required non-optional tables.
         let mut store = InMemoryStore::new();
 
- // avgSpeedBin — one row so the inner join has a result.
+        // avgSpeedBin — one row so the inner join has a result.
         let avg_speed_bin = vec![AvgSpeedBinRow {
             avg_speed_bin_id: 1,
             avg_bin_speed: 25.0,
@@ -1942,33 +1945,33 @@ mod tests {
             AvgSpeedBinRow::into_dataframe(avg_speed_bin).unwrap(),
         );
 
- // avgSpeedDistribution — empty (no rows needed for the test to pass).
+        // avgSpeedDistribution — empty (no rows needed for the test to pass).
         store.insert(
             "avgSpeedDistribution",
             AvgSpeedDistributionRow::into_dataframe(vec![]).unwrap(),
         );
 
- // runSpecRoadType — one entry (road type 3).
+        // runSpecRoadType — one entry (road type 3).
         store.insert(
             "runSpecRoadType",
             RunSpecRoadTypeRow::into_dataframe(vec![RunSpecRoadTypeRow { road_type_id: 3 }])
                 .unwrap(),
         );
 
- // runSpecHourDay — one entry.
+        // runSpecHourDay — one entry.
         store.insert(
             "runSpecHourDay",
             RunSpecHourDayRow::into_dataframe(vec![RunSpecHourDayRow { hour_day_id: 85 }]).unwrap(),
         );
 
- // runSpecSourceType — one entry.
+        // runSpecSourceType — one entry.
         store.insert(
             "runSpecSourceType",
             RunSpecSourceTypeRow::into_dataframe(vec![RunSpecSourceTypeRow { source_type_id: 21 }])
                 .unwrap(),
         );
 
- // runSpecPollutantProcess — one entry for process 2 (pol 101).
+        // runSpecPollutantProcess — one entry for process 2 (pol 101).
         store.insert(
             "runSpecPollutantProcess",
             RunSpecPollutantProcessRow::into_dataframe(vec![RunSpecPollutantProcessRow {
@@ -1977,7 +1980,7 @@ mod tests {
             .unwrap(),
         );
 
- // opModePolProcAssoc — one entry linking pol process to an op mode.
+        // opModePolProcAssoc — one entry linking pol process to an op mode.
         store.insert(
             "opModePolProcAssoc",
             OpModePolProcRow::into_dataframe(vec![OpModePolProcRow {
@@ -1987,7 +1990,7 @@ mod tests {
             .unwrap(),
         );
 
- // Build a context with process 2 and year 2020.
+        // Build a context with process 2 and year 2020.
         let pos = IterationPosition {
             iteration: 0,
             process_id: Some(ProcessId(2)),
@@ -1996,12 +1999,12 @@ mod tests {
         };
         let mut ctx = CalculatorContext::with_position_and_tables(pos, store);
 
- // Execute must succeed.
+        // Execute must succeed.
         let generator = BaseRateGenerator;
         let result = generator.execute(&mut ctx);
         assert!(result.is_ok(), "execute failed: {:?}", result.err());
 
- // All three output tables must be present in scratch.
+        // All three output tables must be present in scratch.
         assert!(
             ctx.scratch().store.contains("BaseRate"),
             "BaseRate not in scratch"

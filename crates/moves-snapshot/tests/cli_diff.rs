@@ -113,11 +113,11 @@ fn tolerance_config_suppresses_small_diff() {
     write_snapshot(&[(1, 1.000000)], lhs.path());
     write_snapshot(&[(1, 1.000001)], rhs.path());
 
- // Without tolerance, this is a diff.
+    // Without tolerance, this is a diff.
     let (code, _, _) = run_diff(&[lhs.path().as_os_str(), rhs.path().as_os_str()]);
     assert_eq!(code, 1);
 
- // With a per-column tolerance > 1e-6, the diff is suppressed.
+    // With a per-column tolerance > 1e-6, the diff is suppressed.
     let cfg = tempfile::NamedTempFile::new().unwrap();
     std::fs::write(
         cfg.path(),
@@ -189,6 +189,6 @@ fn limit_caps_text_output_rows() {
         stdout.contains("more row diff(s) suppressed"),
         "stdout: {stdout}"
     );
- // 50 cell diffs, 3 shown, 47 suppressed.
+    // 50 cell diffs, 3 shown, 47 suppressed.
     assert!(stdout.contains("47 more"), "stdout: {stdout}");
 }

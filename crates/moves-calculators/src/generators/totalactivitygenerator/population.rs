@@ -80,11 +80,11 @@ pub fn calculate_base_year_population(
 /// What [`grow_population_to_analysis_year`] produces.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct GrownPopulation {
- /// `SourceTypeAgePopulation` for every year in `base_year..=analysis_year`
- /// — the base-year rows passed in plus every grown year.
+    /// `SourceTypeAgePopulation` for every year in `base_year..=analysis_year`
+    /// — the base-year rows passed in plus every grown year.
     pub population: Vec<SourceTypeAgePopulationRow>,
- /// `SourceTypeAgeDistribution` rows the Java `INSERT IGNORE`s for the
- /// analysis year (only keys absent from the existing table).
+    /// `SourceTypeAgeDistribution` rows the Java `INSERT IGNORE`s for the
+    /// analysis year (only keys absent from the existing table).
     pub age_distribution_additions: Vec<SourceTypeAgeDistributionRow>,
 }
 
@@ -120,7 +120,7 @@ pub fn grow_population_to_analysis_year(
     base_year: i32,
     analysis_year: i32,
 ) -> GrownPopulation {
- // (yearID, sourceTypeID) -> (migrationRate, salesGrowthFactor).
+    // (yearID, sourceTypeID) -> (migrationRate, salesGrowthFactor).
     let year_factors: BTreeMap<(i32, i32), (f64, f64)> = source_type_year
         .iter()
         .map(|r| {
@@ -130,18 +130,18 @@ pub fn grow_population_to_analysis_year(
             )
         })
         .collect();
- // (sourceTypeID, ageID) -> survivalRate.
+    // (sourceTypeID, ageID) -> survivalRate.
     let survival_rate: BTreeMap<(i32, i32), f64> = source_type_age
         .iter()
         .map(|r| ((r.source_type_id, r.age_id), r.survival_rate))
         .collect();
 
- // (yearID, sourceTypeID, ageID) -> population. Seeded with the base year.
+    // (yearID, sourceTypeID, ageID) -> population. Seeded with the base year.
     let mut population: BTreeMap<(i32, i32, i32), f64> = base_year_population
         .iter()
         .map(|r| ((r.year_id, r.source_type_id, r.age_id), r.population))
         .collect();
- // Source types that have a base-year population — the universe to grow.
+    // Source types that have a base-year population — the universe to grow.
     let source_types: Vec<i32> = {
         let mut s: Vec<i32> = base_year_population
             .iter()
@@ -153,16 +153,16 @@ pub fn grow_population_to_analysis_year(
     };
 
     for y in (base_year + 1)..=analysis_year {
- // Each year is computed entirely from year y-1, so the new rows can
- // be staged and merged after — exactly as the Java stages them in
- // SourceTypeAgePopulation2 before copying into SourceTypeAgePopulation.
+        // Each year is computed entirely from year y-1, so the new rows can
+        // be staged and merged after — exactly as the Java stages them in
+        // SourceTypeAgePopulation2 before copying into SourceTypeAgePopulation.
         let mut staged: Vec<((i32, i32, i32), f64)> = Vec::new();
         for &st in &source_types {
             let Some(&(migration_rate, sales_growth_factor)) = year_factors.get(&(y, st)) else {
                 continue;
             };
 
- // Age 0 — sales growth.
+            // Age 0 — sales growth.
             if let (Some(&prior_mr), Some(&pop_prev)) = (
                 year_factors.get(&(y - 1, st)).map(|(mr, _)| mr),
                 population.get(&(y - 1, st, 0)),
@@ -173,7 +173,7 @@ pub fn grow_population_to_analysis_year(
                 }
             }
 
- // Ages 1-39 — survival of the next-younger cohort.
+            // Ages 1-39 — survival of the next-younger cohort.
             for age in 1..MAX_AGE_ID {
                 let (Some(&survival), Some(&pop_prev)) = (
                     survival_rate.get(&(st, age)),
@@ -184,7 +184,7 @@ pub fn grow_population_to_analysis_year(
                 staged.push(((y, st, age), pop_prev * survival * migration_rate));
             }
 
- // Age 40 — survivors of age 39 plus survivors already at age 40.
+            // Age 40 — survivors of age 39 plus survivors already at age 40.
             if let (Some(&sr39), Some(&sr40), Some(&pop39), Some(&pop40)) = (
                 survival_rate.get(&(st, MAX_AGE_ID - 1)),
                 survival_rate.get(&(st, MAX_AGE_ID)),
@@ -198,11 +198,11 @@ pub fn grow_population_to_analysis_year(
         population.extend(staged);
     }
 
- // Analysis-year SourceTypeAgeDistribution rebuild.
+    // Analysis-year SourceTypeAgeDistribution rebuild.
     let mut total_by_source_type: BTreeMap<i32, f64> = BTreeMap::new();
     for (&(year, st, _age), &pop) in &population {
         if year == analysis_year {
- *total_by_source_type.entry(st).or_insert(0.0) += pop;
+            *total_by_source_type.entry(st).or_insert(0.0) += pop;
         }
     }
     let existing: BTreeMap<(i32, i32, i32), ()> = existing_age_distribution
@@ -253,7 +253,7 @@ pub fn grow_population_to_analysis_year(
 mod tests {
     use super::*;
 
- /// Tolerance for the population products under test.
+    /// Tolerance for the population products under test.
     const EPS: f64 = 1e-9;
 
     fn year(year_id: i32, is_base: bool) -> YearRow {
@@ -317,11 +317,11 @@ mod tests {
             year(2020, true),
             year(2025, true),
         ];
- // 2020 is a base year and the closest at or below 2022.
+        // 2020 is a base year and the closest at or below 2022.
         assert_eq!(determine_base_year(&years, 2022), Some(2020));
- // Exact hit on a base year.
+        // Exact hit on a base year.
         assert_eq!(determine_base_year(&years, 2015), Some(2015));
- // 2018 is not a base year — fall back to 2015.
+        // 2018 is not a base year — fall back to 2015.
         assert_eq!(determine_base_year(&years, 2019), Some(2015));
     }
 
@@ -341,7 +341,7 @@ mod tests {
             stad(21, 2020, 0, 0.25),
             stad(21, 2020, 1, 0.75),
             stad(31, 2020, 0, 1.0),
- // A different year — must be ignored.
+            // A different year — must be ignored.
             stad(21, 2019, 0, 1.0),
         ];
         let out = calculate_base_year_population(&stys, &stads, 2020);
@@ -353,7 +353,7 @@ mod tests {
 
     #[test]
     fn base_year_population_drops_age_distribution_without_source_type_year() {
- // Source type 99 has an age distribution but no SourceTypeYear row.
+        // Source type 99 has an age distribution but no SourceTypeYear row.
         let stys = [sty(2020, 21, 1000.0, 1.0, 1.0)];
         let stads = [stad(21, 2020, 0, 1.0), stad(99, 2020, 0, 1.0)];
         let out = calculate_base_year_population(&stys, &stads, 2020);
@@ -363,7 +363,7 @@ mod tests {
 
     #[test]
     fn grow_one_year_ages_cohorts_by_survival_and_migration() {
- // Base year 2020: source type 21, ages 0, 1, 2.
+        // Base year 2020: source type 21, ages 0, 1, 2.
         let base = [
             SourceTypeAgePopulationRow {
                 year_id: 2020,
@@ -384,22 +384,22 @@ mod tests {
                 population: 60.0,
             },
         ];
- // migrationRate 2020 = 1.0, 2021 = 1.1; salesGrowthFactor 2021 = 1.5.
+        // migrationRate 2020 = 1.0, 2021 = 1.1; salesGrowthFactor 2021 = 1.5.
         let stys = [sty(2020, 21, 0.0, 1.0, 1.0), sty(2021, 21, 0.0, 1.1, 1.5)];
- // survivalRate: age 1 = 0.9, age 2 = 0.8, age 3 = 0.7.
+        // survivalRate: age 1 = 0.9, age 2 = 0.8, age 3 = 0.7.
         let stas = [sta(21, 1, 0.9), sta(21, 2, 0.8), sta(21, 3, 0.7)];
         let grown = grow_population_to_analysis_year(&base, &stys, &stas, &[], 2020, 2021);
 
- // age 0, 2021 = (100/1.0) * 1.5 * 1.1 = 165.
+        // age 0, 2021 = (100/1.0) * 1.5 * 1.1 = 165.
         assert!((pop_at(&grown.population, 2021, 21, 0).unwrap() - 165.0).abs() < EPS);
- // age 1, 2021 = pop[0,2020] * survival[1] * migration[2021]
- // = 100 * 0.9 * 1.1 = 99.
+        // age 1, 2021 = pop[0,2020] * survival[1] * migration[2021]
+        // = 100 * 0.9 * 1.1 = 99.
         assert!((pop_at(&grown.population, 2021, 21, 1).unwrap() - 99.0).abs() < EPS);
- // age 2, 2021 = 80 * 0.8 * 1.1 = 70.4.
+        // age 2, 2021 = 80 * 0.8 * 1.1 = 70.4.
         assert!((pop_at(&grown.population, 2021, 21, 2).unwrap() - 70.4).abs() < EPS);
- // age 3, 2021 = 60 * 0.7 * 1.1 = 46.2.
+        // age 3, 2021 = 60 * 0.7 * 1.1 = 46.2.
         assert!((pop_at(&grown.population, 2021, 21, 3).unwrap() - 46.2).abs() < EPS);
- // The base-year rows are carried through unchanged.
+        // The base-year rows are carried through unchanged.
         assert!((pop_at(&grown.population, 2020, 21, 0).unwrap() - 100.0).abs() < EPS);
     }
 
@@ -411,7 +411,7 @@ mod tests {
             age_id: 0,
             population: 100.0,
         }];
- // 2020 migrationRate is 0 — the age-0 division is skipped.
+        // 2020 migrationRate is 0 — the age-0 division is skipped.
         let stys = [sty(2020, 21, 0.0, 0.0, 1.0), sty(2021, 21, 0.0, 1.0, 1.0)];
         let grown = grow_population_to_analysis_year(&base, &stys, &[], &[], 2020, 2021);
         assert_eq!(pop_at(&grown.population, 2021, 21, 0), None);
@@ -419,7 +419,7 @@ mod tests {
 
     #[test]
     fn grow_age_forty_folds_two_cohorts() {
- // Base year ages 39 and 40 present.
+        // Base year ages 39 and 40 present.
         let base = [
             SourceTypeAgePopulationRow {
                 year_id: 2020,
@@ -437,7 +437,7 @@ mod tests {
         let stys = [sty(2020, 21, 0.0, 1.0, 1.0), sty(2021, 21, 0.0, 1.0, 1.0)];
         let stas = [sta(21, 39, 0.5), sta(21, 40, 0.4)];
         let grown = grow_population_to_analysis_year(&base, &stys, &stas, &[], 2020, 2021);
- // age 40, 2021 = 10 * 0.5 * 1.0 + 5 * 0.4 * 1.0 = 5 + 2 = 7.
+        // age 40, 2021 = 10 * 0.5 * 1.0 + 5 * 0.4 * 1.0 = 5 + 2 = 7.
         assert!((pop_at(&grown.population, 2021, 21, 40).unwrap() - 7.0).abs() < EPS);
     }
 
@@ -457,7 +457,7 @@ mod tests {
                 population: 70.0,
             },
         ];
- // analysis year == base year: no growth, distribution built directly.
+        // analysis year == base year: no growth, distribution built directly.
         let grown = grow_population_to_analysis_year(&base, &[], &[], &[], 2020, 2020);
         let frac = |age| {
             grown
@@ -478,7 +478,7 @@ mod tests {
             age_id: 0,
             population: 100.0,
         }];
- // age 0 is already present — INSERT IGNORE keeps the existing row.
+        // age 0 is already present — INSERT IGNORE keeps the existing row.
         let existing = [stad(21, 2020, 0, 0.123)];
         let grown = grow_population_to_analysis_year(&base, &[], &[], &existing, 2020, 2020);
         assert!(grown.age_distribution_additions.is_empty());

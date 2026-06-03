@@ -53,27 +53,27 @@ pub fn fortran_e(value: f32, width: usize, decimals: usize) -> String {
     let negative = value < 0.0;
     let magnitude = f64::from(value).abs();
 
- // A non-finite value cannot occur in a valid emissions record;
- // if one ever reaches a writer it signals an upstream
- // computational error (a divide-by-zero, log of a negative
- // quantity, etc.). A Fortran `Ew.d` WRITE of such a value never
- // produces a legitimate-looking `0.0E+00` — it emits a visible
- // failure indicator. Reproduce that with the same field-overflow
- // asterisk fill this descriptor already uses, so the corrupt
- // value is not silently reported as a zero inventory.
+    // A non-finite value cannot occur in a valid emissions record;
+    // if one ever reaches a writer it signals an upstream
+    // computational error (a divide-by-zero, log of a negative
+    // quantity, etc.). A Fortran `Ew.d` WRITE of such a value never
+    // produces a legitimate-looking `0.0E+00` — it emits a visible
+    // failure indicator. Reproduce that with the same field-overflow
+    // asterisk fill this descriptor already uses, so the corrupt
+    // value is not silently reported as a zero inventory.
     if !magnitude.is_finite() {
         return "*".repeat(width);
     }
 
- // Decompose into a `d`-digit integer mantissa and an exponent so
- // that `value ≈ ± 0.<digits> × 10^exp`.
+    // Decompose into a `d`-digit integer mantissa and an exponent so
+    // that `value ≈ ± 0.<digits> × 10^exp`.
     let (digits, exp): (i64, i32) = if magnitude == 0.0 {
- // Zero prints as `0.0…0E+00`.
+        // Zero prints as `0.0…0E+00`.
         (0, 0)
     } else {
- // Normalise the mantissa to `0.1 ≤ m < 1.0`. `log10` can land
- // a hair either side of an exact power of ten, so the result
- // is corrected by one ulp of exponent if needed.
+        // Normalise the mantissa to `0.1 ≤ m < 1.0`. `log10` can land
+        // a hair either side of an exact power of ten, so the result
+        // is corrected by one ulp of exponent if needed.
         let mut exp = magnitude.log10().floor() as i32 + 1;
         let mut mantissa = magnitude / 10f64.powi(exp);
         if mantissa >= 1.0 {
@@ -83,8 +83,8 @@ pub fn fortran_e(value: f32, width: usize, decimals: usize) -> String {
             exp -= 1;
             mantissa = magnitude / 10f64.powi(exp);
         }
- // Round the mantissa to `d` digits; a round-up that reaches
- // 10^d carries into the exponent.
+        // Round the mantissa to `d` digits; a round-up that reaches
+        // 10^d carries into the exponent.
         let pow_d = 10i64.pow(d as u32);
         let mut digits = (mantissa * pow_d as f64).round() as i64;
         if digits >= pow_d {
@@ -94,7 +94,7 @@ pub fn fortran_e(value: f32, width: usize, decimals: usize) -> String {
         (digits, exp)
     };
 
- // The leading `0` survives only in a field wide enough for it.
+    // The leading `0` survives only in a field wide enough for it.
     let leading = if width >= d + 7 { "0." } else { "." };
     let exp_sign = if exp < 0 { '-' } else { '+' };
     let core = format!(
@@ -123,9 +123,9 @@ pub fn fortran_f(value: f32, width: usize, decimals: usize) -> String {
     let body = if decimals == 0 {
         format!("{scaled}.")
     } else {
- // Zero-pad so there is at least one digit before the point,
- // then splice the decimal point `decimals` places from the
- // right.
+        // Zero-pad so there is at least one digit before the point,
+        // then splice the decimal point `decimals` places from the
+        // right.
         let mut digits = format!("{scaled:0min$}", min = decimals + 1);
         digits.insert(digits.len() - decimals, '.');
         digits
@@ -185,26 +185,26 @@ pub struct FortranLine {
 }
 
 impl FortranLine {
- /// An empty line with the cursor at column 1.
+    /// An empty line with the cursor at column 1.
     pub fn new() -> Self {
         Self::default()
     }
 
- /// Move the cursor to 1-based `column` — the Fortran `Tn`
- /// descriptor. `column` 0 is treated as column 1.
+    /// Move the cursor to 1-based `column` — the Fortran `Tn`
+    /// descriptor. `column` 0 is treated as column 1.
     pub fn tab(&mut self, column: usize) {
         self.cursor = column.saturating_sub(1);
     }
 
- /// Move the cursor forward `n` columns — the Fortran `nX`
- /// descriptor.
+    /// Move the cursor forward `n` columns — the Fortran `nX`
+    /// descriptor.
     pub fn skip(&mut self, n: usize) {
         self.cursor += n;
     }
 
- /// Write `text` at the cursor, advancing it. A gap between the
- /// buffer end and the cursor is filled with blanks; content the
- /// cursor has been tabbed back over is overwritten.
+    /// Write `text` at the cursor, advancing it. A gap between the
+    /// buffer end and the cursor is filled with blanks; content the
+    /// cursor has been tabbed back over is overwritten.
     pub fn text(&mut self, text: &str) {
         for &byte in text.as_bytes() {
             if self.cursor >= self.buf.len() {
@@ -217,10 +217,10 @@ impl FortranLine {
         }
     }
 
- /// Consume the line and return its text.
+    /// Consume the line and return its text.
     pub fn finish(self) -> String {
- // The buffer only ever holds the ASCII bytes written through
- // `text`, so this conversion cannot fail.
+        // The buffer only ever holds the ASCII bytes written through
+        // `text`, so this conversion cannot fail.
         String::from_utf8(self.buf).expect("FortranLine holds only ASCII")
     }
 }
@@ -229,12 +229,12 @@ impl FortranLine {
 mod tests {
     use super::*;
 
- // ---- fortran_e ----
+    // ---- fortran_e ----
 
     #[test]
     fn e15_8_positive_has_leading_zero_and_blank_sign() {
- // 100.0 → 0.10000000E+03, right-justified in 15 with one
- // blank standing in for the (positive) sign.
+        // 100.0 → 0.10000000E+03, right-justified in 15 with one
+        // blank standing in for the (positive) sign.
         assert_eq!(fortran_e(100.0, 15, 8), " 0.10000000E+03");
     }
 
@@ -250,15 +250,15 @@ mod tests {
 
     #[test]
     fn e15_8_small_and_large_exponents() {
- // 0.001 → 0.10000000E-02
+        // 0.001 → 0.10000000E-02
         assert_eq!(fortran_e(0.001, 15, 8), " 0.10000000E-02");
- // 1.0 → 0.10000000E+01
+        // 1.0 → 0.10000000E+01
         assert_eq!(fortran_e(1.0, 15, 8), " 0.10000000E+01");
     }
 
     #[test]
     fn e15_8_rounds_to_eight_digits() {
- // 1.0/3.0 ≈ 0.33333334 (f32 value, eight mantissa digits).
+        // 1.0/3.0 ≈ 0.33333334 (f32 value, eight mantissa digits).
         let s = fortran_e(1.0 / 3.0, 15, 8);
         assert_eq!(s.len(), 15);
         assert_eq!(s, " 0.33333334E+00");
@@ -266,38 +266,38 @@ mod tests {
 
     #[test]
     fn e_carry_on_round_up() {
- // A value a hair below 100.0: its six-digit mantissa rounds
- // up to 1.000000 and must carry into the exponent — printing
- // .100000E+03, not a seven-digit mantissa or .1000000E+02.
+        // A value a hair below 100.0: its six-digit mantissa rounds
+        // up to 1.000000 and must carry into the exponent — printing
+        // .100000E+03, not a seven-digit mantissa or .1000000E+02.
         let just_below_100 = 100.0_f32 - 100.0 * f32::EPSILON;
         assert_eq!(fortran_e(just_below_100, 12, 6), " .100000E+03");
     }
 
     #[test]
     fn e10_4_drops_leading_zero() {
- // w = 10 = d + 6: no room for the leading 0.
+        // w = 10 = d + 6: no room for the leading 0.
         assert_eq!(fortran_e(100.0, 10, 4), " .1000E+03");
         assert_eq!(fortran_e(-100.0, 10, 4), "-.1000E+03");
     }
 
     #[test]
     fn e12_6_drops_leading_zero() {
- // w = 12 = d + 6 (the wrtsi SI-report descriptor).
+        // w = 12 = d + 6 (the wrtsi SI-report descriptor).
         assert_eq!(fortran_e(0.0, 12, 6), " .000000E+00");
         assert_eq!(fortran_e(1.5, 12, 6), " .150000E+01");
     }
 
     #[test]
     fn e_too_narrow_overflows_to_asterisks() {
- // w = 8 < d + 6 = 10 cannot hold an E4 value.
+        // w = 8 < d + 6 = 10 cannot hold an E4 value.
         assert_eq!(fortran_e(1.0, 8, 4), "********");
     }
 
- // ---- fortran_f ----
+    // ---- fortran_f ----
 
     #[test]
     fn f3_0_of_zero() {
- // wrthdr's leading dummy record writes rdum = 0.0 with F3.0.
+        // wrthdr's leading dummy record writes rdum = 0.0 with F3.0.
         assert_eq!(fortran_f(0.0, 3, 0), " 0.");
     }
 
@@ -313,7 +313,7 @@ mod tests {
         assert_eq!(fortran_f(12345.0, 3, 0), "***");
     }
 
- // ---- fortran_i ----
+    // ---- fortran_i ----
 
     #[test]
     fn i_right_justifies() {
@@ -328,7 +328,7 @@ mod tests {
         assert_eq!(fortran_i(123456, 4), "****");
     }
 
- // ---- fortran_a ----
+    // ---- fortran_a ----
 
     #[test]
     fn a_pads_short_value_on_the_right() {
@@ -338,7 +338,7 @@ mod tests {
 
     #[test]
     fn a_truncates_long_value_to_leftmost() {
- // A4 of the 15-wide name field "UnitsRetro".
+        // A4 of the 15-wide name field "UnitsRetro".
         assert_eq!(fortran_a("UnitsRetro", 4), "Unit");
     }
 
@@ -353,7 +353,7 @@ mod tests {
         assert_eq!(fortran_a("", 3), "   ");
     }
 
- // ---- FortranLine ----
+    // ---- FortranLine ----
 
     #[test]
     fn line_tab_pads_a_forward_gap_with_blanks() {
@@ -373,8 +373,8 @@ mod tests {
 
     #[test]
     fn line_tab_back_overwrites_existing_content() {
- // wrtsum.f's national line tabs back over already-written
- // text to drop a ':' into it.
+        // wrtsum.f's national line tabs back over already-written
+        // text to drop a ':' into it.
         let mut line = FortranLine::new();
         line.text("National Record");
         line.tab(10); // T10 — back into the written text

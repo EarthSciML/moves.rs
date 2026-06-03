@@ -78,7 +78,7 @@ fn all_17_generators_registered() {
         "duplicate generator name: {names:?}"
     );
 
- // Reading each generator's master-loop metadata must not panic.
+    // Reading each generator's master-loop metadata must not panic.
     for generator in &registered {
         let _ = generator.subscriptions();
         let _ = generator.output_tables();
@@ -105,18 +105,18 @@ fn coverage_matrix_reaches_every_fixture() {
 
 #[test]
 fn harness_composes_with_live_meteorology_output() {
- // Run the real MeteorologyGenerator numeric compute core over the
- // sample grid and shape its output into a snapshot table.
+    // Run the real MeteorologyGenerator numeric compute core over the
+    // sample grid and shape its output into a snapshot table.
     let cells = adapter::sample_cells();
     let produced = adapter::run_meteorology(&cells).expect("meteorology table builds");
     assert_eq!(produced.row_count(), cells.len());
     assert_eq!(produced.name(), adapter::ZONE_MONTH_HOUR_TABLE);
 
- // Plumbing check: live port output routed through the comparison
- // engine against itself shows no divergence. This exercises
- // adapter → compare_table on genuine `moves-calculators` output.
- // It is *not* a fidelity check against canonical MOVES — that
- // needs the snapshots (see the dormant test below).
+    // Plumbing check: live port output routed through the comparison
+    // engine against itself shows no divergence. This exercises
+    // adapter → compare_table on genuine `moves-calculators` output.
+    // It is *not* a fidelity check against canonical MOVES — that
+    // needs the snapshots (see the dormant test below).
     let diff = compare::compare_table(&produced, &produced, &DiffOptions::default())
         .expect("self-comparison runs");
     assert!(diff.is_empty(), "self-comparison must be empty:\n{diff:?}");
@@ -127,8 +127,8 @@ fn diff_engine_catches_a_perturbed_generator_value() {
     let cells = adapter::sample_cells();
     let produced = adapter::run_meteorology(&cells).expect("table builds");
 
- // Recompute with one cell's temperature perturbed well beyond any
- // tolerance budget; the diff must report the resulting divergence.
+    // Recompute with one cell's temperature perturbed well beyond any
+    // tolerance budget; the diff must report the resulting divergence.
     let mut perturbed_cells = cells.clone();
     perturbed_cells[2].inputs.temperature_f += 5.0;
     let perturbed = adapter::run_meteorology(&perturbed_cells).expect("table builds");
@@ -147,11 +147,11 @@ fn tolerance_budget_parses_and_carries_the_meteorology_exception() {
     let opts = compare::tolerance_options()
         .unwrap_or_else(|e| panic!("the committed tolerance.toml must parse: {e}"));
 
- // The budget records the one *expected* divergence the generator
- // port already documents: MeteorologyGenerator routes
- // specificHumidity / molWaterFraction through fahrenheit_to_kelvin,
- // whose exact 5.0/9.0 ratio differs ~8e-6 relative from MariaDB's
- // (5/9). Those columns must be widened past the strict default.
+    // The budget records the one *expected* divergence the generator
+    // port already documents: MeteorologyGenerator routes
+    // specificHumidity / molWaterFraction through fahrenheit_to_kelvin,
+    // whose exact 5.0/9.0 ratio differs ~8e-6 relative from MariaDB's
+    // (5/9). Those columns must be widened past the strict default.
     for column in ["specificHumidity", "molWaterFraction"] {
         let key = ("ZoneMonthHour".to_string(), column.to_string());
         let tol = opts.per_column_tolerance.get(&key).copied();
@@ -168,9 +168,9 @@ fn canonical_snapshots_validate_when_present() {
     let loaded = fixtures::load_all_fixtures().expect("fixtures must load");
     let opts = compare::tolerance_options().expect("tolerance budget parses");
 
- // The live-port adapter exists for MeteorologyGenerator today;
- // build its output once and validate it for every fixture that
- // exercises the generator.
+    // The live-port adapter exists for MeteorologyGenerator today;
+    // build its output once and validate it for every fixture that
+    // exercises the generator.
     let produced =
         adapter::run_meteorology(&adapter::sample_cells()).expect("meteorology table builds");
     let matrix = CoverageMatrix::build(&loaded, &generators::all_generators());
@@ -206,20 +206,20 @@ fn canonical_snapshots_validate_when_present() {
             "{LIVE_PORT_GENERATOR} must be exercised by at least one fixture"
         );
     } else {
- // The harness loaded the snapshots and ran the diff without
- // error — the dormant → active transition works. Divergences
- // are not asserted on here: until the data plane lands,
- // `produced` is the adapter's synthetic sample grid, not the
- // fixture's real generator output, so a mismatch is expected.
- // The pass/fail-on-divergence gate tightens when that wiring
- // replaces the sample grid with per-fixture output.
+        // The harness loaded the snapshots and ran the diff without
+        // error — the dormant → active transition works. Divergences
+        // are not asserted on here: until the data plane lands,
+        // `produced` is the adapter's synthetic sample grid, not the
+        // fixture's real generator output, so a mismatch is expected.
+        // The pass/fail-on-divergence gate tightens when that wiring
+        // replaces the sample grid with per-fixture output.
         eprintln!("generator-validation gate: ACTIVE — {active} fixture(s) loaded and diffed.");
     }
 }
 
 #[test]
 fn harness_status() {
- // An always-on status line, visible under `cargo test -- --nocapture`.
+    // An always-on status line, visible under `cargo test -- --nocapture`.
     let loaded = fixtures::load_all_fixtures().expect("fixtures must load");
     let matrix = CoverageMatrix::build(&loaded, &generators::all_generators());
 

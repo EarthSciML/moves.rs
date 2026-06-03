@@ -28,24 +28,24 @@ use std::path::PathBuf;
 /// Region scope level.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RegionLevel {
- /// US-total inventory.
+    /// US-total inventory.
     UsTotal,
- /// National inventory (per-state).
+    /// National inventory (per-state).
     Nation,
- /// State-level inventory.
+    /// State-level inventory.
     State,
- /// County-level inventory.
+    /// County-level inventory.
     County,
- /// Subcounty-level inventory.
+    /// Subcounty-level inventory.
     Subcounty,
 }
 
 /// Parsed `/REGION/` packet.
 #[derive(Debug, Clone)]
 pub struct RegionConfig {
- /// Region level.
+    /// Region level.
     pub level: RegionLevel,
- /// Region codes (FIPS or subcounty IDs). Empty for `UsTotal`/`Nation`.
+    /// Region codes (FIPS or subcounty IDs). Empty for `UsTotal`/`Nation`.
     pub regions: Vec<String>,
 }
 
@@ -111,7 +111,7 @@ pub fn read_region<R: BufRead>(reader: R) -> Result<RegionConfig> {
     })?;
 
     if matches!(level_value, RegionLevel::UsTotal | RegionLevel::Nation) {
- // Region list is ignored for these scopes; drop quietly.
+        // Region list is ignored for these scopes; drop quietly.
         return Ok(RegionConfig {
             level: level_value,
             regions: Vec::new(),

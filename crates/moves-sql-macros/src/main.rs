@@ -39,23 +39,23 @@ use moves_sql_macros::{
     version
 )]
 struct Args {
- /// Path to the raw SQL script (e.g. one of the files under
- /// `database/` in the upstream `EPA_MOVES_Model` repo).
+    /// Path to the raw SQL script (e.g. one of the files under
+    /// `database/` in the upstream `EPA_MOVES_Model` repo).
     #[arg(long, value_name = "FILE")]
     script: PathBuf,
 
- /// Path to the TOML configuration file. See the crate-level docs for
- /// the schema. Pass `--config /dev/null` (or an empty file) for a
- /// pass-through with no macros, no sections, no replacements.
+    /// Path to the TOML configuration file. See the crate-level docs for
+    /// the schema. Pass `--config /dev/null` (or an empty file) for a
+    /// pass-through with no macros, no sections, no replacements.
     #[arg(long, value_name = "FILE")]
     config: PathBuf,
 
- /// Output file. Omit to print to stdout.
+    /// Output file. Omit to print to stdout.
     #[arg(long, value_name = "FILE")]
     output: Option<PathBuf>,
 
- /// Emit a one-line summary on stderr (sections seen / kept / dropped).
- /// Off by default so the tool can be used in shell pipelines.
+    /// Emit a one-line summary on stderr (sections seen / kept / dropped).
+    /// Off by default so the tool can be used in shell pipelines.
     #[arg(long)]
     summary: bool,
 }
@@ -125,9 +125,9 @@ fn write_output(args: &Args, lines: &[String]) -> Result<()> {
         None => {
             let mut stdout = std::io::stdout().lock();
             for line in lines {
- // stdout write errors generally indicate a closed pipe;
- // there's no useful Error variant for them in the doc tool,
- // so map them to the script path for context.
+                // stdout write errors generally indicate a closed pipe;
+                // there's no useful Error variant for them in the doc tool,
+                // so map them to the script path for context.
                 writeln!(stdout, "{line}").map_err(|source| Error::Io {
                     path: args.script.clone(),
                     source,

@@ -21,25 +21,25 @@ const PROVENANCE_FILE: &str = "provenance.json";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Provenance {
- /// Sidecar format version, bumped on incompatible changes.
+    /// Sidecar format version, bumped on incompatible changes.
     pub provenance_version: String,
- /// Filename-derived fixture identifier (e.g. `samplerunspec`).
+    /// Filename-derived fixture identifier (e.g. `samplerunspec`).
     pub fixture_name: String,
- /// SHA256 of the SIF the run executed against.
+    /// SHA256 of the SIF the run executed against.
     pub sif_sha256: String,
- /// File path the SIF lockfile recorded (relative to repo root). Captured
- /// for human-readability; the SHA is the canonical identity.
+    /// File path the SIF lockfile recorded (relative to repo root). Captured
+    /// for human-readability; the SHA is the canonical identity.
     pub sif_path: String,
- /// Original RunSpec path on the host. Captured for traceability.
+    /// Original RunSpec path on the host. Captured for traceability.
     pub runspec_path: String,
- /// SHA256 of the RunSpec file's bytes — the input that, together with
- /// `sif_sha256`, defines the snapshot's identity.
+    /// SHA256 of the RunSpec file's bytes — the input that, together with
+    /// `sif_sha256`, defines the snapshot's identity.
     pub runspec_sha256: String,
- /// Snapshot's aggregate hash from the moves-snapshot manifest. Stored
- /// here for cross-reference; the manifest is the source of truth.
+    /// Snapshot's aggregate hash from the moves-snapshot manifest. Stored
+    /// here for cross-reference; the manifest is the source of truth.
     pub snapshot_aggregate_sha256: String,
- /// Output and (optional) scale-input database names, in case downstream
- /// tools need them without re-parsing the RunSpec.
+    /// Output and (optional) scale-input database names, in case downstream
+    /// tools need them without re-parsing the RunSpec.
     pub output_database: String,
     pub scale_input_database: Option<String>,
 }
@@ -106,7 +106,7 @@ pub fn read_sif_sha_from_lockfile(path: &Path) -> Result<Option<String>> {
         if trimmed.starts_with('#') || trimmed.is_empty() {
             continue;
         }
- // Match `sif_sha256 = "..."` or `sif_sha256= "..."` or `sif_sha256="..."`.
+        // Match `sif_sha256 = "..."` or `sif_sha256= "..."` or `sif_sha256="..."`.
         let Some(rest) = trimmed.strip_prefix("sif_sha256") else {
             continue;
         };

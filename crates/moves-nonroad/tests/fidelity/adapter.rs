@@ -168,16 +168,16 @@ pub fn clcems_records(ctx: &Context, out: &ExhaustCalcOutputs) -> Vec<ReferenceR
 /// The accumulated [`captured`](Self::captured) records are the
 /// port-side input to [`super::divergence::compare_runs`].
 pub struct InstrumentingExecutor<G: GeographyExecutor> {
- /// The wrapped executor that evaluates the geography routines.
+    /// The wrapped executor that evaluates the geography routines.
     pub inner: G,
- /// Port-side records accumulated across all dispatches.
+    /// Port-side records accumulated across all dispatches.
     pub captured: Vec<ReferenceRecord>,
     call_counter: usize,
 }
 
 impl<G: GeographyExecutor> InstrumentingExecutor<G> {
- /// Wrap `inner` in a new instrumenting executor with an empty
- /// capture log.
+    /// Wrap `inner` in a new instrumenting executor with an empty
+    /// capture log.
     pub fn new(inner: G) -> Self {
         Self {
             inner,
@@ -343,7 +343,7 @@ mod tests {
         assert_eq!(popeqp.values, vec![100.0, 250.0]);
         let ipopyr = records.iter().find(|r| r.label == "ipopyr").unwrap();
         assert_eq!(ipopyr.values, vec![2018.0, 2021.0]);
- // Every array has one entry per selected population.
+        // Every array has one entry per selected population.
         for r in &records {
             assert_eq!(r.values.len(), pops.len());
         }
@@ -475,7 +475,7 @@ mod tests {
         let mut instr = InstrumentingExecutor::new(inner);
         instr.execute(&dispatch_ctx, &options).unwrap();
 
- // Three GETPOP records per dispatch (popeqp, avghpc, ipopyr).
+        // Three GETPOP records per dispatch (popeqp, avghpc, ipopyr).
         let getpop: Vec<_> = instr
             .captured
             .iter()
@@ -486,7 +486,7 @@ mod tests {
         assert!(labels.contains(&"popeqp"));
         assert!(labels.contains(&"ipopyr"));
 
- // PlanRecordingExecutor returns no rows → no CLCEMS records.
+        // PlanRecordingExecutor returns no rows → no CLCEMS records.
         let clcems_count = instr
             .captured
             .iter()
@@ -494,7 +494,7 @@ mod tests {
             .count();
         assert_eq!(clcems_count, 0);
 
- // Call counter is reflected in the context.
+        // Call counter is reflected in the context.
         assert_eq!(instr.captured[0].context.call(), Some(1));
     }
 
@@ -522,9 +522,9 @@ mod tests {
         instr.execute(&dispatch_ctx, &options).unwrap();
         instr.execute(&dispatch_ctx, &options).unwrap();
 
- // Two dispatches × 3 GETPOP records each = 6 total.
+        // Two dispatches × 3 GETPOP records each = 6 total.
         assert_eq!(instr.captured.len(), 6);
- // Second dispatch has call=2.
+        // Second dispatch has call=2.
         let second_call_records: Vec<_> = instr
             .captured
             .iter()

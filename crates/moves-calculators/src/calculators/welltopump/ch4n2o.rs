@@ -133,8 +133,8 @@ struct GroupKey {
     county_id: i32,
     zone_id: i32,
     link_id: i32,
- /// The well-to-pump factor table's pollutant — methane (5) or nitrous
- /// oxide (6).
+    /// The well-to-pump factor table's pollutant — methane (5) or nitrous
+    /// oxide (6).
     pollutant_id: i32,
     source_type_id: i32,
     fuel_type_id: i32,
@@ -151,42 +151,42 @@ struct GroupKey {
 pub struct Ch4N2oWtpCalculator;
 
 impl Ch4N2oWtpCalculator {
- /// Stable module name — matches the Java class and the chain-DAG entry.
+    /// Stable module name — matches the Java class and the chain-DAG entry.
     pub const NAME: &'static str = CALCULATOR_NAME;
 
- /// Compute the well-to-pump CH4 and N2O rows — the port of
- /// `CH4N2OWTPCalculator.sql`.
- ///
- /// Returns no rows when the inputs carry no usable energy: an energy
- /// record contributes only if it is pollutant 91 for a process other than
- /// Well-To-Pump, its month resolves a month group, and its
- /// `(year, monthGroup, fuelType)` resolves a well-to-pump factor — every
- /// SQL join is an `INNER JOIN`. The result is ordered by its `GROUP BY`
- /// cell for deterministic output; MOVES leaves `MOVESWorkerOutput`
- /// physically unordered.
+    /// Compute the well-to-pump CH4 and N2O rows — the port of
+    /// `CH4N2OWTPCalculator.sql`.
+    ///
+    /// Returns no rows when the inputs carry no usable energy: an energy
+    /// record contributes only if it is pollutant 91 for a process other than
+    /// Well-To-Pump, its month resolves a month group, and its
+    /// `(year, monthGroup, fuelType)` resolves a well-to-pump factor — every
+    /// SQL join is an `INNER JOIN`. The result is ordered by its `GROUP BY`
+    /// cell for deterministic output; MOVES leaves `MOVESWorkerOutput`
+    /// physically unordered.
     #[must_use]
     pub fn calculate(&self, inputs: &WtpInputs) -> Vec<WorkerOutputRow> {
         let factor_table = build_wtp_factor_by_fuel_type(inputs);
         let month_group = month_group_index(&inputs.month_of_any_year);
 
- // emissionQuant = Σ (energy × WTPFactor) — the factor is folded into
- // the per-row product, matching the SQL's SUM(emissionQuant * factor).
+        // emissionQuant = Σ (energy × WTPFactor) — the factor is folded into
+        // the per-row product, matching the SQL's SUM(emissionQuant * factor).
         let mut groups: BTreeMap<GroupKey, f64> = BTreeMap::new();
         for energy in &inputs.worker_output {
- // mwo.pollutantID = 91.
+            // mwo.pollutantID = 91.
             if energy.pollutant_id != TOTAL_ENERGY_POLLUTANT_ID {
                 continue;
             }
- // mwo.processID <> 99 — do not re-process well-to-pump energy.
+            // mwo.processID <> 99 — do not re-process well-to-pump energy.
             if energy.process_id == WELL_TO_PUMP_PROCESS_ID {
                 continue;
             }
- // INNER JOIN may ON may.monthID = mwo.monthID.
+            // INNER JOIN may ON may.monthID = mwo.monthID.
             let Some(&month_group_id) = month_group.get(&energy.month_id) else {
                 continue;
             };
- // INNER JOIN wfft ON yearID, monthGroupID, fuelTypeID (countyID is
- // the trivially-satisfied single-county join).
+            // INNER JOIN wfft ON yearID, monthGroupID, fuelTypeID (countyID is
+            // the trivially-satisfied single-county join).
             let Some(cells) =
                 factor_table.get(&(energy.year_id, month_group_id, energy.fuel_type_id))
             else {
@@ -208,7 +208,7 @@ impl Ch4N2oWtpCalculator {
                     model_year_id: energy.model_year_id,
                     road_type_id: energy.road_type_id,
                 };
- *groups.entry(key).or_insert(0.0) += energy.emission_quant * cell.factor;
+                *groups.entry(key).or_insert(0.0) += energy.emission_quant * cell.factor;
             }
         }
 
@@ -260,15 +260,15 @@ impl Calculator for Ch4N2oWtpCalculator {
         Self::NAME
     }
 
- /// `CH4N2OWTPCalculator` is a chained calculator: it does not subscribe to
- /// the MasterLoop directly. `calculator-dag.json` records
- /// `subscribes_directly: false` and an empty `subscriptions` list.
+    /// `CH4N2OWTPCalculator` is a chained calculator: it does not subscribe to
+    /// the MasterLoop directly. `calculator-dag.json` records
+    /// `subscribes_directly: false` and an empty `subscriptions` list.
     fn subscriptions(&self) -> &[CalculatorSubscription] {
         NO_SUBSCRIPTIONS
     }
 
- /// Empty — `CH4N2OWTPCalculator` is superseded by `BaseRateCalculator` and
- /// registers no `(pollutant, process)` pairs; see the module-level note.
+    /// Empty — `CH4N2OWTPCalculator` is superseded by `BaseRateCalculator` and
+    /// registers no `(pollutant, process)` pairs; see the module-level note.
     fn registrations(&self) -> &[PollutantProcessAssociation] {
         NO_REGISTRATIONS
     }
@@ -289,7 +289,9 @@ impl Calculator for Ch4N2oWtpCalculator {
             .time
             .year
             .map(i32::from)
-            .ok_or_else(|| Error::MissingContext { what: "context.year".into() })?;
+            .ok_or_else(|| Error::MissingContext {
+                what: "context.year".into(),
+            })?;
         let inputs = WtpInputs {
             greet: tables.iter_typed::<GreetWellToPumpRow>("GREETWellToPump")?,
             fuel_supply: tables.iter_typed::<FuelSupplyRow>("FuelSupply")?,
@@ -320,11 +322,11 @@ mod tests {
         YearRow,
     };
 
- /// Build a one-formulation / one-energy-row input carrying GREET factors
- /// for both methane (5) and nitrous oxide (6). With market share 1.0 the
- /// factors are the GREET rates `10.0` (CH4) and `20.0` (N2O); the single
- /// energy record is `200.0`, so the two output rows are `200.0 × 10.0`
- /// and `200.0 × 20.0`.
+    /// Build a one-formulation / one-energy-row input carrying GREET factors
+    /// for both methane (5) and nitrous oxide (6). With market share 1.0 the
+    /// factors are the GREET rates `10.0` (CH4) and `20.0` (N2O); the single
+    /// energy record is `200.0`, so the two output rows are `200.0 × 10.0`
+    /// and `200.0 × 20.0`.
     fn minimal_inputs() -> WtpInputs {
         WtpInputs {
             greet: vec![
@@ -394,13 +396,13 @@ mod tests {
     #[test]
     fn calculate_fans_out_to_methane_and_nitrous_oxide() {
         let rows = Ch4N2oWtpCalculator.calculate(&minimal_inputs());
- // One energy record → one CH4 row and one N2O row.
+        // One energy record → one CH4 row and one N2O row.
         assert_eq!(rows.len(), 2);
         let methane = rows.iter().find(|r| r.pollutant_id == 5).unwrap();
         let nitrous = rows.iter().find(|r| r.pollutant_id == 6).unwrap();
         assert_eq!(methane.process_id, 99);
         assert_eq!(nitrous.process_id, 99);
- // 200.0 × 10.0 and 200.0 × 20.0.
+        // 200.0 × 10.0 and 200.0 × 20.0.
         assert_close(methane.emission_quant, 2_000.0);
         assert_close(nitrous.emission_quant, 4_000.0);
     }
@@ -420,8 +422,8 @@ mod tests {
 
     #[test]
     fn calculate_sums_energy_across_source_processes() {
- // Two energy records, processes 1 and 2 — collapsed (GROUP BY omits
- // processID); each pollutant row sums Σ(energy × factor).
+        // Two energy records, processes 1 and 2 — collapsed (GROUP BY omits
+        // processID); each pollutant row sums Σ(energy × factor).
         let mut inputs = minimal_inputs();
         inputs.worker_output.push(WorkerOutputRow {
             process_id: 2,
@@ -431,7 +433,7 @@ mod tests {
         let rows = Ch4N2oWtpCalculator.calculate(&inputs);
         assert_eq!(rows.len(), 2);
         let methane = rows.iter().find(|r| r.pollutant_id == 5).unwrap();
- // 200.0 × 10.0 + 50.0 × 10.0.
+        // 200.0 × 10.0 + 50.0 × 10.0.
         assert_close(methane.emission_quant, 2_500.0);
     }
 
@@ -465,7 +467,7 @@ mod tests {
 
     #[test]
     fn calculate_handles_a_single_pollutant() {
- // GREET data for methane only → only methane output rows.
+        // GREET data for methane only → only methane output rows.
         let mut inputs = minimal_inputs();
         inputs.greet.retain(|g| g.pollutant_id == 5);
         let rows = Ch4N2oWtpCalculator.calculate(&inputs);
@@ -482,7 +484,7 @@ mod tests {
 
     #[test]
     fn calculate_output_is_ordered_by_pollutant() {
- // The two pollutant rows of one cell come back CH4 (5) before N2O (6).
+        // The two pollutant rows of one cell come back CH4 (5) before N2O (6).
         let rows = Ch4N2oWtpCalculator.calculate(&minimal_inputs());
         assert_eq!(rows[0].pollutant_id, 5);
         assert_eq!(rows[1].pollutant_id, 6);

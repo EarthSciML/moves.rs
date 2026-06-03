@@ -192,48 +192,48 @@ const HONO_POLLUTANT: PollutantId = PollutantId(34);
 /// copies verbatim; they are not modelled (see the [module documentation](self)).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MovesWorkerOutputRow {
- /// `yearID`.
+    /// `yearID`.
     pub year_id: i32,
- /// `monthID`.
+    /// `monthID`.
     pub month_id: i32,
- /// `dayID`.
+    /// `dayID`.
     pub day_id: i32,
- /// `hourID`.
+    /// `hourID`.
     pub hour_id: i32,
- /// `stateID`.
+    /// `stateID`.
     pub state_id: i32,
- /// `countyID`.
+    /// `countyID`.
     pub county_id: i32,
- /// `zoneID`.
+    /// `zoneID`.
     pub zone_id: i32,
- /// `linkID`.
+    /// `linkID`.
     pub link_id: i32,
- /// `pollutantID` — Oxides of Nitrogen (3) on an input row, the NO / NO2 /
- /// HONO species pollutant on an output row.
+    /// `pollutantID` — Oxides of Nitrogen (3) on an input row, the NO / NO2 /
+    /// HONO species pollutant on an output row.
     pub pollutant_id: i32,
- /// `processID` — the emission process.
+    /// `processID` — the emission process.
     pub process_id: i32,
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: i32,
- /// `regClassID`.
+    /// `regClassID`.
     pub reg_class_id: i32,
- /// `fuelTypeID`.
+    /// `fuelTypeID`.
     pub fuel_type_id: i32,
- /// `modelYearID`.
+    /// `modelYearID`.
     pub model_year_id: i32,
- /// `roadTypeID`.
+    /// `roadTypeID`.
     pub road_type_id: i32,
- /// `emissionQuant` — the emission quantity.
+    /// `emissionQuant` — the emission quantity.
     pub emission_quant: f64,
- /// `emissionRate` — the emission rate.
+    /// `emissionRate` — the emission rate.
     pub emission_rate: f64,
 }
 
 impl MovesWorkerOutputRow {
- /// The integer dimension tuple — every column except the two emission
- /// values. Used to sort the output deterministically: MOVES leaves
- /// `MOVESWorkerOutput` physically unordered (the SQL `INSERT … SELECT` has
- /// no `ORDER BY`), so the port sorts purely for reproducibility.
+    /// The integer dimension tuple — every column except the two emission
+    /// values. Used to sort the output deterministically: MOVES leaves
+    /// `MOVESWorkerOutput` physically unordered (the SQL `INSERT … SELECT` has
+    /// no `ORDER BY`), so the port sorts purely for reproducibility.
     fn dimension_key(&self) -> [i32; 15] {
         [
             self.year_id,
@@ -263,19 +263,19 @@ impl MovesWorkerOutputRow {
 /// `dataSourceID` columns are not modelled.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct NoNo2RatioRow {
- /// `polProcessID` — `pollutantID × 100 + processID` of the species
- /// pollutant; joins to [`PollutantProcessAssocRow::pol_process_id`] and
- /// [`PollutantProcessModelYearRow::pol_process_id`].
+    /// `polProcessID` — `pollutantID × 100 + processID` of the species
+    /// pollutant; joins to [`PollutantProcessAssocRow::pol_process_id`] and
+    /// [`PollutantProcessModelYearRow::pol_process_id`].
     pub pol_process_id: i32,
- /// `sourceTypeID` — the source type the ratio applies to.
+    /// `sourceTypeID` — the source type the ratio applies to.
     pub source_type_id: i32,
- /// `fuelTypeID` — the fuel type the ratio applies to.
+    /// `fuelTypeID` — the fuel type the ratio applies to.
     pub fuel_type_id: i32,
- /// `modelYearGroupID` — the model-year group the ratio applies to;
- /// `PollutantProcessMappedModelYear` expands it into individual model years.
+    /// `modelYearGroupID` — the model-year group the ratio applies to;
+    /// `PollutantProcessMappedModelYear` expands it into individual model years.
     pub model_year_group_id: i32,
- /// `NOxRatio` — the species ÷ NOx multiplier. `FLOAT` in MOVES (see the
- /// [module fidelity notes](self)).
+    /// `NOxRatio` — the species ÷ NOx multiplier. `FLOAT` in MOVES (see the
+    /// [module fidelity notes](self)).
     pub nox_ratio: f64,
 }
 
@@ -287,11 +287,11 @@ pub struct NoNo2RatioRow {
 /// Both restrict `processID` to the iteration's process.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PollutantProcessAssocRow {
- /// `polProcessID` — `pollutantID × 100 + processID`.
+    /// `polProcessID` — `pollutantID × 100 + processID`.
     pub pol_process_id: i32,
- /// `processID` — the emission process.
+    /// `processID` — the emission process.
     pub process_id: i32,
- /// `pollutantID` — the species pollutant (NO, NO2 or HONO).
+    /// `pollutantID` — the species pollutant (NO, NO2 or HONO).
     pub pollutant_id: i32,
 }
 
@@ -303,12 +303,12 @@ pub struct PollutantProcessAssocRow {
 /// group spans. The unused `fuelMYGroupID` column is not modelled.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PollutantProcessModelYearRow {
- /// `polProcessID` — `pollutantID × 100 + processID`.
+    /// `polProcessID` — `pollutantID × 100 + processID`.
     pub pol_process_id: i32,
- /// `modelYearID` — the vehicle model year.
+    /// `modelYearID` — the vehicle model year.
     pub model_year_id: i32,
- /// `modelYearGroupID` — the model-year group `modelYearID` falls in; joins
- /// to [`NoNo2RatioRow::model_year_group_id`].
+    /// `modelYearGroupID` — the model-year group `modelYearID` falls in; joins
+    /// to [`NoNo2RatioRow::model_year_group_id`].
     pub model_year_group_id: i32,
 }
 
@@ -323,22 +323,22 @@ pub struct PollutantProcessModelYearRow {
 /// contract the unit tests build directly.
 #[derive(Debug, Clone, Default)]
 pub struct NitrogenOxideInputs {
- /// `NONO2Ratio` rows — the species-to-NOx ratio lookup table.
+    /// `NONO2Ratio` rows — the species-to-NOx ratio lookup table.
     pub no_no2_ratio: Vec<NoNo2RatioRow>,
- /// `PollutantProcessAssoc` rows — resolve each ratio's `polProcessID` into
- /// its process and species pollutant.
+    /// `PollutantProcessAssoc` rows — resolve each ratio's `polProcessID` into
+    /// its process and species pollutant.
     pub pollutant_process_assoc: Vec<PollutantProcessAssocRow>,
- /// `PollutantProcessMappedModelYear` rows — expand each ratio's
- /// `modelYearGroupID` into the individual model years it covers.
+    /// `PollutantProcessMappedModelYear` rows — expand each ratio's
+    /// `modelYearGroupID` into the individual model years it covers.
     pub pollutant_process_model_year: Vec<PollutantProcessModelYearRow>,
- /// `SourceUseType` ids — the SQL's `NOCopyOfSourceUseType` join is an
- /// existence filter on the source type; a `NONO2Ratio` row whose
- /// `sourceTypeID` is absent here is dropped.
+    /// `SourceUseType` ids — the SQL's `NOCopyOfSourceUseType` join is an
+    /// existence filter on the source type; a `NONO2Ratio` row whose
+    /// `sourceTypeID` is absent here is dropped.
     pub source_use_type: Vec<i32>,
- /// `MOVESWorkerOutput` rows — the upstream calculator's records. The
- /// calculation reads only the total-NOx rows (`pollutantID` 3); any other
- /// pollutant present is ignored, as the SQL's `mwo.pollutantID = 3` filter
- /// does.
+    /// `MOVESWorkerOutput` rows — the upstream calculator's records. The
+    /// calculation reads only the total-NOx rows (`pollutantID` 3); any other
+    /// pollutant present is ignored, as the SQL's `mwo.pollutantID = 3` filter
+    /// does.
     pub worker_output: Vec<MovesWorkerOutputRow>,
 }
 
@@ -835,12 +835,12 @@ fn build_inputs(ctx: &CalculatorContext, species: &[i32]) -> Result<NitrogenOxid
 /// kept here.
 #[derive(Debug, Clone, Copy)]
 struct RatioCell {
- /// `processID` from the joined `PollutantProcessAssoc` row.
+    /// `processID` from the joined `PollutantProcessAssoc` row.
     process_id: i32,
- /// `pollutantID` from the joined `PollutantProcessAssoc` row — the NO /
- /// NO2 / HONO species.
+    /// `pollutantID` from the joined `PollutantProcessAssoc` row — the NO /
+    /// NO2 / HONO species.
     pollutant_id: i32,
- /// `NOxRatio` from the `NONO2Ratio` row.
+    /// `NOxRatio` from the `NONO2Ratio` row.
     nox_ratio: f64,
 }
 
@@ -856,19 +856,19 @@ struct RatioCell {
 /// JOIN`. The result is sorted by its integer dimension columns for
 /// deterministic output; MOVES leaves `MOVESWorkerOutput` physically unordered.
 fn compute_nitrogen_oxide(inputs: &NitrogenOxideInputs) -> Vec<MovesWorkerOutputRow> {
- // PollutantProcessAssoc indexed by polProcessID → (processID, pollutantID).
- // pollutantprocessassoc's primary key is polProcessID, so the mapping is a
- // function.
+    // PollutantProcessAssoc indexed by polProcessID → (processID, pollutantID).
+    // pollutantprocessassoc's primary key is polProcessID, so the mapping is a
+    // function.
     let process_of_pol_process: HashMap<i32, (i32, i32)> = inputs
         .pollutant_process_assoc
         .iter()
         .map(|ppa| (ppa.pol_process_id, (ppa.process_id, ppa.pollutant_id)))
         .collect();
 
- // PollutantProcessMappedModelYear indexed by (polProcessID,
- // modelYearGroupID) → the model years that group spans. The table's
- // primary key is (polProcessID, modelYearID), so each model year appears
- // once per cell.
+    // PollutantProcessMappedModelYear indexed by (polProcessID,
+    // modelYearGroupID) → the model years that group spans. The table's
+    // primary key is (polProcessID, modelYearID), so each model year appears
+    // once per cell.
     let mut model_years_of_group: HashMap<(i32, i32), Vec<i32>> = HashMap::new();
     for ppmy in &inputs.pollutant_process_model_year {
         model_years_of_group
@@ -877,25 +877,25 @@ fn compute_nitrogen_oxide(inputs: &NitrogenOxideInputs) -> Vec<MovesWorkerOutput
             .push(ppmy.model_year_id);
     }
 
- // --- NOCalculation1 -----------------------------------------------------
- // Add (process, pollutant, modelYear) dimensions to each NOxRatio, indexed
- // by the NOMOVESOutputTemp1 join key (fuelTypeID, modelYearID,
- // sourceTypeID). A cell can carry several rows — distinct nitrogen species
- // (NO and HONO for NOCalculator) sharing the dimension cell.
+    // --- NOCalculation1 -----------------------------------------------------
+    // Add (process, pollutant, modelYear) dimensions to each NOxRatio, indexed
+    // by the NOMOVESOutputTemp1 join key (fuelTypeID, modelYearID,
+    // sourceTypeID). A cell can carry several rows — distinct nitrogen species
+    // (NO and HONO for NOCalculator) sharing the dimension cell.
     let mut ratio_cells: HashMap<(i32, i32, i32), Vec<RatioCell>> = HashMap::new();
     for nnr in &inputs.no_no2_ratio {
- // INNER JOIN NOCopyOfPPA ON polProcessID — resolves the species
- // pollutant and process; drops a ratio with no association row.
+        // INNER JOIN NOCopyOfPPA ON polProcessID — resolves the species
+        // pollutant and process; drops a ratio with no association row.
         let Some(&(process_id, pollutant_id)) = process_of_pol_process.get(&nnr.pol_process_id)
         else {
             continue;
         };
- // INNER JOIN NOCopyOfSourceUseType ON sourceTypeID — an existence
- // filter on the source type.
+        // INNER JOIN NOCopyOfSourceUseType ON sourceTypeID — an existence
+        // filter on the source type.
         if !inputs.source_use_type.contains(&nnr.source_type_id) {
             continue;
         }
- // INNER JOIN NOCopyOfPPMY ON modelYearGroupID AND polProcessID // expands the ratio's model-year group into the individual model years.
+        // INNER JOIN NOCopyOfPPMY ON modelYearGroupID AND polProcessID // expands the ratio's model-year group into the individual model years.
         let Some(model_years) =
             model_years_of_group.get(&(nnr.pol_process_id, nnr.model_year_group_id))
         else {
@@ -913,26 +913,26 @@ fn compute_nitrogen_oxide(inputs: &NitrogenOxideInputs) -> Vec<MovesWorkerOutput
         }
     }
 
- // --- NOMOVESOutputTemp1 -------------------------------------------------
- // emissionQuant = NOxRatio × Oxides of Nitrogen (3).
+    // --- NOMOVESOutputTemp1 -------------------------------------------------
+    // emissionQuant = NOxRatio × Oxides of Nitrogen (3).
     let mut out: Vec<MovesWorkerOutputRow> = Vec::new();
     for mwo in &inputs.worker_output {
- // WHERE mwo.pollutantID = 3 — only the total-NOx rows are speciated.
+        // WHERE mwo.pollutantID = 3 — only the total-NOx rows are speciated.
         if mwo.pollutant_id != NOX_POLLUTANT_ID {
             continue;
         }
- // INNER JOIN NOCalculation1 ON fuelTypeID, modelYearID, sourceTypeID.
+        // INNER JOIN NOCalculation1 ON fuelTypeID, modelYearID, sourceTypeID.
         let Some(cells) =
             ratio_cells.get(&(mwo.fuel_type_id, mwo.model_year_id, mwo.source_type_id))
         else {
             continue;
         };
         for cell in cells {
- // The species row: the pollutant is relabelled and the process
- // taken from NOCalculation1 (SELECT noc.pollutantID, noc.processID);
- // every other column — sourceTypeID included, the join pins it
- // equal — is carried from the NOx row, with both emission values
- // scaled by the ratio.
+            // The species row: the pollutant is relabelled and the process
+            // taken from NOCalculation1 (SELECT noc.pollutantID, noc.processID);
+            // every other column — sourceTypeID included, the join pins it
+            // equal — is carried from the NOx row, with both emission values
+            // scaled by the ratio.
             out.push(MovesWorkerOutputRow {
                 pollutant_id: cell.pollutant_id,
                 process_id: cell.process_id,
@@ -1031,28 +1031,28 @@ static NO_REGISTRATIONS: &[PollutantProcessAssociation] = &[
 pub struct NOCalculator;
 
 impl NOCalculator {
- /// Stable module name — matches the Java class and the chain-DAG entry.
+    /// Stable module name — matches the Java class and the chain-DAG entry.
     pub const NAME: &'static str = NO_CALCULATOR_NAME;
 
- /// Construct the calculator.
+    /// Construct the calculator.
     #[must_use]
     pub fn new() -> Self {
         Self
     }
 
- /// Compute the NO and HONO species rows — the port of the
- /// `NOCalculator.sql` "Processing" section.
- ///
- /// Each total-NOx `MOVESWorkerOutput` row (`pollutantID` 3) is scaled by
- /// its `NONO2Ratio` into the NO (32) and/or HONO (34) species rows the
- /// inputs carry ratios for; a row that resolves no ratio is dropped. The
- /// result is sorted by its integer dimension columns for deterministic
- /// output.
- ///
- /// This is the identical `compute_nitrogen_oxide` call as
- /// [`NO2Calculator::calculate`] — the two Java scripts share their
- /// "Processing" section and differ only in the extract that builds
- /// [`NitrogenOxideInputs`] (see the [module documentation](self)).
+    /// Compute the NO and HONO species rows — the port of the
+    /// `NOCalculator.sql` "Processing" section.
+    ///
+    /// Each total-NOx `MOVESWorkerOutput` row (`pollutantID` 3) is scaled by
+    /// its `NONO2Ratio` into the NO (32) and/or HONO (34) species rows the
+    /// inputs carry ratios for; a row that resolves no ratio is dropped. The
+    /// result is sorted by its integer dimension columns for deterministic
+    /// output.
+    ///
+    /// This is the identical `compute_nitrogen_oxide` call as
+    /// [`NO2Calculator::calculate`] — the two Java scripts share their
+    /// "Processing" section and differ only in the extract that builds
+    /// [`NitrogenOxideInputs`] (see the [module documentation](self)).
     #[must_use]
     pub fn calculate(&self, inputs: &NitrogenOxideInputs) -> Vec<MovesWorkerOutputRow> {
         compute_nitrogen_oxide(inputs)
@@ -1064,10 +1064,10 @@ impl Calculator for NOCalculator {
         Self::NAME
     }
 
- /// `NOCalculator` is a chained calculator: it does not subscribe to the
- /// MasterLoop directly but fires when its upstream `BaseRateCalculator`
- /// does. `calculator-dag.json` records `subscribes_directly: false` and an
- /// empty `subscriptions` list.
+    /// `NOCalculator` is a chained calculator: it does not subscribe to the
+    /// MasterLoop directly but fires when its upstream `BaseRateCalculator`
+    /// does. `calculator-dag.json` records `subscribes_directly: false` and an
+    /// empty `subscriptions` list.
     fn subscriptions(&self) -> &[CalculatorSubscription] {
         NO_SUBSCRIPTIONS
     }
@@ -1076,8 +1076,8 @@ impl Calculator for NOCalculator {
         NO_REGISTRATIONS
     }
 
- /// `NOCalculator` chains off `BaseRateCalculator` — `calculator-dag.json`
- /// records `depends_on: ["BaseRateCalculator"]`.
+    /// `NOCalculator` chains off `BaseRateCalculator` — `calculator-dag.json`
+    /// records `depends_on: ["BaseRateCalculator"]`.
     fn upstream(&self) -> &[&'static str] {
         UPSTREAM
     }
@@ -1136,27 +1136,27 @@ static NO2_REGISTRATIONS: &[PollutantProcessAssociation] = &[
 pub struct NO2Calculator;
 
 impl NO2Calculator {
- /// Stable module name — matches the Java class and the chain-DAG entry.
+    /// Stable module name — matches the Java class and the chain-DAG entry.
     pub const NAME: &'static str = NO2_CALCULATOR_NAME;
 
- /// Construct the calculator.
+    /// Construct the calculator.
     #[must_use]
     pub fn new() -> Self {
         Self
     }
 
- /// Compute the NO2 species rows — the port of the `NO2Calculator.sql`
- /// "Processing" section.
- ///
- /// Each total-NOx `MOVESWorkerOutput` row (`pollutantID` 3) is scaled by
- /// its `NONO2Ratio` into the NO2 (33) species row; a row that resolves no
- /// ratio is dropped. The result is sorted by its integer dimension columns
- /// for deterministic output.
- ///
- /// This is the identical `compute_nitrogen_oxide` call as
- /// [`NOCalculator::calculate`] — the two Java scripts share their
- /// "Processing" section and differ only in the extract that builds
- /// [`NitrogenOxideInputs`] (see the [module documentation](self)).
+    /// Compute the NO2 species rows — the port of the `NO2Calculator.sql`
+    /// "Processing" section.
+    ///
+    /// Each total-NOx `MOVESWorkerOutput` row (`pollutantID` 3) is scaled by
+    /// its `NONO2Ratio` into the NO2 (33) species row; a row that resolves no
+    /// ratio is dropped. The result is sorted by its integer dimension columns
+    /// for deterministic output.
+    ///
+    /// This is the identical `compute_nitrogen_oxide` call as
+    /// [`NOCalculator::calculate`] — the two Java scripts share their
+    /// "Processing" section and differ only in the extract that builds
+    /// [`NitrogenOxideInputs`] (see the [module documentation](self)).
     #[must_use]
     pub fn calculate(&self, inputs: &NitrogenOxideInputs) -> Vec<MovesWorkerOutputRow> {
         compute_nitrogen_oxide(inputs)
@@ -1168,10 +1168,10 @@ impl Calculator for NO2Calculator {
         Self::NAME
     }
 
- /// `NO2Calculator` is a chained calculator: it does not subscribe to the
- /// MasterLoop directly but fires when its upstream `BaseRateCalculator`
- /// does. `calculator-dag.json` records `subscribes_directly: false` and an
- /// empty `subscriptions` list.
+    /// `NO2Calculator` is a chained calculator: it does not subscribe to the
+    /// MasterLoop directly but fires when its upstream `BaseRateCalculator`
+    /// does. `calculator-dag.json` records `subscribes_directly: false` and an
+    /// empty `subscriptions` list.
     fn subscriptions(&self) -> &[CalculatorSubscription] {
         NO_SUBSCRIPTIONS
     }
@@ -1180,8 +1180,8 @@ impl Calculator for NO2Calculator {
         NO2_REGISTRATIONS
     }
 
- /// `NO2Calculator` chains off `BaseRateCalculator` — `calculator-dag.json`
- /// records `depends_on: ["BaseRateCalculator"]`.
+    /// `NO2Calculator` chains off `BaseRateCalculator` — `calculator-dag.json`
+    /// records `depends_on: ["BaseRateCalculator"]`.
     fn upstream(&self) -> &[&'static str] {
         UPSTREAM
     }
@@ -1214,9 +1214,9 @@ pub fn no2_factory() -> Box<dyn Calculator> {
 mod tests {
     use super::*;
 
- /// Build a total-NOx `MOVESWorkerOutput` row with fixed dimension columns,
- /// `emissionQuant = 200.0` and `emissionRate = 8.0`. Values are chosen for
- /// exact scaled results, not physical realism.
+    /// Build a total-NOx `MOVESWorkerOutput` row with fixed dimension columns,
+    /// `emissionQuant = 200.0` and `emissionRate = 8.0`. Values are chosen for
+    /// exact scaled results, not physical realism.
     fn nox_row() -> MovesWorkerOutputRow {
         MovesWorkerOutputRow {
             year_id: 2020,
@@ -1239,11 +1239,11 @@ mod tests {
         }
     }
 
- /// Build a one-ratio / one-NOx-row NO2-style input whose single output row
- /// has `emissionQuant = 0.25 × 200.0 = 50.0` and `emissionRate =
- /// 0.25 × 8.0 = 2.0`.
- ///
- /// `polProcessID` 3301 is NO2 (33) on the running process (1).
+    /// Build a one-ratio / one-NOx-row NO2-style input whose single output row
+    /// has `emissionQuant = 0.25 × 200.0 = 50.0` and `emissionRate =
+    /// 0.25 × 8.0 = 2.0`.
+    ///
+    /// `polProcessID` 3301 is NO2 (33) on the running process (1).
     fn minimal_inputs() -> NitrogenOxideInputs {
         NitrogenOxideInputs {
             no_no2_ratio: vec![NoNo2RatioRow {
@@ -1268,8 +1268,8 @@ mod tests {
         }
     }
 
- /// Assert `actual` matches `expected` within `f64` slack — the
- /// FLOAT-column fidelity note means the port computes in `f64`.
+    /// Assert `actual` matches `expected` within `f64` slack — the
+    /// FLOAT-column fidelity note means the port computes in `f64`.
     fn assert_close(actual: f64, expected: f64) {
         assert!(
             (actual - expected).abs() < 1e-9,
@@ -1282,7 +1282,7 @@ mod tests {
         let rows = NO2Calculator::new().calculate(&minimal_inputs());
         assert_eq!(rows.len(), 1);
         let r = rows[0];
- // The dimension cell is carried straight from the NOx row.
+        // The dimension cell is carried straight from the NOx row.
         assert_eq!(r.year_id, 2020);
         assert_eq!(r.month_id, 7);
         assert_eq!(r.day_id, 5);
@@ -1296,17 +1296,17 @@ mod tests {
         assert_eq!(r.fuel_type_id, 2);
         assert_eq!(r.model_year_id, 2015);
         assert_eq!(r.road_type_id, 4);
- // The pollutant is relabelled to the NO2 species; the process carried.
+        // The pollutant is relabelled to the NO2 species; the process carried.
         assert_eq!(r.pollutant_id, 33);
         assert_eq!(r.process_id, 1);
- // 0.25 × 200.0 and 0.25 × 8.0.
+        // 0.25 × 200.0 and 0.25 × 8.0.
         assert_close(r.emission_quant, 50.0);
         assert_close(r.emission_rate, 2.0);
     }
 
     #[test]
     fn calculate_scales_both_emission_values_by_the_ratio() {
- // A ratio of 0.6 scales both the quantity and the rate.
+        // A ratio of 0.6 scales both the quantity and the rate.
         let mut inputs = minimal_inputs();
         inputs.no_no2_ratio[0].nox_ratio = 0.6;
         let rows = NO2Calculator::new().calculate(&inputs);
@@ -1317,9 +1317,9 @@ mod tests {
 
     #[test]
     fn calculate_emits_one_row_per_species_for_a_cell() {
- // NOCalculator-style input: the same (fuelType, modelYear, sourceType)
- // cell carries both an NO (32) and a HONO (34) ratio, so one NOx row
- // produces one row of each species — the SQL join cross-product.
+        // NOCalculator-style input: the same (fuelType, modelYear, sourceType)
+        // cell carries both an NO (32) and a HONO (34) ratio, so one NOx row
+        // produces one row of each species — the SQL join cross-product.
         let mut inputs = minimal_inputs();
         inputs.no_no2_ratio = vec![
             NoNo2RatioRow {
@@ -1375,8 +1375,8 @@ mod tests {
 
     #[test]
     fn calculate_expands_ratio_over_the_model_year_group() {
- // One NONO2Ratio row's modelYearGroup spans two model years; a NOx row
- // for each yields a row, a NOx row for an unmapped model year does not.
+        // One NONO2Ratio row's modelYearGroup spans two model years; a NOx row
+        // for each yields a row, a NOx row for an unmapped model year does not.
         let mut inputs = minimal_inputs();
         inputs.pollutant_process_model_year = vec![
             PollutantProcessModelYearRow {
@@ -1418,8 +1418,8 @@ mod tests {
 
     #[test]
     fn calculate_ignores_non_nox_worker_rows() {
- // A worker-output row whose pollutant is not Oxides of Nitrogen (3) is
- // not speciated — mwo.pollutantID = 3 in the SQL.
+        // A worker-output row whose pollutant is not Oxides of Nitrogen (3) is
+        // not speciated — mwo.pollutantID = 3 in the SQL.
         let mut inputs = minimal_inputs();
         inputs.worker_output[0].pollutant_id = 2; // CO, say — not NOx
         assert!(NO2Calculator::new().calculate(&inputs).is_empty());
@@ -1427,8 +1427,8 @@ mod tests {
 
     #[test]
     fn calculate_drops_nox_row_without_a_ratio_cell() {
- // A NOx row whose (fuelType, modelYear, sourceType) resolves no
- // NOCalculation1 cell is dropped by the inner join.
+        // A NOx row whose (fuelType, modelYear, sourceType) resolves no
+        // NOCalculation1 cell is dropped by the inner join.
         let mut wrong_fuel = minimal_inputs();
         wrong_fuel.worker_output[0].fuel_type_id = 99;
         assert!(NO2Calculator::new().calculate(&wrong_fuel).is_empty());
@@ -1444,8 +1444,8 @@ mod tests {
 
     #[test]
     fn calculate_drops_ratio_without_a_source_use_type() {
- // The NONO2Ratio row's sourceTypeID is absent from the SourceUseType
- // existence filter — the NOCopyOfSourceUseType inner join drops it.
+        // The NONO2Ratio row's sourceTypeID is absent from the SourceUseType
+        // existence filter — the NOCopyOfSourceUseType inner join drops it.
         let mut inputs = minimal_inputs();
         inputs.source_use_type.clear();
         assert!(NO2Calculator::new().calculate(&inputs).is_empty());
@@ -1453,7 +1453,7 @@ mod tests {
 
     #[test]
     fn calculate_drops_ratio_without_a_pollutant_process() {
- // NONO2Ratio carries a polProcessID with no PollutantProcessAssoc row // the nnr ↔ ppa inner join drops it, leaving no NOCalculation1 cell.
+        // NONO2Ratio carries a polProcessID with no PollutantProcessAssoc row // the nnr ↔ ppa inner join drops it, leaving no NOCalculation1 cell.
         let mut inputs = minimal_inputs();
         inputs.pollutant_process_assoc.clear();
         assert!(NO2Calculator::new().calculate(&inputs).is_empty());
@@ -1461,9 +1461,9 @@ mod tests {
 
     #[test]
     fn calculate_drops_ratio_without_a_mapped_model_year() {
- // NONO2Ratio carries a modelYearGroupID with no
- // PollutantProcessMappedModelYear row — the nnr ↔ ppmy inner join drops
- // it, leaving no NOCalculation1 cell.
+        // NONO2Ratio carries a modelYearGroupID with no
+        // PollutantProcessMappedModelYear row — the nnr ↔ ppmy inner join drops
+        // it, leaving no NOCalculation1 cell.
         let mut inputs = minimal_inputs();
         inputs.pollutant_process_model_year.clear();
         assert!(NO2Calculator::new().calculate(&inputs).is_empty());
@@ -1471,8 +1471,8 @@ mod tests {
 
     #[test]
     fn calculate_output_is_sorted_by_dimension_key() {
- // Two NOx rows on distinct links produce two rows; the result comes
- // back dimension-key sorted regardless of input order.
+        // Two NOx rows on distinct links produce two rows; the result comes
+        // back dimension-key sorted regardless of input order.
         let mut inputs = minimal_inputs();
         inputs.worker_output.insert(
             0,
@@ -1505,8 +1505,8 @@ mod tests {
 
     #[test]
     fn both_calculators_share_the_processing_section() {
- // NOCalculator and NO2Calculator port the identical SQL "Processing"
- // section; on the same inputs they produce the same rows.
+        // NOCalculator and NO2Calculator port the identical SQL "Processing"
+        // section; on the same inputs they produce the same rows.
         let inputs = minimal_inputs();
         assert_eq!(
             NOCalculator::new().calculate(&inputs),
@@ -1524,16 +1524,16 @@ mod tests {
 
     #[test]
     fn calculators_are_chained_with_no_subscriptions() {
- // calculator-dag.json: subscribes_directly false, subscriptions [].
+        // calculator-dag.json: subscribes_directly false, subscriptions [].
         assert!(NOCalculator::new().subscriptions().is_empty());
         assert!(NO2Calculator::new().subscriptions().is_empty());
     }
 
     #[test]
     fn no_registrations_match_the_eight_calculator_info_directives() {
- // calculator-dag.json records registrations_count 8: NO (32) and
- // HONO (34), each for the running (1), start (2), extended-idle (90)
- // and aux-power (91) exhaust processes.
+        // calculator-dag.json records registrations_count 8: NO (32) and
+        // HONO (34), each for the running (1), start (2), extended-idle (90)
+        // and aux-power (91) exhaust processes.
         let calc = NOCalculator::new();
         let regs = calc.registrations();
         assert_eq!(regs.len(), 8);
@@ -1550,9 +1550,9 @@ mod tests {
 
     #[test]
     fn no2_registrations_match_the_four_calculator_info_directives() {
- // calculator-dag.json records registrations_count 4: NO2 (33) for the
- // running (1), start (2), extended-idle (90) and aux-power (91)
- // exhaust processes.
+        // calculator-dag.json records registrations_count 4: NO2 (33) for the
+        // running (1), start (2), extended-idle (90) and aux-power (91)
+        // exhaust processes.
         let calc = NO2Calculator::new();
         let regs = calc.registrations();
         assert_eq!(regs.len(), 4);
@@ -1564,7 +1564,7 @@ mod tests {
 
     #[test]
     fn calculators_chain_off_base_rate_calculator() {
- // calculator-dag.json records depends_on ["BaseRateCalculator"].
+        // calculator-dag.json records depends_on ["BaseRateCalculator"].
         assert_eq!(NOCalculator::new().upstream(), &["BaseRateCalculator"]);
         assert_eq!(NO2Calculator::new().upstream(), &["BaseRateCalculator"]);
     }
@@ -1636,7 +1636,7 @@ mod tests {
             .unwrap()
             .get(0)
             .unwrap();
- // 0.25 × 200.0 = 50.0 and 0.25 × 8.0 = 2.0
+        // 0.25 × 200.0 = 50.0 and 0.25 × 8.0 = 2.0
         assert!((quant - 50.0).abs() < 1e-9, "emissionQuant {quant} != 50.0");
         assert!((rate - 2.0).abs() < 1e-9, "emissionRate {rate} != 2.0");
     }
@@ -1710,7 +1710,7 @@ mod tests {
             .unwrap()
             .get(0)
             .unwrap();
- // 0.7 × 200.0 = 140.0 and 0.7 × 8.0 = 5.6
+        // 0.7 × 200.0 = 140.0 and 0.7 × 8.0 = 5.6
         assert!(
             (quant - 140.0).abs() < 1e-9,
             "emissionQuant {quant} != 140.0"
@@ -1720,7 +1720,7 @@ mod tests {
 
     #[test]
     fn calculators_are_object_safe() {
- // The registry stores calculators as Box<dyn Calculator>.
+        // The registry stores calculators as Box<dyn Calculator>.
         let calcs: Vec<Box<dyn Calculator>> = vec![
             Box::new(NOCalculator::new()),
             Box::new(NO2Calculator::new()),

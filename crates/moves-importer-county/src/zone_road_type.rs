@@ -77,13 +77,13 @@ impl Importer for ZoneRoadTypeImporter {
             }
             let r = road.value(row);
             let f = factor.value(row);
- *sums.entry(r).or_insert(0.0) += f;
+            *sums.entry(r).or_insert(0.0) += f;
         }
 
         let mut out = Vec::new();
         for (road_type, sum) in sums {
- // Round to 4 decimal places, matching MariaDB's
- // `round(sum(SHOAllocFactor),4) <> 1.0000` check.
+            // Round to 4 decimal places, matching MariaDB's
+            // `round(sum(SHOAllocFactor),4) <> 1.0000` check.
             let rounded = (sum * 10_000.0).round() / 10_000.0;
             if (rounded - 1.0).abs() > f64::EPSILON {
                 out.push(ValidationMessage::error(
@@ -127,9 +127,9 @@ mod tests {
 
     #[test]
     fn factors_summing_to_one_per_road_type_pass() {
- // Two zones in county 6037; for each road type the zones'
- // SHOAllocFactor sums to exactly 1.0, which is the invariant
- // `validate_imported` enforces per `roadTypeID`.
+        // Two zones in county 6037; for each road type the zones'
+        // SHOAllocFactor sums to exactly 1.0, which is the invariant
+        // `validate_imported` enforces per `roadTypeID`.
         let b = batch(&[
             (60371, 2, 0.60),
             (60372, 2, 0.40),
@@ -152,7 +152,7 @@ mod tests {
         let b = batch(&[
             (60371, 2, 0.25),
             (60371, 3, 0.30),
- // road type 4 sums to 1.10 — over
+            // road type 4 sums to 1.10 — over
             (60371, 4, 0.10),
             (60372, 4, 1.00),
             (60371, 5, 0.35),
@@ -162,9 +162,9 @@ mod tests {
         let ctx = ValidationContext::without_default_db();
         let msgs = imp.validate_imported(&[imported], &ctx);
         let errors: Vec<_> = msgs.iter().filter(|m| m.is_error()).collect();
- // Road type 4 sums to 1.10, road type 2 sums to 0.25 only,
- // road type 3 sums to 0.30 only, road type 5 sums to 0.35
- // only — so four error messages, one per off-balance road type.
+        // Road type 4 sums to 1.10, road type 2 sums to 0.25 only,
+        // road type 3 sums to 0.30 only, road type 5 sums to 0.35
+        // only — so four error messages, one per off-balance road type.
         assert_eq!(errors.len(), 4, "got: {errors:?}");
         assert!(errors
             .iter()
@@ -173,9 +173,9 @@ mod tests {
 
     #[test]
     fn rounding_to_four_decimals_tolerates_micro_drift() {
- // Road type 2 across three zones: 0.3333 + 0.3333 + 0.3334
- // rounds to exactly 1.0000, so the four-decimal tolerance
- // accepts it.
+        // Road type 2 across three zones: 0.3333 + 0.3333 + 0.3334
+        // rounds to exactly 1.0000, so the four-decimal tolerance
+        // accepts it.
         let b = batch(&[(60371, 2, 0.3333), (60372, 2, 0.3333), (60373, 2, 0.3334)]);
         let imp = ZoneRoadTypeImporter;
         let imported = ImportedTable::new(&imp.tables()[0], PathBuf::from("test"), b);

@@ -30,7 +30,7 @@ use moves_runspec::{
 };
 
 fn workspace_root() -> PathBuf {
- // tests run with CARGO_MANIFEST_DIR=crates/moves-runspec
+    // tests run with CARGO_MANIFEST_DIR=crates/moves-runspec
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent() // crates/
         .and_then(Path::parent)
@@ -134,16 +134,16 @@ fn round_trip_fixture(name: &str) {
     let xml = read(&path);
     let spec = from_xml_str(&xml).unwrap_or_else(|e| panic!("parse {name}: {e}"));
 
- // Self-loop is model-identical.
+    // Self-loop is model-identical.
     let out1 = to_xml_string(&spec).expect("serialize");
     let reparsed = from_xml_str(&out1).unwrap_or_else(|e| panic!("reparse {name}: {e}"));
     assert_eq!(spec, reparsed, "XML self-loop failed for {name}");
 
- // Serializer is idempotent: the second round-trip is byte-identical.
+    // Serializer is idempotent: the second round-trip is byte-identical.
     let out2 = to_xml_string(&reparsed).expect("re-serialize");
     assert_eq!(out1, out2, "serializer not idempotent on {name}");
 
- // Cross-format: model survives a TOML detour too.
+    // Cross-format: model survives a TOML detour too.
     let toml = to_toml_string(&spec).expect("serialize TOML");
     let from_toml = from_toml_str(&toml).unwrap_or_else(|e| panic!("re-parse TOML {name}: {e}"));
     assert_eq!(spec, from_toml, "cross-format round-trip failed for {name}");
@@ -204,9 +204,9 @@ per_fixture_round_trip! {
 
 #[test]
 fn every_fixture_is_covered_by_a_per_fixture_test() {
- // Defensive: the per-fixture macro is hand-maintained. If a new fixture
- // appears under characterization/fixtures, this test fails so we
- // remember to add it.
+    // Defensive: the per-fixture macro is hand-maintained. If a new fixture
+    // appears under characterization/fixtures, this test fails so we
+    // remember to add it.
     let mut found = 0usize;
     for entry in std::fs::read_dir(fixtures_dir()).expect("read fixtures dir") {
         let path = entry.expect("entry").path();
@@ -234,27 +234,27 @@ fn java_runspec_test_sample_values() {
     let xml = read(&fixture("characterization/fixtures/sample-runspec.xml"));
     let spec = from_xml_str(&xml).expect("parse sample-runspec.xml");
 
- // Description is empty in the sample fixture (just the placeholder
- // `<description></description>` tag).
+    // Description is empty in the sample fixture (just the placeholder
+    // `<description></description>` tag).
     assert_eq!(spec.description, None);
 
- // MACROSCALE = inventory output (the default mode for sample-runspec.xml).
+    // MACROSCALE = inventory output (the default mode for sample-runspec.xml).
     assert_eq!(spec.scale, ModelScale::Macro);
 
- // Geographic selection: Washtenaw County, MI (FIPS 26161).
+    // Geographic selection: Washtenaw County, MI (FIPS 26161).
     assert_eq!(spec.geographic_selections.len(), 1);
     let g = &spec.geographic_selections[0];
     assert_eq!(g.kind, GeoKind::County);
     assert_eq!(g.key, 26161);
     assert_eq!(g.description, "MICHIGAN - Washtenaw County");
 
- // Time span: hour 6 of June 2001 (the smoke-test slice).
+    // Time span: hour 6 of June 2001 (the smoke-test slice).
     assert_eq!(spec.timespan.years, vec![2001]);
     assert_eq!(spec.timespan.months, vec![6]);
     assert_eq!(spec.timespan.begin_hour, Some(6));
     assert_eq!(spec.timespan.end_hour, Some(6));
 
- // Single vehicle selection: gasoline passenger cars.
+    // Single vehicle selection: gasoline passenger cars.
     assert_eq!(spec.onroad_vehicle_selections.len(), 1);
     let v = &spec.onroad_vehicle_selections[0];
     assert_eq!(v.fuel_type_id, 1);
@@ -262,27 +262,27 @@ fn java_runspec_test_sample_values() {
     assert_eq!(v.source_type_id, 21);
     assert_eq!(v.source_type_name, "Passenger Car");
 
- // Single road type: urban restricted access.
+    // Single road type: urban restricted access.
     assert_eq!(spec.road_types.len(), 1);
     assert_eq!(spec.road_types[0].road_type_id, 4);
     assert_eq!(spec.road_types[0].road_type_name, "Urban Restricted Access");
 
- // Pollutant-process associations: three energy pollutants × three
- // processes + Well-to-Pump on Total Energy = 10 rows.
+    // Pollutant-process associations: three energy pollutants × three
+    // processes + Well-to-Pump on Total Energy = 10 rows.
     assert_eq!(spec.pollutant_process_associations.len(), 10);
 
- // Uncertainty mode is off.
+    // Uncertainty mode is off.
     assert!(!spec.uncertainty.enabled);
 
- // Output detail: county-level rollup.
+    // Output detail: county-level rollup.
     assert_eq!(
         spec.geographic_output_detail,
         GeographicOutputDetail::County
     );
 
- // A representative subset of the output-breakdown flags. The full
- // shape is exercised by the round-trip tests; we sample the values
- // that the Java test asserts explicitly.
+    // A representative subset of the output-breakdown flags. The full
+    // shape is exercised by the round-trip tests; we sample the values
+    // that the Java test asserts explicitly.
     let b = &spec.output_breakdown;
     assert!(b.model_year);
     assert!(b.fuel_type);
@@ -290,13 +290,13 @@ fn java_runspec_test_sample_values() {
     assert!(!b.source_use_type);
     assert!(b.onroad_scc);
 
- // Output database is JUnitTestOutput (the Java test's well-known sentinel).
+    // Output database is JUnitTestOutput (the Java test's well-known sentinel).
     assert_eq!(spec.output_database.database, "JUnitTestOutput");
     assert_eq!(spec.output_timestep, OutputTimestep::Hour);
     assert!(!spec.output_vmt_data);
     assert_eq!(spec.pm_size, 0);
 
- // Output factors: seconds, miles, grams, million BTU; all enabled.
+    // Output factors: seconds, miles, grams, million BTU; all enabled.
     let f = &spec.output_factors;
     assert!(f.time.enabled);
     assert!(f.distance.enabled);
@@ -306,19 +306,19 @@ fn java_runspec_test_sample_values() {
     assert_eq!(f.mass.units, MassUnit::Grams);
     assert_eq!(f.mass.energy_units, EnergyUnit::MillionBtu);
 
- // No internal control strategies and no database selections in the
- // fixture (those are open-ended placeholder containers).
+    // No internal control strategies and no database selections in the
+    // fixture (those are open-ended placeholder containers).
     assert!(spec.internal_control_strategies.is_empty());
     assert!(spec.database_selections.is_empty());
 }
 
 #[test]
 fn java_runspec_test_build_in_code_round_trip() {
- // Mirrors the build-and-round-trip pattern from the Java `RunSpecTest`:
- // assemble a RunSpec programmatically, serialize to XML, reparse, and
- // verify the structure survives. Combined with the byte-idempotence
- // check this proves the model ↔ XML mapping is lossless for the fields
- // the Java test exercises.
+    // Mirrors the build-and-round-trip pattern from the Java `RunSpecTest`:
+    // assemble a RunSpec programmatically, serialize to XML, reparse, and
+    // verify the structure survives. Combined with the byte-idempotence
+    // check this proves the model ↔ XML mapping is lossless for the fields
+    // the Java test exercises.
     let spec = RunSpec {
         description: Some("Test Description".to_string()),
         scale: ModelScale::Macro,
@@ -383,19 +383,19 @@ fn java_runspec_test_build_in_code_round_trip() {
         ..RunSpec::default()
     };
 
- // First serialization.
+    // First serialization.
     let xml1 = to_xml_string(&spec).expect("serialize");
     let reparsed = from_xml_str(&xml1).expect("reparse");
     assert_eq!(spec, reparsed, "build-in-code RunSpec must survive XML");
 
- // Byte-identical idempotence on the build-in-code spec too.
+    // Byte-identical idempotence on the build-in-code spec too.
     let xml2 = to_xml_string(&reparsed).expect("re-serialize");
     assert_eq!(
         xml1, xml2,
         "the serializer is idempotent on a hand-built RunSpec"
     );
 
- // The fields the Java test calls out explicitly.
+    // The fields the Java test calls out explicitly.
     assert_eq!(reparsed.description.as_deref(), Some("Test Description"));
     assert_eq!(reparsed.output_database.database, "JUnitTestOUTPUT");
     assert_eq!(reparsed.output_database.server, "localhost");
@@ -411,8 +411,8 @@ fn java_runspec_test_build_in_code_round_trip() {
 
 #[test]
 fn java_runspec_xml_test_version_preserved() {
- // Mirrors `RunSpecXMLTest`'s version-attribute check: the optional
- // version attribute on `<runspec>` survives parse → serialize → parse.
+    // Mirrors `RunSpecXMLTest`'s version-attribute check: the optional
+    // version attribute on `<runspec>` survives parse → serialize → parse.
     let xml = read(&fixture(
         "characterization/fixtures/nr-agriculture-state.xml",
     ));
@@ -426,7 +426,7 @@ fn java_runspec_xml_test_version_preserved() {
         &out[..out.find('\n').unwrap_or(out.len())]
     );
 
- // And the absence of a version attribute round-trips too.
+    // And the absence of a version attribute round-trips too.
     let sample = read(&fixture("characterization/fixtures/sample-runspec.xml"));
     let spec = from_xml_str(&sample).expect("parse");
     assert_eq!(spec.version, None);
@@ -440,8 +440,8 @@ fn java_runspec_xml_test_version_preserved() {
 
 #[test]
 fn java_runspec_xml_test_nonroad_output_flags() {
- // NONROAD fixtures carry the six `<outputsho>` / `<outputsh>` / ... flags
- // that ONROAD fixtures omit. Verify they survive XML → model → XML.
+    // NONROAD fixtures carry the six `<outputsho>` / `<outputsh>` / ... flags
+    // that ONROAD fixtures omit. Verify they survive XML → model → XML.
     let xml = read(&fixture(
         "characterization/fixtures/nr-agriculture-state.xml",
     ));
@@ -462,7 +462,7 @@ fn java_runspec_xml_test_nonroad_output_flags() {
 
 #[test]
 fn java_runspec_xml_test_models_and_domain() {
- // ONROAD/NONROAD model selectors and the modeldomain element round-trip.
+    // ONROAD/NONROAD model selectors and the modeldomain element round-trip.
     let xml = read(&fixture(
         "characterization/fixtures/nr-agriculture-state.xml",
     ));
@@ -477,8 +477,8 @@ fn java_runspec_xml_test_models_and_domain() {
 
 #[test]
 fn java_runspec_xml_test_aggregate_by() {
- // `<aggregateBy>` is one of the optional timespan children. It appears
- // in only a couple of fixtures; round-tripping is the test.
+    // `<aggregateBy>` is one of the optional timespan children. It appears
+    // in only a couple of fixtures; round-tripping is the test.
     let xml = read(&fixture("characterization/fixtures/expand-month.xml"));
     let spec = from_xml_str(&xml).expect("parse");
     assert_eq!(spec.timespan.aggregate_by.as_deref(), Some("Month"));
@@ -491,11 +491,11 @@ fn java_runspec_xml_test_aggregate_by() {
 
 #[test]
 fn java_runspec_xml_test_serializer_is_byte_idempotent() {
- // The Java `RunSpecXMLTest.testRoundTrip` checks that emitting a
- // parsed RunSpec produces the same bytes the parser would re-read.
- // We test the stronger property: across all 33 fixtures, after one
- // model round-trip the serializer is byte-identical on every
- // subsequent re-serialization.
+    // The Java `RunSpecXMLTest.testRoundTrip` checks that emitting a
+    // parsed RunSpec produces the same bytes the parser would re-read.
+    // We test the stronger property: across all 33 fixtures, after one
+    // model round-trip the serializer is byte-identical on every
+    // subsequent re-serialization.
     let mut failures = vec![];
     for entry in std::fs::read_dir(fixtures_dir()).expect("read fixtures dir") {
         let path = entry.expect("entry").path();
@@ -539,9 +539,9 @@ fn base_spec_xml() -> String {
 
 #[test]
 fn rate_of_progress_xml_parses_use_parameters_yes() {
- // Verified against Task1806.mrs from the EPA MOVES source tree:
- // internalcontrolstrategy with classname=RateOfProgressStrategy and
- // CDATA body "useParameters\tYes".
+    // Verified against Task1806.mrs from the EPA MOVES source tree:
+    // internalcontrolstrategy with classname=RateOfProgressStrategy and
+    // CDATA body "useParameters\tYes".
     let base = base_spec_xml();
     let xml = base.replace(
         "\t<internalcontrolstrategies>\n\t</internalcontrolstrategies>",
@@ -561,7 +561,7 @@ useParameters\tYes\n\
         }
         other => panic!("expected RateOfProgress variant, got {other:?}"),
     }
- // Round-trip through XML and back — must be model-identical.
+    // Round-trip through XML and back — must be model-identical.
     let serialized = to_xml_string(&spec).expect("serialize");
     let reparsed = from_xml_str(&serialized).expect("reparse");
     assert_eq!(spec, reparsed);

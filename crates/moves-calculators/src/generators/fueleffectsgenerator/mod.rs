@@ -111,10 +111,10 @@ impl Generator for FuelEffectsGenerator {
     }
 
     fn subscriptions(&self) -> &[CalculatorSubscription] {
- // Built once: `Priority::parse` is not a `const fn`, so the slice
- // cannot be a plain `static`. The generator subscribes at PROCESS
- // granularity, priority GENERATOR-1 — it runs just after the
- // TankFuelGenerator, which modifies fuel-formulation parameters.
+        // Built once: `Priority::parse` is not a `const fn`, so the slice
+        // cannot be a plain `static`. The generator subscribes at PROCESS
+        // granularity, priority GENERATOR-1 — it runs just after the
+        // TankFuelGenerator, which modifies fuel-formulation parameters.
         static SUBS: OnceLock<Vec<CalculatorSubscription>> = OnceLock::new();
         SUBS.get_or_init(|| {
             let priority = Priority::parse("GENERATOR-1").expect("GENERATOR-1 is a valid priority");
@@ -136,7 +136,7 @@ impl Generator for FuelEffectsGenerator {
     }
 
     fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
- // Read `generalFuelRatioExpression`.
+        // Read `generalFuelRatioExpression`.
         let expr_rows: Vec<GeneralFuelRatioExpressionRow> =
             ctx.tables().iter_typed("generalFuelRatioExpression")?;
         let expressions: Vec<GeneralFuelRatioExpression> = expr_rows
@@ -156,22 +156,22 @@ impl Generator for FuelEffectsGenerator {
             })
             .collect();
 
- // Read `FuelSubtype` to map fuelSubtypeID → fuelTypeID.
+        // Read `FuelSubtype` to map fuelSubtypeID → fuelTypeID.
         let subtype_rows: Vec<FuelSubtypeRow> = ctx.tables().iter_typed("FuelSubtype")?;
         let subtype_to_type: std::collections::HashMap<i32, i32> = subtype_rows
             .into_iter()
             .map(|r| (r.fuel_subtype_id, r.fuel_type_id))
             .collect();
 
- // Read `FuelFormulation` and group by fuelTypeID via the subtype map.
+        // Read `FuelFormulation` and group by fuelTypeID via the subtype map.
         let ff_rows: Vec<FuelFormulationRow> = ctx.tables().iter_typed("FuelFormulation")?;
         let mut formulations_by_fuel_type: BTreeMap<i32, Vec<FuelFormulation>> = BTreeMap::new();
         for r in ff_rows {
- // Java `getFuelFormulations` joins fuelFormulation to fuelSubtype with an
- // INNER JOIN (FuelEffectsGenerator.java:1356-1363), so a formulation whose
- // fuelSubtypeID has no matching FuelSubtype row contributes to no fuel
- // type. Drop such rows to match inner-join semantics rather than inventing
- // a phantom fuelTypeID 0 bucket.
+            // Java `getFuelFormulations` joins fuelFormulation to fuelSubtype with an
+            // INNER JOIN (FuelEffectsGenerator.java:1356-1363), so a formulation whose
+            // fuelSubtypeID has no matching FuelSubtype row contributes to no fuel
+            // type. Drop such rows to match inner-join semantics rather than inventing
+            // a phantom fuelTypeID 0 bucket.
             let Some(&fuel_type_id) = subtype_to_type.get(&r.fuel_subtype_id) else {
                 continue;
             };
@@ -181,11 +181,11 @@ impl Generator for FuelEffectsGenerator {
                 .push(r.into_model());
         }
 
- // Read `FuelSupply` and build supplied_by_fuel_type (fuelFormulationID
- // sets per fuelTypeID). We join through the subtype map by way of
- // FuelFormulation: a formulation's fuelTypeID determines its bucket.
+        // Read `FuelSupply` and build supplied_by_fuel_type (fuelFormulationID
+        // sets per fuelTypeID). We join through the subtype map by way of
+        // FuelFormulation: a formulation's fuelTypeID determines its bucket.
         let fs_rows: Vec<FuelSupplyRow> = ctx.tables().iter_typed("FuelSupply")?;
- // Build a fast lookup: fuelFormulationID → fuelTypeID.
+        // Build a fast lookup: fuelFormulationID → fuelTypeID.
         let formulation_to_type: std::collections::HashMap<i32, i32> = formulations_by_fuel_type
             .iter()
             .flat_map(|(&ft, ffs)| ffs.iter().map(move |ff| (ff.fuel_formulation_id, ft)))
@@ -784,7 +784,7 @@ impl TableRow for FuelSupplyRow {
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
- // Emit all required schema columns; we only carry fuelFormulationID.
+        // Emit all required schema columns; we only carry fuelFormulationID.
         DataFrame::new(
             n,
             vec![
@@ -1045,14 +1045,14 @@ mod tests {
         assert_eq!(generator.name(), "FuelEffectsGenerator");
 
         let subs = generator.subscriptions();
- // The DAG records fourteen process subscriptions.
+        // The DAG records fourteen process subscriptions.
         assert_eq!(subs.len(), 14);
         let processes: Vec<u16> = subs.iter().map(|s| s.process_id.0).collect();
         assert_eq!(
             processes,
             vec![1, 2, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 90, 91]
         );
- // All at PROCESS granularity, priority GENERATOR-1.
+        // All at PROCESS granularity, priority GENERATOR-1.
         assert!(subs.iter().all(|s| s.granularity == Granularity::Process));
         assert!(subs.iter().all(|s| s.priority.display() == "GENERATOR-1"));
 
@@ -1065,19 +1065,19 @@ mod tests {
 
     #[test]
     fn generator_is_object_safe() {
- // The registry stores generators as `Box<dyn Generator>`.
+        // The registry stores generators as `Box<dyn Generator>`.
         let generators: Vec<Box<dyn Generator>> = vec![Box::new(FuelEffectsGenerator)];
         assert_eq!(generators[0].name(), "FuelEffectsGenerator");
     }
 
- /// Build a minimal `InMemoryStore` with one expression, one formulation,
- /// one subtype mapping, and one fuel-supply row. The expression evaluates
- /// `MTBEVolume + 7` and `MTBEVolume * 2` against the formulation
- /// (MTBEVolume = 10.0), so the expected ratios are 17.0 and 20.0.
+    /// Build a minimal `InMemoryStore` with one expression, one formulation,
+    /// one subtype mapping, and one fuel-supply row. The expression evaluates
+    /// `MTBEVolume + 7` and `MTBEVolume * 2` against the formulation
+    /// (MTBEVolume = 10.0), so the expected ratios are 17.0 and 20.0.
     fn make_store() -> InMemoryStore {
         let mut store = InMemoryStore::default();
 
- // generalFuelRatioExpression
+        // generalFuelRatioExpression
         store.insert(
             "generalFuelRatioExpression",
             GeneralFuelRatioExpressionRow::into_dataframe(vec![GeneralFuelRatioExpressionRow {
@@ -1094,7 +1094,7 @@ mod tests {
             .unwrap(),
         );
 
- // FuelFormulation (fuelSubtypeID 10 → fuelTypeID 1 via FuelSubtype)
+        // FuelFormulation (fuelSubtypeID 10 → fuelTypeID 1 via FuelSubtype)
         store.insert(
             "FuelFormulation",
             FuelFormulationRow::into_dataframe(vec![FuelFormulationRow {
@@ -1121,7 +1121,7 @@ mod tests {
             .unwrap(),
         );
 
- // FuelSubtype: subtype 10 → fuel type 1
+        // FuelSubtype: subtype 10 → fuel type 1
         store.insert(
             "FuelSubtype",
             FuelSubtypeRow::into_dataframe(vec![FuelSubtypeRow {
@@ -1131,7 +1131,7 @@ mod tests {
             .unwrap(),
         );
 
- // FuelSupply: formulation 100 is in the supply
+        // FuelSupply: formulation 100 is in the supply
         store.insert(
             "FuelSupply",
             FuelSupplyRow::into_dataframe(vec![FuelSupplyRow {
@@ -1175,7 +1175,7 @@ mod tests {
 
     #[test]
     fn execute_empty_supply_produces_no_rows() {
- // No FuelSupply rows → no supplied formulations → kernel returns empty.
+        // No FuelSupply rows → no supplied formulations → kernel returns empty.
         let mut store = InMemoryStore::default();
         store.insert(
             "generalFuelRatioExpression",
@@ -1225,7 +1225,7 @@ mod tests {
             }])
             .unwrap(),
         );
- // No FuelSupply rows.
+        // No FuelSupply rows.
         store.insert("FuelSupply", FuelSupplyRow::into_dataframe(vec![]).unwrap());
 
         let position = IterationPosition {

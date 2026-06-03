@@ -91,9 +91,9 @@ fn fixture_catalog_parses_and_is_unique() {
             path.display()
         );
         if !output_dbs.insert(runspec.output_database.clone()) {
- // sample-runspec.xml uses JUnitTestOutput (the canonical name);
- // every other fixture must pick a unique name so concurrent runs
- // don't write to the same MariaDB schema.
+            // sample-runspec.xml uses JUnitTestOutput (the canonical name);
+            // every other fixture must pick a unique name so concurrent runs
+            // don't write to the same MariaDB schema.
             panic!(
                 "duplicate <outputdatabase databasename={}> in {}",
                 runspec.output_database,

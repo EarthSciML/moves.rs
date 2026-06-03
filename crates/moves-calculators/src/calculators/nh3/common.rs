@@ -161,23 +161,23 @@ pub const NH3_POLLUTANT_ID: i32 = 30;
 /// `(polProcess, inspection program, age group)` cell.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ImFactorRow {
- /// `polProcessID` — `pollutantID * 100 + processID`.
+    /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
- /// `inspectFreq` — inspection frequency code.
+    /// `inspectFreq` — inspection frequency code.
     pub inspect_freq: i32,
- /// `testStandardsID` — the I/M test standard.
+    /// `testStandardsID` — the I/M test standard.
     pub test_standards_id: i32,
- /// `sourceTypeID` — MOVES source (vehicle) type.
+    /// `sourceTypeID` — MOVES source (vehicle) type.
     pub source_type_id: i32,
- /// `fuelTypeID` — fuel type.
+    /// `fuelTypeID` — fuel type.
     pub fuel_type_id: i32,
- /// `IMModelYearGroupID` — joins to
- /// [`PollutantProcessMappedModelYearRow::im_model_year_group_id`].
+    /// `IMModelYearGroupID` — joins to
+    /// [`PollutantProcessMappedModelYearRow::im_model_year_group_id`].
     pub im_model_year_group_id: i32,
- /// `ageGroupID` — joins to [`AgeCategoryRow::age_group_id`].
+    /// `ageGroupID` — joins to [`AgeCategoryRow::age_group_id`].
     pub age_group_id: i32,
- /// `IMFactor` — the I/M benefit factor (a percentage; the SQL multiplies
- /// it by `complianceFactor * 0.01`).
+    /// `IMFactor` — the I/M benefit factor (a percentage; the SQL multiplies
+    /// it by `complianceFactor * 0.01`).
     pub im_factor: f64,
 }
 
@@ -189,25 +189,25 @@ pub struct ImFactorRow {
 /// I/M-active coverage rows only; `useIMyn` is therefore not modelled.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ImCoverageRow {
- /// `polProcessID` — `pollutantID * 100 + processID`.
+    /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
- /// `countyID` — the county the program covers.
+    /// `countyID` — the county the program covers.
     pub county_id: i32,
- /// `yearID` — calendar year.
+    /// `yearID` — calendar year.
     pub year_id: i32,
- /// `sourceTypeID` — MOVES source (vehicle) type.
+    /// `sourceTypeID` — MOVES source (vehicle) type.
     pub source_type_id: i32,
- /// `fuelTypeID` — fuel type.
+    /// `fuelTypeID` — fuel type.
     pub fuel_type_id: i32,
- /// `inspectFreq` — inspection frequency code.
+    /// `inspectFreq` — inspection frequency code.
     pub inspect_freq: i32,
- /// `testStandardsID` — the I/M test standard.
+    /// `testStandardsID` — the I/M test standard.
     pub test_standards_id: i32,
- /// `begModelYearID` — first model year the program covers.
+    /// `begModelYearID` — first model year the program covers.
     pub beg_model_year_id: i32,
- /// `endModelYearID` — last model year the program covers.
+    /// `endModelYearID` — last model year the program covers.
     pub end_model_year_id: i32,
- /// `complianceFactor` — the program's compliance rate.
+    /// `complianceFactor` — the program's compliance rate.
     pub compliance_factor: f64,
 }
 
@@ -215,12 +215,12 @@ pub struct ImCoverageRow {
 /// onto its I/M model-year group.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PollutantProcessMappedModelYearRow {
- /// `polProcessID` — `pollutantID * 100 + processID`.
+    /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
- /// `modelYearID` — vehicle model year.
+    /// `modelYearID` — vehicle model year.
     pub model_year_id: i32,
- /// `IMModelYearGroupID` — joins to
- /// [`ImFactorRow::im_model_year_group_id`].
+    /// `IMModelYearGroupID` — joins to
+    /// [`ImFactorRow::im_model_year_group_id`].
     pub im_model_year_group_id: i32,
 }
 
@@ -228,9 +228,9 @@ pub struct PollutantProcessMappedModelYearRow {
 /// single `ageGroupID` spans several `ageID`s.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AgeCategoryRow {
- /// `ageID` — vehicle age in years; `modelYearID = yearID - ageID`.
+    /// `ageID` — vehicle age in years; `modelYearID = yearID - ageID`.
     pub age_id: i32,
- /// `ageGroupID` — the age group the age belongs to.
+    /// `ageGroupID` — the age group the age belongs to.
     pub age_group_id: i32,
 }
 
@@ -238,11 +238,11 @@ pub struct AgeCategoryRow {
 /// `(pollutantID, processID)` components.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PollutantProcessAssocRow {
- /// `polProcessID` — the surrogate key.
+    /// `polProcessID` — the surrogate key.
     pub pol_process_id: i32,
- /// `processID` — the process half.
+    /// `processID` — the process half.
     pub process_id: i32,
- /// `pollutantID` — the pollutant half.
+    /// `pollutantID` — the pollutant half.
     pub pollutant_id: i32,
 }
 
@@ -250,17 +250,17 @@ pub struct PollutantProcessAssocRow {
 /// `(polProcess, sourceBin, opMode, ageGroup)` cell.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct EmissionRateByAgeRow {
- /// `sourceBinID` — `BIGINT` key; joins to [`SourceBinRow::source_bin_id`].
+    /// `sourceBinID` — `BIGINT` key; joins to [`SourceBinRow::source_bin_id`].
     pub source_bin_id: i64,
- /// `polProcessID` — `pollutantID * 100 + processID`.
+    /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
- /// `opModeID` — operating mode.
+    /// `opModeID` — operating mode.
     pub op_mode_id: i32,
- /// `ageGroupID` — joins to [`AgeCategoryRow::age_group_id`].
+    /// `ageGroupID` — joins to [`AgeCategoryRow::age_group_id`].
     pub age_group_id: i32,
- /// `meanBaseRate` — the base emission rate (no I/M).
+    /// `meanBaseRate` — the base emission rate (no I/M).
     pub mean_base_rate: f64,
- /// `meanBaseRateIM` — the base emission rate with I/M applied.
+    /// `meanBaseRateIM` — the base emission rate with I/M applied.
     pub mean_base_rate_im: f64,
 }
 
@@ -268,11 +268,11 @@ pub struct EmissionRateByAgeRow {
 /// surrogate key into its `(sourceTypeID, modelYearID)` components.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceTypeModelYearRow {
- /// `sourceTypeModelYearID` — the surrogate key.
+    /// `sourceTypeModelYearID` — the surrogate key.
     pub source_type_model_year_id: i32,
- /// `modelYearID` — vehicle model year.
+    /// `modelYearID` — vehicle model year.
     pub model_year_id: i32,
- /// `sourceTypeID` — MOVES source (vehicle) type.
+    /// `sourceTypeID` — MOVES source (vehicle) type.
     pub source_type_id: i32,
 }
 
@@ -280,14 +280,14 @@ pub struct SourceTypeModelYearRow {
 /// `(sourceTypeModelYear)` group's activity for one `polProcessID`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceBinDistributionRow {
- /// `sourceTypeModelYearID` — joins to
- /// [`SourceTypeModelYearRow::source_type_model_year_id`].
+    /// `sourceTypeModelYearID` — joins to
+    /// [`SourceTypeModelYearRow::source_type_model_year_id`].
     pub source_type_model_year_id: i32,
- /// `polProcessID` — `pollutantID * 100 + processID`.
+    /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
- /// `sourceBinID` — joins to [`SourceBinRow::source_bin_id`].
+    /// `sourceBinID` — joins to [`SourceBinRow::source_bin_id`].
     pub source_bin_id: i64,
- /// `sourceBinActivityFraction` — the bin's share of the group's activity.
+    /// `sourceBinActivityFraction` — the bin's share of the group's activity.
     pub source_bin_activity_fraction: f64,
 }
 
@@ -295,9 +295,9 @@ pub struct SourceBinDistributionRow {
 /// `fuelTypeID` is read by the NH3 pipeline.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceBinRow {
- /// `sourceBinID` — `BIGINT` primary key.
+    /// `sourceBinID` — `BIGINT` primary key.
     pub source_bin_id: i64,
- /// `fuelTypeID` — fuel type.
+    /// `fuelTypeID` — fuel type.
     pub fuel_type_id: i32,
 }
 
@@ -305,28 +305,28 @@ pub struct SourceBinRow {
 /// `(sourceType, hourDay, link, polProcess)` cell.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OpModeDistributionRow {
- /// `sourceTypeID` — MOVES source (vehicle) type.
+    /// `sourceTypeID` — MOVES source (vehicle) type.
     pub source_type_id: i32,
- /// `hourDayID` — joins to [`HourDayRow::hour_day_id`].
+    /// `hourDayID` — joins to [`HourDayRow::hour_day_id`].
     pub hour_day_id: i32,
- /// `linkID` — the road link.
+    /// `linkID` — the road link.
     pub link_id: i32,
- /// `polProcessID` — `pollutantID * 100 + processID`.
+    /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
- /// `opModeID` — operating mode.
+    /// `opModeID` — operating mode.
     pub op_mode_id: i32,
- /// `opModeFraction` — the fraction of activity in this operating mode.
+    /// `opModeFraction` — the fraction of activity in this operating mode.
     pub op_mode_fraction: f64,
 }
 
 /// One `HourDay` row — the `hourDayID` → `(dayID, hourID)` split.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HourDayRow {
- /// `hourDayID` — the surrogate key.
+    /// `hourDayID` — the surrogate key.
     pub hour_day_id: i32,
- /// `dayID` — day-of-week type.
+    /// `dayID` — day-of-week type.
     pub day_id: i32,
- /// `hourID` — hour of day.
+    /// `hourID` — hour of day.
     pub hour_id: i32,
 }
 
@@ -339,25 +339,25 @@ pub struct HourDayRow {
 /// [`merge_im_coverage`].
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ImCoverageMergedRow {
- /// `polProcessID` — `pollutantID * 100 + processID`.
+    /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
- /// `pollutantID` — resolved from `PollutantProcessAssoc`; `0` if the
- /// `polProcessID` is absent from the supplied associations (the SQL
- /// `UPDATE` would leave the column at its `0` insert default).
+    /// `pollutantID` — resolved from `PollutantProcessAssoc`; `0` if the
+    /// `polProcessID` is absent from the supplied associations (the SQL
+    /// `UPDATE` would leave the column at its `0` insert default).
     pub pollutant_id: i32,
- /// `processID` — resolved from `PollutantProcessAssoc`; `0` if absent.
+    /// `processID` — resolved from `PollutantProcessAssoc`; `0` if absent.
     pub process_id: i32,
- /// `modelYearID` — vehicle model year.
+    /// `modelYearID` — vehicle model year.
     pub model_year_id: i32,
- /// `fuelTypeID` — fuel type.
+    /// `fuelTypeID` — fuel type.
     pub fuel_type_id: i32,
- /// `sourceTypeID` — MOVES source (vehicle) type.
+    /// `sourceTypeID` — MOVES source (vehicle) type.
     pub source_type_id: i32,
- /// `IMAdjustFract` — `Σ(IMFactor × complianceFactor × 0.01)` over the
- /// cell. The blend weight applied by [`finalize_with_im`].
+    /// `IMAdjustFract` — `Σ(IMFactor × complianceFactor × 0.01)` over the
+    /// cell. The blend weight applied by [`finalize_with_im`].
     pub im_adjust_fract: f64,
- /// `weightFactor` — `Σ(complianceFactor)` over the cell. The SQL computes
- /// this column but no later step reads it; it is carried for fidelity.
+    /// `weightFactor` — `Σ(complianceFactor)` over the cell. The SQL computes
+    /// this column but no later step reads it; it is carried for fidelity.
     pub weight_factor: f64,
 }
 
@@ -371,20 +371,20 @@ pub struct ImCoverageMergedRow {
 /// here.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceBinEmissionRate {
- /// `polProcessID` — `pollutantID * 100 + processID`.
+    /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
- /// `sourceTypeID` — MOVES source (vehicle) type.
+    /// `sourceTypeID` — MOVES source (vehicle) type.
     pub source_type_id: i32,
- /// `modelYearID` — vehicle model year.
+    /// `modelYearID` — vehicle model year.
     pub model_year_id: i32,
- /// `fuelTypeID` — fuel type.
+    /// `fuelTypeID` — fuel type.
     pub fuel_type_id: i32,
- /// `opModeID` — operating mode.
+    /// `opModeID` — operating mode.
     pub op_mode_id: i32,
- /// `meanBaseRate` — `Σ(EmissionRateByAge.meanBaseRate ×
- /// sourceBinActivityFraction)` over the source bins of the cell.
+    /// `meanBaseRate` — `Σ(EmissionRateByAge.meanBaseRate ×
+    /// sourceBinActivityFraction)` over the source bins of the cell.
     pub mean_base_rate: f64,
- /// `meanBaseRateIM` — the same sum over `meanBaseRateIM`.
+    /// `meanBaseRateIM` — the same sum over `meanBaseRateIM`.
     pub mean_base_rate_im: f64,
 }
 
@@ -397,43 +397,43 @@ pub struct SourceBinEmissionRate {
 /// SQL adds and drops is not part of this struct.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct EmissionRow {
- /// `yearID`.
+    /// `yearID`.
     pub year_id: i32,
- /// `monthID`.
+    /// `monthID`.
     pub month_id: i32,
- /// `dayID`.
+    /// `dayID`.
     pub day_id: i32,
- /// `hourID`.
+    /// `hourID`.
     pub hour_id: i32,
- /// `stateID`.
+    /// `stateID`.
     pub state_id: i32,
- /// `countyID`.
+    /// `countyID`.
     pub county_id: i32,
- /// `zoneID`.
+    /// `zoneID`.
     pub zone_id: i32,
- /// `linkID`.
+    /// `linkID`.
     pub link_id: i32,
- /// `pollutantID` — always `30` (ammonia).
+    /// `pollutantID` — always `30` (ammonia).
     pub pollutant_id: i32,
- /// `processID` — `1` (Running Exhaust) or `2` (Start Exhaust).
+    /// `processID` — `1` (Running Exhaust) or `2` (Start Exhaust).
     pub process_id: i32,
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: i32,
- /// `fuelTypeID`.
+    /// `fuelTypeID`.
     pub fuel_type_id: i32,
- /// `modelYearID`.
+    /// `modelYearID`.
     pub model_year_id: i32,
- /// `roadTypeID`.
+    /// `roadTypeID`.
     pub road_type_id: i32,
- /// `emissionQuant` — the I/M-blended emission total for this cell.
+    /// `emissionQuant` — the I/M-blended emission total for this cell.
     pub emission_quant: f64,
 }
 
 impl EmissionRow {
- /// The integer dimension tuple — every column except `emission_quant`, in
- /// `MOVESWorkerOutput` column order. Used to sort the output
- /// deterministically; MOVES leaves `MOVESWorkerOutput` physically
- /// unordered.
+    /// The integer dimension tuple — every column except `emission_quant`, in
+    /// `MOVESWorkerOutput` column order. Used to sort the output
+    /// deterministically; MOVES leaves `MOVESWorkerOutput` physically
+    /// unordered.
     fn dimension_key(&self) -> [i32; 14] {
         [
             self.year_id,
@@ -1530,7 +1530,7 @@ pub fn merge_im_coverage(
     im_coverage: &[ImCoverageRow],
     pollutant_process_assoc: &[PollutantProcessAssocRow],
 ) -> Vec<ImCoverageMergedRow> {
- // IMFactor indexed by its join key to PollutantProcessMappedModelYear.
+    // IMFactor indexed by its join key to PollutantProcessMappedModelYear.
     let mut im_factor_by: HashMap<(i32, i32), Vec<&ImFactorRow>> = HashMap::new();
     for imf in im_factor {
         im_factor_by
@@ -1538,7 +1538,7 @@ pub fn merge_im_coverage(
             .or_default()
             .push(imf);
     }
- // AgeCategory indexed by ageGroupID — a group spans several ages.
+    // AgeCategory indexed by ageGroupID — a group spans several ages.
     let mut ages_by_group: HashMap<i32, Vec<i32>> = HashMap::new();
     for ac in age_category {
         ages_by_group
@@ -1546,9 +1546,9 @@ pub fn merge_im_coverage(
             .or_default()
             .push(ac.age_id);
     }
- // IMCoverage indexed by its join key to IMFactor, filtered to the
- // iteration county and year (the SQL `WHERE imc.countyID = … AND
- // imc.yearID = …`).
+    // IMCoverage indexed by its join key to IMFactor, filtered to the
+    // iteration county and year (the SQL `WHERE imc.countyID = … AND
+    // imc.yearID = …`).
     let mut im_coverage_by: HashMap<(i32, i32, i32, i32, i32), Vec<&ImCoverageRow>> =
         HashMap::new();
     for imc in im_coverage {
@@ -1566,34 +1566,34 @@ pub fn merge_im_coverage(
             .or_default()
             .push(imc);
     }
- // PollutantProcessAssoc lookup — polProcessID → (pollutantID, processID).
+    // PollutantProcessAssoc lookup — polProcessID → (pollutantID, processID).
     let ppa_by: HashMap<i32, &PollutantProcessAssocRow> = pollutant_process_assoc
         .iter()
         .map(|r| (r.pol_process_id, r))
         .collect();
 
- // Accumulate (IMAdjustFract, weightFactor) over the GROUP BY key.
+    // Accumulate (IMAdjustFract, weightFactor) over the GROUP BY key.
     let mut acc: HashMap<(i32, i32, i32, i32), (f64, f64)> = HashMap::new();
     for ppmy in pollutant_process_mapped_model_year {
- // INNER JOIN IMFactor USING (polProcessID, IMModelYearGroupID).
+        // INNER JOIN IMFactor USING (polProcessID, IMModelYearGroupID).
         let Some(im_factors) =
             im_factor_by.get(&(ppmy.pol_process_id, ppmy.im_model_year_group_id))
         else {
             continue;
         };
         for imf in im_factors {
- // INNER JOIN AgeCategory ON ageGroupID — one tuple per age.
+            // INNER JOIN AgeCategory ON ageGroupID — one tuple per age.
             let Some(ages) = ages_by_group.get(&imf.age_group_id) else {
                 continue;
             };
             for &age_id in ages {
                 let model_year_id = year_id - age_id;
- // WHERE ppmy.modelYearID = yearID - ageID.
+                // WHERE ppmy.modelYearID = yearID - ageID.
                 if ppmy.model_year_id != model_year_id {
                     continue;
                 }
- // INNER JOIN IMCoverage USING (polProcessID, inspectFreq,
- // testStandardsID, sourceTypeID, fuelTypeID).
+                // INNER JOIN IMCoverage USING (polProcessID, inspectFreq,
+                // testStandardsID, sourceTypeID, fuelTypeID).
                 let Some(coverages) = im_coverage_by.get(&(
                     imf.pol_process_id,
                     imf.inspect_freq,
@@ -1604,8 +1604,8 @@ pub fn merge_im_coverage(
                     continue;
                 };
                 for imc in coverages {
- // … AND imc.begModelYearID <= modelYear <=
- // imc.endModelYearID.
+                    // … AND imc.begModelYearID <= modelYear <=
+                    // imc.endModelYearID.
                     if model_year_id < imc.beg_model_year_id
                         || model_year_id > imc.end_model_year_id
                     {
@@ -1630,8 +1630,8 @@ pub fn merge_im_coverage(
         .into_iter()
         .map(
             |((pol_process_id, model_year_id, fuel_type_id, source_type_id), (adj, wf))| {
- // The SQL `UPDATE … SET pollutantID = …, processID = …` from
- // PollutantProcessAssoc; the `0` insert default stands if absent.
+                // The SQL `UPDATE … SET pollutantID = …, processID = …` from
+                // PollutantProcessAssoc; the `0` insert default stands if absent.
                 let (pollutant_id, process_id) = ppa_by
                     .get(&pol_process_id)
                     .map_or((0, 0), |a| (a.pollutant_id, a.process_id));
@@ -1693,7 +1693,7 @@ pub fn weight_by_source_bin(
     source_bin_distribution: &[SourceBinDistributionRow],
     source_bin: &[SourceBinRow],
 ) -> Vec<SourceBinEmissionRate> {
- // AgeCategory indexed by ageGroupID.
+    // AgeCategory indexed by ageGroupID.
     let mut ages_by_group: HashMap<i32, Vec<i32>> = HashMap::new();
     for ac in age_category {
         ages_by_group
@@ -1701,7 +1701,7 @@ pub fn weight_by_source_bin(
             .or_default()
             .push(ac.age_id);
     }
- // SourceTypeModelYear indexed by modelYearID.
+    // SourceTypeModelYear indexed by modelYearID.
     let mut stmy_by_year: HashMap<i32, Vec<&SourceTypeModelYearRow>> = HashMap::new();
     for stmy in source_type_model_year {
         stmy_by_year
@@ -1709,7 +1709,7 @@ pub fn weight_by_source_bin(
             .or_default()
             .push(stmy);
     }
- // SourceBinDistribution indexed by its join key.
+    // SourceBinDistribution indexed by its join key.
     let mut sbd_by: HashMap<(i32, i32, i64), Vec<&SourceBinDistributionRow>> = HashMap::new();
     for sbd in source_bin_distribution {
         sbd_by
@@ -1721,7 +1721,7 @@ pub fn weight_by_source_bin(
             .or_default()
             .push(sbd);
     }
- // SourceBin lookup — sourceBinID → fuelTypeID.
+    // SourceBin lookup — sourceBinID → fuelTypeID.
     let source_bin_fuel: HashMap<i64, i32> = source_bin
         .iter()
         .map(|r| (r.source_bin_id, r.fuel_type_id))
@@ -1729,19 +1729,19 @@ pub fn weight_by_source_bin(
 
     let mut acc: HashMap<SourceBinGroupKey, (f64, f64)> = HashMap::new();
     for er in emission_rate_by_age {
- // INNER JOIN AgeCategory ON ageGroupID.
+        // INNER JOIN AgeCategory ON ageGroupID.
         let Some(ages) = ages_by_group.get(&er.age_group_id) else {
             continue;
         };
         for &age_id in ages {
             let model_year_id = year_id - age_id;
- // INNER JOIN SourceTypeModelYear ON modelYearID = yearID - ageID.
+            // INNER JOIN SourceTypeModelYear ON modelYearID = yearID - ageID.
             let Some(stmys) = stmy_by_year.get(&model_year_id) else {
                 continue;
             };
             for stmy in stmys {
- // INNER JOIN SourceBinDistribution USING
- // (sourceTypeModelYearID, polProcessID, sourceBinID).
+                // INNER JOIN SourceBinDistribution USING
+                // (sourceTypeModelYearID, polProcessID, sourceBinID).
                 let Some(sbds) = sbd_by.get(&(
                     stmy.source_type_model_year_id,
                     er.pol_process_id,
@@ -1750,7 +1750,7 @@ pub fn weight_by_source_bin(
                     continue;
                 };
                 for sbd in sbds {
- // INNER JOIN SourceBin ON sourceBinID.
+                    // INNER JOIN SourceBin ON sourceBinID.
                     let Some(&fuel_type_id) = source_bin_fuel.get(&sbd.source_bin_id) else {
                         continue;
                     };
@@ -1865,14 +1865,14 @@ pub fn finalize_with_im(
 mod tests {
     use super::*;
 
- /// NH3 Running Exhaust `polProcessID` — `pollutant 30 × 100 + process 1`.
+    /// NH3 Running Exhaust `polProcessID` — `pollutant 30 × 100 + process 1`.
     const NH3_RUNNING_POL_PROCESS: i32 = 3001;
 
     #[test]
     fn merge_im_coverage_sums_factor_and_compliance_over_the_cell() {
- // Two ages in one group; both resolve to model years the single
- // IMCoverage row covers, so the cell sums two (factor, compliance)
- // contributions.
+        // Two ages in one group; both resolve to model years the single
+        // IMCoverage row covers, so the cell sums two (factor, compliance)
+        // contributions.
         let ppmy = vec![
             PollutantProcessMappedModelYearRow {
                 pol_process_id: NH3_RUNNING_POL_PROCESS,
@@ -1933,8 +1933,8 @@ mod tests {
             &ppa,
         );
 
- // age 1 → model year 2019, age 2 → model year 2018 — two distinct
- // cells, each one contribution: IMAdjustFract = 50 × 80 × 0.01 = 40.
+        // age 1 → model year 2019, age 2 → model year 2018 — two distinct
+        // cells, each one contribution: IMAdjustFract = 50 × 80 × 0.01 = 40.
         assert_eq!(merged.len(), 2);
         for row in &merged {
             assert_eq!(row.pollutant_id, NH3_POLLUTANT_ID);
@@ -1950,8 +1950,8 @@ mod tests {
 
     #[test]
     fn merge_im_coverage_drops_model_years_outside_coverage() {
- // The IMCoverage row covers only 2015–2017; model year 2019 (age 1 of
- // run year 2020) falls outside, so the cell is dropped.
+        // The IMCoverage row covers only 2015–2017; model year 2019 (age 1 of
+        // run year 2020) falls outside, so the cell is dropped.
         let ppmy = vec![PollutantProcessMappedModelYearRow {
             pol_process_id: NH3_RUNNING_POL_PROCESS,
             model_year_id: 2019,
@@ -2017,7 +2017,7 @@ mod tests {
             age_id: 1,
             age_group_id: 3,
         }];
- // Coverage for a different county — no cell survives.
+        // Coverage for a different county — no cell survives.
         let im_coverage = vec![ImCoverageRow {
             pol_process_id: NH3_RUNNING_POL_PROCESS,
             county_id: 99_999,
@@ -2045,8 +2045,8 @@ mod tests {
 
     #[test]
     fn weight_by_source_bin_sums_rate_times_activity_fraction() {
- // Two source bins of one fuel type contribute to one cell:
- // meanBaseRate = 2·0.25 + 4·0.75 = 3.5.
+        // Two source bins of one fuel type contribute to one cell:
+        // meanBaseRate = 2·0.25 + 4·0.75 = 3.5.
         let emission_rate_by_age = vec![
             EmissionRateByAgeRow {
                 source_bin_id: 1000,
@@ -2115,7 +2115,7 @@ mod tests {
         assert!((rates[0].mean_base_rate_im - 1.75).abs() < 1e-9);
     }
 
- /// A worker row carrying the dimension columns the I/M blend keys on.
+    /// A worker row carrying the dimension columns the I/M blend keys on.
     fn quant_row(model_year_id: i32, emission_quant: f64) -> EmissionRow {
         EmissionRow {
             year_id: 2020,
@@ -2148,8 +2148,8 @@ mod tests {
             im_adjust_fract: 0.25,
             weight_factor: 80.0,
         }];
- // 2018 matches: 4 × 0.25 + 10 × 0.75 = 8.5. 2019 has no I/M row, so
- // its non-I/M quantity (10.0) passes through unchanged.
+        // 2018 matches: 4 × 0.25 + 10 × 0.75 = 8.5. 2019 has no I/M row, so
+        // its non-I/M quantity (10.0) passes through unchanged.
         let rows = vec![(quant_row(2018, 10.0), 4.0), (quant_row(2019, 10.0), 4.0)];
 
         let out = finalize_with_im(rows, &merged);
@@ -2162,8 +2162,8 @@ mod tests {
 
     #[test]
     fn finalize_with_im_floors_a_matched_blend_at_zero() {
- // An IMAdjustFract above one drives the blend negative; the SQL
- // `GREATEST(…, 0)` floors a *matched* row at zero.
+        // An IMAdjustFract above one drives the blend negative; the SQL
+        // `GREATEST(…, 0)` floors a *matched* row at zero.
         let merged = vec![ImCoverageMergedRow {
             pol_process_id: NH3_RUNNING_POL_PROCESS,
             pollutant_id: NH3_POLLUTANT_ID,
@@ -2174,7 +2174,7 @@ mod tests {
             im_adjust_fract: 2.0,
             weight_factor: 80.0,
         }];
- // 1 × 2 + 10 × (1 - 2) = -8 → floored to 0.
+        // 1 × 2 + 10 × (1 - 2) = -8 → floored to 0.
         let rows = vec![(quant_row(2018, 10.0), 1.0)];
 
         let out = finalize_with_im(rows, &merged);

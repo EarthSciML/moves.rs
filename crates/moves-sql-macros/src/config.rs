@@ -46,27 +46,27 @@ use crate::expander::MacroExpander;
 #[derive(Debug, Default, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ExpandConfig {
- /// Section names the runtime would mark as enabled for this bundle.
- /// Matched case-insensitively against `-- Section <name>` markers in
- /// the SQL script.
+    /// Section names the runtime would mark as enabled for this bundle.
+    /// Matched case-insensitively against `-- Section <name>` markers in
+    /// the SQL script.
     #[serde(default)]
     pub enabled_sections: Vec<String>,
 
- /// `##context.*##`-style textual replacements applied to non-marker
- /// lines after macro expansion. Keys are inserted as-is (Java does
- /// case-insensitive substring matching on the key).
+    /// `##context.*##`-style textual replacements applied to non-marker
+    /// lines after macro expansion. Keys are inserted as-is (Java does
+    /// case-insensitive substring matching on the key).
     #[serde(default)]
     pub replacements: BTreeMap<String, String>,
 
- /// Multi-column macro value sets. Each one fans out into `columns.len()`
- /// macros of the form `##macro.{prefix}{column}##`.
+    /// Multi-column macro value sets. Each one fans out into `columns.len()`
+    /// macros of the form `##macro.{prefix}{column}##`.
     #[serde(default)]
     pub data_sets: Vec<DataSet>,
 
- /// CSV-style value sets. Each one produces two macros:
- /// `##macro.csv.{column_name}##` (chunked, one row per `max_length`-
- /// bounded chunk) and `##macro.csv.all.{column_name}##` (one row with
- /// the full list).
+    /// CSV-style value sets. Each one produces two macros:
+    /// `##macro.csv.{column_name}##` (chunked, one row per `max_length`-
+    /// bounded chunk) and `##macro.csv.all.{column_name}##` (one row with
+    /// the full list).
     #[serde(default)]
     pub csv_sets: Vec<CsvSet>,
 }
@@ -75,18 +75,18 @@ pub struct ExpandConfig {
 #[derive(Debug, Default, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DataSet {
- /// Macro-name prefix. Use the empty string for no prefix.
+    /// Macro-name prefix. Use the empty string for no prefix.
     #[serde(default)]
     pub prefix: String,
- /// Arbitrary string used only to derive the set's identity key.
- /// Java passes the SQL statement text; downstream tests can use any
- /// stable string.
+    /// Arbitrary string used only to derive the set's identity key.
+    /// Java passes the SQL statement text; downstream tests can use any
+    /// stable string.
     pub sql_id: String,
- /// Column names, ordered. Produce macros `##macro.{prefix}{column}##`.
+    /// Column names, ordered. Produce macros `##macro.{prefix}{column}##`.
     pub columns: Vec<String>,
- /// Rows, in macro-expansion order (Java's `PermutationCreator`
- /// increments the first-added dimension fastest, so the row ordering
- /// here directly maps to expansion order).
+    /// Rows, in macro-expansion order (Java's `PermutationCreator`
+    /// increments the first-added dimension fastest, so the row ordering
+    /// here directly maps to expansion order).
     pub rows: Vec<Vec<String>>,
 }
 
@@ -94,28 +94,28 @@ pub struct DataSet {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CsvSet {
- /// Identity key (Java passes the SQL statement text).
+    /// Identity key (Java passes the SQL statement text).
     pub sql_id: String,
- /// Column name, used in the macro suffix.
+    /// Column name, used in the macro suffix.
     pub column_name: String,
- /// Raw column values (unsorted, possibly duplicated). The expander sorts
- /// and dedupes them via `BTreeSet<String>` (Java's `TreeSet<String>`).
+    /// Raw column values (unsorted, possibly duplicated). The expander sorts
+    /// and dedupes them via `BTreeSet<String>` (Java's `TreeSet<String>`).
     pub values: Vec<String>,
- /// Maximum chunk length in characters. `0` means no chunking — every
- /// value joins into one row.
+    /// Maximum chunk length in characters. `0` means no chunking — every
+    /// value joins into one row.
     #[serde(default = "default_max_length")]
     pub max_length: usize,
- /// Wrap each value with `'…'` (MySQL-escaped). Use `true` for textual
- /// columns, `false` for numeric IDs.
+    /// Wrap each value with `'…'` (MySQL-escaped). Use `true` for textual
+    /// columns, `false` for numeric IDs.
     #[serde(default)]
     pub should_add_quotes: bool,
- /// Keep `default_value` in the data even when real rows are present.
+    /// Keep `default_value` in the data even when real rows are present.
     #[serde(default)]
     pub use_default_value_in_data: bool,
- /// Value to emit when the value list collapses to empty (prevents
- /// zero-element SQL `IN ()` syntax errors). `null`/missing = no default.
- /// An empty string with `should_add_quotes = false` is treated as
- /// "no default", matching the Java `hasDefaultValue` predicate.
+    /// Value to emit when the value list collapses to empty (prevents
+    /// zero-element SQL `IN ()` syntax errors). `null`/missing = no default.
+    /// An empty string with `should_add_quotes = false` is treated as
+    /// "no default", matching the Java `hasDefaultValue` predicate.
     #[serde(default)]
     pub default_value: Option<String>,
 }
@@ -125,7 +125,7 @@ fn default_max_length() -> usize {
 }
 
 impl ExpandConfig {
- /// Load and parse a TOML configuration file.
+    /// Load and parse a TOML configuration file.
     pub fn load(path: &Path) -> Result<Self> {
         let contents = std::fs::read_to_string(path).map_err(|source| Error::Io {
             path: path.to_path_buf(),
@@ -137,12 +137,12 @@ impl ExpandConfig {
         })
     }
 
- /// Apply the configured value sets to a fresh [`MacroExpander`].
- ///
- /// Order: [`Self::data_sets`] first, then [`Self::csv_sets`]. The
- /// order is observable via [`crate::MacroExpander::expand_and_add`]'s
- /// cartesian-product expansion — the first-added set's row index
- /// cycles fastest.
+    /// Apply the configured value sets to a fresh [`MacroExpander`].
+    ///
+    /// Order: [`Self::data_sets`] first, then [`Self::csv_sets`]. The
+    /// order is observable via [`crate::MacroExpander::expand_and_add`]'s
+    /// cartesian-product expansion — the first-added set's row index
+    /// cycles fastest.
     pub fn build_expander(&self) -> Result<MacroExpander> {
         let mut m = MacroExpander::new();
         for set in &self.data_sets {
@@ -165,9 +165,9 @@ impl ExpandConfig {
         Ok(m)
     }
 
- /// Materialise the replacement map as a vector of `(key, value)` pairs
- /// in the order [`crate::do_replacements`] expects. Sorted by key for
- /// determinism (BTreeMap's natural order).
+    /// Materialise the replacement map as a vector of `(key, value)` pairs
+    /// in the order [`crate::do_replacements`] expects. Sorted by key for
+    /// determinism (BTreeMap's natural order).
     pub fn replacement_pairs(&self) -> Vec<(String, String)> {
         self.replacements
             .iter()
@@ -251,7 +251,7 @@ values = ["3", "4"]
 "#;
         let cfg: ExpandConfig = toml::from_str(toml).unwrap();
         let m = cfg.build_expander().unwrap();
- // 1 data set + 2 CSV sets (csv chunked + csv all) = 3.
+        // 1 data set + 2 CSV sets (csv chunked + csv all) = 3.
         assert_eq!(m.len(), 3);
     }
 

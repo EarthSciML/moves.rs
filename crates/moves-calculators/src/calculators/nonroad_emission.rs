@@ -2,7 +2,7 @@
 //! in-process simulation API — port of
 //! `gov/epa/otaq/moves/master/nonroad/NonroadEmissionCalculator.java`.
 //!
-//! 
+//!
 //!
 //! # What this adapter does
 //!
@@ -105,14 +105,14 @@ const NONROAD_INPUT_TABLES: &[&str] = &[
     "nrequipmenttype",
     "nragecategory",
     "nrmodelyear",
- // Evaporative emission rates by (SCC, HP-bin, polProcessID, engTechID).
- // Not yet consumed by the data-plane loader (evap calculation is stubbed),
- // but declaring it here ensures the snapshot loader admits the table into
- // the in-memory store so the evap wiring can read it without a schema change.
+    // Evaporative emission rates by (SCC, HP-bin, polProcessID, engTechID).
+    // Not yet consumed by the data-plane loader (evap calculation is stubbed),
+    // but declaring it here ensures the snapshot loader admits the table into
+    // the in-memory store so the evap wiring can read it without a schema change.
     "nrevapemissionrate",
- // Retrofit annual/effective fractions by (SCC, engTech, hp, pollutant, retrofitID).
- // The engine's ReferenceData carries a retrofit_records slot; this declaration
- // ensures the table is available in-store for the retrofit loader.
+    // Retrofit annual/effective fractions by (SCC, engTech, hp, pollutant, retrofitID).
+    // The engine's ReferenceData carries a retrofit_records slot; this declaration
+    // ensures the table is available in-store for the retrofit loader.
     "nrretrofitfactors",
 ];
 
@@ -133,12 +133,12 @@ pub struct NonroadEmissionCalculator {
 }
 
 impl NonroadEmissionCalculator {
- /// DAG name — matches the Java class and the `calculator-dag.json` entry.
+    /// DAG name — matches the Java class and the `calculator-dag.json` entry.
     pub const NAME: &'static str = "NonroadEmissionCalculator";
 
- /// Construct the adapter, building one [`CalculatorSubscription`]
- /// per subscribed process at `DAY` granularity /
- /// `EMISSION_CALCULATOR` priority.
+    /// Construct the adapter, building one [`CalculatorSubscription`]
+    /// per subscribed process at `DAY` granularity /
+    /// `EMISSION_CALCULATOR` priority.
     #[must_use]
     pub fn new() -> Self {
         let priority = Priority::parse("EMISSION_CALCULATOR")
@@ -166,58 +166,58 @@ impl Calculator for NonroadEmissionCalculator {
         &self.subscriptions
     }
 
- /// Declares the `nr*` execution-DB tables the data-plane loader reads,
- /// so the snapshot loader admits them into the in-memory store.
+    /// Declares the `nr*` execution-DB tables the data-plane loader reads,
+    /// so the snapshot loader admits them into the in-memory store.
     fn input_tables(&self) -> &[&'static str] {
         NONROAD_INPUT_TABLES
     }
 
- /// `NonroadEmissionCalculator` emits no `MOVESWorkerOutput` rows of its
- /// own: the Java class delegated to `nonroad.exe`, which wrote to separate
- /// output tables. In `moves-nonroad`, the simulation output flows through
- /// `NonroadOutputs` and will be mapped to the unified Parquet schema by
- /// the data-plane wiring (a follow-on task). Until that wiring lands,
- /// this slice is empty — consistent with `calculator-dag.json`'s
- /// `registrations_count: 0`.
+    /// `NonroadEmissionCalculator` emits no `MOVESWorkerOutput` rows of its
+    /// own: the Java class delegated to `nonroad.exe`, which wrote to separate
+    /// output tables. In `moves-nonroad`, the simulation output flows through
+    /// `NonroadOutputs` and will be mapped to the unified Parquet schema by
+    /// the data-plane wiring (a follow-on task). Until that wiring lands,
+    /// this slice is empty — consistent with `calculator-dag.json`'s
+    /// `registrations_count: 0`.
     fn registrations(&self) -> &[PollutantProcessAssociation] {
         &[]
     }
 
- /// Run the NONROAD simulation for the current master-loop iteration.
- ///
- /// Canonical `NonroadEmissionCalculator.doesProcessContext`
- /// (`NonroadEmissionCalculator.java:457-481`) returns `false` for any
- /// context with `year <= 0`, `monthID <= 0`, or `dayID <= 0`. In the
- /// Rust port there is no separate `doesProcessContext` gate — the
- /// master loop guarantees that year, month, and day are all `Some` when
- /// dispatching at `DAY` granularity (the granularity this calculator
- /// subscribes at). A `None` here therefore means the engine failed to
- /// populate the position, which is a programming error — surface it as
- /// [`Error::MissingContext`] rather than silently returning empty output.
- ///
- /// Once a valid temporal position is present, builds the NONROAD engine
- /// inputs from the `nr*` execution-DB tables, calls
- /// [`moves_nonroad::run_simulation`], and maps the result onto the
- /// MOVESOutput schema.
+    /// Run the NONROAD simulation for the current master-loop iteration.
+    ///
+    /// Canonical `NonroadEmissionCalculator.doesProcessContext`
+    /// (`NonroadEmissionCalculator.java:457-481`) returns `false` for any
+    /// context with `year <= 0`, `monthID <= 0`, or `dayID <= 0`. In the
+    /// Rust port there is no separate `doesProcessContext` gate — the
+    /// master loop guarantees that year, month, and day are all `Some` when
+    /// dispatching at `DAY` granularity (the granularity this calculator
+    /// subscribes at). A `None` here therefore means the engine failed to
+    /// populate the position, which is a programming error — surface it as
+    /// [`Error::MissingContext`] rather than silently returning empty output.
+    ///
+    /// Once a valid temporal position is present, builds the NONROAD engine
+    /// inputs from the `nr*` execution-DB tables, calls
+    /// [`moves_nonroad::run_simulation`], and maps the result onto the
+    /// MOVESOutput schema.
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let time = &ctx.position().time;
- // The master loop guarantees year/month/day are Some at DAY granularity.
- // A None here is a programming error — the engine should have filled the
- // position before dispatch.
-        let year = time
-            .year
-            .ok_or_else(|| Error::MissingContext { what: "context.year".into() })?;
-        let month_present = time
-            .month
-            .ok_or_else(|| Error::MissingContext { what: "context.month".into() })?;
-        let _ = time
-            .day_id
-            .ok_or_else(|| Error::MissingContext { what: "context.day_id".into() })?;
+        // The master loop guarantees year/month/day are Some at DAY granularity.
+        // A None here is a programming error — the engine should have filled the
+        // position before dispatch.
+        let year = time.year.ok_or_else(|| Error::MissingContext {
+            what: "context.year".into(),
+        })?;
+        let month_present = time.month.ok_or_else(|| Error::MissingContext {
+            what: "context.month".into(),
+        })?;
+        let _ = time.day_id.ok_or_else(|| Error::MissingContext {
+            what: "context.day_id".into(),
+        })?;
         let year = i32::from(year);
         let month_id = i64::from(month_present);
 
- // Build the NONROAD engine inputs from the nr* execution-DB tables
- // (the in-process replacement for the Java input-file generator).
+        // Build the NONROAD engine inputs from the nr* execution-DB tables
+        // (the in-process replacement for the Java input-file generator).
         let store = ctx.tables();
         let options = nonroad_loader::build_options(year);
         let inputs = nonroad_loader::build_nonroad_inputs(store, year);
@@ -232,23 +232,23 @@ impl Calculator for NonroadEmissionCalculator {
             );
         }
         if inputs.is_empty() {
- // An empty inputs bundle has two very different causes:
- //
- //  (a) the population-defining tables are *present* but produced no
- //      driver records (zero population, or every source type filtered
- //      out by the runspec's sector/fuel selection). This is a
- //      legitimate nonroad-free slice — canonical NONROAD simply emits
- //      no equipment for it — so we no-op.
- //
- //  (b) the population-defining tables are *absent* from the store. This
- //      calculator only fires for nonroad processes that are in the
- //      runspec (canonical `subscribeToMe` subscribes only when
- //      `doesHavePollutantAndProcess` holds — NonroadEmissionCalculator
- //      .java:108-134), so the snapshot loader was expected to admit
- //      these `nr*` tables. Their absence is a data-load failure, and a
- //      silent zero-emissions run would be indistinguishable from (a).
- //      Surface it as a hard error instead of fabricating an empty,
- //      successful-looking result.
+            // An empty inputs bundle has two very different causes:
+            //
+            //  (a) the population-defining tables are *present* but produced no
+            //      driver records (zero population, or every source type filtered
+            //      out by the runspec's sector/fuel selection). This is a
+            //      legitimate nonroad-free slice — canonical NONROAD simply emits
+            //      no equipment for it — so we no-op.
+            //
+            //  (b) the population-defining tables are *absent* from the store. This
+            //      calculator only fires for nonroad processes that are in the
+            //      runspec (canonical `subscribeToMe` subscribes only when
+            //      `doesHavePollutantAndProcess` holds — NonroadEmissionCalculator
+            //      .java:108-134), so the snapshot loader was expected to admit
+            //      these `nr*` tables. Their absence is a data-load failure, and a
+            //      silent zero-emissions run would be indistinguishable from (a).
+            //      Surface it as a hard error instead of fabricating an empty,
+            //      successful-looking result.
             let has_source_use_type = store.contains("nrsourceusetype");
             let has_population = store.contains("nrbaseyearequippopulation");
             if !has_source_use_type || !has_population {
@@ -267,7 +267,7 @@ impl Calculator for NonroadEmissionCalculator {
                     missing.join(", ")
                 )));
             }
- // Tables present but empty population — a genuine nonroad-free slice.
+            // Tables present but empty population — a genuine nonroad-free slice.
             return Ok(CalculatorOutput::empty());
         }
         let mut executor = nonroad_loader::build_production_executor(store, year, month_id);
@@ -288,9 +288,9 @@ impl Calculator for NonroadEmissionCalculator {
             );
         }
 
- // Map the engine's SimEmissionRows onto the MOVESOutput schema,
- // allocating the engine's annual emissions onto this iteration's
- // month/day slice.
+        // Map the engine's SimEmissionRows onto the MOVESOutput schema,
+        // allocating the engine's annual emissions onto this iteration's
+        // month/day slice.
         let month = time.month.map(i32::from);
         let day = time.day_id.map(i32::from);
         let keys = EmissionTimeKeys {

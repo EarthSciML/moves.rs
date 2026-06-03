@@ -96,8 +96,8 @@ fn make_executor() -> ProductionExecutor {
             }],
             scrappage_curve: make_scrappage_curve(),
             age_adjustment_table: AgeAdjustmentTable::default(),
- // ambient_temp_f must be > 0 so emission_adjustments can compute the
- // exhaust temperature correction (mo-2v1: panic → Err on tamb <= 0).
+            // ambient_temp_f must be > 0 so emission_adjustments can compute the
+            // exhaust temperature correction (mo-2v1: panic → Err on tamb <= 0).
             ambient_temp_f: 75.0,
             ..ReferenceData::default()
         },
@@ -334,7 +334,7 @@ fn state_to_county_dispatch_produces_county_rows() {
     let mut opts = NonroadOptions::new(RegionLevel::County, 2020);
     opts.growth_loaded = true;
 
- // NR*.SCO county-allocation (alosub.f) is not ported — returns Err (mo-2v1).
+    // NR*.SCO county-allocation (alosub.f) is not ported — returns Err (mo-2v1).
     let err = run_simulation(&opts, &inputs, &mut executor)
         .expect_err("state_to_county must fail until NR*.SCO is ported");
     let msg = err.to_string();
@@ -373,7 +373,7 @@ fn state_from_national_dispatch_produces_state_row() {
     let mut opts = NonroadOptions::new(RegionLevel::State, 2020);
     opts.growth_loaded = true;
 
- // NR*.TMF temporal-factor loader (daymthf.f) is not ported — returns Err (mo-2v1).
+    // NR*.TMF temporal-factor loader (daymthf.f) is not ported — returns Err (mo-2v1).
     let err = run_simulation(&opts, &inputs, &mut executor)
         .expect_err("state_from_national must fail until NR*.TMF is ported");
     let msg = err.to_string();
@@ -412,12 +412,12 @@ fn national_dispatch_allocates_population_to_state() {
             median_life: 0.0,
         }],
     );
- // national records ("00000") are always selected; no region filter required
+    // national records ("00000") are always selected; no region filter required
 
     let mut opts = NonroadOptions::new(RegionLevel::Nation, 2020);
     opts.growth_loaded = true;
 
- // NR*.ALO state-allocation (alosta.f) is not ported — returns Err (mo-2v1).
+    // NR*.ALO state-allocation (alosta.f) is not ported — returns Err (mo-2v1).
     let err = run_simulation(&opts, &inputs, &mut executor)
         .expect_err("national dispatch must fail until NR*.ALO is ported");
     let msg = err.to_string();
@@ -452,7 +452,7 @@ fn us_total_dispatch_produces_us_total_row() {
     let mut opts = NonroadOptions::new(RegionLevel::UsTotal, 2020);
     opts.growth_loaded = true;
 
- // NR*.TMF temporal-factor loader (daymthf.f) is not ported — returns Err (mo-2v1).
+    // NR*.TMF temporal-factor loader (daymthf.f) is not ported — returns Err (mo-2v1).
     let err = run_simulation(&opts, &inputs, &mut executor)
         .expect_err("us_total dispatch must fail until NR*.TMF is ported");
     let msg = err.to_string();
@@ -492,9 +492,9 @@ fn subcounty_region_list_routes_to_county_and_subcounty_dispatch() {
     );
     inputs.regions = RunRegions {
         selected_counties: vec!["06037".into()],
- // A whole-county entry (exact 5-char match) triggers both
- // Dispatch::County and Dispatch::Subcounty per subcounty_dispatch
- // in driver/run.rs.
+        // A whole-county entry (exact 5-char match) triggers both
+        // Dispatch::County and Dispatch::Subcounty per subcounty_dispatch
+        // in driver/run.rs.
         region_list: vec!["06037".into()],
         ..RunRegions::default()
     };
