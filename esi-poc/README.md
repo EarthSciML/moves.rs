@@ -2,43 +2,79 @@
 
 Can real moves.rs calculators — ones with genuine math — be re-expressed in the
 [ESI format](https://github.com/EarthSciML/EarthSciInventory) and still reproduce
-moves.rs's own tests? This is that experiment, on two calculators chosen to
-exercise *different* capabilities of the format.
+moves.rs's own results? This is that experiment: two calculators reproduced from
+their Rust unit-test fixtures (chosen to exercise *different* capabilities), plus
+one run end-to-end against a **real characterization snapshot's captured Parquet**.
 
 ## What's here
 
-| Calculator | ESI file | Harness | Reproduced |
-|---|---|---|---|
-| `criteria_running_calculator.rs` | `criteria_running.esi` | `run_poc.py` | 8/8 |
-| `evaporative_permeation_calculator.rs` | `permeation.esi` | `run_permeation.py` | 9/9 |
+| Calculator | ESI file | Harness | Source of truth | Reproduced |
+|---|---|---|---|---|
+| `criteria_running_calculator.rs` | `criteria_running.esi` | `run_poc.py` | Rust `#[test]` fixtures | 8/8 |
+| `evaporative_permeation_calculator.rs` | `permeation.esi` | `run_permeation.py` | Rust `#[test]` fixtures | 9/9 |
+| `crankcase_emission.rs` (core) | `crankcase.esi` | `run_crankcase.py` | **real captured snapshot Parquet** | 2352/2352 |
 
-Each harness re-runs the calculator's Rust `#[test]` cases — same fixture
-values, same per-test tweaks — through the pure-Python ESI reference engine and
-checks each reproduces the asserted `emission_quant` (or, for the filter cases,
-the empty result).
+The first two harnesses re-run the calculator's Rust `#[test]` cases — same
+fixture values, same per-test tweaks — through the pure-Python ESI reference
+engine and check each reproduces the asserted `emission_quant` (or, for the
+filter cases, the empty result). The third loads a real `CrankcaseEmissionRatio`
+table straight from a committed characterization snapshot and verifies against
+the captured values (see [Real-data end-to-end](#real-data-end-to-end)).
 
 ## Capabilities exercised (the point of picking two)
 
-| ESI capability | CriteriaRunning | Permeation |
-|---|:--:|:--:|
-| `join` (equi) + cartesian cross-join | ✅ | ✅ |
-| weighted `aggregate` (sum) | ✅ | ✅ |
-| `derive` polynomial — quadratic `1+(T−75)(A+(T−75)B)` | ✅ | |
-| `min`/`max` clamp | ✅ | |
-| **`exp`** — Arrhenius `A·exp(B·tankTemp)` | | ✅ |
-| **`filter`** — interval predicates (model-year range, ethanol bin) | | ✅ |
-| **`coalesce`** — null ETOH volume → 0 | | ✅ |
+| ESI capability | CriteriaRunning | Permeation | Crankcase |
+|---|:--:|:--:|:--:|
+| `join` (equi) + cartesian cross-join | ✅ | ✅ | ✅ |
+| weighted `aggregate` (sum) | ✅ | ✅ | ✅ |
+| `derive` polynomial — quadratic `1+(T−75)(A+(T−75)B)` | ✅ | | |
+| `min`/`max` clamp | ✅ | | |
+| **`exp`** — Arrhenius `A·exp(B·tankTemp)` | | ✅ | |
+| **`filter`** — interval predicates (model-year range, ethanol bin) | | ✅ | |
+| **`coalesce`** — null ETOH volume → 0 | | ✅ | |
+| **interval theta-join** — `min≤MY≤max` window join | | | ✅ |
+| **real Parquet data-source loader** (snapshot) | | | ✅ |
 
 CriteriaRunning is the multiplicative adjustment chain with an I/M blend;
-Permeation adds genuine exponential physics and conditional/interval logic.
-Together they cover the relational core plus polynomial, exponential, clamp,
-filter, and null-handling math.
+Permeation adds genuine exponential physics and conditional/interval logic;
+Crankcase adds a `join` predicate (the model-year window) and the data-source
+loader reading real captured Parquet. Together they cover the relational core
+plus polynomial, exponential, clamp, filter, null-handling, interval-join, and
+real-data loading.
+
+## Real-data end-to-end
+
+`run_crankcase.py` is the first POC that runs against **real captured data**
+rather than transcribed fixtures. It loads the `CrankcaseEmissionRatio` table
+(572 rows) straight from `characterization/snapshots/process-crankcase-running`
+via an ESI `parquet` data-source loader, applies the crankcase ratio
+(`crankcaseEmission = exhaustEmission × crankcaseRatio`) through the model-year
+window join, and verifies **every** cell against a Polars ground-truth lookup:
+
+```
+loaded real CrankcaseEmissionRatio: 572 rows
+2352/2352 cells match the captured ratios (ESI Parquet loader + interval theta-join + multiply)
+
+model-year window selection on real data (polProcess 115, sourceType 21, regClass 20, fuelType 1):
+  captured windows: [1950,1968]->0.33, [1969,2060]->0.0132
+  MY 1960  ->  ESI crankcaseRatio 0.33
+  MY 1975  ->  ESI crankcaseRatio 0.0132
+```
+
+**Scope/honesty.** A full scenario's *final* output (`MOVESOutput`) is the
+aggregate of the entire calculator DAG (dozens of steps) and the snapshots
+capture only the *input* execution-DB tables (worker output is empty), so a
+single hand-authored pipeline can't reproduce a whole scenario end-to-end. This
+reproduces one calculator's core computation against the real captured table —
+the meaningful unit, and the same `parquet` loader + pushdown path a production
+`moves.rs`→ESI bridge would use (ESI libraries spec §4.7).
 
 ## Result
 
 ```
-8/8 CriteriaRunning tests reproduced through ESI
-9/9 Permeation tests reproduced through ESI
+8/8    CriteriaRunning  tests reproduced through ESI (Rust fixtures)
+9/9    Permeation       tests reproduced through ESI (Rust fixtures)
+2352/2352  Crankcase    cells reproduced through ESI (real snapshot Parquet)
 ```
 
 | Rust test (`criteria_running_calculator.rs`) | expected `emission_quant` | ESI |
@@ -98,10 +134,12 @@ Rust tests use. To keep the POC focused on the math:
 # ESI re-implementations (need the EarthSciInventory repo beside moves.rs)
 python3 esi-poc/run_poc.py
 python3 esi-poc/run_permeation.py
+python3 esi-poc/run_crankcase.py        # real snapshot Parquet; also needs `polars`
 
 # The Rust baselines
 cargo test -p moves-calculators --lib criteria_running_calculator
 cargo test -p moves-calculators --lib evaporative_permeation_calculator
+cargo test -p moves-calculators --lib crankcase_emission
 ```
 
 Both harnesses import the pure-Python ESI reference engine from
