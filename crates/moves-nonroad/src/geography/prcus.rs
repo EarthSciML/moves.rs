@@ -512,9 +512,9 @@ pub fn process_us_total_record(
     let mut poptot: f32 = 0.0;
     let mut acttot: f32 = 0.0;
     let mut strtot: f32 = 0.0;
-    let fulcsm: f32 = 0.0;
+    let mut fulcsm: f32 = 0.0;
     let mut fracretro: f32 = 0.0;
-    let unitsretro: f32 = 0.0;
+    let mut unitsretro: f32 = 0.0;
     let mut evpoptot: f32 = 0.0;
     let mut evacttot: f32 = 0.0;
     let mut evstrtot: f32 = 0.0;
@@ -568,7 +568,7 @@ pub fn process_us_total_record(
             callbacks.filter_retrofits_by_year(iyr)?;
         }
 
-        let fulbmytot: f32 = 0.0;
+        let mut fulbmytot: f32 = 0.0;
 
         // --- exhaust tech-type loop (prcus.f :456–:546) ---
         for (tech_i, tech_name) in tech.tech_names.iter().enumerate() {
@@ -582,11 +582,14 @@ pub fn process_us_total_record(
 
             // --- filter retrofits by tech type + retrofit calc
             // (prcus.f :480–:488) ---
+            let mut frac_retro_bmy = 0.0_f32;
+            let mut units_retro_bmy = 0.0_f32;
             if opt.retrofit_loaded {
                 callbacks.filter_retrofits_by_tech(tech_name)?;
-                // Retrofit fracs (fracretrobmy / unitsretrobmy) will be accumulated
-                // into unitsretro once BSFC is available (mo-2v1).
-                let _r = callbacks.calculate_retrofit(popbmy, scc, hpval, iyr, tech_name)?;
+                let r = callbacks.calculate_retrofit(popbmy, scc, hpval, iyr, tech_name)?;
+                frac_retro_bmy = r.frac_retro;
+                units_retro_bmy = r.units_retro;
+                unitsretro += units_retro_bmy;
             }
 
             // --- temporal adjustment factor (prcus.f :492–:498) ---
