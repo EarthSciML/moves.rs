@@ -714,7 +714,12 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
     }
 
     fn find_refueling(&self, scc: &str, hp_avg: f32, tech_name: &str) -> Option<RefuelingData> {
-        fndrfm(&self.executor.reference.spillage_records, scc, hp_avg, tech_name)
+        fndrfm(
+            &self.executor.reference.spillage_records,
+            scc,
+            hp_avg,
+            tech_name,
+        )
     }
 
     // ---- Growth cross-reference -----------------------------------------
@@ -2604,7 +2609,12 @@ fn geography_output_to_execution(output: GeographyOutput) -> GeographyExecution 
 /// 3. Prefer the most-specific SCC match; break ties by closest HP mid-point.
 ///
 /// Returns `None` when no record matches (caller falls back to `"ALL"` tech).
-fn fndrfm(records: &[SpillageRecord], scc: &str, hp_avg: f32, tech_name: &str) -> Option<RefuelingData> {
+fn fndrfm(
+    records: &[SpillageRecord],
+    scc: &str,
+    hp_avg: f32,
+    tech_name: &str,
+) -> Option<RefuelingData> {
     let tech = tech_name.trim();
 
     let scc_t = scc.trim();
@@ -3741,13 +3751,16 @@ mod fndrfm_tests {
             make_rec("2260001000", "ALL", 0.0, 9999.0, 7.0), // 7-char glob
         ];
         let r = fndrfm(&recs, "2260001010", 25.0, "ALL").unwrap();
-        assert!((r.tank - 7.0).abs() < 1e-4, "7-char glob should beat 4-char glob");
+        assert!(
+            (r.tank - 7.0).abs() < 1e-4,
+            "7-char glob should beat 4-char glob"
+        );
     }
 
     #[test]
     fn hp_range_filter() {
         let recs = vec![
-            make_rec("2260001010", "ALL", 0.0, 25.0, 1.0),   // excludes hp=50
+            make_rec("2260001010", "ALL", 0.0, 25.0, 1.0), // excludes hp=50
             make_rec("2260001010", "ALL", 25.0, 100.0, 2.0), // includes hp=50
         ];
         let r = fndrfm(&recs, "2260001010", 50.0, "ALL").unwrap();
@@ -3758,8 +3771,8 @@ mod fndrfm_tests {
     fn hp_proximity_tiebreak_same_scc_quality() {
         // Two exact-SCC records in same HP band; hp=15 is closer to [10,20] than [0,50]
         let recs = vec![
-            make_rec("2260001010", "ALL", 0.0, 50.0, 10.0),  // idiff = max(15,35) = 35
-            make_rec("2260001010", "ALL", 10.0, 20.0, 5.0),  // idiff = max(5,5) = 5 (closer)
+            make_rec("2260001010", "ALL", 0.0, 50.0, 10.0), // idiff = max(15,35) = 35
+            make_rec("2260001010", "ALL", 10.0, 20.0, 5.0), // idiff = max(5,5) = 5 (closer)
         ];
         let r = fndrfm(&recs, "2260001010", 15.0, "ALL").unwrap();
         assert!((r.tank - 5.0).abs() < 1e-4, "closer HP range should win");
@@ -3784,8 +3797,9 @@ mod fndrfm_tests {
             Ok(h) => h,
             Err(_) => return,
         };
-        let path = std::path::PathBuf::from(home)
-            .join(".cache/moves-rs-migration-src/EPA_MOVES_Model/NONROAD/NR08a/DATA/EMSFAC/SPILLAGE.EMF");
+        let path = std::path::PathBuf::from(home).join(
+            ".cache/moves-rs-migration-src/EPA_MOVES_Model/NONROAD/NR08a/DATA/EMSFAC/SPILLAGE.EMF",
+        );
         if !path.exists() {
             eprintln!("canonical_spillage_emf: SPILLAGE.EMF not found at {path:?}; skipping");
             return;
@@ -3800,12 +3814,36 @@ mod fndrfm_tests {
         let r = fndrfm(&recs, "2260001010", 500.0, "ALL")
             .expect("should find a record for 2260001010 at any HP");
         assert_eq!(r.mode.trim(), "CONTAINER", "mode mismatch for 2260001010");
-        assert!((r.tank - 3.0).abs() < 1e-3, "tank_volume mismatch: {}", r.tank);
-        assert!((r.tank_full - 0.5).abs() < 1e-5, "tank_full mismatch: {}", r.tank_full);
-        assert!((r.hot_soak_start - 0.05).abs() < 1e-5, "hot_soak mismatch: {}", r.hot_soak_start);
-        assert!((r.hose_length - 0.45750).abs() < 1e-4, "hose_len mismatch: {}", r.hose_length);
-        assert!((r.tnk_e10_factor - 1.0).abs() < 1e-6, "tank_e10 mismatch: {}", r.tnk_e10_factor);
+        assert!(
+            (r.tank - 3.0).abs() < 1e-3,
+            "tank_volume mismatch: {}",
+            r.tank
+        );
+        assert!(
+            (r.tank_full - 0.5).abs() < 1e-5,
+            "tank_full mismatch: {}",
+            r.tank_full
+        );
+        assert!(
+            (r.hot_soak_start - 0.05).abs() < 1e-5,
+            "hot_soak mismatch: {}",
+            r.hot_soak_start
+        );
+        assert!(
+            (r.hose_length - 0.45750).abs() < 1e-4,
+            "hose_len mismatch: {}",
+            r.hose_length
+        );
+        assert!(
+            (r.tnk_e10_factor - 1.0).abs() < 1e-6,
+            "tank_e10 mismatch: {}",
+            r.tnk_e10_factor
+        );
         // neck_e10 was 0.0 in file → should be defaulted to 1.0
-        assert!((r.neck_e10_factor - 1.0).abs() < 1e-6, "neck_e10 mismatch: {}", r.neck_e10_factor);
+        assert!(
+            (r.neck_e10_factor - 1.0).abs() < 1e-6,
+            "neck_e10 mismatch: {}",
+            r.neck_e10_factor
+        );
     }
 }
