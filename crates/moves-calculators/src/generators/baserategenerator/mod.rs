@@ -223,8 +223,8 @@ impl Generator for BaseRateGenerator {
         // applyAvgSpeedDistribution: Inventory (Java MACROSCALE) scale for processes 1/9/10.
         // Project domain overrides it to false later (handled via the !is_project gate on
         // use_avg_speed_bin rather than mutating the intermediate).
-        let apply_avg_speed_distribution = matches!(scale, Some(ModelScale::Inventory))
-            && matches!(process_id, 1 | 9 | 10);
+        let apply_avg_speed_distribution =
+            matches!(scale, Some(ModelScale::Inventory)) && matches!(process_id, 1 | 9 | 10);
         // Net after Project-domain override (Java: if isProjectDomain && proc∈{1,9,10} then false):
         let apply_avg_speed_distribution = apply_avg_speed_distribution && !is_project;
 
@@ -243,8 +243,8 @@ impl Generator for BaseRateGenerator {
         // useSumSBD (applySourceBinDistribution in Java): Inventory scale or processes 2/90/91.
         // Java: applySourceBinDistribution = (scale == MACROSCALE); if process ∈ {2,90,91} →
         // applySourceBinDistribution = true. No Project-domain override for this flag.
-        let use_sum_sbd = matches!(scale, Some(ModelScale::Inventory))
-            || matches!(process_id, 2 | 90 | 91);
+        let use_sum_sbd =
+            matches!(scale, Some(ModelScale::Inventory)) || matches!(process_id, 2 | 90 | 91);
 
         // useSumSBDRaw: Rates (Java MESOSCALE_LOOKUP) scale AND processes 2/90/91.
         let use_sum_sbd_raw =
@@ -259,7 +259,11 @@ impl Generator for BaseRateGenerator {
         let params: Vec<&str> = [
             if keep_op_mode_id { "yOp" } else { "nOp" },
             if use_avg_speed_bin { "yASB" } else { "nASB" },
-            if use_avg_speed_fraction { "yASF" } else { "nASF" },
+            if use_avg_speed_fraction {
+                "yASF"
+            } else {
+                "nASF"
+            },
             if use_sum_sbd { "ySBD" } else { "nSBD" },
             if use_sum_sbd_raw { "yRaw" } else { "nRaw" },
             &process_str,
@@ -268,8 +272,8 @@ impl Generator for BaseRateGenerator {
         ]
         .to_vec();
 
-        let flags = ExternalFlags::from_parameters(&params)
-            .map_err(|e| Error::Polars(e.to_string()))?;
+        let flags =
+            ExternalFlags::from_parameters(&params).map_err(|e| Error::Polars(e.to_string()))?;
 
         let inputs = BaseRateInputs {
             avg_speed_bin: ctx.tables().iter_typed("avgSpeedBin")?,
@@ -2098,10 +2102,8 @@ mod tests {
         );
         store.insert(
             "runSpecSourceType",
-            RunSpecSourceTypeRow::into_dataframe(vec![RunSpecSourceTypeRow {
-                source_type_id: 21,
-            }])
-            .unwrap(),
+            RunSpecSourceTypeRow::into_dataframe(vec![RunSpecSourceTypeRow { source_type_id: 21 }])
+                .unwrap(),
         );
         let pol_process_id = process_id * 100 + process_id;
         store.insert(
@@ -2186,7 +2188,11 @@ mod tests {
         assert!(ctx.is_project(), "context must report is_project=true");
         let generator = BaseRateGenerator;
         let result = generator.execute(&mut ctx);
-        assert!(result.is_ok(), "execute failed in Project domain: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "execute failed in Project domain: {:?}",
+            result.err()
+        );
         assert!(ctx.scratch().store.contains("BaseRate"));
     }
 
@@ -2216,22 +2222,34 @@ mod tests {
     /// context.is_project() reflects the ModelDomain set by the engine.
     #[test]
     fn context_is_project_reflects_domain() {
-        use moves_framework::{ModelDomain};
+        use moves_framework::ModelDomain;
         let mut ctx = CalculatorContext::new();
         assert!(!ctx.is_project(), "default context is not project domain");
         ctx.set_model_domain(Some(ModelDomain::Project));
-        assert!(ctx.is_project(), "Project domain → is_project() must be true");
+        assert!(
+            ctx.is_project(),
+            "Project domain → is_project() must be true"
+        );
         ctx.set_model_domain(Some(ModelDomain::Default));
-        assert!(!ctx.is_project(), "Default domain → is_project() must be false");
+        assert!(
+            !ctx.is_project(),
+            "Default domain → is_project() must be false"
+        );
         ctx.set_model_domain(None);
-        assert!(!ctx.is_project(), "None domain → is_project() must be false");
+        assert!(
+            !ctx.is_project(),
+            "None domain → is_project() must be false"
+        );
     }
 
     /// context.parameters() starts empty and round-trips through set_parameters().
     #[test]
     fn context_parameters_round_trip() {
         let mut ctx = CalculatorContext::new();
-        assert!(ctx.parameters().is_empty(), "default parameters must be empty");
+        assert!(
+            ctx.parameters().is_empty(),
+            "default parameters must be empty"
+        );
         let tokens = vec!["yOp".to_string(), "nASB".to_string()];
         ctx.set_parameters(tokens.clone());
         assert_eq!(ctx.parameters(), tokens.as_slice());

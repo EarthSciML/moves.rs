@@ -746,7 +746,10 @@ mod tests {
     #[test]
     fn context_parameters_default_empty_and_round_trip() {
         let mut ctx = CalculatorContext::new();
-        assert!(ctx.parameters().is_empty(), "default parameters must be empty");
+        assert!(
+            ctx.parameters().is_empty(),
+            "default parameters must be empty"
+        );
         let tokens = vec!["yOp".to_string(), "nASB".to_string(), "1".to_string()];
         ctx.set_parameters(tokens.clone());
         assert_eq!(ctx.parameters(), tokens.as_slice());
