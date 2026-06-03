@@ -648,12 +648,11 @@ fn build_emission_output(
         link_id: keep_opt(kept("linkID"), rep.link_id),
         pollutant_id: keep_opt(kept("pollutantID"), rep.pollutant_id),
         process_id: keep_opt(kept("processID"), rep.process_id),
-        // sourceTypeID uses MySQL ANY_VALUE semantics: the representative
-        // record's value is always carried through regardless of whether
-        // sourceTypeID is a GROUP BY key. This matches canonical MOVES,
-        // where MySQL returns an arbitrary (but non-NULL) value for non-grouped
-        // columns when all rows in the group share the same source type.
-        source_type_id: rep.source_type_id,
+        // sourceTypeID collapses to NULL when it is not a GROUP BY key, matching
+        // AggregationSQLGenerator.java's `null as sourceTypeID` for the master/worker
+        // SELECTs when `!outputEmissionsBreakdownSelection.sourceUseType`
+        // (AggregationSQLGenerator.java:1353-1366).
+        source_type_id: keep_opt(kept("sourceTypeID"), rep.source_type_id),
         reg_class_id: keep_opt(kept("regClassID"), rep.reg_class_id),
         fuel_type_id: keep_opt(kept("fuelTypeID"), rep.fuel_type_id),
         fuel_sub_type_id: keep_opt(kept("fuelSubTypeID"), rep.fuel_sub_type_id),
@@ -691,7 +690,11 @@ fn build_activity_output(
         county_id: keep_opt(kept("countyID"), rep.county_id),
         zone_id: keep_opt(kept("zoneID"), rep.zone_id),
         link_id: keep_opt(kept("linkID"), rep.link_id),
-        source_type_id: rep.source_type_id,
+        // sourceTypeID collapses to NULL unless it is a GROUP BY key, matching
+        // AggregationSQLGenerator.java's `null as sourceTypeID` for the
+        // activity SELECT when `!outputEmissionsBreakdownSelection.sourceUseType`
+        // (AggregationSQLGenerator.java:1353-1366).
+        source_type_id: keep_opt(kept("sourceTypeID"), rep.source_type_id),
         reg_class_id: keep_opt(kept("regClassID"), rep.reg_class_id),
         fuel_type_id: keep_opt(kept("fuelTypeID"), rep.fuel_type_id),
         fuel_sub_type_id: keep_opt(kept("fuelSubTypeID"), rep.fuel_sub_type_id),
@@ -894,11 +897,59 @@ mod tests {
         assert_eq!(row.day_id, None);
         assert_eq!(row.hour_id, None);
         assert_eq!(row.county_id, None);
-        assert_eq!(row.source_type_id, Some(21)); // ANY_VALUE from representative record
+        assert_eq!(row.source_type_id, None); // not a GROUP BY key → NULL
         assert_eq!(row.scc, None);
         // emissionRate is always dropped; runHash always flows through.
         assert_eq!(row.emission_rate, None);
         assert_eq!(row.run_hash, "run-hash");
+    }
+
+    #[test]
+    fn source_type_collapses_to_null_when_not_grouped() {
+ // When source_use_type is false, sourceTypeID is not a GROUP BY key.
+ // Rows with different source types must merge into one group and the
+ // output field must be NULL — matching AggregationSQLGenerator.java:1353-1366
+ // which emits `null as sourceTypeID` for the non-sourceUseType case.
+        let b = breakdown_all_false();
+        let plan = emission_aggregation(&inputs(
+            OutputTimestep::Year,
+            GeographicOutputDetail::Nation,
+            &[Model::Onroad],
+            &b,
+        ));
+        let mut r1 = emission(2, 1, Some(1.0));
+        r1.source_type_id = Some(21);
+        let mut r2 = emission(2, 1, Some(2.0));
+        r2.source_type_id = Some(31);
+        let out = aggregate_emissions(&plan, &[r1, r2], &IdentityRealFactors).unwrap();
+        assert_eq!(out.len(), 1, "different source types merge into one group");
+        assert_eq!(out[0].emission_quant, Some(3.0));
+        assert_eq!(
+            out[0].source_type_id, None,
+            "non-grouped sourceTypeID must collapse to NULL"
+        );
+    }
+
+    #[test]
+    fn source_type_kept_when_source_use_type_breakdown_on() {
+ // When source_use_type is true, sourceTypeID is a GROUP BY key: rows of
+ // different source types stay distinct and the value flows through.
+        let mut b = breakdown_all_false();
+        b.source_use_type = true;
+        let plan = emission_aggregation(&inputs(
+            OutputTimestep::Year,
+            GeographicOutputDetail::Nation,
+            &[Model::Onroad],
+            &b,
+        ));
+        let mut r1 = emission(2, 1, Some(1.0));
+        r1.source_type_id = Some(21);
+        let mut r2 = emission(2, 1, Some(2.0));
+        r2.source_type_id = Some(31);
+        let out = aggregate_emissions(&plan, &[r1, r2], &IdentityRealFactors).unwrap();
+        assert_eq!(out.len(), 2, "source types stay separated when grouped");
+        assert_eq!(out[0].source_type_id, Some(21));
+        assert_eq!(out[1].source_type_id, Some(31));
     }
 
     #[test]
