@@ -493,12 +493,18 @@ impl BaseRateCalculator {
     /// in two independent accumulation passes, then aggregates the
     /// operating-mode detail and applies the activity weighting; the port
     /// follows the same order.
-    #[must_use]
+    ///
+    /// Returns [`Error::MissingContext`] when the County table does not contain
+    /// an entry for the run's county ID but GPA-blending data
+    /// (`GeneralFuelRatio`, `criteriaRatio`, or `altCriteriaRatio`) is present.
+    /// Real runs always carry the run county in the County table; this error
+    /// surfaces a broken invariant rather than silently returning a 0.0
+    /// GPA fraction.
     pub fn run(
         mut inputs: BaseRateCalculatorInputs,
         constants: &RunConstants,
         flags: &ModuleFlags,
-    ) -> BaseRateCalculatorOutput {
+    ) -> Result<BaseRateCalculatorOutput, Error> {
         let smfr_sbd_summary = std::mem::take(&mut inputs.smfr_sbd_summary);
         let base_rate_by_age = std::mem::take(&mut inputs.base_rate_by_age);
         let base_rate = std::mem::take(&mut inputs.base_rate);
@@ -520,19 +526,28 @@ impl BaseRateCalculator {
         prepared: &PreparedTables,
         constants: &RunConstants,
         flags: &ModuleFlags,
-    ) -> BaseRateCalculatorOutput {
+    ) -> Result<BaseRateCalculatorOutput, Error> {
         // The Go indexes `County[CountyID]` per row; the run processes a single
-        // county that the County table always holds, so a county absent from the
-        // table yields `0.0` (the Go would have panicked, but the county table
-        // always holds the run's one county in a real run). (The audit's FINDING 2
-        // turned this into an `assert!`/panic when GPA-blending data is present; it
-        // only ever fires on minimal no-county unit fixtures — a real run always
-        // carries its county — so it was reverted to avoid breaking previously-
-        // correct tests without adding any real-run protection.)
-        let gpa_fract = prepared
-            .county
-            .get(&constants.county_id)
-            .map_or(0.0, |c| c.gpa_fract);
+        // county that the County table always holds. When GPA-blending data is
+        // present and the county is absent, return a typed error instead of
+        // silently defaulting to 0.0 (which the Go would have panicked on).
+        // Real runs always carry the run county, so this only fires on broken
+        // minimal fixtures.
+        let has_gpa_data = !prepared.general_fuel_ratio.is_empty()
+            || !prepared.criteria_ratio.is_empty()
+            || !prepared.alt_criteria_ratio.is_empty();
+        let gpa_fract = match prepared.county.get(&constants.county_id) {
+            Some(c) => c.gpa_fract,
+            None if has_gpa_data => {
+                return Err(Error::MissingContext {
+                    what: format!(
+                        "County[{}]: required for GPA blending but absent from County table",
+                        constants.county_id
+                    ),
+                });
+            }
+            None => 0.0,
+        };
 
         // calculateActivityWeight runs once, ahead of the aggregation tail.
         let activity_weights = calculate_activity_weight(&smfr_sbd_summary, prepared, flags);
@@ -548,7 +563,7 @@ impl BaseRateCalculator {
             aggregate_and_apply_activity(block, prepared, flags, &activity_weights);
         }
 
-        BaseRateCalculatorOutput { blocks }
+        Ok(BaseRateCalculatorOutput { blocks })
     }
 }
 
@@ -759,7 +774,7 @@ impl Calculator for BaseRateCalculator {
             &prepared,
             &constants,
             &flags,
-        );
+        )?;
         let rows = output.rows();
         crate::wiring::emit_rows(rows)
     }
