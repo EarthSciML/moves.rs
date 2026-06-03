@@ -81,12 +81,20 @@ pub trait NationalCallbacks {
     /// `alosta(..)` — perform the national-to-state allocation. The
     /// callback owns the allocation table; the result is returned as
     /// [`StateAllocationOutcome`].
+    ///
+    /// `national_fips` is the 5-character FIPS of the national record
+    /// (Fortran `regncd(icurec)(1:5)`, typically `"00000"`), used as
+    /// the parent geography for the `getind` national-indicator lookup.
+    /// `year` is the population-input year (`ipopyr(icurec)`) used for
+    /// the closest-earlier year selection rule in the indicator table.
     fn allocate_to_states(
         &mut self,
         scc: &str,
         states: &[StateDescriptor],
         national_population: f32,
         growth: f32,
+        national_fips: &str,
+        year: i32,
     ) -> Result<StateAllocationOutcome>;
     /// `fndtch(scc, hp_avg, tech_year)`.
     fn find_exhaust_tech(&mut self, scc: &str, hp_avg: f32, year: i32)
@@ -167,6 +175,11 @@ pub struct NationalContext<'a> {
     /// argument in Fortran). `-9.0` means "not yet computed" and is
     /// passed through to the allocation callback.
     pub growth_hint: f32,
+    /// 5-character FIPS code of the national record (Fortran
+    /// `regncd(icurec)(1:5)` in `alosta.f` :79). Typically `"00000"`.
+    /// Passed to [`NationalCallbacks::allocate_to_states`] as the
+    /// parent geography for the `getind` national-indicator lookup.
+    pub national_fips: String,
 }
 
 /// Process one national-level record. Ports `prcnat.f`.
@@ -248,7 +261,14 @@ pub fn process_national_record(
             ));
         }
         output.national_record_count = 1;
-        let alloc = callbacks.allocate_to_states(scc, ctx.states, popus, ctx.growth_hint)?;
+        let alloc = callbacks.allocate_to_states(
+            scc,
+            ctx.states,
+            popus,
+            ctx.growth_hint,
+            &ctx.national_fips,
+            ctx.equipment.pop_year,
+        )?;
         if alloc.populations.len() != ctx.states.len() || alloc.growth.len() != ctx.states.len() {
             return Err(Error::Config(format!(
                 "alosta callback returned {} populations / {} growth values \
@@ -809,8 +829,10 @@ mod tests {
             states: &[StateDescriptor],
             national_population: f32,
             growth: f32,
+            _national_fips: &str,
+            _year: i32,
         ) -> Result<StateAllocationOutcome> {
-            // Equal split across selected states.
+            // Equal split across selected states (test stub only).
             let selected: Vec<_> = states
                 .iter()
                 .enumerate()
@@ -957,6 +979,7 @@ mod tests {
             states: &states,
             state_index: -1,
             growth_hint: -9.0,
+            national_fips: "00000".to_string(),
         };
         let mut cb = HappyCallbacks::new();
         let out = process_national_record(&ctx, &mut cb).unwrap();
@@ -979,6 +1002,7 @@ mod tests {
             states: &states,
             state_index: -1,
             growth_hint: -9.0,
+            national_fips: "00000".to_string(),
         };
         let mut cb = HappyCallbacks::new();
         let out = process_national_record(&ctx, &mut cb).expect("national path should succeed");
@@ -1003,6 +1027,7 @@ mod tests {
             states: &states,
             state_index: 2,
             growth_hint: -9.0,
+            national_fips: "00000".to_string(),
         };
         let mut cb = HappyCallbacks::new();
         let out = process_national_record(&ctx, &mut cb).expect("state path should succeed");
@@ -1037,6 +1062,7 @@ mod tests {
             states: &states,
             state_index: -1,
             growth_hint: -9.0,
+            national_fips: "00000".to_string(),
         };
         let mut cb = HappyCallbacks::new();
         let out = process_national_record(&ctx, &mut cb).expect("national path should succeed");
@@ -1057,8 +1083,11 @@ mod tests {
                 states: &[StateDescriptor],
                 pop: f32,
                 growth: f32,
+                national_fips: &str,
+                year: i32,
             ) -> Result<StateAllocationOutcome> {
-                self.0.allocate_to_states(scc, states, pop, growth)
+                self.0
+                    .allocate_to_states(scc, states, pop, growth, national_fips, year)
             }
             fn find_exhaust_tech(
                 &mut self,
@@ -1146,6 +1175,7 @@ mod tests {
             states: &states,
             state_index: -1,
             growth_hint: -9.0,
+            national_fips: "00000".to_string(),
         };
         let mut cb = NoAlloc(HappyCallbacks::new());
         let err = process_national_record(&ctx, &mut cb).unwrap_err();

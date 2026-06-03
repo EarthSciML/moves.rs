@@ -52,7 +52,7 @@ pub const MAX_COEF: usize = 3;
 pub const COEF_SUM_TOLERANCE: f32 = 0.001;
 
 /// One parsed allocation cross-reference record.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct AllocationRecord {
     /// SCC equipment code (10 chars).
     pub scc: String,

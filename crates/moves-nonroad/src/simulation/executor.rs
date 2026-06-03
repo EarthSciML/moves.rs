@@ -35,7 +35,7 @@
 //! numerical-fidelity harness needs for capturing
 //! port-side intermediate state.
 
-use crate::allocation::{allocate_county, CountyDescriptor};
+use crate::allocation::{allocate_county, allocate_state, CountyDescriptor};
 use crate::common::consts::{
     CVTTON, MXAGYR, MXEVTECH, MXPOL, MXTECH, RMISS, SWTCNG, SWTDSL, SWTGS2, SWTGS4, SWTLPG,
 };
@@ -395,8 +395,8 @@ impl GeographyExecutor for PlanRecordingExecutor {
 /// |--------|---------|---------------|-------------|--------|
 /// | `find_allocation` (subcounty) | `fndasc(asccod, ascalo, nalorc)` | Subcounty allocation coefficients from NR\*.SCO files | — | **⚠ NOT YET LOADABLE** |
 /// | `allocate_subcounty` | `alosub(…)` | Same NR\*.SCO records | — (pure computation) | **⚠ NOT YET PORTED** |
-/// | `find_allocation` (national) | `fndasc` national path | National-to-state allocation coefficients from NR\*.ALO files | — | **⚠ NOT YET LOADABLE** |
-/// | `allocate_to_states` | `alosta(…)` | Same NR\*.ALO records | — (pure computation) | **⚠ NOT YET PORTED** |
+/// | `find_allocation` (national) | `fndasc` national path | National-to-state allocation coefficients from NR\*.ALO files | [`NationalAllocationEntry::record`] + [`ReferenceData::allocation_indicators`] | ✓ loadable by caller |
+/// | `allocate_to_states` | `alosta(…)` | Same NR\*.ALO records | [`allocation::allocate_state`] | ✓ ported (mo-i6q) |
 ///
 /// # Summary: what blocks production execution
 ///
@@ -410,9 +410,7 @@ impl GeographyExecutor for PlanRecordingExecutor {
 ///    spillage data, evap permeation (g/m²/day) and diurnal (Mult) cannot
 ///    be computed — those species return RMISS (explicitly not-computed).
 /// 4. **NR\*.SCO** — subcounty allocation coefficients.
-/// 5. **NR\*.ALO** — national-to-state allocation coefficients.
-/// 6. **`alosub` / `alosta` ports** — allocation math (pure computation,
-/// no new files, but not yet ported).
+/// 5. **`alosub` port** — subcounty allocation math (pure computation, not yet ported).
 ///
 /// Tech-type fractions (NR\*.EF), activity records (NR\*.ACT), growth
 /// cross-reference and growth-factor data (NR\*.GRW), and retrofit
@@ -1859,29 +1857,64 @@ impl<'a> NationalCallbacks for NationalAdapter<'a> {
 
     fn allocate_to_states(
         &mut self,
-        _scc: &str,
+        scc: &str,
         states: &[StateDescriptor],
         national_population: f32,
-        _growth: f32,
+        growth: f32,
+        national_fips: &str,
+        year: i32,
     ) -> Result<StateAllocationOutcome> {
-        // Canonical `alosta.f:133-135` distributes the national population
-        // to states by the NR*.ALO coefficient-weighted ratio
-        // `popsta = popyr * Σ_i (valsta_i / valnat_i) * coeffs(asc, i)`, where
-        // `coeffs` come from the per-SCC NR*.ALO allocation-indicator packet.
-        // The prior implementation spread `national_population` UNIFORMLY
-        // across eligible states (`national_population / eligible_count`),
-        // which is not the canonical allocation and silently mis-attributes
-        // population (hence emissions) across states. The NR*.ALO allocation
-        // loader (alosta.f) is not ported, so the coefficient-weighted ratio
-        // cannot be computed — and a uniform split cannot be fabricated in its
-        // place. Fail loudly.
-        let _ = (states, national_population);
-        Err(crate::Error::Config(format!(
-            "allocate_to_states: NR*.ALO coefficient-weighted state allocation \
-             (alosta.f) is not ported; national population cannot be distributed to \
-             states. A uniform split is not the canonical allocation and cannot be \
-             fabricated for SCC {_scc}."
-        )))
+        // Canonical `alosta.f:133-135`: popsta = popyr * Σ_i (valsta_i / valnat_i) * coeffs_i
+        let entry = self
+            .executor
+            .reference
+            .national_allocation
+            .iter()
+            .find(|e| e.scc == scc)
+            .ok_or_else(|| {
+                crate::Error::Config(format!(
+                    "allocate_to_states: no NR*.ALO allocation record for SCC {scc}"
+                ))
+            })?;
+        let record = entry.record.clone();
+        let indicators = &self.executor.reference.allocation_indicators;
+        // Convert geography::StateDescriptor to allocation::StateDescriptor (same fields).
+        let alloc_states: Vec<crate::allocation::StateDescriptor> = states
+            .iter()
+            .map(|s| crate::allocation::StateDescriptor {
+                fips: s.fips.clone(),
+                selected: s.selected,
+                has_state_records: s.has_state_records,
+            })
+            .collect();
+        let allocs = allocate_state(
+            national_fips,
+            &alloc_states,
+            &record,
+            indicators,
+            year,
+            national_population,
+            growth,
+        )?;
+        let mut populations = Vec::with_capacity(allocs.len());
+        let mut growths = Vec::with_capacity(allocs.len());
+        let mut used = false;
+        for (alloc, state) in allocs.iter().zip(states.iter()) {
+            populations.push(alloc.population);
+            growths.push(
+                alloc
+                    .growth
+                    .unwrap_or(if state.selected { growth } else { 1.0 }),
+            );
+            if alloc.population > 0.0 {
+                used = true;
+            }
+        }
+        Ok(StateAllocationOutcome {
+            populations,
+            growth: growths,
+            used,
+        })
     }
 
     fn find_exhaust_tech(
@@ -2822,6 +2855,7 @@ fn build_national_context<'a>(
         states,
         state_index: 0,
         growth_hint: ctx.growth.unwrap_or(-9.0),
+        national_fips: ctx.record.region_code.clone(),
     }
 }
 
@@ -3329,6 +3363,8 @@ mod production {
     use super::*;
     use crate::driver::RegionLevel;
     use crate::emissions::exhaust::FuelKind;
+    use crate::input::alo::AllocationRecord;
+    use crate::input::indicator::{IndicatorRecord, IndicatorTable};
     use crate::input::scrappage::ScrappagePoint;
     use crate::population::AgeAdjustmentTable;
 
@@ -3689,9 +3725,10 @@ mod production {
     /// one `SimEmissionRow` at the state FIPS.
     ///
     /// `state_index = 0` (national record) triggers `alosta`; the
-    /// uniform-allocation stub gives state "06000" the full population.
+    /// NR*.ALO allocation gives state "06000" population 100*(300/1000)=30.
     /// Zero tech fractions bypass the emission iteration; one `StateOutput`
-    /// is still emitted per selected state.
+    /// is still emitted per selected state. The next barrier after ALO is
+    /// NR*.TMF (daymthf not ported), so we expect a TMF error.
     #[test]
     fn national_minimal_ref_returns_one_row() {
         let mut exec = ProductionExecutor {
@@ -3704,7 +3741,28 @@ mod production {
             reference: ReferenceData {
                 national_allocation: vec![NationalAllocationEntry {
                     scc: "2270001010".into(),
+                    record: AllocationRecord {
+                        scc: "2270001010".into(),
+                        coefficients: vec![1.0],
+                        indicator_codes: vec!["POP".into()],
+                    },
                 }],
+                allocation_indicators: IndicatorTable::new(vec![
+                    IndicatorRecord {
+                        code: "POP".into(),
+                        fips: "00000".into(),
+                        subcounty: "".into(),
+                        year: "2002".into(),
+                        value: 1000.0,
+                    },
+                    IndicatorRecord {
+                        code: "POP".into(),
+                        fips: "06000".into(),
+                        subcounty: "".into(),
+                        year: "2002".into(),
+                        value: 300.0,
+                    },
+                ]),
                 exhaust_tech_entries: vec![ExhaustTechEntry {
                     scc: "2270001010".into(),
                     hp_min: 0.0,
@@ -3792,12 +3850,12 @@ mod production {
             growth: None,
         };
 
-        // NR*.ALO state allocation is not ported — returns Err (mo-2v1).
+        // ALO allocation now succeeds; next barrier is NR*.TMF (daymthf not ported).
         let err = exec.execute(&ctx, &opts).unwrap_err();
         let msg = err.to_string();
         assert!(
-            msg.contains("ALO") || msg.contains("allocation") || msg.contains("alosta"),
-            "expected ALO-allocation error, got: {msg}"
+            msg.contains("TMF") || msg.contains("temporal") || msg.contains("daymthf"),
+            "expected TMF error after ALO allocation succeeds, got: {msg}"
         );
     }
 
