@@ -377,8 +377,8 @@ fn county_one_scc_produces_nonzero_emissions() {
 /// prcsta.f and emits one row per county in the state.
 ///
 /// Two counties in state 06 → dispatch_calls == 1 (one StateToCounty).
-/// County allocation (alocty.f) succeeds; run fails downstream at
-/// day_month_factor (NR*.TMF not yet ported).
+/// County allocation (alocty.f) succeeds; NR*.TMF temporal factors are now
+/// loaded (daymthf.f ported in mo-cdo) so the run completes successfully.
 #[test]
 fn state_to_county_dispatch_produces_county_rows() {
     // County allocation indicator: state 06000 has pop=1000,
@@ -421,6 +421,9 @@ fn state_to_county_dispatch_produces_county_rows() {
         county_fips: vec!["06037".into(), "06059".into()],
         hp_levels: default_hp_levels(),
         reference: ref_data,
+        // All months selected → annual run; mthf = 1.0 with flat default profiles.
+        months_selected: [true; 12],
+        total_mode: true,
         ..ProductionExecutor::default()
     };
 
@@ -443,15 +446,21 @@ fn state_to_county_dispatch_produces_county_rows() {
     let mut opts = NonroadOptions::new(RegionLevel::County, 2020);
     opts.growth_loaded = true;
 
-    // County allocation (alocty.f) now succeeds. The run fails downstream
-    // at day_month_factor because NR*.TMF temporal-factor loader is not
-    // yet ported (daymthf.f).
-    let err = run_simulation(&opts, &inputs, &mut executor)
-        .expect_err("state_to_county must fail until NR*.TMF is ported");
-    let msg = err.to_string();
-    assert!(
-        msg.contains("TMF") || msg.contains("daymthf"),
-        "expected NR*.TMF temporal-factor error, got: {msg}"
+    let outputs =
+        run_simulation(&opts, &inputs, &mut executor).expect("run_simulation must succeed");
+
+    assert_eq!(
+        outputs.rows.len(),
+        2,
+        "expected two county rows (06037, 06059)"
+    );
+    let fips_set: std::collections::HashSet<&str> =
+        outputs.rows.iter().map(|r| r.fips.as_str()).collect();
+    assert!(fips_set.contains("06037"), "missing county 06037");
+    assert!(fips_set.contains("06059"), "missing county 06059");
+    assert_eq!(
+        outputs.counters.dispatch_calls, 1,
+        "expected one StateToCounty dispatch"
     );
 }
 
