@@ -29,6 +29,8 @@ use std::collections::BTreeMap;
 use crate::driver::{DriverRecord, RunRegions};
 use crate::emissions::exhaust::EmissionUnitCode;
 use crate::geography::common::ActivityUnit;
+use crate::input::alo::AllocationRecord;
+use crate::input::indicator::IndicatorTable;
 use crate::population::retrofit::RetrofitRecord;
 use crate::population::{AgeAdjustmentTable, GrowthIndicatorRecord, ScrappageCurve};
 
@@ -353,9 +355,18 @@ pub struct ReferenceData {
     /// National-to-state allocation entries keyed by SCC. Fortran:
     /// `ALOSTA` allocation data from NR*.ALO files (`rdalo.f`).
     pub national_allocation: Vec<NationalAllocationEntry>,
-    /// Subcounty allocation coefficients from NR*.SCO files. Fortran:
-    /// `ALOSUB` from `rdsco.f`. **⚠ NOT YET LOADABLE.**
-    pub subcounty_allocation: Vec<u8>,
+    /// County and subcounty allocation cross-reference records from NR*.SCO
+    /// files. Fortran: `ascalo`, `coeffs`, `indcod` from `rdalo.f`
+    /// (same format as the NR*.ALO national-to-state file). Each entry maps
+    /// an SCC to up to [`crate::input::alo::MAX_COEF`] spatial-indicator
+    /// codes with regression coefficients for `alocty.f` (county) and
+    /// `alosub.f` (subcounty) allocation.
+    pub county_allocation_records: Vec<AllocationRecord>,
+    /// Spatial-indicator values from NR*.IND files, queried by the county
+    /// and subcounty allocation functions (`getind.f`). Built from all
+    /// indicator records and used by [`crate::allocation::allocate_county`]
+    /// and [`crate::allocation::allocate_subcounty`].
+    pub county_allocation_indicators: IndicatorTable,
     /// Retrofit records from NR*.RFT files. Fortran: `RTRFTDAT` from
     /// `rdrft.f` (`population::retrofit::RetrofitRecord`).
     pub retrofit_records: Vec<RetrofitRecord>,

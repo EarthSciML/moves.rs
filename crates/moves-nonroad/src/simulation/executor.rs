@@ -57,6 +57,7 @@ use crate::geography::prcus::{
     DayMonthFactor, EvapCallInputs, EvapResult, EvapTechLookup, ExhaustCallInputs, ExhaustResult,
     ExhaustTechLookup, ModelYearOutput as PrcusModelYearOutput, RetrofitResult, UsTotalCallbacks,
 };
+use crate::allocation::{allocate_county, CountyDescriptor};
 use crate::geography::state::{CountyInput, StateContext};
 use crate::geography::subcounty::SubcountyRecordIndex;
 use crate::geography::{
@@ -550,31 +551,56 @@ impl ProductionExecutor {
             return Ok(GeographyExecution::skipped());
         }
 
-        // Each county's population (`popcty(idxfip)`) comes from the
-        // NR*.SCO county-allocation packet via `alocty.f`/`alosub.f`, and
-        // `process_state_to_county_record` scales every state aggregate by
-        // `popctyfrac = county.population / state_population`. The prior code
-        // assigned every county `population = 1.0`, which distributes the
-        // state total UNIFORMLY (1/N per county) instead of by the NR*.SCO
-        // allocation fractions — silently mis-attributing county emissions.
-        // The NR*.SCO county-allocation loader (alosub.f / alocty.f) is not
-        // ported, so per-county populations cannot be obtained and a uniform
-        // 1.0 cannot be fabricated in their place. Fail loudly.
-        return Err(crate::Error::Config(format!(
-            "execute_state_to_county: NR*.SCO per-county allocation (alosub.f / \
-             alocty.f) is not ported; county populations (popcty) cannot be obtained. \
-             A uniform population = 1.0 is not the canonical county allocation and \
-             cannot be fabricated ({} matching counties for state prefix {state_prefix}).",
-            county_fips.len()
-        )));
+        // Find the NR*.SCO allocation cross-reference record for this SCC.
+        // `alocty.f` :65–70 calls `fndasc(asccod, ascalo, nalorc)` to locate
+        // the SCC's row in the allocation arrays; missing → error.
+        let alloc_record = self
+            .reference
+            .county_allocation_records
+            .iter()
+            .find(|r| r.scc == ctx.scc)
+            .ok_or_else(|| {
+                crate::Error::Config(format!(
+                    "execute_state_to_county: no NR*.SCO county-allocation record \
+                     (alocty.f / fndasc) for SCC {}; county populations cannot be \
+                     computed without an allocation cross-reference entry.",
+                    ctx.scc
+                ))
+            })?;
 
-        #[allow(unreachable_code)]
-        let counties: Vec<CountyInput> = county_fips
-            .into_iter()
-            .map(|fips| CountyInput {
-                fips,
+        // All counties in the matching state are selected; none are flagged
+        // as carrying their own county-level records (those dispatch via
+        // Dispatch::County and do not appear in the StateToCounty path).
+        let county_descriptors: Vec<CountyDescriptor> = county_fips
+            .iter()
+            .map(|fips| CountyDescriptor {
+                fips: fips.clone(),
                 selected: true,
-                population: 1.0,
+                has_county_records: false,
+            })
+            .collect();
+
+        // Allocate state population to counties via spatial-indicator
+        // regression — ports `alocty.f`. `ctx.record.region_code` is the
+        // 5-char state FIPS (e.g., "06000"), matching `regncd(icurec)(1:5)`
+        // in the Fortran.
+        let growth = ctx.growth.unwrap_or(0.0);
+        let allocations = allocate_county(
+            &ctx.record.region_code,
+            &county_descriptors,
+            alloc_record,
+            &self.reference.county_allocation_indicators,
+            options.episode_year,
+            ctx.record.population,
+            growth,
+        )?;
+
+        let counties: Vec<CountyInput> = allocations
+            .into_iter()
+            .map(|a| CountyInput {
+                fips: a.fips,
+                selected: true,
+                population: a.population,
             })
             .collect();
 

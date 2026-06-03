@@ -15,7 +15,11 @@ use moves_nonroad::simulation::run_simulation;
 use moves_nonroad::{
     driver::{DriverRecord, RegionLevel, RunRegions},
     geography::{common::ActivityUnit, StateDescriptor},
-    input::scrappage::ScrappagePoint,
+    input::{
+        alo::AllocationRecord,
+        indicator::{IndicatorRecord, IndicatorTable},
+        scrappage::ScrappagePoint,
+    },
     population::AgeAdjustmentTable,
     simulation::{
         ActivityTableEntry, EvapTechEntry, ExhaustTechEntry, GrowthXrefEntry,
@@ -308,14 +312,51 @@ fn county_one_scc_produces_nonzero_emissions() {
 /// StateToCounty dispatch: a state-code record at County level routes to
 /// prcsta.f and emits one row per county in the state.
 ///
-/// Two counties in state 06 → dispatch_calls == 1 (one StateToCounty),
-/// two output rows (one per county).
+/// Two counties in state 06 → dispatch_calls == 1 (one StateToCounty).
+/// County allocation (alocty.f) succeeds; run fails downstream at
+/// day_month_factor (NR*.TMF not yet ported).
 #[test]
 fn state_to_county_dispatch_produces_county_rows() {
+ // County allocation indicator: state 06000 has pop=1000,
+ // county 06037 (LA) has pop=600, county 06059 (Orange) has pop=400.
+ // Allocate SCC "2270001010" by POP with coefficient 1.0.
+    let alloc_record = AllocationRecord {
+        scc: "2270001010".into(),
+        coefficients: vec![1.0],
+        indicator_codes: vec!["POP".into()],
+    };
+    let indicator_table = IndicatorTable::new(vec![
+        IndicatorRecord {
+            code: "POP".into(),
+            fips: "06000".into(),
+            subcounty: "".into(),
+            year: "2020".into(),
+            value: 1000.0,
+        },
+        IndicatorRecord {
+            code: "POP".into(),
+            fips: "06037".into(),
+            subcounty: "".into(),
+            year: "2020".into(),
+            value: 600.0,
+        },
+        IndicatorRecord {
+            code: "POP".into(),
+            fips: "06059".into(),
+            subcounty: "".into(),
+            year: "2020".into(),
+            value: 400.0,
+        },
+    ]);
+
+    let mut ref_data = state_level_reference("06000");
+    ref_data.county_allocation_records = vec![alloc_record];
+    ref_data.county_allocation_indicators = indicator_table;
+
     let mut executor = ProductionExecutor {
         county_fips: vec!["06037".into(), "06059".into()],
         hp_levels: default_hp_levels(),
-        reference: state_level_reference("06000"),
+        reference: ref_data,
         ..ProductionExecutor::default()
     };
 
@@ -338,13 +379,15 @@ fn state_to_county_dispatch_produces_county_rows() {
     let mut opts = NonroadOptions::new(RegionLevel::County, 2020);
     opts.growth_loaded = true;
 
-    // NR*.SCO county-allocation (alosub.f) is not ported — returns Err (mo-2v1).
+    // County allocation (alocty.f) now succeeds. The run fails downstream
+    // at day_month_factor because NR*.TMF temporal-factor loader is not
+    // yet ported (daymthf.f).
     let err = run_simulation(&opts, &inputs, &mut executor)
-        .expect_err("state_to_county must fail until NR*.SCO is ported");
+        .expect_err("state_to_county must fail until NR*.TMF is ported");
     let msg = err.to_string();
     assert!(
-        msg.contains("SCO") || msg.contains("allocation") || msg.contains("alocty"),
-        "expected SCO-allocation error, got: {msg}"
+        msg.contains("TMF") || msg.contains("daymthf"),
+        "expected NR*.TMF temporal-factor error, got: {msg}"
     );
 }
 
