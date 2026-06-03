@@ -1324,11 +1324,10 @@ pub fn build_scrappage_curve<S: DataFrameStore + ?Sized>(store: &S) -> Vec<Scrap
 /// Average ambient temperature (°F) for the given month from
 /// `zonemonthhour`, for the `emsadj.f` exhaust temperature correction.
 /// `month = 0` averages all rows (snapshot-loaded tables are already
-/// pre-filtered to the execution month). `0.0` ⇒ absent meteorology.
-fn build_ambient_temp<S: DataFrameStore + ?Sized>(store: &S, month: i64) -> f32 {
-    let Some(df) = store.get("zonemonthhour") else {
-        return 0.0;
-    };
+/// pre-filtered to the execution month). Returns `None` when `zonemonthhour`
+/// is absent or has no matching rows.
+fn build_ambient_temp<S: DataFrameStore + ?Sized>(store: &S, month: i64) -> Option<f32> {
+    let df = store.get("zonemonthhour")?;
     let m = int_col(&df, "monthID");
     let t = float_col(&df, "temperature");
     let (mut sum, mut n) = (0.0_f64, 0_u32);
@@ -1339,9 +1338,9 @@ fn build_ambient_temp<S: DataFrameStore + ?Sized>(store: &S, month: i64) -> f32 
         }
     }
     if n > 0 {
-        (sum / n as f64) as f32
+        Some((sum / n as f64) as f32)
     } else {
-        0.0
+        None
     }
 }
 

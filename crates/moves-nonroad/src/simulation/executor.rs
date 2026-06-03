@@ -878,33 +878,29 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
     ) -> Result<AdjustmentTable> {
         let oxy = self.executor.reference.fuel_oxygen_pct;
         // Per-SCC activity-weighted ambient temperature (warm-daytime-weighted
-        // for daylight-use equipment), falling back to the scalar mean.
+        // for daylight-use equipment), falling back to the run-level scalar.
+        // Canonical emsadj.f:167-220 ALWAYS applies EXP(acoeff*(tamb-75));
+        // absent zonemonthhour is a load error, not a silent 75 °F bypass.
         let tamb = self
             .executor
             .reference
             .ambient_temp_by_scc
             .get(scc)
             .copied()
-            .unwrap_or(self.executor.reference.ambient_temp_f);
-        // Canonical `emsadj.f:167-220` ALWAYS applies the exhaust
-        // temperature correction `temfac = EXP(acoeff * (tamb - 75))` using
-        // the run-level ambient temperature `tamb` (read from the
-        // temperature/ambient input). The prior code (a) returned an all-1.0
-        // neutral table when no fuel/ambient data was present, and (b)
-        // fabricated `tamb = 75 °F` when the ambient temp was absent — 75 °F
-        // makes `temfac = EXP(0) = 1`, silently NEUTRALIZING the temperature
-        // correction. A genuine run always carries an ambient temperature; an
-        // absent/non-positive `tamb` means the ambient-temperature input was
-        // not loaded (missing required data), not a legitimate "no
-        // correction". The oxygenate term is a separate, legitimately-optional
-        // input (`oxy == 0.0` ⇒ no oxygenate correction), so it is left
-        // defaultable — but the ambient temperature cannot be fabricated.
+            .or(self.executor.reference.ambient_temp_f)
+            .ok_or_else(|| {
+                crate::Error::Config(format!(
+                    "emission_adjustments: run-level ambient temperature is absent for \
+                     SCC {scc} (zonemonthhour not loaded). emsadj.f always applies \
+                     EXP(acoeff*(tamb-75)); a neutral 75 °F cannot be fabricated as \
+                     it silently drops the exhaust temperature correction."
+                ))
+            })?;
         if tamb <= 0.0 {
             return Err(crate::Error::Config(format!(
-                "emission_adjustments: run-level ambient temperature is absent for \
-                 SCC {scc} (NR*.EMF / temperature input not loaded). emsadj.f always \
-                 applies EXP(acoeff*(tamb-75)); a neutral 75 °F (temfac=1) cannot be \
-                 fabricated as it silently drops the exhaust temperature correction."
+                "emission_adjustments: ambient temperature is non-positive ({tamb}°F) \
+                 for SCC {scc}. This indicates a data error in zonemonthhour or \
+                 nrhourallocation."
             )));
         }
         // Port of `emsadj.f`: the gasoline exhaust temperature + oxygenate
@@ -3481,11 +3477,11 @@ mod production {
             county_fips: vec!["06037".into()],
             hp_levels: default_hp_levels(),
             reference: ReferenceData {
-                // ambient_temp_f must be > 0 so emission_adjustments can compute the
+                // ambient_temp_f must be Some(>0) so emission_adjustments can compute the
                 // exhaust temperature correction. bsfc must be non-empty so
                 // compute_exhaust_factors can populate the BSFC array; tech_fractions
                 // are 0.0 so the exhaust loop is skipped and bsfc is never consumed.
-                ambient_temp_f: 75.0,
+                ambient_temp_f: Some(75.0),
                 exhaust_tech_entries: vec![ExhaustTechEntry {
                     scc: "2270001010".into(),
                     hp_min: 0.0,
