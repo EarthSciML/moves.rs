@@ -288,6 +288,25 @@ impl CalculatorContext {
         self.domain == Some(ModelDomain::Project)
     }
 
+    /// Whether the run is in Single (County) domain — county-scale run with a
+    /// County Data Manager (CDB) input. County-scale CDB tables are loaded into
+    /// the slow store and override the default-DB tables for the tables they cover.
+    #[must_use]
+    pub fn is_single(&self) -> bool {
+        self.domain == Some(ModelDomain::Single)
+    }
+
+    /// Whether the run uses a user-supplied scale input database — true for both
+    /// Single (County) and Project domain. CDB/PDB Parquet tables override the
+    /// default-DB tables for the tables they cover.
+    #[must_use]
+    pub fn has_scale_input(&self) -> bool {
+        matches!(
+            self.domain,
+            Some(ModelDomain::Single) | Some(ModelDomain::Project)
+        )
+    }
+
     /// Per-run behavioral tokens from the worker's `-parameters=` CSV (not
     /// including the trailing processID, yearID, roadTypeID integers). The
     /// engine populates this from the RunSpec so calculators that call
@@ -741,6 +760,33 @@ mod tests {
 
         ctx.set_model_domain(None);
         assert!(!ctx.is_project(), "None domain is not project");
+    }
+
+    #[test]
+    fn context_is_single_and_has_scale_input() {
+        use moves_runspec::model::ModelDomain;
+        let mut ctx = CalculatorContext::new();
+
+        // None domain: neither Single nor has_scale_input.
+        assert!(!ctx.is_single(), "None → not single");
+        assert!(!ctx.has_scale_input(), "None → no scale input");
+
+        // Default domain: neither.
+        ctx.set_model_domain(Some(ModelDomain::Default));
+        assert!(!ctx.is_single(), "Default → not single");
+        assert!(!ctx.has_scale_input(), "Default → no scale input");
+
+        // Single domain: is_single=true, has_scale_input=true.
+        ctx.set_model_domain(Some(ModelDomain::Single));
+        assert!(ctx.is_single(), "Single → is_single()");
+        assert!(ctx.has_scale_input(), "Single → has_scale_input()");
+        assert!(!ctx.is_project(), "Single → not project");
+
+        // Project domain: is_single=false, has_scale_input=true.
+        ctx.set_model_domain(Some(ModelDomain::Project));
+        assert!(!ctx.is_single(), "Project → not single");
+        assert!(ctx.has_scale_input(), "Project → has_scale_input()");
+        assert!(ctx.is_project(), "Project → is_project()");
     }
 
     #[test]

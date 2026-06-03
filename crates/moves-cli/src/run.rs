@@ -260,10 +260,27 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
             .execution_run_spec_mut()
             .build_execution_locations(&geography);
     } else if let Some(scale_dir) = &opts.scale_input {
-        // Scale-only path: no snapshot — build a store from CDB/PDB Parquet alone.
+        // Scale-only path: no snapshot or default DB — build a store from CDB/PDB
+        // Parquet alone, then run the same synthesis steps as the default-DB path.
+        // CDB provides county-scale tables (ZoneRoadType, SourceTypePopulation, …);
+        // the synthesis steps fill in derived tables that are not in the CDB:
+        //   - Link: synthesised from ZoneRoadType when CDB omits it
+        //   - RunSpec*: derived from the RunSpec (not a DB table)
+        //   - sourceUseTypePhysicsMapping: derived from sourceUseTypePhysics if present
+        //   - ZoneMonthHour meteorology columns: filled from temperature/relHumidity
+        // Each synthesis function is a no-op when its input table is absent, so it
+        // is safe to call even for minimal CDB dirs that omit optional tables.
         let mut store = InMemoryStore::new();
         overlay_scale_input_db(&mut store, scale_dir)
             .with_context(|| format!("loading scale-input DB from {}", scale_dir.display()))?;
+        populate_link_from_zone_road_type(&mut store)
+            .context("synthesising Link from ZoneRoadType")?;
+        build_runspec_tables(&run_spec, &mut store)
+            .context("building RunSpec tables from RunSpec")?;
+        populate_source_use_type_physics_mapping(&mut store)
+            .context("synthesising sourceUseTypePhysicsMapping")?;
+        populate_zone_month_hour_meteorology(&mut store)
+            .context("populating ZoneMonthHour meteorology")?;
         let geography = load_geography_from_store(&store)
             .with_context(|| format!("building geography from {}", scale_dir.display()))?;
         engine = engine.with_slow_store(store);
@@ -2663,5 +2680,240 @@ mod tests {
         let store = InMemoryStore::new();
         let region_ids = derive_region_ids_from_store(&store);
         assert_eq!(region_ids, vec![0i64]);
+    }
+
+    // ---------- overlay_scale_input_db ----------------------------------------
+
+    /// Write `df` to `<dir>/<name>.parquet`.
+    fn write_parquet_to_dir(
+        dir: &std::path::Path,
+        name: &str,
+        df: &mut polars::prelude::DataFrame,
+    ) {
+        use polars::prelude::{ParquetCompression, ParquetWriter, StatisticsOptions};
+        let path = dir.join(format!("{name}.parquet"));
+        let file = std::fs::File::create(&path).expect("create parquet file");
+        ParquetWriter::new(file)
+            .with_compression(ParquetCompression::Uncompressed)
+            .with_statistics(StatisticsOptions::empty())
+            .finish(df)
+            .expect("write parquet");
+    }
+
+    #[test]
+    fn overlay_scale_input_db_loads_parquet_into_store() {
+        use polars::prelude::*;
+        let dir = tempfile::tempdir().unwrap();
+
+        let mut df = df!(
+            "sourceTypeID" => &[21i32],
+            "population"   => &[1000i32],
+        )
+        .unwrap();
+        write_parquet_to_dir(dir.path(), "SourceTypePopulation", &mut df);
+
+        let mut store = InMemoryStore::new();
+        overlay_scale_input_db(&mut store, dir.path()).expect("overlay must succeed");
+
+        assert!(
+            store.contains("SourceTypePopulation"),
+            "SourceTypePopulation must be in store after overlay"
+        );
+        let loaded = store.get("SourceTypePopulation").unwrap();
+        assert_eq!(loaded.height(), 1, "one row should be loaded");
+    }
+
+    #[test]
+    fn overlay_scale_input_db_overrides_existing_table() {
+        // CDB/PDB tables take precedence over same-named tables already in the store.
+        use polars::prelude::*;
+        let dir = tempfile::tempdir().unwrap();
+
+        // Write a CDB SourceTypePopulation with count=999.
+        let mut cdb_df = df!(
+            "sourceTypeID" => &[21i32],
+            "population"   => &[999i32],
+        )
+        .unwrap();
+        write_parquet_to_dir(dir.path(), "SourceTypePopulation", &mut cdb_df);
+
+        // Pre-seed the store with a same-named table (default DB value = 100).
+        let default_df = df!(
+            "sourceTypeID" => &[21i32],
+            "population"   => &[100i32],
+        )
+        .unwrap();
+        let mut store = InMemoryStore::new();
+        store.insert("SourceTypePopulation".to_string(), default_df);
+
+        overlay_scale_input_db(&mut store, dir.path()).expect("overlay must succeed");
+
+        // CDB value (999) should win over the prior default (100).
+        let result = store.get("SourceTypePopulation").unwrap();
+        assert_eq!(result.height(), 1);
+        let pop = result
+            .column("population")
+            .unwrap()
+            .i32()
+            .unwrap()
+            .get(0)
+            .unwrap();
+        assert_eq!(
+            pop, 999,
+            "CDB population (999) must override default (100)"
+        );
+    }
+
+    #[test]
+    fn overlay_scale_input_db_skips_non_parquet_files() {
+        use polars::prelude::*;
+        let dir = tempfile::tempdir().unwrap();
+
+        // Write a JSON file that should be ignored.
+        std::fs::write(dir.path().join("manifest.json"), b"{}").unwrap();
+
+        // Write one real Parquet table.
+        let mut df = df!("zoneID" => &[261610i32], "roadTypeID" => &[4i32]).unwrap();
+        write_parquet_to_dir(dir.path(), "ZoneRoadType", &mut df);
+
+        let mut store = InMemoryStore::new();
+        overlay_scale_input_db(&mut store, dir.path()).expect("overlay must succeed");
+
+        assert!(
+            store.contains("ZoneRoadType"),
+            "ZoneRoadType must be loaded"
+        );
+        // The JSON file must not produce any table.
+        assert_eq!(
+            store.names().len(),
+            1,
+            "only ZoneRoadType should be in store, not the .json file"
+        );
+    }
+
+    #[test]
+    fn scale_only_path_synthesises_runspec_tables_and_link() {
+        // Verifies that the scale-only code path (no snapshot, no default DB)
+        // runs the same synthesis steps as the default-DB path: RunSpec* tables
+        // are built from the RunSpec, and Link is synthesised from ZoneRoadType
+        // when CDB provides ZoneRoadType but no explicit Link table.
+        use polars::prelude::*;
+        let dir = tempfile::tempdir().unwrap();
+
+        // Minimal CDB: ZoneRoadType (county 26161, zone 261610, Urban Restricted = 4).
+        let mut zrt_df = df!(
+            "zoneID"     => &[261610i32],
+            "roadTypeID" => &[4i32],
+            "SHOAllocFactor" => &[1.0f64],
+        )
+        .unwrap();
+        write_parquet_to_dir(dir.path(), "ZoneRoadType", &mut zrt_df);
+
+        // Build a minimal RunSpec matching scale-county.xml.
+        use moves_runspec::{
+            GeoKind, GeographicSelection, ModelDomain, OnroadVehicleSelection, RunSpec,
+            Timespan,
+        };
+        let run_spec = RunSpec {
+            domain: Some(ModelDomain::Single),
+            geographic_selections: vec![GeographicSelection {
+                kind: GeoKind::County,
+                key: 26161,
+                description: "Washtenaw County".to_string(),
+            }],
+            timespan: Timespan {
+                years: vec![2020],
+                months: vec![7],
+                days: vec![5],
+                begin_hour: Some(6),
+                end_hour: Some(6),
+                ..Default::default()
+            },
+            onroad_vehicle_selections: vec![OnroadVehicleSelection {
+                fuel_type_id: 1,
+                source_type_id: 21,
+                fuel_type_name: "Gasoline".to_string(),
+                source_type_name: "Passenger Car".to_string(),
+            }],
+            ..Default::default()
+        };
+
+        // Run the synthesis steps against a store seeded from the CDB dir.
+        let mut store = InMemoryStore::new();
+        overlay_scale_input_db(&mut store, dir.path()).expect("overlay");
+        populate_link_from_zone_road_type(&mut store).expect("link synthesis");
+        build_runspec_tables(&run_spec, &mut store).expect("runspec tables");
+
+        // Link must have been synthesised from ZoneRoadType.
+        assert!(store.contains("link"), "Link must be synthesised from ZoneRoadType");
+        let link = store.get("link").unwrap();
+        assert_eq!(link.height(), 1, "one link row for zone 261610 + road type 4");
+
+        // RunSpec* tables must be present (calculators read these from the slow tier).
+        assert!(
+            store.contains("RunSpecSourceType"),
+            "RunSpecSourceType must be built from RunSpec"
+        );
+        assert!(
+            store.contains("RunSpecPollutantProcess"),
+            "RunSpecPollutantProcess must be built from RunSpec"
+        );
+        let src_types: Vec<i32> = store
+            .get("RunSpecSourceType")
+            .unwrap()
+            .column("sourceTypeID")
+            .unwrap()
+            .i32()
+            .unwrap()
+            .into_no_null_iter()
+            .collect();
+        assert_eq!(src_types, vec![21i32], "source type 21 from RunSpec");
+    }
+
+    #[test]
+    fn overlay_scale_input_db_preference_over_default_db_tables() {
+        // Integration-level check: when a default-DB store is seeded with a table
+        // and the CDB dir contains a same-named file, the CDB value wins.
+        // This is the canonical acceptance test for Task 144 /
+        // bead mo-2yx: "a SINGLE-scale run with a minimal county input DB reads
+        // the user-supplied tables over defaults."
+        use polars::prelude::*;
+        let dir = tempfile::tempdir().unwrap();
+
+        // CDB SourceTypePopulation: population=500 (user-supplied).
+        let mut cdb_stp = df!(
+            "sourceTypeID" => &[21i32],
+            "yearID"       => &[2020i32],
+            "population"   => &[500i32],
+        )
+        .unwrap();
+        write_parquet_to_dir(dir.path(), "SourceTypePopulation", &mut cdb_stp);
+
+        // Simulate a default-DB store that has population=100 for the same row.
+        let default_stp = df!(
+            "sourceTypeID" => &[21i32],
+            "yearID"       => &[2020i32],
+            "population"   => &[100i32],
+        )
+        .unwrap();
+        let mut store = InMemoryStore::new();
+        store.insert("SourceTypePopulation".to_string(), default_stp);
+
+        // Overlay the CDB — mirrors what build_default_db_store does for path C
+        // and what run_simulation now does for path B (scale-only).
+        overlay_scale_input_db(&mut store, dir.path()).expect("overlay");
+
+        let result = store.get("SourceTypePopulation").unwrap();
+        let pop = result
+            .column("population")
+            .unwrap()
+            .i32()
+            .unwrap()
+            .get(0)
+            .unwrap();
+        assert_eq!(
+            pop, 500,
+            "user-supplied CDB population (500) must override default (100)"
+        );
     }
 }
