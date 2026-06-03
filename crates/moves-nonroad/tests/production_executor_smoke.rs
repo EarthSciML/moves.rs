@@ -102,9 +102,9 @@ fn make_executor() -> ProductionExecutor {
             }],
             scrappage_curve: make_scrappage_curve(),
             age_adjustment_table: AgeAdjustmentTable::default(),
-            // ambient_temp_f must be > 0 so emission_adjustments can compute the
-            // exhaust temperature correction (mo-2v1: panic → Err on tamb <= 0).
-            ambient_temp_f: 75.0,
+            // ambient_temp_f must be Some(>0) so emission_adjustments can compute the
+            // exhaust temperature correction.
+            ambient_temp_f: Some(75.0),
             ..ReferenceData::default()
         },
         // All months selected → annual run; mthf = 1.0 with flat default profiles.
@@ -720,5 +720,85 @@ fn county_loaded_thc_ef_produces_linear_nonzero_thc() {
     assert!(
         (two / one - 2.0).abs() < 1e-4,
         "THC output must scale linearly with the base rate: one={one} two={two}"
+    );
+}
+
+/// County dispatch with no ambient temperature loaded (`ambient_temp_f: None`)
+/// must surface a typed error from `emission_adjustments`, not silently apply
+/// a fabricated 75 °F neutral factor. Canonical emsadj.f always reads `amtemp`
+/// from the .opt file; there is no all-1.0 bypass path.
+#[test]
+fn county_absent_ambient_temp_returns_error() {
+    let mut executor = ProductionExecutor {
+        county_fips: vec!["06037".into()],
+        hp_levels: default_hp_levels(),
+        reference: ReferenceData {
+            ambient_temp_f: None,
+            exhaust_tech_entries: vec![ExhaustTechEntry {
+                scc: "2270001010".into(),
+                hp_min: 0.0,
+                hp_max: 100.0,
+                tech_names: vec!["T1".into()],
+                tech_fractions: vec![1.0],
+                bsfc: vec![0.45],
+                ..Default::default()
+            }],
+            evap_tech_entries: vec![EvapTechEntry {
+                scc: "2270001010".into(),
+                hp_min: 0.0,
+                hp_max: 100.0,
+                tech_names: vec!["EV1".into()],
+                tech_fractions: vec![0.0],
+                ..Default::default()
+            }],
+            growth_xref_entries: vec![GrowthXrefEntry {
+                fips: "06037".into(),
+                scc: "2270001010".into(),
+                hp_min: 0.0,
+                hp_max: 100.0,
+                indicator: "GDP".into(),
+            }],
+            growth_records: vec![],
+            activity_entries: vec![ActivityTableEntry {
+                scc: "2270001010".into(),
+                fips: "06037".into(),
+                starts: 0.0,
+                activity_level: 100.0,
+                activity_unit: ActivityUnit::HoursPerYear,
+                load_factor: 0.5,
+                age_code: "DEFAULT".into(),
+            }],
+            scrappage_curve: make_scrappage_curve(),
+            age_adjustment_table: AgeAdjustmentTable::default(),
+            ..ReferenceData::default()
+        },
+        ..ProductionExecutor::default()
+    };
+
+    let mut inputs = NonroadInputs::new();
+    inputs.push_group(
+        "2270001010",
+        vec![DriverRecord {
+            region_code: "06037".into(),
+            hp_avg: 25.0,
+            population: 100.0,
+            pop_year: 2020,
+            median_life: 0.0,
+        }],
+    );
+    inputs.regions = RunRegions {
+        selected_counties: vec!["06037".into()],
+        ..RunRegions::default()
+    };
+
+    let mut opts = NonroadOptions::new(RegionLevel::County, 2020);
+    opts.growth_loaded = true;
+
+    let err = run_simulation(&opts, &inputs, &mut executor)
+        .expect_err("absent ambient_temp_f must yield a typed error");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("ambient") || msg.contains("zonemonthhour") || msg.contains("temperature"),
+        "expected ambient-temperature error, got: {msg}"
     );
 }

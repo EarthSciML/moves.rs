@@ -416,9 +416,10 @@ pub struct ReferenceData {
     /// the oxygenate / sulfur corrections and takes the RFG-bin path instead.
     pub fuel_rfg: bool,
     /// Ambient temperature (°F) for the exhaust temperature corrections
-    /// (`emsadj.f` :167–220). `0.0` ⇒ neutral (treated as 75 °F). Used as
-    /// the fallback when an SCC has no entry in `ambient_temp_by_scc`.
-    pub ambient_temp_f: f32,
+    /// (`emsadj.f` :167–220). `None` means `zonemonthhour` was not loaded;
+    /// `emission_adjustments` returns an error rather than fabricating 75 °F.
+    /// Used as the fallback when an SCC has no entry in `ambient_temp_by_scc`.
+    pub ambient_temp_f: Option<f32>,
     /// Per-SCC ambient temperature (°F) for the exhaust temperature
     /// corrections, activity-weighted by the equipment's hour-allocation
     /// pattern (`nrhourpatternfinder` → `nrhourallocation`). The temperature
