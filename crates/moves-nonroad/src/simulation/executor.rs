@@ -3601,7 +3601,7 @@ mod production {
             county_fips: vec!["06037".into()],
             hp_levels: default_hp_levels(),
             reference: ReferenceData {
-                ambient_temp_f: 75.0,
+                ambient_temp_f: Some(75.0),
                 exhaust_tech_entries: vec![ExhaustTechEntry {
                     scc: "2270001010".into(),
                     hp_min: 0.0,
@@ -3693,7 +3693,7 @@ mod production {
             county_fips: vec!["06037".into()],
             hp_levels: default_hp_levels(),
             reference: ReferenceData {
-                ambient_temp_f: 75.0,
+                ambient_temp_f: Some(75.0),
                 exhaust_tech_entries: vec![ExhaustTechEntry {
                     scc: "2270001010".into(),
                     hp_min: 0.0,

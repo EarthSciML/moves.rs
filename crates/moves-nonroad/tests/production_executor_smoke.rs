@@ -756,7 +756,7 @@ fn county_absent_ambient_temp_returns_error() {
                 scc: "2270001010".into(),
                 hp_min: 0.0,
                 hp_max: 100.0,
-                indicator: "GDP".into(),
+                indicator: Some("GDP".to_string()),
             }],
             growth_records: vec![],
             activity_entries: vec![ActivityTableEntry {
