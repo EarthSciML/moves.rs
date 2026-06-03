@@ -1,38 +1,39 @@
 //! Rate-of-Progress internal control strategy — ports
-//! `gov.epa.otaq.moves.master.implementation.internalcontrolstrategies.rateofprogress.RateOfProgressStrategy`.
+//! `gov.epa.otaq.moves.master.implementation.ghg.internalcontrolstrategies.rateofprogress.RateOfProgressStrategy`.
 //!
 //! # Role
 //!
-//! The Rate-of-Progress (ROP) control strategy applies emission-reduction
-//! percentages by pollutant, source type, regulatory class, and model year.
-//! It is used to model the effect of new emissions regulations that require
-//! specific percentage reductions in pollutant output from specific vehicle
-//! classes.
+//! In canonical MOVES the Rate-of-Progress (ROP) strategy does **not** apply
+//! per-row percentage reductions. When enabled it runs
+//! `database/RateOfProgressStrategy.sql`, which "removes the effects of the
+//! Clean Air Act by propagating 1993 emission rates into the future": it locates
+//! the `RateOfProgress` model-year cut point (default 1993), rewrites future
+//! calendar fuel years, and then propagates the cut-point model-year-group
+//! values forward across roughly two dozen execution-DB tables (`baseFuel`,
+//! `crankcaseEmissionRatio`, `cumTVVCoeffs`, `fuelSupply`, `fuelUsageFraction`,
+//! `generalFuelRatioExpression`, `meanFuelParameters`, `noNO2Ratio`,
+//! `pollutantProcessModelYear`, `sourceTypeModelYear`,
+//! `sourceTypeModelYearGroup`, `startTempAdjustment`, the various emission-rate
+//! and air-toxic ratio tables, etc.). See
+//! `RateOfProgressStrategy.runScript()` and the `spDoRateOfProgress` procedure
+//! in `database/RateOfProgressStrategy.sql`.
 //!
-//! Each [`crate::model::RopRecord`] carries a `reductionFraction` in `[0.0, 1.0]`:
+//! # Implementation status
 //!
-//! * `0.0` — no change
-//! * `0.25` — 25% reduction (downstream emission rate × 0.75)
-//! * `1.0` — 100% elimination
+//! That transformation has not been ported. It depends on default-DB tables
+//! and helper structures (`modelYearCutPoints`, `modelYearGroup` decoding, the
+//! fuel-year ripple logic) that this crate's in-memory data plane does not yet
+//! expose, so [`pre_run`](RateOfProgressControlStrategy::pre_run) cannot
+//! faithfully reproduce it. Until those tables and the model-year-group decode
+//! step land, the strategy reports the unported condition as an explicit error
+//! rather than silently returning success and leaving every advertised
+//! [`modified_tables`](RateOfProgressControlStrategy::modified_tables) entry
+//! untouched.
 //!
-//! The emission scaling factor applied to any matching rate row is
-//! `1.0 - reductionFraction`.
-//!
-//! # Lifecycle
-//!
-//! ROP applies its reductions globally before the master loop begins, using
-//! [`pre_run`](RateOfProgressControlStrategy::pre_run). The modified tables
-//! declared via [`modified_tables`](RateOfProgressControlStrategy::modified_tables)
-//! signal the engine to invalidate and reload those tables before calculators
-//! consume them.
-//!
-//! # Data-plane status
-//!
-//! The actual write of the adjusted emission rates into the execution database
-//! is deferred until `moves-framework`'s `ExecutionTables` gains a mutable
-//! write API. The `modified_tables` declaration
-//! already signals the engine which tables will be modified, so the hook-up
-//! is a single `TODO` line once the data plane lands.
+//! Note: the [`crate::model::RopRecord`] / `reductionFraction` data model in
+//! this crate is a placeholder that does not correspond to any field used by
+//! the canonical strategy; it must not be wired into a per-row rate scaling,
+//! which canonical MOVES never performs.
 
 use moves_framework::{InMemoryStore, InternalControlStrategy};
 
@@ -67,25 +68,37 @@ impl InternalControlStrategy for RateOfProgressControlStrategy {
     }
 
     fn modified_tables(&self) -> &[&'static str] {
- // The ROP strategy modifies the emission rate tables that downstream
- // calculators consume — specifically the rates keyed by
- // (pollutantID, sourceTypeID, regClassID, modelYearID).
- //
- // TODO( / DataFrameStore): replace this placeholder list with
- // the actual execution-DB table names once the data plane is defined.
- // The names below match the Java strategy's `getModifiedTables()` return.
-        &["ratepollutantprocessmodelyeargroup", "sourceTypeModelYear"]
+ // Tables the canonical `spDoRateOfProgress` procedure rewrites when the
+ // Clean-Air-Act effect is removed (see `database/RateOfProgressStrategy.sql`).
+ // This is the subset most material to downstream calculators; the full
+ // procedure touches additional fuel and air-toxic ratio tables. The list
+ // is advisory metadata for engine invalidation — `pre_run` does not yet
+ // perform these rewrites (see below).
+        &[
+            "baseFuel",
+            "fuelSupply",
+            "fuelUsageFraction",
+            "pollutantProcessModelYear",
+            "sourceTypeModelYear",
+            "sourceTypeModelYearGroup",
+        ]
     }
 
     fn pre_run(
         &self,
         _tables: &mut InMemoryStore,
     ) -> std::result::Result<(), moves_framework::Error> {
- // TODO: apply `self.table` reductions to the emission-rate tables in
- // `_tables`. Requires reading the target rate tables, joining against
- // `RopRecord` fields, and writing scaled rows back. Deferred to a
- // follow-on work item; `modified_tables` already signals the engine.
-        Ok(())
+ // Canonical MOVES runs `spDoRateOfProgress` here, propagating the
+ // RateOfProgress cut-point (1993) model-year-group data forward across
+ // the execution-DB tables listed in `modified_tables`. That port depends
+ // on default-DB structures this crate does not yet expose
+ // (`modelYearCutPoints`, model-year-group decoding, the fuel-year ripple).
+ //
+ // Rather than silently returning success — which would leave every
+ // advertised modified table untouched and drop the entire control effect
+ // while the run reports OK — surface the unported path as an explicit
+ // error so callers cannot mistake a no-op for an applied strategy.
+        Err(moves_framework::Error::NotImplemented)
     }
 }
 
@@ -118,14 +131,19 @@ mod tests {
     }
 
     #[test]
-    fn pre_run_succeeds_with_empty_table() {
+    fn pre_run_reports_unported_with_empty_table() {
+ // The Clean-Air-Act removal procedure is not ported; `pre_run` must
+ // surface that explicitly rather than silently returning success.
         let s = RateOfProgressControlStrategy::new(RopTable::new());
         let mut store = InMemoryStore::new();
-        s.pre_run(&mut store).expect("pre_run must not fail");
+        let err = s
+            .pre_run(&mut store)
+            .expect_err("pre_run must report the unported path, not silently succeed");
+        assert!(matches!(err, moves_framework::Error::NotImplemented));
     }
 
     #[test]
-    fn pre_run_succeeds_with_populated_table() {
+    fn pre_run_reports_unported_with_populated_table() {
         let t = small_table(&[
             (3, 11, 10, 2020, 0.25),
             (3, 21, 10, 2020, 0.10),
@@ -133,7 +151,10 @@ mod tests {
         ]);
         let s = RateOfProgressControlStrategy::new(t);
         let mut store = InMemoryStore::new();
-        s.pre_run(&mut store).expect("pre_run must not fail");
+        let err = s
+            .pre_run(&mut store)
+            .expect_err("pre_run must report the unported path, not silently succeed");
+        assert!(matches!(err, moves_framework::Error::NotImplemented));
     }
 
     #[test]

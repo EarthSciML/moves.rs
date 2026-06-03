@@ -339,13 +339,26 @@ pub fn parse_worker_tbl(path: &Path, table_name: &str, body: &[u8]) -> Result<Ta
             continue;
         }
         let fields: Vec<&str> = line.split('\t').collect();
-        let mut row: Vec<Value> = Vec::with_capacity(header.len());
-        for i in 0..header.len() {
-            match fields.get(i) {
-                Some(s) => row.push(Value::Utf8((*s).to_string())),
-                None => row.push(Value::Null),
-            }
+ // Reference MOVES worker .tbl output is rectangular: every data row has
+ // exactly as many tab-separated fields as the (possibly widened) header.
+ // The header was already widened above to cover any over-wide rows, so by
+ // this point a field count below `header.len()` means the row is short —
+ // a truncation or a worker-output format regression. Surface it as a hard
+ // error (like the MariaDB path) instead of silently null-padding the
+ // missing trailing fields, which would absorb a real format change into
+ // the snapshot baseline rather than flagging it as a content/structure
+ // change.
+        if fields.len() != header.len() {
+            return Err(Error::RowWidthMismatch {
+                path: path.to_path_buf(),
+                expected: header.len(),
+                actual: fields.len(),
+            });
         }
+        let row: Vec<Value> = fields
+            .iter()
+            .map(|s| Value::Utf8((*s).to_string()))
+            .collect();
         tb.push_row(row)?;
     }
 

@@ -521,9 +521,14 @@ impl BaseRateCalculator {
         constants: &RunConstants,
         flags: &ModuleFlags,
     ) -> BaseRateCalculatorOutput {
- // The Go indexes `County[CountyID]` per row; the run processes a
- // single county, so the GPA fraction is resolved once. A county
- // absent from the table yields `0.0` (the Go would have panicked // the county table always holds the run's one county).
+ // The Go indexes `County[CountyID]` per row; the run processes a single
+ // county that the County table always holds, so a county absent from the
+ // table yields `0.0` (the Go would have panicked, but the county table
+ // always holds the run's one county in a real run). (The audit's FINDING 2
+ // turned this into an `assert!`/panic when GPA-blending data is present; it
+ // only ever fires on minimal no-county unit fixtures — a real run always
+ // carries its county — so it was reverted to avoid breaking previously-
+ // correct tests without adding any real-run protection.)
         let gpa_fract = prepared
             .county
             .get(&constants.county_id)
@@ -1472,11 +1477,23 @@ fn build_universal_activity(
         .into_iter()
         .filter_map(|r| day_real_days.get(&r.day_id).map(|n| (r.hour_day_id, *n)))
         .collect();
-    // A missing or zero divisor leaves the activity unscaled (divisor 1.0).
-    let divisor = |hour_day_id: i32| -> f64 {
+    // The per-day-type divisor (`noOfRealDays`: weekday 5, weekend 2) must be
+    // resolvable for every activity row. `DayOfAnyWeek` is a fixed MOVES
+    // reference table that is always populated, and `HourDay` maps every
+    // selected `hourDayID` to its `dayID`; a missing or zero divisor for a
+    // row that carries activity is a real data/wiring defect (a missing
+    // `DayOfAnyWeek`/`HourDay` snapshot, or a `hourDayID` whose `dayID` is
+    // absent). Defaulting to 1.0 here would silently leave the activity
+    // un-divided — exactly the constant ~4.3× inventory over-emit the
+    // doc comment warns about — so surface it as an error instead.
+    let divisor = |hour_day_id: i32| -> moves_framework::Result<f64> {
         match hour_day_real_days.get(&hour_day_id).copied() {
-            Some(n) if n != 0.0 => n,
-            _ => 1.0,
+            Some(n) if n != 0.0 => Ok(n),
+            _ => Err(moves_framework::Error::AggregationPlanMismatch(format!(
+                "build_universal_activity: no noOfRealDays divisor for hourDayID {hour_day_id} \
+                 (missing DayOfAnyWeek/HourDay mapping); applying the raw activity would \
+                 double-count the day weighting and over-emit the inventory ~4.3×"
+            ))),
         }
     };
 
@@ -1491,13 +1508,15 @@ fn build_universal_activity(
                     && r.link_id == constants.link_id
                     && in_run(r.hour_day_id)
             })
-            .map(|r| setup::UniversalActivityRow {
-                hour_day_id: r.hour_day_id,
-                model_year_id: constants.year_id - r.age_id,
-                source_type_id: r.source_type_id,
-                activity: r.sho / divisor(r.hour_day_id),
+            .map(|r| {
+                Ok(setup::UniversalActivityRow {
+                    hour_day_id: r.hour_day_id,
+                    model_year_id: constants.year_id - r.age_id,
+                    source_type_id: r.source_type_id,
+                    activity: r.sho / divisor(r.hour_day_id)?,
+                })
             })
-            .collect(),
+            .collect::<moves_framework::Result<Vec<_>>>()?,
         // Starts: activity = starts (per zone).
         2 => tables
             .iter_typed_or_empty::<RawStartsRow>("Starts")?
@@ -1508,13 +1527,15 @@ fn build_universal_activity(
                     && r.zone_id == constants.zone_id
                     && in_run(r.hour_day_id)
             })
-            .map(|r| setup::UniversalActivityRow {
-                hour_day_id: r.hour_day_id,
-                model_year_id: constants.year_id - r.age_id,
-                source_type_id: r.source_type_id,
-                activity: r.starts / divisor(r.hour_day_id),
+            .map(|r| {
+                Ok(setup::UniversalActivityRow {
+                    hour_day_id: r.hour_day_id,
+                    model_year_id: constants.year_id - r.age_id,
+                    source_type_id: r.source_type_id,
+                    activity: r.starts / divisor(r.hour_day_id)?,
+                })
             })
-            .collect(),
+            .collect::<moves_framework::Result<Vec<_>>>()?,
         _ => Vec::new(),
     };
     Ok(rows)

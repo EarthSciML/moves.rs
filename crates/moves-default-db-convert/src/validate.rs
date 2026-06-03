@@ -14,12 +14,19 @@
 //! from `SELECT * ORDER BY 1..N`.
 //! 4. **Per-column aggregates** — for every column whose Arrow type is
 //! `Int64` or `Float64`, recompute `count_non_null`, `min`, `max`,
-//! and `sum` from (a) the source TSV (parsed with the same rules the
-//! converter applies) and (b) the Parquet contents. The two must
-//! match. For Float64, exact equality is the contract: the converter
-//! parses TSV via `str::parse::<f64>`, the reader returns the same
-//! bit pattern, and we sum in a deterministic primary-key order so no
-//! floating-point reordering can creep in.
+//! and a `sum` signal from (a) the source TSV (parsed with the same
+//! rules the converter applies) and (b) the Parquet contents. The two
+//! must match. For Float64, the load-bearing checks are `count`,
+//! `min`, and `max`, which compare the exact f64 *bit patterns*: the
+//! converter parses TSV via `str::parse::<f64>`, the reader returns
+//! the same bit pattern, so any per-value divergence (including in
+//! tiny-magnitude emission-rate columns) shifts the min or max bits
+//! and is caught exactly. The Float64 `sum` is intentionally a coarse,
+//! order-independent corroborating signal only: values are scaled by
+//! 10^9, rounded, and accumulated as i128, so it deliberately collapses
+//! magnitudes below ~1e-9 to zero and does NOT detect sub-1e-9
+//! differences on its own. Do not rely on the float sum for fidelity
+//! of small-rate columns — the exact min/max/count checks carry that.
 //! 5. **First-row spot check** — read the first row from the source TSV
 //! and the first row from the first partition, compare field-by-field
 //! using the converter's TSV-decode rules. Catches obvious type/order
@@ -330,18 +337,27 @@ fn validate_table(
     let schema_tsv =
         crate::convert::find_tsv_case_insensitive_pub(&opts.tsv_dir, &entry.name, ".schema.tsv")?;
     let (Some(tsv_path), Some(schema_path)) = (tsv_match, schema_tsv) else {
- // Source TSV missing — that's fine if the manifest also has zero
- // rows; otherwise it's a hole worth flagging.
-        if parquet_rows != 0 {
+ // Source TSV missing. The whole module rests on the transitivity
+ // argument "TSV == MariaDB ground truth"; with no TSV we cannot
+ // cross-check the Parquet content at all. If the table is genuinely
+ // empty (parquet has zero rows and the manifest agrees) there is
+ // nothing to certify, so a Warning is appropriate. But a populated
+ // table with no source TSV means the data plane is being shipped
+ // unverified — that is a hard contract break, not a diagnostic, and
+ // must drive a non-zero exit so CI cannot pass with the cross-check
+ // silently skipped.
+        if parquet_rows != 0 || entry.row_count != 0 {
             push(
                 report,
                 &entry.name,
-                FindingKind::Warning,
+                FindingKind::RowContentError,
                 format!(
-                    "no source TSV/schema in {} but parquet has {} rows; \
-                 cannot validate row content",
+                    "no source TSV/schema in {} but table is non-empty \
+                 (parquet has {} rows, manifest reports {}); \
+                 cannot cross-check Parquet content against source",
                     opts.tsv_dir.display(),
-                    parquet_rows
+                    parquet_rows,
+                    entry.row_count
                 ),
             );
         }

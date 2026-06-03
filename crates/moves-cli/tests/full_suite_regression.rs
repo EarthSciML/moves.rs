@@ -65,12 +65,16 @@
 //! Point it at a different snapshot tree with
 //! `REGRESSION_SNAPSHOTS_DIR=<path>`.
 
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use moves_cli::{build_default_db_store, load_run_spec, run_simulation, RunOptions};
+use moves_cli::{
+    build_default_db_store, default_replaced_pollutants, load_run_spec, run_simulation, RunOptions,
+};
 use moves_snapshot::{
     compare_pollutant_sums, diff_snapshots, pollutant_sums_from_output_dir,
-    pollutant_sums_from_snapshot, DiffOptions, Snapshot, ToleranceConfig,
+    pollutant_sums_from_snapshot, zero_valued_replaced_rows, DiffOptions, Snapshot,
+    ToleranceConfig,
 };
 use tempfile::tempdir;
 
@@ -451,6 +455,14 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
         ("process-evap-leaks", ONROAD_REL_TOL, false), // ~1.6e-7
         ("process-evap-permeation", ONROAD_REL_TOL, false), // ~2.1e-7
         ("nr-commercial-nation", NONROAD_REL_TOL, false), // ~3.5e-3 (real*4)
+        // process-refueling: the chained RefuelingLossCalculator now runs (the
+        // engine's chainCalculator step), reads a synthesized RefuelingFuelType
+        // extract, gates output to THC (pollutant 1), and reconciles the
+        // regClass-collapsed energy MOVESWorkerOutput against the per-reg-class
+        // RefuelingControlTechnology in the displacement join. Displacement
+        // (1,18) = 1042 / 128 rows and spillage (1,19) = 451.05 / 208 rows both
+        // match canonical to f64 precision.
+        ("process-refueling", ONROAD_REL_TOL, false),
         // expand-criteria: inventory activity weighting now wired in
         // BaseRateCalculator (universalActivity = SHO / noOfRealDays applied as
         // ApplyActivity). Criteria pollutants (THC/CO/NOx) match canonical to
@@ -458,6 +470,29 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
         // (pollutant 91) and stay quarantined on the separate KJ→Million-BTU
         // output-unit conversion. See docs/known-divergences.md §4.4.
         ("expand-criteria", ONROAD_REL_TOL, false), // ~8.5e-8
+        // Speciation / chained-calculator fixtures graduated once the regClass
+        // collapse, SulfatePM pass-through doubling and NO/NO2 species doubling
+        // were fixed (see QUARANTINED_FIXTURES for the three root causes). Each
+        // now matches canonical to f64 summation drift.
+        ("chain-tog-speciation", ONROAD_REL_TOL, false), // HCSpeciation: 1/5/79/80/86 exact
+        ("chain-nonhaptog", ONROAD_REL_TOL, false),      // HCSpeciation: 1/5/79/80/86 exact
+        ("process-nox-speciation", ONROAD_REL_TOL, false), // NO/NO2/HONO: 3/32/33/34 exact
+        ("process-crankcase-running", ONROAD_REL_TOL, false), // crankcase THC: 1/2/3 exact
+        ("process-brakewear", ONROAD_REL_TOL, false),    // 91/106/116 exact
+        ("process-tirewear", ONROAD_REL_TOL, false),     // 91/107/117 exact
+        // AirToxics: extracts synthesized from the raw ratio tables + per-row
+        // formulation expansion (AT*FuelSupply). 1/20/24/25/79/87 exact.
+        ("process-airtoxics", ONROAD_REL_TOL, false),
+        // process-pm-exhaust: SulfatePM consume/replace of EC (112) / NonECPM
+        // (118). Three fixes: (1) execute emits the true per-key delta F − I so
+        // the additive engine reproduces canonical's DELETE+reinsert without
+        // double-counting; (2) the general fuel ratio is restricted to
+        // pollutant 120 (the sPMOneCountyYearGeneralFuelRatio extract filter),
+        // so EC is no longer wrongly rescaled; (3) the engine's
+        // `replaced_pollutants` mechanism drops BaseRate's zero-valued
+        // fuelType-9 (electricity) 112/118 rows the additive delta cannot
+        // cancel. 100/110/111/112/115/118/119 all exact to f64 drift.
+        ("process-pm-exhaust", ONROAD_REL_TOL, false),
         // process-apu was asserted-vacuous (canon 0 / port 0) only because the
         // month off-by-one blocked all BaseRate output. With that fixed the
         // BaseRate path now emits the process-91 / opMode-201,203 (APU /
@@ -507,26 +542,33 @@ const QUARANTINED_FIXTURES: &[&str] = &[
  // legitimate rows (separate/known). See docs/known-divergences.md §4.4.
     "process-apu",
     "mixed-onroad-nonroad",
- // UNDER-emit class — calculator-chain coverage gaps (a DIFFERENT bug from
- // the over-emit above): downstream speciation / chained calculators fire but
- // produce no rows for several pollutants/processes, so the port emits FEWER
- // rows than canonical. process-pm-exhaust emits only PM components 112/118
- // (the two BasicRunningPM produces) and is missing 100/110/111/115/119;
- // process-airtoxics / process-nox-speciation / chain-* emit one base
- // process's worth where canonical has the full speciated set; brakewear /
- // tirewear / crankcase-running under-emit a whole slice (and also carry the
- // activity-weighting mass gap). process-refueling emits the WRONG content // BaseRate energy (process 1 / pollutant 91) instead of refueling THC
- // (processes 18/19 / pollutant 1), whose calculator is not wired. See
- // docs/known-divergences.md §4.4 reported bug 3.
-    "chain-nonhaptog",
-    "chain-tog-speciation",
-    "process-airtoxics",
-    "process-brakewear",
-    "process-crankcase-running",
-    "process-nox-speciation",
-    "process-pm-exhaust",
-    "process-refueling",
-    "process-tirewear",
+ // Speciation / chained-calculator class. Three engine/calculator bugs in this
+ // class were FOUND and FIXED, GRADUATING chain-nonhaptog, chain-tog-speciation,
+ // process-crankcase-running, process-nox-speciation, process-brakewear and
+ // process-tirewear to asserted_fixtures (all exact to f64 drift):
+ //   (1) regClass collapse — the engine's `frame_to_emission_records` dropped
+ //       `regClassID` (and fuelSubType/engTech/sector/hp) when round-tripping a
+ //       calculator's output through the per-chunk MOVESWorkerOutput
+ //       accumulator, so chained speciators (HCSpeciation) keyed their ratio
+ //       lookups on regClass 0 and emitted nothing. Now preserved.
+ //   (2) SulfatePMCalculator re-emitted every pass-through row (its `calculate`
+ //       ports the SQL's in-place mutation and returns the full final state);
+ //       the chained engine ADDS emitted rows, so the upstream THC/NOx was
+ //       doubled. `execute` now emits only the delta versus its input.
+ //   (3) NOCalculator and NO2Calculator shared `build_inputs` and both resolved
+ //       every NO/NO2/HONO species, doubling 32/33/34. Each now filters
+ //       PollutantProcessAssoc to its own species, matching the per-calculator
+ //       canonical extract.
+ // process-airtoxics also GRADUATED: its AirToxicsCalculator extracts are now
+ // synthesized from the raw default-DB ratio tables (PollutantProcessAssoc join
+ // + modelYearGroupID expansion + the ATRatio FuelSupply join), and each worker
+ // row is expanded across its fuel type's formulations (the AT*FuelSupply join)
+ // so the ATRatioGas1 path keys on a concrete fuelFormulationID. The minor-HAP
+ // toxics 20/24/25 now match canonical to f64 drift (base 1/79/87 too).
+ // process-pm-exhaust ALSO GRADUATED: SulfatePM's consume/replace of EC (112)
+ // and NonECPM (118) is now exact via the true per-key delta emit, the general
+ // fuel ratio restricted to pollutant 120, and the engine's
+ // `replaced_pollutants` drop of BaseRate's zero fuelType-9 electricity rows.
  // NONROAD fixtures that emit nothing (port row count 0 vs a populated
  // canonical) or a wrong row count — population/sector-coverage gaps.
     "nr-agriculture-state",
@@ -577,10 +619,12 @@ fn canonical_snapshot_diff() {
     let root = snapshots_root();
     let fixtures = all_fixtures();
 
+    let only = std::env::var("MOVES_DIFF_ONLY").ok();
     let covered: Vec<&Path> = fixtures
         .iter()
         .map(|p| p.as_path())
         .filter(|p| canonical_present(&root, fixture_name(p)))
+        .filter(|p| only.as_deref().is_none_or(|n| fixture_name(p) == n))
         .collect();
 
     if covered.is_empty() {
@@ -608,26 +652,90 @@ fn canonical_snapshot_diff() {
     let mut passed = 0usize;
     let mut quarantined = 0usize;
 
+    // Pollutants a chained calculator consumes and replaces (SulfatePM's EC 112
+    // / NonECPM 118). The engine drops an upstream producer's zero-valued row
+    // for these — exact only while canonical never emits a zero row for one of
+    // them. The per-fixture guard below asserts that premise against every
+    // captured snapshot so a future violation fails loudly here instead of as
+    // an opaque row-count divergence.
+    let replaced_pollutants: BTreeSet<i64> = default_replaced_pollutants()
+        .expect("default replaced-pollutant set")
+        .into_iter()
+        .map(i64::from)
+        .collect();
+
     for fixture_path in covered {
         let name = fixture_name(fixture_path);
         let out = tempdir().expect("tempdir");
 
-        let outcome = run_simulation(&RunOptions {
-            runspec: fixture_path.to_path_buf(),
-            output: out.path().to_path_buf(),
-            max_parallel_chunks: 1,
-            calculator_dag: None,
-            run_date_time: Some("2026-05-21T00:00:00".to_string()),
+        // A fixture whose data plane is unported may now *panic* (the audit
+        // hardened several fabricated-neutral-value paths into `panic!`, per the
+        // operator decision that an honest crash beats wrong numbers). Catch it
+        // per-fixture so one unported nonroad fixture cannot abort the whole
+        // gate before the asserted (previously-correct) fixtures are verified.
+        // A caught panic/run-error is recorded as a failure and the fixture is
+        // skipped: an *asserted* fixture that does so simply never increments
+        // `passed`, surfacing the regression in the summary; a *quarantined*
+        // fixture is expected to be red anyway.
+        let run = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            run_simulation(&RunOptions {
+                runspec: fixture_path.to_path_buf(),
+                output: out.path().to_path_buf(),
+                max_parallel_chunks: 1,
+                calculator_dag: None,
+                run_date_time: Some("2026-05-21T00:00:00".to_string()),
  // Activate the data plane: calculators execute against the captured
  // execution DB and the engine writes the real MOVESOutput tree.
-            snapshot: Some(root.join(name)),
-            scale_input: None,
-            default_db: None,
-        })
-        .unwrap_or_else(|e| panic!("{name}: run error — {e}"));
+                snapshot: Some(root.join(name)),
+                scale_input: None,
+                default_db: None,
+            })
+        }));
+        let outcome = match run {
+            Ok(Ok(o)) => o,
+            Ok(Err(e)) => {
+                let tag = if asserted_fixtures().iter().any(|(n, _, _)| *n == name) {
+                    "RUN-ERROR(ASSERTED-REGRESSION)"
+                } else {
+                    "RUN-ERROR"
+                };
+                println!("{name:<28} {:>10} {:>10} {:>14} {tag}", "-", "-", "-");
+                failures.push(format!("{name}: run error — {e:#}"));
+                continue;
+            }
+            Err(panic) => {
+                let msg = panic
+                    .downcast_ref::<&str>()
+                    .map(|s| s.to_string())
+                    .or_else(|| panic.downcast_ref::<String>().cloned())
+                    .unwrap_or_else(|| "<non-string panic payload>".to_string());
+                let tag = if asserted_fixtures().iter().any(|(n, _, _)| *n == name) {
+                    "PANIC(ASSERTED-REGRESSION)"
+                } else {
+                    "PANIC"
+                };
+                println!("{name:<28} {:>10} {:>10} {:>14} {tag}", "-", "-", "-");
+                failures.push(format!("{name}: panicked — {msg}"));
+                continue;
+            }
+        };
 
         let canonical = match Snapshot::load(&root.join(name)) {
-            Ok(s) => pollutant_sums_from_snapshot(&s),
+            Ok(s) => {
+                // Guard the consume/replace zero-drop premise: canonical must
+                // not carry a zero-valued row for a replaced pollutant.
+                let zeros = zero_valued_replaced_rows(&s, &replaced_pollutants);
+                if !zeros.is_empty() {
+                    failures.push(format!(
+                        "{name}: canonical has zero-valued rows for replaced \
+                         pollutant(s) {zeros:?} — the engine drops producer zero \
+                         rows for these (SulfatePM consume/replace), so this \
+                         snapshot violates the premise and the drop must be \
+                         revisited (see Calculator::replaced_pollutants)"
+                    ));
+                }
+                pollutant_sums_from_snapshot(&s)
+            }
             Err(e) => {
                 println!("{name:<28} canonical load error: {e}");
                 failures.push(format!("{name}: canonical load error: {e}"));
@@ -1077,6 +1185,13 @@ fn default_db_snapshot_diff() {
     let mut passed = 0usize;
     let mut quarantined = 0usize;
 
+    // Same consume/replace zero-drop premise guard as `canonical_snapshot_diff`.
+    let replaced_pollutants: BTreeSet<i64> = default_replaced_pollutants()
+        .expect("default replaced-pollutant set")
+        .into_iter()
+        .map(i64::from)
+        .collect();
+
     for fixture_path in covered {
         let name = fixture_name(fixture_path);
         let out = tempdir().expect("tempdir");
@@ -1094,7 +1209,17 @@ fn default_db_snapshot_diff() {
         .unwrap_or_else(|e| panic!("{name}: run error — {e}"));
 
         let canonical = match Snapshot::load(&snap_root.join(name)) {
-            Ok(s) => pollutant_sums_from_snapshot(&s),
+            Ok(s) => {
+                let zeros = zero_valued_replaced_rows(&s, &replaced_pollutants);
+                if !zeros.is_empty() {
+                    failures.push(format!(
+                        "{name}: canonical has zero-valued rows for replaced \
+                         pollutant(s) {zeros:?} — violates the consume/replace \
+                         zero-drop premise (see Calculator::replaced_pollutants)"
+                    ));
+                }
+                pollutant_sums_from_snapshot(&s)
+            }
             Err(e) => {
                 println!("{name:<28} canonical load error: {e}");
                 failures.push(format!("{name}: canonical load error: {e}"));

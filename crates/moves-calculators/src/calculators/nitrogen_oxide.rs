@@ -789,13 +789,28 @@ impl TableRow for PollutantProcessModelYearRow {
     }
 }
 
-fn build_inputs(ctx: &CalculatorContext) -> Result<NitrogenOxideInputs, Error> {
+/// Build the calculator inputs, restricting the `PollutantProcessAssoc` to the
+/// `species` this calculator produces (NO + HONO for [`NOCalculator`], NO2 for
+/// [`NO2Calculator`]).
+///
+/// Canonical `NOCalculator.sql` / `NO2Calculator.sql` differ only in their
+/// extract: each loads `PollutantProcessAssoc WHERE pollutantID IN (its own
+/// species)` (NO2's is literally `pollutantID = 33`), so its inner join to
+/// `NONO2Ratio` resolves only its own species. The port shares
+/// [`compute_nitrogen_oxide`]; without this filter both calculators would load
+/// the full association table, resolve **every** species (32/33/34) and emit
+/// each one — doubling NO/NO2/HONO across the two calculators. Filtering here
+/// mirrors the per-calculator extract.
+fn build_inputs(ctx: &CalculatorContext, species: &[i32]) -> Result<NitrogenOxideInputs, Error> {
     let tables = ctx.tables();
     let filter = crate::wiring::position_filter(ctx);
     Ok(NitrogenOxideInputs {
         no_no2_ratio: tables.iter_typed::<NoNo2RatioRow>("NONO2Ratio")?,
         pollutant_process_assoc: tables
-            .iter_typed::<PollutantProcessAssocRow>("PollutantProcessAssoc")?,
+            .iter_typed::<PollutantProcessAssocRow>("PollutantProcessAssoc")?
+            .into_iter()
+            .filter(|ppa| species.contains(&ppa.pollutant_id))
+            .collect(),
         pollutant_process_model_year: tables
             .iter_typed::<PollutantProcessModelYearRow>("PollutantProcessMappedModelYear")?,
         source_use_type: tables
@@ -1072,7 +1087,8 @@ impl Calculator for NOCalculator {
     }
 
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
-        let inputs = build_inputs(ctx)?;
+        // NOCalculator produces NO (32) and HONO (34) — see NO_REGISTRATIONS.
+        let inputs = build_inputs(ctx, &[NO_POLLUTANT.0 as i32, HONO_POLLUTANT.0 as i32])?;
         let rows = self.calculate(&inputs);
         crate::wiring::emit_rows(rows)
     }
@@ -1175,7 +1191,8 @@ impl Calculator for NO2Calculator {
     }
 
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
-        let inputs = build_inputs(ctx)?;
+        // NO2Calculator produces only NO2 (33) — see NO2_REGISTRATIONS.
+        let inputs = build_inputs(ctx, &[NO2_POLLUTANT.0 as i32])?;
         let rows = self.calculate(&inputs);
         crate::wiring::emit_rows(rows)
     }

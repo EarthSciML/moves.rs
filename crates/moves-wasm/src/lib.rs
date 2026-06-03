@@ -111,7 +111,7 @@ use moves_nonroad::{
         PlanRecordingExecutor,
     },
 };
-use moves_runspec::{from_xml_str, GeoKind};
+use moves_runspec::{from_xml_str, GeoKind, RunSpec};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 
@@ -338,10 +338,60 @@ pub fn required_partition_paths(
     runspec_xml: &str,
     manifest_json: &str,
 ) -> Result<JsValue, JsValue> {
-    use std::collections::BTreeSet;
-
     let run_spec = from_xml_str(runspec_xml)
         .map_err(|e| JsValue::from_str(&format!("RunSpec parse error: {e}")))?;
+    let paths = required_partition_paths_inner(&run_spec, manifest_json)
+        .map_err(|e| JsValue::from_str(&e))?;
+    let arr = js_sys::Array::new();
+    for p in paths {
+        arr.push(&JsValue::from_str(&p));
+    }
+    Ok(arr.into())
+}
+
+/// Per-table geographic/time dimensions that the default-DB merge plan
+/// actually filters on. Derived from [`default_tables`]; a dimension is only
+/// applied to partition selection when the canonical spec declares a filter
+/// column for it. This matters for tables the conversion partitions by a
+/// dimension that the merge plan treats as a national wildcard — e.g.
+/// `hotellingActivityDistribution` is stored under `zone=990000` (the MOVES
+/// national-default zone) but the merge plan copies it wholesale, so its zone
+/// partition must NOT be filtered out by the run's geography.
+#[derive(Clone, Copy, Default)]
+struct TableFilterDims {
+    year: bool,
+    zone: bool,
+    county: bool,
+    state: bool,
+}
+
+/// Build the table-name → filtered-dimensions map from [`default_tables`].
+/// Keys are lower-cased table names (manifest names are matched case-insensitively).
+fn table_filter_dims() -> std::collections::HashMap<String, TableFilterDims> {
+    moves_framework::input::default_tables()
+        .into_iter()
+        .map(|s| {
+            (
+                s.table_name.to_ascii_lowercase(),
+                TableFilterDims {
+                    year: s.year_column.is_some(),
+                    zone: s.zone_column.is_some(),
+                    county: s.county_column.is_some(),
+                    state: s.state_column.is_some(),
+                },
+            )
+        })
+        .collect()
+}
+
+/// Pure core of [`required_partition_paths`]: compute the relative partition
+/// paths the run needs from a parsed [`RunSpec`] and the default-DB manifest
+/// JSON. Shared by the wasm-bindgen wrapper and native tests.
+fn required_partition_paths_inner(
+    run_spec: &RunSpec,
+    manifest_json: &str,
+) -> Result<Vec<String>, String> {
+    use std::collections::BTreeSet;
 
     // County IDs and derived zone / state IDs from the geographic selections.
     let mut county_ids: BTreeSet<i64> = BTreeSet::new();
@@ -363,19 +413,35 @@ pub fn required_partition_paths(
     let zone_ids: BTreeSet<i64> = county_ids.iter().map(|&c| c * 10).collect();
     let year_ids: BTreeSet<i64> = run_spec.timespan.years.iter().map(|&y| y as i64).collect();
 
-    let manifest: serde_json::Value = serde_json::from_str(manifest_json)
-        .map_err(|e| JsValue::from_str(&format!("manifest parse error: {e}")))?;
+    let dims_map = table_filter_dims();
+
+    let manifest: serde_json::Value =
+        serde_json::from_str(manifest_json).map_err(|e| format!("manifest parse error: {e}"))?;
 
     let tables = manifest["tables"]
         .as_array()
-        .ok_or_else(|| JsValue::from_str("manifest missing 'tables' array"))?;
+        .ok_or_else(|| "manifest missing 'tables' array".to_string())?;
 
-    let arr = js_sys::Array::new();
+    let mut out: Vec<String> = Vec::new();
     for table in tables {
         let strategy = table["partition_strategy"].as_str().unwrap_or("");
         if strategy == "schema_only" {
             continue;
         }
+
+        // Which dimensions the merge plan actually filters this table on.
+        // Unknown tables (not in the curated default-tables list) fall back to
+        // filtering on every partition dimension — the conservative default.
+        let table_name = table["name"].as_str().unwrap_or("");
+        let dims = dims_map
+            .get(&table_name.to_ascii_lowercase())
+            .copied()
+            .unwrap_or(TableFilterDims {
+                year: true,
+                zone: true,
+                county: true,
+                state: true,
+            });
 
         let partition_columns: Vec<String> = table["partition_columns"]
             .as_array()
@@ -409,17 +475,18 @@ pub fn required_partition_paths(
             if partition_path_needed(
                 &partition_columns,
                 &values,
+                &dims,
                 &county_ids,
                 &zone_ids,
                 &state_ids,
                 &year_ids,
             ) {
-                arr.push(&JsValue::from_str(path));
+                out.push(path.to_string());
             }
         }
     }
 
-    Ok(arr.into())
+    Ok(out)
 }
 
 /// Returns `true` when the partition described by `(columns, values)` is
@@ -431,6 +498,7 @@ pub fn required_partition_paths(
 fn partition_path_needed(
     columns: &[String],
     values: &[String],
+    dims: &TableFilterDims,
     county_ids: &std::collections::BTreeSet<i64>,
     zone_ids: &std::collections::BTreeSet<i64>,
     state_ids: &std::collections::BTreeSet<i64>,
@@ -438,11 +506,23 @@ fn partition_path_needed(
 ) -> bool {
     for (col, val) in columns.iter().zip(values.iter()) {
         let parsed: Option<i64> = val.parse().ok();
+        // A dimension is only filtered when the canonical merge plan declares a
+        // filter column for it (`dims.*`). Dimensions the plan treats as a
+        // national wildcard (e.g. hotellingActivityDistribution's zoneID) pass
+        // unconditionally so their default partition is never dropped.
         let ok = match col.as_str() {
-            "countyid" => county_ids.is_empty() || parsed.map_or(true, |v| county_ids.contains(&v)),
-            "zoneid" => zone_ids.is_empty() || parsed.map_or(true, |v| zone_ids.contains(&v)),
-            "stateid" => state_ids.is_empty() || parsed.map_or(true, |v| state_ids.contains(&v)),
-            "yearid" => year_ids.is_empty() || parsed.map_or(true, |v| year_ids.contains(&v)),
+            "countyid" => {
+                !dims.county || county_ids.is_empty() || parsed.map_or(true, |v| county_ids.contains(&v))
+            }
+            "zoneid" => {
+                !dims.zone || zone_ids.is_empty() || parsed.map_or(true, |v| zone_ids.contains(&v))
+            }
+            "stateid" => {
+                !dims.state || state_ids.is_empty() || parsed.map_or(true, |v| state_ids.contains(&v))
+            }
+            "yearid" => {
+                !dims.year || year_ids.is_empty() || parsed.map_or(true, |v| year_ids.contains(&v))
+            }
             _ => true,
         };
         if !ok {
@@ -586,6 +666,8 @@ pub fn run_simulation_from_partitions(
 /// ```json
 /// {
 /// "completion_message": "Successful completion — no warnings",
+/// "emission_rows": 0,
+/// "produces_emissions": false,
 /// "counters": {
 /// "scc_groups_planned": 12,
 /// "scc_groups_skipped": 0,
@@ -598,11 +680,17 @@ pub fn run_simulation_from_partitions(
 /// }
 /// ```
 ///
-/// Emission rows are not yet included in the WASM result — the production
-/// `GeographyExecutor` that evaluates the geography routines numerically
-/// lives in the native orchestrator and will be wired into the WASM build
-/// in a following task. The counters confirm that the driver loop ran
-/// correctly over the supplied population data.
+/// Emission rows are not yet computed in this WASM build. The driver loop
+/// runs with `PlanRecordingExecutor`, which records every geography-routine
+/// dispatch but evaluates none of them, so `emission_rows` is `0` and
+/// `produces_emissions` is `false`. (The native CLI `main.rs` is likewise a
+/// dry run.) The numerical `ProductionExecutor` requires a fully loaded
+/// `ReferenceData` bundle — temporal-factor, emission-factor, spillage, and
+/// allocation file loaders that are not yet portable to the `.POP`-only WASM
+/// input — and wiring it in is tracked as remaining work. Callers MUST check
+/// `produces_emissions` before treating the result as a numerical run: the
+/// counters confirm the loop ran over the supplied population data, not that
+/// emissions were produced.
 ///
 /// # Errors
 ///
@@ -669,6 +757,27 @@ pub fn run_nonroad_simulation(options_json: &str, pop_bytes: &[u8]) -> Result<Js
     let result = js_sys::Object::new();
     js_set_str(&result, "completion_message", &outputs.completion_message)?;
 
+ // Surface the emission-row count explicitly so a browser caller is
+ // not misled by the "Successful completion" banner. This WASM build
+ // drives the NONROAD loop with `PlanRecordingExecutor`, which records
+ // every dispatch but evaluates no geography routines, so `outputs.rows`
+ // is always empty (see `run_simulation` docs and the native CLI
+ // `main.rs`, which is likewise a dry run). The numerical
+ // `ProductionExecutor` needs a fully loaded `ReferenceData` bundle
+ // (temporal-factor / emission-factor / spillage / allocation file
+ // loaders) that is not yet portable to the `.POP`-only WASM input, so
+ // wiring it in is tracked as remaining work. Reporting the row count
+ // (and a `produces_emissions` flag) makes the dry-run nature of this
+ // result explicit instead of silently implying emissions were computed.
+    let emission_rows = outputs.rows.len();
+    js_set_num(&result, "emission_rows", emission_rows as f64)?;
+    js_sys::Reflect::set(
+        &result,
+        &JsValue::from_str("produces_emissions"),
+        &JsValue::from_bool(emission_rows > 0),
+    )
+    .map_err(|_| JsValue::from_str("failed to set produces_emissions"))?;
+
     let counters_obj = js_sys::Object::new();
     let c = &outputs.counters;
     js_set_num(
@@ -721,6 +830,7 @@ fn nonroad_inputs_from_pop(
         hp_avg,
         population,
         year,
+        usage,
         ..
     } in records
     {
@@ -729,11 +839,14 @@ fn nonroad_inputs_from_pop(
             hp_avg,
             population,
             pop_year: year,
-            // The .POP demo input carries no source-use-type table, so there is
-            // no medianLifeFullLoad to supply. 0.0 is the documented sentinel:
-            // the geography routines fall back to a neutral lifespan when
-            // median_life is non-positive (see DriverRecord::median_life).
-            median_life: 0.0,
+ // Median life at full load comes straight from the `.POP`
+ // record's usage field (cols 88–92, Fortran `usehrs(icurec)` set
+ // in `getpop.f` :127/:221) — it is NOT a fabricated default. It is
+ // passed through to `scrptime` as `uselif` (`modyr.f` :153), which
+ // applies the canonical `uselif .LE. 0 => 1.0` fallback itself
+ // (`modyr.f` :165). Forwarding the parsed value preserves the real
+ // per-record lifespan instead of forcing every record to 0.0.
+            median_life: usage,
         };
         if let Some(&idx) = scc_to_idx.get(&scc) {
             groups[idx].1.push(driver_rec);
@@ -924,49 +1037,9 @@ mod tests {
             .expect("sample RunSpec must have a county selection");
         assert_eq!(county_id, 26161);
 
-        // Build the path list using the pure-Rust helper.
-        let mut county_ids = std::collections::BTreeSet::new();
-        county_ids.insert(county_id);
-        let zone_ids: std::collections::BTreeSet<i64> =
-            county_ids.iter().map(|&c| c * 10).collect();
-        let state_ids: std::collections::BTreeSet<i64> =
-            county_ids.iter().map(|&c| c / 1000).collect();
-        let year_ids: std::collections::BTreeSet<i64> =
-            run_spec.timespan.years.iter().map(|&y| y as i64).collect();
-
-        let manifest: serde_json::Value = serde_json::from_str(manifest_json).unwrap();
-        let mut paths: Vec<String> = Vec::new();
-        for table in manifest["tables"].as_array().unwrap() {
-            let strategy = table["partition_strategy"].as_str().unwrap_or("");
-            if strategy == "schema_only" {
-                continue;
-            }
-            let cols: Vec<String> = table["partition_columns"]
-                .as_array()
-                .unwrap_or(&vec![])
-                .iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_ascii_lowercase()))
-                .collect();
-            for partition in table["partitions"].as_array().unwrap_or(&vec![]) {
-                let path = partition["path"].as_str().unwrap_or("");
-                let values: Vec<String> = partition["values"]
-                    .as_array()
-                    .unwrap_or(&vec![])
-                    .iter()
-                    .filter_map(|v| v.as_str().map(str::to_string))
-                    .collect();
-                if partition_path_needed(
-                    &cols,
-                    &values,
-                    &county_ids,
-                    &zone_ids,
-                    &state_ids,
-                    &year_ids,
-                ) {
-                    paths.push(path.to_string());
-                }
-            }
-        }
+        // Build the path list using the real selection logic.
+        let paths = required_partition_paths_inner(&run_spec, manifest_json)
+            .expect("partition selection must succeed");
 
         // Monolithic table must always be included.
         assert!(
@@ -1133,6 +1206,81 @@ mod tests {
             .map(|(p, b)| (p.to_string_lossy().into_owned(), b))
             .collect();
         Ok(("ok".to_string(), output))
+    }
+
+    /// Reproduce the live demo's Default-DB onroad simulation natively, reading
+    /// the partition tree from `$MOVES_DDB_DIR`. Uses the real
+    /// [`required_partition_paths_inner`] selection logic, then reads the
+    /// selected paths off disk. Ignored by default — run with:
+    ///   MOVES_DDB_DIR=/tmp/ddb/movesdb20241112 \
+    ///   cargo test -p moves-wasm repro_default_db_onroad -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn repro_default_db_onroad() {
+        let Ok(dir) = std::env::var("MOVES_DDB_DIR") else {
+            panic!("set MOVES_DDB_DIR to the extracted default-DB tree");
+        };
+        let root = std::path::PathBuf::from(&dir);
+        let runspec_xml = match std::env::var("MOVES_RUNSPEC") {
+            Ok(p) => std::fs::read_to_string(&p).expect("read runspec"),
+            Err(_) => {
+                include_str!("../../../characterization/fixtures/sample-runspec.xml").to_string()
+            }
+        };
+        let runspec_xml = runspec_xml.as_str();
+
+        let run_spec = from_xml_str(runspec_xml).expect("runspec parse");
+
+        // Use the real selection logic to pick which partitions to load.
+        let manifest_json =
+            std::fs::read_to_string(root.join("manifest.json")).expect("read manifest.json");
+        let paths =
+            required_partition_paths_inner(&run_spec, &manifest_json).expect("partition selection");
+        let files: Vec<(String, Vec<u8>)> = paths
+            .iter()
+            .filter_map(|p| std::fs::read(root.join(p)).ok().map(|b| (p.clone(), b)))
+            .collect();
+        eprintln!("selected {} partition files", files.len());
+        use moves_framework::DataFrameStore;
+        let mut store = default_db::load_partitions_to_store(&files).expect("load partitions");
+        eprintln!("store has {} tables after load", store.names().len());
+        default_db::setup_execution_store(&run_spec, &mut store).expect("setup store");
+        let geography = default_db::load_geography_from_store(&store).expect("geography");
+
+        let registry = build_registry().expect("registry");
+        let config = EngineConfig {
+            output_root: std::path::PathBuf::from(""),
+            max_parallel_chunks: 1,
+            run_spec_file_name: None,
+            run_date_time: None,
+            collect_output_in_memory: true,
+        };
+        let mut engine = MOVESEngine::new(run_spec.clone(), registry, config);
+        engine = engine.with_slow_store(store);
+        engine
+            .execution_run_spec_mut()
+            .build_execution_locations(&geography);
+
+        // Diagnostics: planned modules and chunk grouping.
+        if let Ok(modules) = engine.planned_modules() {
+            eprintln!("planned_modules ({}): {:?}", modules.len(), modules);
+        }
+        if let Ok(chunks) = engine.planned_chunks() {
+            eprintln!("chunks: {}", chunks.len());
+            for (i, c) in chunks.iter().enumerate() {
+                eprintln!("  chunk[{i}]: {:?}", c.modules());
+            }
+        }
+
+        match engine.run() {
+            Ok(outcome) => {
+                eprintln!("SUCCESS: {} output file(s)", outcome.output_bytes.len());
+                eprintln!("modules_executed: {:?}", outcome.modules_executed);
+            }
+            Err(e) => {
+                panic!("engine.run() failed: {e}");
+            }
+        }
     }
 
     /// Build a 130-char fixed-width `.POP` record, matching the column layout

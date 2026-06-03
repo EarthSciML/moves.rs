@@ -46,6 +46,7 @@
 //! [`MOVESEngine::execution_run_spec_mut`] drives the full
 //! `state → county → zone → link` nest immediately.
 
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -77,7 +78,7 @@ mod wasm_instant {
     }
 }
 
-use crate::data::InMemoryStore;
+use crate::data::{DataFrameStore, InMemoryStore};
 
 use moves_data::output_schema::{ActivityRecord, EmissionRecord, MovesRunRecord, OutputTable};
 use moves_data::{PollutantId, ProcessId};
@@ -246,12 +247,29 @@ impl ModuleInstance {
         }
     }
 
- /// Run the module against `ctx`. Returns the calculator's emission
- /// DataFrame if any, or `None` for generators and empty outputs.
- ///
- /// Accepts `&mut CalculatorContext` so generators can write to
- /// `ctx.scratch_mut()`. Calculators receive a shared `&CalculatorContext`
- /// via the automatic coercion from `&mut`.
+    /// The module's calculator/generator name (for diagnostics).
+    fn name(&self) -> &'static str {
+        match self {
+            ModuleInstance::Calculator(c) => c.name(),
+            ModuleInstance::Generator(g) => g.name(),
+        }
+    }
+
+    /// Pollutants this module consumes/replaces (calculators only; generators
+    /// produce no emission rows and replace nothing).
+    fn replaced_pollutants(&self) -> &[i32] {
+        match self {
+            ModuleInstance::Calculator(c) => c.replaced_pollutants(),
+            ModuleInstance::Generator(_) => &[],
+        }
+    }
+
+    /// Run the module against `ctx`. Returns the calculator's emission
+    /// DataFrame if any, or `None` for generators and empty outputs.
+    ///
+    /// Accepts `&mut CalculatorContext` so generators can write to
+    /// `ctx.scratch_mut()`. Calculators receive a shared `&CalculatorContext`
+    /// via the automatic coercion from `&mut`.
     fn execute(&self, ctx: &mut CalculatorContext) -> Result<Option<DataFrame>> {
         match self {
             ModuleInstance::Calculator(c) => Ok(c.execute(ctx)?.into_dataframe()),
@@ -302,6 +320,27 @@ struct CalculatorMasterLoopable {
     activity_acc: Arc<Mutex<Vec<ActivityRecord>>>,
  /// Run hash stamped into every accumulated [`EmissionRecord`] and [`ActivityRecord`].
     run_hash: Arc<str>,
+    /// The RunSpec's user-selected `(pollutantID, processID)` pairs. Emission
+    /// rows whose pair is absent are dropped before aggregation — canonical
+    /// writes `MOVESOutput` from the selected `pollutantProcessIDs` only, so the
+    /// intermediate pollutants a calculator produces to feed a chained
+    /// downstream (e.g. BaseRate's Total Energy 91/process-1 feeding refueling)
+    /// never reach the final output. An empty set imposes no filter (the
+    /// unit-test contexts that drive a stub calculator with no selections).
+    selected_pol_proc: Arc<BTreeSet<(u16, u16)>>,
+    /// Pollutants a chained calculator in this chunk consumes and replaces
+    /// (e.g. SulfatePM's EC 112 / NonECPM 118). A producer's *zero-valued* row
+    /// for one of these is dropped before the output aggregator — the chained
+    /// calculator's delta cannot cancel it, and canonical's delete removed it.
+    /// Still fed to `worker_acc` so the chained calculator sees the full input.
+    /// Empty imposes no filter.
+    replaced_pol: Arc<BTreeSet<i32>>,
+    /// Per-chunk `MOVESWorkerOutput` accumulator — the *unfiltered* emission
+    /// rows (including chain-prerequisite intermediates like BaseRate energy)
+    /// the chunk's chained calculators read after the master loop completes.
+    /// `None` for chunks with no chained calculators, so the accumulation cost
+    /// is paid only where it is needed.
+    worker_acc: Option<Arc<Mutex<Vec<EmissionRecord>>>>,
 }
 
 impl MasterLoopable for CalculatorMasterLoopable {
@@ -315,15 +354,64 @@ impl MasterLoopable for CalculatorMasterLoopable {
         let df = {
             let mut ctx = self.ctx.lock().expect("CalculatorContext mutex poisoned");
             ctx.set_position(context.position);
-            self.module.execute(&mut ctx)?
+            let out = self.module.execute(&mut ctx)?;
+ // A generator writes its output tables to scratch; promote them into the
+ // slow tier so downstream calculators in this chunk — which read every
+ // input through `ctx.tables()` — observe them. (Calculators write no
+ // scratch, so this is skipped for them.)
+            if matches!(*self.module, ModuleInstance::Generator(_)) {
+                ctx.promote_scratch();
+            }
+            out
  // ctx lock released here — conversion and accumulator write happen outside
         };
         if let Some(df) = df {
             if df.height() > 0 {
                 if df.column("pollutantID").is_ok() {
- // Emission output: stream into the running group-by aggregator.
-                    let records = frame_to_emission_records(&df, &self.run_hash);
+                    // Emission output: stream into the running group-by aggregator.
+                    let mut records = frame_to_emission_records(&df, &self.run_hash);
                     drop(df);
+                    // Feed the per-chunk MOVESWorkerOutput accumulator the
+                    // *unfiltered* rows so chained calculators see the
+                    // chain-prerequisite intermediates (e.g. BaseRate energy).
+                    if let Some(acc) = &self.worker_acc {
+                        acc.lock()
+                            .expect("worker accumulator poisoned")
+                            .extend(records.iter().cloned());
+                    }
+                    // Drop intermediate pollutants the RunSpec never selected
+                    // (chain prerequisites such as BaseRate energy 91/1) before
+                    // they reach the aggregator — the worker-level filter
+                    // canonical applies via `pollutantProcessIDs`. Done here,
+                    // pre-aggregation, while the rows still carry processID
+                    // (the aggregator may NULL it for runs that don't break the
+                    // output down by process).
+                    if !self.selected_pol_proc.is_empty() {
+                        records.retain(|r| match (r.pollutant_id, r.process_id) {
+                            (Some(p), Some(proc)) => u16::try_from(p)
+                                .ok()
+                                .zip(u16::try_from(proc).ok())
+                                .is_some_and(|pair| self.selected_pol_proc.contains(&pair)),
+                            _ => true,
+                        });
+                    }
+                    // Drop a producer's zero-valued row for any pollutant a
+                    // chained calculator in this chunk consumes and replaces
+                    // (e.g. SulfatePM's EC 112 / NonECPM 118). The chained delta
+                    // cannot cancel a 0 (0 − 0 = 0); canonical's `delete …`
+                    // removed it. The row already reached `worker_acc` above, so
+                    // the chained calculator still sees the full input. Canonical
+                    // never emits a zero row for a replaced pollutant.
+                    if !self.replaced_pol.is_empty() {
+                        records.retain(|r| {
+                            let is_replaced = r
+                                .pollutant_id
+                                .is_some_and(|p| self.replaced_pol.contains(&i32::from(p)));
+                            let is_zero = r.emission_quant.unwrap_or(0.0) == 0.0
+                                && r.emission_rate.unwrap_or(0.0) == 0.0;
+                            !(is_replaced && is_zero)
+                        });
+                    }
                     self.streaming_agg
                         .lock()
                         .expect("output accumulator poisoned")
@@ -488,7 +576,8 @@ impl MOVESEngine {
     pub fn planned_chunks(&self) -> Result<Vec<Chunk>> {
         let modules = self.planned_modules()?;
         let refs: Vec<&str> = modules.iter().map(String::as_str).collect();
-        chunk_chains(&self.registry, &refs)
+        let provided: BTreeSet<&str> = self.slow_store.names().into_iter().collect();
+        chunk_chains(&self.registry, &refs, &provided)
     }
 
  /// Execute the run: plan and chunk the calculator graph, drive one
@@ -510,7 +599,8 @@ impl MOVESEngine {
         let t_plan_start = Instant::now();
         let modules_planned = self.planned_modules()?;
         let module_refs: Vec<&str> = modules_planned.iter().map(String::as_str).collect();
-        let chunks = chunk_chains(&self.registry, &module_refs)?;
+        let provided_tables: BTreeSet<&str> = self.slow_store.names().into_iter().collect();
+        let chunks = chunk_chains(&self.registry, &module_refs, &provided_tables)?;
         let planning_time = t_plan_start.elapsed();
 
  // Shared, immutable per-run iteration plan handed to every chunk's
@@ -543,10 +633,29 @@ impl MOVESEngine {
         let run_record = self.build_run_record();
         let run_hash_str: Arc<str> = run_record.run_hash.clone().into();
 
- // Build the emission aggregation plan upfront so the streaming
- // accumulator can fold records directly into running group-by sums
- // during execution rather than buffering raw rows until run end.
- // Peak memory is bounded by N_distinct_groups, not N_raw_rows.
+        // The RunSpec's user-selected (pollutant, process) pairs — the
+        // worker-output filter each calculator adapter applies before
+        // aggregation. Use `run_spec` (the raw selections), NOT
+        // `execution.pollutant_process_associations` (the *expanded* set that
+        // adds the chain prerequisites we must drop, e.g. BaseRate energy 91/1).
+        let selected_pol_proc: Arc<BTreeSet<(u16, u16)>> = Arc::new(
+            self.execution
+                .run_spec
+                .pollutant_process_associations
+                .iter()
+                .filter_map(|a| {
+                    Some((
+                        u16::try_from(a.pollutant_id).ok()?,
+                        u16::try_from(a.process_id).ok()?,
+                    ))
+                })
+                .collect(),
+        );
+
+        // Build the emission aggregation plan upfront so the streaming
+        // accumulator can fold records directly into running group-by sums
+        // during execution rather than buffering raw rows until run end.
+        // Peak memory is bounded by N_distinct_groups, not N_raw_rows.
         let agg_inputs = aggregation_inputs_from_run_spec(&self.execution.run_spec);
         let emission_plan = emission_aggregation(&agg_inputs);
         let activity_plan = activity_aggregation(&agg_inputs);
@@ -605,22 +714,51 @@ impl MOVESEngine {
                 ctx.set_model_scale(run_scale);
                 ctx
             }));
-            for name in chunk.modules() {
-                let Some(instance) = instantiate(registry, name) else {
-                    continue;
-                };
-                let module = Arc::new(instance);
- // One MasterLoop subscription per declared calculator
- // subscription, all sharing the single module instance and
- // the chunk's CalculatorContext.
+            // Instantiate the chunk's modules (topologically ordered, upstream
+            // first). A module that declares MasterLoop subscriptions is a
+            // *producer*, driven by the loop; one with no subscriptions is a
+            // *chained* calculator (the canonical `subscribeToMe` chaining),
+            // run after the loop against the accumulated `MOVESWorkerOutput`.
+            let chunk_modules: Vec<Arc<ModuleInstance>> = chunk
+                .modules()
+                .iter()
+                .filter_map(|name| instantiate(registry, name).map(Arc::new))
+                .collect();
+            let chained: Vec<Arc<ModuleInstance>> = chunk_modules
+                .iter()
+                .filter(|m| m.subscriptions().is_empty())
+                .cloned()
+                .collect();
+            // Only accumulate the worker output when the chunk has chained
+            // calculators that will read it.
+            let worker_acc: Option<Arc<Mutex<Vec<EmissionRecord>>>> =
+                (!chained.is_empty()).then(|| Arc::new(Mutex::new(Vec::new())));
+
+            // Pollutants any chained calculator in this chunk consumes and
+            // replaces (SulfatePM's EC 112 / NonECPM 118). Producers drop their
+            // zero-valued rows for these before the output aggregator.
+            let replaced_pol: Arc<BTreeSet<i32>> = Arc::new(
+                chained
+                    .iter()
+                    .flat_map(|m| m.replaced_pollutants().iter().copied())
+                    .collect(),
+            );
+
+            for module in &chunk_modules {
+                // One MasterLoop subscription per declared calculator
+                // subscription, all sharing the single module instance and
+                // the chunk's CalculatorContext.
                 for sub in module.subscriptions() {
                     let adapter = Arc::new(CalculatorMasterLoopable {
-                        module: Arc::clone(&module),
+                        module: Arc::clone(module),
                         gate_process: sub.process_id,
                         ctx: Arc::clone(&chunk_ctx),
                         streaming_agg: Arc::clone(&streaming_agg_ref),
                         activity_acc: Arc::clone(&activity_acc_ref),
                         run_hash: Arc::clone(&run_hash_str),
+                        selected_pol_proc: Arc::clone(&selected_pol_proc),
+                        replaced_pol: Arc::clone(&replaced_pol),
+                        worker_acc: worker_acc.clone(),
                     });
                     master.subscribe(MasterLoopableSubscription::new(
                         sub.granularity,
@@ -630,6 +768,98 @@ impl MOVESEngine {
                 }
             }
             master.run()?;
+
+            // Chained-calculator execution — the canonical `chainCalculator`
+            // step the MasterLoop cannot drive (chained calculators declare no
+            // subscriptions). After the producers populate the per-chunk
+            // `MOVESWorkerOutput`, run each chained calculator in topological
+            // order: it reads the accumulated worker output, emits its rows
+            // (accumulated for the next chained calculator and folded into the
+            // aggregator under the same RunSpec-selection filter the producers
+            // use).
+            if let Some(acc) = &worker_acc {
+                for module in &chained {
+                    let worker_df = {
+                        let recs = acc.lock().expect("worker accumulator poisoned");
+                        emission_records_to_worker_df(&recs)?
+                    };
+                    // Relevance gate. A chained calculator transforms the
+                    // accumulated `MOVESWorkerOutput`. With no accumulated input
+                    // the chunk is vacuous — the producers emitted nothing (a
+                    // legitimately empty slice), or the loop never descended to a
+                    // real year/location iteration. There is genuinely no work to
+                    // do, so skip rather than dispatch into a context the
+                    // calculator cannot resolve (a year-less position makes
+                    // AirToxics / criteria calculators fail on `modelYearID =
+                    // year - ageID`). This is not hiding a fault: a producer that
+                    // *should* have emitted but did not surfaces as a row-count
+                    // divergence in the gate, not here.
+                    //
+                    // When input IS present, run the calculator and propagate any
+                    // `execute` error. A failure here means a real data/logic
+                    // problem (e.g. a NULL in a ratio table, a missing column, a
+                    // type mismatch) — it must surface as an error even if this
+                    // run does not select the calculator's output, rather than be
+                    // silently swallowed and masked until some later run depends
+                    // on it. The underlying data problem is the thing to fix.
+                    if worker_df.height() == 0 {
+                        if std::env::var_os("MOVES_DEBUG_CHAINED").is_some() {
+                            eprintln!(
+                                "[chained-skip] {} — no accumulated worker input (vacuous chunk)",
+                                module.name()
+                            );
+                        }
+                        continue;
+                    }
+                    let out = {
+                        let mut ctx = chunk_ctx.lock().expect("CalculatorContext mutex poisoned");
+                        ctx.tables_mut().insert("MOVESWorkerOutput", worker_df);
+                        module.execute(&mut ctx)?
+                    };
+                    let Some(df) = out else {
+                        if std::env::var_os("MOVES_DEBUG_CHAINED").is_some() {
+                            eprintln!("[chained-empty] {} returned no DataFrame", module.name());
+                        }
+                        continue;
+                    };
+                    if df.height() == 0 || df.column("pollutantID").is_err() {
+                        if std::env::var_os("MOVES_DEBUG_CHAINED").is_some() {
+                            eprintln!(
+                                "[chained-empty] {} emitted {} rows (pollutantID present: {})",
+                                module.name(),
+                                df.height(),
+                                df.column("pollutantID").is_ok()
+                            );
+                        }
+                        continue;
+                    }
+                    if std::env::var_os("MOVES_DEBUG_CHAINED").is_some() {
+                        eprintln!("[chained-ok] {} emitted {} rows", module.name(), df.height());
+                    }
+                    let records = frame_to_emission_records(&df, &run_hash_str);
+                    acc.lock()
+                        .expect("worker accumulator poisoned")
+                        .extend(records.iter().cloned());
+                    let filtered: Vec<EmissionRecord> = if selected_pol_proc.is_empty() {
+                        records
+                    } else {
+                        records
+                            .into_iter()
+                            .filter(|r| match (r.pollutant_id, r.process_id) {
+                                (Some(p), Some(proc)) => u16::try_from(p)
+                                    .ok()
+                                    .zip(u16::try_from(proc).ok())
+                                    .is_some_and(|pair| selected_pol_proc.contains(&pair)),
+                                _ => true,
+                            })
+                            .collect()
+                    };
+                    streaming_agg_ref
+                        .lock()
+                        .expect("output accumulator poisoned")
+                        .extend(&filtered, &UnitScaling)?;
+                }
+            }
             let elapsed = t_chunk.elapsed();
  // Find the slot that corresponds to this chunk by pointer identity.
  // Safe: `chunk` is a reference into the `chunks` slice that was
@@ -911,6 +1141,76 @@ fn apply_energy_unit_conversion(records: &mut [EmissionRecord], factor: f64) {
     }
 }
 
+/// Materialise the accumulated chunk emissions as a `MOVESWorkerOutput`
+/// `DataFrame` for chained calculators to read.
+///
+/// Chained calculators (refueling, PM/TOG/airtoxics speciation, …) read their
+/// inputs from the `MOVESWorkerOutput` table the upstream producers populate.
+/// The port routes producer emissions only into the streaming aggregator, so
+/// this rebuilds the table from the per-chunk accumulator. The 24 columns are
+/// 1:1 with [`EmissionRecord`]; downstream `iter_typed` readers project and cast
+/// the subset they need.
+fn emission_records_to_worker_df(records: &[EmissionRecord]) -> Result<DataFrame> {
+    use polars::prelude::{Column, NamedFrom, Series};
+    // Canonical `MOVESWorkerOutput` carries non-null id columns (0 = "aggregated
+    // away"); the port's `EmissionRecord` uses `None` for the same. Coalesce
+    // `None → 0` so chained readers (which require non-null ids) succeed.
+    let i32_col = |name: &str, f: &dyn Fn(&EmissionRecord) -> Option<i32>| -> Column {
+        Series::new(
+            name.into(),
+            records
+                .iter()
+                .map(|r| f(r).unwrap_or(0))
+                .collect::<Vec<i32>>(),
+        )
+        .into()
+    };
+    let f64_col = |name: &str, f: &dyn Fn(&EmissionRecord) -> Option<f64>| -> Column {
+        Series::new(
+            name.into(),
+            records
+                .iter()
+                .map(|r| f(r).unwrap_or(0.0))
+                .collect::<Vec<f64>>(),
+        )
+        .into()
+    };
+    let cols = vec![
+        i32_col("MOVESRunID", &|r| Some(i32::from(r.moves_run_id))),
+        i32_col("iterationID", &|r| r.iteration_id.map(i32::from)),
+        i32_col("yearID", &|r| r.year_id.map(i32::from)),
+        i32_col("monthID", &|r| r.month_id.map(i32::from)),
+        i32_col("dayID", &|r| r.day_id.map(i32::from)),
+        i32_col("hourID", &|r| r.hour_id.map(i32::from)),
+        i32_col("stateID", &|r| r.state_id.map(i32::from)),
+        i32_col("countyID", &|r| r.county_id),
+        i32_col("zoneID", &|r| r.zone_id),
+        i32_col("linkID", &|r| r.link_id),
+        i32_col("pollutantID", &|r| r.pollutant_id.map(i32::from)),
+        i32_col("processID", &|r| r.process_id.map(i32::from)),
+        i32_col("sourceTypeID", &|r| r.source_type_id.map(i32::from)),
+        i32_col("regClassID", &|r| r.reg_class_id.map(i32::from)),
+        i32_col("fuelTypeID", &|r| r.fuel_type_id.map(i32::from)),
+        i32_col("fuelSubTypeID", &|r| r.fuel_sub_type_id.map(i32::from)),
+        i32_col("modelYearID", &|r| r.model_year_id.map(i32::from)),
+        i32_col("roadTypeID", &|r| r.road_type_id.map(i32::from)),
+        Series::new(
+            "SCC".into(),
+            records
+                .iter()
+                .map(|r| r.scc.clone())
+                .collect::<Vec<Option<String>>>(),
+        )
+        .into(),
+        i32_col("engTechID", &|r| r.eng_tech_id.map(i32::from)),
+        i32_col("sectorID", &|r| r.sector_id.map(i32::from)),
+        i32_col("hpID", &|r| r.hp_id.map(i32::from)),
+        f64_col("emissionQuant", &|r| r.emission_quant),
+        f64_col("emissionRate", &|r| r.emission_rate),
+    ];
+    DataFrame::new(records.len(), cols).map_err(|e| crate::Error::Polars(e.to_string()))
+}
+
 /// Build an [`AggregationInputs`] from a [`RunSpec`].
 fn aggregation_inputs_from_run_spec(run_spec: &RunSpec) -> AggregationInputs<'_> {
     AggregationInputs {
@@ -920,11 +1220,21 @@ fn aggregation_inputs_from_run_spec(run_spec: &RunSpec) -> AggregationInputs<'_>
         domain: run_spec.domain,
         models: &run_spec.models,
         breakdown: &run_spec.output_breakdown,
-        output_population: false,
+        // `outputPopulation` (canonical `ExecutionRunSpec.getRunSpec().outputPopulation`,
+        // RunSpecXML `<outputpopulation>`). In the Rust model this is the
+        // Nonroad output flag `population`; absent => false.
+        output_population: run_spec.output_nonroad.population.unwrap_or(false),
+        // Canonical `OutputEmissionsBreakdownSelection.sector`, parsed from the
+        // `<sector>`/`<segment>` element (RunSpecXML.java:1206 treats them as the
+        // same flag). The Rust model surfaces it as `output_breakdown.segment`.
+        sector: run_spec.output_breakdown.segment,
+        // The canonical `regClassID`, `fuelSubType`, and `engTechID` breakdown
+        // flags (`<regclassid>`/`<fuelsubtype>`/`<engtechid>`) are not yet
+        // captured by the Rust RunSpec model (`OutputBreakdown` lacks these
+        // fields), so they cannot be wired here without extending moves-runspec.
         reg_class_id: false,
         fuel_sub_type: false,
         eng_tech_id: false,
-        sector: false,
     }
 }
 
@@ -951,6 +1261,19 @@ fn frame_to_emission_records(df: &DataFrame, run_hash: &str) -> Vec<EmissionReco
     let model_year_ca = df.column("modelYearID").ok().and_then(|s| s.i32().ok());
     let fuel_type_ca = df.column("fuelTypeID").ok().and_then(|s| s.i32().ok());
     let road_type_ca = df.column("roadTypeID").ok().and_then(|s| s.i32().ok());
+    // Worker-output dimension columns that the chained calculators
+    // (HCSpeciation, AirToxics, Crankcase) join their ratio tables on. The
+    // producing calculators (BaseRate) emit a concrete `regClassID` /
+    // `fuelSubTypeID`; preserve them through the accumulator so the
+    // post-master-loop chained calculators see them. The final-output
+    // aggregation collapses these away by its breakdown flags regardless of the
+    // record value, so reading them here does not change the user-facing output
+    // (but does make a `regClassID`-breakdown RunSpec emit the right value).
+    let reg_class_ca = df.column("regClassID").ok().and_then(|s| s.i32().ok());
+    let fuel_sub_type_ca = df.column("fuelSubTypeID").ok().and_then(|s| s.i32().ok());
+    let eng_tech_ca = df.column("engTechID").ok().and_then(|s| s.i32().ok());
+    let sector_ca = df.column("sectorID").ok().and_then(|s| s.i32().ok());
+    let hp_ca = df.column("hpID").ok().and_then(|s| s.i32().ok());
     let emission_ca = df.column("emissionQuant").ok().and_then(|s| s.f64().ok());
  // Optional explicit SCC column (nonroad emits its own 10-digit SCC, which
  // the onroad dimension-formula below cannot reconstruct).
@@ -998,15 +1321,15 @@ fn frame_to_emission_records(df: &DataFrame, run_hash: &str) -> Vec<EmissionReco
                 pollutant_id: pollutant_ca.and_then(|c| c.get(i)).map(|v| v as i16),
                 process_id: process_v.map(|v| v as i16),
                 source_type_id: source_type_v.map(|v| v as i16),
-                reg_class_id: None,
+                reg_class_id: reg_class_ca.and_then(|c| c.get(i)).map(|v| v as i16),
                 fuel_type_id: fuel_type_v.map(|v| v as i16),
-                fuel_sub_type_id: None,
+                fuel_sub_type_id: fuel_sub_type_ca.and_then(|c| c.get(i)).map(|v| v as i16),
                 model_year_id: model_year_ca.and_then(|c| c.get(i)).map(|v| v as i16),
                 road_type_id: road_type_v.map(|v| v as i16),
                 scc,
-                eng_tech_id: None,
-                sector_id: None,
-                hp_id: None,
+                eng_tech_id: eng_tech_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+                sector_id: sector_ca.and_then(|c| c.get(i)).map(|v| v as i16),
+                hp_id: hp_ca.and_then(|c| c.get(i)).map(|v| v as i16),
                 emission_quant: emission_ca.and_then(|c| c.get(i)),
                 emission_rate: None,
                 run_hash: run_hash.to_string(),
@@ -1498,6 +1821,9 @@ mod tests {
             streaming_agg: stub_streaming_agg(),
             activity_acc: Arc::new(Mutex::new(Vec::new())),
             run_hash: Arc::from("test"),
+            selected_pol_proc: Arc::new(std::collections::BTreeSet::new()),
+            replaced_pol: Arc::new(std::collections::BTreeSet::new()),
+            worker_acc: None,
         };
 
         let mut ctx = MasterLoopContext::default();
@@ -1532,6 +1858,9 @@ mod tests {
             streaming_agg: stub_streaming_agg(),
             activity_acc: Arc::new(Mutex::new(Vec::new())),
             run_hash: Arc::from("test"),
+            selected_pol_proc: Arc::new(std::collections::BTreeSet::new()),
+            replaced_pol: Arc::new(std::collections::BTreeSet::new()),
+            worker_acc: None,
         };
         let mut ctx = MasterLoopContext::default();
         ctx.position.process_id = Some(ProcessId(1));

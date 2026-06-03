@@ -532,10 +532,12 @@ fn project_constant(
         .map(|r| ((r.fuel_type_id, r.eng_tech_id), r.fuel_eng_fraction))
         .collect();
 
-    // The SQL `JOIN defaultavft d USING (sourceTypeID, fuelTypeID, engTechID)`
-    // — the future-year rows take their (fuel, eng) skeleton from the
-    // defaults so we always emit the same (fuel × eng) cardinality as
-    // the defaults.
+    // The SQL `... FROM inputGapFilledAVFT i join defaultavft d
+    // USING (sourceTypeID, fuelTypeID, engTechID)` is an INNER join: only
+    // (fuel, eng) combinations present in BOTH the last_my baseline and the
+    // default future-year skeleton produce an output row. A default future
+    // (fuel, eng) with no last_my baseline match is dropped, not zero-filled —
+    // do not fabricate a 0.0 fraction for it.
     let future_keys: BTreeSet<(FuelTypeId, EngTechId, ModelYearId)> = default
         .rows_for_source_type(source_type_id)
         .filter(|r| r.model_year_id > last_my && r.model_year_id <= analysis_year)
@@ -543,7 +545,9 @@ fn project_constant(
         .collect();
 
     for (fuel, eng, my) in future_keys {
-        let frac = baseline.get(&(fuel, eng)).copied().unwrap_or(0.0);
+        let Some(frac) = baseline.get(&(fuel, eng)).copied() else {
+            continue;
+        };
         output.insert(AvftRecord::new(source_type_id, my, fuel, eng, frac));
     }
     Ok(())
@@ -639,17 +643,21 @@ fn project_known_fractions(
         if *is_known {
             continue;
         }
-        let def = default
-            .get(&AvftKey {
-                source_type_id: k.source_type_id,
-                model_year_id: k.model_year_id,
-                fuel_type_id: k.fuel_type_id,
-                eng_tech_id: k.eng_tech_id,
-            })
-            .unwrap_or(*frac);
-        let min = def / BOUNDARY_RATIO_LIMIT;
-        if *frac < min {
-            *frac = min;
+        // INNER join to defaultavft on (sourceTypeID, fuelTypeID, engTechID,
+        // modelYearID) — the SQL `UPDATE outputavft o, defaultavft d ...`. When
+        // no matching default row exists the join yields no row, so the clamp
+        // does not fire. Mirror that (and the sibling `enforce_minimum_boundary`)
+        // by skipping the clamp entirely, rather than fabricating a default.
+        if let Some(def) = default.get(&AvftKey {
+            source_type_id: k.source_type_id,
+            model_year_id: k.model_year_id,
+            fuel_type_id: k.fuel_type_id,
+            eng_tech_id: k.eng_tech_id,
+        }) {
+            let min = def / BOUNDARY_RATIO_LIMIT;
+            if *frac < min {
+                *frac = min;
+            }
         }
     }
 

@@ -293,12 +293,30 @@ impl Calculator for WellToPumpProcessor {
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let tables = ctx.tables();
         let year: Vec<YearRow> = tables.iter_typed("Year")?;
+        // The canonical `WellToPumpCalculator.sql` substitutes every
+        // `##context.year##` (the GREET interpolation bracket and the
+        // `WTPFactorByFuelType` join, lines 93–145) before the script runs;
+        // an unresolved one is a hard preprocessor failure, never a silent
+        // default. A `None` context year here means the calculator was
+        // dispatched at a granularity coarser than YEAR. Fabricating
+        // `year.first()` (an arbitrary Year row) or `0` would silently shift
+        // the GREET interpolation bracket and the surviving fuel supply,
+        // scaling Total Energy Consumption by a wrong WTP factor — surface it
+        // rather than fabricate. `IterationPosition` has no dedicated error
+        // variant, so reuse `RowExtraction` (its documented "value was null
+        // where a non-null value is required" case), as
+        // `CriteriaStartCalculator::execute` does.
         let target_year = ctx
             .position()
             .time
             .year
             .map(i32::from)
-            .unwrap_or_else(|| year.first().map(|y| y.year_id).unwrap_or(0));
+            .ok_or_else(|| Error::RowExtraction {
+                table: "IterationPosition".into(),
+                row: ctx.position().iteration as usize,
+                column: "year".into(),
+                message: "required run-context scalar is unresolved (None)".into(),
+            })?;
         let inputs = WtpInputs {
             greet: tables.iter_typed::<GreetWellToPumpRow>("GREETWellToPump")?,
             fuel_supply: tables.iter_typed::<FuelSupplyRow>("FuelSupply")?,
@@ -512,6 +530,7 @@ mod tests {
 
     #[test]
     fn execute_returns_nonempty_dataframe_for_minimal_inputs() {
+        use moves_framework::execution::execution_db::{ExecutionTime, IterationPosition};
         use moves_framework::{DataFrameStore, InMemoryStore, TableRow};
         let inputs = minimal_inputs();
         let mut store = InMemoryStore::new();
@@ -540,7 +559,14 @@ mod tests {
             "MOVESWorkerOutput",
             WorkerOutputRow::into_dataframe(inputs.worker_output).unwrap(),
         );
-        let ctx = CalculatorContext::with_tables(store);
+        // `execute` now requires a resolved context year (the SQL substitutes
+        // `##context.year##` before running); supply the run year (2020) the
+        // minimal inputs are keyed to.
+        let pos = IterationPosition {
+            time: ExecutionTime::year(2020),
+            ..IterationPosition::default()
+        };
+        let ctx = CalculatorContext::with_position_and_tables(pos, store);
         let out = WellToPumpProcessor.execute(&ctx).expect("execute ok");
         let df = out.dataframe().expect("output should contain a DataFrame");
         assert_eq!(df.height(), 1, "minimal inputs produce exactly one row");

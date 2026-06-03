@@ -200,6 +200,25 @@ impl CalculatorContext {
         &mut self.scratch
     }
 
+ /// Make generator scratch output visible to calculators that read the slow
+ /// tier through [`tables`](Self::tables).
+ ///
+ /// Generators write their output tables (SHO, BaseRateByAge, …) to
+ /// [`scratch_mut`](Self::scratch_mut), but most calculators read every
+ /// input — default-DB and generator-produced alike — through
+ /// `ctx.tables()`. This copies the scratch tables into the slow store
+ /// (cheap `Arc` clones; `Arc::make_mut` clones the chunk's slow store only
+ /// on first write) so both read paths resolve generator output. Scratch is
+ /// left intact, so the calculators that read `ctx.scratch()` directly keep
+ /// working.
+    pub fn promote_scratch(&mut self) {
+        if self.scratch.store.is_empty() {
+            return;
+        }
+        let slow = std::sync::Arc::make_mut(&mut self.slow);
+        self.scratch.store.copy_into(slow);
+    }
+
  /// Current MasterLoop iteration / location / time triple.
     #[must_use]
     pub fn position(&self) -> &IterationPosition {
@@ -350,6 +369,28 @@ pub trait Calculator: Send + Sync + std::fmt::Debug {
  ///
  /// Default empty: calculator authors fill this in as they port.
     fn input_tables(&self) -> &[&'static str] {
+        &[]
+    }
+
+ /// Pollutants this (chained) calculator **consumes and replaces** in the
+ /// worker output — the canonical `delete from MOVESWorkerOutput where
+ /// pollutantID = …` that a speciation calculator runs before re-inserting
+ /// its adjusted/split values (e.g. `SulfatePMCalculator` deletes EC 112 and
+ /// NonECPM 118).
+ ///
+ /// The additive chained engine cannot delete a row, so an upstream
+ /// producer's *zero-valued* row for such a pollutant — which the chained
+ /// calculator's per-key delta cannot cancel (`0 − 0 = 0`) — would survive
+ /// into the final output where canonical removed it (e.g. BaseRate's
+ /// fuelType-9 electricity EC/NonECPM zeros). The engine therefore drops a
+ /// producer's zero-valued row for any replaced pollutant before it reaches
+ /// the output aggregator; it still reaches the per-chunk worker accumulator
+ /// the chained calculator reads, and non-zero rows are kept and corrected by
+ /// the chained calculator's delta. Canonical never emits a zero row for a
+ /// replaced pollutant, so this is exact.
+ ///
+ /// Default empty: only consume/replace speciation calculators override it.
+    fn replaced_pollutants(&self) -> &[i32] {
         &[]
     }
 

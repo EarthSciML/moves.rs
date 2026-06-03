@@ -280,12 +280,24 @@ impl Calculator for Ch4N2oWtpCalculator {
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let tables = ctx.tables();
         let year: Vec<YearRow> = tables.iter_typed("Year")?;
-        let target_year = ctx
-            .position()
-            .time
-            .year
-            .map(i32::from)
-            .unwrap_or_else(|| year.first().map(|y| y.year_id).unwrap_or(0));
+        // `CH4N2OWTPCalculator.sql` substitutes the MasterLoop `##context.year##`
+        // directly into the GREET interpolation bracket queries and the
+        // `y.yearID = wf.yearID` join with no documented fallback. An absent
+        // context year is a configuration error, not a defaultable condition:
+        // substituting `0` (or an arbitrary `Year`-table row) would silently
+        // clamp every well-to-pump CH4/N2O factor to the earliest tabulated
+        // GREET year instead of the run year's interpolated rate. Propagate
+        // instead. `IterationPosition` has no dedicated error variant; reuse
+        // `RowExtraction` (its documented "value was null where a non-null
+        // value is required" case) keyed to a synthetic table, matching
+        // `CriteriaStartCalculator`.
+        let pos = ctx.position();
+        let target_year = pos.time.year.map(i32::from).ok_or_else(|| Error::RowExtraction {
+            table: "IterationPosition".into(),
+            row: pos.iteration as usize,
+            column: "year".into(),
+            message: "required run-context year is unresolved (None)".into(),
+        })?;
         let inputs = WtpInputs {
             greet: tables.iter_typed::<GreetWellToPumpRow>("GREETWellToPump")?,
             fuel_supply: tables.iter_typed::<FuelSupplyRow>("FuelSupply")?,
@@ -535,7 +547,15 @@ mod tests {
             "MOVESWorkerOutput",
             WorkerOutputRow::into_dataframe(inputs.worker_output).unwrap(),
         );
-        let ctx = CalculatorContext::with_tables(store);
+        // `execute` requires the MasterLoop `##context.year##`; supply it
+        // through the position (the default `with_tables` context leaves it
+        // `None`, which `execute` now rejects).
+        use moves_framework::execution::execution_db::{ExecutionTime, IterationPosition};
+        let pos = IterationPosition {
+            time: ExecutionTime::year(2020),
+            ..IterationPosition::default()
+        };
+        let ctx = CalculatorContext::with_position_and_tables(pos, store);
         let out = Ch4N2oWtpCalculator.execute(&ctx).expect("execute ok");
         let df = out.dataframe().expect("output should contain a DataFrame");
         assert!(df.height() > 0, "minimal inputs produce at least one row");

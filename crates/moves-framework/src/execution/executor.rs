@@ -215,7 +215,11 @@ impl Chunk {
 /// Returns [`Error::CyclicChain`] if the dependency subgraph induced on a
 /// chunk contains a cycle. The MOVES calculator chain is acyclic by
 /// construction, so this signals malformed input data.
-pub fn chunk_chains(registry: &CalculatorRegistry, names: &[&str]) -> Result<Vec<Chunk>> {
+pub fn chunk_chains(
+    registry: &CalculatorRegistry,
+    names: &[&str],
+    provided_tables: &BTreeSet<&str>,
+) -> Result<Vec<Chunk>> {
  // BTreeSet → deterministic, de-duplicated iteration order.
     let members: BTreeSet<&str> = names.iter().copied().collect();
     if members.is_empty() {
@@ -235,6 +239,55 @@ pub fn chunk_chains(registry: &CalculatorRegistry, names: &[&str]) -> Result<Vec
             if let Some(&other) = members.get(dependency.as_str()) {
                 adjacency.entry(name).or_default().insert(other);
                 adjacency.entry(other).or_default().insert(name);
+            }
+        }
+    }
+
+ // Producer→consumer table-dependency edges. The chain DAG (`depends_on`)
+ // only links calculator-to-calculator chains; it does NOT connect a
+ // generator to the calculators that read the scratch tables it produces.
+ // Without these edges a generator lands in its own singleton chunk, and
+ // because scratch is per-chunk-isolated, its output never reaches the
+ // consumer — the consumer then fails with "table not found in store".
+ //
+ // Connect any consumer whose `input_tables()` intersect a producer's
+ // `output_tables()` so producer and consumer share a chunk (and thus a
+ // `CalculatorContext`). Execution order within the chunk is handled by the
+ // MasterLoop's (granularity, priority) sort — generators fire before the
+ // emission calculators — so the undirected grouping is all chunking needs.
+ //
+ // `provided_tables` lists tables already present in the run's slow tier
+ // (e.g. a snapshot's pre-computed generator outputs). Such a table needs
+ // no edge: every chunk reads it directly through the shared, read-only
+ // slow tier, so co-chunking the generator would only let it re-run and
+ // clobber the authoritative snapshot value via `promote_scratch`. Skipping
+ // these edges keeps the generator in its own chunk (harmless — its output
+ // is already available) and preserves the chained-calculator chunk shape.
+    let mut producers_by_table: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+    for &name in &members {
+        if let Some(outputs) = registry.module_output_tables_of(name) {
+            for table in outputs {
+                if provided_tables.contains(table.as_str()) {
+                    continue;
+                }
+                producers_by_table.entry(table.as_str()).or_default().push(name);
+            }
+        }
+    }
+    for &name in &members {
+        let Some(inputs) = registry.module_input_tables_of(name) else {
+            continue;
+        };
+        for table in inputs {
+            let Some(producers) = producers_by_table.get(table.as_str()) else {
+                continue;
+            };
+            for &producer in producers {
+                if producer == name {
+                    continue;
+                }
+                adjacency.entry(name).or_default().insert(producer);
+                adjacency.entry(producer).or_default().insert(name);
             }
         }
     }
@@ -552,7 +605,7 @@ mod tests {
     #[test]
     fn chunk_chains_empty_input_yields_no_chunks() {
         let reg = registry("Registration\tCO\t2\tRunning Exhaust\t1\tBaseRateCalculator\n");
-        assert!(chunk_chains(&reg, &[]).unwrap().is_empty());
+        assert!(chunk_chains(&reg, &[], &std::collections::BTreeSet::new()).unwrap().is_empty());
     }
 
     #[test]
@@ -563,7 +616,7 @@ mod tests {
              Subscribe\tBanana\tRunning Exhaust\t1\tMONTH\tEMISSION_CALCULATOR\n\
              Subscribe\tCherry\tRunning Exhaust\t1\tMONTH\tEMISSION_CALCULATOR\n",
         );
-        let chunks = chunk_chains(&reg, &["Cherry", "Apple", "Banana"]).unwrap();
+        let chunks = chunk_chains(&reg, &["Cherry", "Apple", "Banana"], &std::collections::BTreeSet::new()).unwrap();
         assert_eq!(chunks.len(), 3);
  // Chunk order is by smallest member name, independent of input order.
         assert_eq!(chunks[0].modules(), ["Apple"]);
@@ -581,7 +634,7 @@ mod tests {
              Chain\tRoot\tUpstreamGen\n\
              Chain\tLeaf\tRoot\n",
         );
-        let chunks = chunk_chains(&reg, &["Leaf", "Root", "UpstreamGen"]).unwrap();
+        let chunks = chunk_chains(&reg, &["Leaf", "Root", "UpstreamGen"], &std::collections::BTreeSet::new()).unwrap();
         assert_eq!(chunks.len(), 1);
  // Topologically ordered: producers before consumers.
         assert_eq!(chunks[0].modules(), ["UpstreamGen", "Root", "Leaf"]);
@@ -600,7 +653,7 @@ mod tests {
              Chain\tRootA\tGenA\n\
              Chain\tRootB\tGenB\n",
         );
-        let chunks = chunk_chains(&reg, &["RootA", "RootB", "GenA", "GenB"]).unwrap();
+        let chunks = chunk_chains(&reg, &["RootA", "RootB", "GenA", "GenB"], &std::collections::BTreeSet::new()).unwrap();
         assert_eq!(chunks.len(), 2);
  // Component reachable from "GenA" sorts first (smallest member).
         assert_eq!(members(&chunks[0]), ["GenA", "RootA"]);
@@ -620,9 +673,9 @@ mod tests {
              Subscribe\tGenA\tRunning Exhaust\t1\tPROCESS\tGENERATOR\n\
              Chain\tRootA\tGenA\n",
         );
-        let one = chunk_chains(&reg, &["GenA", "RootA", "RootB"]).unwrap();
-        let two = chunk_chains(&reg, &["RootB", "GenA", "RootA"]).unwrap();
-        let three = chunk_chains(&reg, &["RootA", "RootB", "GenA"]).unwrap();
+        let one = chunk_chains(&reg, &["GenA", "RootA", "RootB"], &std::collections::BTreeSet::new()).unwrap();
+        let two = chunk_chains(&reg, &["RootB", "GenA", "RootA"], &std::collections::BTreeSet::new()).unwrap();
+        let three = chunk_chains(&reg, &["RootA", "RootB", "GenA"], &std::collections::BTreeSet::new()).unwrap();
         assert_eq!(one, two);
         assert_eq!(two, three);
     }
@@ -630,7 +683,7 @@ mod tests {
     #[test]
     fn chunk_chains_treats_unknown_module_as_singleton() {
         let reg = registry("Registration\tCO\t2\tRunning Exhaust\t1\tBaseRateCalculator\n");
-        let chunks = chunk_chains(&reg, &["BaseRateCalculator", "NotInDag"]).unwrap();
+        let chunks = chunk_chains(&reg, &["BaseRateCalculator", "NotInDag"], &std::collections::BTreeSet::new()).unwrap();
         assert_eq!(chunks.len(), 2);
         assert_eq!(chunks[0].modules(), ["BaseRateCalculator"]);
         assert_eq!(chunks[1].modules(), ["NotInDag"]);

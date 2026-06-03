@@ -348,8 +348,13 @@ impl TableRow for DriveScheduleAssocRow {
             .map_err(|e| row_err(t, 0, "driveScheduleID", e.to_string()))?
             .i32()
             .map_err(|e| row_err(t, 0, "driveScheduleID", e.to_string()))?;
- // `isRamp` defaults to 'N' (non-ramp) in MOVES, and some snapshots omit
- // the column entirely. Treat an absent column — and any NULL within it // as non-ramp, matching the MOVES default rather than erroring.
+ // `isRamp` defaults to 'N' (non-ramp) in MOVES, and canonical's
+ // `DriveScheduleAssoc` table declares only sourceTypeID/roadTypeID/
+ // driveScheduleID (CreateDefault.sql:393-397) — it carries NO `isRamp`
+ // column, so the captured snapshots legitimately omit it. Treat an absent
+ // column — and any NULL within it — as non-ramp, matching the MOVES default
+ // rather than erroring (the audit's strict variant demanded a column
+ // canonical's table does not have, breaking previously-correct runs).
         let is_ramp = df
             .column("isRamp")
             .ok()

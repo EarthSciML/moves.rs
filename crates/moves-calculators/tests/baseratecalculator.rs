@@ -417,19 +417,40 @@ fn emission_rate_adjustment_scales_mean_and_emission_rate() {
 #[test]
 fn ev_efficiency_divides_through_the_efficiency_product() {
  // divisor = battery * charging = 0.5 * 0.5 = 0.25.
+ //
+ // EVEfficiency only applies to electricity (fuelTypeID 9), and the raw
+ // row is expanded over its [beginModelYearID, endModelYearID] range,
+ // keeping only model years whose age (`year - modelYearID`) maps to the
+ // row's ageGroupID via AgeCategory. Here year 2020, modelYear 2018 ->
+ // ageID 2 -> ageGroupID 3, so the row covers the base rate's 2018 bin.
     let flags = ModuleFlags {
         ev_efficiency: true,
         ..ModuleFlags::default()
     };
+    let mut ev_base = base_rate_row(2, 1, 4.0, 8.0);
+    ev_base.fuel_type_id = 9;
     let inputs = BaseRateCalculatorInputs {
-        base_rate: vec![base_rate_row(2, 1, 4.0, 8.0)],
-        fuel_supply: fuel_supply_one(),
+        base_rate: vec![ev_base],
+        fuel_supply: vec![FuelSupplyRow {
+            county_id: 1,
+            year_id: 2020,
+            month_id: 7,
+            fuel_type_id: 9,
+            fuel_sub_type_id: 90,
+            fuel_formulation_id: 0,
+            market_share: 1.0,
+        }],
+        age_category: vec![AgeCategoryRow {
+            age_id: 2,
+            age_group_id: 3,
+        }],
         ev_efficiency: vec![EvEfficiencyRow {
             pol_process_id: 201,
             source_type_id: 21,
             reg_class_id: 10,
-            fuel_type_id: 1,
-            model_year_id: 2018,
+            age_group_id: 3,
+            begin_model_year_id: 2018,
+            end_model_year_id: 2018,
             battery_efficiency: 0.5,
             charging_efficiency: 0.5,
         }],

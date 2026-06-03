@@ -1419,6 +1419,8 @@ struct NrAirToxicsMwoRow {
     fuel_type_id: i32,
     eng_tech_id: i32,
     hp_id: i32,
+    fuel_sub_type_id: i32,
+    fuel_formulation_id: i32,
     model_year_id: i32,
     road_type_id: i32,
     emission_quant: f64,
@@ -1446,6 +1448,8 @@ impl TableRow for NrAirToxicsMwoRow {
             ("fuelTypeID".into(), DataType::Int32),
             ("engTechID".into(), DataType::Int32),
             ("hpID".into(), DataType::Int32),
+            ("fuelSubTypeID".into(), DataType::Int32),
+            ("fuelFormulationID".into(), DataType::Int32),
             ("modelYearID".into(), DataType::Int32),
             ("roadTypeID".into(), DataType::Int32),
             ("emissionQuant".into(), DataType::Float64),
@@ -1529,6 +1533,18 @@ impl TableRow for NrAirToxicsMwoRow {
                 )
                 .into(),
                 Series::new(
+                    "fuelSubTypeID".into(),
+                    rows.iter().map(|r| r.fuel_sub_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelFormulationID".into(),
+                    rows.iter()
+                        .map(|r| r.fuel_formulation_id)
+                        .collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
                     "modelYearID".into(),
                     rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>(),
                 )
@@ -1580,6 +1596,8 @@ impl TableRow for NrAirToxicsMwoRow {
         let fuel_type = get_i32("fuelTypeID")?;
         let eng_tech = get_i32("engTechID")?;
         let hp = get_i32("hpID")?;
+        let fuel_sub_type = get_i32("fuelSubTypeID")?;
+        let fuel_formulation = get_i32("fuelFormulationID")?;
         let model_year = get_i32("modelYearID")?;
         let road_type = get_i32("roadTypeID")?;
         let emission_quant = get_f64("emissionQuant")?;
@@ -1602,6 +1620,12 @@ impl TableRow for NrAirToxicsMwoRow {
                     fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
                     eng_tech_id: eng_tech.get(i).ok_or_else(|| null("engTechID"))?,
                     hp_id: hp.get(i).ok_or_else(|| null("hpID"))?,
+                    fuel_sub_type_id: fuel_sub_type
+                        .get(i)
+                        .ok_or_else(|| null("fuelSubTypeID"))?,
+                    fuel_formulation_id: fuel_formulation
+                        .get(i)
+                        .ok_or_else(|| null("fuelFormulationID"))?,
                     model_year_id: model_year.get(i).ok_or_else(|| null("modelYearID"))?,
                     road_type_id: road_type.get(i).ok_or_else(|| null("roadTypeID"))?,
                     emission_quant: emission_quant.get(i).ok_or_else(|| null("emissionQuant"))?,
@@ -1698,8 +1722,8 @@ impl Calculator for NrAirToxicsCalculator {
                     hp_id: row.hp_id,
                 },
                 emissions: vec![Emission {
-                    fuel_sub_type_id: 0,
-                    fuel_formulation_id: 0,
+                    fuel_sub_type_id: row.fuel_sub_type_id,
+                    fuel_formulation_id: row.fuel_formulation_id,
                     emission_quant: row.emission_quant,
                     emission_rate: row.emission_rate,
                 }],
@@ -1721,6 +1745,8 @@ impl Calculator for NrAirToxicsCalculator {
                         fuel_type_id: row.fuel_type_id,
                         eng_tech_id: row.eng_tech_id,
                         hp_id: row.hp_id,
+                        fuel_sub_type_id: emission.fuel_sub_type_id,
+                        fuel_formulation_id: emission.fuel_formulation_id,
                         model_year_id: row.model_year_id,
                         road_type_id: row.road_type_id,
                         emission_quant: emission.emission_quant,
@@ -1745,6 +1771,8 @@ impl Calculator for NrAirToxicsCalculator {
                         fuel_type_id: row.fuel_type_id,
                         eng_tech_id: row.eng_tech_id,
                         hp_id: row.hp_id,
+                        fuel_sub_type_id: emission.fuel_sub_type_id,
+                        fuel_formulation_id: emission.fuel_formulation_id,
                         model_year_id: row.model_year_id,
                         road_type_id: row.road_type_id,
                         emission_quant: emission.emission_quant,
@@ -2538,6 +2566,8 @@ mod tests {
                 fuel_type_id: 1,
                 eng_tech_id: 10,
                 hp_id: 5,
+                fuel_sub_type_id: 0,
+                fuel_formulation_id: 0,
                 model_year_id: 0,
                 road_type_id: 0,
                 emission_quant: 100.0,

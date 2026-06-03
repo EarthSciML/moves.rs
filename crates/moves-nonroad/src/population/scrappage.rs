@@ -106,7 +106,14 @@ pub fn select_scrappage(
  // column carries its own percent values per bin.
     let mut curve = Vec::with_capacity(alts.rows.len());
     for row in &alts.rows {
-        let percent = row.percents.get(idx).copied().unwrap_or(0.0);
+        // rdalt.f initializes `altpct(i,j)` to 100.0 and substitutes
+        // 100.0 ("fully scrapped") for any blank/absent percent column
+        // (rdalt.f loops 10/20 and the else branch of loop 40). Mirror
+        // that documented default here rather than fabricating 0.0
+        // (no scrappage), which is the opposite and would overstate the
+        // surviving population. (The parser guarantees `idx` is in range
+        // today, so this fallback is currently unreachable.)
+        let percent = row.percents.get(idx).copied().unwrap_or(100.0);
         curve.push(ScrappagePoint {
             bin: row.bin,
             percent,

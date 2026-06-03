@@ -184,6 +184,17 @@ const H2O_POLLUTANT: i32 = 119;
 /// final output (the SQL's unconditional `delete … where pollutantID = 120`).
 const NON_EC_NON_SO4_PM_POLLUTANT: i32 = 120;
 
+/// The four PM species the `crankcaseSplit` working table carries — EC (112),
+/// Sulfate (115), H2O (119) and NonECNonSO4PM (120). The canonical extract
+/// keeps only these `crankcaseEmissionRatio.polProcessID` pollutants (SQL:
+/// `polProcessID in (112*100+p, 115*100+p, 119*100+p, 120*100+p)`).
+const CRANKCASE_SPLIT_POLLUTANTS: [i32; 4] = [
+    EC_POLLUTANT,
+    SULFATE_POLLUTANT,
+    H2O_POLLUTANT,
+    NON_EC_NON_SO4_PM_POLLUTANT,
+];
+
 /// Primary Exhaust PM2.5 - Total — `Pollutant` id 110. The sum of EC, sulfate,
 /// water and the residue, produced only when the optional `MakePM2.5Total`
 /// section is enabled.
@@ -668,15 +679,21 @@ impl SulfatePMCalculator {
         let crankcase_index = index_crankcase_split(&inputs.crankcase_split);
         let mut spm_output2: Vec<EmissionRow> = Vec::new();
         for row in &spm_output {
-            let Some(splits) = crankcase_index.get(&(
-                row.pollutant_id,
-                row.fuel_type_id,
-                row.source_type_id,
-                row.reg_class_id,
-            )) else {
+            let Some(splits) =
+                crankcase_index.get(&(row.pollutant_id, row.fuel_type_id, row.source_type_id))
+            else {
                 continue;
             };
             for split in splits {
+                // SQL `s.regClassID = mwo.regClassID`, reconciled for a
+                // regClass-collapsed worker output: when the worker row carries
+                // a concrete reg class, enforce equality; when it is the
+                // aggregated `0`, treat reg class as a wildcard (the split rows
+                // for the row's `(pollutant, fuel, source)` share one reg class
+                // per source type, so this stays unambiguous).
+                if row.reg_class_id != 0 && split.reg_class_id != row.reg_class_id {
+                    continue;
+                }
                 if row.model_year_id < split.min_model_year_id
                     || row.model_year_id > split.max_model_year_id
                 {
@@ -867,21 +884,24 @@ fn compute_sulfate_fractions(
 /// Index the pre-aggregated general fuel-effect ratios by the seven id columns
 /// the SQL's `UPDATE` joins on.
 /// Index the crankcase split fractions by `(pollutantID, fuelTypeID,
-/// sourceTypeID, regClassID)` — the SQL's crankcase-split join key. The
-/// model-year window is left on each row; a cell may carry several rows (the
-/// primary and crankcase process, and overlapping model-year windows).
+/// sourceTypeID)` — the SQL's crankcase-split join key minus `regClassID`. The
+/// SQL joins on `regClassID` too, but the `MOVESWorkerOutput` BaseRate emits is
+/// collapsed over `regClassID` (every emitted row carries `regClassID = 0`,
+/// matching canonical's `baseRateOutput`) whenever the RunSpec does not break
+/// emissions down by reg class — so a literal `s.regClassID = mwo.regClassID`
+/// would never match the per-reg-class `crankcaseEmissionRatio` rows. The
+/// caller reconciles this: it keeps the `regClassID` on each split row and
+/// applies the equality only when the worker row carries a concrete (non-zero)
+/// reg class, treating a collapsed `0` as a wildcard. The model-year window is
+/// left on each row; a cell may carry several rows (the primary and crankcase
+/// process, and overlapping model-year windows).
 fn index_crankcase_split(
     rows: &[CrankcaseSplitRow],
-) -> FxHashMap<(i32, i32, i32, i32), Vec<&CrankcaseSplitRow>> {
-    let mut index: FxHashMap<(i32, i32, i32, i32), Vec<&CrankcaseSplitRow>> = FxHashMap::default();
+) -> FxHashMap<(i32, i32, i32), Vec<&CrankcaseSplitRow>> {
+    let mut index: FxHashMap<(i32, i32, i32), Vec<&CrankcaseSplitRow>> = FxHashMap::default();
     for row in rows {
         index
-            .entry((
-                row.pollutant_id,
-                row.fuel_type_id,
-                row.source_type_id,
-                row.reg_class_id,
-            ))
+            .entry((row.pollutant_id, row.fuel_type_id, row.source_type_id))
             .or_default()
             .push(row);
     }
@@ -1743,8 +1763,7 @@ impl TableRow for CrankcaseSplitRow {
 
     fn polars_schema() -> Schema {
         Schema::from_iter([
-            ("processID".into(), DataType::Int32),
-            ("pollutantID".into(), DataType::Int32),
+            ("polProcessID".into(), DataType::Int32),
             ("sourceTypeID".into(), DataType::Int32),
             ("regClassID".into(), DataType::Int32),
             ("fuelTypeID".into(), DataType::Int32),
@@ -1760,13 +1779,10 @@ impl TableRow for CrankcaseSplitRow {
             n,
             vec![
                 Series::new(
-                    "processID".into(),
-                    rows.iter().map(|r| r.process_id).collect::<Vec<i32>>(),
-                )
-                .into(),
-                Series::new(
-                    "pollutantID".into(),
-                    rows.iter().map(|r| r.pollutant_id).collect::<Vec<i32>>(),
+                    "polProcessID".into(),
+                    rows.iter()
+                        .map(|r| r.pollutant_id * 100 + r.process_id)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -1815,8 +1831,15 @@ impl TableRow for CrankcaseSplitRow {
                 .i32()
                 .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
-        let process = get_i32("processID")?;
-        let pollutant = get_i32("pollutantID")?;
+        // `crankcaseEmissionRatio` carries a combined `polProcessID`, not the
+        // separate `processID`/`pollutantID` the `crankcaseSplit` working table
+        // uses. The canonical extract derives them — `floor(polProcessID/100)`
+        // and `polProcessID % 100` — and keeps only the PM species it splits
+        // (EC 112, Sulfate 115, H2O 119, NonECNonSO4PM 120). Reproduce that
+        // here so the reader yields `crankcaseSplit` rows directly. The process
+        // filter (`primaryAndCrankcaseProcessIDs`) is applied in `build_inputs`,
+        // where the iteration's process is known.
+        let pol_process = get_i32("polProcessID")?;
         let source_type = get_i32("sourceTypeID")?;
         let reg_class = get_i32("regClassID")?;
         let fuel_type = get_i32("fuelTypeID")?;
@@ -1828,18 +1851,28 @@ impl TableRow for CrankcaseSplitRow {
             .f64()
             .map_err(|e| row_err(t, 0, "crankcaseRatio", e.to_string()))?;
         (0..df.height())
-            .map(|i| {
+            .filter_map(|i| {
+                let pp = match pol_process.get(i) {
+                    Some(pp) => pp,
+                    None => return Some(Err(row_err(t, i, "polProcessID", "null value".into()))),
+                };
+                let pollutant_id = pp / 100;
+                if !CRANKCASE_SPLIT_POLLUTANTS.contains(&pollutant_id) {
+                    return None;
+                }
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
-                Ok(CrankcaseSplitRow {
-                    process_id: process.get(i).ok_or_else(|| null("processID"))?,
-                    pollutant_id: pollutant.get(i).ok_or_else(|| null("pollutantID"))?,
-                    source_type_id: source_type.get(i).ok_or_else(|| null("sourceTypeID"))?,
-                    reg_class_id: reg_class.get(i).ok_or_else(|| null("regClassID"))?,
-                    fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
-                    min_model_year_id: min_my.get(i).ok_or_else(|| null("minModelYearID"))?,
-                    max_model_year_id: max_my.get(i).ok_or_else(|| null("maxModelYearID"))?,
-                    crankcase_ratio: ratio.get(i).ok_or_else(|| null("crankcaseRatio"))?,
-                })
+                Some((|| {
+                    Ok(CrankcaseSplitRow {
+                        process_id: pp % 100,
+                        pollutant_id,
+                        source_type_id: source_type.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                        reg_class_id: reg_class.get(i).ok_or_else(|| null("regClassID"))?,
+                        fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
+                        min_model_year_id: min_my.get(i).ok_or_else(|| null("minModelYearID"))?,
+                        max_model_year_id: max_my.get(i).ok_or_else(|| null("maxModelYearID"))?,
+                        crankcase_ratio: ratio.get(i).ok_or_else(|| null("crankcaseRatio"))?,
+                    })
+                })())
             })
             .collect()
     }
@@ -2189,8 +2222,31 @@ fn build_inputs(ctx: &CalculatorContext) -> Result<SulfatePmInputs, Error> {
         sulfate_fractions: tables.iter_typed("sulfateFractions")?,
         month_of_any_year: tables.iter_typed("MonthOfAnyYear")?,
         run_spec_model_years,
-        general_fuel_ratio: tables.iter_typed("generalFuelRatio")?,
-        crankcase_split: tables.iter_typed("crankcaseEmissionRatio")?,
+        // Canonical's `sPMOneCountyYearGeneralFuelRatio` extract joins
+        // `generalFuelRatio` with `gfr.pollutantID in (120)` (SulfatePMCalculator.sql
+        // §75): only the NonECNonSO4PM residue (120) is fuel-ratio adjusted. The
+        // snapshot ships the RAW `generalFuelRatio`, which also carries EC (112)
+        // rows; applying those would wrongly rescale EC (and the PM2.5 total that
+        // sums it) — e.g. process-pm-exhaust EC by ~1.09x on fuelType 1. Restrict
+        // to pollutant 120 to match the extract.
+        general_fuel_ratio: tables
+            .iter_typed::<GeneralFuelRatioRow>("generalFuelRatio")?
+            .into_iter()
+            .filter(|r| r.pollutant_id == NON_EC_NON_SO4_PM_POLLUTANT)
+            .collect(),
+        // The crankcase split join does not constrain process, so the canonical
+        // extract pre-filters `crankcaseEmissionRatio` to the iteration's
+        // primary process and its crankcase counterpart
+        // (`primaryAndCrankcaseProcessIDs`). Apply that here — the reader has
+        // already restricted to the four split pollutants and derived processID.
+        crankcase_split: tables
+            .iter_typed::<CrankcaseSplitRow>("crankcaseEmissionRatio")?
+            .into_iter()
+            .filter(|r| {
+                r.process_id == primary_process_id
+                    || crankcase_process_id == Some(r.process_id)
+            })
+            .collect(),
         pm_speciation: tables.iter_typed("PMSpeciation")?,
         worker_output: tables
             .iter_typed::<EmissionRow>("MOVESWorkerOutput")?
@@ -2229,9 +2285,79 @@ impl Calculator for SulfatePMCalculator {
         INPUT_TABLES
     }
 
+    /// SulfatePM consumes and replaces EC (112) and NonECPM (118) — canonical
+    /// `delete from MOVESWorkerOutput where pollutantID = 112 / 118`. The engine
+    /// drops a producer's zero-valued 112/118 rows (e.g. BaseRate's fuelType-9
+    /// electricity zeros) that this calculator's per-key delta cannot cancel.
+    fn replaced_pollutants(&self) -> &[i32] {
+        &[EC_POLLUTANT, NON_EC_PM_POLLUTANT]
+    }
+
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let inputs = build_inputs(ctx)?;
-        let rows = self.calculate(&inputs);
+        // `calculate` ports the SQL's in-place mutation of `MOVESWorkerOutput`, so
+        // it returns the **full desired final state** F: the input minus the
+        // consumed EC (112) and NonECPM (118), plus the adjusted/split PM species
+        // (see the module docs). The chained-calculator engine, however, *adds* a
+        // calculator's emitted rows to the already-accumulated worker output I —
+        // BaseRate's rows, which still include the base 112/118. Emitting F
+        // directly would double-count the base EC and NonECPM; canonical instead
+        // DELETEs them (SulfatePMCalculator.sql §174/§334) before re-inserting the
+        // adjusted values, so `base + adjusted` over-states EC ~1.68x and
+        // NonECPM ~2.0x.
+        //
+        // Emit the true per-key delta F − I so that `accumulator(I) + delta == F`:
+        // a key F raises or adds is positive; a key F lowered or deleted is
+        // negative, cancelling the stale base contribution. Both sides are summed
+        // per full dimension key first (each may carry several rows per key, and
+        // the engine group-aggregates the emitted rows anyway). Net-zero keys —
+        // every untouched pass-through row, and an EC value copied through
+        // unchanged — drop out, leaving BaseRate's own contribution intact. A
+        // no-PM fixture has F == I, so the delta is empty (the previous
+        // bit-identical filter behaved identically there).
+        // Per-key accumulator: (template row, Σquant, Σrate, in_input, in_calc).
+        let calc = self.calculate(&inputs);
+        let mut net: FxHashMap<[i32; 15], (EmissionRow, f64, f64, bool, bool)> =
+            FxHashMap::default();
+        for row in &inputs.worker_output {
+            let entry = net
+                .entry(row.dimension_key())
+                .or_insert((*row, 0.0, 0.0, false, false));
+            entry.1 -= row.emission_quant;
+            entry.2 -= row.emission_rate;
+            entry.3 = true;
+        }
+        for row in &calc {
+            let entry = net
+                .entry(row.dimension_key())
+                .or_insert((*row, 0.0, 0.0, false, false));
+            entry.0 = *row;
+            entry.1 += row.emission_quant;
+            entry.2 += row.emission_rate;
+            entry.4 = true;
+        }
+        // Emit the per-key delta, dropping any net-zero row that was present in
+        // the input. Such a row is either an unchanged pass-through (BaseRate's
+        // own row already carries it) or a base row `calculate` deleted and did
+        // not re-add at a non-zero value (e.g. fuelType-9 EC/NonECPM, which has
+        // no crankcase split). For a deleted *consumed* pollutant the matching
+        // producer zero row is dropped by the engine's `replaced_pollutants`
+        // filter, so emitting a `0 − 0 = 0` here would needlessly re-introduce
+        // the row canonical removed. A freshly-inserted species that is
+        // genuinely zero (in F only — e.g. water 119, which canonical keeps) is
+        // NOT in the input, so it is preserved. Non-zero deltas are always kept.
+        let mut rows: Vec<EmissionRow> = net
+            .into_values()
+            .filter(|(_, quant, rate, in_input, _in_calc)| {
+                !(*quant == 0.0 && *rate == 0.0 && *in_input)
+            })
+            .map(|(template, quant, rate, _, _)| EmissionRow {
+                emission_quant: quant,
+                emission_rate: rate,
+                ..template
+            })
+            .collect();
+        rows.sort_unstable_by_key(EmissionRow::dimension_key);
         crate::wiring::emit_rows(rows)
     }
 }
@@ -2836,13 +2962,31 @@ mod tests {
             ])
             .unwrap(),
         );
-        let ctx = CalculatorContext::with_tables(store);
+        // Iterate the running-exhaust process (1) so `build_inputs` derives
+        // `primaryAndCrankcaseProcessIDs = {1, 15}`, which the crankcase-split
+        // process filter keeps (the test's identity splits are process 1).
+        let pos = moves_framework::IterationPosition {
+            process_id: Some(ProcessId(1)),
+            ..Default::default()
+        };
+        let ctx = CalculatorContext::with_position_and_tables(pos, store);
         let out = SulfatePMCalculator.execute(&ctx).expect("execute ok");
         let df = out.dataframe().expect("output should contain a DataFrame");
+        // Iterating process 1 (rather than the previous position-less degenerate
+        // primaryProcessID = 0) enables the NonECPM (118) re-sum and the
+        // PM2.5-Total (110) roll-up for the running process. `calculate` produces
+        // eight species rows: EC (112), Sulfate (115), H2O (119), Organic Carbon
+        // (111), the NonECNonSO4NonOM residue, Total Organic Matter, the re-summed
+        // NonECPM (118), and PM2.5 Total (110). `execute` then emits only the
+        // **delta** versus its input (the chained engine adds emitted rows to the
+        // already-accumulated worker output). The crankcase split here is the
+        // identity, so the EC (112) output is bit-identical to the input EC row
+        // and is dropped as a pass-through the upstream calculator already
+        // contributed — leaving seven emitted rows.
         assert_eq!(
             df.height(),
             7,
-            "minimal inputs produce exactly seven species rows"
+            "execute emits the seven delta rows (EC pass-through dropped)"
         );
         let sulfate_quant = df
             .column("emissionQuant")

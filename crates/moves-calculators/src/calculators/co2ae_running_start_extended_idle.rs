@@ -116,14 +116,19 @@
 //!
 //! # Data plane
 //!
-//! [`Calculator::execute`] receives a [`CalculatorContext`] whose execution
-//! tables and scratch namespace are placeholders until the
-//! `DataFrameStore` lands (), so `execute` cannot yet
-//! read `MOVESWorkerOutput` nor write the CO2 rows back. The numeric algorithm
-//! is fully ported and unit-tested on `calculate`; `execute` is a documented
-//! shell returning an empty [`CalculatorOutput`]. Once the data plane exists,
-//! `execute` materialises a [`Co2aeInputs`] from `ctx`, calls `calculate`, and
-//! writes the [`Co2aeOutput`] rows into `MOVESWorkerOutput`.
+//! [`Calculator::execute`] is fully wired and on the live execution path. It
+//! reads `RunSpecPollutantProcess` from the [`CalculatorContext`] tables to
+//! derive the Step 1a / Step 2 process filters (the Java `##CO2Step1AprocessIDs##`
+//! / `##CO2Step2processIDs##` macros), reads the SQL's extracted input tables
+//! (`FuelSupply`, `FuelFormulation`, `FuelSubtype`, `Year`, `MonthOfAnyYear`,
+//! `Pollutant`, and `MOVESWorkerOutput`) via [`CalculatorContext::tables`],
+//! materialises a [`Co2aeInputs`], calls [`calculate`](CO2AERunningStartExtendedIdleCalculator::calculate),
+//! and emits the produced Atmospheric CO2 and CO2 Equivalent rows back into
+//! `MOVESWorkerOutput` via the shared `wiring::emit_rows` helper. The SQL's
+//! two-step insert-then-read-back ordering is preserved inside `calculate`,
+//! which feeds the Step 1a Atmospheric CO2 rows into Step 2 before they are
+//! returned. The numeric algorithm is also independently unit-tested on
+//! `calculate`.
 
 use rustc_hash::FxHashMap;
 
@@ -730,15 +735,22 @@ impl TableRow for Co2EqPollutantRow {
         };
         let poll = get_i32("pollutantID")?;
         let gwp = get_i32("globalWarmingPotential")?;
+        // The SQL extracts `Pollutant` filtered to a non-null, strictly-positive
+        // `globalWarmingPotential` (only CO2-equivalent species — CO2, CH4, N2O
+        // — carry one; every other pollutant row has NULL). The port reads the
+        // raw `Pollutant` table, so apply that WHERE clause here: skip rows whose
+        // `globalWarmingPotential` is NULL or non-positive rather than erroring.
         (0..df.height())
-            .map(|i| {
-                let null = |col: &'static str| row_err(t, i, col, "null value".into());
-                Ok(Co2EqPollutantRow {
-                    pollutant_id: poll.get(i).ok_or_else(|| null("pollutantID"))?,
-                    global_warming_potential: gwp
-                        .get(i)
-                        .ok_or_else(|| null("globalWarmingPotential"))?,
-                })
+            .filter_map(|i| {
+                let pollutant_id = poll.get(i)?;
+                let g = gwp.get(i)?;
+                if g <= 0 {
+                    return None;
+                }
+                Some(Ok(Co2EqPollutantRow {
+                    pollutant_id,
+                    global_warming_potential: g,
+                }))
             })
             .collect()
     }

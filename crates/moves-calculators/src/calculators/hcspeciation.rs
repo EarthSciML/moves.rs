@@ -578,9 +578,8 @@ impl HcSpeciation {
  /// emission's own subtype on the THC path, the E10 subtype (12) on the
  /// `altTHC` path. With a row found, the output is `operand` (NMHC or
  /// `altNMHC`) scaled by `speciationConstant + oxySpeciation *
- /// volToWtPercentOxy * totalOxygenate`; with no row found, it is the
- /// original THC emission scaled by zero (a zero emission still tagged
- /// with the THC fuel ids, the Go `NewEmissionScaled(e, 0)`).
+ /// volToWtPercentOxy * totalOxygenate`; with no profile row found, the
+ /// result is `None` (the row is dropped, matching canonical's INNER JOIN).
     #[allow(clippy::too_many_arguments)]
     fn speciate_nmog_or_voc(
         &self,
@@ -592,22 +591,31 @@ impl HcSpeciation {
         formulation: &FuelFormulation,
         total_oxygenate: f64,
         operand: &Emission,
-        thc_emission: &Emission,
-    ) -> Emission {
+        _thc_emission: &Emission,
+    ) -> Option<Emission> {
         let key = HcSpeciationKey {
             pol_process_id: output_pollutant_id * 100 + process_id,
             fuel_sub_type_id: speciation_fuel_sub_type_id,
             reg_class_id,
             model_year_id,
         };
-        match self.speciation_detail(&key) {
-            Some(detail) => {
-                let factor = detail.speciation_constant
-                    + detail.oxy_speciation * formulation.vol_to_wt_percent_oxy * total_oxygenate;
-                operand.scaled(factor)
-            }
-            None => thc_emission.scaled(0.0),
-        }
+        // Canonical computes NMOG/VOC via an INNER JOIN to the HCSpeciation
+        // profile table: a (polProc, fuelSubType, regClass, modelYear) with no
+        // profile row produces NO output row. The Go reference instead emits a
+        // zero (`NewEmissionScaled(e, 0)`), which diverges from the canonical
+        // SQL — for processes with no profile rows at all (e.g. refueling
+        // 18/19, whose HCSpeciation table is empty) the Go/port path emits
+        // spurious zero NMOG/VOC, and the downstream TOG (86) inherits them as
+        // zero rows canonical never writes. Returning `None` here drops those
+        // rows, matching canonical. Exhaust processes always carry profile rows
+        // (real or the SQL's speciationConstant=0 fill), so this branch is not
+        // taken there and their non-zero NMOG/VOC are unaffected. (The audit's
+        // FINDING 1 reintroduced the Go zero-emit; it regressed process-refueling
+        // — see [[process-refueling-false-graduation]] — so it is reverted here.)
+        let detail = self.speciation_detail(&key)?;
+        let factor = detail.speciation_constant
+            + detail.oxy_speciation * formulation.vol_to_wt_percent_oxy * total_oxygenate;
+        Some(operand.scaled(factor))
     }
 
  /// Speciate one input [`Emission`] into its methane / NMHC / `altNMHC` /
@@ -675,7 +683,7 @@ impl HcSpeciation {
 
                 if !is_ethanol_alt_case {
                     if tables.is_needed(NMOG_POLLUTANT_ID, process_id) {
-                        result.nmog = Some(self.speciate_nmog_or_voc(
+                        result.nmog = self.speciate_nmog_or_voc(
                             NMOG_POLLUTANT_ID,
                             process_id,
                             emission.fuel_sub_type_id,
@@ -685,10 +693,10 @@ impl HcSpeciation {
                             total_oxygenate,
                             &nmhc,
                             emission,
-                        ));
+                        );
                     }
                     if tables.is_needed(VOC_POLLUTANT_ID, process_id) {
-                        result.voc = Some(self.speciate_nmog_or_voc(
+                        result.voc = self.speciate_nmog_or_voc(
                             VOC_POLLUTANT_ID,
                             process_id,
                             emission.fuel_sub_type_id,
@@ -698,7 +706,7 @@ impl HcSpeciation {
                             total_oxygenate,
                             &nmhc,
                             emission,
-                        ));
+                        );
                     }
                 }
             }
@@ -724,7 +732,7 @@ impl HcSpeciation {
  // The HCSpeciation lookup keys on the E10 subtype (12); the
  // oxygenate term still uses the actual emission's formulation.
                 if tables.is_needed(NMOG_POLLUTANT_ID, process_id) {
-                    result.nmog = Some(self.speciate_nmog_or_voc(
+                    result.nmog = self.speciate_nmog_or_voc(
                         NMOG_POLLUTANT_ID,
                         process_id,
                         E10_FUEL_SUBTYPE_ID,
@@ -734,10 +742,10 @@ impl HcSpeciation {
                         total_oxygenate,
                         &alt_nmhc,
                         emission,
-                    ));
+                    );
                 }
                 if tables.is_needed(VOC_POLLUTANT_ID, process_id) {
-                    result.voc = Some(self.speciate_nmog_or_voc(
+                    result.voc = self.speciate_nmog_or_voc(
                         VOC_POLLUTANT_ID,
                         process_id,
                         E10_FUEL_SUBTYPE_ID,
@@ -747,7 +755,7 @@ impl HcSpeciation {
                         total_oxygenate,
                         &alt_nmhc,
                         emission,
-                    ));
+                    );
                 }
             }
         }
@@ -1198,8 +1206,30 @@ impl TableRow for ThcWorkerRow {
         let fuel_type = get_i32("fuelTypeID")?;
         let model_year = get_i32("modelYearID")?;
         let road_type = get_i32("roadTypeID")?;
-        let fuel_sub_type = get_i32("fuelSubTypeID")?;
-        let fuel_formulation = get_i32("fuelFormulationID")?;
+        // `fuelSubTypeID` / `fuelFormulationID` are not reliably present on the
+        // accumulated `MOVESWorkerOutput` (the standard worker schema carries
+        // `fuelSubTypeID` only, and never `fuelFormulationID`). The HCFuelSupply
+        // expansion in `execute` joins each THC row to the fuel supply and
+        // overwrites both, so a *missing column* is acceptable (default 0). But
+        // a column that *is* present must obey the same contract as every other
+        // column in this loader: a wrong dtype or a null cell is a data error,
+        // not a silently-fabricated key `0` (which would mis-key or miss the
+        // methaneTHCRatio / HCSpeciation lookups). Distinguish the two: probe
+        // the column, and if present require `i32` (propagating a dtype error);
+        // null cells are then rejected per-row below.
+        let get_opt_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            match df.column(col) {
+                // Column absent by design: tolerated, defaults to 0 per row.
+                Err(_) => Ok(None),
+                // Column present: enforce dtype like the rest of the loader.
+                Ok(c) => c
+                    .i32()
+                    .map(|c| Some(c.clone()))
+                    .map_err(|e| row_err(t, 0, col, e.to_string())),
+            }
+        };
+        let fuel_sub_type = get_opt_i32("fuelSubTypeID")?;
+        let fuel_formulation = get_opt_i32("fuelFormulationID")?;
         let emission_quant = get_f64("emissionQuant")?;
         let emission_rate = get_f64("emissionRate")?;
         (0..df.height())
@@ -1221,10 +1251,17 @@ impl TableRow for ThcWorkerRow {
                     fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
                     model_year_id: model_year.get(i).ok_or_else(|| null("modelYearID"))?,
                     road_type_id: road_type.get(i).ok_or_else(|| null("roadTypeID"))?,
-                    fuel_sub_type_id: fuel_sub_type.get(i).ok_or_else(|| null("fuelSubTypeID"))?,
-                    fuel_formulation_id: fuel_formulation
-                        .get(i)
-                        .ok_or_else(|| null("fuelFormulationID"))?,
+                    // Column absent → 0 (overwritten by HCFuelSupply expansion);
+                    // column present but this cell null → error like every other
+                    // column, rather than fabricating the invalid key 0.
+                    fuel_sub_type_id: match fuel_sub_type.as_ref() {
+                        Some(c) => c.get(i).ok_or_else(|| null("fuelSubTypeID"))?,
+                        None => 0,
+                    },
+                    fuel_formulation_id: match fuel_formulation.as_ref() {
+                        Some(c) => c.get(i).ok_or_else(|| null("fuelFormulationID"))?,
+                        None => 0,
+                    },
                     emission_quant: emission_quant.get(i).ok_or_else(|| null("emissionQuant"))?,
                     emission_rate: emission_rate.get(i).ok_or_else(|| null("emissionRate"))?,
                 })
@@ -1539,9 +1576,64 @@ impl Calculator for HcSpeciationCalculator {
             .map(|r| i32::from(r.pollutant_id.0) * 100 + i32::from(r.process_id.0));
         let worker_tables = OnroadWorkerTables::new(fuel_formulations, needed_pol_process_ids);
 
+        // `MOVESWorkerOutput` carries no `fuelFormulationID` — MOVES derives one
+        // per THC row by joining the county-year fuel supply (`HCFuelSupply`),
+        // which expands each row across the formulations of its fuel type and
+        // market-share-weights the emission. Synthesize that extract here.
+        //
+        // NOTE: the `methaneTHCRatio` / `HCSpeciation` lookups below key on
+        // `regClassID`, with a *distinct* ratio for each of ~8 reg classes per
+        // (process, fuelSubtype, modelYear). Canonical `MOVESWorkerOutput`
+        // carries the concrete `regClassID` (it is aggregated away only at the
+        // final output step), so each reg class is speciated with its own ratio.
+        // The port's BaseRate currently collapses `regClassID` to 0 in the
+        // worker output, so these lookups find no match and speciation produces
+        // nothing for the onroad chained fixtures. End-to-end emission is
+        // therefore blocked on BaseRate preserving `regClassID` in the worker
+        // output; the derivation and expansion below are otherwise complete (the
+        // unit test exercises them at reg class 0, where the ratio tables match).
+        let hc_fuel_supply = synthesize_hc_fuel_supply(ctx)?;
+
         let thc_rows: Vec<ThcWorkerRow> = tables.iter_typed("MOVESWorkerOutput")?;
         let mut output: Vec<ThcWorkerRow> = Vec::new();
         for row in &thc_rows {
+            // The SQL inserts only THC (1) and altTHC (10001) into
+            // HCWorkerOutputAll (`where pollutantID in (1, 10001)`).
+            if row.pollutant_id != THC_POLLUTANT_ID && row.pollutant_id != ALT_THC_POLLUTANT_ID {
+                continue;
+            }
+            // Canonical speciates only THC carrying a concrete fuel formulation.
+            // BaseRate's exhaust THC is emitted per fuel-subtype/formulation, so
+            // `MOVESWorkerOutput` keeps a concrete `fuelSubTypeID`; the Go reads
+            // `e.FuelFormulationID` and speciates. The evaporative producers
+            // (TankVaporVenting/Permeation/LiquidLeaking) write `MOVESWorkerOutput`
+            // with no `fuelSubTypeID`/`fuelFormulationID` — the multiday TVV-9
+            // `INSERT … SELECT` carries `regClassID` but neither fuel column — so
+            // their THC arrives with `fuelSubTypeID = 0`. Canonical then finds no
+            // fuel formulation (`mwo.FuelFormulations[0]` is nil) and skips the
+            // emission, emitting THC alone. The `HCFuelSupply` expansion below
+            // would instead synthesize a formulation from the fuel type and emit
+            // spurious NMOG/VOC/TOG (pol 80/86/87) that canonical never writes, so
+            // skip rows with no concrete subtype to match canonical's INNER JOIN.
+            if row.fuel_sub_type_id == 0 {
+                continue;
+            }
+            // HCFuelSupply join on (countyID, monthID, fuelTypeID, yearID) —
+            // countyID is a run constant, so key on (yearID, monthID, fuelType).
+            let Some(supply) =
+                hc_fuel_supply.get(&(row.year_id, row.month_id, row.fuel_type_id))
+            else {
+                continue;
+            };
+            let emissions: Vec<Emission> = supply
+                .iter()
+                .map(|&(fuel_sub_type_id, fuel_formulation_id, market_share)| Emission {
+                    fuel_sub_type_id,
+                    fuel_formulation_id,
+                    emission_quant: row.emission_quant * market_share,
+                    emission_rate: row.emission_rate * market_share,
+                })
+                .collect();
             let block = FuelBlock {
                 key: FuelBlockKey {
                     pollutant_id: row.pollutant_id,
@@ -1550,12 +1642,7 @@ impl Calculator for HcSpeciationCalculator {
                     reg_class_id: row.reg_class_id,
                     model_year_id: row.model_year_id,
                 },
-                emissions: vec![Emission {
-                    fuel_sub_type_id: row.fuel_sub_type_id,
-                    fuel_formulation_id: row.fuel_formulation_id,
-                    emission_quant: row.emission_quant,
-                    emission_rate: row.emission_rate,
-                }],
+                emissions,
             };
             for speciated in speciation.speciate_block(&block, &worker_tables) {
                 for em in &speciated.emissions {
@@ -1573,6 +1660,121 @@ impl Calculator for HcSpeciationCalculator {
 
         crate::wiring::emit_rows(output)
     }
+}
+
+/// `(yearID, monthID, fuelTypeID)` → the fuel-supply formulations of that cell,
+/// each `(fuelSubtypeID, fuelFormulationID, marketShare)`.
+type HcFuelSupply = HashMap<(i32, i32, i32), Vec<(i32, i32, f64)>>;
+
+/// Synthesize the `HCFuelSupply` extract each THC row joins to.
+///
+/// MOVES builds it from the county-year fuel supply, joined out to formulation
+/// and subtype:
+///
+/// ```sql
+/// select countyID, yearID, monthID, fst.fuelTypeID, fst.fuelSubTypeID,
+///        ff.fuelFormulationID, fs.marketShare
+/// from year
+///   join fuelSupply     fs   on fs.fuelYearID = year.fuelYearID
+///   join monthOfAnyYear moay on moay.monthGroupID = fs.monthGroupID
+///   join fuelFormulation ff  on ff.fuelFormulationID = fs.fuelFormulationID
+///   join fuelSubtype    fst  on fst.fuelSubtypeID = ff.fuelSubtypeID
+/// ```
+///
+/// `HCWorkerOutputAll` then joins `MOVESWorkerOutput` to it
+/// `using (countyID, monthID, fuelTypeID, yearID) where pollutantID in (1,
+/// 10001)`, expanding each THC row across the cell's formulations and
+/// market-share-weighting the emission. `countyID` is a run constant, so the
+/// port keys on `(yearID, monthID, fuelTypeID)`. Columns are read via
+/// `column_views` and cast, avoiding a `TableRow` impl per source table.
+fn synthesize_hc_fuel_supply(ctx: &CalculatorContext) -> Result<HcFuelSupply, Error> {
+    let tables = ctx.tables();
+    let i32v = |s: &Series| -> Result<Vec<Option<i32>>, Error> {
+        Ok(s.cast(&DataType::Int32)
+            .map_err(|e| Error::Polars(e.to_string()))?
+            .i32()
+            .map_err(|e| Error::Polars(e.to_string()))?
+            .into_iter()
+            .collect())
+    };
+    let f64v = |s: &Series| -> Result<Vec<Option<f64>>, Error> {
+        Ok(s.cast(&DataType::Float64)
+            .map_err(|e| Error::Polars(e.to_string()))?
+            .f64()
+            .map_err(|e| Error::Polars(e.to_string()))?
+            .into_iter()
+            .collect())
+    };
+
+    // fuelYearID → yearID
+    let year = tables.column_views("Year", &["yearID", "fuelYearID"])?;
+    let year_of_fuel_year: HashMap<i32, i32> = i32v(&year[1])?
+        .into_iter()
+        .zip(i32v(&year[0])?)
+        .filter_map(|(fy, y)| Some((fy?, y?)))
+        .collect();
+
+    // monthGroupID → [monthID]
+    let moay = tables.column_views("MonthOfAnyYear", &["monthID", "monthGroupID"])?;
+    let mut months_of_group: HashMap<i32, Vec<i32>> = HashMap::new();
+    for (m, g) in i32v(&moay[0])?.into_iter().zip(i32v(&moay[1])?) {
+        if let (Some(m), Some(g)) = (m, g) {
+            months_of_group.entry(g).or_default().push(m);
+        }
+    }
+
+    // fuelFormulationID → fuelSubtypeID
+    let ff = tables.column_views("FuelFormulation", &["fuelFormulationID", "fuelSubtypeID"])?;
+    let subtype_of_formulation: HashMap<i32, i32> = i32v(&ff[0])?
+        .into_iter()
+        .zip(i32v(&ff[1])?)
+        .filter_map(|(f, s)| Some((f?, s?)))
+        .collect();
+
+    // fuelSubtypeID → fuelTypeID
+    let fst = tables.column_views("FuelSubtype", &["fuelSubtypeID", "fuelTypeID"])?;
+    let fuel_type_of_subtype: HashMap<i32, i32> = i32v(&fst[0])?
+        .into_iter()
+        .zip(i32v(&fst[1])?)
+        .filter_map(|(s, t)| Some((s?, t?)))
+        .collect();
+
+    let fs = tables.column_views(
+        "FuelSupply",
+        &["fuelYearID", "monthGroupID", "fuelFormulationID", "marketShare"],
+    )?;
+    let (fuel_year, month_group, formulation, share) =
+        (i32v(&fs[0])?, i32v(&fs[1])?, i32v(&fs[2])?, f64v(&fs[3])?);
+
+    let mut out: HcFuelSupply = HashMap::new();
+    for (((fy, mg), form), ms) in fuel_year
+        .into_iter()
+        .zip(month_group)
+        .zip(formulation)
+        .zip(share)
+    {
+        let (Some(fy), Some(mg), Some(form), Some(ms)) = (fy, mg, form, ms) else {
+            continue;
+        };
+        let Some(&year_id) = year_of_fuel_year.get(&fy) else {
+            continue;
+        };
+        let Some(&subtype) = subtype_of_formulation.get(&form) else {
+            continue;
+        };
+        let Some(&fuel_type) = fuel_type_of_subtype.get(&subtype) else {
+            continue;
+        };
+        let Some(months) = months_of_group.get(&mg) else {
+            continue;
+        };
+        for &month in months {
+            out.entry((year_id, month, fuel_type))
+                .or_default()
+                .push((subtype, form, ms));
+        }
+    }
+    Ok(out)
 }
 
 /// Construct the calculator as a boxed trait object — matches the engine's
@@ -1843,19 +2045,24 @@ mod tests {
     }
 
     #[test]
-    fn speciate_emission_nmog_and_voc_are_zero_without_a_speciation_row() {
+    fn speciate_emission_nmog_and_voc_are_omitted_without_a_speciation_row() {
  // Lookup tables with the methane ratio but no HCSpeciation rows.
         let speciation = HcSpeciation::build([methane_row(1, 20, 0, 2000, 2010, 0.25)], []);
         let (_, tables, key) = fixture();
         let speciated = speciation
             .speciate_emission(&key, &emission(8.0, 4.0, 20, 100), &tables)
             .expect("speciation produced");
- // No row -> NMOG/VOC fall back to the original THC emission scaled by
- // zero, still tagged with the THC fuel ids.
-        assert_eq!(speciated.nmog, Some(emission(0.0, 0.0, 20, 100)));
-        assert_eq!(speciated.voc, Some(emission(0.0, 0.0, 20, 100)));
+ // No HCSpeciation profile row -> NMOG/VOC are OMITTED, matching
+ // canonical's inner join (it produces no row, not a zero row). The Go
+ // reference's `NewEmissionScaled(e, 0)` zero-emit diverges from the
+ // canonical SQL and produced spurious zero rows downstream (e.g.
+ // refueling TOG 86 — see [[process-refueling-false-graduation]]).
+        assert_eq!(speciated.nmog, None);
+        assert_eq!(speciated.voc, None);
  // NMHC is unaffected — it needs no speciation row.
         assert_eq!(speciated.nmhc, Some(emission(6.0, 3.0, 20, 100)));
+ // TOG (= NMOG + methane) is therefore methane alone here.
+        assert_eq!(speciated.tog, Some(emission(2.0, 1.0, 20, 100)));
     }
 
     #[test]
@@ -2366,14 +2573,6 @@ mod tests {
                 oxy_speciation: 0.0,
             },
         ];
-        let ff_rows = vec![HcFuelFormulationRow {
-            fuel_formulation_id: 100,
-            mtbe_volume: 2.0,
-            etbe_volume: 0.0,
-            tame_volume: 0.0,
-            etoh_volume: 2.0,
-            vol_to_wt_percent_oxy: 0.5,
-        }];
         let mut store = moves_framework::InMemoryStore::new();
         store.insert(
             "MOVESWorkerOutput",
@@ -2387,9 +2586,66 @@ mod tests {
             "HCSpeciation",
             HcSpeciationRow::into_dataframe(hc_rows).unwrap(),
         );
+        // `FuelFormulation` carries the oxygenate volumes (read by execute) and
+        // `fuelSubtypeID` (read by the HCFuelSupply synthesis), so build it with
+        // both rather than via `HcFuelFormulationRow::into_dataframe`.
+        let col_i32 = |name: &str, v: i32| Series::new(name.into(), vec![v]).into();
+        let col_f64 = |name: &str, v: f64| Series::new(name.into(), vec![v]).into();
         store.insert(
             "FuelFormulation",
-            HcFuelFormulationRow::into_dataframe(ff_rows).unwrap(),
+            DataFrame::new(
+                1,
+                vec![
+                    col_i32("fuelFormulationID", 100),
+                    col_i32("fuelSubtypeID", 20),
+                    col_f64("MTBEVolume", 2.0),
+                    col_f64("ETBEVolume", 0.0),
+                    col_f64("TAMEVolume", 0.0),
+                    col_f64("ETOHVolume", 2.0),
+                    col_f64("volToWtPercentOxy", 0.5),
+                ],
+            )
+            .unwrap(),
+        );
+        // HCFuelSupply source tables: a single formulation (100) of fuel type 1,
+        // subtype 20, marketShare 1.0 in (year 2020, month 7) — so the THC row's
+        // 8.0 expands one-to-one and the speciated values are unchanged.
+        store.insert(
+            "Year",
+            DataFrame::new(
+                1,
+                vec![col_i32("yearID", 2020), col_i32("fuelYearID", 2020)],
+            )
+            .unwrap(),
+        );
+        store.insert(
+            "FuelSupply",
+            DataFrame::new(
+                1,
+                vec![
+                    col_i32("fuelYearID", 2020),
+                    col_i32("monthGroupID", 7),
+                    col_i32("fuelFormulationID", 100),
+                    col_f64("marketShare", 1.0),
+                ],
+            )
+            .unwrap(),
+        );
+        store.insert(
+            "MonthOfAnyYear",
+            DataFrame::new(
+                1,
+                vec![col_i32("monthID", 7), col_i32("monthGroupID", 7)],
+            )
+            .unwrap(),
+        );
+        store.insert(
+            "FuelSubtype",
+            DataFrame::new(
+                1,
+                vec![col_i32("fuelSubtypeID", 20), col_i32("fuelTypeID", 1)],
+            )
+            .unwrap(),
         );
         let ctx = CalculatorContext::with_tables(store);
         let out = HcSpeciationCalculator::new()

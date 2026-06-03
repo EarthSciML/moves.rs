@@ -119,22 +119,21 @@
 //!
 //! # Data plane
 //!
-//! [`Calculator::execute`] receives a [`CalculatorContext`] whose
-//! `ExecutionTables` / `ScratchNamespace` are Phase-2 placeholders until the
-//! `DataFrameStore` data plane lands, so `execute` cannot yet
-//! read the nine lookup tables nor the upstream emission blocks, nor write the
-//! toxic blocks back. The numerically faithful algorithm is fully ported and
-//! unit-tested on [`AirToxics`]; once the data plane exists, `execute` builds
-//! an [`AirToxics`] from `ctx.tables()`, reads the input [`FuelBlock`]s,
-//! applies [`air_toxics_block`](AirToxics::air_toxics_block), and stores the
-//! resulting [`ToxicFuelBlock`]s.
+//! [`Calculator::execute`] reads the raw default-DB ratio tables, reproduces the
+//! master's `Section Extract Data` transforms (`PollutantProcessAssoc` join,
+//! `modelYearGroupID` expansion, the `ATRatio` `FuelSupply` join), expands each
+//! `MOVESWorkerOutput` row across its fuel type's formulations (the
+//! `AT*FuelSupply` join — the port's worker output carries no
+//! `fuelFormulationID`), builds an [`AirToxics`] from those extracts, applies
+//! [`air_toxics_block`](AirToxics::air_toxics_block) to every input
+//! [`FuelBlock`], and emits the resulting [`ToxicFuelBlock`]s.
 
 use std::collections::{BTreeMap, HashMap};
 
 use moves_data::{PollutantId, PollutantProcessAssociation, ProcessId};
 use moves_framework::{
-    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStoreTyped,
-    Error, TableRow,
+    Calculator, CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStore,
+    DataFrameStoreTyped, Error, TableRow,
 };
 use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
 
@@ -1716,8 +1715,25 @@ impl TableRow for AirToxicsMwoRow {
         let fuel_type = get_i32("fuelTypeID")?;
         let model_year = get_i32("modelYearID")?;
         let road_type = get_i32("roadTypeID")?;
-        let fuel_sub_type = get_i32("fuelSubTypeID")?;
-        let fuel_formulation = get_i32("fuelFormulationID")?;
+        // `MOVESWorkerOutput` (rebuilt from the engine's EmissionRecord) carries
+        // no `fuelFormulationID`, and `fuelSubTypeID` may also be absent. An
+        // *absent* column is expected — `execute` re-derives both per emission
+        // from the county-year fuel supply (the canonical `AT*FuelSupply`
+        // join), so a missing column reads as `None` (→ 0 per row). But a
+        // *present* column that is not i32 is a schema drift, not an absence:
+        // surface it like every other column rather than silently coercing to
+        // 0 (which would make every fuel-keyed ratio lookup miss).
+        let opt_i32 = |col: &'static str| -> moves_framework::Result<_> {
+            match df.column(col) {
+                Ok(c) => c
+                    .i32()
+                    .map(|s| Some(s.clone()))
+                    .map_err(|e| row_err(t, 0, col, e.to_string())),
+                Err(_) => Ok(None),
+            }
+        };
+        let fuel_sub_type = opt_i32("fuelSubTypeID")?;
+        let fuel_formulation = opt_i32("fuelFormulationID")?;
         let emission_quant = get_f64("emissionQuant")?;
         let emission_rate = get_f64("emissionRate")?;
         (0..df.height())
@@ -1739,10 +1755,14 @@ impl TableRow for AirToxicsMwoRow {
                     fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
                     model_year_id: model_year.get(i).ok_or_else(|| null("modelYearID"))?,
                     road_type_id: road_type.get(i).ok_or_else(|| null("roadTypeID"))?,
-                    fuel_sub_type_id: fuel_sub_type.get(i).ok_or_else(|| null("fuelSubTypeID"))?,
+                    fuel_sub_type_id: fuel_sub_type
+                        .as_ref()
+                        .and_then(|c| c.get(i))
+                        .unwrap_or(0),
                     fuel_formulation_id: fuel_formulation
-                        .get(i)
-                        .ok_or_else(|| null("fuelFormulationID"))?,
+                        .as_ref()
+                        .and_then(|c| c.get(i))
+                        .unwrap_or(0),
                     emission_quant: emission_quant.get(i).ok_or_else(|| null("emissionQuant"))?,
                     emission_rate: emission_rate.get(i).ok_or_else(|| null("emissionRate"))?,
                 })
@@ -1891,6 +1911,436 @@ impl AirToxicsCalculator {
     }
 }
 
+// ===========================================================================
+// Extract synthesis — Section Extract Data of AirToxicsCalculator.sql.
+//
+// The snapshot ships the *raw* default-DB ratio tables (`minorHAPRatio`,
+// `pahGasRatio`, `pahParticleRatio`, `ATRatio`, `ATRatioGas2`, `ATRatioNonGas`),
+// keyed by `polProcessID` and (for the direct + NonGas paths) `modelYearGroupID`.
+// The worker reads pre-built *extract* files (`processID` / `outputPollutantID`
+// / a single `modelYearID`, …). These helpers reproduce the master's
+// `cache select … into outfile` transforms so the data plane can run from the
+// raw tables. `MYMAP` / `MYRMAP` are the identity for the default (un-remapped)
+// model-year space, so `round(modelYearGroupID/10000)` / `mod(…,10000)` decode
+// the group's [start, end] window directly.
+// ===========================================================================
+
+/// Decode a `modelYearGroupID` into its inclusive `[start, end]` model-year
+/// window — the SQL `round(modelYearGroupID/10000,0)` / `mod(modelYearGroupID,
+/// 10000)` pair (exact integer ops).
+fn decode_model_year_group(group_id: i32) -> (i32, i32) {
+    (group_id / 10000, group_id % 10000)
+}
+
+/// Cast a `Series` to `Vec<Option<i32>>`.
+fn col_i32(s: &Series) -> Result<Vec<Option<i32>>, Error> {
+    Ok(s.cast(&DataType::Int32)
+        .map_err(|e| Error::Polars(e.to_string()))?
+        .i32()
+        .map_err(|e| Error::Polars(e.to_string()))?
+        .into_iter()
+        .collect())
+}
+
+/// Cast a `Series` to `Vec<Option<f64>>`.
+fn col_f64(s: &Series) -> Result<Vec<Option<f64>>, Error> {
+    Ok(s.cast(&DataType::Float64)
+        .map_err(|e| Error::Polars(e.to_string()))?
+        .f64()
+        .map_err(|e| Error::Polars(e.to_string()))?
+        .into_iter()
+        .collect())
+}
+
+/// Read `columns` from `name`, or return `None` if the table is absent (a
+/// RunSpec may not materialise every ratio table).
+fn optional_columns(
+    ctx: &CalculatorContext,
+    name: &str,
+    columns: &[&str],
+) -> Result<Option<Vec<Series>>, Error> {
+    if ctx.tables().get(name).is_none() {
+        return Ok(None);
+    }
+    Ok(Some(ctx.tables().column_views(name, columns)?))
+}
+
+/// `polProcessID → (processID, outputPollutantID)` from `PollutantProcessAssoc`.
+fn pollutant_process_map(ctx: &CalculatorContext) -> Result<HashMap<i32, (i32, i32)>, Error> {
+    let cols = ctx
+        .tables()
+        .column_views("PollutantProcessAssoc", &["polProcessID", "processID", "pollutantID"])?;
+    let pp = col_i32(&cols[0])?;
+    let proc = col_i32(&cols[1])?;
+    let poll = col_i32(&cols[2])?;
+    let mut map = HashMap::new();
+    for ((p, pr), po) in pp.into_iter().zip(proc).zip(poll) {
+        if let (Some(p), Some(pr), Some(po)) = (p, pr, po) {
+            map.insert(p, (pr, po));
+        }
+    }
+    Ok(map)
+}
+
+/// The `minorHAPRatio` extract — raw `(polProcessID, fuelTypeID, fuelSubtypeID,
+/// modelYearGroupID, atRatio)` joined to `PollutantProcessAssoc` and expanded
+/// over the model years its group covers (bounded by `[year-40, year]`).
+fn synthesize_minor_hap_ratio(
+    ctx: &CalculatorContext,
+    ppa: &HashMap<i32, (i32, i32)>,
+    year: i32,
+) -> Result<Vec<MinorHapRatioRow>, Error> {
+    let Some(cols) = optional_columns(
+        ctx,
+        "minorHAPRatio",
+        &["polProcessID", "fuelSubtypeID", "modelYearGroupID", "atRatio"],
+    )?
+    else {
+        return Ok(Vec::new());
+    };
+    let pp = col_i32(&cols[0])?;
+    let sub = col_i32(&cols[1])?;
+    let grp = col_i32(&cols[2])?;
+    let ratio = col_f64(&cols[3])?;
+    let mut out = Vec::new();
+    for (((p, s), g), r) in pp.iter().zip(&sub).zip(&grp).zip(&ratio) {
+        let (Some(p), Some(s), Some(g), Some(r)) = (*p, *s, *g, *r) else {
+            continue;
+        };
+        let Some(&(process_id, output_pollutant_id)) = ppa.get(&p) else {
+            continue;
+        };
+        let (start, end) = decode_model_year_group(g);
+        for my in start.max(year - 40)..=end.min(year) {
+            out.push(MinorHapRatioRow {
+                process_id,
+                output_pollutant_id,
+                fuel_sub_type_id: s,
+                model_year_id: my,
+                at_ratio: r,
+            });
+        }
+    }
+    Ok(out)
+}
+
+/// A `pahGasRatio` / `pahParticleRatio` extract — raw `(polProcessID,
+/// fuelTypeID, modelYearGroupID, atRatio)` joined to `PollutantProcessAssoc`
+/// and expanded over the model years its group covers.
+fn synthesize_pah_ratio(
+    ctx: &CalculatorContext,
+    table: &str,
+    ppa: &HashMap<i32, (i32, i32)>,
+    year: i32,
+) -> Result<Vec<PahRatioRow>, Error> {
+    let Some(cols) = optional_columns(
+        ctx,
+        table,
+        &["polProcessID", "fuelTypeID", "modelYearGroupID", "atRatio"],
+    )?
+    else {
+        return Ok(Vec::new());
+    };
+    let pp = col_i32(&cols[0])?;
+    let fuel = col_i32(&cols[1])?;
+    let grp = col_i32(&cols[2])?;
+    let ratio = col_f64(&cols[3])?;
+    let mut out = Vec::new();
+    for (((p, f), g), r) in pp.iter().zip(&fuel).zip(&grp).zip(&ratio) {
+        let (Some(p), Some(f), Some(g), Some(r)) = (*p, *f, *g, *r) else {
+            continue;
+        };
+        let Some(&(process_id, output_pollutant_id)) = ppa.get(&p) else {
+            continue;
+        };
+        let (start, end) = decode_model_year_group(g);
+        for my in start.max(year - 40)..=end.min(year) {
+            out.push(PahRatioRow {
+                process_id,
+                output_pollutant_id,
+                fuel_type_id: f,
+                model_year_id: my,
+                at_ratio: r,
+            });
+        }
+    }
+    Ok(out)
+}
+
+/// The `ATRatioNonGas` extract — raw `(polProcessID, sourceTypeID,
+/// fuelSubtypeID, modelYearGroupID, ATRatio)` expanded over the model years its
+/// group covers. No `PollutantProcessAssoc` join: the SQL selects
+/// `r.polProcessID` directly (it is the *output* toxic `polProcessID`).
+fn synthesize_at_ratio_non_gas(
+    ctx: &CalculatorContext,
+    year: i32,
+) -> Result<Vec<AtRatioNonGasRow>, Error> {
+    let Some(cols) = optional_columns(
+        ctx,
+        "ATRatioNonGas",
+        &["polProcessID", "sourceTypeID", "fuelSubtypeID", "modelYearGroupID", "ATRatio"],
+    )?
+    else {
+        return Ok(Vec::new());
+    };
+    let pp = col_i32(&cols[0])?;
+    let src = col_i32(&cols[1])?;
+    let sub = col_i32(&cols[2])?;
+    let grp = col_i32(&cols[3])?;
+    let ratio = col_f64(&cols[4])?;
+    let mut out = Vec::new();
+    for ((((p, st), s), g), r) in pp.iter().zip(&src).zip(&sub).zip(&grp).zip(&ratio) {
+        let (Some(p), Some(st), Some(s), Some(g), Some(r)) = (*p, *st, *s, *g, *r) else {
+            continue;
+        };
+        let (start, end) = decode_model_year_group(g);
+        for my in start.max(year - 40)..=end.min(year) {
+            out.push(AtRatioNonGasRow {
+                pol_process_id: p,
+                source_type_id: st,
+                fuel_sub_type_id: s,
+                model_year_id: my,
+                at_ratio: r,
+            });
+        }
+    }
+    Ok(out)
+}
+
+/// The `ATRatioGas2` extract — raw `(polProcessID, sourceTypeID, fuelSubtypeID,
+/// ATRatio)` verbatim (SQL `SELECT *`, no model-year expansion).
+fn synthesize_at_ratio_gas2(ctx: &CalculatorContext) -> Result<Vec<AtRatioGas2Row>, Error> {
+    let Some(cols) = optional_columns(
+        ctx,
+        "ATRatioGas2",
+        &["polProcessID", "sourceTypeID", "fuelSubtypeID", "ATRatio"],
+    )?
+    else {
+        return Ok(Vec::new());
+    };
+    let pp = col_i32(&cols[0])?;
+    let src = col_i32(&cols[1])?;
+    let sub = col_i32(&cols[2])?;
+    let ratio = col_f64(&cols[3])?;
+    let mut out = Vec::new();
+    for (((p, st), s), r) in pp.iter().zip(&src).zip(&sub).zip(&ratio) {
+        if let (Some(p), Some(st), Some(s), Some(r)) = (*p, *st, *s, *r) {
+            out.push(AtRatioGas2Row {
+                pol_process_id: p,
+                source_type_id: st,
+                fuel_sub_type_id: s,
+                at_ratio: r,
+            });
+        }
+    }
+    Ok(out)
+}
+
+/// The `ATRatio` (ATRatioGas1) extract — raw `(fuelTypeID, fuelFormulationID,
+/// polProcessID, minModelYearID, maxModelYearID, ageID, monthGroupID, atRatio)`
+/// joined to the run's `FuelSupply` (which formulations are sold, in which
+/// months) and resolved to a single `modelYearID = year - ageID` inside the
+/// `[minModelYearID, maxModelYearID]` window. One output row per (raw row,
+/// month the formulation is sold).
+fn synthesize_at_ratio(ctx: &CalculatorContext, year: i32) -> Result<Vec<AtRatioRow>, Error> {
+    let Some(cols) = optional_columns(
+        ctx,
+        "ATRatio",
+        &[
+            "fuelTypeID",
+            "fuelFormulationID",
+            "polProcessID",
+            "minModelYearID",
+            "maxModelYearID",
+            "ageID",
+            "atRatio",
+        ],
+    )?
+    else {
+        return Ok(Vec::new());
+    };
+    // No raw rows → nothing to extract; skip the (possibly absent) FuelSupply /
+    // MonthOfAnyYear reads a unit-test or non-fuel RunSpec may not supply.
+    if cols[0].is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // formulation → months it is sold in (FuelSupply.monthGroupID → the run's
+    // MonthOfAnyYear.monthID). The SQL derives the extract's monthID from this
+    // join, not from any monthGroupID on ATRatio itself.
+    let months_of_group = {
+        let m = ctx
+            .tables()
+            .column_views("MonthOfAnyYear", &["monthID", "monthGroupID"])?;
+        let month = col_i32(&m[0])?;
+        let group = col_i32(&m[1])?;
+        let mut map: HashMap<i32, Vec<i32>> = HashMap::new();
+        for (mo, g) in month.into_iter().zip(group) {
+            if let (Some(mo), Some(g)) = (mo, g) {
+                map.entry(g).or_default().push(mo);
+            }
+        }
+        map
+    };
+    let formulation_months = {
+        let fs = ctx
+            .tables()
+            .column_views("FuelSupply", &["fuelFormulationID", "monthGroupID"])?;
+        let form = col_i32(&fs[0])?;
+        let group = col_i32(&fs[1])?;
+        let mut map: HashMap<i32, Vec<i32>> = HashMap::new();
+        for (f, g) in form.into_iter().zip(group) {
+            if let (Some(f), Some(g)) = (f, g) {
+                if let Some(months) = months_of_group.get(&g) {
+                    map.entry(f).or_default().extend(months.iter().copied());
+                }
+            }
+        }
+        map
+    };
+
+    let fuel = col_i32(&cols[0])?;
+    let form = col_i32(&cols[1])?;
+    let pp = col_i32(&cols[2])?;
+    let min_my = col_i32(&cols[3])?;
+    let max_my = col_i32(&cols[4])?;
+    let age = col_i32(&cols[5])?;
+    let ratio = col_f64(&cols[6])?;
+
+    let mut out = Vec::new();
+    for i in 0..pp.len() {
+        let (Some(ft), Some(ff), Some(p), Some(min_y), Some(max_y), Some(a), Some(r)) = (
+            fuel[i], form[i], pp[i], min_my[i], max_my[i], age[i], ratio[i],
+        ) else {
+            continue;
+        };
+        let model_year_id = year - a;
+        if model_year_id < min_y || model_year_id > max_y {
+            continue;
+        }
+        let Some(months) = formulation_months.get(&ff) else {
+            continue; // formulation not sold in the run → INNER JOIN drops it
+        };
+        for &month_id in months {
+            out.push(AtRatioRow {
+                fuel_type_id: ft,
+                fuel_formulation_id: ff,
+                pol_process_id: p,
+                min_model_year_id: min_y,
+                max_model_year_id: max_y,
+                age_id: a,
+                month_id,
+                at_ratio: r,
+                model_year_id,
+            });
+        }
+    }
+    Ok(out)
+}
+
+/// `(yearID, monthID, fuelTypeID)` → the fuel-supply formulations of that cell,
+/// each `(fuelSubtypeID, fuelFormulationID, marketShare)` — the canonical
+/// `AT*FuelSupply` extract.
+type FuelSupplyMap = HashMap<(i32, i32, i32), Vec<(i32, i32, f64)>>;
+
+/// Synthesize the county-year fuel supply the worker rows expand across.
+///
+/// `MOVESWorkerOutput` carries no `fuelFormulationID`; MOVES derives one per row
+/// by joining the county-year fuel supply (`AT1FuelSupply` / `ATNonGasFuelSupply`
+/// in the SQL), expanding each row over the formulations of its fuel type and
+/// market-share-weighting the emission. Built from `Year` (fuelYearID→yearID),
+/// `MonthOfAnyYear` (monthGroupID→monthID), `FuelFormulation`
+/// (fuelFormulationID→fuelSubtypeID), `FuelSubtype` (fuelSubtypeID→fuelTypeID)
+/// and `FuelSupply` (the marketShare). Mirrors `HCSpeciationCalculator`'s
+/// `HCFuelSupply` derivation. `countyID` is a run constant, so the key drops it.
+fn synthesize_fuel_supply(ctx: &CalculatorContext) -> Result<FuelSupplyMap, Error> {
+    let tables = ctx.tables();
+
+    // The expansion is only needed where the worker rows carry no formulation
+    // and the run supplies the fuel tables. If any source table is absent (e.g.
+    // a unit-test context, or a RunSpec that does not reach this calculator),
+    // return an empty map — callers fall back to the row's own fuel ids.
+    for name in [
+        "Year",
+        "MonthOfAnyYear",
+        "FuelFormulation",
+        "FuelSubtype",
+        "FuelSupply",
+    ] {
+        if tables.get(name).is_none() {
+            return Ok(FuelSupplyMap::new());
+        }
+    }
+
+    let year = tables.column_views("Year", &["yearID", "fuelYearID"])?;
+    let year_of_fuel_year: HashMap<i32, i32> = col_i32(&year[1])?
+        .into_iter()
+        .zip(col_i32(&year[0])?)
+        .filter_map(|(fy, y)| Some((fy?, y?)))
+        .collect();
+
+    let moay = tables.column_views("MonthOfAnyYear", &["monthID", "monthGroupID"])?;
+    let mut months_of_group: HashMap<i32, Vec<i32>> = HashMap::new();
+    for (m, g) in col_i32(&moay[0])?.into_iter().zip(col_i32(&moay[1])?) {
+        if let (Some(m), Some(g)) = (m, g) {
+            months_of_group.entry(g).or_default().push(m);
+        }
+    }
+
+    let ff = tables.column_views("FuelFormulation", &["fuelFormulationID", "fuelSubtypeID"])?;
+    let subtype_of_formulation: HashMap<i32, i32> = col_i32(&ff[0])?
+        .into_iter()
+        .zip(col_i32(&ff[1])?)
+        .filter_map(|(f, s)| Some((f?, s?)))
+        .collect();
+
+    let fst = tables.column_views("FuelSubtype", &["fuelSubtypeID", "fuelTypeID"])?;
+    let fuel_type_of_subtype: HashMap<i32, i32> = col_i32(&fst[0])?
+        .into_iter()
+        .zip(col_i32(&fst[1])?)
+        .filter_map(|(s, t)| Some((s?, t?)))
+        .collect();
+
+    let fs = tables.column_views(
+        "FuelSupply",
+        &["fuelYearID", "monthGroupID", "fuelFormulationID", "marketShare"],
+    )?;
+    let fuel_year = col_i32(&fs[0])?;
+    let month_group = col_i32(&fs[1])?;
+    let formulation = col_i32(&fs[2])?;
+    let share = col_f64(&fs[3])?;
+
+    let mut map: FuelSupplyMap = HashMap::new();
+    for (((fy, mg), form), sh) in fuel_year
+        .iter()
+        .zip(&month_group)
+        .zip(&formulation)
+        .zip(&share)
+    {
+        let (Some(fy), Some(mg), Some(form), Some(sh)) = (*fy, *mg, *form, *sh) else {
+            continue;
+        };
+        let Some(&year_id) = year_of_fuel_year.get(&fy) else {
+            continue;
+        };
+        let Some(&subtype) = subtype_of_formulation.get(&form) else {
+            continue;
+        };
+        let Some(&fuel_type) = fuel_type_of_subtype.get(&subtype) else {
+            continue;
+        };
+        let Some(months) = months_of_group.get(&mg) else {
+            continue;
+        };
+        for &month_id in months {
+            map.entry((year_id, month_id, fuel_type))
+                .or_default()
+                .push((subtype, form, sh));
+        }
+    }
+    Ok(map)
+}
+
 impl Calculator for AirToxicsCalculator {
     fn name(&self) -> &'static str {
         Self::NAME
@@ -1925,28 +2375,45 @@ impl Calculator for AirToxicsCalculator {
 
  /// Run the calculator for the current master-loop iteration.
  ///
- /// **Data plane pending.** [`CalculatorContext`] exposes only
- /// placeholder `ExecutionTables` / `ScratchNamespace` today, so this body
- /// cannot read the nine air-toxics tables nor the upstream emission fuel
- /// blocks, nor write the toxic blocks back. The faithful algorithm is
- /// ported and tested on [`AirToxics`]; once the `DataFrameStore` lands,
- /// `execute` builds an [`AirToxics`] from `ctx.tables()`, reads the input
- /// [`FuelBlock`]s, applies
- /// [`air_toxics_block`](AirToxics::air_toxics_block), and stores the
- /// resulting [`ToxicFuelBlock`]s.
+ /// Synthesizes the ratio extracts from the raw default-DB tables
+ /// (`Section Extract Data`: the `PollutantProcessAssoc` join,
+ /// `modelYearGroupID` expansion and the `ATRatio` `FuelSupply` join), expands
+ /// each `MOVESWorkerOutput` row across its fuel type's formulations (the
+ /// `AT*FuelSupply` join, since the port's worker output carries no
+ /// `fuelFormulationID`), builds an [`AirToxics`], applies
+ /// [`air_toxics_block`](AirToxics::air_toxics_block) to every input block and
+ /// emits the resulting toxic rows.
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let tables = ctx.tables();
         let chained_to: Vec<ChainedToRow> = tables.iter_typed("RunSpecChainedTo")?;
+        // The snapshot ships the raw default-DB ratio tables; reproduce the
+        // master's `Section Extract Data` transforms (PollutantProcessAssoc
+        // join + modelYearGroupID expansion + the ATRatio FuelSupply join) so
+        // the calculator runs from them. Every extract resolves
+        // `modelYearID = year - ageID` against the run year and bounds the
+        // model-year windows by `[year-40, year]`; the canonical SQL binds
+        // `##context.year##` for every real run, so an absent year is a
+        // missing-context bug, not a zero-emission success. Surface it rather
+        // than silently collapsing every model-year window to empty.
+        let year = crate::wiring::position_filter(ctx).year.ok_or_else(|| {
+            Error::Polars(
+                "AirToxicsCalculator.execute: iteration position has no year; \
+                 cannot resolve modelYearID = year - ageID (context.year is \
+                 always bound in a real run)"
+                    .to_string(),
+            )
+        })?;
+        let ppa = pollutant_process_map(ctx)?;
         let extracts = AirToxicsExtracts {
-            minor_hap_ratio: tables.iter_typed::<MinorHapRatioRow>("minorHAPRatio")?,
-            pah_gas_ratio: tables.iter_typed::<PahRatioRow>("pahGasRatio")?,
-            pah_particle_ratio: tables.iter_typed::<PahRatioRow>("pahParticleRatio")?,
+            minor_hap_ratio: synthesize_minor_hap_ratio(ctx, &ppa, year)?,
+            pah_gas_ratio: synthesize_pah_ratio(ctx, "pahGasRatio", &ppa, year)?,
+            pah_particle_ratio: synthesize_pah_ratio(ctx, "pahParticleRatio", &ppa, year)?,
             at_ratio_gas1_chained_to: chained_to.clone(),
             at_ratio_gas2_chained_to: chained_to.clone(),
             at_ratio_non_gas_chained_to: chained_to,
-            at_ratio: tables.iter_typed::<AtRatioRow>("ATRatio")?,
-            at_ratio_gas2: tables.iter_typed::<AtRatioGas2Row>("ATRatioGas2")?,
-            at_ratio_non_gas: tables.iter_typed::<AtRatioNonGasRow>("ATRatioNonGas")?,
+            at_ratio: synthesize_at_ratio(ctx, year)?,
+            at_ratio_gas2: synthesize_at_ratio_gas2(ctx)?,
+            at_ratio_non_gas: synthesize_at_ratio_non_gas(ctx, year)?,
         };
         let air_toxics = AirToxics::build(extracts);
         let modules = ModuleFlags {
@@ -1957,9 +2424,46 @@ impl Calculator for AirToxicsCalculator {
             at_ratio_gas2: true,
             at_ratio_non_gas: true,
         };
+        // `MOVESWorkerOutput` carries no `fuelFormulationID`; expand each input
+        // row across the formulations of its fuel type, market-share-weighted,
+        // so the ATRatioGas1 path can key on a concrete formulation (the
+        // canonical `AT*FuelSupply` join). Matches the NONROAD/onroad MWO reader
+        // (`calc/mwo/mworeader.go`, `readMOVESWorkerOutput`): each block is split
+        // over `FuelSupply[county,year,month,fuelType]`, and a block whose
+        // fuel-type cell has *no* supply entry (`fsDetail == nil`) is dropped
+        // (`continue`) — it emits no toxics, rather than passing through with a
+        // fabricated formulation 0. A row that already carries a concrete
+        // formulation (the engine never produces one, but keep it robust) is
+        // taken verbatim.
+        let fuel_supply = synthesize_fuel_supply(ctx)?;
         let input_rows: Vec<AirToxicsMwoRow> = tables.iter_typed("MOVESWorkerOutput")?;
         let mut output_rows: Vec<AirToxicsMwoRow> = Vec::new();
         for row in &input_rows {
+            let emissions: Vec<Emission> = if row.fuel_formulation_id != 0 {
+                vec![Emission {
+                    fuel_sub_type_id: row.fuel_sub_type_id,
+                    fuel_formulation_id: row.fuel_formulation_id,
+                    emission_quant: row.emission_quant,
+                    emission_rate: row.emission_rate,
+                }]
+            } else {
+                match fuel_supply.get(&(row.year_id, row.month_id, row.fuel_type_id)) {
+                    Some(supply) => supply
+                        .iter()
+                        .map(|&(fuel_sub_type_id, fuel_formulation_id, market_share)| Emission {
+                            fuel_sub_type_id,
+                            fuel_formulation_id,
+                            emission_quant: row.emission_quant * market_share,
+                            emission_rate: row.emission_rate * market_share,
+                        })
+                        .collect(),
+                    // No supply for this (year, month, fuelType) cell: the
+                    // canonical reader drops the block. Skipping it here keeps
+                    // the fuelType-keyed PAH paths from emitting toxics off a
+                    // block canonical MOVES would have produced nothing for.
+                    None => continue,
+                }
+            };
             let block = FuelBlock {
                 key: FuelBlockKey {
                     pollutant_id: row.pollutant_id,
@@ -1970,12 +2474,7 @@ impl Calculator for AirToxicsCalculator {
                     month_id: row.month_id,
                     source_type_id: row.source_type_id,
                 },
-                emissions: vec![Emission {
-                    fuel_sub_type_id: row.fuel_sub_type_id,
-                    fuel_formulation_id: row.fuel_formulation_id,
-                    emission_quant: row.emission_quant,
-                    emission_rate: row.emission_rate,
-                }],
+                emissions,
             };
             for tblock in air_toxics.air_toxics_block(&block, modules) {
                 for emission in &tblock.emissions {
@@ -2721,36 +3220,89 @@ mod tests {
         }
     }
 
+    /// Build a raw default-DB ratio table: every column but the last is `i32`,
+    /// the last is the `f64` ratio. `int_row` supplies the one row's integer
+    /// values (empty → a 0-row table). Used to feed the extract-synthesis path.
+    fn raw_table(cols: &[&str], int_row: &[i32], ratio: f64) -> DataFrame {
+        let n = if int_row.is_empty() { 0 } else { 1 };
+        let mut series: Vec<polars::prelude::Column> = Vec::new();
+        for (idx, &name) in cols[..cols.len() - 1].iter().enumerate() {
+            let vals: Vec<i32> = if n == 1 { vec![int_row[idx]] } else { vec![] };
+            series.push(Series::new(name.into(), vals).into());
+        }
+        let last = cols[cols.len() - 1];
+        let vals: Vec<f64> = if n == 1 { vec![ratio] } else { vec![] };
+        series.push(Series::new(last.into(), vals).into());
+        DataFrame::new(n, series).unwrap()
+    }
+
     #[test]
     fn execute_wires_through_data_plane() {
-        use moves_framework::DataFrameStore;
+        use moves_framework::{DataFrameStore, IterationPosition};
         let calc = AirToxicsCalculator::new();
         let mut store = moves_framework::InMemoryStore::new();
- // minorHAPRatio: VOC (87), process 1, sub-type 10, MY 2020 → pollutant 20, ratio 0.5.
+        // Raw `minorHAPRatio`: polProcessID 2001 (pollutant 20, process 1),
+        // fuelSubtype 10, modelYearGroupID 2020×10000+2020 (the single MY 2020),
+        // ratio 0.5. `synthesize_minor_hap_ratio` joins PollutantProcessAssoc to
+        // resolve processID/outputPollutantID and expands the group to MY 2020.
         store.insert(
             "minorHAPRatio",
-            MinorHapRatioRow::into_dataframe(vec![minor_hap_row(1, 20, 10, 2020, 0.5)]).unwrap(),
+            raw_table(
+                &["polProcessID", "fuelTypeID", "fuelSubtypeID", "modelYearGroupID", "atRatio"],
+                &[2001, 1, 10, 2020 * 10000 + 2020],
+                0.5,
+            ),
         );
- // Empty tables for unexercised paths.
-        store.insert("pahGasRatio", PahRatioRow::into_dataframe(vec![]).unwrap());
+        // PollutantProcessAssoc: polProcessID 2001 → processID 1, pollutantID 20
+        // (read via `column_views`/`col_i32`, so the trailing f64 casts back).
+        store.insert(
+            "PollutantProcessAssoc",
+            raw_table(&["polProcessID", "processID", "pollutantID"], &[2001, 1], 20.0),
+        );
+        // Empty raw tables for the unexercised paths.
+        store.insert(
+            "pahGasRatio",
+            raw_table(&["polProcessID", "fuelTypeID", "modelYearGroupID", "atRatio"], &[], 0.0),
+        );
         store.insert(
             "pahParticleRatio",
-            PahRatioRow::into_dataframe(vec![]).unwrap(),
+            raw_table(&["polProcessID", "fuelTypeID", "modelYearGroupID", "atRatio"], &[], 0.0),
         );
         store.insert(
             "RunSpecChainedTo",
             ChainedToRow::into_dataframe(vec![]).unwrap(),
         );
-        store.insert("ATRatio", AtRatioRow::into_dataframe(vec![]).unwrap());
+        store.insert(
+            "ATRatio",
+            raw_table(
+                &[
+                    "fuelTypeID",
+                    "fuelFormulationID",
+                    "polProcessID",
+                    "minModelYearID",
+                    "maxModelYearID",
+                    "ageID",
+                    "monthGroupID",
+                    "atRatio",
+                ],
+                &[],
+                0.0,
+            ),
+        );
         store.insert(
             "ATRatioGas2",
-            AtRatioGas2Row::into_dataframe(vec![]).unwrap(),
+            raw_table(&["polProcessID", "sourceTypeID", "fuelSubtypeID", "ATRatio"], &[], 0.0),
         );
         store.insert(
             "ATRatioNonGas",
-            AtRatioNonGasRow::into_dataframe(vec![]).unwrap(),
+            raw_table(
+                &["polProcessID", "sourceTypeID", "fuelSubtypeID", "modelYearGroupID", "ATRatio"],
+                &[],
+                0.0,
+            ),
         );
- // Input: one VOC (87) row matching the minorHAPRatio entry above.
+        // Input: one VOC (87) row matching the minorHAPRatio entry. It already
+        // carries a formulation (100), so no fuel-supply expansion is needed.
         store.insert(
             "MOVESWorkerOutput",
             AirToxicsMwoRow::into_dataframe(vec![AirToxicsMwoRow {
@@ -2776,7 +3328,14 @@ mod tests {
             }])
             .unwrap(),
         );
-        let ctx = CalculatorContext::with_tables(store);
+        let pos = IterationPosition {
+            time: moves_framework::ExecutionTime {
+                year: Some(2020),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let ctx = CalculatorContext::with_position_and_tables(pos, store);
         let out = calc.execute(&ctx).expect("execute ok");
         let df = out.dataframe().expect("output should contain a DataFrame");
  // minorHAPRatio fires: VOC 87 * 0.5 → pollutant 20.

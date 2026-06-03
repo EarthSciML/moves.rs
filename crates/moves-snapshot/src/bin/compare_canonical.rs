@@ -124,16 +124,19 @@ fn main() -> ExitCode {
 
 fn run(args: &Args) -> Result<(), Box<dyn std::error::Error>> {
     let canonical = if args.canonical.exists() {
-        match Snapshot::load(&args.canonical) {
-            Ok(s) => pollutant_sums_from_snapshot(&s),
-            Err(e) => {
-                eprintln!(
-                    "warning: could not load canonical snapshot at {}: {e}",
-                    args.canonical.display()
-                );
-                Default::default()
-            }
-        }
+        // The canonical fixture is present: a load failure (hash mismatch,
+        // corruption, unsupported format version) is a hard error, not a
+        // recoverable "no canonical data" condition. Surface it so the audit
+        // gate cannot silently treat tampered/corrupt reference data as an
+        // empty comparison. (Mirrors the in-tree regression gate in
+        // crates/moves-cli/tests/full_suite_regression.rs.)
+        let s = Snapshot::load(&args.canonical).map_err(|e| {
+            format!(
+                "could not load canonical snapshot at {}: {e}",
+                args.canonical.display()
+            )
+        })?;
+        pollutant_sums_from_snapshot(&s)
     } else {
         Default::default()
     };

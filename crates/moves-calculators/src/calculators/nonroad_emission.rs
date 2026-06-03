@@ -17,27 +17,28 @@
 //! fires the adapter for a DAY-granularity iteration over processes
 //! 1, 15, 18–21, or 30–32, the adapter:
 //!
-//! 1. Extracts the episode year from the iteration position.
-//! 2. Builds a [`NonroadOptions`] for a county-level run.
-//! 3. Creates a [`NonroadInputs`] bundle (currently empty — the
-//! data-plane wiring that populates it from execution-DB tables
-//! is a follow-on task).
-//! 4. Calls [`run_simulation`] with a [`ProductionExecutor`] backed
-//! by default (empty) [`ReferenceData`].
-//! 5. Returns [`CalculatorOutput::empty()`] — the output-to-DataFrame
-//! conversion (mapping [`SimEmissionRow`] onto the unified Parquet
-//! output schema) is likewise deferred until the data-plane wiring
-//! lands.
+//! 1. Checks the iteration position carries a full Year-Month-Day key
+//! (mirroring canonical `doesProcessContext`); a context missing any
+//! of those is skipped rather than run with a fabricated year.
+//! 2. Builds a [`NonroadOptions`] for a county-level run at that year.
+//! 3. Builds the [`NonroadInputs`] population bundle from the `nr*`
+//! execution-DB tables via [`nonroad_loader::build_nonroad_inputs`].
+//! 4. Calls [`run_simulation`] with a [`ProductionExecutor`] whose
+//! [`ReferenceData`] is loaded from the same `nr*` tables.
+//! 5. Maps the engine's [`SimEmissionRow`]s onto the MOVESOutput schema
+//! and returns the resulting [`CalculatorOutput`].
 //!
-//! # Why empty inputs are safe for now
+//! # Empty inputs: no-op vs. data-load failure
 //!
-//! `NonroadInputs::new()` creates an SCC-group list with no records
-//! and an unconstrained region selection. `run_simulation` exits its
-//! outer SCC-group loop immediately and returns an empty
-//! `NonroadOutputs`. The call is a pure no-op — no I/O, no panics//! so the adapter can be registered and exercised by the
-//! mixed-onroad-nonroad fixture today, even though the actual nonroad
-//! emission numbers will only appear once the population-data wiring
-//! is done.
+//! An empty [`NonroadInputs`] bundle is treated as a *legitimate
+//! nonroad-free slice* (no equipment after the runspec's sector/fuel
+//! selection) **only** when the population-defining tables
+//! (`nrsourceusetype`, `nrbaseyearequippopulation`) are actually present
+//! in the execution store. If those tables are absent, the empty bundle
+//! is instead a data-load failure — the snapshot loader was expected to
+//! admit them (this calculator only fires for nonroad processes the
+//! runspec selected) — and the adapter returns an [`Error::Nonroad`]
+//! rather than a silent, successful-looking zero-emissions result.
 //!
 //! # Process subscription note
 //!
@@ -64,10 +65,6 @@ use moves_framework::{
 use moves_framework::data::DataFrameStore;
 
 use crate::calculators::nonroad_loader::{self, EmissionTimeKeys};
-
-/// MOVES default episode year used when the iteration position carries
-/// no year (e.g. when the master loop fires before entering YEAR scope).
-const DEFAULT_YEAR: i32 = 2020;
 
 /// Subscribed process IDs — the nine nonroad emission processes the
 /// `calculator-dag.json` records for `NonroadEmissionCalculator`.
@@ -188,15 +185,33 @@ impl Calculator for NonroadEmissionCalculator {
 
  /// Run the NONROAD simulation for the current master-loop iteration.
  ///
- /// Extracts the episode year from `ctx.position().time.year`, falls
- /// back to `DEFAULT_YEAR` when the position carries none (should
- /// not happen at `DAY` granularity, but defensively handled).
- /// Calls [`moves_nonroad::run_simulation`] with empty inputs and
- /// default reference data, returning [`CalculatorOutput::empty()`]
- /// until the output-mapping wiring is in place.
+ /// Mirrors canonical `NonroadEmissionCalculator.doesProcessContext`
+ /// (`NonroadEmissionCalculator.java:457-481`), which returns `false`
+ /// — i.e. does *not* execute — for any context with `year <= 0`,
+ /// `monthID <= 0`, or `dayID <= 0`. The Zone-Year-Month-Day position
+ /// is mandatory in NONROAD; a missing temporal key is not a defaultable
+ /// value but a "this context should be skipped" signal. We therefore
+ /// skip (return [`CalculatorOutput::empty()`]) when the year, month, or
+ /// day is absent, rather than fabricating an episode year and running
+ /// the whole simulation for the wrong (or guessed) year.
+ ///
+ /// Once a valid temporal position is present, builds the NONROAD engine
+ /// inputs from the `nr*` execution-DB tables, calls
+ /// [`moves_nonroad::run_simulation`], and maps the result onto the
+ /// MOVESOutput schema.
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let time = &ctx.position().time;
-        let year = time.year.map(i32::from).unwrap_or(DEFAULT_YEAR);
+ // Canonical doesProcessContext: skip contexts without a full
+ // Year-Month-Day temporal position (year/month/day all > 0). At DAY
+ // granularity all three are normally set; a missing one means the
+ // master loop has not descended into DAY scope, so there is nothing
+ // for this calculator to do at this position.
+        let (Some(year), Some(_month_present), Some(_day_present)) =
+            (time.year, time.month, time.day_id)
+        else {
+            return Ok(CalculatorOutput::empty());
+        };
+        let year = i32::from(year);
 
  // Build the NONROAD engine inputs from the nr* execution-DB tables
  // (the in-process replacement for the Java input-file generator).
@@ -214,7 +229,42 @@ impl Calculator for NonroadEmissionCalculator {
             );
         }
         if inputs.is_empty() {
- // No nonroad population in this run — nothing to compute.
+ // An empty inputs bundle has two very different causes:
+ //
+ //  (a) the population-defining tables are *present* but produced no
+ //      driver records (zero population, or every source type filtered
+ //      out by the runspec's sector/fuel selection). This is a
+ //      legitimate nonroad-free slice — canonical NONROAD simply emits
+ //      no equipment for it — so we no-op.
+ //
+ //  (b) the population-defining tables are *absent* from the store. This
+ //      calculator only fires for nonroad processes that are in the
+ //      runspec (canonical `subscribeToMe` subscribes only when
+ //      `doesHavePollutantAndProcess` holds — NonroadEmissionCalculator
+ //      .java:108-134), so the snapshot loader was expected to admit
+ //      these `nr*` tables. Their absence is a data-load failure, and a
+ //      silent zero-emissions run would be indistinguishable from (a).
+ //      Surface it as a hard error instead of fabricating an empty,
+ //      successful-looking result.
+            let has_source_use_type = store.contains("nrsourceusetype");
+            let has_population = store.contains("nrbaseyearequippopulation");
+            if !has_source_use_type || !has_population {
+                let mut missing = Vec::new();
+                if !has_source_use_type {
+                    missing.push("nrsourceusetype");
+                }
+                if !has_population {
+                    missing.push("nrbaseyearequippopulation");
+                }
+                return Err(Error::Nonroad(format!(
+                    "nonroad population tables missing from the execution store \
+                     ({}); cannot build NONROAD inputs for a nonroad-enabled run. \
+                     A successful zero-emissions result would silently hide this \
+                     missing-data condition.",
+                    missing.join(", ")
+                )));
+            }
+ // Tables present but empty population — a genuine nonroad-free slice.
             return Ok(CalculatorOutput::empty());
         }
         let mut executor = nonroad_loader::build_production_executor(store, year);

@@ -15,7 +15,7 @@
 //! | `RateOfProgressControlStrategy` | `scale = 1.0 − reductionFraction` | `RateOfProgressStrategy.java` |
 //! | `OnRoadRetrofitStrategy` | `factor = ∏(1 − fraction × effectiveness)` | `OnRoadRetrofit.java` |
 //! | `AvftControlStrategy` | gap-fill + project via `AVFTTool` | `AVFTTool.java` |
-//! | `NonRoadRetrofitStrategy` | pass-through to `calculate_retrofit_reduction` | `clcrtrft.f` |
+//! | `NonRoadRetrofitStrategy` | framework adapter only (record storage/order + lifecycle); the per-SCC reduction formula (`clcrtrft.f`) is validated in `moves-nonroad`'s `calculate_retrofit_reduction` tests, not here | `clcrtrft.f` |
 //!
 //! # Cross-strategy order-of-application
 //!

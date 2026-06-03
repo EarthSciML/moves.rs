@@ -3414,11 +3414,25 @@ impl Calculator for EvaporativePermeationCalculator {
         };
         let reg_class_rows =
             tables.iter_typed::<RegClassSourceTypeFractionRow>("RegClassSourceTypeFraction")?;
-        let with_reg_class = !reg_class_rows.is_empty();
+        // `BundleUtilities.prepareCountyDataWithRunSpec` unconditionally adds
+        // "WithRegClassID" to the enabled SQL sections (BundleUtilities.java:178),
+        // so PC-1b's `NoRegClassID` section is dead in current MOVES. The port
+        // always takes `WithRegClassID`; an empty/absent `RegClassSourceTypeFraction`
+        // is a data-extraction gap, not a cue to silently switch sections (which
+        // would change the output's `regClassID` dimension and per-reg-class
+        // splitting), so surface it as an error instead.
+        if reg_class_rows.is_empty() {
+            return Err(Error::InvalidBundle(
+                "RegClassSourceTypeFraction is empty: EvaporativePermeationCalculator requires \
+                 the WithRegClassID regulatory-class fractions (BundleUtilities force-enables \
+                 the WithRegClassID section)"
+                    .into(),
+            ));
+        }
         let run_context = RunContext {
             year,
             zone_id,
-            with_reg_class,
+            with_reg_class: true,
         };
         let run_spec_source_type: Vec<i32> = tables
             .iter_typed::<RunSpecSourceTypeRow>("RunSpecSourceType")?

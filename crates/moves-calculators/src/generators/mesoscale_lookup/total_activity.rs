@@ -1353,6 +1353,70 @@ impl TableRow for LinkAverageSpeedRow {
     }
 }
 
+/// One `monthOfAnyYear` row — supplies the real day count per month, the
+/// basis for the `WeeksInMonthHelper` divisor (`noOfDays / 7.0`).
+struct MonthOfAnyYearRow {
+    month_id: i16,
+ /// `noOfDays` — calendar days in the month. Nullable in the canonical
+ /// schema; a null (or non-positive) value is stored as `0` and treated
+ /// by the weeks-per-month lookup as the Java fallback (1 week).
+    no_of_days: i32,
+}
+
+impl TableRow for MonthOfAnyYearRow {
+    fn table_name() -> &'static str {
+        "monthOfAnyYear"
+    }
+    fn polars_schema() -> polars::prelude::Schema {
+        polars::prelude::Schema::from_iter([
+            ("monthID".into(), DataType::Int32),
+            ("noOfDays".into(), DataType::Int32),
+        ])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.month_id as i32).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "noOfDays".into(),
+                    rows.iter().map(|r| r.no_of_days).collect::<Vec<i32>>(),
+                )
+                .into(),
+            ],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "monthOfAnyYear";
+        let month_id_col = df
+            .column("monthID")
+            .map_err(|e| row_err(t, 0, "monthID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "monthID", e.to_string()))?;
+        let no_of_days_col = df
+            .column("noOfDays")
+            .map_err(|e| row_err(t, 0, "noOfDays", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "noOfDays", e.to_string()))?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(MonthOfAnyYearRow {
+                    month_id: month_id_col.get(i).ok_or_else(|| null("monthID"))? as i16,
+ // noOfDays is nullable in the canonical schema; a null becomes 0,
+ // which the weeks-per-month lookup maps to the Java fallback.
+                    no_of_days: no_of_days_col.get(i).unwrap_or(0),
+                })
+            })
+            .collect()
+    }
+}
+
 /// One `hourDay` row — packed `(hour, day)` catalogue entry.
 struct HourDayRow {
     hour_day_id: i32,
@@ -1726,6 +1790,7 @@ static INPUT_TABLES: &[&str] = &[
     "monthVMTFraction",
     "dayVMTFraction",
     "hourVMTFraction",
+    "monthOfAnyYear",
     "roadType",
     "link",
     "linkAverageSpeed",
@@ -1813,10 +1878,13 @@ impl Generator for MesoscaleLookupTotalActivityGenerator {
  /// For mesoscale-lookup runs `SHO = VMT` (the travel fraction) and
  /// `sourceHours = SHO`; `distance = SHO × averageSpeed`. Apportionment
  /// to months/days/hours uses `monthVMTFraction × dayVMTFraction ×
- /// hourVMTFraction / 1` (weeks-in-month defaults to 1 because
- /// `monthOfAnyYear` is not in the generator's input table set). Links
- /// are iterated uniformly; each link's road type drives the day/hour
- /// fraction lookup.
+ /// hourVMTFraction / weeksInMonth`, where `weeksInMonth` is
+ /// `monthOfAnyYear.noOfDays / 7.0` (the `WeeksInMonthHelper` divisor).
+ /// Tuples lacking any of the three VMT-fraction rows are dropped, matching
+ /// the Java `INNER JOIN` domain rather than emitting fabricated zeros.
+ /// Links are iterated uniformly; each link's road type drives the
+ /// day/hour fraction lookup, and every link must have a `linkAverageSpeed`
+ /// row.
     fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
  // ── position ──────────────────────────────────────────────────────────
         let year_id = ctx
@@ -1840,6 +1908,8 @@ impl Generator for MesoscaleLookupTotalActivityGenerator {
             ctx.tables().iter_typed("dayVMTFraction")?;
         let hour_vmt_fractions: Vec<HourVmtFractionRow> =
             ctx.tables().iter_typed("hourVMTFraction")?;
+        let month_of_any_year: Vec<MonthOfAnyYearRow> =
+            ctx.tables().iter_typed("monthOfAnyYear")?;
         let links: Vec<LinkRow> = ctx.tables().iter_typed("link")?;
         let link_avg_speeds: Vec<LinkAverageSpeedRow> =
             ctx.tables().iter_typed("linkAverageSpeed")?;
@@ -1899,6 +1969,20 @@ impl Generator for MesoscaleLookupTotalActivityGenerator {
             .iter()
             .map(|r| (r.link_id, r.average_speed))
             .collect();
+ // monthID -> weeksInMonth (WeeksInMonthHelper.getWeeksPerMonth =
+ // noOfDays/7.0, read from MonthOfAnyYear). Mirrors the Java fallback:
+ // a missing/non-positive noOfDays divides by 1 rather than 0.
+        let weeks_per_month: BTreeMap<i16, f64> = month_of_any_year
+            .iter()
+            .map(|r| {
+                let weeks = if r.no_of_days > 0 {
+                    f64::from(r.no_of_days) / 7.0
+                } else {
+                    1.0
+                };
+                (r.month_id, weeks)
+            })
+            .collect();
  // hourDayID -> (dayID, hourID)
         let _hour_day_map: BTreeMap<i32, (i16, i16)> = hour_days
             .iter()
@@ -1922,15 +2006,20 @@ impl Generator for MesoscaleLookupTotalActivityGenerator {
         month_day_hour_hd.dedup();
 
  // ── Tag-5…Tag-7/Tag-9: apportion and build output rows ────────────────
- // weeks_in_month defaults to 1 (Java WeeksInMonthHelper fallback for
- // unknown months, since MonthOfAnyYear is not in INPUT_TABLES).
-        let weeks_in_month = 1.0_f64;
-
         let mut sho_rows: Vec<ShoOutputRow> = Vec::new();
         let mut source_hours_rows: Vec<SourceHoursOutputRow> = Vec::new();
 
         for link in &links {
-            let speed = avg_speed.get(&link.link_id).copied().unwrap_or(0.0);
+ // Java calculateDistance updates SHO via an inner join on
+ // LinkAverageSpeed.linkID; a link with no speed row is a data error,
+ // not a real zero. Surface it rather than fabricating distance = 0.
+            let speed = *avg_speed.get(&link.link_id).ok_or_else(|| {
+                Error::Polars(format!(
+                    "linkAverageSpeed has no row for linkID {} (mesoscale-lookup \
+                     requires a speed for every modelled link)",
+                    link.link_id
+                ))
+            })?;
             let road_type_id = link.road_type_id;
 
             for tf in &travel_fracs {
@@ -1938,18 +2027,19 @@ impl Generator for MesoscaleLookupTotalActivityGenerator {
                 let age_id = tf.age_id;
 
                 for &(month_id, day_id, hour_id, hour_day_id) in &month_day_hour_hd {
-                    let m_frac = month_frac
-                        .get(&(source_type_id, month_id))
-                        .copied()
-                        .unwrap_or(0.0);
-                    let d_frac = day_frac
-                        .get(&(source_type_id, month_id, road_type_id, day_id))
-                        .copied()
-                        .unwrap_or(0.0);
-                    let h_frac = hour_frac
-                        .get(&(source_type_id, road_type_id, day_id, hour_id))
-                        .copied()
-                        .unwrap_or(0.0);
+ // The Java pipeline INNER JOINs MonthVMTFraction, DayVMTFraction
+ // and HourVMTFraction (and divides by weeksPerMonth from
+ // MonthOfAnyYear). A tuple with any missing join key is dropped by
+ // the inner join — it must NOT be emitted as a fabricated
+ // zero-activity row. Skip such tuples to match the join domain.
+                    let (Some(&m_frac), Some(&d_frac), Some(&h_frac), Some(&weeks_in_month)) = (
+                        month_frac.get(&(source_type_id, month_id)),
+                        day_frac.get(&(source_type_id, month_id, road_type_id, day_id)),
+                        hour_frac.get(&(source_type_id, road_type_id, day_id, hour_id)),
+                        weeks_per_month.get(&month_id),
+                    ) else {
+                        continue;
+                    };
 
  // Tag-5/6: apportion travel fraction to this hour.
                     let sho =
@@ -2516,6 +2606,17 @@ mod tests {
                 day_id: 5,
                 hour_id: 8,
                 hour_vmt_fraction: 1.0,
+            }])
+            .unwrap(),
+        );
+
+ // monthOfAnyYear — month 1 with 7 days so weeksInMonth = 7/7 = 1.0,
+ // keeping the apportionment divisor at 1 for this single-cell test.
+        store.insert(
+            "monthOfAnyYear",
+            MonthOfAnyYearRow::into_dataframe(vec![MonthOfAnyYearRow {
+                month_id: 1,
+                no_of_days: 7,
             }])
             .unwrap(),
         );

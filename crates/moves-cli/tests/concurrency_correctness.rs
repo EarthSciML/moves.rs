@@ -15,8 +15,13 @@
 //! bug in the chunking, executor, or output-processor layers — not in the
 //! numeric calculator cores.
 //!
-//! When the data plane lands, the same test immediately covers real
-//! calculator outputs with no changes needed.
+//! Because the compared file is `MOVESRun.parquet` (run metadata), this test
+//! CANNOT yet catch non-deterministic float summation in the numeric cores —
+//! there are no emission rows to vary. To stop it silently passing green as a
+//! permanent no-op once that bug class becomes testable, the test asserts the
+//! run is *not* fully implemented; the moment a fully-implemented calculator
+//! graph runs (data plane wired), that guard fails and forces the comparison
+//! to be re-pointed at the real emission output.
 //!
 //! # Byte-identity contract
 //!
@@ -70,8 +75,11 @@ fn read_bytes(path: &Path) -> Vec<u8> {
 }
 
 /// Run one fixture at a given parallelism and return the `MOVESRun.parquet`
-/// bytes.
-fn run_fixture_bytes(fixture: &Path, max_parallel_chunks: usize) -> Vec<u8> {
+/// bytes together with whether the run was fully implemented (every planned
+/// module had a registered factory). The implemented flag is used by the
+/// caller to detect when the data plane has landed so the byte-identity check
+/// must be strengthened to compare real emission output.
+fn run_fixture_bytes(fixture: &Path, max_parallel_chunks: usize) -> (Vec<u8>, bool) {
     let out_dir = tempdir().expect("tempdir");
     let opts = RunOptions {
         runspec: fixture.to_path_buf(),
@@ -92,7 +100,8 @@ fn run_fixture_bytes(fixture: &Path, max_parallel_chunks: usize) -> Vec<u8> {
             max_parallel_chunks
         )
     });
-    read_bytes(&outcome.run_record_path)
+    let bytes = read_bytes(&outcome.run_record_path);
+    (bytes, outcome.is_fully_implemented())
 }
 
 #[test]
@@ -118,6 +127,16 @@ fn outputs_are_byte_identical_across_parallelism_settings() {
     };
 
     let mut failures: Vec<String> = Vec::new();
+ // Tracks whether ANY fixture ran with a fully-implemented calculator graph.
+ // While calculators are stubs (`CalculatorOutput::empty()`), the only bytes
+ // in `MOVESRun.parquet` are pinned run metadata, so this test exercises
+ // framework non-determinism only and CANNOT catch non-deterministic float
+ // summation in the numeric cores. The moment the data plane lands and a run
+ // becomes fully implemented, this flag flips and the guard below fails the
+ // test — forcing the byte-identity comparison to be re-pointed at the real
+ // emission output (`MOVESOutput.parquet`) rather than silently remaining a
+ // metadata-only no-op that passes green forever.
+    let mut any_fully_implemented = false;
 
     for fixture in &fixtures {
         let name = fixture.file_stem().and_then(|n| n.to_str()).unwrap_or("?");
@@ -126,7 +145,8 @@ fn outputs_are_byte_identical_across_parallelism_settings() {
         let runs: Vec<(usize, &str, Vec<u8>)> = settings
             .iter()
             .map(|&(limit, label)| {
-                let bytes = run_fixture_bytes(fixture, limit);
+                let (bytes, fully_implemented) = run_fixture_bytes(fixture, limit);
+                any_fully_implemented |= fully_implemented;
                 (limit, label, bytes)
             })
             .collect();
@@ -150,6 +170,20 @@ fn outputs_are_byte_identical_across_parallelism_settings() {
         failures.is_empty(),
         "concurrency-correctness failures — non-deterministic output detected:\n  {}",
         failures.join("\n  ")
+    );
+
+ // Strengthening guard: the data plane has landed (calculators now have
+ // registered factories), so this test is no longer comparing pinned run
+ // metadata — it must be updated to compare the real per-bucket emission
+ // output across parallelism settings. Failing here is intentional: it
+ // prevents the determinism gate from passing green on empty output.
+    assert!(
+        !any_fully_implemented,
+        "data plane is wired: at least one fixture ran a fully-implemented \
+         calculator graph, but this test still only diffs MOVESRun.parquet \
+         (run metadata). Re-point the byte-identity comparison at the real \
+         emission output so it actually exercises non-deterministic float \
+         summation across threads, then remove this guard."
     );
 }
 

@@ -119,9 +119,101 @@ pub fn parse_bundle_to_store(bundle_bytes: &[u8]) -> Result<InMemoryStore, Strin
 pub fn setup_execution_store(runspec: &RunSpec, store: &mut InMemoryStore) -> Result<(), String> {
     merge_store_variants_eager(store)?;
     populate_source_use_type_physics_mapping(store)?;
+    populate_pollutant_process_mapped_model_year(store)?;
     populate_zone_month_hour_meteorology(store)?;
     populate_link_from_zone_road_type(store)?;
+    // The default DB ships an all-zero "placeholder" row (fuelFormulationID=0)
+    // in FuelSupply with NULL market-share columns. Real fuel supplies always
+    // carry a value; the placeholder never joins real data, so fill its NULLs
+    // with 0.0 rather than have the strict per-row extractors error on it.
+    fill_fuel_supply_placeholder_nulls(store)?;
     build_runspec_tables(runspec, store)?;
+    Ok(())
+}
+
+/// Zero-fill the NULL `marketShare`/`marketShareCV` of the FuelSupply
+/// `fuelFormulationID = 0` placeholder row(s) only, in place.
+///
+/// The default DB ships a single all-zero placeholder row (fuelFormulationID=0)
+/// whose market-share columns are NULL and that never joins real data; that row
+/// is the only legitimate NULL. A NULL `marketShare` on any *real*
+/// (fuelFormulationID != 0) row is a genuine data gap — the native strict
+/// per-row extractor (criteria_running_calculator.rs `FuelSupplyRow::extract`
+/// errors via `ok_or_else(|| null("marketShare"))`), so we must surface it as an
+/// error here rather than coerce it to 0.0 and silently zero out that
+/// formulation's blend-weighted contribution. No-op if the table is absent.
+/// Uses polars-core only.
+fn fill_fuel_supply_placeholder_nulls(store: &mut InMemoryStore) -> Result<(), String> {
+    const TABLE: &str = "FuelSupply";
+    const COLS: &[&str] = &["marketShare", "marketShareCV"];
+
+    let Some(arc) = store.get(TABLE) else {
+        return Ok(());
+    };
+    let mut df = (*arc).clone();
+    drop(arc);
+
+    // Locate the fuelFormulationID column so the NULL fill can be restricted to
+    // the placeholder row(s). If it is missing we cannot distinguish placeholder
+    // from real rows, so leave the data untouched and let the strict extractor
+    // decide.
+    let ffid_name = df
+        .columns()
+        .iter()
+        .find(|c| c.name().eq_ignore_ascii_case("fuelFormulationID"))
+        .map(|c| c.name().to_string());
+    let Some(ffid_name) = ffid_name else {
+        return Ok(());
+    };
+    let ffid = df
+        .column(&ffid_name)
+        .and_then(|c| c.cast(&DataType::Int32))
+        .map_err(|e| format!("FuelSupply.fuelFormulationID cast: {e}"))?;
+    let ffid = ffid.i32().map_err(|e| format!("{e}"))?.clone();
+    let is_placeholder = |i: usize| ffid.get(i) == Some(0);
+
+    let mut changed = false;
+    for &want in COLS {
+        let actual = df
+            .columns()
+            .iter()
+            .find(|c| c.name().to_ascii_lowercase() == want.to_ascii_lowercase())
+            .map(|c| c.name().to_string());
+        let Some(name) = actual else { continue };
+        let casted = df
+            .column(&name)
+            .and_then(|c| c.cast(&DataType::Float64))
+            .map_err(|e| format!("FuelSupply.{want} cast: {e}"))?;
+        let ca = casted.f64().map_err(|e| format!("{e}"))?;
+        if ca.null_count() == 0 {
+            continue;
+        }
+        let mut filled: Vec<f64> = Vec::with_capacity(ca.len());
+        for i in 0..ca.len() {
+            match ca.get(i) {
+                Some(v) => filled.push(v),
+                // A NULL on a real row is a data gap the native path would
+                // surface; only the fuelFormulationID=0 placeholder may be 0.0.
+                None if is_placeholder(i) => filled.push(0.0),
+                None => {
+                    return Err(format!(
+                        "FuelSupply.{want} is NULL for fuelFormulationID={} (row {i}): \
+                         a real fuel-supply row is missing its market share",
+                        ffid.get(i)
+                            .map(|v| v.to_string())
+                            .unwrap_or_else(|| "NULL".to_string()),
+                    ));
+                }
+            }
+        }
+        let series: Column = Series::new(name.as_str().into(), filled).into();
+        if df.with_column(series).is_ok() {
+            changed = true;
+        }
+    }
+    if changed {
+        store.insert(TABLE.to_string(), df);
+    }
     Ok(())
 }
 
@@ -779,6 +871,40 @@ fn build_runspec_tables(runspec: &RunSpec, store: &mut InMemoryStore) -> Result<
     Ok(())
 }
 
+/// Synthesise `PollutantProcessMappedModelYear` from `PollutantProcessModelYear`.
+///
+/// MOVES builds this table during execution-DB setup by mapping each
+/// `(polProcessID, modelYearID)` through `modelYearMapping` (a user→standard
+/// model-year remap). The default DB ships an empty `modelYearMapping`, so the
+/// mapping is the identity and the result is a direct projection of
+/// `PollutantProcessModelYear`'s `(polProcessID, modelYearID, IMModelYearGroupID)`
+/// columns. Calculators (BaseRate, criteria, NOx, …) read this table to expand
+/// per-pollutant-process ratios across model years; without it they fail with
+/// "table 'PollutantProcessMappedModelYear' not found in store".
+///
+/// No-op when the table already exists or the source table is absent. Uses
+/// polars-core only (wasm32-compatible).
+fn populate_pollutant_process_mapped_model_year(
+    store: &mut InMemoryStore,
+) -> Result<(), String> {
+    if store.contains("PollutantProcessMappedModelYear")
+        || !store.contains("PollutantProcessModelYear")
+    {
+        return Ok(());
+    }
+
+    // With an identity model-year mapping the mapped table carries exactly the
+    // source table's columns (polProcessID, modelYearID, modelYearGroupID,
+    // fuelMYGroupID, IMModelYearGroupID) — different calculators read different
+    // subsets — so copy the source wholesale under the mapped name.
+    let mapped: DataFrame = (*store
+        .get("PollutantProcessModelYear")
+        .expect("present after contains check"))
+    .clone();
+    store.insert("PollutantProcessMappedModelYear".to_string(), mapped);
+    Ok(())
+}
+
 /// Synthesise `sourceUseTypePhysicsMapping` from `sourceUseTypePhysics` when
 /// the table is absent.
 ///
@@ -898,6 +1024,15 @@ fn populate_zone_month_hour_meteorology(store: &mut InMemoryStore) -> Result<(),
         .cast(&DataType::Int32)
         .map_err(|e| format!("hourID cast: {e}"))?;
 
+    // temperature is the heatIndex fallback for unmatched rows. Canonical MOVES
+    // (MeteorologyGenerator.java:151-156) sets `heatIndex = temperature` when
+    // temperature < 78F (the no-humidity-polynomial path), so an unmatched
+    // ZoneMonthHour row must inherit its own ambient temperature, NOT 0.0.
+    // (matches the CLI port: moves-cli/src/run.rs uses `heat.push(temps[i])`.)
+    let temps_col = find("temperature")?.cast(&DataType::Float64)
+        .map_err(|e| format!("temperature cast: {e}"))?;
+    let temps_ca = temps_col.f64().map_err(|e| format!("{e}"))?;
+
     let zids = zone_ids_col.i32().map_err(|e| format!("{e}"))?;
     let mids = month_ids_col.i32().map_err(|e| format!("{e}"))?;
     let hids = hour_ids_col.i32().map_err(|e| format!("{e}"))?;
@@ -913,10 +1048,18 @@ fn populate_zone_month_hour_meteorology(store: &mut InMemoryStore) -> Result<(),
             mids.get(i).unwrap_or(0),
             hids.get(i).unwrap_or(0),
         );
-        let (hi, sh, mwf) = by_key.get(&key).copied().unwrap_or((0.0, 0.0, 0.0));
-        heat_index.push(hi);
-        specific_humidity.push(sh);
-        mol_water_fraction.push(mwf);
+        match by_key.get(&key).copied() {
+            Some((hi, sh, mwf)) => {
+                heat_index.push(hi);
+                specific_humidity.push(sh);
+                mol_water_fraction.push(mwf);
+            }
+            None => {
+                heat_index.push(temps_ca.get(i).unwrap_or(0.0));
+                specific_humidity.push(0.0);
+                mol_water_fraction.push(0.0);
+            }
+        }
     }
 
     let mut updated = zmh.clone();

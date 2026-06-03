@@ -40,7 +40,9 @@ use moves_runspec::{from_toml_str, from_xml_str, RunSpec};
 
 pub use convert::{convert_runspec, ConvertOptions, ConvertOutcome};
 pub use import::{import_cdb, ImportOptions, ImportOutcome, ImportStatus, ImportedTableReport};
-pub use run::{build_default_db_store, run_simulation, RunOptions};
+pub use run::{
+    build_default_db_store, default_replaced_pollutants, run_simulation, RunOptions,
+};
 
 /// Re-exported so callers (and the integration tests) can inspect a
 /// [`run_simulation`] result without depending on `moves-framework` directly.

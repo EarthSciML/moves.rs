@@ -158,6 +158,16 @@ const START_EXHAUST_PROCESS_ID: u16 = 2;
 /// there, and the CSEC-8 output stamps `roadTypeID = 1`.
 const OFF_NETWORK_ROAD_TYPE_ID: i32 = 1;
 
+/// The calculator's `polProcessID` capability — THC (`102`), CO (`202`) and
+/// NOx (`302`) on the Start Exhaust process. `GenericCalculatorBase`'s
+/// constructor passes exactly these; the SQL's only processing-section
+/// `WHERE` clause is `polProcessID IN (##pollutantProcessIDs##)`, and
+/// `##pollutantProcessIDs##` is the RunSpec selection intersected with this
+/// capability. The replayed `PollutantProcessAssoc` snapshot carries every
+/// Start Exhaust pair, so `execute` intersects against this set to recover
+/// the WHERE filter (the RunSpec narrowing is applied upstream at extract).
+const CAPABILITY_POL_PROCESS_IDS: [i32; 3] = [102, 202, 302];
+
 /// Reference temperature (°F) of the MOVES start-temperature equations. The
 /// SQL `LEAST(temperature, 75)` caps the input here, so a start at or above
 /// `75 °F` gets a zero (`POLY`) or `termB + termC` (`LOG`) adjustment.
@@ -558,6 +568,16 @@ pub struct RunContext {
  /// `##context.iterLocation.stateRecordID##` — the run's state. Stamped as
  /// `stateID` on the worker output.
     pub state_id: i32,
+ /// `##context.iterLocation.zoneRecordID##` — the run's zone. The canonical
+ /// extract scopes `ZoneMonthHour` to the context (its worker DB holds only
+ /// the running zone's rows); the replayed execution-DB snapshot carries
+ /// *every* zone's `ZoneMonthHour` (930 816 at national scale = ~3232 zones
+ /// × 12 months × 24 hours), so `met_start_adjustment` filters to this zone.
+ /// Looping the whole table would multiply CSEC-3 by the zone count — the
+ /// source of the observed `mixed-onroad-nonroad` memory blow-up — and the
+ /// extra zones are inner-joined away downstream against the context-scoped
+ /// `Starts2` anyway, so the filter is result-preserving.
+    pub zone_id: i32,
  /// `##pollutantProcessIDs##` — the run's `polProcessID`s, the
  /// RunSpec-intersected subset of the calculator's `{102, 202, 302}`
  /// capability. CSEC 2-a filters `PollutantProcessAssoc` to this set (the
@@ -2771,13 +2791,24 @@ fn fuel_supply_adjustment(
  // `County` table would (a) multiply the work by the county count — the
  // source of the observed national-scale hang — and (b) fold every county's
  // GPA contribution into the county-agnostic `totals` keys, inflating the
- // result. A missing county row leaves `GPAFract = 0` (the GPA term drops
- // out), matching the LEFT-JOIN-style default.
-    let gpa_fract = inputs
+ // result.
+ //
+ // `County` is the lead INNER join of CSEC 2-a (`FROM County c inner join
+ // PollutantProcessAssoc … WHERE c.countyID = ##context…countyRecordID##`),
+ // so an absent context-county row collapses the whole `CountyFuelAdjustment`
+ // cartesian product to zero rows and `FuelSupplyAdjustment` is empty. A
+ // missing county is a real run-context/data gap (the run's own county is
+ // always present in canonical MOVES); reproduce the inner-join semantics by
+ // returning no rows rather than fabricating a `GPAFract = 0` blend, which
+ // would silently emit a different (non-empty, wrong) adjustment.
+    let Some(gpa_fract) = inputs
         .county
         .iter()
         .find(|c| c.county_id == ctx.county_id)
-        .map_or(0.0, |c| c.gpa_fract);
+        .map(|c| c.gpa_fract)
+    else {
+        return Vec::new();
+    };
 
  // GROUP BY (yearID, monthID, polProcessID, modelYearID, sourceTypeID,
  // fuelTypeID). The capacity is an upper bound on the distinct key count;
@@ -2893,7 +2924,24 @@ fn fuel_supply_adjustment(
 /// Year × ZoneMonthHour` with the start-temperature equation applied per
 /// `startTempEquationType`. `ZoneMonthHour` is extract-filtered to the run's
 /// zone.
-fn met_start_adjustment(inputs: &CriteriaStartInputs) -> Vec<MetStartAdjustment> {
+fn met_start_adjustment(
+    inputs: &CriteriaStartInputs,
+    ctx: &RunContext,
+) -> Vec<MetStartAdjustment> {
+ // Scope `ZoneMonthHour` to the context zone. The canonical extract's worker
+ // DB holds only the running zone; the replayed snapshot carries every zone
+ // (930 816 rows at national scale), and the `sta × ppmy × ZoneMonthHour`
+ // product over all of them is the `mixed-onroad-nonroad` 41 GB blow-up. The
+ // non-context zones are inner-joined away downstream against `Starts2`
+ // anyway (the (zone, month, hour, …) join in `assemble_emission_output`),
+ // so this filter is result-preserving. `zone_id == 0` (an unset context,
+ // e.g. unit tests) imposes no filter.
+    let zmh_rows: Vec<&ZoneMonthHourRow> = inputs
+        .zone_month_hour
+        .iter()
+        .filter(|zmh| ctx.zone_id == 0 || zmh.zone_id == ctx.zone_id)
+        .collect();
+
  // PollutantProcessMappedModelYear indexed for the `(polProcessID,
  // modelYearGroupID)` join — a group spans several model years.
     let mut ppmy_by_key: FxHashMap<(i32, i32), Vec<&PollutantProcessMappedModelYearRow>> =
@@ -2916,7 +2964,7 @@ fn met_start_adjustment(inputs: &CriteriaStartInputs) -> Vec<MetStartAdjustment>
             continue;
         };
         for ppmy in ppmys {
-            for zmh in &inputs.zone_month_hour {
+            for zmh in &zmh_rows {
                 let delta = zmh.temperature.min(START_TEMP_REFERENCE_F) - START_TEMP_REFERENCE_F;
                 let temperature_adjustment = if sta.equation_type.eq_ignore_ascii_case("LOG") {
                     sta.term_b * (sta.term_a * delta).exp() + sta.term_c
@@ -3501,7 +3549,7 @@ impl CriteriaStartCalculator {
             },
             || {
                 join(
-                    || met_start_adjustment(inputs),
+                    || met_start_adjustment(inputs, ctx),
                     || build_starts2(inputs, ctx),
                 )
             },
@@ -3599,19 +3647,88 @@ impl Calculator for CriteriaStartCalculator {
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let tables = ctx.tables();
         let pos = ctx.position();
+
+ // The canonical SQL resolves every `##context.*##` substitution before the
+ // script runs; an unresolved one is a hard preprocessor failure, never a
+ // silent default. When this calculator actually fires (Start Exhaust,
+ // off-network, MONTH granularity) the loop has descended to LINK
+ // granularity, so year/state/county/zone/link are all populated. A `None`
+ // here means the calculator was dispatched at a granularity the SQL never
+ // runs at — surface it rather than fabricate `0`, which would mis-key
+ // `modelYearID = year - ageID` (every CSEC join silently missing) and
+ // short-circuit the `met_start_adjustment` zone filter.
+ //
+ // `IterationPosition` has no dedicated error variant; reuse
+ // `RowExtraction` (its documented "value was null where a non-null value
+ // is required" case) keyed to a synthetic "IterationPosition" table.
+        let missing = |field: &'static str| Error::RowExtraction {
+            table: "IterationPosition".into(),
+            row: pos.iteration as usize,
+            column: field.into(),
+            message: "required run-context scalar is unresolved (None)".into(),
+        };
+        let year = pos.time.year.map(|y| y as i32).ok_or_else(|| missing("year"))?;
+        let county_id = pos
+            .location
+            .county_id
+            .map(|c| c as i32)
+            .ok_or_else(|| missing("countyID"))?;
+        let link_id = pos
+            .location
+            .link_id
+            .map(|l| l as i32)
+            .ok_or_else(|| missing("linkID"))?;
+        let state_id = pos
+            .location
+            .state_id
+            .map(|s| s as i32)
+            .ok_or_else(|| missing("stateID"))?;
+        let zone_id = pos
+            .location
+            .zone_id
+            .map(|z| z as i32)
+            .ok_or_else(|| missing("zoneID"))?;
+
         let fuel_supply_rows: Vec<FuelSupplyRow> = tables.iter_typed("FuelSupply")?;
-        let fuel_region_id = fuel_supply_rows
-            .first()
-            .map(|r| r.fuel_region_id)
-            .unwrap_or(0);
+ // The SQL scopes the run to a single `##context.fuelRegionID##`. The
+ // `IterationPosition` does not yet carry the fuel region (see the followup
+ // to thread it through the framework), so it is recovered from the
+ // (extract-scoped, single-region) `FuelSupply` snapshot. An empty
+ // `FuelSupply` cannot yield a region: erroring is faithful to the SQL,
+ // where an empty extract means the run has no fuel supply, not region `0`.
+        let fuel_region_id = fuel_supply_rows.first().map(|r| r.fuel_region_id).ok_or_else(|| {
+            Error::RowExtraction {
+                table: "FuelSupply".into(),
+                row: 0,
+                column: "fuelRegionID".into(),
+                message: "FuelSupply is empty; cannot resolve the run's fuelRegionID".into(),
+            }
+        })?;
+
         let ppa_rows: Vec<PollutantProcessAssocRow> = tables.iter_typed("PollutantProcessAssoc")?;
-        let pol_process_ids: Vec<i32> = ppa_rows.iter().map(|r| r.pol_process_id).collect();
+ // CSEC 2-a's only processing-section filter is
+ // `WHERE ppa.polProcessID IN (##pollutantProcessIDs##)`, and
+ // `##pollutantProcessIDs##` ⊆ this calculator's `{102, 202, 302}`
+ // capability. The replayed `PollutantProcessAssoc` snapshot is left at
+ // every Start Exhaust pair, so without this intersection the WHERE clause
+ // is a no-op and `fuel_supply_adjustment` would weight pol-processes the
+ // calculator does not own. Intersecting against the capability set recovers
+ // the filter for the pollutants this calculator never registers; the
+ // finer RunSpec narrowing within {102,202,302} is applied upstream at
+ // extract time (and would need the RunSpec, which is not exposed here).
+        let pol_process_ids: Vec<i32> = ppa_rows
+            .iter()
+            .map(|r| r.pol_process_id)
+            .filter(|id| CAPABILITY_POL_PROCESS_IDS.contains(id))
+            .collect();
+
         let run_ctx = RunContext {
-            year: pos.time.year.map(|y| y as i32).unwrap_or(0),
+            year,
             fuel_region_id,
-            county_id: pos.location.county_id.map(|c| c as i32).unwrap_or(0),
-            link_id: pos.location.link_id.map(|l| l as i32).unwrap_or(0),
-            state_id: pos.location.state_id.map(|s| s as i32).unwrap_or(0),
+            county_id,
+            link_id,
+            state_id,
+            zone_id,
             pol_process_ids,
         };
         let inputs = CriteriaStartInputs {
@@ -3667,6 +3784,7 @@ mod tests {
             county_id: 26_161,
             link_id: 5001,
             state_id: 26,
+            zone_id: 90,
             pol_process_ids: vec![CO_START_POL_PROCESS],
         }
     }

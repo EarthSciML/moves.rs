@@ -52,16 +52,14 @@
 //! from canonical MOVES is bounded well within the tolerance budget
 //! (`characterization/tolerance.toml`).
 //!
-//! # Data-plane deferral
+//! # Execution wiring
 //!
-//! The framework data plane (`ExecutionTables` / `ScratchNamespace`,
-//! `DataFrameStore`) is still a placeholder, so [`TankFuelGenerator`]'s
-//! `Generator::execute` returns an empty output — the established
-//! pattern. The ported computation lives in the pure
-//! [`calculate_average_tank_gasoline`] function and is fully exercised by the
-//! crate tests; wiring will read the input tables from the
-//! [`CalculatorContext`], call it per `(county, year)`, and write
-//! `AverageTankGasoline` into the scratch namespace.
+//! [`TankFuelGenerator`]'s `Generator::execute` is fully wired: it reads the
+//! input tables from the [`CalculatorContext`] for the current `(county, year)`
+//! iteration position, calls the pure [`calculate_average_tank_gasoline`]
+//! function, and writes the resulting `AverageTankGasoline` rows into the
+//! scratch namespace via [`crate::wiring::write_scratch_table`]. The pure
+//! computation is additionally exercised directly by the crate tests.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -111,10 +109,13 @@ pub struct FuelFormulationRow {
     pub fuel_formulation_id: i32,
  /// `fuelSubtypeID`.
     pub fuel_subtype_id: i32,
- /// `RVP` — Reid Vapor Pressure of the formulation.
-    pub rvp: f64,
- /// `ETOHVolume` — ethanol volume percentage.
-    pub etoh_volume: f64,
+ /// `RVP` — Reid Vapor Pressure of the formulation. `None` mirrors the
+ /// nullable `RVP FLOAT NULL` column (NULL for diesel / electric / the
+ /// formulation-0 placeholder, which carry no Reid vapor pressure).
+    pub rvp: Option<f64>,
+ /// `ETOHVolume` — ethanol volume percentage. `None` mirrors the nullable
+ /// `ETOHVolume FLOAT NULL` column.
+    pub etoh_volume: Option<f64>,
 }
 
 /// One `FuelSubtype` row — maps a fuel subtype to its fuel type.
@@ -283,11 +284,15 @@ fn k_ethanol(etoh_volume: f64) -> f64 {
 /// formulation (TFG-1a).
 ///
 /// `(RVP - kEthanol*e/100*ethanolRVP) / (kGasoline*(100-e)/100)`.
-fn gas_portion_rvp(rvp: f64, etoh_volume: f64) -> f64 {
-    let e = etoh_volume;
+///
+/// `RVP` / `ETOHVolume` are nullable columns; in MySQL a NULL operand makes the
+/// whole expression NULL, so this returns `None` when either is NULL rather than
+/// fabricating a value from a coerced zero.
+fn gas_portion_rvp(rvp: Option<f64>, etoh_volume: Option<f64>) -> Option<f64> {
+    let (rvp, e) = (rvp?, etoh_volume?);
     let numerator = rvp - k_ethanol(e) * e / 100.0 * ETHANOL_RVP;
     let denominator = k_gasoline(e) * (100.0 - e) / 100.0;
-    numerator / denominator
+    Some(numerator / denominator)
 }
 
 /// "Reddy RVP" — recombines the gasoline and ethanol RVP portions into a
@@ -359,7 +364,10 @@ fn commingled_factor(gasohol_market_share: Option<f64>) -> f64 {
 /// `kGasoline` / `kEthanol` are folded into [`gas_portion_rvp`].
 struct UsedFuelFormulation {
     fuel_type_id: i32,
-    gas_portion_rvp: f64,
+ /// `None` when `RVP` or `ETOHVolume` is NULL — MySQL leaves `gasPortionRVP`
+ /// NULL, so the row is skipped by the `sum(gasPortionRVP*marketShare)`
+ /// aggregate downstream.
+    gas_portion_rvp: Option<f64>,
 }
 
 /// One `TFGFuelSupplyAverage` row — per `(fuel type, fuel year, month group)`
@@ -526,12 +534,24 @@ fn build_fuel_supply_averages(
         let acc = groups
             .entry((uff.fuel_type_id, fs.fuel_year_id, fs.month_group_id))
             .or_default();
-        acc.sum_rvp_ms += ff.rvp * weight;
-        acc.sum_etoh_ms += ff.etoh_volume * weight;
-        acc.sum_gas_portion_rvp_ms += uff.gas_portion_rvp * weight;
+ // MySQL `sum(col*marketShare)` skips terms whose `col` is NULL, while
+ // `sum(marketShare)` (the shared denominator) still counts the row. Mirror
+ // that here: a NULL RVP / ETOHVolume / gasPortionRVP contributes its
+ // marketShare to `sum_ms` but nothing to the respective weighted numerator.
+        if let Some(rvp) = ff.rvp {
+            acc.sum_rvp_ms += rvp * weight;
+        }
+        if let Some(etoh) = ff.etoh_volume {
+            acc.sum_etoh_ms += etoh * weight;
+        }
+        if let Some(gpr) = uff.gas_portion_rvp {
+            acc.sum_gas_portion_rvp_ms += gpr * weight;
+        }
         acc.sum_ms += weight;
- // TFG-1c: gasohol is a formulation with 4 <= ETOHVolume <= 20.
-        if (4.0..=20.0).contains(&ff.etoh_volume) {
+ // TFG-1c: gasohol is a formulation with 4 <= ETOHVolume <= 20. A NULL
+ // ETOHVolume makes the SQL comparison NULL (i.e. not matched), so a
+ // missing value is excluded from the gasohol market share.
+        if ff.etoh_volume.is_some_and(|e| (4.0..=20.0).contains(&e)) {
  *acc.gasohol_market_share.get_or_insert(0.0) += weight;
         }
     }
@@ -878,12 +898,14 @@ impl TableRow for FuelFormulationRow {
                 .into(),
                 Series::new(
                     "RVP".into(),
-                    rows.iter().map(|r| r.rvp).collect::<Vec<f64>>(),
+                    rows.iter().map(|r| r.rvp).collect::<Vec<Option<f64>>>(),
                 )
                 .into(),
                 Series::new(
                     "ETOHVolume".into(),
-                    rows.iter().map(|r| r.etoh_volume).collect::<Vec<f64>>(),
+                    rows.iter()
+                        .map(|r| r.etoh_volume)
+                        .collect::<Vec<Option<f64>>>(),
                 )
                 .into(),
             ],
@@ -921,8 +943,15 @@ impl TableRow for FuelFormulationRow {
                     fuel_subtype_id: fuel_subtype_id_col
                         .get(i)
                         .ok_or_else(|| null("fuelSubtypeID"))?,
-                    rvp: rvp_col.get(i).ok_or_else(|| null("RVP"))?,
-                    etoh_volume: etoh_volume_col.get(i).ok_or_else(|| null("ETOHVolume"))?,
+                    // RVP / ETOHVolume are `FLOAT NULL` in the default DB; they are
+                    // NULL for non-gasoline formulations (diesel, electric, and the
+                    // formulation-0 placeholder), which carry no Reid vapor pressure
+                    // or ethanol content. The NULL is preserved (not coerced to 0.0)
+                    // so the downstream market-share-weighted sums can replicate
+                    // MySQL `SUM()` NULL-skipping semantics rather than folding a
+                    // fabricated zero into the commingled tank averages.
+                    rvp: rvp_col.get(i),
+                    etoh_volume: etoh_volume_col.get(i),
                 })
             })
             .collect()
@@ -1779,12 +1808,19 @@ mod tests {
  // an unweathered gas-portion RVP back through `reddy_rvp` reconstructs
  // the original formulation RVP.
         for &(rvp, etoh) in &[(12.0, 10.0), (9.0, 0.0), (13.5, 15.0), (7.8, 5.5)] {
-            let gpr = gas_portion_rvp(rvp, etoh);
+            let gpr = gas_portion_rvp(Some(rvp), Some(etoh)).expect("non-null gpr");
             let recombined = reddy_rvp(k_gasoline(etoh), k_ethanol(etoh), etoh, gpr);
             assert_close(recombined, rvp, "reddy_rvp ∘ gas_portion_rvp");
         }
  // A zero-ethanol formulation's gas portion is just its RVP.
-        assert_close(gas_portion_rvp(9.0, 0.0), 9.0, "gas_portion_rvp(9, 0)");
+        assert_close(
+            gas_portion_rvp(Some(9.0), Some(0.0)).expect("non-null gpr"),
+            9.0,
+            "gas_portion_rvp(9, 0)",
+        );
+ // A NULL RVP or ETOHVolume propagates to a NULL gasPortionRVP.
+        assert_eq!(gas_portion_rvp(None, Some(10.0)), None);
+        assert_eq!(gas_portion_rvp(Some(12.0), None), None);
     }
 
     #[test]
@@ -1846,8 +1882,8 @@ mod tests {
             fuel_formulation: vec![FuelFormulationRow {
                 fuel_formulation_id: 100,
                 fuel_subtype_id: 10,
-                rvp: 12.0,
-                etoh_volume: 10.0,
+                rvp: Some(12.0),
+                etoh_volume: Some(10.0),
             }],
             fuel_subtype: vec![FuelSubtypeRow {
                 fuel_subtype_id: 10,
@@ -1920,14 +1956,14 @@ mod tests {
             FuelFormulationRow {
                 fuel_formulation_id: 100,
                 fuel_subtype_id: 10,
-                rvp: 11.5,
-                etoh_volume: 10.0,
+                rvp: Some(11.5),
+                etoh_volume: Some(10.0),
             },
             FuelFormulationRow {
                 fuel_formulation_id: 101,
                 fuel_subtype_id: 10,
-                rvp: 9.0,
-                etoh_volume: 0.0,
+                rvp: Some(9.0),
+                etoh_volume: Some(0.0),
             },
         ];
         inputs.zone_month_hour = vec![

@@ -1064,7 +1064,15 @@ impl TableRow for RatesOpModeDistributionRow {
         let op = get_i32("opModeID")?;
         let omf = get_f64("opModeFraction")?;
         let abs = get_f64("avgBinSpeed")?;
-        let asf = get_f64("avgSpeedFraction")?;
+ // `avgSpeedFraction` is part of the canonical RatesOpModeDistribution
+ // schema, but the rates-path producer
+ // (RatesOperatingModeDistributionGenerator) does not populate it. Its
+ // value is only consulted under the `yASF` flag; the engine never sets
+ // that flag (BaseRateGenerator::execute leaves ExternalFlags at default,
+ // so use_avg_speed_fraction = false and the aggregator substitutes 1.0).
+ // A missing column or NULL therefore lowers to 0.0 rather than failing
+ // extraction — the value is never read for computation.
+        let asf = df.column("avgSpeedFraction").ok().and_then(|c| c.f64().ok());
         (0..df.height())
             .map(|i| {
                 let null = |c| row_err(t, i, c, "null value".into());
@@ -1079,7 +1087,7 @@ impl TableRow for RatesOpModeDistributionRow {
  // MOVES leaves avgBinSpeed NULL in RatesOpModeDistribution
  // (default 0.0); treat a NULL as 0.0 rather than erroring.
                     avg_bin_speed: abs.get(i).unwrap_or(0.0),
-                    avg_speed_fraction: asf.get(i).ok_or_else(|| null("avgSpeedFraction"))?,
+                    avg_speed_fraction: asf.and_then(|c| c.get(i)).unwrap_or(0.0),
                 })
             })
             .collect()

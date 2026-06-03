@@ -154,17 +154,19 @@
 //!
 //! # Data plane
 //!
-//! [`Calculator::execute`] receives a [`CalculatorContext`] whose
-//! `ExecutionTables` / `ScratchNamespace` are placeholders until the
-//! `DataFrameStore` lands (), so `execute` cannot yet
-//! read the input tables nor emit `MOVESWorkerOutput`. The numeric algorithm
-//! is fully ported and unit-tested on
-//! [`calculate`](CriteriaRunningCalculator::calculate); `execute` is a
-//! documented shell returning an empty [`CalculatorOutput`]. Once the data
-//! plane exists, `execute` materialises a [`CriteriaRunningInputs`] and a
-//! [`RunContext`] from `ctx.tables()` / `ctx.position()`, calls
-//! [`calculate`](CriteriaRunningCalculator::calculate), and writes the rows to
-//! the worker output.
+//! [`Calculator::execute`] is a live execution path: now that the
+//! `DataFrameStore` has landed, it materialises a [`CriteriaRunningInputs`] and
+//! a [`RunContext`] from `ctx.tables()` / `ctx.position()`, calls
+//! [`calculate`](CriteriaRunningCalculator::calculate), and emits the resulting
+//! `MOVESWorkerOutput` rows. The numeric algorithm is additionally unit-tested
+//! in isolation on [`calculate`](CriteriaRunningCalculator::calculate), and
+//! `execute` is covered end to end by
+//! `execute_returns_nonempty_dataframe_for_minimal_inputs`. Because this is a
+//! real emission path, its output must be validated against
+//! `BaseRateCalculator`; the required `##context.year##` /
+//! `##context.iterLocation.*RecordID##` substitutions are read from the
+//! master-loop position and a missing one is surfaced as a hard error rather
+//! than substituted with a sentinel.
 
 use rustc_hash::FxHashMap;
 use std::collections::HashSet;
@@ -4377,22 +4379,58 @@ impl Calculator for CriteriaRunningCalculator {
         INPUT_TABLES
     }
 
- /// skeleton — returns an empty [`CalculatorOutput`].
+ /// Live execution path: materialises [`CriteriaRunningInputs`] and a
+ /// [`RunContext`] from `ctx.tables()` / `ctx.position()`, runs
+ /// [`calculate`](CriteriaRunningCalculator::calculate), and emits the
+ /// resulting `MOVESWorkerOutput` rows.
  ///
- /// [`CalculatorContext`] cannot yet surface the input tables or accept the
- /// worker-output rows — its row storage lands with the
- /// `DataFrameStore`. The computation itself is ported and tested in
- /// [`CriteriaRunningCalculator::calculate`]; see the
+ /// The required `##context.year##` and `##context.iterLocation.*RecordID##`
+ /// substitutions are read from the master-loop position; a missing one is
+ /// returned as an error rather than defaulted, since this calculator only
+ /// runs at MONTH granularity where they are guaranteed present. See the
  /// [module documentation](self).
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let tables = ctx.tables();
         let pos = ctx.position();
+        // The `##context.year##` / `##context.iterLocation.*RecordID##`
+        // substitutions the SQL preprocessor resolves are *always* present for
+        // a MONTH-granularity Running Exhaust task (see `ExecutionTime` /
+        // `ExecutionLocation`: year/county/zone/link/state are guaranteed once
+        // the master loop has descended to this granularity). A missing value
+        // here is a fatal setup error, not a substitutable default: `year`
+        // drives `model_year_id = year - ageID` and the `y.yearID =
+        // ##context.year##` filter, so a fabricated `0` would yield negative
+        // model years, drop every fuel-supply row, and silently emit a wrong /
+        // empty inventory. Surface it instead.
+        let missing = |field: &str| {
+            Error::Polars(format!(
+                "CriteriaRunningCalculator: required run-context value '{field}' is \
+                 missing from the master-loop position; the calculator runs at MONTH \
+                 granularity, where this ##context## substitution must be resolved"
+            ))
+        };
         let run_ctx = RunContext {
-            year: pos.time.year.map(|y| y as i32).unwrap_or(0),
-            county_id: pos.location.county_id.map(|c| c as i32).unwrap_or(0),
-            zone_id: pos.location.zone_id.map(|z| z as i32).unwrap_or(0),
-            link_id: pos.location.link_id.map(|l| l as i32).unwrap_or(0),
-            state_id: pos.location.state_id.map(|s| s as i32).unwrap_or(0),
+            year: pos.time.year.map(i32::from).ok_or_else(|| missing("year"))?,
+            county_id: pos
+                .location
+                .county_id
+                .map(|c| c as i32)
+                .ok_or_else(|| missing("countyID"))?,
+            zone_id: pos
+                .location
+                .zone_id
+                .map(|z| z as i32)
+                .ok_or_else(|| missing("zoneID"))?,
+            link_id: pos
+                .location
+                .link_id
+                .map(|l| l as i32)
+                .ok_or_else(|| missing("linkID"))?,
+            state_id: pos
+                .location
+                .state_id
+                .map(|s| s as i32)
+                .ok_or_else(|| missing("stateID"))?,
         };
         let inputs = CriteriaRunningInputs {
             age_category: tables.iter_typed("AgeCategory")?,

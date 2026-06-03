@@ -167,7 +167,14 @@ impl Generator for FuelEffectsGenerator {
         let ff_rows: Vec<FuelFormulationRow> = ctx.tables().iter_typed("FuelFormulation")?;
         let mut formulations_by_fuel_type: BTreeMap<i32, Vec<FuelFormulation>> = BTreeMap::new();
         for r in ff_rows {
-            let fuel_type_id = *subtype_to_type.get(&r.fuel_subtype_id).unwrap_or(&0);
+ // Java `getFuelFormulations` joins fuelFormulation to fuelSubtype with an
+ // INNER JOIN (FuelEffectsGenerator.java:1356-1363), so a formulation whose
+ // fuelSubtypeID has no matching FuelSubtype row contributes to no fuel
+ // type. Drop such rows to match inner-join semantics rather than inventing
+ // a phantom fuelTypeID 0 bucket.
+            let Some(&fuel_type_id) = subtype_to_type.get(&r.fuel_subtype_id) else {
+                continue;
+            };
             formulations_by_fuel_type
                 .entry(fuel_type_id)
                 .or_default()
@@ -649,6 +656,13 @@ impl TableRow for FuelFormulationRow {
         let pah_content_col = f64_col!("PAHContent");
         let t50_col = f64_col!("T50");
         let t90_col = f64_col!("T90");
+        // Fuel-property columns are NULL in the default DB for formulations that
+        // do not carry the property (e.g. diesel/electric have no RVP, ethanol
+        // volume, or aromatic content; the formulation-0 placeholder is all
+        // NULL). MOVES treats an absent fuel property as zero — those rows are
+        // excluded from the property-based calculations by fuel-type joins — so
+        // a missing value lowers to 0.0 rather than failing extraction. Only the
+        // identity columns remain strictly required.
         (0..df.height())
             .map(|i| {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
@@ -659,40 +673,24 @@ impl TableRow for FuelFormulationRow {
                     fuel_subtype_id: fuel_subtype_id_col
                         .get(i)
                         .ok_or_else(|| null("fuelSubtypeID"))?,
-                    rvp: rvp_col.get(i).ok_or_else(|| null("RVP"))? as f32,
-                    sulfur_level: sulfur_level_col.get(i).ok_or_else(|| null("sulfurLevel"))?
+                    rvp: rvp_col.get(i).unwrap_or(0.0) as f32,
+                    sulfur_level: sulfur_level_col.get(i).unwrap_or(0.0) as f32,
+                    etoh_volume: etoh_volume_col.get(i).unwrap_or(0.0) as f32,
+                    mtbe_volume: mtbe_volume_col.get(i).unwrap_or(0.0) as f32,
+                    etbe_volume: etbe_volume_col.get(i).unwrap_or(0.0) as f32,
+                    tame_volume: tame_volume_col.get(i).unwrap_or(0.0) as f32,
+                    aromatic_content: aromatic_content_col.get(i).unwrap_or(0.0) as f32,
+                    olefin_content: olefin_content_col.get(i).unwrap_or(0.0) as f32,
+                    benzene_content: benzene_content_col.get(i).unwrap_or(0.0) as f32,
+                    e200: e200_col.get(i).unwrap_or(0.0) as f32,
+                    e300: e300_col.get(i).unwrap_or(0.0) as f32,
+                    vol_to_wt_percent_oxy: vol_to_wt_percent_oxy_col.get(i).unwrap_or(0.0) as f32,
+                    bio_diesel_ester_volume: bio_diesel_ester_volume_col.get(i).unwrap_or(0.0)
                         as f32,
-                    etoh_volume: etoh_volume_col.get(i).ok_or_else(|| null("ETOHVolume"))? as f32,
-                    mtbe_volume: mtbe_volume_col.get(i).ok_or_else(|| null("MTBEVolume"))? as f32,
-                    etbe_volume: etbe_volume_col.get(i).ok_or_else(|| null("ETBEVolume"))? as f32,
-                    tame_volume: tame_volume_col.get(i).ok_or_else(|| null("TAMEVolume"))? as f32,
-                    aromatic_content: aromatic_content_col
-                        .get(i)
-                        .ok_or_else(|| null("aromaticContent"))?
-                        as f32,
-                    olefin_content: olefin_content_col
-                        .get(i)
-                        .ok_or_else(|| null("olefinContent"))?
-                        as f32,
-                    benzene_content: benzene_content_col
-                        .get(i)
-                        .ok_or_else(|| null("benzeneContent"))?
-                        as f32,
-                    e200: e200_col.get(i).ok_or_else(|| null("e200"))? as f32,
-                    e300: e300_col.get(i).ok_or_else(|| null("e300"))? as f32,
-                    vol_to_wt_percent_oxy: vol_to_wt_percent_oxy_col
-                        .get(i)
-                        .ok_or_else(|| null("volToWtPercentOxy"))?
-                        as f32,
-                    bio_diesel_ester_volume: bio_diesel_ester_volume_col
-                        .get(i)
-                        .ok_or_else(|| null("BioDieselEsterVolume"))?
-                        as f32,
-                    cetane_index: cetane_index_col.get(i).ok_or_else(|| null("CetaneIndex"))?
-                        as f32,
-                    pah_content: pah_content_col.get(i).ok_or_else(|| null("PAHContent"))? as f32,
-                    t50: t50_col.get(i).ok_or_else(|| null("T50"))? as f32,
-                    t90: t90_col.get(i).ok_or_else(|| null("T90"))? as f32,
+                    cetane_index: cetane_index_col.get(i).unwrap_or(0.0) as f32,
+                    pah_content: pah_content_col.get(i).unwrap_or(0.0) as f32,
+                    t50: t50_col.get(i).unwrap_or(0.0) as f32,
+                    t90: t90_col.get(i).unwrap_or(0.0) as f32,
                 })
             })
             .collect()

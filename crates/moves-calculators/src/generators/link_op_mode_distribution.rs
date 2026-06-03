@@ -259,6 +259,10 @@ impl OpModeClassifier {
 /// fidelity notes for why they are held as `f64` here.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DriveScheduleSecond {
+ /// `linkID` — the link this second belongs to. The canonical
+ /// `driveScheduleSecondLink` table is keyed by `(linkID, secondID)`;
+ /// `execute` filters the table to the current link on this column.
+    pub link_id: i32,
  /// `secondID` — the 1-based second index within the schedule.
     pub second_id: i16,
  /// `speed` — vehicle speed at this second, miles per hour.
@@ -612,9 +616,10 @@ pub fn expand_to_op_mode_distribution(
 /// rather than using the engine to counteract any grade." Every second has
 /// `speed = 0`, so the classifier assigns `STOPPED_OP_MODE` throughout.
 #[must_use]
-pub fn default_idle_drive_schedule() -> Vec<DriveScheduleSecond> {
+pub fn default_idle_drive_schedule(link_id: i32) -> Vec<DriveScheduleSecond> {
     (1..=DEFAULT_IDLE_SECONDS)
         .map(|second_id| DriveScheduleSecond {
+            link_id,
             second_id,
             speed: 0.0,
             grade: 0.0,
@@ -637,6 +642,7 @@ impl TableRow for DriveScheduleSecond {
     }
     fn polars_schema() -> Schema {
         Schema::from_iter([
+            ("linkID".into(), DataType::Int32),
             ("secondID".into(), DataType::Int32),
             ("speed".into(), DataType::Float64),
             ("grade".into(), DataType::Float64),
@@ -647,6 +653,11 @@ impl TableRow for DriveScheduleSecond {
         DataFrame::new(
             n,
             vec![
+                Series::new(
+                    "linkID".into(),
+                    rows.iter().map(|r| r.link_id).collect::<Vec<i32>>(),
+                )
+                .into(),
                 Series::new(
                     "secondID".into(),
                     rows.iter()
@@ -669,6 +680,11 @@ impl TableRow for DriveScheduleSecond {
     }
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         let t = "driveScheduleSecondLink";
+        let link_id_col = df
+            .column("linkID")
+            .map_err(|e| row_err(t, 0, "linkID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "linkID", e.to_string()))?;
         let second_id_col = df
             .column("secondID")
             .map_err(|e| row_err(t, 0, "secondID", e.to_string()))?
@@ -688,6 +704,7 @@ impl TableRow for DriveScheduleSecond {
             .map(|i| {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
                 Ok(DriveScheduleSecond {
+                    link_id: link_id_col.get(i).ok_or_else(|| null("linkID"))?,
                     second_id: second_id_col.get(i).ok_or_else(|| null("secondID"))? as i16,
                     speed: speed_col.get(i).ok_or_else(|| null("speed"))?,
                     grade: grade_col.get(i).ok_or_else(|| null("grade"))?,
@@ -1409,8 +1426,10 @@ impl LinkOperatingModeDistributionGenerator {
  /// * an input running-process distribution is already present → emit
  /// nothing (the link keeps its user-supplied distribution);
  /// * the link has a drive schedule → derive the distribution from it;
- /// * no drive schedule but `linkAvgSpeed <= 0` → synthesise the
- /// [`default_idle_drive_schedule`] and derive from that;
+ /// * no drive schedule but `linkAvgSpeed <= 0` (including a NULL or
+ /// absent `linkAvgSpeed`, which the Java `executeScalar` reads as 0.0)
+ /// → synthesise the [`default_idle_drive_schedule`] and derive from
+ /// that;
  /// * no drive schedule and `linkAvgSpeed > 0` → the interpolation path,
  /// which is out of scope for this task (see the module docs); emit
  /// nothing.
@@ -1431,11 +1450,14 @@ impl LinkOperatingModeDistributionGenerator {
                 inputs.run_spec_source_type,
                 &classifier,
             )
-        } else if inputs.link_avg_speed.is_some_and(|s| s <= 0.0) {
- // No drive schedule and a non-positive average speed: derive the
- // distribution from a synthesised 30-second all-idle schedule.
+        } else if inputs.link_avg_speed.is_none_or(|s| s <= 0.0) {
+ // No drive schedule and a non-positive (or NULL/absent) average
+ // speed: derive the distribution from a synthesised 30-second
+ // all-idle schedule. The Java step-100 path reads a missing or NULL
+ // `linkAvgSpeed` as `executeScalar`'s 0.0 default, so it too falls
+ // into the `averageSpeed <= 0` idle branch rather than interpolation.
             op_mode_fractions_from_schedule(
-                &default_idle_drive_schedule(),
+                &default_idle_drive_schedule(inputs.link_id),
                 inputs.physics,
                 inputs.run_spec_source_type,
                 &classifier,
@@ -1562,10 +1584,13 @@ impl Generator for LinkOperatingModeDistributionGenerator {
             .map(|r| r.hour_day_id as i16)
             .collect();
 
- // Filter drive schedule to the current link.
+ // Filter the drive schedule to the current link. The
+ // `driveScheduleSecondLink` table is keyed by `(linkID, secondID)` and
+ // `iter_typed` returns every link's rows, so this filter mirrors the
+ // Java core SQL's `where a.linkID = <linkID>` (steps 110-149).
         let link_drive_schedule: Vec<DriveScheduleSecond> = drive_schedule
             .into_iter()
-            .filter(|_| true) // drive_schedule rows are already link-scoped by the registry
+            .filter(|r| r.link_id == link_id)
             .collect();
 
         let inputs = LinkDriveScheduleInputs {
@@ -1722,6 +1747,7 @@ mod tests {
  // A single second has no predecessor, so all three accelerations
  // and the inertial VSP term are zero.
         let schedule = [DriveScheduleSecond {
+            link_id: 7,
             second_id: 1,
             speed: 10.0,
             grade: 0.0,
@@ -1739,6 +1765,7 @@ mod tests {
  // va = 100 * 0.44704 = 44.704
  // VSP = (va * 1.0 + 0 + 0) / 2.0 = 22.352
         let schedule = [DriveScheduleSecond {
+            link_id: 7,
             second_id: 1,
             speed: 100.0,
             grade: 0.0,
@@ -1752,11 +1779,13 @@ mod tests {
  // Flat grade: At0 of the second second is the plain speed delta.
         let flat = [
             DriveScheduleSecond {
+                link_id: 7,
                 second_id: 1,
                 speed: 10.0,
                 grade: 0.0,
             },
             DriveScheduleSecond {
+                link_id: 7,
                 second_id: 2,
                 speed: 15.0,
                 grade: 0.0,
@@ -1769,11 +1798,13 @@ mod tests {
  // 9.81/0.44704 * sin(atan(grade/100)).
         let graded = [
             DriveScheduleSecond {
+                link_id: 7,
                 second_id: 1,
                 speed: 10.0,
                 grade: 0.0,
             },
             DriveScheduleSecond {
+                link_id: 7,
                 second_id: 2,
                 speed: 10.0,
                 grade: 100.0,
@@ -1790,21 +1821,25 @@ mod tests {
  // [3,4], [2,3] and [1,2] respectively.
         let schedule = [
             DriveScheduleSecond {
+                link_id: 7,
                 second_id: 1,
                 speed: 0.0,
                 grade: 0.0,
             },
             DriveScheduleSecond {
+                link_id: 7,
                 second_id: 2,
                 speed: 10.0,
                 grade: 0.0,
             },
             DriveScheduleSecond {
+                link_id: 7,
                 second_id: 3,
                 speed: 30.0,
                 grade: 0.0,
             },
             DriveScheduleSecond {
+                link_id: 7,
                 second_id: 4,
                 speed: 60.0,
                 grade: 0.0,
@@ -1822,11 +1857,13 @@ mod tests {
  // Two seconds at distinct speeds → two op modes, fractions 1/2 each.
         let schedule = [
             DriveScheduleSecond {
+                link_id: 7,
                 second_id: 1,
                 speed: 0.0,
                 grade: 0.0,
             },
             DriveScheduleSecond {
+                link_id: 7,
                 second_id: 2,
                 speed: 30.0,
                 grade: 0.0,
@@ -1849,6 +1886,7 @@ mod tests {
     #[test]
     fn op_mode_fractions_filter_by_run_spec_source_type() {
         let schedule = [DriveScheduleSecond {
+            link_id: 7,
             second_id: 1,
             speed: 0.0,
             grade: 0.0,
@@ -1870,6 +1908,7 @@ mod tests {
  // realSourceTypeID 21 maps to tempSourceTypeID 2100 — output is
  // keyed by the temp id, while the RunSpec filter uses the real id.
         let schedule = [DriveScheduleSecond {
+            link_id: 7,
             second_id: 1,
             speed: 0.0,
             grade: 0.0,
@@ -2002,10 +2041,11 @@ mod tests {
 
     #[test]
     fn default_idle_schedule_is_thirty_idle_seconds() {
-        let schedule = default_idle_drive_schedule();
+        let schedule = default_idle_drive_schedule(7);
         assert_eq!(schedule.len(), 30);
         assert_eq!(schedule[0].second_id, 1);
         assert_eq!(schedule[29].second_id, 30);
+        assert!(schedule.iter().all(|s| s.link_id == 7));
         assert!(schedule.iter().all(|s| s.speed == 0.0 && s.grade == 0.0));
     }
 
@@ -2018,11 +2058,13 @@ mod tests {
     fn op_mode_distribution_from_drive_schedule() {
         let schedule = [
             DriveScheduleSecond {
+                link_id: 7,
                 second_id: 1,
                 speed: 0.0,
                 grade: 0.0,
             },
             DriveScheduleSecond {
+                link_id: 7,
                 second_id: 2,
                 speed: 30.0,
                 grade: 0.0,
@@ -2166,11 +2208,13 @@ mod tests {
  // second 2 → op mode 13; second 1 → stopped 501, folded to idle 1.
         let schedule = vec![
             DriveScheduleSecond {
+                link_id: LINK_ID,
                 second_id: 1,
                 speed: 0.0,
                 grade: 0.0,
             },
             DriveScheduleSecond {
+                link_id: LINK_ID,
                 second_id: 2,
                 speed: 30.0,
                 grade: 0.0,

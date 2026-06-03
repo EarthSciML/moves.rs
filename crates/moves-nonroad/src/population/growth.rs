@@ -43,12 +43,12 @@
 //!
 //! - If `growth_year == base_year`, the factor is 0 (no growth).
 //! - If both interpolated indicators are zero, the factor is 0.
-//! - If only the base-year indicator is zero, the port bumps it up
-//! to `MINGRWIND` to avoid divide-by-zero, and a warning is
-//! produced (returned alongside the factor — the Fortran source
-//! writes to `IOWMSG` and bumps the global `nwarn` counter). The
-//! Fortran computes but does not *use* this clamp — see the
-//! "Known divergence" note below.
+//! - If only the base-year indicator is zero, a warning is produced
+//! (returned alongside the factor — the Fortran source writes to
+//! `IOWMSG` and bumps the global `nwarn` counter). The Fortran
+//! computes a `MINGRWIND` clamp *only for the warning text* and
+//! still divides by the raw, zero base indicator; this port does
+//! the same (see the "Zero base-year indicator" note below).
 //!
 //! The factor formula is `grwfac.f` :244–245:
 //!
@@ -59,27 +59,22 @@
 //! This is the *annualized* year-to-year fractional change between
 //! the base and growth years (not the cumulative ratio).
 //!
-//! # Known divergence — zero base-year indicator
+//! # Zero base-year indicator
 //!
-//! The port divides by `effective_base` — the `MINGRWIND`-clamped
-//! indicator — in **both** the numerator and the denominator. The
-//! Fortran does **not**: `grwfac.f` :233 computes the clamped value
-//! into a local `tmpbaseyearind`, uses it only to format the
-//! warning message, and then :244 divides by the *un-clamped*
-//! `baseyearind`. When the interpolated base indicator is exactly
-//! zero this makes the Fortran factor `growthyearind / 0` → `±Inf`,
-//! which propagates to infinite population and emissions downstream
-//! (`agedist.f` :132). The port instead applies the clamp the
-//! NONROAD warning text itself promises ("Adjusting base-year
-//! growth indicator to avoid divide by zero"), yielding a finite
-//! factor.
+//! `grwfac.f` :233 computes a clamped value `tmpbaseyearind =
+//! max(MINGRWIND, baseyearind)`, but uses it **only** to format the
+//! warning message (:234–240) and then :244 divides by the
+//! *un-clamped* `baseyearind`. When the interpolated base indicator
+//! is exactly zero the Fortran factor is therefore `growthyearind /
+//! 0` → `±Inf`, which propagates to infinite population and
+//! emissions downstream (`agedist.f` :132). This port reproduces the
+//! Fortran exactly: it emits the warning (with the `MINGRWIND` value
+//! the message reports) but divides by the raw base indicator, so a
+//! zero base indicator yields `±Inf`.
 //!
-//! This is a deliberate, documented divergence: faithfully
-//! reproducing the Fortran's latent divide-by-zero would emit `Inf`
-//! emissions for the affected region. Realistic growth-indicator
-//! data does not interpolate to exactly zero, so the 1e-9 fidelity
-//! gate is not expected to exercise this path. Tracked in
-//! `characterization/nonroad-fidelity/README.md`.
+//! Realistic growth-indicator data does not interpolate to exactly
+//! zero, so the 1e-9 fidelity gate is not expected to exercise this
+//! path. Tracked in `characterization/nonroad-fidelity/README.md`.
 
 use crate::common::consts::MINGRWIND;
 use crate::{Error, Result};
@@ -186,7 +181,20 @@ pub fn growth_factor(
         });
     }
 
-    let st_fips = format!("{}000", &fips.get(..2).unwrap_or("00"));
+ // grwfac.f :113 forms the state key from `infips(1:2)`, where
+ // `infips` is a fixed-width `character*5` and therefore always has
+ // at least two characters. The Rust port takes a `&str` that could
+ // be malformed; rather than fabricate a "00" prefix (which would
+ // collide with the "00000" national sentinel and silently return
+ // national growth data for a bad FIPS), treat a sub-2-char FIPS as
+ // a data error.
+    let state_prefix = fips.get(..2).ok_or_else(|| {
+        Error::Config(format!(
+            "growth-factor FIPS {:?} is shorter than 2 characters; cannot form state key",
+            fips
+        ))
+    })?;
+    let st_fips = format!("{state_prefix}000");
 
  // --- loop looking for national, state, or county match — keep
  // the last (most-specific) hit (grwfac.f :115–119) ---
@@ -263,10 +271,13 @@ pub fn growth_factor(
         });
     }
 
- // --- bump base-year indicator to MINGRWIND when it is zero
- // (grwfac.f :230–241) ---
+ // --- warn (and clamp for the message only) when the base-year
+ // indicator is zero (grwfac.f :230–241). The Fortran computes
+ // `tmpbaseyearind = max(MINGRWIND, baseyearind)` *solely* to format
+ // the warning message and to bump `nwarn`; it does NOT use the
+ // clamped value in the factor calculation. ---
     let mut warning = None;
-    let effective_base = if base_indicator == 0.0 {
+    if base_indicator == 0.0 {
         let adjusted = MINGRWIND.max(base_indicator);
         warning = Some(GrowthFactorWarning {
             base_year,
@@ -275,19 +286,16 @@ pub fn growth_factor(
             growth_year,
             growth_indicator,
         });
-        adjusted
-    } else {
-        base_indicator
-    };
+    }
 
- // grwfac.f :244–245. DELIBERATE DIVERGENCE:
- // the Fortran divides by the raw `baseyearind`, not the clamped
- // `tmpbaseyearind` — so a zero base indicator gives it `±Inf`. The
- // port divides by `effective_base` (the clamp the Fortran's own
- // warning text promises) to keep the factor finite. See the
- // module-level "Known divergence" note.
+ // grwfac.f :244–245. The Fortran divides by the *raw* `baseyearind`,
+ // not the clamped `tmpbaseyearind`. A zero base indicator therefore
+ // yields `growthyearind / 0` → `±Inf`, which propagates downstream
+ // (agedist.f :132). We match that behavior for fidelity rather than
+ // substituting the MINGRWIND clamp (which would silently produce a
+ // finite factor the Fortran never computes).
     let factor =
-        (growth_indicator - effective_base) / (effective_base * (growth_year - base_year) as f32);
+        (growth_indicator - base_indicator) / (base_indicator * (growth_year - base_year) as f32);
 
     Ok(GrowthFactor {
         factor,
@@ -527,29 +535,29 @@ mod tests {
         assert!(r.warning.is_some());
         let w = r.warning.unwrap();
         assert_eq!(w.base_indicator, 0.0);
+ // The warning still reports the MINGRWIND value the Fortran
+ // formats into its message (grwfac.f :233).
         assert_eq!(w.adjusted_base_indicator, MINGRWIND);
- // factor = (50 - MINGRWIND) / (MINGRWIND * 10)
-        let expected = (50.0 - MINGRWIND) / (MINGRWIND * 10.0);
-        assert!((r.factor - expected).abs() < 1.0); // large positive; precise sanity
+ // grwfac.f :244 divides by the *raw* zero base indicator, so the
+ // factor is +Inf — not the MINGRWIND-clamped finite value.
+        assert!(r.factor.is_infinite() && r.factor > 0.0);
     }
 
     #[test]
-    fn zero_base_indicator_yields_finite_factor_not_fortran_inf() {
- // () deliberate divergence: `grwfac.f` :244
- // divides by the un-clamped `baseyearind`, so a zero base
- // indicator gives the Fortran `growthyearind / 0` → `±Inf`.
- // The port divides by the `MINGRWIND` clamp instead. This test
- // pins that choice — a future decision to match the Fortran's
- // `Inf` must break this test knowingly. See the module-level
- // "Known divergence" note.
+    fn zero_base_indicator_matches_fortran_inf() {
+ // Fidelity: `grwfac.f` :244 divides by the un-clamped
+ // `baseyearind`, so a zero base indicator gives `growthyearind /
+ // 0` → `+Inf`. The port reproduces this exactly, while still
+ // surfacing the warning the Fortran writes to IOWMSG. See the
+ // module-level "Zero base-year indicator" note.
         let records = vec![
             rec("POP", "06000", 2010, 0.0),
             rec("POP", "06000", 2020, 50.0),
         ];
         let r = growth_factor(&refs(&records), 2010, 2020, "06000").unwrap();
-        assert!(r.factor.is_finite(), "port keeps the factor finite");
+        assert!(r.factor.is_infinite(), "port matches the Fortran divide-by-zero");
         assert!(r.factor > 0.0);
-        assert!(r.warning.is_some(), "the MINGRWIND clamp is flagged");
+        assert!(r.warning.is_some(), "the MINGRWIND clamp is still flagged");
     }
 
     #[test]
