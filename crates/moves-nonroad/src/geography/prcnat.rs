@@ -983,10 +983,7 @@ mod tests {
         assert_eq!(out.state_outputs.len(), 2);
         assert!(out.state_outputs.iter().all(|s| !s.missing));
         // Unselected state "36000" must not appear.
-        assert!(out
-            .state_outputs
-            .iter()
-            .all(|s| s.fips != "36000"));
+        assert!(out.state_outputs.iter().all(|s| s.fips != "36000"));
     }
 
     #[test]
@@ -1041,10 +1038,7 @@ mod tests {
         let mut cb = HappyCallbacks::new();
         let out = process_national_record(&ctx, &mut cb).expect("national path should succeed");
         assert_eq!(out.state_outputs.len(), 2);
-        assert!(out
-            .state_outputs
-            .iter()
-            .all(|s| s.fips != "36000"));
+        assert!(out.state_outputs.iter().all(|s| s.fips != "36000"));
     }
 
     #[test]
