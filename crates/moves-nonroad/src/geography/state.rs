@@ -459,16 +459,49 @@ pub fn compute_state_aggregate(
 
             accumulate_emissions(&mut emsday, &er.ems_day_delta);
 
-            // Cannot compute fulbmy: BSFC from NR*.EMF not yet threaded through
-            // ExhaustResult on the state path (prcsta.f:623-625 / prc1st.f:524-526).
-            // TODO(mo-2v1): surface bsfc from ExhaustResult, then compute actbmy/fulbmy
-            // and collect exhaust BMY/SI cells here.
-            return Err(Error::Config(format!(
-                "prcsta.f/prc1st.f fulbmy requires bsfc(idxyr,i) from the NR*.EMF \
-                 emfclc.f packet, but the state-path exhaust calculator does not return \
-                 BSFC; a literal 1.0 cannot be fabricated in its place (it overstates \
-                 fuel consumption by ~1/bsfc). SCC {scc} model year {iyr} tech {tech_name}."
-            )));
+            // --- bookkeeping (prcsta.f :620–:635 / prc1st.f :522–:535) ---
+            let actbmy = actadj * popsta * modfrc * tplful * tfrac * adjtime;
+            // Canonical `prcsta.f:623-625` / `prc1st.f:524-526`:
+            // fulbmy = tplful * popsta * actadj * modfrc * tchfrc
+            //   * (hpval * faclod * bsfc(idxyr,i) / denful) * adjtime
+            let fulbmy = tplful
+                * popsta
+                * actadj
+                * modfrc
+                * tfrac
+                * (hpval * activity.load_factor * er.bsfc / denful)
+                * adjtime;
+
+            fulcsm += fulbmy;
+            fulbmytot += fulbmy;
+
+            // --- collect BMY / SI cells (prcsta.f :880–:894 / prc1st.f :539–:551) ---
+            if opt.emit_bmy {
+                exhaust_bmy.push(StateBmyCell {
+                    model_year: iyr,
+                    tech_code: tech_name.clone(),
+                    population: popbmy,
+                    activity: actbmy,
+                    fuel_consumption: fulbmy,
+                    emissions: er.ems_bmy.clone(),
+                    frac_retrofitted: frac_retro_bmy,
+                    units_retrofitted: units_retro_bmy,
+                    channel: 1,
+                });
+            }
+            if opt.emit_si {
+                si_cells.push(StateBmyCell {
+                    model_year: iyr,
+                    tech_code: tech_name.clone(),
+                    population: popbmy,
+                    activity: actbmy,
+                    fuel_consumption: fulbmy,
+                    emissions: er.ems_bmy,
+                    frac_retrofitted: frac_retro_bmy,
+                    units_retrofitted: units_retro_bmy,
+                    channel: 1,
+                });
+            }
         }
 
         // --- per-model-year exhaust totals (prcsta.f :643–:647 / prc1st.f :560–:564) ---
@@ -1163,6 +1196,7 @@ mod tests {
             Ok(ExhaustResult {
                 ems_day_delta: emsday,
                 ems_bmy: emsbmy,
+                bsfc: 0.5,
             })
         }
         fn calculate_evap(&mut self, _inputs: &EvapCallInputs<'_>) -> Result<EvapResult> {
@@ -1271,18 +1305,18 @@ mod tests {
     }
 
     #[test]
-    fn prc1st_full_path_errors_on_missing_bsfc() {
-        // State path requires BSFC from NR*.EMF to compute fuel. Returns Err
-        // until ExhaustResult carries BSFC (mo-2v1).
+    fn prc1st_full_path_emits_state_record_and_bmy() {
+        // Happy-path: single model year, single tech, bsfc=0.5.
+        // Expect exactly 1 StateOutput for "06000".
         let hp = [1.0, 11.0, 25.0, 50.0];
         let ctx = default_ctx("06000", &hp);
         let mut cb = StubCallbacks::ok_single_year();
-        let err = process_state_from_national_record(&ctx, &mut cb).unwrap_err();
-        let msg = format!("{err}");
-        assert!(
-            msg.contains("bsfc") || msg.contains("BSFC") || msg.contains("fulbmy"),
-            "expected bsfc error, got: {msg}"
-        );
+        let out = process_state_from_national_record(&ctx, &mut cb)
+            .expect("prc1st full path should succeed");
+        assert_eq!(out.state_outputs.len(), 1);
+        assert_eq!(out.state_outputs[0].fips, "06000");
+        assert!(!out.state_outputs[0].missing);
+        assert!(out.warnings.is_empty());
     }
 
     // ---------- prcsta.f path ----------
@@ -1340,9 +1374,9 @@ mod tests {
     }
 
     #[test]
-    fn prcsta_full_path_errors_on_missing_bsfc() {
-        // State path requires BSFC from NR*.EMF to compute fuel. Returns Err
-        // until ExhaustResult carries BSFC (mo-2v1).
+    fn prcsta_full_path_allocates_proportionally() {
+        // Happy-path: 2 selected counties (pop 250 + 750 = 1000 total).
+        // Expect 2 StateOutputs, one per county.
         let hp = [1.0, 11.0, 25.0, 50.0];
         let ctx = default_ctx("06000", &hp);
         let counties = vec![
@@ -1358,18 +1392,18 @@ mod tests {
             },
         ];
         let mut cb = StubCallbacks::ok_single_year();
-        let err = process_state_to_county_record(&ctx, &counties, &mut cb).unwrap_err();
-        let msg = format!("{err}");
-        assert!(
-            msg.contains("bsfc") || msg.contains("BSFC") || msg.contains("fulbmy"),
-            "expected bsfc error, got: {msg}"
-        );
+        let out = process_state_to_county_record(&ctx, &counties, &mut cb)
+            .expect("prcsta full path should succeed");
+        assert_eq!(out.state_outputs.len(), 2);
+        let fips: Vec<_> = out.state_outputs.iter().map(|s| s.fips.as_str()).collect();
+        assert!(fips.contains(&"06037"));
+        assert!(fips.contains(&"06059"));
+        assert!(out.state_outputs.iter().all(|s| !s.missing));
     }
 
     #[test]
     fn prcsta_skips_unselected_counties() {
-        // State path requires BSFC from NR*.EMF (mo-2v1) — returns Err before
-        // the county loop, so we can't observe the skip in the Ok path.
+        // Unselected county "06037" must not appear in outputs.
         let hp = [1.0, 11.0, 25.0, 50.0];
         let ctx = default_ctx("06000", &hp);
         let counties = vec![
@@ -1385,18 +1419,16 @@ mod tests {
             },
         ];
         let mut cb = StubCallbacks::ok_single_year();
-        let err = process_state_to_county_record(&ctx, &counties, &mut cb).unwrap_err();
-        let msg = format!("{err}");
-        assert!(
-            msg.contains("bsfc") || msg.contains("BSFC") || msg.contains("fulbmy"),
-            "expected bsfc error, got: {msg}"
-        );
+        let out = process_state_to_county_record(&ctx, &counties, &mut cb)
+            .expect("prcsta skip test should succeed");
+        assert_eq!(out.state_outputs.len(), 1);
+        assert_eq!(out.state_outputs[0].fips, "06059");
     }
 
     #[test]
     fn prcsta_emits_zero_record_for_zero_pop_county() {
-        // State path requires BSFC from NR*.EMF (mo-2v1) — returns Err before
-        // the county loop, so we can't observe zero-pop county handling in the Ok path.
+        // A county with population=0 gets a zero record; the non-zero county
+        // gets a normal allocated record. Both selected → 2 outputs.
         let hp = [1.0, 11.0, 25.0, 50.0];
         let ctx = default_ctx("06000", &hp);
         let counties = vec![
@@ -1412,20 +1444,24 @@ mod tests {
             },
         ];
         let mut cb = StubCallbacks::ok_single_year();
-        let err = process_state_to_county_record(&ctx, &counties, &mut cb).unwrap_err();
-        let msg = format!("{err}");
-        assert!(
-            msg.contains("bsfc") || msg.contains("BSFC") || msg.contains("fulbmy"),
-            "expected bsfc error, got: {msg}"
-        );
+        let out = process_state_to_county_record(&ctx, &counties, &mut cb)
+            .expect("prcsta zero-pop county test should succeed");
+        assert_eq!(out.state_outputs.len(), 2);
+        let zero = out
+            .state_outputs
+            .iter()
+            .find(|s| s.fips == "06037")
+            .expect("06037 should be present");
+        assert_eq!(zero.population, 0.0);
+        assert!(!zero.missing);
     }
 
     // ---------- compute_state_aggregate ----------
 
     #[test]
     fn aggregate_multi_year_multi_tech_accumulates() {
-        // State path requires BSFC from NR*.EMF to compute fuel. Returns Err
-        // until ExhaustResult carries BSFC (mo-2v1).
+        // 2 model years × 2 tech types → exhaust_calls == 4.
+        // Verify the aggregate succeeds and exhaust was called the right number of times.
         let hp = [1.0, 11.0, 25.0, 50.0];
         let ctx = default_ctx("06000", &hp);
         let mut cb = StubCallbacks::ok_single_year();
@@ -1438,11 +1474,17 @@ mod tests {
             tech_names: vec!["T0".to_string(), "T1".to_string()],
             fractions: vec![0.6, 0.4],
         });
-        let err = compute_state_aggregate(&ctx, &mut cb).unwrap_err();
-        let msg = format!("{err}");
+        let outcome = compute_state_aggregate(&ctx, &mut cb)
+            .expect("multi-year multi-tech aggregate should succeed");
         assert!(
-            msg.contains("bsfc") || msg.contains("BSFC") || msg.contains("fulbmy"),
-            "expected bsfc error, got: {msg}"
+            matches!(outcome, StateAggregateOutcome::Ok(_)),
+            "expected Ok outcome, got {:?}",
+            state_outcome_label(&outcome)
+        );
+        assert_eq!(
+            cb.exhaust_calls.get(),
+            4,
+            "expected 4 exhaust calls (2 years × 2 techs)"
         );
     }
 
