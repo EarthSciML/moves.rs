@@ -547,17 +547,52 @@ pub fn process_national_record(
 
                 accumulate_emissions(&mut emsday, &er.ems_day_delta);
 
-                // Cannot compute fulbmy: BSFC from NR*.EMF not yet threaded through
-                // ExhaustResult on the national path (prcnat.f:723-726). TODO(mo-2v1):
-                // surface bsfc from ExhaustResult, then compute actbmy/fulbmy and emit
-                // BMY/SI outputs here.
-                return Err(Error::Config(format!(
-                    "prcnat.f fulbmy requires bsfc(idxyr,i) from the NR*.EMF emfclc.f \
-                     packet, but the national-path exhaust calculator does not return \
-                     BSFC; the bsfc factor cannot be fabricated (omitting it / using 1.0 \
-                     overstates fuel consumption by ~1/bsfc). SCC {scc} model year {iyr} \
-                     tech {tech_name}."
-                )));
+                let actbmy = actadj * pop_state * modfrc * tplful * tfrac * adjtime;
+                // Canonical `prcnat.f:723-726`: fulbmy = tplful * pop_state *
+                // actadj(idxyr) * modfrc(idxyr) * tchfrc(idxtch,i)
+                //   * (hpval * faclod(idxact) * bsfc(idxyr,i) / denful) * adjtime
+                let fulbmy = tplful
+                    * pop_state
+                    * actadj
+                    * modfrc
+                    * tfrac
+                    * (hpval * activity.load_factor * er.bsfc / denful)
+                    * adjtime;
+
+                fulcsm += fulbmy;
+                fulbmytot += fulbmy;
+
+                if opt.emit_bmy {
+                    output.bmy_outputs.push(ByModelYearOutput {
+                        fips: fips.to_string(),
+                        subcounty: subcur.clone(),
+                        scc: scc.to_string(),
+                        hp_level: hplev,
+                        tech_type: tech_name.clone(),
+                        model_year: iyr,
+                        population: popbmy,
+                        emissions: er.ems_bmy.clone(),
+                        fuel_consumption: fulbmy,
+                        activity: actbmy,
+                        load_factor: activity.load_factor,
+                        hp_avg: hpval,
+                        frac_retrofitted: frac_retro_bmy,
+                        units_retrofitted: units_retro_bmy,
+                        channel: 1,
+                    });
+                }
+                if opt.emit_si {
+                    output.si_aggregates.push(SiAggregate {
+                        fips: fips.to_string(),
+                        scc: scc.to_string(),
+                        tech_type: tech_name.clone(),
+                        population: popbmy,
+                        activity: actbmy,
+                        fuel_consumption: fulbmy,
+                        emissions: er.ems_bmy,
+                        channel: 1,
+                    });
+                }
             }
 
             // --- population / activity / starts totals (prcnat.f :761–:765) ---
@@ -896,6 +931,7 @@ mod tests {
             Ok(ExhaustResult {
                 ems_day_delta: vec![0.0; MXPOL],
                 ems_bmy: vec![0.0; MXPOL],
+                bsfc: 0.5,
             })
         }
         fn calculate_evap(&mut self, _: &EvapCallInputs<'_>) -> Result<EvapResult> {
@@ -929,8 +965,8 @@ mod tests {
 
     #[test]
     fn national_record_invokes_alosta_and_processes_each_selected_state() {
-        // National path requires BSFC from NR*.EMF to compute fuel. Returns
-        // Err until ExhaustResult carries BSFC (mo-2v1).
+        // National mode (state_index=-1) allocates across all selected states.
+        // With 2 selected states, 2000 pop is split 1000/1000 → 2 StateOutputs.
         let states = sample_states();
         let ctx = NationalContext {
             equipment: sample_equipment(2000.0),
@@ -942,18 +978,22 @@ mod tests {
             growth_hint: -9.0,
         };
         let mut cb = HappyCallbacks::new();
-        let err = process_national_record(&ctx, &mut cb).unwrap_err();
-        let msg = format!("{err}");
-        assert!(
-            msg.contains("bsfc") || msg.contains("BSFC") || msg.contains("fulbmy"),
-            "expected bsfc error, got: {msg}"
-        );
+        let out = process_national_record(&ctx, &mut cb).expect("national path should succeed");
+        // 2 selected states in sample_states → 2 StateOutput records.
+        assert_eq!(out.state_outputs.len(), 2);
+        assert!(out.state_outputs.iter().all(|s| !s.missing));
+        // Unselected state "36000" must not appear.
+        assert!(out
+            .state_outputs
+            .iter()
+            .all(|s| s.fips != "36000"));
     }
 
     #[test]
     fn state_record_skips_allocation_and_only_processes_its_state() {
-        // National path requires BSFC from NR*.EMF to compute fuel. Returns
-        // Err until ExhaustResult carries BSFC (mo-2v1).
+        // State mode (state_index=2) assigns all pop to states[1] (17000).
+        // prcnat.f emits a zero record for selected states with zero pop
+        // (06000 gets zero, 17000 gets real data; 36000 is unselected → skipped).
         let states = sample_states();
         let ctx = NationalContext {
             equipment: sample_equipment(2000.0),
@@ -965,18 +1005,29 @@ mod tests {
             growth_hint: -9.0,
         };
         let mut cb = HappyCallbacks::new();
-        let err = process_national_record(&ctx, &mut cb).unwrap_err();
-        let msg = format!("{err}");
-        assert!(
-            msg.contains("bsfc") || msg.contains("BSFC") || msg.contains("fulbmy"),
-            "expected bsfc error, got: {msg}"
-        );
+        let out = process_national_record(&ctx, &mut cb).expect("state path should succeed");
+        // 2 selected states: 06000 (zero record), 17000 (real record).
+        assert_eq!(out.state_outputs.len(), 2);
+        let zero = out
+            .state_outputs
+            .iter()
+            .find(|s| s.fips == "06000")
+            .expect("06000 should have zero record");
+        assert_eq!(zero.population, 0.0);
+        let real = out
+            .state_outputs
+            .iter()
+            .find(|s| s.fips == "17000")
+            .expect("17000 should be present");
+        assert!(!real.missing);
+        // Unselected state must not appear.
+        assert!(out.state_outputs.iter().all(|s| s.fips != "36000"));
     }
 
     #[test]
     fn unselected_states_are_skipped_entirely() {
-        // National path requires BSFC from NR*.EMF to compute fuel. Returns
-        // Err until ExhaustResult carries BSFC (mo-2v1).
+        // National mode with 2 selected + 1 unselected state.
+        // Only 2 StateOutputs; "36000" (unselected) must not appear.
         let states = sample_states();
         let ctx = NationalContext {
             equipment: sample_equipment(1000.0),
@@ -988,12 +1039,12 @@ mod tests {
             growth_hint: -9.0,
         };
         let mut cb = HappyCallbacks::new();
-        let err = process_national_record(&ctx, &mut cb).unwrap_err();
-        let msg = format!("{err}");
-        assert!(
-            msg.contains("bsfc") || msg.contains("BSFC") || msg.contains("fulbmy"),
-            "expected bsfc error, got: {msg}"
-        );
+        let out = process_national_record(&ctx, &mut cb).expect("national path should succeed");
+        assert_eq!(out.state_outputs.len(), 2);
+        assert!(out
+            .state_outputs
+            .iter()
+            .all(|s| s.fips != "36000"));
     }
 
     #[test]

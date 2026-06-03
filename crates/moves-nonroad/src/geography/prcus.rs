@@ -89,6 +89,10 @@ pub struct ExhaustResult {
     pub ems_day_delta: Vec<f32>,
     /// Per-pollutant by-model-year emissions, length [`MXPOL`].
     pub ems_bmy: Vec<f32>,
+    /// BSFC (lb/HP-hr) for this `(year, tech)` slot, sourced from the
+    /// NR\*.EMF / NR\*.BSF packet via `emfclc.f`. Canonical
+    /// `prcus.f:514-516` uses `bsfc(idxyr,i)` in `fulbmy`.
+    pub bsfc: f32,
 }
 
 /// Output of one `clcevems`-equivalent call.
@@ -611,16 +615,56 @@ pub fn process_us_total_record(
             // --- accumulate emsday (prcus.f :502–:508 side effects) ---
             accumulate_emissions(&mut emsday, &er.ems_day_delta);
 
-            // Cannot compute fulbmy: BSFC from NR*.EMF not yet threaded through
-            // ExhaustResult on the state path (prcus.f:514-516). TODO(mo-2v1):
-            // surface bsfc from ExhaustResult, then compute actbmy/fulbmy and emit
-            // BMY/SI outputs here.
-            return Err(Error::Config(format!(
-                "prcus.f fulbmy requires bsfc(idxyr,i) from the NR*.EMF emfclc.f \
-                 packet, but the state-path exhaust calculator does not return BSFC; \
-                 a literal 1.0 cannot be fabricated in its place (it overstates fuel \
-                 consumption by ~1/bsfc). SCC {scc} model year {iyr} tech {tech_name}."
-            )));
+            // --- bookkeeping (prcus.f :512–:520) ---
+            let actbmy = actadj * popus * modfrc * tplful * tfrac * adjtime;
+            // Canonical `prcus.f:514-516`: fulbmy = tplful * popus *
+            // actadj(idxyr) * modfrc(idxyr) * tchfrc(idxtch,i)
+            //   * (hpval * faclod(idxact) * bsfc(idxyr,i) / denful) * adjtime
+            // `er.bsfc` carries the per-(year,tech) BSFC from the NR*.EMF packet.
+            let fulbmy = tplful
+                * popus
+                * actadj
+                * modfrc
+                * tfrac
+                * (hpval * activity.load_factor * er.bsfc / denful)
+                * adjtime;
+
+            fulcsm += fulbmy;
+            fulbmytot += fulbmy;
+
+            // --- wrtbmy(1=exhaust) (prcus.f :527–:535) ---
+            if opt.emit_bmy {
+                output.bmy_outputs.push(ByModelYearOutput {
+                    fips: fipus.to_string(),
+                    subcounty: subcur.clone(),
+                    scc: scc.to_string(),
+                    hp_level: hplev,
+                    tech_type: tech_name.clone(),
+                    model_year: iyr,
+                    population: popbmy,
+                    emissions: er.ems_bmy.clone(),
+                    fuel_consumption: fulbmy,
+                    activity: actbmy,
+                    load_factor: activity.load_factor,
+                    hp_avg: hpval,
+                    frac_retrofitted: frac_retro_bmy,
+                    units_retrofitted: units_retro_bmy,
+                    channel: 1,
+                });
+            }
+            // --- sitot (prcus.f :539–:542) ---
+            if opt.emit_si {
+                output.si_aggregates.push(SiAggregate {
+                    fips: fipus.to_string(),
+                    scc: scc.to_string(),
+                    tech_type: tech_name.clone(),
+                    population: popbmy,
+                    activity: actbmy,
+                    fuel_consumption: fulbmy,
+                    emissions: er.ems_bmy,
+                    channel: 1,
+                });
+            }
         }
 
         // --- population / activity / starts totals (prcus.f :550–:554) ---
@@ -850,6 +894,7 @@ mod tests {
             Ok(ExhaustResult {
                 ems_day_delta: vec![0.0; MXPOL],
                 ems_bmy: vec![0.0; MXPOL],
+                bsfc: 0.5,
             })
         }
         fn calculate_evap(&mut self, _: &EvapCallInputs<'_>) -> Result<EvapResult> {
@@ -1038,6 +1083,7 @@ mod tests {
             Ok(ExhaustResult {
                 ems_day_delta: vec![0.0; MXPOL],
                 ems_bmy: vec![0.0; MXPOL],
+                bsfc: 0.5,
             })
         }
         fn calculate_evap(&mut self, _: &EvapCallInputs<'_>) -> Result<EvapResult> {
@@ -1050,10 +1096,10 @@ mod tests {
     }
 
     #[test]
-    fn happy_path_errors_on_missing_bsfc() {
-        // The US-total path requires BSFC from the NR*.EMF packet to compute
-        // fuel consumption. Until ExhaustResult carries BSFC, the function
-        // returns Err instead of panicking (mo-2v1).
+    fn happy_path_emits_single_state_output() {
+        // The US-total path uses ExhaustResult.bsfc (from the NR*.EMF packet)
+        // in the fulbmy formula. Verify that a successful run emits exactly one
+        // StateOutput record for fips "00000".
         let ctx = UsTotalContext {
             equipment: sample_equipment(1000.0),
             run_options: sample_options(),
@@ -1064,12 +1110,11 @@ mod tests {
             exhaust_calls: 0,
             evap_calls: 0,
         };
-        let err = process_us_total_record(&ctx, &mut cb).unwrap_err();
-        let msg = format!("{err}");
-        assert!(
-            msg.contains("bsfc") || msg.contains("BSFC") || msg.contains("fulbmy"),
-            "expected bsfc error, got: {msg}"
-        );
+        let out = process_us_total_record(&ctx, &mut cb).expect("happy path should succeed");
+        assert_eq!(out.state_outputs.len(), 1);
+        assert_eq!(out.state_outputs[0].fips, US_TOTAL_FIPS);
+        assert!(!out.state_outputs[0].missing);
+        assert!(out.warnings.is_empty());
     }
 
     #[test]

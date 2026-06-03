@@ -1807,17 +1807,8 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
         ))
     }
 
-    fn calculate_exhaust(&mut self, _inputs: &ExhaustCallInputs<'_>) -> Result<ExhaustResult> {
-        // Emission-factor (NR*.EMF) tables not yet loadable. This is only
-        // reached when a tech fraction is > 0; surface the unloaded-table
-        // condition as an error instead of panicking on the live state
-        // path.
-        Err(Error::Config(
-            "StateAdapter::calculate_exhaust: exhaust emission-factor (NR*.EMF) tables \
-             are not yet loadable; cannot compute exhaust emissions (clcems) for a \
-             record with a non-zero exhaust tech fraction"
-                .to_string(),
-        ))
+    fn calculate_exhaust(&mut self, inputs: &ExhaustCallInputs<'_>) -> Result<ExhaustResult> {
+        calculate_exhaust_from_reference(&self.executor.reference, inputs)
     }
 
     fn calculate_evap(&mut self, _inputs: &EvapCallInputs<'_>) -> Result<EvapResult> {
@@ -2136,13 +2127,8 @@ impl<'a> NationalCallbacks for NationalAdapter<'a> {
         ))
     }
 
-    fn calculate_exhaust(&mut self, _inputs: &ExhaustCallInputs<'_>) -> Result<ExhaustResult> {
-        Err(Error::Config(
-            "NationalAdapter::calculate_exhaust: exhaust emission-factor (NR*.EMF) tables \
-             are not yet loadable; cannot compute exhaust emissions (clcems) for a \
-             record with a non-zero exhaust tech fraction"
-                .to_string(),
-        ))
+    fn calculate_exhaust(&mut self, inputs: &ExhaustCallInputs<'_>) -> Result<ExhaustResult> {
+        calculate_exhaust_from_reference(&self.executor.reference, inputs)
     }
 
     fn calculate_evap(&mut self, _inputs: &EvapCallInputs<'_>) -> Result<EvapResult> {
@@ -2418,13 +2404,8 @@ impl<'a> UsTotalCallbacks for UsTotalAdapter<'a> {
         ))
     }
 
-    fn calculate_exhaust(&mut self, _inputs: &ExhaustCallInputs<'_>) -> Result<ExhaustResult> {
-        Err(Error::Config(
-            "UsTotalAdapter::calculate_exhaust: exhaust emission-factor (NR*.EMF) tables \
-             are not yet loadable; cannot compute exhaust emissions (clcems) for a \
-             record with a non-zero exhaust tech fraction"
-                .to_string(),
-        ))
+    fn calculate_exhaust(&mut self, inputs: &ExhaustCallInputs<'_>) -> Result<ExhaustResult> {
+        calculate_exhaust_from_reference(&self.executor.reference, inputs)
     }
 
     fn calculate_evap(&mut self, _inputs: &EvapCallInputs<'_>) -> Result<EvapResult> {
@@ -2435,6 +2416,201 @@ impl<'a> UsTotalCallbacks for UsTotalAdapter<'a> {
 // =============================================================================
 // Helpers
 // =============================================================================
+
+/// Compute exhaust emissions for one `(model_year, tech)` iteration on the
+/// state / national / US-total path, mirroring the county-path
+/// `compute_exhaust_iteration` logic.
+///
+/// Looks up the `ExhaustTechEntry` for `(scc, hp_avg)`, extracts the
+/// per-tech BSFC, builds the EF arrays, computes emission adjustments, and
+/// calls `calculate_exhaust_emissions`. Returns `ExhaustResult` with
+/// `bsfc` populated.
+///
+/// Used by `StateAdapter`, `NationalAdapter`, and `UsTotalAdapter` to share
+/// the same wiring without duplicating the county-path logic.
+fn calculate_exhaust_from_reference(
+    reference: &ReferenceData,
+    inputs: &ExhaustCallInputs<'_>,
+) -> Result<ExhaustResult> {
+    let entry = reference
+        .exhaust_tech_entries
+        .iter()
+        .find(|e| e.scc == inputs.scc && e.hp_min <= inputs.hp_avg && inputs.hp_avg <= e.hp_max)
+        .ok_or_else(|| {
+            Error::Config(format!(
+                "calculate_exhaust: no exhaust-tech entry for SCC {} hp_avg {}; \
+                 emfclc.f (NR*.EMF packet) must supply a real BSFC.",
+                inputs.scc, inputs.hp_avg
+            ))
+        })?;
+
+    if entry.bsfc.is_empty() {
+        return Err(Error::Config(format!(
+            "calculate_exhaust: exhaust-tech entry for SCC {} hp_avg {} has empty BSFC; \
+             emfclc.f populates a real per-tech BSFC. An empty BSFC is a data error.",
+            inputs.scc, inputs.hp_avg
+        )));
+    }
+    let bsfc = entry
+        .bsfc
+        .get(inputs.tech_index)
+        .copied()
+        .unwrap_or(entry.bsfc[0]);
+
+    let n_tech = entry.tech_names.len().max(1);
+    let mut emission_factors = vec![0.0_f32; MXAGYR * MXPOL * MXTECH];
+    let mut unit_codes = vec![EmissionUnitCode::GramsPerHpHour; MXPOL * MXTECH];
+    let mut adetcf = vec![0.0_f32; MXPOL * MXTECH];
+    let mut bdetcf = vec![0.0_f32; MXPOL * MXTECH];
+    let mut detcap = vec![0.0_f32; MXPOL * MXTECH];
+
+    if !entry.emission_factors.is_empty() {
+        let tech_span = n_tech.min(MXTECH);
+        for pol in 0..MXPOL {
+            for t in 0..tech_span {
+                let src = pol * n_tech + t;
+                if src >= entry.emission_factors.len() {
+                    continue;
+                }
+                let ef = entry.emission_factors[src];
+                if ef != 0.0 {
+                    for y in 0..MXAGYR {
+                        emission_factors[y * (MXPOL * MXTECH) + pol * MXTECH + t] = ef;
+                    }
+                }
+                let dst = pol * MXTECH + t;
+                if let Some(u) = entry.emission_units.get(src) {
+                    unit_codes[dst] = *u;
+                }
+                if let Some(a) = entry.det_a.get(src) {
+                    adetcf[dst] = *a;
+                }
+                if let Some(b) = entry.det_b.get(src) {
+                    bdetcf[dst] = *b;
+                }
+                if let Some(c) = entry.det_cap.get(src) {
+                    detcap[dst] = *c;
+                }
+            }
+        }
+    }
+
+    let tamb = reference
+        .ambient_temp_by_scc
+        .get(inputs.scc)
+        .copied()
+        .unwrap_or(reference.ambient_temp_f);
+    if tamb <= 0.0 {
+        return Err(Error::Config(format!(
+            "calculate_exhaust: ambient temperature absent for SCC {} \
+             (NR*.EMF / temperature input not loaded).",
+            inputs.scc
+        )));
+    }
+    let fuel = fuel_for_scc(inputs.scc).unwrap_or(FuelKind::Gasoline4Stroke);
+    let temps = DailyTemperatures {
+        daily_temperature_mode: false,
+        daily_ambient_temp_f: Vec::new(),
+        ambient_temp: tamb,
+    };
+    let dummy_month = [1.0_f32; crate::common::consts::MXDAYS];
+    let adj_inputs = AdjustmentInputs {
+        fuel,
+        scc: inputs.scc,
+        fips: "",
+        day_range: DayRange {
+            begin_day: 1,
+            end_day: 1,
+            winter_skip_begin: 0,
+            winter_skip_end: 0,
+            winter_skip: false,
+        },
+        temperatures: &temps,
+        daily_month_fraction: &dummy_month,
+        rfg: reference.fuel_rfg,
+        high_altitude: false,
+        oxygen_percent: reference.fuel_oxygen_pct,
+        episode_year: 0,
+        month: 0,
+        month_to_season: [Season::Summer; 12],
+        rfg_winter_2_stroke: None,
+        rfg_winter_4_stroke: None,
+        rfg_summer_2_stroke: None,
+        rfg_summer_4_stroke: None,
+        sox_fuel: [1.0; 5],
+        sox_base: [1.0; 5],
+        sox_diesel_marine: 1.0,
+        altitude_factor: [1.0; 5],
+    };
+    let adjustments = calculate_emission_adjustments(&adj_inputs);
+
+    let mut tech_fracs = vec![0.0_f32; MXTECH];
+    if inputs.tech_index < MXTECH {
+        tech_fracs[inputs.tech_index] = inputs.tech_fraction;
+    }
+
+    let mut pollutant_filter = PollutantFilter::empty();
+    for pol in 0..MXPOL {
+        let has = (0..MXTECH).any(|t| {
+            emission_factors
+                .get(inputs.year_index * (MXPOL * MXTECH) + pol * MXTECH + t)
+                .is_some_and(|&v| v != 0.0)
+        });
+        pollutant_filter = pollutant_filter.set_slot(pol, has);
+    }
+
+    let retrofit_reduction = vec![0.0_f32; MXPOL];
+    let sox_conversion = [SWTGS2, SWTGS4, SWTDSL, SWTLPG, SWTCNG];
+    let sox_base_arr = [SWTGS2, SWTGS4, SWTDSL, SWTLPG, SWTCNG];
+
+    let mut calc_inputs = ExhaustCalcInputs {
+        year_index: inputs.year_index,
+        tech_index: inputs.tech_index,
+        scc_tech_index: 0,
+        equipment_age: inputs.deterioration_age,
+        detcap: &detcap,
+        adetcf: &adetcf,
+        bdetcf: &bdetcf,
+        unit_codes: &unit_codes,
+        tech_fraction: inputs.tech_fraction,
+        hp_avg: inputs.hp_avg,
+        fuel_density: inputs.fuel_density,
+        bsfc,
+        activity_index: 0,
+        load_factor: inputs.activity.load_factor,
+        activity_unit: inputs.activity.units,
+        daily_adjustments: &adjustments,
+        adjustment_time: inputs.adjustment_time,
+        day_range: DayRange {
+            begin_day: 1,
+            end_day: 1,
+            winter_skip_begin: 0,
+            winter_skip_end: 0,
+            winter_skip: false,
+        },
+        emission_factors: &mut emission_factors,
+        starts_adjustment: inputs.starts_adjustment,
+        temporal_adjustment: inputs.temporal_adjustment,
+        population: inputs.population,
+        model_year_fraction: inputs.model_year_fraction,
+        n_days: inputs.n_days,
+        activity_adjustment: inputs.activity_adjustment,
+        tech_fractions_table: &tech_fracs,
+        retrofit_reduction: &retrofit_reduction,
+        fuel,
+        sox_conversion,
+        sox_base: sox_base_arr,
+        sulfur_alternate: None,
+    };
+
+    let outputs = calculate_exhaust_emissions(&mut calc_inputs, &pollutant_filter);
+
+    Ok(ExhaustResult {
+        ems_day_delta: outputs.emissions_day,
+        ems_bmy: outputs.emissions_by_model_year,
+        bsfc,
+    })
+}
 
 /// Build a [`CountyRunOptions`] from the dispatch context and run options.
 fn build_run_options(
