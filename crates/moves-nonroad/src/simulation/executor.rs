@@ -3980,8 +3980,8 @@ mod production {
     /// `state_index = 0` (national record) triggers `alosta`; the
     /// NR*.ALO allocation gives state "06000" population 100*(300/1000)=30.
     /// Zero tech fractions bypass the emission iteration; one `StateOutput`
-    /// is still emitted per selected state. The next barrier after ALO is
-    /// NR*.TMF (daymthf not ported), so we expect a TMF error.
+    /// is still emitted per selected state.
+    /// ALO and TMF are both ported; execution now succeeds end-to-end.
     #[test]
     fn national_minimal_ref_returns_one_row() {
         let mut exec = ProductionExecutor {
@@ -4103,13 +4103,11 @@ mod production {
             growth: None,
         };
 
-        // ALO allocation now succeeds; next barrier is NR*.TMF (daymthf not ported).
-        let err = exec.execute(&ctx, &opts).unwrap_err();
-        let msg = err.to_string();
-        assert!(
-            msg.contains("TMF") || msg.contains("temporal") || msg.contains("daymthf"),
-            "expected TMF error after ALO allocation succeeds, got: {msg}"
-        );
+        // ALO and TMF both ported; execution succeeds.
+        let result = exec.execute(&ctx, &opts).unwrap();
+        assert!(!result.skipped, "expected non-skipped execution");
+        assert_eq!(result.rows.len(), 1, "expected exactly one SimEmissionRow");
+        assert_eq!(result.rows[0].fips, "06000");
     }
 
     /// (f) US-total dispatch with a minimal reference table →
