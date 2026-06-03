@@ -30,7 +30,7 @@ use moves_data_default::DefaultDb;
 use moves_framework::{
     default_tables, read_execution_bundle, read_execution_bundle_filtered, CalculatorRegistry,
     CountyRow, DataFrameStore, DataFrameStoreTyped, EngineConfig, EngineOutcome, GeographyTables,
-    InMemoryStore, InputDataManager, LinkRow, MOVESEngine, RunSpecFilters,
+    InMemoryStore, InputDataManager, LinkRow, MergeTableSpec, MOVESEngine, RunSpecFilters,
 };
 use moves_runspec::{GeoKind, RunSpec};
 use polars::prelude::{
@@ -1278,6 +1278,84 @@ fn build_runspec_tables(runspec: &RunSpec, store: &mut InMemoryStore) -> Result<
     Ok(())
 }
 
+/// Derive `fuelYearID` values from the already-loaded `Year` table.
+///
+/// Ports the first half of `ExecutionRunSpec.initializeAfterShallowTables`
+/// (lines 223–241): `SELECT DISTINCT fuelYearID FROM year WHERE yearID IN
+/// (<runspec years>)`. The `Year` table is unfiltered in the default-DB
+/// registry, so all year→fuelYear mappings are available here.
+#[cfg(not(target_arch = "wasm32"))]
+fn derive_fuel_years_from_store(store: &InMemoryStore, year_ids: &[i64]) -> Vec<i64> {
+    let Some(arc) = store.get("Year") else {
+        return Vec::new();
+    };
+    let df = &*arc;
+    let find = |want: &str| -> Option<polars::prelude::Column> {
+        let target = want.to_ascii_lowercase();
+        df.columns()
+            .iter()
+            .find(|c| c.name().to_ascii_lowercase() == target)
+            .cloned()
+    };
+    let (Some(yid_col), Some(fyid_col)) = (find("yearID"), find("fuelYearID")) else {
+        return Vec::new();
+    };
+    let Ok(yids) = yid_col
+        .cast(&polars::prelude::DataType::Int64)
+        .and_then(|c| c.i64().cloned())
+    else {
+        return Vec::new();
+    };
+    let Ok(fyids) = fyid_col
+        .cast(&polars::prelude::DataType::Int64)
+        .and_then(|c| c.i64().cloned())
+    else {
+        return Vec::new();
+    };
+    let year_set: BTreeSet<i64> = year_ids.iter().copied().collect();
+    let mut fuel_years: BTreeSet<i64> = BTreeSet::new();
+    for i in 0..df.height() {
+        if let (Some(y), Some(fy)) = (yids.get(i), fyids.get(i)) {
+            if year_set.contains(&y) {
+                fuel_years.insert(fy);
+            }
+        }
+    }
+    fuel_years.into_iter().collect()
+}
+
+/// Derive `regionID` values from the county-filtered `regionCounty` table.
+///
+/// Ports the second half of `ExecutionRunSpec.initializeAfterShallowTables`
+/// (lines 243–251): `{0} ∪ SELECT DISTINCT regionID FROM regionCounty`.
+/// Region 0 is the MOVES "all-regions" wildcard and is always included
+/// (canonical Java line 245: `regions.add(Integer.valueOf(0))`).
+#[cfg(not(target_arch = "wasm32"))]
+fn derive_region_ids_from_store(store: &InMemoryStore) -> Vec<i64> {
+    let mut regions: BTreeSet<i64> = BTreeSet::new();
+    regions.insert(0); // wildcard — always present
+    let Some(arc) = store.get("regionCounty") else {
+        return regions.into_iter().collect();
+    };
+    let df = &*arc;
+    let Some(rid_col) = df
+        .columns()
+        .iter()
+        .find(|c| c.name().to_ascii_lowercase() == "regionid")
+        .cloned()
+    else {
+        return regions.into_iter().collect();
+    };
+    if let Ok(casted) = rid_col.cast(&polars::prelude::DataType::Int64) {
+        if let Ok(rids) = casted.i64() {
+            for v in rids.into_iter().flatten() {
+                regions.insert(v);
+            }
+        }
+    }
+    regions.into_iter().collect()
+}
+
 /// Build the in-memory execution store from a converted default-DB Parquet
 /// tree, applying RunSpec-scoped filters via [`InputDataManager`] and then
 /// synthesising the `Link`, `RunSpec*`, and meteorology tables.
@@ -1311,10 +1389,44 @@ pub fn build_default_db_store(
 ) -> Result<InMemoryStore> {
     let db = DefaultDb::open(default_db_path)
         .with_context(|| format!("opening default DB at {}", default_db_path.display()))?;
-    let filters = RunSpecFilters::from_runspec(run_spec);
-    let plan = InputDataManager::plan(&filters, &default_tables());
+
+    // Phase 1: load all default-DB tables with base filters.
+    // `fuel_years` and `region_ids` are empty at this stage — they require
+    // DB lookups (Year → fuelYearID mapping, regionCounty → regionID set)
+    // that are only valid after Phase 1 completes. Year loads unfiltered
+    // (no year_column in the registry); regionCounty loads county-filtered
+    // but without the fuelYear filter (which isn't known yet).
+    let base_filters = RunSpecFilters::from_runspec(run_spec);
+    let plan = InputDataManager::plan(&base_filters, &default_tables());
     let mut store = InputDataManager::execute(&plan, &db)
         .map_err(|e| anyhow::anyhow!("loading default DB: {e}"))?;
+
+    // Phase 2: derive fuel_years and region_ids from the Phase 1 tables,
+    // then re-execute only the fuel/region-sensitive tables with the correct
+    // filters. Mirrors `ExecutionRunSpec.initializeAfterShallowTables`
+    // (Java lines 217–251).
+    let fuel_years = derive_fuel_years_from_store(&store, &base_filters.years);
+    let region_ids = derive_region_ids_from_store(&store);
+    let full_filters = RunSpecFilters {
+        fuel_years,
+        region_ids,
+        ..base_filters
+    };
+    // Select only the tables that carry a fuel_year or region column
+    // annotation — those are the tables whose Phase 1 load lacked these
+    // filters. Year and regionCounty are the source tables for the
+    // derivation above and are intentionally left as loaded in Phase 1
+    // (Year is registry-unfiltered; regionCounty is county-filtered only).
+    let fuel_region_specs: Vec<MergeTableSpec> = default_tables()
+        .into_iter()
+        .filter(|t| t.fuel_year_column.is_some() || t.region_column.is_some())
+        .filter(|t| !matches!(t.table_name, "Year" | "regionCounty"))
+        .collect();
+    let replan = InputDataManager::plan(&full_filters, &fuel_region_specs);
+    let replenished = InputDataManager::execute(&replan, &db)
+        .map_err(|e| anyhow::anyhow!("loading default DB (fuel/region re-pass): {e}"))?;
+    replenished.copy_into(&mut store);
+
     if let Some(sd) = scale_dir {
         overlay_scale_input_db(&mut store, sd)
             .with_context(|| format!("loading scale-input DB from {}", sd.display()))?;
@@ -2457,5 +2569,90 @@ mod tests {
             df.column("monthGroupID").unwrap().i32().unwrap().get(0),
             Some(3), // looked up from MonthGroupOfAnyYear
         );
+    }
+
+    // ---------- derive_fuel_years_from_store ---------------------------------
+
+    #[test]
+    fn derive_fuel_years_extracts_matching_year_rows() {
+        use polars::prelude::*;
+        let mut store = InMemoryStore::new();
+        // Year table: 2019→2018 (historical boundary), 2020→2019, 2021→2020.
+        let year_df = df!(
+            "yearID"     => &[2019i32, 2020i32, 2021i32],
+            "isBaseYear" => &[0i32, 0i32, 0i32],
+            "fuelYearID" => &[2018i32, 2019i32, 2020i32],
+        )
+        .unwrap();
+        store.insert("Year", year_df);
+
+        // RunSpec years = [2020] → fuelYearID should be [2019].
+        let fuel_years = derive_fuel_years_from_store(&store, &[2020]);
+        assert_eq!(fuel_years, vec![2019i64]);
+    }
+
+    #[test]
+    fn derive_fuel_years_multi_year_deduplicates() {
+        use polars::prelude::*;
+        let mut store = InMemoryStore::new();
+        // Two calendar years map to the same fuelYearID (many-to-one).
+        let year_df = df!(
+            "yearID"     => &[2020i32, 2021i32, 2022i32],
+            "isBaseYear" => &[0i32, 0i32, 0i32],
+            "fuelYearID" => &[2019i32, 2019i32, 2021i32],
+        )
+        .unwrap();
+        store.insert("Year", year_df);
+
+        let fuel_years = derive_fuel_years_from_store(&store, &[2020, 2021]);
+        assert_eq!(fuel_years, vec![2019i64]); // deduplicated
+    }
+
+    #[test]
+    fn derive_fuel_years_returns_empty_when_year_table_absent() {
+        let store = InMemoryStore::new();
+        let fuel_years = derive_fuel_years_from_store(&store, &[2020]);
+        assert!(fuel_years.is_empty());
+    }
+
+    // ---------- derive_region_ids_from_store ---------------------------------
+
+    #[test]
+    fn derive_region_ids_always_includes_wildcard_zero() {
+        // Even with an empty regionCounty table, region 0 must be present.
+        let mut store = InMemoryStore::new();
+        use polars::prelude::*;
+        let rc_df = df!(
+            "regionID" => Vec::<i32>::new(),
+            "countyID" => Vec::<i32>::new(),
+            "fuelYearID" => Vec::<i32>::new(),
+        )
+        .unwrap();
+        store.insert("regionCounty", rc_df);
+        let region_ids = derive_region_ids_from_store(&store);
+        assert_eq!(region_ids, vec![0i64]);
+    }
+
+    #[test]
+    fn derive_region_ids_unions_table_values_with_zero() {
+        use polars::prelude::*;
+        let mut store = InMemoryStore::new();
+        let rc_df = df!(
+            "regionID"   => &[100000000i32, 200000000i32, 100000000i32],
+            "countyID"   => &[40001i32, 40003i32, 40005i32],
+            "fuelYearID" => &[2019i32, 2019i32, 2019i32],
+        )
+        .unwrap();
+        store.insert("regionCounty", rc_df);
+        let region_ids = derive_region_ids_from_store(&store);
+        // 0 (wildcard) + unique regionIDs from the table.
+        assert_eq!(region_ids, vec![0i64, 100000000i64, 200000000i64]);
+    }
+
+    #[test]
+    fn derive_region_ids_returns_only_zero_when_table_absent() {
+        let store = InMemoryStore::new();
+        let region_ids = derive_region_ids_from_store(&store);
+        assert_eq!(region_ids, vec![0i64]);
     }
 }
