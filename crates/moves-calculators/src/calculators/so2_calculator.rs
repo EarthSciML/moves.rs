@@ -1782,7 +1782,7 @@ fn synthesize_general_fuel_ratio(
         .into_iter()
         .filter(|r| {
             r.pollutant_id == i32::from(SO2_POLLUTANT.0)
-                && process_id.is_none_or(|p| r.process_id == p)
+                && process_id.map_or(true, |p| r.process_id == p)
         })
         .collect();
     // No SO2 fuel-effect rows (the universal case) → empty extract, multiplier 1.
@@ -1825,7 +1825,8 @@ fn synthesize_general_fuel_ratio(
         return Ok(Vec::new());
     };
 
-    let mut acc: HashMap<(i32, i32, i32, i32, i32, i32, i32), f64> = HashMap::new();
+    type FuelRatioKey = (i32, i32, i32, i32, i32, i32, i32);
+    let mut acc: HashMap<FuelRatioKey, f64> = HashMap::new();
     for gfr in &raw {
         for fs in &fuel_supply {
             if fs.fuel_formulation_id != gfr.fuel_formulation_id {
