@@ -163,16 +163,16 @@ mod tests {
             &self,
             _: &str,
             _: &str,
-        ) -> ([f32; crate::common::consts::MXDAYS], f32, f32, i32) {
-            ([0.0; crate::common::consts::MXDAYS], 1.0, 1.0, 30)
+        ) -> Result<([f32; crate::common::consts::MXDAYS], f32, f32, i32)> {
+            Ok(([0.0; crate::common::consts::MXDAYS], 1.0, 1.0, 30))
         }
         fn emission_adjustments(
             &self,
             _: &str,
             _: &str,
             _: &[f32; crate::common::consts::MXDAYS],
-        ) -> crate::emissions::exhaust::AdjustmentTable {
-            crate::emissions::exhaust::AdjustmentTable::new(crate::common::consts::MXDAYS)
+        ) -> Result<crate::emissions::exhaust::AdjustmentTable> {
+            Ok(crate::emissions::exhaust::AdjustmentTable::new(crate::common::consts::MXDAYS))
         }
         fn model_year_and_agedist(
             &mut self,

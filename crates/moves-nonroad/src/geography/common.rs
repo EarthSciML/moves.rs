@@ -654,7 +654,11 @@ pub trait GeographyCallbacks {
  /// Compute the daily/monthly factor table (Fortran
  /// `daymthf(asccod, fipin, daymthfac, mthf, dayf, ndays)`).
  /// Returns `(daymthfac[365], mthf, dayf, ndays)`.
-    fn day_month_factors(&self, scc: &str, fips: &str) -> ([f32; MXDAYS], f32, f32, i32);
+    fn day_month_factors(
+        &self,
+        scc: &str,
+        fips: &str,
+    ) -> Result<([f32; MXDAYS], f32, f32, i32)>;
 
  /// Compute the daily emission-adjustment table (Fortran
  /// `emsadj(adjems, asccod, fipin, daymthfac)`).
@@ -663,7 +667,7 @@ pub trait GeographyCallbacks {
         scc: &str,
         fips: &str,
         daymthfac: &[f32; MXDAYS],
-    ) -> AdjustmentTable;
+    ) -> Result<AdjustmentTable>;
 
  /// Bundled `modyr` + `agedist` invocation.
  ///
@@ -819,11 +823,20 @@ impl GeographyCallbacks for NoopCallbacks {
     fn surviving_retrofits(&self) -> Vec<&RetrofitRecord> {
         Vec::new()
     }
-    fn day_month_factors(&self, _: &str, _: &str) -> ([f32; MXDAYS], f32, f32, i32) {
-        ([0.0; MXDAYS], 0.0, 0.0, 0)
+    fn day_month_factors(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<([f32; MXDAYS], f32, f32, i32)> {
+        Err(Error::Config("NoopCallbacks::day_month_factors".into()))
     }
-    fn emission_adjustments(&self, _: &str, _: &str, _: &[f32; MXDAYS]) -> AdjustmentTable {
-        AdjustmentTable::new(MXDAYS)
+    fn emission_adjustments(
+        &self,
+        _: &str,
+        _: &str,
+        _: &[f32; MXDAYS],
+    ) -> Result<AdjustmentTable> {
+        Err(Error::Config("NoopCallbacks::emission_adjustments".into()))
     }
     fn model_year_and_agedist(
         &mut self,

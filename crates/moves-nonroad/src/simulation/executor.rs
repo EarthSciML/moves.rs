@@ -554,13 +554,13 @@ impl ProductionExecutor {
  // The NR*.SCO county-allocation loader (alosub.f / alocty.f) is not
  // ported, so per-county populations cannot be obtained and a uniform
  // 1.0 cannot be fabricated in their place. Fail loudly.
-        panic!(
+        return Err(crate::Error::Config(format!(
             "execute_state_to_county: NR*.SCO per-county allocation (alosub.f / \
              alocty.f) is not ported; county populations (popcty) cannot be obtained. \
              A uniform population = 1.0 is not the canonical county allocation and \
              cannot be fabricated ({} matching counties for state prefix {state_prefix}).",
             county_fips.len()
-        );
+        )));
 
         #[allow(unreachable_code)]
         let counties: Vec<CountyInput> = county_fips
@@ -820,7 +820,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         &self,
         _scc: &str,
         _fips: &str,
-    ) -> ([f32; crate::common::consts::MXDAYS], f32, f32, i32) {
+    ) -> Result<([f32; crate::common::consts::MXDAYS], f32, f32, i32)> {
  // Temporal-factor file not yet loaded. Return a neutral
  // single-day factor: mthf=1, dayf=1, ndays=1. This collapses
  // the emission period to one day (adjtime=1 in total mode).
@@ -832,7 +832,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
  // consistent with ndays=1 — so the panic broke a previously-correct
  // fixture. The other nonroad fixtures remain quarantined either way.
  // Porting the real NR*.TMF loader is a pre-existing, deferred concern.
-        ([0.0; crate::common::consts::MXDAYS], 1.0, 1.0, 1)
+        Ok(([0.0; crate::common::consts::MXDAYS], 1.0, 1.0, 1))
     }
 
     fn emission_adjustments(
@@ -840,7 +840,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         scc: &str,
         fips: &str,
         _daymthfac: &[f32; crate::common::consts::MXDAYS],
-    ) -> AdjustmentTable {
+    ) -> Result<AdjustmentTable> {
         let oxy = self.executor.reference.fuel_oxygen_pct;
  // Per-SCC activity-weighted ambient temperature (warm-daytime-weighted
  // for daylight-use equipment), falling back to the scalar mean.
@@ -865,12 +865,12 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
  // input (`oxy == 0.0` ⇒ no oxygenate correction), so it is left
  // defaultable — but the ambient temperature cannot be fabricated.
         if tamb <= 0.0 {
-            panic!(
+            return Err(crate::Error::Config(format!(
                 "emission_adjustments: run-level ambient temperature is absent for \
                  SCC {scc} (NR*.EMF / temperature input not loaded). emsadj.f always \
                  applies EXP(acoeff*(tamb-75)); a neutral 75 °F (temfac=1) cannot be \
                  fabricated as it silently drops the exhaust temperature correction."
-            );
+            )));
         }
  // Port of `emsadj.f`: the gasoline exhaust temperature + oxygenate
  // corrections. The engine evaluates day 1 (begin=end=1), matching
@@ -912,7 +912,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             sox_diesel_marine: 1.0,
             altitude_factor: [1.0; 5],
         };
-        calculate_emission_adjustments(&inputs)
+        Ok(calculate_emission_adjustments(&inputs))
     }
 
  // ---- Model-year and age distribution --------------------------------
@@ -1052,21 +1052,21 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
  // zeroes fuel consumption and the CO2/SOx that depend on it, so fail
  // loudly instead.
         let Some(e_bsfc) = entry else {
-            panic!(
+            return Err(crate::Error::Config(format!(
                 "compute_exhaust_factors: no exhaust-tech reference entry for \
                  SCC {scc} at hp_avg {hp_avg}; emfclc.f (NR*.EMF packet) must supply a \
                  BSFC for the matched tech. A zero BSFC cannot be fabricated (it zeroes \
                  fuel consumption and the BSFC-derived CO2/SOx)."
-            );
+            )));
         };
         if e_bsfc.bsfc.is_empty() {
-            panic!(
+            return Err(crate::Error::Config(format!(
                 "compute_exhaust_factors: exhaust-tech entry for SCC {scc} at \
                  hp_avg {hp_avg} carries an empty BSFC vector; emfclc.f (NR*.EMF packet) \
                  populates a real per-tech BSFC. An empty/zero BSFC is a data error and \
                  cannot be fabricated (it zeroes fuel consumption and the BSFC-derived \
                  CO2/SOx)."
-            );
+            )));
         }
         let bsfc_per_tech: Vec<f32> = e_bsfc.bsfc.clone();
         let mut bsfc = vec![0.0_f32; MXAGYR * n_tech];
@@ -1438,7 +1438,7 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
         })
     }
 
-    fn day_month_factor(&mut self, _scc: &str, _fips: &str) -> DayMonthFactor {
+    fn day_month_factor(&mut self, _scc: &str, _fips: &str) -> Result<DayMonthFactor> {
  // Canonical `daymthf.f` reads the per-SCC month/day temporal
  // fractions from the NR*.TMF temporal-factor packet and returns the
  // real `(day_month_fac, mthf, dayf, n_days)`. The prior code
@@ -1446,13 +1446,14 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
  // which collapses an annual total-mode run to a single day —
  // understating the annual total by ~365x. The NR*.TMF temporal-factor
  // loader is not ported, so the real factors cannot be obtained and a
- // neutral single-day value cannot be fabricated. Fail loudly.
-        panic!(
+ // neutral single-day value cannot be fabricated.
+        Err(crate::Error::Config(
             "day_month_factor: NR*.TMF temporal-factor loader (daymthf.f) is not \
              ported; the month/day fractions and n_days cannot be obtained. A neutral \
              mthf=dayf=n_days=1 cannot be fabricated (it collapses an annual run by \
              ~365x)."
-        );
+                .into(),
+        ))
     }
 
     fn growth_factor(&mut self, year1: i32, year2: i32, fips: &str, indcod: i32) -> Result<f32> {
@@ -1704,12 +1705,12 @@ impl<'a> NationalCallbacks for NationalAdapter<'a> {
  // cannot be computed — and a uniform split cannot be fabricated in its
  // place. Fail loudly.
         let _ = (states, national_population);
-        panic!(
+        Err(crate::Error::Config(format!(
             "allocate_to_states: NR*.ALO coefficient-weighted state allocation \
              (alosta.f) is not ported; national population cannot be distributed to \
              states. A uniform split is not the canonical allocation and cannot be \
              fabricated for SCC {_scc}."
-        );
+        )))
     }
 
     fn find_exhaust_tech(
@@ -1777,7 +1778,7 @@ impl<'a> NationalCallbacks for NationalAdapter<'a> {
         })
     }
 
-    fn day_month_factor(&mut self, _scc: &str, _fips: &str) -> DayMonthFactor {
+    fn day_month_factor(&mut self, _scc: &str, _fips: &str) -> Result<DayMonthFactor> {
  // Canonical `daymthf.f` reads the per-SCC month/day temporal
  // fractions from the NR*.TMF temporal-factor packet and returns the
  // real `(day_month_fac, mthf, dayf, n_days)`. The prior code
@@ -1785,13 +1786,14 @@ impl<'a> NationalCallbacks for NationalAdapter<'a> {
  // which collapses an annual total-mode run to a single day —
  // understating the annual total by ~365x. The NR*.TMF temporal-factor
  // loader is not ported, so the real factors cannot be obtained and a
- // neutral single-day value cannot be fabricated. Fail loudly.
-        panic!(
+ // neutral single-day value cannot be fabricated.
+        Err(crate::Error::Config(
             "day_month_factor: NR*.TMF temporal-factor loader (daymthf.f) is not \
              ported; the month/day fractions and n_days cannot be obtained. A neutral \
              mthf=dayf=n_days=1 cannot be fabricated (it collapses an annual run by \
              ~365x)."
-        );
+                .into(),
+        ))
     }
 
     fn growth_factor(&mut self, year1: i32, year2: i32, fips: &str, indcod: i32) -> Result<f32> {
@@ -2063,7 +2065,7 @@ impl<'a> UsTotalCallbacks for UsTotalAdapter<'a> {
         })
     }
 
-    fn day_month_factor(&mut self, _scc: &str, _fips: &str) -> DayMonthFactor {
+    fn day_month_factor(&mut self, _scc: &str, _fips: &str) -> Result<DayMonthFactor> {
  // Canonical `daymthf.f` reads the per-SCC month/day temporal
  // fractions from the NR*.TMF temporal-factor packet and returns the
  // real `(day_month_fac, mthf, dayf, n_days)`. The prior code
@@ -2071,13 +2073,14 @@ impl<'a> UsTotalCallbacks for UsTotalAdapter<'a> {
  // which collapses an annual total-mode run to a single day —
  // understating the annual total by ~365x. The NR*.TMF temporal-factor
  // loader is not ported, so the real factors cannot be obtained and a
- // neutral single-day value cannot be fabricated. Fail loudly.
-        panic!(
+ // neutral single-day value cannot be fabricated.
+        Err(crate::Error::Config(
             "day_month_factor: NR*.TMF temporal-factor loader (daymthf.f) is not \
              ported; the month/day fractions and n_days cannot be obtained. A neutral \
              mthf=dayf=n_days=1 cannot be fabricated (it collapses an annual run by \
              ~365x)."
-        );
+                .into(),
+        ))
     }
 
     fn growth_factor(&mut self, year1: i32, year2: i32, fips: &str, indcod: i32) -> Result<f32> {
@@ -2943,13 +2946,18 @@ mod production {
             county_fips: vec!["06037".into()],
             hp_levels: default_hp_levels(),
             reference: ReferenceData {
+ // ambient_temp_f must be > 0 so emission_adjustments can compute the
+ // exhaust temperature correction. bsfc must be non-empty so
+ // compute_exhaust_factors can populate the BSFC array; tech_fractions
+ // are 0.0 so the exhaust loop is skipped and bsfc is never consumed.
+                ambient_temp_f: 75.0,
                 exhaust_tech_entries: vec![ExhaustTechEntry {
                     scc: "2270001010".into(),
                     hp_min: 0.0,
                     hp_max: 100.0,
                     tech_names: vec!["T1".into()],
                     tech_fractions: vec![0.0],
-                    bsfc: vec![],
+                    bsfc: vec![1.0],
                     ..Default::default()
                 }],
                 evap_tech_entries: vec![EvapTechEntry {
@@ -3115,13 +3123,13 @@ mod production {
             growth: None,
         };
 
-        let result = exec.execute(&ctx, &opts).unwrap();
-        assert!(!result.skipped, "expected non-skipped execution");
-        assert_eq!(result.rows.len(), 2, "expected one row per county");
-        let fips_set: std::collections::HashSet<_> =
-            result.rows.iter().map(|r| r.fips.as_str()).collect();
-        assert!(fips_set.contains("06037"));
-        assert!(fips_set.contains("06059"));
+ // NR*.SCO county allocation is not ported — returns Err (mo-2v1).
+        let err = exec.execute(&ctx, &opts).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("SCO") || msg.contains("allocation") || msg.contains("alocty"),
+            "expected SCO-allocation error, got: {msg}"
+        );
     }
 
  /// (d) StateFromNational dispatch with a state-level record →
@@ -3217,10 +3225,13 @@ mod production {
             growth: None,
         };
 
-        let result = exec.execute(&ctx, &opts).unwrap();
-        assert!(!result.skipped, "expected non-skipped execution");
-        assert_eq!(result.rows.len(), 1, "expected exactly one row for state");
-        assert_eq!(result.rows[0].fips, "06000");
+ // NR*.TMF temporal-factor loader not ported — returns Err (mo-2v1).
+        let err = exec.execute(&ctx, &opts).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("TMF") || msg.contains("temporal") || msg.contains("daymthf"),
+            "expected TMF error, got: {msg}"
+        );
     }
 
  /// (e) National dispatch with one state and one allocation entry →
@@ -3329,14 +3340,13 @@ mod production {
             growth: None,
         };
 
-        let result = exec.execute(&ctx, &opts).unwrap();
-        assert!(!result.skipped, "expected non-skipped execution");
-        assert_eq!(
-            result.rows.len(),
-            1,
-            "expected one row for the one selected state"
+ // NR*.ALO state allocation is not ported — returns Err (mo-2v1).
+        let err = exec.execute(&ctx, &opts).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("ALO") || msg.contains("allocation") || msg.contains("alosta"),
+            "expected ALO-allocation error, got: {msg}"
         );
-        assert_eq!(result.rows[0].fips, "06000");
     }
 
  /// (f) US-total dispatch with a minimal reference table →
@@ -3435,14 +3445,13 @@ mod production {
             growth: None,
         };
 
-        let result = exec.execute(&ctx, &opts).unwrap();
-        assert!(!result.skipped, "expected non-skipped execution");
-        assert_eq!(
-            result.rows.len(),
-            1,
-            "expected exactly one row for US total"
+ // NR*.TMF temporal-factor loader not ported — returns Err (mo-2v1).
+        let err = exec.execute(&ctx, &opts).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("TMF") || msg.contains("temporal") || msg.contains("daymthf"),
+            "expected TMF error, got: {msg}"
         );
-        assert_eq!(result.rows[0].fips, "00000");
     }
 
  /// (g) National dispatch with no allocation entry for the SCC →
