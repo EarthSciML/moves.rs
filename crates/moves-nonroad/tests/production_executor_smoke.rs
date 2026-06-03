@@ -317,9 +317,9 @@ fn county_one_scc_produces_nonzero_emissions() {
 /// day_month_factor (NR*.TMF not yet ported).
 #[test]
 fn state_to_county_dispatch_produces_county_rows() {
- // County allocation indicator: state 06000 has pop=1000,
- // county 06037 (LA) has pop=600, county 06059 (Orange) has pop=400.
- // Allocate SCC "2270001010" by POP with coefficient 1.0.
+    // County allocation indicator: state 06000 has pop=1000,
+    // county 06037 (LA) has pop=600, county 06059 (Orange) has pop=400.
+    // Allocate SCC "2270001010" by POP with coefficient 1.0.
     let alloc_record = AllocationRecord {
         scc: "2270001010".into(),
         coefficients: vec![1.0],

@@ -35,6 +35,7 @@
 //! numerical-fidelity harness needs for capturing
 //! port-side intermediate state.
 
+use crate::allocation::{allocate_county, CountyDescriptor};
 use crate::common::consts::{
     CVTTON, MXAGYR, MXEVTECH, MXPOL, MXTECH, RMISS, SWTCNG, SWTDSL, SWTGS2, SWTGS4, SWTLPG,
 };
@@ -57,7 +58,6 @@ use crate::geography::prcus::{
     DayMonthFactor, EvapCallInputs, EvapResult, EvapTechLookup, ExhaustCallInputs, ExhaustResult,
     ExhaustTechLookup, ModelYearOutput as PrcusModelYearOutput, RetrofitResult, UsTotalCallbacks,
 };
-use crate::allocation::{allocate_county, CountyDescriptor};
 use crate::geography::state::{CountyInput, StateContext};
 use crate::geography::subcounty::SubcountyRecordIndex;
 use crate::geography::{
