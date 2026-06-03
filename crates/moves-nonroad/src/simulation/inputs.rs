@@ -289,14 +289,19 @@ pub struct ActivityTableEntry {
 
 /// National-to-state allocation entry for [`ProductionExecutor`](super::executor::ProductionExecutor).
 ///
-/// Identifies an SCC for which national-to-state allocation data is
-/// available. `NationalAdapter::find_allocation` succeeds when an
-/// entry for the SCC exists; the actual per-state distribution uses a
-/// uniform placeholder until NR*.ALO loaders are ported.
+/// Carries the per-SCC regression coefficients and indicator codes
+/// from the `ALLOCATE.XRF` `/ALLOC XREF/` packet (`rdalo.f`).
+/// `NationalAdapter::find_allocation` succeeds when an entry for the
+/// SCC exists; `NationalAdapter::allocate_to_states` uses the embedded
+/// [`AllocationRecord`] together with [`ReferenceData::allocation_indicators`]
+/// to compute the canonical `alosta.f` coefficient-weighted ratio.
 #[derive(Debug, Clone, Default)]
 pub struct NationalAllocationEntry {
     /// 10-character SCC code.
     pub scc: String,
+    /// Regression coefficients and indicator codes for this SCC
+    /// (from the NR*.ALO `/ALLOC XREF/` packet, parsed by `rdalo.f`).
+    pub record: AllocationRecord,
 }
 
 /// Reference tables loaded once per run by the orchestrator.
@@ -368,6 +373,11 @@ pub struct ReferenceData {
     /// indicator records and used by [`crate::allocation::allocate_county`]
     /// and [`crate::allocation::allocate_subcounty`].
     pub county_allocation_indicators: IndicatorTable,
+    /// Spatial-indicator values for national-to-state allocation.
+    /// Loaded from the US_*.ALO indicator files. Fortran: the sorted
+    /// spatial-indicator scratch file read by `getind.f` at the
+    /// national (`00000`) and per-state FIPS levels.
+    pub allocation_indicators: IndicatorTable,
     /// Retrofit records from NR*.RFT files. Fortran: `RTRFTDAT` from
     /// `rdrft.f` (`population::retrofit::RetrofitRecord`).
     pub retrofit_records: Vec<RetrofitRecord>,

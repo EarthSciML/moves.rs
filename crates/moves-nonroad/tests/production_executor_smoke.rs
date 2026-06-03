@@ -165,9 +165,39 @@ fn state_level_reference(fips: &str) -> ReferenceData {
 /// todo!(). Activity uses empty fips (wildcard) because compute_state_aggregate
 /// is called per allocated state and the activity lookup must match any fips.
 /// growth_xref uses state_fips so the per-state lookup succeeds.
+///
+/// Includes a real `AllocationRecord` (POP indicator, coeff=1.0) and a minimal
+/// `IndicatorTable` with national (00000) and state-level POP values, satisfying
+/// the alosta.f coefficient-weighted ratio without fabricating data.
 fn national_reference(state_fips: &str, scc: &str) -> ReferenceData {
+    let alloc_record = AllocationRecord {
+        scc: scc.to_string(),
+        coefficients: vec![1.0],
+        indicator_codes: vec!["POP".to_string()],
+    };
+    // National population 1000, state population 300 → ratio 0.3.
+    let indicators = IndicatorTable::new(vec![
+        IndicatorRecord {
+            code: "POP".to_string(),
+            fips: "00000".to_string(),
+            subcounty: "".to_string(),
+            year: "2002".to_string(),
+            value: 1000.0,
+        },
+        IndicatorRecord {
+            code: "POP".to_string(),
+            fips: state_fips.to_string(),
+            subcounty: "".to_string(),
+            year: "2002".to_string(),
+            value: 300.0,
+        },
+    ]);
     ReferenceData {
-        national_allocation: vec![NationalAllocationEntry { scc: scc.into() }],
+        national_allocation: vec![NationalAllocationEntry {
+            scc: scc.into(),
+            record: alloc_record,
+        }],
+        allocation_indicators: indicators,
         exhaust_tech_entries: vec![ExhaustTechEntry {
             scc: scc.into(),
             hp_min: 0.0,
@@ -431,10 +461,14 @@ fn state_from_national_dispatch_produces_state_row() {
 }
 
 /// National dispatch: a national "00000" record at Nation level routes to
-/// prcnat.f and allocates population to selected states.
+/// prcnat.f and allocates population to selected states via NR*.ALO
+/// coefficient-weighted ratio (alosta.f).
 ///
-/// One selected state (06000, no own state records) → dispatch_calls == 1,
-/// one output row at the allocated state FIPS.
+/// One selected state (06000, no own state records). national_reference
+/// sets national POP=1000, state POP=300 with coefficient 1.0, so the
+/// state receives 100 * (300/1000) * 1.0 = 30.0 units of population.
+/// The next barrier is NR*.TMF (daymthf.f not ported), so we expect a
+/// TMF error rather than an ALO error — confirming the ALO step passes.
 #[test]
 fn national_dispatch_allocates_population_to_state() {
     let mut executor = ProductionExecutor {
@@ -464,13 +498,13 @@ fn national_dispatch_allocates_population_to_state() {
     let mut opts = NonroadOptions::new(RegionLevel::Nation, 2020);
     opts.growth_loaded = true;
 
-    // NR*.ALO state-allocation (alosta.f) is not ported — returns Err (mo-2v1).
+    // ALO allocation now succeeds; next barrier is NR*.TMF (daymthf not ported).
     let err = run_simulation(&opts, &inputs, &mut executor)
-        .expect_err("national dispatch must fail until NR*.ALO is ported");
+        .expect_err("national dispatch must fail until NR*.TMF is ported");
     let msg = err.to_string();
     assert!(
-        msg.contains("ALO") || msg.contains("allocation") || msg.contains("alosta"),
-        "expected ALO-allocation error, got: {msg}"
+        msg.contains("TMF") || msg.contains("temporal") || msg.contains("daymthf"),
+        "expected TMF error after ALO allocation succeeds, got: {msg}"
     );
 }
 
