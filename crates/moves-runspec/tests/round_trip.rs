@@ -523,3 +523,68 @@ fn java_runspec_xml_test_serializer_is_byte_idempotent() {
         failures.join("\n")
     );
 }
+
+// --- InternalControlStrategy XML parsing --------------------------------
+//
+// Strategy: parse the sample-runspec.xml (which has no internalcontrolstrategy
+// elements), then replace the empty container with a RateOfProgress entry
+// in the serialized string and reparse. This avoids crafting a full valid
+// RunSpec XML from scratch while still exercising the parser end-to-end.
+
+fn base_spec_xml() -> String {
+    let xml = read(&fixture("characterization/fixtures/sample-runspec.xml"));
+    let spec = from_xml_str(&xml).expect("parse sample-runspec.xml");
+    to_xml_string(&spec).expect("serialize sample-runspec to XML")
+}
+
+#[test]
+fn rate_of_progress_xml_parses_use_parameters_yes() {
+ // Verified against Task1806.mrs from the EPA MOVES source tree:
+ // internalcontrolstrategy with classname=RateOfProgressStrategy and
+ // CDATA body "useParameters\tYes".
+    let base = base_spec_xml();
+    let xml = base.replace(
+        "\t<internalcontrolstrategies>\n\t</internalcontrolstrategies>",
+        "\t<internalcontrolstrategies>\n\
+<internalcontrolstrategy classname=\"gov.epa.otaq.moves.master.implementation.ghg\
+.internalcontrolstrategies.rateofprogress.RateOfProgressStrategy\"><![CDATA[\n\
+useParameters\tYes\n\
+\n\
+]]></internalcontrolstrategy>\n\
+\t</internalcontrolstrategies>",
+    );
+    let spec = from_xml_str(&xml).expect("parse XML with RateOfProgress Yes");
+    assert_eq!(spec.internal_control_strategies.len(), 1);
+    match &spec.internal_control_strategies[0] {
+        moves_runspec::InternalControlStrategy::RateOfProgress { use_parameters } => {
+            assert!(*use_parameters, "useParameters=Yes should parse to true");
+        }
+        other => panic!("expected RateOfProgress variant, got {other:?}"),
+    }
+ // Round-trip through XML and back — must be model-identical.
+    let serialized = to_xml_string(&spec).expect("serialize");
+    let reparsed = from_xml_str(&serialized).expect("reparse");
+    assert_eq!(spec, reparsed);
+}
+
+#[test]
+fn rate_of_progress_xml_parses_use_parameters_no() {
+    let base = base_spec_xml();
+    let xml = base.replace(
+        "\t<internalcontrolstrategies>\n\t</internalcontrolstrategies>",
+        "\t<internalcontrolstrategies>\n\
+<internalcontrolstrategy classname=\"gov.epa.otaq.moves.master.implementation.ghg\
+.internalcontrolstrategies.rateofprogress.RateOfProgressStrategy\"><![CDATA[\n\
+useParameters\tNo\n\
+\n\
+]]></internalcontrolstrategy>\n\
+\t</internalcontrolstrategies>",
+    );
+    let spec = from_xml_str(&xml).expect("parse XML with RateOfProgress No");
+    match &spec.internal_control_strategies[0] {
+        moves_runspec::InternalControlStrategy::RateOfProgress { use_parameters } => {
+            assert!(!use_parameters, "useParameters=No should parse to false");
+        }
+        other => panic!("expected RateOfProgress variant, got {other:?}"),
+    }
+}
