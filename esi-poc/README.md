@@ -12,7 +12,8 @@ one run end-to-end against a **real characterization snapshot's captured Parquet
 |---|---|---|---|---|
 | `criteria_running_calculator.rs` | `criteria_running.esi` | `run_poc.py` | Rust `#[test]` fixtures | 8/8 |
 | `evaporative_permeation_calculator.rs` | `permeation.esi` | `run_permeation.py` | Rust `#[test]` fixtures | 9/9 |
-| `crankcase_emission.rs` (core) | `crankcase.esi` | `run_crankcase.py` | **real captured snapshot Parquet** | 2352/2352 |
+| `crankcase_emission.rs` (core) | `crankcase.esi` | `run_crankcase.py` | **real captured snapshot Parquet** | 2352/2352 exact |
+| source-bin weighting (`BaseRateGenerator`) | `sbweighted.esi` | `run_sbweighted.py` | **real Parquet, 3-table join at scale** | engine exact vs Polars on 19,964 cells |
 
 The first two harnesses re-run the calculator's Rust `#[test]` cases — same
 fixture values, same per-test tweaks — through the pure-Python ESI reference
@@ -38,9 +39,10 @@ the captured values (see [Real-data end-to-end](#real-data-end-to-end)).
 CriteriaRunning is the multiplicative adjustment chain with an I/M blend;
 Permeation adds genuine exponential physics and conditional/interval logic;
 Crankcase adds a `join` predicate (the model-year window) and the data-source
-loader reading real captured Parquet. Together they cover the relational core
-plus polynomial, exponential, clamp, filter, null-handling, interval-join, and
-real-data loading.
+loader reading real captured Parquet; SBWeighted adds `weighted_mean` and a
+three-table join over the real 590k-row rate table at scale. Together they cover
+the relational core plus polynomial, exponential, clamp, filter, null-handling,
+interval-join, weighted-mean, and real-data loading.
 
 ## Real-data end-to-end
 
@@ -61,20 +63,41 @@ model-year window selection on real data (polProcess 115, sourceType 21, regClas
   MY 1975  ->  ESI crankcaseRatio 0.0132
 ```
 
+`run_sbweighted.py` goes one step further — a **multi-step, multi-table chain at
+scale**. It joins three real captured tables (the 590k-row `EmissionRateByAge`,
+`SourceBinDistribution`, and `SourceBin`) and computes the source-bin-weighted
+base rate with a `weighted_mean` aggregate. Two findings:
+
+```
+[1] ENGINE: ESI vs Polars (same formula, same real data): 19964 cells, 0 mismatches -> EXACT MATCH
+[2] CANONICAL: 713/2852 cells within 2% of the captured SBWeightedEmissionRateByAge.meanBaseRate
+```
+
+The ESI **engine** executes the 3-table join + weighted-mean on real data exactly
+(verified against an independent Polars recomputation). The *formula* only
+loosely tracks the canonical intermediate, because the real `BaseRateGenerator`
+adds `sumSBD` normalization and model-year-group keying — which is exactly the
+point: reproducing a non-trivial captured intermediate *bit-for-bit* means
+porting its generator, not guessing a formula.
+
 **Scope/honesty.** A full scenario's *final* output (`MOVESOutput`) is the
-aggregate of the entire calculator DAG (dozens of steps) and the snapshots
-capture only the *input* execution-DB tables (worker output is empty), so a
-single hand-authored pipeline can't reproduce a whole scenario end-to-end. This
-reproduces one calculator's core computation against the real captured table —
-the meaningful unit, and the same `parquet` loader + pushdown path a production
+aggregate of the entire calculator DAG (dozens of steps); the rate→inventory
+multiply (rate × activity, with fuel/regClass splitting — the `ActivityCalculator`
+back-half) is **not captured** in the snapshots (worker output is empty), so a
+single hand-authored pipeline can't reproduce a whole scenario's emissions
+end-to-end. The clean exact wins are where there's no hidden normalization
+(crankcase's pure `× ratio`); multi-step chains run correctly on the real data
+(SBWeighted's engine match) but exact canonical fidelity tracks the per-generator
+porting. All of this uses the same `parquet` loader + pushdown path a production
 `moves.rs`→ESI bridge would use (ESI libraries spec §4.7).
 
 ## Result
 
 ```
-8/8    CriteriaRunning  tests reproduced through ESI (Rust fixtures)
-9/9    Permeation       tests reproduced through ESI (Rust fixtures)
-2352/2352  Crankcase    cells reproduced through ESI (real snapshot Parquet)
+8/8        CriteriaRunning  tests reproduced through ESI (Rust fixtures)
+9/9        Permeation       tests reproduced through ESI (Rust fixtures)
+2352/2352  Crankcase        cells reproduced through ESI, EXACT (real snapshot Parquet)
+19964/19964  SBWeighted     engine cells match Polars, EXACT (real Parquet, 3-table join + weighted_mean)
 ```
 
 | Rust test (`criteria_running_calculator.rs`) | expected `emission_quant` | ESI |
@@ -135,6 +158,7 @@ Rust tests use. To keep the POC focused on the math:
 python3 esi-poc/run_poc.py
 python3 esi-poc/run_permeation.py
 python3 esi-poc/run_crankcase.py        # real snapshot Parquet; also needs `polars`
+python3 esi-poc/run_sbweighted.py       # real Parquet, 3-table join + weighted_mean
 
 # The Rust baselines
 cargo test -p moves-calculators --lib criteria_running_calculator
