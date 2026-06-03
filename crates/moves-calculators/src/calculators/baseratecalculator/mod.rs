@@ -1808,7 +1808,8 @@ mod tests {
     fn run_on_empty_inputs_yields_empty_output() {
         let inputs = BaseRateCalculatorInputs::default();
         let output =
-            BaseRateCalculator::run(inputs, &RunConstants::default(), &ModuleFlags::default());
+            BaseRateCalculator::run(inputs, &RunConstants::default(), &ModuleFlags::default())
+                .unwrap();
         assert!(output.blocks.is_empty());
         assert!(output.rows().is_empty());
     }
