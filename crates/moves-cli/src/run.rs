@@ -94,14 +94,18 @@ impl SnapshotFilter {
                 .collect::<BTreeSet<_>>()
                 .into_iter()
                 .collect(),
-            // RunSpec `<month key="N"/>` carries the literal MOVES monthID (1-12,
-            // e.g. key=7 = July); it is NOT 0-indexed. Pass it through unchanged,
-            // matching RunSpecFilters::from_runspec and build_runspec_tables.
+            // RunSpec `<month key="N"/>` is a 0-based index into the canonical
+            // MOVES MonthOfAnyYear table (January=0 … December=11). Java parses
+            // it via `TimeSpan.getMonthByIndex(key)`, which returns the Month
+            // object at position `key` in a list ordered by monthID, so
+            // `monthID = key + 1` (e.g. key=7 → monthID=8, August).
+            // The Rust RunSpec model stores the raw key; add 1 here to match
+            // the MOVES monthID stored in execution-DB tables.
             month_ids: run_spec
                 .timespan
                 .months
                 .iter()
-                .map(|&m| i64::from(m))
+                .map(|&m| i64::from(m) + 1)
                 .collect::<BTreeSet<_>>()
                 .into_iter()
                 .collect(),
@@ -2170,8 +2174,8 @@ mod tests {
         assert_eq!(f.year_ids, vec![2020i64]);
         assert_eq!(
             f.month_ids,
-            vec![7i64],
-            "month key=7 = monthID 7 (July); RunSpec months are 1-indexed and passed through unchanged"
+            vec![8i64],
+            "month key=7 → monthID=8 (August): RunSpec key is 0-indexed, monthID = key + 1"
         );
     }
 
@@ -2294,17 +2298,22 @@ mod tests {
         let store = load_execution_db_from_parquet(dir.path(), &filter, None)
             .expect("filtered load must succeed");
         let df = store.get("zonemonthhour").unwrap();
-        // Only the row for zone=100, month=7 should survive.
-        assert_eq!(df.height(), 1, "filter should keep only 1 matching row");
+        // RunSpec month key=7 → monthID=8 (August, 0-indexed key). The fixture has
+        // rows for monthID=7 and monthID=8 at zone=100. The filter is zone=100 AND
+        // monthID=8, so only the August row survives; zone=200 is dropped.
+        assert_eq!(
+            df.height(),
+            1,
+            "filter should keep only the month=8 row for zone 100"
+        );
         let zone_col = df
             .column("zoneID")
             .unwrap()
             .cast(&polars::prelude::DataType::Int64)
             .unwrap();
-        assert_eq!(
-            zone_col.i64().unwrap().get(0).unwrap(),
-            100,
-            "surviving row must be zone 100"
+        assert!(
+            zone_col.i64().unwrap().into_iter().all(|v| v == Some(100)),
+            "all surviving rows must be zone 100"
         );
     }
 
