@@ -76,6 +76,7 @@ fn make_executor() -> ProductionExecutor {
                 hp_max: 50.0,
                 tech_names: vec!["EV1".into()],
                 tech_fractions: vec![0.0],
+                ..Default::default()
             }],
             growth_xref_entries: vec![GrowthXrefEntry {
                 fips: "06037".into(),
@@ -129,6 +130,7 @@ fn state_level_reference(fips: &str) -> ReferenceData {
             hp_max: 50.0,
             tech_names: vec!["EV1".into()],
             tech_fractions: vec![0.0],
+            ..Default::default()
         }],
         growth_xref_entries: vec![GrowthXrefEntry {
             fips: fips.into(),
@@ -177,6 +179,7 @@ fn national_reference(state_fips: &str, scc: &str) -> ReferenceData {
             hp_max: 50.0,
             tech_names: vec!["EV1".into()],
             tech_fractions: vec![0.0],
+            ..Default::default()
         }],
         growth_xref_entries: vec![GrowthXrefEntry {
             fips: state_fips.into(),
@@ -223,6 +226,7 @@ fn us_total_reference(scc: &str) -> ReferenceData {
             hp_max: 50.0,
             tech_names: vec!["EV1".into()],
             tech_fractions: vec![0.0],
+            ..Default::default()
         }],
         growth_xref_entries: vec![GrowthXrefEntry {
             fips: "00000".into(),

@@ -222,6 +222,27 @@ pub struct EvapTechEntry {
     pub tech_names: Vec<String>,
     /// Per-evap-tech-slot fractions (`evtchfrc(idxtch, 1..n)`).
     pub tech_fractions: Vec<f32>,
+    /// Per-`(evap-species slot, tech slot)` evap emission factors, row-
+    /// major as `[evap_species_slot * tech_names.len() + tech]` (from the
+    /// MOVES `nrevapemissionrate` table). The base rate is constant across
+    /// calendar years; age variation enters through deterioration.
+    ///
+    /// Empty ⇒ all factors zero (no evap emissions computed). When
+    /// non-empty its length is `MXPOL * tech_names.len()`.
+    pub emission_factors: Vec<f32>,
+    /// Per-`(evap-species slot, tech slot)` EF unit codes, same layout as
+    /// [`emission_factors`](Self::emission_factors). Empty ⇒ defaults to
+    /// `GramsPerHour` for every slot.
+    pub unit_codes: Vec<EmissionUnitCode>,
+    /// Per-`(evap-species slot, tech slot)` deterioration A coefficient,
+    /// same layout as [`emission_factors`](Self::emission_factors).
+    pub det_a: Vec<f32>,
+    /// Per-`(evap-species slot, tech slot)` deterioration B (age-exponent)
+    /// coefficient, same layout.
+    pub det_b: Vec<f32>,
+    /// Per-`(evap-species slot, tech slot)` deterioration age cap,
+    /// same layout.
+    pub det_cap: Vec<f32>,
 }
 
 /// Growth cross-reference entry for [`ProductionExecutor`](super::executor::ProductionExecutor) (Fortran `fndgxf`).

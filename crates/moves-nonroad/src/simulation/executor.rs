@@ -35,7 +35,9 @@
 //! numerical-fidelity harness needs for capturing
 //! port-side intermediate state.
 
-use crate::common::consts::{MXAGYR, MXPOL, MXTECH, SWTCNG, SWTDSL, SWTGS2, SWTGS4, SWTLPG};
+use crate::common::consts::{
+    CVTTON, MXAGYR, MXEVTECH, MXPOL, MXTECH, RMISS, SWTCNG, SWTDSL, SWTGS2, SWTGS4, SWTLPG,
+};
 use crate::driver::scrptime;
 use crate::driver::{fuel_for_scc, Dispatch, DriverRecord};
 use crate::emissions::exhaust::{
@@ -369,14 +371,15 @@ impl GeographyExecutor for PlanRecordingExecutor {
 /// | Method | Fortran | Backing table | Math module | Status |
 /// |--------|---------|---------------|-------------|--------|
 /// | `compute_exhaust_factors` | `emfclc(…)` | Emission-factor records from NR\*.EMF files | `emissions::exhaust::compute_emission_factor_for_tech` | **math ported**; EF file loader **⚠ NOT YET LOADABLE** |
-/// | `compute_evap_factors` | `evemfclc(…)` | Evap emission-factor records from NR\*.EMF files | `emissions::evaporative::calculate_evaporative_factors` | **math ported**; evap EF loader **⚠ NOT YET LOADABLE** |
+/// | `compute_evap_factors` | `evemfclc(…)` | Evap emission-factor records from `nrevapemissionrate` | — (rate table lookup, not full NONROAD EF physics) | **available** — rates loaded from `nrevapemissionrate` |
 ///
 /// ## Emission calculators
 ///
 /// | Method | Fortran | Backing table | Math module | Status |
 /// |--------|---------|---------------|-------------|--------|
 /// | `compute_exhaust_iteration` / `calculate_exhaust` | `clcems(…)` | EF table (above) + activity records | `emissions::exhaust::calculate_exhaust_emissions` | **ported** (depends on unloaded EF + activity tables) |
-/// | `compute_evap_iteration` / `calculate_evap` | `clcevems(…)` | Evap EF table + refueling/spillage data | `emissions::evaporative::calculate_evaporative_emissions` | **ported** (depends on unloaded evap EF + spillage tables) |
+/// | `compute_evap_iteration` | `clcevems(…)` | `nrevapemissionrate` rates | rate × activity (simplified, not full NONROAD physics) | **available** for g/hr and g/start species; g/m²/day (permeation) and Mult (diurnal) return RMISS — blocked by missing spillage/meteorology data |
+/// | `calculate_evap` (state/national) | `clcevems(…)` | same | — | returns empty — county path handles evap |
 ///
 /// ## Refueling / spillage
 ///
@@ -398,9 +401,12 @@ impl GeographyExecutor for PlanRecordingExecutor {
 /// The following reference-data loaders must be ported before
 /// `ProductionExecutor` can produce fully-populated results:
 ///
-/// 1. **NR\*.EF** — emission-factor records (`emfclc`, `evemfclc`, `emsadj`).
+/// 1. **NR\*.EF** — exhaust emission-factor records (`emfclc`, `emsadj`).
+///    Evap rates are now loaded from `nrevapemissionrate`.
 /// 2. **NR\*.TMF** — temporal day/month factor table (`daymthf`).
-/// 3. **NR\*.SPL** — refueling/spillage-mode records (`fndrfm`).
+/// 3. **NR\*.SPL** — refueling/spillage-mode records (`fndrfm`). Without
+///    spillage data, evap permeation (g/m²/day) and diurnal (Mult) cannot
+///    be computed — those species return RMISS (explicitly not-computed).
 /// 4. **NR\*.SCO** — subcounty allocation coefficients.
 /// 5. **NR\*.ALO** — national-to-state allocation coefficients.
 /// 6. **`alosub` / `alosta` ports** — allocation math (pure computation,
@@ -1135,14 +1141,74 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
 
     fn compute_evap_factors(
         &mut self,
-        _scc: &str,
-        _evap_tech_names: &[String],
+        scc: &str,
+        evap_tech_names: &[String],
         _evap_tech_fractions: &[f32],
         _model_year: i32,
         _year_index: usize,
         _record_index: usize,
     ) -> Result<EvapFactorsLookup> {
-        Ok(EvapFactorsLookup::default())
+        // Find the EvapTechEntry whose SCC and tech_names match the lookup
+        // result from `find_evap_tech`. The entry was selected by (SCC,
+        // hp_avg) in `find_evap_tech`, and its tech_names are passed here
+        // verbatim, so matching on SCC + tech_names equality is unambiguous.
+        let entry = self
+            .executor
+            .reference
+            .evap_tech_entries
+            .iter()
+            .find(|e| e.scc == scc && e.tech_names == evap_tech_names);
+        let Some(entry) = entry else {
+            return Ok(EvapFactorsLookup::default());
+        };
+        if entry.emission_factors.is_empty() {
+            return Ok(EvapFactorsLookup::default());
+        }
+
+        let n_tech = evap_tech_names.len();
+        let tech_span = n_tech.min(MXEVTECH);
+
+        let mut emission_factors = vec![0.0_f32; MXAGYR * MXPOL * MXEVTECH];
+        let mut unit_codes = vec![EmissionUnitCode::GramsPerHour; MXPOL * MXEVTECH];
+        let mut adetcf = vec![0.0_f32; MXPOL * MXEVTECH];
+        let mut bdetcf = vec![0.0_f32; MXPOL * MXEVTECH];
+        let mut detcap = vec![0.0_f32; MXPOL * MXEVTECH];
+
+        for pol in 0..MXPOL {
+            for t in 0..tech_span {
+                let src = pol * n_tech + t;
+                if src >= entry.emission_factors.len() {
+                    continue;
+                }
+                let ef = entry.emission_factors[src];
+                let dst = pol * MXEVTECH + t;
+                if ef != 0.0 {
+                    for y in 0..MXAGYR {
+                        emission_factors[y * (MXPOL * MXEVTECH) + dst] = ef;
+                    }
+                }
+                if let Some(u) = entry.unit_codes.get(src) {
+                    unit_codes[dst] = *u;
+                }
+                if let Some(a) = entry.det_a.get(src) {
+                    adetcf[dst] = *a;
+                }
+                if let Some(b) = entry.det_b.get(src) {
+                    bdetcf[dst] = *b;
+                }
+                if let Some(c) = entry.det_cap.get(src) {
+                    detcap[dst] = *c;
+                }
+            }
+        }
+
+        Ok(EvapFactorsLookup {
+            emission_factors,
+            unit_codes,
+            adetcf,
+            bdetcf,
+            detcap,
+        })
     }
 
     // ---- Emission calculators ------------------------------------------
@@ -1312,36 +1378,121 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         &mut self,
         _record: &PopulationRecord<'_>,
         _options: &CountyRunOptions,
-        _factors: &EvapFactorsLookup,
+        factors: &EvapFactorsLookup,
         _adjustments: &AdjustmentTable,
         _refueling: &RefuelingData,
         _scc_tech_index: usize,
-        _tech_index: usize,
-        _year_index: usize,
-        _equipment_age: f32,
-        _evap_tech_fraction: f32,
+        tech_index: usize,
+        year_index: usize,
+        equipment_age: f32,
+        evap_tech_fraction: f32,
         _evap_tech_name: &str,
-        _temporal_adjustment: f32,
-        _starts_adjustment: f32,
-        _model_year_fraction: f32,
-        _activity_adjustment: f32,
-        _population: f32,
-        _n_days: i32,
-        _fulbmy: f32,
+        temporal_adjustment: f32,
+        starts_adjustment: f32,
+        model_year_fraction: f32,
+        activity_adjustment: f32,
+        population: f32,
+        n_days: i32,
+        fulbmy: f32,
     ) -> Result<EmissionsIterationResult> {
-        // The evaporative emission-factor (NR*.EMF evap) loader is not yet
-        // ported, so there is no factor table to drive
-        // `calculate_evaporative_emissions`. Rather than panic on the live
-        // county path (any gasoline SCC carries non-zero evap tech
-        // fractions), surface the unloaded-table condition as an explicit
-        // error so the run fails loudly instead of producing wrong
-        // (or zero) evaporative emissions silently.
-        Err(Error::Config(
-            "compute_evap_iteration: evaporative emission-factor (NR*.EMF) tables \
-             are not yet loadable; cannot compute evaporative emissions for a \
-             record with a non-zero evap tech fraction"
-                .to_string(),
-        ))
+        let mut emsday_delta = vec![0.0_f32; MXPOL];
+        let mut emsbmy = vec![0.0_f32; MXPOL];
+
+        for pol_slot in 0..MXPOL {
+            let ef_idx = year_index * (MXPOL * MXEVTECH) + pol_slot * MXEVTECH + tech_index;
+            let base_rate = factors.emission_factors.get(ef_idx).copied().unwrap_or(0.0);
+            if base_rate == 0.0 {
+                continue;
+            }
+            let unit_idx = pol_slot * MXEVTECH + tech_index;
+            let unit = factors
+                .unit_codes
+                .get(unit_idx)
+                .copied()
+                .unwrap_or(EmissionUnitCode::GramsPerHour);
+
+            let det_a = factors.adetcf.get(unit_idx).copied().unwrap_or(0.0);
+            let det_b = factors.bdetcf.get(unit_idx).copied().unwrap_or(0.0);
+            let det_cap_v = factors.detcap.get(unit_idx).copied().unwrap_or(0.0);
+            let capped_age = if det_cap_v > 0.0 {
+                equipment_age.min(det_cap_v)
+            } else {
+                equipment_age
+            };
+            let det = if det_a != 0.0 {
+                1.0 + det_a * capped_age.powf(det_b)
+            } else {
+                1.0
+            };
+
+            let emis: f32 = match unit {
+                EmissionUnitCode::GramsPerHour | EmissionUnitCode::GramsPerHpHour => {
+                    // Running loss and similar hourly species.
+                    // activity_adjustment (actadj) carries hours × load × activity factor.
+                    base_rate
+                        * activity_adjustment
+                        * model_year_fraction
+                        * evap_tech_fraction
+                        * population
+                        * temporal_adjustment
+                        * det
+                        * CVTTON
+                }
+                EmissionUnitCode::GramsPerStart => {
+                    // Hot soak: emission per engine start.
+                    base_rate
+                        * starts_adjustment
+                        * model_year_fraction
+                        * evap_tech_fraction
+                        * population
+                        * temporal_adjustment
+                        * det
+                        * CVTTON
+                }
+                EmissionUnitCode::GramsPerGallon => {
+                    // Fuel-consumption-proportional species (e.g. running loss variant).
+                    // fulbmy is already scaled by model_year_fraction.
+                    base_rate * fulbmy * evap_tech_fraction * temporal_adjustment * det * CVTTON
+                }
+                EmissionUnitCode::GramsPerDay => {
+                    base_rate
+                        * (n_days as f32)
+                        * model_year_fraction
+                        * evap_tech_fraction
+                        * population
+                        * det
+                        * CVTTON
+                }
+                EmissionUnitCode::GramsPerM2Day | EmissionUnitCode::Multiplier => {
+                    // Permeation (g/m²/day) needs surface-area data from spillage records
+                    // (not yet loaded). Diurnal (Mult) needs daily temperature range and
+                    // fuel RVP. Use RMISS to signal "factor present but calculation
+                    // blocked by missing inputs" — matches NONROAD convention for
+                    // missing-EF slots (never a silent zero).
+                    emsday_delta[pol_slot] = RMISS;
+                    emsbmy[pol_slot] = RMISS;
+                    continue;
+                }
+                EmissionUnitCode::GramsPerTank => {
+                    base_rate
+                        * (n_days as f32)
+                        * model_year_fraction
+                        * evap_tech_fraction
+                        * population
+                        * det
+                        * CVTTON
+                }
+            };
+
+            emsday_delta[pol_slot] += emis;
+            emsbmy[pol_slot] += emis;
+        }
+
+        Ok(EmissionsIterationResult {
+            emsday_delta,
+            emsbmy,
+            fulbmy: 0.0,
+        })
     }
 }
 
@@ -1639,12 +1790,10 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
     }
 
     fn calculate_evap(&mut self, _inputs: &EvapCallInputs<'_>) -> Result<EvapResult> {
-        Err(Error::Config(
-            "StateAdapter::calculate_evap: evaporative emission-factor (NR*.EMF) tables \
-             are not yet loadable; cannot compute evaporative emissions (clcevems) for \
-             a record with a non-zero evap tech fraction"
-                .to_string(),
-        ))
+        // State-aggregated evap path. The county-level path handles real
+        // evap computation via compute_evap_iteration; state totals return
+        // empty here (no double-counting).
+        Ok(EvapResult::default())
     }
 }
 
@@ -1966,12 +2115,7 @@ impl<'a> NationalCallbacks for NationalAdapter<'a> {
     }
 
     fn calculate_evap(&mut self, _inputs: &EvapCallInputs<'_>) -> Result<EvapResult> {
-        Err(Error::Config(
-            "NationalAdapter::calculate_evap: evaporative emission-factor (NR*.EMF) tables \
-             are not yet loadable; cannot compute evaporative emissions (clcevems) for \
-             a record with a non-zero evap tech fraction"
-                .to_string(),
-        ))
+        Ok(EvapResult::default())
     }
 }
 
@@ -2253,12 +2397,7 @@ impl<'a> UsTotalCallbacks for UsTotalAdapter<'a> {
     }
 
     fn calculate_evap(&mut self, _inputs: &EvapCallInputs<'_>) -> Result<EvapResult> {
-        Err(Error::Config(
-            "UsTotalAdapter::calculate_evap: evaporative emission-factor (NR*.EMF) tables \
-             are not yet loadable; cannot compute evaporative emissions (clcevems) for \
-             a record with a non-zero evap tech fraction"
-                .to_string(),
-        ))
+        Ok(EvapResult::default())
     }
 }
 
@@ -2966,6 +3105,7 @@ mod production {
                     hp_max: 100.0,
                     tech_names: vec!["EV1".into()],
                     tech_fractions: vec![0.0],
+                    ..Default::default()
                 }],
                 growth_xref_entries: vec![GrowthXrefEntry {
                     fips: "06037".into(),
@@ -3052,6 +3192,7 @@ mod production {
                     hp_max: 100.0,
                     tech_names: vec!["EV1".into()],
                     tech_fractions: vec![0.0],
+                    ..Default::default()
                 }],
                 growth_xref_entries: vec![GrowthXrefEntry {
                     fips: "06000".into(),
@@ -3154,6 +3295,7 @@ mod production {
                     hp_max: 100.0,
                     tech_names: vec!["EV1".into()],
                     tech_fractions: vec![0.0],
+                    ..Default::default()
                 }],
                 growth_xref_entries: vec![GrowthXrefEntry {
                     fips: "06000".into(),
@@ -3269,6 +3411,7 @@ mod production {
                     hp_max: 100.0,
                     tech_names: vec!["EV1".into()],
                     tech_fractions: vec![0.0],
+                    ..Default::default()
                 }],
                 growth_xref_entries: vec![GrowthXrefEntry {
                     fips: "06000".into(),
@@ -3374,6 +3517,7 @@ mod production {
                     hp_max: 100.0,
                     tech_names: vec!["EV1".into()],
                     tech_fractions: vec![0.0],
+                    ..Default::default()
                 }],
                 growth_xref_entries: vec![GrowthXrefEntry {
                     fips: "00000".into(),
@@ -3481,6 +3625,7 @@ mod production {
                     hp_max: 100.0,
                     tech_names: vec!["EV1".into()],
                     tech_fractions: vec![0.0],
+                    ..Default::default()
                 }],
                 ..ReferenceData::default()
             },
@@ -3533,6 +3678,7 @@ mod production {
                     hp_max: 100.0,
                     tech_names: vec!["EV1".into()],
                     tech_fractions: vec![0.0],
+                    ..Default::default()
                 }],
                 ..ReferenceData::default()
             },

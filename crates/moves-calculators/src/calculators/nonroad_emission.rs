@@ -106,9 +106,10 @@ const NONROAD_INPUT_TABLES: &[&str] = &[
     "nragecategory",
     "nrmodelyear",
     // Evaporative emission rates by (SCC, HP-bin, polProcessID, engTechID).
-    // Not yet consumed by the data-plane loader (evap calculation is stubbed),
-    // but declaring it here ensures the snapshot loader admits the table into
-    // the in-memory store so the evap wiring can read it without a schema change.
+    // Consumed by build_evap_tech_entries to populate EvapTechEntry emission
+    // factors; drives compute_evap_factors / compute_evap_iteration in the
+    // county path. g/hr and g/start species are computed; g/m2/day
+    // (permeation) and Mult (diurnal) return RMISS pending spillage data.
     "nrevapemissionrate",
     // Retrofit annual/effective fractions by (SCC, engTech, hp, pollutant, retrofitID).
     // The engine's ReferenceData carries a retrofit_records slot; this declaration

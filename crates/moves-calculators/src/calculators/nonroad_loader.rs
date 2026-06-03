@@ -27,7 +27,7 @@
 use std::collections::BTreeMap;
 
 use moves_framework::data::DataFrameStore;
-use moves_nonroad::common::consts::{MXHPC, MXPOL, MXTECH};
+use moves_nonroad::common::consts::{MXEVTECH, MXHPC, MXPOL, MXTECH};
 use moves_nonroad::driver::{DriverRecord, RegionLevel, RunRegions};
 use moves_nonroad::emissions::exhaust::EmissionUnitCode;
 use moves_nonroad::geography::common::ActivityUnit;
@@ -222,6 +222,8 @@ fn unit_code_for(units: &str) -> EmissionUnitCode {
         "g/day" => EmissionUnitCode::GramsPerDay,
         "g/start" => EmissionUnitCode::GramsPerStart,
         "mult" => EmissionUnitCode::Multiplier,
+        // Evap permeation species: grams per square metre per day.
+        "g/m2/day" => EmissionUnitCode::GramsPerM2Day,
         other => panic!(
             "nremissionrate: missing or invalid emission-rate units {other:?} \
              (canonical rdemfc.f errors on an unrecognized units keyword); \
@@ -588,6 +590,228 @@ pub fn build_exhaust_tech_entries<S: DataFrameStore + ?Sized>(store: &S) -> Vec<
                 &det,
             ));
         }
+    }
+    entries
+}
+
+// =============================================================================
+// Evaporative tech entries and emission rates
+// =============================================================================
+
+/// Map a nonroad `polProcessID` from `nrevapemissionrate` to the engine's
+/// 0-based evap-species slot (`EvapSpecies::slot()`).
+///
+/// `polProcessID = pollutantID × 100 + processID`. The evap process IDs in
+/// the MOVES database and their corresponding `EvapSpecies` slots are:
+///
+/// | processID | Species               | Slot |
+/// |-----------|----------------------|------|
+/// | 20        | TankPermeation       | 8    |
+/// | 21        | HosePermeation       | 9    |
+/// | 22        | NeckPermeation       | 10   |
+/// | 23        | SupplyReturnPermeation | 11 |
+/// | 24        | VentPermeation       | 12   |
+/// | 30        | Diurnal              | 7    |
+/// | 31        | HotSoak              | 13   |
+/// | 32        | RunningLoss          | 16   |
+fn evap_pollutant_slot_for(pol_process_id: i64) -> Option<usize> {
+    match pol_process_id % 100 {
+        20 => Some(8),  // TankPermeation
+        21 => Some(9),  // HosePermeation
+        22 => Some(10), // NeckPermeation
+        23 => Some(11), // SupplyReturnPermeation
+        24 => Some(12), // VentPermeation
+        30 => Some(7),  // Diurnal
+        31 => Some(13), // HotSoak
+        32 => Some(16), // RunningLoss
+        _ => None,
+    }
+}
+
+/// Read `nrevapemissionrate` into `(SCC, engTechID) -> TechRate` (the evap
+/// equivalent of the `.EMF` exhaust rate table). Slots in `TechRate.by_pollutant`
+/// map to evap-species slots (7-16) via [`evap_pollutant_slot_for`].
+fn load_evap_rate_lookup<S: DataFrameStore + ?Sized>(
+    store: &S,
+) -> BTreeMap<(String, i64), TechRate> {
+    let mut map: BTreeMap<(String, i64), TechRate> = BTreeMap::new();
+    let Some(df) = store.get("nrevapemissionrate") else {
+        return map;
+    };
+    let scc = str_col(&df, "SCC");
+    let pp = int_col(&df, "polProcessID");
+    let hmin = int_col(&df, "hpMin");
+    let hmax = int_col(&df, "hpMax");
+    let tech = int_col(&df, "engTechID");
+    let rate = float_col(&df, "meanBaseRate");
+    let units = str_col(&df, "units");
+    for i in 0..df.height() {
+        let Some(pslot) = evap_pollutant_slot_for(pp[i]) else {
+            continue;
+        };
+        let e = map.entry((scc[i].clone(), tech[i])).or_default();
+        e.by_pollutant.entry(pslot).or_default().push((
+            hmin[i],
+            hmax[i],
+            (rate[i] as f32, unit_code_for(&units[i])),
+        ));
+    }
+    map
+}
+
+/// Read `nrengtechfraction` (processGroupID = 2, evap) into a
+/// `(SCC, hpMin, hpMax) -> { engTechID -> { modelYear -> fraction } }` map.
+fn load_evap_tech_mix<S: DataFrameStore + ?Sized>(store: &S) -> TechMix {
+    let mut map = TechMix::new();
+    let Some(df) = store.get("nrengtechfraction") else {
+        return map;
+    };
+    let scc = str_col(&df, "SCC");
+    let hmin = int_col(&df, "hpMin");
+    let hmax = int_col(&df, "hpMax");
+    let my = int_col(&df, "modelYearID");
+    let tech = int_col(&df, "engTechID");
+    let frac = float_col(&df, "NREngTechFraction");
+    let pg = int_col(&df, "processGroupID");
+    for i in 0..df.height() {
+        if pg[i] != 2 {
+            continue; // evap only
+        }
+        map.entry((scc[i].clone(), hmin[i], hmax[i]))
+            .or_default()
+            .entry(tech[i])
+            .or_default()
+            .insert(my[i], frac[i] as f32);
+    }
+    map
+}
+
+/// Build the per-`(SCC, HP-bin)` evap-tech entries — real tech fractions from
+/// `nrengtechfraction` (processGroupID = 2) and emission rates from
+/// `nrevapemissionrate`. Returns an empty vec when either table is absent.
+pub fn build_evap_tech_entries<S: DataFrameStore + ?Sized>(
+    store: &S,
+    analysis_year: i32,
+) -> Vec<EvapTechEntry> {
+    let mix = load_evap_tech_mix(store);
+    if mix.is_empty() {
+        return Vec::new();
+    }
+    let rates = load_evap_rate_lookup(store);
+    let det = load_deterioration(store);
+
+    let Some(sut) = store.get("nrsourceusetype") else {
+        return Vec::new();
+    };
+    let su_scc = str_col(&sut, "SCC");
+    let su_hp = float_col(&sut, "hpAvg");
+    let mut pairs: std::collections::BTreeSet<(String, i64)> = std::collections::BTreeSet::new();
+    for i in 0..sut.height() {
+        pairs.insert((su_scc[i].clone(), (su_hp[i] * 1.0e3).round() as i64));
+    }
+
+    let mix_sccs: std::collections::BTreeSet<&String> = mix.keys().map(|(s, _, _)| s).collect();
+    let mut entries = Vec::new();
+    for (scc, hp_milli) in pairs {
+        let hp_avg = hp_milli as f32 / 1.0e3;
+        let root = family_root(&scc);
+
+        let find_bin = |target: &str| {
+            mix.iter().find(|((s, lo, hi), _)| {
+                s.as_str() == target && (*lo as f32) <= hp_avg && hp_avg <= (*hi as f32)
+            })
+        };
+        let found = if mix_sccs.contains(&scc) {
+            find_bin(&scc).or_else(|| find_bin(&root))
+        } else {
+            find_bin(&root)
+        };
+        let Some((_, tech_map)) = found else {
+            continue; // no evap tech mix for this SCC (e.g. diesel)
+        };
+
+        let mut tech_ids: Vec<i64> = tech_map.keys().copied().collect();
+        tech_ids.truncate(MXEVTECH);
+        let n_tech = tech_ids.len().max(1);
+
+        let mut emission_factors = vec![0.0_f32; MXPOL * n_tech];
+        let mut unit_codes = vec![EmissionUnitCode::GramsPerHour; MXPOL * n_tech];
+        let mut det_a = vec![0.0_f32; MXPOL * n_tech];
+        let mut det_b = vec![0.0_f32; MXPOL * n_tech];
+        let mut det_cap = vec![0.0_f32; MXPOL * n_tech];
+        let mut by_year: BTreeMap<i32, Vec<f32>> = BTreeMap::new();
+
+        // Map from evap species slot to polProcessID (for deterioration lookup).
+        // Deterioration is keyed by (polProcessID, engTechID). polProcessID is
+        // pollutantID × 100 + processID; for THC (pollutantID=1) and the evap
+        // process IDs (20-24, 30-32) this gives the values below.
+        let evap_slot_to_pp: [(usize, i64); 8] = [
+            (7, 130),  // Diurnal
+            (8, 120),  // TankPermeation
+            (9, 121),  // HosePermeation
+            (10, 122), // NeckPermeation
+            (11, 123), // SupplyReturnPermeation
+            (12, 124), // VentPermeation
+            (13, 131), // HotSoak
+            (16, 132), // RunningLoss
+        ];
+
+        for (t, &tid) in tech_ids.iter().enumerate() {
+            for &(pslot, pp_for) in &evap_slot_to_pp {
+                let picked = rates
+                    .get(&(scc.clone(), tid))
+                    .and_then(|tr| tr.by_pollutant.get(&pslot))
+                    .and_then(|v| hp_pick(v, hp_avg).copied())
+                    .or_else(|| {
+                        rates
+                            .get(&(root.clone(), tid))
+                            .and_then(|tr| tr.by_pollutant.get(&pslot))
+                            .and_then(|v| hp_pick(v, hp_avg).copied())
+                    });
+                let idx = pslot * n_tech + t;
+                if let Some((r, u)) = picked {
+                    emission_factors[idx] = r;
+                    unit_codes[idx] = u;
+                }
+                if let Some(&(a, b, c)) = det.get(&(pp_for, tid)) {
+                    det_a[idx] = a;
+                    det_b[idx] = b;
+                    det_cap[idx] = c;
+                }
+            }
+
+            // Per-model-year tech fractions for this tech slot.
+            for (&yr, &f) in &tech_map[&tid] {
+                by_year
+                    .entry(yr as i32)
+                    .or_insert_with(|| vec![0.0_f32; n_tech])[t] = f;
+            }
+        }
+
+        // Scalar tech fractions = latest model-year mix (fallback to first).
+        let tech_fractions = by_year
+            .range(..=analysis_year)
+            .next_back()
+            .or_else(|| by_year.iter().next_back())
+            .map(|(_, v)| v.clone())
+            .unwrap_or_else(|| {
+                let mut d = vec![0.0_f32; n_tech];
+                d[0] = 1.0;
+                d
+            });
+
+        entries.push(EvapTechEntry {
+            scc,
+            hp_min: hp_avg,
+            hp_max: hp_avg,
+            tech_names: tech_ids.iter().map(|t| t.to_string()).collect(),
+            tech_fractions,
+            emission_factors,
+            unit_codes,
+            det_a,
+            det_b,
+            det_cap,
+        });
     }
     entries
 }
@@ -1262,10 +1486,7 @@ fn build_fuel_oxygenate<S: DataFrameStore + ?Sized>(store: &S) -> (f32, bool) {
 }
 
 /// Assemble the full [`ReferenceData`] the [`ProductionExecutor`] needs
-/// from the `nr*` tables. Growth, scrappage, and evap are left at their
-/// neutral defaults for this first end-to-end pass (no growth, default
-/// scrappage); the exhaust rate + activity + tech-fraction path is fully
-/// populated.
+/// from the `nr*` tables.
 pub fn load_nonroad_reference<S: DataFrameStore + ?Sized>(
     store: &S,
     analysis_year: i32,
@@ -1275,21 +1496,25 @@ pub fn load_nonroad_reference<S: DataFrameStore + ?Sized>(
     fill_tech_fractions(&mut exhaust_tech_entries, store, analysis_year);
     let activity_entries = build_activity_entries(store);
 
-    // The county routine requires an *evap* tech lookup to succeed before
-    // it computes exhaust (it skips the record otherwise). We don't yet
-    // compute evaporative emissions, so mirror each exhaust (SCC, HP bin)
-    // with a zero-fraction evap entry: the lookup succeeds and the per-tech
-    // loop contributes nothing.
-    let evap_tech_entries = exhaust_tech_entries
-        .iter()
-        .map(|e| EvapTechEntry {
-            scc: e.scc.clone(),
-            hp_min: e.hp_min,
-            hp_max: e.hp_max,
-            tech_names: vec!["1".to_string()],
-            tech_fractions: vec![0.0],
-        })
-        .collect();
+    // Build real evap tech entries from nrengtechfraction (processGroupID=2) and
+    // nrevapemissionrate. Falls back to zero-fraction mirror entries so the
+    // county routine's evap tech lookup always succeeds (it skips the record when
+    // no evap entry is found) — the zero-fraction fallback contributes nothing to
+    // the per-tech-type emission loop.
+    let mut evap_tech_entries = build_evap_tech_entries(store, analysis_year);
+    if evap_tech_entries.is_empty() {
+        evap_tech_entries = exhaust_tech_entries
+            .iter()
+            .map(|e| EvapTechEntry {
+                scc: e.scc.clone(),
+                hp_min: e.hp_min,
+                hp_max: e.hp_max,
+                tech_names: vec!["1".to_string()],
+                tech_fractions: vec![0.0],
+                ..Default::default()
+            })
+            .collect();
+    }
 
     // Growth cross-reference per (SCC, HP bin): indicator = the SCC's
     // growth-pattern id (most-specific match). Unmatched SCCs get "DEF",
