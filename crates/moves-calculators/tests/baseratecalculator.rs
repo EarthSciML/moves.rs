@@ -213,7 +213,11 @@ fn general_fuel_ratio_outside_its_year_range_does_not_apply() {
     let inputs = BaseRateCalculatorInputs {
         base_rate: vec![base_rate_row(2, 1, 4.0, 8.0)],
         fuel_supply: fuel_supply_one(),
-        county: vec![CountyRow { county_id: 1, gpa_fract: 0.0, barometric_pressure: 0.0 }],
+        county: vec![CountyRow {
+            county_id: 1,
+            gpa_fract: 0.0,
+            barometric_pressure: 0.0,
+        }],
         general_fuel_ratio: vec![GeneralFuelRatioRow {
             fuel_formulation_id: 100,
             pol_process_id: 201,
@@ -236,7 +240,11 @@ fn criteria_ratio_scales_running_exhaust() {
     let inputs = BaseRateCalculatorInputs {
         base_rate: vec![base_rate_row(2, 1, 4.0, 8.0)],
         fuel_supply: fuel_supply_one(),
-        county: vec![CountyRow { county_id: 1, gpa_fract: 0.0, barometric_pressure: 0.0 }],
+        county: vec![CountyRow {
+            county_id: 1,
+            gpa_fract: 0.0,
+            barometric_pressure: 0.0,
+        }],
         criteria_ratio: vec![CriteriaRatioRow {
             fuel_formulation_id: 100,
             pol_process_id: 201,
@@ -553,7 +561,11 @@ fn e85_thc_emits_a_10000_offset_pollutant() {
     let inputs = BaseRateCalculatorInputs {
         base_rate: vec![base_rate_row(2, 1, 4.0, 8.0)],
         fuel_supply: fuel_supply_one(),
-        county: vec![CountyRow { county_id: 1, gpa_fract: 0.0, barometric_pressure: 0.0 }],
+        county: vec![CountyRow {
+            county_id: 1,
+            gpa_fract: 0.0,
+            barometric_pressure: 0.0,
+        }],
         fuel_formulations: vec![FuelFormulationRow {
             fuel_formulation_id: 100,
             fuel_sub_type_id: 51,
@@ -759,10 +771,10 @@ fn smfr_reg_class_preserved_enables_hc_speciation() {
 
 #[test]
 fn missing_county_with_live_gpa_data_returns_error() {
- // County table is empty but GPA-blending data is present. The calculator
- // must surface a typed MissingContext error rather than silently using
- // gpa_fract=0.0 (Go would have panicked; this port propagates the
- // broken invariant as a recoverable Result error).
+    // County table is empty but GPA-blending data is present. The calculator
+    // must surface a typed MissingContext error rather than silently using
+    // gpa_fract=0.0 (Go would have panicked; this port propagates the
+    // broken invariant as a recoverable Result error).
     let inputs = BaseRateCalculatorInputs {
         base_rate: vec![base_rate_row(2, 1, 4.0, 8.0)],
         fuel_supply: fuel_supply_one(),
