@@ -262,9 +262,7 @@ fn col(bytes: &[u8], start: usize, end: usize) -> &str {
     if start >= bytes.len() {
         return "";
     }
-    std::str::from_utf8(&bytes[start..end])
-        .unwrap_or("")
-        .trim()
+    std::str::from_utf8(&bytes[start..end]).unwrap_or("").trim()
 }
 
 /// Parse a fixed-width column as `f32`, returning a parse error on failure.
@@ -322,7 +320,13 @@ mod tests {
         let bad: String = SAMPLE_LINE
             .chars()
             .enumerate()
-            .map(|(i, c)| if (53..62).contains(&i) { "BLEHBLEHB".chars().nth(i - 53).unwrap_or(' ') } else { c })
+            .map(|(i, c)| {
+                if (53..62).contains(&i) {
+                    "BLEHBLEHB".chars().nth(i - 53).unwrap_or(' ')
+                } else {
+                    c
+                }
+            })
             .collect();
         let input = format!("/EMSFAC/\n{bad}\n/END/\n");
         let err = read_spil(input.as_bytes()).unwrap_err();
