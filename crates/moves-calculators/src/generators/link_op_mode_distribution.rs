@@ -1450,7 +1450,7 @@ impl LinkOperatingModeDistributionGenerator {
                 inputs.run_spec_source_type,
                 &classifier,
             )
-        } else if inputs.link_avg_speed.is_none_or(|s| s <= 0.0) {
+        } else if inputs.link_avg_speed.map_or(true, |s| s <= 0.0) {
             // No drive schedule and a non-positive (or NULL/absent) average
             // speed: derive the distribution from a synthesised 30-second
             // all-idle schedule. The Java step-100 path reads a missing or NULL

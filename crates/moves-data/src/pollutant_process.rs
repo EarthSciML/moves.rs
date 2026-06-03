@@ -177,7 +177,7 @@ impl PollutantProcessAssociation {
     pub fn is_affected_by_onroad(self) -> bool {
         PPA_FLAGS
             .get(&self.polproc_id().0)
-            .map_or(false, |&f| f & 1 != 0)
+            .is_some_and(|&f| f & 1 != 0)
     }
 
     /// Whether this `(pollutant, process)` pair is affected by nonroad
@@ -191,7 +191,7 @@ impl PollutantProcessAssociation {
     pub fn is_affected_by_nonroad(self) -> bool {
         PPA_FLAGS
             .get(&self.polproc_id().0)
-            .map_or(false, |&f| f & 2 != 0)
+            .is_some_and(|&f| f & 2 != 0)
     }
 }
 
