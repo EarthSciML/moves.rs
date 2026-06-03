@@ -34,17 +34,12 @@
 //! # Road type
 //!
 //! The Java `ExecutionLocation` carries a fifth field, `roadTypeRecordID`.
-//! The Rust [`ExecutionLocation`] is the four-field
-//! `(state, county, zone, link)` value introduced for the
-//! MasterLoop position and commits the `execution_locations` set
-//! of [`ExecutionRunSpec`](crate::ExecutionRunSpec) to — and the migration
-//! plan itself describes output as
-//! *(state, county, zone, link) tuples*. Road type therefore enters this
-//! module only as a **filter**: [`RoadTypeFilter`] ports
-//! `buildRoadTypesSQL`'s onroad / NONROAD split. It is not stored on the
-//! produced tuple. (calculators read `roadTypeRecordID` off the
-//! iteration position; threading road type onto the position is a
-//! MasterLoop concern for whichever task ports those calculators.)
+//! The Rust [`ExecutionLocation`] now carries the matching `road_type_id`
+//! field. [`RoadTypeFilter`] ports `buildRoadTypesSQL`'s onroad / NONROAD
+//! split; [`LinkRow::location`] and [`CountyRow::nonroad_location`] stamp
+//! `road_type_id` from the `Link` table (or the NONROAD sentinel 100) onto
+//! the produced location so calculators can read it from the iteration
+//! position.
 //!
 //! # Entry point
 //!
@@ -120,13 +115,17 @@ pub struct LinkRow {
 }
 
 impl LinkRow {
-    /// Project this onroad link to its [`ExecutionLocation`].
-    ///
-    /// Drops `road_type_id`: the produced tuple is `(state, county, zone,
-    /// link)` only — see the module docs on road type.
+    /// Project this onroad link to its [`ExecutionLocation`], carrying
+    /// `road_type_id` so calculators can read it from the iteration position.
     #[must_use]
     pub fn location(&self) -> ExecutionLocation {
-        ExecutionLocation::link(self.state_id, self.county_id, self.zone_id, self.link_id)
+        ExecutionLocation::link_with_road_type_id(
+            self.state_id,
+            self.county_id,
+            self.zone_id,
+            self.link_id,
+            self.road_type_id,
+        )
     }
 }
 
@@ -148,16 +147,17 @@ impl CountyRow {
     /// Synthesise the NONROAD [`ExecutionLocation`] for this county.
     ///
     /// Ports the Java NONROAD `SELECT`'s column aliasing
-    /// `County.countyID as zoneID, County.countyID as linkID` — the county
-    /// id stands in as both the zone id and the link id, so off-highway
-    /// equipment iterates one synthetic link per county.
+    /// `County.countyID as zoneID, County.countyID as linkID, 100 as roadTypeID`
+    /// — the county id stands in as both the zone id and the link id, and the
+    /// NONROAD sentinel road type 100 is used.
     #[must_use]
     pub fn nonroad_location(&self) -> ExecutionLocation {
-        ExecutionLocation::link(
+        ExecutionLocation::link_with_road_type_id(
             self.state_id,
             self.county_id,
             self.county_id,
             self.county_id,
+            NONROAD_ROAD_TYPE_ID,
         )
     }
 }
@@ -682,25 +682,25 @@ mod tests {
         let locs = producer.build_execution_locations(&sample_geography());
         assert_eq!(
             locs.into_iter().collect::<Vec<_>>(),
-            vec![ExecutionLocation::link(24, 24001, 240010, 2400100)]
+            vec![ExecutionLocation::link_with_road_type_id(24, 24001, 240010, 2400100, 2)]
         );
     }
 
     #[test]
     fn zone_selection_yields_links_in_zone() {
-        // Zone 240010 owns exactly link 2400100.
+        // Zone 240010 owns exactly link 2400100 (road type 2).
         let producer =
             ExecutionLocationProducer::new(vec![selection(GeoKind::Zone, 240010)], [2, 3, 5], None);
         let locs = producer.build_execution_locations(&sample_geography());
         assert_eq!(
             locs.into_iter().collect::<Vec<_>>(),
-            vec![ExecutionLocation::link(24, 24001, 240010, 2400100)]
+            vec![ExecutionLocation::link_with_road_type_id(24, 24001, 240010, 2400100, 2)]
         );
     }
 
     #[test]
     fn county_selection_yields_all_links_in_county() {
-        // County 24001 owns two links across two zones.
+        // County 24001 owns two links across two zones (road types 2 and 3).
         let producer = ExecutionLocationProducer::new(
             vec![selection(GeoKind::County, 24001)],
             [2, 3, 5],
@@ -710,24 +710,24 @@ mod tests {
         assert_eq!(
             locs.into_iter().collect::<Vec<_>>(),
             vec![
-                ExecutionLocation::link(24, 24001, 240010, 2400100),
-                ExecutionLocation::link(24, 24001, 240011, 2400110),
+                ExecutionLocation::link_with_road_type_id(24, 24001, 240010, 2400100, 2),
+                ExecutionLocation::link_with_road_type_id(24, 24001, 240011, 2400110, 3),
             ]
         );
     }
 
     #[test]
     fn state_selection_yields_all_links_in_state() {
-        // State 24 owns counties 24001 (two links) and 24003 (one link).
+        // State 24 owns counties 24001 (road types 2, 3) and 24003 (road type 5).
         let producer =
             ExecutionLocationProducer::new(vec![selection(GeoKind::State, 24)], [2, 3, 5], None);
         let locs = producer.build_execution_locations(&sample_geography());
         assert_eq!(
             locs.into_iter().collect::<Vec<_>>(),
             vec![
-                ExecutionLocation::link(24, 24001, 240010, 2400100),
-                ExecutionLocation::link(24, 24001, 240011, 2400110),
-                ExecutionLocation::link(24, 24003, 240030, 2400300),
+                ExecutionLocation::link_with_road_type_id(24, 24001, 240010, 2400100, 2),
+                ExecutionLocation::link_with_road_type_id(24, 24001, 240011, 2400110, 3),
+                ExecutionLocation::link_with_road_type_id(24, 24003, 240030, 2400300, 5),
             ]
         );
     }
@@ -742,10 +742,10 @@ mod tests {
         assert_eq!(
             locs.into_iter().collect::<Vec<_>>(),
             vec![
-                ExecutionLocation::link(24, 24001, 240010, 2400100),
-                ExecutionLocation::link(24, 24001, 240011, 2400110),
-                ExecutionLocation::link(24, 24003, 240030, 2400300),
-                ExecutionLocation::link(51, 51001, 510010, 5100100),
+                ExecutionLocation::link_with_road_type_id(24, 24001, 240010, 2400100, 2),
+                ExecutionLocation::link_with_road_type_id(24, 24001, 240011, 2400110, 3),
+                ExecutionLocation::link_with_road_type_id(24, 24003, 240030, 2400300, 5),
+                ExecutionLocation::link_with_road_type_id(51, 51001, 510010, 5100100, 2),
             ]
         );
     }
@@ -760,7 +760,7 @@ mod tests {
         let locs = producer.build_execution_locations(&sample_geography());
         assert_eq!(
             locs.into_iter().collect::<Vec<_>>(),
-            vec![ExecutionLocation::link(24, 24001, 240010, 2400100)]
+            vec![ExecutionLocation::link_with_road_type_id(24, 24001, 240010, 2400100, 2)]
         );
     }
 
@@ -779,8 +779,8 @@ mod tests {
 
     #[test]
     fn nonroad_county_selection_synthesises_one_link_per_county() {
-        // NONROAD-only run: county 24001 becomes link (24, 24001, 24001,
-        // 24001); no onroad links appear.
+        // NONROAD-only run: county 24001 becomes a synthetic link with road
+        // type 100 (NONROAD sentinel); no onroad links appear.
         let producer = ExecutionLocationProducer::new(
             vec![selection(GeoKind::County, 24001)],
             [NONROAD_ROAD_TYPE_ID],
@@ -789,7 +789,13 @@ mod tests {
         let locs = producer.build_execution_locations(&sample_geography());
         assert_eq!(
             locs.into_iter().collect::<Vec<_>>(),
-            vec![ExecutionLocation::link(24, 24001, 24001, 24001)]
+            vec![ExecutionLocation::link_with_road_type_id(
+                24,
+                24001,
+                24001,
+                24001,
+                NONROAD_ROAD_TYPE_ID,
+            )]
         );
     }
 
@@ -804,8 +810,20 @@ mod tests {
         assert_eq!(
             locs.into_iter().collect::<Vec<_>>(),
             vec![
-                ExecutionLocation::link(24, 24001, 24001, 24001),
-                ExecutionLocation::link(24, 24003, 24003, 24003),
+                ExecutionLocation::link_with_road_type_id(
+                    24,
+                    24001,
+                    24001,
+                    24001,
+                    NONROAD_ROAD_TYPE_ID,
+                ),
+                ExecutionLocation::link_with_road_type_id(
+                    24,
+                    24003,
+                    24003,
+                    24003,
+                    NONROAD_ROAD_TYPE_ID,
+                ),
             ]
         );
     }
@@ -821,9 +839,27 @@ mod tests {
         assert_eq!(
             locs.into_iter().collect::<Vec<_>>(),
             vec![
-                ExecutionLocation::link(24, 24001, 24001, 24001),
-                ExecutionLocation::link(24, 24003, 24003, 24003),
-                ExecutionLocation::link(51, 51001, 51001, 51001),
+                ExecutionLocation::link_with_road_type_id(
+                    24,
+                    24001,
+                    24001,
+                    24001,
+                    NONROAD_ROAD_TYPE_ID,
+                ),
+                ExecutionLocation::link_with_road_type_id(
+                    24,
+                    24003,
+                    24003,
+                    24003,
+                    NONROAD_ROAD_TYPE_ID,
+                ),
+                ExecutionLocation::link_with_road_type_id(
+                    51,
+                    51001,
+                    51001,
+                    51001,
+                    NONROAD_ROAD_TYPE_ID,
+                ),
             ]
         );
     }
@@ -858,9 +894,15 @@ mod tests {
         assert_eq!(
             locs.into_iter().collect::<Vec<_>>(),
             vec![
-                ExecutionLocation::link(24, 24001, 24001, 24001),
-                ExecutionLocation::link(24, 24001, 240010, 2400100),
-                ExecutionLocation::link(24, 24001, 240011, 2400110),
+                ExecutionLocation::link_with_road_type_id(
+                    24,
+                    24001,
+                    24001,
+                    24001,
+                    NONROAD_ROAD_TYPE_ID,
+                ),
+                ExecutionLocation::link_with_road_type_id(24, 24001, 240010, 2400100, 2),
+                ExecutionLocation::link_with_road_type_id(24, 24001, 240011, 2400110, 3),
             ]
         );
     }
@@ -902,7 +944,7 @@ mod tests {
         let locs = producer.build_execution_locations(&sample_geography());
         assert_eq!(
             locs.into_iter().collect::<Vec<_>>(),
-            vec![ExecutionLocation::link(24, 24003, 240030, 2400300)]
+            vec![ExecutionLocation::link_with_road_type_id(24, 24003, 240030, 2400300, 5)]
         );
     }
 
@@ -914,8 +956,14 @@ mod tests {
         assert_eq!(
             locs.into_iter().collect::<Vec<_>>(),
             vec![
-                ExecutionLocation::link(24, 24001, 24001, 24001),
-                ExecutionLocation::link(24, 24001, 240010, 2400100),
+                ExecutionLocation::link_with_road_type_id(
+                    24,
+                    24001,
+                    24001,
+                    24001,
+                    NONROAD_ROAD_TYPE_ID,
+                ),
+                ExecutionLocation::link_with_road_type_id(24, 24001, 240010, 2400100, 2),
             ]
         );
     }
@@ -942,16 +990,16 @@ mod tests {
         };
         assert_eq!(
             link.location(),
-            ExecutionLocation::link(24, 24001, 240010, 2400100)
+            ExecutionLocation::link_with_road_type_id(24, 24001, 240010, 2400100, 2)
         );
         let county = CountyRow {
             state_id: 24,
             county_id: 24001,
         };
-        // NONROAD synthesis: county id stands in as zone and link.
+        // NONROAD synthesis: county id stands in as zone and link; road type 100.
         assert_eq!(
             county.nonroad_location(),
-            ExecutionLocation::link(24, 24001, 24001, 24001)
+            ExecutionLocation::link_with_road_type_id(24, 24001, 24001, 24001, NONROAD_ROAD_TYPE_ID)
         );
     }
 

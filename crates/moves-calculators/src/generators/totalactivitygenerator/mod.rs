@@ -3542,6 +3542,7 @@ mod tests {
                     county_id: None,
                     zone_id: Some(100),
                     link_id: None,
+                    road_type_id: None,
                 },
                 time: ExecutionTime {
                     year: Some(2020),
