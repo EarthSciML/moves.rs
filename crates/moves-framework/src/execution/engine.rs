@@ -682,6 +682,9 @@ impl MOVESEngine {
         // weighting) can branch on it. Mirrors the Java
         // `ExecutionRunSpec.getModelScale()`.
         let run_scale = self.execution.model_scale();
+        // The run's model domain — whether it's a Project-domain run. Mirrors
+        // `ExecutionRunSpec.getModelDomain()` / Go `configuration.Singleton.IsProject`.
+        let run_domain = self.execution.model_domain();
         // Per-chunk wall times collected from within the parallel closure.
         // Indexed to match the `chunks` slice order: `chunk_slot[i]` holds
         // the timing for `chunks[i]`. Using a `Mutex<Vec<Option<...>>>` lets
@@ -721,6 +724,7 @@ impl MOVESEngine {
             let chunk_ctx: Arc<Mutex<CalculatorContext>> = Arc::new(Mutex::new({
                 let mut ctx = CalculatorContext::with_slow(Arc::clone(&chunk_slow));
                 ctx.set_model_scale(run_scale);
+                ctx.set_model_domain(run_domain);
                 ctx
             }));
             // Instantiate the chunk's modules (topologically ordered, upstream

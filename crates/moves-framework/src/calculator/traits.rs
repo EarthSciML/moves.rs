@@ -67,7 +67,7 @@ use std::sync::Arc;
 
 use moves_calculator_info::{Granularity, Priority};
 use moves_data::{PollutantProcessAssociation, ProcessId};
-use moves_runspec::model::ModelScale;
+use moves_runspec::model::{ModelDomain, ModelScale};
 use polars::prelude::DataFrame;
 
 use crate::data::InMemoryStore;
@@ -113,6 +113,19 @@ pub struct CalculatorContext {
     /// runspec. Mirrors `ExecutionRunSpec.getModelScale()` used by the Java
     /// `BaseRateCalculator.doExecute`.
     scale: Option<ModelScale>,
+    /// The run's [`ModelDomain`] (`targetRunSpec.domain`). `None` in default/test
+    /// contexts. The engine sets it so domain-sensitive calculators (e.g.
+    /// `BaseRateGenerator`) can distinguish Project from non-Project domain without
+    /// re-reading the RunSpec. Mirrors `ExecutionRunSpec.getModelDomain()` /
+    /// `configuration.Singleton.IsProject` in the Go worker.
+    domain: Option<ModelDomain>,
+    /// Per-run behavioral tokens from the worker's `-parameters=` CSV
+    /// (everything except the trailing processID, yearID, roadTypeID integers).
+    /// The engine derives these from the RunSpec and stores them here so
+    /// calculators can pass them — augmented with per-iteration integers — to
+    /// [`moves_calculators`] parsers like `ExternalFlags::from_parameters`.
+    /// Empty in default/test contexts.
+    parameters: Vec<String>,
 }
 
 impl CalculatorContext {
@@ -132,6 +145,8 @@ impl CalculatorContext {
             scratch: ScratchNamespace::empty(),
             position,
             scale: None,
+            domain: None,
+            parameters: Vec::new(),
         }
     }
 
@@ -145,6 +160,8 @@ impl CalculatorContext {
             scratch: ScratchNamespace::empty(),
             position: IterationPosition::default(),
             scale: None,
+            domain: None,
+            parameters: Vec::new(),
         }
     }
 
@@ -157,6 +174,8 @@ impl CalculatorContext {
             scratch: ScratchNamespace::empty(),
             position,
             scale: None,
+            domain: None,
+            parameters: Vec::new(),
         }
     }
 
@@ -170,6 +189,8 @@ impl CalculatorContext {
             scratch: ScratchNamespace::empty(),
             position: IterationPosition::default(),
             scale: None,
+            domain: None,
+            parameters: Vec::new(),
         }
     }
 
@@ -243,6 +264,44 @@ impl CalculatorContext {
     /// context so scale-sensitive calculator bodies can read it.
     pub fn set_model_scale(&mut self, scale: ModelScale) {
         self.scale = Some(scale);
+    }
+
+    /// The run's [`ModelDomain`], if the engine set it. `None` in default/test
+    /// contexts. Mirrors `ExecutionRunSpec.getModelDomain()` / the Go worker's
+    /// `configuration.Singleton.IsProject`.
+    #[must_use]
+    pub fn model_domain(&self) -> Option<ModelDomain> {
+        self.domain
+    }
+
+    /// Set the run's [`ModelDomain`]. The engine calls this once per chunk
+    /// context so domain-sensitive calculators (e.g. `BaseRateGenerator`) can
+    /// branch on Project vs non-Project domain without re-reading the RunSpec.
+    pub fn set_model_domain(&mut self, domain: Option<ModelDomain>) {
+        self.domain = domain;
+    }
+
+    /// Whether the run is in Project domain — equivalent to the Go worker's
+    /// `configuration.Singleton.IsProject`.
+    #[must_use]
+    pub fn is_project(&self) -> bool {
+        self.domain == Some(ModelDomain::Project)
+    }
+
+    /// Per-run behavioral tokens from the worker's `-parameters=` CSV (not
+    /// including the trailing processID, yearID, roadTypeID integers). The
+    /// engine populates this from the RunSpec so calculators that call
+    /// `ExternalFlags::from_parameters` can prepend these run-level tokens to
+    /// their per-iteration integers. Empty in default/test contexts.
+    #[must_use]
+    pub fn parameters(&self) -> &[String] {
+        &self.parameters
+    }
+
+    /// Set the per-run behavioral parameter tokens. Called by the engine once
+    /// per chunk context from the RunSpec.
+    pub fn set_parameters(&mut self, parameters: Vec<String>) {
+        self.parameters = parameters;
     }
 }
 
@@ -664,5 +723,35 @@ mod tests {
         assert_eq!(ctx.position().location.state_id, Some(40));
         assert_eq!(ctx.position().location.link_id, Some(4_000_111));
         assert_eq!(ctx.position().time.hour, Some(8));
+    }
+
+    #[test]
+    fn context_domain_and_is_project_accessors() {
+        use moves_runspec::model::ModelDomain;
+        let mut ctx = CalculatorContext::new();
+        assert_eq!(ctx.model_domain(), None, "default domain is None");
+        assert!(!ctx.is_project(), "None domain → is_project() is false");
+
+        ctx.set_model_domain(Some(ModelDomain::Project));
+        assert_eq!(ctx.model_domain(), Some(ModelDomain::Project));
+        assert!(ctx.is_project(), "Project domain → is_project() is true");
+
+        ctx.set_model_domain(Some(ModelDomain::Default));
+        assert!(!ctx.is_project(), "Default domain is not project");
+
+        ctx.set_model_domain(None);
+        assert!(!ctx.is_project(), "None domain is not project");
+    }
+
+    #[test]
+    fn context_parameters_default_empty_and_round_trip() {
+        let mut ctx = CalculatorContext::new();
+        assert!(ctx.parameters().is_empty(), "default parameters must be empty");
+        let tokens = vec!["yOp".to_string(), "nASB".to_string(), "1".to_string()];
+        ctx.set_parameters(tokens.clone());
+        assert_eq!(ctx.parameters(), tokens.as_slice());
+        // Overwrite clears the previous value.
+        ctx.set_parameters(vec![]);
+        assert!(ctx.parameters().is_empty());
     }
 }
