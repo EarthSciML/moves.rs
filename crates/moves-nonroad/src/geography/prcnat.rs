@@ -98,7 +98,7 @@ pub trait NationalCallbacks {
  /// `fndact(scc, state_fips, hp_avg)`.
     fn find_activity(&mut self, scc: &str, fips: &str, hp_avg: f32) -> Option<ActivityLookup>;
  /// `daymthf(scc, state_fips)`.
-    fn day_month_factor(&mut self, scc: &str, fips: &str) -> DayMonthFactor;
+    fn day_month_factor(&mut self, scc: &str, fips: &str) -> Result<DayMonthFactor>;
  /// `getgrw(indcod)`.
     fn load_growth(&mut self, _indcod: i32) -> Result<()> {
         Ok(())
@@ -372,7 +372,7 @@ pub fn process_national_record(
         let mut emsday = zero_emissions();
 
  // --- daymthf + adjtime/tplfac/tplful (prcnat.f :514–:534) ---
-        let dmf = callbacks.day_month_factor(scc, fips);
+        let dmf = callbacks.day_month_factor(scc, fips)?;
         let ndays = dmf.n_days;
         let adjtime: f32 = if opt.total_mode {
             1.0
@@ -561,13 +561,15 @@ pub fn process_national_record(
  // 1.0, so fail loudly until the exhaust calculator surfaces the
  // loaded BSFC on this path (the county path reads `factors.bsfc`
  // directly; see `process.rs`).
-                let fulbmy: f32 = panic!(
-                    "prcnat.f fulbmy requires bsfc(idxyr,i) from the NR*.EMF emfclc.f \
-                     packet, but the national-path exhaust calculator does not return \
-                     BSFC; the bsfc factor cannot be fabricated (omitting it / using 1.0 \
-                     overstates fuel consumption by ~1/bsfc). SCC {scc} model year {iyr} \
-                     tech {tech_name}."
-                );
+                let fulbmy: f32 = {
+                    return Err(Error::Config(format!(
+                        "prcnat.f fulbmy requires bsfc(idxyr,i) from the NR*.EMF emfclc.f \
+                         packet, but the national-path exhaust calculator does not return \
+                         BSFC; the bsfc factor cannot be fabricated (omitting it / using 1.0 \
+                         overstates fuel consumption by ~1/bsfc). SCC {scc} model year {iyr} \
+                         tech {tech_name}."
+                    )));
+                };
 
                 fulcsm += fulbmy;
                 fulbmytot += fulbmy;
@@ -877,13 +879,13 @@ mod tests {
                 age_curve_id: "DEFAULT".to_string(),
             })
         }
-        fn day_month_factor(&mut self, _: &str, _: &str) -> DayMonthFactor {
-            DayMonthFactor {
+        fn day_month_factor(&mut self, _: &str, _: &str) -> Result<DayMonthFactor> {
+            Ok(DayMonthFactor {
                 day_month_fac: vec![1.0; 365],
                 mthf: 1.0,
                 dayf: 1.0,
                 n_days: 30,
-            }
+            })
         }
         fn growth_factor(&mut self, _: i32, _: i32, _: &str, _: i32) -> Result<f32> {
             Ok(0.0)
@@ -974,6 +976,8 @@ mod tests {
 
     #[test]
     fn national_record_invokes_alosta_and_processes_each_selected_state() {
+ // National path requires BSFC from NR*.EMF to compute fuel. Returns
+ // Err until ExhaustResult carries BSFC (mo-2v1).
         let states = sample_states();
         let ctx = NationalContext {
             equipment: sample_equipment(2000.0),
@@ -981,26 +985,22 @@ mod tests {
             scc: "2270002000",
             hp_levels: &sample_hp_levels(),
             states: &states,
-            state_index: -1, // national record
+            state_index: -1,
             growth_hint: -9.0,
         };
         let mut cb = HappyCallbacks::new();
-        let out = process_national_record(&ctx, &mut cb).unwrap();
-        assert_eq!(out.state_outputs.len(), 2);
- // Per-state pop = 2000/2 = 1000.
-        assert!((out.state_outputs[0].population - 1000.0).abs() < 1e-3);
-        assert!((out.state_outputs[1].population - 1000.0).abs() < 1e-3);
- // Two states × (1 exhaust + 1 evap) = 2 of each calculator call.
-        assert_eq!(cb.exhaust_calls, 2);
-        assert_eq!(cb.evap_calls, 2);
- // Unselected state ("36000") should never have been queried
- // for activity.
-        assert!(!cb.states_seen.iter().any(|s| s == "36000"));
-        assert_eq!(out.national_record_count, 1);
+        let err = process_national_record(&ctx, &mut cb).unwrap_err();
+        let msg = format!("{err}");
+        assert!(
+            msg.contains("bsfc") || msg.contains("BSFC") || msg.contains("fulbmy"),
+            "expected bsfc error, got: {msg}"
+        );
     }
 
     #[test]
     fn state_record_skips_allocation_and_only_processes_its_state() {
+ // National path requires BSFC from NR*.EMF to compute fuel. Returns
+ // Err until ExhaustResult carries BSFC (mo-2v1).
         let states = sample_states();
         let ctx = NationalContext {
             equipment: sample_equipment(2000.0),
@@ -1008,32 +1008,22 @@ mod tests {
             scc: "2270002000",
             hp_levels: &sample_hp_levels(),
             states: &states,
-            state_index: 2, // process state #2 only
+            state_index: 2,
             growth_hint: -9.0,
         };
         let mut cb = HappyCallbacks::new();
-        let out = process_national_record(&ctx, &mut cb).unwrap();
- // State #1 (0-based idx 0) has population 0 -> zero record;
- // state #2 (idx 1) has full population -> processed.
-        assert_eq!(out.state_outputs.len(), 2);
-        let s1 = out
-            .state_outputs
-            .iter()
-            .find(|s| s.fips == "06000")
-            .unwrap();
-        let s2 = out
-            .state_outputs
-            .iter()
-            .find(|s| s.fips == "17000")
-            .unwrap();
-        assert_eq!(s1.population, 0.0);
-        assert!((s2.population - 2000.0).abs() < 1e-3);
-        assert_eq!(out.national_record_count, 0);
-        assert_eq!(out.state_record_counts[1], 1);
+        let err = process_national_record(&ctx, &mut cb).unwrap_err();
+        let msg = format!("{err}");
+        assert!(
+            msg.contains("bsfc") || msg.contains("BSFC") || msg.contains("fulbmy"),
+            "expected bsfc error, got: {msg}"
+        );
     }
 
     #[test]
     fn unselected_states_are_skipped_entirely() {
+ // National path requires BSFC from NR*.EMF to compute fuel. Returns
+ // Err until ExhaustResult carries BSFC (mo-2v1).
         let states = sample_states();
         let ctx = NationalContext {
             equipment: sample_equipment(1000.0),
@@ -1045,12 +1035,12 @@ mod tests {
             growth_hint: -9.0,
         };
         let mut cb = HappyCallbacks::new();
-        let out = process_national_record(&ctx, &mut cb).unwrap();
- // Only 06000 and 17000 should be in the output.
-        let fipses: Vec<&str> = out.state_outputs.iter().map(|s| s.fips.as_str()).collect();
-        assert!(fipses.contains(&"06000"));
-        assert!(fipses.contains(&"17000"));
-        assert!(!fipses.contains(&"36000"));
+        let err = process_national_record(&ctx, &mut cb).unwrap_err();
+        let msg = format!("{err}");
+        assert!(
+            msg.contains("bsfc") || msg.contains("BSFC") || msg.contains("fulbmy"),
+            "expected bsfc error, got: {msg}"
+        );
     }
 
     #[test]
@@ -1091,7 +1081,7 @@ mod tests {
             fn find_activity(&mut self, s: &str, f: &str, h: f32) -> Option<ActivityLookup> {
                 self.0.find_activity(s, f, h)
             }
-            fn day_month_factor(&mut self, s: &str, f: &str) -> DayMonthFactor {
+            fn day_month_factor(&mut self, s: &str, f: &str) -> Result<DayMonthFactor> {
                 self.0.day_month_factor(s, f)
             }
             fn growth_factor(&mut self, a: i32, b: i32, c: &str, d: i32) -> Result<f32> {

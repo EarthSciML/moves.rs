@@ -261,13 +261,13 @@ pub fn process_geography<C: GeographyCallbacks + ?Sized>(
     let denful = fuel_density(options.fuel);
 
  // ---- prccty.f :297 / prcsub.f :328 — daymthf. ----
-    let (daymthfac, mthf, dayf, ndays) = callbacks.day_month_factors(record.scc, fipin);
+    let (daymthfac, mthf, dayf, ndays) = callbacks.day_month_factors(record.scc, fipin)?;
 
  // ---- prccty.f :301–:312 / prcsub.f :332–:343 — time-period factors. ----
     let tp = time_period_setup(options.sum_type, ndays, options.daily_mode, mthf, dayf);
 
  // ---- prccty.f :317 / prcsub.f :348 — emsadj. ----
-    let adjems = callbacks.emission_adjustments(record.scc, fipin, &daymthfac);
+    let adjems = callbacks.emission_adjustments(record.scc, fipin, &daymthfac)?;
 
  // ---- prccty.f :326–:328 / prcsub.f :357–:359 — growth file
  // required for any non-base-year run. ----

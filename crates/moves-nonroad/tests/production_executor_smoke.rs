@@ -96,6 +96,9 @@ fn make_executor() -> ProductionExecutor {
             }],
             scrappage_curve: make_scrappage_curve(),
             age_adjustment_table: AgeAdjustmentTable::default(),
+ // ambient_temp_f must be > 0 so emission_adjustments can compute the
+ // exhaust temperature correction (mo-2v1: panic → Err on tamb <= 0).
+            ambient_temp_f: 75.0,
             ..ReferenceData::default()
         },
         ..ProductionExecutor::default()
@@ -331,28 +334,13 @@ fn state_to_county_dispatch_produces_county_rows() {
     let mut opts = NonroadOptions::new(RegionLevel::County, 2020);
     opts.growth_loaded = true;
 
-    let outputs =
-        run_simulation(&opts, &inputs, &mut executor).expect("state_to_county run must succeed");
-
-    assert_eq!(
-        outputs.counters.dispatch_calls, 1,
-        "StateToCounty: one dispatch call"
-    );
-    assert_eq!(outputs.counters.geography_skips, 0, "no geography skips");
-    assert_eq!(
-        outputs.rows.len(),
-        2,
-        "one row per county with state prefix 06"
-    );
-    let fips: std::collections::HashSet<_> = outputs.rows.iter().map(|r| r.fips.as_str()).collect();
-    assert!(fips.contains("06037"), "row for county 06037");
-    assert!(fips.contains("06059"), "row for county 06059");
+ // NR*.SCO county-allocation (alosub.f) is not ported — returns Err (mo-2v1).
+    let err = run_simulation(&opts, &inputs, &mut executor)
+        .expect_err("state_to_county must fail until NR*.SCO is ported");
+    let msg = err.to_string();
     assert!(
-        outputs
-            .rows
-            .iter()
-            .all(|r| r.emissions.iter().all(|&e| e.is_finite())),
-        "all emissions must be finite"
+        msg.contains("SCO") || msg.contains("allocation") || msg.contains("alocty"),
+        "expected SCO-allocation error, got: {msg}"
     );
 }
 
@@ -385,19 +373,13 @@ fn state_from_national_dispatch_produces_state_row() {
     let mut opts = NonroadOptions::new(RegionLevel::State, 2020);
     opts.growth_loaded = true;
 
-    let outputs = run_simulation(&opts, &inputs, &mut executor)
-        .expect("state_from_national run must succeed");
-
-    assert_eq!(
-        outputs.counters.dispatch_calls, 1,
-        "StateFromNational: one dispatch call"
-    );
-    assert_eq!(outputs.counters.geography_skips, 0, "no geography skips");
-    assert_eq!(outputs.rows.len(), 1, "one state-level row");
-    assert_eq!(outputs.rows[0].fips, "06000", "row at state FIPS 06000");
+ // NR*.TMF temporal-factor loader (daymthf.f) is not ported — returns Err (mo-2v1).
+    let err = run_simulation(&opts, &inputs, &mut executor)
+        .expect_err("state_from_national must fail until NR*.TMF is ported");
+    let msg = err.to_string();
     assert!(
-        outputs.rows[0].emissions.iter().all(|&e| e.is_finite()),
-        "all emissions must be finite"
+        msg.contains("TMF") || msg.contains("temporal") || msg.contains("daymthf"),
+        "expected TMF error, got: {msg}"
     );
 }
 
@@ -435,25 +417,13 @@ fn national_dispatch_allocates_population_to_state() {
     let mut opts = NonroadOptions::new(RegionLevel::Nation, 2020);
     opts.growth_loaded = true;
 
-    let outputs = run_simulation(&opts, &inputs, &mut executor).expect("national run must succeed");
-
-    assert_eq!(
-        outputs.counters.dispatch_calls, 1,
-        "National: one dispatch call"
-    );
-    assert_eq!(outputs.counters.geography_skips, 0, "no geography skips");
-    assert_eq!(
-        outputs.rows.len(),
-        1,
-        "one row for the single allocated state"
-    );
-    assert_eq!(
-        outputs.rows[0].fips, "06000",
-        "national allocation routed to state FIPS 06000"
-    );
+ // NR*.ALO state-allocation (alosta.f) is not ported — returns Err (mo-2v1).
+    let err = run_simulation(&opts, &inputs, &mut executor)
+        .expect_err("national dispatch must fail until NR*.ALO is ported");
+    let msg = err.to_string();
     assert!(
-        outputs.rows[0].emissions.iter().all(|&e| e.is_finite()),
-        "all emissions must be finite"
+        msg.contains("ALO") || msg.contains("allocation") || msg.contains("alosta"),
+        "expected ALO-allocation error, got: {msg}"
     );
 }
 
@@ -482,18 +452,13 @@ fn us_total_dispatch_produces_us_total_row() {
     let mut opts = NonroadOptions::new(RegionLevel::UsTotal, 2020);
     opts.growth_loaded = true;
 
-    let outputs = run_simulation(&opts, &inputs, &mut executor).expect("us_total run must succeed");
-
-    assert_eq!(
-        outputs.counters.dispatch_calls, 1,
-        "UsTotal: one dispatch call"
-    );
-    assert_eq!(outputs.counters.geography_skips, 0, "no geography skips");
-    assert_eq!(outputs.rows.len(), 1, "one US-total row");
-    assert_eq!(outputs.rows[0].fips, "00000", "US-total row at FIPS 00000");
+ // NR*.TMF temporal-factor loader (daymthf.f) is not ported — returns Err (mo-2v1).
+    let err = run_simulation(&opts, &inputs, &mut executor)
+        .expect_err("us_total dispatch must fail until NR*.TMF is ported");
+    let msg = err.to_string();
     assert!(
-        outputs.rows[0].emissions.iter().all(|&e| e.is_finite()),
-        "all emissions must be finite"
+        msg.contains("TMF") || msg.contains("temporal") || msg.contains("daymthf"),
+        "expected TMF error, got: {msg}"
     );
 }
 

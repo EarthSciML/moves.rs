@@ -146,7 +146,7 @@ pub trait UsTotalCallbacks {
  /// matches. Triggers the missing-activity branch of `prcus.f`.
     fn find_activity(&mut self, scc: &str, fips: &str, hp_avg: f32) -> Option<ActivityLookup>;
  /// `daymthf(scc, fips)` — month/day factor lookup.
-    fn day_month_factor(&mut self, scc: &str, fips: &str) -> DayMonthFactor;
+    fn day_month_factor(&mut self, scc: &str, fips: &str) -> Result<DayMonthFactor>;
  /// `getgrw(indcod)` — preload the growth-factor stream for this
  /// indicator. The Fortran source caches the stream into the
  /// `grwfac` COMMON block; the Rust callback is a no-op for
@@ -407,8 +407,16 @@ pub fn process_us_total_record(
  // --- fuel density (prcus.f :274–:283) ---
     let denful = fuel_density(opt.fuel);
 
+ // --- growth-file packet must be loaded (prcus.f :318 / :7003) ---
+ // Checked before daymthf so the growth-missing error is returned when
+ // the daymthf loader is also absent (its Err would otherwise shadow the
+ // growth-file error and make the growth-missing test unreachable).
+    if !opt.growth_loaded {
+        return Err(Error::Config(GeographyError::GrowthFileMissing.to_string()));
+    }
+
  // --- daymthf, tplfac, tplful, adjtime (prcus.f :289–:309) ---
-    let dmf = callbacks.day_month_factor(scc, fipus);
+    let dmf = callbacks.day_month_factor(scc, fipus)?;
     let ndays = dmf.n_days;
     let adjtime: f32 = if opt.total_mode {
         1.0
@@ -423,11 +431,6 @@ pub fn process_us_total_record(
         dmf.mthf * dmf.dayf
     };
     let tplful: f32 = dmf.mthf * dmf.dayf;
-
- // --- growth-file packet must be loaded (prcus.f :318 / :7003) ---
-    if !opt.growth_loaded {
-        return Err(Error::Config(GeographyError::GrowthFileMissing.to_string()));
-    }
 
  // --- growth Xref / activity / missing-activity branch (prcus.f :319–:344) ---
     let Some(indcod) = callbacks.find_growth_xref(fipus, scc, hpval) else {
@@ -623,12 +626,14 @@ pub fn process_us_total_record(
  // fail loudly until the exhaust calculator surfaces the loaded BSFC
  // on this path (the county path reads `factors.bsfc` directly; see
  // `process.rs`).
-            let fulbmy: f32 = panic!(
-                "prcus.f fulbmy requires bsfc(idxyr,i) from the NR*.EMF emfclc.f \
-                 packet, but the state-path exhaust calculator does not return BSFC; \
-                 a literal 1.0 cannot be fabricated in its place (it overstates fuel \
-                 consumption by ~1/bsfc). SCC {scc} model year {iyr} tech {tech_name}."
-            );
+            let fulbmy: f32 = {
+                return Err(Error::Config(format!(
+                    "prcus.f fulbmy requires bsfc(idxyr,i) from the NR*.EMF emfclc.f \
+                     packet, but the state-path exhaust calculator does not return BSFC; \
+                     a literal 1.0 cannot be fabricated in its place (it overstates fuel \
+                     consumption by ~1/bsfc). SCC {scc} model year {iyr} tech {tech_name}."
+                )));
+            };
 
             fulcsm += fulbmy;
             fulbmytot += fulbmy;
@@ -834,13 +839,13 @@ mod tests {
         fn find_activity(&mut self, _s: &str, _f: &str, _h: f32) -> Option<ActivityLookup> {
             None
         }
-        fn day_month_factor(&mut self, _s: &str, _f: &str) -> DayMonthFactor {
-            DayMonthFactor {
+        fn day_month_factor(&mut self, _s: &str, _f: &str) -> Result<DayMonthFactor> {
+            Ok(DayMonthFactor {
                 day_month_fac: vec![1.0; 365],
                 mthf: 1.0,
                 dayf: 1.0,
                 n_days: 1,
-            }
+            })
         }
         fn growth_factor(&mut self, _: i32, _: i32, _: &str, _: i32) -> Result<f32> {
             Ok(0.0)
@@ -1019,13 +1024,13 @@ mod tests {
                 age_curve_id: "DEFAULT".to_string(),
             })
         }
-        fn day_month_factor(&mut self, _: &str, _: &str) -> DayMonthFactor {
-            DayMonthFactor {
+        fn day_month_factor(&mut self, _: &str, _: &str) -> Result<DayMonthFactor> {
+            Ok(DayMonthFactor {
                 day_month_fac: vec![1.0; 365],
                 mthf: 1.0,
                 dayf: 1.0,
                 n_days: 30,
-            }
+            })
         }
         fn growth_factor(&mut self, _: i32, _: i32, _: &str, _: i32) -> Result<f32> {
             Ok(0.0)
@@ -1095,7 +1100,10 @@ mod tests {
     }
 
     #[test]
-    fn happy_path_emits_single_state_output() {
+    fn happy_path_errors_on_missing_bsfc() {
+ // The US-total path requires BSFC from the NR*.EMF packet to compute
+ // fuel consumption. Until ExhaustResult carries BSFC, the function
+ // returns Err instead of panicking (mo-2v1).
         let ctx = UsTotalContext {
             equipment: sample_equipment(1000.0),
             run_options: sample_options(),
@@ -1106,20 +1114,12 @@ mod tests {
             exhaust_calls: 0,
             evap_calls: 0,
         };
-        let out = process_us_total_record(&ctx, &mut cb).unwrap();
- // exactly one model year × one tech × (exhaust + evap) =>
- // one of each calculator call.
-        assert_eq!(cb.exhaust_calls, 1, "expected one exhaust call");
-        assert_eq!(cb.evap_calls, 1, "expected one evap call");
-        assert_eq!(out.state_outputs.len(), 1);
-        let so = &out.state_outputs[0];
-        assert_eq!(so.fips, US_TOTAL_FIPS);
-        assert!(!so.missing);
- // population total == popus * modfrc(0) = 1000 * 1.0
-        assert_eq!(so.population, 1000.0);
- // emissions vector is filled with zeros
-        assert_eq!(so.emissions_day.len(), MXPOL);
-        assert!(so.emissions_day.iter().all(|&v| v == 0.0));
+        let err = process_us_total_record(&ctx, &mut cb).unwrap_err();
+        let msg = format!("{err}");
+        assert!(
+            msg.contains("bsfc") || msg.contains("BSFC") || msg.contains("fulbmy"),
+            "expected bsfc error, got: {msg}"
+        );
     }
 
     #[test]
@@ -1144,13 +1144,13 @@ mod tests {
             fn find_activity(&mut self, _: &str, _: &str, _: f32) -> Option<ActivityLookup> {
                 None
             }
-            fn day_month_factor(&mut self, _: &str, _: &str) -> DayMonthFactor {
-                DayMonthFactor {
+            fn day_month_factor(&mut self, _: &str, _: &str) -> Result<DayMonthFactor> {
+                Ok(DayMonthFactor {
                     day_month_fac: vec![1.0; 365],
                     mthf: 1.0,
                     dayf: 1.0,
                     n_days: 1,
-                }
+                })
             }
             fn growth_factor(&mut self, _: i32, _: i32, _: &str, _: i32) -> Result<f32> {
                 Ok(0.0)
@@ -1242,13 +1242,13 @@ mod tests {
             fn find_activity(&mut self, _: &str, _: &str, _: f32) -> Option<ActivityLookup> {
                 None
             }
-            fn day_month_factor(&mut self, _: &str, _: &str) -> DayMonthFactor {
-                DayMonthFactor {
+            fn day_month_factor(&mut self, _: &str, _: &str) -> Result<DayMonthFactor> {
+                Ok(DayMonthFactor {
                     day_month_fac: vec![1.0; 365],
                     mthf: 1.0,
                     dayf: 1.0,
                     n_days: 1,
-                }
+                })
             }
             fn growth_factor(&mut self, _: i32, _: i32, _: &str, _: i32) -> Result<f32> {
                 Ok(0.0)

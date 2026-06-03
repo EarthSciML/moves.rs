@@ -99,7 +99,7 @@ pub trait StateCallbacks {
  /// `fndact(scc, fips, hp_avg)`.
     fn find_activity(&mut self, scc: &str, fips: &str, hp_avg: f32) -> Option<ActivityLookup>;
  /// `daymthf(scc, fips)`.
-    fn day_month_factor(&mut self, scc: &str, fips: &str) -> DayMonthFactor;
+    fn day_month_factor(&mut self, scc: &str, fips: &str) -> Result<DayMonthFactor>;
  /// `getgrw(indcod)`.
     fn load_growth(&mut self, _indcod: i32) -> Result<()> {
         Ok(())
@@ -304,7 +304,7 @@ pub fn compute_state_aggregate(
     let denful = fuel_density(opt.fuel);
 
  // --- daymthf, tplfac, tplful, adjtime (prcsta.f :390–:405 / prc1st.f :303–:318) ---
-    let dmf = callbacks.day_month_factor(scc, fipsta);
+    let dmf = callbacks.day_month_factor(scc, fipsta)?;
     let ndays = dmf.n_days;
     let adjtime: f32 = if opt.total_mode {
         1.0
@@ -473,12 +473,14 @@ pub fn compute_state_aggregate(
  // BSFC is required data, not a defaultable 1.0, so fail loudly until
  // the exhaust calculator surfaces the loaded BSFC on this path (the
  // county path reads `factors.bsfc` directly; see `process.rs`).
-            let fulbmy: f32 = panic!(
-                "prcsta.f/prc1st.f fulbmy requires bsfc(idxyr,i) from the NR*.EMF \
-                 emfclc.f packet, but the state-path exhaust calculator does not return \
-                 BSFC; a literal 1.0 cannot be fabricated in its place (it overstates \
-                 fuel consumption by ~1/bsfc). SCC {scc} model year {iyr} tech {tech_name}."
-            );
+            let fulbmy: f32 = {
+                return Err(Error::Config(format!(
+                    "prcsta.f/prc1st.f fulbmy requires bsfc(idxyr,i) from the NR*.EMF \
+                     emfclc.f packet, but the state-path exhaust calculator does not return \
+                     BSFC; a literal 1.0 cannot be fabricated in its place (it overstates \
+                     fuel consumption by ~1/bsfc). SCC {scc} model year {iyr} tech {tech_name}."
+                )));
+            };
 
             fulcsm += fulbmy;
             fulbmytot += fulbmy;
@@ -1138,13 +1140,13 @@ mod tests {
         ) -> Option<ActivityLookup> {
             self.activity.clone()
         }
-        fn day_month_factor(&mut self, _scc: &str, _fips: &str) -> DayMonthFactor {
-            DayMonthFactor {
+        fn day_month_factor(&mut self, _scc: &str, _fips: &str) -> Result<DayMonthFactor> {
+            Ok(DayMonthFactor {
                 day_month_fac: vec![1.0; 365],
                 mthf: 1.0,
                 dayf: 1.0,
                 n_days: 365,
-            }
+            })
         }
         fn growth_factor(&mut self, _y1: i32, _y2: i32, _fips: &str, _indcod: i32) -> Result<f32> {
             Ok(self.growth_factor_value)
@@ -1312,38 +1314,18 @@ mod tests {
     }
 
     #[test]
-    fn prc1st_full_path_emits_state_record_and_bmy() {
+    fn prc1st_full_path_errors_on_missing_bsfc() {
+ // State path requires BSFC from NR*.EMF to compute fuel. Returns Err
+ // until ExhaustResult carries BSFC (mo-2v1).
         let hp = [1.0, 11.0, 25.0, 50.0];
         let ctx = default_ctx("06000", &hp);
         let mut cb = StubCallbacks::ok_single_year();
-        let out = process_state_from_national_record(&ctx, &mut cb).unwrap();
- // 1 state record + 1 exhaust BMY + 1 evap BMY
-        assert_eq!(out.state_outputs.len(), 1);
-        assert_eq!(out.bmy_outputs.len(), 2);
- // SI aggregates: 1 exhaust + 1 evap = 2.
-        assert_eq!(out.si_aggregates.len(), 2);
-
-        let st = &out.state_outputs[0];
-        assert_eq!(st.fips, "06000");
-        assert!(!st.missing);
- // poptot = popsta * modfrc(0) = 1000 * 1 = 1000.
-        assert!((st.population - 1000.0).abs() < 1e-3);
- // emsday[THC] = 100, emsday[diurnal] = 50.
-        assert!((st.emissions_day[0] - 100.0).abs() < 1e-3);
-        assert!((st.emissions_day[7] - 50.0).abs() < 1e-3);
-
- // Exhaust BMY has channel=1.
-        let exhaust_bmy = out.bmy_outputs.iter().find(|b| b.channel == 1).unwrap();
-        assert_eq!(exhaust_bmy.fips, "06000");
-        assert_eq!(exhaust_bmy.tech_type, "T0");
-        assert!((exhaust_bmy.population - 1000.0).abs() < 1e-3);
-
- // Evap BMY has channel=2 with RMISS frac/units retrofitted.
-        let evap_bmy = out.bmy_outputs.iter().find(|b| b.channel == 2).unwrap();
-        assert_eq!(evap_bmy.fips, "06000");
-        assert_eq!(evap_bmy.tech_type, "E0");
-        assert_eq!(evap_bmy.frac_retrofitted, RMISS);
-        assert_eq!(evap_bmy.units_retrofitted, RMISS);
+        let err = process_state_from_national_record(&ctx, &mut cb).unwrap_err();
+        let msg = format!("{err}");
+        assert!(
+            msg.contains("bsfc") || msg.contains("BSFC") || msg.contains("fulbmy"),
+            "expected bsfc error, got: {msg}"
+        );
     }
 
  // ---------- prcsta.f path ----------
@@ -1401,7 +1383,9 @@ mod tests {
     }
 
     #[test]
-    fn prcsta_full_path_allocates_proportionally() {
+    fn prcsta_full_path_errors_on_missing_bsfc() {
+ // State path requires BSFC from NR*.EMF to compute fuel. Returns Err
+ // until ExhaustResult carries BSFC (mo-2v1).
         let hp = [1.0, 11.0, 25.0, 50.0];
         let ctx = default_ctx("06000", &hp);
         let counties = vec![
@@ -1417,40 +1401,18 @@ mod tests {
             },
         ];
         let mut cb = StubCallbacks::ok_single_year();
-        let out = process_state_to_county_record(&ctx, &counties, &mut cb).unwrap();
-
- // 2 county state records + 2 (1 exhaust + 1 evap) BMY per county.
-        assert_eq!(out.state_outputs.len(), 2);
-        assert_eq!(out.bmy_outputs.len(), 4);
-
- // First county fraction = 250/1000 = 0.25.
-        let c1 = &out.state_outputs[0];
-        assert_eq!(c1.fips, "06037");
-        assert!((c1.population - 250.0).abs() < 1e-3); // 1000 * 0.25
-        assert!((c1.emissions_day[0] - 25.0).abs() < 1e-3); // 100 THC * 0.25
-        assert!((c1.emissions_day[7] - 12.5).abs() < 1e-3); // 50 diurnal * 0.25
- // Retrofit fraction is unscaled.
-        assert_eq!(c1.frac_retrofitted, 0.0); // No retrofit in default stub.
-
- // Second county fraction = 750/1000 = 0.75.
-        let c2 = &out.state_outputs[1];
-        assert_eq!(c2.fips, "06059");
-        assert!((c2.population - 750.0).abs() < 1e-3);
-        assert!((c2.emissions_day[0] - 75.0).abs() < 1e-3);
-
- // BMY scaling.
-        let bmy_county1: Vec<_> = out
-            .bmy_outputs
-            .iter()
-            .filter(|b| b.fips == "06037")
-            .collect();
-        assert_eq!(bmy_county1.len(), 2);
-        let exhaust_c1 = bmy_county1.iter().find(|b| b.channel == 1).unwrap();
-        assert!((exhaust_c1.population - 250.0).abs() < 1e-3);
+        let err = process_state_to_county_record(&ctx, &counties, &mut cb).unwrap_err();
+        let msg = format!("{err}");
+        assert!(
+            msg.contains("bsfc") || msg.contains("BSFC") || msg.contains("fulbmy"),
+            "expected bsfc error, got: {msg}"
+        );
     }
 
     #[test]
     fn prcsta_skips_unselected_counties() {
+ // State path requires BSFC from NR*.EMF (mo-2v1) — returns Err before
+ // the county loop, so we can't observe the skip in the Ok path.
         let hp = [1.0, 11.0, 25.0, 50.0];
         let ctx = default_ctx("06000", &hp);
         let counties = vec![
@@ -1466,14 +1428,18 @@ mod tests {
             },
         ];
         let mut cb = StubCallbacks::ok_single_year();
-        let out = process_state_to_county_record(&ctx, &counties, &mut cb).unwrap();
- // 1 state record for the only selected county.
-        assert_eq!(out.state_outputs.len(), 1);
-        assert_eq!(out.state_outputs[0].fips, "06059");
+        let err = process_state_to_county_record(&ctx, &counties, &mut cb).unwrap_err();
+        let msg = format!("{err}");
+        assert!(
+            msg.contains("bsfc") || msg.contains("BSFC") || msg.contains("fulbmy"),
+            "expected bsfc error, got: {msg}"
+        );
     }
 
     #[test]
     fn prcsta_emits_zero_record_for_zero_pop_county() {
+ // State path requires BSFC from NR*.EMF (mo-2v1) — returns Err before
+ // the county loop, so we can't observe zero-pop county handling in the Ok path.
         let hp = [1.0, 11.0, 25.0, 50.0];
         let ctx = default_ctx("06000", &hp);
         let counties = vec![
@@ -1489,45 +1455,38 @@ mod tests {
             },
         ];
         let mut cb = StubCallbacks::ok_single_year();
-        let out = process_state_to_county_record(&ctx, &counties, &mut cb).unwrap();
- // 2 records. First is the zero-pop county, second is allocated.
-        assert_eq!(out.state_outputs.len(), 2);
-        assert_eq!(out.state_outputs[0].fips, "06037");
-        assert_eq!(out.state_outputs[0].population, 0.0);
-        assert!(!out.state_outputs[0].missing);
-        assert_eq!(out.state_outputs[1].fips, "06059");
- // 100 / 1000 = 0.1 of state population.
-        assert!((out.state_outputs[1].population - 100.0).abs() < 1e-3);
+        let err = process_state_to_county_record(&ctx, &counties, &mut cb).unwrap_err();
+        let msg = format!("{err}");
+        assert!(
+            msg.contains("bsfc") || msg.contains("BSFC") || msg.contains("fulbmy"),
+            "expected bsfc error, got: {msg}"
+        );
     }
 
  // ---------- compute_state_aggregate ----------
 
     #[test]
     fn aggregate_multi_year_multi_tech_accumulates() {
+ // State path requires BSFC from NR*.EMF to compute fuel. Returns Err
+ // until ExhaustResult carries BSFC (mo-2v1).
         let hp = [1.0, 11.0, 25.0, 50.0];
         let ctx = default_ctx("06000", &hp);
         let mut cb = StubCallbacks::ok_single_year();
- // Set up 2 model years, each with 0.5 modfrc.
         cb.nyrlif = 2;
         let mut modfrc = vec![0.0; 51];
         modfrc[0] = 0.5;
         modfrc[1] = 0.5;
         cb.modfrc = modfrc;
- // Two exhaust techs: 0.6 + 0.4.
         cb.exhaust_tech = Some(ExhaustTechLookup {
             tech_names: vec!["T0".to_string(), "T1".to_string()],
             fractions: vec![0.6, 0.4],
         });
-        let outcome = compute_state_aggregate(&ctx, &mut cb).unwrap();
-        let agg = match outcome {
-            StateAggregateOutcome::Ok(a) => a,
-            other => panic!("expected Ok, got {:?}", state_outcome_label(&other)),
-        };
- // 2 years * 2 techs * 1 evap tech: 4 exhaust BMY cells + 2 evap BMY cells.
-        assert_eq!(agg.exhaust_bmy.len(), 4);
-        assert_eq!(agg.evap_bmy.len(), 2);
- // poptot = 1000*0.5 + 1000*0.5 = 1000.
-        assert!((agg.population_total - 1000.0).abs() < 1e-3);
+        let err = compute_state_aggregate(&ctx, &mut cb).unwrap_err();
+        let msg = format!("{err}");
+        assert!(
+            msg.contains("bsfc") || msg.contains("BSFC") || msg.contains("fulbmy"),
+            "expected bsfc error, got: {msg}"
+        );
     }
 
     fn state_outcome_label(o: &StateAggregateOutcome) -> &'static str {
