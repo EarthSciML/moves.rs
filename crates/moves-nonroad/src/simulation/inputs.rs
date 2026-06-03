@@ -286,7 +286,7 @@ pub struct NationalAllocationEntry {
 /// # Fortran COMMON-block sources
 ///
 /// Each field name maps to one or more Fortran COMMON blocks or
-/// parallel arrays from the NONROAD source. Fields marked
+/// parallel arrays from the NONROAD source. Fields still marked
 /// **⚠ NOT YET LOADABLE** have no ported loader; their `Vec<u8>`
 /// placeholder signals intent without blocking compilation.
 #[derive(Debug, Clone, Default)]
