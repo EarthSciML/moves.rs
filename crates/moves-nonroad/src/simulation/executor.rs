@@ -63,6 +63,7 @@ use crate::geography::{
     EquipmentRecord, GeographyOutput, NationalContext, RunOptions as StateRunOptions,
     StateCallbacks, StateDescriptor, UsTotalContext,
 };
+use crate::input::spillage::{RangeIndicator, RefuelingMode, SpillageRecord};
 use crate::population::retrofit::RetrofitRecord;
 use crate::population::{
     age_distribution, growth_factor, model_year, select_for_indicator, ActivityUnits,
@@ -382,7 +383,7 @@ impl GeographyExecutor for PlanRecordingExecutor {
 ///
 /// | Method | Fortran | Backing table | Math module | Status |
 /// |--------|---------|---------------|-------------|--------|
-/// | `find_refueling` | `fndrfm(asccod, hpval, tech)` | Refueling/spillage-mode table (`modspl`, `volspl`, etc.) from NR\*.SPL files | — | **⚠ NOT YET LOADABLE** — spillage-file loader not ported |
+/// | `find_refueling` | `fndrfm(asccod, hpval, tech)` | Refueling/spillage-mode records from NR\*.SPL files (`ReferenceData::spillage_records`) | — | **available** — populate `spillage_records` and set `NonroadOptions::spillage_loaded = true` |
 ///
 /// ## Allocation (subcounty and national)
 ///
@@ -712,9 +713,8 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         })
     }
 
-    fn find_refueling(&self, _scc: &str, _hp_avg: f32, _tech_name: &str) -> Option<RefuelingData> {
-        // Spillage-mode records not yet loaded; always miss.
-        None
+    fn find_refueling(&self, scc: &str, hp_avg: f32, tech_name: &str) -> Option<RefuelingData> {
+        fndrfm(&self.executor.reference.spillage_records, scc, hp_avg, tech_name)
     }
 
     // ---- Growth cross-reference -----------------------------------------
@@ -2593,6 +2593,103 @@ fn geography_output_to_execution(output: GeographyOutput) -> GeographyExecution 
 }
 
 // =============================================================================
+// fndrfm — refueling-mode lookup (ports fndrfm.f)
+// =============================================================================
+
+/// Find the best-matching spillage record for `(scc, hp_avg, tech_name)`.
+///
+/// Ports `fndrfm.f` exactly:
+/// 1. Build three SCC glob patterns: exact, 7-char prefix + "000", 4-char + "000000".
+/// 2. For each record: skip non-matching tech, HP-range, or SCC.
+/// 3. Prefer the most-specific SCC match; break ties by closest HP mid-point.
+///
+/// Returns `None` when no record matches (caller falls back to `"ALL"` tech).
+fn fndrfm(records: &[SpillageRecord], scc: &str, hp_avg: f32, tech_name: &str) -> Option<RefuelingData> {
+    let tech = tech_name.trim();
+
+    let scc_t = scc.trim();
+    let scc_pad: String = format!("{scc_t:<10}");
+    // Fortran: ascglb(2) = ascin(1:7)//'000'  (10-char patterns)
+    let glob2 = format!("{:<7}000", scc_t.get(..7).unwrap_or(scc_t));
+    let glob3 = format!("{:<4}000000", scc_t.get(..4).unwrap_or(scc_t));
+
+    let mut best: Option<usize> = None;
+    let mut best_iasc = usize::MAX;
+    let mut best_idiff = i32::MAX;
+
+    for (i, rec) in records.iter().enumerate() {
+        // Must match tech type (case-insensitive trim, like Fortran COMMON uppercase storage)
+        if rec.tech_type.trim() != tech {
+            continue;
+        }
+
+        // HP-range check; tank-volume indicator (TANK) uses the same hp_avg value per
+        // fndrfm.f (the tvol branch was commented out — chkval stays as hp_avg).
+        let in_range = match rec.indicator {
+            RangeIndicator::Horsepower | RangeIndicator::Tank => {
+                hp_avg >= rec.hp_min && hp_avg <= rec.hp_max
+            }
+        };
+        if !in_range {
+            continue;
+        }
+
+        // SCC hierarchy match (Fortran fndchr scan of ascglb)
+        let rec_scc = format!("{:<10}", rec.scc.trim());
+        let idxasc = if rec_scc == scc_pad {
+            1
+        } else if rec_scc == glob2 {
+            2
+        } else if rec_scc == glob3 {
+            3
+        } else {
+            continue;
+        };
+
+        // HP-range proximity: max of distances from each end (Fortran INT() truncates toward 0)
+        let idiff = ((hp_avg - rec.hp_min) as i32).max((rec.hp_max - hp_avg) as i32);
+
+        if idxasc < best_iasc || (idxasc == best_iasc && idiff < best_idiff) {
+            best = Some(i);
+            best_iasc = idxasc;
+            best_idiff = idiff;
+        }
+    }
+
+    best.map(|i| spillage_to_refueling(&records[i]))
+}
+
+/// Convert a parsed [`SpillageRecord`] to the [`RefuelingData`] expected by the
+/// geography callbacks (maps Fortran COMMON field names to Rust struct fields).
+fn spillage_to_refueling(rec: &SpillageRecord) -> RefuelingData {
+    RefuelingData {
+        mode: match rec.mode {
+            RefuelingMode::Pump => "PUMP     ".to_string(),
+            RefuelingMode::Container => "CONTAINER".to_string(),
+        },
+        tank: rec.tank_volume,
+        tank_full: rec.tank_full,
+        tank_metal: rec.tank_metal_pct,
+        hose_length: rec.hose_len,
+        hose_dia: rec.hose_dia,
+        hose_metal: rec.hose_metal_pct,
+        hot_soak_start: rec.hot_soak_per_hr,
+        neck_length: rec.neck_len,
+        neck_dia: rec.neck_dia,
+        supply_length: rec.sr_len,
+        supply_dia: rec.sr_dia,
+        vent_length: rec.vent_len,
+        vent_dia: rec.vent_dia,
+        diurnal_fractions: rec.diurnal,
+        tnk_e10_factor: rec.tank_e10,
+        hose_e10_factor: rec.hose_e10,
+        neck_e10_factor: rec.neck_e10,
+        supply_e10_factor: rec.sr_e10,
+        vent_e10_factor: rec.vent_e10,
+    }
+}
+
+// =============================================================================
 // Tests
 // =============================================================================
 
@@ -3561,5 +3658,154 @@ mod production {
             msg.contains("GROWTH") || msg.contains("growth"),
             "expected GrowthFileMissing error, got: {msg}"
         );
+    }
+}
+
+// =============================================================================
+// fndrfm unit tests
+// =============================================================================
+
+#[cfg(test)]
+mod fndrfm_tests {
+    use super::*;
+    use crate::input::spillage::{RangeIndicator, RefuelingMode, SpillageRecord, SpillageUnits};
+
+    fn make_rec(scc: &str, tech: &str, hp_min: f32, hp_max: f32, tank: f32) -> SpillageRecord {
+        SpillageRecord {
+            scc: scc.to_string(),
+            mode: RefuelingMode::Pump,
+            indicator: RangeIndicator::Horsepower,
+            hp_min,
+            hp_max,
+            tech_type: tech.to_string(),
+            units: SpillageUnits::Gallons,
+            tank_volume: tank,
+            tank_full: 0.5,
+            tank_metal_pct: 0.0,
+            hose_len: 0.1,
+            hose_dia: 0.005,
+            hose_metal_pct: 0.0,
+            neck_len: 0.0,
+            neck_dia: 0.0,
+            sr_len: 0.0,
+            sr_dia: 0.0,
+            vent_len: 0.0,
+            vent_dia: 0.0,
+            hot_soak_per_hr: 0.05,
+            diurnal: [1.0, 0.0, 0.0, 0.0, 0.0],
+            tank_e10: 1.0,
+            hose_e10: 1.0,
+            neck_e10: 1.0,
+            sr_e10: 1.0,
+            vent_e10: 1.0,
+        }
+    }
+
+    #[test]
+    fn exact_scc_match() {
+        let recs = vec![make_rec("2260001010", "ALL", 0.0, 9999.0, 3.0)];
+        let r = fndrfm(&recs, "2260001010", 25.0, "ALL").unwrap();
+        assert!((r.tank - 3.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn glob7_match() {
+        // Record has 7-char-padded SCC "2260001000"; query is "2260001010"
+        let recs = vec![make_rec("2260001000", "ALL", 0.0, 9999.0, 7.0)];
+        let r = fndrfm(&recs, "2260001010", 25.0, "ALL").unwrap();
+        assert!((r.tank - 7.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn glob4_match() {
+        let recs = vec![make_rec("2260000000", "ALL", 0.0, 9999.0, 4.0)];
+        let r = fndrfm(&recs, "2260001010", 25.0, "ALL").unwrap();
+        assert!((r.tank - 4.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn exact_beats_glob() {
+        let recs = vec![
+            make_rec("2260000000", "ALL", 0.0, 9999.0, 4.0), // 4-char glob
+            make_rec("2260001010", "ALL", 0.0, 9999.0, 3.0), // exact
+            make_rec("2260001000", "ALL", 0.0, 9999.0, 7.0), // 7-char glob
+        ];
+        let r = fndrfm(&recs, "2260001010", 25.0, "ALL").unwrap();
+        assert!((r.tank - 3.0).abs() < 1e-4, "exact match should win");
+    }
+
+    #[test]
+    fn glob7_beats_glob4() {
+        let recs = vec![
+            make_rec("2260000000", "ALL", 0.0, 9999.0, 4.0), // 4-char glob
+            make_rec("2260001000", "ALL", 0.0, 9999.0, 7.0), // 7-char glob
+        ];
+        let r = fndrfm(&recs, "2260001010", 25.0, "ALL").unwrap();
+        assert!((r.tank - 7.0).abs() < 1e-4, "7-char glob should beat 4-char glob");
+    }
+
+    #[test]
+    fn hp_range_filter() {
+        let recs = vec![
+            make_rec("2260001010", "ALL", 0.0, 25.0, 1.0),   // excludes hp=50
+            make_rec("2260001010", "ALL", 25.0, 100.0, 2.0), // includes hp=50
+        ];
+        let r = fndrfm(&recs, "2260001010", 50.0, "ALL").unwrap();
+        assert!((r.tank - 2.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn hp_proximity_tiebreak_same_scc_quality() {
+        // Two exact-SCC records in same HP band; hp=15 is closer to [10,20] than [0,50]
+        let recs = vec![
+            make_rec("2260001010", "ALL", 0.0, 50.0, 10.0),  // idiff = max(15,35) = 35
+            make_rec("2260001010", "ALL", 10.0, 20.0, 5.0),  // idiff = max(5,5) = 5 (closer)
+        ];
+        let r = fndrfm(&recs, "2260001010", 15.0, "ALL").unwrap();
+        assert!((r.tank - 5.0).abs() < 1e-4, "closer HP range should win");
+    }
+
+    #[test]
+    fn tech_filter_no_match() {
+        let recs = vec![make_rec("2260001010", "BASE", 0.0, 9999.0, 3.0)];
+        assert!(fndrfm(&recs, "2260001010", 25.0, "ALL").is_none());
+    }
+
+    #[test]
+    fn no_records_returns_none() {
+        assert!(fndrfm(&[], "2260001010", 25.0, "ALL").is_none());
+    }
+
+    #[test]
+    fn canonical_spillage_emf() {
+        // Reads the actual EPA SPILLAGE.EMF from the canonical migration-source
+        // cache. Skips gracefully when the file is not present (e.g. in CI).
+        let home = match std::env::var("HOME") {
+            Ok(h) => h,
+            Err(_) => return,
+        };
+        let path = std::path::PathBuf::from(home)
+            .join(".cache/moves-rs-migration-src/EPA_MOVES_Model/NONROAD/NR08a/DATA/EMSFAC/SPILLAGE.EMF");
+        if !path.exists() {
+            eprintln!("canonical_spillage_emf: SPILLAGE.EMF not found at {path:?}; skipping");
+            return;
+        }
+        let file = std::fs::File::open(&path).expect("open SPILLAGE.EMF");
+        let reader = std::io::BufReader::new(file);
+        let recs = crate::input::spillage::read_spil(reader).expect("parse SPILLAGE.EMF");
+        assert!(!recs.is_empty(), "SPILLAGE.EMF must contain records");
+
+        // Verify the first record against known values from the file header.
+        // SCC 2260001010 (2-Str Offroad Motorcycles), ALL tech, HP 0-9999, CONTAINER.
+        let r = fndrfm(&recs, "2260001010", 500.0, "ALL")
+            .expect("should find a record for 2260001010 at any HP");
+        assert_eq!(r.mode.trim(), "CONTAINER", "mode mismatch for 2260001010");
+        assert!((r.tank - 3.0).abs() < 1e-3, "tank_volume mismatch: {}", r.tank);
+        assert!((r.tank_full - 0.5).abs() < 1e-5, "tank_full mismatch: {}", r.tank_full);
+        assert!((r.hot_soak_start - 0.05).abs() < 1e-5, "hot_soak mismatch: {}", r.hot_soak_start);
+        assert!((r.hose_length - 0.45750).abs() < 1e-4, "hose_len mismatch: {}", r.hose_length);
+        assert!((r.tnk_e10_factor - 1.0).abs() < 1e-6, "tank_e10 mismatch: {}", r.tnk_e10_factor);
+        // neck_e10 was 0.0 in file → should be defaulted to 1.0
+        assert!((r.neck_e10_factor - 1.0).abs() < 1e-6, "neck_e10 mismatch: {}", r.neck_e10_factor);
     }
 }
