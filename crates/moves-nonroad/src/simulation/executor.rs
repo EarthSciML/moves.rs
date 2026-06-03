@@ -4342,7 +4342,7 @@ mod production {
                 daily: [1.0 / 7.0; 2],
             },
         );
-        let mut exec = ProductionExecutor {
+        let exec = ProductionExecutor {
             reference: ref_data,
             months_selected: [true; 12], // annual = all months
             weekday_selected: true,
@@ -4378,7 +4378,7 @@ mod production {
         );
         let mut months = [false; 12];
         months[7] = true; // August only
-        let mut exec = ProductionExecutor {
+        let exec = ProductionExecutor {
             reference: ref_data,
             months_selected: months,
             weekday_selected: true,

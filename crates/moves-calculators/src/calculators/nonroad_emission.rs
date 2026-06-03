@@ -219,8 +219,8 @@ impl Calculator for NonroadEmissionCalculator {
         // Build the NONROAD engine inputs from the nr* execution-DB tables
         // (the in-process replacement for the Java input-file generator).
         let store = ctx.tables();
-        let month = time.month.map(|m| m as u8).unwrap_or(0);
-        let day_id = time.day_id.map(|d| d as u8).unwrap_or(0);
+        let month = time.month.unwrap_or(0);
+        let day_id = time.day_id.unwrap_or(0);
         let options = nonroad_loader::build_options(year, month, day_id);
         let inputs = nonroad_loader::build_nonroad_inputs(store, year);
         let debug = std::env::var("MOVES_NR_DEBUG").is_ok();
