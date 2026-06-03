@@ -208,19 +208,20 @@ impl Calculator for NonroadEmissionCalculator {
         let year = time.year.ok_or_else(|| Error::MissingContext {
             what: "context.year".into(),
         })?;
-        let month_present = time.month.ok_or_else(|| Error::MissingContext {
+        let _ = time.month.ok_or_else(|| Error::MissingContext {
             what: "context.month".into(),
         })?;
         let _ = time.day_id.ok_or_else(|| Error::MissingContext {
             what: "context.day_id".into(),
         })?;
         let year = i32::from(year);
-        let month_id = i64::from(month_present);
 
         // Build the NONROAD engine inputs from the nr* execution-DB tables
         // (the in-process replacement for the Java input-file generator).
         let store = ctx.tables();
-        let options = nonroad_loader::build_options(year);
+        let month = time.month.map(|m| m as u8).unwrap_or(0);
+        let day_id = time.day_id.map(|d| d as u8).unwrap_or(0);
+        let options = nonroad_loader::build_options(year, month, day_id);
         let inputs = nonroad_loader::build_nonroad_inputs(store, year);
         let debug = std::env::var("MOVES_NR_DEBUG").is_ok();
         if debug {
@@ -271,7 +272,7 @@ impl Calculator for NonroadEmissionCalculator {
             // Tables present but empty population — a genuine nonroad-free slice.
             return Ok(CalculatorOutput::empty());
         }
-        let mut executor = nonroad_loader::build_production_executor(store, year, month_id);
+        let mut executor = nonroad_loader::build_production_executor(store, year, month, day_id);
 
         let outputs = moves_nonroad::run_simulation(&options, &inputs, &mut executor)
             .map_err(|e| Error::Nonroad(e.to_string()))?;
@@ -289,19 +290,23 @@ impl Calculator for NonroadEmissionCalculator {
             );
         }
 
-        // Map the engine's SimEmissionRows onto the MOVESOutput schema,
-        // allocating the engine's annual emissions onto this iteration's
-        // month/day slice.
-        let month = time.month.map(i32::from);
-        let day = time.day_id.map(i32::from);
+        // Map the engine's SimEmissionRows onto the MOVESOutput schema.
+        // The engine now applies temporal scaling internally (daymthf.f port)
+        // when temporal profiles are loaded, so post-processing uses a neutral
+        // map to avoid double-counting.
+        let month_i = time.month.map(i32::from);
+        let day_i = time.day_id.map(i32::from);
         let keys = EmissionTimeKeys {
             year,
-            month,
-            day,
+            month: month_i,
+            day: day_i,
             hour: time.hour.map(i32::from),
         };
-        let temporal =
-            nonroad_loader::build_temporal_factors(store, month.unwrap_or(0), day.unwrap_or(0));
+        let temporal = if executor.reference.temporal_profiles.is_empty() {
+            nonroad_loader::build_temporal_factors(store, month_i.unwrap_or(0), day_i.unwrap_or(0))
+        } else {
+            std::collections::BTreeMap::new()
+        };
         match nonroad_loader::emissions_to_dataframe(&outputs.rows, &keys, &temporal)
             .map_err(|e| Error::Polars(e.to_string()))?
         {

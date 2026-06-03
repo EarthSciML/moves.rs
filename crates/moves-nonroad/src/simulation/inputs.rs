@@ -307,6 +307,22 @@ pub struct NationalAllocationEntry {
     pub record: AllocationRecord,
 }
 
+/// Monthly and daily temporal profile for one SCC — NR*.TMF (SEASON.DAT) record.
+///
+/// Canonical Fortran: `mthfac(1..12, idx)` and `dayfac(1..2, idx)` from
+/// `nonrdtpl.inc` / `rdseas.f`. In MOVES the equivalent data lives in
+/// `nrmonthallocation` (12 rows per SCC, one per month) and
+/// `nrdayallocation` (2 rows per SCC, weekday + weekend).
+#[derive(Debug, Clone)]
+pub struct TemporalProfile {
+    /// Monthly fractions, index 0 = January … 11 = December.
+    /// Canonical normalization: sum = 1.0.
+    pub monthly: [f32; 12],
+    /// Day-of-week fractions: index 0 = weekday, 1 = weekend.
+    /// Canonical normalization: 5×weekday + 2×weekend = 1.0.
+    pub daily: [f32; 2],
+}
+
 /// Reference tables loaded once per run by the orchestrator.
 ///
 /// Aggregates every reference table [`ProductionExecutor`](super::executor::ProductionExecutor) needs to
@@ -353,10 +369,19 @@ pub struct ReferenceData {
     /// `/AGE ADJUSTMENT/` packet in NR*.ACT files (`rdact.f`). Defaults
     /// to an empty table (DEFAULT curve only).
     pub age_adjustment_table: AgeAdjustmentTable,
-    /// Day/month temporal factors from NR*.TMF files. Fortran:
-    /// `DAYMTHFAC`, `MTHF`, `DAYF`, `NDAYS` from `rdtmfac.f`.
-    /// **⚠ NOT YET LOADABLE.**
-    pub temporal_factors: Vec<u8>,
+    /// Monthly and daily temporal profiles from NR*.TMF (SEASON.DAT /
+    /// `nrmonthallocation` + `nrdayallocation`). Keyed by SCC. Missing
+    /// SCC falls back to canonical defaults: monthly = [1/12; 12],
+    /// daily = [1/7; 2] (`rdseas.f` :215–221 — `defmth`/`defday`).
+    pub temporal_profiles: std::collections::BTreeMap<String, TemporalProfile>,
+    /// Which months are active for this run — Fortran `lmonth(12)`.
+    /// Index 0 = January … 11 = December. Set from the run-spec month
+    /// selection (1 month for a MOVES typical-day run; all 12 for annual).
+    /// All `false` means "no temporal data loaded; use defaults".
+    pub months_selected: [bool; 12],
+    /// `true` when weekday activity is selected, `false` for weekend.
+    /// Fortran `ldays(IDXWKD)`. MOVES `dayID = 5` → weekday, `2` → weekend.
+    pub weekday_selected: bool,
     /// Refueling/spillage-mode records from NR*.SPL files. Fortran:
     /// `MODSPL`, `VOLSPL`, and associated permeation arrays from `rdspil.f`.
     /// Non-empty when a spillage file was loaded; drives `find_refueling`.

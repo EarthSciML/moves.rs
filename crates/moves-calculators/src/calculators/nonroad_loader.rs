@@ -35,7 +35,7 @@ use moves_nonroad::input::scrappage::ScrappagePoint;
 use moves_nonroad::population::{AgeAdjustmentTable, GrowthIndicatorRecord};
 use moves_nonroad::simulation::{
     ActivityTableEntry, EvapTechEntry, ExhaustTechEntry, NonroadInputs, NonroadOptions,
-    ProductionExecutor, ReferenceData, SimEmissionRow,
+    ProductionExecutor, ReferenceData, SimEmissionRow, TemporalProfile,
 };
 use polars::prelude::*;
 
@@ -1485,12 +1485,81 @@ fn build_fuel_oxygenate<S: DataFrameStore + ?Sized>(store: &S) -> (f32, bool) {
     ((weighted_oxy / tot) as f32, rfg_share / tot > 0.5)
 }
 
+/// Build temporal profiles from `nrmonthallocation` + `nrdayallocation`.
+///
+/// Returns `(profiles, months_selected, weekday_selected)` where
+/// `months_selected[i]` is true for the active month(s) and
+/// `weekday_selected` is true when `day_id == 5` (MOVES weekday).
+/// `selected_month = 0` means annual (all 12 months selected).
+fn build_temporal_profiles_for_period<S: DataFrameStore + ?Sized>(
+    store: &S,
+    selected_month: u8,
+    day_id: u8,
+) -> (BTreeMap<String, TemporalProfile>, [bool; 12], bool) {
+    // Collect monthly fractions per SCC: index 0=Jan..11=Dec.
+    let mut monthly_by_scc: BTreeMap<String, [f32; 12]> = BTreeMap::new();
+    if let Some(df) = store.get("nrmonthallocation") {
+        let scc = str_col(&df, "SCC");
+        let month = int_col(&df, "monthID");
+        let frac = float_col(&df, "monthFraction");
+        for i in 0..df.height() {
+            let m = month[i] as usize;
+            if m >= 1 && m <= 12 {
+                monthly_by_scc.entry(scc[i].clone()).or_insert([0.0; 12])[m - 1] = frac[i] as f32;
+            }
+        }
+    }
+    // Collect daily fractions per SCC: [weekday, weekend].
+    let mut daily_by_scc: BTreeMap<String, [f32; 2]> = BTreeMap::new();
+    if let Some(df) = store.get("nrdayallocation") {
+        let scc = str_col(&df, "scc");
+        let day = int_col(&df, "dayID");
+        let frac = float_col(&df, "dayFraction");
+        for i in 0..df.height() {
+            // MOVES dayID: 5 = weekday (slot 0), 2 = weekend (slot 1).
+            let slot = match day[i] {
+                5 => 0usize,
+                2 => 1usize,
+                _ => continue,
+            };
+            daily_by_scc.entry(scc[i].clone()).or_insert([1.0 / 7.0; 2])[slot] = frac[i] as f32;
+        }
+    }
+    // Merge into TemporalProfile, falling back to canonical defaults
+    // (defmth=1/12, defday=1/7) for missing dimensions.
+    let all_sccs: std::collections::BTreeSet<&String> =
+        monthly_by_scc.keys().chain(daily_by_scc.keys()).collect();
+    let result: BTreeMap<String, TemporalProfile> = all_sccs
+        .into_iter()
+        .map(|scc| {
+            let monthly = monthly_by_scc.get(scc).copied().unwrap_or([1.0 / 12.0; 12]);
+            let daily = daily_by_scc.get(scc).copied().unwrap_or([1.0 / 7.0; 2]);
+            (scc.clone(), TemporalProfile { monthly, daily })
+        })
+        .collect();
+
+    let months_selected = if selected_month == 0 {
+        [true; 12]
+    } else {
+        let mut m = [false; 12];
+        if (1..=12).contains(&selected_month) {
+            m[selected_month as usize - 1] = true;
+        }
+        m
+    };
+
+    let weekday_selected = day_id == 5;
+
+    (result, months_selected, weekday_selected)
+}
+
 /// Assemble the full [`ReferenceData`] the [`ProductionExecutor`] needs
 /// from the `nr*` tables.
 pub fn load_nonroad_reference<S: DataFrameStore + ?Sized>(
     store: &S,
     analysis_year: i32,
-    month: i64,
+    selected_month: u8,
+    day_id: u8,
 ) -> ReferenceData {
     let mut exhaust_tech_entries = build_exhaust_tech_entries(store);
     fill_tech_fractions(&mut exhaust_tech_entries, store, analysis_year);
@@ -1534,6 +1603,9 @@ pub fn load_nonroad_reference<S: DataFrameStore + ?Sized>(
 
     let (fuel_oxygen_pct, fuel_rfg) = build_fuel_oxygenate(store);
 
+    let (temporal_profiles, months_selected, weekday_selected) =
+        build_temporal_profiles_for_period(store, selected_month, day_id);
+
     ReferenceData {
         exhaust_tech_entries,
         evap_tech_entries,
@@ -1542,36 +1614,64 @@ pub fn load_nonroad_reference<S: DataFrameStore + ?Sized>(
         growth_records,
         scrappage_curve: build_scrappage_curve(store),
         age_adjustment_table: AgeAdjustmentTable::default(),
+        // NR*.TMF temporal profiles + period flags.
+        temporal_profiles,
+        months_selected,
+        weekday_selected,
         // emsadj.f oxygenate + temperature corrections.
         fuel_oxygen_pct,
         fuel_rfg,
-        ambient_temp_f: build_ambient_temp(store, month),
-        ambient_temp_by_scc: build_ambient_temp_by_scc(store, month),
+        ambient_temp_f: build_ambient_temp(store, selected_month as i64),
+        ambient_temp_by_scc: build_ambient_temp_by_scc(store, selected_month as i64),
         ..ReferenceData::default()
     }
 }
 
 /// Build the [`ProductionExecutor`] for the national pseudo-county run.
 ///
-/// `month` is the master-loop month (1–12) used to select the correct
-/// `zonemonthhour` temperature rows. Pass `0` to average all available rows.
+/// `selected_month` (1–12) and `day_id` (MOVES dayID: 5=weekday, 2=weekend)
+/// are used to load temporal profiles and set the period flags the
+/// `day_month_factor(s)` callbacks need. Pass `selected_month=0` for
+/// an annual (all-months) run.
 pub fn build_production_executor<S: DataFrameStore + ?Sized>(
     store: &S,
     analysis_year: i32,
-    month: i64,
+    selected_month: u8,
+    day_id: u8,
 ) -> ProductionExecutor {
-    let reference = load_nonroad_reference(store, analysis_year, month);
+    let reference = load_nonroad_reference(store, analysis_year, selected_month, day_id);
+    let (months_selected, weekday_selected) = period_flags(selected_month, day_id);
     ProductionExecutor {
         county_fips: vec![PSEUDO_COUNTY.to_string()],
         hp_levels: HP_LEVELS,
         reference,
+        months_selected,
+        weekday_selected,
+        total_mode: false, // MOVES always uses typical-day
         ..ProductionExecutor::default()
     }
 }
 
+/// Derive `(months_selected, weekday_selected)` from MOVES period identifiers.
+fn period_flags(selected_month: u8, day_id: u8) -> ([bool; 12], bool) {
+    let months = if selected_month == 0 {
+        [true; 12]
+    } else {
+        let mut m = [false; 12];
+        if (1..=12).contains(&selected_month) {
+            m[selected_month as usize - 1] = true;
+        }
+        m
+    };
+    (months, day_id == 5)
+}
+
 /// Build the [`NonroadOptions`] for a county-level (national pseudo-county)
-/// run at `analysis_year`.
-pub fn build_options(analysis_year: i32) -> NonroadOptions {
+/// run at `analysis_year` for the given period.
+///
+/// `selected_month` (1–12 or 0 for annual) and `day_id` (5=weekday, 2=weekend)
+/// mirror the MOVES runspec month/day selection.
+pub fn build_options(analysis_year: i32, selected_month: u8, day_id: u8) -> NonroadOptions {
     let mut opts = NonroadOptions::new(RegionLevel::County, analysis_year);
     opts.growth_loaded = true;
     // Emit by-model-year exhaust rows so the output matches canonical's
@@ -1579,6 +1679,8 @@ pub fn build_options(analysis_year: i32) -> NonroadOptions {
     // by-model-year rows (model_year = Some) to avoid double-counting the
     // per-record totals the engine also emits.
     opts.emit_bmy_exhaust = true;
+    opts.selected_month = selected_month;
+    opts.weekday_selected = day_id == 5;
     opts
 }
 
@@ -1840,9 +1942,9 @@ mod tests {
         }
         eprintln!("driver records matched-by-exhaust-entry: {matched}/{total}");
 
-        // Reproduce the engine run in-process.
-        let options = build_options(2020);
-        let mut executor = build_production_executor(&store, 2020, 0);
+        // Reproduce the engine run in-process (August weekday, typical-day).
+        let options = build_options(2020, 8, 5);
+        let mut executor = build_production_executor(&store, 2020, 8, 5);
         eprintln!("executor.county_fips = {:?}", executor.county_fips);
         eprintln!(
             "inputs.regions.selected_counties = {:?}",
@@ -2121,5 +2223,58 @@ mod tests {
     fn missing_table_yields_no_entries() {
         let store = InMemoryStore::new();
         assert!(build_exhaust_tech_entries(&store).is_empty());
+    }
+
+    // ---- build_temporal_profiles_for_period --------------------------------
+
+    fn month_alloc_df() -> DataFrame {
+        df!(
+            "SCC"           => ["2260001000", "2260001000", "2260002000"],
+            "stateID"       => [0i64, 0i64, 0i64],
+            "monthID"       => [8i64, 9i64, 8i64],
+            "monthFraction" => ["0.1", "0.09", "0.08"]
+        )
+        .unwrap()
+    }
+
+    fn day_alloc_df() -> DataFrame {
+        df!(
+            "scc"         => ["2260001000", "2260001000"],
+            "dayID"       => [5i64, 2i64],
+            "dayFraction" => ["0.166667", "0.083333"]
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn temporal_profiles_loaded_from_month_and_day_tables() {
+        let mut store = InMemoryStore::new();
+        store.insert("nrmonthallocation", month_alloc_df());
+        store.insert("nrdayallocation", day_alloc_df());
+
+        let (profiles, months_selected, weekday_selected) =
+            build_temporal_profiles_for_period(&store, 8, 5);
+
+        let p = profiles.get("2260001000").expect("profile for 2260001000");
+        assert!((p.monthly[7] - 0.1).abs() < 1e-5, "August fraction");
+        assert!((p.monthly[8] - 0.09).abs() < 1e-5, "September fraction");
+        assert!((p.daily[0] - 0.166667).abs() < 1e-4, "weekday fraction");
+        assert!((p.daily[1] - 0.083333).abs() < 1e-4, "weekend fraction");
+
+        assert!(months_selected[7], "August must be selected");
+        assert!(!months_selected[0], "January must not be selected");
+        assert!(weekday_selected, "dayID=5 means weekday");
+    }
+
+    #[test]
+    fn period_flags_all_months_for_annual_run() {
+        let store = InMemoryStore::new();
+        let (_, months_selected, weekday_selected) =
+            build_temporal_profiles_for_period(&store, 0, 2);
+        assert!(
+            months_selected.iter().all(|&m| m),
+            "month=0 means all 12 selected"
+        );
+        assert!(!weekday_selected, "dayID=2 means weekend");
     }
 }

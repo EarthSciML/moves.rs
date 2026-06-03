@@ -76,6 +76,15 @@ pub struct NonroadOptions {
     /// typical-day run — Fortran `ismtyp == IDXTOT`.
     pub total_mode: bool,
 
+    /// Selected month (1–12), or 0 for an annual/all-months run.
+    /// Fortran `imonth`. Drives `lmonth`: a MOVES monthly run has exactly
+    /// one month set; 0 sets all 12 (annual run).
+    pub selected_month: u8,
+
+    /// `true` when weekday activity is selected, `false` for weekend.
+    /// Fortran `ldays(IDXWKD)`. MOVES `dayID = 5` → weekday, `2` → weekend.
+    pub weekday_selected: bool,
+
     /// `true` when day-of-year output is requested — Fortran `ldayfl`.
     pub daily_output: bool,
 
@@ -120,6 +129,8 @@ impl NonroadOptions {
             growth_year: year,
             tech_year: year,
             total_mode: false,
+            selected_month: 0,
+            weekday_selected: true,
             daily_output: false,
             emit_bmy_exhaust: false,
             emit_bmy_evap: false,

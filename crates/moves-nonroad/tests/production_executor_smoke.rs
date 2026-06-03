@@ -22,8 +22,9 @@ use moves_nonroad::{
     },
     population::AgeAdjustmentTable,
     simulation::{
-        ActivityTableEntry, EvapTechEntry, ExhaustTechEntry, GrowthXrefEntry,
-        NationalAllocationEntry, NonroadInputs, NonroadOptions, ProductionExecutor, ReferenceData,
+        ActivityTableEntry, EvapTechEntry, ExhaustTechEntry, GrowthIndicatorRecord,
+        GrowthXrefEntry, NationalAllocationEntry, NonroadInputs, NonroadOptions,
+        ProductionExecutor, ReferenceData,
     },
 };
 
@@ -106,6 +107,9 @@ fn make_executor() -> ProductionExecutor {
             ambient_temp_f: 75.0,
             ..ReferenceData::default()
         },
+        // All months selected → annual run; mthf = 1.0 with flat default profiles.
+        months_selected: [true; 12],
+        total_mode: true,
         ..ProductionExecutor::default()
     }
 }
@@ -143,7 +147,22 @@ fn state_level_reference(fips: &str) -> ReferenceData {
             hp_max: 50.0,
             indicator: Some("GDP".into()),
         }],
-        growth_records: vec![],
+        growth_records: vec![
+            GrowthIndicatorRecord {
+                indicator: "GDP".into(),
+                fips: "00000".into(),
+                subregion: String::new(),
+                year: 2020,
+                value: 1.0,
+            },
+            GrowthIndicatorRecord {
+                indicator: "GDP".into(),
+                fips: "00000".into(),
+                subregion: String::new(),
+                year: 2021,
+                value: 1.0,
+            },
+        ],
         activity_entries: vec![ActivityTableEntry {
             scc: "2270001010".into(),
             fips: fips.into(),
@@ -269,7 +288,22 @@ fn us_total_reference(scc: &str) -> ReferenceData {
             hp_max: 50.0,
             indicator: Some("GDP".into()),
         }],
-        growth_records: vec![],
+        growth_records: vec![
+            GrowthIndicatorRecord {
+                indicator: "GDP".into(),
+                fips: "00000".into(),
+                subregion: String::new(),
+                year: 2020,
+                value: 1.0,
+            },
+            GrowthIndicatorRecord {
+                indicator: "GDP".into(),
+                fips: "00000".into(),
+                subregion: String::new(),
+                year: 2021,
+                value: 1.0,
+            },
+        ],
         activity_entries: vec![ActivityTableEntry {
             scc: scc.into(),
             fips: "".into(),
@@ -428,6 +462,9 @@ fn state_from_national_dispatch_produces_state_row() {
     let mut executor = ProductionExecutor {
         hp_levels: default_hp_levels(),
         reference: state_level_reference("06000"),
+        // All months selected → annual run; mthf = 1.0 with flat default profiles.
+        months_selected: [true; 12],
+        total_mode: true,
         ..ProductionExecutor::default()
     };
 
@@ -450,13 +487,13 @@ fn state_from_national_dispatch_produces_state_row() {
     let mut opts = NonroadOptions::new(RegionLevel::State, 2020);
     opts.growth_loaded = true;
 
-    // NR*.TMF temporal-factor loader (daymthf.f) is not ported — returns Err (mo-2v1).
-    let err = run_simulation(&opts, &inputs, &mut executor)
-        .expect_err("state_from_national must fail until NR*.TMF is ported");
-    let msg = err.to_string();
-    assert!(
-        msg.contains("TMF") || msg.contains("temporal") || msg.contains("daymthf"),
-        "expected TMF error, got: {msg}"
+    // Temporal factors ported (mo-cdo): StateFromNational execution now succeeds.
+    let outputs = run_simulation(&opts, &inputs, &mut executor)
+        .expect("run_simulation must succeed after TMF port");
+    assert!(!outputs.rows.is_empty(), "expected at least one row");
+    assert_eq!(
+        outputs.rows[0].fips, "06000",
+        "first row fips must be 06000"
     );
 }
 
@@ -515,6 +552,9 @@ fn us_total_dispatch_produces_us_total_row() {
     let mut executor = ProductionExecutor {
         hp_levels: default_hp_levels(),
         reference: us_total_reference("2270001010"),
+        // All months selected → annual run; mthf = 1.0 with flat default profiles.
+        months_selected: [true; 12],
+        total_mode: true,
         ..ProductionExecutor::default()
     };
 
@@ -533,13 +573,13 @@ fn us_total_dispatch_produces_us_total_row() {
     let mut opts = NonroadOptions::new(RegionLevel::UsTotal, 2020);
     opts.growth_loaded = true;
 
-    // NR*.TMF temporal-factor loader (daymthf.f) is not ported — returns Err (mo-2v1).
-    let err = run_simulation(&opts, &inputs, &mut executor)
-        .expect_err("us_total dispatch must fail until NR*.TMF is ported");
-    let msg = err.to_string();
-    assert!(
-        msg.contains("TMF") || msg.contains("temporal") || msg.contains("daymthf"),
-        "expected TMF error, got: {msg}"
+    // Temporal factors ported (mo-cdo): UsTotal execution now succeeds.
+    let outputs = run_simulation(&opts, &inputs, &mut executor)
+        .expect("run_simulation must succeed after TMF port");
+    assert!(!outputs.rows.is_empty(), "expected at least one row");
+    assert_eq!(
+        outputs.rows[0].fips, "00000",
+        "first row fips must be 00000"
     );
 }
 

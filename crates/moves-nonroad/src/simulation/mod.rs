@@ -69,13 +69,14 @@ pub mod inputs;
 pub mod options;
 pub mod outputs;
 
+pub use crate::population::GrowthIndicatorRecord;
 pub use executor::{
     DispatchContext, GeographyExecution, GeographyExecutor, PlanRecordingExecutor,
     ProductionExecutor, RecordedDispatch,
 };
 pub use inputs::{
     ActivityTableEntry, EvapTechEntry, ExhaustTechEntry, GrowthXrefEntry, NationalAllocationEntry,
-    NonroadInputs, ReferenceData, SccGroup,
+    NonroadInputs, ReferenceData, SccGroup, TemporalProfile,
 };
 pub use options::{NonroadOptions, MAX_YEAR, MIN_YEAR};
 pub use outputs::{EmissionChannel, NonroadOutputs, RunCounters, SimEmissionRow};
