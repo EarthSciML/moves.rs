@@ -166,10 +166,9 @@ mod tests {
 
     #[test]
     fn dispatches_to_spillage_parser() {
-        let record = "2270001000 PUMP TNK 0.0 25.0 BASE GALLONS \
-0.5 0.6 70.0 1.0 0.5 50.0 0.0 0.0 \
-0.0 0.0 0.0 0.0 0.05 0.2 0.2 0.2 0.2 0.2 \
-0.0 1.5 1.0 1.0 1.0";
+        // Fixed-width format matching rdspil.f column positions.
+        let record =
+            "2270001000 2-Str Offroad Motorcycles                 PUMP      HP       0   25    ALL    GALLONS         0.50000 0.60000  70.00000   1.00000  0.500000  50.00000   0.00000  0.000000   0.00000  0.000000   0.00000  0.000000   0.05000     0.200     0.200     0.200     0.200     0.200     0.000     1.500     1.000     1.000     1.000";
         let body = format!("/EMSFAC/\n{}\n/END/\n", record);
         let f = write_temp(&body);
 

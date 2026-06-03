@@ -31,6 +31,7 @@ use crate::emissions::exhaust::EmissionUnitCode;
 use crate::geography::common::ActivityUnit;
 use crate::input::alo::AllocationRecord;
 use crate::input::indicator::IndicatorTable;
+use crate::input::spillage::SpillageRecord;
 use crate::population::retrofit::RetrofitRecord;
 use crate::population::{AgeAdjustmentTable, GrowthIndicatorRecord, ScrappageCurve};
 
@@ -349,9 +350,9 @@ pub struct ReferenceData {
     /// **⚠ NOT YET LOADABLE.**
     pub temporal_factors: Vec<u8>,
     /// Refueling/spillage-mode records from NR*.SPL files. Fortran:
-    /// `MODSPL`, `VOLSPL`, `VOLRFL` from `rdspl.f`.
-    /// **⚠ NOT YET LOADABLE.**
-    pub spillage_records: Vec<u8>,
+    /// `MODSPL`, `VOLSPL`, and associated permeation arrays from `rdspil.f`.
+    /// Non-empty when a spillage file was loaded; drives `find_refueling`.
+    pub spillage_records: Vec<SpillageRecord>,
     /// National-to-state allocation entries keyed by SCC. Fortran:
     /// `ALOSTA` allocation data from NR*.ALO files (`rdalo.f`).
     pub national_allocation: Vec<NationalAllocationEntry>,
