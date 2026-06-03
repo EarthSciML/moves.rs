@@ -367,13 +367,13 @@ pub fn compute_state_aggregate(
     let mut poptot: f32 = 0.0;
     let mut acttot: f32 = 0.0;
     let mut strtot: f32 = 0.0;
-    let mut fulcsm: f32 = 0.0;
-    let mut unitsretro: f32 = 0.0;
+    let fulcsm: f32 = 0.0;
+    let unitsretro: f32 = 0.0;
     let mut evpoptot: f32 = 0.0;
     let mut evacttot: f32 = 0.0;
     let mut evstrtot: f32 = 0.0;
 
-    let mut exhaust_bmy: Vec<StateBmyCell> = Vec::new();
+    let exhaust_bmy: Vec<StateBmyCell> = Vec::new();
     let mut evap_bmy: Vec<StateBmyCell> = Vec::new();
     let mut si_cells: Vec<StateBmyCell> = Vec::new();
 
@@ -416,7 +416,7 @@ pub fn compute_state_aggregate(
             callbacks.filter_retrofits_by_year(iyr)?;
         }
 
-        let mut fulbmytot: f32 = 0.0;
+        let fulbmytot: f32 = 0.0;
 
         // --- exhaust tech-type loop (prcsta.f :556–:639 / prc1st.f :464–:556) ---
         for (tech_i, tech_name) in tech.tech_names.iter().enumerate() {
@@ -428,14 +428,11 @@ pub fn compute_state_aggregate(
             let popbmy = popsta * modfrc * tfrac;
 
             // --- retrofit reduction (prcsta.f :583–:593 / prc1st.f :490–:498) ---
-            let mut frac_retro_bmy = 0.0_f32;
-            let mut units_retro_bmy = 0.0_f32;
             if opt.retrofit_loaded {
                 callbacks.filter_retrofits_by_tech(tech_name)?;
-                let r = callbacks.calculate_retrofit(popbmy, scc, hpval, iyr, tech_name)?;
-                frac_retro_bmy = r.frac_retro;
-                units_retro_bmy = r.units_retro;
-                unitsretro += units_retro_bmy;
+                // Retrofit fracs will be accumulated into unitsretro once BSFC
+                // is available (mo-2v1).
+                let _r = callbacks.calculate_retrofit(popbmy, scc, hpval, iyr, tech_name)?;
             }
 
             let tpltmp = temporal_adjustment_for_unit(activity.units, tplfac);
@@ -462,56 +459,16 @@ pub fn compute_state_aggregate(
 
             accumulate_emissions(&mut emsday, &er.ems_day_delta);
 
-            // --- bookkeeping (prcsta.f :620–:635 / prc1st.f :522–:535) ---
-            let actbmy = actadj * popsta * modfrc * tplful * tfrac * adjtime;
-            // `fulbmy` requires the real per-(year, tech) BSFC: canonical
-            // `prcsta.f:623-625` / `prc1st.f:524-526` multiply by `bsfc(idxyr,i)`,
-            // the array that `emfclc.f` (NR*.EMF packet) populates. The state-path
-            // `calculate_exhaust` callback returns only `ExhaustResult` and does
-            // NOT thread `bsfc` back here, so the prior literal `1.0` fabricated
-            // fuel consumption (overstated by ~1/bsfc, i.e. ~2x for bsfc≈0.4-0.6).
-            // BSFC is required data, not a defaultable 1.0, so fail loudly until
-            // the exhaust calculator surfaces the loaded BSFC on this path (the
-            // county path reads `factors.bsfc` directly; see `process.rs`).
-            let fulbmy: f32 = {
-                return Err(Error::Config(format!(
-                    "prcsta.f/prc1st.f fulbmy requires bsfc(idxyr,i) from the NR*.EMF \
-                     emfclc.f packet, but the state-path exhaust calculator does not return \
-                     BSFC; a literal 1.0 cannot be fabricated in its place (it overstates \
-                     fuel consumption by ~1/bsfc). SCC {scc} model year {iyr} tech {tech_name}."
-                )));
-            };
-
-            fulcsm += fulbmy;
-            fulbmytot += fulbmy;
-
-            // --- collect BMY / SI cells (prcsta.f :880–:894 / prc1st.f :539–:551) ---
-            if opt.emit_bmy {
-                exhaust_bmy.push(StateBmyCell {
-                    model_year: iyr,
-                    tech_code: tech_name.clone(),
-                    population: popbmy,
-                    activity: actbmy,
-                    fuel_consumption: fulbmy,
-                    emissions: er.ems_bmy.clone(),
-                    frac_retrofitted: frac_retro_bmy,
-                    units_retrofitted: units_retro_bmy,
-                    channel: 1,
-                });
-            }
-            if opt.emit_si {
-                si_cells.push(StateBmyCell {
-                    model_year: iyr,
-                    tech_code: tech_name.clone(),
-                    population: popbmy,
-                    activity: actbmy,
-                    fuel_consumption: fulbmy,
-                    emissions: er.ems_bmy,
-                    frac_retrofitted: frac_retro_bmy,
-                    units_retrofitted: units_retro_bmy,
-                    channel: 1,
-                });
-            }
+            // Cannot compute fulbmy: BSFC from NR*.EMF not yet threaded through
+            // ExhaustResult on the state path (prcsta.f:623-625 / prc1st.f:524-526).
+            // TODO(mo-2v1): surface bsfc from ExhaustResult, then compute actbmy/fulbmy
+            // and collect exhaust BMY/SI cells here.
+            return Err(Error::Config(format!(
+                "prcsta.f/prc1st.f fulbmy requires bsfc(idxyr,i) from the NR*.EMF \
+                 emfclc.f packet, but the state-path exhaust calculator does not return \
+                 BSFC; a literal 1.0 cannot be fabricated in its place (it overstates \
+                 fuel consumption by ~1/bsfc). SCC {scc} model year {iyr} tech {tech_name}."
+            )));
         }
 
         // --- per-model-year exhaust totals (prcsta.f :643–:647 / prc1st.f :560–:564) ---

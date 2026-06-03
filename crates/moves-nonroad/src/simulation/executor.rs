@@ -528,7 +528,7 @@ impl ProductionExecutor {
         options: &NonroadOptions,
     ) -> Result<GeographyExecution> {
         let hp_levels = self.hp_levels;
-        let state_ctx = build_state_context(ctx, options, &hp_levels);
+        let _state_ctx = build_state_context(ctx, options, &hp_levels);
 
         // Build county list by filtering county_fips to those whose
         // 2-char state prefix matches the state FIPS in region_code.
@@ -573,7 +573,7 @@ impl ProductionExecutor {
             .collect();
 
         let mut adapter = StateAdapter::new(self);
-        let output = process_state_to_county_record(&state_ctx, &counties, &mut adapter)?;
+        let output = process_state_to_county_record(&_state_ctx, &counties, &mut adapter)?;
         Ok(geography_output_to_execution(output))
     }
 
