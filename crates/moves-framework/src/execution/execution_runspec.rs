@@ -415,23 +415,40 @@ impl ExecutionRunSpec {
  /// Wildcard query — pass `None` for either component to match any value.
  /// Returns `false` if both are `None` (matches Java's behaviour).
  ///
- /// Java's `doesHavePollutantAndProcess(Pollutant, EmissionProcess)`
- /// additionally filters by `Model.ModelCombination` for NONROAD — the
- /// runtime checks `isAffectedByNonroad` on the per-pair metadata
- /// stored in the default DB. That metadata isn't in
- /// [`moves_data::PollutantProcessAssociation`] ( keeps the
- /// identity-only layer pure); when data plane lands, this
- /// method gains the M2 filter. For now it matches the M1 / default
- /// path: any selected pair matches without further filtering.
+ /// Ports `doesHavePollutantAndProcess(Pollutant, EmissionProcess)` with the
+ /// M1/M2 `isAffectedByOnroad` / `isAffectedByNonroad` gate applied per the
+ /// Java switch in `ExecutionRunSpec.java:833-892`. On M1 (onroad) the process
+ /// match requires `isAffectedByOnroad`; on M2 (nonroad) it requires
+ /// `isAffectedByNonroad`. The pollutant-only wildcard (`(Some(p), None)`) is
+ /// not gated — Java has no model-combination branch for that arm.
     #[must_use]
     pub fn does_have_pollutant_or_process(
         &self,
         pollutant_id: Option<PollutantId>,
         process_id: Option<ProcessId>,
     ) -> bool {
+        let mc = self.model_combination();
         match (pollutant_id, process_id) {
-            (Some(p), Some(pr)) => self.does_have_pollutant_and_process(p, pr),
-            (None, Some(pr)) => self.target_processes.contains(&pr),
+            (Some(p), Some(pr)) => {
+                let assoc = PollutantProcessAssociation { pollutant_id: p, process_id: pr };
+                if !self.pollutant_process_associations.contains(&assoc) {
+                    return false;
+                }
+                match mc {
+                    ModelCombination::Nonroad => assoc.is_affected_by_nonroad(),
+                    _ => assoc.is_affected_by_onroad(),
+                }
+            }
+            (None, Some(pr)) => {
+                match mc {
+                    ModelCombination::Nonroad => {
+                        self.pollutant_process_associations
+                            .iter()
+                            .any(|a| a.process_id == pr && a.is_affected_by_nonroad())
+                    }
+                    _ => self.target_processes.contains(&pr),
+                }
+            }
             (Some(p), None) => self
                 .pollutant_process_associations
                 .iter()
@@ -814,12 +831,17 @@ impl ExecutionRunSpec {
 
  // ---- Test-friendly accessors -------------------------------------------
 
- /// True if the runspec selected any rate-of-progress calculation. Ports
- /// `hasRateOfProgress`. The RunSpec model doesn't yet carry the flag
- ///, so this returns `false` for now.
+ /// True if the runspec selected any rate-of-progress calculation.
+ ///
+ /// Ports `RunSpec.hasRateOfProgress()` (Java lines 269-281). Returns `true`
+ /// when `internalcontrolstrategies` contains a `RateOfProgressStrategy`
+ /// with `useParameters = true`.
     #[must_use]
     pub fn has_rate_of_progress(&self) -> bool {
-        false
+        use moves_runspec::InternalControlStrategy;
+        self.run_spec.internal_control_strategies.iter().any(|s| {
+            matches!(s, InternalControlStrategy::RateOfProgress { use_parameters: true })
+        })
     }
 
  /// Whether the runspec contains a Running Exhaust pollutant whose
@@ -1710,5 +1732,133 @@ mod tests {
         assert_eq!(er.counties, BTreeSet::from([24001]));
         assert_eq!(er.zones, BTreeSet::from([240010, 240011]));
         assert_eq!(er.links, BTreeSet::from([2400100, 2400110]));
+    }
+
+ // ---- PPA affectation flags (M1/M2 filter) ----------------------------
+
+    #[test]
+    fn does_have_pollutant_or_process_m1_excludes_nonroad_only_ppa() {
+ // Pollutant 88 + process 1 has isAffectedByOnroad=0, isAffectedByNonroad=1.
+ // An M1 run that selects this PPA should NOT match on the process part.
+        let spec = build_run_spec(|s| {
+            s.pollutant_process_associations = vec![RsppA {
+                pollutant_id: 88,
+                pollutant_name: "NMHC".into(),
+                process_id: 1,
+                process_name: "Running Exhaust".into(),
+            }];
+        });
+        let er = ExecutionRunSpec::new(spec);
+ // M1 (onroad): PPA(88, 1) is onroad=0 → full (Some,Some) match returns false.
+        assert!(!er.does_have_pollutant_or_process(
+            Some(PollutantId(88)),
+            Some(ProcessId(1))
+        ));
+ // Process-wildcard: M1 path checks target_processes, process 1 IS there → true.
+        assert!(er.does_have_pollutant_or_process(None, Some(ProcessId(1))));
+ // Pollutant-wildcard: not gated by flag → true.
+        assert!(er.does_have_pollutant_or_process(Some(PollutantId(88)), None));
+    }
+
+    #[test]
+    fn does_have_pollutant_or_process_m2_requires_nonroad_flag() {
+ // Pollutant 1 (THC) + process 1 (Running Exhaust): isAffectedByNonroad=1 → matches M2.
+ // Pollutant 88 + process 1: isAffectedByNonroad=1 → matches M2.
+ // Pollutant 91 (TEC) + process 1: isAffectedByNonroad=0 → does NOT match M2.
+        let mut spec = build_run_spec(|s| {
+            s.pollutant_process_associations = vec![
+                RsppA {
+                    pollutant_id: 1,
+                    pollutant_name: "Total Gaseous Hydrocarbons".into(),
+                    process_id: 1,
+                    process_name: "Running Exhaust".into(),
+                },
+                RsppA {
+                    pollutant_id: 91,
+                    pollutant_name: "Total Energy Consumption".into(),
+                    process_id: 1,
+                    process_name: "Running Exhaust".into(),
+                },
+            ];
+        });
+        spec.models = vec![Model::Nonroad];
+        let er = ExecutionRunSpec::new(spec);
+
+ // THC/Running: nonroad=1 → matches on M2.
+        assert!(er.does_have_pollutant_or_process(
+            Some(PollutantId(1)),
+            Some(ProcessId(1))
+        ));
+ // TEC/Running: nonroad=0 → does NOT match on M2.
+        assert!(!er.does_have_pollutant_or_process(
+            Some(PollutantId(91)),
+            Some(ProcessId(1))
+        ));
+ // Process-wildcard on M2: scans PPAs for nonroad=1 with proc 1 → THC found → true.
+        assert!(er.does_have_pollutant_or_process(None, Some(ProcessId(1))));
+    }
+
+    #[test]
+    fn does_have_pollutant_or_process_m1_onroad_ppa_matches() {
+ // THC/Running (91+1) has isAffectedByOnroad=1 on M1 — the common case.
+        let spec = build_run_spec(|s| {
+            s.pollutant_process_associations = vec![RsppA {
+                pollutant_id: 91,
+                pollutant_name: "Total Energy Consumption".into(),
+                process_id: 1,
+                process_name: "Running Exhaust".into(),
+            }];
+        });
+        let er = ExecutionRunSpec::new(spec);
+        assert!(er.does_have_pollutant_or_process(
+            Some(PollutantId(91)),
+            Some(ProcessId(1))
+        ));
+    }
+
+ // ---- has_rate_of_progress --------------------------------------------
+
+    #[test]
+    fn has_rate_of_progress_false_when_no_strategies() {
+        let er = ExecutionRunSpec::new(build_run_spec(|_| {}));
+        assert!(!er.has_rate_of_progress());
+    }
+
+    #[test]
+    fn has_rate_of_progress_false_when_use_parameters_false() {
+        use moves_runspec::InternalControlStrategy;
+        let spec = build_run_spec(|s| {
+            s.internal_control_strategies = vec![
+                InternalControlStrategy::RateOfProgress { use_parameters: false },
+            ];
+        });
+        let er = ExecutionRunSpec::new(spec);
+        assert!(!er.has_rate_of_progress());
+    }
+
+    #[test]
+    fn has_rate_of_progress_true_when_use_parameters_true() {
+        use moves_runspec::InternalControlStrategy;
+        let spec = build_run_spec(|s| {
+            s.internal_control_strategies = vec![
+                InternalControlStrategy::RateOfProgress { use_parameters: true },
+            ];
+        });
+        let er = ExecutionRunSpec::new(spec);
+        assert!(er.has_rate_of_progress());
+    }
+
+    #[test]
+    fn has_rate_of_progress_false_for_other_strategy_variant() {
+        use moves_runspec::InternalControlStrategy;
+        let spec = build_run_spec(|s| {
+            s.internal_control_strategies = vec![
+                InternalControlStrategy::Other {
+                    class_name: "com.example.SomeOtherStrategy".into(),
+                },
+            ];
+        });
+        let er = ExecutionRunSpec::new(spec);
+        assert!(!er.has_rate_of_progress());
     }
 }

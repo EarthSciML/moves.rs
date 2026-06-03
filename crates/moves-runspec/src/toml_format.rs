@@ -359,7 +359,7 @@ impl RunSpecToml {
             internal_control_strategies: self
                 .internal_control_strategies
                 .into_iter()
-                .map(|_| InternalControlStrategy {})
+                .map(|_| InternalControlStrategy::Other { class_name: String::new() })
                 .collect(),
             input_database: DatabaseRef {
                 server: self.input_db.server,
