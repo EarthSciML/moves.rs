@@ -103,7 +103,11 @@ jobs:
       #     When NONROAD_FIDELITY_REFERENCE is set (weekly self-hosted),
       #     this also diffs against the gfortran reference captures.
       - name: cargo test
-        run: cargo test --workspace --all-targets
+        # --no-fail-fast: run every test binary even after one fails. Without it,
+        # cargo stops at the first failing binary, which masked a 3-deep failure
+        # chain on main (concurrency_correctness -> concurrency_tuning_sweep ->
+        # canonical_snapshot_diff) and blinded merge-gating to snapshot regressions.
+        run: cargo test --workspace --all-targets --no-fail-fast
 
   # ── WASM build gate ────────────────────────────────────────────────────────
   #
