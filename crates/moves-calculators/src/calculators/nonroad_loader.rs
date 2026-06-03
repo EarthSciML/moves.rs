@@ -1517,8 +1517,9 @@ pub fn load_nonroad_reference<S: DataFrameStore + ?Sized>(
     }
 
     // Growth cross-reference per (SCC, HP bin): indicator = the SCC's
-    // growth-pattern id (most-specific match). Unmatched SCCs get "DEF",
-    // which selects no growth record ⇒ no growth for that SCC.
+    // growth-pattern id (most-specific match). Unmatched SCCs get
+    // indicator=None; the engine errors on None when growth is active
+    // (canonical prccty.f label 7001 / fndgxf no-match path).
     let (scc_pattern, growth_records) = build_growth(store);
     let growth_xref_entries = exhaust_tech_entries
         .iter()
@@ -1527,9 +1528,7 @@ pub fn load_nonroad_reference<S: DataFrameStore + ?Sized>(
             scc: e.scc.clone(),
             hp_min: e.hp_min,
             hp_max: e.hp_max,
-            indicator: scc_lookup(&scc_pattern, &e.scc)
-                .cloned()
-                .unwrap_or_else(|| "DEF".to_string()),
+            indicator: scc_lookup(&scc_pattern, &e.scc).cloned(),
         })
         .collect();
 

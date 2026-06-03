@@ -261,8 +261,11 @@ pub struct GrowthXrefEntry {
     pub hp_min: f32,
     /// Upper bound of the HP range (inclusive).
     pub hp_max: f32,
-    /// 4-character growth indicator code (`indcod`).
-    pub indicator: String,
+    /// Growth indicator code (`indcod`). `None` means no growth-pattern
+    /// cross-reference matched this SCC — canonical `fndgxf` returns
+    /// `idxgrw ≤ 0`, which the caller treats as a fatal error when growth
+    /// is active (prccty.f label 7001).
+    pub indicator: Option<String>,
 }
 
 /// Activity lookup entry for [`ProductionExecutor`](super::executor::ProductionExecutor) (Fortran `fndact`).
