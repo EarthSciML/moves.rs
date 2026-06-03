@@ -1581,17 +1581,12 @@ impl Calculator for HcSpeciationCalculator {
         // which expands each row across the formulations of its fuel type and
         // market-share-weights the emission. Synthesize that extract here.
         //
-        // NOTE: the `methaneTHCRatio` / `HCSpeciation` lookups below key on
+        // The `methaneTHCRatio` / `HCSpeciation` lookups below key on
         // `regClassID`, with a *distinct* ratio for each of ~8 reg classes per
-        // (process, fuelSubtype, modelYear). Canonical `MOVESWorkerOutput`
-        // carries the concrete `regClassID` (it is aggregated away only at the
-        // final output step), so each reg class is speciated with its own ratio.
-        // The port's BaseRate currently collapses `regClassID` to 0 in the
-        // worker output, so these lookups find no match and speciation produces
-        // nothing for the onroad chained fixtures. End-to-end emission is
-        // therefore blocked on BaseRate preserving `regClassID` in the worker
-        // output; the derivation and expansion below are otherwise complete (the
-        // unit test exercises them at reg class 0, where the ratio tables match).
+        // (process, fuelSubtype, modelYear). BaseRate carries the concrete
+        // `regClassID` through SMFR weighting (zeroing it only at the final
+        // output aggregation step), so each reg class is speciated with its
+        // own ratio (see baseratecalculator tests for the guarantee).
         let hc_fuel_supply = synthesize_hc_fuel_supply(ctx)?;
 
         let thc_rows: Vec<ThcWorkerRow> = tables.iter_typed("MOVESWorkerOutput")?;

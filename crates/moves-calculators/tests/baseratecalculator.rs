@@ -652,4 +652,104 @@ fn aggregate_smfr_weights_emissions_by_the_activity_distribution() {
     let output = BaseRateCalculator::run(inputs, &constants(), &flags);
     assert_eq!(output.rows()[0].emission_quant, 1.0); // 4 * 0.25
     assert_eq!(output.rows()[0].emission_rate, 2.0); // 8 * 0.25
+ // Canonical: MOVES discards regClassID only at the final output aggregation
+ // step, after per-reg-class speciation (Go hcspeciation.go:231,262,280 keys
+ // on fb.Key.RegClassID). The BRC must carry the original regClassID through
+ // SMFR weighting so chained speciators (HCSpeciation) can key their ratio
+ // lookups on the real reg class, not on a prematurely-zeroed 0.
+    assert_eq!(output.rows()[0].key.reg_class_id, 10);
+}
+
+#[test]
+fn smfr_reg_class_preserved_enables_hc_speciation() {
+ // Verify the end-to-end guarantee: a BRC output block whose regClassID was
+ // preserved through SMFR weighting (not zeroed early) allows HCSpeciation
+ // to produce non-zero methane — the onroad acceptance criterion for mo-17m.
+    use moves_calculators::calculators::hcspeciation::{
+        FuelBlock as HcFuelBlock, FuelBlockKey, HcSpeciation, MethaneThcRatioRow,
+        OnroadWorkerTables,
+    };
+
+    let flags = ModuleFlags {
+        aggregate_smfr: true,
+        adjust_mean_base_rate_and_emission_rate: true,
+        discard_reg_class_id: true,
+        ..ModuleFlags::default()
+    };
+    let inputs = BaseRateCalculatorInputs {
+        base_rate: vec![base_rate_row(1, 1, 4.0, 8.0)], // THC (pollutant 1), reg class 10
+        fuel_supply: fuel_supply_one(),
+        universal_activity: vec![UniversalActivityRow {
+            hour_day_id: 85,
+            model_year_id: 2018,
+            source_type_id: 21,
+            activity: 1.0,
+        }],
+        smfr_sbd_summary: vec![SmfrSbdSummaryRow {
+            source_type_id: 21,
+            model_year_id: 2018,
+            fuel_type_id: 1,
+            reg_class_id: 10,
+            sbd_total: 1.0,
+        }],
+        ..BaseRateCalculatorInputs::default()
+    };
+    let brc_output = BaseRateCalculator::run(inputs, &constants(), &flags);
+ // BRC must carry reg_class_id = 10 through SMFR weighting.
+    let row = &brc_output.rows()[0];
+    assert_eq!(row.key.reg_class_id, 10);
+    assert_eq!(row.key.pollutant_id, 1); // THC
+
+ // Build HcSpeciation with a methaneTHCRatio entry keyed on reg_class_id = 10.
+    let speciation = HcSpeciation::build(
+        [MethaneThcRatioRow {
+            process_id: 1,
+            fuel_sub_type_id: 10, // matches fuel_supply_one
+            reg_class_id: 10,
+            begin_model_year_id: 2010,
+            end_model_year_id: 2025,
+            ch4_thc_ratio: 0.3,
+        }],
+        [],
+    );
+ // FuelFormulation for id 100 (from fuel_supply_one); no oxygenate volumes
+ // needed since there are no HCSpeciation rows (no NMOG/VOC).
+    let tables = OnroadWorkerTables::new(
+        [(
+            100_i32,
+            moves_calculators::calculators::hcspeciation::FuelFormulation {
+                mtbe_volume: 0.0,
+                etbe_volume: 0.0,
+                tame_volume: 0.0,
+                etoh_volume: 0.0,
+                vol_to_wt_percent_oxy: 0.0,
+            },
+        )],
+        [5 * 100 + 1, 79 * 100 + 1], // methane (5) and NMHC (79) needed
+    );
+    let block = HcFuelBlock {
+        key: FuelBlockKey {
+            pollutant_id: row.key.pollutant_id,
+            process_id: row.key.process_id,
+            fuel_type_id: row.key.fuel_type_id,
+            reg_class_id: row.key.reg_class_id, // 10 — preserved by BRC
+            model_year_id: row.key.model_year_id,
+        },
+        emissions: vec![moves_calculators::calculators::hcspeciation::Emission {
+            fuel_sub_type_id: row.fuel_sub_type_id,
+            fuel_formulation_id: row.fuel_formulation_id,
+            emission_quant: row.emission_quant,
+            emission_rate: row.emission_rate,
+        }],
+    };
+    let speciated = speciation.speciate_block(&block, &tables);
+ // methane (pollutant 5) must be present and non-zero.
+    let methane = speciated
+        .iter()
+        .find(|b| b.pollutant_id == 5)
+        .expect("methane block present");
+    assert!(
+        methane.emissions[0].emission_quant > 0.0,
+        "methane emission_quant must be non-zero (lookup keyed on reg_class_id 10 found ratio)"
+    );
 }
