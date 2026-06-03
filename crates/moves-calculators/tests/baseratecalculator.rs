@@ -709,7 +709,7 @@ fn smfr_reg_class_preserved_enables_hc_speciation() {
         }],
         ..BaseRateCalculatorInputs::default()
     };
-    let brc_output = BaseRateCalculator::run(inputs, &constants(), &flags);
+    let brc_output = BaseRateCalculator::run(inputs, &constants(), &flags).unwrap();
     // BRC must carry reg_class_id = 10 through SMFR weighting.
     let row = &brc_output.rows()[0];
     assert_eq!(row.key.reg_class_id, 10);
