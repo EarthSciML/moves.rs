@@ -65,11 +65,12 @@
 //! `AggregationSQLGenerator.nrActivityWeightSQL` for the reference
 //! algorithm).
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use moves_data::output_schema::{ActivityRecord, EmissionRecord};
 
 use crate::aggregation::{AggregationPlan, AggregationTable, TemporalScaling};
+use crate::data::DataFrameStore;
 use crate::error::{Error, Result};
 
 /// Lowest `pollutantID` reserved for MOVES' synthetic, output-internal
@@ -97,6 +98,10 @@ const FIRST_INTERNAL_POLLUTANT_ID: i16 = 10_000;
 /// Implementors decide how to handle `None` time keys (a row missing the
 /// `yearID`/`monthID`/`dayID` it would be scaled by). [`UnitScaling`]
 /// returns `1.0` unconditionally.
+///
+/// The [`supplies_temporal_factors`](Self::supplies_temporal_factors) method
+/// distinguishes the real-table-backed [`MonthDayScaling`] implementation from
+/// the identity placeholder [`UnitScaling`] so the aggregator can gate on it.
 pub trait TemporalScalingFactors {
  /// Weeks-per-month factor applied to a row landing in
  /// (`year_id`, `month_id`) when the plan's [`TemporalScaling`] is
@@ -107,14 +112,30 @@ pub trait TemporalScalingFactors {
  /// `day_id` when the plan's [`TemporalScaling`] is
  /// [`TemporalScaling::PortionOfWeekPerDay`].
     fn portion_of_week_per_day(&self, day_id: Option<i16>) -> f64;
+
+ /// Returns `true` when this implementation is backed by the real reference
+ /// tables rather than being the identity placeholder.
+ ///
+ /// The default is `false`. Override to `true` in any implementation that
+ /// actually reads `monthOfAnyYear` / `dayOfAnyWeek` data (e.g.
+ /// [`MonthDayScaling`]). The aggregator gates on this flag: if a plan
+ /// carries [`TemporalScaling::WeeksPerMonth`] or
+ /// [`TemporalScaling::PortionOfWeekPerDay`] but the supplied factors report
+ /// `false` here, the call returns [`crate::Error::AggregationPlanMismatch`]
+ /// rather than silently applying an identity factor.
+    fn supplies_temporal_factors(&self) -> bool {
+        false
+    }
 }
 
 /// A [`TemporalScalingFactors`] that always returns `1.0`.
 ///
 /// Use this for any plan whose `SUM` carries [`TemporalScaling::None`]
-/// (where no factor is consulted at all) and as the placeholder
-/// until the `monthOfAnyYear` / `dayOfAnyWeek`-backed factors are wired in
-/// by (`MOVESEngine`).
+/// (where no factor is consulted at all). Passing it to an aggregator for a
+/// plan with non-`None` scaling is an error: the aggregator will return
+/// [`crate::Error::AggregationPlanMismatch`] because
+/// [`supplies_temporal_factors`](TemporalScalingFactors::supplies_temporal_factors)
+/// returns `false`.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct UnitScaling;
 
@@ -126,6 +147,95 @@ impl TemporalScalingFactors for UnitScaling {
     fn portion_of_week_per_day(&self, _day_id: Option<i16>) -> f64 {
         1.0
     }
+}
+
+/// Reference-table-backed [`TemporalScalingFactors`] — the production
+/// implementation used by [`crate::MOVESEngine`].
+///
+/// **`weeks_per_month`** — returns `noOfDays / 7.0` for the row's `monthID`
+/// per `MonthOfAnyYear.noOfDays` (porting
+/// `WeeksInMonthHelper.getWeeksPerMonth`). Falls back to `1.0` for an unknown
+/// month or an empty table.
+///
+/// **`portion_of_week_per_day`** — returns `1.0`. Rust calculators apply the
+/// `1 / noOfRealDays` factor internally (universalActivity = SHO /
+/// noOfRealDays), so the aggregator's correct factor is the identity.
+///
+/// Construct via [`MonthDayScaling::new`], passing any [`DataFrameStore`]
+/// that contains a `MonthOfAnyYear` table.
+#[derive(Debug, Clone, Default)]
+pub struct MonthDayScaling {
+    /// monthID → noOfDays / 7.0
+    month_to_weeks: HashMap<i16, f64>,
+}
+
+impl MonthDayScaling {
+ /// Build the scaling table from an execution-DB store.
+ ///
+ /// Reads `MonthOfAnyYear` columns `monthID` and `noOfDays`. Rows whose
+ /// `noOfDays` is zero or negative are skipped (matching the Java fallback
+ /// "month not found ⇒ 1.0"). Silently returns an empty (identity) mapping
+ /// when the table is absent — correct for the Nonroad-only path, which
+ /// does not use temporal scaling.
+    pub fn new(store: &impl DataFrameStore) -> Self {
+        let mut month_to_weeks = HashMap::new();
+        if let Some(df) = store.get("MonthOfAnyYear") {
+            let find = |name: &str| -> Option<polars::prelude::Series> {
+                let lower = name.to_ascii_lowercase();
+                df.columns()
+                    .iter()
+                    .find(|c| c.name().to_ascii_lowercase() == lower)
+                    .map(|c| c.as_materialized_series().clone())
+            };
+            if let (Some(month_s), Some(days_s)) = (find("monthID"), find("noOfDays")) {
+                if let (Ok(month_ca), Ok(days_ca)) = (month_s.i32(), days_s.i32()) {
+                    for i in 0..month_ca.len() {
+                        if let (Some(mid), Some(nd)) = (month_ca.get(i), days_ca.get(i)) {
+                            if nd > 0 {
+                                month_to_weeks.insert(mid as i16, f64::from(nd) / 7.0);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Self { month_to_weeks }
+    }
+}
+
+impl TemporalScalingFactors for MonthDayScaling {
+    fn weeks_per_month(&self, _year_id: Option<i16>, month_id: Option<i16>) -> f64 {
+        month_id
+            .and_then(|m| self.month_to_weeks.get(&m).copied())
+            .unwrap_or(1.0)
+    }
+
+    fn portion_of_week_per_day(&self, _day_id: Option<i16>) -> f64 {
+        // Rust calculators apply 1/noOfRealDays inside (universalActivity = SHO/noOfRealDays).
+        // The aggregator's correct factor here is 1.0.
+        1.0
+    }
+
+    fn supplies_temporal_factors(&self) -> bool {
+        true
+    }
+}
+
+/// Guard: reject a non-`None` scaling plan when the supplied factors are the
+/// identity placeholder.
+fn require_real_factors(
+    scaling: TemporalScaling,
+    factors: &impl TemporalScalingFactors,
+) -> Result<()> {
+    if scaling != TemporalScaling::None && !factors.supplies_temporal_factors() {
+        return Err(Error::AggregationPlanMismatch(
+            "plan carries temporal scaling but the supplied TemporalScalingFactors \
+             is the identity placeholder (UnitScaling); \
+             build a MonthDayScaling from the execution-DB store and pass it instead"
+                .to_string(),
+        ));
+    }
+    Ok(())
 }
 
 /// Aggregate a batch of [`EmissionRecord`]s with an emission
@@ -162,6 +272,7 @@ pub fn aggregate_emissions(
         )));
     }
     let scaling = plan_sum_scaling(plan, "emissionQuant")?;
+    require_real_factors(scaling, factors)?;
     let keys = plan.group_by();
 
     let mut groups: BTreeMap<Vec<KeyValue>, Accum<'_, EmissionRecord>> = BTreeMap::new();
@@ -211,6 +322,7 @@ pub fn aggregate_activity(
         )));
     }
     let scaling = plan_sum_scaling(plan, "activity")?;
+    require_real_factors(scaling, factors)?;
     let keys = plan.group_by();
 
     let mut groups: BTreeMap<Vec<KeyValue>, Accum<'_, ActivityRecord>> = BTreeMap::new();
@@ -314,6 +426,7 @@ impl StreamingEmissionAgg {
         records: &[EmissionRecord],
         factors: &impl TemporalScalingFactors,
     ) -> Result<()> {
+        require_real_factors(self.scaling, factors)?;
         for rec in records {
  // Drop MOVES' synthetic, output-internal pollutants (altTHC 10001,
  // altNMHC 10079): they are produced only to feed HC speciation via
@@ -615,6 +728,26 @@ mod tests {
         fn portion_of_week_per_day(&self, day_id: Option<i16>) -> f64 {
             f64::from(day_id.unwrap_or(1))
         }
+        fn supplies_temporal_factors(&self) -> bool {
+            true
+        }
+    }
+
+    /// Identity implementation that satisfies the guard (`supplies_temporal_factors == true`)
+    /// but returns 1.0 for all factors — used by tests that exercise plans with non-None
+    /// scaling but want to verify sum behavior without actual reference-table values.
+    pub(crate) struct IdentityRealFactors;
+
+    impl TemporalScalingFactors for IdentityRealFactors {
+        fn weeks_per_month(&self, _year_id: Option<i16>, _month_id: Option<i16>) -> f64 {
+            1.0
+        }
+        fn portion_of_week_per_day(&self, _day_id: Option<i16>) -> f64 {
+            1.0
+        }
+        fn supplies_temporal_factors(&self) -> bool {
+            true
+        }
     }
 
     fn breakdown_all_false() -> OutputBreakdown {
@@ -726,7 +859,7 @@ mod tests {
             emission(2, 7, Some(2.0)),
             emission(3, 1, Some(4.0)),
         ];
-        let out = aggregate_emissions(&plan, &rows, &UnitScaling).unwrap();
+        let out = aggregate_emissions(&plan, &rows, &IdentityRealFactors).unwrap();
 
         assert_eq!(out.len(), 2, "one row per distinct pollutantID");
  // BTreeMap key order: pollutantID 2 before 3.
@@ -747,7 +880,7 @@ mod tests {
             &[Model::Onroad],
             &b,
         ));
-        let out = aggregate_emissions(&plan, &[emission(2, 7, Some(5.0))], &UnitScaling).unwrap();
+        let out = aggregate_emissions(&plan, &[emission(2, 7, Some(5.0))], &IdentityRealFactors).unwrap();
         let row = &out[0];
 
  // Surviving keys.
@@ -783,7 +916,7 @@ mod tests {
             emission(2, 1, Some(2.0)),
             emission(2, 3, Some(8.0)),
         ];
-        let out = aggregate_emissions(&plan, &rows, &UnitScaling).unwrap();
+        let out = aggregate_emissions(&plan, &rows, &IdentityRealFactors).unwrap();
         assert_eq!(out.len(), 2);
         assert_eq!(out[0].month_id, Some(1));
         assert_eq!(out[0].emission_quant, Some(3.0));
@@ -806,7 +939,7 @@ mod tests {
             emission(2, 1, None),
             emission(2, 1, Some(5.0)),
         ];
-        let out = aggregate_emissions(&plan, &rows, &UnitScaling).unwrap();
+        let out = aggregate_emissions(&plan, &rows, &IdentityRealFactors).unwrap();
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].emission_quant, Some(15.0));
     }
@@ -821,7 +954,7 @@ mod tests {
             &b,
         ));
         let rows = vec![emission(2, 1, None), emission(2, 1, None)];
-        let out = aggregate_emissions(&plan, &rows, &UnitScaling).unwrap();
+        let out = aggregate_emissions(&plan, &rows, &IdentityRealFactors).unwrap();
         assert_eq!(out.len(), 1);
         assert_eq!(
             out[0].emission_quant, None,
@@ -893,7 +1026,7 @@ mod tests {
         let mut c = emission(2, 1, Some(7.0));
         c.scc = Some("ZZZ".to_string());
 
-        let out = aggregate_emissions(&plan, &[c, a, a2], &UnitScaling).unwrap();
+        let out = aggregate_emissions(&plan, &[c, a, a2], &IdentityRealFactors).unwrap();
         assert_eq!(out.len(), 2);
  // Group-key sort: "AAA" before "ZZZ".
         assert_eq!(out[0].scc.as_deref(), Some("AAA"));
@@ -922,8 +1055,8 @@ mod tests {
         let mut reversed = forward.clone();
         reversed.reverse();
 
-        let a = aggregate_emissions(&plan, &forward, &UnitScaling).unwrap();
-        let b = aggregate_emissions(&plan, &reversed, &UnitScaling).unwrap();
+        let a = aggregate_emissions(&plan, &forward, &IdentityRealFactors).unwrap();
+        let b = aggregate_emissions(&plan, &reversed, &IdentityRealFactors).unwrap();
         assert_eq!(a, b, "aggregation output must not depend on input order");
         assert_eq!(a.len(), 4);
     }
@@ -944,7 +1077,7 @@ mod tests {
             activity(1, 7, Some(200.0)),
             activity(2, 1, Some(50.0)),
         ];
-        let out = aggregate_activity(&plan, &rows, &UnitScaling).unwrap();
+        let out = aggregate_activity(&plan, &rows, &IdentityRealFactors).unwrap();
         assert_eq!(out.len(), 2);
         assert_eq!(out[0].activity_type_id, Some(1));
         assert_eq!(out[0].activity, Some(300.0));
@@ -963,7 +1096,7 @@ mod tests {
             &[Model::Onroad],
             &b,
         ));
-        assert!(aggregate_emissions(&plan, &[], &UnitScaling)
+        assert!(aggregate_emissions(&plan, &[], &IdentityRealFactors)
             .unwrap()
             .is_empty());
     }
@@ -1082,7 +1215,7 @@ mod tests {
             emission(3, 1, Some(4.0)),
         ];
 
-        let batch = aggregate_emissions(&plan, &rows, &UnitScaling).unwrap();
+        let batch = aggregate_emissions(&plan, &rows, &IdentityRealFactors).unwrap();
 
         let stream_plan = emission_aggregation(&inputs(
             OutputTimestep::Year,
@@ -1091,7 +1224,7 @@ mod tests {
             &b,
         ));
         let mut agg = StreamingEmissionAgg::new(stream_plan).unwrap();
-        agg.extend(&rows, &UnitScaling).unwrap();
+        agg.extend(&rows, &IdentityRealFactors).unwrap();
         let stream = agg.finalize();
 
         assert_eq!(batch, stream, "streaming and batch results must match");
@@ -1116,7 +1249,7 @@ mod tests {
             emission(79, 1, Some(8.0)),    // NMHC — kept
         ];
         let mut agg = StreamingEmissionAgg::new(plan).unwrap();
-        agg.extend(&rows, &UnitScaling).unwrap();
+        agg.extend(&rows, &IdentityRealFactors).unwrap();
         let out = agg.finalize();
         let pollutants: Vec<_> = out.iter().filter_map(|r| r.pollutant_id).collect();
         assert_eq!(
@@ -1146,13 +1279,13 @@ mod tests {
         };
 
         let mut single = StreamingEmissionAgg::new(make_plan()).unwrap();
-        single.extend(&rows, &UnitScaling).unwrap();
+        single.extend(&rows, &IdentityRealFactors).unwrap();
         let single_out = single.finalize();
 
         let mut incremental = StreamingEmissionAgg::new(make_plan()).unwrap();
         for row in &rows {
             incremental
-                .extend(std::slice::from_ref(row), &UnitScaling)
+                .extend(std::slice::from_ref(row), &IdentityRealFactors)
                 .unwrap();
         }
         let incremental_out = incremental.finalize();
@@ -1163,7 +1296,7 @@ mod tests {
     #[test]
     fn streaming_agg_all_null_metric_yields_null() {
         let mut agg = StreamingEmissionAgg::new(year_nation_plan()).unwrap();
-        agg.extend(&[emission(2, 1, None), emission(2, 7, None)], &UnitScaling)
+        agg.extend(&[emission(2, 1, None), emission(2, 7, None)], &IdentityRealFactors)
             .unwrap();
         let out = agg.finalize();
         assert_eq!(out.len(), 1);
@@ -1181,5 +1314,105 @@ mod tests {
         ));
         let err = StreamingEmissionAgg::new(activity_plan).unwrap_err();
         assert!(matches!(err, Error::AggregationPlanMismatch(_)));
+    }
+
+    #[test]
+    fn scaling_plan_with_identity_placeholder_is_rejected() {
+        // A plan with WeeksPerMonth scaling must reject UnitScaling — passing
+        // the identity placeholder for a non-None plan is a wiring error.
+        let b = breakdown_all_false();
+        let plan = emission_aggregation(&inputs(
+            OutputTimestep::Year,
+            GeographicOutputDetail::Nation,
+            &[Model::Onroad],
+            &b,
+        ));
+        assert_eq!(
+            plan.sum_columns(),
+            vec![("emissionQuant", TemporalScaling::WeeksPerMonth)]
+        );
+        let err = aggregate_emissions(&plan, &[], &UnitScaling).unwrap_err();
+        assert!(
+            matches!(err, Error::AggregationPlanMismatch(_)),
+            "UnitScaling must be rejected for non-None scaling plans; got {err:?}"
+        );
+
+        let mut agg = StreamingEmissionAgg::new(
+            emission_aggregation(&inputs(
+                OutputTimestep::Year,
+                GeographicOutputDetail::Nation,
+                &[Model::Onroad],
+                &b,
+            )),
+        )
+        .unwrap();
+        let err = agg
+            .extend(&[emission(2, 1, Some(1.0))], &UnitScaling)
+            .unwrap_err();
+        assert!(matches!(err, Error::AggregationPlanMismatch(_)));
+    }
+
+    #[test]
+    fn month_day_scaling_applies_weeks_per_month_from_table() {
+        // MonthDayScaling reads MonthOfAnyYear from the store and applies
+        // noOfDays/7.0 as the weeksPerMonth factor per row.
+        // January (monthID=1): noOfDays=31 → factor=31/7≈4.4286
+        // July (monthID=7):    noOfDays=31 → factor=31/7≈4.4286
+        use crate::data::store::InMemoryStore;
+        use crate::data::DataFrameStore;
+        use polars::prelude::*;
+
+        let mut store = InMemoryStore::new();
+        let month_id_series = Series::new("monthID".into(), vec![1i32, 7i32]);
+        let no_of_days_series = Series::new("noOfDays".into(), vec![31i32, 31i32]);
+        let df = DataFrame::new(2, vec![month_id_series.into(), no_of_days_series.into()]).unwrap();
+        store.insert("MonthOfAnyYear", df);
+
+        let scaling = MonthDayScaling::new(&store);
+        assert!(scaling.supplies_temporal_factors());
+
+        let expected_jan = 31.0 / 7.0;
+        let expected_jul = 31.0 / 7.0;
+        let eps = 1e-10;
+        assert!((scaling.weeks_per_month(Some(2020), Some(1)) - expected_jan).abs() < eps);
+        assert!((scaling.weeks_per_month(Some(2020), Some(7)) - expected_jul).abs() < eps);
+        assert_eq!(scaling.weeks_per_month(Some(2020), None), 1.0, "None month → 1.0");
+        assert_eq!(scaling.weeks_per_month(Some(2020), Some(99)), 1.0, "unknown month → 1.0");
+
+        // portionOfWeekPerDay is always 1.0 (calculators handle noOfRealDays).
+        assert_eq!(scaling.portion_of_week_per_day(Some(5)), 1.0);
+        assert_eq!(scaling.portion_of_week_per_day(None), 1.0);
+
+        // Year plan with two months (Jan and Jul): real weeksPerMonth applied.
+        let b = breakdown_all_false();
+        let plan = emission_aggregation(&inputs(
+            OutputTimestep::Year,
+            GeographicOutputDetail::Nation,
+            &[Model::Onroad],
+            &b,
+        ));
+        // Two rows: month 1 quant=1.0, month 7 quant=2.0.
+        // Expected sum = 1.0*(31/7) + 2.0*(31/7) = 3.0*(31/7).
+        let rows = vec![emission(2, 1, Some(1.0)), emission(2, 7, Some(2.0))];
+        let out = aggregate_emissions(&plan, &rows, &scaling).unwrap();
+        assert_eq!(out.len(), 1);
+        let expected_sum = (1.0 + 2.0) * (31.0 / 7.0);
+        assert!(
+            (out[0].emission_quant.unwrap() - expected_sum).abs() < eps,
+            "expected {expected_sum}, got {:?}",
+            out[0].emission_quant
+        );
+    }
+
+    #[test]
+    fn month_day_scaling_empty_store_falls_back_to_identity() {
+        use crate::data::store::InMemoryStore;
+
+        let store = InMemoryStore::new();
+        let scaling = MonthDayScaling::new(&store);
+        assert!(scaling.supplies_temporal_factors());
+        // No table → fallback to 1.0 for all months.
+        assert_eq!(scaling.weeks_per_month(Some(2020), Some(1)), 1.0);
+        assert_eq!(scaling.weeks_per_month(Some(2020), Some(7)), 1.0);
     }
 }

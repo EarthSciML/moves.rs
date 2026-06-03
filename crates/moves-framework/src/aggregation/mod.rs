@@ -13,8 +13,8 @@ pub use nonroad_postprocess::{
     PopulationRow,
 };
 pub use output_aggregate::{
-    aggregate_activity, aggregate_emissions, StreamingEmissionAgg, TemporalScalingFactors,
-    UnitScaling,
+    aggregate_activity, aggregate_emissions, MonthDayScaling, StreamingEmissionAgg,
+    TemporalScalingFactors, UnitScaling,
 };
 pub use output_processor::{OutputProcessor, NULL_PARTITION, PARQUET_CREATED_BY};
 pub use plan::{
