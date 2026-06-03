@@ -198,7 +198,6 @@ pub fn calculate_nox_k(zmh: &ZoneMonthHourDetail, nha: &NoxHumidityAdjustDetail)
 /// `return` on a nil lookup. When `panic_on_missing_supply` is `true` (the
 /// non-age path, `streamBaseRate`), a missing supply is a fatal data error and
 /// [`Error::MissingContext`] is returned — matching the Go `panic` there.
-#[must_use]
 pub fn build_fuel_blocks(
     rows: &[BaseRateRow],
     prepared: &PreparedTables,
