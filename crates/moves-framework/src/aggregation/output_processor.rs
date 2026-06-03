@@ -930,8 +930,7 @@ mod tests {
 
     #[test]
     fn write_aggregated_emissions_rolls_up_then_writes_partition() {
-        use crate::aggregation::emission_aggregation;
-        use crate::aggregation::UnitScaling;
+        use crate::aggregation::{emission_aggregation, MonthDayScaling};
         use moves_runspec::model::{Model, OutputBreakdown};
 
         let dir = tempdir().unwrap();
@@ -948,7 +947,7 @@ mod tests {
             emission(Some(2020), Some(7), 4.0),
         ];
         let written = proc
-            .write_aggregated_emissions(&plan, &rows, &UnitScaling)
+            .write_aggregated_emissions(&plan, &rows, &MonthDayScaling::default())
             .unwrap();
         assert_eq!(written.len(), 1, "all rows roll into one partition");
 
@@ -977,8 +976,7 @@ mod tests {
 
     #[test]
     fn write_aggregated_activity_rolls_up_then_writes_partition() {
-        use crate::aggregation::activity_aggregation;
-        use crate::aggregation::UnitScaling;
+        use crate::aggregation::{activity_aggregation, MonthDayScaling};
         use moves_runspec::model::{Model, OutputBreakdown};
 
         let dir = tempdir().unwrap();
@@ -992,7 +990,7 @@ mod tests {
             activity(Some(2020), Some(2), 200.0),
         ];
         let written = proc
-            .write_aggregated_activity(&plan, &rows, &UnitScaling)
+            .write_aggregated_activity(&plan, &rows, &MonthDayScaling::default())
             .unwrap();
         assert_eq!(written.len(), 1);
 

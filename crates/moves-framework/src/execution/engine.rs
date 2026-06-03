@@ -91,8 +91,8 @@ use super::execution_db::ExecutionTime;
 use super::execution_runspec::ExecutionRunSpec;
 use super::executor::{chunk_chains, BoundedExecutor, Chunk};
 use crate::aggregation::{
-    activity_aggregation, emission_aggregation, AggregationInputs, OutputProcessor,
-    StreamingEmissionAgg, UnitScaling,
+    activity_aggregation, emission_aggregation, AggregationInputs, MonthDayScaling,
+    OutputProcessor, StreamingEmissionAgg,
 };
 use crate::calculator::{
     Calculator, CalculatorContext, CalculatorRegistry, CalculatorSubscription, Generator,
@@ -341,6 +341,8 @@ struct CalculatorMasterLoopable {
     /// `None` for chunks with no chained calculators, so the accumulation cost
     /// is paid only where it is needed.
     worker_acc: Option<Arc<Mutex<Vec<EmissionRecord>>>>,
+    /// Temporal scaling factors (weeksPerMonth from MonthOfAnyYear).
+    temporal_factors: Arc<MonthDayScaling>,
 }
 
 impl MasterLoopable for CalculatorMasterLoopable {
@@ -415,7 +417,7 @@ impl MasterLoopable for CalculatorMasterLoopable {
                     self.streaming_agg
                         .lock()
                         .expect("output accumulator poisoned")
-                        .extend(&records, &UnitScaling)?;
+                        .extend(&records, &*self.temporal_factors)?;
                 } else if df.column("activityTypeID").is_ok() {
  // Activity output (e.g. MOVESWorkerActivityOutput from
  // ActivityCalculator or DistanceCalculator): collect raw rows
@@ -665,6 +667,13 @@ impl MOVESEngine {
         let activity_acc: Arc<Mutex<Vec<ActivityRecord>>> = Arc::new(Mutex::new(Vec::new()));
         let activity_acc_ref = Arc::clone(&activity_acc);
 
+        // Build temporal scaling factors from the execution-DB store.
+        // weeksPerMonth is read from MonthOfAnyYear; portionOfWeekPerDay is
+        // identity (1.0) because Rust calculators apply 1/noOfRealDays
+        // internally via universalActivity = SHO/noOfRealDays.
+        let temporal_factors = Arc::new(MonthDayScaling::new(&*self.slow_store));
+        let temporal_factors_ref = Arc::clone(&temporal_factors);
+
         let executor = BoundedExecutor::new(self.config.max_parallel_chunks)?;
         let registry = &self.registry;
         let chunk_slow = Arc::clone(&self.slow_store);
@@ -759,6 +768,7 @@ impl MOVESEngine {
                         selected_pol_proc: Arc::clone(&selected_pol_proc),
                         replaced_pol: Arc::clone(&replaced_pol),
                         worker_acc: worker_acc.clone(),
+                        temporal_factors: Arc::clone(&temporal_factors_ref),
                     });
                     master.subscribe(MasterLoopableSubscription::new(
                         sub.granularity,
@@ -857,7 +867,7 @@ impl MOVESEngine {
                     streaming_agg_ref
                         .lock()
                         .expect("output accumulator poisoned")
-                        .extend(&filtered, &UnitScaling)?;
+                        .extend(&filtered, &*temporal_factors_ref)?;
                 }
             }
             let elapsed = t_chunk.elapsed();
@@ -931,7 +941,11 @@ impl MOVESEngine {
                 p.write_emissions(&aggregated_records)?;
             }
             if !activity_records.is_empty() {
-                p.write_aggregated_activity(&activity_plan, &activity_records, &UnitScaling)?;
+                p.write_aggregated_activity(
+                    &activity_plan,
+                    &activity_records,
+                    &*temporal_factors,
+                )?;
             }
             let bytes = p.take_memory_files().unwrap_or_default();
             (p, bytes)
@@ -941,7 +955,11 @@ impl MOVESEngine {
                 p.write_emissions(&aggregated_records)?;
             }
             if !activity_records.is_empty() {
-                p.write_aggregated_activity(&activity_plan, &activity_records, &UnitScaling)?;
+                p.write_aggregated_activity(
+                    &activity_plan,
+                    &activity_records,
+                    &*temporal_factors,
+                )?;
             }
             (p, Vec::new())
         };
@@ -1824,6 +1842,7 @@ mod tests {
             selected_pol_proc: Arc::new(std::collections::BTreeSet::new()),
             replaced_pol: Arc::new(std::collections::BTreeSet::new()),
             worker_acc: None,
+            temporal_factors: Arc::new(MonthDayScaling::default()),
         };
 
         let mut ctx = MasterLoopContext::default();
@@ -1861,6 +1880,7 @@ mod tests {
             selected_pol_proc: Arc::new(std::collections::BTreeSet::new()),
             replaced_pol: Arc::new(std::collections::BTreeSet::new()),
             worker_acc: None,
+            temporal_factors: Arc::new(MonthDayScaling::default()),
         };
         let mut ctx = MasterLoopContext::default();
         ctx.position.process_id = Some(ProcessId(1));
