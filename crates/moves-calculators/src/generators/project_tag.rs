@@ -822,12 +822,36 @@ impl TableRow for LinkRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("linkID".into(), rows.iter().map(|r| r.link_id).collect::<Vec<i32>>()).into(),
-                Series::new("linkVolume".into(), rows.iter().map(|r| r.link_volume).collect::<Vec<f64>>()).into(),
-                Series::new("linkLength".into(), rows.iter().map(|r| r.link_length).collect::<Vec<f64>>()).into(),
-                Series::new("linkAvgSpeed".into(), rows.iter().map(|r| r.link_avg_speed).collect::<Vec<f64>>()).into(),
-                Series::new("roadTypeID".into(), rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("zoneID".into(), rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>()).into(),
+                Series::new(
+                    "linkID".into(),
+                    rows.iter().map(|r| r.link_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "linkVolume".into(),
+                    rows.iter().map(|r| r.link_volume).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "linkLength".into(),
+                    rows.iter().map(|r| r.link_length).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "linkAvgSpeed".into(),
+                    rows.iter().map(|r| r.link_avg_speed).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "roadTypeID".into(),
+                    rows.iter().map(|r| r.road_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "zoneID".into(),
+                    rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -836,17 +860,37 @@ impl TableRow for LinkRow {
         macro_rules! col_i32 {
             ($col:expr) => {
                 df.column($col)
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
                     .i32()
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
             };
         }
         macro_rules! col_f64 {
             ($col:expr) => {
                 df.column($col)
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
                     .f64()
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
             };
         }
         let link_id = col_i32!("linkID");
@@ -857,7 +901,12 @@ impl TableRow for LinkRow {
         let zone_id = col_i32!("zoneID");
         (0..df.height())
             .map(|i| {
-                let null = |col: &str| Error::RowExtraction { table: T.into(), row: i, column: col.into(), message: "null value".into() };
+                let null = |col: &str| Error::RowExtraction {
+                    table: T.into(),
+                    row: i,
+                    column: col.into(),
+                    message: "null value".into(),
+                };
                 Ok(LinkRow {
                     link_id: link_id.get(i).ok_or_else(|| null("linkID"))?,
                     link_volume: link_volume.get(i).ok_or_else(|| null("linkVolume"))?,
@@ -887,9 +936,23 @@ impl TableRow for LinkSourceTypeHourRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("linkID".into(), rows.iter().map(|r| r.link_id).collect::<Vec<i32>>()).into(),
-                Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("sourceTypeHourFraction".into(), rows.iter().map(|r| r.source_type_hour_fraction).collect::<Vec<f64>>()).into(),
+                Series::new(
+                    "linkID".into(),
+                    rows.iter().map(|r| r.link_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeHourFraction".into(),
+                    rows.iter()
+                        .map(|r| r.source_type_hour_fraction)
+                        .collect::<Vec<f64>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -898,17 +961,37 @@ impl TableRow for LinkSourceTypeHourRow {
         macro_rules! col_i32 {
             ($col:expr) => {
                 df.column($col)
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
                     .i32()
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
             };
         }
         macro_rules! col_f64 {
             ($col:expr) => {
                 df.column($col)
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
                     .f64()
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
             };
         }
         let link_id = col_i32!("linkID");
@@ -916,11 +999,18 @@ impl TableRow for LinkSourceTypeHourRow {
         let frac = col_f64!("sourceTypeHourFraction");
         (0..df.height())
             .map(|i| {
-                let null = |col: &str| Error::RowExtraction { table: T.into(), row: i, column: col.into(), message: "null value".into() };
+                let null = |col: &str| Error::RowExtraction {
+                    table: T.into(),
+                    row: i,
+                    column: col.into(),
+                    message: "null value".into(),
+                };
                 Ok(LinkSourceTypeHourRow {
                     link_id: link_id.get(i).ok_or_else(|| null("linkID"))?,
                     source_type_id: source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))?,
-                    source_type_hour_fraction: frac.get(i).ok_or_else(|| null("sourceTypeHourFraction"))?,
+                    source_type_hour_fraction: frac
+                        .get(i)
+                        .ok_or_else(|| null("sourceTypeHourFraction"))?,
                 })
             })
             .collect()
@@ -944,10 +1034,26 @@ impl TableRow for SourceTypeAgeDistributionRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("yearID".into(), rows.iter().map(|r| r.year_id).collect::<Vec<i32>>()).into(),
-                Series::new("ageID".into(), rows.iter().map(|r| r.age_id).collect::<Vec<i32>>()).into(),
-                Series::new("ageFraction".into(), rows.iter().map(|r| r.age_fraction).collect::<Vec<f64>>()).into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "yearID".into(),
+                    rows.iter().map(|r| r.year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "ageID".into(),
+                    rows.iter().map(|r| r.age_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "ageFraction".into(),
+                    rows.iter().map(|r| r.age_fraction).collect::<Vec<f64>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -956,17 +1062,37 @@ impl TableRow for SourceTypeAgeDistributionRow {
         macro_rules! col_i32 {
             ($col:expr) => {
                 df.column($col)
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
                     .i32()
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
             };
         }
         macro_rules! col_f64 {
             ($col:expr) => {
                 df.column($col)
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
                     .f64()
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
             };
         }
         let source_type_id = col_i32!("sourceTypeID");
@@ -975,7 +1101,12 @@ impl TableRow for SourceTypeAgeDistributionRow {
         let age_fraction = col_f64!("ageFraction");
         (0..df.height())
             .map(|i| {
-                let null = |col: &str| Error::RowExtraction { table: T.into(), row: i, column: col.into(), message: "null value".into() };
+                let null = |col: &str| Error::RowExtraction {
+                    table: T.into(),
+                    row: i,
+                    column: col.into(),
+                    message: "null value".into(),
+                };
                 Ok(SourceTypeAgeDistributionRow {
                     source_type_id: source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))?,
                     year_id: year_id.get(i).ok_or_else(|| null("yearID"))?,
@@ -1002,8 +1133,16 @@ impl TableRow for HourDayRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("hourDayID".into(), rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>()).into(),
-                Series::new("dayID".into(), rows.iter().map(|r| r.day_id).collect::<Vec<i32>>()).into(),
+                Series::new(
+                    "hourDayID".into(),
+                    rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "dayID".into(),
+                    rows.iter().map(|r| r.day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -1012,16 +1151,31 @@ impl TableRow for HourDayRow {
         macro_rules! col_i32 {
             ($col:expr) => {
                 df.column($col)
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
                     .i32()
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
             };
         }
         let hour_day_id = col_i32!("hourDayID");
         let day_id = col_i32!("dayID");
         (0..df.height())
             .map(|i| {
-                let null = |col: &str| Error::RowExtraction { table: T.into(), row: i, column: col.into(), message: "null value".into() };
+                let null = |col: &str| Error::RowExtraction {
+                    table: T.into(),
+                    row: i,
+                    column: col.into(),
+                    message: "null value".into(),
+                };
                 Ok(HourDayRow {
                     hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))?,
                     day_id: day_id.get(i).ok_or_else(|| null("dayID"))?,
@@ -1042,19 +1196,41 @@ impl TableRow for RunSpecHourDayRow {
         let n = rows.len();
         DataFrame::new(
             n,
-            vec![Series::new("hourDayID".into(), rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>()).into()],
+            vec![Series::new(
+                "hourDayID".into(),
+                rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+            )
+            .into()],
         )
     }
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         const T: &str = "runSpecHourDay";
-        let col = df.column("hourDayID")
-            .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: "hourDayID".into(), message: e.to_string() })?
+        let col = df
+            .column("hourDayID")
+            .map_err(|e| Error::RowExtraction {
+                table: T.into(),
+                row: 0,
+                column: "hourDayID".into(),
+                message: e.to_string(),
+            })?
             .i32()
-            .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: "hourDayID".into(), message: e.to_string() })?;
+            .map_err(|e| Error::RowExtraction {
+                table: T.into(),
+                row: 0,
+                column: "hourDayID".into(),
+                message: e.to_string(),
+            })?;
         (0..df.height())
             .map(|i| {
-                let null = |c: &str| Error::RowExtraction { table: T.into(), row: i, column: c.into(), message: "null value".into() };
-                Ok(RunSpecHourDayRow { hour_day_id: col.get(i).ok_or_else(|| null("hourDayID"))? })
+                let null = |c: &str| Error::RowExtraction {
+                    table: T.into(),
+                    row: i,
+                    column: c.into(),
+                    message: "null value".into(),
+                };
+                Ok(RunSpecHourDayRow {
+                    hour_day_id: col.get(i).ok_or_else(|| null("hourDayID"))?,
+                })
             })
             .collect()
     }
@@ -1071,19 +1247,41 @@ impl TableRow for RunSpecMonthRow {
         let n = rows.len();
         DataFrame::new(
             n,
-            vec![Series::new("monthID".into(), rows.iter().map(|r| r.month_id).collect::<Vec<i32>>()).into()],
+            vec![Series::new(
+                "monthID".into(),
+                rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
+            )
+            .into()],
         )
     }
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
         const T: &str = "RunSpecMonth";
-        let col = df.column("monthID")
-            .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: "monthID".into(), message: e.to_string() })?
+        let col = df
+            .column("monthID")
+            .map_err(|e| Error::RowExtraction {
+                table: T.into(),
+                row: 0,
+                column: "monthID".into(),
+                message: e.to_string(),
+            })?
             .i32()
-            .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: "monthID".into(), message: e.to_string() })?;
+            .map_err(|e| Error::RowExtraction {
+                table: T.into(),
+                row: 0,
+                column: "monthID".into(),
+                message: e.to_string(),
+            })?;
         (0..df.height())
             .map(|i| {
-                let null = |c: &str| Error::RowExtraction { table: T.into(), row: i, column: c.into(), message: "null value".into() };
-                Ok(RunSpecMonthRow { month_id: col.get(i).ok_or_else(|| null("monthID"))? })
+                let null = |c: &str| Error::RowExtraction {
+                    table: T.into(),
+                    row: i,
+                    column: c.into(),
+                    message: "null value".into(),
+                };
+                Ok(RunSpecMonthRow {
+                    month_id: col.get(i).ok_or_else(|| null("monthID"))?,
+                })
             })
             .collect()
     }
@@ -1104,8 +1302,16 @@ impl TableRow for DayOfAnyWeekRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("dayID".into(), rows.iter().map(|r| r.day_id).collect::<Vec<i32>>()).into(),
-                Series::new("noOfRealDays".into(), rows.iter().map(|r| r.no_of_real_days).collect::<Vec<f64>>()).into(),
+                Series::new(
+                    "dayID".into(),
+                    rows.iter().map(|r| r.day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "noOfRealDays".into(),
+                    rows.iter().map(|r| r.no_of_real_days).collect::<Vec<f64>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -1114,24 +1320,49 @@ impl TableRow for DayOfAnyWeekRow {
         macro_rules! col_i32 {
             ($col:expr) => {
                 df.column($col)
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
                     .i32()
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
             };
         }
         macro_rules! col_f64 {
             ($col:expr) => {
                 df.column($col)
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
                     .f64()
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
             };
         }
         let day_id = col_i32!("dayID");
         let no_of_real_days = col_f64!("noOfRealDays");
         (0..df.height())
             .map(|i| {
-                let null = |col: &str| Error::RowExtraction { table: T.into(), row: i, column: col.into(), message: "null value".into() };
+                let null = |col: &str| Error::RowExtraction {
+                    table: T.into(),
+                    row: i,
+                    column: col.into(),
+                    message: "null value".into(),
+                };
                 Ok(DayOfAnyWeekRow {
                     day_id: day_id.get(i).ok_or_else(|| null("dayID"))?,
                     no_of_real_days: no_of_real_days.get(i).ok_or_else(|| null("noOfRealDays"))?,
@@ -1160,12 +1391,42 @@ impl TableRow for OffNetworkLinkRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("zoneID".into(), rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>()).into(),
-                Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("vehiclePopulation".into(), rows.iter().map(|r| r.vehicle_population).collect::<Vec<f64>>()).into(),
-                Series::new("parkedVehicleFraction".into(), rows.iter().map(|r| r.parked_vehicle_fraction).collect::<Vec<f64>>()).into(),
-                Series::new("startFraction".into(), rows.iter().map(|r| r.start_fraction).collect::<Vec<f64>>()).into(),
-                Series::new("extendedIdleFraction".into(), rows.iter().map(|r| r.extended_idle_fraction).collect::<Vec<f64>>()).into(),
+                Series::new(
+                    "zoneID".into(),
+                    rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "vehiclePopulation".into(),
+                    rows.iter()
+                        .map(|r| r.vehicle_population)
+                        .collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "parkedVehicleFraction".into(),
+                    rows.iter()
+                        .map(|r| r.parked_vehicle_fraction)
+                        .collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "startFraction".into(),
+                    rows.iter().map(|r| r.start_fraction).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "extendedIdleFraction".into(),
+                    rows.iter()
+                        .map(|r| r.extended_idle_fraction)
+                        .collect::<Vec<f64>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -1174,17 +1435,37 @@ impl TableRow for OffNetworkLinkRow {
         macro_rules! col_i32 {
             ($col:expr) => {
                 df.column($col)
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
                     .i32()
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
             };
         }
         macro_rules! col_f64 {
             ($col:expr) => {
                 df.column($col)
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
                     .f64()
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
             };
         }
         let zone_id = col_i32!("zoneID");
@@ -1195,14 +1476,25 @@ impl TableRow for OffNetworkLinkRow {
         let extended_idle_fraction = col_f64!("extendedIdleFraction");
         (0..df.height())
             .map(|i| {
-                let null = |col: &str| Error::RowExtraction { table: T.into(), row: i, column: col.into(), message: "null value".into() };
+                let null = |col: &str| Error::RowExtraction {
+                    table: T.into(),
+                    row: i,
+                    column: col.into(),
+                    message: "null value".into(),
+                };
                 Ok(OffNetworkLinkRow {
                     zone_id: zone_id.get(i).ok_or_else(|| null("zoneID"))?,
                     source_type_id: source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))?,
-                    vehicle_population: vehicle_population.get(i).ok_or_else(|| null("vehiclePopulation"))?,
-                    parked_vehicle_fraction: parked_vehicle_fraction.get(i).ok_or_else(|| null("parkedVehicleFraction"))?,
+                    vehicle_population: vehicle_population
+                        .get(i)
+                        .ok_or_else(|| null("vehiclePopulation"))?,
+                    parked_vehicle_fraction: parked_vehicle_fraction
+                        .get(i)
+                        .ok_or_else(|| null("parkedVehicleFraction"))?,
                     start_fraction: start_fraction.get(i).ok_or_else(|| null("startFraction"))?,
-                    extended_idle_fraction: extended_idle_fraction.get(i).ok_or_else(|| null("extendedIdleFraction"))?,
+                    extended_idle_fraction: extended_idle_fraction
+                        .get(i)
+                        .ok_or_else(|| null("extendedIdleFraction"))?,
                 })
             })
             .collect()
@@ -1226,10 +1518,28 @@ impl TableRow for AvftRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("modelYearID".into(), rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>()).into(),
-                Series::new("fuelTypeID".into(), rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("fuelEngFraction".into(), rows.iter().map(|r| r.fuel_eng_fraction).collect::<Vec<f64>>()).into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "modelYearID".into(),
+                    rows.iter().map(|r| r.model_year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelTypeID".into(),
+                    rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelEngFraction".into(),
+                    rows.iter()
+                        .map(|r| r.fuel_eng_fraction)
+                        .collect::<Vec<f64>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -1238,17 +1548,37 @@ impl TableRow for AvftRow {
         macro_rules! col_i32 {
             ($col:expr) => {
                 df.column($col)
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
                     .i32()
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
             };
         }
         macro_rules! col_f64 {
             ($col:expr) => {
                 df.column($col)
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
                     .f64()
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
             };
         }
         let source_type_id = col_i32!("sourceTypeID");
@@ -1257,12 +1587,19 @@ impl TableRow for AvftRow {
         let fuel_eng_fraction = col_f64!("fuelEngFraction");
         (0..df.height())
             .map(|i| {
-                let null = |col: &str| Error::RowExtraction { table: T.into(), row: i, column: col.into(), message: "null value".into() };
+                let null = |col: &str| Error::RowExtraction {
+                    table: T.into(),
+                    row: i,
+                    column: col.into(),
+                    message: "null value".into(),
+                };
                 Ok(AvftRow {
                     source_type_id: source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))?,
                     model_year_id: model_year_id.get(i).ok_or_else(|| null("modelYearID"))?,
                     fuel_type_id: fuel_type_id.get(i).ok_or_else(|| null("fuelTypeID"))?,
-                    fuel_eng_fraction: fuel_eng_fraction.get(i).ok_or_else(|| null("fuelEngFraction"))?,
+                    fuel_eng_fraction: fuel_eng_fraction
+                        .get(i)
+                        .ok_or_else(|| null("fuelEngFraction"))?,
                 })
             })
             .collect()
@@ -1292,14 +1629,46 @@ impl TableRow for ShoRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("hourDayID".into(), rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>()).into(),
-                Series::new("monthID".into(), rows.iter().map(|r| r.month_id).collect::<Vec<i32>>()).into(),
-                Series::new("yearID".into(), rows.iter().map(|r| r.year_id).collect::<Vec<i32>>()).into(),
-                Series::new("ageID".into(), rows.iter().map(|r| r.age_id).collect::<Vec<i32>>()).into(),
-                Series::new("linkID".into(), rows.iter().map(|r| r.link_id).collect::<Vec<i32>>()).into(),
-                Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("SHO".into(), rows.iter().map(|r| r.sho).collect::<Vec<f64>>()).into(),
-                Series::new("distance".into(), rows.iter().map(|r| r.distance).collect::<Vec<f64>>()).into(),
+                Series::new(
+                    "hourDayID".into(),
+                    rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "yearID".into(),
+                    rows.iter().map(|r| r.year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "ageID".into(),
+                    rows.iter().map(|r| r.age_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "linkID".into(),
+                    rows.iter().map(|r| r.link_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "SHO".into(),
+                    rows.iter().map(|r| r.sho).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new(
+                    "distance".into(),
+                    rows.iter().map(|r| r.distance).collect::<Vec<f64>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -1308,17 +1677,37 @@ impl TableRow for ShoRow {
         macro_rules! col_i32 {
             ($col:expr) => {
                 df.column($col)
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
                     .i32()
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
             };
         }
         macro_rules! col_f64 {
             ($col:expr) => {
                 df.column($col)
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
                     .f64()
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
             };
         }
         let hour_day_id = col_i32!("hourDayID");
@@ -1331,7 +1720,12 @@ impl TableRow for ShoRow {
         let distance = col_f64!("distance");
         (0..df.height())
             .map(|i| {
-                let null = |col: &str| Error::RowExtraction { table: T.into(), row: i, column: col.into(), message: "null value".into() };
+                let null = |col: &str| Error::RowExtraction {
+                    table: T.into(),
+                    row: i,
+                    column: col.into(),
+                    message: "null value".into(),
+                };
                 Ok(ShoRow {
                     hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))?,
                     month_id: month_id.get(i).ok_or_else(|| null("monthID"))?,
@@ -1367,13 +1761,41 @@ impl TableRow for ShpRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("hourDayID".into(), rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>()).into(),
-                Series::new("monthID".into(), rows.iter().map(|r| r.month_id).collect::<Vec<i32>>()).into(),
-                Series::new("yearID".into(), rows.iter().map(|r| r.year_id).collect::<Vec<i32>>()).into(),
-                Series::new("ageID".into(), rows.iter().map(|r| r.age_id).collect::<Vec<i32>>()).into(),
-                Series::new("zoneID".into(), rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>()).into(),
-                Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("SHP".into(), rows.iter().map(|r| r.shp).collect::<Vec<f64>>()).into(),
+                Series::new(
+                    "hourDayID".into(),
+                    rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "yearID".into(),
+                    rows.iter().map(|r| r.year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "ageID".into(),
+                    rows.iter().map(|r| r.age_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "zoneID".into(),
+                    rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "SHP".into(),
+                    rows.iter().map(|r| r.shp).collect::<Vec<f64>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -1382,17 +1804,37 @@ impl TableRow for ShpRow {
         macro_rules! col_i32 {
             ($col:expr) => {
                 df.column($col)
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
                     .i32()
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
             };
         }
         macro_rules! col_f64 {
             ($col:expr) => {
                 df.column($col)
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
                     .f64()
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
             };
         }
         let hour_day_id = col_i32!("hourDayID");
@@ -1404,7 +1846,12 @@ impl TableRow for ShpRow {
         let shp = col_f64!("SHP");
         (0..df.height())
             .map(|i| {
-                let null = |col: &str| Error::RowExtraction { table: T.into(), row: i, column: col.into(), message: "null value".into() };
+                let null = |col: &str| Error::RowExtraction {
+                    table: T.into(),
+                    row: i,
+                    column: col.into(),
+                    message: "null value".into(),
+                };
                 Ok(ShpRow {
                     hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))?,
                     month_id: month_id.get(i).ok_or_else(|| null("monthID"))?,
@@ -1439,13 +1886,41 @@ impl TableRow for StartsRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("hourDayID".into(), rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>()).into(),
-                Series::new("monthID".into(), rows.iter().map(|r| r.month_id).collect::<Vec<i32>>()).into(),
-                Series::new("yearID".into(), rows.iter().map(|r| r.year_id).collect::<Vec<i32>>()).into(),
-                Series::new("ageID".into(), rows.iter().map(|r| r.age_id).collect::<Vec<i32>>()).into(),
-                Series::new("zoneID".into(), rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>()).into(),
-                Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("starts".into(), rows.iter().map(|r| r.starts).collect::<Vec<f64>>()).into(),
+                Series::new(
+                    "hourDayID".into(),
+                    rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "yearID".into(),
+                    rows.iter().map(|r| r.year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "ageID".into(),
+                    rows.iter().map(|r| r.age_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "zoneID".into(),
+                    rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "starts".into(),
+                    rows.iter().map(|r| r.starts).collect::<Vec<f64>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -1454,17 +1929,37 @@ impl TableRow for StartsRow {
         macro_rules! col_i32 {
             ($col:expr) => {
                 df.column($col)
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
                     .i32()
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
             };
         }
         macro_rules! col_f64 {
             ($col:expr) => {
                 df.column($col)
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
                     .f64()
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
             };
         }
         let hour_day_id = col_i32!("hourDayID");
@@ -1476,7 +1971,12 @@ impl TableRow for StartsRow {
         let starts = col_f64!("starts");
         (0..df.height())
             .map(|i| {
-                let null = |col: &str| Error::RowExtraction { table: T.into(), row: i, column: col.into(), message: "null value".into() };
+                let null = |col: &str| Error::RowExtraction {
+                    table: T.into(),
+                    row: i,
+                    column: col.into(),
+                    message: "null value".into(),
+                };
                 Ok(StartsRow {
                     hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))?,
                     month_id: month_id.get(i).ok_or_else(|| null("monthID"))?,
@@ -1512,14 +2012,46 @@ impl TableRow for HotellingRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("hourDayID".into(), rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>()).into(),
-                Series::new("monthID".into(), rows.iter().map(|r| r.month_id).collect::<Vec<i32>>()).into(),
-                Series::new("yearID".into(), rows.iter().map(|r| r.year_id).collect::<Vec<i32>>()).into(),
-                Series::new("ageID".into(), rows.iter().map(|r| r.age_id).collect::<Vec<i32>>()).into(),
-                Series::new("zoneID".into(), rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>()).into(),
-                Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("fuelTypeID".into(), rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("hotellingHours".into(), rows.iter().map(|r| r.hotelling_hours).collect::<Vec<f64>>()).into(),
+                Series::new(
+                    "hourDayID".into(),
+                    rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "yearID".into(),
+                    rows.iter().map(|r| r.year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "ageID".into(),
+                    rows.iter().map(|r| r.age_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "zoneID".into(),
+                    rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "fuelTypeID".into(),
+                    rows.iter().map(|r| r.fuel_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hotellingHours".into(),
+                    rows.iter().map(|r| r.hotelling_hours).collect::<Vec<f64>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -1528,17 +2060,37 @@ impl TableRow for HotellingRow {
         macro_rules! col_i32 {
             ($col:expr) => {
                 df.column($col)
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
                     .i32()
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
             };
         }
         macro_rules! col_f64 {
             ($col:expr) => {
                 df.column($col)
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
                     .f64()
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
             };
         }
         let hour_day_id = col_i32!("hourDayID");
@@ -1551,7 +2103,12 @@ impl TableRow for HotellingRow {
         let hotelling_hours = col_f64!("hotellingHours");
         (0..df.height())
             .map(|i| {
-                let null = |col: &str| Error::RowExtraction { table: T.into(), row: i, column: col.into(), message: "null value".into() };
+                let null = |col: &str| Error::RowExtraction {
+                    table: T.into(),
+                    row: i,
+                    column: col.into(),
+                    message: "null value".into(),
+                };
                 Ok(HotellingRow {
                     hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))?,
                     month_id: month_id.get(i).ok_or_else(|| null("monthID"))?,
@@ -1560,7 +2117,9 @@ impl TableRow for HotellingRow {
                     zone_id: zone_id.get(i).ok_or_else(|| null("zoneID"))?,
                     source_type_id: source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))?,
                     fuel_type_id: fuel_type_id.get(i).ok_or_else(|| null("fuelTypeID"))?,
-                    hotelling_hours: hotelling_hours.get(i).ok_or_else(|| null("hotellingHours"))?,
+                    hotelling_hours: hotelling_hours
+                        .get(i)
+                        .ok_or_else(|| null("hotellingHours"))?,
                 })
             })
             .collect()
@@ -1587,13 +2146,41 @@ impl TableRow for SourceHoursRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("hourDayID".into(), rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>()).into(),
-                Series::new("monthID".into(), rows.iter().map(|r| r.month_id).collect::<Vec<i32>>()).into(),
-                Series::new("yearID".into(), rows.iter().map(|r| r.year_id).collect::<Vec<i32>>()).into(),
-                Series::new("ageID".into(), rows.iter().map(|r| r.age_id).collect::<Vec<i32>>()).into(),
-                Series::new("linkID".into(), rows.iter().map(|r| r.link_id).collect::<Vec<i32>>()).into(),
-                Series::new("sourceTypeID".into(), rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>()).into(),
-                Series::new("sourceHours".into(), rows.iter().map(|r| r.source_hours).collect::<Vec<f64>>()).into(),
+                Series::new(
+                    "hourDayID".into(),
+                    rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "yearID".into(),
+                    rows.iter().map(|r| r.year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "ageID".into(),
+                    rows.iter().map(|r| r.age_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "linkID".into(),
+                    rows.iter().map(|r| r.link_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceHours".into(),
+                    rows.iter().map(|r| r.source_hours).collect::<Vec<f64>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -1602,17 +2189,37 @@ impl TableRow for SourceHoursRow {
         macro_rules! col_i32 {
             ($col:expr) => {
                 df.column($col)
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
                     .i32()
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
             };
         }
         macro_rules! col_f64 {
             ($col:expr) => {
                 df.column($col)
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
                     .f64()
-                    .map_err(|e| Error::RowExtraction { table: T.into(), row: 0, column: $col.into(), message: e.to_string() })?
+                    .map_err(|e| Error::RowExtraction {
+                        table: T.into(),
+                        row: 0,
+                        column: $col.into(),
+                        message: e.to_string(),
+                    })?
             };
         }
         let hour_day_id = col_i32!("hourDayID");
@@ -1624,7 +2231,12 @@ impl TableRow for SourceHoursRow {
         let source_hours = col_f64!("sourceHours");
         (0..df.height())
             .map(|i| {
-                let null = |col: &str| Error::RowExtraction { table: T.into(), row: i, column: col.into(), message: "null value".into() };
+                let null = |col: &str| Error::RowExtraction {
+                    table: T.into(),
+                    row: i,
+                    column: col.into(),
+                    message: "null value".into(),
+                };
                 Ok(SourceHoursRow {
                     hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))?,
                     month_id: month_id.get(i).ok_or_else(|| null("monthID"))?,
@@ -1646,7 +2258,15 @@ fn sho_keys_from_scratch(store: &InMemoryStore) -> HashSet<(i32, i32, i32, i32, 
         .iter_typed_or_empty::<ShoRow>("SHO")
         .unwrap_or_default()
         .iter()
-        .map(|r| (r.hour_day_id, r.month_id, r.age_id, r.source_type_id, r.link_id))
+        .map(|r| {
+            (
+                r.hour_day_id,
+                r.month_id,
+                r.age_id,
+                r.source_type_id,
+                r.link_id,
+            )
+        })
         .collect()
 }
 
@@ -1655,7 +2275,15 @@ fn shp_keys_from_scratch(store: &InMemoryStore) -> HashSet<(i32, i32, i32, i32, 
         .iter_typed_or_empty::<ShpRow>("SHP")
         .unwrap_or_default()
         .iter()
-        .map(|r| (r.hour_day_id, r.month_id, r.age_id, r.source_type_id, r.zone_id))
+        .map(|r| {
+            (
+                r.hour_day_id,
+                r.month_id,
+                r.age_id,
+                r.source_type_id,
+                r.zone_id,
+            )
+        })
         .collect()
 }
 
@@ -1664,7 +2292,15 @@ fn starts_keys_from_scratch(store: &InMemoryStore) -> HashSet<(i32, i32, i32, i3
         .iter_typed_or_empty::<StartsRow>("Starts")
         .unwrap_or_default()
         .iter()
-        .map(|r| (r.hour_day_id, r.month_id, r.age_id, r.source_type_id, r.zone_id))
+        .map(|r| {
+            (
+                r.hour_day_id,
+                r.month_id,
+                r.age_id,
+                r.source_type_id,
+                r.zone_id,
+            )
+        })
         .collect()
 }
 
@@ -1673,7 +2309,16 @@ fn hotelling_keys_from_scratch(store: &InMemoryStore) -> HashSet<(i32, i32, i32,
         .iter_typed_or_empty::<HotellingRow>("hotellingHours")
         .unwrap_or_default()
         .iter()
-        .map(|r| (r.hour_day_id, r.month_id, r.age_id, r.source_type_id, r.zone_id, r.fuel_type_id))
+        .map(|r| {
+            (
+                r.hour_day_id,
+                r.month_id,
+                r.age_id,
+                r.source_type_id,
+                r.zone_id,
+                r.fuel_type_id,
+            )
+        })
         .collect()
 }
 
@@ -1682,7 +2327,15 @@ fn sh_keys_from_scratch(store: &InMemoryStore) -> HashSet<(i32, i32, i32, i32, i
         .iter_typed_or_empty::<SourceHoursRow>("sourceHours")
         .unwrap_or_default()
         .iter()
-        .map(|r| (r.hour_day_id, r.month_id, r.age_id, r.source_type_id, r.link_id))
+        .map(|r| {
+            (
+                r.hour_day_id,
+                r.month_id,
+                r.age_id,
+                r.source_type_id,
+                r.link_id,
+            )
+        })
         .collect()
 }
 
@@ -1812,8 +2465,7 @@ impl Generator for ProjectTAG {
             ($new_rows:expr, $name:literal, $RowType:ty) => {{
                 if !$new_rows.is_empty() {
                     let scratch = ctx.scratch_mut();
-                    let mut existing: Vec<$RowType> =
-                        scratch.store.iter_typed_or_empty($name)?;
+                    let mut existing: Vec<$RowType> = scratch.store.iter_typed_or_empty($name)?;
                     existing.extend($new_rows);
                     let df = <$RowType as TableRow>::into_dataframe(existing)
                         .map_err(|e| Error::Polars(e.to_string()))?;
@@ -2052,8 +2704,7 @@ mod tests {
         // runSpecHourDay
         store.insert(
             "runSpecHourDay",
-            RunSpecHourDayRow::into_dataframe(vec![RunSpecHourDayRow { hour_day_id: 52 }])
-                .unwrap(),
+            RunSpecHourDayRow::into_dataframe(vec![RunSpecHourDayRow { hour_day_id: 52 }]).unwrap(),
         );
 
         // RunSpecMonth
@@ -2147,7 +2798,8 @@ mod tests {
         };
         let gen = ProjectTAG::new();
         let mut ctx = CalculatorContext::with_position_and_tables(pos, store);
-        gen.execute(&mut ctx).expect("project-domain execute should succeed");
+        gen.execute(&mut ctx)
+            .expect("project-domain execute should succeed");
         ctx
     }
 
@@ -2159,7 +2811,11 @@ mod tests {
         let ctx = run_execute_with_process(project_domain_store(false), RUNNING_EXHAUST, 2020);
         let sho: Vec<ShoRow> = ctx.scratch().store.iter_typed("SHO").unwrap();
         assert_eq!(sho.len(), 1, "expected 1 SHO row");
-        assert!((sho[0].sho - 50.0).abs() < 1e-9, "SHO value mismatch: {}", sho[0].sho);
+        assert!(
+            (sho[0].sho - 50.0).abs() < 1e-9,
+            "SHO value mismatch: {}",
+            sho[0].sho
+        );
         assert!((sho[0].distance - 1500.0).abs() < 1e-9);
         // sourceHours not produced by Running Exhaust
         assert!(!ctx.scratch().store.contains("sourceHours"));
@@ -2170,8 +2826,14 @@ mod tests {
         // Evap Permeation + on-road link → SHO + sourceHours.
         let ctx = run_execute_with_process(project_domain_store(false), EVAP_PERMEATION, 2020);
         assert!(ctx.scratch().store.contains("SHO"), "SHO missing");
-        assert!(ctx.scratch().store.contains("sourceHours"), "sourceHours missing");
-        assert!(!ctx.scratch().store.contains("SHP"), "SHP should not appear for on-road evap");
+        assert!(
+            ctx.scratch().store.contains("sourceHours"),
+            "sourceHours missing"
+        );
+        assert!(
+            !ctx.scratch().store.contains("SHP"),
+            "SHP should not appear for on-road evap"
+        );
     }
 
     #[test]
@@ -2179,7 +2841,10 @@ mod tests {
         // Evap Permeation with off-network link → SHP + sourceHours (no SHO for off-network link).
         let ctx = run_execute_with_process(project_domain_store(true), EVAP_PERMEATION, 2020);
         assert!(ctx.scratch().store.contains("SHP"), "SHP missing");
-        assert!(ctx.scratch().store.contains("sourceHours"), "sourceHours missing");
+        assert!(
+            ctx.scratch().store.contains("sourceHours"),
+            "sourceHours missing"
+        );
     }
 
     #[test]
@@ -2196,8 +2861,7 @@ mod tests {
     #[test]
     fn execute_project_domain_extended_idle_populates_hotelling() {
         // Extended Idle + off-network link + source type 62 → hotellingHours rows.
-        let ctx =
-            run_execute_with_process(project_domain_store(true), EXTENDED_IDLE_EXHAUST, 2020);
+        let ctx = run_execute_with_process(project_domain_store(true), EXTENDED_IDLE_EXHAUST, 2020);
         let hotelling: Vec<HotellingRow> =
             ctx.scratch().store.iter_typed("hotellingHours").unwrap();
         assert!(!hotelling.is_empty(), "expected hotellingHours rows");
@@ -2224,7 +2888,11 @@ mod tests {
         let mut ctx = CalculatorContext::with_position_and_tables(pos1, store);
         gen.execute(&mut ctx).unwrap();
         let sho_after_first: Vec<ShoRow> = ctx.scratch().store.iter_typed("SHO").unwrap();
-        assert_eq!(sho_after_first.len(), 1, "first call should produce 1 SHO row");
+        assert_eq!(
+            sho_after_first.len(),
+            1,
+            "first call should produce 1 SHO row"
+        );
 
         // Second call: Evap Permeation (also produces SHO for on-road links).
         let pos2 = IterationPosition {
