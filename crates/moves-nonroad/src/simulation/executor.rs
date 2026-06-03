@@ -1414,6 +1414,17 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             pollutant_filter = pollutant_filter.set_slot(pol, has);
         }
 
+        // Canonical `clcems.f :197–199`: `emstmp = ef * cvttmp * detrat * adjems * adjtime`
+        // where `adjtime = 1/ndays` (from `prccty.f`). The `temporal_adjustment`
+        // (= `tpltmp = mthf * dayf`) is applied separately in the outer `emiss` formula.
+        // They are NOT the same value once real temporal profiles are loaded; using
+        // `tpltmp` here instead of `1/ndays` double-applies the monthly factor and
+        // over-emits by `mthf * ndays` (≈ 2.6× for July/August with mthf=0.0833, ndays=31).
+        let adjustment_time = if options.sum_type == SumType::Total || n_days <= 0 {
+            1.0_f32
+        } else {
+            1.0_f32 / n_days as f32
+        };
         let mut calc_inputs = ExhaustCalcInputs {
             year_index,
             tech_index,
@@ -1431,7 +1442,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             load_factor,
             activity_unit,
             daily_adjustments: adjustments,
-            adjustment_time: temporal_adjustment,
+            adjustment_time,
             day_range: DayRange {
                 begin_day: 1,
                 end_day: 1,
@@ -4103,13 +4114,19 @@ mod production {
             growth: None,
         };
 
-        // ALO allocation now succeeds; next barrier is NR*.TMF (daymthf not ported).
-        let err = exec.execute(&ctx, &opts).unwrap_err();
-        let msg = err.to_string();
-        assert!(
-            msg.contains("TMF") || msg.contains("temporal") || msg.contains("daymthf"),
-            "expected TMF error after ALO allocation succeeds, got: {msg}"
+        // ALO allocation succeeds and NR*.TMF is now ported (mo-cdo), so the
+        // full national path runs. Zero tech fractions skip emission iteration;
+        // one StateOutput row for "06000" is emitted.
+        let geo = exec
+            .execute(&ctx, &opts)
+            .expect("national dispatch should succeed");
+        assert_eq!(
+            geo.rows.len(),
+            1,
+            "expected one national output row, got {}",
+            geo.rows.len()
         );
+        assert_eq!(geo.rows[0].fips, "06000");
     }
 
     /// (f) US-total dispatch with a minimal reference table →

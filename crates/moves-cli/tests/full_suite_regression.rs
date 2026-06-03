@@ -466,10 +466,16 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
         // expand-criteria: inventory activity weighting now wired in
         // BaseRateCalculator (universalActivity = SHO / noOfRealDays applied as
         // ApplyActivity). Criteria pollutants (THC/CO/NOx) match canonical to
-        // f64 precision (~8.5e-8). The sibling expand-* fixtures select energy
-        // (pollutant 91) and stay quarantined on the separate KJ→Million-BTU
-        // output-unit conversion. See docs/known-divergences.md §4.4.
+        // f64 precision (~8.5e-8).
         ("expand-criteria", ONROAD_REL_TOL, false), // ~8.5e-8
+        // expand-day / expand-fueltype-diesel / expand-sourcetype: select energy
+        // pollutants 91/92/93. The KJ→Million-BTU unit conversion is wired in the
+        // engine; activity weighting is also applied. All three now match canonical
+        // within ONROAD_REL_TOL. expand-counties and expand-month remain quarantined
+        // (expand-counties ~200% over; expand-month ~9.9e-3, just above tolerance).
+        ("expand-day", ONROAD_REL_TOL, false), // ~3.5e-4
+        ("expand-fueltype-diesel", ONROAD_REL_TOL, false), // ~3.0e-4
+        ("expand-sourcetype", ONROAD_REL_TOL, false), // ~1.3e-4
         // Speciation / chained-calculator fixtures graduated once the regClass
         // collapse, SulfatePM pass-through doubling and NO/NO2 species doubling
         // were fixed (see QUARANTINED_FIXTURES for the three root causes). Each
@@ -516,24 +522,18 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
 /// data plane is fixed it should graduate from this list into
 /// [`asserted_fixtures`].
 const QUARANTINED_FIXTURES: &[&str] = &[
-    // OVER-emit class — ROW SHAPE matches canonical (process / road type /
-    // pollutant / row count). Two mass causes were separated and FIXED: (1) the
-    // port emitted off-network start-exhaust rows (process 2, roadTypeID 1) the
-    // RunSpec never selected — fixed by mirroring the worker's `runSpecRoadType`
-    // join; and (2) the surviving rows carried the raw BaseRate rate, not
-    // `rate × activity` — the inventory activity weighting (`universalActivity`,
-    // never persisted) is now synthesized as `SHO / noOfRealDays` and applied
-    // (`ApplyActivity`) in `BaseRateCalculator::execute`, gated on `ModelScale`.
-    // `expand-criteria` (criteria pollutants) now matches canonical and has
-    // GRADUATED to asserted_fixtures. The fixtures below remain quarantined for
-    // a DIFFERENT, separate reason: they select energy (pollutant 91), whose
-    // KJ→Million-BTU output-unit conversion the port does not yet apply
-    // (max_rel_diff ≈ 1.055e6). See docs/known-divergences.md §4.4 bug 1.
+    // expand-* energy fixtures — energy pollutants 91/92/93, activity weighting
+    // applied, KJ→Million-BTU conversion wired. expand-criteria/expand-day/
+    // expand-fueltype-diesel/expand-sourcetype GRADUATED to asserted_fixtures.
+    // Remaining quarantined:
+    //   expand-counties: ~200% over (max_rel_diff ≈ 2.0); multi-county run with
+    //     per-county weighting not yet reproduced. See docs/known-divergences.md §4.4.
+    //   expand-month: ~9.9e-3 (just above ONROAD_REL_TOL=1e-3). Multi-day expansion
+    //     with weekday/weekend weighting; residual gap under investigation.
+    //   sample-runspec: ~1.3e-6, within tolerance but unclassified — leave quarantined
+    //     until the cause is confirmed (possibly floating-point accumulation only).
     "expand-counties",
-    "expand-day",
-    "expand-fueltype-diesel",
     "expand-month",
-    "expand-sourcetype",
     "sample-runspec",
     // process-apu: BaseRate emits the process-91 / op-mode-201,203 (APU /
     // shorepower) energy rates canonical activity-gates to 0 in baseRateOutput;
