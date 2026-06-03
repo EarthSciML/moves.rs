@@ -280,24 +280,16 @@ impl Calculator for Ch4N2oWtpCalculator {
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let tables = ctx.tables();
         let year: Vec<YearRow> = tables.iter_typed("Year")?;
-        // `CH4N2OWTPCalculator.sql` substitutes the MasterLoop `##context.year##`
-        // directly into the GREET interpolation bracket queries and the
-        // `y.yearID = wf.yearID` join with no documented fallback. An absent
-        // context year is a configuration error, not a defaultable condition:
-        // substituting `0` (or an arbitrary `Year`-table row) would silently
-        // clamp every well-to-pump CH4/N2O factor to the earliest tabulated
-        // GREET year instead of the run year's interpolated rate. Propagate
-        // instead. `IterationPosition` has no dedicated error variant; reuse
-        // `RowExtraction` (its documented "value was null where a non-null
-        // value is required" case) keyed to a synthetic table, matching
-        // `CriteriaStartCalculator`.
+        // `CH4N2OWTPCalculator.sql` substitutes `##context.year##` directly into
+        // GREET interpolation and the `y.yearID = wf.yearID` join — no fallback.
+        // The master loop guarantees year is Some at YEAR+ granularity; None here
+        // is a programming error, not a defaultable condition.
         let pos = ctx.position();
-        let target_year = pos.time.year.map(i32::from).ok_or_else(|| Error::RowExtraction {
-            table: "IterationPosition".into(),
-            row: pos.iteration as usize,
-            column: "year".into(),
-            message: "required run-context year is unresolved (None)".into(),
-        })?;
+        let target_year = pos
+            .time
+            .year
+            .map(i32::from)
+            .ok_or_else(|| Error::MissingContext { what: "context.year".into() })?;
         let inputs = WtpInputs {
             greet: tables.iter_typed::<GreetWellToPumpRow>("GREETWellToPump")?,
             fuel_supply: tables.iter_typed::<FuelSupplyRow>("FuelSupply")?,

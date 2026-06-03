@@ -2751,27 +2751,15 @@ fn build_inputs(ctx: &CalculatorContext) -> Result<(BasicPm25Inputs, RunConstant
         .first()
         .map(|r| r.gpa_fract)
         .ok_or_else(|| row_err("County", 0, "GPAFract", "County extract is empty".into()))?;
- // `##context.year##` and the `##context.iterLocation.*##` IDs are concrete
- // run constants in every SQL iteration; a `None` here is a framework/context
- // bug. Defaulting to 0 would corrupt the model-year/age arithmetic and the
- // year filters (yielding silent empty output) or misplace emissions at
- // location 0, so surface the missing context value instead.
+ // The master loop guarantees context fields are set at the subscribed
+ // granularity; a None here is a programming error.
+    let mc = |what: &'static str| Error::MissingContext { what: what.into() };
     let constants = RunConstants {
-        year: pos.time.year.map(|y| y as i32).ok_or_else(|| {
-            row_err("County", 0, "yearID", "context year is missing".into())
-        })?,
-        state_id: pos.location.state_id.map(|s| s as i32).ok_or_else(|| {
-            row_err("County", 0, "stateID", "context state record ID is missing".into())
-        })?,
-        county_id: pos.location.county_id.map(|c| c as i32).ok_or_else(|| {
-            row_err("County", 0, "countyID", "context county record ID is missing".into())
-        })?,
-        zone_id: pos.location.zone_id.map(|z| z as i32).ok_or_else(|| {
-            row_err("County", 0, "zoneID", "context zone record ID is missing".into())
-        })?,
-        link_id: pos.location.link_id.map(|l| l as i32).ok_or_else(|| {
-            row_err("Link", 0, "linkID", "context link record ID is missing".into())
-        })?,
+        year: pos.time.year.map(|y| y as i32).ok_or_else(|| mc("context.year"))?,
+        state_id: pos.location.state_id.map(|s| s as i32).ok_or_else(|| mc("context.stateID"))?,
+        county_id: pos.location.county_id.map(|c| c as i32).ok_or_else(|| mc("context.countyID"))?,
+        zone_id: pos.location.zone_id.map(|z| z as i32).ok_or_else(|| mc("context.zoneID"))?,
+        link_id: pos.location.link_id.map(|l| l as i32).ok_or_else(|| mc("context.linkID"))?,
         road_type_id,
         gpa_fract,
     };

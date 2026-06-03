@@ -2591,20 +2591,9 @@ impl Calculator for LiquidLeakingCalculator {
             let year_i64 = pos.time.year.map(i64::from).unwrap_or(0);
             format!("sourceBinDistributionFuelUsage_{process_id_i64}_{county_id_i64}_{year_i64}")
         };
- // The MOVES `##context.year##` / `##context.iterLocation.*##` macros are
- // always substituted from the active master-loop iteration; they are never
- // absent when an emission calculator runs (see `LiquidLeakingCalculator.sql`
- // LL-9, which stamps these directly onto every `MOVESWorkerOutput` row and
- // joins SourceHours on `ageID = ##context.year## - modelYearID`). An absent
- // field here is an internal master-loop wiring error, not a 0-valued
- // iteration; surface it rather than fabricating 0 and silently emitting
- // location-0 / empty output.
-        let missing_field = |field: &str| {
-            Error::InvalidBundle(format!(
-                "{CALCULATOR_NAME}: master-loop iteration position is missing {field}; \
-                 every evap-fuel-leaks iteration must carry a year and location"
-            ))
-        };
+ // The master loop guarantees context fields are set at the subscribed
+ // granularity; a None here is a programming error.
+        let missing_field = |field: &'static str| Error::MissingContext { what: field.into() };
         let liquid_ctx = LiquidLeakingContext {
             year: pos.time.year.ok_or_else(|| missing_field("year"))? as i32,
             state_id: pos

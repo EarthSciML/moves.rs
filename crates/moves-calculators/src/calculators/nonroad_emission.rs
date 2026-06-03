@@ -185,15 +185,15 @@ impl Calculator for NonroadEmissionCalculator {
 
  /// Run the NONROAD simulation for the current master-loop iteration.
  ///
- /// Mirrors canonical `NonroadEmissionCalculator.doesProcessContext`
- /// (`NonroadEmissionCalculator.java:457-481`), which returns `false`
- /// — i.e. does *not* execute — for any context with `year <= 0`,
- /// `monthID <= 0`, or `dayID <= 0`. The Zone-Year-Month-Day position
- /// is mandatory in NONROAD; a missing temporal key is not a defaultable
- /// value but a "this context should be skipped" signal. We therefore
- /// skip (return [`CalculatorOutput::empty()`]) when the year, month, or
- /// day is absent, rather than fabricating an episode year and running
- /// the whole simulation for the wrong (or guessed) year.
+ /// Canonical `NonroadEmissionCalculator.doesProcessContext`
+ /// (`NonroadEmissionCalculator.java:457-481`) returns `false` for any
+ /// context with `year <= 0`, `monthID <= 0`, or `dayID <= 0`. In the
+ /// Rust port there is no separate `doesProcessContext` gate — the
+ /// master loop guarantees that year, month, and day are all `Some` when
+ /// dispatching at `DAY` granularity (the granularity this calculator
+ /// subscribes at). A `None` here therefore means the engine failed to
+ /// populate the position, which is a programming error — surface it as
+ /// [`Error::MissingContext`] rather than silently returning empty output.
  ///
  /// Once a valid temporal position is present, builds the NONROAD engine
  /// inputs from the `nr*` execution-DB tables, calls
@@ -201,16 +201,18 @@ impl Calculator for NonroadEmissionCalculator {
  /// MOVESOutput schema.
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let time = &ctx.position().time;
- // Canonical doesProcessContext: skip contexts without a full
- // Year-Month-Day temporal position (year/month/day all > 0). At DAY
- // granularity all three are normally set; a missing one means the
- // master loop has not descended into DAY scope, so there is nothing
- // for this calculator to do at this position.
-        let (Some(year), Some(_month_present), Some(_day_present)) =
-            (time.year, time.month, time.day_id)
-        else {
-            return Ok(CalculatorOutput::empty());
-        };
+ // The master loop guarantees year/month/day are Some at DAY granularity.
+ // A None here is a programming error — the engine should have filled the
+ // position before dispatch.
+        let year = time
+            .year
+            .ok_or_else(|| Error::MissingContext { what: "context.year".into() })?;
+        let _ = time
+            .month
+            .ok_or_else(|| Error::MissingContext { what: "context.month".into() })?;
+        let _ = time
+            .day_id
+            .ok_or_else(|| Error::MissingContext { what: "context.day_id".into() })?;
         let year = i32::from(year);
 
  // Build the NONROAD engine inputs from the nr* execution-DB tables
@@ -360,14 +362,18 @@ mod tests {
     }
 
     #[test]
-    fn execute_with_empty_context_succeeds() {
+    fn execute_without_year_returns_missing_context() {
+        // The master loop guarantees year/month/day are set at DAY granularity.
+        // Calling execute() with an empty context (no position) is a programming
+        // error — the calculator must surface it as MissingContext, not silently
+        // return empty output.
         let calc = NonroadEmissionCalculator::new();
         let ctx = CalculatorContext::new();
         let result = calc.execute(&ctx);
-        assert!(result.is_ok(), "execute with empty context must not error");
         assert!(
-            result.unwrap().dataframe().is_none(),
-            "output must be empty (no DataFrame) until data-plane wiring lands"
+            matches!(result, Err(Error::MissingContext { .. })),
+            "expected Err(MissingContext) for empty context, got {:?}",
+            result
         );
     }
 

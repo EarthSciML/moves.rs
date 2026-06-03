@@ -752,26 +752,14 @@ impl Calculator for Nh3RunningCalculator {
         // The SQL substitutes `##context.year##`,
         // `##context.iterLocation.countyRecordID##` and
         // `##context.iterLocation.linkRecordID##` as concrete run constants into
-        // the model-year arithmetic (`MYMAP(##context.year## - ageID)`), the
-        // I/M county/year filter and the final `Link` join. At this YEAR
-        // master-loop granularity those macros are never empty; a `None` here is
-        // a framework/context bug. Defaulting to 0 would silently corrupt the
-        // model-year/age arithmetic (yielding empty SourceTypeModelYear joins
-        // and dropped I/M coverage) or misplace emissions at link 0, so surface
-        // the missing context value instead of fabricating a non-identifier 0.
+        // The master loop guarantees context fields are set at the subscribed
+        // granularity; a None here is a programming error.
+        let mc = |what: &'static str| Error::MissingContext { what: what.into() };
         let run_ctx = RunningContext {
-            year_id: pos.time.year.map(|y| y as i32).ok_or_else(|| {
-                row_err("Link", 0, "yearID", "context year is missing".into())
-            })?,
-            state_id: pos.location.state_id.map(|s| s as i32).ok_or_else(|| {
-                row_err("Link", 0, "stateID", "context state record ID is missing".into())
-            })?,
-            county_id: pos.location.county_id.map(|c| c as i32).ok_or_else(|| {
-                row_err("Link", 0, "countyID", "context county record ID is missing".into())
-            })?,
-            link_id: pos.location.link_id.map(|l| l as i32).ok_or_else(|| {
-                row_err("Link", 0, "linkID", "context link record ID is missing".into())
-            })?,
+            year_id: pos.time.year.map(|y| y as i32).ok_or_else(|| mc("context.year"))?,
+            state_id: pos.location.state_id.map(|s| s as i32).ok_or_else(|| mc("context.stateID"))?,
+            county_id: pos.location.county_id.map(|c| c as i32).ok_or_else(|| mc("context.countyID"))?,
+            link_id: pos.location.link_id.map(|l| l as i32).ok_or_else(|| mc("context.linkID"))?,
         };
         let inputs = RunningInputs {
             sho: tables.iter_typed::<ShoRow>("SHO")?,

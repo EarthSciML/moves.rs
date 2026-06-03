@@ -703,29 +703,15 @@ impl Calculator for Nh3StartCalculator {
         let pos = ctx.position();
         // `NH3StartCalculator.sql` substitutes `##context.year##`,
         // `##context.iterLocation.zoneRecordID##`, `.countyRecordID## and
-        // `.linkRecordID## directly into its queries; the master loop always
-        // supplies these at this (YEAR/zone) granularity, so a `None` here is a
-        // framework/context bug. Defaulting to 0 would silently corrupt the
-        // model-year/age arithmetic (`##context.year## - ageID`) and the
-        // zone/year guard in `multiply_by_activity` (no real zone is 0),
-        // zeroing emissions, so surface the missing context value instead of
-        // fabricating a non-identifier 0.
+        // The master loop guarantees context fields are set at the subscribed
+        // granularity; a None here is a programming error.
+        let mc = |what: &'static str| Error::MissingContext { what: what.into() };
         let start_ctx = StartContext {
-            year_id: pos.time.year.map(|y| y as i32).ok_or_else(|| {
-                row_err("Starts", 0, "yearID", "context year is missing".into())
-            })?,
-            state_id: pos.location.state_id.map(|s| s as i32).ok_or_else(|| {
-                row_err("Starts", 0, "stateID", "context state record ID is missing".into())
-            })?,
-            county_id: pos.location.county_id.map(|c| c as i32).ok_or_else(|| {
-                row_err("Starts", 0, "countyID", "context county record ID is missing".into())
-            })?,
-            zone_id: pos.location.zone_id.map(|z| z as i32).ok_or_else(|| {
-                row_err("Starts", 0, "zoneID", "context zone record ID is missing".into())
-            })?,
-            link_id: pos.location.link_id.map(|l| l as i32).ok_or_else(|| {
-                row_err("Starts", 0, "linkID", "context link record ID is missing".into())
-            })?,
+            year_id: pos.time.year.map(|y| y as i32).ok_or_else(|| mc("context.year"))?,
+            state_id: pos.location.state_id.map(|s| s as i32).ok_or_else(|| mc("context.stateID"))?,
+            county_id: pos.location.county_id.map(|c| c as i32).ok_or_else(|| mc("context.countyID"))?,
+            zone_id: pos.location.zone_id.map(|z| z as i32).ok_or_else(|| mc("context.zoneID"))?,
+            link_id: pos.location.link_id.map(|l| l as i32).ok_or_else(|| mc("context.linkID"))?,
         };
         let inputs = StartInputs {
             starts: tables.iter_typed::<StartsRow>("Starts")?,

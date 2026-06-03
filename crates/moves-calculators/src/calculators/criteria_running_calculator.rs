@@ -4392,23 +4392,9 @@ impl Calculator for CriteriaRunningCalculator {
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let tables = ctx.tables();
         let pos = ctx.position();
-        // The `##context.year##` / `##context.iterLocation.*RecordID##`
-        // substitutions the SQL preprocessor resolves are *always* present for
-        // a MONTH-granularity Running Exhaust task (see `ExecutionTime` /
-        // `ExecutionLocation`: year/county/zone/link/state are guaranteed once
-        // the master loop has descended to this granularity). A missing value
-        // here is a fatal setup error, not a substitutable default: `year`
-        // drives `model_year_id = year - ageID` and the `y.yearID =
-        // ##context.year##` filter, so a fabricated `0` would yield negative
-        // model years, drop every fuel-supply row, and silently emit a wrong /
-        // empty inventory. Surface it instead.
-        let missing = |field: &str| {
-            Error::Polars(format!(
-                "CriteriaRunningCalculator: required run-context value '{field}' is \
-                 missing from the master-loop position; the calculator runs at MONTH \
-                 granularity, where this ##context## substitution must be resolved"
-            ))
-        };
+        // The master loop guarantees context fields are set at the subscribed
+        // granularity; a None here is a programming error.
+        let missing = |field: &'static str| Error::MissingContext { what: field.into() };
         let run_ctx = RunContext {
             year: pos.time.year.map(i32::from).ok_or_else(|| missing("year"))?,
             county_id: pos

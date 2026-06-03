@@ -3648,25 +3648,9 @@ impl Calculator for CriteriaStartCalculator {
         let tables = ctx.tables();
         let pos = ctx.position();
 
- // The canonical SQL resolves every `##context.*##` substitution before the
- // script runs; an unresolved one is a hard preprocessor failure, never a
- // silent default. When this calculator actually fires (Start Exhaust,
- // off-network, MONTH granularity) the loop has descended to LINK
- // granularity, so year/state/county/zone/link are all populated. A `None`
- // here means the calculator was dispatched at a granularity the SQL never
- // runs at — surface it rather than fabricate `0`, which would mis-key
- // `modelYearID = year - ageID` (every CSEC join silently missing) and
- // short-circuit the `met_start_adjustment` zone filter.
- //
- // `IterationPosition` has no dedicated error variant; reuse
- // `RowExtraction` (its documented "value was null where a non-null value
- // is required" case) keyed to a synthetic "IterationPosition" table.
-        let missing = |field: &'static str| Error::RowExtraction {
-            table: "IterationPosition".into(),
-            row: pos.iteration as usize,
-            column: field.into(),
-            message: "required run-context scalar is unresolved (None)".into(),
-        };
+ // The master loop guarantees context fields are set at the subscribed
+ // granularity; a None here is a programming error.
+        let missing = |field: &'static str| Error::MissingContext { what: field.into() };
         let year = pos.time.year.map(|y| y as i32).ok_or_else(|| missing("year"))?;
         let county_id = pos
             .location

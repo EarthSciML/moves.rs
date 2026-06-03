@@ -109,6 +109,20 @@ pub enum Error {
         message: String,
     },
 
+ /// A required master-loop context value was absent when the calculator
+ /// executed. The master loop guarantees that fields at the subscribed
+ /// granularity are `Some` before dispatch, so `None` here is a
+ /// programming error — either a calculator is subscribed at a granularity
+ /// coarser than the context field it requires, or the engine failed to
+ /// populate the position before calling `execute`.
+ ///
+ /// `what` identifies the missing field (e.g. `"context.year"`).
+    #[error("missing required context value: {what}")]
+    MissingContext {
+ /// Human-readable name of the missing field.
+        what: String,
+    },
+
  /// A Polars operation failed.
     #[error("polars: {0}")]
     Polars(String),

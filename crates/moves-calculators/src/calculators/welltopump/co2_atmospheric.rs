@@ -370,28 +370,16 @@ impl Calculator for Co2AtmosphericWtpCalculator {
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let tables = ctx.tables();
         let year: Vec<YearRow> = tables.iter_typed("Year")?;
-        // `CO2AtmosphericWTPCalculator.sql` substitutes the MasterLoop
-        // `##context.year##` directly into `gwtp.yearID = ##context.year##`
-        // and `y.yearID = ##context.year##` with no documented fallback. An
-        // absent context year is a configuration error, not a defaultable
-        // condition: substituting `0` (or an arbitrary `Year`-table row)
-        // would silently weight emissions on the wrong GREET rate and fuel
-        // supply, or hide a missing-year data gap as an empty result.
-        // Propagate instead. `IterationPosition` has no dedicated error
-        // variant; reuse `RowExtraction` (its documented "value was null
-        // where a non-null value is required" case) keyed to a synthetic
-        // table, matching the sibling WTP calculators.
+        // `CO2AtmosphericWTPCalculator.sql` substitutes `##context.year##`
+        // directly into `gwtp.yearID = ...` and `y.yearID = ...` — no fallback.
+        // The master loop guarantees year is Some at YEAR+ granularity; None
+        // here is a programming error, not a defaultable condition.
         let pos = ctx.position();
         let target_year = pos
             .time
             .year
             .map(i32::from)
-            .ok_or_else(|| Error::RowExtraction {
-                table: "IterationPosition".into(),
-                row: pos.iteration as usize,
-                column: "year".into(),
-                message: "required run-context year is unresolved (None)".into(),
-            })?;
+            .ok_or_else(|| Error::MissingContext { what: "context.year".into() })?;
         let inputs = WtpInputs {
             greet: tables.iter_typed::<GreetWellToPumpRow>("GREETWellToPump")?,
             fuel_supply: tables.iter_typed::<FuelSupplyRow>("FuelSupply")?,

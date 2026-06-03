@@ -2395,14 +2395,9 @@ impl Calculator for AirToxicsCalculator {
         // `##context.year##` for every real run, so an absent year is a
         // missing-context bug, not a zero-emission success. Surface it rather
         // than silently collapsing every model-year window to empty.
-        let year = crate::wiring::position_filter(ctx).year.ok_or_else(|| {
-            Error::Polars(
-                "AirToxicsCalculator.execute: iteration position has no year; \
-                 cannot resolve modelYearID = year - ageID (context.year is \
-                 always bound in a real run)"
-                    .to_string(),
-            )
-        })?;
+        let year = crate::wiring::position_filter(ctx)
+            .year
+            .ok_or_else(|| Error::MissingContext { what: "context.year".into() })?;
         let ppa = pollutant_process_map(ctx)?;
         let extracts = AirToxicsExtracts {
             minor_hap_ratio: synthesize_minor_hap_ratio(ctx, &ppa, year)?,
