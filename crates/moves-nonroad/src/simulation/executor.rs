@@ -2579,11 +2579,19 @@ fn calculate_exhaust_from_reference(
         .ambient_temp_by_scc
         .get(inputs.scc)
         .copied()
-        .unwrap_or(reference.ambient_temp_f);
+        .or(reference.ambient_temp_f)
+        .ok_or_else(|| {
+            Error::Config(format!(
+                "calculate_exhaust: ambient temperature absent for SCC {} \
+                 (zonemonthhour not loaded). emsadj.f always applies \
+                 EXP(acoeff*(tamb-75)); a neutral 75 °F cannot be fabricated.",
+                inputs.scc
+            ))
+        })?;
     if tamb <= 0.0 {
         return Err(Error::Config(format!(
-            "calculate_exhaust: ambient temperature absent for SCC {} \
-             (NR*.EMF / temperature input not loaded).",
+            "calculate_exhaust: ambient temperature is non-positive ({tamb}°F) for SCC {} \
+             (data error in zonemonthhour or nrhourallocation).",
             inputs.scc
         )));
     }
