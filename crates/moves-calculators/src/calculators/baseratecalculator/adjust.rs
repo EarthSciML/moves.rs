@@ -31,6 +31,7 @@ use super::model::{
     ZoneMonthHourDetail, ZoneMonthHourKey,
 };
 use super::setup::{BaseRateRow, FuelSupplyKey, PreparedTables};
+use moves_framework::Error;
 
 /// Apply the start-temperature adjustment equations — the Go
 /// `StartTempAdjustmentDetail.startTempAdjust`.
@@ -192,16 +193,18 @@ pub fn calculate_nox_k(zmh: &ZoneMonthHourDetail, nha: &NoxHumidityAdjustDetail)
 /// block whose [`OpModeRates::base_rates`] holds one [`BaseRate`] per fuel
 /// formulation supplied to the row's `(county, year, month, fuel type)` cell.
 ///
-/// A row with no matching fuel supply is dropped. The Go `streamBaseRateByAge`
-/// returns early on a missing supply; `streamBaseRate` instead panics — a
-/// "cannot happen" guard, since the run's fuel supply always covers its fuel
-/// types. The port drops the row in both cases rather than aborting.
+/// When `panic_on_missing_supply` is `false` (the age path, `streamBaseRateByAge`),
+/// a row with no matching fuel supply is silently dropped — matching the Go
+/// `return` on a nil lookup. When `panic_on_missing_supply` is `true` (the
+/// non-age path, `streamBaseRate`), a missing supply is a fatal data error and
+/// [`Error::MissingContext`] is returned — matching the Go `panic` there.
 #[must_use]
 pub fn build_fuel_blocks(
     rows: &[BaseRateRow],
     prepared: &PreparedTables,
     constants: &RunConstants,
-) -> Vec<FuelBlock> {
+    panic_on_missing_supply: bool,
+) -> Result<Vec<FuelBlock>, Error> {
     let mut blocks = Vec::with_capacity(rows.len());
     for row in rows {
         let fuel_supply = prepared.fuel_supply.get(&FuelSupplyKey {
@@ -211,6 +214,17 @@ pub fn build_fuel_blocks(
             fuel_type_id: row.fuel_type_id,
         });
         let Some(fuel_supply) = fuel_supply else {
+            if panic_on_missing_supply {
+                return Err(Error::MissingContext {
+                    what: format!(
+                        "fuel supply for county_id={} year_id={} month_id={} fuel_type_id={}",
+                        constants.county_id,
+                        constants.year_id,
+                        constants.month_id,
+                        row.fuel_type_id
+                    ),
+                });
+            }
             continue;
         };
 
@@ -265,7 +279,7 @@ pub fn build_fuel_blocks(
             emissions: Vec::new(),
         });
     }
-    blocks
+    Ok(blocks)
 }
 
 /// Scale the four mean-base-rate fields of every base rate in place — the Go

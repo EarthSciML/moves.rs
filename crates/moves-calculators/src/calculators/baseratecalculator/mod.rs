@@ -461,9 +461,10 @@ fn process_pass(
     constants: &RunConstants,
     flags: &ModuleFlags,
     gpa_fract: f64,
-) -> Vec<FuelBlock> {
+    panic_on_missing_supply: bool,
+) -> Result<Vec<FuelBlock>, Error> {
     let mut unique: BTreeMap<BlockKey, FuelBlock> = BTreeMap::new();
-    for fb in build_fuel_blocks(rows, prepared, constants) {
+    for fb in build_fuel_blocks(rows, prepared, constants, panic_on_missing_supply)? {
         for processed in process_fuel_block(fb, prepared, flags, gpa_fract) {
             match unique.get_mut(&processed.key) {
                 Some(existing) => {
@@ -479,7 +480,7 @@ fn process_pass(
             }
         }
     }
-    unique.into_values().collect()
+    Ok(unique.into_values().collect())
 }
 
 impl BaseRateCalculator {
@@ -552,11 +553,19 @@ impl BaseRateCalculator {
         // calculateActivityWeight runs once, ahead of the aggregation tail.
         let activity_weights = calculate_activity_weight(&smfr_sbd_summary, prepared, flags);
 
-        // Two accumulation passes: age-based then non-age-based.
-        let mut blocks = process_pass(&base_rate_by_age, prepared, constants, flags, gpa_fract);
+        // Two accumulation passes: age-based (supply missing → drop row) then
+        // non-age-based (supply missing → error, matching Go streamBaseRate panic).
+        let mut blocks = process_pass(
+            &base_rate_by_age,
+            prepared,
+            constants,
+            flags,
+            gpa_fract,
+            false,
+        )?;
         blocks.extend(process_pass(
-            &base_rate, prepared, constants, flags, gpa_fract,
-        ));
+            &base_rate, prepared, constants, flags, gpa_fract, true,
+        )?);
 
         // Aggregate operating modes and apply the activity weighting.
         for block in &mut blocks {
@@ -1809,7 +1818,7 @@ mod tests {
         let inputs = BaseRateCalculatorInputs::default();
         let output =
             BaseRateCalculator::run(inputs, &RunConstants::default(), &ModuleFlags::default())
-                .unwrap();
+                .expect("run ok");
         assert!(output.blocks.is_empty());
         assert!(output.rows().is_empty());
     }
