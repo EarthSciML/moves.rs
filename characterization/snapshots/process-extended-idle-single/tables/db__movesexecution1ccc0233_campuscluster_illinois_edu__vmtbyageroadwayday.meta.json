@@ -1,0 +1,49 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__vmtbyageroadwayday",
+  "schema": [
+    {
+      "name": "yearID",
+      "kind": "int64"
+    },
+    {
+      "name": "roadTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "dayID",
+      "kind": "int64"
+    },
+    {
+      "name": "VMT",
+      "kind": "float64"
+    },
+    {
+      "name": "hotellingHours",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "yearID",
+    "roadTypeID",
+    "sourceTypeID",
+    "ageID",
+    "monthID",
+    "dayID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "8fa690133f040e423687a09a14f57732c4c4b8ef169e3261fb053e69272799d7"
+}

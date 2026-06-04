@@ -89,10 +89,19 @@ pub const SNAPSHOTS_DIR_ENV: &str = "REGRESSION_SNAPSHOTS_DIR";
 /// The layout expected under this root is:
 /// ```text
 /// <dir>/
-/// scale-county/ ← *.parquet produced by `moves import-cdb`
-/// scale-project/ ← *.parquet produced by the PDB importer
-/// scale-rates/ ← *.parquet (Rates mode uses County-scale CDB inputs)
+/// scale-county/                   ← *.parquet produced by `moves import-cdb`
+/// scale-project/                  ← *.parquet produced by the PDB importer
+/// scale-rates/                    ← *.parquet (Rates mode uses County-scale CDB)
+/// process-crankcase-start-single/ ← Starts.parquet (county starts data)
+/// process-extended-idle-single/   ← hotellingHours.parquet + hotellingActivityDistribution.parquet
+/// process-apu-single/             ← hotellingHours.parquet + hotellingActivityDistribution.parquet
+/// process-crankcase-extidle-single/ ← hotellingHours.parquet + hotellingActivityDistribution.parquet
 /// ```
+///
+/// For the `*-single` fixtures: the in-repo `characterization/county-inputs/` tree
+/// is pre-populated with Washtenaw County data (matching the national default so
+/// SINGLE-scale output ≈ DEFAULT-scale at hour 7).
+///
 /// When this variable is unset (or empty) the scale-fixture tests are dormant.
 pub const SCALE_INPUTS_DIR_ENV: &str = "SCALE_INPUTS_DIR";
 
@@ -852,6 +861,24 @@ fn scale_fixtures_run_without_error() {
         ("scale-county", "County-scale (CDB) inventory"),
         ("scale-project", "Project-scale (PDB) inventory"),
         ("scale-rates", "Rates-mode (County-scale CDB)"),
+        // Process-specific SINGLE-scale fixtures (mo-ky1): non-vacuous variants
+        // that provide county hotelling/starts data so activity exists at hour 7.
+        (
+            "process-crankcase-start-single",
+            "Crankcase start (SINGLE, county Starts)",
+        ),
+        (
+            "process-extended-idle-single",
+            "Extended idle (SINGLE, county hotellingHours)",
+        ),
+        (
+            "process-apu-single",
+            "APU exhaust (SINGLE, county hotellingHours)",
+        ),
+        (
+            "process-crankcase-extidle-single",
+            "Crankcase ext-idle (SINGLE, county hotellingHours)",
+        ),
     ];
 
     println!(
@@ -882,6 +909,19 @@ fn scale_fixtures_run_without_error() {
             continue;
         }
 
+        // The `*-single` fixtures provide only county activity data (Starts,
+        // hotellingHours). They need both a snapshot (for emission rates) and
+        // a scale input (for county activity) to produce a non-empty module
+        // plan. Without the snapshot, the scale-only path has no emission
+        // rates and plans 0 modules — acceptable, just log a SKIP notice.
+        let snap_dir = snapshots_root().join(fixture_name);
+        let snapshot = if fixture_name.ends_with("-single") && snap_dir.is_dir() {
+            Some(snap_dir.clone())
+        } else {
+            None
+        };
+        let require_modules = snapshot.is_some() || !fixture_name.ends_with("-single");
+
         let out = tempdir().expect("tempdir");
         let result = run_simulation(&RunOptions {
             runspec: fixture_path.clone(),
@@ -889,7 +929,7 @@ fn scale_fixtures_run_without_error() {
             max_parallel_chunks: 1,
             calculator_dag: None,
             run_date_time: Some("2026-05-21T00:00:00".to_string()),
-            snapshot: None,
+            snapshot,
             scale_input: Some(scale_input_dir),
             default_db: None,
         });
@@ -903,7 +943,7 @@ fn scale_fixtures_run_without_error() {
                 if !outcome.run_record_path.is_file() {
                     failures.push(format!("{fixture_name}: MOVESRun.parquet missing"));
                 }
-                if outcome.modules_planned.is_empty() {
+                if require_modules && outcome.modules_planned.is_empty() {
                     failures.push(format!("{fixture_name}: no modules planned"));
                 }
                 println!(
@@ -937,6 +977,10 @@ fn scale_fixtures_run_without_error() {
 /// `scale-county`, `scale-project`, and `scale-rates` must be produced by a
 /// separate run of `characterization/run-all-fixtures.sh --include scale-*`
 /// on an Apptainer-capable HPC node.
+///
+/// The `*-single` process-specific fixtures (mo-ky1) have their snapshots captured
+/// via `characterization/apptainer/capture-county-snapshot.sh` using the Washtenaw
+/// County CDB in `characterization/county-inputs/washtenaw-county/`.
 #[test]
 fn scale_canonical_snapshot_diff() {
     let scale_root = match scale_inputs_root() {
@@ -951,7 +995,16 @@ fn scale_canonical_snapshot_diff() {
     };
 
     let snaps_root = snapshots_root();
-    let scale_fixtures = ["scale-county", "scale-project", "scale-rates"];
+    let scale_fixtures = [
+        "scale-county",
+        "scale-project",
+        "scale-rates",
+        // County-scale SINGLE-domain fixtures (mo-ky1): non-vacuous variants.
+        "process-crankcase-start-single",
+        "process-extended-idle-single",
+        "process-apu-single",
+        "process-crankcase-extidle-single",
+    ];
     let covered: Vec<&str> = scale_fixtures
         .iter()
         .copied()
@@ -996,6 +1049,15 @@ fn scale_canonical_snapshot_diff() {
             continue;
         }
 
+        // `*-single` fixtures provide only activity data (Starts, hotellingHours);
+        // they need the canonical snapshot for emission rates. Use
+        // snapshot+scale_input so that both activity and rates are available.
+        let snap_for_run = if fixture_name.ends_with("-single") {
+            Some(snaps_root.join(*fixture_name))
+        } else {
+            None
+        };
+
         let out = tempdir().expect("tempdir");
         let outcome = run_simulation(&RunOptions {
             runspec: fixture_path,
@@ -1003,7 +1065,7 @@ fn scale_canonical_snapshot_diff() {
             max_parallel_chunks: 1,
             calculator_dag: None,
             run_date_time: Some("2026-05-21T00:00:00".to_string()),
-            snapshot: None,
+            snapshot: snap_for_run,
             scale_input: Some(scale_input_dir),
             default_db: None,
         })

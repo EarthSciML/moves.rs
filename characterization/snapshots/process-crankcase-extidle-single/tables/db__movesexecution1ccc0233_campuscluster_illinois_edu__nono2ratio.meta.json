@@ -1,0 +1,43 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__nono2ratio",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "NOxRatio",
+      "kind": "float64"
+    },
+    {
+      "name": "NOxRatioCV",
+      "kind": "float64"
+    },
+    {
+      "name": "dataSourceId",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID",
+    "sourceTypeID",
+    "fuelTypeID",
+    "modelYearGroupID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "ec95431c00f8ae5b59159e5e7136b41edda41747b6ee3b766fe2a03adc40d355"
+}

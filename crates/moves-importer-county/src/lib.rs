@@ -17,9 +17,11 @@
 //! | `ZoneRoadTypeImporter` | [`zone_road_type`] | `SHOAllocFactor` sums to 1 per `roadTypeID` (per `ZoneRoadTypeImporter.sql`) |
 //! | `AgeDistributionImporter` | [`age_distribution`] | `ageFraction` sums to 1 per (sourceTypeID, yearID) |
 //! | `ZoneImporter` | [`zone`] | allocation factors sum to 1 per `countyID`; embeds `zoneRoadType` |
+//! | `HotellingImporter` | [`hotelling`] | opModeID validity; hourFraction/ageFraction sum-to-1 |
+//! | `StartsImporter` | [`starts`] | hourFraction sum-to-1 per (dayID, sourceTypeID) |
 //!
-//! The remaining ~20 CDB importers (`AverageSpeedDistribution`,
-//! `FuelSupply`, `FuelFormulation`, `IMCoverage`, `Hotelling`, etc.)
+//! The remaining ~18 CDB importers (`AverageSpeedDistribution`,
+//! `FuelSupply`, `FuelFormulation`, `IMCoverage`, etc.)
 //! follow the same pattern and will be added in follow-up tasks under
 //! 's tracking. See `moves-rust-.md` for
 //! the full list, and the Java sources for the validation SQL each
@@ -35,12 +37,16 @@
 //! sums or required-tuple coverage.
 
 pub mod age_distribution;
+pub mod hotelling;
 pub mod source_type_population;
+pub mod starts;
 pub mod zone;
 pub mod zone_road_type;
 
 pub use age_distribution::AgeDistributionImporter;
+pub use hotelling::HotellingImporter;
 pub use source_type_population::SourceTypePopulationImporter;
+pub use starts::StartsImporter;
 pub use zone::ZoneImporter;
 pub use zone_road_type::ZoneRoadTypeImporter;
 
@@ -57,4 +63,6 @@ pub const ALL: &[&dyn moves_importer::Importer] = &[
     &ZoneRoadTypeImporter,
     &AgeDistributionImporter,
     &ZoneImporter,
+    &HotellingImporter,
+    &StartsImporter,
 ];

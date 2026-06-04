@@ -1,0 +1,57 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__ratesopmodedistribution",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "roadTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "avgSpeedBinID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeFraction",
+      "kind": "float64"
+    },
+    {
+      "name": "opModeFractionCV",
+      "kind": "float64"
+    },
+    {
+      "name": "avgBinSpeed",
+      "kind": "float64"
+    },
+    {
+      "name": "avgSpeedFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "roadTypeID",
+    "avgSpeedBinID",
+    "hourDayID",
+    "polProcessID",
+    "opModeID"
+  ],
+  "row_count": 6,
+  "float_decimals": 12,
+  "content_sha256": "64f0d994f5efd84d40ba4c8672c02cd20df14a7a21f5890e5306b8e477d20a38"
+}

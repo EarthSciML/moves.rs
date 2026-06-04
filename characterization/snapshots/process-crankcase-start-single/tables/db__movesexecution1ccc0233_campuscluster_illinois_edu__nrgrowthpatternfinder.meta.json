@@ -1,0 +1,25 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__nrgrowthpatternfinder",
+  "schema": [
+    {
+      "name": "SCC",
+      "kind": "utf8"
+    },
+    {
+      "name": "stateID",
+      "kind": "int64"
+    },
+    {
+      "name": "growthPatternID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "SCC",
+    "stateID"
+  ],
+  "row_count": 4189,
+  "float_decimals": 12,
+  "content_sha256": "b16d637a6340114072220ce5fa7cfe0645f7d9ad4a0cb8157bffe956d8893292"
+}

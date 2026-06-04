@@ -1,0 +1,58 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__shobyageroadwayhour",
+  "schema": [
+    {
+      "name": "yearID",
+      "kind": "int64"
+    },
+    {
+      "name": "roadTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "dayID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "SHO",
+      "kind": "float64"
+    },
+    {
+      "name": "VMT",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "yearID",
+    "roadTypeID",
+    "sourceTypeID",
+    "ageID",
+    "monthID",
+    "dayID",
+    "hourID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "0c6c1b9f88a1d4ea1d4a71dade38ec2426cd753d7163bea614f055fe0eafb062"
+}

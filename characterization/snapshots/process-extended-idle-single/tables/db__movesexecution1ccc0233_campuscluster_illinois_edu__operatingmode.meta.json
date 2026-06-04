@@ -1,0 +1,52 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__operatingmode",
+  "schema": [
+    {
+      "name": "opModeID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeName",
+      "kind": "utf8"
+    },
+    {
+      "name": "VSPLower",
+      "kind": "float64"
+    },
+    {
+      "name": "VSPUpper",
+      "kind": "float64"
+    },
+    {
+      "name": "speedLower",
+      "kind": "float64"
+    },
+    {
+      "name": "speedUpper",
+      "kind": "float64"
+    },
+    {
+      "name": "brakeRate1Sec",
+      "kind": "float64"
+    },
+    {
+      "name": "brakeRate3Sec",
+      "kind": "float64"
+    },
+    {
+      "name": "minSoakTime",
+      "kind": "int64"
+    },
+    {
+      "name": "maxSoakTime",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "opModeID"
+  ],
+  "row_count": 60,
+  "float_decimals": 12,
+  "content_sha256": "dda01dcc5745052f31b07fc926d94fd968466c314d53d79809477aa3ca63232e"
+}

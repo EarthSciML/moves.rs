@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "process-crankcase-extidle-single",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-ky1/characterization/fixture-image.lock",
+  "runspec_path": "/scratch/ctessum/moves-county-fixture/process-crankcase-extidle-single/process-crankcase-extidle-single.xml",
+  "runspec_sha256": "4026881c4557cf60ea2a8a94cf344a7f1f0309a5a6682baef79d4a9dec9f1064",
+  "snapshot_aggregate_sha256": "a51741b90f24f5f9941468286929adfb394d4f3f2ac3a721f5c5c76d5e345a6e",
+  "output_database": "out_process_crankcase_extidle_single",
+  "scale_input_database": "washtenaw_cdb"
+}

@@ -1,0 +1,32 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__nrequipmenttype",
+  "schema": [
+    {
+      "name": "NREquipTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "description",
+      "kind": "utf8"
+    },
+    {
+      "name": "sectorID",
+      "kind": "int64"
+    },
+    {
+      "name": "useDefaultScrappage",
+      "kind": "utf8"
+    },
+    {
+      "name": "surrogateID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "NREquipTypeID"
+  ],
+  "row_count": 88,
+  "float_decimals": 12,
+  "content_sha256": "5494a01d76ea84bdeb6fe3b55920027bbea7391856159ddde702aaefa3efabb6"
+}

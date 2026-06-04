@@ -1,0 +1,24 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__activitytype",
+  "schema": [
+    {
+      "name": "activityTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "activityType",
+      "kind": "utf8"
+    },
+    {
+      "name": "activityTypeDesc",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "activityTypeID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "c3d47031a7f2bf213b93b980a79d9ad30adeca7d952ef328dd8d11847db7be41"
+}
