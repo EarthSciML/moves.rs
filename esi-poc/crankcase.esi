@@ -1,0 +1,73 @@
+{
+  "esi": "0.1.0",
+  "metadata": {
+    "name": "MOVES_Crankcase_EndToEnd_POC",
+    "description": "The core of the CrankcaseEmissionCalculator (crankcaseEmission = exhaustEmission * crankcaseRatio) as an ESI pipeline, run END-TO-END against a REAL characterization snapshot: the CrankcaseEmissionRatio table is loaded straight from the captured Parquet (characterization/snapshots/process-crankcase-running) via an ESI data-source loader. Exercises real-data loading at snapshot scale (572 captured rows) plus the model-year interval theta-join (minModelYearID <= modelYearID <= maxModelYearID) against the real overlapping-window ratio table. Verified row-for-row against the captured ratios in run_crankcase.py. (The exhaust->crankcase process relabel is a trivial derive omitted here; PM pollutants 112/115 have special SulfatePM handling, so the exhaust input keys on the crankcase polProcessID directly.)",
+    "authors": ["Chris Tessum"],
+    "created": "2026-06-03T00:00:00Z",
+    "references": [
+      { "citation": "moves.rs crates/moves-calculators/src/calculators/crankcase_emission.rs",
+        "notes": "crankcaseEmission = exhaustEmission x crankcaseRatio; CrankcaseEmissionRatio keyed by polProcess,sourceType,regClass,fuelType with [minMY,maxMY] window (overlapping windows summed)" }
+    ]
+  },
+
+  "index_sets": {
+    "polProcessID":   { "description": "crankcase polProcessID (key of the captured ratio table)" },
+    "sourceTypeID":   { "description": "source (vehicle) type" },
+    "regClassID":     { "description": "regulatory class" },
+    "fuelTypeID":     { "description": "fuel type" },
+    "modelYearID":    { "description": "vehicle model year" },
+    "minModelYearID": { "description": "ratio window lower bound" },
+    "maxModelYearID": { "description": "ratio window upper bound" }
+  },
+
+  "data_sources": {
+    "snapshot": {
+      "type": "parquet",
+      "loader_id": "snapshot-parquet",
+      "config": {},
+      "reference": { "citation": "characterization/snapshots/process-crankcase-running execution DB", "version": "MOVES5.0.1" }
+    }
+  },
+
+  "tables": {
+    "exhaust": {
+      "description": "Exhaust-process emissions per cell (runtime input). emissionQuant=1.0 in the harness so output == crankcaseRatio.",
+      "keys": { "polProcessID": "polProcessID", "sourceTypeID": "sourceTypeID",
+                "regClassID": "regClassID", "fuelTypeID": "fuelTypeID", "modelYearID": "modelYearID" },
+      "values": { "emissionQuant": { "units": "g" }, "emissionRate": { "units": "g/hr" } }
+    },
+    "crankcaseRatio": {
+      "description": "REAL captured CrankcaseEmissionRatio table, read from the snapshot Parquet via the 'snapshot' data source.",
+      "keys": { "polProcessID": "polProcessID", "minModelYearID": "minModelYearID",
+                "maxModelYearID": "maxModelYearID", "sourceTypeID": "sourceTypeID",
+                "regClassID": "regClassID", "fuelTypeID": "fuelTypeID" },
+      "values": { "crankcaseRatio": { "units": "1" } },
+      "data": { "source": "snapshot", "table": "crankcaseemissionratio" }
+    }
+  },
+
+  "pipelines": {
+    "Crankcase": {
+      "description": "crankcaseEmission = exhaustEmission * crankcaseRatio, with the model-year window join.",
+      "provides": { "emission": { "units": "g",
+        "keys": ["polProcessID", "sourceTypeID", "regClassID", "fuelTypeID", "modelYearID"] } },
+      "steps": [
+        { "id": "s3", "op": "join", "inputs": ["exhaust", "crankcaseRatio"],
+          "on": ["polProcessID", "sourceTypeID", "regClassID", "fuelTypeID"],
+          "predicate": { "op": "and", "args": [
+            { "op": ">=", "args": ["modelYearID", "minModelYearID"] },
+            { "op": "<=", "args": ["modelYearID", "maxModelYearID"] } ] },
+          "description": "join on (polProcess, sourceType, regClass, fuelType) + model-year window theta-join" },
+        { "id": "s4", "op": "derive", "input": "s3", "column": "crankcaseQuant",
+          "expr": { "op": "*", "args": ["emissionQuant", "crankcaseRatio"] } },
+        { "id": "s5", "op": "derive", "input": "s4", "column": "crankcaseRate",
+          "expr": { "op": "*", "args": ["emissionRate", "crankcaseRatio"] } },
+        { "id": "out", "op": "aggregate", "input": "s5",
+          "over": ["minModelYearID", "maxModelYearID"],
+          "reduce": "sum", "value": ["crankcaseQuant", "crankcaseRate"] }
+      ],
+      "output": { "emission": "out" }
+    }
+  }
+}
