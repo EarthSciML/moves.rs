@@ -1,13 +1,18 @@
 <runspec version="MOVES5.0.1">
-	<description><![CDATA[Crankcase Start Exhaust (process 16) at County (SINGLE) scale — non-vacuous variant.
+	<description><![CDATA[Crankcase Start Exhaust (process 16) at County (SINGLE) scale — vacuous reference (issue #39).
 
-The national default starts activity (startsHourFraction) covers hourID=7 only. This
-variant runs at hour 7 with county-scale Starts data, making crankcase start exhaust
-non-vacuous.
+Process 16 crankcase start exhaust is proportional to start exhaust (process 2).
+Canonical MOVES 5.0.1 emits no inventory for process 16 in these single-hour county
+runs — it is absent from every captured snapshot's MOVESOutput (0 of ~28 non-empty
+snapshots emit process 16). See docs/known-divergences.md §4.5.
 
-Requires scale-input directory with Starts.parquet (pre-synthesized county start
-activity for Washtenaw County, hour 7). Snapshot captured with canonical MOVES 5.0.1
-against a county input DB containing startsPerDay.]]></description>
+The scale gate (scale_canonical_snapshot_diff) therefore asserts a VACUOUS match:
+canonical 0 rows == port 0 rows. The port correctly emits nothing; a future
+over-emission fails the gate.
+
+Provides a scale-input directory with Starts.parquet (county start activity for
+Washtenaw County). Snapshot captured with canonical MOVES 5.0.1 against the Washtenaw
+County CDB.]]></description>
 	<models>
 		<model value="ONROAD"/>
 	</models>

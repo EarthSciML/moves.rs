@@ -127,12 +127,24 @@ fn snapshots_root() -> PathBuf {
         .unwrap_or_else(|| workspace_root().join("characterization").join("snapshots"))
 }
 
-/// The scale-inputs root directory, or `None` when [`SCALE_INPUTS_DIR_ENV`] is
-/// not set or does not point to a directory.
+/// The scale-inputs root directory.
+///
+/// Defaults to the in-repo `characterization/county-inputs/` tree (which holds
+/// the per-fixture activity inputs for the `*-single` County-scale fixtures), so
+/// the scale gates run in CI without any environment setup. [`SCALE_INPUTS_DIR_ENV`]
+/// overrides the root (e.g. to point at a tree that also carries
+/// `scale-county/`, `scale-project/`, `scale-rates/` inputs). Returns `None`
+/// only when neither the override nor the default directory exists.
 fn scale_inputs_root() -> Option<PathBuf> {
     std::env::var_os(SCALE_INPUTS_DIR_ENV)
         .map(PathBuf::from)
         .filter(|p| !p.as_os_str().is_empty() && p.is_dir())
+        .or_else(|| {
+            let default = workspace_root()
+                .join("characterization")
+                .join("county-inputs");
+            default.is_dir().then_some(default)
+        })
 }
 
 /// Path to the cell-level tolerance config (used only by the dormant scale-diff gate).
@@ -169,6 +181,11 @@ fn all_fixtures() -> Vec<PathBuf> {
             p.extension().and_then(|x| x.to_str()) == Some("xml")
                 && !name.starts_with("scale-")
                 && !name.starts_with("error-")
+                // `*-single` are County (SINGLE) scale fixtures: they require a
+                // `scale_input` activity tree, so the scale gate
+                // (`scale_canonical_snapshot_diff`) owns them, not the
+                // default-scale `canonical_snapshot_diff`.
+                && !name.ends_with("-single.xml")
         })
         .collect();
     paths.sort();
@@ -187,14 +204,16 @@ fn canonical_present(snapshots_root: &Path, name: &str) -> bool {
 
 /// The fixture catalogue must contain exactly 40 non-scale non-error fixtures.
 ///
-/// 46 total in `characterization/fixtures/`:
-/// - 30 onroad/mixed (non-`nr-`, non-`scale-`, non-`error-`):
+/// 50 total in `characterization/fixtures/`:
+/// - 30 onroad/mixed (non-`nr-`, non-`scale-`, non-`error-`, non-`*-single`):
 /// 23 original default-scale + `mixed-onroad-nonroad` + 6 added by
 /// (`expand-counties-large`, `expand-multifuel`, `expand-fullyear`,
 /// `expand-multiyear`, `expand-roadtypes`, `rates-minimal`)
 /// - 10 NONROAD (`nr-*.xml`)
 /// - 3 `scale-*.xml` (excluded — require additional input databases)
 /// - 3 `error-*.xml` (excluded — test expected parse failures separately)
+/// - 4 `*-single.xml` (excluded — County/SINGLE-scale fixtures owned by the
+/// scale gate, which supplies their `scale_input` activity tree)
 #[test]
 fn fixture_catalogue_size() {
     let fixtures = all_fixtures();
@@ -830,19 +849,23 @@ fn canonical_snapshot_diff() {
 
 // ── scale-fixture gate ────────────────────────────────────────────────────────
 
-/// Run the three County/Project/Rates-scale fixtures and check they complete
-/// without error.
+/// Run the scale fixtures and check they complete without error.
 ///
-/// **Dormant** unless [`SCALE_INPUTS_DIR_ENV`] points at a populated inputs
-/// root (see module docs). When active, each fixture:
+/// **Active by default** for the in-repo `*-single` County-scale fixtures (their
+/// `scale_input` activity tree ships under the default [`scale_inputs_root`],
+/// `characterization/county-inputs/`). The `scale-county` / `scale-project` /
+/// `scale-rates` fixtures stay skipped until their input trees exist under the
+/// scale-inputs root (override it with [`SCALE_INPUTS_DIR_ENV`]). Each covered
+/// fixture:
 ///
 /// 1. Runs `moves run` with `scale_input` pointing at its per-fixture
-/// sub-directory under the scale-inputs root.
+/// sub-directory under the scale-inputs root (and, for `*-single`, the captured
+/// snapshot as the execution DB).
 /// 2. Asserts no error, a non-empty module plan, and a `MOVESRun.parquet`
 /// metadata file.
 ///
-/// The canonical-diff gate (comparing against a canonical-MOVES
-/// snapshot) requires the reference snapshots to be generated separately/// see [`SNAPSHOTS_DIR_ENV`] and the module-level docs for details.
+/// Output-value fidelity (vs a canonical-MOVES snapshot) is checked separately
+/// by [`scale_canonical_snapshot_diff`].
 #[test]
 fn scale_fixtures_run_without_error() {
     let scale_root = match scale_inputs_root() {
@@ -965,22 +988,24 @@ fn scale_fixtures_run_without_error() {
     );
 }
 
-/// Diff each scale fixture's port output against its canonical-MOVES snapshot.
+/// Compare each scale fixture's port output against its canonical-MOVES snapshot.
 ///
-/// **Doubly-dormant**: requires both [`SCALE_INPUTS_DIR_ENV`] (for the
-/// CDB/PDB Parquet inputs) and [`SNAPSHOTS_DIR_ENV`] (for the reference
-/// canonical-MOVES output). When one or both are absent the test prints a
-/// notice and passes without running any diff.
+/// **Active by default** for the `*-single` County-scale fixtures: their
+/// `scale_input` activity tree ships in-repo under
+/// `characterization/county-inputs/` (the default [`scale_inputs_root`]) and
+/// their canonical snapshots ship under `characterization/snapshots/`. Only
+/// fixtures with a captured snapshot (`canonical_present`) are covered, so the
+/// `scale-county` / `scale-project` / `scale-rates` fixtures stay dormant until
+/// their reference snapshots are produced on an Apptainer-capable HPC node
+/// (`characterization/run-all-fixtures.sh --include scale-*`). Override the
+/// inputs root with [`SCALE_INPUTS_DIR_ENV`].
 ///
-/// Note: at author time, canonical MOVES was **not runnable** on the
-/// implementation machine (SIF files were absent). The reference snapshots for
-/// `scale-county`, `scale-project`, and `scale-rates` must be produced by a
-/// separate run of `characterization/run-all-fixtures.sh --include scale-*`
-/// on an Apptainer-capable HPC node.
-///
-/// The `*-single` process-specific fixtures (mo-ky1) have their snapshots captured
-/// via `characterization/apptainer/capture-county-snapshot.sh` using the Washtenaw
-/// County CDB in `characterization/county-inputs/washtenaw-county/`.
+/// The `*-single` fixtures (mo-ky1, issue #39) exercise hotelling / extended-idle
+/// / crankcase processes 90 and 91. Canonical MOVES 5.0.1 emits **no** inventory
+/// for those processes (see docs/known-divergences.md §4.5), so the comparison is
+/// a *vacuous* assertion: canonical 0 rows == port 0 rows. Their snapshots were
+/// captured via `characterization/apptainer/capture-county-snapshot.sh` using the
+/// Washtenaw County CDB in `characterization/county-inputs/washtenaw-county/`.
 #[test]
 fn scale_canonical_snapshot_diff() {
     let scale_root = match scale_inputs_root() {
@@ -988,7 +1013,8 @@ fn scale_canonical_snapshot_diff() {
         None => {
             println!(
                 "\n[scale_canonical_snapshot_diff] DORMANT\n\
-                 Set {SCALE_INPUTS_DIR_ENV} to enable scale-fixture canonical diffs."
+                 No scale-inputs directory (neither {SCALE_INPUTS_DIR_ENV} nor the \
+                 default characterization/county-inputs/ is present)."
             );
             return;
         }
@@ -999,7 +1025,9 @@ fn scale_canonical_snapshot_diff() {
         "scale-county",
         "scale-project",
         "scale-rates",
-        // County-scale SINGLE-domain fixtures (mo-ky1): non-vacuous variants.
+        // County-scale SINGLE-domain fixtures (mo-ky1, issue #39). Canonical
+        // MOVES emits no process-90/91 inventory, so these assert a vacuous
+        // match (canon 0 == port 0); see the per-fixture comment below.
         "process-crankcase-start-single",
         "process-extended-idle-single",
         "process-apu-single",
@@ -1078,6 +1106,41 @@ fn scale_canonical_snapshot_diff() {
                 continue;
             }
         };
+
+        // The `*-single` fixtures exercise hotelling / extended-idle / crankcase
+        // processes 90 and 91. Canonical MOVES 5.0.1 emits **no** inventory for
+        // these processes: its `BaseRateCalculator.sql` GetActivity path reads
+        // the `hotellingHours` activity, but the worker-output step never lands
+        // process-90/91 rows in `MOVESOutput`/`BaseRateOutput` — every captured
+        // snapshot is empty for them, including the fully-populated default-scale
+        // `process-apu` (358 `baseRate_91_2020` rows, APU op-mode-201 fraction
+        // 0.07, non-zero `hotellingHours`, diesel fuel supply — and still 0
+        // output rows). 28 of 28 non-empty snapshots emit only process 1.
+        //
+        // So these fixtures are genuinely vacuous, not a port defect: the port
+        // correctly emits 0 rows too. Assert the vacuous match (canon 0 == port
+        // 0), mirroring the `vacuous` fixtures in `canonical_snapshot_diff`. This
+        // is read from the real `MOVESOutput` row counts (the port writes no
+        // snapshot manifest for an empty output, which is why a `Snapshot::load`
+        // here would otherwise SKIP). A future port over-emission (port > 0)
+        // fails loudly. See docs/known-divergences.md §4.5.
+        if fixture_name.ends_with("-single") {
+            let canon_rows = pollutant_sums_from_snapshot(&canonical).row_count;
+            let port_rows = pollutant_sums_from_output_dir(outcome.output_root.as_path())
+                .unwrap_or_else(|e| panic!("{fixture_name}: reading port MOVESOutput — {e}"))
+                .row_count;
+            if canon_rows == 0 && port_rows == 0 {
+                println!("{fixture_name:<42} vacuous PASS (canon 0 / port 0)");
+                ok.push(fixture_name);
+            } else {
+                failures.push(format!(
+                    "{fixture_name}: expected vacuous (0 rows both) but \
+                     canon={canon_rows} port={port_rows} — canonical MOVES emits no \
+                     process-90/91 inventory (see docs/known-divergences.md §4.5)"
+                ));
+            }
+            continue;
+        }
 
         let port = match Snapshot::load(outcome.output_root.as_path()) {
             Ok(s) => s,

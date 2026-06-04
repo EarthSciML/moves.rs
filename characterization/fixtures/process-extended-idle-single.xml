@@ -1,13 +1,19 @@
 <runspec version="MOVES5.0.1">
-	<description><![CDATA[Extended Idle Exhaust (process 90) at County (SINGLE) scale — non-vacuous variant.
+	<description><![CDATA[Extended Idle Exhaust (process 90) at County (SINGLE) scale — vacuous reference (issue #39).
 
-Extended idle activity (hotellingHours) in the national default database is populated
-for hourID=7 only. This single-county variant runs at hour 7 and provides county-scale
-hotellingHours via the scale-input database, producing non-zero output.
+Canonical MOVES 5.0.1 emits NO inventory for process 90 (extended idle). Its
+BaseRateCalculator.sql reads the hotellingHours activity in GetActivity (Section
+Process90), but the worker-output step never lands process-90 rows in
+MOVESOutput/BaseRateOutput — every captured snapshot is empty for process 90/91 (0 of
+~28 non-empty snapshots emit them). See docs/known-divergences.md §4.5.
 
-Requires scale-input directory with hotellingHours.parquet (pre-synthesized county
-hotelling activity for Washtenaw County, hour 7). Snapshot captured with canonical
-MOVES 5.0.1 against a county input DB containing hotellingHoursPerDay.]]></description>
+The scale gate (scale_canonical_snapshot_diff) therefore asserts a VACUOUS match:
+canonical 0 rows == port 0 rows. The port correctly emits nothing; a future
+over-emission fails the gate.
+
+Provides a scale-input directory with hotellingHours.parquet (county hotelling activity)
+and hotellingActivityDistribution.parquet. Snapshot captured with canonical MOVES 5.0.1
+against the Washtenaw County CDB.]]></description>
 	<models>
 		<model value="ONROAD"/>
 	</models>

@@ -452,6 +452,46 @@ that the corresponding unit test did not cover.
 **Resolution:** fix the bug in the calculator, update the unit test to cover
 the case, and verify the divergence disappears.
 
+### 4.5 Vacuous by canonical design: hotelling / extended-idle / crankcase inventory (processes 16/17/90/91)
+
+The four County (SINGLE) scale fixtures `process-apu-single` (process 91),
+`process-extended-idle-single` (90), `process-crankcase-start-single` (16), and
+`process-crankcase-extidle-single` (17) emit **no `MOVESOutput` rows** — and
+neither does canonical MOVES 5.0.1. This is **not** a port defect; canonical
+itself produces no inventory for these processes:
+
+- Across all captured snapshots, **0 of ~28 with non-empty `MOVESOutput` emit
+  process 16, 17, 90, or 91** — every non-empty output is process 1 (running
+  exhaust) plus a handful of 9/10/11/12/13/15/18/19. None of the
+  hotelling/extended-idle/crankcase-start/crankcase-ext-idle processes appear.
+- The default-scale `process-apu` snapshot is the clinching case: it has every
+  upstream input populated — 358 `baseRate_91_2020` rate rows, a non-zero APU
+  op-mode (201) fraction (0.07), non-zero `hotellingHours` activity at the run's
+  `hourDayID`, and diesel fuel supply — yet `baseRateOutput` and `MOVESOutput`
+  are still **0 rows**.
+- `BaseRateCalculator.sql` does read the activity (`GetActivity → Section
+  Process90` / `Section Process91`: `activity = sum(hotellingHours)`), but the
+  worker-output step that would populate `MOVESWorkerOutput` from
+  `BaseRateOutput` is marked `***GOLANG TODO***` and lands no process-90/91 rows
+  in this build.
+
+**Why this matters for the port.** The port reproduces the vacuity correctly:
+`build_universal_activity` (`baseratecalculator`) builds activity only for
+processes 1/9/10 (SHO) and 2 (Starts), returning empty for 90/91, so the
+inventory multiply emits nothing — matching canonical's empty output. Wiring
+process-90/91 activity into the port would make it **over**-emit relative to a
+canonical that drops those rows (the same gap already quarantined for the
+default-scale `process-apu`); the honest behaviour is to emit nothing.
+
+**Gate handling.** `scale_canonical_snapshot_diff` asserts a **vacuous match**
+for these fixtures: canonical 0 rows == port 0 rows. (The port writes no snapshot
+manifest for an empty output, so the gate reads the real `MOVESOutput` row count
+rather than loading a `Snapshot`.) A future port over-emission (`port > 0`) fails
+the gate loudly. The four fixtures are therefore active references, not
+quarantined — they pin the *absence* of process-16/17/90/91 inventory until a
+MOVES build that completes that path is adopted (at which point they would
+graduate to a non-vacuous diff). Tracked in issue #39.
+
 ---
 
 ## 5. Regression workflow once the gate is active
@@ -479,7 +519,26 @@ REGRESSION_SNAPSHOTS_DIR=characterization/snapshots \
 
 ---
 
-## 6. Scale fixtures (deferred)
+## 6. Scale fixtures
+
+### 6.1 Active: County (SINGLE) `*-single` fixtures
+
+Four County-scale fixtures ship their `scale_input` activity tree in-repo under
+`characterization/county-inputs/` and their canonical snapshots under
+`characterization/snapshots/`, so `scale_canonical_snapshot_diff` runs them **by
+default** (the default [`scale_inputs_root`] is `characterization/county-inputs/`;
+override with `SCALE_INPUTS_DIR`):
+
+| Fixture | Process | Status |
+|---------|---------|--------|
+| `process-apu-single` | 91 (APU / hotelling) | vacuous (§4.5) |
+| `process-extended-idle-single` | 90 (extended idle) | vacuous (§4.5) |
+| `process-crankcase-start-single` | 16 (crankcase start) | vacuous (§4.5) |
+| `process-crankcase-extidle-single` | 17 (crankcase ext-idle) | vacuous (§4.5) |
+
+All four assert a vacuous match (canon 0 == port 0); see §4.5.
+
+### 6.2 Deferred: `scale-*` fixtures
 
 The three excluded `scale-*` fixtures require additional input databases:
 
