@@ -1,0 +1,20 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__nrhourpatternfinder",
+  "schema": [
+    {
+      "name": "NREquipTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "NRHourAllocPatternID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "NREquipTypeID"
+  ],
+  "row_count": 89,
+  "float_decimals": 12,
+  "content_sha256": "6737bc626c136eb80e76810b70db4dc36af9f7df1c1448c09db621939489568d"
+}

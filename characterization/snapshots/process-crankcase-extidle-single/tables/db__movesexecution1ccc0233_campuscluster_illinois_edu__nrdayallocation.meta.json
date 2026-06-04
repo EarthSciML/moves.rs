@@ -1,0 +1,25 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__nrdayallocation",
+  "schema": [
+    {
+      "name": "scc",
+      "kind": "utf8"
+    },
+    {
+      "name": "dayID",
+      "kind": "int64"
+    },
+    {
+      "name": "dayFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "scc",
+    "dayID"
+  ],
+  "row_count": 210,
+  "float_decimals": 12,
+  "content_sha256": "77265db54fe029376cf673dfb5a05c97d79afb6136e65f519d93707e508658e8"
+}

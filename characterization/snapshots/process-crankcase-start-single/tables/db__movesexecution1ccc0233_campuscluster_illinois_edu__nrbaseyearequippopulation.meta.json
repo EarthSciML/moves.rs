@@ -1,0 +1,29 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__nrbaseyearequippopulation",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "stateID",
+      "kind": "int64"
+    },
+    {
+      "name": "population",
+      "kind": "float64"
+    },
+    {
+      "name": "NRBaseYearID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "stateID"
+  ],
+  "row_count": 62699,
+  "float_decimals": 12,
+  "content_sha256": "a434dc5c5f56ec0e2d3db7ba82e0deb2c1807598b9de832aec3af80463d4057c"
+}

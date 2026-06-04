@@ -1,0 +1,24 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__togspeciationprofilename",
+  "schema": [
+    {
+      "name": "togSpeciationProfileID",
+      "kind": "utf8"
+    },
+    {
+      "name": "TOGSpeciationProfileName",
+      "kind": "utf8"
+    },
+    {
+      "name": "dataSourceId",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "togSpeciationProfileID"
+  ],
+  "row_count": 29,
+  "float_decimals": 12,
+  "content_sha256": "fa31c7f9f0cdc4199914aea7100aaeb046222fc4db1a40f3d78901f19504c48e"
+}

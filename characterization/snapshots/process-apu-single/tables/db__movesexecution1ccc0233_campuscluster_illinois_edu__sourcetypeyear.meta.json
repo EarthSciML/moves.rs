@@ -1,0 +1,33 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__sourcetypeyear",
+  "schema": [
+    {
+      "name": "yearID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "salesGrowthFactor",
+      "kind": "float64"
+    },
+    {
+      "name": "sourceTypePopulation",
+      "kind": "float64"
+    },
+    {
+      "name": "migrationrate",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "yearID",
+    "sourceTypeID"
+  ],
+  "row_count": 13,
+  "float_decimals": 12,
+  "content_sha256": "23da317778cfeca239471378d7e57e021480af1f769e3a765028981da84c12be"
+}

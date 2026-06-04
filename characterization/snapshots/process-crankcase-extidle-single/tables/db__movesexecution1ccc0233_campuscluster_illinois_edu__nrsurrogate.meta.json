@@ -1,0 +1,24 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__nrsurrogate",
+  "schema": [
+    {
+      "name": "surrogateID",
+      "kind": "int64"
+    },
+    {
+      "name": "description",
+      "kind": "utf8"
+    },
+    {
+      "name": "surrogateAbbr",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "surrogateID"
+  ],
+  "row_count": 19,
+  "float_decimals": 12,
+  "content_sha256": "c4ed17e32ffe3e46389a3f67d8bfe5dae2a2ec1900f9b335e56789c95b51b320"
+}
