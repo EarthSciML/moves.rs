@@ -960,7 +960,9 @@ impl TableRow for RefuelingFuelFormulationRow {
                 Ok(RefuelingFuelFormulationRow {
                     fuel_formulation_id: ff.get(i).ok_or_else(|| null("fuelFormulationID"))?,
                     fuel_subtype_id: fs.get(i).ok_or_else(|| null("fuelSubtypeID"))?,
-                    rvp: rvp.get(i).ok_or_else(|| null("RVP"))?,
+                    // RVP is nullable in MOVES; a NULL contributes nothing to
+                    // sum(RVP × marketShare), identical to contributing 0.0.
+                    rvp: rvp.get(i).unwrap_or(0.0),
                 })
             })
             .collect()
