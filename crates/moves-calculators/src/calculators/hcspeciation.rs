@@ -900,19 +900,24 @@ fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -
 }
 
 /// One `FuelFormulation` row — the oxygenate fields the speciation formula reads.
+///
+/// All five oxygenate columns are nullable `FLOAT` in MOVES. They feed the
+/// additive `totalOxygenate` sum (and `volToWtPercentOxy` as a multiplier), so
+/// a `NULL` is modelled as `0.0` — consistent with the MOVES SQL, which opens
+/// with `update FuelFormulation set ETOHVolume = 0 where ETOHVolume is null`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HcFuelFormulationRow {
  /// `fuelFormulationID`.
     pub fuel_formulation_id: i32,
- /// `MTBEVolume`.
+ /// `MTBEVolume`. Nullable; `NULL` → `0.0`.
     pub mtbe_volume: f64,
- /// `ETBEVolume`.
+ /// `ETBEVolume`. Nullable; `NULL` → `0.0`.
     pub etbe_volume: f64,
- /// `TAMEVolume`.
+ /// `TAMEVolume`. Nullable; `NULL` → `0.0`.
     pub tame_volume: f64,
- /// `ETOHVolume`.
+ /// `ETOHVolume`. Nullable; `NULL` → `0.0`.
     pub etoh_volume: f64,
- /// `volToWtPercentOxy`.
+ /// `volToWtPercentOxy`. Nullable; `NULL` → `0.0`.
     pub vol_to_wt_percent_oxy: f64,
 }
 
@@ -1000,13 +1005,14 @@ impl TableRow for HcFuelFormulationRow {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
                 Ok(HcFuelFormulationRow {
                     fuel_formulation_id: ff_id.get(i).ok_or_else(|| null("fuelFormulationID"))?,
-                    mtbe_volume: mtbe.get(i).ok_or_else(|| null("MTBEVolume"))?,
-                    etbe_volume: etbe.get(i).ok_or_else(|| null("ETBEVolume"))?,
-                    tame_volume: tame.get(i).ok_or_else(|| null("TAMEVolume"))?,
-                    etoh_volume: etoh.get(i).ok_or_else(|| null("ETOHVolume"))?,
-                    vol_to_wt_percent_oxy: vol_to_wt
-                        .get(i)
-                        .ok_or_else(|| null("volToWtPercentOxy"))?,
+                    // The oxygenate volumes are nullable; a NULL contributes
+                    // nothing to totalOxygenate, identical to 0.0 (MOVES coalesces
+                    // ETOHVolume to 0 before reading).
+                    mtbe_volume: mtbe.get(i).unwrap_or(0.0),
+                    etbe_volume: etbe.get(i).unwrap_or(0.0),
+                    tame_volume: tame.get(i).unwrap_or(0.0),
+                    etoh_volume: etoh.get(i).unwrap_or(0.0),
+                    vol_to_wt_percent_oxy: vol_to_wt.get(i).unwrap_or(0.0),
                 })
             })
             .collect()
@@ -2695,5 +2701,36 @@ mod tests {
         let calc: Box<dyn Calculator> = Box::new(HcSpeciationCalculator::new());
         assert_eq!(calc.name(), "HCSpeciationCalculator");
         assert_eq!(calc.registrations().len(), 40);
+    }
+
+    #[test]
+    fn from_dataframe_treats_null_oxygenate_volumes_as_zero() {
+        use polars::prelude::{DataFrame, NamedFrom, Series};
+ // The FuelFormulation oxygenate columns are nullable; a NULL contributes
+ // nothing to totalOxygenate, identical to 0.0 (MOVES coalesces them).
+ // Row 1 has every oxygenate column NULL and must extract as 0.0, not error.
+        let df = DataFrame::new(
+            2,
+            vec![
+                Series::new("fuelFormulationID".into(), &[10_i32, 20]).into(),
+                Series::new("MTBEVolume".into(), &[Some(1.0_f64), None]).into(),
+                Series::new("ETBEVolume".into(), &[Some(2.0_f64), None]).into(),
+                Series::new("TAMEVolume".into(), &[Some(3.0_f64), None]).into(),
+                Series::new("ETOHVolume".into(), &[Some(4.0_f64), None]).into(),
+                Series::new("volToWtPercentOxy".into(), &[Some(5.0_f64), None]).into(),
+            ],
+        )
+        .unwrap();
+
+        let rows = HcFuelFormulationRow::from_dataframe(&df)
+            .expect("null oxygenate volumes must extract as 0.0, not error");
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].mtbe_volume, 1.0);
+        assert_eq!(rows[0].vol_to_wt_percent_oxy, 5.0);
+        assert_eq!(rows[1].mtbe_volume, 0.0);
+        assert_eq!(rows[1].etbe_volume, 0.0);
+        assert_eq!(rows[1].tame_volume, 0.0);
+        assert_eq!(rows[1].etoh_volume, 0.0);
+        assert_eq!(rows[1].vol_to_wt_percent_oxy, 0.0);
     }
 }

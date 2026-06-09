@@ -2838,6 +2838,29 @@ mod tests {
     }
 
     #[test]
+    fn from_dataframe_treats_null_rvp_as_zero() {
+        use polars::prelude::{DataFrame, NamedFrom, Series};
+ // FuelFormulation.RVP is nullable — non-gasoline formulations carry a
+ // NULL RVP in the default DB. Extraction must yield 0.0, not error
+ // (the bug that crashed the default-DB demo).
+        let df = DataFrame::new(
+            2,
+            vec![
+                Series::new("fuelFormulationID".into(), &[10_i32, 20]).into(),
+                Series::new("fuelSubtypeID".into(), &[1_i32, 2]).into(),
+                Series::new("RVP".into(), &[Some(9.0_f64), None]).into(),
+            ],
+        )
+        .unwrap();
+
+        let rows = RefuelingFuelFormulationRow::from_dataframe(&df)
+            .expect("null RVP must extract as 0.0, not error");
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].rvp, 9.0);
+        assert_eq!(rows[1].rvp, 0.0);
+    }
+
+    #[test]
     fn spillage_zeroes_the_program_adjustment_for_non_gasoline_fuels() {
  // Fuel type 2 (diesel): the synthesised RefuelingCountyYear row carries
  // refuelingSpillProgramAdjust = 0 even though the run county/year sets

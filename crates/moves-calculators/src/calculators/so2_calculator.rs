@@ -190,7 +190,8 @@ pub struct FuelFormulationRow {
     pub fuel_formulation_id: i32,
  /// `fuelSubTypeID` — joins to [`FuelSubTypeRow::fuel_sub_type_id`].
     pub fuel_sub_type_id: i32,
- /// `sulfurLevel` — fuel sulfur content. `FLOAT` in MOVES.
+ /// `sulfurLevel` — fuel sulfur content. `FLOAT` in MOVES; nullable, read by
+ /// the SQL as `coalesce(sulfurLevel, 0)`, so a `NULL` is modelled as `0.0`.
     pub sulfur_level: f64,
 }
 
@@ -619,7 +620,9 @@ impl TableRow for FuelFormulationRow {
                 Ok(FuelFormulationRow {
                     fuel_formulation_id: form_id.get(i).ok_or_else(|| null("fuelFormulationID"))?,
                     fuel_sub_type_id: sub_type.get(i).ok_or_else(|| null("fuelSubTypeID"))?,
-                    sulfur_level: sulfur.get(i).ok_or_else(|| null("sulfurLevel"))?,
+                    // sulfurLevel is nullable; the SQL reads coalesce(sulfurLevel, 0),
+                    // and SO2 sums marketShare × sulfurLevel, so NULL contributes 0.0.
+                    sulfur_level: sulfur.get(i).unwrap_or(0.0),
                 })
             })
             .collect()
@@ -2781,5 +2784,27 @@ mod tests {
  // The registry stores calculators as Box<dyn Calculator>.
         let calc: Box<dyn Calculator> = Box::new(SO2Calculator);
         assert_eq!(calc.name(), "SO2Calculator");
+    }
+
+    #[test]
+    fn from_dataframe_treats_null_sulfur_level_as_zero() {
+        use polars::prelude::{DataFrame, NamedFrom, Series};
+ // FuelFormulation.sulfurLevel is nullable; the SQL reads it as
+ // coalesce(sulfurLevel, 0). Extraction must yield 0.0, not error.
+        let df = DataFrame::new(
+            2,
+            vec![
+                Series::new("fuelFormulationID".into(), &[10_i32, 20]).into(),
+                Series::new("fuelSubTypeID".into(), &[1_i32, 2]).into(),
+                Series::new("sulfurLevel".into(), &[Some(30.0_f64), None]).into(),
+            ],
+        )
+        .unwrap();
+
+        let rows = FuelFormulationRow::from_dataframe(&df)
+            .expect("null sulfurLevel must extract as 0.0, not error");
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].sulfur_level, 30.0);
+        assert_eq!(rows[1].sulfur_level, 0.0);
     }
 }
