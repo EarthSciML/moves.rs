@@ -25,7 +25,7 @@ use moves_framework::{
     CountyRow, DataFrameStore, DataFrameStoreTyped, GeographyTables, InMemoryStore, LinkRow,
 };
 use moves_runspec::RunSpec;
-use polars::prelude::{Column, DataFrame, DataType, NamedFrom, Series};
+use polars::prelude::{BooleanChunked, Column, DataFrame, DataType, NamedFrom, Series};
 
 const BUNDLE_MAGIC: &[u8; 8] = b"MXDB\x00\x00\x00\x01";
 
@@ -118,6 +118,14 @@ pub fn parse_bundle_to_store(bundle_bytes: &[u8]) -> Result<InMemoryStore, Strin
 /// engine needs.
 pub fn setup_execution_store(runspec: &RunSpec, store: &mut InMemoryStore) -> Result<(), String> {
     merge_store_variants_eager(store)?;
+    // Several geography-keyed tables ship as a single unpartitioned national
+    // file (ZoneMonthHour alone is ~930k rows). A county-scoped onroad run only
+    // ever reads its own county/zone, so pruning the rest up front shrinks the
+    // meteorology synthesis below and every downstream calculator's
+    // ZoneMonthHour scan — the WASM analogue of the gate's zone-filter. Must run
+    // before populate_zone_month_hour_meteorology so the synthesis sees the
+    // already-pruned table.
+    prune_geographic_tables_to_runspec(runspec, store)?;
     populate_source_use_type_physics_mapping(store)?;
     populate_pollutant_process_mapped_model_year(store)?;
     populate_zone_month_hour_meteorology(store)?;
@@ -128,6 +136,141 @@ pub fn setup_execution_store(runspec: &RunSpec, store: &mut InMemoryStore) -> Re
     // with 0.0 rather than have the strict per-row extractors error on it.
     fill_fuel_supply_placeholder_nulls(store)?;
     build_runspec_tables(runspec, store)?;
+    Ok(())
+}
+
+/// Drop rows of geography-keyed national tables that fall outside the runspec's
+/// county selections, so the in-browser store build and the calculator chain
+/// don't carry ~3000× the data a single-county run needs.
+///
+/// The default DB ships `ZoneMonthHour` (≈930k rows = 3232 zones × 288
+/// month/hours) and `CountyYear` (≈204k rows) as single unpartitioned files.
+/// For a county-scoped onroad run only the run's own county/zone is ever read,
+/// so the rest is dead weight that dominates the WASM runtime (the
+/// `ZoneMonthHour` meteorology synthesis re-materialises every row, and each
+/// met-reading calculator rescans the table per chunk).
+///
+/// Conservative by design:
+/// * No-op unless the run is *purely* county-scoped (any state/nation selection
+///   leaves the tables intact — we can't enumerate their zones here).
+/// * The keep-set of zone IDs is taken from the loaded `Zone` table
+///   (`countyID → zoneID`), which is authoritative, falling back to the MOVES
+///   `zoneID = countyID × 10` convention only if `Zone` is absent.
+/// * Per table, a filter that would drop *every* row is skipped (a column or
+///   convention mismatch must not silently empty a table — keep it full and
+///   correct, just slow).
+fn prune_geographic_tables_to_runspec(
+    runspec: &RunSpec,
+    store: &mut InMemoryStore,
+) -> Result<(), String> {
+    use moves_runspec::GeoKind;
+
+    let mut county_ids: BTreeSet<i64> = BTreeSet::new();
+    let mut has_broader_scope = false;
+    for sel in &runspec.geographic_selections {
+        match sel.kind {
+            GeoKind::County => {
+                county_ids.insert(sel.key as i64);
+            }
+            // State / Nation (or anything else): can't safely enumerate zones.
+            _ => has_broader_scope = true,
+        }
+    }
+    if county_ids.is_empty() || has_broader_scope {
+        return Ok(());
+    }
+
+    // Authoritative zoneIDs for the selected counties, from the Zone table.
+    let zone_ids = zone_ids_for_counties(store, &county_ids);
+
+    prune_table_by_id(store, "ZoneMonthHour", "zoneID", &zone_ids)?;
+    prune_table_by_id(store, "CountyYear", "countyID", &county_ids)?;
+    Ok(())
+}
+
+/// Resolve the set of zone IDs belonging to `county_ids` from the `Zone` table
+/// (`zoneID`, `countyID`). Falls back to the MOVES `zoneID = countyID × 10`
+/// convention if `Zone` is missing or carries neither column.
+fn zone_ids_for_counties(store: &InMemoryStore, county_ids: &BTreeSet<i64>) -> BTreeSet<i64> {
+    let fallback = || county_ids.iter().map(|&c| c * 10).collect::<BTreeSet<i64>>();
+
+    let Some(arc) = store.get("Zone") else {
+        return fallback();
+    };
+    let df = &*arc;
+    let col = |name: &str| {
+        df.columns()
+            .iter()
+            .find(|c| c.name().eq_ignore_ascii_case(name))
+            .and_then(|c| c.cast(&DataType::Int32).ok())
+    };
+    let (Some(zone_col), Some(county_col)) = (col("zoneID"), col("countyID")) else {
+        return fallback();
+    };
+    let (Ok(zids), Ok(cids)) = (zone_col.i32(), county_col.i32()) else {
+        return fallback();
+    };
+    let mut out: BTreeSet<i64> = BTreeSet::new();
+    for i in 0..df.height() {
+        if let (Some(z), Some(c)) = (zids.get(i), cids.get(i)) {
+            if county_ids.contains(&(c as i64)) {
+                out.insert(z as i64);
+            }
+        }
+    }
+    if out.is_empty() {
+        fallback()
+    } else {
+        out
+    }
+}
+
+/// Filter `table` in place to rows whose `id_col` value is in `keep`. No-op if
+/// the table or column is absent, if nothing would be dropped, or if the filter
+/// would keep zero rows (treated as a convention mismatch: leave the table full
+/// so the run stays correct).
+fn prune_table_by_id(
+    store: &mut InMemoryStore,
+    table: &str,
+    id_col: &str,
+    keep: &BTreeSet<i64>,
+) -> Result<(), String> {
+    let Some(arc) = store.get(table) else {
+        return Ok(());
+    };
+    let df = (*arc).clone();
+    drop(arc);
+
+    let Some(name) = df
+        .columns()
+        .iter()
+        .find(|c| c.name().eq_ignore_ascii_case(id_col))
+        .map(|c| c.name().to_string())
+    else {
+        return Ok(());
+    };
+    let col = df
+        .column(&name)
+        .and_then(|c| c.cast(&DataType::Int32))
+        .map_err(|e| format!("{table}.{id_col} cast: {e}"))?;
+    let ca = col.i32().map_err(|e| format!("{table}.{id_col}: {e}"))?;
+
+    let mut mask: Vec<bool> = Vec::with_capacity(ca.len());
+    let mut kept = 0usize;
+    for v in ca {
+        let b = v.is_some_and(|x| keep.contains(&(x as i64)));
+        kept += usize::from(b);
+        mask.push(b);
+    }
+    // Nothing to drop, or a mismatch that would empty the table: leave it.
+    if kept == df.height() || kept == 0 {
+        return Ok(());
+    }
+    let mask: BooleanChunked = mask.into_iter().collect();
+    let filtered = df
+        .filter(&mask)
+        .map_err(|e| format!("filtering {table}: {e}"))?;
+    store.insert(table.to_string(), filtered);
     Ok(())
 }
 
@@ -1239,5 +1382,135 @@ mod tests {
         merge_store_variants_eager(&mut store).expect("merge must succeed");
         let merged = store.get("baserate").expect("merged table must exist");
         assert_eq!(merged.height(), 4, "two variants × 2 rows each = 4");
+    }
+
+    #[test]
+    fn prune_geographic_tables_filters_to_selected_county() {
+        use moves_runspec::{GeoKind, GeographicSelection, RunSpec};
+
+        // ZoneMonthHour with two zones (60370 belongs to county 6037, 99990 to
+        // county 9999); the run selects only county 6037.
+        let zmh = DataFrame::new(
+            4,
+            vec![
+                Series::new("zoneID".into(), &[60370_i32, 60370, 99990, 99990]).into(),
+                Series::new("monthID".into(), &[1_i32, 2, 1, 2]).into(),
+            ],
+        )
+        .unwrap();
+        let zone = DataFrame::new(
+            2,
+            vec![
+                Series::new("zoneID".into(), &[60370_i32, 99990]).into(),
+                Series::new("countyID".into(), &[6037_i32, 9999]).into(),
+            ],
+        )
+        .unwrap();
+        let county_year = DataFrame::new(
+            2,
+            vec![
+                Series::new("countyID".into(), &[6037_i32, 9999]).into(),
+                Series::new("yearID".into(), &[2020_i32, 2020]).into(),
+            ],
+        )
+        .unwrap();
+
+        let mut store = InMemoryStore::new();
+        store.insert("ZoneMonthHour".to_string(), zmh);
+        store.insert("Zone".to_string(), zone);
+        store.insert("CountyYear".to_string(), county_year);
+
+        let runspec = RunSpec {
+            geographic_selections: vec![GeographicSelection {
+                kind: GeoKind::County,
+                key: 6037,
+                description: String::new(),
+            }],
+            ..RunSpec::default()
+        };
+
+        prune_geographic_tables_to_runspec(&runspec, &mut store).expect("prune must succeed");
+
+        assert_eq!(
+            store.get("ZoneMonthHour").unwrap().height(),
+            2,
+            "only county 6037's zone (60370) rows kept"
+        );
+        assert_eq!(
+            store.get("CountyYear").unwrap().height(),
+            1,
+            "only county 6037 kept"
+        );
+    }
+
+    #[test]
+    fn prune_geographic_tables_is_noop_for_non_county_scope() {
+        use moves_runspec::{GeoKind, GeographicSelection, RunSpec};
+
+        let zmh = DataFrame::new(
+            2,
+            vec![Series::new("zoneID".into(), &[60370_i32, 99990]).into()],
+        )
+        .unwrap();
+        let mut store = InMemoryStore::new();
+        store.insert("ZoneMonthHour".to_string(), zmh);
+
+        // State-level selection: zones aren't enumerable here, so leave intact.
+        let runspec = RunSpec {
+            geographic_selections: vec![GeographicSelection {
+                kind: GeoKind::State,
+                key: 6,
+                description: String::new(),
+            }],
+            ..RunSpec::default()
+        };
+
+        prune_geographic_tables_to_runspec(&runspec, &mut store).expect("prune must succeed");
+        assert_eq!(
+            store.get("ZoneMonthHour").unwrap().height(),
+            2,
+            "state scope: ZoneMonthHour untouched"
+        );
+    }
+
+    #[test]
+    fn prune_keeps_full_table_when_no_zone_matches() {
+        use moves_runspec::{GeoKind, GeographicSelection, RunSpec};
+
+        // Zone maps the only zone to a different county than the run selects, so
+        // the keep-set wouldn't match any ZoneMonthHour row — the guard must
+        // leave the table full (correct, if slow) rather than empty it.
+        let zmh = DataFrame::new(
+            2,
+            vec![Series::new("zoneID".into(), &[60370_i32, 60370]).into()],
+        )
+        .unwrap();
+        let zone = DataFrame::new(
+            1,
+            vec![
+                Series::new("zoneID".into(), &[60370_i32]).into(),
+                Series::new("countyID".into(), &[6037_i32]).into(),
+            ],
+        )
+        .unwrap();
+        let mut store = InMemoryStore::new();
+        store.insert("ZoneMonthHour".to_string(), zmh);
+        store.insert("Zone".to_string(), zone);
+
+        let runspec = RunSpec {
+            geographic_selections: vec![GeographicSelection {
+                kind: GeoKind::County,
+                key: 1234, // no zone maps to this county
+                description: String::new(),
+            }],
+            ..RunSpec::default()
+        };
+
+        prune_geographic_tables_to_runspec(&runspec, &mut store).expect("prune must succeed");
+        assert_eq!(
+            store.get("ZoneMonthHour").unwrap().height(),
+            2,
+            "no match → keep full table, never empty it"
+        );
     }
 }
