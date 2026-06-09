@@ -158,9 +158,7 @@ impl Importer for StartsImporter {
                         if day.is_null(i) || st.is_null(i) || frac.is_null(i) {
                             continue;
                         }
-                        *sums
-                            .entry((day.value(i), st.value(i)))
-                            .or_insert(0.0) += frac.value(i);
+                        *sums.entry((day.value(i), st.value(i))).or_insert(0.0) += frac.value(i);
                     }
                     for ((d, s), sum) in &sums {
                         let rounded = (sum * 10_000.0).round() / 10_000.0;
@@ -209,11 +207,8 @@ mod tests {
             Arc::new(s.finish()),
             Arc::new(f.finish()),
         ];
-        moves_importer::writer::build_record_batch_from_columns(
-            &STARTS_HOUR_FRACTION_TABLE,
-            cols,
-        )
-        .unwrap()
+        moves_importer::writer::build_record_batch_from_columns(&STARTS_HOUR_FRACTION_TABLE, cols)
+            .unwrap()
     }
 
     #[test]

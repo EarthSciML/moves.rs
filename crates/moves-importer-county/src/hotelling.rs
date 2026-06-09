@@ -173,8 +173,7 @@ impl Importer for HotellingImporter {
                         if zone.is_null(i) || day.is_null(i) || frac.is_null(i) {
                             continue;
                         }
-                        *sums.entry((zone.value(i), day.value(i))).or_insert(0.0) +=
-                            frac.value(i);
+                        *sums.entry((zone.value(i), day.value(i))).or_insert(0.0) += frac.value(i);
                     }
                     for ((z, d), sum) in &sums {
                         let rounded = (sum * 10_000.0).round() / 10_000.0;
@@ -238,9 +237,9 @@ impl Importer for HotellingImporter {
                 .column_by_name("fuelTypeID")
                 .and_then(|c| c.as_any().downcast_ref::<Int64Array>().map(|_| c));
             // opModeID uses Filter::NonNegative → Float64 storage; read and cast to i64.
-            let op_mode_col = batch.column_by_name("opModeID").and_then(|c| {
-                c.as_any().downcast_ref::<Float64Array>().map(|_| c)
-            });
+            let op_mode_col = batch
+                .column_by_name("opModeID")
+                .and_then(|c| c.as_any().downcast_ref::<Float64Array>().map(|_| c));
             let frac_col = batch
                 .column_by_name("opModeFraction")
                 .and_then(|c| c.as_any().downcast_ref::<Float64Array>().map(|_| c));
@@ -251,13 +250,8 @@ impl Importer for HotellingImporter {
                 .column_by_name("endModelYearID")
                 .and_then(|c| c.as_any().downcast_ref::<Int64Array>().map(|_| c));
 
-            if let (
-                Some(fuel_c),
-                Some(op_mode_c),
-                Some(frac_c),
-                Some(begin_c),
-                Some(end_c),
-            ) = (fuel_col, op_mode_col, frac_col, begin_col, end_col)
+            if let (Some(fuel_c), Some(op_mode_c), Some(frac_c), Some(begin_c), Some(end_c)) =
+                (fuel_col, op_mode_col, frac_col, begin_col, end_col)
             {
                 let fuel = fuel_c.as_any().downcast_ref::<Int64Array>().unwrap();
                 let op_mode_f = op_mode_c.as_any().downcast_ref::<Float64Array>().unwrap();
@@ -330,9 +324,7 @@ impl Importer for HotellingImporter {
                             "hotellingActivityDistribution",
                             Some("beginModelYearID"),
                             Some(i),
-                            format!(
-                                "BeginModelYearID ({bmy}) must be <= EndModelYearID ({emy})"
-                            ),
+                            format!("BeginModelYearID ({bmy}) must be <= EndModelYearID ({emy})"),
                         ));
                     }
                 }
