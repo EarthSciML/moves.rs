@@ -69,7 +69,7 @@ use moves_calculator_info::{Granularity, Priority};
 use moves_data::{PollutantId, PollutantProcessAssociation, ProcessId};
 use moves_framework::{
     CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStoreTyped, Error,
-    Generator, TableRow,
+    Generator, ModelScale, TableRow,
 };
 use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
 
@@ -1037,10 +1037,18 @@ impl Generator for StartOperatingModeDistributionGenerator {
         // Write OpModeDistribution to scratch.
         crate::wiring::write_scratch_table(ctx, OUTPUT_TABLES[0], op_mode_rows)?;
 
-        // Write RatesOpModeDistribution to scratch directly (second table).
-        let rates_df = RatesOpModeDistributionRow::into_dataframe(rates_rows)
-            .map_err(|e| Error::Polars(e.to_string()))?;
-        ctx.scratch_mut().insert(OUTPUT_TABLES[1], rates_df);
+        // RatesOpModeDistribution is a rates-mode table. This generator's start
+        // rows carry only a narrow schema (no canonical `roadTypeID`/etc.), and
+        // in an inventory run it is the *only* writer of the table — so emitting
+        // it leaves a schema-incompatible table that breaks strict extraction in
+        // every reader (BaseRateGenerator, SourceTypePhysics). No inventory
+        // reader needs it, so only emit it outside inventory mode (rates/project,
+        // and the `None` default used by unit tests).
+        if ctx.model_scale() != Some(ModelScale::Inventory) {
+            let rates_df = RatesOpModeDistributionRow::into_dataframe(rates_rows)
+                .map_err(|e| Error::Polars(e.to_string()))?;
+            ctx.scratch_mut().insert(OUTPUT_TABLES[1], rates_df);
+        }
 
         Ok(CalculatorOutput::empty())
     }
