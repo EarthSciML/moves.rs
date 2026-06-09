@@ -8,3 +8,9 @@
 # which matters on quota-limited home dirs.
 channel = "1.95.0"
 components = ["rustfmt", "clippy"]
+# The WASM demo (moves-wasm) compiles for this target. Declaring it here pins
+# the wasm32 std to the SAME toolchain cargo actually uses, so the CI WASM
+# build (and local `cargo build --target wasm32-unknown-unknown`) finds `core`
+# instead of failing E0463 — the dtolnay action's `targets:` input adds wasm32
+# to `stable`, a different toolchain than this pinned 1.95.0.
+targets = ["wasm32-unknown-unknown"]
