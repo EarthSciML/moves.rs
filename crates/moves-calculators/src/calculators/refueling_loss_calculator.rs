@@ -960,7 +960,9 @@ impl TableRow for RefuelingFuelFormulationRow {
                 Ok(RefuelingFuelFormulationRow {
                     fuel_formulation_id: ff.get(i).ok_or_else(|| null("fuelFormulationID"))?,
                     fuel_subtype_id: fs.get(i).ok_or_else(|| null("fuelSubtypeID"))?,
-                    rvp: rvp.get(i).ok_or_else(|| null("RVP"))?,
+                    // RVP is nullable in MOVES; a NULL contributes nothing to
+                    // sum(RVP × marketShare), identical to contributing 0.0.
+                    rvp: rvp.get(i).unwrap_or(0.0),
                 })
             })
             .collect()
@@ -2841,6 +2843,29 @@ mod tests {
         let displacement = rows.iter().find(|r| r.process_id == 18).unwrap();
         // emissionQuant = displacedVaporRate × 100.0 / 10.0 = exp(1.1) × 10.0.
         assert_close(displacement.emission_quant, 1.1_f64.exp() * 10.0);
+    }
+
+    #[test]
+    fn from_dataframe_treats_null_rvp_as_zero() {
+        use polars::prelude::{DataFrame, NamedFrom, Series};
+        // FuelFormulation.RVP is nullable — non-gasoline formulations carry a
+        // NULL RVP in the default DB. Extraction must yield 0.0, not error
+        // (the bug that crashed the default-DB demo).
+        let df = DataFrame::new(
+            2,
+            vec![
+                Series::new("fuelFormulationID".into(), &[10_i32, 20]).into(),
+                Series::new("fuelSubtypeID".into(), &[1_i32, 2]).into(),
+                Series::new("RVP".into(), &[Some(9.0_f64), None]).into(),
+            ],
+        )
+        .unwrap();
+
+        let rows = RefuelingFuelFormulationRow::from_dataframe(&df)
+            .expect("null RVP must extract as 0.0, not error");
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].rvp, 9.0);
+        assert_eq!(rows[1].rvp, 0.0);
     }
 
     #[test]
