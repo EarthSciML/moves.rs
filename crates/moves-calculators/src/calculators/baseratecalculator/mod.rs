@@ -125,15 +125,15 @@ static INPUT_TABLES: &[&str] = &[
 /// produces the equivalent flat row form.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct EmissionOutputRow {
- /// Identifying key of the block this emission belongs to.
+    /// Identifying key of the block this emission belongs to.
     pub key: BlockKey,
- /// Fuel subtype id.
+    /// Fuel subtype id.
     pub fuel_sub_type_id: i32,
- /// Fuel formulation id.
+    /// Fuel formulation id.
     pub fuel_formulation_id: i32,
- /// Emission quantity.
+    /// Emission quantity.
     pub emission_quant: f64,
- /// Emission rate.
+    /// Emission rate.
     pub emission_rate: f64,
 }
 
@@ -145,13 +145,13 @@ pub struct EmissionOutputRow {
 /// every block here.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct BaseRateCalculatorOutput {
- /// The aggregated, activity-weighted fuel blocks.
+    /// The aggregated, activity-weighted fuel blocks.
     pub blocks: Vec<FuelBlock>,
 }
 
 impl BaseRateCalculatorOutput {
- /// Flatten the blocks into one [`EmissionOutputRow`] per
- /// `(block, fuel formulation)` pair.
+    /// Flatten the blocks into one [`EmissionOutputRow`] per
+    /// `(block, fuel formulation)` pair.
     #[must_use]
     pub fn rows(&self) -> Vec<EmissionOutputRow> {
         let mut rows = Vec::new();
@@ -461,9 +461,10 @@ fn process_pass(
     constants: &RunConstants,
     flags: &ModuleFlags,
     gpa_fract: f64,
-) -> Vec<FuelBlock> {
+    panic_on_missing_supply: bool,
+) -> Result<Vec<FuelBlock>, Error> {
     let mut unique: BTreeMap<BlockKey, FuelBlock> = BTreeMap::new();
-    for fb in build_fuel_blocks(rows, prepared, constants) {
+    for fb in build_fuel_blocks(rows, prepared, constants, panic_on_missing_supply)? {
         for processed in process_fuel_block(fb, prepared, flags, gpa_fract) {
             match unique.get_mut(&processed.key) {
                 Some(existing) => {
@@ -479,26 +480,32 @@ fn process_pass(
             }
         }
     }
-    unique.into_values().collect()
+    Ok(unique.into_values().collect())
 }
 
 impl BaseRateCalculator {
- /// Stable module name — matches the Go source and the chain-DAG entry.
+    /// Stable module name — matches the Go source and the chain-DAG entry.
     pub const NAME: &'static str = CALCULATOR_NAME;
 
- /// Run the calculator over a fully materialised set of input tables.
- ///
- /// Ports `StartCalculating` / `doCalculationPipeline`. The Go processes
- /// the age-based (`BaseRateByAge`) and non-age-based (`BaseRate`) tables
- /// in two independent accumulation passes, then aggregates the
- /// operating-mode detail and applies the activity weighting; the port
- /// follows the same order.
-    #[must_use]
+    /// Run the calculator over a fully materialised set of input tables.
+    ///
+    /// Ports `StartCalculating` / `doCalculationPipeline`. The Go processes
+    /// the age-based (`BaseRateByAge`) and non-age-based (`BaseRate`) tables
+    /// in two independent accumulation passes, then aggregates the
+    /// operating-mode detail and applies the activity weighting; the port
+    /// follows the same order.
+    ///
+    /// Returns [`Error::MissingContext`] when the County table does not contain
+    /// an entry for the run's county ID but GPA-blending data
+    /// (`GeneralFuelRatio`, `criteriaRatio`, or `altCriteriaRatio`) is present.
+    /// Real runs always carry the run county in the County table; this error
+    /// surfaces a broken invariant rather than silently returning a 0.0
+    /// GPA fraction.
     pub fn run(
         mut inputs: BaseRateCalculatorInputs,
         constants: &RunConstants,
         flags: &ModuleFlags,
-    ) -> BaseRateCalculatorOutput {
+    ) -> Result<BaseRateCalculatorOutput, Error> {
         let smfr_sbd_summary = std::mem::take(&mut inputs.smfr_sbd_summary);
         let base_rate_by_age = std::mem::take(&mut inputs.base_rate_by_age);
         let base_rate = std::mem::take(&mut inputs.base_rate);
@@ -520,35 +527,52 @@ impl BaseRateCalculator {
         prepared: &PreparedTables,
         constants: &RunConstants,
         flags: &ModuleFlags,
-    ) -> BaseRateCalculatorOutput {
- // The Go indexes `County[CountyID]` per row; the run processes a single
- // county that the County table always holds, so a county absent from the
- // table yields `0.0` (the Go would have panicked, but the county table
- // always holds the run's one county in a real run). (The audit's FINDING 2
- // turned this into an `assert!`/panic when GPA-blending data is present; it
- // only ever fires on minimal no-county unit fixtures — a real run always
- // carries its county — so it was reverted to avoid breaking previously-
- // correct tests without adding any real-run protection.)
-        let gpa_fract = prepared
-            .county
-            .get(&constants.county_id)
-            .map_or(0.0, |c| c.gpa_fract);
+    ) -> Result<BaseRateCalculatorOutput, Error> {
+        // The Go indexes `County[CountyID]` per row; the run processes a single
+        // county that the County table always holds. When GPA-blending data is
+        // present and the county is absent, return a typed error instead of
+        // silently defaulting to 0.0 (which the Go would have panicked on).
+        // Real runs always carry the run county, so this only fires on broken
+        // minimal fixtures.
+        let has_gpa_data = !prepared.general_fuel_ratio.is_empty()
+            || !prepared.criteria_ratio.is_empty()
+            || !prepared.alt_criteria_ratio.is_empty();
+        let gpa_fract = match prepared.county.get(&constants.county_id) {
+            Some(c) => c.gpa_fract,
+            None if has_gpa_data => {
+                return Err(Error::MissingContext {
+                    what: format!(
+                        "County[{}]: required for GPA blending but absent from County table",
+                        constants.county_id
+                    ),
+                });
+            }
+            None => 0.0,
+        };
 
- // calculateActivityWeight runs once, ahead of the aggregation tail.
+        // calculateActivityWeight runs once, ahead of the aggregation tail.
         let activity_weights = calculate_activity_weight(&smfr_sbd_summary, prepared, flags);
 
- // Two accumulation passes: age-based then non-age-based.
-        let mut blocks = process_pass(&base_rate_by_age, prepared, constants, flags, gpa_fract);
+        // Two accumulation passes: age-based (supply missing → drop row) then
+        // non-age-based (supply missing → error, matching Go streamBaseRate panic).
+        let mut blocks = process_pass(
+            &base_rate_by_age,
+            prepared,
+            constants,
+            flags,
+            gpa_fract,
+            false,
+        )?;
         blocks.extend(process_pass(
-            &base_rate, prepared, constants, flags, gpa_fract,
-        ));
+            &base_rate, prepared, constants, flags, gpa_fract, true,
+        )?);
 
- // Aggregate operating modes and apply the activity weighting.
+        // Aggregate operating modes and apply the activity weighting.
         for block in &mut blocks {
             aggregate_and_apply_activity(block, prepared, flags, &activity_weights);
         }
 
-        BaseRateCalculatorOutput { blocks }
+        Ok(BaseRateCalculatorOutput { blocks })
     }
 }
 
@@ -562,7 +586,7 @@ fn subscriptions() -> &'static [CalculatorSubscription] {
     SUBS.get_or_init(|| {
         let priority = Priority::parse("EMISSION_CALCULATOR")
             .expect("EMISSION_CALCULATOR is a valid priority");
- // Running, Start, Brakewear, Tirewear, Extended Idle, Aux Power.
+        // Running, Start, Brakewear, Tirewear, Extended Idle, Aux Power.
         [1_u16, 2, 9, 10, 90, 91]
             .into_iter()
             .map(|process| {
@@ -589,7 +613,7 @@ fn registrations() -> &'static [PollutantProcessAssociation] {
     static REGS: OnceLock<Vec<PollutantProcessAssociation>> = OnceLock::new();
     REGS.get_or_init(|| {
         let mut regs = Vec::with_capacity(96);
- // Exhaust pollutants × processes.
+        // Exhaust pollutants × processes.
         const EXHAUST_POLLUTANTS: [u16; 12] = [1, 2, 3, 6, 30, 91, 92, 93, 112, 116, 117, 118];
         const PROCESSES: [u16; 6] = [1, 2, 9, 10, 90, 91];
         for pollutant in EXHAUST_POLLUTANTS {
@@ -600,7 +624,7 @@ fn registrations() -> &'static [PollutantProcessAssociation] {
                 });
             }
         }
- // Distance-based pollutants, all process 1.
+        // Distance-based pollutants, all process 1.
         let distance_pollutants = (60_u16..=67).filter(|p| *p != 64).chain(130_u16..=146);
         for pollutant in distance_pollutants {
             regs.push(PollutantProcessAssociation {
@@ -638,13 +662,13 @@ impl Calculator for BaseRateCalculator {
             zone_id: pos.location.zone_id.map(|z| z as i32).unwrap_or(0),
             link_id: pos.location.link_id.map(|l| l as i32).unwrap_or(0),
             year_id: pos.time.year.map(|y| y as i32).unwrap_or(0),
- // MOVES keys its execution DB (and every captured snapshot) by the
- // internal `monthID = RunSpec <month key> + 1` (e.g. `<month
- // key="7"/>` → monthID 8 / August). The sibling generators apply
- // the same `+1` (`SnapshotFilter::from_run_spec`,
- // `evap_op_mode_distribution::fraction_of_operating`); mirror it
- // here so the fuel-supply join (`build_fuel_blocks`) keys on the
- // monthID the snapshot's fuel supply was captured at.
+            // MOVES keys its execution DB (and every captured snapshot) by the
+            // internal `monthID = RunSpec <month key> + 1` (e.g. `<month
+            // key="7"/>` → monthID 8 / August). The sibling generators apply
+            // the same `+1` (`SnapshotFilter::from_run_spec`,
+            // `evap_op_mode_distribution::fraction_of_operating`); mirror it
+            // here so the fuel-supply join (`build_fuel_blocks`) keys on the
+            // monthID the snapshot's fuel supply was captured at.
             month_id: pos
                 .time
                 .month
@@ -696,31 +720,31 @@ impl Calculator for BaseRateCalculator {
         let smfr_sbd_summary = std::mem::take(&mut inputs.smfr_sbd_summary);
         let mut base_rate_by_age = std::mem::take(&mut inputs.base_rate_by_age);
         let mut base_rate = std::mem::take(&mut inputs.base_rate);
- // MOVES splits `BaseRate`/`BaseRateByAge` into per-process execution-DB
- // tables (`baseratebyage_1_2020` = process 1, `_2_2020` = process 2,
- // …); `merge_process_year_variants` unions them back under the
- // canonical name, so the merged table carries every process. The
- // master loop fires this multi-process subscriber once per subscribed
- // process (the engine gates `execute` on `position.process_id`), so
- // without a per-process filter every firing would emit every process's
- // rows — ~2× the canonical row count. Restrict to the firing process
- // so each position emits only its own process, matching canonical's
- // per-process `baseRateOutput`.
+        // MOVES splits `BaseRate`/`BaseRateByAge` into per-process execution-DB
+        // tables (`baseratebyage_1_2020` = process 1, `_2_2020` = process 2,
+        // …); `merge_process_year_variants` unions them back under the
+        // canonical name, so the merged table carries every process. The
+        // master loop fires this multi-process subscriber once per subscribed
+        // process (the engine gates `execute` on `position.process_id`), so
+        // without a per-process filter every firing would emit every process's
+        // rows — ~2× the canonical row count. Restrict to the firing process
+        // so each position emits only its own process, matching canonical's
+        // per-process `baseRateOutput`.
         if let Some(process_id) = pos.process_id.map(|p| p.0 as i32) {
             base_rate_by_age.retain(|r| r.process_id == process_id);
             base_rate.retain(|r| r.process_id == process_id);
         }
- // MOVES drives the BaseRate worker off a join to `runSpecRoadType`, so
- // it only processes rate rows whose road type the RunSpec selected. The
- // generator emits rates for every process's natural road type — running
- // exhaust on the selected on-road type(s), but start exhaust (process 2)
- // on off-network `roadTypeID` 1 — and the port reads them all back via
- // `merge_process_year_variants`. Without this join the port emits the
- // off-network start rows even when the run selects only an on-road type
- // (e.g. road type 4), where canonical's `baseRateOutput`/`MOVESOutput`
- // carry no start rows at all. Mirror the join: keep only rate rows on a
- // selected road type. An empty/absent `runSpecRoadType` (unit-test
- // contexts) imposes no restriction.
+        // MOVES drives the BaseRate worker off a join to `runSpecRoadType`, so
+        // it only processes rate rows whose road type the RunSpec selected. The
+        // generator emits rates for every process's natural road type — running
+        // exhaust on the selected on-road type(s), but start exhaust (process 2)
+        // on off-network `roadTypeID` 1 — and the port reads them all back via
+        // `merge_process_year_variants`. Without this join the port emits the
+        // off-network start rows even when the run selects only an on-road type
+        // (e.g. road type 4), where canonical's `baseRateOutput`/`MOVESOutput`
+        // carry no start rows at all. Mirror the join: keep only rate rows on a
+        // selected road type. An empty/absent `runSpecRoadType` (unit-test
+        // contexts) imposes no restriction.
         let selected_road_types: std::collections::BTreeSet<i32> = tables
             .iter_typed_or_empty::<setup::RunSpecRoadTypeRow>("runSpecRoadType")?
             .into_iter()
@@ -759,7 +783,7 @@ impl Calculator for BaseRateCalculator {
             &prepared,
             &constants,
             &flags,
-        );
+        )?;
         let rows = output.rows();
         crate::wiring::emit_rows(rows)
     }
@@ -1566,7 +1590,7 @@ mod tests {
         let regs = calc.registrations();
         assert_eq!(regs.len(), 96);
 
- // Twelve exhaust pollutants each appear for all six processes.
+        // Twelve exhaust pollutants each appear for all six processes.
         for pollutant in [1_u16, 2, 3, 6, 30, 91, 92, 93, 112, 116, 117, 118] {
             let count = regs
                 .iter()
@@ -1574,12 +1598,12 @@ mod tests {
                 .count();
             assert_eq!(count, 6, "pollutant {pollutant} should have six processes");
         }
- // Distance pollutant 64 did not resolve; 65 did.
+        // Distance pollutant 64 did not resolve; 65 did.
         assert!(!regs.iter().any(|r| r.pollutant_id == PollutantId(64)));
         assert!(regs
             .iter()
             .any(|r| r.pollutant_id == PollutantId(65) && r.process_id == ProcessId(1)));
- // Distance pollutants are process 1 only.
+        // Distance pollutants are process 1 only.
         for pollutant in (130_u16..=146).chain(60..=63) {
             let procs: Vec<u16> = regs
                 .iter()
@@ -1592,7 +1616,7 @@ mod tests {
 
     #[test]
     fn input_tables_name_the_base_rate_generator_output() {
- // The two tables linking this calculator to generator.
+        // The two tables linking this calculator to generator.
         let calc = BaseRateCalculator::default();
         assert!(calc.input_tables().contains(&"BaseRate"));
         assert!(calc.input_tables().contains(&"BaseRateByAge"));
@@ -1601,7 +1625,7 @@ mod tests {
 
     #[test]
     fn calculator_is_object_safe() {
- // The registry stores calculators as `Box<dyn Calculator>`.
+        // The registry stores calculators as `Box<dyn Calculator>`.
         let calcs: Vec<Box<dyn Calculator>> = vec![Box::new(BaseRateCalculator::default())];
         assert_eq!(calcs[0].name(), "BaseRateCalculator");
     }
@@ -1635,7 +1659,7 @@ mod tests {
             op_mode_fraction: 1.0,
             op_mode_fraction_rate: 1.0,
         };
- // Raw DB schema for FuelSupply (joined in build_fuel_supply).
+        // Raw DB schema for FuelSupply (joined in build_fuel_supply).
         let raw_fuel_supply = RawFuelSupplyRow {
             fuel_region_id: 270000000, // placeholder region
             fuel_year_id: 2020,
@@ -1761,11 +1785,11 @@ mod tests {
         );
         store.insert(
             "MonthOfAnyYear",
- // `MonthOfAnyYear` maps the fuel `monthGroupID` to the internal
- // `monthID`. `execute` now keys `RunConstants.month_id` off the
- // position month with the MOVES `+1` convention (position month 7
- // → monthID 8), so the fuel supply must land at the same monthID
- // for the join in `build_fuel_blocks` to match — map group 7 → 8.
+            // `MonthOfAnyYear` maps the fuel `monthGroupID` to the internal
+            // `monthID`. `execute` now keys `RunConstants.month_id` off the
+            // position month with the MOVES `+1` convention (position month 7
+            // → monthID 8), so the fuel supply must land at the same monthID
+            // for the join in `build_fuel_blocks` to match — map group 7 → 8.
             LocalMonthGroupRow::into_dataframe(vec![LocalMonthGroupRow {
                 month_group_id: 7,
                 month_id: 8,
@@ -1793,7 +1817,8 @@ mod tests {
     fn run_on_empty_inputs_yields_empty_output() {
         let inputs = BaseRateCalculatorInputs::default();
         let output =
-            BaseRateCalculator::run(inputs, &RunConstants::default(), &ModuleFlags::default());
+            BaseRateCalculator::run(inputs, &RunConstants::default(), &ModuleFlags::default())
+                .expect("run ok");
         assert!(output.blocks.is_empty());
         assert!(output.rows().is_empty());
     }
@@ -1936,7 +1961,7 @@ mod tests {
         assert_eq!(calc.cache.lock().unwrap().len(), 0, "cache starts empty");
 
         let ctx_a = CalculatorContext::with_slow(Arc::clone(&slow));
- // pos_a and pos_b share the same county/zone/link/year/month — same RunConstants.
+        // pos_a and pos_b share the same county/zone/link/year/month — same RunConstants.
         let mut ctx_a = ctx_a;
         ctx_a.set_position(pos_a);
         calc.execute(&ctx_a).expect("first execute ok");

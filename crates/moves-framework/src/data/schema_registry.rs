@@ -33,7 +33,7 @@ use polars::prelude::{DataType, Schema};
 /// by [`schema_registry`]. If the schema has not been catalogued yet, the
 /// entry maps to `fn() -> Schema::default()`.
 pub const KNOWN_CALCULATOR_INPUT_TABLES: &[&str] = &[
- // ── PascalCase canonical default-DB tables ──────────────────────────────
+    // ── PascalCase canonical default-DB tables ──────────────────────────────
     "ATRatio",
     "ATRatioGas2",
     "ATRatioNonGas",
@@ -150,7 +150,8 @@ pub const KNOWN_CALCULATOR_INPUT_TABLES: &[&str] = &[
     "Zone",
     "ZoneMonthHour",
     "ZoneRoadType",
- // ── camelCase scratch / generator output tables ──────────────────────────
+    // ── camelCase scratch / generator output tables ──────────────────────────
+    "avft",
     "altCriteriaRatio",
     "apuEmissionRateFraction",
     "avgSpeedBin",
@@ -234,9 +235,9 @@ pub const KNOWN_CALCULATOR_INPUT_TABLES: &[&str] = &[
 // function pointer in the static registry map.
 
 fn sho_schema() -> Schema {
- // Columns read by the ported distance calculator's ShoRow. The full MOVES
- // SHO table also carries a "SHO" activity column (source hours operating),
- // but DistanceCalculator only reads the columns below.
+    // Columns read by the ported distance calculator's ShoRow. The full MOVES
+    // SHO table also carries a "SHO" activity column (source hours operating),
+    // but DistanceCalculator only reads the columns below.
     Schema::from_iter([
         ("hourDayID".into(), DataType::Int32),
         ("monthID".into(), DataType::Int32),
@@ -290,6 +291,56 @@ fn link_schema() -> Schema {
         ("countyID".into(), DataType::Int32),
         ("zoneID".into(), DataType::Int32),
         ("roadTypeID".into(), DataType::Int32),
+    ])
+}
+
+/// Project-domain `link` table — per-link traffic data supplied by the user.
+/// Distinct from the county-domain `Link` (PascalCase) table.
+fn project_link_schema() -> Schema {
+    Schema::from_iter([
+        ("linkID".into(), DataType::Int32),
+        ("linkVolume".into(), DataType::Float64),
+        ("linkLength".into(), DataType::Float64),
+        ("linkAvgSpeed".into(), DataType::Float64),
+        ("roadTypeID".into(), DataType::Int32),
+        ("zoneID".into(), DataType::Int32),
+    ])
+}
+
+fn link_source_type_hour_schema() -> Schema {
+    Schema::from_iter([
+        ("linkID".into(), DataType::Int32),
+        ("sourceTypeID".into(), DataType::Int32),
+        ("sourceTypeHourFraction".into(), DataType::Float64),
+    ])
+}
+
+fn off_network_link_schema() -> Schema {
+    Schema::from_iter([
+        ("zoneID".into(), DataType::Int32),
+        ("sourceTypeID".into(), DataType::Int32),
+        ("vehiclePopulation".into(), DataType::Float64),
+        ("parkedVehicleFraction".into(), DataType::Float64),
+        ("startFraction".into(), DataType::Float64),
+        ("extendedIdleFraction".into(), DataType::Float64),
+    ])
+}
+
+fn avft_schema() -> Schema {
+    Schema::from_iter([
+        ("sourceTypeID".into(), DataType::Int32),
+        ("modelYearID".into(), DataType::Int32),
+        ("fuelTypeID".into(), DataType::Int32),
+        ("fuelEngFraction".into(), DataType::Float64),
+    ])
+}
+
+fn drive_schedule_second_link_schema() -> Schema {
+    Schema::from_iter([
+        ("linkID".into(), DataType::Int32),
+        ("secondID".into(), DataType::Int32),
+        ("speed".into(), DataType::Float64),
+        ("grade".into(), DataType::Float64),
     ])
 }
 
@@ -626,7 +677,7 @@ pub fn schema_registry() -> &'static HashMap<&'static str, fn() -> Schema> {
 fn build_registry() -> HashMap<&'static str, fn() -> Schema> {
     let mut m: HashMap<&'static str, fn() -> Schema> = HashMap::new();
 
- // ── Fully catalogued schemas ─────────────────────────────────────────────
+    // ── Fully catalogued schemas ─────────────────────────────────────────────
     m.insert("SHO", sho_schema);
     m.insert("sho", sho_schema);
     m.insert("SourceBin", source_bin_schema);
@@ -636,7 +687,11 @@ fn build_registry() -> HashMap<&'static str, fn() -> Schema> {
     m.insert("HourDay", hour_day_schema);
     m.insert("hourDay", hour_day_schema);
     m.insert("Link", link_schema);
-    m.insert("link", link_schema);
+    m.insert("link", project_link_schema);
+    m.insert("linkSourceTypeHour", link_source_type_hour_schema);
+    m.insert("offNetworkLink", off_network_link_schema);
+    m.insert("avft", avft_schema);
+    m.insert("driveScheduleSecondLink", drive_schedule_second_link_schema);
     m.insert("County", county_schema);
     m.insert("Zone", zone_schema);
     m.insert("ZoneMonthHour", zone_month_hour_schema);
@@ -695,7 +750,7 @@ fn build_registry() -> HashMap<&'static str, fn() -> Schema> {
     m.insert("SBWeightedDistanceRate", sb_weighted_distance_rate_schema);
     m.insert("DrivingIdleFraction", driving_idle_fraction_schema);
 
- // ── Stub entries for remaining tables (schema not yet catalogued) ────────
+    // ── Stub entries for remaining tables (schema not yet catalogued) ────────
     for &name in KNOWN_CALCULATOR_INPUT_TABLES {
         m.entry(name).or_insert(stub_schema);
     }
@@ -712,8 +767,8 @@ mod tests {
     use crate::data::store::InMemoryStore;
     use crate::data::DataFrameStoreTyped;
 
- // ── Local ShoRow ─────────────────────────────────────────────────────────
- // Mirrors `ShoRow` in `moves-calculators` without a circular dependency.
+    // ── Local ShoRow ─────────────────────────────────────────────────────────
+    // Mirrors `ShoRow` in `moves-calculators` without a circular dependency.
 
     #[derive(Debug, Clone, PartialEq)]
     struct ShoRow {
@@ -837,7 +892,7 @@ mod tests {
         }
     }
 
- // ── WrongRow: claims to be SHO but has wrong columns ────────────────────
+    // ── WrongRow: claims to be SHO but has wrong columns ────────────────────
 
     #[derive(Debug, Clone)]
     struct WrongRow {
@@ -861,7 +916,7 @@ mod tests {
         }
     }
 
- // ── Tests ────────────────────────────────────────────────────────────────
+    // ── Tests ────────────────────────────────────────────────────────────────
 
     #[test]
     fn registry_has_all_calculator_input_tables() {
@@ -921,7 +976,7 @@ mod tests {
                 actual,
             } => {
                 assert_eq!(table, "SHO");
- // Registry SHO schema has ≥ 7 columns; WrongRow declares 1
+                // Registry SHO schema has ≥ 7 columns; WrongRow declares 1
                 assert!(
                     expected.len() > 1,
                     "expected should list registry SHO columns, got {expected:?}"

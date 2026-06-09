@@ -279,6 +279,9 @@ fn write_database_selections(out: &mut String, items: &[DatabaseSelection]) -> s
     writeln!(out, "\t</databaseselections>")
 }
 
+const ROP_CLASS: &str = "gov.epa.otaq.moves.master.implementation.ghg\
+    .internalcontrolstrategies.rateofprogress.RateOfProgressStrategy";
+
 fn write_internal_control_strategies(
     out: &mut String,
     items: &[InternalControlStrategy],
@@ -289,8 +292,25 @@ fn write_internal_control_strategies(
         return Ok(());
     }
     writeln!(out, "\t<internalcontrolstrategies>")?;
-    for _ in items {
-        writeln!(out, "\t\t<internalcontrolstrategy/>")?;
+    for item in items {
+        match item {
+            InternalControlStrategy::RateOfProgress { use_parameters } => {
+                let flag = if *use_parameters { "Yes" } else { "No" };
+                writeln!(
+                    out,
+                    "\t\t<internalcontrolstrategy classname=\"{ROP_CLASS}\"><![CDATA["
+                )?;
+                writeln!(out, "useParameters\t{flag}")?;
+                writeln!(out, "]]></internalcontrolstrategy>")?;
+            }
+            InternalControlStrategy::Other { class_name } => {
+                writeln!(
+                    out,
+                    "\t\t<internalcontrolstrategy classname=\"{}\"/>",
+                    escape_attr(class_name)
+                )?;
+            }
+        }
     }
     writeln!(out, "\t</internalcontrolstrategies>")
 }
@@ -717,8 +737,13 @@ struct XmlInternalControlStrategies {
     items: Vec<XmlInternalControlStrategy>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct XmlInternalControlStrategy {}
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct XmlInternalControlStrategy {
+    #[serde(rename = "@classname", default)]
+    classname: String,
+    #[serde(rename = "$text", default)]
+    content: String,
+}
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct XmlDatabaseRef {
@@ -943,7 +968,33 @@ impl XmlRunSpec {
             .internalcontrolstrategies
             .items
             .into_iter()
-            .map(|_| InternalControlStrategy {})
+            .map(|x| {
+                if x.classname == ROP_CLASS {
+                    let use_parameters = x
+                        .content
+                        .lines()
+                        .find_map(|line| {
+                            let mut parts = line.splitn(2, '\t');
+                            if parts.next()? == "useParameters" {
+                                Some(
+                                    parts
+                                        .next()
+                                        .unwrap_or("")
+                                        .trim()
+                                        .eq_ignore_ascii_case("yes"),
+                                )
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap_or(false);
+                    InternalControlStrategy::RateOfProgress { use_parameters }
+                } else {
+                    InternalControlStrategy::Other {
+                        class_name: x.classname,
+                    }
+                }
+            })
             .collect();
 
         let input_database = DatabaseRef {

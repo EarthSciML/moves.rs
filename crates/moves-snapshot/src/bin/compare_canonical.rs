@@ -39,35 +39,35 @@ use moves_snapshot::{
     version
 )]
 struct Args {
- /// Canonical fixture snapshot directory (from `characterization/snapshots/<fixture>`).
+    /// Canonical fixture snapshot directory (from `characterization/snapshots/<fixture>`).
     #[arg(long, value_name = "DIR")]
     canonical: PathBuf,
 
- /// moves.rs output directory (produced by `moves run --output <dir>`).
+    /// moves.rs output directory (produced by `moves run --output <dir>`).
     #[arg(long, value_name = "DIR")]
     moves_rs: PathBuf,
 
- /// Fixture name used in the report header.
+    /// Fixture name used in the report header.
     #[arg(long, value_name = "NAME")]
     fixture: String,
 
- /// Canonical-MOVES wall-clock time in seconds (omit if not available).
+    /// Canonical-MOVES wall-clock time in seconds (omit if not available).
     #[arg(long, value_name = "SECS")]
     canonical_wall: Option<f64>,
 
- /// moves.rs wall-clock time in seconds.
+    /// moves.rs wall-clock time in seconds.
     #[arg(long, value_name = "SECS")]
     moves_rs_wall: Option<f64>,
 
- /// moves.rs peak RSS in MiB (from `/usr/bin/time -v`; omit if not available).
+    /// moves.rs peak RSS in MiB (from `/usr/bin/time -v`; omit if not available).
     #[arg(long, value_name = "MIB")]
     moves_rs_peak_mb: Option<f64>,
 
- /// Canonical-MOVES peak RSS in MiB (from `/usr/bin/time -v`; omit if not available).
+    /// Canonical-MOVES peak RSS in MiB (from `/usr/bin/time -v`; omit if not available).
     #[arg(long, value_name = "MIB")]
     canonical_peak_mb: Option<f64>,
 
- /// Output format.
+    /// Output format.
     #[arg(long, value_enum, default_value_t = Format::Text)]
     format: Format,
 }

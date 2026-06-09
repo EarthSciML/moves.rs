@@ -170,24 +170,24 @@ const TIREWEAR_NAME_PREFIX: &str = "tirewear";
 /// roadTypeID, hourDayID, opModeID, avgSpeedBinID)`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RatesOpModeDistributionRow {
- /// `sourceTypeID` — a RunSpec-selected source type.
+    /// `sourceTypeID` — a RunSpec-selected source type.
     pub source_type_id: SourceTypeId,
- /// `roadTypeID` — a RunSpec-selected road type (non-Project) or the
- /// project link's road type (Project).
+    /// `roadTypeID` — a RunSpec-selected road type (non-Project) or the
+    /// project link's road type (Project).
     pub road_type_id: RoadTypeId,
- /// `avgSpeedBinID` — the speed bin (non-Project) or `0` (Project).
+    /// `avgSpeedBinID` — the speed bin (non-Project) or `0` (Project).
     pub avg_speed_bin_id: i16,
- /// `hourDayID` — a RunSpec-selected hour/day combination.
+    /// `hourDayID` — a RunSpec-selected hour/day combination.
     pub hour_day_id: i16,
- /// `polProcessID` — always `TIREWEAR_POL_PROCESS` (11710).
+    /// `polProcessID` — always `TIREWEAR_POL_PROCESS` (11710).
     pub pol_process_id: PolProcessId,
- /// `opModeID` — the tire-wear operating mode this fraction applies to.
+    /// `opModeID` — the tire-wear operating mode this fraction applies to.
     pub op_mode_id: i16,
- /// `opModeFraction` — always `1.0`: tire-wear op-mode distributions are
- /// degenerate (one operating mode per speed context).
+    /// `opModeFraction` — always `1.0`: tire-wear op-mode distributions are
+    /// degenerate (one operating mode per speed context).
     pub op_mode_fraction: f64,
- /// `avgBinSpeed` — the bin's average speed (non-Project) or the link's
- /// average speed (Project).
+    /// `avgBinSpeed` — the bin's average speed (non-Project) or the link's
+    /// average speed (Project).
     pub avg_bin_speed: f64,
 }
 
@@ -196,8 +196,8 @@ pub struct RatesOpModeDistributionRow {
 type RowKey = (SourceTypeId, PolProcessId, RoadTypeId, i16, i16, i16);
 
 impl RatesOpModeDistributionRow {
- /// The primary-key projection used both to de-duplicate `INSERT IGNORE`
- /// collisions and to give the output a deterministic order.
+    /// The primary-key projection used both to de-duplicate `INSERT IGNORE`
+    /// collisions and to give the output a deterministic order.
     fn key(&self) -> RowKey {
         (
             self.source_type_id,
@@ -228,13 +228,13 @@ fn insert_ignore(rows: Vec<RatesOpModeDistributionRow>) -> Vec<RatesOpModeDistri
 /// table also has `avgSpeedBinDesc` and `opModeIDRunning`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AvgSpeedBin {
- /// `avgSpeedBinID`.
+    /// `avgSpeedBinID`.
     pub avg_speed_bin_id: i16,
- /// `avgBinSpeed` — the bin's representative average speed (`FLOAT`).
+    /// `avgBinSpeed` — the bin's representative average speed (`FLOAT`).
     pub avg_bin_speed: f64,
- /// `opModeIDTirewear` — the tire-wear operating mode for this bin. The
- /// column is `NULL`-able; a `None` is written into the `NOT NULL`
- /// `opModeID` column as `NULL_OP_MODE_DEFAULT` by `INSERT IGNORE`.
+    /// `opModeIDTirewear` — the tire-wear operating mode for this bin. The
+    /// column is `NULL`-able; a `None` is written into the `NOT NULL`
+    /// `opModeID` column as `NULL_OP_MODE_DEFAULT` by `INSERT IGNORE`.
     pub op_mode_id_tirewear: Option<i16>,
 }
 
@@ -245,15 +245,15 @@ pub struct AvgSpeedBin {
 /// times); only the four the tire-wear `CASE` clause needs are modeled.
 #[derive(Debug, Clone, PartialEq)]
 pub struct OperatingMode {
- /// `opModeID`.
+    /// `opModeID`.
     pub op_mode_id: i16,
- /// `opModeName` — filtered with `LIKE 'tirewear%'` (case-insensitive).
+    /// `opModeName` — filtered with `LIKE 'tirewear%'` (case-insensitive).
     pub op_mode_name: String,
- /// `speedLower` — inclusive lower speed bound (`FLOAT`, `NULL`-able);
- /// `None` means the range is open below.
+    /// `speedLower` — inclusive lower speed bound (`FLOAT`, `NULL`-able);
+    /// `None` means the range is open below.
     pub speed_lower: Option<f64>,
- /// `speedUpper` — exclusive upper speed bound (`FLOAT`, `NULL`-able);
- /// `None` means the range is open above.
+    /// `speedUpper` — exclusive upper speed bound (`FLOAT`, `NULL`-able);
+    /// `None` means the range is open above.
     pub speed_upper: Option<f64>,
 }
 
@@ -263,10 +263,10 @@ pub struct OperatingMode {
 /// `executeLoop`, reading only its road type and average speed.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Link {
- /// `roadTypeID` — copied straight onto every emitted row.
+    /// `roadTypeID` — copied straight onto every emitted row.
     pub road_type_id: RoadTypeId,
- /// `linkAvgSpeed` — the link's average speed (`FLOAT`); drives the
- /// op-mode assignment and is copied to `avgBinSpeed`.
+    /// `linkAvgSpeed` — the link's average speed (`FLOAT`); drives the
+    /// op-mode assignment and is copied to `avgBinSpeed`.
     pub link_avg_speed: f64,
 }
 
@@ -278,17 +278,17 @@ pub struct Link {
 /// builds this view from `ctx.tables()`.
 #[derive(Debug, Clone, Copy)]
 pub struct RatesFirstInputs<'a> {
- /// `avgSpeedBin` — every speed bin and its tire-wear operating mode.
+    /// `avgSpeedBin` — every speed bin and its tire-wear operating mode.
     pub avg_speed_bins: &'a [AvgSpeedBin],
- /// `runSpecSourceType.sourceTypeID` — the RunSpec's source types.
+    /// `runSpecSourceType.sourceTypeID` — the RunSpec's source types.
     pub run_spec_source_type: &'a [SourceTypeId],
- /// `runSpecRoadType.roadTypeID` — the RunSpec's road types.
+    /// `runSpecRoadType.roadTypeID` — the RunSpec's road types.
     pub run_spec_road_type: &'a [RoadTypeId],
- /// `runSpecHourDay.hourDayID` — the RunSpec's hour/day combinations.
+    /// `runSpecHourDay.hourDayID` — the RunSpec's hour/day combinations.
     pub run_spec_hour_day: &'a [i16],
- /// `pollutantProcessAssoc` — the modeled `(pollutant, process)` pairs.
- /// The Java `where polProcessID in (11710)` filter means this path
- /// emits nothing unless the tire-wear pol-process is modeled.
+    /// `pollutantProcessAssoc` — the modeled `(pollutant, process)` pairs.
+    /// The Java `where polProcessID in (11710)` filter means this path
+    /// emits nothing unless the tire-wear pol-process is modeled.
     pub pollutant_process_assoc: &'a [PollutantProcessAssociation],
 }
 
@@ -296,14 +296,14 @@ pub struct RatesFirstInputs<'a> {
 /// Project-domain (`LINK`-granularity) path.
 #[derive(Debug, Clone, Copy)]
 pub struct ProjectInputs<'a> {
- /// The single `link` being processed this `executeLoop`.
+    /// The single `link` being processed this `executeLoop`.
     pub link: Link,
- /// `runSpecSourceType.sourceTypeID` — the RunSpec's source types.
+    /// `runSpecSourceType.sourceTypeID` — the RunSpec's source types.
     pub run_spec_source_type: &'a [SourceTypeId],
- /// `runSpecHourDay.hourDayID` — the RunSpec's hour/day combinations.
+    /// `runSpecHourDay.hourDayID` — the RunSpec's hour/day combinations.
     pub run_spec_hour_day: &'a [i16],
- /// `operatingMode` — the rows `buildOpModeClause` scans for tire-wear
- /// speed ranges.
+    /// `operatingMode` — the rows `buildOpModeClause` scans for tire-wear
+    /// speed ranges.
     pub operating_modes: &'a [OperatingMode],
 }
 
@@ -347,13 +347,13 @@ fn cmp_optional_speed(a: Option<f64>, b: Option<f64>) -> Ordering {
 /// `UNASSIGNED_OP_MODE` (`-1`) when no range matches.
 #[must_use]
 pub fn assign_tirewear_op_mode(link_avg_speed: f64, operating_modes: &[OperatingMode]) -> i16 {
- // First CASE clause: `when linkAvgSpeed < 0.1 then 400`.
+    // First CASE clause: `when linkAvgSpeed < 0.1 then 400`.
     if link_avg_speed < IDLE_SPEED_THRESHOLD {
         return IDLE_TIREWEAR_OP_MODE;
     }
- // The remaining clauses, in `ORDER BY speedLower` order. Op-mode id is
- // a stable tie-breaker so equal-`speedLower` rows resolve the same way
- // every run (MySQL leaves that order unspecified).
+    // The remaining clauses, in `ORDER BY speedLower` order. Op-mode id is
+    // a stable tie-breaker so equal-`speedLower` rows resolve the same way
+    // every run (MySQL leaves that order unspecified).
     let mut tirewear: Vec<&OperatingMode> = operating_modes
         .iter()
         .filter(|om| {
@@ -371,7 +371,7 @@ pub fn assign_tirewear_op_mode(link_avg_speed: f64, operating_modes: &[Operating
             return om.op_mode_id;
         }
     }
- // `else -1`.
+    // `else -1`.
     UNASSIGNED_OP_MODE
 }
 
@@ -397,8 +397,8 @@ pub fn assign_tirewear_op_mode(link_avg_speed: f64, operating_modes: &[Operating
 pub fn rates_first_op_mode_fractions(
     inputs: &RatesFirstInputs<'_>,
 ) -> Vec<RatesOpModeDistributionRow> {
- // `from ... pollutantProcessAssoc ppa where polProcessID in (11710)`:
- // an empty filtered join emits nothing.
+    // `from ... pollutantProcessAssoc ppa where polProcessID in (11710)`:
+    // an empty filtered join emits nothing.
     let tirewear_modeled = inputs
         .pollutant_process_assoc
         .iter()
@@ -408,9 +408,9 @@ pub fn rates_first_op_mode_fractions(
     }
 
     let capacity = inputs.avg_speed_bins.len()
- * inputs.run_spec_source_type.len()
- * inputs.run_spec_road_type.len()
- * inputs.run_spec_hour_day.len();
+        * inputs.run_spec_source_type.len()
+        * inputs.run_spec_road_type.len()
+        * inputs.run_spec_hour_day.len();
     let mut rows: Vec<RatesOpModeDistributionRow> = Vec::with_capacity(capacity);
     for bin in inputs.avg_speed_bins {
         let op_mode_id = bin.op_mode_id_tirewear.unwrap_or(NULL_OP_MODE_DEFAULT);
@@ -716,7 +716,7 @@ impl TableRow for Link {
 /// RunSpec.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RunSpecSourceTypeRow {
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: i32,
 }
 
@@ -759,7 +759,7 @@ impl TableRow for RunSpecSourceTypeRow {
 /// A wrapper row for `runSpecRoadType` — one road type selected by the RunSpec.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RunSpecRoadTypeRow {
- /// `roadTypeID`.
+    /// `roadTypeID`.
     pub road_type_id: i32,
 }
 
@@ -803,7 +803,7 @@ impl TableRow for RunSpecRoadTypeRow {
 /// the RunSpec.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RunSpecHourDayRow {
- /// `hourDayID`.
+    /// `hourDayID`.
     pub hour_day_id: i32,
 }
 
@@ -851,9 +851,9 @@ impl TableRow for RunSpecHourDayRow {
 /// carries the same semantics with the columns the rates-first path needs.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AvgSpeedPollutantProcessAssocRow {
- /// `pollutantID`.
+    /// `pollutantID`.
     pub pollutant_id: i32,
- /// `processID`.
+    /// `processID`.
     pub process_id: i32,
 }
 
@@ -1031,15 +1031,15 @@ impl TableRow for RatesOpModeDistributionRow {
                     op_mode_fraction: op_mode_fraction
                         .get(i)
                         .ok_or_else(|| null("opModeFraction"))?,
- // This generator always populates avgBinSpeed in its
- // `insert ignore ... avgBinSpeed` statements (Java
- // AverageSpeedOperatingModeDistributionGenerator.java lines
- // 171-177, 283-286, 309-312) from the speed bin / link speed,
- // and CreateExecutionRates.sql declares the column `FLOAT NULL`
- // with no DEFAULT. A NULL read-back is a genuine data gap that
- // downstream rate aggregation divides by
- // (baserategenerator/aggregate.rs), so error loudly like every
- // sibling column rather than fabricate a 0.0 mph speed.
+                    // This generator always populates avgBinSpeed in its
+                    // `insert ignore ... avgBinSpeed` statements (Java
+                    // AverageSpeedOperatingModeDistributionGenerator.java lines
+                    // 171-177, 283-286, 309-312) from the speed bin / link speed,
+                    // and CreateExecutionRates.sql declares the column `FLOAT NULL`
+                    // with no DEFAULT. A NULL read-back is a genuine data gap that
+                    // downstream rate aggregation divides by
+                    // (baserategenerator/aggregate.rs), so error loudly like every
+                    // sibling column rather than fabricate a 0.0 mph speed.
                     avg_bin_speed: avg_bin_speed.get(i).ok_or_else(|| null("avgBinSpeed"))?,
                 })
             })
@@ -1054,22 +1054,22 @@ impl TableRow for RatesOpModeDistributionRow {
 /// module documentation for the scope of the port.
 #[derive(Debug, Clone)]
 pub struct AverageSpeedOperatingModeDistributionGenerator {
- /// The single master-loop subscription, built once in [`Self::new`].
+    /// The single master-loop subscription, built once in [`Self::new`].
     subscriptions: [CalculatorSubscription; 1],
 }
 
 impl AverageSpeedOperatingModeDistributionGenerator {
- /// Chain-DAG name — matches the Java class name.
+    /// Chain-DAG name — matches the Java class name.
     pub const NAME: &'static str = "AverageSpeedOperatingModeDistributionGenerator";
 
- /// Construct the generator with its master-loop subscription.
- ///
- /// The chain DAG (`calculator-dag.json`) records one subscription:
- /// Tirewear (process 10), `PROCESS` granularity, `GENERATOR` priority.
- /// The Java `subscribeToMe` instead subscribes at `LINK` granularity in
- /// the Project domain — a runtime RunSpec decision the registry /
- /// engine applies — so the static metadata follows the DAG's
- /// (non-Project) `PROCESS` subscription.
+    /// Construct the generator with its master-loop subscription.
+    ///
+    /// The chain DAG (`calculator-dag.json`) records one subscription:
+    /// Tirewear (process 10), `PROCESS` granularity, `GENERATOR` priority.
+    /// The Java `subscribeToMe` instead subscribes at `LINK` granularity in
+    /// the Project domain — a runtime RunSpec decision the registry /
+    /// engine applies — so the static metadata follows the DAG's
+    /// (non-Project) `PROCESS` subscription.
     #[must_use]
     pub fn new() -> Self {
         let priority =
@@ -1117,9 +1117,9 @@ impl Generator for AverageSpeedOperatingModeDistributionGenerator {
         &self.subscriptions
     }
 
- // `upstream` keeps the trait default (empty): the chain DAG records no
- // `depends_on` edges — this generator's inputs are default-DB and
- // RunSpec tables, not other generators' output.
+    // `upstream` keeps the trait default (empty): the chain DAG records no
+    // `depends_on` edges — this generator's inputs are default-DB and
+    // RunSpec tables, not other generators' output.
 
     fn input_tables(&self) -> &[&'static str] {
         INPUT_TABLES
@@ -1129,22 +1129,22 @@ impl Generator for AverageSpeedOperatingModeDistributionGenerator {
         OUTPUT_TABLES
     }
 
- /// Run the generator for the current master-loop iteration.
- ///
- /// Dispatches on the RunSpec domain derived from `ctx.position()`:
- ///
- /// * **Project domain** (`link_id` is `Some`) → reads `link`,
- /// `runSpecSourceType`, `runSpecHourDay` and `operatingMode` from
- /// `ctx.tables()`, calls [`project_op_mode_fractions`].
- /// * **Non-Project domain** (`link_id` is `None`) → reads `avgSpeedBin`,
- /// `runSpecSourceType`, `runSpecRoadType`, `runSpecHourDay` and
- /// `pollutantProcessAssoc` from `ctx.tables()`, calls
- /// [`rates_first_op_mode_fractions`].
- ///
- /// The result is written to `ctx.scratch()` under `"RatesOpModeDistribution"`.
+    /// Run the generator for the current master-loop iteration.
+    ///
+    /// Dispatches on the RunSpec domain derived from `ctx.position()`:
+    ///
+    /// * **Project domain** (`link_id` is `Some`) → reads `link`,
+    /// `runSpecSourceType`, `runSpecHourDay` and `operatingMode` from
+    /// `ctx.tables()`, calls [`project_op_mode_fractions`].
+    /// * **Non-Project domain** (`link_id` is `None`) → reads `avgSpeedBin`,
+    /// `runSpecSourceType`, `runSpecRoadType`, `runSpecHourDay` and
+    /// `pollutantProcessAssoc` from `ctx.tables()`, calls
+    /// [`rates_first_op_mode_fractions`].
+    ///
+    /// The result is written to `ctx.scratch()` under `"RatesOpModeDistribution"`.
     fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
         let rows = if ctx.position().location.link_id.is_some() {
- // Project domain — one link, assign tirewear op-mode from link speed.
+            // Project domain — one link, assign tirewear op-mode from link speed.
             let link_rows: Vec<Link> = ctx.tables().iter_typed("link")?;
             let source_type_rows: Vec<RunSpecSourceTypeRow> =
                 ctx.tables().iter_typed("runSpecSourceType")?;
@@ -1153,8 +1153,8 @@ impl Generator for AverageSpeedOperatingModeDistributionGenerator {
             let operating_mode_rows: Vec<OperatingMode> =
                 ctx.tables().iter_typed("operatingMode")?;
 
- // The project link table contains only the single current link.
- // If it is empty, produce no rows (defensive).
+            // The project link table contains only the single current link.
+            // If it is empty, produce no rows (defensive).
             let Some(&link) = link_rows.first() else {
                 return crate::wiring::write_scratch_table(
                     ctx,
@@ -1178,7 +1178,7 @@ impl Generator for AverageSpeedOperatingModeDistributionGenerator {
             };
             project_op_mode_fractions(&inputs)
         } else {
- // Non-Project (rates-first) domain — cross-join all speed bins.
+            // Non-Project (rates-first) domain — cross-join all speed bins.
             let avg_speed_bin_rows: Vec<AvgSpeedBin> = ctx.tables().iter_typed("avgSpeedBin")?;
             let source_type_rows: Vec<RunSpecSourceTypeRow> =
                 ctx.tables().iter_typed("runSpecSourceType")?;
@@ -1199,7 +1199,7 @@ impl Generator for AverageSpeedOperatingModeDistributionGenerator {
                 .collect();
             let run_spec_hour_day: Vec<i16> =
                 hour_day_rows.iter().map(|r| r.hour_day_id as i16).collect();
- // Convert wrapper rows back to PollutantProcessAssociation.
+            // Convert wrapper rows back to PollutantProcessAssociation.
             let pollutant_process_assoc: Vec<PollutantProcessAssociation> = ppa_rows
                 .iter()
                 .filter_map(|r| {
@@ -1236,7 +1236,7 @@ mod tests {
     use super::*;
     use moves_data::PollutantId;
 
- /// `pollutantProcessAssoc` row for the tire-wear pol-process (11710).
+    /// `pollutantProcessAssoc` row for the tire-wear pol-process (11710).
     fn tirewear_ppa() -> PollutantProcessAssociation {
         PollutantProcessAssociation {
             pollutant_id: PollutantId(117),
@@ -1244,7 +1244,7 @@ mod tests {
         }
     }
 
- /// `pollutantProcessAssoc` row helper for an arbitrary pair.
+    /// `pollutantProcessAssoc` row helper for an arbitrary pair.
     fn ppa(pollutant: u16, process: u16) -> PollutantProcessAssociation {
         PollutantProcessAssociation {
             pollutant_id: PollutantId(pollutant),
@@ -1252,7 +1252,7 @@ mod tests {
         }
     }
 
- /// `avgSpeedBin` row helper.
+    /// `avgSpeedBin` row helper.
     fn bin(id: i16, speed: f64, op_mode: Option<i16>) -> AvgSpeedBin {
         AvgSpeedBin {
             avg_speed_bin_id: id,
@@ -1261,7 +1261,7 @@ mod tests {
         }
     }
 
- /// `operatingMode` row helper.
+    /// `operatingMode` row helper.
     fn om(id: i16, name: &str, lower: Option<f64>, upper: Option<f64>) -> OperatingMode {
         OperatingMode {
             op_mode_id: id,
@@ -1271,8 +1271,8 @@ mod tests {
         }
     }
 
- /// A realistic contiguous tire-wear speed-bin set: idle handled by the
- /// `< 0.1` clause, then `[0.1, 2.5)`, `[2.5, 7.5)`, `[7.5, ∞)`.
+    /// A realistic contiguous tire-wear speed-bin set: idle handled by the
+    /// `< 0.1` clause, then `[0.1, 2.5)`, `[2.5, 7.5)`, `[7.5, ∞)`.
     fn tirewear_modes() -> Vec<OperatingMode> {
         vec![
             om(401, "Tirewear 0-2.5 mph", Some(0.1), Some(2.5)),
@@ -1281,7 +1281,7 @@ mod tests {
         ]
     }
 
- // ── assign_tirewear_op_mode ─────────────────────────────────────────
+    // ── assign_tirewear_op_mode ─────────────────────────────────────────
 
     #[test]
     fn idle_speed_assigns_op_mode_400() {
@@ -1292,10 +1292,10 @@ mod tests {
 
     #[test]
     fn idle_threshold_is_exclusive_at_0_1() {
- // 0.1 is NOT < 0.1, so it falls through to the speed ranges.
+        // 0.1 is NOT < 0.1, so it falls through to the speed ranges.
         let modes = tirewear_modes();
         assert_eq!(assign_tirewear_op_mode(0.1, &modes), 401);
- // Just below the threshold is still idle.
+        // Just below the threshold is still idle.
         assert_eq!(assign_tirewear_op_mode(0.099, &modes), 400);
     }
 
@@ -1310,30 +1310,30 @@ mod tests {
     #[test]
     fn lower_bound_is_inclusive_upper_bound_is_exclusive() {
         let modes = tirewear_modes();
- // 2.5 is excluded from [0.1, 2.5) and included in [2.5, 7.5).
+        // 2.5 is excluded from [0.1, 2.5) and included in [2.5, 7.5).
         assert_eq!(assign_tirewear_op_mode(2.5, &modes), 402);
- // 7.5 is excluded from [2.5, 7.5) and included in [7.5, ∞).
+        // 7.5 is excluded from [2.5, 7.5) and included in [7.5, ∞).
         assert_eq!(assign_tirewear_op_mode(7.5, &modes), 403);
     }
 
     #[test]
     fn unmatched_speed_returns_minus_one() {
- // Ranges cover only [0.1, 5.0); a speed >= 0.1 with no covering
- // range yields the CASE `else -1`.
+        // Ranges cover only [0.1, 5.0); a speed >= 0.1 with no covering
+        // range yields the CASE `else -1`.
         let modes = vec![om(401, "Tirewear low", Some(0.1), Some(5.0))];
         assert_eq!(assign_tirewear_op_mode(10.0, &modes), -1);
- // And with no tire-wear modes at all.
+        // And with no tire-wear modes at all.
         assert_eq!(assign_tirewear_op_mode(10.0, &[]), -1);
     }
 
     #[test]
     fn open_bounds_match_unbounded_side() {
- // Open below: matches any speed >= 0.1 up to the upper bound.
+        // Open below: matches any speed >= 0.1 up to the upper bound.
         let open_low = vec![om(401, "Tirewear open low", None, Some(5.0))];
         assert_eq!(assign_tirewear_op_mode(0.1, &open_low), 401);
         assert_eq!(assign_tirewear_op_mode(4.9, &open_low), 401);
         assert_eq!(assign_tirewear_op_mode(5.0, &open_low), -1);
- // Open above: matches any speed at or above the lower bound.
+        // Open above: matches any speed at or above the lower bound.
         let open_high = vec![om(402, "Tirewear open high", Some(5.0), None)];
         assert_eq!(assign_tirewear_op_mode(5.0, &open_high), 402);
         assert_eq!(assign_tirewear_op_mode(1.0e6, &open_high), 402);
@@ -1342,8 +1342,8 @@ mod tests {
 
     #[test]
     fn op_modes_outside_401_499_are_ignored() {
- // 400 and 500 are out of the scanned band even with a matching
- // name; only 401's range applies.
+        // 400 and 500 are out of the scanned band even with a matching
+        // name; only 401's range applies.
         let modes = vec![
             om(400, "Tirewear idle", None, Some(100.0)),
             om(500, "Tirewear over", None, Some(100.0)),
@@ -1354,23 +1354,23 @@ mod tests {
 
     #[test]
     fn non_tirewear_named_modes_are_ignored() {
- // An id in 401..=499 whose name is not `tirewear%` is excluded by
- // the `LIKE` filter, leaving the speed unmatched.
+        // An id in 401..=499 whose name is not `tirewear%` is excluded by
+        // the `LIKE` filter, leaving the speed unmatched.
         let modes = vec![om(450, "Running exhaust bin", Some(0.1), Some(100.0))];
         assert_eq!(assign_tirewear_op_mode(10.0, &modes), -1);
     }
 
     #[test]
     fn name_filter_is_case_insensitive() {
- // `utf8mb4_unicode_ci` makes `LIKE 'tirewear%'` case-insensitive.
+        // `utf8mb4_unicode_ci` makes `LIKE 'tirewear%'` case-insensitive.
         let modes = vec![om(401, "TIREWEAR CRUISE", Some(0.1), Some(100.0))];
         assert_eq!(assign_tirewear_op_mode(10.0, &modes), 401);
     }
 
     #[test]
     fn ranges_resolve_regardless_of_input_order() {
- // Same bins as `tirewear_modes` but shuffled: `ORDER BY speedLower`
- // makes the result independent of input order.
+        // Same bins as `tirewear_modes` but shuffled: `ORDER BY speedLower`
+        // makes the result independent of input order.
         let shuffled = vec![
             om(403, "Tirewear 7.5+ mph", Some(7.5), None),
             om(401, "Tirewear 0-2.5 mph", Some(0.1), Some(2.5)),
@@ -1383,14 +1383,14 @@ mod tests {
 
     #[test]
     fn idle_clause_wins_over_a_range_covering_low_speed() {
- // A range that also covers sub-0.1 speeds must not pre-empt op-mode
- // 400 — the idle clause is the first CASE `WHEN`.
+        // A range that also covers sub-0.1 speeds must not pre-empt op-mode
+        // 400 — the idle clause is the first CASE `WHEN`.
         let modes = vec![om(401, "Tirewear open low", None, Some(100.0))];
         assert_eq!(assign_tirewear_op_mode(0.05, &modes), 400);
         assert_eq!(assign_tirewear_op_mode(0.5, &modes), 401);
     }
 
- // ── rates_first_op_mode_fractions ───────────────────────────────────
+    // ── rates_first_op_mode_fractions ───────────────────────────────────
 
     #[test]
     fn rates_first_cross_joins_all_dimensions() {
@@ -1404,13 +1404,13 @@ mod tests {
             pollutant_process_assoc: &assoc,
         };
         let rows = rates_first_op_mode_fractions(&inputs);
- // 2 bins × 2 source types × 2 road types × 2 hour/days = 16 rows.
+        // 2 bins × 2 source types × 2 road types × 2 hour/days = 16 rows.
         assert_eq!(rows.len(), 16);
         for r in &rows {
             assert_eq!(r.pol_process_id, TIREWEAR_POL_PROCESS);
             assert_eq!(r.op_mode_fraction, 1.0);
         }
- // Each row carries its bin's op mode and avg speed.
+        // Each row carries its bin's op mode and avg speed.
         let bin1 = rows.iter().find(|r| r.avg_speed_bin_id == 1).unwrap();
         assert_eq!(bin1.op_mode_id, 401);
         assert_eq!(bin1.avg_bin_speed, 2.0);
@@ -1421,7 +1421,7 @@ mod tests {
 
     #[test]
     fn rates_first_empty_when_tirewear_not_modeled() {
- // pollutantProcessAssoc lacks 11710: the filtered join is empty.
+        // pollutantProcessAssoc lacks 11710: the filtered join is empty.
         let bins = [bin(1, 2.0, Some(401))];
         let assoc = [ppa(2, 1), ppa(31, 90)];
         let inputs = RatesFirstInputs {
@@ -1436,7 +1436,7 @@ mod tests {
 
     #[test]
     fn rates_first_null_op_mode_tirewear_becomes_zero() {
- // A NULL `opModeIDTirewear` is coerced to 0 by `INSERT IGNORE`.
+        // A NULL `opModeIDTirewear` is coerced to 0 by `INSERT IGNORE`.
         let bins = [bin(1, 2.0, None)];
         let assoc = [tirewear_ppa()];
         let inputs = RatesFirstInputs {
@@ -1453,7 +1453,7 @@ mod tests {
 
     #[test]
     fn rates_first_empty_inputs_produce_no_rows() {
- // Tire-wear modeled, but no bins / no RunSpec dimensions.
+        // Tire-wear modeled, but no bins / no RunSpec dimensions.
         let assoc = [tirewear_ppa()];
         let inputs = RatesFirstInputs {
             avg_speed_bins: &[],
@@ -1467,8 +1467,8 @@ mod tests {
 
     #[test]
     fn rates_first_dedups_duplicate_bins_and_sorts() {
- // Two identical bins collide on the primary key; `INSERT IGNORE`
- // keeps one. Output is primary-key sorted.
+        // Two identical bins collide on the primary key; `INSERT IGNORE`
+        // keeps one. Output is primary-key sorted.
         let bins = [bin(1, 2.0, Some(401)), bin(1, 2.0, Some(401))];
         let assoc = [tirewear_ppa()];
         let inputs = RatesFirstInputs {
@@ -1479,7 +1479,7 @@ mod tests {
             pollutant_process_assoc: &assoc,
         };
         let rows = rates_first_op_mode_fractions(&inputs);
- // 1 distinct bin × 2 source types × 1 road type × 2 hour/days = 4.
+        // 1 distinct bin × 2 source types × 1 road type × 2 hour/days = 4.
         assert_eq!(rows.len(), 4);
         let keys: Vec<RowKey> = rows.iter().map(RatesOpModeDistributionRow::key).collect();
         let mut sorted = keys.clone();
@@ -1487,7 +1487,7 @@ mod tests {
         assert_eq!(keys, sorted);
     }
 
- // ── project_op_mode_fractions ───────────────────────────────────────
+    // ── project_op_mode_fractions ───────────────────────────────────────
 
     #[test]
     fn project_cross_joins_source_types_and_hour_days() {
@@ -1502,7 +1502,7 @@ mod tests {
             operating_modes: &modes,
         };
         let rows = project_op_mode_fractions(&inputs);
- // 2 source types × 3 hour/days = 6 rows.
+        // 2 source types × 3 hour/days = 6 rows.
         assert_eq!(rows.len(), 6);
         for r in &rows {
             assert_eq!(r.pol_process_id, TIREWEAR_POL_PROCESS);
@@ -1510,7 +1510,7 @@ mod tests {
             assert_eq!(r.avg_speed_bin_id, 0);
             assert_eq!(r.avg_bin_speed, 5.0);
             assert_eq!(r.op_mode_fraction, 1.0);
- // 5.0 mph falls in the [2.5, 7.5) tire-wear range.
+            // 5.0 mph falls in the [2.5, 7.5) tire-wear range.
             assert_eq!(r.op_mode_id, 402);
         }
     }
@@ -1534,7 +1534,7 @@ mod tests {
 
     #[test]
     fn project_unmatched_link_speed_gets_op_mode_minus_one() {
- // No operating modes: every non-idle speed is unassigned.
+        // No operating modes: every non-idle speed is unassigned.
         let inputs = ProjectInputs {
             link: Link {
                 road_type_id: RoadTypeId(5),
@@ -1583,18 +1583,18 @@ mod tests {
         assert!(project_op_mode_fractions(&inputs).is_empty());
     }
 
- // ── generator metadata / trait ──────────────────────────────────────
+    // ── generator metadata / trait ──────────────────────────────────────
 
     #[test]
     fn generator_metadata_matches_chain_dag() {
         let gen = AverageSpeedOperatingModeDistributionGenerator::new();
         assert_eq!(gen.name(), "AverageSpeedOperatingModeDistributionGenerator");
         assert_eq!(gen.output_tables(), &["RatesOpModeDistribution"]);
- // No upstream generators (chain DAG `depends_on` is empty).
+        // No upstream generators (chain DAG `depends_on` is empty).
         assert!(gen.upstream().is_empty());
         assert!(gen.input_tables().contains(&"avgSpeedBin"));
         assert!(gen.input_tables().contains(&"operatingMode"));
- // The dead `calculateOpModeFractions` path's table is not listed.
+        // The dead `calculateOpModeFractions` path's table is not listed.
         assert!(!gen.input_tables().contains(&"avgSpeedDistribution"));
 
         let subs = gen.subscriptions();
@@ -1604,17 +1604,17 @@ mod tests {
         assert_eq!(subs[0].priority.display(), "GENERATOR");
     }
 
- // ── execute() integration tests ─────────────────────────────────────
+    // ── execute() integration tests ─────────────────────────────────────
 
- /// Build an `InMemoryStore` populated with the rates-first (non-Project)
- /// input tables required by `execute`.
+    /// Build an `InMemoryStore` populated with the rates-first (non-Project)
+    /// input tables required by `execute`.
     fn rates_first_store() -> moves_framework::InMemoryStore {
         use moves_framework::{DataFrameStore, InMemoryStore};
 
         let mut store = InMemoryStore::new();
 
- // avgSpeedBin: two bins — bin 1 at 2.0 mph (op mode 401), bin 2 at
- // 8.0 mph (op mode 402).
+        // avgSpeedBin: two bins — bin 1 at 2.0 mph (op mode 401), bin 2 at
+        // 8.0 mph (op mode 402).
         store.insert(
             "avgSpeedBin",
             AvgSpeedBin::into_dataframe(vec![
@@ -1631,24 +1631,24 @@ mod tests {
             ])
             .unwrap(),
         );
- // runSpecSourceType: one source type.
+        // runSpecSourceType: one source type.
         store.insert(
             "runSpecSourceType",
             RunSpecSourceTypeRow::into_dataframe(vec![RunSpecSourceTypeRow { source_type_id: 21 }])
                 .unwrap(),
         );
- // runSpecRoadType: one road type.
+        // runSpecRoadType: one road type.
         store.insert(
             "runSpecRoadType",
             RunSpecRoadTypeRow::into_dataframe(vec![RunSpecRoadTypeRow { road_type_id: 2 }])
                 .unwrap(),
         );
- // runSpecHourDay: one hour/day.
+        // runSpecHourDay: one hour/day.
         store.insert(
             "runSpecHourDay",
             RunSpecHourDayRow::into_dataframe(vec![RunSpecHourDayRow { hour_day_id: 51 }]).unwrap(),
         );
- // pollutantProcessAssoc: tire-wear pol-process (pollutant 117, process 10).
+        // pollutantProcessAssoc: tire-wear pol-process (pollutant 117, process 10).
         store.insert(
             "pollutantProcessAssoc",
             AvgSpeedPollutantProcessAssocRow::into_dataframe(vec![
@@ -1667,13 +1667,13 @@ mod tests {
         use moves_framework::{DataFrameStoreTyped, IterationPosition};
 
         let store = rates_first_store();
- // Non-project position: no link_id.
+        // Non-project position: no link_id.
         let pos = IterationPosition::default();
         let mut ctx = CalculatorContext::with_position_and_tables(pos, store);
 
         let gen = AverageSpeedOperatingModeDistributionGenerator::new();
         let out = gen.execute(&mut ctx).expect("execute ok");
- // Generator writes to scratch, not the main output DataFrame.
+        // Generator writes to scratch, not the main output DataFrame.
         assert!(out.dataframe().is_none());
 
         let rows: Vec<RatesOpModeDistributionRow> = ctx
@@ -1681,16 +1681,16 @@ mod tests {
             .store
             .iter_typed("RatesOpModeDistribution")
             .expect("RatesOpModeDistribution in scratch");
- // 2 bins × 1 source type × 1 road type × 1 hour/day = 2 rows.
+        // 2 bins × 1 source type × 1 road type × 1 hour/day = 2 rows.
         assert_eq!(rows.len(), 2);
 
- // All rows carry the tirewear pol-process and fraction = 1.
+        // All rows carry the tirewear pol-process and fraction = 1.
         for r in &rows {
             assert_eq!(r.pol_process_id, TIREWEAR_POL_PROCESS);
             assert_eq!(r.op_mode_fraction, 1.0);
         }
 
- // Each row is keyed by its bin's speed and op mode.
+        // Each row is keyed by its bin's speed and op mode.
         let row1 = rows.iter().find(|r| r.avg_speed_bin_id == 1).unwrap();
         assert_eq!(row1.op_mode_id, 401);
         assert_eq!(row1.avg_bin_speed, 2.0);
@@ -1708,7 +1708,7 @@ mod tests {
         use moves_framework::{DataFrameStore, DataFrameStoreTyped, IterationPosition};
 
         let mut store = rates_first_store();
- // Replace pollutantProcessAssoc with one that has no tire-wear entry.
+        // Replace pollutantProcessAssoc with one that has no tire-wear entry.
         store.insert(
             "pollutantProcessAssoc",
             AvgSpeedPollutantProcessAssocRow::into_dataframe(vec![
@@ -1743,7 +1743,7 @@ mod tests {
 
         let mut store = InMemoryStore::new();
 
- // link: 5.0 mph on road type 5.
+        // link: 5.0 mph on road type 5.
         store.insert(
             "link",
             Link::into_dataframe(vec![Link {
@@ -1752,7 +1752,7 @@ mod tests {
             }])
             .unwrap(),
         );
- // runSpecSourceType: two source types.
+        // runSpecSourceType: two source types.
         store.insert(
             "runSpecSourceType",
             RunSpecSourceTypeRow::into_dataframe(vec![
@@ -1761,12 +1761,12 @@ mod tests {
             ])
             .unwrap(),
         );
- // runSpecHourDay: one hour/day.
+        // runSpecHourDay: one hour/day.
         store.insert(
             "runSpecHourDay",
             RunSpecHourDayRow::into_dataframe(vec![RunSpecHourDayRow { hour_day_id: 51 }]).unwrap(),
         );
- // operatingMode: realistic tirewear modes.
+        // operatingMode: realistic tirewear modes.
         store.insert(
             "operatingMode",
             OperatingMode::into_dataframe(vec![
@@ -1792,7 +1792,7 @@ mod tests {
             .unwrap(),
         );
 
- // Project domain position: link_id is Some.
+        // Project domain position: link_id is Some.
         let pos = IterationPosition {
             iteration: 0,
             process_id: None,
@@ -1810,7 +1810,7 @@ mod tests {
             .store
             .iter_typed("RatesOpModeDistribution")
             .expect("RatesOpModeDistribution in scratch");
- // 2 source types × 1 hour/day = 2 rows.
+        // 2 source types × 1 hour/day = 2 rows.
         assert_eq!(rows.len(), 2);
 
         for r in &rows {
@@ -1819,14 +1819,14 @@ mod tests {
             assert_eq!(r.avg_speed_bin_id, 0);
             assert_eq!(r.avg_bin_speed, 5.0);
             assert_eq!(r.op_mode_fraction, 1.0);
- // 5.0 mph → tirewear range [2.5, 7.5) → op mode 402.
+            // 5.0 mph → tirewear range [2.5, 7.5) → op mode 402.
             assert_eq!(r.op_mode_id, 402);
         }
     }
 
     #[test]
     fn generator_is_object_safe() {
- // The registry stores generators as Box<dyn Generator>.
+        // The registry stores generators as Box<dyn Generator>.
         let gen: Box<dyn Generator> =
             Box::new(AverageSpeedOperatingModeDistributionGenerator::new());
         assert_eq!(gen.name(), "AverageSpeedOperatingModeDistributionGenerator");

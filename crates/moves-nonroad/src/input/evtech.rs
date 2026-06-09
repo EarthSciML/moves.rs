@@ -27,15 +27,15 @@ use crate::{Error, Result};
 /// at `rdevtech.f` :117-134.
 #[derive(Debug, Clone, PartialEq)]
 pub struct EvapTechFractionGroup {
- /// SCC code.
+    /// SCC code.
     pub scc: String,
- /// HP-range minimum.
+    /// HP-range minimum.
     pub hp_min: f32,
- /// HP-range maximum.
+    /// HP-range maximum.
     pub hp_max: f32,
- /// Model year.
+    /// Model year.
     pub year: i32,
- /// Tech-type → fraction, in header order.
+    /// Tech-type → fraction, in header order.
     pub fractions: Vec<(String, f32)>,
 }
 
@@ -194,7 +194,7 @@ fn renormalise(groups: &mut [EvapTechFractionGroup]) {
         let sum: f32 = group.fractions.iter().map(|(_, f)| *f).sum();
         if sum > 0.0 {
             for (_, f) in group.fractions.iter_mut() {
- *f /= sum;
+                *f /= sum;
             }
         }
     }
@@ -288,7 +288,7 @@ mod tests {
         let g = &groups[0];
         assert_eq!(g.fractions[0].0, "E00000000");
         assert_eq!(g.fractions[1].0, "E11111111");
- // 0.60 + 0.20 = 0.80; renormalised → 0.75 + 0.25
+        // 0.60 + 0.20 = 0.80; renormalised → 0.75 + 0.25
         assert!((g.fractions[0].1 - 0.75).abs() < 1e-6);
         assert!((g.fractions[1].1 - 0.25).abs() < 1e-6);
     }
@@ -311,7 +311,7 @@ mod tests {
 
     #[test]
     fn rejects_wrong_length_tech_code() {
- // E followed by only 4 chars (5 total instead of 9)
+        // E followed by only 4 chars (5 total instead of 9)
         let header = at(&[
             (6, "2270001000"),
             (21, " 25.0"),

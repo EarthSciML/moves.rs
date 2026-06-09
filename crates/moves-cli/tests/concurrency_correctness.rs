@@ -63,6 +63,7 @@ fn onroad_fixtures() -> Vec<PathBuf> {
             p.extension().and_then(|x| x.to_str()) == Some("xml")
                 && !name.starts_with("nr-")
                 && !name.starts_with("scale-")
+                && !name.starts_with("error-")
         })
         .collect();
     paths.sort();
@@ -86,8 +87,8 @@ fn run_fixture_bytes(fixture: &Path, max_parallel_chunks: usize) -> (Vec<u8>, bo
         output: out_dir.path().to_path_buf(),
         max_parallel_chunks,
         calculator_dag: None,
- // Pin to a fixed timestamp so the output row is byte-stable across
- // parallelism variants; the engine does not stamp the wall clock.
+        // Pin to a fixed timestamp so the output row is byte-stable across
+        // parallelism variants; the engine does not stamp the wall clock.
         run_date_time: Some("2026-01-01T00:00:00".to_string()),
         snapshot: None,
         scale_input: None,
@@ -113,13 +114,13 @@ fn outputs_are_byte_identical_across_parallelism_settings() {
         fixtures_dir().display()
     );
 
- // Host parallelism — 0 expands to available_parallelism inside the engine.
+    // Host parallelism — 0 expands to available_parallelism inside the engine.
     let ncpu: usize = std::thread::available_parallelism()
         .map(|n| n.get())
         .unwrap_or(1);
 
- // The three settings to compare. If NCPU is 1 or 4 we deduplicate so we
- // don't run the same setting twice and call that "a comparison".
+    // The three settings to compare. If NCPU is 1 or 4 we deduplicate so we
+    // don't run the same setting twice and call that "a comparison".
     let settings: Vec<(usize, &str)> = {
         let mut s = vec![(1usize, "1"), (4, "4"), (ncpu, "NCPU")];
         s.dedup_by_key(|(n, _)| *n);
@@ -127,21 +128,21 @@ fn outputs_are_byte_identical_across_parallelism_settings() {
     };
 
     let mut failures: Vec<String> = Vec::new();
- // Tracks whether ANY fixture ran with a fully-implemented calculator graph.
- // While calculators are stubs (`CalculatorOutput::empty()`), the only bytes
- // in `MOVESRun.parquet` are pinned run metadata, so this test exercises
- // framework non-determinism only and CANNOT catch non-deterministic float
- // summation in the numeric cores. The moment the data plane lands and a run
- // becomes fully implemented, this flag flips and the guard below fails the
- // test — forcing the byte-identity comparison to be re-pointed at the real
- // emission output (`MOVESOutput.parquet`) rather than silently remaining a
- // metadata-only no-op that passes green forever.
+    // Tracks whether ANY fixture ran with a fully-implemented calculator graph.
+    // While calculators are stubs (`CalculatorOutput::empty()`), the only bytes
+    // in `MOVESRun.parquet` are pinned run metadata, so this test exercises
+    // framework non-determinism only and CANNOT catch non-deterministic float
+    // summation in the numeric cores. The moment the data plane lands and a run
+    // becomes fully implemented, this flag flips and the guard below fails the
+    // test — forcing the byte-identity comparison to be re-pointed at the real
+    // emission output (`MOVESOutput.parquet`) rather than silently remaining a
+    // metadata-only no-op that passes green forever.
     let mut any_fully_implemented = false;
 
     for fixture in &fixtures {
         let name = fixture.file_stem().and_then(|n| n.to_str()).unwrap_or("?");
 
- // Run at each parallelism setting and collect bytes.
+        // Run at each parallelism setting and collect bytes.
         let runs: Vec<(usize, &str, Vec<u8>)> = settings
             .iter()
             .map(|&(limit, label)| {
@@ -151,7 +152,7 @@ fn outputs_are_byte_identical_across_parallelism_settings() {
             })
             .collect();
 
- // Compare every pair against the first run.
+        // Compare every pair against the first run.
         let (_, ref_label, ref_bytes) = &runs[0];
         for (limit, label, bytes) in &runs[1..] {
             if bytes != ref_bytes {
@@ -172,11 +173,11 @@ fn outputs_are_byte_identical_across_parallelism_settings() {
         failures.join("\n  ")
     );
 
- // Strengthening guard: the data plane has landed (calculators now have
- // registered factories), so this test is no longer comparing pinned run
- // metadata — it must be updated to compare the real per-bucket emission
- // output across parallelism settings. Failing here is intentional: it
- // prevents the determinism gate from passing green on empty output.
+    // Strengthening guard: the data plane has landed (calculators now have
+    // registered factories), so this test is no longer comparing pinned run
+    // metadata — it must be updated to compare the real per-bucket emission
+    // output across parallelism settings. Failing here is intentional: it
+    // prevents the determinism gate from passing green on empty output.
     assert!(
         !any_fully_implemented,
         "data plane is wired: at least one fixture ran a fully-implemented \

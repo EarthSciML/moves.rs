@@ -156,8 +156,8 @@ mod tests {
 
     #[test]
     fn fractions_summing_to_one_per_source_year_pass() {
- // (sourceTypeID=21, yearID=2020) — three buckets that sum to 1.
- // (sourceTypeID=21, yearID=2021) — same.
+        // (sourceTypeID=21, yearID=2020) — three buckets that sum to 1.
+        // (sourceTypeID=21, yearID=2021) — same.
         let rows: Vec<(i64, i64, i64, f64)> = vec![
             (21, 2020, 0, 0.50),
             (21, 2020, 1, 0.30),
@@ -179,11 +179,11 @@ mod tests {
         let rows: Vec<(i64, i64, i64, f64)> = vec![
             (21, 2020, 0, 0.50),
             (21, 2020, 1, 0.30),
- // (21, 2020) sums to 0.80 — off
+            // (21, 2020) sums to 0.80 — off
             (21, 2021, 0, 1.00),
- // (21, 2021) sums to 1.00 — ok
+            // (21, 2021) sums to 1.00 — ok
             (32, 2020, 0, 0.60),
- // (32, 2020) sums to 0.60 — off
+            // (32, 2020) sums to 0.60 — off
         ];
         let b = batch(&rows);
         let imp = AgeDistributionImporter;

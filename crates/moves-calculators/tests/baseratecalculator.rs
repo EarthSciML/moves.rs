@@ -12,7 +12,7 @@
 //! separate downstream task (`moves-rust-.md`).
 
 use moves_calculators::calculators::baseratecalculator::setup::{
-    AgeCategoryRow, BaseRateCalculatorInputs, BaseRateRow, CriteriaRatioRow,
+    AgeCategoryRow, BaseRateCalculatorInputs, BaseRateRow, CountyRow, CriteriaRatioRow,
     EmissionRateAdjustmentRow, EvEfficiencyRow, FuelFormulationRow, FuelSupplyRow,
     GeneralFuelRatioRow, ImCoverageRow, ImFactorRow, ModelYearFuelFractionRow,
     PollutantProcessMappedModelYearRow, SmfrSbdSummaryRow, StartTempAdjustmentRow,
@@ -78,14 +78,15 @@ fn base_rate_row(pollutant: i32, process: i32, mean: f64, rate: f64) -> BaseRate
 
 #[test]
 fn single_row_passes_through_unchanged_when_no_tables_apply() {
- // No lookup tables: every adjustment is skipped, aggregate_op_modes just
- // sums the one base rate by market share.
+    // No lookup tables: every adjustment is skipped, aggregate_op_modes just
+    // sums the one base rate by market share.
     let inputs = BaseRateCalculatorInputs {
         base_rate: vec![base_rate_row(2, 1, 4.0, 8.0)],
         fuel_supply: fuel_supply_one(),
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
+    let output =
+        BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default()).expect("run ok");
     assert_eq!(output.blocks.len(), 1);
     let block = &output.blocks[0];
     assert_eq!(block.key.process_id, 1);
@@ -99,25 +100,44 @@ fn single_row_passes_through_unchanged_when_no_tables_apply() {
 
 #[test]
 fn age_based_pass_is_processed_like_the_non_age_pass() {
- // A row in `base_rate_by_age` flows through the same pipeline.
+    // A row in `base_rate_by_age` flows through the same pipeline.
     let inputs = BaseRateCalculatorInputs {
         base_rate_by_age: vec![base_rate_row(2, 1, 4.0, 8.0)],
         fuel_supply: fuel_supply_one(),
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
+    let output =
+        BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default()).expect("run ok");
     assert_eq!(output.rows().len(), 1);
     assert_eq!(output.rows()[0].emission_quant, 4.0);
 }
 
 #[test]
-fn row_without_matching_fuel_supply_is_dropped() {
- // No fuel supply -> the row expands to zero base rates and is dropped.
+fn non_age_row_without_matching_fuel_supply_errors() {
+    // Non-age path (base_rate) with no matching fuel supply must return an
+    // error — matching Go streamBaseRate's panic on a nil FuelSupply lookup.
     let inputs = BaseRateCalculatorInputs {
         base_rate: vec![base_rate_row(2, 1, 4.0, 8.0)],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
+    let err = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default())
+        .expect_err("expected MissingContext error for missing fuel supply");
+    assert!(
+        err.to_string().contains("missing required context value"),
+        "unexpected error: {err}"
+    );
+}
+
+#[test]
+fn age_based_row_without_matching_fuel_supply_is_dropped() {
+    // Age path (base_rate_by_age) with no matching fuel supply drops the row
+    // silently — matching Go streamBaseRateByAge's `return` on nil supply.
+    let inputs = BaseRateCalculatorInputs {
+        base_rate_by_age: vec![base_rate_row(2, 1, 4.0, 8.0)],
+        ..BaseRateCalculatorInputs::default()
+    };
+    let output =
+        BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default()).expect("run ok");
     assert!(output.blocks.is_empty());
 }
 
@@ -147,10 +167,11 @@ fn two_fuel_formulations_expand_to_two_emissions() {
         ],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
+    let output =
+        BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default()).expect("run ok");
     let rows = output.rows();
     assert_eq!(rows.len(), 2);
- // emissions are ordered by fuel formulation id.
+    // emissions are ordered by fuel formulation id.
     assert_eq!(rows[0].fuel_formulation_id, 100);
     assert_eq!(rows[0].emission_quant, 3.0); // 4 * 0.75
     assert_eq!(rows[1].fuel_formulation_id, 101);
@@ -159,8 +180,8 @@ fn two_fuel_formulations_expand_to_two_emissions() {
 
 #[test]
 fn rows_sharing_a_key_accumulate_before_aggregation() {
- // Two rows differing only in operating mode (not part of the block key)
- // accumulate into one block; aggregate_op_modes then sums both.
+    // Two rows differing only in operating mode (not part of the block key)
+    // accumulate into one block; aggregate_op_modes then sums both.
     let mut row_a = base_rate_row(2, 1, 4.0, 8.0);
     row_a.op_mode_id = 0;
     let mut row_b = base_rate_row(2, 1, 4.0, 8.0);
@@ -170,7 +191,8 @@ fn rows_sharing_a_key_accumulate_before_aggregation() {
         fuel_supply: fuel_supply_one(),
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
+    let output =
+        BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default()).expect("run ok");
     assert_eq!(output.blocks.len(), 1);
     assert_eq!(output.blocks[0].emissions[0].emission_quant, 8.0); // 4 + 4
     assert_eq!(output.blocks[0].emissions[0].emission_rate, 16.0); // 8 + 8
@@ -178,7 +200,7 @@ fn rows_sharing_a_key_accumulate_before_aggregation() {
 
 #[test]
 fn general_fuel_ratio_blends_normal_and_gpa_by_county_fraction() {
- // r = ratio + gpaFract*(ratioGPA - ratio) = 2 + 0.5*(4 - 2) = 3.
+    // r = ratio + gpaFract*(ratioGPA - ratio) = 2 + 0.5*(4 - 2) = 3.
     let inputs = BaseRateCalculatorInputs {
         base_rate: vec![base_rate_row(2, 1, 4.0, 8.0)],
         fuel_supply: fuel_supply_one(),
@@ -202,17 +224,23 @@ fn general_fuel_ratio_blends_normal_and_gpa_by_county_fraction() {
         }],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
+    let output =
+        BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default()).expect("run ok");
     assert_eq!(output.rows()[0].emission_quant, 12.0); // 4 * 3
     assert_eq!(output.rows()[0].emission_rate, 24.0); // 8 * 3
 }
 
 #[test]
 fn general_fuel_ratio_outside_its_year_range_does_not_apply() {
- // model year 2018 is outside [2000, 2010]; no scaling.
+    // model year 2018 is outside [2000, 2010]; no scaling.
     let inputs = BaseRateCalculatorInputs {
         base_rate: vec![base_rate_row(2, 1, 4.0, 8.0)],
         fuel_supply: fuel_supply_one(),
+        county: vec![CountyRow {
+            county_id: 1,
+            gpa_fract: 0.0,
+            barometric_pressure: 0.0,
+        }],
         general_fuel_ratio: vec![GeneralFuelRatioRow {
             fuel_formulation_id: 100,
             pol_process_id: 201,
@@ -226,7 +254,8 @@ fn general_fuel_ratio_outside_its_year_range_does_not_apply() {
         }],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
+    let output =
+        BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default()).expect("run ok");
     assert_eq!(output.rows()[0].emission_quant, 4.0); // unchanged
 }
 
@@ -235,6 +264,11 @@ fn criteria_ratio_scales_running_exhaust() {
     let inputs = BaseRateCalculatorInputs {
         base_rate: vec![base_rate_row(2, 1, 4.0, 8.0)],
         fuel_supply: fuel_supply_one(),
+        county: vec![CountyRow {
+            county_id: 1,
+            gpa_fract: 0.0,
+            barometric_pressure: 0.0,
+        }],
         criteria_ratio: vec![CriteriaRatioRow {
             fuel_formulation_id: 100,
             pol_process_id: 201,
@@ -247,15 +281,16 @@ fn criteria_ratio_scales_running_exhaust() {
         }],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
+    let output =
+        BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default()).expect("run ok");
     assert_eq!(output.rows()[0].emission_quant, 5.0); // 4 * 1.25
     assert_eq!(output.rows()[0].emission_rate, 10.0); // 8 * 1.25
 }
 
 #[test]
 fn im_coverage_blends_the_im_and_non_im_rates() {
- // IM coverage = imFactor * (0.01 * complianceFactor) = 0.5 * 0.5 = 0.25.
- // meanBaseRate = (1 - 0.25)*4 + 0.25*8 = 5; emissionRate = 0.75*8 + 0.25*16 = 10.
+    // IM coverage = imFactor * (0.01 * complianceFactor) = 0.5 * 0.5 = 0.25.
+    // meanBaseRate = (1 - 0.25)*4 + 0.25*8 = 5; emissionRate = 0.75*8 + 0.25*16 = 10.
     let mut row = base_rate_row(2, 1, 4.0, 8.0);
     row.mean_base_rate_im = 8.0;
     row.emission_rate_im = 16.0;
@@ -295,14 +330,15 @@ fn im_coverage_blends_the_im_and_non_im_rates() {
         }],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
+    let output =
+        BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default()).expect("run ok");
     assert_eq!(output.rows()[0].emission_quant, 5.0);
     assert_eq!(output.rows()[0].emission_rate, 10.0);
 }
 
 #[test]
 fn air_conditioning_adds_the_ac_adjusted_rate() {
- // process 1 (not start exhaust): rate += acFactor * acAdj.
+    // process 1 (not start exhaust): rate += acFactor * acAdj.
     let mut row = base_rate_row(2, 1, 4.0, 8.0);
     row.mean_base_rate_ac_adj = 2.0;
     row.emission_rate_ac_adj = 1.0;
@@ -319,15 +355,16 @@ fn air_conditioning_adds_the_ac_adjusted_rate() {
         ],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
+    let output =
+        BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default()).expect("run ok");
     assert_eq!(output.rows()[0].emission_quant, 5.0); // 4 + 0.5*2
     assert_eq!(output.rows()[0].emission_rate, 8.5); // 8 + 0.5*1
 }
 
 #[test]
 fn extended_idle_scales_mean_rates_but_not_emission_rates() {
- // process 90: the four mean-base-rate fields scale by the opMode-200
- // fraction; emission rates are untouched.
+    // process 90: the four mean-base-rate fields scale by the opMode-200
+    // fraction; emission rates are untouched.
     let inputs = BaseRateCalculatorInputs {
         base_rate: vec![base_rate_row(2, 90, 4.0, 8.0)],
         fuel_supply: fuel_supply_one(),
@@ -338,15 +375,16 @@ fn extended_idle_scales_mean_rates_but_not_emission_rates() {
         }],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
+    let output =
+        BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default()).expect("run ok");
     assert_eq!(output.rows()[0].emission_quant, 2.0); // 4 * 0.5
     assert_eq!(output.rows()[0].emission_rate, 8.0); // emission rate untouched
 }
 
 #[test]
 fn apu_scales_mean_rates_for_operating_mode_201() {
- // process 91, operating mode 201: the four mean-base-rate fields scale
- // by the opMode-201 fraction; the process is not retagged.
+    // process 91, operating mode 201: the four mean-base-rate fields scale
+    // by the opMode-201 fraction; the process is not retagged.
     let mut row = base_rate_row(91, 91, 4.0, 8.0);
     row.op_mode_id = 201;
     let inputs = BaseRateCalculatorInputs {
@@ -359,7 +397,8 @@ fn apu_scales_mean_rates_for_operating_mode_201() {
         }],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
+    let output =
+        BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default()).expect("run ok");
     assert_eq!(output.blocks.len(), 1);
     assert_eq!(output.blocks[0].key.process_id, 91); // not retagged
     assert_eq!(output.rows()[0].emission_quant, 2.0); // 4 * 0.5
@@ -368,8 +407,8 @@ fn apu_scales_mean_rates_for_operating_mode_201() {
 
 #[test]
 fn shorepower_retags_the_process_to_93() {
- // process 91, operating mode 203: process is retagged 91 -> 93, but
- // pol_process_id is deliberately not recomputed (stays 9191).
+    // process 91, operating mode 203: process is retagged 91 -> 93, but
+    // pol_process_id is deliberately not recomputed (stays 9191).
     let mut row = base_rate_row(91, 91, 4.0, 8.0);
     row.op_mode_id = 203;
     let inputs = BaseRateCalculatorInputs {
@@ -382,7 +421,8 @@ fn shorepower_retags_the_process_to_93() {
         }],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
+    let output =
+        BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default()).expect("run ok");
     assert_eq!(output.blocks.len(), 1);
     assert_eq!(output.blocks[0].key.process_id, 93);
     assert_eq!(output.blocks[0].key.pol_process_id, 9191); // stale, by design
@@ -409,20 +449,20 @@ fn emission_rate_adjustment_scales_mean_and_emission_rate() {
         }],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(inputs, &constants(), &flags);
+    let output = BaseRateCalculator::run(inputs, &constants(), &flags).expect("run ok");
     assert_eq!(output.rows()[0].emission_quant, 2.0); // 4 * 0.5
     assert_eq!(output.rows()[0].emission_rate, 4.0); // 8 * 0.5
 }
 
 #[test]
 fn ev_efficiency_divides_through_the_efficiency_product() {
- // divisor = battery * charging = 0.5 * 0.5 = 0.25.
- //
- // EVEfficiency only applies to electricity (fuelTypeID 9), and the raw
- // row is expanded over its [beginModelYearID, endModelYearID] range,
- // keeping only model years whose age (`year - modelYearID`) maps to the
- // row's ageGroupID via AgeCategory. Here year 2020, modelYear 2018 ->
- // ageID 2 -> ageGroupID 3, so the row covers the base rate's 2018 bin.
+    // divisor = battery * charging = 0.5 * 0.5 = 0.25.
+    //
+    // EVEfficiency only applies to electricity (fuelTypeID 9), and the raw
+    // row is expanded over its [beginModelYearID, endModelYearID] range,
+    // keeping only model years whose age (`year - modelYearID`) maps to the
+    // row's ageGroupID via AgeCategory. Here year 2020, modelYear 2018 ->
+    // ageID 2 -> ageGroupID 3, so the row covers the base rate's 2018 bin.
     let flags = ModuleFlags {
         ev_efficiency: true,
         ..ModuleFlags::default()
@@ -456,15 +496,15 @@ fn ev_efficiency_divides_through_the_efficiency_product() {
         }],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(inputs, &constants(), &flags);
+    let output = BaseRateCalculator::run(inputs, &constants(), &flags).expect("run ok");
     assert_eq!(output.rows()[0].emission_quant, 16.0); // 4 / 0.25
     assert_eq!(output.rows()[0].emission_rate, 32.0); // 8 / 0.25
 }
 
 #[test]
 fn temperature_adjustment_applies_the_standard_quadratic_term() {
- // CO (pollutant 2), process 1: standard form
- // factor = 1 + (temp-75)*(A + (temp-75)*B). temp 77, A 0.5, B 0 -> 2.0.
+    // CO (pollutant 2), process 1: standard form
+    // factor = 1 + (temp-75)*(A + (temp-75)*B). temp 77, A 0.5, B 0 -> 2.0.
     let inputs = BaseRateCalculatorInputs {
         base_rate: vec![base_rate_row(2, 1, 4.0, 8.0)],
         fuel_supply: fuel_supply_one(),
@@ -491,16 +531,17 @@ fn temperature_adjustment_applies_the_standard_quadratic_term() {
         }],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
+    let output =
+        BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default()).expect("run ok");
     assert_eq!(output.rows()[0].emission_quant, 8.0); // 4 * 2
     assert_eq!(output.rows()[0].emission_rate, 16.0); // 8 * 2
 }
 
 #[test]
 fn start_temperature_adjustment_applies_the_polynomial_form() {
- // process 2, pollutant 1, polProcessID 102. POLY form:
- // rate = base + weight * d * (A + d*(B + d*C)), d = least(temp,75) - 75.
- // temp 71 -> d = -4; A 1, B 0, C 0; weight 0.5 -> base + 0.5*(-4)*1 = base - 2.
+    // process 2, pollutant 1, polProcessID 102. POLY form:
+    // rate = base + weight * d * (A + d*(B + d*C)), d = least(temp,75) - 75.
+    // temp 71 -> d = -4; A 1, B 0, C 0; weight 0.5 -> base + 0.5*(-4)*1 = base - 2.
     let mut row = base_rate_row(1, 2, 4.0, 8.0);
     row.op_mode_fraction = 0.5;
     row.op_mode_fraction_rate = 0.5;
@@ -537,20 +578,26 @@ fn start_temperature_adjustment_applies_the_polynomial_form() {
         }],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
+    let output =
+        BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default()).expect("run ok");
     assert_eq!(output.rows()[0].emission_quant, 2.0); // 4 - 2
     assert_eq!(output.rows()[0].emission_rate, 6.0); // 8 - 2
 }
 
 #[test]
 fn e85_thc_emits_a_10000_offset_pollutant() {
- // E85 formulation (subtype 51), model year >= 2001, criteria + alt
- // criteria ratios present. The criteria step scales the base block by
- // 2.0; the E85 block then scales a copy by altRatio/ratio = 6/2 = 3.
+    // E85 formulation (subtype 51), model year >= 2001, criteria + alt
+    // criteria ratios present. The criteria step scales the base block by
+    // 2.0; the E85 block then scales a copy by altRatio/ratio = 6/2 = 3.
     let cr_key = (100, 201, 21, 2018, 2);
     let inputs = BaseRateCalculatorInputs {
         base_rate: vec![base_rate_row(2, 1, 4.0, 8.0)],
         fuel_supply: fuel_supply_one(),
+        county: vec![CountyRow {
+            county_id: 1,
+            gpa_fract: 0.0,
+            barometric_pressure: 0.0,
+        }],
         fuel_formulations: vec![FuelFormulationRow {
             fuel_formulation_id: 100,
             fuel_sub_type_id: 51,
@@ -577,12 +624,13 @@ fn e85_thc_emits_a_10000_offset_pollutant() {
         }],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default());
+    let output =
+        BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default()).expect("run ok");
     assert_eq!(output.blocks.len(), 2);
- // Block 0: the base pollutant 2, criteria-scaled by 2.
+    // Block 0: the base pollutant 2, criteria-scaled by 2.
     assert_eq!(output.blocks[0].key.pollutant_id, 2);
     assert_eq!(output.blocks[0].emissions[0].emission_quant, 8.0); // 4 * 2
- // Block 1: pollutant 10002, scaled again by 3 (alt/criteria ratio).
+                                                                   // Block 1: pollutant 10002, scaled again by 3 (alt/criteria ratio).
     assert_eq!(output.blocks[1].key.pollutant_id, 10002);
     assert_eq!(output.blocks[1].key.pol_process_id, 1_000_201);
     assert_eq!(output.blocks[1].emissions[0].emission_quant, 24.0); // 8 * 3
@@ -591,7 +639,7 @@ fn e85_thc_emits_a_10000_offset_pollutant() {
 
 #[test]
 fn apply_activity_converts_a_rate_into_an_inventory() {
- // BRC_ApplyActivity: emission quantity scales by universal activity.
+    // BRC_ApplyActivity: emission quantity scales by universal activity.
     let flags = ModuleFlags {
         apply_activity: true,
         ..ModuleFlags::default()
@@ -607,15 +655,15 @@ fn apply_activity_converts_a_rate_into_an_inventory() {
         }],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(inputs, &constants(), &flags);
+    let output = BaseRateCalculator::run(inputs, &constants(), &flags).expect("run ok");
     assert_eq!(output.rows()[0].emission_quant, 12.0); // 4 * 3
     assert_eq!(output.rows()[0].emission_rate, 8.0); // emission rate untouched
 }
 
 #[test]
 fn aggregate_smfr_weights_emissions_by_the_activity_distribution() {
- // Two reg classes contribute activity 1 and 3; with regClassID discarded
- // they share a total of 4, so reg class 10 normalises to 1/4 = 0.25.
+    // Two reg classes contribute activity 1 and 3; with regClassID discarded
+    // they share a total of 4, so reg class 10 normalises to 1/4 = 0.25.
     let flags = ModuleFlags {
         aggregate_smfr: true,
         adjust_mean_base_rate_and_emission_rate: true,
@@ -649,7 +697,138 @@ fn aggregate_smfr_weights_emissions_by_the_activity_distribution() {
         ],
         ..BaseRateCalculatorInputs::default()
     };
-    let output = BaseRateCalculator::run(inputs, &constants(), &flags);
+    let output = BaseRateCalculator::run(inputs, &constants(), &flags).expect("run ok");
     assert_eq!(output.rows()[0].emission_quant, 1.0); // 4 * 0.25
     assert_eq!(output.rows()[0].emission_rate, 2.0); // 8 * 0.25
+                                                     // Canonical: MOVES discards regClassID only at the final output aggregation
+                                                     // step, after per-reg-class speciation (Go hcspeciation.go:231,262,280 keys
+                                                     // on fb.Key.RegClassID). The BRC must carry the original regClassID through
+                                                     // SMFR weighting so chained speciators (HCSpeciation) can key their ratio
+                                                     // lookups on the real reg class, not on a prematurely-zeroed 0.
+    assert_eq!(output.rows()[0].key.reg_class_id, 10);
+}
+
+#[test]
+fn smfr_reg_class_preserved_enables_hc_speciation() {
+    // Verify the end-to-end guarantee: a BRC output block whose regClassID was
+    // preserved through SMFR weighting (not zeroed early) allows HCSpeciation
+    // to produce non-zero methane — the onroad acceptance criterion for mo-17m.
+    use moves_calculators::calculators::hcspeciation::{
+        FuelBlock as HcFuelBlock, FuelBlockKey, HcSpeciation, MethaneThcRatioRow,
+        OnroadWorkerTables,
+    };
+
+    let flags = ModuleFlags {
+        aggregate_smfr: true,
+        adjust_mean_base_rate_and_emission_rate: true,
+        discard_reg_class_id: true,
+        ..ModuleFlags::default()
+    };
+    let inputs = BaseRateCalculatorInputs {
+        base_rate: vec![base_rate_row(1, 1, 4.0, 8.0)], // THC (pollutant 1), reg class 10
+        fuel_supply: fuel_supply_one(),
+        universal_activity: vec![UniversalActivityRow {
+            hour_day_id: 85,
+            model_year_id: 2018,
+            source_type_id: 21,
+            activity: 1.0,
+        }],
+        smfr_sbd_summary: vec![SmfrSbdSummaryRow {
+            source_type_id: 21,
+            model_year_id: 2018,
+            fuel_type_id: 1,
+            reg_class_id: 10,
+            sbd_total: 1.0,
+        }],
+        ..BaseRateCalculatorInputs::default()
+    };
+    let brc_output = BaseRateCalculator::run(inputs, &constants(), &flags).expect("run ok");
+    // BRC must carry reg_class_id = 10 through SMFR weighting.
+    let row = &brc_output.rows()[0];
+    assert_eq!(row.key.reg_class_id, 10);
+    assert_eq!(row.key.pollutant_id, 1); // THC
+
+    // Build HcSpeciation with a methaneTHCRatio entry keyed on reg_class_id = 10.
+    let speciation = HcSpeciation::build(
+        [MethaneThcRatioRow {
+            process_id: 1,
+            fuel_sub_type_id: 10, // matches fuel_supply_one
+            reg_class_id: 10,
+            begin_model_year_id: 2010,
+            end_model_year_id: 2025,
+            ch4_thc_ratio: 0.3,
+        }],
+        [],
+    );
+    // FuelFormulation for id 100 (from fuel_supply_one); no oxygenate volumes
+    // needed since there are no HCSpeciation rows (no NMOG/VOC).
+    let tables = OnroadWorkerTables::new(
+        [(
+            100_i32,
+            moves_calculators::calculators::hcspeciation::FuelFormulation {
+                mtbe_volume: 0.0,
+                etbe_volume: 0.0,
+                tame_volume: 0.0,
+                etoh_volume: 0.0,
+                vol_to_wt_percent_oxy: 0.0,
+            },
+        )],
+        [5 * 100 + 1, 79 * 100 + 1], // methane (5) and NMHC (79) needed
+    );
+    let block = HcFuelBlock {
+        key: FuelBlockKey {
+            pollutant_id: row.key.pollutant_id,
+            process_id: row.key.process_id,
+            fuel_type_id: row.key.fuel_type_id,
+            reg_class_id: row.key.reg_class_id, // 10 — preserved by BRC
+            model_year_id: row.key.model_year_id,
+        },
+        emissions: vec![moves_calculators::calculators::hcspeciation::Emission {
+            fuel_sub_type_id: row.fuel_sub_type_id,
+            fuel_formulation_id: row.fuel_formulation_id,
+            emission_quant: row.emission_quant,
+            emission_rate: row.emission_rate,
+        }],
+    };
+    let speciated = speciation.speciate_block(&block, &tables);
+    // methane (pollutant 5) must be present and non-zero.
+    let methane = speciated
+        .iter()
+        .find(|b| b.pollutant_id == 5)
+        .expect("methane block present");
+    assert!(
+        methane.emissions[0].emission_quant > 0.0,
+        "methane emission_quant must be non-zero (lookup keyed on reg_class_id 10 found ratio)"
+    );
+}
+
+#[test]
+fn missing_county_with_live_gpa_data_returns_error() {
+    // County table is empty but GPA-blending data is present. The calculator
+    // must surface a typed MissingContext error rather than silently using
+    // gpa_fract=0.0 (Go would have panicked; this port propagates the
+    // broken invariant as a recoverable Result error).
+    let inputs = BaseRateCalculatorInputs {
+        base_rate: vec![base_rate_row(2, 1, 4.0, 8.0)],
+        fuel_supply: fuel_supply_one(),
+        general_fuel_ratio: vec![GeneralFuelRatioRow {
+            fuel_formulation_id: 100,
+            pol_process_id: 201,
+            source_type_id: 21,
+            min_model_year_id: 2000,
+            max_model_year_id: 2020,
+            min_age_id: 0,
+            max_age_id: 40,
+            fuel_effect_ratio: 2.0,
+            fuel_effect_ratio_gpa: 4.0,
+        }],
+        // county intentionally absent to trigger the error
+        ..BaseRateCalculatorInputs::default()
+    };
+    let err = BaseRateCalculator::run(inputs, &constants(), &ModuleFlags::default())
+        .expect_err("missing county with live GPA data must be an error");
+    assert!(
+        err.to_string().contains("County[1]"),
+        "error should name the missing county ID; got: {err}"
+    );
 }

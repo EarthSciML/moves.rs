@@ -24,19 +24,19 @@ const DAYS_PER_MONTH: [i32; 12] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 3
 /// Period code emitted into the AMS file header.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PeriodCode {
- /// Annual or month — empty string (`' '`).
+    /// Annual or month — empty string (`' '`).
     None,
- /// Seasonal (typical day not on summer/winter) — `S`.
+    /// Seasonal (typical day not on summer/winter) — `S`.
     Season,
- /// Photochemical Ozone (summer typical day) — `PO`.
+    /// Photochemical Ozone (summer typical day) — `PO`.
     PhotochemicalOzone,
- /// Photochemical CO (winter typical day) — `PC`.
+    /// Photochemical CO (winter typical day) — `PC`.
     PhotochemicalCo,
 }
 
 impl PeriodCode {
- /// AMS code as a `'A1'` (one-character) string. Two-character
- /// codes return their full text.
+    /// AMS code as a `'A1'` (one-character) string. Two-character
+    /// codes return their full text.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::None => " ",
@@ -51,19 +51,19 @@ impl PeriodCode {
 /// (`yy*1000000 + mm*10000 + dd*100 + hh`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AmsDateStamp {
- /// Two-digit year (`yy`).
+    /// Two-digit year (`yy`).
     pub yy: i32,
- /// Month, 1..=12.
+    /// Month, 1..=12.
     pub month: i32,
- /// Day of month.
+    /// Day of month.
     pub day: i32,
- /// Hour (`00` for begin, `24` for end).
+    /// Hour (`00` for begin, `24` for end).
     pub hour: i32,
 }
 
 impl AmsDateStamp {
- /// Pack the stamp into the Fortran wire format used in
- /// `ibegdt`/`ienddt`.
+    /// Pack the stamp into the Fortran wire format used in
+    /// `ibegdt`/`ienddt`.
     pub fn packed(self) -> i32 {
         self.yy * 1_000_000 + self.month * 10_000 + self.day * 100 + self.hour
     }
@@ -72,26 +72,26 @@ impl AmsDateStamp {
 /// AMS output parameters derived from the `/PERIOD/` packet.
 #[derive(Debug, Clone)]
 pub struct AmsParams {
- /// Report-type flag (`itype` in Fortran). Always `'B'`.
+    /// Report-type flag (`itype` in Fortran). Always `'B'`.
     pub report_type: char,
- /// Network-type flag (`inetyp` in Fortran). Always `'AC'`.
+    /// Network-type flag (`inetyp` in Fortran). Always `'AC'`.
     pub network_type: &'static str,
- /// Two-digit reference year (`irefyr`).
+    /// Two-digit reference year (`irefyr`).
     pub reference_year: i32,
- /// Two-digit base year (`ibasyr`); always equal to
- /// [`Self::reference_year`].
+    /// Two-digit base year (`ibasyr`); always equal to
+    /// [`Self::reference_year`].
     pub base_year: i32,
- /// Period conversion factor (`cvtams`). Multiplies typical-day
- /// emissions to obtain the period total when [`SummaryType::TypicalDay`]
- /// is selected.
+    /// Period conversion factor (`cvtams`). Multiplies typical-day
+    /// emissions to obtain the period total when [`SummaryType::TypicalDay`]
+    /// is selected.
     pub conversion_factor: f32,
- /// Period code (`iperod`).
+    /// Period code (`iperod`).
     pub period_code: PeriodCode,
- /// Begin date stamp (`ibegdt`).
+    /// Begin date stamp (`ibegdt`).
     pub begin: AmsDateStamp,
- /// End date stamp (`ienddt`).
+    /// End date stamp (`ienddt`).
     pub end: AmsDateStamp,
- /// Non-fatal warnings produced during the derivation.
+    /// Non-fatal warnings produced during the derivation.
     pub warnings: Vec<String>,
 }
 
@@ -129,7 +129,7 @@ pub fn initialize_ams_params(period: &PeriodConfig) -> AmsParams {
 
     match period.period_type {
         PeriodType::Annual => {
- // Empty period code, full year date range.
+            // Empty period code, full year date range.
             params.period_code = PeriodCode::None;
             if is_typical_day {
                 params.conversion_factor = 365.0;
@@ -198,8 +198,8 @@ pub fn initialize_ams_params(period: &PeriodConfig) -> AmsParams {
         }
     }
 
- // Day-of-week is parsed but unused by AMS; reference it so
- // unused-field warnings stay quiet and the intent is documented.
+    // Day-of-week is parsed but unused by AMS; reference it so
+    // unused-field warnings stay quiet and the intent is documented.
     let _ = period.day_kind.unwrap_or(DayKind::Weekday);
 
     params
@@ -207,9 +207,9 @@ pub fn initialize_ams_params(period: &PeriodConfig) -> AmsParams {
 
 fn seasonal_date_range(yy: i32, season: Season) -> (AmsDateStamp, AmsDateStamp) {
     match season {
- // Winter spans the previous calendar year's December through
- // February — the Fortran source bumps `yy-1` for the begin
- // date stamp.
+        // Winter spans the previous calendar year's December through
+        // February — the Fortran source bumps `yy-1` for the begin
+        // date stamp.
         Season::Winter => (
             AmsDateStamp {
                 yy: yy - 1,
@@ -270,7 +270,7 @@ fn seasonal_date_range(yy: i32, season: Season) -> (AmsDateStamp, AmsDateStamp) 
 }
 
 fn typical_day_warning() -> String {
- // Matches the multiline warning emitted at intams.f label 6000.
+    // Matches the multiline warning emitted at intams.f label 6000.
     "WARNING: The output EPS file contains period total emissions. This does \
      NOT correspond to the user specified typical day emissions written to \
      the NONROAD output file."
@@ -327,7 +327,7 @@ mod tests {
         p.summary_type = SummaryType::TypicalDay;
         p.season = Some(Season::Summer);
         let r = initialize_ams_params(&p);
- // Summer typical day -> cvtams snaps to 1.0 and PO code.
+        // Summer typical day -> cvtams snaps to 1.0 and PO code.
         assert!((r.conversion_factor - 1.0).abs() < 1e-6);
         assert_eq!(r.period_code, PeriodCode::PhotochemicalOzone);
         assert!(r.warnings.is_empty());
@@ -356,7 +356,7 @@ mod tests {
         p.summary_type = SummaryType::TypicalDay;
         p.season = Some(Season::Spring);
         let r = initialize_ams_params(&p);
- // Conversion factor sticks at 91.21 for non-summer/winter typical days.
+        // Conversion factor sticks at 91.21 for non-summer/winter typical days.
         assert!((r.conversion_factor - 91.21).abs() < 1e-3);
         assert_eq!(r.period_code, PeriodCode::Season);
         assert_eq!(r.warnings.len(), 1);
@@ -383,7 +383,7 @@ mod tests {
         p.month = Some(2);
         let r = initialize_ams_params(&p);
         assert!((r.conversion_factor - 1.0).abs() < 1e-6);
- // Feb 28 with 24-hour end.
+        // Feb 28 with 24-hour end.
         assert_eq!(r.end.packed(), 25_022_824);
     }
 

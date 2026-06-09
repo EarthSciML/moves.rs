@@ -33,34 +33,34 @@ use std::path::PathBuf;
 /// One `/ACTIVITY/` packet record.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ActivityRecord {
- /// SCC (Source Classification Code), 10 characters left-justified.
+    /// SCC (Source Classification Code), 10 characters left-justified.
     pub scc: String,
- /// Subcategory string (5 characters).
+    /// Subcategory string (5 characters).
     pub sub: String,
- /// Horsepower range minimum.
+    /// Horsepower range minimum.
     pub hp_min: f32,
- /// Horsepower range maximum.
+    /// Horsepower range maximum.
     pub hp_max: f32,
- /// Load factor (fraction).
+    /// Load factor (fraction).
     pub load_factor: f32,
- /// Activity-units indicator: `HRY`, `HRD`, `GLY`, or `GLD`.
+    /// Activity-units indicator: `HRY`, `HRD`, `GLY`, or `GLD`.
     pub units: ActivityUnits,
- /// Activity level value.
+    /// Activity level value.
     pub activity_level: f32,
- /// Activity-vs-age curve identifier (10 characters).
+    /// Activity-vs-age curve identifier (10 characters).
     pub age_curve_id: String,
 }
 
 /// Activity units encoded in the `/ACTIVITY/` packet.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActivityUnits {
- /// Hours per year.
+    /// Hours per year.
     HoursPerYear,
- /// Hours per day.
+    /// Hours per day.
     HoursPerDay,
- /// Gallons per year.
+    /// Gallons per year.
     GallonsPerYear,
- /// Gallons per day.
+    /// Gallons per day.
     GallonsPerDay,
 }
 
@@ -79,20 +79,20 @@ impl ActivityUnits {
 /// One `/AGE ADJUSTMENT/` packet record.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AgeAdjustmentRecord {
- /// Useful-life bin (e.g., 25.0 for 25%).
+    /// Useful-life bin (e.g., 25.0 for 25%).
     pub bin: f32,
- /// Percent-of-new-activity values for each named age column.
+    /// Percent-of-new-activity values for each named age column.
     pub percents: Vec<f32>,
 }
 
 /// Parsed `.ACT` content.
 #[derive(Debug, Default, Clone)]
 pub struct ActivityFile {
- /// `/ACTIVITY/` records.
+    /// `/ACTIVITY/` records.
     pub activity: Vec<ActivityRecord>,
- /// Column labels from the `/AGE ADJUSTMENT/` packet.
+    /// Column labels from the `/AGE ADJUSTMENT/` packet.
     pub age_columns: Vec<String>,
- /// `/AGE ADJUSTMENT/` records.
+    /// `/AGE ADJUSTMENT/` records.
     pub age_adjustment: Vec<AgeAdjustmentRecord>,
 }
 

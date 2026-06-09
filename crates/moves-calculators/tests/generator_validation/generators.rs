@@ -117,10 +117,10 @@ mod tests {
 
     #[test]
     fn every_generator_subscribes_or_is_a_known_helper() {
- // All generators are master-loop scheduled except SourceTypePhysics,
- // a helper that other generators invoke directly. Any *other*
- // generator with no subscriptions would never fire — a bug worth
- // catching here.
+        // All generators are master-loop scheduled except SourceTypePhysics,
+        // a helper that other generators invoke directly. Any *other*
+        // generator with no subscriptions would never fire — a bug worth
+        // catching here.
         for generator in all_generators() {
             let subs = subscribed_process_ids(generator.as_ref());
             if subs.is_empty() {

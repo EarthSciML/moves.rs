@@ -35,20 +35,20 @@ use std::io::BufRead;
 /// `moves-nonroad` module (see [`super::adapter`] for the mapping).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize)]
 pub enum Phase {
- /// `getpop.f` — per-SCC population apportionment.
+    /// `getpop.f` — per-SCC population apportionment.
     Getpop,
- /// `agedist.f` — age-distribution growth (the 's
- /// flagged numerical-fidelity risk; see ARCHITECTURE.md § 2.3).
+    /// `agedist.f` — age-distribution growth (the 's
+    /// flagged numerical-fidelity risk; see ARCHITECTURE.md § 2.3).
     Agedist,
- /// `grwfac.f` — growth-factor application.
+    /// `grwfac.f` — growth-factor application.
     Grwfac,
- /// `clcems.f` — exhaust-emissions calculation.
+    /// `clcems.f` — exhaust-emissions calculation.
     Clcems,
 }
 
 impl Phase {
- /// Parse the `phase` field. Accepts the canonical upper-case
- /// spelling and is tolerant of surrounding whitespace and case.
+    /// Parse the `phase` field. Accepts the canonical upper-case
+    /// spelling and is tolerant of surrounding whitespace and case.
     pub fn parse(field: &str) -> Option<Phase> {
         match field.trim().to_ascii_uppercase().as_str() {
             "GETPOP" => Some(Phase::Getpop),
@@ -59,7 +59,7 @@ impl Phase {
         }
     }
 
- /// The canonical upper-case label, as emitted by `dbgemit.f`.
+    /// The canonical upper-case label, as emitted by `dbgemit.f`.
     pub fn as_str(self) -> &'static str {
         match self {
             Phase::Getpop => "GETPOP",
@@ -69,8 +69,8 @@ impl Phase {
         }
     }
 
- /// All four phases, in `dbgemit` declaration order. Lets the
- /// harness iterate the phase space without hard-coding the list.
+    /// All four phases, in `dbgemit` declaration order. Lets the
+    /// harness iterate the phase space without hard-coding the list.
     pub fn all() -> [Phase; 4] {
         [Phase::Getpop, Phase::Agedist, Phase::Grwfac, Phase::Clcems]
     }
@@ -95,9 +95,9 @@ pub struct Context {
 }
 
 impl Context {
- /// Parse a `key=val,key=val` context string. Empty pieces (from
- /// a stray `,`) are dropped; a piece with no `=` becomes a key
- /// with an empty value. An empty input yields an empty context.
+    /// Parse a `key=val,key=val` context string. Empty pieces (from
+    /// a stray `,`) are dropped; a piece with no `=` becomes a key
+    /// with an empty value. An empty input yields an empty context.
     pub fn parse(field: &str) -> Context {
         let mut pairs = Vec::new();
         for piece in field.split(',') {
@@ -113,10 +113,10 @@ impl Context {
         Context { pairs }
     }
 
- /// Build a context directly from key/value pairs, without going
- /// through a `key=val` string. The constructor port-side
- /// instrumentation uses to tag a record with run-loop state
- /// (FIPS, SCC, year, call counter) it already holds.
+    /// Build a context directly from key/value pairs, without going
+    /// through a `key=val` string. The constructor port-side
+    /// instrumentation uses to tag a record with run-loop state
+    /// (FIPS, SCC, year, call counter) it already holds.
     pub fn from_pairs<K, V, I>(pairs: I) -> Context
     where
         I: IntoIterator<Item = (K, V)>,
@@ -131,7 +131,7 @@ impl Context {
         }
     }
 
- /// The raw value for `key`, if present (first match wins).
+    /// The raw value for `key`, if present (first match wins).
     pub fn get(&self, key: &str) -> Option<&str> {
         self.pairs
             .iter()
@@ -139,25 +139,25 @@ impl Context {
             .map(|(_, v)| v.as_str())
     }
 
- /// `key`'s value parsed as an integer.
+    /// `key`'s value parsed as an integer.
     pub fn get_i64(&self, key: &str) -> Option<i64> {
         self.get(key).and_then(|v| v.trim().parse().ok())
     }
 
- /// The `call=N` per-call-site counter, if the record carries one.
+    /// The `call=N` per-call-site counter, if the record carries one.
     pub fn call(&self) -> Option<i64> {
         self.get_i64("call")
     }
 
- /// `true` when the context carries no pairs.
+    /// `true` when the context carries no pairs.
     pub fn is_empty(&self) -> bool {
         self.pairs.is_empty()
     }
 
- /// Key-sorted `key=val,key=val` rendering. Two contexts that
- /// differ only in pair order produce the same canonical string,
- /// so this is the stable key for pairing reference and actual
- /// records in [`super::divergence`].
+    /// Key-sorted `key=val,key=val` rendering. Two contexts that
+    /// differ only in pair order produce the same canonical string,
+    /// so this is the stable key for pairing reference and actual
+    /// records in [`super::divergence`].
     pub fn canonical(&self) -> String {
         let mut sorted = self.pairs.clone();
         sorted.sort();
@@ -192,20 +192,20 @@ impl fmt::Display for Context {
 /// Agedist`, `label = "mdyrfrc"`, and 51 `values`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ReferenceRecord {
- /// Which instrumented subsystem produced the record.
+    /// Which instrumented subsystem produced the record.
     pub phase: Phase,
- /// The `key=val` tag string identifying the computation.
+    /// The `key=val` tag string identifying the computation.
     pub context: Context,
- /// The emitted variable's name.
+    /// The emitted variable's name.
     pub label: String,
- /// The emitted values (`real*4`/`integer*4`, widened to `f64`;
- /// both fit exactly — `i32` is well within `f64`'s 53-bit
- /// integer range and an `f32` widens losslessly).
+    /// The emitted values (`real*4`/`integer*4`, widened to `f64`;
+    /// both fit exactly — `i32` is well within `f64`'s 53-bit
+    /// integer range and an `f32` widens losslessly).
     pub values: Vec<f64>,
 }
 
 impl ReferenceRecord {
- /// Construct a record. Used by [`super::adapter`] and tests.
+    /// Construct a record. Used by [`super::adapter`] and tests.
     pub fn new(phase: Phase, context: Context, label: impl Into<String>, values: Vec<f64>) -> Self {
         ReferenceRecord {
             phase,
@@ -215,9 +215,9 @@ impl ReferenceRecord {
         }
     }
 
- /// The pairing key: `(phase, canonical-context, label)`. Two
- /// records — one from the reference TSV, one from the Rust port
- /// — describe the same measurement exactly when their keys match.
+    /// The pairing key: `(phase, canonical-context, label)`. Two
+    /// records — one from the reference TSV, one from the Rust port
+    /// — describe the same measurement exactly when their keys match.
     pub fn key(&self) -> RecordKey {
         RecordKey {
             phase: self.phase,
@@ -231,11 +231,11 @@ impl ReferenceRecord {
 /// [`ReferenceRecord::key`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize)]
 pub struct RecordKey {
- /// Originating phase.
+    /// Originating phase.
     pub phase: Phase,
- /// Canonical (key-sorted) context string.
+    /// Canonical (key-sorted) context string.
     pub context: String,
- /// Variable label.
+    /// Variable label.
     pub label: String,
 }
 
@@ -249,9 +249,9 @@ impl fmt::Display for RecordKey {
 /// baseline can be pinpointed in a multi-megabyte capture.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseError {
- /// 1-based line number of the offending record.
+    /// 1-based line number of the offending record.
     pub line: usize,
- /// Human-readable description of the fault.
+    /// Human-readable description of the fault.
     pub message: String,
 }
 
@@ -354,9 +354,9 @@ pub fn parse_reference<R: BufRead>(reader: R) -> Result<Vec<ReferenceRecord>, Pa
             ),
         })?;
 
- // Drop a stray trailing empty field (terminating tab) before
- // validating the count — but keep interior empties so a real
- // count mismatch still surfaces.
+        // Drop a stray trailing empty field (terminating tab) before
+        // validating the count — but keep interior empties so a real
+        // count mismatch still surfaces.
         let mut value_fields: Vec<&str> = fields[4..].to_vec();
         while value_fields.last().map(|s| s.trim().is_empty()) == Some(true) {
             value_fields.pop();
@@ -420,7 +420,7 @@ mod tests {
         assert_eq!(ctx.get_i64("year"), Some(2021));
         assert_eq!(ctx.call(), Some(2));
         assert_eq!(ctx.get("missing"), None);
- // Canonical form is key-sorted regardless of input order.
+        // Canonical form is key-sorted regardless of input order.
         let reordered = Context::parse("year=2021,fips=26000,call=2");
         assert_eq!(ctx.canonical(), reordered.canonical());
         assert_eq!(ctx.canonical(), "call=2,fips=26000,year=2021");
@@ -441,7 +441,7 @@ mod tests {
         let ctx = Context::from_pairs([("call", "1"), ("fips", "26000")]);
         assert_eq!(ctx.get("fips"), Some("26000"));
         assert_eq!(ctx.call(), Some(1));
- // Equivalent to the parsed form.
+        // Equivalent to the parsed form.
         assert_eq!(
             ctx.canonical(),
             Context::parse("fips=26000,call=1").canonical()

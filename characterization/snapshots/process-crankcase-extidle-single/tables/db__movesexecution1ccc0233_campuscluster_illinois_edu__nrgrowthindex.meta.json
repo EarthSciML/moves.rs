@@ -1,0 +1,25 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__nrgrowthindex",
+  "schema": [
+    {
+      "name": "growthPatternID",
+      "kind": "int64"
+    },
+    {
+      "name": "yearID",
+      "kind": "int64"
+    },
+    {
+      "name": "growthIndex",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "growthPatternID",
+    "yearID"
+  ],
+  "row_count": 50955,
+  "float_decimals": 12,
+  "content_sha256": "ef1f84a679ea1c14b17939e436f7fe878018e2085029a12f65fc7aac31bb27ac"
+}

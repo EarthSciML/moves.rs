@@ -65,7 +65,7 @@ fn walk_dir(root: &Path, dir: &Path, out: &mut Vec<Entry>) -> Result<()> {
                 relative,
             });
         }
- // Skip symlinks and other types.
+        // Skip symlinks and other types.
     }
     Ok(())
 }
@@ -90,7 +90,7 @@ mod tests {
     #[test]
     fn walks_in_lexicographic_order() {
         let dir = tempdir().unwrap();
- // Create files in non-sorted order.
+        // Create files in non-sorted order.
         fs::write(dir.path().join("zeta.txt"), b"").unwrap();
         fs::write(dir.path().join("alpha.txt"), b"").unwrap();
         fs::create_dir_all(dir.path().join("sub/child")).unwrap();
@@ -122,7 +122,7 @@ mod tests {
     fn skips_symlinks() {
         let dir = tempdir().unwrap();
         fs::write(dir.path().join("real.txt"), b"x").unwrap();
- // Best-effort symlink: skip on platforms that disallow it.
+        // Best-effort symlink: skip on platforms that disallow it.
         #[cfg(unix)]
         std::os::unix::fs::symlink(dir.path().join("real.txt"), dir.path().join("link.txt"))
             .unwrap();

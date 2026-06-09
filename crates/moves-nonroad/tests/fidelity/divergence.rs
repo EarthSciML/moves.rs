@@ -21,21 +21,21 @@ use super::tolerance::{classify, compare, is_known, Quantity};
 /// One scalar value that fell outside its tolerance rule.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct Divergence {
- /// Which record (phase, context, label) the value belongs to.
+    /// Which record (phase, context, label) the value belongs to.
     pub key: RecordKey,
- /// Index of the value within the record's value vector.
+    /// Index of the value within the record's value vector.
     pub index: usize,
- /// The reference (gfortran NONROAD) value.
+    /// The reference (gfortran NONROAD) value.
     pub expected: f64,
- /// The actual (`moves-nonroad` port) value.
+    /// The actual (`moves-nonroad` port) value.
     pub actual: f64,
- /// `|expected - actual|`.
+    /// `|expected - actual|`.
     pub abs_diff: f64,
- /// Relative difference (see [`super::tolerance::compare`]).
+    /// Relative difference (see [`super::tolerance::compare`]).
     pub rel_diff: f64,
- /// The quantity class whose rule was applied.
+    /// The quantity class whose rule was applied.
     pub quantity: Quantity,
- /// `true` when either operand is `NaN`/infinite.
+    /// `true` when either operand is `NaN`/infinite.
     pub non_finite: bool,
 }
 
@@ -64,22 +64,22 @@ impl fmt::Display for Divergence {
 /// express.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct CountMismatch {
- /// The record whose lengths disagreed.
+    /// The record whose lengths disagreed.
     pub key: RecordKey,
- /// Value count in the reference capture.
+    /// Value count in the reference capture.
     pub reference_len: usize,
- /// Value count in the port's output.
+    /// Value count in the port's output.
     pub actual_len: usize,
 }
 
 /// Per-phase tally line within a [`DivergenceReport`].
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
 pub struct PhaseTally {
- /// The phase this line summarises.
+    /// The phase this line summarises.
     pub phase: Phase,
- /// Scalar values compared for the phase.
+    /// Scalar values compared for the phase.
     pub values_compared: usize,
- /// Of those, how many fell outside tolerance.
+    /// Of those, how many fell outside tolerance.
     pub divergences: usize,
 }
 
@@ -98,45 +98,45 @@ fn phase_index(phase: Phase) -> usize {
 /// Rust port's output.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct DivergenceReport {
- /// The fixture this report covers (e.g. `nr-construction-state`).
+    /// The fixture this report covers (e.g. `nr-construction-state`).
     pub fixture: String,
- /// Total scalar values compared across all matched records.
+    /// Total scalar values compared across all matched records.
     pub values_compared: usize,
- /// Count of comparisons where an operand was `NaN`/infinite
- /// (whether or not the pair matched).
+    /// Count of comparisons where an operand was `NaN`/infinite
+    /// (whether or not the pair matched).
     pub non_finite: usize,
- /// Every value that fell outside its tolerance rule.
+    /// Every value that fell outside its tolerance rule.
     pub divergences: Vec<Divergence>,
- /// Records present in the reference but absent from the port's
- /// output — the port skipped a computation the reference made.
+    /// Records present in the reference but absent from the port's
+    /// output — the port skipped a computation the reference made.
     pub missing_from_actual: Vec<RecordKey>,
- /// Records present in the port's output but absent from the
- /// reference — the port emitted something the reference did not.
+    /// Records present in the port's output but absent from the
+    /// reference — the port emitted something the reference did not.
     pub missing_from_reference: Vec<RecordKey>,
- /// Matched records whose value vectors had unequal lengths.
+    /// Matched records whose value vectors had unequal lengths.
     pub count_mismatches: Vec<CountMismatch>,
- /// Matched records carrying a label the tolerance table does not
- /// classify — a signal the `dbgemit` instrumentation changed.
+    /// Matched records carrying a label the tolerance table does not
+    /// classify — a signal the `dbgemit` instrumentation changed.
     pub unknown_labels: Vec<RecordKey>,
- /// Count of duplicate `(phase, context, label)` keys collapsed
- /// while indexing either side (each side should be unique).
+    /// Count of duplicate `(phase, context, label)` keys collapsed
+    /// while indexing either side (each side should be unique).
     pub duplicate_keys: usize,
- /// Per-phase value/divergence tallies, in [`Phase::all`] order.
+    /// Per-phase value/divergence tallies, in [`Phase::all`] order.
     pub phase_tallies: Vec<PhaseTally>,
 }
 
 impl DivergenceReport {
- /// Values that satisfied their tolerance rule.
+    /// Values that satisfied their tolerance rule.
     pub fn values_within_tolerance(&self) -> usize {
         self.values_compared - self.divergences.len()
     }
 
- /// `true` when nothing diverged: no out-of-tolerance values, no
- /// missing records on either side, no count mismatches.
- ///
- /// Unknown labels and tolerated non-finite values are surfaced
- /// as warnings but do not, by themselves, fail the report — they
- /// are flagged for a human to examine.
+    /// `true` when nothing diverged: no out-of-tolerance values, no
+    /// missing records on either side, no count mismatches.
+    ///
+    /// Unknown labels and tolerated non-finite values are surfaced
+    /// as warnings but do not, by themselves, fail the report — they
+    /// are flagged for a human to examine.
     pub fn passed(&self) -> bool {
         self.divergences.is_empty()
             && self.missing_from_actual.is_empty()
@@ -144,12 +144,12 @@ impl DivergenceReport {
             && self.count_mismatches.is_empty()
     }
 
- /// Per-phase value/divergence tallies, in [`Phase::all`] order.
+    /// Per-phase value/divergence tallies, in [`Phase::all`] order.
     pub fn phase_breakdown(&self) -> &[PhaseTally] {
         &self.phase_tallies
     }
 
- /// A single-line summary suitable for a test log header.
+    /// A single-line summary suitable for a test log header.
     pub fn summary(&self) -> String {
         format!(
             "fixture `{}`: {} value(s) compared, {} divergence(s), {} non-finite, {} structural \
@@ -169,11 +169,11 @@ impl DivergenceReport {
         )
     }
 
- /// Serialise the report as pretty-printed JSON for the
- /// triage handoff and CI artifact upload.
+    /// Serialise the report as pretty-printed JSON for the
+    /// triage handoff and CI artifact upload.
     pub fn to_json(&self) -> String {
- // The report is plain data (strings, numbers, enums) — serde
- // cannot fail to serialise it; fall back rather than panic.
+        // The report is plain data (strings, numbers, enums) — serde
+        // cannot fail to serialise it; fall back rather than panic.
         serde_json::to_string_pretty(self)
             .unwrap_or_else(|e| format!("{{\"serialization_error\":\"{e}\"}}"))
     }
@@ -223,9 +223,9 @@ impl fmt::Display for DivergenceReport {
             }
         )?;
 
- // Cap the inline divergence listing; the full set is in the
- // JSON form. A triage run with thousands of divergences must
- // not flood the test log.
+        // Cap the inline divergence listing; the full set is in the
+        // JSON form. A triage run with thousands of divergences must
+        // not flood the test log.
         const MAX_SHOWN: usize = 50;
         if !self.divergences.is_empty() {
             writeln!(f, "\n  divergences ({}):", self.divergences.len())?;
@@ -303,10 +303,10 @@ pub fn compare_runs(
         phase_tallies: Vec::new(),
     };
 
- // Per-phase scalar-value counters, indexed by `phase_index`.
+    // Per-phase scalar-value counters, indexed by `phase_index`.
     let mut compared_by_phase = [0usize; 4];
 
- // Deterministic iteration over the union of both key sets.
+    // Deterministic iteration over the union of both key sets.
     let keys: BTreeSet<&RecordKey> = ref_map.keys().chain(act_map.keys()).collect();
 
     for key in keys {
@@ -325,9 +325,9 @@ pub fn compare_runs(
                     });
                 }
 
- // Compare the common prefix value-by-value. A length
- // disagreement is already recorded above; comparing
- // the overlap still surfaces value divergences.
+                // Compare the common prefix value-by-value. A length
+                // disagreement is already recorded above; comparing
+                // the overlap still surfaces value divergences.
                 let common = ref_rec.values.len().min(act_rec.values.len());
                 for index in 0..common {
                     let expected = ref_rec.values[index];
@@ -405,7 +405,7 @@ mod tests {
     #[test]
     fn a_perturbed_value_is_one_divergence() {
         let reference = vec![rec(Phase::Clcems, "call=1", "emsday", &[1.0, 2.0, 3.0])];
- // Middle value perturbed beyond 1e-9 relative.
+        // Middle value perturbed beyond 1e-9 relative.
         let actual = vec![rec(
             Phase::Clcems,
             "call=1",
@@ -457,7 +457,7 @@ mod tests {
         assert_eq!(report.count_mismatches.len(), 1);
         assert_eq!(report.count_mismatches[0].reference_len, 3);
         assert_eq!(report.count_mismatches[0].actual_len, 2);
- // The overlapping prefix is still diffed: index 1 (0.2 vs 0.9).
+        // The overlapping prefix is still diffed: index 1 (0.2 vs 0.9).
         assert_eq!(report.values_compared, 2);
         assert_eq!(report.divergences.len(), 1);
         assert_eq!(report.divergences[0].index, 1);
@@ -479,7 +479,7 @@ mod tests {
         let reference = vec![rec(Phase::Clcems, "call=1", "emsday", &[f64::NAN, 1.0])];
         let actual = vec![rec(Phase::Clcems, "call=1", "emsday", &[f64::NAN, 1.0])];
         let report = compare_runs("nonfinite", &reference, &actual);
- // Both NaN → tolerated match, but flagged.
+        // Both NaN → tolerated match, but flagged.
         assert!(report.passed());
         assert_eq!(report.non_finite, 1);
     }
@@ -502,7 +502,7 @@ mod tests {
         let json = report.to_json();
         assert!(json.contains("\"fixture\": \"json\""));
         assert!(json.contains("\"divergences\""));
- // Round-trips back to an equal value through serde_json.
+        // Round-trips back to an equal value through serde_json.
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed["fixture"], "json");
         assert_eq!(parsed["divergences"].as_array().unwrap().len(), 1);

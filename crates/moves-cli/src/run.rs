@@ -30,7 +30,7 @@ use moves_data_default::DefaultDb;
 use moves_framework::{
     default_tables, read_execution_bundle, read_execution_bundle_filtered, CalculatorRegistry,
     CountyRow, DataFrameStore, DataFrameStoreTyped, EngineConfig, EngineOutcome, GeographyTables,
-    InMemoryStore, InputDataManager, LinkRow, MOVESEngine, RunSpecFilters,
+    InMemoryStore, InputDataManager, LinkRow, MOVESEngine, MergeTableSpec, RunSpecFilters,
 };
 use moves_runspec::{GeoKind, RunSpec};
 use polars::prelude::{
@@ -53,14 +53,14 @@ const EMBEDDED_CALCULATOR_DAG: &str =
 /// Derived from a [`RunSpec`] before loading the execution-DB snapshot. Only the
 /// Parquet fallback path uses this; the Arrow-IPC bundle path loads tables whole.
 struct SnapshotFilter {
- /// Zone IDs the run touches. Derived from County geographic selections using
- /// the MOVES convention `zone_id = county_id * 10`, plus any Zone selections.
+    /// Zone IDs the run touches. Derived from County geographic selections using
+    /// the MOVES convention `zone_id = county_id * 10`, plus any Zone selections.
     zone_ids: Vec<i64>,
- /// County IDs from the RunSpec's geographic selections.
+    /// County IDs from the RunSpec's geographic selections.
     county_ids: Vec<i64>,
- /// Calendar year IDs from the RunSpec's timespan.
+    /// Calendar year IDs from the RunSpec's timespan.
     year_ids: Vec<i64>,
- /// Month IDs from the RunSpec's timespan.
+    /// Month IDs from the RunSpec's timespan.
     month_ids: Vec<i64>,
 }
 
@@ -73,7 +73,7 @@ impl SnapshotFilter {
                 GeoKind::County => {
                     let county = i64::from(sel.key);
                     county_set.insert(county);
- // MOVES convention: the default zone for each county is county_id * 10.
+                    // MOVES convention: the default zone for each county is county_id * 10.
                     zone_set.insert(county * 10);
                 }
                 GeoKind::Zone => {
@@ -94,14 +94,18 @@ impl SnapshotFilter {
                 .collect::<BTreeSet<_>>()
                 .into_iter()
                 .collect(),
- // RunSpec `<month key="N"/>` carries the literal MOVES monthID (1-12,
- // e.g. key=7 = July); it is NOT 0-indexed. Pass it through unchanged,
- // matching RunSpecFilters::from_runspec and build_runspec_tables.
+            // RunSpec `<month key="N"/>` is a 0-based index into the canonical
+            // MOVES MonthOfAnyYear table (January=0 … December=11). Java parses
+            // it via `TimeSpan.getMonthByIndex(key)`, which returns the Month
+            // object at position `key` in a list ordered by monthID, so
+            // `monthID = key + 1` (e.g. key=7 → monthID=8, August).
+            // The Rust RunSpec model stores the raw key; add 1 here to match
+            // the MOVES monthID stored in execution-DB tables.
             month_ids: run_spec
                 .timespan
                 .months
                 .iter()
-                .map(|&m| i64::from(m))
+                .map(|&m| i64::from(m) + 1)
                 .collect::<BTreeSet<_>>()
                 .into_iter()
                 .collect(),
@@ -146,37 +150,37 @@ fn table_filter_expr(table_name: &str, filter: &SnapshotFilter) -> Option<Expr> 
 /// Inputs for one `moves run` invocation.
 #[derive(Debug, Clone)]
 pub struct RunOptions {
- /// Path to the RunSpec file (`.xml`, `.mrs`, or `.toml`).
+    /// Path to the RunSpec file (`.xml`, `.mrs`, or `.toml`).
     pub runspec: PathBuf,
- /// Directory the engine writes output Parquet into. Created if absent.
+    /// Directory the engine writes output Parquet into. Created if absent.
     pub output: PathBuf,
- /// `--max-parallel-chunks`: the maximum number of calculator chains run
- /// concurrently. `0` selects the host's available parallelism.
+    /// `--max-parallel-chunks`: the maximum number of calculator chains run
+    /// concurrently. `0` selects the host's available parallelism.
     pub max_parallel_chunks: usize,
- /// Optional override for the calculator-chain DAG. `None` uses the
- /// DAG embedded in the binary at compile time.
+    /// Optional override for the calculator-chain DAG. `None` uses the
+    /// DAG embedded in the binary at compile time.
     pub calculator_dag: Option<PathBuf>,
- /// Optional value for the `MOVESRun.runDateTime` output column. `None`
- /// leaves it null, which keeps the run's output byte-stable — the
- /// engine deliberately does not stamp the wall clock itself.
+    /// Optional value for the `MOVESRun.runDateTime` output column. `None`
+    /// leaves it null, which keeps the run's output byte-stable — the
+    /// engine deliberately does not stamp the wall clock itself.
     pub run_date_time: Option<String>,
- /// Path to a canonical MOVES snapshot directory (as written by the
- /// capture harness). When present, the `db__movesexecution*` Parquet
- /// files under `<snapshot>/tables/` are loaded as the execution-database
- /// slow tier and made available to calculators via `ctx.tables()`.
+    /// Path to a canonical MOVES snapshot directory (as written by the
+    /// capture harness). When present, the `db__movesexecution*` Parquet
+    /// files under `<snapshot>/tables/` are loaded as the execution-database
+    /// slow tier and made available to calculators via `ctx.tables()`.
     pub snapshot: Option<PathBuf>,
- /// Path to a County/Project-scale input directory produced by
- /// `moves import-cdb` (CDB) or the PDB importer. When present, every
- /// `*.parquet` file in the directory is loaded and inserted into the
- /// execution-database slow tier, **overriding** any same-named table
- /// that the snapshot (or default-DB) already loaded. This implements
- /// the MOVES County/Project-scale data-preference rule: user-supplied
- /// CDB/PDB tables take precedence over the default database for the
- /// tables they cover, while all other tables continue to come from the
- /// snapshot/default-DB.
- ///
- /// Applies when the RunSpec sets `<modeldomain>` to `SINGLE` (County)
- /// or `PROJECT`.
+    /// Path to a County/Project-scale input directory produced by
+    /// `moves import-cdb` (CDB) or the PDB importer. When present, every
+    /// `*.parquet` file in the directory is loaded and inserted into the
+    /// execution-database slow tier, **overriding** any same-named table
+    /// that the snapshot (or default-DB) already loaded. This implements
+    /// the MOVES County/Project-scale data-preference rule: user-supplied
+    /// CDB/PDB tables take precedence over the default database for the
+    /// tables they cover, while all other tables continue to come from the
+    /// snapshot/default-DB.
+    ///
+    /// Applies when the RunSpec sets `<modeldomain>` to `SINGLE` (County)
+    /// or `PROJECT`.
     pub scale_input: Option<PathBuf>,
     /// Path to a converted default-DB Parquet tree (as written by
     /// `moves-default-db-convert`). When present, the default database is
@@ -214,19 +218,19 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
         .snapshot
         .is_some()
         .then(|| SnapshotFilter::from_run_spec(&run_spec));
- // Compute the allowed table set before the registry moves into the engine.
+    // Compute the allowed table set before the registry moves into the engine.
     let allowed_tables = if opts.snapshot.is_some() {
         let mut tables = registry.required_input_tables();
- // `populate_sho_distances` recomputes the NULL `SHO.distance` column
- // from these reference tables. They are not declared inputs of any
- // calculator (MOVES populates distance inside the activity generator,
- // which does not re-run against a snapshot), so they must be admitted
- // explicitly or the load filter drops them and distance stays NULL.
+        // `populate_sho_distances` recomputes the NULL `SHO.distance` column
+        // from these reference tables. They are not declared inputs of any
+        // calculator (MOVES populates distance inside the activity generator,
+        // which does not re-run against a snapshot), so they must be admitted
+        // explicitly or the load filter drops them and distance stays NULL.
         tables.extend(SHO_DISTANCE_INPUT_TABLES.iter().map(|t| (*t).to_owned()));
- // `populate_source_use_type_physics_mapping` derives the missing
- // `sourceUseTypePhysicsMapping` table from `sourceUseTypePhysics` when a
- // snapshot omits the runtime-built mapping; admit both so neither is
- // filtered out before the synthesis runs.
+        // `populate_source_use_type_physics_mapping` derives the missing
+        // `sourceUseTypePhysicsMapping` table from `sourceUseTypePhysics` when a
+        // snapshot omits the runtime-built mapping; admit both so neither is
+        // filtered out before the synthesis runs.
         tables.extend(
             SOURCE_TYPE_PHYSICS_MAPPING_INPUT_TABLES
                 .iter()
@@ -243,8 +247,8 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
             .expect("built above when snapshot is Some");
         let mut store = load_execution_db(snapshot_dir, filter, allowed_tables.as_ref())
             .with_context(|| format!("loading execution DB from {}", snapshot_dir.display()))?;
- // Overlay any County/Project-scale Parquet tables on top of the snapshot
- // tables. CDB/PDB tables take precedence for the tables they supply.
+        // Overlay any County/Project-scale Parquet tables on top of the snapshot
+        // tables. CDB/PDB tables take precedence for the tables they supply.
         if let Some(scale_dir) = &opts.scale_input {
             overlay_scale_input_db(&mut store, scale_dir)
                 .with_context(|| format!("loading scale-input DB from {}", scale_dir.display()))?;
@@ -256,10 +260,27 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
             .execution_run_spec_mut()
             .build_execution_locations(&geography);
     } else if let Some(scale_dir) = &opts.scale_input {
- // Scale-only path: no snapshot — build a store from CDB/PDB Parquet alone.
+        // Scale-only path: no snapshot or default DB — build a store from CDB/PDB
+        // Parquet alone, then run the same synthesis steps as the default-DB path.
+        // CDB provides county-scale tables (ZoneRoadType, SourceTypePopulation, …);
+        // the synthesis steps fill in derived tables that are not in the CDB:
+        //   - Link: synthesised from ZoneRoadType when CDB omits it
+        //   - RunSpec*: derived from the RunSpec (not a DB table)
+        //   - sourceUseTypePhysicsMapping: derived from sourceUseTypePhysics if present
+        //   - ZoneMonthHour meteorology columns: filled from temperature/relHumidity
+        // Each synthesis function is a no-op when its input table is absent, so it
+        // is safe to call even for minimal CDB dirs that omit optional tables.
         let mut store = InMemoryStore::new();
         overlay_scale_input_db(&mut store, scale_dir)
             .with_context(|| format!("loading scale-input DB from {}", scale_dir.display()))?;
+        populate_link_from_zone_road_type(&mut store)
+            .context("synthesising Link from ZoneRoadType")?;
+        build_runspec_tables(&run_spec, &mut store)
+            .context("building RunSpec tables from RunSpec")?;
+        populate_source_use_type_physics_mapping(&mut store)
+            .context("synthesising sourceUseTypePhysicsMapping")?;
+        populate_zone_month_hour_meteorology(&mut store)
+            .context("populating ZoneMonthHour meteorology")?;
         let geography = load_geography_from_store(&store)
             .with_context(|| format!("building geography from {}", scale_dir.display()))?;
         engine = engine.with_slow_store(store);
@@ -332,21 +353,21 @@ fn load_execution_db(
     } else {
         load_execution_db_from_parquet(snapshot_dir, filter, allowed_tables)?
     };
- // If the SHO table has null distances (MOVES inserts them before calculateDistance
- // runs), compute distance = SHO * averageSpeed and write back to the store.
+    // If the SHO table has null distances (MOVES inserts them before calculateDistance
+    // runs), compute distance = SHO * averageSpeed and write back to the store.
     populate_sho_distances(&mut store).context("populating SHO distances from snapshot")?;
- // Synthesise sourceUseTypePhysicsMapping from sourceUseTypePhysics when the
- // snapshot omits the runtime-built mapping (MOVES builds it inside
- // SourceUseTypePhysics.setup, which does not re-run against a snapshot).
+    // Synthesise sourceUseTypePhysicsMapping from sourceUseTypePhysics when the
+    // snapshot omits the runtime-built mapping (MOVES builds it inside
+    // SourceUseTypePhysics.setup, which does not re-run against a snapshot).
     populate_source_use_type_physics_mapping(&mut store)
         .context("synthesising sourceUseTypePhysicsMapping from snapshot")?;
- // Fill the NULL ZoneMonthHour meteorology columns (heatIndex,
- // specificHumidity, molWaterFraction) that MeteorologyGenerator computes at
- // runtime but some snapshots capture empty.
+    // Fill the NULL ZoneMonthHour meteorology columns (heatIndex,
+    // specificHumidity, molWaterFraction) that MeteorologyGenerator computes at
+    // runtime but some snapshots capture empty.
     populate_zone_month_hour_meteorology(&mut store)
         .context("populating ZoneMonthHour meteorology from snapshot")?;
- // Union process/year-indexed table variants (e.g. baserate_1_2001, baserate_2_2001)
- // into their canonical names (e.g. baserate) so calculators can read real data.
+    // Union process/year-indexed table variants (e.g. baserate_1_2001, baserate_2_2001)
+    // into their canonical names (e.g. baserate) so calculators can read real data.
     merge_process_year_variants(&mut store)
         .context("merging process/year-indexed table variants into canonical names")?;
     Ok(store)
@@ -488,26 +509,26 @@ fn load_execution_db_from_parquet(
         let entry = entry.context("reading directory entry")?;
         let file_name = entry.file_name();
         let name_str = file_name.to_string_lossy();
- // Only the execution-DB tables; skip output-DB and other prefixes.
+        // Only the execution-DB tables; skip output-DB and other prefixes.
         if !name_str.starts_with("db__movesexecution") || !name_str.ends_with(".parquet") {
             continue;
         }
- // Extract the table name: last `__`-separated segment, strip `.parquet`.
+        // Extract the table name: last `__`-separated segment, strip `.parquet`.
         let table_name = name_str
             .rsplit("__")
             .next()
             .unwrap_or(&name_str)
             .trim_end_matches(".parquet")
             .to_owned();
- // Skip tables not needed by any registered calculator/generator.
- // Year-suffixed tables (e.g. `stmyTVVCoeffs2020`) are admitted when
- // their base name (e.g. `stmytvvcoeffs`) appears in the allowed set,
- // because some generators read them dynamically and declare no static
- // INPUT_TABLES entry.
- // Process/year-indexed tables (e.g. `baserate_1_2001`) are admitted when
- // their canonical base name (e.g. `baserate`) appears in the allowed set;
- // they are merged into that canonical name by `merge_process_year_variants`
- // after loading.
+        // Skip tables not needed by any registered calculator/generator.
+        // Year-suffixed tables (e.g. `stmyTVVCoeffs2020`) are admitted when
+        // their base name (e.g. `stmytvvcoeffs`) appears in the allowed set,
+        // because some generators read them dynamically and declare no static
+        // INPUT_TABLES entry.
+        // Process/year-indexed tables (e.g. `baserate_1_2001`) are admitted when
+        // their canonical base name (e.g. `baserate`) appears in the allowed set;
+        // they are merged into that canonical name by `merge_process_year_variants`
+        // after loading.
         if let Some(allowed) = allowed_tables {
             let lower = table_name.to_ascii_lowercase();
             if !allowed.contains(&lower)
@@ -572,17 +593,17 @@ fn populate_sho_distances(store: &mut InMemoryStore) -> Result<()> {
         return Ok(());
     }
 
- // ---: read SHO column data ---
- // We extract only the columns needed for the computation and collect them
- // into owned Vecs so the Arc<DataFrame> borrow is released before we need
- // &mut InMemoryStore below.
+    // ---: read SHO column data ---
+    // We extract only the columns needed for the computation and collect them
+    // into owned Vecs so the Arc<DataFrame> borrow is released before we need
+    // &mut InMemoryStore below.
     let (link_ids, hour_day_ids, source_type_ids, sho_vals, n) = {
         let sho_arc = store
             .get("SHO")
             .context("SHO not in store after contains check")?;
         let df = &*sho_arc;
 
- // Case-insensitive column finder for snapshot tables (all-lowercase MySQL names).
+        // Case-insensitive column finder for snapshot tables (all-lowercase MySQL names).
         let find_col = |want: &str| -> Result<polars::prelude::Column> {
             let lower = want.to_ascii_lowercase();
             df.columns()
@@ -592,7 +613,7 @@ fn populate_sho_distances(store: &mut InMemoryStore) -> Result<()> {
                 .with_context(|| format!("SHO column '{want}' not found"))
         };
 
- // Early exit: if any distance is already non-zero, skip.
+        // Early exit: if any distance is already non-zero, skip.
         let dist_nonzero = find_col("distance")
             .ok()
             .and_then(|c| c.f64().ok().cloned())
@@ -601,7 +622,7 @@ fn populate_sho_distances(store: &mut InMemoryStore) -> Result<()> {
             return Ok(());
         }
 
- // Cast helper: accepts Int32 or Int64 snapshot columns.
+        // Cast helper: accepts Int32 or Int64 snapshot columns.
         let to_i32_vec = |col: polars::prelude::Column| -> Result<Vec<i32>> {
             let casted = if *col.dtype() == DataType::Int64 {
                 col.cast(&DataType::Int32)
@@ -630,7 +651,7 @@ fn populate_sho_distances(store: &mut InMemoryStore) -> Result<()> {
         (link_ids, hour_day_ids, source_type_ids, sho_vals, n)
     }; // sho_arc is dropped; Arc<DataFrame> refcount returns to 1
 
- // ---: build lookup tables from small reference tables ---
+    // ---: build lookup tables from small reference tables ---
     if !store.contains("Link") || !store.contains("AverageSpeed") || !store.contains("HourDay") {
         return Ok(());
     }
@@ -660,7 +681,7 @@ fn populate_sho_distances(store: &mut InMemoryStore) -> Result<()> {
         })
         .collect();
 
- // ---: compute distance column (same formula as calculate_distance) ---
+    // ---: compute distance column (same formula as calculate_distance) ---
     let distances: Vec<f64> = (0..n)
         .map(|i| {
             (|| {
@@ -677,8 +698,8 @@ fn populate_sho_distances(store: &mut InMemoryStore) -> Result<()> {
         return Ok(());
     }
 
- // ---: update distance column in-place ---
- // Arc<DataFrame> refcount is 1 (sho_arc was dropped); no DataFrame clone occurs.
+    // ---: update distance column in-place ---
+    // Arc<DataFrame> refcount is 1 (sho_arc was dropped); no DataFrame clone occurs.
     let sho_mut = store.get_mut("SHO").expect("SHO was present above");
     sho_mut
         .with_column(Series::new("distance".into(), distances).into())
@@ -706,8 +727,8 @@ fn populate_sho_distances(store: &mut InMemoryStore) -> Result<()> {
 fn populate_source_use_type_physics_mapping(store: &mut InMemoryStore) -> Result<()> {
     use polars::prelude::{NamedFrom, Series};
 
- // Nothing to do if the mapping is already present, or there is no source
- // physics table to derive it from.
+    // Nothing to do if the mapping is already present, or there is no source
+    // physics table to derive it from.
     if store.contains("sourceUseTypePhysicsMapping") || !store.contains("sourceUseTypePhysics") {
         return Ok(());
     }
@@ -718,8 +739,8 @@ fn populate_source_use_type_physics_mapping(store: &mut InMemoryStore) -> Result
     let mut mapping: polars::prelude::DataFrame = (*physics).clone();
     drop(physics); // release the Arc clone before mutating the store below
 
- // Resolve the source-type column case-insensitively (snapshot column
- // casings vary), then rename it to the mapping's `realSourceTypeID`.
+    // Resolve the source-type column case-insensitively (snapshot column
+    // casings vary), then rename it to the mapping's `realSourceTypeID`.
     let src_col = mapping
         .get_column_names()
         .iter()
@@ -730,7 +751,7 @@ fn populate_source_use_type_physics_mapping(store: &mut InMemoryStore) -> Result
         .rename(&src_col, "realSourceTypeID".into())
         .map_err(|e| anyhow::anyhow!("renaming sourceTypeID -> realSourceTypeID: {e}"))?;
 
- // tempSourceTypeID is a copy of realSourceTypeID for the identity mapping.
+    // tempSourceTypeID is a copy of realSourceTypeID for the identity mapping.
     let mut temp = mapping
         .column("realSourceTypeID")
         .map_err(|e| anyhow::anyhow!("{e}"))?
@@ -773,8 +794,8 @@ fn populate_zone_month_hour_meteorology(store: &mut InMemoryStore) -> Result<()>
         return Ok(());
     }
 
- // Early exit: if heatIndex already carries any non-null value, the snapshot
- // captured the computed columns — leave the table untouched.
+    // Early exit: if heatIndex already carries any non-null value, the snapshot
+    // captured the computed columns — leave the table untouched.
     {
         let zmh = store
             .get("ZoneMonthHour")
@@ -791,7 +812,7 @@ fn populate_zone_month_hour_meteorology(store: &mut InMemoryStore) -> Result<()>
         }
     }
 
- // Zone and County are needed to resolve each county's barometric pressure.
+    // Zone and County are needed to resolve each county's barometric pressure.
     if !store.contains("Zone") || !store.contains("County") {
         return Ok(());
     }
@@ -805,7 +826,7 @@ fn populate_zone_month_hour_meteorology(store: &mut InMemoryStore) -> Result<()>
     };
     let computed = build_meteorology_table(&inputs);
 
- // Index the computed meteorology by (zoneID, monthID, hourID).
+    // Index the computed meteorology by (zoneID, monthID, hourID).
     let mut by_key: std::collections::HashMap<(i32, i32, i32), (f64, f64, f64)> =
         std::collections::HashMap::with_capacity(computed.len());
     for r in &computed {
@@ -815,8 +836,8 @@ fn populate_zone_month_hour_meteorology(store: &mut InMemoryStore) -> Result<()>
         );
     }
 
- // Read the existing key columns + temperature (the unmatched-row fallback)
- // in DataFrame row order, then release the Arc before mutating the store.
+    // Read the existing key columns + temperature (the unmatched-row fallback)
+    // in DataFrame row order, then release the Arc before mutating the store.
     let (heat, spec, mol) = {
         let zmh = store.get("ZoneMonthHour").expect("ZoneMonthHour present");
         let df = &*zmh;
@@ -912,7 +933,7 @@ fn cast_to_i32(df: &polars::prelude::DataFrame, name: &str) -> Result<polars::pr
 fn load_geography_from_store(store: &InMemoryStore) -> Result<GeographyTables> {
     let links: Vec<LinkRow> = if let Some(arc_df) = store.get("link") {
         let df = &*arc_df;
- // Cast all four columns once; iterate row-wise to avoid 4 intermediate Vecs.
+        // Cast all four columns once; iterate row-wise to avoid 4 intermediate Vecs.
         let link_id_s = cast_to_i32(df, "linkID")?;
         let county_id_s = cast_to_i32(df, "countyID")?;
         let zone_id_s = cast_to_i32(df, "zoneID")?;
@@ -1278,6 +1299,84 @@ fn build_runspec_tables(runspec: &RunSpec, store: &mut InMemoryStore) -> Result<
     Ok(())
 }
 
+/// Derive `fuelYearID` values from the already-loaded `Year` table.
+///
+/// Ports the first half of `ExecutionRunSpec.initializeAfterShallowTables`
+/// (lines 223–241): `SELECT DISTINCT fuelYearID FROM year WHERE yearID IN
+/// (<runspec years>)`. The `Year` table is unfiltered in the default-DB
+/// registry, so all year→fuelYear mappings are available here.
+#[cfg(not(target_arch = "wasm32"))]
+fn derive_fuel_years_from_store(store: &InMemoryStore, year_ids: &[i64]) -> Vec<i64> {
+    let Some(arc) = store.get("Year") else {
+        return Vec::new();
+    };
+    let df = &*arc;
+    let find = |want: &str| -> Option<polars::prelude::Column> {
+        let target = want.to_ascii_lowercase();
+        df.columns()
+            .iter()
+            .find(|c| c.name().to_ascii_lowercase() == target)
+            .cloned()
+    };
+    let (Some(yid_col), Some(fyid_col)) = (find("yearID"), find("fuelYearID")) else {
+        return Vec::new();
+    };
+    let Ok(yids) = yid_col
+        .cast(&polars::prelude::DataType::Int64)
+        .and_then(|c| c.i64().cloned())
+    else {
+        return Vec::new();
+    };
+    let Ok(fyids) = fyid_col
+        .cast(&polars::prelude::DataType::Int64)
+        .and_then(|c| c.i64().cloned())
+    else {
+        return Vec::new();
+    };
+    let year_set: BTreeSet<i64> = year_ids.iter().copied().collect();
+    let mut fuel_years: BTreeSet<i64> = BTreeSet::new();
+    for i in 0..df.height() {
+        if let (Some(y), Some(fy)) = (yids.get(i), fyids.get(i)) {
+            if year_set.contains(&y) {
+                fuel_years.insert(fy);
+            }
+        }
+    }
+    fuel_years.into_iter().collect()
+}
+
+/// Derive `regionID` values from the county-filtered `regionCounty` table.
+///
+/// Ports the second half of `ExecutionRunSpec.initializeAfterShallowTables`
+/// (lines 243–251): `{0} ∪ SELECT DISTINCT regionID FROM regionCounty`.
+/// Region 0 is the MOVES "all-regions" wildcard and is always included
+/// (canonical Java line 245: `regions.add(Integer.valueOf(0))`).
+#[cfg(not(target_arch = "wasm32"))]
+fn derive_region_ids_from_store(store: &InMemoryStore) -> Vec<i64> {
+    let mut regions: BTreeSet<i64> = BTreeSet::new();
+    regions.insert(0); // wildcard — always present
+    let Some(arc) = store.get("regionCounty") else {
+        return regions.into_iter().collect();
+    };
+    let df = &*arc;
+    let Some(rid_col) = df
+        .columns()
+        .iter()
+        .find(|c| c.name().to_ascii_lowercase() == "regionid")
+        .cloned()
+    else {
+        return regions.into_iter().collect();
+    };
+    if let Ok(casted) = rid_col.cast(&polars::prelude::DataType::Int64) {
+        if let Ok(rids) = casted.i64() {
+            for v in rids.into_iter().flatten() {
+                regions.insert(v);
+            }
+        }
+    }
+    regions.into_iter().collect()
+}
+
 /// Build the in-memory execution store from a converted default-DB Parquet
 /// tree, applying RunSpec-scoped filters via [`InputDataManager`] and then
 /// synthesising the `Link`, `RunSpec*`, and meteorology tables.
@@ -1311,10 +1410,44 @@ pub fn build_default_db_store(
 ) -> Result<InMemoryStore> {
     let db = DefaultDb::open(default_db_path)
         .with_context(|| format!("opening default DB at {}", default_db_path.display()))?;
-    let filters = RunSpecFilters::from_runspec(run_spec);
-    let plan = InputDataManager::plan(&filters, &default_tables());
+
+    // Phase 1: load all default-DB tables with base filters.
+    // `fuel_years` and `region_ids` are empty at this stage — they require
+    // DB lookups (Year → fuelYearID mapping, regionCounty → regionID set)
+    // that are only valid after Phase 1 completes. Year loads unfiltered
+    // (no year_column in the registry); regionCounty loads county-filtered
+    // but without the fuelYear filter (which isn't known yet).
+    let base_filters = RunSpecFilters::from_runspec(run_spec);
+    let plan = InputDataManager::plan(&base_filters, &default_tables());
     let mut store = InputDataManager::execute(&plan, &db)
         .map_err(|e| anyhow::anyhow!("loading default DB: {e}"))?;
+
+    // Phase 2: derive fuel_years and region_ids from the Phase 1 tables,
+    // then re-execute only the fuel/region-sensitive tables with the correct
+    // filters. Mirrors `ExecutionRunSpec.initializeAfterShallowTables`
+    // (Java lines 217–251).
+    let fuel_years = derive_fuel_years_from_store(&store, &base_filters.years);
+    let region_ids = derive_region_ids_from_store(&store);
+    let full_filters = RunSpecFilters {
+        fuel_years,
+        region_ids,
+        ..base_filters
+    };
+    // Select only the tables that carry a fuel_year or region column
+    // annotation — those are the tables whose Phase 1 load lacked these
+    // filters. Year and regionCounty are the source tables for the
+    // derivation above and are intentionally left as loaded in Phase 1
+    // (Year is registry-unfiltered; regionCounty is county-filtered only).
+    let fuel_region_specs: Vec<MergeTableSpec> = default_tables()
+        .into_iter()
+        .filter(|t| t.fuel_year_column.is_some() || t.region_column.is_some())
+        .filter(|t| !matches!(t.table_name, "Year" | "regionCounty"))
+        .collect();
+    let replan = InputDataManager::plan(&full_filters, &fuel_region_specs);
+    let replenished = InputDataManager::execute(&replan, &db)
+        .map_err(|e| anyhow::anyhow!("loading default DB (fuel/region re-pass): {e}"))?;
+    replenished.copy_into(&mut store);
+
     if let Some(sd) = scale_dir {
         overlay_scale_input_db(&mut store, sd)
             .with_context(|| format!("loading scale-input DB from {}", sd.display()))?;
@@ -1408,7 +1541,7 @@ mod tests {
     #[test]
     fn load_execution_db_prefers_bundle_when_present() {
         let (dir, _snap) = make_execdb_snapshot();
- // The bundle should have been written by Snapshot::write.
+        // The bundle should have been written by Snapshot::write.
         let bundle_path = dir.path().join("tables").join("execution-db.bundle");
         assert!(
             bundle_path.exists(),
@@ -1429,7 +1562,7 @@ mod tests {
     #[test]
     fn load_execution_db_fallback_works_without_bundle() {
         let (dir, _snap) = make_execdb_snapshot();
- // Remove the bundle to force the per-file Parquet fallback.
+        // Remove the bundle to force the per-file Parquet fallback.
         let bundle_path = dir.path().join("tables").join("execution-db.bundle");
         std::fs::remove_file(&bundle_path).unwrap();
 
@@ -1450,7 +1583,7 @@ mod tests {
         let bundle_path = dir.path().join("tables").join("execution-db.bundle");
         assert!(bundle_path.exists(), "bundle must exist");
 
- // Build an allowed set that does NOT include "activitytype".
+        // Build an allowed set that does NOT include "activitytype".
         let mut allowed: BTreeSet<String> = BTreeSet::new();
         allowed.insert("sometable".to_string());
 
@@ -1486,7 +1619,7 @@ mod tests {
     #[test]
     fn load_execution_db_parquet_skips_table_not_in_allowed_set() {
         let (dir, _snap) = make_execdb_snapshot();
- // Remove bundle to force Parquet path.
+        // Remove bundle to force Parquet path.
         let bundle_path = dir.path().join("tables").join("execution-db.bundle");
         std::fs::remove_file(&bundle_path).unwrap();
 
@@ -1528,7 +1661,7 @@ mod tests {
         use moves_snapshot::table::{TableBuilder, Value};
         use moves_snapshot::Snapshot;
 
- // Build a snapshot with two process/year-indexed baserate variants.
+        // Build a snapshot with two process/year-indexed baserate variants.
         let make_table = |name: &str, id_val: i64| {
             let mut tb = TableBuilder::new(
                 name,
@@ -1553,11 +1686,11 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         snap.write(dir.path()).unwrap();
 
- // Remove bundle to force Parquet path.
+        // Remove bundle to force Parquet path.
         let bundle_path = dir.path().join("tables").join("execution-db.bundle");
         std::fs::remove_file(&bundle_path).unwrap();
 
- // Allowed set contains only the canonical base name.
+        // Allowed set contains only the canonical base name.
         let mut allowed: BTreeSet<String> = BTreeSet::new();
         allowed.insert("baserate".to_string());
 
@@ -1565,7 +1698,7 @@ mod tests {
         let store = load_execution_db(dir.path(), &filter, Some(&allowed))
             .expect("indexed Parquet load must succeed");
 
- // The canonical "baserate" must exist and have 2 merged rows.
+        // The canonical "baserate" must exist and have 2 merged rows.
         assert!(
             store.contains("baserate"),
             "canonical baserate must exist after merge"
@@ -1584,7 +1717,7 @@ mod tests {
         use moves_snapshot::table::{TableBuilder, Value};
         use moves_snapshot::Snapshot;
 
- // Build a snapshot with a year-suffixed table (stmytvvcoeffs2020).
+        // Build a snapshot with a year-suffixed table (stmytvvcoeffs2020).
         let mut tb = TableBuilder::new(
             "db__movesexecution1__stmytvvcoeffs2020",
             [
@@ -1603,11 +1736,11 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         snap.write(dir.path()).unwrap();
 
- // Remove bundle to force Parquet path.
+        // Remove bundle to force Parquet path.
         let bundle_path = dir.path().join("tables").join("execution-db.bundle");
         std::fs::remove_file(&bundle_path).unwrap();
 
- // Allowed set contains only the base name — no year suffix.
+        // Allowed set contains only the base name — no year suffix.
         let mut allowed: BTreeSet<String> = BTreeSet::new();
         allowed.insert("stmytvvcoeffs".to_string());
 
@@ -1646,7 +1779,7 @@ mod tests {
     fn strip_numeric_index_suffix_no_change_plain_name() {
         assert_eq!(strip_numeric_index_suffix("baserate"), "baserate");
         assert_eq!(strip_numeric_index_suffix("activitytype"), "activitytype");
- // year-only suffix (no underscore separator) is unchanged
+        // year-only suffix (no underscore separator) is unchanged
         assert_eq!(
             strip_numeric_index_suffix("stmytvvcoeffs2020"),
             "stmytvvcoeffs2020"
@@ -1664,19 +1797,19 @@ mod tests {
         };
 
         let mut store = InMemoryStore::new();
- // Two variants for "baserate", plus an empty canonical stub.
+        // Two variants for "baserate", plus an empty canonical stub.
         store.insert("baserate", DataFrame::default());
         store.insert("baserate_1_2001", make_df(1));
         store.insert("baserate_2_2001", make_df(2));
- // Unrelated table that must not be touched.
+        // Unrelated table that must not be touched.
         store.insert("activitytype", make_df(99));
 
         merge_process_year_variants(&mut store).expect("merge must succeed");
 
- // Canonical "baserate" must now have 2 rows (union of the two variants).
+        // Canonical "baserate" must now have 2 rows (union of the two variants).
         let merged = store.get("baserate").expect("baserate must exist");
         assert_eq!(merged.height(), 2, "merged baserate must have 2 rows");
- // Unrelated table must be untouched.
+        // Unrelated table must be untouched.
         assert_eq!(
             store.get("activitytype").unwrap().height(),
             1,
@@ -1754,20 +1887,20 @@ mod tests {
 
         let sho_df = store.get("SHO").expect("SHO table missing");
         let dist = sho_df.column("distance").unwrap().f64().unwrap();
- // link 1001 (road 2): 10.0 * 55.0 = 550.0
+        // link 1001 (road 2): 10.0 * 55.0 = 550.0
         assert!(
             (dist.get(0).unwrap() - 550.0).abs() < 1e-9,
             "dist[0]={}",
             dist.get(0).unwrap()
         );
- // link 1000 (road 1, off-network): no AverageSpeed → 0.0
+        // link 1000 (road 1, off-network): no AverageSpeed → 0.0
         assert_eq!(dist.get(1).unwrap(), 0.0);
     }
 
     #[test]
     fn populate_sho_distances_skips_when_already_set() {
         let mut store = make_sho_store();
- // Pre-populate distance on the first row.
+        // Pre-populate distance on the first row.
         {
             let sho_mut = store.get_mut("SHO").unwrap();
             sho_mut
@@ -1777,7 +1910,7 @@ mod tests {
                 .unwrap();
         }
         populate_sho_distances(&mut store).expect("populate_sho_distances failed");
- // Distance should be unchanged because at least one was non-zero.
+        // Distance should be unchanged because at least one was non-zero.
         let dist = store
             .get("SHO")
             .unwrap()
@@ -1795,8 +1928,8 @@ mod tests {
         populate_sho_distances(&mut store).expect("should be noop");
     }
 
- /// Build a one-row `sourceUseTypePhysics` DataFrame mirroring the snapshot
- /// schema (int64 IDs, string road-load terms).
+    /// Build a one-row `sourceUseTypePhysics` DataFrame mirroring the snapshot
+    /// schema (int64 IDs, string road-load terms).
     fn make_physics_df() -> polars::prelude::DataFrame {
         use polars::prelude::*;
         df!(
@@ -1822,7 +1955,7 @@ mod tests {
         let df = store
             .get("sourceUseTypePhysicsMapping")
             .expect("mapping table must be synthesised");
- // All 11 mapping columns present.
+        // All 11 mapping columns present.
         for col in [
             "realSourceTypeID",
             "tempSourceTypeID",
@@ -1838,14 +1971,14 @@ mod tests {
         ] {
             assert!(df.column(col).is_ok(), "missing column {col}");
         }
- // Identity mapping: real == temp == sourceTypeID, offset 0.
+        // Identity mapping: real == temp == sourceTypeID, offset 0.
         let real = df.column("realSourceTypeID").unwrap().i64().unwrap();
         let temp = df.column("tempSourceTypeID").unwrap().i64().unwrap();
         let offset = df.column("opModeIDOffset").unwrap().i64().unwrap();
         assert_eq!(real.get(0), Some(21));
         assert_eq!(temp.get(0), Some(21));
         assert_eq!(offset.get(0), Some(0));
- // The original sourceTypeID column is renamed, not duplicated.
+        // The original sourceTypeID column is renamed, not duplicated.
         assert!(df.column("sourceTypeID").is_err());
     }
 
@@ -1853,7 +1986,7 @@ mod tests {
     fn physics_mapping_synthesis_is_noop_when_mapping_present() {
         let mut store = InMemoryStore::new();
         store.insert("sourceUseTypePhysics".to_string(), make_physics_df());
- // Pre-existing mapping (single sentinel column) must be left untouched.
+        // Pre-existing mapping (single sentinel column) must be left untouched.
         let sentinel = polars::prelude::df!("realSourceTypeID" => &[99i64]).unwrap();
         store.insert("sourceUseTypePhysicsMapping".to_string(), sentinel);
         populate_source_use_type_physics_mapping(&mut store).expect("noop");
@@ -1872,8 +2005,8 @@ mod tests {
         assert!(!store.contains("sourceUseTypePhysicsMapping"));
     }
 
- /// One-row `ZoneMonthHour` with the three derived columns left NULL, plus
- /// the `Zone`/`County` rows meteorology needs to resolve pressure.
+    /// One-row `ZoneMonthHour` with the three derived columns left NULL, plus
+    /// the `Zone`/`County` rows meteorology needs to resolve pressure.
     fn make_raw_meteorology_store() -> InMemoryStore {
         use polars::prelude::*;
         let mut store = InMemoryStore::new();
@@ -1906,9 +2039,9 @@ mod tests {
         let mut store = make_raw_meteorology_store();
         populate_zone_month_hour_meteorology(&mut store).expect("fill should succeed");
         let df = store.get("ZoneMonthHour").unwrap();
- // 90 °F / 60 % RH is above the 78 °F threshold, so the regression makes
- // heatIndex exceed the dry-bulb temperature, and the humidity terms are
- // populated (non-null).
+        // 90 °F / 60 % RH is above the 78 °F threshold, so the regression makes
+        // heatIndex exceed the dry-bulb temperature, and the humidity terms are
+        // populated (non-null).
         let hi = df
             .column("heatIndex")
             .unwrap()
@@ -1967,9 +2100,9 @@ mod tests {
 
     #[test]
     fn populate_sho_distances_handles_str_sho_column() {
- // Regression: snapshots from canonical MOVES sometimes serialize the
- // SHO column as Utf8/String rather than Float64. Verify the cast path
- // handles this without error and produces correct distances.
+        // Regression: snapshots from canonical MOVES sometimes serialize the
+        // SHO column as Utf8/String rather than Float64. Verify the cast path
+        // handles this without error and produces correct distances.
         let mut store = make_sho_store();
         {
             let df = store.get_mut("SHO").unwrap();
@@ -1995,7 +2128,7 @@ mod tests {
     #[test]
     fn embedded_dag_parses_into_a_registry() {
         let registry = load_registry(None, false).expect("embedded DAG should parse");
- // The reconstruction recovers ~63 calculator-graph modules.
+        // The reconstruction recovers ~63 calculator-graph modules.
         assert!(
             registry.dag().modules.len() >= 60,
             "expected ~63 modules, got {}",
@@ -2030,7 +2163,7 @@ mod tests {
         );
     }
 
- // ---- SnapshotFilter and table_filter_expr tests ----
+    // ---- SnapshotFilter and table_filter_expr tests ----
 
     fn county_run_spec(county_id: u32, year: u32, month: u32) -> moves_runspec::RunSpec {
         use moves_runspec::{GeoKind, GeographicSelection, Timespan};
@@ -2058,8 +2191,8 @@ mod tests {
         assert_eq!(f.year_ids, vec![2020i64]);
         assert_eq!(
             f.month_ids,
-            vec![7i64],
-            "month key=7 = monthID 7 (July); RunSpec months are 1-indexed and passed through unchanged"
+            vec![8i64],
+            "month key=7 → monthID=8 (August): RunSpec key is 0-indexed, monthID = key + 1"
         );
     }
 
@@ -2116,7 +2249,7 @@ mod tests {
         use moves_snapshot::table::{TableBuilder, Value};
         use moves_snapshot::Snapshot;
 
- // Build a snapshot with a small ZoneMonthHour table: 3 zones × 2 months × 1 hour.
+        // Build a snapshot with a small ZoneMonthHour table: 3 zones × 2 months × 1 hour.
         let mut tb = TableBuilder::new(
             "db__movesexecution1__zonemonthhour",
             [
@@ -2129,7 +2262,7 @@ mod tests {
         .unwrap()
         .with_natural_key(["monthID", "zoneID", "hourID"])
         .unwrap();
- // zone 100 (county 10), month 7
+        // zone 100 (county 10), month 7
         tb.push_row([
             Value::Int64(7),
             Value::Int64(100),
@@ -2137,7 +2270,7 @@ mod tests {
             Value::Float64(75.0),
         ])
         .unwrap();
- // zone 100, month 8
+        // zone 100, month 8
         tb.push_row([
             Value::Int64(8),
             Value::Int64(100),
@@ -2145,7 +2278,7 @@ mod tests {
             Value::Float64(80.0),
         ])
         .unwrap();
- // zone 200 (different county), month 7
+        // zone 200 (different county), month 7
         tb.push_row([
             Value::Int64(7),
             Value::Int64(200),
@@ -2158,13 +2291,13 @@ mod tests {
         snap.add_table(table).unwrap();
         let dir = tempfile::tempdir().unwrap();
         snap.write(dir.path()).unwrap();
- // Remove bundle to force Parquet fallback.
+        // Remove bundle to force Parquet fallback.
         let bundle = dir.path().join("tables").join("execution-db.bundle");
         if bundle.exists() {
             std::fs::remove_file(&bundle).unwrap();
         }
 
- // Filter: county 10 → zone 100, month 7.
+        // Filter: county 10 → zone 100, month 7.
         use moves_runspec::{GeoKind, GeographicSelection, Timespan};
         let rs = moves_runspec::RunSpec {
             geographic_selections: vec![GeographicSelection {
@@ -2182,17 +2315,22 @@ mod tests {
         let store = load_execution_db_from_parquet(dir.path(), &filter, None)
             .expect("filtered load must succeed");
         let df = store.get("zonemonthhour").unwrap();
- // Only the row for zone=100, month=7 should survive.
-        assert_eq!(df.height(), 1, "filter should keep only 1 matching row");
+        // RunSpec month key=7 → monthID=8 (August, 0-indexed key). The fixture has
+        // rows for monthID=7 and monthID=8 at zone=100. The filter is zone=100 AND
+        // monthID=8, so only the August row survives; zone=200 is dropped.
+        assert_eq!(
+            df.height(),
+            1,
+            "filter should keep only the month=8 row for zone 100"
+        );
         let zone_col = df
             .column("zoneID")
             .unwrap()
             .cast(&polars::prelude::DataType::Int64)
             .unwrap();
-        assert_eq!(
-            zone_col.i64().unwrap().get(0).unwrap(),
-            100,
-            "surviving row must be zone 100"
+        assert!(
+            zone_col.i64().unwrap().into_iter().all(|v| v == Some(100)),
+            "all surviving rows must be zone 100"
         );
     }
 
@@ -2456,6 +2594,329 @@ mod tests {
         assert_eq!(
             df.column("monthGroupID").unwrap().i32().unwrap().get(0),
             Some(3), // looked up from MonthGroupOfAnyYear
+        );
+    }
+
+    // ---------- derive_fuel_years_from_store ---------------------------------
+
+    #[test]
+    fn derive_fuel_years_extracts_matching_year_rows() {
+        use polars::prelude::*;
+        let mut store = InMemoryStore::new();
+        // Year table: 2019→2018 (historical boundary), 2020→2019, 2021→2020.
+        let year_df = df!(
+            "yearID"     => &[2019i32, 2020i32, 2021i32],
+            "isBaseYear" => &[0i32, 0i32, 0i32],
+            "fuelYearID" => &[2018i32, 2019i32, 2020i32],
+        )
+        .unwrap();
+        store.insert("Year", year_df);
+
+        // RunSpec years = [2020] → fuelYearID should be [2019].
+        let fuel_years = derive_fuel_years_from_store(&store, &[2020]);
+        assert_eq!(fuel_years, vec![2019i64]);
+    }
+
+    #[test]
+    fn derive_fuel_years_multi_year_deduplicates() {
+        use polars::prelude::*;
+        let mut store = InMemoryStore::new();
+        // Two calendar years map to the same fuelYearID (many-to-one).
+        let year_df = df!(
+            "yearID"     => &[2020i32, 2021i32, 2022i32],
+            "isBaseYear" => &[0i32, 0i32, 0i32],
+            "fuelYearID" => &[2019i32, 2019i32, 2021i32],
+        )
+        .unwrap();
+        store.insert("Year", year_df);
+
+        let fuel_years = derive_fuel_years_from_store(&store, &[2020, 2021]);
+        assert_eq!(fuel_years, vec![2019i64]); // deduplicated
+    }
+
+    #[test]
+    fn derive_fuel_years_returns_empty_when_year_table_absent() {
+        let store = InMemoryStore::new();
+        let fuel_years = derive_fuel_years_from_store(&store, &[2020]);
+        assert!(fuel_years.is_empty());
+    }
+
+    // ---------- derive_region_ids_from_store ---------------------------------
+
+    #[test]
+    fn derive_region_ids_always_includes_wildcard_zero() {
+        // Even with an empty regionCounty table, region 0 must be present.
+        let mut store = InMemoryStore::new();
+        use polars::prelude::*;
+        let rc_df = df!(
+            "regionID" => Vec::<i32>::new(),
+            "countyID" => Vec::<i32>::new(),
+            "fuelYearID" => Vec::<i32>::new(),
+        )
+        .unwrap();
+        store.insert("regionCounty", rc_df);
+        let region_ids = derive_region_ids_from_store(&store);
+        assert_eq!(region_ids, vec![0i64]);
+    }
+
+    #[test]
+    fn derive_region_ids_unions_table_values_with_zero() {
+        use polars::prelude::*;
+        let mut store = InMemoryStore::new();
+        let rc_df = df!(
+            "regionID"   => &[100000000i32, 200000000i32, 100000000i32],
+            "countyID"   => &[40001i32, 40003i32, 40005i32],
+            "fuelYearID" => &[2019i32, 2019i32, 2019i32],
+        )
+        .unwrap();
+        store.insert("regionCounty", rc_df);
+        let region_ids = derive_region_ids_from_store(&store);
+        // 0 (wildcard) + unique regionIDs from the table.
+        assert_eq!(region_ids, vec![0i64, 100000000i64, 200000000i64]);
+    }
+
+    #[test]
+    fn derive_region_ids_returns_only_zero_when_table_absent() {
+        let store = InMemoryStore::new();
+        let region_ids = derive_region_ids_from_store(&store);
+        assert_eq!(region_ids, vec![0i64]);
+    }
+
+    // ---------- overlay_scale_input_db ----------------------------------------
+
+    /// Write `df` to `<dir>/<name>.parquet`.
+    fn write_parquet_to_dir(
+        dir: &std::path::Path,
+        name: &str,
+        df: &mut polars::prelude::DataFrame,
+    ) {
+        use polars::prelude::{ParquetCompression, ParquetWriter, StatisticsOptions};
+        let path = dir.join(format!("{name}.parquet"));
+        let file = std::fs::File::create(&path).expect("create parquet file");
+        ParquetWriter::new(file)
+            .with_compression(ParquetCompression::Uncompressed)
+            .with_statistics(StatisticsOptions::empty())
+            .finish(df)
+            .expect("write parquet");
+    }
+
+    #[test]
+    fn overlay_scale_input_db_loads_parquet_into_store() {
+        use polars::prelude::*;
+        let dir = tempfile::tempdir().unwrap();
+
+        let mut df = df!(
+            "sourceTypeID" => &[21i32],
+            "population"   => &[1000i32],
+        )
+        .unwrap();
+        write_parquet_to_dir(dir.path(), "SourceTypePopulation", &mut df);
+
+        let mut store = InMemoryStore::new();
+        overlay_scale_input_db(&mut store, dir.path()).expect("overlay must succeed");
+
+        assert!(
+            store.contains("SourceTypePopulation"),
+            "SourceTypePopulation must be in store after overlay"
+        );
+        let loaded = store.get("SourceTypePopulation").unwrap();
+        assert_eq!(loaded.height(), 1, "one row should be loaded");
+    }
+
+    #[test]
+    fn overlay_scale_input_db_overrides_existing_table() {
+        // CDB/PDB tables take precedence over same-named tables already in the store.
+        use polars::prelude::*;
+        let dir = tempfile::tempdir().unwrap();
+
+        // Write a CDB SourceTypePopulation with count=999.
+        let mut cdb_df = df!(
+            "sourceTypeID" => &[21i32],
+            "population"   => &[999i32],
+        )
+        .unwrap();
+        write_parquet_to_dir(dir.path(), "SourceTypePopulation", &mut cdb_df);
+
+        // Pre-seed the store with a same-named table (default DB value = 100).
+        let default_df = df!(
+            "sourceTypeID" => &[21i32],
+            "population"   => &[100i32],
+        )
+        .unwrap();
+        let mut store = InMemoryStore::new();
+        store.insert("SourceTypePopulation".to_string(), default_df);
+
+        overlay_scale_input_db(&mut store, dir.path()).expect("overlay must succeed");
+
+        // CDB value (999) should win over the prior default (100).
+        let result = store.get("SourceTypePopulation").unwrap();
+        assert_eq!(result.height(), 1);
+        let pop = result
+            .column("population")
+            .unwrap()
+            .i32()
+            .unwrap()
+            .get(0)
+            .unwrap();
+        assert_eq!(pop, 999, "CDB population (999) must override default (100)");
+    }
+
+    #[test]
+    fn overlay_scale_input_db_skips_non_parquet_files() {
+        use polars::prelude::*;
+        let dir = tempfile::tempdir().unwrap();
+
+        // Write a JSON file that should be ignored.
+        std::fs::write(dir.path().join("manifest.json"), b"{}").unwrap();
+
+        // Write one real Parquet table.
+        let mut df = df!("zoneID" => &[261610i32], "roadTypeID" => &[4i32]).unwrap();
+        write_parquet_to_dir(dir.path(), "ZoneRoadType", &mut df);
+
+        let mut store = InMemoryStore::new();
+        overlay_scale_input_db(&mut store, dir.path()).expect("overlay must succeed");
+
+        assert!(
+            store.contains("ZoneRoadType"),
+            "ZoneRoadType must be loaded"
+        );
+        // The JSON file must not produce any table.
+        assert_eq!(
+            store.names().len(),
+            1,
+            "only ZoneRoadType should be in store, not the .json file"
+        );
+    }
+
+    #[test]
+    fn scale_only_path_synthesises_runspec_tables_and_link() {
+        // Verifies that the scale-only code path (no snapshot, no default DB)
+        // runs the same synthesis steps as the default-DB path: RunSpec* tables
+        // are built from the RunSpec, and Link is synthesised from ZoneRoadType
+        // when CDB provides ZoneRoadType but no explicit Link table.
+        use polars::prelude::*;
+        let dir = tempfile::tempdir().unwrap();
+
+        // Minimal CDB: ZoneRoadType (county 26161, zone 261610, Urban Restricted = 4).
+        let mut zrt_df = df!(
+            "zoneID"     => &[261610i32],
+            "roadTypeID" => &[4i32],
+            "SHOAllocFactor" => &[1.0f64],
+        )
+        .unwrap();
+        write_parquet_to_dir(dir.path(), "ZoneRoadType", &mut zrt_df);
+
+        // Build a minimal RunSpec matching scale-county.xml.
+        use moves_runspec::{
+            GeoKind, GeographicSelection, ModelDomain, OnroadVehicleSelection, RunSpec, Timespan,
+        };
+        let run_spec = RunSpec {
+            domain: Some(ModelDomain::Single),
+            geographic_selections: vec![GeographicSelection {
+                kind: GeoKind::County,
+                key: 26161,
+                description: "Washtenaw County".to_string(),
+            }],
+            timespan: Timespan {
+                years: vec![2020],
+                months: vec![7],
+                days: vec![5],
+                begin_hour: Some(6),
+                end_hour: Some(6),
+                ..Default::default()
+            },
+            onroad_vehicle_selections: vec![OnroadVehicleSelection {
+                fuel_type_id: 1,
+                source_type_id: 21,
+                fuel_type_name: "Gasoline".to_string(),
+                source_type_name: "Passenger Car".to_string(),
+            }],
+            ..Default::default()
+        };
+
+        // Run the synthesis steps against a store seeded from the CDB dir.
+        let mut store = InMemoryStore::new();
+        overlay_scale_input_db(&mut store, dir.path()).expect("overlay");
+        populate_link_from_zone_road_type(&mut store).expect("link synthesis");
+        build_runspec_tables(&run_spec, &mut store).expect("runspec tables");
+
+        // Link must have been synthesised from ZoneRoadType.
+        assert!(
+            store.contains("link"),
+            "Link must be synthesised from ZoneRoadType"
+        );
+        let link = store.get("link").unwrap();
+        assert_eq!(
+            link.height(),
+            1,
+            "one link row for zone 261610 + road type 4"
+        );
+
+        // RunSpec* tables must be present (calculators read these from the slow tier).
+        assert!(
+            store.contains("RunSpecSourceType"),
+            "RunSpecSourceType must be built from RunSpec"
+        );
+        assert!(
+            store.contains("RunSpecPollutantProcess"),
+            "RunSpecPollutantProcess must be built from RunSpec"
+        );
+        let src_types: Vec<i32> = store
+            .get("RunSpecSourceType")
+            .unwrap()
+            .column("sourceTypeID")
+            .unwrap()
+            .i32()
+            .unwrap()
+            .into_no_null_iter()
+            .collect();
+        assert_eq!(src_types, vec![21i32], "source type 21 from RunSpec");
+    }
+
+    #[test]
+    fn overlay_scale_input_db_preference_over_default_db_tables() {
+        // Integration-level check: when a default-DB store is seeded with a table
+        // and the CDB dir contains a same-named file, the CDB value wins.
+        // This is the canonical acceptance test for Task 144 /
+        // bead mo-2yx: "a SINGLE-scale run with a minimal county input DB reads
+        // the user-supplied tables over defaults."
+        use polars::prelude::*;
+        let dir = tempfile::tempdir().unwrap();
+
+        // CDB SourceTypePopulation: population=500 (user-supplied).
+        let mut cdb_stp = df!(
+            "sourceTypeID" => &[21i32],
+            "yearID"       => &[2020i32],
+            "population"   => &[500i32],
+        )
+        .unwrap();
+        write_parquet_to_dir(dir.path(), "SourceTypePopulation", &mut cdb_stp);
+
+        // Simulate a default-DB store that has population=100 for the same row.
+        let default_stp = df!(
+            "sourceTypeID" => &[21i32],
+            "yearID"       => &[2020i32],
+            "population"   => &[100i32],
+        )
+        .unwrap();
+        let mut store = InMemoryStore::new();
+        store.insert("SourceTypePopulation".to_string(), default_stp);
+
+        // Overlay the CDB — mirrors what build_default_db_store does for path C
+        // and what run_simulation now does for path B (scale-only).
+        overlay_scale_input_db(&mut store, dir.path()).expect("overlay");
+
+        let result = store.get("SourceTypePopulation").unwrap();
+        let pop = result
+            .column("population")
+            .unwrap()
+            .i32()
+            .unwrap()
+            .get(0)
+            .unwrap();
+        assert_eq!(
+            pop, 500,
+            "user-supplied CDB population (500) must override default (100)"
         );
     }
 }

@@ -1,0 +1,50 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__totalidlefraction",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "minModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "maxModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "dayID",
+      "kind": "int64"
+    },
+    {
+      "name": "idleRegionID",
+      "kind": "int64"
+    },
+    {
+      "name": "countyTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "totalIdleFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "minModelYearID",
+    "maxModelYearID",
+    "monthID",
+    "dayID",
+    "idleRegionID",
+    "countyTypeID"
+  ],
+  "row_count": 20,
+  "float_decimals": 12,
+  "content_sha256": "bf83b2245d8cdedc03c4e6693a66dcd6e83519da9e59c35a69ea11a5759e090e"
+}

@@ -1,0 +1,104 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__baserate_90_2020",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "roadTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "avgSpeedBinID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "pollutantID",
+      "kind": "int64"
+    },
+    {
+      "name": "processID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "regClassID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeID",
+      "kind": "int64"
+    },
+    {
+      "name": "meanBaseRate",
+      "kind": "float64"
+    },
+    {
+      "name": "meanBaseRateIM",
+      "kind": "float64"
+    },
+    {
+      "name": "emissionRate",
+      "kind": "float64"
+    },
+    {
+      "name": "emissionRateIM",
+      "kind": "float64"
+    },
+    {
+      "name": "meanBaseRateACAdj",
+      "kind": "float64"
+    },
+    {
+      "name": "meanBaseRateIMACAdj",
+      "kind": "float64"
+    },
+    {
+      "name": "emissionRateACAdj",
+      "kind": "float64"
+    },
+    {
+      "name": "emissionRateIMACAdj",
+      "kind": "float64"
+    },
+    {
+      "name": "opModeFraction",
+      "kind": "float64"
+    },
+    {
+      "name": "opModeFractionRate",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "roadTypeID",
+    "avgSpeedBinID",
+    "hourDayID",
+    "polProcessID",
+    "modelYearID",
+    "fuelTypeID",
+    "regClassID",
+    "opModeID"
+  ],
+  "row_count": 188,
+  "float_decimals": 12,
+  "content_sha256": "e20a612738d83a40c05e91b2a32845633680af685522820dc57c2178527b4475"
+}

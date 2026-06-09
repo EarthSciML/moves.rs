@@ -94,7 +94,7 @@ fn canonical_data_appears_in_text_output() {
         stdout.contains("| 3 |"),
         "pollutant 3 row missing: {stdout}"
     );
- // moves.rs produced no output → delta equals -canonical
+    // moves.rs produced no output → delta equals -canonical
     assert!(
         stdout.contains("-1.0e2") || stdout.contains("-100"),
         "expected negative delta for pollutant 2: {stdout}"

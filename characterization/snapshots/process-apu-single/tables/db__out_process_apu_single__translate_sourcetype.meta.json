@@ -1,0 +1,24 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__out_process_apu_single__translate_sourcetype",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "HPMSVtypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeName",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID"
+  ],
+  "row_count": 13,
+  "float_decimals": 12,
+  "content_sha256": "c27fc2474a34746c7fddc7827c468bccaa562acd899b7277117a6a7f3e788fe0"
+}

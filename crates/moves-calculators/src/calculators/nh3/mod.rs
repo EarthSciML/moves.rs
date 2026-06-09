@@ -21,7 +21,7 @@
 //! `BaseRateCalculator` (), the modern base-rate
 //! calculator that superseded the older per-pollutant scripted-SQL
 //! calculators; `characterization/calculator-chains/calculator-dag.json`
-//! records both NH3 modules with `registrations_count: 0`. The 
+//! records both NH3 modules with `registrations_count: 0`. The
 //! still lists the classes as, so this module ports their algorithms
 //! faithfully for reference and cross-validation, with each calculator's
 //! [`Calculator::registrations`](moves_framework::Calculator::registrations)

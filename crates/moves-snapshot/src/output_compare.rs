@@ -33,9 +33,9 @@ use crate::table::NormalizedColumn;
 /// `pollutantID → Σ emissionQuant` plus the total `MOVESOutput` row count.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct PollutantSums {
- /// Sum of `emissionQuant` for each `pollutantID` present in the table.
+    /// Sum of `emissionQuant` for each `pollutantID` present in the table.
     pub sums: BTreeMap<i64, f64>,
- /// Total number of `MOVESOutput` rows the sums were accumulated from.
+    /// Total number of `MOVESOutput` rows the sums were accumulated from.
     pub row_count: usize,
 }
 
@@ -45,9 +45,9 @@ pub struct PollutantRow {
     pub pollutant_id: i64,
     pub canonical: f64,
     pub port: f64,
- /// `port - canonical`.
+    /// `port - canonical`.
     pub delta: f64,
- /// `delta / max(|canonical|, abs_floor)` — signed relative difference.
+    /// `delta / max(|canonical|, abs_floor)` — signed relative difference.
     pub rel_diff: f64,
 }
 
@@ -57,14 +57,14 @@ pub struct PollutantComparison {
     pub rows: Vec<PollutantRow>,
     pub canonical_row_count: usize,
     pub port_row_count: usize,
- /// Largest `|delta|` across all pollutants.
+    /// Largest `|delta|` across all pollutants.
     pub max_abs_delta: f64,
- /// Largest `|rel_diff|` across all pollutants (signed value carried through).
+    /// Largest `|rel_diff|` across all pollutants (signed value carried through).
     pub max_rel_diff: f64,
 }
 
 impl PollutantComparison {
- /// `true` when every pollutant's `|rel_diff| <= rel_tol`.
+    /// `true` when every pollutant's `|rel_diff| <= rel_tol`.
     pub fn within(&self, rel_tol: f64) -> bool {
         self.max_rel_diff.abs() <= rel_tol
     }
@@ -127,7 +127,7 @@ pub fn pollutant_sums_from_snapshot(snap: &Snapshot) -> PollutantSums {
             },
             _ => continue,
         };
- *out.sums.entry(pid).or_insert(0.0) += eq;
+        *out.sums.entry(pid).or_insert(0.0) += eq;
     }
 
     out
@@ -261,7 +261,7 @@ fn accumulate_output_file(path: &Path, sums: &mut BTreeMap<i64, f64>) -> io::Res
             }
             let eq = eqs.value(i);
             if eq.is_finite() {
- *sums.entry(pids.value(i) as i64).or_insert(0.0) += eq;
+                *sums.entry(pids.value(i) as i64).or_insert(0.0) += eq;
             }
         }
     }
@@ -362,12 +362,7 @@ mod tests {
     fn zero_valued_replaced_rows_counts_only_replaced_zeros() {
         // pollutant 112 has one zero row; 118 has none; 119 (not replaced) has
         // a zero row that must be ignored.
-        let s = snap_with_output(&[
-            (112, "5.0"),
-            (112, "0.0"),
-            (118, "3.0"),
-            (119, "0.0"),
-        ]);
+        let s = snap_with_output(&[(112, "5.0"), (112, "0.0"), (118, "3.0"), (119, "0.0")]);
         let replaced: BTreeSet<i64> = [112, 118].into_iter().collect();
         let zeros = zero_valued_replaced_rows(&s, &replaced);
         assert_eq!(zeros.get(&112).copied(), Some(1));
@@ -395,7 +390,7 @@ mod tests {
             sums: BTreeMap::from([(1, 100.0), (2, 50.0)]),
             row_count: 2,
         };
- // pollutant 1 within 1e-4, pollutant 2 off by 20%.
+        // pollutant 1 within 1e-4, pollutant 2 off by 20%.
         let port = PollutantSums {
             sums: BTreeMap::from([(1, 100.005), (2, 60.0)]),
             row_count: 2,

@@ -55,23 +55,23 @@ impl FromStr for ProcessId {
 /// Mirrors the `EmissionProcess.java` (id, name) pair.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct EmissionProcess {
- /// Database key (`processID`).
+    /// Database key (`processID`).
     pub id: ProcessId,
- /// Display name as it appears in the default DB.
+    /// Display name as it appears in the default DB.
     pub name: &'static str,
 }
 
 impl EmissionProcess {
- /// Look up the canonical process with the given id.
+    /// Look up the canonical process with the given id.
     #[must_use]
     pub fn find_by_id(id: ProcessId) -> Option<Self> {
         BY_ID.get(&id.0).copied()
     }
 
- /// Look up the canonical process with the given name.
- ///
- /// Case-insensitive (ASCII), with the same numeric-id fallback as
- /// [`crate::Pollutant::find_by_name`].
+    /// Look up the canonical process with the given name.
+    ///
+    /// Case-insensitive (ASCII), with the same numeric-id fallback as
+    /// [`crate::Pollutant::find_by_name`].
     #[must_use]
     pub fn find_by_name(name: &str) -> Option<Self> {
         let key = name.to_ascii_lowercase();
@@ -83,7 +83,7 @@ impl EmissionProcess {
             .and_then(|n| Self::find_by_id(ProcessId(n)))
     }
 
- /// Iterate every canonical process in ascending-id order.
+    /// Iterate every canonical process in ascending-id order.
     pub fn all() -> impl Iterator<Item = Self> {
         ALL_PROCESSES.iter().copied()
     }
@@ -242,7 +242,7 @@ static BY_NAME_LOWER: phf::Map<&'static str, EmissionProcess> = phf::phf_map! {
 mod tests {
     use super::*;
 
- // Ports the spirit of EmissionProcessTest.java.
+    // Ports the spirit of EmissionProcessTest.java.
 
     #[test]
     fn find_by_id_returns_canonical_match() {

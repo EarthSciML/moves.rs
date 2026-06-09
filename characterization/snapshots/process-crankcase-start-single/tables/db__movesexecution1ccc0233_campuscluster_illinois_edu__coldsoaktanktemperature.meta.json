@@ -1,0 +1,30 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__coldsoaktanktemperature",
+  "schema": [
+    {
+      "name": "zoneID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourID",
+      "kind": "int64"
+    },
+    {
+      "name": "coldSoakTankTemperature",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "zoneID",
+    "monthID",
+    "hourID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "60a2f8325b9430c4142687f9e28b58942f62e056573fe3a75b8087ec216090b2"
+}

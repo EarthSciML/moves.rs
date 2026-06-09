@@ -45,9 +45,9 @@ use std::path::PathBuf;
 /// Seasonal factor record for one equipment category.
 #[derive(Debug, Clone)]
 pub struct SeasonalRecord {
- /// Equipment index (0-based).
+    /// Equipment index (0-based).
     pub equipment_idx: usize,
- /// Monthly seasonal factors (12 values, one per month).
+    /// Monthly seasonal factors (12 values, one per month).
     pub monthly_factors: [f64; 12],
 }
 
@@ -60,7 +60,7 @@ pub fn read_dat<R: BufRead>(reader: R, n_equipment: usize) -> Result<Array2<f64>
     let mut lines = reader.lines();
     let mut line_num = 0;
 
- // Read header (skip blank and comment lines)
+    // Read header (skip blank and comment lines)
     let header_line = loop {
         line_num += 1;
         let line = lines
@@ -111,7 +111,7 @@ pub fn read_dat<R: BufRead>(reader: R, n_equipment: usize) -> Result<Array2<f64>
         });
     }
 
- // Read seasonal factor records
+    // Read seasonal factor records
     for line_result in lines {
         line_num += 1;
         let line = line_result.map_err(|e| Error::Io {
@@ -188,7 +188,7 @@ pub fn read_dat_records<R: BufRead>(reader: R) -> Result<Vec<SeasonalRecord>> {
     let mut lines = reader.lines();
     let mut line_num = 0;
 
- // Skip header (first non-blank, non-comment line)
+    // Skip header (first non-blank, non-comment line)
     loop {
         line_num += 1;
         let line = lines
@@ -208,7 +208,7 @@ pub fn read_dat_records<R: BufRead>(reader: R) -> Result<Vec<SeasonalRecord>> {
         }
     }
 
- // Read seasonal factor records
+    // Read seasonal factor records
     // `rdseas.f` parses each record with a fixed-format `read(...,ERR=7003)`
     // and aborts (`ierr = IFAIL`) on any malformed record or non-numeric
     // field; it never skips a line or substitutes a default factor. Match
@@ -308,7 +308,7 @@ pub fn read_day<R: BufRead>(reader: R) -> Result<Vec<f64>> {
         }
     }
 
- // Pad to 365 days if needed
+    // Pad to 365 days if needed
     while factors.len() < 365 {
         factors.push(1.0);
     }
@@ -323,7 +323,7 @@ pub fn read_day<R: BufRead>(reader: R) -> Result<Vec<f64>> {
 /// * `equipment_idx` - 0-based equipment index
 /// * `month` - 0-based month index (0 = January)
 pub fn get_seasonal_factor(seasonal: &Array2<f64>, equipment_idx: usize, month: usize) -> f64 {
- *seasonal.get([equipment_idx, month.min(11)]).unwrap_or(&1.0)
+    *seasonal.get([equipment_idx, month.min(11)]).unwrap_or(&1.0)
 }
 
 /// Get day-of-year factor.
@@ -332,7 +332,7 @@ pub fn get_seasonal_factor(seasonal: &Array2<f64>, equipment_idx: usize, month: 
 /// * `day_factors` - Vector of 365 day-of-year factors
 /// * `day_of_year` - 0-based day index (0 = January 1)
 pub fn get_day_factor(day_factors: &[f64], day_of_year: usize) -> f64 {
- *day_factors.get(day_of_year.min(364)).unwrap_or(&1.0)
+    *day_factors.get(day_of_year.min(364)).unwrap_or(&1.0)
 }
 
 #[cfg(test)]

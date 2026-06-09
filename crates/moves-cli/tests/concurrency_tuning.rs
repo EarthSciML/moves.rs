@@ -61,6 +61,7 @@ fn onroad_fixtures() -> Vec<PathBuf> {
             p.extension().and_then(|x| x.to_str()) == Some("xml")
                 && !name.starts_with("nr-")
                 && !name.starts_with("scale-")
+                && !name.starts_with("error-")
         })
         .collect();
     paths.sort();
@@ -130,7 +131,7 @@ fn concurrency_tuning_sweep() {
         .map(|n| n.get())
         .unwrap_or(1);
 
- // Sweep: 1, 2, 4, 8, ... doubling up to NCPU; then NCPU itself.
+    // Sweep: 1, 2, 4, 8, ... doubling up to NCPU; then NCPU itself.
     let mut n_values: Vec<(usize, String)> = Vec::new();
     let mut n = 1usize;
     while n < ncpu {
@@ -150,7 +151,7 @@ fn concurrency_tuning_sweep() {
     }
     let mut rows: Vec<Row> = Vec::new();
 
- // Run in ascending N order so the monotonic VmHWM captures the deltas.
+    // Run in ascending N order so the monotonic VmHWM captures the deltas.
     let mut prev_rss: Option<f64> = None;
     for (n, label) in &n_values {
         let (wall_ms, rss_mib) = run_all_fixtures(&fixtures, *n);
@@ -170,13 +171,13 @@ fn concurrency_tuning_sweep() {
         });
     }
 
- // Compute speedup relative to N=1.
+    // Compute speedup relative to N=1.
     let baseline_wall = rows[0].wall_ms;
     for row in &mut rows {
         row.speedup = baseline_wall / row.wall_ms;
     }
 
- // Print the table.
+    // Print the table.
     println!(
         "\n{:>12}  {:>12}  {:>10}  {:>10}  {:>12}",
         "N", "total_wall_ms", "speedup", "RSS_MiB", "delta_RSS_MiB"
@@ -201,7 +202,7 @@ fn concurrency_tuning_sweep() {
     let n1_row = &rows[0];
     let ncpu_row = rows.last().unwrap();
 
- // Assertion 1: throughput must not degrade beyond noise factor.
+    // Assertion 1: throughput must not degrade beyond noise factor.
     assert!(
         ncpu_row.wall_ms <= n1_row.wall_ms * MAX_THROUGHPUT_REGRESSION_FACTOR,
         "Throughput regression at N={}: wall {:.1} ms > N=1 wall {:.1} ms × {:.0} \
@@ -213,9 +214,9 @@ fn concurrency_tuning_sweep() {
         n1_row.wall_ms * MAX_THROUGHPUT_REGRESSION_FACTOR,
     );
 
- // Assertion 2: RSS must stay within the chain-isolation model.
- // At (empty calculators), expected additional RSS = N × ~0.
- // We allow RSS_PER_EXTRA_CHUNK_MIB per additional parallel slot as slack.
+    // Assertion 2: RSS must stay within the chain-isolation model.
+    // At (empty calculators), expected additional RSS = N × ~0.
+    // We allow RSS_PER_EXTRA_CHUNK_MIB per additional parallel slot as slack.
     if let (Some(rss_n1), Some(rss_ncpu)) = (n1_row.rss_mib, ncpu_row.rss_mib) {
         let extra_slots = ncpu_row.n.saturating_sub(1) as f64;
         let rss_ceiling = rss_n1 + extra_slots * RSS_PER_EXTRA_CHUNK_MIB;

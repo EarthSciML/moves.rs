@@ -35,14 +35,14 @@ use moves_fixture_capture::{
     version
 )]
 struct Args {
- /// Snapshots root, typically `characterization/snapshots`. Each
- /// immediate subdirectory is treated as one fixture; subdirectories
- /// without an `execution-trace.json` are skipped silently.
+    /// Snapshots root, typically `characterization/snapshots`. Each
+    /// immediate subdirectory is treated as one fixture; subdirectories
+    /// without an `execution-trace.json` are skipped silently.
     #[arg(long, value_name = "DIR")]
     snapshots_dir: PathBuf,
 
- /// Output directory. Will be created if absent. The file is written
- /// as `<output-dir>/coverage-map.json`.
+    /// Output directory. Will be created if absent. The file is written
+    /// as `<output-dir>/coverage-map.json`.
     #[arg(long, value_name = "DIR")]
     output_dir: PathBuf,
 }

@@ -122,18 +122,18 @@ fn all_strategies_target_independent_tables() {
     let onroad_tables: Vec<&str> = strategies[2].modified_tables().to_vec();
     let nonroad_tables: Vec<&str> = strategies[3].modified_tables().to_vec();
 
- // AVFT does not touch emission-rate tables.
+    // AVFT does not touch emission-rate tables.
     assert!(!avft_tables.contains(&"emissionRateAdjustment"));
     assert!(!avft_tables.contains(&"ratepollutantprocessmodelyeargroup"));
 
- // ROP does not touch the AVFT fleet-composition table.
+    // ROP does not touch the AVFT fleet-composition table.
     assert!(!rop_tables.contains(&"AVFT"));
     assert!(!rop_tables.contains(&"emissionRateAdjustment"));
 
- // OnRoadRetrofit does not overwrite the AVFT or raw rate tables directly.
+    // OnRoadRetrofit does not overwrite the AVFT or raw rate tables directly.
     assert!(!onroad_tables.contains(&"AVFT"));
 
- // NonRoadRetrofit writes nothing to the shared execution DB.
+    // NonRoadRetrofit writes nothing to the shared execution DB.
     assert!(nonroad_tables.is_empty());
 }
 
@@ -197,10 +197,10 @@ fn all_strategies_have_no_per_iteration_subscriptions() {
 
 #[test]
 fn rop_and_onroad_retrofit_compound_multiplicatively() {
- // Fixture: NOx (pollutant=3), passenger cars (source=11), reg class 10,
- // model year 2010. Two independent strategies affect this combination.
+    // Fixture: NOx (pollutant=3), passenger cars (source=11), reg class 10,
+    // model year 2010. Two independent strategies affect this combination.
 
- // ROP reduces NOx by 25% → scale factor = 0.75.
+    // ROP reduces NOx by 25% → scale factor = 0.75.
     let rop_table: RopTable = [moves_rate_of_progress::RopRecord::new(
         3, 11, 10, 2010, 0.25,
     )]
@@ -214,7 +214,7 @@ fn rop_and_onroad_retrofit_compound_multiplicatively() {
     });
     assert!((rop_scale - 0.75).abs() < 1e-14, "ROP scale = 0.75");
 
- // OnRoadRetrofit: 50% of fleet retrofitted, 80% effective → factor = 0.60.
+    // OnRoadRetrofit: 50% of fleet retrofitted, 80% effective → factor = 0.60.
     let retrofit_programs: RetrofitTable = [RetrofitRecord::new(
         11,   // sourceTypeID
         2005, // startModelYear
@@ -233,8 +233,8 @@ fn rop_and_onroad_retrofit_compound_multiplicatively() {
         "Retrofit factor = 0.60"
     );
 
- // Combined (Java order: ROP first, then OnRoadRetrofit).
- // base_rate × 0.75 × 0.60 = base_rate × 0.45
+    // Combined (Java order: ROP first, then OnRoadRetrofit).
+    // base_rate × 0.75 × 0.60 = base_rate × 0.45
     let combined = rop_scale * retrofit_factor;
     assert!(
         (combined - 0.45).abs() < 1e-12,
@@ -244,8 +244,8 @@ fn rop_and_onroad_retrofit_compound_multiplicatively() {
 
 #[test]
 fn avft_and_rop_are_orthogonal() {
- // AVFT modifies fleet-composition fractions; ROP modifies emission rates.
- // They operate on completely separate tables and never interfere.
+    // AVFT modifies fleet-composition fractions; ROP modifies emission rates.
+    // They operate on completely separate tables and never interfere.
     let avft_strategy = AvftControlStrategy::from_completed(AvftTable::new());
     let rop_strategy = RateOfProgressControlStrategy::new(RopTable::new());
 
@@ -268,8 +268,8 @@ fn avft_and_rop_are_orthogonal() {
 
 #[test]
 fn nonroad_retrofit_does_not_conflict_with_onroad_strategies() {
- // NonRoadRetrofit has empty modified_tables — it never writes to the
- // shared execution DB, so it cannot conflict with any onroad strategy.
+    // NonRoadRetrofit has empty modified_tables — it never writes to the
+    // shared execution DB, so it cannot conflict with any onroad strategy.
     let nonroad = NonRoadRetrofitStrategy::new(vec![NonRoadRecord {
         record_index: 0,
         id: 1,

@@ -73,15 +73,15 @@ use crate::{Error, Result};
 /// `IDXHRY=1`, `IDXHRD=2`, `IDXGLY=3`, `IDXGLD=4`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActivityUnits {
- /// Hours per year — `IDXHRY = 1`. `acttmp = acthrs`.
+    /// Hours per year — `IDXHRY = 1`. `acttmp = acthrs`.
     HoursPerYear,
- /// Hours per day — `IDXHRD = 2`. `acttmp = acthrs * 365`.
+    /// Hours per day — `IDXHRD = 2`. `acttmp = acthrs * 365`.
     HoursPerDay,
- /// Gallons per year — `IDXGLY = 3`. `acttmp = 1 / (2*uselif)`
- /// when `uselif > 0`, else `0`.
+    /// Gallons per year — `IDXGLY = 3`. `acttmp = 1 / (2*uselif)`
+    /// when `uselif > 0`, else `0`.
     GallonsPerYear,
- /// Gallons per day — `IDXGLD = 4`. Same conversion as
- /// `GallonsPerYear` (see the Fortran source).
+    /// Gallons per day — `IDXGLD = 4`. Same conversion as
+    /// `GallonsPerYear` (see the Fortran source).
     GallonsPerDay,
 }
 
@@ -90,13 +90,13 @@ pub enum ActivityUnits {
 /// Supplied to [`model_year`] by the caller's `scrappage_fn` callback.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ScrappageTime {
- /// Year-to-year fraction scrapped by age. Length [`MXAGYR`].
+    /// Year-to-year fraction scrapped by age. Length [`MXAGYR`].
     pub yryrfrcscrp: Vec<f32>,
- /// Model-year fractions by age (initial age distribution).
- /// Length [`MXAGYR`].
+    /// Model-year fractions by age (initial age distribution).
+    /// Length [`MXAGYR`].
     pub modfrc: Vec<f32>,
- /// Lifetime in years (number of years until full scrappage).
- /// `1 <= nyrlif <= MXAGYR`.
+    /// Lifetime in years (number of years until full scrappage).
+    /// `1 <= nyrlif <= MXAGYR`.
     pub nyrlif: usize,
 }
 
@@ -108,51 +108,51 @@ pub struct ScrappageTime {
 /// 1-based; the table itself stores them 0-based).
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct AgeAdjustmentTable {
- /// Curve names from the `/AGE ADJUSTMENT/` header; upper-cased,
- /// left-justified. Length `<= MXAGE`. `rdact.f` :240–243 trims
- /// + upper-cases when loading.
+    /// Curve names from the `/AGE ADJUSTMENT/` header; upper-cased,
+    /// left-justified. Length `<= MXAGE`. `rdact.f` :240–243 trims
+    /// + upper-cases when loading.
     pub names: Vec<String>,
- /// Bin boundaries. Length `MXUSE`; `rdact.f` :217–222
- /// pre-initializes every slot to `2.5` before reading the file,
- /// so unloaded tails are `2.5` (not zero / not garbage).
+    /// Bin boundaries. Length `MXUSE`; `rdact.f` :217–222
+    /// pre-initializes every slot to `2.5` before reading the file,
+    /// so unloaded tails are `2.5` (not zero / not garbage).
     pub bins: Vec<f32>,
- /// Per-bin percent values, indexed `pcts[bin_idx][curve_idx]`.
- /// Outer length must equal `bins.len()`. Unloaded slots default
- /// to `100.0` per `rdact.f` :219–221.
+    /// Per-bin percent values, indexed `pcts[bin_idx][curve_idx]`.
+    /// Outer length must equal `bins.len()`. Unloaded slots default
+    /// to `100.0` per `rdact.f` :219–221.
     pub pcts: Vec<Vec<f32>>,
 }
 
 /// Output of [`model_year`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelYearOutput {
- /// Year-to-year fraction scrapped by age — pass-through from
- /// the scrappage callback. Length [`MXAGYR`].
+    /// Year-to-year fraction scrapped by age — pass-through from
+    /// the scrappage callback. Length [`MXAGYR`].
     pub yryrfrcscrp: Vec<f32>,
- /// Initial model-year fractions — pass-through from the
- /// scrappage callback. Length [`MXAGYR`].
+    /// Initial model-year fractions — pass-through from the
+    /// scrappage callback. Length [`MXAGYR`].
     pub modfrc: Vec<f32>,
- /// Starts adjustment per year. Length `nyrlif`. Each slot is
- /// `strhrs` (Fortran's `adjfac` is constant 1.0).
+    /// Starts adjustment per year. Length `nyrlif`. Each slot is
+    /// `strhrs` (Fortran's `adjfac` is constant 1.0).
     pub stradj: Vec<f32>,
- /// Activity adjustment per year. Length `nyrlif`. DEFAULT
- /// uses `acttmp`; alternate curves scale `acttmp` by per-bin
- /// percentages.
+    /// Activity adjustment per year. Length `nyrlif`. DEFAULT
+    /// uses `acttmp`; alternate curves scale `acttmp` by per-bin
+    /// percentages.
     pub actadj: Vec<f32>,
- /// Deterioration age per year. Length `nyrlif`. Cumulative
- /// `accum/uselif`, clamped to zero.
+    /// Deterioration age per year. Length `nyrlif`. Cumulative
+    /// `accum/uselif`, clamped to zero.
     pub detage: Vec<f32>,
- /// Lifetime in years — echoed from the scrappage callback.
+    /// Lifetime in years — echoed from the scrappage callback.
     pub nyrlif: usize,
- /// `uselif` actually used in the post-scrptime computations.
- /// Equals the input `uselif` unless that was `<= 0`, in which
- /// case it was bumped to `1.0`.
+    /// `uselif` actually used in the post-scrptime computations.
+    /// Equals the input `uselif` unless that was `<= 0`, in which
+    /// case it was bumped to `1.0`.
     pub uselif_used: f32,
- /// Annual activity hours (`acttmp`) used for the scrappage
- /// callback and as the unscaled default activity adjustment.
+    /// Annual activity hours (`acttmp`) used for the scrappage
+    /// callback and as the unscaled default activity adjustment.
     pub acttmp: f32,
- /// Set when the alternate-curve lookup failed and the routine
- /// fell back to DEFAULT. Mirrors the warning the Fortran source
- /// writes to `IOWMSG` plus the `nwarn` bump.
+    /// Set when the alternate-curve lookup failed and the routine
+    /// fell back to DEFAULT. Mirrors the warning the Fortran source
+    /// writes to `IOWMSG` plus the `nwarn` bump.
     pub age_curve_warning: Option<String>,
 }
 
@@ -198,7 +198,7 @@ pub fn model_year<F>(
 where
     F: FnOnce(f32) -> Result<ScrappageTime>,
 {
- // --- search for the alternate activity curve (modyr.f :121–132) ---
+    // --- search for the alternate activity curve (modyr.f :121–132) ---
     let agecod_trim = agecod.trim().to_ascii_uppercase();
     let mut age_curve_warning: Option<String> = None;
     let curve_idx: Option<usize> = if agecod_trim == "DEFAULT" {
@@ -217,9 +217,9 @@ where
         hit
     };
 
- // --- compute acttmp from the unit indicator (modyr.f :136–144).
- // Uninitialized branches default to 0.0 to match the Fortran
- // binary built with -finit-real=zero. ---
+    // --- compute acttmp from the unit indicator (modyr.f :136–144).
+    // Uninitialized branches default to 0.0 to match the Fortran
+    // binary built with -finit-real=zero. ---
     let mut acttmp: f32 = 0.0;
     match units {
         ActivityUnits::HoursPerYear => {
@@ -235,9 +235,9 @@ where
         }
     }
 
- // --- call the scrappage-time computation (scrptime.f, modyr.f :153–154).
- // The callback captures uselif, eload, disin, popgrwfac from the
- // caller's scope. ---
+    // --- call the scrappage-time computation (scrptime.f, modyr.f :153–154).
+    // The callback captures uselif, eload, disin, popgrwfac from the
+    // caller's scope. ---
     let scrappage = scrappage_fn(acttmp)?;
     if scrappage.yryrfrcscrp.len() != MXAGYR {
         return Err(Error::Config(format!(
@@ -258,7 +258,7 @@ where
         )));
     }
 
- // --- validate alternate-curve table when in use ---
+    // --- validate alternate-curve table when in use ---
     if let Some(cidx) = curve_idx {
         if age_table.pcts.len() != age_table.bins.len() {
             return Err(Error::Config(format!(
@@ -287,11 +287,11 @@ where
 
     let nyrlif = scrappage.nyrlif;
 
- // --- bump uselif to 1.0 if it was non-positive (modyr.f :165).
- // Only used in the post-scrptime loops below. ---
+    // --- bump uselif to 1.0 if it was non-positive (modyr.f :165).
+    // Only used in the post-scrptime loops below. ---
     let uselif_used = if uselif <= 0.0 { 1.0 } else { uselif };
 
- // --- activity & starts adjustment loop (modyr.f :164–191) ---
+    // --- activity & starts adjustment loop (modyr.f :164–191) ---
     let mut actadj: Vec<f32> = Vec::with_capacity(nyrlif);
     let mut stradj: Vec<f32> = Vec::with_capacity(nyrlif);
     let mut accum: f32 = 0.0;
@@ -305,7 +305,7 @@ where
         accum += value * eload;
     }
 
- // --- deterioration-age loop (modyr.f :196–204) ---
+    // --- deterioration-age loop (modyr.f :196–204) ---
     let mut detage: Vec<f32> = Vec::with_capacity(nyrlif);
     let mut accum: f32 = 0.0;
     for &a in &actadj {
@@ -343,16 +343,16 @@ fn alternate_actadj(
     if ratio >= 2.0 {
         return 0.0;
     }
- // bins[0] corresponds to Fortran agebin(1)
+    // bins[0] corresponds to Fortran agebin(1)
     let bin0 = age_table.bins[0];
     if ratio <= bin0 {
         return age_table.pcts[0][curve_idx] / 100.0 * acttmp;
     }
- // Walk pairs (bins[k], bins[k+1]) for k in 0..bins.len() - 1.
- // The Fortran loop `j = 1..MXUSE` reads agebin(j+1) which is OOB
- // when j == MXUSE; we drop that final iteration since `rdact.f`
- // initializes the trailing bins to 2.5 and the outer ratio < 2
- // guard makes the OOB read unreachable in practice.
+    // Walk pairs (bins[k], bins[k+1]) for k in 0..bins.len() - 1.
+    // The Fortran loop `j = 1..MXUSE` reads agebin(j+1) which is OOB
+    // when j == MXUSE; we drop that final iteration since `rdact.f`
+    // initializes the trailing bins to 2.5 and the outer ratio < 2
+    // guard makes the OOB read unreachable in practice.
     let end = age_table.bins.len().saturating_sub(1);
     for k in 0..end {
         let lo = age_table.bins[k];
@@ -361,9 +361,9 @@ fn alternate_actadj(
             return age_table.pcts[k][curve_idx] / 100.0 * acttmp;
         }
     }
- // Unreached given the data invariants above; preserve the
- // implicit Fortran "actadj untouched" semantics by returning the
- // -finit-real=zero value.
+    // Unreached given the data invariants above; preserve the
+    // implicit Fortran "actadj untouched" semantics by returning the
+    // -finit-real=zero value.
     0.0
 }
 
@@ -455,7 +455,7 @@ mod tests {
         .unwrap();
         assert!(out.age_curve_warning.is_some());
         assert!(out.age_curve_warning.unwrap().contains("MISSING"));
- // DEFAULT behavior: actadj == acttmp.
+        // DEFAULT behavior: actadj == acttmp.
         for v in &out.actadj {
             assert_eq!(*v, 8.0);
         }
@@ -519,7 +519,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(out.acttmp, 0.0);
- // The bump-to-1 also applies for non-positive uselif.
+        // The bump-to-1 also applies for non-positive uselif.
         assert_eq!(out.uselif_used, 1.0);
     }
 
@@ -579,8 +579,8 @@ mod tests {
 
     #[test]
     fn detage_accumulates_over_years() {
- // DEFAULT, acttmp=10, eload=1, uselif=10, nyrlif=3.
- // detage[i] = sum(actadj[0..=i] * eload) / uselif = (10*(i+1))/10 = i+1.
+        // DEFAULT, acttmp=10, eload=1, uselif=10, nyrlif=3.
+        // detage[i] = sum(actadj[0..=i] * eload) / uselif = (10*(i+1))/10 = i+1.
         let scrap = default_scrappage(3);
         let out = model_year(
             0.0,
@@ -598,7 +598,7 @@ mod tests {
 
     #[test]
     fn detage_clamped_at_zero_when_acttmp_zero() {
- // acttmp=0, eload=1 → accum stays 0 → detage all zero.
+        // acttmp=0, eload=1 → accum stays 0 → detage all zero.
         let scrap = default_scrappage(2);
         let out = model_year(
             0.0,
@@ -616,8 +616,8 @@ mod tests {
 
     #[test]
     fn alternate_curve_bin_below_first_returns_pcts0() {
- // One alternate curve "CRV", 3 loaded bins (1.0, 1.5, 2.0)
- // with percents 50, 80, 100 for that curve.
+        // One alternate curve "CRV", 3 loaded bins (1.0, 1.5, 2.0)
+        // with percents 50, 80, 100 for that curve.
         let mut bins = vec![2.5; MXUSE];
         bins[0] = 1.0;
         bins[1] = 1.5;
@@ -631,8 +631,8 @@ mod tests {
             bins,
             pcts,
         };
- // acttmp=100, eload=0 → accum stays 0 → ratio = 0/uselif = 0,
- // which is <= bins[0]=1.0 → actadj = 50/100 * 100 = 50.
+        // acttmp=100, eload=0 → accum stays 0 → ratio = 0/uselif = 0,
+        // which is <= bins[0]=1.0 → actadj = 50/100 * 100 = 50.
         let scrap = default_scrappage(2);
         let out = model_year(
             0.0,
@@ -664,12 +664,12 @@ mod tests {
             bins,
             pcts,
         };
- // acttmp=100, eload=1, uselif=1 →
- // i=0: ratio=0 → <= bins[0]=0.5 → actadj=25.
- // accum += 25*1 = 25.
- // i=1: ratio=25 → >= 2 → actadj=0.
- // accum += 0.
- // i=2: ratio=25 → >= 2 → actadj=0.
+        // acttmp=100, eload=1, uselif=1 →
+        // i=0: ratio=0 → <= bins[0]=0.5 → actadj=25.
+        // accum += 25*1 = 25.
+        // i=1: ratio=25 → >= 2 → actadj=0.
+        // accum += 0.
+        // i=2: ratio=25 → >= 2 → actadj=0.
         let scrap = default_scrappage(3);
         let out = model_year(
             0.0,
@@ -687,14 +687,14 @@ mod tests {
 
     #[test]
     fn alternate_curve_walks_bin_pairs_as_accum_grows() {
- // bins=[0.5, 1.0, 1.5, 2.5, ...], pcts[0]=25, pcts[1]=60, pcts[2]=90.
- // The Fortran maps:
- // ratio <= bins[0] → pcts[0] (early-branch in modyr.f :175)
- // bins[0] < ratio <= bins[1] → pcts[0] (j=1 in modyr.f :178–183)
- // bins[1] < ratio <= bins[2] → pcts[1] (j=2)
- // bins[2] < ratio <= bins[3] → pcts[2] (j=3)
- // With uselif=1, eload=0.1, acttmp=10, the accum walks past the bin
- // boundaries within a few iterations.
+        // bins=[0.5, 1.0, 1.5, 2.5, ...], pcts[0]=25, pcts[1]=60, pcts[2]=90.
+        // The Fortran maps:
+        // ratio <= bins[0] → pcts[0] (early-branch in modyr.f :175)
+        // bins[0] < ratio <= bins[1] → pcts[0] (j=1 in modyr.f :178–183)
+        // bins[1] < ratio <= bins[2] → pcts[1] (j=2)
+        // bins[2] < ratio <= bins[3] → pcts[2] (j=3)
+        // With uselif=1, eload=0.1, acttmp=10, the accum walks past the bin
+        // boundaries within a few iterations.
         let mut bins = vec![2.5; MXUSE];
         bins[0] = 0.5;
         bins[1] = 1.0;
@@ -720,15 +720,15 @@ mod tests {
             |_| Ok(scrap.clone()),
         )
         .unwrap();
- // Expected trace:
- // i=0: ratio=0 → ≤ 0.5 → pcts[0]=25 → actadj=2.5; accum=0.25
- // i=1: ratio=0.25 → ≤ 0.5 → pcts[0]=25 → actadj=2.5; accum=0.50
- // i=2: ratio=0.50 → ≤ 0.5 → pcts[0]=25 → actadj=2.5; accum=0.75
- // i=3: ratio=0.75 → (0.5,1.0] → pcts[0]=25 → actadj=2.5; accum=1.00
- // i=4: ratio=1.00 → (0.5,1.0] → pcts[0]=25 → actadj=2.5; accum=1.25
- // i=5: ratio=1.25 → (1.0,1.5] → pcts[1]=60 → actadj=6.0; accum=1.85
- // i=6: ratio=1.85 → (1.5,2.5] → pcts[2]=90 → actadj=9.0; accum=2.75
- // i=7: ratio=2.75 → ≥ 2 → 0
+        // Expected trace:
+        // i=0: ratio=0 → ≤ 0.5 → pcts[0]=25 → actadj=2.5; accum=0.25
+        // i=1: ratio=0.25 → ≤ 0.5 → pcts[0]=25 → actadj=2.5; accum=0.50
+        // i=2: ratio=0.50 → ≤ 0.5 → pcts[0]=25 → actadj=2.5; accum=0.75
+        // i=3: ratio=0.75 → (0.5,1.0] → pcts[0]=25 → actadj=2.5; accum=1.00
+        // i=4: ratio=1.00 → (0.5,1.0] → pcts[0]=25 → actadj=2.5; accum=1.25
+        // i=5: ratio=1.25 → (1.0,1.5] → pcts[1]=60 → actadj=6.0; accum=1.85
+        // i=6: ratio=1.85 → (1.5,2.5] → pcts[2]=90 → actadj=9.0; accum=2.75
+        // i=7: ratio=2.75 → ≥ 2 → 0
         for (i, &v) in out.actadj.iter().enumerate() {
             let expected = match i {
                 0..=4 => 2.5,
@@ -746,7 +746,7 @@ mod tests {
 
     #[test]
     fn detage_uses_bumped_uselif() {
- // uselif=0 → bumped to 1.0 → detage = accum, where accum = actadj*eload.
+        // uselif=0 → bumped to 1.0 → detage = accum, where accum = actadj*eload.
         let scrap = default_scrappage(2);
         let out = model_year(
             0.0,

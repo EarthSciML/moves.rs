@@ -150,9 +150,9 @@ fn build_subscriptions() -> Vec<CalculatorSubscription> {
 /// Java `ActivityInfo.locationLevel`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LocationLevel {
- /// Keyed per road link.
+    /// Keyed per road link.
     Link,
- /// Keyed per zone.
+    /// Keyed per zone.
     Zone,
 }
 
@@ -168,28 +168,28 @@ pub enum LocationLevel {
 /// metadata is kept for the wiring that will.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActivityType {
- /// Source hours (`activityTypeID` 2).
+    /// Source hours (`activityTypeID` 2).
     SourceHours,
- /// Extended idle hours (`activityTypeID` 3).
+    /// Extended idle hours (`activityTypeID` 3).
     ExtendedIdleHours,
- /// Hotelling hours (`activityTypeID` 13 / 14 / 15).
+    /// Hotelling hours (`activityTypeID` 13 / 14 / 15).
     HotellingHours,
- /// Source hours operating (`activityTypeID` 4).
+    /// Source hours operating (`activityTypeID` 4).
     Sho,
- /// Source hours parked (`activityTypeID` 5).
+    /// Source hours parked (`activityTypeID` 5).
     Shp,
- /// Vehicle population (`activityTypeID` 6).
+    /// Vehicle population (`activityTypeID` 6).
     Population,
- /// Engine starts (`activityTypeID` 7).
+    /// Engine starts (`activityTypeID` 7).
     Starts,
- /// Off-network idle (`activityTypeID` 4) — the `SHO` table processed for
- /// off-network links.
+    /// Off-network idle (`activityTypeID` 4) — the `SHO` table processed for
+    /// off-network links.
     Oni,
 }
 
 impl ActivityType {
- /// The eight activity types, in the order the Java `activities` array
- /// declares them.
+    /// The eight activity types, in the order the Java `activities` array
+    /// declares them.
     #[must_use]
     pub const fn all() -> [ActivityType; 8] {
         [
@@ -204,8 +204,8 @@ impl ActivityType {
         ]
     }
 
- /// The `ActivityInfo.sectionName` — the `ActivityCalculator.sql` section
- /// this type enables.
+    /// The `ActivityInfo.sectionName` — the `ActivityCalculator.sql` section
+    /// this type enables.
     #[must_use]
     pub const fn section_name(self) -> &'static str {
         match self {
@@ -220,8 +220,8 @@ impl ActivityType {
         }
     }
 
- /// The emission processes that generate this activity — the
- /// `ActivityInfo.processIDs` the Java subscribes the calculator to.
+    /// The emission processes that generate this activity — the
+    /// `ActivityInfo.processIDs` the Java subscribes the calculator to.
     #[must_use]
     pub const fn process_ids(self) -> &'static [i32] {
         match self {
@@ -236,8 +236,8 @@ impl ActivityType {
         }
     }
 
- /// `ActivityInfo.offNetworkOnly` — `true` when the type is computed only
- /// for the off-network road type (`roadTypeID` 1).
+    /// `ActivityInfo.offNetworkOnly` — `true` when the type is computed only
+    /// for the off-network road type (`roadTypeID` 1).
     #[must_use]
     pub const fn off_network_only(self) -> bool {
         matches!(
@@ -250,15 +250,15 @@ impl ActivityType {
         )
     }
 
- /// `ActivityInfo.onNetworkOnly` — `true` when the type is computed only
- /// for non-off-network road types. Only `SHO` sets this.
+    /// `ActivityInfo.onNetworkOnly` — `true` when the type is computed only
+    /// for non-off-network road types. Only `SHO` sets this.
     #[must_use]
     pub const fn on_network_only(self) -> bool {
         matches!(self, ActivityType::Sho)
     }
 
- /// `ActivityInfo.locationLevel` — the resolution of the dedup key the
- /// Java forms for the type.
+    /// `ActivityInfo.locationLevel` — the resolution of the dedup key the
+    /// Java forms for the type.
     #[must_use]
     pub const fn location_level(self) -> LocationLevel {
         match self {
@@ -279,12 +279,12 @@ impl ActivityType {
 /// domain-independent.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Domain {
- /// A County / Nation / default-scale run — `Population` is allocated from
- /// `sourceTypeAgePopulation`.
+    /// A County / Nation / default-scale run — `Population` is allocated from
+    /// `sourceTypeAgePopulation`.
     #[default]
     NonProject,
- /// A Project-scale run — `Population` is allocated from `offNetworkLink`
- /// and `linkSourceTypeHour`.
+    /// A Project-scale run — `Population` is allocated from `offNetworkLink`
+    /// and `linkSourceTypeHour`.
     Project,
 }
 
@@ -298,19 +298,19 @@ pub enum Domain {
 /// decision so it stays free of RunSpec plumbing.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ActivityConfig {
- /// The activity types to compute, in order. A type listed twice is
- /// computed twice; the caller (the Java master loop, later) is
- /// responsible for the per-iteration deduplication.
+    /// The activity types to compute, in order. A type listed twice is
+    /// computed twice; the caller (the Java master loop, later) is
+    /// responsible for the per-iteration deduplication.
     pub enabled: Vec<ActivityType>,
- /// The model domain — selects the `Population` variant.
+    /// The model domain — selects the `Population` variant.
     pub domain: Domain,
- /// Which `createSourceTypeFuelFraction` variant to run.
+    /// Which `createSourceTypeFuelFraction` variant to run.
     pub fuel_fraction_mode: FuelFractionMode,
 }
 
 impl ActivityConfig {
- /// A config that computes every [`ActivityType`] with the default
- /// [`Domain`] and [`FuelFractionMode`].
+    /// A config that computes every [`ActivityType`] with the default
+    /// [`Domain`] and [`FuelFractionMode`].
     #[must_use]
     pub fn all_activities() -> Self {
         Self {
@@ -358,20 +358,20 @@ static INPUT_TABLES: &[&str] = &[
 pub struct ActivityCalculator;
 
 impl ActivityCalculator {
- /// Stable module name — matches the `ActivityCalculator` entry in the
- /// calculator-chain DAG.
+    /// Stable module name — matches the `ActivityCalculator` entry in the
+    /// calculator-chain DAG.
     pub const NAME: &'static str = CALCULATOR_NAME;
 
- /// Compute the activity rows for one master-loop iteration.
- ///
- /// Ports the `Processing` section of `ActivityCalculator.sql`: build the
- /// `sourceTypeFuelFraction` source-bin split once, then run each activity
- /// section [`config`](ActivityConfig::enabled) enables and concatenate
- /// the rows. `SHO` and `ONI` share one section body (the SQL is
- /// identical); `Population` dispatches on [`ActivityConfig::domain`].
+    /// Compute the activity rows for one master-loop iteration.
+    ///
+    /// Ports the `Processing` section of `ActivityCalculator.sql`: build the
+    /// `sourceTypeFuelFraction` source-bin split once, then run each activity
+    /// section [`config`](ActivityConfig::enabled) enables and concatenate
+    /// the rows. `SHO` and `ONI` share one section body (the SQL is
+    /// identical); `Population` dispatches on [`ActivityConfig::domain`].
     #[must_use]
     pub fn run(&self, inputs: &ActivityInputs, config: &ActivityConfig) -> Vec<ActivityRow> {
- // createSourceTypeFuelFraction — built once, shared by every section.
+        // createSourceTypeFuelFraction — built once, shared by every section.
         let source_type_fuel_fraction =
             fuelfraction::create_source_type_fuel_fraction(inputs, config.fuel_fraction_mode);
         let fuel = fuelfraction::FuelFractionIndex::new(&source_type_fuel_fraction);
@@ -381,7 +381,7 @@ impl ActivityCalculator {
         for &activity in &config.enabled {
             let rows = match activity {
                 ActivityType::SourceHours => hours::source_hours(inputs, &fuel, &reg),
- // ONI's SQL is byte-identical to SHO's — both process `SHO`.
+                // ONI's SQL is byte-identical to SHO's — both process `SHO`.
                 ActivityType::Sho | ActivityType::Oni => hours::sho(inputs, &fuel, &reg),
                 ActivityType::Shp => hours::shp(inputs, &fuel, &reg),
                 ActivityType::Starts => hours::starts(inputs, &fuel, &reg),
@@ -410,18 +410,18 @@ impl Calculator for ActivityCalculator {
         Self::NAME
     }
 
- /// Subscribes to the same nine processes as [`TotalActivityGenerator`],
- /// at `EMISSION_CALCULATOR` priority so the calculator runs after
- /// generators have written their scratch tables.
- ///
- /// [`TotalActivityGenerator`]: crate::generators::totalactivitygenerator
+    /// Subscribes to the same nine processes as [`TotalActivityGenerator`],
+    /// at `EMISSION_CALCULATOR` priority so the calculator runs after
+    /// generators have written their scratch tables.
+    ///
+    /// [`TotalActivityGenerator`]: crate::generators::totalactivitygenerator
     fn subscriptions(&self) -> &[CalculatorSubscription] {
         static SUBSCRIPTIONS: OnceLock<Vec<CalculatorSubscription>> = OnceLock::new();
         SUBSCRIPTIONS.get_or_init(build_subscriptions).as_slice()
     }
 
- /// Empty: the calculator emits activity, not emissions, and registers no
- /// `(pollutant, process)` pair.
+    /// Empty: the calculator emits activity, not emissions, and registers no
+    /// `(pollutant, process)` pair.
     fn registrations(&self) -> &[PollutantProcessAssociation] {
         &[]
     }
@@ -493,9 +493,9 @@ mod tests {
         }
     }
 
- /// Inputs covering a single source bin: source type 21, model year 2015
- /// (age 5 of 2020), one fuel type, one regulatory class — every weight
- /// is 1, so `activity` equals the base table value.
+    /// Inputs covering a single source bin: source type 21, model year 2015
+    /// (age 5 of 2020), one fuel type, one regulatory class — every weight
+    /// is 1, so `activity` equals the base table value.
     fn whole_bin_inputs() -> ActivityInputs {
         ActivityInputs {
             context: context(),
@@ -562,8 +562,8 @@ mod tests {
     fn subscribes_to_activity_processes_and_has_no_emission_registrations() {
         let calc = ActivityCalculator;
         let subs = calc.subscriptions();
- // "Evap Non-Fuel Vapors" does not resolve to a valid process; nine of
- // ten SUBSCRIBED_PROCESSES entries produce a subscription.
+        // "Evap Non-Fuel Vapors" does not resolve to a valid process; nine of
+        // ten SUBSCRIBED_PROCESSES entries produce a subscription.
         assert_eq!(subs.len(), 9, "expected 9 activity-process subscriptions");
         assert!(
             subs.iter().all(|s| s.granularity == Granularity::Year),
@@ -726,7 +726,7 @@ mod tests {
             ..ActivityConfig::default()
         };
         let out = ActivityCalculator.run(&inputs, &config);
- // One whole-bin source-hours row and one whole-bin starts row.
+        // One whole-bin source-hours row and one whole-bin starts row.
         assert_eq!(out.len(), 2);
         let source_hours = out.iter().find(|r| r.activity_type_id == 2).unwrap();
         assert!((source_hours.activity - 100.0).abs() < 1e-9);
@@ -772,7 +772,7 @@ mod tests {
         assert_eq!(ActivityType::SourceHours.section_name(), "SourceHours");
         assert_eq!(ActivityType::Sho.process_ids(), &[1, 9, 10, 11, 12, 13]);
         assert_eq!(ActivityType::Oni.process_ids(), &[1]);
- // SHO is the only on-network-only type; ONI is off-network-only.
+        // SHO is the only on-network-only type; ONI is off-network-only.
         assert!(ActivityType::Sho.on_network_only());
         assert!(!ActivityType::Sho.off_network_only());
         assert!(ActivityType::Oni.off_network_only());

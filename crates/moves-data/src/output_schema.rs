@@ -81,24 +81,24 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OutputColumnType {
- /// 16-bit integer. Matches MOVES `smallint`.
+    /// 16-bit integer. Matches MOVES `smallint`.
     Smallint,
- /// 32-bit integer. Matches MOVES `int` (used for `countyID`, `zoneID`,
- /// `linkID`, the `*DONEFiles` counters).
+    /// 32-bit integer. Matches MOVES `int` (used for `countyID`, `zoneID`,
+    /// `linkID`, the `*DONEFiles` counters).
     Int,
- /// 64-bit float. Matches MOVES `float`/`double` (the `emissionQuant`,
- /// `emissionRate`, `activity`, and `minutesDuration` columns).
+    /// 64-bit float. Matches MOVES `float`/`double` (the `emissionQuant`,
+    /// `emissionRate`, `activity`, and `minutesDuration` columns).
     Float,
- /// UTF-8 string. Matches MOVES `char(n)`/`varchar(n)`/`text`/`enum`.
+    /// UTF-8 string. Matches MOVES `char(n)`/`varchar(n)`/`text`/`enum`.
     Text,
- /// ISO 8601 string. Matches MOVES `datetime` (`runSpecFileDateTime`,
- /// `runDateTime`).
+    /// ISO 8601 string. Matches MOVES `datetime` (`runSpecFileDateTime`,
+    /// `runDateTime`).
     DateTime,
 }
 
 impl OutputColumnType {
- /// Short identifier used in serialised metadata sidecars and error
- /// messages. Stable across Parquet writer revisions.
+    /// Short identifier used in serialised metadata sidecars and error
+    /// messages. Stable across Parquet writer revisions.
     #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
@@ -119,22 +119,22 @@ impl OutputColumnType {
 /// look up columns via [`OutputTable::columns`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OutputColumn {
- /// Column name. Legacy columns match the MOVES MariaDB DDL exactly
- /// (case-sensitive, `MOVESRunID`-style camelCase).
+    /// Column name. Legacy columns match the MOVES MariaDB DDL exactly
+    /// (case-sensitive, `MOVESRunID`-style camelCase).
     pub name: &'static str,
- /// Logical type. See [`OutputColumnType`] for the Arrow / Parquet
- /// mapping.
+    /// Logical type. See [`OutputColumnType`] for the Arrow / Parquet
+    /// mapping.
     pub kind: OutputColumnType,
- /// Whether the column accepts SQL `NULL` / Arrow null. Matches the
- /// MOVES DDL's `NOT NULL` annotation for legacy columns; additive
- /// columns are non-null by construction.
+    /// Whether the column accepts SQL `NULL` / Arrow null. Matches the
+    /// MOVES DDL's `NOT NULL` annotation for legacy columns; additive
+    /// columns are non-null by construction.
     pub nullable: bool,
- /// True if the column participates in the table's primary key.
- /// Mirrors the `PRIMARY KEY` declaration in the MOVES DDL — used by
- /// downstream readers to drive `sort_by` and join logic.
+    /// True if the column participates in the table's primary key.
+    /// Mirrors the `PRIMARY KEY` declaration in the MOVES DDL — used by
+    /// downstream readers to drive `sort_by` and join logic.
     pub primary_key: bool,
- /// `false` for columns ported unchanged from canonical MOVES; `true`
- /// for columns the Rust port introduces.
+    /// `false` for columns ported unchanged from canonical MOVES; `true`
+    /// for columns the Rust port introduces.
     pub additive: bool,
 }
 
@@ -142,17 +142,17 @@ pub struct OutputColumn {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OutputTable {
- /// `MOVESRun` — singleton run-metadata table.
+    /// `MOVESRun` — singleton run-metadata table.
     Run,
- /// `MOVESOutput` — per-(time, location, pollutant, process) emissions.
+    /// `MOVESOutput` — per-(time, location, pollutant, process) emissions.
     Emissions,
- /// `MOVESActivityOutput` — per-(time, location, activity-type) activity.
+    /// `MOVESActivityOutput` — per-(time, location, activity-type) activity.
     Activity,
 }
 
 impl OutputTable {
- /// Canonical table name as it appears in the MOVES DDL and on the
- /// output directory layout.
+    /// Canonical table name as it appears in the MOVES DDL and on the
+    /// output directory layout.
     #[must_use]
     pub fn name(self) -> &'static str {
         match self {
@@ -162,7 +162,7 @@ impl OutputTable {
         }
     }
 
- /// Column schema for this table.
+    /// Column schema for this table.
     #[must_use]
     pub fn columns(self) -> &'static [OutputColumn] {
         match self {
@@ -172,8 +172,8 @@ impl OutputTable {
         }
     }
 
- /// Hive-style partition columns (in order). Empty for the singleton
- /// `Run` table; `["yearID", "monthID"]` for the two row-level tables.
+    /// Hive-style partition columns (in order). Empty for the singleton
+    /// `Run` table; `["yearID", "monthID"]` for the two row-level tables.
     #[must_use]
     pub fn partition_columns(self) -> &'static [&'static str] {
         match self {
@@ -182,7 +182,7 @@ impl OutputTable {
         }
     }
 
- /// Iterate every table in fixed order: Run → Emissions → Activity.
+    /// Iterate every table in fixed order: Run → Emissions → Activity.
     pub fn all() -> impl Iterator<Item = Self> {
         [Self::Run, Self::Emissions, Self::Activity].into_iter()
     }
@@ -362,7 +362,7 @@ pub static MOVES_RUN_COLUMNS: &[OutputColumn] = &[
         primary_key: false,
         additive: false,
     },
- // -- Additive columns introduced by the Rust port --------------------
+    // -- Additive columns introduced by the Rust port --------------------
     OutputColumn {
         name: "runHash",
         kind: OutputColumnType::Text,
@@ -553,7 +553,7 @@ pub static MOVES_OUTPUT_COLUMNS: &[OutputColumn] = &[
         primary_key: false,
         additive: false,
     },
- // -- Additive columns introduced by the Rust port --------------------
+    // -- Additive columns introduced by the Rust port --------------------
     OutputColumn {
         name: "runHash",
         kind: OutputColumnType::Text,
@@ -723,7 +723,7 @@ pub static MOVES_ACTIVITY_OUTPUT_COLUMNS: &[OutputColumn] = &[
         primary_key: false,
         additive: false,
     },
- // -- Additive columns introduced by the Rust port --------------------
+    // -- Additive columns introduced by the Rust port --------------------
     OutputColumn {
         name: "runHash",
         kind: OutputColumnType::Text,
@@ -770,10 +770,10 @@ pub struct MovesRunRecord {
     pub expected_done_files: Option<i32>,
     pub retrieved_done_files: Option<i32>,
     pub models: Option<String>,
- /// Hex SHA-256 of the canonical run inputs.
+    /// Hex SHA-256 of the canonical run inputs.
     pub run_hash: String,
- /// `moves.rs` build identifier — typically `CARGO_PKG_VERSION` plus
- /// an optional `+<git-sha>` suffix.
+    /// `moves.rs` build identifier — typically `CARGO_PKG_VERSION` plus
+    /// an optional `+<git-sha>` suffix.
     pub calculator_version: String,
 }
 
@@ -807,7 +807,7 @@ pub struct EmissionRecord {
     pub hp_id: Option<i16>,
     pub emission_quant: Option<f64>,
     pub emission_rate: Option<f64>,
- /// Hex SHA-256 of the producing run.
+    /// Hex SHA-256 of the producing run.
     pub run_hash: String,
 }
 
@@ -837,7 +837,7 @@ pub struct ActivityRecord {
     pub hp_id: Option<i16>,
     pub activity_type_id: Option<i16>,
     pub activity: Option<f64>,
- /// Hex SHA-256 of the producing run.
+    /// Hex SHA-256 of the producing run.
     pub run_hash: String,
 }
 
@@ -908,8 +908,8 @@ mod tests {
 
     #[test]
     fn additive_columns_trail_legacy_columns() {
- // The schema contract says additive columns come *after* the
- // legacy block, so reorderings that interleave them get caught.
+        // The schema contract says additive columns come *after* the
+        // legacy block, so reorderings that interleave them get caught.
         for table in OutputTable::all() {
             let cols = table.columns();
             let first_additive = cols.iter().position(|c| c.additive);
@@ -1017,20 +1017,20 @@ mod tests {
             OutputColumnType::Text,
             OutputColumnType::DateTime,
         ] {
- // `as_str` must produce a non-empty stable identifier — the
- // string ends up in metadata sidecars and the test guards
- // against accidental rename.
+            // `as_str` must produce a non-empty stable identifier — the
+            // string ends up in metadata sidecars and the test guards
+            // against accidental rename.
             assert!(!kind.as_str().is_empty(), "{:?} has empty as_str", kind);
         }
     }
 
     #[test]
     fn moves_run_record_field_count_matches_schema() {
- // Hand-count guard so the record type and the schema constants
- // stay in lockstep. A drift here means the writer would silently
- // drop or invent columns.
- //
- // Bump this number when intentionally adding a column to both.
+        // Hand-count guard so the record type and the schema constants
+        // stay in lockstep. A drift here means the writer would silently
+        // drop or invent columns.
+        //
+        // Bump this number when intentionally adding a column to both.
         const EXPECTED_RUN_COLUMNS: usize = 26;
         assert_eq!(MOVES_RUN_COLUMNS.len(), EXPECTED_RUN_COLUMNS);
     }

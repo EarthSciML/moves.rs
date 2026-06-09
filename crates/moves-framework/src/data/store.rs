@@ -22,30 +22,30 @@ pub struct InMemoryStore {
 }
 
 impl InMemoryStore {
- /// Construct an empty store.
+    /// Construct an empty store.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
- /// Return a mutable reference to the DataFrame stored under `name`, or
- /// `None` if absent. Uses `Arc::make_mut` to ensure exclusive ownership;
- /// if the Arc has multiple owners the value is cloned first.
+    /// Return a mutable reference to the DataFrame stored under `name`, or
+    /// `None` if absent. Uses `Arc::make_mut` to ensure exclusive ownership;
+    /// if the Arc has multiple owners the value is cloned first.
     pub fn get_mut(&mut self, name: &str) -> Option<&mut DataFrame> {
         let lower = name.to_ascii_lowercase();
         self.map.get_mut(lower.as_str()).map(Arc::make_mut)
     }
 
- /// Whether the store holds no tables.
+    /// Whether the store holds no tables.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.map.is_empty()
     }
 
- /// Copy every table into `dest` (cheap `Arc` clones — no DataFrame deep
- /// copy), replacing any same-named entry. Used to promote generator
- /// scratch output into the slow tier so calculators that read via
- /// [`crate::CalculatorContext::tables`] observe it.
+    /// Copy every table into `dest` (cheap `Arc` clones — no DataFrame deep
+    /// copy), replacing any same-named entry. Used to promote generator
+    /// scratch output into the slow tier so calculators that read via
+    /// [`crate::CalculatorContext::tables`] observe it.
     pub fn copy_into(&self, dest: &mut InMemoryStore) {
         for (name, df) in &self.map {
             dest.map.insert(name.clone(), Arc::clone(df));
@@ -111,7 +111,7 @@ mod tests {
         store.insert("t", one_col_df("a"));
         store.insert("t", one_col_df("b"));
         let got = store.get("t").unwrap();
- // The second insert replaced the first: column name is "b".
+        // The second insert replaced the first: column name is "b".
         assert_eq!(got.get_column_names(), vec!["b"]);
     }
 
@@ -159,7 +159,7 @@ mod tests {
             DataFrame::new(2, vec![Series::new("hourDayID".into(), [85i32, 86]).into()]).unwrap();
         store.insert("SHO", df);
 
- // Request with lowercase; should find the mixed-case column.
+        // Request with lowercase; should find the mixed-case column.
         let views = store
             .column_views("SHO", &["hourdayid"])
             .expect("column_views failed");

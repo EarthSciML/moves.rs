@@ -145,21 +145,21 @@ const OPERATING_OP_MODE: i16 = 300;
 /// key: `(sourceTypeID, hourDayID, linkID, polProcessID, opModeID)`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OpModeDistributionRow {
- /// `sourceTypeID` — the MOVES source (vehicle) type.
+    /// `sourceTypeID` — the MOVES source (vehicle) type.
     pub source_type_id: SourceTypeId,
- /// `hourDayID` — one of the RunSpec's selected hour/day combinations.
+    /// `hourDayID` — one of the RunSpec's selected hour/day combinations.
     pub hour_day_id: i16,
- /// `linkID` — the link currently iterating; constant for one
- /// generator invocation (`MONTH`-granularity loop, link in context).
+    /// `linkID` — the link currently iterating; constant for one
+    /// generator invocation (`MONTH`-granularity loop, link in context).
     pub link_id: u32,
- /// `polProcessID` — the pollutant/process this fraction applies to.
+    /// `polProcessID` — the pollutant/process this fraction applies to.
     pub pol_process_id: PolProcessId,
- /// `opModeID` — the operating mode this fraction applies to; a soak
- /// op mode for the non-operating rows, `OPERATING_OP_MODE` for the
- /// operating row.
+    /// `opModeID` — the operating mode this fraction applies to; a soak
+    /// op mode for the non-operating rows, `OPERATING_OP_MODE` for the
+    /// operating row.
     pub op_mode_id: i16,
- /// `opModeFraction` — the share of this `(sourceType, hourDay,
- /// polProcess)` cell's activity that falls in this operating mode.
+    /// `opModeFraction` — the share of this `(sourceType, hourDay,
+    /// polProcess)` cell's activity that falls in this operating mode.
     pub op_mode_fraction: f64,
 }
 
@@ -169,7 +169,7 @@ pub struct OpModeDistributionRow {
 type RowKey = (SourceTypeId, i16, u32, PolProcessId, i16);
 
 impl OpModeDistributionRow {
- /// The primary-key projection — see [`RowKey`].
+    /// The primary-key projection — see [`RowKey`].
     fn key(&self) -> RowKey {
         (
             self.source_type_id,
@@ -189,19 +189,19 @@ impl OpModeDistributionRow {
 /// `fractionOfOperating`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceHoursRow {
- /// `hourDayID`.
+    /// `hourDayID`.
     pub hour_day_id: i16,
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: SourceTypeId,
- /// `ageID` — the age dimension `fractionOfOperating` sums across.
+    /// `ageID` — the age dimension `fractionOfOperating` sums across.
     pub age_id: i16,
- /// `linkID`.
+    /// `linkID`.
     pub link_id: u32,
- /// `monthID`.
+    /// `monthID`.
     pub month_id: u8,
- /// `yearID`.
+    /// `yearID`.
     pub year_id: u16,
- /// `sourceHours` — total source-hours of activity.
+    /// `sourceHours` — total source-hours of activity.
     pub source_hours: f64,
 }
 
@@ -212,19 +212,19 @@ pub struct SourceHoursRow {
 /// `sourceHours` row contributes `0` operating hours (`COALESCE(SUM(SHO),0)`).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ShoRow {
- /// `hourDayID`.
+    /// `hourDayID`.
     pub hour_day_id: i16,
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: SourceTypeId,
- /// `ageID`.
+    /// `ageID`.
     pub age_id: i16,
- /// `linkID`.
+    /// `linkID`.
     pub link_id: u32,
- /// `monthID`.
+    /// `monthID`.
     pub month_id: u8,
- /// `yearID`.
+    /// `yearID`.
     pub year_id: u16,
- /// `SHO` — source-hours operating.
+    /// `SHO` — source-hours operating.
     pub sho: f64,
 }
 
@@ -235,18 +235,18 @@ pub struct ShoRow {
 /// the parked/cooling modes (150, 151, …); none is `OPERATING_OP_MODE`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SoakActivityFractionRow {
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: SourceTypeId,
- /// `zoneID` — Java step 2 filters this to the loop's zone.
+    /// `zoneID` — Java step 2 filters this to the loop's zone.
     pub zone_id: u32,
- /// `monthID` — Java step 2 filters this to the loop's month.
+    /// `monthID` — Java step 2 filters this to the loop's month.
     pub month_id: u8,
- /// `hourDayID`.
+    /// `hourDayID`.
     pub hour_day_id: i16,
- /// `opModeID` — a soak operating mode.
+    /// `opModeID` — a soak operating mode.
     pub op_mode_id: i16,
- /// `soakActivityFraction` — the soak op mode's share of soaking
- /// activity.
+    /// `soakActivityFraction` — the soak op mode's share of soaking
+    /// activity.
     pub soak_activity_fraction: f64,
 }
 
@@ -255,9 +255,9 @@ pub struct SoakActivityFractionRow {
 /// `polProcessID` to each `SoakActivityFraction` op mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OpModePolProcAssoc {
- /// `polProcessID`.
+    /// `polProcessID`.
     pub pol_process_id: PolProcessId,
- /// `opModeID`.
+    /// `opModeID`.
     pub op_mode_id: i16,
 }
 
@@ -270,16 +270,16 @@ pub struct OpModePolProcAssoc {
 /// `year_id` from `position().time`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EvapOpModeContext {
- /// The evaporative process the loop is currently dispatching — one of
- /// 11, 12, 13.
+    /// The evaporative process the loop is currently dispatching — one of
+    /// 11, 12, 13.
     pub process_id: ProcessId,
- /// `Link.linkID` of the link currently iterating.
+    /// `Link.linkID` of the link currently iterating.
     pub link_id: u32,
- /// `Zone.zoneID` of the zone currently iterating.
+    /// `Zone.zoneID` of the zone currently iterating.
     pub zone_id: u32,
- /// `MonthOfAnyYear.monthID` of the month currently iterating.
+    /// `MonthOfAnyYear.monthID` of the month currently iterating.
     pub month_id: u8,
- /// Calendar year currently iterating.
+    /// Calendar year currently iterating.
     pub year_id: u16,
 }
 
@@ -291,17 +291,17 @@ pub struct EvapOpModeContext {
 /// builds this view from `ctx.tables()`.
 #[derive(Debug, Clone, Copy)]
 pub struct EvapOpModeInputs<'a> {
- /// `sourceHours` — total source-hours; the `fractionOfOperating`
- /// denominator.
+    /// `sourceHours` — total source-hours; the `fractionOfOperating`
+    /// denominator.
     pub source_hours: &'a [SourceHoursRow],
- /// `SHO` — source-hours-operating; the `fractionOfOperating` numerator.
+    /// `SHO` — source-hours-operating; the `fractionOfOperating` numerator.
     pub sho: &'a [ShoRow],
- /// `SoakActivityFraction` — soak-op-mode fractions of soaking activity.
+    /// `SoakActivityFraction` — soak-op-mode fractions of soaking activity.
     pub soak_activity_fraction: &'a [SoakActivityFractionRow],
- /// `OpModePolProcAssoc` — operating modes per pollutant/process.
+    /// `OpModePolProcAssoc` — operating modes per pollutant/process.
     pub op_mode_pol_proc_assoc: &'a [OpModePolProcAssoc],
- /// `PollutantProcessAssoc` — every modeled `(pollutant, process)`
- /// pair; step 2 filters it by `processID`.
+    /// `PollutantProcessAssoc` — every modeled `(pollutant, process)`
+    /// pair; step 2 filters it by `processID`.
     pub pollutant_process_assoc: &'a [PollutantProcessAssociation],
 }
 
@@ -309,12 +309,12 @@ pub struct EvapOpModeInputs<'a> {
 /// `(hourDayID, sourceTypeID)` cell. The intermediate Java step 1 builds.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FractionOfOperatingRow {
- /// `hourDayID`.
+    /// `hourDayID`.
     pub hour_day_id: i16,
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: SourceTypeId,
- /// `fractionOfOperating` — `least(1, SUM(SHO)/SUM(sourceHours))`, in
- /// `[0, 1]`.
+    /// `fractionOfOperating` — `least(1, SUM(SHO)/SUM(sourceHours))`, in
+    /// `[0, 1]`.
     pub fraction_of_operating: f64,
 }
 
@@ -350,14 +350,14 @@ pub fn fraction_of_operating(
     ctx: &EvapOpModeContext,
     inputs: &EvapOpModeInputs<'_>,
 ) -> Vec<FractionOfOperatingRow> {
- // sourceHours and SHO are written for MONTH+1 (same convention as SAF).
+    // sourceHours and SHO are written for MONTH+1 (same convention as SAF).
     let next_month = if ctx.month_id == 12 {
         1
     } else {
         ctx.month_id + 1
     };
- // `LEFT JOIN sho`: `monthID`/`yearID`/`linkID` are pinned to the
- // context, so the live join key is `(hourDayID, ageID, sourceTypeID)`.
+    // `LEFT JOIN sho`: `monthID`/`yearID`/`linkID` are pinned to the
+    // context, so the live join key is `(hourDayID, ageID, sourceTypeID)`.
     let mut sho_lookup: HashMap<(i16, i16, SourceTypeId), f64> = HashMap::new();
     for row in inputs.sho {
         if row.link_id == ctx.link_id && row.month_id == next_month && row.year_id == ctx.year_id {
@@ -365,9 +365,9 @@ pub fn fraction_of_operating(
         }
     }
 
- // `GROUP BY (hourDayID, sourceTypeID)`: accumulate
- // `COALESCE(SUM(SHO), 0)` and `SUM(sourceHours)` across the ages.
- // BTreeMap keeps the output in the Java `ORDER BY` order.
+    // `GROUP BY (hourDayID, sourceTypeID)`: accumulate
+    // `COALESCE(SUM(SHO), 0)` and `SUM(sourceHours)` across the ages.
+    // BTreeMap keeps the output in the Java `ORDER BY` order.
     let mut groups: BTreeMap<(i16, SourceTypeId), (f64, f64)> = BTreeMap::new();
     for sh in inputs.source_hours {
         if sh.link_id == ctx.link_id
@@ -446,24 +446,24 @@ pub fn op_mode_distribution(
     ctx: &EvapOpModeContext,
     inputs: &EvapOpModeInputs<'_>,
 ) -> Vec<OpModeDistributionRow> {
- // @step 010, stage 1: FractionOfOperating, indexed for the join.
+    // @step 010, stage 1: FractionOfOperating, indexed for the join.
     let fractions: HashMap<(i16, SourceTypeId), f64> = fraction_of_operating(ctx, inputs)
         .into_iter()
         .map(|r| ((r.hour_day_id, r.source_type_id), r.fraction_of_operating))
         .collect();
 
- // The `polProcessID`s the `PollutantProcessAssoc` join admits.
+    // The `polProcessID`s the `PollutantProcessAssoc` join admits.
     let relevant_polprocs = polprocs_for_process(inputs.pollutant_process_assoc, ctx.process_id);
 
- // @step 010, stage 2: the non-operating (soak) modes.
- // opModeFraction = soakActivityFraction * (1 - fractionOfOperating).
- //
- // TankTemperatureGenerator writes SoakActivityFraction for the NEXT month
- // (month + 1, wrapping December → January) relative to its loop context:
- // a vehicle's soak activity from month M carries forward into month M+1.
- // The Java EvapOpModeGen's SQL therefore joins on
- // `saf.monthID = ##context.monthID## + 1`, and the canonical snapshots
- // confirm this — SAF rows for a month=7 run carry month_id=8.
+    // @step 010, stage 2: the non-operating (soak) modes.
+    // opModeFraction = soakActivityFraction * (1 - fractionOfOperating).
+    //
+    // TankTemperatureGenerator writes SoakActivityFraction for the NEXT month
+    // (month + 1, wrapping December → January) relative to its loop context:
+    // a vehicle's soak activity from month M carries forward into month M+1.
+    // The Java EvapOpModeGen's SQL therefore joins on
+    // `saf.monthID = ##context.monthID## + 1`, and the canonical snapshots
+    // confirm this — SAF rows for a month=7 run carry month_id=8.
     let next_month = if ctx.month_id == 12 {
         1
     } else {
@@ -474,12 +474,12 @@ pub fn op_mode_distribution(
         if saf.month_id != next_month || saf.zone_id != ctx.zone_id {
             continue;
         }
- // INNER JOIN FractionOfOperating on (sourceType, hourDay).
+        // INNER JOIN FractionOfOperating on (sourceType, hourDay).
         let Some(&fraction) = fractions.get(&(saf.hour_day_id, saf.source_type_id)) else {
             continue;
         };
         let op_mode_fraction = saf.soak_activity_fraction * (1.0 - fraction);
- // INNER JOIN OpModePolProcAssoc on opModeID, then the process filter.
+        // INNER JOIN OpModePolProcAssoc on opModeID, then the process filter.
         for omppa in inputs.op_mode_pol_proc_assoc {
             if omppa.op_mode_id == saf.op_mode_id
                 && relevant_polprocs.contains(&omppa.pol_process_id)
@@ -496,12 +496,12 @@ pub fn op_mode_distribution(
         }
     }
 
- // @step 010, stage 3: operating mode 300 takes whatever fraction the
- // non-operating modes left, floored at 0. Group the stage-2 rows by
- // (sourceType, hourDay, polProcess) — linkID is constant in context.
+    // @step 010, stage 3: operating mode 300 takes whatever fraction the
+    // non-operating modes left, floored at 0. Group the stage-2 rows by
+    // (sourceType, hourDay, polProcess) — linkID is constant in context.
     let mut operating: BTreeMap<(SourceTypeId, i16, PolProcessId), f64> = BTreeMap::new();
     for row in &rows {
- *operating
+        *operating
             .entry((row.source_type_id, row.hour_day_id, row.pol_process_id))
             .or_insert(0.0) += row.op_mode_fraction;
     }
@@ -1133,23 +1133,23 @@ impl TableRow for OpModeDistributionRow {
 /// the module documentation for the scope of the port.
 #[derive(Debug, Clone)]
 pub struct EvaporativeEmissionsOperatingModeDistributionGenerator {
- /// The master-loop subscriptions, built once in [`Self::new`] — one
- /// per evaporative process that resolves against the default DB.
+    /// The master-loop subscriptions, built once in [`Self::new`] — one
+    /// per evaporative process that resolves against the default DB.
     subscriptions: Vec<CalculatorSubscription>,
 }
 
 impl EvaporativeEmissionsOperatingModeDistributionGenerator {
- /// Chain-DAG name — matches the Java class name.
+    /// Chain-DAG name — matches the Java class name.
     pub const NAME: &'static str = "EvaporativeEmissionsOperatingModeDistributionGenerator";
 
- /// Construct the generator with its master-loop subscriptions.
- ///
- /// Mirrors `subscribeToMe`: it walks `EVAP_PROCESS_NAMES`, resolves
- /// each through `EmissionProcess::find_by_name`, and subscribes to
- /// every name that resolves — at `MONTH` granularity, `GENERATOR`
- /// priority. "Evap Non-Fuel Vapors" does not resolve against the
- /// MOVES5 default database, so the result is three subscriptions
- /// (processes 11, 12, 13).
+    /// Construct the generator with its master-loop subscriptions.
+    ///
+    /// Mirrors `subscribeToMe`: it walks `EVAP_PROCESS_NAMES`, resolves
+    /// each through `EmissionProcess::find_by_name`, and subscribes to
+    /// every name that resolves — at `MONTH` granularity, `GENERATOR`
+    /// priority. "Evap Non-Fuel Vapors" does not resolve against the
+    /// MOVES5 default database, so the result is three subscriptions
+    /// (processes 11, 12, 13).
     #[must_use]
     pub fn new() -> Self {
         let priority =
@@ -1254,10 +1254,10 @@ impl Generator for EvaporativeEmissionsOperatingModeDistributionGenerator {
             pollutant_process_assoc: &pollutant_process_assoc,
         };
         let rows = op_mode_distribution(&context, &inputs);
- // Write to the slow store (not scratch) so that downstream calculators
- // can find the table via ctx.tables(), which they already use for all
- // other input tables. The slow store is per-chunk after Arc::make_mut
- // clones it, so this write is visible only within this chunk.
+        // Write to the slow store (not scratch) so that downstream calculators
+        // can find the table via ctx.tables(), which they already use for all
+        // other input tables. The slow store is per-chunk after Arc::make_mut
+        // clones it, so this write is visible only within this chunk.
         let df = OpModeDistributionRow::into_dataframe(rows)
             .map_err(|e| Error::Polars(e.to_string()))?;
         ctx.tables_mut().insert(OUTPUT_TABLES[0], df);
@@ -1277,13 +1277,13 @@ mod tests {
     use super::*;
     use moves_data::PollutantId;
 
- /// The fixed loop context the table helpers below populate against.
+    /// The fixed loop context the table helpers below populate against.
     const LINK: u32 = 101;
     const ZONE: u32 = 90_001;
     const MONTH: u8 = 7;
     const YEAR: u16 = 2020;
 
- /// Loop context for `process`, at the fixed `(link, zone, month, year)`.
+    /// Loop context for `process`, at the fixed `(link, zone, month, year)`.
     fn ctx(process: u16) -> EvapOpModeContext {
         EvapOpModeContext {
             process_id: ProcessId(process),
@@ -1294,10 +1294,10 @@ mod tests {
         }
     }
 
- /// `sourceHours` row at the fixed `(link, month+1, year)`.
- ///
- /// Activity generators write sourceHours for the NEXT month (MONTH+1),
- /// so `fraction_of_operating` filters on `month_id = ctx.month_id + 1`.
+    /// `sourceHours` row at the fixed `(link, month+1, year)`.
+    ///
+    /// Activity generators write sourceHours for the NEXT month (MONTH+1),
+    /// so `fraction_of_operating` filters on `month_id = ctx.month_id + 1`.
     fn sh(hour_day: i16, source_type: u16, age: i16, source_hours: f64) -> SourceHoursRow {
         SourceHoursRow {
             hour_day_id: hour_day,
@@ -1310,10 +1310,10 @@ mod tests {
         }
     }
 
- /// `SHO` row at the fixed `(link, month+1, year)`.
- ///
- /// Activity generators write SHO for the NEXT month (MONTH+1),
- /// so `fraction_of_operating` filters on `month_id = ctx.month_id + 1`.
+    /// `SHO` row at the fixed `(link, month+1, year)`.
+    ///
+    /// Activity generators write SHO for the NEXT month (MONTH+1),
+    /// so `fraction_of_operating` filters on `month_id = ctx.month_id + 1`.
     fn sho(hour_day: i16, source_type: u16, age: i16, sho: f64) -> ShoRow {
         ShoRow {
             hour_day_id: hour_day,
@@ -1326,10 +1326,10 @@ mod tests {
         }
     }
 
- /// `SoakActivityFraction` row at the fixed `(zone, month+1)`.
- ///
- /// `TankTemperatureGenerator` writes SAF for the NEXT month (MONTH+1),
- /// so `op_mode_distribution` joins on `saf.monthID = ctx.month_id + 1`.
+    /// `SoakActivityFraction` row at the fixed `(zone, month+1)`.
+    ///
+    /// `TankTemperatureGenerator` writes SAF for the NEXT month (MONTH+1),
+    /// so `op_mode_distribution` joins on `saf.monthID = ctx.month_id + 1`.
     fn saf(
         source_type: u16,
         hour_day: i16,
@@ -1346,12 +1346,12 @@ mod tests {
         }
     }
 
- /// `polProcessID` for a `(pollutant, process)` pair.
+    /// `polProcessID` for a `(pollutant, process)` pair.
     fn polproc(pollutant: u16, process: u16) -> PolProcessId {
         PolProcessId::new(PollutantId(pollutant), ProcessId(process))
     }
 
- /// `OpModePolProcAssoc` row helper.
+    /// `OpModePolProcAssoc` row helper.
     fn omppa(op_mode: i16, pol_process: PolProcessId) -> OpModePolProcAssoc {
         OpModePolProcAssoc {
             pol_process_id: pol_process,
@@ -1359,7 +1359,7 @@ mod tests {
         }
     }
 
- /// `PollutantProcessAssoc` row helper.
+    /// `PollutantProcessAssoc` row helper.
     fn ppa(pollutant: u16, process: u16) -> PollutantProcessAssociation {
         PollutantProcessAssociation {
             pollutant_id: PollutantId(pollutant),
@@ -1367,7 +1367,7 @@ mod tests {
         }
     }
 
- /// Empty `EvapOpModeInputs` — tests override the fields they exercise.
+    /// Empty `EvapOpModeInputs` — tests override the fields they exercise.
     fn empty_inputs<'a>() -> EvapOpModeInputs<'a> {
         EvapOpModeInputs {
             source_hours: &[],
@@ -1380,7 +1380,7 @@ mod tests {
 
     #[test]
     fn fraction_of_operating_is_sho_over_source_hours() {
- // One cell, one age: 25 operating hours of 100 total -> 0.25.
+        // One cell, one age: 25 operating hours of 100 total -> 0.25.
         let source_hours = [sh(51, 21, 0, 100.0)];
         let sho_rows = [sho(51, 21, 0, 25.0)];
         let inputs = EvapOpModeInputs {
@@ -1397,7 +1397,7 @@ mod tests {
 
     #[test]
     fn fraction_of_operating_sums_across_ages() {
- // SUM(SHO)/SUM(sourceHours) = (4+6)/(10+30) = 0.25, summed over age.
+        // SUM(SHO)/SUM(sourceHours) = (4+6)/(10+30) = 0.25, summed over age.
         let source_hours = [sh(51, 21, 3, 10.0), sh(51, 21, 4, 30.0)];
         let sho_rows = [sho(51, 21, 3, 4.0), sho(51, 21, 4, 6.0)];
         let inputs = EvapOpModeInputs {
@@ -1412,8 +1412,8 @@ mod tests {
 
     #[test]
     fn fraction_of_operating_left_join_miss_contributes_zero_sho() {
- // age 4 has source-hours but no matching SHO row: COALESCE -> 0,
- // so the cell's operating share is (4+0)/(10+30) = 0.1.
+        // age 4 has source-hours but no matching SHO row: COALESCE -> 0,
+        // so the cell's operating share is (4+0)/(10+30) = 0.1.
         let source_hours = [sh(51, 21, 3, 10.0), sh(51, 21, 4, 30.0)];
         let sho_rows = [sho(51, 21, 3, 4.0)];
         let inputs = EvapOpModeInputs {
@@ -1427,7 +1427,7 @@ mod tests {
 
     #[test]
     fn fraction_of_operating_clamps_to_one() {
- // More operating hours than total source-hours: least(1, …) caps it.
+        // More operating hours than total source-hours: least(1, …) caps it.
         let source_hours = [sh(51, 21, 0, 10.0)];
         let sho_rows = [sho(51, 21, 0, 999.0)];
         let inputs = EvapOpModeInputs {
@@ -1441,8 +1441,8 @@ mod tests {
 
     #[test]
     fn fraction_of_operating_excludes_non_positive_source_hours() {
- // `WHERE sourceHours > 0` drops the zero-hours row; only the 20.0
- // row survives -> 5/20 = 0.25.
+        // `WHERE sourceHours > 0` drops the zero-hours row; only the 20.0
+        // row survives -> 5/20 = 0.25.
         let source_hours = [sh(51, 21, 0, 0.0), sh(51, 21, 1, 20.0)];
         let sho_rows = [sho(51, 21, 0, 7.0), sho(51, 21, 1, 5.0)];
         let inputs = EvapOpModeInputs {
@@ -1457,8 +1457,8 @@ mod tests {
 
     #[test]
     fn fraction_of_operating_filters_by_context() {
- // A sourceHours row on another link, and an SHO row in another
- // month, are both ignored: only the in-context pair counts.
+        // A sourceHours row on another link, and an SHO row in another
+        // month, are both ignored: only the in-context pair counts.
         let source_hours = [
             sh(51, 21, 0, 100.0),
             SourceHoursRow {
@@ -1479,14 +1479,14 @@ mod tests {
             ..empty_inputs()
         };
         let fo = fraction_of_operating(&ctx(11), &inputs);
- // In-context sourceHours = 100, in-context SHO = 40 -> 0.4.
+        // In-context sourceHours = 100, in-context SHO = 40 -> 0.4.
         assert_eq!(fo.len(), 1);
         assert!((fo[0].fraction_of_operating - 0.4).abs() < 1e-12);
     }
 
     #[test]
     fn fraction_of_operating_orders_by_hour_day_then_source_type() {
- // Inputs deliberately out of order; output follows the SQL ORDER BY.
+        // Inputs deliberately out of order; output follows the SQL ORDER BY.
         let source_hours = [sh(52, 21, 0, 1.0), sh(51, 30, 0, 1.0), sh(51, 21, 0, 1.0)];
         let inputs = EvapOpModeInputs {
             source_hours: &source_hours,
@@ -1509,9 +1509,9 @@ mod tests {
 
     #[test]
     fn op_mode_distribution_splits_operating_and_soak() {
- // fractionOfOperating(51,21) = 25/100 = 0.25.
- // Soak op mode 151 fraction 0.6 -> opModeFraction = 0.6 * 0.75 = 0.45.
- // Operating mode 300 -> 1 - 0.45 = 0.55.
+        // fractionOfOperating(51,21) = 25/100 = 0.25.
+        // Soak op mode 151 fraction 0.6 -> opModeFraction = 0.6 * 0.75 = 0.45.
+        // Operating mode 300 -> 1 - 0.45 = 0.55.
         let source_hours = [sh(51, 21, 0, 100.0)];
         let sho_rows = [sho(51, 21, 0, 25.0)];
         let soak = [saf(21, 51, 151, 0.6)];
@@ -1527,7 +1527,7 @@ mod tests {
         };
         let rows = op_mode_distribution(&ctx(11), &inputs);
         assert_eq!(rows.len(), 2);
- // Sorted by primary key: soak op mode 151 precedes operating 300.
+        // Sorted by primary key: soak op mode 151 precedes operating 300.
         assert_eq!(rows[0].op_mode_id, 151);
         assert!((rows[0].op_mode_fraction - 0.45).abs() < 1e-12);
         assert_eq!(rows[1].op_mode_id, OPERATING_OP_MODE);
@@ -1542,8 +1542,8 @@ mod tests {
 
     #[test]
     fn op_mode_distribution_operating_mode_is_one_minus_soak_sum() {
- // Two soak modes; fractionOfOperating = 0 (no SHO).
- // opModeFractions: 0.3 and 0.2 -> operating 300 = 1 - 0.5 = 0.5.
+        // Two soak modes; fractionOfOperating = 0 (no SHO).
+        // opModeFractions: 0.3 and 0.2 -> operating 300 = 1 - 0.5 = 0.5.
         let source_hours = [sh(51, 21, 0, 100.0)];
         let soak = [saf(21, 51, 150, 0.3), saf(21, 51, 151, 0.2)];
         let pp = polproc(31, 12);
@@ -1566,9 +1566,9 @@ mod tests {
 
     #[test]
     fn op_mode_distribution_operating_mode_floored_at_zero() {
- // Soak fractions sum past 1 (degenerate input): greatest(0, …)
- // floors the operating-mode fraction at 0 rather than going
- // negative.
+        // Soak fractions sum past 1 (degenerate input): greatest(0, …)
+        // floors the operating-mode fraction at 0 rather than going
+        // negative.
         let source_hours = [sh(51, 21, 0, 100.0)];
         let soak = [saf(21, 51, 150, 0.8), saf(21, 51, 151, 0.7)];
         let pp = polproc(31, 13);
@@ -1591,8 +1591,8 @@ mod tests {
 
     #[test]
     fn op_mode_distribution_filters_by_process() {
- // The op mode's only polProcess is process 12; running for
- // process 11 yields nothing.
+        // The op mode's only polProcess is process 12; running for
+        // process 11 yields nothing.
         let source_hours = [sh(51, 21, 0, 100.0)];
         let soak = [saf(21, 51, 151, 0.6)];
         let omppa_rows = [omppa(151, polproc(31, 12))];
@@ -1605,14 +1605,14 @@ mod tests {
             ..empty_inputs()
         };
         assert!(op_mode_distribution(&ctx(11), &inputs).is_empty());
- // …but running for process 12 produces the soak + operating rows.
+        // …but running for process 12 produces the soak + operating rows.
         assert_eq!(op_mode_distribution(&ctx(12), &inputs).len(), 2);
     }
 
     #[test]
     fn op_mode_distribution_filters_soak_by_zone_and_month() {
- // SoakActivityFraction rows outside the loop's zone or month are
- // dropped by the step-2 WHERE clause.
+        // SoakActivityFraction rows outside the loop's zone or month are
+        // dropped by the step-2 WHERE clause.
         let source_hours = [sh(51, 21, 0, 100.0)];
         let soak = [
             SoakActivityFractionRow {
@@ -1639,8 +1639,8 @@ mod tests {
 
     #[test]
     fn op_mode_distribution_emits_one_row_per_associated_polprocess() {
- // One soak op mode associated with two polProcesses of process 11:
- // step 2 emits a row for each, and step 3 a 300 row for each.
+        // One soak op mode associated with two polProcesses of process 11:
+        // step 2 emits a row for each, and step 3 a 300 row for each.
         let source_hours = [sh(51, 21, 0, 100.0)];
         let soak = [saf(21, 51, 151, 0.6)];
         let pp_a = polproc(31, 11);
@@ -1658,7 +1658,7 @@ mod tests {
         assert_eq!(rows.len(), 4);
         let polprocs: HashSet<PolProcessId> = rows.iter().map(|r| r.pol_process_id).collect();
         assert_eq!(polprocs, HashSet::from([pp_a, pp_b]));
- // Each polProcess gets exactly one operating-mode row.
+        // Each polProcess gets exactly one operating-mode row.
         assert_eq!(
             rows.iter()
                 .filter(|r| r.op_mode_id == OPERATING_OP_MODE)
@@ -1669,9 +1669,9 @@ mod tests {
 
     #[test]
     fn op_mode_distribution_skips_cell_without_fraction_of_operating() {
- // No sourceHours -> no FractionOfOperating entry -> the INNER JOIN
- // drops the SoakActivityFraction row; nothing (not even a 300 row)
- // is emitted.
+        // No sourceHours -> no FractionOfOperating entry -> the INNER JOIN
+        // drops the SoakActivityFraction row; nothing (not even a 300 row)
+        // is emitted.
         let soak = [saf(21, 51, 151, 0.6)];
         let omppa_rows = [omppa(151, polproc(31, 11))];
         let ppa_rows = [ppa(31, 11)];
@@ -1686,8 +1686,8 @@ mod tests {
 
     #[test]
     fn op_mode_distribution_skips_soak_op_mode_without_association() {
- // A soak op mode with no OpModePolProcAssoc row contributes no
- // non-operating row, and so no operating-mode-300 row either.
+        // A soak op mode with no OpModePolProcAssoc row contributes no
+        // non-operating row, and so no operating-mode-300 row either.
         let source_hours = [sh(51, 21, 0, 100.0)];
         let soak = [saf(21, 51, 199, 0.6)];
         let omppa_rows = [omppa(151, polproc(31, 11))];
@@ -1704,8 +1704,8 @@ mod tests {
 
     #[test]
     fn op_mode_distribution_output_is_sorted_by_primary_key() {
- // Two source types, two hour/days, two op modes — deliberately
- // unsorted inputs; the output must follow the primary key.
+        // Two source types, two hour/days, two op modes — deliberately
+        // unsorted inputs; the output must follow the primary key.
         let source_hours = [sh(52, 30, 0, 100.0), sh(51, 21, 0, 100.0)];
         let soak = [
             saf(30, 52, 152, 0.1),
@@ -1727,7 +1727,7 @@ mod tests {
         let mut sorted = keys.clone();
         sorted.sort_unstable();
         assert_eq!(keys, sorted);
- // All keys distinct — steps 2 and 3 never collide.
+        // All keys distinct — steps 2 and 3 never collide.
         let unique: HashSet<RowKey> = keys.iter().copied().collect();
         assert_eq!(unique.len(), keys.len());
     }
@@ -1755,9 +1755,9 @@ mod tests {
 
     #[test]
     fn subscribe_to_me_drops_evap_non_fuel_vapors() {
- // The fourth process name does not resolve against the default DB,
- // so the null-guard leaves exactly three subscriptions: 11, 12, 13,
- // all at MONTH granularity / GENERATOR priority.
+        // The fourth process name does not resolve against the default DB,
+        // so the null-guard leaves exactly three subscriptions: 11, 12, 13,
+        // all at MONTH granularity / GENERATOR priority.
         let generator = EvaporativeEmissionsOperatingModeDistributionGenerator::new();
         let subs = generator.subscriptions();
         assert_eq!(subs.len(), 3);
@@ -1776,9 +1776,9 @@ mod tests {
             IterationPosition,
         };
 
- // Build the five input tables using raw insert to bypass registry
- // schema validation (the registry sho/PollutantProcessAssoc schemas
- // describe partial column sets from other calculators).
+        // Build the five input tables using raw insert to bypass registry
+        // schema validation (the registry sho/PollutantProcessAssoc schemas
+        // describe partial column sets from other calculators).
         let mut store = InMemoryStore::default();
         store.insert(
             "sourceHours",
@@ -1823,8 +1823,8 @@ mod tests {
 
         let out: Vec<OpModeDistributionRow> =
             ctx.tables().iter_typed("OpModeDistribution").unwrap();
- // fractionOfOperating = 25/100 = 0.25; soak 151 fraction = 0.6 * 0.75 = 0.45;
- // operating 300 = 1 - 0.45 = 0.55. Expect two rows sorted by opModeID.
+        // fractionOfOperating = 25/100 = 0.25; soak 151 fraction = 0.6 * 0.75 = 0.45;
+        // operating 300 = 1 - 0.45 = 0.55. Expect two rows sorted by opModeID.
         assert_eq!(out.len(), 2, "expected soak + operating rows");
         let soak = out.iter().find(|r| r.op_mode_id == 151).unwrap();
         assert!((soak.op_mode_fraction - 0.45).abs() < 1e-12);
@@ -1834,7 +1834,7 @@ mod tests {
 
     #[test]
     fn generator_is_object_safe() {
- // The registry stores generators as Box<dyn Generator>.
+        // The registry stores generators as Box<dyn Generator>.
         let generator: Box<dyn Generator> =
             Box::new(EvaporativeEmissionsOperatingModeDistributionGenerator::new());
         assert_eq!(

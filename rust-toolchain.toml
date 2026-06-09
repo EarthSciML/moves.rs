@@ -1,0 +1,10 @@
+# Pin the toolchain so the formatting/lint CI gates can't silently drift when a
+# new `stable` ships — that drift (unpinned dtolnay/rust-toolchain@stable picking
+# up a newer rustfmt/clippy) is what put `main` at odds with its own gates.
+[toolchain]
+# Pin the exact stable that `main` is formatted/linted against, so CI's gates
+# can't silently drift when a newer `stable` ships. Exact (not "1.95") because a
+# fixed version is immutable — rustup uses the installed copy without re-syncing,
+# which matters on quota-limited home dirs.
+channel = "1.95.0"
+components = ["rustfmt", "clippy"]

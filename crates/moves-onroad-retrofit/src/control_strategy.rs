@@ -53,12 +53,12 @@ pub struct OnRoadRetrofitStrategy {
 }
 
 impl OnRoadRetrofitStrategy {
- /// Build from a [`RetrofitTable`] already loaded from user input.
+    /// Build from a [`RetrofitTable`] already loaded from user input.
     pub fn new(programs: RetrofitTable) -> Self {
         Self { programs }
     }
 
- /// The retrofit programs this strategy will apply.
+    /// The retrofit programs this strategy will apply.
     pub fn programs(&self) -> &RetrofitTable {
         &self.programs
     }
@@ -77,25 +77,25 @@ impl InternalControlStrategy for OnRoadRetrofitStrategy {
         &self,
         _tables: &mut InMemoryStore,
     ) -> std::result::Result<(), moves_framework::Error> {
- // The canonical `OnRoadRetrofitStrategy.subscribeToMe` early-returns
- // when there are no `onRoadRetrofit` rows (`dbLines.size() <= 0`); with
- // no programs there is genuinely nothing to apply, so an empty table is
- // a clean no-op.
+        // The canonical `OnRoadRetrofitStrategy.subscribeToMe` early-returns
+        // when there are no `onRoadRetrofit` rows (`dbLines.size() <= 0`); with
+        // no programs there is genuinely nothing to apply, so an empty table is
+        // a clean no-op.
         if self.programs.is_empty() {
             return Ok(());
         }
 
- // When programs ARE present the canonical code multiplies emission
- // rates/quantities by the combined retrofit factor (Java
- // `CompiledLine.buildSQL`: `emissionQuant=emissionQuant*(retrofitFactor
- // +nonRetrofitFactor)`, applied per pollutant/process/fuel/source/year/
- // modelYear). The data-plane write of that adjustment is not yet ported:
- // it requires the run's analysis years and the model-year / regClass /
- // fuelType universe (none of which reach `pre_run`), plus the
- // `EmissionRateAdjustment` key columns (`polProcessID`, `regClassID`,
- // `fuelTypeID`) that `RetrofitRecord` does not carry. Returning `Ok(())`
- // here would silently drop the entire retrofit effect while the engine
- // reports success, so surface the unported live path explicitly instead.
+        // When programs ARE present the canonical code multiplies emission
+        // rates/quantities by the combined retrofit factor (Java
+        // `CompiledLine.buildSQL`: `emissionQuant=emissionQuant*(retrofitFactor
+        // +nonRetrofitFactor)`, applied per pollutant/process/fuel/source/year/
+        // modelYear). The data-plane write of that adjustment is not yet ported:
+        // it requires the run's analysis years and the model-year / regClass /
+        // fuelType universe (none of which reach `pre_run`), plus the
+        // `EmissionRateAdjustment` key columns (`polProcessID`, `regClassID`,
+        // `fuelTypeID`) that `RetrofitRecord` does not carry. Returning `Ok(())`
+        // here would silently drop the entire retrofit effect while the engine
+        // reports success, so surface the unported live path explicitly instead.
         Err(moves_framework::Error::NotImplemented)
     }
 }

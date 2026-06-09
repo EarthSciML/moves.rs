@@ -99,7 +99,7 @@ fn parse_bundle(
     }
     let count = u32::from_le_bytes([src[8], src[9], src[10], src[11]]) as usize;
 
- // Parse TOC.
+    // Parse TOC.
     let mut cursor = 12usize;
     let mut toc: Vec<(String, u64, u64)> = Vec::with_capacity(count);
     for i in 0..count {
@@ -131,7 +131,7 @@ fn parse_bundle(
         toc.push((name, offset, length));
     }
 
- // Decode tables.
+    // Decode tables.
     let mut store = InMemoryStore::new();
     for (full_name, offset, length) in toc {
         let start = offset as usize;
@@ -159,10 +159,10 @@ fn parse_bundle(
             .unwrap_or(&full_name)
             .to_ascii_lowercase();
         if let Some(allowed) = allowed {
- // Year-suffixed tables (e.g. `stmyTVVCoeffs2020`) are admitted when
- // their base name (e.g. `stmytvvcoeffs`) appears in the allowed set.
- // Process/year-indexed tables (e.g. `baserate_1_2001`) are admitted when
- // their canonical base name (e.g. `baserate`) appears in the allowed set.
+            // Year-suffixed tables (e.g. `stmyTVVCoeffs2020`) are admitted when
+            // their base name (e.g. `stmytvvcoeffs`) appears in the allowed set.
+            // Process/year-indexed tables (e.g. `baserate_1_2001`) are admitted when
+            // their canonical base name (e.g. `baserate`) appears in the allowed set.
             if !allowed.contains(&short_name)
                 && !allowed.contains(strip_year_suffix(&short_name))
                 && !allowed.contains(strip_numeric_index_suffix(&short_name))
@@ -246,7 +246,7 @@ mod tests {
 
     #[test]
     fn empty_bundle_returns_empty_store() {
- // Build a valid bundle with count=0.
+        // Build a valid bundle with count=0.
         let buf = build_bundle_bytes(std::iter::empty::<(&str, &[u8])>());
         let dir = tempdir().unwrap();
         let p = dir.path().join("empty.bundle");
@@ -257,7 +257,7 @@ mod tests {
 
     #[test]
     fn filtered_bundle_skips_tables_not_in_allowed_set() {
- // Bundle with two tables; allowed set contains only one.
+        // Bundle with two tables; allowed set contains only one.
         let ipc_a = ipc_for_table("db__movesexecution1__tablea", 2);
         let ipc_b = ipc_for_table("db__movesexecution1__tableb", 5);
         let bundle = build_bundle_bytes([
@@ -295,7 +295,7 @@ mod tests {
         );
     }
 
- // --- strip_year_suffix unit tests ---
+    // --- strip_year_suffix unit tests ---
 
     #[test]
     fn strip_year_suffix_strips_four_digits() {
@@ -314,9 +314,9 @@ mod tests {
 
     #[test]
     fn strip_year_suffix_no_change_partial_digits() {
- // Fewer than 4 trailing digits: no change.
+        // Fewer than 4 trailing digits: no change.
         assert_eq!(strip_year_suffix("table202"), "table202");
- // 5 trailing digits: last 4 ("0200") are stripped, leaving "table2".
+        // 5 trailing digits: last 4 ("0200") are stripped, leaving "table2".
         assert_eq!(strip_year_suffix("table20200"), "table2");
     }
 
@@ -325,7 +325,7 @@ mod tests {
         assert_eq!(strip_year_suffix("table20a0"), "table20a0");
     }
 
- // --- strip_numeric_index_suffix unit tests ---
+    // --- strip_numeric_index_suffix unit tests ---
 
     #[test]
     fn strip_numeric_index_suffix_strips_process_year() {
@@ -352,20 +352,20 @@ mod tests {
 
     #[test]
     fn strip_numeric_index_suffix_no_change_year_only() {
- // A bare year suffix (no underscore separator) is NOT stripped — that's
- // `strip_year_suffix`'s job.
+        // A bare year suffix (no underscore separator) is NOT stripped — that's
+        // `strip_year_suffix`'s job.
         assert_eq!(
             strip_numeric_index_suffix("stmytvvcoeffs2020"),
             "stmytvvcoeffs2020"
         );
     }
 
- // --- filtered bundle admits numeric-indexed tables ---
+    // --- filtered bundle admits numeric-indexed tables ---
 
     #[test]
     fn filtered_bundle_admits_indexed_table_when_base_in_allowed() {
- // Simulates the baserate_1_2001 scenario: the bundle has a process/year-indexed
- // table, and the allowed set contains only the base (canonical) name.
+        // Simulates the baserate_1_2001 scenario: the bundle has a process/year-indexed
+        // table, and the allowed set contains only the base (canonical) name.
         let ipc_indexed = ipc_for_table("db__movesexecution1__baserate_1_2001", 4);
         let ipc_other = ipc_for_table("db__movesexecution1__unrelated", 1);
         let bundle = build_bundle_bytes([
@@ -394,12 +394,12 @@ mod tests {
         );
     }
 
- // --- year-suffixed table admission test ---
+    // --- year-suffixed table admission test ---
 
     #[test]
     fn filtered_bundle_admits_year_suffixed_table_when_base_in_allowed() {
- // Simulates the stmyTVVCoeffs2020 scenario: the bundle has a year-suffixed
- // table, and the allowed set contains only the base (unsuffixed) name.
+        // Simulates the stmyTVVCoeffs2020 scenario: the bundle has a year-suffixed
+        // table, and the allowed set contains only the base (unsuffixed) name.
         let ipc_year = ipc_for_table("db__movesexecution1__stmytvvcoeffs2020", 3);
         let ipc_other = ipc_for_table("db__movesexecution1__unrelated", 1);
         let bundle = build_bundle_bytes([

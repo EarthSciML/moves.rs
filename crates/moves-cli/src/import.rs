@@ -41,79 +41,79 @@ use moves_importer::{
 /// Inputs for one `moves import-cdb` invocation.
 #[derive(Debug, Clone)]
 pub struct ImportOptions {
- /// Directory holding the user's `<TableName>.csv` files.
+    /// Directory holding the user's `<TableName>.csv` files.
     pub input: PathBuf,
- /// Directory the validated `<TableName>.parquet` files are written to.
- /// Created if absent.
+    /// Directory the validated `<TableName>.parquet` files are written to.
+    /// Created if absent.
     pub output: PathBuf,
- /// Optional converted default-DB Parquet tree. When set, foreign-key
- /// columns are validated against it (violations become errors);
- /// otherwise FK checks degrade to warnings.
+    /// Optional converted default-DB Parquet tree. When set, foreign-key
+    /// columns are validated against it (violations become errors);
+    /// otherwise FK checks degrade to warnings.
     pub default_db: Option<PathBuf>,
 }
 
 /// The fate of one table in an [`import_cdb`] run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ImportStatus {
- /// Validated clean and written to a `.parquet` file.
+    /// Validated clean and written to a `.parquet` file.
     Written,
- /// Validation found errors; no Parquet was written.
+    /// Validation found errors; no Parquet was written.
     Rejected,
- /// No `<TableName>.csv` was present in the input directory.
+    /// No `<TableName>.csv` was present in the input directory.
     Missing,
 }
 
 /// Per-table result of an [`import_cdb`] run.
 #[derive(Debug, Clone)]
 pub struct ImportedTableReport {
- /// Human-readable name of the importer that owns this table.
+    /// Human-readable name of the importer that owns this table.
     pub importer: &'static str,
- /// Canonical table name (matches the `<TableName>.csv` / `.parquet`).
+    /// Canonical table name (matches the `<TableName>.csv` / `.parquet`).
     pub table: &'static str,
- /// What happened to the table.
+    /// What happened to the table.
     pub status: ImportStatus,
- /// The CSV that was read. `None` when [`ImportStatus::Missing`].
+    /// The CSV that was read. `None` when [`ImportStatus::Missing`].
     pub source: Option<PathBuf>,
- /// The Parquet that was written. `Some` only for [`ImportStatus::Written`].
+    /// The Parquet that was written. `Some` only for [`ImportStatus::Written`].
     pub destination: Option<PathBuf>,
- /// Data-row count of the table (0 when missing).
+    /// Data-row count of the table (0 when missing).
     pub row_count: u64,
- /// Formatted validation errors (empty unless [`ImportStatus::Rejected`]).
+    /// Formatted validation errors (empty unless [`ImportStatus::Rejected`]).
     pub errors: Vec<String>,
- /// Formatted validation warnings — surfaced for any read table.
+    /// Formatted validation warnings — surfaced for any read table.
     pub warnings: Vec<String>,
 }
 
 /// What [`import_cdb`] did, table by table.
 #[derive(Debug, Clone)]
 pub struct ImportOutcome {
- /// One entry per declared table across every County importer, in
- /// importer-then-declaration order.
+    /// One entry per declared table across every County importer, in
+    /// importer-then-declaration order.
     pub tables: Vec<ImportedTableReport>,
- /// Whether a default-DB handle was wired for foreign-key validation.
+    /// Whether a default-DB handle was wired for foreign-key validation.
     pub default_db_used: bool,
 }
 
 impl ImportOutcome {
- /// Count of tables written to Parquet.
+    /// Count of tables written to Parquet.
     #[must_use]
     pub fn written(&self) -> usize {
         self.count(ImportStatus::Written)
     }
 
- /// Count of tables rejected by validation.
+    /// Count of tables rejected by validation.
     #[must_use]
     pub fn rejected(&self) -> usize {
         self.count(ImportStatus::Rejected)
     }
 
- /// Count of declared tables with no CSV present.
+    /// Count of declared tables with no CSV present.
     #[must_use]
     pub fn missing(&self) -> usize {
         self.count(ImportStatus::Missing)
     }
 
- /// Whether any present table failed validation.
+    /// Whether any present table failed validation.
     #[must_use]
     pub fn has_errors(&self) -> bool {
         self.rejected() > 0
@@ -141,7 +141,7 @@ pub fn import_cdb(opts: &ImportOptions) -> Result<ImportOutcome> {
     fs::create_dir_all(&opts.output)
         .with_context(|| format!("creating output directory {}", opts.output.display()))?;
 
- // An optional default-DB handle; `ctx` borrows it for the whole run.
+    // An optional default-DB handle; `ctx` borrows it for the whole run.
     let default_db = match &opts.default_db {
         Some(path) => Some(
             DefaultDb::open(path)
@@ -160,9 +160,9 @@ pub fn import_cdb(opts: &ImportOptions) -> Result<ImportOutcome> {
     for &importer in moves_importer_county::ALL {
         let descriptors = importer.tables();
 
- // Read every declared table that has a CSV present. A CSV that is
- // present but structurally unreadable is a hard error (propagated
- // with `?`); a *validation* failure is reported as Rejected below.
+        // Read every declared table that has a CSV present. A CSV that is
+        // present but structurally unreadable is a hard error (propagated
+        // with `?`); a *validation* failure is reported as Rejected below.
         let mut imported: Vec<ImportedTable> = Vec::new();
         for descriptor in descriptors {
             let csv = opts.input.join(format!("{}.csv", descriptor.name));
@@ -175,15 +175,15 @@ pub fn import_cdb(opts: &ImportOptions) -> Result<ImportOutcome> {
             imported.push(ImportedTable::new(descriptor, rows.source_path, rows.batch));
         }
 
- // Cross-row checks index the table slice positionally, so they can
- // only run when every table the importer declares is present.
+        // Cross-row checks index the table slice positionally, so they can
+        // only run when every table the importer declares is present.
         let cross = if !imported.is_empty() && imported.len() == descriptors.len() {
             importer.validate_imported(&imported, &ctx)
         } else {
             Vec::new()
         };
 
- // One report per declared table, in declaration order.
+        // One report per declared table, in declaration order.
         for descriptor in descriptors {
             let Some(table) = imported
                 .iter()

@@ -34,17 +34,12 @@
 //! # Road type
 //!
 //! The Java `ExecutionLocation` carries a fifth field, `roadTypeRecordID`.
-//! The Rust [`ExecutionLocation`] is the four-field
-//! `(state, county, zone, link)` value introduced for the
-//! MasterLoop position and commits the `execution_locations` set
-//! of [`ExecutionRunSpec`](crate::ExecutionRunSpec) to — and the migration
-//! plan itself describes output as
-//! *(state, county, zone, link) tuples*. Road type therefore enters this
-//! module only as a **filter**: [`RoadTypeFilter`] ports
-//! `buildRoadTypesSQL`'s onroad / NONROAD split. It is not stored on the
-//! produced tuple. (calculators read `roadTypeRecordID` off the
-//! iteration position; threading road type onto the position is a
-//! MasterLoop concern for whichever task ports those calculators.)
+//! The Rust [`ExecutionLocation`] now carries the matching `road_type_id`
+//! field. [`RoadTypeFilter`] ports `buildRoadTypesSQL`'s onroad / NONROAD
+//! split; [`LinkRow::location`] and [`CountyRow::nonroad_location`] stamp
+//! `road_type_id` from the `Link` table (or the NONROAD sentinel 100) onto
+//! the produced location so calculators can read it from the iteration
+//! position.
 //!
 //! # Entry point
 //!
@@ -107,26 +102,30 @@ pub const NONROAD_ROAD_TYPE_ID: u32 = 100;
 /// `state → county → zone → link` ancestry of one onroad link.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct LinkRow {
- /// `County.stateID` — the state owning the county.
+    /// `County.stateID` — the state owning the county.
     pub state_id: u32,
- /// `Link.countyID` / `County.countyID` — the county owning the zone.
+    /// `Link.countyID` / `County.countyID` — the county owning the zone.
     pub county_id: u32,
- /// `Link.zoneID` — the zone owning the link.
+    /// `Link.zoneID` — the zone owning the link.
     pub zone_id: u32,
- /// `Link.linkID` — the link's primary key (globally unique).
+    /// `Link.linkID` — the link's primary key (globally unique).
     pub link_id: u32,
- /// `Link.roadTypeID` — the link's road type (1–5 for onroad links).
+    /// `Link.roadTypeID` — the link's road type (1–5 for onroad links).
     pub road_type_id: u32,
 }
 
 impl LinkRow {
- /// Project this onroad link to its [`ExecutionLocation`].
- ///
- /// Drops `road_type_id`: the produced tuple is `(state, county, zone,
- /// link)` only — see the module docs on road type.
+    /// Project this onroad link to its [`ExecutionLocation`], carrying
+    /// `road_type_id` so calculators can read it from the iteration position.
     #[must_use]
     pub fn location(&self) -> ExecutionLocation {
-        ExecutionLocation::link(self.state_id, self.county_id, self.zone_id, self.link_id)
+        ExecutionLocation::link_with_road_type_id(
+            self.state_id,
+            self.county_id,
+            self.zone_id,
+            self.link_id,
+            self.road_type_id,
+        )
     }
 }
 
@@ -138,26 +137,27 @@ impl LinkRow {
 /// the `County` rows independently of the `Link` ⋈ `County` join.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CountyRow {
- /// `County.stateID` — the state owning the county.
+    /// `County.stateID` — the state owning the county.
     pub state_id: u32,
- /// `County.countyID` — the county's primary key.
+    /// `County.countyID` — the county's primary key.
     pub county_id: u32,
 }
 
 impl CountyRow {
- /// Synthesise the NONROAD [`ExecutionLocation`] for this county.
- ///
- /// Ports the Java NONROAD `SELECT`'s column aliasing
- /// `County.countyID as zoneID, County.countyID as linkID` — the county
- /// id stands in as both the zone id and the link id, so off-highway
- /// equipment iterates one synthetic link per county.
+    /// Synthesise the NONROAD [`ExecutionLocation`] for this county.
+    ///
+    /// Ports the Java NONROAD `SELECT`'s column aliasing
+    /// `County.countyID as zoneID, County.countyID as linkID, 100 as roadTypeID`
+    /// — the county id stands in as both the zone id and the link id, and the
+    /// NONROAD sentinel road type 100 is used.
     #[must_use]
     pub fn nonroad_location(&self) -> ExecutionLocation {
-        ExecutionLocation::link(
+        ExecutionLocation::link_with_road_type_id(
             self.state_id,
             self.county_id,
             self.county_id,
             self.county_id,
+            NONROAD_ROAD_TYPE_ID,
         )
     }
 }
@@ -181,27 +181,27 @@ pub struct GeographyTables {
 }
 
 impl GeographyTables {
- /// Build a `GeographyTables` from `Link` ⋈ `County` rows and `County`
- /// rows. Row order is irrelevant — the producer scans both fully and
- /// returns a sorted set.
+    /// Build a `GeographyTables` from `Link` ⋈ `County` rows and `County`
+    /// rows. Row order is irrelevant — the producer scans both fully and
+    /// returns a sorted set.
     #[must_use]
     pub fn new(links: Vec<LinkRow>, counties: Vec<CountyRow>) -> Self {
         Self { links, counties }
     }
 
- /// The `Link` ⋈ `County` rows — every onroad link with its ancestry.
+    /// The `Link` ⋈ `County` rows — every onroad link with its ancestry.
     #[must_use]
     pub fn links(&self) -> &[LinkRow] {
         &self.links
     }
 
- /// The `County` rows — the source for NONROAD synthesis.
+    /// The `County` rows — the source for NONROAD synthesis.
     #[must_use]
     pub fn counties(&self) -> &[CountyRow] {
         &self.counties
     }
 
- /// `true` when both tables are empty.
+    /// `true` when both tables are empty.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.links.is_empty() && self.counties.is_empty()
@@ -230,18 +230,18 @@ impl GeographyTables {
 /// `add*Locations` method's body sits inside one of those `if` guards.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RoadTypeFilter {
- /// The selected onroad (non-NONROAD) road type ids.
+    /// The selected onroad (non-NONROAD) road type ids.
     onroad: BTreeSet<u32>,
- /// Whether road type [`NONROAD_ROAD_TYPE_ID`] was selected.
+    /// Whether road type [`NONROAD_ROAD_TYPE_ID`] was selected.
     has_nonroad: bool,
 }
 
 impl RoadTypeFilter {
- /// Split a set of road-type ids into the onroad / NONROAD filter.
- ///
- /// Ports `buildRoadTypesSQL`. Duplicate ids collapse (the Java input
- /// is a `TreeSet`); [`NONROAD_ROAD_TYPE_ID`] is recorded as the
- /// `has_nonroad` flag rather than added to the onroad set.
+    /// Split a set of road-type ids into the onroad / NONROAD filter.
+    ///
+    /// Ports `buildRoadTypesSQL`. Duplicate ids collapse (the Java input
+    /// is a `TreeSet`); [`NONROAD_ROAD_TYPE_ID`] is recorded as the
+    /// `has_nonroad` flag rather than added to the onroad set.
     #[must_use]
     pub fn from_road_type_ids(ids: impl IntoIterator<Item = u32>) -> Self {
         let mut onroad = BTreeSet::new();
@@ -259,32 +259,32 @@ impl RoadTypeFilter {
         }
     }
 
- /// Whether any onroad road type was selected — Java's `hasOnroad`.
- ///
- /// Gates the onroad `Link` queries. `false` for a NONROAD-only run.
+    /// Whether any onroad road type was selected — Java's `hasOnroad`.
+    ///
+    /// Gates the onroad `Link` queries. `false` for a NONROAD-only run.
     #[must_use]
     pub fn has_onroad(&self) -> bool {
         !self.onroad.is_empty()
     }
 
- /// Whether the NONROAD road type was selected — Java's `hasNonroad`.
- ///
- /// Gates the NONROAD `County` synthesis (county / state / nation
- /// selections only).
+    /// Whether the NONROAD road type was selected — Java's `hasNonroad`.
+    ///
+    /// Gates the NONROAD `County` synthesis (county / state / nation
+    /// selections only).
     #[must_use]
     pub fn has_nonroad(&self) -> bool {
         self.has_nonroad
     }
 
- /// Whether an onroad link with this `roadTypeID` survives the filter.
- ///
- /// Replaces the `roadTypesSQL` `WHERE` fragment with set membership.
+    /// Whether an onroad link with this `roadTypeID` survives the filter.
+    ///
+    /// Replaces the `roadTypesSQL` `WHERE` fragment with set membership.
     #[must_use]
     pub fn allows_onroad_road_type(&self, road_type_id: u32) -> bool {
         self.onroad.contains(&road_type_id)
     }
 
- /// The selected onroad road type ids, ascending.
+    /// The selected onroad road type ids, ascending.
     pub fn onroad_road_type_ids(&self) -> impl Iterator<Item = u32> + '_ {
         self.onroad.iter().copied()
     }
@@ -301,32 +301,32 @@ impl RoadTypeFilter {
 /// run's [`GeographyTables`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExecutionLocationProducer {
- /// The RunSpec's geographic selections, in RunSpec order.
+    /// The RunSpec's geographic selections, in RunSpec order.
     geographic_selections: Vec<GeographicSelection>,
- /// When the run is a custom domain, the generic county's id. The Java
- /// `buildExecutionLocations` early-branches on `runSpec.isCustomDomain()`
- /// and expands that single county instead of `geographicSelections`.
- ///
- /// The Rust [`RunSpec`](moves_runspec::RunSpec) does not yet carry the
- /// `genericCounty` field `isCustomDomain` depends on (a
- /// follow-up), so
- /// [`ExecutionRunSpec::build_execution_locations`](crate::ExecutionRunSpec::build_execution_locations)
- /// always passes `None`. The field and code path are kept so the
- /// custom-domain behaviour is a faithful, tested port the moment the
- /// RunSpec gains the field.
+    /// When the run is a custom domain, the generic county's id. The Java
+    /// `buildExecutionLocations` early-branches on `runSpec.isCustomDomain()`
+    /// and expands that single county instead of `geographicSelections`.
+    ///
+    /// The Rust [`RunSpec`](moves_runspec::RunSpec) does not yet carry the
+    /// `genericCounty` field `isCustomDomain` depends on (a
+    /// follow-up), so
+    /// [`ExecutionRunSpec::build_execution_locations`](crate::ExecutionRunSpec::build_execution_locations)
+    /// always passes `None`. The field and code path are kept so the
+    /// custom-domain behaviour is a faithful, tested port the moment the
+    /// RunSpec gains the field.
     custom_domain_county: Option<u32>,
- /// The onroad / NONROAD filter derived from the effective road types.
+    /// The onroad / NONROAD filter derived from the effective road types.
     road_type_filter: RoadTypeFilter,
 }
 
 impl ExecutionLocationProducer {
- /// Build a producer from a RunSpec's geographic selections, the
- /// effective road-type ids, and an optional custom-domain county.
- ///
- /// `road_type_ids` is the *effective* set /// [`ExecutionRunSpec::execution_road_types`](crate::ExecutionRunSpec::execution_road_types),
- /// which already applies the Off-Network-Idle expansion. Pass
- /// `custom_domain_county = Some(id)` to expand a single generic county
- /// and ignore `geographic_selections`; `None` for a normal run.
+    /// Build a producer from a RunSpec's geographic selections, the
+    /// effective road-type ids, and an optional custom-domain county.
+    ///
+    /// `road_type_ids` is the *effective* set /// [`ExecutionRunSpec::execution_road_types`](crate::ExecutionRunSpec::execution_road_types),
+    /// which already applies the Off-Network-Idle expansion. Pass
+    /// `custom_domain_county = Some(id)` to expand a single generic county
+    /// and ignore `geographic_selections`; `None` for a normal run.
     #[must_use]
     pub fn new(
         geographic_selections: Vec<GeographicSelection>,
@@ -340,22 +340,22 @@ impl ExecutionLocationProducer {
         }
     }
 
- /// The onroad / NONROAD road-type filter — Java's `buildRoadTypesSQL`
- /// state. Exposed for inspection and testing.
+    /// The onroad / NONROAD road-type filter — Java's `buildRoadTypesSQL`
+    /// state. Exposed for inspection and testing.
     #[must_use]
     pub fn road_type_filter(&self) -> &RoadTypeFilter {
         &self.road_type_filter
     }
 
- /// Expand the selections into the sorted, de-duplicated set of
- /// link-granularity execution locations.
- ///
- /// Ports `buildExecutionLocations(Connection)`: the custom-domain
- /// early branch, then the per-selection dispatch. The returned
- /// [`BTreeSet`] gives the sort + de-duplication the Java `TreeSet`
- /// provided — locations order by `(state, county, zone, link)`, and
- /// overlapping selections (e.g. a `NATION` plus a `STATE`) collapse to
- /// one entry per link.
+    /// Expand the selections into the sorted, de-duplicated set of
+    /// link-granularity execution locations.
+    ///
+    /// Ports `buildExecutionLocations(Connection)`: the custom-domain
+    /// early branch, then the per-selection dispatch. The returned
+    /// [`BTreeSet`] gives the sort + de-duplication the Java `TreeSet`
+    /// provided — locations order by `(state, county, zone, link)`, and
+    /// overlapping selections (e.g. a `NATION` plus a `STATE`) collapse to
+    /// one entry per link.
     #[must_use]
     pub fn build_execution_locations(
         &self,
@@ -363,7 +363,7 @@ impl ExecutionLocationProducer {
     ) -> BTreeSet<ExecutionLocation> {
         let mut results = BTreeSet::new();
         if let Some(county_id) = self.custom_domain_county {
- // `runSpec.isCustomDomain()` branch: expand the generic county.
+            // `runSpec.isCustomDomain()` branch: expand the generic county.
             self.add_county_locations(county_id, geography, &mut results);
         } else {
             for selection in &self.geographic_selections {
@@ -373,8 +373,8 @@ impl ExecutionLocationProducer {
         results
     }
 
- /// Dispatch one geographic selection by granularity — ports the
- /// `buildExecutionLocations(GeographicSelection)` `if`/`else` ladder.
+    /// Dispatch one geographic selection by granularity — ports the
+    /// `buildExecutionLocations(GeographicSelection)` `if`/`else` ladder.
     fn add_for_selection(
         &self,
         selection: &GeographicSelection,
@@ -390,10 +390,10 @@ impl ExecutionLocationProducer {
         }
     }
 
- /// Onroad links matching `link_id` — ports `addLinkLocations`.
- ///
- /// There is no NONROAD `Link` table, so a `LINK` selection produces
- /// onroad locations only, even on a NONROAD run.
+    /// Onroad links matching `link_id` — ports `addLinkLocations`.
+    ///
+    /// There is no NONROAD `Link` table, so a `LINK` selection produces
+    /// onroad locations only, even on a NONROAD run.
     fn add_link_locations(
         &self,
         link_id: u32,
@@ -414,10 +414,10 @@ impl ExecutionLocationProducer {
         }
     }
 
- /// Onroad links in `zone_id` — ports `addZoneLocations`.
- ///
- /// As with [`add_link_locations`](Self::add_link_locations), a `ZONE`
- /// selection has no NONROAD branch.
+    /// Onroad links in `zone_id` — ports `addZoneLocations`.
+    ///
+    /// As with [`add_link_locations`](Self::add_link_locations), a `ZONE`
+    /// selection has no NONROAD branch.
     fn add_zone_locations(
         &self,
         zone_id: u32,
@@ -438,8 +438,8 @@ impl ExecutionLocationProducer {
         }
     }
 
- /// Onroad links in `county_id` plus the NONROAD synthesis — ports
- /// `addCountyLocations`.
+    /// Onroad links in `county_id` plus the NONROAD synthesis — ports
+    /// `addCountyLocations`.
     fn add_county_locations(
         &self,
         county_id: u32,
@@ -466,8 +466,8 @@ impl ExecutionLocationProducer {
         }
     }
 
- /// Onroad links in `state_id` plus the NONROAD synthesis for every
- /// county in the state — ports `addStateLocations`.
+    /// Onroad links in `state_id` plus the NONROAD synthesis for every
+    /// county in the state — ports `addStateLocations`.
     fn add_state_locations(
         &self,
         state_id: u32,
@@ -494,7 +494,7 @@ impl ExecutionLocationProducer {
         }
     }
 
- /// Every onroad link plus the NONROAD synthesis for every county /// ports `addNationLocations`.
+    /// Every onroad link plus the NONROAD synthesis for every county /// ports `addNationLocations`.
     fn add_nation_locations(
         &self,
         geography: &GeographyTables,
@@ -522,12 +522,12 @@ impl ExecutionLocationProducer {
 mod tests {
     use super::*;
 
- // ---- fixtures ----------------------------------------------------------
+    // ---- fixtures ----------------------------------------------------------
 
- /// A small onroad geography: two counties in state 24, one in state 51.
- /// County 24001 has two links (road types 2 and 3) across two zones;
- /// county 24003 has one link (road type 5); county 51001 has one link
- /// (road type 2).
+    /// A small onroad geography: two counties in state 24, one in state 51.
+    /// County 24001 has two links (road types 2 and 3) across two zones;
+    /// county 24003 has one link (road type 5); county 51001 has one link
+    /// (road type 2).
     fn sample_geography() -> GeographyTables {
         GeographyTables::new(
             vec![
@@ -585,15 +585,15 @@ mod tests {
         }
     }
 
- // ---- ExecutionLocation ordering (ports ExecutionLocationTest.java) -----
+    // ---- ExecutionLocation ordering (ports ExecutionLocationTest.java) -----
 
     #[test]
     fn execution_location_compare_to() {
- // Direct port of `ExecutionLocationTest.testExecLocCompareTo`. The
- // Java fixture builds nine `ExecutionLocation`s (state, county,
- // zone, link) and compares element 0 against each; the produced
- // tuple sorts by `(state, county, zone, link)`, exactly the order
- // the producer's `BTreeSet` output relies on.
+        // Direct port of `ExecutionLocationTest.testExecLocCompareTo`. The
+        // Java fixture builds nine `ExecutionLocation`s (state, county,
+        // zone, link) and compares element 0 against each; the produced
+        // tuple sorts by `(state, county, zone, link)`, exactly the order
+        // the producer's `BTreeSet` output relies on.
         use std::cmp::Ordering;
         let exec_locs = [
             ExecutionLocation::link(2, 2, 2, 2), // 0
@@ -606,7 +606,7 @@ mod tests {
             ExecutionLocation::link(1, 1, 1, 4), // 7
             ExecutionLocation::link(3, 1, 1, 4), // 8
         ];
- // Java `expectedOutcomes = {0, 1,-1, 1,-1, 1,-1, 1,-1}`.
+        // Java `expectedOutcomes = {0, 1,-1, 1,-1, 1,-1, 1,-1}`.
         let expected = [
             Ordering::Equal,
             Ordering::Greater,
@@ -621,13 +621,13 @@ mod tests {
         for (i, want) in expected.iter().enumerate() {
             assert_eq!(
                 exec_locs[0].cmp(&exec_locs[i]),
- *want,
+                *want,
                 "ExecutionLocation compare to index {i}"
             );
         }
     }
 
- // ---- RoadTypeFilter (ports buildRoadTypesSQL) --------------------------
+    // ---- RoadTypeFilter (ports buildRoadTypesSQL) --------------------------
 
     #[test]
     fn road_type_filter_empty_has_neither() {
@@ -648,8 +648,8 @@ mod tests {
 
     #[test]
     fn road_type_filter_nonroad_only() {
- // Road type 100 sets `hasNonroad` and is dropped from the onroad
- // set, so `hasOnroad` stays false — a NONROAD-only run.
+        // Road type 100 sets `hasNonroad` and is dropped from the onroad
+        // set, so `hasOnroad` stays false — a NONROAD-only run.
         let f = RoadTypeFilter::from_road_type_ids([NONROAD_ROAD_TYPE_ID]);
         assert!(!f.has_onroad());
         assert!(f.has_nonroad());
@@ -670,7 +670,7 @@ mod tests {
         assert_eq!(f.onroad_road_type_ids().collect::<Vec<_>>(), vec![2, 3]);
     }
 
- // ---- selection dispatch ------------------------------------------------
+    // ---- selection dispatch ------------------------------------------------
 
     #[test]
     fn link_selection_yields_only_that_link() {
@@ -682,25 +682,29 @@ mod tests {
         let locs = producer.build_execution_locations(&sample_geography());
         assert_eq!(
             locs.into_iter().collect::<Vec<_>>(),
-            vec![ExecutionLocation::link(24, 24001, 240010, 2400100)]
+            vec![ExecutionLocation::link_with_road_type_id(
+                24, 24001, 240010, 2400100, 2
+            )]
         );
     }
 
     #[test]
     fn zone_selection_yields_links_in_zone() {
- // Zone 240010 owns exactly link 2400100.
+        // Zone 240010 owns exactly link 2400100 (road type 2).
         let producer =
             ExecutionLocationProducer::new(vec![selection(GeoKind::Zone, 240010)], [2, 3, 5], None);
         let locs = producer.build_execution_locations(&sample_geography());
         assert_eq!(
             locs.into_iter().collect::<Vec<_>>(),
-            vec![ExecutionLocation::link(24, 24001, 240010, 2400100)]
+            vec![ExecutionLocation::link_with_road_type_id(
+                24, 24001, 240010, 2400100, 2
+            )]
         );
     }
 
     #[test]
     fn county_selection_yields_all_links_in_county() {
- // County 24001 owns two links across two zones.
+        // County 24001 owns two links across two zones (road types 2 and 3).
         let producer = ExecutionLocationProducer::new(
             vec![selection(GeoKind::County, 24001)],
             [2, 3, 5],
@@ -710,24 +714,24 @@ mod tests {
         assert_eq!(
             locs.into_iter().collect::<Vec<_>>(),
             vec![
-                ExecutionLocation::link(24, 24001, 240010, 2400100),
-                ExecutionLocation::link(24, 24001, 240011, 2400110),
+                ExecutionLocation::link_with_road_type_id(24, 24001, 240010, 2400100, 2),
+                ExecutionLocation::link_with_road_type_id(24, 24001, 240011, 2400110, 3),
             ]
         );
     }
 
     #[test]
     fn state_selection_yields_all_links_in_state() {
- // State 24 owns counties 24001 (two links) and 24003 (one link).
+        // State 24 owns counties 24001 (road types 2, 3) and 24003 (road type 5).
         let producer =
             ExecutionLocationProducer::new(vec![selection(GeoKind::State, 24)], [2, 3, 5], None);
         let locs = producer.build_execution_locations(&sample_geography());
         assert_eq!(
             locs.into_iter().collect::<Vec<_>>(),
             vec![
-                ExecutionLocation::link(24, 24001, 240010, 2400100),
-                ExecutionLocation::link(24, 24001, 240011, 2400110),
-                ExecutionLocation::link(24, 24003, 240030, 2400300),
+                ExecutionLocation::link_with_road_type_id(24, 24001, 240010, 2400100, 2),
+                ExecutionLocation::link_with_road_type_id(24, 24001, 240011, 2400110, 3),
+                ExecutionLocation::link_with_road_type_id(24, 24003, 240030, 2400300, 5),
             ]
         );
     }
@@ -738,36 +742,38 @@ mod tests {
             ExecutionLocationProducer::new(vec![selection(GeoKind::Nation, 0)], [2, 3, 5], None);
         let locs = producer.build_execution_locations(&sample_geography());
         assert_eq!(locs.len(), 4);
- // BTreeSet ordering: state 24 before state 51.
+        // BTreeSet ordering: state 24 before state 51.
         assert_eq!(
             locs.into_iter().collect::<Vec<_>>(),
             vec![
-                ExecutionLocation::link(24, 24001, 240010, 2400100),
-                ExecutionLocation::link(24, 24001, 240011, 2400110),
-                ExecutionLocation::link(24, 24003, 240030, 2400300),
-                ExecutionLocation::link(51, 51001, 510010, 5100100),
+                ExecutionLocation::link_with_road_type_id(24, 24001, 240010, 2400100, 2),
+                ExecutionLocation::link_with_road_type_id(24, 24001, 240011, 2400110, 3),
+                ExecutionLocation::link_with_road_type_id(24, 24003, 240030, 2400300, 5),
+                ExecutionLocation::link_with_road_type_id(51, 51001, 510010, 5100100, 2),
             ]
         );
     }
 
- // ---- road-type filtering -----------------------------------------------
+    // ---- road-type filtering -----------------------------------------------
 
     #[test]
     fn links_with_unselected_road_type_are_excluded() {
- // Only road type 2 selected: county 24001's road-type-3 link drops.
+        // Only road type 2 selected: county 24001's road-type-3 link drops.
         let producer =
             ExecutionLocationProducer::new(vec![selection(GeoKind::County, 24001)], [2], None);
         let locs = producer.build_execution_locations(&sample_geography());
         assert_eq!(
             locs.into_iter().collect::<Vec<_>>(),
-            vec![ExecutionLocation::link(24, 24001, 240010, 2400100)]
+            vec![ExecutionLocation::link_with_road_type_id(
+                24, 24001, 240010, 2400100, 2
+            )]
         );
     }
 
     #[test]
     fn empty_road_types_yield_no_locations() {
- // Both `hasOnroad` and `hasNonroad` false: every `add*` guard
- // fails, so even a NATION selection produces nothing.
+        // Both `hasOnroad` and `hasNonroad` false: every `add*` guard
+        // fails, so even a NATION selection produces nothing.
         let producer =
             ExecutionLocationProducer::new(vec![selection(GeoKind::Nation, 0)], [], None);
         assert!(producer
@@ -775,12 +781,12 @@ mod tests {
             .is_empty());
     }
 
- // ---- NONROAD synthesis -------------------------------------------------
+    // ---- NONROAD synthesis -------------------------------------------------
 
     #[test]
     fn nonroad_county_selection_synthesises_one_link_per_county() {
- // NONROAD-only run: county 24001 becomes link (24, 24001, 24001,
- // 24001); no onroad links appear.
+        // NONROAD-only run: county 24001 becomes a synthetic link with road
+        // type 100 (NONROAD sentinel); no onroad links appear.
         let producer = ExecutionLocationProducer::new(
             vec![selection(GeoKind::County, 24001)],
             [NONROAD_ROAD_TYPE_ID],
@@ -789,7 +795,13 @@ mod tests {
         let locs = producer.build_execution_locations(&sample_geography());
         assert_eq!(
             locs.into_iter().collect::<Vec<_>>(),
-            vec![ExecutionLocation::link(24, 24001, 24001, 24001)]
+            vec![ExecutionLocation::link_with_road_type_id(
+                24,
+                24001,
+                24001,
+                24001,
+                NONROAD_ROAD_TYPE_ID,
+            )]
         );
     }
 
@@ -804,8 +816,20 @@ mod tests {
         assert_eq!(
             locs.into_iter().collect::<Vec<_>>(),
             vec![
-                ExecutionLocation::link(24, 24001, 24001, 24001),
-                ExecutionLocation::link(24, 24003, 24003, 24003),
+                ExecutionLocation::link_with_road_type_id(
+                    24,
+                    24001,
+                    24001,
+                    24001,
+                    NONROAD_ROAD_TYPE_ID,
+                ),
+                ExecutionLocation::link_with_road_type_id(
+                    24,
+                    24003,
+                    24003,
+                    24003,
+                    NONROAD_ROAD_TYPE_ID,
+                ),
             ]
         );
     }
@@ -821,17 +845,35 @@ mod tests {
         assert_eq!(
             locs.into_iter().collect::<Vec<_>>(),
             vec![
-                ExecutionLocation::link(24, 24001, 24001, 24001),
-                ExecutionLocation::link(24, 24003, 24003, 24003),
-                ExecutionLocation::link(51, 51001, 51001, 51001),
+                ExecutionLocation::link_with_road_type_id(
+                    24,
+                    24001,
+                    24001,
+                    24001,
+                    NONROAD_ROAD_TYPE_ID,
+                ),
+                ExecutionLocation::link_with_road_type_id(
+                    24,
+                    24003,
+                    24003,
+                    24003,
+                    NONROAD_ROAD_TYPE_ID,
+                ),
+                ExecutionLocation::link_with_road_type_id(
+                    51,
+                    51001,
+                    51001,
+                    51001,
+                    NONROAD_ROAD_TYPE_ID,
+                ),
             ]
         );
     }
 
     #[test]
     fn nonroad_zone_and_link_selections_produce_nothing() {
- // Java `addZoneLocations` / `addLinkLocations` have no `hasNonroad`
- // branch — a ZONE or LINK selection on a NONROAD-only run is empty.
+        // Java `addZoneLocations` / `addLinkLocations` have no `hasNonroad`
+        // branch — a ZONE or LINK selection on a NONROAD-only run is empty.
         let geo = sample_geography();
         for (kind, key) in [(GeoKind::Zone, 240010), (GeoKind::Link, 2400100)] {
             let producer = ExecutionLocationProducer::new(
@@ -848,7 +890,7 @@ mod tests {
 
     #[test]
     fn mixed_run_emits_both_onroad_links_and_nonroad_synthesis() {
- // County 24001: two onroad links plus the synthetic NONROAD link.
+        // County 24001: two onroad links plus the synthetic NONROAD link.
         let producer = ExecutionLocationProducer::new(
             vec![selection(GeoKind::County, 24001)],
             [2, 3, NONROAD_ROAD_TYPE_ID],
@@ -858,19 +900,25 @@ mod tests {
         assert_eq!(
             locs.into_iter().collect::<Vec<_>>(),
             vec![
-                ExecutionLocation::link(24, 24001, 24001, 24001),
-                ExecutionLocation::link(24, 24001, 240010, 2400100),
-                ExecutionLocation::link(24, 24001, 240011, 2400110),
+                ExecutionLocation::link_with_road_type_id(
+                    24,
+                    24001,
+                    24001,
+                    24001,
+                    NONROAD_ROAD_TYPE_ID,
+                ),
+                ExecutionLocation::link_with_road_type_id(24, 24001, 240010, 2400100, 2),
+                ExecutionLocation::link_with_road_type_id(24, 24001, 240011, 2400110, 3),
             ]
         );
     }
 
- // ---- de-duplication ----------------------------------------------------
+    // ---- de-duplication ----------------------------------------------------
 
     #[test]
     fn overlapping_selections_deduplicate() {
- // A NATION selection plus a redundant STATE selection: the state's
- // links appear once, not twice.
+        // A NATION selection plus a redundant STATE selection: the state's
+        // links appear once, not twice.
         let producer = ExecutionLocationProducer::new(
             vec![selection(GeoKind::Nation, 0), selection(GeoKind::State, 24)],
             [2, 3, 5],
@@ -888,12 +936,12 @@ mod tests {
             .is_empty());
     }
 
- // ---- custom domain -----------------------------------------------------
+    // ---- custom domain -----------------------------------------------------
 
     #[test]
     fn custom_domain_expands_the_generic_county_and_ignores_selections() {
- // A custom-domain producer ignores `geographic_selections`
- // entirely and expands only the generic county — here 24003.
+        // A custom-domain producer ignores `geographic_selections`
+        // entirely and expands only the generic county — here 24003.
         let producer = ExecutionLocationProducer::new(
             vec![selection(GeoKind::Nation, 0)],
             [2, 3, 5],
@@ -902,7 +950,9 @@ mod tests {
         let locs = producer.build_execution_locations(&sample_geography());
         assert_eq!(
             locs.into_iter().collect::<Vec<_>>(),
-            vec![ExecutionLocation::link(24, 24003, 240030, 2400300)]
+            vec![ExecutionLocation::link_with_road_type_id(
+                24, 24003, 240030, 2400300, 5
+            )]
         );
     }
 
@@ -914,13 +964,19 @@ mod tests {
         assert_eq!(
             locs.into_iter().collect::<Vec<_>>(),
             vec![
-                ExecutionLocation::link(24, 24001, 24001, 24001),
-                ExecutionLocation::link(24, 24001, 240010, 2400100),
+                ExecutionLocation::link_with_road_type_id(
+                    24,
+                    24001,
+                    24001,
+                    24001,
+                    NONROAD_ROAD_TYPE_ID,
+                ),
+                ExecutionLocation::link_with_road_type_id(24, 24001, 240010, 2400100, 2),
             ]
         );
     }
 
- // ---- accessors ---------------------------------------------------------
+    // ---- accessors ---------------------------------------------------------
 
     #[test]
     fn geography_tables_accessors() {
@@ -942,16 +998,22 @@ mod tests {
         };
         assert_eq!(
             link.location(),
-            ExecutionLocation::link(24, 24001, 240010, 2400100)
+            ExecutionLocation::link_with_road_type_id(24, 24001, 240010, 2400100, 2)
         );
         let county = CountyRow {
             state_id: 24,
             county_id: 24001,
         };
- // NONROAD synthesis: county id stands in as zone and link.
+        // NONROAD synthesis: county id stands in as zone and link; road type 100.
         assert_eq!(
             county.nonroad_location(),
-            ExecutionLocation::link(24, 24001, 24001, 24001)
+            ExecutionLocation::link_with_road_type_id(
+                24,
+                24001,
+                24001,
+                24001,
+                NONROAD_ROAD_TYPE_ID
+            )
         );
     }
 

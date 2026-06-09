@@ -52,10 +52,10 @@ pub struct CalculatorDag {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Source {
- /// SHA-256 of the parsed `CalculatorInfo.txt`. Lowercase hex.
+    /// SHA-256 of the parsed `CalculatorInfo.txt`. Lowercase hex.
     pub calculator_info_sha256: String,
- /// Number of Java source files the optional source-dir scan visited.
- /// Zero if the scan was skipped.
+    /// Number of Java source files the optional source-dir scan visited.
+    /// Zero if the scan was skipped.
     pub java_files_scanned: usize,
 }
 
@@ -94,9 +94,9 @@ impl ModuleKind {
 /// Where a piece of subscription info came from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SubscriptionSource {
- /// Runtime log `Subscribe` directive — captured during a real MOVES run.
+    /// Runtime log `Subscribe` directive — captured during a real MOVES run.
     CalculatorInfo,
- /// Recovered from a `.java` source file under the optional source-dir.
+    /// Recovered from a `.java` source file under the optional source-dir.
     JavaSource,
 }
 
@@ -104,26 +104,26 @@ pub enum SubscriptionSource {
 pub struct ModuleEntry {
     pub name: String,
     pub kind: ModuleKind,
- /// True if any source records the module subscribing directly to the
- /// MasterLoop. False if it only participates via chaining or never
- /// hooks the loop at all.
+    /// True if any source records the module subscribing directly to the
+    /// MasterLoop. False if it only participates via chaining or never
+    /// hooks the loop at all.
     pub subscribes_directly: bool,
- /// Subscription records, oldest-known-first. Each entry pins the
- /// `(process, granularity, priority)` triple along with the source it
- /// was learned from.
+    /// Subscription records, oldest-known-first. Each entry pins the
+    /// `(process, granularity, priority)` triple along with the source it
+    /// was learned from.
     pub subscriptions: Vec<SubscriptionEntry>,
- /// Total number of `(process, pollutant)` pairs this module registered
- /// to produce. The full list is in the top-level `registrations`
- /// array; this is the cheap-to-read summary.
+    /// Total number of `(process, pollutant)` pairs this module registered
+    /// to produce. The full list is in the top-level `registrations`
+    /// array; this is the cheap-to-read summary.
     pub registrations_count: usize,
- /// Modules whose output this module consumes (upstream).
+    /// Modules whose output this module consumes (upstream).
     pub depends_on: Vec<String>,
- /// Modules that consume this module's output (downstream).
+    /// Modules that consume this module's output (downstream).
     pub dependents: Vec<String>,
- /// Transitive closure of `dependents`. When this module fires, every
- /// module in this list (in topological order) also fires.
+    /// Transitive closure of `dependents`. When this module fires, every
+    /// module in this list (in topological order) also fires.
     pub chained_downstream: Vec<String>,
- /// Java source path, if the optional source-dir scan saw it.
+    /// Java source path, if the optional source-dir scan saw it.
     pub java_path: Option<String>,
 }
 
@@ -133,14 +133,14 @@ pub struct SubscriptionEntry {
     pub process_name: String,
     pub granularity: Granularity,
     pub priority: Priority,
- /// Total integer priority (Java's `MasterLoopPriority` value).
+    /// Total integer priority (Java's `MasterLoopPriority` value).
     pub priority_value: i32,
- /// Numeric granularity value matching Java's
- /// `MasterLoopGranularity.granularityValue`.
+    /// Numeric granularity value matching Java's
+    /// `MasterLoopGranularity.granularityValue`.
     pub granularity_value: i32,
- /// Execution-order index — smaller fires earlier. Combines granularity
- /// (coarsest first) and priority (highest first) into a single key
- /// downstream sort routines can use. See [`Granularity::execution_index`].
+    /// Execution-order index — smaller fires earlier. Combines granularity
+    /// (coarsest first) and priority (highest first) into a single key
+    /// downstream sort routines can use. See [`Granularity::execution_index`].
     pub execution_index: ExecutionIndex,
     pub source: SubscriptionSource,
 }
@@ -177,13 +177,13 @@ pub struct ExecutionChain {
     pub process_name: String,
     pub pollutant_id: u32,
     pub pollutant_name: String,
- /// Calculators that registered to produce this `(process, pollutant)`,
- /// sorted alphabetically.
+    /// Calculators that registered to produce this `(process, pollutant)`,
+    /// sorted alphabetically.
     pub registered_calculators: Vec<String>,
- /// Root subscribers whose chain templates fire for this key. Sorted
- /// in MasterLoop firing order: coarsest granularity first, then
- /// highest priority. Each name is also a key in
- /// [`CalculatorDag::chain_templates`].
+    /// Root subscribers whose chain templates fire for this key. Sorted
+    /// in MasterLoop firing order: coarsest granularity first, then
+    /// highest priority. Each name is also a key in
+    /// [`CalculatorDag::chain_templates`].
     pub roots: Vec<String>,
 }
 
@@ -192,16 +192,16 @@ pub struct ExecutionChain {
 /// calculators inherit the root's (granularity, priority).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChainTemplate {
- /// The direct-subscriber that drives this chain. Unique within the
- /// `chain_templates` array.
+    /// The direct-subscriber that drives this chain. Unique within the
+    /// `chain_templates` array.
     pub root: String,
- /// The (granularity, priority) the root subscribes at. `None` for
- /// roots whose subscription metadata we don't have (e.g. Java-source
- /// scan saw the class but didn't find a usable subscribe call).
+    /// The (granularity, priority) the root subscribes at. `None` for
+    /// roots whose subscription metadata we don't have (e.g. Java-source
+    /// scan saw the class but didn't find a usable subscribe call).
     pub granularity: Option<Granularity>,
     pub priority: Option<Priority>,
- /// Topological order, starting at `root`. Each step is a module that
- /// fires when the root fires.
+    /// Topological order, starting at `root`. Each step is a module that
+    /// fires when the root fires.
     pub steps: Vec<ChainStep>,
 }
 
@@ -211,8 +211,8 @@ pub struct ChainTemplate {
 pub struct ChainStep {
     pub module: String,
     pub role: ChainRole,
- /// For chained steps, the parent in the chain tree (the module that
- /// directly triggers this step). `None` for the root.
+    /// For chained steps, the parent in the chain tree (the module that
+    /// directly triggers this step). `None` for the root.
     pub triggered_by: Option<String>,
 }
 
@@ -247,7 +247,7 @@ pub fn build_dag(
     let chains_in: BTreeMap<String, BTreeSet<String>> = group_chains_inputs(&info.chains);
     let chains_out: BTreeMap<String, BTreeSet<String>> = group_chains_outputs(&info.chains);
 
- // 1. Modules table.
+    // 1. Modules table.
     let mut modules: Vec<ModuleEntry> = Vec::new();
     for name in &module_set {
         let subscriptions = build_subscription_entries(name, info, java_subscriptions);
@@ -283,10 +283,10 @@ pub fn build_dag(
         });
     }
 
- // 2. Transitive downstream closure.
+    // 2. Transitive downstream closure.
     fill_chained_downstream(&mut modules, &chains_in);
 
- // 3. Chain edges (verbatim copy of directives, deduplicated).
+    // 3. Chain edges (verbatim copy of directives, deduplicated).
     let mut chain_edges: BTreeSet<(String, String)> = BTreeSet::new();
     for c in &info.chains {
         chain_edges.insert((c.output.clone(), c.input.clone()));
@@ -296,9 +296,9 @@ pub fn build_dag(
         .map(|(output, input)| ChainEdge { output, input })
         .collect();
 
- // 4. Registrations sorted on (process_id, pollutant_id, calculator).
- // BTreeMap keyed by the sort tuple deduplicates raw directives that
- // recorded the same (process, pollutant, calculator) more than once.
+    // 4. Registrations sorted on (process_id, pollutant_id, calculator).
+    // BTreeMap keyed by the sort tuple deduplicates raw directives that
+    // recorded the same (process, pollutant, calculator) more than once.
     let mut registration_map: BTreeMap<(u32, u32, String), RegistrationEntry> = BTreeMap::new();
     for r in &info.registrations {
         registration_map
@@ -313,17 +313,17 @@ pub fn build_dag(
     }
     let registrations: Vec<RegistrationEntry> = registration_map.into_values().collect();
 
- // 5. Per-(process, pollutant) execution chains, plus the deduplicated
- // chain templates they reference.
+    // 5. Per-(process, pollutant) execution chains, plus the deduplicated
+    // chain templates they reference.
     let module_index: BTreeMap<String, &ModuleEntry> =
         modules.iter().map(|m| (m.name.clone(), m)).collect();
     let (chain_templates, execution_chains) =
         build_execution_chains(&registrations, &module_index, &chains_out, &chains_in, info)?;
 
- // 6. Global execution order over all subscribers.
+    // 6. Global execution order over all subscribers.
     let global_execution_order = build_global_execution_order(&modules);
 
- // 7. Counts.
+    // 7. Counts.
     let direct_subscribers = modules.iter().filter(|m| m.subscribes_directly).count();
     let chained_only_modules = modules
         .iter()
@@ -432,27 +432,27 @@ fn build_subscription_entries(
             ));
         }
     }
- // Java-source fallback: only consulted when the runtime log didn't
- // mention this module.
+    // Java-source fallback: only consulted when the runtime log didn't
+    // mention this module.
     if out.is_empty() {
         for j in java_subscriptions
             .iter()
             .filter(|j| j.calculator == module && j.style != SubscribeStyle::ChainedOnly)
         {
             if let (Some(g), Some(p)) = (j.granularity, j.priority) {
- // The static Java scan cannot recover the real numeric
- // process id(s) this subscription fires for: for GenericBase
- // the constructor passes a `pollutantProcessIDs` String[] that
- // GenericCalculatorBase.subscribeToMe resolves against the
- // execution DB and subscribes once per real EmissionProcess
- // (see framework/GenericCalculatorBase.java:256-284 — never
- // process id 0); for an explicit `targetLoop.subscribe(this,
- // <expr>, ...)` the process arg is a runtime variable, not a
- // literal. Canonical MOVES has NO process-id-0 "all processes"
- // subscription, so we emit process_id=0 strictly as an
- // unresolved marker (paired with source=JavaSource) and make
- // process_name self-describing so a consumer of the JSON cannot
- // silently mistake the 0 for a real, named process.
+                // The static Java scan cannot recover the real numeric
+                // process id(s) this subscription fires for: for GenericBase
+                // the constructor passes a `pollutantProcessIDs` String[] that
+                // GenericCalculatorBase.subscribeToMe resolves against the
+                // execution DB and subscribes once per real EmissionProcess
+                // (see framework/GenericCalculatorBase.java:256-284 — never
+                // process id 0); for an explicit `targetLoop.subscribe(this,
+                // <expr>, ...)` the process arg is a runtime variable, not a
+                // literal. Canonical MOVES has NO process-id-0 "all processes"
+                // subscription, so we emit process_id=0 strictly as an
+                // unresolved marker (paired with source=JavaSource) and make
+                // process_name self-describing so a consumer of the JSON cannot
+                // silently mistake the 0 for a real, named process.
                 let (pid, pname): (u32, &str) = match j.style {
                     SubscribeStyle::GenericBase => (0, "<unresolved: all RunSpec processes>"),
                     _ if j.process_expr.is_empty() => (0, "<unresolved process>"),
@@ -544,12 +544,12 @@ fn build_execution_chains(
     chains_in: &BTreeMap<String, BTreeSet<String>>,
     _info: &CalculatorInfo,
 ) -> Result<(Vec<ChainTemplate>, Vec<ExecutionChain>)> {
- // Phase A: for every registered calculator, walk up to its root
- // subscriber(s). Phase B: rebuild every distinct root's chain steps
- // once (cached). Phase C: emit one ExecutionChain per (process,
- // pollutant), referencing roots by name.
+    // Phase A: for every registered calculator, walk up to its root
+    // subscriber(s). Phase B: rebuild every distinct root's chain steps
+    // once (cached). Phase C: emit one ExecutionChain per (process,
+    // pollutant), referencing roots by name.
 
- // Pre-compute root chains in a deterministic order.
+    // Pre-compute root chains in a deterministic order.
     let mut templates: BTreeMap<String, ChainTemplate> = BTreeMap::new();
     let mut roots_for_registered: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let mut all_registered: BTreeSet<String> = BTreeSet::new();
@@ -588,7 +588,7 @@ fn build_execution_chains(
         }
     }
 
- // Group registrations by (process_id, pollutant_id).
+    // Group registrations by (process_id, pollutant_id).
     let mut grouped: BTreeMap<(u32, u32), (String, String, BTreeSet<String>)> = BTreeMap::new();
     for r in registrations {
         let entry = grouped.entry((r.process_id, r.pollutant_id)).or_insert((
@@ -602,7 +602,7 @@ fn build_execution_chains(
     let mut out: Vec<ExecutionChain> = Vec::new();
     for ((process_id, pollutant_id), (process_name, pollutant_name, regs)) in grouped {
         let registered: Vec<String> = regs.iter().cloned().collect();
- // Collect roots across all registered calcs (deduplicated).
+        // Collect roots across all registered calcs (deduplicated).
         let mut roots_set: BTreeSet<String> = BTreeSet::new();
         for reg in &registered {
             if let Some(rs) = roots_for_registered.get(reg) {
@@ -611,8 +611,8 @@ fn build_execution_chains(
                 }
             }
         }
- // Order roots by MasterLoop firing order, then by name as a stable
- // tiebreaker.
+        // Order roots by MasterLoop firing order, then by name as a stable
+        // tiebreaker.
         let mut roots: Vec<String> = roots_set.into_iter().collect();
         roots.sort_by(|a, b| {
             let ia = template_execution_index(templates.get(a));
@@ -644,7 +644,7 @@ fn template_execution_index(template: Option<&ChainTemplate>) -> ExecutionIndex 
             granularity_index: g.execution_index(),
             neg_priority: -p.value(),
         },
- // Unknown subscription metadata sorts last.
+        // Unknown subscription metadata sorts last.
         None => ExecutionIndex {
             granularity_index: i32::MAX,
             neg_priority: i32::MAX,
@@ -707,9 +707,9 @@ fn build_chain_template(
         triggered_by: None,
     }];
 
- // BFS to enumerate the downstream chain rooted at `root`, in topo
- // order (parent fires before child). Parents are recorded so the
- // output captures who triggers whom.
+    // BFS to enumerate the downstream chain rooted at `root`, in topo
+    // order (parent fires before child). Parents are recorded so the
+    // output captures who triggers whom.
     let mut visited: BTreeSet<String> = BTreeSet::new();
     visited.insert(root.to_string());
     let mut frontier: Vec<String> = vec![root.to_string()];
@@ -813,13 +813,13 @@ mod tests {
         assert_eq!(hc.depends_on, vec!["BaseRateCalculator"]);
         assert_eq!(base.dependents, vec!["HCSpeciationCalculator"]);
         assert_eq!(base.chained_downstream, vec!["HCSpeciationCalculator"]);
- // HCSpeciation has no direct subscriber line — so it's chained-only.
+        // HCSpeciation has no direct subscriber line — so it's chained-only.
         assert!(!hc.subscribes_directly);
     }
 
     #[test]
     fn transitive_chained_downstream() {
- // Chain A → B → C; A subscribes; B and C do not.
+        // Chain A → B → C; A subscribes; B and C do not.
         let info = parse(
             "Subscribe\tA\tRunning Exhaust\t1\tMONTH\tEMISSION_CALCULATOR\n\
              Chain\tB\tA\n\
@@ -834,8 +834,8 @@ mod tests {
 
     #[test]
     fn execution_chain_walks_from_root_subscriber() {
- // Two registrations for (1, 2): a direct subscriber (Root) and a
- // chained child (Leaf) reachable via Root.
+        // Two registrations for (1, 2): a direct subscriber (Root) and a
+        // chained child (Leaf) reachable via Root.
         let info = parse(
             "Registration\tCO\t2\tRunning Exhaust\t1\tRoot\n\
              Registration\tCO\t2\tRunning Exhaust\t1\tLeaf\n\
@@ -848,10 +848,10 @@ mod tests {
         assert_eq!(ec.process_id, 1);
         assert_eq!(ec.pollutant_id, 2);
         assert_eq!(ec.registered_calculators, vec!["Leaf", "Root"]);
- // Both registered calcs resolve to Root, so a single root drives
- // this (process, pollutant).
+        // Both registered calcs resolve to Root, so a single root drives
+        // this (process, pollutant).
         assert_eq!(ec.roots, vec!["Root"]);
- // The matching template captures Root → Leaf in topological order.
+        // The matching template captures Root → Leaf in topological order.
         assert_eq!(dag.chain_templates.len(), 1);
         let template = &dag.chain_templates[0];
         assert_eq!(template.root, "Root");
@@ -866,8 +866,8 @@ mod tests {
 
     #[test]
     fn execution_chain_orders_roots_by_firing_order() {
- // Two registrations for (1, 2): two direct subscribers at
- // different granularities. Coarser (MONTH) should fire first.
+        // Two registrations for (1, 2): two direct subscribers at
+        // different granularities. Coarser (MONTH) should fire first.
         let info = parse(
             "Registration\tCO\t2\tRunning Exhaust\t1\tMonthRoot\n\
              Registration\tCO\t2\tRunning Exhaust\t1\tDayRoot\n\
@@ -893,8 +893,8 @@ mod tests {
             .iter()
             .map(|e| e.module.as_str())
             .collect();
- // Inside MONTH (coarser than DAY): GenHi(=100) > GenLow(=99) > MonthCalc(=10)
- // DAY (finer) fires last.
+        // Inside MONTH (coarser than DAY): GenHi(=100) > GenLow(=99) > MonthCalc(=10)
+        // DAY (finer) fires last.
         assert_eq!(order, vec!["GenHi", "GenLow", "MonthCalc", "DayCalc"]);
     }
 
@@ -906,18 +906,18 @@ mod tests {
              Subscribe\tBaseRateCalculator\tRunning Exhaust\t1\tMONTH\tEMISSION_CALCULATOR\n",
         );
         let dag = build_dag(&info, &[]).unwrap();
- // Two raw directives → one canonical registration entry.
+        // Two raw directives → one canonical registration entry.
         assert_eq!(dag.registrations.len(), 1);
- // The module entry still counts every original raw directive, since
- // that's how's RunSpec-driven instantiation will see them
- // (every duplicate pre-image came from a distinct call site).
+        // The module entry still counts every original raw directive, since
+        // that's how's RunSpec-driven instantiation will see them
+        // (every duplicate pre-image came from a distinct call site).
         assert_eq!(dag.modules[0].registrations_count, 2);
     }
 
     #[test]
     fn java_subscription_fills_in_missing_module() {
- // BaseCalc has no Subscribe in CalculatorInfo (didn't fire) but
- // Java says it's a GenericCalculatorBase subclass at MONTH/+1.
+        // BaseCalc has no Subscribe in CalculatorInfo (didn't fire) but
+        // Java says it's a GenericCalculatorBase subclass at MONTH/+1.
         let info = parse("Registration\tCO\t2\tRunning Exhaust\t1\tBaseCalc\n");
         let java = vec![JavaSubscription {
             calculator: "BaseCalc".into(),
@@ -986,13 +986,13 @@ mod tests {
 
     #[test]
     fn registered_calculator_not_chained_to_any_subscriber_has_no_chains() {
- // Orphan: registers for (1, 2), no subscribe entry, no chain.
+        // Orphan: registers for (1, 2), no subscribe entry, no chain.
         let info = parse("Registration\tCO\t2\tRunning Exhaust\t1\tOrphan\n");
         let dag = build_dag(&info, &[]).unwrap();
         assert_eq!(dag.execution_chains.len(), 1);
         let ec = &dag.execution_chains[0];
         assert_eq!(ec.registered_calculators, vec!["Orphan"]);
- // Orphan doesn't subscribe and has no upstream → no roots.
+        // Orphan doesn't subscribe and has no upstream → no roots.
         assert!(ec.roots.is_empty());
         assert!(dag.chain_templates.is_empty());
     }

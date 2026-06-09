@@ -102,9 +102,9 @@ struct PlanEntry {
 }
 
 impl<'a> ImportSession<'a> {
- /// Begin building a session. `output_root` is the directory that
- /// will receive `<table>.parquet` files plus `manifest.json`. The
- /// directory is created on `write_to_disk` if it doesn't exist.
+    /// Begin building a session. `output_root` is the directory that
+    /// will receive `<table>.parquet` files plus `manifest.json`. The
+    /// directory is created on `write_to_disk` if it doesn't exist.
     pub fn builder<P: Into<PathBuf>>(
         output_root: P,
         runspec: &'a RunSpecFilter,
@@ -116,8 +116,8 @@ impl<'a> ImportSession<'a> {
         }
     }
 
- /// Read every planned CSV, write the Parquet files atomically,
- /// and write `manifest.json` alongside them. Returns the manifest.
+    /// Read every planned CSV, write the Parquet files atomically,
+    /// and write `manifest.json` alongside them. Returns the manifest.
     pub fn write_to_disk(&self) -> Result<Manifest> {
         std::fs::create_dir_all(&self.output_root).map_err(|source| Error::Io {
             path: self.output_root.clone(),

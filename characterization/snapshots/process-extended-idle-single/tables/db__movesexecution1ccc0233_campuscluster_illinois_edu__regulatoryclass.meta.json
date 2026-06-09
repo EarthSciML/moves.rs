@@ -1,0 +1,28 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__regulatoryclass",
+  "schema": [
+    {
+      "name": "regClassID",
+      "kind": "int64"
+    },
+    {
+      "name": "regClassName",
+      "kind": "utf8"
+    },
+    {
+      "name": "regClassDesc",
+      "kind": "utf8"
+    },
+    {
+      "name": "fleetAvgGroupID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "regClassID"
+  ],
+  "row_count": 10,
+  "float_decimals": 12,
+  "content_sha256": "603bbf3c05461743ed6bf568c961d2d29aa7bec2763e772721ff5c7093b2861e"
+}

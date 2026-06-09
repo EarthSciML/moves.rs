@@ -48,15 +48,15 @@ pub struct RateOfProgressControlStrategy {
 }
 
 impl RateOfProgressControlStrategy {
- /// Build from a [`RopTable`] of reduction parameters.
- ///
- /// The table is applied in [`pre_run`](Self::pre_run) to modify emission
- /// rate tables in the execution database before calculators run.
+    /// Build from a [`RopTable`] of reduction parameters.
+    ///
+    /// The table is applied in [`pre_run`](Self::pre_run) to modify emission
+    /// rate tables in the execution database before calculators run.
     pub fn new(table: RopTable) -> Self {
         Self { table }
     }
 
- /// The reduction table that will be applied in [`pre_run`](Self::pre_run).
+    /// The reduction table that will be applied in [`pre_run`](Self::pre_run).
     pub fn table(&self) -> &RopTable {
         &self.table
     }
@@ -68,12 +68,12 @@ impl InternalControlStrategy for RateOfProgressControlStrategy {
     }
 
     fn modified_tables(&self) -> &[&'static str] {
- // Tables the canonical `spDoRateOfProgress` procedure rewrites when the
- // Clean-Air-Act effect is removed (see `database/RateOfProgressStrategy.sql`).
- // This is the subset most material to downstream calculators; the full
- // procedure touches additional fuel and air-toxic ratio tables. The list
- // is advisory metadata for engine invalidation — `pre_run` does not yet
- // perform these rewrites (see below).
+        // Tables the canonical `spDoRateOfProgress` procedure rewrites when the
+        // Clean-Air-Act effect is removed (see `database/RateOfProgressStrategy.sql`).
+        // This is the subset most material to downstream calculators; the full
+        // procedure touches additional fuel and air-toxic ratio tables. The list
+        // is advisory metadata for engine invalidation — `pre_run` does not yet
+        // perform these rewrites (see below).
         &[
             "baseFuel",
             "fuelSupply",
@@ -88,16 +88,16 @@ impl InternalControlStrategy for RateOfProgressControlStrategy {
         &self,
         _tables: &mut InMemoryStore,
     ) -> std::result::Result<(), moves_framework::Error> {
- // Canonical MOVES runs `spDoRateOfProgress` here, propagating the
- // RateOfProgress cut-point (1993) model-year-group data forward across
- // the execution-DB tables listed in `modified_tables`. That port depends
- // on default-DB structures this crate does not yet expose
- // (`modelYearCutPoints`, model-year-group decoding, the fuel-year ripple).
- //
- // Rather than silently returning success — which would leave every
- // advertised modified table untouched and drop the entire control effect
- // while the run reports OK — surface the unported path as an explicit
- // error so callers cannot mistake a no-op for an applied strategy.
+        // Canonical MOVES runs `spDoRateOfProgress` here, propagating the
+        // RateOfProgress cut-point (1993) model-year-group data forward across
+        // the execution-DB tables listed in `modified_tables`. That port depends
+        // on default-DB structures this crate does not yet expose
+        // (`modelYearCutPoints`, model-year-group decoding, the fuel-year ripple).
+        //
+        // Rather than silently returning success — which would leave every
+        // advertised modified table untouched and drop the entire control effect
+        // while the run reports OK — surface the unported path as an explicit
+        // error so callers cannot mistake a no-op for an applied strategy.
         Err(moves_framework::Error::NotImplemented)
     }
 }
@@ -132,8 +132,8 @@ mod tests {
 
     #[test]
     fn pre_run_reports_unported_with_empty_table() {
- // The Clean-Air-Act removal procedure is not ported; `pre_run` must
- // surface that explicitly rather than silently returning success.
+        // The Clean-Air-Act removal procedure is not ported; `pre_run` must
+        // surface that explicitly rather than silently returning success.
         let s = RateOfProgressControlStrategy::new(RopTable::new());
         let mut store = InMemoryStore::new();
         let err = s

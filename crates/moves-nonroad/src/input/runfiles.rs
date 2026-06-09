@@ -67,64 +67,64 @@ use std::path::{Path, PathBuf};
 /// parsers.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunFiles {
- /// Output message-log path (always required).
+    /// Output message-log path (always required).
     pub message: PathBuf,
- /// Allocation cross-reference input path (required).
+    /// Allocation cross-reference input path (required).
     pub alloc_xref: PathBuf,
- /// Activity-data input path (required).
+    /// Activity-data input path (required).
     pub activity: PathBuf,
- /// Exhaust technology fractions input path (required).
+    /// Exhaust technology fractions input path (required).
     pub exhaust_tech: PathBuf,
- /// Evaporative technology fractions input path (required).
+    /// Evaporative technology fractions input path (required).
     pub evap_tech: PathBuf,
- /// Seasonality input path (required).
+    /// Seasonality input path (required).
     pub seasonality: PathBuf,
- /// Regions definition input path (required).
+    /// Regions definition input path (required).
     pub regions: PathBuf,
- /// Primary output-data path (required).
+    /// Primary output-data path (required).
     pub output_data: PathBuf,
- /// EPS2 AMS workfile output path (optional).
+    /// EPS2 AMS workfile output path (optional).
     pub ams: Option<PathBuf>,
- /// US Counties FIPS lookup path (optional).
+    /// US Counties FIPS lookup path (optional).
     pub fips: Option<PathBuf>,
- /// Retrofit input path (optional).
+    /// Retrofit input path (optional).
     pub retrofit: Option<PathBuf>,
- /// Population input files (at least one; `MXPFIL = 3265` in the
- /// Fortran source).
+    /// Population input files (at least one; `MXPFIL = 3265` in the
+    /// Fortran source).
     pub population: Vec<PathBuf>,
- /// Exhaust by-model-year output path (optional).
+    /// Exhaust by-model-year output path (optional).
     pub exhaust_bmy_out: Option<PathBuf>,
- /// Evaporative by-model-year output path (optional).
+    /// Evaporative by-model-year output path (optional).
     pub evap_bmy_out: Option<PathBuf>,
- /// SI-report output path (optional).
+    /// SI-report output path (optional).
     pub si_report: Option<PathBuf>,
- /// Daily-temperature/RVP input path (optional).
+    /// Daily-temperature/RVP input path (optional).
     pub daily_temp_rvp: Option<PathBuf>,
- /// Non-fatal warnings (unknown labels, etc.) collected during the
- /// parse. The Fortran source raises a fatal error on unknown
- /// labels (`7007`); the Rust port keeps the same default but
- /// callers that prefer a permissive parse can switch to
- /// [`RunFilesOptions::permissive`].
+    /// Non-fatal warnings (unknown labels, etc.) collected during the
+    /// parse. The Fortran source raises a fatal error on unknown
+    /// labels (`7007`); the Rust port keeps the same default but
+    /// callers that prefer a permissive parse can switch to
+    /// [`RunFilesOptions::permissive`].
     pub warnings: Vec<String>,
 }
 
 /// Parser-time options.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RunFilesOptions {
- /// When `true`, unknown labels in any packet are recorded as
- /// warnings instead of raised as fatal errors. The Fortran source
- /// is strict; this is provided as an opt-in escape hatch for
- /// adopted-but-extended packet vocabularies.
+    /// When `true`, unknown labels in any packet are recorded as
+    /// warnings instead of raised as fatal errors. The Fortran source
+    /// is strict; this is provided as an opt-in escape hatch for
+    /// adopted-but-extended packet vocabularies.
     pub permissive_labels: bool,
 }
 
 impl RunFilesOptions {
- /// Strict parse mirroring `opnnon.f`'s behaviour.
+    /// Strict parse mirroring `opnnon.f`'s behaviour.
     pub const STRICT: Self = Self {
         permissive_labels: false,
     };
 
- /// Permissive parse — unknown labels become warnings.
+    /// Permissive parse — unknown labels become warnings.
     pub const fn permissive() -> Self {
         Self {
             permissive_labels: true,
@@ -435,12 +435,12 @@ fn split_label_value(line: &str) -> (String, String) {
 }
 
 impl RunFiles {
- /// Verify that every required input file exists on disk.
- ///
- /// Returns an [`Error::Config`] listing every missing path. The
- /// Fortran source performs the same check inline via `inquire`
- /// statements (`opnnon.f` lines 241–323). Output paths are not
- /// checked — the orchestrator creates them on open.
+    /// Verify that every required input file exists on disk.
+    ///
+    /// Returns an [`Error::Config`] listing every missing path. The
+    /// Fortran source performs the same check inline via `inquire`
+    /// statements (`opnnon.f` lines 241–323). Output paths are not
+    /// checked — the orchestrator creates them on open.
     pub fn check_exists(&self) -> Result<()> {
         let mut missing: Vec<&Path> = Vec::new();
         let required_inputs: [&Path; 7] = [
@@ -450,8 +450,8 @@ impl RunFiles {
             self.evap_tech.as_path(),
             self.seasonality.as_path(),
             self.regions.as_path(),
- // FIPS file required only if specified — included as
- // optional via `self.fips` below.
+            // FIPS file required only if specified — included as
+            // optional via `self.fips` below.
             self.population
                 .first()
                 .map(|p| p.as_path())
@@ -602,7 +602,7 @@ DAILY              : daily.dat
     #[test]
     fn check_exists_flags_missing_inputs() {
         let dir = TempDir::new().unwrap();
- // Create a subset of expected files; leave the rest missing.
+        // Create a subset of expected files; leave the rest missing.
         let exists = ["allocate.xref", "exhtech.dat", "pop1.pop"];
         for name in exists {
             let mut f = std::fs::File::create(dir.path().join(name)).unwrap();

@@ -1,0 +1,40 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__hotellingactivitydistribution",
+  "schema": [
+    {
+      "name": "zoneID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "beginModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "endModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeID",
+      "kind": "int64"
+    },
+    {
+      "name": "opModeFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "zoneID",
+    "fuelTypeID",
+    "beginModelYearID",
+    "endModelYearID",
+    "opModeID"
+  ],
+  "row_count": 12,
+  "float_decimals": 12,
+  "content_sha256": "76b77ba1839f5ec34cac392a3cbc1bc42b024ed64f7f1c38c9c1a18b4324f844"
+}

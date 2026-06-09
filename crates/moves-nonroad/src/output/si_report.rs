@@ -33,14 +33,14 @@ use crate::output::statics::{MXOTCH, SI_INDEX, SI_TECH};
 /// initialises.
 #[derive(Debug, Clone)]
 pub struct SiReport {
- /// Population total per output bin (`popsi`).
+    /// Population total per output bin (`popsi`).
     pub population: [f32; MXOTCH],
- /// Activity total per output bin (`actsi`).
+    /// Activity total per output bin (`actsi`).
     pub activity: [f32; MXOTCH],
- /// Fuel-consumption total per output bin (`fuelsi`).
+    /// Fuel-consumption total per output bin (`fuelsi`).
     pub fuel: [f32; MXOTCH],
- /// Per-pollutant emission totals per output bin (`emissi`):
- /// `emissions[bin][pollutant_slot]`.
+    /// Per-pollutant emission totals per output bin (`emissi`):
+    /// `emissions[bin][pollutant_slot]`.
     pub emissions: [[f32; MXPOL]; MXOTCH],
 }
 
@@ -58,22 +58,22 @@ impl Default for SiReport {
 /// Outcome of feeding one record to [`SiReport::accumulate`]/// `sitot.f`'s `ISUCES`/`ISKIP` return codes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SiOutcome {
- /// The record's tech type is one of the 42 SI-tracked types and
- /// its totals were added to a bin (`ISUCES`).
+    /// The record's tech type is one of the 42 SI-tracked types and
+    /// its totals were added to a bin (`ISUCES`).
     Accumulated,
- /// The record's tech type is not SI-tracked; the record
- /// contributes nothing (`ISKIP`).
+    /// The record's tech type is not SI-tracked; the record
+    /// contributes nothing (`ISKIP`).
     Skipped,
 }
 
 impl SiReport {
- /// Add one record's totals to the matching SI bin — `sitot.f`.
- ///
- /// The record's `tech_type` is matched against the [`SI_TECH`]
- /// table; an unmatched type returns [`SiOutcome::Skipped`] and
- /// leaves the accumulator untouched. A negative population,
- /// activity, fuel, or emission value is NONROAD's "no data"
- /// marker and is not added.
+    /// Add one record's totals to the matching SI bin — `sitot.f`.
+    ///
+    /// The record's `tech_type` is matched against the [`SI_TECH`]
+    /// table; an unmatched type returns [`SiOutcome::Skipped`] and
+    /// leaves the accumulator untouched. A negative population,
+    /// activity, fuel, or emission value is NONROAD's "no data"
+    /// marker and is not added.
     pub fn accumulate(
         &mut self,
         tech_type: &str,
@@ -82,21 +82,21 @@ impl SiReport {
         fuel: f32,
         emissions: &[f32; MXPOL],
     ) -> SiOutcome {
- // sitot.f :76–80 — fndchr lookup of the tech type. The
- // Fortran compares the 10-character (blank-padded) fields, so
- // trailing blanks on the record's name are not significant.
+        // sitot.f :76–80 — fndchr lookup of the tech type. The
+        // Fortran compares the 10-character (blank-padded) fields, so
+        // trailing blanks on the record's name are not significant.
         let key = tech_type.trim_end();
         let Some(table_idx) = SI_TECH.iter().position(|&t| t == key) else {
             return SiOutcome::Skipped;
         };
- // sitot.f :84 — the indxsi entry maps the input slot to a
- // 1-based output bin; with the static SI_INDEX table it is
- // always within range, so the Fortran's `7000` out-of-range
- // error path is unreachable.
+        // sitot.f :84 — the indxsi entry maps the input slot to a
+        // 1-based output bin; with the static SI_INDEX table it is
+        // always within range, so the Fortran's `7000` out-of-range
+        // error path is unreachable.
         let bin = usize::from(SI_INDEX[table_idx]) - 1;
         debug_assert!(bin < MXOTCH, "SI_INDEX entry exceeds MXOTCH");
 
- // sitot.f :88–110 — accumulate, skipping the no-data marker.
+        // sitot.f :88–110 — accumulate, skipping the no-data marker.
         if population >= 0.0 {
             self.population[bin] += population;
         }
@@ -133,7 +133,7 @@ fn pollutant_column(report: &SiReport, pollutant: PollutantIndex) -> [f32; MXOTC
     let slot = pollutant.slot();
     let mut column = [0.0; MXOTCH];
     for (bin, value) in column.iter_mut().enumerate() {
- *value = report.emissions[bin][slot];
+        *value = report.emissions[bin][slot];
     }
     column
 }
@@ -167,12 +167,12 @@ mod tests {
         [0.0; MXPOL]
     }
 
- // ---- sitot ----
+    // ---- sitot ----
 
     #[test]
     fn accumulate_maps_tech_type_to_its_bin() {
         let mut report = SiReport::default();
- // "G2N1" is SI_TECH[0] → SI_INDEX[0] = 1 → bin 0.
+        // "G2N1" is SI_TECH[0] → SI_INDEX[0] = 1 → bin 0.
         let outcome = report.accumulate("G2N1", 100.0, 50.0, 10.0, &zero_emissions());
         assert_eq!(outcome, SiOutcome::Accumulated);
         assert_eq!(report.population[0], 100.0);
@@ -183,7 +183,7 @@ mod tests {
     #[test]
     fn accumulate_groups_three_tech_types_into_one_bin() {
         let mut report = SiReport::default();
- // "G2N1", "G2N11", "G2N12" all map to bin 0.
+        // "G2N1", "G2N11", "G2N12" all map to bin 0.
         report.accumulate("G2N1", 1.0, 0.0, 0.0, &zero_emissions());
         report.accumulate("G2N11", 2.0, 0.0, 0.0, &zero_emissions());
         report.accumulate("G2N12", 4.0, 0.0, 0.0, &zero_emissions());
@@ -201,7 +201,7 @@ mod tests {
     #[test]
     fn accumulate_ignores_trailing_blanks_in_tech_type() {
         let mut report = SiReport::default();
- // The Fortran compares 10-character padded fields.
+        // The Fortran compares 10-character padded fields.
         assert_eq!(
             report.accumulate("G4H5C2    ", 1.0, 0.0, 0.0, &zero_emissions()),
             SiOutcome::Skipped // not a real code — but exercises trimming
@@ -223,11 +223,11 @@ mod tests {
         emissions[0] = -9.0; // no-data marker
         emissions[1] = 5.0;
         report.accumulate("G2N1", -9.0, -9.0, -9.0, &emissions);
- // The negative population/activity/fuel are not accumulated.
+        // The negative population/activity/fuel are not accumulated.
         assert_eq!(report.population[0], 0.0);
         assert_eq!(report.activity[0], 0.0);
         assert_eq!(report.fuel[0], 0.0);
- // The negative emission slot is skipped, the positive added.
+        // The negative emission slot is skipped, the positive added.
         assert_eq!(report.emissions[0][0], 0.0);
         assert_eq!(report.emissions[0][1], 5.0);
     }
@@ -235,12 +235,12 @@ mod tests {
     #[test]
     fn accumulate_last_tech_type_maps_to_last_bin() {
         let mut report = SiReport::default();
- // "G2H5C2" is SI_TECH[41] → SI_INDEX[41] = 14 → bin 13.
+        // "G2H5C2" is SI_TECH[41] → SI_INDEX[41] = 14 → bin 13.
         report.accumulate("G2H5C2", 1.0, 0.0, 0.0, &zero_emissions());
         assert_eq!(report.population[MXOTCH - 1], 1.0);
     }
 
- // ---- wrtsi ----
+    // ---- wrtsi ----
 
     #[test]
     fn si_report_has_ten_rows() {
@@ -249,7 +249,7 @@ mod tests {
         write_si_report(&mut buf, &report).unwrap();
         let out = String::from_utf8(buf).unwrap();
         assert_eq!(out.lines().count(), 10);
- // Every row carries MXOTCH values ⇒ MXOTCH-1 commas.
+        // Every row carries MXOTCH values ⇒ MXOTCH-1 commas.
         for row in out.lines() {
             assert_eq!(row.matches(',').count(), MXOTCH - 1);
         }
@@ -266,11 +266,11 @@ mod tests {
         write_si_report(&mut buf, &report).unwrap();
         let out = String::from_utf8(buf).unwrap();
         let lines: Vec<&str> = out.lines().collect();
- // Row 1 is population; bin 0 holds 100.0.
+        // Row 1 is population; bin 0 holds 100.0.
         assert!(lines[0].starts_with(&fortran_e(100.0, 12, 6)));
- // Row 9 is NOx exhaust; bin 0 holds 42.0.
+        // Row 9 is NOx exhaust; bin 0 holds 42.0.
         assert!(lines[8].starts_with(&fortran_e(42.0, 12, 6)));
- // Row 8 is the literal zero placeholder row.
+        // Row 8 is the literal zero placeholder row.
         assert!(lines[7].starts_with(&fortran_e(0.0, 12, 6)));
     }
 }

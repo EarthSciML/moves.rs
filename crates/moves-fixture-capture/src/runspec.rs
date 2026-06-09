@@ -19,20 +19,20 @@ use crate::error::{Error, Result};
 /// The slice of a MOVES RunSpec that fixture-capture needs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunSpec {
- /// Filename-derived identifier (e.g., `samplerunspec` for `SampleRunSpec.xml`).
+    /// Filename-derived identifier (e.g., `samplerunspec` for `SampleRunSpec.xml`).
     pub fixture_name: String,
- /// Source path the RunSpec was parsed from.
+    /// Source path the RunSpec was parsed from.
     pub path: PathBuf,
- /// Name of the DB MOVES writes its output to. Required.
+    /// Name of the DB MOVES writes its output to. Required.
     pub output_database: String,
- /// Name of the default-input (scale) DB. Optional — older RunSpecs use a
- /// different element name. None = "no default-input DB declared, capture
- /// every non-system DB".
+    /// Name of the default-input (scale) DB. Optional — older RunSpecs use a
+    /// different element name. None = "no default-input DB declared, capture
+    /// every non-system DB".
     pub scale_input_database: Option<String>,
 }
 
 impl RunSpec {
- /// Parse the RunSpec at `path`, returning the fields fixture-capture needs.
+    /// Parse the RunSpec at `path`, returning the fields fixture-capture needs.
     pub fn from_file(path: &Path) -> Result<Self> {
         let bytes = std::fs::read(path).map_err(|source| Error::Io {
             path: path.to_path_buf(),
@@ -41,8 +41,8 @@ impl RunSpec {
         Self::from_bytes(path, &bytes)
     }
 
- /// Parse a RunSpec from in-memory bytes. `path` is used for diagnostic
- /// messages and to derive the fixture name.
+    /// Parse a RunSpec from in-memory bytes. `path` is used for diagnostic
+    /// messages and to derive the fixture name.
     pub fn from_bytes(path: &Path, bytes: &[u8]) -> Result<Self> {
         let fixture_name = derive_fixture_name(path);
 
@@ -103,10 +103,10 @@ impl RunSpec {
         })
     }
 
- /// Returns true if `db_name` is the scale-input (default) DB declared by
- /// the RunSpec. Used to filter the database list before capture — the
- /// default DB is read-only during a run, so dumping it would just bloat
- /// the snapshot with content already pinned by the SIF SHA.
+    /// Returns true if `db_name` is the scale-input (default) DB declared by
+    /// the RunSpec. Used to filter the database list before capture — the
+    /// default DB is read-only during a run, so dumping it would just bloat
+    /// the snapshot with content already pinned by the SIF SHA.
     pub fn is_default_db(&self, db_name: &str) -> bool {
         self.scale_input_database
             .as_deref()
@@ -123,9 +123,9 @@ fn attr(e: &BytesStart, name: &str) -> Result<Option<String>> {
         })?;
         let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
         if key.eq_ignore_ascii_case(name) {
- // The XML attribute set in MOVES RunSpecs is plain ASCII (no
- // entity-escaped values worth worrying about), but unescape via
- // the library to be defensive.
+            // The XML attribute set in MOVES RunSpecs is plain ASCII (no
+            // entity-escaped values worth worrying about), but unescape via
+            // the library to be defensive.
             let value = attr.unescape_value().map_err(|source| Error::Xml {
                 path: PathBuf::from("<runspec>"),
                 source,
@@ -218,12 +218,12 @@ mod tests {
 
     #[test]
     fn handles_self_closing_and_open_close_forms() {
- // Self-closing — the form MOVES emits.
+        // Self-closing — the form MOVES emits.
         let xml1 = r#"<runspec><outputdatabase databasename="o"/></runspec>"#;
         let rs1 = RunSpec::from_bytes(Path::new("t.xml"), xml1.as_bytes()).unwrap();
         assert_eq!(rs1.output_database, "o");
 
- // Open/close — defensive, in case a hand-edited RunSpec uses it.
+        // Open/close — defensive, in case a hand-edited RunSpec uses it.
         let xml2 = r#"<runspec><outputdatabase databasename="o"></outputdatabase></runspec>"#;
         let rs2 = RunSpec::from_bytes(Path::new("t.xml"), xml2.as_bytes()).unwrap();
         assert_eq!(rs2.output_database, "o");

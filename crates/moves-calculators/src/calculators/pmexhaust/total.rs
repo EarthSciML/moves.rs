@@ -119,44 +119,44 @@ const PM25_COMPONENT_POLLUTANT_IDS: [i32; 3] = [111, 112, 115];
 /// fidelity note on MOVES `FLOAT` columns).
 #[derive(Debug, Clone, PartialEq)]
 pub struct PmWorkerRow {
- /// `yearID`.
+    /// `yearID`.
     pub year_id: i32,
- /// `monthID`.
+    /// `monthID`.
     pub month_id: i32,
- /// `dayID`.
+    /// `dayID`.
     pub day_id: i32,
- /// `hourID`.
+    /// `hourID`.
     pub hour_id: i32,
- /// `stateID`.
+    /// `stateID`.
     pub state_id: i32,
- /// `countyID`.
+    /// `countyID`.
     pub county_id: i32,
- /// `zoneID`.
+    /// `zoneID`.
     pub zone_id: i32,
- /// `linkID`.
+    /// `linkID`.
     pub link_id: i32,
- /// `pollutantID` — the only column the re-label changes.
+    /// `pollutantID` — the only column the re-label changes.
     pub pollutant_id: i32,
- /// `processID`.
+    /// `processID`.
     pub process_id: i32,
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: i32,
- /// `fuelTypeID`.
+    /// `fuelTypeID`.
     pub fuel_type_id: i32,
- /// `modelYearID`.
+    /// `modelYearID`.
     pub model_year_id: i32,
- /// `roadTypeID`.
+    /// `roadTypeID`.
     pub road_type_id: i32,
- /// `SCC` — the optional `CHAR(10)` source classification code.
+    /// `SCC` — the optional `CHAR(10)` source classification code.
     pub scc: Option<String>,
- /// `emissionQuant` — the emission quantity.
+    /// `emissionQuant` — the emission quantity.
     pub emission_quant: f64,
 }
 
 impl PmWorkerRow {
- /// A copy of this row with `pollutantID` replaced by `pollutant_id` /// the per-row work of the SQL `select …, <total> as pollutantID, …`.
- ///
- /// Every other column, `scc` included, is carried through verbatim.
+    /// A copy of this row with `pollutantID` replaced by `pollutant_id` /// the per-row work of the SQL `select …, <total> as pollutantID, …`.
+    ///
+    /// Every other column, `scc` included, is carried through verbatim.
     #[must_use]
     pub fn relabelled(&self, pollutant_id: i32) -> PmWorkerRow {
         PmWorkerRow {
@@ -175,14 +175,14 @@ impl PmWorkerRow {
 /// calculation. [`PmTotalExhaustCalculator::run`] honours the same gate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct TotalSelection {
- /// Enable the `PM10Total` section (re-label 101/102/105 → 100).
+    /// Enable the `PM10Total` section (re-label 101/102/105 → 100).
     pub pm10_total: bool,
- /// Enable the `PM25Total` section (re-label 111/112/115 → 110).
+    /// Enable the `PM25Total` section (re-label 111/112/115 → 110).
     pub pm25_total: bool,
 }
 
 impl TotalSelection {
- /// Both totals enabled — the common case for a run that requests PM.
+    /// Both totals enabled — the common case for a run that requests PM.
     #[must_use]
     pub const fn both() -> Self {
         Self {
@@ -191,8 +191,8 @@ impl TotalSelection {
         }
     }
 
- /// `true` when at least one section is enabled. `doExecute` returns
- /// without work — `null` — when this is `false`.
+    /// `true` when at least one section is enabled. `doExecute` returns
+    /// without work — `null` — when this is `false`.
     #[must_use]
     pub const fn any(self) -> bool {
         self.pm10_total || self.pm25_total
@@ -208,32 +208,32 @@ impl TotalSelection {
 pub struct PmTotalExhaustCalculator;
 
 impl PmTotalExhaustCalculator {
- /// Chain-DAG name — matches the Java class and the `calculator-dag.json`
- /// entry.
+    /// Chain-DAG name — matches the Java class and the `calculator-dag.json`
+    /// entry.
     pub const NAME: &'static str = CALCULATOR_NAME;
 
- /// Construct the calculator.
+    /// Construct the calculator.
     #[must_use]
     pub fn new() -> Self {
         Self
     }
 
- /// Form the requested PM totals from a set of `MOVESWorkerOutput` rows.
- ///
- /// Ports the processing section of `PMTotalExhaustCalculator.sql`: for
- /// each enabled section, every `worker_output` row whose `pollutant_id`
- /// is one of that section's components is copied with the total's
- /// pollutant id. The returned rows are the ones the SQL appends back into
- /// `MOVESWorkerOutput`; the caller appends them likewise.
- ///
- /// The result is *not* aggregated — re-labelled component rows that share
- /// a dimension key are left as separate rows, exactly as the SQL leaves
- /// them. The output processor's aggregation pass (enabled for pollutants
- /// 100 and 110 by the Java constructor's `pollutantNeedsAggregation`
- /// calls) sums them later.
- ///
- /// `PM10Total` rows precede `PM25Total` rows, matching the section order
- /// in the script. Within a section the input order is preserved.
+    /// Form the requested PM totals from a set of `MOVESWorkerOutput` rows.
+    ///
+    /// Ports the processing section of `PMTotalExhaustCalculator.sql`: for
+    /// each enabled section, every `worker_output` row whose `pollutant_id`
+    /// is one of that section's components is copied with the total's
+    /// pollutant id. The returned rows are the ones the SQL appends back into
+    /// `MOVESWorkerOutput`; the caller appends them likewise.
+    ///
+    /// The result is *not* aggregated — re-labelled component rows that share
+    /// a dimension key are left as separate rows, exactly as the SQL leaves
+    /// them. The output processor's aggregation pass (enabled for pollutants
+    /// 100 and 110 by the Java constructor's `pollutantNeedsAggregation`
+    /// calls) sums them later.
+    ///
+    /// `PM10Total` rows precede `PM25Total` rows, matching the section order
+    /// in the script. Within a section the input order is preserved.
     #[must_use]
     pub fn run(&self, worker_output: &[PmWorkerRow], select: TotalSelection) -> Vec<PmWorkerRow> {
         let mut out = Vec::new();
@@ -456,36 +456,36 @@ impl Calculator for PmTotalExhaustCalculator {
         Self::NAME
     }
 
- /// Empty — `PMTotalExhaustCalculator` is a *chained* calculator. Its Java
- /// `subscribeToMe` states "this is a chained calculator, so don't
- /// subscribe to the MasterLoop"; it instead attaches itself downstream of
- /// the calculators producing the OC / EC / sulfate component pollutants.
- /// `calculator-dag.json` records `subscribes_directly: false` with an
- /// empty `subscriptions` list.
+    /// Empty — `PMTotalExhaustCalculator` is a *chained* calculator. Its Java
+    /// `subscribeToMe` states "this is a chained calculator, so don't
+    /// subscribe to the MasterLoop"; it instead attaches itself downstream of
+    /// the calculators producing the OC / EC / sulfate component pollutants.
+    /// `calculator-dag.json` records `subscribes_directly: false` with an
+    /// empty `subscriptions` list.
     fn subscriptions(&self) -> &[CalculatorSubscription] {
         NO_SUBSCRIPTIONS
     }
 
- /// Empty — `calculator-dag.json` records `registrations_count: 0`.
- ///
- /// The Java constructor registers `Primary Exhaust PM10 - Total` (100)
- /// and `Primary Exhaust PM2.5 - Total` (110) for *every* emission
- /// process — it loops over `EmissionProcess.getAllEmissionProcesses()`,
- /// a set resolved at runtime from the execution database, not a static
- /// list. The chain-DAG capture, taken from a `BaseRateCalculator` run
- /// that never loaded this legacy calculator, recorded no pairs; with no
- /// static, capture-grounded pair list to return, this method returns the
- /// empty slice the trait explicitly permits.
+    /// Empty — `calculator-dag.json` records `registrations_count: 0`.
+    ///
+    /// The Java constructor registers `Primary Exhaust PM10 - Total` (100)
+    /// and `Primary Exhaust PM2.5 - Total` (110) for *every* emission
+    /// process — it loops over `EmissionProcess.getAllEmissionProcesses()`,
+    /// a set resolved at runtime from the execution database, not a static
+    /// list. The chain-DAG capture, taken from a `BaseRateCalculator` run
+    /// that never loaded this legacy calculator, recorded no pairs; with no
+    /// static, capture-grounded pair list to return, this method returns the
+    /// empty slice the trait explicitly permits.
     fn registrations(&self) -> &[PollutantProcessAssociation] {
         NO_REGISTRATIONS
     }
 
- /// Empty — the calculator's SQL reads `MOVESWorkerOutput`, the run's
- /// accumulating emission output, not a default-database table.
- /// `calculator-dag.json` records `depends_on: []`; at runtime the Java
- /// `subscribeToMe` chains the calculator off whichever calculators
- /// produced the OC / EC / sulfate component pollutants, a set resolved
- /// per run.
+    /// Empty — the calculator's SQL reads `MOVESWorkerOutput`, the run's
+    /// accumulating emission output, not a default-database table.
+    /// `calculator-dag.json` records `depends_on: []`; at runtime the Java
+    /// `subscribeToMe` chains the calculator off whichever calculators
+    /// produced the OC / EC / sulfate component pollutants, a set resolved
+    /// per run.
     fn input_tables(&self) -> &[&'static str] {
         &[]
     }
@@ -505,9 +505,9 @@ pub fn factory() -> Box<dyn moves_framework::Calculator> {
 mod tests {
     use super::*;
 
- /// Build a worker-output row carrying `pollutant_id`; every other column
- /// gets a distinct, recognisable value so the re-label's "carry through"
- /// can be checked.
+    /// Build a worker-output row carrying `pollutant_id`; every other column
+    /// gets a distinct, recognisable value so the re-label's "carry through"
+    /// can be checked.
     fn row(pollutant_id: i32, emission_quant: f64) -> PmWorkerRow {
         PmWorkerRow {
             year_id: 2020,
@@ -533,8 +533,8 @@ mod tests {
     fn calculator_metadata() {
         let calc = PmTotalExhaustCalculator::new();
         assert_eq!(calc.name(), "PMTotalExhaustCalculator");
- // Chained calculator: no subscriptions, no captured registrations,
- // no default-DB input tables.
+        // Chained calculator: no subscriptions, no captured registrations,
+        // no default-DB input tables.
         assert!(calc.subscriptions().is_empty());
         assert!(calc.registrations().is_empty());
         assert!(calc.upstream().is_empty());
@@ -543,7 +543,7 @@ mod tests {
 
     #[test]
     fn calculator_is_object_safe() {
- // The registry stores calculators as `Box<dyn Calculator>`.
+        // The registry stores calculators as `Box<dyn Calculator>`.
         let calcs: Vec<Box<dyn Calculator>> = vec![Box::new(PmTotalExhaustCalculator::new())];
         assert_eq!(calcs[0].name(), "PMTotalExhaustCalculator");
     }
@@ -555,7 +555,7 @@ mod tests {
         };
         use moves_framework::{DataFrameStore, InMemoryStore};
 
- // One PM2.5 component row (ec = 112) — relabelled to 110 by PM25Total.
+        // One PM2.5 component row (ec = 112) — relabelled to 110 by PM25Total.
         let input = vec![row(112, 2.0)];
         let mut store = InMemoryStore::new();
         store.insert(
@@ -583,7 +583,7 @@ mod tests {
         let original = row(102, 1.5);
         let relabelled = original.relabelled(PM10_TOTAL_POLLUTANT_ID);
         assert_eq!(relabelled.pollutant_id, 100);
- // Every other column is carried through verbatim.
+        // Every other column is carried through verbatim.
         assert_eq!(relabelled.year_id, original.year_id);
         assert_eq!(relabelled.process_id, original.process_id);
         assert_eq!(relabelled.source_type_id, original.source_type_id);
@@ -609,8 +609,8 @@ mod tests {
         );
         assert_eq!(out.len(), 3);
         assert!(out.iter().all(|r| r.pollutant_id == 100));
- // The emission quantities are carried through unchanged — the
- // calculator re-labels, it does not add.
+        // The emission quantities are carried through unchanged — the
+        // calculator re-labels, it does not add.
         let quants: Vec<f64> = out.iter().map(|r| r.emission_quant).collect();
         assert_eq!(quants, vec![1.0, 2.0, 4.0]);
     }
@@ -637,8 +637,8 @@ mod tests {
     #[test]
     fn non_component_pollutants_are_ignored() {
         let calc = PmTotalExhaustCalculator::new();
- // Pollutants 1 (THC) and 100/110 (the totals themselves) are not
- // components of either total.
+        // Pollutants 1 (THC) and 100/110 (the totals themselves) are not
+        // components of either total.
         let input = vec![row(1, 9.0), row(100, 9.0), row(110, 9.0)];
         let out = calc.run(&input, TotalSelection::both());
         assert!(out.is_empty());
@@ -647,12 +647,12 @@ mod tests {
     #[test]
     fn both_sections_emit_pm10_before_pm25() {
         let calc = PmTotalExhaustCalculator::new();
- // One PM2.5 component then one PM10 component, in that input order.
+        // One PM2.5 component then one PM10 component, in that input order.
         let input = vec![row(112, 2.0), row(102, 1.0)];
         let out = calc.run(&input, TotalSelection::both());
         assert_eq!(out.len(), 2);
- // The PM10Total section runs first, so pollutant 100 leads despite
- // its component appearing second in the input.
+        // The PM10Total section runs first, so pollutant 100 leads despite
+        // its component appearing second in the input.
         assert_eq!(out[0].pollutant_id, 100);
         assert_eq!(out[1].pollutant_id, 110);
     }
@@ -669,8 +669,8 @@ mod tests {
 
     #[test]
     fn a_component_row_is_relabelled_once_per_enabled_section_it_belongs_to() {
- // Component pollutant ids are disjoint between the two totals, so a
- // row contributes to at most one section regardless of selection.
+        // Component pollutant ids are disjoint between the two totals, so a
+        // row contributes to at most one section regardless of selection.
         let calc = PmTotalExhaustCalculator::new();
         let input = vec![row(102, 1.0)]; // PM10 component only
         let out = calc.run(&input, TotalSelection::both());

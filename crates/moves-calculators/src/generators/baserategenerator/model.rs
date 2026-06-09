@@ -29,38 +29,38 @@ pub const ALWAYS_USE_ROMD_TABLE: bool = false;
 /// [`from_parameters`]: ExternalFlags::from_parameters
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct ExternalFlags {
- /// Keep the real `opModeID` in the output key rather than collapsing
- /// it to `0`. Go `keepOpModeID`.
+    /// Keep the real `opModeID` in the output key rather than collapsing
+    /// it to `0`. Go `keepOpModeID`.
     pub keep_op_mode_id: bool,
- /// Retain the average-speed bin in the output key. Go `useAvgSpeedBin`.
+    /// Retain the average-speed bin in the output key. Go `useAvgSpeedBin`.
     pub use_avg_speed_bin: bool,
- /// Weight rate sums by `avgSpeedFraction`. Go `useAvgSpeedFraction`.
+    /// Weight rate sums by `avgSpeedFraction`. Go `useAvgSpeedFraction`.
     pub use_avg_speed_fraction: bool,
- /// Weight operating-mode fractions by `sumSBD`. Go `useSumSBD`.
+    /// Weight operating-mode fractions by `sumSBD`. Go `useSumSBD`.
     pub use_sum_sbd: bool,
- /// Weight rate sums by `sumSBDRaw`. Go `useSumSBDRaw`.
+    /// Weight rate sums by `sumSBDRaw`. Go `useSumSBDRaw`.
     pub use_sum_sbd_raw: bool,
- /// Emission process being generated for. Go `processID`.
+    /// Emission process being generated for. Go `processID`.
     pub process_id: i32,
- /// Calendar year being generated for. Go `yearID`.
+    /// Calendar year being generated for. Go `yearID`.
     pub year_id: i32,
- /// Road type filter (`0` = no filter). Go `roadTypeID`.
+    /// Road type filter (`0` = no filter). Go `roadTypeID`.
     pub road_type_id: i32,
 }
 
 impl ExternalFlags {
- /// Parse the worker's `-parameters=` CSV list.
- ///
- /// Ports `readExternalFlags`. The list must hold at least 8 entries: a
- /// run of identifier tokens followed by exactly three trailing integers
- /// — `processID`, `yearID`, `roadTypeID`. Identifier tokens are matched
- /// across `params[.. len-3]`; unrecognised tokens are ignored, exactly
- /// as the Go `switch` (which has no `default` case) does.
- ///
- /// # Errors
- ///
- /// Returns [`Error::Parameters`] if fewer than 8 entries are supplied or
- /// if a trailing identifier does not parse as an integer.
+    /// Parse the worker's `-parameters=` CSV list.
+    ///
+    /// Ports `readExternalFlags`. The list must hold at least 8 entries: a
+    /// run of identifier tokens followed by exactly three trailing integers
+    /// — `processID`, `yearID`, `roadTypeID`. Identifier tokens are matched
+    /// across `params[.. len-3]`; unrecognised tokens are ignored, exactly
+    /// as the Go `switch` (which has no `default` case) does.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Parameters`] if fewer than 8 entries are supplied or
+    /// if a trailing identifier does not parse as an integer.
     pub fn from_parameters(params: &[&str]) -> Result<Self> {
         if params.len() < 8 {
             return Err(Error::Parameters(format!(
@@ -81,7 +81,7 @@ impl ExternalFlags {
                 "nSBD" => flags.use_sum_sbd = false,
                 "yRaw" => flags.use_sum_sbd_raw = true,
                 "nRaw" => flags.use_sum_sbd_raw = false,
- // Unknown tokens are ignored — the Go switch has no default.
+                // Unknown tokens are ignored — the Go switch has no default.
                 _ => {}
             }
         }
@@ -109,27 +109,27 @@ fn parse_trailing(raw: &str, name: &str) -> Result<i32> {
 /// apply only to the temporary source type.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct SourceUseTypePhysicsMappingDetail {
- /// Real (traditional) source type id.
+    /// Real (traditional) source type id.
     pub real_source_type_id: i32,
- /// Temporary source type id, unique per record.
+    /// Temporary source type id, unique per record.
     pub temp_source_type_id: i32,
- /// Operating-mode id offset for the temporary source type.
+    /// Operating-mode id offset for the temporary source type.
     pub op_mode_id_offset: i32,
- /// Regulatory class id.
+    /// Regulatory class id.
     pub reg_class_id: i32,
- /// First model year the mapping applies to.
+    /// First model year the mapping applies to.
     pub begin_model_year_id: i32,
- /// Last model year the mapping applies to.
+    /// Last model year the mapping applies to.
     pub end_model_year_id: i32,
- /// Rolling-resistance term `A` of the road-load polynomial.
+    /// Rolling-resistance term `A` of the road-load polynomial.
     pub rolling_term_a: f64,
- /// Rotating-mass term `B` of the road-load polynomial.
+    /// Rotating-mass term `B` of the road-load polynomial.
     pub rotating_term_b: f64,
- /// Aerodynamic-drag term `C` of the road-load polynomial.
+    /// Aerodynamic-drag term `C` of the road-load polynomial.
     pub drag_term_c: f64,
- /// Source mass used in the VSP calculation.
+    /// Source mass used in the VSP calculation.
     pub source_mass: f64,
- /// Fixed mass factor used in the VSP calculation.
+    /// Fixed mass factor used in the VSP calculation.
     pub fixed_mass_factor: f64,
 }
 
@@ -141,23 +141,23 @@ pub struct SourceUseTypePhysicsMappingDetail {
 /// drive-cycle path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct RomdKey {
- /// Source type id.
+    /// Source type id.
     pub source_type_id: i32,
- /// Pollutant/process id (`pollutantID * 100 + processID`).
+    /// Pollutant/process id (`pollutantID * 100 + processID`).
     pub pol_process_id: i32,
- /// Road type id.
+    /// Road type id.
     pub road_type_id: i32,
- /// Hour/day id.
+    /// Hour/day id.
     pub hour_day_id: i32,
- /// Operating-mode id.
+    /// Operating-mode id.
     pub op_mode_id: i32,
- /// Average-speed bin id.
+    /// Average-speed bin id.
     pub avg_speed_bin_id: i32,
- /// First model year, or `0` on the core path.
+    /// First model year, or `0` on the core path.
     pub begin_model_year_id: i32,
- /// Last model year, or `0` on the core path.
+    /// Last model year, or `0` on the core path.
     pub end_model_year_id: i32,
- /// Regulatory class id, or `0` on the core path.
+    /// Regulatory class id, or `0` on the core path.
     pub reg_class_id: i32,
 }
 
@@ -166,13 +166,13 @@ pub struct RomdKey {
 /// Ports `romdBlock`.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RomdBlock {
- /// Identifying key.
+    /// Identifying key.
     pub key: RomdKey,
- /// Operating-mode fraction.
+    /// Operating-mode fraction.
     pub op_mode_fraction: f64,
- /// Average bin speed.
+    /// Average bin speed.
     pub avg_bin_speed: f64,
- /// Average-speed-bin fraction.
+    /// Average-speed-bin fraction.
     pub avg_speed_fraction: f64,
 }
 
@@ -181,11 +181,11 @@ pub struct RomdBlock {
 /// Ports `sbWeightedEmissionRateByAgeKey`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct SbWeightedRateKey {
- /// Source type id.
+    /// Source type id.
     pub source_type_id: i32,
- /// Pollutant/process id.
+    /// Pollutant/process id.
     pub pol_process_id: i32,
- /// Operating-mode id.
+    /// Operating-mode id.
     pub op_mode_id: i32,
 }
 
@@ -195,31 +195,31 @@ pub struct SbWeightedRateKey {
 /// `SBWeightedEmissionRate` (no age dimension) carry `age_group_id == 0`.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct SbWeightedRateDetail {
- /// Source type id.
+    /// Source type id.
     pub source_type_id: i32,
- /// Pollutant/process id.
+    /// Pollutant/process id.
     pub pol_process_id: i32,
- /// Operating-mode id.
+    /// Operating-mode id.
     pub op_mode_id: i32,
- /// Model year id.
+    /// Model year id.
     pub model_year_id: i32,
- /// Fuel type id.
+    /// Fuel type id.
     pub fuel_type_id: i32,
- /// Age group id (`0` for `SBWeightedEmissionRate`).
+    /// Age group id (`0` for `SBWeightedEmissionRate`).
     pub age_group_id: i32,
- /// Regulatory class id.
+    /// Regulatory class id.
     pub reg_class_id: i32,
- /// Source-bin distribution sum.
+    /// Source-bin distribution sum.
     pub sum_sbd: f64,
- /// Raw source-bin distribution sum.
+    /// Raw source-bin distribution sum.
     pub sum_sbd_raw: f64,
- /// Mean base rate.
+    /// Mean base rate.
     pub mean_base_rate: f64,
- /// Mean base rate, I/M adjusted.
+    /// Mean base rate, I/M adjusted.
     pub mean_base_rate_im: f64,
- /// Mean base rate, air-conditioning adjusted.
+    /// Mean base rate, air-conditioning adjusted.
     pub mean_base_rate_ac_adj: f64,
- /// Mean base rate, I/M and air-conditioning adjusted.
+    /// Mean base rate, I/M and air-conditioning adjusted.
     pub mean_base_rate_im_ac_adj: f64,
 }
 
@@ -231,15 +231,15 @@ pub struct SbWeightedRateDetail {
 /// Only modes `1 < opModeID < 100` excluding `26` and `36` are loaded.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct OperatingMode {
- /// Operating-mode id.
+    /// Operating-mode id.
     pub op_mode_id: i32,
- /// Lower VSP bound, or `None` if unconstrained.
+    /// Lower VSP bound, or `None` if unconstrained.
     pub vsp_lower: Option<f64>,
- /// Upper VSP bound, or `None` if unconstrained.
+    /// Upper VSP bound, or `None` if unconstrained.
     pub vsp_upper: Option<f64>,
- /// Lower speed bound, or `None` if unconstrained.
+    /// Lower speed bound, or `None` if unconstrained.
     pub speed_lower: Option<f64>,
- /// Upper speed bound, or `None` if unconstrained.
+    /// Upper speed bound, or `None` if unconstrained.
     pub speed_upper: Option<f64>,
 }
 
@@ -248,13 +248,13 @@ pub struct OperatingMode {
 /// Ports `avgSpeedDistributionKey`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct AvgSpeedDistributionKey {
- /// Source type id.
+    /// Source type id.
     pub source_type_id: i32,
- /// Road type id.
+    /// Road type id.
     pub road_type_id: i32,
- /// Hour/day id.
+    /// Hour/day id.
     pub hour_day_id: i32,
- /// Average-speed bin id.
+    /// Average-speed bin id.
     pub avg_speed_bin_id: i32,
 }
 
@@ -264,9 +264,9 @@ pub struct AvgSpeedDistributionKey {
 /// `avgSpeedBin` table.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct AvgSpeedDistributionDetail {
- /// Average-speed-bin fraction.
+    /// Average-speed-bin fraction.
     pub avg_speed_fraction: f64,
- /// Average bin speed (joined from `avgSpeedBin`).
+    /// Average bin speed (joined from `avgSpeedBin`).
     pub avg_bin_speed: f64,
 }
 
@@ -275,9 +275,9 @@ pub struct AvgSpeedDistributionDetail {
 /// Ports `driveScheduleAssocKey`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct DriveScheduleAssocKey {
- /// Source type id.
+    /// Source type id.
     pub source_type_id: i32,
- /// Road type id.
+    /// Road type id.
     pub road_type_id: i32,
 }
 
@@ -286,25 +286,25 @@ pub struct DriveScheduleAssocKey {
 /// Ports `baseRateOutputKey`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct BaseRateOutputKey {
- /// Source type id.
+    /// Source type id.
     pub source_type_id: i32,
- /// Pollutant/process id.
+    /// Pollutant/process id.
     pub pol_process_id: i32,
- /// Road type id.
+    /// Road type id.
     pub road_type_id: i32,
- /// Hour/day id.
+    /// Hour/day id.
     pub hour_day_id: i32,
- /// Average-speed bin id.
+    /// Average-speed bin id.
     pub avg_speed_bin_id: i32,
- /// Model year id.
+    /// Model year id.
     pub model_year_id: i32,
- /// Fuel type id.
+    /// Fuel type id.
     pub fuel_type_id: i32,
- /// Age group id.
+    /// Age group id.
     pub age_group_id: i32,
- /// Regulatory class id.
+    /// Regulatory class id.
     pub reg_class_id: i32,
- /// Operating-mode id.
+    /// Operating-mode id.
     pub op_mode_id: i32,
 }
 
@@ -315,49 +315,49 @@ pub struct BaseRateOutputKey {
 /// the real age group.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct BaseRateOutputRecord {
- /// Source type id.
+    /// Source type id.
     pub source_type_id: i32,
- /// Road type id.
+    /// Road type id.
     pub road_type_id: i32,
- /// Average-speed bin id.
+    /// Average-speed bin id.
     pub avg_speed_bin_id: i32,
- /// Hour/day id.
+    /// Hour/day id.
     pub hour_day_id: i32,
- /// Pollutant/process id.
+    /// Pollutant/process id.
     pub pol_process_id: i32,
- /// Pollutant id (`polProcessID / 100`).
+    /// Pollutant id (`polProcessID / 100`).
     pub pollutant_id: i32,
- /// Process id (`polProcessID % 100`).
+    /// Process id (`polProcessID % 100`).
     pub process_id: i32,
- /// Model year id.
+    /// Model year id.
     pub model_year_id: i32,
- /// Fuel type id.
+    /// Fuel type id.
     pub fuel_type_id: i32,
- /// Age group id.
+    /// Age group id.
     pub age_group_id: i32,
- /// Regulatory class id.
+    /// Regulatory class id.
     pub reg_class_id: i32,
- /// Operating-mode id.
+    /// Operating-mode id.
     pub op_mode_id: i32,
- /// Mean base rate.
+    /// Mean base rate.
     pub mean_base_rate: f64,
- /// Mean base rate, I/M adjusted.
+    /// Mean base rate, I/M adjusted.
     pub mean_base_rate_im: f64,
- /// Mean base rate, air-conditioning adjusted.
+    /// Mean base rate, air-conditioning adjusted.
     pub mean_base_rate_ac_adj: f64,
- /// Mean base rate, I/M and air-conditioning adjusted.
+    /// Mean base rate, I/M and air-conditioning adjusted.
     pub mean_base_rate_im_ac_adj: f64,
- /// Distance-normalised emission rate.
+    /// Distance-normalised emission rate.
     pub emission_rate: f64,
- /// Distance-normalised emission rate, I/M adjusted.
+    /// Distance-normalised emission rate, I/M adjusted.
     pub emission_rate_im: f64,
- /// Distance-normalised emission rate, air-conditioning adjusted.
+    /// Distance-normalised emission rate, air-conditioning adjusted.
     pub emission_rate_ac_adj: f64,
- /// Distance-normalised emission rate, I/M and AC adjusted.
+    /// Distance-normalised emission rate, I/M and AC adjusted.
     pub emission_rate_im_ac_adj: f64,
- /// Operating-mode fraction (key-weighted accumulation).
+    /// Operating-mode fraction (key-weighted accumulation).
     pub op_mode_fraction: f64,
- /// Operating-mode fraction used for rate normalisation.
+    /// Operating-mode fraction used for rate normalisation.
     pub op_mode_fraction_rate: f64,
 }
 
@@ -368,15 +368,15 @@ pub struct BaseRateOutputRecord {
 /// `processDriveCycles`.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct DrivingIdleFractionRow {
- /// Hour/day id.
+    /// Hour/day id.
     pub hour_day_id: i32,
- /// Calendar year id.
+    /// Calendar year id.
     pub year_id: i32,
- /// Road type id.
+    /// Road type id.
     pub road_type_id: i32,
- /// Source type id.
+    /// Source type id.
     pub source_type_id: i32,
- /// Fraction of driving time spent idling.
+    /// Fraction of driving time spent idling.
     pub driving_idle_fraction: f64,
 }
 
@@ -402,7 +402,7 @@ mod tests {
 
     #[test]
     fn from_parameters_ignores_unknown_tokens() {
- // The Go switch has no default case — unknown identifiers are skipped.
+        // The Go switch has no default case — unknown identifiers are skipped.
         let flags = ExternalFlags::from_parameters(&[
             "nOp", "mystery", "nASB", "nASF", "nSBD", "9", "2018", "0",
         ])

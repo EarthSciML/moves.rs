@@ -58,7 +58,7 @@ mod tests {
         assert!(bytes.ends_with(b"\n"));
         let text = std::str::from_utf8(&bytes).unwrap();
         assert!(text.starts_with('{'));
- // Pretty-printed: contains a newline before "schema":
+        // Pretty-printed: contains a newline before "schema":
         assert!(text.contains("\n  \"schema\":"));
     }
 
@@ -68,7 +68,7 @@ mod tests {
         let dag = build_dag(&CalculatorInfo::empty(), &[]).unwrap();
         let p1 = write_dag_json(dir.path(), &dag).unwrap();
         let a = fs::read(&p1).unwrap();
- // Overwrite and re-read.
+        // Overwrite and re-read.
         let p2 = write_dag_json(dir.path(), &dag).unwrap();
         let b = fs::read(&p2).unwrap();
         assert_eq!(a, b);

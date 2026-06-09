@@ -527,11 +527,11 @@ pub fn find_evap_emission_factor(
             continue;
         };
         if year < rec.year {
- // Record's year is later than the input — skip without
- // adjusting bookkeeping (the Fortran source updates the
- // `iemyr` COMMON here; the Rust port omits that side
- // effect — callers that need a "next allowable year"
- // hint can compute it externally).
+            // Record's year is later than the input — skip without
+            // adjusting bookkeeping (the Fortran source updates the
+            // `iemyr` COMMON here; the Rust port omits that side
+            // effect — callers that need a "next allowable year"
+            // hint can compute it externally).
             continue;
         }
 
@@ -585,7 +585,7 @@ mod tests {
         v.to_string()
     }
 
- // ---- find_string ----
+    // ---- find_string ----
 
     #[test]
     fn find_string_matches_first_occurrence() {
@@ -601,7 +601,7 @@ mod tests {
         assert_eq!(find_string("X", &haystack), None);
     }
 
- // ---- find_scc_hierarchy ----
+    // ---- find_scc_hierarchy ----
 
     #[test]
     fn scc_hierarchy_exact_match_short_circuits() {
@@ -630,8 +630,8 @@ mod tests {
 
     #[test]
     fn scc_hierarchy_returns_last_occurrence_of_global() {
- // Fortran semantics: when multiple records share the same global
- // SCC form, the last one wins (Fortran "last write" sets the index).
+        // Fortran semantics: when multiple records share the same global
+        // SCC form, the last one wins (Fortran "last write" sets the index).
         let haystack = vec![
             s("2265001000"), // first 7-digit
             s("2265001000"), // second 7-digit — should win
@@ -645,7 +645,7 @@ mod tests {
         assert_eq!(find_scc_hierarchy("2265001010", &haystack), None);
     }
 
- // ---- find_hp_category ----
+    // ---- find_hp_category ----
 
     #[test]
     fn hp_category_exact_match() {
@@ -661,7 +661,7 @@ mod tests {
         assert_eq!(find_hp_category(9999.0), None);
     }
 
- // ---- find_scrappage_percent ----
+    // ---- find_scrappage_percent ----
 
     fn sample_scrappage() -> Vec<ScrappagePoint> {
         vec![
@@ -693,15 +693,15 @@ mod tests {
     #[test]
     fn scrappage_within_range_returns_lower_bin_percent() {
         let pts = sample_scrappage();
- // 60.0 falls between bin 50 (40%) and bin 75 (75%) → returns 40%
+        // 60.0 falls between bin 50 (40%) and bin 75 (75%) → returns 40%
         assert_eq!(find_scrappage_percent(60.0, &pts), Some(40.0));
     }
 
     #[test]
     fn scrappage_at_first_bin_returns_first_percent() {
         let pts = sample_scrappage();
- // frac == first.bin: not < first.bin, so falls into the windowed
- // search. Bin 50 > 25, so returns percent at index 0 = 10%.
+        // frac == first.bin: not < first.bin, so falls into the windowed
+        // search. Bin 50 > 25, so returns percent at index 0 = 10%.
         assert_eq!(find_scrappage_percent(25.0, &pts), Some(10.0));
     }
 
@@ -717,7 +717,7 @@ mod tests {
         assert_eq!(find_scrappage_percent(50.0, &pts), None);
     }
 
- // ---- find_region ----
+    // ---- find_region ----
 
     fn sample_regions() -> RegionDefinitions {
         let mut defs = RegionDefinitions::default();
@@ -749,14 +749,14 @@ mod tests {
     #[test]
     fn region_state_wildcard_match() {
         let defs = sample_regions();
- // Indiana state-wide via "18000"
+        // Indiana state-wide via "18000"
         assert_eq!(find_region("18045", &defs), Some("EAST"));
     }
 
     #[test]
     fn region_national_wildcard_match() {
         let defs = sample_regions();
- // Texas (not in any explicit region) falls through to NATIONAL
+        // Texas (not in any explicit region) falls through to NATIONAL
         assert_eq!(find_region("48201", &defs), Some("NATIONAL"));
     }
 
@@ -768,7 +768,7 @@ mod tests {
         assert_eq!(find_region("48201", &defs), None);
     }
 
- // ---- find_deterioration ----
+    // ---- find_deterioration ----
 
     fn sample_det() -> Vec<DeteriorationRecord> {
         vec![
@@ -816,7 +816,7 @@ mod tests {
         assert_eq!(find_deterioration("T3", "CO", &recs), None);
     }
 
- // ---- find_activity ----
+    // ---- find_activity ----
 
     fn act_rec(scc: &str, sub: &str, hp_lo: f32, hp_hi: f32) -> ActivityRecord {
         ActivityRecord {
@@ -859,7 +859,7 @@ mod tests {
             act_rec("2265001010", "", 0.0, 50.0),     // exact + global
             act_rec("2265001000", "EAST", 0.0, 50.0), // 7-digit + region
         ];
- // No exact+region available; the next tier is exact+global.
+        // No exact+region available; the next tier is exact+global.
         assert_eq!(
             find_activity("2265001010", "17031", 25.0, &recs, &defs),
             Some(0)
@@ -914,7 +914,7 @@ mod tests {
         );
     }
 
- // ---- find_refueling_mode ----
+    // ---- find_refueling_mode ----
 
     fn spill_rec(
         scc: &str,
@@ -1040,18 +1040,18 @@ mod tests {
         );
     }
 
- // ---- helpers ----
+    // ---- helpers ----
 
     #[test]
     fn scc_global_forms_pad_correctly() {
         assert_eq!(scc_global_7("2265001010"), "2265001000");
         assert_eq!(scc_global_4("2265001010"), "2265000000");
- // Short input gets padded out to 10 chars.
+        // Short input gets padded out to 10 chars.
         assert_eq!(scc_global_7("226"), "2260000000");
         assert_eq!(scc_global_4("22"), "2200000000");
     }
 
- // ---- find_evap_emission_factor ----
+    // ---- find_evap_emission_factor ----
 
     use crate::input::evemfc::{EvapEmissionFactorRecord, EvapEmissionUnits};
 
@@ -1113,7 +1113,7 @@ mod tests {
             evap_rec("2270002003", "ALL", 0.0, 100.0, 2019, 0.10),
             evap_rec("2270002003", "ALL", 0.0, 100.0, 2025, 0.20),
         ];
- // Looking up year 2020: 2025 record should be skipped.
+        // Looking up year 2020: 2025 record should be skipped.
         let idx = find_evap_emission_factor("2270002003", "E1", 50.0, 2020, &recs).unwrap();
         assert_eq!(recs[idx].factor, 0.10);
     }
@@ -1163,7 +1163,7 @@ mod tests {
     fn evefc_prefers_tighter_hp_range_on_tied_scc() {
         let recs = vec![
             evap_rec("2270002003", "ALL", 0.0, 100.0, 2020, 0.10),
- // Tighter HP centered on 50: 40..60 → idiff = max(50-40, 60-50) = 10
+            // Tighter HP centered on 50: 40..60 → idiff = max(50-40, 60-50) = 10
             evap_rec("2270002003", "ALL", 40.0, 60.0, 2020, 0.42),
         ];
         let idx = find_evap_emission_factor("2270002003", "E1", 50.0, 2020, &recs).unwrap();

@@ -192,14 +192,14 @@ const CARBON_TO_CO2_MASS_RATIO: f64 = 44.0 / 12.0;
 /// `fuelRegionID` is constant and is not modelled.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FuelSupplyRow {
- /// `fuelYearID` — joins to [`YearRow::fuel_year_id`].
+    /// `fuelYearID` — joins to [`YearRow::fuel_year_id`].
     pub fuel_year_id: i32,
- /// `monthGroupID` — the month group this share applies to.
+    /// `monthGroupID` — the month group this share applies to.
     pub month_group_id: i32,
- /// `fuelFormulationID` — joins to [`FuelFormulationRow::fuel_formulation_id`].
+    /// `fuelFormulationID` — joins to [`FuelFormulationRow::fuel_formulation_id`].
     pub fuel_formulation_id: i32,
- /// `marketShare` — this formulation's share of the fuel supply. `FLOAT` in
- /// MOVES.
+    /// `marketShare` — this formulation's share of the fuel supply. `FLOAT` in
+    /// MOVES.
     pub market_share: f64,
 }
 
@@ -209,9 +209,9 @@ pub struct FuelSupplyRow {
 /// `FuelSupply.fuelFormulationID → FuelFormulation.fuelSubtypeID → FuelSubtype`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FuelFormulationRow {
- /// `fuelFormulationID` — the formulation primary key.
+    /// `fuelFormulationID` — the formulation primary key.
     pub fuel_formulation_id: i32,
- /// `fuelSubtypeID` — joins to [`FuelSubtypeRow::fuel_subtype_id`].
+    /// `fuelSubtypeID` — joins to [`FuelSubtypeRow::fuel_subtype_id`].
     pub fuel_subtype_id: i32,
 }
 
@@ -219,14 +219,14 @@ pub struct FuelFormulationRow {
 /// and oxidation fraction.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FuelSubtypeRow {
- /// `fuelSubtypeID` — the subtype primary key.
+    /// `fuelSubtypeID` — the subtype primary key.
     pub fuel_subtype_id: i32,
- /// `fuelTypeID` — the parent fuel type the carbon-oxidation cell is keyed by.
+    /// `fuelTypeID` — the parent fuel type the carbon-oxidation cell is keyed by.
     pub fuel_type_id: i32,
- /// `carbonContent` — mass of carbon per unit energy. `FLOAT` in MOVES.
+    /// `carbonContent` — mass of carbon per unit energy. `FLOAT` in MOVES.
     pub carbon_content: f64,
- /// `oxidationFraction` — fraction of fuel carbon that oxidises to CO2.
- /// `FLOAT` in MOVES.
+    /// `oxidationFraction` — fraction of fuel carbon that oxidises to CO2.
+    /// `FLOAT` in MOVES.
     pub oxidation_fraction: f64,
 }
 
@@ -236,9 +236,9 @@ pub struct FuelSubtypeRow {
 /// carries a single calendar year here.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct YearRow {
- /// `yearID` — the calendar year.
+    /// `yearID` — the calendar year.
     pub year_id: i32,
- /// `fuelYearID` — the fuel year; joins to [`FuelSupplyRow::fuel_year_id`].
+    /// `fuelYearID` — the fuel year; joins to [`FuelSupplyRow::fuel_year_id`].
     pub fuel_year_id: i32,
 }
 
@@ -246,9 +246,9 @@ pub struct YearRow {
 /// `CO2MonthofAnyYear` extract).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MonthGroupRow {
- /// `monthID` — the calendar month.
+    /// `monthID` — the calendar month.
     pub month_id: i32,
- /// `monthGroupID` — the month group it belongs to.
+    /// `monthGroupID` — the month group it belongs to.
     pub month_group_id: i32,
 }
 
@@ -261,10 +261,10 @@ pub struct MonthGroupRow {
 /// modelled.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Co2EqPollutantRow {
- /// `pollutantID` — joins to [`WorkerOutputRow::pollutant_id`].
+    /// `pollutantID` — joins to [`WorkerOutputRow::pollutant_id`].
     pub pollutant_id: i32,
- /// `globalWarmingPotential` — the CO2-equivalence multiplier. `SMALLINT`
- /// (exact integer) in MOVES.
+    /// `globalWarmingPotential` — the CO2-equivalence multiplier. `SMALLINT`
+    /// (exact integer) in MOVES.
     pub global_warming_potential: i32,
 }
 
@@ -280,50 +280,50 @@ pub struct Co2EqPollutantRow {
 /// `GROUP BY` fidelity note.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WorkerOutputRow {
- /// `pollutantID` — 91 for Step 1a inputs; 90 / 5 / 6 for Step 2 inputs;
- /// 90 / 98 on the rows `calculate` produces.
+    /// `pollutantID` — 91 for Step 1a inputs; 90 / 5 / 6 for Step 2 inputs;
+    /// 90 / 98 on the rows `calculate` produces.
     pub pollutant_id: i32,
- /// `processID` — the emission process.
+    /// `processID` — the emission process.
     pub process_id: i32,
- /// `yearID`.
+    /// `yearID`.
     pub year_id: i32,
- /// `monthID`.
+    /// `monthID`.
     pub month_id: i32,
- /// `dayID`.
+    /// `dayID`.
     pub day_id: i32,
- /// `hourID`.
+    /// `hourID`.
     pub hour_id: i32,
- /// `stateID`.
+    /// `stateID`.
     pub state_id: i32,
- /// `countyID`.
+    /// `countyID`.
     pub county_id: i32,
- /// `zoneID`.
+    /// `zoneID`.
     pub zone_id: i32,
- /// `linkID`.
+    /// `linkID`.
     pub link_id: i32,
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: i32,
- /// `regClassID`.
+    /// `regClassID`.
     pub reg_class_id: i32,
- /// `fuelTypeID`.
+    /// `fuelTypeID`.
     pub fuel_type_id: i32,
- /// `modelYearID`.
+    /// `modelYearID`.
     pub model_year_id: i32,
- /// `roadTypeID`.
+    /// `roadTypeID`.
     pub road_type_id: i32,
- /// `emissionQuant` — the emission quantity.
+    /// `emissionQuant` — the emission quantity.
     pub emission_quant: f64,
- /// `emissionRate` — the emission rate.
+    /// `emissionRate` — the emission rate.
     pub emission_rate: f64,
 }
 
 impl WorkerOutputRow {
- /// The fourteen integer columns the SQL's two `GROUP BY` clauses share,
- /// minus `pollutantID` (replaced by the literal output pollutant) and the
- /// pass-through `MOVESRunID` / `SCC` (see the module fidelity note). Used
- /// both as the grouping key and — via [`Ord`] on the array — as the
- /// deterministic output sort key; MOVES leaves `MOVESWorkerOutput`
- /// physically unordered.
+    /// The fourteen integer columns the SQL's two `GROUP BY` clauses share,
+    /// minus `pollutantID` (replaced by the literal output pollutant) and the
+    /// pass-through `MOVESRunID` / `SCC` (see the module fidelity note). Used
+    /// both as the grouping key and — via [`Ord`] on the array — as the
+    /// deterministic output sort key; MOVES leaves `MOVESWorkerOutput`
+    /// physically unordered.
     fn dimension_key(&self) -> [i32; 14] {
         [
             self.year_id,
@@ -941,31 +941,31 @@ impl TableRow for WorkerOutputRow {
 /// contract the unit tests build directly.
 #[derive(Debug, Clone, Default)]
 pub struct Co2aeInputs {
- /// `FuelSupply` rows (single fuel region).
+    /// `FuelSupply` rows (single fuel region).
     pub fuel_supply: Vec<FuelSupplyRow>,
- /// `FuelFormulation` rows.
+    /// `FuelFormulation` rows.
     pub fuel_formulation: Vec<FuelFormulationRow>,
- /// `FuelSubtype` rows.
+    /// `FuelSubtype` rows.
     pub fuel_subtype: Vec<FuelSubtypeRow>,
- /// `Year` rows (single calendar year).
+    /// `Year` rows (single calendar year).
     pub year: Vec<YearRow>,
- /// `MonthOfAnyYear` rows — the `monthID → monthGroupID` mapping.
+    /// `MonthOfAnyYear` rows — the `monthID → monthGroupID` mapping.
     pub month_of_any_year: Vec<MonthGroupRow>,
- /// `CO2EqPollutant` rows — global warming potentials, pre-filtered to a
- /// positive potential. A pollutant absent here has no row to `INNER JOIN`,
- /// so its emissions are dropped from Step 2.
+    /// `CO2EqPollutant` rows — global warming potentials, pre-filtered to a
+    /// positive potential. A pollutant absent here has no row to `INNER JOIN`,
+    /// so its emissions are dropped from Step 2.
     pub co2_eq_pollutant: Vec<Co2EqPollutantRow>,
- /// `MOVESWorkerOutput` rows — the Total Energy Consumption rows Step 1a
- /// reads and the methane / nitrous-oxide rows Step 2 reads. Any other
- /// pollutant present is ignored.
+    /// `MOVESWorkerOutput` rows — the Total Energy Consumption rows Step 1a
+    /// reads and the methane / nitrous-oxide rows Step 2 reads. Any other
+    /// pollutant present is ignored.
     pub worker_output: Vec<WorkerOutputRow>,
- /// Step 1a process filter — the processes `##CO2Step1AprocessIDs##`
- /// expands to. An empty list is the SQL's never-true `1=2`: no Atmospheric
- /// CO2 is produced.
+    /// Step 1a process filter — the processes `##CO2Step1AprocessIDs##`
+    /// expands to. An empty list is the SQL's never-true `1=2`: no Atmospheric
+    /// CO2 is produced.
     pub step1a_process_ids: Vec<i32>,
- /// Step 2 process filter — the processes `##CO2Step2processIDs##` expands
- /// to. An empty list is the SQL's never-true `1=2`: no CO2 Equivalent is
- /// produced.
+    /// Step 2 process filter — the processes `##CO2Step2processIDs##` expands
+    /// to. An empty list is the SQL's never-true `1=2`: no CO2 Equivalent is
+    /// produced.
     pub step2_process_ids: Vec<i32>,
 }
 
@@ -976,9 +976,9 @@ pub struct Co2aeInputs {
 /// deterministic output.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Co2aeOutput {
- /// Atmospheric CO2 (pollutant 90) rows — Step 1a output.
+    /// Atmospheric CO2 (pollutant 90) rows — Step 1a output.
     pub atmospheric_co2: Vec<WorkerOutputRow>,
- /// CO2 Equivalent (pollutant 98) rows — Step 2 output.
+    /// CO2 Equivalent (pollutant 98) rows — Step 2 output.
     pub co2_equivalent: Vec<WorkerOutputRow>,
 }
 
@@ -986,9 +986,9 @@ pub struct Co2aeOutput {
 /// properties of one `(yearID, monthGroupID, fuelTypeID)` group.
 #[derive(Debug, Clone, Copy, Default)]
 struct CarbonOxidationCell {
- /// `Σ marketShare × carbonContent`.
+    /// `Σ marketShare × carbonContent`.
     sum_carbon_content: f64,
- /// `Σ marketShare × oxidationFraction`.
+    /// `Σ marketShare × oxidationFraction`.
     sum_oxidation_fraction: f64,
 }
 
@@ -1015,7 +1015,7 @@ fn carbon_oxidation_by_fuel_type(
         .iter()
         .map(|fst| (fst.fuel_subtype_id, fst))
         .collect();
- // `Year` resolves fuelYearID → yearID; the extract carries one calendar year.
+    // `Year` resolves fuelYearID → yearID; the extract carries one calendar year.
     let year_of_fuel_year: FxHashMap<i32, i32> = inputs
         .year
         .iter()
@@ -1024,15 +1024,15 @@ fn carbon_oxidation_by_fuel_type(
 
     let mut cells: FxHashMap<(i32, i32, i32), CarbonOxidationCell> = FxHashMap::default();
     for fs in &inputs.fuel_supply {
- // INNER JOIN FuelFormulation ON fuelFormulationID.
+        // INNER JOIN FuelFormulation ON fuelFormulationID.
         let Some(ff) = formulation.get(&fs.fuel_formulation_id) else {
             continue;
         };
- // INNER JOIN FuelSubtype ON fuelSubtypeID.
+        // INNER JOIN FuelSubtype ON fuelSubtypeID.
         let Some(fst) = subtype.get(&ff.fuel_subtype_id) else {
             continue;
         };
- // INNER JOIN Year ON Year.fuelYearID = FuelSupply.fuelYearID.
+        // INNER JOIN Year ON Year.fuelYearID = FuelSupply.fuelYearID.
         let Some(&year_id) = year_of_fuel_year.get(&fs.fuel_year_id) else {
             continue;
         };
@@ -1065,25 +1065,25 @@ fn atmospheric_co2_rows(
 
     let mut groups: FxHashMap<[i32; 14], WorkerOutputRow> = FxHashMap::default();
     for w in &inputs.worker_output {
- // mwo.pollutantID = ##totalEnergyConsumptionID## (91).
+        // mwo.pollutantID = ##totalEnergyConsumptionID## (91).
         if w.pollutant_id != TOTAL_ENERGY_POLLUTANT_ID {
             continue;
         }
- // ##CO2Step1AprocessIDs## — an empty list is the never-true `1=2`.
+        // ##CO2Step1AprocessIDs## — an empty list is the never-true `1=2`.
         if !inputs.step1a_process_ids.contains(&w.process_id) {
             continue;
         }
- // INNER JOIN may ON may.monthID = mwo.monthID.
+        // INNER JOIN may ON may.monthID = mwo.monthID.
         let Some(&month_group_id) = month_group_of_month.get(&w.month_id) else {
             continue;
         };
- // INNER JOIN coft ON yearID, monthGroupID, fuelTypeID. countyID is the
- // single-county invariant — see the module documentation.
+        // INNER JOIN coft ON yearID, monthGroupID, fuelTypeID. countyID is the
+        // single-county invariant — see the module documentation.
         let Some(cell) = carbon_oxidation.get(&(w.year_id, month_group_id, w.fuel_type_id)) else {
             continue;
         };
- // SUM(emission × sumCarbonContent × sumOxidationFraction × 44/12),
- // accumulated per dimension cell.
+        // SUM(emission × sumCarbonContent × sumOxidationFraction × 44/12),
+        // accumulated per dimension cell.
         let row = groups
             .entry(w.dimension_key())
             .or_insert_with(|| WorkerOutputRow {
@@ -1093,13 +1093,13 @@ fn atmospheric_co2_rows(
                 ..*w
             });
         row.emission_quant += w.emission_quant
- * cell.sum_carbon_content
- * cell.sum_oxidation_fraction
- * CARBON_TO_CO2_MASS_RATIO;
+            * cell.sum_carbon_content
+            * cell.sum_oxidation_fraction
+            * CARBON_TO_CO2_MASS_RATIO;
         row.emission_rate += w.emission_rate
- * cell.sum_carbon_content
- * cell.sum_oxidation_fraction
- * CARBON_TO_CO2_MASS_RATIO;
+            * cell.sum_carbon_content
+            * cell.sum_oxidation_fraction
+            * CARBON_TO_CO2_MASS_RATIO;
     }
 
     let mut out: Vec<WorkerOutputRow> = groups.into_values().collect();
@@ -1128,21 +1128,21 @@ fn co2_equivalent_rows(
 
     let mut groups: FxHashMap<[i32; 14], WorkerOutputRow> = FxHashMap::default();
     for w in inputs.worker_output.iter().chain(atmospheric_co2.iter()) {
- // mwo.pollutantID IN (##CO2Step2pollutantIDs##) — "90,5,6".
+        // mwo.pollutantID IN (##CO2Step2pollutantIDs##) — "90,5,6".
         if !CO2_EQUIVALENT_INPUTS.contains(&w.pollutant_id) {
             continue;
         }
- // ##CO2Step2processIDs## — an empty list is the never-true `1=2`.
+        // ##CO2Step2processIDs## — an empty list is the never-true `1=2`.
         if !inputs.step2_process_ids.contains(&w.process_id) {
             continue;
         }
- // INNER JOIN CO2EqPollutant ON pollutantID — drops a pollutant with no
- // (positive) global warming potential.
+        // INNER JOIN CO2EqPollutant ON pollutantID — drops a pollutant with no
+        // (positive) global warming potential.
         let Some(&gwp) = gwp_of_pollutant.get(&w.pollutant_id) else {
             continue;
         };
         let gwp = f64::from(gwp);
- // SUM(emission × globalWarmingPotential), accumulated per dimension cell.
+        // SUM(emission × globalWarmingPotential), accumulated per dimension cell.
         let row = groups
             .entry(w.dimension_key())
             .or_insert_with(|| WorkerOutputRow {
@@ -1170,17 +1170,17 @@ fn co2_equivalent_rows(
 pub struct CO2AERunningStartExtendedIdleCalculator;
 
 impl CO2AERunningStartExtendedIdleCalculator {
- /// Stable module name — matches the Java class and the chain-DAG entry.
+    /// Stable module name — matches the Java class and the chain-DAG entry.
     pub const NAME: &'static str = CALCULATOR_NAME;
 
- /// Compute the Atmospheric CO2 and CO2 Equivalent rows — the port of the
- /// `CO2AERunningStartExtendedIdleCalculator.sql` "Processing" section.
- ///
- /// Runs the two ordered steps: Step 1a derives Atmospheric CO2 from Total
- /// Energy Consumption, then Step 2 derives CO2 Equivalent from Atmospheric
- /// CO2, methane and nitrous oxide — consuming Step 1a's output, exactly as
- /// the SQL reads back `MOVESWorkerOutput` after inserting it. See the
- /// [module documentation](self) for the algorithm and fidelity notes.
+    /// Compute the Atmospheric CO2 and CO2 Equivalent rows — the port of the
+    /// `CO2AERunningStartExtendedIdleCalculator.sql` "Processing" section.
+    ///
+    /// Runs the two ordered steps: Step 1a derives Atmospheric CO2 from Total
+    /// Energy Consumption, then Step 2 derives CO2 Equivalent from Atmospheric
+    /// CO2, methane and nitrous oxide — consuming Step 1a's output, exactly as
+    /// the SQL reads back `MOVESWorkerOutput` after inserting it. See the
+    /// [module documentation](self) for the algorithm and fidelity notes.
     #[must_use]
     pub fn calculate(&self, inputs: &Co2aeInputs) -> Co2aeOutput {
         let carbon_oxidation = carbon_oxidation_by_fuel_type(inputs);
@@ -1274,9 +1274,9 @@ impl Calculator for CO2AERunningStartExtendedIdleCalculator {
         Self::NAME
     }
 
- /// A chained calculator: it does not subscribe to the MasterLoop directly
- /// but fires when its upstream calculators do. `calculator-dag.json`
- /// records `subscribes_directly: false` and an empty `subscriptions` list.
+    /// A chained calculator: it does not subscribe to the MasterLoop directly
+    /// but fires when its upstream calculators do. `calculator-dag.json`
+    /// records `subscribes_directly: false` and an empty `subscriptions` list.
     fn subscriptions(&self) -> &[CalculatorSubscription] {
         NO_SUBSCRIPTIONS
     }
@@ -1285,8 +1285,8 @@ impl Calculator for CO2AERunningStartExtendedIdleCalculator {
         REGISTRATIONS
     }
 
- /// Chains off `BaseRateCalculator`, `CrankcaseEmissionCalculatorNonPM` and
- /// `HCSpeciationCalculator` — `calculator-dag.json` `depends_on`.
+    /// Chains off `BaseRateCalculator`, `CrankcaseEmissionCalculatorNonPM` and
+    /// `HCSpeciationCalculator` — `calculator-dag.json` `depends_on`.
     fn upstream(&self) -> &[&'static str] {
         UPSTREAM
     }
@@ -1338,18 +1338,18 @@ pub fn factory() -> Box<dyn Calculator> {
 mod tests {
     use super::*;
 
- /// Build a one-fuel / one-energy-row input.
- ///
- /// The single Total Energy row drives the whole chain: Step 1a turns it
- /// into one Atmospheric CO2 row, which Step 2 turns into one CO2 Equivalent
- /// row. The fuel cell is `sumCarbonContent = 2.0`, `sumOxidationFraction =
- /// 0.5`, so the Step 1a factor is `2.0 × 0.5 × 44/12 = 44/12`:
- ///
- /// * `atmosphericCO2.emissionQuant = 12.0 × 44/12 = 44.0`
- /// * `atmosphericCO2.emissionRate = 6.0 × 44/12 = 22.0`
- ///
- /// and with `globalWarmingPotential(90) = 1`, CO2 Equivalent equals the
- /// Atmospheric CO2 it consumes — `44.0` / `22.0`.
+    /// Build a one-fuel / one-energy-row input.
+    ///
+    /// The single Total Energy row drives the whole chain: Step 1a turns it
+    /// into one Atmospheric CO2 row, which Step 2 turns into one CO2 Equivalent
+    /// row. The fuel cell is `sumCarbonContent = 2.0`, `sumOxidationFraction =
+    /// 0.5`, so the Step 1a factor is `2.0 × 0.5 × 44/12 = 44/12`:
+    ///
+    /// * `atmosphericCO2.emissionQuant = 12.0 × 44/12 = 44.0`
+    /// * `atmosphericCO2.emissionRate = 6.0 × 44/12 = 22.0`
+    ///
+    /// and with `globalWarmingPotential(90) = 1`, CO2 Equivalent equals the
+    /// Atmospheric CO2 it consumes — `44.0` / `22.0`.
     fn minimal_inputs() -> Co2aeInputs {
         Co2aeInputs {
             fuel_supply: vec![FuelSupplyRow {
@@ -1414,8 +1414,8 @@ mod tests {
         }
     }
 
- /// Assert `actual` matches `expected` within `f64` slack — the
- /// FLOAT-column / `44÷12` fidelity notes mean the port computes in `f64`.
+    /// Assert `actual` matches `expected` within `f64` slack — the
+    /// FLOAT-column / `44÷12` fidelity notes mean the port computes in `f64`.
     fn assert_close(actual: f64, expected: f64) {
         assert!(
             (actual - expected).abs() < 1e-9,
@@ -1430,8 +1430,8 @@ mod tests {
         assert_eq!(out.co2_equivalent.len(), 1);
 
         let a = out.atmospheric_co2[0];
- // The dimension cell is carried straight from the energy row; the
- // pollutant is relabelled to Atmospheric CO2.
+        // The dimension cell is carried straight from the energy row; the
+        // pollutant is relabelled to Atmospheric CO2.
         assert_eq!(a.pollutant_id, 90);
         assert_eq!(a.process_id, 1);
         assert_eq!(a.year_id, 2020);
@@ -1447,24 +1447,24 @@ mod tests {
         assert_eq!(a.fuel_type_id, 2);
         assert_eq!(a.model_year_id, 2018);
         assert_eq!(a.road_type_id, 4);
- // 12.0 × 2.0 × 0.5 × 44/12 and 6.0 × 2.0 × 0.5 × 44/12.
+        // 12.0 × 2.0 × 0.5 × 44/12 and 6.0 × 2.0 × 0.5 × 44/12.
         assert_close(a.emission_quant, 44.0);
         assert_close(a.emission_rate, 22.0);
 
         let e = out.co2_equivalent[0];
         assert_eq!(e.pollutant_id, 98);
         assert_eq!(e.process_id, 1);
- // 44.0 × gwp(90)=1 and 22.0 × 1.
+        // 44.0 × gwp(90)=1 and 22.0 × 1.
         assert_close(e.emission_quant, 44.0);
         assert_close(e.emission_rate, 22.0);
     }
 
     #[test]
     fn atmospheric_co2_applies_the_carbon_to_co2_mass_ratio() {
- // With sumCarbonContent × sumOxidationFraction = 1 and one unit of
- // energy, the Atmospheric CO2 is exactly the 44/12 mass ratio. The port
- // uses the exact f64 ratio, not MariaDB's 4-decimal 3.6667 — see the
- // module fidelity note.
+        // With sumCarbonContent × sumOxidationFraction = 1 and one unit of
+        // energy, the Atmospheric CO2 is exactly the 44/12 mass ratio. The port
+        // uses the exact f64 ratio, not MariaDB's 4-decimal 3.6667 — see the
+        // module fidelity note.
         let mut inputs = minimal_inputs();
         inputs.fuel_subtype[0].carbon_content = 1.0;
         inputs.fuel_subtype[0].oxidation_fraction = 1.0;
@@ -1479,12 +1479,12 @@ mod tests {
 
     #[test]
     fn atmospheric_co2_weights_carbon_and_oxidation_by_market_share() {
- // Two formulations of fuel type 2 with unequal market shares; the
- // carbon-oxidation cell is a share-weighted sum, not a plain sum or an
- // average:
- // sumCarbonContent = 0.25×10 + 0.75×2 = 4.0
- // sumOxidationFraction = 0.25×1.0 + 0.75×0.2 = 0.4
- // emissionQuant = 12.0 × 4.0 × 0.4 × 44/12 = 1.6 × 44 = 70.4
+        // Two formulations of fuel type 2 with unequal market shares; the
+        // carbon-oxidation cell is a share-weighted sum, not a plain sum or an
+        // average:
+        // sumCarbonContent = 0.25×10 + 0.75×2 = 4.0
+        // sumOxidationFraction = 0.25×1.0 + 0.75×0.2 = 0.4
+        // emissionQuant = 12.0 × 4.0 × 0.4 × 44/12 = 1.6 × 44 = 70.4
         let mut inputs = minimal_inputs();
         inputs.fuel_supply = vec![
             FuelSupplyRow {
@@ -1533,8 +1533,8 @@ mod tests {
 
     #[test]
     fn atmospheric_co2_sums_duplicate_dimension_rows() {
- // Two Total Energy rows with the identical dimension are summed into
- // one Atmospheric CO2 row — the SQL GROUP BY + SUM.
+        // Two Total Energy rows with the identical dimension are summed into
+        // one Atmospheric CO2 row — the SQL GROUP BY + SUM.
         let mut inputs = minimal_inputs();
         let cell = inputs.worker_output[0];
         inputs.worker_output.push(WorkerOutputRow {
@@ -1545,17 +1545,17 @@ mod tests {
 
         let out = CO2AERunningStartExtendedIdleCalculator.calculate(&inputs);
         assert_eq!(out.atmospheric_co2.len(), 1);
- // (12.0 + 3.0) × 2.0 × 0.5 × 44/12 = 15.0 × 44/12 = 55.0.
+        // (12.0 + 3.0) × 2.0 × 0.5 × 44/12 = 15.0 × 44/12 = 55.0.
         assert_close(out.atmospheric_co2[0].emission_quant, 55.0);
- // (6.0 + 1.5) × 44/12 = 7.5 × 44/12 = 27.5.
+        // (6.0 + 1.5) × 44/12 = 7.5 × 44/12 = 27.5.
         assert_close(out.atmospheric_co2[0].emission_rate, 27.5);
     }
 
     #[test]
     fn atmospheric_co2_skips_process_not_in_step1a_filter() {
- // The energy row's process is absent from step1a_process_ids ([1]);
- // ##CO2Step1AprocessIDs## excludes it, so no Atmospheric CO2 — and so
- // no Step 2 input either.
+        // The energy row's process is absent from step1a_process_ids ([1]);
+        // ##CO2Step1AprocessIDs## excludes it, so no Atmospheric CO2 — and so
+        // no Step 2 input either.
         let mut inputs = minimal_inputs();
         inputs.worker_output[0].process_id = 2;
 
@@ -1566,7 +1566,7 @@ mod tests {
 
     #[test]
     fn atmospheric_co2_empty_when_step1a_process_ids_empty() {
- // An empty step1a_process_ids is the SQL's never-true `1=2`.
+        // An empty step1a_process_ids is the SQL's never-true `1=2`.
         let mut inputs = minimal_inputs();
         inputs.step1a_process_ids.clear();
 
@@ -1577,8 +1577,8 @@ mod tests {
 
     #[test]
     fn atmospheric_co2_skips_non_energy_rows() {
- // A worker-output row whose pollutant is not Total Energy Consumption
- // (91) and not a Step 2 input drives neither step.
+        // A worker-output row whose pollutant is not Total Energy Consumption
+        // (91) and not a Step 2 input drives neither step.
         let mut inputs = minimal_inputs();
         inputs.worker_output[0].pollutant_id = 2; // CO, say
 
@@ -1589,7 +1589,7 @@ mod tests {
 
     #[test]
     fn atmospheric_co2_dropped_without_a_carbon_oxidation_cell() {
- // Each INNER JOIN feeding CarbonOxidationByFuelType, dropped in turn // no cell, so the Step 1a join drops the energy row.
+        // Each INNER JOIN feeding CarbonOxidationByFuelType, dropped in turn // no cell, so the Step 1a join drops the energy row.
         let mut no_supply = minimal_inputs();
         no_supply.fuel_supply.clear();
         assert!(CO2AERunningStartExtendedIdleCalculator
@@ -1618,7 +1618,7 @@ mod tests {
             .atmospheric_co2
             .is_empty());
 
- // The energy row's fuel type has no carbon-oxidation cell.
+        // The energy row's fuel type has no carbon-oxidation cell.
         let mut other_fuel_type = minimal_inputs();
         other_fuel_type.worker_output[0].fuel_type_id = 9;
         assert!(CO2AERunningStartExtendedIdleCalculator
@@ -1629,8 +1629,8 @@ mod tests {
 
     #[test]
     fn atmospheric_co2_dropped_without_a_month_group() {
- // The energy row's month is absent from MonthOfAnyYear — the
- // CO2MonthofAnyYear inner join drops it.
+        // The energy row's month is absent from MonthOfAnyYear — the
+        // CO2MonthofAnyYear inner join drops it.
         let mut inputs = minimal_inputs();
         inputs.month_of_any_year.clear();
         assert!(CO2AERunningStartExtendedIdleCalculator
@@ -1641,9 +1641,9 @@ mod tests {
 
     #[test]
     fn co2_equivalent_consumes_freshly_computed_atmospheric_co2() {
- // The worker output carries only Total Energy — no pollutant-90, -5 or
- // -6 row. CO2 Equivalent is non-empty purely because Step 2 reads the
- // Atmospheric CO2 that Step 1a just produced and inserted.
+        // The worker output carries only Total Energy — no pollutant-90, -5 or
+        // -6 row. CO2 Equivalent is non-empty purely because Step 2 reads the
+        // Atmospheric CO2 that Step 1a just produced and inserted.
         let inputs = minimal_inputs();
         assert!(inputs.worker_output.iter().all(|w| w.pollutant_id == 91));
 
@@ -1654,11 +1654,11 @@ mod tests {
 
     #[test]
     fn co2_equivalent_sums_atmospheric_methane_and_nitrous_oxide() {
- // Add a methane and a nitrous-oxide row at the energy row's dimension
- // cell. Step 2 sums Atmospheric CO2 (from Step 1a), methane and nitrous
- // oxide, each weighted by its global warming potential:
- // quant = 44.0×1 + 2.0×25 + 1.0×298 = 44 + 50 + 298 = 392.0
- // rate = 22.0×1 + 1.0×25 + 1.0×298 = 22 + 25 + 298 = 345.0
+        // Add a methane and a nitrous-oxide row at the energy row's dimension
+        // cell. Step 2 sums Atmospheric CO2 (from Step 1a), methane and nitrous
+        // oxide, each weighted by its global warming potential:
+        // quant = 44.0×1 + 2.0×25 + 1.0×298 = 44 + 50 + 298 = 392.0
+        // rate = 22.0×1 + 1.0×25 + 1.0×298 = 22 + 25 + 298 = 345.0
         let mut inputs = minimal_inputs();
         let cell = inputs.worker_output[0];
         inputs.worker_output.push(WorkerOutputRow {
@@ -1675,7 +1675,7 @@ mod tests {
         });
 
         let out = CO2AERunningStartExtendedIdleCalculator.calculate(&inputs);
- // Step 1a sees only the one Total Energy row.
+        // Step 1a sees only the one Total Energy row.
         assert_eq!(out.atmospheric_co2.len(), 1);
         assert_eq!(out.co2_equivalent.len(), 1);
         assert_close(out.co2_equivalent[0].emission_quant, 392.0);
@@ -1684,8 +1684,8 @@ mod tests {
 
     #[test]
     fn co2_equivalent_skips_pollutant_without_a_global_warming_potential() {
- // Drop Atmospheric CO2's CO2EqPollutant row: Step 1a still produces the
- // 90 row, but Step 2's INNER JOIN finds no potential for it.
+        // Drop Atmospheric CO2's CO2EqPollutant row: Step 1a still produces the
+        // 90 row, but Step 2's INNER JOIN finds no potential for it.
         let mut inputs = minimal_inputs();
         inputs.co2_eq_pollutant.retain(|p| p.pollutant_id != 90);
 
@@ -1696,8 +1696,8 @@ mod tests {
 
     #[test]
     fn co2_equivalent_skips_process_not_in_step2_filter() {
- // ##CO2Step2processIDs## excludes the 90 row's process; Step 1a is
- // unaffected, Step 2 produces nothing.
+        // ##CO2Step2processIDs## excludes the 90 row's process; Step 1a is
+        // unaffected, Step 2 produces nothing.
         let mut inputs = minimal_inputs();
         inputs.step2_process_ids = vec![2];
 
@@ -1708,9 +1708,9 @@ mod tests {
 
     #[test]
     fn co2_equivalent_excludes_total_energy_rows() {
- // Even given a global warming potential, a Total Energy (91) row is
- // excluded from Step 2 — the filter is `pollutantID IN (90,5,6)`, not
- // "has a potential". CO2 Equivalent stays the 90-only 44.0.
+        // Even given a global warming potential, a Total Energy (91) row is
+        // excluded from Step 2 — the filter is `pollutantID IN (90,5,6)`, not
+        // "has a potential". CO2 Equivalent stays the 90-only 44.0.
         let mut inputs = minimal_inputs();
         inputs.co2_eq_pollutant.push(Co2EqPollutantRow {
             pollutant_id: 91,
@@ -1724,9 +1724,9 @@ mod tests {
 
     #[test]
     fn output_is_sorted_by_dimension_key() {
- // Two Total Energy rows on distinct links yield two dimension cells;
- // each step's output comes back dimension-key sorted regardless of
- // input order.
+        // Two Total Energy rows on distinct links yield two dimension cells;
+        // each step's output comes back dimension-key sorted regardless of
+        // input order.
         let mut inputs = minimal_inputs();
         let cell = inputs.worker_output[0];
         inputs.worker_output.insert(
@@ -1776,7 +1776,7 @@ mod tests {
 
     #[test]
     fn calculator_is_chained_with_no_subscriptions() {
- // calculator-dag.json: subscribes_directly false, subscriptions [].
+        // calculator-dag.json: subscribes_directly false, subscriptions [].
         assert!(CO2AERunningStartExtendedIdleCalculator
             .subscriptions()
             .is_empty());
@@ -1784,9 +1784,9 @@ mod tests {
 
     #[test]
     fn registrations_match_the_eight_calculator_info_directives() {
- // calculator-dag.json records registrations_count 8: Atmospheric CO2
- // (90) and CO2 Equivalent (98), each for the running (1), start (2),
- // extended-idle (90) and aux-power (91) exhaust processes.
+        // calculator-dag.json records registrations_count 8: Atmospheric CO2
+        // (90) and CO2 Equivalent (98), each for the running (1), start (2),
+        // extended-idle (90) and aux-power (91) exhaust processes.
         let regs = CO2AERunningStartExtendedIdleCalculator.registrations();
         assert_eq!(regs.len(), 8);
         assert!(regs
@@ -1796,7 +1796,7 @@ mod tests {
         procs.sort_unstable();
         procs.dedup();
         assert_eq!(procs, vec![1, 2, 90, 91]);
- // Each process carries both the Atmospheric CO2 and CO2 Equivalent pair.
+        // Each process carries both the Atmospheric CO2 and CO2 Equivalent pair.
         for p in [1u16, 2, 90, 91] {
             assert_eq!(regs.iter().filter(|r| r.process_id.0 == p).count(), 2);
         }
@@ -1804,7 +1804,7 @@ mod tests {
 
     #[test]
     fn calculator_chains_off_three_upstream_calculators() {
- // calculator-dag.json records depends_on with these three.
+        // calculator-dag.json records depends_on with these three.
         assert_eq!(
             CO2AERunningStartExtendedIdleCalculator.upstream(),
             &[
@@ -1864,8 +1864,8 @@ mod tests {
             "MOVESWorkerOutput",
             WorkerOutputRow::into_dataframe(inputs.worker_output.clone()).unwrap(),
         );
- // RunSpecPollutantProcess: pollutant 90 (AtmosphericCO2) for process 1 → 90*100+1=9001
- // pollutant 98 (CO2Equivalent) for process 1 → 98*100+1=9801
+        // RunSpecPollutantProcess: pollutant 90 (AtmosphericCO2) for process 1 → 90*100+1=9001
+        // pollutant 98 (CO2Equivalent) for process 1 → 98*100+1=9801
         store.insert(
             "RunSpecPollutantProcess",
             RunSpecPollutantProcessRow::into_dataframe(vec![
@@ -1896,7 +1896,7 @@ mod tests {
 
     #[test]
     fn calculator_is_object_safe() {
- // The registry stores calculators as Box<dyn Calculator>.
+        // The registry stores calculators as Box<dyn Calculator>.
         let calc: Box<dyn Calculator> = Box::new(CO2AERunningStartExtendedIdleCalculator);
         assert_eq!(calc.name(), "CO2AERunningStartExtendedIdleCalculator");
     }

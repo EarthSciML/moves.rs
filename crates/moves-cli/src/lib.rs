@@ -40,9 +40,7 @@ use moves_runspec::{from_toml_str, from_xml_str, RunSpec};
 
 pub use convert::{convert_runspec, ConvertOptions, ConvertOutcome};
 pub use import::{import_cdb, ImportOptions, ImportOutcome, ImportStatus, ImportedTableReport};
-pub use run::{
-    build_default_db_store, default_replaced_pollutants, run_simulation, RunOptions,
-};
+pub use run::{build_default_db_store, default_replaced_pollutants, run_simulation, RunOptions};
 
 /// Re-exported so callers (and the integration tests) can inspect a
 /// [`run_simulation`] result without depending on `moves-framework` directly.
@@ -55,18 +53,18 @@ pub use moves_framework::EngineOutcome;
 /// [`convert_runspec`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RunSpecFormat {
- /// Legacy MOVES XML (`.xml` / `.mrs`).
+    /// Legacy MOVES XML (`.xml` / `.mrs`).
     Xml,
- /// The recommended TOML format (`.toml`).
+    /// The recommended TOML format (`.toml`).
     Toml,
 }
 
 impl RunSpecFormat {
- /// Infer the format from a path's extension: `xml` / `mrs` → [`Xml`],
- /// `toml` → [`Toml`]. Case-insensitive. `None` for anything else.
- ///
- /// [`Xml`]: RunSpecFormat::Xml
- /// [`Toml`]: RunSpecFormat::Toml
+    /// Infer the format from a path's extension: `xml` / `mrs` → [`Xml`],
+    /// `toml` → [`Toml`]. Case-insensitive. `None` for anything else.
+    ///
+    /// [`Xml`]: RunSpecFormat::Xml
+    /// [`Toml`]: RunSpecFormat::Toml
     #[must_use]
     pub fn from_path(path: &Path) -> Option<Self> {
         let ext = path.extension()?.to_str()?;
@@ -79,7 +77,7 @@ impl RunSpecFormat {
         }
     }
 
- /// The other format — the target of an XML↔TOML conversion.
+    /// The other format — the target of an XML↔TOML conversion.
     #[must_use]
     pub fn opposite(self) -> Self {
         match self {
@@ -88,7 +86,7 @@ impl RunSpecFormat {
         }
     }
 
- /// The canonical file extension for this format (no leading dot).
+    /// The canonical file extension for this format (no leading dot).
     #[must_use]
     pub fn extension(self) -> &'static str {
         match self {
@@ -97,7 +95,7 @@ impl RunSpecFormat {
         }
     }
 
- /// A short human label for diagnostics.
+    /// A short human label for diagnostics.
     #[must_use]
     pub fn label(self) -> &'static str {
         match self {

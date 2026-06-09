@@ -31,22 +31,22 @@ use crate::{Error, Result};
 /// `G/M2/DAY` permeation unit (`IDXGMD` in `nonrdefc.inc`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EvapEmissionUnits {
- /// `G/HR`.
+    /// `G/HR`.
     GramsPerHour,
- /// `G/HP-HR`.
+    /// `G/HP-HR`.
     GramsPerHpHour,
- /// `G/GALLON`.
+    /// `G/GALLON`.
     GramsPerGallon,
- /// `G/TANK`.
+    /// `G/TANK`.
     GramsPerTank,
- /// `G/DAY`.
+    /// `G/DAY`.
     GramsPerDay,
- /// `G/START`.
+    /// `G/START`.
     GramsPerStart,
- /// `MULT` — unitless multiplier (diurnal).
+    /// `MULT` — unitless multiplier (diurnal).
     Multiplier,
- /// `G/M2/DAY` — grams per square metre per day
- /// (permeation pollutants).
+    /// `G/M2/DAY` — grams per square metre per day
+    /// (permeation pollutants).
     GramsPerM2Day,
 }
 
@@ -75,15 +75,15 @@ impl EvapEmissionUnits {
 /// (typically a string code) into the right [`EvapPollutantKind`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EvapPollutantKind {
- /// Diurnal (IDXDIU) — units must be `MULT`.
+    /// Diurnal (IDXDIU) — units must be `MULT`.
     Diurnal,
- /// Tank permeation (IDXTKP) — units must be `G/M2/DAY`.
+    /// Tank permeation (IDXTKP) — units must be `G/M2/DAY`.
     TankPermeation,
- /// Hose / fill-neck / supply-return / vent permeation
- /// (IDXHOS..IDXVNT) — units must be `G/M2/DAY`.
+    /// Hose / fill-neck / supply-return / vent permeation
+    /// (IDXHOS..IDXVNT) — units must be `G/M2/DAY`.
     HosePermeation,
- /// No unit constraint (other evap pollutants such as hot soak,
- /// running loss, resting loss, displacement, spillage).
+    /// No unit constraint (other evap pollutants such as hot soak,
+    /// running loss, resting loss, displacement, spillage).
     Unconstrained,
 }
 
@@ -100,20 +100,20 @@ impl EvapPollutantKind {
 /// One evap emission-factor record.
 #[derive(Debug, Clone, PartialEq)]
 pub struct EvapEmissionFactorRecord {
- /// SCC code.
+    /// SCC code.
     pub scc: String,
- /// Evap technology-type code (10 chars; see the `E00000000`
- /// encoding documented at `rdevtech.f` :117-134).
+    /// Evap technology-type code (10 chars; see the `E00000000`
+    /// encoding documented at `rdevtech.f` :117-134).
     pub tech_type: String,
- /// Horsepower-range minimum.
+    /// Horsepower-range minimum.
     pub hp_min: f32,
- /// Horsepower-range maximum.
+    /// Horsepower-range maximum.
     pub hp_max: f32,
- /// Model year.
+    /// Model year.
     pub year: i32,
- /// Units keyword.
+    /// Units keyword.
     pub units: EvapEmissionUnits,
- /// Emission-factor value.
+    /// Emission-factor value.
     pub factor: f32,
 }
 
@@ -405,7 +405,7 @@ mod tests {
 
     #[test]
     fn diurnal_requires_mult() {
- // Diurnal pollutant with G/DAY → rejected.
+        // Diurnal pollutant with G/DAY → rejected.
         let header = at(&[
             (6, "2270001000"),
             (21, " 25.0"),

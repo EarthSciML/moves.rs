@@ -18,13 +18,8 @@
 *.db
 .beads-credential-key
 
-# Gas City
-.beads/*
-!.beads/config.yaml
-!.beads/metadata.json
-
-# Gas City
-!.beads/identity.toml
+# Gas City — beads is local-only runtime state; never commit it
+.beads/
 
 # Default output directory for moves run
 moves-output/

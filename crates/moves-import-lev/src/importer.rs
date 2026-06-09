@@ -11,15 +11,15 @@ use crate::validate::validate;
 /// Summary of a successful import run.
 #[derive(Debug, Clone)]
 pub struct ImportReport {
- /// Which alternative-rate table was written.
+    /// Which alternative-rate table was written.
     pub kind: LevKind,
- /// Absolute path of the input CSV.
+    /// Absolute path of the input CSV.
     pub input_path: PathBuf,
- /// Absolute path of the Parquet file produced.
+    /// Absolute path of the Parquet file produced.
     pub output_path: PathBuf,
- /// Number of data rows written to Parquet.
+    /// Number of data rows written to Parquet.
     pub row_count: u64,
- /// SHA-256 of the written Parquet bytes (lower-case hex).
+    /// SHA-256 of the written Parquet bytes (lower-case hex).
     pub sha256: String,
 }
 

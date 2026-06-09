@@ -50,18 +50,18 @@ pub fn allocate_vmt_by_road_type_source_age(
         .iter()
         .map(|r| (r.source_type_id, r.hpms_v_type_id))
         .collect();
- // (yearID, HPMSVTypeID) -> VMT.
+    // (yearID, HPMSVTypeID) -> VMT.
     let analysis_vmt: BTreeMap<(i32, i32), f64> = analysis_year_vmt
         .iter()
         .map(|r| ((r.year_id, r.hpms_v_type_id), r.vmt))
         .collect();
- // (yearID, sourceTypeID) -> VMT.
+    // (yearID, sourceTypeID) -> VMT.
     let source_type_vmt: BTreeMap<(i32, i32), f64> = source_type_year_vmt
         .iter()
         .filter(|r| r.year_id == analysis_year)
         .map(|r| ((r.year_id, r.source_type_id), r.vmt))
         .collect();
- // sourceTypeID -> [(roadTypeID, roadTypeVMTFraction)] for in-scope roads.
+    // sourceTypeID -> [(roadTypeID, roadTypeVMTFraction)] for in-scope roads.
     let mut road_fractions: BTreeMap<i32, Vec<(i32, f64)>> = BTreeMap::new();
     for rtd in road_type_distribution {
         if road_types.contains(&rtd.road_type_id) {
@@ -77,11 +77,11 @@ pub fn allocate_vmt_by_road_type_source_age(
         let Some(roads) = road_fractions.get(&tf.source_type_id) else {
             continue;
         };
- // HPMS path: annual VMT keyed by the source type's HPMS type.
+        // HPMS path: annual VMT keyed by the source type's HPMS type.
         let hpms_vmt = hpms_of
             .get(&tf.source_type_id)
             .and_then(|hpms| analysis_vmt.get(&(tf.year_id, *hpms)));
- // Source-type path: annual VMT keyed by the source type directly.
+        // Source-type path: annual VMT keyed by the source type directly.
         let st_vmt = source_type_vmt.get(&(tf.year_id, tf.source_type_id));
 
         for &(road_type_id, road_fraction) in roads {
@@ -132,7 +132,7 @@ pub fn hourly_vmt_from_annual(
     hour_day: &[HourDayRow],
     month_of_any_year: &[MonthOfAnyYearRow],
 ) -> Vec<VmtByAgeRoadwayHourRow> {
- // sourceTypeID -> [(monthID, monthVMTFraction)].
+    // sourceTypeID -> [(monthID, monthVMTFraction)].
     let mut months_by_source: BTreeMap<i32, Vec<(i32, f64)>> = BTreeMap::new();
     for m in month_vmt_fraction {
         months_by_source
@@ -140,14 +140,14 @@ pub fn hourly_vmt_from_annual(
             .or_default()
             .push((m.month_id, m.month_vmt_fraction));
     }
- // (sourceTypeID, monthID, roadTypeID) -> [(dayID, dayVMTFraction)].
+    // (sourceTypeID, monthID, roadTypeID) -> [(dayID, dayVMTFraction)].
     let mut days: BTreeMap<(i32, i32, i32), Vec<(i32, f64)>> = BTreeMap::new();
     for d in day_vmt_fraction {
         days.entry((d.source_type_id, d.month_id, d.road_type_id))
             .or_default()
             .push((d.day_id, d.day_vmt_fraction));
     }
- // (sourceTypeID, roadTypeID, dayID) -> [(hourID, hourVMTFraction)].
+    // (sourceTypeID, roadTypeID, dayID) -> [(hourID, hourVMTFraction)].
     let mut hours: BTreeMap<(i32, i32, i32), Vec<(i32, f64)>> = BTreeMap::new();
     for h in hour_vmt_fraction {
         hours
@@ -155,7 +155,7 @@ pub fn hourly_vmt_from_annual(
             .or_default()
             .push((h.hour_id, h.hour_vmt_fraction));
     }
- // (hourID, dayID) -> hourDayID.
+    // (hourID, dayID) -> hourDayID.
     let hour_day_id: BTreeMap<(i32, i32), i32> = hour_day
         .iter()
         .map(|r| ((r.hour_id, r.day_id), r.hour_day_id))
@@ -206,15 +206,15 @@ pub fn hourly_vmt_from_annual(
 /// [`hourly_vmt_from_hpms_day`] within a readable argument count.
 #[derive(Debug, Clone, Copy)]
 pub struct DailyVmtJoinTables<'a> {
- /// `RoadTypeDistribution` — the `(sourceType, roadType)` VMT split.
+    /// `RoadTypeDistribution` — the `(sourceType, roadType)` VMT split.
     pub road_type_distribution: &'a [RoadTypeDistributionRow],
- /// `HourDay` — the `(hour, day)` packed-key catalogue.
+    /// `HourDay` — the `(hour, day)` packed-key catalogue.
     pub hour_day: &'a [HourDayRow],
- /// `HourVMTFraction` — the hourly VMT shares.
+    /// `HourVMTFraction` — the hourly VMT shares.
     pub hour_vmt_fraction: &'a [HourVmtFractionRow],
- /// `TravelFraction` — the per-cohort travel shares.
+    /// `TravelFraction` — the per-cohort travel shares.
     pub travel_fraction: &'a [TravelFractionRow],
- /// `DayOfAnyWeek` — the real-days-per-day-type counts.
+    /// `DayOfAnyWeek` — the real-days-per-day-type counts.
     pub day_of_any_week: &'a [DayOfAnyWeekRow],
 }
 
@@ -371,7 +371,7 @@ pub fn hourly_vmt_from_hpms_day(
             .push((rtd.road_type_id, rtd.road_type_vmt_fraction));
     }
     let hour_fraction = hour_fraction_index(tables.hour_vmt_fraction);
- // HPMSVTypeID -> [sourceTypeID].
+    // HPMSVTypeID -> [sourceTypeID].
     let mut source_types: BTreeMap<i32, Vec<i32>> = BTreeMap::new();
     for sut in source_use_type {
         source_types
@@ -469,10 +469,10 @@ pub fn combine_hourly_vmt(
 pub fn vmt_by_my_road_hour_fraction(
     vmt_by_age_roadway_hour: &[VmtByAgeRoadwayHourRow],
 ) -> Vec<VmtByMyRoadHourFractionRow> {
- // (year, road, source, month, day, hour) -> total VMT.
+    // (year, road, source, month, day, hour) -> total VMT.
     let mut totals: BTreeMap<(i32, i32, i32, i32, i32, i32), f64> = BTreeMap::new();
     for v in vmt_by_age_roadway_hour {
- *totals
+        *totals
             .entry((
                 v.year_id,
                 v.road_type_id,
@@ -497,7 +497,7 @@ pub fn vmt_by_my_road_hour_fraction(
         let Some(&total) = totals.get(&key) else {
             continue;
         };
- // The summary `HAVING sum(VMT) > 0` drops non-positive totals.
+        // The summary `HAVING sum(VMT) > 0` drops non-positive totals.
         if total <= 0.0 {
             continue;
         }
@@ -562,8 +562,8 @@ mod tests {
 
     #[test]
     fn allocate_vmt_hpms_path() {
- // HPMS type 10 has 1000 VMT; source type 21 rolls up to it, with
- // 60% of VMT on road type 2 and a 0.5 travel fraction at age 0.
+        // HPMS type 10 has 1000 VMT; source type 21 rolls up to it, with
+        // 60% of VMT on road type 2 and a 0.5 travel fraction at age 0.
         let travel = [tf(2020, 21, 0, 0.5)];
         let roads = [RoadTypeRow { road_type_id: 2 }];
         let rtds = [rtd(21, 2, 0.6)];
@@ -579,7 +579,7 @@ mod tests {
         let out =
             allocate_vmt_by_road_type_source_age(&travel, &roads, &rtds, &ayv, &suts, &[], 2020);
         assert_eq!(out.len(), 1);
- // 1000 * 0.6 * 0.5 = 300.
+        // 1000 * 0.6 * 0.5 = 300.
         assert!((out[0].vmt - 300.0).abs() < EPS);
     }
 
@@ -596,14 +596,14 @@ mod tests {
         let out =
             allocate_vmt_by_road_type_source_age(&travel, &roads, &rtds, &[], &[], &styv, 2020);
         assert_eq!(out.len(), 1);
- // 2000 * 0.6 * 0.5 = 600.
+        // 2000 * 0.6 * 0.5 = 600.
         assert!((out[0].vmt - 600.0).abs() < EPS);
     }
 
     #[test]
     fn allocate_vmt_skips_road_types_not_in_road_type() {
         let travel = [tf(2020, 21, 0, 1.0)];
- // RoadType has only road 2; the distribution mentions road 9 too.
+        // RoadType has only road 2; the distribution mentions road 9 too.
         let roads = [RoadTypeRow { road_type_id: 2 }];
         let rtds = [rtd(21, 2, 0.5), rtd(21, 9, 0.5)];
         let styv = [SourceTypeYearVmtRow {
@@ -624,7 +624,7 @@ mod tests {
             no_of_days: 28,
         }];
         assert!((weeks_per_month(&moy, 1) - 4.0).abs() < EPS);
- // Unknown month falls back to 1.
+        // Unknown month falls back to 1.
         assert!((weeks_per_month(&moy, 7) - 1.0).abs() < EPS);
     }
 
@@ -655,14 +655,14 @@ mod tests {
             hour_id: 8,
             day_id: 5,
         }];
- // 7 days in the month -> weeksPerMonth = 1.0.
+        // 7 days in the month -> weeksPerMonth = 1.0.
         let moy = [MonthOfAnyYearRow {
             month_id: 1,
             no_of_days: 7,
         }];
         let out = hourly_vmt_from_annual(&annual_rows, &mvf, &dvf, &hvf, &hd, &moy);
         assert_eq!(out.len(), 1);
- // 7000 * (0.5*0.4) * 0.1 / 1.0 = 140.
+        // 7000 * (0.5*0.4) * 0.1 / 1.0 = 140.
         assert!((out[0].vmt - 140.0).abs() < EPS);
         assert_eq!(out[0].hour_day_id, 85);
     }
@@ -703,7 +703,7 @@ mod tests {
         };
         let out = hourly_vmt_from_source_type_day(&stdv, &tables, 2020);
         assert_eq!(out.len(), 1);
- // 1000 * 0.25 * 0.5 * 0.8 * 2 = 200.
+        // 1000 * 0.25 * 0.5 * 0.8 * 2 = 200.
         assert!((out[0].vmt - 200.0).abs() < EPS);
         assert_eq!(out[0].age_id, 3);
     }
@@ -721,7 +721,7 @@ mod tests {
             hour_day_id: 85,
             vmt,
         };
- // The annual path wins; the daily path's same-key row is ignored.
+        // The annual path wins; the daily path's same-key row is ignored.
         let merged = combine_hourly_vmt(vec![row(100.0)], vec![row(999.0)], vec![]);
         assert_eq!(merged.len(), 1);
         assert!((merged[0].vmt - 100.0).abs() < EPS);
@@ -729,7 +729,7 @@ mod tests {
 
     #[test]
     fn vmt_by_my_road_hour_fraction_is_share_of_cell_total() {
- // Two ages in the same (year,road,source,month,day,hour) cell.
+        // Two ages in the same (year,road,source,month,day,hour) cell.
         let v = |age, vmt| VmtByAgeRoadwayHourRow {
             year_id: 2020,
             road_type_id: 2,
@@ -744,10 +744,10 @@ mod tests {
         let hourly = [v(0, 300.0), v(1, 100.0)];
         let out = vmt_by_my_road_hour_fraction(&hourly);
         assert_eq!(out.len(), 2);
- // age 0 -> modelYear 2020, fraction 300/400 = 0.75.
+        // age 0 -> modelYear 2020, fraction 300/400 = 0.75.
         let age0 = out.iter().find(|r| r.model_year_id == 2020).unwrap();
         assert!((age0.vmt_fraction - 0.75).abs() < EPS);
- // age 1 -> modelYear 2019, fraction 100/400 = 0.25.
+        // age 1 -> modelYear 2019, fraction 100/400 = 0.25.
         let age1 = out.iter().find(|r| r.model_year_id == 2019).unwrap();
         assert!((age1.vmt_fraction - 0.25).abs() < EPS);
     }

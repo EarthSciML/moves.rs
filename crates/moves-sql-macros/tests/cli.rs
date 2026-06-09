@@ -11,8 +11,8 @@ fn fixtures_dir() -> PathBuf {
 }
 
 fn bin_path() -> PathBuf {
- // CARGO_BIN_EXE_<name> is set by cargo for integration tests when the
- // crate declares a [[bin]] target.
+    // CARGO_BIN_EXE_<name> is set by cargo for integration tests when the
+    // crate declares a [[bin]] target.
     PathBuf::from(env!("CARGO_BIN_EXE_moves-sql-expand"))
 }
 
@@ -33,21 +33,21 @@ fn cli_emits_expected_expansion_to_stdout() {
     );
 
     let stdout = String::from_utf8(output.stdout).unwrap();
- // Spot-check the lines we know should be there post-expansion.
+    // Spot-check the lines we know should be there post-expansion.
     assert!(stdout.contains("CREATE TABLE foo (id INT, year INT);"));
     assert!(stdout.contains("INSERT INTO foo VALUES (1, 2030);"));
     assert!(stdout.contains("DROP TABLE bar21;"));
     assert!(stdout.contains("DROP TABLE bar31;"));
- // Sort order is lexicographic over strings — Java `TreeSet<String>`.
- // hourID values sort as ["10", "7", "8", "9"].
+    // Sort order is lexicographic over strings — Java `TreeSet<String>`.
+    // hourID values sort as ["10", "7", "8", "9"].
     assert!(stdout.contains("WHERE hourID in (10,7,8,9)"));
     assert!(stdout.contains("WHERE fuelTypeID in (1,2,9)"));
- // The disabled `Rates` section's body must not appear.
+    // The disabled `Rates` section's body must not appear.
     assert!(
         !stdout.contains("INSERT INTO foo VALUES (2,"),
         "Rates section should be filtered out; stdout was:\n{stdout}"
     );
- // Marker for a disabled section must not appear either.
+    // Marker for a disabled section must not appear either.
     assert!(
         !stdout.contains("-- Section Rates"),
         "Rates section marker should be filtered out; stdout was:\n{stdout}"
@@ -70,9 +70,9 @@ fn cli_writes_to_output_file_when_requested() {
         .output()
         .expect("failed to invoke moves-sql-expand");
     assert!(output.status.success());
- // stdout should be empty when --output is set.
+    // stdout should be empty when --output is set.
     assert!(output.stdout.is_empty());
- // Summary lands on stderr when --summary is passed.
+    // Summary lands on stderr when --summary is passed.
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("[moves-sql-expand]"), "stderr={stderr}");
 

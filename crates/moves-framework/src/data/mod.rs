@@ -55,17 +55,17 @@ use polars::prelude::{DataFrame, SchemaRef};
 /// Schema validation against store contents is deferred to T3.
 #[derive(Debug, Clone)]
 pub struct TableSchema {
- /// Canonical name matching the default-DB table or scratch-table declaration
- /// (e.g. `"sourceUseTypePopulation"`).
+    /// Canonical name matching the default-DB table or scratch-table declaration
+    /// (e.g. `"sourceUseTypePopulation"`).
     pub name: &'static str,
- /// Expected column names and types. Built once at startup from the
- /// characterization catalogue; individual store inserts are not yet
- /// validated against this (T3).
+    /// Expected column names and types. Built once at startup from the
+    /// characterization catalogue; individual store inserts are not yet
+    /// validated against this (T3).
     pub schema: SchemaRef,
 }
 
 impl TableSchema {
- /// Construct a schema entry.
+    /// Construct a schema entry.
     #[must_use]
     pub fn new(name: &'static str, schema: SchemaRef) -> Self {
         Self { name, schema }
@@ -78,14 +78,14 @@ impl TableSchema {
 /// references to the same loaded table without copying data.
 #[derive(Debug, Clone)]
 pub struct TableHandle {
- /// Canonical table name.
+    /// Canonical table name.
     pub name: String,
- /// The table's data, shared behind an `Arc` to avoid copies.
+    /// The table's data, shared behind an `Arc` to avoid copies.
     pub data: Arc<DataFrame>,
 }
 
 impl TableHandle {
- /// Construct a handle from a name and a shared DataFrame.
+    /// Construct a handle from a name and a shared DataFrame.
     #[must_use]
     pub fn new(name: impl Into<String>, data: Arc<DataFrame>) -> Self {
         Self {
@@ -102,16 +102,16 @@ impl TableHandle {
 /// [`InMemoryStore`]. The trait surface is intentionally narrow/// `get`, `insert`, `contains`, `names` — so alternative implementations
 /// (e.g. a read-only Parquet-backed store for tests) are easy to write.
 pub trait DataFrameStore {
- /// Return the DataFrame stored under `name`, or `None` if absent.
+    /// Return the DataFrame stored under `name`, or `None` if absent.
     fn get(&self, name: &str) -> Option<Arc<DataFrame>>;
 
- /// Insert `df` under `name`, replacing any existing entry with the same
- /// name. The store takes ownership of `df` and wraps it in an `Arc`.
+    /// Insert `df` under `name`, replacing any existing entry with the same
+    /// name. The store takes ownership of `df` and wraps it in an `Arc`.
     fn insert(&mut self, name: impl Into<String>, df: DataFrame);
 
- /// Return `true` when a table named `name` is present in the store.
+    /// Return `true` when a table named `name` is present in the store.
     fn contains(&self, name: &str) -> bool;
 
- /// All table names currently in the store, in sorted order.
+    /// All table names currently in the store, in sorted order.
     fn names(&self) -> Vec<&str>;
 }

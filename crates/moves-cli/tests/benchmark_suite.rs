@@ -341,7 +341,7 @@ fn benchmark_all_workload_categories() {
 
     let mut failures: Vec<String> = Vec::new();
 
- // ── 1. Default-scale national (onroad) ─────────────────────────────────
+    // ── 1. Default-scale national (onroad) ─────────────────────────────────
     {
         let fixtures = default_scale_fixtures();
         println!(
@@ -352,7 +352,7 @@ fn benchmark_all_workload_categories() {
         print_n_sweep("Default-Scale", &fixtures, ncpu, &mut failures);
     }
 
- // ── 2. NONROAD-only ───────────────────────────────────────────────────
+    // ── 2. NONROAD-only ───────────────────────────────────────────────────
     {
         let fixtures = nonroad_fixtures();
         println!("\n\n## 2. NONROAD-Only ({} fixtures)\n", fixtures.len());
@@ -360,7 +360,7 @@ fn benchmark_all_workload_categories() {
         print_n_sweep("NONROAD-Only", &fixtures, ncpu, &mut failures);
     }
 
- // ── 3. Mixed onroad + NONROAD ─────────────────────────────────────────
+    // ── 3. Mixed onroad + NONROAD ─────────────────────────────────────────
     {
         let fixtures = mixed_fixtures();
         println!(
@@ -371,7 +371,7 @@ fn benchmark_all_workload_categories() {
         print_n_sweep("Mixed Onroad+NONROAD", &fixtures, ncpu, &mut failures);
     }
 
- // ── 4–6. Scale fixtures (need external inputs) ────────────────────────
+    // ── 4–6. Scale fixtures (need external inputs) ────────────────────────
     let scale_kinds = [
         (
             "scale-county",
@@ -401,7 +401,7 @@ fn benchmark_all_workload_categories() {
         }
     }
 
- // ── assertion ─────────────────────────────────────────────────────────
+    // ── assertion ─────────────────────────────────────────────────────────
     assert!(
         failures.is_empty(),
         "benchmark failures:\n  {}",

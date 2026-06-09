@@ -69,13 +69,14 @@ pub mod inputs;
 pub mod options;
 pub mod outputs;
 
+pub use crate::population::GrowthIndicatorRecord;
 pub use executor::{
     DispatchContext, GeographyExecution, GeographyExecutor, PlanRecordingExecutor,
     ProductionExecutor, RecordedDispatch,
 };
 pub use inputs::{
     ActivityTableEntry, EvapTechEntry, ExhaustTechEntry, GrowthXrefEntry, NationalAllocationEntry,
-    NonroadInputs, ReferenceData, SccGroup,
+    NonroadInputs, ReferenceData, SccGroup, TemporalProfile,
 };
 pub use options::{NonroadOptions, MAX_YEAR, MIN_YEAR};
 pub use outputs::{EmissionChannel, NonroadOutputs, RunCounters, SimEmissionRow};
@@ -155,8 +156,8 @@ where
 
     let mut outputs = NonroadOutputs::default();
 
- // nonroad.f label 111 — the outer getpop loop. One SccGroup is
- // one getpop pass.
+    // nonroad.f label 111 — the outer getpop loop. One SccGroup is
+    // one getpop pass.
     for group in &inputs.scc_groups {
         let plan = plan_scc_group(
             &group.scc,
@@ -165,15 +166,15 @@ where
             &inputs.regions,
         );
 
- // nonroad.f :165–177 — the record-1 region pre-check can
- // reject the whole group before the record loop runs.
+        // nonroad.f :165–177 — the record-1 region pre-check can
+        // reject the whole group before the record loop runs.
         if plan.group_skipped {
             outputs.counters.scc_groups_skipped += 1;
             continue;
         }
         outputs.counters.scc_groups_planned += 1;
 
- // nonroad.f label 333 — the inner record loop.
+        // nonroad.f label 333 — the inner record loop.
         for step in &plan.steps {
             outputs.counters.records_visited += 1;
             let dispatches = match &step.outcome {
@@ -184,9 +185,9 @@ where
                 StepOutcome::Dispatched(dispatches) => dispatches,
             };
             if dispatches.is_empty() {
- // Region shape / run level matched no dispatch branch
- // — nonroad.f falls straight through to the next
- // record.
+                // Region shape / run level matched no dispatch branch
+                // — nonroad.f falls straight through to the next
+                // record.
                 outputs.counters.records_no_dispatch += 1;
                 continue;
             }
@@ -210,8 +211,8 @@ where
         }
     }
 
- // nonroad.f :346–356 — the closing banner, keyed off the warning
- // tally the geography routines accumulated.
+    // nonroad.f :346–356 — the closing banner, keyed off the warning
+    // tally the geography routines accumulated.
     outputs.completion_message = completion_message(outputs.warnings.len() as i32);
     Ok(outputs)
 }
@@ -249,11 +250,11 @@ mod tests {
         inputs
     }
 
- /// A [`GeographyExecutor`] that returns a configurable canned
- /// [`GeographyExecution`] for every call. The driver loop's own
- /// [`RunCounters::dispatch_calls`] is the invocation count.
+    /// A [`GeographyExecutor`] that returns a configurable canned
+    /// [`GeographyExecution`] for every call. The driver loop's own
+    /// [`RunCounters::dispatch_calls`] is the invocation count.
     struct CannedExecutor {
- /// When `Some`, every call returns this clone.
+        /// When `Some`, every call returns this clone.
         canned: Option<GeographyExecution>,
     }
 
@@ -267,8 +268,8 @@ mod tests {
         }
     }
 
- /// A [`GeographyExecutor`] that fails on its `fail_on`-th call
- /// (1-based).
+    /// A [`GeographyExecutor`] that fails on its `fail_on`-th call
+    /// (1-based).
     struct FailingExecutor {
         calls: usize,
         fail_on: usize,
@@ -331,7 +332,7 @@ mod tests {
             Error::Config(msg) => assert!(msg.contains("episode_year")),
             other => panic!("unexpected error: {other:?}"),
         }
- // Nothing dispatched — validation runs first.
+        // Nothing dispatched — validation runs first.
         assert!(exec.is_empty());
     }
 
@@ -363,8 +364,8 @@ mod tests {
     fn record_one_precheck_skips_the_whole_group() {
         let options = NonroadOptions::new(RegionLevel::County, 2020);
         let mut inputs = NonroadInputs::new();
- // First record's county is not selected ⇒ nonroad.f :165–177
- // rejects the entire SCC group.
+        // First record's county is not selected ⇒ nonroad.f :165–177
+        // rejects the entire SCC group.
         inputs.regions = RunRegions {
             selected_counties: vec!["06038".to_string()],
             ..Default::default()
@@ -416,8 +417,8 @@ mod tests {
             selected_counties: vec!["06037".to_string(), "06038".to_string()],
             ..Default::default()
         };
- // Records 0 and 1 form a growth pair (same region + HP, years
- // differ); record 1 is consumed as the partner.
+        // Records 0 and 1 form a growth pair (same region + HP, years
+        // differ); record 1 is consumed as the partner.
         inputs.push_group(
             "2270001010",
             vec![
@@ -428,14 +429,14 @@ mod tests {
         );
         let mut exec = PlanRecordingExecutor::new();
         let out = run_simulation(&options, &inputs, &mut exec).unwrap();
- // Two visited steps: record 0 (with growth), record 2.
+        // Two visited steps: record 0 (with growth), record 2.
         assert_eq!(out.counters.records_visited, 2);
         assert_eq!(exec.len(), 2);
- // Record 0 carries the growth rate (120-100)/(100*2) = 0.1.
+        // Record 0 carries the growth rate (120-100)/(100*2) = 0.1.
         let g = exec.dispatches[0].growth.expect("growth on the pair");
         assert!((g - 0.1).abs() < 1e-6);
         assert_eq!(exec.dispatches[0].region_code, "06037");
- // Record 2 is not a growth record.
+        // Record 2 is not a growth record.
         assert_eq!(exec.dispatches[1].growth, None);
         assert_eq!(exec.dispatches[1].region_code, "06038");
     }
@@ -444,8 +445,8 @@ mod tests {
     fn subcounty_record_dispatches_to_two_routines() {
         let options = NonroadOptions::new(RegionLevel::Subcounty, 2020);
         let mut inputs = NonroadInputs::new();
- // A whole-county region entry triggers both prccty and prcsub
- // — one record, two dispatch calls.
+        // A whole-county region entry triggers both prccty and prcsub
+        // — one record, two dispatch calls.
         inputs.regions = RunRegions {
             selected_counties: vec!["06037".to_string()],
             region_list: vec!["06037".to_string()],
@@ -463,8 +464,8 @@ mod tests {
 
     #[test]
     fn no_dispatch_branch_is_counted() {
- // A national record on a county-level run matches no dispatch
- // branch — nonroad.f falls straight through.
+        // A national record on a county-level run matches no dispatch
+        // branch — nonroad.f falls straight through.
         let options = NonroadOptions::new(RegionLevel::County, 2020);
         let mut inputs = NonroadInputs::new();
         inputs.push_group("2270001010", vec![rec("00000", 25.0, 100.0, 2020)]);
@@ -489,11 +490,11 @@ mod tests {
             }),
         };
         let out = run_simulation(&options, &inputs, &mut exec).unwrap();
- // Two records, one canned row + one warning each.
+        // Two records, one canned row + one warning each.
         assert_eq!(out.counters.dispatch_calls, 2);
         assert_eq!(out.rows.len(), 2);
         assert_eq!(out.warnings.len(), 2);
- // Two warnings ⇒ the "Completion" (not "Successful") banner.
+        // Two warnings ⇒ the "Completion" (not "Successful") banner.
         assert!(out.completion_message.starts_with("Completion"));
         assert!(out.completion_message.contains("2 warnings"));
     }
@@ -522,7 +523,7 @@ mod tests {
             }),
         };
         let out = run_simulation(&options, &inputs, &mut exec).unwrap();
- // Two dispatches × 4 ⇒ 8.
+        // Two dispatches × 4 ⇒ 8.
         assert_eq!(out.national_record_count, 8);
     }
 
@@ -530,7 +531,7 @@ mod tests {
     fn a_geography_error_aborts_the_run() {
         let options = NonroadOptions::new(RegionLevel::County, 2020);
         let inputs = county_inputs();
- // Fail on the second dispatch call.
+        // Fail on the second dispatch call.
         let mut exec = FailingExecutor {
             calls: 0,
             fail_on: 2,
@@ -540,7 +541,7 @@ mod tests {
             Error::Config(msg) => assert!(msg.contains("call 2")),
             other => panic!("unexpected error: {other:?}"),
         }
- // The run stopped at the failing call.
+        // The run stopped at the failing call.
         assert_eq!(exec.calls, 2);
     }
 
@@ -559,7 +560,7 @@ mod tests {
         let out = run_simulation(&options, &inputs, &mut exec).unwrap();
         assert_eq!(out.counters.scc_groups_planned, 2);
         assert_eq!(exec.len(), 2);
- // Diesel SCC first, then 4-stroke gas — input order.
+        // Diesel SCC first, then 4-stroke gas — input order.
         assert_eq!(exec.dispatches[0].scc, "2270001010");
         assert_eq!(exec.dispatches[0].fuel, Some(FuelKind::Diesel));
         assert_eq!(exec.dispatches[1].scc, "2265001010");
@@ -568,7 +569,7 @@ mod tests {
 
     #[test]
     fn run_simulation_accepts_a_trait_object() {
- // `?Sized` bound ⇒ a `&mut dyn GeographyExecutor` works.
+        // `?Sized` bound ⇒ a `&mut dyn GeographyExecutor` works.
         let options = NonroadOptions::new(RegionLevel::County, 2020);
         let inputs = county_inputs();
         let mut concrete = PlanRecordingExecutor::new();

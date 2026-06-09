@@ -126,12 +126,12 @@ pub const DISTANCE_ACTIVITY_TYPE_ID: i32 = 1;
 /// source bin.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceBinRow {
- /// `sourceBinID` — `BIGINT` primary key.
+    /// `sourceBinID` — `BIGINT` primary key.
     pub source_bin_id: i64,
- /// `regClassID` — regulatory class. Schema-nullable, but always
- /// populated for the onroad running-exhaust bins this calculator sees.
+    /// `regClassID` — regulatory class. Schema-nullable, but always
+    /// populated for the onroad running-exhaust bins this calculator sees.
     pub reg_class_id: i32,
- /// `fuelTypeID` — fuel type.
+    /// `fuelTypeID` — fuel type.
     pub fuel_type_id: i32,
 }
 
@@ -139,13 +139,13 @@ pub struct SourceBinRow {
 /// `(sourceTypeModelYear)` group's activity for one `polProcessID`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceBinDistributionRow {
- /// `sourceTypeModelYearID` — surrogate key for a `(sourceType, modelYear)`.
+    /// `sourceTypeModelYearID` — surrogate key for a `(sourceType, modelYear)`.
     pub source_type_model_year_id: i32,
- /// `polProcessID` — `pollutantID * 100 + processID`.
+    /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
- /// `sourceBinID` — joins to [`SourceBinRow::source_bin_id`].
+    /// `sourceBinID` — joins to [`SourceBinRow::source_bin_id`].
     pub source_bin_id: i64,
- /// `sourceBinActivityFraction` — the bin's share of the group's activity.
+    /// `sourceBinActivityFraction` — the bin's share of the group's activity.
     pub source_bin_activity_fraction: f64,
 }
 
@@ -153,11 +153,11 @@ pub struct SourceBinDistributionRow {
 /// surrogate key into its `(sourceTypeID, modelYearID)` components.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceTypeModelYearRow {
- /// `sourceTypeModelYearID` — the surrogate key.
+    /// `sourceTypeModelYearID` — the surrogate key.
     pub source_type_model_year_id: i32,
- /// `sourceTypeID` — MOVES source (vehicle) type.
+    /// `sourceTypeID` — MOVES source (vehicle) type.
     pub source_type_id: i32,
- /// `modelYearID` — vehicle model year.
+    /// `modelYearID` — vehicle model year.
     pub model_year_id: i32,
 }
 
@@ -165,53 +165,53 @@ pub struct SourceTypeModelYearRow {
 /// age, link, sourceType)` travelled distance.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ShoRow {
- /// `hourDayID` — joins to [`HourDayRow::hour_day_id`].
+    /// `hourDayID` — joins to [`HourDayRow::hour_day_id`].
     pub hour_day_id: i32,
- /// `monthID` — calendar month.
+    /// `monthID` — calendar month.
     pub month_id: i32,
- /// `yearID` — calendar year.
+    /// `yearID` — calendar year.
     pub year_id: i32,
- /// `ageID` — vehicle age in years; `modelYearID = yearID - ageID`.
+    /// `ageID` — vehicle age in years; `modelYearID = yearID - ageID`.
     pub age_id: i32,
- /// `linkID` — joins to [`LinkRow::link_id`].
+    /// `linkID` — joins to [`LinkRow::link_id`].
     pub link_id: i32,
- /// `sourceTypeID` — MOVES source (vehicle) type.
+    /// `sourceTypeID` — MOVES source (vehicle) type.
     pub source_type_id: i32,
- /// `distance` — vehicle distance travelled. `FLOAT` in MOVES.
+    /// `distance` — vehicle distance travelled. `FLOAT` in MOVES.
     pub distance: f64,
 }
 
 /// One `HourDay` row — the `hourDayID` → `(dayID, hourID)` split.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HourDayRow {
- /// `hourDayID` — the surrogate key.
+    /// `hourDayID` — the surrogate key.
     pub hour_day_id: i32,
- /// `dayID` — day-of-week type.
+    /// `dayID` — day-of-week type.
     pub day_id: i32,
- /// `hourID` — hour of day.
+    /// `hourID` — hour of day.
     pub hour_id: i32,
 }
 
 /// One `Link` row — a road link's geography and road type.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LinkRow {
- /// `linkID` — the link primary key.
+    /// `linkID` — the link primary key.
     pub link_id: i32,
- /// `countyID` — joins to [`CountyRow::county_id`].
+    /// `countyID` — joins to [`CountyRow::county_id`].
     pub county_id: i32,
- /// `zoneID`. Schema-nullable; populated for the onroad links here.
+    /// `zoneID`. Schema-nullable; populated for the onroad links here.
     pub zone_id: i32,
- /// `roadTypeID` — road type; `1` is off-network (see
- /// [`DistanceCalculator::processes_road_type`]).
+    /// `roadTypeID` — road type; `1` is off-network (see
+    /// [`DistanceCalculator::processes_road_type`]).
     pub road_type_id: i32,
 }
 
 /// One `County` row — supplies the `stateID` for a county.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CountyRow {
- /// `countyID` — the county primary key.
+    /// `countyID` — the county primary key.
     pub county_id: i32,
- /// `stateID` — the state the county belongs to.
+    /// `stateID` — the state the county belongs to.
     pub state_id: i32,
 }
 
@@ -222,20 +222,20 @@ pub struct CountyRow {
 /// execution database via `ctx.tables()`; unit tests build it directly.
 #[derive(Debug, Clone, Default)]
 pub struct DistanceInputs {
- /// `SourceBin` rows.
+    /// `SourceBin` rows.
     pub source_bin: Vec<SourceBinRow>,
- /// `SourceBinDistribution` rows. May carry several `polProcessID`s;
- /// [`DistanceCalculator::calculate`] selects the Running Exhaust ones.
+    /// `SourceBinDistribution` rows. May carry several `polProcessID`s;
+    /// [`DistanceCalculator::calculate`] selects the Running Exhaust ones.
     pub source_bin_distribution: Vec<SourceBinDistributionRow>,
- /// `SourceTypeModelYear` rows.
+    /// `SourceTypeModelYear` rows.
     pub source_type_model_year: Vec<SourceTypeModelYearRow>,
- /// `SHO` rows.
+    /// `SHO` rows.
     pub sho: Vec<ShoRow>,
- /// `HourDay` rows.
+    /// `HourDay` rows.
     pub hour_day: Vec<HourDayRow>,
- /// `Link` rows.
+    /// `Link` rows.
     pub link: Vec<LinkRow>,
- /// `County` rows.
+    /// `County` rows.
     pub county: Vec<CountyRow>,
 }
 
@@ -245,42 +245,42 @@ pub struct DistanceInputs {
 /// stored per row; `activity` carries the distance value.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DistanceActivityRow {
- /// `yearID`.
+    /// `yearID`.
     pub year_id: i32,
- /// `monthID`.
+    /// `monthID`.
     pub month_id: i32,
- /// `dayID`.
+    /// `dayID`.
     pub day_id: i32,
- /// `hourID`.
+    /// `hourID`.
     pub hour_id: i32,
- /// `stateID`.
+    /// `stateID`.
     pub state_id: i32,
- /// `countyID`.
+    /// `countyID`.
     pub county_id: i32,
- /// `zoneID`.
+    /// `zoneID`.
     pub zone_id: i32,
- /// `linkID`.
+    /// `linkID`.
     pub link_id: i32,
- /// `regClassID`.
+    /// `regClassID`.
     pub reg_class_id: i32,
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: i32,
- /// `fuelTypeID`.
+    /// `fuelTypeID`.
     pub fuel_type_id: i32,
- /// `modelYearID`.
+    /// `modelYearID`.
     pub model_year_id: i32,
- /// `roadTypeID`.
+    /// `roadTypeID`.
     pub road_type_id: i32,
- /// `activity` — distance, `SHO.distance × fuelTypeActivityFraction`.
+    /// `activity` — distance, `SHO.distance × fuelTypeActivityFraction`.
     pub activity: f64,
 }
 
 impl DistanceActivityRow {
- /// The integer dimension tuple — every column except `activity`. Used to
- /// sort the output deterministically: MOVES leaves
- /// `MOVESWorkerActivityOutput` physically unordered (the SQL `INSERT …
- /// SELECT` has no `ORDER BY`), so the port sorts purely to make the
- /// result reproducible.
+    /// The integer dimension tuple — every column except `activity`. Used to
+    /// sort the output deterministically: MOVES leaves
+    /// `MOVESWorkerActivityOutput` physically unordered (the SQL `INSERT …
+    /// SELECT` has no `ORDER BY`), so the port sorts purely to make the
+    /// result reproducible.
     fn dimension_key(&self) -> [i32; 13] {
         [
             self.year_id,
@@ -987,20 +987,20 @@ impl TableRow for DistanceActivityRow {
 /// [`calculate`](Self::calculate).
 #[derive(Debug, Clone)]
 pub struct DistanceCalculator {
- /// The single master-loop subscription, built once in [`Self::new`].
+    /// The single master-loop subscription, built once in [`Self::new`].
     subscriptions: [CalculatorSubscription; 1],
 }
 
 impl DistanceCalculator {
- /// Stable module name — matches the Java class and the chain-DAG entry.
+    /// Stable module name — matches the Java class and the chain-DAG entry.
     pub const NAME: &'static str = CALCULATOR_NAME;
 
- /// Construct the calculator with its master-loop subscription.
- ///
- /// `DistanceCalculator.subscribeToMe` signs up for the Running Exhaust
- /// process at `YEAR` granularity with `EMISSION_CALCULATOR` priority
- /// (when the RunSpec requests Running Exhaust); the calculator-chain DAG
- /// records the same single subscription.
+    /// Construct the calculator with its master-loop subscription.
+    ///
+    /// `DistanceCalculator.subscribeToMe` signs up for the Running Exhaust
+    /// process at `YEAR` granularity with `EMISSION_CALCULATOR` priority
+    /// (when the RunSpec requests Running Exhaust); the calculator-chain DAG
+    /// records the same single subscription.
     #[must_use]
     pub fn new() -> Self {
         let priority = Priority::parse("EMISSION_CALCULATOR")
@@ -1014,35 +1014,35 @@ impl DistanceCalculator {
         }
     }
 
- /// Port of `doesProcessContext` — `DistanceCalculator` skips the
- /// off-network road type (`roadTypeID == 1`); off-network "links" model
- /// parking, not travel, and carry no distance.
- ///
- /// [`calculate`](Self::calculate) applies the same exclusion at row
- /// grain (it drops `SHO` rows on off-network links); this predicate is
- /// the master-loop context-filter used to avoid invoking the calculator
- /// for off-network contexts at all.
+    /// Port of `doesProcessContext` — `DistanceCalculator` skips the
+    /// off-network road type (`roadTypeID == 1`); off-network "links" model
+    /// parking, not travel, and carry no distance.
+    ///
+    /// [`calculate`](Self::calculate) applies the same exclusion at row
+    /// grain (it drops `SHO` rows on off-network links); this predicate is
+    /// the master-loop context-filter used to avoid invoking the calculator
+    /// for off-network contexts at all.
     #[must_use]
     pub fn processes_road_type(road_type_id: i32) -> bool {
         road_type_id != OFF_NETWORK_ROAD_TYPE_ID
     }
 
- /// Compute the distance activity rows — the port of the
- /// `DistanceCalculator.sql` "Processing" section.
- ///
- /// Returns no rows when no Running Exhaust `polProcessID` is present in
- /// `inputs.source_bin_distribution`: the Java `doExecute` logs
- /// "Distance calculation requires Running Exhaust" and abandons the
- /// calculation in that case. The result is sorted by its integer
- /// dimension columns for deterministic output — MOVES leaves
- /// `MOVESWorkerActivityOutput` physically unordered.
+    /// Compute the distance activity rows — the port of the
+    /// `DistanceCalculator.sql` "Processing" section.
+    ///
+    /// Returns no rows when no Running Exhaust `polProcessID` is present in
+    /// `inputs.source_bin_distribution`: the Java `doExecute` logs
+    /// "Distance calculation requires Running Exhaust" and abandons the
+    /// calculation in that case. The result is sorted by its integer
+    /// dimension columns for deterministic output — MOVES leaves
+    /// `MOVESWorkerActivityOutput` physically unordered.
     #[must_use]
     pub fn calculate(&self, inputs: &DistanceInputs) -> Vec<DistanceActivityRow> {
- // Select the Running Exhaust pollutant/process. The Java runs
- // `… WHERE ppa.processID = 1 LIMIT 1`; the source-bin activity
- // fraction is identical across a process's pollutants, so any one
- // Running Exhaust `polProcessID` gives the same result. Pick the
- // smallest present for determinism.
+        // Select the Running Exhaust pollutant/process. The Java runs
+        // `… WHERE ppa.processID = 1 LIMIT 1`; the source-bin activity
+        // fraction is identical across a process's pollutants, so any one
+        // Running Exhaust `polProcessID` gives the same result. Pick the
+        // smallest present for determinism.
         let Some(pol_process_id) = inputs
             .source_bin_distribution
             .iter()
@@ -1053,9 +1053,9 @@ impl DistanceCalculator {
             return Vec::new();
         };
 
- // SBD2: fuelTypeActivityFraction[sourceTypeModelYearID, regClassID,
- // fuelTypeID] = Σ sourceBinActivityFraction, over the Running
- // Exhaust source-bin-distribution rows joined to `SourceBin`.
+        // SBD2: fuelTypeActivityFraction[sourceTypeModelYearID, regClassID,
+        // fuelTypeID] = Σ sourceBinActivityFraction, over the Running
+        // Exhaust source-bin-distribution rows joined to `SourceBin`.
         let source_bin: HashMap<i64, &SourceBinRow> = inputs
             .source_bin
             .iter()
@@ -1066,11 +1066,11 @@ impl DistanceCalculator {
             if sbd.pol_process_id != pol_process_id {
                 continue;
             }
- // INNER JOIN SourceBin USING (sourceBinID).
+            // INNER JOIN SourceBin USING (sourceBinID).
             let Some(sb) = source_bin.get(&sbd.source_bin_id) else {
                 continue;
             };
- *sbd2
+            *sbd2
                 .entry((
                     sbd.source_type_model_year_id,
                     sb.reg_class_id,
@@ -1079,17 +1079,17 @@ impl DistanceCalculator {
                 .or_default() += sbd.source_bin_activity_fraction;
         }
 
- // DistFracts: resolve sourceTypeModelYearID into its (sourceTypeID,
- // modelYearID), keyed for the final join.
+        // DistFracts: resolve sourceTypeModelYearID into its (sourceTypeID,
+        // modelYearID), keyed for the final join.
         let stmy: HashMap<i32, &SourceTypeModelYearRow> = inputs
             .source_type_model_year
             .iter()
             .map(|r| (r.source_type_model_year_id, r))
             .collect();
- // (sourceTypeID, modelYearID) -> [(regClassID, fuelTypeID, fraction)]
+        // (sourceTypeID, modelYearID) -> [(regClassID, fuelTypeID, fraction)]
         let mut dist_fracts: DistFractsIndex = HashMap::new();
         for (&(stmy_id, reg_class_id, fuel_type_id), &fraction) in &sbd2 {
- // INNER JOIN SourceTypeModelYear USING (sourceTypeModelYearID).
+            // INNER JOIN SourceTypeModelYear USING (sourceTypeModelYearID).
             let Some(stmy_row) = stmy.get(&stmy_id) else {
                 continue;
             };
@@ -1099,38 +1099,38 @@ impl DistanceCalculator {
                 .push((reg_class_id, fuel_type_id, fraction));
         }
 
- // SHO3 join indices: HourDay (for SHO2), Link and County (for Link2).
+        // SHO3 join indices: HourDay (for SHO2), Link and County (for Link2).
         let hour_day: HashMap<i32, &HourDayRow> =
             inputs.hour_day.iter().map(|r| (r.hour_day_id, r)).collect();
         let link: HashMap<i32, &LinkRow> = inputs.link.iter().map(|r| (r.link_id, r)).collect();
         let county: HashMap<i32, &CountyRow> =
             inputs.county.iter().map(|r| (r.county_id, r)).collect();
 
- // Final join: one output row per (SHO3 row, DistFracts row) pair on
- // (sourceTypeID, modelYearID), with activity = distance × fraction.
+        // Final join: one output row per (SHO3 row, DistFracts row) pair on
+        // (sourceTypeID, modelYearID), with activity = distance × fraction.
         let mut out: Vec<DistanceActivityRow> = Vec::new();
         for sho in &inputs.sho {
- // SHO2: INNER JOIN HourDay USING (hourDayID); modelYearID adds
- // a dimension as yearID - ageID.
+            // SHO2: INNER JOIN HourDay USING (hourDayID); modelYearID adds
+            // a dimension as yearID - ageID.
             let Some(hd) = hour_day.get(&sho.hour_day_id) else {
                 continue;
             };
             let model_year_id = sho.year_id - sho.age_id;
- // SHO3: INNER JOIN Link2 (= Link INNER JOIN County USING
- // (countyID)) USING (linkID).
+            // SHO3: INNER JOIN Link2 (= Link INNER JOIN County USING
+            // (countyID)) USING (linkID).
             let Some(link_row) = link.get(&sho.link_id) else {
                 continue;
             };
             let Some(county_row) = county.get(&link_row.county_id) else {
                 continue;
             };
- // doesProcessContext: off-network links never reach the
- // calculator in MOVES; drop them here so the compute is correct
- // for any input.
+            // doesProcessContext: off-network links never reach the
+            // calculator in MOVES; drop them here so the compute is correct
+            // for any input.
             if !Self::processes_road_type(link_row.road_type_id) {
                 continue;
             }
- // INNER JOIN DistFracts USING (sourceTypeID, modelYearID).
+            // INNER JOIN DistFracts USING (sourceTypeID, modelYearID).
             let Some(fracts) = dist_fracts.get(&(sho.source_type_id, model_year_id)) else {
                 continue;
             };
@@ -1192,29 +1192,29 @@ impl Calculator for DistanceCalculator {
         &self.subscriptions
     }
 
- /// `DistanceCalculator` registers no `(pollutant, process)` pairs — the
- /// Java constructor comment: "This calculator doesn't determine
- /// pollutants in any way, so it does not register itself." Its output is
- /// the distance activity table, not an emission tally; the chain DAG
- /// records `registrations_count: 0`.
+    /// `DistanceCalculator` registers no `(pollutant, process)` pairs — the
+    /// Java constructor comment: "This calculator doesn't determine
+    /// pollutants in any way, so it does not register itself." Its output is
+    /// the distance activity table, not an emission tally; the chain DAG
+    /// records `registrations_count: 0`.
     fn registrations(&self) -> &[PollutantProcessAssociation] {
         NO_REGISTRATIONS
     }
 
- // `upstream` keeps the trait default (empty): the chain DAG records no
- // `depends_on` edges. `DistanceCalculator` consumes `SHO` (Total
- // Activity Generator) and `SourceBinDistribution` (Source Bin
- // Distribution Generator), but those run earlier by master-loop priority
- // ordering — `GENERATOR` before `EMISSION_CALCULATOR` — not as chain
- // dependencies.
+    // `upstream` keeps the trait default (empty): the chain DAG records no
+    // `depends_on` edges. `DistanceCalculator` consumes `SHO` (Total
+    // Activity Generator) and `SourceBinDistribution` (Source Bin
+    // Distribution Generator), but those run earlier by master-loop priority
+    // ordering — `GENERATOR` before `EMISSION_CALCULATOR` — not as chain
+    // dependencies.
 
     fn input_tables(&self) -> &[&'static str] {
         INPUT_TABLES
     }
 
- /// Read the seven input tables from `ctx.tables()`, run
- /// [`DistanceCalculator::calculate`], and wrap the result in a
- /// [`CalculatorOutput`] carrying the activity `DataFrame`.
+    /// Read the seven input tables from `ctx.tables()`, run
+    /// [`DistanceCalculator::calculate`], and wrap the result in a
+    /// [`CalculatorOutput`] carrying the activity `DataFrame`.
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let tables = ctx.tables();
         let inputs = DistanceInputs {
@@ -1247,10 +1247,10 @@ pub fn factory() -> Box<dyn Calculator> {
 mod tests {
     use super::*;
 
- /// Build a one-bin / one-`SHO` input whose single output row has
- /// `activity == 100.0` (distance 100, fuel-type activity fraction 1).
- /// `sourceTypeModelYearID` follows the MOVES `sourceTypeID * 10000 +
- /// modelYearID` convention (`21 * 10000 + 2018`).
+    /// Build a one-bin / one-`SHO` input whose single output row has
+    /// `activity == 100.0` (distance 100, fuel-type activity fraction 1).
+    /// `sourceTypeModelYearID` follows the MOVES `sourceTypeID * 10000 +
+    /// modelYearID` convention (`21 * 10000 + 2018`).
     fn minimal_inputs() -> DistanceInputs {
         DistanceInputs {
             source_bin: vec![SourceBinRow {
@@ -1296,8 +1296,8 @@ mod tests {
         }
     }
 
- /// Assert `actual.activity` matches `expected` within `f64` slack — the
- /// FLOAT-column fidelity note means the port computes in `f64`.
+    /// Assert `actual.activity` matches `expected` within `f64` slack — the
+    /// FLOAT-column fidelity note means the port computes in `f64`.
     fn assert_activity(actual: &DistanceActivityRow, expected: f64) {
         assert!(
             (actual.activity - expected).abs() < 1e-9,
@@ -1311,7 +1311,7 @@ mod tests {
         let rows = DistanceCalculator::new().calculate(&minimal_inputs());
         assert_eq!(rows.len(), 1);
         let r = rows[0];
- // Geography and time carried through the SHO2/Link2/SHO3 joins.
+        // Geography and time carried through the SHO2/Link2/SHO3 joins.
         assert_eq!(r.year_id, 2020);
         assert_eq!(r.month_id, 7);
         assert_eq!(r.day_id, 5); // from HourDay
@@ -1330,9 +1330,9 @@ mod tests {
 
     #[test]
     fn calculate_sums_source_bin_activity_fraction() {
- // Two source bins with the same (regClass, fuelType) but distinct
- // sourceBinIDs — different engTech/engSize. SBD2 sums their activity
- // fractions into one fuelTypeActivityFraction: 0.5 + 0.25 = 0.75.
+        // Two source bins with the same (regClass, fuelType) but distinct
+        // sourceBinIDs — different engTech/engSize. SBD2 sums their activity
+        // fractions into one fuelTypeActivityFraction: 0.5 + 0.25 = 0.75.
         let mut inputs = minimal_inputs();
         inputs.source_bin.push(SourceBinRow {
             source_bin_id: 1001,
@@ -1356,9 +1356,9 @@ mod tests {
 
     #[test]
     fn calculate_splits_distance_across_fuel_types() {
- // A second source bin on a different fuel type adds a DistFracts row
- // for the same (sourceType, modelYear): the single SHO row's
- // distance is emitted once per fuel type.
+        // A second source bin on a different fuel type adds a DistFracts row
+        // for the same (sourceType, modelYear): the single SHO row's
+        // distance is emitted once per fuel type.
         let mut inputs = minimal_inputs();
         inputs.source_bin.push(SourceBinRow {
             source_bin_id: 1002,
@@ -1384,9 +1384,9 @@ mod tests {
 
     #[test]
     fn calculate_picks_single_running_exhaust_pol_process() {
- // SourceBinDistribution carries the same bin under two Running
- // Exhaust polProcessIDs (101, 201) and one non-running one (302).
- // The calculator must use exactly one Running Exhaust polProcessID // not sum across them, and not touch the non-running row.
+        // SourceBinDistribution carries the same bin under two Running
+        // Exhaust polProcessIDs (101, 201) and one non-running one (302).
+        // The calculator must use exactly one Running Exhaust polProcessID // not sum across them, and not touch the non-running row.
         let mut inputs = minimal_inputs();
         inputs.source_bin_distribution[0].source_bin_activity_fraction = 0.5;
         inputs
@@ -1408,14 +1408,14 @@ mod tests {
 
         let rows = DistanceCalculator::new().calculate(&inputs);
         assert_eq!(rows.len(), 1);
- // Only polProcessID 101's row (fraction 0.5) is used — not 0.5 + 0.5
- // and certainly not the 99.0 from the non-running row.
+        // Only polProcessID 101's row (fraction 0.5) is used — not 0.5 + 0.5
+        // and certainly not the 99.0 from the non-running row.
         assert_activity(&rows[0], 50.0);
     }
 
     #[test]
     fn calculate_without_running_exhaust_yields_no_rows() {
- // Every SourceBinDistribution row is for a non-running process.
+        // Every SourceBinDistribution row is for a non-running process.
         let mut inputs = minimal_inputs();
         inputs.source_bin_distribution[0].pol_process_id = 102; // process 2
         assert!(DistanceCalculator::new().calculate(&inputs).is_empty());
@@ -1423,8 +1423,8 @@ mod tests {
 
     #[test]
     fn calculate_excludes_off_network_road_type() {
- // The SHO row's link is off-network (roadTypeID 1): doesProcessContext
- // skips it, so no distance row is produced.
+        // The SHO row's link is off-network (roadTypeID 1): doesProcessContext
+        // skips it, so no distance row is produced.
         let mut inputs = minimal_inputs();
         inputs.link[0].road_type_id = OFF_NETWORK_ROAD_TYPE_ID;
         assert!(DistanceCalculator::new().calculate(&inputs).is_empty());
@@ -1432,14 +1432,14 @@ mod tests {
 
     #[test]
     fn calculate_drops_sho_without_matching_link_or_county() {
- // SHO references a link not in the Link table — the SHO3 inner join
- // drops it.
+        // SHO references a link not in the Link table — the SHO3 inner join
+        // drops it.
         let mut no_link = minimal_inputs();
         no_link.sho[0].link_id = 9999;
         assert!(DistanceCalculator::new().calculate(&no_link).is_empty());
 
- // Link references a county not in the County table — the Link2
- // inner join drops it, and with it the SHO row.
+        // Link references a county not in the County table — the Link2
+        // inner join drops it, and with it the SHO row.
         let mut no_county = minimal_inputs();
         no_county.county.clear();
         assert!(DistanceCalculator::new().calculate(&no_county).is_empty());
@@ -1447,8 +1447,8 @@ mod tests {
 
     #[test]
     fn calculate_drops_source_bin_distribution_without_matching_bin() {
- // The SBD row's sourceBinID is absent from SourceBin — the SBD2
- // inner join drops it, leaving no fuel-type activity fraction.
+        // The SBD row's sourceBinID is absent from SourceBin — the SBD2
+        // inner join drops it, leaving no fuel-type activity fraction.
         let mut inputs = minimal_inputs();
         inputs.source_bin_distribution[0].source_bin_id = 7777;
         assert!(DistanceCalculator::new().calculate(&inputs).is_empty());
@@ -1456,9 +1456,9 @@ mod tests {
 
     #[test]
     fn calculate_drops_sho_without_matching_model_year() {
- // ageID 10 in year 2020 gives modelYearID 2010; SourceTypeModelYear
- // only carries 2018, so the final (sourceTypeID, modelYearID) join
- // finds no DistFracts row.
+        // ageID 10 in year 2020 gives modelYearID 2010; SourceTypeModelYear
+        // only carries 2018, so the final (sourceTypeID, modelYearID) join
+        // finds no DistFracts row.
         let mut inputs = minimal_inputs();
         inputs.sho[0].age_id = 10;
         assert!(DistanceCalculator::new().calculate(&inputs).is_empty());
@@ -1466,8 +1466,8 @@ mod tests {
 
     #[test]
     fn calculate_drops_sho_without_matching_hour_day() {
- // SHO references an hourDayID absent from HourDay — the SHO2 inner
- // join drops it.
+        // SHO references an hourDayID absent from HourDay — the SHO2 inner
+        // join drops it.
         let mut inputs = minimal_inputs();
         inputs.sho[0].hour_day_id = 999;
         assert!(DistanceCalculator::new().calculate(&inputs).is_empty());
@@ -1482,9 +1482,9 @@ mod tests {
 
     #[test]
     fn calculate_output_is_sorted_by_dimension_key() {
- // Two fuel types and two SHO rows of different age produce four
- // output rows; the result must come back dimension-key sorted
- // regardless of the (hash-map-driven) computation order.
+        // Two fuel types and two SHO rows of different age produce four
+        // output rows; the result must come back dimension-key sorted
+        // regardless of the (hash-map-driven) computation order.
         let mut inputs = minimal_inputs();
         inputs.source_bin.push(SourceBinRow {
             source_bin_id: 1002,
@@ -1499,7 +1499,7 @@ mod tests {
                 source_bin_id: 1002,
                 source_bin_activity_fraction: 1.0,
             });
- // A second model year so a second SHO row joins.
+        // A second model year so a second SHO row joins.
         inputs.source_type_model_year.push(SourceTypeModelYearRow {
             source_type_model_year_id: 212_019,
             source_type_id: 21,
@@ -1566,8 +1566,8 @@ mod tests {
 
     #[test]
     fn calculator_registers_nothing() {
- // The Java constructor registers no pollutants; the chain DAG
- // records registrations_count 0.
+        // The Java constructor registers no pollutants; the chain DAG
+        // records registrations_count 0.
         assert!(DistanceCalculator::new().registrations().is_empty());
     }
 
@@ -1586,13 +1586,13 @@ mod tests {
         ] {
             assert!(tables.contains(&expected), "missing input table {expected}");
         }
- // `upstream` keeps the trait default — no chain dependency edges.
+        // `upstream` keeps the trait default — no chain dependency edges.
         assert!(calc.upstream().is_empty());
     }
 
     #[test]
     fn execute_requires_input_tables_in_context() {
- // An empty context has no tables; execute must return an error.
+        // An empty context has no tables; execute must return an error.
         let calc = DistanceCalculator::new();
         let ctx = CalculatorContext::new();
         assert!(calc.execute(&ctx).is_err());
@@ -1604,9 +1604,9 @@ mod tests {
         let calc = DistanceCalculator::new();
         let mut store = moves_framework::InMemoryStore::new();
         let inputs = minimal_inputs();
- // Seed via into_dataframe + insert to bypass schema-validation for
- // tables whose registry schema has more columns than the row struct
- // (SourceBin, County).
+        // Seed via into_dataframe + insert to bypass schema-validation for
+        // tables whose registry schema has more columns than the row struct
+        // (SourceBin, County).
         store.insert("SHO", ShoRow::into_dataframe(inputs.sho).unwrap());
         store.insert(
             "SourceBin",
@@ -1654,7 +1654,7 @@ mod tests {
 
     #[test]
     fn calculator_is_object_safe() {
- // The registry stores calculators as Box<dyn Calculator>.
+        // The registry stores calculators as Box<dyn Calculator>.
         let calc: Box<dyn Calculator> = Box::new(DistanceCalculator::new());
         assert_eq!(calc.name(), "DistanceCalculator");
     }

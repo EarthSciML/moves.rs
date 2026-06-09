@@ -22,7 +22,7 @@
 //! calculators. adds 3 fixtures (process-nox-speciation,
 //! process-extended-idle, chain-nonhaptog) that close the gap. adds
 //! DummyCalculator (no-op, zero registrations) — all 38 calculators are now
-//! in the catalogue; 37 carry registrations covered by fixtures. Task 
+//! in the catalogue; 37 carry registrations covered by fixtures. Task
 //! adds NonroadEmissionCalculator (nonroad adapter, zero registrations)//! 39 calculators total; 37 carry registrations covered by fixtures.
 //!
 //! See `tests/calculator_validation/mod.rs` for what runs today versus
@@ -122,17 +122,17 @@ fn coverage_matrix_reaches_every_fixture() {
 
 #[test]
 fn coverage_matrix_every_calculator_covered() {
- // () added three fixtures that cover the four calculators
- // the original 23 hot-path fixtures left uncovered:
- //
- // process-nox-speciation → NOCalculator (32,1), NO2Calculator (33,1)
- // process-extended-idle → CO2AERunningStartExtendedIdleCalculator (90,90)
- // chain-nonhaptog → TogSpeciationCalculator (88,1)
- //
- // adds DummyCalculator with empty registrations — it has no
- // (pollutant, process) pairs and can never appear as "covered" in the
- // fixture matrix. It is listed in KNOWN_UNCOVERED as an intentional
- // exception; the Java original also produced no output.
+    // () added three fixtures that cover the four calculators
+    // the original 23 hot-path fixtures left uncovered:
+    //
+    // process-nox-speciation → NOCalculator (32,1), NO2Calculator (33,1)
+    // process-extended-idle → CO2AERunningStartExtendedIdleCalculator (90,90)
+    // chain-nonhaptog → TogSpeciationCalculator (88,1)
+    //
+    // adds DummyCalculator with empty registrations — it has no
+    // (pollutant, process) pairs and can never appear as "covered" in the
+    // fixture matrix. It is listed in KNOWN_UNCOVERED as an intentional
+    // exception; the Java original also produced no output.
     const KNOWN_UNCOVERED: &[&str] = &["DummyCalculator"];
 
     let loaded_fixtures = fixtures::load_all_fixtures().expect("the 26 onroad fixtures must load");
@@ -294,8 +294,6 @@ fn harness_status() {
         "  Status: 39 calculators (37 with registrations + DummyCalculator no-op \
          + NonroadEmissionCalculator adapter);"
     );
-    println!(
-        "          canonical-capture diff dormant until compute-node run + data plane."
-    );
+    println!("          canonical-capture diff dormant until compute-node run + data plane.");
     println!("================================================================");
 }

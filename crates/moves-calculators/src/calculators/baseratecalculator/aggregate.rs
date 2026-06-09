@@ -82,7 +82,7 @@ pub fn calculate_activity_weight(
         return activity_weight;
     }
 
- // Seed each cell with universalActivity * sbdTotal.
+    // Seed each cell with universalActivity * sbdTotal.
     for row in smfr_sbd_summary {
         for &hour_day_id in &prepared.universal_activity_hour_day_ids {
             let Some(&activity) = prepared.universal_activity.get(&UniversalActivityKey {
@@ -106,8 +106,8 @@ pub fn calculate_activity_weight(
         }
     }
 
- // Extended-idle rate weighting: the input activity includes all extended
- // idling, but the rate must be weighted only by diesel-APU hours.
+    // Extended-idle rate weighting: the input activity includes all extended
+    // idling, but the rate must be weighted only by diesel-APU hours.
     if flags.adjust_extended_idle_emission_rate {
         for (key, detail) in &mut activity_weight {
             let ei_adjust = prepared
@@ -123,8 +123,8 @@ pub fn calculate_activity_weight(
             }
         }
     }
- // APU rate weighting: restrict the weighting activity to diesel-APU or
- // shorepower hours.
+    // APU rate weighting: restrict the weighting activity to diesel-APU or
+    // shorepower hours.
     if flags.adjust_apu_emission_rate {
         for (key, detail) in &mut activity_weight {
             let my_fuel = ModelYearFuelKey {
@@ -148,7 +148,7 @@ pub fn calculate_activity_weight(
         }
     }
 
- // Total the activity over the aggregated-away dimensions.
+    // Total the activity over the aggregated-away dimensions.
     let mut activity_total: BTreeMap<ActivityWeightKey, ActivityWeightDetail> = BTreeMap::new();
     for (key, detail) in &activity_weight {
         let total = activity_total.entry(discard_key(*key, flags)).or_default();
@@ -156,7 +156,7 @@ pub fn calculate_activity_weight(
         total.smfr_rates_fraction += detail.smfr_rates_fraction;
     }
 
- // Normalise each cell into a fraction of its aggregated total.
+    // Normalise each cell into a fraction of its aggregated total.
     for (key, detail) in &mut activity_weight {
         match activity_total.get(&discard_key(*key, flags)) {
             None => {
@@ -230,8 +230,8 @@ pub fn aggregate_and_apply_activity(
         }
     }
 
- // ScaleEmissions: the mean-base-rate scale weights the emission quantity,
- // the emission-rate scale weights the emission rate.
+    // ScaleEmissions: the mean-base-rate scale weights the emission quantity,
+    // the emission-rate scale weights the emission rate.
     for e in &mut fb.emissions {
         e.emission_quant *= mean_base_rate_scale;
         e.emission_rate *= emission_rate_scale;
@@ -273,7 +273,7 @@ mod tests {
         aggregate_op_modes(&mut fb);
         assert!(fb.op_mode.is_none());
         assert_eq!(fb.emissions.len(), 2);
- // Formulation 100: quant = 4*0.5 + 4*0.25 = 3; rate = 8*0.5 + 8*0.25 = 6.
+        // Formulation 100: quant = 4*0.5 + 4*0.25 = 3; rate = 8*0.5 + 8*0.25 = 6.
         let f100 = fb
             .emissions
             .iter()
@@ -281,7 +281,7 @@ mod tests {
             .unwrap();
         assert_eq!(f100.emission_quant, 3.0);
         assert_eq!(f100.emission_rate, 6.0);
- // Formulation 200: quant = 3*1 = 3; rate = 6*1 = 6.
+        // Formulation 200: quant = 3*1 = 3; rate = 6*1 = 6.
         let f200 = fb
             .emissions
             .iter()
@@ -312,7 +312,7 @@ mod tests {
         let prepared = PreparedTables::default();
         let weights = ActivityWeights::new();
         aggregate_and_apply_activity(&mut fb, &prepared, &ModuleFlags::default(), &weights);
- // No SMFR, no activity: emissions present, unscaled.
+        // No SMFR, no activity: emissions present, unscaled.
         assert_eq!(fb.emissions.len(), 1);
         assert_eq!(fb.emissions[0].emission_quant, 5.0);
         assert_eq!(fb.emissions[0].emission_rate, 9.0);
@@ -349,7 +349,7 @@ mod tests {
             ..ModuleFlags::default()
         };
         aggregate_and_apply_activity(&mut fb, &prepared, &flags, &ActivityWeights::new());
- // emission_quant *= activity (3); emission_rate untouched.
+        // emission_quant *= activity (3); emission_rate untouched.
         assert_eq!(fb.emissions[0].emission_quant, 15.0);
         assert_eq!(fb.emissions[0].emission_rate, 9.0);
     }

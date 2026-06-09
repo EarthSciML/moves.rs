@@ -1,0 +1,25 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__hotellingmonthadjust",
+  "schema": [
+    {
+      "name": "zoneID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthAdjustment",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "zoneID",
+    "monthID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "dde95373ef841da017f69230ee655b2eec92242da84773562c7503bcb6a1095d"
+}

@@ -39,9 +39,9 @@ use crate::error::{Error, Result};
 /// rows (header row not included).
 #[derive(Debug, Clone)]
 pub struct ImportedRows {
- /// User CSV path (for error messages).
+    /// User CSV path (for error messages).
     pub source_path: PathBuf,
- /// Typed data, in descriptor column order.
+    /// Typed data, in descriptor column order.
     pub batch: RecordBatch,
 }
 
@@ -68,7 +68,7 @@ pub fn read_csv_table(path: &Path, descriptor: &TableDescriptor) -> Result<Impor
         })?
         .clone();
 
- // Map descriptor column index → CSV column index. Case-insensitive.
+    // Map descriptor column index → CSV column index. Case-insensitive.
     let mut indices: Vec<usize> = Vec::with_capacity(descriptor.columns.len());
     for col in descriptor.columns {
         let csv_idx = header
@@ -81,9 +81,9 @@ pub fn read_csv_table(path: &Path, descriptor: &TableDescriptor) -> Result<Impor
         indices.push(csv_idx);
     }
 
- // Collect rows: Vec<Vec<Option<String>>> where outer is rows,
- // inner is descriptor columns. Each cell is None if the CSV value
- // was empty or the literal `NULL`.
+    // Collect rows: Vec<Vec<Option<String>>> where outer is rows,
+    // inner is descriptor columns. Each cell is None if the CSV value
+    // was empty or the literal `NULL`.
     let mut rows: Vec<Vec<Option<String>>> = Vec::new();
     for (row_idx, record) in reader.records().enumerate() {
         let record = record.map_err(|e| Error::CsvParse {
@@ -260,8 +260,8 @@ mod tests {
                    2020,21,1,0.04\n";
         let f = write_temp_csv(csv);
         let rows = read_csv_table(f.path(), &AGE_DIST).unwrap();
- // The descriptor lists sourceTypeID first, then yearID, then
- // ageID, then ageFraction. The CSV order is different.
+        // The descriptor lists sourceTypeID first, then yearID, then
+        // ageID, then ageFraction. The CSV order is different.
         assert_eq!(rows.batch.num_rows(), 2);
         assert_eq!(rows.batch.num_columns(), 4);
         let schema = rows.batch.schema();

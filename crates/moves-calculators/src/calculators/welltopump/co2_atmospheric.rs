@@ -150,8 +150,8 @@ struct GroupKey {
     county_id: i32,
     zone_id: i32,
     link_id: i32,
- /// The source exhaust process — a `GROUP BY` axis; the output row is
- /// stamped with the well-to-pump process regardless.
+    /// The source exhaust process — a `GROUP BY` axis; the output row is
+    /// stamped with the well-to-pump process regardless.
     source_process_id: i32,
     source_type_id: i32,
     fuel_type_id: i32,
@@ -179,7 +179,7 @@ struct GroupKey {
 /// skip on a miss.
 #[must_use]
 pub fn build_co2_factor_by_fuel_type(inputs: &WtpInputs) -> HashMap<(i32, i32, i32), f64> {
- // GREET atmospheric-CO2 rate at the run year, keyed by fuel subtype.
+    // GREET atmospheric-CO2 rate at the run year, keyed by fuel subtype.
     let co2_rate: HashMap<i32, f64> = inputs
         .greet
         .iter()
@@ -199,7 +199,7 @@ pub fn build_co2_factor_by_fuel_type(inputs: &WtpInputs) -> HashMap<(i32, i32, i
         .iter()
         .map(|fst| (fst.fuel_sub_type_id, fst))
         .collect();
- // Year resolves fuelYearID → yearID, keeping only the run-year rows.
+    // Year resolves fuelYearID → yearID, keeping only the run-year rows.
     let target_fuel_years: HashSet<i32> = inputs
         .year
         .iter()
@@ -209,24 +209,24 @@ pub fn build_co2_factor_by_fuel_type(inputs: &WtpInputs) -> HashMap<(i32, i32, i
 
     let mut weighted: HashMap<(i32, i32, i32), f64> = HashMap::new();
     for fs in &inputs.fuel_supply {
- // INNER JOIN Year ON Year.fuelYearID = FuelSupply.fuelYearID,
- // y.yearID = run year.
+        // INNER JOIN Year ON Year.fuelYearID = FuelSupply.fuelYearID,
+        // y.yearID = run year.
         if !target_fuel_years.contains(&fs.fuel_year_id) {
             continue;
         }
- // INNER JOIN FuelFormulation USING (fuelFormulationID).
+        // INNER JOIN FuelFormulation USING (fuelFormulationID).
         let Some(ff) = formulation.get(&fs.fuel_formulation_id) else {
             continue;
         };
- // INNER JOIN FuelSubtype USING (fuelSubtypeID).
+        // INNER JOIN FuelSubtype USING (fuelSubtypeID).
         let Some(fst) = sub_type.get(&ff.fuel_sub_type_id) else {
             continue;
         };
- // INNER JOIN greetwelltopump ON fuelSubtypeID (and the run year).
+        // INNER JOIN greetwelltopump ON fuelSubtypeID (and the run year).
         let Some(&rate) = co2_rate.get(&ff.fuel_sub_type_id) else {
             continue;
         };
- *weighted
+        *weighted
             .entry((inputs.target_year, fs.month_group_id, fst.fuel_type_id))
             .or_default() += fs.market_share * rate;
     }
@@ -242,42 +242,42 @@ pub fn build_co2_factor_by_fuel_type(inputs: &WtpInputs) -> HashMap<(i32, i32, i
 pub struct Co2AtmosphericWtpCalculator;
 
 impl Co2AtmosphericWtpCalculator {
- /// Stable module name — matches the Java class and the chain-DAG entry.
+    /// Stable module name — matches the Java class and the chain-DAG entry.
     pub const NAME: &'static str = CALCULATOR_NAME;
 
- /// Compute the well-to-pump atmospheric-CO2 rows — the port of
- /// `CO2AtmosphericWTPCalculator.sql`.
- ///
- /// Returns no rows when the inputs carry no usable energy: an energy
- /// record contributes only if it is pollutant 91 on a running, start or
- /// extended-idle process, its month resolves a month group, and its
- /// `(year, monthGroup, fuelType)` resolves a CO2 factor — every SQL join
- /// is an `INNER JOIN`. The result is ordered by its `GROUP BY` cell for
- /// deterministic output; MOVES leaves `MOVESWorkerOutput` physically
- /// unordered.
+    /// Compute the well-to-pump atmospheric-CO2 rows — the port of
+    /// `CO2AtmosphericWTPCalculator.sql`.
+    ///
+    /// Returns no rows when the inputs carry no usable energy: an energy
+    /// record contributes only if it is pollutant 91 on a running, start or
+    /// extended-idle process, its month resolves a month group, and its
+    /// `(year, monthGroup, fuelType)` resolves a CO2 factor — every SQL join
+    /// is an `INNER JOIN`. The result is ordered by its `GROUP BY` cell for
+    /// deterministic output; MOVES leaves `MOVESWorkerOutput` physically
+    /// unordered.
     #[must_use]
     pub fn calculate(&self, inputs: &WtpInputs) -> Vec<WorkerOutputRow> {
         let factor_table = build_co2_factor_by_fuel_type(inputs);
         let month_group = month_group_index(&inputs.month_of_any_year);
 
- // emissionQuant = Σ (energy × sumCO2EmissionRate), grouped by the
- // output dimension including the source process.
+        // emissionQuant = Σ (energy × sumCO2EmissionRate), grouped by the
+        // output dimension including the source process.
         let mut groups: BTreeMap<GroupKey, f64> = BTreeMap::new();
         for energy in &inputs.worker_output {
- // mwo.pollutantID = 91.
+            // mwo.pollutantID = 91.
             if energy.pollutant_id != TOTAL_ENERGY_POLLUTANT_ID {
                 continue;
             }
- // mwo.processID = 1 OR 2 OR 90 — running, start, extended-idle.
+            // mwo.processID = 1 OR 2 OR 90 — running, start, extended-idle.
             if !SOURCE_PROCESS_IDS.contains(&energy.process_id) {
                 continue;
             }
- // INNER JOIN may ON may.monthID = mwo.monthID.
+            // INNER JOIN may ON may.monthID = mwo.monthID.
             let Some(&month_group_id) = month_group.get(&energy.month_id) else {
                 continue;
             };
- // INNER JOIN gwtp ON yearID, monthGroupID, fuelTypeID (countyID is
- // the trivially-satisfied single-county join).
+            // INNER JOIN gwtp ON yearID, monthGroupID, fuelTypeID (countyID is
+            // the trivially-satisfied single-county join).
             let Some(&rate) =
                 factor_table.get(&(energy.year_id, month_group_id, energy.fuel_type_id))
             else {
@@ -298,7 +298,7 @@ impl Co2AtmosphericWtpCalculator {
                 model_year_id: energy.model_year_id,
                 road_type_id: energy.road_type_id,
             };
- *groups.entry(key).or_insert(0.0) += energy.emission_quant * rate;
+            *groups.entry(key).or_insert(0.0) += energy.emission_quant * rate;
         }
 
         groups
@@ -349,16 +349,16 @@ impl Calculator for Co2AtmosphericWtpCalculator {
         Self::NAME
     }
 
- /// `CO2AtmosphericWTPCalculator` is a chained calculator: it does not
- /// subscribe to the MasterLoop directly. `calculator-dag.json` records
- /// `subscribes_directly: false` and an empty `subscriptions` list.
+    /// `CO2AtmosphericWTPCalculator` is a chained calculator: it does not
+    /// subscribe to the MasterLoop directly. `calculator-dag.json` records
+    /// `subscribes_directly: false` and an empty `subscriptions` list.
     fn subscriptions(&self) -> &[CalculatorSubscription] {
         NO_SUBSCRIPTIONS
     }
 
- /// Empty — `CO2AtmosphericWTPCalculator` is superseded by
- /// `BaseRateCalculator` and registers no `(pollutant, process)` pairs; see
- /// the module-level note.
+    /// Empty — `CO2AtmosphericWTPCalculator` is superseded by
+    /// `BaseRateCalculator` and registers no `(pollutant, process)` pairs; see
+    /// the module-level note.
     fn registrations(&self) -> &[PollutantProcessAssociation] {
         NO_REGISTRATIONS
     }
@@ -370,27 +370,17 @@ impl Calculator for Co2AtmosphericWtpCalculator {
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let tables = ctx.tables();
         let year: Vec<YearRow> = tables.iter_typed("Year")?;
-        // `CO2AtmosphericWTPCalculator.sql` substitutes the MasterLoop
-        // `##context.year##` directly into `gwtp.yearID = ##context.year##`
-        // and `y.yearID = ##context.year##` with no documented fallback. An
-        // absent context year is a configuration error, not a defaultable
-        // condition: substituting `0` (or an arbitrary `Year`-table row)
-        // would silently weight emissions on the wrong GREET rate and fuel
-        // supply, or hide a missing-year data gap as an empty result.
-        // Propagate instead. `IterationPosition` has no dedicated error
-        // variant; reuse `RowExtraction` (its documented "value was null
-        // where a non-null value is required" case) keyed to a synthetic
-        // table, matching the sibling WTP calculators.
+        // `CO2AtmosphericWTPCalculator.sql` substitutes `##context.year##`
+        // directly into `gwtp.yearID = ...` and `y.yearID = ...` — no fallback.
+        // The master loop guarantees year is Some at YEAR+ granularity; None
+        // here is a programming error, not a defaultable condition.
         let pos = ctx.position();
         let target_year = pos
             .time
             .year
             .map(i32::from)
-            .ok_or_else(|| Error::RowExtraction {
-                table: "IterationPosition".into(),
-                row: pos.iteration as usize,
-                column: "year".into(),
-                message: "required run-context year is unresolved (None)".into(),
+            .ok_or_else(|| Error::MissingContext {
+                what: "context.year".into(),
             })?;
         let inputs = WtpInputs {
             greet: tables.iter_typed::<GreetWellToPumpRow>("GREETWellToPump")?,
@@ -422,10 +412,10 @@ mod tests {
         YearRow,
     };
 
- /// Build a one-formulation / one-energy-row input. The CO2 factor is
- /// `5.0 × 1.0 = 5.0` (GREET rate × market share) and the single
- /// running-exhaust energy record is `200.0`, so the one output row is
- /// `200.0 × 5.0 = 1000.0`.
+    /// Build a one-formulation / one-energy-row input. The CO2 factor is
+    /// `5.0 × 1.0 = 5.0` (GREET rate × market share) and the single
+    /// running-exhaust energy record is `200.0`, so the one output row is
+    /// `200.0 × 5.0 = 1000.0`.
     fn minimal_inputs() -> WtpInputs {
         WtpInputs {
             greet: vec![GreetWellToPumpRow {
@@ -492,18 +482,18 @@ mod tests {
         assert_eq!(r.county_id, 26_161);
         assert_eq!(r.fuel_type_id, 2);
         assert_eq!(r.model_year_id, 2018);
- // Pollutant relabelled to atmospheric CO2; process stamped 99.
+        // Pollutant relabelled to atmospheric CO2; process stamped 99.
         assert_eq!(r.pollutant_id, 90);
         assert_eq!(r.process_id, 99);
- // 200.0 × (5.0 × 1.0).
+        // 200.0 × (5.0 × 1.0).
         assert_close(r.emission_quant, 1_000.0);
     }
 
     #[test]
     fn calculate_keeps_source_processes_separate() {
- // Two energy records, running (1) and start (2), same dimension cell:
- // the GROUP BY includes processID, so they yield two distinct output
- // rows — both stamped process 99.
+        // Two energy records, running (1) and start (2), same dimension cell:
+        // the GROUP BY includes processID, so they yield two distinct output
+        // rows — both stamped process 99.
         let mut inputs = minimal_inputs();
         inputs.worker_output.push(WorkerOutputRow {
             process_id: 2,
@@ -513,7 +503,7 @@ mod tests {
         let rows = Co2AtmosphericWtpCalculator.calculate(&inputs);
         assert_eq!(rows.len(), 2);
         assert!(rows.iter().all(|r| r.process_id == 99));
- // 200.0 × 5.0 and 100.0 × 5.0 — summed separately by source process.
+        // 200.0 × 5.0 and 100.0 × 5.0 — summed separately by source process.
         let mut quants: Vec<f64> = rows.iter().map(|r| r.emission_quant).collect();
         quants.sort_by(f64::total_cmp);
         assert_close(quants[0], 500.0);
@@ -522,13 +512,13 @@ mod tests {
 
     #[test]
     fn calculate_admits_only_running_start_extended_idle() {
- // Process 4 (brake wear, say) is not a running/start/extended-idle
- // exhaust process — its energy is not a CO2 WTP input.
+        // Process 4 (brake wear, say) is not a running/start/extended-idle
+        // exhaust process — its energy is not a CO2 WTP input.
         let mut inputs = minimal_inputs();
         inputs.worker_output[0].process_id = 4;
         assert!(Co2AtmosphericWtpCalculator.calculate(&inputs).is_empty());
 
- // Extended idle (90) is admitted.
+        // Extended idle (90) is admitted.
         let mut idle = minimal_inputs();
         idle.worker_output[0].process_id = 90;
         assert_eq!(Co2AtmosphericWtpCalculator.calculate(&idle).len(), 1);
@@ -543,9 +533,9 @@ mod tests {
 
     #[test]
     fn calculate_does_not_interpolate_the_greet_rate() {
- // The GREET rate is tabulated only at 2018 and 2022, not at the run
- // year 2020 — the SQL joins gwtp.yearID = run year, so the fuel
- // subtype is dropped (no interpolation, unlike the other WTP factors).
+        // The GREET rate is tabulated only at 2018 and 2022, not at the run
+        // year 2020 — the SQL joins gwtp.yearID = run year, so the fuel
+        // subtype is dropped (no interpolation, unlike the other WTP factors).
         let mut inputs = minimal_inputs();
         inputs.greet = vec![
             GreetWellToPumpRow {
@@ -580,8 +570,8 @@ mod tests {
 
     #[test]
     fn calculate_weights_factor_by_market_share() {
- // Two formulations of one fuel type, shares 0.25 / 0.75, GREET rates
- // 4.0 / 8.0 → factor 0.25×4 + 0.75×8 = 7.0; energy 200 → 1400.
+        // Two formulations of one fuel type, shares 0.25 / 0.75, GREET rates
+        // 4.0 / 8.0 → factor 0.25×4 + 0.75×8 = 7.0; energy 200 → 1400.
         let mut inputs = minimal_inputs();
         inputs.greet = vec![
             GreetWellToPumpRow {

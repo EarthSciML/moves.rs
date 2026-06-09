@@ -150,9 +150,9 @@ const TOTAL_HYDROCARBONS_POLLUTANT_ID: u16 = 1;
 /// One `AgeCategory` row — the age-group bucket for a vehicle age.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AgeCategoryRow {
- /// `ageID` — vehicle age in years; the unique primary key.
+    /// `ageID` — vehicle age in years; the unique primary key.
     pub age_id: i32,
- /// `ageGroupID` — the age-group bucket the age falls in.
+    /// `ageGroupID` — the age-group bucket the age falls in.
     pub age_group_id: i32,
 }
 
@@ -164,17 +164,17 @@ pub struct AgeCategoryRow {
 /// only and `zoneID` is not modelled.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AverageTankGasolineRow {
- /// `fuelTypeID` — the fuel type.
+    /// `fuelTypeID` — the fuel type.
     pub fuel_type_id: i32,
- /// `fuelYearID` — the fuel year.
+    /// `fuelYearID` — the fuel year.
     pub fuel_year_id: i32,
- /// `monthGroupID` — the month group.
+    /// `monthGroupID` — the month group.
     pub month_group_id: i32,
- /// `ETOHVolume` — ethanol volume percent. `FLOAT` (schema-nullable);
- /// modelled as `f64` (see the module fidelity notes).
+    /// `ETOHVolume` — ethanol volume percent. `FLOAT` (schema-nullable);
+    /// modelled as `f64` (see the module fidelity notes).
     pub etoh_volume: f64,
- /// `RVP` — Reid vapor pressure of the tank gasoline. `FLOAT`
- /// (schema-nullable); modelled as `f64`.
+    /// `RVP` — Reid vapor pressure of the tank gasoline. `FLOAT`
+    /// (schema-nullable); modelled as `f64`.
     pub rvp: f64,
 }
 
@@ -182,17 +182,17 @@ pub struct AverageTankGasolineRow {
 /// activity that began its cold soak in a given initial hour.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ColdSoakInitialHourFractionRow {
- /// `sourceTypeID` — MOVES source (vehicle) type.
+    /// `sourceTypeID` — MOVES source (vehicle) type.
     pub source_type_id: i32,
- /// `zoneID`.
+    /// `zoneID`.
     pub zone_id: i32,
- /// `monthID`.
+    /// `monthID`.
     pub month_id: i32,
- /// `hourDayID` — the current hour-day.
+    /// `hourDayID` — the current hour-day.
     pub hour_day_id: i32,
- /// `initialHourDayID` — the hour-day the cold soak began.
+    /// `initialHourDayID` — the hour-day the cold soak began.
     pub initial_hour_day_id: i32,
- /// `coldSoakInitialHourFraction` — the activity fraction.
+    /// `coldSoakInitialHourFraction` — the activity fraction.
     pub cold_soak_initial_hour_fraction: f64,
 }
 
@@ -204,22 +204,22 @@ pub struct ColdSoakInitialHourFractionRow {
 /// not modelled.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ColdSoakTankTemperatureRow {
- /// `monthID`.
+    /// `monthID`.
     pub month_id: i32,
- /// `hourID` — hour of day.
+    /// `hourID` — hour of day.
     pub hour_id: i32,
- /// `coldSoakTankTemperature` — the cold-soak tank temperature (°F).
+    /// `coldSoakTankTemperature` — the cold-soak tank temperature (°F).
     pub cold_soak_tank_temperature: f64,
 }
 
 /// One `County` row — supplies the altitude bucket of a county.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CountyRow {
- /// `countyID` — the county primary key.
+    /// `countyID` — the county primary key.
     pub county_id: i32,
- /// `altitude` — the `CHAR(1)` altitude bucket (`'L'` low / `'H'` high);
- /// joins to [`TankVaporGenCoeffsRow::altitude`]. Schema-nullable;
- /// modelled as a populated `char`.
+    /// `altitude` — the `CHAR(1)` altitude bucket (`'L'` low / `'H'` high);
+    /// joins to [`TankVaporGenCoeffsRow::altitude`]. Schema-nullable;
+    /// modelled as a populated `char`.
     pub altitude: char,
 }
 
@@ -231,25 +231,25 @@ pub struct CountyRow {
 /// strings and the canister / leak columns are not modelled.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CumTvvCoeffsRow {
- /// `regClassID` — regulatory class.
+    /// `regClassID` — regulatory class.
     pub reg_class_id: i32,
- /// `modelYearGroupID` — model-year group.
+    /// `modelYearGroupID` — model-year group.
     pub model_year_group_id: i32,
- /// `ageGroupID` — age group.
+    /// `ageGroupID` — age group.
     pub age_group_id: i32,
- /// `polProcessID` — `pollutantID * 100 + processID`.
+    /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
- /// `tvvTermA` — the constant term of the base TVV polynomial.
+    /// `tvvTermA` — the constant term of the base TVV polynomial.
     pub tvv_term_a: f64,
- /// `tvvTermB` — the linear term of the base TVV polynomial.
+    /// `tvvTermB` — the linear term of the base TVV polynomial.
     pub tvv_term_b: f64,
- /// `tvvTermC` — the quadratic term of the base TVV polynomial.
+    /// `tvvTermC` — the quadratic term of the base TVV polynomial.
     pub tvv_term_c: f64,
- /// `tvvTermAIM` — the constant term of the I/M TVV polynomial.
+    /// `tvvTermAIM` — the constant term of the I/M TVV polynomial.
     pub tvv_term_a_im: f64,
- /// `tvvTermBIM` — the linear term of the I/M TVV polynomial.
+    /// `tvvTermBIM` — the linear term of the I/M TVV polynomial.
     pub tvv_term_b_im: f64,
- /// `tvvTermCIM` — the quadratic term of the I/M TVV polynomial.
+    /// `tvvTermCIM` — the quadratic term of the I/M TVV polynomial.
     pub tvv_term_c_im: f64,
 }
 
@@ -262,47 +262,47 @@ pub struct CumTvvCoeffsRow {
 /// TVV-8 writes it onto `WeightedMeanBaseRate`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct EmissionRateByAgeRow {
- /// `sourceBinID` — `BIGINT`; joins to [`SourceBinRow::source_bin_id`].
+    /// `sourceBinID` — `BIGINT`; joins to [`SourceBinRow::source_bin_id`].
     pub source_bin_id: i64,
- /// `polProcessID` — `pollutantID * 100 + processID`.
+    /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
- /// `opModeID` — the operating mode (150 hot soak / 300 operating).
+    /// `opModeID` — the operating mode (150 hot soak / 300 operating).
     pub op_mode_id: i32,
- /// `ageGroupID` — the age-group bucket.
+    /// `ageGroupID` — the age-group bucket.
     pub age_group_id: i32,
- /// `meanBaseRate` — the mean emission base rate.
+    /// `meanBaseRate` — the mean emission base rate.
     pub mean_base_rate: f64,
- /// `meanBaseRateIM` — the mean emission base rate under I/M.
+    /// `meanBaseRateIM` — the mean emission base rate under I/M.
     pub mean_base_rate_im: f64,
 }
 
 /// One `FuelType` row — supplies the evap-calculations eligibility flag.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FuelTypeRow {
- /// `fuelTypeID` — the fuel type.
+    /// `fuelTypeID` — the fuel type.
     pub fuel_type_id: i32,
- /// `subjectToEvapCalculations` — the `CHAR(1)` `'Y'`/`'N'` flag,
- /// modelled as a `bool`; TVV-8 keeps only `'Y'` fuel types.
+    /// `subjectToEvapCalculations` — the `CHAR(1)` `'Y'`/`'N'` flag,
+    /// modelled as a `bool`; TVV-8 keeps only `'Y'` fuel types.
     pub subject_to_evap_calculations: bool,
 }
 
 /// One `HourDay` row — the `hourDayID` → `(dayID, hourID)` split.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HourDayRow {
- /// `hourDayID` — the surrogate key.
+    /// `hourDayID` — the surrogate key.
     pub hour_day_id: i32,
- /// `dayID` — day-of-week type.
+    /// `dayID` — day-of-week type.
     pub day_id: i32,
- /// `hourID` — hour of day.
+    /// `hourID` — hour of day.
     pub hour_id: i32,
 }
 
 /// One `DayOfAnyWeek` row — the number of real days a `dayID` represents.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DayOfAnyWeekRow {
- /// `dayID`.
+    /// `dayID`.
     pub day_id: i32,
- /// `noOfRealDays` — count of real days within the week portion.
+    /// `noOfRealDays` — count of real days within the week portion.
     pub no_of_real_days: f64,
 }
 
@@ -315,23 +315,23 @@ pub struct DayOfAnyWeekRow {
 /// `testStandardsID` are schema-nullable join keys modelled as `i32`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ImCoverageRow {
- /// `polProcessID` — `pollutantID * 100 + processID`.
+    /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
- /// `inspectFreq` — inspection frequency; joins to
- /// [`ImFactorRow::inspect_freq`].
+    /// `inspectFreq` — inspection frequency; joins to
+    /// [`ImFactorRow::inspect_freq`].
     pub inspect_freq: i32,
- /// `testStandardsID` — test-standards bucket; joins to
- /// [`ImFactorRow::test_standards_id`].
+    /// `testStandardsID` — test-standards bucket; joins to
+    /// [`ImFactorRow::test_standards_id`].
     pub test_standards_id: i32,
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: i32,
- /// `fuelTypeID`.
+    /// `fuelTypeID`.
     pub fuel_type_id: i32,
- /// `begModelYearID` — inclusive lower model-year bound of the coverage.
+    /// `begModelYearID` — inclusive lower model-year bound of the coverage.
     pub beg_model_year_id: i32,
- /// `endModelYearID` — inclusive upper model-year bound of the coverage.
+    /// `endModelYearID` — inclusive upper model-year bound of the coverage.
     pub end_model_year_id: i32,
- /// `complianceFactor` — the program's compliance factor (percent).
+    /// `complianceFactor` — the program's compliance factor (percent).
     pub compliance_factor: f64,
 }
 
@@ -340,31 +340,31 @@ pub struct ImCoverageRow {
 /// ageGroup)`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ImFactorRow {
- /// `polProcessID` — `pollutantID * 100 + processID`.
+    /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
- /// `inspectFreq` — inspection frequency.
+    /// `inspectFreq` — inspection frequency.
     pub inspect_freq: i32,
- /// `testStandardsID` — test-standards bucket.
+    /// `testStandardsID` — test-standards bucket.
     pub test_standards_id: i32,
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: i32,
- /// `fuelTypeID`.
+    /// `fuelTypeID`.
     pub fuel_type_id: i32,
- /// `IMModelYearGroupID` — joins to
- /// [`PollutantProcessModelYearRow::im_model_year_group_id`].
+    /// `IMModelYearGroupID` — joins to
+    /// [`PollutantProcessModelYearRow::im_model_year_group_id`].
     pub im_model_year_group_id: i32,
- /// `ageGroupID` — joins to [`AgeCategoryRow::age_group_id`].
+    /// `ageGroupID` — joins to [`AgeCategoryRow::age_group_id`].
     pub age_group_id: i32,
- /// `IMFactor` — the I/M adjustment factor.
+    /// `IMFactor` — the I/M adjustment factor.
     pub im_factor: f64,
 }
 
 /// One `MonthOfAnyYear` row — the `monthID` → `monthGroupID` map.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MonthOfAnyYearRow {
- /// `monthID`.
+    /// `monthID`.
     pub month_id: i32,
- /// `monthGroupID` — the month group the month belongs to.
+    /// `monthGroupID` — the month group the month belongs to.
     pub month_group_id: i32,
 }
 
@@ -372,17 +372,17 @@ pub struct MonthOfAnyYearRow {
 /// `(sourceType, link, hourDay)` activity for one `polProcessID`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OpModeDistributionRow {
- /// `sourceTypeID` — MOVES source (vehicle) type.
+    /// `sourceTypeID` — MOVES source (vehicle) type.
     pub source_type_id: i32,
- /// `hourDayID`.
+    /// `hourDayID`.
     pub hour_day_id: i32,
- /// `linkID`.
+    /// `linkID`.
     pub link_id: i32,
- /// `polProcessID` — `pollutantID * 100 + processID`.
+    /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
- /// `opModeID` — the operating mode.
+    /// `opModeID` — the operating mode.
     pub op_mode_id: i32,
- /// `opModeFraction` — the mode's share of activity.
+    /// `opModeFraction` — the mode's share of activity.
     pub op_mode_fraction: f64,
 }
 
@@ -390,11 +390,11 @@ pub struct OpModeDistributionRow {
 /// `(pollutant, process)` pair.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PollutantProcessAssocRow {
- /// `polProcessID` — `pollutantID * 100 + processID`.
+    /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
- /// `processID`.
+    /// `processID`.
     pub process_id: i32,
- /// `pollutantID`.
+    /// `pollutantID`.
     pub pollutant_id: i32,
 }
 
@@ -402,14 +402,14 @@ pub struct PollutantProcessAssocRow {
 /// model-year group and I/M model-year group.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PollutantProcessModelYearRow {
- /// `polProcessID` — `pollutantID * 100 + processID`.
+    /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
- /// `modelYearID` — the model year.
+    /// `modelYearID` — the model year.
     pub model_year_id: i32,
- /// `modelYearGroupID` — the model-year group.
+    /// `modelYearGroupID` — the model-year group.
     pub model_year_group_id: i32,
- /// `IMModelYearGroupID` — the I/M model-year group. Schema-nullable;
- /// modelled as `i32` and populated for I/M-relevant rows.
+    /// `IMModelYearGroupID` — the I/M model-year group. Schema-nullable;
+    /// modelled as `i32` and populated for I/M-relevant rows.
     pub im_model_year_group_id: i32,
 }
 
@@ -417,15 +417,15 @@ pub struct PollutantProcessModelYearRow {
 /// model-year group of a source bin.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceBinRow {
- /// `sourceBinID` — `BIGINT` primary key.
+    /// `sourceBinID` — `BIGINT` primary key.
     pub source_bin_id: i64,
- /// `fuelTypeID` — the source bin's fuel type.
+    /// `fuelTypeID` — the source bin's fuel type.
     pub fuel_type_id: i32,
- /// `regClassID` — the source bin's regulatory class. Schema-nullable;
- /// modelled as `i32`.
+    /// `regClassID` — the source bin's regulatory class. Schema-nullable;
+    /// modelled as `i32`.
     pub reg_class_id: i32,
- /// `modelYearGroupID` — the source bin's model-year group.
- /// Schema-nullable; modelled as `i32`.
+    /// `modelYearGroupID` — the source bin's model-year group.
+    /// Schema-nullable; modelled as `i32`.
     pub model_year_group_id: i32,
 }
 
@@ -433,13 +433,13 @@ pub struct SourceBinRow {
 /// `(sourceTypeModelYear)` group's activity for one `polProcessID`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceBinDistributionRow {
- /// `sourceTypeModelYearID` — surrogate key for a `(sourceType, modelYear)`.
+    /// `sourceTypeModelYearID` — surrogate key for a `(sourceType, modelYear)`.
     pub source_type_model_year_id: i32,
- /// `polProcessID` — `pollutantID * 100 + processID`.
+    /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
- /// `sourceBinID` — joins to [`SourceBinRow::source_bin_id`].
+    /// `sourceBinID` — joins to [`SourceBinRow::source_bin_id`].
     pub source_bin_id: i64,
- /// `sourceBinActivityFraction` — the bin's share of the group's activity.
+    /// `sourceBinActivityFraction` — the bin's share of the group's activity.
     pub source_bin_activity_fraction: f64,
 }
 
@@ -452,15 +452,15 @@ pub struct SourceBinDistributionRow {
 /// `ageID` and `sourceTypeID` joins.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceHoursRow {
- /// `hourDayID`.
+    /// `hourDayID`.
     pub hour_day_id: i32,
- /// `monthID`.
+    /// `monthID`.
     pub month_id: i32,
- /// `ageID` — vehicle age in years; `modelYearID = yearID - ageID`.
+    /// `ageID` — vehicle age in years; `modelYearID = yearID - ageID`.
     pub age_id: i32,
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: i32,
- /// `sourceHours` — the source operating hours.
+    /// `sourceHours` — the source operating hours.
     pub source_hours: f64,
 }
 
@@ -468,11 +468,11 @@ pub struct SourceHoursRow {
 /// surrogate key into its `(sourceTypeID, modelYearID)` components.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceTypeModelYearRow {
- /// `sourceTypeModelYearID` — the surrogate key.
+    /// `sourceTypeModelYearID` — the surrogate key.
     pub source_type_model_year_id: i32,
- /// `modelYearID` — vehicle model year.
+    /// `modelYearID` — vehicle model year.
     pub model_year_id: i32,
- /// `sourceTypeID` — MOVES source (vehicle) type.
+    /// `sourceTypeID` — MOVES source (vehicle) type.
     pub source_type_id: i32,
 }
 
@@ -480,18 +480,18 @@ pub struct SourceTypeModelYearRow {
 /// an ethanol level and altitude bucket.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TankVaporGenCoeffsRow {
- /// `ethanolLevelID` — the ethanol level (0 or 10) the coefficients
- /// apply to; TVV-4 interpolates between the two.
+    /// `ethanolLevelID` — the ethanol level (0 or 10) the coefficients
+    /// apply to; TVV-4 interpolates between the two.
     pub ethanol_level_id: i32,
- /// `altitude` — the `CHAR(1)` altitude bucket; joins to
- /// [`CountyRow::altitude`].
+    /// `altitude` — the `CHAR(1)` altitude bucket; joins to
+    /// [`CountyRow::altitude`].
     pub altitude: char,
- /// `tvgTermA` — the multiplicative term of the TVG equation.
+    /// `tvgTermA` — the multiplicative term of the TVG equation.
     pub tvg_term_a: f64,
- /// `tvgTermB` — the RVP exponential coefficient of the TVG equation.
+    /// `tvgTermB` — the RVP exponential coefficient of the TVG equation.
     pub tvg_term_b: f64,
- /// `tvgTermC` — the temperature exponential coefficient of the TVG
- /// equation.
+    /// `tvgTermC` — the temperature exponential coefficient of the TVG
+    /// equation.
     pub tvg_term_c: f64,
 }
 
@@ -500,18 +500,18 @@ pub struct TankVaporGenCoeffsRow {
 /// `Year` is extracted to the run's single calendar year.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct YearRow {
- /// `yearID` — calendar year.
+    /// `yearID` — calendar year.
     pub year_id: i32,
- /// `fuelYearID` — the fuel year.
+    /// `fuelYearID` — the fuel year.
     pub fuel_year_id: i32,
 }
 
 /// One `Zone` row — resolves a zone into its county.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ZoneRow {
- /// `zoneID` — the zone primary key.
+    /// `zoneID` — the zone primary key.
     pub zone_id: i32,
- /// `countyID` — the county the zone belongs to.
+    /// `countyID` — the county the zone belongs to.
     pub county_id: i32,
 }
 
@@ -523,60 +523,60 @@ pub struct ZoneRow {
 /// data-plane contract the unit tests build directly.
 #[derive(Debug, Clone, Default)]
 pub struct TankVaporVentingInputs {
- /// `AgeCategory` rows.
+    /// `AgeCategory` rows.
     pub age_category: Vec<AgeCategoryRow>,
- /// `AverageTankGasoline` rows.
+    /// `AverageTankGasoline` rows.
     pub average_tank_gasoline: Vec<AverageTankGasolineRow>,
- /// `ColdSoakInitialHourFraction` rows.
+    /// `ColdSoakInitialHourFraction` rows.
     pub cold_soak_initial_hour_fraction: Vec<ColdSoakInitialHourFractionRow>,
- /// `ColdSoakTankTemperature` rows.
+    /// `ColdSoakTankTemperature` rows.
     pub cold_soak_tank_temperature: Vec<ColdSoakTankTemperatureRow>,
- /// `County` rows.
+    /// `County` rows.
     pub county: Vec<CountyRow>,
- /// `CumTVVCoeffs` rows.
+    /// `CumTVVCoeffs` rows.
     pub cum_tvv_coeffs: Vec<CumTvvCoeffsRow>,
- /// `EmissionRateByAge` rows.
+    /// `EmissionRateByAge` rows.
     pub emission_rate_by_age: Vec<EmissionRateByAgeRow>,
- /// `FuelType` rows.
+    /// `FuelType` rows.
     pub fuel_type: Vec<FuelTypeRow>,
- /// `DayOfAnyWeek` rows.
+    /// `DayOfAnyWeek` rows.
     pub day_of_any_week: Vec<DayOfAnyWeekRow>,
- /// `HourDay` rows.
+    /// `HourDay` rows.
     pub hour_day: Vec<HourDayRow>,
- /// `IMCoverage` rows.
+    /// `IMCoverage` rows.
     pub im_coverage: Vec<ImCoverageRow>,
- /// `IMFactor` rows.
+    /// `IMFactor` rows.
     pub im_factor: Vec<ImFactorRow>,
- /// `MonthOfAnyYear` rows.
+    /// `MonthOfAnyYear` rows.
     pub month_of_any_year: Vec<MonthOfAnyYearRow>,
- /// `OpModeDistribution` rows.
+    /// `OpModeDistribution` rows.
     pub op_mode_distribution: Vec<OpModeDistributionRow>,
- /// `PollutantProcessAssoc` rows.
+    /// `PollutantProcessAssoc` rows.
     pub pollutant_process_assoc: Vec<PollutantProcessAssocRow>,
- /// `PollutantProcessModelYear` rows.
+    /// `PollutantProcessModelYear` rows.
     pub pollutant_process_model_year: Vec<PollutantProcessModelYearRow>,
- /// `RunSpecHourDay` — the `hourDayID`s the run processes; TVV-8's second
- /// insert cross-joins this.
+    /// `RunSpecHourDay` — the `hourDayID`s the run processes; TVV-8's second
+    /// insert cross-joins this.
     pub run_spec_hour_day: Vec<i32>,
- /// `RunSpecMonth` — the `monthID`s the run processes; TVV-8's second
- /// insert cross-joins this.
+    /// `RunSpecMonth` — the `monthID`s the run processes; TVV-8's second
+    /// insert cross-joins this.
     pub run_spec_month: Vec<i32>,
- /// `RunSpecSourceType` — the `sourceTypeID`s the run processes; TVV-8's
- /// second insert joins this to keep run-spec source types only.
+    /// `RunSpecSourceType` — the `sourceTypeID`s the run processes; TVV-8's
+    /// second insert joins this to keep run-spec source types only.
     pub run_spec_source_type: Vec<i32>,
- /// `SourceBin` rows.
+    /// `SourceBin` rows.
     pub source_bin: Vec<SourceBinRow>,
- /// `SourceBinDistribution` rows.
+    /// `SourceBinDistribution` rows.
     pub source_bin_distribution: Vec<SourceBinDistributionRow>,
- /// `SourceHours` rows.
+    /// `SourceHours` rows.
     pub source_hours: Vec<SourceHoursRow>,
- /// `SourceTypeModelYear` rows.
+    /// `SourceTypeModelYear` rows.
     pub source_type_model_year: Vec<SourceTypeModelYearRow>,
- /// `TankVaporGenCoeffs` rows.
+    /// `TankVaporGenCoeffs` rows.
     pub tank_vapor_gen_coeffs: Vec<TankVaporGenCoeffsRow>,
- /// `Year` rows.
+    /// `Year` rows.
     pub year: Vec<YearRow>,
- /// `Zone` rows.
+    /// `Zone` rows.
     pub zone: Vec<ZoneRow>,
 }
 
@@ -590,24 +590,24 @@ pub struct TankVaporVentingInputs {
 /// TVV-5 and TVV-8 derive vehicle age from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RunContext {
- /// `##context.year##` — the run's calendar year. Used to derive vehicle
- /// age (`year − modelYearID` / `year − ageID`) in TVV-1, TVV-5 and
- /// TVV-8, and stamped as `yearID` on the output in TVV-9.
+    /// `##context.year##` — the run's calendar year. Used to derive vehicle
+    /// age (`year − modelYearID` / `year − ageID`) in TVV-1, TVV-5 and
+    /// TVV-8, and stamped as `yearID` on the output in TVV-9.
     pub year: i32,
- /// `##context.iterLocation.stateRecordID##` — stamped as `stateID` in
- /// TVV-9.
+    /// `##context.iterLocation.stateRecordID##` — stamped as `stateID` in
+    /// TVV-9.
     pub state_id: i32,
- /// `##context.iterLocation.countyRecordID##` — stamped as `countyID` in
- /// TVV-9.
+    /// `##context.iterLocation.countyRecordID##` — stamped as `countyID` in
+    /// TVV-9.
     pub county_id: i32,
- /// `##context.iterLocation.zoneRecordID##` — the `UnweightedHourlyTVV`
- /// `zoneID` default in TVV-6 and the `zoneID` stamped in TVV-9.
+    /// `##context.iterLocation.zoneRecordID##` — the `UnweightedHourlyTVV`
+    /// `zoneID` default in TVV-6 and the `zoneID` stamped in TVV-9.
     pub zone_id: i32,
- /// `##context.iterLocation.linkRecordID##` — stamped as `linkID` in
- /// TVV-9.
+    /// `##context.iterLocation.linkRecordID##` — stamped as `linkID` in
+    /// TVV-9.
     pub link_id: i32,
- /// `##context.iterLocation.roadTypeRecordID##` — stamped as `roadTypeID`
- /// in TVV-9.
+    /// `##context.iterLocation.roadTypeRecordID##` — stamped as `roadTypeID`
+    /// in TVV-9.
     pub road_type_id: i32,
 }
 
@@ -619,46 +619,46 @@ pub struct RunContext {
 /// carries the I/M-adjusted emission.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TankVaporVentingEmissionRow {
- /// `yearID`.
+    /// `yearID`.
     pub year_id: i32,
- /// `monthID`.
+    /// `monthID`.
     pub month_id: i32,
- /// `dayID`.
+    /// `dayID`.
     pub day_id: i32,
- /// `hourID`.
+    /// `hourID`.
     pub hour_id: i32,
- /// `stateID`.
+    /// `stateID`.
     pub state_id: i32,
- /// `countyID`.
+    /// `countyID`.
     pub county_id: i32,
- /// `zoneID`.
+    /// `zoneID`.
     pub zone_id: i32,
- /// `linkID`.
+    /// `linkID`.
     pub link_id: i32,
- /// `pollutantID`.
+    /// `pollutantID`.
     pub pollutant_id: i32,
- /// `processID`.
+    /// `processID`.
     pub process_id: i32,
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: i32,
- /// `fuelTypeID`.
+    /// `fuelTypeID`.
     pub fuel_type_id: i32,
- /// `modelYearID`.
+    /// `modelYearID`.
     pub model_year_id: i32,
- /// `roadTypeID`.
+    /// `roadTypeID`.
     pub road_type_id: i32,
- /// `emissionQuant` — the I/M-adjusted venting emission. Equal to
- /// `weightedMeanBaseRate × sourceHours × opModeFraction` where no I/M
- /// program applies, else the I/M blend (see TVV-9).
+    /// `emissionQuant` — the I/M-adjusted venting emission. Equal to
+    /// `weightedMeanBaseRate × sourceHours × opModeFraction` where no I/M
+    /// program applies, else the I/M blend (see TVV-9).
     pub emission_quant: f64,
 }
 
 impl TankVaporVentingEmissionRow {
- /// The integer dimension tuple — every column except `emissionQuant`.
- /// Used to sort the output deterministically: MOVES leaves
- /// `MOVESWorkerOutput` physically unordered (the TVV-9 `INSERT … SELECT`
- /// has no `ORDER BY`), so the port sorts purely to make the result
- /// reproducible.
+    /// The integer dimension tuple — every column except `emissionQuant`.
+    /// Used to sort the output deterministically: MOVES leaves
+    /// `MOVESWorkerOutput` physically unordered (the TVV-9 `INSERT … SELECT`
+    /// has no `ORDER BY`), so the port sorts purely to make the result
+    /// reproducible.
     fn dimension_key(&self) -> [i32; 14] {
         [
             self.year_id,
@@ -2705,7 +2705,7 @@ fn im_coverage_merged_ungrouped(
     inputs: &TankVaporVentingInputs,
     ctx: &RunContext,
 ) -> Vec<ImCoverageMerged> {
- // PollutantProcessAssoc is keyed on polProcessID — one row per id.
+    // PollutantProcessAssoc is keyed on polProcessID — one row per id.
     let assoc_by_pp: HashMap<i32, &PollutantProcessAssocRow> = inputs
         .pollutant_process_assoc
         .iter()
@@ -2736,7 +2736,7 @@ fn im_coverage_merged_ungrouped(
             .push(imc);
     }
 
- // GROUP BY (processID, pollutantID, modelYearID, fuelTypeID, sourceTypeID).
+    // GROUP BY (processID, pollutantID, modelYearID, fuelTypeID, sourceTypeID).
     let mut merged: HashMap<ImMergedKey, f64> = HashMap::new();
     for ppmy in &inputs.pollutant_process_model_year {
         let Some(assoc) = assoc_by_pp.get(&ppmy.pol_process_id) else {
@@ -2751,7 +2751,7 @@ fn im_coverage_merged_ungrouped(
                 continue;
             };
             for ac in ages {
- // WHERE ppmy.modelYearID = ##context.year## - ageID.
+                // WHERE ppmy.modelYearID = ##context.year## - ageID.
                 if ppmy.model_year_id != ctx.year - ac.age_id {
                     continue;
                 }
@@ -2765,14 +2765,14 @@ fn im_coverage_merged_ungrouped(
                     continue;
                 };
                 for imc in coverages {
- // INNER JOIN IMCoverage … begModelYearID <= modelYearID
- // <= endModelYearID.
+                    // INNER JOIN IMCoverage … begModelYearID <= modelYearID
+                    // <= endModelYearID.
                     if imc.beg_model_year_id > ppmy.model_year_id
                         || imc.end_model_year_id < ppmy.model_year_id
                     {
                         continue;
                     }
- *merged
+                    *merged
                         .entry((
                             assoc.process_id,
                             assoc.pollutant_id,
@@ -2813,8 +2813,8 @@ fn im_coverage_merged_ungrouped(
 /// float noise the SQL's `mod` step is exposed to (see the module fidelity
 /// notes).
 fn peak_hour_of_cold_soak(inputs: &TankVaporVentingInputs) -> Vec<PeakHourOfColdSoak> {
- // best[monthID] = (roundedTempScaled, -hourID): a higher rounded
- // temperature wins; on a tie the smaller hourID (larger -hourID) wins.
+    // best[monthID] = (roundedTempScaled, -hourID): a higher rounded
+    // temperature wins; on a tie the smaller hourID (larger -hourID) wins.
     let mut best: HashMap<i32, (i64, i32)> = HashMap::new();
     for row in &inputs.cold_soak_tank_temperature {
         let rounded = (row.cold_soak_tank_temperature * 100.0).round() as i64;
@@ -2822,7 +2822,7 @@ fn peak_hour_of_cold_soak(inputs: &TankVaporVentingInputs) -> Vec<PeakHourOfCold
         best.entry(row.month_id)
             .and_modify(|current| {
                 if candidate > *current {
- *current = candidate;
+                    *current = candidate;
                 }
             })
             .or_insert(candidate);
@@ -2860,7 +2860,7 @@ fn tank_vapor_generated(
     inputs: &TankVaporVentingInputs,
     peak_hours: &[PeakHourOfColdSoak],
 ) -> Vec<TankVaporGenerated> {
- // HourDay is keyed on hourDayID — one hourID per id.
+    // HourDay is keyed on hourDayID — one hourID per id.
     let hour_of: HashMap<i32, i32> = inputs
         .hour_day
         .iter()
@@ -2870,8 +2870,8 @@ fn tank_vapor_generated(
         .iter()
         .map(|p| (p.month_id, p.peak_hour_id))
         .collect();
- // ColdSoakTankTemperature is extracted to one zone — (monthID, hourID)
- // is unique.
+    // ColdSoakTankTemperature is extracted to one zone — (monthID, hourID)
+    // is unique.
     let temp_of: HashMap<(i32, i32), f64> = inputs
         .cold_soak_tank_temperature
         .iter()
@@ -2906,7 +2906,7 @@ fn tank_vapor_generated(
 
     let mut out = Vec::new();
     for ihf in &inputs.cold_soak_initial_hour_fraction {
- // WHERE coldSoakInitialHourFraction > 0 AND hourDayID <> initialHourDayID.
+        // WHERE coldSoakInitialHourFraction > 0 AND hourDayID <> initialHourDayID.
         if ihf.cold_soak_initial_hour_fraction <= 0.0 || ihf.hour_day_id == ihf.initial_hour_day_id
         {
             continue;
@@ -2920,7 +2920,7 @@ fn tank_vapor_generated(
         let Some(&peak_hour) = peak_of.get(&ihf.month_id) else {
             continue;
         };
- // WHERE hd.hourID <= ph.peakHourID.
+        // WHERE hd.hourID <= ph.peakHourID.
         if current_hour > peak_hour {
             continue;
         }
@@ -2951,8 +2951,8 @@ fn tank_vapor_generated(
                     0.0
                 } else {
                     coeffs.tvg_term_a
- * (coeffs.tvg_term_b * gas.rvp).exp()
- * ((coeffs.tvg_term_c * t2).exp() - (coeffs.tvg_term_c * t1).exp())
+                        * (coeffs.tvg_term_b * gas.rvp).exp()
+                        * ((coeffs.tvg_term_c * t2).exp() - (coeffs.tvg_term_c * t1).exp())
                 };
                 out.push(TankVaporGenerated {
                     hour_day_id: ihf.hour_day_id,
@@ -3097,7 +3097,7 @@ fn cumulative_tank_vapor_vented(
             .or_default()
             .push(ppmy);
     }
- // HourDay is keyed on hourDayID — one (dayID, hourID) per id.
+    // HourDay is keyed on hourDayID — one (dayID, hourID) per id.
     let hour_day_of: HashMap<i32, &HourDayRow> = inputs
         .hour_day
         .iter()
@@ -3131,12 +3131,12 @@ fn cumulative_tank_vapor_vented(
             let tvv_im = (coeffs.tvv_term_a_im
                 + tvg * (coeffs.tvv_term_b_im + coeffs.tvv_term_c_im * tvg))
                 .max(0.0);
- // mod(hourID - 1 - 1 + 24, 24) + 1 — the cyclic prior hour.
+            // mod(hourID - 1 - 1 + 24, 24) + 1 — the cyclic prior hour.
             let prior_hour_id = (hd.hour_id - 1 - 1 + 24).rem_euclid(24) + 1;
             for y in years {
                 for ac in ages {
                     for ppmy in model_years {
- // WHERE acat.ageID = y.yearID - ppmy.modelYearID.
+                        // WHERE acat.ageID = y.yearID - ppmy.modelYearID.
                         if ac.age_id != y.year_id - ppmy.model_year_id {
                             continue;
                         }
@@ -3160,7 +3160,7 @@ fn cumulative_tank_vapor_vented(
             }
         }
     }
- // Sorted on the SQL primary key for a canonical, reproducible order.
+    // Sorted on the SQL primary key for a canonical, reproducible order.
     out.sort_unstable_by_key(|c| {
         (
             c.reg_class_id,
@@ -3192,7 +3192,7 @@ fn unweighted_hourly_tvv(
     cumulative: &[CumulativeTankVaporVented],
     zone_id: i32,
 ) -> Vec<UnweightedHourlyTvv> {
- // The full CummulativeTankVaporVented primary key.
+    // The full CummulativeTankVaporVented primary key.
     type CtvKey = (i32, i32, i32, i32, i32, i32, i32, i32, i32);
     let key_of = |c: &CumulativeTankVaporVented, hour_id: i32| -> CtvKey {
         (
@@ -3215,7 +3215,7 @@ fn unweighted_hourly_tvv(
     let mut out: Vec<UnweightedHourlyTvv> = cumulative
         .iter()
         .map(|ctv1| {
- // Prior-hour row: same dimensions, hourID = ctv1.priorHourID.
+            // Prior-hour row: same dimensions, hourID = ctv1.priorHourID.
             let prior = by_key.get(&key_of(ctv1, ctv1.prior_hour_id));
             let prior_tvv = prior.map_or(0.0, |p| p.tank_vapor_vented);
             let prior_tvv_im = prior.map_or(0.0, |p| p.tank_vapor_vented_im);
@@ -3293,7 +3293,7 @@ fn hourly_tvv(
     unweighted: &[UnweightedHourlyTvv],
     peak_hours: &[PeakHourOfColdSoak],
 ) -> Vec<HourlyTvv> {
- // --- Part A: weight by cold-soak fraction, sum over initialHourDayID ---
+    // --- Part A: weight by cold-soak fraction, sum over initialHourDayID ---
     let fraction_of: HashMap<CsihfKey, f64> = inputs
         .cold_soak_initial_hour_fraction
         .iter()
@@ -3351,7 +3351,7 @@ fn hourly_tvv(
         .collect();
     part_a.sort_unstable_by_key(hourly_tvv_key);
 
- // --- Part B: the four post-peak decay hours ---
+    // --- Part B: the four post-peak decay hours ---
     let hour_day_of: HashMap<i32, &HourDayRow> = inputs
         .hour_day
         .iter()
@@ -3369,11 +3369,11 @@ fn hourly_tvv(
 
     let mut part_b = Vec::new();
     for htvv in &part_a {
- // CopyOfHourlyTVV = HourlyTVV inner join HourDay on hourDayID.
+        // CopyOfHourlyTVV = HourlyTVV inner join HourDay on hourDayID.
         let Some(hd) = hour_day_of.get(&htvv.hour_day_id) else {
             continue;
         };
- // inner join PeakHourOfColdSoak on monthID, and hourID = peakHourID.
+        // inner join PeakHourOfColdSoak on monthID, and hourID = peakHourID.
         let Some(&peak) = peak_of.get(&htvv.month_id) else {
             continue;
         };
@@ -3440,7 +3440,7 @@ fn weighted_mean_base_rate(
     ctx: &RunContext,
     hourly: &[HourlyTvv],
 ) -> Vec<WeightedMeanBaseRate> {
- // Shared join indexes.
+    // Shared join indexes.
     let source_bin_of: HashMap<i64, &SourceBinRow> = inputs
         .source_bin
         .iter()
@@ -3458,9 +3458,9 @@ fn weighted_mean_base_rate(
             .or_default()
             .push(ppmy);
     }
- // A FuelType row with subjectToEvapCalculations = 'Y'.
+    // A FuelType row with subjectToEvapCalculations = 'Y'.
     let evap_ok = |fuel_type_id: i32| evap_fuel_type.get(&fuel_type_id) == Some(&true);
- // A PollutantProcessModelYear row links the bin's model-year group.
+    // A PollutantProcessModelYear row links the bin's model-year group.
     let ppmy_links = |pol_process_id: i32, model_year_id: i32, model_year_group_id: i32| {
         ppmy_by_pp_my
             .get(&(pol_process_id, model_year_id))
@@ -3472,7 +3472,7 @@ fn weighted_mean_base_rate(
 
     let mut grouped: HashMap<WeightedRateKey, (f64, f64)> = HashMap::new();
 
- // --- Cold-soak insert: opModeID = 151, from HourlyTVV ---
+    // --- Cold-soak insert: opModeID = 151, from HourlyTVV ---
     let mut stmy_by_my_st: HashMap<(i32, i32), Vec<&SourceTypeModelYearRow>> = HashMap::new();
     for stmy in &inputs.source_type_model_year {
         stmy_by_my_st
@@ -3531,7 +3531,7 @@ fn weighted_mean_base_rate(
         }
     }
 
- // --- Operating / hot-soak insert: opModeID ∈ {150, 300}, from EmissionRateByAge ---
+    // --- Operating / hot-soak insert: opModeID ∈ {150, 300}, from EmissionRateByAge ---
     let mut age_by_group: HashMap<i32, Vec<&AgeCategoryRow>> = HashMap::new();
     for ac in &inputs.age_category {
         age_by_group.entry(ac.age_group_id).or_default().push(ac);
@@ -3583,7 +3583,7 @@ fn weighted_mean_base_rate(
                 }
                 let contribution = sbd.source_bin_activity_fraction * er.mean_base_rate;
                 let contribution_im = sbd.source_bin_activity_fraction * er.mean_base_rate_im;
- // Cross join RunSpecMonth × RunSpecHourDay.
+                // Cross join RunSpecMonth × RunSpecHourDay.
                 for &month_id in &inputs.run_spec_month {
                     for &hour_day_id in &inputs.run_spec_hour_day {
                         let entry = grouped
@@ -3695,7 +3695,7 @@ fn assemble_emission_output(
         .iter()
         .map(|d| (d.day_id, d.no_of_real_days))
         .collect();
- // IMCoverageMergedUngrouped, unique on its five-column index.
+    // IMCoverageMergedUngrouped, unique on its five-column index.
     let im_adjust_of: HashMap<ImMergedKey, f64> = im_merged
         .iter()
         .map(|m| {
@@ -3747,7 +3747,7 @@ fn assemble_emission_output(
                 let emission_quant_im =
                     w.weighted_mean_base_rate_im * sh.source_hours * omd.op_mode_fraction
                         / no_of_real_days;
- // Apply I/M: blend where an IMCoverageMergedUngrouped row matches.
+                // Apply I/M: blend where an IMCoverageMergedUngrouped row matches.
                 let final_quant = match im_adjust_of.get(&(
                     assoc.process_id,
                     assoc.pollutant_id,
@@ -3791,22 +3791,22 @@ fn assemble_emission_output(
 /// to [`calculate`](Self::calculate).
 #[derive(Debug, Clone)]
 pub struct TankVaporVentingCalculator {
- /// The single master-loop subscription, built once in [`Self::new`].
+    /// The single master-loop subscription, built once in [`Self::new`].
     subscriptions: [CalculatorSubscription; 1],
 }
 
 impl TankVaporVentingCalculator {
- /// Stable module name — matches the Java class and the chain-DAG entry.
+    /// Stable module name — matches the Java class and the chain-DAG entry.
     pub const NAME: &'static str = CALCULATOR_NAME;
 
- /// Construct the calculator with its master-loop subscription.
- ///
- /// The Java constructor signs up for the Evap Fuel Vapor Venting process
- /// (12) at `MONTH` granularity with the base `EMISSION_CALCULATOR`
- /// priority — its `0` offset carries the comment "no offset from the
- /// standard MasterLoopPriority.EMISSION_CALCULATOR". The
- /// `CalculatorInfo.txt` `Subscribe` directive records the same single
- /// subscription.
+    /// Construct the calculator with its master-loop subscription.
+    ///
+    /// The Java constructor signs up for the Evap Fuel Vapor Venting process
+    /// (12) at `MONTH` granularity with the base `EMISSION_CALCULATOR`
+    /// priority — its `0` offset carries the comment "no offset from the
+    /// standard MasterLoopPriority.EMISSION_CALCULATOR". The
+    /// `CalculatorInfo.txt` `Subscribe` directive records the same single
+    /// subscription.
     #[must_use]
     pub fn new() -> Self {
         let priority = Priority::parse("EMISSION_CALCULATOR")
@@ -3820,17 +3820,17 @@ impl TankVaporVentingCalculator {
         }
     }
 
- /// Compute the tank-vapor-venting emission rows — the port of the
- /// `TankVaporVentingCalculator.sql` "Processing" section.
- ///
- /// The nine numbered TVV steps run in order: TVV-1 merges the I/M
- /// adjustment fractions, TVV-2 finds the peak cold-soak hour, TVV-3
- /// generates tank vapor by ethanol level, TVV-4 ethanol-weights it,
- /// TVV-5 accumulates vapor vented, TVV-6 differences it into hourly
- /// increments, TVV-7 cold-soak-weights it and adds the post-peak decay
- /// hours, TVV-8 builds the weighted mean base rates, and TVV-9
- /// assembles the output. The result is sorted by its integer dimension
- /// columns (ties broken on `emissionQuant`) for deterministic output /// MOVES leaves `MOVESWorkerOutput` physically unordered.
+    /// Compute the tank-vapor-venting emission rows — the port of the
+    /// `TankVaporVentingCalculator.sql` "Processing" section.
+    ///
+    /// The nine numbered TVV steps run in order: TVV-1 merges the I/M
+    /// adjustment fractions, TVV-2 finds the peak cold-soak hour, TVV-3
+    /// generates tank vapor by ethanol level, TVV-4 ethanol-weights it,
+    /// TVV-5 accumulates vapor vented, TVV-6 differences it into hourly
+    /// increments, TVV-7 cold-soak-weights it and adds the post-peak decay
+    /// hours, TVV-8 builds the weighted mean base rates, and TVV-9
+    /// assembles the output. The result is sorted by its integer dimension
+    /// columns (ties broken on `emissionQuant`) for deterministic output /// MOVES leaves `MOVESWorkerOutput` physically unordered.
     #[must_use]
     pub fn calculate(
         &self,
@@ -3847,10 +3847,10 @@ impl TankVaporVentingCalculator {
         let weighted_rates = weighted_mean_base_rate(inputs, ctx, &hourly);
         let mut output = assemble_emission_output(inputs, ctx, &weighted_rates, &im_merged);
 
- // MOVESWorkerOutput is physically unordered; sort for reproducibility.
- // Two output rows can share a dimension key — the SQL writes one row
- // per operating mode but does not carry opModeID into the output — so
- // ties break on emissionQuant for a fully canonical order.
+        // MOVESWorkerOutput is physically unordered; sort for reproducibility.
+        // Two output rows can share a dimension key — the SQL writes one row
+        // per operating mode but does not carry opModeID into the output — so
+        // ties break on emissionQuant for a fully canonical order.
         output.sort_by(|a, b| {
             a.dimension_key()
                 .cmp(&b.dimension_key())
@@ -3927,26 +3927,26 @@ impl Calculator for TankVaporVentingCalculator {
         &self.subscriptions
     }
 
- /// The one `(pollutant, process)` pair: THC × Evap Fuel Vapor Venting.
- /// See `REGISTRATIONS`.
+    /// The one `(pollutant, process)` pair: THC × Evap Fuel Vapor Venting.
+    /// See `REGISTRATIONS`.
     fn registrations(&self) -> &[PollutantProcessAssociation] {
         &REGISTRATIONS
     }
 
- // `upstream` keeps the trait default (empty): `calculator-dag.json`
- // records `depends_on: []`. `TankVaporVentingCalculator` subscribes
- // directly to the master loop; the `Chain` directive makes it an
- // upstream of `HCSpeciationCalculator`, not the reverse.
+    // `upstream` keeps the trait default (empty): `calculator-dag.json`
+    // records `depends_on: []`. `TankVaporVentingCalculator` subscribes
+    // directly to the master loop; the `Chain` directive makes it an
+    // upstream of `HCSpeciationCalculator`, not the reverse.
 
     fn input_tables(&self) -> &[&'static str] {
         INPUT_TABLES
     }
 
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
- // The pinned MOVES build uses USE_MULTIDAY_DIURNALS, so the multiday
- // script is the one that actually runs. Delegate entirely to the
- // multiday calculator which reads the correct input tables and uses
- // DefaultVentingEquations to evaluate the TVV polynomial expressions.
+        // The pinned MOVES build uses USE_MULTIDAY_DIURNALS, so the multiday
+        // script is the one that actually runs. Delegate entirely to the
+        // multiday calculator which reads the correct input tables and uses
+        // DefaultVentingEquations to evaluate the TVV polynomial expressions.
         multiday_tank_vapor_venting_calculator::MultidayTankVaporVentingCalculator::new()
             .execute(ctx)
     }
@@ -3963,8 +3963,8 @@ pub fn factory() -> Box<dyn Calculator> {
 mod tests {
     use super::*;
 
- /// The run context the fixtures use: calendar year 2020, county 26161
- /// of state 26, zone 90, link 5001, road type 5.
+    /// The run context the fixtures use: calendar year 2020, county 26161
+    /// of state 26, zone 90, link 5001, road type 5.
     fn run_context() -> RunContext {
         RunContext {
             year: 2020,
@@ -3976,12 +3976,12 @@ mod tests {
         }
     }
 
- /// Run the calculator over `inputs` with the standard [`run_context`].
+    /// Run the calculator over `inputs` with the standard [`run_context`].
     fn run(inputs: &TankVaporVentingInputs) -> Vec<TankVaporVentingEmissionRow> {
         TankVaporVentingCalculator::new().calculate(inputs, &run_context())
     }
 
- /// Assert two `emissionQuant`s match within `f64` slack.
+    /// Assert two `emissionQuant`s match within `f64` slack.
     fn assert_quant(actual: f64, expected: f64) {
         assert!(
             (actual - expected).abs() < 1e-9,
@@ -3989,23 +3989,23 @@ mod tests {
         );
     }
 
- /// `D` — the temperature term `exp(0.01·70) − exp(0.01·60)` the
- /// minimal fixture's TVG reduces to (its `tvgTermB` is zero, so the RVP
- /// exponential is `exp(0) = 1`).
+    /// `D` — the temperature term `exp(0.01·70) − exp(0.01·60)` the
+    /// minimal fixture's TVG reduces to (its `tvgTermB` is zero, so the RVP
+    /// exponential is `exp(0) = 1`).
     fn temperature_term() -> f64 {
         (0.01_f64 * 70.0).exp() - (0.01_f64 * 60.0).exp()
     }
 
- /// A minimal one-of-everything input that threads exactly one row
- /// through all nine TVV steps via the cold-soak (`opModeID = 151`) path.
- ///
- /// Hand-computed: TVG (both ethanol levels, identical coefficients) is
- /// `1 · exp(0·9) · (exp(0.7) − exp(0.6)) = D`; TVV-4 with `ETOHVolume`
- /// 10 weights entirely to level 10, so `ethanolWeightedTVG = D`; TVV-5
- /// `tankVaporVented = max(0 + D·(1 + 0·D), 0) = D`; TVV-6 has no prior
- /// hour so `unweightedHourlyTVV = D`; TVV-7 weights by the cold-soak
- /// fraction 1.0; TVV-8 weights by `sourceBinActivityFraction` 1.0; TVV-9
- /// `emissionQuant = D · sourceHours(10) · opModeFraction(1) = 10·D`.
+    /// A minimal one-of-everything input that threads exactly one row
+    /// through all nine TVV steps via the cold-soak (`opModeID = 151`) path.
+    ///
+    /// Hand-computed: TVG (both ethanol levels, identical coefficients) is
+    /// `1 · exp(0·9) · (exp(0.7) − exp(0.6)) = D`; TVV-4 with `ETOHVolume`
+    /// 10 weights entirely to level 10, so `ethanolWeightedTVG = D`; TVV-5
+    /// `tankVaporVented = max(0 + D·(1 + 0·D), 0) = D`; TVV-6 has no prior
+    /// hour so `unweightedHourlyTVV = D`; TVV-7 weights by the cold-soak
+    /// fraction 1.0; TVV-8 weights by `sourceBinActivityFraction` 1.0; TVV-9
+    /// `emissionQuant = D · sourceHours(10) · opModeFraction(1) = 10·D`.
     fn minimal_inputs() -> TankVaporVentingInputs {
         TankVaporVentingInputs {
             age_category: vec![AgeCategoryRow {
@@ -4184,10 +4184,10 @@ mod tests {
 
     #[test]
     fn calculate_blends_in_the_im_adjustment() {
- // An I/M program covering model year 2018: IMFactor 1.0 ×
- // complianceFactor 50 × 0.01 = 0.5 adjustment fraction. The I/M
- // coefficient `tvvTermBIM = 2.0` doubles the I/M emission, so the
- // blend is 20D·0.5 + 10D·0.5 = 15D.
+        // An I/M program covering model year 2018: IMFactor 1.0 ×
+        // complianceFactor 50 × 0.01 = 0.5 adjustment fraction. The I/M
+        // coefficient `tvvTermBIM = 2.0` doubles the I/M emission, so the
+        // blend is 20D·0.5 + 10D·0.5 = 15D.
         let mut inputs = minimal_inputs();
         inputs.cum_tvv_coeffs[0].tvv_term_b_im = 2.0;
         inputs.im_factor = vec![ImFactorRow {
@@ -4217,9 +4217,9 @@ mod tests {
 
     #[test]
     fn calculate_interpolates_tvg_between_ethanol_levels() {
- // Distinct level-0 and level-10 vapor generation; ETOHVolume 5.0
- // puts the ethanol weight at least(10, 5)/10 = 0.5, so
- // ethanolWeightedTVG = 3D·0.5 + D·0.5 = 2D and emissionQuant = 20D.
+        // Distinct level-0 and level-10 vapor generation; ETOHVolume 5.0
+        // puts the ethanol weight at least(10, 5)/10 = 0.5, so
+        // ethanolWeightedTVG = 3D·0.5 + D·0.5 = 2D and emissionQuant = 20D.
         let mut inputs = minimal_inputs();
         inputs.tank_vapor_gen_coeffs[1].tvg_term_a = 3.0;
         inputs.average_tank_gasoline[0].etoh_volume = 5.0;
@@ -4230,8 +4230,8 @@ mod tests {
 
     #[test]
     fn calculate_clamps_negative_cumulative_tvv_to_zero() {
- // A large negative tvvTermA drives tankVaporVented below zero; the
- // SQL `greatest(…, 0)` floors it, so the emission is exactly zero.
+        // A large negative tvvTermA drives tankVaporVented below zero; the
+        // SQL `greatest(…, 0)` floors it, so the emission is exactly zero.
         let mut inputs = minimal_inputs();
         inputs.cum_tvv_coeffs[0].tvv_term_a = -100.0;
         let rows = run(&inputs);
@@ -4241,8 +4241,8 @@ mod tests {
 
     #[test]
     fn calculate_handles_the_operating_mode_emission_rate_path() {
- // An EmissionRateByAge row drives the opModeID-300 insert, which
- // bypasses the TVG chain: weightedMeanBaseRate = 4.0.
+        // An EmissionRateByAge row drives the opModeID-300 insert, which
+        // bypasses the TVG chain: weightedMeanBaseRate = 4.0.
         let mut inputs = minimal_inputs();
         inputs.emission_rate_by_age = vec![EmissionRateByAgeRow {
             source_bin_id: 500_000,
@@ -4261,9 +4261,9 @@ mod tests {
             op_mode_fraction: 1.0,
         });
         let rows = run(&inputs);
- // The opMode-151 venting row plus the opMode-300 operating row.
+        // The opMode-151 venting row plus the opMode-300 operating row.
         assert_eq!(rows.len(), 2);
- // opMode-300: weightedMeanBaseRate 4.0 × sourceHours 10 × fraction 1.
+        // opMode-300: weightedMeanBaseRate 4.0 × sourceHours 10 × fraction 1.
         assert!(
             rows.iter().any(|r| (r.emission_quant - 40.0).abs() < 1e-9),
             "missing the operating-mode emission row",
@@ -4272,7 +4272,7 @@ mod tests {
 
     #[test]
     fn calculate_skips_fuel_type_not_subject_to_evap() {
- // FuelType.subjectToEvapCalculations = 'N' drops every TVV-8 row.
+        // FuelType.subjectToEvapCalculations = 'N' drops every TVV-8 row.
         let mut inputs = minimal_inputs();
         inputs.fuel_type[0].subject_to_evap_calculations = false;
         assert!(run(&inputs).is_empty());
@@ -4280,7 +4280,7 @@ mod tests {
 
     #[test]
     fn calculate_drops_row_without_op_mode_distribution() {
- // TVV-9 inner-joins OpModeDistribution; with none, no output.
+        // TVV-9 inner-joins OpModeDistribution; with none, no output.
         let mut inputs = minimal_inputs();
         inputs.op_mode_distribution.clear();
         assert!(run(&inputs).is_empty());
@@ -4288,8 +4288,8 @@ mod tests {
 
     #[test]
     fn calculate_output_is_sorted_by_dimension_key_then_quant() {
- // The operating-mode fixture yields two rows sharing a dimension
- // key (opModeID is not an output column); they come back ordered.
+        // The operating-mode fixture yields two rows sharing a dimension
+        // key (opModeID is not an output column); they come back ordered.
         let mut inputs = minimal_inputs();
         inputs.emission_rate_by_age = vec![EmissionRateByAgeRow {
             source_bin_id: 500_000,
@@ -4349,7 +4349,7 @@ mod tests {
         let peaks = peak_hour_of_cold_soak(&inputs);
         assert_eq!(peaks.len(), 1);
         assert_eq!(peaks[0].month_id, 7);
- // Hours 2 and 3 tie at 70.0 °F; the earlier hour wins.
+        // Hours 2 and 3 tie at 70.0 °F; the earlier hour wins.
         assert_eq!(peaks[0].peak_hour_id, 2);
     }
 
@@ -4370,15 +4370,15 @@ mod tests {
             hour_day_id: hour_id * 10 + 5,
             prior_hour_id,
         };
- // Hour 1 → cumulative 3.0; hour 2 → cumulative 5.0, prior hour 1.
+        // Hour 1 → cumulative 3.0; hour 2 → cumulative 5.0, prior hour 1.
         let cumulative = vec![row(1, 24, 3.0), row(2, 1, 5.0)];
         let out = unweighted_hourly_tvv(&cumulative, 90);
         assert_eq!(out.len(), 2);
- // Hour 1 has no prior row: unweighted = cumulative = 3.0.
+        // Hour 1 has no prior row: unweighted = cumulative = 3.0.
         let h1 = out.iter().find(|u| u.hour_day_id == 15).unwrap();
         assert_eq!(h1.unweighted_hourly_tvv, 3.0);
         assert_eq!(h1.zone_id, 90);
- // Hour 2's prior is hour 1: unweighted = 5.0 − 3.0 = 2.0.
+        // Hour 2's prior is hour 1: unweighted = 5.0 − 3.0 = 2.0.
         let h2 = out.iter().find(|u| u.hour_day_id == 25).unwrap();
         assert_eq!(h2.unweighted_hourly_tvv, 2.0);
     }
@@ -4441,10 +4441,10 @@ mod tests {
             peak_hour_id: 2,
         }];
         let out = hourly_tvv(&inputs, &unweighted, &peak);
- // Part A: the peak-hour row (hourDay 25) = 100.0 × fraction 1.0.
+        // Part A: the peak-hour row (hourDay 25) = 100.0 × fraction 1.0.
         let at_peak = out.iter().find(|h| h.hour_day_id == 25).unwrap();
         assert_eq!(at_peak.hourly_tvv, 100.0);
- // Part B: four decay hours scaled 0.0200 / 0.0100 / 0.0040 / 0.0005.
+        // Part B: four decay hours scaled 0.0200 / 0.0100 / 0.0040 / 0.0005.
         let decay = |hour_day_id| out.iter().find(|h| h.hour_day_id == hour_day_id).unwrap();
         assert_quant(decay(35).hourly_tvv, 2.0);
         assert_quant(decay(45).hourly_tvv, 1.0);
@@ -4477,7 +4477,7 @@ mod tests {
 
     #[test]
     fn calculator_registers_thc_evap_fuel_vapor_venting() {
- // One Registration directive: pollutant 1 (THC) × process 12.
+        // One Registration directive: pollutant 1 (THC) × process 12.
         let calc = TankVaporVentingCalculator::new();
         let regs = calc.registrations();
         assert_eq!(regs.len(), 1);
@@ -4489,8 +4489,8 @@ mod tests {
     fn calculator_declares_input_tables_and_no_upstream() {
         let calc = TankVaporVentingCalculator::new();
         let tables = calc.input_tables();
- // execute() delegates to MultidayTankVaporVentingCalculator, so the
- // input-table set is the multiday set (stmyTVVEquations replaces CumTVVCoeffs).
+        // execute() delegates to MultidayTankVaporVentingCalculator, so the
+        // input-table set is the multiday set (stmyTVVEquations replaces CumTVVCoeffs).
         for expected in [
             "stmyTVVEquations",
             "stmyTVVCoeffs",
@@ -4503,44 +4503,44 @@ mod tests {
         ] {
             assert!(tables.contains(&expected), "missing input table {expected}");
         }
- // `calculator-dag.json` records `depends_on: []`.
+        // `calculator-dag.json` records `depends_on: []`.
         assert!(calc.upstream().is_empty());
     }
 
- /// execute() is a one-liner that delegates to MultidayTankVaporVentingCalculator;
- /// the multiday calculator's own test suite covers the end-to-end execute path.
- /// This test just verifies the delegation compiles with the correct trait impl.
+    /// execute() is a one-liner that delegates to MultidayTankVaporVentingCalculator;
+    /// the multiday calculator's own test suite covers the end-to-end execute path.
+    /// This test just verifies the delegation compiles with the correct trait impl.
     #[test]
     fn execute_delegates_to_multiday() {
         use moves_framework::Calculator;
         let calc = TankVaporVentingCalculator::new();
- // The calculator is object-safe and the delegation compiles.
+        // The calculator is object-safe and the delegation compiles.
         let _boxed: Box<dyn Calculator> = Box::new(calc);
     }
 
- /// Golden row-level test using real coefficients from the
- /// `characterization/snapshots/process-evap-fvv` fixture for
- /// sourceType=21, modelYear=2010, August (month=8), hourDay=172 (weekday
- /// 5 p.m. peak, zone=261610 Washtenaw County MI).
- ///
- /// AverageTankGasoline (empty in snapshot) is supplied synthetically with
- /// ETOHVolume=0.0 so the ethanol weight is 0 and EthanolWeightedTVG = TVG₀.
- /// Only hours 16 and 17 are modelled; hour=17 is the peak, so the
- /// TVV-6 prior-hour lookup for hour=16 finds nothing (prior TVV = 0).
- /// No post-peak decay rows are produced (HourDay rows for hours 18–21 are
- /// absent). OpModeDistribution and SourceHours are supplied synthetically.
- ///
- /// Hand-derived chain (TVV-3 → TVV-9, no I/M):
- /// TVG₀ = 0.008170 × exp(0.2357×9) × (exp(0.0409×81.8977) − exp(0.0409×81.8084))
- /// = 0.007079336599388528
- /// ewTVG = TVG₀ × 1.0 (ETOHVol 0.0 → f=0)
- /// = 0.007079336599388528
- /// cumTVV = 0.0 + ewTVG × (0.269 + 0.053×ewTVG)
- /// = 0.0019069977465899486
- /// uhTVV = cumTVV − 0.0 = 0.0019069977465899486 (no prior hour)
- /// hTVV = 1.0 × uhTVV = 0.0019069977465899486 (CSIF frac=1.0)
- /// wMBR = 0.935510 × hTVV = 0.0017840154619123626
- /// emit = wMBR × 24.1821 × 1.0 / 2.0 = 0.02157062015075547
+    /// Golden row-level test using real coefficients from the
+    /// `characterization/snapshots/process-evap-fvv` fixture for
+    /// sourceType=21, modelYear=2010, August (month=8), hourDay=172 (weekday
+    /// 5 p.m. peak, zone=261610 Washtenaw County MI).
+    ///
+    /// AverageTankGasoline (empty in snapshot) is supplied synthetically with
+    /// ETOHVolume=0.0 so the ethanol weight is 0 and EthanolWeightedTVG = TVG₀.
+    /// Only hours 16 and 17 are modelled; hour=17 is the peak, so the
+    /// TVV-6 prior-hour lookup for hour=16 finds nothing (prior TVV = 0).
+    /// No post-peak decay rows are produced (HourDay rows for hours 18–21 are
+    /// absent). OpModeDistribution and SourceHours are supplied synthetically.
+    ///
+    /// Hand-derived chain (TVV-3 → TVV-9, no I/M):
+    /// TVG₀ = 0.008170 × exp(0.2357×9) × (exp(0.0409×81.8977) − exp(0.0409×81.8084))
+    /// = 0.007079336599388528
+    /// ewTVG = TVG₀ × 1.0 (ETOHVol 0.0 → f=0)
+    /// = 0.007079336599388528
+    /// cumTVV = 0.0 + ewTVG × (0.269 + 0.053×ewTVG)
+    /// = 0.0019069977465899486
+    /// uhTVV = cumTVV − 0.0 = 0.0019069977465899486 (no prior hour)
+    /// hTVV = 1.0 × uhTVV = 0.0019069977465899486 (CSIF frac=1.0)
+    /// wMBR = 0.935510 × hTVV = 0.0017840154619123626
+    /// emit = wMBR × 24.1821 × 1.0 / 2.0 = 0.02157062015075547
     #[test]
     fn calculate_snapshot_golden_sourcetype21_modelyear2010_august_hour17() {
         let ctx = RunContext {
@@ -4724,7 +4724,7 @@ mod tests {
 
     #[test]
     fn calculator_is_object_safe() {
- // The registry stores calculators as `Box<dyn Calculator>`.
+        // The registry stores calculators as `Box<dyn Calculator>`.
         let calc: Box<dyn Calculator> = Box::new(TankVaporVentingCalculator::new());
         assert_eq!(calc.name(), "TankVaporVentingCalculator");
         assert_eq!(calc.registrations().len(), 1);

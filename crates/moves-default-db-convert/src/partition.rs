@@ -28,9 +28,9 @@ const COUNTY_LIKE: &[&str] = &["countyID", "zoneID", "stateID"];
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PartitionSpec {
     pub strategy: PartitionStrategy,
- /// Ordered list of (column-name, path-label) pairs. Empty for
- /// monolithic and schema-only strategies. Path-label is the prefix
- /// that appears in directory components (`county=42/...`).
+    /// Ordered list of (column-name, path-label) pairs. Empty for
+    /// monolithic and schema-only strategies. Path-label is the prefix
+    /// that appears in directory components (`county=42/...`).
     pub columns: Vec<PartitionColumn>,
 }
 

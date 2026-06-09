@@ -103,7 +103,7 @@ const BMY_EVAP_SLOTS: [usize; 7] = [13, 7, 14, 15, 16, 8, 9];
 /// cosmetic, but it is reproduced so the array matches the source.
 fn combine_hose(emissions: &[f32; MXPOL]) -> [f32; MXPOL] {
     let mut tmp = *emissions;
- // 1-based IDXHOS=10, IDXNCK=11, IDXSR=12, IDXVNT=13 → 0-based 9..=12.
+    // 1-based IDXHOS=10, IDXNCK=11, IDXSR=12, IDXVNT=13 → 0-based 9..=12.
     tmp[9] = emissions[9] + emissions[10] + emissions[11] + emissions[12];
     tmp[10] = 0.0;
     tmp[11] = 0.0;
@@ -132,18 +132,18 @@ fn push_optional(line: &mut String, value: f32) {
 /// `ismtyp`, one of the `IDXTYP`/`IDXTOT` parameters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SummaryKind {
- /// `IDXTYP` — a typical day within the period.
+    /// `IDXTYP` — a typical day within the period.
     TypicalDay,
- /// `IDXTOT` — the period total.
+    /// `IDXTOT` — the period total.
     PeriodTotal,
 }
 
 /// Which typical day a [`SummaryKind::TypicalDay`] run reports/// Fortran `iday`, one of `IDXWKD`/`IDXWKE`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DayKind {
- /// `IDXWKD` — a typical weekday.
+    /// `IDXWKD` — a typical weekday.
     Weekday,
- /// `IDXWKE` — a typical weekend day.
+    /// `IDXWKE` — a typical weekend day.
     WeekendDay,
 }
 
@@ -151,19 +151,19 @@ pub enum DayKind {
 /// `IDXFAL`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SeasonKind {
- /// `IDXWTR`.
+    /// `IDXWTR`.
     Winter,
- /// `IDXSPR`.
+    /// `IDXSPR`.
     Spring,
- /// `IDXSUM`.
+    /// `IDXSUM`.
     Summer,
- /// `IDXFAL`.
+    /// `IDXFAL`.
     Fall,
 }
 
 impl SeasonKind {
- /// Season name as it appears in `wrthdr.f`'s period string
- /// (`:163–171` — note `Fall`, not `Autumn`).
+    /// Season name as it appears in `wrthdr.f`'s period string
+    /// (`:163–171` — note `Fall`, not `Autumn`).
     fn name(self) -> &'static str {
         match self {
             SeasonKind::Winter => "Winter",
@@ -193,8 +193,8 @@ pub enum MonthKind {
 }
 
 impl MonthKind {
- /// Month name as written into `wrthdr.f`'s period string
- /// (`:174–197`).
+    /// Month name as written into `wrthdr.f`'s period string
+    /// (`:174–197`).
     fn name(self) -> &'static str {
         match self {
             MonthKind::January => "January",
@@ -218,11 +218,11 @@ impl MonthKind {
 /// month.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PeriodKind {
- /// `IDXANN` — a full calendar year.
+    /// `IDXANN` — a full calendar year.
     Annual,
- /// `IDXSES` — one season.
+    /// `IDXSES` — one season.
     Seasonal(SeasonKind),
- /// `IDXMTH` — one month.
+    /// `IDXMTH` — one month.
     Monthly(MonthKind),
 }
 
@@ -267,23 +267,23 @@ pub fn period_string(
 /// `/perdat/` COMMON blocks.
 #[derive(Debug, Clone, Copy)]
 pub struct RunHeader<'a> {
- /// Local date/time string (Fortran `cdate` from `getime`; see
- /// [`crate::util::time::format_now`]).
+    /// Local date/time string (Fortran `cdate` from `getime`; see
+    /// [`crate::util::time::format_now`]).
     pub date: &'a str,
- /// First run-title line (Fortran `title1`).
+    /// First run-title line (Fortran `title1`).
     pub title1: &'a str,
- /// Second run-title line (Fortran `title2`).
+    /// Second run-title line (Fortran `title2`).
     pub title2: &'a str,
- /// Name of the options file used (Fortran `sysfl`).
+    /// Name of the options file used (Fortran `sysfl`).
     pub options_file: &'a str,
- /// How emissions are summed over the period (Fortran `ismtyp`).
+    /// How emissions are summed over the period (Fortran `ismtyp`).
     pub summary: SummaryKind,
- /// Which typical day, when [`SummaryKind::TypicalDay`] (Fortran
- /// `iday`); ignored for [`SummaryKind::PeriodTotal`].
+    /// Which typical day, when [`SummaryKind::TypicalDay`] (Fortran
+    /// `iday`); ignored for [`SummaryKind::PeriodTotal`].
     pub day: DayKind,
- /// The reporting period (Fortran `iprtyp`).
+    /// The reporting period (Fortran `iprtyp`).
     pub period: PeriodKind,
- /// Episode year (Fortran `iepyr`).
+    /// Episode year (Fortran `iepyr`).
     pub year: i32,
 }
 
@@ -299,9 +299,9 @@ pub fn write_data_header<W: Write>(
     header: &RunHeader<'_>,
     retrofit: bool,
 ) -> io::Result<()> {
- // --- leading dummy record: blank key fields, zero HP, and one
- // F3.0 zero per emission/quantity column (wrthdr.f :112–123).
- // The post-processor reads it to count the columns to come.
+    // --- leading dummy record: blank key fields, zero HP, and one
+    // F3.0 zero per emission/quantity column (wrthdr.f :112–123).
+    // The post-processor reads it to count the columns to come.
     let dummy_quantities = 14 + if retrofit { 7 } else { 5 };
     let mut dummy = String::from(" , , ,");
     dummy.push_str(&fortran_i(0, 5)); // idum
@@ -311,12 +311,12 @@ pub fn write_data_header<W: Write>(
     }
     writeln!(w, "{dummy}")?;
 
- // --- program name, version, date (wrthdr.f :127–130). ---
+    // --- program name, version, date (wrthdr.f :127–130). ---
     writeln!(w, "\"{}\"", fortran_a(crate::driver::run::PROGRAM_NAME, 30))?;
     writeln!(w, "\"{}\"", fortran_a(crate::driver::run::VERSION, 30))?;
     writeln!(w, "\"{}\"", &header.date[..strmin(header.date)])?;
 
- // --- title lines, options file (wrthdr.f :134–140). ---
+    // --- title lines, options file (wrthdr.f :134–140). ---
     writeln!(w, "\"{}\"", &header.title1[..strmin(header.title1)])?;
     writeln!(w, "\"{}\"", &header.title2[..strmin(header.title2)])?;
     writeln!(
@@ -325,12 +325,12 @@ pub fn write_data_header<W: Write>(
         &header.options_file[..strmin(header.options_file)]
     )?;
 
- // --- period string and units (wrthdr.f :144–207). ---
+    // --- period string and units (wrthdr.f :144–207). ---
     let (period, units) = period_string(header.summary, header.day, header.period, header.year);
     writeln!(w, "\"{period}\"")?;
     writeln!(w, "\"{units}\"")?;
 
- // --- column-name row (wrthdr.f :209–258). ---
+    // --- column-name row (wrthdr.f :209–258). ---
     let mut row = String::new();
     for name in ["Cnty", "SubR"] {
         row.push_str(&fortran_a(name, 5));
@@ -365,33 +365,33 @@ pub fn write_data_header<W: Write>(
 /// One `.OUT` data-file record — the `wrtdat.f` argument list.
 #[derive(Debug, Clone, Copy)]
 pub struct OutputRecord<'a> {
- /// County FIPS code (Fortran `fipin`, `character*5`).
+    /// County FIPS code (Fortran `fipin`, `character*5`).
     pub fips: &'a str,
- /// Subregion code (Fortran `subin`, `character*5`).
+    /// Subregion code (Fortran `subin`, `character*5`).
     pub subregion: &'a str,
- /// SCC code (Fortran `ascin`, `character*10`).
+    /// SCC code (Fortran `ascin`, `character*10`).
     pub scc: &'a str,
- /// Horsepower category; written as a truncated integer
- /// (`INT(hpin)`).
+    /// Horsepower category; written as a truncated integer
+    /// (`INT(hpin)`).
     pub hp: f32,
- /// Equipment population (Fortran `popin`); negative ⇒ empty field.
+    /// Equipment population (Fortran `popin`); negative ⇒ empty field.
     pub population: f32,
- /// Fuel consumption (Fortran `fulin`); negative ⇒ empty field.
+    /// Fuel consumption (Fortran `fulin`); negative ⇒ empty field.
     pub fuel_consumption: f32,
- /// Activity (Fortran `actin`); negative ⇒ empty field.
+    /// Activity (Fortran `actin`); negative ⇒ empty field.
     pub activity: f32,
- /// Load factor (Fortran `ldfcin`); negative ⇒ empty field.
+    /// Load factor (Fortran `ldfcin`); negative ⇒ empty field.
     pub load_factor: f32,
- /// Average horsepower (Fortran `hpavin`); negative ⇒ empty field.
+    /// Average horsepower (Fortran `hpavin`); negative ⇒ empty field.
     pub hp_avg: f32,
- /// Fraction of the population retrofitted (Fortran `fracretro`);
- /// emitted only when `retrofit` is set, negative ⇒ empty field.
+    /// Fraction of the population retrofitted (Fortran `fracretro`);
+    /// emitted only when `retrofit` is set, negative ⇒ empty field.
     pub frac_retrofit: f32,
- /// Count of units retrofitted (Fortran `unitsretro`); emitted
- /// only when `retrofit` is set, negative ⇒ empty field.
+    /// Count of units retrofitted (Fortran `unitsretro`); emitted
+    /// only when `retrofit` is set, negative ⇒ empty field.
     pub units_retrofit: f32,
- /// Per-pollutant emissions, indexed by 0-based pollutant slot
- /// ([`crate::emissions::exhaust::PollutantIndex::slot`]).
+    /// Per-pollutant emissions, indexed by 0-based pollutant slot
+    /// ([`crate::emissions::exhaust::PollutantIndex::slot`]).
     pub emissions: [f32; MXPOL],
 }
 
@@ -408,7 +408,7 @@ pub fn write_data_record<W: Write>(
 ) -> io::Result<()> {
     let mut line = String::new();
 
- // --- key identifiers (wrtdat.f :137–138, format 9000). ---
+    // --- key identifiers (wrtdat.f :137–138, format 9000). ---
     line.push_str(&fortran_a(record.fips, 5));
     line.push(',');
     line.push_str(&fortran_a(record.subregion, 5));
@@ -417,30 +417,30 @@ pub fn write_data_record<W: Write>(
     line.push(',');
     line.push_str(&fortran_i(record.hp.trunc() as i64, 5));
 
- // --- population (wrtdat.f :140–144). ---
+    // --- population (wrtdat.f :140–144). ---
     push_optional(&mut line, record.population);
 
- // --- emission columns, hose-combined and re-ordered
- // (wrtdat.f :155–164). ---
+    // --- emission columns, hose-combined and re-ordered
+    // (wrtdat.f :155–164). ---
     let tmpemis = combine_hose(&record.emissions);
     for slot in OUT_EMISSION_SLOTS {
         push_optional(&mut line, tmpemis[slot]);
     }
 
- // --- fuel, activity, load factor, average HP
- // (wrtdat.f :173–196). ---
+    // --- fuel, activity, load factor, average HP
+    // (wrtdat.f :173–196). ---
     push_optional(&mut line, record.fuel_consumption);
     push_optional(&mut line, record.activity);
     push_optional(&mut line, record.load_factor);
     push_optional(&mut line, record.hp_avg);
 
- // --- retrofit columns (wrtdat.f :197–210). ---
+    // --- retrofit columns (wrtdat.f :197–210). ---
     if retrofit {
         push_optional(&mut line, record.frac_retrofit);
         push_optional(&mut line, record.units_retrofit);
     }
 
- // --- the record carries a trailing comma (wrtdat.f :214). ---
+    // --- the record carries a trailing comma (wrtdat.f :214). ---
     line.push(',');
     writeln!(w, "{line}")
 }
@@ -456,14 +456,14 @@ pub fn write_data_record<W: Write>(
 /// sets; this selects between them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ByModelYearKind {
- /// `iexev = 1` — the exhaust by-model-year file (`bmyfl`).
+    /// `iexev = 1` — the exhaust by-model-year file (`bmyfl`).
     Exhaust,
- /// `iexev = 2` — the evaporative by-model-year file (`evbmyfl`).
+    /// `iexev = 2` — the evaporative by-model-year file (`evbmyfl`).
     Evaporative,
 }
 
 impl ByModelYearKind {
- /// The seven emission-column heading/slot pairs for this file.
+    /// The seven emission-column heading/slot pairs for this file.
     fn species(self) -> (&'static [&'static str], &'static [usize; 7]) {
         match self {
             ByModelYearKind::Exhaust => (
@@ -506,7 +506,7 @@ pub fn write_bmy_header<W: Write>(
 ) -> io::Result<()> {
     let mut row = String::new();
 
- // --- key columns (hdrbmy.f :104–111, format 9000). ---
+    // --- key columns (hdrbmy.f :104–111, format 9000). ---
     for (name, width) in [
         ("Cnty", 5),
         ("SubR", 5),
@@ -520,15 +520,15 @@ pub fn write_bmy_header<W: Write>(
         row.push(',');
     }
 
- // --- emission species (hdrbmy.f :137–156). ---
+    // --- emission species (hdrbmy.f :137–156). ---
     let (species, _) = kind.species();
     for name in species {
         row.push_str(&fortran_a(name, 15));
         row.push(',');
     }
 
- // --- fuel/activity, and (exhaust only) LF/HPAvg/retrofit
- // (hdrbmy.f :158–177). ---
+    // --- fuel/activity, and (exhaust only) LF/HPAvg/retrofit
+    // (hdrbmy.f :158–177). ---
     let mut trailing = vec!["FuelCons.", "Activity"];
     if kind == ByModelYearKind::Exhaust {
         trailing.push("LF");
@@ -548,38 +548,38 @@ pub fn write_bmy_header<W: Write>(
 /// One by-model-year record — the `wrtbmy.f` argument list.
 #[derive(Debug, Clone, Copy)]
 pub struct ByModelYearRecord<'a> {
- /// County FIPS code (Fortran `fipin`, `character*5`).
+    /// County FIPS code (Fortran `fipin`, `character*5`).
     pub fips: &'a str,
- /// Subregion code (Fortran `subin`, `character*5`).
+    /// Subregion code (Fortran `subin`, `character*5`).
     pub subregion: &'a str,
- /// SCC code (Fortran `ascin`, `character*10`).
+    /// SCC code (Fortran `ascin`, `character*10`).
     pub scc: &'a str,
- /// Horsepower category; written as a truncated integer
- /// (`INT(hpin)`).
+    /// Horsepower category; written as a truncated integer
+    /// (`INT(hpin)`).
     pub hp: f32,
- /// Technology-type name (Fortran `tecin`, `character*10`).
+    /// Technology-type name (Fortran `tecin`, `character*10`).
     pub tech_type: &'a str,
- /// Model year (Fortran `iyrin`).
+    /// Model year (Fortran `iyrin`).
     pub model_year: i32,
- /// Equipment population (Fortran `popin`); always written.
+    /// Equipment population (Fortran `popin`); always written.
     pub population: f32,
- /// Fuel consumption (Fortran `fulin`); negative ⇒ empty field.
+    /// Fuel consumption (Fortran `fulin`); negative ⇒ empty field.
     pub fuel_consumption: f32,
- /// Activity (Fortran `actin`); negative ⇒ empty field.
+    /// Activity (Fortran `actin`); negative ⇒ empty field.
     pub activity: f32,
- /// Load factor (Fortran `ldfcin`, exhaust only); negative ⇒
- /// empty field.
+    /// Load factor (Fortran `ldfcin`, exhaust only); negative ⇒
+    /// empty field.
     pub load_factor: f32,
- /// Average horsepower (Fortran `hpavin`, exhaust only); negative
- /// ⇒ empty field.
+    /// Average horsepower (Fortran `hpavin`, exhaust only); negative
+    /// ⇒ empty field.
     pub hp_avg: f32,
- /// Fraction retrofitted (Fortran `fracretro`, exhaust + retrofit
- /// only); negative ⇒ empty field.
+    /// Fraction retrofitted (Fortran `fracretro`, exhaust + retrofit
+    /// only); negative ⇒ empty field.
     pub frac_retrofit: f32,
- /// Count retrofitted (Fortran `unitsretro`, exhaust + retrofit
- /// only); negative ⇒ empty field.
+    /// Count retrofitted (Fortran `unitsretro`, exhaust + retrofit
+    /// only); negative ⇒ empty field.
     pub units_retrofit: f32,
- /// Per-pollutant emissions, indexed by 0-based pollutant slot.
+    /// Per-pollutant emissions, indexed by 0-based pollutant slot.
     pub emissions: [f32; MXPOL],
 }
 
@@ -598,7 +598,7 @@ pub fn write_bmy_record<W: Write>(
 ) -> io::Result<()> {
     let mut line = String::new();
 
- // --- key identifiers (wrtbmy.f :151–157, format 9000). ---
+    // --- key identifiers (wrtbmy.f :151–157, format 9000). ---
     line.push_str(&fortran_a(record.fips, 5));
     line.push(',');
     line.push_str(&fortran_a(record.subregion, 5));
@@ -613,8 +613,8 @@ pub fn write_bmy_record<W: Write>(
     line.push(',');
     line.push_str(&fortran_e(record.population, 15, 8));
 
- // --- emission columns: hose-combined, always written
- // (wrtbmy.f :169–190). ---
+    // --- emission columns: hose-combined, always written
+    // (wrtbmy.f :169–190). ---
     let tmpemis = combine_hose(&record.emissions);
     let (_, slots) = kind.species();
     for &slot in slots {
@@ -622,11 +622,11 @@ pub fn write_bmy_record<W: Write>(
         line.push_str(&fortran_e(tmpemis[slot], 15, 8));
     }
 
- // --- fuel and activity (wrtbmy.f :197–209). ---
+    // --- fuel and activity (wrtbmy.f :197–209). ---
     push_optional(&mut line, record.fuel_consumption);
     push_optional(&mut line, record.activity);
 
- // --- exhaust-only quantity columns (wrtbmy.f :211–241). ---
+    // --- exhaust-only quantity columns (wrtbmy.f :211–241). ---
     if kind == ByModelYearKind::Exhaust {
         push_optional(&mut line, record.load_factor);
         push_optional(&mut line, record.hp_avg);
@@ -636,7 +636,7 @@ pub fn write_bmy_record<W: Write>(
         }
     }
 
- // --- trailing comma (wrtbmy.f :245). ---
+    // --- trailing comma (wrtbmy.f :245). ---
     line.push(',');
     writeln!(w, "{line}")
 }
@@ -659,23 +659,23 @@ const AMS_SAROAD: [(i64, &str); 5] = [
 /// COMMON blocks `/epschr/` and `/epsdat/` (`nonrdeqp.inc`).
 #[derive(Debug, Clone, Copy)]
 pub struct AmsHeader<'a> {
- /// Inventory type (Fortran `itype`, `character*1`).
+    /// Inventory type (Fortran `itype`, `character*1`).
     pub inventory_type: &'a str,
- /// Reference year of the inventory (Fortran `irefyr`, written
- /// `I2` — the EPS2 format expects a two-digit year).
+    /// Reference year of the inventory (Fortran `irefyr`, written
+    /// `I2` — the EPS2 format expects a two-digit year).
     pub reference_year: i32,
- /// Base year of the inventory (Fortran `ibasyr`, written `I2`).
+    /// Base year of the inventory (Fortran `ibasyr`, written `I2`).
     pub base_year: i32,
- /// Emissions type (Fortran `inetyp`, `character*2`).
+    /// Emissions type (Fortran `inetyp`, `character*2`).
     pub emission_type: &'a str,
- /// Inventory period code (Fortran `iperod`, `character*2`).
+    /// Inventory period code (Fortran `iperod`, `character*2`).
     pub period_code: &'a str,
- /// Inventory begin date/time (Fortran `ibegdt`).
+    /// Inventory begin date/time (Fortran `ibegdt`).
     pub begin_date: i32,
- /// Inventory end date/time (Fortran `ienddt`).
+    /// Inventory end date/time (Fortran `ienddt`).
     pub end_date: i32,
- /// Factor converting emissions to the AMS reporting period
- /// (Fortran `cvtams`).
+    /// Factor converting emissions to the AMS reporting period
+    /// (Fortran `cvtams`).
     pub period_conversion: f32,
 }
 
@@ -683,10 +683,10 @@ pub struct AmsHeader<'a> {
 /// Fortran `emsams(NCNTY,MXPOL)` array plus its FIPS code.
 #[derive(Debug, Clone, Copy)]
 pub struct AmsCountyEmissions<'a> {
- /// County FIPS code (Fortran `fipcod(idxfip)`, `character*5`).
+    /// County FIPS code (Fortran `fipcod(idxfip)`, `character*5`).
     pub fips: &'a str,
- /// Per-pollutant emissions for this county, indexed by 0-based
- /// pollutant slot.
+    /// Per-pollutant emissions for this county, indexed by 0-based
+    /// pollutant slot.
     pub emissions: [f32; MXPOL],
 }
 
@@ -697,8 +697,8 @@ pub struct AmsCountyEmissions<'a> {
 /// are taken directly. Every total is scaled by the AMS
 /// period-conversion factor.
 fn ams_pollutant_totals(emissions: &[f32; MXPOL], period_conversion: f32) -> [f32; 5] {
- // 0-based slots: THC=0, CO=1, NOX=2, PM=5, CRA=6, DIU=7,
- // DIS=14, SPL=15, RLS=16, SOX=4.
+    // 0-based slots: THC=0, CO=1, NOX=2, PM=5, CRA=6, DIU=7,
+    // DIS=14, SPL=15, RLS=16, SOX=4.
     let hc =
         emissions[0] + emissions[6] + emissions[7] + emissions[14] + emissions[15] + emissions[16];
     [
@@ -767,9 +767,9 @@ fn ams_record(header: &AmsHeader<'_>, scc: &str, fips: &str, saroad: i64, value:
     line.push(' '); // 1X
     line.push_str(&fortran_a(" ", 3)); // A3 ' '
 
- // 36 trailing `-9` fillers: 3(1X,I5), 1X,I3, 28(I5,1X), then
- // four of 5(1X,I10) — the list of 36 runs out one item into the
- // last group (wrtams.f format 9000, data `(-9,i=1,36)`).
+    // 36 trailing `-9` fillers: 3(1X,I5), 1X,I3, 28(I5,1X), then
+    // four of 5(1X,I10) — the list of 36 runs out one item into the
+    // last group (wrtams.f format 9000, data `(-9,i=1,36)`).
     for _ in 0..3 {
         line.push(' ');
         line.push_str(&fortran_i(-9, 5));
@@ -792,7 +792,7 @@ fn ams_record(header: &AmsHeader<'_>, scc: &str, fips: &str, saroad: i64, value:
 mod tests {
     use super::*;
 
- /// Decode a writer's output to a `String` for assertions.
+    /// Decode a writer's output to a `String` for assertions.
     fn rendered<F>(f: F) -> String
     where
         F: FnOnce(&mut Vec<u8>) -> io::Result<()>,
@@ -806,7 +806,7 @@ mod tests {
         [0.0; MXPOL]
     }
 
- // ---- period_string ----
+    // ---- period_string ----
 
     #[test]
     fn period_string_total_annual() {
@@ -862,7 +862,7 @@ mod tests {
         assert_eq!(units, "Tons/Month");
     }
 
- // ---- combine_hose ----
+    // ---- combine_hose ----
 
     #[test]
     fn combine_hose_folds_rec_marine_into_hose_slot() {
@@ -878,7 +878,7 @@ mod tests {
         assert_eq!(tmp[12], 0.0);
     }
 
- // ---- wrthdr ----
+    // ---- wrthdr ----
 
     #[test]
     fn data_header_has_ten_lines_without_retrofit() {
@@ -894,8 +894,8 @@ mod tests {
         };
         let out = rendered(|w| write_data_header(w, &header, false));
         let lines: Vec<&str> = out.lines().collect();
- // dummy, program, version, date, title1, title2, options,
- // period, units, column row.
+        // dummy, program, version, date, title1, title2, options,
+        // period, units, column row.
         assert_eq!(lines.len(), 10);
         assert!(lines[1].contains("NONROAD Emissions Model"));
         assert_eq!(lines[3], "\"Jan 01 00:00:00: 2020\"");
@@ -904,7 +904,7 @@ mod tests {
         assert_eq!(lines[6], "Options file used: test.opt");
         assert_eq!(lines[7], "\"Total for year: 2020\"");
         assert_eq!(lines[8], "\"Tons/Year\"");
- // Column row: 5 key columns + 14 species + 4 trailing.
+        // Column row: 5 key columns + 14 species + 4 trailing.
         assert!(lines[9].starts_with("Cnty ,SubR ,SCC       ,HP   ,Population     ,"));
         assert!(lines[9].contains("THC-Exhaust    ,"));
         assert!(lines[9].contains("HosePerm       ,"));
@@ -925,16 +925,16 @@ mod tests {
         };
         let without = rendered(|w| write_data_header(w, &header, false));
         let with = rendered(|w| write_data_header(w, &header, true));
- // Dummy record: " , , ," + I5 + "," then one " 0.," per
- // quantity column — 19 without retrofit, 21 with.
+        // Dummy record: " , , ," + I5 + "," then one " 0.," per
+        // quantity column — 19 without retrofit, 21 with.
         assert_eq!(without.lines().next().unwrap().matches(" 0.,").count(), 19);
         assert_eq!(with.lines().next().unwrap().matches(" 0.,").count(), 21);
- // Retrofit header carries the two extra column names.
+        // Retrofit header carries the two extra column names.
         assert!(with.lines().last().unwrap().contains("FracRetro"));
         assert!(with.lines().last().unwrap().contains("UnitsRetro"));
     }
 
- // ---- wrtdat ----
+    // ---- wrtdat ----
 
     #[test]
     fn data_record_key_and_trailing_comma() {
@@ -954,11 +954,11 @@ mod tests {
         };
         let out = rendered(|w| write_data_record(w, &record, false));
         let line = out.trim_end_matches('\n');
- // HP is INT-truncated to 25.
+        // HP is INT-truncated to 25.
         assert!(line.starts_with("06037,     ,2270001010,   25,"));
         assert!(line.ends_with(','));
- // 3 key separators + population + 14 emissions + 4 quantity
- // fields + 1 trailing comma.
+        // 3 key separators + population + 14 emissions + 4 quantity
+        // fields + 1 trailing comma.
         assert_eq!(line.matches(',').count(), 3 + 1 + 14 + 4 + 1);
     }
 
@@ -981,12 +981,12 @@ mod tests {
         record.emissions[0] = 1.5; // THC
         let out = rendered(|w| write_data_record(w, &record, true));
         let line = out.trim_end_matches('\n');
- // Population negative ⇒ empty: the field after the HP key is
- // just ",," (comma to open the field, comma to close it).
+        // Population negative ⇒ empty: the field after the HP key is
+        // just ",," (comma to open the field, comma to close it).
         assert!(line.contains(",   10,,"));
- // THC emission column present and formatted E15.8.
+        // THC emission column present and formatted E15.8.
         assert!(line.contains(&fortran_e(1.5, 15, 8)));
- // Retrofit columns are emitted (retrofit = true).
+        // Retrofit columns are emitted (retrofit = true).
         assert!(line.contains(&fortran_e(0.25, 15, 8)));
         assert!(line.contains(&fortran_e(40.0, 15, 8)));
     }
@@ -1013,11 +1013,11 @@ mod tests {
             emissions,
         };
         let out = rendered(|w| write_data_record(w, &record, false));
- // The final emission column (HosePerm) is the sum 1+1+1+1.
+        // The final emission column (HosePerm) is the sum 1+1+1+1.
         assert!(out.contains(&fortran_e(4.0, 15, 8)));
     }
 
- // ---- hdrbmy ----
+    // ---- hdrbmy ----
 
     #[test]
     fn bmy_header_exhaust_columns() {
@@ -1037,7 +1037,7 @@ mod tests {
         assert!(line.contains("Diurnal        ,"));
         assert!(line.contains("HosePerm       ,"));
         assert!(line.trim_end().ends_with("Activity       ,"));
- // LF / HPAvg / retrofit are exhaust-only.
+        // LF / HPAvg / retrofit are exhaust-only.
         assert!(!line.contains("HPAvg"));
         assert!(!line.contains("FracRetro"));
     }
@@ -1049,7 +1049,7 @@ mod tests {
         assert!(out.contains("UnitsRetro"));
     }
 
- // ---- wrtbmy ----
+    // ---- wrtbmy ----
 
     fn sample_bmy_record() -> ByModelYearRecord<'static> {
         ByModelYearRecord {
@@ -1077,9 +1077,9 @@ mod tests {
         let line = out.trim_end_matches('\n');
         assert!(line.starts_with("06037,     ,2270001010,   25,T2        ,2015,"));
         assert!(line.ends_with(','));
- // 6 key separators + 7 emissions + 4 quantity fields
- // (fuel/activity/LF/HPAvg) + 1 trailing comma. Population is
- // written inline with the key and adds no comma of its own.
+        // 6 key separators + 7 emissions + 4 quantity fields
+        // (fuel/activity/LF/HPAvg) + 1 trailing comma. Population is
+        // written inline with the key and adds no comma of its own.
         assert_eq!(line.matches(',').count(), 6 + 7 + 4 + 1);
     }
 
@@ -1088,8 +1088,8 @@ mod tests {
         let record = sample_bmy_record();
         let out = rendered(|w| write_bmy_record(w, &record, ByModelYearKind::Evaporative, false));
         let line = out.trim_end_matches('\n');
- // 6 key separators + 7 emissions + fuel + activity + 1
- // trailing comma; no exhaust-only LF/HPAvg/retrofit columns.
+        // 6 key separators + 7 emissions + fuel + activity + 1
+        // trailing comma; no exhaust-only LF/HPAvg/retrofit columns.
         assert_eq!(line.matches(',').count(), 6 + 7 + 2 + 1);
     }
 
@@ -1101,7 +1101,7 @@ mod tests {
         assert!(out.contains(&fortran_e(-9.0, 15, 8)));
     }
 
- // ---- wrtams ----
+    // ---- wrtams ----
 
     fn sample_ams_header() -> AmsHeader<'static> {
         AmsHeader {
@@ -1126,7 +1126,7 @@ mod tests {
             emissions,
         }];
         let out = rendered(|w| write_ams(w, &sample_ams_header(), "2270001010", &counties));
- // NOx and CO are positive; the other three pollutants are 0.
+        // NOx and CO are positive; the other three pollutants are 0.
         assert_eq!(out.lines().count(), 2);
         assert!(out.contains("42603")); // ISCNOX SAROAD code
         assert!(out.contains("42101")); // ISCCO SAROAD code
@@ -1160,7 +1160,7 @@ mod tests {
         let mut emissions = [0.0_f32; MXPOL];
         emissions[2] = 1.0;
         let line = ams_record(&sample_ams_header(), "2270001010", "06037", 42603, 1.0);
- // 3 + 1 + 28 + 4 = 36 `-9` fillers.
+        // 3 + 1 + 28 + 4 = 36 `-9` fillers.
         assert_eq!(line.matches("-9").count(), 36);
         assert!(line.starts_with("A20 20"));
         let _ = emissions;

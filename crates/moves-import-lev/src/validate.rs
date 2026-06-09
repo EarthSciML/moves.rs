@@ -34,11 +34,11 @@ pub struct TypedRow {
 /// flavors used by [`crate::schema::COLUMNS`].
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TypedValue {
- /// SQL NULL — only legal for non-required columns.
+    /// SQL NULL — only legal for non-required columns.
     Null,
- /// Signed integer parsed from [`ColumnKind::Integer`].
+    /// Signed integer parsed from [`ColumnKind::Integer`].
     Integer(i64),
- /// Finite, non-negative float parsed from [`ColumnKind::Float`].
+    /// Finite, non-negative float parsed from [`ColumnKind::Float`].
     Float(f64),
 }
 
@@ -141,8 +141,8 @@ fn primary_key_indices() -> [usize; 4] {
 }
 
 fn integer_at(values: &[TypedValue], idx: usize) -> i64 {
- // Primary-key columns are required, so this is unreachable for
- // valid inputs that survived the `required` check.
+    // Primary-key columns are required, so this is unreachable for
+    // valid inputs that survived the `required` check.
     match values[idx] {
         TypedValue::Integer(v) => v,
         _ => unreachable!("primary-key cell at index {idx} is not an integer"),
@@ -221,7 +221,7 @@ mod tests {
 
     #[test]
     fn validates_minimal_row() {
- // Only the five required columns.
+        // Only the five required columns.
         let body = b"sourceBinID,polProcessID,opModeID,ageGroupID,meanBaseRate\n\
                      1000,101,1,1,0.5\n";
         let csv = parse(p(), body).unwrap();
@@ -230,7 +230,7 @@ mod tests {
         assert_eq!(typed[0].values[0], TypedValue::Integer(1000));
         assert_eq!(typed[0].values[1], TypedValue::Integer(101));
         assert_eq!(typed[0].values[4], TypedValue::Float(0.5));
- // Optional columns absent from the header default to Null.
+        // Optional columns absent from the header default to Null.
         assert_eq!(typed[0].values[5], TypedValue::Null);
         assert_eq!(typed[0].values[8], TypedValue::Null);
     }
@@ -259,7 +259,7 @@ mod tests {
 
     #[test]
     fn rejects_missing_required_column() {
- // Drop ageGroupID.
+        // Drop ageGroupID.
         let body = b"sourceBinID,polProcessID,opModeID,meanBaseRate\n\
                      1000,101,1,0.5\n";
         let csv = parse(p(), body).unwrap();
@@ -399,7 +399,7 @@ mod tests {
 
     #[test]
     fn distinct_keys_with_one_pk_diff_ok() {
- // Differing only in ageGroupID is a legitimate distinct key.
+        // Differing only in ageGroupID is a legitimate distinct key.
         let body = b"sourceBinID,polProcessID,opModeID,ageGroupID,meanBaseRate\n\
                      1000,101,1,1,0.5\n\
                      1000,101,1,2,0.7\n";
@@ -418,7 +418,7 @@ mod tests {
 
     #[test]
     fn zero_rate_is_accepted() {
- // 0 is a legal rate (e.g., zero-emission technology).
+        // 0 is a legal rate (e.g., zero-emission technology).
         let body = b"sourceBinID,polProcessID,opModeID,ageGroupID,meanBaseRate\n\
                      1000,101,1,1,0\n";
         let csv = parse(p(), body).unwrap();

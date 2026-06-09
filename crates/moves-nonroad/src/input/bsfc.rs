@@ -21,7 +21,7 @@ pub use super::emfc::EmissionFactorRecord;
 /// Where to find the BSFC bundle.
 #[derive(Debug, Clone)]
 pub struct BsfcSource {
- /// Path on disk.
+    /// Path on disk.
     pub path: PathBuf,
 }
 
@@ -43,18 +43,18 @@ mod tests {
 
     #[test]
     fn loads_empty_bsfc_packet() {
- // BSFC file with no data lines (header only); parser
- // returns no records but does not error.
+        // BSFC file with no data lines (header only); parser
+        // returns no records but does not error.
         let mut f = NamedTempFile::new().unwrap();
- // Header with units at col 35, "BSFC" at col 45, no
- // tech-type columns → zero records.
+        // Header with units at col 35, "BSFC" at col 45, no
+        // tech-type columns → zero records.
         let header = format!(
             "{:5}{:<10}{:<5}{:<5}{:<5}{:<10}{:<10}",
             "", "2270001000", "", " 25.0", " 50.0", "G/HP-HR", "BSFC"
         );
- // Format: cols 1-5 blank, 6-15 SCC, 16-20 blank, 21-25
- // hp_min, 26-30 hp_max, 31-34 blank, 35-44 units, 45-54
- // pollutant. Build explicitly.
+        // Format: cols 1-5 blank, 6-15 SCC, 16-20 blank, 21-25
+        // hp_min, 26-30 hp_max, 31-34 blank, 35-44 units, 45-54
+        // pollutant. Build explicitly.
         let mut line = String::new();
         line.push_str("     "); // 1-5
         line.push_str("2270001000"); // 6-15

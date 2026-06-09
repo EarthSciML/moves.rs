@@ -53,29 +53,29 @@ use std::path::{Path, PathBuf};
 /// One parsed population record from a `.POP` file.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PopulationRecord {
- /// FIPS region code (state || county; 5 chars, left-justified).
+    /// FIPS region code (state || county; 5 chars, left-justified).
     pub fips: String,
- /// Subregion code (5 chars).
+    /// Subregion code (5 chars).
     pub subregion: String,
- /// Calendar year.
+    /// Calendar year.
     pub year: i32,
- /// SCC equipment code (10 chars).
+    /// SCC equipment code (10 chars).
     pub scc: String,
- /// Horsepower-category lower bound.
+    /// Horsepower-category lower bound.
     pub hp_min: f32,
- /// Horsepower-category upper bound.
+    /// Horsepower-category upper bound.
     pub hp_max: f32,
- /// Horsepower-category midpoint (`(hp_min + hp_max) / 2` if
- /// blank in the file).
+    /// Horsepower-category midpoint (`(hp_min + hp_max) / 2` if
+    /// blank in the file).
     pub hp_avg: f32,
- /// Usage factor (annual hours, etc.).
+    /// Usage factor (annual hours, etc.).
     pub usage: f32,
- /// Technology/distribution code (10 chars, left-justified).
+    /// Technology/distribution code (10 chars, left-justified).
     pub tech_code: String,
- /// Equipment population. `getpop.f` :211 reads this field into
- /// `valtmp`, a `real*4`; the port keeps it `f32` so the value
- /// carries exactly the single-precision rounding the Fortran
- /// reference does.
+    /// Equipment population. `getpop.f` :211 reads this field into
+    /// `valtmp`, a `real*4`; the port keeps it `f32` so the value
+    /// carries exactly the single-precision rounding the Fortran
+    /// reference does.
     pub population: f32,
 }
 
@@ -111,10 +111,10 @@ pub fn read_pop<R: BufRead>(reader: R) -> Result<Vec<PopulationRecord>> {
             break;
         }
 
- // Blank lines inside the packet are tolerated (the Fortran
- // parser would treat them as records with empty fields and
- // bail out on the numeric reads; we skip them to avoid
- // confusing error messages on whitespace).
+        // Blank lines inside the packet are tolerated (the Fortran
+        // parser would treat them as records with empty fields and
+        // bail out on the numeric reads; we skip them to avoid
+        // confusing error messages on whitespace).
         if line.trim().is_empty() {
             continue;
         }
@@ -261,8 +261,8 @@ mod tests {
         tech: &str,
         pop: &str,
     ) -> String {
- // Build a 122-char fixed-width record matching rdpop.f /
- // getpop.f column layout.
+        // Build a 122-char fixed-width record matching rdpop.f /
+        // getpop.f column layout.
         let mut buf = vec![b' '; 130];
         let put = |buf: &mut [u8], start_1based: usize, value: &str, width: usize| {
             let start = start_1based - 1;
@@ -274,7 +274,7 @@ mod tests {
         put(&mut buf, 7, sub, 5);
         put(&mut buf, 13, year, 4);
         put(&mut buf, 18, scc, 10);
- // right-justify HP fields in 5-char slot
+        // right-justify HP fields in 5-char slot
         let put_right = |buf: &mut [u8], start_1based: usize, value: &str, width: usize| {
             let pad = width.saturating_sub(value.len());
             let start = start_1based - 1 + pad;
@@ -462,12 +462,12 @@ mod tests {
 
     #[test]
     fn population_carries_real4_precision() {
- // 16_777_217 = 2^24 + 1 is the smallest integer that `real*4`
- // cannot represent exactly; it rounds to 16_777_216. `getpop.f`
- // :211 reads the population into `valtmp` (`real*4`), so the
- // port must round the same way. An `f64` parse would keep the
- // exact 16_777_217 and diverge from the Fortran reference
- //.
+        // 16_777_217 = 2^24 + 1 is the smallest integer that `real*4`
+        // cannot represent exactly; it rounds to 16_777_216. `getpop.f`
+        // :211 reads the population into `valtmp` (`real*4`), so the
+        // port must round the same way. An `f64` parse would keep the
+        // exact 16_777_217 and diverge from the Fortran reference
+        //.
         let line = build_pop_line(
             "06000",
             "00000",

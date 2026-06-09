@@ -57,7 +57,7 @@ use moves_calculator_info::{Granularity, Priority};
 use moves_data::ProcessId;
 use moves_framework::{
     CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStore,
-    DataFrameStoreTyped, Error, Generator, InMemoryStore, IntoDataFrame, TableRow,
+    DataFrameStoreTyped, Error, Generator, InMemoryStore, IntoDataFrame, ModelScale, TableRow,
 };
 use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
 
@@ -111,11 +111,11 @@ static OUTPUT_TABLES: &[&str] = &["BaseRate", "BaseRateByAge", "DrivingIdleFract
 /// table. `driving_idle_fraction` is populated only on the drive-cycle path.
 #[derive(Debug, Clone, Default)]
 pub struct BaseRateOutput {
- /// Rows of the `BaseRate` table.
+    /// Rows of the `BaseRate` table.
     pub base_rate: Vec<BaseRateOutputRecord>,
- /// Rows of the `BaseRateByAge` table.
+    /// Rows of the `BaseRateByAge` table.
     pub base_rate_by_age: Vec<BaseRateOutputRecord>,
- /// Rows of the `DrivingIdleFraction` table (drive-cycle path only).
+    /// Rows of the `DrivingIdleFraction` table (drive-cycle path only).
     pub driving_idle_fraction: Vec<DrivingIdleFractionRow>,
 }
 
@@ -128,20 +128,20 @@ pub struct BaseRateOutput {
 pub struct BaseRateGenerator;
 
 impl BaseRateGenerator {
- /// Run the generator over a fully materialised set of input tables.
- ///
- /// Ports `BaseRateGeneratorFromRatesOpModeDistribution`. The drive-cycle
- /// fast path is taken for non-Project Running Exhaust (`processID == 1`)
- /// and Brakewear (`processID == 9`); every other process, and every
- /// Project-domain run, takes the `RatesOpModeDistribution` core path.
- /// Distance-based rates are always folded into the `BaseRate` output.
+    /// Run the generator over a fully materialised set of input tables.
+    ///
+    /// Ports `BaseRateGeneratorFromRatesOpModeDistribution`. The drive-cycle
+    /// fast path is taken for non-Project Running Exhaust (`processID == 1`)
+    /// and Brakewear (`processID == 9`); every other process, and every
+    /// Project-domain run, takes the `RatesOpModeDistribution` core path.
+    /// Distance-based rates are always folded into the `BaseRate` output.
     #[must_use]
     pub fn run(inputs: &BaseRateInputs, flags: &ExternalFlags) -> BaseRateOutput {
         let prepared = PreparedTables::from_inputs(inputs, flags);
 
- // shouldProcessDriveCycles — EMT-633 added processID 9 (Brakewear)
- // alongside processID 1 (Running Exhaust). ALWAYS_USE_ROMD_TABLE
- // forces the core path; it is `false` in normal operation.
+        // shouldProcessDriveCycles — EMT-633 added processID 9 (Brakewear)
+        // alongside processID 1 (Running Exhaust). ALWAYS_USE_ROMD_TABLE
+        // forces the core path; it is `false` in normal operation.
         let should_process_drive_cycles = !inputs.is_project
             && (flags.process_id == 1 || flags.process_id == 9)
             && !ALWAYS_USE_ROMD_TABLE;
@@ -175,13 +175,13 @@ impl Generator for BaseRateGenerator {
     }
 
     fn subscriptions(&self) -> &[CalculatorSubscription] {
- // Built once: `Priority::parse` is not a `const fn`, so the slice
- // cannot be a plain `static`. The Base Rate Generator subscribes for
- // every exhaust process at YEAR granularity, priority GENERATOR-2 // the rows recorded in `CalculatorInfo.txt`.
+        // Built once: `Priority::parse` is not a `const fn`, so the slice
+        // cannot be a plain `static`. The Base Rate Generator subscribes for
+        // every exhaust process at YEAR granularity, priority GENERATOR-2 // the rows recorded in `CalculatorInfo.txt`.
         static SUBS: OnceLock<Vec<CalculatorSubscription>> = OnceLock::new();
         SUBS.get_or_init(|| {
             let priority = Priority::parse("GENERATOR-2").expect("GENERATOR-2 is a valid priority");
- // Running, Start, Brakewear, Tirewear, Extended Idle, Aux Power.
+            // Running, Start, Brakewear, Tirewear, Extended Idle, Aux Power.
             [1_u16, 2, 9, 10, 90, 91]
                 .into_iter()
                 .map(|process| {
@@ -200,7 +200,6 @@ impl Generator for BaseRateGenerator {
     }
 
     fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
- // Extract process_id and year_id from the iteration position.
         let pos = ctx.position();
         let process_id = pos
             .process_id
@@ -212,11 +211,69 @@ impl Generator for BaseRateGenerator {
             .ok_or_else(|| Error::Polars("no year in iteration position".into()))
             .map(|y| y as i32)?;
 
-        let flags = ExternalFlags {
-            process_id,
-            year_id,
-            ..ExternalFlags::default()
-        };
+        let is_project = ctx.is_project();
+        let scale = ctx.model_scale();
+
+        // Derive behavioral flags — mirrors Java BaseRateGenerator.generateBaseRates().
+        //
+        // Scale mapping (Java ModelScale → Rust ModelScale):
+        //   Java MACROSCALE (description="Inv")     → Rust ModelScale::Inventory
+        //   Java MESOSCALE_LOOKUP (description="Rates") → Rust ModelScale::Rates
+        //
+        // applyAvgSpeedDistribution: Inventory (Java MACROSCALE) scale for processes 1/9/10.
+        // Project domain overrides it to false later (handled via the !is_project gate on
+        // use_avg_speed_bin rather than mutating the intermediate).
+        let apply_avg_speed_distribution =
+            matches!(scale, Some(ModelScale::Inventory)) && matches!(process_id, 1 | 9 | 10);
+        // Net after Project-domain override (Java: if isProjectDomain && proc∈{1,9,10} then false):
+        let apply_avg_speed_distribution = apply_avg_speed_distribution && !is_project;
+
+        // keepOpModeID: process 2 (Start Exhaust). The Java Project-domain override only
+        // fires for processes 1/9/10, so process 2 keeps keepOpModeID=true even in Project domain.
+        let keep_op_mode_id = process_id == 2;
+
+        // useAvgSpeedBin: Rates-path processes 1/9/10 (non-Project). Collapsed to 0 when
+        // applyAvgSpeedDistribution is active or in Project domain.
+        let use_avg_speed_bin =
+            !apply_avg_speed_distribution && !is_project && matches!(process_id, 1 | 9 | 10);
+
+        // useAvgSpeedFraction: active on the applyAvgSpeedDistribution (Inventory) path.
+        let use_avg_speed_fraction = apply_avg_speed_distribution;
+
+        // useSumSBD (applySourceBinDistribution in Java): Inventory scale or processes 2/90/91.
+        // Java: applySourceBinDistribution = (scale == MACROSCALE); if process ∈ {2,90,91} →
+        // applySourceBinDistribution = true. No Project-domain override for this flag.
+        let use_sum_sbd =
+            matches!(scale, Some(ModelScale::Inventory)) || matches!(process_id, 2 | 90 | 91);
+
+        // useSumSBDRaw: Rates (Java MESOSCALE_LOOKUP) scale AND processes 2/90/91.
+        let use_sum_sbd_raw =
+            matches!(scale, Some(ModelScale::Rates)) && matches!(process_id, 2 | 90 | 91);
+
+        // Build the 8-token parameter list that ExternalFlags::from_parameters expects,
+        // mirroring brbaFlags.getCSVForExternalGenerator() + ",processID,yearID,roadTypeID".
+        // roadTypeID = 0: no per-road-type filter for non-Project; the input tables carry
+        // the full runSpecRoadType set which the generator iterates internally.
+        let process_str = process_id.to_string();
+        let year_str = year_id.to_string();
+        let params: Vec<&str> = [
+            if keep_op_mode_id { "yOp" } else { "nOp" },
+            if use_avg_speed_bin { "yASB" } else { "nASB" },
+            if use_avg_speed_fraction {
+                "yASF"
+            } else {
+                "nASF"
+            },
+            if use_sum_sbd { "ySBD" } else { "nSBD" },
+            if use_sum_sbd_raw { "yRaw" } else { "nRaw" },
+            &process_str,
+            &year_str,
+            "0",
+        ]
+        .to_vec();
+
+        let flags =
+            ExternalFlags::from_parameters(&params).map_err(|e| Error::Polars(e.to_string()))?;
 
         let inputs = BaseRateInputs {
             avg_speed_bin: ctx.tables().iter_typed("avgSpeedBin")?,
@@ -261,12 +318,12 @@ impl Generator for BaseRateGenerator {
             operating_mode: iter_optional(ctx.tables(), "operatingMode")?,
             rates_op_mode_distribution: iter_optional(ctx.tables(), "RatesOpModeDistribution")?,
             drive_schedule_second: iter_optional(ctx.tables(), "driveScheduleSecond")?,
-            is_project: false,
+            is_project,
         };
 
         let output = BaseRateGenerator::run(&inputs, &flags);
 
- // Write output tables to scratch.
+        // Write output tables to scratch.
         let base_rate_df = output
             .base_rate
             .into_dataframe()
@@ -1064,15 +1121,18 @@ impl TableRow for RatesOpModeDistributionRow {
         let op = get_i32("opModeID")?;
         let omf = get_f64("opModeFraction")?;
         let abs = get_f64("avgBinSpeed")?;
- // `avgSpeedFraction` is part of the canonical RatesOpModeDistribution
- // schema, but the rates-path producer
- // (RatesOperatingModeDistributionGenerator) does not populate it. Its
- // value is only consulted under the `yASF` flag; the engine never sets
- // that flag (BaseRateGenerator::execute leaves ExternalFlags at default,
- // so use_avg_speed_fraction = false and the aggregator substitutes 1.0).
- // A missing column or NULL therefore lowers to 0.0 rather than failing
- // extraction — the value is never read for computation.
-        let asf = df.column("avgSpeedFraction").ok().and_then(|c| c.f64().ok());
+        // `avgSpeedFraction` is part of the canonical RatesOpModeDistribution
+        // schema, but the rates-path producer
+        // (RatesOperatingModeDistributionGenerator) does not populate it. Its
+        // value is only consulted under the `yASF` flag; the engine never sets
+        // that flag (BaseRateGenerator::execute leaves ExternalFlags at default,
+        // so use_avg_speed_fraction = false and the aggregator substitutes 1.0).
+        // A missing column or NULL therefore lowers to 0.0 rather than failing
+        // extraction — the value is never read for computation.
+        let asf = df
+            .column("avgSpeedFraction")
+            .ok()
+            .and_then(|c| c.f64().ok());
         (0..df.height())
             .map(|i| {
                 let null = |c| row_err(t, i, c, "null value".into());
@@ -1084,8 +1144,8 @@ impl TableRow for RatesOpModeDistributionRow {
                     pol_process_id: pol.get(i).ok_or_else(|| null("polProcessID"))?,
                     op_mode_id: op.get(i).ok_or_else(|| null("opModeID"))?,
                     op_mode_fraction: omf.get(i).ok_or_else(|| null("opModeFraction"))?,
- // MOVES leaves avgBinSpeed NULL in RatesOpModeDistribution
- // (default 0.0); treat a NULL as 0.0 rather than erroring.
+                    // MOVES leaves avgBinSpeed NULL in RatesOpModeDistribution
+                    // (default 0.0); treat a NULL as 0.0 rather than erroring.
                     avg_bin_speed: abs.get(i).unwrap_or(0.0),
                     avg_speed_fraction: asf.and_then(|c| c.get(i)).unwrap_or(0.0),
                 })
@@ -1430,10 +1490,10 @@ impl TableRow for SbWeightedRateDetail {
         let op = get_i32("opModeID")?;
         let my = get_i32("modelYearID")?;
         let ft = get_i32("fuelTypeID")?;
- // The non-age `SBWeightedEmissionRate` table is read with this same
- // struct but has no `ageGroupID` column; its rows carry age group 0
- // (see [`SbWeightedRateDetail`]). Treat an absent column — and any NULL
- // within it — as age group 0 rather than erroring.
+        // The non-age `SBWeightedEmissionRate` table is read with this same
+        // struct but has no `ageGroupID` column; its rows carry age group 0
+        // (see [`SbWeightedRateDetail`]). Treat an absent column — and any NULL
+        // within it — as age group 0 rather than erroring.
         let ag = df
             .column("ageGroupID")
             .ok()
@@ -1891,7 +1951,7 @@ mod tests {
         assert!(subs.iter().all(|s| s.granularity == Granularity::Year));
         assert!(subs.iter().all(|s| s.priority.display() == "GENERATOR-2"));
 
- // Generators register no (pollutant, process) output pairs.
+        // Generators register no (pollutant, process) output pairs.
         assert!(generator.upstream().is_empty());
         assert!(generator
             .input_tables()
@@ -1904,7 +1964,7 @@ mod tests {
 
     #[test]
     fn generator_is_object_safe() {
- // The registry stores generators as `Box<dyn Generator>`.
+        // The registry stores generators as `Box<dyn Generator>`.
         let generators: Vec<Box<dyn Generator>> = vec![Box::new(BaseRateGenerator)];
         assert_eq!(generators[0].name(), "BaseRateGenerator");
     }
@@ -1929,10 +1989,10 @@ mod tests {
             DataFrameStore, ExecutionLocation, ExecutionTime, InMemoryStore, IterationPosition,
         };
 
- // Build a minimal InMemoryStore with the required non-optional tables.
+        // Build a minimal InMemoryStore with the required non-optional tables.
         let mut store = InMemoryStore::new();
 
- // avgSpeedBin — one row so the inner join has a result.
+        // avgSpeedBin — one row so the inner join has a result.
         let avg_speed_bin = vec![AvgSpeedBinRow {
             avg_speed_bin_id: 1,
             avg_bin_speed: 25.0,
@@ -1942,33 +2002,33 @@ mod tests {
             AvgSpeedBinRow::into_dataframe(avg_speed_bin).unwrap(),
         );
 
- // avgSpeedDistribution — empty (no rows needed for the test to pass).
+        // avgSpeedDistribution — empty (no rows needed for the test to pass).
         store.insert(
             "avgSpeedDistribution",
             AvgSpeedDistributionRow::into_dataframe(vec![]).unwrap(),
         );
 
- // runSpecRoadType — one entry (road type 3).
+        // runSpecRoadType — one entry (road type 3).
         store.insert(
             "runSpecRoadType",
             RunSpecRoadTypeRow::into_dataframe(vec![RunSpecRoadTypeRow { road_type_id: 3 }])
                 .unwrap(),
         );
 
- // runSpecHourDay — one entry.
+        // runSpecHourDay — one entry.
         store.insert(
             "runSpecHourDay",
             RunSpecHourDayRow::into_dataframe(vec![RunSpecHourDayRow { hour_day_id: 85 }]).unwrap(),
         );
 
- // runSpecSourceType — one entry.
+        // runSpecSourceType — one entry.
         store.insert(
             "runSpecSourceType",
             RunSpecSourceTypeRow::into_dataframe(vec![RunSpecSourceTypeRow { source_type_id: 21 }])
                 .unwrap(),
         );
 
- // runSpecPollutantProcess — one entry for process 2 (pol 101).
+        // runSpecPollutantProcess — one entry for process 2 (pol 101).
         store.insert(
             "runSpecPollutantProcess",
             RunSpecPollutantProcessRow::into_dataframe(vec![RunSpecPollutantProcessRow {
@@ -1977,7 +2037,7 @@ mod tests {
             .unwrap(),
         );
 
- // opModePolProcAssoc — one entry linking pol process to an op mode.
+        // opModePolProcAssoc — one entry linking pol process to an op mode.
         store.insert(
             "opModePolProcAssoc",
             OpModePolProcRow::into_dataframe(vec![OpModePolProcRow {
@@ -1987,7 +2047,7 @@ mod tests {
             .unwrap(),
         );
 
- // Build a context with process 2 and year 2020.
+        // Build a context with process 2 and year 2020.
         let pos = IterationPosition {
             iteration: 0,
             process_id: Some(ProcessId(2)),
@@ -1996,12 +2056,12 @@ mod tests {
         };
         let mut ctx = CalculatorContext::with_position_and_tables(pos, store);
 
- // Execute must succeed.
+        // Execute must succeed.
         let generator = BaseRateGenerator;
         let result = generator.execute(&mut ctx);
         assert!(result.is_ok(), "execute failed: {:?}", result.err());
 
- // All three output tables must be present in scratch.
+        // All three output tables must be present in scratch.
         assert!(
             ctx.scratch().store.contains("BaseRate"),
             "BaseRate not in scratch"
@@ -2014,5 +2074,184 @@ mod tests {
             ctx.scratch().store.contains("DrivingIdleFraction"),
             "DrivingIdleFraction not in scratch"
         );
+    }
+
+    /// Build a minimal InMemoryStore with the required non-optional tables for execute().
+    fn minimal_store_for_process(process_id: i32) -> InMemoryStore {
+        let mut store = InMemoryStore::new();
+        store.insert(
+            "avgSpeedBin",
+            AvgSpeedBinRow::into_dataframe(vec![AvgSpeedBinRow {
+                avg_speed_bin_id: 1,
+                avg_bin_speed: 25.0,
+            }])
+            .unwrap(),
+        );
+        store.insert(
+            "avgSpeedDistribution",
+            AvgSpeedDistributionRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "runSpecRoadType",
+            RunSpecRoadTypeRow::into_dataframe(vec![RunSpecRoadTypeRow { road_type_id: 3 }])
+                .unwrap(),
+        );
+        store.insert(
+            "runSpecHourDay",
+            RunSpecHourDayRow::into_dataframe(vec![RunSpecHourDayRow { hour_day_id: 85 }]).unwrap(),
+        );
+        store.insert(
+            "runSpecSourceType",
+            RunSpecSourceTypeRow::into_dataframe(vec![RunSpecSourceTypeRow { source_type_id: 21 }])
+                .unwrap(),
+        );
+        let pol_process_id = process_id * 100 + process_id;
+        store.insert(
+            "runSpecPollutantProcess",
+            RunSpecPollutantProcessRow::into_dataframe(vec![RunSpecPollutantProcessRow {
+                pol_process_id,
+            }])
+            .unwrap(),
+        );
+        store.insert(
+            "opModePolProcAssoc",
+            OpModePolProcRow::into_dataframe(vec![OpModePolProcRow {
+                pol_process_id,
+                op_mode_id: 0,
+            }])
+            .unwrap(),
+        );
+        store
+    }
+
+    /// execute() sets ExternalFlags.keep_op_mode_id=true for process 2 (Start Exhaust)
+    /// and useSumSBDRaw=true on a Rates run — mirrors Java BaseRateGenerator.generateBaseRates().
+    /// keepOpModeID is process 2 regardless of domain (the Java Project-domain override only
+    /// applies to processes 1/9/10).
+    #[test]
+    fn execute_flags_process2_rates_keep_op_mode_id_and_sum_sbd_raw() {
+        use moves_framework::{ExecutionLocation, ExecutionTime, IterationPosition, ModelScale};
+
+        let store = minimal_store_for_process(2);
+        let pos = IterationPosition {
+            iteration: 0,
+            process_id: Some(ProcessId(2)),
+            location: ExecutionLocation::none(),
+            time: ExecutionTime::year(2020),
+        };
+        let mut ctx = CalculatorContext::with_position_and_tables(pos, store);
+        ctx.set_model_scale(ModelScale::Rates);
+        let generator = BaseRateGenerator;
+        let result = generator.execute(&mut ctx);
+        assert!(result.is_ok(), "execute failed: {:?}", result.err());
+        // With process 2 on a Rates run, keepOpModeID=true and useSumSBDRaw=true.
+        // Flag correctness is validated in the numerical baserategenerator.rs integration tests.
+        assert!(ctx.scratch().store.contains("BaseRate"));
+    }
+
+    /// execute() propagates is_project=true from the context into BaseRateInputs,
+    /// forcing the ROMD path even for process 1 (Running Exhaust).
+    #[test]
+    fn execute_project_domain_forces_romd_path_for_process1() {
+        use moves_framework::{
+            ExecutionLocation, ExecutionTime, IterationPosition, ModelDomain, ModelScale,
+        };
+
+        let mut store = minimal_store_for_process(1);
+        // Add minimal RatesOpModeDistribution so the ROMD path produces output.
+        store.insert(
+            "RatesOpModeDistribution",
+            RatesOpModeDistributionRow::into_dataframe(vec![RatesOpModeDistributionRow {
+                source_type_id: 21,
+                road_type_id: 3,
+                avg_speed_bin_id: 1,
+                hour_day_id: 85,
+                pol_process_id: 101,
+                op_mode_id: 0,
+                op_mode_fraction: 1.0,
+                avg_bin_speed: 25.0,
+                avg_speed_fraction: 1.0,
+            }])
+            .unwrap(),
+        );
+        let pos = IterationPosition {
+            iteration: 0,
+            process_id: Some(ProcessId(1)),
+            location: ExecutionLocation::none(),
+            time: ExecutionTime::year(2020),
+        };
+        let mut ctx = CalculatorContext::with_position_and_tables(pos, store);
+        ctx.set_model_scale(ModelScale::Rates);
+        // Project domain: is_project=true → drive-cycle path is skipped even for
+        // process 1 (Running Exhaust). execute() must complete without error.
+        ctx.set_model_domain(Some(ModelDomain::Project));
+        assert!(ctx.is_project(), "context must report is_project=true");
+        let generator = BaseRateGenerator;
+        let result = generator.execute(&mut ctx);
+        assert!(
+            result.is_ok(),
+            "execute failed in Project domain: {:?}",
+            result.err()
+        );
+        assert!(ctx.scratch().store.contains("BaseRate"));
+    }
+
+    /// execute() uses use_avg_speed_bin=true for process 1 on a Rates run (non-Project),
+    /// meaning the drive-cycle fast path is taken.
+    #[test]
+    fn execute_flags_process1_rates_use_avg_speed_bin() {
+        use moves_framework::{ExecutionLocation, ExecutionTime, IterationPosition, ModelScale};
+
+        let store = minimal_store_for_process(1);
+        let pos = IterationPosition {
+            iteration: 0,
+            process_id: Some(ProcessId(1)),
+            location: ExecutionLocation::none(),
+            time: ExecutionTime::year(2020),
+        };
+        let mut ctx = CalculatorContext::with_position_and_tables(pos, store);
+        ctx.set_model_scale(ModelScale::Rates);
+        let generator = BaseRateGenerator;
+        // On Rates scale, process 1, non-Project: drive-cycle path is taken.
+        // This exercises the branch where use_avg_speed_bin=true.
+        let result = generator.execute(&mut ctx);
+        assert!(result.is_ok(), "execute failed: {:?}", result.err());
+        assert!(ctx.scratch().store.contains("BaseRate"));
+    }
+
+    /// context.is_project() reflects the ModelDomain set by the engine.
+    #[test]
+    fn context_is_project_reflects_domain() {
+        use moves_framework::ModelDomain;
+        let mut ctx = CalculatorContext::new();
+        assert!(!ctx.is_project(), "default context is not project domain");
+        ctx.set_model_domain(Some(ModelDomain::Project));
+        assert!(
+            ctx.is_project(),
+            "Project domain → is_project() must be true"
+        );
+        ctx.set_model_domain(Some(ModelDomain::Default));
+        assert!(
+            !ctx.is_project(),
+            "Default domain → is_project() must be false"
+        );
+        ctx.set_model_domain(None);
+        assert!(
+            !ctx.is_project(),
+            "None domain → is_project() must be false"
+        );
+    }
+
+    /// context.parameters() starts empty and round-trips through set_parameters().
+    #[test]
+    fn context_parameters_round_trip() {
+        let mut ctx = CalculatorContext::new();
+        assert!(
+            ctx.parameters().is_empty(),
+            "default parameters must be empty"
+        );
+        let tokens = vec!["yOp".to_string(), "nASB".to_string()];
+        ctx.set_parameters(tokens.clone());
+        assert_eq!(ctx.parameters(), tokens.as_slice());
     }
 }

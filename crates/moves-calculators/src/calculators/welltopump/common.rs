@@ -56,35 +56,35 @@ fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -
 /// carries only `emissionQuant`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WorkerOutputRow {
- /// `yearID`.
+    /// `yearID`.
     pub year_id: i32,
- /// `monthID`.
+    /// `monthID`.
     pub month_id: i32,
- /// `dayID`.
+    /// `dayID`.
     pub day_id: i32,
- /// `hourID`.
+    /// `hourID`.
     pub hour_id: i32,
- /// `stateID`.
+    /// `stateID`.
     pub state_id: i32,
- /// `countyID`.
+    /// `countyID`.
     pub county_id: i32,
- /// `zoneID`.
+    /// `zoneID`.
     pub zone_id: i32,
- /// `linkID`.
+    /// `linkID`.
     pub link_id: i32,
- /// `pollutantID`.
+    /// `pollutantID`.
     pub pollutant_id: i32,
- /// `processID`.
+    /// `processID`.
     pub process_id: i32,
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: i32,
- /// `fuelTypeID`.
+    /// `fuelTypeID`.
     pub fuel_type_id: i32,
- /// `modelYearID`.
+    /// `modelYearID`.
     pub model_year_id: i32,
- /// `roadTypeID`.
+    /// `roadTypeID`.
     pub road_type_id: i32,
- /// `emissionQuant` — the emission quantity.
+    /// `emissionQuant` — the emission quantity.
     pub emission_quant: f64,
 }
 
@@ -97,13 +97,13 @@ pub struct WorkerOutputRow {
 /// triple resolves last-write-wins.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GreetWellToPumpRow {
- /// `pollutantID` — the well-to-pump pollutant the rate is for.
+    /// `pollutantID` — the well-to-pump pollutant the rate is for.
     pub pollutant_id: i32,
- /// `fuelSubtypeID` — the fuel subtype the rate is for.
+    /// `fuelSubtypeID` — the fuel subtype the rate is for.
     pub fuel_sub_type_id: i32,
- /// `yearID` — the calendar year the rate is tabulated at.
+    /// `yearID` — the calendar year the rate is tabulated at.
     pub year_id: i32,
- /// `emissionRate` — the GREET emission rate. `FLOAT` in MOVES.
+    /// `emissionRate` — the GREET emission rate. `FLOAT` in MOVES.
     pub emission_rate: f64,
 }
 
@@ -114,40 +114,40 @@ pub struct GreetWellToPumpRow {
 /// `fuelRegionID` is constant and is not modelled.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FuelSupplyRow {
- /// `fuelYearID` — joins to [`YearRow::fuel_year_id`].
+    /// `fuelYearID` — joins to [`YearRow::fuel_year_id`].
     pub fuel_year_id: i32,
- /// `monthGroupID` — the month group this share applies to.
+    /// `monthGroupID` — the month group this share applies to.
     pub month_group_id: i32,
- /// `fuelFormulationID` — joins to [`FuelFormulationRow::fuel_formulation_id`].
+    /// `fuelFormulationID` — joins to [`FuelFormulationRow::fuel_formulation_id`].
     pub fuel_formulation_id: i32,
- /// `marketShare` — this formulation's share of the fuel supply. `FLOAT`.
+    /// `marketShare` — this formulation's share of the fuel supply. `FLOAT`.
     pub market_share: f64,
 }
 
 /// One `FuelFormulation` row — resolves a fuel formulation to its subtype.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FuelFormulationRow {
- /// `fuelFormulationID` — the formulation primary key.
+    /// `fuelFormulationID` — the formulation primary key.
     pub fuel_formulation_id: i32,
- /// `fuelSubtypeID` — joins to [`FuelSubTypeRow::fuel_sub_type_id`].
+    /// `fuelSubtypeID` — joins to [`FuelSubTypeRow::fuel_sub_type_id`].
     pub fuel_sub_type_id: i32,
 }
 
 /// One `FuelSubtype` row — resolves a fuel subtype to its parent fuel type.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FuelSubTypeRow {
- /// `fuelSubtypeID` — the subtype primary key.
+    /// `fuelSubtypeID` — the subtype primary key.
     pub fuel_sub_type_id: i32,
- /// `fuelTypeID` — the parent fuel type.
+    /// `fuelTypeID` — the parent fuel type.
     pub fuel_type_id: i32,
 }
 
 /// One `Year` row — resolves a `fuelYearID` to its calendar `yearID`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct YearRow {
- /// `yearID` — the calendar year.
+    /// `yearID` — the calendar year.
     pub year_id: i32,
- /// `fuelYearID` — the fuel year, joins to [`FuelSupplyRow::fuel_year_id`].
+    /// `fuelYearID` — the fuel year, joins to [`FuelSupplyRow::fuel_year_id`].
     pub fuel_year_id: i32,
 }
 
@@ -155,9 +155,9 @@ pub struct YearRow {
 /// "Processing" join resolves.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MonthGroupRow {
- /// `monthID` — the calendar month.
+    /// `monthID` — the calendar month.
     pub month_id: i32,
- /// `monthGroupID` — the month group it belongs to.
+    /// `monthGroupID` — the month group it belongs to.
     pub month_group_id: i32,
 }
 
@@ -172,22 +172,22 @@ pub struct MonthGroupRow {
 /// GREET year-bracket query.
 #[derive(Debug, Clone, Default)]
 pub struct WtpInputs {
- /// `GREETWellToPump` rows — filtered to the calculator's pollutant set.
+    /// `GREETWellToPump` rows — filtered to the calculator's pollutant set.
     pub greet: Vec<GreetWellToPumpRow>,
- /// `FuelSupply` rows (single fuel region).
+    /// `FuelSupply` rows (single fuel region).
     pub fuel_supply: Vec<FuelSupplyRow>,
- /// `FuelFormulation` rows.
+    /// `FuelFormulation` rows.
     pub fuel_formulation: Vec<FuelFormulationRow>,
- /// `FuelSubtype` rows.
+    /// `FuelSubtype` rows.
     pub fuel_sub_type: Vec<FuelSubTypeRow>,
- /// `Year` rows.
+    /// `Year` rows.
     pub year: Vec<YearRow>,
- /// `MonthOfAnyYear` rows — the `monthID → monthGroupID` mapping.
+    /// `MonthOfAnyYear` rows — the `monthID → monthGroupID` mapping.
     pub month_of_any_year: Vec<MonthGroupRow>,
- /// `MOVESWorkerOutput` rows — the upstream calculators' output the WTP
- /// "Processing" section reads.
+    /// `MOVESWorkerOutput` rows — the upstream calculators' output the WTP
+    /// "Processing" section reads.
     pub worker_output: Vec<WorkerOutputRow>,
- /// The MasterLoop context year (`##context.year##`).
+    /// The MasterLoop context year (`##context.year##`).
     pub target_year: i32,
 }
 
@@ -195,9 +195,9 @@ pub struct WtpInputs {
 /// pollutant, after GREET year-interpolation and market-share weighting.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WtpFactorCell {
- /// `pollutantID` — the well-to-pump pollutant this factor is for.
+    /// `pollutantID` — the well-to-pump pollutant this factor is for.
     pub pollutant_id: i32,
- /// `WTPFactor` — the market-share-weighted, year-interpolated factor.
+    /// `WTPFactor` — the market-share-weighted, year-interpolated factor.
     pub factor: f64,
 }
 
@@ -252,7 +252,7 @@ fn interpolate_wtp_factors(
     greet: &[GreetWellToPumpRow],
     target_year: i32,
 ) -> HashMap<i32, Vec<WtpFactorCell>> {
- // Group GREET rows by (pollutant, fuelSubType) → yearID → emissionRate.
+    // Group GREET rows by (pollutant, fuelSubType) → yearID → emissionRate.
     let mut tabulated: HashMap<(i32, i32), HashMap<i32, f64>> = HashMap::new();
     for g in greet {
         tabulated
@@ -263,18 +263,18 @@ fn interpolate_wtp_factors(
 
     let mut factors: HashMap<i32, Vec<WtpFactorCell>> = HashMap::new();
     for ((pollutant_id, fuel_sub_type_id), years) in &tabulated {
- // GREETWellToPumpBounds — the earliest/latest tabulated year. `years`
- // is non-empty: it was created by the loop above only on an insert.
+        // GREETWellToPumpBounds — the earliest/latest tabulated year. `years`
+        // is non-empty: it was created by the loop above only on an insert.
         let min_year = years.keys().min().copied().unwrap_or(target_year);
         let max_year = years.keys().max().copied().unwrap_or(target_year);
- // GREETWellToPumpLo — latest year ≤ target_year, else the earliest.
+        // GREETWellToPumpLo — latest year ≤ target_year, else the earliest.
         let lo_year = years
             .keys()
             .filter(|&&y| y <= target_year)
             .max()
             .copied()
             .unwrap_or(min_year);
- // GREETWellToPumpHi — earliest year > target_year, else the latest.
+        // GREETWellToPumpHi — earliest year > target_year, else the latest.
         let hi_year = years
             .keys()
             .filter(|&&y| y > target_year)
@@ -338,8 +338,8 @@ pub fn build_wtp_factor_by_fuel_type(inputs: &WtpInputs) -> WtpFactorTable {
         .iter()
         .map(|fst| (fst.fuel_sub_type_id, fst))
         .collect();
- // Year resolves fuelYearID → yearID, keeping only the target-year rows
- // (the SQL's y.yearID = wf.yearID, wf.yearID being target_year).
+    // Year resolves fuelYearID → yearID, keeping only the target-year rows
+    // (the SQL's y.yearID = wf.yearID, wf.yearID being target_year).
     let target_fuel_years: std::collections::HashSet<i32> = inputs
         .year
         .iter()
@@ -347,29 +347,29 @@ pub fn build_wtp_factor_by_fuel_type(inputs: &WtpInputs) -> WtpFactorTable {
         .map(|y| y.fuel_year_id)
         .collect();
 
- // Accumulate Σ(WTPFactor × marketShare), grouped by the four SQL key
- // columns minus the literal-context countyID.
+    // Accumulate Σ(WTPFactor × marketShare), grouped by the four SQL key
+    // columns minus the literal-context countyID.
     let mut weighted: HashMap<(i32, i32, i32, i32), f64> = HashMap::new();
     for fs in &inputs.fuel_supply {
- // INNER JOIN Year ON Year.fuelYearID = FuelSupply.fuelYearID, the
- // surviving rows being target_year only.
+        // INNER JOIN Year ON Year.fuelYearID = FuelSupply.fuelYearID, the
+        // surviving rows being target_year only.
         if !target_fuel_years.contains(&fs.fuel_year_id) {
             continue;
         }
- // INNER JOIN FuelFormulation USING (fuelFormulationID).
+        // INNER JOIN FuelFormulation USING (fuelFormulationID).
         let Some(ff) = formulation.get(&fs.fuel_formulation_id) else {
             continue;
         };
- // INNER JOIN FuelSubtype USING (fuelSubtypeID).
+        // INNER JOIN FuelSubtype USING (fuelSubtypeID).
         let Some(fst) = sub_type.get(&ff.fuel_sub_type_id) else {
             continue;
         };
- // INNER JOIN WTPFactor ON fuelSubtypeID — one cell per pollutant.
+        // INNER JOIN WTPFactor ON fuelSubtypeID — one cell per pollutant.
         let Some(cells) = wtp_factor.get(&ff.fuel_sub_type_id) else {
             continue;
         };
         for cell in cells {
- *weighted
+            *weighted
                 .entry((
                     inputs.target_year,
                     fs.month_group_id,
@@ -380,8 +380,8 @@ pub fn build_wtp_factor_by_fuel_type(inputs: &WtpInputs) -> WtpFactorTable {
         }
     }
 
- // Reshape to the (year, monthGroup, fuelType) → [cell] index the WTP
- // "Processing" join consumes.
+    // Reshape to the (year, monthGroup, fuelType) → [cell] index the WTP
+    // "Processing" join consumes.
     let mut table: WtpFactorTable = HashMap::new();
     for ((year_id, month_group_id, pollutant_id, fuel_type_id), factor) in weighted {
         table
@@ -922,7 +922,7 @@ impl TableRow for MonthGroupRow {
 mod tests {
     use super::*;
 
- /// `target_year` between two tabulated years interpolates linearly.
+    /// `target_year` between two tabulated years interpolates linearly.
     #[test]
     fn interpolate_midpoint_between_two_years() {
         let greet = vec![
@@ -942,12 +942,12 @@ mod tests {
         let factors = interpolate_wtp_factors(&greet, 2015);
         let cells = &factors[&21];
         assert_eq!(cells.len(), 1);
- // 100 + (200 − 100) × (2015 − 2010) / (2020 − 2010) = 150.
+        // 100 + (200 − 100) × (2015 − 2010) / (2020 − 2010) = 150.
         assert!((cells[0].factor - 150.0).abs() < 1e-9);
     }
 
- /// An exact hit on a tabulated year returns that year's rate unchanged:
- /// `lo` is the year itself, `hi` is the next, and `(target − lo) = 0`.
+    /// An exact hit on a tabulated year returns that year's rate unchanged:
+    /// `lo` is the year itself, `hi` is the next, and `(target − lo) = 0`.
     #[test]
     fn interpolate_exact_year_returns_tabulated_rate() {
         let greet = vec![
@@ -968,8 +968,8 @@ mod tests {
         assert!((factors[&21][0].factor - 100.0).abs() < 1e-9);
     }
 
- /// `target_year` outside the tabulated range clamps to the nearest
- /// endpoint — `lo == hi`, so the factor is that endpoint's rate.
+    /// `target_year` outside the tabulated range clamps to the nearest
+    /// endpoint — `lo == hi`, so the factor is that endpoint's rate.
     #[test]
     fn interpolate_clamps_outside_the_tabulated_range() {
         let greet = vec![
@@ -986,13 +986,13 @@ mod tests {
                 emission_rate: 200.0,
             },
         ];
- // Before the range → earliest year's rate.
+        // Before the range → earliest year's rate.
         assert!((interpolate_wtp_factors(&greet, 1990)[&21][0].factor - 100.0).abs() < 1e-9);
- // After the range → latest year's rate.
+        // After the range → latest year's rate.
         assert!((interpolate_wtp_factors(&greet, 2050)[&21][0].factor - 200.0).abs() < 1e-9);
     }
 
- /// A single tabulated year yields that year's rate for any target.
+    /// A single tabulated year yields that year's rate for any target.
     #[test]
     fn interpolate_single_year_is_constant() {
         let greet = vec![GreetWellToPumpRow {
@@ -1006,7 +1006,7 @@ mod tests {
         }
     }
 
- /// Distinct pollutants for one fuel subtype produce one cell each.
+    /// Distinct pollutants for one fuel subtype produce one cell each.
     #[test]
     fn interpolate_keeps_pollutants_distinct() {
         let greet = vec![
@@ -1033,8 +1033,8 @@ mod tests {
             .any(|c| c.pollutant_id == 6 && c.factor == 20.0));
     }
 
- /// A one-formulation supply weights the interpolated factor by its market
- /// share and keys the result by `(target_year, monthGroup, fuelType)`.
+    /// A one-formulation supply weights the interpolated factor by its market
+    /// share and keys the result by `(target_year, monthGroup, fuelType)`.
     #[test]
     fn build_factor_weights_by_market_share() {
         let inputs = WtpInputs {
@@ -1069,13 +1069,13 @@ mod tests {
         let table = build_wtp_factor_by_fuel_type(&inputs);
         let cells = &table[&(2020, 1, 2)];
         assert_eq!(cells.len(), 1);
- // 100.0 × 0.25.
+        // 100.0 × 0.25.
         assert!((cells[0].factor - 25.0).abs() < 1e-9);
         assert_eq!(cells[0].pollutant_id, 91);
     }
 
- /// Two formulations of one fuel type sum their market-share-weighted
- /// factors into a single fuel-type cell.
+    /// Two formulations of one fuel type sum their market-share-weighted
+    /// factors into a single fuel-type cell.
     #[test]
     fn build_factor_sums_formulations_of_one_fuel_type() {
         let inputs = WtpInputs {
@@ -1136,12 +1136,12 @@ mod tests {
             target_year: 2020,
         };
         let table = build_wtp_factor_by_fuel_type(&inputs);
- // 0.5 × 100 + 0.5 × 200 = 150, both subtypes rolling up to fuel type 2.
+        // 0.5 × 100 + 0.5 × 200 = 150, both subtypes rolling up to fuel type 2.
         assert!((table[&(2020, 1, 2)][0].factor - 150.0).abs() < 1e-9);
     }
 
- /// A fuel-supply row whose `Year` join resolves a year other than the
- /// target is dropped — the SQL keeps only `y.yearID = target_year`.
+    /// A fuel-supply row whose `Year` join resolves a year other than the
+    /// target is dropped — the SQL keeps only `y.yearID = target_year`.
     #[test]
     fn build_factor_drops_non_target_year_supply() {
         let inputs = WtpInputs {
@@ -1165,8 +1165,8 @@ mod tests {
                 fuel_sub_type_id: 21,
                 fuel_type_id: 2,
             }],
- // The only Year row resolves fuel year 1990 → calendar 1990, not
- // the target 2020.
+            // The only Year row resolves fuel year 1990 → calendar 1990, not
+            // the target 2020.
             year: vec![YearRow {
                 year_id: 1990,
                 fuel_year_id: 1990,
@@ -1178,7 +1178,7 @@ mod tests {
         assert!(build_wtp_factor_by_fuel_type(&inputs).is_empty());
     }
 
- /// A fuel-supply row with no matching formulation/subtype is dropped.
+    /// A fuel-supply row with no matching formulation/subtype is dropped.
     #[test]
     fn build_factor_drops_unjoined_supply() {
         let mut inputs = WtpInputs {
@@ -1210,7 +1210,7 @@ mod tests {
             worker_output: vec![],
             target_year: 2020,
         };
- // No formulation → the supply row cannot resolve a subtype.
+        // No formulation → the supply row cannot resolve a subtype.
         inputs.fuel_formulation.clear();
         assert!(build_wtp_factor_by_fuel_type(&inputs).is_empty());
     }

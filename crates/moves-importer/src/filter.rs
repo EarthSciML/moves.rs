@@ -31,49 +31,49 @@ use arrow::datatypes::DataType;
 /// default-DB lookup table a foreign-key filter resolves against.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Filter {
- // ----- Foreign-key (decode-table) filters -----
- /// Calendar year. Decode table `Year`, valid range 1990-2060
- /// (inclusive) per `SourceTypePopulationImporter.sql` and the
- /// default-DB `year` table contents.
+    // ----- Foreign-key (decode-table) filters -----
+    /// Calendar year. Decode table `Year`, valid range 1990-2060
+    /// (inclusive) per `SourceTypePopulationImporter.sql` and the
+    /// default-DB `year` table contents.
     Year,
- /// MOVES source-use type id (1-99 per `SourceUseType` table).
+    /// MOVES source-use type id (1-99 per `SourceUseType` table).
     SourceType,
- /// Age category id (0-30 per `AgeCategory` table).
+    /// Age category id (0-30 per `AgeCategory` table).
     Age,
- /// Zone id (decoded as `countyID * 10` historically; we don't
- /// enforce the encoding, just that the id appears in the user's
- /// `Zone` table).
+    /// Zone id (decoded as `countyID * 10` historically; we don't
+    /// enforce the encoding, just that the id appears in the user's
+    /// `Zone` table).
     Zone,
- /// County id (5-digit FIPS, e.g. 06037 = Los Angeles County).
+    /// County id (5-digit FIPS, e.g. 06037 = Los Angeles County).
     County,
- /// State id (1-2-digit FIPS, 1-56).
+    /// State id (1-2-digit FIPS, 1-56).
     State,
- /// Road type id (1-5 inclusive per `RoadType` table).
+    /// Road type id (1-5 inclusive per `RoadType` table).
     RoadType,
- /// Road type excluding off-network (i.e. 2-5).
+    /// Road type excluding off-network (i.e. 2-5).
     RoadTypeNotOffNetwork,
- /// Pollutant id.
+    /// Pollutant id.
     Pollutant,
- /// Emission process id.
+    /// Emission process id.
     Process,
- /// Fuel type id.
+    /// Fuel type id.
     FuelType,
- /// Month id (1-12).
+    /// Month id (1-12).
     Month,
- /// Day id (1-7 per `DayOfAnyWeek`).
+    /// Day id (1-7 per `DayOfAnyWeek`).
     Day,
- /// Hour id (1-24 per `HourOfAnyDay`).
+    /// Hour id (1-24 per `HourOfAnyDay`).
     Hour,
- /// Model year id (>=1950, <=2060 per `ImporterManager.FILTER_MODELYEARID`).
+    /// Model year id (>=1950, <=2060 per `ImporterManager.FILTER_MODELYEARID`).
     ModelYear,
 
- // ----- Numeric range filters -----
- /// Non-negative float (`>= 0.0`). Nulls are NOT permitted by the
- /// SQL importer (see `SourceTypePopulationImporter.sql` line 67-71
- /// which surfaces an ERROR on missing values), so the framework
- /// treats null as a validation error here.
+    // ----- Numeric range filters -----
+    /// Non-negative float (`>= 0.0`). Nulls are NOT permitted by the
+    /// SQL importer (see `SourceTypePopulationImporter.sql` line 67-71
+    /// which surfaces an ERROR on missing values), so the framework
+    /// treats null as a validation error here.
     NonNegative,
- /// Non-negative float whose canonical missing-value default is 1.0
+    /// Non-negative float whose canonical missing-value default is 1.0
     /// (`ImporterManager.FILTER_NON_NEGATIVE_DEFAULT_1`, seeded with the
     /// value set `{1.0}`). Used by the Idle (`idleMonthAdjust`,
     /// `idleDayAdjust`) and Hotelling (`monthAdjustment`) importers, where
@@ -87,29 +87,29 @@ pub enum Filter {
     /// before the column is consumed by emission math, or downstream
     /// multipliers will see NULL instead of the canonical 1.0.
     NonNegativeDefault1,
- /// Fraction in `[0.0, 1.0]` inclusive.
+    /// Fraction in `[0.0, 1.0]` inclusive.
     ZeroToOne,
- /// Percentage in `[0.0, 100.0]` inclusive.
+    /// Percentage in `[0.0, 100.0]` inclusive.
     ZeroToOneHundred,
- /// Yes/No flag — the column type is `char(1)` per MOVES convention;
- /// allowed values are `Y` and `N` (case-insensitive).
+    /// Yes/No flag — the column type is `char(1)` per MOVES convention;
+    /// allowed values are `Y` and `N` (case-insensitive).
     YesNo,
- /// Boolean (`0` / `1`), accepted by some importers in place of
- /// `Y`/`N`.
+    /// Boolean (`0` / `1`), accepted by some importers in place of
+    /// `Y`/`N`.
     Boolean,
- /// Free-form text — no constraint beyond non-null when listed as a
- /// required column. Used for description fields.
+    /// Free-form text — no constraint beyond non-null when listed as a
+    /// required column. Used for description fields.
     Text,
 }
 
 impl Filter {
- /// The canonical Arrow type for a column carrying this filter.
- ///
- /// Foreign-key filters all map to [`DataType::Int64`] (matching the
- /// `mysql_to_arrow` widening in `moves-default-db-convert`).
- /// Fractions and population counts map to [`DataType::Float64`].
- /// Flags map to [`DataType::Utf8`] for `Y`/`N` and [`DataType::Boolean`]
- /// for `0`/`1`.
+    /// The canonical Arrow type for a column carrying this filter.
+    ///
+    /// Foreign-key filters all map to [`DataType::Int64`] (matching the
+    /// `mysql_to_arrow` widening in `moves-default-db-convert`).
+    /// Fractions and population counts map to [`DataType::Float64`].
+    /// Flags map to [`DataType::Utf8`] for `Y`/`N` and [`DataType::Boolean`]
+    /// for `0`/`1`.
     pub fn arrow_type(&self) -> DataType {
         match self {
             Filter::Year
@@ -138,13 +138,13 @@ impl Filter {
         }
     }
 
- /// If this filter is a foreign-key constraint into the MOVES default
- /// DB, return the decode-table name (case-sensitive, as used in
- /// `tables.json`). Returns `None` for pure numeric / text filters.
- ///
- /// The validator uses this to fetch the set of valid ids from the
- /// `moves-data-default::DefaultDb` and check the imported column
- /// against it.
+    /// If this filter is a foreign-key constraint into the MOVES default
+    /// DB, return the decode-table name (case-sensitive, as used in
+    /// `tables.json`). Returns `None` for pure numeric / text filters.
+    ///
+    /// The validator uses this to fetch the set of valid ids from the
+    /// `moves-data-default::DefaultDb` and check the imported column
+    /// against it.
     pub fn decode_table(&self) -> Option<&'static str> {
         match self {
             Filter::Year => Some("Year"),
@@ -165,10 +165,10 @@ impl Filter {
         }
     }
 
- /// The canonical primary-key column name in the decode table, if
- /// any. Caller uses this to pull the id column out of the
- /// decode-table DataFrame returned by
- /// `moves-data-default::DefaultDb`.
+    /// The canonical primary-key column name in the decode table, if
+    /// any. Caller uses this to pull the id column out of the
+    /// decode-table DataFrame returned by
+    /// `moves-data-default::DefaultDb`.
     pub fn decode_column(&self) -> Option<&'static str> {
         match self {
             Filter::Year => Some("yearID"),
@@ -189,8 +189,8 @@ impl Filter {
         }
     }
 
- /// Whether null values are permitted. Most filters reject null; the
- /// `*Default1` variant permits null because in canonical MOVES the
+    /// Whether null values are permitted. Most filters reject null; the
+    /// `*Default1` variant permits null because in canonical MOVES the
     /// missing value carries a default of 1.0 (a blank adjustment factor
     /// means "no adjustment").
     ///
@@ -198,14 +198,14 @@ impl Filter {
     /// does NOT cause 1.0 to be substituted. The reader/validator must
     /// materialize the 1.0 default for any column carrying
     /// [`Filter::NonNegativeDefault1`]; until they do, such a column is
- /// emitted as a NULL rather than 1.0. No descriptor currently adopts
+    /// emitted as a NULL rather than 1.0. No descriptor currently adopts
     /// this filter, so the gap is latent.
     pub fn nullable(&self) -> bool {
         matches!(self, Filter::NonNegativeDefault1 | Filter::Text)
     }
 
- /// For numeric range filters, the inclusive lower bound. `None`
- /// means "no constraint."
+    /// For numeric range filters, the inclusive lower bound. `None`
+    /// means "no constraint."
     pub fn numeric_min(&self) -> Option<f64> {
         match self {
             Filter::NonNegative | Filter::NonNegativeDefault1 => Some(0.0),
@@ -215,7 +215,7 @@ impl Filter {
         }
     }
 
- /// For numeric range filters, the inclusive upper bound.
+    /// For numeric range filters, the inclusive upper bound.
     pub fn numeric_max(&self) -> Option<f64> {
         match self {
             Filter::ZeroToOne => Some(1.0),
@@ -235,8 +235,8 @@ mod tests {
         assert_eq!(Filter::SourceType.decode_table(), Some("SourceUseType"));
         assert_eq!(Filter::Age.decode_table(), Some("AgeCategory"));
         assert_eq!(Filter::RoadType.decode_table(), Some("RoadType"));
- // Off-network variant uses the same decode table but a
- // narrower numeric range — validator enforces the narrowing.
+        // Off-network variant uses the same decode table but a
+        // narrower numeric range — validator enforces the narrowing.
         assert_eq!(
             Filter::RoadTypeNotOffNetwork.decode_table(),
             Some("RoadType")

@@ -61,12 +61,12 @@ use moves_runspec::model::{
 /// Which output table the aggregation targets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AggregationTable {
- /// `MOVESOutput` — pollutant emission quantities (and per-worker rates).
+    /// `MOVESOutput` — pollutant emission quantities (and per-worker rates).
     Emission,
- /// `MOVESActivityOutput` — distance / hours / starts / population
- /// rows, keyed by `activityTypeID`.
+    /// `MOVESActivityOutput` — distance / hours / starts / population
+    /// rows, keyed by `activityTypeID`.
     Activity,
- /// `BaseRateOutput` — rates-mode base rates and emission rates.
+    /// `BaseRateOutput` — rates-mode base rates and emission rates.
     BaseRate,
 }
 
@@ -79,35 +79,35 @@ pub enum AggregationTable {
 /// the Rust XML schema doesn't (yet) surface them.
 #[derive(Debug, Clone, Copy)]
 pub struct AggregationInputs<'a> {
- /// Output time granularity (Hour/Day/Month/Year). Controls which of
- /// `yearID`/`monthID`/`dayID`/`hourID` survive and whether a temporal
- /// scaling factor multiplies the summed metric.
+    /// Output time granularity (Hour/Day/Month/Year). Controls which of
+    /// `yearID`/`monthID`/`dayID`/`hourID` survive and whether a temporal
+    /// scaling factor multiplies the summed metric.
     pub timestep: OutputTimestep,
- /// Geographic output detail level (Nation/State/County/Zone/Link).
+    /// Geographic output detail level (Nation/State/County/Zone/Link).
     pub geographic_output_detail: GeographicOutputDetail,
- /// Run scale (Macro/Inventory/Rates).
+    /// Run scale (Macro/Inventory/Rates).
     pub scale: ModelScale,
- /// Run domain (Default/Single/Project), if any.
+    /// Run domain (Default/Single/Project), if any.
     pub domain: Option<ModelDomain>,
- /// Active models (Onroad/Nonroad). The mix changes some defaults.
+    /// Active models (Onroad/Nonroad). The mix changes some defaults.
     pub models: &'a [Model],
- /// Emission breakdown selection.
+    /// Emission breakdown selection.
     pub breakdown: &'a OutputBreakdown,
- /// `outputPopulation` — when true, activity row 6 (population) is
- /// aggregated only by spatial keys, mirroring Java's
- /// `selectActivityNoScaleSQL` path.
+    /// `outputPopulation` — when true, activity row 6 (population) is
+    /// aggregated only by spatial keys, mirroring Java's
+    /// `selectActivityNoScaleSQL` path.
     pub output_population: bool,
- /// Java's `regClassID` breakdown flag — keep `regClassID` when true.
+    /// Java's `regClassID` breakdown flag — keep `regClassID` when true.
     pub reg_class_id: bool,
- /// Java's `fuelSubType` breakdown flag — keep `fuelSubTypeID` when
- /// true. Matched the `ALLOW_FUELSUBTYPE_OUTPUT` compilation flag in
- /// Java.
+    /// Java's `fuelSubType` breakdown flag — keep `fuelSubTypeID` when
+    /// true. Matched the `ALLOW_FUELSUBTYPE_OUTPUT` compilation flag in
+    /// Java.
     pub fuel_sub_type: bool,
- /// Java's `engTechID` breakdown flag — Nonroad-only; keep `engTechID`
- /// when true *and* `models` contains `Nonroad`.
+    /// Java's `engTechID` breakdown flag — Nonroad-only; keep `engTechID`
+    /// when true *and* `models` contains `Nonroad`.
     pub eng_tech_id: bool,
- /// Java's `sector` breakdown flag — Nonroad-only; keep `sectorID`
- /// when true *and* `models` contains `Nonroad`.
+    /// Java's `sector` breakdown flag — Nonroad-only; keep `sectorID`
+    /// when true *and* `models` contains `Nonroad`.
     pub sector: bool,
 }
 
@@ -120,42 +120,42 @@ pub struct AggregationInputs<'a> {
 /// lands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TemporalScaling {
- /// No rescaling — `SUM(metric) AS metric`.
+    /// No rescaling — `SUM(metric) AS metric`.
     None,
- /// `SUM(metric * weeksPerMonth(yearID, monthID)) AS metric`. Applies
- /// when the timestep collapses days into month/year output.
+    /// `SUM(metric * weeksPerMonth(yearID, monthID)) AS metric`. Applies
+    /// when the timestep collapses days into month/year output.
     WeeksPerMonth,
- /// `SUM(metric * portionOfWeekPerDay(dayID)) AS metric`. Applies
- /// when the timestep collapses portion-of-week into a classical
- /// 24-hour day (or to hour).
+    /// `SUM(metric * portionOfWeekPerDay(dayID)) AS metric`. Applies
+    /// when the timestep collapses portion-of-week into a classical
+    /// 24-hour day (or to hour).
     PortionOfWeekPerDay,
 }
 
 /// One column slot in the aggregation `SELECT` list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AggregationColumn {
- /// `column AS column` — a group-by key. The column flows through.
+    /// `column AS column` — a group-by key. The column flows through.
     Key(&'static str),
- /// `NULL AS column` — aggregated away. Most "drop this dimension"
- /// columns are emitted this way so the destination schema stays fixed.
+    /// `NULL AS column` — aggregated away. Most "drop this dimension"
+    /// columns are emitted this way so the destination schema stays fixed.
     Null(&'static str),
- /// `0 AS column` — like [`Null`](Self::Null) but with a zero literal.
- /// `BaseRateOutput` prefers `0` over `NULL` for its integer keys.
+    /// `0 AS column` — like [`Null`](Self::Null) but with a zero literal.
+    /// `BaseRateOutput` prefers `0` over `NULL` for its integer keys.
     Zero(&'static str),
- /// `'' AS column` — like [`Null`](Self::Null) but with an empty
- /// string literal. `BaseRateOutput` uses this for `SCC`.
+    /// `'' AS column` — like [`Null`](Self::Null) but with an empty
+    /// string literal. `BaseRateOutput` uses this for `SCC`.
     EmptyString(&'static str),
- /// `SUM(metric [* scale]) AS metric` — the aggregated metric column.
+    /// `SUM(metric [* scale]) AS metric` — the aggregated metric column.
     Sum {
- /// Source/destination column name (e.g. `"emissionQuant"`).
+        /// Source/destination column name (e.g. `"emissionQuant"`).
         column: &'static str,
- /// Optional temporal rescaling factor.
+        /// Optional temporal rescaling factor.
         scaling: TemporalScaling,
     },
 }
 
 impl AggregationColumn {
- /// Name of the output column, regardless of variant.
+    /// Name of the output column, regardless of variant.
     #[must_use]
     pub fn name(&self) -> &'static str {
         match self {
@@ -167,7 +167,7 @@ impl AggregationColumn {
         }
     }
 
- /// True when this column appears in the `GROUP BY` clause.
+    /// True when this column appears in the `GROUP BY` clause.
     #[must_use]
     pub fn is_group_key(&self) -> bool {
         matches!(self, Self::Key(_))
@@ -181,19 +181,19 @@ impl AggregationColumn {
 /// entries and (b) build the SELECT projection from the entire list.
 #[derive(Debug, Clone)]
 pub struct AggregationPlan {
- /// Which table this plan targets.
+    /// Which table this plan targets.
     pub table: AggregationTable,
- /// Output columns, in destination-schema order.
+    /// Output columns, in destination-schema order.
     pub columns: Vec<AggregationColumn>,
- /// Whether the Nonroad activity-weighting pre-pass is needed before
- /// aggregation. When `true`, callers must run the weight pass (see
- /// `AggregationSQLGenerator.nrActivityWeightSQL` in Java for the
- /// reference algorithm) before applying this plan.
+    /// Whether the Nonroad activity-weighting pre-pass is needed before
+    /// aggregation. When `true`, callers must run the weight pass (see
+    /// `AggregationSQLGenerator.nrActivityWeightSQL` in Java for the
+    /// reference algorithm) before applying this plan.
     pub needs_nonroad_activity_weight: bool,
 }
 
 impl AggregationPlan {
- /// Column names that participate in the `GROUP BY` clause, in order.
+    /// Column names that participate in the `GROUP BY` clause, in order.
     #[must_use]
     pub fn group_by(&self) -> Vec<&'static str> {
         self.columns
@@ -208,7 +208,7 @@ impl AggregationPlan {
             .collect()
     }
 
- /// Names of the columns that are aggregated away (NULL/0/'' filled).
+    /// Names of the columns that are aggregated away (NULL/0/'' filled).
     #[must_use]
     pub fn aggregated_columns(&self) -> Vec<&'static str> {
         self.columns
@@ -222,7 +222,7 @@ impl AggregationPlan {
             .collect()
     }
 
- /// `(column, scaling)` pairs for every `SUM(...)` metric.
+    /// `(column, scaling)` pairs for every `SUM(...)` metric.
     #[must_use]
     pub fn sum_columns(&self) -> Vec<(&'static str, TemporalScaling)> {
         self.columns
@@ -234,7 +234,7 @@ impl AggregationPlan {
             .collect()
     }
 
- /// All output column names, in order.
+    /// All output column names, in order.
     #[must_use]
     pub fn output_columns(&self) -> Vec<&'static str> {
         self.columns.iter().map(AggregationColumn::name).collect()
@@ -269,8 +269,8 @@ pub fn emission_aggregation(inputs: &AggregationInputs<'_>) -> AggregationPlan {
     add_optional_dimension(&mut state, "regClassID", inputs.reg_class_id);
     add_fuel_type_column(&mut state, inputs);
     if inputs.fuel_sub_type {
- // fuelSubType only appears when ALLOW_FUELSUBTYPE_OUTPUT is on;
- // treat the input flag as the gate.
+        // fuelSubType only appears when ALLOW_FUELSUBTYPE_OUTPUT is on;
+        // treat the input flag as the gate.
         state.push(AggregationColumn::Key("fuelSubTypeID"));
     }
     add_model_year_column(&mut state, inputs);
@@ -423,9 +423,9 @@ fn effective_geographic_detail(inputs: &AggregationInputs<'_>) -> GeographicOutp
 /// the temporal scaling that should multiply summed metrics.
 fn add_time_columns(state: &mut PlanState, inputs: &AggregationInputs<'_>) -> TemporalScaling {
     let ts = inputs.timestep;
- // Java only applies week-to-month / portion-of-week scaling on Worker
- // SQL and never for Nonroad. In the Rust port there's no Worker/Master
- // split, so we keep the scaling iff Nonroad is *not* selected.
+    // Java only applies week-to-month / portion-of-week scaling on Worker
+    // SQL and never for Nonroad. In the Rust port there's no Worker/Master
+    // split, so we keep the scaling iff Nonroad is *not* selected.
     let is_nonroad = inputs.models.contains(&Model::Nonroad);
     match ts {
         OutputTimestep::Year => {
@@ -453,8 +453,8 @@ fn add_time_columns(state: &mut PlanState, inputs: &AggregationInputs<'_>) -> Te
             }
         }
         OutputTimestep::Day => {
- // 24-hour day timestep: usesClassicalDay = true, so portion-of-week
- // scaling applies.
+            // 24-hour day timestep: usesClassicalDay = true, so portion-of-week
+            // scaling applies.
             state.push(AggregationColumn::Key("yearID"));
             state.push(AggregationColumn::Key("monthID"));
             state.push(AggregationColumn::Key("dayID"));
@@ -494,10 +494,10 @@ fn add_geographic_columns(
             state.mark_needs_nr_weight();
         }
         GeographicOutputDetail::State => {
- // Nonroad workers retain countyID for downstream LF/avgHP
- // weighting at the master; the Rust port has no worker split,
- // so we follow the master-side semantics (countyID aggregated
- // away). The needs-NR-weight flag still fires.
+            // Nonroad workers retain countyID for downstream LF/avgHP
+            // weighting at the master; the Rust port has no worker split,
+            // so we follow the master-side semantics (countyID aggregated
+            // away). The needs-NR-weight flag still fires.
             state.push(AggregationColumn::Key("stateID"));
             state.push(AggregationColumn::Null("countyID"));
             state.push(AggregationColumn::Null("zoneID"));
@@ -516,10 +516,10 @@ fn add_geographic_columns(
             state.push(AggregationColumn::Key("stateID"));
             state.push(AggregationColumn::Key("countyID"));
             state.push(AggregationColumn::Key("zoneID"));
- // linkID always starts as Null here; for Macroscale + Zone +
- // roadType the road-type pass promotes it to Key
- // (Java lines 1192–1209), so this position is the same in
- // both Macroscale and non-Macroscale code paths.
+            // linkID always starts as Null here; for Macroscale + Zone +
+            // roadType the road-type pass promotes it to Key
+            // (Java lines 1192–1209), so this position is the same in
+            // both Macroscale and non-Macroscale code paths.
             state.push(AggregationColumn::Null("linkID"));
         }
         GeographicOutputDetail::Link => {
@@ -541,10 +541,10 @@ fn add_road_type_column(
     let kept = inputs.breakdown.road_type;
     let macroscale = matches!(inputs.scale, ModelScale::Macro);
     if macroscale && geo == GeographicOutputDetail::Zone {
- // Special case from Java lines 1164–1227: at Macroscale + Zone,
- // linkID's group-key status is tied to road_type's status. The
- // previously-pushed linkID is a Null; if road_type is kept we
- // promote it to a Key.
+        // Special case from Java lines 1164–1227: at Macroscale + Zone,
+        // linkID's group-key status is tied to road_type's status. The
+        // previously-pushed linkID is a Null; if road_type is kept we
+        // promote it to a Key.
         if kept {
             promote_link_to_key(state);
             state.push(AggregationColumn::Key("roadTypeID"));
@@ -561,7 +561,7 @@ fn add_road_type_column(
 fn promote_link_to_key(state: &mut PlanState) {
     for col in state.columns.iter_mut().rev() {
         if matches!(col, AggregationColumn::Null(n) if *n == "linkID") {
- *col = AggregationColumn::Key("linkID");
+            *col = AggregationColumn::Key("linkID");
             return;
         }
     }
@@ -666,8 +666,8 @@ fn add_base_rate_year_column(state: &mut PlanState, _inputs: &AggregationInputs<
 }
 
 fn add_base_rate_geographic_columns(state: &mut PlanState, geo: GeographicOutputDetail) {
- // BaseRate only carries (zoneID, linkID). State/County/Nation collapse
- // both to 0.
+    // BaseRate only carries (zoneID, linkID). State/County/Nation collapse
+    // both to 0.
     match geo {
         GeographicOutputDetail::Nation
         | GeographicOutputDetail::State
@@ -694,11 +694,11 @@ fn add_base_rate_road_type_column(
     let macroscale = matches!(inputs.scale, ModelScale::Macro);
     let kept = inputs.breakdown.road_type;
     if macroscale && geo == GeographicOutputDetail::Zone && kept {
- // Promote linkID to Key when road type is also kept (Macroscale +
- // Zone + roadType).
+        // Promote linkID to Key when road type is also kept (Macroscale +
+        // Zone + roadType).
         for col in state.columns.iter_mut().rev() {
             if matches!(col, AggregationColumn::Zero(n) if *n == "linkID") {
- *col = AggregationColumn::Key("linkID");
+                *col = AggregationColumn::Key("linkID");
                 break;
             }
         }
@@ -755,13 +755,13 @@ mod tests {
     use super::*;
     use moves_runspec::model::OutputBreakdown;
 
- /// All-false breakdown — used as a baseline for "everything aggregates
- /// away".
+    /// All-false breakdown — used as a baseline for "everything aggregates
+    /// away".
     fn empty_breakdown() -> OutputBreakdown {
         OutputBreakdown::default()
     }
 
- /// Maximally-detailed breakdown (every dimension kept).
+    /// Maximally-detailed breakdown (every dimension kept).
     fn full_breakdown() -> OutputBreakdown {
         OutputBreakdown {
             model_year: true,
@@ -804,8 +804,8 @@ mod tests {
 
     #[test]
     fn emission_year_nation_drops_everything_below_year() {
- // Year + Nation + empty breakdown: nothing survives below the year
- // level except the run/iteration IDs and the SUM.
+        // Year + Nation + empty breakdown: nothing survives below the year
+        // level except the run/iteration IDs and the SUM.
         let b = empty_breakdown();
         let i = inputs(
             OutputTimestep::Year,
@@ -816,16 +816,16 @@ mod tests {
         );
         let plan = emission_aggregation(&i);
         assert_eq!(plan.table, AggregationTable::Emission);
- // Group-by keys: MOVESRunID, iterationID, yearID, pollutantID.
- // (pollutantID is always a key — it's not breakdown-flagged.)
+        // Group-by keys: MOVESRunID, iterationID, yearID, pollutantID.
+        // (pollutantID is always a key — it's not breakdown-flagged.)
         let keys = plan.group_by();
         assert_eq!(
             keys,
             vec!["MOVESRunID", "iterationID", "yearID", "pollutantID"]
         );
- // monthID, dayID, hourID, all geographic, road, process, fuelType,
- // modelYear, sourceType, regClass, SCC, engTech, sector, hp aggregate
- // away.
+        // monthID, dayID, hourID, all geographic, road, process, fuelType,
+        // modelYear, sourceType, regClass, SCC, engTech, sector, hp aggregate
+        // away.
         let aggr = plan.aggregated_columns();
         assert!(aggr.contains(&"monthID"));
         assert!(aggr.contains(&"dayID"));
@@ -840,8 +840,8 @@ mod tests {
         assert!(aggr.contains(&"modelYearID"));
         assert!(aggr.contains(&"sourceTypeID"));
         assert!(aggr.contains(&"SCC"));
- // SUM expression: emissionQuant with weeks-per-month scaling (the
- // Year timestep collapses days into months).
+        // SUM expression: emissionQuant with weeks-per-month scaling (the
+        // Year timestep collapses days into months).
         let sums = plan.sum_columns();
         assert_eq!(
             sums,
@@ -851,8 +851,8 @@ mod tests {
 
     #[test]
     fn emission_hour_link_project_keeps_everything() {
- // Hour + Link + Project domain + full breakdown: every dimension
- // survives.
+        // Hour + Link + Project domain + full breakdown: every dimension
+        // survives.
         let b = full_breakdown();
         let mut i = inputs(
             OutputTimestep::Hour,
@@ -865,7 +865,7 @@ mod tests {
         i.reg_class_id = true;
         let plan = emission_aggregation(&i);
         let keys = plan.group_by();
- // Time + geo + breakdown columns should all be keys.
+        // Time + geo + breakdown columns should all be keys.
         for expected in [
             "MOVESRunID",
             "iterationID",
@@ -892,7 +892,7 @@ mod tests {
                 keys
             );
         }
- // Hour timestep uses portion-of-week scaling on the SUM.
+        // Hour timestep uses portion-of-week scaling on the SUM.
         let sums = plan.sum_columns();
         assert_eq!(
             sums,
@@ -902,8 +902,8 @@ mod tests {
 
     #[test]
     fn macroscale_non_project_link_downgrades_to_county() {
- // Java line 968: Macroscale + non-Project + Link → County. Verify
- // the silent downgrade.
+        // Java line 968: Macroscale + non-Project + Link → County. Verify
+        // the silent downgrade.
         let b = full_breakdown();
         let i = inputs(
             OutputTimestep::Hour,
@@ -912,25 +912,25 @@ mod tests {
             &[Model::Onroad],
             &b,
         );
- // No project domain — should downgrade.
+        // No project domain — should downgrade.
         let plan = emission_aggregation(&i);
         let keys = plan.group_by();
- // linkID is aggregated away (downgraded to County).
+        // linkID is aggregated away (downgraded to County).
         assert!(
             !keys.contains(&"linkID"),
             "linkID survived downgrade: {:?}",
             keys
         );
         assert!(plan.aggregated_columns().contains(&"linkID"));
- // countyID still survives.
+        // countyID still survives.
         assert!(keys.contains(&"countyID"));
     }
 
     #[test]
     fn macroscale_zone_with_road_type_keeps_link() {
- // Java lines 1192–1209: at Macroscale + Zone with roadType=true,
- // linkID is implicit-keyed because zone + roadType uniquely
- // identifies a link.
+        // Java lines 1192–1209: at Macroscale + Zone with roadType=true,
+        // linkID is implicit-keyed because zone + roadType uniquely
+        // identifies a link.
         let b = OutputBreakdown {
             road_type: true,
             ..OutputBreakdown::default()
@@ -955,7 +955,7 @@ mod tests {
 
     #[test]
     fn macroscale_zone_without_road_type_drops_link() {
- // Same scenario but road_type = false → linkID should not be a key.
+        // Same scenario but road_type = false → linkID should not be a key.
         let b = empty_breakdown();
         let i = inputs(
             OutputTimestep::Hour,
@@ -973,8 +973,8 @@ mod tests {
 
     #[test]
     fn activity_plan_has_activity_type_id_and_no_pollutant() {
- // Activity rows replace pollutantID/processID with activityTypeID
- // and SUM `activity` instead of `emissionQuant`.
+        // Activity rows replace pollutantID/processID with activityTypeID
+        // and SUM `activity` instead of `emissionQuant`.
         let b = full_breakdown();
         let i = inputs(
             OutputTimestep::Hour,
@@ -989,14 +989,14 @@ mod tests {
         assert!(!cols.contains(&"pollutantID"));
         assert!(!cols.contains(&"processID"));
         assert!(cols.contains(&"activityTypeID"));
- // The metric is `activity`.
+        // The metric is `activity`.
         let sums: Vec<_> = plan.sum_columns().iter().map(|(c, _)| *c).collect();
         assert_eq!(sums, vec!["activity"]);
     }
 
     #[test]
     fn base_rate_uses_zero_literals_instead_of_null() {
- // BaseRate prefers 0/'' over NULL for dropped columns.
+        // BaseRate prefers 0/'' over NULL for dropped columns.
         let b = empty_breakdown();
         let i = inputs(
             OutputTimestep::Hour,
@@ -1007,14 +1007,14 @@ mod tests {
         );
         let plan = base_rate_aggregation(&i);
         assert_eq!(plan.table, AggregationTable::BaseRate);
- // Dropped columns must be Zero (or EmptyString for SCC), not Null.
+        // Dropped columns must be Zero (or EmptyString for SCC), not Null.
         for col in &plan.columns {
             assert!(
                 !matches!(col, AggregationColumn::Null(_)),
                 "BaseRate plan should not contain Null columns: {col:?}"
             );
         }
- // SCC drop must be EmptyString.
+        // SCC drop must be EmptyString.
         assert!(plan
             .columns
             .iter()
@@ -1023,7 +1023,7 @@ mod tests {
 
     #[test]
     fn base_rate_carries_two_sum_metrics() {
- // meanBaseRate AND emissionRate must both be summed.
+        // meanBaseRate AND emissionRate must both be summed.
         let b = full_breakdown();
         let i = inputs(
             OutputTimestep::Hour,
@@ -1039,9 +1039,9 @@ mod tests {
 
     #[test]
     fn nonroad_year_does_not_apply_temporal_scaling() {
- // Java sets the SUM clause to plain SUM(emissionQuant) when the
- // model includes Nonroad; the weeks-per-month/portion-of-week
- // scaling only fires for Onroad.
+        // Java sets the SUM clause to plain SUM(emissionQuant) when the
+        // model includes Nonroad; the weeks-per-month/portion-of-week
+        // scaling only fires for Onroad.
         let b = empty_breakdown();
         let i = inputs(
             OutputTimestep::Year,
@@ -1053,14 +1053,14 @@ mod tests {
         let plan = emission_aggregation(&i);
         let (_, scale) = plan.sum_columns()[0];
         assert_eq!(scale, TemporalScaling::None);
- // Dropping multiple Nonroad-relevant dimensions should also flip
- // the activity-weight flag.
+        // Dropping multiple Nonroad-relevant dimensions should also flip
+        // the activity-weight flag.
         assert!(plan.needs_nonroad_activity_weight);
     }
 
     #[test]
     fn onroad_year_uses_weeks_per_month_scaling() {
- // Onroad + Year → weeks-per-month temporal scaling.
+        // Onroad + Year → weeks-per-month temporal scaling.
         let b = empty_breakdown();
         let i = inputs(
             OutputTimestep::Year,
@@ -1077,8 +1077,8 @@ mod tests {
 
     #[test]
     fn nonroad_keeps_eng_tech_and_sector_when_flagged() {
- // engTechID, sectorID, hpID are Nonroad-only keys. When models
- // include Nonroad and the breakdown flag is true, they become keys.
+        // engTechID, sectorID, hpID are Nonroad-only keys. When models
+        // include Nonroad and the breakdown flag is true, they become keys.
         let b = OutputBreakdown {
             hp_class: true,
             ..OutputBreakdown::default()
@@ -1101,9 +1101,9 @@ mod tests {
 
     #[test]
     fn onroad_never_keys_nonroad_dimensions() {
- // Onroad-only run: engTechID/sectorID/hpID are NULL even when the
- // breakdown flag is true, since the Java guard `models contains
- // Nonroad` is false.
+        // Onroad-only run: engTechID/sectorID/hpID are NULL even when the
+        // breakdown flag is true, since the Java guard `models contains
+        // Nonroad` is false.
         let b = OutputBreakdown {
             hp_class: true,
             ..OutputBreakdown::default()
@@ -1126,10 +1126,10 @@ mod tests {
 
     #[test]
     fn emission_columns_match_canonical_master_output_table_fields() {
- // Spot-check the destination-schema order against Java's
- // `masterOutputTableFields` constant (lines 276–298 of
- // AggregationSQLGenerator.java). All columns are Keys here
- // because we asked for a maximally-detailed breakdown.
+        // Spot-check the destination-schema order against Java's
+        // `masterOutputTableFields` constant (lines 276–298 of
+        // AggregationSQLGenerator.java). All columns are Keys here
+        // because we asked for a maximally-detailed breakdown.
         let b = full_breakdown();
         let mut i = inputs(
             OutputTimestep::Hour,
@@ -1173,10 +1173,10 @@ mod tests {
 
     #[test]
     fn activity_columns_match_canonical_output_activity_table_fields() {
- // Spot-check the destination-schema order against Java's
- // `outputActivityTableFields` constant (lines 332–353 of
- // AggregationSQLGenerator.java). activityTypeID sits between hpID
- // and the activity metric.
+        // Spot-check the destination-schema order against Java's
+        // `outputActivityTableFields` constant (lines 332–353 of
+        // AggregationSQLGenerator.java). activityTypeID sits between hpID
+        // and the activity metric.
         let b = full_breakdown();
         let mut i = inputs(
             OutputTimestep::Hour,
@@ -1219,8 +1219,8 @@ mod tests {
 
     #[test]
     fn base_rate_columns_match_canonical_output_base_rate_table_fields() {
- // Spot-check against Java's `outputBaseRateOutputTableFields`
- // (lines 358–375 of AggregationSQLGenerator.java).
+        // Spot-check against Java's `outputBaseRateOutputTableFields`
+        // (lines 358–375 of AggregationSQLGenerator.java).
         let b = full_breakdown();
         let mut i = inputs(
             OutputTimestep::Hour,
@@ -1259,7 +1259,7 @@ mod tests {
 
     #[test]
     fn day_timestep_keeps_day_drops_hour() {
- // Day timestep: yearID, monthID, dayID are keys; hourID is NULL.
+        // Day timestep: yearID, monthID, dayID are keys; hourID is NULL.
         let b = empty_breakdown();
         let i = inputs(
             OutputTimestep::Day,
@@ -1274,7 +1274,7 @@ mod tests {
         assert!(keys.contains(&"monthID"));
         assert!(keys.contains(&"dayID"));
         assert!(!keys.contains(&"hourID"));
- // Onroad + day timestep → portion-of-week scaling.
+        // Onroad + day timestep → portion-of-week scaling.
         let (_, scale) = plan.sum_columns()[0];
         assert_eq!(scale, TemporalScaling::PortionOfWeekPerDay);
     }
@@ -1295,7 +1295,7 @@ mod tests {
         assert!(keys.contains(&"monthID"));
         assert!(!keys.contains(&"dayID"));
         assert!(!keys.contains(&"hourID"));
- // Onroad + month timestep → weeks-per-month scaling.
+        // Onroad + month timestep → weeks-per-month scaling.
         let (_, scale) = plan.sum_columns()[0];
         assert_eq!(scale, TemporalScaling::WeeksPerMonth);
     }
@@ -1339,8 +1339,8 @@ mod tests {
 
     #[test]
     fn base_rate_year_uses_zero_for_month_and_hourday() {
- // BaseRate at Year-timestep collapses both monthID and hourDayID
- // to Zero.
+        // BaseRate at Year-timestep collapses both monthID and hourDayID
+        // to Zero.
         let b = full_breakdown();
         let i = inputs(
             OutputTimestep::Year,
@@ -1364,9 +1364,9 @@ mod tests {
 
     #[test]
     fn nation_geographic_marks_nonroad_weight_needed() {
- // Java line 986: NATION geographic detail flips
- // nrNeedsActivityWeight = true regardless of model. Verify the
- // flag fires even for Onroad runs (Java also sets it).
+        // Java line 986: NATION geographic detail flips
+        // nrNeedsActivityWeight = true regardless of model. Verify the
+        // flag fires even for Onroad runs (Java also sets it).
         let b = full_breakdown();
         let i = inputs(
             OutputTimestep::Hour,
@@ -1381,9 +1381,9 @@ mod tests {
 
     #[test]
     fn plan_accessors_partition_columns_correctly() {
- // Sanity check: every column is reachable via exactly one of the
- // partitioning accessors (group_by / aggregated_columns /
- // sum_columns).
+        // Sanity check: every column is reachable via exactly one of the
+        // partitioning accessors (group_by / aggregated_columns /
+        // sum_columns).
         let b = full_breakdown();
         let mut i = inputs(
             OutputTimestep::Day,

@@ -176,9 +176,9 @@ const OFF_NETWORK_ROAD_TYPE_ID: i32 = 1;
 /// which also reads `regClassID`).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceBinRow {
- /// `sourceBinID` — `BIGINT` primary key.
+    /// `sourceBinID` — `BIGINT` primary key.
     pub source_bin_id: i64,
- /// `fuelTypeID` — fuel type.
+    /// `fuelTypeID` — fuel type.
     pub fuel_type_id: i32,
 }
 
@@ -186,13 +186,13 @@ pub struct SourceBinRow {
 /// `(sourceTypeModelYear)` group's activity for one `polProcessID`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceBinDistributionRow {
- /// `sourceTypeModelYearID` — surrogate key for a `(sourceType, modelYear)`.
+    /// `sourceTypeModelYearID` — surrogate key for a `(sourceType, modelYear)`.
     pub source_type_model_year_id: i32,
- /// `polProcessID` — `pollutantID * 100 + processID`.
+    /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
- /// `sourceBinID` — joins to [`SourceBinRow::source_bin_id`].
+    /// `sourceBinID` — joins to [`SourceBinRow::source_bin_id`].
     pub source_bin_id: i64,
- /// `sourceBinActivityFraction` — the bin's share of the group's activity.
+    /// `sourceBinActivityFraction` — the bin's share of the group's activity.
     pub source_bin_activity_fraction: f64,
 }
 
@@ -200,11 +200,11 @@ pub struct SourceBinDistributionRow {
 /// surrogate key into its `(sourceTypeID, modelYearID)` components.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SourceTypeModelYearRow {
- /// `sourceTypeModelYearID` — the surrogate key.
+    /// `sourceTypeModelYearID` — the surrogate key.
     pub source_type_model_year_id: i32,
- /// `sourceTypeID` — MOVES source (vehicle) type.
+    /// `sourceTypeID` — MOVES source (vehicle) type.
     pub source_type_id: i32,
- /// `modelYearID` — vehicle model year.
+    /// `modelYearID` — vehicle model year.
     pub model_year_id: i32,
 }
 
@@ -212,13 +212,13 @@ pub struct SourceTypeModelYearRow {
 /// `(polProcessID, sourceBinID, opModeID)` triple.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct EmissionRateRow {
- /// `polProcessID` — `pollutantID * 100 + processID`.
+    /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
- /// `sourceBinID` — joins to [`SourceBinRow::source_bin_id`].
+    /// `sourceBinID` — joins to [`SourceBinRow::source_bin_id`].
     pub source_bin_id: i64,
- /// `opModeID` — operating mode; `[0, 100)` is running, `100` is start.
+    /// `opModeID` — operating mode; `[0, 100)` is running, `100` is start.
     pub op_mode_id: i32,
- /// `meanBaseRate` — the base emission rate. `FLOAT` in MOVES.
+    /// `meanBaseRate` — the base emission rate. `FLOAT` in MOVES.
     pub mean_base_rate: f64,
 }
 
@@ -226,11 +226,11 @@ pub struct EmissionRateRow {
 /// `(pollutantID, processID)` components.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PollutantProcessAssocRow {
- /// `polProcessID` — the surrogate key.
+    /// `polProcessID` — the surrogate key.
     pub pol_process_id: i32,
- /// `pollutantID` — the pollutant half.
+    /// `pollutantID` — the pollutant half.
     pub pollutant_id: i32,
- /// `processID` — the process half.
+    /// `processID` — the process half.
     pub process_id: i32,
 }
 
@@ -239,49 +239,49 @@ pub struct PollutantProcessAssocRow {
 /// extracted process(es).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct EmissionProcessRow {
- /// `processID` — the process primary key.
+    /// `processID` — the process primary key.
     pub process_id: i32,
 }
 
 /// One `HourDay` row — the `hourDayID` → `(dayID, hourID)` split.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HourDayRow {
- /// `hourDayID` — the surrogate key.
+    /// `hourDayID` — the surrogate key.
     pub hour_day_id: i32,
- /// `dayID` — day-of-week type.
+    /// `dayID` — day-of-week type.
     pub day_id: i32,
- /// `hourID` — hour of day.
+    /// `hourID` — hour of day.
     pub hour_id: i32,
 }
 
 /// One `Link` row — a road link's geography and road type.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LinkRow {
- /// `linkID` — the link primary key.
+    /// `linkID` — the link primary key.
     pub link_id: i32,
- /// `countyID` — joins to [`CountyRow::county_id`].
+    /// `countyID` — joins to [`CountyRow::county_id`].
     pub county_id: i32,
- /// `zoneID` — the zone the link belongs to.
+    /// `zoneID` — the zone the link belongs to.
     pub zone_id: i32,
- /// `roadTypeID` — road type; `1` is off-network.
+    /// `roadTypeID` — road type; `1` is off-network.
     pub road_type_id: i32,
 }
 
 /// One `County` row — supplies the `stateID` for a county.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CountyRow {
- /// `countyID` — the county primary key.
+    /// `countyID` — the county primary key.
     pub county_id: i32,
- /// `stateID` — the state the county belongs to.
+    /// `stateID` — the state the county belongs to.
     pub state_id: i32,
 }
 
 /// One `Zone` row — supplies the `countyID` for a zone.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ZoneRow {
- /// `zoneID` — the zone primary key.
+    /// `zoneID` — the zone primary key.
     pub zone_id: i32,
- /// `countyID` — joins to [`CountyRow::county_id`].
+    /// `countyID` — joins to [`CountyRow::county_id`].
     pub county_id: i32,
 }
 
@@ -289,19 +289,19 @@ pub struct ZoneRow {
 /// `(hourDay, month, year, age, link, sourceType)` cell.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ShoRow {
- /// `hourDayID` — joins to [`HourDayRow::hour_day_id`].
+    /// `hourDayID` — joins to [`HourDayRow::hour_day_id`].
     pub hour_day_id: i32,
- /// `monthID` — calendar month.
+    /// `monthID` — calendar month.
     pub month_id: i32,
- /// `yearID` — calendar year.
+    /// `yearID` — calendar year.
     pub year_id: i32,
- /// `ageID` — vehicle age in years; `modelYearID = yearID - ageID`.
+    /// `ageID` — vehicle age in years; `modelYearID = yearID - ageID`.
     pub age_id: i32,
- /// `linkID` — joins to [`LinkRow::link_id`].
+    /// `linkID` — joins to [`LinkRow::link_id`].
     pub link_id: i32,
- /// `sourceTypeID` — MOVES source (vehicle) type.
+    /// `sourceTypeID` — MOVES source (vehicle) type.
     pub source_type_id: i32,
- /// `SHO` — source hours operating. `FLOAT` in MOVES.
+    /// `SHO` — source hours operating. `FLOAT` in MOVES.
     pub sho: f64,
 }
 
@@ -309,19 +309,19 @@ pub struct ShoRow {
 /// age, zone, sourceType)` cell. Engine starts are zone-level, not link-level.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StartsRow {
- /// `hourDayID` — joins to [`HourDayRow::hour_day_id`].
+    /// `hourDayID` — joins to [`HourDayRow::hour_day_id`].
     pub hour_day_id: i32,
- /// `monthID` — calendar month.
+    /// `monthID` — calendar month.
     pub month_id: i32,
- /// `yearID` — calendar year.
+    /// `yearID` — calendar year.
     pub year_id: i32,
- /// `ageID` — vehicle age in years; `modelYearID = yearID - ageID`.
+    /// `ageID` — vehicle age in years; `modelYearID = yearID - ageID`.
     pub age_id: i32,
- /// `zoneID` — the zone the starts occur in.
+    /// `zoneID` — the zone the starts occur in.
     pub zone_id: i32,
- /// `sourceTypeID` — MOVES source (vehicle) type.
+    /// `sourceTypeID` — MOVES source (vehicle) type.
     pub source_type_id: i32,
- /// `starts` — number of engine starts. `FLOAT` in MOVES.
+    /// `starts` — number of engine starts. `FLOAT` in MOVES.
     pub starts: f64,
 }
 
@@ -334,23 +334,23 @@ pub struct StartsRow {
 /// data-plane contract the unit tests build directly.
 #[derive(Debug, Clone, Default)]
 pub struct RunningExhaustInputs {
- /// `SHO` rows — the running-exhaust activity.
+    /// `SHO` rows — the running-exhaust activity.
     pub sho: Vec<ShoRow>,
- /// `HourDay` rows.
+    /// `HourDay` rows.
     pub hour_day: Vec<HourDayRow>,
- /// `Link` rows.
+    /// `Link` rows.
     pub link: Vec<LinkRow>,
- /// `County` rows.
+    /// `County` rows.
     pub county: Vec<CountyRow>,
- /// `SourceBin` rows.
+    /// `SourceBin` rows.
     pub source_bin: Vec<SourceBinRow>,
- /// `SourceBinDistribution` rows.
+    /// `SourceBinDistribution` rows.
     pub source_bin_distribution: Vec<SourceBinDistributionRow>,
- /// `SourceTypeModelYear` rows.
+    /// `SourceTypeModelYear` rows.
     pub source_type_model_year: Vec<SourceTypeModelYearRow>,
- /// `EmissionRate` rows.
+    /// `EmissionRate` rows.
     pub emission_rate: Vec<EmissionRateRow>,
- /// `PollutantProcessAssoc` rows.
+    /// `PollutantProcessAssoc` rows.
     pub pollutant_process_assoc: Vec<PollutantProcessAssocRow>,
 }
 
@@ -363,27 +363,27 @@ pub struct RunningExhaustInputs {
 /// data-plane contract the unit tests build directly.
 #[derive(Debug, Clone, Default)]
 pub struct StartExhaustInputs {
- /// `Starts` rows — the start-exhaust activity.
+    /// `Starts` rows — the start-exhaust activity.
     pub starts: Vec<StartsRow>,
- /// `HourDay` rows.
+    /// `HourDay` rows.
     pub hour_day: Vec<HourDayRow>,
- /// `Link` rows.
+    /// `Link` rows.
     pub link: Vec<LinkRow>,
- /// `County` rows.
+    /// `County` rows.
     pub county: Vec<CountyRow>,
- /// `Zone` rows.
+    /// `Zone` rows.
     pub zone: Vec<ZoneRow>,
- /// `SourceBin` rows.
+    /// `SourceBin` rows.
     pub source_bin: Vec<SourceBinRow>,
- /// `SourceBinDistribution` rows.
+    /// `SourceBinDistribution` rows.
     pub source_bin_distribution: Vec<SourceBinDistributionRow>,
- /// `SourceTypeModelYear` rows.
+    /// `SourceTypeModelYear` rows.
     pub source_type_model_year: Vec<SourceTypeModelYearRow>,
- /// `EmissionRate` rows.
+    /// `EmissionRate` rows.
     pub emission_rate: Vec<EmissionRateRow>,
- /// `PollutantProcessAssoc` rows.
+    /// `PollutantProcessAssoc` rows.
     pub pollutant_process_assoc: Vec<PollutantProcessAssocRow>,
- /// `EmissionProcess` rows.
+    /// `EmissionProcess` rows.
     pub emission_process: Vec<EmissionProcessRow>,
 }
 
@@ -395,43 +395,43 @@ pub struct StartExhaustInputs {
 /// algorithm input.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct EmissionRow {
- /// `yearID`.
+    /// `yearID`.
     pub year_id: i32,
- /// `monthID`.
+    /// `monthID`.
     pub month_id: i32,
- /// `dayID`.
+    /// `dayID`.
     pub day_id: i32,
- /// `hourID`.
+    /// `hourID`.
     pub hour_id: i32,
- /// `stateID`.
+    /// `stateID`.
     pub state_id: i32,
- /// `countyID`.
+    /// `countyID`.
     pub county_id: i32,
- /// `zoneID`.
+    /// `zoneID`.
     pub zone_id: i32,
- /// `linkID`.
+    /// `linkID`.
     pub link_id: i32,
- /// `pollutantID` — always `6` (nitrous oxide, N2O).
+    /// `pollutantID` — always `6` (nitrous oxide, N2O).
     pub pollutant_id: i32,
- /// `processID` — `1` (Running Exhaust) or `2` (Start Exhaust).
+    /// `processID` — `1` (Running Exhaust) or `2` (Start Exhaust).
     pub process_id: i32,
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: i32,
- /// `fuelTypeID`.
+    /// `fuelTypeID`.
     pub fuel_type_id: i32,
- /// `modelYearID`.
+    /// `modelYearID`.
     pub model_year_id: i32,
- /// `roadTypeID`.
+    /// `roadTypeID`.
     pub road_type_id: i32,
- /// `emissionQuant` — the emission total for this dimension cell.
+    /// `emissionQuant` — the emission total for this dimension cell.
     pub emission_quant: f64,
 }
 
 impl EmissionRow {
- /// The integer dimension tuple — every column except `emission_quant`,
- /// in `MOVESWorkerOutputTemp` column order. Used both to sort the output
- /// deterministically (MOVES leaves `MOVESWorkerOutput` physically
- /// unordered) and as the `GROUP BY` key of the start-exhaust aggregation.
+    /// The integer dimension tuple — every column except `emission_quant`,
+    /// in `MOVESWorkerOutputTemp` column order. Used both to sort the output
+    /// deterministically (MOVES leaves `MOVESWorkerOutput` physically
+    /// unordered) and as the `GROUP BY` key of the start-exhaust aggregation.
     fn dimension_key(&self) -> [i32; 14] {
         [
             self.year_id,
@@ -451,9 +451,9 @@ impl EmissionRow {
         ]
     }
 
- /// Rebuild a row from a [`dimension_key`](Self::dimension_key) tuple and
- /// its emission total — the inverse of `dimension_key`, used to turn the
- /// start-exhaust `GROUP BY` accumulator back into rows.
+    /// Rebuild a row from a [`dimension_key`](Self::dimension_key) tuple and
+    /// its emission total — the inverse of `dimension_key`, used to turn the
+    /// start-exhaust `GROUP BY` accumulator back into rows.
     fn from_dimension_key(key: [i32; 14], emission_quant: f64) -> Self {
         Self {
             year_id: key[0],
@@ -1522,25 +1522,25 @@ type EmissionRate3Index = FxHashMap<(i32, i32), Vec<(i32, i32, i32, f64)>>;
 /// [`calculate_start`](Self::calculate_start).
 #[derive(Debug, Clone)]
 pub struct Ch4N2oRunningStartCalculator {
- /// The Running Exhaust and Start Exhaust master-loop subscriptions,
- /// built once in [`Self::new`].
+    /// The Running Exhaust and Start Exhaust master-loop subscriptions,
+    /// built once in [`Self::new`].
     subscriptions: [CalculatorSubscription; 2],
 }
 
 impl Ch4N2oRunningStartCalculator {
- /// Stable module name — matches the Java class and the chain-DAG entry.
+    /// Stable module name — matches the Java class and the chain-DAG entry.
     pub const NAME: &'static str = CALCULATOR_NAME;
 
- /// Construct the calculator with its master-loop subscriptions.
- ///
- /// `CH4N2ORunningStartCalculator.subscribeToMe` signs up for the Running
- /// Exhaust and Start Exhaust processes — each at `MONTH` granularity
- /// with `EMISSION_CALCULATOR` priority — gated on whether the RunSpec
- /// requests the process. `calculator-dag.json` collapses the two
- /// `targetLoop.subscribe` calls into one entry with an unresolved
- /// process id; this port records both resolved subscriptions. The
- /// RunSpec gating is a registry-time concern, not part of the static
- /// subscription metadata.
+    /// Construct the calculator with its master-loop subscriptions.
+    ///
+    /// `CH4N2ORunningStartCalculator.subscribeToMe` signs up for the Running
+    /// Exhaust and Start Exhaust processes — each at `MONTH` granularity
+    /// with `EMISSION_CALCULATOR` priority — gated on whether the RunSpec
+    /// requests the process. `calculator-dag.json` collapses the two
+    /// `targetLoop.subscribe` calls into one entry with an unresolved
+    /// process id; this port records both resolved subscriptions. The
+    /// RunSpec gating is a registry-time concern, not part of the static
+    /// subscription metadata.
     #[must_use]
     pub fn new() -> Self {
         let priority = Priority::parse("EMISSION_CALCULATOR")
@@ -1553,64 +1553,64 @@ impl Ch4N2oRunningStartCalculator {
         }
     }
 
- /// Port of `doesProcessContext` — whether the master loop should run the
- /// calculator for a `(process, road type)` context.
- ///
- /// Running Exhaust runs for every road type. Start Exhaust runs **only**
- /// for the off-network road type (`roadTypeID == 1`) — engine starts are
- /// modelled as off-network activity. The Java predicate returns `false`
- /// only when the process is Start Exhaust and the road type is a
- /// positive non-off-network id; an absent (`<= 0`) road type still
- /// passes. [`calculate_start`](Self::calculate_start) applies the same
- /// off-network exclusion at row grain, so its pure compute is correct
- /// for any input; this predicate is the master-loop context-filter form
- /// the `execute` wiring uses.
+    /// Port of `doesProcessContext` — whether the master loop should run the
+    /// calculator for a `(process, road type)` context.
+    ///
+    /// Running Exhaust runs for every road type. Start Exhaust runs **only**
+    /// for the off-network road type (`roadTypeID == 1`) — engine starts are
+    /// modelled as off-network activity. The Java predicate returns `false`
+    /// only when the process is Start Exhaust and the road type is a
+    /// positive non-off-network id; an absent (`<= 0`) road type still
+    /// passes. [`calculate_start`](Self::calculate_start) applies the same
+    /// off-network exclusion at row grain, so its pure compute is correct
+    /// for any input; this predicate is the master-loop context-filter form
+    /// the `execute` wiring uses.
     #[must_use]
     pub fn processes_context(process_id: i32, road_type_id: i32) -> bool {
         let is_start = process_id == i32::from(START_EXHAUST.0);
         !(is_start && road_type_id > 0 && road_type_id != OFF_NETWORK_ROAD_TYPE_ID)
     }
 
- /// Compute the running-exhaust emission rows — the port of the
- /// `CH4N2ORunningStartCalculator.sql` `-- Section Running Exhaust` of
- /// "Processing".
- ///
- /// Each output row is `emissionQuant = SHO × Σ(sourceBinActivityFraction
- /// × meanBaseRate)`. The result is sorted by its integer dimension
- /// columns for deterministic output — MOVES leaves `MOVESWorkerOutput`
- /// physically unordered.
+    /// Compute the running-exhaust emission rows — the port of the
+    /// `CH4N2ORunningStartCalculator.sql` `-- Section Running Exhaust` of
+    /// "Processing".
+    ///
+    /// Each output row is `emissionQuant = SHO × Σ(sourceBinActivityFraction
+    /// × meanBaseRate)`. The result is sorted by its integer dimension
+    /// columns for deterministic output — MOVES leaves `MOVESWorkerOutput`
+    /// physically unordered.
     #[must_use]
     pub fn calculate_running(&self, inputs: &RunningExhaustInputs) -> Vec<EmissionRow> {
- // PollutantProcessAssoc lookup — resolves polProcessID into
- // (pollutantID, processID).
+        // PollutantProcessAssoc lookup — resolves polProcessID into
+        // (pollutantID, processID).
         let ppa: FxHashMap<i32, &PollutantProcessAssocRow> = inputs
             .pollutant_process_assoc
             .iter()
             .map(|r| (r.pol_process_id, r))
             .collect();
- // SourceBin lookup — sourceBinID → fuelTypeID.
+        // SourceBin lookup — sourceBinID → fuelTypeID.
         let source_bin: FxHashMap<i64, &SourceBinRow> = inputs
             .source_bin
             .iter()
             .map(|r| (r.source_bin_id, r))
             .collect();
- // SourceTypeModelYear lookup.
+        // SourceTypeModelYear lookup.
         let stmy: FxHashMap<i32, &SourceTypeModelYearRow> = inputs
             .source_type_model_year
             .iter()
             .map(|r| (r.source_type_model_year_id, r))
             .collect();
 
- // EmissionRate2: EmissionRate ⋈ PollutantProcessAssoc on
- // polProcessID, kept for pollutantID == 6 and opModeID ∈ [0, 100).
- // Indexed by (polProcessID, sourceBinID); a key carries one
- // meanBaseRate per surviving operating mode.
+        // EmissionRate2: EmissionRate ⋈ PollutantProcessAssoc on
+        // polProcessID, kept for pollutantID == 6 and opModeID ∈ [0, 100).
+        // Indexed by (polProcessID, sourceBinID); a key carries one
+        // meanBaseRate per surviving operating mode.
         let mut emission_rate2: FxHashMap<(i32, i64), Vec<f64>> = FxHashMap::default();
         for er in &inputs.emission_rate {
             if !(RUNNING_OP_MODE_MIN..RUNNING_OP_MODE_MAX).contains(&er.op_mode_id) {
                 continue;
             }
- // INNER JOIN PollutantProcessAssoc USING (polProcessID).
+            // INNER JOIN PollutantProcessAssoc USING (polProcessID).
             let Some(assoc) = ppa.get(&er.pol_process_id) else {
                 continue;
             };
@@ -1623,33 +1623,33 @@ impl Ch4N2oRunningStartCalculator {
                 .push(er.mean_base_rate);
         }
 
- // EmissionRate3: Σ(sourceBinActivityFraction × meanBaseRate) over
- // SourceBinDistribution3 ⋈ EmissionRate2 USING (polProcessID,
- // sourceBinID), grouped by (sourceTypeModelYearID, fuelTypeID,
- // pollutantID, processID).
+        // EmissionRate3: Σ(sourceBinActivityFraction × meanBaseRate) over
+        // SourceBinDistribution3 ⋈ EmissionRate2 USING (polProcessID,
+        // sourceBinID), grouped by (sourceTypeModelYearID, fuelTypeID,
+        // pollutantID, processID).
         let mut emission_rate3: FxHashMap<(i32, i32, i32, i32), f64> = FxHashMap::default();
         for sbd in &inputs.source_bin_distribution {
- // SBD2: INNER JOIN SourceBin USING (sourceBinID).
+            // SBD2: INNER JOIN SourceBin USING (sourceBinID).
             let Some(sb) = source_bin.get(&sbd.source_bin_id) else {
                 continue;
             };
- // SBD3: INNER JOIN SourceTypeModelYear USING
- // (sourceTypeModelYearID).
+            // SBD3: INNER JOIN SourceTypeModelYear USING
+            // (sourceTypeModelYearID).
             if !stmy.contains_key(&sbd.source_type_model_year_id) {
                 continue;
             }
- // INNER JOIN EmissionRate2 USING (polProcessID, sourceBinID).
+            // INNER JOIN EmissionRate2 USING (polProcessID, sourceBinID).
             let Some(rates) = emission_rate2.get(&(sbd.pol_process_id, sbd.source_bin_id)) else {
                 continue;
             };
- // EmissionRate2 only holds keys whose polProcessID resolved
- // through `ppa`, so this lookup always succeeds; `continue`
- // keeps the join total without an unreachable panic.
+            // EmissionRate2 only holds keys whose polProcessID resolved
+            // through `ppa`, so this lookup always succeeds; `continue`
+            // keeps the join total without an unreachable panic.
             let Some(assoc) = ppa.get(&sbd.pol_process_id) else {
                 continue;
             };
             for &mean_base_rate in rates {
- *emission_rate3
+                *emission_rate3
                     .entry((
                         sbd.source_type_model_year_id,
                         sb.fuel_type_id,
@@ -1660,12 +1660,12 @@ impl Ch4N2oRunningStartCalculator {
             }
         }
 
- // Index EmissionRate3 by (sourceTypeID, modelYearID) for the
- // WorkerOutputBySourceType join — sourceTypeModelYearID resolves to
- // exactly that pair.
+        // Index EmissionRate3 by (sourceTypeID, modelYearID) for the
+        // WorkerOutputBySourceType join — sourceTypeModelYearID resolves to
+        // exactly that pair.
         let mut er3_index: EmissionRate3Index = FxHashMap::default();
         for (&(stmy_id, fuel_type_id, pollutant_id, process_id), &sbaf_x_mbr) in &emission_rate3 {
- // stmy present — the SBD3 inner join above required it.
+            // stmy present — the SBD3 inner join above required it.
             let Some(stmy_row) = stmy.get(&stmy_id) else {
                 continue;
             };
@@ -1675,8 +1675,8 @@ impl Ch4N2oRunningStartCalculator {
                 .push((fuel_type_id, pollutant_id, process_id, sbaf_x_mbr));
         }
 
- // SHO ⋈ HourDay (SHO2) ⋈ Link ⋈ County (Link2/SHO3) ⋈ EmissionRate3
- // (WorkerOutputBySourceType).
+        // SHO ⋈ HourDay (SHO2) ⋈ Link ⋈ County (Link2/SHO3) ⋈ EmissionRate3
+        // (WorkerOutputBySourceType).
         let hour_day: FxHashMap<i32, &HourDayRow> =
             inputs.hour_day.iter().map(|r| (r.hour_day_id, r)).collect();
         let link: FxHashMap<i32, &LinkRow> = inputs.link.iter().map(|r| (r.link_id, r)).collect();
@@ -1685,21 +1685,21 @@ impl Ch4N2oRunningStartCalculator {
 
         let mut out: Vec<EmissionRow> = Vec::new();
         for sho in &inputs.sho {
- // SHO2: INNER JOIN HourDay USING (hourDayID).
+            // SHO2: INNER JOIN HourDay USING (hourDayID).
             let Some(hd) = hour_day.get(&sho.hour_day_id) else {
                 continue;
             };
             let model_year_id = sho.year_id - sho.age_id;
- // SHO3: INNER JOIN Link2 (= Link ⋈ County USING (countyID))
- // USING (linkID).
+            // SHO3: INNER JOIN Link2 (= Link ⋈ County USING (countyID))
+            // USING (linkID).
             let Some(link_row) = link.get(&sho.link_id) else {
                 continue;
             };
             let Some(county_row) = county.get(&link_row.county_id) else {
                 continue;
             };
- // WorkerOutputBySourceType: INNER JOIN EmissionRate3 USING
- // (sourceTypeID, modelYearID).
+            // WorkerOutputBySourceType: INNER JOIN EmissionRate3 USING
+            // (sourceTypeID, modelYearID).
             let Some(rate_rows) = er3_index.get(&(sho.source_type_id, model_year_id)) else {
                 continue;
             };
@@ -1728,20 +1728,20 @@ impl Ch4N2oRunningStartCalculator {
         out
     }
 
- /// Compute the start-exhaust emission rows — the port of the
- /// `CH4N2ORunningStartCalculator.sql` `-- Section Start Exhaust` of
- /// "Processing".
- ///
- /// Each output row is `emissionQuant = Σ(sourceBinActivityFraction ×
- /// starts × meanBaseRate)`, summed over the SQL's fourteen-column
- /// `GROUP BY`. Only off-network links (`roadTypeID == 1`) participate:
- /// engine starts are zone-level, and joining them to every link of a
- /// zone would multi-count — MOVES extracts only the off-network link
- /// (see [`processes_context`](Self::processes_context)). The result is
- /// sorted by its integer dimension columns for deterministic output.
+    /// Compute the start-exhaust emission rows — the port of the
+    /// `CH4N2ORunningStartCalculator.sql` `-- Section Start Exhaust` of
+    /// "Processing".
+    ///
+    /// Each output row is `emissionQuant = Σ(sourceBinActivityFraction ×
+    /// starts × meanBaseRate)`, summed over the SQL's fourteen-column
+    /// `GROUP BY`. Only off-network links (`roadTypeID == 1`) participate:
+    /// engine starts are zone-level, and joining them to every link of a
+    /// zone would multi-count — MOVES extracts only the off-network link
+    /// (see [`processes_context`](Self::processes_context)). The result is
+    /// sorted by its integer dimension columns for deterministic output.
     #[must_use]
     pub fn calculate_start(&self, inputs: &StartExhaustInputs) -> Vec<EmissionRow> {
- // Primary-key lookups.
+        // Primary-key lookups.
         let hour_day: FxHashMap<i32, &HourDayRow> =
             inputs.hour_day.iter().map(|r| (r.hour_day_id, r)).collect();
         let county: FxHashMap<i32, &CountyRow> =
@@ -1757,23 +1757,23 @@ impl Ch4N2oRunningStartCalculator {
             .map(|r| (r.pol_process_id, r))
             .collect();
         let zone: FxHashMap<i32, &ZoneRow> = inputs.zone.iter().map(|r| (r.zone_id, r)).collect();
- // EmissionProcess set — the `ppa.processID = ep.processID` join
- // gates ppa rows to the extracted process(es).
+        // EmissionProcess set — the `ppa.processID = ep.processID` join
+        // gates ppa rows to the extracted process(es).
         let process_ids: HashSet<i32> = inputs
             .emission_process
             .iter()
             .map(|r| r.process_id)
             .collect();
- // SourceTypeModelYear keyed by (sourceTypeID, modelYearID) — the
- // `st.ageID = st.yearID - stmy.modelYearID AND st.sourceTypeID =
- // stmy.sourceTypeID` join target.
+        // SourceTypeModelYear keyed by (sourceTypeID, modelYearID) — the
+        // `st.ageID = st.yearID - stmy.modelYearID AND st.sourceTypeID =
+        // stmy.sourceTypeID` join target.
         let stmy_by_type_year: FxHashMap<(i32, i32), &SourceTypeModelYearRow> = inputs
             .source_type_model_year
             .iter()
             .map(|r| ((r.source_type_id, r.model_year_id), r))
             .collect();
- // Link keyed by zoneID, off-network only — the SQL joins starts to
- // links through `st.zoneID = l.zoneID`; see the method docs.
+        // Link keyed by zoneID, off-network only — the SQL joins starts to
+        // links through `st.zoneID = l.zoneID`; see the method docs.
         let mut links_by_zone: FxHashMap<i32, Vec<&LinkRow>> = FxHashMap::default();
         for l in &inputs.link {
             if l.road_type_id != OFF_NETWORK_ROAD_TYPE_ID {
@@ -1781,7 +1781,7 @@ impl Ch4N2oRunningStartCalculator {
             }
             links_by_zone.entry(l.zone_id).or_default().push(l);
         }
- // SourceBinDistribution keyed by sourceTypeModelYearID.
+        // SourceBinDistribution keyed by sourceTypeModelYearID.
         let mut sbd_by_stmy: FxHashMap<i32, Vec<&SourceBinDistributionRow>> = FxHashMap::default();
         for sbd in &inputs.source_bin_distribution {
             sbd_by_stmy
@@ -1789,9 +1789,9 @@ impl Ch4N2oRunningStartCalculator {
                 .or_default()
                 .push(sbd);
         }
- // EmissionRate keyed by (polProcessID, sourceBinID) for opModeID ==
- // 100; (polProcessID, sourceBinID, opModeID) is unique, so the
- // start operating mode gives at most one rate per key.
+        // EmissionRate keyed by (polProcessID, sourceBinID) for opModeID ==
+        // 100; (polProcessID, sourceBinID, opModeID) is unique, so the
+        // start operating mode gives at most one rate per key.
         let mut emission_rate_start: FxHashMap<(i32, i64), f64> = FxHashMap::default();
         for er in &inputs.emission_rate {
             if er.op_mode_id != START_OP_MODE_ID {
@@ -1800,36 +1800,36 @@ impl Ch4N2oRunningStartCalculator {
             emission_rate_start.insert((er.pol_process_id, er.source_bin_id), er.mean_base_rate);
         }
 
- // The fourteen-column GROUP BY accumulator.
+        // The fourteen-column GROUP BY accumulator.
         let mut totals: FxHashMap<[i32; 14], f64> = FxHashMap::default();
         for st in &inputs.starts {
- // INNER JOIN HourDay USING (hourDayID).
+            // INNER JOIN HourDay USING (hourDayID).
             let Some(hd) = hour_day.get(&st.hour_day_id) else {
                 continue;
             };
- // INNER JOIN SourceTypeModelYear ON st.sourceTypeID =
- // stmy.sourceTypeID AND st.ageID = st.yearID - stmy.modelYearID,
- // i.e. modelYearID = yearID - ageID.
+            // INNER JOIN SourceTypeModelYear ON st.sourceTypeID =
+            // stmy.sourceTypeID AND st.ageID = st.yearID - stmy.modelYearID,
+            // i.e. modelYearID = yearID - ageID.
             let model_year_id = st.year_id - st.age_id;
             let Some(stmy_row) = stmy_by_type_year.get(&(st.source_type_id, model_year_id)) else {
                 continue;
             };
- // INNER JOIN Zone ON st.zoneID = z.zoneID.
+            // INNER JOIN Zone ON st.zoneID = z.zoneID.
             let Some(zone_row) = zone.get(&st.zone_id) else {
                 continue;
             };
- // INNER JOIN Link ON st.zoneID = l.zoneID (off-network only).
+            // INNER JOIN Link ON st.zoneID = l.zoneID (off-network only).
             let Some(zone_links) = links_by_zone.get(&st.zone_id) else {
                 continue;
             };
- // INNER JOIN SourceBinDistribution ON sbd.sourceTypeModelYearID
- // = stmy.sourceTypeModelYearID.
+            // INNER JOIN SourceBinDistribution ON sbd.sourceTypeModelYearID
+            // = stmy.sourceTypeModelYearID.
             let Some(sbd_rows) = sbd_by_stmy.get(&stmy_row.source_type_model_year_id) else {
                 continue;
             };
             for link_row in zone_links {
- // INNER JOIN County ON c.countyID = l.countyID AND
- // c.countyID = z.countyID.
+                // INNER JOIN County ON c.countyID = l.countyID AND
+                // c.countyID = z.countyID.
                 if link_row.county_id != zone_row.county_id {
                     continue;
                 }
@@ -1837,27 +1837,27 @@ impl Ch4N2oRunningStartCalculator {
                     continue;
                 };
                 for sbd in sbd_rows {
- // INNER JOIN PollutantProcessAssoc ON sbd.polProcessID =
- // ppa.polProcessID, with ppa.pollutantID = 6.
+                    // INNER JOIN PollutantProcessAssoc ON sbd.polProcessID =
+                    // ppa.polProcessID, with ppa.pollutantID = 6.
                     let Some(assoc) = ppa.get(&sbd.pol_process_id) else {
                         continue;
                     };
                     if assoc.pollutant_id != N2O_POLLUTANT_ID {
                         continue;
                     }
- // INNER JOIN EmissionProcess ON ppa.processID =
- // ep.processID.
+                    // INNER JOIN EmissionProcess ON ppa.processID =
+                    // ep.processID.
                     if !process_ids.contains(&assoc.process_id) {
                         continue;
                     }
- // INNER JOIN SourceBin ON sbd.sourceBinID =
- // sb.sourceBinID.
+                    // INNER JOIN SourceBin ON sbd.sourceBinID =
+                    // sb.sourceBinID.
                     let Some(sb) = source_bin.get(&sbd.source_bin_id) else {
                         continue;
                     };
- // INNER JOIN EmissionRate ON sbd.polProcessID =
- // er.polProcessID AND sbd.sourceBinID = er.sourceBinID,
- // with er.opModeID = 100.
+                    // INNER JOIN EmissionRate ON sbd.polProcessID =
+                    // er.polProcessID AND sbd.sourceBinID = er.sourceBinID,
+                    // with er.opModeID = 100.
                     let Some(&mean_base_rate) =
                         emission_rate_start.get(&(sbd.pol_process_id, sbd.source_bin_id))
                     else {
@@ -1880,7 +1880,7 @@ impl Ch4N2oRunningStartCalculator {
                         road_type_id: link_row.road_type_id,
                         emission_quant: 0.0,
                     };
- *totals.entry(row.dimension_key()).or_default() +=
+                    *totals.entry(row.dimension_key()).or_default() +=
                         sbd.source_bin_activity_fraction * st.starts * mean_base_rate;
                 }
             }
@@ -1932,30 +1932,30 @@ impl Calculator for Ch4N2oRunningStartCalculator {
         &self.subscriptions
     }
 
- /// `CH4N2ORunningStartCalculator` registers **no** `(pollutant, process)`
- /// pairs.
- ///
- /// The Java constructor calls `EmissionCalculatorRegistration.register`
- /// for nitrous oxide (pollutant 6) on Running Exhaust (process 1) and
- /// Start Exhaust (process 2) — but those are legacy registrations. In
- /// the pinned MOVES, `CalculatorInfo.txt` (the runtime registration
- /// file) has no `Registration` directive for this module: N2O Running
- /// Exhaust `(6, 1)` and N2O Start Exhaust `(6, 2)` are registered to
- /// `BaseRateCalculator` instead (`CalculatorInfo.txt` lines 505–506),
- /// and `calculator-dag.json` records `registrations_count: 0` to match.
- ///
- /// Returning an empty slice keeps this port consistent with the runtime
- /// and prevents the registry from double-registering `(6, 1)`/`(6, 2)`
- /// against `BaseRateCalculator`. See the [module docs](self).
+    /// `CH4N2ORunningStartCalculator` registers **no** `(pollutant, process)`
+    /// pairs.
+    ///
+    /// The Java constructor calls `EmissionCalculatorRegistration.register`
+    /// for nitrous oxide (pollutant 6) on Running Exhaust (process 1) and
+    /// Start Exhaust (process 2) — but those are legacy registrations. In
+    /// the pinned MOVES, `CalculatorInfo.txt` (the runtime registration
+    /// file) has no `Registration` directive for this module: N2O Running
+    /// Exhaust `(6, 1)` and N2O Start Exhaust `(6, 2)` are registered to
+    /// `BaseRateCalculator` instead (`CalculatorInfo.txt` lines 505–506),
+    /// and `calculator-dag.json` records `registrations_count: 0` to match.
+    ///
+    /// Returning an empty slice keeps this port consistent with the runtime
+    /// and prevents the registry from double-registering `(6, 1)`/`(6, 2)`
+    /// against `BaseRateCalculator`. See the [module docs](self).
     fn registrations(&self) -> &[PollutantProcessAssociation] {
         NO_REGISTRATIONS
     }
 
- // `upstream` keeps the trait default (empty): `calculator-dag.json`
- // records no `depends_on` edges. The calculator consumes `SHO` and
- // `Starts` (activity generators) and `SourceBinDistribution` (the source
- // bin distribution generator), but those run earlier by master-loop
- // priority ordering, not as chain dependencies.
+    // `upstream` keeps the trait default (empty): `calculator-dag.json`
+    // records no `depends_on` edges. The calculator consumes `SHO` and
+    // `Starts` (activity generators) and `SourceBinDistribution` (the source
+    // bin distribution generator), but those run earlier by master-loop
+    // priority ordering, not as chain dependencies.
 
     fn input_tables(&self) -> &[&'static str] {
         INPUT_TABLES
@@ -1988,15 +1988,15 @@ pub fn factory() -> Box<dyn Calculator> {
 mod tests {
     use super::*;
 
- /// N2O Running Exhaust `polProcessID` — `pollutantID 6 × 100 + processID 1`.
+    /// N2O Running Exhaust `polProcessID` — `pollutantID 6 × 100 + processID 1`.
     const N2O_RUNNING_POL_PROCESS: i32 = 601;
- /// N2O Start Exhaust `polProcessID` — `pollutantID 6 × 100 + processID 2`.
+    /// N2O Start Exhaust `polProcessID` — `pollutantID 6 × 100 + processID 2`.
     const N2O_START_POL_PROCESS: i32 = 602;
 
- /// A one-`SHO` / one-bin running input whose single output row has
- /// `emissionQuant = SHO 100 × (sbaf 1 × meanBaseRate 2) = 200`.
- /// `sourceTypeModelYearID` follows the MOVES `sourceTypeID * 10000 +
- /// modelYearID` convention (`21 * 10000 + 2018`).
+    /// A one-`SHO` / one-bin running input whose single output row has
+    /// `emissionQuant = SHO 100 × (sbaf 1 × meanBaseRate 2) = 200`.
+    /// `sourceTypeModelYearID` follows the MOVES `sourceTypeID * 10000 +
+    /// modelYearID` convention (`21 * 10000 + 2018`).
     fn minimal_running_inputs() -> RunningExhaustInputs {
         RunningExhaustInputs {
             sho: vec![ShoRow {
@@ -2052,8 +2052,8 @@ mod tests {
         }
     }
 
- /// A one-`Starts` / one-bin start input whose single output row has
- /// `emissionQuant = sbaf 1 × starts 10 × meanBaseRate 3 = 30`.
+    /// A one-`Starts` / one-bin start input whose single output row has
+    /// `emissionQuant = sbaf 1 × starts 10 × meanBaseRate 3 = 30`.
     fn minimal_start_inputs() -> StartExhaustInputs {
         StartExhaustInputs {
             starts: vec![StartsRow {
@@ -2114,7 +2114,7 @@ mod tests {
         }
     }
 
- /// Assert `actual.emission_quant` matches `expected` within `f64` slack /// the FLOAT-column fidelity note means the port computes in `f64`.
+    /// Assert `actual.emission_quant` matches `expected` within `f64` slack /// the FLOAT-column fidelity note means the port computes in `f64`.
     fn assert_emission(actual: &EmissionRow, expected: f64) {
         assert!(
             (actual.emission_quant - expected).abs() < 1e-9,
@@ -2123,7 +2123,7 @@ mod tests {
         );
     }
 
- // ----- Running Exhaust -------------------------------------------------
+    // ----- Running Exhaust -------------------------------------------------
 
     #[test]
     fn running_minimal_input_yields_one_row() {
@@ -2149,8 +2149,8 @@ mod tests {
 
     #[test]
     fn running_sums_mean_base_rate_across_operating_modes() {
- // Two EmissionRate rows for the same bin, distinct running operating
- // modes: EmissionRate3 sums their meanBaseRates into sbafXmbr.
+        // Two EmissionRate rows for the same bin, distinct running operating
+        // modes: EmissionRate3 sums their meanBaseRates into sbafXmbr.
         let mut inputs = minimal_running_inputs();
         inputs.emission_rate.push(EmissionRateRow {
             pol_process_id: N2O_RUNNING_POL_PROCESS,
@@ -2160,15 +2160,15 @@ mod tests {
         });
         let rows = Ch4N2oRunningStartCalculator::new().calculate_running(&inputs);
         assert_eq!(rows.len(), 1);
- // SHO 100 × (sbaf 1 × (meanBaseRate 2 + meanBaseRate 5)).
+        // SHO 100 × (sbaf 1 × (meanBaseRate 2 + meanBaseRate 5)).
         assert_emission(&rows[0], 700.0);
     }
 
     #[test]
     fn running_sums_source_bin_activity_fraction_across_bins() {
- // Two source bins with the same fuel type: EmissionRate3 groups by
- // (sourceTypeModelYearID, fuelTypeID, ...) so their sbaf×meanBaseRate
- // terms add into one fuel-type group.
+        // Two source bins with the same fuel type: EmissionRate3 groups by
+        // (sourceTypeModelYearID, fuelTypeID, ...) so their sbaf×meanBaseRate
+        // terms add into one fuel-type group.
         let mut inputs = minimal_running_inputs();
         inputs.source_bin.push(SourceBinRow {
             source_bin_id: 1001,
@@ -2191,15 +2191,15 @@ mod tests {
         });
         let rows = Ch4N2oRunningStartCalculator::new().calculate_running(&inputs);
         assert_eq!(rows.len(), 1);
- // SHO 100 × (sbaf 0.5 × mbr 2 + sbaf 0.25 × mbr 2) = 100 × 1.5.
+        // SHO 100 × (sbaf 0.5 × mbr 2 + sbaf 0.25 × mbr 2) = 100 × 1.5.
         assert_emission(&rows[0], 150.0);
     }
 
     #[test]
     fn running_splits_emissions_across_fuel_types() {
- // A second bin on a different fuel type adds an EmissionRate3 group
- // for the same (sourceType, modelYear): the SHO row emits once per
- // fuel type.
+        // A second bin on a different fuel type adds an EmissionRate3 group
+        // for the same (sourceType, modelYear): the SHO row emits once per
+        // fuel type.
         let mut inputs = minimal_running_inputs();
         inputs.source_bin.push(SourceBinRow {
             source_bin_id: 1002,
@@ -2229,8 +2229,8 @@ mod tests {
 
     #[test]
     fn running_excludes_start_operating_mode_rate() {
- // The only EmissionRate row is the start operating mode (100): the
- // running section's opModeID ∈ [0, 100) filter drops it.
+        // The only EmissionRate row is the start operating mode (100): the
+        // running section's opModeID ∈ [0, 100) filter drops it.
         let mut inputs = minimal_running_inputs();
         inputs.emission_rate[0].op_mode_id = START_OP_MODE_ID;
         assert!(Ch4N2oRunningStartCalculator::new()
@@ -2240,8 +2240,8 @@ mod tests {
 
     #[test]
     fn running_excludes_non_n2o_pollutant() {
- // The PollutantProcessAssoc resolves the rate's polProcessID to a
- // non-N2O pollutant: EmissionRate2's `pollutantID = 6` filter drops it.
+        // The PollutantProcessAssoc resolves the rate's polProcessID to a
+        // non-N2O pollutant: EmissionRate2's `pollutantID = 6` filter drops it.
         let mut inputs = minimal_running_inputs();
         inputs.pollutant_process_assoc[0].pollutant_id = 3; // not N2O
         assert!(Ch4N2oRunningStartCalculator::new()
@@ -2253,33 +2253,33 @@ mod tests {
     fn running_drops_rows_missing_an_inner_join() {
         let calc = Ch4N2oRunningStartCalculator::new();
 
- // SHO references an hourDayID absent from HourDay.
+        // SHO references an hourDayID absent from HourDay.
         let mut no_hour_day = minimal_running_inputs();
         no_hour_day.sho[0].hour_day_id = 999;
         assert!(calc.calculate_running(&no_hour_day).is_empty());
 
- // SHO references a link absent from Link.
+        // SHO references a link absent from Link.
         let mut no_link = minimal_running_inputs();
         no_link.sho[0].link_id = 9999;
         assert!(calc.calculate_running(&no_link).is_empty());
 
- // Link references a county absent from County.
+        // Link references a county absent from County.
         let mut no_county = minimal_running_inputs();
         no_county.county.clear();
         assert!(calc.calculate_running(&no_county).is_empty());
 
- // SourceBinDistribution references a bin absent from SourceBin.
+        // SourceBinDistribution references a bin absent from SourceBin.
         let mut no_bin = minimal_running_inputs();
         no_bin.source_bin_distribution[0].source_bin_id = 7777;
         assert!(calc.calculate_running(&no_bin).is_empty());
 
- // SourceBinDistribution references a sourceTypeModelYearID absent
- // from SourceTypeModelYear.
+        // SourceBinDistribution references a sourceTypeModelYearID absent
+        // from SourceTypeModelYear.
         let mut no_stmy = minimal_running_inputs();
         no_stmy.source_type_model_year.clear();
         assert!(calc.calculate_running(&no_stmy).is_empty());
 
- // SHO age gives a modelYearID with no EmissionRate3 group.
+        // SHO age gives a modelYearID with no EmissionRate3 group.
         let mut wrong_age = minimal_running_inputs();
         wrong_age.sho[0].age_id = 10; // modelYearID 2010, not 2018
         assert!(calc.calculate_running(&wrong_age).is_empty());
@@ -2292,7 +2292,7 @@ mod tests {
             .is_empty());
     }
 
- // ----- Start Exhaust ---------------------------------------------------
+    // ----- Start Exhaust ---------------------------------------------------
 
     #[test]
     fn start_minimal_input_yields_one_row() {
@@ -2318,8 +2318,8 @@ mod tests {
 
     #[test]
     fn start_aggregates_bins_of_the_same_fuel_type() {
- // Two source bins of the same fuel type: the SQL GROUP BY collapses
- // them into one row, summing sbaf×starts×meanBaseRate.
+        // Two source bins of the same fuel type: the SQL GROUP BY collapses
+        // them into one row, summing sbaf×starts×meanBaseRate.
         let mut inputs = minimal_start_inputs();
         inputs.source_bin.push(SourceBinRow {
             source_bin_id: 1001,
@@ -2341,13 +2341,13 @@ mod tests {
         });
         let rows = Ch4N2oRunningStartCalculator::new().calculate_start(&inputs);
         assert_eq!(rows.len(), 1);
- // starts 10 × (sbaf 1 × mbr 3 + sbaf 0.5 × mbr 3) = 10 × 4.5.
+        // starts 10 × (sbaf 1 × mbr 3 + sbaf 0.5 × mbr 3) = 10 × 4.5.
         assert_emission(&rows[0], 45.0);
     }
 
     #[test]
     fn start_splits_emissions_across_fuel_types() {
- // A second bin on a different fuel type: a separate GROUP BY cell.
+        // A second bin on a different fuel type: a separate GROUP BY cell.
         let mut inputs = minimal_start_inputs();
         inputs.source_bin.push(SourceBinRow {
             source_bin_id: 1002,
@@ -2375,9 +2375,9 @@ mod tests {
 
     #[test]
     fn start_uses_only_the_off_network_link_of_a_zone() {
- // The zone carries two links — off-network and urban. Only the
- // off-network link joins, so the start is counted once, not twice,
- // and the output road type is off-network.
+        // The zone carries two links — off-network and urban. Only the
+        // off-network link joins, so the start is counted once, not twice,
+        // and the output road type is off-network.
         let mut inputs = minimal_start_inputs();
         inputs.link.push(LinkRow {
             link_id: 5002,
@@ -2394,7 +2394,7 @@ mod tests {
 
     #[test]
     fn start_without_an_off_network_link_yields_no_rows() {
- // The zone's only link is urban: no off-network link to join.
+        // The zone's only link is urban: no off-network link to join.
         let mut inputs = minimal_start_inputs();
         inputs.link[0].road_type_id = 4;
         assert!(Ch4N2oRunningStartCalculator::new()
@@ -2404,8 +2404,8 @@ mod tests {
 
     #[test]
     fn start_drops_link_whose_county_differs_from_the_zone() {
- // County join is `c.countyID = l.countyID AND c.countyID =
- // z.countyID`: a link in a different county than its zone drops.
+        // County join is `c.countyID = l.countyID AND c.countyID =
+        // z.countyID`: a link in a different county than its zone drops.
         let mut inputs = minimal_start_inputs();
         inputs.link[0].county_id = 99_999;
         inputs.county.push(CountyRow {
@@ -2421,28 +2421,28 @@ mod tests {
     fn start_drops_rows_missing_an_inner_join() {
         let calc = Ch4N2oRunningStartCalculator::new();
 
- // Starts references an hourDayID absent from HourDay.
+        // Starts references an hourDayID absent from HourDay.
         let mut no_hour_day = minimal_start_inputs();
         no_hour_day.starts[0].hour_day_id = 999;
         assert!(calc.calculate_start(&no_hour_day).is_empty());
 
- // Starts age gives a (sourceType, modelYear) with no
- // SourceTypeModelYear row.
+        // Starts age gives a (sourceType, modelYear) with no
+        // SourceTypeModelYear row.
         let mut wrong_age = minimal_start_inputs();
         wrong_age.starts[0].age_id = 30;
         assert!(calc.calculate_start(&wrong_age).is_empty());
 
- // Starts references a zone absent from Zone.
+        // Starts references a zone absent from Zone.
         let mut no_zone = minimal_start_inputs();
         no_zone.zone.clear();
         assert!(calc.calculate_start(&no_zone).is_empty());
 
- // SourceBinDistribution references a bin absent from SourceBin.
+        // SourceBinDistribution references a bin absent from SourceBin.
         let mut no_bin = minimal_start_inputs();
         no_bin.source_bin_distribution[0].source_bin_id = 7777;
         assert!(calc.calculate_start(&no_bin).is_empty());
 
- // The EmissionRate row uses a running operating mode, not 100.
+        // The EmissionRate row uses a running operating mode, not 100.
         let mut wrong_op_mode = minimal_start_inputs();
         wrong_op_mode.emission_rate[0].op_mode_id = 1;
         assert!(calc.calculate_start(&wrong_op_mode).is_empty());
@@ -2450,8 +2450,8 @@ mod tests {
 
     #[test]
     fn start_drops_rows_when_emission_process_is_absent() {
- // The `ppa.processID = ep.processID` join: with no EmissionProcess
- // row for process 2, every ppa row is gated out.
+        // The `ppa.processID = ep.processID` join: with no EmissionProcess
+        // row for process 2, every ppa row is gated out.
         let mut inputs = minimal_start_inputs();
         inputs.emission_process.clear();
         assert!(Ch4N2oRunningStartCalculator::new()
@@ -2477,9 +2477,9 @@ mod tests {
 
     #[test]
     fn calculate_output_is_sorted_by_dimension_key() {
- // Two fuel types over two model years give four start rows; the
- // result must come back dimension-key sorted regardless of the
- // hash-map-driven aggregation order.
+        // Two fuel types over two model years give four start rows; the
+        // result must come back dimension-key sorted regardless of the
+        // hash-map-driven aggregation order.
         let mut inputs = minimal_start_inputs();
         inputs.source_bin.push(SourceBinRow {
             source_bin_id: 1002,
@@ -2533,7 +2533,7 @@ mod tests {
         assert_eq!(rebuilt, row);
     }
 
- // ----- Context filter --------------------------------------------------
+    // ----- Context filter --------------------------------------------------
 
     #[test]
     fn processes_context_runs_running_exhaust_on_every_road_type() {
@@ -2552,7 +2552,7 @@ mod tests {
             start,
             OFF_NETWORK_ROAD_TYPE_ID,
         ));
- // An unset (<= 0) road type still passes — matches the Java guard.
+        // An unset (<= 0) road type still passes — matches the Java guard.
         assert!(Ch4N2oRunningStartCalculator::processes_context(start, 0));
         for road_type in [2, 3, 4, 5] {
             assert!(!Ch4N2oRunningStartCalculator::processes_context(
@@ -2561,7 +2561,7 @@ mod tests {
         }
     }
 
- // ----- Calculator trait metadata --------------------------------------
+    // ----- Calculator trait metadata --------------------------------------
 
     #[test]
     fn calculator_name_matches_dag_module() {
@@ -2591,8 +2591,8 @@ mod tests {
 
     #[test]
     fn calculator_registers_nothing() {
- // CalculatorInfo.txt routes N2O running/start to BaseRateCalculator;
- // calculator-dag.json records registrations_count 0.
+        // CalculatorInfo.txt routes N2O running/start to BaseRateCalculator;
+        // calculator-dag.json records registrations_count 0.
         assert!(Ch4N2oRunningStartCalculator::new()
             .registrations()
             .is_empty());
@@ -2618,7 +2618,7 @@ mod tests {
         ] {
             assert!(tables.contains(&expected), "missing input table {expected}");
         }
- // `upstream` keeps the trait default — no chain dependency edges.
+        // `upstream` keeps the trait default — no chain dependency edges.
         assert!(calc.upstream().is_empty());
     }
 
@@ -2668,7 +2668,7 @@ mod tests {
             1,
             "minimal running inputs produce exactly one row"
         );
- // SHO 100 × (sbaf 1 × meanBaseRate 2) = 200
+        // SHO 100 × (sbaf 1 × meanBaseRate 2) = 200
         let quant = df
             .column("emissionQuant")
             .unwrap()
@@ -2733,7 +2733,7 @@ mod tests {
             1,
             "minimal start inputs produce exactly one row"
         );
- // sbaf 1 × starts 10 × meanBaseRate 3 = 30
+        // sbaf 1 × starts 10 × meanBaseRate 3 = 30
         let quant = df
             .column("emissionQuant")
             .unwrap()
@@ -2751,7 +2751,7 @@ mod tests {
 
     #[test]
     fn calculator_is_object_safe() {
- // The registry stores calculators as Box<dyn Calculator>.
+        // The registry stores calculators as Box<dyn Calculator>.
         let calc: Box<dyn Calculator> = Box::new(Ch4N2oRunningStartCalculator::new());
         assert_eq!(calc.name(), "CH4N2ORunningStartCalculator");
     }

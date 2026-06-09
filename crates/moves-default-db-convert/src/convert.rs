@@ -55,12 +55,12 @@ pub struct ConvertOptions {
     pub plan_path: PathBuf,
     pub output_root: PathBuf,
     pub moves_db_version: String,
- /// Optional override for the "generated at" stamp written to the
- /// manifest. Default: ISO-8601 UTC of the current wall clock. Tests
- /// pass a fixed string for byte-stable assertions.
+    /// Optional override for the "generated at" stamp written to the
+    /// manifest. Default: ISO-8601 UTC of the current wall clock. Tests
+    /// pass a fixed string for byte-stable assertions.
     pub generated_at_utc: Option<String>,
- /// If `false`, skip tables present in the plan but absent from the
- /// TSV directory. If `true`, error out so silent omissions surface.
+    /// If `false`, skip tables present in the plan but absent from the
+    /// TSV directory. If `true`, error out so silent omissions surface.
     pub require_every_table: bool,
 }
 
@@ -153,13 +153,13 @@ fn convert_table(
             table, opts,
         )?)),
         _ => {
- // All other strategies need the TSV pair. Missing TSV means the
- // dumper skipped this table — surface vs. silently omit per
- // ConvertOptions.require_every_table. Lookup is case-insensitive
- // because the MariaDB on Linux normalizes the original Windows
- // dump's CamelCase table names to lowercase on disk, while the
- // audit (`tables.json`) preserves the canonical CamelCase from
- // the MOVES Java schema.
+            // All other strategies need the TSV pair. Missing TSV means the
+            // dumper skipped this table — surface vs. silently omit per
+            // ConvertOptions.require_every_table. Lookup is case-insensitive
+            // because the MariaDB on Linux normalizes the original Windows
+            // dump's CamelCase table names to lowercase on disk, while the
+            // audit (`tables.json`) preserves the canonical CamelCase from
+            // the MOVES Java schema.
             let schema_path =
                 match find_tsv_case_insensitive(&opts.tsv_dir, &table.name, ".schema.tsv")? {
                     Some(p) => p,
@@ -252,10 +252,10 @@ fn write_schema_only(table: &TableEntry, opts: &ConvertOptions) -> Result<TableM
     let columns = if let Some(p) = &schema_path {
         read_schema_tsv(p)?
     } else {
- // Fall back to the audit's columns when the dumper didn't ship
- // anything (the table was empty in MariaDB and a future toolchain
- // may not even emit a schema TSV). The audit is authoritative for
- // these schema-only tables since they ship empty in the default DB.
+        // Fall back to the audit's columns when the dumper didn't ship
+        // anything (the table was empty in MariaDB and a future toolchain
+        // may not even emit a schema TSV). The audit is authoritative for
+        // these schema-only tables since they ship empty in the default DB.
         synthesize_columns(table)
     };
     let row_tsv = find_tsv_case_insensitive(&opts.tsv_dir, &table.name, ".tsv")?;
@@ -454,10 +454,10 @@ fn write_partitions_grouped(
     rows: Vec<Row>,
     opts: &ConvertOptions,
 ) -> Result<Vec<PartitionManifest>> {
- // Group rows by their partition value tuple. BTreeMap so iteration is
- // deterministic across runs; the key is the joined-with-NUL string of
- // the partition values so a tuple with embedded `=` or `/` does not
- // collide with another tuple after path sanitisation.
+    // Group rows by their partition value tuple. BTreeMap so iteration is
+    // deterministic across runs; the key is the joined-with-NUL string of
+    // the partition values so a tuple with embedded `=` or `/` does not
+    // collide with another tuple after path sanitisation.
     let mut groups: BTreeMap<String, (Vec<String>, Vec<Row>)> = BTreeMap::new();
     for row in rows {
         let mut key = String::new();
@@ -542,7 +542,7 @@ pub fn format_iso8601_utc(unix_secs: u64) -> String {
     let minute = (secs / 60) % 60;
     let second = secs % 60;
 
- // Days from civil epoch (1970-01-01) to a (year, month, day).
+    // Days from civil epoch (1970-01-01) to a (year, month, day).
     let z = days + 719_468; // shift to civil epoch 0000-03-01
     let era = z.div_euclid(146_097);
     let doe = (z - era * 146_097) as u64;
@@ -666,13 +666,13 @@ mod tests {
         let plan_path = dir.path().join("tables.json");
 
         write_file(&plan_path, &minimal_plan(Some("YxC")));
- // Year (monolithic)
+        // Year (monolithic)
         write_file(
             &tsv_dir.join("Year.schema.tsv"),
             b"yearID\tsmallint\tPRI\nisBaseYear\tchar\t\n",
         );
         write_file(&tsv_dir.join("Year.tsv"), b"2020\tY\n");
- // YxC (year_x_county partitioned)
+        // YxC (year_x_county partitioned)
         write_file(
             &tsv_dir.join("YxC.schema.tsv"),
             b"yearID\tint\tPRI\ncountyID\tint\tPRI\nvalue\tdouble\t\n",
@@ -691,7 +691,7 @@ mod tests {
             require_every_table: true,
         };
         let (manifest, _) = convert(&opts).unwrap();
- // sorted lower-case: yxc before year? "yxc" > "year". So Year first.
+        // sorted lower-case: yxc before year? "yxc" > "year". So Year first.
         let yxc = manifest.tables.iter().find(|t| t.name == "YxC").unwrap();
         assert_eq!(yxc.partitions.len(), 3);
         let mut paths: Vec<&str> = yxc.partitions.iter().map(|p| p.path.as_str()).collect();
@@ -699,14 +699,14 @@ mod tests {
         assert_eq!(paths[0], "YxC/year=2020/county=06037/part.parquet");
         assert_eq!(paths[1], "YxC/year=2020/county=17031/part.parquet");
         assert_eq!(paths[2], "YxC/year=2021/county=17031/part.parquet");
- // Row count for the 2020/17031 group should be 2.
+        // Row count for the 2020/17031 group should be 2.
         let p = yxc
             .partitions
             .iter()
             .find(|p| p.path.contains("year=2020/county=17031"))
             .unwrap();
         assert_eq!(p.row_count, 2);
- // All partitions exist on disk.
+        // All partitions exist on disk.
         for p in &yxc.partitions {
             assert!(out_dir.join(&p.path).exists(), "missing {}", p.path);
         }
@@ -736,7 +736,7 @@ mod tests {
             }]
         }"#;
         write_file(&plan_path, plan_body);
- // No TSV files written — schema_only ships empty in default DB.
+        // No TSV files written — schema_only ships empty in default DB.
 
         let opts = ConvertOptions {
             tsv_dir,
@@ -801,17 +801,17 @@ mod tests {
 
     #[test]
     fn column_drift_warns_in_lenient_mode_errors_in_strict() {
- // The audit's column list is from the canonical DDL; the actual
- // dump may have additional columns. Lenient mode warns and writes
- // using the dump's schema; strict mode errors so a CI audit catches
- // the drift.
+        // The audit's column list is from the canonical DDL; the actual
+        // dump may have additional columns. Lenient mode warns and writes
+        // using the dump's schema; strict mode errors so a CI audit catches
+        // the drift.
         let dir = tempdir().unwrap();
         let tsv_dir = dir.path().join("dump");
         let out_dir = dir.path().join("out");
         let plan_path = dir.path().join("tables.json");
 
         write_file(&plan_path, &minimal_plan(None));
- // Audit lists 2 columns; dump emits 3 (extra `isUserInput`).
+        // Audit lists 2 columns; dump emits 3 (extra `isUserInput`).
         write_file(
             &tsv_dir.join("Year.schema.tsv"),
             b"yearID\tsmallint\tPRI\nisBaseYear\tchar\t\nisUserInput\tchar\t\n",
@@ -850,16 +850,16 @@ mod tests {
 
     #[test]
     fn case_insensitive_tsv_lookup_picks_lowercased_dump() {
- // The dump from a MariaDB-on-Linux load of a Windows-originated dump
- // emits lower-cased filenames (e.g. `year.tsv` / `year.schema.tsv`)
- // while the audit names the table `Year`. The converter must match.
+        // The dump from a MariaDB-on-Linux load of a Windows-originated dump
+        // emits lower-cased filenames (e.g. `year.tsv` / `year.schema.tsv`)
+        // while the audit names the table `Year`. The converter must match.
         let dir = tempdir().unwrap();
         let tsv_dir = dir.path().join("dump");
         let out_dir = dir.path().join("out");
         let plan_path = dir.path().join("tables.json");
 
         write_file(&plan_path, &minimal_plan(None));
- // Note the lower-case filenames here.
+        // Note the lower-case filenames here.
         write_file(
             &tsv_dir.join("year.schema.tsv"),
             b"yearID\tsmallint\tPRI\nisBaseYear\tchar\t\n",
@@ -876,7 +876,7 @@ mod tests {
         };
         let (manifest, report) = convert(&opts).unwrap();
         assert_eq!(report.tables_written, 1);
- // Output uses the audit's canonical CamelCase.
+        // Output uses the audit's canonical CamelCase.
         assert_eq!(manifest.tables[0].name, "Year");
         assert!(out_dir.join("Year.parquet").exists());
     }
@@ -888,7 +888,7 @@ mod tests {
         let out_dir = dir.path().join("out");
         let plan_path = dir.path().join("tables.json");
         write_file(&plan_path, &minimal_plan(None));
- // No TSV files written.
+        // No TSV files written.
 
         let opts = ConvertOptions {
             tsv_dir: tsv_dir.clone(),
@@ -912,11 +912,11 @@ mod tests {
 
     #[test]
     fn iso8601_format_known_vectors() {
- // 1970-01-01T00:00:00Z
+        // 1970-01-01T00:00:00Z
         assert_eq!(format_iso8601_utc(0), "1970-01-01T00:00:00Z");
- // 2025-01-01T00:00:00Z = 1735689600
+        // 2025-01-01T00:00:00Z = 1735689600
         assert_eq!(format_iso8601_utc(1_735_689_600), "2025-01-01T00:00:00Z");
- // 2000-02-29T12:34:56Z (leap day) — 951_827_696
+        // 2000-02-29T12:34:56Z (leap day) — 951_827_696
         assert_eq!(format_iso8601_utc(951_827_696), "2000-02-29T12:34:56Z");
     }
 }

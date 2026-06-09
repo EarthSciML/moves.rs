@@ -77,7 +77,7 @@ mod tests {
         )
         .unwrap();
         let report = read(tmp.path(), &RunSpecFilter::default()).unwrap();
- // Source type 32 is missing, but road type 1 isn't selected → no error.
+        // Source type 32 is missing, but road type 1 isn't selected → no error.
         validate_against_runspec(
             &report.batch,
             &BTreeSet::from([4]),

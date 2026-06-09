@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "process-extended-idle-single",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-ky1/characterization/fixture-image.lock",
+  "runspec_path": "/scratch/ctessum/moves-county-fixture/process-extended-idle-single/process-extended-idle-single.xml",
+  "runspec_sha256": "20dd996998fd7f4be173874adf57200bc3ab4e68562c29102f80844a2625d3bf",
+  "snapshot_aggregate_sha256": "3dd95b524b0b61980af7612a3bf8e57d3ec4d298af2b601dbbc5bd61d281f274",
+  "output_database": "out_process_extended_idle_single",
+  "scale_input_database": "washtenaw_cdb"
+}

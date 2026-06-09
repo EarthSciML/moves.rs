@@ -28,14 +28,14 @@ pub const PARQUET_CREATED_BY: &str = "moves-import-lev v0.1";
 /// Result of encoding rows to Parquet.
 #[derive(Debug, Clone)]
 pub struct ParquetOutput {
- /// Raw Parquet bytes. The encoder buffers in memory so callers can
- /// hash without re-reading from disk.
+    /// Raw Parquet bytes. The encoder buffers in memory so callers can
+    /// hash without re-reading from disk.
     pub bytes: Vec<u8>,
- /// Number of rows actually written.
+    /// Number of rows actually written.
     pub row_count: u64,
- /// Lower-case hex SHA-256 of [`Self::bytes`]. Distinct CSVs hash to
- /// distinct outputs; identical CSVs (modulo cell whitespace / NULL
- /// spellings) hash identically.
+    /// Lower-case hex SHA-256 of [`Self::bytes`]. Distinct CSVs hash to
+    /// distinct outputs; identical CSVs (modulo cell whitespace / NULL
+    /// spellings) hash identically.
     pub sha256: String,
 }
 
@@ -106,7 +106,7 @@ fn build_arrays(rows: &[TypedRow]) -> Result<Vec<ArrayRef>> {
                         TypedValue::Integer(v) => builder.append_value(v),
                         TypedValue::Null => builder.append_null(),
                         TypedValue::Float(_) => {
- // The validator guarantees this can't happen.
+                            // The validator guarantees this can't happen.
                             unreachable!(
                                 "column {} expects Integer, validator produced Float",
                                 column.name
@@ -187,7 +187,7 @@ mod tests {
             im_cv.map_or(TypedValue::Null, TypedValue::Float),
             ds.map_or(TypedValue::Null, TypedValue::Integer),
         ];
- // Force size match — tests would catch a schema length change.
+        // Force size match — tests would catch a schema length change.
         values.truncate(COLUMNS.len());
         TypedRow { line, values }
     }
@@ -220,21 +220,21 @@ mod tests {
         let batch = read_back(&out.bytes);
         assert_eq!(batch.num_rows(), 1);
         assert_eq!(batch.num_columns(), COLUMNS.len());
- // Spot-check: meanBaseRate column is index 4, value 0.5.
+        // Spot-check: meanBaseRate column is index 4, value 0.5.
         let rate = batch
             .column(4)
             .as_any()
             .downcast_ref::<arrow::array::Float64Array>()
             .unwrap();
         assert_eq!(rate.value(0), 0.5);
- // meanBaseRateIM (index 6) is null.
+        // meanBaseRateIM (index 6) is null.
         let im = batch
             .column(6)
             .as_any()
             .downcast_ref::<arrow::array::Float64Array>()
             .unwrap();
         assert!(im.is_null(0));
- // dataSourceId (index 8) is 7.
+        // dataSourceId (index 8) is 7.
         let ds = batch
             .column(8)
             .as_any()
@@ -252,8 +252,8 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
- // Empty-rows path may or may not emit an empty batch — the
- // important contract is "no panic, schema preserved".
+        // Empty-rows path may or may not emit an empty batch — the
+        // important contract is "no panic, schema preserved".
         if let Some(batch) = reader.next() {
             let batch = batch.unwrap();
             assert_eq!(batch.num_rows(), 0);

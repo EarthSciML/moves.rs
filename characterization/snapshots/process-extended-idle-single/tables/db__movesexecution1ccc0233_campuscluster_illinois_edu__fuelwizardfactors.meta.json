@@ -1,0 +1,89 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__fuelwizardfactors",
+  "schema": [
+    {
+      "name": "adjustedParameter",
+      "kind": "utf8"
+    },
+    {
+      "name": "minLevel",
+      "kind": "float64"
+    },
+    {
+      "name": "maxLevel",
+      "kind": "float64"
+    },
+    {
+      "name": "functionType",
+      "kind": "utf8"
+    },
+    {
+      "name": "monthGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "RVP_factor",
+      "kind": "float64"
+    },
+    {
+      "name": "sulf_factor",
+      "kind": "float64"
+    },
+    {
+      "name": "ETOH_factor",
+      "kind": "float64"
+    },
+    {
+      "name": "arom_factor",
+      "kind": "float64"
+    },
+    {
+      "name": "olef_factor",
+      "kind": "float64"
+    },
+    {
+      "name": "benz_factor",
+      "kind": "float64"
+    },
+    {
+      "name": "e200_factor",
+      "kind": "float64"
+    },
+    {
+      "name": "e300_factor",
+      "kind": "float64"
+    },
+    {
+      "name": "T50_factor",
+      "kind": "float64"
+    },
+    {
+      "name": "T90_factor",
+      "kind": "float64"
+    },
+    {
+      "name": "units",
+      "kind": "utf8"
+    },
+    {
+      "name": "dataSourceId",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "adjustedParameter",
+    "minLevel",
+    "maxLevel",
+    "functionType",
+    "monthGroupID",
+    "fuelTypeID"
+  ],
+  "row_count": 156,
+  "float_decimals": 12,
+  "content_sha256": "0d8efa54b070fce2547a5fbd29618bab2cdb0aa9ad512d797bab1d1e8e71d6a7"
+}

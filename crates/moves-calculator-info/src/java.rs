@@ -42,18 +42,18 @@ use crate::loop_meta::{Granularity, Priority, PriorityBase};
 /// How a calculator hooks into the MasterLoop.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SubscribeStyle {
- /// Inherits `subscribeToMe` from `GenericCalculatorBase`; granularity
- /// comes from the `super(...)` call.
+    /// Inherits `subscribeToMe` from `GenericCalculatorBase`; granularity
+    /// comes from the `super(...)` call.
     GenericBase,
- /// Overrides `subscribeToMe` with explicit `targetLoop.subscribe(...)`
- /// calls.
+    /// Overrides `subscribeToMe` with explicit `targetLoop.subscribe(...)`
+    /// calls.
     Explicit,
- /// Overrides `subscribeToMe` to chain itself via
- /// `c.chainCalculator(this)` and does NOT call `targetLoop.subscribe`.
- /// Granularity is whatever the upstream trigger declares.
+    /// Overrides `subscribeToMe` to chain itself via
+    /// `c.chainCalculator(this)` and does NOT call `targetLoop.subscribe`.
+    /// Granularity is whatever the upstream trigger declares.
     ChainedOnly,
- /// `subscribeToMe` neither subscribed nor chained — likely
- /// abstract/utility class or a base we shouldn't scan from.
+    /// `subscribeToMe` neither subscribed nor chained — likely
+    /// abstract/utility class or a base we shouldn't scan from.
     Unknown,
 }
 
@@ -68,13 +68,13 @@ pub struct JavaSubscription {
     pub calculator: String,
     pub java_path: PathBuf,
     pub style: SubscribeStyle,
- /// `None` for chained-only calculators.
+    /// `None` for chained-only calculators.
     pub granularity: Option<Granularity>,
- /// `None` for chained-only calculators.
+    /// `None` for chained-only calculators.
     pub priority: Option<Priority>,
- /// Free-form description of the process selector. Empty for chained
- /// calculators or for GenericCalculatorBase (which subscribes against
- /// every entry in the constructor's `pollutantProcessIDs` array).
+    /// Free-form description of the process selector. Empty for chained
+    /// calculators or for GenericCalculatorBase (which subscribes against
+    /// every entry in the constructor's `pollutantProcessIDs` array).
     pub process_expr: String,
 }
 
@@ -165,7 +165,7 @@ pub fn parse_java_subscriptions(text: &str, path: &Path) -> Vec<JavaSubscription
         return out;
     }
 
- // Scan inside subscribeToMe() for explicit subscribe calls.
+    // Scan inside subscribeToMe() for explicit subscribe calls.
     if let Some(body) = extract_subscribe_to_me_body(text) {
         let mut explicit_found = false;
         for hit in find_target_loop_subscribe_calls(body) {
@@ -232,7 +232,7 @@ fn find_base_class(text: &str, class_name: &str) -> Option<String> {
     let class_decl = format!("class {class_name}");
     let class_idx = text.find(&class_decl)?;
     let rest = &text[class_idx + class_decl.len()..];
- // We allow `extends` to appear within the next line or two.
+    // We allow `extends` to appear within the next line or two.
     let stop = rest.find('{').unwrap_or(rest.len());
     let header = &rest[..stop];
     let ext_idx = header.find("extends ")?;
@@ -368,14 +368,14 @@ fn find_first_int_after(text: &str) -> Option<i32> {
             continue;
         }
         if c == '/' && bytes.get(i + 1).map(|&b| b as char) == Some('/') {
- // line comment — skip to end of line
+            // line comment — skip to end of line
             while i < bytes.len() && (bytes[i] as char) != '\n' {
                 i += 1;
             }
             continue;
         }
         if c == '/' && bytes.get(i + 1).map(|&b| b as char) == Some('*') {
- // block comment — skip to closing */
+            // block comment — skip to closing */
             i += 2;
             while i + 1 < bytes.len()
                 && !((bytes[i] as char) == '*' && (bytes[i + 1] as char) == '/')
@@ -385,7 +385,7 @@ fn find_first_int_after(text: &str) -> Option<i32> {
             i += 2;
             continue;
         }
- // Otherwise expect optional sign + digits.
+        // Otherwise expect optional sign + digits.
         let start = i;
         if c == '-' || c == '+' {
             i += 1;
@@ -481,8 +481,8 @@ fn parse_priority_expr(arg: &str) -> Option<Priority> {
     if tail.is_empty() {
         return Some(Priority { base, offset: 0 });
     }
- // tail starts with '+' or '-' then either an int literal or a variable
- // we can't statically resolve.
+    // tail starts with '+' or '-' then either an int literal or a variable
+    // we can't statically resolve.
     let sign = tail.as_bytes()[0] as char;
     if sign != '+' && sign != '-' {
         return Some(Priority { base, offset: 0 });
@@ -492,12 +492,12 @@ fn parse_priority_expr(arg: &str) -> Option<Priority> {
         .find(|c: char| !c.is_ascii_digit())
         .unwrap_or(after_sign.len());
     if digit_end == 0 {
- // Symbolic offset (e.g. `+priorityAdjustment`) — we can't resolve
- // it statically, and the actual value (passed via the constructor /
- // RunSpec at runtime) may be nonzero (e.g. EvaporativePermeationCalculator
- // uses +1). Fabricating offset 0 here would silently misorder the
- // calculator within its granularity bucket, so decline to produce a
- // priority and let the caller skip this subscribe record instead.
+        // Symbolic offset (e.g. `+priorityAdjustment`) — we can't resolve
+        // it statically, and the actual value (passed via the constructor /
+        // RunSpec at runtime) may be nonzero (e.g. EvaporativePermeationCalculator
+        // uses +1). Fabricating offset 0 here would silently misorder the
+        // calculator within its granularity bucket, so decline to produce a
+        // priority and let the caller skip this subscribe record instead.
         return None;
     }
     let n: i32 = after_sign[..digit_end].parse().ok()?;
@@ -626,8 +626,8 @@ public class BazCalc extends EmissionCalculator {
 
     #[test]
     fn explicit_subscribe_priority_with_symbolic_offset() {
- // Boilerplate inside GenericCalculatorBase itself — its
- // subscribeToMe uses MasterLoopPriority.EMISSION_CALCULATOR+priorityAdjustment.
+        // Boilerplate inside GenericCalculatorBase itself — its
+        // subscribeToMe uses MasterLoopPriority.EMISSION_CALCULATOR+priorityAdjustment.
         let src = r#"
 public class GenericCalculatorBase extends EmissionCalculator {
     public void subscribeToMe(MasterLoop targetLoop) {
@@ -637,13 +637,13 @@ public class GenericCalculatorBase extends EmissionCalculator {
 }
 "#;
         let hits = parse(src);
- // The base class isn't a GenericCalculatorBase subclass itself // and granularity is a variable. We don't try to resolve.
+        // The base class isn't a GenericCalculatorBase subclass itself // and granularity is a variable. We don't try to resolve.
         assert_eq!(hits.len(), 1);
- // granularity is None because `granularity` (lowercase) isn't a
- // MasterLoopGranularity.X reference.
+        // granularity is None because `granularity` (lowercase) isn't a
+        // MasterLoopGranularity.X reference.
         assert_eq!(hits[0].granularity, None);
- // Style falls through to Unknown because we couldn't parse the
- // call as an explicit subscribe at a static granularity.
+        // Style falls through to Unknown because we couldn't parse the
+        // call as an explicit subscribe at a static granularity.
         assert_eq!(hits[0].style, SubscribeStyle::Unknown);
     }
 
@@ -681,7 +681,7 @@ public class JustAUtility {
         use tempfile::tempdir;
 
         let dir = tempdir().unwrap();
- // Write three calc files in non-alphabetical disk order.
+        // Write three calc files in non-alphabetical disk order.
         fs::write(
             dir.path().join("BBB.java"),
             r#"public class BBB extends GenericCalculatorBase {

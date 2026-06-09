@@ -158,11 +158,11 @@ pub fn wadeeq(frc_ful: f32, tnk_siz: f32, rvp: f32, min_tmp: f32, max_tmp: f32) 
         let mol_wt = (73.23 - 1.274 * rvp) + (((min_tmp + adj_max) / 2.0) - 60.0) * 0.059;
 
         vap_spc
- * 454.0
- * fl_dens
- * (520.0 / (690.0 - 4.0 * mol_wt))
- * ((int_prs / (14.7 - int_prs) + fin_prs / (14.7 - fin_prs)) / 2.0)
- * (((14.7 - int_prs) / (min_tmp + 460.0)) - ((14.7 - fin_prs) / (adj_max + 460.0)))
+            * 454.0
+            * fl_dens
+            * (520.0 / (690.0 - 4.0 * mol_wt))
+            * ((int_prs / (14.7 - int_prs) + fin_prs / (14.7 - fin_prs)) / 2.0)
+            * (((14.7 - int_prs) / (min_tmp + 460.0)) - ((14.7 - fin_prs) / (adj_max + 460.0)))
     } else {
         0.0
     }
@@ -264,8 +264,8 @@ mod tests {
 
     #[test]
     fn low2up_does_not_replicate_fortran_off_by_one() {
- // Fortran low2up.f maps '{' (123) to '[' (91) due to its
- // `idiff .LE. 26` bound. The Rust port leaves '{' alone.
+        // Fortran low2up.f maps '{' (123) to '[' (91) due to its
+        // `idiff .LE. 26` bound. The Rust port leaves '{' alone.
         assert_eq!(low2up("{"), "{");
         assert_eq!(low2up("`"), "`"); // one byte before 'a'; both leave alone
     }
@@ -274,7 +274,7 @@ mod tests {
     fn chrsrt_returns_stable_sorted_indices() {
         let arr = ["BB", "AA", "CC", "AA"];
         let order = chrsrt(&arr, 2);
- // Sorted: AA(idx 1), AA(idx 3), BB(idx 0), CC(idx 2)
+        // Sorted: AA(idx 1), AA(idx 3), BB(idx 0), CC(idx 2)
         assert_eq!(order, vec![1, 3, 0, 2]);
 
         let sorted: Vec<&str> = order.iter().map(|&i| arr[i]).collect();
@@ -285,7 +285,7 @@ mod tests {
     fn chrsrt_uses_first_key_len_bytes_only() {
         let arr = ["AAxx", "AByy", "AAzz"];
         let order = chrsrt(&arr, 2);
- // Sort by first 2: AA(0), AA(2), AB(1) — stable so 0 before 2.
+        // Sort by first 2: AA(0), AA(2), AB(1) — stable so 0 before 2.
         assert_eq!(order, vec![0, 2, 1]);
     }
 
@@ -305,9 +305,9 @@ mod tests {
 
     #[test]
     fn wadeeq_positive_for_warming_day() {
- // Representative 60→90°F day, half-full 10-gal tank, RVP=9
- // psi. Exact value is what the Fortran formula evaluates to;
- // we just check sign and a sanity bound.
+        // Representative 60→90°F day, half-full 10-gal tank, RVP=9
+        // psi. Exact value is what the Fortran formula evaluates to;
+        // we just check sign and a sanity bound.
         let g = wadeeq(0.5, 10.0, 9.0, 60.0, 90.0);
         assert!(g > 0.0, "expected positive vapor generation, got {g}");
         assert!(g.is_finite());
@@ -315,9 +315,9 @@ mod tests {
 
     #[test]
     fn wadeeq_matches_known_inputs() {
- // Reproduces the formula by hand for a fixed input so a
- // future refactor cannot silently drift. Inputs:
- // frc_ful=0.5, tnk_siz=10, rvp=9, min=60, max=90.
+        // Reproduces the formula by hand for a fixed input so a
+        // future refactor cannot silently drift. Inputs:
+        // frc_ful=0.5, tnk_siz=10, rvp=9, min=60, max=90.
         let frc_ful: f32 = 0.5;
         let tnk_siz: f32 = 10.0;
         let rvp: f32 = 9.0;
@@ -341,57 +341,57 @@ mod tests {
         let fl_dens = 6.386 - 0.0186 * rvp;
         let mol_wt = (73.23 - 1.274 * rvp) + (((min_tmp + adj_max) / 2.0) - 60.0) * 0.059;
         let expected = vap_spc
- * 454.0
- * fl_dens
- * (520.0 / (690.0 - 4.0 * mol_wt))
- * ((int_prs / (14.7 - int_prs) + fin_prs / (14.7 - fin_prs)) / 2.0)
- * (((14.7 - int_prs) / (min_tmp + 460.0)) - ((14.7 - fin_prs) / (adj_max + 460.0)));
+            * 454.0
+            * fl_dens
+            * (520.0 / (690.0 - 4.0 * mol_wt))
+            * ((int_prs / (14.7 - int_prs) + fin_prs / (14.7 - fin_prs)) / 2.0)
+            * (((14.7 - int_prs) / (min_tmp + 460.0)) - ((14.7 - fin_prs) / (adj_max + 460.0)));
 
         let actual = wadeeq(frc_ful, tnk_siz, rvp, min_tmp, max_tmp);
         assert_eq!(actual, expected);
     }
 
     fn sample_hpclev() -> Vec<f32> {
- // Three boundaries → four implied categories. Realistic
- // NONROAD has 18 entries; three is enough to exercise the
- // index arithmetic.
+        // Three boundaries → four implied categories. Realistic
+        // NONROAD has 18 entries; three is enough to exercise the
+        // index arithmetic.
         vec![10.0, 25.0, 50.0]
     }
 
     #[test]
     fn cnthpcat_full_range() {
         let hpclev = sample_hpclev();
- // 0 → 9999 spans all four categories: 0+1+2+3+(MXHPC+1=4) − 0 = 4
+        // 0 → 9999 spans all four categories: 0+1+2+3+(MXHPC+1=4) − 0 = 4
         assert_eq!(cnthpcat(0.0, 9999.0, &hpclev), 4);
     }
 
     #[test]
     fn cnthpcat_inner_range() {
         let hpclev = sample_hpclev();
- // 10 → 50 spans two categories (10–25 and 25–50).
+        // 10 → 50 spans two categories (10–25 and 25–50).
         assert_eq!(cnthpcat(10.0, 50.0, &hpclev), 2);
- // 25 → 50 spans one category.
+        // 25 → 50 spans one category.
         assert_eq!(cnthpcat(25.0, 50.0, &hpclev), 1);
     }
 
     #[test]
     fn cnthpcat_open_lower() {
         let hpclev = sample_hpclev();
- // 0 → 25 spans two categories: below-10, 10–25.
+        // 0 → 25 spans two categories: below-10, 10–25.
         assert_eq!(cnthpcat(0.0, 25.0, &hpclev), 2);
     }
 
     #[test]
     fn cnthpcat_open_upper() {
         let hpclev = sample_hpclev();
- // 50 → 9999 spans one category: above-50.
+        // 50 → 9999 spans one category: above-50.
         assert_eq!(cnthpcat(50.0, 9999.0, &hpclev), 1);
     }
 
     #[test]
     fn cnthpcat_unknown_value_returns_zero() {
         let hpclev = sample_hpclev();
- // 30 is not in hpclev → 0.
+        // 30 is not in hpclev → 0.
         assert_eq!(cnthpcat(30.0, 50.0, &hpclev), 0);
         assert_eq!(cnthpcat(10.0, 30.0, &hpclev), 0);
     }

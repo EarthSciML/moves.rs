@@ -288,7 +288,7 @@ fn apply_cross_row_invariants(
                 rows,
                 fraction_column,
                 group_columns,
- *tolerance,
+                *tolerance,
             )?,
         }
     }
@@ -344,7 +344,7 @@ fn check_fraction_sum(
                 });
             }
         };
- *sums.entry(key).or_insert(0.0) += v;
+        *sums.entry(key).or_insert(0.0) += v;
     }
     for (key, sum) in sums {
         if (sum - 1.0).abs() > tolerance {
@@ -511,8 +511,8 @@ mod tests {
                 required: true,
                 rule: Rule::None,
             },
- // Nullable but range-checked when present — the common
- // "DEFAULT NULL with a business-rule range" pattern.
+            // Nullable but range-checked when present — the common
+            // "DEFAULT NULL with a business-rule range" pattern.
             Column {
                 name: "population",
                 mysql_type: "float",
@@ -656,7 +656,7 @@ mod tests {
             columns: COLS,
             invariants: INV,
         };
- // Two groups each summing to exactly 1.0.
+        // Two groups each summing to exactly 1.0.
         let rows = vec![
             (1, 1, "0.5"),
             (1, 2, "0.5"),

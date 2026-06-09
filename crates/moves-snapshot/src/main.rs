@@ -48,44 +48,44 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
- /// Compute a structured diff between two snapshot directories.
+    /// Compute a structured diff between two snapshot directories.
     Diff(DiffArgs),
 
- /// Write (or refresh) `tables/execution-db.bundle` for one or more
- /// snapshot directories. Reads existing `db__movesexecution*.parquet`
- /// files and bundles them as Arrow IPC. Use this to migrate snapshots
- /// captured before bundle support was added.
+    /// Write (or refresh) `tables/execution-db.bundle` for one or more
+    /// snapshot directories. Reads existing `db__movesexecution*.parquet`
+    /// files and bundles them as Arrow IPC. Use this to migrate snapshots
+    /// captured before bundle support was added.
     BundleUpdate(BundleUpdateArgs),
 }
 
 #[derive(Debug, Parser)]
 struct BundleUpdateArgs {
- /// One or more snapshot directories to update.
+    /// One or more snapshot directories to update.
     #[arg(value_name = "DIR", required = true)]
     dirs: Vec<PathBuf>,
 }
 
 #[derive(Debug, Parser)]
 struct DiffArgs {
- /// Left-hand snapshot directory (the baseline / expected snapshot).
+    /// Left-hand snapshot directory (the baseline / expected snapshot).
     #[arg(value_name = "LHS")]
     lhs: PathBuf,
 
- /// Right-hand snapshot directory (the candidate / observed snapshot).
+    /// Right-hand snapshot directory (the candidate / observed snapshot).
     #[arg(value_name = "RHS")]
     rhs: PathBuf,
 
- /// TOML tolerance config. See module docs for the file shape.
+    /// TOML tolerance config. See module docs for the file shape.
     #[arg(long, value_name = "PATH")]
     tolerance: Option<PathBuf>,
 
- /// Output format. `text` is the human-readable summary; `json` emits the
- /// full structured diff suitable for piping into `jq`.
+    /// Output format. `text` is the human-readable summary; `json` emits the
+    /// full structured diff suitable for piping into `jq`.
     #[arg(long, value_enum, default_value_t = OutputFormat::Text)]
     format: OutputFormat,
 
- /// Cap the per-table row-diff list rendered in `text` output. `0` means
- /// unlimited. Has no effect on `json` output.
+    /// Cap the per-table row-diff list rendered in `text` output. `0` means
+    /// unlimited. Has no effect on `json` output.
     #[arg(long, default_value_t = 25)]
     limit: usize,
 }

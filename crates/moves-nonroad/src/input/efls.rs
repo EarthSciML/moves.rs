@@ -41,44 +41,44 @@ use super::spillage::{read_spil, SpillageRecord};
 /// `rdemfc.f` :173 / `rdevemfc.f` :177-180.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PollutantKind {
- /// Exhaust pollutant — dispatched to [`read_emf`].
+    /// Exhaust pollutant — dispatched to [`read_emf`].
     Exhaust {
- /// `true` for the crankcase HC pollutant (`IDXCRA`),
- /// which triggers the `MULT`-units rule at
- /// `rdemfc.f` :173.
+        /// `true` for the crankcase HC pollutant (`IDXCRA`),
+        /// which triggers the `MULT`-units rule at
+        /// `rdemfc.f` :173.
         is_crankcase: bool,
     },
- /// Evap pollutant — dispatched to [`read_evemf`] with the
- /// unit policy encoded by [`EvapPollutantKind`].
+    /// Evap pollutant — dispatched to [`read_evemf`] with the
+    /// unit policy encoded by [`EvapPollutantKind`].
     Evap(EvapPollutantKind),
- /// Spillage — dispatched to [`read_spil`].
+    /// Spillage — dispatched to [`read_spil`].
     Spillage,
 }
 
 /// Per-pollutant input bundle.
 #[derive(Debug, Clone)]
 pub struct PollutantBundle {
- /// Pollutant name (e.g., `THC`, `CO`, `NOX`, `CRA`, `DIU`).
+    /// Pollutant name (e.g., `THC`, `CO`, `NOX`, `CRA`, `DIU`).
     pub name: String,
- /// Optional emission-factor file path
- /// (`facfl(idxpol)` in Fortran).
+    /// Optional emission-factor file path
+    /// (`facfl(idxpol)` in Fortran).
     pub factor_file: Option<PathBuf>,
- /// Optional deterioration file path (`detfl(idxpol)`).
+    /// Optional deterioration file path (`detfl(idxpol)`).
     pub det_file: Option<PathBuf>,
- /// Which parser to use for this pollutant.
+    /// Which parser to use for this pollutant.
     pub kind: PollutantKind,
 }
 
 /// Loaded emission-factor data, organized by pollutant.
 #[derive(Debug, Default, Clone)]
 pub struct EmissionFactorTables {
- /// Exhaust emission-factor records, keyed by pollutant name.
+    /// Exhaust emission-factor records, keyed by pollutant name.
     pub exhaust: HashMap<String, Vec<EmissionFactorRecord>>,
- /// Evap emission-factor records, keyed by pollutant name.
+    /// Evap emission-factor records, keyed by pollutant name.
     pub evap: HashMap<String, Vec<EvapEmissionFactorRecord>>,
- /// Spillage records (populated for the spillage pollutant).
+    /// Spillage records (populated for the spillage pollutant).
     pub spillage: Vec<SpillageRecord>,
- /// Deterioration records, keyed by pollutant name.
+    /// Deterioration records, keyed by pollutant name.
     pub deterioration: HashMap<String, Vec<DeteriorationRecord>>,
 }
 
@@ -166,10 +166,9 @@ mod tests {
 
     #[test]
     fn dispatches_to_spillage_parser() {
-        let record = "2270001000 PUMP TNK 0.0 25.0 BASE GALLONS \
-0.5 0.6 70.0 1.0 0.5 50.0 0.0 0.0 \
-0.0 0.0 0.0 0.0 0.05 0.2 0.2 0.2 0.2 0.2 \
-0.0 1.5 1.0 1.0 1.0";
+        // Fixed-width format matching rdspil.f column positions.
+        let record =
+            "2270001000 2-Str Offroad Motorcycles                 PUMP      HP       0   25    ALL    GALLONS         0.50000 0.60000  70.00000   1.00000  0.500000  50.00000   0.00000  0.000000   0.00000  0.000000   0.00000  0.000000   0.05000     0.200     0.200     0.200     0.200     0.200     0.000     1.500     1.000     1.000     1.000";
         let body = format!("/EMSFAC/\n{}\n/END/\n", record);
         let f = write_temp(&body);
 

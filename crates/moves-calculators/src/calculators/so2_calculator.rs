@@ -173,25 +173,25 @@ const TOTAL_ENERGY_POLLUTANT_ID: i32 = 91;
 /// `fuelRegionID` is constant and is not modelled.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FuelSupplyRow {
- /// `fuelYearID` — joins to [`YearRow::fuel_year_id`].
+    /// `fuelYearID` — joins to [`YearRow::fuel_year_id`].
     pub fuel_year_id: i32,
- /// `monthGroupID` — the month group this share applies to.
+    /// `monthGroupID` — the month group this share applies to.
     pub month_group_id: i32,
- /// `fuelFormulationID` — joins to [`FuelFormulationRow::fuel_formulation_id`].
+    /// `fuelFormulationID` — joins to [`FuelFormulationRow::fuel_formulation_id`].
     pub fuel_formulation_id: i32,
- /// `marketShare` — this formulation's share of the fuel supply.
+    /// `marketShare` — this formulation's share of the fuel supply.
     pub market_share: f64,
 }
 
 /// One `FuelFormulation` row — a fuel blend's subtype and sulfur level.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FuelFormulationRow {
- /// `fuelFormulationID` — the formulation primary key.
+    /// `fuelFormulationID` — the formulation primary key.
     pub fuel_formulation_id: i32,
- /// `fuelSubTypeID` — joins to [`FuelSubTypeRow::fuel_sub_type_id`].
+    /// `fuelSubTypeID` — joins to [`FuelSubTypeRow::fuel_sub_type_id`].
     pub fuel_sub_type_id: i32,
- /// `sulfurLevel` — fuel sulfur content. `FLOAT` in MOVES; nullable, read by
- /// the SQL as `coalesce(sulfurLevel, 0)`, so a `NULL` is modelled as `0.0`.
+    /// `sulfurLevel` — fuel sulfur content. `FLOAT` in MOVES; nullable, read by
+    /// the SQL as `coalesce(sulfurLevel, 0)`, so a `NULL` is modelled as `0.0`.
     pub sulfur_level: f64,
 }
 
@@ -199,11 +199,11 @@ pub struct FuelFormulationRow {
 /// content.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FuelSubTypeRow {
- /// `fuelSubTypeID` — the subtype primary key.
+    /// `fuelSubTypeID` — the subtype primary key.
     pub fuel_sub_type_id: i32,
- /// `fuelTypeID` — the parent fuel type.
+    /// `fuelTypeID` — the parent fuel type.
     pub fuel_type_id: i32,
- /// `energyContent` — energy per unit fuel. `FLOAT` in MOVES.
+    /// `energyContent` — energy per unit fuel. `FLOAT` in MOVES.
     pub energy_content: f64,
 }
 
@@ -213,9 +213,9 @@ pub struct FuelSubTypeRow {
 /// run carries a single row here.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct YearRow {
- /// `yearID` — the calendar year.
+    /// `yearID` — the calendar year.
     pub year_id: i32,
- /// `fuelYearID` — the fuel year, joins to [`FuelSupplyRow::fuel_year_id`].
+    /// `fuelYearID` — the fuel year, joins to [`FuelSupplyRow::fuel_year_id`].
     pub fuel_year_id: i32,
 }
 
@@ -226,15 +226,15 @@ pub struct YearRow {
 /// SO2 for the running, start, extended-idle and auxiliary-power processes.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SulfateEmissionRateRow {
- /// `polProcessID` — `pollutantID × 100 + processID`; joins to
- /// [`PollutantProcessRow::pol_process_id`].
+    /// `polProcessID` — `pollutantID × 100 + processID`; joins to
+    /// [`PollutantProcessRow::pol_process_id`].
     pub pol_process_id: i32,
- /// `fuelTypeID` — the fuel type the rate applies to.
+    /// `fuelTypeID` — the fuel type the rate applies to.
     pub fuel_type_id: i32,
- /// `modelYearGroupID` — encodes the model-year range as
- /// `minModelYearID × 10000 + maxModelYearID`.
+    /// `modelYearGroupID` — encodes the model-year range as
+    /// `minModelYearID × 10000 + maxModelYearID`.
     pub model_year_group_id: i32,
- /// `meanBaseRate` — the base rate. `FLOAT` in MOVES.
+    /// `meanBaseRate` — the base rate. `FLOAT` in MOVES.
     pub mean_base_rate: f64,
 }
 
@@ -245,20 +245,20 @@ pub struct SulfateEmissionRateRow {
 /// SO2 for the iteration's single process.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PollutantProcessRow {
- /// `polProcessID` — `pollutantID × 100 + processID`.
+    /// `polProcessID` — `pollutantID × 100 + processID`.
     pub pol_process_id: i32,
- /// `processID` — the emission process.
+    /// `processID` — the emission process.
     pub process_id: i32,
- /// `pollutantID` — the pollutant (always 31, SO2, in this extract).
+    /// `pollutantID` — the pollutant (always 31, SO2, in this extract).
     pub pollutant_id: i32,
 }
 
 /// One `MonthOfAnyYear` row — the `monthID → monthGroupID` mapping.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MonthGroupRow {
- /// `monthID` — the calendar month.
+    /// `monthID` — the calendar month.
     pub month_id: i32,
- /// `monthGroupID` — the month group it belongs to.
+    /// `monthGroupID` — the month group it belongs to.
     pub month_group_id: i32,
 }
 
@@ -271,21 +271,21 @@ pub struct MonthGroupRow {
 /// pollutant, process, modelYear, year)` cell carries at most one ratio.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GeneralFuelRatioRow {
- /// `fuelTypeID`.
+    /// `fuelTypeID`.
     pub fuel_type_id: i32,
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: i32,
- /// `monthID`.
+    /// `monthID`.
     pub month_id: i32,
- /// `pollutantID`.
+    /// `pollutantID`.
     pub pollutant_id: i32,
- /// `processID`.
+    /// `processID`.
     pub process_id: i32,
- /// `modelYearID`.
+    /// `modelYearID`.
     pub model_year_id: i32,
- /// `yearID`.
+    /// `yearID`.
     pub year_id: i32,
- /// `fuelEffectRatio` — the multiplier applied to the SO2 emission.
+    /// `fuelEffectRatio` — the multiplier applied to the SO2 emission.
     pub fuel_effect_ratio: f64,
 }
 
@@ -298,41 +298,41 @@ pub struct GeneralFuelRatioRow {
 /// remaining fields are the dimension cell the SO2 row inherits.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct EnergyRow {
- /// `pollutantID` — the energy algorithm only reads rows where this is
- /// `TOTAL_ENERGY_POLLUTANT_ID` (91).
+    /// `pollutantID` — the energy algorithm only reads rows where this is
+    /// `TOTAL_ENERGY_POLLUTANT_ID` (91).
     pub pollutant_id: i32,
- /// `processID` — the emission process; joins to the calculator's
- /// `SO2FuelCalculation2` process.
+    /// `processID` — the emission process; joins to the calculator's
+    /// `SO2FuelCalculation2` process.
     pub process_id: i32,
- /// `yearID`.
+    /// `yearID`.
     pub year_id: i32,
- /// `monthID`.
+    /// `monthID`.
     pub month_id: i32,
- /// `dayID`.
+    /// `dayID`.
     pub day_id: i32,
- /// `hourID`.
+    /// `hourID`.
     pub hour_id: i32,
- /// `stateID`.
+    /// `stateID`.
     pub state_id: i32,
- /// `countyID`.
+    /// `countyID`.
     pub county_id: i32,
- /// `zoneID`.
+    /// `zoneID`.
     pub zone_id: i32,
- /// `linkID`.
+    /// `linkID`.
     pub link_id: i32,
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: i32,
- /// `regClassID`.
+    /// `regClassID`.
     pub reg_class_id: i32,
- /// `fuelTypeID`.
+    /// `fuelTypeID`.
     pub fuel_type_id: i32,
- /// `modelYearID`.
+    /// `modelYearID`.
     pub model_year_id: i32,
- /// `roadTypeID`.
+    /// `roadTypeID`.
     pub road_type_id: i32,
- /// `emissionQuant` — the Total Energy Consumption quantity.
+    /// `emissionQuant` — the Total Energy Consumption quantity.
     pub energy: f64,
- /// `emissionRate` — the Total Energy Consumption rate.
+    /// `emissionRate` — the Total Energy Consumption rate.
     pub energy_rate: f64,
 }
 
@@ -344,33 +344,33 @@ pub struct EnergyRow {
 /// contract the unit tests build directly.
 #[derive(Debug, Clone, Default)]
 pub struct So2Inputs {
- /// `FuelSupply` rows (single fuel region).
+    /// `FuelSupply` rows (single fuel region).
     pub fuel_supply: Vec<FuelSupplyRow>,
- /// `FuelFormulation` rows.
+    /// `FuelFormulation` rows.
     pub fuel_formulation: Vec<FuelFormulationRow>,
- /// `FuelSubType` rows.
+    /// `FuelSubType` rows.
     pub fuel_sub_type: Vec<FuelSubTypeRow>,
- /// `FuelType` ids — the SQL's `SO2CopyOfFuelType` join is an existence
- /// filter on the fuel type; a fuel subtype whose `fuelTypeID` is absent
- /// here is dropped.
+    /// `FuelType` ids — the SQL's `SO2CopyOfFuelType` join is an existence
+    /// filter on the fuel type; a fuel subtype whose `fuelTypeID` is absent
+    /// here is dropped.
     pub fuel_type: Vec<i32>,
- /// `Year` rows (single calendar year).
+    /// `Year` rows (single calendar year).
     pub year: Vec<YearRow>,
- /// `SulfateEmissionRate` rows for the SO2 processes.
+    /// `SulfateEmissionRate` rows for the SO2 processes.
     pub sulfate_emission_rate: Vec<SulfateEmissionRateRow>,
- /// `PollutantProcessAssoc` rows — SO2 for the iteration's process.
+    /// `PollutantProcessAssoc` rows — SO2 for the iteration's process.
     pub pollutant_process_assoc: Vec<PollutantProcessRow>,
- /// `RunSpecModelYear` — the model years the run covers; the
- /// `SulfateEmissionRate` model-year groups are expanded onto these.
+    /// `RunSpecModelYear` — the model years the run covers; the
+    /// `SulfateEmissionRate` model-year groups are expanded onto these.
     pub run_spec_model_year: Vec<i32>,
- /// `MonthOfAnyYear` rows — the `monthID → monthGroupID` mapping.
+    /// `MonthOfAnyYear` rows — the `monthID → monthGroupID` mapping.
     pub month_of_any_year: Vec<MonthGroupRow>,
- /// `generalFuelRatio` effect rows. May be empty: a cell with no matching
- /// ratio keeps its emission unchanged.
+    /// `generalFuelRatio` effect rows. May be empty: a cell with no matching
+    /// ratio keeps its emission unchanged.
     pub general_fuel_ratio: Vec<GeneralFuelRatioRow>,
- /// `MOVESWorkerOutput` rows. The calculation reads only the Total Energy
- /// Consumption rows (`pollutantID` 91); any other pollutant present is
- /// ignored, as the SQL's `mwo.pollutantID = 91` filter does.
+    /// `MOVESWorkerOutput` rows. The calculation reads only the Total Energy
+    /// Consumption rows (`pollutantID` 91); any other pollutant present is
+    /// ignored, as the SQL's `mwo.pollutantID = 91` filter does.
     pub energy: Vec<EnergyRow>,
 }
 
@@ -382,48 +382,48 @@ pub struct So2Inputs {
 /// documentation](self)). `pollutant_id` is always 31 (SO2).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct So2EmissionRow {
- /// `yearID`.
+    /// `yearID`.
     pub year_id: i32,
- /// `monthID`.
+    /// `monthID`.
     pub month_id: i32,
- /// `dayID`.
+    /// `dayID`.
     pub day_id: i32,
- /// `hourID`.
+    /// `hourID`.
     pub hour_id: i32,
- /// `stateID`.
+    /// `stateID`.
     pub state_id: i32,
- /// `countyID`.
+    /// `countyID`.
     pub county_id: i32,
- /// `zoneID`.
+    /// `zoneID`.
     pub zone_id: i32,
- /// `linkID`.
+    /// `linkID`.
     pub link_id: i32,
- /// `pollutantID` — always 31 (SO2).
+    /// `pollutantID` — always 31 (SO2).
     pub pollutant_id: i32,
- /// `processID` — the emission process.
+    /// `processID` — the emission process.
     pub process_id: i32,
- /// `sourceTypeID`.
+    /// `sourceTypeID`.
     pub source_type_id: i32,
- /// `regClassID`.
+    /// `regClassID`.
     pub reg_class_id: i32,
- /// `fuelTypeID`.
+    /// `fuelTypeID`.
     pub fuel_type_id: i32,
- /// `modelYearID`.
+    /// `modelYearID`.
     pub model_year_id: i32,
- /// `roadTypeID`.
+    /// `roadTypeID`.
     pub road_type_id: i32,
- /// `emissionQuant` — the SO2 emission quantity.
+    /// `emissionQuant` — the SO2 emission quantity.
     pub emission_quant: f64,
- /// `emissionRate` — the SO2 emission rate.
+    /// `emissionRate` — the SO2 emission rate.
     pub emission_rate: f64,
 }
 
 impl So2EmissionRow {
- /// The integer dimension tuple — every column except the two emission
- /// values. Used to sort the output deterministically: MOVES leaves
- /// `MOVESWorkerOutput` physically unordered (the SQL `INSERT … SELECT` has
- /// no `ORDER BY`), so the port sorts purely to make the result
- /// reproducible.
+    /// The integer dimension tuple — every column except the two emission
+    /// values. Used to sort the output deterministically: MOVES leaves
+    /// `MOVESWorkerOutput` physically unordered (the SQL `INSERT … SELECT` has
+    /// no `ORDER BY`), so the port sorts purely to make the result
+    /// reproducible.
     fn dimension_key(&self) -> [i32; 15] {
         [
             self.year_id,
@@ -1714,9 +1714,9 @@ impl TableRow for So2EmissionRow {
 /// one `(yearID, monthGroupID, fuelTypeID)` group.
 #[derive(Debug, Clone, Copy, Default)]
 struct FuelCalc1 {
- /// `Σ marketShare × energyContent`.
+    /// `Σ marketShare × energyContent`.
     energy_content: f64,
- /// `Σ marketShare × sulfurLevel`.
+    /// `Σ marketShare × sulfurLevel`.
     w_sulfur_level: f64,
 }
 
@@ -1724,11 +1724,11 @@ struct FuelCalc1 {
 /// `(process, pollutant)`.
 #[derive(Debug, Clone, Copy)]
 struct FuelCalc2 {
- /// `processID` from the joined `PollutantProcessAssoc` row.
+    /// `processID` from the joined `PollutantProcessAssoc` row.
     process_id: i32,
- /// `pollutantID` from the joined `PollutantProcessAssoc` row (31, SO2).
+    /// `pollutantID` from the joined `PollutantProcessAssoc` row (31, SO2).
     pollutant_id: i32,
- /// `meanBaseRate` from the `SulfateEmissionRate` row.
+    /// `meanBaseRate` from the `SulfateEmissionRate` row.
     mean_base_rate: f64,
 }
 
@@ -1785,7 +1785,7 @@ fn synthesize_general_fuel_ratio(
         .into_iter()
         .filter(|r| {
             r.pollutant_id == i32::from(SO2_POLLUTANT.0)
-                && process_id.is_none_or(|p| r.process_id == p)
+                && process_id.map_or(true, |p| r.process_id == p)
         })
         .collect();
     // No SO2 fuel-effect rows (the universal case) → empty extract, multiplier 1.
@@ -1828,7 +1828,8 @@ fn synthesize_general_fuel_ratio(
         return Ok(Vec::new());
     };
 
-    let mut acc: HashMap<(i32, i32, i32, i32, i32, i32, i32), f64> = HashMap::new();
+    type FuelRatioKey = (i32, i32, i32, i32, i32, i32, i32);
+    let mut acc: HashMap<FuelRatioKey, f64> = HashMap::new();
     for gfr in &raw {
         for fs in &fuel_supply {
             if fs.fuel_formulation_id != gfr.fuel_formulation_id {
@@ -1871,16 +1872,18 @@ fn synthesize_general_fuel_ratio(
 
     Ok(acc
         .into_iter()
-        .map(|((ft, st, mo, po, pr, my, yr), ratio)| GeneralFuelRatioRow {
-            fuel_type_id: ft,
-            source_type_id: st,
-            month_id: mo,
-            pollutant_id: po,
-            process_id: pr,
-            model_year_id: my,
-            year_id: yr,
-            fuel_effect_ratio: ratio,
-        })
+        .map(
+            |((ft, st, mo, po, pr, my, yr), ratio)| GeneralFuelRatioRow {
+                fuel_type_id: ft,
+                source_type_id: st,
+                month_id: mo,
+                pollutant_id: po,
+                process_id: pr,
+                model_year_id: my,
+                year_id: yr,
+                fuel_effect_ratio: ratio,
+            },
+        )
         .collect())
 }
 
@@ -1950,26 +1953,26 @@ fn write_rows(rows: Vec<So2EmissionRow>) -> Result<CalculatorOutput, Error> {
 pub struct SO2Calculator;
 
 impl SO2Calculator {
- /// Stable module name — matches the Java class and the chain-DAG entry.
+    /// Stable module name — matches the Java class and the chain-DAG entry.
     pub const NAME: &'static str = CALCULATOR_NAME;
 
- /// Compute the SO2 emission rows — the port of the `SO2Calculator.sql`
- /// "Processing" section.
- ///
- /// Returns no rows when the inputs carry no usable energy: an energy row
- /// is used only if its `(year, monthGroup, fuelType)` resolves a
- /// `SO2FuelCalculation1` cell, its `(fuelType, modelYear)` resolves a
- /// `SO2FuelCalculation2` cell for the *same process*, and its month
- /// resolves a month group — every SQL join is an `INNER JOIN`. The result
- /// is sorted by its integer dimension columns for deterministic output;
- /// MOVES leaves `MOVESWorkerOutput` physically unordered.
+    /// Compute the SO2 emission rows — the port of the `SO2Calculator.sql`
+    /// "Processing" section.
+    ///
+    /// Returns no rows when the inputs carry no usable energy: an energy row
+    /// is used only if its `(year, monthGroup, fuelType)` resolves a
+    /// `SO2FuelCalculation1` cell, its `(fuelType, modelYear)` resolves a
+    /// `SO2FuelCalculation2` cell for the *same process*, and its month
+    /// resolves a month group — every SQL join is an `INNER JOIN`. The result
+    /// is sorted by its integer dimension columns for deterministic output;
+    /// MOVES leaves `MOVESWorkerOutput` physically unordered.
     #[must_use]
     pub fn calculate(&self, inputs: &So2Inputs) -> Vec<So2EmissionRow> {
- // --- SO2FuelCalculation1 -------------------------------------------
- // energyContent = Σ marketShare × subtype.energyContent,
- // WsulfurLevel = Σ marketShare × formulation.sulfurLevel,
- // grouped by (yearID, monthGroupID, fuelTypeID), over the fuel supply
- // joined FuelFormulation → FuelSubType → FuelType and to Year.
+        // --- SO2FuelCalculation1 -------------------------------------------
+        // energyContent = Σ marketShare × subtype.energyContent,
+        // WsulfurLevel = Σ marketShare × formulation.sulfurLevel,
+        // grouped by (yearID, monthGroupID, fuelTypeID), over the fuel supply
+        // joined FuelFormulation → FuelSubType → FuelType and to Year.
         let formulation: HashMap<i32, &FuelFormulationRow> = inputs
             .fuel_formulation
             .iter()
@@ -1980,7 +1983,7 @@ impl SO2Calculator {
             .iter()
             .map(|fst| (fst.fuel_sub_type_id, fst))
             .collect();
- // Year resolves fuelYearID → yearID; the run carries one calendar year.
+        // Year resolves fuelYearID → yearID; the run carries one calendar year.
         let year_of_fuel_year: HashMap<i32, i32> = inputs
             .year
             .iter()
@@ -1989,19 +1992,19 @@ impl SO2Calculator {
 
         let mut fuel_calc1: HashMap<(i32, i32, i32), FuelCalc1> = HashMap::new();
         for fs in &inputs.fuel_supply {
- // INNER JOIN FuelFormulation USING (fuelFormulationID).
+            // INNER JOIN FuelFormulation USING (fuelFormulationID).
             let Some(ff) = formulation.get(&fs.fuel_formulation_id) else {
                 continue;
             };
- // INNER JOIN FuelSubType USING (fuelSubTypeID).
+            // INNER JOIN FuelSubType USING (fuelSubTypeID).
             let Some(fst) = sub_type.get(&ff.fuel_sub_type_id) else {
                 continue;
             };
- // INNER JOIN FuelType USING (fuelTypeID) — an existence filter.
+            // INNER JOIN FuelType USING (fuelTypeID) — an existence filter.
             if !inputs.fuel_type.contains(&fst.fuel_type_id) {
                 continue;
             }
- // INNER JOIN Year ON Year.fuelYearID = FuelSupply.fuelYearID.
+            // INNER JOIN Year ON Year.fuelYearID = FuelSupply.fuelYearID.
             let Some(&year_id) = year_of_fuel_year.get(&fs.fuel_year_id) else {
                 continue;
             };
@@ -2012,11 +2015,11 @@ impl SO2Calculator {
             cell.w_sulfur_level += fs.market_share * ff.sulfur_level;
         }
 
- // --- SO2FuelCalculation2 -------------------------------------------
- // Expand each SulfateEmissionRate row's modelYearGroupID over the
- // run-spec model years it covers, resolving polProcessID through the
- // PollutantProcessAssoc extract. The SQL has no GROUP BY here, so a
- // (fuelType, modelYear) cell may carry several rates.
+        // --- SO2FuelCalculation2 -------------------------------------------
+        // Expand each SulfateEmissionRate row's modelYearGroupID over the
+        // run-spec model years it covers, resolving polProcessID through the
+        // PollutantProcessAssoc extract. The SQL has no GROUP BY here, so a
+        // (fuelType, modelYear) cell may carry several rates.
         let process_of_pol_process: HashMap<i32, (i32, i32)> = inputs
             .pollutant_process_assoc
             .iter()
@@ -2025,15 +2028,15 @@ impl SO2Calculator {
 
         let mut fuel_calc2: HashMap<(i32, i32), Vec<FuelCalc2>> = HashMap::new();
         for ser in &inputs.sulfate_emission_rate {
- // INNER JOIN SO2CopyOfPPA ON polProcessID — drops rates whose
- // pollutant/process is not the iteration's SO2 process.
+            // INNER JOIN SO2CopyOfPPA ON polProcessID — drops rates whose
+            // pollutant/process is not the iteration's SO2 process.
             let Some(&(process_id, pollutant_id)) = process_of_pol_process.get(&ser.pol_process_id)
             else {
                 continue;
             };
- // minModelYearID = floor(modelYearGroupID / 10000),
- // maxModelYearID = mod(modelYearGroupID, 10000). Exact integer
- // arithmetic — see the module fidelity notes.
+            // minModelYearID = floor(modelYearGroupID / 10000),
+            // maxModelYearID = mod(modelYearGroupID, 10000). Exact integer
+            // arithmetic — see the module fidelity notes.
             let min_model_year = ser.model_year_group_id / 10_000;
             let max_model_year = ser.model_year_group_id % 10_000;
             for &model_year in &inputs.run_spec_model_year {
@@ -2050,14 +2053,14 @@ impl SO2Calculator {
             }
         }
 
- // --- SO2MOVESOutputTemp1 -------------------------------------------
- // monthID → monthGroupID, the SO2CopyOfMonthOfAnyYear join target.
+        // --- SO2MOVESOutputTemp1 -------------------------------------------
+        // monthID → monthGroupID, the SO2CopyOfMonthOfAnyYear join target.
         let month_group_of_month: HashMap<i32, i32> = inputs
             .month_of_any_year
             .iter()
             .map(|m| (m.month_id, m.month_group_id))
             .collect();
- // The general fuel-effect ratios, keyed by the SQL UPDATE's join tuple.
+        // The general fuel-effect ratios, keyed by the SQL UPDATE's join tuple.
         let fuel_effect_ratio: FuelEffectRatioIndex = inputs
             .general_fuel_ratio
             .iter()
@@ -2079,39 +2082,39 @@ impl SO2Calculator {
 
         let mut out: Vec<So2EmissionRow> = Vec::new();
         for e in &inputs.energy {
- // mwo.pollutantID = 91 — only Total Energy Consumption rows.
+            // mwo.pollutantID = 91 — only Total Energy Consumption rows.
             if e.pollutant_id != TOTAL_ENERGY_POLLUTANT_ID {
                 continue;
             }
- // INNER JOIN may ON mwo.monthID = may.monthID.
+            // INNER JOIN may ON mwo.monthID = may.monthID.
             let Some(&month_group_id) = month_group_of_month.get(&e.month_id) else {
                 continue;
             };
- // INNER JOIN fc1 ON (countyID,) yearID, fc1.monthGroupID =
- // may.monthGroupID, fuelTypeID. countyID is the single-county
- // invariant (see the module docs).
+            // INNER JOIN fc1 ON (countyID,) yearID, fc1.monthGroupID =
+            // may.monthGroupID, fuelTypeID. countyID is the single-county
+            // invariant (see the module docs).
             let Some(fc1) = fuel_calc1.get(&(e.year_id, month_group_id, e.fuel_type_id)) else {
                 continue;
             };
- // INNER JOIN fc2 ON fuelTypeID, modelYearID.
+            // INNER JOIN fc2 ON fuelTypeID, modelYearID.
             let Some(fc2_cells) = fuel_calc2.get(&(e.fuel_type_id, e.model_year_id)) else {
                 continue;
             };
             for fc2 in fc2_cells {
- // mwo.processID = ##context.iterProcess…## — fc2's process is
- // the iteration's process; an energy row for any other is
- // dropped here.
+                // mwo.processID = ##context.iterProcess…## — fc2's process is
+                // the iteration's process; an energy row for any other is
+                // dropped here.
                 if fc2.process_id != e.process_id {
                     continue;
                 }
- // SO2 = (meanBaseRate × WsulfurLevel × energy) / energyContent.
- // MariaDB evaluates `x / 0` as NULL, so a cell whose
- // market-share-weighted `energyContent` sums to zero (every
- // contributing subtype carries a NULL/zero `energyContent`)
- // produces a NULL emission row that contributes nothing
- // downstream. The `f64` port would instead yield a non-finite
- // value that propagates into output; reproduce the SQL by
- // dropping the row rather than emitting inf/NaN.
+                // SO2 = (meanBaseRate × WsulfurLevel × energy) / energyContent.
+                // MariaDB evaluates `x / 0` as NULL, so a cell whose
+                // market-share-weighted `energyContent` sums to zero (every
+                // contributing subtype carries a NULL/zero `energyContent`)
+                // produces a NULL emission row that contributes nothing
+                // downstream. The `f64` port would instead yield a non-finite
+                // value that propagates into output; reproduce the SQL by
+                // dropping the row rather than emitting inf/NaN.
                 if fc1.energy_content == 0.0 {
                     continue;
                 }
@@ -2119,9 +2122,9 @@ impl SO2Calculator {
                     (fc2.mean_base_rate * fc1.w_sulfur_level * e.energy) / fc1.energy_content;
                 let mut emission_rate =
                     (fc2.mean_base_rate * fc1.w_sulfur_level * e.energy_rate) / fc1.energy_content;
- // Apply the general fuel-effect ratio where one matches; a
- // cell with no ratio keeps its value (the SQL UPDATE leaves
- // unmatched rows untouched).
+                // Apply the general fuel-effect ratio where one matches; a
+                // cell with no ratio keeps its value (the SQL UPDATE leaves
+                // unmatched rows untouched).
                 let ratio_key = (
                     e.fuel_type_id,
                     e.source_type_id,
@@ -2228,10 +2231,10 @@ impl Calculator for SO2Calculator {
         Self::NAME
     }
 
- /// `SO2Calculator` is a chained calculator: it does not subscribe to the
- /// MasterLoop directly but fires when its upstream `BaseRateCalculator`
- /// does. `calculator-dag.json` records `subscribes_directly: false` and an
- /// empty `subscriptions` list.
+    /// `SO2Calculator` is a chained calculator: it does not subscribe to the
+    /// MasterLoop directly but fires when its upstream `BaseRateCalculator`
+    /// does. `calculator-dag.json` records `subscribes_directly: false` and an
+    /// empty `subscriptions` list.
     fn subscriptions(&self) -> &[CalculatorSubscription] {
         NO_SUBSCRIPTIONS
     }
@@ -2240,8 +2243,8 @@ impl Calculator for SO2Calculator {
         REGISTRATIONS
     }
 
- /// `SO2Calculator` chains off `BaseRateCalculator` — `calculator-dag.json`
- /// records `depends_on: ["BaseRateCalculator"]`.
+    /// `SO2Calculator` chains off `BaseRateCalculator` — `calculator-dag.json`
+    /// records `depends_on: ["BaseRateCalculator"]`.
     fn upstream(&self) -> &[&'static str] {
         UPSTREAM
     }
@@ -2250,8 +2253,8 @@ impl Calculator for SO2Calculator {
         INPUT_TABLES
     }
 
- /// Read input tables from `ctx`, run the SO2 algorithm, and return the
- /// emission rows as a `MOVESWorkerOutput` `DataFrame`.
+    /// Read input tables from `ctx`, run the SO2 algorithm, and return the
+    /// emission rows as a `MOVESWorkerOutput` `DataFrame`.
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let inputs = build_inputs(ctx)?;
         let rows = self.calculate(&inputs);
@@ -2270,15 +2273,15 @@ pub fn factory() -> Box<dyn Calculator> {
 mod tests {
     use super::*;
 
- /// Build a one-formulation / one-energy-row input whose single output row
- /// has `emission_quant == 120.0` and `emission_rate == 3.0`:
- ///
- /// * `WsulfurLevel = 1.0 × 10.0 = 10.0`
- /// * `energyContent = 1.0 × 50.0 = 50.0`
- /// * `emissionQuant = (3.0 × 10.0 × 200.0) / 50.0 = 120.0`
- /// * `emissionRate = (3.0 × 10.0 × 5.0) / 50.0 = 3.0`
- ///
- /// Values are chosen for an exact result, not physical realism.
+    /// Build a one-formulation / one-energy-row input whose single output row
+    /// has `emission_quant == 120.0` and `emission_rate == 3.0`:
+    ///
+    /// * `WsulfurLevel = 1.0 × 10.0 = 10.0`
+    /// * `energyContent = 1.0 × 50.0 = 50.0`
+    /// * `emissionQuant = (3.0 × 10.0 × 200.0) / 50.0 = 120.0`
+    /// * `emissionRate = (3.0 × 10.0 × 5.0) / 50.0 = 3.0`
+    ///
+    /// Values are chosen for an exact result, not physical realism.
     fn minimal_inputs() -> So2Inputs {
         So2Inputs {
             fuel_supply: vec![FuelSupplyRow {
@@ -2341,8 +2344,8 @@ mod tests {
         }
     }
 
- /// Assert `actual` matches `expected` within `f64` slack — the
- /// FLOAT-column fidelity note means the port computes in `f64`.
+    /// Assert `actual` matches `expected` within `f64` slack — the
+    /// FLOAT-column fidelity note means the port computes in `f64`.
     fn assert_close(actual: f64, expected: f64) {
         assert!(
             (actual - expected).abs() < 1e-9,
@@ -2355,7 +2358,7 @@ mod tests {
         let rows = SO2Calculator.calculate(&minimal_inputs());
         assert_eq!(rows.len(), 1);
         let r = rows[0];
- // The dimension cell is carried straight from the energy row.
+        // The dimension cell is carried straight from the energy row.
         assert_eq!(r.year_id, 2020);
         assert_eq!(r.month_id, 1);
         assert_eq!(r.day_id, 5);
@@ -2369,21 +2372,21 @@ mod tests {
         assert_eq!(r.fuel_type_id, 2);
         assert_eq!(r.model_year_id, 2018);
         assert_eq!(r.road_type_id, 4);
- // The pollutant is relabelled to SO2; the process is carried through.
+        // The pollutant is relabelled to SO2; the process is carried through.
         assert_eq!(r.pollutant_id, 31);
         assert_eq!(r.process_id, 1);
- // (3.0 × 10.0 × 200.0) / 50.0 and (3.0 × 10.0 × 5.0) / 50.0.
+        // (3.0 × 10.0 × 200.0) / 50.0 and (3.0 × 10.0 × 5.0) / 50.0.
         assert_close(r.emission_quant, 120.0);
         assert_close(r.emission_rate, 3.0);
     }
 
     #[test]
     fn calculate_weights_fuel_properties_by_market_share() {
- // Two formulations of the same fuel type, market shares 0.5 / 0.5,
- // different sulfur levels and energy contents:
- // WsulfurLevel = 0.5×10 + 0.5×30 = 20.0
- // energyContent = 0.5×40 + 0.5×60 = 50.0
- // emissionQuant = (3.0 × 20.0 × 200.0) / 50.0 = 240.0
+        // Two formulations of the same fuel type, market shares 0.5 / 0.5,
+        // different sulfur levels and energy contents:
+        // WsulfurLevel = 0.5×10 + 0.5×30 = 20.0
+        // energyContent = 0.5×40 + 0.5×60 = 50.0
+        // emissionQuant = (3.0 × 20.0 × 200.0) / 50.0 = 240.0
         let mut inputs = minimal_inputs();
         inputs.fuel_supply = vec![
             FuelSupplyRow {
@@ -2432,9 +2435,9 @@ mod tests {
 
     #[test]
     fn calculate_expands_emission_rate_over_model_year_group() {
- // One SulfateEmissionRate row covers model years 2015..=2020. An
- // energy row inside the group resolves a rate; one outside (a run-spec
- // model year, but not covered by the group) finds no fc2 cell.
+        // One SulfateEmissionRate row covers model years 2015..=2020. An
+        // energy row inside the group resolves a rate; one outside (a run-spec
+        // model year, but not covered by the group) finds no fc2 cell.
         let mut inputs = minimal_inputs();
         inputs.sulfate_emission_rate[0].model_year_group_id = 20_152_020;
         inputs.run_spec_model_year = vec![2010, 2018];
@@ -2450,7 +2453,7 @@ mod tests {
 
     #[test]
     fn calculate_applies_general_fuel_ratio() {
- // A matching generalFuelRatio row doubles the emission.
+        // A matching generalFuelRatio row doubles the emission.
         let mut inputs = minimal_inputs();
         inputs.general_fuel_ratio = vec![GeneralFuelRatioRow {
             fuel_type_id: 2,
@@ -2471,8 +2474,8 @@ mod tests {
 
     #[test]
     fn calculate_leaves_emission_unchanged_when_no_fuel_ratio_matches() {
- // A generalFuelRatio row that matches every column but the fuel type
- // does not apply; the SQL UPDATE leaves the unmatched row untouched.
+        // A generalFuelRatio row that matches every column but the fuel type
+        // does not apply; the SQL UPDATE leaves the unmatched row untouched.
         let mut inputs = minimal_inputs();
         inputs.general_fuel_ratio = vec![GeneralFuelRatioRow {
             fuel_type_id: 99, // no energy row uses fuel type 99
@@ -2493,8 +2496,8 @@ mod tests {
 
     #[test]
     fn calculate_ignores_non_energy_rows() {
- // An energy row whose pollutant is not Total Energy Consumption (91)
- // is not part of the SO2 input — mwo.pollutantID = 91 in the SQL.
+        // An energy row whose pollutant is not Total Energy Consumption (91)
+        // is not part of the SO2 input — mwo.pollutantID = 91 in the SQL.
         let mut inputs = minimal_inputs();
         inputs.energy[0].pollutant_id = 2; // CO, say — not energy
         assert!(SO2Calculator.calculate(&inputs).is_empty());
@@ -2502,9 +2505,9 @@ mod tests {
 
     #[test]
     fn calculate_drops_energy_row_for_a_different_process() {
- // The PollutantProcessAssoc / SulfateEmissionRate extract is for
- // process 1; an energy row for process 2 finds an fc2 cell on its
- // (fuelType, modelYear) but not for its process, so it is dropped // the SQL's mwo.processID = context process filter.
+        // The PollutantProcessAssoc / SulfateEmissionRate extract is for
+        // process 1; an energy row for process 2 finds an fc2 cell on its
+        // (fuelType, modelYear) but not for its process, so it is dropped // the SQL's mwo.processID = context process filter.
         let mut inputs = minimal_inputs();
         inputs.energy[0].process_id = 2;
         assert!(SO2Calculator.calculate(&inputs).is_empty());
@@ -2512,14 +2515,14 @@ mod tests {
 
     #[test]
     fn calculate_drops_energy_row_without_a_fuel_calculation() {
- // No fuel supply for the energy row's month group → no
- // SO2FuelCalculation1 cell → the INNER JOIN drops the row.
+        // No fuel supply for the energy row's month group → no
+        // SO2FuelCalculation1 cell → the INNER JOIN drops the row.
         let mut no_supply = minimal_inputs();
         no_supply.fuel_supply.clear();
         assert!(SO2Calculator.calculate(&no_supply).is_empty());
 
- // The energy row's model year is not a run-spec model year (the run
- // spec is [2018]) → no SO2FuelCalculation2 cell.
+        // The energy row's model year is not a run-spec model year (the run
+        // spec is [2018]) → no SO2FuelCalculation2 cell.
         let mut no_model_year = minimal_inputs();
         no_model_year.energy[0].model_year_id = 1999;
         assert!(SO2Calculator.calculate(&no_model_year).is_empty());
@@ -2527,8 +2530,8 @@ mod tests {
 
     #[test]
     fn calculate_drops_energy_row_without_a_month_group() {
- // The energy row's month is absent from MonthOfAnyYear — the
- // SO2CopyOfMonthOfAnyYear inner join drops it.
+        // The energy row's month is absent from MonthOfAnyYear — the
+        // SO2CopyOfMonthOfAnyYear inner join drops it.
         let mut inputs = minimal_inputs();
         inputs.month_of_any_year.clear();
         assert!(SO2Calculator.calculate(&inputs).is_empty());
@@ -2536,18 +2539,18 @@ mod tests {
 
     #[test]
     fn calculate_drops_fuel_supply_without_a_matching_join() {
- // FuelSupply references a formulation absent from FuelFormulation // the fuel-calculation join drops it, leaving no fc1 cell.
+        // FuelSupply references a formulation absent from FuelFormulation // the fuel-calculation join drops it, leaving no fc1 cell.
         let mut no_formulation = minimal_inputs();
         no_formulation.fuel_formulation.clear();
         assert!(SO2Calculator.calculate(&no_formulation).is_empty());
 
- // The fuel subtype's fuel type is absent from the FuelType existence
- // filter.
+        // The fuel subtype's fuel type is absent from the FuelType existence
+        // filter.
         let mut no_fuel_type = minimal_inputs();
         no_fuel_type.fuel_type.clear();
         assert!(SO2Calculator.calculate(&no_fuel_type).is_empty());
 
- // No Year row resolves the fuel year.
+        // No Year row resolves the fuel year.
         let mut no_year = minimal_inputs();
         no_year.year.clear();
         assert!(SO2Calculator.calculate(&no_year).is_empty());
@@ -2555,8 +2558,8 @@ mod tests {
 
     #[test]
     fn calculate_drops_emission_rate_without_a_pollutant_process() {
- // SulfateEmissionRate carries a polProcessID with no PollutantProcessAssoc
- // row — the ser ↔ ppa inner join drops it, leaving no fc2 cell.
+        // SulfateEmissionRate carries a polProcessID with no PollutantProcessAssoc
+        // row — the ser ↔ ppa inner join drops it, leaving no fc2 cell.
         let mut inputs = minimal_inputs();
         inputs.pollutant_process_assoc.clear();
         assert!(SO2Calculator.calculate(&inputs).is_empty());
@@ -2564,8 +2567,8 @@ mod tests {
 
     #[test]
     fn calculate_splits_energy_across_fuel_types() {
- // Two fuel types, each with its own fuel supply and emission rate; a
- // single energy row per fuel type produces one SO2 row apiece.
+        // Two fuel types, each with its own fuel supply and emission rate; a
+        // single energy row per fuel type produces one SO2 row apiece.
         let mut inputs = minimal_inputs();
         inputs.fuel_supply.push(FuelSupplyRow {
             fuel_year_id: 2020,
@@ -2599,7 +2602,7 @@ mod tests {
         assert_eq!(rows.len(), 2);
         assert!(rows.iter().any(|r| r.fuel_type_id == 2));
         assert!(rows.iter().any(|r| r.fuel_type_id == 5));
- // Same arithmetic on both fuel types.
+        // Same arithmetic on both fuel types.
         for r in &rows {
             assert_close(r.emission_quant, 120.0);
         }
@@ -2607,8 +2610,8 @@ mod tests {
 
     #[test]
     fn calculate_output_is_sorted_by_dimension_key() {
- // Two energy rows on distinct links produce two rows; the result
- // comes back dimension-key sorted regardless of input order.
+        // Two energy rows on distinct links produce two rows; the result
+        // comes back dimension-key sorted regardless of input order.
         let mut inputs = minimal_inputs();
         inputs.energy.insert(
             0,
@@ -2642,15 +2645,15 @@ mod tests {
 
     #[test]
     fn calculator_is_a_chained_calculator_with_no_subscriptions() {
- // calculator-dag.json: subscribes_directly false, subscriptions [].
+        // calculator-dag.json: subscribes_directly false, subscriptions [].
         assert!(SO2Calculator.subscriptions().is_empty());
     }
 
     #[test]
     fn registrations_match_the_four_calculator_info_directives() {
- // calculator-dag.json records registrations_count 4: SO2 (31) for the
- // running (1), start (2), extended-idle (90) and aux-power (91)
- // exhaust processes.
+        // calculator-dag.json records registrations_count 4: SO2 (31) for the
+        // running (1), start (2), extended-idle (90) and aux-power (91)
+        // exhaust processes.
         let regs = SO2Calculator.registrations();
         assert_eq!(regs.len(), 4);
         assert!(regs.iter().all(|r| r.pollutant_id == PollutantId(31)));
@@ -2661,7 +2664,7 @@ mod tests {
 
     #[test]
     fn calculator_chains_off_base_rate_calculator() {
- // calculator-dag.json records depends_on ["BaseRateCalculator"].
+        // calculator-dag.json records depends_on ["BaseRateCalculator"].
         assert_eq!(SO2Calculator.upstream(), &["BaseRateCalculator"]);
     }
 
@@ -2691,8 +2694,8 @@ mod tests {
         use polars::prelude::{DataFrame, NamedFrom, Series};
         let inputs = minimal_inputs();
         let mut store = moves_framework::InMemoryStore::new();
- // Seed via raw insert to bypass schema-column-count validation for
- // tables whose row structs model a column subset of the registry schema.
+        // Seed via raw insert to bypass schema-column-count validation for
+        // tables whose row structs model a column subset of the registry schema.
         store.insert(
             "FuelSupply",
             FuelSupplyRow::into_dataframe(inputs.fuel_supply).unwrap(),
@@ -2765,8 +2768,8 @@ mod tests {
             .unwrap()
             .get(0)
             .unwrap();
- // Same values as calculate_minimal_input_yields_one_row:
- // (3.0 × 10.0 × 200.0) / 50.0 = 120.0 and (3.0 × 10.0 × 5.0) / 50.0 = 3.0
+        // Same values as calculate_minimal_input_yields_one_row:
+        // (3.0 × 10.0 × 200.0) / 50.0 = 120.0 and (3.0 × 10.0 × 5.0) / 50.0 = 3.0
         assert!(
             (quant - 120.0).abs() < 1e-9,
             "emissionQuant {quant} != 120.0"
@@ -2781,7 +2784,7 @@ mod tests {
 
     #[test]
     fn calculator_is_object_safe() {
- // The registry stores calculators as Box<dyn Calculator>.
+        // The registry stores calculators as Box<dyn Calculator>.
         let calc: Box<dyn Calculator> = Box::new(SO2Calculator);
         assert_eq!(calc.name(), "SO2Calculator");
     }
@@ -2789,8 +2792,8 @@ mod tests {
     #[test]
     fn from_dataframe_treats_null_sulfur_level_as_zero() {
         use polars::prelude::{DataFrame, NamedFrom, Series};
- // FuelFormulation.sulfurLevel is nullable; the SQL reads it as
- // coalesce(sulfurLevel, 0). Extraction must yield 0.0, not error.
+        // FuelFormulation.sulfurLevel is nullable; the SQL reads it as
+        // coalesce(sulfurLevel, 0). Extraction must yield 0.0, not error.
         let df = DataFrame::new(
             2,
             vec![

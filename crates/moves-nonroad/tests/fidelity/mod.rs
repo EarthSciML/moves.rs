@@ -91,17 +91,17 @@ pub fn manifest_path(dir: &Path) -> PathBuf {
 #[derive(Debug, serde::Deserialize)]
 #[allow(dead_code)]
 pub struct ManifestEntry {
- /// Fixture name (e.g. `nr-construction-state`), must match a `FIXTURE_NAMES` entry.
+    /// Fixture name (e.g. `nr-construction-state`), must match a `FIXTURE_NAMES` entry.
     pub name: String,
- /// Relative path to the TSV within the baseline directory.
+    /// Relative path to the TSV within the baseline directory.
     pub path: String,
- /// Lowercase hex SHA256 of the TSV file bytes.
+    /// Lowercase hex SHA256 of the TSV file bytes.
     pub sha256: String,
- /// Byte count of the TSV file.
+    /// Byte count of the TSV file.
     pub bytes: u64,
- /// Row count (non-comment lines) in the TSV file.
+    /// Row count (non-comment lines) in the TSV file.
     pub rows: u64,
- /// Capture wall time in seconds (optional provenance field).
+    /// Capture wall time in seconds (optional provenance field).
     #[serde(default)]
     pub wall_seconds: Option<u64>,
 }
@@ -110,9 +110,9 @@ pub struct ManifestEntry {
 #[derive(Debug, serde::Deserialize)]
 #[allow(dead_code)]
 pub struct CorpusManifest {
- /// SHA256 of the SIF used to generate the corpus (optional provenance).
+    /// SHA256 of the SIF used to generate the corpus (optional provenance).
     #[serde(default)]
     pub sif_sha256: Option<String>,
- /// One entry per fixture, in any order.
+    /// One entry per fixture, in any order.
     pub fixtures: Vec<ManifestEntry>,
 }

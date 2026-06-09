@@ -64,27 +64,27 @@ pub const VERSION: &str = "Core Model ver 2008a, 07/06/09";
 /// `COUNTY`/`SUBCTY` parameters in `nonrdusr.inc`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RegionLevel {
- /// `USTOT` (`'US TOTAL '`) — a single US-total result.
+    /// `USTOT` (`'US TOTAL '`) — a single US-total result.
     UsTotal,
- /// `NATION` (`'50STATE '`) — national totals, allocated to
- /// states.
+    /// `NATION` (`'50STATE '`) — national totals, allocated to
+    /// states.
     Nation,
- /// `STATE` (`'STATE '`) — state-level results.
+    /// `STATE` (`'STATE '`) — state-level results.
     State,
- /// `COUNTY` (`'COUNTY '`) — county-level results.
+    /// `COUNTY` (`'COUNTY '`) — county-level results.
     County,
- /// `SUBCTY` (`'SUBCOUNTY '`) — subcounty-level results.
+    /// `SUBCTY` (`'SUBCOUNTY '`) — subcounty-level results.
     Subcounty,
 }
 
 impl RegionLevel {
- /// Parse the Fortran `reglvl` COMMON-block string.
- ///
- /// Accepts the `nonrdusr.inc` parameter values
- /// (`'US TOTAL '`, `'50STATE '`, `'STATE '`,
- /// `'COUNTY '`, `'SUBCOUNTY '`); leading/trailing blanks are
- /// ignored and the match is case-insensitive. Returns `None` for
- /// any other string.
+    /// Parse the Fortran `reglvl` COMMON-block string.
+    ///
+    /// Accepts the `nonrdusr.inc` parameter values
+    /// (`'US TOTAL '`, `'50STATE '`, `'STATE '`,
+    /// `'COUNTY '`, `'SUBCOUNTY '`); leading/trailing blanks are
+    /// ignored and the match is case-insensitive. Returns `None` for
+    /// any other string.
     pub fn from_reglvl(s: &str) -> Option<RegionLevel> {
         match s.trim().to_ascii_uppercase().as_str() {
             "US TOTAL" => Some(RegionLevel::UsTotal),
@@ -105,13 +105,13 @@ impl RegionLevel {
 /// `nonroad.f` classifies it before dispatch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RegionShape {
- /// The all-zero code `"00000"` — a national record
- /// (`nonroad.f` :265).
+    /// The all-zero code `"00000"` — a national record
+    /// (`nonroad.f` :265).
     National,
- /// A state code: county digits (chars 3–5) are `"000"`
- /// (`nonroad.f` :282).
+    /// A state code: county digits (chars 3–5) are `"000"`
+    /// (`nonroad.f` :282).
     StateCode,
- /// A county code: anything else (`nonroad.f` :297).
+    /// A county code: anything else (`nonroad.f` :297).
     CountyCode,
 }
 
@@ -143,23 +143,23 @@ pub fn classify_region(region_code: &str) -> RegionShape {
 /// entry point that ports it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Dispatch {
- /// `prcus` — US-total processing
- /// ([`crate::geography::process_us_total_record`]).
+    /// `prcus` — US-total processing
+    /// ([`crate::geography::process_us_total_record`]).
     UsTotal,
- /// `prcnat` — national-to-state processing
- /// ([`crate::geography::process_national_record`]).
+    /// `prcnat` — national-to-state processing
+    /// ([`crate::geography::process_national_record`]).
     National,
- /// `prcsta` — state-to-county processing
- /// ([`crate::geography::process_state_to_county_record`]).
+    /// `prcsta` — state-to-county processing
+    /// ([`crate::geography::process_state_to_county_record`]).
     StateToCounty,
- /// `prc1st` — state-from-national processing
- /// ([`crate::geography::process_state_from_national_record`]).
+    /// `prc1st` — state-from-national processing
+    /// ([`crate::geography::process_state_from_national_record`]).
     StateFromNational,
- /// `prccty` — county-level processing
- /// ([`crate::geography::process_county`]).
+    /// `prccty` — county-level processing
+    /// ([`crate::geography::process_county`]).
     County,
- /// `prcsub` — subcounty-level processing
- /// ([`crate::geography::process_subcounty`]).
+    /// `prcsub` — subcounty-level processing
+    /// ([`crate::geography::process_subcounty`]).
     Subcounty,
 }
 
@@ -171,21 +171,21 @@ pub enum Dispatch {
 /// [`Default`] (all empty) is convenient for unit tests.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RunRegions {
- /// 5-character state codes selected for the run — Fortran
- /// `statcd` filtered by the `lstacd` selection flag. A state-code
- /// record whose code is absent here is skipped (`nonroad.f`
- /// :228–230).
+    /// 5-character state codes selected for the run — Fortran
+    /// `statcd` filtered by the `lstacd` selection flag. A state-code
+    /// record whose code is absent here is skipped (`nonroad.f`
+    /// :228–230).
     pub selected_states: Vec<String>,
- /// 5-character county FIPS codes selected for the run — Fortran
- /// `fipcod` filtered by the `lfipcd` selection flag. A county-code
- /// record whose code is absent here is skipped (`nonroad.f`
- /// :232–234).
+    /// 5-character county FIPS codes selected for the run — Fortran
+    /// `fipcod` filtered by the `lfipcd` selection flag. A county-code
+    /// record whose code is absent here is skipped (`nonroad.f`
+    /// :232–234).
     pub selected_counties: Vec<String>,
- /// The region list (`reglst`) — consulted only at
- /// [`RegionLevel::Subcounty`] to split a county record into a
- /// whole-county (`prccty`) and/or a subcounty (`prcsub`) dispatch.
- /// Entries are region codes; a bare 5-character county code marks
- /// a whole-county region, a longer code a subcounty region.
+    /// The region list (`reglst`) — consulted only at
+    /// [`RegionLevel::Subcounty`] to split a county record into a
+    /// whole-county (`prccty`) and/or a subcounty (`prcsub`) dispatch.
+    /// Entries are region codes; a bare 5-character county code marks
+    /// a whole-county region, a longer code a subcounty region.
     pub region_list: Vec<String>,
 }
 
@@ -203,27 +203,27 @@ pub struct RunRegions {
 /// consulted only for that case.
 pub fn dispatch_for(region_code: &str, level: RegionLevel, regions: &RunRegions) -> Vec<Dispatch> {
     match (classify_region(region_code), level) {
- // nonroad.f :266–270 — '00000' at US-TOTAL ⇒ prcus.
+        // nonroad.f :266–270 — '00000' at US-TOTAL ⇒ prcus.
         (RegionShape::National, RegionLevel::UsTotal) => vec![Dispatch::UsTotal],
- // nonroad.f :271–277 — '00000' at STATE/NATION ⇒ prcnat.
+        // nonroad.f :271–277 — '00000' at STATE/NATION ⇒ prcnat.
         (RegionShape::National, RegionLevel::Nation | RegionLevel::State) => {
             vec![Dispatch::National]
         }
- // nonroad.f :283–287 — state code at COUNTY ⇒ prcsta.
+        // nonroad.f :283–287 — state code at COUNTY ⇒ prcsta.
         (RegionShape::StateCode, RegionLevel::County) => vec![Dispatch::StateToCounty],
- // nonroad.f :288–292 — state code at STATE/NATION ⇒ prc1st.
+        // nonroad.f :288–292 — state code at STATE/NATION ⇒ prc1st.
         (RegionShape::StateCode, RegionLevel::Nation | RegionLevel::State) => {
             vec![Dispatch::StateFromNational]
         }
- // nonroad.f :298–304 — county code at COUNTY ⇒ prccty.
+        // nonroad.f :298–304 — county code at COUNTY ⇒ prccty.
         (RegionShape::CountyCode, RegionLevel::County) => vec![Dispatch::County],
- // nonroad.f :308–322 — county code at SUBCOUNTY ⇒ region-list
- // driven (whole-county prccty and/or subcounty prcsub).
+        // nonroad.f :308–322 — county code at SUBCOUNTY ⇒ region-list
+        // driven (whole-county prccty and/or subcounty prcsub).
         (RegionShape::CountyCode, RegionLevel::Subcounty) => {
             subcounty_dispatch(region_code, regions)
         }
- // Every other shape/level pair matches no dispatch branch;
- // nonroad.f falls straight through to `goto 333`.
+        // Every other shape/level pair matches no dispatch branch;
+        // nonroad.f falls straight through to `goto 333`.
         _ => Vec::new(),
     }
 }
@@ -245,13 +245,13 @@ pub fn dispatch_for(region_code: &str, level: RegionLevel, regions: &RunRegions)
 fn subcounty_dispatch(region_code: &str, regions: &RunRegions) -> Vec<Dispatch> {
     let code5 = region_code.get(..5).unwrap_or(region_code);
     let mut out = Vec::new();
- // nonroad.f :309 — whole-county region: an entry that is exactly
- // the 5-char county code (Fortran's code + blank padding).
+    // nonroad.f :309 — whole-county region: an entry that is exactly
+    // the 5-char county code (Fortran's code + blank padding).
     if regions.region_list.iter().any(|r| r.trim() == code5) {
         out.push(Dispatch::County);
     }
- // nonroad.f :316 — any entry whose first 5 characters are the
- // county code (Fortran's 5-char fndchr truncation).
+    // nonroad.f :316 — any entry whose first 5 characters are the
+    // county code (Fortran's 5-char fndchr truncation).
     if regions
         .region_list
         .iter()
@@ -305,22 +305,22 @@ pub fn fuel_for_scc(scc: &str) -> Option<FuelKind> {
 /// classification.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DriverRecord {
- /// Region code — Fortran `regncd(icurec)`. The driver inspects
- /// the first five characters (state + county) and characters 3–5
- /// (county).
+    /// Region code — Fortran `regncd(icurec)`. The driver inspects
+    /// the first five characters (state + county) and characters 3–5
+    /// (county).
     pub region_code: String,
- /// Average horsepower for the record — Fortran `avghpc(icurec)`.
+    /// Average horsepower for the record — Fortran `avghpc(icurec)`.
     pub hp_avg: f32,
- /// Equipment population — Fortran `popeqp(icurec)`.
+    /// Equipment population — Fortran `popeqp(icurec)`.
     pub population: f32,
- /// Population-input year — Fortran `ipopyr(icurec)`.
+    /// Population-input year — Fortran `ipopyr(icurec)`.
     pub pop_year: i32,
- /// Median life at full load in hours — the `.POP` "usage" field
- /// (cols 88–92, Fortran `usehrs(icurec)`), MOVES
- /// `nrsourceusetype.medianLifeFullLoad`. Drives `scrptime`'s
- /// equipment lifespan (`median_life_years = min(25, median_life /
- /// load / activity_hrs)`). Defaults to 0.0; the geography routines
- /// fall back to a neutral value when it is non-positive.
+    /// Median life at full load in hours — the `.POP` "usage" field
+    /// (cols 88–92, Fortran `usehrs(icurec)`), MOVES
+    /// `nrsourceusetype.medianLifeFullLoad`. Drives `scrptime`'s
+    /// equipment lifespan (`median_life_years = min(25, median_life /
+    /// load / activity_hrs)`). Defaults to 0.0; the geography routines
+    /// fall back to a neutral value when it is non-positive.
     pub median_life: f32,
 }
 
@@ -360,43 +360,43 @@ pub fn growth_pair(current: &DriverRecord, next: &DriverRecord) -> Option<f32> {
 /// What the driver loop does with one population record.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StepOutcome {
- /// The record's state or county is not in the run's selection;
- /// the record is skipped (`nonroad.f` :224–236, `goto 333`).
+    /// The record's state or county is not in the run's selection;
+    /// the record is skipped (`nonroad.f` :224–236, `goto 333`).
     NotSelected,
- /// The record is dispatched to the listed geography routines.
- /// Empty means its region shape and the run level match no
- /// dispatch branch; two entries is the SUBCOUNTY whole-county +
- /// subcounty case (see [`dispatch_for`]).
+    /// The record is dispatched to the listed geography routines.
+    /// Empty means its region shape and the run level match no
+    /// dispatch branch; two entries is the SUBCOUNTY whole-county +
+    /// subcounty case (see [`dispatch_for`]).
     Dispatched(Vec<Dispatch>),
 }
 
 /// One iteration of `nonroad.f`'s inner record loop (label `333`).
 #[derive(Debug, Clone, PartialEq)]
 pub struct DriverStep {
- /// 0-based index into the SCC group's records of the record this
- /// iteration processed (Fortran `icurec`, 1-based, minus one).
+    /// 0-based index into the SCC group's records of the record this
+    /// iteration processed (Fortran `icurec`, 1-based, minus one).
     pub record_index: usize,
- /// Growth rate when this record paired with the *next* one as a
- /// growth record (see [`growth_pair`]). `Some` means the next
- /// record was consumed as the growth partner — the following
- /// loop iteration skips over it.
+    /// Growth rate when this record paired with the *next* one as a
+    /// growth record (see [`growth_pair`]). `Some` means the next
+    /// record was consumed as the growth partner — the following
+    /// loop iteration skips over it.
     pub growth: Option<f32>,
- /// What the driver does with the record.
+    /// What the driver does with the record.
     pub outcome: StepOutcome,
 }
 
 /// The result of planning one SCC group's record loop/// [`plan_scc_group`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct SccGroupPlan {
- /// The fuel resolved from the group's SCC ([`fuel_for_scc`]);
- /// `None` is the Fortran `ifuel = 0` default.
+    /// The fuel resolved from the group's SCC ([`fuel_for_scc`]);
+    /// `None` is the Fortran `ifuel = 0` default.
     pub fuel: Option<FuelKind>,
- /// `true` when `nonroad.f`'s record-1 region pre-check
- /// (:165–177) rejected the whole SCC group before the record
- /// loop ran. When set, `steps` is empty.
+    /// `true` when `nonroad.f`'s record-1 region pre-check
+    /// (:165–177) rejected the whole SCC group before the record
+    /// loop ran. When set, `steps` is empty.
     pub group_skipped: bool,
- /// One entry per inner-loop iteration, in order. Empty when
- /// `group_skipped` is set or the group has no records.
+    /// One entry per inner-loop iteration, in order. Empty when
+    /// `group_skipped` is set or the group has no records.
     pub steps: Vec<DriverStep>,
 }
 
@@ -428,8 +428,8 @@ pub fn plan_scc_group(
 ) -> SccGroupPlan {
     let fuel = fuel_for_scc(scc);
 
- // nonroad.f :165–177 — record-1 region pre-check. A non-selected
- // first record skips the whole SCC group.
+    // nonroad.f :165–177 — record-1 region pre-check. A non-selected
+    // first record skips the whole SCC group.
     if let Some(first) = records.first() {
         if !region_selected(&first.region_code, regions) {
             return SccGroupPlan {
@@ -440,12 +440,12 @@ pub fn plan_scc_group(
         }
     }
 
- // nonroad.f label 333 — the inner record loop.
- //
- // `icurec` is the Fortran 1-based record cursor; `lskip` carries
- // over from the previous iteration's growth-pair detection and,
- // when set, makes this iteration skip the consumed growth partner
- // (the extra `icurec += 1` at :187–189).
+    // nonroad.f label 333 — the inner record loop.
+    //
+    // `icurec` is the Fortran 1-based record cursor; `lskip` carries
+    // over from the previous iteration's growth-pair detection and,
+    // when set, makes this iteration skip the consumed growth partner
+    // (the extra `icurec += 1` at :187–189).
     let n = records.len();
     let mut steps = Vec::new();
     let mut icurec: usize = 0;
@@ -461,9 +461,9 @@ pub fn plan_scc_group(
         }
         let idx = icurec - 1; // 0-based index of this iteration's record.
 
- // nonroad.f :206–219 — growth-record-pair lookahead. Runs
- // before the selection check, so a record that later fails
- // selection still arms `lskip` for its growth partner.
+        // nonroad.f :206–219 — growth-record-pair lookahead. Runs
+        // before the selection check, so a record that later fails
+        // selection still arms `lskip` for its growth partner.
         let mut growth = None;
         lskip = false;
         if icurec < n {
@@ -473,8 +473,8 @@ pub fn plan_scc_group(
             }
         }
 
- // nonroad.f :224–236 — per-record region selection, then
- // :265–323 — the geography dispatch.
+        // nonroad.f :224–236 — per-record region selection, then
+        // :265–323 — the geography dispatch.
         let outcome = if region_selected(&records[idx].region_code, regions) {
             StepOutcome::Dispatched(dispatch_for(&records[idx].region_code, level, regions))
         } else {
@@ -549,7 +549,7 @@ mod tests {
         }
     }
 
- // ---- RegionLevel::from_reglvl ----
+    // ---- RegionLevel::from_reglvl ----
 
     #[test]
     fn region_level_parses_fortran_strings() {
@@ -573,7 +573,7 @@ mod tests {
         assert_eq!(RegionLevel::from_reglvl("ZONE"), None);
     }
 
- // ---- classify_region ----
+    // ---- classify_region ----
 
     #[test]
     fn classify_region_national() {
@@ -583,7 +583,7 @@ mod tests {
 
     #[test]
     fn classify_region_state_code() {
- // chars 3-5 == "000" and not all-zero.
+        // chars 3-5 == "000" and not all-zero.
         assert_eq!(classify_region("06000"), RegionShape::StateCode);
         assert_eq!(classify_region("17000"), RegionShape::StateCode);
     }
@@ -596,12 +596,12 @@ mod tests {
 
     #[test]
     fn classify_region_short_code_defaults_to_county() {
- // Defensive: a code with no chars 3-5 cannot be a state code.
+        // Defensive: a code with no chars 3-5 cannot be a state code.
         assert_eq!(classify_region("06"), RegionShape::CountyCode);
         assert_eq!(classify_region(""), RegionShape::CountyCode);
     }
 
- // ---- fuel_for_scc ----
+    // ---- fuel_for_scc ----
 
     #[test]
     fn fuel_from_four_digit_prefixes() {
@@ -634,23 +634,23 @@ mod tests {
 
     #[test]
     fn fuel_seven_digit_does_not_collide_with_four_digit() {
- // 2282xxx splits three ways by the 7-digit prefix even though
- // all share the "2282" 4-digit prefix (which matches nothing).
+        // 2282xxx splits three ways by the 7-digit prefix even though
+        // all share the "2282" 4-digit prefix (which matches nothing).
         assert_eq!(fuel_for_scc("2282005000"), Some(FuelKind::Gasoline2Stroke));
         assert_eq!(fuel_for_scc("2282010000"), Some(FuelKind::Gasoline4Stroke));
         assert_eq!(fuel_for_scc("2282020000"), Some(FuelKind::Diesel));
         assert_eq!(fuel_for_scc("2282999000"), None); // unmatched 2282 subtype
     }
 
- // ---- growth_pair ----
+    // ---- growth_pair ----
 
     #[test]
     fn growth_pair_detected_for_matching_records() {
- // Same region + HP, population grows 100 → 120 over 2 years.
+        // Same region + HP, population grows 100 → 120 over 2 years.
         let a = rec("06037", 25.0, 100.0, 2000);
         let b = rec("06037", 25.0, 120.0, 2002);
         let g = growth_pair(&a, &b).unwrap();
- // (120 - 100) / (100 * 2) = 0.1
+        // (120 - 100) / (100 * 2) = 0.1
         assert!((g - 0.1).abs() < 1e-6);
     }
 
@@ -684,15 +684,15 @@ mod tests {
 
     #[test]
     fn growth_pair_can_be_negative() {
- // A declining population gives a negative growth rate.
+        // A declining population gives a negative growth rate.
         let a = rec("06037", 25.0, 200.0, 2000);
         let b = rec("06037", 25.0, 100.0, 2005);
         let g = growth_pair(&a, &b).unwrap();
- // (100 - 200) / (200 * 5) = -0.1
+        // (100 - 200) / (200 * 5) = -0.1
         assert!((g + 0.1).abs() < 1e-6);
     }
 
- // ---- dispatch_for ----
+    // ---- dispatch_for ----
 
     #[test]
     fn dispatch_national_record() {
@@ -709,7 +709,7 @@ mod tests {
             dispatch_for("00000", RegionLevel::State, &r),
             vec![Dispatch::National]
         );
- // No dispatch branch for a national record on a county run.
+        // No dispatch branch for a national record on a county run.
         assert!(dispatch_for("00000", RegionLevel::County, &r).is_empty());
         assert!(dispatch_for("00000", RegionLevel::Subcounty, &r).is_empty());
     }
@@ -740,7 +740,7 @@ mod tests {
             dispatch_for("06037", RegionLevel::County, &r),
             vec![Dispatch::County]
         );
- // County code with no matching level branch.
+        // County code with no matching level branch.
         assert!(dispatch_for("06037", RegionLevel::UsTotal, &r).is_empty());
         assert!(dispatch_for("06037", RegionLevel::Nation, &r).is_empty());
         assert!(dispatch_for("06037", RegionLevel::State, &r).is_empty());
@@ -748,9 +748,9 @@ mod tests {
 
     #[test]
     fn dispatch_subcounty_whole_county_region() {
- // A whole-county region entry (bare 5-char code) triggers both
- // prccty (10-char match) and prcsub (5-char match) — see the
- // subcounty_dispatch docs.
+        // A whole-county region entry (bare 5-char code) triggers both
+        // prccty (10-char match) and prcsub (5-char match) — see the
+        // subcounty_dispatch docs.
         let r = RunRegions {
             region_list: vec!["06037".to_string()],
             ..Default::default()
@@ -763,8 +763,8 @@ mod tests {
 
     #[test]
     fn dispatch_subcounty_subcounty_only_region() {
- // A subcounty entry (county code + marker) triggers prcsub
- // only — its trimmed form is not the bare county code.
+        // A subcounty entry (county code + marker) triggers prcsub
+        // only — its trimmed form is not the bare county code.
         let r = RunRegions {
             region_list: vec!["06037DOWNT".to_string()],
             ..Default::default()
@@ -777,7 +777,7 @@ mod tests {
 
     #[test]
     fn dispatch_subcounty_no_region_entry() {
- // A county absent from the region list dispatches to nothing.
+        // A county absent from the region list dispatches to nothing.
         let r = RunRegions {
             region_list: vec!["48201DOWNT".to_string()],
             ..Default::default()
@@ -785,7 +785,7 @@ mod tests {
         assert!(dispatch_for("06037", RegionLevel::Subcounty, &r).is_empty());
     }
 
- // ---- plan_scc_group ----
+    // ---- plan_scc_group ----
 
     fn counties(codes: &[&str]) -> RunRegions {
         RunRegions {
@@ -816,9 +816,9 @@ mod tests {
 
     #[test]
     fn plan_skips_growth_partner_record() {
- // Records 0 and 1 are a growth pair (same region + HP, years
- // differ): the loop processes record 0, records the growth
- // rate, and the next iteration jumps over record 1 to record 2.
+        // Records 0 and 1 are a growth pair (same region + HP, years
+        // differ): the loop processes record 0, records the growth
+        // rate, and the next iteration jumps over record 1 to record 2.
         let recs = vec![
             rec("06037", 25.0, 100.0, 2000),
             rec("06037", 25.0, 150.0, 2010),
@@ -827,10 +827,10 @@ mod tests {
         let regions = counties(&["06037", "06038"]);
         let plan = plan_scc_group("2270001010", &recs, RegionLevel::County, &regions);
         assert_eq!(plan.steps.len(), 2);
- // First step: record 0, with a growth rate.
+        // First step: record 0, with a growth rate.
         assert_eq!(plan.steps[0].record_index, 0);
         assert!(plan.steps[0].growth.is_some());
- // Second step jumps straight to record 2 — record 1 consumed.
+        // Second step jumps straight to record 2 — record 1 consumed.
         assert_eq!(plan.steps[1].record_index, 2);
         assert_eq!(plan.steps[1].growth, None);
     }
@@ -842,7 +842,7 @@ mod tests {
             rec("06099", 25.0, 200.0, 2000), // not selected
             rec("06038", 25.0, 300.0, 2000),
         ];
- // Only 06037 and 06038 are selected.
+        // Only 06037 and 06038 are selected.
         let regions = counties(&["06037", "06038"]);
         let plan = plan_scc_group("2270001010", &recs, RegionLevel::County, &regions);
         assert_eq!(plan.steps.len(), 3);
@@ -852,8 +852,8 @@ mod tests {
 
     #[test]
     fn plan_record_one_precheck_skips_whole_group() {
- // nonroad.f :165–177 — first record's county not selected ⇒
- // the entire SCC group is skipped before the loop runs.
+        // nonroad.f :165–177 — first record's county not selected ⇒
+        // the entire SCC group is skipped before the loop runs.
         let recs = vec![
             rec("06099", 25.0, 100.0, 2000), // not selected
             rec("06037", 25.0, 200.0, 2000), // would be selected
@@ -862,15 +862,15 @@ mod tests {
         let plan = plan_scc_group("2270001010", &recs, RegionLevel::County, &regions);
         assert!(plan.group_skipped);
         assert!(plan.steps.is_empty());
- // Fuel is still classified even for a skipped group.
+        // Fuel is still classified even for a skipped group.
         assert_eq!(plan.fuel, Some(FuelKind::Diesel));
     }
 
     #[test]
     fn plan_national_first_record_passes_precheck() {
- // A national first record is never selection-filtered, so the
- // group is not skipped (nonroad.f guards the check with
- // `if regncd != '00000'`).
+        // A national first record is never selection-filtered, so the
+        // group is not skipped (nonroad.f guards the check with
+        // `if regncd != '00000'`).
         let recs = vec![rec("00000", 25.0, 100.0, 2000)];
         let plan = plan_scc_group(
             "2270001010",
@@ -900,11 +900,11 @@ mod tests {
 
     #[test]
     fn plan_growth_pair_still_arms_skip_when_record_unselected() {
- // The growth-pair lookahead runs before the selection check,
- // so even an unselected record consumes its growth partner.
- // Record 0 is selected (so the record-1 pre-check passes);
- // records 1 and 2 are an unselected growth pair; record 3 is
- // selected.
+        // The growth-pair lookahead runs before the selection check,
+        // so even an unselected record consumes its growth partner.
+        // Record 0 is selected (so the record-1 pre-check passes);
+        // records 1 and 2 are an unselected growth pair; record 3 is
+        // selected.
         let recs = vec![
             rec("06037", 25.0, 100.0, 2000),
             rec("06099", 25.0, 100.0, 2000), // unselected, pairs with rec 2
@@ -914,8 +914,8 @@ mod tests {
         let regions = counties(&["06037", "06038"]); // 06099 not selected
         let plan = plan_scc_group("2270001010", &recs, RegionLevel::County, &regions);
         assert!(!plan.group_skipped);
- // Records 0, 1, 3 are visited; record 2 is consumed as the
- // growth partner of the (unselected) record 1.
+        // Records 0, 1, 3 are visited; record 2 is consumed as the
+        // growth partner of the (unselected) record 1.
         assert_eq!(plan.steps.len(), 3);
         assert_eq!(plan.steps[0].record_index, 0);
         assert_eq!(plan.steps[1].record_index, 1);
@@ -926,8 +926,8 @@ mod tests {
 
     #[test]
     fn plan_consecutive_growth_pairs() {
- // Four records forming two back-to-back growth pairs:
- // (0,1) and (2,3). The loop visits records 0 and 2 only.
+        // Four records forming two back-to-back growth pairs:
+        // (0,1) and (2,3). The loop visits records 0 and 2 only.
         let recs = vec![
             rec("06037", 25.0, 100.0, 2000),
             rec("06037", 25.0, 110.0, 2005),
@@ -943,7 +943,7 @@ mod tests {
         assert!(plan.steps[1].growth.is_some());
     }
 
- // ---- completion_message ----
+    // ---- completion_message ----
 
     #[test]
     fn completion_message_success() {

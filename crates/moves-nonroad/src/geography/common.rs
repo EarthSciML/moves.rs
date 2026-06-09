@@ -29,27 +29,27 @@ use crate::{Error, Result};
 /// to the borrowed fields in [`ProcessOutput`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct PopulationRecord<'a> {
- /// 5-character region code (Fortran `regncd(icurec)(1:5)`).
- /// For prccty this is the county FIPS directly; for prcsub it
- /// is the 5-character county FIPS prefix of the 10-character
- /// region code (the trailing 5 hold the subcounty marker).
+    /// 5-character region code (Fortran `regncd(icurec)(1:5)`).
+    /// For prccty this is the county FIPS directly; for prcsub it
+    /// is the 5-character county FIPS prefix of the 10-character
+    /// region code (the trailing 5 hold the subcounty marker).
     pub region_code: &'a str,
- /// Equipment population (Fortran `popeqp(icurec)`). For prcsub
- /// this is the state-level population that `alosub` will further
- /// subdivide.
+    /// Equipment population (Fortran `popeqp(icurec)`). For prcsub
+    /// this is the state-level population that `alosub` will further
+    /// subdivide.
     pub population: f32,
- /// HP range — `(lower, upper)` (Fortran
- /// `hprang(1,icurec)`, `hprang(2,icurec)`).
+    /// HP range — `(lower, upper)` (Fortran
+    /// `hprang(1,icurec)`, `hprang(2,icurec)`).
     pub hp_range: (f32, f32),
- /// Average HP for this record (Fortran `avghpc(icurec)`).
+    /// Average HP for this record (Fortran `avghpc(icurec)`).
     pub hp_avg: f32,
- /// Use hours per year (Fortran `usehrs(icurec)`).
+    /// Use hours per year (Fortran `usehrs(icurec)`).
     pub use_hours: f32,
- /// Discode/alternate-curve picker (Fortran `discod(icurec)`).
+    /// Discode/alternate-curve picker (Fortran `discod(icurec)`).
     pub disc_code: &'a str,
- /// Base population year (Fortran `ipopyr(icurec)`).
+    /// Base population year (Fortran `ipopyr(icurec)`).
     pub base_pop_year: i32,
- /// 10-character SCC code (Fortran `asccod`).
+    /// 10-character SCC code (Fortran `asccod`).
     pub scc: &'a str,
 }
 
@@ -58,43 +58,43 @@ pub struct PopulationRecord<'a> {
 /// `/io/`.
 #[derive(Debug, Clone)]
 pub struct RunOptions {
- /// Tech year for fndtch/fndevtch lookups (Fortran `itchyr`).
+    /// Tech year for fndtch/fndevtch lookups (Fortran `itchyr`).
     pub tech_year: i32,
- /// Episode year (Fortran `iepyr`) — top of the model-year loop.
+    /// Episode year (Fortran `iepyr`) — top of the model-year loop.
     pub episode_year: i32,
- /// Growth year (Fortran `igryr`) — passed to `agedist`.
+    /// Growth year (Fortran `igryr`) — passed to `agedist`.
     pub growth_year: i32,
- /// Fuel kind (Fortran `ifuel`) — picks the density constant.
+    /// Fuel kind (Fortran `ifuel`) — picks the density constant.
     pub fuel: FuelKind,
- /// Total-vs-typical-day mode (Fortran `ismtyp`).
+    /// Total-vs-typical-day mode (Fortran `ismtyp`).
     pub sum_type: SumType,
- /// Daily-mode flag (Fortran `ldayfl`) — drops the monthly
- /// factor from `tplfac`.
+    /// Daily-mode flag (Fortran `ldayfl`) — drops the monthly
+    /// factor from `tplfac`.
     pub daily_mode: bool,
- /// Exhaust by-model-year output flag (Fortran `lbmyfl`).
+    /// Exhaust by-model-year output flag (Fortran `lbmyfl`).
     pub write_bmy_exhaust: bool,
- /// Evaporative by-model-year output flag (Fortran `levbmyfl`).
+    /// Evaporative by-model-year output flag (Fortran `levbmyfl`).
     pub write_bmy_evap: bool,
- /// SI-report output flag (Fortran `lsifl`).
+    /// SI-report output flag (Fortran `lsifl`).
     pub write_si: bool,
- /// Retrofit-file present (Fortran `lrtrftfl`).
+    /// Retrofit-file present (Fortran `lrtrftfl`).
     pub retrofit_enabled: bool,
- /// Spillage-EF file present (Fortran `lfacfl(IDXSPL)`).
+    /// Spillage-EF file present (Fortran `lfacfl(IDXSPL)`).
     pub spillage_enabled: bool,
- /// Growth-file present (Fortran `lgrwfl`). When `false`, the
- /// Fortran source's `goto 7003` error path triggers — surfaced
- /// here as [`Error::Config`].
+    /// Growth-file present (Fortran `lgrwfl`). When `false`, the
+    /// Fortran source's `goto 7003` error path triggers — surfaced
+    /// here as [`Error::Config`].
     pub growth_enabled: bool,
- /// HP-category midpoints (Fortran `hpclev(1..MXHPC)`).
+    /// HP-category midpoints (Fortran `hpclev(1..MXHPC)`).
     pub hp_levels: [f32; MXHPC],
 }
 
 /// Sum / typical-day indicator from `prccty.f` :301 (`ismtyp`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SumType {
- /// Period totals (Fortran `IDXTOT` — `ismtyp == IDXTOT`).
+    /// Period totals (Fortran `IDXTOT` — `ismtyp == IDXTOT`).
     Total,
- /// Per-typical-day rates — anything other than `IDXTOT`.
+    /// Per-typical-day rates — anything other than `IDXTOT`.
     Typical,
 }
 
@@ -104,13 +104,13 @@ pub enum SumType {
 /// the per-period `tplfac` (yearly activity) or `1.0` (daily activity).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActivityUnit {
- /// Hours per year (Fortran `IDXHRY = 1`).
+    /// Hours per year (Fortran `IDXHRY = 1`).
     HoursPerYear,
- /// Hours per day (Fortran `IDXHRD = 2`).
+    /// Hours per day (Fortran `IDXHRD = 2`).
     HoursPerDay,
- /// Gallons per year (Fortran `IDXGLY = 3`).
+    /// Gallons per year (Fortran `IDXGLY = 3`).
     GallonsPerYear,
- /// Gallons per day (Fortran `IDXGLD = 4`).
+    /// Gallons per day (Fortran `IDXGLD = 4`).
     GallonsPerDay,
 }
 
@@ -126,11 +126,11 @@ pub enum ActivityUnit {
 /// decide whether to log, count, or abort.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ProcessWarning {
- /// Kind of warning emitted.
+    /// Kind of warning emitted.
     pub kind: WarningKind,
- /// Human-readable description, preserved verbatim from the
- /// Fortran `write(IOWMSG, …)` calls so log diffs against the
- /// reference can be exact.
+    /// Human-readable description, preserved verbatim from the
+    /// Fortran `write(IOWMSG, …)` calls so log diffs against the
+    /// reference can be exact.
     pub message: String,
 }
 
@@ -142,13 +142,13 @@ pub struct ProcessWarning {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(clippy::enum_variant_names)]
 pub enum WarningKind {
- /// Could not find tech-type fractions (`IDXWTC`).
+    /// Could not find tech-type fractions (`IDXWTC`).
     MissingTechType,
- /// Could not find activity data (`IDXWAC`).
+    /// Could not find activity data (`IDXWAC`).
     MissingActivity,
- /// Could not find emission-factor / spillage data (`IDXWEM`).
+    /// Could not find emission-factor / spillage data (`IDXWEM`).
     MissingEmissionFactor,
- /// Could not find allocation coefficients (used by prcsub).
+    /// Could not find allocation coefficients (used by prcsub).
     MissingAllocation,
 }
 
@@ -160,30 +160,30 @@ pub enum WarningKind {
 /// `wrtdat(…, 0., 0., 0., 0., 0., 0., 0., emsday)` paths.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DatRecord {
- /// 5-character county FIPS (Fortran `fipin`).
+    /// 5-character county FIPS (Fortran `fipin`).
     pub fips: String,
- /// 5-character subcounty marker — empty for county records,
- /// the subcounty ID for subcounty records (Fortran `subcur`).
+    /// 5-character subcounty marker — empty for county records,
+    /// the subcounty ID for subcounty records (Fortran `subcur`).
     pub subcounty: String,
- /// 10-character SCC (Fortran `asccod`).
+    /// 10-character SCC (Fortran `asccod`).
     pub scc: String,
- /// HP level (Fortran `hplev`).
+    /// HP level (Fortran `hplev`).
     pub hp_level: f32,
- /// Total population for the period (Fortran `poptot`).
+    /// Total population for the period (Fortran `poptot`).
     pub population_total: f32,
- /// Total activity for the period (Fortran `acttot`).
+    /// Total activity for the period (Fortran `acttot`).
     pub activity_total: f32,
- /// Total fuel consumption (Fortran `fulcsm`).
+    /// Total fuel consumption (Fortran `fulcsm`).
     pub fuel_consumption: f32,
- /// Load factor (Fortran `faclod(idxact)`).
+    /// Load factor (Fortran `faclod(idxact)`).
     pub load_factor: f32,
- /// HP-average (Fortran `hpval`).
+    /// HP-average (Fortran `hpval`).
     pub hp_avg: f32,
- /// Fraction retrofitted (Fortran `fracretro`).
+    /// Fraction retrofitted (Fortran `fracretro`).
     pub frac_retrofitted: f32,
- /// Units retrofitted (Fortran `unitsretro`).
+    /// Units retrofitted (Fortran `unitsretro`).
     pub units_retrofitted: f32,
- /// Per-pollutant emissions (Fortran `emsday(MXPOL)`).
+    /// Per-pollutant emissions (Fortran `emsday(MXPOL)`).
     pub emissions: Vec<f32>,
 }
 
@@ -193,9 +193,9 @@ pub struct DatRecord {
 /// Rust port uses an enum.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BmyKind {
- /// Exhaust by-model-year row (Fortran flag `1`).
+    /// Exhaust by-model-year row (Fortran flag `1`).
     Exhaust,
- /// Evaporative by-model-year row (Fortran flag `2`).
+    /// Evaporative by-model-year row (Fortran flag `2`).
     Evaporative,
 }
 
@@ -206,42 +206,42 @@ pub enum BmyKind {
 /// faclod, hpval, fracretrobmy, unitsretrobmy, kind)`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BmyRecord {
- /// 5-character county FIPS (Fortran `fipin`).
+    /// 5-character county FIPS (Fortran `fipin`).
     pub fips: String,
- /// 5-character subcounty marker (Fortran `subcur`).
+    /// 5-character subcounty marker (Fortran `subcur`).
     pub subcounty: String,
- /// 10-character SCC (Fortran `asccod`).
+    /// 10-character SCC (Fortran `asccod`).
     pub scc: String,
- /// HP level (Fortran `hplev`).
+    /// HP level (Fortran `hplev`).
     pub hp_level: f32,
- /// Tech type for this row (Fortran `tecnam(i)` or `evtecnam(i)`).
+    /// Tech type for this row (Fortran `tecnam(i)` or `evtecnam(i)`).
     pub tech_name: String,
- /// Absolute model year (Fortran `iyr`).
+    /// Absolute model year (Fortran `iyr`).
     pub model_year: i32,
- /// Population at this (year, tech) (Fortran `popbmy`).
+    /// Population at this (year, tech) (Fortran `popbmy`).
     pub population: f32,
- /// Per-pollutant emissions at this (year, tech) (Fortran
- /// `emsbmy(MXPOL)`).
+    /// Per-pollutant emissions at this (year, tech) (Fortran
+    /// `emsbmy(MXPOL)`).
     pub emissions: Vec<f32>,
- /// Fuel consumption at this (year, tech) (Fortran `fulbmy`).
+    /// Fuel consumption at this (year, tech) (Fortran `fulbmy`).
     pub fuel: f32,
- /// Activity at this (year, tech) (Fortran `actbmy`).
+    /// Activity at this (year, tech) (Fortran `actbmy`).
     pub activity: f32,
- /// Load factor (Fortran `faclod(idxact)`) or
- /// [`crate::common::consts::RMISS`] for the evap path.
+    /// Load factor (Fortran `faclod(idxact)`) or
+    /// [`crate::common::consts::RMISS`] for the evap path.
     pub load_factor: f32,
- /// HP-average (Fortran `hpval`) or
- /// [`crate::common::consts::RMISS`] for the evap path.
+    /// HP-average (Fortran `hpval`) or
+    /// [`crate::common::consts::RMISS`] for the evap path.
     pub hp_avg: f32,
- /// Fraction retrofitted for this (year, tech) (Fortran
- /// `fracretrobmy`) or [`crate::common::consts::RMISS`] for the
- /// evap path.
+    /// Fraction retrofitted for this (year, tech) (Fortran
+    /// `fracretrobmy`) or [`crate::common::consts::RMISS`] for the
+    /// evap path.
     pub frac_retrofitted: f32,
- /// Units retrofitted for this (year, tech) (Fortran
- /// `unitsretrobmy`) or [`crate::common::consts::RMISS`] for the
- /// evap path.
+    /// Units retrofitted for this (year, tech) (Fortran
+    /// `unitsretrobmy`) or [`crate::common::consts::RMISS`] for the
+    /// evap path.
     pub units_retrofitted: f32,
- /// Exhaust vs evap (Fortran flag `1` or `2`).
+    /// Exhaust vs evap (Fortran flag `1` or `2`).
     pub kind: BmyKind,
 }
 
@@ -249,15 +249,15 @@ pub struct BmyRecord {
 /// actbmy, fulbmy, emsbmy)` — populates the SI-report buffers).
 #[derive(Debug, Clone, PartialEq)]
 pub struct SiRecord {
- /// Tech type for this row (Fortran `tecnam(i)` or `evtecnam(i)`).
+    /// Tech type for this row (Fortran `tecnam(i)` or `evtecnam(i)`).
     pub tech_name: String,
- /// Population at this row (Fortran `popbmy`).
+    /// Population at this row (Fortran `popbmy`).
     pub population: f32,
- /// Activity at this row (Fortran `actbmy`).
+    /// Activity at this row (Fortran `actbmy`).
     pub activity: f32,
- /// Fuel consumption at this row (Fortran `fulbmy`).
+    /// Fuel consumption at this row (Fortran `fulbmy`).
     pub fuel: f32,
- /// Per-pollutant emissions at this row.
+    /// Per-pollutant emissions at this row.
     pub emissions: Vec<f32>,
 }
 
@@ -274,30 +274,30 @@ pub struct SiRecord {
 /// than as a variant.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ProcessOutcome {
- /// Normal completion (Fortran `ierr == ISUCES`).
+    /// Normal completion (Fortran `ierr == ISUCES`).
     Success(ProcessOutput),
- /// Record skipped (Fortran `ierr == ISKIP`).
- ///
- /// Carries the output anyway because the Fortran source may
- /// have written a zero record (e.g. `popcty == 0` path).
+    /// Record skipped (Fortran `ierr == ISKIP`).
+    ///
+    /// Carries the output anyway because the Fortran source may
+    /// have written a zero record (e.g. `popcty == 0` path).
     Skipped(ProcessOutput),
 }
 
 impl ProcessOutcome {
- /// Reference to the inner [`ProcessOutput`] regardless of variant.
+    /// Reference to the inner [`ProcessOutput`] regardless of variant.
     pub fn output(&self) -> &ProcessOutput {
         match self {
             ProcessOutcome::Success(o) | ProcessOutcome::Skipped(o) => o,
         }
     }
 
- /// True when this outcome is the `ISKIP` variant.
+    /// True when this outcome is the `ISKIP` variant.
     pub fn is_skipped(&self) -> bool {
         matches!(self, ProcessOutcome::Skipped(_))
     }
 
- /// Destructure into the inner [`ProcessOutput`], discarding the
- /// skip flag.
+    /// Destructure into the inner [`ProcessOutput`], discarding the
+    /// skip flag.
     pub fn into_output(self) -> ProcessOutput {
         match self {
             ProcessOutcome::Success(o) | ProcessOutcome::Skipped(o) => o,
@@ -313,31 +313,31 @@ impl ProcessOutcome {
 /// total that the caller folds into `emsams(NCNTY, MXPOL)`.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ProcessOutput {
- /// 5-character county FIPS (`fipin`).
+    /// 5-character county FIPS (`fipin`).
     pub fips: String,
- /// 5-character subcounty marker (`subcur`) — empty for
- /// county-level outputs.
+    /// 5-character subcounty marker (`subcur`) — empty for
+    /// county-level outputs.
     pub subcounty: String,
- /// HP level for the processed record (`hplev`).
+    /// HP level for the processed record (`hplev`).
     pub hp_level: f32,
- /// Per-pollutant emissions for the period (`emsday(MXPOL)`).
+    /// Per-pollutant emissions for the period (`emsday(MXPOL)`).
     pub emissions_day: Vec<f32>,
- /// Cumulative county-level emissions to fold into `emsams` /// only populated when at least one pollutant emitted (Fortran
- /// `if (emsday(i) > 0)` gate at `prccty.f` :721).
+    /// Cumulative county-level emissions to fold into `emsams` /// only populated when at least one pollutant emitted (Fortran
+    /// `if (emsday(i) > 0)` gate at `prccty.f` :721).
     pub emsams_delta: Vec<f32>,
- /// FIPS slot the caller should fold `emsams_delta` into. The
- /// Fortran source indexes `emsams(idxfip, …)`; the Rust port
- /// returns the slot so callers don't have to re-resolve it.
- /// `None` when no fold-in is needed (skipped paths).
+    /// FIPS slot the caller should fold `emsams_delta` into. The
+    /// Fortran source indexes `emsams(idxfip, …)`; the Rust port
+    /// returns the slot so callers don't have to re-resolve it.
+    /// `None` when no fold-in is needed (skipped paths).
     pub emsams_fips_index: Option<usize>,
- /// `dat`-record(s) the Fortran source would emit via `wrtdat`.
- /// Usually one; the early-return paths emit a zero record.
+    /// `dat`-record(s) the Fortran source would emit via `wrtdat`.
+    /// Usually one; the early-return paths emit a zero record.
     pub dat_records: Vec<DatRecord>,
- /// `bmy`-records emitted via `wrtbmy`.
+    /// `bmy`-records emitted via `wrtbmy`.
     pub bmy_records: Vec<BmyRecord>,
- /// `si`-records emitted via `sitot`.
+    /// `si`-records emitted via `sitot`.
     pub si_records: Vec<SiRecord>,
- /// Warnings collected during processing.
+    /// Warnings collected during processing.
     pub warnings: Vec<ProcessWarning>,
 }
 
@@ -353,11 +353,11 @@ pub struct ProcessOutput {
 /// slot, so callers don't have to expose the COMMON-block layout.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TechLookup {
- /// Index into the SCC-level tech table (`idxtch`, 0-based).
+    /// Index into the SCC-level tech table (`idxtch`, 0-based).
     pub scc_tech_index: usize,
- /// Per-tech-slot names in this SCC's row (`tectyp(idxtch, 1..n)`).
+    /// Per-tech-slot names in this SCC's row (`tectyp(idxtch, 1..n)`).
     pub tech_names: Vec<String>,
- /// Per-tech-slot fractions in this SCC's row (`tchfrc(idxtch, 1..n)`).
+    /// Per-tech-slot fractions in this SCC's row (`tchfrc(idxtch, 1..n)`).
     pub tech_fractions: Vec<f32>,
 }
 
@@ -366,45 +366,45 @@ pub struct TechLookup {
 /// the spillage COMMON when `lfacfl(IDXSPL)` is set.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct RefuelingData {
- /// Refueling-mode string (`modspl(idxref)`).
+    /// Refueling-mode string (`modspl(idxref)`).
     pub mode: String,
- /// Tank volume in gallons (`volspl`, then capped/scaled by `untspl`).
+    /// Tank volume in gallons (`volspl`, then capped/scaled by `untspl`).
     pub tank: f32,
- /// Tank-full flag (`tnkful`).
+    /// Tank-full flag (`tnkful`).
     pub tank_full: f32,
- /// Tank-metal flag (`tnkmtl`).
+    /// Tank-metal flag (`tnkmtl`).
     pub tank_metal: f32,
- /// Hose length (`hoslen`).
+    /// Hose length (`hoslen`).
     pub hose_length: f32,
- /// Hose diameter (`hosdia`).
+    /// Hose diameter (`hosdia`).
     pub hose_dia: f32,
- /// Hose-metal flag (`hosmtl`).
+    /// Hose-metal flag (`hosmtl`).
     pub hose_metal: f32,
- /// Hot-soak start probability (`hssph`).
+    /// Hot-soak start probability (`hssph`).
     pub hot_soak_start: f32,
- /// Neck length (`ncklen`).
+    /// Neck length (`ncklen`).
     pub neck_length: f32,
- /// Neck diameter (`nckdia`).
+    /// Neck diameter (`nckdia`).
     pub neck_dia: f32,
- /// Supply length (`srlen`).
+    /// Supply length (`srlen`).
     pub supply_length: f32,
- /// Supply diameter (`srdia`).
+    /// Supply diameter (`srdia`).
     pub supply_dia: f32,
- /// Vent length (`vntlen`).
+    /// Vent length (`vntlen`).
     pub vent_length: f32,
- /// Vent diameter (`vntdia`).
+    /// Vent diameter (`vntdia`).
     pub vent_dia: f32,
- /// Per-day-of-week diurnal fractions (`diufrc(1..5, idxref)`).
+    /// Per-day-of-week diurnal fractions (`diufrc(1..5, idxref)`).
     pub diurnal_fractions: [f32; 5],
- /// E10 permeation factor for tanks (`tnke10`).
+    /// E10 permeation factor for tanks (`tnke10`).
     pub tnk_e10_factor: f32,
- /// E10 permeation factor for hoses (`hose10`).
+    /// E10 permeation factor for hoses (`hose10`).
     pub hose_e10_factor: f32,
- /// E10 permeation factor for fill necks (`ncke10`).
+    /// E10 permeation factor for fill necks (`ncke10`).
     pub neck_e10_factor: f32,
- /// E10 permeation factor for supply/return (`sre10`).
+    /// E10 permeation factor for supply/return (`sre10`).
     pub supply_e10_factor: f32,
- /// E10 permeation factor for vents (`vnte10`).
+    /// E10 permeation factor for vents (`vnte10`).
     pub vent_e10_factor: f32,
 }
 
@@ -416,17 +416,17 @@ pub struct RefuelingData {
 /// dependency.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ExhaustFactorsLookup {
- /// Emission factors `[year][pollutant][tech]`, row-major.
+    /// Emission factors `[year][pollutant][tech]`, row-major.
     pub emission_factors: Vec<f32>,
- /// BSFC `[year][tech]`, row-major.
+    /// BSFC `[year][tech]`, row-major.
     pub bsfc: Vec<f32>,
- /// Unit codes `[pollutant][tech]`, row-major.
+    /// Unit codes `[pollutant][tech]`, row-major.
     pub unit_codes: Vec<EmissionUnitCode>,
- /// Deterioration A coefficient `[pollutant][tech]`.
+    /// Deterioration A coefficient `[pollutant][tech]`.
     pub adetcf: Vec<f32>,
- /// Deterioration B coefficient `[pollutant][tech]`.
+    /// Deterioration B coefficient `[pollutant][tech]`.
     pub bdetcf: Vec<f32>,
- /// Deterioration cap `[pollutant][tech]`.
+    /// Deterioration cap `[pollutant][tech]`.
     pub detcap: Vec<f32>,
 }
 
@@ -436,26 +436,26 @@ pub struct ExhaustFactorsLookup {
 /// `idxevunt`, `aevdetcf`, `bevdetcf`, `evdetcap` arguments.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct EvapFactorsLookup {
- /// Evap emission factors `[year][pollutant][evtech]`, row-major.
+    /// Evap emission factors `[year][pollutant][evtech]`, row-major.
     pub emission_factors: Vec<f32>,
- /// Unit codes `[pollutant][evtech]`, row-major.
+    /// Unit codes `[pollutant][evtech]`, row-major.
     pub unit_codes: Vec<EmissionUnitCode>,
- /// Evap deterioration A coefficient `[pollutant][evtech]`.
+    /// Evap deterioration A coefficient `[pollutant][evtech]`.
     pub adetcf: Vec<f32>,
- /// Evap deterioration B coefficient `[pollutant][evtech]`.
+    /// Evap deterioration B coefficient `[pollutant][evtech]`.
     pub bdetcf: Vec<f32>,
- /// Evap deterioration cap `[pollutant][evtech]`.
+    /// Evap deterioration cap `[pollutant][evtech]`.
     pub detcap: Vec<f32>,
 }
 
 /// Retrofit-filter mode (Fortran `fltrtyp` argument of `fndrtrft`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RetrofitFilter {
- /// `fltrtyp=1`: keep records whose `(SCC, HP)` matches.
+    /// `fltrtyp=1`: keep records whose `(SCC, HP)` matches.
     SccHp,
- /// `fltrtyp=2`: keep records whose model-year span matches.
+    /// `fltrtyp=2`: keep records whose model-year span matches.
     ModelYear,
- /// `fltrtyp=3`: keep records whose tech type matches.
+    /// `fltrtyp=3`: keep records whose tech type matches.
     TechType,
 }
 
@@ -470,19 +470,19 @@ pub enum RetrofitFilter {
 /// [`crate::population::agedist::age_distribution`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelYearAgedistResult {
- /// Year-to-year fraction scrapped by age — `yryrfrcscrp`.
+    /// Year-to-year fraction scrapped by age — `yryrfrcscrp`.
     pub yryrfrcscrp: Vec<f32>,
- /// Model-year fractions, grown to `growth_year` (`modfrc`).
+    /// Model-year fractions, grown to `growth_year` (`modfrc`).
     pub modfrc: Vec<f32>,
- /// Starts adjustment per year (`stradj`).
+    /// Starts adjustment per year (`stradj`).
     pub stradj: Vec<f32>,
- /// Activity adjustment per year (`actadj`).
+    /// Activity adjustment per year (`actadj`).
     pub actadj: Vec<f32>,
- /// Deterioration age per year (`detage`).
+    /// Deterioration age per year (`detage`).
     pub detage: Vec<f32>,
- /// Lifetime in years (`nyrlif`).
+    /// Lifetime in years (`nyrlif`).
     pub nyrlif: usize,
- /// Population after agedist (may be backward-grown).
+    /// Population after agedist (may be backward-grown).
     pub population: f32,
 }
 
@@ -497,16 +497,16 @@ pub struct ModelYearAgedistResult {
 /// tech)).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct EmissionsIterationResult {
- /// Per-pollutant additions to `emsday(MXPOL)`. Equivalent to
- /// the difference in `emsday` after the call: positive for
- /// computed emissions, [`crate::common::consts::RMISS`] for
- /// missing-factor slots (`emsday(j) = RMISS`).
+    /// Per-pollutant additions to `emsday(MXPOL)`. Equivalent to
+    /// the difference in `emsday` after the call: positive for
+    /// computed emissions, [`crate::common::consts::RMISS`] for
+    /// missing-factor slots (`emsday(j) = RMISS`).
     pub emsday_delta: Vec<f32>,
- /// Per-pollutant `emsbmy(MXPOL)` for this iteration.
+    /// Per-pollutant `emsbmy(MXPOL)` for this iteration.
     pub emsbmy: Vec<f32>,
- /// Fuel consumption for this exhaust iteration (Fortran
- /// `fulbmy`). The evap branch does not compute fuel; it
- /// reuses the exhaust value.
+    /// Fuel consumption for this exhaust iteration (Fortran
+    /// `fulbmy`). The evap branch does not compute fuel; it
+    /// reuses the exhaust value.
     pub fulbmy: f32,
 }
 
@@ -516,15 +516,15 @@ pub struct EmissionsIterationResult {
 /// against `/actdat/` via the matched `idxact` slot.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ActivityRecord {
- /// Starts per period (Fortran `starts(idxact)`).
+    /// Starts per period (Fortran `starts(idxact)`).
     pub starts: f32,
- /// Activity level (Fortran `actlev(idxact)`).
+    /// Activity level (Fortran `actlev(idxact)`).
     pub activity_level: f32,
- /// Activity-units indicator (Fortran `iactun(idxact)`).
+    /// Activity-units indicator (Fortran `iactun(idxact)`).
     pub activity_unit: ActivityUnit,
- /// Load factor (Fortran `faclod(idxact)`).
+    /// Load factor (Fortran `faclod(idxact)`).
     pub load_factor: f32,
- /// Age code for the alternate-curve lookup (Fortran `actage(idxact)`).
+    /// Age code for the alternate-curve lookup (Fortran `actage(idxact)`).
     pub age_code: String,
 }
 
@@ -536,12 +536,12 @@ pub struct ActivityRecord {
 /// `luse` (skip flag); the Rust port carries them as fields.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SubcountyAllocation {
- /// Allocated population for this subcounty (`popsub`).
+    /// Allocated population for this subcounty (`popsub`).
     pub population: f32,
- /// Pre-computed growth, or `None` when not yet computed
- /// (Fortran sentinel `growth == -9`).
+    /// Pre-computed growth, or `None` when not yet computed
+    /// (Fortran sentinel `growth == -9`).
     pub growth: Option<f32>,
- /// `false` ⇒ skip this subcounty (Fortran `luse`).
+    /// `false` ⇒ skip this subcounty (Fortran `luse`).
     pub use_record: bool,
 }
 
@@ -566,44 +566,44 @@ pub struct SubcountyAllocation {
 /// [`crate::emissions`]; the orchestration calls them directly
 /// rather than going through the trait.
 pub trait GeographyCallbacks {
- /// Find the county FIPS slot in the run's county list (Fortran
- /// `fndchr(fipin, 5, fipcod, NCNTY)`). Returns `None` when the
- /// county is not in the run (Fortran `idxfip .LE. 0` → `ISKIP`).
+    /// Find the county FIPS slot in the run's county list (Fortran
+    /// `fndchr(fipin, 5, fipcod, NCNTY)`). Returns `None` when the
+    /// county is not in the run (Fortran `idxfip .LE. 0` → `ISKIP`).
     fn find_fips(&self, fips: &str) -> Option<usize>;
 
- /// Record the per-county processed-record-count update (Fortran
- /// `nctyrc(idxfip) = nctyrc(idxfip) + 1`).
+    /// Record the per-county processed-record-count update (Fortran
+    /// `nctyrc(idxfip) = nctyrc(idxfip) + 1`).
     fn tally_county_record(&mut self, fips_idx: usize);
 
- /// Find the exhaust-tech slot and accompanying tech-name +
- /// tech-fraction arrays (Fortran `fndtch(asccod, hpval, year)`).
+    /// Find the exhaust-tech slot and accompanying tech-name +
+    /// tech-fraction arrays (Fortran `fndtch(asccod, hpval, year)`).
     fn find_exhaust_tech(&self, scc: &str, hp_avg: f32, year: i32) -> Option<TechLookup>;
 
- /// Find the evap-tech slot (Fortran `fndevtch`).
+    /// Find the evap-tech slot (Fortran `fndevtch`).
     fn find_evap_tech(&self, scc: &str, hp_avg: f32, year: i32) -> Option<TechLookup>;
 
- /// Look up the refueling mode for `(SCC, HP, tech_name)`
- /// (Fortran `fndrfm`). Returns `None` for no match — the caller
- /// then re-queries with the default tech (`TECDEF = 'ALL'`).
+    /// Look up the refueling mode for `(SCC, HP, tech_name)`
+    /// (Fortran `fndrfm`). Returns `None` for no match — the caller
+    /// then re-queries with the default tech (`TECDEF = 'ALL'`).
     fn find_refueling(&self, scc: &str, hp_avg: f32, tech_name: &str) -> Option<RefuelingData>;
 
- /// Look up the growth cross-reference slot (Fortran `fndgxf`).
+    /// Look up the growth cross-reference slot (Fortran `fndgxf`).
     fn find_growth_xref(&self, fips: &str, scc: &str, hp_avg: f32) -> Option<usize>;
 
- /// Find the activity-data slot (Fortran `fndact`).
+    /// Find the activity-data slot (Fortran `fndact`).
     fn find_activity(&self, scc: &str, fips: &str, hp_avg: f32) -> Option<usize>;
 
- /// Find the allocation-record slot for the subcounty branch
- /// (Fortran `fndasc(asccod, ascalo, nalorc)`). Default impl
- /// returns `None` — only the subcounty processor needs to
- /// override.
+    /// Find the allocation-record slot for the subcounty branch
+    /// (Fortran `fndasc(asccod, ascalo, nalorc)`). Default impl
+    /// returns `None` — only the subcounty processor needs to
+    /// override.
     fn find_allocation(&self, _scc: &str) -> Option<usize> {
         None
     }
 
- /// Compute the subcounty allocation (Fortran `alosub`). Default
- /// impl returns a zero-population skip — only the subcounty
- /// processor needs to override.
+    /// Compute the subcounty allocation (Fortran `alosub`). Default
+    /// impl returns a zero-population skip — only the subcounty
+    /// processor needs to override.
     #[allow(clippy::too_many_arguments)]
     fn allocate_subcounty(
         &mut self,
@@ -622,20 +622,20 @@ pub trait GeographyCallbacks {
         })
     }
 
- /// Find the subcounty marker for the current record (Fortran
- /// `prcsub.f` :246–:258 — `reglst(idxreg)(6:10)` after a
- /// linear search). Returns `None` when the region code is
- /// blank (Fortran `subcur == ' '` → `ISKIP`).
- ///
- /// Default impl returns `None` so the county path is a no-op.
+    /// Find the subcounty marker for the current record (Fortran
+    /// `prcsub.f` :246–:258 — `reglst(idxreg)(6:10)` after a
+    /// linear search). Returns `None` when the region code is
+    /// blank (Fortran `subcur == ' '` → `ISKIP`).
+    ///
+    /// Default impl returns `None` so the county path is a no-op.
     fn find_subcounty(&self, _region_code: &str) -> Option<String> {
         None
     }
 
- /// Apply a retrofit filter mutation (Fortran
- /// `fndrtrft(fltrtyp, …)`). The implementation maintains the
- /// running filter state; subsequent calls progressively narrow
- /// the surviving records.
+    /// Apply a retrofit filter mutation (Fortran
+    /// `fndrtrft(fltrtyp, …)`). The implementation maintains the
+    /// running filter state; subsequent calls progressively narrow
+    /// the surviving records.
     fn filter_retrofits(
         &mut self,
         filter: RetrofitFilter,
@@ -645,36 +645,36 @@ pub trait GeographyCallbacks {
         tech_name: &str,
     ) -> Result<()>;
 
- /// Yield the currently-surviving retrofit records — Fortran
- /// `rtrftfltr3` (after the type-3 filter call). The Rust port
- /// requests this once per tech-type iteration to feed
- /// `clcrtrft`.
+    /// Yield the currently-surviving retrofit records — Fortran
+    /// `rtrftfltr3` (after the type-3 filter call). The Rust port
+    /// requests this once per tech-type iteration to feed
+    /// `clcrtrft`.
     fn surviving_retrofits(&self) -> Vec<&RetrofitRecord>;
 
- /// Compute the daily/monthly factor table (Fortran
- /// `daymthf(asccod, fipin, daymthfac, mthf, dayf, ndays)`).
- /// Returns `(daymthfac[365], mthf, dayf, ndays)`.
-    fn day_month_factors(&self, scc: &str, fips: &str) -> ([f32; MXDAYS], f32, f32, i32);
+    /// Compute the daily/monthly factor table (Fortran
+    /// `daymthf(asccod, fipin, daymthfac, mthf, dayf, ndays)`).
+    /// Returns `(daymthfac[365], mthf, dayf, ndays)`.
+    fn day_month_factors(&self, scc: &str, fips: &str) -> Result<([f32; MXDAYS], f32, f32, i32)>;
 
- /// Compute the daily emission-adjustment table (Fortran
- /// `emsadj(adjems, asccod, fipin, daymthfac)`).
+    /// Compute the daily emission-adjustment table (Fortran
+    /// `emsadj(adjems, asccod, fipin, daymthfac)`).
     fn emission_adjustments(
         &self,
         scc: &str,
         fips: &str,
         daymthfac: &[f32; MXDAYS],
-    ) -> AdjustmentTable;
+    ) -> Result<AdjustmentTable>;
 
- /// Bundled `modyr` + `agedist` invocation.
- ///
- /// The Fortran routines call `modyr` then `agedist` back-to-back
- /// (with the latter consuming the former's `modfrc` and
- /// `yryrfrcscrp` outputs). Both Fortran calls use closure-style
- /// dispatch to scrappage / growth-factor helpers; the Rust ports
- /// expose those via `FnOnce` / `FnMut` closures. Bundling the two
- /// here lets the trait method own the closures and hand back a
- /// single result, avoiding the borrow-conflict trap of letting
- /// the caller pass closures that also borrow `self`.
+    /// Bundled `modyr` + `agedist` invocation.
+    ///
+    /// The Fortran routines call `modyr` then `agedist` back-to-back
+    /// (with the latter consuming the former's `modfrc` and
+    /// `yryrfrcscrp` outputs). Both Fortran calls use closure-style
+    /// dispatch to scrappage / growth-factor helpers; the Rust ports
+    /// expose those via `FnOnce` / `FnMut` closures. Bundling the two
+    /// here lets the trait method own the closures and hand back a
+    /// single result, avoiding the borrow-conflict trap of letting
+    /// the caller pass closures that also borrow `self`.
     #[allow(clippy::too_many_arguments)]
     fn model_year_and_agedist(
         &mut self,
@@ -687,8 +687,8 @@ pub trait GeographyCallbacks {
         base_population: f32,
     ) -> Result<ModelYearAgedistResult>;
 
- /// Compute the exhaust EF table for the current
- /// `(SCC, model_year, tech_index)` slot (Fortran `emfclc`).
+    /// Compute the exhaust EF table for the current
+    /// `(SCC, model_year, tech_index)` slot (Fortran `emfclc`).
     #[allow(clippy::too_many_arguments)]
     fn compute_exhaust_factors(
         &mut self,
@@ -701,8 +701,8 @@ pub trait GeographyCallbacks {
         record_index: usize,
     ) -> Result<ExhaustFactorsLookup>;
 
- /// Compute the evap EF table for the current
- /// `(SCC, model_year, evap_tech_index)` slot (Fortran `evemfclc`).
+    /// Compute the evap EF table for the current
+    /// `(SCC, model_year, evap_tech_index)` slot (Fortran `evemfclc`).
     #[allow(clippy::too_many_arguments)]
     fn compute_evap_factors(
         &mut self,
@@ -714,17 +714,17 @@ pub trait GeographyCallbacks {
         record_index: usize,
     ) -> Result<EvapFactorsLookup>;
 
- /// Run one `(model_year, exhaust_tech_index)` iteration of the
- /// exhaust calculator (`clcems.f`).
- ///
- /// The orchestrator passes the slot-and-iteration context; the
- /// implementation assembles the full
- /// [`crate::emissions::exhaust::ExhaustCalcInputs`] from the
- /// SCC-level + run-level state it carries and invokes
- /// [`crate::emissions::exhaust::calculate_exhaust_emissions`].
- /// Test fakes can stub the trait method directly to return
- /// canned `EmissionsIterationResult`s without setting up the
- /// full ~30-field input.
+    /// Run one `(model_year, exhaust_tech_index)` iteration of the
+    /// exhaust calculator (`clcems.f`).
+    ///
+    /// The orchestrator passes the slot-and-iteration context; the
+    /// implementation assembles the full
+    /// [`crate::emissions::exhaust::ExhaustCalcInputs`] from the
+    /// SCC-level + run-level state it carries and invokes
+    /// [`crate::emissions::exhaust::calculate_exhaust_emissions`].
+    /// Test fakes can stub the trait method directly to return
+    /// canned `EmissionsIterationResult`s without setting up the
+    /// full ~30-field input.
     #[allow(clippy::too_many_arguments)]
     fn compute_exhaust_iteration(
         &mut self,
@@ -746,8 +746,8 @@ pub trait GeographyCallbacks {
         activity_index: usize,
     ) -> Result<EmissionsIterationResult>;
 
- /// Run one `(model_year, evap_tech_index)` iteration of the evap
- /// calculator (`clcevems.f`).
+    /// Run one `(model_year, evap_tech_index)` iteration of the evap
+    /// calculator (`clcevems.f`).
     #[allow(clippy::too_many_arguments)]
     fn compute_evap_iteration(
         &mut self,
@@ -771,9 +771,9 @@ pub trait GeographyCallbacks {
         fulbmy: f32,
     ) -> Result<EmissionsIterationResult>;
 
- /// Get the activity-record-derived inputs (`starts(idxact)`,
- /// `actlev(idxact)`, `iactun(idxact)`, `faclod(idxact)`,
- /// `actage(idxact)`) for the matched slot.
+    /// Get the activity-record-derived inputs (`starts(idxact)`,
+    /// `actlev(idxact)`, `iactun(idxact)`, `faclod(idxact)`,
+    /// `actage(idxact)`) for the matched slot.
     fn activity_record(&self, activity_index: usize) -> ActivityRecord;
 }
 
@@ -819,11 +819,11 @@ impl GeographyCallbacks for NoopCallbacks {
     fn surviving_retrofits(&self) -> Vec<&RetrofitRecord> {
         Vec::new()
     }
-    fn day_month_factors(&self, _: &str, _: &str) -> ([f32; MXDAYS], f32, f32, i32) {
-        ([0.0; MXDAYS], 0.0, 0.0, 0)
+    fn day_month_factors(&self, _: &str, _: &str) -> Result<([f32; MXDAYS], f32, f32, i32)> {
+        Err(Error::Config("NoopCallbacks::day_month_factors".into()))
     }
-    fn emission_adjustments(&self, _: &str, _: &str, _: &[f32; MXDAYS]) -> AdjustmentTable {
-        AdjustmentTable::new(MXDAYS)
+    fn emission_adjustments(&self, _: &str, _: &str, _: &[f32; MXDAYS]) -> Result<AdjustmentTable> {
+        Err(Error::Config("NoopCallbacks::emission_adjustments".into()))
     }
     fn model_year_and_agedist(
         &mut self,
@@ -943,10 +943,10 @@ pub fn hp_level_lookup(hp_range: (f32, f32), hp_levels: &[f32]) -> f32 {
     if hp_mid > hp_levels[hp_levels.len() - 1] {
         return 9999.0;
     }
- // Fortran: do 10 i=2,MXHPC ; if hplev < 0 .AND. hpmid < hpclev(i) then hplev = hpclev(i)
- // The "first match wins" semantics come from the
- // `hplev .LT. 0` guard: once set, subsequent matches are
- // ignored.
+    // Fortran: do 10 i=2,MXHPC ; if hplev < 0 .AND. hpmid < hpclev(i) then hplev = hpclev(i)
+    // The "first match wins" semantics come from the
+    // `hplev .LT. 0` guard: once set, subsequent matches are
+    // ignored.
     let mut hplev: f32 = -9.0;
     for &boundary in hp_levels.iter().skip(1) {
         if hplev < 0.0 && hp_mid < boundary {
@@ -974,12 +974,12 @@ pub fn fuel_density(fuel: FuelKind) -> f32 {
 /// to `clcems` / `clcevems`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TimePeriodFactors {
- /// `1.0` for total mode, `1.0/ndays` otherwise (Fortran `adjtime`).
+    /// `1.0` for total mode, `1.0/ndays` otherwise (Fortran `adjtime`).
     pub adjtime: f32,
- /// `dayf` in daily mode, `mthf * dayf` otherwise (Fortran `tplfac`).
+    /// `dayf` in daily mode, `mthf * dayf` otherwise (Fortran `tplfac`).
     pub tplfac: f32,
- /// Always `mthf * dayf` (Fortran `tplful`) — used by the fuel
- /// accumulation branch.
+    /// Always `mthf * dayf` (Fortran `tplful`) — used by the fuel
+    /// accumulation branch.
     pub tplful: f32,
 }
 
@@ -1039,9 +1039,9 @@ pub fn accumulate_exhaust_iteration(
     tplful: f32,
     adjtime: f32,
 ) {
- *poptot += population * modfrc;
- *acttot += actadj * population * modfrc * tplful * adjtime;
- *strtot += stradj * population * modfrc * tplful * adjtime;
+    *poptot += population * modfrc;
+    *acttot += actadj * population * modfrc * tplful * adjtime;
+    *strtot += stradj * population * modfrc * tplful * adjtime;
 }
 
 /// Convenience accumulator: add one evap-iteration's contribution
@@ -1092,17 +1092,17 @@ mod tests {
     #[test]
     fn hp_level_lookup_floor_and_overflow() {
         let levels = hp_levels_default();
- // Midpoint strictly below first boundary → first boundary
- // (Fortran `.LE.` at :215 matches both `<` and `==`).
+        // Midpoint strictly below first boundary → first boundary
+        // (Fortran `.LE.` at :215 matches both `<` and `==`).
         assert_eq!(hp_level_lookup((0.0, 2.0), &levels), 3.0);
- // Midpoint exactly equal to the first boundary → first
- // boundary (the `.LE.` branch fires, before the strict-less
- // loop runs).
+        // Midpoint exactly equal to the first boundary → first
+        // boundary (the `.LE.` branch fires, before the strict-less
+        // loop runs).
         assert_eq!(hp_level_lookup((0.0, 6.0), &levels), 3.0);
- // Midpoint above first boundary, below second → the
- // strict-less loop returns the second boundary.
+        // Midpoint above first boundary, below second → the
+        // strict-less loop returns the second boundary.
         assert_eq!(hp_level_lookup((1.5, 8.5), &levels), 6.0);
- // Above last boundary → 9999.0.
+        // Above last boundary → 9999.0.
         assert_eq!(hp_level_lookup((3000.0, 4000.0), &levels), 9999.0);
     }
 
@@ -1135,7 +1135,7 @@ mod tests {
     fn time_period_setup_daily_drops_monthly_factor_from_tplfac() {
         let tp = time_period_setup(SumType::Typical, 1, true, 0.5, 2.0);
         assert_eq!(tp.tplfac, 2.0);
- // tplful keeps both factors regardless of daily_mode.
+        // tplful keeps both factors regardless of daily_mode.
         assert_eq!(tp.tplful, 0.5 * 2.0);
     }
 
@@ -1162,9 +1162,9 @@ mod tests {
         let mut p = 0.0_f32;
         let mut a = 0.0_f32;
         let mut s = 0.0_f32;
- // Fortran: poptot = popcty * modfrc(idxyr)
- // acttot = actadj * popcty * modfrc * tplful * adjtime
- // strtot = stradj * popcty * modfrc * tplful * adjtime
+        // Fortran: poptot = popcty * modfrc(idxyr)
+        // acttot = actadj * popcty * modfrc * tplful * adjtime
+        // strtot = stradj * popcty * modfrc * tplful * adjtime
         accumulate_exhaust_iteration(&mut p, &mut a, &mut s, 100.0, 0.5, 2.0, 3.0, 0.5, 0.25);
         assert_eq!(p, 50.0);
         assert_eq!(a, 2.0 * 100.0 * 0.5 * 0.5 * 0.25);

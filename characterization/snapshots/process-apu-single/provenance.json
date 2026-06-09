@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "process-apu-single",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/scratch.local/ctessum/earthcity/.gc/worktrees/moves.rs/polecats/gastown.furiosa/worktrees/mo-ky1/characterization/fixture-image.lock",
+  "runspec_path": "/scratch/ctessum/moves-county-fixture/process-apu-single/process-apu-single.xml",
+  "runspec_sha256": "75d94004942b1828d568739277cd7a0e161a95ee68129d0b97fc618c7ce1bf65",
+  "snapshot_aggregate_sha256": "32b563f4f070aa8fc3dd37cca39bcd8df02e58bbc830cd82c8d8a3d9ec998296",
+  "output_database": "out_process_apu_single",
+  "scale_input_database": "washtenaw_cdb"
+}

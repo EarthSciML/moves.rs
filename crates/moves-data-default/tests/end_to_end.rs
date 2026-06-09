@@ -24,12 +24,12 @@ fn build_fixture() -> (tempfile::TempDir, PathBuf) {
     let out_dir = dir.path().join("out");
     let plan_path = dir.path().join("tables.json");
 
- // Plan covers all three pruning-relevant shapes: monolithic
- // (SourceUseType), schema-only (SHO), county-partitioned (Surrogate),
- // year_x_county-partitioned (Coverage), and model_year-partitioned
- // (EmRate). Surrogate exercises the stateID PK fallback so the
- // reader's pruning is checked against the converter's actual path
- // labels.
+    // Plan covers all three pruning-relevant shapes: monolithic
+    // (SourceUseType), schema-only (SHO), county-partitioned (Surrogate),
+    // year_x_county-partitioned (Coverage), and model_year-partitioned
+    // (EmRate). Surrogate exercises the stateID PK fallback so the
+    // reader's pruning is checked against the converter's actual path
+    // labels.
     let plan = br#"{
         "schema_version": "moves-default-db-schema/v1",
         "moves_commit": "deadbeefcafe",
@@ -110,7 +110,7 @@ fn build_fixture() -> (tempfile::TempDir, PathBuf) {
     }"#;
     write(&plan_path, plan);
 
- // SourceUseType: three rows covering the three columns.
+    // SourceUseType: three rows covering the three columns.
     write(
         &tsv_dir.join("SourceUseType.schema.tsv"),
         b"sourceTypeID\tsmallint\tPRI\nHPMSVtypeID\tsmallint\t\nsourceTypeName\tvarchar\t\n",
@@ -120,16 +120,16 @@ fn build_fixture() -> (tempfile::TempDir, PathBuf) {
         b"11\t10\tMotorcycle\n21\t25\tPassenger Car\n62\t60\tCombination Long-haul Truck\n",
     );
 
- // SHO: schema_only, no data file needed (schema can come from synth
- // if no TSV pair is shipped). Provide schema only so the converter
- // writes the sidecar.
+    // SHO: schema_only, no data file needed (schema can come from synth
+    // if no TSV pair is shipped). Provide schema only so the converter
+    // writes the sidecar.
     write(
         &tsv_dir.join("SHO.schema.tsv"),
         b"hourDayID\tsmallint\tPRI\nlinkID\tint\tPRI\nsho\tdouble\t\n",
     );
 
- // Surrogate: 3 partitions (06, 17, 36), 2 rows each — exercises the
- // state= label and partition pruning.
+    // Surrogate: 3 partitions (06, 17, 36), 2 rows each — exercises the
+    // state= label and partition pruning.
     write(
         &tsv_dir.join("Surrogate.schema.tsv"),
         b"stateID\tsmallint\tPRI\nmetric\tvarchar\tPRI\nvalue\tdouble\t\n",
@@ -139,7 +139,7 @@ fn build_fixture() -> (tempfile::TempDir, PathBuf) {
         b"6\talpha\t1.5\n6\tbeta\t2.5\n17\talpha\t3.5\n17\tbeta\t4.5\n36\talpha\t5.5\n36\tbeta\t6.5\n",
     );
 
- // Coverage: 4 partitions (year_x_county). 2020/1, 2020/2, 2021/1, 2025/2.
+    // Coverage: 4 partitions (year_x_county). 2020/1, 2020/2, 2021/1, 2025/2.
     write(
         &tsv_dir.join("Coverage.schema.tsv"),
         b"countyID\tint\tPRI\nyearID\tsmallint\tPRI\nfactor\tdouble\t\n",
@@ -149,7 +149,7 @@ fn build_fixture() -> (tempfile::TempDir, PathBuf) {
         b"1\t2020\t1.0\n2\t2020\t2.0\n1\t2021\t3.0\n2\t2025\t4.0\n",
     );
 
- // EmRate: model_year-partitioned. 3 years.
+    // EmRate: model_year-partitioned. 3 years.
     write(
         &tsv_dir.join("EmRate.schema.tsv"),
         b"modelYearID\tsmallint\tPRI\nscc\tvarchar\tPRI\nrate\tdouble\t\n",
@@ -186,7 +186,7 @@ fn open_reads_manifest_metadata() {
     let (_tmp, out_dir) = build_fixture();
     let db = DefaultDb::open(&out_dir).unwrap();
     assert_eq!(db.db_version(), "movesdb20991231");
- // 5 tables — including the schema-only SHO sidecar.
+    // 5 tables — including the schema-only SHO sidecar.
     assert_eq!(db.tables().count(), 5);
 }
 
@@ -216,7 +216,7 @@ fn typed_source_use_type_returns_materialized_dataframe() {
     let mut ids: Vec<i64> = ids.into_iter().flatten().collect();
     ids.sort();
     assert_eq!(ids, vec![11, 21, 62]);
- // Name column is Utf8 / String.
+    // Name column is Utf8 / String.
     assert!(df.column(SOURCE_TYPE_NAME).unwrap().str().is_ok());
 }
 
@@ -224,7 +224,7 @@ fn typed_source_use_type_returns_materialized_dataframe() {
 fn case_insensitive_table_lookup() {
     let (_tmp, out_dir) = build_fixture();
     let db = DefaultDb::open(&out_dir).unwrap();
- // Mixed case + lowercase both resolve to the same Parquet.
+    // Mixed case + lowercase both resolve to the same Parquet.
     let upper = collect_lazy(db.scan("SourceUseType", &TableFilter::new()).unwrap());
     let lower = collect_lazy(db.scan("sourceusetype", &TableFilter::new()).unwrap());
     assert_eq!(upper.height(), lower.height());
@@ -235,9 +235,9 @@ fn scan_partitioned_county_prunes_by_state_label() {
     let (_tmp, out_dir) = build_fixture();
     let db = DefaultDb::open(&out_dir).unwrap();
 
- // Filter on stateID even though the path label is `state=` — the
- // reader matches against partition_columns (the SQL column name),
- // which is `stateID`.
+    // Filter on stateID even though the path label is `state=` — the
+    // reader matches against partition_columns (the SQL column name),
+    // which is `stateID`.
     let filter = TableFilter::new().partition_eq("stateID", 17i64);
     let df = collect_lazy(db.scan("Surrogate", &filter).unwrap());
     assert_eq!(df.height(), 2, "expected 2 rows for stateID=17, got {df}");
@@ -263,7 +263,7 @@ fn scan_year_x_county_with_two_predicates() {
         .partition_eq("countyID", 2i64)
         .partition_in("yearID", [2020i64, 2025]);
     let df = collect_lazy(db.scan("Coverage", &filter).unwrap());
- // Two partitions match: year=2020/county=2 and year=2025/county=2.
+    // Two partitions match: year=2020/county=2 and year=2025/county=2.
     assert_eq!(df.height(), 2);
     let counties = df.column("countyID").unwrap().i64().unwrap();
     for v in counties {
@@ -275,8 +275,8 @@ fn scan_year_x_county_with_two_predicates() {
 fn scan_year_x_county_partition_pruning_excludes_other_files() {
     let (_tmp, out_dir) = build_fixture();
     let db = DefaultDb::open(&out_dir).unwrap();
- // Asking for a year that isn't present yields zero rows but doesn't
- // error — pruning excluded every file before any disk read.
+    // Asking for a year that isn't present yields zero rows but doesn't
+    // error — pruning excluded every file before any disk read.
     let filter = TableFilter::new().partition_in("yearID", [1900i64]);
     let df = collect_lazy(db.scan("Coverage", &filter).unwrap());
     assert_eq!(df.height(), 0);
@@ -297,8 +297,8 @@ fn scan_model_year_filters_to_single_year() {
 fn scan_rejects_unknown_table() {
     let (_tmp, out_dir) = build_fixture();
     let db = DefaultDb::open(&out_dir).unwrap();
- // LazyFrame doesn't implement Debug, so unwrap_err() can't render
- // the Ok branch — match on the Result manually instead.
+    // LazyFrame doesn't implement Debug, so unwrap_err() can't render
+    // the Ok branch — match on the Result manually instead.
     let err = match db.scan("DoesNotExist", &TableFilter::new()) {
         Ok(_) => panic!("expected UnknownTable error"),
         Err(e) => e,
@@ -324,8 +324,8 @@ fn scan_rejects_schema_only_table() {
 fn scan_rejects_filter_on_unknown_partition_column() {
     let (_tmp, out_dir) = build_fixture();
     let db = DefaultDb::open(&out_dir).unwrap();
- // Surrogate is partitioned on stateID; asking to prune by countyID
- // is a programming error, not a silent no-op.
+    // Surrogate is partitioned on stateID; asking to prune by countyID
+    // is a programming error, not a silent no-op.
     let filter = TableFilter::new().partition_eq("countyID", 17i64);
     let err = match db.scan("Surrogate", &filter) {
         Ok(_) => panic!("expected UnknownPartitionColumn error"),
@@ -365,8 +365,8 @@ fn schema_sidecar_returns_none_for_data_table() {
 
 #[test]
 fn scan_predicate_on_lazyframe_composes_with_partition_pruning() {
- // Demonstrates the recommended pattern: partition pruning via
- // `TableFilter`, column-level filtering via Polars expressions.
+    // Demonstrates the recommended pattern: partition pruning via
+    // `TableFilter`, column-level filtering via Polars expressions.
     let (_tmp, out_dir) = build_fixture();
     let db = DefaultDb::open(&out_dir).unwrap();
     let filter = TableFilter::new().partition_eq("countyID", 2i64);
@@ -379,8 +379,8 @@ fn scan_predicate_on_lazyframe_composes_with_partition_pruning() {
 
 #[test]
 fn scan_returns_consistent_row_count_with_manifest() {
- // Sanity: the manifest's row_count equals what we observe via the
- // reader. Guards against accidental joins/duplicates from concat.
+    // Sanity: the manifest's row_count equals what we observe via the
+    // reader. Guards against accidental joins/duplicates from concat.
     let (_tmp, out_dir) = build_fixture();
     let db = DefaultDb::open(&out_dir).unwrap();
     for tbl in db.tables() {

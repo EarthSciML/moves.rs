@@ -38,7 +38,7 @@ pub fn core_base_rate_generator_from_romd(
     prepared: &PreparedTables,
     flags: &ExternalFlags,
 ) -> Vec<RomdBlock> {
- // WHERE: optional process and road-type restrictions.
+    // WHERE: optional process and road-type restrictions.
     let mut rows: Vec<_> = inputs
         .rates_op_mode_distribution
         .iter()
@@ -46,7 +46,7 @@ pub fn core_base_rate_generator_from_romd(
         .filter(|r| flags.process_id <= 0 || r.pol_process_id % 100 == flags.process_id)
         .filter(|r| flags.road_type_id <= 0 || r.road_type_id == flags.road_type_id)
         .collect();
- // ORDER BY ... DESC on all six key columns.
+    // ORDER BY ... DESC on all six key columns.
     rows.sort_by(|a, b| {
         let ka = (
             a.source_type_id,
@@ -68,7 +68,7 @@ pub fn core_base_rate_generator_from_romd(
     });
 
     let mut output: Vec<RomdBlock> = Vec::new();
- // Combinations already emitted for the current (sourceType, polProcess).
+    // Combinations already emitted for the current (sourceType, polProcess).
     let mut romd_keys: BTreeSet<RomdKey> = BTreeSet::new();
     let mut previous_source_type_id = 0;
     let mut previous_pol_process_id = 0;
@@ -89,7 +89,7 @@ pub fn core_base_rate_generator_from_romd(
         previous_source_type_id = source_type_id;
         previous_pol_process_id = row.pol_process_id;
 
- // Resolve the average-speed information if the row did not carry it.
+        // Resolve the average-speed information if the row did not carry it.
         if avg_speed_fraction <= 0.0 {
             if let Some(d) = prepared
                 .avg_speed_distribution
@@ -105,7 +105,7 @@ pub fn core_base_rate_generator_from_romd(
             }
         }
 
- // Physics-mapping details are looked up by the *original* source type.
+        // Physics-mapping details are looked up by the *original* source type.
         let temp_detail = prepared
             .physics_by_temp_source_type
             .get(&source_type_id)
@@ -115,19 +115,19 @@ pub fn core_base_rate_generator_from_romd(
             .get(&source_type_id)
             .copied();
 
- // The transform branches gate on Running (1) / Brakewear (9) — or a
- // negative (wildcard) polProcessID.
+        // The transform branches gate on Running (1) / Brakewear (9) — or a
+        // negative (wildcard) polProcessID.
         let process_eligible = row.pol_process_id < 0
             || row.pol_process_id % 100 == 1
             || row.pol_process_id % 100 == 9;
 
- // Delete wildcard placeholders.
+        // Delete wildcard placeholders.
         if !did_handle && row.pol_process_id < 0 {
             did_handle = true;
             should_write = false;
         }
 
- // Change source types for any new (already-offset) operating modes.
+        // Change source types for any new (already-offset) operating modes.
         if !did_handle {
             if let Some(temp) = temp_detail {
                 if op_mode_id >= temp.op_mode_id_offset
@@ -141,9 +141,9 @@ pub fn core_base_rate_generator_from_romd(
             }
         }
 
- // Promote old operating modes and change source types. If a genuine
- // extended-operating-mode record already claimed the deduplication
- // key, the promoted record collides and is silently dropped later.
+        // Promote old operating modes and change source types. If a genuine
+        // extended-operating-mode record already claimed the deduplication
+        // key, the promoted record collides and is silently dropped later.
         if !did_handle {
             if let Some(temp) = temp_detail {
                 if (0..100).contains(&op_mode_id) && process_eligible {
@@ -155,7 +155,7 @@ pub fn core_base_rate_generator_from_romd(
             }
         }
 
- // A temp source type with a positive offset discards its real modes.
+        // A temp source type with a positive offset discards its real modes.
         if !did_handle {
             if let Some(temp) = temp_detail {
                 if temp.op_mode_id_offset > 0 && (0..100).contains(&op_mode_id) && process_eligible
@@ -166,7 +166,7 @@ pub fn core_base_rate_generator_from_romd(
             }
         }
 
- // A real source type that has been superseded discards its modes.
+        // A real source type that has been superseded discards its modes.
         if !did_handle && temp_detail.is_none() {
             if let Some(real) = real_detail {
                 if real.op_mode_id_offset > 0 && (0..100).contains(&op_mode_id) && process_eligible
@@ -177,7 +177,7 @@ pub fn core_base_rate_generator_from_romd(
             }
         }
 
- // Anything not otherwise handled is kept.
+        // Anything not otherwise handled is kept.
         if !did_handle {
             should_write = true;
         }
@@ -201,8 +201,8 @@ pub fn core_base_rate_generator_from_romd(
             continue;
         }
 
- // Re-resolve the average-speed information now that the source type
- // may have changed.
+        // Re-resolve the average-speed information now that the source type
+        // may have changed.
         if avg_speed_fraction <= 0.0 {
             if let Some(d) = prepared
                 .avg_speed_distribution
@@ -297,7 +297,7 @@ fn new_output_record(
         pollutant_id: pol_process_id / 100,
         model_year_id: rate.model_year_id,
         fuel_type_id: rate.fuel_type_id,
- // BaseRate carries no age dimension; BaseRateByAge carries the rate's.
+        // BaseRate carries no age dimension; BaseRateByAge carries the rate's.
         age_group_id: if by_age { rate.age_group_id } else { 0 },
         reg_class_id: rate.reg_class_id,
         ..BaseRateOutputRecord::default()
@@ -305,9 +305,9 @@ fn new_output_record(
     if flags.use_avg_speed_bin {
         record.avg_speed_bin_id = romd.key.avg_speed_bin_id;
     }
- // Rates mode (useAvgSpeedBin) needs the real opModeID retained; inventory
- // mode collapses it to 0. keepOpModeID is, per the Go comment, always
- // false in practice, but is honoured for completeness.
+    // Rates mode (useAvgSpeedBin) needs the real opModeID retained; inventory
+    // mode collapses it to 0. keepOpModeID is, per the Go comment, always
+    // false in practice, but is honoured for completeness.
     if flags.use_avg_speed_bin || flags.keep_op_mode_id {
         record.op_mode_id = romd.key.op_mode_id;
     }
@@ -341,8 +341,8 @@ pub fn make_base_rate_from_source_bin_rates(
         };
         let rates = prepared.sb_weighted_emission_rate.get(&sb_key);
         if rates.is_none() && romd.key.op_mode_id >= 1000 {
- // Offset operating modes that miss are skipped to avoid the
- // double-counting the Go comment describes.
+            // Offset operating modes that miss are skipped to avoid the
+            // double-counting the Go comment describes.
             continue;
         }
         let Some(rates) = rates else { continue };
@@ -385,9 +385,9 @@ pub fn make_base_rate_from_source_bin_rates(
             record.op_mode_fraction_rate += t;
 
             t = op_mode_fraction * avg_speed_fraction * sum_sbd_raw;
- // ONI exception: undo the source-bin weighting for total energy
- // consumption (pollutant 91) on off-network roads, so refueling
- // — which is chained to energy — agrees with the inventory.
+            // ONI exception: undo the source-bin weighting for total energy
+            // consumption (pollutant 91) on off-network roads, so refueling
+            // — which is chained to energy — agrees with the inventory.
             if flags.use_avg_speed_bin
                 && record.road_type_id == 1
                 && record.process_id == 1
@@ -453,8 +453,8 @@ pub fn make_base_rate_by_age_from_source_bin_rates(
         };
         let mut rates = prepared.sb_weighted_emission_rate_by_age.get(&sb_key);
         if rates.is_none() && romd.key.op_mode_id >= 1000 {
- // Non-brakewear offset modes are skipped to avoid double-counting;
- // brakewear keeps rates only for non-offset modes, so fall back.
+            // Non-brakewear offset modes are skipped to avoid double-counting;
+            // brakewear keeps rates only for non-offset modes, so fall back.
             if romd.key.pol_process_id % 100 != 9 {
                 continue;
             }
@@ -540,8 +540,8 @@ pub fn make_base_rate_from_distance_rates(
     prepared: &PreparedTables,
     flags: &ExternalFlags,
 ) -> Vec<BaseRateOutputRecord> {
- // WHERE mod(polProcessID,100)=processID, ORDER BY sourceTypeID,
- // polProcessID, modelYearID, fuelTypeID, regClassID, avgSpeedBinID.
+    // WHERE mod(polProcessID,100)=processID, ORDER BY sourceTypeID,
+    // polProcessID, modelYearID, fuelTypeID, regClassID, avgSpeedBinID.
     let mut rows: Vec<_> = inputs
         .sb_weighted_distance_rate
         .iter()
@@ -619,7 +619,7 @@ pub fn make_base_rate_from_distance_rates(
                         age_group_id: 0,
                         process_id: row.pol_process_id % 100,
                         pollutant_id: row.pol_process_id / 100,
- // Distance rates use operating mode 300 in rates mode.
+                        // Distance rates use operating mode 300 in rates mode.
                         op_mode_id: if flags.keep_op_mode_id { 300 } else { 0 },
                         ..BaseRateOutputRecord::default()
                     };
@@ -642,7 +642,7 @@ pub fn make_base_rate_from_distance_rates(
                     1.0
                 };
 
- // opModeFraction == 1 for distance rates (single mode 300).
+                // opModeFraction == 1 for distance rates (single mode 300).
                 let mut t = avg_speed_fraction * sum_sbd;
                 record.op_mode_fraction += t;
                 record.op_mode_fraction_rate += t;

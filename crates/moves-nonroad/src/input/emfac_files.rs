@@ -69,56 +69,56 @@ use std::path::{Path, PathBuf};
 /// so that ports of routines indexed by these constants line up.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PollutantIndex {
- /// Total HC exhaust (`IDXTHC = 1`).
+    /// Total HC exhaust (`IDXTHC = 1`).
     ThcExhaust = 1,
- /// CO exhaust (`IDXCO = 2`).
+    /// CO exhaust (`IDXCO = 2`).
     CoExhaust = 2,
- /// NOx exhaust (`IDXNOX = 3`).
+    /// NOx exhaust (`IDXNOX = 3`).
     NoxExhaust = 3,
- /// CO2 exhaust (`IDXCO2 = 4`) — computed from BSFC; file ignored.
+    /// CO2 exhaust (`IDXCO2 = 4`) — computed from BSFC; file ignored.
     Co2Exhaust = 4,
- /// SO2 exhaust (`IDXSOX = 5`) — computed from BSFC; file ignored.
+    /// SO2 exhaust (`IDXSOX = 5`) — computed from BSFC; file ignored.
     SoxExhaust = 5,
- /// PM exhaust (`IDXPM = 6`).
+    /// PM exhaust (`IDXPM = 6`).
     PmExhaust = 6,
- /// Crankcase (`IDXCRA = 7`).
+    /// Crankcase (`IDXCRA = 7`).
     Crankcase = 7,
- /// Diurnal evap (`IDXDIU = 8`).
+    /// Diurnal evap (`IDXDIU = 8`).
     Diurnal = 8,
- /// Tank permeation evap (`IDXTKP = 9`).
+    /// Tank permeation evap (`IDXTKP = 9`).
     TankPerm = 9,
- /// Non-rec-marine hose permeation evap (`IDXHOS = 10`).
+    /// Non-rec-marine hose permeation evap (`IDXHOS = 10`).
     HosePerm = 10,
- /// Rec-marine fill-neck hose permeation (`IDXNCK = 11`).
+    /// Rec-marine fill-neck hose permeation (`IDXNCK = 11`).
     NeckPerm = 11,
- /// Rec-marine supply/return hose permeation (`IDXSR = 12`).
+    /// Rec-marine supply/return hose permeation (`IDXSR = 12`).
     SupplyReturnPerm = 12,
- /// Rec-marine vent hose permeation (`IDXVNT = 13`).
+    /// Rec-marine vent hose permeation (`IDXVNT = 13`).
     VentPerm = 13,
- /// Hot soak (`IDXSOK = 14`).
+    /// Hot soak (`IDXSOK = 14`).
     HotSoak = 14,
- /// Refueling displacement (`IDXDIS = 15`) — computed; file ignored.
+    /// Refueling displacement (`IDXDIS = 15`) — computed; file ignored.
     Displacement = 15,
- /// Spillage (`IDXSPL = 16`).
+    /// Spillage (`IDXSPL = 16`).
     Spillage = 16,
- /// Running loss (`IDXRLS = 17`).
+    /// Running loss (`IDXRLS = 17`).
     RunningLoss = 17,
- /// Start THC (`IDSTHC = 18`).
+    /// Start THC (`IDSTHC = 18`).
     ThcStarts = 18,
- /// Start CO (`IDSCO = 19`).
+    /// Start CO (`IDSCO = 19`).
     CoStarts = 19,
- /// Start NOx (`IDSNOX = 20`).
+    /// Start NOx (`IDSNOX = 20`).
     NoxStarts = 20,
- /// Start CO2 (`IDSCO2 = 21`) — computed; file ignored.
+    /// Start CO2 (`IDSCO2 = 21`) — computed; file ignored.
     Co2Starts = 21,
- /// Start SOx (`IDSSOX = 22`) — computed; file ignored.
+    /// Start SOx (`IDSSOX = 22`) — computed; file ignored.
     SoxStarts = 22,
- /// Start PM (`IDSPM = 23`).
+    /// Start PM (`IDSPM = 23`).
     PmStarts = 23,
 }
 
 impl PollutantIndex {
- /// All declared variants.
+    /// All declared variants.
     pub const ALL: &'static [Self] = &[
         Self::ThcExhaust,
         Self::CoExhaust,
@@ -145,8 +145,8 @@ impl PollutantIndex {
         Self::PmStarts,
     ];
 
- /// Map a label string (already trimmed and upper-cased) to its
- /// pollutant index. Returns `None` for unknown labels.
+    /// Map a label string (already trimmed and upper-cased) to its
+    /// pollutant index. Returns `None` for unknown labels.
     pub fn from_label(label: &str) -> Option<Self> {
         Some(match label {
             "THC EXHAUST" => Self::ThcExhaust,
@@ -176,8 +176,8 @@ impl PollutantIndex {
         })
     }
 
- /// Whether the Fortran code ignores files supplied for this
- /// pollutant (it's computed from other inputs).
+    /// Whether the Fortran code ignores files supplied for this
+    /// pollutant (it's computed from other inputs).
     pub fn is_computed(self) -> bool {
         matches!(
             self,
@@ -189,8 +189,8 @@ impl PollutantIndex {
         )
     }
 
- /// Whether the Fortran code skips the "missing factor file"
- /// warning for this pollutant (`opnefc.f` lines 184–189).
+    /// Whether the Fortran code skips the "missing factor file"
+    /// warning for this pollutant (`opnefc.f` lines 184–189).
     fn skip_missing_emfac_warning(self) -> bool {
         matches!(
             self,
@@ -207,23 +207,23 @@ impl PollutantIndex {
 /// packets.
 #[derive(Debug, Clone)]
 pub struct EmfacFiles {
- /// Required BSFC file path.
+    /// Required BSFC file path.
     pub bsfc: PathBuf,
- /// Per-pollutant emission-factor file paths.
+    /// Per-pollutant emission-factor file paths.
     pub emission_factors: HashMap<PollutantIndex, PathBuf>,
- /// Per-pollutant deterioration-factor file paths.
+    /// Per-pollutant deterioration-factor file paths.
     pub deterioration_factors: HashMap<PollutantIndex, PathBuf>,
- /// Non-fatal warnings produced during the parse.
+    /// Non-fatal warnings produced during the parse.
     pub warnings: Vec<String>,
 }
 
 impl EmfacFiles {
- /// Look up the emission-factor file for a pollutant, if any.
+    /// Look up the emission-factor file for a pollutant, if any.
     pub fn emission_factor(&self, pollutant: PollutantIndex) -> Option<&Path> {
         self.emission_factors.get(&pollutant).map(|p| p.as_path())
     }
 
- /// Look up the deterioration-factor file for a pollutant, if any.
+    /// Look up the deterioration-factor file for a pollutant, if any.
     pub fn deterioration_factor(&self, pollutant: PollutantIndex) -> Option<&Path> {
         self.deterioration_factors
             .get(&pollutant)
@@ -271,7 +271,7 @@ pub fn read_emfac_files<R: BufRead>(reader: R) -> Result<EmfacFiles> {
             continue;
         }
         if upper.starts_with('/') {
- // Some other packet header — bail out of any active packet.
+            // Some other packet header — bail out of any active packet.
             packet = None;
             continue;
         }
@@ -327,8 +327,8 @@ pub fn read_emfac_files<R: BufRead>(reader: R) -> Result<EmfacFiles> {
                 | PollutantIndex::SoxStarts
                 | PollutantIndex::PmStarts
         ) {
- // Fortran `opnefc.f` iterates `1..=IDSTHC-1` only — start
- // emissions are not required and are not warned about.
+            // Fortran `opnefc.f` iterates `1..=IDSTHC-1` only — start
+            // emissions are not required and are not warned about.
             continue;
         }
         if pollutant.skip_missing_emfac_warning() {
@@ -393,7 +393,7 @@ fn apply_emfac(
     warnings: &mut Vec<String>,
 ) -> Result<()> {
     if label == "BSFC" {
- *bsfc = Some(PathBuf::from(value));
+        *bsfc = Some(PathBuf::from(value));
         return Ok(());
     }
     let Some(pollutant) = PollutantIndex::from_label(label) else {

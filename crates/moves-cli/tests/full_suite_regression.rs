@@ -89,10 +89,19 @@ pub const SNAPSHOTS_DIR_ENV: &str = "REGRESSION_SNAPSHOTS_DIR";
 /// The layout expected under this root is:
 /// ```text
 /// <dir>/
-/// scale-county/ ← *.parquet produced by `moves import-cdb`
-/// scale-project/ ← *.parquet produced by the PDB importer
-/// scale-rates/ ← *.parquet (Rates mode uses County-scale CDB inputs)
+/// scale-county/                   ← *.parquet produced by `moves import-cdb`
+/// scale-project/                  ← *.parquet produced by the PDB importer
+/// scale-rates/                    ← *.parquet (Rates mode uses County-scale CDB)
+/// process-crankcase-start-single/ ← Starts.parquet (county starts data)
+/// process-extended-idle-single/   ← hotellingHours.parquet + hotellingActivityDistribution.parquet
+/// process-apu-single/             ← hotellingHours.parquet + hotellingActivityDistribution.parquet
+/// process-crankcase-extidle-single/ ← hotellingHours.parquet + hotellingActivityDistribution.parquet
 /// ```
+///
+/// For the `*-single` fixtures: the in-repo `characterization/county-inputs/` tree
+/// is pre-populated with Washtenaw County data (matching the national default so
+/// SINGLE-scale output ≈ DEFAULT-scale at hour 7).
+///
 /// When this variable is unset (or empty) the scale-fixture tests are dormant.
 pub const SCALE_INPUTS_DIR_ENV: &str = "SCALE_INPUTS_DIR";
 
@@ -381,14 +390,14 @@ fn error_fixtures_return_expected_errors() {
                 ));
             }
             Err(e) => {
- // Collect the full error chain so we see the root cause, not
- // just the outermost `anyhow` context frame.
+                // Collect the full error chain so we see the root cause, not
+                // just the outermost `anyhow` context frame.
                 let msg: String = e
                     .chain()
                     .map(|c| c.to_string())
                     .collect::<Vec<_>>()
                     .join(": ");
- // Require a non-panic, human-readable message.
+                // Require a non-panic, human-readable message.
                 if msg.contains("panicked at") || msg.contains("thread 'main' panicked") {
                     failures.push(format!(
                         "{name}: got a panic instead of a clean error: {msg}"
@@ -406,7 +415,7 @@ fn error_fixtures_return_expected_errors() {
                         println!("{name}: ok — {msg}");
                     }
                 } else {
- // Unknown error fixture — just require it returns an error.
+                    // Unknown error fixture — just require it returns an error.
                     println!("{name}: ok (unknown fixture, got error) — {msg}");
                 }
             }
@@ -450,7 +459,7 @@ const REL_DIFF_FLOOR: f64 = 1e-30;
 /// that if either side starts producing rows the asymmetry is caught.
 fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
     &[
- // (fixture, per-pollutant relative tolerance, vacuous)
+        // (fixture, per-pollutant relative tolerance, vacuous)
         ("process-evap-fvv", ONROAD_REL_TOL, false), // ~8.2e-5
         ("process-evap-leaks", ONROAD_REL_TOL, false), // ~1.6e-7
         ("process-evap-permeation", ONROAD_REL_TOL, false), // ~2.1e-7
@@ -466,10 +475,16 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
         // expand-criteria: inventory activity weighting now wired in
         // BaseRateCalculator (universalActivity = SHO / noOfRealDays applied as
         // ApplyActivity). Criteria pollutants (THC/CO/NOx) match canonical to
-        // f64 precision (~8.5e-8). The sibling expand-* fixtures select energy
-        // (pollutant 91) and stay quarantined on the separate KJ→Million-BTU
-        // output-unit conversion. See docs/known-divergences.md §4.4.
+        // f64 precision (~8.5e-8).
         ("expand-criteria", ONROAD_REL_TOL, false), // ~8.5e-8
+        // expand-day / expand-fueltype-diesel / expand-sourcetype: select energy
+        // pollutants 91/92/93. The KJ→Million-BTU unit conversion is wired in the
+        // engine; activity weighting is also applied. All three now match canonical
+        // within ONROAD_REL_TOL. expand-counties and expand-month remain quarantined
+        // (expand-counties ~200% over; expand-month ~9.9e-3, just above tolerance).
+        ("expand-day", ONROAD_REL_TOL, false), // ~3.5e-4
+        ("expand-fueltype-diesel", ONROAD_REL_TOL, false), // ~3.0e-4
+        ("expand-sourcetype", ONROAD_REL_TOL, false), // ~1.3e-4
         // Speciation / chained-calculator fixtures graduated once the regClass
         // collapse, SulfatePM pass-through doubling and NO/NO2 species doubling
         // were fixed (see QUARANTINED_FIXTURES for the three root causes). Each
@@ -516,61 +531,55 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
 /// data plane is fixed it should graduate from this list into
 /// [`asserted_fixtures`].
 const QUARANTINED_FIXTURES: &[&str] = &[
-    // OVER-emit class — ROW SHAPE matches canonical (process / road type /
-    // pollutant / row count). Two mass causes were separated and FIXED: (1) the
-    // port emitted off-network start-exhaust rows (process 2, roadTypeID 1) the
-    // RunSpec never selected — fixed by mirroring the worker's `runSpecRoadType`
-    // join; and (2) the surviving rows carried the raw BaseRate rate, not
-    // `rate × activity` — the inventory activity weighting (`universalActivity`,
-    // never persisted) is now synthesized as `SHO / noOfRealDays` and applied
-    // (`ApplyActivity`) in `BaseRateCalculator::execute`, gated on `ModelScale`.
-    // `expand-criteria` (criteria pollutants) now matches canonical and has
-    // GRADUATED to asserted_fixtures. The fixtures below remain quarantined for
-    // a DIFFERENT, separate reason: they select energy (pollutant 91), whose
-    // KJ→Million-BTU output-unit conversion the port does not yet apply
-    // (max_rel_diff ≈ 1.055e6). See docs/known-divergences.md §4.4 bug 1.
+    // expand-* energy fixtures — energy pollutants 91/92/93, activity weighting
+    // applied, KJ→Million-BTU conversion wired. expand-criteria/expand-day/
+    // expand-fueltype-diesel/expand-sourcetype GRADUATED to asserted_fixtures.
+    // Remaining quarantined:
+    //   expand-counties: ~200% over (max_rel_diff ≈ 2.0); multi-county run with
+    //     per-county weighting not yet reproduced. See docs/known-divergences.md §4.4.
+    //   expand-month: ~9.9e-3 (just above ONROAD_REL_TOL=1e-3). Multi-day expansion
+    //     with weekday/weekend weighting; residual gap under investigation.
+    //   sample-runspec: ~1.3e-6, within tolerance but unclassified — leave quarantined
+    //     until the cause is confirmed (possibly floating-point accumulation only).
     "expand-counties",
-    "expand-day",
-    "expand-fueltype-diesel",
     "expand-month",
-    "expand-sourcetype",
     "sample-runspec",
- // process-apu: BaseRate emits the process-91 / op-mode-201,203 (APU /
- // shorepower) energy rates canonical activity-gates to 0 in baseRateOutput;
- // same missing-activity-weighting gap. mixed-onroad-nonroad: canonical
- // MOVESOutput is empty (0 rows) while the port's NONROAD half emits ~8,632
- // legitimate rows (separate/known). See docs/known-divergences.md §4.4.
+    // process-apu: BaseRate emits the process-91 / op-mode-201,203 (APU /
+    // shorepower) energy rates canonical activity-gates to 0 in baseRateOutput;
+    // same missing-activity-weighting gap. mixed-onroad-nonroad: canonical
+    // MOVESOutput is empty (0 rows) while the port's NONROAD half emits ~8,632
+    // legitimate rows (separate/known). See docs/known-divergences.md §4.4.
     "process-apu",
     "mixed-onroad-nonroad",
- // Speciation / chained-calculator class. Three engine/calculator bugs in this
- // class were FOUND and FIXED, GRADUATING chain-nonhaptog, chain-tog-speciation,
- // process-crankcase-running, process-nox-speciation, process-brakewear and
- // process-tirewear to asserted_fixtures (all exact to f64 drift):
- //   (1) regClass collapse — the engine's `frame_to_emission_records` dropped
- //       `regClassID` (and fuelSubType/engTech/sector/hp) when round-tripping a
- //       calculator's output through the per-chunk MOVESWorkerOutput
- //       accumulator, so chained speciators (HCSpeciation) keyed their ratio
- //       lookups on regClass 0 and emitted nothing. Now preserved.
- //   (2) SulfatePMCalculator re-emitted every pass-through row (its `calculate`
- //       ports the SQL's in-place mutation and returns the full final state);
- //       the chained engine ADDS emitted rows, so the upstream THC/NOx was
- //       doubled. `execute` now emits only the delta versus its input.
- //   (3) NOCalculator and NO2Calculator shared `build_inputs` and both resolved
- //       every NO/NO2/HONO species, doubling 32/33/34. Each now filters
- //       PollutantProcessAssoc to its own species, matching the per-calculator
- //       canonical extract.
- // process-airtoxics also GRADUATED: its AirToxicsCalculator extracts are now
- // synthesized from the raw default-DB ratio tables (PollutantProcessAssoc join
- // + modelYearGroupID expansion + the ATRatio FuelSupply join), and each worker
- // row is expanded across its fuel type's formulations (the AT*FuelSupply join)
- // so the ATRatioGas1 path keys on a concrete fuelFormulationID. The minor-HAP
- // toxics 20/24/25 now match canonical to f64 drift (base 1/79/87 too).
- // process-pm-exhaust ALSO GRADUATED: SulfatePM's consume/replace of EC (112)
- // and NonECPM (118) is now exact via the true per-key delta emit, the general
- // fuel ratio restricted to pollutant 120, and the engine's
- // `replaced_pollutants` drop of BaseRate's zero fuelType-9 electricity rows.
- // NONROAD fixtures that emit nothing (port row count 0 vs a populated
- // canonical) or a wrong row count — population/sector-coverage gaps.
+    // Speciation / chained-calculator class. Three engine/calculator bugs in this
+    // class were FOUND and FIXED, GRADUATING chain-nonhaptog, chain-tog-speciation,
+    // process-crankcase-running, process-nox-speciation, process-brakewear and
+    // process-tirewear to asserted_fixtures (all exact to f64 drift):
+    //   (1) regClass collapse — the engine's `frame_to_emission_records` dropped
+    //       `regClassID` (and fuelSubType/engTech/sector/hp) when round-tripping a
+    //       calculator's output through the per-chunk MOVESWorkerOutput
+    //       accumulator, so chained speciators (HCSpeciation) keyed their ratio
+    //       lookups on regClass 0 and emitted nothing. Now preserved.
+    //   (2) SulfatePMCalculator re-emitted every pass-through row (its `calculate`
+    //       ports the SQL's in-place mutation and returns the full final state);
+    //       the chained engine ADDS emitted rows, so the upstream THC/NOx was
+    //       doubled. `execute` now emits only the delta versus its input.
+    //   (3) NOCalculator and NO2Calculator shared `build_inputs` and both resolved
+    //       every NO/NO2/HONO species, doubling 32/33/34. Each now filters
+    //       PollutantProcessAssoc to its own species, matching the per-calculator
+    //       canonical extract.
+    // process-airtoxics also GRADUATED: its AirToxicsCalculator extracts are now
+    // synthesized from the raw default-DB ratio tables (PollutantProcessAssoc join
+    // + modelYearGroupID expansion + the ATRatio FuelSupply join), and each worker
+    // row is expanded across its fuel type's formulations (the AT*FuelSupply join)
+    // so the ATRatioGas1 path keys on a concrete fuelFormulationID. The minor-HAP
+    // toxics 20/24/25 now match canonical to f64 drift (base 1/79/87 too).
+    // process-pm-exhaust ALSO GRADUATED: SulfatePM's consume/replace of EC (112)
+    // and NonECPM (118) is now exact via the true per-key delta emit, the general
+    // fuel ratio restricted to pollutant 120, and the engine's
+    // `replaced_pollutants` drop of BaseRate's zero fuelType-9 electricity rows.
+    // NONROAD fixtures that emit nothing (port row count 0 vs a populated
+    // canonical) or a wrong row count — population/sector-coverage gaps.
     "nr-agriculture-state",
     "nr-airport-support-county",
     "nr-construction-state",
@@ -684,8 +693,8 @@ fn canonical_snapshot_diff() {
                 max_parallel_chunks: 1,
                 calculator_dag: None,
                 run_date_time: Some("2026-05-21T00:00:00".to_string()),
- // Activate the data plane: calculators execute against the captured
- // execution DB and the engine writes the real MOVESOutput tree.
+                // Activate the data plane: calculators execute against the captured
+                // execution DB and the engine writes the real MOVESOutput tree.
                 snapshot: Some(root.join(name)),
                 scale_input: None,
                 default_db: None,
@@ -749,7 +758,7 @@ fn canonical_snapshot_diff() {
 
         let asserted = asserted_fixtures().iter().find(|(n, _, _)| *n == name);
         let verdict = if let Some((_, tol, vacuous)) = asserted {
- // Hard-asserted fixture.
+            // Hard-asserted fixture.
             let row_mismatch = canonical.row_count != port.row_count;
             let within = cmp.within(*tol);
             if *vacuous {
@@ -775,9 +784,9 @@ fn canonical_snapshot_diff() {
             }
         } else if is_quarantined(name) {
             quarantined += 1;
- // HARD-FAIL (operator decision): known data-plane bugs turn CI red // it is OK for CI to be red while results are wrong. Each fixture
- // graduates out of QUARANTINED_FIXTURES into asserted_fixtures once
- // its data plane is fixed. See docs/known-divergences.md §4.4.
+            // HARD-FAIL (operator decision): known data-plane bugs turn CI red // it is OK for CI to be red while results are wrong. Each fixture
+            // graduates out of QUARANTINED_FIXTURES into asserted_fixtures once
+            // its data plane is fixed. See docs/known-divergences.md §4.4.
             failures.push(format!(
                 "{name}: KNOWN DATA-PLANE BUG — max_rel_diff={:.3e}, canon_rows={} \
                  port_rows={} — see docs/known-divergences.md §4.4",
@@ -785,9 +794,9 @@ fn canonical_snapshot_diff() {
             ));
             "BUG(FAIL)"
         } else {
- // A covered fixture that is neither asserted nor quarantined is an
- // unclassified divergence: fail loudly so it gets triaged rather
- // than silently ignored.
+            // A covered fixture that is neither asserted nor quarantined is an
+            // unclassified divergence: fail loudly so it gets triaged rather
+            // than silently ignored.
             failures.push(format!(
                 "{name}: UNCLASSIFIED max_rel_diff={:.3e}, canon_rows={} port_rows={} — \
                  add to asserted_fixtures (with a documented precision-only tolerance) \
@@ -852,6 +861,24 @@ fn scale_fixtures_run_without_error() {
         ("scale-county", "County-scale (CDB) inventory"),
         ("scale-project", "Project-scale (PDB) inventory"),
         ("scale-rates", "Rates-mode (County-scale CDB)"),
+        // Process-specific SINGLE-scale fixtures (mo-ky1): non-vacuous variants
+        // that provide county hotelling/starts data so activity exists at hour 7.
+        (
+            "process-crankcase-start-single",
+            "Crankcase start (SINGLE, county Starts)",
+        ),
+        (
+            "process-extended-idle-single",
+            "Extended idle (SINGLE, county hotellingHours)",
+        ),
+        (
+            "process-apu-single",
+            "APU exhaust (SINGLE, county hotellingHours)",
+        ),
+        (
+            "process-crankcase-extidle-single",
+            "Crankcase ext-idle (SINGLE, county hotellingHours)",
+        ),
     ];
 
     println!(
@@ -882,6 +909,19 @@ fn scale_fixtures_run_without_error() {
             continue;
         }
 
+        // The `*-single` fixtures provide only county activity data (Starts,
+        // hotellingHours). They need both a snapshot (for emission rates) and
+        // a scale input (for county activity) to produce a non-empty module
+        // plan. Without the snapshot, the scale-only path has no emission
+        // rates and plans 0 modules — acceptable, just log a SKIP notice.
+        let snap_dir = snapshots_root().join(fixture_name);
+        let snapshot = if fixture_name.ends_with("-single") && snap_dir.is_dir() {
+            Some(snap_dir.clone())
+        } else {
+            None
+        };
+        let require_modules = snapshot.is_some() || !fixture_name.ends_with("-single");
+
         let out = tempdir().expect("tempdir");
         let result = run_simulation(&RunOptions {
             runspec: fixture_path.clone(),
@@ -889,7 +929,7 @@ fn scale_fixtures_run_without_error() {
             max_parallel_chunks: 1,
             calculator_dag: None,
             run_date_time: Some("2026-05-21T00:00:00".to_string()),
-            snapshot: None,
+            snapshot,
             scale_input: Some(scale_input_dir),
             default_db: None,
         });
@@ -903,7 +943,7 @@ fn scale_fixtures_run_without_error() {
                 if !outcome.run_record_path.is_file() {
                     failures.push(format!("{fixture_name}: MOVESRun.parquet missing"));
                 }
-                if outcome.modules_planned.is_empty() {
+                if require_modules && outcome.modules_planned.is_empty() {
                     failures.push(format!("{fixture_name}: no modules planned"));
                 }
                 println!(
@@ -937,6 +977,10 @@ fn scale_fixtures_run_without_error() {
 /// `scale-county`, `scale-project`, and `scale-rates` must be produced by a
 /// separate run of `characterization/run-all-fixtures.sh --include scale-*`
 /// on an Apptainer-capable HPC node.
+///
+/// The `*-single` process-specific fixtures (mo-ky1) have their snapshots captured
+/// via `characterization/apptainer/capture-county-snapshot.sh` using the Washtenaw
+/// County CDB in `characterization/county-inputs/washtenaw-county/`.
 #[test]
 fn scale_canonical_snapshot_diff() {
     let scale_root = match scale_inputs_root() {
@@ -951,7 +995,16 @@ fn scale_canonical_snapshot_diff() {
     };
 
     let snaps_root = snapshots_root();
-    let scale_fixtures = ["scale-county", "scale-project", "scale-rates"];
+    let scale_fixtures = [
+        "scale-county",
+        "scale-project",
+        "scale-rates",
+        // County-scale SINGLE-domain fixtures (mo-ky1): non-vacuous variants.
+        "process-crankcase-start-single",
+        "process-extended-idle-single",
+        "process-apu-single",
+        "process-crankcase-extidle-single",
+    ];
     let covered: Vec<&str> = scale_fixtures
         .iter()
         .copied()
@@ -996,6 +1049,15 @@ fn scale_canonical_snapshot_diff() {
             continue;
         }
 
+        // `*-single` fixtures provide only activity data (Starts, hotellingHours);
+        // they need the canonical snapshot for emission rates. Use
+        // snapshot+scale_input so that both activity and rates are available.
+        let snap_for_run = if fixture_name.ends_with("-single") {
+            Some(snaps_root.join(*fixture_name))
+        } else {
+            None
+        };
+
         let out = tempdir().expect("tempdir");
         let outcome = run_simulation(&RunOptions {
             runspec: fixture_path,
@@ -1003,7 +1065,7 @@ fn scale_canonical_snapshot_diff() {
             max_parallel_chunks: 1,
             calculator_dag: None,
             run_date_time: Some("2026-05-21T00:00:00".to_string()),
-            snapshot: None,
+            snapshot: snap_for_run,
             scale_input: Some(scale_input_dir),
             default_db: None,
         })

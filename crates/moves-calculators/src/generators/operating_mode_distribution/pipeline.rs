@@ -55,13 +55,13 @@ type ScheduleFractionsByJoinKey = BTreeMap<(SourceTypeId, i16), Vec<(RoadTypeId,
 /// a `Vec`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BracketBin {
- /// Average speed of the lo-bracket driving cycle(s), mph.
+    /// Average speed of the lo-bracket driving cycle(s), mph.
     pub lo_speed: f64,
- /// Average speed of the hi-bracket driving cycle(s), mph.
+    /// Average speed of the hi-bracket driving cycle(s), mph.
     pub hi_speed: f64,
- /// `driveScheduleID`s whose average speed equals [`lo_speed`](Self::lo_speed).
+    /// `driveScheduleID`s whose average speed equals [`lo_speed`](Self::lo_speed).
     pub lo_schedules: Vec<i16>,
- /// `driveScheduleID`s whose average speed equals [`hi_speed`](Self::hi_speed).
+    /// `driveScheduleID`s whose average speed equals [`hi_speed`](Self::hi_speed).
     pub hi_schedules: Vec<i16>,
 }
 
@@ -81,24 +81,24 @@ pub struct BracketBin {
 /// [`Generator::execute`]: moves_framework::Generator::execute
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OpModeFractionRow {
- /// `sourceTypeID` (real or temporary).
+    /// `sourceTypeID` (real or temporary).
     pub source_type_id: SourceTypeId,
- /// `roadTypeID`.
+    /// `roadTypeID`.
     pub road_type_id: RoadTypeId,
- /// `hourDayID`.
+    /// `hourDayID`.
     pub hour_day_id: i16,
- /// `polProcessID`.
+    /// `polProcessID`.
     pub pol_process_id: PolProcessId,
- /// `opModeID`.
+    /// `opModeID`.
     pub op_mode_id: i16,
- /// `opModeFraction` — the operating-mode fraction; the fractions for one
- /// `(sourceType, roadType, hourDay, polProcess)` sum to 1 when every
- /// second of the contributing drive schedules was assigned a mode.
+    /// `opModeFraction` — the operating-mode fraction; the fractions for one
+    /// `(sourceType, roadType, hourDay, polProcess)` sum to 1 when every
+    /// second of the contributing drive schedules was assigned a mode.
     pub op_mode_fraction: f64,
 }
 
 impl OpModeFractionRow {
- /// Primary-key projection, used to order the output deterministically.
+    /// Primary-key projection, used to order the output deterministically.
     fn key(&self) -> (SourceTypeId, RoadTypeId, i16, PolProcessId, i16) {
         (
             self.source_type_id,
@@ -146,7 +146,7 @@ pub fn validate_drive_schedule_distribution(
         let entry = has_non_ramp
             .entry((assoc.source_type_id, assoc.road_type_id))
             .or_insert(false);
- *entry = *entry || !assoc.is_ramp;
+        *entry = *entry || !assoc.is_ramp;
     }
     has_non_ramp
         .into_iter()
@@ -172,7 +172,7 @@ pub fn bracket_average_speed_bins(inputs: &OmdgInputs<'_>) -> BTreeMap<BinKey, B
         .map(|cycle| (cycle.drive_schedule_id, cycle.average_speed))
         .collect();
 
- // Driving cycles per (sourceType, roadType), restricted to the RunSpec.
+    // Driving cycles per (sourceType, roadType), restricted to the RunSpec.
     let mut cycles_by_combination: BTreeMap<(SourceTypeId, RoadTypeId), Vec<(i16, f64)>> =
         BTreeMap::new();
     for assoc in inputs.drive_schedule_assoc {
@@ -201,16 +201,16 @@ pub fn bracket_average_speed_bins(inputs: &OmdgInputs<'_>) -> BTreeMap<BinKey, B
             .unwrap_or(bound_lo);
         for bin in inputs.avg_speed_bin {
             let bin_speed = bin.avg_bin_speed;
- // Lo bracket: fastest cycle no faster than the bin; clamp up to
- // the slowest cycle when every cycle is faster.
+            // Lo bracket: fastest cycle no faster than the bin; clamp up to
+            // the slowest cycle when every cycle is faster.
             let lo_speed = cycles
                 .iter()
                 .map(|&(_, speed)| speed)
                 .filter(|&speed| speed <= bin_speed)
                 .reduce(f64::max)
                 .unwrap_or(bound_lo);
- // Hi bracket: slowest cycle strictly faster than the bin; clamp
- // down to the fastest cycle when every cycle is slower.
+            // Hi bracket: slowest cycle strictly faster than the bin; clamp
+            // down to the fastest cycle when every cycle is slower.
             let hi_speed = cycles
                 .iter()
                 .map(|&(_, speed)| speed)
@@ -291,7 +291,7 @@ fn drive_schedule_fractions(
     }
     let hour_days: BTreeSet<i16> = inputs.run_spec_hour_day.iter().copied().collect();
 
- // OMDG-2: weight each bracketing cycle's share by the bin's time fraction.
+    // OMDG-2: weight each bracketing cycle's share by the bin's time fraction.
     let mut lo_fraction: BTreeMap<DriveScheduleFractionKey, f64> = BTreeMap::new();
     let mut hi_fraction: BTreeMap<DriveScheduleFractionKey, f64> = BTreeMap::new();
     for (&(source_type_id, road_type_id, bin_id), bracket) in brackets {
@@ -309,26 +309,26 @@ fn drive_schedule_fractions(
             let lo_weighted = lo_share * fraction;
             let hi_weighted = hi_share * fraction;
             for &drive_schedule_id in &bracket.lo_schedules {
- *lo_fraction
+                *lo_fraction
                     .entry((source_type_id, road_type_id, hour_day_id, drive_schedule_id))
                     .or_insert(0.0) += lo_weighted;
             }
             for &drive_schedule_id in &bracket.hi_schedules {
- *hi_fraction
+                *hi_fraction
                     .entry((source_type_id, road_type_id, hour_day_id, drive_schedule_id))
                     .or_insert(0.0) += hi_weighted;
             }
         }
     }
- // OMDG-3: a cycle's drive-schedule fraction is the sum of the lo and hi
- // shares it accumulated. A cycle that brackets bins from only one side
- // contributes that side alone.
+    // OMDG-3: a cycle's drive-schedule fraction is the sum of the lo and hi
+    // shares it accumulated. A cycle that brackets bins from only one side
+    // contributes that side alone.
     let mut drive_schedule_fraction = lo_fraction;
     for (key, fraction) in hi_fraction {
- *drive_schedule_fraction.entry(key).or_insert(0.0) += fraction;
+        *drive_schedule_fraction.entry(key).or_insert(0.0) += fraction;
     }
- // OMDG-3: copy each real source type's rows onto its temporary source
- // types. `INSERT IGNORE` — an existing key is never overwritten.
+    // OMDG-3: copy each real source type's rows onto its temporary source
+    // types. `INSERT IGNORE` — an existing key is never overwritten.
     let mut temp_rows: Vec<(DriveScheduleFractionKey, f64)> = Vec::new();
     for mapping in inputs.physics_mapping {
         if mapping.temp_source_type_id == mapping.real_source_type_id {
@@ -425,8 +425,8 @@ fn assign_operating_mode(
     candidates: &[(i16, OperatingModeRow)],
 ) -> Option<i16> {
     let mut op_mode: Option<i16> = None;
- // Braking — Java OMDG-5 `OpModeIDBySecond_Temp` plus the `acceleration <=
- // -2` update.
+    // Braking — Java OMDG-5 `OpModeIDBySecond_Temp` plus the `acceleration <=
+    // -2` update.
     if acceleration_mph <= -2.0 {
         op_mode = Some(BRAKING_OP_MODE);
     } else if let (Some(prev1), Some(prev2)) = prev_accelerations {
@@ -434,7 +434,7 @@ fn assign_operating_mode(
             op_mode = Some(BRAKING_OP_MODE);
         }
     }
- // VSP / speed binning — only seconds still unassigned (`opModeID IS NULL`).
+    // VSP / speed binning — only seconds still unassigned (`opModeID IS NULL`).
     if op_mode.is_none() {
         for &(op_mode_id, mode) in candidates {
             if op_mode_matches(vsp, speed_mph, &mode) {
@@ -443,7 +443,7 @@ fn assign_operating_mode(
             }
         }
     }
- // Idle override — applied last, so it wins over braking and VSP binning.
+    // Idle override — applied last, so it wins over braking and VSP binning.
     if speed_mph == 0.0 && pol_process_id == ZERO_SPEED_OP_MODE_POL_PROCESS {
         op_mode = Some(ZERO_SPEED_OP_MODE);
     } else if speed_mph < 1.0 {
@@ -473,7 +473,7 @@ fn source_type_drive_schedules(
 ) -> BTreeSet<(SourceTypeId, i16)> {
     let mut fraction_sum: BTreeMap<(SourceTypeId, i16), f64> = BTreeMap::new();
     for (&(source_type_id, _, _, drive_schedule_id), &fraction) in drive_schedule_fraction {
- *fraction_sum
+        *fraction_sum
             .entry((source_type_id, drive_schedule_id))
             .or_insert(0.0) += fraction;
     }
@@ -482,8 +482,8 @@ fn source_type_drive_schedules(
         .filter(|&(_, sum)| sum != 0.0)
         .map(|(pair, _)| pair)
         .collect();
- // `drive_schedule_fraction` already carries temp-source rows, so this
- // expansion adds nothing in practice — ported from OMDG-4 for fidelity.
+    // `drive_schedule_fraction` already carries temp-source rows, so this
+    // expansion adds nothing in practice — ported from OMDG-4 for fidelity.
     for mapping in inputs.physics_mapping {
         if mapping.temp_source_type_id == mapping.real_source_type_id {
             continue;
@@ -577,8 +577,8 @@ fn count_schedule_op_modes(
         second_count += 1;
         let speed_mph = speeds[&second];
         let acceleration_mph_now = acceleration_mph[&second];
- // The three-consecutive-deceleration test needs the two preceding
- // seconds to be binned seconds too.
+        // The three-consecutive-deceleration test needs the two preceding
+        // seconds to be binned seconds too.
         let prev_accelerations = (
             binned
                 .contains(&(second - 1))
@@ -600,7 +600,7 @@ fn count_schedule_op_modes(
                 pol_process_id,
                 pol_process_candidates,
             ) {
- *mode_counts.entry((pol_process_id, op_mode)).or_insert(0) += 1;
+                *mode_counts.entry((pol_process_id, op_mode)).or_insert(0) += 1;
             }
         }
     }
@@ -632,9 +632,9 @@ fn op_mode_fraction_by_schedule(
         let Some(physics) = physics_by_temp_source.get(&source_type_id) else {
             continue;
         };
- // The Java VSP `SELECT` joins `sourceMass <> 0`; a zero
- // `fixedMassFactor` would make its division yield `NULL`. Either way
- // there is no usable VSP, so the source type contributes nothing.
+        // The Java VSP `SELECT` joins `sourceMass <> 0`; a zero
+        // `fixedMassFactor` would make its division yield `NULL`. Either way
+        // there is no usable VSP, so the source type contributes nothing.
         if physics.source_mass == 0.0 || physics.fixed_mass_factor == 0.0 {
             continue;
         }
@@ -672,8 +672,8 @@ fn preliminary_op_mode_fractions(
         .iter()
         .map(|assoc| (assoc.pol_process_id, assoc.op_mode_id))
         .collect();
- // Drive-schedule fractions indexed by their (sourceType, driveSchedule)
- // join key into `op_mode_fraction_by_schedule`.
+    // Drive-schedule fractions indexed by their (sourceType, driveSchedule)
+    // join key into `op_mode_fraction_by_schedule`.
     let mut fractions_by_source_schedule: ScheduleFractionsByJoinKey = BTreeMap::new();
     for (&(source_type_id, road_type_id, hour_day_id, drive_schedule_id), &fraction) in
         drive_schedule_fraction
@@ -700,7 +700,7 @@ fn preliminary_op_mode_fractions(
             continue;
         };
         for &(road_type_id, hour_day_id, schedule_fraction) in fractions {
- *op_mode_fraction
+            *op_mode_fraction
                 .entry((
                     source_type_id,
                     road_type_id,
@@ -750,10 +750,10 @@ pub fn op_mode_distribution(inputs: &OmdgInputs<'_>) -> Vec<OpModeFractionRow> {
             },
         )
         .collect();
- // OMDG-7: a represented pol/process copies the rows of its representing
- // pol/process. `OpModeFraction2` never holds a represented pol/process
- // (it is excluded from `OMDGPollutantProcess`), so the copies never
- // collide with an existing row.
+    // OMDG-7: a represented pol/process copies the rows of its representing
+    // pol/process. `OpModeFraction2` never holds a represented pol/process
+    // (it is excluded from `OMDGPollutantProcess`), so the copies never
+    // collide with an existing row.
     for represented in inputs.pol_process_represented {
         let copies: Vec<OpModeFractionRow> = op_mode_fraction
             .iter()
@@ -787,16 +787,16 @@ mod tests {
         DriveScheduleSecondRow, OpModePolProcAssocRow, PolProcessRepresentedRow,
     };
 
- /// Source / road / hour-day identifiers reused across the tests.
+    /// Source / road / hour-day identifiers reused across the tests.
     const SOURCE_TYPE: SourceTypeId = SourceTypeId(21);
     const ROAD_TYPE: RoadTypeId = RoadTypeId(5);
     const HOUR_DAY: i16 = 51;
- /// A plain running-exhaust pol/process (pollutant 1, process 1) — neither
- /// the zero-speed (11609) nor the excluded (11710) special case.
+    /// A plain running-exhaust pol/process (pollutant 1, process 1) — neither
+    /// the zero-speed (11609) nor the excluded (11710) special case.
     const POL_PROCESS: PolProcessId = PolProcessId(101);
 
- /// Physics terms that make VSP identically zero for a constant-speed
- /// second: only the (zeroed) acceleration term would contribute.
+    /// Physics terms that make VSP identically zero for a constant-speed
+    /// second: only the (zeroed) acceleration term would contribute.
     fn flat_physics(real: SourceTypeId, temp: SourceTypeId) -> PhysicsMappingRow {
         PhysicsMappingRow {
             real_source_type_id: real,
@@ -809,7 +809,7 @@ mod tests {
         }
     }
 
- /// A constant-speed driving cycle: four seconds (0..=3) all at `speed`.
+    /// A constant-speed driving cycle: four seconds (0..=3) all at `speed`.
     fn constant_cycle(drive_schedule_id: i16, speed: f64) -> Vec<DriveScheduleSecondRow> {
         (0..=3)
             .map(|second| DriveScheduleSecondRow {
@@ -850,7 +850,7 @@ mod tests {
             run_spec_road_type: &[ROAD_TYPE, RoadTypeId(2)],
             run_spec_hour_day: &[HOUR_DAY],
         };
- // Road type 5 has only a ramp cycle; road type 2 has a non-ramp one.
+        // Road type 5 has only a ramp cycle; road type 2 has a non-ramp one.
         assert_eq!(
             validate_drive_schedule_distribution(&inputs),
             vec![(SOURCE_TYPE, ROAD_TYPE)],
@@ -913,21 +913,21 @@ mod tests {
         };
         let brackets = bracket_average_speed_bins(&inputs);
 
- // Bin 1 (5 mph) is below every cycle: both brackets clamp to cycle 1.
+        // Bin 1 (5 mph) is below every cycle: both brackets clamp to cycle 1.
         let below = &brackets[&(SOURCE_TYPE, ROAD_TYPE, 1)];
         assert_eq!((below.lo_speed, below.hi_speed), (10.0, 10.0));
         assert_eq!(
             (&below.lo_schedules[..], &below.hi_schedules[..]),
             (&[1][..], &[1][..])
         );
- // Bin 2 (20 mph) sits between the two cycles.
+        // Bin 2 (20 mph) sits between the two cycles.
         let between = &brackets[&(SOURCE_TYPE, ROAD_TYPE, 2)];
         assert_eq!((between.lo_speed, between.hi_speed), (10.0, 30.0));
         assert_eq!(
             (&between.lo_schedules[..], &between.hi_schedules[..]),
             (&[1][..], &[2][..]),
         );
- // Bin 3 (50 mph) is above every cycle: both brackets clamp to cycle 2.
+        // Bin 3 (50 mph) is above every cycle: both brackets clamp to cycle 2.
         let above = &brackets[&(SOURCE_TYPE, ROAD_TYPE, 3)];
         assert_eq!((above.lo_speed, above.hi_speed), (30.0, 30.0));
         assert_eq!(
@@ -938,7 +938,7 @@ mod tests {
 
     #[test]
     fn vehicle_specific_power_matches_road_load_polynomial() {
- // rollingTermA dominates; quadratic, cubic and mass terms are zeroed.
+        // rollingTermA dominates; quadratic, cubic and mass terms are zeroed.
         let physics = PhysicsMappingRow {
             real_source_type_id: SOURCE_TYPE,
             temp_source_type_id: SOURCE_TYPE,
@@ -948,14 +948,14 @@ mod tests {
             source_mass: 0.0,
             fixed_mass_factor: 4.0,
         };
- // VSP = (2 * 10) / 4 = 5.
+        // VSP = (2 * 10) / 4 = 5.
         assert_eq!(vehicle_specific_power(10.0, 0.0, &physics), 5.0);
     }
 
     #[test]
     fn assign_operating_mode_brakes_on_hard_deceleration() {
- // A single second decelerating 2 mph/s bins to braking, before any
- // VSP/speed candidate is considered.
+        // A single second decelerating 2 mph/s bins to braking, before any
+        // VSP/speed candidate is considered.
         let bin = OperatingModeRow {
             op_mode_id: 30,
             vsp_lower: None,
@@ -973,8 +973,8 @@ mod tests {
         let op_mode =
             assign_operating_mode(25.0, -1.5, (Some(-1.2), Some(-1.1)), 0.0, POL_PROCESS, &[]);
         assert_eq!(op_mode, Some(BRAKING_OP_MODE));
- // The same second without two preceding soft decelerations is not
- // braking — it falls through to (here, no) VSP candidates.
+        // The same second without two preceding soft decelerations is not
+        // braking — it falls through to (here, no) VSP candidates.
         assert_eq!(
             assign_operating_mode(25.0, -1.5, (None, None), 0.0, POL_PROCESS, &[]),
             None,
@@ -990,12 +990,12 @@ mod tests {
             speed_lower: Some(25.0),
             speed_upper: Some(50.0),
         };
- // VSP 4, speed 30 — inside both ranges.
+        // VSP 4, speed 30 — inside both ranges.
         assert_eq!(
             assign_operating_mode(30.0, 0.0, (None, None), 4.0, POL_PROCESS, &[(33, bin)]),
             Some(33),
         );
- // VSP 7 is above the upper bound — no candidate matches.
+        // VSP 7 is above the upper bound — no candidate matches.
         assert_eq!(
             assign_operating_mode(30.0, 0.0, (None, None), 7.0, POL_PROCESS, &[(33, bin)]),
             None,
@@ -1011,12 +1011,12 @@ mod tests {
             speed_lower: None,
             speed_upper: None,
         };
- // speed < 1 overrides the VSP/speed bin the second would otherwise get.
+        // speed < 1 overrides the VSP/speed bin the second would otherwise get.
         assert_eq!(
             assign_operating_mode(0.5, 0.0, (None, None), 0.0, POL_PROCESS, &[(30, bin)]),
             Some(IDLE_OP_MODE),
         );
- // speed == 0 bins to mode 501 for pol/process 11609 only.
+        // speed == 0 bins to mode 501 for pol/process 11609 only.
         assert_eq!(
             assign_operating_mode(
                 0.0,
@@ -1036,8 +1036,8 @@ mod tests {
 
     #[test]
     fn count_schedule_op_modes_bins_hard_deceleration_as_braking() {
- // A cycle decelerating 10, 10 then 5 mph/s — every binned second has
- // an acceleration at or below -2 and so brakes.
+        // A cycle decelerating 10, 10 then 5 mph/s — every binned second has
+        // an acceleration at or below -2 and so brakes.
         let speeds: BTreeMap<i16, f64> = [(0, 30.0), (1, 20.0), (2, 10.0), (3, 5.0)]
             .into_iter()
             .collect();
@@ -1046,7 +1046,7 @@ mod tests {
         let candidates: OpModeCandidates = BTreeMap::new();
         let (second_count, mode_counts) =
             count_schedule_op_modes(&speeds, &physics, &pol_processes, &candidates);
- // Seconds 1, 2 and 3 are binned; second 0 has no predecessor.
+        // Seconds 1, 2 and 3 are binned; second 0 has no predecessor.
         assert_eq!(second_count, 3);
         assert_eq!(
             mode_counts.get(&(POL_PROCESS, BRAKING_OP_MODE)).copied(),
@@ -1056,9 +1056,9 @@ mod tests {
 
     #[test]
     fn count_schedule_op_modes_counts_seconds_with_no_operating_mode() {
- // Constant 30 mph: no braking, no idle. A candidate whose VSP floor
- // sits above the cycle's VSP leaves every second unbinned — those
- // seconds still count toward the denominator (`secondSum`).
+        // Constant 30 mph: no braking, no idle. A candidate whose VSP floor
+        // sits above the cycle's VSP leaves every second unbinned — those
+        // seconds still count toward the denominator (`secondSum`).
         let speeds: BTreeMap<i16, f64> = [(0, 30.0), (1, 30.0), (2, 30.0)].into_iter().collect();
         let physics = flat_physics(SOURCE_TYPE, SOURCE_TYPE);
         let pol_processes: BTreeSet<PolProcessId> = [POL_PROCESS].into_iter().collect();
@@ -1078,9 +1078,9 @@ mod tests {
         assert!(mode_counts.is_empty());
     }
 
- /// Build the two-cycle scenario shared by the end-to-end tests: an
- /// all-idle cycle (`ds1`) and a constant-30-mph cycle (`ds2`) bracketing a
- /// single 20-mph bin, each weighted 0.5.
+    /// Build the two-cycle scenario shared by the end-to-end tests: an
+    /// all-idle cycle (`ds1`) and a constant-30-mph cycle (`ds2`) bracketing a
+    /// single 20-mph bin, each weighted 0.5.
     struct Scenario {
         drive_schedule: Vec<DriveScheduleRow>,
         drive_schedule_assoc: Vec<DriveScheduleAssocRow>,
@@ -1132,8 +1132,8 @@ mod tests {
                     avg_speed_bin_id: 1,
                     avg_speed_fraction: 1.0,
                 }],
- // VSP is identically zero here, so the cruising cycle bins
- // into mode 30.
+                // VSP is identically zero here, so the cruising cycle bins
+                // into mode 30.
                 operating_mode: vec![OperatingModeRow {
                     op_mode_id: 30,
                     vsp_lower: Some(-100.0),
@@ -1173,8 +1173,8 @@ mod tests {
         let inputs = scenario.inputs(&[], &[]);
         let brackets = bracket_average_speed_bins(&inputs);
         let fractions = drive_schedule_fractions(&inputs, &brackets);
- // The 20-mph bin sits halfway between the 10- and 30-mph cycles, so
- // each cycle takes half of the (unit) bin fraction.
+        // The 20-mph bin sits halfway between the 10- and 30-mph cycles, so
+        // each cycle takes half of the (unit) bin fraction.
         assert_eq!(
             fractions
                 .get(&(SOURCE_TYPE, ROAD_TYPE, HOUR_DAY, 1))
@@ -1204,8 +1204,8 @@ mod tests {
         ];
         let rows = op_mode_distribution(&scenario.inputs(&assoc, &[]));
 
- // The idle cycle (fraction 0.5) is all idle; the cruising cycle
- // (fraction 0.5) is all mode 30.
+        // The idle cycle (fraction 0.5) is all idle; the cruising cycle
+        // (fraction 0.5) is all mode 30.
         assert_eq!(rows.len(), 2);
         assert_eq!(
             rows[0],
@@ -1229,7 +1229,7 @@ mod tests {
                 op_mode_fraction: 0.5,
             },
         );
- // The operating-mode fractions for the pol/process sum to one.
+        // The operating-mode fractions for the pol/process sum to one.
         let total: f64 = rows.iter().map(|r| r.op_mode_fraction).sum();
         assert!((total - 1.0).abs() < 1e-12);
     }
@@ -1254,7 +1254,7 @@ mod tests {
         }];
         let rows = op_mode_distribution(&scenario.inputs(&assoc, &represented));
 
- // Two rows for the representing pol/process, two copied onto 201.
+        // Two rows for the representing pol/process, two copied onto 201.
         assert_eq!(rows.len(), 4);
         let copied: Vec<&OpModeFractionRow> = rows
             .iter()
@@ -1269,8 +1269,8 @@ mod tests {
     #[test]
     fn op_mode_distribution_drops_excluded_pol_process() {
         let scenario = Scenario::new();
- // pol/process 11710 is associated with the same modes but must never
- // reach OpModeFraction2.
+        // pol/process 11710 is associated with the same modes but must never
+        // reach OpModeFraction2.
         let assoc = [
             OpModePolProcAssocRow {
                 pol_process_id: POL_PROCESS,
@@ -1315,8 +1315,8 @@ mod tests {
     #[test]
     fn zero_source_mass_drops_the_source_type() {
         let mut scenario = Scenario::new();
- // A zero-mass physics mapping yields no VSP rows — the Java VSP
- // `SELECT` joins `sourceMass <> 0`.
+        // A zero-mass physics mapping yields no VSP rows — the Java VSP
+        // `SELECT` joins `sourceMass <> 0`.
         scenario.physics_mapping = vec![PhysicsMappingRow {
             source_mass: 0.0,
             ..flat_physics(SOURCE_TYPE, SOURCE_TYPE)

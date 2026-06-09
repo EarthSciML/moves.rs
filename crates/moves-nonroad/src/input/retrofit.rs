@@ -126,58 +126,58 @@ pub const FRAC_RETRO_TOLERANCE: f32 = 0.0049;
 /// deterioration tech-type list (`tecdet` from `nonrdtch.inc`).
 #[derive(Debug, Clone)]
 pub struct RetrofitContext<'a> {
- /// Evaluation year. Records that wouldn't take effect until a
- /// later year are skipped (`rdrtrft.f` :351–366).
+    /// Evaluation year. Records that wouldn't take effect until a
+    /// later year are skipped (`rdrtrft.f` :351–366).
     pub eval_year: i32,
- /// Equipment codes loaded for the run, paired with whether each
- /// is requested (`eqpcod`/`lascat`). Used by both the SCC
- /// validator (`vldrtrftscc.f`, ignores the `requested` flag) and
- /// the skip filter (`chkasc` with `skipunreq=.TRUE.`, requires
- /// the flag).
+    /// Equipment codes loaded for the run, paired with whether each
+    /// is requested (`eqpcod`/`lascat`). Used by both the SCC
+    /// validator (`vldrtrftscc.f`, ignores the `requested` flag) and
+    /// the skip filter (`chkasc` with `skipunreq=.TRUE.`, requires
+    /// the flag).
     pub equipment_codes: &'a [(String, bool)],
- /// Tech types loaded into the THC deterioration table
- /// (`fnddet(IDXTHC, ...)`).
+    /// Tech types loaded into the THC deterioration table
+    /// (`fnddet(IDXTHC, ...)`).
     pub valid_tech_types: &'a [String],
 }
 
 /// Outcome of parsing a retrofit input file.
 #[derive(Debug, Clone, Default)]
 pub struct RetrofitParseResult {
- /// Records that survived field validation and skip-filtering.
+    /// Records that survived field validation and skip-filtering.
     pub records: Vec<RetrofitRecord>,
- /// One entry per record dropped by the skip filter.
+    /// One entry per record dropped by the skip filter.
     pub skip_warnings: Vec<RetrofitSkipWarning>,
- /// One entry per surviving record that retrofits an absolute
- /// count (`annual_frac_or_count > 1`) yet affects more than one
- /// engine.
+    /// One entry per surviving record that retrofits an absolute
+    /// count (`annual_frac_or_count > 1`) yet affects more than one
+    /// engine.
     pub n_units_warnings: Vec<RetrofitNUnitsWarning>,
- /// True when the packet contained no records at all (matches the
- /// "no retrofit records read" warning in `rdrtrft.f` :438).
+    /// True when the packet contained no records at all (matches the
+    /// "no retrofit records read" warning in `rdrtrft.f` :438).
     pub no_records: bool,
 }
 
 /// One skip-filter warning recorded by [`read_retrofit`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct RetrofitSkipWarning {
- /// 1-based input record number.
+    /// 1-based input record number.
     pub record_number: usize,
- /// Human-readable reason for skipping.
+    /// Human-readable reason for skipping.
     pub reason: String,
 }
 
 /// One "N units" warning recorded by [`read_retrofit`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct RetrofitNUnitsWarning {
- /// 1-based input record number.
+    /// 1-based input record number.
     pub record_number: usize,
 }
 
 /// One non-fatal warning produced by [`validate_retrofit_recordset`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct RetrofitRecordsetWarning {
- /// Retrofit ID where the duplicate was observed.
+    /// Retrofit ID where the duplicate was observed.
     pub retrofit_id: i32,
- /// Pollutant that appeared more than once.
+    /// Pollutant that appeared more than once.
     pub pollutant: String,
 }
 
@@ -299,7 +299,7 @@ pub fn read_retrofit<R: BufRead>(reader: R, ctx: &RetrofitContext) -> Result<Ret
 
         let parsed = parse_record(&line, line_num, &path)?;
 
- // --- field-level validation (matching the goto-7005..7014 path) ---
+        // --- field-level validation (matching the goto-7005..7014 path) ---
         validate_year(
             parsed.ryst,
             "retrofit year start",
@@ -436,7 +436,7 @@ pub fn read_retrofit<R: BufRead>(reader: R, ctx: &RetrofitContext) -> Result<Ret
             ));
         }
 
- // --- skip-filter check (rdrtrft.f :350–367) ---
+        // --- skip-filter check (rdrtrft.f :350–367) ---
         if let Some(reason) = skip_reason(&parsed, ctx) {
             result.skip_warnings.push(RetrofitSkipWarning {
                 record_number,
@@ -445,7 +445,7 @@ pub fn read_retrofit<R: BufRead>(reader: R, ctx: &RetrofitContext) -> Result<Ret
             continue;
         }
 
- // --- N-units warning (rdrtrft.f :394–413) ---
+        // --- N-units warning (rdrtrft.f :394–413) ---
         if parsed.annual_frac_or_count > 1.0 && affects_multiple_engines(&parsed) {
             result
                 .n_units_warnings
@@ -511,7 +511,7 @@ pub fn validate_retrofit_recordset(
     let last = records.len() - 1;
     sort_retrofits(records, Comparison::IdPollutantRecord, 0, last);
 
- // Group boundaries by retrofit ID.
+    // Group boundaries by retrofit ID.
     let mut group_starts: Vec<usize> = Vec::new();
     let mut prev_id: i32 = i32::MIN;
     for (i, rec) in records.iter().enumerate() {
@@ -531,23 +531,23 @@ pub fn validate_retrofit_recordset(
             continue;
         }
 
- // Re-emit at most one duplicate-pollutant warning per
- // (group, pollutant) — `vldrtrftrecs.f` :170, :238–254.
+        // Re-emit at most one duplicate-pollutant warning per
+        // (group, pollutant) — `vldrtrftrecs.f` :170, :238–254.
         let mut warned_pollutants: Vec<String> = Vec::new();
 
- // The Fortran source's outer loop iterates `j` over the
- // group; the inner loop over `k` rebuilds per-pollutant
- // accumulators each time, so the recordset-level error
- // checks observe the *first* `j` they fire on. We mirror
- // that loop nesting exactly.
+        // The Fortran source's outer loop iterates `j` over the
+        // group; the inner loop over `k` rebuilds per-pollutant
+        // accumulators each time, so the recordset-level error
+        // checks observe the *first* `j` they fire on. We mirror
+        // that loop nesting exactly.
         for j in start..=end {
- // Per-pollutant accumulators (sized to NRTRFTPLLTNT, one
- // slot per pollutant in canonical order HC/CO/NOX/PM).
+            // Per-pollutant accumulators (sized to NRTRFTPLLTNT, one
+            // slot per pollutant in canonical order HC/CO/NOX/PM).
             let mut frac_sum = [0.0f32; 4];
- // -1 sentinel = "first occurrence not yet seen".
+            // -1 sentinel = "first occurrence not yet seen".
             let mut effect_seen = [-1.0f32; 4];
- // Counts of overlapping records of the same pollutant
- // as `records[j]` — only crosses 1 if there's a duplicate.
+            // Counts of overlapping records of the same pollutant
+            // as `records[j]` — only crosses 1 if there's a duplicate.
             let mut same_pollutant_overlap: usize = 0;
 
             for k in start..=end {
@@ -635,7 +635,7 @@ pub fn validate_retrofit_recordset(
                 }
             }
 
- // --- per-pollutant fraction-sum equality (vldrtrftrecs.f :262–281) ---
+            // --- per-pollutant fraction-sum equality (vldrtrftrecs.f :262–281) ---
             let mut expected: Option<(usize, f32)> = None;
             for (slot, &sum) in frac_sum.iter().enumerate() {
                 if sum > 0.0 {
@@ -743,7 +743,7 @@ fn parse_f32(
     let raw = column(line, start, end);
     let trimmed = raw.trim();
     if trimmed.is_empty() {
- // Fortran F-format reads blanks as 0.
+        // Fortran F-format reads blanks as 0.
         return Ok(0.0);
     }
     trimmed.parse::<f32>().map_err(|_| Error::Parse {
@@ -855,9 +855,9 @@ fn affects_multiple_engines(parsed: &ParsedFields) -> bool {
 /// Map a pollutant index (`IDXTHC`/`IDXCO`/`IDXNOX`/`IDXPM`) to a
 /// dense 0-based slot in the per-pollutant accumulator arrays.
 fn pollutant_slot(pollutant_idx: i32) -> usize {
- // RetrofitPollutant order: HC=0, CO=1, NOX=2, PM=3. The Fortran
- // indexes are non-contiguous (HC=1, CO=2, NOX=3, PM=6) so we map
- // through RetrofitPollutant.
+    // RetrofitPollutant order: HC=0, CO=1, NOX=2, PM=3. The Fortran
+    // indexes are non-contiguous (HC=1, CO=2, NOX=3, PM=6) so we map
+    // through RetrofitPollutant.
     match pollutant_idx {
         x if x == RetrofitPollutant::Hc.pollutant_index() => 0,
         x if x == RetrofitPollutant::Co.pollutant_index() => 1,
@@ -892,9 +892,9 @@ fn order_pair(records: &[RetrofitRecord], a: usize, b: usize) -> (usize, usize) 
 mod tests {
     use super::*;
 
- /// Default context that accepts every well-formed SCC and tech
- /// type. Use [`make_ctx`] for tests that need the skip filter to
- /// fire.
+    /// Default context that accepts every well-formed SCC and tech
+    /// type. Use [`make_ctx`] for tests that need the skip filter to
+    /// fire.
     fn permissive_ctx<'a>(eqp: &'a [(String, bool)], techs: &'a [String]) -> RetrofitContext<'a> {
         RetrofitContext {
             eval_year: 2020,
@@ -915,8 +915,8 @@ mod tests {
         }
     }
 
- /// Build a single retrofit record line at exact column positions
- /// matching `rdrtrft.f`.
+    /// Build a single retrofit record line at exact column positions
+    /// matching `rdrtrft.f`.
     #[allow(clippy::too_many_arguments)]
     fn line(
         ryst: i32,
@@ -939,7 +939,7 @@ mod tests {
             let n = bytes.len().min(width);
             buf[start..start + n].copy_from_slice(&bytes[..n]);
         };
- // 4-digit ints right-justified in a 4-wide slot.
+        // 4-digit ints right-justified in a 4-wide slot.
         let put_int4 = |buf: &mut [u8], col_1based: usize, value: i32| {
             let s = format!("{value:>4}");
             put_str(buf, col_1based, &s, 4);
@@ -983,25 +983,25 @@ mod tests {
     #[test]
     fn validate_scc_accepts_4digit_global() {
         let codes = vec![("2270002003".to_string(), true)];
- // 2270000000 = 4-digit global for the 2270* family.
+        // 2270000000 = 4-digit global for the 2270* family.
         assert!(validate_retrofit_scc("2270000000", &codes));
- // 2265000000 != 2270* — should fail.
+        // 2265000000 != 2270* — should fail.
         assert!(!validate_retrofit_scc("2265000000", &codes));
     }
 
     #[test]
     fn validate_scc_accepts_7digit_global() {
         let codes = vec![("2270002003".to_string(), true)];
- // 2270002000 = 7-digit global for 2270002* — should match.
+        // 2270002000 = 7-digit global for 2270002* — should match.
         assert!(validate_retrofit_scc("2270002000", &codes));
- // 2270003000 != 2270002* — should fail.
+        // 2270003000 != 2270002* — should fail.
         assert!(!validate_retrofit_scc("2270003000", &codes));
     }
 
     #[test]
     fn validate_scc_unrequested_still_valid() {
- // Validation ignores the `requested` flag: only the skip
- // filter (chkasc with skipunreq=.TRUE.) honours it.
+        // Validation ignores the `requested` flag: only the skip
+        // filter (chkasc with skipunreq=.TRUE.) honours it.
         let codes = vec![("2270002003".to_string(), false)];
         assert!(validate_retrofit_scc("2270002003", &codes));
     }
@@ -1017,11 +1017,11 @@ mod tests {
 
     #[test]
     fn count_hp_categories_basic_ranges() {
- // Sentinel 0 = idx 0; 50 hp = idx 8; 100 hp = idx 10; 9999 = MXHPC+1 = 19.
+        // Sentinel 0 = idx 0; 50 hp = idx 8; 100 hp = idx 10; 9999 = MXHPC+1 = 19.
         assert_eq!(count_hp_categories(0.0, 9999.0), 19);
         assert_eq!(count_hp_categories(50.0, 100.0), 2);
         assert_eq!(count_hp_categories(50.0, 75.0), 1);
- // Invalid endpoint → 0.
+        // Invalid endpoint → 0.
         assert_eq!(count_hp_categories(60.0, 100.0), 0);
     }
 
@@ -1107,7 +1107,7 @@ mod tests {
 
     #[test]
     fn skip_filter_drops_record_before_eval_year() {
- // ryst > eval_year → skip.
+        // ryst > eval_year → skip.
         let l = line(
             2030, 2030, 1996, 1997, "ALL", "ALL", "50", "300", "0.05", "0.50", "PM", 1,
         );
@@ -1140,7 +1140,7 @@ mod tests {
             2,
         );
         let body = format!("/RETROFIT/\n{l}\n/END/\n");
- // SCC is valid (matches eqpcod) but not requested.
+        // SCC is valid (matches eqpcod) but not requested.
         let codes = vec![("2270002069".to_string(), false)];
         let techs: Vec<String> = vec![];
         let ctx = make_ctx(2020, &codes, &techs);
@@ -1152,7 +1152,7 @@ mod tests {
 
     #[test]
     fn n_units_warning_fires_for_count_with_wildcard_scc() {
- // annual = 5 (count, > 1) AND SCC = ALL → warning.
+        // annual = 5 (count, > 1) AND SCC = ALL → warning.
         let l = line(
             2008, 2008, 1996, 1996, "ALL", "ALL", "50", "75", "5", "0.50", "PM", 1,
         );
@@ -1167,8 +1167,8 @@ mod tests {
 
     #[test]
     fn n_units_warning_silent_for_single_engine() {
- // count > 1 but record affects exactly one (RY, MY, SCC,
- // tech, HP-cat) — no warning.
+        // count > 1 but record affects exactly one (RY, MY, SCC,
+        // tech, HP-cat) — no warning.
         let l = line(
             2008,
             2008,
@@ -1210,7 +1210,7 @@ mod tests {
 
     #[test]
     fn invalid_year_range_is_fatal() {
- // ryst > ryen
+        // ryst > ryen
         let l = line(
             2010, 2009, 1996, 1996, "ALL", "ALL", "50", "75", "0.05", "0.50", "PM", 1,
         );
@@ -1291,7 +1291,7 @@ mod tests {
 
     #[test]
     fn parses_the_canonical_retrotst_packet() {
- // Mirrors the 4 records in DATA/RETROFIT/retrotst.dat.
+        // Mirrors the 4 records in DATA/RETROFIT/retrotst.dat.
         let l1 = line(
             2008,
             2009,
@@ -1362,7 +1362,7 @@ mod tests {
         assert!(result.n_units_warnings.is_empty());
     }
 
- // ---- recordset validation ----
+    // ---- recordset validation ----
 
     #[allow(clippy::too_many_arguments)]
     fn rec(
@@ -1400,8 +1400,8 @@ mod tests {
 
     #[test]
     fn validate_recordset_passes_on_consistent_pair() {
- // Two records, same retrofit ID, different pollutants, same
- // effect range, equal fraction sums.
+        // Two records, same retrofit ID, different pollutants, same
+        // effect range, equal fraction sums.
         let mut records = vec![
             rec(
                 1,
@@ -1522,8 +1522,8 @@ mod tests {
 
     #[test]
     fn validate_recordset_rejects_different_effectiveness_for_same_pollutant() {
- // Two PM records with overlapping engines under same ID but
- // different effect values.
+        // Two PM records with overlapping engines under same ID but
+        // different effect values.
         let mut records = vec![
             rec(
                 1,
@@ -1565,7 +1565,7 @@ mod tests {
 
     #[test]
     fn validate_recordset_rejects_mismatched_fraction_sums() {
- // PM sum = 0.04, NOX sum = 0.10 → outside tolerance.
+        // PM sum = 0.04, NOX sum = 0.10 → outside tolerance.
         let mut records = vec![
             rec(
                 1,
@@ -1607,8 +1607,8 @@ mod tests {
 
     #[test]
     fn validate_recordset_warns_on_duplicate_pollutant() {
- // Two PM records, overlapping engines, same effect — the
- // duplication is allowed but should warn.
+        // Two PM records, overlapping engines, same effect — the
+        // duplication is allowed but should warn.
         let mut records = vec![
             rec(
                 1,
@@ -1649,8 +1649,8 @@ mod tests {
 
     #[test]
     fn validate_recordset_independent_groups() {
- // Two retrofit IDs, neither overlapping with the other →
- // both validate.
+        // Two retrofit IDs, neither overlapping with the other →
+        // both validate.
         let mut records = vec![
             rec(
                 1,

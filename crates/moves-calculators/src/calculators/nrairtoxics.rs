@@ -193,15 +193,15 @@ const GRAMS_PER_POUND: f64 = 453.592;
 pub fn gallons_factor(fuel_type_id: i32) -> f64 {
     let grams_to_pounds = 1.0 / GRAMS_PER_POUND;
     match fuel_type_id {
- // Gasoline.
+        // Gasoline.
         1 => grams_to_pounds / 6.17,
- // Diesel and its nonroad variants (23, 24).
+        // Diesel and its nonroad variants (23, 24).
         2 | 23 | 24 => grams_to_pounds / 7.1,
- // CNG.
+        // CNG.
         3 => grams_to_pounds / 0.0061,
- // LPG.
+        // LPG.
         4 => grams_to_pounds / 4.507,
- // Any other fuel type: no conversion.
+        // Any other fuel type: no conversion.
         _ => 1.0,
     }
 }
@@ -215,23 +215,23 @@ pub fn gallons_factor(fuel_type_id: i32) -> f64 {
 /// emission derived from it.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Emission {
- /// `fuelSubTypeID` — the emission's fuel subtype.
+    /// `fuelSubTypeID` — the emission's fuel subtype.
     pub fuel_sub_type_id: i32,
- /// `fuelFormulationID` — the emission's fuel formulation. Keys the
- /// nonroad worker's `FuelFormulations` table to recover the *formulation's*
- /// fuel subtype, which keys the `nrATRatio` lookup.
+    /// `fuelFormulationID` — the emission's fuel formulation. Keys the
+    /// nonroad worker's `FuelFormulations` table to recover the *formulation's*
+    /// fuel subtype, which keys the `nrATRatio` lookup.
     pub fuel_formulation_id: i32,
- /// `emissionQuant` — the emission quantity (mass).
+    /// `emissionQuant` — the emission quantity (mass).
     pub emission_quant: f64,
- /// `emissionRate` — the emission rate.
+    /// `emissionRate` — the emission rate.
     pub emission_rate: f64,
 }
 
 impl Emission {
- /// A linearly scaled copy — the Go `mwo.NewEmissionScaled`.
- ///
- /// Both the quantity and the rate are multiplied by `factor`; the fuel
- /// subtype and formulation ids are copied unchanged.
+    /// A linearly scaled copy — the Go `mwo.NewEmissionScaled`.
+    ///
+    /// Both the quantity and the rate are multiplied by `factor`; the fuel
+    /// subtype and formulation ids are copied unchanged.
     #[must_use]
     pub fn scaled(&self, factor: f64) -> Emission {
         Emission {
@@ -249,13 +249,13 @@ impl Emission {
 /// subtype*; the other four key by *fuel type* (see [`ProcFuelEngHpKey`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct AtRatioKey {
- /// `processID`.
+    /// `processID`.
     process_id: i32,
- /// `engTechID`.
+    /// `engTechID`.
     eng_tech_id: i32,
- /// `fuelSubTypeID` — the *fuel formulation's* subtype.
+    /// `fuelSubTypeID` — the *fuel formulation's* subtype.
     fuel_sub_type_id: i32,
- /// `nrHPCategory` — the single-character horse-power-category code.
+    /// `nrHPCategory` — the single-character horse-power-category code.
     nr_hp_category: u8,
 }
 
@@ -263,13 +263,13 @@ struct AtRatioKey {
 /// and `nrMetalEmissionRate` lookups — the Go `NRProcFuelEngHPKey`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct ProcFuelEngHpKey {
- /// `processID`.
+    /// `processID`.
     process_id: i32,
- /// `fuelTypeID` — the *block's* fuel type.
+    /// `fuelTypeID` — the *block's* fuel type.
     fuel_type_id: i32,
- /// `engTechID`.
+    /// `engTechID`.
     eng_tech_id: i32,
- /// `nrHPCategory` — the single-character horse-power-category code.
+    /// `nrHPCategory` — the single-character horse-power-category code.
     nr_hp_category: u8,
 }
 
@@ -280,14 +280,14 @@ struct ProcFuelEngHpKey {
 /// pollutant the key produces.
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct RatioDetail {
- /// `pollutantID` — the output toxic pollutant.
+    /// `pollutantID` — the output toxic pollutant.
     pollutant_id: i32,
- /// `polProcessID` — `pollutantID * 100 + processID`, the id checked
- /// against the run's needed set.
+    /// `polProcessID` — `pollutantID * 100 + processID`, the id checked
+    /// against the run's needed set.
     pol_process_id: i32,
- /// The multiplier — `atRatio` for the PAH ratio tables, `meanBaseRate`
- /// for the dioxin and metal emission-rate tables. The Go stores all of
- /// them in a single `atRatio` field.
+    /// The multiplier — `atRatio` for the PAH ratio tables, `meanBaseRate`
+    /// for the dioxin and metal emission-rate tables. The Go stores all of
+    /// them in a single `atRatio` field.
     ratio: f64,
 }
 
@@ -298,17 +298,17 @@ struct RatioDetail {
 /// processID, engTechID, fuelSubtypeID, nrHPCategory, atRatio`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AtRatioRow {
- /// `pollutantID` — the output toxic.
+    /// `pollutantID` — the output toxic.
     pub pollutant_id: i32,
- /// `processID`.
+    /// `processID`.
     pub process_id: i32,
- /// `engTechID`.
+    /// `engTechID`.
     pub eng_tech_id: i32,
- /// `fuelSubtypeID`.
+    /// `fuelSubtypeID`.
     pub fuel_sub_type_id: i32,
- /// `nrHPCategory` — the horse-power-category code byte.
+    /// `nrHPCategory` — the horse-power-category code byte.
     pub nr_hp_category: u8,
- /// `atRatio` — the toxic-to-VOC ratio.
+    /// `atRatio` — the toxic-to-VOC ratio.
     pub at_ratio: f64,
 }
 
@@ -321,17 +321,17 @@ pub struct AtRatioRow {
 /// for the dioxin and metal tables.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ProcFuelEngHpRow {
- /// `pollutantID` — the output toxic.
+    /// `pollutantID` — the output toxic.
     pub pollutant_id: i32,
- /// `processID`.
+    /// `processID`.
     pub process_id: i32,
- /// `fuelTypeID`.
+    /// `fuelTypeID`.
     pub fuel_type_id: i32,
- /// `engTechID`.
+    /// `engTechID`.
     pub eng_tech_id: i32,
- /// `nrHPCategory` — the horse-power-category code byte.
+    /// `nrHPCategory` — the horse-power-category code byte.
     pub nr_hp_category: u8,
- /// `atratio` (PAH tables) or `meanBaseRate` (dioxin / metal tables).
+    /// `atratio` (PAH tables) or `meanBaseRate` (dioxin / metal tables).
     pub ratio: f64,
 }
 
@@ -344,17 +344,17 @@ pub struct ProcFuelEngHpRow {
 /// so it is not modeled here.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FuelBlockKey {
- /// `pollutantID` — the calculator processes only VOC (87), PM2.5 (110)
- /// and fuel-consumption (99) blocks.
+    /// `pollutantID` — the calculator processes only VOC (87), PM2.5 (110)
+    /// and fuel-consumption (99) blocks.
     pub pollutant_id: i32,
- /// `processID`.
+    /// `processID`.
     pub process_id: i32,
- /// `engTechID`.
+    /// `engTechID`.
     pub eng_tech_id: i32,
- /// `fuelTypeID` — keys the four `ProcFuelEngHp` ratio tables and selects
- /// the [`gallons_factor`].
+    /// `fuelTypeID` — keys the four `ProcFuelEngHp` ratio tables and selects
+    /// the [`gallons_factor`].
     pub fuel_type_id: i32,
- /// `hpID` — keys the `nrHPCategory` horse-power-category lookup.
+    /// `hpID` — keys the `nrHPCategory` horse-power-category lookup.
     pub hp_id: i32,
 }
 
@@ -362,9 +362,9 @@ pub struct FuelBlockKey {
 /// fields and emissions the calculator consumes.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FuelBlock {
- /// The block's key fields.
+    /// The block's key fields.
     pub key: FuelBlockKey,
- /// The per-fuel-formulation emissions in the block.
+    /// The per-fuel-formulation emissions in the block.
     pub emissions: Vec<Emission>,
 }
 
@@ -377,12 +377,12 @@ pub struct FuelBlock {
 /// plumbing the caller handles.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ToxicFuelBlock {
- /// `pollutantID` of the derived toxic.
+    /// `pollutantID` of the derived toxic.
     pub pollutant_id: i32,
- /// `polProcessID` — `pollutantID * 100 + processID`.
+    /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
- /// The derived emissions, one per input emission that produced this
- /// pollutant, in input-emission order.
+    /// The derived emissions, one per input emission that produced this
+    /// pollutant, in input-emission order.
     pub emissions: Vec<Emission>,
 }
 
@@ -400,20 +400,20 @@ pub struct ToxicFuelBlock {
 /// which gates which output pollutants are computed.
 #[derive(Debug, Clone, Default)]
 pub struct NonroadWorkerTables {
- /// `mwo.FuelFormulations` projected to `fuelFormulationID → fuelSubTypeID`.
+    /// `mwo.FuelFormulations` projected to `fuelFormulationID → fuelSubTypeID`.
     fuel_sub_type_by_formulation: HashMap<i32, i32>,
- /// `mwo.NRHPCategory` — `(hpID, engTechID)` → horse-power-category byte.
+    /// `mwo.NRHPCategory` — `(hpID, engTechID)` → horse-power-category byte.
     hp_categories: HashMap<(i32, i32), u8>,
- /// `mwo.NeededPolProcessIDs` — the set of needed `polProcessID`s.
+    /// `mwo.NeededPolProcessIDs` — the set of needed `polProcessID`s.
     needed_pol_process_ids: HashSet<i32>,
 }
 
 impl NonroadWorkerTables {
- /// Assemble the worker tables from their three inputs.
- ///
- /// * `fuel_formulations` — `(fuelFormulationID, fuelSubTypeID)` pairs;
- /// * `hp_categories` — `((hpID, engTechID), nrHPCategory)` pairs;
- /// * `needed_pol_process_ids` — the needed `polProcessID`s.
+    /// Assemble the worker tables from their three inputs.
+    ///
+    /// * `fuel_formulations` — `(fuelFormulationID, fuelSubTypeID)` pairs;
+    /// * `hp_categories` — `((hpID, engTechID), nrHPCategory)` pairs;
+    /// * `needed_pol_process_ids` — the needed `polProcessID`s.
     #[must_use]
     pub fn new(
         fuel_formulations: impl IntoIterator<Item = (i32, i32)>,
@@ -427,20 +427,20 @@ impl NonroadWorkerTables {
         }
     }
 
- /// The fuel subtype of a fuel formulation, or `None` when the formulation
- /// is unknown — the Go `mwo.FuelFormulations[id]` returning nil, which
- /// makes `calculate` skip the emission.
+    /// The fuel subtype of a fuel formulation, or `None` when the formulation
+    /// is unknown — the Go `mwo.FuelFormulations[id]` returning nil, which
+    /// makes `calculate` skip the emission.
     fn fuel_sub_type_id(&self, fuel_formulation_id: i32) -> Option<i32> {
         self.fuel_sub_type_by_formulation
             .get(&fuel_formulation_id)
             .copied()
     }
 
- /// The horse-power category for an `(hpID, engTechID)` pair.
- ///
- /// A missing entry yields `0` — the zero value a Go map returns for an
- /// absent key, which `calculate` then carries straight into the lookup
- /// keys.
+    /// The horse-power category for an `(hpID, engTechID)` pair.
+    ///
+    /// A missing entry yields `0` — the zero value a Go map returns for an
+    /// absent key, which `calculate` then carries straight into the lookup
+    /// keys.
     fn hp_category(&self, hp_id: i32, eng_tech_id: i32) -> u8 {
         self.hp_categories
             .get(&(hp_id, eng_tech_id))
@@ -448,8 +448,8 @@ impl NonroadWorkerTables {
             .unwrap_or(0)
     }
 
- /// Whether a `polProcessID` is in the run's needed set — the Go
- /// `mwo.NeededPolProcessIDs[ppid]`.
+    /// Whether a `polProcessID` is in the run's needed set — the Go
+    /// `mwo.NeededPolProcessIDs[ppid]`.
     fn is_pol_process_needed(&self, pol_process_id: i32) -> bool {
         self.needed_pol_process_ids.contains(&pol_process_id)
     }
@@ -489,47 +489,47 @@ fn apply_ratio_details(
 /// `nrairtoxics` package.
 #[derive(Debug, Clone, Default)]
 pub struct NrAirToxics {
- /// `nrATRatio` — gaseous-toxic ratios, keyed by fuel subtype.
+    /// `nrATRatio` — gaseous-toxic ratios, keyed by fuel subtype.
     at_ratio: HashMap<AtRatioKey, Vec<RatioDetail>>,
- /// `nrATRatioProcesses` — the set of process ids present in `nrATRatio`.
+    /// `nrATRatioProcesses` — the set of process ids present in `nrATRatio`.
     at_ratio_processes: HashSet<i32>,
- /// `nrPAHGasRatio` — gaseous-PAH ratios, keyed by fuel type.
+    /// `nrPAHGasRatio` — gaseous-PAH ratios, keyed by fuel type.
     pah_gas_ratio: HashMap<ProcFuelEngHpKey, Vec<RatioDetail>>,
- /// `nrPAHGasRatioProcesses` — process ids present in `nrPAHGasRatio`.
+    /// `nrPAHGasRatioProcesses` — process ids present in `nrPAHGasRatio`.
     pah_gas_ratio_processes: HashSet<i32>,
- /// `nrPAHParticleRatio` — particulate-PAH ratios, keyed by fuel type.
+    /// `nrPAHParticleRatio` — particulate-PAH ratios, keyed by fuel type.
     pah_particle_ratio: HashMap<ProcFuelEngHpKey, Vec<RatioDetail>>,
- /// `nrPAHParticleRatioProcesses` — process ids in `nrPAHParticleRatio`.
+    /// `nrPAHParticleRatioProcesses` — process ids in `nrPAHParticleRatio`.
     pah_particle_ratio_processes: HashSet<i32>,
- /// `nrDioxinEmissionRate` — dioxin/furan per-gallon rates, keyed by fuel
- /// type.
+    /// `nrDioxinEmissionRate` — dioxin/furan per-gallon rates, keyed by fuel
+    /// type.
     dioxin_emission_rate: HashMap<ProcFuelEngHpKey, Vec<RatioDetail>>,
- /// `nrDioxinEmissionRateProcesses` — process ids in
- /// `nrDioxinEmissionRate`.
+    /// `nrDioxinEmissionRateProcesses` — process ids in
+    /// `nrDioxinEmissionRate`.
     dioxin_emission_rate_processes: HashSet<i32>,
- /// `nrMetalEmissionRate` — metallic-toxic per-gallon rates, keyed by fuel
- /// type.
+    /// `nrMetalEmissionRate` — metallic-toxic per-gallon rates, keyed by fuel
+    /// type.
     metal_emission_rate: HashMap<ProcFuelEngHpKey, Vec<RatioDetail>>,
- /// `nrMetalEmissionRateProcesses` — process ids in `nrMetalEmissionRate`.
+    /// `nrMetalEmissionRateProcesses` — process ids in `nrMetalEmissionRate`.
     metal_emission_rate_processes: HashSet<i32>,
- /// `nrIntegratedSpecies` — pollutant ids subtracted from NMOG to form
- /// NonHAPTOG.
+    /// `nrIntegratedSpecies` — pollutant ids subtracted from NMOG to form
+    /// NonHAPTOG.
     integrated_species: HashSet<i32>,
 }
 
 impl NrAirToxics {
- /// Build the lookup tables from the six air-toxics table extracts — the
- /// in-memory half of the Go `StartSetup`.
- ///
- /// Each ratio table maps a key to a list of details, one per output
- /// pollutant; when several rows share a key the Go appends them in file
- /// order and this port preserves that order. The per-table process sets
- /// (`nrATRatioProcesses` etc.) are derived here from the rows, as the Go
- /// derives them inside `StartSetup`.
- ///
- /// The four `ProcFuelEngHp`-keyed tables share the [`ProcFuelEngHpRow`]
- /// shape; `integrated_species` is the `nrIntegratedSpecies` pollutant id
- /// list.
+    /// Build the lookup tables from the six air-toxics table extracts — the
+    /// in-memory half of the Go `StartSetup`.
+    ///
+    /// Each ratio table maps a key to a list of details, one per output
+    /// pollutant; when several rows share a key the Go appends them in file
+    /// order and this port preserves that order. The per-table process sets
+    /// (`nrATRatioProcesses` etc.) are derived here from the rows, as the Go
+    /// derives them inside `StartSetup`.
+    ///
+    /// The four `ProcFuelEngHp`-keyed tables share the [`ProcFuelEngHpRow`]
+    /// shape; `integrated_species` is the `nrIntegratedSpecies` pollutant id
+    /// list.
     #[must_use]
     pub fn build(
         at_ratio_rows: impl IntoIterator<Item = AtRatioRow>,
@@ -581,32 +581,32 @@ impl NrAirToxics {
         }
     }
 
- /// Derive the air-toxics emissions from one input [`Emission`] — the inner
- /// per-emission body of the Go `calculate`.
- ///
- /// `block_key` is the key of the fuel block the emission belongs to; the
- /// calculator reads `pollutant_id`, `process_id`, `eng_tech_id`,
- /// `fuel_type_id` and `hp_id` from it. Which ratio tables are consulted
- /// depends on `block_key.pollutant_id`:
- ///
- /// * VOC (87) — `nrATRatio` then `nrPAHGasRatio`;
- /// * PM2.5 (110) — `nrPAHParticleRatio`;
- /// * fuel consumption (99), running exhaust only — `nrDioxinEmissionRate`
- /// then `nrMetalEmissionRate`, each scaled by the [`gallons_factor`].
- ///
- /// Any other pollutant produces no output. The block-level pollutant /
- /// process filter is applied by [`air_toxics_block`]; calling this
- /// directly is meaningful only for a VOC, PM2.5 or fuel-consumption block.
- ///
- /// Returns `None` when the emission's fuel formulation is unknown — the Go
- /// `ff == nil`, which makes `calculate` skip the emission entirely, even
- /// on the PM2.5 and fuel-consumption paths that never read the fuel
- /// subtype (see the module-level fidelity note). A returned `Vec` holds
- /// the produced `(pollutant_id, emission)` pairs in ascending
- /// pollutant-id order, and is empty when the run needs none of the
- /// pollutants the matching ratio rows produce.
- ///
- /// [`air_toxics_block`]: Self::air_toxics_block
+    /// Derive the air-toxics emissions from one input [`Emission`] — the inner
+    /// per-emission body of the Go `calculate`.
+    ///
+    /// `block_key` is the key of the fuel block the emission belongs to; the
+    /// calculator reads `pollutant_id`, `process_id`, `eng_tech_id`,
+    /// `fuel_type_id` and `hp_id` from it. Which ratio tables are consulted
+    /// depends on `block_key.pollutant_id`:
+    ///
+    /// * VOC (87) — `nrATRatio` then `nrPAHGasRatio`;
+    /// * PM2.5 (110) — `nrPAHParticleRatio`;
+    /// * fuel consumption (99), running exhaust only — `nrDioxinEmissionRate`
+    /// then `nrMetalEmissionRate`, each scaled by the [`gallons_factor`].
+    ///
+    /// Any other pollutant produces no output. The block-level pollutant /
+    /// process filter is applied by [`air_toxics_block`]; calling this
+    /// directly is meaningful only for a VOC, PM2.5 or fuel-consumption block.
+    ///
+    /// Returns `None` when the emission's fuel formulation is unknown — the Go
+    /// `ff == nil`, which makes `calculate` skip the emission entirely, even
+    /// on the PM2.5 and fuel-consumption paths that never read the fuel
+    /// subtype (see the module-level fidelity note). A returned `Vec` holds
+    /// the produced `(pollutant_id, emission)` pairs in ascending
+    /// pollutant-id order, and is empty when the run needs none of the
+    /// pollutants the matching ratio rows produce.
+    ///
+    /// [`air_toxics_block`]: Self::air_toxics_block
     #[must_use]
     pub fn air_toxics_for_emission(
         &self,
@@ -614,23 +614,23 @@ impl NrAirToxics {
         emission: &Emission,
         tables: &NonroadWorkerTables,
     ) -> Option<Vec<(i32, Emission)>> {
- // Go: ff := mwo.FuelFormulations[e.FuelFormulationID]; if ff == nil { continue }.
- // This precedes every pollutant branch, so an unknown formulation
- // skips the whole emission regardless of which branch would run.
+        // Go: ff := mwo.FuelFormulations[e.FuelFormulationID]; if ff == nil { continue }.
+        // This precedes every pollutant branch, so an unknown formulation
+        // skips the whole emission regardless of which branch would run.
         let formulation_fuel_sub_type_id = tables.fuel_sub_type_id(emission.fuel_formulation_id)?;
 
- // Go: hpCategory := mwo.NRHPCategory[NRHPCategoryKey{HPID, EngTechID}].
+        // Go: hpCategory := mwo.NRHPCategory[NRHPCategoryKey{HPID, EngTechID}].
         let nr_hp_category = tables.hp_category(block_key.hp_id, block_key.eng_tech_id);
         let process_id = block_key.process_id;
 
- // The produced emissions, keyed by output pollutant. A BTreeMap keeps
- // the result in ascending pollutant-id order and reproduces the Go's
- // last-write-wins on a repeated pollutant.
+        // The produced emissions, keyed by output pollutant. A BTreeMap keeps
+        // the result in ascending pollutant-id order and reproduces the Go's
+        // last-write-wins on a repeated pollutant.
         let mut produced: BTreeMap<i32, Emission> = BTreeMap::new();
 
         match block_key.pollutant_id {
             VOC_POLLUTANT_ID => {
- // nrATRatio — keyed on the *formulation's* fuel subtype.
+                // nrATRatio — keyed on the *formulation's* fuel subtype.
                 if let Some(details) = self.at_ratio.get(&AtRatioKey {
                     process_id,
                     eng_tech_id: block_key.eng_tech_id,
@@ -639,8 +639,8 @@ impl NrAirToxics {
                 }) {
                     apply_ratio_details(details, emission, 1.0, tables, &mut produced);
                 }
- // nrPAHGasRatio — keyed on the *block's* fuel type. Filled
- // after nrATRatio, so it wins any shared output pollutant.
+                // nrPAHGasRatio — keyed on the *block's* fuel type. Filled
+                // after nrATRatio, so it wins any shared output pollutant.
                 if let Some(details) = self.pah_gas_ratio.get(&ProcFuelEngHpKey {
                     process_id,
                     fuel_type_id: block_key.fuel_type_id,
@@ -651,7 +651,7 @@ impl NrAirToxics {
                 }
             }
             PM25_POLLUTANT_ID => {
- // nrPAHParticleRatio — keyed on the block's fuel type.
+                // nrPAHParticleRatio — keyed on the block's fuel type.
                 if let Some(details) = self.pah_particle_ratio.get(&ProcFuelEngHpKey {
                     process_id,
                     fuel_type_id: block_key.fuel_type_id,
@@ -662,8 +662,8 @@ impl NrAirToxics {
                 }
             }
             FUEL_CONSUMPTION_POLLUTANT_ID if process_id == RUNNING_EXHAUST_PROCESS_ID => {
- // Fuel consumption is in grams but the dioxin/metal rates are
- // per gallon, so both paths scale by the grams→gallons factor.
+                // Fuel consumption is in grams but the dioxin/metal rates are
+                // per gallon, so both paths scale by the grams→gallons factor.
                 let gallons = gallons_factor(block_key.fuel_type_id);
                 let key = ProcFuelEngHpKey {
                     process_id,
@@ -671,8 +671,8 @@ impl NrAirToxics {
                     eng_tech_id: block_key.eng_tech_id,
                     nr_hp_category,
                 };
- // nrDioxinEmissionRate, then nrMetalEmissionRate — metal wins
- // any shared output pollutant.
+                // nrDioxinEmissionRate, then nrMetalEmissionRate — metal wins
+                // any shared output pollutant.
                 if let Some(details) = self.dioxin_emission_rate.get(&key) {
                     apply_ratio_details(details, emission, gallons, tables, &mut produced);
                 }
@@ -680,37 +680,37 @@ impl NrAirToxics {
                     apply_ratio_details(details, emission, gallons, tables, &mut produced);
                 }
             }
- // Any other pollutant: no air-toxics output.
+            // Any other pollutant: no air-toxics output.
             _ => {}
         }
 
         Some(produced.into_iter().collect())
     }
 
- /// Derive the air-toxics output blocks from one input fuel block — the
- /// Go `calculate`'s per-`FuelBlock` body.
- ///
- /// A block whose pollutant is not a usable input, or whose
- /// `(pollutant, process)` has no ratio rows, yields no output (the Go's
- /// block-level `continue` filter):
- ///
- /// * a block whose pollutant is not VOC (87), PM2.5 (110) or
- /// fuel-consumption (99) is skipped;
- /// * a fuel-consumption block whose process is not running exhaust is
- /// skipped;
- /// * a VOC block whose process appears in neither `nrATRatio` nor
- /// `nrPAHGasRatio` is skipped;
- /// * a PM2.5 block whose process is absent from `nrPAHParticleRatio` is
- /// skipped;
- /// * a fuel-consumption block whose process is absent from both
- /// `nrDioxinEmissionRate` and `nrMetalEmissionRate` is skipped.
- ///
- /// Otherwise each emission is run through
- /// [`air_toxics_for_emission`](Self::air_toxics_for_emission) and the
- /// resulting toxic emissions are grouped into [`ToxicFuelBlock`]s by
- /// pollutant — the emissions within a block keep input-emission order, and
- /// the blocks are returned in ascending pollutant-id order (see the
- /// module-level fidelity note on output order).
+    /// Derive the air-toxics output blocks from one input fuel block — the
+    /// Go `calculate`'s per-`FuelBlock` body.
+    ///
+    /// A block whose pollutant is not a usable input, or whose
+    /// `(pollutant, process)` has no ratio rows, yields no output (the Go's
+    /// block-level `continue` filter):
+    ///
+    /// * a block whose pollutant is not VOC (87), PM2.5 (110) or
+    /// fuel-consumption (99) is skipped;
+    /// * a fuel-consumption block whose process is not running exhaust is
+    /// skipped;
+    /// * a VOC block whose process appears in neither `nrATRatio` nor
+    /// `nrPAHGasRatio` is skipped;
+    /// * a PM2.5 block whose process is absent from `nrPAHParticleRatio` is
+    /// skipped;
+    /// * a fuel-consumption block whose process is absent from both
+    /// `nrDioxinEmissionRate` and `nrMetalEmissionRate` is skipped.
+    ///
+    /// Otherwise each emission is run through
+    /// [`air_toxics_for_emission`](Self::air_toxics_for_emission) and the
+    /// resulting toxic emissions are grouped into [`ToxicFuelBlock`]s by
+    /// pollutant — the emissions within a block keep input-emission order, and
+    /// the blocks are returned in ascending pollutant-id order (see the
+    /// module-level fidelity note on output order).
     #[must_use]
     pub fn air_toxics_block(
         &self,
@@ -720,9 +720,9 @@ impl NrAirToxics {
         let pollutant_id = block.key.pollutant_id;
         let process_id = block.key.process_id;
 
- // Go block-level filter: only VOC, PM2.5 or running-exhaust fuel
- // consumption are usable inputs, and only when the process has rows
- // in a relevant ratio table.
+        // Go block-level filter: only VOC, PM2.5 or running-exhaust fuel
+        // consumption are usable inputs, and only when the process has rows
+        // in a relevant ratio table.
         let usable = match pollutant_id {
             VOC_POLLUTANT_ID => {
                 self.at_ratio_processes.contains(&process_id)
@@ -739,9 +739,9 @@ impl NrAirToxics {
             return Vec::new();
         }
 
- // Group the toxic emissions by output pollutant. A BTreeMap keeps the
- // output blocks in ascending pollutant-id order; each Vec keeps
- // input-emission order.
+        // Group the toxic emissions by output pollutant. A BTreeMap keeps the
+        // output blocks in ascending pollutant-id order; each Vec keeps
+        // input-emission order.
         let mut by_pollutant: BTreeMap<i32, Vec<Emission>> = BTreeMap::new();
         for emission in &block.emissions {
             let Some(produced) = self.air_toxics_for_emission(&block.key, emission, tables) else {
@@ -765,28 +765,28 @@ impl NrAirToxics {
             .collect()
     }
 
- /// Derive the NonHAPTOG partial-contribution block from one input fuel
- /// block — the Go `calculateNonHAPTOG`'s per-`FuelBlock` body.
- ///
- /// NonHAPTOG (pollutant 88) is `NMOG − Σ(integrated species)`. This pass
- /// produces one *partial* contribution per input block:
- ///
- /// * an NMOG (80) block contributes every emission scaled by `+1`;
- /// * an `nrIntegratedSpecies` block contributes every emission scaled by
- /// `-1`.
- ///
- /// The full NonHAPTOG total is the sum of those partials, formed
- /// downstream when the per-pollutant blocks are aggregated.
- ///
- /// Returns `None` when the block produces no contribution — the Go's
- /// block-level `continue` filter:
- ///
- /// * NonHAPTOG (`88 * 100 + processID`) is not in the run's needed set; or
- /// * the block's pollutant is neither NMOG nor an integrated species; or
- /// * the block has no emissions.
- ///
- /// Otherwise the returned [`ToxicFuelBlock`] carries pollutant 88 and one
- /// scaled emission per input emission, in input-emission order.
+    /// Derive the NonHAPTOG partial-contribution block from one input fuel
+    /// block — the Go `calculateNonHAPTOG`'s per-`FuelBlock` body.
+    ///
+    /// NonHAPTOG (pollutant 88) is `NMOG − Σ(integrated species)`. This pass
+    /// produces one *partial* contribution per input block:
+    ///
+    /// * an NMOG (80) block contributes every emission scaled by `+1`;
+    /// * an `nrIntegratedSpecies` block contributes every emission scaled by
+    /// `-1`.
+    ///
+    /// The full NonHAPTOG total is the sum of those partials, formed
+    /// downstream when the per-pollutant blocks are aggregated.
+    ///
+    /// Returns `None` when the block produces no contribution — the Go's
+    /// block-level `continue` filter:
+    ///
+    /// * NonHAPTOG (`88 * 100 + processID`) is not in the run's needed set; or
+    /// * the block's pollutant is neither NMOG nor an integrated species; or
+    /// * the block has no emissions.
+    ///
+    /// Otherwise the returned [`ToxicFuelBlock`] carries pollutant 88 and one
+    /// scaled emission per input emission, in input-emission order.
     #[must_use]
     pub fn non_hap_tog_block(
         &self,
@@ -795,20 +795,20 @@ impl NrAirToxics {
     ) -> Option<ToxicFuelBlock> {
         let process_id = block.key.process_id;
 
- // Go: ppid := 88*100 + processID; if !NeededPolProcessIDs[ppid] { continue }.
+        // Go: ppid := 88*100 + processID; if !NeededPolProcessIDs[ppid] { continue }.
         let pol_process_id = NON_HAP_TOG_POLLUTANT_ID * 100 + process_id;
         if !tables.is_pol_process_needed(pol_process_id) {
             return None;
         }
 
- // Go: skip any pollutant that is neither NMOG (80) nor an integrated
- // species.
+        // Go: skip any pollutant that is neither NMOG (80) nor an integrated
+        // species.
         let is_nmog = block.key.pollutant_id == NMOG_POLLUTANT_ID;
         if !is_nmog && !self.integrated_species.contains(&block.key.pollutant_id) {
             return None;
         }
 
- // NMOG contributes +NMOG; an integrated species contributes -itself.
+        // NMOG contributes +NMOG; an integrated species contributes -itself.
         let factor = if is_nmog { 1.0 } else { -1.0 };
         let emissions: Vec<Emission> = block.emissions.iter().map(|e| e.scaled(factor)).collect();
         if emissions.is_empty() {
@@ -877,8 +877,8 @@ const fn reg(pollutant: u16, process: u16) -> PollutantProcessAssociation {
 /// rows and `registrations_count: 205` for `NRAirToxicsCalculator` in
 /// `characterization/calculator-chains/calculator-dag.json`.
 const REGISTRATION_GROUPS: &[(u16, &[u16])] = &[
- // Running Exhaust (1) — the full set: aromatics, aldehydes, metals,
- // dioxins/furans, gaseous and particulate PAH, and NonHAPTOG.
+    // Running Exhaust (1) — the full set: aromatics, aldehydes, metals,
+    // dioxins/furans, gaseous and particulate PAH, and NonHAPTOG.
     (
         1,
         &[
@@ -888,7 +888,7 @@ const REGISTRATION_GROUPS: &[(u16, &[u16])] = &[
             172, 173, 174, 175, 176, 177, 178, 181, 182, 183, 184, 185,
         ],
     ),
- // Crankcase Running Exhaust (15) — no metals or dioxins/furans.
+    // Crankcase Running Exhaust (15) — no metals or dioxins/furans.
     (
         15,
         &[
@@ -897,25 +897,25 @@ const REGISTRATION_GROUPS: &[(u16, &[u16])] = &[
             178, 181, 182, 183, 184, 185,
         ],
     ),
- // Refueling Displacement Vapor Loss (18).
+    // Refueling Displacement Vapor Loss (18).
     (18, &[20, 21, 22, 40, 41, 42, 45, 46, 88]),
- // Refueling Spillage Loss (19).
+    // Refueling Spillage Loss (19).
     (19, &[20, 21, 22, 40, 41, 42, 45, 46, 88]),
- // Evap Tank Permeation (20).
+    // Evap Tank Permeation (20).
     (20, &[20, 21, 22, 40, 41, 42, 45, 46, 88]),
- // Evap Hose Permeation (21).
+    // Evap Hose Permeation (21).
     (21, &[20, 21, 22, 40, 41, 42, 45, 46, 88]),
- // Evap RecMar Neck Hose Permeation (22) — no NonHAPTOG.
+    // Evap RecMar Neck Hose Permeation (22) — no NonHAPTOG.
     (22, &[20, 21, 22, 40, 41, 42, 45, 46]),
- // Evap RecMar Supply/Return Hose Permeation (23) — no NonHAPTOG.
+    // Evap RecMar Supply/Return Hose Permeation (23) — no NonHAPTOG.
     (23, &[20, 21, 22, 40, 41, 42, 45, 46]),
- // Evap RecMar Vent Hose Permeation (24) — no NonHAPTOG.
+    // Evap RecMar Vent Hose Permeation (24) — no NonHAPTOG.
     (24, &[20, 21, 22, 40, 41, 42, 45, 46]),
- // Diurnal Fuel Vapor Venting (30).
+    // Diurnal Fuel Vapor Venting (30).
     (30, &[20, 21, 22, 40, 41, 42, 45, 46, 88]),
- // HotSoak Fuel Vapor Venting (31).
+    // HotSoak Fuel Vapor Venting (31).
     (31, &[20, 21, 22, 40, 41, 42, 45, 46, 88]),
- // RunningLoss Fuel Vapor Venting (32).
+    // RunningLoss Fuel Vapor Venting (32).
     (32, &[20, 21, 22, 40, 41, 42, 45, 46, 88]),
 ];
 
@@ -1000,7 +1000,7 @@ impl TableRow for AtRatioRow {
             ("processID".into(), DataType::Int32),
             ("engTechID".into(), DataType::Int32),
             ("fuelSubtypeID".into(), DataType::Int32),
-            ("nrHPCategory".into(), DataType::Int32),
+            ("nrHPCategory".into(), DataType::String),
             ("atRatio".into(), DataType::Float64),
         ])
     }
@@ -1035,8 +1035,8 @@ impl TableRow for AtRatioRow {
                 Series::new(
                     "nrHPCategory".into(),
                     rows.iter()
-                        .map(|r| r.nr_hp_category as i32)
-                        .collect::<Vec<i32>>(),
+                        .map(|r| char::from(r.nr_hp_category).to_string())
+                        .collect::<Vec<String>>(),
                 )
                 .into(),
                 Series::new(
@@ -1062,21 +1062,33 @@ impl TableRow for AtRatioRow {
                 .f64()
                 .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
+        let get_str = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .str()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
         let pollutant = get_i32("pollutantID")?;
         let process = get_i32("processID")?;
         let eng_tech = get_i32("engTechID")?;
         let fuel_sub = get_i32("fuelSubtypeID")?;
-        let hp_cat = get_i32("nrHPCategory")?;
+        let hp_cat = get_str("nrHPCategory")?;
         let ratio = get_f64("atRatio")?;
         (0..df.height())
             .map(|i| {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                let cat_str = hp_cat.get(i).ok_or_else(|| null("nrHPCategory"))?;
+                let cat_byte = cat_str
+                    .as_bytes()
+                    .first()
+                    .copied()
+                    .ok_or_else(|| row_err(t, i, "nrHPCategory", "empty string".into()))?;
                 Ok(AtRatioRow {
                     pollutant_id: pollutant.get(i).ok_or_else(|| null("pollutantID"))?,
                     process_id: process.get(i).ok_or_else(|| null("processID"))?,
                     eng_tech_id: eng_tech.get(i).ok_or_else(|| null("engTechID"))?,
                     fuel_sub_type_id: fuel_sub.get(i).ok_or_else(|| null("fuelSubtypeID"))?,
-                    nr_hp_category: hp_cat.get(i).ok_or_else(|| null("nrHPCategory"))? as u8,
+                    nr_hp_category: cat_byte,
                     at_ratio: ratio.get(i).ok_or_else(|| null("atRatio"))?,
                 })
             })
@@ -1095,7 +1107,7 @@ impl TableRow for ProcFuelEngHpRow {
             ("processID".into(), DataType::Int32),
             ("fuelTypeID".into(), DataType::Int32),
             ("engTechID".into(), DataType::Int32),
-            ("nrHPCategory".into(), DataType::Int32),
+            ("nrHPCategory".into(), DataType::String),
             ("ratio".into(), DataType::Float64),
         ])
     }
@@ -1128,8 +1140,8 @@ impl TableRow for ProcFuelEngHpRow {
                 Series::new(
                     "nrHPCategory".into(),
                     rows.iter()
-                        .map(|r| r.nr_hp_category as i32)
-                        .collect::<Vec<i32>>(),
+                        .map(|r| char::from(r.nr_hp_category).to_string())
+                        .collect::<Vec<String>>(),
                 )
                 .into(),
                 Series::new(
@@ -1155,22 +1167,43 @@ impl TableRow for ProcFuelEngHpRow {
                 .f64()
                 .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
+        let get_str = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .str()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
         let pollutant = get_i32("pollutantID")?;
         let process = get_i32("processID")?;
         let fuel_type = get_i32("fuelTypeID")?;
         let eng_tech = get_i32("engTechID")?;
-        let hp_cat = get_i32("nrHPCategory")?;
-        let ratio = get_f64("ratio")?;
+        let hp_cat = get_str("nrHPCategory")?;
+        // The ratio column is named differently across the four tables this row type
+        // covers: "ratio" (canonical in into_dataframe), "atRatio"/"atratio" (PAH gas/
+        // particle snapshots), "meanBaseRate" (dioxin/metal snapshots). String-encoded
+        // decimals (snapshot DECIMAL columns) are parsed via the get_f64 closure.
+        // Absent columns default to 0.0 per row (causes the lookup to return None →
+        // skip the emission), which is correct for empty/mis-named snapshot tables.
+        let ratio_col = get_f64("ratio")
+            .ok()
+            .or_else(|| get_f64("atRatio").ok())
+            .or_else(|| get_f64("meanBaseRate").ok());
         (0..df.height())
             .map(|i| {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                let cat_str = hp_cat.get(i).ok_or_else(|| null("nrHPCategory"))?;
+                let cat_byte = cat_str
+                    .as_bytes()
+                    .first()
+                    .copied()
+                    .ok_or_else(|| row_err(t, i, "nrHPCategory", "empty string".into()))?;
                 Ok(ProcFuelEngHpRow {
                     pollutant_id: pollutant.get(i).ok_or_else(|| null("pollutantID"))?,
                     process_id: process.get(i).ok_or_else(|| null("processID"))?,
                     fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
                     eng_tech_id: eng_tech.get(i).ok_or_else(|| null("engTechID"))?,
-                    nr_hp_category: hp_cat.get(i).ok_or_else(|| null("nrHPCategory"))? as u8,
-                    ratio: ratio.get(i).ok_or_else(|| null("ratio"))?,
+                    nr_hp_category: cat_byte,
+                    ratio: ratio_col.as_ref().and_then(|ca| ca.get(i)).unwrap_or(0.0),
                 })
             })
             .collect()
@@ -1286,8 +1319,9 @@ impl TableRow for FuelFormulationRow {
     }
 }
 
-/// One `NRHPCategory` row — maps `(hpID, engTechID)` to a horse-power
-/// category byte.
+/// One `NRHPCategory` row — maps `(nrHPRangeBinID, engTechID)` to a horse-power
+/// category byte. The MySQL column is `nrHPRangeBinID`; the Go model calls it
+/// `HPID`, which is the same value that appears as `hpID` in `MOVESWorkerOutput`.
 struct NrHpCategoryRow {
     hp_id: i32,
     eng_tech_id: i32,
@@ -1301,9 +1335,9 @@ impl TableRow for NrHpCategoryRow {
 
     fn polars_schema() -> Schema {
         Schema::from_iter([
-            ("hpID".into(), DataType::Int32),
+            ("nrHPRangeBinID".into(), DataType::Int32),
             ("engTechID".into(), DataType::Int32),
-            ("nrHPCategory".into(), DataType::Int32),
+            ("nrHPCategory".into(), DataType::String),
         ])
     }
 
@@ -1313,7 +1347,7 @@ impl TableRow for NrHpCategoryRow {
             n,
             vec![
                 Series::new(
-                    "hpID".into(),
+                    "nrHPRangeBinID".into(),
                     rows.iter().map(|r| r.hp_id).collect::<Vec<i32>>(),
                 )
                 .into(),
@@ -1324,7 +1358,9 @@ impl TableRow for NrHpCategoryRow {
                 .into(),
                 Series::new(
                     "nrHPCategory".into(),
-                    rows.iter().map(|r| r.nr_hp_category).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| char::from(r.nr_hp_category as u8).to_string())
+                        .collect::<Vec<String>>(),
                 )
                 .into(),
             ],
@@ -1339,16 +1375,28 @@ impl TableRow for NrHpCategoryRow {
                 .i32()
                 .map_err(|e| row_err(t, 0, col, e.to_string()))
         };
-        let hp = get_i32("hpID")?;
+        let get_str = |col: &'static str| -> moves_framework::Result<_> {
+            df.column(col)
+                .map_err(|e| row_err(t, 0, col, e.to_string()))?
+                .str()
+                .map_err(|e| row_err(t, 0, col, e.to_string()))
+        };
+        let hp = get_i32("nrHPRangeBinID")?;
         let eng = get_i32("engTechID")?;
-        let cat = get_i32("nrHPCategory")?;
+        let cat = get_str("nrHPCategory")?;
         (0..df.height())
             .map(|i| {
                 let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                let cat_str = cat.get(i).ok_or_else(|| null("nrHPCategory"))?;
+                let cat_byte = cat_str
+                    .as_bytes()
+                    .first()
+                    .copied()
+                    .ok_or_else(|| row_err(t, i, "nrHPCategory", "empty string".into()))?;
                 Ok(NrHpCategoryRow {
-                    hp_id: hp.get(i).ok_or_else(|| null("hpID"))?,
+                    hp_id: hp.get(i).ok_or_else(|| null("nrHPRangeBinID"))?,
                     eng_tech_id: eng.get(i).ok_or_else(|| null("engTechID"))?,
-                    nr_hp_category: cat.get(i).ok_or_else(|| null("nrHPCategory"))?,
+                    nr_hp_category: i32::from(cat_byte),
                 })
             })
             .collect()
@@ -1534,7 +1582,9 @@ impl TableRow for NrAirToxicsMwoRow {
                 .into(),
                 Series::new(
                     "fuelSubTypeID".into(),
-                    rows.iter().map(|r| r.fuel_sub_type_id).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.fuel_sub_type_id)
+                        .collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -1597,7 +1647,13 @@ impl TableRow for NrAirToxicsMwoRow {
         let eng_tech = get_i32("engTechID")?;
         let hp = get_i32("hpID")?;
         let fuel_sub_type = get_i32("fuelSubTypeID")?;
-        let fuel_formulation = get_i32("fuelFormulationID")?;
+        // fuelFormulationID is absent from nonroad MOVESWorkerOutput. Default to 0,
+        // which causes the fuel-formulation lookup to return None → emission skipped.
+        // This produces empty air-toxics output for nonroad, matching canonical.
+        let fuel_formulation = df
+            .column("fuelFormulationID")
+            .ok()
+            .and_then(|c| c.i32().ok());
         let model_year = get_i32("modelYearID")?;
         let road_type = get_i32("roadTypeID")?;
         let emission_quant = get_f64("emissionQuant")?;
@@ -1620,12 +1676,11 @@ impl TableRow for NrAirToxicsMwoRow {
                     fuel_type_id: fuel_type.get(i).ok_or_else(|| null("fuelTypeID"))?,
                     eng_tech_id: eng_tech.get(i).ok_or_else(|| null("engTechID"))?,
                     hp_id: hp.get(i).ok_or_else(|| null("hpID"))?,
-                    fuel_sub_type_id: fuel_sub_type
-                        .get(i)
-                        .ok_or_else(|| null("fuelSubTypeID"))?,
+                    fuel_sub_type_id: fuel_sub_type.get(i).ok_or_else(|| null("fuelSubTypeID"))?,
                     fuel_formulation_id: fuel_formulation
-                        .get(i)
-                        .ok_or_else(|| null("fuelFormulationID"))?,
+                        .as_ref()
+                        .and_then(|ca| ca.get(i))
+                        .unwrap_or(0),
                     model_year_id: model_year.get(i).ok_or_else(|| null("modelYearID"))?,
                     road_type_id: road_type.get(i).ok_or_else(|| null("roadTypeID"))?,
                     emission_quant: emission_quant.get(i).ok_or_else(|| null("emissionQuant"))?,
@@ -1646,11 +1701,11 @@ impl TableRow for NrAirToxicsMwoRow {
 pub struct NrAirToxicsCalculator;
 
 impl NrAirToxicsCalculator {
- /// Chain-DAG name — matches the Java class / Go package and the
- /// `calculator-dag.json` entry.
+    /// Chain-DAG name — matches the Java class / Go package and the
+    /// `calculator-dag.json` entry.
     pub const NAME: &'static str = "NRAirToxicsCalculator";
 
- /// Construct the calculator.
+    /// Construct the calculator.
     #[must_use]
     pub fn new() -> Self {
         Self
@@ -1662,11 +1717,11 @@ impl Calculator for NrAirToxicsCalculator {
         Self::NAME
     }
 
- /// `NRAirToxicsCalculator` carries no master-loop subscription of its own:
- /// `calculator-dag.json` records `subscribes_directly: false`. It is a
- /// chained calculator — it runs when the calculators it chains to (its
- /// [`upstream`](Calculator::upstream) modules) run, deriving the toxics
- /// from their VOC / PM2.5 / fuel-consumption / NMOG output.
+    /// `NRAirToxicsCalculator` carries no master-loop subscription of its own:
+    /// `calculator-dag.json` records `subscribes_directly: false`. It is a
+    /// chained calculator — it runs when the calculators it chains to (its
+    /// [`upstream`](Calculator::upstream) modules) run, deriving the toxics
+    /// from their VOC / PM2.5 / fuel-consumption / NMOG output.
     fn subscriptions(&self) -> &[CalculatorSubscription] {
         NO_SUBSCRIPTIONS
     }
@@ -1706,7 +1761,7 @@ impl Calculator for NrAirToxicsCalculator {
                 .into_iter()
                 .map(|r| ((r.hp_id, r.eng_tech_id), r.nr_hp_category as u8)),
             tables
-                .iter_typed::<NrNeededPolProcessRow>("NeededPolProcessIDs")?
+                .iter_typed_or_empty::<NrNeededPolProcessRow>("NeededPolProcessIDs")?
                 .into_iter()
                 .map(|r| r.pol_process_id),
         );
@@ -1796,10 +1851,10 @@ pub fn factory() -> Box<dyn Calculator> {
 mod tests {
     use super::*;
 
- /// HP-category code used throughout the tests.
+    /// HP-category code used throughout the tests.
     const CAT: u8 = b'A';
 
- /// An `nrATRatio` row helper.
+    /// An `nrATRatio` row helper.
     fn at_row(
         pollutant_id: i32,
         process_id: i32,
@@ -1818,7 +1873,7 @@ mod tests {
         }
     }
 
- /// A `ProcFuelEngHp`-keyed row helper (PAH / dioxin / metal tables).
+    /// A `ProcFuelEngHp`-keyed row helper (PAH / dioxin / metal tables).
     fn pfeh_row(
         pollutant_id: i32,
         process_id: i32,
@@ -1837,7 +1892,7 @@ mod tests {
         }
     }
 
- /// An [`Emission`] helper.
+    /// An [`Emission`] helper.
     fn emission(
         quant: f64,
         rate: f64,
@@ -1852,14 +1907,14 @@ mod tests {
         }
     }
 
- /// `polProcessID` for a `(pollutant, process)` pair.
+    /// `polProcessID` for a `(pollutant, process)` pair.
     fn ppid(pollutant: i32, process: i32) -> i32 {
         pollutant * 100 + process
     }
 
- /// Worker tables for process 1, fuel formulation 100 → subtype 20, HP id 5
- /// / engTech 10 → category `CAT`, with exactly `pollutants` needed (each
- /// for process 1).
+    /// Worker tables for process 1, fuel formulation 100 → subtype 20, HP id 5
+    /// / engTech 10 → category `CAT`, with exactly `pollutants` needed (each
+    /// for process 1).
     fn tables_needing(pollutants: &[i32]) -> NonroadWorkerTables {
         NonroadWorkerTables::new(
             [(100, 20)],
@@ -1868,7 +1923,7 @@ mod tests {
         )
     }
 
- /// A VOC (87) fuel-block key: process 1, engTech 10, fuel type 1, HP id 5.
+    /// A VOC (87) fuel-block key: process 1, engTech 10, fuel type 1, HP id 5.
     fn voc_key() -> FuelBlockKey {
         FuelBlockKey {
             pollutant_id: VOC_POLLUTANT_ID,
@@ -1895,7 +1950,7 @@ mod tests {
         assert_eq!(toxics.dioxin_emission_rate.len(), 1);
         assert_eq!(toxics.metal_emission_rate.len(), 1);
         assert_eq!(toxics.integrated_species, HashSet::from([21, 24]));
- // Each table records the process ids it carries.
+        // Each table records the process ids it carries.
         assert!(toxics.at_ratio_processes.contains(&1));
         assert!(toxics.pah_gas_ratio_processes.contains(&1));
         assert!(toxics.pah_particle_ratio_processes.contains(&1));
@@ -1905,7 +1960,7 @@ mod tests {
 
     #[test]
     fn build_computes_pol_process_id_and_keeps_file_order_on_a_shared_key() {
- // Two nrATRatio rows share a key — the Go appends both details.
+        // Two nrATRatio rows share a key — the Go appends both details.
         let toxics = NrAirToxics::build(
             [
                 at_row(20, 1, 10, 20, CAT, 0.5),
@@ -1927,10 +1982,10 @@ mod tests {
             })
             .expect("keyed details");
         assert_eq!(details.len(), 2);
- // File order preserved.
+        // File order preserved.
         assert_eq!(details[0].pollutant_id, 20);
         assert_eq!(details[1].pollutant_id, 24);
- // polProcessID = pollutantID * 100 + processID.
+        // polProcessID = pollutantID * 100 + processID.
         assert_eq!(details[0].pol_process_id, 2001);
         assert_eq!(details[1].pol_process_id, 2401);
     }
@@ -1938,15 +1993,15 @@ mod tests {
     #[test]
     fn gallons_factor_matches_the_go_two_division_order() {
         let grams_to_pounds = 1.0_f64 / 453.592;
- // Gasoline, diesel, CNG, LPG — the Go fuel-density literals.
+        // Gasoline, diesel, CNG, LPG — the Go fuel-density literals.
         assert_eq!(gallons_factor(1), grams_to_pounds / 6.17);
         assert_eq!(gallons_factor(2), grams_to_pounds / 7.1);
         assert_eq!(gallons_factor(3), grams_to_pounds / 0.0061);
         assert_eq!(gallons_factor(4), grams_to_pounds / 4.507);
- // Fuel types 23 and 24 are nonroad diesel variants.
+        // Fuel types 23 and 24 are nonroad diesel variants.
         assert_eq!(gallons_factor(23), gallons_factor(2));
         assert_eq!(gallons_factor(24), gallons_factor(2));
- // Any other fuel type: the identity factor, no conversion.
+        // Any other fuel type: the identity factor, no conversion.
         assert_eq!(gallons_factor(5), 1.0);
         assert_eq!(gallons_factor(0), 1.0);
     }
@@ -1955,9 +2010,9 @@ mod tests {
     fn emission_scaled_multiplies_both_quant_and_rate() {
         let e = emission(8.0, 4.0, 20, 100);
         assert_eq!(e.scaled(0.5), emission(4.0, 2.0, 20, 100));
- // Fuel ids carry through; scaling by zero still keeps the tags.
+        // Fuel ids carry through; scaling by zero still keeps the tags.
         assert_eq!(e.scaled(0.0), emission(0.0, 0.0, 20, 100));
- // Scaling by -1 negates — the NonHAPTOG integrated-species sign.
+        // Scaling by -1 negates — the NonHAPTOG integrated-species sign.
         assert_eq!(e.scaled(-1.0), emission(-8.0, -4.0, 20, 100));
     }
 
@@ -1968,7 +2023,7 @@ mod tests {
         let produced = toxics
             .air_toxics_for_emission(&voc_key(), &emission(8.0, 4.0, 20, 100), &tables)
             .expect("formulation known");
- // benzene (20) = VOC * 0.5.
+        // benzene (20) = VOC * 0.5.
         assert_eq!(produced, vec![(20, emission(4.0, 2.0, 20, 100))]);
     }
 
@@ -1979,7 +2034,7 @@ mod tests {
         let produced = toxics
             .air_toxics_for_emission(&voc_key(), &emission(8.0, 4.0, 20, 100), &tables)
             .expect("formulation known");
- // gaseous PAH (168) = VOC * 0.25.
+        // gaseous PAH (168) = VOC * 0.25.
         assert_eq!(produced, vec![(168, emission(2.0, 1.0, 20, 100))]);
     }
 
@@ -1997,7 +2052,7 @@ mod tests {
         let produced = toxics
             .air_toxics_for_emission(&voc_key(), &emission(8.0, 4.0, 20, 100), &tables)
             .expect("formulation known");
- // Both tables contribute; output is in ascending pollutant-id order.
+        // Both tables contribute; output is in ascending pollutant-id order.
         assert_eq!(
             produced,
             vec![
@@ -2009,8 +2064,8 @@ mod tests {
 
     #[test]
     fn voc_pah_gas_ratio_overwrites_at_ratio_on_a_shared_pollutant() {
- // Both tables tabulate pollutant 20 for the same key; the Go fills
- // nrATRatio first then nrPAHGasRatio, so the PAH gas value wins.
+        // Both tables tabulate pollutant 20 for the same key; the Go fills
+        // nrATRatio first then nrPAHGasRatio, so the PAH gas value wins.
         let toxics = NrAirToxics::build(
             [at_row(20, 1, 10, 20, CAT, 0.5)],
             [pfeh_row(20, 1, 1, 10, CAT, 0.9)],
@@ -2023,7 +2078,7 @@ mod tests {
         let produced = toxics
             .air_toxics_for_emission(&voc_key(), &emission(8.0, 4.0, 20, 100), &tables)
             .expect("formulation known");
- // PAH gas ratio 0.9 wins over the AT ratio 0.5.
+        // PAH gas ratio 0.9 wins over the AT ratio 0.5.
         assert_eq!(produced, vec![(20, emission(7.2, 3.6, 20, 100))]);
     }
 
@@ -2038,7 +2093,7 @@ mod tests {
         let produced = toxics
             .air_toxics_for_emission(&pm_key, &emission(8.0, 4.0, 20, 100), &tables)
             .expect("formulation known");
- // particulate PAH (23) = PM2.5 * 0.1.
+        // particulate PAH (23) = PM2.5 * 0.1.
         assert_eq!(produced, vec![(23, emission(0.8, 0.4, 20, 100))]);
     }
 
@@ -2061,8 +2116,8 @@ mod tests {
         let produced = toxics
             .air_toxics_for_emission(&fuel_key, &input, &tables)
             .expect("formulation known");
- // dioxin (130) = fuel * meanBaseRate * gallonsFactor;
- // metal (60) = fuel * meanBaseRate * gallonsFactor.
+        // dioxin (130) = fuel * meanBaseRate * gallonsFactor;
+        // metal (60) = fuel * meanBaseRate * gallonsFactor.
         let gallons = gallons_factor(1);
         assert_eq!(
             produced,
@@ -2075,8 +2130,8 @@ mod tests {
 
     #[test]
     fn fuel_consumption_metal_overwrites_dioxin_on_a_shared_pollutant() {
- // Both the dioxin and metal tables tabulate pollutant 130; the Go
- // fills dioxin first then metal, so the metal value wins.
+        // Both the dioxin and metal tables tabulate pollutant 130; the Go
+        // fills dioxin first then metal, so the metal value wins.
         let toxics = NrAirToxics::build(
             [],
             [],
@@ -2101,8 +2156,8 @@ mod tests {
     fn fuel_consumption_outside_running_exhaust_produces_nothing() {
         let toxics = NrAirToxics::build([], [], [], [pfeh_row(130, 15, 1, 10, CAT, 2.0)], [], []);
         let tables = NonroadWorkerTables::new([(100, 20)], [((5, 10), CAT)], [ppid(130, 15)]);
- // Fuel consumption from crankcase running exhaust (process 15) — the
- // dioxin/metal path runs only for running exhaust (process 1).
+        // Fuel consumption from crankcase running exhaust (process 15) — the
+        // dioxin/metal path runs only for running exhaust (process 1).
         let fuel_key = FuelBlockKey {
             pollutant_id: FUEL_CONSUMPTION_POLLUTANT_ID,
             process_id: 15,
@@ -2129,7 +2184,7 @@ mod tests {
             [],
             [],
         );
- // Only benzene (20) is needed; 1,3-butadiene (24) is not.
+        // Only benzene (20) is needed; 1,3-butadiene (24) is not.
         let tables = tables_needing(&[20]);
         let produced = toxics
             .air_toxics_for_emission(&voc_key(), &emission(8.0, 4.0, 20, 100), &tables)
@@ -2140,7 +2195,7 @@ mod tests {
     #[test]
     fn emission_with_unknown_fuel_formulation_is_skipped() {
         let toxics = NrAirToxics::build([at_row(20, 1, 10, 20, CAT, 0.5)], [], [], [], [], []);
- // Worker tables that know no fuel formulations at all.
+        // Worker tables that know no fuel formulations at all.
         let tables = NonroadWorkerTables::new([], [((5, 10), CAT)], [ppid(20, 1)]);
         assert!(toxics
             .air_toxics_for_emission(&voc_key(), &emission(8.0, 4.0, 20, 100), &tables)
@@ -2149,8 +2204,8 @@ mod tests {
 
     #[test]
     fn unknown_formulation_skips_even_a_pm25_emission() {
- // The PM2.5 path never reads the formulation's fuel subtype, yet the
- // Go's `ff == nil` check still skips the emission.
+        // The PM2.5 path never reads the formulation's fuel subtype, yet the
+        // Go's `ff == nil` check still skips the emission.
         let toxics = NrAirToxics::build([], [], [pfeh_row(23, 1, 1, 10, CAT, 0.1)], [], [], []);
         let tables = NonroadWorkerTables::new([], [((5, 10), CAT)], [ppid(23, 1)]);
         let pm_key = FuelBlockKey {
@@ -2164,10 +2219,10 @@ mod tests {
 
     #[test]
     fn at_ratio_keys_on_formulation_subtype_pah_keys_on_block_fuel_type() {
- // The emission's formulation maps to subtype 30, but the emission is
- // tagged subtype 99; the block's fuel type is 1. The nrATRatio lookup
- // must use the formulation's subtype (30); nrPAHGasRatio must use the
- // block's fuel type (1).
+        // The emission's formulation maps to subtype 30, but the emission is
+        // tagged subtype 99; the block's fuel type is 1. The nrATRatio lookup
+        // must use the formulation's subtype (30); nrPAHGasRatio must use the
+        // block's fuel type (1).
         let toxics = NrAirToxics::build(
             [at_row(20, 1, 10, 30, CAT, 0.5)],
             [pfeh_row(168, 1, 1, 10, CAT, 0.25)],
@@ -2184,7 +2239,7 @@ mod tests {
         let produced = toxics
             .air_toxics_for_emission(&voc_key(), &emission(8.0, 4.0, 99, 100), &tables)
             .expect("formulation known");
- // Both lookups hit: AT ratio via subtype 30, PAH gas via fuel type 1.
+        // Both lookups hit: AT ratio via subtype 30, PAH gas via fuel type 1.
         assert_eq!(
             produced,
             vec![
@@ -2196,8 +2251,8 @@ mod tests {
 
     #[test]
     fn missing_hp_category_falls_back_to_zero() {
- // The AT ratio is keyed with HP category 0; the worker tables carry
- // no NRHPCategory entry, so the lookup falls back to 0 and hits.
+        // The AT ratio is keyed with HP category 0; the worker tables carry
+        // no NRHPCategory entry, so the lookup falls back to 0 and hits.
         let toxics = NrAirToxics::build([at_row(20, 1, 10, 20, 0, 0.5)], [], [], [], [], []);
         let tables = NonroadWorkerTables::new([(100, 20)], [], [ppid(20, 1)]);
         let produced = toxics
@@ -2210,7 +2265,7 @@ mod tests {
     fn non_input_pollutant_produces_nothing() {
         let toxics = NrAirToxics::build([at_row(20, 1, 10, 20, CAT, 0.5)], [], [], [], [], []);
         let tables = tables_needing(&[20]);
- // A THC (1) block is not one of the three usable inputs.
+        // A THC (1) block is not one of the three usable inputs.
         let thc_key = FuelBlockKey {
             pollutant_id: 1,
             ..voc_key()
@@ -2244,7 +2299,7 @@ mod tests {
         assert_eq!(pollutants, vec![20, 24]);
         for b in &blocks {
             assert_eq!(b.emissions.len(), 1);
- // polProcessID = pollutantID * 100 + processID.
+            // polProcessID = pollutantID * 100 + processID.
             assert_eq!(b.pol_process_id, b.pollutant_id * 100 + 1);
         }
     }
@@ -2259,7 +2314,7 @@ mod tests {
         };
         let blocks = toxics.air_toxics_block(&block, &tables);
         assert_eq!(blocks.len(), 1);
- // Both emissions speciated, in input order: 8*0.5 then 20*0.5.
+        // Both emissions speciated, in input order: 8*0.5 then 20*0.5.
         assert_eq!(
             blocks[0].emissions,
             vec![emission(4.0, 2.0, 20, 100), emission(10.0, 5.0, 20, 100)],
@@ -2270,7 +2325,7 @@ mod tests {
     fn air_toxics_block_skips_an_emission_with_unknown_formulation() {
         let toxics = NrAirToxics::build([at_row(20, 1, 10, 20, CAT, 0.5)], [], [], [], [], []);
         let tables = tables_needing(&[20]);
- // First emission's formulation (100) is known; the second (999) is not.
+        // First emission's formulation (100) is known; the second (999) is not.
         let block = FuelBlock {
             key: voc_key(),
             emissions: vec![emission(8.0, 4.0, 20, 100), emission(8.0, 4.0, 20, 999)],
@@ -2284,7 +2339,7 @@ mod tests {
     fn air_toxics_block_filters_a_non_input_pollutant() {
         let toxics = NrAirToxics::build([at_row(20, 1, 10, 20, CAT, 0.5)], [], [], [], [], []);
         let tables = tables_needing(&[20]);
- // A THC (1) block — not VOC, PM2.5 or fuel consumption.
+        // A THC (1) block — not VOC, PM2.5 or fuel consumption.
         let block = FuelBlock {
             key: FuelBlockKey {
                 pollutant_id: 1,
@@ -2297,10 +2352,10 @@ mod tests {
 
     #[test]
     fn air_toxics_block_filters_a_voc_block_whose_process_has_no_ratios() {
- // nrATRatio / nrPAHGasRatio only carry process 1.
+        // nrATRatio / nrPAHGasRatio only carry process 1.
         let toxics = NrAirToxics::build([at_row(20, 1, 10, 20, CAT, 0.5)], [], [], [], [], []);
         let tables = tables_needing(&[20]);
- // A VOC block for process 99 — absent from both ratio tables.
+        // A VOC block for process 99 — absent from both ratio tables.
         let block = FuelBlock {
             key: FuelBlockKey {
                 process_id: 99,
@@ -2313,7 +2368,7 @@ mod tests {
 
     #[test]
     fn air_toxics_block_filters_a_pm25_block_whose_process_has_no_particle_ratios() {
- // nrPAHParticleRatio carries only process 1.
+        // nrPAHParticleRatio carries only process 1.
         let toxics = NrAirToxics::build([], [], [pfeh_row(23, 1, 1, 10, CAT, 0.1)], [], [], []);
         let tables = tables_needing(&[23]);
         let block = FuelBlock {
@@ -2331,7 +2386,7 @@ mod tests {
     fn air_toxics_block_filters_fuel_consumption_outside_running_exhaust() {
         let toxics = NrAirToxics::build([], [], [], [pfeh_row(130, 15, 1, 10, CAT, 2.0)], [], []);
         let tables = NonroadWorkerTables::new([(100, 20)], [((5, 10), CAT)], [ppid(130, 15)]);
- // Fuel consumption for crankcase running exhaust (process 15).
+        // Fuel consumption for crankcase running exhaust (process 15).
         let block = FuelBlock {
             key: FuelBlockKey {
                 pollutant_id: FUEL_CONSUMPTION_POLLUTANT_ID,
@@ -2361,7 +2416,7 @@ mod tests {
             .expect("NMOG contributes to NonHAPTOG");
         assert_eq!(out.pollutant_id, NON_HAP_TOG_POLLUTANT_ID);
         assert_eq!(out.pol_process_id, ppid(NON_HAP_TOG_POLLUTANT_ID, 1));
- // NMOG contributes +NMOG, in input order.
+        // NMOG contributes +NMOG, in input order.
         assert_eq!(
             out.emissions,
             vec![emission(8.0, 4.0, 20, 100), emission(2.0, 1.0, 20, 100)],
@@ -2372,7 +2427,7 @@ mod tests {
     fn non_hap_tog_block_subtracts_an_integrated_species() {
         let toxics = NrAirToxics::build([], [], [], [], [], [20]);
         let tables = tables_needing(&[NON_HAP_TOG_POLLUTANT_ID]);
- // Benzene (20) is an integrated species — it subtracts from NonHAPTOG.
+        // Benzene (20) is an integrated species — it subtracts from NonHAPTOG.
         let block = FuelBlock {
             key: FuelBlockKey {
                 pollutant_id: 20,
@@ -2384,13 +2439,13 @@ mod tests {
             .non_hap_tog_block(&block, &tables)
             .expect("integrated species contributes to NonHAPTOG");
         assert_eq!(out.pollutant_id, NON_HAP_TOG_POLLUTANT_ID);
- // Integrated species contributes -itself.
+        // Integrated species contributes -itself.
         assert_eq!(out.emissions, vec![emission(-8.0, -4.0, 20, 100)]);
     }
 
     #[test]
     fn non_hap_tog_block_skips_a_non_integrated_non_nmog_block() {
- // Pollutant 20 is not in the integrated-species set here.
+        // Pollutant 20 is not in the integrated-species set here.
         let toxics = NrAirToxics::build([], [], [], [], [], [24]);
         let tables = tables_needing(&[NON_HAP_TOG_POLLUTANT_ID]);
         let block = FuelBlock {
@@ -2406,7 +2461,7 @@ mod tests {
     #[test]
     fn non_hap_tog_block_skips_when_nonhaptog_is_not_needed() {
         let toxics = NrAirToxics::build([], [], [], [], [], [20]);
- // NonHAPTOG (88) is absent from the needed set.
+        // NonHAPTOG (88) is absent from the needed set.
         let tables = tables_needing(&[20]);
         let block = FuelBlock {
             key: FuelBlockKey {
@@ -2436,13 +2491,13 @@ mod tests {
     fn calculator_metadata() {
         let calc = NrAirToxicsCalculator::new();
         assert_eq!(calc.name(), "NRAirToxicsCalculator");
- // Chained calculator — no direct master-loop subscription.
+        // Chained calculator — no direct master-loop subscription.
         assert!(calc.subscriptions().is_empty());
         assert_eq!(
             calc.upstream(),
             &["NRHCSpeciationCalculator", "NonroadEmissionCalculator"],
         );
- // The six SQL-extracted tables.
+        // The six SQL-extracted tables.
         for table in [
             "nrATRatio",
             "nrDioxinEmissionRate",
@@ -2462,25 +2517,25 @@ mod tests {
         let regs = calc.registrations();
         assert_eq!(regs.len(), 205);
 
- // Spot-check a registration from each of the irregular process
- // groups: benzene (20) and a dioxin (130) in running exhaust (1),
- // NonHAPTOG (88) in crankcase (15), xylene (46) in RecMar neck-hose
- // permeation (22), NonHAPTOG in runningloss venting (32).
+        // Spot-check a registration from each of the irregular process
+        // groups: benzene (20) and a dioxin (130) in running exhaust (1),
+        // NonHAPTOG (88) in crankcase (15), xylene (46) in RecMar neck-hose
+        // permeation (22), NonHAPTOG in runningloss venting (32).
         assert!(regs.contains(&reg(20, 1)));
         assert!(regs.contains(&reg(130, 1)));
         assert!(regs.contains(&reg(88, 15)));
         assert!(regs.contains(&reg(46, 22)));
         assert!(regs.contains(&reg(88, 32)));
 
- // Metals (mercury 60) and dioxins (130) are running-exhaust only // never crankcase (process 15).
+        // Metals (mercury 60) and dioxins (130) are running-exhaust only // never crankcase (process 15).
         assert!(!regs.contains(&reg(60, 15)));
         assert!(!regs.contains(&reg(130, 15)));
 
- // The RecMar hose-permeation processes (22, 23, 24) carry no
- // NonHAPTOG (88).
+        // The RecMar hose-permeation processes (22, 23, 24) carry no
+        // NonHAPTOG (88).
         assert!(!regs.contains(&reg(88, 22)));
 
- // No registration is duplicated.
+        // No registration is duplicated.
         let unique: HashSet<_> = regs.iter().collect();
         assert_eq!(unique.len(), regs.len());
     }
@@ -2490,7 +2545,7 @@ mod tests {
         use moves_framework::DataFrameStore;
         let calc = NrAirToxicsCalculator::new();
         let mut store = moves_framework::InMemoryStore::new();
- // Empty lookup tables for paths not exercised in this test.
+        // Empty lookup tables for paths not exercised in this test.
         store.insert("nrATRatio", AtRatioRow::into_dataframe(vec![]).unwrap());
         store.insert(
             "nrPAHParticleRatio",
@@ -2508,7 +2563,7 @@ mod tests {
             "nrIntegratedSpecies",
             NrIntegratedSpeciesRow::into_dataframe(vec![]).unwrap(),
         );
- // FuelFormulation: formulation 0 → subtype 0 (makes fuel_formulation_id=0 lookup succeed).
+        // FuelFormulation: formulation 0 → subtype 0 (makes fuel_formulation_id=0 lookup succeed).
         store.insert(
             "FuelFormulation",
             FuelFormulationRow::into_dataframe(vec![FuelFormulationRow {
@@ -2517,7 +2572,7 @@ mod tests {
             }])
             .unwrap(),
         );
- // NRHPCategory: (hp=5, eng=10) → category b'A'=65.
+        // NRHPCategory: (hp=5, eng=10) → category b'A'=65.
         store.insert(
             "NRHPCategory",
             NrHpCategoryRow::into_dataframe(vec![NrHpCategoryRow {
@@ -2527,7 +2582,7 @@ mod tests {
             }])
             .unwrap(),
         );
- // NeededPolProcessIDs: benzene (20) for process 1 → polProcessID 2001.
+        // NeededPolProcessIDs: benzene (20) for process 1 → polProcessID 2001.
         store.insert(
             "NeededPolProcessIDs",
             NrNeededPolProcessRow::into_dataframe(vec![NrNeededPolProcessRow {
@@ -2535,7 +2590,7 @@ mod tests {
             }])
             .unwrap(),
         );
- // nrPAHGasRatio: VOC (87), process 1, fuel type 1, eng 10, hp cat 65 → pollutant 20, ratio 0.5.
+        // nrPAHGasRatio: VOC (87), process 1, fuel type 1, eng 10, hp cat 65 → pollutant 20, ratio 0.5.
         store.insert(
             "nrPAHGasRatio",
             ProcFuelEngHpRow::into_dataframe(vec![ProcFuelEngHpRow {
@@ -2548,7 +2603,7 @@ mod tests {
             }])
             .unwrap(),
         );
- // Input: one VOC (87) row — will be scaled by nrPAHGasRatio.
+        // Input: one VOC (87) row — will be scaled by nrPAHGasRatio.
         store.insert(
             "MOVESWorkerOutput",
             NrAirToxicsMwoRow::into_dataframe(vec![NrAirToxicsMwoRow {
@@ -2578,7 +2633,7 @@ mod tests {
         let ctx = CalculatorContext::with_tables(store);
         let out = calc.execute(&ctx).expect("execute ok");
         let df = out.dataframe().expect("output should contain a DataFrame");
- // nrPAHGasRatio fires: VOC 87 * 0.5 → pollutant 20.
+        // nrPAHGasRatio fires: VOC 87 * 0.5 → pollutant 20.
         assert_eq!(
             df.height(),
             1,
@@ -2604,7 +2659,7 @@ mod tests {
 
     #[test]
     fn calculator_is_object_safe() {
- // The registry stores calculators as Box<dyn Calculator>.
+        // The registry stores calculators as Box<dyn Calculator>.
         let calc: Box<dyn Calculator> = Box::new(NrAirToxicsCalculator::new());
         assert_eq!(calc.name(), "NRAirToxicsCalculator");
         assert_eq!(calc.registrations().len(), 205);

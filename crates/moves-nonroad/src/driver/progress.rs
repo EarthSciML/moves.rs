@@ -32,17 +32,17 @@
 /// percent-complete figure. [`Progress`] owns the same two counters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Progress {
- /// Records processed so far — Fortran `nrecds`.
+    /// Records processed so far — Fortran `nrecds`.
     records_done: i32,
- /// Total records expected — Fortran `ntotrc`.
+    /// Total records expected — Fortran `ntotrc`.
     records_total: i32,
 }
 
 impl Progress {
- /// Create a counter for a run of `total` records.
- ///
- /// Mirrors `nonroad.f` :84 (`nrecds = 0`) plus the `ntotrc`
- /// established once the population records are counted.
+    /// Create a counter for a run of `total` records.
+    ///
+    /// Mirrors `nonroad.f` :84 (`nrecds = 0`) plus the `ntotrc`
+    /// established once the population records are counted.
     pub fn new(total: i32) -> Self {
         Progress {
             records_done: 0,
@@ -50,23 +50,23 @@ impl Progress {
         }
     }
 
- /// Register one processed record and return the new
- /// percent-complete — the `dispit.f` call.
- ///
- /// `dispit.f` :28–33: `nrecds = nrecds + 1`, then
- /// `ipct = INT(100.0 * FLOAT(nrecds) / FLOAT(ntotrc))` when
- /// `ntotrc > 0`, else `ipct = 100`.
+    /// Register one processed record and return the new
+    /// percent-complete — the `dispit.f` call.
+    ///
+    /// `dispit.f` :28–33: `nrecds = nrecds + 1`, then
+    /// `ipct = INT(100.0 * FLOAT(nrecds) / FLOAT(ntotrc))` when
+    /// `ntotrc > 0`, else `ipct = 100`.
     pub fn tick(&mut self) -> i32 {
         self.records_done += 1;
         self.percent()
     }
 
- /// Percent complete, `0..=100`-ish — the value `dispit.f`
- /// computes for the (commented-out) console write.
- ///
- /// Returns `100` when the total is non-positive, matching
- /// `dispit.f` :29–33. The `INT()` truncation toward zero is
- /// reproduced by the `as i32` cast.
+    /// Percent complete, `0..=100`-ish — the value `dispit.f`
+    /// computes for the (commented-out) console write.
+    ///
+    /// Returns `100` when the total is non-positive, matching
+    /// `dispit.f` :29–33. The `INT()` truncation toward zero is
+    /// reproduced by the `as i32` cast.
     pub fn percent(&self) -> i32 {
         if self.records_total > 0 {
             (100.0_f32 * self.records_done as f32 / self.records_total as f32) as i32
@@ -75,21 +75,21 @@ impl Progress {
         }
     }
 
- /// Records processed so far (`nrecds`).
+    /// Records processed so far (`nrecds`).
     pub fn records_done(&self) -> i32 {
         self.records_done
     }
 
- /// Total records expected (`ntotrc`).
+    /// Total records expected (`ntotrc`).
     pub fn records_total(&self) -> i32 {
         self.records_total
     }
 
- /// Set the processed-record count directly.
- ///
- /// `nonroad.f` :339 assigns `nrecds = ntotrc - 1` just before the
- /// final `dispit` so the closing display reads 100%. This is the
- /// Rust equivalent of that direct COMMON-block write.
+    /// Set the processed-record count directly.
+    ///
+    /// `nonroad.f` :339 assigns `nrecds = ntotrc - 1` just before the
+    /// final `dispit` so the closing display reads 100%. This is the
+    /// Rust equivalent of that direct COMMON-block write.
     pub fn set_records_done(&mut self, done: i32) {
         self.records_done = done;
     }
@@ -118,34 +118,34 @@ const SPIN_CYCLE: usize = 8;
 /// module docs for why the write itself is dropped.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Spinner {
- /// Current frame index — Fortran `icall`, always `0..SPIN_CYCLE`.
+    /// Current frame index — Fortran `icall`, always `0..SPIN_CYCLE`.
     frame: usize,
 }
 
 impl Spinner {
- /// Create a spinner at frame 0.
- ///
- /// Matches `icall`'s zero-initialised COMMON-block state before
- /// the first `mspinit` call.
+    /// Create a spinner at frame 0.
+    ///
+    /// Matches `icall`'s zero-initialised COMMON-block state before
+    /// the first `mspinit` call.
     pub fn new() -> Self {
         Spinner::default()
     }
 
- /// Advance the spinner one frame and return the new frame
- /// character — the `mspinit.f` call.
- ///
- /// `mspinit.f` :23: `icall = MOD(icall + 1, 8)`.
+    /// Advance the spinner one frame and return the new frame
+    /// character — the `mspinit.f` call.
+    ///
+    /// `mspinit.f` :23: `icall = MOD(icall + 1, 8)`.
     pub fn advance(&mut self) -> char {
         self.frame = (self.frame + 1) % SPIN_CYCLE;
         self.current()
     }
 
- /// The current frame character without advancing.
+    /// The current frame character without advancing.
     pub fn current(&self) -> char {
         SPIN_FRAMES[self.frame]
     }
 
- /// The current frame index (`icall`).
+    /// The current frame index (`icall`).
     pub fn frame(&self) -> usize {
         self.frame
     }
@@ -167,10 +167,10 @@ mod tests {
 
     #[test]
     fn percent_truncates_toward_zero() {
- // 1 / 3 = 33.33% ⇒ INT() ⇒ 33.
+        // 1 / 3 = 33.33% ⇒ INT() ⇒ 33.
         let mut p = Progress::new(3);
         assert_eq!(p.tick(), 33);
- // 2 / 3 = 66.66% ⇒ 66.
+        // 2 / 3 = 66.66% ⇒ 66.
         assert_eq!(p.tick(), 66);
     }
 
@@ -186,8 +186,8 @@ mod tests {
 
     #[test]
     fn percent_can_exceed_100_when_overshooting() {
- // The Fortran formula is not clamped; a record count above the
- // total yields > 100. Reproduce that rather than clamping.
+        // The Fortran formula is not clamped; a record count above the
+        // total yields > 100. Reproduce that rather than clamping.
         let mut p = Progress::new(2);
         p.tick();
         p.tick();
@@ -196,7 +196,7 @@ mod tests {
 
     #[test]
     fn set_records_done_matches_the_final_dispit_pattern() {
- // nonroad.f :339–340: nrecds = ntotrc - 1; dispit() ⇒ 100%.
+        // nonroad.f :339–340: nrecds = ntotrc - 1; dispit() ⇒ 100%.
         let mut p = Progress::new(100);
         p.set_records_done(p.records_total() - 1);
         assert_eq!(p.tick(), 100);
@@ -213,7 +213,7 @@ mod tests {
     #[test]
     fn spinner_advances_through_the_eight_frame_cycle() {
         let mut s = Spinner::new();
- // mspinit: icall = MOD(icall+1, 8) ⇒ first call lands on 1.
+        // mspinit: icall = MOD(icall+1, 8) ⇒ first call lands on 1.
         let seen: Vec<char> = (0..8).map(|_| s.advance()).collect();
         assert_eq!(seen, vec!['|', '/', '-', '-', '\\', '|', '|', '|']);
     }
@@ -224,7 +224,7 @@ mod tests {
         for _ in 0..SPIN_CYCLE {
             s.advance();
         }
- // After a full cycle of 8 advances the frame returns to 0.
+        // After a full cycle of 8 advances the frame returns to 0.
         assert_eq!(s.frame(), 0);
     }
 }

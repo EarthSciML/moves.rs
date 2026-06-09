@@ -302,22 +302,22 @@ pub fn load_canonical_snapshot(snapshot: &str) -> Result<Option<Snapshot>> {
 /// are *not* counted by [`has_importer_bug`](Self::has_importer_bug).
 #[derive(Debug, Clone)]
 pub struct ComparisonReport {
- /// Canonical `db__…` table id that was looked up.
+    /// Canonical `db__…` table id that was looked up.
     pub table: String,
- /// `false` when no canonical table was available to compare against.
+    /// `false` when no canonical table was available to compare against.
     pub canonical_present: bool,
- /// Per-row and per-cell differences. Each is a candidate importer bug.
+    /// Per-row and per-cell differences. Each is a candidate importer bug.
     pub row_diffs: Vec<RowDiff>,
- /// Columns canonical MOVES has that the importer did not emit. Often
- /// benign — importers omit columns the MOVES SQL load script derives /// so these are surfaced but not treated as bugs.
+    /// Columns canonical MOVES has that the importer did not emit. Often
+    /// benign — importers omit columns the MOVES SQL load script derives /// so these are surfaced but not treated as bugs.
     pub columns_omitted_by_importer: Vec<String>,
- /// Schema differences that *do* indicate a bug: a column the importer
- /// emits that canonical MOVES lacks, or a column-type mismatch.
+    /// Schema differences that *do* indicate a bug: a column the importer
+    /// emits that canonical MOVES lacks, or a column-type mismatch.
     pub schema_bugs: Vec<SchemaDiff>,
 }
 
 impl ComparisonReport {
- /// A report for a table with no canonical baseline available.
+    /// A report for a table with no canonical baseline available.
     pub fn canonical_missing(table: impl Into<String>) -> Self {
         Self {
             table: table.into(),
@@ -328,15 +328,15 @@ impl ComparisonReport {
         }
     }
 
- /// `true` when importer output diverged from canonical MOVES in a way
- /// that indicates a bug — any row/cell difference or suspicious schema
- /// difference. The suite fails on this.
+    /// `true` when importer output diverged from canonical MOVES in a way
+    /// that indicates a bug — any row/cell difference or suspicious schema
+    /// difference. The suite fails on this.
     pub fn has_importer_bug(&self) -> bool {
         !self.row_diffs.is_empty() || !self.schema_bugs.is_empty()
     }
 
- /// `true` when a canonical baseline existed and the importer output
- /// matched it (benign omitted columns aside).
+    /// `true` when a canonical baseline existed and the importer output
+    /// matched it (benign omitted columns aside).
     pub fn is_validated(&self) -> bool {
         self.canonical_present && !self.has_importer_bug()
     }
@@ -364,8 +364,8 @@ pub fn compare_importer_output(
         return Ok(ComparisonReport::canonical_missing(canonical_table));
     };
 
- // Build the importer table with the canonical table's own name and
- // natural key so the diff is keyed and pairs the two tables.
+    // Build the importer table with the canonical table's own name and
+    // natural key so the diff is keyed and pairs the two tables.
     let key: Vec<&str> = canon.natural_key().iter().map(String::as_str).collect();
     let importer = parquet_to_table(canonical_table, importer_parquet, &key)?;
 
@@ -389,9 +389,9 @@ pub fn compare_importer_output(
         .find(|tc| tc.table == canonical_table)
     {
         report.row_diffs = change.row_diffs;
- // `canonical_side` is the diff's lhs, so `ColumnRemoved` is a
- // column present in canonical MOVES but missing from importer
- // output — a deliberate omission, not a bug. Everything else is.
+        // `canonical_side` is the diff's lhs, so `ColumnRemoved` is a
+        // column present in canonical MOVES but missing from importer
+        // output — a deliberate omission, not a bug. Everything else is.
         for schema_diff in change.schema_diffs {
             match schema_diff {
                 SchemaDiff::ColumnRemoved(spec) => {
@@ -414,8 +414,8 @@ mod tests {
     use arrow::datatypes::{Field, Schema as ArrowSchema};
     use parquet::arrow::ArrowWriter;
 
- /// Encode an importer-style Parquet buffer (real `Int64` / `Float64` /
- /// `Utf8` columns — *not* the snapshot's fixed-decimal encoding).
+    /// Encode an importer-style Parquet buffer (real `Int64` / `Float64` /
+    /// `Utf8` columns — *not* the snapshot's fixed-decimal encoding).
     fn importer_parquet(columns: Vec<(&str, arrow::array::ArrayRef)>) -> Vec<u8> {
         let fields: Vec<Field> = columns
             .iter()
@@ -454,7 +454,7 @@ mod tests {
 
     #[test]
     fn parquet_to_table_normalizes_and_sorts() {
- // Rows out of natural-key order; the builder must sort them.
+        // Rows out of natural-key order; the builder must sort them.
         let parquet = importer_parquet(vec![
             ("yearID", int_col(&[2021, 2020, 2020])),
             ("sourceTypeID", int_col(&[21, 31, 21])),
@@ -464,7 +464,7 @@ mod tests {
             parquet_to_table("SourceTypeYear", &parquet, &["yearID", "sourceTypeID"]).unwrap();
         assert_eq!(table.row_count(), 3);
         assert_eq!(table.natural_key(), &["yearID", "sourceTypeID"]);
- // First row after sorting is (2020, 21).
+        // First row after sorting is (2020, 21).
         let year = table.column_index("yearID").unwrap();
         let source = table.column_index("sourceTypeID").unwrap();
         assert_eq!(
@@ -484,7 +484,7 @@ mod tests {
         assert!(matches!(err, Error::Snapshot(_)), "got {err:?}");
     }
 
- /// Build a tiny canonical snapshot holding one `db__…` table.
+    /// Build a tiny canonical snapshot holding one `db__…` table.
     fn canonical_with(table: &str, parquet: &[u8], natural_key: &[&str]) -> Snapshot {
         let mut snap = Snapshot::new();
         snap.add_table(parquet_to_table(table, parquet, natural_key).unwrap())
@@ -515,7 +515,7 @@ mod tests {
         ]);
         let canonical = canonical_with(&id, &canonical_parquet, &["linkID"]);
 
- // Importer output: linkID 2's length drifted 0.5 → 0.9.
+        // Importer output: linkID 2's length drifted 0.5 → 0.9.
         let importer_parquet_bytes = importer_parquet(vec![
             ("linkID", int_col(&[1, 2])),
             ("linkLength", float_col(&[0.5, 0.9])),
@@ -534,7 +534,7 @@ mod tests {
     #[test]
     fn compare_treats_omitted_canonical_column_as_benign() {
         let id = canonical_table_name("cdb", "SourceTypeYear");
- // Canonical has the SQL-derived salesGrowthFactor column.
+        // Canonical has the SQL-derived salesGrowthFactor column.
         let canonical_parquet = importer_parquet(vec![
             ("yearID", int_col(&[2020])),
             ("sourceTypeID", int_col(&[21])),
@@ -543,7 +543,7 @@ mod tests {
         ]);
         let canonical = canonical_with(&id, &canonical_parquet, &["yearID", "sourceTypeID"]);
 
- // Importer omits salesGrowthFactor (matches the real importer).
+        // Importer omits salesGrowthFactor (matches the real importer).
         let importer_parquet_bytes = importer_parquet(vec![
             ("yearID", int_col(&[2020])),
             ("sourceTypeID", int_col(&[21])),
@@ -570,7 +570,7 @@ mod tests {
         let canonical_parquet = importer_parquet(vec![("linkID", int_col(&[1]))]);
         let canonical = canonical_with(&id, &canonical_parquet, &["linkID"]);
 
- // Importer emits a stray column canonical MOVES never has.
+        // Importer emits a stray column canonical MOVES never has.
         let importer_parquet_bytes = importer_parquet(vec![
             ("linkID", int_col(&[1])),
             ("strayColumn", str_col(&["x"])),

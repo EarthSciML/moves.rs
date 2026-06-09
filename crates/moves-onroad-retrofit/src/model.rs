@@ -36,36 +36,36 @@ pub type ProcessId = u16;
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct RetrofitRecord {
- /// Vehicle source-use type.
+    /// Vehicle source-use type.
     #[serde(rename = "sourceTypeID")]
     pub source_type_id: SourceTypeId,
- /// First model year in the range this program applies to (inclusive).
+    /// First model year in the range this program applies to (inclusive).
     #[serde(rename = "startModelYear")]
     pub start_model_year: ModelYearId,
- /// Last model year in the range this program applies to (inclusive).
+    /// Last model year in the range this program applies to (inclusive).
     #[serde(rename = "endModelYear")]
     pub end_model_year: ModelYearId,
- /// Calendar year through which this cumulative fraction applies.
+    /// Calendar year through which this cumulative fraction applies.
     #[serde(rename = "retrofitYearID")]
     pub retrofit_year_id: RetrofitYearId,
- /// Pollutant this program reduces.
+    /// Pollutant this program reduces.
     #[serde(rename = "pollutantID")]
     pub pollutant_id: PollutantId,
- /// Emission process this program reduces.
+    /// Emission process this program reduces.
     #[serde(rename = "processID")]
     pub process_id: ProcessId,
- /// Cumulative fraction of matching fleet that has been retrofitted by
- /// `retrofit_year_id`. Range: `[0.0, 1.0]`.
+    /// Cumulative fraction of matching fleet that has been retrofitted by
+    /// `retrofit_year_id`. Range: `[0.0, 1.0]`.
     #[serde(rename = "cumulativeRetrofitFraction")]
     pub cumulative_retrofit_fraction: f64,
- /// Emission reduction effectiveness for retrofitted vehicles.
- /// `0.0` = no reduction; `1.0` = complete elimination. Range: `[0.0, 1.0]`.
+    /// Emission reduction effectiveness for retrofitted vehicles.
+    /// `0.0` = no reduction; `1.0` = complete elimination. Range: `[0.0, 1.0]`.
     #[serde(rename = "retrofitEffectiveness")]
     pub retrofit_effectiveness: f64,
 }
 
 impl RetrofitRecord {
- /// Construct a record from individual fields.
+    /// Construct a record from individual fields.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         source_type_id: SourceTypeId,
@@ -89,16 +89,16 @@ impl RetrofitRecord {
         }
     }
 
- /// `true` if `model_year` falls within `[start_model_year, end_model_year]`.
+    /// `true` if `model_year` falls within `[start_model_year, end_model_year]`.
     pub fn covers_model_year(&self, model_year: ModelYearId) -> bool {
         model_year >= self.start_model_year && model_year <= self.end_model_year
     }
 
- /// Emission-reduction factor contributed by this single record:
- /// `1.0 - cumulative_retrofit_fraction * retrofit_effectiveness`.
- ///
- /// Values are clamped to `[0.0, 1.0]` as a safety net for
- /// floating-point edge cases.
+    /// Emission-reduction factor contributed by this single record:
+    /// `1.0 - cumulative_retrofit_fraction * retrofit_effectiveness`.
+    ///
+    /// Values are clamped to `[0.0, 1.0]` as a safety net for
+    /// floating-point edge cases.
     pub fn emission_factor(&self) -> f64 {
         (1.0 - self.cumulative_retrofit_fraction * self.retrofit_effectiveness).clamp(0.0, 1.0)
     }
@@ -141,36 +141,36 @@ pub struct RetrofitTable {
 }
 
 impl RetrofitTable {
- /// Create an empty table.
+    /// Create an empty table.
     pub fn new() -> Self {
         Self::default()
     }
 
- /// Number of rows in the table.
+    /// Number of rows in the table.
     pub fn len(&self) -> usize {
         self.records.len()
     }
 
- /// `true` if the table has no rows.
+    /// `true` if the table has no rows.
     pub fn is_empty(&self) -> bool {
         self.records.is_empty()
     }
 
- /// Insert a record. Duplicate keys replace the previous entry.
+    /// Insert a record. Duplicate keys replace the previous entry.
     pub fn insert(&mut self, record: RetrofitRecord) {
         self.records.insert(RetrofitKey::from(&record), record);
     }
 
- /// Iterate all records in key order.
+    /// Iterate all records in key order.
     pub fn iter(&self) -> impl Iterator<Item = &RetrofitRecord> {
         self.records.values()
     }
 
- /// All records whose `(sourceType, modelYear, pollutant, process)`
- /// match and whose `retrofit_year_id ≤ analysis_year`.
- ///
- /// These are the programs active for the given vehicle / year / pollutant
- /// combination during an analysis run.
+    /// All records whose `(sourceType, modelYear, pollutant, process)`
+    /// match and whose `retrofit_year_id ≤ analysis_year`.
+    ///
+    /// These are the programs active for the given vehicle / year / pollutant
+    /// combination during an analysis run.
     pub fn active_records(
         &self,
         source_type_id: SourceTypeId,
@@ -188,13 +188,13 @@ impl RetrofitTable {
         })
     }
 
- /// Compute the combined emission adjustment factor for a given
- /// `(sourceType, modelYear, pollutant, process)` combination in
- /// `analysis_year`.
- ///
- /// Returns the product of [`RetrofitRecord::emission_factor`] over all
- /// active records, or `1.0` if no programs apply (no adjustment). A
- /// factor of `0.5` means 50% of baseline emissions remain.
+    /// Compute the combined emission adjustment factor for a given
+    /// `(sourceType, modelYear, pollutant, process)` combination in
+    /// `analysis_year`.
+    ///
+    /// Returns the product of [`RetrofitRecord::emission_factor`] over all
+    /// active records, or `1.0` if no programs apply (no adjustment). A
+    /// factor of `0.5` means 50% of baseline emissions remain.
     pub fn combined_factor(
         &self,
         source_type_id: SourceTypeId,

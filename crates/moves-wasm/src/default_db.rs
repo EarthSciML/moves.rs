@@ -884,9 +884,7 @@ fn build_runspec_tables(runspec: &RunSpec, store: &mut InMemoryStore) -> Result<
 ///
 /// No-op when the table already exists or the source table is absent. Uses
 /// polars-core only (wasm32-compatible).
-fn populate_pollutant_process_mapped_model_year(
-    store: &mut InMemoryStore,
-) -> Result<(), String> {
+fn populate_pollutant_process_mapped_model_year(store: &mut InMemoryStore) -> Result<(), String> {
     if store.contains("PollutantProcessMappedModelYear")
         || !store.contains("PollutantProcessModelYear")
     {
@@ -1029,7 +1027,8 @@ fn populate_zone_month_hour_meteorology(store: &mut InMemoryStore) -> Result<(),
     // temperature < 78F (the no-humidity-polynomial path), so an unmatched
     // ZoneMonthHour row must inherit its own ambient temperature, NOT 0.0.
     // (matches the CLI port: moves-cli/src/run.rs uses `heat.push(temps[i])`.)
-    let temps_col = find("temperature")?.cast(&DataType::Float64)
+    let temps_col = find("temperature")?
+        .cast(&DataType::Float64)
         .map_err(|e| format!("temperature cast: {e}"))?;
     let temps_ca = temps_col.f64().map_err(|e| format!("{e}"))?;
 
@@ -1159,32 +1158,34 @@ mod tests {
             OnroadVehicleSelection, PollutantProcessAssociation, RoadType, RunSpec, Timespan,
         };
 
-        let mut runspec = RunSpec::default();
-        runspec.onroad_vehicle_selections = vec![OnroadVehicleSelection {
-            source_type_id: 21,
-            fuel_type_id: 1,
-            source_type_name: String::new(),
-            fuel_type_name: String::new(),
-        }];
-        runspec.pollutant_process_associations = vec![PollutantProcessAssociation {
-            pollutant_id: 3,
-            pollutant_name: String::new(),
-            process_id: 1,
-            process_name: String::new(),
-        }];
-        runspec.timespan = Timespan {
-            years: vec![2020],
-            months: vec![1],
-            days: vec![5],
-            begin_hour: Some(1),
-            end_hour: Some(2),
-            aggregate_by: None,
+        let runspec = RunSpec {
+            onroad_vehicle_selections: vec![OnroadVehicleSelection {
+                source_type_id: 21,
+                fuel_type_id: 1,
+                source_type_name: String::new(),
+                fuel_type_name: String::new(),
+            }],
+            pollutant_process_associations: vec![PollutantProcessAssociation {
+                pollutant_id: 3,
+                pollutant_name: String::new(),
+                process_id: 1,
+                process_name: String::new(),
+            }],
+            timespan: Timespan {
+                years: vec![2020],
+                months: vec![1],
+                days: vec![5],
+                begin_hour: Some(1),
+                end_hour: Some(2),
+                aggregate_by: None,
+            },
+            road_types: vec![RoadType {
+                road_type_id: 2,
+                road_type_name: String::new(),
+                model_combination: None,
+            }],
+            ..RunSpec::default()
         };
-        runspec.road_types = vec![RoadType {
-            road_type_id: 2,
-            road_type_name: String::new(),
-            model_combination: None,
-        }];
 
         let mut store = InMemoryStore::new();
         build_runspec_tables(&runspec, &mut store).expect("build must succeed");

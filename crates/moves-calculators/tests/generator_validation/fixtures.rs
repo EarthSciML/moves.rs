@@ -60,18 +60,18 @@ pub fn fixtures_dir() -> PathBuf {
 /// A failure loading or parsing one fixture RunSpec.
 #[derive(Debug)]
 pub enum FixtureError {
- /// The RunSpec XML file is missing or unreadable.
+    /// The RunSpec XML file is missing or unreadable.
     Io {
- /// Fixture name the failure belongs to.
+        /// Fixture name the failure belongs to.
         name: String,
- /// The underlying I/O error.
+        /// The underlying I/O error.
         source: std::io::Error,
     },
- /// The RunSpec XML failed to parse through `moves-runspec`.
+    /// The RunSpec XML failed to parse through `moves-runspec`.
     Parse {
- /// Fixture name the failure belongs to.
+        /// Fixture name the failure belongs to.
         name: String,
- /// The underlying parser error.
+        /// The underlying parser error.
         source: moves_runspec::Error,
     },
 }
@@ -95,26 +95,26 @@ impl std::error::Error for FixtureError {}
 /// parsed from the RunSpec XML.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OnroadFixture {
- /// The fixture name (file stem, e.g. `process-brakewear`).
+    /// The fixture name (file stem, e.g. `process-brakewear`).
     pub name: String,
- /// Absolute path to the RunSpec XML.
+    /// Absolute path to the RunSpec XML.
     pub path: PathBuf,
- /// `true` when the RunSpec selects no NONROAD model — i.e. every
- /// `<model>` is ONROAD, or the legacy RunSpec omits `<models>`
- /// entirely (the canonical `SampleRunSpec.xml` predates the
- /// element). Every fixture in [`ONROAD_FIXTURE_NAMES`] satisfies it.
+    /// `true` when the RunSpec selects no NONROAD model — i.e. every
+    /// `<model>` is ONROAD, or the legacy RunSpec omits `<models>`
+    /// entirely (the canonical `SampleRunSpec.xml` predates the
+    /// element). Every fixture in [`ONROAD_FIXTURE_NAMES`] satisfies it.
     pub is_onroad: bool,
- /// `<modelscale>` — Macro, Inventory, or Rates.
+    /// `<modelscale>` — Macro, Inventory, or Rates.
     pub scale: ModelScale,
- /// `<modeldomain>` — Default, Single (county), or Project.
+    /// `<modeldomain>` — Default, Single (county), or Project.
     pub domain: Option<ModelDomain>,
- /// First `<timespan>` calendar year, if the RunSpec records one.
+    /// First `<timespan>` calendar year, if the RunSpec records one.
     pub year: Option<u32>,
- /// Distinct `emissionprocess.processID` values the RunSpec's
- /// `<pollutantprocessassociations>` exercise, ascending. This is
- /// the key the coverage matrix joins generator subscriptions on.
+    /// Distinct `emissionprocess.processID` values the RunSpec's
+    /// `<pollutantprocessassociations>` exercise, ascending. This is
+    /// the key the coverage matrix joins generator subscriptions on.
     pub process_ids: Vec<u32>,
- /// The RunSpec `<description>` CDATA text, if present.
+    /// The RunSpec `<description>` CDATA text, if present.
     pub description: Option<String>,
 }
 
@@ -151,11 +151,11 @@ pub fn load_fixture(name: &str) -> Result<OnroadFixture, FixtureError> {
         source,
     })?;
 
- // A RunSpec with no `<models>` element is implicitly ONROAD — the
- // element is a newer MOVES addition and the canonical
- // `SampleRunSpec.xml` omits it. `all` is vacuously true on an empty
- // model list, which correctly classifies that case as onroad; a
- // `<model value="NONROAD"/>` is what flips it false.
+    // A RunSpec with no `<models>` element is implicitly ONROAD — the
+    // element is a newer MOVES addition and the canonical
+    // `SampleRunSpec.xml` omits it. `all` is vacuously true on an empty
+    // model list, which correctly classifies that case as onroad; a
+    // `<model value="NONROAD"/>` is what flips it false.
     let is_onroad = spec.models.iter().all(|m| *m == Model::Onroad);
 
     let mut process_ids: Vec<u32> = spec
@@ -205,7 +205,7 @@ mod tests {
 
     #[test]
     fn no_nonroad_fixtures_in_the_onroad_catalogue() {
- // The `nr-*` fixtures belong to the NONROAD gate.
+        // The `nr-*` fixtures belong to the NONROAD gate.
         assert!(
             ONROAD_FIXTURE_NAMES.iter().all(|n| !n.starts_with("nr-")),
             "an nr-* NONROAD fixture leaked into the onroad catalogue"
@@ -249,7 +249,7 @@ mod tests {
             );
         }
 
- // The scale/domain fixtures are named for the dimension they pin.
+        // The scale/domain fixtures are named for the dimension they pin.
         let rates = fixtures
             .iter()
             .find(|f| f.name == "scale-rates")
@@ -270,7 +270,7 @@ mod tests {
             "scale-project must be Project domain"
         );
 
- // Every fixture is authored with a <description> CDATA block.
+        // Every fixture is authored with a <description> CDATA block.
         let described = fixtures.iter().filter(|f| f.description.is_some()).count();
         assert!(
             described >= 20,

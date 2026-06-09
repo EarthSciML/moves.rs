@@ -33,11 +33,11 @@ use moves_calculators::generators::meteorology::{
 /// row.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ZoneMonthHourKey {
- /// `ZoneMonthHour.zoneID`.
+    /// `ZoneMonthHour.zoneID`.
     pub zone_id: i64,
- /// `ZoneMonthHour.monthID`.
+    /// `ZoneMonthHour.monthID`.
     pub month_id: i64,
- /// `ZoneMonthHour.hourID`.
+    /// `ZoneMonthHour.hourID`.
     pub hour_id: i64,
 }
 
@@ -45,9 +45,9 @@ pub struct ZoneMonthHourKey {
 /// `MeteorologyGenerator` reads for that row.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ZoneMonthHourCell {
- /// The row's `(zone, month, hour)` key.
+    /// The row's `(zone, month, hour)` key.
     pub key: ZoneMonthHourKey,
- /// The temperature / humidity / pressure inputs.
+    /// The temperature / humidity / pressure inputs.
     pub inputs: ZoneMonthHourInputs,
 }
 
@@ -130,13 +130,13 @@ pub fn sample_cells() -> Vec<ZoneMonthHourCell> {
         },
     };
     vec![
- // Cool January morning — below the heat-index threshold.
+        // Cool January morning — below the heat-index threshold.
         cell(260000, 1, 6, 35.0, 70.0, 28.94),
- // Mild April afternoon — still below threshold.
+        // Mild April afternoon — still below threshold.
         cell(260000, 4, 14, 62.0, 45.0, 28.94),
- // Hot, humid July afternoon — NWS regression regime.
+        // Hot, humid July afternoon — NWS regression regime.
         cell(260000, 7, 14, 95.0, 65.0, 28.94),
- // Hot, dry July afternoon at high altitude.
+        // Hot, dry July afternoon at high altitude.
         cell(80000, 7, 14, 99.0, 15.0, 24.59),
     ]
 }
@@ -151,7 +151,7 @@ mod tests {
         assert_eq!(table.name(), ZONE_MONTH_HOUR_TABLE);
         assert_eq!(table.row_count(), sample_cells().len());
         assert_eq!(table.natural_key(), ["zoneID", "monthID", "hourID"]);
- // Six columns: the three-part key plus the three written columns.
+        // Six columns: the three-part key plus the three written columns.
         assert_eq!(table.schema().len(), 6);
         for column in ["heatIndex", "specificHumidity", "molWaterFraction"] {
             assert!(
@@ -179,7 +179,7 @@ mod tests {
 
     #[test]
     fn below_threshold_heat_index_is_the_temperature() {
- // The cool-morning cell sits below 78 °F, so heatIndex == temperature.
+        // The cool-morning cell sits below 78 °F, so heatIndex == temperature.
         let cells = sample_cells();
         let cool = cells[0];
         let met = compute_zone_month_hour(cool.inputs);
