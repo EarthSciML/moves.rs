@@ -1533,6 +1533,23 @@ mod tests {
         let t = Instant::now();
         let outcome = engine.run().expect("engine run");
         eprintln!("[phase] engine.run(): {:?}", t.elapsed());
-        eprintln!("[result] output tables: {}", outcome.output_bytes.len());
+        // Content fingerprint of the output bytes — single-threaded + parquet
+        // are deterministic, so two runs whose computed emissions are identical
+        // produce byte-identical output. Used to confirm a perf change (table
+        // scoping) does not alter results.
+        let mut total_len = 0usize;
+        let mut checksum: u64 = 0;
+        for (_, bytes) in &outcome.output_bytes {
+            total_len += bytes.len();
+            for &b in bytes {
+                checksum = checksum.wrapping_mul(1_000_000_007).wrapping_add(u64::from(b));
+            }
+        }
+        eprintln!(
+            "[result] output tables: {} bytes: {} fingerprint: {:016x}",
+            outcome.output_bytes.len(),
+            total_len,
+            checksum
+        );
     }
 }

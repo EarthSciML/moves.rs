@@ -136,7 +136,48 @@ pub fn setup_execution_store(runspec: &RunSpec, store: &mut InMemoryStore) -> Re
     // with 0.0 rather than have the strict per-row extractors error on it.
     fill_fuel_supply_placeholder_nulls(store)?;
     build_runspec_tables(runspec, store)?;
+    // PollutantProcessModelYear ships as the full national table (~15.6k rows);
+    // MOVES's execution-DB copy is run-scoped. Several calculators iterate it
+    // (notably BasicRunningPmEmissionCalculator's fuel_supply_adjustment), so
+    // scope it to the run's pol-process pairs from RunSpecPollutantProcess (just
+    // synthesised by build_runspec_tables). Every PollutantProcessModelYear
+    // reader is a primary calculator processing the run's pp pairs, so this
+    // drops only rows no calculator reads.
+    scope_pollutant_process_model_year_to_runspec(store)?;
     Ok(())
+}
+
+/// Filter `PollutantProcessModelYear` to the `polProcessID`s the run selects
+/// (`RunSpecPollutantProcess`). No-op if either table is absent or the keep-set
+/// is empty; `prune_table_by_id`'s own guard keeps the full table if nothing
+/// matches (so a column/convention mismatch can't empty it).
+fn scope_pollutant_process_model_year_to_runspec(
+    store: &mut InMemoryStore,
+) -> Result<(), String> {
+    let keep: BTreeSet<i64> = {
+        let Some(arc) = store.get("RunSpecPollutantProcess") else {
+            return Ok(());
+        };
+        let df = &*arc;
+        let Some(name) = df
+            .columns()
+            .iter()
+            .find(|c| c.name().eq_ignore_ascii_case("polProcessID"))
+            .map(|c| c.name().to_string())
+        else {
+            return Ok(());
+        };
+        let col = df
+            .column(&name)
+            .and_then(|c| c.cast(&DataType::Int32))
+            .map_err(|e| format!("RunSpecPollutantProcess.polProcessID cast: {e}"))?;
+        let ca = col.i32().map_err(|e| format!("{e}"))?;
+        ca.into_iter().flatten().map(i64::from).collect()
+    };
+    if keep.is_empty() {
+        return Ok(());
+    }
+    prune_table_by_id(store, "PollutantProcessModelYear", "polProcessID", &keep)
 }
 
 /// Drop rows of geography-keyed national tables that fall outside the runspec's
@@ -1518,6 +1559,45 @@ mod tests {
             store.get("ZoneMonthHour").unwrap().height(),
             2,
             "no match → keep full table, never empty it"
+        );
+    }
+
+    #[test]
+    fn scope_ppmy_filters_to_runspec_pol_processes() {
+        // PollutantProcessModelYear with rows for 301, 202 (in the run) and 999
+        // (not). Scope keeps only the run's pol-process rows.
+        let ppmy = DataFrame::new(
+            3,
+            vec![
+                Series::new("polProcessID".into(), &[301_i32, 202, 999]).into(),
+                Series::new("modelYearID".into(), &[2020_i32, 2020, 2020]).into(),
+            ],
+        )
+        .unwrap();
+        let rspp = DataFrame::new(
+            2,
+            vec![Series::new("polProcessID".into(), &[301_i32, 202]).into()],
+        )
+        .unwrap();
+        let mut store = InMemoryStore::new();
+        store.insert("PollutantProcessModelYear".to_string(), ppmy);
+        store.insert("RunSpecPollutantProcess".to_string(), rspp);
+
+        scope_pollutant_process_model_year_to_runspec(&mut store).expect("scope must succeed");
+
+        let kept = store.get("PollutantProcessModelYear").unwrap();
+        assert_eq!(kept.height(), 2, "only the run's pol-process rows kept");
+        let pps: std::collections::BTreeSet<i32> = kept
+            .column("polProcessID")
+            .unwrap()
+            .i32()
+            .unwrap()
+            .into_iter()
+            .flatten()
+            .collect();
+        assert_eq!(
+            pps,
+            [202, 301].into_iter().collect::<std::collections::BTreeSet<_>>()
         );
     }
 }
