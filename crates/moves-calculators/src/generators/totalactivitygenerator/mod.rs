@@ -65,6 +65,7 @@ pub mod allocation;
 pub mod inputs;
 pub mod model;
 pub mod population;
+pub mod starts;
 pub mod travel;
 pub mod vmt;
 
@@ -2945,6 +2946,12 @@ static INPUT_TABLES: &[&str] = &[
     "SampleVehicleDay",
     "SampleVehicleTrip",
     "StartsPerVehicle",
+    // AdjustStarts inputs (the inventory `Starts` table).
+    "StartsPerDayPerVehicle",
+    "startsAgeAdjustment",
+    "startsMonthAdjust",
+    "startsHourFraction",
+    "Zone",
 ];
 
 /// Scratch tables the generator writes for downstream calculators — the
@@ -2965,6 +2972,7 @@ static OUTPUT_TABLES: &[&str] = &[
     "IdleHoursByAgeHour",
     "StartsByAgeHour",
     "SHPByAgeHour",
+    "Starts",
 ];
 
 /// Resolve [`SUBSCRIBED_PROCESSES`] into the generator's subscription set:
@@ -3268,6 +3276,24 @@ impl Generator for TotalActivityGenerator {
         write_scratch!(output.starts_by_age_hour, "StartsByAgeHour");
         write_scratch!(output.shp_by_age_hour, "SHPByAgeHour");
 
+        // AdjustStarts (database/AdjustStarts.sql) — the inventory `Starts`
+        // activity table the start calculators read. The `StartsByAgeHour`
+        // intermediate above is not the table consumers use; this is the
+        // population × startsPerDayPerVehicle × age/month/hour allocation.
+        let starts_rows = starts::adjust_starts(&starts::AdjustStartsInputs {
+            analysis_year,
+            zone_id,
+            source_type_year: inputs.source_type_year.clone(),
+            source_type_age_distribution: inputs.source_type_age_distribution.clone(),
+            day_of_any_week: inputs.day_of_any_week.clone(),
+            starts_per_day_per_vehicle: ctx.tables().iter_typed("StartsPerDayPerVehicle")?,
+            starts_age_adjustment: ctx.tables().iter_typed("startsAgeAdjustment")?,
+            starts_month_adjust: ctx.tables().iter_typed("startsMonthAdjust")?,
+            starts_hour_fraction: ctx.tables().iter_typed("startsHourFraction")?,
+            zone: ctx.tables().iter_typed("Zone")?,
+        });
+        write_scratch!(starts_rows, "Starts");
+
         Ok(CalculatorOutput::empty())
     }
 }
@@ -3531,6 +3557,28 @@ mod tests {
         store.insert(
             "HourOfAnyDay",
             inp.hour_of_any_day.clone().into_dataframe().unwrap(),
+        );
+        // AdjustStarts inputs (the `Starts` table); empty is sufficient here —
+        // this test asserts the activity tables, not the start allocation.
+        store.insert(
+            "StartsPerDayPerVehicle",
+            starts::StartsPerDayPerVehicleRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "startsAgeAdjustment",
+            starts::StartsAgeAdjustmentRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "startsMonthAdjust",
+            starts::StartsMonthAdjustRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "startsHourFraction",
+            starts::StartsHourFractionRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "Zone",
+            starts::StartsZoneRow::into_dataframe(vec![]).unwrap(),
         );
 
         let mut ctx = CalculatorContext::with_position_and_tables(
