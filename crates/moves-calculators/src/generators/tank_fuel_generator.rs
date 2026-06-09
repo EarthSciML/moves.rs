@@ -58,7 +58,7 @@
 //! input tables from the [`CalculatorContext`] for the current `(county, year)`
 //! iteration position, calls the pure [`calculate_average_tank_gasoline`]
 //! function, and writes the resulting `AverageTankGasoline` rows into the
-//! scratch namespace via [`crate::wiring::write_scratch_table`]. The pure
+//! scratch namespace via `wiring::write_scratch_table`. The pure
 //! computation is additionally exercised directly by the crate tests.
 
 use std::collections::{BTreeMap, HashMap, HashSet};

@@ -51,7 +51,7 @@ use crate::data::{DataFrameStore, InMemoryStore};
 /// All ids are stored as raw integers matching the default-DB primary
 /// keys (`State.stateID`, `County.countyID`, `Zone.zoneID`, `Link.linkID`,
 /// `Link.roadTypeID`). `road_type_id` is populated at LINK granularity from
-/// `Link.roadTypeID` via [`ExecutionLocationProducer`].
+/// `Link.roadTypeID` via `ExecutionLocationProducer`.
 ///
 /// `None` means "the loop has not yet entered iteration at that
 /// granularity." A subscription firing at PROCESS granularity sees all
@@ -83,7 +83,7 @@ pub struct ExecutionLocation {
     pub link_id: Option<u32>,
     /// `Link.roadTypeID` — the road type of the current link. `None` outside
     /// LINK granularity scopes. Populated from the `Link` table by
-    /// [`ExecutionLocationProducer`] and propagated by the MasterLoop.
+    /// `ExecutionLocationProducer` and propagated by the MasterLoop.
     pub road_type_id: Option<u32>,
 }
 
@@ -141,7 +141,7 @@ impl ExecutionLocation {
 
     /// Construct a fully-populated location including `road_type_id`.
     ///
-    /// Used by [`ExecutionLocationProducer`] and the MasterLoop to carry the
+    /// Used by `ExecutionLocationProducer` and the MasterLoop to carry the
     /// `Link.roadTypeID` from the geography tables through to calculators.
     #[must_use]
     pub const fn link_with_road_type_id(

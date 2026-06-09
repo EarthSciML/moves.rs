@@ -252,7 +252,7 @@ impl CalculatorRegistry {
     /// The (lowercased) scratch output tables a registered module produces, or
     /// `None` if the module has no registered factory. Calculators produce no
     /// scratch tables, so their set is empty; generators list their
-    /// [`Generator::output_tables`](crate::calculator::Generator::output_tables).
+    /// [`Generator::output_tables`].
     #[must_use]
     pub fn module_output_tables_of(&self, name: &str) -> Option<&BTreeSet<String>> {
         self.module_outputs.get(name)
