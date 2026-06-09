@@ -108,7 +108,7 @@ impl FromStr for PolProcessId {
 /// Identity: the `(pollutant_id, process_id)` pair. The per-pair
 /// `isAffectedByOnroad` / `isAffectedByNonroad` flags from the default-DB
 /// `PollutantProcessAssoc` table are stored in the companion static
-/// [`PPA_FLAGS`] map and queried via [`Self::is_affected_by_onroad`] /
+/// `PPA_FLAGS` map and queried via [`Self::is_affected_by_onroad`] /
 /// [`Self::is_affected_by_nonroad`]. Chaining (`chainedto1`, `chainedto2`,
 /// `nrChainedTo1`, `nrChainedTo2`) and the IM flags remain in the data plane.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -171,7 +171,7 @@ impl PollutantProcessAssociation {
     ///
     /// Ports `PollutantProcessAssociation.isAffectedByOnroad`. Values are
     /// extracted from the `PollutantProcessAssoc` default-DB table via the
-    /// static [`PPA_FLAGS`] map. Returns `false` for pairs that are not in
+    /// static `PPA_FLAGS` map. Returns `false` for pairs that are not in
     /// the canonical set (should not occur in practice).
     #[must_use]
     pub fn is_affected_by_onroad(self) -> bool {
@@ -185,7 +185,7 @@ impl PollutantProcessAssociation {
     ///
     /// Ports `PollutantProcessAssociation.isAffectedByNonroad`. Values are
     /// extracted from the `PollutantProcessAssoc` default-DB table via the
-    /// static [`PPA_FLAGS`] map. Returns `false` for pairs that are not in
+    /// static `PPA_FLAGS` map. Returns `false` for pairs that are not in
     /// the canonical set.
     #[must_use]
     pub fn is_affected_by_nonroad(self) -> bool {

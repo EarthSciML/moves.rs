@@ -396,8 +396,8 @@ impl GeographyExecutor for PlanRecordingExecutor {
 /// |--------|---------|---------------|-------------|--------|
 /// | `find_allocation` (subcounty) | `fndasc(asccod, ascalo, nalorc)` | Subcounty allocation coefficients from NR\*.SCO files | — | **⚠ NOT YET LOADABLE** |
 /// | `allocate_subcounty` | `alosub(…)` | Same NR\*.SCO records | — (pure computation) | **⚠ NOT YET PORTED** |
-/// | `find_allocation` (national) | `fndasc` national path | National-to-state allocation coefficients from NR\*.ALO files | [`NationalAllocationEntry::record`] + [`ReferenceData::allocation_indicators`] | ✓ loadable by caller |
-/// | `allocate_to_states` | `alosta(…)` | Same NR\*.ALO records | [`allocation::allocate_state`] | ✓ ported (mo-i6q) |
+/// | `find_allocation` (national) | `fndasc` national path | National-to-state allocation coefficients from NR\*.ALO files | `NationalAllocationEntry::record` + [`ReferenceData::allocation_indicators`] | ✓ loadable by caller |
+/// | `allocate_to_states` | `alosta(…)` | Same NR\*.ALO records | [`crate::allocation::allocate_state`] | ✓ ported (mo-i6q) |
 ///
 /// # Summary: what blocks production execution
 ///
