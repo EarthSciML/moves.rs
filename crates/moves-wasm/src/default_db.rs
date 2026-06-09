@@ -185,6 +185,13 @@ fn prune_geographic_tables_to_runspec(
 
     prune_table_by_id(store, "ZoneMonthHour", "zoneID", &zone_ids)?;
     prune_table_by_id(store, "CountyYear", "countyID", &county_ids)?;
+    // County ships as the full national table (3232 rows). Several onroad
+    // calculators (e.g. BasicRunningPmEmissionCalculator's fuel_supply_adjustment)
+    // iterate `inputs.county` directly, expecting only the run's county; the
+    // national table turns that into a 3232x cartesian blow-up (and double-counts
+    // the gpa-blended fuel adjustment across every county). Prune to the run's
+    // counties.
+    prune_table_by_id(store, "County", "countyID", &county_ids)?;
     Ok(())
 }
 

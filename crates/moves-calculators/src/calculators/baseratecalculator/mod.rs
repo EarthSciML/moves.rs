@@ -689,7 +689,13 @@ impl Calculator for BaseRateCalculator {
             county: tables.iter_typed("County")?,
             general_fuel_ratio: tables.iter_typed("GeneralFuelRatio")?,
             criteria_ratio: tables.iter_typed("criteriaRatio")?,
-            alt_criteria_ratio: tables.iter_typed("altCriteriaRatio")?,
+            // altCriteriaRatio is empty in the default DB (alt-fuel criteria
+            // ratios are scenario-specific), so the packager ships no partition
+            // for it. Absent ≡ empty here — the adjust step already guards on
+            // `len(AltCriteriaRatio) > 0` — so read it leniently like the other
+            // optional tables in this struct rather than erroring on the missing
+            // table.
+            alt_criteria_ratio: tables.iter_typed_or_empty("altCriteriaRatio")?,
             temperature_adjustment: tables.iter_typed("TemperatureAdjustment")?,
             nox_humidity_adjust: tables.iter_typed("NOxHumidityAdjust")?,
             zone_ac_factor: tables.iter_typed_or_empty("zoneACFactor")?,
