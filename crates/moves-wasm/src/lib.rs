@@ -1452,4 +1452,87 @@ mod tests {
         assert_eq!(inputs.scc_groups[1].scc, "2265001010");
         assert_eq!(inputs.scc_groups[1].len(), 1);
     }
+
+    // ---- Native default-DB profiling harness (ignored; manual) -------------
+    //
+    // Replicates `run_simulation_from_partitions` natively so the default-DB
+    // pipeline can be profiled with samply/perf and timed per phase. Driven by
+    // env vars (set by the profiling scripts under /tmp):
+    //   MOVES_PROFILE_RUNSPEC   — path to the RunSpec XML
+    //   MOVES_PROFILE_MANIFEST  — path to manifest.json
+    //   MOVES_PROFILE_DATA_DIR  — dir holding the partition files (mirroring
+    //                             the manifest paths)
+    // Run single-threaded (RAYON_NUM_THREADS=1, max_parallel_chunks=0) to mirror
+    // the single-thread WASM demo.
+
+    #[test]
+    #[ignore = "manual profiling harness; needs MOVES_PROFILE_* env + data"]
+    fn profile_print_required_partitions() {
+        let runspec = std::fs::read_to_string(std::env::var("MOVES_PROFILE_RUNSPEC").unwrap())
+            .expect("read runspec");
+        let manifest = std::fs::read_to_string(std::env::var("MOVES_PROFILE_MANIFEST").unwrap())
+            .expect("read manifest");
+        let run_spec = from_xml_str(&runspec).expect("parse runspec");
+        let paths = required_partition_paths_inner(&run_spec, &manifest).expect("compute paths");
+        // One path per line on stdout (capture with --nocapture).
+        for p in &paths {
+            println!("PARTITION\t{p}");
+        }
+        eprintln!("total required partitions: {}", paths.len());
+    }
+
+    #[test]
+    #[ignore = "manual profiling harness; needs MOVES_PROFILE_* env + data"]
+    fn profile_run_default_db() {
+        use std::time::Instant;
+
+        let runspec = std::fs::read_to_string(std::env::var("MOVES_PROFILE_RUNSPEC").unwrap())
+            .expect("read runspec");
+        let manifest = std::fs::read_to_string(std::env::var("MOVES_PROFILE_MANIFEST").unwrap())
+            .expect("read manifest");
+        let data_dir = std::path::PathBuf::from(std::env::var("MOVES_PROFILE_DATA_DIR").unwrap());
+
+        let run_spec = from_xml_str(&runspec).expect("parse runspec");
+        let paths = required_partition_paths_inner(&run_spec, &manifest).expect("compute paths");
+
+        let t = Instant::now();
+        let mut partition_files: Vec<(String, Vec<u8>)> = Vec::with_capacity(paths.len());
+        for p in &paths {
+            let bytes = std::fs::read(data_dir.join(p))
+                .unwrap_or_else(|e| panic!("read partition {p}: {e}"));
+            partition_files.push((p.clone(), bytes));
+        }
+        eprintln!("[phase] read {} partitions: {:?}", paths.len(), t.elapsed());
+
+        let t = Instant::now();
+        let mut store = default_db::load_partitions_to_store(&partition_files).expect("load");
+        eprintln!("[phase] load_partitions_to_store: {:?}", t.elapsed());
+
+        let t = Instant::now();
+        default_db::setup_execution_store(&run_spec, &mut store).expect("setup");
+        eprintln!("[phase] setup_execution_store: {:?}", t.elapsed());
+
+        let t = Instant::now();
+        let geography = default_db::load_geography_from_store(&store).expect("geography");
+        eprintln!("[phase] load_geography_from_store: {:?}", t.elapsed());
+
+        let registry = build_registry().expect("registry");
+        let config = EngineConfig {
+            output_root: std::path::PathBuf::from(""),
+            max_parallel_chunks: 0,
+            run_spec_file_name: None,
+            run_date_time: None,
+            collect_output_in_memory: true,
+        };
+        let mut engine = MOVESEngine::new(run_spec.clone(), registry, config);
+        engine = engine.with_slow_store(store);
+        engine
+            .execution_run_spec_mut()
+            .build_execution_locations(&geography);
+
+        let t = Instant::now();
+        let outcome = engine.run().expect("engine run");
+        eprintln!("[phase] engine.run(): {:?}", t.elapsed());
+        eprintln!("[result] output tables: {}", outcome.output_bytes.len());
+    }
 }
