@@ -336,7 +336,7 @@ pub fn hour_day_id(hour_id: u16, day_id: u16) -> u16 {
 /// Default-DB and execution tables the generator reads. `SampleVehicleTrip`
 /// / `SampleVehicleDay` / `OperatingMode` drive the soak-time classification;
 /// `HourDay` / `RunSpecHourDay` / `RunSpecSourceType` scope the aggregation;
-/// `startsOpModeDistribution`, `OpModeDistribution`, `PollutantProcessAssoc`,
+/// `startsOpModeDistribution`, `OpModeDistribution`, `RunSpecPollutantProcess`,
 /// `Link`, `SourceTypePolProcess` and `OpModePolProcAssoc` feed the step-400
 /// copy.
 static INPUT_TABLES: &[&str] = &[
@@ -348,7 +348,7 @@ static INPUT_TABLES: &[&str] = &[
     "RunSpecSourceType",
     "startsOpModeDistribution",
     "OpModeDistribution",
-    "PollutantProcessAssoc",
+    "RunSpecPollutantProcess",
     "Link",
     "SourceTypePolProcess",
     "OpModePolProcAssoc",
@@ -869,63 +869,53 @@ pub struct StartOpModeInputs {
     pub start_pol_process_ids: Vec<i32>,
 }
 
-/// One `PollutantProcessAssoc` row — only the `polProcessID` and `processID`
-/// the step-400 fan-out needs (`where ppa.processID in (2,16)`).
+/// One `RunSpecPollutantProcess` row — the `polProcessID`s the run selects
+/// (post chain-expansion). Step 400 fans the soak fractions out across the
+/// *run's* start `polProcessID`s. MOVES cross-joins the full
+/// `pollutantProcessAssoc`, but its execution-DB copy is already run-scoped;
+/// using the run-spec list directly matches that effective behaviour and keeps
+/// `OpModeDistribution` from exploding across every national start process
+/// (~160) when the run needs only a handful. `processID = polProcessID % 100`.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct PollutantProcessAssocRow {
+pub struct RunSpecPollutantProcessRow {
     /// `polProcessID` — `pollutantID * 100 + processID`.
     pub pol_process_id: i32,
-    /// `processID` — the emission process.
-    pub process_id: i32,
 }
 
-impl TableRow for PollutantProcessAssocRow {
+impl TableRow for RunSpecPollutantProcessRow {
     fn table_name() -> &'static str {
-        "PollutantProcessAssoc"
+        "RunSpecPollutantProcess"
     }
     fn polars_schema() -> Schema {
-        Schema::from_iter([
-            ("polProcessID".into(), DataType::Int32),
-            ("processID".into(), DataType::Int32),
-        ])
+        Schema::from_iter([("polProcessID".into(), DataType::Int32)])
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
         let n = rows.len();
         DataFrame::new(
             n,
-            vec![
-                Series::new(
-                    "polProcessID".into(),
-                    rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>(),
-                )
-                .into(),
-                Series::new(
-                    "processID".into(),
-                    rows.iter().map(|r| r.process_id).collect::<Vec<i32>>(),
-                )
-                .into(),
-            ],
+            vec![Series::new(
+                "polProcessID".into(),
+                rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>(),
+            )
+            .into()],
         )
     }
     fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
-        let t = "PollutantProcessAssoc";
-        let get_i32 = |col: &'static str| -> moves_framework::Result<_> {
-            df.column(col)
-                .map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .cast(&DataType::Int32)
-                .map_err(|e| row_err(t, 0, col, e.to_string()))?
-                .i32()
-                .map_err(|e| row_err(t, 0, col, e.to_string()))
-                .map(|c| c.clone())
-        };
-        let pol_process_id = get_i32("polProcessID")?;
-        let process_id = get_i32("processID")?;
+        let t = "RunSpecPollutantProcess";
+        let pol_process_id = df
+            .column("polProcessID")
+            .map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?
+            .cast(&DataType::Int32)
+            .map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?
+            .clone();
         (0..df.height())
             .map(|i| {
-                let null = |col: &'static str| row_err(t, i, col, "null value".into());
-                Ok(PollutantProcessAssocRow {
-                    pol_process_id: pol_process_id.get(i).ok_or_else(|| null("polProcessID"))?,
-                    process_id: process_id.get(i).ok_or_else(|| null("processID"))?,
+                Ok(RunSpecPollutantProcessRow {
+                    pol_process_id: pol_process_id
+                        .get(i)
+                        .ok_or_else(|| row_err(t, i, "polProcessID", "null value".into()))?,
                 })
             })
             .collect()
@@ -1126,19 +1116,21 @@ impl Generator for StartOperatingModeDistributionGenerator {
     }
 
     fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
-        // Step 400 fans the soak fractions out across the start `polProcessID`s —
-        // `pollutantProcessAssoc` filtered to the start-exhaust (2) and
-        // crankcase-start (16) processes (the canonical `cross join ... where
-        // ppa.processID in (2,16)`).
+        // Step 400 fans the soak fractions out across the run's start
+        // `polProcessID`s — `RunSpecPollutantProcess` (the run-scoped pol-process
+        // set, post chain-expansion) filtered to the start-exhaust (2) and
+        // crankcase-start (16) processes. `processID = polProcessID % 100`.
+        let start_exhaust = START_EXHAUST_PROCESS_ID.0 as i32;
+        let crankcase_start = CRANKCASE_START_EXHAUST_PROCESS_ID.0 as i32;
         let start_pol_process_ids: Vec<i32> = ctx
             .tables()
-            .iter_typed::<PollutantProcessAssocRow>("PollutantProcessAssoc")?
+            .iter_typed::<RunSpecPollutantProcessRow>("RunSpecPollutantProcess")?
             .into_iter()
-            .filter(|r| {
-                r.process_id == START_EXHAUST_PROCESS_ID.0 as i32
-                    || r.process_id == CRANKCASE_START_EXHAUST_PROCESS_ID.0 as i32
-            })
             .map(|r| r.pol_process_id)
+            .filter(|&pp| {
+                let process = pp.rem_euclid(100);
+                process == start_exhaust || process == crankcase_start
+            })
             .collect();
 
         // Read the trip/op-mode input tables the kernel needs.
@@ -1561,27 +1553,16 @@ mod tests {
             .unwrap(),
         );
 
-        // Step 400 fans the soak fractions across start polProcessIDs (processes
-        // 2 and 16); the running process (1) row is filtered out.
+        // Step 400 fans the soak fractions across the run's start polProcessIDs
+        // (processID = polProcessID % 100 in {2,16}); the running process (1)
+        // row 201 is filtered out.
         store.insert(
-            "PollutantProcessAssoc",
-            PollutantProcessAssocRow::into_dataframe(vec![
-                PollutantProcessAssocRow {
-                    pol_process_id: 202,
-                    process_id: 2,
-                },
-                PollutantProcessAssocRow {
-                    pol_process_id: 302,
-                    process_id: 2,
-                },
-                PollutantProcessAssocRow {
-                    pol_process_id: 216,
-                    process_id: 16,
-                },
-                PollutantProcessAssocRow {
-                    pol_process_id: 201,
-                    process_id: 1,
-                },
+            "RunSpecPollutantProcess",
+            RunSpecPollutantProcessRow::into_dataframe(vec![
+                RunSpecPollutantProcessRow { pol_process_id: 202 },
+                RunSpecPollutantProcessRow { pol_process_id: 302 },
+                RunSpecPollutantProcessRow { pol_process_id: 216 },
+                RunSpecPollutantProcessRow { pol_process_id: 201 },
             ])
             .unwrap(),
         );
@@ -1679,10 +1660,9 @@ mod tests {
         );
 
         store.insert(
-            "PollutantProcessAssoc",
-            PollutantProcessAssocRow::into_dataframe(vec![PollutantProcessAssocRow {
+            "RunSpecPollutantProcess",
+            RunSpecPollutantProcessRow::into_dataframe(vec![RunSpecPollutantProcessRow {
                 pol_process_id: 202,
-                process_id: 2,
             }])
             .unwrap(),
         );
@@ -1778,10 +1758,9 @@ mod tests {
         );
 
         store.insert(
-            "PollutantProcessAssoc",
-            PollutantProcessAssocRow::into_dataframe(vec![PollutantProcessAssocRow {
+            "RunSpecPollutantProcess",
+            RunSpecPollutantProcessRow::into_dataframe(vec![RunSpecPollutantProcessRow {
                 pol_process_id: 202,
-                process_id: 2,
             }])
             .unwrap(),
         );
@@ -1834,8 +1813,8 @@ mod tests {
             OperatingModeRow::into_dataframe(vec![]).unwrap(),
         );
         store.insert(
-            "PollutantProcessAssoc",
-            PollutantProcessAssocRow::into_dataframe(vec![]).unwrap(),
+            "RunSpecPollutantProcess",
+            RunSpecPollutantProcessRow::into_dataframe(vec![]).unwrap(),
         );
         let mut ctx = CalculatorContext::with_tables(store);
         assert!(StartOperatingModeDistributionGenerator
