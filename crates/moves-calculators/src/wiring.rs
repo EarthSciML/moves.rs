@@ -32,7 +32,7 @@
 
 use std::collections::HashSet;
 
-use polars::prelude::{Column, DataFrame, PolarsResult};
+use polars::prelude::{Column, DataFrame, DataType, PolarsResult};
 
 use moves_framework::{
     CalculatorContext, CalculatorOutput, DataFrameStore, Error, IntoDataFrame, TableRow,
@@ -152,14 +152,28 @@ fn polars_err(e: impl std::fmt::Display) -> Error {
 /// Project an OMD producer's frame onto [`OMD_COLUMNS`]: synthesize a
 /// zero-filled `roadTypeID` if the producer doesn't emit one (the Start and Evap
 /// distributions are off-network and no `OpModeDistribution` reader extracts
-/// `roadTypeID`) and reorder to the canonical column order. All producers emit
-/// `Int32` ids + `Float64` fractions already, so no cast is needed.
+/// `roadTypeID`), reorder to the canonical column order, and cast to the
+/// canonical dtypes (`Int32` ids + `Float64` fraction). The cast matters because
+/// frames must vstack against each other AND against a *provided* slow-tier
+/// `OpModeDistribution`, which the default DB ships with `Int64` columns.
 fn normalize_omd(mut df: DataFrame) -> PolarsResult<DataFrame> {
     if df.column("roadTypeID").is_err() {
         let n = df.height();
         df.with_column(Column::new("roadTypeID".into(), vec![0i32; n]))?;
     }
-    df.select(OMD_COLUMNS)
+    let height = df.height();
+    let cols = OMD_COLUMNS
+        .iter()
+        .map(|&name| {
+            let dtype = if name == "opModeFraction" {
+                DataType::Float64
+            } else {
+                DataType::Int32
+            };
+            df.column(name)?.cast(&dtype)
+        })
+        .collect::<PolarsResult<Vec<Column>>>()?;
+    DataFrame::new(height, cols)
 }
 
 /// The distinct `polProcessID`s present in an OMD frame.
