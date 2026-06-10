@@ -22,6 +22,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use rustc_hash::FxHashMap;
+
 use super::inputs::{BaseRateInputs, PreparedTables};
 use super::model::{
     AvgSpeedDistributionKey, DriveScheduleAssocKey, DrivingIdleFractionRow, ExternalFlags,
@@ -56,7 +58,7 @@ struct ScheduleOpModeKey {
 }
 
 /// Fast lookup key into the bracketed bins — Go `dcbFastKey`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct FastKey {
     source_type_id: i32,
     road_type_id: i32,
@@ -388,7 +390,9 @@ pub fn process_drive_cycles(
     op_modes_to_iterate.extend(prepared.operating_modes.keys().copied());
 
     // Group the bracketed bins for fast lookup by real source type.
-    let mut bins_fast: BTreeMap<FastKey, Vec<BracketedBinKey>> = BTreeMap::new();
+    // Lookup-only (never iterated for order) → FxHashMap for O(1) probes in
+    // the driving-idle and RatesOpModeDistribution inner loops.
+    let mut bins_fast: FxHashMap<FastKey, Vec<BracketedBinKey>> = FxHashMap::default();
     for &key in bracketed_bins.keys() {
         let physics = &prepared.source_use_type_physics_mapping[key.physics_index];
         bins_fast

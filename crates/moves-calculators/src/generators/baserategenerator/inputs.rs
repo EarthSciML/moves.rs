@@ -16,6 +16,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use rustc_hash::FxHashMap;
+
 use super::model::{
     AvgSpeedDistributionDetail, AvgSpeedDistributionKey, DriveScheduleAssocKey, ExternalFlags,
     OperatingMode, SbWeightedRateDetail, SbWeightedRateKey, SourceUseTypePhysicsMappingDetail,
@@ -200,8 +202,11 @@ pub struct PreparedTables {
     pub avg_speed_bin: BTreeMap<i32, f64>,
     /// Average schedule speed keyed by `driveScheduleID`.
     pub drive_schedule: BTreeMap<i32, f64>,
-    /// Average-speed distribution keyed by source/road/hour/bin.
-    pub avg_speed_distribution: BTreeMap<AvgSpeedDistributionKey, AvgSpeedDistributionDetail>,
+    /// Average-speed distribution keyed by source/road/hour/bin. `FxHashMap`
+    /// (not `BTreeMap`) because it is only ever point-looked-up by key in the
+    /// drive-cycle / aggregation hot loops — never iterated for order — so the
+    /// O(1) hash probe replaces an O(log n) multi-field key comparison.
+    pub avg_speed_distribution: FxHashMap<AvgSpeedDistributionKey, AvgSpeedDistributionDetail>,
     /// All physics-mapping records, ordered by real source type then
     /// begin model year.
     pub source_use_type_physics_mapping: Vec<SourceUseTypePhysicsMappingDetail>,
