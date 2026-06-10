@@ -86,8 +86,8 @@ pub mod pipeline;
 use moves_calculator_info::{Granularity, Priority};
 use moves_data::{PolProcessId, ProcessId, RoadTypeId, SourceTypeId};
 use moves_framework::{
-    CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStoreTyped, Error,
-    Generator, TableRow,
+    CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStore,
+    DataFrameStoreTyped, Error, Generator, TableRow,
 };
 use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
 
@@ -201,6 +201,25 @@ impl Generator for OperatingModeDistributionGenerator {
     /// `Link` table on `roadTypeID` to fill link-keyed `OpModeDistribution`
     /// rows, and writes them to the scratch namespace.
     fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
+        // Memoize: the op-mode-distribution kernel and its Link cross-join depend
+        // only on run-static reference tables (drive schedules, avg-speed
+        // distribution, operating modes, links) — never on the master-loop
+        // position. This generator subscribes at YEAR granularity to two
+        // processes (Running Exhaust, Brakewear) and the Java explicitly "shares
+        // one set of computed fractions across both"; the master loop fires it
+        // once per (process, location, time), so every firing after the first
+        // rebuilds a byte-identical OpModeDistribution. Once it is in scratch,
+        // reuse it instead of recomputing (the kernel classifies every
+        // drive-schedule second — the dominant cost).
+        if ctx
+            .scratch()
+            .store
+            .get("OpModeDistribution")
+            .is_some_and(|df| df.height() > 0)
+        {
+            return Ok(CalculatorOutput::empty());
+        }
+
         // -- Read all input tables --
         let drive_schedule: Vec<DriveScheduleRow> = ctx.tables().iter_typed("DriveSchedule")?;
         let drive_schedule_assoc: Vec<DriveScheduleAssocRow> =
@@ -262,20 +281,30 @@ impl Generator for OperatingModeDistributionGenerator {
         // -- Cross-join OpModeFractionRow with Link on roadTypeID --
         // Java: INSERT IGNORE INTO OpModeDistribution SELECT linkID, ...
         // FROM OpModeFraction2 INNER JOIN Link ON link.roadTypeID = opModeFraction.roadTypeID
+        //
+        // Index the links by roadTypeID so the join is O(fractions + output)
+        // rather than O(fractions × links). Each bucket preserves `link_rows`
+        // order, so the emitted row order is identical to the nested-loop form.
+        let mut links_by_road: std::collections::HashMap<i32, Vec<&OmdgLinkRow>> =
+            std::collections::HashMap::new();
+        for link in &link_rows {
+            links_by_road.entry(link.road_type_id).or_default().push(link);
+        }
         let mut output_rows: Vec<OpModeDistributionRow> = Vec::new();
         for fraction in &fractions {
-            for link in &link_rows {
-                if link.road_type_id == fraction.road_type_id.0 as i32 {
-                    output_rows.push(OpModeDistributionRow {
-                        source_type_id: fraction.source_type_id,
-                        road_type_id: fraction.road_type_id,
-                        link_id: link.link_id,
-                        hour_day_id: fraction.hour_day_id,
-                        pol_process_id: fraction.pol_process_id,
-                        op_mode_id: fraction.op_mode_id,
-                        op_mode_fraction: fraction.op_mode_fraction,
-                    });
-                }
+            let Some(links) = links_by_road.get(&(fraction.road_type_id.0 as i32)) else {
+                continue;
+            };
+            for link in links {
+                output_rows.push(OpModeDistributionRow {
+                    source_type_id: fraction.source_type_id,
+                    road_type_id: fraction.road_type_id,
+                    link_id: link.link_id,
+                    hour_day_id: fraction.hour_day_id,
+                    pol_process_id: fraction.pol_process_id,
+                    op_mode_id: fraction.op_mode_id,
+                    op_mode_fraction: fraction.op_mode_fraction,
+                });
             }
         }
 
