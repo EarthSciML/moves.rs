@@ -353,9 +353,20 @@ impl MasterLoopable for CalculatorMasterLoopable {
         if context.position.process_id != Some(self.gate_process) {
             return Ok(());
         }
+        let debug_modules = std::env::var_os("MOVES_DEBUG_MODULES").is_some();
         let df = {
             let mut ctx = self.ctx.lock().expect("CalculatorContext mutex poisoned");
             ctx.set_position(context.position);
+            if debug_modules {
+                eprintln!(
+                    "[mod] enter {} proc={:?}",
+                    self.module.name(),
+                    context.position.process_id
+                );
+                use std::io::Write as _;
+                let _ = std::io::stderr().flush();
+            }
+            let t_mod = Instant::now();
             let out = self.module.execute(&mut ctx)?;
             // A generator writes its output tables to scratch; promote them into the
             // slow tier so downstream calculators in this chunk — which read every
@@ -363,6 +374,16 @@ impl MasterLoopable for CalculatorMasterLoopable {
             // scratch, so this is skipped for them.)
             if matches!(*self.module, ModuleInstance::Generator(_)) {
                 ctx.promote_scratch();
+            }
+            if debug_modules {
+                let rows = out.as_ref().map_or(0, polars::prelude::DataFrame::height);
+                eprintln!(
+                    "[mod] exit  {} rows={rows} {:?}",
+                    self.module.name(),
+                    t_mod.elapsed()
+                );
+                use std::io::Write as _;
+                let _ = std::io::stderr().flush();
             }
             out
             // ctx lock released here — conversion and accumulator write happen outside
@@ -859,11 +880,31 @@ impl MOVESEngine {
                         }
                         continue;
                     }
+                    if std::env::var_os("MOVES_DEBUG_MODULES").is_some() {
+                        eprintln!(
+                            "[chain] enter {} worker_rows={}",
+                            module.name(),
+                            worker_df.height()
+                        );
+                        use std::io::Write as _;
+                        let _ = std::io::stderr().flush();
+                    }
+                    let t_chain = Instant::now();
                     let out = {
                         let mut ctx = chunk_ctx.lock().expect("CalculatorContext mutex poisoned");
                         ctx.tables_mut().insert("MOVESWorkerOutput", worker_df);
                         module.execute(&mut ctx)?
                     };
+                    if std::env::var_os("MOVES_DEBUG_MODULES").is_some() {
+                        eprintln!(
+                            "[chain] exit  {} {:?} rows={}",
+                            module.name(),
+                            t_chain.elapsed(),
+                            out.as_ref().map_or(0, polars::prelude::DataFrame::height)
+                        );
+                        use std::io::Write as _;
+                        let _ = std::io::stderr().flush();
+                    }
                     let Some(df) = out else {
                         if std::env::var_os("MOVES_DEBUG_CHAINED").is_some() {
                             eprintln!("[chained-empty] {} returned no DataFrame", module.name());

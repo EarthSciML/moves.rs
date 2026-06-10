@@ -1519,7 +1519,13 @@ mod tests {
         let registry = build_registry().expect("registry");
         let config = EngineConfig {
             output_root: std::path::PathBuf::from(""),
-            max_parallel_chunks: 0,
+            // Honor MOVES_PROFILE_CHUNKS (default 0 = all cores). Set to 1 to make
+            // chunk execution sequential — clean per-module enter/exit tracing and
+            // isolates a single-calculator OOM from cumulative parallel allocation.
+            max_parallel_chunks: std::env::var("MOVES_PROFILE_CHUNKS")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0),
             run_spec_file_name: None,
             run_date_time: None,
             collect_output_in_memory: true,
@@ -1551,5 +1557,29 @@ mod tests {
             total_len,
             checksum
         );
+        // Per-table breakdown: name, row count, and (for MOVESOutput) the sum of
+        // emissionQuant — the actual check for nonzero emissions.
+        for (name, bytes) in &outcome.output_bytes {
+            let name = name.display();
+            match default_db::parquet_bytes_to_polars_df(bytes) {
+                Ok(df) => {
+                    let sum = df
+                        .column("emissionQuant")
+                        .ok()
+                        .and_then(|c| c.cast(&polars::prelude::DataType::Float64).ok())
+                        .and_then(|c| c.f64().ok().map(|ca| ca.into_iter().flatten().sum::<f64>()));
+                    let extra = match sum {
+                        Some(s) => format!(" emissionQuant_sum={s:.6e}"),
+                        None => String::new(),
+                    };
+                    eprintln!(
+                        "[table] {name}: {} rows x {} cols{extra}",
+                        df.height(),
+                        df.width()
+                    );
+                }
+                Err(e) => eprintln!("[table] {name}: <decode error: {e}>"),
+            }
+        }
     }
 }
