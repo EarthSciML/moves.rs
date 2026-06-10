@@ -86,8 +86,8 @@ pub mod pipeline;
 use moves_calculator_info::{Granularity, Priority};
 use moves_data::{PolProcessId, ProcessId, RoadTypeId, SourceTypeId};
 use moves_framework::{
-    CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStore,
-    DataFrameStoreTyped, Error, Generator, TableRow,
+    CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStoreTyped, Error,
+    Generator, TableRow,
 };
 use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
 
@@ -169,6 +169,13 @@ static INPUT_TABLES: &[&str] = &[
 /// Scratch-namespace table this generator writes.
 static OUTPUT_TABLES: &[&str] = &["OpModeDistribution"];
 
+/// Per-generator scratch marker (see [`crate::wiring::merge_op_mode_distribution`]).
+/// Set once this generator has contributed its rows to the shared
+/// `OpModeDistribution` table, so a repeat firing in the same chunk (the YEAR
+/// granularity fires for both Running Exhaust and Brakewear) returns early
+/// instead of rebuilding the distribution.
+const OMDG_DONE_MARKER: &str = "__omdg_done__OperatingModeDistributionGenerator";
+
 /// Upstream module: `SourceTypePhysics` builds `sourceUseTypePhysicsMapping`/// the road-load polynomial terms and real/temporary source-type rows the VSP
 /// calculation reads.
 static UPSTREAM: &[&str] = &["SourceTypePhysics"];
@@ -211,12 +218,7 @@ impl Generator for OperatingModeDistributionGenerator {
         // rebuilds a byte-identical OpModeDistribution. Once it is in scratch,
         // reuse it instead of recomputing (the kernel classifies every
         // drive-schedule second — the dominant cost).
-        if ctx
-            .scratch()
-            .store
-            .get("OpModeDistribution")
-            .is_some_and(|df| df.height() > 0)
-        {
+        if crate::wiring::op_mode_distribution_already_built(ctx, OMDG_DONE_MARKER) {
             return Ok(CalculatorOutput::empty());
         }
 
@@ -308,7 +310,7 @@ impl Generator for OperatingModeDistributionGenerator {
             }
         }
 
-        crate::wiring::write_scratch_table(ctx, "OpModeDistribution", output_rows)
+        crate::wiring::merge_op_mode_distribution(ctx, OMDG_DONE_MARKER, output_rows)
     }
 }
 

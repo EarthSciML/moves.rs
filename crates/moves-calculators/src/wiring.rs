@@ -30,7 +30,13 @@
 //! All helpers are `pub(crate)` — they are implementation detail shared across
 //! calculators and generators, not part of the public API.
 
-use moves_framework::{CalculatorContext, CalculatorOutput, Error, IntoDataFrame, TableRow};
+use std::collections::HashSet;
+
+use polars::prelude::{Column, DataFrame, PolarsResult};
+
+use moves_framework::{
+    CalculatorContext, CalculatorOutput, DataFrameStore, Error, IntoDataFrame, TableRow,
+};
 
 /// Position filters extracted from the current [`CalculatorContext`].
 ///
@@ -123,4 +129,254 @@ pub(crate) fn write_scratch_table<T: TableRow>(
         .map_err(|e| Error::Polars(e.to_string()))?;
     ctx.scratch_mut().insert(name, df);
     Ok(CalculatorOutput::empty())
+}
+
+/// The shared `OpModeDistribution` scratch table and its canonical superset
+/// schema, in column order. Every OMD generator's frame is projected onto this
+/// so frames from different producers concatenate cleanly.
+const OMD_TABLE: &str = "OpModeDistribution";
+const OMD_COLUMNS: [&str; 7] = [
+    "sourceTypeID",
+    "roadTypeID",
+    "linkID",
+    "hourDayID",
+    "polProcessID",
+    "opModeID",
+    "opModeFraction",
+];
+
+fn polars_err(e: impl std::fmt::Display) -> Error {
+    Error::Polars(e.to_string())
+}
+
+/// Project an OMD producer's frame onto [`OMD_COLUMNS`]: synthesize a
+/// zero-filled `roadTypeID` if the producer doesn't emit one (the Start and Evap
+/// distributions are off-network and no `OpModeDistribution` reader extracts
+/// `roadTypeID`) and reorder to the canonical column order. All producers emit
+/// `Int32` ids + `Float64` fractions already, so no cast is needed.
+fn normalize_omd(mut df: DataFrame) -> PolarsResult<DataFrame> {
+    if df.column("roadTypeID").is_err() {
+        let n = df.height();
+        df.with_column(Column::new("roadTypeID".into(), vec![0i32; n]))?;
+    }
+    df.select(OMD_COLUMNS)
+}
+
+/// The distinct `polProcessID`s present in an OMD frame.
+fn omd_pol_procs(df: &DataFrame) -> PolarsResult<HashSet<i32>> {
+    Ok(df
+        .column("polProcessID")?
+        .i32()?
+        .into_iter()
+        .flatten()
+        .collect())
+}
+
+/// Whether an OMD generator has nothing left to contribute this chunk, so it
+/// should return without rebuilding its (expensive) distribution.
+///
+/// True when either its own `marker` is already in scratch (a later firing of
+/// the same generator), or `OpModeDistribution` is a *provided* slow-tier table
+/// (a snapshot's pre-computed distribution) that no generator has augmented in
+/// scratch yet. The engine's `promote_scratch` copies each generator's scratch
+/// output into the slow tier after every firing but leaves scratch intact, so
+/// "scratch holds no `OpModeDistribution`" is what distinguishes a provided
+/// table from one an earlier generator in this same chunk already wrote.
+pub(crate) fn op_mode_distribution_already_built(ctx: &CalculatorContext, marker: &str) -> bool {
+    ctx.scratch().store.contains(marker)
+        || (ctx.scratch().store.get(OMD_TABLE).is_none()
+            && ctx.tables().get(OMD_TABLE).is_some_and(|df| df.height() > 0))
+}
+
+/// Merge one OMD producer's rows into the single shared `OpModeDistribution`
+/// scratch table instead of replacing it.
+///
+/// Canonical MOVES keeps `OpModeDistribution` as ONE process-keyed table that
+/// every OMD generator writes by `INSERT`. In the Rust port the OMD generators
+/// are co-chunked (every consumer reads the bare `OpModeDistribution` name) and
+/// share one per-chunk scratch table, so a plain replace lets the last-firing
+/// generator clobber the other processes' rows. This appends each producer's
+/// (process-disjoint) rows: if the table already holds rows for any of this
+/// producer's `polProcessID`s — a provided snapshot, or an earlier firing of the
+/// same generator — it is left untouched; otherwise the normalized rows are
+/// concatenated. `marker` is a per-generator scratch key set on completion so a
+/// later firing returns early via [`op_mode_distribution_already_built`].
+pub(crate) fn merge_op_mode_distribution<T: TableRow>(
+    ctx: &mut CalculatorContext,
+    marker: &str,
+    rows: Vec<T>,
+) -> Result<CalculatorOutput, Error> {
+    let incoming = normalize_omd(rows.into_dataframe().map_err(polars_err)?).map_err(polars_err)?;
+    let my_pps = omd_pol_procs(&incoming).map_err(polars_err)?;
+    // A prior generator's scratch output overrides a provided slow-tier table.
+    let existing = ctx
+        .scratch()
+        .store
+        .get(OMD_TABLE)
+        .or_else(|| ctx.tables().get(OMD_TABLE));
+    let merged = match existing {
+        // No table yet: create it (even when empty — downstream readers
+        // `iter_typed` the table and expect it to be present).
+        None => Some(incoming),
+        Some(existing) => {
+            let covered = existing
+                .column("polProcessID")
+                .ok()
+                .and_then(|c| {
+                    c.i32()
+                        .ok()
+                        .map(|c| c.into_iter().flatten().any(|v| my_pps.contains(&v)))
+                })
+                .unwrap_or(false);
+            if covered || incoming.height() == 0 {
+                // Already present for these processes (a provided snapshot or an
+                // earlier firing), or nothing to add — leave the table as is.
+                None
+            } else {
+                Some(
+                    normalize_omd((*existing).clone())
+                        .map_err(polars_err)?
+                        .vstack(&incoming)
+                        .map_err(polars_err)?,
+                )
+            }
+        }
+    };
+    if let Some(df) = merged {
+        ctx.scratch_mut().insert(OMD_TABLE, df);
+    }
+    // Mark this generator done even when it added nothing, so a repeat firing in
+    // the same chunk early-returns before rebuilding.
+    ctx.scratch_mut().insert(marker, DataFrame::empty());
+    Ok(CalculatorOutput::empty())
+}
+
+#[cfg(test)]
+mod omd_merge_tests {
+    use super::*;
+    use moves_framework::InMemoryStore;
+    use polars::prelude::{DataType, NamedFrom, Schema, Series};
+
+    /// Minimal `OpModeDistribution`-shaped row (no `roadTypeID`, like Start/Evap)
+    /// for exercising the cross-process merge directly.
+    struct OmdTestRow {
+        pol_process_id: i32,
+        op_mode_id: i32,
+    }
+
+    impl TableRow for OmdTestRow {
+        fn table_name() -> &'static str {
+            "OpModeDistribution"
+        }
+        fn polars_schema() -> Schema {
+            Schema::from_iter([
+                ("sourceTypeID".into(), DataType::Int32),
+                ("linkID".into(), DataType::Int32),
+                ("hourDayID".into(), DataType::Int32),
+                ("polProcessID".into(), DataType::Int32),
+                ("opModeID".into(), DataType::Int32),
+                ("opModeFraction".into(), DataType::Float64),
+            ])
+        }
+        fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+            let n = rows.len();
+            DataFrame::new(
+                n,
+                vec![
+                    Series::new("sourceTypeID".into(), vec![21i32; n]).into(),
+                    Series::new("linkID".into(), vec![1i32; n]).into(),
+                    Series::new("hourDayID".into(), vec![1i32; n]).into(),
+                    Series::new(
+                        "polProcessID".into(),
+                        rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>(),
+                    )
+                    .into(),
+                    Series::new(
+                        "opModeID".into(),
+                        rows.iter().map(|r| r.op_mode_id).collect::<Vec<i32>>(),
+                    )
+                    .into(),
+                    Series::new("opModeFraction".into(), vec![1.0f64; n]).into(),
+                ],
+            )
+        }
+        fn from_dataframe(_df: &DataFrame) -> Result<Vec<Self>, Error> {
+            Ok(Vec::new())
+        }
+    }
+
+    fn pol_procs(ctx: &CalculatorContext) -> HashSet<i32> {
+        let df = ctx
+            .scratch()
+            .store
+            .get(OMD_TABLE)
+            .expect("OpModeDistribution present");
+        omd_pol_procs(&df).unwrap()
+    }
+
+    #[test]
+    fn merge_accumulates_disjoint_processes_and_is_idempotent() {
+        let mut ctx = CalculatorContext::new();
+
+        // Producer A (process 101) then producer B (process 201): both survive.
+        merge_op_mode_distribution(
+            &mut ctx,
+            "__m_a",
+            vec![OmdTestRow { pol_process_id: 101, op_mode_id: 0 }],
+        )
+        .unwrap();
+        merge_op_mode_distribution(
+            &mut ctx,
+            "__m_b",
+            vec![
+                OmdTestRow { pol_process_id: 201, op_mode_id: 0 },
+                OmdTestRow { pol_process_id: 201, op_mode_id: 1 },
+            ],
+        )
+        .unwrap();
+
+        assert_eq!(pol_procs(&ctx), HashSet::from([101, 201]));
+        let height = ctx.scratch().store.get(OMD_TABLE).unwrap().height();
+        assert_eq!(height, 3, "1 row from A + 2 from B");
+        // roadTypeID synthesized for the schemaless rows.
+        assert!(ctx
+            .scratch()
+            .store
+            .get(OMD_TABLE)
+            .unwrap()
+            .column("roadTypeID")
+            .is_ok());
+
+        // Re-running a producer whose processes are already present adds nothing.
+        merge_op_mode_distribution(
+            &mut ctx,
+            "__m_a_again",
+            vec![OmdTestRow { pol_process_id: 101, op_mode_id: 9 }],
+        )
+        .unwrap();
+        assert_eq!(
+            ctx.scratch().store.get(OMD_TABLE).unwrap().height(),
+            3,
+            "process 101 already covered — no duplicate rows"
+        );
+    }
+
+    #[test]
+    fn already_built_detects_marker_and_provided_table() {
+        // Marker set → already built.
+        let mut ctx = CalculatorContext::new();
+        ctx.scratch_mut().insert("__m", DataFrame::empty());
+        assert!(op_mode_distribution_already_built(&ctx, "__m"));
+        assert!(!op_mode_distribution_already_built(&ctx, "__other"));
+
+        // Provided slow-tier table (no scratch OMD yet) → already built.
+        let mut store = InMemoryStore::new();
+        store.insert(
+            "OpModeDistribution",
+            OmdTestRow::into_dataframe(vec![OmdTestRow { pol_process_id: 101, op_mode_id: 0 }])
+                .unwrap(),
+        );
+        let provided = CalculatorContext::with_tables(store);
+        assert!(op_mode_distribution_already_built(&provided, "__unset"));
+    }
 }

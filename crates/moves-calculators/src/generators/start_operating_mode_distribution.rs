@@ -359,6 +359,9 @@ static INPUT_TABLES: &[&str] = &[
 /// (rates runs).
 static OUTPUT_TABLES: &[&str] = &["OpModeDistribution", "RatesOpModeDistribution"];
 
+/// Per-generator scratch marker (see [`crate::wiring::merge_op_mode_distribution`]).
+const START_OMDG_DONE_MARKER: &str = "__omdg_done__StartOperatingModeDistributionGenerator";
+
 // ---- row_err ----------------------------------------------------------------
 
 fn row_err(table: &'static str, row: usize, column: &'static str, msg: String) -> Error {
@@ -1116,6 +1119,12 @@ impl Generator for StartOperatingModeDistributionGenerator {
     }
 
     fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
+        // Skip when this generator has already contributed its rows to the shared
+        // OpModeDistribution table, or when it is provided by a snapshot.
+        if crate::wiring::op_mode_distribution_already_built(ctx, START_OMDG_DONE_MARKER) {
+            return Ok(CalculatorOutput::empty());
+        }
+
         // Step 400 fans the soak fractions out across the run's start
         // `polProcessID`s — `RunSpecPollutantProcess` (the run-scoped pol-process
         // set, post chain-expansion) filtered to the start-exhaust (2) and
@@ -1145,8 +1154,9 @@ impl Generator for StartOperatingModeDistributionGenerator {
         // populate both output tables.
         let (op_mode_rows, rates_rows) = build_start_op_mode_distribution(&inputs);
 
-        // Write OpModeDistribution to scratch.
-        crate::wiring::write_scratch_table(ctx, OUTPUT_TABLES[0], op_mode_rows)?;
+        // Merge the start rows into the shared OpModeDistribution table (the
+        // running/brake and evap generators contribute the other processes).
+        crate::wiring::merge_op_mode_distribution(ctx, START_OMDG_DONE_MARKER, op_mode_rows)?;
 
         // RatesOpModeDistribution is a rates-mode table. This generator's start
         // rows carry only a narrow schema (no canonical `roadTypeID`/etc.), and
