@@ -578,8 +578,27 @@ impl MOVESEngine {
     pub fn planned_chunks(&self) -> Result<Vec<Chunk>> {
         let modules = self.planned_modules()?;
         let refs: Vec<&str> = modules.iter().map(String::as_str).collect();
-        let provided: BTreeSet<&str> = self.slow_store.names().into_iter().collect();
+        let provided = self.provided_tables();
         chunk_chains(&self.registry, &refs, &provided)
+    }
+
+    /// Slow-tier table names that are actually populated.
+    ///
+    /// The default DB ships some runtime-derived tables (e.g. `SourceBin` /
+    /// `SourceBinDistribution`) as **0-row placeholder** partitions that a
+    /// generator fills at run time. Such an empty placeholder must NOT count as
+    /// "provided": if it did, [`chunk_chains`] would skip the producer→consumer
+    /// edge and leave every consumer reading the empty placeholder instead of
+    /// the generator's real output (the whole onroad inventory then comes out
+    /// empty). An authoritative, *nonempty* provided table (a snapshot's
+    /// pre-computed generator output) keeps its edge skipped, as before — that
+    /// is what prevents the generator from clobbering the snapshot value.
+    fn provided_tables(&self) -> BTreeSet<&str> {
+        self.slow_store
+            .names()
+            .into_iter()
+            .filter(|&n| self.slow_store.get(n).is_some_and(|df| df.height() > 0))
+            .collect()
     }
 
     /// Execute the run: plan and chunk the calculator graph, drive one
@@ -601,7 +620,7 @@ impl MOVESEngine {
         let t_plan_start = Instant::now();
         let modules_planned = self.planned_modules()?;
         let module_refs: Vec<&str> = modules_planned.iter().map(String::as_str).collect();
-        let provided_tables: BTreeSet<&str> = self.slow_store.names().into_iter().collect();
+        let provided_tables = self.provided_tables();
         let chunks = chunk_chains(&self.registry, &module_refs, &provided_tables)?;
         let planning_time = t_plan_start.elapsed();
 
