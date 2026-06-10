@@ -240,7 +240,51 @@ fn prune_geographic_tables_to_runspec(
     // rows — of which only the run county's handful of links are ever consumed.
     // Prune to the run's counties (links carry a countyID column).
     prune_table_by_id(store, "Link", "countyID", &county_ids)?;
+    // FuelSupply ships national — every fuelRegionID (~105k rows). The onroad
+    // fuel-effect calculators cross-join it (BasicRunningPmEmissionCalculator's
+    // fuel_supply_with_fuel_type × fuel_supply_adjustment), so the national
+    // table both explodes the join (100k × the rest) and double-counts market
+    // share across regions. Resolve the run's fuel regions from regionCounty
+    // (countyID → regionID) and prune FuelSupply to them.
+    let region_ids = fuel_region_ids_for_counties(store, &county_ids);
+    if !region_ids.is_empty() {
+        prune_table_by_id(store, "FuelSupply", "fuelRegionID", &region_ids)?;
+    }
     Ok(())
+}
+
+/// Resolve the fuel-region IDs serving `county_ids`, from `regionCounty`
+/// (`countyID`, `regionID`). Returns empty if the table or its columns are
+/// absent, in which case the caller leaves `FuelSupply` unpruned.
+fn fuel_region_ids_for_counties(
+    store: &InMemoryStore,
+    county_ids: &BTreeSet<i64>,
+) -> BTreeSet<i64> {
+    let Some(arc) = store.get("regionCounty") else {
+        return BTreeSet::new();
+    };
+    let df = &*arc;
+    let col = |name: &str| {
+        df.columns()
+            .iter()
+            .find(|c| c.name().eq_ignore_ascii_case(name))
+            .and_then(|c| c.cast(&DataType::Int64).ok())
+    };
+    let (Some(region_col), Some(county_col)) = (col("regionID"), col("countyID")) else {
+        return BTreeSet::new();
+    };
+    let (Ok(rids), Ok(cids)) = (region_col.i64(), county_col.i64()) else {
+        return BTreeSet::new();
+    };
+    let mut out: BTreeSet<i64> = BTreeSet::new();
+    for i in 0..df.height() {
+        if let (Some(r), Some(c)) = (rids.get(i), cids.get(i)) {
+            if county_ids.contains(&c) {
+                out.insert(r);
+            }
+        }
+    }
+    out
 }
 
 /// Resolve the set of zone IDs belonging to `county_ids` from the `Zone` table
