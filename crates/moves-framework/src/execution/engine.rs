@@ -82,7 +82,7 @@ use crate::data::{DataFrameStore, InMemoryStore};
 
 use moves_data::output_schema::{ActivityRecord, EmissionRecord, MovesRunRecord, OutputTable};
 use moves_data::{PollutantId, ProcessId};
-use moves_runspec::model::Model;
+use moves_runspec::model::{Model, ModelDomain, ModelScale};
 use moves_runspec::RunSpec;
 use polars::prelude::DataFrame;
 use sha2::{Digest, Sha256};
@@ -566,8 +566,23 @@ impl MOVESEngine {
         // `Models.evaluateModels` on an empty list and `models_label`).
         let nonroad = models.contains(&Model::Nonroad);
         let onroad = models.is_empty() || models.contains(&Model::Onroad);
-        self.registry
-            .execution_order_for_models(&self.selections(), onroad, nonroad)
+        let mut names =
+            self.registry
+                .execution_order_for_models(&self.selections(), onroad, nonroad)?;
+
+        // Domain/scale OpModeDistribution swap (canonical `MOVESInstantiator`
+        // M1): exactly one of the three OMD producers runs, chosen by
+        // domain/scale. The `(pollutant, process)` filter over-selects all three
+        // (they share processes 1+9), so drop the two that don't match this run.
+        // Dropping after the topological order is safe — removing modules
+        // preserves the remaining modules' relative order.
+        let is_project = self.execution.model_domain() == Some(ModelDomain::Project);
+        let is_mesoscale = self.execution.model_scale() == ModelScale::Rates;
+        let drop = self
+            .registry
+            .domain_scale_excluded_omd_modules(is_project, is_mesoscale);
+        names.retain(|n| !drop.contains(n));
+        Ok(names)
     }
 
     /// The planned modules split into independent calculator chains /// what the [`BoundedExecutor`] dispatches.
