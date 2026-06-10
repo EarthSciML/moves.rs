@@ -100,7 +100,13 @@
 //! `DataFrameStore` lands, `execute` builds the inputs from `ctx.tables()`,
 //! calls `run`, and stores the [`WorkerOutputRow`]s.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
+
+// Drop-in alias: these maps are all built-then-point-looked-up indexes over the
+// calculator's input rows, rebuilt on every invocation. The default SipHash
+// hasher dominated the profile here (`core::hash::BuildHasher::hash_one`);
+// FxHash is a far cheaper non-crypto hash for the small integer/tuple keys used.
+use rustc_hash::FxHashMap as HashMap;
 use std::sync::OnceLock;
 
 use moves_calculator_info::{Granularity, Priority};
@@ -546,7 +552,7 @@ fn weight_by_op_mode(
     constants: &RunConstants,
 ) -> Vec<OpModeWeightedRate> {
     // EmissionRateByAge indexed by the `USING (polProcessID, opModeID)` join.
-    let mut er_by_pol_op: HashMap<(i32, i32), Vec<&EmissionRateByAgeRow>> = HashMap::new();
+    let mut er_by_pol_op: HashMap<(i32, i32), Vec<&EmissionRateByAgeRow>> = HashMap::default();
     for er in &inputs.emission_rate_by_age {
         er_by_pol_op
             .entry((er.pol_process_id, er.op_mode_id))
@@ -554,7 +560,7 @@ fn weight_by_op_mode(
             .push(er);
     }
     // AgeCategory age ids grouped by age group.
-    let mut age_ids_by_group: HashMap<i32, Vec<i32>> = HashMap::new();
+    let mut age_ids_by_group: HashMap<i32, Vec<i32>> = HashMap::default();
     for acat in &inputs.age_category {
         age_ids_by_group
             .entry(acat.age_group_id)
@@ -562,7 +568,7 @@ fn weight_by_op_mode(
             .push(acat.age_id);
     }
     // SourceBinDistribution's `sourceTypeModelYearID`s by `(polProcessID, sourceBinID)`.
-    let mut stmy_ids_by_pol_bin: HashMap<(i32, i64), Vec<i32>> = HashMap::new();
+    let mut stmy_ids_by_pol_bin: HashMap<(i32, i64), Vec<i32>> = HashMap::default();
     for sbd in &inputs.source_bin_distribution {
         stmy_ids_by_pol_bin
             .entry((sbd.pol_process_id, sbd.source_bin_id))
@@ -648,7 +654,7 @@ fn weight_by_source_bin(
     constants: &RunConstants,
 ) -> Vec<FullyWeightedRate> {
     // SourceBinDistribution rows by `(polProcessID, sourceBinID)`.
-    let mut sbd_by_pol_bin: HashMap<(i32, i64), Vec<&SourceBinDistributionRow>> = HashMap::new();
+    let mut sbd_by_pol_bin: HashMap<(i32, i64), Vec<&SourceBinDistributionRow>> = HashMap::default();
     for sbd in &inputs.source_bin_distribution {
         sbd_by_pol_bin
             .entry((sbd.pol_process_id, sbd.source_bin_id))
@@ -754,7 +760,7 @@ fn multiply_by_activity(
     fully_weighted: &[FullyWeightedRate],
     inputs: &BasicStartPmInputs,
 ) -> Vec<UnadjustedEmission> {
-    let mut starts_by: HashMap<(i32, i32, i32, i32), Vec<&StartsRow>> = HashMap::new();
+    let mut starts_by: HashMap<(i32, i32, i32, i32), Vec<&StartsRow>> = HashMap::default();
     for s in &inputs.starts {
         starts_by
             .entry((s.hour_day_id, s.year_id, s.age_id, s.source_type_id))
