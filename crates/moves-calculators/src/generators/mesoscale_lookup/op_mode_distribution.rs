@@ -373,6 +373,20 @@ pub fn classify_op_mode(
     if speed_mph == 0.0 && pol_process_id == BRAKE_PARTICULATE_POLPROCESS {
         return Some(STOPPED_BRAKE_OP_MODE);
     }
+    classify_op_mode_generic(speed_mph, vsp, is_braking, operating_modes)
+}
+
+/// The pol-process-independent core of [`classify_op_mode`] — everything
+/// except the brake-particulate zero-speed override. Factored out so the
+/// generator can classify each second once and reuse the result across every
+/// pollutant/process (see [`operating_mode_distribution`]).
+#[must_use]
+fn classify_op_mode_generic(
+    speed_mph: f64,
+    vsp: Option<f64>,
+    is_braking: bool,
+    operating_modes: &[OperatingModeBin],
+) -> Option<i16> {
     // Override: any sub-1-mph second is idle.
     if speed_mph < IDLE_SPEED_MPH {
         return Some(IDLE_OP_MODE);
@@ -520,6 +534,90 @@ pub fn op_mode_fractions_for_schedule(
     fractions
 }
 
+/// One drive schedule's operating-mode classification, shared across every
+/// pollutant/process. The expensive per-second VSP + bin lookup
+/// ([`classify_op_mode_generic`]) is pol-process-independent, so
+/// [`operating_mode_distribution`] computes it once per schedule and derives
+/// each process's fractions from these histograms rather than re-classifying
+/// every second for every process.
+///
+/// `generic_counts` is the op-mode histogram for any ordinary process;
+/// `brake_counts` is the same with each zero-speed second remapped to the
+/// stopped-brake mode (501), reproducing the brake-particulate override in
+/// [`classify_op_mode`]. Both share the denominator `total` — the count of
+/// classified seconds, including those that classify to no mode.
+struct ScheduleClassification {
+    total: f64,
+    generic_counts: BTreeMap<i16, usize>,
+    brake_counts: BTreeMap<i16, usize>,
+}
+
+impl ScheduleClassification {
+    /// Fractions for one pollutant/process — `opModeID -> count / total`,
+    /// bit-identical to what [`op_mode_fractions_for_schedule`] returns for
+    /// the same `(seconds, physics, pol_process_id)`.
+    fn fractions_for(&self, pol_process_id: PolProcessId) -> BTreeMap<i16, f64> {
+        let counts = if pol_process_id == BRAKE_PARTICULATE_POLPROCESS {
+            &self.brake_counts
+        } else {
+            &self.generic_counts
+        };
+        let mut fractions: BTreeMap<i16, f64> = BTreeMap::new();
+        for (&op_mode, &count) in counts {
+            fractions.insert(op_mode, count as f64 / self.total);
+        }
+        fractions
+    }
+}
+
+/// Classify every second of one drive schedule once, independent of
+/// pollutant/process. Mirrors [`op_mode_fractions_for_schedule`]'s per-second
+/// loop exactly, but accumulates the generic and brake-override histograms in
+/// a single pass so the per-second physics is not repeated for each process.
+fn classify_schedule_seconds(
+    seconds: &[DriveScheduleSecond],
+    physics: &SourceTypePhysics,
+    operating_modes: &[OperatingModeBin],
+) -> ScheduleClassification {
+    let mut sorted: Vec<DriveScheduleSecond> = seconds.to_vec();
+    sorted.sort_by_key(|s| s.second);
+    let mut generic_counts: BTreeMap<i16, usize> = BTreeMap::new();
+    let mut brake_counts: BTreeMap<i16, usize> = BTreeMap::new();
+    if sorted.len() < 2 {
+        return ScheduleClassification {
+            total: 0.0,
+            generic_counts,
+            brake_counts,
+        };
+    }
+    let accels: Vec<f64> = sorted.windows(2).map(|w| w[1].speed - w[0].speed).collect();
+    let total = accels.len() as f64;
+    for (index, accel) in accels.iter().copied().enumerate() {
+        let speed_mph = sorted[index + 1].speed;
+        let vsp = vehicle_specific_power(physics, speed_mph * MPH_TO_MPS, accel * MPH_TO_MPS);
+        let braking = is_braking_second(&accels, index);
+        let generic = classify_op_mode_generic(speed_mph, vsp, braking, operating_modes);
+        if let Some(op_mode) = generic {
+            *generic_counts.entry(op_mode).or_insert(0) += 1;
+        }
+        // The brake-particulate override only diverges at exactly zero speed;
+        // every other second classifies identically to the generic path.
+        let brake = if speed_mph == 0.0 {
+            Some(STOPPED_BRAKE_OP_MODE)
+        } else {
+            generic
+        };
+        if let Some(op_mode) = brake {
+            *brake_counts.entry(op_mode).or_insert(0) += 1;
+        }
+    }
+    ScheduleClassification {
+        total,
+        generic_counts,
+        brake_counts,
+    }
+}
+
 /// Run the full `MesoscaleLookupOperatingModeDistributionGenerator`
 /// pipeline — Java steps `OMDG-1` … `OMDG-7` (preliminary).
 ///
@@ -606,13 +704,11 @@ pub fn operating_mode_distribution(
         let Some(seconds) = schedule_seconds.get(&schedule_id) else {
             continue;
         };
+        // Classify the schedule's seconds once; the per-second physics is
+        // pol-process-independent except the brake-particulate override.
+        let classified = classify_schedule_seconds(seconds, phys, inputs.operating_modes);
         for &pol_process_id in op_modes_for_polproc.keys() {
-            let fractions = op_mode_fractions_for_schedule(
-                seconds,
-                phys,
-                pol_process_id,
-                inputs.operating_modes,
-            );
+            let fractions = classified.fractions_for(pol_process_id);
             if !fractions.is_empty() {
                 mode_fractions.insert((source_type, schedule_id, pol_process_id), fractions);
             }
