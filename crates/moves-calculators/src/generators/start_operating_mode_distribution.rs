@@ -1163,9 +1163,10 @@ impl Generator for StartOperatingModeDistributionGenerator {
         // in an inventory run it is the *only* writer of the table — so emitting
         // it leaves a schema-incompatible table that breaks strict extraction in
         // every reader (BaseRateGenerator, SourceTypePhysics). No inventory
-        // reader needs it, so only emit it outside inventory mode (rates/project,
-        // and the `None` default used by unit tests).
-        if ctx.model_scale() != Some(ModelScale::Inventory) {
+        // reader needs it, so only emit it outside inventory mode. Both `Macro`
+        // (legacy `MACROSCALE`) and `Inventory` (`Inv`) are inventory scales —
+        // only `Rates` (and the `None` default used by unit tests) emit.
+        if !ctx.model_scale().is_some_and(ModelScale::is_inventory) {
             let rates_df = RatesOpModeDistributionRow::into_dataframe(rates_rows)
                 .map_err(|e| Error::Polars(e.to_string()))?;
             ctx.scratch_mut().insert(OUTPUT_TABLES[1], rates_df);

@@ -97,6 +97,15 @@ impl ModelScale {
             _ => None,
         }
     }
+
+    /// Whether this is an inventory (mass-output) scale — `Macro` (the legacy
+    /// `MACROSCALE` string) or `Inventory` (`Inv`) — as opposed to `Rates`.
+    /// Both produce mass inventories and share the same calculator behavior, so
+    /// scale-sensitive logic must treat them identically; only `Rates` differs.
+    #[must_use]
+    pub fn is_inventory(self) -> bool {
+        matches!(self, Self::Macro | Self::Inventory)
+    }
 }
 
 /// `modeldomain[value]` — execution-domain mode.

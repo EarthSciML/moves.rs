@@ -762,7 +762,7 @@ impl Generator for SourceTypePhysics {
         // table is populated only by the start op-mode generator's narrow
         // schema (no `roadTypeID`), and nothing downstream consumes it, so skip
         // the correction rather than fail extracting the absent columns.
-        if ctx.model_scale() == Some(ModelScale::Inventory) {
+        if ctx.model_scale().is_some_and(ModelScale::is_inventory) {
             return Ok(CalculatorOutput::empty());
         }
 

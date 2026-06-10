@@ -237,7 +237,7 @@ impl Generator for BaseRateGenerator {
         // Project domain overrides it to false later (handled via the !is_project gate on
         // use_avg_speed_bin rather than mutating the intermediate).
         let apply_avg_speed_distribution =
-            matches!(scale, Some(ModelScale::Inventory)) && matches!(process_id, 1 | 9 | 10);
+            scale.is_some_and(ModelScale::is_inventory) && matches!(process_id, 1 | 9 | 10);
         // Net after Project-domain override (Java: if isProjectDomain && proc∈{1,9,10} then false):
         let apply_avg_speed_distribution = apply_avg_speed_distribution && !is_project;
 
@@ -257,7 +257,7 @@ impl Generator for BaseRateGenerator {
         // Java: applySourceBinDistribution = (scale == MACROSCALE); if process ∈ {2,90,91} →
         // applySourceBinDistribution = true. No Project-domain override for this flag.
         let use_sum_sbd =
-            matches!(scale, Some(ModelScale::Inventory)) || matches!(process_id, 2 | 90 | 91);
+            scale.is_some_and(ModelScale::is_inventory) || matches!(process_id, 2 | 90 | 91);
 
         // useSumSBDRaw: Rates (Java MESOSCALE_LOOKUP) scale AND processes 2/90/91.
         let use_sum_sbd_raw =
