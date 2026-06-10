@@ -407,9 +407,12 @@ pub fn process_drive_cycles(
 
     // Group the bracketed bins for fast lookup by real source type.
     // Lookup-only (never iterated for order) → FxHashMap for O(1) probes in
-    // the driving-idle and RatesOpModeDistribution inner loops.
-    let mut bins_fast: FxHashMap<FastKey, Vec<BracketedBinKey>> = FxHashMap::default();
-    for &key in bracketed_bins.keys() {
+    // the driving-idle and RatesOpModeDistribution inner loops. `bracketed_bins`
+    // is not mutated past this point, so carry each detail by reference and
+    // avoid re-probing the BTreeMap by key in those hot inner loops.
+    let mut bins_fast: FxHashMap<FastKey, Vec<(BracketedBinKey, &BracketedBinDetail)>> =
+        FxHashMap::default();
+    for (&key, detail) in &bracketed_bins {
         let physics = &prepared.source_use_type_physics_mapping[key.physics_index];
         bins_fast
             .entry(FastKey {
@@ -418,7 +421,7 @@ pub fn process_drive_cycles(
                 avg_speed_bin_id: key.avg_speed_bin_id,
             })
             .or_default()
-            .push(key);
+            .push((key, detail));
     }
 
     // Driving-idle fraction, needed for off-network idling.
@@ -452,8 +455,7 @@ pub fn process_drive_cycles(
                         }) else {
                             continue;
                         };
-                        for key in keys {
-                            let detail = &bracketed_bins[key];
+                        for &(_, detail) in keys {
                             if detail.op_mode_fractions.is_empty() {
                                 continue;
                             }
@@ -566,8 +568,7 @@ pub fn process_drive_cycles(
                             }) else {
                                 continue;
                             };
-                            for key in keys {
-                                let detail = &bracketed_bins[key];
+                            for &(key, detail) in keys {
                                 if detail.op_mode_fractions.is_empty() {
                                     continue;
                                 }
