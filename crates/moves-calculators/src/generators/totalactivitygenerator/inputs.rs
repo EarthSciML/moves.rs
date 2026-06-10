@@ -560,6 +560,12 @@ pub struct TotalActivityInputs {
     pub hour_of_any_day: Vec<HourOfAnyDayRow>,
     /// `ZoneRoadType`.
     pub zone_road_type: Vec<ZoneRoadTypeRow>,
+    /// `Link` — needed to allocate `SHOByAgeRoadwayHour` to links for the
+    /// worker `SHO` table (`allocateTotalActivityBasis`).
+    pub link: Vec<LinkRow>,
+    /// `RunSpecHourDay` — selects the hour/day combinations the `SHO`
+    /// allocation keeps.
+    pub run_spec_hour_day: Vec<RunSpecHourDayRow>,
     /// `HotellingCalendarYear`.
     pub hotelling_calendar_year: Vec<HotellingCalendarYearRow>,
     /// `SampleVehicleDay`.

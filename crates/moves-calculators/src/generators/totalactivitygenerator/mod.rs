@@ -2941,6 +2941,8 @@ static INPUT_TABLES: &[&str] = &[
     "AvgSpeedDistribution",
     "HourOfAnyDay",
     "ZoneRoadType",
+    "Link",
+    "runSpecHourDay",
     "hotellingCalendarYear",
     "hotellingHoursPerDay",
     "SampleVehicleDay",
@@ -2968,6 +2970,7 @@ static OUTPUT_TABLES: &[&str] = &[
     "VMTByAgeRoadwayHour",
     "vmtByMYRoadHourFraction",
     "SHOByAgeRoadwayHour",
+    "SHO",
     "VMTByAgeRoadwayDay",
     "IdleHoursByAgeHour",
     "StartsByAgeHour",
@@ -3239,6 +3242,8 @@ impl Generator for TotalActivityGenerator {
             avg_speed_distribution: ctx.tables().iter_typed("AvgSpeedDistribution")?,
             hour_of_any_day: ctx.tables().iter_typed("HourOfAnyDay")?,
             zone_road_type: iter_optional(ctx.tables(), "ZoneRoadType")?,
+            link: iter_optional(ctx.tables(), "Link")?,
+            run_spec_hour_day: iter_optional(ctx.tables(), "runSpecHourDay")?,
             hotelling_calendar_year: iter_optional(ctx.tables(), "hotellingCalendarYear")?,
             sample_vehicle_day: iter_optional(ctx.tables(), "SampleVehicleDay")?,
             sample_vehicle_trip: iter_optional(ctx.tables(), "SampleVehicleTrip")?,
@@ -3246,6 +3251,24 @@ impl Generator for TotalActivityGenerator {
         };
 
         let output = self.run(&inputs);
+
+        // Allocate SHOByAgeRoadwayHour to links → the worker `SHO` table the
+        // emission calculators read. This is the `allocateTotalActivityBasis`
+        // SHO step (TotalActivityGenerator.java line ~2143); it was previously
+        // unported, leaving `SHO` empty and zeroing the entire running-exhaust
+        // inventory. `SHO` is link-level (downstream consumers extract `linkID`
+        // and the output aggregation sums over links), so it is written as-is.
+        let zone_road_type_link =
+            allocation::zone_road_type_link(&inputs.zone_road_type, &inputs.link, inputs.zone_id);
+        let sho_alloc = allocation::allocate_sho(
+            &output.sho_by_age_roadway_hour,
+            &zone_road_type_link,
+            &inputs.run_spec_hour_day,
+            analysis_year,
+        );
+        let sho_df = <allocation::ShoRow as TableRow>::into_dataframe(sho_alloc)
+            .map_err(|e| Error::Polars(e.to_string()))?;
+        ctx.scratch_mut().store.insert("SHO", sho_df);
 
         // Write all 12 output tables to scratch.
         macro_rules! write_scratch {
@@ -3318,6 +3341,8 @@ mod tests {
             analysis_year: 2020,
             zone_id: 100,
             has_hotelling_hours_per_day_input: false,
+            link: vec![],
+            run_spec_hour_day: vec![],
             year: vec![YearRow {
                 year_id: 2020,
                 is_base_year: true,
