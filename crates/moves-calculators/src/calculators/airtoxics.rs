@@ -2399,7 +2399,15 @@ impl Calculator for AirToxicsCalculator {
     /// emits the resulting toxic rows.
     fn execute(&self, ctx: &CalculatorContext) -> Result<CalculatorOutput, Error> {
         let tables = ctx.tables();
-        let chained_to: Vec<ChainedToRow> = tables.iter_typed("RunSpecChainedTo")?;
+        // `RunSpecChainedTo` maps each selected input pol-process to the
+        // `ATRatio*` air-toxics outputs chained from it. It is a runtime-derived
+        // table; the default-DB path only synthesises it when the run actually
+        // selects chained-to air-toxics pollutants. A run that selects none (e.g.
+        // a PM- or criteria-only inventory) legitimately has no chained-to rows,
+        // so treat an absent table as empty — the `ATRatio*` paths produce nothing
+        // and the direct air-toxics paths still run. (When the table IS present —
+        // snapshots, or an air-toxics run — it is read normally.)
+        let chained_to: Vec<ChainedToRow> = tables.iter_typed_or_empty("RunSpecChainedTo")?;
         // The snapshot ships the raw default-DB ratio tables; reproduce the
         // master's `Section Extract Data` transforms (PollutantProcessAssoc
         // join + modelYearGroupID expansion + the ATRatio FuelSupply join) so

@@ -1039,6 +1039,36 @@ fn build_runspec_tables(runspec: &RunSpec, store: &mut InMemoryStore) -> Result<
     };
     insert_i32(store, "RunSpecYear", "yearID", year_ids);
 
+    // RunSpecModelYear: the fleet model years covered by the run — each analysis
+    // year minus every age in `AgeCategory` (ages 0..=40). SO2 / SulfatePM filter
+    // their per-`modelYearID` rates to this set; canonical MOVES populates
+    // `RunSpecModelYear` the same way (the run's years crossed with the age range).
+    // Mirrors the `modelYearID = year - ageID` derivation already used by the
+    // BaseRate SBWeighted port.
+    let model_year_ids: Vec<i32> = {
+        let age_ids: Vec<i32> = store
+            .get("AgeCategory")
+            .and_then(|arc| {
+                let df = &*arc;
+                let col = df
+                    .columns()
+                    .iter()
+                    .find(|c| c.name().eq_ignore_ascii_case("ageID"))?;
+                let casted = col.cast(&DataType::Int32).ok()?;
+                let ca = casted.i32().ok()?;
+                Some(ca.into_iter().flatten().collect::<Vec<i32>>())
+            })
+            .unwrap_or_default();
+        let mut ids: BTreeSet<i32> = BTreeSet::new();
+        for &y in &runspec.timespan.years {
+            for &a in &age_ids {
+                ids.insert(y as i32 - a);
+            }
+        }
+        ids.into_iter().collect()
+    };
+    insert_i32(store, "RunSpecModelYear", "modelYearID", model_year_ids);
+
     // RunSpecRoadType.
     let road_type_ids: Vec<i32> = {
         let mut ids: BTreeSet<i32> = BTreeSet::new();

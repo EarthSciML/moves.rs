@@ -5342,7 +5342,7 @@ impl Calculator for MultidayTankVaporVentingCalculator {
                 .iter_typed::<EvapRvpTemperatureAdjustmentRow>("evapRVPTemperatureAdjustment")?,
             fuel_type: tables.iter_typed::<FuelTypeRow>("FuelType")?,
             hour_day: tables.iter_typed::<HourDayRow>("HourDay")?,
-            im_coverage: tables.iter_typed::<ImCoverageRow>("IMCoverage")?,
+            im_coverage: tables.iter_typed_or_empty::<ImCoverageRow>("IMCoverage")?,
             im_factor: tables.iter_typed::<ImFactorRow>("IMFactor")?,
             month_of_any_year: tables.iter_typed::<MonthOfAnyYearRow>("MonthOfAnyYear")?,
             op_mode_distribution: tables

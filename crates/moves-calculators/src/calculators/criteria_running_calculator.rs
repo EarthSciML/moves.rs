@@ -4433,7 +4433,7 @@ impl Calculator for CriteriaRunningCalculator {
             full_ac_adjustment: tables.iter_typed("FullACAdjustment")?,
             fuel_type: tables.iter_typed("FuelType")?,
             hour_day: tables.iter_typed("HourDay")?,
-            im_coverage: tables.iter_typed("IMCoverage")?,
+            im_coverage: tables.iter_typed_or_empty("IMCoverage")?,
             im_factor: tables.iter_typed("IMFactor")?,
             link: tables.iter_typed("Link")?,
             model_year: tables.iter_typed("ModelYear")?,

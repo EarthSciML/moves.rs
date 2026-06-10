@@ -3726,7 +3726,7 @@ impl Calculator for CriteriaStartCalculator {
             fuel_subtype: tables.iter_typed("FuelSubtype")?,
             fuel_supply: fuel_supply_rows,
             hour_day: tables.iter_typed("HourDay")?,
-            im_coverage: tables.iter_typed("IMCoverage")?,
+            im_coverage: tables.iter_typed_or_empty("IMCoverage")?,
             im_factor: tables.iter_typed("IMFactor")?,
             month_of_any_year: tables.iter_typed("MonthOfAnyYear")?,
             op_mode_distribution: tables.iter_typed("OpModeDistribution")?,

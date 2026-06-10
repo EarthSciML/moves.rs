@@ -802,7 +802,7 @@ impl Calculator for Nh3RunningCalculator {
                     "PollutantProcessMappedModelYear",
                 )?,
             im_factor: tables.iter_typed::<ImFactorRow>("IMFactor")?,
-            im_coverage: tables.iter_typed::<ImCoverageRow>("IMCoverage")?,
+            im_coverage: tables.iter_typed_or_empty::<ImCoverageRow>("IMCoverage")?,
         };
         let rows = Nh3RunningCalculator::calculate(&inputs, &run_ctx);
         crate::wiring::emit_rows(rows)
