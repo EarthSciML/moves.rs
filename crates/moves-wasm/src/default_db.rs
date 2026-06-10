@@ -233,6 +233,13 @@ fn prune_geographic_tables_to_runspec(
     // the gpa-blended fuel adjustment across every county). Prune to the run's
     // counties.
     prune_table_by_id(store, "County", "countyID", &county_ids)?;
+    // Link ships as the full national table (22610 rows across 3232 counties).
+    // OperatingModeDistributionGenerator cross-joins it against the op-mode
+    // fractions on roadTypeID (`for fraction { for link { if road match }}`),
+    // so a national Link turns ~62k fractions into ~200M OpModeDistribution
+    // rows — of which only the run county's handful of links are ever consumed.
+    // Prune to the run's counties (links carry a countyID column).
+    prune_table_by_id(store, "Link", "countyID", &county_ids)?;
     Ok(())
 }
 
