@@ -303,9 +303,11 @@ impl Generator for BaseRateGenerator {
             if !provided_by_age.is_empty() || !provided_non_age.is_empty() {
                 (provided_by_age, provided_non_age)
             } else {
+                let county_id = pos.location.county_id.unwrap_or(0) as i64;
                 let computed = sbweighted::compute_sb_weighted_rates(
                     ctx.tables(),
                     i64::from(process_id),
+                    county_id,
                     i64::from(year_id),
                 )?;
                 (computed.by_age, computed.non_age)

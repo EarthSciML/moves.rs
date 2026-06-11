@@ -127,12 +127,31 @@ fn index_rates<S: DataFrameStoreTyped + ?Sized>(
 pub fn compute_sb_weighted_rates<S: DataFrameStoreTyped + ?Sized>(
     store: &S,
     process_id: i64,
+    county_id: i64,
     year: i64,
 ) -> Result<SbWeightedRates, Error> {
+    // Canonical `BaseRateGenerator.generateSBWeightedEmissionRates` weights the
+    // raw rates by the FUEL-USAGE-remapped source-bin distribution
+    // (`sourceBinDistributionFuelUsage_<process>_<county>_<year>`, built by
+    // SourceBinDistributionGenerator.doCountyYear), NOT the raw
+    // `SourceBinDistribution`. The remap reattributes each flex-fuel vehicle's
+    // activity from its *equipped* fuel bin (e.g. E85) to the fuel it actually
+    // *burns* (mostly gasoline) via `fuelUsageFraction`. Using the raw
+    // (equipped) distribution over-weights E85 energy ~50× and under-weights
+    // gasoline (growing with model year as flex-fuel penetration rises). Prefer
+    // the fuel-usage table; fall back to raw `SourceBinDistribution` only when
+    // it is absent (unit-test contexts that seed the raw table directly).
+    let fuel_usage_table = format!("sourceBinDistributionFuelUsage_{process_id}_{county_id}_{year}");
+    let sbd_table: &str = if store.get(&fuel_usage_table).is_some() {
+        &fuel_usage_table
+    } else {
+        "SourceBinDistribution"
+    };
+
     // Nothing to weight when the driver tables are absent (a context that
     // supplies the `SBWeighted*` tables directly), rather than erroring on a
     // missing column.
-    if store.get("SourceBinDistribution").is_none() || store.get("EmissionRateByAge").is_none() {
+    if store.get(sbd_table).is_none() || store.get("EmissionRateByAge").is_none() {
         return Ok(SbWeightedRates {
             by_age: Vec::new(),
             non_age: Vec::new(),
@@ -204,12 +223,12 @@ pub fn compute_sb_weighted_rates<S: DataFrameStoreTyped + ?Sized>(
     let rates_by_age = index_rates(store, "EmissionRateByAge", true)?;
     let rates_non_age = index_rates(store, "EmissionRate", false)?;
 
-    // SourceBinDistribution — the driver (small: one row per (stmy, polProcess,
-    // bin) for the run's source bins).
-    let sbd_stmy = col_i64(store, "SourceBinDistribution", "sourceTypeModelYearID")?;
-    let sbd_pol = col_i64(store, "SourceBinDistribution", "polProcessID")?;
-    let sbd_bin = col_i64(store, "SourceBinDistribution", "sourceBinID")?;
-    let sbd_frac = col_f64(store, "SourceBinDistribution", "sourceBinActivityFraction")?;
+    // The fuel-usage-remapped SBD (or raw, as fallback) — the driver (small: one
+    // row per (stmy, polProcess, bin) for the run's source bins).
+    let sbd_stmy = col_i64(store, sbd_table, "sourceTypeModelYearID")?;
+    let sbd_pol = col_i64(store, sbd_table, "polProcessID")?;
+    let sbd_bin = col_i64(store, sbd_table, "sourceBinID")?;
+    let sbd_frac = col_f64(store, sbd_table, "sourceBinActivityFraction")?;
 
     // Output group keys: byAge carries ageGroupID, non-age does not.
     let mut by_age: BTreeMap<(i64, i64, i64, i64, i64, i64, i64), Acc> = BTreeMap::new();

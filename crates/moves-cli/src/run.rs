@@ -232,6 +232,14 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
                 .iter()
                 .map(|t| (*t).to_owned()),
         );
+        // The BaseRateGenerator's SB-weighting reads the fuel-usage-remapped
+        // source-bin distribution under a dynamic per-(process,county,year) name
+        // (`sourceBinDistributionFuelUsage_1_26161_2020`). It declares no static
+        // INPUT_TABLES entry, so admit its base name explicitly; the loader
+        // strips the numeric suffix to match (see `strip_numeric_index_suffix`).
+        // Without this the SB-weighting falls back to the raw SourceBinDistribution
+        // and over-weights flex-fuel (E85) energy ~50×.
+        tables.insert("sourcebindistributionfuelusage".to_owned());
         Some(tables)
     } else {
         None
