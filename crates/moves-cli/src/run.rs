@@ -303,6 +303,11 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
                 default_db_path.display()
             )
         })?;
+        // Execution day types: canonical iterates every DayOfAnyWeek day (not the
+        // runspec `<day>` selection). The load filter above loaded the day-keyed
+        // tables for all day types; read them back here (store is moved into the
+        // engine below) so the execution day set can be expanded to match.
+        let execution_day_ids: Vec<u32> = day_ids_from_store(&store);
         // The default DB carries both the rates and inventory execution tables,
         // so follow canonical MOVESInstantiator DO_RATES_FIRST (the released
         // default) and run only the BaseRate + chained pipeline — otherwise the
@@ -312,6 +317,9 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
         engine
             .execution_run_spec_mut()
             .build_execution_locations(&geography);
+        engine
+            .execution_run_spec_mut()
+            .set_execution_days(execution_day_ids);
     }
     let outcome = engine.run().context("MOVES engine run failed")?;
     Ok(outcome)
@@ -1009,6 +1017,15 @@ pub fn build_default_db_store(
     // fuel_type_id=2"). Union the fleet fuels into the load filter.
     expand_fuel_filter_to_fleet(&db, &mut base_filters)
         .context("expanding fuelType filter to the selected sources' fleet fuels")?;
+    // Expand the dayID load filter to all DayOfAnyWeek day types. Canonical's
+    // execution time span (buildExecutionTimeSpan useRunSpec=false) iterates
+    // every DayOfAnyWeek day, not the runspec `<day>` selection, so the
+    // day-keyed tables (DayOfAnyWeek, HourDay, HourVMTFraction, …) must load for
+    // both weekend (2) and weekday (5). The execution-day set is expanded to
+    // match after load (set_execution_days). Without this, selecting weekday
+    // only would drop the weekend day type's activity — ~half the output rows.
+    expand_day_filter_to_all_day_types(&db, &mut base_filters)
+        .context("expanding dayID filter to all DayOfAnyWeek day types")?;
     let plan = InputDataManager::plan(&base_filters, &default_tables());
     let mut store = InputDataManager::execute(&plan, &db)
         .map_err(|e| anyhow::anyhow!("loading default DB: {e}"))?;
@@ -1100,6 +1117,66 @@ fn expand_fuel_filter_to_fleet(
     }
     filters.fuel_type_ids = fuels.into_iter().collect();
     Ok(())
+}
+
+/// Replace `filters.days` with all `DayOfAnyWeek` day types from the default DB.
+///
+/// Canonical's execution time span iterates every `DayOfAnyWeek` day (not the
+/// runspec selection); the day-keyed input tables must therefore load for all
+/// day types. No-op (filter unchanged) if `DayOfAnyWeek` is absent or yields no
+/// day IDs.
+#[cfg(not(target_arch = "wasm32"))]
+fn expand_day_filter_to_all_day_types(
+    db: &DefaultDb,
+    filters: &mut RunSpecFilters,
+) -> Result<()> {
+    let days = day_ids_from_default_db(db)?;
+    if !days.is_empty() {
+        filters.days = days;
+    }
+    Ok(())
+}
+
+/// Read the distinct `dayID`s from the loaded `DayOfAnyWeek` table in the store
+/// as `u32` (for the execution day set). Empty if absent / no `dayID` column.
+fn day_ids_from_store(store: &InMemoryStore) -> Vec<u32> {
+    use polars::prelude::DataType;
+    let Some(arc) = store.get("DayOfAnyWeek") else {
+        return Vec::new();
+    };
+    let Ok(col) = arc.column("dayID").and_then(|c| c.cast(&DataType::Int64)) else {
+        return Vec::new();
+    };
+    let Ok(ca) = col.i64() else {
+        return Vec::new();
+    };
+    let set: BTreeSet<i64> = ca.into_iter().flatten().collect();
+    set.into_iter()
+        .filter_map(|d| u32::try_from(d).ok())
+        .collect()
+}
+
+/// Read the distinct `dayID`s from the default DB's `DayOfAnyWeek` table
+/// (unfiltered). Empty if the table is absent or carries no `dayID` column.
+#[cfg(not(target_arch = "wasm32"))]
+fn day_ids_from_default_db(db: &DefaultDb) -> Result<Vec<i64>> {
+    use moves_data_default::TableFilter;
+    use polars::prelude::DataType;
+
+    let Ok(lf) = db.scan("DayOfAnyWeek", &TableFilter::new()) else {
+        return Ok(Vec::new());
+    };
+    let df = lf
+        .collect()
+        .context("scanning DayOfAnyWeek for day-type expansion")?;
+    let Ok(col) = df.column("dayID").and_then(|c| c.cast(&DataType::Int64)) else {
+        return Ok(Vec::new());
+    };
+    let Ok(ca) = col.i64() else {
+        return Ok(Vec::new());
+    };
+    let set: BTreeSet<i64> = ca.into_iter().flatten().collect();
+    Ok(set.into_iter().collect())
 }
 
 /// The pollutants the default (embedded-DAG) calculator set consumes and

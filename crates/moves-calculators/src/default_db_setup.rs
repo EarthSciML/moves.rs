@@ -791,6 +791,21 @@ pub fn populate_link_from_zone_road_type(store: &mut InMemoryStore) -> Result<()
 ///
 /// Port of `build_runspec_tables` in `moves-cli/src/run.rs`.
 /// Uses polars-core only.
+/// Distinct `dayID`s from the store's `DayOfAnyWeek` table (the run's full set
+/// of day types). Empty if the table is absent or carries no `dayID` column.
+fn day_ids_from_day_of_any_week(store: &InMemoryStore) -> BTreeSet<i32> {
+    let Some(arc) = store.get("DayOfAnyWeek") else {
+        return BTreeSet::new();
+    };
+    let Ok(col) = arc.column("dayID").and_then(|c| c.cast(&DataType::Int32)) else {
+        return BTreeSet::new();
+    };
+    let Ok(ca) = col.i32() else {
+        return BTreeSet::new();
+    };
+    ca.into_iter().flatten().collect()
+}
+
 pub fn build_runspec_tables(runspec: &RunSpec, store: &mut InMemoryStore) -> Result<(), String> {
     let insert_i32 = |store: &mut InMemoryStore, name: &str, col: &str, vals: Vec<i32>| {
         let n = vals.len();
@@ -829,13 +844,19 @@ pub fn build_runspec_tables(runspec: &RunSpec, store: &mut InMemoryStore) -> Res
         pol_process_ids,
     );
 
-    // RunSpecDay.
+    // RunSpecDay. Canonical's execution time span iterates EVERY DayOfAnyWeek
+    // day type, not the runspec `<day>` selection (buildExecutionTimeSpan
+    // useRunSpec=false) — so RunSpecDay / RunSpecHourDay (and the activity those
+    // drive) must cover both weekend (2) and weekday (5). The store's
+    // DayOfAnyWeek is the authority (loaded for all day types via the expanded
+    // day filter); fall back to the runspec days only when it is absent.
     let day_ids: Vec<i32> = {
-        let mut ids: BTreeSet<i32> = BTreeSet::new();
-        for &d in &runspec.timespan.days {
-            ids.insert(d as i32);
+        let from_store: BTreeSet<i32> = day_ids_from_day_of_any_week(store);
+        if from_store.is_empty() {
+            runspec.timespan.days.iter().map(|&d| d as i32).collect()
+        } else {
+            from_store.into_iter().collect()
         }
-        ids.into_iter().collect()
     };
     insert_i32(store, "RunSpecDay", "dayID", day_ids.clone());
 
