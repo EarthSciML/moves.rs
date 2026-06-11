@@ -54,6 +54,10 @@ pub fn setup_execution_store(runspec: &RunSpec, store: &mut InMemoryStore) -> Re
     );
     synth_step!("link_from_zone_road_type", populate_link_from_zone_road_type(store));
     synth_step!("fill_fuel_supply", fill_fuel_supply_placeholder_nulls(store));
+    synth_step!(
+        "high_ethanol_fuel_props",
+        transform_high_ethanol_fuel_properties(store)
+    );
     synth_step!("build_runspec_tables", build_runspec_tables(runspec, store));
     synth_step!(
         "scope_pollutant_process_model_year",
@@ -371,6 +375,281 @@ pub fn fill_fuel_supply_placeholder_nulls(store: &mut InMemoryStore) -> Result<(
     if changed {
         store.insert(TABLE.to_string(), df);
     }
+    Ok(())
+}
+
+/// Port of `FuelEffectsGenerator.setup()`'s high-ethanol (E85/E70) fuel-property
+/// transformation (`cloneEthanolFuelsForRegions` +
+/// `alterHighEthanolFuelProperties`, steps 005/020/025).
+///
+/// The default DB ships high-ethanol formulations (`fuelSubtypeID` 51/52) with
+/// raw E85 distillation sentinels (`T50=999`, `T90=999`, `ETOHVolume≈74`). The
+/// BaseRate general-fuel-ratio THC expression contains
+/// `exp(5.58e-5*T50*T50 - 0.0195*T50 + …)`, so `T50=999` explodes the ratio to
+/// ~1.67e17 and produces garbage THC. Canonical `FuelEffectsGenerator.setup()`
+/// fixes this by overwriting each high-ethanol formulation's *combustion*
+/// properties with the matching **E10 base-fuel** values from the
+/// `e10FuelProperties` table before any fuel-effect math runs. The captured
+/// snapshot/`canonical_snapshot_diff` path already has this baked into its
+/// `fuelFormulation`; the default-DB path did not — this synthesises it.
+///
+/// Steps (citing `FuelEffectsGenerator.java`):
+///   - **005** (`cloneEthanolFuelsForRegions`): when one high-ethanol
+///     `fuelFormulationID` is used by multiple distinct
+///     `(fuelRegionID, fuelYearID, monthGroupID)` usages, each usage after the
+///     first must get its own clone so region/month-specific E10 props don't
+///     collide. **Cloning is intentionally skipped here** (see below); we apply
+///     the per-formulation substitution using the formulation's single usage.
+///     If a multi-usage formulation is found, we log via `MOVES_DEBUG_LOAD`
+///     rather than silently mis-handle.
+///   - **020** (`alterHighEthanolFuelProperties`): for each high-ethanol
+///     formulation `(f, region, year, monthGroup)`, set each property to
+///     `coalesce(e1.<col>, e0.<col>, ff.<col>)` where
+///     `e0 = e10FuelProperties[region=0, year, monthGroup]` (nation) and
+///     `e1 = e10FuelProperties[region=usage region, year, monthGroup]` (region;
+///     may be absent). `coalesce` uses e1's value if its row exists and the
+///     column is non-NULL, else e0's if non-NULL, else keeps the formulation's
+///     existing value. Also adds an `altRVP` column (defaulted to `RVP` for all
+///     rows) and sets it to `coalesce(e1.RVP, e0.RVP, ff.RVP)` for high-ethanol
+///     formulations. The port's `FuelEffectsGenerator` reads `altRVP`.
+///   - **025** (`DefaultDataMaker.calculateVolToWtPercentOxy`): recompute
+///     `volToWtPercentOxy` over the *whole* table from the (now-altered)
+///     oxygenate volumes.
+///
+/// No-op if any of `FuelFormulation`, `FuelSupply`, `e10FuelProperties` is
+/// absent (some paths lack them). Polars-core only (wasm32-safe).
+///
+/// **Cloning skipped, by design**: single-county / single-month fixtures use
+/// each high-ethanol formulationID in exactly one `(region, year, monthGroup)`,
+/// so cloning is a no-op for them. Faithfully porting the multi-usage clone in
+/// polars-core (insert-new-row + repoint FuelSupply) is non-trivial; for the
+/// rare multi-usage case we log and apply the first usage's substitution rather
+/// than silently producing region-incorrect props.
+pub fn transform_high_ethanol_fuel_properties(
+    store: &mut InMemoryStore,
+) -> Result<(), String> {
+    // The combustion-property columns altered in step 020 (altRVP is handled
+    // separately because it is a *new* column sourced from RVP).
+    const PROP_COLS: &[&str] = &[
+        "sulfurLevel",
+        "ETOHVolume",
+        "MTBEVolume",
+        "ETBEVolume",
+        "TAMEVolume",
+        "aromaticContent",
+        "olefinContent",
+        "benzeneContent",
+        "e200",
+        "e300",
+        "BioDieselEsterVolume",
+        "CetaneIndex",
+        "PAHContent",
+        "T50",
+        "T90",
+    ];
+
+    let (Some(ff_arc), Some(fs_arc), Some(e10_arc)) = (
+        store.get("FuelFormulation"),
+        store.get("FuelSupply"),
+        store.get("e10FuelProperties"),
+    ) else {
+        return Ok(());
+    };
+    let mut ff = (*ff_arc).clone();
+    let fs = &*fs_arc;
+    let e10 = &*e10_arc;
+    drop(ff_arc);
+
+    let log = |msg: &str| {
+        if std::env::var("MOVES_DEBUG_LOAD").is_ok() {
+            use std::io::Write;
+            let _ = writeln!(std::io::stderr(), "[synth] high_ethanol_fuel_props: {msg}");
+            let _ = std::io::stderr().flush();
+        }
+    };
+
+    // Case-insensitive column lookup → owned actual name.
+    let col_name = |df: &DataFrame, want: &str| -> Option<String> {
+        df.get_column_names()
+            .iter()
+            .find(|c| c.eq_ignore_ascii_case(want))
+            .map(|c| c.to_string())
+    };
+    // Read an Int64 column as a Vec<i64>, erroring on NULL keys.
+    let i64_col = |df: &DataFrame, want: &str, ctx: &str| -> Result<Vec<i64>, String> {
+        let name = col_name(df, want)
+            .ok_or_else(|| format!("{ctx}: column {want} missing"))?;
+        let casted = df
+            .column(&name)
+            .and_then(|c| c.cast(&DataType::Int64))
+            .map_err(|e| format!("{ctx}.{want} cast: {e}"))?;
+        let ca = casted.i64().map_err(|e| format!("{ctx}.{want}: {e}"))?;
+        ca.into_iter()
+            .map(|v| v.ok_or_else(|| format!("{ctx}.{want} has a NULL key")))
+            .collect()
+    };
+    // Read a Float64 column as Vec<Option<f64>> (NULLs preserved for coalesce).
+    let f64_opt_col = |df: &DataFrame, want: &str, ctx: &str| -> Result<Vec<Option<f64>>, String> {
+        let name = col_name(df, want)
+            .ok_or_else(|| format!("{ctx}: column {want} missing"))?;
+        let casted = df
+            .column(&name)
+            .and_then(|c| c.cast(&DataType::Float64))
+            .map_err(|e| format!("{ctx}.{want} cast: {e}"))?;
+        let ca = casted.f64().map_err(|e| format!("{ctx}.{want}: {e}"))?;
+        Ok(ca.into_iter().collect())
+    };
+
+    // ---- Build the e10FuelProperties lookup, keyed (region, year, monthGroup).
+    let e10_region = i64_col(e10, "fuelRegionID", "e10FuelProperties")?;
+    let e10_year = i64_col(e10, "fuelYearID", "e10FuelProperties")?;
+    let e10_month = i64_col(e10, "monthGroupID", "e10FuelProperties")?;
+    // altRVP is sourced from e10's RVP; PROP_COLS map directly.
+    let mut e10_cols: BTreeMap<&str, Vec<Option<f64>>> = BTreeMap::new();
+    for &c in PROP_COLS {
+        e10_cols.insert(c, f64_opt_col(e10, c, "e10FuelProperties")?);
+    }
+    let e10_rvp = f64_opt_col(e10, "RVP", "e10FuelProperties")?;
+    // (region, year, month) -> row index. A duplicate key keeps the first row
+    // (canonical relies on uniqueness of (region,year,month) here).
+    let mut e10_index: BTreeMap<(i64, i64, i64), usize> = BTreeMap::new();
+    for i in 0..e10_region.len() {
+        e10_index
+            .entry((e10_region[i], e10_year[i], e10_month[i]))
+            .or_insert(i);
+    }
+
+    // ---- FuelSupply usages, keyed by fuelFormulationID.
+    let fs_ffid = i64_col(fs, "fuelFormulationID", "FuelSupply")?;
+    let fs_region = i64_col(fs, "fuelRegionID", "FuelSupply")?;
+    let fs_year = i64_col(fs, "fuelYearID", "FuelSupply")?;
+    let fs_month = i64_col(fs, "monthGroupID", "FuelSupply")?;
+    // fuelFormulationID -> set of distinct (region, year, month) usages.
+    let mut usages: BTreeMap<i64, BTreeSet<(i64, i64, i64)>> = BTreeMap::new();
+    for i in 0..fs_ffid.len() {
+        usages
+            .entry(fs_ffid[i])
+            .or_default()
+            .insert((fs_region[i], fs_year[i], fs_month[i]));
+    }
+
+    // ---- FuelFormulation columns we mutate.
+    let ff_ffid = i64_col(&ff, "fuelFormulationID", "FuelFormulation")?;
+    let ff_subtype = i64_col(&ff, "fuelSubtypeID", "FuelFormulation")?;
+    let n = ff_ffid.len();
+
+    // Existing FuelFormulation property values (Option for NULL-aware coalesce).
+    let mut ff_vals: BTreeMap<&str, Vec<Option<f64>>> = BTreeMap::new();
+    for &c in PROP_COLS {
+        ff_vals.insert(c, f64_opt_col(&ff, c, "FuelFormulation")?);
+    }
+    let ff_rvp = f64_opt_col(&ff, "RVP", "FuelFormulation")?;
+    // altRVP starts as a copy of RVP for every row (canonical: add column,
+    // `update set altRVP=RVP`).
+    let mut alt_rvp: Vec<Option<f64>> = ff_rvp.clone();
+
+    // coalesce(e1.col, e0.col, existing)
+    let coalesce = |e1: Option<usize>, e0: Option<usize>, src: &[Option<f64>], existing: Option<f64>| -> Option<f64> {
+        if let Some(i1) = e1 {
+            if let Some(v) = src[i1] {
+                return Some(v);
+            }
+        }
+        if let Some(i0) = e0 {
+            if let Some(v) = src[i0] {
+                return Some(v);
+            }
+        }
+        existing
+    };
+
+    // ---- Step 005/020: alter high-ethanol formulations in place.
+    let mut altered = 0usize;
+    for row in 0..n {
+        let subtype = ff_subtype[row];
+        if subtype != 51 && subtype != 52 {
+            continue;
+        }
+        let ffid = ff_ffid[row];
+        let Some(usage_set) = usages.get(&ffid) else {
+            // High-ethanol formulation not referenced by FuelSupply — nothing
+            // to key the E10 lookup on, so leave it untouched.
+            log(&format!(
+                "formulation {ffid} (subtype {subtype}) not used in FuelSupply; left unaltered"
+            ));
+            continue;
+        };
+        if usage_set.len() > 1 {
+            // cloneEthanolFuelsForRegions would split this into one formulation
+            // per usage; we do not clone. Apply the first usage and warn.
+            log(&format!(
+                "formulation {ffid} has {} distinct (region,year,month) usages; \
+                 cloning SKIPPED — applying first usage's E10 props only",
+                usage_set.len()
+            ));
+        }
+        let &(region, year, month) = usage_set.iter().next().expect("usage_set non-empty");
+
+        // e0 = nation (region 0), e1 = usage region (may be absent).
+        let e0 = e10_index.get(&(0, year, month)).copied();
+        let e1 = e10_index.get(&(region, year, month)).copied();
+        if e0.is_none() && e1.is_none() {
+            log(&format!(
+                "formulation {ffid}: no e10FuelProperties row for (year {year}, month {month}); \
+                 properties unchanged"
+            ));
+            continue;
+        }
+
+        for &c in PROP_COLS {
+            let src = &e10_cols[c];
+            let existing = ff_vals[c][row];
+            let new = coalesce(e1, e0, src, existing);
+            ff_vals.get_mut(c).expect("prop col present")[row] = new;
+        }
+        alt_rvp[row] = coalesce(e1, e0, &e10_rvp, ff_rvp[row]);
+        altered += 1;
+    }
+    log(&format!("altered {altered} high-ethanol formulation row(s)"));
+
+    // ---- Step 025: recompute volToWtPercentOxy over the whole table from the
+    // (now-altered) oxygenate volumes. Denominator <= 0 → 0.
+    let etoh = &ff_vals["ETOHVolume"];
+    let mtbe = &ff_vals["MTBEVolume"];
+    let etbe = &ff_vals["ETBEVolume"];
+    let tame = &ff_vals["TAMEVolume"];
+    let mut vol_to_wt: Vec<Option<f64>> = Vec::with_capacity(n);
+    for row in 0..n {
+        let e = etoh[row].unwrap_or(0.0);
+        let m = mtbe[row].unwrap_or(0.0);
+        let eb = etbe[row].unwrap_or(0.0);
+        let t = tame[row].unwrap_or(0.0);
+        let denom = e + m + eb + t;
+        let v = if denom > 0.0 {
+            (e * 0.3653 + m * 0.1792 + eb * 0.1537 + t * 0.1651) / denom
+        } else {
+            0.0
+        };
+        vol_to_wt.push(Some(v));
+    }
+
+    // ---- Write the altered property columns + altRVP + volToWtPercentOxy back.
+    let set_col = |df: &mut DataFrame, want: &str, vals: &[Option<f64>]| -> Result<(), String> {
+        let name = col_name(df, want).unwrap_or_else(|| want.to_string());
+        let owned: Vec<Option<f64>> = vals.to_vec();
+        let s: Series = Series::new(name.as_str().into(), owned);
+        df.with_column(Column::from(s))
+            .map_err(|e| format!("FuelFormulation.{want} write: {e}"))?;
+        Ok(())
+    };
+    for &c in PROP_COLS {
+        set_col(&mut ff, c, &ff_vals[c])?;
+    }
+    set_col(&mut ff, "volToWtPercentOxy", &vol_to_wt)?;
+    // altRVP is a NEW column; with_column adds it if absent.
+    set_col(&mut ff, "altRVP", &alt_rvp)?;
+
+    store.insert("FuelFormulation".to_string(), ff);
     Ok(())
 }
 
