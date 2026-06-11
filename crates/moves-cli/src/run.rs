@@ -997,7 +997,18 @@ pub fn build_default_db_store(
     // that are only valid after Phase 1 completes. Year loads unfiltered
     // (no year_column in the registry); regionCounty loads county-filtered
     // but without the fuelYear filter (which isn't known yet).
-    let base_filters = RunSpecFilters::from_runspec(run_spec);
+    let mut base_filters = RunSpecFilters::from_runspec(run_spec);
+    // Expand the fuelType load filter to the selected source types' full fleet
+    // fuel mix. A runspec `onroadvehicleselection` names one (sourceType,
+    // fuelType), but canonical runs the source type's whole fleet (its
+    // `RunSpecSourceFuelType` is `FuelType ⋈ SourceUseType ⋈ FuelEngTechAssoc`
+    // for the selected source types — see build_runspec_tables). Without
+    // matching that here, the fuel-sensitive tables (FuelSupply, …) load only
+    // the literal selection fuel, so the BaseRate/activity for the other fleet
+    // fuels canonical emits have no fuel supply ("missing fuel supply for
+    // fuel_type_id=2"). Union the fleet fuels into the load filter.
+    expand_fuel_filter_to_fleet(&db, &mut base_filters)
+        .context("expanding fuelType filter to the selected sources' fleet fuels")?;
     let plan = InputDataManager::plan(&base_filters, &default_tables());
     let mut store = InputDataManager::execute(&plan, &db)
         .map_err(|e| anyhow::anyhow!("loading default DB: {e}"))?;
@@ -1042,6 +1053,53 @@ pub fn build_default_db_store(
         .map_err(|e| anyhow::anyhow!(e))
         .context("default-DB execution-store synthesis")?;
     Ok(store)
+}
+
+/// Expand `filters.fuel_type_ids` to include every fuel type the selected
+/// source types use, read from the default DB's `FuelEngTechAssoc`.
+///
+/// Mirrors canonical's `RunSpecSourceFuelType` derivation (the selected source
+/// type's whole fleet fuel mix, not the literal per-selection fuel). Only
+/// *adds* fuels — the resulting filter is a superset, so a fixture that already
+/// listed every fleet fuel is unchanged. A no-op (leaving the filter as-is) if
+/// `FuelEngTechAssoc` is absent or carries neither key column.
+#[cfg(not(target_arch = "wasm32"))]
+fn expand_fuel_filter_to_fleet(
+    db: &DefaultDb,
+    filters: &mut RunSpecFilters,
+) -> Result<()> {
+    use moves_data_default::TableFilter;
+    use polars::prelude::DataType;
+
+    if filters.source_type_ids.is_empty() {
+        return Ok(());
+    }
+    let Ok(lf) = db.scan("FuelEngTechAssoc", &TableFilter::new()) else {
+        return Ok(());
+    };
+    let df = lf
+        .collect()
+        .context("scanning FuelEngTechAssoc for fleet fuel expansion")?;
+    let (Ok(st), Ok(ft)) = (
+        df.column("sourceTypeID").and_then(|c| c.cast(&DataType::Int64)),
+        df.column("fuelTypeID").and_then(|c| c.cast(&DataType::Int64)),
+    ) else {
+        return Ok(());
+    };
+    let (Ok(st), Ok(ft)) = (st.i64(), ft.i64()) else {
+        return Ok(());
+    };
+    let selected: BTreeSet<i64> = filters.source_type_ids.iter().copied().collect();
+    let mut fuels: BTreeSet<i64> = filters.fuel_type_ids.iter().copied().collect();
+    for i in 0..df.height() {
+        if let (Some(s), Some(f)) = (st.get(i), ft.get(i)) {
+            if selected.contains(&s) {
+                fuels.insert(f);
+            }
+        }
+    }
+    filters.fuel_type_ids = fuels.into_iter().collect();
+    Ok(())
 }
 
 /// The pollutants the default (embedded-DAG) calculator set consumes and

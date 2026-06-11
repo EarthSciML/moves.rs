@@ -682,10 +682,56 @@ pub fn build_runspec_tables(runspec: &RunSpec, store: &mut InMemoryStore) -> Res
     insert_i32(store, "RunSpecMonthGroup", "monthGroupID", month_group_ids);
 
     // RunSpecSourceFuelType (Int64 pairs per SourceBinDistributionGenerator schema).
+    //
+    // Canonical does NOT restrict to the per-selection fuelType. A runspec
+    // `onroadvehicleselection` names one (sourceType, fuelType), but MOVES runs
+    // the selected source type's WHOLE fleet fuel mix: the GUI's
+    // `loadValidFuelSourceCombinations`
+    // (gui/OnRoadVehicleEquipment.java) populates the run from
+    // `FuelType ⋈ SourceUseType ⋈ FuelEngTechAssoc`, so the captured execution
+    // `RunSpecSourceFuelType` holds e.g. (21,{1,2,5,9}) for a single (21,1)
+    // selection. Mirror that: expand each SELECTED sourceType to all
+    // `(sourceTypeID, fuelTypeID)` pairs FuelEngTechAssoc lists for it.
+    // Restricting to the literal selection fuel (the prior behaviour) dropped
+    // every non-selected fuel bin's activity — a uniform under-emission across
+    // all default-DB criteria fixtures. Falls back to the raw selection pairs
+    // only if FuelEngTechAssoc is absent (no default-DB load).
+    let selected_source_types: BTreeSet<i64> = runspec
+        .onroad_vehicle_selections
+        .iter()
+        .map(|sel| sel.source_type_id as i64)
+        .collect();
     let source_fuel_pairs: Vec<(i64, i64)> = {
         let mut pairs: BTreeSet<(i64, i64)> = BTreeSet::new();
-        for sel in &runspec.onroad_vehicle_selections {
-            pairs.insert((sel.source_type_id as i64, sel.fuel_type_id as i64));
+        let from_feta = store.get("FuelEngTechAssoc").and_then(|arc| {
+            let st = arc
+                .column("sourceTypeID")
+                .and_then(|c| c.cast(&DataType::Int64))
+                .ok()?;
+            let ft = arc
+                .column("fuelTypeID")
+                .and_then(|c| c.cast(&DataType::Int64))
+                .ok()?;
+            let st = st.i64().ok()?.clone();
+            let ft = ft.i64().ok()?.clone();
+            let mut found = false;
+            for i in 0..arc.height() {
+                if let (Some(s), Some(f)) = (st.get(i), ft.get(i)) {
+                    if selected_source_types.contains(&s) {
+                        pairs.insert((s, f));
+                        found = true;
+                    }
+                }
+            }
+            // Only treat FuelEngTechAssoc as authoritative when it actually
+            // covered the selected source types; an empty/irrelevant table
+            // falls through to the literal-selection pairs below.
+            found.then_some(())
+        });
+        if from_feta.is_none() {
+            for sel in &runspec.onroad_vehicle_selections {
+                pairs.insert((sel.source_type_id as i64, sel.fuel_type_id as i64));
+            }
         }
         pairs.into_iter().collect()
     };
