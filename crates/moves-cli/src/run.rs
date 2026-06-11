@@ -240,6 +240,13 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
         // Without this the SB-weighting falls back to the raw SourceBinDistribution
         // and over-weights flex-fuel (E85) energy ~50×.
         tables.insert("sourcebindistributionfuelusage".to_owned());
+        // The same SB-weighting applies the canonical EV-sales ICE back-scaling
+        // (step 010) from these three tables; they are not declared static
+        // calculator inputs either, so admit them or recent-model-year ICE
+        // energy rates come out ~2-3% low.
+        tables.insert("evsalesfraction".to_owned());
+        tables.insert("fleetavgadjustment".to_owned());
+        tables.insert("regulatoryclass".to_owned());
         Some(tables)
     } else {
         None

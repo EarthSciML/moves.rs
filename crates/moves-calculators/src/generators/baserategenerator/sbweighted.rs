@@ -15,8 +15,8 @@
 //!
 //! Inventory scale uses `normalizationFactor = 1` (no division); only
 //! Mesoscale-Lookup normalises by `SUM(sourceBinActivityFraction)`. The EV-sales
-//! `evMultiplier` adjustment (canonical step 010) is a follow-up refinement and
-//! is not yet applied here.
+//! `evMultiplier` adjustment (canonical step 010) IS applied here (see
+//! `ev_factor`): it scales surviving ICE rates up to compensate for EV sales.
 
 use std::collections::BTreeMap;
 
@@ -54,6 +54,21 @@ fn col_f64<S: DataFrameStoreTyped + ?Sized>(
         .map_err(|e| Error::Polars(e.to_string()))?;
     let ca = s.f64().map_err(|e| Error::Polars(e.to_string()))?;
     Ok(ca.into_iter().map(|v| v.unwrap_or(0.0)).collect())
+}
+
+/// Like [`col_f64`] but preserves NULL as `None` (needed for `adjustmentCap`,
+/// where NULL means "no cap" — distinct from a real `0.0`).
+fn col_f64_opt<S: DataFrameStoreTyped + ?Sized>(
+    store: &S,
+    table: &str,
+    column: &str,
+) -> Result<Vec<Option<f64>>, Error> {
+    let views = store.column_views(table, &[column])?;
+    let s = views[0]
+        .cast(&DataType::Float64)
+        .map_err(|e| Error::Polars(e.to_string()))?;
+    let ca = s.f64().map_err(|e| Error::Polars(e.to_string()))?;
+    Ok(ca.into_iter().collect())
 }
 
 /// Accumulator for one output group (the `SUM(...)` aggregates).
@@ -305,43 +320,128 @@ pub fn compute_sb_weighted_rates<S: DataFrameStoreTyped + ?Sized>(
         }
     }
 
+    // --- Canonical SBWeighted step 010: EV-sales ICE back-scaling ------------
+    // Scale each surviving ICE (fuelType != 9) per-vehicle rate UP to
+    // compensate for EV sales removing vehicles from the ICE fleet:
+    //   factor = LEAST(1 / (1 - ev*m / ((1-ev) + ev*m)), adjustmentCap)
+    // joined `evSalesFraction` ⋈ `fleetAvgAdjustment` ⋈ `regulatoryClass`
+    // (BaseRateGenerator.generateSBWeightedEmissionRates: non-age 522-539,
+    // age 555-572). Without it, recent-model-year ICE rates are ~2-3% low (the
+    // EV share of the cohort is silently treated as ICE). Tables absent (some
+    // unit-test contexts) → factor 1.0 everywhere.
+    let reg_to_group: FxHashMap<i64, i64> = if store.get("regulatoryClass").is_some() {
+        let id = col_i64(store, "regulatoryClass", "regClassID")?;
+        let grp = col_i64(store, "regulatoryClass", "fleetAvgGroupID")?;
+        id.into_iter().zip(grp).collect()
+    } else {
+        FxHashMap::default()
+    };
+    let ev_fraction: FxHashMap<(i64, i64), f64> = if store.get("evSalesFraction").is_some() {
+        let my = col_i64(store, "evSalesFraction", "modelYearID")?;
+        let grp = col_i64(store, "evSalesFraction", "fleetAvgGroupID")?;
+        let frac = col_f64(store, "evSalesFraction", "evFraction")?;
+        (0..my.len()).map(|i| ((my[i], grp[i]), frac[i])).collect()
+    } else {
+        FxHashMap::default()
+    };
+    // (polProcessID, fleetAvgGroupID) → [(beginMY, endMY, evMultiplier, cap)].
+    let fleet_adj: FxHashMap<(i64, i64), Vec<(i64, i64, f64, Option<f64>)>> =
+        if store.get("fleetAvgAdjustment").is_some() {
+            let pp = col_i64(store, "fleetAvgAdjustment", "polProcessID")?;
+            let bmy = col_i64(store, "fleetAvgAdjustment", "beginModelYearID")?;
+            let emy = col_i64(store, "fleetAvgAdjustment", "endModelYearID")?;
+            let grp = col_i64(store, "fleetAvgAdjustment", "fleetAvgGroupID")?;
+            let mult = col_f64(store, "fleetAvgAdjustment", "evMultiplier")?;
+            let cap = col_f64_opt(store, "fleetAvgAdjustment", "adjustmentCap")?;
+            let mut m: FxHashMap<(i64, i64), Vec<(i64, i64, f64, Option<f64>)>> =
+                FxHashMap::default();
+            for i in 0..pp.len() {
+                m.entry((pp[i], grp[i]))
+                    .or_default()
+                    .push((bmy[i], emy[i], mult[i], cap[i]));
+            }
+            m
+        } else {
+            FxHashMap::default()
+        };
+    let ev_factor = |pol_process_id: i64, model_year_id: i64, fuel_type_id: i64, reg_class_id: i64| -> f64 {
+        if fuel_type_id == 9 {
+            return 1.0;
+        }
+        let Some(&group) = reg_to_group.get(&reg_class_id) else {
+            return 1.0;
+        };
+        let ev = ev_fraction
+            .get(&(model_year_id, group))
+            .copied()
+            .unwrap_or(0.0);
+        // `evFraction == 1` would divide by zero in canonical; it skips, so do we.
+        if ev <= 0.0 || ev >= 1.0 {
+            return 1.0;
+        }
+        let Some(adjs) = fleet_adj.get(&(pol_process_id, group)) else {
+            return 1.0;
+        };
+        let Some(&(_, _, mult, cap)) = adjs
+            .iter()
+            .find(|(b, e, _, _)| model_year_id >= *b && model_year_id <= *e)
+        else {
+            return 1.0;
+        };
+        let denom = (1.0 - ev) + ev * mult;
+        if denom == 0.0 {
+            return 1.0;
+        }
+        let factor = 1.0 / (1.0 - (ev * mult) / denom);
+        match cap {
+            Some(c) if c > 0.0 => factor.min(c),
+            _ => factor,
+        }
+    };
+
     // Emit groups with SUM(sourceBinActivityFraction) > 0 (the SQL HAVING clause).
     let by_age_out = by_age
         .into_iter()
         .filter(|(_, a)| a.sum_sbd > 0.0)
-        .map(|(k, a)| SbWeightedRateDetail {
-            source_type_id: k.0 as i32,
-            pol_process_id: k.1 as i32,
-            model_year_id: k.2 as i32,
-            fuel_type_id: k.3 as i32,
-            op_mode_id: k.4 as i32,
-            age_group_id: k.5 as i32,
-            reg_class_id: k.6 as i32,
-            sum_sbd: a.sum_sbd,
-            sum_sbd_raw: a.sum_sbd,
-            mean_base_rate: a.mean_base_rate,
-            mean_base_rate_im: a.mean_base_rate_im,
-            mean_base_rate_ac_adj: a.mean_base_rate_ac_adj,
-            mean_base_rate_im_ac_adj: a.mean_base_rate_im_ac_adj,
+        .map(|(k, a)| {
+            let f = ev_factor(k.1, k.2, k.3, k.6);
+            SbWeightedRateDetail {
+                source_type_id: k.0 as i32,
+                pol_process_id: k.1 as i32,
+                model_year_id: k.2 as i32,
+                fuel_type_id: k.3 as i32,
+                op_mode_id: k.4 as i32,
+                age_group_id: k.5 as i32,
+                reg_class_id: k.6 as i32,
+                sum_sbd: a.sum_sbd,
+                sum_sbd_raw: a.sum_sbd,
+                mean_base_rate: a.mean_base_rate * f,
+                mean_base_rate_im: a.mean_base_rate_im * f,
+                mean_base_rate_ac_adj: a.mean_base_rate_ac_adj * f,
+                mean_base_rate_im_ac_adj: a.mean_base_rate_im_ac_adj * f,
+            }
         })
         .collect();
     let non_age_out = non_age
         .into_iter()
         .filter(|(_, a)| a.sum_sbd > 0.0)
-        .map(|(k, a)| SbWeightedRateDetail {
-            source_type_id: k.0 as i32,
-            pol_process_id: k.1 as i32,
-            model_year_id: k.2 as i32,
-            fuel_type_id: k.3 as i32,
-            op_mode_id: k.4 as i32,
-            age_group_id: 0,
-            reg_class_id: k.5 as i32,
-            sum_sbd: a.sum_sbd,
-            sum_sbd_raw: a.sum_sbd,
-            mean_base_rate: a.mean_base_rate,
-            mean_base_rate_im: a.mean_base_rate_im,
-            mean_base_rate_ac_adj: a.mean_base_rate_ac_adj,
-            mean_base_rate_im_ac_adj: a.mean_base_rate_im_ac_adj,
+        .map(|(k, a)| {
+            let f = ev_factor(k.1, k.2, k.3, k.5);
+            SbWeightedRateDetail {
+                source_type_id: k.0 as i32,
+                pol_process_id: k.1 as i32,
+                model_year_id: k.2 as i32,
+                fuel_type_id: k.3 as i32,
+                op_mode_id: k.4 as i32,
+                age_group_id: 0,
+                reg_class_id: k.5 as i32,
+                sum_sbd: a.sum_sbd,
+                sum_sbd_raw: a.sum_sbd,
+                mean_base_rate: a.mean_base_rate * f,
+                mean_base_rate_im: a.mean_base_rate_im * f,
+                mean_base_rate_ac_adj: a.mean_base_rate_ac_adj * f,
+                mean_base_rate_im_ac_adj: a.mean_base_rate_im_ac_adj * f,
+            }
         })
         .collect();
 
