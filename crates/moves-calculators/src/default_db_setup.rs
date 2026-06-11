@@ -25,33 +25,40 @@ use polars::prelude::{BooleanChunked, Column, DataFrame, DataType, NamedFrom, Se
 use crate::generators::meteorology::{build_meteorology_table, MeteorologyInputs};
 
 pub fn setup_execution_store(runspec: &RunSpec, store: &mut InMemoryStore) -> Result<(), String> {
-    merge_store_variants_eager(store)?;
-    // Several geography-keyed tables ship as a single unpartitioned national
-    // file (ZoneMonthHour alone is ~930k rows). A county-scoped onroad run only
-    // ever reads its own county/zone, so pruning the rest up front shrinks the
-    // meteorology synthesis below and every downstream calculator's
-    // ZoneMonthHour scan — the WASM analogue of the gate's zone-filter. Must run
-    // before populate_zone_month_hour_meteorology so the synthesis sees the
-    // already-pruned table.
-    prune_geographic_tables_to_runspec(runspec, store)?;
-    populate_source_use_type_physics_mapping(store)?;
-    populate_pollutant_process_mapped_model_year(store)?;
-    populate_zone_month_hour_meteorology(store)?;
-    populate_link_from_zone_road_type(store)?;
-    // The default DB ships an all-zero "placeholder" row (fuelFormulationID=0)
-    // in FuelSupply with NULL market-share columns. Real fuel supplies always
-    // carry a value; the placeholder never joins real data, so fill its NULLs
-    // with 0.0 rather than have the strict per-row extractors error on it.
-    fill_fuel_supply_placeholder_nulls(store)?;
-    build_runspec_tables(runspec, store)?;
-    // PollutantProcessModelYear ships as the full national table (~15.6k rows);
-    // MOVES's execution-DB copy is run-scoped. Several calculators iterate it
-    // (notably BasicRunningPmEmissionCalculator's fuel_supply_adjustment), so
-    // scope it to the run's pol-process pairs from RunSpecPollutantProcess (just
-    // synthesised by build_runspec_tables). Every PollutantProcessModelYear
-    // reader is a primary calculator processing the run's pp pairs, so this
-    // drops only rows no calculator reads.
-    scope_pollutant_process_model_year_to_runspec(store)?;
+    macro_rules! synth_step {
+        ($label:expr, $call:expr) => {{
+            if std::env::var("MOVES_DEBUG_LOAD").is_ok() {
+                use std::io::Write;
+                let _ = writeln!(std::io::stderr(), "[synth] {}", $label);
+                let _ = std::io::stderr().flush();
+            }
+            $call?;
+        }};
+    }
+    synth_step!("merge_store_variants_eager", merge_store_variants_eager(store));
+    synth_step!(
+        "prune_geographic",
+        prune_geographic_tables_to_runspec(runspec, store)
+    );
+    synth_step!(
+        "source_use_type_physics",
+        populate_source_use_type_physics_mapping(store)
+    );
+    synth_step!(
+        "pollutant_process_mapped",
+        populate_pollutant_process_mapped_model_year(store)
+    );
+    synth_step!(
+        "zone_month_hour_meteorology",
+        populate_zone_month_hour_meteorology(store)
+    );
+    synth_step!("link_from_zone_road_type", populate_link_from_zone_road_type(store));
+    synth_step!("fill_fuel_supply", fill_fuel_supply_placeholder_nulls(store));
+    synth_step!("build_runspec_tables", build_runspec_tables(runspec, store));
+    synth_step!(
+        "scope_pollutant_process_model_year",
+        scope_pollutant_process_model_year_to_runspec(store)
+    );
     Ok(())
 }
 

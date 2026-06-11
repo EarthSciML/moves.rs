@@ -909,7 +909,32 @@ impl InputDataManager {
             .tables
             .par_iter()
             .filter_map(|table_plan| {
-                let lf = match db.scan(table_plan.table_name, &TableFilter::new()) {
+                // Build a partition-pruning filter from the InList clauses that
+                // target this table's *partition* columns, so a heavily
+                // partitioned table (e.g. IMCoverage = 21,625 year×county
+                // partitions) scans only the run's partitions. Without it,
+                // `db.scan` unions every partition file into one LazyFrame and the
+                // year/county filtering happens only post-scan — which OOMs on a
+                // multi-county run (it materialises the whole 2M-row national
+                // table across thousands of files before filtering). The post-scan
+                // `apply_where_clauses` still applies every clause, so the result
+                // is identical — this only prunes files that cannot contribute.
+                let scan_filter = {
+                    let part_cols: &[String] = db
+                        .table(table_plan.table_name)
+                        .map(|t| t.partition_columns.as_slice())
+                        .unwrap_or(&[]);
+                    let mut f = TableFilter::new();
+                    for clause in &table_plan.clauses {
+                        if let WhereClause::InList { column, values } = clause {
+                            if part_cols.iter().any(|pc| pc == column) {
+                                f = f.partition_in(column.clone(), values.iter().copied());
+                            }
+                        }
+                    }
+                    f
+                };
+                let lf = match db.scan(table_plan.table_name, &scan_filter) {
                     Ok(lf) => lf,
                     Err(DefaultDbError::SchemaOnly { .. }) => return None,
                     // A table missing entirely from the default-DB snapshot is a
@@ -931,11 +956,23 @@ impl InputDataManager {
                     Err(e) => return Some(Err(Error::Polars(e.to_string()))),
                 };
                 let lf = apply_where_clauses(lf, &table_plan.clauses);
-                Some(
-                    lf.collect()
-                        .map(|df| (table_plan.table_name, df))
-                        .map_err(|e| Error::Polars(e.to_string())),
-                )
+                let collected = lf.collect().map_err(|e| Error::Polars(e.to_string()));
+                if std::env::var("MOVES_DEBUG_LOAD").is_ok() {
+                    if let Ok(df) = &collected {
+                        use std::io::Write;
+                        let bytes: usize = df.estimated_size();
+                        let _ = writeln!(
+                            std::io::stderr(),
+                            "[load] {} rows={} cols={} ~{}MB",
+                            table_plan.table_name,
+                            df.height(),
+                            df.width(),
+                            bytes / 1_048_576
+                        );
+                        let _ = std::io::stderr().flush();
+                    }
+                }
+                Some(collected.map(|df| (table_plan.table_name, df)))
             })
             .collect();
 
