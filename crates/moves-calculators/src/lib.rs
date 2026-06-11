@@ -24,6 +24,7 @@
 //! merge-conflict-free area list as grows.
 
 pub mod calculators;
+pub mod default_db_setup;
 pub mod error;
 pub mod generators;
 pub(crate) mod wiring;

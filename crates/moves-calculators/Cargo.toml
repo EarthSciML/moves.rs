@@ -18,6 +18,7 @@ moves-framework = { path = "../moves-framework" }
 moves-fuel-control = { path = "../moves-fuel-control" }
 moves-nonroad = { path = "../moves-nonroad" }
 moves-rate-of-progress = { path = "../moves-rate-of-progress" }
+moves-runspec = { path = "../moves-runspec" }
 rayon = { workspace = true }
 rustc-hash = { workspace = true }
 thiserror = { workspace = true }
