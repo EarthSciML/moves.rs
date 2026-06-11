@@ -16,12 +16,17 @@ type = "county"
 key = 26161
 description = "MICHIGAN - Washtenaw County"
 
+# TOML stores literal MOVES IDs. The companion sample-runspec.xml writes
+# `<month key="6">` / `<beginhour key="6">`, where `key` is a 0-based index
+# (canonical getMonthByIndex/getHourByIndex), so the resolved IDs are key+1 = 7
+# (July; the hour beginning 6:00 AM). `days` mirrors the XML `<day key="0">`,
+# which the port keeps as a literal (day selection is overridden at execution).
 [time]
 years = [2001]
-months = [6]
+months = [7]
 days = [0]
-begin_hour = 6
-end_hour = 6
+begin_hour = 7
+end_hour = 7
 
 [[onroad]]
 fuel_id = 1

@@ -662,18 +662,13 @@ impl Calculator for BaseRateCalculator {
             zone_id: pos.location.zone_id.map(|z| z as i32).unwrap_or(0),
             link_id: pos.location.link_id.map(|l| l as i32).unwrap_or(0),
             year_id: pos.time.year.map(|y| y as i32).unwrap_or(0),
-            // MOVES keys its execution DB (and every captured snapshot) by the
-            // internal `monthID = RunSpec <month key> + 1` (e.g. `<month
-            // key="7"/>` → monthID 8 / August). The sibling generators apply
-            // the same `+1` (`SnapshotFilter::from_run_spec`,
-            // `evap_op_mode_distribution::fraction_of_operating`); mirror it
-            // here so the fuel-supply join (`build_fuel_blocks`) keys on the
-            // monthID the snapshot's fuel supply was captured at.
-            month_id: pos
-                .time
-                .month
-                .map(|m| if m == 12 { 1 } else { m as i32 + 1 })
-                .unwrap_or(0),
+            // `pos.time.month` is the real MOVES `monthID` (the `<month key>`
+            // 0-based index → ID conversion happens once, in the XML parser).
+            // The captured execution DB keys its fuel supply at that same
+            // monthID, so the `build_fuel_blocks` join uses it verbatim — the
+            // former `+1` here was compensating the unconverted key and now
+            // would double-shift (August → September).
+            month_id: pos.time.month.map(|m| m as i32).unwrap_or(0),
         };
         let mut inputs = BaseRateCalculatorInputs {
             base_rate_by_age: tables.iter_typed("BaseRateByAge")?,
@@ -1792,13 +1787,14 @@ mod tests {
         store.insert(
             "MonthOfAnyYear",
             // `MonthOfAnyYear` maps the fuel `monthGroupID` to the internal
-            // `monthID`. `execute` now keys `RunConstants.month_id` off the
-            // position month with the MOVES `+1` convention (position month 7
-            // → monthID 8), so the fuel supply must land at the same monthID
-            // for the join in `build_fuel_blocks` to match — map group 7 → 8.
+            // `monthID`. `execute` keys `RunConstants.month_id` off the position
+            // month verbatim (the key→ID conversion is done in the XML parser,
+            // so no `+1` here). The position below is month 7, so the fuel
+            // supply must land at monthID 7 for `build_fuel_blocks` to match —
+            // map group 7 → 7.
             LocalMonthGroupRow::into_dataframe(vec![LocalMonthGroupRow {
                 month_group_id: 7,
-                month_id: 8,
+                month_id: 7,
             }])
             .unwrap(),
         );

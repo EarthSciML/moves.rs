@@ -93,18 +93,15 @@ impl SnapshotFilter {
                 .collect::<BTreeSet<_>>()
                 .into_iter()
                 .collect(),
-            // RunSpec `<month key="N"/>` is a 0-based index into the canonical
-            // MOVES MonthOfAnyYear table (January=0 … December=11). Java parses
-            // it via `TimeSpan.getMonthByIndex(key)`, which returns the Month
-            // object at position `key` in a list ordered by monthID, so
-            // `monthID = key + 1` (e.g. key=7 → monthID=8, August).
-            // The Rust RunSpec model stores the raw key; add 1 here to match
-            // the MOVES monthID stored in execution-DB tables.
+            // `timespan.months` already holds the real MOVES `monthID` (the
+            // `<month key="N"/>` 0-based index → ID conversion happens once, in
+            // the XML parser; see `XmlIndexedId`). Use it verbatim — adding 1
+            // here would double-shift (e.g. August → September).
             month_ids: run_spec
                 .timespan
                 .months
                 .iter()
-                .map(|&m| i64::from(m) + 1)
+                .map(|&m| i64::from(m))
                 .collect::<BTreeSet<_>>()
                 .into_iter()
                 .collect(),
@@ -1907,8 +1904,9 @@ mod tests {
         assert_eq!(f.year_ids, vec![2020i64]);
         assert_eq!(
             f.month_ids,
-            vec![8i64],
-            "month key=7 → monthID=8 (August): RunSpec key is 0-indexed, monthID = key + 1"
+            vec![7i64],
+            "the model `months` already holds the real monthID; SnapshotFilter \
+             uses it verbatim (key→ID conversion happens in the XML parser)"
         );
     }
 
@@ -2031,13 +2029,15 @@ mod tests {
         let store = load_execution_db_from_parquet(dir.path(), &filter, None)
             .expect("filtered load must succeed");
         let df = store.get("zonemonthhour").unwrap();
-        // RunSpec month key=7 → monthID=8 (August, 0-indexed key). The fixture has
-        // rows for monthID=7 and monthID=8 at zone=100. The filter is zone=100 AND
-        // monthID=8, so only the August row survives; zone=200 is dropped.
+        // The model `months` holds the real monthID (here 7) — the key→ID
+        // conversion is the XML parser's job, so SnapshotFilter uses it
+        // verbatim. The fixture has rows for monthID 7 and 8 at zone=100; the
+        // filter is zone=100 AND monthID=7, so only the month-7 row survives
+        // and zone=200 is dropped.
         assert_eq!(
             df.height(),
             1,
-            "filter should keep only the month=8 row for zone 100"
+            "filter should keep only the month=7 row for zone 100"
         );
         let zone_col = df
             .column("zoneID")

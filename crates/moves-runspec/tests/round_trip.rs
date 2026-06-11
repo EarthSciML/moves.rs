@@ -248,11 +248,15 @@ fn java_runspec_test_sample_values() {
     assert_eq!(g.key, 26161);
     assert_eq!(g.description, "MICHIGAN - Washtenaw County");
 
-    // Time span: hour 6 of June 2001 (the smoke-test slice).
+    // Time span: hourID 7 (the hour beginning 6:00 AM) of July (monthID 7) 2001.
+    // The fixture writes `<month key="6">` / `<beginhour key="6">`; the `key`
+    // attribute is a 0-based index (canonical `getMonthByIndex`/`getHourByIndex`),
+    // so the resolved IDs are key+1 = 7. Canonical `RunSpecTest.java` builds the
+    // same sample with `TimeSpan.getMonthByIndex(6)` (= monthID 7).
     assert_eq!(spec.timespan.years, vec![2001]);
-    assert_eq!(spec.timespan.months, vec![6]);
-    assert_eq!(spec.timespan.begin_hour, Some(6));
-    assert_eq!(spec.timespan.end_hour, Some(6));
+    assert_eq!(spec.timespan.months, vec![7]);
+    assert_eq!(spec.timespan.begin_hour, Some(7));
+    assert_eq!(spec.timespan.end_hour, Some(7));
 
     // Single vehicle selection: gasoline passenger cars.
     assert_eq!(spec.onroad_vehicle_selections.len(), 1);
