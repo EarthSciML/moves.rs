@@ -164,20 +164,30 @@ pub fn prune_geographic_tables_to_runspec(
     // fuel_supply_with_fuel_type × fuel_supply_adjustment), so the national
     // table both explodes the join (100k × the rest) and double-counts market
     // share across regions. Resolve the run's fuel regions from regionCounty
-    // (countyID → regionID) and prune FuelSupply to them.
-    let region_ids = fuel_region_ids_for_counties(store, &county_ids);
+    // (countyID → regionID) and prune FuelSupply to them. `regionCounty` maps a
+    // county to DIFFERENT regions across fuel years (e.g. 26161 → 200000000 only
+    // for fuelYear 1990, → 270000000 for 1999+), so the resolution MUST be scoped
+    // to the run's fuel year — otherwise both regions survive and every fuelType's
+    // market share sums to ~2, doubling the inventory.
+    let fuel_years = fuel_years_for_runspec(store, runspec);
+    let region_ids = fuel_region_ids_for_counties(store, &county_ids, &fuel_years);
     if !region_ids.is_empty() {
         prune_table_by_id(store, "FuelSupply", "fuelRegionID", &region_ids)?;
     }
     Ok(())
 }
 
-/// Resolve the fuel-region IDs serving `county_ids`, from `regionCounty`
-/// (`countyID`, `regionID`). Returns empty if the table or its columns are
-/// absent, in which case the caller leaves `FuelSupply` unpruned.
+/// Resolve the fuel-region IDs serving `county_ids` for the run's fuel
+/// year(s), from `regionCounty` (`countyID`, `regionID`, `fuelYearID`). A
+/// county maps to different regions across fuel years, so rows are restricted
+/// to `fuel_years` (when non-empty and the column is present) — otherwise the
+/// historical regions (e.g. a 1990-only region) survive and double the
+/// FuelSupply market share. Returns empty if the table/columns are absent, in
+/// which case the caller leaves `FuelSupply` unpruned.
 fn fuel_region_ids_for_counties(
     store: &InMemoryStore,
     county_ids: &BTreeSet<i64>,
+    fuel_years: &BTreeSet<i64>,
 ) -> BTreeSet<i64> {
     let Some(arc) = store.get("regionCounty") else {
         return BTreeSet::new();
@@ -195,11 +205,62 @@ fn fuel_region_ids_for_counties(
     let (Ok(rids), Ok(cids)) = (region_col.i64(), county_col.i64()) else {
         return BTreeSet::new();
     };
+    // Optional fuelYearID column for year-scoped resolution.
+    let fy_ids = col("fuelYearID").and_then(|c| c.i64().ok().cloned());
     let mut out: BTreeSet<i64> = BTreeSet::new();
     for i in 0..df.height() {
         if let (Some(r), Some(c)) = (rids.get(i), cids.get(i)) {
-            if county_ids.contains(&c) {
-                out.insert(r);
+            if !county_ids.contains(&c) {
+                continue;
+            }
+            // Scope to the run's fuel year(s) when known.
+            if !fuel_years.is_empty() {
+                match fy_ids.as_ref().and_then(|fc| fc.get(i)) {
+                    Some(fy) if fuel_years.contains(&fy) => {}
+                    Some(_) => continue,
+                    None => {}
+                }
+            }
+            out.insert(r);
+        }
+    }
+    out
+}
+
+/// Map the runspec's calendar years to `fuelYearID`s via the loaded `Year`
+/// table (`yearID` → `fuelYearID`). Empty if `Year` is absent or carries
+/// neither column — the caller then leaves the region resolution year-agnostic.
+fn fuel_years_for_runspec(store: &InMemoryStore, runspec: &RunSpec) -> BTreeSet<i64> {
+    let year_set: BTreeSet<i64> = runspec
+        .timespan
+        .years
+        .iter()
+        .map(|&y| i64::from(y))
+        .collect();
+    if year_set.is_empty() {
+        return BTreeSet::new();
+    }
+    let Some(arc) = store.get("Year") else {
+        return BTreeSet::new();
+    };
+    let df = &*arc;
+    let col = |name: &str| {
+        df.columns()
+            .iter()
+            .find(|c| c.name().eq_ignore_ascii_case(name))
+            .and_then(|c| c.cast(&DataType::Int64).ok())
+    };
+    let (Some(yid_col), Some(fyid_col)) = (col("yearID"), col("fuelYearID")) else {
+        return BTreeSet::new();
+    };
+    let (Ok(yids), Ok(fyids)) = (yid_col.i64(), fyid_col.i64()) else {
+        return BTreeSet::new();
+    };
+    let mut out: BTreeSet<i64> = BTreeSet::new();
+    for i in 0..df.height() {
+        if let (Some(y), Some(fy)) = (yids.get(i), fyids.get(i)) {
+            if year_set.contains(&y) {
+                out.insert(fy);
             }
         }
     }
