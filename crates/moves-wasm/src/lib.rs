@@ -1662,5 +1662,46 @@ mod tests {
                 eprintln!("[pol] {p}: sum={s:.6e} rows={n}");
             }
         }
+        // Dimension breakdown for pol 110 (PM2.5 total): sum + rows by fuelTypeID.
+        // The canonical snapshot disaggregates by fuelType {1,2,5}; this surfaces
+        // whether the default-DB path collapses or mis-weights the fuel split.
+        {
+            use std::collections::BTreeMap;
+            let mut by_ft: BTreeMap<i64, (f64, usize)> = BTreeMap::new();
+            for (name, bytes) in &outcome.output_bytes {
+                if !name.to_string_lossy().contains("MOVESOutput") {
+                    continue;
+                }
+                let Ok(df) = default_db::parquet_bytes_to_polars_df(bytes) else {
+                    continue;
+                };
+                let i64c = |n: &str| {
+                    df.column(n)
+                        .ok()
+                        .and_then(|c| c.cast(&polars::prelude::DataType::Int64).ok())
+                };
+                let f64c = |n: &str| {
+                    df.column(n)
+                        .ok()
+                        .and_then(|c| c.cast(&polars::prelude::DataType::Float64).ok())
+                };
+                if let (Some(pol), Some(ft), Some(q)) =
+                    (i64c("pollutantID"), i64c("fuelTypeID"), f64c("emissionQuant"))
+                {
+                    if let (Ok(pc), Ok(fc), Ok(qc)) = (pol.i64(), ft.i64(), q.f64()) {
+                        for ((p, f), v) in pc.into_iter().zip(fc.into_iter()).zip(qc.into_iter()) {
+                            if p == Some(110) {
+                                let e = by_ft.entry(f.unwrap_or(-1)).or_default();
+                                e.0 += v.unwrap_or(0.0);
+                                e.1 += 1;
+                            }
+                        }
+                    }
+                }
+            }
+            for (f, (s, n)) in &by_ft {
+                eprintln!("[pol110/fuelType] {f}: sum={s:.6e} rows={n}");
+            }
+        }
     }
 }
