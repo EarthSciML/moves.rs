@@ -537,6 +537,55 @@ impl CalculatorRegistry {
             .collect()
     }
 
+    /// The selected modules to drop under canonical `MOVESInstantiator`
+    /// `DO_RATES_FIRST` (the released-MOVES default, `CompilationFlags
+    /// .DO_RATES_FIRST = true`): every selected **emission calculator** that is
+    /// not on the rates-first keep-list. Canonical clears `neededClassNames` and
+    /// re-adds only `BaseRateCalculator` plus a chained-calculator whitelist;
+    /// the legacy inventory calculators (Basic*PM, Criteria*, NH3*, CH4N2O*,
+    /// …) are never instantiated. Mirroring that here prevents the default-DB
+    /// path — which carries both the rates and inventory execution tables —
+    /// from running both pipelines and double-counting.
+    ///
+    /// Only **calculators** are considered: generators are left untouched (the
+    /// port's BaseRate pipeline still consumes the inventory OperatingMode
+    /// distribution generator's output; the RatesOMD swap is modeled separately
+    /// by [`domain_scale_excluded_omd_modules`](Self::domain_scale_excluded_omd_modules)).
+    pub fn rates_first_excluded_calculators(&self, selected: &[String]) -> BTreeSet<String> {
+        // BaseRateCalculator + the MOVESInstantiator DO_RATES_FIRST whitelist
+        // (chained calculators), mapped to the port's calculator names.
+        const KEEP: &[&str] = &[
+            "BaseRateCalculator",
+            "ActivityCalculator",
+            "AirToxicsCalculator",
+            "AirToxicsDistanceCalculator",
+            "CO2AERunningStartExtendedIdleCalculator",
+            "CrankcaseEmissionCalculatorNonPM",
+            "DistanceCalculator",
+            "HCSpeciationCalculator",
+            "LiquidLeakingCalculator",
+            "NOCalculator",
+            "NO2Calculator",
+            "PM10BrakeTireCalculator",
+            "PM10EmissionCalculator",
+            "RefuelingLossCalculator",
+            "SO2Calculator",
+            "SulfatePMCalculator",
+            "TankVaporVentingCalculator",
+            "TOGSpeciationCalculator",
+        ];
+        selected
+            .iter()
+            .filter(|n| {
+                !KEEP.contains(&n.as_str())
+                    // A calculator (not a generator): generators are kept so the
+                    // BaseRate pipeline's inputs are still produced.
+                    && self.instantiate_calculator(n).is_some()
+            })
+            .cloned()
+            .collect()
+    }
+
     /// Convenience: filter + topo-sort in one call. Returns the modules
     /// relevant to `selections`, in execution-safe order.
     pub fn execution_order_for_runspec(

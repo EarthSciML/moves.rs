@@ -304,7 +304,12 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
                 default_db_path.display()
             )
         })?;
-        engine = engine.with_slow_store(store);
+        // The default DB carries both the rates and inventory execution tables,
+        // so follow canonical MOVESInstantiator DO_RATES_FIRST (the released
+        // default) and run only the BaseRate + chained pipeline — otherwise the
+        // legacy inventory calculators double-count and fan a single run-month
+        // out across all 12 months.
+        engine = engine.with_rates_first(true).with_slow_store(store);
         engine
             .execution_run_spec_mut()
             .build_execution_locations(&geography);

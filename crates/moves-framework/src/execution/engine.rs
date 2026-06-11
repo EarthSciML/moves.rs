@@ -496,6 +496,15 @@ pub struct MOVESEngine {
     /// Populated by [`with_slow_store`](Self::with_slow_store); empty by
     /// default (calculators receive an empty slow tier).
     slow_store: Arc<InMemoryStore>,
+    /// When `true`, the plan follows canonical `MOVESInstantiator`
+    /// `DO_RATES_FIRST` (the released-MOVES default): the legacy inventory
+    /// emission calculators are cleared so only the `BaseRateCalculator` +
+    /// chained-whitelist path produces emissions. Set by the default-DB run
+    /// path (the only path that loads the full, both-mode execution DB and so
+    /// would otherwise run rates and inventory calculators together and
+    /// double-count). Snapshot/scale runs leave this `false` because their
+    /// captured execution tables already pin a single mode.
+    rates_first: bool,
 }
 
 impl MOVESEngine {
@@ -514,7 +523,18 @@ impl MOVESEngine {
             strategy_registry: ControlStrategyRegistry::new(),
             config,
             slow_store: Arc::new(InMemoryStore::new()),
+            rates_first: false,
         }
+    }
+
+    /// Opt into the canonical `DO_RATES_FIRST` plan (drop the legacy inventory
+    /// emission calculators, keeping only the `BaseRateCalculator` + chained
+    /// whitelist). The default-DB run path sets this; see the
+    /// [`rates_first`](Self::rates_first) field.
+    #[must_use]
+    pub fn with_rates_first(mut self, rates_first: bool) -> Self {
+        self.rates_first = rates_first;
+        self
     }
 
     /// Pre-load execution-database tables into every chunk's
@@ -603,6 +623,21 @@ impl MOVESEngine {
             .registry
             .domain_scale_excluded_omd_modules(is_project, is_mesoscale);
         names.retain(|n| !drop.contains(n));
+
+        // Canonical `MOVESInstantiator` DO_RATES_FIRST (released-MOVES default):
+        // clear the legacy inventory emission calculators so only the
+        // `BaseRateCalculator` + chained whitelist produce emissions. Without
+        // this, the full default DB (which carries BOTH the rates and inventory
+        // execution tables) runs both pipelines and double-counts; the legacy
+        // running/start/criteria/NH3 calculators also lack the per-bundle
+        // RunSpecMonth extract filter, so they fan a single run-month out across
+        // all 12 months. Only generators that the BaseRate pipeline consumes
+        // (e.g. the inventory OpModeDistribution generator) are kept; the
+        // RatesOMD swap is handled by `domain_scale_excluded_omd_modules`.
+        if self.rates_first {
+            let drop = self.registry.rates_first_excluded_calculators(&names);
+            names.retain(|n| !drop.contains(n));
+        }
         Ok(names)
     }
 

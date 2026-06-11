@@ -700,7 +700,7 @@ impl Calculator for BaseRateCalculator {
             nox_humidity_adjust: tables.iter_typed("NOxHumidityAdjust")?,
             zone_ac_factor: tables.iter_typed_or_empty("zoneACFactor")?,
             im_factor: tables.iter_typed("IMFactor")?,
-            im_coverage: tables.iter_typed("IMCoverage")?,
+            im_coverage: tables.iter_typed_or_empty("IMCoverage")?,
             emission_rate_adjustment: tables.iter_typed("EmissionRateAdjustment")?,
             ev_efficiency: tables.iter_typed("EVEfficiency")?,
             // MOVES never persists `universalActivity` (it is a runtime-derived
