@@ -1511,8 +1511,23 @@ pub fn default_tables() -> Vec<MergeTableSpec> {
 /// multiple clauses are AND-chained by folding.
 #[cfg(not(target_arch = "wasm32"))]
 fn apply_where_clauses(lf: LazyFrame, clauses: &[WhereClause]) -> LazyFrame {
+    if clauses.is_empty() {
+        return lf;
+    }
+    // An empty-shipped default-DB table (zero partitions in the manifest — e.g.
+    // the runtime-generated `AverageTankGasoline` / `SoakActivityFraction`,
+    // which a generator fills at run time) scans to a schemaless 0-column frame.
+    // Filtering it by a column it does not carry errors at `collect()`
+    // ("unable to find column …; valid columns: []"). A predicate over an empty
+    // table is a no-op, so skip any clause whose column is absent from the
+    // scanned schema rather than crashing the whole default-DB load.
+    let mut probe = lf.clone();
+    let Ok(schema) = probe.collect_schema() else {
+        return lf;
+    };
     clauses
         .iter()
+        .filter(|clause| schema.index_of(clause.column()).is_some())
         .fold(lf, |lf, clause| lf.filter(where_clause_to_expr(clause)))
 }
 

@@ -1268,7 +1268,7 @@ fn default_db_snapshot_diff() {
             scale_input: None,
             default_db: Some(db_root.clone()),
         })
-        .unwrap_or_else(|e| panic!("{name}: run error — {e}"));
+        .unwrap_or_else(|e| panic!("{name}: run error — {e:#}"));
 
         let canonical = match Snapshot::load(&snap_root.join(name)) {
             Ok(s) => {

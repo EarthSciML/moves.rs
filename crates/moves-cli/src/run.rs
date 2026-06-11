@@ -34,8 +34,8 @@ use moves_framework::{
 };
 use moves_runspec::{GeoKind, RunSpec};
 use polars::prelude::{
-    col, concat, lit, Expr, IntoLazy, LazyFrame, NamedFrom, PlRefPath, ScanArgsParquet, SerReader,
-    Series, UnionArgs,
+    col, concat, lit, DataType, Expr, IntoLazy, LazyFrame, NamedFrom, PlRefPath, ScanArgsParquet,
+    SerReader, Series, UnionArgs,
 };
 
 use crate::load_run_spec;
@@ -774,6 +774,100 @@ fn populate_source_use_type_physics_mapping(store: &mut InMemoryStore) -> Result
     Ok(())
 }
 
+/// Synthesise `PollutantProcessMappedModelYear` from `PollutantProcessModelYear`
+/// when absent. With MOVES's identity model-year mapping the mapped table is a
+/// straight copy of the source (same columns: polProcessID, modelYearID,
+/// modelYearGroupID, fuelMYGroupID, IMModelYearGroupID), which `BaseRateCalculator`
+/// and the NOx calculators read. (Kept in sync with the WASM `default_db.rs`
+/// synthesis — see the note on default-DB synthesis duplication.)
+fn populate_pollutant_process_mapped_model_year(store: &mut InMemoryStore) -> Result<()> {
+    if store.contains("PollutantProcessMappedModelYear")
+        || !store.contains("PollutantProcessModelYear")
+    {
+        return Ok(());
+    }
+    let mapped: polars::prelude::DataFrame = (*store
+        .get("PollutantProcessModelYear")
+        .context("PollutantProcessModelYear not in store after contains check")?)
+    .clone();
+    store.insert("PollutantProcessMappedModelYear".to_string(), mapped);
+    Ok(())
+}
+
+/// Fill the NULL `marketShare`/`marketShareCV` of the default DB's all-zero
+/// `FuelSupply` placeholder row (`fuelFormulationID = 0`) with `0.0`, so the
+/// strict per-row extractors do not error on it. A NULL on a *real* row is a
+/// genuine data gap and is surfaced as an error. (Kept in sync with the WASM
+/// `default_db.rs` synthesis.)
+fn fill_fuel_supply_placeholder_nulls(store: &mut InMemoryStore) -> Result<()> {
+    use polars::prelude::Column;
+    const TABLE: &str = "FuelSupply";
+    const COLS: &[&str] = &["marketShare", "marketShareCV"];
+
+    let Some(arc) = store.get(TABLE) else {
+        return Ok(());
+    };
+    let mut df: polars::prelude::DataFrame = (*arc).clone();
+    drop(arc);
+
+    let ffid_name = df
+        .get_column_names()
+        .iter()
+        .find(|n| n.as_str().eq_ignore_ascii_case("fuelFormulationID"))
+        .map(|n| n.to_string());
+    let Some(ffid_name) = ffid_name else {
+        return Ok(());
+    };
+    let ffid = df
+        .column(&ffid_name)
+        .and_then(|c| c.cast(&DataType::Int32))
+        .map_err(|e| anyhow::anyhow!("FuelSupply.fuelFormulationID cast: {e}"))?;
+    let ffid = ffid.i32().map_err(|e| anyhow::anyhow!("{e}"))?.clone();
+    let is_placeholder = |i: usize| ffid.get(i) == Some(0);
+
+    let mut changed = false;
+    for &want in COLS {
+        let actual = df
+            .get_column_names()
+            .iter()
+            .find(|n| n.as_str().eq_ignore_ascii_case(want))
+            .map(|n| n.to_string());
+        let Some(name) = actual else { continue };
+        let casted = df
+            .column(&name)
+            .and_then(|c| c.cast(&DataType::Float64))
+            .map_err(|e| anyhow::anyhow!("FuelSupply.{want} cast: {e}"))?;
+        let ca = casted.f64().map_err(|e| anyhow::anyhow!("{e}"))?;
+        if ca.null_count() == 0 {
+            continue;
+        }
+        let mut filled: Vec<f64> = Vec::with_capacity(ca.len());
+        for i in 0..ca.len() {
+            match ca.get(i) {
+                Some(v) => filled.push(v),
+                None if is_placeholder(i) => filled.push(0.0),
+                None => {
+                    return Err(anyhow::anyhow!(
+                        "FuelSupply.{want} is NULL for fuelFormulationID={} (row {i}): \
+                         a real fuel-supply row is missing its market share",
+                        ffid.get(i)
+                            .map(|v| v.to_string())
+                            .unwrap_or_else(|| "NULL".to_string()),
+                    ));
+                }
+            }
+        }
+        let series: Column = Series::new(name.as_str().into(), filled).into();
+        if df.with_column(series).is_ok() {
+            changed = true;
+        }
+    }
+    if changed {
+        store.insert(TABLE.to_string(), df);
+    }
+    Ok(())
+}
+
 /// Fill the NULL `ZoneMonthHour` meteorology columns (`heatIndex`,
 /// `specificHumidity`, `molWaterFraction`) from `temperature` / `relHumidity`.
 ///
@@ -1227,6 +1321,37 @@ fn build_runspec_tables(runspec: &RunSpec, store: &mut InMemoryStore) -> Result<
     };
     insert_i32(store, "RunSpecYear", "yearID", year_ids);
 
+    // RunSpecModelYear: the fleet model years covered by the run — each analysis
+    // year minus every age in `AgeCategory` (ages 0..=40). SO2 / SulfatePM filter
+    // their per-`modelYearID` rates to this set; canonical MOVES populates
+    // `RunSpecModelYear` the same way (the run's years crossed with the age
+    // range). Mirrors the `modelYearID = year - ageID` derivation the BaseRate
+    // SBWeighted port uses. (Kept in sync with the WASM `default_db.rs` synthesis.)
+    let model_year_ids: Vec<i32> = {
+        let age_ids: Vec<i32> = store
+            .get("AgeCategory")
+            .and_then(|arc| {
+                let df = &*arc;
+                let name = df
+                    .get_column_names()
+                    .iter()
+                    .find(|n| n.as_str().eq_ignore_ascii_case("ageID"))
+                    .map(|n| n.to_string())?;
+                let casted = df.column(&name).ok()?.cast(&DataType::Int32).ok()?;
+                let ca = casted.i32().ok()?;
+                Some(ca.into_iter().flatten().collect::<Vec<i32>>())
+            })
+            .unwrap_or_default();
+        let mut ids: BTreeSet<i32> = BTreeSet::new();
+        for &y in &runspec.timespan.years {
+            for &a in &age_ids {
+                ids.insert(y as i32 - a);
+            }
+        }
+        ids.into_iter().collect()
+    };
+    insert_i32(store, "RunSpecModelYear", "modelYearID", model_year_ids);
+
     // RunSpecRoadType (note: generators access this as "runSpecRoadType" or
     // "RunSpecRoadType" — InMemoryStore uses case-insensitive lookup).
     let road_type_ids: Vec<i32> = {
@@ -1461,6 +1586,10 @@ pub fn build_default_db_store(
     build_runspec_tables(run_spec, &mut store).context("building RunSpec tables from RunSpec")?;
     populate_source_use_type_physics_mapping(&mut store)
         .context("synthesising sourceUseTypePhysicsMapping")?;
+    populate_pollutant_process_mapped_model_year(&mut store)
+        .context("synthesising PollutantProcessMappedModelYear")?;
+    fill_fuel_supply_placeholder_nulls(&mut store)
+        .context("filling FuelSupply placeholder NULLs")?;
     populate_zone_month_hour_meteorology(&mut store)
         .context("populating ZoneMonthHour meteorology")?;
     merge_process_year_variants(&mut store)
