@@ -882,6 +882,35 @@ impl MOVESEngine {
             // aggregator under the same RunSpec-selection filter the producers
             // use).
             if let Some(acc) = &worker_acc {
+                // Canonical's `chainCalculator` runs INSIDE the
+                // (process → location → year → …) nest, so it always sees a
+                // fully-specified `context.year` — AirToxics / SO2 / criteria
+                // derive `modelYearID = year − ageID` from it (and hard-error
+                // on a missing year). The port batches chained execution after
+                // `master.run()`, so it inherits the chunk's *leftover*
+                // position. That position is year-less whenever the last
+                // process iterated subscribed only at a coarse granularity
+                // (e.g. a Process-granularity generator like FuelEffects
+                // Generator): entering a process resets `position.time` to
+                // `none()`, and the loop never descends into the year nest for
+                // it. Restore the run year from the plan so the chained
+                // calculators resolve the same `context.year` they would inside
+                // the loop. Only `time.year` is filled — `location` is left
+                // alone on purpose: chained calculators read county/zone from
+                // the worker rows themselves, and the position's `county_id`
+                // serves only as an OPTIONAL `matches()` filter (crankcase),
+                // where `None` is the correct wildcard for a multi-county chunk
+                // — pinning it to `locations.first()` would wrongly drop every
+                // other county's rows.
+                if times.first().is_some() {
+                    let mut ctx =
+                        chunk_ctx.lock().expect("CalculatorContext mutex poisoned");
+                    let mut pos = *ctx.position();
+                    if pos.time.year.is_none() {
+                        pos.time = times[0];
+                        ctx.set_position(pos);
+                    }
+                }
                 for module in &chained {
                     let worker_df = {
                         let recs = acc.lock().expect("worker accumulator poisoned");
