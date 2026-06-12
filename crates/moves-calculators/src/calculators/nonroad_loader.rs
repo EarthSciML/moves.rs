@@ -1756,6 +1756,12 @@ fn build_fuel_properties<S: DataFrameStore + ?Sized>(
     let s_share = float_col(&sup, "marketShare");
     let s_region = resolve(&sup, "fuelRegionID").map(|_| int_col(&sup, "fuelRegionID"));
     let s_month = resolve(&sup, "monthGroupID").map(|_| int_col(&sup, "monthGroupID"));
+    // The canonical `year` join also restricts the SUPPLY rows to the run's
+    // fuelYearID — a county capture carries every fuel year (1990–2060,
+    // shares summing to ~1 per fuel type per year), so skipping this filter
+    // overcounts the weighted sums ~60x (oxygen ≈ 140 wt% → the oxygenate
+    // correction zeroes CO/THC and inflates NOx ~17x).
+    let s_fuelyear = resolve(&sup, "fuelYearID").map(|_| int_col(&sup, "fuelYearID"));
 
     let mut oxy = 0.0_f64;
     let (mut gas_sulfur, mut gas_rows) = (0.0_f64, 0u32);
@@ -1775,6 +1781,11 @@ fn build_fuel_properties<S: DataFrameStore + ?Sized>(
                 if m[i] != i64::from(month) {
                     continue;
                 }
+            }
+        }
+        if let Some(fy) = &s_fuelyear {
+            if fy[i] != fuel_year {
+                continue;
             }
         }
         any_row = true;
@@ -2286,11 +2297,11 @@ pub fn emissions_to_dataframe(
             }
             // Canonical clamps every loaded value at zero
             // (`NonroadOutputDataLoader`: `Math.max(0, …) * USTON_TO_GRAM`) —
-            // the NONROAD SOx balance can go negative for low-sulfur fuels.
+            // the NONROAD SOx balance can go negative for low-sulfur fuels —
+            // and KEEPS the zero-valued row (every selected pollutant of
+            // every .BMY record gets a MOVESOutput row), so zero is not
+            // skipped here.
             let e = row.emissions.get(slot).copied().unwrap_or(0.0).max(0.0);
-            if e == 0.0 {
-                continue;
-            }
             year.push(keys.year);
             month.push(keys.month.unwrap_or(0));
             day.push(keys.day.unwrap_or(0));

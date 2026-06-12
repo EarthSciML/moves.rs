@@ -471,6 +471,15 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
         // month-allocation/growth/fuel-property/ambient-temperature lookups
         // landed: 440/440 rows, max_rel ~7.2e-3 (real*4 class).
         ("nr-pleasure-craft-state", NONROAD_REL_TOL, false),
+        // nr-lawn-garden-county / nr-recreational-county: county-scale
+        // (Washtenaw MI) gasoline fixtures. Graduated once the supply
+        // fuelYearID filter (a county capture carries every fuel year
+        // 1990–2060; without the filter the oxygenate sum hit ~140 wt%)
+        // and canonical zero-row emission (every selected pollutant of
+        // every .BMY record gets a row, clamped at 0) landed: identical
+        // key sets, every pollutant ≤ ~1e-5 (f32 drift class).
+        ("nr-lawn-garden-county", NONROAD_REL_TOL, false), // ~4e-6, 1936/1936
+        ("nr-recreational-county", NONROAD_REL_TOL, false), // exact, 1010/1010
         // process-refueling: the chained RefuelingLossCalculator now runs (the
         // engine's chainCalculator step), reads a synthesized RefuelingFuelType
         // extract, gates output to THC (pollutant 1), and reconciles the
@@ -626,19 +635,20 @@ const QUARANTINED_FIXTURES: &[&str] = &[
     //   - state scale: agriculture -6.2e-2 (Tier-4-era diesel MYs 2014+
     //     under ~2x; marine-diesel SCCs skipped), construction 1.0e-3 but
     //     5 rows short of canonical, railroad-support -0.25.
-    //   - county scale: large per-pollutant inflation + row deficits
-    //     (lawn-garden 1.6e1, recreational 3.9e2, logging 1.7e1,
-    //     airport-support 7.8e2, industrial 3.6e0) — the county paths of
-    //     the region-scoped fuel/temperature/temporal lookups still
-    //     diverge; not yet root-caused.
+    //   - county scale: after the supply fuelYearID filter + canonical
+    //     zero-row emission, nr-lawn-garden-county and
+    //     nr-recreational-county GRADUATED (exact, identical key sets).
+    //     nr-logging-county is ≤6e-4 on every pollutant but emits one
+    //     spurious model year (2265007010 MY 1991, ~3 g — fleet-span
+    //     off-by-one). nr-industrial-county / nr-airport-support-county
+    //     carry the same Tier-4-era diesel gap (NOx ~0.82) plus
+    //     airport-support SO2 ~0.75.
     "nr-agriculture-state",
     "nr-airport-support-county",
     "nr-construction-state",
     "nr-industrial-county",
-    "nr-lawn-garden-county",
     "nr-logging-county",
     "nr-railroad-support-nation",
-    "nr-recreational-county",
 ];
 
 fn is_quarantined(name: &str) -> bool {
