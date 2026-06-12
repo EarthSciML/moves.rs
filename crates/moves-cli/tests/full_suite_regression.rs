@@ -499,6 +499,12 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
         // to ~3 and the inventory tripled. Filtering FuelSupply to the county's
         // region(s) via `regionCounty` drops it to ~3.4e-4 (precision class).
         ("expand-counties", ONROAD_REL_TOL, false), // ~3.4e-4
+        // sample-runspec: the canonical EPA sample (energy pollutant 91 only in the
+        // captured MOVESOutput, 84 rows). Port reproduces the same coverage (84 rows,
+        // pol 91) and value to ~1.6e-6 — pure f64 summation-order drift, smaller than
+        // every other energy fixture above. Confirmed precision-only via the union
+        // per-pollutant diff (no 92/93 emitted by either side; single pol-91 row).
+        ("sample-runspec", ONROAD_REL_TOL, false), // ~1.6e-6
         // Speciation / chained-calculator fixtures graduated once the regClass
         // collapse, SulfatePM pass-through doubling and NO/NO2 species doubling
         // were fixed (see QUARANTINED_FIXTURES for the three root causes). Each
@@ -548,12 +554,10 @@ const QUARANTINED_FIXTURES: &[&str] = &[
     // expand-* energy fixtures — energy pollutants 91/92/93, activity weighting
     // applied, KJ→Million-BTU conversion wired. expand-criteria/expand-day/
     // expand-fueltype-diesel/expand-sourcetype GRADUATED to asserted_fixtures.
-    // Remaining quarantined:
-    //   sample-runspec: ~1.3e-6, within tolerance but unclassified — leave quarantined
-    //     until the cause is confirmed (possibly floating-point accumulation only).
     // expand-month GRADUATED to asserted_fixtures (zoneACFactor recompute, ~3.8e-4).
     // expand-counties GRADUATED to asserted_fixtures (FuelSupply region filter, ~3.4e-4).
-    "sample-runspec",
+    // sample-runspec GRADUATED to asserted_fixtures: confirmed precision-only
+    //   (single energy pol-91, 84 rows both sides, ~1.6e-6 f64 summation drift).
     // process-apu: BaseRate emits the process-91 / op-mode-201,203 (APU /
     // shorepower) energy rates canonical activity-gates to 0 in baseRateOutput;
     // same missing-activity-weighting gap. mixed-onroad-nonroad: canonical
