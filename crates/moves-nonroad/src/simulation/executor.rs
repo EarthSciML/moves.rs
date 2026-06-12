@@ -37,7 +37,8 @@
 
 use crate::allocation::{allocate_county, allocate_state, CountyDescriptor};
 use crate::common::consts::{
-    CVTTON, MXAGYR, MXDAYS, MXEVTECH, MXPOL, MXTECH, RMISS, SWTCNG, SWTDSL, SWTGS2, SWTGS4, SWTLPG,
+    CVTTON, MXAGYR, MXDAYS, MXEVTECH, MXPOL, MXTECH, RMISS, SFCCNG, SFCDSL, SFCGS2, SFCGS4,
+    SFCLPG, SWTCNG, SWTDSL, SWTGS2, SWTGS4, SWTLPG,
 };
 use crate::driver::scrptime;
 use crate::driver::{day_month_factors as daymthf, DayMonthFactors};
@@ -982,11 +983,21 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             rfg_winter_4_stroke: None,
             rfg_summer_2_stroke: None,
             rfg_summer_4_stroke: None,
-            // SOx/altitude unused by the emitted pollutants; neutral values
-            // (soxcor = sox_fuel/sox_base = 1, altitude factor = 1).
-            sox_fuel: [1.0; 5],
-            sox_base: [1.0; 5],
-            sox_diesel_marine: 1.0,
+            // SOx correction (emsadj.f :260-271): soxcor = soxful/soxbas.
+            // `fuel_sulfur_pct` carries the run's in-use sulfur weight %
+            // (the .opt OPTIONS values); when absent the correction is
+            // neutral (soxful = soxbas), preserving legacy behaviour.
+            sox_fuel: self
+                .executor
+                .reference
+                .fuel_sulfur_pct
+                .unwrap_or([SWTGS2, SWTGS4, SWTDSL, SWTLPG, SWTCNG]),
+            sox_base: [SWTGS2, SWTGS4, SWTDSL, SWTLPG, SWTCNG],
+            sox_diesel_marine: if self.executor.reference.fuel_sulfur_pct.is_some() {
+                self.executor.reference.fuel_sulfur_marine
+            } else {
+                SWTDSL
+            },
             altitude_factor: [1.0; 5],
         };
         Ok(calculate_emission_adjustments(&inputs))
@@ -1090,6 +1101,14 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             |y1, y2| growth_factor(&selected_refs, y1, y2, fips),
         )?;
 
+        if std::env::var("MOVES_NR_DEBUG_GROWTH").is_ok() {
+            let mult: f32 = agedist_out.mdyrfrc.iter().sum();
+            eprintln!(
+                "[nr-growth] indicator={indicator:?} fips={fips} base_year={} growth_year={growth_year} records={} multiplier={mult}",
+                record.base_pop_year,
+                selected_refs.len(),
+            );
+        }
         // 8. Build ModelYearAgedistResult. modfrc comes from agedist
         // (grown to growth_year); the per-year adjustments from modyr.
         let nyrlif = modyr_out.nyrlif;
@@ -1388,8 +1407,24 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
 
         let retrofit_reduction = vec![0.0_f32; MXPOL];
         let mut emission_factors = factors.emission_factors.clone();
-        let sox_conversion = [SWTGS2, SWTGS4, SWTDSL, SWTLPG, SWTCNG];
+        let sox_conversion = [SFCGS2, SFCGS4, SFCDSL, SFCLPG, SFCCNG]; // soxfrc = SFC* (intadj.f:60-64): the sulfur->SOx/PM conversion FRACTIONS, not the SWT* sulfur weights
         let sox_base = [SWTGS2, SWTGS4, SWTDSL, SWTLPG, SWTCNG];
+
+        // Per-tech sulfur alternate (clcems.f `fndchr(tectyp(...), sultec)`):
+        // resolve this iteration's tech name from the same hp-matched
+        // reference entry `compute_exhaust_factors` used, then look it up in
+        // the /PM BASE SULFUR/ table.
+        let sulfur_alternate = self
+            .executor
+            .reference
+            .exhaust_tech_entries
+            .iter()
+            .find(|e| {
+                e.scc == record.scc && e.hp_min <= record.hp_avg && record.hp_avg <= e.hp_max
+            })
+            .and_then(|e| e.tech_names.get(tech_index))
+            .and_then(|name| self.executor.reference.sulfur_alternates.get(name))
+            .copied();
 
         // A pollutant takes the EF-gated branch of
         // `calculate_exhaust_emissions` only when an emission-factor file
@@ -1458,7 +1493,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             fuel: options.fuel,
             sox_conversion,
             sox_base,
-            sulfur_alternate: None,
+            sulfur_alternate,
         };
 
         let outputs = calculate_exhaust_emissions(&mut calc_inputs, &pollutant_filter);
@@ -2687,7 +2722,7 @@ fn calculate_exhaust_from_reference(
     }
 
     let retrofit_reduction = vec![0.0_f32; MXPOL];
-    let sox_conversion = [SWTGS2, SWTGS4, SWTDSL, SWTLPG, SWTCNG];
+    let sox_conversion = [SFCGS2, SFCGS4, SFCDSL, SFCLPG, SFCCNG]; // soxfrc = SFC* (intadj.f:60-64): the sulfur->SOx/PM conversion FRACTIONS, not the SWT* sulfur weights
     let sox_base_arr = [SWTGS2, SWTGS4, SWTDSL, SWTLPG, SWTCNG];
 
     let mut calc_inputs = ExhaustCalcInputs {

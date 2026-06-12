@@ -428,6 +428,23 @@ pub struct ReferenceData {
     /// canonical reproduces — a flat 24-hour mean biases NOx high and CO/THC
     /// low. Empty ⇒ fall back to the scalar `ambient_temp_f`.
     pub ambient_temp_by_scc: std::collections::BTreeMap<String, f32>,
+    /// In-use fuel sulfur weight % per fuel slot `[gas-2str, gas-4str,
+    /// diesel, LPG, CNG]` — the `.opt` OPTIONS `Gas/Diesel/CNG-LPG sulfur %`
+    /// values (`soxful` in `emsadj.f`; the SOx correction is
+    /// `soxful/soxbas`). `None` ⇒ neutral correction (`soxful = soxbas`),
+    /// preserving the pre-sulfur-wiring behaviour for callers that do not
+    /// load fuel-supply data.
+    pub fuel_sulfur_pct: Option<[f32; 5]>,
+    /// In-use marine-diesel sulfur weight % (`soxdsm`, the rec-marine SCC
+    /// override in `emsadj.f` :267). Only meaningful when
+    /// `fuel_sulfur_pct` is `Some`.
+    pub fuel_sulfur_marine: f32,
+    /// Per-tech sulfur alternates keyed by tech name (engTechID string) —
+    /// the `.opt` `/PM BASE SULFUR/` packet (`nrsulfuradjustment`, diesel
+    /// fuel types 23/24; `sultec`/`sulalt`/`sulcnv` in `clcems.f`). Used by
+    /// the SOx EF rewrite and the diesel PM sulfur correction.
+    pub sulfur_alternates:
+        std::collections::BTreeMap<String, crate::emissions::exhaust::SulfurAlternate>,
 }
 
 #[cfg(test)]
