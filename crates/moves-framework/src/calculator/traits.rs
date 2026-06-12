@@ -237,7 +237,11 @@ impl CalculatorContext {
             return;
         }
         let slow = std::sync::Arc::make_mut(&mut self.slow);
-        self.scratch.store.copy_into(slow);
+        // Never let a generator's empty recomputation clobber an authoritative
+        // (non-empty) slow-tier table — e.g. a snapshot's captured `SHO` that a
+        // co-chunked `TotalActivityGenerator` re-derives as an empty frame.
+        // See `InMemoryStore::copy_into_preserving_nonempty`.
+        self.scratch.store.copy_into_preserving_nonempty(slow);
     }
 
     /// Current MasterLoop iteration / location / time triple.
