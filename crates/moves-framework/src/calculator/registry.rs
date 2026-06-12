@@ -553,15 +553,25 @@ impl CalculatorRegistry {
     /// by [`domain_scale_excluded_omd_modules`](Self::domain_scale_excluded_omd_modules)).
     pub fn rates_first_excluded_calculators(&self, selected: &[String]) -> BTreeSet<String> {
         // BaseRateCalculator + the MOVESInstantiator DO_RATES_FIRST whitelist
-        // (chained calculators), mapped to the port's calculator names.
+        // (chained calculators), mapped to the port's calculator names. This is
+        // a faithful 1:1 mirror of the canonical `whiteList[]` in
+        // `MOVESInstantiator.generateExecutionGraph` (the `neededClasses` array
+        // adds `BaseRateCalculator`; the `whiteList` adds the rest). Keep this
+        // list in lockstep with that array — notably it INCLUDES
+        // `EvaporativePermeationCalculator` and `NonroadEmissionCalculator` (so
+        // the evap-permeation and NONROAD pipelines survive rates-first), and it
+        // EXCLUDES `AirToxicsDistanceCalculator` (canonical does not whitelist
+        // it, so the per-distance air-toxics calculator is dropped under
+        // rates-first).
         const KEEP: &[&str] = &[
             "BaseRateCalculator",
+            "NonroadEmissionCalculator",
             "ActivityCalculator",
             "AirToxicsCalculator",
-            "AirToxicsDistanceCalculator",
+            "DistanceCalculator",
             "CO2AERunningStartExtendedIdleCalculator",
             "CrankcaseEmissionCalculatorNonPM",
-            "DistanceCalculator",
+            "EvaporativePermeationCalculator",
             "HCSpeciationCalculator",
             "LiquidLeakingCalculator",
             "NOCalculator",

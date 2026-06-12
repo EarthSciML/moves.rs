@@ -266,7 +266,17 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
         }
         let geography = load_geography_from_store(&store)
             .with_context(|| format!("building geography from {}", snapshot_dir.display()))?;
-        engine = engine.with_slow_store(store);
+        // Canonical MOVES runs `DO_RATES_FIRST` (the released default): only the
+        // BaseRate + chained-calculator whitelist produces emissions, and the
+        // legacy inventory calculators (CriteriaStart/CriteriaRunning/BasicPm/…)
+        // are cleared. A captured snapshot is, by construction, the execution DB
+        // of such a rates-first canonical run (every snapshot carries a
+        // `baseRateOutput`), so the snapshot replay must mirror the same plan.
+        // Without this, the port runs BOTH pipelines and double-counts — e.g.
+        // start exhaust (process 2) is emitted by the legacy CriteriaStart
+        // calculator on off-network road type 1 even when the RunSpec selects
+        // only an on-road type, where canonical's rates-first plan emits nothing.
+        engine = engine.with_rates_first(true).with_slow_store(store);
         engine
             .execution_run_spec_mut()
             .build_execution_locations(&geography);
