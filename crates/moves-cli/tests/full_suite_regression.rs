@@ -187,11 +187,13 @@ fn canonical_present(snapshots_root: &Path, name: &str) -> bool {
 
 /// The fixture catalogue must contain exactly 40 non-scale non-error fixtures.
 ///
-/// 46 total in `characterization/fixtures/`:
-/// - 30 onroad/mixed (non-`nr-`, non-`scale-`, non-`error-`):
+/// 50 total in `characterization/fixtures/`:
+/// - 34 onroad/mixed (non-`nr-`, non-`scale-`, non-`error-`):
 /// 23 original default-scale + `mixed-onroad-nonroad` + 6 added by
 /// (`expand-counties-large`, `expand-multifuel`, `expand-fullyear`,
-/// `expand-multiyear`, `expand-roadtypes`, `rates-minimal`)
+/// `expand-multiyear`, `expand-roadtypes`, `rates-minimal`) + 4 SINGLE-scale
+/// county fixtures (`process-apu-single`, `process-extended-idle-single`,
+/// `process-crankcase-start-single`, `process-crankcase-extidle-single`)
 /// - 10 NONROAD (`nr-*.xml`)
 /// - 3 `scale-*.xml` (excluded — require additional input databases)
 /// - 3 `error-*.xml` (excluded — test expected parse failures separately)
@@ -200,8 +202,8 @@ fn fixture_catalogue_size() {
     let fixtures = all_fixtures();
     assert_eq!(
         fixtures.len(),
-        40,
-        "expected 40 non-scale non-error fixtures (30 onroad/mixed + 10 NONROAD), \
+        44,
+        "expected 44 non-scale non-error fixtures (34 onroad/mixed + 10 NONROAD), \
          found {}. Update this test if the catalogue changes.",
         fixtures.len()
     );
@@ -216,8 +218,8 @@ fn fixture_catalogue_size() {
         .count();
 
     assert_eq!(
-        onroad_count, 30,
-        "expected 30 onroad/mixed fixtures, found {onroad_count}"
+        onroad_count, 34,
+        "expected 34 onroad/mixed fixtures, found {onroad_count}"
     );
     assert_eq!(
         nonroad_count, 10,
@@ -528,17 +530,32 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
         // fuelType-9 (electricity) 112/118 rows the additive delta cannot
         // cancel. 100/110/111/112/115/118/119 all exact to f64 drift.
         ("process-pm-exhaust", ONROAD_REL_TOL, false),
-        // process-apu was asserted-vacuous (canon 0 / port 0) only because the
-        // month off-by-one blocked all BaseRate output. With that fixed the
-        // BaseRate path now emits the process-91 / opMode-201,203 (APU /
-        // shorepower) energy rates, which canonical drops from baseRateOutput
-        // (its baserateoutput is 0 even though baserate_91_2020 has 358 rows
-        // and a baserateunits row exists). Reproducing that requires the
-        // runspec-derived BRC activity gating the port has not yet wired —
-        // see QUARANTINED_FIXTURES and docs/known-divergences.md §4.4.
+        // Vacuous (canon 0 / port 0) hotelling/idle/start-process fixtures.
+        // Canonical's captured execution DB for each carries the base RATE
+        // (e.g. process-apu's baserate_91_2020 has 358 nonzero opMode-201 APU
+        // rows) and the units metadata, but its activity tables — sho,
+        // sourcehours, movesworkeractivityoutput — and every output table —
+        // baserateoutput, rateperhour, ratepervehicle, movesactivityoutput,
+        // movesoutput — are EMPTY. So canonical's authoritative output for the
+        // process is zero rows. The port reproduces that: the BaseRate
+        // activity weighting (universalActivity = SHO / noOfRealDays) multiplies
+        // the captured rate by the captured SHO, which is empty, gating the
+        // output to nothing — exactly the "runspec-derived BRC activity gating"
+        // process-apu previously lacked (it used to emit the ungated APU rate,
+        // which is why it was quarantined). canon 0 == port 0, asserted vacuous.
+        // `vacuous` makes the gate fail loudly if a recapture ever gives either
+        // side a nonzero row, forcing reclassification rather than a silent pass.
+        ("process-apu", ONROAD_REL_TOL, true),
         ("process-crankcase-extidle", ONROAD_REL_TOL, true),
         ("process-crankcase-start", ONROAD_REL_TOL, true),
         ("process-extended-idle", ONROAD_REL_TOL, true),
+        // SINGLE-scale county variants (added with canonical snapshots by the
+        // HotellingImporter + Starts port). Same empty-canonical / empty-port
+        // vacuous case as their non-single counterparts above.
+        ("process-apu-single", ONROAD_REL_TOL, true),
+        ("process-crankcase-extidle-single", ONROAD_REL_TOL, true),
+        ("process-crankcase-start-single", ONROAD_REL_TOL, true),
+        ("process-extended-idle-single", ONROAD_REL_TOL, true),
     ]
 }
 
@@ -558,12 +575,12 @@ const QUARANTINED_FIXTURES: &[&str] = &[
     // expand-counties GRADUATED to asserted_fixtures (FuelSupply region filter, ~3.4e-4).
     // sample-runspec GRADUATED to asserted_fixtures: confirmed precision-only
     //   (single energy pol-91, 84 rows both sides, ~1.6e-6 f64 summation drift).
-    // process-apu: BaseRate emits the process-91 / op-mode-201,203 (APU /
-    // shorepower) energy rates canonical activity-gates to 0 in baseRateOutput;
-    // same missing-activity-weighting gap. mixed-onroad-nonroad: canonical
-    // MOVESOutput is empty (0 rows) while the port's NONROAD half emits ~8,632
-    // legitimate rows (separate/known). See docs/known-divergences.md §4.4.
-    "process-apu",
+    // process-apu GRADUATED to asserted_fixtures (vacuous): the BaseRate activity
+    // weighting now gates the captured APU rate to 0 against the empty captured
+    // SHO, matching canonical's empty output (canon 0 == port 0).
+    // mixed-onroad-nonroad: canonical MOVESOutput is empty (0 rows); the port's
+    // NONROAD half is a separate/known nonroad data-plane effort. See
+    // docs/known-divergences.md §4.4.
     "mixed-onroad-nonroad",
     // Speciation / chained-calculator class. Three engine/calculator bugs in this
     // class were FOUND and FIXED, GRADUATING chain-nonhaptog, chain-tog-speciation,
