@@ -53,8 +53,8 @@ use std::sync::OnceLock;
 use moves_calculator_info::{Granularity, Priority};
 use moves_data::ProcessId;
 use moves_framework::{
-    CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStoreTyped, Error,
-    Generator, TableRow,
+    CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStore,
+    DataFrameStoreTyped, Error, Generator, TableRow,
 };
 use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Series};
 
@@ -206,14 +206,78 @@ impl Generator for FuelEffectsGenerator {
             supplied_by_fuel_type,
             already_ratioed: BTreeSet::new(),
         };
+        // Canonical `FuelEffectsGenerator` builds generalFuelRatio for every
+        // polProcess in generalFuelRatioExpression, but for the criteria
+        // pollutants (THC/CO/NOx running+start) `doCOCalculations` /
+        // `doHCCalculations` / `doNOxCalculations` call
+        // `copyGeneralFuelRatioToCriteriaRatio`, which copies those rows into
+        // `criteriaRatio` and then `delete from generalFuelRatio where
+        // polProcessID in (...)` (FuelEffectsGenerator.java:3640-3644). The
+        // ONROAD BaseRateCalculator applies generalFuelRatio AND criteriaRatio as
+        // separate steps (BaseRateCalculator.sql:1034 and :1063), so leaving the
+        // criteria rows in generalFuelRatio while criteriaRatio also carries them
+        // double-applies the fuel effect for MY2017+ (the only model years whose
+        // criteria fuel-effect ratio is ≠ 1).
+        //
+        // The copy-and-delete only fires when the criteria fuel models are active
+        // (an onroad criteria run): nonroad runs use the SAME polProcessIDs
+        // (101/201/301 = THC/CO/NOx Running Exhaust) but have no criteriaRatio, so
+        // canonical keeps the fuel effect in generalFuelRatio for them. Mirror that
+        // exactly: drop a criteria polProcessID from generalFuelRatio only when it
+        // is actually present in `criteriaRatio` (the table the calculator will
+        // apply). This keeps the effect in generalFuelRatio for nonroad and for
+        // the default-DB path (where the port does not yet build criteriaRatio),
+        // and removes the double-count for the onroad snapshot path.
+        let criteria_ratio_pol_procs = criteria_ratio_pol_process_set(ctx);
         let rows = do_general_fuel_ratio(&inputs)
             .map_err(|e| Error::Polars(format!("FuelEffectsGenerator expression error: {e}")))?;
         let output_rows: Vec<GeneralFuelRatioOutputRow> = rows
             .into_iter()
             .map(GeneralFuelRatioOutputRow::from)
+            .filter(|r| {
+                !(is_criteria_ratio_pol_process(r.pol_process_id)
+                    && criteria_ratio_pol_procs.contains(&r.pol_process_id))
+            })
             .collect();
         crate::wiring::write_scratch_table(ctx, OUTPUT_TABLES[0], output_rows)
     }
+}
+
+/// The criteria-pollutant polProcessIDs whose fuel effect canonical MOVES moves
+/// out of `generalFuelRatio` into `criteriaRatio`: THC (1), CO (2) and NOx (3)
+/// for Running Exhaust (process 1) and Start Exhaust (process 2). Matches the
+/// `copyGeneralFuelRatioToCriteriaRatio` polProcess lists in
+/// `doCOCalculations` ("201,202"), `doHCCalculations` ("101,102") and
+/// `doNOxCalculations` ("301,302").
+const fn is_criteria_ratio_pol_process(pol_process_id: i32) -> bool {
+    matches!(pol_process_id, 101 | 102 | 201 | 202 | 301 | 302)
+}
+
+/// The set of `polProcessID`s present in the `criteriaRatio` table for this run,
+/// or empty when the table is absent/empty. Used to decide whether a criteria
+/// polProcess's fuel effect has been moved into `criteriaRatio` (onroad) and so
+/// must be dropped from `generalFuelRatio` to avoid double-application, or kept
+/// (nonroad / default-DB, where `criteriaRatio` carries no such rows).
+fn criteria_ratio_pol_process_set(ctx: &CalculatorContext) -> BTreeSet<i32> {
+    let mut set = BTreeSet::new();
+    let Some(df) = ctx.tables().get("criteriaRatio") else {
+        return set;
+    };
+    if df.height() == 0 {
+        return set;
+    }
+    let Ok(col) = df.column("polProcessID") else {
+        return set;
+    };
+    let Ok(ca) = col.cast(&DataType::Int32) else {
+        return set;
+    };
+    if let Ok(ca) = ca.i32() {
+        for v in ca.into_iter().flatten() {
+            set.insert(v);
+        }
+    }
+    set
 }
 
 // =============================================================================
