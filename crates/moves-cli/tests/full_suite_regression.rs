@@ -480,11 +480,18 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
         // expand-day / expand-fueltype-diesel / expand-sourcetype: select energy
         // pollutants 91/92/93. The KJ→Million-BTU unit conversion is wired in the
         // engine; activity weighting is also applied. All three now match canonical
-        // within ONROAD_REL_TOL. expand-counties and expand-month remain quarantined
-        // (expand-counties ~200% over; expand-month ~9.9e-3, just above tolerance).
+        // within ONROAD_REL_TOL. expand-counties remains quarantined (~200% over).
         ("expand-day", ONROAD_REL_TOL, false), // ~3.5e-4
         ("expand-fueltype-diesel", ONROAD_REL_TOL, false), // ~3.0e-4
         ("expand-sourcetype", ONROAD_REL_TOL, false), // ~1.3e-4
+        // expand-month: 4-month run (Feb/May/Aug/Nov), energy pollutant 91. Was
+        // ~9.9e-3, driven entirely by August (-3.4%): the rates-first
+        // BaseRateCalculator never recomputed the dropped-by-canonical
+        // `zoneACFactor`, so the air-conditioning energy adjustment was omitted —
+        // negligible in cool months, large in hot ones. `setup::compute_zone_ac_factor`
+        // now ports the canonical cache query (BaseRateCalculator.sql:507-523), so
+        // the AC term is applied and the residual drops to ~3.8e-4 (precision class).
+        ("expand-month", ONROAD_REL_TOL, false), // ~3.8e-4
         // Speciation / chained-calculator fixtures graduated once the regClass
         // collapse, SulfatePM pass-through doubling and NO/NO2 species doubling
         // were fixed (see QUARANTINED_FIXTURES for the three root causes). Each
@@ -537,12 +544,10 @@ const QUARANTINED_FIXTURES: &[&str] = &[
     // Remaining quarantined:
     //   expand-counties: ~200% over (max_rel_diff ≈ 2.0); multi-county run with
     //     per-county weighting not yet reproduced. See docs/known-divergences.md §4.4.
-    //   expand-month: ~9.9e-3 (just above ONROAD_REL_TOL=1e-3). Multi-day expansion
-    //     with weekday/weekend weighting; residual gap under investigation.
     //   sample-runspec: ~1.3e-6, within tolerance but unclassified — leave quarantined
     //     until the cause is confirmed (possibly floating-point accumulation only).
+    // expand-month GRADUATED to asserted_fixtures (zoneACFactor recompute, ~3.8e-4).
     "expand-counties",
-    "expand-month",
     "sample-runspec",
     // process-apu: BaseRate emits the process-91 / op-mode-201,203 (APU /
     // shorepower) energy rates canonical activity-gates to 0 in baseRateOutput;

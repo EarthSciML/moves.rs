@@ -103,6 +103,11 @@ static INPUT_TABLES: &[&str] = &[
     "FuelSupply",
     "FuelSubtype",
     "MonthOfAnyYear",
+    // AC-factor recomputation inputs (see setup::compute_zone_ac_factor): the
+    // canonical zoneACFactor cache query joins these to ZoneMonthHour.heatIndex.
+    "MonthGroupHour",
+    "SourceTypeAge",
+    "SourceTypeModelYear",
     "runSpecRoadType",
     // Activity tables the GetActivity SQL section reads to build
     // `universalActivity` (see `build_universal_activity`): SHO drives
@@ -693,7 +698,25 @@ impl Calculator for BaseRateCalculator {
             alt_criteria_ratio: tables.iter_typed_or_empty("altCriteriaRatio")?,
             temperature_adjustment: tables.iter_typed("TemperatureAdjustment")?,
             nox_humidity_adjust: tables.iter_typed("NOxHumidityAdjust")?,
-            zone_ac_factor: tables.iter_typed_or_empty("zoneACFactor")?,
+            // Canonical computes zoneACFactor inside the calculator and drops it
+            // (BaseRateCalculator.sql:507-523, :1546), so a captured snapshot
+            // never carries it. When the table is absent/empty, recompute it from
+            // ZoneMonthHour + the AC coefficient tables so the air-conditioning
+            // energy adjustment is not silently omitted (see
+            // `setup::compute_zone_ac_factor`).
+            zone_ac_factor: {
+                let captured = tables.iter_typed_or_empty::<setup::ZoneAcFactorRow>("zoneACFactor")?;
+                if captured.is_empty() {
+                    setup::compute_zone_ac_factor(
+                        tables,
+                        constants.year_id,
+                        constants.month_id,
+                        constants.zone_id,
+                    )?
+                } else {
+                    captured
+                }
+            },
             im_factor: tables.iter_typed("IMFactor")?,
             im_coverage: tables.iter_typed_or_empty("IMCoverage")?,
             emission_rate_adjustment: tables.iter_typed("EmissionRateAdjustment")?,
