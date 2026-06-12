@@ -115,6 +115,17 @@ const NONROAD_INPUT_TABLES: &[&str] = &[
     // The engine's ReferenceData carries a retrofit_records slot; this declaration
     // ensures the table is available in-store for the retrofit loader.
     "nrretrofitfactors",
+    // The runspec's pollutant×process selection — gates which engine
+    // pollutant slots are emitted onto MOVESOutput (canonical's
+    // need3101/need9001 bundle-SQL flags in NonroadOutputDataLoader).
+    "runspecpollutantprocess",
+    // zone (zoneID → countyID) joins zonemonthhour to the bundle county for
+    // the OPTIONS-packet daytime ambient temperature; regioncounty + year
+    // scope nrfuelsupply to the county's nonroad fuel region (the
+    // OPTIONS-packet oxygen/sulfur queries).
+    "zone",
+    "regioncounty",
+    "year",
 ];
 
 /// Adapter that routes onroad master-loop notifications for nonroad
@@ -221,12 +232,18 @@ impl Calculator for NonroadEmissionCalculator {
         let store = ctx.tables();
         let month = time.month.unwrap_or(0);
         let day_id = time.day_id.unwrap_or(0);
+        // The master loop's current county scopes the national population
+        // capture: None/0 ⇒ national, XX000 ⇒ state, else surrogate-allocated
+        // county (NONROAD runs one region per bundle; the loop fires this
+        // calculator once per county).
+        let county_fips = ctx.position().location.county_id;
         let options = nonroad_loader::build_options(year, month, day_id);
-        let inputs = nonroad_loader::build_nonroad_inputs(store, year);
+        let inputs = nonroad_loader::build_nonroad_inputs(store, year, county_fips);
         let debug = std::env::var("MOVES_NR_DEBUG").is_ok();
         if debug {
             eprintln!(
-                "[nr] execute year={year} groups={} records={} has_nremissionrate={} has_pop={}",
+                "[nr] execute year={year} county={county_fips:?} state={:?} groups={} records={} has_nremissionrate={} has_pop={}",
+                ctx.position().location.state_id,
                 inputs.group_count(),
                 inputs.record_count(),
                 store.contains("nremissionrate"),
@@ -272,7 +289,8 @@ impl Calculator for NonroadEmissionCalculator {
             // Tables present but empty population — a genuine nonroad-free slice.
             return Ok(CalculatorOutput::empty());
         }
-        let mut executor = nonroad_loader::build_production_executor(store, year, month, day_id);
+        let mut executor =
+            nonroad_loader::build_production_executor(store, year, month, day_id, county_fips);
 
         let outputs = moves_nonroad::run_simulation(&options, &inputs, &mut executor)
             .map_err(|e| Error::Nonroad(e.to_string()))?;
@@ -303,11 +321,22 @@ impl Calculator for NonroadEmissionCalculator {
             hour: time.hour.map(i32::from),
         };
         let temporal = if executor.reference.temporal_profiles.is_empty() {
-            nonroad_loader::build_temporal_factors(store, month_i.unwrap_or(0), day_i.unwrap_or(0))
+            nonroad_loader::build_temporal_factors(
+                store,
+                month_i.unwrap_or(0),
+                day_i.unwrap_or(0),
+                county_fips.filter(|&c| c > 0).map(|c| i64::from(c) / 1000),
+            )
         } else {
             std::collections::BTreeMap::new()
         };
-        match nonroad_loader::emissions_to_dataframe(&outputs.rows, &keys, &temporal)
+        let selected_pollutants = nonroad_loader::selected_output_pollutants(store);
+        match nonroad_loader::emissions_to_dataframe(
+            &outputs.rows,
+            &keys,
+            &temporal,
+            selected_pollutants.as_ref(),
+        )
             .map_err(|e| Error::Polars(e.to_string()))?
         {
             Some(df) => Ok(CalculatorOutput::with_dataframe(df)),

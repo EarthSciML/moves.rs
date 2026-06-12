@@ -466,6 +466,11 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
         ("process-evap-leaks", ONROAD_REL_TOL, false), // ~1.6e-7
         ("process-evap-permeation", ONROAD_REL_TOL, false), // ~2.1e-7
         ("nr-commercial-nation", NONROAD_REL_TOL, false), // ~3.5e-3 (real*4)
+        // nr-pleasure-craft-state: Florida state-scale, gasoline pleasure
+        // craft, processes 1/22/23/24. Graduated once the state-scoped
+        // month-allocation/growth/fuel-property/ambient-temperature lookups
+        // landed: 440/440 rows, max_rel ~7.2e-3 (real*4 class).
+        ("nr-pleasure-craft-state", NONROAD_REL_TOL, false),
         // process-refueling: the chained RefuelingLossCalculator now runs (the
         // engine's chainCalculator step), reads a synthesized RefuelingFuelType
         // extract, gates output to THC (pollutant 1), and reconciles the
@@ -609,15 +614,29 @@ const QUARANTINED_FIXTURES: &[&str] = &[
     // and NonECPM (118) is now exact via the true per-key delta emit, the general
     // fuel ratio restricted to pollutant 120, and the engine's
     // `replaced_pollutants` drop of BaseRate's zero fuelType-9 electricity rows.
-    // NONROAD fixtures that emit nothing (port row count 0 vs a populated
-    // canonical) or a wrong row count — population/sector-coverage gaps.
+    // NONROAD fixtures with residual data-plane gaps. The original
+    // "emits nothing / wrong row count" class was fixed by the canonical
+    // empty-/SOURCE CATEGORY/ quirk (an unmatched fuel×sector selection
+    // runs the WHOLE inventory), state/county surrogate allocation
+    // (alocty.f via nrstatesurrogate), state-scoped month-allocation /
+    // growth-pattern / fuel-property / ambient-temperature lookups, the
+    // SFC-vs-SWT sox_conversion fix and the /PM BASE SULFUR/ per-tech
+    // alternates. nr-pleasure-craft-state GRADUATED to asserted_fixtures
+    // (440/440 rows, ~7.2e-3). Remaining residuals:
+    //   - state scale: agriculture -6.2e-2 (Tier-4-era diesel MYs 2014+
+    //     under ~2x; marine-diesel SCCs skipped), construction 1.0e-3 but
+    //     5 rows short of canonical, railroad-support -0.25.
+    //   - county scale: large per-pollutant inflation + row deficits
+    //     (lawn-garden 1.6e1, recreational 3.9e2, logging 1.7e1,
+    //     airport-support 7.8e2, industrial 3.6e0) — the county paths of
+    //     the region-scoped fuel/temperature/temporal lookups still
+    //     diverge; not yet root-caused.
     "nr-agriculture-state",
     "nr-airport-support-county",
     "nr-construction-state",
     "nr-industrial-county",
     "nr-lawn-garden-county",
     "nr-logging-county",
-    "nr-pleasure-craft-state",
     "nr-railroad-support-nation",
     "nr-recreational-county",
 ];
