@@ -94,6 +94,8 @@ fn make_executor() -> ProductionExecutor {
             activity_entries: vec![ActivityTableEntry {
                 scc: "2270001010".into(),
                 fips: "06037".into(),
+                hp_min: 0.0,
+                hp_max: f32::MAX,
                 starts: 0.0,
                 activity_level: 100.0,
                 activity_unit: ActivityUnit::HoursPerYear,
@@ -166,6 +168,8 @@ fn state_level_reference(fips: &str) -> ReferenceData {
         activity_entries: vec![ActivityTableEntry {
             scc: "2270001010".into(),
             fips: fips.into(),
+            hp_min: 0.0,
+            hp_max: f32::MAX,
             starts: 0.0,
             activity_level: 100.0,
             activity_unit: ActivityUnit::HoursPerYear,
@@ -245,6 +249,8 @@ fn national_reference(state_fips: &str, scc: &str) -> ReferenceData {
         activity_entries: vec![ActivityTableEntry {
             scc: scc.into(),
             fips: "".into(),
+            hp_min: 0.0,
+            hp_max: f32::MAX,
             starts: 0.0,
             activity_level: 100.0,
             activity_unit: ActivityUnit::HoursPerYear,
@@ -307,6 +313,8 @@ fn us_total_reference(scc: &str) -> ReferenceData {
         activity_entries: vec![ActivityTableEntry {
             scc: scc.into(),
             fips: "".into(),
+            hp_min: 0.0,
+            hp_max: f32::MAX,
             starts: 0.0,
             activity_level: 100.0,
             activity_unit: ActivityUnit::HoursPerYear,
@@ -762,6 +770,8 @@ fn county_absent_ambient_temp_returns_error() {
             activity_entries: vec![ActivityTableEntry {
                 scc: "2270001010".into(),
                 fips: "06037".into(),
+                hp_min: 0.0,
+                hp_max: f32::MAX,
                 starts: 0.0,
                 activity_level: 100.0,
                 activity_unit: ActivityUnit::HoursPerYear,

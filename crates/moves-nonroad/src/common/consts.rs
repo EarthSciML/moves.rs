@@ -41,13 +41,20 @@ pub const NCNTY: usize = 3400;
 
 /// Maximum exhaust technology types.
 ///
-/// Original Fortran parameter: `MXTECH = 15` in `nonrdprm.inc`.
-pub const MXTECH: usize = 15;
+/// Original Fortran parameter: `MXTECH = 15` in `nonrdprm.inc` — but that
+/// bound applies per `(SCC, hp-bin, modelYear)` record (`rdtech_moves.f`
+/// keys entries on the year too; movesdb maxes out at 10 techs per year).
+/// This port keys one entry per `(SCC, hp-bin)` with the tech list UNIONED
+/// across model years, which reaches 18 for diesel (`167-176` + the
+/// `2000-2007` Tier-4 phase-in techs); a bound of 15 silently truncated
+/// the T4FB/T4FC/T4FD techs that carry the entire MY2015+ diesel mix.
+pub const MXTECH: usize = 32;
 
 /// Maximum evaporative technology types.
 ///
-/// Original Fortran parameter: `MXEVTECH = 15` in `nonrdprm.inc`.
-pub const MXEVTECH: usize = 15;
+/// Original Fortran parameter: `MXEVTECH = 15` in `nonrdprm.inc`; raised
+/// for the same cross-model-year union as [`MXTECH`].
+pub const MXEVTECH: usize = 32;
 
 /// Maximum horsepower categories.
 ///

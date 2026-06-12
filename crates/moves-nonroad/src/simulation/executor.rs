@@ -820,12 +820,19 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
 
     // ---- Activity records -----------------------------------------------
 
-    fn find_activity(&self, scc: &str, fips: &str, _hp_avg: f32) -> Option<usize> {
+    fn find_activity(&self, scc: &str, fips: &str, hp_avg: f32) -> Option<usize> {
+        // Canonical fndact only considers records whose HP category
+        // contains hp_avg — activity hours vary by HP bin within an SCC.
         self.executor
             .reference
             .activity_entries
             .iter()
-            .position(|e| e.scc == scc && (e.fips.is_empty() || e.fips == fips))
+            .position(|e| {
+                e.scc == scc
+                    && (e.fips.is_empty() || e.fips == fips)
+                    && e.hp_min <= hp_avg
+                    && hp_avg <= e.hp_max
+            })
     }
 
     fn activity_record(&self, activity_index: usize) -> ActivityRecord {
@@ -1076,7 +1083,20 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         let curve = self.executor.reference.scrappage_curve.clone();
         let use_hours = record.use_hours;
         let load_factor = act.load_factor;
-        let pop_growth_factor = self.ctx_growth.unwrap_or(0.0);
+        // Canonical prccty.f :365–368: grwcty = grwfac(ipopyr, ipopyr+1)
+        // — the base-population-year growth rate, "used only for the
+        // scrptime call in modyr, which uses the growth factor at the
+        // base-population year to extrapolate a full sales/scrappage
+        // history". NOT the .POP growth-pair rate (ctx_growth): a large
+        // base-year growth flips salesgrwfac negative, which sign-flips
+        // the initial age distribution and produces canonical's truncated
+        // model-year tails and negative-new-sales gap years.
+        let pop_growth_factor = if selected.is_empty() {
+            self.ctx_growth.unwrap_or(0.0)
+        } else {
+            let refs: Vec<&GrowthIndicatorRecord> = selected.iter().collect();
+            growth_factor(&refs, record.base_pop_year, record.base_pop_year + 1, fips)?.factor
+        };
 
         // 6. model_year → calls scrptime closure.
         let modyr_out = model_year(
@@ -1091,15 +1111,42 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         )?;
 
         // 7. age_distribution → uses growth records for forward/backward growth.
+        //
+        // Canonical `prcsta.f` grows the age distribution on the STATE
+        // population and only afterwards allocates it to counties
+        // (`alocty.f`). The loader pre-allocated `base_population` by the
+        // county's surrogate fraction, and `agedist`'s `MINGRWIND`
+        // (0.0001) clamp is magnitude-sensitive: a sub-MINGRWIND
+        // pre-allocated population balloons new-sales cohorts canonical
+        // never produces (verified against the NONROAD binary). Divide
+        // the fraction back out for the agedist call, then rescale the
+        // returned (possibly back-grown) population.
+        let alloc_frac = self
+            .executor
+            .reference
+            .alloc_fractions
+            .get(record.scc)
+            .copied()
+            .unwrap_or(1.0);
+        let agedist_basepop = if alloc_frac > 0.0 && alloc_frac < 1.0 {
+            base_population / alloc_frac
+        } else {
+            base_population
+        };
         let selected_refs: Vec<&GrowthIndicatorRecord> = selected.iter().collect();
         let agedist_out = age_distribution(
-            base_population,
+            agedist_basepop,
             &modyr_out.modfrc,
             record.base_pop_year,
             growth_year,
             &modyr_out.yryrfrcscrp,
             |y1, y2| growth_factor(&selected_refs, y1, y2, fips),
         )?;
+        let agedist_population = if agedist_basepop != base_population {
+            agedist_out.base_population * alloc_frac
+        } else {
+            agedist_out.base_population
+        };
 
         if std::env::var("MOVES_NR_DEBUG_GROWTH").is_ok() {
             let mult: f32 = agedist_out.mdyrfrc.iter().sum();
@@ -1108,6 +1155,21 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
                 record.base_pop_year,
                 selected_refs.len(),
             );
+        }
+        if let Ok(want) = std::env::var("MOVES_NR_DEBUG_AGEDIST") {
+            if record.scc == want {
+                eprintln!(
+                    "[nr-agedist] scc={} hp={} pgf={pop_growth_factor} nyrlif={} uh={} al={} lf={} ai={activity_index} gi={growth_index} ind={indicator:?} pop={} modfrc[0..12]={:?}",
+                    record.scc,
+                    record.hp_avg,
+                    modyr_out.nyrlif,
+                    use_hours,
+                    act.activity_level,
+                    act.load_factor,
+                    record.population,
+                    &agedist_out.mdyrfrc[..12.min(agedist_out.mdyrfrc.len())],
+                );
+            }
         }
         // 8. Build ModelYearAgedistResult. modfrc comes from agedist
         // (grown to growth_year); the per-year adjustments from modyr.
@@ -1124,7 +1186,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             actadj: pad(modyr_out.actadj),
             detage: pad(modyr_out.detage),
             nyrlif,
-            population: agedist_out.base_population,
+            population: agedist_population,
         })
     }
 
@@ -1698,13 +1760,18 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
         Some(idx as i32)
     }
 
-    fn find_activity(&mut self, scc: &str, fips: &str, _hp_avg: f32) -> Option<ActivityLookup> {
+    fn find_activity(&mut self, scc: &str, fips: &str, hp_avg: f32) -> Option<ActivityLookup> {
         let entry = self
             .executor
             .reference
             .activity_entries
             .iter()
-            .find(|e| e.scc == scc && (e.fips.is_empty() || e.fips == fips))?;
+            .find(|e| {
+                e.scc == scc
+                    && (e.fips.is_empty() || e.fips == fips)
+                    && e.hp_min <= hp_avg
+                    && hp_avg <= e.hp_max
+            })?;
         // Convert geography::common::ActivityUnit → emissions::exhaust::ActivityUnit.
         let units = match entry.activity_unit {
             ActivityUnit::HoursPerYear => ExhaustActivityUnit::HoursPerYear,
@@ -2069,13 +2136,18 @@ impl<'a> NationalCallbacks for NationalAdapter<'a> {
         Some(idx as i32)
     }
 
-    fn find_activity(&mut self, scc: &str, fips: &str, _hp_avg: f32) -> Option<ActivityLookup> {
+    fn find_activity(&mut self, scc: &str, fips: &str, hp_avg: f32) -> Option<ActivityLookup> {
         let entry = self
             .executor
             .reference
             .activity_entries
             .iter()
-            .find(|e| e.scc == scc && (e.fips.is_empty() || e.fips == fips))?;
+            .find(|e| {
+                e.scc == scc
+                    && (e.fips.is_empty() || e.fips == fips)
+                    && e.hp_min <= hp_avg
+                    && hp_avg <= e.hp_max
+            })?;
         let units = match entry.activity_unit {
             ActivityUnit::HoursPerYear => ExhaustActivityUnit::HoursPerYear,
             ActivityUnit::HoursPerDay => ExhaustActivityUnit::HoursPerDay,
@@ -2352,13 +2424,18 @@ impl<'a> UsTotalCallbacks for UsTotalAdapter<'a> {
         Some(idx as i32)
     }
 
-    fn find_activity(&mut self, scc: &str, fips: &str, _hp_avg: f32) -> Option<ActivityLookup> {
+    fn find_activity(&mut self, scc: &str, fips: &str, hp_avg: f32) -> Option<ActivityLookup> {
         let entry = self
             .executor
             .reference
             .activity_entries
             .iter()
-            .find(|e| e.scc == scc && (e.fips.is_empty() || e.fips == fips))?;
+            .find(|e| {
+                e.scc == scc
+                    && (e.fips.is_empty() || e.fips == fips)
+                    && e.hp_min <= hp_avg
+                    && hp_avg <= e.hp_max
+            })?;
         let units = match entry.activity_unit {
             ActivityUnit::HoursPerYear => ExhaustActivityUnit::HoursPerYear,
             ActivityUnit::HoursPerDay => ExhaustActivityUnit::HoursPerDay,
@@ -3594,6 +3671,8 @@ mod production {
                 activity_entries: vec![ActivityTableEntry {
                     scc: "2270001010".into(),
                     fips: "06037".into(),
+                    hp_min: 0.0,
+                    hp_max: f32::MAX,
                     starts: 0.0,
                     activity_level: 100.0,
                     activity_unit: ActivityUnit::HoursPerYear,
@@ -3677,6 +3756,8 @@ mod production {
                 activity_entries: vec![ActivityTableEntry {
                     scc: "2270001010".into(),
                     fips: "06037".into(),
+                    hp_min: 0.0,
+                    hp_max: f32::MAX,
                     starts: 0.0,
                     activity_level: 100.0,
                     activity_unit: ActivityUnit::HoursPerYear,
@@ -3769,6 +3850,8 @@ mod production {
                 activity_entries: vec![ActivityTableEntry {
                     scc: "2270001010".into(),
                     fips: "06037".into(),
+                    hp_min: 0.0,
+                    hp_max: f32::MAX,
                     starts: 0.0,
                     activity_level: 100.0,
                     activity_unit: ActivityUnit::HoursPerYear,
@@ -3877,6 +3960,8 @@ mod production {
                 activity_entries: vec![ActivityTableEntry {
                     scc: "2270001010".into(),
                     fips: "06000".into(),
+                    hp_min: 0.0,
+                    hp_max: f32::MAX,
                     starts: 0.0,
                     activity_level: 100.0,
                     activity_unit: ActivityUnit::HoursPerYear,
@@ -3980,6 +4065,8 @@ mod production {
                 activity_entries: vec![ActivityTableEntry {
                     scc: "2270001010".into(),
                     fips: "06000".into(),
+                    hp_min: 0.0,
+                    hp_max: f32::MAX,
                     starts: 0.0,
                     activity_level: 100.0,
                     activity_unit: ActivityUnit::HoursPerYear,
@@ -4115,6 +4202,8 @@ mod production {
                 activity_entries: vec![ActivityTableEntry {
                     scc: "2270001010".into(),
                     fips: "".into(),
+                    hp_min: 0.0,
+                    hp_max: f32::MAX,
                     starts: 0.0,
                     activity_level: 100.0,
                     activity_unit: ActivityUnit::HoursPerYear,
@@ -4219,6 +4308,8 @@ mod production {
                 activity_entries: vec![ActivityTableEntry {
                     scc: "2270001010".into(),
                     fips: "".into(),
+                    hp_min: 0.0,
+                    hp_max: f32::MAX,
                     starts: 0.0,
                     activity_level: 100.0,
                     activity_unit: ActivityUnit::HoursPerYear,

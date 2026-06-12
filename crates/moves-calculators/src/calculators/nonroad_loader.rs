@@ -390,14 +390,21 @@ fn build_entries_from_mix<S: DataFrameStore + ?Sized>(store: &S) -> Vec<ExhaustT
         pairs.insert((su_scc[i].clone(), (su_hp[i] * 1.0e3).round() as i64));
     }
 
-    let mix_sccs: std::collections::BTreeSet<&String> = mix.keys().map(|(s, _, _)| s).collect();
     let mut entries = Vec::new();
     for (scc, hp_milli) in pairs {
         let hp_avg = hp_milli as f32 / 1.0e3;
+        // Canonical SCC fallback chain (`fndtch`/`fndefc` `ascglb`): exact,
+        // then the 7-digit equipment root (`xxxxxxx000`), then the 4-digit
+        // family root (`xxxx000000`). Mixes and rates key at DIFFERENT
+        // levels per SCC — diesel lawn&garden rates live at 2270004000
+        // while their tech mix lives at 2270000000 — so each lookup must
+        // walk the full chain independently.
+        let equip = equip_root(&scc);
         let root = family_root(&scc);
+        let chain: [&String; 3] = [&scc, &equip, &root];
         // The tech-mix hp bin containing hp_avg. NONROAD's .TECH lookup uses
         // the most-specific SCC that has a bin covering this hp, then falls
-        // back to the family-root (default) tech file. A specific SCC's tech
+        // back to the root (default) tech files. A specific SCC's tech
         // rows need not span every hp bin its population uses: e.g.
         // 2265006010 has tech rows only for 0-25 hp, but its population
         // extends to 175 hp — those high-hp points are served by the
@@ -409,11 +416,7 @@ fn build_entries_from_mix<S: DataFrameStore + ?Sized>(store: &S) -> Vec<ExhaustT
                 s.as_str() == target && (*lo as f32) <= hp_avg && hp_avg <= (*hi as f32)
             })
         };
-        let found = if mix_sccs.contains(&scc) {
-            find_bin(&scc).or_else(|| find_bin(&root))
-        } else {
-            find_bin(&root)
-        };
+        let found = chain.iter().find_map(|s| find_bin(s));
         let Some((_, tech_map)) = found else {
             continue;
         };
@@ -431,28 +434,23 @@ fn build_entries_from_mix<S: DataFrameStore + ?Sized>(store: &S) -> Vec<ExhaustT
         let mut by_year: BTreeMap<i32, Vec<f32>> = BTreeMap::new();
 
         for (t, &tid) in tech_ids.iter().enumerate() {
-            // BSFC: rate lookup, specific SCC then family root.
-            bsfc[t] = rates
-                .get(&(scc.clone(), tid))
-                .and_then(|tr| hp_pick(&tr.bsfc, hp_avg).copied())
-                .or_else(|| {
+            // BSFC: rate lookup over the canonical SCC fallback chain.
+            bsfc[t] = chain
+                .iter()
+                .find_map(|s| {
                     rates
-                        .get(&(root.clone(), tid))
+                        .get(&((*s).clone(), tid))
                         .and_then(|tr| hp_pick(&tr.bsfc, hp_avg).copied())
                 })
                 .unwrap_or(0.0);
 
             for (pslot, pp_for) in [(0, PP_THC), (1, PP_CO), (2, PP_NOX), (5, PP_PM)] {
-                let picked = rates
-                    .get(&(scc.clone(), tid))
-                    .and_then(|tr| tr.by_pollutant.get(&pslot))
-                    .and_then(|v| hp_pick(v, hp_avg).copied())
-                    .or_else(|| {
-                        rates
-                            .get(&(root.clone(), tid))
-                            .and_then(|tr| tr.by_pollutant.get(&pslot))
-                            .and_then(|v| hp_pick(v, hp_avg).copied())
-                    });
+                let picked = chain.iter().find_map(|s| {
+                    rates
+                        .get(&((*s).clone(), tid))
+                        .and_then(|tr| tr.by_pollutant.get(&pslot))
+                        .and_then(|v| hp_pick(v, hp_avg).copied())
+                });
                 let idx = pslot * n_tech + t;
                 if let Some((r, u)) = picked {
                     emission_factors[idx] = r;
@@ -710,22 +708,22 @@ pub fn build_evap_tech_entries<S: DataFrameStore + ?Sized>(
         pairs.insert((su_scc[i].clone(), (su_hp[i] * 1.0e3).round() as i64));
     }
 
-    let mix_sccs: std::collections::BTreeSet<&String> = mix.keys().map(|(s, _, _)| s).collect();
     let mut entries = Vec::new();
     for (scc, hp_milli) in pairs {
         let hp_avg = hp_milli as f32 / 1.0e3;
+        // Canonical `fndevtch` SCC fallback: exact → 7-digit equipment root
+        // → 4-digit family root (marine-diesel evap mixes key at
+        // 2282020000, for example).
+        let equip = equip_root(&scc);
         let root = family_root(&scc);
+        let chain: [&String; 3] = [&scc, &equip, &root];
 
         let find_bin = |target: &str| {
             mix.iter().find(|((s, lo, hi), _)| {
                 s.as_str() == target && (*lo as f32) <= hp_avg && hp_avg <= (*hi as f32)
             })
         };
-        let found = if mix_sccs.contains(&scc) {
-            find_bin(&scc).or_else(|| find_bin(&root))
-        } else {
-            find_bin(&root)
-        };
+        let found = chain.iter().find_map(|s| find_bin(s));
         let Some((_, tech_map)) = found else {
             continue; // no evap tech mix for this SCC (e.g. diesel)
         };
@@ -758,16 +756,12 @@ pub fn build_evap_tech_entries<S: DataFrameStore + ?Sized>(
 
         for (t, &tid) in tech_ids.iter().enumerate() {
             for &(pslot, pp_for) in &evap_slot_to_pp {
-                let picked = rates
-                    .get(&(scc.clone(), tid))
-                    .and_then(|tr| tr.by_pollutant.get(&pslot))
-                    .and_then(|v| hp_pick(v, hp_avg).copied())
-                    .or_else(|| {
-                        rates
-                            .get(&(root.clone(), tid))
-                            .and_then(|tr| tr.by_pollutant.get(&pslot))
-                            .and_then(|v| hp_pick(v, hp_avg).copied())
-                    });
+                let picked = chain.iter().find_map(|s| {
+                    rates
+                        .get(&((*s).clone(), tid))
+                        .and_then(|tr| tr.by_pollutant.get(&pslot))
+                        .and_then(|v| hp_pick(v, hp_avg).copied())
+                });
                 let idx = pslot * n_tech + t;
                 if let Some((r, u)) = picked {
                     emission_factors[idx] = r;
@@ -814,6 +808,17 @@ pub fn build_evap_tech_entries<S: DataFrameStore + ?Sized>(
         });
     }
     entries
+}
+
+/// The equipment-type root SCC for a full 10-digit nonroad SCC — the first
+/// seven digits followed by `000` (e.g. `2270004071` → `2270004000`). The
+/// middle step of the canonical `fndtch`/`fndefc` `ascglb` fallback chain.
+fn equip_root(scc: &str) -> String {
+    if scc.len() >= 10 {
+        format!("{}000", &scc[..7])
+    } else {
+        scc.to_string()
+    }
 }
 
 /// The engine-family root SCC for a full 10-digit nonroad SCC — the first
@@ -1214,7 +1219,13 @@ fn load_source_units<S: DataFrameStore + ?Sized>(
                 continue;
             }
         }
-        *pop_by_src.entry(pop_src[i]).or_default() += pop_val[i];
+        // Canonical writes each state population row to the NONROAD .POP
+        // file with `%17.1f` (NonroadDataFileHelper.generatePopFile), so
+        // the engine only ever sees populations rounded to ONE decimal.
+        // Sub-0.05 rows (e.g. a 0.0285-unit long-lived hp bin) round to
+        // zero and contribute nothing — without this, the port emits
+        // model-year tails canonical never produces.
+        *pop_by_src.entry(pop_src[i]).or_default() += (pop_val[i] * 10.0).round() / 10.0;
     }
 
     let src = int_col(&sut, "sourceTypeID");
@@ -1305,24 +1316,28 @@ pub fn build_nonroad_inputs<S: DataFrameStore + ?Sized>(
     inputs
 }
 
-/// Build the activity table — one [`ActivityTableEntry`] per SCC. The
-/// engine's `find_activity` matches by SCC (and FIPS) only, so a single
-/// representative `(hoursUsedPerYear, loadFactor)` per SCC is used (the
-/// first source unit seen). Activity actually varies by HP bin; a
-/// per-HP-bin refinement is a follow-up.
+/// Build the activity table — one [`ActivityTableEntry`] per
+/// `(SCC, hpAvg)` equipment point, with a point HP range so the
+/// engine's `find_activity(scc, hp)` resolves the same row canonical
+/// `fndact` does (its HP-category check matters: hours/year vary by HP
+/// bin within an SCC, e.g. marine gasoline 2282010005 uses 47.6 hr/yr
+/// below the 750-hp bin but 30 hr/yr inside it — feeding the wrong
+/// hours into `scrptime` shifts that bin's whole model-year span).
 ///
-/// Built unscoped (national): the per-SCC `(hoursUsedPerYear,
-/// loadFactor)` representatives come from `nrsourceusetype`, which does
-/// not vary by geography — only the population (handled in
+/// Built unscoped (national): the `(hoursUsedPerYear, loadFactor)`
+/// values come from `nrsourceusetype`, which does not vary by
+/// geography — only the population (handled in
 /// [`build_nonroad_inputs`]) is allocated.
 pub fn build_activity_entries<S: DataFrameStore + ?Sized>(store: &S) -> Vec<ActivityTableEntry> {
     let units = load_source_units(store, None);
-    let mut seen: BTreeMap<String, ActivityTableEntry> = BTreeMap::new();
+    let mut seen: BTreeMap<(String, i64), ActivityTableEntry> = BTreeMap::new();
     for u in units {
-        seen.entry(u.scc.clone())
+        seen.entry((u.scc.clone(), (u.hp_avg * 1.0e3).round() as i64))
             .or_insert_with(|| ActivityTableEntry {
                 scc: u.scc.clone(),
                 fips: String::new(), // match any FIPS
+                hp_min: u.hp_avg,
+                hp_max: u.hp_avg,
                 starts: 0.0,
                 activity_level: u.hours_used_per_year,
                 activity_unit: ActivityUnit::HoursPerYear,
@@ -1489,7 +1504,13 @@ fn build_growth<S: DataFrameStore + ?Sized>(
                 fips: PSEUDO_COUNTY.to_string(),
                 subregion: String::new(),
                 year: year[i] as i32,
-                value: idx[i] as f32,
+                // Canonical writes the /GROWTH/ packet with
+                // `results.getInt(growthindex)` (NonroadDataFileHelper.
+                // generateGrowthFile `%20d`), truncating the fractional
+                // index toward zero. The year-over-year growth factors sit
+                // near zero, so the fraction decides the SIGN — and with it
+                // which sale-years agedist's max(0,…) clamp zeroes out.
+                value: (idx[i] as i64) as f32,
             });
         }
     }
@@ -2047,8 +2068,35 @@ pub fn load_nonroad_reference<S: DataFrameStore + ?Sized>(
         fuel_sulfur_marine: fuel.sulfur_marine,
         sulfur_alternates: build_sulfur_alternates(store),
         ambient_temp_f: build_ambient_temp(store, i64::from(selected_month), county_fips),
+        alloc_fractions: build_alloc_fractions(store, county_fips, analysis_year),
         ..ReferenceData::default()
     }
+}
+
+/// Per-SCC state→county allocation fraction for a county-scoped run
+/// (empty for state/national scopes). The loader pre-allocates the
+/// population in [`load_source_units`], but canonical `prcsta.f` grows
+/// the age distribution on the **state** population and only then
+/// allocates to counties (`alocty`) — `agedist`'s `MINGRWIND` clamp is
+/// magnitude-sensitive, so a pre-allocated sub-0.0001 county population
+/// balloons cohorts canonical leaves untouched. The engine divides this
+/// fraction back out around its `age_distribution` call.
+fn build_alloc_fractions<S: DataFrameStore + ?Sized>(
+    store: &S,
+    county_fips: Option<u32>,
+    analysis_year: i32,
+) -> BTreeMap<String, f32> {
+    let Some(c) = county_fips else {
+        return BTreeMap::new();
+    };
+    if c == 0 || c % 1000 == 0 {
+        return BTreeMap::new();
+    }
+    let fractions = surrogate_fractions(store, i64::from(c), i64::from(analysis_year));
+    scc_surrogate_map(store)
+        .into_iter()
+        .map(|(scc, sur)| (scc, fractions.get(&sur).copied().unwrap_or(0.0) as f32))
+        .collect()
 }
 
 /// Build the [`ProductionExecutor`] for the national pseudo-county run.

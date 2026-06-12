@@ -480,6 +480,32 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
         // key sets, every pollutant ≤ ~1e-5 (f32 drift class).
         ("nr-lawn-garden-county", NONROAD_REL_TOL, false), // ~4e-6, 1936/1936
         ("nr-recreational-county", NONROAD_REL_TOL, false), // exact, 1010/1010
+        // Remaining six nonroad fixtures, graduated together once the
+        // Tier-4 fidelity round landed: MXTECH raised 15→32 (the per-
+        // (SCC,hp) tech union spans 18 diesel techs; truncation dropped
+        // the T4FB/T4FC/T4FD techs carrying the whole MY2015+ mix), the
+        // canonical 3-step SCC fallback (exact → 7-digit equipment root →
+        // 4-digit family root) for rate/mix/evap lookups (diesel
+        // lawn&garden rates key at 2270004000; marine-diesel mixes at
+        // 2282020000), per-HP-bin activity resolution (fndact matches the
+        // HP category; marine 750-hp bins use 30 hr/yr vs 47.6 below),
+        // the canonical .POP one-decimal population rounding, the /GROWTH/
+        // integer-truncated indices, the base-pop-year grwfac feed into
+        // scrptime (prccty.f grwcty — not the .POP growth-pair rate), and
+        // the prcsta-ordering MINGRWIND fix (agedist grows the STATE
+        // population; the pre-allocated county population is divided back
+        // out so the 0.0001 clamp can't balloon sub-MINGRWIND records).
+        // All six: identical key sets, worst per-key rel ≤ ~1e-3.
+        ("nr-agriculture-state", NONROAD_REL_TOL, false), // ≤1.0e-3, 21120/21120
+        ("nr-airport-support-county", NONROAD_REL_TOL, false), // ≤1.0e-3, 21068/21068
+        ("nr-construction-state", NONROAD_REL_TOL, false), // ~2.9e-6, 2355/2355
+        ("nr-industrial-county", NONROAD_REL_TOL, false), // ≤1.0e-3, 15801/15801
+        ("nr-logging-county", NONROAD_REL_TOL, false),    // ~2.0e-6, 144/144
+        ("nr-railroad-support-nation", NONROAD_REL_TOL, false), // ~8.6e-4, 23108/23108
+        // mixed-onroad-nonroad: the canonical capture's MOVESOutput is
+        // empty (0 rows) and the port emits 0 rows for it — vacuous, so
+        // the gate fails loudly if a recapture gives either side rows.
+        ("mixed-onroad-nonroad", NONROAD_REL_TOL, true),
         // process-refueling: the chained RefuelingLossCalculator now runs (the
         // engine's chainCalculator step), reads a synthesized RefuelingFuelType
         // extract, gates output to THC (pollutant 1), and reconciles the
@@ -592,10 +618,10 @@ const QUARANTINED_FIXTURES: &[&str] = &[
     // process-apu GRADUATED to asserted_fixtures (vacuous): the BaseRate activity
     // weighting now gates the captured APU rate to 0 against the empty captured
     // SHO, matching canonical's empty output (canon 0 == port 0).
-    // mixed-onroad-nonroad: canonical MOVESOutput is empty (0 rows); the port's
-    // NONROAD half is a separate/known nonroad data-plane effort. See
-    // docs/known-divergences.md §4.4.
-    "mixed-onroad-nonroad",
+    // mixed-onroad-nonroad GRADUATED to asserted_fixtures (vacuous): the
+    // canonical capture is empty (0 rows) and the port also emits 0 rows;
+    // the vacuous flag fails the gate loudly if a recapture ever gives
+    // either side a nonzero row.
     // Speciation / chained-calculator class. Three engine/calculator bugs in this
     // class were FOUND and FIXED, GRADUATING chain-nonhaptog, chain-tog-speciation,
     // process-crankcase-running, process-nox-speciation, process-brakewear and
@@ -623,32 +649,17 @@ const QUARANTINED_FIXTURES: &[&str] = &[
     // and NonECPM (118) is now exact via the true per-key delta emit, the general
     // fuel ratio restricted to pollutant 120, and the engine's
     // `replaced_pollutants` drop of BaseRate's zero fuelType-9 electricity rows.
-    // NONROAD fixtures with residual data-plane gaps. The original
-    // "emits nothing / wrong row count" class was fixed by the canonical
-    // empty-/SOURCE CATEGORY/ quirk (an unmatched fuel×sector selection
-    // runs the WHOLE inventory), state/county surrogate allocation
-    // (alocty.f via nrstatesurrogate), state-scoped month-allocation /
-    // growth-pattern / fuel-property / ambient-temperature lookups, the
-    // SFC-vs-SWT sox_conversion fix and the /PM BASE SULFUR/ per-tech
-    // alternates. nr-pleasure-craft-state GRADUATED to asserted_fixtures
-    // (440/440 rows, ~7.2e-3). Remaining residuals:
-    //   - state scale: agriculture -6.2e-2 (Tier-4-era diesel MYs 2014+
-    //     under ~2x; marine-diesel SCCs skipped), construction 1.0e-3 but
-    //     5 rows short of canonical, railroad-support -0.25.
-    //   - county scale: after the supply fuelYearID filter + canonical
-    //     zero-row emission, nr-lawn-garden-county and
-    //     nr-recreational-county GRADUATED (exact, identical key sets).
-    //     nr-logging-county is ≤6e-4 on every pollutant but emits one
-    //     spurious model year (2265007010 MY 1991, ~3 g — fleet-span
-    //     off-by-one). nr-industrial-county / nr-airport-support-county
-    //     carry the same Tier-4-era diesel gap (NOx ~0.82) plus
-    //     airport-support SO2 ~0.75.
-    "nr-agriculture-state",
-    "nr-airport-support-county",
-    "nr-construction-state",
-    "nr-industrial-county",
-    "nr-logging-county",
-    "nr-railroad-support-nation",
+    // All nine quarantined nr-* fixtures GRADUATED to asserted_fixtures:
+    // the original "emits nothing / wrong row count" class fell to the
+    // canonical empty-/SOURCE CATEGORY/ quirk, surrogate allocation,
+    // state-scoped lookups, the SFC-vs-SWT sox fix and the /PM BASE
+    // SULFUR/ alternates; the residual Tier-4-era diesel gap was the
+    // MXTECH=15 truncation of the cross-model-year tech union (T4FB/
+    // T4FC/T4FD dropped) plus the missing 7-digit step of the canonical
+    // SCC fallback chain; the row-count edges were the canonical .POP
+    // one-decimal rounding, per-HP-bin activity (fndact), the base-pop-
+    // year grwfac feed into scrptime, and the prcsta-ordering MINGRWIND
+    // fix (agedist on the state population, allocation divided back out).
 ];
 
 fn is_quarantined(name: &str) -> bool {
