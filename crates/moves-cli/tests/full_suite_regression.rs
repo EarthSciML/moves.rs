@@ -480,7 +480,7 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
         // expand-day / expand-fueltype-diesel / expand-sourcetype: select energy
         // pollutants 91/92/93. The KJ→Million-BTU unit conversion is wired in the
         // engine; activity weighting is also applied. All three now match canonical
-        // within ONROAD_REL_TOL. expand-counties remains quarantined (~200% over).
+        // within ONROAD_REL_TOL.
         ("expand-day", ONROAD_REL_TOL, false), // ~3.5e-4
         ("expand-fueltype-diesel", ONROAD_REL_TOL, false), // ~3.0e-4
         ("expand-sourcetype", ONROAD_REL_TOL, false), // ~1.3e-4
@@ -492,6 +492,13 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
         // now ports the canonical cache query (BaseRateCalculator.sql:507-523), so
         // the AC term is applied and the residual drops to ~3.8e-4 (precision class).
         ("expand-month", ONROAD_REL_TOL, false), // ~3.8e-4
+        // expand-counties: 3-county run (Washtenaw/Cook/LA), energy pollutant 91.
+        // Was ~200% over: `build_fuel_supply` pooled all three counties' fuel
+        // regions under the firing county (the captured FuelSupply has a
+        // fuelRegionID but no countyID), so each fuel type's market shares summed
+        // to ~3 and the inventory tripled. Filtering FuelSupply to the county's
+        // region(s) via `regionCounty` drops it to ~3.4e-4 (precision class).
+        ("expand-counties", ONROAD_REL_TOL, false), // ~3.4e-4
         // Speciation / chained-calculator fixtures graduated once the regClass
         // collapse, SulfatePM pass-through doubling and NO/NO2 species doubling
         // were fixed (see QUARANTINED_FIXTURES for the three root causes). Each
@@ -542,12 +549,10 @@ const QUARANTINED_FIXTURES: &[&str] = &[
     // applied, KJ→Million-BTU conversion wired. expand-criteria/expand-day/
     // expand-fueltype-diesel/expand-sourcetype GRADUATED to asserted_fixtures.
     // Remaining quarantined:
-    //   expand-counties: ~200% over (max_rel_diff ≈ 2.0); multi-county run with
-    //     per-county weighting not yet reproduced. See docs/known-divergences.md §4.4.
     //   sample-runspec: ~1.3e-6, within tolerance but unclassified — leave quarantined
     //     until the cause is confirmed (possibly floating-point accumulation only).
     // expand-month GRADUATED to asserted_fixtures (zoneACFactor recompute, ~3.8e-4).
-    "expand-counties",
+    // expand-counties GRADUATED to asserted_fixtures (FuelSupply region filter, ~3.4e-4).
     "sample-runspec",
     // process-apu: BaseRate emits the process-91 / op-mode-201,203 (APU /
     // shorepower) energy rates canonical activity-gates to 0 in baseRateOutput;

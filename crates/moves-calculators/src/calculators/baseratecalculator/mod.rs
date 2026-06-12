@@ -1106,6 +1106,45 @@ fn build_fuel_supply(
     let fs: Vec<LocalFuelSubtypeRow> = tables.iter_typed_or_empty("FuelSubtype")?;
     let mg: Vec<LocalMonthGroupRow> = tables.iter_typed_or_empty("MonthOfAnyYear")?;
 
+    // Restrict FuelSupply to the current county's fuel region(s). Canonical
+    // extracts FuelSupply per county-context (the `##FuelSupply##` OUTFILE is
+    // region-filtered to `context.iterLocation`), but a captured snapshot
+    // accumulates EVERY selected county's region into one `FuelSupply` table
+    // (the table has a `fuelRegionID`, not a `countyID`). Without this filter a
+    // multi-county run pools all N regions' formulations under the firing
+    // county, so each fuel type's market shares sum to ~N instead of 1 and the
+    // inventory over-emits N× (e.g. a 3-county run is exactly 3× canonical).
+    // `regionCounty` maps `countyID → regionID`. When it is absent/empty (single
+    // -region unit-test contexts, or a default-DB run that already supplies a
+    // county-scoped FuelSupply) the set is empty and no restriction is imposed.
+    let county_regions: std::collections::BTreeSet<i32> = match tables
+        .column_views("regionCounty", &["regionID", "countyID"])
+    {
+        Ok(views) => {
+            let region = views[0].cast(&DataType::Int64).ok();
+            let county = views[1].cast(&DataType::Int64).ok();
+            match (region.as_ref().and_then(|s| s.i64().ok()), county.as_ref().and_then(|s| s.i64().ok())) {
+                (Some(region), Some(county)) => region
+                    .into_iter()
+                    .zip(county)
+                    .filter_map(|(r, c)| match (r, c) {
+                        (Some(r), Some(c)) if c == i64::from(constants.county_id) => Some(r as i32),
+                        _ => None,
+                    })
+                    .collect(),
+                _ => std::collections::BTreeSet::new(),
+            }
+        }
+        Err(_) => std::collections::BTreeSet::new(),
+    };
+    let raw: Vec<RawFuelSupplyRow> = if county_regions.is_empty() {
+        raw
+    } else {
+        raw.into_iter()
+            .filter(|r| county_regions.contains(&r.fuel_region_id))
+            .collect()
+    };
+
     let formulation_to_subtype: HashMap<i32, i32> = ff
         .iter()
         .map(|r| (r.fuel_formulation_id, r.fuel_sub_type_id))
