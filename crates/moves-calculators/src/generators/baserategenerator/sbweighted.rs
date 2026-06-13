@@ -156,7 +156,8 @@ pub fn compute_sb_weighted_rates<S: DataFrameStoreTyped + ?Sized>(
     // gasoline (growing with model year as flex-fuel penetration rises). Prefer
     // the fuel-usage table; fall back to raw `SourceBinDistribution` only when
     // it is absent (unit-test contexts that seed the raw table directly).
-    let fuel_usage_table = format!("sourceBinDistributionFuelUsage_{process_id}_{county_id}_{year}");
+    let fuel_usage_table =
+        format!("sourceBinDistributionFuelUsage_{process_id}_{county_id}_{year}");
     let sbd_table: &str = if store.get(&fuel_usage_table).is_some() {
         &fuel_usage_table
     } else {
@@ -260,7 +261,8 @@ pub fn compute_sb_weighted_rates<S: DataFrameStoreTyped + ?Sized>(
         let Some(&(source_type_id, model_year_id)) = stmy.get(&sbd_stmy[i]) else {
             continue;
         };
-        let Some(&(fuel_type_id, reg_class_id, model_year_group_id)) = source_bin.get(&source_bin_id)
+        let Some(&(fuel_type_id, reg_class_id, model_year_group_id)) =
+            source_bin.get(&source_bin_id)
         else {
             continue;
         };
@@ -364,40 +366,41 @@ pub fn compute_sb_weighted_rates<S: DataFrameStoreTyped + ?Sized>(
         } else {
             FxHashMap::default()
         };
-    let ev_factor = |pol_process_id: i64, model_year_id: i64, fuel_type_id: i64, reg_class_id: i64| -> f64 {
-        if fuel_type_id == 9 {
-            return 1.0;
-        }
-        let Some(&group) = reg_to_group.get(&reg_class_id) else {
-            return 1.0;
+    let ev_factor =
+        |pol_process_id: i64, model_year_id: i64, fuel_type_id: i64, reg_class_id: i64| -> f64 {
+            if fuel_type_id == 9 {
+                return 1.0;
+            }
+            let Some(&group) = reg_to_group.get(&reg_class_id) else {
+                return 1.0;
+            };
+            let ev = ev_fraction
+                .get(&(model_year_id, group))
+                .copied()
+                .unwrap_or(0.0);
+            // `evFraction == 1` would divide by zero in canonical; it skips, so do we.
+            if ev <= 0.0 || ev >= 1.0 {
+                return 1.0;
+            }
+            let Some(adjs) = fleet_adj.get(&(pol_process_id, group)) else {
+                return 1.0;
+            };
+            let Some(&(_, _, mult, cap)) = adjs
+                .iter()
+                .find(|(b, e, _, _)| model_year_id >= *b && model_year_id <= *e)
+            else {
+                return 1.0;
+            };
+            let denom = (1.0 - ev) + ev * mult;
+            if denom == 0.0 {
+                return 1.0;
+            }
+            let factor = 1.0 / (1.0 - (ev * mult) / denom);
+            match cap {
+                Some(c) if c > 0.0 => factor.min(c),
+                _ => factor,
+            }
         };
-        let ev = ev_fraction
-            .get(&(model_year_id, group))
-            .copied()
-            .unwrap_or(0.0);
-        // `evFraction == 1` would divide by zero in canonical; it skips, so do we.
-        if ev <= 0.0 || ev >= 1.0 {
-            return 1.0;
-        }
-        let Some(adjs) = fleet_adj.get(&(pol_process_id, group)) else {
-            return 1.0;
-        };
-        let Some(&(_, _, mult, cap)) = adjs
-            .iter()
-            .find(|(b, e, _, _)| model_year_id >= *b && model_year_id <= *e)
-        else {
-            return 1.0;
-        };
-        let denom = (1.0 - ev) + ev * mult;
-        if denom == 0.0 {
-            return 1.0;
-        }
-        let factor = 1.0 / (1.0 - (ev * mult) / denom);
-        match cap {
-            Some(c) if c > 0.0 => factor.min(c),
-            _ => factor,
-        }
-    };
 
     // Emit groups with SUM(sourceBinActivityFraction) > 0 (the SQL HAVING clause).
     let by_age_out = by_age

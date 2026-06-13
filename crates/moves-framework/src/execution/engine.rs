@@ -903,8 +903,7 @@ impl MOVESEngine {
                 // — pinning it to `locations.first()` would wrongly drop every
                 // other county's rows.
                 if times.first().is_some() {
-                    let mut ctx =
-                        chunk_ctx.lock().expect("CalculatorContext mutex poisoned");
+                    let mut ctx = chunk_ctx.lock().expect("CalculatorContext mutex poisoned");
                     let mut pos = *ctx.position();
                     if pos.time.year.is_none() {
                         pos.time = times[0];

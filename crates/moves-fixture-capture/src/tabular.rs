@@ -579,12 +579,32 @@ mod tests {
     }
 
     #[test]
-    fn parse_worker_tbl_widens_short_rows() {
-        // Header has 2 cols, second row has 3.
-        let body = b"a\tb\n1\t2\n3\t4\t5\n";
+    fn parse_worker_tbl_widens_header_to_widest_row() {
+        // Header has 2 cols; every data row has 3, so the header widens to 3
+        // (a generated `col_2`) without losing the trailing column.
+        let body = b"a\tb\n1\t2\t3\n4\t5\t6\n";
         let table = parse_worker_tbl(Path::new("t.tbl"), "t", body).unwrap();
         assert_eq!(table.schema().len(), 3);
         assert_eq!(table.schema()[2].name, "col_2");
+        assert_eq!(table.row_count(), 2);
+    }
+
+    #[test]
+    fn parse_worker_tbl_rejects_short_rows() {
+        // Header widens to the widest row (3 cols). A subsequent 2-field row is
+        // then short — a truncation / worker-output format regression that is
+        // surfaced as a hard error rather than silently null-padded (which would
+        // absorb a real structure change into the snapshot baseline).
+        let body = b"a\tb\n1\t2\n3\t4\t5\n";
+        let err = parse_worker_tbl(Path::new("t.tbl"), "t", body).unwrap_err();
+        assert!(matches!(
+            err,
+            Error::RowWidthMismatch {
+                expected: 3,
+                actual: 2,
+                ..
+            }
+        ));
     }
 
     #[test]

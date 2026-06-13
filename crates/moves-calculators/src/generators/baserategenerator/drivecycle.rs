@@ -226,8 +226,8 @@ fn calculate_drive_cycle_op_mode_distribution(
     };
 
     for &(second, speed) in seconds {
-        let detail = details[(second - first_second) as usize]
-            .get_or_insert_with(SecondDetail::default);
+        let detail =
+            details[(second - first_second) as usize].get_or_insert_with(SecondDetail::default);
         detail.speed = speed;
         detail.speed_mph = speed * 0.44704;
         // Assign the idle operating mode to near-zero speeds.

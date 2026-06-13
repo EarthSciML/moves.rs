@@ -37,8 +37,8 @@
 
 use crate::allocation::{allocate_county, allocate_state, CountyDescriptor};
 use crate::common::consts::{
-    CVTTON, MXAGYR, MXDAYS, MXEVTECH, MXPOL, MXTECH, RMISS, SFCCNG, SFCDSL, SFCGS2, SFCGS4,
-    SFCLPG, SWTCNG, SWTDSL, SWTGS2, SWTGS4, SWTLPG,
+    CVTTON, MXAGYR, MXDAYS, MXEVTECH, MXPOL, MXTECH, RMISS, SFCCNG, SFCDSL, SFCGS2, SFCGS4, SFCLPG,
+    SWTCNG, SWTDSL, SWTGS2, SWTGS4, SWTLPG,
 };
 use crate::driver::scrptime;
 use crate::driver::{day_month_factors as daymthf, DayMonthFactors};
@@ -1481,9 +1481,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             .reference
             .exhaust_tech_entries
             .iter()
-            .find(|e| {
-                e.scc == record.scc && e.hp_min <= record.hp_avg && record.hp_avg <= e.hp_max
-            })
+            .find(|e| e.scc == record.scc && e.hp_min <= record.hp_avg && record.hp_avg <= e.hp_max)
             .and_then(|e| e.tech_names.get(tech_index))
             .and_then(|name| self.executor.reference.sulfur_alternates.get(name))
             .copied();
@@ -1761,17 +1759,12 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
     }
 
     fn find_activity(&mut self, scc: &str, fips: &str, hp_avg: f32) -> Option<ActivityLookup> {
-        let entry = self
-            .executor
-            .reference
-            .activity_entries
-            .iter()
-            .find(|e| {
-                e.scc == scc
-                    && (e.fips.is_empty() || e.fips == fips)
-                    && e.hp_min <= hp_avg
-                    && hp_avg <= e.hp_max
-            })?;
+        let entry = self.executor.reference.activity_entries.iter().find(|e| {
+            e.scc == scc
+                && (e.fips.is_empty() || e.fips == fips)
+                && e.hp_min <= hp_avg
+                && hp_avg <= e.hp_max
+        })?;
         // Convert geography::common::ActivityUnit → emissions::exhaust::ActivityUnit.
         let units = match entry.activity_unit {
             ActivityUnit::HoursPerYear => ExhaustActivityUnit::HoursPerYear,
@@ -2137,17 +2130,12 @@ impl<'a> NationalCallbacks for NationalAdapter<'a> {
     }
 
     fn find_activity(&mut self, scc: &str, fips: &str, hp_avg: f32) -> Option<ActivityLookup> {
-        let entry = self
-            .executor
-            .reference
-            .activity_entries
-            .iter()
-            .find(|e| {
-                e.scc == scc
-                    && (e.fips.is_empty() || e.fips == fips)
-                    && e.hp_min <= hp_avg
-                    && hp_avg <= e.hp_max
-            })?;
+        let entry = self.executor.reference.activity_entries.iter().find(|e| {
+            e.scc == scc
+                && (e.fips.is_empty() || e.fips == fips)
+                && e.hp_min <= hp_avg
+                && hp_avg <= e.hp_max
+        })?;
         let units = match entry.activity_unit {
             ActivityUnit::HoursPerYear => ExhaustActivityUnit::HoursPerYear,
             ActivityUnit::HoursPerDay => ExhaustActivityUnit::HoursPerDay,
@@ -2425,17 +2413,12 @@ impl<'a> UsTotalCallbacks for UsTotalAdapter<'a> {
     }
 
     fn find_activity(&mut self, scc: &str, fips: &str, hp_avg: f32) -> Option<ActivityLookup> {
-        let entry = self
-            .executor
-            .reference
-            .activity_entries
-            .iter()
-            .find(|e| {
-                e.scc == scc
-                    && (e.fips.is_empty() || e.fips == fips)
-                    && e.hp_min <= hp_avg
-                    && hp_avg <= e.hp_max
-            })?;
+        let entry = self.executor.reference.activity_entries.iter().find(|e| {
+            e.scc == scc
+                && (e.fips.is_empty() || e.fips == fips)
+                && e.hp_min <= hp_avg
+                && hp_avg <= e.hp_max
+        })?;
         let units = match entry.activity_unit {
             ActivityUnit::HoursPerYear => ExhaustActivityUnit::HoursPerYear,
             ActivityUnit::HoursPerDay => ExhaustActivityUnit::HoursPerDay,

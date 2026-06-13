@@ -714,10 +714,12 @@ fn step1_op_mode_weighted(inputs: &BasicRunningPmInputs, year: i32) -> Vec<OpMod
                     sbds.iter().any(|sbd| {
                         acat_by.get(&er.age_group_id).is_some_and(|acats| {
                             acats.iter().any(|acat| {
-                                stmy_by.get(&sbd.source_type_model_year_id).is_some_and(|stmy| {
-                                    stmy.source_type_id == omd.source_type_id
-                                        && stmy.model_year_id == year - acat.age_id
-                                })
+                                stmy_by
+                                    .get(&sbd.source_type_model_year_id)
+                                    .is_some_and(|stmy| {
+                                        stmy.source_type_id == omd.source_type_id
+                                            && stmy.model_year_id == year - acat.age_id
+                                    })
                             })
                         })
                     })
@@ -894,12 +896,7 @@ fn step3_unadjusted(
     let mut sho_by: FxHashMap<(i32, i32, i32, i32), Vec<&ShoRow>> = FxHashMap::default();
     for sho in &inputs.sho {
         sho_by
-            .entry((
-                sho.hour_day_id,
-                sho.year_id,
-                sho.age_id,
-                sho.source_type_id,
-            ))
+            .entry((sho.hour_day_id, sho.year_id, sho.age_id, sho.source_type_id))
             .or_default()
             .push(sho);
     }

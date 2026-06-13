@@ -1189,9 +1189,8 @@ fn load_source_units<S: DataFrameStore + ?Sized>(
         None => (None, None),
         Some(GeoScope { county_fips, year }) => {
             let state = i64::from(county_fips) / 1000;
-            let alloc = (county_fips % 1000 != 0).then(|| {
-                surrogate_fractions(store, i64::from(county_fips), i64::from(year))
-            });
+            let alloc = (county_fips % 1000 != 0)
+                .then(|| surrogate_fractions(store, i64::from(county_fips), i64::from(year)));
             (Some(state), alloc)
         }
     };
@@ -1441,7 +1440,9 @@ pub fn fill_tech_fractions<S: DataFrameStore + ?Sized>(
 /// table has no such column (unit-test stores; treated as stateID = 0
 /// defaults).
 fn opt_state_col(df: &DataFrame) -> Option<Vec<i64>> {
-    resolve(df, "stateID").is_some().then(|| int_col(df, "stateID"))
+    resolve(df, "stateID")
+        .is_some()
+        .then(|| int_col(df, "stateID"))
 }
 
 fn base_year<S: DataFrameStore + ?Sized>(store: &S) -> i32 {
@@ -1754,24 +1755,27 @@ fn build_fuel_properties<S: DataFrameStore + ?Sized>(
         .and_then(|y| {
             let yid = int_col(&y, "yearID");
             let fy = int_col(&y, "fuelYearID");
-            (0..y.height()).find(|&i| yid[i] == i64::from(year)).map(|i| fy[i])
+            (0..y.height())
+                .find(|&i| yid[i] == i64::from(year))
+                .map(|i| fy[i])
         })
         .unwrap_or(i64::from(year));
-    let regions: Option<std::collections::BTreeSet<i64>> = match (store.get("regioncounty"), county_fips) {
-        (Some(rc), Some(c)) => {
-            let rid = int_col(&rc, "regionID");
-            let cid = int_col(&rc, "countyID");
-            let code = int_col(&rc, "regionCodeID");
-            let fy = int_col(&rc, "fuelYearID");
-            Some(
-                (0..rc.height())
-                    .filter(|&i| code[i] == 2 && cid[i] == i64::from(c) && fy[i] == fuel_year)
-                    .map(|i| rid[i])
-                    .collect(),
-            )
-        }
-        _ => None,
-    };
+    let regions: Option<std::collections::BTreeSet<i64>> =
+        match (store.get("regioncounty"), county_fips) {
+            (Some(rc), Some(c)) => {
+                let rid = int_col(&rc, "regionID");
+                let cid = int_col(&rc, "countyID");
+                let code = int_col(&rc, "regionCodeID");
+                let fy = int_col(&rc, "fuelYearID");
+                Some(
+                    (0..rc.height())
+                        .filter(|&i| code[i] == 2 && cid[i] == i64::from(c) && fy[i] == fuel_year)
+                        .map(|i| rid[i])
+                        .collect(),
+                )
+            }
+            _ => None,
+        };
 
     let s_form = int_col(&sup, "fuelFormulationID");
     let s_share = float_col(&sup, "marketShare");
@@ -2178,8 +2182,7 @@ const GRAMS_PER_SHORT_TON: f64 = 1.0 / 1.102_311e-6;
 /// Which of these actually reach the output is gated per-run by
 /// [`selected_output_pollutants`] (canonical gates on the bundle SQL's
 /// polProcessIDs — `need3101`/`need9001` flags).
-const SLOT_POLLUTANT: [(usize, i32); 6] =
-    [(0, 1), (1, 2), (2, 3), (3, 90), (4, 31), (5, 100)];
+const SLOT_POLLUTANT: [(usize, i32); 6] = [(0, 1), (1, 2), (2, 3), (3, 90), (4, 31), (5, 100)];
 
 /// The runspec's selected output pollutants, from the execution DB's
 /// `runspecpollutantprocess` (`pollutantID = polProcessID / 100`).

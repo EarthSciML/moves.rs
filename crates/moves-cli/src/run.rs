@@ -489,7 +489,8 @@ fn merge_process_year_variants(store: &mut InMemoryStore) -> Result<()> {
     // Delegates to the single shared implementation in
     // `moves_calculators::default_db_setup` (see that module — both the native
     // CLI and the wasm path call it, so the synthesis can no longer drift).
-    moves_calculators::default_db_setup::merge_store_variants_eager(store).map_err(|e| anyhow::anyhow!(e))
+    moves_calculators::default_db_setup::merge_store_variants_eager(store)
+        .map_err(|e| anyhow::anyhow!(e))
 }
 
 /// Fall-back loader: scan `<snapshot>/tables/` for individual `db__movesexecution*.parquet`
@@ -733,7 +734,8 @@ fn populate_source_use_type_physics_mapping(store: &mut InMemoryStore) -> Result
     // Delegates to the single shared implementation in
     // `moves_calculators::default_db_setup` (see that module — both the native
     // CLI and the wasm path call it, so the synthesis can no longer drift).
-    moves_calculators::default_db_setup::populate_source_use_type_physics_mapping(store).map_err(|e| anyhow::anyhow!(e))
+    moves_calculators::default_db_setup::populate_source_use_type_physics_mapping(store)
+        .map_err(|e| anyhow::anyhow!(e))
 }
 
 /// Fill the NULL `ZoneMonthHour` meteorology columns (`heatIndex`,
@@ -757,7 +759,8 @@ fn populate_zone_month_hour_meteorology(store: &mut InMemoryStore) -> Result<()>
     // Delegates to the single shared implementation in
     // `moves_calculators::default_db_setup` (see that module — both the native
     // CLI and the wasm path call it, so the synthesis can no longer drift).
-    moves_calculators::default_db_setup::populate_zone_month_hour_meteorology(store).map_err(|e| anyhow::anyhow!(e))
+    moves_calculators::default_db_setup::populate_zone_month_hour_meteorology(store)
+        .map_err(|e| anyhow::anyhow!(e))
 }
 
 /// Cast a DataFrame column to Int32, returning the Column for row-wise access.
@@ -872,7 +875,8 @@ fn populate_link_from_zone_road_type(store: &mut InMemoryStore) -> Result<()> {
     // Delegates to the single shared implementation in
     // `moves_calculators::default_db_setup` (see that module — both the native
     // CLI and the wasm path call it, so the synthesis can no longer drift).
-    moves_calculators::default_db_setup::populate_link_from_zone_road_type(store).map_err(|e| anyhow::anyhow!(e))
+    moves_calculators::default_db_setup::populate_link_from_zone_road_type(store)
+        .map_err(|e| anyhow::anyhow!(e))
 }
 
 /// Build the `RunSpec*` tables that generators read from the execution-DB
@@ -906,7 +910,8 @@ fn build_runspec_tables(runspec: &RunSpec, store: &mut InMemoryStore) -> Result<
     // Delegates to the single shared implementation in
     // `moves_calculators::default_db_setup` (see that module — both the native
     // CLI and the wasm path call it, so the synthesis can no longer drift).
-    moves_calculators::default_db_setup::build_runspec_tables(runspec, store).map_err(|e| anyhow::anyhow!(e))
+    moves_calculators::default_db_setup::build_runspec_tables(runspec, store)
+        .map_err(|e| anyhow::anyhow!(e))
 }
 
 /// Derive `fuelYearID` values from the already-loaded `Year` table.
@@ -1103,10 +1108,7 @@ pub fn build_default_db_store(
 /// listed every fleet fuel is unchanged. A no-op (leaving the filter as-is) if
 /// `FuelEngTechAssoc` is absent or carries neither key column.
 #[cfg(not(target_arch = "wasm32"))]
-fn expand_fuel_filter_to_fleet(
-    db: &DefaultDb,
-    filters: &mut RunSpecFilters,
-) -> Result<()> {
+fn expand_fuel_filter_to_fleet(db: &DefaultDb, filters: &mut RunSpecFilters) -> Result<()> {
     use moves_data_default::TableFilter;
     use polars::prelude::DataType;
 
@@ -1120,8 +1122,10 @@ fn expand_fuel_filter_to_fleet(
         .collect()
         .context("scanning FuelEngTechAssoc for fleet fuel expansion")?;
     let (Ok(st), Ok(ft)) = (
-        df.column("sourceTypeID").and_then(|c| c.cast(&DataType::Int64)),
-        df.column("fuelTypeID").and_then(|c| c.cast(&DataType::Int64)),
+        df.column("sourceTypeID")
+            .and_then(|c| c.cast(&DataType::Int64)),
+        df.column("fuelTypeID")
+            .and_then(|c| c.cast(&DataType::Int64)),
     ) else {
         return Ok(());
     };
@@ -1148,10 +1152,7 @@ fn expand_fuel_filter_to_fleet(
 /// day types. No-op (filter unchanged) if `DayOfAnyWeek` is absent or yields no
 /// day IDs.
 #[cfg(not(target_arch = "wasm32"))]
-fn expand_day_filter_to_all_day_types(
-    db: &DefaultDb,
-    filters: &mut RunSpecFilters,
-) -> Result<()> {
+fn expand_day_filter_to_all_day_types(db: &DefaultDb, filters: &mut RunSpecFilters) -> Result<()> {
     let days = day_ids_from_default_db(db)?;
     if !days.is_empty() {
         filters.days = days;

@@ -200,6 +200,19 @@ per_fixture_round_trip! {
     fixture_process_nox_speciation => "process-nox-speciation.xml",
  // fixture — mixed onroad + NONROAD dual-model run:
     fixture_mixed_onroad_nonroad => "mixed-onroad-nonroad.xml",
+    // Task 148 coverage expansion (valid fixtures; the `error-*` siblings are
+    // negative tests and are excluded from the round-trip sweep):
+    fixture_expand_counties_large => "expand-counties-large.xml",
+    fixture_expand_fullyear => "expand-fullyear.xml",
+    fixture_expand_multifuel => "expand-multifuel.xml",
+    fixture_expand_multiyear => "expand-multiyear.xml",
+    fixture_expand_roadtypes => "expand-roadtypes.xml",
+    fixture_rates_minimal => "rates-minimal.xml",
+    // SINGLE-scale process variants:
+    fixture_process_apu_single => "process-apu-single.xml",
+    fixture_process_crankcase_extidle_single => "process-crankcase-extidle-single.xml",
+    fixture_process_crankcase_start_single => "process-crankcase-start-single.xml",
+    fixture_process_extended_idle_single => "process-extended-idle-single.xml",
 }
 
 #[test]
@@ -210,14 +223,19 @@ fn every_fixture_is_covered_by_a_per_fixture_test() {
     let mut found = 0usize;
     for entry in std::fs::read_dir(fixtures_dir()).expect("read fixtures dir") {
         let path = entry.expect("entry").path();
-        if path.extension().and_then(|e| e.to_str()) == Some("xml") {
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        // `error-*` fixtures never parse (negative tests) and so cannot be
+        // round-tripped; they are excluded from the per-fixture coverage and
+        // gated separately in full_suite_regression.rs.
+        if path.extension().and_then(|e| e.to_str()) == Some("xml") && !name.starts_with("error-") {
             found += 1;
         }
     }
     assert_eq!(
-        found, 37,
-        "expected 37 XML fixtures; bump the per_fixture_round_trip! macro when adding one \
-         (33 baseline + 3 additional onroad + 1 mixed-onroad-nonroad)"
+        found, 47,
+        "expected 47 round-trippable XML fixtures; bump the per_fixture_round_trip! macro \
+         when adding one (37 prior + 6 Task-148 valid + 4 SINGLE-scale variants; \
+         `error-*` negative fixtures excluded)"
     );
 }
 
@@ -507,6 +525,12 @@ fn java_runspec_xml_test_serializer_is_byte_idempotent() {
             continue;
         }
         let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        // `error-*` fixtures are deliberately-malformed RunSpecs (negative
+        // tests) that never parse — covered by the error-fixture gate in
+        // full_suite_regression.rs, excluded from the byte-idempotence sweep.
+        if name.starts_with("error-") {
+            continue;
+        }
         let xml = read(&path);
         let spec = match from_xml_str(&xml) {
             Ok(s) => s,

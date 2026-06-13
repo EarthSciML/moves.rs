@@ -199,7 +199,10 @@ fn omd_pol_procs(df: &DataFrame) -> PolarsResult<HashSet<i32>> {
 pub(crate) fn op_mode_distribution_already_built(ctx: &CalculatorContext, marker: &str) -> bool {
     ctx.scratch().store.contains(marker)
         || (ctx.scratch().store.get(OMD_TABLE).is_none()
-            && ctx.tables().get(OMD_TABLE).is_some_and(|df| df.height() > 0))
+            && ctx
+                .tables()
+                .get(OMD_TABLE)
+                .is_some_and(|df| df.height() > 0))
 }
 
 /// Merge one OMD producer's rows into the single shared `OpModeDistribution`
@@ -336,15 +339,24 @@ mod omd_merge_tests {
         merge_op_mode_distribution(
             &mut ctx,
             "__m_a",
-            vec![OmdTestRow { pol_process_id: 101, op_mode_id: 0 }],
+            vec![OmdTestRow {
+                pol_process_id: 101,
+                op_mode_id: 0,
+            }],
         )
         .unwrap();
         merge_op_mode_distribution(
             &mut ctx,
             "__m_b",
             vec![
-                OmdTestRow { pol_process_id: 201, op_mode_id: 0 },
-                OmdTestRow { pol_process_id: 201, op_mode_id: 1 },
+                OmdTestRow {
+                    pol_process_id: 201,
+                    op_mode_id: 0,
+                },
+                OmdTestRow {
+                    pol_process_id: 201,
+                    op_mode_id: 1,
+                },
             ],
         )
         .unwrap();
@@ -365,7 +377,10 @@ mod omd_merge_tests {
         merge_op_mode_distribution(
             &mut ctx,
             "__m_a_again",
-            vec![OmdTestRow { pol_process_id: 101, op_mode_id: 9 }],
+            vec![OmdTestRow {
+                pol_process_id: 101,
+                op_mode_id: 9,
+            }],
         )
         .unwrap();
         assert_eq!(
@@ -387,8 +402,11 @@ mod omd_merge_tests {
         let mut store = InMemoryStore::new();
         store.insert(
             "OpModeDistribution",
-            OmdTestRow::into_dataframe(vec![OmdTestRow { pol_process_id: 101, op_mode_id: 0 }])
-                .unwrap(),
+            OmdTestRow::into_dataframe(vec![OmdTestRow {
+                pol_process_id: 101,
+                op_mode_id: 0,
+            }])
+            .unwrap(),
         );
         let provided = CalculatorContext::with_tables(store);
         assert!(op_mode_distribution_already_built(&provided, "__unset"));

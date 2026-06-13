@@ -654,7 +654,8 @@ fn weight_by_source_bin(
     constants: &RunConstants,
 ) -> Vec<FullyWeightedRate> {
     // SourceBinDistribution rows by `(polProcessID, sourceBinID)`.
-    let mut sbd_by_pol_bin: HashMap<(i32, i64), Vec<&SourceBinDistributionRow>> = HashMap::default();
+    let mut sbd_by_pol_bin: HashMap<(i32, i64), Vec<&SourceBinDistributionRow>> =
+        HashMap::default();
     for sbd in &inputs.source_bin_distribution {
         sbd_by_pol_bin
             .entry((sbd.pol_process_id, sbd.source_bin_id))

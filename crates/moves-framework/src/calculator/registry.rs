@@ -941,7 +941,10 @@ mod tests {
 
         // Mesoscale-Lookup (Rates): keep MESOSCALE, drop STANDARD + LINK.
         let meso = reg.domain_scale_excluded_omd_modules(false, true);
-        assert!(!meso.contains(MESOSCALE), "Mesoscale keeps the mesoscale OMDG");
+        assert!(
+            !meso.contains(MESOSCALE),
+            "Mesoscale keeps the mesoscale OMDG"
+        );
         assert!(meso.contains(STANDARD) && meso.contains(LINK));
 
         // Project takes precedence over scale (matches MOVESInstantiator order).
@@ -1139,7 +1142,10 @@ mod tests {
         const MESOSCALE: &str = "MesoscaleLookupOperatingModeDistributionGenerator";
 
         // Running Exhaust (1) + Brakewear (9) — the onroad-inventory demo's set.
-        let selections = vec![(PollutantId(2), ProcessId(1)), (PollutantId(2), ProcessId(9))];
+        let selections = vec![
+            (PollutantId(2), ProcessId(1)),
+            (PollutantId(2), ProcessId(9)),
+        ];
         let planned = reg.modules_for_runspec(&selections);
         for n in [STANDARD, LINK, MESOSCALE] {
             assert!(

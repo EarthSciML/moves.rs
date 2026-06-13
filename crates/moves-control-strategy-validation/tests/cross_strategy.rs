@@ -83,8 +83,21 @@ fn registry_runs_pre_run_for_all_strategies() {
     let strategies = registry.instantiate_all();
     let mut store = InMemoryStore::new();
     for s in &strategies {
-        s.pre_run(&mut store)
-            .unwrap_or_else(|e| panic!("{} pre_run failed: {e}", s.name()));
+        let result = s.pre_run(&mut store);
+        match s.name() {
+            // RateOfProgress is not yet ported (the `RateOfProgressStrategy.sql`
+            // model-year-group propagation depends on default-DB tables this data
+            // plane does not expose). It reports the unported condition
+            // explicitly rather than silently succeeding — see
+            // RateOfProgressControlStrategy::pre_run.
+            "RateOfProgressControlStrategy" => assert!(
+                matches!(result, Err(moves_framework::Error::NotImplemented)),
+                "ROP pre_run should report NotImplemented until ported, got {result:?}"
+            ),
+            // AVFT and the empty retrofit strategies have nothing to block on and
+            // apply cleanly.
+            other => result.unwrap_or_else(|e| panic!("{other} pre_run failed: {e}")),
+        }
     }
 }
 
@@ -343,9 +356,35 @@ fn full_lifecycle_four_strategies_active_simultaneously() {
 
     let mut store = InMemoryStore::new();
     for s in &strategies {
-        s.pre_run(&mut store)
-            .unwrap_or_else(|e| panic!("{} pre_run failed: {e}", s.name()));
+        let result = s.pre_run(&mut store);
+        match s.name() {
+            // AVFT (here built empty) applies cleanly.
+            "AvftControlStrategy" => result.unwrap_or_else(|e| panic!("AVFT pre_run failed: {e}")),
+            // ROP is unported; a populated table still reports NotImplemented
+            // rather than silently dropping its reductions.
+            "RateOfProgressControlStrategy" => assert!(
+                matches!(result, Err(moves_framework::Error::NotImplemented)),
+                "ROP pre_run should report NotImplemented until ported, got {result:?}"
+            ),
+            // A *populated* on-road retrofit cannot yet be applied through the
+            // framework, so pre_run fails loudly rather than no-op (canonical
+            // OnRoadRetrofitStrategy always applies its adjustment).
+            "OnRoadRetrofitStrategy" => assert!(
+                result.is_err(),
+                "populated OnRoadRetrofit pre_run should fail until a write API \
+                 exists, got {result:?}"
+            ),
+            // A *populated* nonroad retrofit likewise cannot be bridged to
+            // ReferenceData::retrofit_records, so pre_run fails loudly.
+            "NonRoadRetrofitStrategy" => assert!(
+                result.is_err(),
+                "populated NonRoadRetrofit pre_run should fail until a write API \
+                 exists, got {result:?}"
+            ),
+            other => panic!("unexpected strategy {other}"),
+        }
     }
+    // post_run is a no-op for every strategy regardless of port status.
     let ctx = CalculatorContext::new();
     for s in &strategies {
         s.post_run(&ctx)

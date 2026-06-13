@@ -714,10 +714,7 @@ impl Generator for NewTvvYearGenerator {
 
         // Snapshot path: the year-suffixed execution-DB tables are present —
         // promote them to the canonical scratch names verbatim.
-        let have_suffixed = ctx
-            .tables()
-            .get(&format!("stmyTVVCoeffs{year}"))
-            .is_some()
+        let have_suffixed = ctx.tables().get(&format!("stmyTVVCoeffs{year}")).is_some()
             || ctx
                 .tables()
                 .get(&format!("stmyTVVEquations{year}"))
@@ -736,11 +733,11 @@ impl Generator for NewTvvYearGenerator {
         // Default-DB path: build stmyTVVEquations / stmyTVVCoeffs from the raw
         // tables, porting the NewTVVYear section (SQL lines 336-431).
         let cum: Vec<CumTvvCoeffsRow> = ctx.tables().iter_typed("CumTVVCoeffs")?;
-        let svp: Vec<SampleVehiclePopulationRow> =
-            ctx.tables().iter_typed_or_empty("SampleVehiclePopulation")?;
-        let ppmy: Vec<PollutantProcessMappedModelYearRow> = ctx
+        let svp: Vec<SampleVehiclePopulationRow> = ctx
             .tables()
-            .iter_typed("PollutantProcessMappedModelYear")?;
+            .iter_typed_or_empty("SampleVehiclePopulation")?;
+        let ppmy: Vec<PollutantProcessMappedModelYearRow> =
+            ctx.tables().iter_typed("PollutantProcessMappedModelYear")?;
         let age: Vec<AgeCategoryRow> = ctx.tables().iter_typed("AgeCategory")?;
 
         let (equations, coeffs) = build_tvv_tables(&cum, &svp, &ppmy, &age, i32::from(year));
@@ -828,7 +825,10 @@ mod tests {
             "PollutantProcessMappedModelYear",
             PollutantProcessMappedModelYearRow::into_dataframe(vec![]).unwrap(),
         );
-        store.insert("AgeCategory", AgeCategoryRow::into_dataframe(vec![]).unwrap());
+        store.insert(
+            "AgeCategory",
+            AgeCategoryRow::into_dataframe(vec![]).unwrap(),
+        );
 
         let mut ctx = CalculatorContext::with_position_and_tables(position_year_2020(), store);
         NewTvvYearGenerator::new()
@@ -912,6 +912,9 @@ mod tests {
         assert!((co.back_purge_factor - 1.0).abs() < 1e-12);
         // leakFraction = 0.5 * 0.5 = 0.25
         assert!((co.leak_fraction - 0.25).abs() < 1e-12);
-        assert_eq!(co.leak_fraction_im, 0.0, "all-None coeffs leakFractionIM → 0");
+        assert_eq!(
+            co.leak_fraction_im, 0.0,
+            "all-None coeffs leakFractionIM → 0"
+        );
     }
 }

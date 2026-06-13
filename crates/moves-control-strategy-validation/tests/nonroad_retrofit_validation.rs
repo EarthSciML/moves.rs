@@ -106,7 +106,12 @@ fn subscriptions_empty_lifecycle_is_global() {
 }
 
 #[test]
-fn pre_run_succeeds_with_multiple_records() {
+fn pre_run_fails_loudly_with_multiple_records() {
+    // The nonroad calculator reads retrofit records from
+    // ReferenceData::retrofit_records, and no framework write API bridges this
+    // strategy to it. Rather than silently dropping the reductions canonical
+    // NONROAD (clcrtrft.f) always applies, a populated strategy fails loudly in
+    // pre_run. (An empty strategy is a harmless no-op — see post_run_succeeds.)
     let recs = vec![
         make_record(1, "ALL", "ALL", 0.5, 0.6),
         make_record(2, "2265004010", "ALL", 0.3, 0.8),
@@ -115,7 +120,10 @@ fn pre_run_succeeds_with_multiple_records() {
     ];
     let strategy = NonRoadRetrofitStrategy::new(recs);
     let mut store = InMemoryStore::new();
-    strategy.pre_run(&mut store).expect("pre_run must succeed");
+    assert!(
+        strategy.pre_run(&mut store).is_err(),
+        "a populated NonRoadRetrofit pre_run must fail until a write API exists"
+    );
 }
 
 #[test]

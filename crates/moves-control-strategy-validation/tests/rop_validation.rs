@@ -219,7 +219,18 @@ fn strategy_lifecycle_with_fixture_data() {
     let t = load_fixture();
     let strategy = RateOfProgressControlStrategy::new(t);
     let mut store = InMemoryStore::new();
-    strategy.pre_run(&mut store).expect("pre_run must succeed");
+    // ROP's `RateOfProgressStrategy.sql` model-year-group propagation is not yet
+    // ported (it needs default-DB tables this data plane does not expose), so
+    // pre_run reports the unported condition rather than silently succeeding and
+    // leaving every declared modified_tables entry untouched.
+    assert!(
+        matches!(
+            strategy.pre_run(&mut store),
+            Err(moves_framework::Error::NotImplemented)
+        ),
+        "ROP pre_run should report NotImplemented until ported"
+    );
+    // post_run remains a no-op regardless of port status.
     let ctx = CalculatorContext::new();
     strategy.post_run(&ctx).expect("post_run must succeed");
 }
@@ -248,6 +259,11 @@ fn strategy_is_trait_object_safe_with_fixture() {
     let strategy: Box<dyn InternalControlStrategy> =
         Box::new(RateOfProgressControlStrategy::new(t));
     let mut store = InMemoryStore::new();
-    strategy.pre_run(&mut store).expect("pre_run ok");
+    // Unported through the trait object too — reports NotImplemented (see
+    // strategy_lifecycle_with_fixture_data).
+    assert!(matches!(
+        strategy.pre_run(&mut store),
+        Err(moves_framework::Error::NotImplemented)
+    ));
     assert_eq!(strategy.name(), "RateOfProgressControlStrategy");
 }

@@ -1570,10 +1570,18 @@ mod tests {
         store.insert(
             "RunSpecPollutantProcess",
             RunSpecPollutantProcessRow::into_dataframe(vec![
-                RunSpecPollutantProcessRow { pol_process_id: 202 },
-                RunSpecPollutantProcessRow { pol_process_id: 302 },
-                RunSpecPollutantProcessRow { pol_process_id: 216 },
-                RunSpecPollutantProcessRow { pol_process_id: 201 },
+                RunSpecPollutantProcessRow {
+                    pol_process_id: 202,
+                },
+                RunSpecPollutantProcessRow {
+                    pol_process_id: 302,
+                },
+                RunSpecPollutantProcessRow {
+                    pol_process_id: 216,
+                },
+                RunSpecPollutantProcessRow {
+                    pol_process_id: 201,
+                },
             ])
             .unwrap(),
         );
