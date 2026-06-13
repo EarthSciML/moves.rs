@@ -1767,7 +1767,7 @@ mod tests {
     fn default_db_canonical_diff() {
         use moves_snapshot::{
             compare_pollutant_sums, pollutant_sums_from_output_dir, pollutant_sums_from_snapshot,
-            Snapshot,
+            PollutantSums, Snapshot,
         };
         use std::path::PathBuf;
 
@@ -1814,58 +1814,75 @@ mod tests {
                 // No canonical snapshot in-repo for this fixture — skip.
                 continue;
             }
-            let xml = std::fs::read_to_string(fixtures_dir.join(format!("{name}.xml")))
-                .unwrap_or_else(|e| panic!("{name}: read runspec: {e}"));
-            let run_spec =
-                from_xml_str(&xml).unwrap_or_else(|e| panic!("{name}: parse runspec: {e}"));
+            // Run the wasm default-DB pipeline and extract the port's
+            // per-pollutant sums. A run error is recorded as a fixture failure
+            // (e.g. mixed-onroad-nonroad has no NONROAD population tables in the
+            // onroad default-DB tree) rather than aborting the whole sweep.
+            let port_result: Result<PollutantSums, String> = (|| {
+                let xml = std::fs::read_to_string(fixtures_dir.join(format!("{name}.xml")))
+                    .map_err(|e| format!("read runspec: {e}"))?;
+                let run_spec = from_xml_str(&xml).map_err(|e| format!("parse runspec: {e}"))?;
 
-            // Required partitions → read their bytes from the default-DB tree.
-            let paths = required_partition_paths_inner(&run_spec, &manifest)
-                .unwrap_or_else(|e| panic!("{name}: required partitions: {e}"));
-            let mut partition_files: Vec<(String, Vec<u8>)> = Vec::with_capacity(paths.len());
-            for p in &paths {
-                let bytes = std::fs::read(db_root.join(p))
-                    .unwrap_or_else(|e| panic!("{name}: read partition {p}: {e}"));
-                partition_files.push((p.clone(), bytes));
-            }
-
-            // WASM default-DB pipeline (same calls as run_simulation_from_partitions).
-            let mut store = default_db::load_partitions_to_store(&partition_files)
-                .unwrap_or_else(|e| panic!("{name}: load partitions: {e}"));
-            default_db::setup_execution_store(&run_spec, &mut store)
-                .unwrap_or_else(|e| panic!("{name}: setup execution store: {e}"));
-            let geography = default_db::load_geography_from_store(&store)
-                .unwrap_or_else(|e| panic!("{name}: geography: {e}"));
-            let registry = build_registry().unwrap_or_else(|e| panic!("{name}: registry: {e}"));
-            let config = EngineConfig {
-                output_root: PathBuf::new(),
-                max_parallel_chunks: 1,
-                run_spec_file_name: None,
-                run_date_time: None,
-                collect_output_in_memory: true,
-            };
-            let mut engine = MOVESEngine::new(run_spec.clone(), registry, config)
-                .with_rates_first(true)
-                .with_slow_store(store);
-            engine
-                .execution_run_spec_mut()
-                .build_execution_locations(&geography);
-            let outcome = engine
-                .run()
-                .unwrap_or_else(|e| panic!("{name}: engine run: {e}"));
-
-            // Materialise output_bytes into a temp dir so the canonical
-            // comparison helper (reads <dir>/MOVESOutput/**/*.parquet) applies.
-            let out = tempfile::tempdir().expect("tempdir");
-            for (rel, bytes) in &outcome.output_bytes {
-                let dst = out.path().join(rel);
-                if let Some(parent) = dst.parent() {
-                    std::fs::create_dir_all(parent).expect("mkdir output");
+                // Required partitions → read their bytes from the default-DB tree.
+                let paths = required_partition_paths_inner(&run_spec, &manifest)
+                    .map_err(|e| format!("required partitions: {e}"))?;
+                let mut partition_files: Vec<(String, Vec<u8>)> = Vec::with_capacity(paths.len());
+                for p in &paths {
+                    let bytes = std::fs::read(db_root.join(p))
+                        .map_err(|e| format!("read partition {p}: {e}"))?;
+                    partition_files.push((p.clone(), bytes));
                 }
-                std::fs::write(&dst, bytes).expect("write output parquet");
-            }
-            let port = pollutant_sums_from_output_dir(out.path())
-                .unwrap_or_else(|e| panic!("{name}: read port output: {e}"));
+
+                // WASM default-DB pipeline (same calls as run_simulation_from_partitions).
+                let mut store = default_db::load_partitions_to_store(&partition_files)
+                    .map_err(|e| format!("load partitions: {e}"))?;
+                default_db::setup_execution_store(&run_spec, &mut store)
+                    .map_err(|e| format!("setup execution store: {e}"))?;
+                let geography = default_db::load_geography_from_store(&store)
+                    .map_err(|e| format!("geography: {e}"))?;
+                let registry = build_registry().map_err(|e| format!("registry: {e}"))?;
+                let config = EngineConfig {
+                    output_root: PathBuf::new(),
+                    max_parallel_chunks: 1,
+                    run_spec_file_name: None,
+                    run_date_time: None,
+                    collect_output_in_memory: true,
+                };
+                let mut engine = MOVESEngine::new(run_spec.clone(), registry, config)
+                    .with_rates_first(true)
+                    .with_slow_store(store);
+                engine
+                    .execution_run_spec_mut()
+                    .build_execution_locations(&geography);
+                let outcome = engine.run().map_err(|e| format!("engine run: {e}"))?;
+
+                // Materialise output_bytes into a temp dir so the canonical
+                // comparison helper (reads <dir>/MOVESOutput/**/*.parquet) applies.
+                let out = tempfile::tempdir().map_err(|e| format!("tempdir: {e}"))?;
+                for (rel, bytes) in &outcome.output_bytes {
+                    let dst = out.path().join(rel);
+                    if let Some(parent) = dst.parent() {
+                        std::fs::create_dir_all(parent)
+                            .map_err(|e| format!("mkdir output: {e}"))?;
+                    }
+                    std::fs::write(&dst, bytes)
+                        .map_err(|e| format!("write output parquet: {e}"))?;
+                }
+                pollutant_sums_from_output_dir(out.path())
+                    .map_err(|e| format!("read port output: {e}"))
+            })();
+
+            let port = match port_result {
+                Ok(p) => p,
+                Err(e) => {
+                    println!(
+                        "{name:<32} {:>10} {:>10} {:>14} {:>10}",
+                        "-", "-", "-", "RUN-ERR"
+                    );
+                    failures.push(format!("{name}: run error — {e}"));
+                    continue;
+                }
+            };
 
             let snap =
                 Snapshot::load(&snap_dir).unwrap_or_else(|e| panic!("{name}: load canonical: {e}"));
