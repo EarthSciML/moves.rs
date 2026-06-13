@@ -40,6 +40,10 @@ pub fn setup_execution_store(runspec: &RunSpec, store: &mut InMemoryStore) -> Re
         merge_store_variants_eager(store)
     );
     synth_step!(
+        "build_ev_sales_fraction",
+        build_ev_sales_fraction(runspec, store)
+    );
+    synth_step!(
         "prune_geographic",
         prune_geographic_tables_to_runspec(runspec, store)
     );
@@ -72,6 +76,182 @@ pub fn setup_execution_store(runspec: &RunSpec, store: &mut InMemoryStore) -> Re
         "scope_pollutant_process_model_year",
         scope_pollutant_process_model_year_to_runspec(store)
     );
+    Ok(())
+}
+
+/// Build the runtime-derived `evSalesFraction` table the SBWeighted EV-sales
+/// ICE back-scaling consumes (BaseRateGenerator SBWeightedRate step 010).
+///
+/// Canonical `BaseRateGenerator` (`BaseRateGenerator.java:315-341`) builds it as
+/// `evFraction[modelYearID, fleetAvgGroupID] = evsales / sales` over the
+/// **age-0 slice** (so `modelYearID = yearID`) of the default
+/// `SourceTypeYear ⋈ SourceTypeAgeDistribution ⋈ SampleVehiclePopulation ⋈
+/// RegulatoryClass`:
+///
+/// * `evsales = Σ sourceTypePopulation · ageFraction · stmyFraction` with
+///   `fuelTypeID = 9`
+/// * `sales   = Σ sourceTypePopulation · ageFraction · stmyFraction` (all fuels)
+///
+/// restricted to `modelYearID ∈ [analysisYear-40, analysisYear]`. The two
+/// subqueries are INNER-joined on `(modelYearID, fleetAvgGroupID)`, so a row is
+/// emitted for every group that has *any* fuelType-9 sample-vehicle row (its
+/// `evFraction` may be `0`).
+///
+/// The raw default DB does not ship `evSalesFraction` (it is execution-time
+/// derived), so without this step the back-scaling silently no-ops and
+/// recent-model-year ICE energy rates come out ~2-3% low (`fuelType 9`
+/// electricity ~12% low). No-op if any input table is absent — e.g. a partial
+/// wasm partition load — so it can never empty an already-correct store.
+fn build_ev_sales_fraction(runspec: &RunSpec, store: &mut InMemoryStore) -> Result<(), String> {
+    use std::collections::{HashMap, HashSet};
+
+    // Analysis year drives the [year-40, year] model-year window (canonical uses
+    // the run year). A run with no years selected has nothing to build.
+    let Some(&year) = runspec.timespan.years.iter().max() else {
+        return Ok(());
+    };
+    let (year, lo) = (year as i64, year as i64 - 40);
+
+    // Case-insensitive column readers (cast to the requested type), matching the
+    // idiom used elsewhere in this module.
+    let icol = |df: &DataFrame, name: &str| -> Option<Vec<Option<i64>>> {
+        let c = df
+            .columns()
+            .iter()
+            .find(|c| c.name().eq_ignore_ascii_case(name))?
+            .cast(&DataType::Int64)
+            .ok()?;
+        let ca = c.i64().ok()?;
+        Some((0..ca.len()).map(|i| ca.get(i)).collect())
+    };
+    let fcol = |df: &DataFrame, name: &str| -> Option<Vec<Option<f64>>> {
+        let c = df
+            .columns()
+            .iter()
+            .find(|c| c.name().eq_ignore_ascii_case(name))?
+            .cast(&DataType::Float64)
+            .ok()?;
+        let ca = c.f64().ok()?;
+        Some((0..ca.len()).map(|i| ca.get(i)).collect())
+    };
+
+    let (Some(sty), Some(stad), Some(svp), Some(rc)) = (
+        store.get("SourceTypeYear"),
+        store.get("SourceTypeAgeDistribution"),
+        store.get("SampleVehiclePopulation"),
+        store.get("RegulatoryClass"),
+    ) else {
+        return Ok(());
+    };
+
+    // regClassID → fleetAvgGroupID.
+    let (Some(rc_id), Some(rc_grp)) = (icol(&rc, "regClassID"), icol(&rc, "fleetAvgGroupID"))
+    else {
+        return Ok(());
+    };
+    let reg_to_group: HashMap<i64, i64> = (0..rc_id.len())
+        .filter_map(|i| Some((rc_id[i]?, rc_grp[i]?)))
+        .collect();
+
+    // sourceTypePopulation[(sourceTypeID, yearID)].
+    let (Some(sty_st), Some(sty_yr), Some(sty_pop)) = (
+        icol(&sty, "sourceTypeID"),
+        icol(&sty, "yearID"),
+        fcol(&sty, "sourceTypePopulation"),
+    ) else {
+        return Ok(());
+    };
+    let mut pop: HashMap<(i64, i64), f64> = HashMap::new();
+    for i in 0..sty_st.len() {
+        if let (Some(s), Some(y), Some(p)) = (sty_st[i], sty_yr[i], sty_pop[i]) {
+            pop.insert((s, y), p);
+        }
+    }
+
+    // age-0 ageFraction[(sourceTypeID, yearID)].
+    let (Some(ad_st), Some(ad_yr), Some(ad_age), Some(ad_frac)) = (
+        icol(&stad, "sourceTypeID"),
+        icol(&stad, "yearID"),
+        icol(&stad, "ageID"),
+        fcol(&stad, "ageFraction"),
+    ) else {
+        return Ok(());
+    };
+    let mut age0: HashMap<(i64, i64), f64> = HashMap::new();
+    for i in 0..ad_st.len() {
+        if ad_age[i] == Some(0) {
+            if let (Some(s), Some(y), Some(f)) = (ad_st[i], ad_yr[i], ad_frac[i]) {
+                age0.insert((s, y), f);
+            }
+        }
+    }
+
+    // SampleVehiclePopulation rows. age-0 join ⇒ yearID == modelYearID.
+    let (Some(svp_st), Some(svp_my), Some(svp_ft), Some(svp_rc), Some(svp_frac)) = (
+        icol(&svp, "sourceTypeID"),
+        icol(&svp, "modelYearID"),
+        icol(&svp, "fuelTypeID"),
+        icol(&svp, "regClassID"),
+        fcol(&svp, "stmyFraction"),
+    ) else {
+        return Ok(());
+    };
+
+    let mut sales: HashMap<(i64, i64), f64> = HashMap::new();
+    let mut evsales: HashMap<(i64, i64), f64> = HashMap::new();
+    let mut ev_present: HashSet<(i64, i64)> = HashSet::new();
+    for i in 0..svp_st.len() {
+        let (Some(s), Some(my), Some(ft), Some(rcid), Some(frac)) =
+            (svp_st[i], svp_my[i], svp_ft[i], svp_rc[i], svp_frac[i])
+        else {
+            continue;
+        };
+        if my < lo || my > year {
+            continue;
+        }
+        let Some(&grp) = reg_to_group.get(&rcid) else {
+            continue;
+        };
+        // age-0 ⇒ yearID = modelYearID for the population / age-fraction lookup.
+        let (Some(&p), Some(&af)) = (pop.get(&(s, my)), age0.get(&(s, my))) else {
+            continue;
+        };
+        let contrib = p * af * frac;
+        *sales.entry((my, grp)).or_insert(0.0) += contrib;
+        if ft == 9 {
+            ev_present.insert((my, grp));
+            *evsales.entry((my, grp)).or_insert(0.0) += contrib;
+        }
+    }
+
+    // INNER JOIN t1(evsales) ⋈ t2(sales): emit every group with a fuelType-9 row
+    // and positive total sales; evFraction may be 0.
+    let mut keys: Vec<(i64, i64)> = ev_present.into_iter().collect();
+    keys.sort_unstable();
+    let mut out_my = Vec::with_capacity(keys.len());
+    let mut out_grp = Vec::with_capacity(keys.len());
+    let mut out_frac = Vec::with_capacity(keys.len());
+    for (my, grp) in keys {
+        let total = sales.get(&(my, grp)).copied().unwrap_or(0.0);
+        if total <= 0.0 {
+            continue;
+        }
+        out_my.push(my);
+        out_grp.push(grp);
+        out_frac.push(evsales.get(&(my, grp)).copied().unwrap_or(0.0) / total);
+    }
+
+    let n = out_my.len();
+    let df = DataFrame::new(
+        n,
+        vec![
+            Series::new("modelYearID".into(), out_my).into(),
+            Series::new("fleetAvgGroupID".into(), out_grp).into(),
+            Series::new("evFraction".into(), out_frac).into(),
+        ],
+    )
+    .map_err(|e| format!("building evSalesFraction: {e}"))?;
+    store.insert("evSalesFraction".to_string(), df);
     Ok(())
 }
 
