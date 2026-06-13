@@ -79,21 +79,23 @@ fn zero_fraction_retrofitted_means_no_adjustment() {
 }
 
 // ---------------------------------------------------------------------------
-// Two programs for the same vehicle/pollutant/process compound multiplicatively
+// Multiple retrofit-year buckets: the most-recent bucket ≤ analysis_year wins
+// (cumFractionRetrofit is cumulative; canonical buckets do NOT multiply — see
+// OnRoadRetrofitStrategy.java compile()/maxCalendarYear and
+// RetrofitTable::combined_factor).
 // ---------------------------------------------------------------------------
 
 #[test]
-fn two_programs_same_scope_multiply() {
-    // Program A: 30% of fleet, 60% effective → factor = 1 − 0.30×0.60 = 0.82
-    // Program B: 20% of fleet, 50% effective → factor = 1 − 0.20×0.50 = 0.90
-    // Combined: 0.82 × 0.90 = 0.738
+fn two_programs_most_recent_retrofit_year_supersedes() {
+    // Buckets at retrofitYear 2010 and 2015, analysis year 2020 → only the 2015
+    // bucket applies: factor = 1 − 0.20×0.50 = 0.90.
     let programs: RetrofitTable = [
         rec(11, 2000, 2015, 2010, 3, 1, 0.30, 0.60),
         rec(11, 2000, 2015, 2015, 3, 1, 0.20, 0.50),
     ]
     .into_iter()
     .collect();
-    let expected = (1.0 - 0.30 * 0.60) * (1.0 - 0.20 * 0.50);
+    let expected = 1.0 - 0.20 * 0.50;
     let actual = programs.combined_factor(11, 2010, 3, 1, 2020);
     assert!(
         (actual - expected).abs() < 1e-12,
@@ -102,12 +104,9 @@ fn two_programs_same_scope_multiply() {
 }
 
 #[test]
-fn three_programs_compound() {
-    // Three programs, each with distinct non-trivial parameters.
-    // Program A: fraction=0.40, effectiveness=0.70 → factor = 0.72
-    // Program B: fraction=0.25, effectiveness=0.80 → factor = 0.80
-    // Program C: fraction=0.10, effectiveness=0.90 → factor = 0.91
-    // Combined: 0.72 × 0.80 × 0.91 = 0.52416
+fn three_programs_most_recent_retrofit_year_applies() {
+    // Buckets at retrofitYear 2018, 2020, 2022; analysis year 2025 → only the
+    // 2022 bucket applies: factor = 1 − 0.10×0.90 = 0.91.
     let programs: RetrofitTable = [
         rec(21, 2010, 2020, 2018, 98, 1, 0.40, 0.70),
         rec(21, 2010, 2020, 2020, 98, 1, 0.25, 0.80),
@@ -115,7 +114,7 @@ fn three_programs_compound() {
     ]
     .into_iter()
     .collect();
-    let expected = (1.0 - 0.40 * 0.70) * (1.0 - 0.25 * 0.80) * (1.0 - 0.10 * 0.90);
+    let expected = 1.0 - 0.10 * 0.90;
     let actual = programs.combined_factor(21, 2015, 98, 1, 2025);
     assert!(
         (actual - expected).abs() < 1e-12,
@@ -226,31 +225,20 @@ fn strategy_lifecycle_with_fixture_programs() {
     .collect();
     let strategy = OnRoadRetrofitStrategy::new(programs);
     let mut store = InMemoryStore::new();
-    // A *populated* on-road retrofit cannot yet be applied through the framework
-    // (emissionRateAdjustment needs source-bin keys RetrofitRecord does not
-    // carry), so pre_run reports the unported condition rather than silently
-    // no-opping the adjustment canonical OnRoadRetrofitStrategy always applies.
-    assert!(
-        matches!(
-            strategy.pre_run(&mut store),
-            Err(moves_framework::Error::NotImplemented)
-        ),
-        "populated OnRoadRetrofit pre_run should report NotImplemented until ported"
-    );
-    // post_run remains a no-op regardless of port status.
+    // pre_run loads programs from the (here empty) store and keeps the seeded
+    // ones; the retrofit effect is applied later in apply_to_output, so pre_run
+    // and post_run both succeed.
+    strategy.pre_run(&mut store).expect("pre_run must succeed");
     let ctx = CalculatorContext::new();
     strategy.post_run(&ctx).expect("post_run must succeed");
 }
 
 #[test]
-fn strategy_modified_tables_contains_emission_rate_adjustment() {
+fn strategy_declares_no_modified_input_tables() {
+    // Retrofit is a post-output scaling (apply_to_output), not an input-table
+    // mutation, so it declares no modified tables.
     let strategy = OnRoadRetrofitStrategy::new(RetrofitTable::new());
-    assert!(
-        strategy
-            .modified_tables()
-            .contains(&"emissionRateAdjustment"),
-        "OnRoadRetrofit must declare emissionRateAdjustment"
-    );
+    assert!(strategy.modified_tables().is_empty());
 }
 
 #[test]

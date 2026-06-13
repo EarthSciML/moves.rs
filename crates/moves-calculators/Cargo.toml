@@ -28,6 +28,7 @@ thiserror = { workspace = true }
 # Exclude the parquet feature on that target to break the chain.
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 moves-avft = { path = "../moves-avft" }
+moves-onroad-retrofit = { path = "../moves-onroad-retrofit" }
 polars = { workspace = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

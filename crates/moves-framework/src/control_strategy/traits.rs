@@ -153,6 +153,22 @@ pub trait InternalControlStrategy: Send + Sync + std::fmt::Debug {
     fn post_run(&self, _ctx: &CalculatorContext) -> Result<(), Error> {
         Ok(())
     }
+
+    /// Apply a strategy effect to the finalized, aggregated emission output,
+    /// in place, after all chunks complete and the streaming aggregator has
+    /// been drained (engine `run()` post-finalize step).
+    ///
+    /// Some canonical strategies are *post-output* transforms rather than
+    /// input-table mutations: `OnRoadRetrofitStrategy` issues
+    /// `UPDATE MOVESWorkerOutput SET emissionQuant = emissionQuant *
+    /// (retrofitFactor + nonRetrofitFactor)` keyed by `(pollutant, process,
+    /// fuel, source, yearID, modelYearID)` (`OnRoadRetrofitStrategy.java`
+    /// `CompiledLine.buildSQL`). Those cannot be expressed through `pre_run`,
+    /// which runs before any output exists; they hook here instead.
+    ///
+    /// `records` are mutated in place. Default: no-op (input-table strategies
+    /// such as AVFT do nothing here).
+    fn apply_to_output(&self, _records: &mut [moves_data::output_schema::EmissionRecord]) {}
 }
 
 #[cfg(test)]
