@@ -190,11 +190,26 @@ impl RetrofitTable {
 
     /// Compute the combined emission adjustment factor for a given
     /// `(sourceType, modelYear, pollutant, process)` combination in
-    /// `analysis_year`.
+    /// `analysis_year`. A factor of `0.5` means 50% of baseline emissions
+    /// remain; `1.0` means no programs apply.
     ///
-    /// Returns the product of [`RetrofitRecord::emission_factor`] over all
-    /// active records, or `1.0` if no programs apply (no adjustment). A
-    /// factor of `0.5` means 50% of baseline emissions remain.
+    /// # Canonical semantics
+    ///
+    /// `OnRoadRetrofitStrategy.compile()` partitions calendar years into
+    /// **non-overlapping** buckets per `(pollutant, process, fuel, source,
+    /// modelYear)`, one per distinct `retrofitYearID`, where bucket `b` covers
+    /// `[retrofitYear_b, nextRetrofitYear − 1]` (the `maxCalendarYear` loop,
+    /// `OnRoadRetrofitStrategy.java` ~1330-1346). For any analysis (calendar)
+    /// year **exactly one** bucket applies — the most-recent `retrofitYearID ≤
+    /// analysis_year` — because `cumFractionRetrofit` is *cumulative*, so a
+    /// later bucket already accounts for (and supersedes) earlier retrofits.
+    ///
+    /// Within that bucket the per-row reductions accumulate **additively**
+    /// (`retrofitFactor += cumFrac·(1−eff)`, `nonRetrofitFactor −= cumFrac`,
+    /// compile() ~1269-1272), so the applied factor is
+    /// `retrofitFactor + nonRetrofitFactor = 1 − Σ(cumFrac·eff)` over the
+    /// bucket's rows — **not** a product over every program with
+    /// `retrofitYear ≤ analysis_year`.
     pub fn combined_factor(
         &self,
         source_type_id: SourceTypeId,
@@ -203,15 +218,33 @@ impl RetrofitTable {
         process_id: ProcessId,
         analysis_year: i32,
     ) -> f64 {
-        self.active_records(
-            source_type_id,
-            model_year_id,
-            pollutant_id,
-            process_id,
-            analysis_year,
-        )
-        .map(|r| r.emission_factor())
-        .fold(1.0, |acc, f| acc * f)
+        // The applicable bucket is the most-recent retrofit year ≤ analysis_year.
+        let Some(bucket_year) = self
+            .active_records(
+                source_type_id,
+                model_year_id,
+                pollutant_id,
+                process_id,
+                analysis_year,
+            )
+            .map(|r| r.retrofit_year_id)
+            .max()
+        else {
+            return 1.0; // no program applies
+        };
+        // Additive reduction over the rows in that bucket.
+        let reduction: f64 = self
+            .active_records(
+                source_type_id,
+                model_year_id,
+                pollutant_id,
+                process_id,
+                analysis_year,
+            )
+            .filter(|r| r.retrofit_year_id == bucket_year)
+            .map(|r| r.cumulative_retrofit_fraction * r.retrofit_effectiveness)
+            .sum();
+        (1.0 - reduction).clamp(0.0, 1.0)
     }
 }
 
@@ -299,7 +332,11 @@ mod tests {
     }
 
     #[test]
-    fn combined_factor_two_independent_programs_multiply() {
+    fn combined_factor_uses_most_recent_retrofit_year_bucket() {
+        // Two retrofit-year buckets (2010, 2015) for the same scope. Canonical
+        // applies only the most-recent bucket ≤ analysis_year (2015) because
+        // cumFractionRetrofit is cumulative — earlier retrofits are already
+        // folded into the later bucket, so the buckets do NOT multiply.
         let t: RetrofitTable = [
             make_record(11, 2000, 2015, 2010, 98, 1, 0.3, 0.6),
             make_record(11, 2000, 2015, 2015, 98, 1, 0.2, 0.5),
@@ -307,8 +344,24 @@ mod tests {
         .into_iter()
         .collect();
         let f = t.combined_factor(11, 2010, 98, 1, 2020);
-        let expected = (1.0 - 0.3 * 0.6) * (1.0 - 0.2 * 0.5);
-        assert!((f - expected).abs() < 1e-12);
+        let expected = 1.0 - 0.2 * 0.5; // only the 2015 bucket
+        assert!((f - expected).abs() < 1e-12, "expected {expected}, got {f}");
+    }
+
+    #[test]
+    fn combined_factor_same_retrofit_year_accumulates_additively() {
+        // Two rows sharing retrofitYear 2015 (distinct model-year ranges that
+        // both cover MY 2008) accumulate additively within the bucket:
+        // factor = 1 − Σ(cumFrac·eff) = 1 − (0.3·0.5 + 0.2·0.5) = 0.75.
+        let t: RetrofitTable = [
+            make_record(11, 2000, 2010, 2015, 98, 1, 0.3, 0.5),
+            make_record(11, 2005, 2015, 2015, 98, 1, 0.2, 0.5),
+        ]
+        .into_iter()
+        .collect();
+        let f = t.combined_factor(11, 2008, 98, 1, 2020);
+        let expected = 1.0 - (0.3 * 0.5 + 0.2 * 0.5);
+        assert!((f - expected).abs() < 1e-12, "expected {expected}, got {f}");
     }
 
     #[test]
