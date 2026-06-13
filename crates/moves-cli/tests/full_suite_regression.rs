@@ -1329,7 +1329,7 @@ fn default_db_snapshot_diff() {
         let name = fixture_name(fixture_path);
         let out = tempdir().expect("tempdir");
 
-        let outcome = run_simulation(&RunOptions {
+        let outcome = match run_simulation(&RunOptions {
             runspec: fixture_path.to_path_buf(),
             output: out.path().to_path_buf(),
             max_parallel_chunks: 1,
@@ -1338,8 +1338,21 @@ fn default_db_snapshot_diff() {
             snapshot: None,
             scale_input: None,
             default_db: Some(db_root.clone()),
-        })
-        .unwrap_or_else(|e| panic!("{name}: run error — {e:#}"));
+        }) {
+            Ok(o) => o,
+            // A run error is a gate failure for this fixture, not a reason to
+            // abort the whole sweep — record it and keep going so every fixture
+            // gets a verdict (e.g. mixed-onroad-nonroad errors because the
+            // default-DB onroad tree carries no NONROAD population tables).
+            Err(e) => {
+                println!(
+                    "{name:<28} {:>10} {:>10} {:>14} {:>10}",
+                    "-", "-", "-", "RUN-ERR"
+                );
+                failures.push(format!("{name}: run error — {e:#}"));
+                continue;
+            }
+        };
 
         let canonical = match Snapshot::load(&snap_root.join(name)) {
             Ok(s) => {

@@ -1,0 +1,104 @@
+# default-DB end-to-end gate
+#
+# Runs the from-scratch default-DB correctness gates that read the converted
+# default-DB Parquet tree, build the execution tables from scratch, emit, and
+# compare per-pollutant emissionQuant sums against the in-repo canonical MOVES
+# snapshots:
+#
+#   * NATIVE — crates/moves-cli/tests/full_suite_regression.rs::default_db_snapshot_diff
+#     drives the CLI `--default-db` path (InputDataManager + generators + the
+#     full calculator chain).
+#   * WASM   — crates/moves-wasm/src/lib.rs::default_db_canonical_diff drives the
+#     wasm default-DB pipeline (parquet decode + partition assembly + engine)
+#     natively, against the same canonical snapshots.
+#
+# Both gates are env-gated (MOVES_DEFAULT_DB_DIR) and dormant in the per-PR
+# `ci.yml` run. They are activated here on a weekly schedule (+ manual dispatch)
+# because the default-DB Parquet tree is a large (~390 MB) release asset and the
+# from-scratch run is slow — keeping PR CI fast.
+#
+# This workflow is intentionally NOT a required/PR-blocking check: it monitors
+# from-scratch fidelity. A red run is a real signal (a generator / InputDataManager
+# divergence or a wasm parquet/partition bug), not a CI-hygiene failure.
+#
+# The default-DB Parquet tree is downloaded from the most recent GitHub Release
+# carrying a `default-db-<version>.tar.gz` asset (produced by package-default-db).
+# Skips gracefully if no such asset exists yet.
+
+name: default-db-gate
+
+on:
+  schedule:
+    # Mondays 07:00 UTC.
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  default-db-gate:
+    name: default-DB gate (native + wasm)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry, target/
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: default-db-gate
+
+      # Download + extract the most recent default-DB Parquet tree (same release
+      # lookup as ci.yml's Pages step). Exports MOVES_DEFAULT_DB_DIR to the tree
+      # root (the <db_version>/ dir, which carries manifest.json). If no asset
+      # exists yet, leaves MOVES_DEFAULT_DB_DIR unset so both gates stay dormant.
+      - name: Download default-DB Parquet tree
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG=""
+          ARCHIVE=""
+          for t in $(gh release list --limit 20 --json tagName --jq '.[].tagName' 2>/dev/null || true); do
+            a=$(gh release view "$t" --json assets --jq '.assets[].name' 2>/dev/null \
+                | grep -E '^default-db-.*\.tar\.gz$' | head -1) || true
+            if [ -n "$a" ]; then TAG="$t"; ARCHIVE="$a"; break; fi
+          done
+          if [ -z "$TAG" ]; then
+            echo "No default-DB release asset found — gates will run DORMANT."
+            echo "(run the package-default-db workflow to produce one)"
+            exit 0
+          fi
+          DB_VERSION="${ARCHIVE#default-db-}"
+          DB_VERSION="${DB_VERSION%.tar.gz}"
+          echo "Downloading ${ARCHIVE} from release ${TAG}..."
+          gh release download "${TAG}" -p "${ARCHIVE}" -D /tmp/
+          mkdir -p "${GITHUB_WORKSPACE}/default-db"
+          tar -xzf "/tmp/${ARCHIVE}" \
+            --exclude="${DB_VERSION}/_tsv" \
+            -C "${GITHUB_WORKSPACE}/default-db/"
+          rm -f "/tmp/${ARCHIVE}"
+          DB_DIR="${GITHUB_WORKSPACE}/default-db/${DB_VERSION}"
+          echo "MOVES_DEFAULT_DB_DIR=${DB_DIR}" >> "$GITHUB_ENV"
+          echo "Extracted default-DB ${DB_VERSION} to ${DB_DIR}"
+          du -sh "${DB_DIR}" || true
+
+      - name: cargo build (test targets)
+        run: cargo build -p moves-cli -p moves-wasm --tests
+
+      # NATIVE gate. --nocapture so the per-fixture verdict table is in the log.
+      - name: native default-DB gate
+        run: cargo test -p moves-cli --test full_suite_regression default_db -- --nocapture
+
+      # WASM gate — runs even if the native gate failed, so both verdicts surface.
+      - name: wasm default-DB gate
+        if: always()
+        run: cargo test -p moves-wasm default_db_canonical_diff -- --nocapture

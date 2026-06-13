@@ -58,3 +58,8 @@ console_error_panic_hook = "0.1"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
+# Native-only (host) test deps for the default-DB canonical gate
+# (default_db_canonical_diff). Tests run on the host, so these never reach the
+# wasm32 target.
+moves-snapshot = { path = "../moves-snapshot" }
+tempfile = { workspace = true }
