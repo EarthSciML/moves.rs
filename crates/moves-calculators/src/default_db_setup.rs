@@ -513,7 +513,65 @@ pub fn prune_geographic_tables_to_runspec(
     if !region_ids.is_empty() {
         prune_table_by_id(store, "FuelSupply", "fuelRegionID", &region_ids)?;
     }
+    // FuelSupply also ships every monthGroupID (0–12). Canonical extracts it
+    // per calculator filtered to the run's month (`FuelSupply INNER JOIN
+    // MonthOfAnyYear WHERE monthID = context.monthID`), so each iteration sees a
+    // single monthGroup. The port loads the whole table, and the fuel-adjustment
+    // chains join it WITHOUT a monthGroup key (e.g. EvaporativePermeationCalculator
+    // PC-4 joins WeightedFuelAdjustment → SBWeightedPermeationRate on
+    // (polProcessID, modelYearID, fuelTypeID) only). With all 12 month groups
+    // present, every emission rate is multiplied by the month count — a clean
+    // 12× over-count on a single-month run. Prune FuelSupply to the run's
+    // month group(s), mirroring the canonical extraction. (In the snapshot path
+    // FuelSupply is already captured filtered to the run's month, so this is a
+    // no-op there.)
+    let month_groups = month_groups_for_runspec(store, runspec);
+    if !month_groups.is_empty() {
+        prune_table_by_id(store, "FuelSupply", "monthGroupID", &month_groups)?;
+    }
     Ok(())
+}
+
+/// Map the runspec's selected calendar months to `monthGroupID`s via the loaded
+/// `MonthOfAnyYear` table (`monthID` → `monthGroupID`). Falls back to the
+/// identity mapping (`monthGroupID == monthID`, which holds in the default DB)
+/// when `MonthOfAnyYear` is absent or lacks the columns. Empty when the runspec
+/// selects no months — the caller then leaves `FuelSupply` unpruned by month.
+fn month_groups_for_runspec(store: &InMemoryStore, runspec: &RunSpec) -> BTreeSet<i64> {
+    let month_set: BTreeSet<i64> = runspec
+        .timespan
+        .months
+        .iter()
+        .map(|&m| i64::from(m))
+        .collect();
+    if month_set.is_empty() {
+        return BTreeSet::new();
+    }
+    let Some(arc) = store.get("MonthOfAnyYear") else {
+        return month_set; // identity fallback (monthGroupID == monthID)
+    };
+    let df = &*arc;
+    let col = |name: &str| {
+        df.columns()
+            .iter()
+            .find(|c| c.name().eq_ignore_ascii_case(name))
+            .and_then(|c| c.cast(&DataType::Int64).ok())
+    };
+    let (Some(mid_col), Some(mg_col)) = (col("monthID"), col("monthGroupID")) else {
+        return month_set; // identity fallback
+    };
+    let (Ok(mids), Ok(mgs)) = (mid_col.i64(), mg_col.i64()) else {
+        return month_set;
+    };
+    let mut out: BTreeSet<i64> = BTreeSet::new();
+    for i in 0..df.height() {
+        if let (Some(m), Some(g)) = (mids.get(i), mgs.get(i)) {
+            if month_set.contains(&m) {
+                out.insert(g);
+            }
+        }
+    }
+    if out.is_empty() { month_set } else { out }
 }
 
 /// Resolve the fuel-region IDs serving `county_ids` for the run's fuel
