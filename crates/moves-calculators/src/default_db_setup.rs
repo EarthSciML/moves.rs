@@ -73,6 +73,10 @@ pub fn setup_execution_store(runspec: &RunSpec, store: &mut InMemoryStore) -> Re
     );
     synth_step!("build_runspec_tables", build_runspec_tables(runspec, store));
     synth_step!(
+        "build_regclass_source_type_fraction",
+        build_regclass_source_type_fraction(store)
+    );
+    synth_step!(
         "scope_pollutant_process_model_year",
         scope_pollutant_process_model_year_to_runspec(store)
     );
@@ -252,6 +256,152 @@ fn build_ev_sales_fraction(runspec: &RunSpec, store: &mut InMemoryStore) -> Resu
     )
     .map_err(|e| format!("building evSalesFraction: {e}"))?;
     store.insert("evSalesFraction".to_string(), df);
+    Ok(())
+}
+
+/// Build the runtime-derived `RegClassSourceTypeFraction` table the activity and
+/// evaporative calculators consume (canonical `database/UpdateExecution.sql`,
+/// "Create RegClassSourceTypeFraction").
+///
+/// `regClassFraction` is the share of a `(sourceType, fuelSupplyFuelType,
+/// modelYear)` a regClass covers, weighted by fuel-usage fraction:
+///
+/// * `num[st, fsFT, my, rc] = Σ usageFraction · stmyFraction` over the sample-
+///   vehicle rows of `(st, my, rc)` joined to their fuel-usage rows
+/// * `denom[st, fsFT, my]   = Σ num` over all regClasses
+/// * `regClassFraction = num / denom`
+///
+/// joining `fuelUsageFraction (fuf) ⋈ SampleVehiclePopulation (svp)` on
+/// `fuf.sourceBinFuelTypeID = svp.fuelTypeID`, restricted to the runspec's
+/// (sourceType × modelYear) set. The output `fuelTypeID` is the **supply** fuel
+/// type (`fuelSupplyFuelTypeID`); zero fractions are dropped.
+///
+/// In the store `fuelUsageFraction` is already county+fuelYear scoped and the
+/// default DB's `modelYearGroupID` is uniformly 0, so the canonical join (which
+/// keys only on fuel type) is unambiguous. The raw default DB does not ship this
+/// table (it is execution-time derived), so without this step the activity /
+/// evaporative-permeation / liquid-leaking calculators error on a missing
+/// `RegClassSourceTypeFraction`. No-op if any input table is absent.
+fn build_regclass_source_type_fraction(store: &mut InMemoryStore) -> Result<(), String> {
+    use std::collections::{HashMap, HashSet};
+
+    let icol = |df: &DataFrame, name: &str| -> Option<Vec<Option<i64>>> {
+        let c = df
+            .columns()
+            .iter()
+            .find(|c| c.name().eq_ignore_ascii_case(name))?
+            .cast(&DataType::Int64)
+            .ok()?;
+        let ca = c.i64().ok()?;
+        Some((0..ca.len()).map(|i| ca.get(i)).collect())
+    };
+    let fcol = |df: &DataFrame, name: &str| -> Option<Vec<Option<f64>>> {
+        let c = df
+            .columns()
+            .iter()
+            .find(|c| c.name().eq_ignore_ascii_case(name))?
+            .cast(&DataType::Float64)
+            .ok()?;
+        let ca = c.f64().ok()?;
+        Some((0..ca.len()).map(|i| ca.get(i)).collect())
+    };
+
+    let (Some(fuf), Some(svp), Some(rst), Some(rmy)) = (
+        store.get("fuelUsageFraction"),
+        store.get("SampleVehiclePopulation"),
+        store.get("RunSpecSourceType"),
+        store.get("RunSpecModelYear"),
+    ) else {
+        return Ok(());
+    };
+
+    // Runspec (sourceType × modelYear) scope = canonical runspecSourceTypeModelYearID.
+    let (Some(rst_ids), Some(rmy_ids)) = (icol(&rst, "sourceTypeID"), icol(&rmy, "modelYearID"))
+    else {
+        return Ok(());
+    };
+    let src_set: HashSet<i64> = rst_ids.into_iter().flatten().collect();
+    let my_set: HashSet<i64> = rmy_ids.into_iter().flatten().collect();
+
+    // fuelUsageFraction: sourceBinFuelTypeID → [(fuelSupplyFuelTypeID, usageFraction)].
+    let (Some(fuf_bin), Some(fuf_sup), Some(fuf_use)) = (
+        icol(&fuf, "sourceBinFuelTypeID"),
+        icol(&fuf, "fuelSupplyFuelTypeID"),
+        fcol(&fuf, "usageFraction"),
+    ) else {
+        return Ok(());
+    };
+    let mut usage: HashMap<i64, Vec<(i64, f64)>> = HashMap::new();
+    for i in 0..fuf_bin.len() {
+        if let (Some(b), Some(s), Some(u)) = (fuf_bin[i], fuf_sup[i], fuf_use[i]) {
+            usage.entry(b).or_default().push((s, u));
+        }
+    }
+
+    let (Some(svp_st), Some(svp_my), Some(svp_ft), Some(svp_rc), Some(svp_frac)) = (
+        icol(&svp, "sourceTypeID"),
+        icol(&svp, "modelYearID"),
+        icol(&svp, "fuelTypeID"),
+        icol(&svp, "regClassID"),
+        fcol(&svp, "stmyFraction"),
+    ) else {
+        return Ok(());
+    };
+
+    let mut num: HashMap<(i64, i64, i64, i64), f64> = HashMap::new();
+    let mut denom: HashMap<(i64, i64, i64), f64> = HashMap::new();
+    for i in 0..svp_st.len() {
+        let (Some(st), Some(my), Some(bin), Some(rc), Some(frac)) =
+            (svp_st[i], svp_my[i], svp_ft[i], svp_rc[i], svp_frac[i])
+        else {
+            continue;
+        };
+        if !src_set.contains(&st) || !my_set.contains(&my) {
+            continue;
+        }
+        let Some(supplies) = usage.get(&bin) else {
+            continue;
+        };
+        for &(fs, u) in supplies {
+            let contrib = u * frac;
+            *num.entry((st, fs, my, rc)).or_insert(0.0) += contrib;
+            *denom.entry((st, fs, my)).or_insert(0.0) += contrib;
+        }
+    }
+
+    let mut keys: Vec<(i64, i64, i64, i64)> = num.keys().copied().collect();
+    keys.sort_unstable();
+    let (mut o_ft, mut o_my, mut o_st, mut o_rc, mut o_fr) =
+        (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
+    for (st, fs, my, rc) in keys {
+        let d = denom.get(&(st, fs, my)).copied().unwrap_or(0.0);
+        if d == 0.0 {
+            continue;
+        }
+        let frac = num[&(st, fs, my, rc)] / d;
+        if frac == 0.0 {
+            continue;
+        }
+        o_ft.push(fs);
+        o_my.push(my);
+        o_st.push(st);
+        o_rc.push(rc);
+        o_fr.push(frac);
+    }
+
+    let n = o_ft.len();
+    let df = DataFrame::new(
+        n,
+        vec![
+            Series::new("fuelTypeID".into(), o_ft).into(),
+            Series::new("modelYearID".into(), o_my).into(),
+            Series::new("sourceTypeID".into(), o_st).into(),
+            Series::new("regClassID".into(), o_rc).into(),
+            Series::new("regClassFraction".into(), o_fr).into(),
+        ],
+    )
+    .map_err(|e| format!("building RegClassSourceTypeFraction: {e}"))?;
+    store.insert("RegClassSourceTypeFraction".to_string(), df);
     Ok(())
 }
 
