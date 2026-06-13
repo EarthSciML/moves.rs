@@ -290,26 +290,109 @@ pub fn register_all(
     Ok(())
 }
 
-/// Register every wired control strategy factory with `registry`.
+/// Register the wired control-strategy factories that `run_spec` enables.
 ///
-/// Call this after constructing a [`moves_framework::ControlStrategyRegistry`] to
-/// make all ported strategy implementations available for execution. Parallels
-/// [`register_all`] for [`moves_framework::CalculatorRegistry`].
+/// Canonical MOVES gates each internal control strategy on a RunSpec predicate
+/// (`hasRateOfProgress()`, `hasOnRoadRetrofit()`, AVFT-table presence) and only
+/// subscribes the ones the run actually uses. We mirror that: a strategy is
+/// registered only when the RunSpec requests it, so an unported (or
+/// fail-loud) strategy can never perturb a run that does not use it.
 ///
-/// Additional strategies (OnRoadRetrofitStrategy, etc.) will be added here as each
-/// strategy wiring work item lands (see ).
-pub fn register_strategies(registry: &mut moves_framework::ControlStrategyRegistry) {
+/// Currently wired:
+/// - [`FuelControlStrategy`](moves_fuel_control::FuelControlStrategy) — always; a
+///   verified no-op (`pct_diff = 0` vs canonical) that exercises the strategy
+///   pipeline without changing results.
+/// - [`RateOfProgressControlStrategy`](moves_rate_of_progress::RateOfProgressControlStrategy)
+///   — only when [`has_rate_of_progress`]. Its `pre_run` reports
+///   [`NotImplemented`](moves_framework::Error::NotImplemented) (the
+///   `RateOfProgressStrategy.sql` model-year-group propagation is unported), so a
+///   run that requests ROP fails loudly rather than silently dropping the control
+///   effect and reporting wrong totals.
+///
+/// Not yet wired (need their input-loader / post-output ports first):
+/// - `AvftControlStrategy` — needs the AVFT input-table loader. Registering it
+///   with an empty table (the only constructor available here) would have its
+///   `pre_run` `insert("AVFT", <empty>)` and **clobber** a real `AVFT`
+///   execution-DB table, so it must stay out until its loader lands.
+/// - On/NonRoad retrofit — canonical applies these as a *post-output*
+///   multiplicative scaling keyed by analysis year, which the
+///   `pre_run(&mut store)` signature cannot express; needs a post-rate hook plus
+///   RunSpec analysis-year threading.
+pub fn register_strategies(
+    registry: &mut moves_framework::ControlStrategyRegistry,
+    run_spec: &moves_runspec::RunSpec,
+) {
     registry.register(|| Box::new(moves_fuel_control::FuelControlStrategy::new()));
-    // AVFT uses polars+parquet and is not available on wasm32 (mio linkage issue).
-    #[cfg(not(target_arch = "wasm32"))]
-    registry.register(|| {
-        Box::new(moves_avft::AvftControlStrategy::from_completed(
-            moves_avft::AvftTable::new(),
-        ))
-    });
-    registry.register(|| {
-        Box::new(moves_rate_of_progress::RateOfProgressControlStrategy::new(
-            moves_rate_of_progress::RopTable::new(),
-        ))
-    });
+    if has_rate_of_progress(run_spec) {
+        registry.register(|| {
+            Box::new(moves_rate_of_progress::RateOfProgressControlStrategy::new(
+                moves_rate_of_progress::RopTable::new(),
+            ))
+        });
+    }
+}
+
+/// Ports `RunSpec.hasRateOfProgress()`: `true` when the RunSpec carries an
+/// enabled `RateOfProgress` internal control strategy (`useParameters Yes`).
+#[must_use]
+pub fn has_rate_of_progress(run_spec: &moves_runspec::RunSpec) -> bool {
+    run_spec.internal_control_strategies.iter().any(|s| {
+        matches!(
+            s,
+            moves_runspec::InternalControlStrategy::RateOfProgress {
+                use_parameters: true
+            }
+        )
+    })
+}
+
+#[cfg(test)]
+mod strategy_registration_tests {
+    use moves_framework::ControlStrategyRegistry;
+    use moves_runspec::{InternalControlStrategy, RunSpec};
+
+    use super::{has_rate_of_progress, register_strategies};
+
+    fn registered_names(run_spec: &RunSpec) -> Vec<String> {
+        let mut reg = ControlStrategyRegistry::new();
+        register_strategies(&mut reg, run_spec);
+        reg.instantiate_all()
+            .iter()
+            .map(|s| s.name().to_string())
+            .collect()
+    }
+
+    #[test]
+    fn no_internal_strategies_registers_only_the_no_op_fuel_control() {
+        let run_spec = RunSpec::default();
+        assert!(!has_rate_of_progress(&run_spec));
+        assert_eq!(registered_names(&run_spec), ["FuelControlStrategy"]);
+    }
+
+    #[test]
+    fn enabled_rate_of_progress_registers_rop_alongside_fuel_control() {
+        let run_spec = RunSpec {
+            internal_control_strategies: vec![InternalControlStrategy::RateOfProgress {
+                use_parameters: true,
+            }],
+            ..RunSpec::default()
+        };
+        assert!(has_rate_of_progress(&run_spec));
+        let names = registered_names(&run_spec);
+        assert!(names.contains(&"FuelControlStrategy".to_string()));
+        assert!(names.contains(&"RateOfProgressControlStrategy".to_string()));
+    }
+
+    #[test]
+    fn disabled_rate_of_progress_does_not_register_rop() {
+        // `useParameters No` → hasRateOfProgress() is false → ROP is not subscribed.
+        let run_spec = RunSpec {
+            internal_control_strategies: vec![InternalControlStrategy::RateOfProgress {
+                use_parameters: false,
+            }],
+            ..RunSpec::default()
+        };
+        assert!(!has_rate_of_progress(&run_spec));
+        assert_eq!(registered_names(&run_spec), ["FuelControlStrategy"]);
+    }
 }
