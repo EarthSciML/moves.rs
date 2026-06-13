@@ -1855,6 +1855,22 @@ impl Generator for SourceBinDistributionGenerator {
             all_distribution.extend(out.distribution);
         }
 
+        // Dedupe the newly generated bins by `sourceBinID`. Canonical grows a
+        // single `SourceBin` table incrementally across every `doPollutantProcess`
+        // call (a bin first emitted for one polProcessID is "known" and skipped
+        // for the next), so each bin is stored exactly once. The port instead
+        // calls `pollutant_process_distribution` per polProcessID with a
+        // `known_bin_ids` set seeded only from `existing_bins`, so a process with
+        // N base polProcessIDs (e.g. PM running exhaust: EC 11201 + NonECPM 11801)
+        // re-emits the same bins N times. Those duplicates then fan out in
+        // `source_bin_fuel_usage`, which iterates the bin list in BOTH its
+        // equipped and used loops — turning an N-fold bin duplication into an N²
+        // over-count of `sourceBinActivityFraction` (gate `process-pm-exhaust`:
+        // exactly 4× from 2 base polProcessIDs). A bin's `sourceBinID` fully
+        // determines its components, so deduping by id is loss-free.
+        let mut seen_bin_ids: BTreeSet<i64> = existing_bins.iter().map(|b| b.source_bin_id).collect();
+        all_new_bins.retain(|b| seen_bin_ids.insert(b.source_bin_id));
+
         // Collect all source bins (existing + newly generated).
         let mut all_bins: Vec<SourceBinRow> = existing_bins.clone();
         all_bins.extend(all_new_bins.iter().copied());
