@@ -1276,7 +1276,7 @@ fn load_source_units<S: DataFrameStore + ?Sized>(
 ///
 /// `county_fips` is the master loop's current county (`None`/`0` ⇒
 /// national, `XX000` ⇒ state level, else a real county allocated via
-/// [`surrogate_fractions`]).
+/// `surrogate_fractions`).
 pub fn build_nonroad_inputs<S: DataFrameStore + ?Sized>(
     store: &S,
     analysis_year: i32,

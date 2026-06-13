@@ -530,7 +530,7 @@ impl MOVESEngine {
     /// Opt into the canonical `DO_RATES_FIRST` plan (drop the legacy inventory
     /// emission calculators, keeping only the `BaseRateCalculator` + chained
     /// whitelist). The default-DB run path sets this; see the
-    /// [`rates_first`](Self::rates_first) field.
+    /// `rates_first` field.
     #[must_use]
     pub fn with_rates_first(mut self, rates_first: bool) -> Self {
         self.rates_first = rates_first;

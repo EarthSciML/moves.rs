@@ -623,7 +623,7 @@ impl ExecutionRunSpec {
     /// product) from the execution DB's `DayOfAnyWeek` rows.
     ///
     /// Canonical builds the execution time span twice
-    /// ([`ExecutionRunSpec.buildExecutionTimeSpan`]): once from the RunSpec
+    /// (`ExecutionRunSpec.buildExecutionTimeSpan`): once from the RunSpec
     /// (`useRunSpec=true`, default-DB read / input filtering) and once from the
     /// execution DB (`useRunSpec=false`) for the actual masterloop. In the
     /// second build the day set is **all** `DayOfAnyWeek` rows, NOT the RunSpec
