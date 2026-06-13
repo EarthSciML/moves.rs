@@ -504,6 +504,185 @@ pub fn allocate_shp(
     out
 }
 
+/// One `SourceHours` row — canonical step-190 source operating/parked hours,
+/// per `(hourDay, month, year, age, link, sourceType)`. The evaporative,
+/// liquid-leaking, and activity calculators read this table.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SourceHoursRow {
+    /// `hourDayID`.
+    pub hour_day_id: i32,
+    /// `monthID`.
+    pub month_id: i32,
+    /// `yearID`.
+    pub year_id: i32,
+    /// `ageID`.
+    pub age_id: i32,
+    /// `linkID`.
+    pub link_id: i32,
+    /// `sourceTypeID`.
+    pub source_type_id: i32,
+    /// `sourceHours`.
+    pub source_hours: f64,
+}
+
+impl TableRow for SourceHoursRow {
+    fn table_name() -> &'static str {
+        "SourceHours"
+    }
+
+    fn polars_schema() -> Schema {
+        Schema::from_iter([
+            ("hourDayID".into(), DataType::Int32),
+            ("monthID".into(), DataType::Int32),
+            ("yearID".into(), DataType::Int32),
+            ("ageID".into(), DataType::Int32),
+            ("linkID".into(), DataType::Int32),
+            ("sourceTypeID".into(), DataType::Int32),
+            ("sourceHours".into(), DataType::Float64),
+            ("sourceHoursCV".into(), DataType::Float64),
+            ("isUserInput".into(), DataType::String),
+        ])
+    }
+
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![
+                Series::new(
+                    "hourDayID".into(),
+                    rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "yearID".into(),
+                    rows.iter().map(|r| r.year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "ageID".into(),
+                    rows.iter().map(|r| r.age_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "linkID".into(),
+                    rows.iter().map(|r| r.link_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceTypeID".into(),
+                    rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "sourceHours".into(),
+                    rows.iter().map(|r| r.source_hours).collect::<Vec<f64>>(),
+                )
+                .into(),
+                Series::new("sourceHoursCV".into(), vec![0.0_f64; n]).into(),
+                Series::new("isUserInput".into(), vec!["N"; n]).into(),
+            ],
+        )
+    }
+
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "SourceHours";
+        let get_i32 = |col: &'static str| {
+            df.column(col)
+                .map_err(|e| row_err_alloc(t, 0, col, e.to_string()))?
+                .i32()
+                .map_err(|e| row_err_alloc(t, 0, col, e.to_string()))
+        };
+        let get_f64 = |col: &'static str| {
+            df.column(col)
+                .map_err(|e| row_err_alloc(t, 0, col, e.to_string()))?
+                .f64()
+                .map_err(|e| row_err_alloc(t, 0, col, e.to_string()))
+        };
+        let hour_day_id = get_i32("hourDayID")?;
+        let month_id = get_i32("monthID")?;
+        let year_id = get_i32("yearID")?;
+        let age_id = get_i32("ageID")?;
+        let link_id = get_i32("linkID")?;
+        let source_type_id = get_i32("sourceTypeID")?;
+        let source_hours = get_f64("sourceHours")?;
+        (0..df.height())
+            .map(|i| {
+                let null = |col| row_err_alloc(t, i, col, "null value".into());
+                Ok(Self {
+                    hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))?,
+                    month_id: month_id.get(i).ok_or_else(|| null("monthID"))?,
+                    year_id: year_id.get(i).ok_or_else(|| null("yearID"))?,
+                    age_id: age_id.get(i).ok_or_else(|| null("ageID"))?,
+                    link_id: link_id.get(i).ok_or_else(|| null("linkID"))?,
+                    source_type_id: source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))?,
+                    source_hours: source_hours.get(i).ok_or_else(|| null("sourceHours"))?,
+                })
+            })
+            .collect()
+    }
+}
+
+/// Canonical `TotalActivityGenerator` step 190 — assemble `SourceHours` from the
+/// allocated `SHP` / `SHO`:
+///
+/// * the zone's off-network link (`roadTypeID == 1`, where soak/parked activity
+///   lives): `SourceHours = SHP`;
+/// * on-network links: `SourceHours = SHO`.
+///
+/// The off-network parked hours (SHP) carry the soak activity the evaporative /
+/// liquid-leaking calculators weight by; on-network hours carry running
+/// activity. Off-network `SHO` rows (if any) are skipped — that link uses SHP.
+#[must_use]
+pub fn source_hours_from_shp_sho(
+    shp: &[ShpRow],
+    sho: &[ShoRow],
+    link: &[LinkRow],
+    zone_id: i32,
+) -> Vec<SourceHoursRow> {
+    let mut out = Vec::with_capacity(shp.len() + sho.len());
+    // SHP → the zone's off-network link (canonical roadTypeID == 1 branch).
+    if let Some(off_link) = link
+        .iter()
+        .find(|l| l.zone_id == zone_id && l.road_type_id == OFF_NETWORK_ROAD_TYPE)
+    {
+        for r in shp {
+            out.push(SourceHoursRow {
+                hour_day_id: r.hour_day_id,
+                month_id: r.month_id,
+                year_id: r.year_id,
+                age_id: r.age_id,
+                link_id: off_link.link_id,
+                source_type_id: r.source_type_id,
+                source_hours: r.shp,
+            });
+        }
+    }
+    // SHO → on-network links (skip off-network SHO; that link uses SHP).
+    let road_type_of: BTreeMap<i32, i32> =
+        link.iter().map(|l| (l.link_id, l.road_type_id)).collect();
+    for r in sho {
+        if road_type_of.get(&r.link_id) == Some(&OFF_NETWORK_ROAD_TYPE) {
+            continue;
+        }
+        out.push(SourceHoursRow {
+            hour_day_id: r.hour_day_id,
+            month_id: r.month_id,
+            year_id: r.year_id,
+            age_id: r.age_id,
+            link_id: r.link_id,
+            source_type_id: r.source_type_id,
+            source_hours: r.sho,
+        });
+    }
+    out
+}
+
 /// Step 200 — distance travelled, `distance = SHO * averageSpeed`.
 ///
 /// Ports the inventory-domain `calculateDistance`: each allocated `SHO` row

@@ -2975,6 +2975,7 @@ static OUTPUT_TABLES: &[&str] = &[
     "IdleHoursByAgeHour",
     "StartsByAgeHour",
     "SHPByAgeHour",
+    "SourceHours",
     "Starts",
 ];
 
@@ -3266,7 +3267,7 @@ impl Generator for TotalActivityGenerator {
             &inputs.run_spec_hour_day,
             analysis_year,
         );
-        let sho_df = <allocation::ShoRow as TableRow>::into_dataframe(sho_alloc)
+        let sho_df = <allocation::ShoRow as TableRow>::into_dataframe(sho_alloc.clone())
             .map_err(|e| Error::Polars(e.to_string()))?;
         ctx.scratch_mut().store.insert("SHO", sho_df);
 
@@ -3297,7 +3298,61 @@ impl Generator for TotalActivityGenerator {
         write_scratch!(output.vmt_by_age_roadway_day, "VMTByAgeRoadwayDay");
         write_scratch!(output.idle_hours_by_age_hour, "IdleHoursByAgeHour");
         write_scratch!(output.starts_by_age_hour, "StartsByAgeHour");
-        write_scratch!(output.shp_by_age_hour, "SHPByAgeHour");
+        write_scratch!(output.shp_by_age_hour.clone(), "SHPByAgeHour");
+
+        // SourceHours (canonical TotalActivityGenerator.java step 190): allocate
+        // SHP to the zone, then derive SourceHours — the zone's off-network link
+        // (roadType 1, where soak/parked activity lives) gets SourceHours = SHP;
+        // on-network links get SourceHours = SHO. The evaporative / liquid-leaking
+        // calculators read SourceHours; without it the default-DB path leaves it
+        // empty and the evap pipeline emits nothing. (Previously only the
+        // mesoscale TotalActivity generator produced SourceHours, so county-scale
+        // inventory runs had none.)
+        // `inputs::ZoneRow` (zoneID + SHPAllocFactor) is not a `TableRow`, so read
+        // the two columns from the Zone table directly.
+        let zone: Vec<inputs::ZoneRow> = ctx
+            .tables()
+            .get("Zone")
+            .map(|df| {
+                let find = |name: &str| {
+                    df.columns()
+                        .iter()
+                        .find(|c| c.name().eq_ignore_ascii_case(name))
+                };
+                let zid = find("zoneID").and_then(|c| c.cast(&DataType::Int32).ok());
+                let shp = find("SHPAllocFactor").and_then(|c| c.cast(&DataType::Float64).ok());
+                match (zid, shp) {
+                    (Some(zid), Some(shp)) => match (zid.i32(), shp.f64()) {
+                        (Ok(zid), Ok(shp)) => (0..df.height())
+                            .filter_map(|i| {
+                                Some(inputs::ZoneRow {
+                                    zone_id: zid.get(i)?,
+                                    shp_alloc_factor: shp.get(i).unwrap_or(0.0),
+                                })
+                            })
+                            .collect(),
+                        _ => Vec::new(),
+                    },
+                    _ => Vec::new(),
+                }
+            })
+            .unwrap_or_default();
+        let shp_alloc = allocation::allocate_shp(
+            &output.shp_by_age_hour,
+            &inputs.hour_day,
+            &inputs.run_spec_hour_day,
+            &zone,
+            zone_id,
+            analysis_year,
+        );
+        let source_hours =
+            allocation::source_hours_from_shp_sho(&shp_alloc, &sho_alloc, &inputs.link, zone_id);
+        let source_hours_df =
+            <allocation::SourceHoursRow as TableRow>::into_dataframe(source_hours)
+                .map_err(|e| Error::Polars(e.to_string()))?;
+        ctx.scratch_mut()
+            .store
+            .insert("SourceHours", source_hours_df);
 
         // AdjustStarts (database/AdjustStarts.sql) — the inventory `Starts`
         // activity table the start calculators read. The `StartsByAgeHour`
