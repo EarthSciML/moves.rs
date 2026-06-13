@@ -1294,11 +1294,25 @@ pub fn build_runspec_tables(runspec: &RunSpec, store: &mut InMemoryStore) -> Res
         source_type_ids.clone(),
     );
 
-    // RunSpecPollutantProcess.
+    // RunSpecPollutantProcess. Includes the silently-required chain
+    // prerequisites (canonical `ExecutionRunSpec.flagRequiredPollutantProcesses`)
+    // — e.g. refueling (processes 18/19) chains off Total Energy Consumption
+    // (pollutant 91) for Running/Start/Extended-Idle Exhaust (processes 1/2/90).
+    // `scope_pollutant_process_model_year_to_runspec` prunes
+    // `PollutantProcessModelYear` to this table's polProcessIDs; without the
+    // prerequisites the energy model-year-group rows are dropped, so the
+    // SourceBinDistribution generator's `aggregate_svp` inner-join to PPMY yields
+    // no energy distribution, `BaseRate` emits no energy, and the chained
+    // refueling calculator sees no input (gate `process-refueling`: 0 rows). The
+    // refueling/CO2AE calculators that also read this table intersect it with
+    // their own (pollutant, process) pairs, so the extra energy rows are inert
+    // there. For every non-chained runspec this is a no-op (the execution set
+    // equals the raw set).
     let pol_process_ids: Vec<i32> = {
+        let exec = moves_framework::execution::ExecutionRunSpec::new(runspec.clone());
         let mut ids: BTreeSet<i32> = BTreeSet::new();
-        for assoc in &runspec.pollutant_process_associations {
-            ids.insert((assoc.pollutant_id * 100 + assoc.process_id) as i32);
+        for assoc in &exec.pollutant_process_associations {
+            ids.insert(i32::from(assoc.pollutant_id.0) * 100 + i32::from(assoc.process_id.0));
         }
         ids.into_iter().collect()
     };
