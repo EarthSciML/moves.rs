@@ -252,6 +252,16 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
         None
     };
     let mut engine = MOVESEngine::new(run_spec.clone(), registry, config);
+    // Attach the internal control strategies this RunSpec enables. Canonical
+    // MOVES subscribes each strategy only when its RunSpec predicate is set;
+    // `register_strategies` mirrors that gating, so a strategy the run does not
+    // use never runs (and an unported-but-requested strategy fails loudly in
+    // `pre_run` instead of silently dropping its control effect).
+    if has_slow_store {
+        let mut strategies = moves_framework::ControlStrategyRegistry::new();
+        moves_calculators::register_strategies(&mut strategies, &run_spec);
+        engine = engine.with_strategy_registry(strategies);
+    }
     if let Some(snapshot_dir) = &opts.snapshot {
         let filter = snap_filter
             .as_ref()
