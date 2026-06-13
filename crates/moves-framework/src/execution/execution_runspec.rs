@@ -619,6 +619,35 @@ impl ExecutionRunSpec {
     /// custom-domain (`genericCounty`) path is not wired — the RunSpec
     /// model does not carry that field yet (a follow-up) — so the
     /// producer is always built with no custom-domain county.
+    /// Override the execution day set (and rebuild the dependent `hour_days`
+    /// product) from the execution DB's `DayOfAnyWeek` rows.
+    ///
+    /// Canonical builds the execution time span twice
+    /// (`ExecutionRunSpec.buildExecutionTimeSpan`): once from the RunSpec
+    /// (`useRunSpec=true`, default-DB read / input filtering) and once from the
+    /// execution DB (`useRunSpec=false`) for the actual masterloop. In the
+    /// second build the day set is **all** `DayOfAnyWeek` rows, NOT the RunSpec
+    /// `<day>` selection — so a run that selected only weekdays (dayID 5) still
+    /// executes both weekend (2) and weekday (5) day types (hours stay filtered
+    /// by begin/end). `populate_timespan` seeds `days` from the RunSpec; the
+    /// default-DB path calls this after load to apply the execution semantics.
+    /// No-op on an empty `day_ids` (don't wipe a real day set on a missing
+    /// table).
+    pub fn set_execution_days(&mut self, day_ids: impl IntoIterator<Item = u32>) {
+        let days: BTreeSet<u32> = day_ids.into_iter().collect();
+        if days.is_empty() {
+            return;
+        }
+        self.days = days;
+        // hour_days = hours × days product (mirrors populate_timespan).
+        self.hour_days.clear();
+        for &h in &self.hours {
+            for &d in &self.days {
+                self.hour_days.insert(Self::hour_day_id(h, d));
+            }
+        }
+    }
+
     pub fn build_execution_locations(&mut self, geography: &GeographyTables) {
         let producer = ExecutionLocationProducer::new(
             self.run_spec.geographic_selections.clone(),

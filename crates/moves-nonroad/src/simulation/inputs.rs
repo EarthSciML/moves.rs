@@ -270,14 +270,21 @@ pub struct GrowthXrefEntry {
 
 /// Activity lookup entry for [`ProductionExecutor`](super::executor::ProductionExecutor) (Fortran `fndact`).
 ///
-/// Key: `(scc, fips)`. The HP is not matched in the linear scan/// the Fortran `fndact` searches by SCC and FIPS only, then returns
-/// the first matching activity record.
+/// Key: `(scc, fips, hp range)`. Canonical `fndact` only considers
+/// records whose HP category contains the equipment's average HP
+/// (`hpin .GE. hpcact(1,i) .AND. hpin .LE. hpcact(2,i)`) — activity
+/// hours genuinely vary by HP bin within an SCC (marine gasoline
+/// 2282010005: 47.6 hr/yr below the 750-hp bin, 30 hr/yr in it).
 #[derive(Debug, Clone)]
 pub struct ActivityTableEntry {
     /// 10-character SCC code.
     pub scc: String,
     /// 5-character county FIPS, or empty to match any FIPS.
     pub fips: String,
+    /// Lower HP bound (`hpcact(1,i)`), inclusive.
+    pub hp_min: f32,
+    /// Upper HP bound (`hpcact(2,i)`), inclusive.
+    pub hp_max: f32,
     /// Starts per period (`starts(idxact)`).
     pub starts: f32,
     /// Activity level (`actlev(idxact)`).
@@ -420,6 +427,14 @@ pub struct ReferenceData {
     /// `emission_adjustments` returns an error rather than fabricating 75 °F.
     /// Used as the fallback when an SCC has no entry in `ambient_temp_by_scc`.
     pub ambient_temp_f: Option<f32>,
+    /// Per-SCC state→county allocation fraction already multiplied into
+    /// each record's population by the loader. Canonical `prcsta.f` runs
+    /// `agedist` on the **state** population and allocates to counties
+    /// afterwards (`alocty`); `agedist`'s `MINGRWIND` clamp is
+    /// magnitude-sensitive, so the adapter divides this fraction back out
+    /// for the `age_distribution` call (then rescales the returned
+    /// population). Empty for state/national scopes (fraction 1.0).
+    pub alloc_fractions: std::collections::BTreeMap<String, f32>,
     /// Per-SCC ambient temperature (°F) for the exhaust temperature
     /// corrections, activity-weighted by the equipment's hour-allocation
     /// pattern (`nrhourpatternfinder` → `nrhourallocation`). The temperature
@@ -428,6 +443,23 @@ pub struct ReferenceData {
     /// canonical reproduces — a flat 24-hour mean biases NOx high and CO/THC
     /// low. Empty ⇒ fall back to the scalar `ambient_temp_f`.
     pub ambient_temp_by_scc: std::collections::BTreeMap<String, f32>,
+    /// In-use fuel sulfur weight % per fuel slot `[gas-2str, gas-4str,
+    /// diesel, LPG, CNG]` — the `.opt` OPTIONS `Gas/Diesel/CNG-LPG sulfur %`
+    /// values (`soxful` in `emsadj.f`; the SOx correction is
+    /// `soxful/soxbas`). `None` ⇒ neutral correction (`soxful = soxbas`),
+    /// preserving the pre-sulfur-wiring behaviour for callers that do not
+    /// load fuel-supply data.
+    pub fuel_sulfur_pct: Option<[f32; 5]>,
+    /// In-use marine-diesel sulfur weight % (`soxdsm`, the rec-marine SCC
+    /// override in `emsadj.f` :267). Only meaningful when
+    /// `fuel_sulfur_pct` is `Some`.
+    pub fuel_sulfur_marine: f32,
+    /// Per-tech sulfur alternates keyed by tech name (engTechID string) —
+    /// the `.opt` `/PM BASE SULFUR/` packet (`nrsulfuradjustment`, diesel
+    /// fuel types 23/24; `sultec`/`sulalt`/`sulcnv` in `clcems.f`). Used by
+    /// the SOx EF rewrite and the diesel PM sulfur correction.
+    pub sulfur_alternates:
+        std::collections::BTreeMap<String, crate::emissions::exhaust::SulfurAlternate>,
 }
 
 #[cfg(test)]

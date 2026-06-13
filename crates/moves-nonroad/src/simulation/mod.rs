@@ -205,6 +205,12 @@ where
                 outputs.counters.dispatch_calls += 1;
                 if execution.skipped {
                     outputs.counters.geography_skips += 1;
+                    if std::env::var("MOVES_NR_DEBUG_SKIP").is_ok() {
+                        eprintln!(
+                            "[nr-skip] scc={} dispatch={:?} region={} pop={}",
+                            group.scc, dispatch, record.region_code, record.population
+                        );
+                    }
                 }
                 outputs.absorb(execution);
             }

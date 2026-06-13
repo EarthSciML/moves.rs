@@ -34,8 +34,7 @@ use moves_framework::{
 };
 use moves_runspec::{GeoKind, RunSpec};
 use polars::prelude::{
-    col, concat, lit, Expr, IntoLazy, LazyFrame, NamedFrom, PlRefPath, ScanArgsParquet, SerReader,
-    Series, UnionArgs,
+    col, lit, Expr, LazyFrame, NamedFrom, PlRefPath, ScanArgsParquet, SerReader, Series,
 };
 
 use crate::load_run_spec;
@@ -94,18 +93,15 @@ impl SnapshotFilter {
                 .collect::<BTreeSet<_>>()
                 .into_iter()
                 .collect(),
-            // RunSpec `<month key="N"/>` is a 0-based index into the canonical
-            // MOVES MonthOfAnyYear table (January=0 … December=11). Java parses
-            // it via `TimeSpan.getMonthByIndex(key)`, which returns the Month
-            // object at position `key` in a list ordered by monthID, so
-            // `monthID = key + 1` (e.g. key=7 → monthID=8, August).
-            // The Rust RunSpec model stores the raw key; add 1 here to match
-            // the MOVES monthID stored in execution-DB tables.
+            // `timespan.months` already holds the real MOVES `monthID` (the
+            // `<month key="N"/>` 0-based index → ID conversion happens once, in
+            // the XML parser; see `XmlIndexedId`). Use it verbatim — adding 1
+            // here would double-shift (e.g. August → September).
             month_ids: run_spec
                 .timespan
                 .months
                 .iter()
-                .map(|&m| i64::from(m) + 1)
+                .map(|&m| i64::from(m))
                 .collect::<BTreeSet<_>>()
                 .into_iter()
                 .collect(),
@@ -236,6 +232,21 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
                 .iter()
                 .map(|t| (*t).to_owned()),
         );
+        // The BaseRateGenerator's SB-weighting reads the fuel-usage-remapped
+        // source-bin distribution under a dynamic per-(process,county,year) name
+        // (`sourceBinDistributionFuelUsage_1_26161_2020`). It declares no static
+        // INPUT_TABLES entry, so admit its base name explicitly; the loader
+        // strips the numeric suffix to match (see `strip_numeric_index_suffix`).
+        // Without this the SB-weighting falls back to the raw SourceBinDistribution
+        // and over-weights flex-fuel (E85) energy ~50×.
+        tables.insert("sourcebindistributionfuelusage".to_owned());
+        // The same SB-weighting applies the canonical EV-sales ICE back-scaling
+        // (step 010) from these three tables; they are not declared static
+        // calculator inputs either, so admit them or recent-model-year ICE
+        // energy rates come out ~2-3% low.
+        tables.insert("evsalesfraction".to_owned());
+        tables.insert("fleetavgadjustment".to_owned());
+        tables.insert("regulatoryclass".to_owned());
         Some(tables)
     } else {
         None
@@ -255,7 +266,17 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
         }
         let geography = load_geography_from_store(&store)
             .with_context(|| format!("building geography from {}", snapshot_dir.display()))?;
-        engine = engine.with_slow_store(store);
+        // Canonical MOVES runs `DO_RATES_FIRST` (the released default): only the
+        // BaseRate + chained-calculator whitelist produces emissions, and the
+        // legacy inventory calculators (CriteriaStart/CriteriaRunning/BasicPm/…)
+        // are cleared. A captured snapshot is, by construction, the execution DB
+        // of such a rates-first canonical run (every snapshot carries a
+        // `baseRateOutput`), so the snapshot replay must mirror the same plan.
+        // Without this, the port runs BOTH pipelines and double-counts — e.g.
+        // start exhaust (process 2) is emitted by the legacy CriteriaStart
+        // calculator on off-network road type 1 even when the RunSpec selects
+        // only an on-road type, where canonical's rates-first plan emits nothing.
+        engine = engine.with_rates_first(true).with_slow_store(store);
         engine
             .execution_run_spec_mut()
             .build_execution_locations(&geography);
@@ -304,10 +325,23 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
                 default_db_path.display()
             )
         })?;
-        engine = engine.with_slow_store(store);
+        // Execution day types: canonical iterates every DayOfAnyWeek day (not the
+        // runspec `<day>` selection). The load filter above loaded the day-keyed
+        // tables for all day types; read them back here (store is moved into the
+        // engine below) so the execution day set can be expanded to match.
+        let execution_day_ids: Vec<u32> = day_ids_from_store(&store);
+        // The default DB carries both the rates and inventory execution tables,
+        // so follow canonical MOVESInstantiator DO_RATES_FIRST (the released
+        // default) and run only the BaseRate + chained pipeline — otherwise the
+        // legacy inventory calculators double-count and fan a single run-month
+        // out across all 12 months.
+        engine = engine.with_rates_first(true).with_slow_store(store);
         engine
             .execution_run_spec_mut()
             .build_execution_locations(&geography);
+        engine
+            .execution_run_spec_mut()
+            .set_execution_days(execution_day_ids);
     }
     let outcome = engine.run().context("MOVES engine run failed")?;
     Ok(outcome)
@@ -452,39 +486,10 @@ fn strip_numeric_index_suffix(name: &str) -> &str {
 /// Calculators read only the canonical name, so this step unions all variants into
 /// that name, replacing the empty stub with the full merged table.
 fn merge_process_year_variants(store: &mut InMemoryStore) -> Result<()> {
-    let all_names: Vec<String> = store.names().into_iter().map(|s| s.to_string()).collect();
-    let mut by_base: std::collections::BTreeMap<String, Vec<String>> =
-        std::collections::BTreeMap::new();
-    for name in &all_names {
-        let base = strip_numeric_index_suffix(name);
-        if base != *name {
-            by_base
-                .entry(base.to_string())
-                .or_default()
-                .push(name.clone());
-        }
-    }
-    for (base, variant_names) in by_base {
-        let frames: Vec<LazyFrame> = variant_names
-            .iter()
-            .filter_map(|vname| store.get(vname))
-            .filter(|df| df.height() > 0)
-            .map(|df| df.as_ref().clone().lazy())
-            .collect();
-        if frames.is_empty() {
-            continue;
-        }
-        let merged = if frames.len() == 1 {
-            frames.into_iter().next().unwrap().collect()
-        } else {
-            concat(frames, UnionArgs::default())
-                .map_err(|e| anyhow::anyhow!("concat {base} variants: {e}"))?
-                .collect()
-        }
-        .map_err(|e| anyhow::anyhow!("collecting merged {base}: {e}"))?;
-        store.insert(base, merged);
-    }
-    Ok(())
+    // Delegates to the single shared implementation in
+    // `moves_calculators::default_db_setup` (see that module — both the native
+    // CLI and the wasm path call it, so the synthesis can no longer drift).
+    moves_calculators::default_db_setup::merge_store_variants_eager(store).map_err(|e| anyhow::anyhow!(e))
 }
 
 /// Fall-back loader: scan `<snapshot>/tables/` for individual `db__movesexecution*.parquet`
@@ -725,48 +730,10 @@ fn populate_sho_distances(store: &mut InMemoryStore) -> Result<()> {
 /// leave emission results unchanged — they only let calculators that read the
 /// mapping table run instead of erroring on a missing table.
 fn populate_source_use_type_physics_mapping(store: &mut InMemoryStore) -> Result<()> {
-    use polars::prelude::{NamedFrom, Series};
-
-    // Nothing to do if the mapping is already present, or there is no source
-    // physics table to derive it from.
-    if store.contains("sourceUseTypePhysicsMapping") || !store.contains("sourceUseTypePhysics") {
-        return Ok(());
-    }
-
-    let physics = store
-        .get("sourceUseTypePhysics")
-        .context("sourceUseTypePhysics not in store after contains check")?;
-    let mut mapping: polars::prelude::DataFrame = (*physics).clone();
-    drop(physics); // release the Arc clone before mutating the store below
-
-    // Resolve the source-type column case-insensitively (snapshot column
-    // casings vary), then rename it to the mapping's `realSourceTypeID`.
-    let src_col = mapping
-        .get_column_names()
-        .iter()
-        .find(|n| n.as_str().eq_ignore_ascii_case("sourceTypeID"))
-        .map(|n| n.to_string())
-        .context("sourceUseTypePhysics has no sourceTypeID column")?;
-    mapping
-        .rename(&src_col, "realSourceTypeID".into())
-        .map_err(|e| anyhow::anyhow!("renaming sourceTypeID -> realSourceTypeID: {e}"))?;
-
-    // tempSourceTypeID is a copy of realSourceTypeID for the identity mapping.
-    let mut temp = mapping
-        .column("realSourceTypeID")
-        .map_err(|e| anyhow::anyhow!("{e}"))?
-        .clone();
-    temp.rename("tempSourceTypeID".into());
-    let n = mapping.height();
-    mapping
-        .with_column(temp)
-        .map_err(|e| anyhow::anyhow!("adding tempSourceTypeID: {e}"))?;
-    mapping
-        .with_column(Series::new("opModeIDOffset".into(), vec![0i64; n]).into())
-        .map_err(|e| anyhow::anyhow!("adding opModeIDOffset: {e}"))?;
-
-    store.insert("sourceUseTypePhysicsMapping".to_string(), mapping);
-    Ok(())
+    // Delegates to the single shared implementation in
+    // `moves_calculators::default_db_setup` (see that module — both the native
+    // CLI and the wasm path call it, so the synthesis can no longer drift).
+    moves_calculators::default_db_setup::populate_source_use_type_physics_mapping(store).map_err(|e| anyhow::anyhow!(e))
 }
 
 /// Fill the NULL `ZoneMonthHour` meteorology columns (`heatIndex`,
@@ -787,133 +754,10 @@ fn populate_source_use_type_physics_mapping(store: &mut InMemoryStore) -> Result
 /// non-NULL value (snapshot captured the computed table), or when `Zone` /
 /// `County` are unavailable.
 fn populate_zone_month_hour_meteorology(store: &mut InMemoryStore) -> Result<()> {
-    use moves_calculators::generators::meteorology::{build_meteorology_table, MeteorologyInputs};
-    use polars::prelude::{DataType, NamedFrom, Series};
-
-    if !store.contains("ZoneMonthHour") {
-        return Ok(());
-    }
-
-    // Early exit: if heatIndex already carries any non-null value, the snapshot
-    // captured the computed columns — leave the table untouched.
-    {
-        let zmh = store
-            .get("ZoneMonthHour")
-            .context("ZoneMonthHour not in store after contains check")?;
-        let already_filled = zmh
-            .columns()
-            .iter()
-            .find(|c| c.name().eq_ignore_ascii_case("heatIndex"))
-            .and_then(|c| c.cast(&DataType::Float64).ok())
-            .and_then(|c| c.f64().ok().cloned())
-            .is_some_and(|ca| ca.into_iter().any(|v| v.is_some()));
-        if already_filled {
-            return Ok(());
-        }
-    }
-
-    // Zone and County are needed to resolve each county's barometric pressure.
-    if !store.contains("Zone") || !store.contains("County") {
-        return Ok(());
-    }
-
-    let inputs = MeteorologyInputs {
-        zone_month_hour: store
-            .iter_typed("ZoneMonthHour")
-            .context("reading ZoneMonthHour for meteorology")?,
-        zone: store.iter_typed("Zone").context("reading Zone")?,
-        county: store.iter_typed("County").context("reading County")?,
-    };
-    let computed = build_meteorology_table(&inputs);
-
-    // Index the computed meteorology by (zoneID, monthID, hourID).
-    let mut by_key: std::collections::HashMap<(i32, i32, i32), (f64, f64, f64)> =
-        std::collections::HashMap::with_capacity(computed.len());
-    for r in &computed {
-        by_key.insert(
-            (r.zone_id, r.month_id, r.hour_id),
-            (r.heat_index, r.specific_humidity, r.mol_water_fraction),
-        );
-    }
-
-    // Read the existing key columns + temperature (the unmatched-row fallback)
-    // in DataFrame row order, then release the Arc before mutating the store.
-    let (heat, spec, mol) = {
-        let zmh = store.get("ZoneMonthHour").expect("ZoneMonthHour present");
-        let df = &*zmh;
-        let find = |want: &str| -> Result<polars::prelude::Column> {
-            let lower = want.to_ascii_lowercase();
-            df.columns()
-                .iter()
-                .find(|c| c.name().to_ascii_lowercase() == lower)
-                .cloned()
-                .with_context(|| format!("ZoneMonthHour column '{want}' not found"))
-        };
-        // Key columns must not be NULL: a NULL zoneID/monthID/hourID could
-        // never match a generator-computed (zone,month,hour) key, so coercing
-        // it to 0 would silently route the row into the unmatched-fallback
-        // branch and fabricate meteorology. Canonical MOVES keys ZoneMonthHour
-        // on non-null (monthID, zoneID, hourID); surface the corrupt input
-        // instead of hiding it. (populate_sho_distances treats its key columns
-        // the same way, via into_no_null_iter.)
-        let to_i32 = |c: polars::prelude::Column, name: &str| -> Result<Vec<i32>> {
-            c.cast(&DataType::Int32)
-                .map_err(|e| anyhow::anyhow!("{e}"))?
-                .i32()
-                .map_err(|e| anyhow::anyhow!("{e}"))?
-                .into_iter()
-                .map(|v| {
-                    v.ok_or_else(|| {
-                        anyhow::anyhow!("ZoneMonthHour.{name} contains a NULL key value")
-                    })
-                })
-                .collect()
-        };
-        let zone = to_i32(find("zoneID")?, "zoneID")?;
-        let month = to_i32(find("monthID")?, "monthID")?;
-        let hour = to_i32(find("hourID")?, "hourID")?;
-        let temps: Vec<f64> = find("temperature")?
-            .cast(&DataType::Float64)
-            .map_err(|e| anyhow::anyhow!("{e}"))?
-            .f64()
-            .map_err(|e| anyhow::anyhow!("{e}"))?
-            .into_iter()
-            .map(|v| v.unwrap_or(0.0))
-            .collect();
-        let n = df.height();
-        let mut heat = Vec::with_capacity(n);
-        let mut spec = Vec::with_capacity(n);
-        let mut mol = Vec::with_capacity(n);
-        for i in 0..n {
-            match by_key.get(&(zone[i], month[i], hour[i])) {
-                Some(&(hi, sh, mwf)) => {
-                    heat.push(hi);
-                    spec.push(sh);
-                    mol.push(mwf);
-                }
-                None => {
-                    heat.push(temps[i]);
-                    spec.push(0.0);
-                    mol.push(0.0);
-                }
-            }
-        }
-        (heat, spec, mol)
-    };
-
-    let zmh_mut = store
-        .get_mut("ZoneMonthHour")
-        .expect("ZoneMonthHour present");
-    zmh_mut
-        .with_column(Series::new("heatIndex".into(), heat).into())
-        .map_err(|e| anyhow::anyhow!("replacing ZoneMonthHour.heatIndex: {e}"))?;
-    zmh_mut
-        .with_column(Series::new("specificHumidity".into(), spec).into())
-        .map_err(|e| anyhow::anyhow!("replacing ZoneMonthHour.specificHumidity: {e}"))?;
-    zmh_mut
-        .with_column(Series::new("molWaterFraction".into(), mol).into())
-        .map_err(|e| anyhow::anyhow!("replacing ZoneMonthHour.molWaterFraction: {e}"))?;
-    Ok(())
+    // Delegates to the single shared implementation in
+    // `moves_calculators::default_db_setup` (see that module — both the native
+    // CLI and the wasm path call it, so the synthesis can no longer drift).
+    moves_calculators::default_db_setup::populate_zone_month_hour_meteorology(store).map_err(|e| anyhow::anyhow!(e))
 }
 
 /// Cast a DataFrame column to Int32, returning the Column for row-wise access.
@@ -1025,81 +869,10 @@ fn load_geography_from_store(store: &InMemoryStore) -> Result<GeographyTables> {
 /// when a non-empty `Link` table is already present (user-supplied CDB/PDB
 /// data takes precedence).
 fn populate_link_from_zone_road_type(store: &mut InMemoryStore) -> Result<()> {
-    use polars::prelude::{DataFrame, DataType, NamedFrom, Series};
-
-    if !store.contains("ZoneRoadType") {
-        return Ok(());
-    }
-    // Respect user-supplied Link table (e.g. from a CDB/PDB overlay).
-    if store.get("link").is_some_and(|df| df.height() > 0) {
-        return Ok(());
-    }
-
-    let (zone_ids, road_type_ids) = {
-        let arc = store
-            .get("ZoneRoadType")
-            .expect("ZoneRoadType present after contains check");
-        let df = &*arc;
-        let find = |want: &str| -> Result<polars::prelude::Column> {
-            let lower = want.to_ascii_lowercase();
-            df.columns()
-                .iter()
-                .find(|c| c.name().to_ascii_lowercase() == lower)
-                .cloned()
-                .with_context(|| format!("ZoneRoadType column '{want}' not found"))
-        };
-        let zone_col = find("zoneID")?
-            .cast(&DataType::Int32)
-            .map_err(|e| anyhow::anyhow!("ZoneRoadType.zoneID cast: {e}"))?;
-        let road_col = find("roadTypeID")?
-            .cast(&DataType::Int32)
-            .map_err(|e| anyhow::anyhow!("ZoneRoadType.roadTypeID cast: {e}"))?;
-        let zids: Vec<i32> = zone_col
-            .i32()
-            .map_err(|e| anyhow::anyhow!("{e}"))?
-            .into_iter()
-            .map(|v| v.unwrap_or(0))
-            .collect();
-        let rids: Vec<i32> = road_col
-            .i32()
-            .map_err(|e| anyhow::anyhow!("{e}"))?
-            .into_iter()
-            .map(|v| v.unwrap_or(0))
-            .collect();
-        (zids, rids)
-    };
-
-    // Deduplicate (zoneID, roadTypeID) pairs; synthesise linkID and countyID.
-    let mut seen: BTreeSet<(i32, i32)> = BTreeSet::new();
-    let mut link_ids: Vec<i32> = Vec::new();
-    let mut county_ids: Vec<i32> = Vec::new();
-    let mut out_zone_ids: Vec<i32> = Vec::new();
-    let mut out_road_type_ids: Vec<i32> = Vec::new();
-    for (&zone_id, &road_type_id) in zone_ids.iter().zip(road_type_ids.iter()) {
-        if seen.insert((zone_id, road_type_id)) {
-            link_ids.push(zone_id * 10 + road_type_id);
-            county_ids.push(zone_id / 10);
-            out_zone_ids.push(zone_id);
-            out_road_type_ids.push(road_type_id);
-        }
-    }
-    if link_ids.is_empty() {
-        return Ok(());
-    }
-
-    let n = link_ids.len();
-    let link_df = DataFrame::new(
-        n,
-        vec![
-            Series::new("linkID".into(), link_ids).into(),
-            Series::new("countyID".into(), county_ids).into(),
-            Series::new("zoneID".into(), out_zone_ids).into(),
-            Series::new("roadTypeID".into(), out_road_type_ids).into(),
-        ],
-    )
-    .map_err(|e| anyhow::anyhow!("building Link DataFrame: {e}"))?;
-    store.insert("Link".to_string(), link_df);
-    Ok(())
+    // Delegates to the single shared implementation in
+    // `moves_calculators::default_db_setup` (see that module — both the native
+    // CLI and the wasm path call it, so the synthesis can no longer drift).
+    moves_calculators::default_db_setup::populate_link_from_zone_road_type(store).map_err(|e| anyhow::anyhow!(e))
 }
 
 /// Build the `RunSpec*` tables that generators read from the execution-DB
@@ -1130,173 +903,10 @@ fn populate_link_from_zone_road_type(store: &mut InMemoryStore) -> Result<()> {
 /// month ID is used as the month group ID directly (safe fallback — in the
 /// default MOVES configuration each month belongs to its own group).
 fn build_runspec_tables(runspec: &RunSpec, store: &mut InMemoryStore) -> Result<()> {
-    use polars::prelude::{DataFrame, DataType, NamedFrom, Series};
-
-    // Helper: insert a single-column Int32 table.
-    let insert_i32 = |store: &mut InMemoryStore, name: &str, col: &str, vals: Vec<i32>| {
-        let n = vals.len();
-        let df = DataFrame::new(n, vec![Series::new(col.into(), vals).into()])
-            .expect("single-column DataFrame should never fail");
-        store.insert(name.to_string(), df);
-    };
-
-    // RunSpecSourceType.
-    let source_type_ids: Vec<i32> = {
-        let mut ids: BTreeSet<i32> = BTreeSet::new();
-        for sel in &runspec.onroad_vehicle_selections {
-            ids.insert(sel.source_type_id as i32);
-        }
-        ids.into_iter().collect()
-    };
-    insert_i32(
-        store,
-        "RunSpecSourceType",
-        "sourceTypeID",
-        source_type_ids.clone(),
-    );
-
-    // RunSpecPollutantProcess (single column: polProcessID).
-    let pol_process_ids: Vec<i32> = {
-        let mut ids: BTreeSet<i32> = BTreeSet::new();
-        for assoc in &runspec.pollutant_process_associations {
-            ids.insert((assoc.pollutant_id * 100 + assoc.process_id) as i32);
-        }
-        ids.into_iter().collect()
-    };
-    insert_i32(
-        store,
-        "RunSpecPollutantProcess",
-        "polProcessID",
-        pol_process_ids,
-    );
-
-    // RunSpecDay.
-    let day_ids: Vec<i32> = {
-        let mut ids: BTreeSet<i32> = BTreeSet::new();
-        for &d in &runspec.timespan.days {
-            ids.insert(d as i32);
-        }
-        ids.into_iter().collect()
-    };
-    insert_i32(store, "RunSpecDay", "dayID", day_ids.clone());
-
-    // RunSpecHour.
-    let hour_ids: Vec<i32> = match (runspec.timespan.begin_hour, runspec.timespan.end_hour) {
-        (Some(b), Some(e)) if b <= e => (b..=e).map(|h| h as i32).collect(),
-        (Some(h), _) | (_, Some(h)) => vec![h as i32],
-        (None, None) => Vec::new(),
-    };
-    insert_i32(store, "RunSpecHour", "hourID", hour_ids.clone());
-
-    // RunSpecHourDay: cross-product, packed key = hourID * 10 + dayID.
-    let hour_day_ids: Vec<i32> = {
-        let mut ids: BTreeSet<i32> = BTreeSet::new();
-        for &h in &hour_ids {
-            for &d in &day_ids {
-                ids.insert(h * 10 + d);
-            }
-        }
-        ids.into_iter().collect()
-    };
-    insert_i32(store, "RunSpecHourDay", "hourDayID", hour_day_ids);
-
-    // RunSpecMonth.
-    // Month values from the RunSpec are used as-is (matching RunSpecFilters::from_runspec
-    // which also passes them through without adjustment).
-    let month_ids: Vec<i32> = {
-        let mut ids: BTreeSet<i32> = BTreeSet::new();
-        for &m in &runspec.timespan.months {
-            ids.insert(m as i32);
-        }
-        ids.into_iter().collect()
-    };
-    insert_i32(store, "RunSpecMonth", "monthID", month_ids.clone());
-
-    // RunSpecYear.
-    let year_ids: Vec<i32> = {
-        let mut ids: BTreeSet<i32> = BTreeSet::new();
-        for &y in &runspec.timespan.years {
-            ids.insert(y as i32);
-        }
-        ids.into_iter().collect()
-    };
-    insert_i32(store, "RunSpecYear", "yearID", year_ids);
-
-    // RunSpecRoadType (note: generators access this as "runSpecRoadType" or
-    // "RunSpecRoadType" — InMemoryStore uses case-insensitive lookup).
-    let road_type_ids: Vec<i32> = {
-        let mut ids: BTreeSet<i32> = BTreeSet::new();
-        for rt in &runspec.road_types {
-            ids.insert(rt.road_type_id as i32);
-        }
-        ids.into_iter().collect()
-    };
-    insert_i32(store, "RunSpecRoadType", "roadTypeID", road_type_ids);
-
-    // RunSpecMonthGroup: derive monthGroupID from MonthGroupOfAnyYear if present.
-    let month_group_ids: Vec<i32> = if store.contains("MonthGroupOfAnyYear") {
-        let arc = store
-            .get("MonthGroupOfAnyYear")
-            .expect("MonthGroupOfAnyYear present after contains check");
-        let df = &*arc;
-        let find = |want: &str| {
-            let lower = want.to_ascii_lowercase();
-            df.columns()
-                .iter()
-                .find(|c| c.name().to_ascii_lowercase() == lower)
-                .cloned()
-        };
-        let mut month_to_group: BTreeMap<i32, i32> = BTreeMap::new();
-        if let (Some(mid_col), Some(mgid_col)) = (find("monthID"), find("monthGroupID")) {
-            let mids = mid_col
-                .cast(&DataType::Int32)
-                .ok()
-                .and_then(|c| c.i32().ok().cloned());
-            let mgids = mgid_col
-                .cast(&DataType::Int32)
-                .ok()
-                .and_then(|c| c.i32().ok().cloned());
-            if let (Some(mids), Some(mgids)) = (mids, mgids) {
-                for i in 0..df.height() {
-                    if let (Some(mid), Some(mgid)) = (mids.get(i), mgids.get(i)) {
-                        month_to_group.insert(mid, mgid);
-                    }
-                }
-            }
-        }
-        let mut groups: BTreeSet<i32> = BTreeSet::new();
-        for &m in &month_ids {
-            groups.insert(*month_to_group.get(&m).unwrap_or(&m));
-        }
-        groups.into_iter().collect()
-    } else {
-        // Fallback: each month is its own month group.
-        month_ids.clone()
-    };
-    insert_i32(store, "RunSpecMonthGroup", "monthGroupID", month_group_ids);
-
-    // RunSpecSourceFuelType: unique (sourceTypeID, fuelTypeID) pairs, Int64 per
-    // SourceBinDistributionGenerator's RunSpecSourceFuelTypeRow schema.
-    let source_fuel_pairs: Vec<(i64, i64)> = {
-        let mut pairs: BTreeSet<(i64, i64)> = BTreeSet::new();
-        for sel in &runspec.onroad_vehicle_selections {
-            pairs.insert((sel.source_type_id as i64, sel.fuel_type_id as i64));
-        }
-        pairs.into_iter().collect()
-    };
-    let (sf_source_ids, sf_fuel_ids): (Vec<i64>, Vec<i64>) = source_fuel_pairs.into_iter().unzip();
-    let n = sf_source_ids.len();
-    let sf_df = DataFrame::new(
-        n,
-        vec![
-            Series::new("sourceTypeID".into(), sf_source_ids).into(),
-            Series::new("fuelTypeID".into(), sf_fuel_ids).into(),
-        ],
-    )
-    .map_err(|e| anyhow::anyhow!("building RunSpecSourceFuelType: {e}"))?;
-    store.insert("RunSpecSourceFuelType".to_string(), sf_df);
-
-    Ok(())
+    // Delegates to the single shared implementation in
+    // `moves_calculators::default_db_setup` (see that module — both the native
+    // CLI and the wasm path call it, so the synthesis can no longer drift).
+    moves_calculators::default_db_setup::build_runspec_tables(runspec, store).map_err(|e| anyhow::anyhow!(e))
 }
 
 /// Derive `fuelYearID` values from the already-loaded `Year` table.
@@ -1417,7 +1027,27 @@ pub fn build_default_db_store(
     // that are only valid after Phase 1 completes. Year loads unfiltered
     // (no year_column in the registry); regionCounty loads county-filtered
     // but without the fuelYear filter (which isn't known yet).
-    let base_filters = RunSpecFilters::from_runspec(run_spec);
+    let mut base_filters = RunSpecFilters::from_runspec(run_spec);
+    // Expand the fuelType load filter to the selected source types' full fleet
+    // fuel mix. A runspec `onroadvehicleselection` names one (sourceType,
+    // fuelType), but canonical runs the source type's whole fleet (its
+    // `RunSpecSourceFuelType` is `FuelType ⋈ SourceUseType ⋈ FuelEngTechAssoc`
+    // for the selected source types — see build_runspec_tables). Without
+    // matching that here, the fuel-sensitive tables (FuelSupply, …) load only
+    // the literal selection fuel, so the BaseRate/activity for the other fleet
+    // fuels canonical emits have no fuel supply ("missing fuel supply for
+    // fuel_type_id=2"). Union the fleet fuels into the load filter.
+    expand_fuel_filter_to_fleet(&db, &mut base_filters)
+        .context("expanding fuelType filter to the selected sources' fleet fuels")?;
+    // Expand the dayID load filter to all DayOfAnyWeek day types. Canonical's
+    // execution time span (buildExecutionTimeSpan useRunSpec=false) iterates
+    // every DayOfAnyWeek day, not the runspec `<day>` selection, so the
+    // day-keyed tables (DayOfAnyWeek, HourDay, HourVMTFraction, …) must load for
+    // both weekend (2) and weekday (5). The execution-day set is expanded to
+    // match after load (set_execution_days). Without this, selecting weekday
+    // only would drop the weekend day type's activity — ~half the output rows.
+    expand_day_filter_to_all_day_types(&db, &mut base_filters)
+        .context("expanding dayID filter to all DayOfAnyWeek day types")?;
     let plan = InputDataManager::plan(&base_filters, &default_tables());
     let mut store = InputDataManager::execute(&plan, &db)
         .map_err(|e| anyhow::anyhow!("loading default DB: {e}"))?;
@@ -1452,15 +1082,123 @@ pub fn build_default_db_store(
         overlay_scale_input_db(&mut store, sd)
             .with_context(|| format!("loading scale-input DB from {}", sd.display()))?;
     }
-    populate_link_from_zone_road_type(&mut store).context("synthesising Link from ZoneRoadType")?;
-    build_runspec_tables(run_spec, &mut store).context("building RunSpec tables from RunSpec")?;
-    populate_source_use_type_physics_mapping(&mut store)
-        .context("synthesising sourceUseTypePhysicsMapping")?;
-    populate_zone_month_hour_meteorology(&mut store)
-        .context("populating ZoneMonthHour meteorology")?;
-    merge_process_year_variants(&mut store)
-        .context("merging process/year-indexed table variants")?;
+    // Single shared post-load synthesis (merge variants, prune geography to the
+    // run's counties, synthesise Link + RunSpec* tables, fill meteorology, scope
+    // PollutantProcessModelYear, …) — the same routine the wasm path runs, so the
+    // native default-DB path can no longer drift behind it. This also gives the
+    // native path the geography pruning + pol-process scoping it previously
+    // lacked (memory containment for multi-county runs).
+    moves_calculators::default_db_setup::setup_execution_store(run_spec, &mut store)
+        .map_err(|e| anyhow::anyhow!(e))
+        .context("default-DB execution-store synthesis")?;
     Ok(store)
+}
+
+/// Expand `filters.fuel_type_ids` to include every fuel type the selected
+/// source types use, read from the default DB's `FuelEngTechAssoc`.
+///
+/// Mirrors canonical's `RunSpecSourceFuelType` derivation (the selected source
+/// type's whole fleet fuel mix, not the literal per-selection fuel). Only
+/// *adds* fuels — the resulting filter is a superset, so a fixture that already
+/// listed every fleet fuel is unchanged. A no-op (leaving the filter as-is) if
+/// `FuelEngTechAssoc` is absent or carries neither key column.
+#[cfg(not(target_arch = "wasm32"))]
+fn expand_fuel_filter_to_fleet(
+    db: &DefaultDb,
+    filters: &mut RunSpecFilters,
+) -> Result<()> {
+    use moves_data_default::TableFilter;
+    use polars::prelude::DataType;
+
+    if filters.source_type_ids.is_empty() {
+        return Ok(());
+    }
+    let Ok(lf) = db.scan("FuelEngTechAssoc", &TableFilter::new()) else {
+        return Ok(());
+    };
+    let df = lf
+        .collect()
+        .context("scanning FuelEngTechAssoc for fleet fuel expansion")?;
+    let (Ok(st), Ok(ft)) = (
+        df.column("sourceTypeID").and_then(|c| c.cast(&DataType::Int64)),
+        df.column("fuelTypeID").and_then(|c| c.cast(&DataType::Int64)),
+    ) else {
+        return Ok(());
+    };
+    let (Ok(st), Ok(ft)) = (st.i64(), ft.i64()) else {
+        return Ok(());
+    };
+    let selected: BTreeSet<i64> = filters.source_type_ids.iter().copied().collect();
+    let mut fuels: BTreeSet<i64> = filters.fuel_type_ids.iter().copied().collect();
+    for i in 0..df.height() {
+        if let (Some(s), Some(f)) = (st.get(i), ft.get(i)) {
+            if selected.contains(&s) {
+                fuels.insert(f);
+            }
+        }
+    }
+    filters.fuel_type_ids = fuels.into_iter().collect();
+    Ok(())
+}
+
+/// Replace `filters.days` with all `DayOfAnyWeek` day types from the default DB.
+///
+/// Canonical's execution time span iterates every `DayOfAnyWeek` day (not the
+/// runspec selection); the day-keyed input tables must therefore load for all
+/// day types. No-op (filter unchanged) if `DayOfAnyWeek` is absent or yields no
+/// day IDs.
+#[cfg(not(target_arch = "wasm32"))]
+fn expand_day_filter_to_all_day_types(
+    db: &DefaultDb,
+    filters: &mut RunSpecFilters,
+) -> Result<()> {
+    let days = day_ids_from_default_db(db)?;
+    if !days.is_empty() {
+        filters.days = days;
+    }
+    Ok(())
+}
+
+/// Read the distinct `dayID`s from the loaded `DayOfAnyWeek` table in the store
+/// as `u32` (for the execution day set). Empty if absent / no `dayID` column.
+fn day_ids_from_store(store: &InMemoryStore) -> Vec<u32> {
+    use polars::prelude::DataType;
+    let Some(arc) = store.get("DayOfAnyWeek") else {
+        return Vec::new();
+    };
+    let Ok(col) = arc.column("dayID").and_then(|c| c.cast(&DataType::Int64)) else {
+        return Vec::new();
+    };
+    let Ok(ca) = col.i64() else {
+        return Vec::new();
+    };
+    let set: BTreeSet<i64> = ca.into_iter().flatten().collect();
+    set.into_iter()
+        .filter_map(|d| u32::try_from(d).ok())
+        .collect()
+}
+
+/// Read the distinct `dayID`s from the default DB's `DayOfAnyWeek` table
+/// (unfiltered). Empty if the table is absent or carries no `dayID` column.
+#[cfg(not(target_arch = "wasm32"))]
+fn day_ids_from_default_db(db: &DefaultDb) -> Result<Vec<i64>> {
+    use moves_data_default::TableFilter;
+    use polars::prelude::DataType;
+
+    let Ok(lf) = db.scan("DayOfAnyWeek", &TableFilter::new()) else {
+        return Ok(Vec::new());
+    };
+    let df = lf
+        .collect()
+        .context("scanning DayOfAnyWeek for day-type expansion")?;
+    let Ok(col) = df.column("dayID").and_then(|c| c.cast(&DataType::Int64)) else {
+        return Ok(Vec::new());
+    };
+    let Ok(ca) = col.i64() else {
+        return Ok(Vec::new());
+    };
+    let set: BTreeSet<i64> = ca.into_iter().flatten().collect();
+    Ok(set.into_iter().collect())
 }
 
 /// The pollutants the default (embedded-DAG) calculator set consumes and
@@ -2191,8 +1929,9 @@ mod tests {
         assert_eq!(f.year_ids, vec![2020i64]);
         assert_eq!(
             f.month_ids,
-            vec![8i64],
-            "month key=7 → monthID=8 (August): RunSpec key is 0-indexed, monthID = key + 1"
+            vec![7i64],
+            "the model `months` already holds the real monthID; SnapshotFilter \
+             uses it verbatim (key→ID conversion happens in the XML parser)"
         );
     }
 
@@ -2315,13 +2054,15 @@ mod tests {
         let store = load_execution_db_from_parquet(dir.path(), &filter, None)
             .expect("filtered load must succeed");
         let df = store.get("zonemonthhour").unwrap();
-        // RunSpec month key=7 → monthID=8 (August, 0-indexed key). The fixture has
-        // rows for monthID=7 and monthID=8 at zone=100. The filter is zone=100 AND
-        // monthID=8, so only the August row survives; zone=200 is dropped.
+        // The model `months` holds the real monthID (here 7) — the key→ID
+        // conversion is the XML parser's job, so SnapshotFilter uses it
+        // verbatim. The fixture has rows for monthID 7 and 8 at zone=100; the
+        // filter is zone=100 AND monthID=7, so only the month-7 row survives
+        // and zone=200 is dropped.
         assert_eq!(
             df.height(),
             1,
-            "filter should keep only the month=8 row for zone 100"
+            "filter should keep only the month=7 row for zone 100"
         );
         let zone_col = df
             .column("zoneID")

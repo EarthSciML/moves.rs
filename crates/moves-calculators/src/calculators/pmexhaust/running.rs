@@ -138,8 +138,12 @@
 //! [`BasicRunningPmInputs`] and a [`RunContext`] from the context, calls
 //! `run`, and writes the [`MovesWorkerOutputRow`]s back.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
 use std::sync::OnceLock;
+
+// FxHash for the build-then-probe join indexes and the DISTINCT `seen` sets —
+// the default SipHash dominates once these joins run on real (non-empty) data.
+use rustc_hash::{FxHashMap, FxHashSet as HashSet};
 
 use moves_calculator_info::{Granularity, Priority};
 use moves_data::{PollutantProcessAssociation, ProcessId};
@@ -663,52 +667,83 @@ fn step1_op_mode_weighted(inputs: &BasicRunningPmInputs, year: i32) -> Vec<OpMod
         pol_process_id: i32,
     }
 
-    let mut seen: HashSet<(i32, i32, i64, i32, i32, u64)> = HashSet::new();
+    let mut seen: HashSet<(i32, i32, i64, i32, i32, u64)> = HashSet::default();
     let mut weighted: BTreeMap<Key, f64> = BTreeMap::new();
 
+    // The brute-force form scanned EmissionRateByAge (~1.6M rows) inside the
+    // OpModeDistribution loop. Index the join tables instead — each index Vec
+    // preserves input order, so the DISTINCT `seen` and the `weighted` sums are
+    // visited in the same order and the result is bit-identical.
+    let mut er_by: FxHashMap<(i32, i32), Vec<&EmissionRateByAgeRow>> = FxHashMap::default();
+    for er in &inputs.emission_rate_by_age {
+        er_by
+            .entry((er.pol_process_id, er.op_mode_id))
+            .or_default()
+            .push(er);
+    }
+    let mut sbd_by: FxHashMap<(i32, i64), Vec<&SourceBinDistributionRow>> = FxHashMap::default();
+    for sbd in &inputs.source_bin_distribution {
+        sbd_by
+            .entry((sbd.pol_process_id, sbd.source_bin_id))
+            .or_default()
+            .push(sbd);
+    }
+    let mut acat_by: FxHashMap<i32, Vec<&AgeCategoryRow>> = FxHashMap::default();
+    for acat in &inputs.age_category {
+        acat_by.entry(acat.age_group_id).or_default().push(acat);
+    }
+    let mut stmy_by: FxHashMap<i32, &SourceTypeModelYearRow> = FxHashMap::default();
+    for stmy in &inputs.source_type_model_year {
+        stmy_by
+            .entry(stmy.source_type_model_year_id)
+            .or_insert(stmy);
+    }
+
     for omd in &inputs.op_mode_distribution {
-        for er in &inputs.emission_rate_by_age {
-            if er.pol_process_id != omd.pol_process_id || er.op_mode_id != omd.op_mode_id {
+        let Some(ers) = er_by.get(&(omd.pol_process_id, omd.op_mode_id)) else {
+            continue;
+        };
+        for er in ers {
+            // The SourceBinDistribution / AgeCategory / SourceTypeModelYear join
+            // projects no column, so the `SELECT DISTINCT` keeps one row per
+            // (omd, er) that has *any* matching chain — an early-exit existence
+            // test, equivalent to the original scan-and-dedup.
+            let exists = sbd_by
+                .get(&(er.pol_process_id, er.source_bin_id))
+                .is_some_and(|sbds| {
+                    sbds.iter().any(|sbd| {
+                        acat_by.get(&er.age_group_id).is_some_and(|acats| {
+                            acats.iter().any(|acat| {
+                                stmy_by.get(&sbd.source_type_model_year_id).is_some_and(|stmy| {
+                                    stmy.source_type_id == omd.source_type_id
+                                        && stmy.model_year_id == year - acat.age_id
+                                })
+                            })
+                        })
+                    })
+                });
+            if !exists {
                 continue;
             }
-            for sbd in &inputs.source_bin_distribution {
-                if sbd.pol_process_id != er.pol_process_id || sbd.source_bin_id != er.source_bin_id
-                {
-                    continue;
-                }
-                for acat in &inputs.age_category {
-                    if acat.age_group_id != er.age_group_id {
-                        continue;
-                    }
-                    for stmy in &inputs.source_type_model_year {
-                        if stmy.source_type_model_year_id != sbd.source_type_model_year_id
-                            || stmy.source_type_id != omd.source_type_id
-                            || stmy.model_year_id != year - acat.age_id
-                        {
-                            continue;
-                        }
-                        let value = omd.op_mode_fraction * er.mean_base_rate;
-                        let key = Key {
-                            hour_day_id: omd.hour_day_id,
-                            source_type_id: omd.source_type_id,
-                            source_bin_id: er.source_bin_id,
-                            age_group_id: er.age_group_id,
-                            pol_process_id: omd.pol_process_id,
-                        };
-                        // `SELECT DISTINCT`: a join chain that re-emits the
-                        // exact same six-column row contributes once.
-                        if seen.insert((
-                            key.hour_day_id,
-                            key.source_type_id,
-                            key.source_bin_id,
-                            key.age_group_id,
-                            key.pol_process_id,
-                            value.to_bits(),
-                        )) {
-                            *weighted.entry(key).or_insert(0.0) += value;
-                        }
-                    }
-                }
+            let value = omd.op_mode_fraction * er.mean_base_rate;
+            let key = Key {
+                hour_day_id: omd.hour_day_id,
+                source_type_id: omd.source_type_id,
+                source_bin_id: er.source_bin_id,
+                age_group_id: er.age_group_id,
+                pol_process_id: omd.pol_process_id,
+            };
+            // `SELECT DISTINCT`: a join chain that re-emits the exact same
+            // six-column row contributes once.
+            if seen.insert((
+                key.hour_day_id,
+                key.source_type_id,
+                key.source_bin_id,
+                key.age_group_id,
+                key.pol_process_id,
+                value.to_bits(),
+            )) {
+                *weighted.entry(key).or_insert(0.0) += value;
             }
         }
     }
@@ -750,47 +785,79 @@ fn step2_fully_weighted(
 
     let mut weighted: BTreeMap<Key, f64> = BTreeMap::new();
 
+    // Index the join tables; each index Vec preserves input order, so the
+    // `weighted` sums accumulate in the same order as the brute-force nesting
+    // (sbd → acat → stmy → ppmy → sb) and the result is bit-identical.
+    let mut sbd_by: FxHashMap<(i32, i64), Vec<&SourceBinDistributionRow>> = FxHashMap::default();
+    for sbd in &inputs.source_bin_distribution {
+        sbd_by
+            .entry((sbd.pol_process_id, sbd.source_bin_id))
+            .or_default()
+            .push(sbd);
+    }
+    let mut acat_by: FxHashMap<i32, Vec<&AgeCategoryRow>> = FxHashMap::default();
+    for acat in &inputs.age_category {
+        acat_by.entry(acat.age_group_id).or_default().push(acat);
+    }
+    let mut stmy_by: FxHashMap<i32, &SourceTypeModelYearRow> = FxHashMap::default();
+    for stmy in &inputs.source_type_model_year {
+        stmy_by
+            .entry(stmy.source_type_model_year_id)
+            .or_insert(stmy);
+    }
+    let mut ppmy_by: FxHashMap<(i32, i32), Vec<&PollutantProcessModelYearRow>> =
+        FxHashMap::default();
+    for ppmy in &inputs.pollutant_process_model_year {
+        ppmy_by
+            .entry((ppmy.pol_process_id, ppmy.model_year_id))
+            .or_default()
+            .push(ppmy);
+    }
+    let mut sb_by: FxHashMap<i64, Vec<&SourceBinRow>> = FxHashMap::default();
+    for sb in &inputs.source_bin {
+        sb_by.entry(sb.source_bin_id).or_default().push(sb);
+    }
+
     for omer in op_mode_weighted {
-        for sbd in &inputs.source_bin_distribution {
-            if sbd.source_bin_id != omer.source_bin_id || sbd.pol_process_id != omer.pol_process_id
-            {
+        let Some(sbds) = sbd_by.get(&(omer.pol_process_id, omer.source_bin_id)) else {
+            continue;
+        };
+        for sbd in sbds {
+            let Some(acats) = acat_by.get(&omer.age_group_id) else {
                 continue;
-            }
-            for acat in &inputs.age_category {
-                if acat.age_group_id != omer.age_group_id {
+            };
+            for acat in acats {
+                // sourceTypeModelYearID is unique, so at most one stmy matches.
+                let Some(stmy) = stmy_by.get(&sbd.source_type_model_year_id) else {
+                    continue;
+                };
+                if stmy.source_type_id != omer.source_type_id
+                    || stmy.model_year_id != year - acat.age_id
+                {
                     continue;
                 }
-                for stmy in &inputs.source_type_model_year {
-                    if stmy.source_type_model_year_id != sbd.source_type_model_year_id
-                        || stmy.source_type_id != omer.source_type_id
-                        || stmy.model_year_id != year - acat.age_id
-                    {
+                let Some(ppmys) = ppmy_by.get(&(sbd.pol_process_id, stmy.model_year_id)) else {
+                    continue;
+                };
+                for ppmy in ppmys {
+                    let Some(sbs) = sb_by.get(&sbd.source_bin_id) else {
                         continue;
-                    }
-                    for ppmy in &inputs.pollutant_process_model_year {
-                        if ppmy.pol_process_id != sbd.pol_process_id
-                            || ppmy.model_year_id != stmy.model_year_id
-                        {
+                    };
+                    for sb in sbs {
+                        if sb.model_year_group_id != ppmy.model_year_group_id {
                             continue;
                         }
-                        for sb in &inputs.source_bin {
-                            if sb.source_bin_id != sbd.source_bin_id
-                                || sb.model_year_group_id != ppmy.model_year_group_id
-                            {
-                                continue;
-                            }
-                            let value = sbd.source_bin_activity_fraction
-                                * omer.op_mode_weighted_mean_base_rate;
-                            let key = Key {
-                                hour_day_id: omer.hour_day_id,
-                                source_type_id: omer.source_type_id,
-                                fuel_type_id: sb.fuel_type_id,
-                                model_year_id: stmy.model_year_id,
-                                pol_process_id: omer.pol_process_id,
-                                age_id: acat.age_id,
-                            };
-                            *weighted.entry(key).or_insert(0.0) += value;
-                        }
+                        let value =
+                            sbd.source_bin_activity_fraction * omer.op_mode_weighted_mean_base_rate;
+                        let key = Key {
+                            hour_day_id: omer.hour_day_id,
+                            source_type_id: omer.source_type_id,
+                            fuel_type_id: sb.fuel_type_id,
+                            model_year_id: stmy.model_year_id,
+                            pol_process_id: omer.pol_process_id,
+                            age_id: acat.age_id,
+                        };
+                        *weighted.entry(key).or_insert(0.0) += value;
                     }
                 }
             }
@@ -823,15 +890,24 @@ fn step3_unadjusted(
     fully_weighted: &[FullyWeightedRate],
 ) -> Vec<UnadjustedEmission> {
     let mut out = Vec::new();
+    // Index SHO by its join key (input order preserved → identical `out` order).
+    let mut sho_by: FxHashMap<(i32, i32, i32, i32), Vec<&ShoRow>> = FxHashMap::default();
+    for sho in &inputs.sho {
+        sho_by
+            .entry((
+                sho.hour_day_id,
+                sho.year_id,
+                sho.age_id,
+                sho.source_type_id,
+            ))
+            .or_default()
+            .push(sho);
+    }
     for f in fully_weighted {
-        for sho in &inputs.sho {
-            if sho.hour_day_id != f.hour_day_id
-                || sho.year_id != f.year_id
-                || sho.age_id != f.age_id
-                || sho.source_type_id != f.source_type_id
-            {
-                continue;
-            }
+        let Some(shos) = sho_by.get(&(f.hour_day_id, f.year_id, f.age_id, f.source_type_id)) else {
+            continue;
+        };
+        for sho in shos {
             out.push(UnadjustedEmission {
                 year_id: f.year_id,
                 month_id: sho.month_id,
@@ -857,21 +933,46 @@ fn fuel_supply_with_fuel_type(
     year: i32,
 ) -> Vec<FuelSupplyWithFuelType> {
     let mut out = Vec::new();
+
+    // FuelSupply (~100k rows) brute-force-joined against FuelFormulation (~2k)
+    // exploded to hundreds of millions of iterations. Index the join tables;
+    // each index Vec preserves input order, so `out` is built in the same order
+    // as the brute-force nesting (bit-identical to downstream consumers).
+    let mut ff_by: FxHashMap<i32, Vec<&FuelFormulationRow>> = FxHashMap::default();
+    for ff in &inputs.fuel_formulation {
+        ff_by.entry(ff.fuel_formulation_id).or_default().push(ff);
+    }
+    let mut fst_by: FxHashMap<i32, Vec<&FuelSubTypeRow>> = FxHashMap::default();
+    for fst in &inputs.fuel_sub_type {
+        fst_by.entry(fst.fuel_sub_type_id).or_default().push(fst);
+    }
+    let mut may_by: FxHashMap<i32, Vec<&MonthOfAnyYearRow>> = FxHashMap::default();
+    for may in &inputs.month_of_any_year {
+        may_by.entry(may.month_group_id).or_default().push(may);
+    }
+    let mut y_by: FxHashMap<i32, Vec<&YearRow>> = FxHashMap::default();
+    for y in &inputs.year {
+        y_by.entry(y.fuel_year_id).or_default().push(y);
+    }
+
     for fs in &inputs.fuel_supply {
-        for ff in &inputs.fuel_formulation {
-            if ff.fuel_formulation_id != fs.fuel_formulation_id {
+        let Some(ffs) = ff_by.get(&fs.fuel_formulation_id) else {
+            continue;
+        };
+        for ff in ffs {
+            let Some(fsts) = fst_by.get(&ff.fuel_sub_type_id) else {
                 continue;
-            }
-            for fst in &inputs.fuel_sub_type {
-                if fst.fuel_sub_type_id != ff.fuel_sub_type_id {
+            };
+            for fst in fsts {
+                let Some(mays) = may_by.get(&fs.month_group_id) else {
                     continue;
-                }
-                for may in &inputs.month_of_any_year {
-                    if may.month_group_id != fs.month_group_id {
+                };
+                for may in mays {
+                    let Some(ys) = y_by.get(&fs.fuel_year_id) else {
                         continue;
-                    }
-                    for y in &inputs.year {
-                        if y.fuel_year_id != fs.fuel_year_id || y.year_id != year {
+                    };
+                    for y in ys {
+                        if y.year_id != year {
                             continue;
                         }
                         out.push(FuelSupplyWithFuelType {
@@ -904,7 +1005,7 @@ fn fuel_supply_adjustment(
     fuel_supply_with_fuel_type: &[FuelSupplyWithFuelType],
 ) -> Vec<FuelSupplyAdjustment> {
     /// Group key for the fuel-adjustment sum.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
     struct Key {
         year_id: i32,
         month_id: i32,
@@ -914,7 +1015,12 @@ fn fuel_supply_adjustment(
         fuel_type_id: i32,
     }
 
-    let mut adjustment: BTreeMap<Key, f64> = BTreeMap::new();
+    // Accumulate into an FxHashMap (O(1) per `+=` instead of the BTreeMap's
+    // O(log n)) — the cross-join visits county × ppmy × fsft × rst, which is
+    // millions of contributions on real fuel-supply data. The `+=` order is
+    // unchanged (set only by the loop nesting), so the sums are bit-identical;
+    // the result is sorted by `Key` at the end to match the old BTreeMap order.
+    let mut adjustment: FxHashMap<Key, f64> = FxHashMap::default();
 
     for county in &inputs.county {
         for ppmy in &inputs.pollutant_process_model_year {
@@ -959,7 +1065,9 @@ fn fuel_supply_adjustment(
         }
     }
 
-    adjustment
+    let mut entries: Vec<(Key, f64)> = adjustment.into_iter().collect();
+    entries.sort_by_key(|(k, _)| *k);
+    entries
         .into_iter()
         .map(|(key, fuel_adjustment)| FuelSupplyAdjustment {
             year_id: key.year_id,
@@ -993,20 +1101,39 @@ fn step4_fuel_adjusted(
     let fswft = fuel_supply_with_fuel_type(inputs, year);
     let adjustment = fuel_supply_adjustment(inputs, year, &fswft);
 
-    let mut seen: HashSet<FuelAdjustedDistinctKey> = HashSet::new();
+    let mut seen: HashSet<FuelAdjustedDistinctKey> = HashSet::default();
     let mut out = Vec::new();
 
+    // Index the adjustment rows by the six join columns (input order preserved
+    // → identical `seen`/`out` order, bit-identical result).
+    let mut adj_by: FxHashMap<(i32, i32, i32, i32, i32, i32), Vec<&FuelSupplyAdjustment>> =
+        FxHashMap::default();
+    for f in &adjustment {
+        adj_by
+            .entry((
+                f.year_id,
+                f.month_id,
+                f.source_type_id,
+                f.fuel_type_id,
+                f.model_year_id,
+                f.pol_process_id,
+            ))
+            .or_default()
+            .push(f);
+    }
+
     for u in unadjusted {
-        for f in &adjustment {
-            if f.year_id != u.year_id
-                || f.month_id != u.month_id
-                || f.source_type_id != u.source_type_id
-                || f.fuel_type_id != u.fuel_type_id
-                || f.model_year_id != u.model_year_id
-                || f.pol_process_id != u.pol_process_id
-            {
-                continue;
-            }
+        let Some(fs) = adj_by.get(&(
+            u.year_id,
+            u.month_id,
+            u.source_type_id,
+            u.fuel_type_id,
+            u.model_year_id,
+            u.pol_process_id,
+        )) else {
+            continue;
+        };
+        for f in fs {
             // The SQL `coalesce(f.fuelAdjustment * q, q)` guards a NULL
             // `fuelAdjustment`. `fuelAdjustment` is a `SUM` over a non-empty
             // cross-join group, so it is never NULL here; the product is the

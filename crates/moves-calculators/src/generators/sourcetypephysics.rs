@@ -77,7 +77,7 @@ use std::collections::{HashMap, HashSet};
 use moves_data::SourceTypeId;
 use moves_framework::{
     CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStoreTyped, Error,
-    Generator, TableRow,
+    Generator, ModelScale, TableRow,
 };
 use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Series};
 
@@ -756,6 +756,16 @@ impl Generator for SourceTypePhysics {
     /// [`correct_table`](SourceUseTypePhysicsMapping::correct_table), and
     /// writes the corrected `RatesOpModeDistribution` to scratch.
     fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
+        // This step corrects the *rates-mode* `RatesOpModeDistribution` only
+        // (its in/out tables are that table plus the physics mapping; no
+        // calculator reads `RatesOpModeDistribution`). In an inventory run the
+        // table is populated only by the start op-mode generator's narrow
+        // schema (no `roadTypeID`), and nothing downstream consumes it, so skip
+        // the correction rather than fail extracting the absent columns.
+        if ctx.model_scale().is_some_and(ModelScale::is_inventory) {
+            return Ok(CalculatorOutput::empty());
+        }
+
         let mapping_details: Vec<SourceUseTypePhysicsMappingDetail> =
             ctx.tables().iter_typed("sourceUseTypePhysicsMapping")?;
         let mapping = SourceUseTypePhysicsMapping::build(mapping_details);

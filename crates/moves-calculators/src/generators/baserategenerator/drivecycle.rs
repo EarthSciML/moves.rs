@@ -22,6 +22,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use rustc_hash::FxHashMap;
+
 use super::inputs::{BaseRateInputs, PreparedTables};
 use super::model::{
     AvgSpeedDistributionKey, DriveScheduleAssocKey, DrivingIdleFractionRow, ExternalFlags,
@@ -56,7 +58,7 @@ struct ScheduleOpModeKey {
 }
 
 /// Fast lookup key into the bracketed bins — Go `dcbFastKey`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct FastKey {
     source_type_id: i32,
     road_type_id: i32,
@@ -202,12 +204,30 @@ fn calculate_drive_cycle_op_mode_distribution(
         return op_mode_fractions;
     }
 
-    let mut details: BTreeMap<i32, SecondDetail> = BTreeMap::new();
-    let mut first_second: i32 = 999_999;
-    let mut last_second: i32 = -999_999;
+    // The seconds form a (possibly gapped) contiguous integer range, so index
+    // a dense `Vec` by `second - first_second`: every per-second lookup below
+    // becomes an O(1) array probe instead of a BTreeMap search. `None` marks a
+    // missing second, matching the old map's absent-key semantics.
+    let mut first_second: i32 = i32::MAX;
+    let mut last_second: i32 = i32::MIN;
+    for &(second, _) in seconds {
+        first_second = first_second.min(second);
+        last_second = last_second.max(second);
+    }
+    let span = (last_second - first_second + 1) as usize;
+    let mut details: Vec<Option<SecondDetail>> = vec![None; span];
+    // Index of a second, or `None` if it falls outside [first, last].
+    let idx = |second: i32| -> Option<usize> {
+        if second < first_second || second > last_second {
+            None
+        } else {
+            Some((second - first_second) as usize)
+        }
+    };
 
     for &(second, speed) in seconds {
-        let detail = details.entry(second).or_default();
+        let detail = details[(second - first_second) as usize]
+            .get_or_insert_with(SecondDetail::default);
         detail.speed = speed;
         detail.speed_mph = speed * 0.44704;
         // Assign the idle operating mode to near-zero speeds.
@@ -220,22 +240,20 @@ fn calculate_drive_cycle_op_mode_distribution(
             detail.op_mode_id = 1;
             detail.has_op_mode = true;
         }
-        first_second = first_second.min(second);
-        last_second = last_second.max(second);
     }
 
     // Acceleration of every second beyond the first.
     for second in (first_second + 1)..=last_second {
-        let then = details.get(&(second - 1)).copied();
-        if let (Some(then), true) = (then, details.contains_key(&second)) {
-            let now = details.get_mut(&second).expect("checked present");
+        let then = idx(second - 1).and_then(|i| details[i]);
+        let here = (second - first_second) as usize;
+        if let (Some(then), Some(now)) = (then, details[here].as_mut()) {
             now.acceleration = now.speed - then.speed;
             now.acceleration_mph = now.speed_mph - then.speed_mph;
         }
     }
     // The first second copies the acceleration of the second second.
-    if let Some(next) = details.get(&(first_second + 1)).copied() {
-        if let Some(first) = details.get_mut(&first_second) {
+    if let Some(next) = idx(first_second + 1).and_then(|i| details[i]) {
+        if let Some(first) = details[0].as_mut() {
             first.acceleration = next.acceleration;
             first.acceleration_mph = next.acceleration_mph;
         }
@@ -245,12 +263,12 @@ fn calculate_drive_cycle_op_mode_distribution(
     let mut total_seconds: i32 = 0;
 
     for second in first_second..=last_second {
-        let Some(mut now) = details.get(&second).copied() else {
+        let Some(mut now) = idx(second).and_then(|i| details[i]) else {
             continue;
         };
         if !now.has_op_mode {
-            let back1 = details.get(&(second - 1)).copied();
-            let back2 = details.get(&(second - 2)).copied();
+            let back1 = idx(second - 1).and_then(|i| details[i]);
+            let back2 = idx(second - 2).and_then(|i| details[i]);
             // Braking events.
             if now.acceleration <= -2.0 {
                 now.op_mode_id = 0;
@@ -302,7 +320,7 @@ fn calculate_drive_cycle_op_mode_distribution(
                 }
             }
         }
-        details.insert(second, now);
+        details[(second - first_second) as usize] = Some(now);
         // The `second > 0` guard mirrors a quirk of the Java reference code.
         if now.has_op_mode && second > 0 {
             *op_mode_totals.entry(now.op_mode_id).or_insert(0) += 1;
@@ -388,8 +406,13 @@ pub fn process_drive_cycles(
     op_modes_to_iterate.extend(prepared.operating_modes.keys().copied());
 
     // Group the bracketed bins for fast lookup by real source type.
-    let mut bins_fast: BTreeMap<FastKey, Vec<BracketedBinKey>> = BTreeMap::new();
-    for &key in bracketed_bins.keys() {
+    // Lookup-only (never iterated for order) → FxHashMap for O(1) probes in
+    // the driving-idle and RatesOpModeDistribution inner loops. `bracketed_bins`
+    // is not mutated past this point, so carry each detail by reference and
+    // avoid re-probing the BTreeMap by key in those hot inner loops.
+    let mut bins_fast: FxHashMap<FastKey, Vec<(BracketedBinKey, &BracketedBinDetail)>> =
+        FxHashMap::default();
+    for (&key, detail) in &bracketed_bins {
         let physics = &prepared.source_use_type_physics_mapping[key.physics_index];
         bins_fast
             .entry(FastKey {
@@ -398,7 +421,7 @@ pub fn process_drive_cycles(
                 avg_speed_bin_id: key.avg_speed_bin_id,
             })
             .or_default()
-            .push(key);
+            .push((key, detail));
     }
 
     // Driving-idle fraction, needed for off-network idling.
@@ -432,8 +455,7 @@ pub fn process_drive_cycles(
                         }) else {
                             continue;
                         };
-                        for key in keys {
-                            let detail = &bracketed_bins[key];
+                        for &(_, detail) in keys {
                             if detail.op_mode_fractions.is_empty() {
                                 continue;
                             }
@@ -546,8 +568,7 @@ pub fn process_drive_cycles(
                             }) else {
                                 continue;
                             };
-                            for key in keys {
-                                let detail = &bracketed_bins[key];
+                            for &(key, detail) in keys {
                                 if detail.op_mode_fractions.is_empty() {
                                     continue;
                                 }

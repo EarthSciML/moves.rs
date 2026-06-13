@@ -106,6 +106,17 @@ impl DefaultDb {
         }
         validate_filter_columns(table, filter)?;
         let selected = select_partitions(table, filter);
+        // The filter can prune away every partition (e.g. a county with no I/M
+        // program leaves `IMCoverage` with no matching year×county partition). A
+        // zero-partition scan returns a schemaless empty frame, which makes a
+        // downstream strict reader fail to find a column (`IMCoverage.polProcessID
+        // not found`) rather than see an empty table. Keep one partition so the
+        // scan carries the table's SCHEMA; the caller's post-scan WHERE applies
+        // the same partition-column predicates that excluded every partition, so
+        // its rows are filtered back out — the result is still empty, but typed.
+        if selected.is_empty() && !table.partitions.is_empty() {
+            return schema_only_frame(&self.root, &table.partitions[0]);
+        }
         scan_partitions(&self.root, &selected)
     }
 
@@ -206,6 +217,21 @@ fn scan_partitions(root: &Path, partitions: &[&PartitionManifest]) -> Result<Laz
 
 #[cfg(target_arch = "wasm32")]
 fn scan_partitions(_root: &Path, _partitions: &[&PartitionManifest]) -> Result<LazyFrame> {
+    unreachable!("filesystem scan_parquet is not available in the wasm32 build")
+}
+
+/// A 0-row `LazyFrame` carrying `partition`'s schema — used when partition
+/// pruning matched no partitions but the table exists, so downstream strict
+/// readers see the table's columns (an empty table) instead of a schemaless
+/// frame that makes a column lookup fail. Scans one partition file and
+/// truncates to zero rows (schema only, no data materialised).
+#[cfg(not(target_arch = "wasm32"))]
+fn schema_only_frame(root: &Path, partition: &PartitionManifest) -> Result<LazyFrame> {
+    Ok(scan_partitions(root, &[partition])?.limit(0))
+}
+
+#[cfg(target_arch = "wasm32")]
+fn schema_only_frame(_root: &Path, _partition: &PartitionManifest) -> Result<LazyFrame> {
     unreachable!("filesystem scan_parquet is not available in the wasm32 build")
 }
 

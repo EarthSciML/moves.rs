@@ -51,6 +51,35 @@ impl InMemoryStore {
             dest.map.insert(name.clone(), Arc::clone(df));
         }
     }
+
+    /// Like [`copy_into`](Self::copy_into), but never replaces a **non-empty**
+    /// `dest` table with an **empty** source table.
+    ///
+    /// A captured snapshot supplies the authoritative activity/rate tables
+    /// (`SHO`, `Starts`, …) in the slow tier. When a generator that re-derives
+    /// one of these tables is co-chunked with a downstream calculator (because
+    /// some *other* output of the generator links them), `promote_scratch`
+    /// would otherwise overwrite the captured value with the generator's
+    /// snapshot-incomplete recomputation — often an empty frame — and the
+    /// calculator then sees zero activity. The chunk-graph already skips
+    /// producer→consumer edges for slow-tier tables to avoid exactly this
+    /// (see `chunk_chains`), but that does not prevent the clobber when the
+    /// generator co-chunks via a different table. Guarding the promotion here
+    /// closes that gap: an empty generic recomputation can never destroy a
+    /// non-empty authoritative table. A non-empty recomputation still wins (it
+    /// is the legitimate default-DB path where the generator *is* the source).
+    pub fn copy_into_preserving_nonempty(&self, dest: &mut InMemoryStore) {
+        for (name, df) in &self.map {
+            if df.height() == 0 {
+                if let Some(existing) = dest.map.get(name) {
+                    if existing.height() > 0 {
+                        continue;
+                    }
+                }
+            }
+            dest.map.insert(name.clone(), Arc::clone(df));
+        }
+    }
 }
 
 impl DataFrameStore for InMemoryStore {

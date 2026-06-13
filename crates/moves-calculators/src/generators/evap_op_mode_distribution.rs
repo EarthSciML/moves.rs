@@ -326,12 +326,13 @@ pub struct FractionOfOperatingRow {
 ///
 /// Faithful details of the MySQL `SELECT`:
 ///
-/// * `sourceHours` and `SHO` are filtered to `(link, month+1, year)` — both
-/// tables are written by activity generators for the NEXT month relative to
-/// the evap-OpMode iteration context, matching the Java behavior where
-/// `##context.monthID##` in the sourceHours SQL resolves to the already-
-/// prepared next-month data. Canonical snapshots confirm: a month=7 run
-/// has sourceHours/SHO rows with monthID=8.
+/// * `sourceHours` and `SHO` are filtered to `(link, month, year)` at the
+/// iteration context's real `monthID`. (The earlier "month+1 / next month"
+/// reading was an artifact of the unconverted RunSpec key: a `<month key="7">`
+/// run was processed as monthID 7 while the activity tables — correctly — held
+/// monthID 8, so a `+1` looked necessary. The key→ID conversion now happens
+/// once in the XML parser, so `ctx.month_id` already equals the activity
+/// tables' monthID and is used verbatim.)
 /// * `sourceHours > 0` (`WHERE sourceHours > 0`); a `NULL` or
 /// non-positive `sourceHours` is dropped, exactly as `> 0` would.
 /// * `SHO` joins on `(hourDayID, ageID, sourceTypeID)` within the context.
@@ -350,17 +351,14 @@ pub fn fraction_of_operating(
     ctx: &EvapOpModeContext,
     inputs: &EvapOpModeInputs<'_>,
 ) -> Vec<FractionOfOperatingRow> {
-    // sourceHours and SHO are written for MONTH+1 (same convention as SAF).
-    let next_month = if ctx.month_id == 12 {
-        1
-    } else {
-        ctx.month_id + 1
-    };
+    // sourceHours and SHO are keyed at the context's real monthID (see the
+    // doc comment: the former `+1` compensated the unconverted RunSpec key).
+    let ctx_month = ctx.month_id;
     // `LEFT JOIN sho`: `monthID`/`yearID`/`linkID` are pinned to the
     // context, so the live join key is `(hourDayID, ageID, sourceTypeID)`.
     let mut sho_lookup: HashMap<(i16, i16, SourceTypeId), f64> = HashMap::new();
     for row in inputs.sho {
-        if row.link_id == ctx.link_id && row.month_id == next_month && row.year_id == ctx.year_id {
+        if row.link_id == ctx.link_id && row.month_id == ctx_month && row.year_id == ctx.year_id {
             sho_lookup.insert((row.hour_day_id, row.age_id, row.source_type_id), row.sho);
         }
     }
@@ -371,7 +369,7 @@ pub fn fraction_of_operating(
     let mut groups: BTreeMap<(i16, SourceTypeId), (f64, f64)> = BTreeMap::new();
     for sh in inputs.source_hours {
         if sh.link_id == ctx.link_id
-            && sh.month_id == next_month
+            && sh.month_id == ctx_month
             && sh.year_id == ctx.year_id
             && sh.source_hours > 0.0
         {
@@ -458,20 +456,15 @@ pub fn op_mode_distribution(
     // @step 010, stage 2: the non-operating (soak) modes.
     // opModeFraction = soakActivityFraction * (1 - fractionOfOperating).
     //
-    // TankTemperatureGenerator writes SoakActivityFraction for the NEXT month
-    // (month + 1, wrapping December → January) relative to its loop context:
-    // a vehicle's soak activity from month M carries forward into month M+1.
-    // The Java EvapOpModeGen's SQL therefore joins on
-    // `saf.monthID = ##context.monthID## + 1`, and the canonical snapshots
-    // confirm this — SAF rows for a month=7 run carry month_id=8.
-    let next_month = if ctx.month_id == 12 {
-        1
-    } else {
-        ctx.month_id + 1
-    };
+    // SoakActivityFraction is keyed at the context's real monthID. (The former
+    // "month+1" join was an artifact of the unconverted RunSpec key — a `<month
+    // key="7">` run was processed as monthID 7 while SAF correctly carried
+    // monthID 8. The key→ID conversion now happens in the XML parser, so
+    // `ctx.month_id` already equals the SAF monthID.)
+    let ctx_month = ctx.month_id;
     let mut rows: Vec<OpModeDistributionRow> = Vec::new();
     for saf in inputs.soak_activity_fraction {
-        if saf.month_id != next_month || saf.zone_id != ctx.zone_id {
+        if saf.month_id != ctx_month || saf.zone_id != ctx.zone_id {
             continue;
         }
         // INNER JOIN FractionOfOperating on (sourceType, hourDay).
@@ -1294,42 +1287,42 @@ mod tests {
         }
     }
 
-    /// `sourceHours` row at the fixed `(link, month+1, year)`.
+    /// `sourceHours` row at the fixed `(link, month, year)`.
     ///
-    /// Activity generators write sourceHours for the NEXT month (MONTH+1),
-    /// so `fraction_of_operating` filters on `month_id = ctx.month_id + 1`.
+    /// Activity generators write sourceHours at the context's real monthID,
+    /// so `fraction_of_operating` filters on `month_id = ctx.month_id`.
     fn sh(hour_day: i16, source_type: u16, age: i16, source_hours: f64) -> SourceHoursRow {
         SourceHoursRow {
             hour_day_id: hour_day,
             source_type_id: SourceTypeId(source_type),
             age_id: age,
             link_id: LINK,
-            month_id: MONTH + 1,
+            month_id: MONTH,
             year_id: YEAR,
             source_hours,
         }
     }
 
-    /// `SHO` row at the fixed `(link, month+1, year)`.
+    /// `SHO` row at the fixed `(link, month, year)`.
     ///
-    /// Activity generators write SHO for the NEXT month (MONTH+1),
-    /// so `fraction_of_operating` filters on `month_id = ctx.month_id + 1`.
+    /// Activity generators write SHO at the context's real monthID,
+    /// so `fraction_of_operating` filters on `month_id = ctx.month_id`.
     fn sho(hour_day: i16, source_type: u16, age: i16, sho: f64) -> ShoRow {
         ShoRow {
             hour_day_id: hour_day,
             source_type_id: SourceTypeId(source_type),
             age_id: age,
             link_id: LINK,
-            month_id: MONTH + 1,
+            month_id: MONTH,
             year_id: YEAR,
             sho,
         }
     }
 
-    /// `SoakActivityFraction` row at the fixed `(zone, month+1)`.
+    /// `SoakActivityFraction` row at the fixed `(zone, month)`.
     ///
-    /// `TankTemperatureGenerator` writes SAF for the NEXT month (MONTH+1),
-    /// so `op_mode_distribution` joins on `saf.monthID = ctx.month_id + 1`.
+    /// `TankTemperatureGenerator` writes SAF at the context's real monthID,
+    /// so `op_mode_distribution` joins on `saf.monthID = ctx.month_id`.
     fn saf(
         source_type: u16,
         hour_day: i16,
@@ -1339,7 +1332,7 @@ mod tests {
         SoakActivityFractionRow {
             source_type_id: SourceTypeId(source_type),
             zone_id: ZONE,
-            month_id: MONTH + 1,
+            month_id: MONTH,
             hour_day_id: hour_day,
             op_mode_id: op_mode,
             soak_activity_fraction: fraction,

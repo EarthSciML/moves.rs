@@ -69,7 +69,7 @@ use moves_calculator_info::{Granularity, Priority};
 use moves_data::{PollutantId, PollutantProcessAssociation, ProcessId};
 use moves_framework::{
     CalculatorContext, CalculatorOutput, CalculatorSubscription, DataFrameStoreTyped, Error,
-    Generator, TableRow,
+    Generator, ModelScale, TableRow,
 };
 use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
 
@@ -336,7 +336,7 @@ pub fn hour_day_id(hour_id: u16, day_id: u16) -> u16 {
 /// Default-DB and execution tables the generator reads. `SampleVehicleTrip`
 /// / `SampleVehicleDay` / `OperatingMode` drive the soak-time classification;
 /// `HourDay` / `RunSpecHourDay` / `RunSpecSourceType` scope the aggregation;
-/// `startsOpModeDistribution`, `OpModeDistribution`, `PollutantProcessAssoc`,
+/// `startsOpModeDistribution`, `OpModeDistribution`, `RunSpecPollutantProcess`,
 /// `Link`, `SourceTypePolProcess` and `OpModePolProcAssoc` feed the step-400
 /// copy.
 static INPUT_TABLES: &[&str] = &[
@@ -348,7 +348,7 @@ static INPUT_TABLES: &[&str] = &[
     "RunSpecSourceType",
     "startsOpModeDistribution",
     "OpModeDistribution",
-    "PollutantProcessAssoc",
+    "RunSpecPollutantProcess",
     "Link",
     "SourceTypePolProcess",
     "OpModePolProcAssoc",
@@ -358,6 +358,9 @@ static INPUT_TABLES: &[&str] = &[
 /// rows to `OpModeDistribution` (inventory runs) and `RatesOpModeDistribution`
 /// (rates runs).
 static OUTPUT_TABLES: &[&str] = &["OpModeDistribution", "RatesOpModeDistribution"];
+
+/// Per-generator scratch marker (see [`crate::wiring::merge_op_mode_distribution`]).
+const START_OMDG_DONE_MARKER: &str = "__omdg_done__StartOperatingModeDistributionGenerator";
 
 // ---- row_err ----------------------------------------------------------------
 
@@ -642,18 +645,24 @@ impl TableRow for OperatingModeRow {
 
 /// One `OpModeDistribution` row produced by the start op-mode generator.
 ///
-/// The start-exhaust generator writes `(sourceTypeID, hourDayID, opModeID,
-/// opModeFraction)`. The `linkID` and `polProcessID` columns that appear in the
-/// full `OpModeDistribution` schema (see `evap_op_mode_distribution`) are set
-/// to sentinel values here (`linkID = 0`, `polProcessID = 0`) because the
-/// start-exhaust step 400 writes source-type / hour-day fractions, not
-/// link-/pol-process-scoped ones.
+/// Step 400 (`populateOperatingModeDistribution`) expands the per-`(sourceType,
+/// hourDay, opMode)` soak fractions across the run's start `polProcessID`s — the
+/// start-exhaust (process 2) / crankcase-start (process 16) processes paired
+/// with recognised start pollutants, joined to `OpModePolProcAssoc` on
+/// `(polProcessID, opModeID)` — matching the canonical multi-table
+/// `INSERT … SELECT`. `linkID` is the `OpModeDistribution` schema's link column;
+/// the start distribution is not link-scoped, so it carries the `0` sentinel (no
+/// consumer joins `OpModeDistribution` on `linkID`).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StartOpModeDistributionRow {
     /// `sourceTypeID` — the MOVES source (vehicle) type.
     pub source_type_id: i32,
     /// `hourDayID` — `hourID * 10 + dayID` composite.
     pub hour_day_id: i32,
+    /// `linkID` — `0` sentinel; the start distribution is not link-scoped.
+    pub link_id: i32,
+    /// `polProcessID` — the start pollutant/process this fraction applies to.
+    pub pol_process_id: i32,
     /// `opModeID` — the start operating mode.
     pub op_mode_id: i32,
     /// `opModeFraction` — fraction of starts in this mode.
@@ -668,6 +677,8 @@ impl TableRow for StartOpModeDistributionRow {
         Schema::from_iter([
             ("sourceTypeID".into(), DataType::Int32),
             ("hourDayID".into(), DataType::Int32),
+            ("linkID".into(), DataType::Int32),
+            ("polProcessID".into(), DataType::Int32),
             ("opModeID".into(), DataType::Int32),
             ("opModeFraction".into(), DataType::Float64),
         ])
@@ -685,6 +696,16 @@ impl TableRow for StartOpModeDistributionRow {
                 Series::new(
                     "hourDayID".into(),
                     rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "linkID".into(),
+                    rows.iter().map(|r| r.link_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "polProcessID".into(),
+                    rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>(),
                 )
                 .into(),
                 Series::new(
@@ -712,6 +733,8 @@ impl TableRow for StartOpModeDistributionRow {
         };
         let source_type_id = get_i32("sourceTypeID")?;
         let hour_day_id = get_i32("hourDayID")?;
+        let link_id = get_i32("linkID")?;
+        let pol_process_id = get_i32("polProcessID")?;
         let op_mode_id = get_i32("opModeID")?;
         let op_mode_fraction = df
             .column("opModeFraction")
@@ -724,6 +747,8 @@ impl TableRow for StartOpModeDistributionRow {
                 Ok(StartOpModeDistributionRow {
                     source_type_id: source_type_id.get(i).ok_or_else(|| null("sourceTypeID"))?,
                     hour_day_id: hour_day_id.get(i).ok_or_else(|| null("hourDayID"))?,
+                    link_id: link_id.get(i).ok_or_else(|| null("linkID"))?,
+                    pol_process_id: pol_process_id.get(i).ok_or_else(|| null("polProcessID"))?,
                     op_mode_id: op_mode_id.get(i).ok_or_else(|| null("opModeID"))?,
                     op_mode_fraction: op_mode_fraction
                         .get(i)
@@ -838,6 +863,66 @@ pub struct StartOpModeInputs {
     pub vehicle_days: Vec<SampleVehicleDayRow>,
     /// `OperatingMode` rows — the soak-time band table.
     pub operating_modes: Vec<OperatingModeRow>,
+    /// The `polProcessID`s the step-400 `OpModeDistribution` insert fans the
+    /// per-`(sourceType, hourDay, opMode)` soak fractions out across — the
+    /// `pollutantProcessAssoc` rows whose `processID` is start-exhaust (2) or
+    /// crankcase-start (16). The canonical inventory SQL `cross join`s these
+    /// (`where ppa.processID in (2,16)`), so every start op-mode fraction is
+    /// emitted once per start `polProcessID`.
+    pub start_pol_process_ids: Vec<i32>,
+}
+
+/// One `RunSpecPollutantProcess` row — the `polProcessID`s the run selects
+/// (post chain-expansion). Step 400 fans the soak fractions out across the
+/// *run's* start `polProcessID`s. MOVES cross-joins the full
+/// `pollutantProcessAssoc`, but its execution-DB copy is already run-scoped;
+/// using the run-spec list directly matches that effective behaviour and keeps
+/// `OpModeDistribution` from exploding across every national start process
+/// (~160) when the run needs only a handful. `processID = polProcessID % 100`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RunSpecPollutantProcessRow {
+    /// `polProcessID` — `pollutantID * 100 + processID`.
+    pub pol_process_id: i32,
+}
+
+impl TableRow for RunSpecPollutantProcessRow {
+    fn table_name() -> &'static str {
+        "RunSpecPollutantProcess"
+    }
+    fn polars_schema() -> Schema {
+        Schema::from_iter([("polProcessID".into(), DataType::Int32)])
+    }
+    fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
+        let n = rows.len();
+        DataFrame::new(
+            n,
+            vec![Series::new(
+                "polProcessID".into(),
+                rows.iter().map(|r| r.pol_process_id).collect::<Vec<i32>>(),
+            )
+            .into()],
+        )
+    }
+    fn from_dataframe(df: &DataFrame) -> moves_framework::Result<Vec<Self>> {
+        let t = "RunSpecPollutantProcess";
+        let pol_process_id = df
+            .column("polProcessID")
+            .map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?
+            .cast(&DataType::Int32)
+            .map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?
+            .i32()
+            .map_err(|e| row_err(t, 0, "polProcessID", e.to_string()))?
+            .clone();
+        (0..df.height())
+            .map(|i| {
+                Ok(RunSpecPollutantProcessRow {
+                    pol_process_id: pol_process_id
+                        .get(i)
+                        .ok_or_else(|| row_err(t, i, "polProcessID", "null value".into()))?,
+                })
+            })
+            .collect()
+    }
 }
 
 /// Build the start operating-mode distribution rows for both
@@ -954,17 +1039,28 @@ pub fn build_start_op_mode_distribution(
         });
     }
 
-    // Emit per-mode fraction rows.
+    // Emit per-mode fraction rows. Step 400 fans each `(sourceType, hourDay,
+    // opMode)` soak fraction out across the start `polProcessID`s — the
+    // `cross join pollutantProcessAssoc ... where ppa.processID in (2,16)` of
+    // the canonical inventory `OpModeDistribution` insert. `linkID` is the
+    // `0` sentinel (the canonical SQL takes it from the off-network `link`,
+    // but no `OpModeDistribution` consumer joins on it). `RatesOpModeDistribution`
+    // keeps the unfanned per-`(sourceType, hourDay, opMode)` shape (it is
+    // gated out of inventory runs anyway).
     for ((source_type_id, hd_id, op_mode_id), &count) in &counts {
         let total = *totals.get(&(*source_type_id, *hd_id)).unwrap_or(&1);
         let fraction = op_mode_fraction(count, total);
 
-        op_mode_rows.push(StartOpModeDistributionRow {
-            source_type_id: *source_type_id,
-            hour_day_id: *hd_id,
-            op_mode_id: *op_mode_id,
-            op_mode_fraction: fraction,
-        });
+        for &pol_process_id in &inputs.start_pol_process_ids {
+            op_mode_rows.push(StartOpModeDistributionRow {
+                source_type_id: *source_type_id,
+                hour_day_id: *hd_id,
+                link_id: 0,
+                pol_process_id,
+                op_mode_id: *op_mode_id,
+                op_mode_fraction: fraction,
+            });
+        }
         rates_rows.push(RatesOpModeDistributionRow {
             source_type_id: *source_type_id,
             hour_day_id: *hd_id,
@@ -1023,24 +1119,58 @@ impl Generator for StartOperatingModeDistributionGenerator {
     }
 
     fn execute(&self, ctx: &mut CalculatorContext) -> Result<CalculatorOutput, Error> {
-        // Read the three input tables the kernel needs.
+        // Skip when this generator has already contributed its rows to the shared
+        // OpModeDistribution table, or when it is provided by a snapshot.
+        if crate::wiring::op_mode_distribution_already_built(ctx, START_OMDG_DONE_MARKER) {
+            return Ok(CalculatorOutput::empty());
+        }
+
+        // Step 400 fans the soak fractions out across the run's start
+        // `polProcessID`s — `RunSpecPollutantProcess` (the run-scoped pol-process
+        // set, post chain-expansion) filtered to the start-exhaust (2) and
+        // crankcase-start (16) processes. `processID = polProcessID % 100`.
+        let start_exhaust = START_EXHAUST_PROCESS_ID.0 as i32;
+        let crankcase_start = CRANKCASE_START_EXHAUST_PROCESS_ID.0 as i32;
+        let start_pol_process_ids: Vec<i32> = ctx
+            .tables()
+            .iter_typed::<RunSpecPollutantProcessRow>("RunSpecPollutantProcess")?
+            .into_iter()
+            .map(|r| r.pol_process_id)
+            .filter(|&pp| {
+                let process = pp.rem_euclid(100);
+                process == start_exhaust || process == crankcase_start
+            })
+            .collect();
+
+        // Read the trip/op-mode input tables the kernel needs.
         let inputs = StartOpModeInputs {
             trips: ctx.tables().iter_typed("SampleVehicleTrip")?,
             vehicle_days: ctx.tables().iter_typed("SampleVehicleDay")?,
             operating_modes: ctx.tables().iter_typed("OperatingMode")?,
+            start_pol_process_ids,
         };
 
         // Run steps 100–400: soak time → start op mode → op-mode fraction →
         // populate both output tables.
         let (op_mode_rows, rates_rows) = build_start_op_mode_distribution(&inputs);
 
-        // Write OpModeDistribution to scratch.
-        crate::wiring::write_scratch_table(ctx, OUTPUT_TABLES[0], op_mode_rows)?;
+        // Merge the start rows into the shared OpModeDistribution table (the
+        // running/brake and evap generators contribute the other processes).
+        crate::wiring::merge_op_mode_distribution(ctx, START_OMDG_DONE_MARKER, op_mode_rows)?;
 
-        // Write RatesOpModeDistribution to scratch directly (second table).
-        let rates_df = RatesOpModeDistributionRow::into_dataframe(rates_rows)
-            .map_err(|e| Error::Polars(e.to_string()))?;
-        ctx.scratch_mut().insert(OUTPUT_TABLES[1], rates_df);
+        // RatesOpModeDistribution is a rates-mode table. This generator's start
+        // rows carry only a narrow schema (no canonical `roadTypeID`/etc.), and
+        // in an inventory run it is the *only* writer of the table — so emitting
+        // it leaves a schema-incompatible table that breaks strict extraction in
+        // every reader (BaseRateGenerator, SourceTypePhysics). No inventory
+        // reader needs it, so only emit it outside inventory mode. Both `Macro`
+        // (legacy `MACROSCALE`) and `Inventory` (`Inv`) are inventory scales —
+        // only `Rates` (and the `None` default used by unit tests) emit.
+        if !ctx.model_scale().is_some_and(ModelScale::is_inventory) {
+            let rates_df = RatesOpModeDistributionRow::into_dataframe(rates_rows)
+                .map_err(|e| Error::Polars(e.to_string()))?;
+            ctx.scratch_mut().insert(OUTPUT_TABLES[1], rates_df);
+        }
 
         Ok(CalculatorOutput::empty())
     }
@@ -1434,6 +1564,20 @@ mod tests {
             .unwrap(),
         );
 
+        // Step 400 fans the soak fractions across the run's start polProcessIDs
+        // (processID = polProcessID % 100 in {2,16}); the running process (1)
+        // row 201 is filtered out.
+        store.insert(
+            "RunSpecPollutantProcess",
+            RunSpecPollutantProcessRow::into_dataframe(vec![
+                RunSpecPollutantProcessRow { pol_process_id: 202 },
+                RunSpecPollutantProcessRow { pol_process_id: 302 },
+                RunSpecPollutantProcessRow { pol_process_id: 216 },
+                RunSpecPollutantProcessRow { pol_process_id: 201 },
+            ])
+            .unwrap(),
+        );
+
         let mut ctx = CalculatorContext::with_tables(store);
         let out = StartOperatingModeDistributionGenerator
             .execute(&mut ctx)
@@ -1441,18 +1585,29 @@ mod tests {
         // Generator writes to scratch — main output is empty.
         assert!(out.dataframe().is_none());
 
-        // Read back OpModeDistribution.
+        // Read back OpModeDistribution — one soak op-mode (102) fanned out across
+        // the 3 start polProcessIDs (202, 302, 216).
         let omd: Vec<StartOpModeDistributionRow> = ctx
             .scratch()
             .store
             .iter_typed("OpModeDistribution")
             .expect("OpModeDistribution in scratch");
-        assert_eq!(omd.len(), 1, "one start → one op-mode row");
-        assert_eq!(omd[0].source_type_id, 21);
-        // hourDayID = hourID*10 + dayID = 9*10 + 5 = 95
-        assert_eq!(omd[0].hour_day_id, 95);
-        assert_eq!(omd[0].op_mode_id, 102); // soak = 60, which is [60,∞)
-        assert!((omd[0].op_mode_fraction - 1.0).abs() < 1e-12);
+        assert_eq!(omd.len(), 3, "1 op-mode × 3 start polProcessIDs");
+        let pps: std::collections::BTreeSet<i32> = omd.iter().map(|r| r.pol_process_id).collect();
+        assert_eq!(
+            pps,
+            [202, 216, 302]
+                .into_iter()
+                .collect::<std::collections::BTreeSet<_>>()
+        );
+        for r in &omd {
+            assert_eq!(r.source_type_id, 21);
+            // hourDayID = hourID*10 + dayID = 9*10 + 5 = 95
+            assert_eq!(r.hour_day_id, 95);
+            assert_eq!(r.link_id, 0);
+            assert_eq!(r.op_mode_id, 102); // soak = 60, which is [60,∞)
+            assert!((r.op_mode_fraction - 1.0).abs() < 1e-12);
+        }
 
         // Read back RatesOpModeDistribution.
         let romd: Vec<RatesOpModeDistributionRow> = ctx
@@ -1511,6 +1666,14 @@ mod tests {
                 op_mode_id: 101,
                 min_soak_time: None,
                 max_soak_time: Some(60),
+            }])
+            .unwrap(),
+        );
+
+        store.insert(
+            "RunSpecPollutantProcess",
+            RunSpecPollutantProcessRow::into_dataframe(vec![RunSpecPollutantProcessRow {
+                pol_process_id: 202,
             }])
             .unwrap(),
         );
@@ -1605,6 +1768,14 @@ mod tests {
             .unwrap(),
         );
 
+        store.insert(
+            "RunSpecPollutantProcess",
+            RunSpecPollutantProcessRow::into_dataframe(vec![RunSpecPollutantProcessRow {
+                pol_process_id: 202,
+            }])
+            .unwrap(),
+        );
+
         let mut ctx = CalculatorContext::with_tables(store);
         StartOperatingModeDistributionGenerator
             .execute(&mut ctx)
@@ -1616,10 +1787,13 @@ mod tests {
             .iter_typed("OpModeDistribution")
             .expect("table present");
         // Two starts across two different (hour_day, op_mode) cells — different hourIDs,
-        // so two distinct hourDayIDs: 9*10+5=95 and 10*10+5=105.
+        // so two distinct hourDayIDs: 9*10+5=95 and 10*10+5=105. One start
+        // polProcessID seeded (202) → each cell emits exactly one row.
         assert_eq!(omd.len(), 2, "one mode per distinct (hourDay, opMode) cell");
         for row in &omd {
             assert_eq!(row.source_type_id, 21);
+            assert_eq!(row.pol_process_id, 202);
+            assert_eq!(row.link_id, 0);
             // Each cell has exactly 1 start of 1 total → fraction 1.0.
             assert!(
                 (row.op_mode_fraction - 1.0).abs() < 1e-12,
@@ -1648,6 +1822,10 @@ mod tests {
         store.insert(
             "OperatingMode",
             OperatingModeRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "RunSpecPollutantProcess",
+            RunSpecPollutantProcessRow::into_dataframe(vec![]).unwrap(),
         );
         let mut ctx = CalculatorContext::with_tables(store);
         assert!(StartOperatingModeDistributionGenerator

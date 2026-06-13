@@ -187,11 +187,13 @@ fn canonical_present(snapshots_root: &Path, name: &str) -> bool {
 
 /// The fixture catalogue must contain exactly 40 non-scale non-error fixtures.
 ///
-/// 46 total in `characterization/fixtures/`:
-/// - 30 onroad/mixed (non-`nr-`, non-`scale-`, non-`error-`):
+/// 50 total in `characterization/fixtures/`:
+/// - 34 onroad/mixed (non-`nr-`, non-`scale-`, non-`error-`):
 /// 23 original default-scale + `mixed-onroad-nonroad` + 6 added by
 /// (`expand-counties-large`, `expand-multifuel`, `expand-fullyear`,
-/// `expand-multiyear`, `expand-roadtypes`, `rates-minimal`)
+/// `expand-multiyear`, `expand-roadtypes`, `rates-minimal`) + 4 SINGLE-scale
+/// county fixtures (`process-apu-single`, `process-extended-idle-single`,
+/// `process-crankcase-start-single`, `process-crankcase-extidle-single`)
 /// - 10 NONROAD (`nr-*.xml`)
 /// - 3 `scale-*.xml` (excluded — require additional input databases)
 /// - 3 `error-*.xml` (excluded — test expected parse failures separately)
@@ -200,8 +202,8 @@ fn fixture_catalogue_size() {
     let fixtures = all_fixtures();
     assert_eq!(
         fixtures.len(),
-        40,
-        "expected 40 non-scale non-error fixtures (30 onroad/mixed + 10 NONROAD), \
+        44,
+        "expected 44 non-scale non-error fixtures (34 onroad/mixed + 10 NONROAD), \
          found {}. Update this test if the catalogue changes.",
         fixtures.len()
     );
@@ -216,8 +218,8 @@ fn fixture_catalogue_size() {
         .count();
 
     assert_eq!(
-        onroad_count, 30,
-        "expected 30 onroad/mixed fixtures, found {onroad_count}"
+        onroad_count, 34,
+        "expected 34 onroad/mixed fixtures, found {onroad_count}"
     );
     assert_eq!(
         nonroad_count, 10,
@@ -464,6 +466,46 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
         ("process-evap-leaks", ONROAD_REL_TOL, false), // ~1.6e-7
         ("process-evap-permeation", ONROAD_REL_TOL, false), // ~2.1e-7
         ("nr-commercial-nation", NONROAD_REL_TOL, false), // ~3.5e-3 (real*4)
+        // nr-pleasure-craft-state: Florida state-scale, gasoline pleasure
+        // craft, processes 1/22/23/24. Graduated once the state-scoped
+        // month-allocation/growth/fuel-property/ambient-temperature lookups
+        // landed: 440/440 rows, max_rel ~7.2e-3 (real*4 class).
+        ("nr-pleasure-craft-state", NONROAD_REL_TOL, false),
+        // nr-lawn-garden-county / nr-recreational-county: county-scale
+        // (Washtenaw MI) gasoline fixtures. Graduated once the supply
+        // fuelYearID filter (a county capture carries every fuel year
+        // 1990–2060; without the filter the oxygenate sum hit ~140 wt%)
+        // and canonical zero-row emission (every selected pollutant of
+        // every .BMY record gets a row, clamped at 0) landed: identical
+        // key sets, every pollutant ≤ ~1e-5 (f32 drift class).
+        ("nr-lawn-garden-county", NONROAD_REL_TOL, false), // ~4e-6, 1936/1936
+        ("nr-recreational-county", NONROAD_REL_TOL, false), // exact, 1010/1010
+        // Remaining six nonroad fixtures, graduated together once the
+        // Tier-4 fidelity round landed: MXTECH raised 15→32 (the per-
+        // (SCC,hp) tech union spans 18 diesel techs; truncation dropped
+        // the T4FB/T4FC/T4FD techs carrying the whole MY2015+ mix), the
+        // canonical 3-step SCC fallback (exact → 7-digit equipment root →
+        // 4-digit family root) for rate/mix/evap lookups (diesel
+        // lawn&garden rates key at 2270004000; marine-diesel mixes at
+        // 2282020000), per-HP-bin activity resolution (fndact matches the
+        // HP category; marine 750-hp bins use 30 hr/yr vs 47.6 below),
+        // the canonical .POP one-decimal population rounding, the /GROWTH/
+        // integer-truncated indices, the base-pop-year grwfac feed into
+        // scrptime (prccty.f grwcty — not the .POP growth-pair rate), and
+        // the prcsta-ordering MINGRWIND fix (agedist grows the STATE
+        // population; the pre-allocated county population is divided back
+        // out so the 0.0001 clamp can't balloon sub-MINGRWIND records).
+        // All six: identical key sets, worst per-key rel ≤ ~1e-3.
+        ("nr-agriculture-state", NONROAD_REL_TOL, false), // ≤1.0e-3, 21120/21120
+        ("nr-airport-support-county", NONROAD_REL_TOL, false), // ≤1.0e-3, 21068/21068
+        ("nr-construction-state", NONROAD_REL_TOL, false), // ~2.9e-6, 2355/2355
+        ("nr-industrial-county", NONROAD_REL_TOL, false), // ≤1.0e-3, 15801/15801
+        ("nr-logging-county", NONROAD_REL_TOL, false),    // ~2.0e-6, 144/144
+        ("nr-railroad-support-nation", NONROAD_REL_TOL, false), // ~8.6e-4, 23108/23108
+        // mixed-onroad-nonroad: the canonical capture's MOVESOutput is
+        // empty (0 rows) and the port emits 0 rows for it — vacuous, so
+        // the gate fails loudly if a recapture gives either side rows.
+        ("mixed-onroad-nonroad", NONROAD_REL_TOL, true),
         // process-refueling: the chained RefuelingLossCalculator now runs (the
         // engine's chainCalculator step), reads a synthesized RefuelingFuelType
         // extract, gates output to THC (pollutant 1), and reconciles the
@@ -480,11 +522,31 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
         // expand-day / expand-fueltype-diesel / expand-sourcetype: select energy
         // pollutants 91/92/93. The KJ→Million-BTU unit conversion is wired in the
         // engine; activity weighting is also applied. All three now match canonical
-        // within ONROAD_REL_TOL. expand-counties and expand-month remain quarantined
-        // (expand-counties ~200% over; expand-month ~9.9e-3, just above tolerance).
+        // within ONROAD_REL_TOL.
         ("expand-day", ONROAD_REL_TOL, false), // ~3.5e-4
         ("expand-fueltype-diesel", ONROAD_REL_TOL, false), // ~3.0e-4
         ("expand-sourcetype", ONROAD_REL_TOL, false), // ~1.3e-4
+        // expand-month: 4-month run (Feb/May/Aug/Nov), energy pollutant 91. Was
+        // ~9.9e-3, driven entirely by August (-3.4%): the rates-first
+        // BaseRateCalculator never recomputed the dropped-by-canonical
+        // `zoneACFactor`, so the air-conditioning energy adjustment was omitted —
+        // negligible in cool months, large in hot ones. `setup::compute_zone_ac_factor`
+        // now ports the canonical cache query (BaseRateCalculator.sql:507-523), so
+        // the AC term is applied and the residual drops to ~3.8e-4 (precision class).
+        ("expand-month", ONROAD_REL_TOL, false), // ~3.8e-4
+        // expand-counties: 3-county run (Washtenaw/Cook/LA), energy pollutant 91.
+        // Was ~200% over: `build_fuel_supply` pooled all three counties' fuel
+        // regions under the firing county (the captured FuelSupply has a
+        // fuelRegionID but no countyID), so each fuel type's market shares summed
+        // to ~3 and the inventory tripled. Filtering FuelSupply to the county's
+        // region(s) via `regionCounty` drops it to ~3.4e-4 (precision class).
+        ("expand-counties", ONROAD_REL_TOL, false), // ~3.4e-4
+        // sample-runspec: the canonical EPA sample (energy pollutant 91 only in the
+        // captured MOVESOutput, 84 rows). Port reproduces the same coverage (84 rows,
+        // pol 91) and value to ~1.6e-6 — pure f64 summation-order drift, smaller than
+        // every other energy fixture above. Confirmed precision-only via the union
+        // per-pollutant diff (no 92/93 emitted by either side; single pol-91 row).
+        ("sample-runspec", ONROAD_REL_TOL, false), // ~1.6e-6
         // Speciation / chained-calculator fixtures graduated once the regClass
         // collapse, SulfatePM pass-through doubling and NO/NO2 species doubling
         // were fixed (see QUARANTINED_FIXTURES for the three root causes). Each
@@ -508,17 +570,32 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
         // fuelType-9 (electricity) 112/118 rows the additive delta cannot
         // cancel. 100/110/111/112/115/118/119 all exact to f64 drift.
         ("process-pm-exhaust", ONROAD_REL_TOL, false),
-        // process-apu was asserted-vacuous (canon 0 / port 0) only because the
-        // month off-by-one blocked all BaseRate output. With that fixed the
-        // BaseRate path now emits the process-91 / opMode-201,203 (APU /
-        // shorepower) energy rates, which canonical drops from baseRateOutput
-        // (its baserateoutput is 0 even though baserate_91_2020 has 358 rows
-        // and a baserateunits row exists). Reproducing that requires the
-        // runspec-derived BRC activity gating the port has not yet wired —
-        // see QUARANTINED_FIXTURES and docs/known-divergences.md §4.4.
+        // Vacuous (canon 0 / port 0) hotelling/idle/start-process fixtures.
+        // Canonical's captured execution DB for each carries the base RATE
+        // (e.g. process-apu's baserate_91_2020 has 358 nonzero opMode-201 APU
+        // rows) and the units metadata, but its activity tables — sho,
+        // sourcehours, movesworkeractivityoutput — and every output table —
+        // baserateoutput, rateperhour, ratepervehicle, movesactivityoutput,
+        // movesoutput — are EMPTY. So canonical's authoritative output for the
+        // process is zero rows. The port reproduces that: the BaseRate
+        // activity weighting (universalActivity = SHO / noOfRealDays) multiplies
+        // the captured rate by the captured SHO, which is empty, gating the
+        // output to nothing — exactly the "runspec-derived BRC activity gating"
+        // process-apu previously lacked (it used to emit the ungated APU rate,
+        // which is why it was quarantined). canon 0 == port 0, asserted vacuous.
+        // `vacuous` makes the gate fail loudly if a recapture ever gives either
+        // side a nonzero row, forcing reclassification rather than a silent pass.
+        ("process-apu", ONROAD_REL_TOL, true),
         ("process-crankcase-extidle", ONROAD_REL_TOL, true),
         ("process-crankcase-start", ONROAD_REL_TOL, true),
         ("process-extended-idle", ONROAD_REL_TOL, true),
+        // SINGLE-scale county variants (added with canonical snapshots by the
+        // HotellingImporter + Starts port). Same empty-canonical / empty-port
+        // vacuous case as their non-single counterparts above.
+        ("process-apu-single", ONROAD_REL_TOL, true),
+        ("process-crankcase-extidle-single", ONROAD_REL_TOL, true),
+        ("process-crankcase-start-single", ONROAD_REL_TOL, true),
+        ("process-extended-idle-single", ONROAD_REL_TOL, true),
     ]
 }
 
@@ -534,23 +611,17 @@ const QUARANTINED_FIXTURES: &[&str] = &[
     // expand-* energy fixtures — energy pollutants 91/92/93, activity weighting
     // applied, KJ→Million-BTU conversion wired. expand-criteria/expand-day/
     // expand-fueltype-diesel/expand-sourcetype GRADUATED to asserted_fixtures.
-    // Remaining quarantined:
-    //   expand-counties: ~200% over (max_rel_diff ≈ 2.0); multi-county run with
-    //     per-county weighting not yet reproduced. See docs/known-divergences.md §4.4.
-    //   expand-month: ~9.9e-3 (just above ONROAD_REL_TOL=1e-3). Multi-day expansion
-    //     with weekday/weekend weighting; residual gap under investigation.
-    //   sample-runspec: ~1.3e-6, within tolerance but unclassified — leave quarantined
-    //     until the cause is confirmed (possibly floating-point accumulation only).
-    "expand-counties",
-    "expand-month",
-    "sample-runspec",
-    // process-apu: BaseRate emits the process-91 / op-mode-201,203 (APU /
-    // shorepower) energy rates canonical activity-gates to 0 in baseRateOutput;
-    // same missing-activity-weighting gap. mixed-onroad-nonroad: canonical
-    // MOVESOutput is empty (0 rows) while the port's NONROAD half emits ~8,632
-    // legitimate rows (separate/known). See docs/known-divergences.md §4.4.
-    "process-apu",
-    "mixed-onroad-nonroad",
+    // expand-month GRADUATED to asserted_fixtures (zoneACFactor recompute, ~3.8e-4).
+    // expand-counties GRADUATED to asserted_fixtures (FuelSupply region filter, ~3.4e-4).
+    // sample-runspec GRADUATED to asserted_fixtures: confirmed precision-only
+    //   (single energy pol-91, 84 rows both sides, ~1.6e-6 f64 summation drift).
+    // process-apu GRADUATED to asserted_fixtures (vacuous): the BaseRate activity
+    // weighting now gates the captured APU rate to 0 against the empty captured
+    // SHO, matching canonical's empty output (canon 0 == port 0).
+    // mixed-onroad-nonroad GRADUATED to asserted_fixtures (vacuous): the
+    // canonical capture is empty (0 rows) and the port also emits 0 rows;
+    // the vacuous flag fails the gate loudly if a recapture ever gives
+    // either side a nonzero row.
     // Speciation / chained-calculator class. Three engine/calculator bugs in this
     // class were FOUND and FIXED, GRADUATING chain-nonhaptog, chain-tog-speciation,
     // process-crankcase-running, process-nox-speciation, process-brakewear and
@@ -578,17 +649,17 @@ const QUARANTINED_FIXTURES: &[&str] = &[
     // and NonECPM (118) is now exact via the true per-key delta emit, the general
     // fuel ratio restricted to pollutant 120, and the engine's
     // `replaced_pollutants` drop of BaseRate's zero fuelType-9 electricity rows.
-    // NONROAD fixtures that emit nothing (port row count 0 vs a populated
-    // canonical) or a wrong row count — population/sector-coverage gaps.
-    "nr-agriculture-state",
-    "nr-airport-support-county",
-    "nr-construction-state",
-    "nr-industrial-county",
-    "nr-lawn-garden-county",
-    "nr-logging-county",
-    "nr-pleasure-craft-state",
-    "nr-railroad-support-nation",
-    "nr-recreational-county",
+    // All nine quarantined nr-* fixtures GRADUATED to asserted_fixtures:
+    // the original "emits nothing / wrong row count" class fell to the
+    // canonical empty-/SOURCE CATEGORY/ quirk, surrogate allocation,
+    // state-scoped lookups, the SFC-vs-SWT sox fix and the /PM BASE
+    // SULFUR/ alternates; the residual Tier-4-era diesel gap was the
+    // MXTECH=15 truncation of the cross-model-year tech union (T4FB/
+    // T4FC/T4FD dropped) plus the missing 7-digit step of the canonical
+    // SCC fallback chain; the row-count edges were the canonical .POP
+    // one-decimal rounding, per-HP-bin activity (fndact), the base-pop-
+    // year grwfac feed into scrptime, and the prcsta-ordering MINGRWIND
+    // fix (agedist on the state population, allocation divided back out).
 ];
 
 fn is_quarantined(name: &str) -> bool {
@@ -1268,7 +1339,7 @@ fn default_db_snapshot_diff() {
             scale_input: None,
             default_db: Some(db_root.clone()),
         })
-        .unwrap_or_else(|e| panic!("{name}: run error — {e}"));
+        .unwrap_or_else(|e| panic!("{name}: run error — {e:#}"));
 
         let canonical = match Snapshot::load(&snap_root.join(name)) {
             Ok(s) => {

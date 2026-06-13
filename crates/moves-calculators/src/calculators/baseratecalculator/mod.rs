@@ -103,6 +103,11 @@ static INPUT_TABLES: &[&str] = &[
     "FuelSupply",
     "FuelSubtype",
     "MonthOfAnyYear",
+    // AC-factor recomputation inputs (see setup::compute_zone_ac_factor): the
+    // canonical zoneACFactor cache query joins these to ZoneMonthHour.heatIndex.
+    "MonthGroupHour",
+    "SourceTypeAge",
+    "SourceTypeModelYear",
     "runSpecRoadType",
     // Activity tables the GetActivity SQL section reads to build
     // `universalActivity` (see `build_universal_activity`): SHO drives
@@ -662,18 +667,13 @@ impl Calculator for BaseRateCalculator {
             zone_id: pos.location.zone_id.map(|z| z as i32).unwrap_or(0),
             link_id: pos.location.link_id.map(|l| l as i32).unwrap_or(0),
             year_id: pos.time.year.map(|y| y as i32).unwrap_or(0),
-            // MOVES keys its execution DB (and every captured snapshot) by the
-            // internal `monthID = RunSpec <month key> + 1` (e.g. `<month
-            // key="7"/>` → monthID 8 / August). The sibling generators apply
-            // the same `+1` (`SnapshotFilter::from_run_spec`,
-            // `evap_op_mode_distribution::fraction_of_operating`); mirror it
-            // here so the fuel-supply join (`build_fuel_blocks`) keys on the
-            // monthID the snapshot's fuel supply was captured at.
-            month_id: pos
-                .time
-                .month
-                .map(|m| if m == 12 { 1 } else { m as i32 + 1 })
-                .unwrap_or(0),
+            // `pos.time.month` is the real MOVES `monthID` (the `<month key>`
+            // 0-based index → ID conversion happens once, in the XML parser).
+            // The captured execution DB keys its fuel supply at that same
+            // monthID, so the `build_fuel_blocks` join uses it verbatim — the
+            // former `+1` here was compensating the unconverted key and now
+            // would double-shift (August → September).
+            month_id: pos.time.month.map(|m| m as i32).unwrap_or(0),
         };
         let mut inputs = BaseRateCalculatorInputs {
             base_rate_by_age: tables.iter_typed("BaseRateByAge")?,
@@ -689,12 +689,36 @@ impl Calculator for BaseRateCalculator {
             county: tables.iter_typed("County")?,
             general_fuel_ratio: tables.iter_typed("GeneralFuelRatio")?,
             criteria_ratio: tables.iter_typed("criteriaRatio")?,
-            alt_criteria_ratio: tables.iter_typed("altCriteriaRatio")?,
+            // altCriteriaRatio is empty in the default DB (alt-fuel criteria
+            // ratios are scenario-specific), so the packager ships no partition
+            // for it. Absent ≡ empty here — the adjust step already guards on
+            // `len(AltCriteriaRatio) > 0` — so read it leniently like the other
+            // optional tables in this struct rather than erroring on the missing
+            // table.
+            alt_criteria_ratio: tables.iter_typed_or_empty("altCriteriaRatio")?,
             temperature_adjustment: tables.iter_typed("TemperatureAdjustment")?,
             nox_humidity_adjust: tables.iter_typed("NOxHumidityAdjust")?,
-            zone_ac_factor: tables.iter_typed_or_empty("zoneACFactor")?,
+            // Canonical computes zoneACFactor inside the calculator and drops it
+            // (BaseRateCalculator.sql:507-523, :1546), so a captured snapshot
+            // never carries it. When the table is absent/empty, recompute it from
+            // ZoneMonthHour + the AC coefficient tables so the air-conditioning
+            // energy adjustment is not silently omitted (see
+            // `setup::compute_zone_ac_factor`).
+            zone_ac_factor: {
+                let captured = tables.iter_typed_or_empty::<setup::ZoneAcFactorRow>("zoneACFactor")?;
+                if captured.is_empty() {
+                    setup::compute_zone_ac_factor(
+                        tables,
+                        constants.year_id,
+                        constants.month_id,
+                        constants.zone_id,
+                    )?
+                } else {
+                    captured
+                }
+            },
             im_factor: tables.iter_typed("IMFactor")?,
-            im_coverage: tables.iter_typed("IMCoverage")?,
+            im_coverage: tables.iter_typed_or_empty("IMCoverage")?,
             emission_rate_adjustment: tables.iter_typed("EmissionRateAdjustment")?,
             ev_efficiency: tables.iter_typed("EVEfficiency")?,
             // MOVES never persists `universalActivity` (it is a runtime-derived
@@ -1081,6 +1105,45 @@ fn build_fuel_supply(
     let ff: Vec<FuelFormulationRow> = tables.iter_typed("FuelFormulation")?;
     let fs: Vec<LocalFuelSubtypeRow> = tables.iter_typed_or_empty("FuelSubtype")?;
     let mg: Vec<LocalMonthGroupRow> = tables.iter_typed_or_empty("MonthOfAnyYear")?;
+
+    // Restrict FuelSupply to the current county's fuel region(s). Canonical
+    // extracts FuelSupply per county-context (the `##FuelSupply##` OUTFILE is
+    // region-filtered to `context.iterLocation`), but a captured snapshot
+    // accumulates EVERY selected county's region into one `FuelSupply` table
+    // (the table has a `fuelRegionID`, not a `countyID`). Without this filter a
+    // multi-county run pools all N regions' formulations under the firing
+    // county, so each fuel type's market shares sum to ~N instead of 1 and the
+    // inventory over-emits N× (e.g. a 3-county run is exactly 3× canonical).
+    // `regionCounty` maps `countyID → regionID`. When it is absent/empty (single
+    // -region unit-test contexts, or a default-DB run that already supplies a
+    // county-scoped FuelSupply) the set is empty and no restriction is imposed.
+    let county_regions: std::collections::BTreeSet<i32> = match tables
+        .column_views("regionCounty", &["regionID", "countyID"])
+    {
+        Ok(views) => {
+            let region = views[0].cast(&DataType::Int64).ok();
+            let county = views[1].cast(&DataType::Int64).ok();
+            match (region.as_ref().and_then(|s| s.i64().ok()), county.as_ref().and_then(|s| s.i64().ok())) {
+                (Some(region), Some(county)) => region
+                    .into_iter()
+                    .zip(county)
+                    .filter_map(|(r, c)| match (r, c) {
+                        (Some(r), Some(c)) if c == i64::from(constants.county_id) => Some(r as i32),
+                        _ => None,
+                    })
+                    .collect(),
+                _ => std::collections::BTreeSet::new(),
+            }
+        }
+        Err(_) => std::collections::BTreeSet::new(),
+    };
+    let raw: Vec<RawFuelSupplyRow> = if county_regions.is_empty() {
+        raw
+    } else {
+        raw.into_iter()
+            .filter(|r| county_regions.contains(&r.fuel_region_id))
+            .collect()
+    };
 
     let formulation_to_subtype: HashMap<i32, i32> = ff
         .iter()
@@ -1786,13 +1849,14 @@ mod tests {
         store.insert(
             "MonthOfAnyYear",
             // `MonthOfAnyYear` maps the fuel `monthGroupID` to the internal
-            // `monthID`. `execute` now keys `RunConstants.month_id` off the
-            // position month with the MOVES `+1` convention (position month 7
-            // → monthID 8), so the fuel supply must land at the same monthID
-            // for the join in `build_fuel_blocks` to match — map group 7 → 8.
+            // `monthID`. `execute` keys `RunConstants.month_id` off the position
+            // month verbatim (the key→ID conversion is done in the XML parser,
+            // so no `+1` here). The position below is month 7, so the fuel
+            // supply must land at monthID 7 for `build_fuel_blocks` to match —
+            // map group 7 → 7.
             LocalMonthGroupRow::into_dataframe(vec![LocalMonthGroupRow {
                 month_group_id: 7,
-                month_id: 8,
+                month_id: 7,
             }])
             .unwrap(),
         );

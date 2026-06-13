@@ -75,28 +75,53 @@ impl VariableSource for FuelFormulation {
     /// case. An unknown name returns `None`, which the evaluator surfaces
     /// as an [`UnknownVariable`](super::expression::ExpressionError).
     fn variable(&self, name: &str) -> Option<f64> {
-        let value = match name.to_ascii_lowercase().as_str() {
-            "fuelformulationid" => f64::from(self.fuel_formulation_id),
-            "fuelsubtypeid" => f64::from(self.fuel_subtype_id),
-            "rvp" => f64::from(self.rvp),
-            "sulfurlevel" => f64::from(self.sulfur_level),
-            "etohvolume" => f64::from(self.etoh_volume),
-            "mtbevolume" => f64::from(self.mtbe_volume),
-            "etbevolume" => f64::from(self.etbe_volume),
-            "tamevolume" => f64::from(self.tame_volume),
-            "aromaticcontent" => f64::from(self.aromatic_content),
-            "olefincontent" => f64::from(self.olefin_content),
-            "benzenecontent" => f64::from(self.benzene_content),
-            "e200" => f64::from(self.e200),
-            "e300" => f64::from(self.e300),
-            "voltowtpercentoxy" => f64::from(self.vol_to_wt_percent_oxy),
-            "biodieselestervolume" => f64::from(self.bio_diesel_ester_volume),
-            "cetaneindex" => f64::from(self.cetane_index),
-            "pahcontent" => f64::from(self.pah_content),
-            "t50" => f64::from(self.t50),
-            "t90" => f64::from(self.t90),
-            "altrvp" => f64::from(self.alt_rvp),
-            _ => return None,
+        // `eq_ignore_ascii_case` folds case without allocating; the old
+        // `name.to_ascii_lowercase()` allocated a String on every variable
+        // access, which dominated the fuel-effects evaluator's profile (the
+        // same expression is re-evaluated for every fuel formulation).
+        let eq = |lower: &str| name.eq_ignore_ascii_case(lower);
+        let value = if eq("fuelformulationid") {
+            f64::from(self.fuel_formulation_id)
+        } else if eq("fuelsubtypeid") {
+            f64::from(self.fuel_subtype_id)
+        } else if eq("rvp") {
+            f64::from(self.rvp)
+        } else if eq("sulfurlevel") {
+            f64::from(self.sulfur_level)
+        } else if eq("etohvolume") {
+            f64::from(self.etoh_volume)
+        } else if eq("mtbevolume") {
+            f64::from(self.mtbe_volume)
+        } else if eq("etbevolume") {
+            f64::from(self.etbe_volume)
+        } else if eq("tamevolume") {
+            f64::from(self.tame_volume)
+        } else if eq("aromaticcontent") {
+            f64::from(self.aromatic_content)
+        } else if eq("olefincontent") {
+            f64::from(self.olefin_content)
+        } else if eq("benzenecontent") {
+            f64::from(self.benzene_content)
+        } else if eq("e200") {
+            f64::from(self.e200)
+        } else if eq("e300") {
+            f64::from(self.e300)
+        } else if eq("voltowtpercentoxy") {
+            f64::from(self.vol_to_wt_percent_oxy)
+        } else if eq("biodieselestervolume") {
+            f64::from(self.bio_diesel_ester_volume)
+        } else if eq("cetaneindex") {
+            f64::from(self.cetane_index)
+        } else if eq("pahcontent") {
+            f64::from(self.pah_content)
+        } else if eq("t50") {
+            f64::from(self.t50)
+        } else if eq("t90") {
+            f64::from(self.t90)
+        } else if eq("altrvp") {
+            f64::from(self.alt_rvp)
+        } else {
+            return None;
         };
         Some(value)
     }

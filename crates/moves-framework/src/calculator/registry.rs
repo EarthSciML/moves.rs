@@ -489,6 +489,113 @@ impl CalculatorRegistry {
         set
     }
 
+    /// The `OpModeDistribution`-producing generators that must **not** run for
+    /// the given domain/scale.
+    ///
+    /// Three generators — `OperatingModeDistributionGenerator`,
+    /// `LinkOperatingModeDistributionGenerator` and
+    /// `MesoscaleLookupOperatingModeDistributionGenerator` — all produce the
+    /// `OpModeDistribution` execution table and all subscribe to Running Exhaust
+    /// (process 1) + Brakewear (process 9). Canonical MOVES instantiates exactly
+    /// **one** of them, chosen by domain/scale
+    /// (`MOVESInstantiator.instantiate`, the `M1` swap):
+    ///
+    /// * Project domain                → `LinkOperatingModeDistributionGenerator`
+    /// * Mesoscale-Lookup (Rates) scale → `MesoscaleLookupOperatingModeDistributionGenerator`
+    /// * otherwise (Inventory)          → `OperatingModeDistributionGenerator`
+    ///
+    /// The bare `(pollutant, process)` filter in
+    /// [`modules_for_runspec`](Self::modules_for_runspec) cannot make this choice
+    /// (all three share processes 1+9), so it over-selects all three. They then
+    /// collide on the single `OpModeDistribution` scratch name — the no-`linkID`
+    /// Mesoscale variant clobbering the link-keyed one, which panics downstream
+    /// with `OpModeDistribution.linkID not found`. This returns the two variants
+    /// to drop so only the canonical producer remains, mirroring
+    /// [`nonroad_only_modules`](Self::nonroad_only_modules) on the model axis.
+    #[must_use]
+    pub fn domain_scale_excluded_omd_modules(
+        &self,
+        is_project: bool,
+        is_mesoscale: bool,
+    ) -> BTreeSet<String> {
+        const STANDARD: &str = "OperatingModeDistributionGenerator";
+        const LINK: &str = "LinkOperatingModeDistributionGenerator";
+        const MESOSCALE: &str = "MesoscaleLookupOperatingModeDistributionGenerator";
+        // Project takes precedence over scale, matching the order of the
+        // `isProjectDomain` / `isMesoscaleLookup` blocks in MOVESInstantiator.
+        let keep = if is_project {
+            LINK
+        } else if is_mesoscale {
+            MESOSCALE
+        } else {
+            STANDARD
+        };
+        [STANDARD, LINK, MESOSCALE]
+            .into_iter()
+            .filter(|&n| n != keep)
+            .map(String::from)
+            .collect()
+    }
+
+    /// The selected modules to drop under canonical `MOVESInstantiator`
+    /// `DO_RATES_FIRST` (the released-MOVES default, `CompilationFlags
+    /// .DO_RATES_FIRST = true`): every selected **emission calculator** that is
+    /// not on the rates-first keep-list. Canonical clears `neededClassNames` and
+    /// re-adds only `BaseRateCalculator` plus a chained-calculator whitelist;
+    /// the legacy inventory calculators (Basic*PM, Criteria*, NH3*, CH4N2O*,
+    /// …) are never instantiated. Mirroring that here prevents the default-DB
+    /// path — which carries both the rates and inventory execution tables —
+    /// from running both pipelines and double-counting.
+    ///
+    /// Only **calculators** are considered: generators are left untouched (the
+    /// port's BaseRate pipeline still consumes the inventory OperatingMode
+    /// distribution generator's output; the RatesOMD swap is modeled separately
+    /// by [`domain_scale_excluded_omd_modules`](Self::domain_scale_excluded_omd_modules)).
+    pub fn rates_first_excluded_calculators(&self, selected: &[String]) -> BTreeSet<String> {
+        // BaseRateCalculator + the MOVESInstantiator DO_RATES_FIRST whitelist
+        // (chained calculators), mapped to the port's calculator names. This is
+        // a faithful 1:1 mirror of the canonical `whiteList[]` in
+        // `MOVESInstantiator.generateExecutionGraph` (the `neededClasses` array
+        // adds `BaseRateCalculator`; the `whiteList` adds the rest). Keep this
+        // list in lockstep with that array — notably it INCLUDES
+        // `EvaporativePermeationCalculator` and `NonroadEmissionCalculator` (so
+        // the evap-permeation and NONROAD pipelines survive rates-first), and it
+        // EXCLUDES `AirToxicsDistanceCalculator` (canonical does not whitelist
+        // it, so the per-distance air-toxics calculator is dropped under
+        // rates-first).
+        const KEEP: &[&str] = &[
+            "BaseRateCalculator",
+            "NonroadEmissionCalculator",
+            "ActivityCalculator",
+            "AirToxicsCalculator",
+            "DistanceCalculator",
+            "CO2AERunningStartExtendedIdleCalculator",
+            "CrankcaseEmissionCalculatorNonPM",
+            "EvaporativePermeationCalculator",
+            "HCSpeciationCalculator",
+            "LiquidLeakingCalculator",
+            "NOCalculator",
+            "NO2Calculator",
+            "PM10BrakeTireCalculator",
+            "PM10EmissionCalculator",
+            "RefuelingLossCalculator",
+            "SO2Calculator",
+            "SulfatePMCalculator",
+            "TankVaporVentingCalculator",
+            "TOGSpeciationCalculator",
+        ];
+        selected
+            .iter()
+            .filter(|n| {
+                !KEEP.contains(&n.as_str())
+                    // A calculator (not a generator): generators are kept so the
+                    // BaseRate pipeline's inputs are still produced.
+                    && self.instantiate_calculator(n).is_some()
+            })
+            .cloned()
+            .collect()
+    }
+
     /// Convenience: filter + topo-sort in one call. Returns the modules
     /// relevant to `selections`, in execution-safe order.
     pub fn execution_order_for_runspec(
@@ -814,6 +921,36 @@ mod tests {
     }
 
     #[test]
+    fn domain_scale_excluded_omd_modules_keeps_exactly_one_producer() {
+        // The method returns the OMD producers to DROP; the swap rule itself is
+        // DAG-independent, so any registry works.
+        let reg = CalculatorRegistry::new(single_calc_dag());
+        const STANDARD: &str = "OperatingModeDistributionGenerator";
+        const LINK: &str = "LinkOperatingModeDistributionGenerator";
+        const MESOSCALE: &str = "MesoscaleLookupOperatingModeDistributionGenerator";
+
+        // Default Inventory: keep STANDARD, drop LINK + MESOSCALE.
+        let inv = reg.domain_scale_excluded_omd_modules(false, false);
+        assert!(!inv.contains(STANDARD), "Inventory keeps the standard OMDG");
+        assert!(inv.contains(LINK) && inv.contains(MESOSCALE));
+
+        // Project domain: keep LINK, drop STANDARD + MESOSCALE.
+        let proj = reg.domain_scale_excluded_omd_modules(true, false);
+        assert!(!proj.contains(LINK), "Project keeps the link OMDG");
+        assert!(proj.contains(STANDARD) && proj.contains(MESOSCALE));
+
+        // Mesoscale-Lookup (Rates): keep MESOSCALE, drop STANDARD + LINK.
+        let meso = reg.domain_scale_excluded_omd_modules(false, true);
+        assert!(!meso.contains(MESOSCALE), "Mesoscale keeps the mesoscale OMDG");
+        assert!(meso.contains(STANDARD) && meso.contains(LINK));
+
+        // Project takes precedence over scale (matches MOVESInstantiator order).
+        let both = reg.domain_scale_excluded_omd_modules(true, true);
+        assert!(!both.contains(LINK), "Project wins over Mesoscale");
+        assert!(both.contains(STANDARD) && both.contains(MESOSCALE));
+    }
+
+    #[test]
     fn modules_for_runspec_includes_chain_template_steps() {
         let reg = CalculatorRegistry::new(chained_calc_dag());
         let selections = vec![(PollutantId(2), ProcessId(1))];
@@ -979,6 +1116,50 @@ mod tests {
                 "BaseRateCalculator must precede HCSpeciationCalculator"
             );
         }
+    }
+
+    #[test]
+    fn real_dag_over_selects_all_three_omd_producers_and_swap_keeps_one() {
+        // Against the real calculator DAG: the three OpModeDistribution
+        // producers all carry the `process_id == 0` JavaSource fallback, so the
+        // `(pollutant, process)` filter pulls in ALL THREE for any selection —
+        // they then collide on the single `OpModeDistribution` scratch table.
+        // The domain/scale swap must leave exactly the canonical one.
+        let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let fixture = manifest
+            .parent()
+            .and_then(Path::parent)
+            .map(|root| root.join("characterization/calculator-chains/calculator-dag.json"))
+            .expect("workspace root reachable from manifest dir");
+        let reg = CalculatorRegistry::load_from_json(&fixture)
+            .unwrap_or_else(|e| panic!("loading calculator-dag.json failed: {e:?}"));
+
+        const STANDARD: &str = "OperatingModeDistributionGenerator";
+        const LINK: &str = "LinkOperatingModeDistributionGenerator";
+        const MESOSCALE: &str = "MesoscaleLookupOperatingModeDistributionGenerator";
+
+        // Running Exhaust (1) + Brakewear (9) — the onroad-inventory demo's set.
+        let selections = vec![(PollutantId(2), ProcessId(1)), (PollutantId(2), ProcessId(9))];
+        let planned = reg.modules_for_runspec(&selections);
+        for n in [STANDARD, LINK, MESOSCALE] {
+            assert!(
+                planned.contains(&n.to_string()),
+                "the raw (pollutant, process) filter should over-select {n}"
+            );
+        }
+
+        // Inventory/Default swap: drop LINK + MESOSCALE, keep STANDARD.
+        let drop = reg.domain_scale_excluded_omd_modules(false, false);
+        let kept: Vec<&String> = planned
+            .iter()
+            .filter(|n| !drop.contains(*n))
+            .filter(|n| [STANDARD, LINK, MESOSCALE].contains(&n.as_str()))
+            .collect();
+        assert_eq!(
+            kept,
+            vec![&STANDARD.to_string()],
+            "exactly one OMD producer survives the Inventory/Default swap"
+        );
     }
 
     #[test]

@@ -17,15 +17,19 @@ use arrow::array::{Array, ArrayRef};
 use arrow::datatypes::DataType as ArrowDT;
 use arrow::ipc::reader::FileReader as ArrowFileReader;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::io::Cursor;
 
-use moves_calculators::generators::meteorology::{build_meteorology_table, MeteorologyInputs};
-use moves_framework::{
-    CountyRow, DataFrameStore, DataFrameStoreTyped, GeographyTables, InMemoryStore, LinkRow,
-};
-use moves_runspec::RunSpec;
+use moves_framework::{CountyRow, DataFrameStore, GeographyTables, InMemoryStore, LinkRow};
 use polars::prelude::{Column, DataFrame, DataType, NamedFrom, Series};
+
+// The post-load execution-store synthesis (merge variants, prune geography,
+// synthesise Link + RunSpec* tables, fill meteorology, …) now lives in the
+// shared `moves_calculators::default_db_setup` module — the single source of
+// truth for both this wasm path and the native CLI `build_default_db_store`, so
+// the two can no longer drift. Re-exported so existing callers keep using
+// `default_db::setup_execution_store`.
+pub use moves_calculators::default_db_setup::setup_execution_store;
 
 const BUNDLE_MAGIC: &[u8; 8] = b"MXDB\x00\x00\x00\x01";
 
@@ -104,118 +108,6 @@ pub fn parse_bundle_to_store(bundle_bytes: &[u8]) -> Result<InMemoryStore, Strin
     Ok(store)
 }
 
-/// Post-load store synthesis for the default-DB path.
-///
-/// After [`parse_bundle_to_store`] loads the raw execution-DB tables, this
-/// function:
-/// 1. Merges process/year-indexed variant tables into their canonical names.
-/// 2. Synthesises `sourceUseTypePhysicsMapping` from `sourceUseTypePhysics`.
-/// 3. Fills derived `ZoneMonthHour` meteorology columns.
-/// 4. Synthesises the `Link` table from `ZoneRoadType` (default-DB path).
-/// 5. Builds all `RunSpec*` tables from the parsed [`RunSpec`].
-///
-/// Pair with [`load_geography_from_store`] to get the [`GeographyTables`] the
-/// engine needs.
-pub fn setup_execution_store(runspec: &RunSpec, store: &mut InMemoryStore) -> Result<(), String> {
-    merge_store_variants_eager(store)?;
-    populate_source_use_type_physics_mapping(store)?;
-    populate_pollutant_process_mapped_model_year(store)?;
-    populate_zone_month_hour_meteorology(store)?;
-    populate_link_from_zone_road_type(store)?;
-    // The default DB ships an all-zero "placeholder" row (fuelFormulationID=0)
-    // in FuelSupply with NULL market-share columns. Real fuel supplies always
-    // carry a value; the placeholder never joins real data, so fill its NULLs
-    // with 0.0 rather than have the strict per-row extractors error on it.
-    fill_fuel_supply_placeholder_nulls(store)?;
-    build_runspec_tables(runspec, store)?;
-    Ok(())
-}
-
-/// Zero-fill the NULL `marketShare`/`marketShareCV` of the FuelSupply
-/// `fuelFormulationID = 0` placeholder row(s) only, in place.
-///
-/// The default DB ships a single all-zero placeholder row (fuelFormulationID=0)
-/// whose market-share columns are NULL and that never joins real data; that row
-/// is the only legitimate NULL. A NULL `marketShare` on any *real*
-/// (fuelFormulationID != 0) row is a genuine data gap — the native strict
-/// per-row extractor (criteria_running_calculator.rs `FuelSupplyRow::extract`
-/// errors via `ok_or_else(|| null("marketShare"))`), so we must surface it as an
-/// error here rather than coerce it to 0.0 and silently zero out that
-/// formulation's blend-weighted contribution. No-op if the table is absent.
-/// Uses polars-core only.
-fn fill_fuel_supply_placeholder_nulls(store: &mut InMemoryStore) -> Result<(), String> {
-    const TABLE: &str = "FuelSupply";
-    const COLS: &[&str] = &["marketShare", "marketShareCV"];
-
-    let Some(arc) = store.get(TABLE) else {
-        return Ok(());
-    };
-    let mut df = (*arc).clone();
-    drop(arc);
-
-    // Locate the fuelFormulationID column so the NULL fill can be restricted to
-    // the placeholder row(s). If it is missing we cannot distinguish placeholder
-    // from real rows, so leave the data untouched and let the strict extractor
-    // decide.
-    let ffid_name = df
-        .columns()
-        .iter()
-        .find(|c| c.name().eq_ignore_ascii_case("fuelFormulationID"))
-        .map(|c| c.name().to_string());
-    let Some(ffid_name) = ffid_name else {
-        return Ok(());
-    };
-    let ffid = df
-        .column(&ffid_name)
-        .and_then(|c| c.cast(&DataType::Int32))
-        .map_err(|e| format!("FuelSupply.fuelFormulationID cast: {e}"))?;
-    let ffid = ffid.i32().map_err(|e| format!("{e}"))?.clone();
-    let is_placeholder = |i: usize| ffid.get(i) == Some(0);
-
-    let mut changed = false;
-    for &want in COLS {
-        let actual = df
-            .columns()
-            .iter()
-            .find(|c| c.name().to_ascii_lowercase() == want.to_ascii_lowercase())
-            .map(|c| c.name().to_string());
-        let Some(name) = actual else { continue };
-        let casted = df
-            .column(&name)
-            .and_then(|c| c.cast(&DataType::Float64))
-            .map_err(|e| format!("FuelSupply.{want} cast: {e}"))?;
-        let ca = casted.f64().map_err(|e| format!("{e}"))?;
-        if ca.null_count() == 0 {
-            continue;
-        }
-        let mut filled: Vec<f64> = Vec::with_capacity(ca.len());
-        for i in 0..ca.len() {
-            match ca.get(i) {
-                Some(v) => filled.push(v),
-                // A NULL on a real row is a data gap the native path would
-                // surface; only the fuelFormulationID=0 placeholder may be 0.0.
-                None if is_placeholder(i) => filled.push(0.0),
-                None => {
-                    return Err(format!(
-                        "FuelSupply.{want} is NULL for fuelFormulationID={} (row {i}): \
-                         a real fuel-supply row is missing its market share",
-                        ffid.get(i)
-                            .map(|v| v.to_string())
-                            .unwrap_or_else(|| "NULL".to_string()),
-                    ));
-                }
-            }
-        }
-        let series: Column = Series::new(name.as_str().into(), filled).into();
-        if df.with_column(series).is_ok() {
-            changed = true;
-        }
-    }
-    if changed {
-        store.insert(TABLE.to_string(), df);
-    }
-    Ok(())
-}
 
 /// Build [`GeographyTables`] from `Link` and `County` tables in the store.
 pub fn load_geography_from_store(store: &InMemoryStore) -> Result<GeographyTables, String> {
@@ -571,520 +463,15 @@ fn arrow_arrays_to_polars_series(
 /// Strip all trailing `_<digits>` segments from a table name.
 ///
 /// E.g. `"baserate_1_2001"` → `"baserate"`, `"baserate"` → `"baserate"`.
-fn strip_numeric_index_suffix(name: &str) -> &str {
-    let mut end = name.len();
-    while let Some(pos) = name[..end].rfind('_') {
-        let suffix = &name[pos + 1..end];
-        if !suffix.is_empty() && suffix.bytes().all(|b| b.is_ascii_digit()) {
-            end = pos;
-        } else {
-            break;
-        }
-    }
-    &name[..end]
-}
-
-/// Merge process/year-indexed variant tables into their canonical names using
-/// `DataFrame::vstack` (polars-core, wasm32-compatible).
-///
-/// This is the wasm32-safe equivalent of `merge_process_year_variants` in
-/// `moves-cli/src/run.rs`, which uses `LazyFrame + concat` (polars-lazy,
-/// not available on wasm32).
-fn merge_store_variants_eager(store: &mut InMemoryStore) -> Result<(), String> {
-    let all_names: Vec<String> = store.names().iter().map(|s| s.to_string()).collect();
-    let mut by_base: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    for name in &all_names {
-        let base = strip_numeric_index_suffix(name);
-        if base != name.as_str() {
-            by_base
-                .entry(base.to_string())
-                .or_default()
-                .push(name.clone());
-        }
-    }
-    for (base, variant_names) in by_base {
-        let mut dfs: Vec<DataFrame> = variant_names
-            .iter()
-            .filter_map(|vname| store.get(vname))
-            .filter(|df| df.height() > 0)
-            .map(|df| df.as_ref().clone())
-            .collect();
-        if dfs.is_empty() {
-            continue;
-        }
-        let merged = if dfs.len() == 1 {
-            dfs.remove(0)
-        } else {
-            let mut base_df = dfs[0].clone();
-            for df in &dfs[1..] {
-                base_df = base_df
-                    .vstack(df)
-                    .map_err(|e| format!("vstacking {base} variants: {e}"))?;
-            }
-            base_df
-        };
-        store.insert(base, merged);
-    }
-    Ok(())
-}
-
-/// Synthesise `Link` from `ZoneRoadType` when `Link` is absent or empty.
-///
-/// Port of `populate_link_from_zone_road_type` in `moves-cli/src/run.rs`.
-/// Uses polars-core only.
-fn populate_link_from_zone_road_type(store: &mut InMemoryStore) -> Result<(), String> {
-    if !store.contains("ZoneRoadType") {
-        return Ok(());
-    }
-    if store.get("link").is_some_and(|df| df.height() > 0) {
-        return Ok(());
-    }
-
-    let (zone_ids, road_type_ids) = {
-        let arc = store
-            .get("ZoneRoadType")
-            .expect("ZoneRoadType present after contains check");
-        let df = &*arc;
-        let find = |want: &str| -> Result<polars::prelude::Column, String> {
-            let lower = want.to_ascii_lowercase();
-            df.columns()
-                .iter()
-                .find(|c| c.name().to_ascii_lowercase() == lower)
-                .cloned()
-                .ok_or_else(|| format!("ZoneRoadType column '{want}' not found"))
-        };
-        let zone_col = find("zoneID")?
-            .cast(&DataType::Int32)
-            .map_err(|e| format!("ZoneRoadType.zoneID cast: {e}"))?;
-        let road_col = find("roadTypeID")?
-            .cast(&DataType::Int32)
-            .map_err(|e| format!("ZoneRoadType.roadTypeID cast: {e}"))?;
-        let zids: Vec<i32> = zone_col
-            .i32()
-            .map_err(|e| format!("{e}"))?
-            .into_no_null_iter()
-            .collect();
-        let rids: Vec<i32> = road_col
-            .i32()
-            .map_err(|e| format!("{e}"))?
-            .into_no_null_iter()
-            .collect();
-        (zids, rids)
-    };
-
-    let mut seen: BTreeSet<(i32, i32)> = BTreeSet::new();
-    let mut link_ids: Vec<i32> = Vec::new();
-    let mut county_ids: Vec<i32> = Vec::new();
-    let mut out_zone_ids: Vec<i32> = Vec::new();
-    let mut out_road_type_ids: Vec<i32> = Vec::new();
-    for (&zone_id, &road_type_id) in zone_ids.iter().zip(road_type_ids.iter()) {
-        if seen.insert((zone_id, road_type_id)) {
-            link_ids.push(zone_id * 10 + road_type_id);
-            county_ids.push(zone_id / 10);
-            out_zone_ids.push(zone_id);
-            out_road_type_ids.push(road_type_id);
-        }
-    }
-    if link_ids.is_empty() {
-        return Ok(());
-    }
-
-    let n = link_ids.len();
-    let df = DataFrame::new(
-        n,
-        vec![
-            Series::new("linkID".into(), link_ids).into(),
-            Series::new("countyID".into(), county_ids).into(),
-            Series::new("zoneID".into(), out_zone_ids).into(),
-            Series::new("roadTypeID".into(), out_road_type_ids).into(),
-        ],
-    )
-    .map_err(|e| format!("building Link DataFrame: {e}"))?;
-    store.insert("Link".to_string(), df);
-    Ok(())
-}
-
-/// Build all `RunSpec*` tables that generators read from the execution-DB slow
-/// tier, synthesised from the parsed [`RunSpec`].
-///
-/// Port of `build_runspec_tables` in `moves-cli/src/run.rs`.
-/// Uses polars-core only.
-fn build_runspec_tables(runspec: &RunSpec, store: &mut InMemoryStore) -> Result<(), String> {
-    let insert_i32 = |store: &mut InMemoryStore, name: &str, col: &str, vals: Vec<i32>| {
-        let n = vals.len();
-        let df = DataFrame::new(n, vec![Series::new(col.into(), vals).into()])
-            .expect("single-column DataFrame should never fail");
-        store.insert(name.to_string(), df);
-    };
-
-    // RunSpecSourceType.
-    let source_type_ids: Vec<i32> = {
-        let mut ids: BTreeSet<i32> = BTreeSet::new();
-        for sel in &runspec.onroad_vehicle_selections {
-            ids.insert(sel.source_type_id as i32);
-        }
-        ids.into_iter().collect()
-    };
-    insert_i32(
-        store,
-        "RunSpecSourceType",
-        "sourceTypeID",
-        source_type_ids.clone(),
-    );
-
-    // RunSpecPollutantProcess.
-    let pol_process_ids: Vec<i32> = {
-        let mut ids: BTreeSet<i32> = BTreeSet::new();
-        for assoc in &runspec.pollutant_process_associations {
-            ids.insert((assoc.pollutant_id * 100 + assoc.process_id) as i32);
-        }
-        ids.into_iter().collect()
-    };
-    insert_i32(
-        store,
-        "RunSpecPollutantProcess",
-        "polProcessID",
-        pol_process_ids,
-    );
-
-    // RunSpecDay.
-    let day_ids: Vec<i32> = {
-        let mut ids: BTreeSet<i32> = BTreeSet::new();
-        for &d in &runspec.timespan.days {
-            ids.insert(d as i32);
-        }
-        ids.into_iter().collect()
-    };
-    insert_i32(store, "RunSpecDay", "dayID", day_ids.clone());
-
-    // RunSpecHour.
-    let hour_ids: Vec<i32> = match (runspec.timespan.begin_hour, runspec.timespan.end_hour) {
-        (Some(b), Some(e)) if b <= e => (b..=e).map(|h| h as i32).collect(),
-        (Some(h), _) | (_, Some(h)) => vec![h as i32],
-        (None, None) => Vec::new(),
-    };
-    insert_i32(store, "RunSpecHour", "hourID", hour_ids.clone());
-
-    // RunSpecHourDay.
-    let hour_day_ids: Vec<i32> = {
-        let mut ids: BTreeSet<i32> = BTreeSet::new();
-        for &h in &hour_ids {
-            for &d in &day_ids {
-                ids.insert(h * 10 + d);
-            }
-        }
-        ids.into_iter().collect()
-    };
-    insert_i32(store, "RunSpecHourDay", "hourDayID", hour_day_ids);
-
-    // RunSpecMonth (months are 1-indexed in MOVES internal representation).
-    let month_ids: Vec<i32> = {
-        let mut ids: BTreeSet<i32> = BTreeSet::new();
-        for &m in &runspec.timespan.months {
-            ids.insert(m as i32);
-        }
-        ids.into_iter().collect()
-    };
-    insert_i32(store, "RunSpecMonth", "monthID", month_ids.clone());
-
-    // RunSpecYear.
-    let year_ids: Vec<i32> = {
-        let mut ids: BTreeSet<i32> = BTreeSet::new();
-        for &y in &runspec.timespan.years {
-            ids.insert(y as i32);
-        }
-        ids.into_iter().collect()
-    };
-    insert_i32(store, "RunSpecYear", "yearID", year_ids);
-
-    // RunSpecRoadType.
-    let road_type_ids: Vec<i32> = {
-        let mut ids: BTreeSet<i32> = BTreeSet::new();
-        for rt in &runspec.road_types {
-            ids.insert(rt.road_type_id as i32);
-        }
-        ids.into_iter().collect()
-    };
-    insert_i32(store, "RunSpecRoadType", "roadTypeID", road_type_ids);
-
-    // RunSpecMonthGroup: derive from MonthGroupOfAnyYear if present.
-    let month_group_ids: Vec<i32> = if store.contains("MonthGroupOfAnyYear") {
-        let arc = store
-            .get("MonthGroupOfAnyYear")
-            .expect("MonthGroupOfAnyYear present after contains check");
-        let df = &*arc;
-        let find = |want: &str| {
-            let lower = want.to_ascii_lowercase();
-            df.columns()
-                .iter()
-                .find(|c| c.name().to_ascii_lowercase() == lower)
-                .cloned()
-        };
-        let mut month_to_group: BTreeMap<i32, i32> = BTreeMap::new();
-        if let (Some(mid_col), Some(mgid_col)) = (find("monthID"), find("monthGroupID")) {
-            let mids = mid_col
-                .cast(&DataType::Int32)
-                .ok()
-                .and_then(|c| c.i32().ok().cloned());
-            let mgids = mgid_col
-                .cast(&DataType::Int32)
-                .ok()
-                .and_then(|c| c.i32().ok().cloned());
-            if let (Some(mids), Some(mgids)) = (mids, mgids) {
-                for i in 0..df.height() {
-                    if let (Some(mid), Some(mgid)) = (mids.get(i), mgids.get(i)) {
-                        month_to_group.insert(mid, mgid);
-                    }
-                }
-            }
-        }
-        let mut groups: BTreeSet<i32> = BTreeSet::new();
-        for &m in &month_ids {
-            groups.insert(*month_to_group.get(&m).unwrap_or(&m));
-        }
-        groups.into_iter().collect()
-    } else {
-        month_ids.clone()
-    };
-    insert_i32(store, "RunSpecMonthGroup", "monthGroupID", month_group_ids);
-
-    // RunSpecSourceFuelType (Int64 pairs per SourceBinDistributionGenerator schema).
-    let source_fuel_pairs: Vec<(i64, i64)> = {
-        let mut pairs: BTreeSet<(i64, i64)> = BTreeSet::new();
-        for sel in &runspec.onroad_vehicle_selections {
-            pairs.insert((sel.source_type_id as i64, sel.fuel_type_id as i64));
-        }
-        pairs.into_iter().collect()
-    };
-    let (sf_source_ids, sf_fuel_ids): (Vec<i64>, Vec<i64>) = source_fuel_pairs.into_iter().unzip();
-    let n = sf_source_ids.len();
-    let sf_df = DataFrame::new(
-        n,
-        vec![
-            Series::new("sourceTypeID".into(), sf_source_ids).into(),
-            Series::new("fuelTypeID".into(), sf_fuel_ids).into(),
-        ],
-    )
-    .map_err(|e| format!("building RunSpecSourceFuelType: {e}"))?;
-    store.insert("RunSpecSourceFuelType".to_string(), sf_df);
-
-    Ok(())
-}
-
-/// Synthesise `PollutantProcessMappedModelYear` from `PollutantProcessModelYear`.
-///
-/// MOVES builds this table during execution-DB setup by mapping each
-/// `(polProcessID, modelYearID)` through `modelYearMapping` (a user→standard
-/// model-year remap). The default DB ships an empty `modelYearMapping`, so the
-/// mapping is the identity and the result is a direct projection of
-/// `PollutantProcessModelYear`'s `(polProcessID, modelYearID, IMModelYearGroupID)`
-/// columns. Calculators (BaseRate, criteria, NOx, …) read this table to expand
-/// per-pollutant-process ratios across model years; without it they fail with
-/// "table 'PollutantProcessMappedModelYear' not found in store".
-///
-/// No-op when the table already exists or the source table is absent. Uses
-/// polars-core only (wasm32-compatible).
-fn populate_pollutant_process_mapped_model_year(store: &mut InMemoryStore) -> Result<(), String> {
-    if store.contains("PollutantProcessMappedModelYear")
-        || !store.contains("PollutantProcessModelYear")
-    {
-        return Ok(());
-    }
-
-    // With an identity model-year mapping the mapped table carries exactly the
-    // source table's columns (polProcessID, modelYearID, modelYearGroupID,
-    // fuelMYGroupID, IMModelYearGroupID) — different calculators read different
-    // subsets — so copy the source wholesale under the mapped name.
-    let mapped: DataFrame = (*store
-        .get("PollutantProcessModelYear")
-        .expect("present after contains check"))
-    .clone();
-    store.insert("PollutantProcessMappedModelYear".to_string(), mapped);
-    Ok(())
-}
-
-/// Synthesise `sourceUseTypePhysicsMapping` from `sourceUseTypePhysics` when
-/// the table is absent.
-///
-/// Port of `populate_source_use_type_physics_mapping` in `moves-cli/src/run.rs`.
-fn populate_source_use_type_physics_mapping(store: &mut InMemoryStore) -> Result<(), String> {
-    if store.contains("sourceUseTypePhysicsMapping") || !store.contains("sourceUseTypePhysics") {
-        return Ok(());
-    }
-
-    let physics = store
-        .get("sourceUseTypePhysics")
-        .expect("present after contains check");
-    let mut mapping: DataFrame = (*physics).clone();
-    drop(physics);
-
-    let src_col = mapping
-        .get_column_names()
-        .iter()
-        .find(|n| n.as_str().eq_ignore_ascii_case("sourceTypeID"))
-        .map(|n| n.to_string())
-        .ok_or("sourceUseTypePhysics has no sourceTypeID column")?;
-    mapping
-        .rename(&src_col, "realSourceTypeID".into())
-        .map_err(|e| format!("renaming sourceTypeID → realSourceTypeID: {e}"))?;
-
-    let mut temp = mapping
-        .column("realSourceTypeID")
-        .map_err(|e| format!("{e}"))?
-        .clone();
-    temp.rename("tempSourceTypeID".into());
-    let n = mapping.height();
-    mapping
-        .with_column(temp)
-        .map_err(|e| format!("adding tempSourceTypeID: {e}"))?;
-    mapping
-        .with_column(Series::new("opModeIDOffset".into(), vec![0i64; n]).into())
-        .map_err(|e| format!("adding opModeIDOffset: {e}"))?;
-
-    store.insert("sourceUseTypePhysicsMapping".to_string(), mapping);
-    Ok(())
-}
-
-/// Fill derived `ZoneMonthHour` meteorology columns from `temperature` and
-/// `relHumidity`, when those derived columns are NULL in the store.
-///
-/// Port of `populate_zone_month_hour_meteorology` in `moves-cli/src/run.rs`.
-/// Uses `build_meteorology_table` from the `meteorology` generator.
-fn populate_zone_month_hour_meteorology(store: &mut InMemoryStore) -> Result<(), String> {
-    if !store.contains("ZoneMonthHour") {
-        return Ok(());
-    }
-
-    // Early exit if heatIndex is already populated.
-    {
-        let zmh = store
-            .get("ZoneMonthHour")
-            .expect("ZoneMonthHour not in store after contains check");
-        let already_filled = zmh
-            .columns()
-            .iter()
-            .find(|c| c.name().eq_ignore_ascii_case("heatIndex"))
-            .and_then(|c| c.cast(&DataType::Float64).ok())
-            .and_then(|c| c.f64().ok().cloned())
-            .is_some_and(|ca| ca.into_iter().any(|v| v.is_some()));
-        if already_filled {
-            return Ok(());
-        }
-    }
-
-    if !store.contains("Zone") || !store.contains("County") {
-        return Ok(());
-    }
-
-    let inputs = MeteorologyInputs {
-        zone_month_hour: store
-            .iter_typed("ZoneMonthHour")
-            .map_err(|e| format!("reading ZoneMonthHour: {e}"))?,
-        zone: store
-            .iter_typed("Zone")
-            .map_err(|e| format!("reading Zone: {e}"))?,
-        county: store
-            .iter_typed("County")
-            .map_err(|e| format!("reading County: {e}"))?,
-    };
-    let computed = build_meteorology_table(&inputs);
-
-    let mut by_key: std::collections::HashMap<(i32, i32, i32), (f64, f64, f64)> =
-        std::collections::HashMap::with_capacity(computed.len());
-    for r in &computed {
-        by_key.insert(
-            (r.zone_id, r.month_id, r.hour_id),
-            (r.heat_index, r.specific_humidity, r.mol_water_fraction),
-        );
-    }
-
-    // Re-read ZoneMonthHour and annotate with computed columns.
-    let zmh_arc = store
-        .get("ZoneMonthHour")
-        .expect("ZoneMonthHour present after contains check");
-    let zmh = &*zmh_arc;
-
-    let find = |want: &str| -> Result<polars::prelude::Column, String> {
-        let lower = want.to_ascii_lowercase();
-        zmh.columns()
-            .iter()
-            .find(|c| c.name().to_ascii_lowercase() == lower)
-            .cloned()
-            .ok_or_else(|| format!("ZoneMonthHour column '{want}' not found"))
-    };
-    let zone_ids_col = find("zoneID")?
-        .cast(&DataType::Int32)
-        .map_err(|e| format!("zoneID cast: {e}"))?;
-    let month_ids_col = find("monthID")?
-        .cast(&DataType::Int32)
-        .map_err(|e| format!("monthID cast: {e}"))?;
-    let hour_ids_col = find("hourID")?
-        .cast(&DataType::Int32)
-        .map_err(|e| format!("hourID cast: {e}"))?;
-
-    // temperature is the heatIndex fallback for unmatched rows. Canonical MOVES
-    // (MeteorologyGenerator.java:151-156) sets `heatIndex = temperature` when
-    // temperature < 78F (the no-humidity-polynomial path), so an unmatched
-    // ZoneMonthHour row must inherit its own ambient temperature, NOT 0.0.
-    // (matches the CLI port: moves-cli/src/run.rs uses `heat.push(temps[i])`.)
-    let temps_col = find("temperature")?
-        .cast(&DataType::Float64)
-        .map_err(|e| format!("temperature cast: {e}"))?;
-    let temps_ca = temps_col.f64().map_err(|e| format!("{e}"))?;
-
-    let zids = zone_ids_col.i32().map_err(|e| format!("{e}"))?;
-    let mids = month_ids_col.i32().map_err(|e| format!("{e}"))?;
-    let hids = hour_ids_col.i32().map_err(|e| format!("{e}"))?;
-    let n = zmh.height();
-
-    let mut heat_index: Vec<f64> = Vec::with_capacity(n);
-    let mut specific_humidity: Vec<f64> = Vec::with_capacity(n);
-    let mut mol_water_fraction: Vec<f64> = Vec::with_capacity(n);
-
-    for i in 0..n {
-        let key = (
-            zids.get(i).unwrap_or(0),
-            mids.get(i).unwrap_or(0),
-            hids.get(i).unwrap_or(0),
-        );
-        match by_key.get(&key).copied() {
-            Some((hi, sh, mwf)) => {
-                heat_index.push(hi);
-                specific_humidity.push(sh);
-                mol_water_fraction.push(mwf);
-            }
-            None => {
-                heat_index.push(temps_ca.get(i).unwrap_or(0.0));
-                specific_humidity.push(0.0);
-                mol_water_fraction.push(0.0);
-            }
-        }
-    }
-
-    let mut updated = zmh.clone();
-    drop(zmh_arc);
-
-    updated
-        .with_column(Series::new("heatIndex".into(), heat_index).into())
-        .map_err(|e| format!("writing heatIndex: {e}"))?;
-    updated
-        .with_column(Series::new("specificHumidity".into(), specific_humidity).into())
-        .map_err(|e| format!("writing specificHumidity: {e}"))?;
-    updated
-        .with_column(Series::new("molWaterFraction".into(), mol_water_fraction).into())
-        .map_err(|e| format!("writing molWaterFraction: {e}"))?;
-    store.insert("ZoneMonthHour".to_string(), updated);
-    Ok(())
-}
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::sync::Arc;
+    // Synthesis functions moved to the shared crate; their unit tests stay here.
+    use moves_calculators::default_db_setup::{
+        build_runspec_tables, merge_store_variants_eager, prune_geographic_tables_to_runspec,
+        scope_pollutant_process_model_year_to_runspec,
+    };
 
     // Minimal Arrow-IPC FILE-format bytes for a table with one Int32 column.
     fn make_ipc_bytes(name: &str, values: &[i32]) -> Vec<u8> {
@@ -1239,5 +626,174 @@ mod tests {
         merge_store_variants_eager(&mut store).expect("merge must succeed");
         let merged = store.get("baserate").expect("merged table must exist");
         assert_eq!(merged.height(), 4, "two variants × 2 rows each = 4");
+    }
+
+    #[test]
+    fn prune_geographic_tables_filters_to_selected_county() {
+        use moves_runspec::{GeoKind, GeographicSelection, RunSpec};
+
+        // ZoneMonthHour with two zones (60370 belongs to county 6037, 99990 to
+        // county 9999); the run selects only county 6037.
+        let zmh = DataFrame::new(
+            4,
+            vec![
+                Series::new("zoneID".into(), &[60370_i32, 60370, 99990, 99990]).into(),
+                Series::new("monthID".into(), &[1_i32, 2, 1, 2]).into(),
+            ],
+        )
+        .unwrap();
+        let zone = DataFrame::new(
+            2,
+            vec![
+                Series::new("zoneID".into(), &[60370_i32, 99990]).into(),
+                Series::new("countyID".into(), &[6037_i32, 9999]).into(),
+            ],
+        )
+        .unwrap();
+        let county_year = DataFrame::new(
+            2,
+            vec![
+                Series::new("countyID".into(), &[6037_i32, 9999]).into(),
+                Series::new("yearID".into(), &[2020_i32, 2020]).into(),
+            ],
+        )
+        .unwrap();
+
+        let mut store = InMemoryStore::new();
+        store.insert("ZoneMonthHour".to_string(), zmh);
+        store.insert("Zone".to_string(), zone);
+        store.insert("CountyYear".to_string(), county_year);
+
+        let runspec = RunSpec {
+            geographic_selections: vec![GeographicSelection {
+                kind: GeoKind::County,
+                key: 6037,
+                description: String::new(),
+            }],
+            ..RunSpec::default()
+        };
+
+        prune_geographic_tables_to_runspec(&runspec, &mut store).expect("prune must succeed");
+
+        assert_eq!(
+            store.get("ZoneMonthHour").unwrap().height(),
+            2,
+            "only county 6037's zone (60370) rows kept"
+        );
+        assert_eq!(
+            store.get("CountyYear").unwrap().height(),
+            1,
+            "only county 6037 kept"
+        );
+    }
+
+    #[test]
+    fn prune_geographic_tables_is_noop_for_non_county_scope() {
+        use moves_runspec::{GeoKind, GeographicSelection, RunSpec};
+
+        let zmh = DataFrame::new(
+            2,
+            vec![Series::new("zoneID".into(), &[60370_i32, 99990]).into()],
+        )
+        .unwrap();
+        let mut store = InMemoryStore::new();
+        store.insert("ZoneMonthHour".to_string(), zmh);
+
+        // State-level selection: zones aren't enumerable here, so leave intact.
+        let runspec = RunSpec {
+            geographic_selections: vec![GeographicSelection {
+                kind: GeoKind::State,
+                key: 6,
+                description: String::new(),
+            }],
+            ..RunSpec::default()
+        };
+
+        prune_geographic_tables_to_runspec(&runspec, &mut store).expect("prune must succeed");
+        assert_eq!(
+            store.get("ZoneMonthHour").unwrap().height(),
+            2,
+            "state scope: ZoneMonthHour untouched"
+        );
+    }
+
+    #[test]
+    fn prune_keeps_full_table_when_no_zone_matches() {
+        use moves_runspec::{GeoKind, GeographicSelection, RunSpec};
+
+        // Zone maps the only zone to a different county than the run selects, so
+        // the keep-set wouldn't match any ZoneMonthHour row — the guard must
+        // leave the table full (correct, if slow) rather than empty it.
+        let zmh = DataFrame::new(
+            2,
+            vec![Series::new("zoneID".into(), &[60370_i32, 60370]).into()],
+        )
+        .unwrap();
+        let zone = DataFrame::new(
+            1,
+            vec![
+                Series::new("zoneID".into(), &[60370_i32]).into(),
+                Series::new("countyID".into(), &[6037_i32]).into(),
+            ],
+        )
+        .unwrap();
+        let mut store = InMemoryStore::new();
+        store.insert("ZoneMonthHour".to_string(), zmh);
+        store.insert("Zone".to_string(), zone);
+
+        let runspec = RunSpec {
+            geographic_selections: vec![GeographicSelection {
+                kind: GeoKind::County,
+                key: 1234, // no zone maps to this county
+                description: String::new(),
+            }],
+            ..RunSpec::default()
+        };
+
+        prune_geographic_tables_to_runspec(&runspec, &mut store).expect("prune must succeed");
+        assert_eq!(
+            store.get("ZoneMonthHour").unwrap().height(),
+            2,
+            "no match → keep full table, never empty it"
+        );
+    }
+
+    #[test]
+    fn scope_ppmy_filters_to_runspec_pol_processes() {
+        // PollutantProcessModelYear with rows for 301, 202 (in the run) and 999
+        // (not). Scope keeps only the run's pol-process rows.
+        let ppmy = DataFrame::new(
+            3,
+            vec![
+                Series::new("polProcessID".into(), &[301_i32, 202, 999]).into(),
+                Series::new("modelYearID".into(), &[2020_i32, 2020, 2020]).into(),
+            ],
+        )
+        .unwrap();
+        let rspp = DataFrame::new(
+            2,
+            vec![Series::new("polProcessID".into(), &[301_i32, 202]).into()],
+        )
+        .unwrap();
+        let mut store = InMemoryStore::new();
+        store.insert("PollutantProcessModelYear".to_string(), ppmy);
+        store.insert("RunSpecPollutantProcess".to_string(), rspp);
+
+        scope_pollutant_process_model_year_to_runspec(&mut store).expect("scope must succeed");
+
+        let kept = store.get("PollutantProcessModelYear").unwrap();
+        assert_eq!(kept.height(), 2, "only the run's pol-process rows kept");
+        let pps: std::collections::BTreeSet<i32> = kept
+            .column("polProcessID")
+            .unwrap()
+            .i32()
+            .unwrap()
+            .into_iter()
+            .flatten()
+            .collect();
+        assert_eq!(
+            pps,
+            [202, 301].into_iter().collect::<std::collections::BTreeSet<_>>()
+        );
     }
 }

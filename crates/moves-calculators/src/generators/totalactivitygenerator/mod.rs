@@ -65,6 +65,7 @@ pub mod allocation;
 pub mod inputs;
 pub mod model;
 pub mod population;
+pub mod starts;
 pub mod travel;
 pub mod vmt;
 
@@ -2940,11 +2941,19 @@ static INPUT_TABLES: &[&str] = &[
     "AvgSpeedDistribution",
     "HourOfAnyDay",
     "ZoneRoadType",
+    "Link",
+    "runSpecHourDay",
     "hotellingCalendarYear",
     "hotellingHoursPerDay",
     "SampleVehicleDay",
     "SampleVehicleTrip",
     "StartsPerVehicle",
+    // AdjustStarts inputs (the inventory `Starts` table).
+    "StartsPerDayPerVehicle",
+    "startsAgeAdjustment",
+    "startsMonthAdjust",
+    "startsHourFraction",
+    "Zone",
 ];
 
 /// Scratch tables the generator writes for downstream calculators — the
@@ -2961,10 +2970,12 @@ static OUTPUT_TABLES: &[&str] = &[
     "VMTByAgeRoadwayHour",
     "vmtByMYRoadHourFraction",
     "SHOByAgeRoadwayHour",
+    "SHO",
     "VMTByAgeRoadwayDay",
     "IdleHoursByAgeHour",
     "StartsByAgeHour",
     "SHPByAgeHour",
+    "Starts",
 ];
 
 /// Resolve [`SUBSCRIBED_PROCESSES`] into the generator's subscription set:
@@ -3231,6 +3242,8 @@ impl Generator for TotalActivityGenerator {
             avg_speed_distribution: ctx.tables().iter_typed("AvgSpeedDistribution")?,
             hour_of_any_day: ctx.tables().iter_typed("HourOfAnyDay")?,
             zone_road_type: iter_optional(ctx.tables(), "ZoneRoadType")?,
+            link: iter_optional(ctx.tables(), "Link")?,
+            run_spec_hour_day: iter_optional(ctx.tables(), "runSpecHourDay")?,
             hotelling_calendar_year: iter_optional(ctx.tables(), "hotellingCalendarYear")?,
             sample_vehicle_day: iter_optional(ctx.tables(), "SampleVehicleDay")?,
             sample_vehicle_trip: iter_optional(ctx.tables(), "SampleVehicleTrip")?,
@@ -3238,6 +3251,24 @@ impl Generator for TotalActivityGenerator {
         };
 
         let output = self.run(&inputs);
+
+        // Allocate SHOByAgeRoadwayHour to links → the worker `SHO` table the
+        // emission calculators read. This is the `allocateTotalActivityBasis`
+        // SHO step (TotalActivityGenerator.java line ~2143); it was previously
+        // unported, leaving `SHO` empty and zeroing the entire running-exhaust
+        // inventory. `SHO` is link-level (downstream consumers extract `linkID`
+        // and the output aggregation sums over links), so it is written as-is.
+        let zone_road_type_link =
+            allocation::zone_road_type_link(&inputs.zone_road_type, &inputs.link, inputs.zone_id);
+        let sho_alloc = allocation::allocate_sho(
+            &output.sho_by_age_roadway_hour,
+            &zone_road_type_link,
+            &inputs.run_spec_hour_day,
+            analysis_year,
+        );
+        let sho_df = <allocation::ShoRow as TableRow>::into_dataframe(sho_alloc)
+            .map_err(|e| Error::Polars(e.to_string()))?;
+        ctx.scratch_mut().store.insert("SHO", sho_df);
 
         // Write all 12 output tables to scratch.
         macro_rules! write_scratch {
@@ -3268,6 +3299,24 @@ impl Generator for TotalActivityGenerator {
         write_scratch!(output.starts_by_age_hour, "StartsByAgeHour");
         write_scratch!(output.shp_by_age_hour, "SHPByAgeHour");
 
+        // AdjustStarts (database/AdjustStarts.sql) — the inventory `Starts`
+        // activity table the start calculators read. The `StartsByAgeHour`
+        // intermediate above is not the table consumers use; this is the
+        // population × startsPerDayPerVehicle × age/month/hour allocation.
+        let starts_rows = starts::adjust_starts(&starts::AdjustStartsInputs {
+            analysis_year,
+            zone_id,
+            source_type_year: inputs.source_type_year.clone(),
+            source_type_age_distribution: inputs.source_type_age_distribution.clone(),
+            day_of_any_week: inputs.day_of_any_week.clone(),
+            starts_per_day_per_vehicle: ctx.tables().iter_typed("StartsPerDayPerVehicle")?,
+            starts_age_adjustment: ctx.tables().iter_typed("startsAgeAdjustment")?,
+            starts_month_adjust: ctx.tables().iter_typed("startsMonthAdjust")?,
+            starts_hour_fraction: ctx.tables().iter_typed("startsHourFraction")?,
+            zone: ctx.tables().iter_typed("Zone")?,
+        });
+        write_scratch!(starts_rows, "Starts");
+
         Ok(CalculatorOutput::empty())
     }
 }
@@ -3292,6 +3341,8 @@ mod tests {
             analysis_year: 2020,
             zone_id: 100,
             has_hotelling_hours_per_day_input: false,
+            link: vec![],
+            run_spec_hour_day: vec![],
             year: vec![YearRow {
                 year_id: 2020,
                 is_base_year: true,
@@ -3531,6 +3582,28 @@ mod tests {
         store.insert(
             "HourOfAnyDay",
             inp.hour_of_any_day.clone().into_dataframe().unwrap(),
+        );
+        // AdjustStarts inputs (the `Starts` table); empty is sufficient here —
+        // this test asserts the activity tables, not the start allocation.
+        store.insert(
+            "StartsPerDayPerVehicle",
+            starts::StartsPerDayPerVehicleRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "startsAgeAdjustment",
+            starts::StartsAgeAdjustmentRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "startsMonthAdjust",
+            starts::StartsMonthAdjustRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "startsHourFraction",
+            starts::StartsHourFractionRow::into_dataframe(vec![]).unwrap(),
+        );
+        store.insert(
+            "Zone",
+            starts::StartsZoneRow::into_dataframe(vec![]).unwrap(),
         );
 
         let mut ctx = CalculatorContext::with_position_and_tables(

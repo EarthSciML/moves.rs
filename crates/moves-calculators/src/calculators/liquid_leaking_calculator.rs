@@ -2629,7 +2629,7 @@ impl Calculator for LiquidLeakingCalculator {
             },
             im_factor: tables.iter_typed::<ImFactorRow>("IMFactor")?,
             age_category: tables.iter_typed::<AgeCategoryRow>("AgeCategory")?,
-            im_coverage: tables.iter_typed::<ImCoverageRow>("IMCoverage")?,
+            im_coverage: tables.iter_typed_or_empty::<ImCoverageRow>("IMCoverage")?,
             emission_rate_by_age: tables.iter_typed::<EmissionRateByAgeRow>("EmissionRateByAge")?,
             source_bin: tables.iter_typed::<SourceBinRow>("SourceBin")?,
             fuel_type: tables.iter_typed::<FuelTypeRow>("FuelType")?,

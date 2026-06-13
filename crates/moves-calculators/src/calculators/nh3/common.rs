@@ -43,7 +43,10 @@
 //! [`super::running`]/[`super::start`] fidelity notes and the
 //! `CH4N2ORunningStartCalculator` precedent.
 
-use std::collections::HashMap;
+// Drop-in alias: built-then-looked-up integer/tuple-keyed indexes rebuilt per
+// invocation. Default SipHash dominated the profile (`hash_one`); FxHash is a
+// far cheaper non-crypto hash here. Output is unaffected (lookup-only maps).
+use rustc_hash::FxHashMap as HashMap;
 
 use moves_framework::{Error, TableRow};
 use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
@@ -1531,7 +1534,7 @@ pub fn merge_im_coverage(
     pollutant_process_assoc: &[PollutantProcessAssocRow],
 ) -> Vec<ImCoverageMergedRow> {
     // IMFactor indexed by its join key to PollutantProcessMappedModelYear.
-    let mut im_factor_by: HashMap<(i32, i32), Vec<&ImFactorRow>> = HashMap::new();
+    let mut im_factor_by: HashMap<(i32, i32), Vec<&ImFactorRow>> = HashMap::default();
     for imf in im_factor {
         im_factor_by
             .entry((imf.pol_process_id, imf.im_model_year_group_id))
@@ -1539,7 +1542,7 @@ pub fn merge_im_coverage(
             .push(imf);
     }
     // AgeCategory indexed by ageGroupID — a group spans several ages.
-    let mut ages_by_group: HashMap<i32, Vec<i32>> = HashMap::new();
+    let mut ages_by_group: HashMap<i32, Vec<i32>> = HashMap::default();
     for ac in age_category {
         ages_by_group
             .entry(ac.age_group_id)
@@ -1550,7 +1553,7 @@ pub fn merge_im_coverage(
     // iteration county and year (the SQL `WHERE imc.countyID = … AND
     // imc.yearID = …`).
     let mut im_coverage_by: HashMap<(i32, i32, i32, i32, i32), Vec<&ImCoverageRow>> =
-        HashMap::new();
+        HashMap::default();
     for imc in im_coverage {
         if imc.county_id != county_id || imc.year_id != year_id {
             continue;
@@ -1573,7 +1576,7 @@ pub fn merge_im_coverage(
         .collect();
 
     // Accumulate (IMAdjustFract, weightFactor) over the GROUP BY key.
-    let mut acc: HashMap<(i32, i32, i32, i32), (f64, f64)> = HashMap::new();
+    let mut acc: HashMap<(i32, i32, i32, i32), (f64, f64)> = HashMap::default();
     for ppmy in pollutant_process_mapped_model_year {
         // INNER JOIN IMFactor USING (polProcessID, IMModelYearGroupID).
         let Some(im_factors) =
@@ -1694,7 +1697,7 @@ pub fn weight_by_source_bin(
     source_bin: &[SourceBinRow],
 ) -> Vec<SourceBinEmissionRate> {
     // AgeCategory indexed by ageGroupID.
-    let mut ages_by_group: HashMap<i32, Vec<i32>> = HashMap::new();
+    let mut ages_by_group: HashMap<i32, Vec<i32>> = HashMap::default();
     for ac in age_category {
         ages_by_group
             .entry(ac.age_group_id)
@@ -1702,7 +1705,7 @@ pub fn weight_by_source_bin(
             .push(ac.age_id);
     }
     // SourceTypeModelYear indexed by modelYearID.
-    let mut stmy_by_year: HashMap<i32, Vec<&SourceTypeModelYearRow>> = HashMap::new();
+    let mut stmy_by_year: HashMap<i32, Vec<&SourceTypeModelYearRow>> = HashMap::default();
     for stmy in source_type_model_year {
         stmy_by_year
             .entry(stmy.model_year_id)
@@ -1710,7 +1713,7 @@ pub fn weight_by_source_bin(
             .push(stmy);
     }
     // SourceBinDistribution indexed by its join key.
-    let mut sbd_by: HashMap<(i32, i32, i64), Vec<&SourceBinDistributionRow>> = HashMap::new();
+    let mut sbd_by: HashMap<(i32, i32, i64), Vec<&SourceBinDistributionRow>> = HashMap::default();
     for sbd in source_bin_distribution {
         sbd_by
             .entry((
@@ -1727,7 +1730,7 @@ pub fn weight_by_source_bin(
         .map(|r| (r.source_bin_id, r.fuel_type_id))
         .collect();
 
-    let mut acc: HashMap<SourceBinGroupKey, (f64, f64)> = HashMap::new();
+    let mut acc: HashMap<SourceBinGroupKey, (f64, f64)> = HashMap::default();
     for er in emission_rate_by_age {
         // INNER JOIN AgeCategory ON ageGroupID.
         let Some(ages) = ages_by_group.get(&er.age_group_id) else {

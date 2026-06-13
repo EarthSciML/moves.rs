@@ -94,6 +94,8 @@ fn make_executor() -> ProductionExecutor {
             activity_entries: vec![ActivityTableEntry {
                 scc: "2270001010".into(),
                 fips: "06037".into(),
+                hp_min: 0.0,
+                hp_max: f32::MAX,
                 starts: 0.0,
                 activity_level: 100.0,
                 activity_unit: ActivityUnit::HoursPerYear,
@@ -166,6 +168,8 @@ fn state_level_reference(fips: &str) -> ReferenceData {
         activity_entries: vec![ActivityTableEntry {
             scc: "2270001010".into(),
             fips: fips.into(),
+            hp_min: 0.0,
+            hp_max: f32::MAX,
             starts: 0.0,
             activity_level: 100.0,
             activity_unit: ActivityUnit::HoursPerYear,
@@ -245,6 +249,8 @@ fn national_reference(state_fips: &str, scc: &str) -> ReferenceData {
         activity_entries: vec![ActivityTableEntry {
             scc: scc.into(),
             fips: "".into(),
+            hp_min: 0.0,
+            hp_max: f32::MAX,
             starts: 0.0,
             activity_level: 100.0,
             activity_unit: ActivityUnit::HoursPerYear,
@@ -307,6 +313,8 @@ fn us_total_reference(scc: &str) -> ReferenceData {
         activity_entries: vec![ActivityTableEntry {
             scc: scc.into(),
             fips: "".into(),
+            hp_min: 0.0,
+            hp_max: f32::MAX,
             starts: 0.0,
             activity_level: 100.0,
             activity_unit: ActivityUnit::HoursPerYear,
@@ -513,8 +521,11 @@ fn state_from_national_dispatch_produces_state_row() {
 /// One selected state (06000, no own state records). national_reference
 /// sets national POP=1000, state POP=300 with coefficient 1.0, so the
 /// state receives 100 * (300/1000) * 1.0 = 30.0 units of population.
-/// The next barrier is NR*.TMF (daymthf.f not ported), so we expect a
-/// TMF error rather than an ALO error — confirming the ALO step passes.
+/// The barrier AFTER allocation moves as more of prcnat is ported (it
+/// was NR*.TMF before daymthf landed; it is now the growth-indicator
+/// lookup, which this fixture only stocks for the base year). Either
+/// way the error must be a post-allocation one, never an ALO error —
+/// confirming the ALO step passes.
 #[test]
 fn national_dispatch_allocates_population_to_state() {
     let mut executor = ProductionExecutor {
@@ -544,13 +555,23 @@ fn national_dispatch_allocates_population_to_state() {
     let mut opts = NonroadOptions::new(RegionLevel::Nation, 2020);
     opts.growth_loaded = true;
 
-    // ALO allocation now succeeds; next barrier is NR*.TMF (daymthf not ported).
+    // ALO allocation now succeeds; the next barrier is the post-allocation
+    // growth-indicator lookup (the fixture has no spatial-indicator rows
+    // beyond the base year). Before daymthf landed it was NR*.TMF.
     let err = run_simulation(&opts, &inputs, &mut executor)
-        .expect_err("national dispatch must fail until NR*.TMF is ported");
+        .expect_err("national dispatch must fail at a post-allocation barrier");
     let msg = err.to_string();
     assert!(
-        msg.contains("TMF") || msg.contains("temporal") || msg.contains("daymthf"),
-        "expected TMF error after ALO allocation succeeds, got: {msg}"
+        msg.contains("spatial-indicator")
+            || msg.contains("TMF")
+            || msg.contains("temporal")
+            || msg.contains("daymthf"),
+        "expected a post-allocation (growth-indicator / TMF) error after \
+         ALO allocation succeeds, got: {msg}"
+    );
+    assert!(
+        !msg.to_lowercase().contains("alloc"),
+        "must not be an ALO allocation error: {msg}"
     );
 }
 
@@ -762,6 +783,8 @@ fn county_absent_ambient_temp_returns_error() {
             activity_entries: vec![ActivityTableEntry {
                 scc: "2270001010".into(),
                 fips: "06037".into(),
+                hp_min: 0.0,
+                hp_max: f32::MAX,
                 starts: 0.0,
                 activity_level: 100.0,
                 activity_unit: ActivityUnit::HoursPerYear,

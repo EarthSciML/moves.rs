@@ -2520,6 +2520,19 @@ impl Calculator for RefuelingLossCalculator {
             })
             .map(|r| r.pol_process_id / 100)
             .collect();
+        // Canonical `subscribeToMe` intersects this calculator's pollutant set
+        // (THC) with the RunSpec's `(pollutant, process)` selections for the
+        // refueling processes (18 displacement / 19 spillage). When neither is
+        // selected the Java calculator never subscribes and does no work. In the
+        // chained port it is still dispatched off `BaseRateCalculator`'s chain
+        // template for any run, so short-circuit here: with no refueling pollutant
+        // selected there is nothing to emit, and skipping avoids building the
+        // (national-scale) refueling working tables against an irrelevant worker
+        // output — which otherwise blows up memory on, e.g., a Running-Exhaust-only
+        // inventory run.
+        if refueling_displacement_pollutant.is_empty() && refueling_spillage_pollutant.is_empty() {
+            return Ok(CalculatorOutput::empty());
+        }
         let refueling_fuel_supply = tables.iter_typed::<RefuelingFuelSupplyRow>("FuelSupply")?;
         let refueling_fuel_formulation =
             tables.iter_typed::<RefuelingFuelFormulationRow>("FuelFormulation")?;

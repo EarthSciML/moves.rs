@@ -19,7 +19,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use moves_framework::{data::TableRow, Error as MfError};
+use moves_framework::{data::TableRow, DataFrameStoreTyped, Error as MfError};
 use polars::prelude::{DataFrame, DataType, NamedFrom, PolarsResult, Schema, Series};
 
 use super::model::{
@@ -264,6 +264,157 @@ pub struct ZoneAcFactorRow {
     pub model_year_id: i32,
     /// Air-conditioning factor.
     pub ac_factor: f64,
+}
+
+/// Read one integer column (cast to `i64`, NULL→0) from a store table.
+fn ac_col_i64<S: DataFrameStoreTyped + ?Sized>(
+    store: &S,
+    table: &str,
+    column: &str,
+) -> Result<Vec<i64>, MfError> {
+    let views = store.column_views(table, &[column])?;
+    let s = views[0]
+        .cast(&DataType::Int64)
+        .map_err(|e| MfError::Polars(e.to_string()))?;
+    let ca = s.i64().map_err(|e| MfError::Polars(e.to_string()))?;
+    Ok(ca.into_iter().map(|v| v.unwrap_or(0)).collect())
+}
+
+/// Read one floating column (cast to `f64`, NULL→0.0) from a store table.
+fn ac_col_f64<S: DataFrameStoreTyped + ?Sized>(
+    store: &S,
+    table: &str,
+    column: &str,
+) -> Result<Vec<f64>, MfError> {
+    let views = store.column_views(table, &[column])?;
+    let s = views[0]
+        .cast(&DataType::Float64)
+        .map_err(|e| MfError::Polars(e.to_string()))?;
+    let ca = s.f64().map_err(|e| MfError::Polars(e.to_string()))?;
+    Ok(ca.into_iter().map(|v| v.unwrap_or(0.0)).collect())
+}
+
+/// Compute the `zoneACFactor` table in-process — the port of the
+/// `BaseRateCalculator.sql` cache query (lines 507-523) that canonical MOVES
+/// runs inside the calculator and then **drops** (sql:1546). Because it is
+/// dropped, a captured execution-DB snapshot never carries `zoneACFactor`, so
+/// the rates-first snapshot path must recompute it or the air-conditioning
+/// energy adjustment (`meanBaseRate += meanBaseRateACAdj * ACFactor`,
+/// sql:1183-1195) is silently omitted — visible as a large summer-month
+/// (high-`heatIndex`) under-count and a negligible winter one.
+///
+/// ```text
+/// ACFactor[hourID,sourceTypeID,modelYearID] =
+///     LEAST(GREATEST(ACActivityTermA
+///         + heatIndex*(ACActivityTermB + ACActivityTermC*heatIndex), 0), 1.0)
+///     * ACPenetrationFraction * functioningACFraction
+/// ```
+///
+/// Join (sql:514-523): `ZoneMonthHour` (zone+month → hour→heatIndex) ⋈
+/// `MonthOfAnyYear` (month→monthGroupID) ⋈ `MonthGroupHour` (monthGroupID,hourID
+/// → AC terms) ⋈ `SourceTypeModelYear` (ACPenetrationFraction) ⋈ `SourceTypeAge`
+/// (sourceTypeID, ageID = year − modelYearID → functioningACFraction). INNER
+/// joins: a missing `SourceTypeAge`/`MonthGroupHour` match drops the row.
+pub fn compute_zone_ac_factor<S: DataFrameStoreTyped + ?Sized>(
+    store: &S,
+    year_id: i32,
+    month_id: i32,
+    zone_id: i32,
+) -> Result<Vec<ZoneAcFactorRow>, MfError> {
+    // Degrade to no-AC (the prior behaviour) when any required table is absent,
+    // rather than erroring — some contexts (e.g. nonroad-only) legitimately lack
+    // these onroad lookup tables and previously read an empty zoneACFactor.
+    for t in [
+        "ZoneMonthHour",
+        "MonthOfAnyYear",
+        "MonthGroupHour",
+        "SourceTypeAge",
+        "SourceTypeModelYear",
+    ] {
+        if store.get(t).is_none() {
+            return Ok(Vec::new());
+        }
+    }
+
+    // ZoneMonthHour for this zone+month: hourID → heatIndex.
+    let zmh_zone = ac_col_i64(store, "ZoneMonthHour", "zoneID")?;
+    let zmh_month = ac_col_i64(store, "ZoneMonthHour", "monthID")?;
+    let zmh_hour = ac_col_i64(store, "ZoneMonthHour", "hourID")?;
+    let zmh_heat = ac_col_f64(store, "ZoneMonthHour", "heatIndex")?;
+    let mut heat_by_hour: BTreeMap<i64, f64> = BTreeMap::new();
+    for i in 0..zmh_hour.len() {
+        if zmh_zone[i] == zone_id as i64 && zmh_month[i] == month_id as i64 {
+            heat_by_hour.insert(zmh_hour[i], zmh_heat[i]);
+        }
+    }
+    if heat_by_hour.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // MonthOfAnyYear: month → monthGroupID.
+    let moy_month = ac_col_i64(store, "MonthOfAnyYear", "monthID")?;
+    let moy_group = ac_col_i64(store, "MonthOfAnyYear", "monthGroupID")?;
+    let Some(month_group_id) = moy_month
+        .iter()
+        .position(|&m| m == month_id as i64)
+        .map(|i| moy_group[i])
+    else {
+        return Ok(Vec::new());
+    };
+
+    // MonthGroupHour for this monthGroup: hourID → (A, B, C).
+    let mgh_group = ac_col_i64(store, "MonthGroupHour", "monthGroupID")?;
+    let mgh_hour = ac_col_i64(store, "MonthGroupHour", "hourID")?;
+    let mgh_a = ac_col_f64(store, "MonthGroupHour", "ACActivityTermA")?;
+    let mgh_b = ac_col_f64(store, "MonthGroupHour", "ACActivityTermB")?;
+    let mgh_c = ac_col_f64(store, "MonthGroupHour", "ACActivityTermC")?;
+    let mut terms_by_hour: BTreeMap<i64, (f64, f64, f64)> = BTreeMap::new();
+    for i in 0..mgh_hour.len() {
+        if mgh_group[i] == month_group_id {
+            terms_by_hour.insert(mgh_hour[i], (mgh_a[i], mgh_b[i], mgh_c[i]));
+        }
+    }
+
+    // SourceTypeAge: (sourceTypeID, ageID) → functioningACFraction.
+    let sta_st = ac_col_i64(store, "SourceTypeAge", "sourceTypeID")?;
+    let sta_age = ac_col_i64(store, "SourceTypeAge", "ageID")?;
+    let sta_fac = ac_col_f64(store, "SourceTypeAge", "functioningACFraction")?;
+    let mut func_ac: BTreeMap<(i64, i64), f64> = BTreeMap::new();
+    for i in 0..sta_st.len() {
+        func_ac.insert((sta_st[i], sta_age[i]), sta_fac[i]);
+    }
+
+    // SourceTypeModelYear: (sourceTypeID, modelYearID, ACPenetrationFraction).
+    let stmy_st = ac_col_i64(store, "SourceTypeModelYear", "sourceTypeID")?;
+    let stmy_my = ac_col_i64(store, "SourceTypeModelYear", "modelYearID")?;
+    let stmy_pen = ac_col_f64(store, "SourceTypeModelYear", "ACPenetrationFraction")?;
+
+    let mut out = Vec::new();
+    for i in 0..stmy_st.len() {
+        let source_type_id = stmy_st[i];
+        let model_year_id = stmy_my[i];
+        let age_id = year_id as i64 - model_year_id;
+        // INNER JOIN SourceTypeAge on (sourceTypeID, ageID): drop on miss.
+        let Some(&functioning_ac) = func_ac.get(&(source_type_id, age_id)) else {
+            continue;
+        };
+        let ac_penetration = stmy_pen[i];
+        for (&hour_id, &heat_index) in &heat_by_hour {
+            // INNER JOIN MonthGroupHour on hourID: drop on miss.
+            let Some(&(a, b, c)) = terms_by_hour.get(&hour_id) else {
+                continue;
+            };
+            let raw = a + heat_index * (b + c * heat_index);
+            let ac_factor = raw.clamp(0.0, 1.0) * ac_penetration * functioning_ac;
+            out.push(ZoneAcFactorRow {
+                hour_id: hour_id as i32,
+                source_type_id: source_type_id as i32,
+                model_year_id: model_year_id as i32,
+                ac_factor,
+            });
+        }
+    }
+    Ok(out)
 }
 
 /// One `IMFactor` row.

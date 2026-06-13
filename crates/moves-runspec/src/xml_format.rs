@@ -130,17 +130,20 @@ fn write_timespan(out: &mut String, ts: &Timespan) -> std::fmt::Result {
     for y in &ts.years {
         writeln!(out, "\t\t<year key=\"{y}\"/>")?;
     }
+    // `key` is a 0-based index (ID = key + 1, see `XmlIndexedId`); invert the
+    // model's real month/hour IDs back to the GUI index on write so a
+    // read→write round-trip is byte-identical.
     for m in &ts.months {
-        writeln!(out, "\t\t<month key=\"{m}\"/>")?;
+        writeln!(out, "\t\t<month key=\"{}\"/>", m.saturating_sub(1))?;
     }
     for d in &ts.days {
         writeln!(out, "\t\t<day key=\"{d}\"/>")?;
     }
     if let Some(h) = ts.begin_hour {
-        writeln!(out, "\t\t<beginhour key=\"{h}\"/>")?;
+        writeln!(out, "\t\t<beginhour key=\"{}\"/>", h.saturating_sub(1))?;
     }
     if let Some(h) = ts.end_hour {
-        writeln!(out, "\t\t<endhour key=\"{h}\"/>")?;
+        writeln!(out, "\t\t<endhour key=\"{}\"/>", h.saturating_sub(1))?;
     }
     if let Some(a) = &ts.aggregate_by {
         writeln!(out, "\t\t<aggregateBy key=\"{}\"/>", escape_attr(a))?;
@@ -570,13 +573,13 @@ struct XmlTimespan {
     #[serde(rename = "year", default, skip_serializing_if = "Vec::is_empty")]
     years: Vec<XmlKeyU32>,
     #[serde(rename = "month", default, skip_serializing_if = "Vec::is_empty")]
-    months: Vec<XmlKeyU32>,
+    months: Vec<XmlIndexedId>,
     #[serde(rename = "day", default, skip_serializing_if = "Vec::is_empty")]
     days: Vec<XmlDayEntry>,
     #[serde(rename = "beginhour", default, skip_serializing_if = "Option::is_none")]
-    begin_hour: Option<XmlKeyU32>,
+    begin_hour: Option<XmlIndexedId>,
     #[serde(rename = "endhour", default, skip_serializing_if = "Option::is_none")]
-    end_hour: Option<XmlKeyU32>,
+    end_hour: Option<XmlIndexedId>,
     #[serde(
         rename = "aggregateBy",
         default,
@@ -592,6 +595,34 @@ struct XmlDayEntry {
     key: Option<u32>,
     #[serde(rename = "@id", default, skip_serializing_if = "Option::is_none")]
     id: Option<u32>,
+}
+
+/// `<month>` / `<beginhour>` / `<endhour>` element.
+///
+/// In canonical `RunSpecXML`, a `@key` attribute is a **0-based index** into
+/// the sorted ID list (`TimeSpan.getMonthByIndex` / `getHourByIndex`), while
+/// `@id` (MOVES 5) is the literal ID. Month IDs (1..12) and hour IDs (1..24)
+/// are contiguous from 1, so the literal ID equals `key + 1`. The port's model
+/// stores real IDs everywhere downstream, so we resolve to the ID here.
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct XmlIndexedId {
+    #[serde(rename = "@key", default, skip_serializing_if = "Option::is_none")]
+    key: Option<u32>,
+    #[serde(rename = "@id", default, skip_serializing_if = "Option::is_none")]
+    id: Option<u32>,
+}
+
+impl XmlIndexedId {
+    /// Resolve to the literal 1-based ID: `@id` verbatim, else `@key + 1`.
+    fn to_id(&self, field: &'static str) -> Result<u32> {
+        if let Some(id) = self.id {
+            Ok(id)
+        } else if let Some(key) = self.key {
+            Ok(key + 1)
+        } else {
+            Err(Error::MissingField { field })
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -885,7 +916,12 @@ impl XmlRunSpec {
 
         let timespan = Timespan {
             years: self.timespan.years.into_iter().map(|x| x.key).collect(),
-            months: self.timespan.months.into_iter().map(|x| x.key).collect(),
+            months: self
+                .timespan
+                .months
+                .into_iter()
+                .map(|x| x.to_id("timespan.month @key or @id"))
+                .collect::<Result<Vec<_>>>()?,
             days: self
                 .timespan
                 .days
@@ -896,8 +932,16 @@ impl XmlRunSpec {
                     })
                 })
                 .collect::<Result<Vec<_>>>()?,
-            begin_hour: self.timespan.begin_hour.map(|x| x.key),
-            end_hour: self.timespan.end_hour.map(|x| x.key),
+            begin_hour: self
+                .timespan
+                .begin_hour
+                .map(|x| x.to_id("timespan.beginhour @key or @id"))
+                .transpose()?,
+            end_hour: self
+                .timespan
+                .end_hour
+                .map(|x| x.to_id("timespan.endhour @key or @id"))
+                .transpose()?,
             aggregate_by: self.timespan.aggregate_by.map(|x| x.key),
         };
 

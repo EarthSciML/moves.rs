@@ -1737,8 +1737,14 @@ impl Generator for TankFuelGenerator {
             .into_iter()
             .map(|r| r.0.id)
             .collect();
+        // Pre-existing user-input AverageTankGasoline override rows
+        // (isUserInput='Y'), which TFG re-merges so user values survive
+        // regeneration. Absent — or empty-shipped (0 partitions in the default
+        // DB) — when the user supplied no overrides, so tolerate an empty /
+        // schemaless table rather than erroring on its missing columns. Mirrors
+        // TankTemperatureGenerator's prior_average_tank_temperature.
         let prior_average_tank_gasoline: Vec<AverageTankGasolineRow> =
-            ctx.tables().iter_typed("AverageTankGasoline")?;
+            ctx.tables().iter_typed_or_empty("AverageTankGasoline")?;
 
         let inputs = TankFuelInputs {
             fuel_supply,

@@ -287,7 +287,7 @@ pub fn run_simulation_from_bundle(
     };
 
     let mut engine = MOVESEngine::new(run_spec.clone(), registry, config);
-    engine = engine.with_slow_store(store);
+    engine = engine.with_rates_first(true).with_slow_store(store);
     engine
         .execution_run_spec_mut()
         .build_execution_locations(&geography);
@@ -612,7 +612,7 @@ pub fn run_simulation_from_partitions(
     };
 
     let mut engine = MOVESEngine::new(run_spec.clone(), registry, config);
-    engine = engine.with_slow_store(store);
+    engine = engine.with_rates_first(true).with_slow_store(store);
     engine
         .execution_run_spec_mut()
         .build_execution_locations(&geography);
@@ -932,6 +932,52 @@ mod tests {
         );
     }
 
+    /// Canonical `MOVESInstantiator` DO_RATES_FIRST clears the legacy inventory
+    /// emission calculators, keeping the `BaseRateCalculator` + chained
+    /// whitelist. `rates_first_excluded_calculators` must drop the legacy
+    /// running/start/criteria/NH3 calculators while keeping BaseRate, the
+    /// whitelisted chained calculators, and every generator (the BaseRate
+    /// pipeline still consumes the generators' output).
+    #[test]
+    fn rates_first_filter_drops_legacy_keeps_baserate_and_generators() {
+        let registry = build_registry().expect("registry must build");
+        // Feed in the modules the default-DB process-pm-exhaust plan selects.
+        let selected: Vec<String> = [
+            "BaseRateCalculator",
+            "BasicRunningPMEmissionCalculator",
+            "CriteriaRunningCalculator",
+            "NH3RunningCalculator",
+            "CH4N2ORunningStartCalculator",
+            "SulfatePMCalculator",
+            "HCSpeciationCalculator",
+            "OperatingModeDistributionGenerator",
+            "BaseRateGenerator",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+
+        let drop = registry.rates_first_excluded_calculators(&selected);
+
+        // Legacy inventory emission calculators are dropped.
+        for legacy in [
+            "BasicRunningPMEmissionCalculator",
+            "CriteriaRunningCalculator",
+            "NH3RunningCalculator",
+            "CH4N2ORunningStartCalculator",
+        ] {
+            assert!(drop.contains(legacy), "{legacy} must be dropped");
+        }
+        // BaseRate + whitelisted chained calculators are kept.
+        for keep in ["BaseRateCalculator", "SulfatePMCalculator", "HCSpeciationCalculator"] {
+            assert!(!drop.contains(keep), "{keep} must be kept");
+        }
+        // Generators are never dropped by this filter.
+        for gen in ["OperatingModeDistributionGenerator", "BaseRateGenerator"] {
+            assert!(!drop.contains(gen), "{gen} (a generator) must be kept");
+        }
+    }
+
     /// After `register_all`, `run_simulation` dispatches real calculators.
     /// Without a slow store the calculators fail on missing input tables —
     /// that is the correct behaviour: the engine refuses to silently emit
@@ -1201,7 +1247,7 @@ mod tests {
             collect_output_in_memory: true,
         };
         let mut engine = MOVESEngine::new(run_spec.clone(), registry, config);
-        engine = engine.with_slow_store(store);
+        engine = engine.with_rates_first(true).with_slow_store(store);
         engine
             .execution_run_spec_mut()
             .build_execution_locations(&geography);
@@ -1262,7 +1308,7 @@ mod tests {
             collect_output_in_memory: true,
         };
         let mut engine = MOVESEngine::new(run_spec.clone(), registry, config);
-        engine = engine.with_slow_store(store);
+        engine = engine.with_rates_first(true).with_slow_store(store);
         engine
             .execution_run_spec_mut()
             .build_execution_locations(&geography);
@@ -1451,5 +1497,211 @@ mod tests {
         assert_eq!(inputs.scc_groups[0].len(), 2, "two records for 2270001010");
         assert_eq!(inputs.scc_groups[1].scc, "2265001010");
         assert_eq!(inputs.scc_groups[1].len(), 1);
+    }
+
+    // ---- Native default-DB profiling harness (ignored; manual) -------------
+    //
+    // Replicates `run_simulation_from_partitions` natively so the default-DB
+    // pipeline can be profiled with samply/perf and timed per phase. Driven by
+    // env vars (set by the profiling scripts under /tmp):
+    //   MOVES_PROFILE_RUNSPEC   — path to the RunSpec XML
+    //   MOVES_PROFILE_MANIFEST  — path to manifest.json
+    //   MOVES_PROFILE_DATA_DIR  — dir holding the partition files (mirroring
+    //                             the manifest paths)
+    // Run single-threaded (RAYON_NUM_THREADS=1, max_parallel_chunks=0) to mirror
+    // the single-thread WASM demo.
+
+    #[test]
+    #[ignore = "manual profiling harness; needs MOVES_PROFILE_* env + data"]
+    fn profile_print_required_partitions() {
+        let runspec = std::fs::read_to_string(std::env::var("MOVES_PROFILE_RUNSPEC").unwrap())
+            .expect("read runspec");
+        let manifest = std::fs::read_to_string(std::env::var("MOVES_PROFILE_MANIFEST").unwrap())
+            .expect("read manifest");
+        let run_spec = from_xml_str(&runspec).expect("parse runspec");
+        let paths = required_partition_paths_inner(&run_spec, &manifest).expect("compute paths");
+        // One path per line on stdout (capture with --nocapture).
+        for p in &paths {
+            println!("PARTITION\t{p}");
+        }
+        eprintln!("total required partitions: {}", paths.len());
+    }
+
+    #[test]
+    #[ignore = "manual profiling harness; needs MOVES_PROFILE_* env + data"]
+    fn profile_run_default_db() {
+        use std::time::Instant;
+
+        let runspec = std::fs::read_to_string(std::env::var("MOVES_PROFILE_RUNSPEC").unwrap())
+            .expect("read runspec");
+        let manifest = std::fs::read_to_string(std::env::var("MOVES_PROFILE_MANIFEST").unwrap())
+            .expect("read manifest");
+        let data_dir = std::path::PathBuf::from(std::env::var("MOVES_PROFILE_DATA_DIR").unwrap());
+
+        let run_spec = from_xml_str(&runspec).expect("parse runspec");
+        let paths = required_partition_paths_inner(&run_spec, &manifest).expect("compute paths");
+
+        let t = Instant::now();
+        let mut partition_files: Vec<(String, Vec<u8>)> = Vec::with_capacity(paths.len());
+        for p in &paths {
+            let bytes = std::fs::read(data_dir.join(p))
+                .unwrap_or_else(|e| panic!("read partition {p}: {e}"));
+            partition_files.push((p.clone(), bytes));
+        }
+        eprintln!("[phase] read {} partitions: {:?}", paths.len(), t.elapsed());
+
+        let t = Instant::now();
+        let mut store = default_db::load_partitions_to_store(&partition_files).expect("load");
+        eprintln!("[phase] load_partitions_to_store: {:?}", t.elapsed());
+
+        let t = Instant::now();
+        default_db::setup_execution_store(&run_spec, &mut store).expect("setup");
+        eprintln!("[phase] setup_execution_store: {:?}", t.elapsed());
+
+        let t = Instant::now();
+        let geography = default_db::load_geography_from_store(&store).expect("geography");
+        eprintln!("[phase] load_geography_from_store: {:?}", t.elapsed());
+
+        let registry = build_registry().expect("registry");
+        let config = EngineConfig {
+            output_root: std::path::PathBuf::from(""),
+            // Honor MOVES_PROFILE_CHUNKS (default 0 = all cores). Set to 1 to make
+            // chunk execution sequential — clean per-module enter/exit tracing and
+            // isolates a single-calculator OOM from cumulative parallel allocation.
+            max_parallel_chunks: std::env::var("MOVES_PROFILE_CHUNKS")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0),
+            run_spec_file_name: None,
+            run_date_time: None,
+            collect_output_in_memory: true,
+        };
+        let mut engine = MOVESEngine::new(run_spec.clone(), registry, config);
+        engine = engine.with_rates_first(true).with_slow_store(store);
+        engine
+            .execution_run_spec_mut()
+            .build_execution_locations(&geography);
+
+        let t = Instant::now();
+        let outcome = engine.run().expect("engine run");
+        eprintln!("[phase] engine.run(): {:?}", t.elapsed());
+        // Content fingerprint of the output bytes — single-threaded + parquet
+        // are deterministic, so two runs whose computed emissions are identical
+        // produce byte-identical output. Used to confirm a perf change (table
+        // scoping) does not alter results.
+        let mut total_len = 0usize;
+        let mut checksum: u64 = 0;
+        for (_, bytes) in &outcome.output_bytes {
+            total_len += bytes.len();
+            for &b in bytes {
+                checksum = checksum.wrapping_mul(1_000_000_007).wrapping_add(u64::from(b));
+            }
+        }
+        eprintln!(
+            "[result] output tables: {} bytes: {} fingerprint: {:016x}",
+            outcome.output_bytes.len(),
+            total_len,
+            checksum
+        );
+        // Per-table breakdown: name, row count, and (for MOVESOutput) the sum of
+        // emissionQuant — the actual check for nonzero emissions.
+        for (name, bytes) in &outcome.output_bytes {
+            let name = name.display();
+            match default_db::parquet_bytes_to_polars_df(bytes) {
+                Ok(df) => {
+                    let sum = df
+                        .column("emissionQuant")
+                        .ok()
+                        .and_then(|c| c.cast(&polars::prelude::DataType::Float64).ok())
+                        .and_then(|c| c.f64().ok().map(|ca| ca.into_iter().flatten().sum::<f64>()));
+                    let extra = match sum {
+                        Some(s) => format!(" emissionQuant_sum={s:.6e}"),
+                        None => String::new(),
+                    };
+                    eprintln!(
+                        "[table] {name}: {} rows x {} cols{extra}",
+                        df.height(),
+                        df.width()
+                    );
+                }
+                Err(e) => eprintln!("[table] {name}: <decode error: {e}>"),
+            }
+        }
+        // Per-pollutant emissionQuant sums across all MOVESOutput partitions — to
+        // compare against a canonical snapshot and detect double-counting.
+        {
+            use std::collections::BTreeMap;
+            let mut by_pol: BTreeMap<i64, (f64, usize)> = BTreeMap::new();
+            for (name, bytes) in &outcome.output_bytes {
+                if !name.to_string_lossy().contains("MOVESOutput") {
+                    continue;
+                }
+                if let Ok(df) = default_db::parquet_bytes_to_polars_df(bytes) {
+                    let pol = df
+                        .column("pollutantID")
+                        .ok()
+                        .and_then(|c| c.cast(&polars::prelude::DataType::Int64).ok());
+                    let quant = df
+                        .column("emissionQuant")
+                        .ok()
+                        .and_then(|c| c.cast(&polars::prelude::DataType::Float64).ok());
+                    if let (Some(pol), Some(quant)) = (pol, quant) {
+                        if let (Ok(pc), Ok(qc)) = (pol.i64(), quant.f64()) {
+                            for (p, q) in pc.into_iter().zip(qc.into_iter()) {
+                                if let Some(p) = p {
+                                    let e = by_pol.entry(p).or_default();
+                                    e.0 += q.unwrap_or(0.0);
+                                    e.1 += 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            for (p, (s, n)) in &by_pol {
+                eprintln!("[pol] {p}: sum={s:.6e} rows={n}");
+            }
+        }
+        // Dimension breakdown for pol 110 (PM2.5 total): sum + rows by fuelTypeID.
+        // The canonical snapshot disaggregates by fuelType {1,2,5}; this surfaces
+        // whether the default-DB path collapses or mis-weights the fuel split.
+        {
+            use std::collections::BTreeMap;
+            let mut by_ft: BTreeMap<i64, (f64, usize)> = BTreeMap::new();
+            for (name, bytes) in &outcome.output_bytes {
+                if !name.to_string_lossy().contains("MOVESOutput") {
+                    continue;
+                }
+                let Ok(df) = default_db::parquet_bytes_to_polars_df(bytes) else {
+                    continue;
+                };
+                let i64c = |n: &str| {
+                    df.column(n)
+                        .ok()
+                        .and_then(|c| c.cast(&polars::prelude::DataType::Int64).ok())
+                };
+                let f64c = |n: &str| {
+                    df.column(n)
+                        .ok()
+                        .and_then(|c| c.cast(&polars::prelude::DataType::Float64).ok())
+                };
+                if let (Some(pol), Some(ft), Some(q)) =
+                    (i64c("pollutantID"), i64c("fuelTypeID"), f64c("emissionQuant"))
+                {
+                    if let (Ok(pc), Ok(fc), Ok(qc)) = (pol.i64(), ft.i64(), q.f64()) {
+                        for ((p, f), v) in pc.into_iter().zip(fc.into_iter()).zip(qc.into_iter()) {
+                            if p == Some(110) {
+                                let e = by_ft.entry(f.unwrap_or(-1)).or_default();
+                                e.0 += v.unwrap_or(0.0);
+                                e.1 += 1;
+                            }
+                        }
+                    }
+                }
+            }
+            for (f, (s, n)) in &by_ft {
+                eprintln!("[pol110/fuelType] {f}: sum={s:.6e} rows={n}");
+            }
+        }
     }
 }

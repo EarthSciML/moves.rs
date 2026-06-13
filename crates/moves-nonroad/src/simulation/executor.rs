@@ -37,7 +37,8 @@
 
 use crate::allocation::{allocate_county, allocate_state, CountyDescriptor};
 use crate::common::consts::{
-    CVTTON, MXAGYR, MXDAYS, MXEVTECH, MXPOL, MXTECH, RMISS, SWTCNG, SWTDSL, SWTGS2, SWTGS4, SWTLPG,
+    CVTTON, MXAGYR, MXDAYS, MXEVTECH, MXPOL, MXTECH, RMISS, SFCCNG, SFCDSL, SFCGS2, SFCGS4,
+    SFCLPG, SWTCNG, SWTDSL, SWTGS2, SWTGS4, SWTLPG,
 };
 use crate::driver::scrptime;
 use crate::driver::{day_month_factors as daymthf, DayMonthFactors};
@@ -819,12 +820,19 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
 
     // ---- Activity records -----------------------------------------------
 
-    fn find_activity(&self, scc: &str, fips: &str, _hp_avg: f32) -> Option<usize> {
+    fn find_activity(&self, scc: &str, fips: &str, hp_avg: f32) -> Option<usize> {
+        // Canonical fndact only considers records whose HP category
+        // contains hp_avg — activity hours vary by HP bin within an SCC.
         self.executor
             .reference
             .activity_entries
             .iter()
-            .position(|e| e.scc == scc && (e.fips.is_empty() || e.fips == fips))
+            .position(|e| {
+                e.scc == scc
+                    && (e.fips.is_empty() || e.fips == fips)
+                    && e.hp_min <= hp_avg
+                    && hp_avg <= e.hp_max
+            })
     }
 
     fn activity_record(&self, activity_index: usize) -> ActivityRecord {
@@ -982,11 +990,21 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             rfg_winter_4_stroke: None,
             rfg_summer_2_stroke: None,
             rfg_summer_4_stroke: None,
-            // SOx/altitude unused by the emitted pollutants; neutral values
-            // (soxcor = sox_fuel/sox_base = 1, altitude factor = 1).
-            sox_fuel: [1.0; 5],
-            sox_base: [1.0; 5],
-            sox_diesel_marine: 1.0,
+            // SOx correction (emsadj.f :260-271): soxcor = soxful/soxbas.
+            // `fuel_sulfur_pct` carries the run's in-use sulfur weight %
+            // (the .opt OPTIONS values); when absent the correction is
+            // neutral (soxful = soxbas), preserving legacy behaviour.
+            sox_fuel: self
+                .executor
+                .reference
+                .fuel_sulfur_pct
+                .unwrap_or([SWTGS2, SWTGS4, SWTDSL, SWTLPG, SWTCNG]),
+            sox_base: [SWTGS2, SWTGS4, SWTDSL, SWTLPG, SWTCNG],
+            sox_diesel_marine: if self.executor.reference.fuel_sulfur_pct.is_some() {
+                self.executor.reference.fuel_sulfur_marine
+            } else {
+                SWTDSL
+            },
             altitude_factor: [1.0; 5],
         };
         Ok(calculate_emission_adjustments(&inputs))
@@ -1065,7 +1083,20 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         let curve = self.executor.reference.scrappage_curve.clone();
         let use_hours = record.use_hours;
         let load_factor = act.load_factor;
-        let pop_growth_factor = self.ctx_growth.unwrap_or(0.0);
+        // Canonical prccty.f :365–368: grwcty = grwfac(ipopyr, ipopyr+1)
+        // — the base-population-year growth rate, "used only for the
+        // scrptime call in modyr, which uses the growth factor at the
+        // base-population year to extrapolate a full sales/scrappage
+        // history". NOT the .POP growth-pair rate (ctx_growth): a large
+        // base-year growth flips salesgrwfac negative, which sign-flips
+        // the initial age distribution and produces canonical's truncated
+        // model-year tails and negative-new-sales gap years.
+        let pop_growth_factor = if selected.is_empty() {
+            self.ctx_growth.unwrap_or(0.0)
+        } else {
+            let refs: Vec<&GrowthIndicatorRecord> = selected.iter().collect();
+            growth_factor(&refs, record.base_pop_year, record.base_pop_year + 1, fips)?.factor
+        };
 
         // 6. model_year → calls scrptime closure.
         let modyr_out = model_year(
@@ -1080,16 +1111,66 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
         )?;
 
         // 7. age_distribution → uses growth records for forward/backward growth.
+        //
+        // Canonical `prcsta.f` grows the age distribution on the STATE
+        // population and only afterwards allocates it to counties
+        // (`alocty.f`). The loader pre-allocated `base_population` by the
+        // county's surrogate fraction, and `agedist`'s `MINGRWIND`
+        // (0.0001) clamp is magnitude-sensitive: a sub-MINGRWIND
+        // pre-allocated population balloons new-sales cohorts canonical
+        // never produces (verified against the NONROAD binary). Divide
+        // the fraction back out for the agedist call, then rescale the
+        // returned (possibly back-grown) population.
+        let alloc_frac = self
+            .executor
+            .reference
+            .alloc_fractions
+            .get(record.scc)
+            .copied()
+            .unwrap_or(1.0);
+        let agedist_basepop = if alloc_frac > 0.0 && alloc_frac < 1.0 {
+            base_population / alloc_frac
+        } else {
+            base_population
+        };
         let selected_refs: Vec<&GrowthIndicatorRecord> = selected.iter().collect();
         let agedist_out = age_distribution(
-            base_population,
+            agedist_basepop,
             &modyr_out.modfrc,
             record.base_pop_year,
             growth_year,
             &modyr_out.yryrfrcscrp,
             |y1, y2| growth_factor(&selected_refs, y1, y2, fips),
         )?;
+        let agedist_population = if agedist_basepop != base_population {
+            agedist_out.base_population * alloc_frac
+        } else {
+            agedist_out.base_population
+        };
 
+        if std::env::var("MOVES_NR_DEBUG_GROWTH").is_ok() {
+            let mult: f32 = agedist_out.mdyrfrc.iter().sum();
+            eprintln!(
+                "[nr-growth] indicator={indicator:?} fips={fips} base_year={} growth_year={growth_year} records={} multiplier={mult}",
+                record.base_pop_year,
+                selected_refs.len(),
+            );
+        }
+        if let Ok(want) = std::env::var("MOVES_NR_DEBUG_AGEDIST") {
+            if record.scc == want {
+                eprintln!(
+                    "[nr-agedist] scc={} hp={} pgf={pop_growth_factor} nyrlif={} uh={} al={} lf={} ai={activity_index} gi={growth_index} ind={indicator:?} pop={} modfrc[0..12]={:?}",
+                    record.scc,
+                    record.hp_avg,
+                    modyr_out.nyrlif,
+                    use_hours,
+                    act.activity_level,
+                    act.load_factor,
+                    record.population,
+                    &agedist_out.mdyrfrc[..12.min(agedist_out.mdyrfrc.len())],
+                );
+            }
+        }
         // 8. Build ModelYearAgedistResult. modfrc comes from agedist
         // (grown to growth_year); the per-year adjustments from modyr.
         let nyrlif = modyr_out.nyrlif;
@@ -1105,7 +1186,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             actadj: pad(modyr_out.actadj),
             detage: pad(modyr_out.detage),
             nyrlif,
-            population: agedist_out.base_population,
+            population: agedist_population,
         })
     }
 
@@ -1388,8 +1469,24 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
 
         let retrofit_reduction = vec![0.0_f32; MXPOL];
         let mut emission_factors = factors.emission_factors.clone();
-        let sox_conversion = [SWTGS2, SWTGS4, SWTDSL, SWTLPG, SWTCNG];
+        let sox_conversion = [SFCGS2, SFCGS4, SFCDSL, SFCLPG, SFCCNG]; // soxfrc = SFC* (intadj.f:60-64): the sulfur->SOx/PM conversion FRACTIONS, not the SWT* sulfur weights
         let sox_base = [SWTGS2, SWTGS4, SWTDSL, SWTLPG, SWTCNG];
+
+        // Per-tech sulfur alternate (clcems.f `fndchr(tectyp(...), sultec)`):
+        // resolve this iteration's tech name from the same hp-matched
+        // reference entry `compute_exhaust_factors` used, then look it up in
+        // the /PM BASE SULFUR/ table.
+        let sulfur_alternate = self
+            .executor
+            .reference
+            .exhaust_tech_entries
+            .iter()
+            .find(|e| {
+                e.scc == record.scc && e.hp_min <= record.hp_avg && record.hp_avg <= e.hp_max
+            })
+            .and_then(|e| e.tech_names.get(tech_index))
+            .and_then(|name| self.executor.reference.sulfur_alternates.get(name))
+            .copied();
 
         // A pollutant takes the EF-gated branch of
         // `calculate_exhaust_emissions` only when an emission-factor file
@@ -1458,7 +1555,7 @@ impl<'a> GeographyCallbacks for CountyAdapter<'a> {
             fuel: options.fuel,
             sox_conversion,
             sox_base,
-            sulfur_alternate: None,
+            sulfur_alternate,
         };
 
         let outputs = calculate_exhaust_emissions(&mut calc_inputs, &pollutant_filter);
@@ -1663,13 +1760,18 @@ impl<'a> StateCallbacks for StateAdapter<'a> {
         Some(idx as i32)
     }
 
-    fn find_activity(&mut self, scc: &str, fips: &str, _hp_avg: f32) -> Option<ActivityLookup> {
+    fn find_activity(&mut self, scc: &str, fips: &str, hp_avg: f32) -> Option<ActivityLookup> {
         let entry = self
             .executor
             .reference
             .activity_entries
             .iter()
-            .find(|e| e.scc == scc && (e.fips.is_empty() || e.fips == fips))?;
+            .find(|e| {
+                e.scc == scc
+                    && (e.fips.is_empty() || e.fips == fips)
+                    && e.hp_min <= hp_avg
+                    && hp_avg <= e.hp_max
+            })?;
         // Convert geography::common::ActivityUnit → emissions::exhaust::ActivityUnit.
         let units = match entry.activity_unit {
             ActivityUnit::HoursPerYear => ExhaustActivityUnit::HoursPerYear,
@@ -2034,13 +2136,18 @@ impl<'a> NationalCallbacks for NationalAdapter<'a> {
         Some(idx as i32)
     }
 
-    fn find_activity(&mut self, scc: &str, fips: &str, _hp_avg: f32) -> Option<ActivityLookup> {
+    fn find_activity(&mut self, scc: &str, fips: &str, hp_avg: f32) -> Option<ActivityLookup> {
         let entry = self
             .executor
             .reference
             .activity_entries
             .iter()
-            .find(|e| e.scc == scc && (e.fips.is_empty() || e.fips == fips))?;
+            .find(|e| {
+                e.scc == scc
+                    && (e.fips.is_empty() || e.fips == fips)
+                    && e.hp_min <= hp_avg
+                    && hp_avg <= e.hp_max
+            })?;
         let units = match entry.activity_unit {
             ActivityUnit::HoursPerYear => ExhaustActivityUnit::HoursPerYear,
             ActivityUnit::HoursPerDay => ExhaustActivityUnit::HoursPerDay,
@@ -2317,13 +2424,18 @@ impl<'a> UsTotalCallbacks for UsTotalAdapter<'a> {
         Some(idx as i32)
     }
 
-    fn find_activity(&mut self, scc: &str, fips: &str, _hp_avg: f32) -> Option<ActivityLookup> {
+    fn find_activity(&mut self, scc: &str, fips: &str, hp_avg: f32) -> Option<ActivityLookup> {
         let entry = self
             .executor
             .reference
             .activity_entries
             .iter()
-            .find(|e| e.scc == scc && (e.fips.is_empty() || e.fips == fips))?;
+            .find(|e| {
+                e.scc == scc
+                    && (e.fips.is_empty() || e.fips == fips)
+                    && e.hp_min <= hp_avg
+                    && hp_avg <= e.hp_max
+            })?;
         let units = match entry.activity_unit {
             ActivityUnit::HoursPerYear => ExhaustActivityUnit::HoursPerYear,
             ActivityUnit::HoursPerDay => ExhaustActivityUnit::HoursPerDay,
@@ -2687,7 +2799,7 @@ fn calculate_exhaust_from_reference(
     }
 
     let retrofit_reduction = vec![0.0_f32; MXPOL];
-    let sox_conversion = [SWTGS2, SWTGS4, SWTDSL, SWTLPG, SWTCNG];
+    let sox_conversion = [SFCGS2, SFCGS4, SFCDSL, SFCLPG, SFCCNG]; // soxfrc = SFC* (intadj.f:60-64): the sulfur->SOx/PM conversion FRACTIONS, not the SWT* sulfur weights
     let sox_base_arr = [SWTGS2, SWTGS4, SWTDSL, SWTLPG, SWTCNG];
 
     let mut calc_inputs = ExhaustCalcInputs {
@@ -3559,6 +3671,8 @@ mod production {
                 activity_entries: vec![ActivityTableEntry {
                     scc: "2270001010".into(),
                     fips: "06037".into(),
+                    hp_min: 0.0,
+                    hp_max: f32::MAX,
                     starts: 0.0,
                     activity_level: 100.0,
                     activity_unit: ActivityUnit::HoursPerYear,
@@ -3642,6 +3756,8 @@ mod production {
                 activity_entries: vec![ActivityTableEntry {
                     scc: "2270001010".into(),
                     fips: "06037".into(),
+                    hp_min: 0.0,
+                    hp_max: f32::MAX,
                     starts: 0.0,
                     activity_level: 100.0,
                     activity_unit: ActivityUnit::HoursPerYear,
@@ -3734,6 +3850,8 @@ mod production {
                 activity_entries: vec![ActivityTableEntry {
                     scc: "2270001010".into(),
                     fips: "06037".into(),
+                    hp_min: 0.0,
+                    hp_max: f32::MAX,
                     starts: 0.0,
                     activity_level: 100.0,
                     activity_unit: ActivityUnit::HoursPerYear,
@@ -3842,6 +3960,8 @@ mod production {
                 activity_entries: vec![ActivityTableEntry {
                     scc: "2270001010".into(),
                     fips: "06000".into(),
+                    hp_min: 0.0,
+                    hp_max: f32::MAX,
                     starts: 0.0,
                     activity_level: 100.0,
                     activity_unit: ActivityUnit::HoursPerYear,
@@ -3945,6 +4065,8 @@ mod production {
                 activity_entries: vec![ActivityTableEntry {
                     scc: "2270001010".into(),
                     fips: "06000".into(),
+                    hp_min: 0.0,
+                    hp_max: f32::MAX,
                     starts: 0.0,
                     activity_level: 100.0,
                     activity_unit: ActivityUnit::HoursPerYear,
@@ -4080,6 +4202,8 @@ mod production {
                 activity_entries: vec![ActivityTableEntry {
                     scc: "2270001010".into(),
                     fips: "".into(),
+                    hp_min: 0.0,
+                    hp_max: f32::MAX,
                     starts: 0.0,
                     activity_level: 100.0,
                     activity_unit: ActivityUnit::HoursPerYear,
@@ -4184,6 +4308,8 @@ mod production {
                 activity_entries: vec![ActivityTableEntry {
                     scc: "2270001010".into(),
                     fips: "".into(),
+                    hp_min: 0.0,
+                    hp_max: f32::MAX,
                     starts: 0.0,
                     activity_level: 100.0,
                     activity_unit: ActivityUnit::HoursPerYear,

@@ -273,10 +273,22 @@ pub trait DataFrameStoreTyped: DataFrameStore {
     /// `ExtendedIdleEmissionRateFraction` for process 90, which is absent from
     /// snapshots that don't include that process).
     fn iter_typed_or_empty<R: TableRow>(&self, name: &str) -> Result<Vec<R>> {
-        if self.get(name).is_none() {
-            return Ok(Vec::new());
+        match self.get(name) {
+            None => Ok(Vec::new()),
+            // A present-but-empty table (height 0) yields no typed rows. An
+            // empty-shipped default-DB table — one with 0 partitions, e.g.
+            // AverageTankTemperature / SoakActivityFraction — materialises as a
+            // *schemaless* 0-column / 0-row frame (the scan has no partition to
+            // infer a schema from). `iter_typed` would then call
+            // `from_dataframe`, whose `column("zoneID")` lookup spuriously
+            // errors ("not found") even though there is genuinely nothing to
+            // extract. Treat it the same as an absent table — exactly the
+            // not-created-for-this-RunSpec case this method exists for. A
+            // properly-schema'd empty table already yields `Vec::new()` via
+            // `iter_typed`, so this only rescues the schemaless case.
+            Some(df) if df.height() == 0 => Ok(Vec::new()),
+            Some(_) => self.iter_typed(name),
         }
-        self.iter_typed(name)
     }
 
     /// Return raw column arrays for `columns` from the table named `name`,

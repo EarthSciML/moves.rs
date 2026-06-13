@@ -50,6 +50,7 @@ pub mod aggregate;
 pub mod drivecycle;
 pub mod inputs;
 pub mod model;
+pub mod sbweighted;
 
 use std::sync::OnceLock;
 
@@ -84,9 +85,21 @@ const GENERATOR_NAME: &str = "BaseRateGenerator";
 /// casing used in the MOVES default database.
 static INPUT_TABLES: &[&str] = &[
     "RatesOpModeDistribution",
-    "SBWeightedEmissionRateByAge",
-    "SBWeightedEmissionRate",
-    "SBWeightedDistanceRate",
+    // Source-bin-weighted rates are computed in-process (see `sbweighted`), so
+    // depend on the runtime SourceBin / SourceBinDistribution the
+    // SourceBinDistributionGenerator produces (and the raw rate + lookup tables)
+    // rather than the never-materialised SBWeighted* tables. Declaring these
+    // co-locates this generator with the SourceBinDistributionGenerator in the
+    // same execution chunk so its scratch output is visible here.
+    "SourceBin",
+    "SourceBinDistribution",
+    "EmissionRateByAge",
+    "EmissionRate",
+    "PollutantProcessModelYear",
+    "SourceTypeModelYear",
+    "PollutantProcessAssoc",
+    "fullACAdjustment",
+    "AgeCategory",
     "avgSpeedBin",
     "avgSpeedDistribution",
     "driveSchedule",
@@ -224,7 +237,7 @@ impl Generator for BaseRateGenerator {
         // Project domain overrides it to false later (handled via the !is_project gate on
         // use_avg_speed_bin rather than mutating the intermediate).
         let apply_avg_speed_distribution =
-            matches!(scale, Some(ModelScale::Inventory)) && matches!(process_id, 1 | 9 | 10);
+            scale.is_some_and(ModelScale::is_inventory) && matches!(process_id, 1 | 9 | 10);
         // Net after Project-domain override (Java: if isProjectDomain && proc∈{1,9,10} then false):
         let apply_avg_speed_distribution = apply_avg_speed_distribution && !is_project;
 
@@ -244,7 +257,7 @@ impl Generator for BaseRateGenerator {
         // Java: applySourceBinDistribution = (scale == MACROSCALE); if process ∈ {2,90,91} →
         // applySourceBinDistribution = true. No Project-domain override for this flag.
         let use_sum_sbd =
-            matches!(scale, Some(ModelScale::Inventory)) || matches!(process_id, 2 | 90 | 91);
+            scale.is_some_and(ModelScale::is_inventory) || matches!(process_id, 2 | 90 | 91);
 
         // useSumSBDRaw: Rates (Java MESOSCALE_LOOKUP) scale AND processes 2/90/91.
         let use_sum_sbd_raw =
@@ -275,6 +288,31 @@ impl Generator for BaseRateGenerator {
         let flags =
             ExternalFlags::from_parameters(&params).map_err(|e| Error::Polars(e.to_string()))?;
 
+        // Source-bin-weight the raw emission rates — the port of canonical
+        // `generateSBWeightedEmissionRates`. A run that already provides the
+        // weighted tables (a captured snapshot, or a unit-test fixture that
+        // pre-seeds them) uses them as-is; the default-DB path has no producer
+        // for `SBWeighted*`, so compute them here from the runtime
+        // `SourceBinDistribution` + raw rate tables (otherwise every base rate —
+        // and the whole onroad inventory — is zero).
+        let provided_by_age: Vec<model::SbWeightedRateDetail> =
+            iter_optional(ctx.tables(), "SBWeightedEmissionRateByAge")?;
+        let provided_non_age: Vec<model::SbWeightedRateDetail> =
+            iter_optional(ctx.tables(), "SBWeightedEmissionRate")?;
+        let (sb_weighted_by_age, sb_weighted_non_age) =
+            if !provided_by_age.is_empty() || !provided_non_age.is_empty() {
+                (provided_by_age, provided_non_age)
+            } else {
+                let county_id = pos.location.county_id.unwrap_or(0) as i64;
+                let computed = sbweighted::compute_sb_weighted_rates(
+                    ctx.tables(),
+                    i64::from(process_id),
+                    county_id,
+                    i64::from(year_id),
+                )?;
+                (computed.by_age, computed.non_age)
+            };
+
         let inputs = BaseRateInputs {
             avg_speed_bin: ctx.tables().iter_typed("avgSpeedBin")?,
             drive_schedule: iter_optional(ctx.tables(), "driveSchedule")?,
@@ -283,11 +321,8 @@ impl Generator for BaseRateGenerator {
                 ctx.tables(),
                 "sourceUseTypePhysicsMapping",
             )?,
-            sb_weighted_emission_rate_by_age: iter_optional(
-                ctx.tables(),
-                "SBWeightedEmissionRateByAge",
-            )?,
-            sb_weighted_emission_rate: iter_optional(ctx.tables(), "SBWeightedEmissionRate")?,
+            sb_weighted_emission_rate_by_age: sb_weighted_by_age,
+            sb_weighted_emission_rate: sb_weighted_non_age,
             sb_weighted_distance_rate: iter_optional(ctx.tables(), "SBWeightedDistanceRate")?,
             run_spec_road_type: ctx
                 .tables()

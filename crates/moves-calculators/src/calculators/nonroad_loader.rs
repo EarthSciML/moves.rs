@@ -390,14 +390,21 @@ fn build_entries_from_mix<S: DataFrameStore + ?Sized>(store: &S) -> Vec<ExhaustT
         pairs.insert((su_scc[i].clone(), (su_hp[i] * 1.0e3).round() as i64));
     }
 
-    let mix_sccs: std::collections::BTreeSet<&String> = mix.keys().map(|(s, _, _)| s).collect();
     let mut entries = Vec::new();
     for (scc, hp_milli) in pairs {
         let hp_avg = hp_milli as f32 / 1.0e3;
+        // Canonical SCC fallback chain (`fndtch`/`fndefc` `ascglb`): exact,
+        // then the 7-digit equipment root (`xxxxxxx000`), then the 4-digit
+        // family root (`xxxx000000`). Mixes and rates key at DIFFERENT
+        // levels per SCC — diesel lawn&garden rates live at 2270004000
+        // while their tech mix lives at 2270000000 — so each lookup must
+        // walk the full chain independently.
+        let equip = equip_root(&scc);
         let root = family_root(&scc);
+        let chain: [&String; 3] = [&scc, &equip, &root];
         // The tech-mix hp bin containing hp_avg. NONROAD's .TECH lookup uses
         // the most-specific SCC that has a bin covering this hp, then falls
-        // back to the family-root (default) tech file. A specific SCC's tech
+        // back to the root (default) tech files. A specific SCC's tech
         // rows need not span every hp bin its population uses: e.g.
         // 2265006010 has tech rows only for 0-25 hp, but its population
         // extends to 175 hp — those high-hp points are served by the
@@ -409,11 +416,7 @@ fn build_entries_from_mix<S: DataFrameStore + ?Sized>(store: &S) -> Vec<ExhaustT
                 s.as_str() == target && (*lo as f32) <= hp_avg && hp_avg <= (*hi as f32)
             })
         };
-        let found = if mix_sccs.contains(&scc) {
-            find_bin(&scc).or_else(|| find_bin(&root))
-        } else {
-            find_bin(&root)
-        };
+        let found = chain.iter().find_map(|s| find_bin(s));
         let Some((_, tech_map)) = found else {
             continue;
         };
@@ -431,28 +434,23 @@ fn build_entries_from_mix<S: DataFrameStore + ?Sized>(store: &S) -> Vec<ExhaustT
         let mut by_year: BTreeMap<i32, Vec<f32>> = BTreeMap::new();
 
         for (t, &tid) in tech_ids.iter().enumerate() {
-            // BSFC: rate lookup, specific SCC then family root.
-            bsfc[t] = rates
-                .get(&(scc.clone(), tid))
-                .and_then(|tr| hp_pick(&tr.bsfc, hp_avg).copied())
-                .or_else(|| {
+            // BSFC: rate lookup over the canonical SCC fallback chain.
+            bsfc[t] = chain
+                .iter()
+                .find_map(|s| {
                     rates
-                        .get(&(root.clone(), tid))
+                        .get(&((*s).clone(), tid))
                         .and_then(|tr| hp_pick(&tr.bsfc, hp_avg).copied())
                 })
                 .unwrap_or(0.0);
 
             for (pslot, pp_for) in [(0, PP_THC), (1, PP_CO), (2, PP_NOX), (5, PP_PM)] {
-                let picked = rates
-                    .get(&(scc.clone(), tid))
-                    .and_then(|tr| tr.by_pollutant.get(&pslot))
-                    .and_then(|v| hp_pick(v, hp_avg).copied())
-                    .or_else(|| {
-                        rates
-                            .get(&(root.clone(), tid))
-                            .and_then(|tr| tr.by_pollutant.get(&pslot))
-                            .and_then(|v| hp_pick(v, hp_avg).copied())
-                    });
+                let picked = chain.iter().find_map(|s| {
+                    rates
+                        .get(&((*s).clone(), tid))
+                        .and_then(|tr| tr.by_pollutant.get(&pslot))
+                        .and_then(|v| hp_pick(v, hp_avg).copied())
+                });
                 let idx = pslot * n_tech + t;
                 if let Some((r, u)) = picked {
                     emission_factors[idx] = r;
@@ -710,22 +708,22 @@ pub fn build_evap_tech_entries<S: DataFrameStore + ?Sized>(
         pairs.insert((su_scc[i].clone(), (su_hp[i] * 1.0e3).round() as i64));
     }
 
-    let mix_sccs: std::collections::BTreeSet<&String> = mix.keys().map(|(s, _, _)| s).collect();
     let mut entries = Vec::new();
     for (scc, hp_milli) in pairs {
         let hp_avg = hp_milli as f32 / 1.0e3;
+        // Canonical `fndevtch` SCC fallback: exact → 7-digit equipment root
+        // → 4-digit family root (marine-diesel evap mixes key at
+        // 2282020000, for example).
+        let equip = equip_root(&scc);
         let root = family_root(&scc);
+        let chain: [&String; 3] = [&scc, &equip, &root];
 
         let find_bin = |target: &str| {
             mix.iter().find(|((s, lo, hi), _)| {
                 s.as_str() == target && (*lo as f32) <= hp_avg && hp_avg <= (*hi as f32)
             })
         };
-        let found = if mix_sccs.contains(&scc) {
-            find_bin(&scc).or_else(|| find_bin(&root))
-        } else {
-            find_bin(&root)
-        };
+        let found = chain.iter().find_map(|s| find_bin(s));
         let Some((_, tech_map)) = found else {
             continue; // no evap tech mix for this SCC (e.g. diesel)
         };
@@ -758,16 +756,12 @@ pub fn build_evap_tech_entries<S: DataFrameStore + ?Sized>(
 
         for (t, &tid) in tech_ids.iter().enumerate() {
             for &(pslot, pp_for) in &evap_slot_to_pp {
-                let picked = rates
-                    .get(&(scc.clone(), tid))
-                    .and_then(|tr| tr.by_pollutant.get(&pslot))
-                    .and_then(|v| hp_pick(v, hp_avg).copied())
-                    .or_else(|| {
-                        rates
-                            .get(&(root.clone(), tid))
-                            .and_then(|tr| tr.by_pollutant.get(&pslot))
-                            .and_then(|v| hp_pick(v, hp_avg).copied())
-                    });
+                let picked = chain.iter().find_map(|s| {
+                    rates
+                        .get(&((*s).clone(), tid))
+                        .and_then(|tr| tr.by_pollutant.get(&pslot))
+                        .and_then(|v| hp_pick(v, hp_avg).copied())
+                });
                 let idx = pslot * n_tech + t;
                 if let Some((r, u)) = picked {
                     emission_factors[idx] = r;
@@ -814,6 +808,17 @@ pub fn build_evap_tech_entries<S: DataFrameStore + ?Sized>(
         });
     }
     entries
+}
+
+/// The equipment-type root SCC for a full 10-digit nonroad SCC — the first
+/// seven digits followed by `000` (e.g. `2270004071` → `2270004000`). The
+/// middle step of the canonical `fndtch`/`fndefc` `ascglb` fallback chain.
+fn equip_root(scc: &str) -> String {
+    if scc.len() >= 10 {
+        format!("{}000", &scc[..7])
+    } else {
+        scc.to_string()
+    }
 }
 
 /// The engine-family root SCC for a full 10-digit nonroad SCC — the first
@@ -986,6 +991,89 @@ fn scc_fuel_map<S: DataFrameStore + ?Sized>(store: &S) -> BTreeMap<String, i64> 
     map
 }
 
+/// Map each full SCC to its spatial-allocation surrogate via `nrscc`
+/// (SCC → NREquipTypeID) and `nrequipmenttype` (NREquipTypeID →
+/// surrogateID). This is the DB form of NONROAD's `ALLOCATE.XRF`
+/// (canonical generates it from exactly this join —
+/// `NonroadDataFileHelper.java:186-188` — with `coeff = 1.0`).
+fn scc_surrogate_map<S: DataFrameStore + ?Sized>(store: &S) -> BTreeMap<String, i64> {
+    let mut equip_surrogate: BTreeMap<i64, i64> = BTreeMap::new();
+    if let Some(df) = store.get("nrequipmenttype") {
+        let id = int_col(&df, "NREquipTypeID");
+        let sur = int_col(&df, "surrogateID");
+        for i in 0..df.height() {
+            equip_surrogate.insert(id[i], sur[i]);
+        }
+    }
+    let mut map = BTreeMap::new();
+    if let Some(df) = store.get("nrscc") {
+        let scc = str_col(&df, "SCC");
+        let eq = int_col(&df, "NREquipTypeID");
+        for i in 0..df.height() {
+            if let Some(&sur) = equip_surrogate.get(&eq[i]) {
+                map.insert(scc[i].clone(), sur);
+            }
+        }
+    }
+    map
+}
+
+/// Per-surrogate state→county allocation fractions for `county_fips`,
+/// porting NONROAD's `alocty.f` + `getind.f` over `nrstatesurrogate`
+/// (the DB source of the `.ALO` files):
+///
+///   fraction(surrogateID) = quant(county) / quant(state total row)
+///
+/// where the state total row is `countyID = stateID * 1000` and each
+/// FIPS's quant is taken at the **latest `surrogateYearID` ≤ the episode
+/// year**, falling back to the earliest year above it (`getind.f`'s
+/// `vallow`-else-`valhi` rule — no interpolation). A zero or missing
+/// state total yields fraction 0 (`alocty.f` line 40 guards
+/// `valsta > 0`).
+fn surrogate_fractions<S: DataFrameStore + ?Sized>(
+    store: &S,
+    county_fips: i64,
+    year: i64,
+) -> BTreeMap<i64, f64> {
+    let mut out = BTreeMap::new();
+    let Some(df) = store.get("nrstatesurrogate") else {
+        return out;
+    };
+    let state_row = county_fips / 1000 * 1000;
+    let sur = int_col(&df, "surrogateID");
+    let cty = int_col(&df, "countyID");
+    let yr = int_col(&df, "surrogateYearID");
+    let quant = float_col(&df, "surrogatequant");
+
+    // (surrogateID, fips) → (best year at-or-below, best year above).
+    type Pick = (Option<(i64, f64)>, Option<(i64, f64)>);
+    let mut picks: BTreeMap<(i64, i64), Pick> = BTreeMap::new();
+    for i in 0..df.height() {
+        if cty[i] != county_fips && cty[i] != state_row {
+            continue;
+        }
+        let entry = picks.entry((sur[i], cty[i])).or_default();
+        if yr[i] <= year {
+            if entry.0.is_none_or(|(y, _)| yr[i] > y) {
+                entry.0 = Some((yr[i], quant[i]));
+            }
+        } else if entry.1.is_none_or(|(y, _)| yr[i] < y) {
+            entry.1 = Some((yr[i], quant[i]));
+        }
+    }
+    let value = |sur_id: i64, fips: i64| -> Option<f64> {
+        let (low, hi) = picks.get(&(sur_id, fips))?;
+        low.or(*hi).map(|(_, v)| v)
+    };
+    let surrogate_ids: std::collections::BTreeSet<i64> = sur.iter().copied().collect();
+    for sur_id in surrogate_ids {
+        let qs = value(sur_id, state_row).unwrap_or(0.0);
+        let qc = value(sur_id, county_fips).unwrap_or(0.0);
+        out.insert(sur_id, if qs > 0.0 { qc / qs } else { 0.0 });
+    }
+    out
+}
+
 /// Map each full SCC to its sector via `nrscc` (SCC → NREquipTypeID) and
 /// `nrequipmenttype` (NREquipTypeID → sectorID).
 fn scc_sector_map<S: DataFrameStore + ?Sized>(store: &S) -> BTreeMap<String, i64> {
@@ -1010,38 +1098,134 @@ fn scc_sector_map<S: DataFrameStore + ?Sized>(store: &S) -> BTreeMap<String, i64
     map
 }
 
+/// The set of SCCs the runspec's (fuel × sector) selection matches, mirroring
+/// canonical's `/SOURCE CATEGORY/` packet query
+/// (`NonroadOptFileSqlHelper.getSCCs`): `SELECT SCC FROM nrscc WHERE
+/// fuelTypeID IN (runspec fuels) AND NREquipTypeID IN (runspec sectors)`.
+///
+/// `None` ⇒ run with **no SCC restriction**. That happens in two cases:
+/// - neither selection table is present (unit-test stores), or
+/// - the selection matches NO `nrscc` row. This is a load-bearing canonical
+///   quirk: the runspec stores the *onroad* fuelTypeID (diesel = 2) but
+///   `nrscc` uses nonroad fuel IDs (diesel = 23/24), so a diesel-only
+///   nonroad runspec yields an EMPTY `/SOURCE CATEGORY/` packet — and the
+///   NONROAD Fortran treats an empty packet exactly like a missing one,
+///   running the ENTIRE inventory (all sectors, all fuels). Verified by
+///   running the canonical NONROAD binary with an empty vs absent packet
+///   (identical full output) and by the nr-agriculture-state /
+///   nr-airport-support-county / nr-industrial-county /
+///   nr-railroad-support-nation snapshots, whose diesel-only runspecs
+///   produced every sector's SCCs.
+fn selected_sccs<S: DataFrameStore + ?Sized>(
+    store: &S,
+) -> Option<std::collections::BTreeSet<String>> {
+    let sectors = selected_sectors(store);
+    let fuels = selected_fuels(store);
+    if sectors.is_none() && fuels.is_none() {
+        return None;
+    }
+    let scc_sector = scc_sector_map(store);
+    let scc_fuel = scc_fuel_map(store);
+    let df = store.get("nrscc")?;
+    let scc = str_col(&df, "SCC");
+    let mut allowed = std::collections::BTreeSet::new();
+    for s in &scc {
+        if let Some(sel) = &sectors {
+            match scc_sector.get(s) {
+                Some(sec) if sel.contains(sec) => {}
+                _ => continue,
+            }
+        }
+        if let Some(sel) = &fuels {
+            match scc_fuel.get(s) {
+                Some(fuel) if sel.contains(fuel) => {}
+                _ => continue,
+            }
+        }
+        allowed.insert(s.clone());
+    }
+    // Empty selection ⇒ empty /SOURCE CATEGORY/ packet ⇒ canonical runs
+    // everything.
+    (!allowed.is_empty()).then_some(allowed)
+}
+
+/// Geographic scope of one master-loop firing: the county FIPS the loop
+/// is iterating plus the analysis year (which picks the surrogate year).
+/// `None` ⇒ national (the captured population is summed across all
+/// states, as for a NATION-scale run). A FIPS of `XX000` is a state-level
+/// pseudo-county (NONROAD's state-total region): the population is
+/// filtered to that state but not county-allocated.
+#[derive(Clone, Copy)]
+pub struct GeoScope {
+    pub county_fips: u32,
+    pub year: i32,
+}
+
 /// Join `nrsourceusetype` (SCC, hp, activity by `sourceTypeID`) to
 /// `nrbaseyearequippopulation` (population by `sourceTypeID`), yielding one
 /// [`SourceUnit`] per source type with non-zero population, **restricted to
-/// the runspec's selected sectors** (the snapshot carries every nonroad
-/// sector; the runspec may select only some — e.g. commercial).
-fn load_source_units<S: DataFrameStore + ?Sized>(store: &S) -> Vec<SourceUnit> {
+/// the runspec's selected SCCs** (see [`selected_sccs`]; the snapshot
+/// carries every nonroad sector — the runspec may select only some, or its
+/// selection may match nothing, in which case everything runs).
+///
+/// `scope` narrows the captured national population to the firing
+/// location: state runs keep only that state's rows; county runs
+/// additionally scale each unit by its surrogate's state→county fraction
+/// ([`surrogate_fractions`], NONROAD's `alocty.f`).
+fn load_source_units<S: DataFrameStore + ?Sized>(
+    store: &S,
+    scope: Option<GeoScope>,
+) -> Vec<SourceUnit> {
     let Some(sut) = store.get("nrsourceusetype") else {
         return Vec::new();
     };
     let Some(pop) = store.get("nrbaseyearequippopulation") else {
         return Vec::new();
     };
-    let sectors = selected_sectors(store);
-    let scc_sector = if sectors.is_some() {
-        scc_sector_map(store)
-    } else {
-        BTreeMap::new()
+    let allowed_sccs = selected_sccs(store);
+    // Geographic narrowing: state filter + (for a real county) the
+    // per-surrogate allocation fractions.
+    let (state_filter, county_alloc) = match scope {
+        None => (None, None),
+        Some(GeoScope { county_fips, year }) => {
+            let state = i64::from(county_fips) / 1000;
+            let alloc = (county_fips % 1000 != 0).then(|| {
+                surrogate_fractions(store, i64::from(county_fips), i64::from(year))
+            });
+            (Some(state), alloc)
+        }
     };
-    let fuels = selected_fuels(store);
-    let scc_fuel = if fuels.is_some() {
-        scc_fuel_map(store)
+    let scc_surrogate = if county_alloc.is_some() {
+        scc_surrogate_map(store)
     } else {
         BTreeMap::new()
     };
 
-    // population by sourceTypeID (summed across any state rows; the fixture
-    // carries a single national stateID = 0).
+    // population by sourceTypeID. Unscoped: summed across all state rows
+    // (a NATION capture carries either per-state rows or a single
+    // stateID = 0 aggregate; either way the sum is the national total).
+    // Scoped: only the firing state's rows.
     let pop_src = int_col(&pop, "sourceTypeID");
     let pop_val = float_col(&pop, "population");
+    let pop_state = if state_filter.is_some() {
+        int_col(&pop, "stateID")
+    } else {
+        Vec::new()
+    };
     let mut pop_by_src: BTreeMap<i64, f64> = BTreeMap::new();
     for i in 0..pop.height() {
-        *pop_by_src.entry(pop_src[i]).or_default() += pop_val[i];
+        if let Some(state) = state_filter {
+            if pop_state[i] != state {
+                continue;
+            }
+        }
+        // Canonical writes each state population row to the NONROAD .POP
+        // file with `%17.1f` (NonroadDataFileHelper.generatePopFile), so
+        // the engine only ever sees populations rounded to ONE decimal.
+        // Sub-0.05 rows (e.g. a 0.0285-unit long-lived hp bin) round to
+        // zero and contribute nothing — without this, the port emits
+        // model-year tails canonical never produces.
+        *pop_by_src.entry(pop_src[i]).or_default() += (pop_val[i] * 10.0).round() / 10.0;
     }
 
     let src = int_col(&sut, "sourceTypeID");
@@ -1053,22 +1237,24 @@ fn load_source_units<S: DataFrameStore + ?Sized>(store: &S) -> Vec<SourceUnit> {
 
     let mut units = Vec::new();
     for i in 0..sut.height() {
-        let population = pop_by_src.get(&src[i]).copied().unwrap_or(0.0);
+        let mut population = pop_by_src.get(&src[i]).copied().unwrap_or(0.0);
+        // State→county allocation by the SCC's surrogate share (alocty.f).
+        if let Some(fractions) = &county_alloc {
+            let frac = scc_surrogate
+                .get(&scc[i])
+                .and_then(|sur| fractions.get(sur))
+                .copied()
+                .unwrap_or(0.0);
+            population *= frac;
+        }
         if population <= 0.0 {
             continue;
         }
-        // Skip equipment outside the runspec's selected sectors.
-        if let Some(sel) = &sectors {
-            match scc_sector.get(&scc[i]) {
-                Some(sec) if sel.contains(sec) => {}
-                _ => continue,
-            }
-        }
-        // Skip equipment whose fuel is not in the runspec's fuel selection.
-        if let Some(sel) = &fuels {
-            match scc_fuel.get(&scc[i]) {
-                Some(fuel) if sel.contains(fuel) => {}
-                _ => continue,
+        // Skip equipment outside the runspec's matched SCC selection (the
+        // canonical /SOURCE CATEGORY/ packet).
+        if let Some(allowed) = &allowed_sccs {
+            if !allowed.contains(&scc[i]) {
+                continue;
             }
         }
         units.push(SourceUnit {
@@ -1087,11 +1273,23 @@ fn load_source_units<S: DataFrameStore + ?Sized>(store: &S) -> Vec<SourceUnit> {
 /// source unit, grouped by SCC, all assigned to `PSEUDO_COUNTY`. The
 /// population is the base-year (`NRBaseYearID`) snapshot; the engine's
 /// `age_distribution` projects it forward to the analysis (growth) year.
+///
+/// `county_fips` is the master loop's current county (`None`/`0` ⇒
+/// national, `XX000` ⇒ state level, else a real county allocated via
+/// `surrogate_fractions`).
 pub fn build_nonroad_inputs<S: DataFrameStore + ?Sized>(
     store: &S,
-    _analysis_year: i32,
+    analysis_year: i32,
+    county_fips: Option<u32>,
 ) -> NonroadInputs {
-    let units = load_source_units(store);
+    let scope = match county_fips {
+        None | Some(0) => None,
+        Some(c) => Some(GeoScope {
+            county_fips: c,
+            year: analysis_year,
+        }),
+    };
+    let units = load_source_units(store, scope);
     let base = base_year(store);
     let mut by_scc: BTreeMap<String, Vec<DriverRecord>> = BTreeMap::new();
     for u in &units {
@@ -1118,19 +1316,28 @@ pub fn build_nonroad_inputs<S: DataFrameStore + ?Sized>(
     inputs
 }
 
-/// Build the activity table — one [`ActivityTableEntry`] per SCC. The
-/// engine's `find_activity` matches by SCC (and FIPS) only, so a single
-/// representative `(hoursUsedPerYear, loadFactor)` per SCC is used (the
-/// first source unit seen). Activity actually varies by HP bin; a
-/// per-HP-bin refinement is a follow-up.
+/// Build the activity table — one [`ActivityTableEntry`] per
+/// `(SCC, hpAvg)` equipment point, with a point HP range so the
+/// engine's `find_activity(scc, hp)` resolves the same row canonical
+/// `fndact` does (its HP-category check matters: hours/year vary by HP
+/// bin within an SCC, e.g. marine gasoline 2282010005 uses 47.6 hr/yr
+/// below the 750-hp bin but 30 hr/yr inside it — feeding the wrong
+/// hours into `scrptime` shifts that bin's whole model-year span).
+///
+/// Built unscoped (national): the `(hoursUsedPerYear, loadFactor)`
+/// values come from `nrsourceusetype`, which does not vary by
+/// geography — only the population (handled in
+/// [`build_nonroad_inputs`]) is allocated.
 pub fn build_activity_entries<S: DataFrameStore + ?Sized>(store: &S) -> Vec<ActivityTableEntry> {
-    let units = load_source_units(store);
-    let mut seen: BTreeMap<String, ActivityTableEntry> = BTreeMap::new();
+    let units = load_source_units(store, None);
+    let mut seen: BTreeMap<(String, i64), ActivityTableEntry> = BTreeMap::new();
     for u in units {
-        seen.entry(u.scc.clone())
+        seen.entry((u.scc.clone(), (u.hp_avg * 1.0e3).round() as i64))
             .or_insert_with(|| ActivityTableEntry {
                 scc: u.scc.clone(),
                 fips: String::new(), // match any FIPS
+                hp_min: u.hp_avg,
+                hp_max: u.hp_avg,
                 starts: 0.0,
                 activity_level: u.hours_used_per_year,
                 activity_unit: ActivityUnit::HoursPerYear,
@@ -1230,6 +1437,13 @@ pub fn fill_tech_fractions<S: DataFrameStore + ?Sized>(
 
 /// The base year of the equipment population (`nrbaseyearequippopulation.
 /// NRBaseYearID`). Defaults to 1990 when absent.
+/// The `stateID` column of a state-keyed `nr*` table, or `None` when the
+/// table has no such column (unit-test stores; treated as stateID = 0
+/// defaults).
+fn opt_state_col(df: &DataFrame) -> Option<Vec<i64>> {
+    resolve(df, "stateID").is_some().then(|| int_col(df, "stateID"))
+}
+
 fn base_year<S: DataFrameStore + ?Sized>(store: &S) -> i32 {
     if let Some(df) = store.get("nrbaseyearequippopulation") {
         if let Some(&y) = int_col(&df, "NRBaseYearID").iter().find(|&&y| y > 0) {
@@ -1244,15 +1458,39 @@ fn base_year<S: DataFrameStore + ?Sized>(store: &S) -> i32 {
 /// population to the analysis year (canonical `grwfac.f`). Indicator =
 /// `growthPatternID` (stringified); records carry the per-year
 /// `growthIndex` keyed by the pseudo-county FIPS.
+/// `state` scopes the pattern choice: `nrgrowthpatternfinder` is keyed
+/// (SCC, stateID) — canonical's `.GRW` `/INDICATORS/` packet emits one
+/// pattern per (state FIPS, SCC) (`NonroadDataFileHelper.java:1536`), so a
+/// scoped run must use its own state's pattern. stateID = 0 rows (the only
+/// kind in a NATION capture) are the fallback.
 fn build_growth<S: DataFrameStore + ?Sized>(
     store: &S,
+    state: Option<i64>,
 ) -> (BTreeMap<String, String>, Vec<GrowthIndicatorRecord>) {
     let mut scc_pattern: BTreeMap<String, String> = BTreeMap::new();
     if let Some(df) = store.get("nrgrowthpatternfinder") {
         let scc = str_col(&df, "SCC");
         let pat = int_col(&df, "growthPatternID");
+        let st = opt_state_col(&df);
+        let mut state_specific: std::collections::BTreeSet<String> =
+            std::collections::BTreeSet::new();
         for i in 0..df.height() {
-            scc_pattern.insert(scc[i].clone(), pat[i].to_string());
+            let row_state = st.as_ref().map_or(0, |v| v[i]);
+            match state {
+                Some(s) if row_state == s => {
+                    state_specific.insert(scc[i].clone());
+                    scc_pattern.insert(scc[i].clone(), pat[i].to_string());
+                }
+                Some(_) if row_state == 0 => {
+                    if !state_specific.contains(&scc[i]) {
+                        scc_pattern.insert(scc[i].clone(), pat[i].to_string());
+                    }
+                }
+                Some(_) => {}
+                None => {
+                    scc_pattern.insert(scc[i].clone(), pat[i].to_string());
+                }
+            }
         }
     }
     let mut records = Vec::new();
@@ -1266,7 +1504,13 @@ fn build_growth<S: DataFrameStore + ?Sized>(
                 fips: PSEUDO_COUNTY.to_string(),
                 subregion: String::new(),
                 year: year[i] as i32,
-                value: idx[i] as f32,
+                // Canonical writes the /GROWTH/ packet with
+                // `results.getInt(growthindex)` (NonroadDataFileHelper.
+                // generateGrowthFile `%20d`), truncating the fractional
+                // index toward zero. The year-over-year growth factors sit
+                // near zero, so the fraction decides the SIGN — and with it
+                // which sale-years agedist's max(0,…) clamp zeroes out.
+                value: (idx[i] as i64) as f32,
             });
         }
     }
@@ -1321,21 +1565,56 @@ pub fn build_scrappage_curve<S: DataFrameStore + ?Sized>(store: &S) -> Vec<Scrap
     points
 }
 
-/// Average ambient temperature (°F) for the given month from
-/// `zonemonthhour`, for the `emsadj.f` exhaust temperature correction.
-/// `month = 0` averages all rows (snapshot-loaded tables are already
-/// pre-filtered to the execution month). Returns `None` when `zonemonthhour`
-/// is absent or has no matching rows.
-fn build_ambient_temp<S: DataFrameStore + ?Sized>(store: &S, month: i64) -> Option<f32> {
+/// Average ambient temperature (°F) for the `emsadj.f` exhaust temperature
+/// correction — the canonical `.opt` `Average temper.` value
+/// (`NonroadOptFileSqlHelper`, "averageTemperature"):
+///
+/// ```sql
+/// SELECT avg(temperature) FROM zonemonthhour t
+/// INNER JOIN zone z ON t.zoneid = z.zoneid
+/// WHERE z.countyid = ? AND t.monthid = ? AND hourid >= 6 AND hourid <= 18
+/// ```
+///
+/// One **daytime (hourID 6–18)** mean per bundle county, applied to every
+/// SCC in the region. The bundle county is exactly the master loop's
+/// `county_fips` — a NATION capture has the pseudo county/zone 0, a state
+/// run the `XX000` pseudo county (zone `XX0000`), a county run the real
+/// county — so the same join covers all three scopes. `month = 0`
+/// (annual run) averages all months. Returns `None` when the tables are
+/// absent or no row matches.
+fn build_ambient_temp<S: DataFrameStore + ?Sized>(
+    store: &S,
+    month: i64,
+    county_fips: Option<u32>,
+) -> Option<f32> {
     let df = store.get("zonemonthhour")?;
     let m = int_col(&df, "monthID");
     let t = float_col(&df, "temperature");
+    let h = int_col(&df, "hourID");
+    let z = resolve(&df, "zoneID").map(|_| int_col(&df, "zoneID"));
+    // zone.countyID per zoneID for the county join; absent table (unit
+    // tests) ⇒ no geographic restriction.
+    let zone_county: Option<BTreeMap<i64, i64>> = store.get("zone").map(|zdf| {
+        let zid = int_col(&zdf, "zoneID");
+        let cid = int_col(&zdf, "countyID");
+        (0..zdf.height()).map(|i| (zid[i], cid[i])).collect()
+    });
+    let county = county_fips.map(i64::from);
     let (mut sum, mut n) = (0.0_f64, 0_u32);
     for i in 0..df.height() {
-        if month == 0 || m[i] == month {
-            sum += t[i];
-            n += 1;
+        if month != 0 && m[i] != month {
+            continue;
         }
+        if !(6..=18).contains(&h[i]) {
+            continue;
+        }
+        if let (Some(c), Some(zc), Some(z)) = (county, &zone_county, &z) {
+            if zc.get(&z[i]).copied() != Some(c) {
+                continue;
+            }
+        }
+        sum += t[i];
+        n += 1;
     }
     if n > 0 {
         Some((sum / n as f64) as f32)
@@ -1344,115 +1623,117 @@ fn build_ambient_temp<S: DataFrameStore + ?Sized>(store: &S, month: i64) -> Opti
     }
 }
 
-/// Per-SCC ambient temperature (°F), activity-weighted by each equipment's
-/// hour-allocation pattern, for the `emsadj.f` exhaust temperature correction.
-///
-/// The correction is non-linear (`exp(a·(T−75))`), so the operative
-/// temperature is the *activity-weighted* mean across the day, not the plain
-/// 24-hour mean: daylight-use equipment runs during the warm afternoon, so its
-/// effective temperature is several °F above the flat average. Using the flat
-/// mean biases gasoline-4-stroke NOx high (and CO/THC low) by ~3% — the
-/// canonical weights `zonemonthhour` temperatures by `nrhourallocation`
-/// fractions, selected per equipment via `nrhourpatternfinder`.
-///
-/// SCC → `NREquipTypeID` (`nrscc`) → hour pattern (`nrhourpatternfinder`) →
-/// hour fractions (`nrhourallocation`); the weight is folded against the
-/// runspec-month hourly mean temperature from `zonemonthhour`.
-fn build_ambient_temp_by_scc<S: DataFrameStore + ?Sized>(
+/// Per-tech sulfur alternates from `nrsulfuradjustment` — the canonical
+/// `/PM BASE SULFUR/` packet (`NonroadOptFileSqlHelper.getPMBasedSulfur`:
+/// `SELECT DISTINCT engtechname, pmbasesulfur, sulfatepmconversionfactor
+/// FROM nrsulfuradjustment WHERE fueltypeid IN (23,24)`). Keyed by the
+/// engTechID string (the port's tech names are engTechIDs, 1:1 with
+/// engTechName). Drives the per-tech base/conversion override in the
+/// diesel PM sulfur correction and the SOx EF rewrite (`clcems.f`
+/// `sulalt`/`sulcnv`).
+fn build_sulfur_alternates<S: DataFrameStore + ?Sized>(
     store: &S,
-    month: i64,
-) -> BTreeMap<String, f32> {
+) -> BTreeMap<String, moves_nonroad::emissions::exhaust::SulfurAlternate> {
     let mut out = BTreeMap::new();
-    let (Some(zmh), Some(alloc), Some(finder), Some(scc_tbl)) = (
-        store.get("zonemonthhour"),
-        store.get("nrhourallocation"),
-        store.get("nrhourpatternfinder"),
-        store.get("nrscc"),
-    ) else {
+    let Some(df) = store.get("nrsulfuradjustment") else {
         return out;
     };
-
-    // Runspec-month hourly mean temperature (averaged over zones).
-    let zm = int_col(&zmh, "monthID");
-    let zh = int_col(&zmh, "hourID");
-    let zt = float_col(&zmh, "temperature");
-    let mut hour_sum: BTreeMap<i64, (f64, u32)> = BTreeMap::new();
-    for i in 0..zmh.height() {
-        if month == 0 || zm[i] == month {
-            let e = hour_sum.entry(zh[i]).or_insert((0.0, 0));
-            e.0 += zt[i];
-            e.1 += 1;
-        }
-    }
-    let hour_temp: BTreeMap<i64, f64> = hour_sum
-        .into_iter()
-        .map(|(h, (s, n))| (h, if n > 0 { s / n as f64 } else { 0.0 }))
-        .collect();
-
-    // Hour-allocation pattern → { hourID → fraction }.
-    let ap = int_col(&alloc, "NRHourAllocPatternID");
-    let ah = int_col(&alloc, "hourID");
-    let af = float_col(&alloc, "hourFraction");
-    let mut pattern_frac: BTreeMap<i64, Vec<(i64, f64)>> = BTreeMap::new();
-    for i in 0..alloc.height() {
-        pattern_frac.entry(ap[i]).or_default().push((ah[i], af[i]));
-    }
-
-    // Activity-weighted temperature per pattern.
-    let pattern_temp: BTreeMap<i64, f32> = pattern_frac
-        .iter()
-        .map(|(&pat, hours)| {
-            let (mut num, mut den) = (0.0_f64, 0.0_f64);
-            for &(h, f) in hours {
-                if let Some(&t) = hour_temp.get(&h) {
-                    num += t * f;
-                    den += f;
-                }
-            }
-            (pat, if den > 0.0 { (num / den) as f32 } else { 0.0 })
-        })
-        .collect();
-
-    // NREquipTypeID → pattern.
-    let fe = int_col(&finder, "NREquipTypeID");
-    let fp = int_col(&finder, "NRHourAllocPatternID");
-    let mut equip_pattern: BTreeMap<i64, i64> = BTreeMap::new();
-    for i in 0..finder.height() {
-        equip_pattern.insert(fe[i], fp[i]);
-    }
-
-    // SCC → NREquipTypeID → pattern → temperature.
-    let sc = str_col(&scc_tbl, "SCC");
-    let se = int_col(&scc_tbl, "NREquipTypeID");
-    for i in 0..scc_tbl.height() {
-        if let Some(&pat) = equip_pattern.get(&se[i]) {
-            if let Some(&t) = pattern_temp.get(&pat) {
-                if t > 0.0 {
-                    out.insert(sc[i].clone(), t);
-                }
-            }
+    let fuel = int_col(&df, "fuelTypeID");
+    let tech = int_col(&df, "engTechID");
+    let base = float_col(&df, "PMBaseSulfur");
+    let conv = float_col(&df, "sulfatePMConversionFactor");
+    for i in 0..df.height() {
+        if fuel[i] == 23 || fuel[i] == 24 {
+            out.insert(
+                tech[i].to_string(),
+                moves_nonroad::emissions::exhaust::SulfurAlternate {
+                    alternate_base: base[i] as f32,
+                    alternate_conversion: conv[i] as f32,
+                },
+            );
         }
     }
     out
 }
 
-/// Compute the market-share-weighted gasoline fuel oxygen content (weight
-/// %) and whether the supply is predominantly RFG, for the `emsadj.f`
-/// oxygenate exhaust correction. Oxygen % per formulation = `ETOHVolume ×
-/// volToWtPercentOxy` (`fuelformulation`); weighted by `nrfuelsupply`
-/// market share over gasoline (fuelTypeID = 1, via `nrfuelsubtype`).
-fn build_fuel_oxygenate<S: DataFrameStore + ?Sized>(store: &S) -> (f32, bool) {
-    let (Some(sup), Some(form)) = (store.get("nrfuelsupply"), store.get("fuelformulation")) else {
-        return (0.0, false);
+/// The run's in-use fuel properties — the canonical `.opt` OPTIONS-packet
+/// values (`NonroadOptFileSqlHelper.getOptionsParameters`).
+struct NonroadFuelProperties {
+    /// Gasoline oxygen content (weight %), `emsadj.f` oxygenate correction.
+    oxygen_pct: f32,
+    /// Whether the gasoline supply is predominantly RFG (subtype 11).
+    rfg: bool,
+    /// In-use sulfur weight % per engine fuel slot `[gas-2str, gas-4str,
+    /// diesel, LPG, CNG]`; `None` when no fuel-supply data is loaded.
+    sulfur_pct: Option<[f32; 5]>,
+    /// In-use marine-diesel sulfur weight % (`soxdsm`).
+    sulfur_marine: f32,
+}
+
+/// Port of the canonical OPTIONS-packet fuel queries: every value is a
+/// `marketShare`-weighted sum over the **bundle county's nonroad fuel
+/// region and run month-group** —
+///
+/// ```sql
+/// ... FROM nrfuelsupply fs
+/// INNER JOIN fuelformulation ff ON fs.fuelformulationid = ff.fuelformulationid
+/// INNER JOIN year y ON y.fuelYearID = fs.fuelYearID
+/// INNER JOIN regionCounty rc ON (rc.regionID = fs.fuelRegionID
+///       AND rc.regionCodeID = 2 AND rc.fuelYearID = y.fuelYearID)
+/// WHERE rc.countyid = ? AND fs.monthgroupid = ? AND y.yearID = ?
+/// ```
+///
+/// - oxygen weight % (func A2): Σ (ETOH+MTBE+ETBE+TAME volumes) ×
+///   volToWtPercentOxy × share over gasoline subtypes — **no fallback**:
+///   an empty join yields 0.0. This is load-bearing: a state-scale run's
+///   `regionCounty.regionID` (e.g. Iowa = 19) matches no
+///   `nrfuelsupply.fuelRegionID`, so canonical runs with oxygen 0 while
+///   the national supply would give ~3.6 wt% (a ~22% CO difference).
+/// - gas sulfur (func A): Σ sulfurLevel × share / 10000; when the join
+///   matches nothing, falls back to fuelFormulationID = 10's sulfurLevel.
+/// - diesel / marine-diesel sulfur (funcs C/D): subtypes 23 / 24, raw sums.
+/// - CNG/LPG sulfur (func E): subtypes 30/40, normalized by Σ share.
+fn build_fuel_properties<S: DataFrameStore + ?Sized>(
+    store: &S,
+    county_fips: Option<u32>,
+    month: u8,
+    year: i32,
+) -> NonroadFuelProperties {
+    let none = NonroadFuelProperties {
+        oxygen_pct: 0.0,
+        rfg: false,
+        sulfur_pct: None,
+        sulfur_marine: 0.0,
     };
+    let (Some(sup), Some(form)) = (store.get("nrfuelsupply"), store.get("fuelformulation")) else {
+        return none;
+    };
+
+    // fuelformulation: per-formulation oxygen %, sulfur %, subtype.
     let f_id = int_col(&form, "fuelFormulationID");
     let f_sub = int_col(&form, "fuelSubtypeID");
-    let f_etoh = float_col(&form, "ETOHVolume");
     let f_v2w = float_col(&form, "volToWtPercentOxy");
+    let f_sulfur = float_col(&form, "sulfurLevel");
+    // Oxygenate volumes; columns may be absent from minimal test frames.
+    let vol = |name: &str| -> Vec<f64> {
+        if resolve(&form, name).is_some() {
+            float_col(&form, name)
+        } else {
+            vec![0.0; form.height()]
+        }
+    };
+    let (etoh, mtbe, etbe, tame) = (
+        vol("ETOHVolume"),
+        vol("MTBEVolume"),
+        vol("ETBEVolume"),
+        vol("TAMEVolume"),
+    );
     let mut oxy_by_form: BTreeMap<i64, f64> = BTreeMap::new();
+    let mut sulfur_by_form: BTreeMap<i64, f64> = BTreeMap::new();
     let mut sub_by_form: BTreeMap<i64, i64> = BTreeMap::new();
     for i in 0..form.height() {
-        oxy_by_form.insert(f_id[i], f_etoh[i] * f_v2w[i]);
+        oxy_by_form.insert(f_id[i], (etoh[i] + mtbe[i] + etbe[i] + tame[i]) * f_v2w[i]);
+        sulfur_by_form.insert(f_id[i], f_sulfur[i]);
         sub_by_form.insert(f_id[i], f_sub[i]);
     }
     let mut fueltype_by_sub: BTreeMap<i64, i64> = BTreeMap::new();
@@ -1463,25 +1744,124 @@ fn build_fuel_oxygenate<S: DataFrameStore + ?Sized>(store: &S) -> (f32, bool) {
             fueltype_by_sub.insert(sid[i], ft[i]);
         }
     }
+
+    // The bundle county's nonroad fuel region(s): regionCounty rows with
+    // regionCodeID = 2, countyID = bundle county, fuelYearID = the run
+    // year's fuelYearID. `None` (no regioncounty table, or no county —
+    // unit-test stores) ⇒ no region restriction.
+    let fuel_year: i64 = store
+        .get("year")
+        .and_then(|y| {
+            let yid = int_col(&y, "yearID");
+            let fy = int_col(&y, "fuelYearID");
+            (0..y.height()).find(|&i| yid[i] == i64::from(year)).map(|i| fy[i])
+        })
+        .unwrap_or(i64::from(year));
+    let regions: Option<std::collections::BTreeSet<i64>> = match (store.get("regioncounty"), county_fips) {
+        (Some(rc), Some(c)) => {
+            let rid = int_col(&rc, "regionID");
+            let cid = int_col(&rc, "countyID");
+            let code = int_col(&rc, "regionCodeID");
+            let fy = int_col(&rc, "fuelYearID");
+            Some(
+                (0..rc.height())
+                    .filter(|&i| code[i] == 2 && cid[i] == i64::from(c) && fy[i] == fuel_year)
+                    .map(|i| rid[i])
+                    .collect(),
+            )
+        }
+        _ => None,
+    };
+
     let s_form = int_col(&sup, "fuelFormulationID");
     let s_share = float_col(&sup, "marketShare");
-    let (mut tot, mut weighted_oxy, mut rfg_share) = (0.0_f64, 0.0_f64, 0.0_f64);
+    let s_region = resolve(&sup, "fuelRegionID").map(|_| int_col(&sup, "fuelRegionID"));
+    let s_month = resolve(&sup, "monthGroupID").map(|_| int_col(&sup, "monthGroupID"));
+    // The canonical `year` join also restricts the SUPPLY rows to the run's
+    // fuelYearID — a county capture carries every fuel year (1990–2060,
+    // shares summing to ~1 per fuel type per year), so skipping this filter
+    // overcounts the weighted sums ~60x (oxygen ≈ 140 wt% → the oxygenate
+    // correction zeroes CO/THC and inflates NOx ~17x).
+    let s_fuelyear = resolve(&sup, "fuelYearID").map(|_| int_col(&sup, "fuelYearID"));
+
+    let mut oxy = 0.0_f64;
+    let (mut gas_sulfur, mut gas_rows) = (0.0_f64, 0u32);
+    let (mut gas_share, mut rfg_share) = (0.0_f64, 0.0_f64);
+    let mut dsl_sulfur = 0.0_f64;
+    let mut marine_sulfur = 0.0_f64;
+    let (mut cnglpg_sulfur, mut cnglpg_share) = (0.0_f64, 0.0_f64);
+    let mut any_row = false;
     for i in 0..sup.height() {
-        let sub = sub_by_form.get(&s_form[i]).copied().unwrap_or(0);
-        if fueltype_by_sub.get(&sub).copied().unwrap_or(0) != 1 {
-            continue; // gasoline only
+        if let (Some(regions), Some(r)) = (&regions, &s_region) {
+            if !regions.contains(&r[i]) {
+                continue;
+            }
         }
+        if month != 0 {
+            if let Some(m) = &s_month {
+                if m[i] != i64::from(month) {
+                    continue;
+                }
+            }
+        }
+        if let Some(fy) = &s_fuelyear {
+            if fy[i] != fuel_year {
+                continue;
+            }
+        }
+        any_row = true;
         let share = s_share[i];
-        tot += share;
-        weighted_oxy += share * oxy_by_form.get(&s_form[i]).copied().unwrap_or(0.0);
-        if sub == 11 {
-            rfg_share += share; // fuelSubtypeID 11 = Reformulated Gasoline
+        let sub = sub_by_form.get(&s_form[i]).copied().unwrap_or(0);
+        let sulfur = sulfur_by_form.get(&s_form[i]).copied().unwrap_or(0.0);
+        if fueltype_by_sub.get(&sub).copied().unwrap_or(0) == 1 {
+            oxy += share * oxy_by_form.get(&s_form[i]).copied().unwrap_or(0.0);
+            gas_sulfur += share * sulfur / 10_000.0;
+            gas_rows += 1;
+            gas_share += share;
+            if sub == 11 {
+                rfg_share += share; // fuelSubtypeID 11 = Reformulated Gasoline
+            }
+        }
+        match sub {
+            23 => dsl_sulfur += share * sulfur / 10_000.0,
+            24 => marine_sulfur += share * sulfur / 10_000.0,
+            30 | 40 => {
+                cnglpg_sulfur += share * sulfur / 10_000.0;
+                cnglpg_share += share;
+            }
+            _ => {}
         }
     }
-    if tot <= 0.0 {
-        return (0.0, false);
+    if !any_row && regions.is_none() {
+        // No supply rows at all and no scoping — keep the legacy
+        // "no fuel data" result.
+        return none;
     }
-    ((weighted_oxy / tot) as f32, rfg_share / tot > 0.5)
+
+    // func A fallback: no gasoline row matched the region join ⇒ default
+    // fuelFormulationID 10 sulfur (canonical's RVP==0 && sulfur==0 branch).
+    if gas_rows == 0 {
+        if let Some(i) = f_id.iter().position(|&id| id == 10) {
+            gas_sulfur = f_sulfur[i] / 10_000.0;
+        }
+    }
+    let cnglpg = if cnglpg_share > 0.0 {
+        cnglpg_sulfur / cnglpg_share
+    } else {
+        0.0
+    };
+    NonroadFuelProperties {
+        oxygen_pct: oxy as f32,
+        rfg: gas_share > 0.0 && rfg_share / gas_share > 0.5,
+        sulfur_pct: Some([
+            gas_sulfur as f32,
+            gas_sulfur as f32,
+            dsl_sulfur as f32,
+            cnglpg as f32,
+            cnglpg as f32,
+        ]),
+        sulfur_marine: marine_sulfur as f32,
+    }
 }
 
 /// Build temporal profiles from `nrmonthallocation` + `nrdayallocation`.
@@ -1494,17 +1874,48 @@ fn build_temporal_profiles_for_period<S: DataFrameStore + ?Sized>(
     store: &S,
     selected_month: u8,
     day_id: u8,
+    state: Option<i64>,
 ) -> (BTreeMap<String, TemporalProfile>, [bool; 12], bool) {
     // Collect monthly fractions per SCC: index 0=Jan..11=Dec.
+    // `nrmonthallocation` is keyed (SCC, stateID, monthID) — canonical's
+    // SEASON.DAT /MONTHLY/ packet is per state region
+    // (`NonroadDataFileHelper` groups by `m.stateID, SCC`), so a scoped run
+    // must read its own state's fractions: August agriculture activity in
+    // Iowa is very different from the last-sorted state's. stateID = 0 rows
+    // (the only kind in a NATION capture) act as the fallback default.
     let mut monthly_by_scc: BTreeMap<String, [f32; 12]> = BTreeMap::new();
     if let Some(df) = store.get("nrmonthallocation") {
         let scc = str_col(&df, "SCC");
         let month = int_col(&df, "monthID");
         let frac = float_col(&df, "monthFraction");
+        let st = opt_state_col(&df);
+        let mut state_specific: std::collections::BTreeSet<String> =
+            std::collections::BTreeSet::new();
         for i in 0..df.height() {
             let m = month[i] as usize;
-            if (1..=12).contains(&m) {
-                monthly_by_scc.entry(scc[i].clone()).or_insert([0.0; 12])[m - 1] = frac[i] as f32;
+            if !(1..=12).contains(&m) {
+                continue;
+            }
+            let row_state = st.as_ref().map_or(0, |v| v[i]);
+            match state {
+                Some(s) if row_state == s => {
+                    // State-specific row: wins over any default already seen.
+                    if state_specific.insert(scc[i].clone()) {
+                        monthly_by_scc.insert(scc[i].clone(), [0.0; 12]);
+                    }
+                    monthly_by_scc.get_mut(&scc[i]).unwrap()[m - 1] = frac[i] as f32;
+                }
+                Some(_) if row_state == 0 => {
+                    if !state_specific.contains(&scc[i]) {
+                        monthly_by_scc.entry(scc[i].clone()).or_insert([0.0; 12])[m - 1] =
+                            frac[i] as f32;
+                    }
+                }
+                Some(_) => {} // another state's row — ignore
+                None => {
+                    monthly_by_scc.entry(scc[i].clone()).or_insert([0.0; 12])[m - 1] =
+                        frac[i] as f32;
+                }
             }
         }
     }
@@ -1524,15 +1935,26 @@ fn build_temporal_profiles_for_period<S: DataFrameStore + ?Sized>(
             daily_by_scc.entry(scc[i].clone()).or_insert([1.0 / 7.0; 2])[slot] = frac[i] as f32;
         }
     }
-    // Merge into TemporalProfile, falling back to canonical defaults
-    // (defmth=1/12, defday=1/7) for missing dimensions.
+    // Merge into TemporalProfile. Canonical NONROAD searches the /MONTHLY/
+    // and /DAILY/ packets INDEPENDENTLY, each with its own global-code
+    // fallback (exact SCC → 7-digit+000 → 4-digit+000000 → defmth=1/12 /
+    // defday=1/7). The two tables key at different granularities (e.g.
+    // nrdayallocation has an exact `2265004071` row while
+    // nrmonthallocation only has `2265004000`), so a naive per-SCC merge
+    // would pin the month dimension of an exact-day SCC to the 1/12
+    // default — halving August lawn/garden activity. Resolve each
+    // dimension with `scc_lookup` before merging.
     let all_sccs: std::collections::BTreeSet<&String> =
         monthly_by_scc.keys().chain(daily_by_scc.keys()).collect();
     let result: BTreeMap<String, TemporalProfile> = all_sccs
         .into_iter()
         .map(|scc| {
-            let monthly = monthly_by_scc.get(scc).copied().unwrap_or([1.0 / 12.0; 12]);
-            let daily = daily_by_scc.get(scc).copied().unwrap_or([1.0 / 7.0; 2]);
+            let monthly = scc_lookup(&monthly_by_scc, scc)
+                .copied()
+                .unwrap_or([1.0 / 12.0; 12]);
+            let daily = scc_lookup(&daily_by_scc, scc)
+                .copied()
+                .unwrap_or([1.0 / 7.0; 2]);
             (scc.clone(), TemporalProfile { monthly, daily })
         })
         .collect();
@@ -1554,12 +1976,22 @@ fn build_temporal_profiles_for_period<S: DataFrameStore + ?Sized>(
 
 /// Assemble the full [`ReferenceData`] the [`ProductionExecutor`] needs
 /// from the `nr*` tables.
+///
+/// `county_fips` is the master loop's current county (`None`/`0` ⇒
+/// national, `XX000` ⇒ state level): it scopes the state-keyed reference
+/// tables — month allocation, growth pattern, ZoneMonthHour ambient
+/// temperature — to the run's geography.
 pub fn load_nonroad_reference<S: DataFrameStore + ?Sized>(
     store: &S,
     analysis_year: i32,
     selected_month: u8,
     day_id: u8,
+    county_fips: Option<u32>,
 ) -> ReferenceData {
+    let state = match county_fips {
+        None | Some(0) => None,
+        Some(c) => Some(i64::from(c) / 1000),
+    };
     let mut exhaust_tech_entries = build_exhaust_tech_entries(store);
     fill_tech_fractions(&mut exhaust_tech_entries, store, analysis_year);
     let activity_entries = build_activity_entries(store);
@@ -1588,7 +2020,7 @@ pub fn load_nonroad_reference<S: DataFrameStore + ?Sized>(
     // growth-pattern id (most-specific match). Unmatched SCCs get
     // indicator=None; the engine errors on None when growth is active
     // (canonical prccty.f label 7001 / fndgxf no-match path).
-    let (scc_pattern, growth_records) = build_growth(store);
+    let (scc_pattern, growth_records) = build_growth(store, state);
     let growth_xref_entries = exhaust_tech_entries
         .iter()
         .map(|e| moves_nonroad::simulation::GrowthXrefEntry {
@@ -1600,10 +2032,10 @@ pub fn load_nonroad_reference<S: DataFrameStore + ?Sized>(
         })
         .collect();
 
-    let (fuel_oxygen_pct, fuel_rfg) = build_fuel_oxygenate(store);
+    let fuel = build_fuel_properties(store, county_fips, selected_month, analysis_year);
 
     let (temporal_profiles, months_selected, weekday_selected) =
-        build_temporal_profiles_for_period(store, selected_month, day_id);
+        build_temporal_profiles_for_period(store, selected_month, day_id, state);
 
     ReferenceData {
         exhaust_tech_entries,
@@ -1618,18 +2050,53 @@ pub fn load_nonroad_reference<S: DataFrameStore + ?Sized>(
         months_selected,
         weekday_selected,
         // emsadj.f oxygenate + temperature corrections.
-        // `selected_month` is the RunSpec 0-indexed key; MOVES monthID = key + 1.
-        // When loaded from a snapshot, `zonemonthhour` is already pre-filtered to
-        // the execution monthID by `SnapshotFilter`, so passing `month = 0` averages
-        // all available rows (the correct month's rows only). In default-DB mode all
-        // months are present and `month = 0` gives the annual mean, which is
-        // acceptable pending a full default-DB canonical gate.
-        fuel_oxygen_pct,
-        fuel_rfg,
-        ambient_temp_f: build_ambient_temp(store, 0),
-        ambient_temp_by_scc: build_ambient_temp_by_scc(store, 0),
+        // `selected_month` is the MOVES monthID (1–12), or 0 for an annual run
+        // (see `period_flags` / `build_options`). The exhaust temperature
+        // correction EXP(acoeff*(tamb-75)) is highly month-sensitive, so the
+        // ambient temperature MUST be the run month's, not an annual mean: a
+        // captured `zonemonthhour` carries ALL 12 months (it is NOT pre-filtered),
+        // so passing `month = 0` would average to the cold annual mean (~57 °F vs
+        // ~76 °F in August) and inflate 4-stroke-gasoline NOx by ~18%.
+        //
+        // Canonical applies ONE temperature per bundle region — the daytime
+        // (hourID 6–18) county mean from the .opt OPTIONS packet — to every
+        // SCC, so `ambient_temp_by_scc` stays empty (the engine falls back
+        // to the scalar).
+        fuel_oxygen_pct: fuel.oxygen_pct,
+        fuel_rfg: fuel.rfg,
+        fuel_sulfur_pct: fuel.sulfur_pct,
+        fuel_sulfur_marine: fuel.sulfur_marine,
+        sulfur_alternates: build_sulfur_alternates(store),
+        ambient_temp_f: build_ambient_temp(store, i64::from(selected_month), county_fips),
+        alloc_fractions: build_alloc_fractions(store, county_fips, analysis_year),
         ..ReferenceData::default()
     }
+}
+
+/// Per-SCC state→county allocation fraction for a county-scoped run
+/// (empty for state/national scopes). The loader pre-allocates the
+/// population in [`load_source_units`], but canonical `prcsta.f` grows
+/// the age distribution on the **state** population and only then
+/// allocates to counties (`alocty`) — `agedist`'s `MINGRWIND` clamp is
+/// magnitude-sensitive, so a pre-allocated sub-0.0001 county population
+/// balloons cohorts canonical leaves untouched. The engine divides this
+/// fraction back out around its `age_distribution` call.
+fn build_alloc_fractions<S: DataFrameStore + ?Sized>(
+    store: &S,
+    county_fips: Option<u32>,
+    analysis_year: i32,
+) -> BTreeMap<String, f32> {
+    let Some(c) = county_fips else {
+        return BTreeMap::new();
+    };
+    if c == 0 || c % 1000 == 0 {
+        return BTreeMap::new();
+    }
+    let fractions = surrogate_fractions(store, i64::from(c), i64::from(analysis_year));
+    scc_surrogate_map(store)
+        .into_iter()
+        .map(|(scc, sur)| (scc, fractions.get(&sur).copied().unwrap_or(0.0) as f32))
+        .collect()
 }
 
 /// Build the [`ProductionExecutor`] for the national pseudo-county run.
@@ -1643,8 +2110,10 @@ pub fn build_production_executor<S: DataFrameStore + ?Sized>(
     analysis_year: i32,
     selected_month: u8,
     day_id: u8,
+    county_fips: Option<u32>,
 ) -> ProductionExecutor {
-    let reference = load_nonroad_reference(store, analysis_year, selected_month, day_id);
+    let reference =
+        load_nonroad_reference(store, analysis_year, selected_month, day_id, county_fips);
     let (months_selected, weekday_selected) = period_flags(selected_month, day_id);
     ProductionExecutor {
         county_fips: vec![PSEUDO_COUNTY.to_string()],
@@ -1704,8 +2173,26 @@ pub struct EmissionTimeKeys {
 const GRAMS_PER_SHORT_TON: f64 = 1.0 / 1.102_311e-6;
 
 /// Engine pollutant slot → MOVES `pollutantID` for the emitted nonroad
-/// exhaust pollutants (THC, CO, NOx, PM10).
-const SLOT_POLLUTANT: [(usize, i32); 4] = [(0, 1), (1, 2), (2, 3), (5, 100)];
+/// exhaust pollutants (THC, CO, NOx, CO2, SO2, PM10), mirroring canonical
+/// `NonroadOutputDataLoader` (thc/co/nox/co2/so2/pmExhaust → 1/2/3/90/31/100).
+/// Which of these actually reach the output is gated per-run by
+/// [`selected_output_pollutants`] (canonical gates on the bundle SQL's
+/// polProcessIDs — `need3101`/`need9001` flags).
+const SLOT_POLLUTANT: [(usize, i32); 6] =
+    [(0, 1), (1, 2), (2, 3), (3, 90), (4, 31), (5, 100)];
+
+/// The runspec's selected output pollutants, from the execution DB's
+/// `runspecpollutantprocess` (`pollutantID = polProcessID / 100`).
+/// `None` ⇒ table absent (unit-test stores): emit the legacy exhaust set
+/// (THC/CO/NOx/PM) and not the always-computed BSFC species (CO2/SO2),
+/// matching the pre-gating behaviour.
+pub fn selected_output_pollutants<S: DataFrameStore + ?Sized>(
+    store: &S,
+) -> Option<std::collections::BTreeSet<i32>> {
+    let df = store.get("runspecpollutantprocess")?;
+    let ids = int_col(&df, "polProcessID");
+    Some(ids.iter().map(|&pp| (pp / 100) as i32).collect())
+}
 
 /// Days in a (non-leap) calendar month — NONROAD's `modays`, used as the
 /// typical-day divisor.
@@ -1733,15 +2220,37 @@ pub fn build_temporal_factors<S: DataFrameStore + ?Sized>(
     store: &S,
     month: i32,
     day: i32,
+    state: Option<i64>,
 ) -> BTreeMap<String, f64> {
+    // (SCC, stateID, monthID)-keyed; state-specific rows win over the
+    // stateID = 0 defaults (see build_temporal_profiles_for_period).
     let mut month_by_scc: BTreeMap<String, f64> = BTreeMap::new();
     if let Some(df) = store.get("nrmonthallocation") {
         let scc = str_col(&df, "SCC");
         let m = int_col(&df, "monthID");
         let f = float_col(&df, "monthFraction");
+        let st = opt_state_col(&df);
+        let mut state_specific: std::collections::BTreeSet<String> =
+            std::collections::BTreeSet::new();
         for i in 0..df.height() {
-            if m[i] == month as i64 {
-                month_by_scc.insert(scc[i].clone(), f[i]);
+            if m[i] != month as i64 {
+                continue;
+            }
+            let row_state = st.as_ref().map_or(0, |v| v[i]);
+            match state {
+                Some(s) if row_state == s => {
+                    state_specific.insert(scc[i].clone());
+                    month_by_scc.insert(scc[i].clone(), f[i]);
+                }
+                Some(_) if row_state == 0 => {
+                    if !state_specific.contains(&scc[i]) {
+                        month_by_scc.insert(scc[i].clone(), f[i]);
+                    }
+                }
+                Some(_) => {}
+                None => {
+                    month_by_scc.insert(scc[i].clone(), f[i]);
+                }
             }
         }
     }
@@ -1764,11 +2273,11 @@ pub fn build_temporal_factors<S: DataFrameStore + ?Sized>(
     // (monthFraction 1.0 dumps the whole year into one month; dayFraction 1.0
     // makes `7 × dayFraction = 7`), so default each dimension to its canonical
     // value instead.
+    // Per-dimension global-code fallback (exact → 7-digit+000 →
+    // 4-digit+000000), mirroring canonical's independent /MONTHLY/ and
+    // /DAILY/ searches.
     let lookup = |map: &BTreeMap<String, f64>, scc: &str, default: f64| -> f64 {
-        map.get(scc)
-            .or_else(|| map.get(&family_root(scc)))
-            .copied()
-            .unwrap_or(default)
+        scc_lookup(map, scc).copied().unwrap_or(default)
     };
 
     let ndays = days_in_month(month);
@@ -1794,10 +2303,15 @@ pub fn build_temporal_factors<S: DataFrameStore + ?Sized>(
 /// pass an empty map for no allocation). Returns `Ok(None)` when no
 /// non-zero emissions were produced. Integer columns are `i32` (the
 /// physical type the framework reads via `.i32()`).
+///
+/// `selected` restricts the emitted pollutants to the runspec's selection
+/// (see [`selected_output_pollutants`]); `None` emits the legacy
+/// THC/CO/NOx/PM exhaust set.
 pub fn emissions_to_dataframe(
     rows: &[SimEmissionRow],
     keys: &EmissionTimeKeys,
     temporal: &BTreeMap<String, f64>,
+    selected: Option<&std::collections::BTreeSet<i32>>,
 ) -> PolarsResult<Option<DataFrame>> {
     let mut year = Vec::new();
     let mut month = Vec::new();
@@ -1821,10 +2335,21 @@ pub fn emissions_to_dataframe(
         }
         let tfac = scc_lookup(temporal, &row.scc).copied().unwrap_or(1.0);
         for (slot, pid) in SLOT_POLLUTANT {
-            let e = row.emissions.get(slot).copied().unwrap_or(0.0);
-            if e == 0.0 {
-                continue;
+            match selected {
+                // Gate on the runspec's pollutant selection.
+                Some(sel) if !sel.contains(&pid) => continue,
+                // No selection table: legacy exhaust set only (CO2/SO2 are
+                // always computed by the engine but were never emitted).
+                None if pid == 90 || pid == 31 => continue,
+                _ => {}
             }
+            // Canonical clamps every loaded value at zero
+            // (`NonroadOutputDataLoader`: `Math.max(0, …) * USTON_TO_GRAM`) —
+            // the NONROAD SOx balance can go negative for low-sulfur fuels —
+            // and KEEPS the zero-valued row (every selected pollutant of
+            // every .BMY record gets a MOVESOutput row), so zero is not
+            // skipped here.
+            let e = row.emissions.get(slot).copied().unwrap_or(0.0).max(0.0);
             year.push(keys.year);
             month.push(keys.month.unwrap_or(0));
             day.push(keys.day.unwrap_or(0));
@@ -1923,7 +2448,7 @@ mod tests {
                 &e.emission_factors.iter().take(3).collect::<Vec<_>>()
             );
         }
-        let inputs = build_nonroad_inputs(&store, 2020);
+        let inputs = build_nonroad_inputs(&store, 2020, None);
         eprintln!(
             "inputs groups={} records={}",
             inputs.group_count(),
@@ -1949,7 +2474,7 @@ mod tests {
 
         // Reproduce the engine run in-process (August weekday, typical-day).
         let options = build_options(2020, 8, 5);
-        let mut executor = build_production_executor(&store, 2020, 8, 5);
+        let mut executor = build_production_executor(&store, 2020, 8, 5, None);
         eprintln!("executor.county_fips = {:?}", executor.county_fips);
         eprintln!(
             "inputs.regions.selected_counties = {:?}",
@@ -2026,7 +2551,7 @@ mod tests {
             .filter(|r| r.emissions.iter().any(|&e| e != 0.0))
             .count();
         eprintln!("nonzero rows = {nonzero}");
-        let temporal = build_temporal_factors(&store, 8, 5);
+        let temporal = build_temporal_factors(&store, 8, 5, None);
         let g = 1.0 / 1.102_311e-6; // short tons -> grams
         let mut tot = [0.0f64; 4];
         for r in &out.rows {
@@ -2258,7 +2783,7 @@ mod tests {
         store.insert("nrdayallocation", day_alloc_df());
 
         let (profiles, months_selected, weekday_selected) =
-            build_temporal_profiles_for_period(&store, 8, 5);
+            build_temporal_profiles_for_period(&store, 8, 5, None);
 
         let p = profiles.get("2260001000").expect("profile for 2260001000");
         assert!((p.monthly[7] - 0.1).abs() < 1e-5, "August fraction");
@@ -2275,7 +2800,7 @@ mod tests {
     fn period_flags_all_months_for_annual_run() {
         let store = InMemoryStore::new();
         let (_, months_selected, weekday_selected) =
-            build_temporal_profiles_for_period(&store, 0, 2);
+            build_temporal_profiles_for_period(&store, 0, 2, None);
         assert!(
             months_selected.iter().all(|&m| m),
             "month=0 means all 12 selected"

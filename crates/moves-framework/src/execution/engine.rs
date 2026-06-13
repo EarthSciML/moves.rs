@@ -82,7 +82,7 @@ use crate::data::{DataFrameStore, InMemoryStore};
 
 use moves_data::output_schema::{ActivityRecord, EmissionRecord, MovesRunRecord, OutputTable};
 use moves_data::{PollutantId, ProcessId};
-use moves_runspec::model::Model;
+use moves_runspec::model::{Model, ModelDomain, ModelScale};
 use moves_runspec::RunSpec;
 use polars::prelude::DataFrame;
 use sha2::{Digest, Sha256};
@@ -353,9 +353,20 @@ impl MasterLoopable for CalculatorMasterLoopable {
         if context.position.process_id != Some(self.gate_process) {
             return Ok(());
         }
+        let debug_modules = std::env::var_os("MOVES_DEBUG_MODULES").is_some();
         let df = {
             let mut ctx = self.ctx.lock().expect("CalculatorContext mutex poisoned");
             ctx.set_position(context.position);
+            if debug_modules {
+                eprintln!(
+                    "[mod] enter {} proc={:?}",
+                    self.module.name(),
+                    context.position.process_id
+                );
+                use std::io::Write as _;
+                let _ = std::io::stderr().flush();
+            }
+            let t_mod = Instant::now();
             let out = self.module.execute(&mut ctx)?;
             // A generator writes its output tables to scratch; promote them into the
             // slow tier so downstream calculators in this chunk — which read every
@@ -363,6 +374,16 @@ impl MasterLoopable for CalculatorMasterLoopable {
             // scratch, so this is skipped for them.)
             if matches!(*self.module, ModuleInstance::Generator(_)) {
                 ctx.promote_scratch();
+            }
+            if debug_modules {
+                let rows = out.as_ref().map_or(0, polars::prelude::DataFrame::height);
+                eprintln!(
+                    "[mod] exit  {} rows={rows} {:?}",
+                    self.module.name(),
+                    t_mod.elapsed()
+                );
+                use std::io::Write as _;
+                let _ = std::io::stderr().flush();
             }
             out
             // ctx lock released here — conversion and accumulator write happen outside
@@ -475,6 +496,15 @@ pub struct MOVESEngine {
     /// Populated by [`with_slow_store`](Self::with_slow_store); empty by
     /// default (calculators receive an empty slow tier).
     slow_store: Arc<InMemoryStore>,
+    /// When `true`, the plan follows canonical `MOVESInstantiator`
+    /// `DO_RATES_FIRST` (the released-MOVES default): the legacy inventory
+    /// emission calculators are cleared so only the `BaseRateCalculator` +
+    /// chained-whitelist path produces emissions. Set by the default-DB run
+    /// path (the only path that loads the full, both-mode execution DB and so
+    /// would otherwise run rates and inventory calculators together and
+    /// double-count). Snapshot/scale runs leave this `false` because their
+    /// captured execution tables already pin a single mode.
+    rates_first: bool,
 }
 
 impl MOVESEngine {
@@ -493,7 +523,18 @@ impl MOVESEngine {
             strategy_registry: ControlStrategyRegistry::new(),
             config,
             slow_store: Arc::new(InMemoryStore::new()),
+            rates_first: false,
         }
+    }
+
+    /// Opt into the canonical `DO_RATES_FIRST` plan (drop the legacy inventory
+    /// emission calculators, keeping only the `BaseRateCalculator` + chained
+    /// whitelist). The default-DB run path sets this; see the
+    /// `rates_first` field.
+    #[must_use]
+    pub fn with_rates_first(mut self, rates_first: bool) -> Self {
+        self.rates_first = rates_first;
+        self
     }
 
     /// Pre-load execution-database tables into every chunk's
@@ -566,8 +607,38 @@ impl MOVESEngine {
         // `Models.evaluateModels` on an empty list and `models_label`).
         let nonroad = models.contains(&Model::Nonroad);
         let onroad = models.is_empty() || models.contains(&Model::Onroad);
-        self.registry
-            .execution_order_for_models(&self.selections(), onroad, nonroad)
+        let mut names =
+            self.registry
+                .execution_order_for_models(&self.selections(), onroad, nonroad)?;
+
+        // Domain/scale OpModeDistribution swap (canonical `MOVESInstantiator`
+        // M1): exactly one of the three OMD producers runs, chosen by
+        // domain/scale. The `(pollutant, process)` filter over-selects all three
+        // (they share processes 1+9), so drop the two that don't match this run.
+        // Dropping after the topological order is safe — removing modules
+        // preserves the remaining modules' relative order.
+        let is_project = self.execution.model_domain() == Some(ModelDomain::Project);
+        let is_mesoscale = self.execution.model_scale() == ModelScale::Rates;
+        let drop = self
+            .registry
+            .domain_scale_excluded_omd_modules(is_project, is_mesoscale);
+        names.retain(|n| !drop.contains(n));
+
+        // Canonical `MOVESInstantiator` DO_RATES_FIRST (released-MOVES default):
+        // clear the legacy inventory emission calculators so only the
+        // `BaseRateCalculator` + chained whitelist produce emissions. Without
+        // this, the full default DB (which carries BOTH the rates and inventory
+        // execution tables) runs both pipelines and double-counts; the legacy
+        // running/start/criteria/NH3 calculators also lack the per-bundle
+        // RunSpecMonth extract filter, so they fan a single run-month out across
+        // all 12 months. Only generators that the BaseRate pipeline consumes
+        // (e.g. the inventory OpModeDistribution generator) are kept; the
+        // RatesOMD swap is handled by `domain_scale_excluded_omd_modules`.
+        if self.rates_first {
+            let drop = self.registry.rates_first_excluded_calculators(&names);
+            names.retain(|n| !drop.contains(n));
+        }
+        Ok(names)
     }
 
     /// The planned modules split into independent calculator chains /// what the [`BoundedExecutor`] dispatches.
@@ -578,8 +649,27 @@ impl MOVESEngine {
     pub fn planned_chunks(&self) -> Result<Vec<Chunk>> {
         let modules = self.planned_modules()?;
         let refs: Vec<&str> = modules.iter().map(String::as_str).collect();
-        let provided: BTreeSet<&str> = self.slow_store.names().into_iter().collect();
+        let provided = self.provided_tables();
         chunk_chains(&self.registry, &refs, &provided)
+    }
+
+    /// Slow-tier table names that are actually populated.
+    ///
+    /// The default DB ships some runtime-derived tables (e.g. `SourceBin` /
+    /// `SourceBinDistribution`) as **0-row placeholder** partitions that a
+    /// generator fills at run time. Such an empty placeholder must NOT count as
+    /// "provided": if it did, [`chunk_chains`] would skip the producer→consumer
+    /// edge and leave every consumer reading the empty placeholder instead of
+    /// the generator's real output (the whole onroad inventory then comes out
+    /// empty). An authoritative, *nonempty* provided table (a snapshot's
+    /// pre-computed generator output) keeps its edge skipped, as before — that
+    /// is what prevents the generator from clobbering the snapshot value.
+    fn provided_tables(&self) -> BTreeSet<&str> {
+        self.slow_store
+            .names()
+            .into_iter()
+            .filter(|&n| self.slow_store.get(n).is_some_and(|df| df.height() > 0))
+            .collect()
     }
 
     /// Execute the run: plan and chunk the calculator graph, drive one
@@ -601,7 +691,7 @@ impl MOVESEngine {
         let t_plan_start = Instant::now();
         let modules_planned = self.planned_modules()?;
         let module_refs: Vec<&str> = modules_planned.iter().map(String::as_str).collect();
-        let provided_tables: BTreeSet<&str> = self.slow_store.names().into_iter().collect();
+        let provided_tables = self.provided_tables();
         let chunks = chunk_chains(&self.registry, &module_refs, &provided_tables)?;
         let planning_time = t_plan_start.elapsed();
 
@@ -792,6 +882,35 @@ impl MOVESEngine {
             // aggregator under the same RunSpec-selection filter the producers
             // use).
             if let Some(acc) = &worker_acc {
+                // Canonical's `chainCalculator` runs INSIDE the
+                // (process → location → year → …) nest, so it always sees a
+                // fully-specified `context.year` — AirToxics / SO2 / criteria
+                // derive `modelYearID = year − ageID` from it (and hard-error
+                // on a missing year). The port batches chained execution after
+                // `master.run()`, so it inherits the chunk's *leftover*
+                // position. That position is year-less whenever the last
+                // process iterated subscribed only at a coarse granularity
+                // (e.g. a Process-granularity generator like FuelEffects
+                // Generator): entering a process resets `position.time` to
+                // `none()`, and the loop never descends into the year nest for
+                // it. Restore the run year from the plan so the chained
+                // calculators resolve the same `context.year` they would inside
+                // the loop. Only `time.year` is filled — `location` is left
+                // alone on purpose: chained calculators read county/zone from
+                // the worker rows themselves, and the position's `county_id`
+                // serves only as an OPTIONAL `matches()` filter (crankcase),
+                // where `None` is the correct wildcard for a multi-county chunk
+                // — pinning it to `locations.first()` would wrongly drop every
+                // other county's rows.
+                if times.first().is_some() {
+                    let mut ctx =
+                        chunk_ctx.lock().expect("CalculatorContext mutex poisoned");
+                    let mut pos = *ctx.position();
+                    if pos.time.year.is_none() {
+                        pos.time = times[0];
+                        ctx.set_position(pos);
+                    }
+                }
                 for module in &chained {
                     let worker_df = {
                         let recs = acc.lock().expect("worker accumulator poisoned");
@@ -825,11 +944,31 @@ impl MOVESEngine {
                         }
                         continue;
                     }
+                    if std::env::var_os("MOVES_DEBUG_MODULES").is_some() {
+                        eprintln!(
+                            "[chain] enter {} worker_rows={}",
+                            module.name(),
+                            worker_df.height()
+                        );
+                        use std::io::Write as _;
+                        let _ = std::io::stderr().flush();
+                    }
+                    let t_chain = Instant::now();
                     let out = {
                         let mut ctx = chunk_ctx.lock().expect("CalculatorContext mutex poisoned");
                         ctx.tables_mut().insert("MOVESWorkerOutput", worker_df);
                         module.execute(&mut ctx)?
                     };
+                    if std::env::var_os("MOVES_DEBUG_MODULES").is_some() {
+                        eprintln!(
+                            "[chain] exit  {} {:?} rows={}",
+                            module.name(),
+                            t_chain.elapsed(),
+                            out.as_ref().map_or(0, polars::prelude::DataFrame::height)
+                        );
+                        use std::io::Write as _;
+                        let _ = std::io::stderr().flush();
+                    }
                     let Some(df) = out else {
                         if std::env::var_os("MOVES_DEBUG_CHAINED").is_some() {
                             eprintln!("[chained-empty] {} returned no DataFrame", module.name());
