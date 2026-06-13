@@ -34,12 +34,12 @@
 //! mirrors this in [`apply_to_output`](OnRoadRetrofitStrategy::apply_to_output),
 //! which the engine calls on the aggregated emission records after the streaming
 //! aggregator is drained; the per-record factor comes from
-//! [`RetrofitTable::combined_factor`](crate::model::RetrofitTable::combined_factor).
+//! [`RetrofitTable::combined_factor`].
 //! [`pre_run`](OnRoadRetrofitStrategy::pre_run) loads + compiles the programs
 //! from the `onRoadRetrofit` execution table (an empty table is a clean no-op).
 //!
 //! Known gap: canonical also keys on `fuelTypeID` (retrofit is diesel-only);
-//! [`RetrofitRecord`](crate::model::RetrofitRecord) does not yet carry it, so
+//! [`RetrofitRecord`] does not yet carry it, so
 //! matching is on `(source, modelYear, pollutant, process, year)` only. And
 //! end-to-end numerical fidelity is unverified (no applied-retrofit canonical
 //! capture exists in-repo), though the factor + scaling match the Java formula.

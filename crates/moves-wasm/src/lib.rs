@@ -1653,7 +1653,7 @@ mod tests {
                         .and_then(|c| c.cast(&polars::prelude::DataType::Float64).ok());
                     if let (Some(pol), Some(quant)) = (pol, quant) {
                         if let (Ok(pc), Ok(qc)) = (pol.i64(), quant.f64()) {
-                            for (p, q) in pc.into_iter().zip(qc.into_iter()) {
+                            for (p, q) in pc.into_iter().zip(qc) {
                                 if let Some(p) = p {
                                     let e = by_pol.entry(p).or_default();
                                     e.0 += q.unwrap_or(0.0);
@@ -1697,7 +1697,7 @@ mod tests {
                     f64c("emissionQuant"),
                 ) {
                     if let (Ok(pc), Ok(fc), Ok(qc)) = (pol.i64(), ft.i64(), q.f64()) {
-                        for ((p, f), v) in pc.into_iter().zip(fc.into_iter()).zip(qc.into_iter()) {
+                        for ((p, f), v) in pc.into_iter().zip(fc).zip(qc) {
                             if p == Some(110) {
                                 let e = by_ft.entry(f.unwrap_or(-1)).or_default();
                                 e.0 += v.unwrap_or(0.0);

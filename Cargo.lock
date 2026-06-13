@@ -1800,6 +1800,7 @@ dependencies = [
  "moves-framework",
  "moves-fuel-control",
  "moves-nonroad",
+ "moves-onroad-retrofit",
  "moves-rate-of-progress",
  "moves-runspec",
  "moves-snapshot",
@@ -2033,7 +2034,9 @@ dependencies = [
 name = "moves-onroad-retrofit"
 version = "0.1.0"
 dependencies = [
+ "moves-data",
  "moves-framework",
+ "polars",
  "serde",
  "thiserror 1.0.69",
 ]
