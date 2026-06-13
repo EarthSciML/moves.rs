@@ -330,6 +330,30 @@ pub fn register_strategies(
             ))
         });
     }
+    // OnRoadRetrofit applies as a post-output scaling (apply_to_output); it loads
+    // its programs from the `onRoadRetrofit` execution table in pre_run. Gated
+    // off wasm32 because its (full-polars) dependency pulls in mio, like AVFT.
+    #[cfg(not(target_arch = "wasm32"))]
+    if has_on_road_retrofit(run_spec) {
+        registry.register(|| {
+            Box::new(moves_onroad_retrofit::OnRoadRetrofitStrategy::new(
+                moves_onroad_retrofit::RetrofitTable::new(),
+            ))
+        });
+    }
+}
+
+/// Ports `RunSpec.hasOnRoadRetrofit()`: `true` when the RunSpec carries an
+/// `OnRoadRetrofitStrategy` internal control strategy entry.
+#[must_use]
+pub fn has_on_road_retrofit(run_spec: &moves_runspec::RunSpec) -> bool {
+    run_spec.internal_control_strategies.iter().any(|s| {
+        matches!(
+            s,
+            moves_runspec::InternalControlStrategy::Other { class_name }
+                if class_name.contains("OnRoadRetrofit")
+        )
+    })
 }
 
 /// Ports `RunSpec.hasRateOfProgress()`: `true` when the RunSpec carries an

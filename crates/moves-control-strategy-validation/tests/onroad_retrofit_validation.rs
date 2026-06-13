@@ -225,31 +225,20 @@ fn strategy_lifecycle_with_fixture_programs() {
     .collect();
     let strategy = OnRoadRetrofitStrategy::new(programs);
     let mut store = InMemoryStore::new();
-    // A *populated* on-road retrofit cannot yet be applied through the framework
-    // (emissionRateAdjustment needs source-bin keys RetrofitRecord does not
-    // carry), so pre_run reports the unported condition rather than silently
-    // no-opping the adjustment canonical OnRoadRetrofitStrategy always applies.
-    assert!(
-        matches!(
-            strategy.pre_run(&mut store),
-            Err(moves_framework::Error::NotImplemented)
-        ),
-        "populated OnRoadRetrofit pre_run should report NotImplemented until ported"
-    );
-    // post_run remains a no-op regardless of port status.
+    // pre_run loads programs from the (here empty) store and keeps the seeded
+    // ones; the retrofit effect is applied later in apply_to_output, so pre_run
+    // and post_run both succeed.
+    strategy.pre_run(&mut store).expect("pre_run must succeed");
     let ctx = CalculatorContext::new();
     strategy.post_run(&ctx).expect("post_run must succeed");
 }
 
 #[test]
-fn strategy_modified_tables_contains_emission_rate_adjustment() {
+fn strategy_declares_no_modified_input_tables() {
+    // Retrofit is a post-output scaling (apply_to_output), not an input-table
+    // mutation, so it declares no modified tables.
     let strategy = OnRoadRetrofitStrategy::new(RetrofitTable::new());
-    assert!(
-        strategy
-            .modified_tables()
-            .contains(&"emissionRateAdjustment"),
-        "OnRoadRetrofit must declare emissionRateAdjustment"
-    );
+    assert!(strategy.modified_tables().is_empty());
 }
 
 #[test]

@@ -163,9 +163,12 @@ fn combined_modified_tables_covers_all_affected_tables() {
         .collect();
 
     assert!(all_tables.contains(&"AVFT"), "AVFT must be covered");
+    // OnRoadRetrofit no longer declares a modified input table: it scales the
+    // finalized output in apply_to_output (post-output), so emissionRateAdjustment
+    // is intentionally absent from the union.
     assert!(
-        all_tables.contains(&"emissionRateAdjustment"),
-        "emissionRateAdjustment must be covered"
+        !all_tables.contains(&"emissionRateAdjustment"),
+        "OnRoadRetrofit is post-output now; it must not declare emissionRateAdjustment"
     );
     assert!(
         all_tables
@@ -366,14 +369,11 @@ fn full_lifecycle_four_strategies_active_simultaneously() {
                 matches!(result, Err(moves_framework::Error::NotImplemented)),
                 "ROP pre_run should report NotImplemented until ported, got {result:?}"
             ),
-            // A *populated* on-road retrofit cannot yet be applied through the
-            // framework, so pre_run fails loudly rather than no-op (canonical
-            // OnRoadRetrofitStrategy always applies its adjustment).
-            "OnRoadRetrofitStrategy" => assert!(
-                result.is_err(),
-                "populated OnRoadRetrofit pre_run should fail until a write API \
-                 exists, got {result:?}"
-            ),
+            // OnRoadRetrofit's effect is a post-output scaling (apply_to_output);
+            // pre_run only loads programs from the store, so it succeeds.
+            "OnRoadRetrofitStrategy" => {
+                result.unwrap_or_else(|e| panic!("OnRoadRetrofit pre_run failed: {e}"))
+            }
             // A *populated* nonroad retrofit likewise cannot be bridged to
             // ReferenceData::retrofit_records, so pre_run fails loudly.
             "NonRoadRetrofitStrategy" => assert!(

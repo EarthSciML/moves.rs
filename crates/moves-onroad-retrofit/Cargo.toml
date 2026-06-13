@@ -13,5 +13,7 @@ path = "src/lib.rs"
 
 [dependencies]
 moves-framework = { path = "../moves-framework" }
+moves-data = { path = "../moves-data" }
+polars = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }

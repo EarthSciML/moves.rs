@@ -1060,6 +1060,16 @@ impl MOVESEngine {
             .expect("streaming_agg mutex poisoned")
             .finalize();
 
+        // Post-output control-strategy transforms. Canonical OnRoadRetrofit
+        // scales `emissionQuant` by its combined retrofit factor as a final
+        // UPDATE on the output (not an input-table mutation), so it hooks here
+        // after the aggregator is drained. Input-table strategies (AVFT, ROP)
+        // default to a no-op. Applied before unit conversion so the scaling is
+        // a pure multiplier independent of output units.
+        for s in &strategies {
+            s.apply_to_output(&mut aggregated_records);
+        }
+
         // Mass & energy unit conversion (canonical `OutputProcessor` step 1).
         // MOVES' worker output is in grams (mass) and kilojoules (energy); the
         // run's `outputFactors` rebase that to the chosen units. Mass output is
