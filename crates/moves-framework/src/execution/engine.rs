@@ -902,7 +902,7 @@ impl MOVESEngine {
                 // where `None` is the correct wildcard for a multi-county chunk
                 // — pinning it to `locations.first()` would wrongly drop every
                 // other county's rows.
-                if times.first().is_some() {
+                if !times.is_empty() {
                     let mut ctx = chunk_ctx.lock().expect("CalculatorContext mutex poisoned");
                     let mut pos = *ctx.position();
                     if pos.time.year.is_none() {

@@ -80,7 +80,10 @@ jobs:
 
       - name: cargo clippy
         if: matrix.os == 'ubuntu-latest'
-        run: cargo clippy --workspace --all-targets -- -D warnings -A clippy::doc_lazy_continuation
+        # Cosmetic style lints are allowed workspace-wide (same policy as
+        # doc_lazy_continuation): type_complexity (complex tuple types in the
+        # generators) and unnecessary_map_or (map_or vs is_none_or/is_some_and).
+        run: cargo clippy --workspace --all-targets -- -D warnings -A clippy::doc_lazy_continuation -A clippy::type_complexity -A clippy::unnecessary_map_or
 
       # ── Build + test (all platforms) ─────────────────────────────────────
       - name: cargo build
