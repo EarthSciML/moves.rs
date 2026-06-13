@@ -33,7 +33,13 @@ fn fixture_catalog_parses_and_is_unique() {
         .expect("read characterization/fixtures")
         .filter_map(|e| e.ok())
         .map(|e| e.path())
-        .filter(|p| p.extension().is_some_and(|x| x == "xml"))
+        .filter(|p| {
+            let name = p.file_name().and_then(|n| n.to_str()).unwrap_or_default();
+            // `error-*` are deliberately-malformed RunSpecs (negative tests):
+            // they do not parse via RunSpec::from_file and are gated separately
+            // in full_suite_regression.rs, so exclude them from the catalogue.
+            p.extension().is_some_and(|x| x == "xml") && !name.starts_with("error-")
+        })
         .collect();
     entries.sort();
 
@@ -43,9 +49,9 @@ fn fixture_catalog_parses_and_is_unique() {
         entries.len()
     );
     assert!(
-        entries.len() <= 37,
-        "fixture catalogue is above the expected ceiling of 37: got {} \
-         (the ceiling was last updated when mixed-onroad-nonroad was added)",
+        entries.len() <= 50,
+        "fixture catalogue is above the expected ceiling of 50: got {} \
+         (the ceiling was last updated when the Task-148 fixtures were added)",
         entries.len()
     );
 

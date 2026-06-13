@@ -226,7 +226,18 @@ fn strategy_lifecycle_with_fixture_programs() {
     .collect();
     let strategy = OnRoadRetrofitStrategy::new(programs);
     let mut store = InMemoryStore::new();
-    strategy.pre_run(&mut store).expect("pre_run must succeed");
+    // A *populated* on-road retrofit cannot yet be applied through the framework
+    // (emissionRateAdjustment needs source-bin keys RetrofitRecord does not
+    // carry), so pre_run reports the unported condition rather than silently
+    // no-opping the adjustment canonical OnRoadRetrofitStrategy always applies.
+    assert!(
+        matches!(
+            strategy.pre_run(&mut store),
+            Err(moves_framework::Error::NotImplemented)
+        ),
+        "populated OnRoadRetrofit pre_run should report NotImplemented until ported"
+    );
+    // post_run remains a no-op regardless of port status.
     let ctx = CalculatorContext::new();
     strategy.post_run(&ctx).expect("post_run must succeed");
 }

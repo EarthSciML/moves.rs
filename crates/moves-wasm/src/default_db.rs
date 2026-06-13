@@ -108,7 +108,6 @@ pub fn parse_bundle_to_store(bundle_bytes: &[u8]) -> Result<InMemoryStore, Strin
     Ok(store)
 }
 
-
 /// Build [`GeographyTables`] from `Link` and `County` tables in the store.
 pub fn load_geography_from_store(store: &InMemoryStore) -> Result<GeographyTables, String> {
     let cast_i32 = |df: &DataFrame, name: &str| -> Result<polars::prelude::Column, String> {
@@ -793,7 +792,9 @@ mod tests {
             .collect();
         assert_eq!(
             pps,
-            [202, 301].into_iter().collect::<std::collections::BTreeSet<_>>()
+            [202, 301]
+                .into_iter()
+                .collect::<std::collections::BTreeSet<_>>()
         );
     }
 }

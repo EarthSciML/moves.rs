@@ -969,7 +969,11 @@ mod tests {
             assert!(drop.contains(legacy), "{legacy} must be dropped");
         }
         // BaseRate + whitelisted chained calculators are kept.
-        for keep in ["BaseRateCalculator", "SulfatePMCalculator", "HCSpeciationCalculator"] {
+        for keep in [
+            "BaseRateCalculator",
+            "SulfatePMCalculator",
+            "HCSpeciationCalculator",
+        ] {
             assert!(!drop.contains(keep), "{keep} must be kept");
         }
         // Generators are never dropped by this filter.
@@ -1594,7 +1598,9 @@ mod tests {
         for (_, bytes) in &outcome.output_bytes {
             total_len += bytes.len();
             for &b in bytes {
-                checksum = checksum.wrapping_mul(1_000_000_007).wrapping_add(u64::from(b));
+                checksum = checksum
+                    .wrapping_mul(1_000_000_007)
+                    .wrapping_add(u64::from(b));
             }
         }
         eprintln!(
@@ -1685,9 +1691,11 @@ mod tests {
                         .ok()
                         .and_then(|c| c.cast(&polars::prelude::DataType::Float64).ok())
                 };
-                if let (Some(pol), Some(ft), Some(q)) =
-                    (i64c("pollutantID"), i64c("fuelTypeID"), f64c("emissionQuant"))
-                {
+                if let (Some(pol), Some(ft), Some(q)) = (
+                    i64c("pollutantID"),
+                    i64c("fuelTypeID"),
+                    f64c("emissionQuant"),
+                ) {
                     if let (Ok(pc), Ok(fc), Ok(qc)) = (pol.i64(), ft.i64(), q.f64()) {
                         for ((p, f), v) in pc.into_iter().zip(fc.into_iter()).zip(qc.into_iter()) {
                             if p == Some(110) {

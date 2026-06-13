@@ -290,7 +290,10 @@ impl Generator for OperatingModeDistributionGenerator {
         let mut links_by_road: std::collections::HashMap<i32, Vec<&OmdgLinkRow>> =
             std::collections::HashMap::new();
         for link in &link_rows {
-            links_by_road.entry(link.road_type_id).or_default().push(link);
+            links_by_road
+                .entry(link.road_type_id)
+                .or_default()
+                .push(link);
         }
         let mut output_rows: Vec<OpModeDistributionRow> = Vec::new();
         for fraction in &fractions {

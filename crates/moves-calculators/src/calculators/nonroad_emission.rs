@@ -337,7 +337,7 @@ impl Calculator for NonroadEmissionCalculator {
             &temporal,
             selected_pollutants.as_ref(),
         )
-            .map_err(|e| Error::Polars(e.to_string()))?
+        .map_err(|e| Error::Polars(e.to_string()))?
         {
             Some(df) => Ok(CalculatorOutput::with_dataframe(df)),
             None => Ok(CalculatorOutput::empty()),

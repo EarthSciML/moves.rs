@@ -181,12 +181,7 @@ pub fn adjust_starts(inputs: &AdjustStartsInputs) -> Vec<StartsRow> {
         .iter()
         .filter_map(|r| {
             let total = *total_age_adjust.get(&r.source_type_id)?;
-            (total != 0.0).then(|| {
-                (
-                    (r.source_type_id, r.age_id),
-                    r.age_adjustment / total,
-                )
-            })
+            (total != 0.0).then(|| ((r.source_type_id, r.age_id), r.age_adjustment / total))
         })
         .collect();
 
@@ -333,8 +328,11 @@ impl TableRow for StartsPerDayPerVehicleRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("dayID".into(), rows.iter().map(|r| r.day_id).collect::<Vec<i32>>())
-                    .into(),
+                Series::new(
+                    "dayID".into(),
+                    rows.iter().map(|r| r.day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
                 Series::new(
                     "sourceTypeID".into(),
                     rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
@@ -391,8 +389,11 @@ impl TableRow for StartsAgeAdjustmentRow {
                     rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
                 )
                 .into(),
-                Series::new("ageID".into(), rows.iter().map(|r| r.age_id).collect::<Vec<i32>>())
-                    .into(),
+                Series::new(
+                    "ageID".into(),
+                    rows.iter().map(|r| r.age_id).collect::<Vec<i32>>(),
+                )
+                .into(),
                 Series::new(
                     "ageAdjustment".into(),
                     rows.iter().map(|r| r.age_adjustment).collect::<Vec<f64>>(),
@@ -435,8 +436,11 @@ impl TableRow for StartsMonthAdjustRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("monthID".into(), rows.iter().map(|r| r.month_id).collect::<Vec<i32>>())
-                    .into(),
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
+                )
+                .into(),
                 Series::new(
                     "sourceTypeID".into(),
                     rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
@@ -444,7 +448,9 @@ impl TableRow for StartsMonthAdjustRow {
                 .into(),
                 Series::new(
                     "monthAdjustment".into(),
-                    rows.iter().map(|r| r.month_adjustment).collect::<Vec<f64>>(),
+                    rows.iter()
+                        .map(|r| r.month_adjustment)
+                        .collect::<Vec<f64>>(),
                 )
                 .into(),
             ],
@@ -485,10 +491,16 @@ impl TableRow for StartsHourFractionRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("dayID".into(), rows.iter().map(|r| r.day_id).collect::<Vec<i32>>())
-                    .into(),
-                Series::new("hourID".into(), rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>())
-                    .into(),
+                Series::new(
+                    "dayID".into(),
+                    rows.iter().map(|r| r.day_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "hourID".into(),
+                    rows.iter().map(|r| r.hour_id).collect::<Vec<i32>>(),
+                )
+                .into(),
                 Series::new(
                     "sourceTypeID".into(),
                     rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
@@ -496,7 +508,9 @@ impl TableRow for StartsHourFractionRow {
                 .into(),
                 Series::new(
                     "allocationFraction".into(),
-                    rows.iter().map(|r| r.allocation_fraction).collect::<Vec<f64>>(),
+                    rows.iter()
+                        .map(|r| r.allocation_fraction)
+                        .collect::<Vec<f64>>(),
                 )
                 .into(),
             ],
@@ -537,11 +551,16 @@ impl TableRow for StartsZoneRow {
         DataFrame::new(
             n,
             vec![
-                Series::new("zoneID".into(), rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>())
-                    .into(),
+                Series::new(
+                    "zoneID".into(),
+                    rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>(),
+                )
+                .into(),
                 Series::new(
                     "startAllocFactor".into(),
-                    rows.iter().map(|r| r.start_alloc_factor).collect::<Vec<f64>>(),
+                    rows.iter()
+                        .map(|r| r.start_alloc_factor)
+                        .collect::<Vec<f64>>(),
                 )
                 .into(),
             ],
@@ -588,21 +607,36 @@ impl TableRow for StartsRow {
                     rows.iter().map(|r| r.hour_day_id).collect::<Vec<i32>>(),
                 )
                 .into(),
-                Series::new("monthID".into(), rows.iter().map(|r| r.month_id).collect::<Vec<i32>>())
-                    .into(),
-                Series::new("yearID".into(), rows.iter().map(|r| r.year_id).collect::<Vec<i32>>())
-                    .into(),
-                Series::new("ageID".into(), rows.iter().map(|r| r.age_id).collect::<Vec<i32>>())
-                    .into(),
-                Series::new("zoneID".into(), rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>())
-                    .into(),
+                Series::new(
+                    "monthID".into(),
+                    rows.iter().map(|r| r.month_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "yearID".into(),
+                    rows.iter().map(|r| r.year_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "ageID".into(),
+                    rows.iter().map(|r| r.age_id).collect::<Vec<i32>>(),
+                )
+                .into(),
+                Series::new(
+                    "zoneID".into(),
+                    rows.iter().map(|r| r.zone_id).collect::<Vec<i32>>(),
+                )
+                .into(),
                 Series::new(
                     "sourceTypeID".into(),
                     rows.iter().map(|r| r.source_type_id).collect::<Vec<i32>>(),
                 )
                 .into(),
-                Series::new("starts".into(), rows.iter().map(|r| r.starts).collect::<Vec<f64>>())
-                    .into(),
+                Series::new(
+                    "starts".into(),
+                    rows.iter().map(|r| r.starts).collect::<Vec<f64>>(),
+                )
+                .into(),
             ],
         )
     }

@@ -62,6 +62,9 @@ fn onroad_fixtures() -> Vec<PathBuf> {
             p.extension().and_then(|x| x.to_str()) == Some("xml")
                 && !name.starts_with("nr-")
                 && !name.starts_with("scale-")
+                // `error-*` are deliberately-malformed RunSpecs (negative tests);
+                // they fail to parse by design and are not perf fixtures.
+                && !name.starts_with("error-")
         })
         .collect();
     paths.sort();

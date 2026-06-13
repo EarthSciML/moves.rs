@@ -705,7 +705,8 @@ impl Calculator for BaseRateCalculator {
             // energy adjustment is not silently omitted (see
             // `setup::compute_zone_ac_factor`).
             zone_ac_factor: {
-                let captured = tables.iter_typed_or_empty::<setup::ZoneAcFactorRow>("zoneACFactor")?;
+                let captured =
+                    tables.iter_typed_or_empty::<setup::ZoneAcFactorRow>("zoneACFactor")?;
                 if captured.is_empty() {
                     setup::compute_zone_ac_factor(
                         tables,
@@ -1123,7 +1124,10 @@ fn build_fuel_supply(
         Ok(views) => {
             let region = views[0].cast(&DataType::Int64).ok();
             let county = views[1].cast(&DataType::Int64).ok();
-            match (region.as_ref().and_then(|s| s.i64().ok()), county.as_ref().and_then(|s| s.i64().ok())) {
+            match (
+                region.as_ref().and_then(|s| s.i64().ok()),
+                county.as_ref().and_then(|s| s.i64().ok()),
+            ) {
                 (Some(region), Some(county)) => region
                     .into_iter()
                     .zip(county)

@@ -48,11 +48,16 @@ fn run_compare(args: &[&str]) -> (i32, String, String) {
 
 #[test]
 fn no_snapshot_no_moves_rs_produces_empty_table() {
+    // A genuinely-absent canonical snapshot (path does not exist) is the
+    // "no canonical data" case → empty comparison, exit 0. A *present* path
+    // that fails to load is a hard error (covered separately); see the
+    // `args.canonical.exists()` branch in compare-canonical.
     let empty = tempdir().unwrap();
+    let absent = empty.path().join("no-such-snapshot");
     let mrs = tempdir().unwrap();
     let (code, stdout, _stderr) = run_compare(&[
         "--canonical",
-        empty.path().to_str().unwrap(),
+        absent.to_str().unwrap(),
         "--moves-rs",
         mrs.path().to_str().unwrap(),
         "--fixture",

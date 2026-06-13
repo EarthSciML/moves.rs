@@ -35,7 +35,10 @@ pub fn setup_execution_store(runspec: &RunSpec, store: &mut InMemoryStore) -> Re
             $call?;
         }};
     }
-    synth_step!("merge_store_variants_eager", merge_store_variants_eager(store));
+    synth_step!(
+        "merge_store_variants_eager",
+        merge_store_variants_eager(store)
+    );
     synth_step!(
         "prune_geographic",
         prune_geographic_tables_to_runspec(runspec, store)
@@ -52,8 +55,14 @@ pub fn setup_execution_store(runspec: &RunSpec, store: &mut InMemoryStore) -> Re
         "zone_month_hour_meteorology",
         populate_zone_month_hour_meteorology(store)
     );
-    synth_step!("link_from_zone_road_type", populate_link_from_zone_road_type(store));
-    synth_step!("fill_fuel_supply", fill_fuel_supply_placeholder_nulls(store));
+    synth_step!(
+        "link_from_zone_road_type",
+        populate_link_from_zone_road_type(store)
+    );
+    synth_step!(
+        "fill_fuel_supply",
+        fill_fuel_supply_placeholder_nulls(store)
+    );
     synth_step!(
         "high_ethanol_fuel_props",
         transform_high_ethanol_fuel_properties(store)
@@ -271,7 +280,12 @@ fn fuel_years_for_runspec(store: &InMemoryStore, runspec: &RunSpec) -> BTreeSet<
 /// (`zoneID`, `countyID`). Falls back to the MOVES `zoneID = countyID × 10`
 /// convention if `Zone` is missing or carries neither column.
 fn zone_ids_for_counties(store: &InMemoryStore, county_ids: &BTreeSet<i64>) -> BTreeSet<i64> {
-    let fallback = || county_ids.iter().map(|&c| c * 10).collect::<BTreeSet<i64>>();
+    let fallback = || {
+        county_ids
+            .iter()
+            .map(|&c| c * 10)
+            .collect::<BTreeSet<i64>>()
+    };
 
     let Some(arc) = store.get("Zone") else {
         return fallback();
@@ -486,9 +500,7 @@ pub fn fill_fuel_supply_placeholder_nulls(store: &mut InMemoryStore) -> Result<(
 /// polars-core (insert-new-row + repoint FuelSupply) is non-trivial; for the
 /// rare multi-usage case we log and apply the first usage's substitution rather
 /// than silently producing region-incorrect props.
-pub fn transform_high_ethanol_fuel_properties(
-    store: &mut InMemoryStore,
-) -> Result<(), String> {
+pub fn transform_high_ethanol_fuel_properties(store: &mut InMemoryStore) -> Result<(), String> {
     // The combustion-property columns altered in step 020 (altRVP is handled
     // separately because it is a *new* column sourced from RVP).
     const PROP_COLS: &[&str] = &[
@@ -538,8 +550,7 @@ pub fn transform_high_ethanol_fuel_properties(
     };
     // Read an Int64 column as a Vec<i64>, erroring on NULL keys.
     let i64_col = |df: &DataFrame, want: &str, ctx: &str| -> Result<Vec<i64>, String> {
-        let name = col_name(df, want)
-            .ok_or_else(|| format!("{ctx}: column {want} missing"))?;
+        let name = col_name(df, want).ok_or_else(|| format!("{ctx}: column {want} missing"))?;
         let casted = df
             .column(&name)
             .and_then(|c| c.cast(&DataType::Int64))
@@ -551,8 +562,7 @@ pub fn transform_high_ethanol_fuel_properties(
     };
     // Read a Float64 column as Vec<Option<f64>> (NULLs preserved for coalesce).
     let f64_opt_col = |df: &DataFrame, want: &str, ctx: &str| -> Result<Vec<Option<f64>>, String> {
-        let name = col_name(df, want)
-            .ok_or_else(|| format!("{ctx}: column {want} missing"))?;
+        let name = col_name(df, want).ok_or_else(|| format!("{ctx}: column {want} missing"))?;
         let casted = df
             .column(&name)
             .and_then(|c| c.cast(&DataType::Float64))
@@ -610,7 +620,11 @@ pub fn transform_high_ethanol_fuel_properties(
     let mut alt_rvp: Vec<Option<f64>> = ff_rvp.clone();
 
     // coalesce(e1.col, e0.col, existing)
-    let coalesce = |e1: Option<usize>, e0: Option<usize>, src: &[Option<f64>], existing: Option<f64>| -> Option<f64> {
+    let coalesce = |e1: Option<usize>,
+                    e0: Option<usize>,
+                    src: &[Option<f64>],
+                    existing: Option<f64>|
+     -> Option<f64> {
         if let Some(i1) = e1 {
             if let Some(v) = src[i1] {
                 return Some(v);
@@ -671,7 +685,9 @@ pub fn transform_high_ethanol_fuel_properties(
         alt_rvp[row] = coalesce(e1, e0, &e10_rvp, ff_rvp[row]);
         altered += 1;
     }
-    log(&format!("altered {altered} high-ethanol formulation row(s)"));
+    log(&format!(
+        "altered {altered} high-ethanol formulation row(s)"
+    ));
 
     // ---- Step 025: recompute volToWtPercentOxy over the whole table from the
     // (now-altered) oxygenate volumes. Denominator <= 0 → 0.
@@ -1124,7 +1140,9 @@ pub fn build_runspec_tables(runspec: &RunSpec, store: &mut InMemoryStore) -> Res
 ///
 /// No-op when the table already exists or the source table is absent. Uses
 /// polars-core only (wasm32-compatible).
-pub fn populate_pollutant_process_mapped_model_year(store: &mut InMemoryStore) -> Result<(), String> {
+pub fn populate_pollutant_process_mapped_model_year(
+    store: &mut InMemoryStore,
+) -> Result<(), String> {
     if store.contains("PollutantProcessMappedModelYear")
         || !store.contains("PollutantProcessModelYear")
     {
@@ -1320,4 +1338,3 @@ pub fn populate_zone_month_hour_meteorology(store: &mut InMemoryStore) -> Result
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
-
