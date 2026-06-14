@@ -73,6 +73,10 @@ pub fn setup_execution_store(runspec: &RunSpec, store: &mut InMemoryStore) -> Re
     );
     synth_step!("build_runspec_tables", build_runspec_tables(runspec, store));
     synth_step!(
+        "preaggregate_activity_to_month",
+        preaggregate_activity_to_month(runspec, store)
+    );
+    synth_step!(
         "build_regclass_source_type_fraction",
         build_regclass_source_type_fraction(store)
     );
@@ -418,6 +422,500 @@ fn build_runspec_chained_to(store: &mut InMemoryStore) -> Result<(), String> {
     )
     .map_err(|e| format!("building RunSpecChainedTo: {e}"))?;
     store.insert("RunSpecChainedTo".to_string(), df);
+    Ok(())
+}
+
+/// Read an `Int32`-castable column from a store table into a `Vec<Option<i32>>`.
+fn col_i32(df: &DataFrame, name: &str) -> Result<Vec<Option<i32>>, String> {
+    Ok(df
+        .column(name)
+        .and_then(|c| c.cast(&DataType::Int32))
+        .map_err(|e| format!("{name}: {e}"))?
+        .i32()
+        .map_err(|e| format!("{name}: {e}"))?
+        .into_iter()
+        .collect())
+}
+
+/// Read a `Float64`-castable column from a store table into a `Vec<Option<f64>>`.
+fn col_f64(df: &DataFrame, name: &str) -> Result<Vec<Option<f64>>, String> {
+    Ok(df
+        .column(name)
+        .and_then(|c| c.cast(&DataType::Float64))
+        .map_err(|e| format!("{name}: {e}"))?
+        .f64()
+        .map_err(|e| format!("{name}: {e}"))?
+        .into_iter()
+        .collect())
+}
+
+/// Preaggregate the activity tables to a single monthly time cell when the
+/// runspec's `aggregateBy = Month` — the default-DB port of canonical
+/// `InputDataManager.preAggregateExecutionDB` (`database/PreAggDAY.sql` +
+/// `PreAggMONTH.sql`).
+///
+/// With `aggregateBy = Month` the canonical execution DB collapses the hour and
+/// day dimensions of the activity tables to a single `(hourDayID, dayID, hourID)
+/// = (0,0,0)` "Entire Day / Whole Week" cell *before* the rate calc, so the full
+/// month's activity lands in one row. The default-DB path never ran that step,
+/// so `TotalActivityGenerator` kept hour/day resolution and emitted per-(dayType,
+/// selected-hour) rows at ~1/15 of the monthly total. The snapshot path is
+/// unaffected (it ships the already-collapsed tables — this synth reproduces
+/// them), and every other fixture is unaffected (no other run sets
+/// `aggregateBy = Month`).
+///
+/// Collapses: `HourDay`, `HourOfAnyDay`, `DayOfAnyWeek`, `HourVMTFraction`
+/// (→1.0), `DayVMTFraction` (→1.0) and `AvgSpeedDistribution` (activity-weighted
+/// over the run's day types). The weight mirrors the canonical two-stage
+/// `HourWeighting × DayWeighting`: `W(st,rt,day,hour) = hourVMTFraction ·
+/// (Σ_month dayVMTFraction·noOfRealDays·monthVMTFraction / Σ_month
+/// monthVMTFraction)`.
+fn preaggregate_activity_to_month(
+    runspec: &RunSpec,
+    store: &mut InMemoryStore,
+) -> Result<(), String> {
+    if runspec.timespan.aggregate_by.as_deref() != Some("Month") {
+        return Ok(());
+    }
+    // Only collapse if the time dimension is still expanded (default-DB path).
+    // The snapshot path ships HourDay already collapsed to the single (0,0,0)
+    // cell, so skip there to avoid clobbering captured data.
+    let Some(hour_day) = store.get("HourDay") else {
+        return Ok(());
+    };
+    if hour_day.height() <= 1 {
+        return Ok(());
+    }
+
+    // Run's day types, captured before RunSpecDay is collapsed below — the
+    // AvgSpeedDistribution weighting scopes to these.
+    let run_days: BTreeSet<i32> = match store.get("RunSpecDay") {
+        Some(rd) => col_i32(&rd, "dayID")?.into_iter().flatten().collect(),
+        None => BTreeSet::new(),
+    };
+
+    // OldHourDay: hourDayID → (dayID, hourID), captured before the collapse.
+    let hd_id = col_i32(&hour_day, "hourDayID")?;
+    let hd_day = col_i32(&hour_day, "dayID")?;
+    let hd_hour = col_i32(&hour_day, "hourID")?;
+    let mut hour_day_of: BTreeMap<i32, (i32, i32)> = BTreeMap::new();
+    for i in 0..hd_id.len() {
+        if let (Some(id), Some(d), Some(h)) = (hd_id[i], hd_day[i], hd_hour[i]) {
+            hour_day_of.insert(id, (d, h));
+        }
+    }
+
+    // noOfRealDays per dayID (DayOfAnyWeek, before collapse).
+    let no_of_real_days: BTreeMap<i32, f64> = match store.get("DayOfAnyWeek") {
+        Some(df) => {
+            let day = col_i32(&df, "dayID")?;
+            let nord = col_f64(&df, "noOfRealDays")?;
+            (0..day.len())
+                .filter_map(|i| Some((day[i]?, nord[i]?)))
+                .collect()
+        }
+        None => return Ok(()),
+    };
+
+    // monthVMTFraction: (sourceTypeID, monthID) → fraction.
+    let mut month_vmt: BTreeMap<(i32, i32), f64> = BTreeMap::new();
+    if let Some(df) = store.get("MonthVMTFraction") {
+        let st = col_i32(&df, "sourceTypeID")?;
+        let mo = col_i32(&df, "monthID")?;
+        let fr = col_f64(&df, "monthVMTFraction")?;
+        for i in 0..st.len() {
+            if let (Some(s), Some(m), Some(f)) = (st[i], mo[i], fr[i]) {
+                month_vmt.insert((s, m), f);
+            }
+        }
+    }
+
+    // DayWeighting1(st, rt, day) = Σ_month dayVMT·noOfRealDays·monthVMT
+    //                              / Σ_month monthVMT.
+    let Some(day_vmt_df) = store.get("DayVMTFraction") else {
+        return Ok(());
+    };
+    let (dv_st, dv_mo, dv_rt, dv_day) = (
+        col_i32(&day_vmt_df, "sourceTypeID")?,
+        col_i32(&day_vmt_df, "monthID")?,
+        col_i32(&day_vmt_df, "roadTypeID")?,
+        col_i32(&day_vmt_df, "dayID")?,
+    );
+    let dv_frac = col_f64(&day_vmt_df, "dayVMTFraction")?;
+    // (st, rt, day) → (numerator, denominator)
+    let mut dw1_acc: BTreeMap<(i32, i32, i32), (f64, f64)> = BTreeMap::new();
+    for i in 0..dv_st.len() {
+        let (Some(s), Some(m), Some(rt), Some(d), Some(f)) =
+            (dv_st[i], dv_mo[i], dv_rt[i], dv_day[i], dv_frac[i])
+        else {
+            continue;
+        };
+        let mvf = month_vmt.get(&(s, m)).copied().unwrap_or(0.0);
+        let nord = no_of_real_days.get(&d).copied().unwrap_or(0.0);
+        let e = dw1_acc.entry((s, rt, d)).or_insert((0.0, 0.0));
+        e.0 += f * nord * mvf;
+        e.1 += mvf;
+    }
+    let day_weighting1: BTreeMap<(i32, i32, i32), f64> = dw1_acc
+        .into_iter()
+        .map(|(k, (num, den))| (k, if den > 0.0 { num / den } else { 0.0 }))
+        .collect();
+
+    // Original hourVMTFraction (st, rt, day, hour) → fraction, captured before
+    // the in-place collapse below. Used as the hour-stage weight for the
+    // AvgSpeedDistribution collapse (canonical PreAggDAY's HourWeighting1).
+    let mut hour_vmt: BTreeMap<(i32, i32, i32, i32), f64> = BTreeMap::new();
+    if let Some(df) = store.get("HourVMTFraction") {
+        let st = col_i32(&df, "sourceTypeID")?;
+        let rt = col_i32(&df, "roadTypeID")?;
+        let day = col_i32(&df, "dayID")?;
+        let hour = col_i32(&df, "hourID")?;
+        let fr = col_f64(&df, "hourVMTFraction")?;
+        for i in 0..st.len() {
+            if let (Some(s), Some(r), Some(d), Some(h), Some(f)) =
+                (st[i], rt[i], day[i], hour[i], fr[i])
+            {
+                hour_vmt.insert((s, r, d, h), f);
+            }
+        }
+    }
+
+    // roadTypeVMTFraction (st, rt) → fraction, for the HourWeighting2 collapse.
+    let mut road_type_vmt: BTreeMap<(i32, i32), f64> = BTreeMap::new();
+    if let Some(df) = store.get("RoadTypeDistribution") {
+        let st = col_i32(&df, "sourceTypeID")?;
+        let rt = col_i32(&df, "roadTypeID")?;
+        let fr = col_f64(&df, "roadTypeVMTFraction")?;
+        for i in 0..st.len() {
+            if let (Some(s), Some(r), Some(f)) = (st[i], rt[i], fr[i]) {
+                road_type_vmt.insert((s, r), f);
+            }
+        }
+    }
+
+    // --- HourDay → single (0,0,0) ---
+    let collapsed_hour_day = DataFrame::new(
+        1,
+        vec![
+            Series::new("hourDayID".into(), vec![0i32]).into(),
+            Series::new("dayID".into(), vec![0i32]).into(),
+            Series::new("hourID".into(), vec![0i32]).into(),
+        ],
+    )
+    .map_err(|e| format!("collapsing HourDay: {e}"))?;
+    store.insert("HourDay".to_string(), collapsed_hour_day);
+
+    // --- HourOfAnyDay → single (0, "Entire Day") ---
+    let collapsed_hoad = DataFrame::new(
+        1,
+        vec![
+            Series::new("hourID".into(), vec![0i32]).into(),
+            Series::new("hourName".into(), vec!["Entire Day"]).into(),
+        ],
+    )
+    .map_err(|e| format!("collapsing HourOfAnyDay: {e}"))?;
+    store.insert("HourOfAnyDay".to_string(), collapsed_hoad);
+
+    // --- DayOfAnyWeek → single (0, "Whole Week", 7.0) ---
+    let collapsed_doaw = DataFrame::new(
+        1,
+        vec![
+            Series::new("dayID".into(), vec![0i32]).into(),
+            Series::new("dayName".into(), vec!["Whole Week"]).into(),
+            Series::new("noOfRealDays".into(), vec![7.0f64]).into(),
+        ],
+    )
+    .map_err(|e| format!("collapsing DayOfAnyWeek: {e}"))?;
+    store.insert("DayOfAnyWeek".to_string(), collapsed_doaw);
+
+    // --- RunSpec time tables → the single collapsed (0) cell ---
+    // The activity is allocated across `RunSpecHourDay`; without collapsing these
+    // the SHO would still key on the original hourDayIDs (now missing from the
+    // collapsed HourDay/DayOfAnyWeek), breaking the universalActivity divisor.
+    for (table, col) in [
+        ("RunSpecHourDay", "hourDayID"),
+        ("RunSpecDay", "dayID"),
+        ("RunSpecHour", "hourID"),
+    ] {
+        if store.get(table).is_some() {
+            let df = DataFrame::new(1, vec![Series::new(col.into(), vec![0i32]).into()])
+                .map_err(|e| format!("collapsing {table}: {e}"))?;
+            store.insert(table.to_string(), df);
+        }
+    }
+
+    // --- HourVMTFraction → (st, rt, 0, 0, 1.0) per distinct (st, rt) ---
+    if let Some(df) = store.get("HourVMTFraction") {
+        let st = col_i32(&df, "sourceTypeID")?;
+        let rt = col_i32(&df, "roadTypeID")?;
+        let pairs: BTreeSet<(i32, i32)> = (0..st.len())
+            .filter_map(|i| Some((st[i]?, rt[i]?)))
+            .collect();
+        let n = pairs.len();
+        let (st_c, rt_c): (Vec<i32>, Vec<i32>) = pairs.into_iter().unzip();
+        let hv = DataFrame::new(
+            n,
+            vec![
+                Series::new("sourceTypeID".into(), st_c).into(),
+                Series::new("roadTypeID".into(), rt_c).into(),
+                Series::new("dayID".into(), vec![0i32; n]).into(),
+                Series::new("hourID".into(), vec![0i32; n]).into(),
+                Series::new("hourVMTFraction".into(), vec![1.0f64; n]).into(),
+            ],
+        )
+        .map_err(|e| format!("collapsing HourVMTFraction: {e}"))?;
+        store.insert("HourVMTFraction".to_string(), hv);
+    }
+
+    // --- DayVMTFraction → (st, month, rt, 0, 1.0) per distinct (st, month, rt) ---
+    {
+        let triples: BTreeSet<(i32, i32, i32)> = (0..dv_st.len())
+            .filter_map(|i| Some((dv_st[i]?, dv_mo[i]?, dv_rt[i]?)))
+            .collect();
+        let n = triples.len();
+        let (mut st_c, mut mo_c, mut rt_c) = (Vec::new(), Vec::new(), Vec::new());
+        for (s, m, rt) in triples {
+            st_c.push(s);
+            mo_c.push(m);
+            rt_c.push(rt);
+        }
+        let dv = DataFrame::new(
+            n,
+            vec![
+                Series::new("sourceTypeID".into(), st_c).into(),
+                Series::new("monthID".into(), mo_c).into(),
+                Series::new("roadTypeID".into(), rt_c).into(),
+                Series::new("dayID".into(), vec![0i32; n]).into(),
+                Series::new("dayVMTFraction".into(), vec![1.0f64; n]).into(),
+            ],
+        )
+        .map_err(|e| format!("collapsing DayVMTFraction: {e}"))?;
+        store.insert("DayVMTFraction".to_string(), dv);
+    }
+
+    // --- AvgSpeedDistribution → activity-weighted collapse to hourDayID = 0 ---
+    if let Some(df) = store.get("AvgSpeedDistribution") {
+        let st = col_i32(&df, "sourceTypeID")?;
+        let rt = col_i32(&df, "roadTypeID")?;
+        let hdid = col_i32(&df, "hourDayID")?;
+        let bin = col_i32(&df, "avgSpeedBinID")?;
+        let frac = col_f64(&df, "avgSpeedFraction")?;
+        // (st, rt, bin) → (Σ frac·W, Σ W); combined weight
+        // W = hourVMTFraction(st,rt,day,hour) · DayWeighting1(st,rt,day),
+        // mirroring the canonical two-stage HourWeighting × DayWeighting collapse.
+        let mut acc: BTreeMap<(i32, i32, i32), (f64, f64)> = BTreeMap::new();
+        for i in 0..st.len() {
+            let (Some(s), Some(r), Some(hid), Some(b), Some(fr)) =
+                (st[i], rt[i], hdid[i], bin[i], frac[i])
+            else {
+                continue;
+            };
+            let Some(&(day, hour)) = hour_day_of.get(&hid) else {
+                continue;
+            };
+            if !run_days.is_empty() && !run_days.contains(&day) {
+                continue;
+            }
+            let dw = day_weighting1.get(&(s, r, day)).copied().unwrap_or(0.0);
+            let hw = hour_vmt.get(&(s, r, day, hour)).copied().unwrap_or(0.0);
+            let w = dw * hw;
+            let e = acc.entry((s, r, b)).or_insert((0.0, 0.0));
+            e.0 += fr * w;
+            e.1 += w;
+        }
+        let n = acc.len();
+        let (mut st_c, mut rt_c, mut hd_c, mut bin_c, mut fr_c) =
+            (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
+        for ((s, r, b), (num, den)) in acc {
+            st_c.push(s);
+            rt_c.push(r);
+            hd_c.push(0i32);
+            bin_c.push(b);
+            fr_c.push(if den > 0.0 { num / den } else { 0.0 });
+        }
+        let asd = DataFrame::new(
+            n,
+            vec![
+                Series::new("sourceTypeID".into(), st_c).into(),
+                Series::new("roadTypeID".into(), rt_c).into(),
+                Series::new("hourDayID".into(), hd_c).into(),
+                Series::new("avgSpeedBinID".into(), bin_c).into(),
+                Series::new("avgSpeedFraction".into(), fr_c).into(),
+            ],
+        )
+        .map_err(|e| format!("collapsing AvgSpeedDistribution: {e}"))?;
+        store.insert("AvgSpeedDistribution".to_string(), asd);
+    }
+
+    // HourWeighting3(hour) for the temperature / AC-term hour collapse:
+    // `HW3(hour) = avg_day HW2(preferredSourceType, day, hour)`, where
+    // `HW2(st,day,hour) = Σ_rt hourVMTFraction · roadTypeVMTFraction
+    // / Σ_rt roadTypeVMTFraction` and the preferred sourceType is the first
+    // present in the canonical SourceTypeOrdering (PreAggDAY HourWeighting2/3).
+    let hw3: BTreeMap<i32, f64> = {
+        let mut hw2_num: BTreeMap<(i32, i32, i32), f64> = BTreeMap::new();
+        let mut hw2_den: BTreeMap<(i32, i32, i32), f64> = BTreeMap::new();
+        for (&(s, r, d, h), &hv) in &hour_vmt {
+            let rtv = road_type_vmt.get(&(s, r)).copied().unwrap_or(0.0);
+            *hw2_num.entry((s, d, h)).or_insert(0.0) += hv * rtv;
+            *hw2_den.entry((s, d, h)).or_insert(0.0) += rtv;
+        }
+        let hw2: BTreeMap<(i32, i32, i32), f64> = hw2_num
+            .iter()
+            .map(|(&k, &num)| {
+                let den = hw2_den.get(&k).copied().unwrap_or(0.0);
+                (k, if den != 0.0 { num / den } else { 0.0 })
+            })
+            .collect();
+        const SOURCE_TYPE_ORDER: [i32; 13] = [21, 31, 32, 52, 61, 54, 62, 43, 53, 41, 42, 51, 11];
+        let mut st_total: BTreeMap<i32, f64> = BTreeMap::new();
+        for (&(s, _, _), &v) in &hw2 {
+            *st_total.entry(s).or_insert(0.0) += v;
+        }
+        let preferred_st = SOURCE_TYPE_ORDER
+            .into_iter()
+            .find(|s| st_total.get(s).is_some_and(|&t| t > 0.0))
+            .or_else(|| st_total.keys().next().copied());
+        let mut hw3_sum: BTreeMap<i32, f64> = BTreeMap::new();
+        let mut hw3_cnt: BTreeMap<i32, i32> = BTreeMap::new();
+        if let Some(ps) = preferred_st {
+            for (&(s, _d, h), &v) in &hw2 {
+                if s == ps {
+                    *hw3_sum.entry(h).or_insert(0.0) += v;
+                    *hw3_cnt.entry(h).or_insert(0) += 1;
+                }
+            }
+        }
+        hw3_sum
+            .iter()
+            .map(|(&h, &sum)| {
+                (
+                    h,
+                    sum / f64::from(hw3_cnt.get(&h).copied().unwrap_or(1).max(1)),
+                )
+            })
+            .collect()
+    };
+
+    // --- MonthGroupHour → HW3-weighted AC terms collapsed to hourID = 0 ---
+    // compute_zone_ac_factor joins ZoneMonthHour.hourID with MonthGroupHour.hourID;
+    // both must collapse to hour 0 together or the AC energy term is dropped
+    // (summer-month under-count). Carries the A/B/C terms (the CV columns are
+    // null in canonical) weighted by HW3.
+    if let Some(df) = store.get("MonthGroupHour") {
+        let grp = col_i32(&df, "monthGroupID")?;
+        let hour = col_i32(&df, "hourID")?;
+        let term_cols = ["ACActivityTermA", "ACActivityTermB", "ACActivityTermC"];
+        let terms: Vec<Vec<Option<f64>>> = term_cols
+            .iter()
+            .map(|c| col_f64(&df, c))
+            .collect::<Result<_, _>>()?;
+        let mut acc: BTreeMap<i32, (f64, [f64; 3])> = BTreeMap::new();
+        for i in 0..grp.len() {
+            let (Some(g), Some(h)) = (grp[i], hour[i]) else {
+                continue;
+            };
+            let w = hw3.get(&h).copied().unwrap_or(0.0);
+            let e = acc.entry(g).or_insert((0.0, [0.0; 3]));
+            e.0 += w;
+            for (k, tc) in terms.iter().enumerate() {
+                e.1[k] += tc[i].unwrap_or(0.0) * w;
+            }
+        }
+        let n = acc.len();
+        let mut g_c = Vec::new();
+        let mut a_c = Vec::new();
+        let mut b_c = Vec::new();
+        let mut c_c = Vec::new();
+        for (g, (wsum, sums)) in acc {
+            g_c.push(g);
+            let norm = |x: f64| if wsum != 0.0 { x / wsum } else { 0.0 };
+            a_c.push(norm(sums[0]));
+            b_c.push(norm(sums[1]));
+            c_c.push(norm(sums[2]));
+        }
+        let null_cv: Vec<Option<f64>> = vec![None; n];
+        let mgh = DataFrame::new(
+            n,
+            vec![
+                Series::new("monthGroupID".into(), g_c).into(),
+                Series::new("hourID".into(), vec![0i32; n]).into(),
+                Series::new("ACActivityTermA".into(), a_c).into(),
+                Series::new("ACActivityTermACV".into(), null_cv.clone()).into(),
+                Series::new("ACActivityTermB".into(), b_c).into(),
+                Series::new("ACActivityTermBCV".into(), null_cv.clone()).into(),
+                Series::new("ACActivityTermC".into(), c_c).into(),
+                Series::new("ACActivityTermCCV".into(), null_cv).into(),
+            ],
+        )
+        .map_err(|e| format!("collapsing MonthGroupHour: {e}"))?;
+        store.insert("MonthGroupHour".to_string(), mgh);
+    }
+
+    // --- ZoneMonthHour → activity-weighted collapse to hourID = 0 ---
+    if let Some(df) = store.get("ZoneMonthHour") {
+        // Collapse each met column to a single hourID = 0 row per (month, zone),
+        // weighting by HW3(hour). heatIndex is set equal to the collapsed
+        // temperature (matching canonical, which leaves it == temperature below
+        // the heat-index threshold).
+        let month = col_i32(&df, "monthID")?;
+        let zone = col_i32(&df, "zoneID")?;
+        let hour = col_i32(&df, "hourID")?;
+        let met_cols = [
+            "temperature",
+            "relHumidity",
+            "heatIndex",
+            "specificHumidity",
+            "molWaterFraction",
+        ];
+        let met: Vec<Vec<Option<f64>>> = met_cols
+            .iter()
+            .map(|c| col_f64(&df, c))
+            .collect::<Result<_, _>>()?;
+        // (month, zone) → (Σ HW3, [Σ col·HW3 per met column])
+        let mut acc: BTreeMap<(i32, i32), (f64, [f64; 5])> = BTreeMap::new();
+        for i in 0..month.len() {
+            let (Some(m), Some(z), Some(h)) = (month[i], zone[i], hour[i]) else {
+                continue;
+            };
+            let w = hw3.get(&h).copied().unwrap_or(0.0);
+            let e = acc.entry((m, z)).or_insert((0.0, [0.0; 5]));
+            e.0 += w;
+            for (k, mc) in met.iter().enumerate() {
+                e.1[k] += mc[i].unwrap_or(0.0) * w;
+            }
+        }
+        let n = acc.len();
+        let (mut m_c, mut z_c, mut h_c) = (Vec::new(), Vec::new(), Vec::new());
+        let mut col_out: [Vec<f64>; 5] = Default::default();
+        for ((m, z), (wsum, sums)) in acc {
+            m_c.push(m);
+            z_c.push(z);
+            h_c.push(0i32);
+            let temp = if wsum != 0.0 { sums[0] / wsum } else { 0.0 };
+            for k in 0..5 {
+                let v = if wsum != 0.0 { sums[k] / wsum } else { 0.0 };
+                // heatIndex (k == 2) tracks temperature in the collapsed cell.
+                col_out[k].push(if k == 2 { temp } else { v });
+            }
+        }
+        let zmh = DataFrame::new(
+            n,
+            vec![
+                Series::new("monthID".into(), m_c).into(),
+                Series::new("zoneID".into(), z_c).into(),
+                Series::new("hourID".into(), h_c).into(),
+                Series::new("temperature".into(), std::mem::take(&mut col_out[0])).into(),
+                Series::new("relHumidity".into(), std::mem::take(&mut col_out[1])).into(),
+                Series::new("heatIndex".into(), std::mem::take(&mut col_out[2])).into(),
+                Series::new("specificHumidity".into(), std::mem::take(&mut col_out[3])).into(),
+                Series::new("molWaterFraction".into(), std::mem::take(&mut col_out[4])).into(),
+            ],
+        )
+        .map_err(|e| format!("collapsing ZoneMonthHour: {e}"))?;
+        store.insert("ZoneMonthHour".to_string(), zmh);
+    }
+
     Ok(())
 }
 
