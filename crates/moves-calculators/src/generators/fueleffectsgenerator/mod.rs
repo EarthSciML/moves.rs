@@ -526,6 +526,14 @@ struct FuelFormulationRow {
     pah_content: f32,
     t50: f32,
     t90: f32,
+    /// `altRVP` — the alternate (E10-equivalent) Reid vapor pressure used by the
+    /// E85 high-ethanol pseudo-THC adjustment. Canonical `setup()` adds this
+    /// column with `altRVP=RVP` for every formulation, then overwrites it for
+    /// high-ethanol fuels from `e10FuelProperties`. The default-DB path
+    /// synthesises the column in `transform_high_ethanol_fuel_properties`; the
+    /// snapshot path drops it (canonical `executeLoop` finally-block), so a
+    /// missing column defaults each row to its own `RVP`.
+    alt_rvp: f32,
 }
 
 impl FuelFormulationRow {
@@ -550,7 +558,7 @@ impl FuelFormulationRow {
             pah_content: self.pah_content,
             t50: self.t50,
             t90: self.t90,
-            alt_rvp: 0.0, // added by TankFuelGenerator.setup(); zero at read time
+            alt_rvp: self.alt_rvp,
         }
     }
 }
@@ -580,6 +588,7 @@ impl TableRow for FuelFormulationRow {
             ("PAHContent".into(), DataType::Float64),
             ("T50".into(), DataType::Float64),
             ("T90".into(), DataType::Float64),
+            ("altRVP".into(), DataType::Float64),
         ])
     }
     fn into_dataframe(rows: Vec<Self>) -> PolarsResult<DataFrame> {
@@ -708,6 +717,11 @@ impl TableRow for FuelFormulationRow {
                     rows.iter().map(|r| r.t90 as f64).collect::<Vec<f64>>(),
                 )
                 .into(),
+                Series::new(
+                    "altRVP".into(),
+                    rows.iter().map(|r| r.alt_rvp as f64).collect::<Vec<f64>>(),
+                )
+                .into(),
             ],
         )
     }
@@ -748,6 +762,17 @@ impl TableRow for FuelFormulationRow {
         let pah_content_col = f64_col!("PAHContent");
         let t50_col = f64_col!("T50");
         let t90_col = f64_col!("T90");
+        // `altRVP` is optional: the default-DB path synthesises it (in
+        // `transform_high_ethanol_fuel_properties`), but the captured snapshot
+        // drops it (canonical removes the column at the end of fuel-effects
+        // generation). When absent, each row's altRVP defaults to its own RVP —
+        // canonical's step-010 default (`update fuelFormulation set altRVP=RVP`)
+        // before the high-ethanol overwrite. A NULL value falls back the same way.
+        let alt_rvp_col = df
+            .column("altRVP")
+            .ok()
+            .and_then(|c| c.cast(&DataType::Float64).ok())
+            .and_then(|c| c.f64().ok().cloned());
         // Fuel-property columns are NULL in the default DB for formulations that
         // do not carry the property (e.g. diesel/electric have no RVP, ethanol
         // volume, or aromatic content; the formulation-0 placeholder is all
@@ -783,6 +808,11 @@ impl TableRow for FuelFormulationRow {
                     pah_content: pah_content_col.get(i).unwrap_or(0.0) as f32,
                     t50: t50_col.get(i).unwrap_or(0.0) as f32,
                     t90: t90_col.get(i).unwrap_or(0.0) as f32,
+                    alt_rvp: alt_rvp_col
+                        .as_ref()
+                        .and_then(|c| c.get(i))
+                        .unwrap_or_else(|| rvp_col.get(i).unwrap_or(0.0))
+                        as f32,
                 })
             })
             .collect()
@@ -1209,6 +1239,7 @@ mod tests {
                 pah_content: 0.0,
                 t50: 0.0,
                 t90: 0.0,
+                alt_rvp: 0.0,
             }])
             .unwrap(),
         );
@@ -1306,6 +1337,7 @@ mod tests {
                 pah_content: 0.0,
                 t50: 0.0,
                 t90: 0.0,
+                alt_rvp: 0.0,
             }])
             .unwrap(),
         );

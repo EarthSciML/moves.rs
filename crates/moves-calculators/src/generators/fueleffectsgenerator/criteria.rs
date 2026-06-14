@@ -1034,3 +1034,180 @@ pub fn build_criteria_ratio_rows(store: &InMemoryStore) -> Vec<CriteriaRatioOutR
     }
     rows
 }
+
+/// `fuelTypeID` for ethanol (E85) fuel.
+const ETHANOL_FUEL_TYPE_ID: i32 = 5;
+/// THC running/start `polProcessID`s the E85 pseudo-THC adjustment derives from.
+const THC_PSEUDO_POL_PROCESS_IDS: [i32; 2] = [101, 102];
+/// First model year the E85 pseudo-THC adjustment applies to.
+const E85_MIN_MODEL_YEAR: i32 = 2001;
+/// The E70/E85 fuel subtypes the pseudo-THC adjustment is restricted to.
+const E85_FUEL_SUBTYPES: [i32; 2] = [51, 52];
+
+/// Build the default-DB `altCriteriaRatio` table — the E85 "alternate" (E10-RVP)
+/// THC fuel-effect ratios that the `HCSpeciationCalculator` needs to speciate
+/// ethanol E70/E85 2001+ running/start NMOG and VOC.
+///
+/// Ports `FuelEffectsGenerator.copyGeneralFuelRatioToAltCriteriaRatio` (the
+/// `altCriteriaRatio` half of the E85 "Pseudo-THC" path): the THC
+/// `generalFuelRatioExpression` rows for ethanol (fuelType 5) running/start are
+/// re-evaluated with `RVP` replaced by `altRVP` (the E10-equivalent RVP that
+/// `transform_high_ethanol_fuel_properties` derives from `e10FuelProperties`),
+/// restricted to the E70/E85 fuel subtypes, and expanded across the runspec
+/// `(modelYear ≥ 2001, ageID)` grid. The result is keyed by the *normal* THC
+/// `polProcessID`/`pollutantID` (1) — exactly the key `build_e85_block`
+/// (`BaseRateCalculator`) looks up to emit the `altTHC` (10001) tally.
+///
+/// Emits one row per `(supplied E70/E85 formulation, THC polProcess, runspec
+/// sourceType, modelYear ≥ 2001, ageID)`. Returns an empty vec (no-op) when
+/// `altCriteriaRatio` is already populated (snapshot/onroad path) or the inputs
+/// are absent (nonroad / non-ethanol runs).
+#[must_use]
+pub fn build_alt_criteria_ratio_rows(store: &InMemoryStore) -> Vec<CriteriaRatioOutRow> {
+    // Gate: only the default-DB path (altCriteriaRatio empty) gets these rows.
+    if store
+        .get("altCriteriaRatio")
+        .is_some_and(|df| df.height() > 0)
+    {
+        return Vec::new();
+    }
+    let Some(forms) = load_formulations(store) else {
+        return Vec::new();
+    };
+
+    // Runspec sourceTypes — the pseudo-THC rows are scoped to them exactly as
+    // `generalFuelRatioExpression` is filtered to the run's sourceTypes.
+    let Some(rsst) = store.get("RunSpecSourceType") else {
+        return Vec::new();
+    };
+    let Some(st_ids) = icol(&rsst, "sourceTypeID") else {
+        return Vec::new();
+    };
+    let source_types: BTreeSet<i32> = st_ids.into_iter().flatten().map(|v| v as i32).collect();
+
+    // Runspec (modelYear, ageID) grid — same reconstruction as
+    // `build_criteria_ratio_rows`: RunSpecYear × RunSpecModelYear with
+    // ageID = yearID − modelYearID restricted to [0, 40].
+    let (Some(rsy), Some(rsmy)) = (store.get("RunSpecYear"), store.get("RunSpecModelYear")) else {
+        return Vec::new();
+    };
+    let (Some(year_ids), Some(rsmy_ids)) = (icol(&rsy, "yearID"), icol(&rsmy, "modelYearID"))
+    else {
+        return Vec::new();
+    };
+    let years: Vec<i32> = year_ids.into_iter().flatten().map(|v| v as i32).collect();
+    let model_years: Vec<i32> = rsmy_ids.into_iter().flatten().map(|v| v as i32).collect();
+    let mut my_age: BTreeSet<(i32, i32)> = BTreeSet::new();
+    for &year in &years {
+        for &my in &model_years {
+            let age = year - my;
+            if (0..=40).contains(&age) {
+                my_age.insert((my, age));
+            }
+        }
+    }
+    if my_age.is_empty() {
+        return Vec::new();
+    }
+
+    // Ethanol THC running/start expressions, with RVP → altRVP (the pseudo-THC
+    // derivation). Pre-parse once; index by sourceTypeID.
+    let Ok(expr_rows) =
+        store.iter_typed::<GeneralFuelRatioExpressionRow>("generalFuelRatioExpression")
+    else {
+        return Vec::new();
+    };
+    struct PseudoExpr {
+        process_id: i32,
+        source_type_id: i32,
+        min_model_year_id: i32,
+        max_model_year_id: i32,
+        min_age_id: i32,
+        max_age_id: i32,
+        ratio: Expression,
+        gpa: Expression,
+    }
+    let mut pseudo: Vec<PseudoExpr> = Vec::new();
+    for r in &expr_rows {
+        if r.fuel_type_id != ETHANOL_FUEL_TYPE_ID
+            || !THC_PSEUDO_POL_PROCESS_IDS.contains(&r.pol_process_id)
+            || r.max_model_year_id < E85_MIN_MODEL_YEAR
+            || !source_types.contains(&r.source_type_id)
+        {
+            continue;
+        }
+        // Java replaces `RVP` with `altRVP`; `str::replace` never re-scans its
+        // own output, matching the guarded canonical replace.
+        let ratio_text = r.fuel_effect_ratio_expression.replace("RVP", "altRVP");
+        let gpa_text = r.fuel_effect_ratio_gpa_expression.replace("RVP", "altRVP");
+        let ratio_text = if ratio_text.is_empty() {
+            "1".into()
+        } else {
+            ratio_text
+        };
+        let gpa_text = if gpa_text.is_empty() {
+            "1".into()
+        } else {
+            gpa_text
+        };
+        let (Ok(ratio), Ok(gpa)) = (Expression::parse(&ratio_text), Expression::parse(&gpa_text))
+        else {
+            return Vec::new();
+        };
+        pseudo.push(PseudoExpr {
+            process_id: r.pol_process_id % 100,
+            source_type_id: r.source_type_id,
+            min_model_year_id: r.min_model_year_id.max(E85_MIN_MODEL_YEAR),
+            max_model_year_id: r.max_model_year_id,
+            min_age_id: r.min_age_id,
+            max_age_id: r.max_age_id,
+            ratio,
+            gpa,
+        });
+    }
+
+    let mut rows = Vec::new();
+    for &ffid in &forms.supplied {
+        let Some(ff_model) = forms.by_id.get(&ffid) else {
+            continue;
+        };
+        if !E85_FUEL_SUBTYPES.contains(&ff_model.fuel_subtype_id) {
+            continue;
+        }
+        if forms.fuel_type.get(&ffid).copied() != Some(ETHANOL_FUEL_TYPE_ID) {
+            continue;
+        }
+        for e in &pseudo {
+            let (Ok(ratio), Ok(ratio_gpa)) = (e.ratio.evaluate(ff_model), e.gpa.evaluate(ff_model))
+            else {
+                continue;
+            };
+            for &(my, age) in &my_age {
+                if my < e.min_model_year_id
+                    || my > e.max_model_year_id
+                    || age < e.min_age_id
+                    || age > e.max_age_id
+                {
+                    continue;
+                }
+                rows.push(CriteriaRatioOutRow {
+                    fuel_type_id: ETHANOL_FUEL_TYPE_ID,
+                    fuel_formulation_id: ffid,
+                    // Re-keyed to the normal THC pollutant for fast joins
+                    // (canonical: `if(pollutantID>10000,pollutantID-10000,…)`).
+                    pol_process_id: 100 + e.process_id,
+                    pollutant_id: 1,
+                    process_id: e.process_id,
+                    source_type_id: e.source_type_id,
+                    model_year_id: my,
+                    age_id: age,
+                    ratio,
+                    ratio_gpa,
+                    // Sulfur is baked into the expression; ratioNoSulfur = 1.
+                    ratio_no_sulfur: 1.0,
+                });
+            }
+        }
+    }
+    rows
+}

@@ -81,6 +81,7 @@ pub fn setup_execution_store(runspec: &RunSpec, store: &mut InMemoryStore) -> Re
         scope_pollutant_process_model_year_to_runspec(store)
     );
     synth_step!("build_criteria_ratio", build_criteria_ratio(store));
+    synth_step!("build_alt_criteria_ratio", build_alt_criteria_ratio(store));
     Ok(())
 }
 
@@ -131,6 +132,54 @@ fn build_criteria_ratio(store: &mut InMemoryStore) -> Result<(), String> {
     )
     .map_err(|e| format!("building criteriaRatio: {e}"))?;
     store.insert("criteriaRatio".to_string(), df);
+    Ok(())
+}
+
+/// Build the default-DB `altCriteriaRatio` table — the E85 "alternate" (E10-RVP)
+/// THC fuel-effect ratios the `HCSpeciationCalculator` needs to speciate ethanol
+/// E70/E85 2001+ running/start NMOG and VOC.
+///
+/// Without it the `BaseRateCalculator`'s `build_e85_block` finds no
+/// `altCriteriaRatio` row, never emits the `altTHC` (10001) tally, and HC
+/// speciation produces no NMOG (pollutant 80) for E85 model years ≥ 2001 — the
+/// default-DB `chain-tog-speciation` fixture was short exactly those rows.
+///
+/// Must run after `high_ethanol_fuel_props` (which derives the `altRVP` column
+/// the pseudo-THC expressions reference). No-op when `altCriteriaRatio` is
+/// already populated or the inputs are absent. See
+/// [`crate::generators::fueleffectsgenerator::criteria::build_alt_criteria_ratio_rows`].
+fn build_alt_criteria_ratio(store: &mut InMemoryStore) -> Result<(), String> {
+    use crate::generators::fueleffectsgenerator::criteria;
+
+    let rows = criteria::build_alt_criteria_ratio_rows(store);
+    if rows.is_empty() {
+        return Ok(());
+    }
+    let n = rows.len();
+    let icol = |name: &str, f: &dyn Fn(&criteria::CriteriaRatioOutRow) -> i32| -> Column {
+        Series::new(name.into(), rows.iter().map(f).collect::<Vec<i32>>()).into()
+    };
+    let fcol = |name: &str, f: &dyn Fn(&criteria::CriteriaRatioOutRow) -> f64| -> Column {
+        Series::new(name.into(), rows.iter().map(f).collect::<Vec<f64>>()).into()
+    };
+    let df = DataFrame::new(
+        n,
+        vec![
+            icol("fuelTypeID", &|r| r.fuel_type_id),
+            icol("fuelFormulationID", &|r| r.fuel_formulation_id),
+            icol("polProcessID", &|r| r.pol_process_id),
+            icol("pollutantID", &|r| r.pollutant_id),
+            icol("processID", &|r| r.process_id),
+            icol("sourceTypeID", &|r| r.source_type_id),
+            icol("modelYearID", &|r| r.model_year_id),
+            icol("ageID", &|r| r.age_id),
+            fcol("ratio", &|r| r.ratio),
+            fcol("ratioGPA", &|r| r.ratio_gpa),
+            fcol("ratioNoSulfur", &|r| r.ratio_no_sulfur),
+        ],
+    )
+    .map_err(|e| format!("building altCriteriaRatio: {e}"))?;
+    store.insert("altCriteriaRatio".to_string(), df);
     Ok(())
 }
 
