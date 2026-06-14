@@ -1518,18 +1518,40 @@ pub fn build_runspec_tables(runspec: &RunSpec, store: &mut InMemoryStore) -> Res
         pol_process_ids,
     );
 
-    // RunSpecDay. Canonical's execution time span iterates EVERY DayOfAnyWeek
-    // day type, not the runspec `<day>` selection (buildExecutionTimeSpan
-    // useRunSpec=false) — so RunSpecDay / RunSpecHourDay (and the activity those
-    // drive) must cover both weekend (2) and weekday (5). The store's
-    // DayOfAnyWeek is the authority (loaded for all day types via the expanded
-    // day filter); fall back to the runspec days only when it is absent.
+    // RunSpecDay. `<day key>` is a 0-based INDEX into the sorted DayOfAnyWeek
+    // dayID list (canonical `TimeSpan.getDayByIndex` over `order by dayID` =
+    // [2 weekend, 5 weekday]): key 0 -> day 2, key 1 -> day 5, key >= 2 -> out
+    // of range. An out-of-range or empty selection means canonical adds no day
+    // and the execution time span falls back to ALL day types — the common
+    // `<day key="5"/>` fixtures, and `expand-day`'s keys 2/5. So convert the
+    // selection through the sorted DayOfAnyWeek list and use all day types only
+    // when nothing valid is selected. The port's RunSpec model stores the
+    // literal `<day>` key (unlike months/hours, which `xml_format` already
+    // index-converts), so the index->dayID conversion happens here.
+    //
+    // This restricts the activity (RunSpecHourDay -> SHO) to the selected day,
+    // so the output is day-filtered without a separate output pass: the
+    // captured snapshot's SHO carries only the selected `hourDayID` (e.g.
+    // sample-runspec: hourDay 72 = hour 7 / day 2), and the default-DB path
+    // previously over-emitted both day types (1000/168 rows vs canonical
+    // 500/84).
     let day_ids: Vec<i32> = {
-        let from_store: BTreeSet<i32> = day_ids_from_day_of_any_week(store);
-        if from_store.is_empty() {
+        let all_sorted: Vec<i32> = day_ids_from_day_of_any_week(store).into_iter().collect();
+        if all_sorted.is_empty() {
+            // DayOfAnyWeek absent — fall back to the literal runspec keys.
             runspec.timespan.days.iter().map(|&d| d as i32).collect()
         } else {
-            from_store.into_iter().collect()
+            let selected: BTreeSet<i32> = runspec
+                .timespan
+                .days
+                .iter()
+                .filter_map(|&k| all_sorted.get(k as usize).copied())
+                .collect();
+            if selected.is_empty() {
+                all_sorted
+            } else {
+                selected.into_iter().collect()
+            }
         }
     };
     insert_i32(store, "RunSpecDay", "dayID", day_ids.clone());
