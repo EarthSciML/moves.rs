@@ -1,0 +1,24 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__imtesttype",
+  "schema": [
+    {
+      "name": "testTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "testTypeDesc",
+      "kind": "utf8"
+    },
+    {
+      "name": "shortName",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "testTypeID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "93d8dd341a6b2ca559bd45eb103d7a6063177e8969ba6638e85b4c1815355b8b"
+}

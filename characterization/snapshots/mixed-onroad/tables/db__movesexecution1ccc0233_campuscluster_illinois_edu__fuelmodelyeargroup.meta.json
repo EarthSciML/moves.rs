@@ -1,0 +1,40 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__fuelmodelyeargroup",
+  "schema": [
+    {
+      "name": "fuelMYGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelMYGroupName",
+      "kind": "utf8"
+    },
+    {
+      "name": "fuelMYGroupFunction",
+      "kind": "utf8"
+    },
+    {
+      "name": "maxSulfurLevel",
+      "kind": "float64"
+    },
+    {
+      "name": "maxSulfurLevelCV",
+      "kind": "float64"
+    },
+    {
+      "name": "maxSulfurLevelGPA",
+      "kind": "float64"
+    },
+    {
+      "name": "maxSulfurLevelGPACV",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "fuelMYGroupID"
+  ],
+  "row_count": 18,
+  "float_decimals": 12,
+  "content_sha256": "289e86fa36bc4df8816062693fa5491509cdb48e88a6ac8c8e23cd9d984e919d"
+}

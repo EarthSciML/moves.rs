@@ -1,0 +1,44 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__distanceemissionrate",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "avgSpeedBinID",
+      "kind": "int64"
+    },
+    {
+      "name": "ratePerMile",
+      "kind": "float64"
+    },
+    {
+      "name": "ratePerSHO",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID",
+    "fuelTypeID",
+    "sourceTypeID",
+    "modelYearID",
+    "avgSpeedBinID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "13a5ab5e0e2817bf4ee078b92248b00a6f1423af118ada680a6381a2aacba1d4"
+}

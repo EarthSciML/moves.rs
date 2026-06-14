@@ -1,0 +1,11 @@
+{
+  "provenance_version": "moves-fixture-capture/v1",
+  "fixture_name": "nr-mixed-nonroad",
+  "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/nr-mixed-nonroad.xml",
+  "runspec_sha256": "cac17d9e5113996f8d401f117e49f2b6f3aebc398e04d2844c3e22ea7673f474",
+  "snapshot_aggregate_sha256": "8f2c4420fc94e1e56dffc19d54c5c1af731b139d835d833d51213d278638faf3",
+  "output_database": "out_nr_mixed_nonroad",
+  "scale_input_database": null
+}

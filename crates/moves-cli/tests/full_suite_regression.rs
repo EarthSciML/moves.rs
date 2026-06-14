@@ -156,8 +156,9 @@ fn tolerance_opts() -> DiffOptions {
 ///
 /// 46 total fixtures; 3 `scale-*` excluded (require additional input
 /// databases), 3 `error-*` excluded (expected parse errors — tested by
-/// [`error_fixtures_return_expected_errors`]). Result: 30 onroad (including
-/// mixed-onroad-nonroad) + 10 NONROAD = 40 fixtures.
+/// [`error_fixtures_return_expected_errors`]). Result: 34 onroad/mixed
+/// (including mixed-onroad, the onroad half of the retired
+/// mixed-onroad-nonroad) + 11 NONROAD = 45 fixtures.
 fn all_fixtures() -> Vec<PathBuf> {
     let dir = fixtures_dir();
     let mut paths: Vec<PathBuf> = std::fs::read_dir(&dir)
@@ -185,16 +186,17 @@ fn canonical_present(snapshots_root: &Path, name: &str) -> bool {
 
 // ── fixture catalogue ─────────────────────────────────────────────────────────
 
-/// The fixture catalogue must contain exactly 40 non-scale non-error fixtures.
+/// The fixture catalogue must contain exactly 45 non-scale non-error fixtures.
 ///
-/// 50 total in `characterization/fixtures/`:
+/// 51 total in `characterization/fixtures/`:
 /// - 34 onroad/mixed (non-`nr-`, non-`scale-`, non-`error-`):
-/// 23 original default-scale + `mixed-onroad-nonroad` + 6 added by
+/// 23 original default-scale + `mixed-onroad` (onroad half of the retired
+/// mixed-onroad-nonroad) + 6 added by
 /// (`expand-counties-large`, `expand-multifuel`, `expand-fullyear`,
 /// `expand-multiyear`, `expand-roadtypes`, `rates-minimal`) + 4 SINGLE-scale
 /// county fixtures (`process-apu-single`, `process-extended-idle-single`,
 /// `process-crankcase-start-single`, `process-crankcase-extidle-single`)
-/// - 10 NONROAD (`nr-*.xml`)
+/// - 11 NONROAD (`nr-*.xml`, including `nr-mixed-nonroad`, the nonroad half)
 /// - 3 `scale-*.xml` (excluded — require additional input databases)
 /// - 3 `error-*.xml` (excluded — test expected parse failures separately)
 #[test]
@@ -202,8 +204,8 @@ fn fixture_catalogue_size() {
     let fixtures = all_fixtures();
     assert_eq!(
         fixtures.len(),
-        44,
-        "expected 44 non-scale non-error fixtures (34 onroad/mixed + 10 NONROAD), \
+        45,
+        "expected 45 non-scale non-error fixtures (34 onroad/mixed + 11 NONROAD), \
          found {}. Update this test if the catalogue changes.",
         fixtures.len()
     );
@@ -299,7 +301,7 @@ fn nonroad_fixtures_plan_modules() {
         .into_iter()
         .filter(|p| fixture_name(p).starts_with("nr-"))
         .collect();
-    assert_eq!(fixtures.len(), 10);
+    assert_eq!(fixtures.len(), 11);
 
     for fixture in &fixtures {
         let name = fixture_name(fixture);
@@ -502,10 +504,26 @@ fn asserted_fixtures() -> &'static [(&'static str, f64, bool)] {
         ("nr-industrial-county", NONROAD_REL_TOL, false), // ≤1.0e-3, 15801/15801
         ("nr-logging-county", NONROAD_REL_TOL, false),    // ~2.0e-6, 144/144
         ("nr-railroad-support-nation", NONROAD_REL_TOL, false), // ~8.6e-4, 23108/23108
-        // mixed-onroad-nonroad: the canonical capture's MOVESOutput is
-        // empty (0 rows) and the port emits 0 rows for it — vacuous, so
-        // the gate fails loudly if a recapture gives either side rows.
-        ("mixed-onroad-nonroad", NONROAD_REL_TOL, true),
+        // mixed-onroad / nr-mixed-nonroad: the former mixed-onroad-nonroad
+        // fixture selected ONROAD+NONROAD in one RunSpec, a combination
+        // canonical MOVES 5.0.1 does not implement (ExecutionRunSpec
+        // .buildVehicleSelections leaves the M12 case as an unfinished stub
+        // — "only do one of the models at a time only for now"), so it
+        // populated neither RunSpecSourceType nor RunSpecSector and emitted
+        // an empty MOVESOutput by design. It was split into two single-model
+        // fixtures that canonical can actually run. mixed-onroad is the
+        // ONROAD half: Total Energy (91) running exhaust for a gasoline
+        // passenger car (93 Fossil-Fuel-Energy is not a calculable pollutant
+        // in MOVES5 — no PollutantProcessAssoc row — and start exhaust emits
+        // nothing because the run selects only roadtype 4, not the
+        // off-network roadtype where starts occur). 250/250 rows, pol-91.
+        ("mixed-onroad", ONROAD_REL_TOL, false),
+        // nr-mixed-nonroad is the NONROAD half: Washtenaw County Construction
+        // (diesel) exhaust criteria/PM on process 1. Nonroad does not model
+        // energy (pollutants 91/93 are not nonroad-affected in
+        // PollutantProcessAssoc), so this half reports the nonroad criteria
+        // pollutants instead of the onroad energy ones.
+        ("nr-mixed-nonroad", NONROAD_REL_TOL, false),
         // process-refueling: the chained RefuelingLossCalculator now runs (the
         // engine's chainCalculator step), reads a synthesized RefuelingFuelType
         // extract, gates output to THC (pollutant 1), and reconciles the
@@ -618,10 +636,12 @@ const QUARANTINED_FIXTURES: &[&str] = &[
     // process-apu GRADUATED to asserted_fixtures (vacuous): the BaseRate activity
     // weighting now gates the captured APU rate to 0 against the empty captured
     // SHO, matching canonical's empty output (canon 0 == port 0).
-    // mixed-onroad-nonroad GRADUATED to asserted_fixtures (vacuous): the
-    // canonical capture is empty (0 rows) and the port also emits 0 rows;
-    // the vacuous flag fails the gate loudly if a recapture ever gives
-    // either side a nonzero row.
+    // mixed-onroad-nonroad RETIRED and split into mixed-onroad +
+    // nr-mixed-nonroad (both asserted_fixtures): canonical MOVES 5.0.1 does
+    // not implement a combined ONROAD+NONROAD run (the M12 case in
+    // ExecutionRunSpec.buildVehicleSelections is an unfinished stub), so the
+    // single mixed RunSpec emitted nothing by design. The two single-model
+    // halves each produce real, validatable canonical output.
     // Speciation / chained-calculator class. Three engine/calculator bugs in this
     // class were FOUND and FIXED, GRADUATING chain-nonhaptog, chain-tog-speciation,
     // process-crankcase-running, process-nox-speciation, process-brakewear and
@@ -1342,8 +1362,9 @@ fn default_db_snapshot_diff() {
             Ok(o) => o,
             // A run error is a gate failure for this fixture, not a reason to
             // abort the whole sweep — record it and keep going so every fixture
-            // gets a verdict (e.g. mixed-onroad-nonroad errors because the
-            // default-DB onroad tree carries no NONROAD population tables).
+            // gets a verdict. (NONROAD fixtures are excluded from this gate via
+            // onroad_fixtures(), so the default-DB onroad tree's lack of NONROAD
+            // population tables can't surface here.)
             Err(e) => {
                 println!(
                     "{name:<28} {:>10} {:>10} {:>14} {:>10}",

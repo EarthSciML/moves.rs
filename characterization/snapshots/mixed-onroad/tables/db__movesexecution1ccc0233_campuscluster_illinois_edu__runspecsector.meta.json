@@ -1,0 +1,16 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__runspecsector",
+  "schema": [
+    {
+      "name": "sectorID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "sectorID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "78ba4e70a35140f04e3ee9a6071a83f7fc1a547cd09414027fef28c9ceed405f"
+}

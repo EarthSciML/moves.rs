@@ -1,0 +1,42 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__dioxinemissionrate",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "units",
+      "kind": "utf8"
+    },
+    {
+      "name": "meanBaseRate",
+      "kind": "float64"
+    },
+    {
+      "name": "meanBaseRateCV",
+      "kind": "float64"
+    },
+    {
+      "name": "dataSourceId",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID",
+    "fuelTypeID",
+    "modelYearGroupID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "003af1a20f86fca1d68cce55bb34d7144b879ccb7c39356fa6ef0e0a17e7e69c"
+}

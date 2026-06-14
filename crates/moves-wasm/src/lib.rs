@@ -1751,8 +1751,10 @@ mod tests {
         ("process-tirewear", 1e-3, false),
         ("process-airtoxics", 1e-3, false),
         ("process-pm-exhaust", 1e-3, false),
+        // mixed-onroad: onroad half of the retired mixed-onroad-nonroad run
+        // (Total Energy running exhaust, gasoline passenger car).
+        ("mixed-onroad", 1e-3, false),
         // Vacuous (canonical 0 rows / port 0 rows).
-        ("mixed-onroad-nonroad", 1e-3, true),
         ("process-apu", 1e-3, true),
         ("process-crankcase-extidle", 1e-3, true),
         ("process-crankcase-start", 1e-3, true),
@@ -1816,8 +1818,7 @@ mod tests {
             }
             // Run the wasm default-DB pipeline and extract the port's
             // per-pollutant sums. A run error is recorded as a fixture failure
-            // (e.g. mixed-onroad-nonroad has no NONROAD population tables in the
-            // onroad default-DB tree) rather than aborting the whole sweep.
+            // rather than aborting the whole sweep.
             let port_result: Result<PollutantSums, String> = (|| {
                 let xml = std::fs::read_to_string(fixtures_dir.join(format!("{name}.xml")))
                     .map_err(|e| format!("read runspec: {e}"))?;

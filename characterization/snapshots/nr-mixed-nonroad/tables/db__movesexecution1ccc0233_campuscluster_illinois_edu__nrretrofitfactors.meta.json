@@ -1,0 +1,65 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__nrretrofitfactors",
+  "schema": [
+    {
+      "name": "retrofitStartYear",
+      "kind": "int64"
+    },
+    {
+      "name": "retrofitEndYear",
+      "kind": "int64"
+    },
+    {
+      "name": "StartModelYear",
+      "kind": "int64"
+    },
+    {
+      "name": "EndModelYear",
+      "kind": "int64"
+    },
+    {
+      "name": "SCC",
+      "kind": "utf8"
+    },
+    {
+      "name": "engTechID",
+      "kind": "int64"
+    },
+    {
+      "name": "hpMin",
+      "kind": "int64"
+    },
+    {
+      "name": "hpMax",
+      "kind": "int64"
+    },
+    {
+      "name": "pollutantID",
+      "kind": "int64"
+    },
+    {
+      "name": "retrofitID",
+      "kind": "int64"
+    },
+    {
+      "name": "annualFractionRetrofit",
+      "kind": "float64"
+    },
+    {
+      "name": "retrofitEffectiveFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "SCC",
+    "engTechID",
+    "hpMin",
+    "hpMax",
+    "pollutantID",
+    "retrofitID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "5f1dfe02acc653c15ff626705cb503f6ac4f56533c2cd088740a990c6028a883"
+}

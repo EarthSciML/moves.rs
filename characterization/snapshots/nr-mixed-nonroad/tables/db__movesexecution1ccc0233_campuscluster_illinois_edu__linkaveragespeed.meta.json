@@ -1,0 +1,20 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__linkaveragespeed",
+  "schema": [
+    {
+      "name": "linkID",
+      "kind": "int64"
+    },
+    {
+      "name": "averageSpeed",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "linkID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "85e066fa67575e8be2991953d716f32ab03c53dc70da2e336877001b1350ae20"
+}

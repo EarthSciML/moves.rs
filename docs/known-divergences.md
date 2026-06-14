@@ -17,9 +17,8 @@ environment and are excluded.
 
 | Set | Count | Pattern |
 |-----|-------|---------|
-| Onroad (default-scale) | 23 | `chain-*`, `expand-*`, `process-*`, `sample-runspec` |
-| Mixed onroad + NONROAD | 1 | `mixed-onroad-nonroad` |
-| NONROAD | 10 | `nr-*` |
+| Onroad (default-scale) | 24 | `chain-*`, `expand-*`, `process-*`, `sample-runspec`, `mixed-onroad` |
+| NONROAD | 11 | `nr-*` (including `nr-mixed-nonroad`) |
 | Excluded (need extra input DB) | 3 | `scale-county`, `scale-project`, `scale-rates` |
 
 ### The regression gate
@@ -236,9 +235,15 @@ energy is activity-gated). The port now emits ~100 un-weighted rows, so `apu`
 moved from `asserted_fixtures` (vacuous) into `QUARANTINED_FIXTURES` rather than
 having its assertion forced or a tolerance widened.
 
-`mixed-onroad-nonroad` also stays quarantined: its captured canonical
-`MOVESOutput` is empty (0 rows) while the port's NONROAD half legitimately emits
-~8,632 rows.
+`mixed-onroad-nonroad` was **retired and split** into `mixed-onroad` (onroad
+half) and `nr-mixed-nonroad` (nonroad half), both asserted-pass. Canonical MOVES
+5.0.1 does not implement a combined ONROAD+NONROAD run — `ExecutionRunSpec
+.buildVehicleSelections` leaves the `M12` case an unfinished stub ("only do one
+of the models at a time only for now"), so the single mixed RunSpec populated
+neither `RunSpecSourceType` nor `RunSpecSector` and emitted an empty
+`MOVESOutput` by design. The two single-model halves each produce real,
+validatable canonical output. (Nonroad does not model energy — pollutants 91/93
+are not nonroad-affected — so the nonroad half reports criteria/PM pollutants.)
 
 ### Reported bug 2 — several NONROAD fixtures emit nothing or a wrong row count
 

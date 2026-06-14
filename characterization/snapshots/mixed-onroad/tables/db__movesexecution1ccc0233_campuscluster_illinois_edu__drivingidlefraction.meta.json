@@ -1,0 +1,35 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__drivingidlefraction",
+  "schema": [
+    {
+      "name": "hourDayID",
+      "kind": "int64"
+    },
+    {
+      "name": "yearID",
+      "kind": "int64"
+    },
+    {
+      "name": "roadTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "drivingIdleFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "hourDayID",
+    "yearID",
+    "roadTypeID",
+    "sourceTypeID"
+  ],
+  "row_count": 2,
+  "float_decimals": 12,
+  "content_sha256": "992fdb506bd256aade5d4d92a54ff6febb4c9ef65c95fa29078151e5f3d6e332"
+}

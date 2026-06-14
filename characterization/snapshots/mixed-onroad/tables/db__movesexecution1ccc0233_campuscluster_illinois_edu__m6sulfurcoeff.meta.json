@@ -1,0 +1,42 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__m6sulfurcoeff",
+  "schema": [
+    {
+      "name": "pollutantID",
+      "kind": "int64"
+    },
+    {
+      "name": "minModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "maxModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "minSulfur",
+      "kind": "float64"
+    },
+    {
+      "name": "sulfurLongCoeff",
+      "kind": "float64"
+    },
+    {
+      "name": "sulfurIRFactor",
+      "kind": "float64"
+    },
+    {
+      "name": "maxIRFactorSulfur",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "pollutantID",
+    "minModelYearID",
+    "maxModelYearID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "4778b7adb87df7519f04dcd04eac65dcd1af07b4de4b6b4737a40398e24c6dcd"
+}

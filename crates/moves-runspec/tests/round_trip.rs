@@ -198,8 +198,10 @@ per_fixture_round_trip! {
     fixture_chain_nonhaptog => "chain-nonhaptog.xml",
     fixture_process_extended_idle => "process-extended-idle.xml",
     fixture_process_nox_speciation => "process-nox-speciation.xml",
- // fixture — mixed onroad + NONROAD dual-model run:
-    fixture_mixed_onroad_nonroad => "mixed-onroad-nonroad.xml",
+ // fixtures — the two single-model halves of the retired mixed-onroad-nonroad
+ // run (canonical MOVES 5.0.1 cannot run both models in one RunSpec):
+    fixture_mixed_onroad => "mixed-onroad.xml",
+    fixture_nr_mixed_nonroad => "nr-mixed-nonroad.xml",
     // Task 148 coverage expansion (valid fixtures; the `error-*` siblings are
     // negative tests and are excluded from the round-trip sweep):
     fixture_expand_counties_large => "expand-counties-large.xml",
@@ -232,9 +234,10 @@ fn every_fixture_is_covered_by_a_per_fixture_test() {
         }
     }
     assert_eq!(
-        found, 47,
-        "expected 47 round-trippable XML fixtures; bump the per_fixture_round_trip! macro \
-         when adding one (37 prior + 6 Task-148 valid + 4 SINGLE-scale variants; \
+        found, 48,
+        "expected 48 round-trippable XML fixtures; bump the per_fixture_round_trip! macro \
+         when adding one (37 prior + 6 Task-148 valid + 4 SINGLE-scale variants + \
+         mixed-onroad/nr-mixed-nonroad less the retired mixed-onroad-nonroad; \
          `error-*` negative fixtures excluded)"
     );
 }
