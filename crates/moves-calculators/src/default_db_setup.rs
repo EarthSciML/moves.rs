@@ -86,6 +86,8 @@ pub fn setup_execution_store(runspec: &RunSpec, store: &mut InMemoryStore) -> Re
     );
     synth_step!("build_criteria_ratio", build_criteria_ratio(store));
     synth_step!("build_alt_criteria_ratio", build_alt_criteria_ratio(store));
+    synth_step!("build_at_ratio", build_at_ratio(store));
+    synth_step!("build_runspec_chained_to", build_runspec_chained_to(store));
     Ok(())
 }
 
@@ -271,6 +273,151 @@ fn build_alt_criteria_ratio(store: &mut InMemoryStore) -> Result<(), String> {
     )
     .map_err(|e| format!("building altCriteriaRatio: {e}"))?;
     store.insert("altCriteriaRatio".to_string(), df);
+    Ok(())
+}
+
+/// Build the default-DB `ATRatio` (gaseous air-toxics-to-VOC ratio) table — the
+/// runtime output of `FuelEffectsGenerator.doAirToxicsCalculations` +
+/// `copyAirToxicsToATRatio`, which the default DB ships empty. Without it a
+/// default-DB run emits **no** gaseous air toxics (Benzene/1,3-Butadiene/
+/// Formaldehyde, pollutants 20/24/25), since `AirToxicsCalculator` scales them
+/// from VOC via `ATRatio`.
+///
+/// No-op when `ATRatio` is already populated (snapshot/onroad path ships it
+/// captured) or the model inputs are absent (nonroad / non-toxics runs).
+/// Delegates to
+/// [`crate::generators::fueleffectsgenerator::criteria::build_at_ratio_rows`].
+fn build_at_ratio(store: &mut InMemoryStore) -> Result<(), String> {
+    use crate::generators::fueleffectsgenerator::criteria;
+
+    let rows = criteria::build_at_ratio_rows(store);
+    if rows.is_empty() {
+        return Ok(());
+    }
+    let n = rows.len();
+    let icol = |name: &str, f: &dyn Fn(&criteria::AtRatioOutRow) -> i32| -> Column {
+        Series::new(name.into(), rows.iter().map(f).collect::<Vec<i32>>()).into()
+    };
+    let fcol = |name: &str, f: &dyn Fn(&criteria::AtRatioOutRow) -> f64| -> Column {
+        Series::new(name.into(), rows.iter().map(f).collect::<Vec<f64>>()).into()
+    };
+    let df = DataFrame::new(
+        n,
+        vec![
+            icol("fuelTypeID", &|r| r.fuel_type_id),
+            icol("fuelFormulationID", &|r| r.fuel_formulation_id),
+            icol("polProcessID", &|r| r.pol_process_id),
+            icol("minModelYearID", &|r| r.min_model_year_id),
+            icol("maxModelYearID", &|r| r.max_model_year_id),
+            icol("ageID", &|r| r.age_id),
+            icol("monthGroupID", &|r| r.month_group_id),
+            fcol("atRatio", &|r| r.at_ratio),
+        ],
+    )
+    .map_err(|e| format!("building ATRatio: {e}"))?;
+    store.insert("ATRatio".to_string(), df);
+    Ok(())
+}
+
+/// Build the default-DB `RunSpecChainedTo` table — the chained-calculator
+/// input→output map (`ExecutionRunSpec.buildRunSpecFilterTables`). The default
+/// DB ships it empty, so a default-DB run never tells the chained calculators
+/// (air toxics, NMOG/VOC speciation, …) which input pollutant feeds which
+/// output, and they emit nothing.
+///
+/// Canonical builds it from the *execution* (run-scoped) `PollutantProcessAssoc`
+/// self-joined on `chainedTo1 / chainedTo2`. The default-DB `PollutantProcessAssoc`
+/// is the full table, so both the output and the input pol-process are scoped
+/// here to the run's `RunSpecPollutantProcess`, reproducing the execution DB's
+/// pre-scoped join.
+///
+/// No-op when `RunSpecChainedTo` is already populated (snapshot/onroad path).
+fn build_runspec_chained_to(store: &mut InMemoryStore) -> Result<(), String> {
+    if store
+        .get("RunSpecChainedTo")
+        .is_some_and(|df| df.height() > 0)
+    {
+        return Ok(());
+    }
+    let Some(ppa) = store.get("PollutantProcessAssoc") else {
+        return Ok(());
+    };
+    let read = |df: &DataFrame, name: &str| -> Result<Vec<Option<i32>>, String> {
+        let col = df
+            .column(name)
+            .and_then(|c| c.cast(&DataType::Int32))
+            .map_err(|e| format!("PollutantProcessAssoc.{name}: {e}"))?;
+        Ok(col
+            .i32()
+            .map_err(|e| format!("PollutantProcessAssoc.{name}: {e}"))?
+            .into_iter()
+            .collect())
+    };
+    let pp = read(&ppa, "polProcessID")?;
+    let pol = read(&ppa, "pollutantID")?;
+    let proc = read(&ppa, "processID")?;
+    let c1 = read(&ppa, "chainedto1")?;
+    let c2 = read(&ppa, "chainedto2")?;
+
+    // Run-scoped pol-processes; without them we cannot reproduce the execution
+    // DB's pre-scoped join, so emit nothing rather than the full default chain.
+    let Some(rspp) = store.get("RunSpecPollutantProcess") else {
+        return Ok(());
+    };
+    let selected: BTreeSet<i32> = rspp
+        .column("polProcessID")
+        .and_then(|c| c.cast(&DataType::Int32))
+        .map_err(|e| format!("RunSpecPollutantProcess.polProcessID: {e}"))?
+        .i32()
+        .map_err(|e| format!("RunSpecPollutantProcess.polProcessID: {e}"))?
+        .into_iter()
+        .flatten()
+        .collect();
+
+    // polProcessID → (pollutantID, processID) for the selected, scoped set.
+    let mut info: BTreeMap<i32, (i32, i32)> = BTreeMap::new();
+    for i in 0..pp.len() {
+        if let (Some(p), Some(po), Some(pr)) = (pp[i], pol[i], proc[i]) {
+            if selected.contains(&p) {
+                info.insert(p, (po, pr));
+            }
+        }
+    }
+
+    let (mut out_pp, mut out_pol, mut out_proc) = (Vec::new(), Vec::new(), Vec::new());
+    let (mut in_pp, mut in_pol, mut in_proc) = (Vec::new(), Vec::new(), Vec::new());
+    for i in 0..pp.len() {
+        let Some(opp) = pp[i] else { continue };
+        let (Some(&(opol, oproc)), true) = (info.get(&opp), selected.contains(&opp)) else {
+            continue;
+        };
+        for chained in [c1[i], c2[i]].into_iter().flatten() {
+            // chainedTo 0 / absent → no chain link.
+            let Some(&(ipol, iproc)) = info.get(&chained) else {
+                continue;
+            };
+            out_pp.push(opp);
+            out_pol.push(opol);
+            out_proc.push(oproc);
+            in_pp.push(chained);
+            in_pol.push(ipol);
+            in_proc.push(iproc);
+        }
+    }
+    let n = out_pp.len();
+    let df = DataFrame::new(
+        n,
+        vec![
+            Series::new("outputPolProcessID".into(), out_pp).into(),
+            Series::new("outputPollutantID".into(), out_pol).into(),
+            Series::new("outputProcessID".into(), out_proc).into(),
+            Series::new("inputPolProcessID".into(), in_pp).into(),
+            Series::new("inputPollutantID".into(), in_pol).into(),
+            Series::new("inputProcessID".into(), in_proc).into(),
+        ],
+    )
+    .map_err(|e| format!("building RunSpecChainedTo: {e}"))?;
+    store.insert("RunSpecChainedTo".to_string(), df);
     Ok(())
 }
 

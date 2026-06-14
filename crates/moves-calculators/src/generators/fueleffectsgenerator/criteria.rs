@@ -151,6 +151,11 @@ pub struct CriteriaConfig {
     pub sulfur_alias: bool,
     /// modelYearGroupID for the `fuelModelWtFactor` lookup (falls back to `@0`).
     pub weight_model_year_group: i32,
+    /// modelYearGroupID for the `meanFuelParameters` centering lookup. Criteria
+    /// pollutants center at `19502000`; the air-toxics complex model centers at
+    /// the generic `0` group (mirrors `setMeanFuelParameterVariables`'s fallback,
+    /// since `meanFuelParameters` carries no `19502000` rows for air toxics).
+    pub mean_model_year_group: i32,
 }
 
 /// The six criteria polProcesses, with their model configuration.
@@ -171,6 +176,7 @@ pub const CRITERIA_CONFIGS: [CriteriaConfig; 6] = [
         predictive: true,
         sulfur_alias: false,
         weight_model_year_group: 19502000,
+        mean_model_year_group: COMPLEX_MODEL_YEAR_GROUP,
     },
     CriteriaConfig {
         pol_process_id: 302,
@@ -180,6 +186,7 @@ pub const CRITERIA_CONFIGS: [CriteriaConfig; 6] = [
         predictive: true,
         sulfur_alias: false,
         weight_model_year_group: 19502000,
+        mean_model_year_group: COMPLEX_MODEL_YEAR_GROUP,
     },
     // THC running (101) / start (102) — predictive.
     CriteriaConfig {
@@ -190,6 +197,7 @@ pub const CRITERIA_CONFIGS: [CriteriaConfig; 6] = [
         predictive: true,
         sulfur_alias: false,
         weight_model_year_group: 19502000,
+        mean_model_year_group: COMPLEX_MODEL_YEAR_GROUP,
     },
     CriteriaConfig {
         pol_process_id: 102,
@@ -199,6 +207,7 @@ pub const CRITERIA_CONFIGS: [CriteriaConfig; 6] = [
         predictive: true,
         sulfur_alias: false,
         weight_model_year_group: 19502000,
+        mean_model_year_group: COMPLEX_MODEL_YEAR_GROUP,
     },
     // CO running (201) / start (202) — atDifferenceFraction, age-specific weights.
     CriteriaConfig {
@@ -209,6 +218,7 @@ pub const CRITERIA_CONFIGS: [CriteriaConfig; 6] = [
         predictive: false,
         sulfur_alias: true,
         weight_model_year_group: 19502000,
+        mean_model_year_group: COMPLEX_MODEL_YEAR_GROUP,
     },
     CriteriaConfig {
         pol_process_id: 202,
@@ -218,12 +228,17 @@ pub const CRITERIA_CONFIGS: [CriteriaConfig; 6] = [
         predictive: false,
         sulfur_alias: true,
         weight_model_year_group: 19502000,
+        mean_model_year_group: COMPLEX_MODEL_YEAR_GROUP,
     },
 ];
 
 /// The complex-model modelYearGroupID gasoline criteria fuel effects key on:
 /// the predictive model covers MY 1950–2000 (`baseFuel` group 19502000).
 pub const COMPLEX_MODEL_YEAR_GROUP: i32 = 19502000;
+
+/// `fuelModelName.calculationEngines` token for the air-toxics complex model
+/// (`doAirToxicsCalculations`). Shares fuel models 1–10 with the `co` engine.
+const AIR_TOXICS_ENGINE: &str = "airtoxicsA";
 
 /// The reference data the model reads from the default DB. All maps are built
 /// once per run and shared across every `(ff, sourceType, MY, age)` evaluation.
@@ -391,7 +406,7 @@ fn ratio_no_sulfur(
     // COMPLEX_MODEL_YEAR_GROUP). Missing → (0, 1) (no centering/standardizing).
     let mut centers: BTreeMap<String, (f64, f64)> = BTreeMap::new();
     for ((pp, ft, grp, name), &(c, s)) in &reference.mean_fuel {
-        if *pp == cfg.pol_process_id && *ft == fuel_type_id && *grp == COMPLEX_MODEL_YEAR_GROUP {
+        if *pp == cfg.pol_process_id && *ft == fuel_type_id && *grp == cfg.mean_model_year_group {
             let std = if s > 0.0 { s } else { 1.0 };
             centers.insert(name.clone(), (c, std));
         }
@@ -686,8 +701,11 @@ pub fn load_reference(store: &InMemoryStore) -> Option<CriteriaReference> {
         scol(&fmn_df, "calculationEngines")?,
     );
     let mut fuel_models: BTreeMap<String, Vec<i32>> = BTreeMap::new();
-    for cfg in &CRITERIA_CONFIGS {
-        let needle = format!("|{}|", cfg.engine);
+    let criteria_engines = CRITERIA_CONFIGS.iter().map(|c| c.engine);
+    // `airtoxicsA` is the air-toxics complex-model engine ([`build_at_ratio_rows`]);
+    // it is not in `CRITERIA_CONFIGS` but shares the `fuelModelName` lookup.
+    for engine in criteria_engines.chain(std::iter::once(AIR_TOXICS_ENGINE)) {
+        let needle = format!("|{engine}|");
         let mut ids: Vec<i32> = (0..fmn_id.len())
             .filter_map(|i| {
                 let id = fmn_id[i]?;
@@ -697,7 +715,7 @@ pub fn load_reference(store: &InMemoryStore) -> Option<CriteriaReference> {
             .collect();
         ids.sort_unstable();
         ids.dedup();
-        fuel_models.entry(cfg.engine.to_string()).or_insert(ids);
+        fuel_models.entry(engine.to_string()).or_insert(ids);
     }
 
     // fuelModelWtFactor: (fuelModelID, modelYearGroupID, ageID) → weight.
@@ -1206,6 +1224,300 @@ pub fn build_alt_criteria_ratio_rows(store: &InMemoryStore) -> Vec<CriteriaRatio
                     // Sulfur is baked into the expression; ratioNoSulfur = 1.
                     ratio_no_sulfur: 1.0,
                 });
+            }
+        }
+    }
+    rows
+}
+
+/// Candidate non-VOC air-toxics `polProcessID`s the complex model + GFR copy
+/// build `ATRatio` for (`FuelEffectsGenerator.doAirToxicsCalculations`'s
+/// `polProcessIDsLimitCSV`, restricted to the gaseous toxics the default DB
+/// ships base emissions / expressions for). Each is intersected with the run's
+/// `RunSpecPollutantProcess`. VOC (`87xx`) is the ratio denominator, derived per
+/// process as `8700 + process`.
+const AIR_TOXICS_NONVOC_POL_PROCS: [i32; 12] = [
+    2001, 2002, 2090, 2401, 2402, 2490, 2501, 2502, 2590, 2601, 2602, 2690,
+];
+
+/// One output row of the default-DB `ATRatio` (ATRatioGas1) table.
+#[derive(Clone, Copy, Debug)]
+pub struct AtRatioOutRow {
+    pub fuel_type_id: i32,
+    pub fuel_formulation_id: i32,
+    pub pol_process_id: i32,
+    pub min_model_year_id: i32,
+    pub max_model_year_id: i32,
+    pub age_id: i32,
+    pub month_group_id: i32,
+    pub at_ratio: f64,
+}
+
+/// Build the default-DB `ATRatio` (gaseous air-toxics-to-VOC ratio) table —
+/// the runtime output of `FuelEffectsGenerator.doAirToxicsCalculations` +
+/// `copyAirToxicsToATRatio`, which the default DB ships empty.
+///
+/// Two halves, mirroring the canonical order (`copyAirToxicsToATRatio` runs
+/// first, then the complex model fills the model-year gap below 2001):
+///
+/// * **MY ≥ 2001 (GFR copy):** evaluate each selected toxic's
+///   `generalFuelRatioExpression` on every supplied formulation of its fuel
+///   type, expanded across the run's `(modelYear ≥ 2001, ageID)` grid and month
+///   groups. The expression is identical across sourceType, so the canonical
+///   `avg(fuelEffectRatio)` collapses to that one value. `minModelYearID` /
+///   `maxModelYearID` keep the expression's range (2001/2060).
+/// * **MY ≤ 2000 (complex model):** for gasoline (fuelType 1, the only fuel with
+///   an `airtoxicsA` base fuel), `atRatio = (atBaseEmissions_nonVOC ·
+///   (1+atDifferenceFraction_nonVOC)) / (atBaseEmissions_VOC ·
+///   (1+atDifferenceFraction_VOC))`, where `1+atDifferenceFraction` is the
+///   non-predictive [`ratio_no_sulfur`] over the `airtoxicsA` fuel models with
+///   age-specific `19502000` weights. Ages 0–40, `monthGroupID` from
+///   `atBaseEmissions`, model-year range = `19502000` clamped to the run's
+///   allowed model years ≤ 2000 (`restrictToAllowedModelYears`).
+///
+/// No-op when `ATRatio` is already populated (snapshot/onroad path) or the model
+/// inputs are absent (nonroad / non-toxics runs).
+#[must_use]
+pub fn build_at_ratio_rows(store: &InMemoryStore) -> Vec<AtRatioOutRow> {
+    // Gate: only the default-DB path (ATRatio empty) gets these rows.
+    if store.get("ATRatio").is_some_and(|df| df.height() > 0) {
+        return Vec::new();
+    }
+
+    // Selected non-VOC air toxics = candidate list ∩ RunSpecPollutantProcess.
+    let Some(rspp) = store.get("RunSpecPollutantProcess") else {
+        return Vec::new();
+    };
+    let Some(rspp_ids) = icol(&rspp, "polProcessID") else {
+        return Vec::new();
+    };
+    let selected: BTreeSet<i32> = rspp_ids.into_iter().flatten().map(|v| v as i32).collect();
+    let nonvoc: Vec<i32> = AIR_TOXICS_NONVOC_POL_PROCS
+        .into_iter()
+        .filter(|pp| selected.contains(pp))
+        .collect();
+    if nonvoc.is_empty() {
+        return Vec::new();
+    }
+
+    let Some(forms) = load_formulations(store) else {
+        return Vec::new();
+    };
+
+    // Month groups the run covers = those present in the (already run-filtered)
+    // atBaseEmissions table, which also supplies the complex-model base rates.
+    let Some(abe_df) = store.get("ATBaseEmissions") else {
+        return Vec::new();
+    };
+    let (Some(abe_pp), Some(abe_mg), Some(abe_val)) = (
+        icol(&abe_df, "polProcessID"),
+        icol(&abe_df, "monthGroupID"),
+        fcol(&abe_df, "atBaseEmissions"),
+    ) else {
+        return Vec::new();
+    };
+    let mut at_base: BTreeMap<(i32, i32), f64> = BTreeMap::new();
+    for i in 0..abe_pp.len() {
+        if let (Some(pp), Some(mg), Some(v)) = (abe_pp[i], abe_mg[i], abe_val[i]) {
+            at_base.insert((pp as i32, mg as i32), v);
+        }
+    }
+    // The run's month groups. The default DB ships `ATBaseEmissions` for all 12
+    // month groups (unfiltered), so the month-group dimension must be scoped to
+    // the run here — `ATRatio`'s monthGroupID is downstream-unused, but emitting
+    // all 12 would 12× the rows `synthesize_at_ratio` expands. Canonical filters
+    // `atBaseEmissions` to the run month group during input loading.
+    let month_groups: BTreeSet<i32> = match store
+        .get("RunSpecMonthGroup")
+        .and_then(|df| icol(&df, "monthGroupID"))
+    {
+        Some(ids) => ids.into_iter().flatten().map(|v| v as i32).collect(),
+        None => at_base.keys().map(|&(_, mg)| mg).collect(),
+    };
+    if month_groups.is_empty() {
+        return Vec::new();
+    }
+
+    // Runspec (year, modelYear) → age grid (age = year − modelYear ∈ [0, 40]),
+    // the same reconstruction as `build_alt_criteria_ratio_rows`.
+    let (Some(rsy), Some(rsmy)) = (store.get("RunSpecYear"), store.get("RunSpecModelYear")) else {
+        return Vec::new();
+    };
+    let (Some(year_ids), Some(rsmy_ids)) = (icol(&rsy, "yearID"), icol(&rsmy, "modelYearID"))
+    else {
+        return Vec::new();
+    };
+    let years: Vec<i32> = year_ids.into_iter().flatten().map(|v| v as i32).collect();
+    let model_years: Vec<i32> = rsmy_ids.into_iter().flatten().map(|v| v as i32).collect();
+
+    let mut rows: Vec<AtRatioOutRow> = Vec::new();
+
+    // ---- MY ≥ 2001: copyAirToxicsToATRatio (general fuel ratio expressions) ----
+    // Ages reachable from a model year ≥ 2001 in the run grid.
+    let mut ages_ge_2001: BTreeSet<i32> = BTreeSet::new();
+    for &year in &years {
+        for &my in &model_years {
+            let age = year - my;
+            if my >= 2001 && (0..=40).contains(&age) {
+                ages_ge_2001.insert(age);
+            }
+        }
+    }
+    if let Ok(expr_rows) =
+        store.iter_typed::<GeneralFuelRatioExpressionRow>("generalFuelRatioExpression")
+    {
+        // Dedup expression value per (fuelType, ff, polProc, age, monthGroup):
+        // sourceType variants are identical, so canonical's avg = the value.
+        let mut seen: BTreeSet<(i32, i32, i32, i32, i32)> = BTreeSet::new();
+        for r in &expr_rows {
+            if !nonvoc.contains(&r.pol_process_id) || r.max_model_year_id < 2001 {
+                continue;
+            }
+            let ratio_text = if r.fuel_effect_ratio_expression.is_empty() {
+                "1"
+            } else {
+                &r.fuel_effect_ratio_expression
+            };
+            let Ok(expr) = Expression::parse(ratio_text) else {
+                continue;
+            };
+            for &ffid in &forms.supplied {
+                if forms.fuel_type.get(&ffid).copied() != Some(r.fuel_type_id) {
+                    continue;
+                }
+                let Some(ff_model) = forms.by_id.get(&ffid) else {
+                    continue;
+                };
+                let Ok(value) = expr.evaluate(ff_model) else {
+                    continue;
+                };
+                for &age in &ages_ge_2001 {
+                    if age < r.min_age_id || age > r.max_age_id {
+                        continue;
+                    }
+                    for &mg in &month_groups {
+                        if !seen.insert((r.fuel_type_id, ffid, r.pol_process_id, age, mg)) {
+                            continue;
+                        }
+                        rows.push(AtRatioOutRow {
+                            fuel_type_id: r.fuel_type_id,
+                            fuel_formulation_id: ffid,
+                            pol_process_id: r.pol_process_id,
+                            min_model_year_id: r.min_model_year_id,
+                            max_model_year_id: r.max_model_year_id,
+                            age_id: age,
+                            month_group_id: mg,
+                            at_ratio: value,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    // ---- MY ≤ 2000: the airtoxicsA complex model (gasoline only) ----
+    let Some(reference) = load_reference(store) else {
+        return rows;
+    };
+    // restrictToAllowedModelYears(19502000): [1950, 2000] trimmed to the run's
+    // allowed model years.
+    let allowed_le_2000: Vec<i32> = model_years
+        .iter()
+        .copied()
+        .filter(|&my| (1950..=2000).contains(&my))
+        .collect();
+    let (Some(&min_my), Some(&max_my)) =
+        (allowed_le_2000.iter().min(), allowed_le_2000.iter().max())
+    else {
+        return rows;
+    };
+    const GASOLINE: i32 = 1;
+    // airtoxicsA base fuel: try the 19502000 group, then the generic 0 group.
+    let base_ff = reference
+        .base_fuel
+        .get(&(
+            AIR_TOXICS_ENGINE.to_string(),
+            GASOLINE,
+            COMPLEX_MODEL_YEAR_GROUP,
+        ))
+        .or_else(|| {
+            reference
+                .base_fuel
+                .get(&(AIR_TOXICS_ENGINE.to_string(), GASOLINE, 0))
+        })
+        .copied();
+    let Some(base_model) = base_ff.and_then(|id| forms.by_id.get(&id)) else {
+        return rows;
+    };
+    let base_props = FuelProps::from_model(base_model);
+
+    let cfg_for = |pp: i32| CriteriaConfig {
+        pol_process_id: pp,
+        pollutant_id: pp / 100,
+        process_id: pp % 100,
+        engine: AIR_TOXICS_ENGINE,
+        predictive: false,
+        sulfur_alias: false,
+        weight_model_year_group: COMPLEX_MODEL_YEAR_GROUP,
+        mean_model_year_group: 0,
+    };
+
+    for &ffid in &forms.supplied {
+        if forms.fuel_type.get(&ffid).copied() != Some(GASOLINE) {
+            continue;
+        }
+        let Some(ff_model) = forms.by_id.get(&ffid) else {
+            continue;
+        };
+        let target_props = FuelProps::from_model(ff_model);
+        for &pp in &nonvoc {
+            let voc_pp = 8700 + pp % 100;
+            let cfg_nv = cfg_for(pp);
+            let cfg_voc = cfg_for(voc_pp);
+            for age in 0..=40 {
+                let (Some(rns_nv), Some(rns_voc)) = (
+                    ratio_no_sulfur(
+                        &reference,
+                        &cfg_nv,
+                        GASOLINE,
+                        age,
+                        &target_props,
+                        &base_props,
+                    ),
+                    ratio_no_sulfur(
+                        &reference,
+                        &cfg_voc,
+                        GASOLINE,
+                        age,
+                        &target_props,
+                        &base_props,
+                    ),
+                ) else {
+                    continue;
+                };
+                for &mg in &month_groups {
+                    let (Some(&be_nv), Some(&be_voc)) =
+                        (at_base.get(&(pp, mg)), at_base.get(&(voc_pp, mg)))
+                    else {
+                        continue;
+                    };
+                    let rel_voc = be_voc * rns_voc;
+                    let at_ratio = if rel_voc != 0.0 {
+                        (be_nv * rns_nv) / rel_voc
+                    } else {
+                        0.0
+                    };
+                    rows.push(AtRatioOutRow {
+                        fuel_type_id: GASOLINE,
+                        fuel_formulation_id: ffid,
+                        pol_process_id: pp,
+                        min_model_year_id: min_my,
+                        max_model_year_id: max_my,
+                        age_id: age,
+                        month_group_id: mg,
+                        at_ratio,
+                    });
+                }
             }
         }
     }
