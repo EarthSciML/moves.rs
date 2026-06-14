@@ -80,6 +80,57 @@ pub fn setup_execution_store(runspec: &RunSpec, store: &mut InMemoryStore) -> Re
         "scope_pollutant_process_model_year",
         scope_pollutant_process_model_year_to_runspec(store)
     );
+    synth_step!("build_criteria_ratio", build_criteria_ratio(store));
+    Ok(())
+}
+
+/// Build the MY ≤ 2000 gasoline `criteriaRatio` table (the EPA Complex + sulfur
+/// fuel-effects model) for the default-DB path.
+///
+/// `generalFuelRatioExpression` ships the criteria (THC/CO/NOx running+start)
+/// fuel effects only for model years ≥ 2001; for MY ≤ 2000 the canonical
+/// `FuelEffectsGenerator` runs the live Complex Model + sulfur model into
+/// `criteriaRatio`. Without it a default-DB run applies no criteria fuel
+/// reduction for MY ≤ 2000 and over-emits (NOx ~1.27×, THC ~1.21×, CO ~1.03×).
+///
+/// No-op when `criteriaRatio` is already populated (it is execution-time derived
+/// and the default DB ships it empty, but guard anyway) or when the
+/// complex-model input tables are absent. The MY ≥ 2001 criteria effects stay in
+/// `generalFuelRatio`; the `FuelEffectsGenerator` drops only the
+/// model-year-overlapping criteria rows, so the two tables apply each effect
+/// exactly once. See [`crate::generators::fueleffectsgenerator::criteria`].
+fn build_criteria_ratio(store: &mut InMemoryStore) -> Result<(), String> {
+    use crate::generators::fueleffectsgenerator::criteria;
+
+    let rows = criteria::build_criteria_ratio_rows(store);
+    if rows.is_empty() {
+        return Ok(());
+    }
+    let n = rows.len();
+    let icol = |name: &str, f: &dyn Fn(&criteria::CriteriaRatioOutRow) -> i32| -> Column {
+        Series::new(name.into(), rows.iter().map(f).collect::<Vec<i32>>()).into()
+    };
+    let fcol = |name: &str, f: &dyn Fn(&criteria::CriteriaRatioOutRow) -> f64| -> Column {
+        Series::new(name.into(), rows.iter().map(f).collect::<Vec<f64>>()).into()
+    };
+    let df = DataFrame::new(
+        n,
+        vec![
+            icol("fuelTypeID", &|r| r.fuel_type_id),
+            icol("fuelFormulationID", &|r| r.fuel_formulation_id),
+            icol("polProcessID", &|r| r.pol_process_id),
+            icol("pollutantID", &|r| r.pollutant_id),
+            icol("processID", &|r| r.process_id),
+            icol("sourceTypeID", &|r| r.source_type_id),
+            icol("modelYearID", &|r| r.model_year_id),
+            icol("ageID", &|r| r.age_id),
+            fcol("ratio", &|r| r.ratio),
+            fcol("ratioGPA", &|r| r.ratio_gpa),
+            fcol("ratioNoSulfur", &|r| r.ratio_no_sulfur),
+        ],
+    )
+    .map_err(|e| format!("building criteriaRatio: {e}"))?;
+    store.insert("criteriaRatio".to_string(), df);
     Ok(())
 }
 
@@ -571,7 +622,11 @@ fn month_groups_for_runspec(store: &InMemoryStore, runspec: &RunSpec) -> BTreeSe
             }
         }
     }
-    if out.is_empty() { month_set } else { out }
+    if out.is_empty() {
+        month_set
+    } else {
+        out
+    }
 }
 
 /// Resolve the fuel-region IDs serving `county_ids` for the run's fuel

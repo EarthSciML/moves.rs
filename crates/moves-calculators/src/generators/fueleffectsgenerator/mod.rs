@@ -42,6 +42,7 @@
 //!
 //! [`execute`]: Generator::execute
 
+pub mod criteria;
 pub mod expression;
 pub mod generalfuelratio;
 pub mod model;
@@ -223,20 +224,41 @@ impl Generator for FuelEffectsGenerator {
         // (an onroad criteria run): nonroad runs use the SAME polProcessIDs
         // (101/201/301 = THC/CO/NOx Running Exhaust) but have no criteriaRatio, so
         // canonical keeps the fuel effect in generalFuelRatio for them. Mirror that
-        // exactly: drop a criteria polProcessID from generalFuelRatio only when it
-        // is actually present in `criteriaRatio` (the table the calculator will
-        // apply). This keeps the effect in generalFuelRatio for nonroad and for
-        // the default-DB path (where the port does not yet build criteriaRatio),
-        // and removes the double-count for the onroad snapshot path.
-        let criteria_ratio_pol_procs = criteria_ratio_pol_process_set(ctx);
+        // exactly: drop a generalFuelRatio criteria row only when `criteriaRatio`
+        // carries a row for the SAME `(fuelFormulationID, polProcessID)` whose
+        // model year falls inside the generalFuelRatio row's `[min, max]` range.
+        //
+        // This is a model-year-aware refinement of the canonical "delete the whole
+        // polProcessID" step. The default-DB path builds `criteriaRatio` only for
+        // MY <= 2000 gasoline (the Complex + sulfur model that
+        // `generalFuelRatioExpression` omits), keeping the MY >= 2001 criteria
+        // effects in generalFuelRatio; those two ranges are disjoint, so a blanket
+        // polProcess drop would wrongly strip the MY >= 2001 effect. The
+        // overlap test keeps each effect applied exactly once: MY <= 2000 via
+        // criteriaRatio, MY >= 2001 via generalFuelRatio. For the snapshot/onroad
+        // path `criteriaRatio` spans every model year of each criteria
+        // `(ff, polProcess)`, so every generalFuelRatio criteria row overlaps and
+        // is dropped — identical to the prior blanket behaviour.
+        let criteria_ratio_years = criteria_ratio_model_years(ctx);
         let rows = do_general_fuel_ratio(&inputs)
             .map_err(|e| Error::Polars(format!("FuelEffectsGenerator expression error: {e}")))?;
         let output_rows: Vec<GeneralFuelRatioOutputRow> = rows
             .into_iter()
             .map(GeneralFuelRatioOutputRow::from)
             .filter(|r| {
-                !(is_criteria_ratio_pol_process(r.pol_process_id)
-                    && criteria_ratio_pol_procs.contains(&r.pol_process_id))
+                if !is_criteria_ratio_pol_process(r.pol_process_id) {
+                    return true;
+                }
+                // Keep unless criteriaRatio has a same-(ff, polProc) model year
+                // inside this row's model-year range.
+                let overlaps = criteria_ratio_years
+                    .get(&(r.fuel_formulation_id, r.pol_process_id))
+                    .is_some_and(|years| {
+                        years
+                            .iter()
+                            .any(|&my| my >= r.min_model_year_id && my <= r.max_model_year_id)
+                    });
+                !overlaps
             })
             .collect();
         crate::wiring::write_scratch_table(ctx, OUTPUT_TABLES[0], output_rows)
@@ -253,31 +275,37 @@ const fn is_criteria_ratio_pol_process(pol_process_id: i32) -> bool {
     matches!(pol_process_id, 101 | 102 | 201 | 202 | 301 | 302)
 }
 
-/// The set of `polProcessID`s present in the `criteriaRatio` table for this run,
-/// or empty when the table is absent/empty. Used to decide whether a criteria
-/// polProcess's fuel effect has been moved into `criteriaRatio` (onroad) and so
-/// must be dropped from `generalFuelRatio` to avoid double-application, or kept
-/// (nonroad / default-DB, where `criteriaRatio` carries no such rows).
-fn criteria_ratio_pol_process_set(ctx: &CalculatorContext) -> BTreeSet<i32> {
-    let mut set = BTreeSet::new();
+/// The distinct `modelYearID`s present in `criteriaRatio` for each
+/// `(fuelFormulationID, polProcessID)`, or empty when the table is
+/// absent/empty. Used to decide which `generalFuelRatio` criteria rows have been
+/// superseded by `criteriaRatio` (and so must be dropped to avoid
+/// double-application) on a model-year-resolved basis.
+fn criteria_ratio_model_years(ctx: &CalculatorContext) -> BTreeMap<(i32, i32), Vec<i32>> {
+    let mut map: BTreeMap<(i32, i32), Vec<i32>> = BTreeMap::new();
     let Some(df) = ctx.tables().get("criteriaRatio") else {
-        return set;
+        return map;
     };
     if df.height() == 0 {
-        return set;
+        return map;
     }
-    let Ok(col) = df.column("polProcessID") else {
-        return set;
+    let col_i32 = |name: &str| -> Option<Vec<Option<i32>>> {
+        let ca = df.column(name).ok()?.cast(&DataType::Int32).ok()?;
+        let ca = ca.i32().ok()?;
+        Some((0..ca.len()).map(|i| ca.get(i)).collect())
     };
-    let Ok(ca) = col.cast(&DataType::Int32) else {
-        return set;
+    let (Some(ff), Some(pp), Some(my)) = (
+        col_i32("fuelFormulationID"),
+        col_i32("polProcessID"),
+        col_i32("modelYearID"),
+    ) else {
+        return map;
     };
-    if let Ok(ca) = ca.i32() {
-        for v in ca.into_iter().flatten() {
-            set.insert(v);
+    for i in 0..ff.len() {
+        if let (Some(ff), Some(pp), Some(my)) = (ff[i], pp[i], my[i]) {
+            map.entry((ff, pp)).or_default().push(my);
         }
     }
-    set
+    map
 }
 
 // =============================================================================
