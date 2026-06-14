@@ -80,8 +80,99 @@ pub fn setup_execution_store(runspec: &RunSpec, store: &mut InMemoryStore) -> Re
         "scope_pollutant_process_model_year",
         scope_pollutant_process_model_year_to_runspec(store)
     );
+    synth_step!(
+        "prune_integrated_species",
+        prune_integrated_species_to_run_mechanisms(store)
+    );
     synth_step!("build_criteria_ratio", build_criteria_ratio(store));
     synth_step!("build_alt_criteria_ratio", build_alt_criteria_ratio(store));
+    Ok(())
+}
+
+/// Prune `integratedSpeciesSet` to the chemical mechanisms whose mechanism
+/// pseudo-pollutant the run actually selected — the data-plane equivalent of
+/// `TOGSpeciationCalculator.doExecute`'s `if(mechanismIDs.length()<=0) return null`
+/// gate, which yields **zero** `NonHAPTOG` (pollutant 88) output.
+///
+/// Canonical builds its `##mechanismIDs##` filter from the run's selected
+/// 'Mechanisms'-display-group pollutants and narrows the `integratedSpeciesSet`
+/// extract to them. The captured snapshot ships `integratedSpeciesSet` already
+/// filtered (empty for a run that selects no mechanism), but the default DB
+/// ships the full table — so without this prune `TOGSpeciationCalculator` finds
+/// integrated species to fan out, has nothing to subtract for a non-mechanism
+/// run, and emits a spurious `NonHAPTOG = NMOG` residual. The default-DB
+/// `chain-nonhaptog` fixture over-emitted exactly 208 pol-88 rows this way
+/// (canonical emits none).
+///
+/// A mechanism `m`'s pollutant has databaseKey `1000 + (m-1)*500` (inverting
+/// canonical's `mechanismID = 1 + (databaseKey-1000)/500`); the mechanism is
+/// kept iff that pollutant is in the run's pollutant/process set. The result
+/// may legitimately be empty — unlike [`prune_table_by_id`], which refuses to
+/// empty a table.
+fn prune_integrated_species_to_run_mechanisms(store: &mut InMemoryStore) -> Result<(), String> {
+    let Some(iss_arc) = store.get("integratedSpeciesSet") else {
+        return Ok(());
+    };
+    if iss_arc.height() == 0 {
+        return Ok(());
+    }
+    let iss = (*iss_arc).clone();
+    drop(iss_arc);
+
+    // Selected pollutants — pollutantID = polProcessID / 100. (The default-DB
+    // path synthesises `RunSpecPollutantProcess`, not `RunSpecPollutant`.)
+    let mut selected: BTreeSet<i64> = BTreeSet::new();
+    if let Some(arc) = store.get("RunSpecPollutantProcess") {
+        if let Some(col) = arc
+            .columns()
+            .iter()
+            .find(|c| c.name().eq_ignore_ascii_case("polProcessID"))
+        {
+            let casted = col
+                .cast(&DataType::Int64)
+                .map_err(|e| format!("RunSpecPollutantProcess.polProcessID cast: {e}"))?;
+            let ca = casted
+                .i64()
+                .map_err(|e| format!("RunSpecPollutantProcess.polProcessID: {e}"))?;
+            for v in ca.into_iter().flatten() {
+                selected.insert(v / 100);
+            }
+        }
+    }
+
+    let Some(mech_name) = iss
+        .columns()
+        .iter()
+        .find(|c| c.name().eq_ignore_ascii_case("mechanismID"))
+        .map(|c| c.name().to_string())
+    else {
+        return Ok(());
+    };
+    let casted = iss
+        .column(&mech_name)
+        .and_then(|c| c.cast(&DataType::Int32))
+        .map_err(|e| format!("integratedSpeciesSet.mechanismID cast: {e}"))?;
+    let ca = casted
+        .i32()
+        .map_err(|e| format!("integratedSpeciesSet.mechanismID: {e}"))?;
+
+    let mut mask: Vec<bool> = Vec::with_capacity(ca.len());
+    for v in ca {
+        let keep = v.is_some_and(|m| {
+            let mech_pollutant = 1000 + (i64::from(m) - 1) * 500;
+            selected.contains(&mech_pollutant)
+        });
+        mask.push(keep);
+    }
+    // Already complete? Skip the rebuild. (An all-keep mask is a no-op.)
+    if mask.iter().all(|&b| b) {
+        return Ok(());
+    }
+    let mask: BooleanChunked = mask.into_iter().collect();
+    let filtered = iss
+        .filter(&mask)
+        .map_err(|e| format!("filtering integratedSpeciesSet: {e}"))?;
+    store.insert("integratedSpeciesSet".to_string(), filtered);
     Ok(())
 }
 
