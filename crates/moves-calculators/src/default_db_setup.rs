@@ -40,6 +40,10 @@ pub fn setup_execution_store(runspec: &RunSpec, store: &mut InMemoryStore) -> Re
         merge_store_variants_eager(store)
     );
     synth_step!(
+        "prune_month_keyed_tables",
+        prune_month_keyed_tables_to_runspec(runspec, store)
+    );
+    synth_step!(
         "build_ev_sales_fraction",
         build_ev_sales_fraction(runspec, store)
     );
@@ -1272,6 +1276,51 @@ pub fn scope_pollutant_process_model_year_to_runspec(
         return Ok(());
     }
     prune_table_by_id(store, "PollutantProcessModelYear", "polProcessID", &keep)
+}
+
+/// Prune every month-keyed default-DB table to the run's selected months,
+/// mirroring the native `build_default_db_store` load-time month filter
+/// (`RunSpecFilters.months` applied to each [`moves_framework::MergeTableSpec`]
+/// whose `month_column` is set — `AverageTankTemperature`, the cold-soak /
+/// tank-temperature tables, `ZoneMonthHour`, the activity tables, …).
+///
+/// The native default-DB path applies this filter when reading the DB, so by
+/// the time `setup_execution_store` runs its month-keyed tables already hold
+/// only the run's month(s) and this step is a no-op; the snapshot path never
+/// calls `setup_execution_store` (it feeds captured, already-month-scoped
+/// tables straight to the engine). The WASM `load_partitions_to_store` path,
+/// however, loads each monolithic table in full (all 12 months), so without
+/// this prune a month-keyed table joined downstream WITHOUT a month key — e.g.
+/// the cold-soak / tank-temperature chain feeding Fuel-Vapor-Venting —
+/// multiplies every rate by the month count, a clean 12× over-count on a
+/// single-month run (`process-evap-fvv`: 1536 vs 128 rows). Pruning in the
+/// shared setup makes both loaders month-correct.
+///
+/// The list of tables (and their filter column) is read from
+/// [`moves_framework::default_tables`] so it never drifts from the canonical
+/// merge plan. `FuelSupply` is intentionally NOT here — it is keyed by
+/// `monthGroupID` (not `monthID`) and pruned in
+/// [`prune_geographic_tables_to_runspec`]. Empty month selection → no-op
+/// (the caller leaves the tables unpruned by month).
+fn prune_month_keyed_tables_to_runspec(
+    runspec: &RunSpec,
+    store: &mut InMemoryStore,
+) -> Result<(), String> {
+    let months: BTreeSet<i64> = runspec
+        .timespan
+        .months
+        .iter()
+        .map(|&m| i64::from(m))
+        .collect();
+    if months.is_empty() {
+        return Ok(());
+    }
+    for spec in moves_framework::default_tables() {
+        if let Some(col) = spec.month_column {
+            prune_table_by_id(store, spec.table_name, col, &months)?;
+        }
+    }
+    Ok(())
 }
 
 /// Drop rows of geography-keyed national tables that fall outside the runspec's
