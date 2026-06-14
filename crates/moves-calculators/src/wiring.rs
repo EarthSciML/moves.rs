@@ -69,6 +69,20 @@ impl PositionFilter {
             && self.county_id.map_or(true, |c| c == county_id)
             && self.process_id.map_or(true, |p| p == process_id)
     }
+
+    /// Returns `true` when a row's `(year_id, county_id)` satisfies the time and
+    /// location predicates, **ignoring `process_id`**.
+    ///
+    /// For the year/county dimensions a `None` field is a wildcard, exactly as
+    /// [`matches`](Self::matches). Use this for inputs a calculator reads across
+    /// the *source* process while iterating under a different *output* process —
+    /// e.g. the crankcase calculator reads running/start/extended-idle exhaust
+    /// (`processID` 1/2/90) `MOVESWorkerOutput` while positioned on a crankcase
+    /// process (15/16/17); the source-process restriction is applied inside the
+    /// calculator (via its `processID` join), not by the position filter.
+    pub(crate) fn matches_time_location(&self, year_id: i32, county_id: i32) -> bool {
+        self.year.map_or(true, |y| y == year_id) && self.county_id.map_or(true, |c| c == county_id)
+    }
 }
 
 /// Extract the master-loop position predicates from `ctx`.

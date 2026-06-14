@@ -1143,9 +1143,19 @@ fn build_inputs(ctx: &CalculatorContext) -> Result<CrankcaseInputs, Error> {
         )?,
         crankcase_emission_ratio,
         worker_output: {
+            // Filter by time + location only, NOT process: the crankcase
+            // calculator reads its *source* exhaust processes (1/2/90) while it
+            // is positioned on a crankcase output process (15/16/17). The
+            // source-process restriction is applied inside `calculate` (via
+            // `crankcase_process_of`), exactly as the Java SQL joins
+            // `mwo.processID` to the (1->15, 2->16, 90->17) pairs. Filtering by
+            // the position's output process here would drop every source row —
+            // the chunked default-DB path positions this calculator on process
+            // 15 and so saw zero input (canonical's snapshot path leaves the
+            // process position unset, masking the bug).
             let rows = tables.iter_typed::<MovesWorkerOutputRow>("MOVESWorkerOutput")?;
             rows.into_iter()
-                .filter(|r| filter.matches(r.year_id, r.county_id, r.process_id))
+                .filter(|r| filter.matches_time_location(r.year_id, r.county_id))
                 .collect()
         },
     })
