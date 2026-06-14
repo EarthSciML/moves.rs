@@ -29,7 +29,7 @@ use polars::prelude::{Column, DataFrame, DataType, NamedFrom, Series};
 // truth for both this wasm path and the native CLI `build_default_db_store`, so
 // the two can no longer drift. Re-exported so existing callers keep using
 // `default_db::setup_execution_store`.
-pub use moves_calculators::default_db_setup::setup_execution_store;
+pub use moves_calculators::default_db_setup::{apply_load_filters_to_store, setup_execution_store};
 
 const BUNDLE_MAGIC: &[u8; 8] = b"MXDB\x00\x00\x00\x01";
 

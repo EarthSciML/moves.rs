@@ -18,7 +18,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use moves_framework::{DataFrameStore, DataFrameStoreTyped, InMemoryStore};
+use moves_framework::{
+    default_tables, DataFrameStore, DataFrameStoreTyped, InMemoryStore, InputDataManager,
+    RunSpecFilters, WhereClause,
+};
 use moves_runspec::RunSpec;
 use polars::prelude::{BooleanChunked, Column, DataFrame, DataType, NamedFrom, Series};
 
@@ -1321,6 +1324,283 @@ fn prune_month_keyed_tables_to_runspec(
         }
     }
     Ok(())
+}
+
+/// Apply the canonical default-DB load-time row filters to an already-loaded
+/// store, mirroring the native `build_default_db_store` two-phase
+/// [`InputDataManager`] merge.
+///
+/// The wasm default-DB path (`load_partitions_to_store`) decodes whole Parquet
+/// partitions and prunes only at the *file* level (year / zone / county /
+/// state). The native path additionally applies every per-dimension WHERE
+/// clause from [`InputDataManager::plan`] *at load* — day, hour, pollutant,
+/// process, polProcessID, fuelType, modelYear, fuelYear, region, … . Without
+/// that, the wasm store carries rows for dimensions outside the run, which
+/// (a) inflates activity-weighted emission sums and (b) feeds null-valued
+/// out-of-run rows into the strict per-row extractors (e.g. a
+/// `TemperatureAdjustment` row for a polProcess the run never selected has a
+/// NULL `tempAdjustTermB` → the extractor errors). This reproduces the native
+/// filtering eagerly (polars-core only, wasm32-safe) so the two paths converge.
+///
+/// Two phases, exactly as `build_default_db_store`:
+///  1. Apply every dimension *except* fuelYear / region (which need the loaded
+///     tables to derive), replacing the runspec `<day>` index keys with the
+///     real `DayOfAnyWeek` dayID set (canonical loads every day type).
+///  2. Derive fuelYear / region from the Phase-1 tables, then re-filter the
+///     fuel/region-keyed tables (excluding `Year` and `regionCounty`, the
+///     derivation sources).
+///
+/// Call ONLY from the wasm default-DB code path (after
+/// [`load_partitions_to_store`](crate::default_db_setup), before
+/// [`setup_execution_store`]). The native `build_default_db_store` already
+/// filters at load and must not run this.
+pub fn apply_load_filters_to_store(
+    runspec: &RunSpec,
+    store: &mut InMemoryStore,
+) -> Result<(), String> {
+    // ---- Phase 1: all dimensions except fuelYear / region. ----
+    let mut base = RunSpecFilters::from_runspec(runspec);
+    expand_pol_process_chain_prereqs(runspec, &mut base);
+    expand_fuel_filter_to_fleet(store, &mut base);
+    // Canonical's execution time span iterates every DayOfAnyWeek day type, not
+    // the runspec `<day>` selection (whose stored value is a 0-based index key,
+    // not a dayID). Replace with the real dayID set so the day-keyed input
+    // tables load all day types; RunSpecDay later restricts activity to the
+    // selected day.
+    let all_days: Vec<i64> = day_ids_from_day_of_any_week(store)
+        .into_iter()
+        .map(i64::from)
+        .collect();
+    if !all_days.is_empty() {
+        base.days = all_days;
+    }
+
+    let plan = InputDataManager::plan(&base, &default_tables());
+    for tp in &plan.tables {
+        apply_clauses_to_store_table(store, tp.table_name, &tp.clauses)?;
+    }
+
+    // ---- Phase 2: derive fuelYear / region, re-filter fuel/region tables. ----
+    let fuel_years = derive_fuel_years_from_store(store, &base.years);
+    let region_ids = derive_region_ids_from_store(store);
+    let full = RunSpecFilters {
+        fuel_years,
+        region_ids,
+        ..base
+    };
+    let fuel_region_specs: Vec<_> = default_tables()
+        .into_iter()
+        .filter(|t| t.fuel_year_column.is_some() || t.region_column.is_some())
+        .filter(|t| !matches!(t.table_name, "Year" | "regionCounty"))
+        .collect();
+    let replan = InputDataManager::plan(&full, &fuel_region_specs);
+    for tp in &replan.tables {
+        apply_clauses_to_store_table(store, tp.table_name, &tp.clauses)?;
+    }
+    Ok(())
+}
+
+/// Union the chained-calculator prerequisite pollutant-processes into the load
+/// filter (canonical `ExecutionRunSpec.flagRequiredPollutantProcesses`) — e.g.
+/// refueling (processes 18/19) chains off Total Energy Consumption (pollutant
+/// 91) for Running/Start/Extended-Idle Exhaust. Without these the energy rate
+/// tables filter to empty and the chained calculators emit nothing. A no-op for
+/// every non-chained runspec (the execution set equals the raw set). Mirrors
+/// `run.rs::expand_pol_process_filter_to_chain_prerequisites`.
+fn expand_pol_process_chain_prereqs(runspec: &RunSpec, filters: &mut RunSpecFilters) {
+    let exec = moves_framework::execution::ExecutionRunSpec::new(runspec.clone());
+    let mut pol_process: BTreeSet<i64> = filters.pol_process_ids.iter().copied().collect();
+    let mut pollutants: BTreeSet<i64> = filters.pollutant_ids.iter().copied().collect();
+    let mut processes: BTreeSet<i64> = filters.process_ids.iter().copied().collect();
+    for assoc in &exec.pollutant_process_associations {
+        let pollutant = i64::from(assoc.pollutant_id.0);
+        let process = i64::from(assoc.process_id.0);
+        pol_process.insert(pollutant * 100 + process);
+        pollutants.insert(pollutant);
+        processes.insert(process);
+    }
+    filters.pol_process_ids = pol_process.into_iter().collect();
+    filters.pollutant_ids = pollutants.into_iter().collect();
+    filters.process_ids = processes.into_iter().collect();
+}
+
+/// Expand `filters.fuel_type_ids` to every fuel type the selected source types
+/// use, read from the loaded `FuelEngTechAssoc` table (canonical's
+/// `RunSpecSourceFuelType` = the source type's whole fleet fuel mix, not the
+/// literal per-selection fuel). Only *adds* fuels. No-op if the table is absent
+/// or no source types are selected. Store-reading mirror of
+/// `run.rs::expand_fuel_filter_to_fleet`.
+fn expand_fuel_filter_to_fleet(store: &InMemoryStore, filters: &mut RunSpecFilters) {
+    if filters.source_type_ids.is_empty() {
+        return;
+    }
+    let Some(arc) = store.get("FuelEngTechAssoc") else {
+        return;
+    };
+    let df = &*arc;
+    let (Ok(st), Ok(ft)) = (
+        df.column("sourceTypeID").and_then(|c| c.cast(&DataType::Int64)),
+        df.column("fuelTypeID").and_then(|c| c.cast(&DataType::Int64)),
+    ) else {
+        return;
+    };
+    let (Ok(st), Ok(ft)) = (st.i64(), ft.i64()) else {
+        return;
+    };
+    let selected: BTreeSet<i64> = filters.source_type_ids.iter().copied().collect();
+    let mut fuels: BTreeSet<i64> = filters.fuel_type_ids.iter().copied().collect();
+    for i in 0..df.height() {
+        if let (Some(s), Some(f)) = (st.get(i), ft.get(i)) {
+            if selected.contains(&s) {
+                fuels.insert(f);
+            }
+        }
+    }
+    filters.fuel_type_ids = fuels.into_iter().collect();
+}
+
+/// Derive `fuelYearID`s for the run's years from the loaded `Year` table.
+/// Store-reading mirror of `run.rs::derive_fuel_years_from_store`.
+fn derive_fuel_years_from_store(store: &InMemoryStore, year_ids: &[i64]) -> Vec<i64> {
+    let Some(arc) = store.get("Year") else {
+        return Vec::new();
+    };
+    let df = &*arc;
+    let find = |want: &str| -> Option<Column> {
+        let target = want.to_ascii_lowercase();
+        df.columns()
+            .iter()
+            .find(|c| c.name().to_ascii_lowercase() == target)
+            .cloned()
+    };
+    let (Some(yid_col), Some(fyid_col)) = (find("yearID"), find("fuelYearID")) else {
+        return Vec::new();
+    };
+    let (Ok(yids), Ok(fyids)) = (
+        yid_col.cast(&DataType::Int64).and_then(|c| c.i64().cloned()),
+        fyid_col.cast(&DataType::Int64).and_then(|c| c.i64().cloned()),
+    ) else {
+        return Vec::new();
+    };
+    let year_set: BTreeSet<i64> = year_ids.iter().copied().collect();
+    let mut fuel_years: BTreeSet<i64> = BTreeSet::new();
+    for i in 0..df.height() {
+        if let (Some(y), Some(fy)) = (yids.get(i), fyids.get(i)) {
+            if year_set.contains(&y) {
+                fuel_years.insert(fy);
+            }
+        }
+    }
+    fuel_years.into_iter().collect()
+}
+
+/// Derive `regionID`s from the county-filtered `regionCounty` table, always
+/// including the MOVES "all-regions" wildcard 0. Store-reading mirror of
+/// `run.rs::derive_region_ids_from_store`.
+fn derive_region_ids_from_store(store: &InMemoryStore) -> Vec<i64> {
+    let mut regions: BTreeSet<i64> = BTreeSet::new();
+    regions.insert(0); // wildcard — always present
+    let Some(arc) = store.get("regionCounty") else {
+        return regions.into_iter().collect();
+    };
+    let df = &*arc;
+    let Some(rid_col) = df
+        .columns()
+        .iter()
+        .find(|c| c.name().to_ascii_lowercase() == "regionid")
+        .cloned()
+    else {
+        return regions.into_iter().collect();
+    };
+    if let Ok(rids) = rid_col.cast(&DataType::Int64).and_then(|c| c.i64().cloned()) {
+        for v in rids.into_iter().flatten() {
+            regions.insert(v);
+        }
+    }
+    regions.into_iter().collect()
+}
+
+/// Eagerly apply a table's [`WhereClause`] predicates to its loaded DataFrame
+/// in `store`, AND-chaining them. Mirrors `apply_where_clauses` (the native
+/// LazyFrame lowering): a clause whose column is absent from the table's schema
+/// is skipped (not an error — a predicate over a column the table lacks is a
+/// no-op), and NULL values on a filtered column drop their row (polars treats a
+/// NULL mask entry as false, matching `is_in` / comparison semantics). No-op if
+/// the table is not in the store (schema-only / runtime-generated).
+fn apply_clauses_to_store_table(
+    store: &mut InMemoryStore,
+    table: &str,
+    clauses: &[WhereClause],
+) -> Result<(), String> {
+    if clauses.is_empty() {
+        return Ok(());
+    }
+    let Some(arc) = store.get(table) else {
+        return Ok(());
+    };
+    let mut df = (*arc).clone();
+    drop(arc);
+
+    let mut changed = false;
+    for clause in clauses {
+        let Some(col_name) = df
+            .columns()
+            .iter()
+            .find(|c| c.name().eq_ignore_ascii_case(clause.column()))
+            .map(|c| c.name().to_string())
+        else {
+            continue;
+        };
+        let mask = clause_to_mask(&df, &col_name, clause)?;
+        df = df
+            .filter(&mask)
+            .map_err(|e| format!("filtering {table} on {col_name}: {e}"))?;
+        changed = true;
+    }
+    if changed {
+        store.insert(table.to_string(), df);
+    }
+    Ok(())
+}
+
+/// Build the keep-mask for one [`WhereClause`] over `col_name` in `df`. The
+/// column is cast to `Int64` for comparison; NULL → `false` (row dropped).
+/// Mirrors `where_clause_to_expr`.
+fn clause_to_mask(
+    df: &DataFrame,
+    col_name: &str,
+    clause: &WhereClause,
+) -> Result<BooleanChunked, String> {
+    let col = df
+        .column(col_name)
+        .and_then(|c| c.cast(&DataType::Int64))
+        .map_err(|e| format!("{col_name} cast: {e}"))?;
+    let ca = col.i64().map_err(|e| format!("{col_name}: {e}"))?;
+    let mask: BooleanChunked = match clause {
+        WhereClause::InList { values, .. } => {
+            let set: BTreeSet<i64> = values.iter().copied().collect();
+            ca.into_iter()
+                .map(|v| v.is_some_and(|x| set.contains(&x)))
+                .collect()
+        }
+        WhereClause::PolProcessIds { ids, .. } => {
+            let set: BTreeSet<i64> = ids.iter().copied().collect();
+            ca.into_iter()
+                .map(|v| v.is_some_and(|x| x < 0 || set.contains(&x)))
+                .collect()
+        }
+        WhereClause::ModelYearRanges { years, .. } => {
+            if years.is_empty() {
+                ca.into_iter().map(|_| true).collect()
+            } else {
+                let ys: Vec<i64> = years.iter().map(|&y| i64::from(y)).collect();
+                ca.into_iter()
+                    .map(|v| v.is_some_and(|x| ys.iter().any(|&y| x <= y && x >= y - 40)))
+                    .collect()
+            }
+        }
+    };
+    Ok(mask)
 }
 
 /// Drop rows of geography-keyed national tables that fall outside the runspec's

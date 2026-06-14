@@ -594,6 +594,12 @@ pub fn run_simulation_from_partitions(
     let mut store = default_db::load_partitions_to_store(&partition_files)
         .map_err(|e| JsValue::from_str(&format!("Partition load error: {e}")))?;
 
+    // Replicate the native InputDataManager per-dimension load filtering (the
+    // partition loader only prunes at the file level). Must run before the
+    // shared synthesis, mirroring build_default_db_store.
+    default_db::apply_load_filters_to_store(&run_spec, &mut store)
+        .map_err(|e| JsValue::from_str(&format!("Load-filter error: {e}")))?;
+
     default_db::setup_execution_store(&run_spec, &mut store)
         .map_err(|e| JsValue::from_str(&format!("Store setup error: {e}")))?;
 
@@ -1300,6 +1306,7 @@ mod tests {
         use moves_framework::DataFrameStore;
         let mut store = default_db::load_partitions_to_store(&files).expect("load partitions");
         eprintln!("store has {} tables after load", store.names().len());
+        default_db::apply_load_filters_to_store(&run_spec, &mut store).expect("apply load filters");
         default_db::setup_execution_store(&run_spec, &mut store).expect("setup store");
         let geography = default_db::load_geography_from_store(&store).expect("geography");
 
@@ -1557,6 +1564,10 @@ mod tests {
         let t = Instant::now();
         let mut store = default_db::load_partitions_to_store(&partition_files).expect("load");
         eprintln!("[phase] load_partitions_to_store: {:?}", t.elapsed());
+
+        let t = Instant::now();
+        default_db::apply_load_filters_to_store(&run_spec, &mut store).expect("apply load filters");
+        eprintln!("[phase] apply_load_filters_to_store: {:?}", t.elapsed());
 
         let t = Instant::now();
         default_db::setup_execution_store(&run_spec, &mut store).expect("setup");
@@ -1837,6 +1848,8 @@ mod tests {
                 // WASM default-DB pipeline (same calls as run_simulation_from_partitions).
                 let mut store = default_db::load_partitions_to_store(&partition_files)
                     .map_err(|e| format!("load partitions: {e}"))?;
+                default_db::apply_load_filters_to_store(&run_spec, &mut store)
+                    .map_err(|e| format!("apply load filters: {e}"))?;
                 default_db::setup_execution_store(&run_spec, &mut store)
                     .map_err(|e| format!("setup execution store: {e}"))?;
                 let geography = default_db::load_geography_from_store(&store)
