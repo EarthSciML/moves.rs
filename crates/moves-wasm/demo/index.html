@@ -52,51 +52,10 @@
   port of EPA MOVES entirely in the browser — no server, no install.
   Outputs are returned as downloadable Parquet files.
 </p>
-<p class="note">
-  Build the WASM package first: <code>wasm-pack build --target web crates/moves-wasm</code>
-  then serve this directory and open <code>index.html</code>.
-  See <a href="README.md" style="color:#7af">demo/README.md</a> for full instructions.
-</p>
-
-<!-- ------------------------------------------------------------------ -->
-<section id="onroad-section">
-  <h2>Onroad simulation (bundled execution database)</h2>
-  <p>
-    Runs the onroad emission calculator chain directly from a RunSpec XML,
-    <em>without</em> fetching any database. This entry point only succeeds when
-    the calculators need no external input tables — which no real RunSpec
-    satisfies — so for an actual run use the
-    <a href="#defaultdb-section" style="color:#7af">Default-DB simulation</a>
-    section below, which fetches the required default-DB partitions first.
-    Output is returned as Parquet files.
-  </p>
-  <label>
-    RunSpec XML
-    <input type="file" id="runspec-file" accept=".xml">
-  </label>
-  <label>
-    Max parallel chunks (0 = auto; &gt;1 requires multi-thread build)
-    <input type="number" id="max-parallel-chunks" value="0" min="0" max="128" style="width:6rem">
-  </label>
-  <button id="run-onroad-btn" disabled>Run onroad</button>
-  <p class="note">Select a RunSpec XML file to enable the button.</p>
-
-  <div id="onroad-log-wrapper">
-    <div id="onroad-log" style="display:none">
-      <strong>Log</strong>
-      <div id="onroad-log-content" class="log" style="background:#181818;border:1px solid #444;padding:0.5rem;height:150px;overflow-y:auto;font-size:0.85rem;white-space:pre-wrap;color:#aaa;margin-top:0.25rem;"></div>
-    </div>
-  </div>
-
-  <div id="onroad-results" style="margin-top:1rem;display:none">
-    <strong>Output files</strong>
-    <div id="onroad-file-list"></div>
-  </div>
-</section>
 
 <!-- ------------------------------------------------------------------ -->
 <section id="defaultdb-section">
-  <h2>Default-DB simulation (arbitrary RunSpec)</h2>
+  <h2>Run Simulation</h2>
   <p>
     Build a scenario with the form below, or upload <em>any</em> RunSpec XML.
     The demo fetches only the default-DB partitions your RunSpec needs from
@@ -113,7 +72,7 @@
     </p>
 
     <!-- Scenario builder ------------------------------------------------ -->
-    <details class="sb" id="scenario-builder">
+    <details class="sb" id="scenario-builder" open>
       <summary>Build a scenario (no XML required) ▸</summary>
 
       <div class="sb-row">
@@ -202,61 +161,10 @@
   </div>
 </section>
 
-<!-- ------------------------------------------------------------------ -->
-<section id="nonroad-section">
-  <h2>NONROAD simulation</h2>
-  <p>
-    Upload a NONROAD population (<code>.POP</code>) file and configure
-    run options.  The simulation exercises the full driver loop and returns
-    run counters.
-  </p>
-  <label>
-    Population file (.POP)
-    <input type="file" id="pop-file">
-  </label>
-  <label>
-    Episode year
-    <input type="number" id="episode-year" value="2020" min="1990" max="2099" style="width:6rem">
-  </label>
-  <label>
-    Region level
-    <select id="region-level" style="background:#222;border:1px solid #555;color:#eee;padding:0.3rem;margin-top:0.25rem">
-      <option value="COUNTY">COUNTY</option>
-      <option value="STATE">STATE</option>
-      <option value="50STATE">50STATE</option>
-      <option value="SUBCOUNTY">SUBCOUNTY</option>
-      <option value="US TOTAL">US TOTAL</option>
-    </select>
-  </label>
-  <label>
-    Selected counties (5-char FIPS, comma-separated; blank = all)
-    <input type="text" id="selected-counties" placeholder="e.g. 06037,06038">
-  </label>
-  <button id="run-nonroad-btn" disabled>Run NONROAD</button>
-  <p class="note">Select a .POP population file to enable the button.</p>
-
-  <div id="nonroad-log-wrapper">
-    <div id="nonroad-log" style="display:none">
-      <strong>Log</strong>
-      <div id="nonroad-log-content" class="log" style="background:#181818;border:1px solid #444;padding:0.5rem;height:150px;overflow-y:auto;font-size:0.85rem;white-space:pre-wrap;color:#aaa;margin-top:0.25rem;"></div>
-    </div>
-  </div>
-
-  <div id="nonroad-results" style="margin-top:1rem;display:none">
-    <strong>Completion</strong>
-    <div id="nonroad-completion" style="margin-top:0.25rem"></div>
-    <strong style="margin-top:0.75rem;display:block">Counters</strong>
-    <dl id="nonroad-counters" class="counters"></dl>
-  </div>
-</section>
-
 <script type="module">
 // -----------------------------------------------------------------------
 // Shared worker setup
 // -----------------------------------------------------------------------
-let onroadWorker = null;
-let nonroadWorker = null;
-
 function makeWorker(logEl) {
     // worker.js is in the same directory as index.html
     const w = new Worker(new URL("worker.js", import.meta.url), { type: "module" });
@@ -561,139 +469,6 @@ runDefaultdbBtn.addEventListener("click", async () => {
         }
     };
     worker.postMessage({ type: "default-db", runspecXml, dbBaseUrl, maxParallelChunks });
-});
-
-// -----------------------------------------------------------------------
-// Onroad
-// -----------------------------------------------------------------------
-const runspecInput   = document.getElementById("runspec-file");
-const runOnroadBtn   = document.getElementById("run-onroad-btn");
-const maxChunksInput = document.getElementById("max-parallel-chunks");
-const onroadLogEl    = document.getElementById("onroad-log");
-const onroadLogContent = document.getElementById("onroad-log-content");
-const onroadResults  = document.getElementById("onroad-results");
-const onroadFileList = document.getElementById("onroad-file-list");
-
-runspecInput.addEventListener("change", () => {
-    runOnroadBtn.disabled = !runspecInput.files.length;
-});
-
-runOnroadBtn.addEventListener("click", async () => {
-    const file = runspecInput.files[0];
-    if (!file) return;
-
-    runOnroadBtn.disabled = true;
-    onroadLogEl.style.display = "block";
-    onroadResults.style.display = "none";
-    onroadLogContent.textContent = "";
-    onroadFileList.innerHTML = "";
-
-    const runspecXml = await file.text();
-    const maxParallelChunks = parseInt(maxChunksInput.value, 10) || 0;
-
-    appendLog(onroadLogContent, `RunSpec: ${file.name} (${file.size} bytes)`);
-
-    onroadWorker = makeWorker(onroadLogEl);
-    onroadWorker.onmessage = (e) => {
-        const msg = e.data;
-        if (msg.type === "log") {
-            appendLog(onroadLogContent, msg.message);
-        } else if (msg.type === "result" && msg.mode === "onroad") {
-            appendLog(onroadLogContent, `Done — ${msg.files.length} output file(s).`);
-            onroadResults.style.display = "block";
-            for (const { name, bytes } of msg.files) {
-                const blob = new Blob([bytes], { type: "application/octet-stream" });
-                const url  = URL.createObjectURL(blob);
-                const a    = document.createElement("a");
-                a.href  = url;
-                a.download = name.replace(/\//g, "_");
-                a.textContent = `⬇ ${name} (${bytes.byteLength.toLocaleString()} bytes)`;
-                a.className = "download-link";
-                onroadFileList.appendChild(a);
-            }
-            runOnroadBtn.disabled = false;
-        } else if (msg.type === "error") {
-            appendLog(onroadLogContent, `ERROR: ${msg.message}`);
-            runOnroadBtn.disabled = false;
-        }
-    };
-    onroadWorker.postMessage({ type: "onroad", runspecXml, maxParallelChunks });
-});
-
-// -----------------------------------------------------------------------
-// NONROAD
-// -----------------------------------------------------------------------
-const popInput          = document.getElementById("pop-file");
-const runNonroadBtn     = document.getElementById("run-nonroad-btn");
-const episodeYearInput  = document.getElementById("episode-year");
-const regionLevelSel    = document.getElementById("region-level");
-const countiesInput     = document.getElementById("selected-counties");
-const nonroadLogEl      = document.getElementById("nonroad-log");
-const nonroadLogContent = document.getElementById("nonroad-log-content");
-const nonroadResults    = document.getElementById("nonroad-results");
-const nonroadCompletion = document.getElementById("nonroad-completion");
-const nonroadCounters   = document.getElementById("nonroad-counters");
-
-popInput.addEventListener("change", () => {
-    runNonroadBtn.disabled = !popInput.files.length;
-});
-
-runNonroadBtn.addEventListener("click", async () => {
-    const file = popInput.files[0];
-    if (!file) return;
-
-    runNonroadBtn.disabled = true;
-    nonroadLogEl.style.display = "block";
-    nonroadResults.style.display = "none";
-    nonroadLogContent.textContent = "";
-    nonroadCompletion.textContent = "";
-    nonroadCounters.innerHTML = "";
-
-    appendLog(nonroadLogContent, `Population file: ${file.name} (${file.size} bytes)`);
-
-    const popBytes = new Uint8Array(await file.arrayBuffer());
-
-    const countiesRaw = countiesInput.value.trim();
-    const selectedCounties = countiesRaw
-        ? countiesRaw.split(",").map(s => s.trim()).filter(Boolean)
-        : [];
-
-    const optionsJson = JSON.stringify({
-        episode_year:       parseInt(episodeYearInput.value, 10),
-        region_level:       regionLevelSel.value,
-        selected_counties:  selectedCounties,
-    });
-
-    appendLog(nonroadLogContent, `Options: ${optionsJson}`);
-
-    nonroadWorker = makeWorker(nonroadLogEl);
-    nonroadWorker.onmessage = (e) => {
-        const msg = e.data;
-        if (msg.type === "log") {
-            appendLog(nonroadLogContent, msg.message);
-        } else if (msg.type === "result" && msg.mode === "nonroad") {
-            appendLog(nonroadLogContent, `Done.`);
-            nonroadResults.style.display = "block";
-
-            const ok = msg.completion_message.startsWith("Successful");
-            nonroadCompletion.innerHTML =
-                `<span class="${ok ? "status-ok" : "status-err"}">${msg.completion_message}</span>`;
-
-            for (const [key, val] of Object.entries(msg.counters ?? {})) {
-                const dt = document.createElement("dt");
-                const dd = document.createElement("dd");
-                dt.textContent = key;
-                dd.textContent = val;
-                nonroadCounters.appendChild(dt);
-                nonroadCounters.appendChild(dd);
-            }
-            runNonroadBtn.disabled = false;
-        } else if (msg.type === "error") {
-            appendLog(nonroadLogContent, `ERROR: ${msg.message}`);
-            runNonroadBtn.disabled = false;
-        }
-    };
-    nonroadWorker.postMessage({ type: "nonroad", optionsJson, popBytes });
 });
 </script>
 </body>
