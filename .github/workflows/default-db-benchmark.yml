@@ -1,0 +1,108 @@
+# default-DB 3-way benchmark (manual)
+#
+# Runs the default-DB end-to-end benchmark across the three implementations and
+# uploads (optionally commits) a Markdown report comparing runtime, peak memory,
+# and numerical fidelity:
+#
+#   * canonical — EPA MOVES inside characterization/apptainer/canonical-moves.sif
+#     (master + 1 worker JVM + MariaDB), wall + process-tree peak RSS.
+#   * native    — `moves run --default-db` (InputDataManager + generators + the
+#     full calculator chain), wall + single-process peak RSS.
+#   * wasm      — the wasm partition data-plane (parquet decode + per-dimension
+#     load filter + engine), wall + single-process peak RSS.
+#
+# Numerical fidelity is the per-fixture max per-pollutant rel_diff vs the
+# in-repo canonical snapshots, taken from the two correctness gates
+# (default_db_snapshot_diff / default_db_canonical_diff). Canonical is the
+# reference (rel_diff ≡ 0). All three read the same movesdb20241112 default DB.
+#
+# Manual only (workflow_dispatch): the run builds/uses the ~1.1 GB SIF, rebuilds
+# a ~1 GB parquet tree, and runs canonical Java MOVES on every fixture, so it is
+# slow and intentionally not wired to push/PR triggers.
+#
+# Self-hosted runner labels (same as audit-on-demand):
+#   self-hosted  — opt-in to organisation runners
+#   apptainer    — Apptainer on PATH (canonical SIF runs)
+#   fakeroot     — kernel + apptainer.conf permit `apptainer build --fakeroot`
+#
+# The orchestrator characterization/audit/run-3way-benchmark.sh builds the
+# release binaries, ensures the SIF (builds it if absent), regenerates the
+# parquet default-DB tree from the SIF, runs all three sweeps + both gates, and
+# writes the report under characterization/audit-results/.
+
+name: default-db-benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      fixtures:
+        description: >
+          Space-separated fixture subset (e.g. "sample-runspec process-pm-exhaust").
+          Empty = all 20 non-vacuous onroad default-DB fixtures.
+        required: false
+        default: ""
+      commit_results:
+        description: >
+          Commit the report under characterization/audit-results/ back to the
+          triggering branch. 'false' = retrieve from the uploaded artifact only.
+        required: false
+        default: "true"
+
+# A benchmark run is expensive and produces partial results; never cancel.
+concurrency:
+  group: default-db-benchmark
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  benchmark:
+    name: default-DB 3-way benchmark (self-hosted apptainer)
+    runs-on: [self-hosted, apptainer, fakeroot]
+    # Canonical Java MOVES dominates: ~30-60 s/fixture × 20, plus a possible
+    # one-time SIF build (~30-60 min) and parquet regeneration. 480 min covers
+    # a cold runner that has to build the SIF from scratch.
+    timeout-minutes: 480
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry, target/
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: default-db-benchmark
+
+      - name: Run 3-way benchmark
+        id: bench
+        env:
+          # Scratch on a roomy runner-local fs (MariaDB seed + parquet tree are
+          # multi-GB). Override the label if your runner mounts scratch elsewhere.
+          MOVES_BENCH_SCRATCH: ${{ runner.temp }}
+          FIXTURES: ${{ inputs.fixtures }}
+        run: ./characterization/audit/run-3way-benchmark.sh
+
+      - name: Commit and push report
+        if: ${{ inputs.commit_results == 'true' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add characterization/audit-results/
+          if git diff --cached --quiet; then
+            echo "No new report to commit."
+          else
+            git commit -m "benchmark(default-db): 3-way ${{ steps.bench.outputs.timestamp }}"
+            git push origin HEAD
+          fi
+
+      - name: Upload report as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: default-db-benchmark-${{ steps.bench.outputs.timestamp || 'run' }}
+          path: ${{ steps.bench.outputs.report_file || 'characterization/audit-results' }}
+          if-no-files-found: warn
+          retention-days: 30
