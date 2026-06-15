@@ -16,19 +16,18 @@
 # (default_db_snapshot_diff / default_db_canonical_diff). Canonical is the
 # reference (rel_diff ≡ 0). All three read the same movesdb20241112 default DB.
 #
-# Manual only (workflow_dispatch): the run builds/uses the ~1.1 GB SIF, rebuilds
-# a ~1 GB parquet tree, and runs canonical Java MOVES on every fixture, so it is
-# slow and intentionally not wired to push/PR triggers.
+# Runs on a GitHub-hosted ubuntu-24.04 runner, same as package-default-db /
+# default-db-gate. The canonical SIF (Apptainer + fakeroot) is built/restored by
+# the shared `.github/actions/build-sif` composite action (installs Apptainer,
+# lifts the ubuntu-24.04 AppArmor unprivileged-userns restriction, caches the
+# ~1.1 GB image). The default-DB parquet tree is regenerated from that SIF by
+# the orchestrator. Manual only (workflow_dispatch): a cold run can take ~1 h
+# (SIF build on cache miss) + the canonical Java MOVES sweep, so it is not wired
+# to push/PR triggers.
 #
-# Self-hosted runner labels (same as audit-on-demand):
-#   self-hosted  — opt-in to organisation runners
-#   apptainer    — Apptainer on PATH (canonical SIF runs)
-#   fakeroot     — kernel + apptainer.conf permit `apptainer build --fakeroot`
-#
-# The orchestrator characterization/audit/run-3way-benchmark.sh builds the
-# release binaries, ensures the SIF (builds it if absent), regenerates the
-# parquet default-DB tree from the SIF, runs all three sweeps + both gates, and
-# writes the report under characterization/audit-results/.
+# Disk: the SIF, the regenerated parquet tree (~1 GB), MariaDB datadirs, and the
+# cargo target all live on the roomy root disk (/). A free-disk step reclaims
+# headroom; the orchestrator drops the intermediate TSV dump after conversion.
 
 name: default-db-benchmark
 
@@ -58,15 +57,23 @@ permissions:
 
 jobs:
   benchmark:
-    name: default-DB 3-way benchmark (self-hosted apptainer)
-    runs-on: [self-hosted, apptainer, fakeroot]
-    # Canonical Java MOVES dominates: ~30-60 s/fixture × 20, plus a possible
-    # one-time SIF build (~30-60 min) and parquet regeneration. 480 min covers
-    # a cold runner that has to build the SIF from scratch.
-    timeout-minutes: 480
+    name: default-DB 3-way benchmark (ubuntu-24.04)
+    runs-on: ubuntu-24.04
+    # SIF build on a cache miss (~30-60 min) + canonical Java MOVES (~30-60 s ×
+    # 20 fixtures) + native/wasm + both gates. 360 min covers a cold runner.
+    timeout-minutes: 360
 
     steps:
       - uses: actions/checkout@v4
+
+      # Reclaim ~20+ GB on / so the SIF + parquet tree + MariaDB datadirs +
+      # cargo target fit alongside each other on the root disk.
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /opt/hostedtoolcache/CodeQL /usr/local/.ghcup || true
+          sudo docker image prune --all --force || true
+          df -h /
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -76,12 +83,28 @@ jobs:
         with:
           key: default-db-benchmark
 
+      # Build the release binaries the benchmark drives: the native CLI and the
+      # moves-wasm test binary (which carries the profile_run_default_db harness
+      # the wasm sweep invokes). Surfaces compile errors before the slow SIF step.
+      - name: Build release binaries
+        run: |
+          cargo build --release -p moves-cli
+          cargo test  --release -p moves-wasm --no-run
+
+      # Apptainer + canonical SIF (cache-first). Leaves the image at
+      # characterization/apptainer/canonical-moves.sif and lifts the AppArmor
+      # userns restriction so apptainer --fakeroot also works for the run sweep.
+      - name: Build canonical-MOVES SIF (cache-first)
+        uses: ./.github/actions/build-sif
+
       - name: Run 3-way benchmark
         id: bench
         env:
-          # Scratch on a roomy runner-local fs (MariaDB seed + parquet tree are
-          # multi-GB). Override the label if your runner mounts scratch elsewhere.
-          MOVES_BENCH_SCRATCH: ${{ runner.temp }}
+          # Scratch on the roomy root disk ($GITHUB_WORKSPACE is on /), NOT
+          # runner.temp (/mnt, ~14 GB — too small for the parquet tree + a
+          # MariaDB datadir). Binaries + SIF are already in place.
+          MOVES_BENCH_SCRATCH: ${{ github.workspace }}/.bench-scratch
+          SKIP_BUILD: "1"
           FIXTURES: ${{ inputs.fixtures }}
         run: ./characterization/audit/run-3way-benchmark.sh
 

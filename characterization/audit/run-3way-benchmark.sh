@@ -58,6 +58,10 @@ else
   "${ROOT}/characterization/default-db-conversion/convert-default-db.sh" \
     --sif "${SIF}" --output "${SCRATCH}/moves-defaultdb"
   export MOVES_DEFAULT_DB_DIR="${SCRATCH}/moves-defaultdb/movesdb20241112"
+  # Drop the bulky intermediate TSV dump — the benchmark doesn't validate, and
+  # on a hosted runner the root disk is tight (the canonical sweep still has to
+  # seed its own MariaDB datadir).
+  rm -rf "${MOVES_DEFAULT_DB_DIR}/_tsv"
 fi
 
 # 4. Canonical MOVES timings (serial single-worker, tree-RSS sampled).
