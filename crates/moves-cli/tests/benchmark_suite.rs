@@ -419,7 +419,7 @@ fn benchmark_smoke_test_one_per_category() {
     let candidates = [
         fixtures_dir.join("process-airtoxics.xml"), // default-scale
         fixtures_dir.join("nr-commercial-nation.xml"), // nonroad
-        fixtures_dir.join("mixed-onroad.xml"), // onroad half of the retired mixed run
+        fixtures_dir.join("mixed-onroad.xml"),      // onroad half of the retired mixed run
     ];
 
     let mut failures: Vec<String> = Vec::new();

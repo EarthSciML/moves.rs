@@ -224,8 +224,8 @@ fn fixture_catalogue_size() {
         "expected 34 onroad/mixed fixtures, found {onroad_count}"
     );
     assert_eq!(
-        nonroad_count, 10,
-        "expected 10 NONROAD fixtures (nr-*), found {nonroad_count}"
+        nonroad_count, 11,
+        "expected 11 NONROAD fixtures (nr-*), found {nonroad_count}"
     );
 }
 

@@ -1439,8 +1439,10 @@ fn expand_fuel_filter_to_fleet(store: &InMemoryStore, filters: &mut RunSpecFilte
     };
     let df = &*arc;
     let (Ok(st), Ok(ft)) = (
-        df.column("sourceTypeID").and_then(|c| c.cast(&DataType::Int64)),
-        df.column("fuelTypeID").and_then(|c| c.cast(&DataType::Int64)),
+        df.column("sourceTypeID")
+            .and_then(|c| c.cast(&DataType::Int64)),
+        df.column("fuelTypeID")
+            .and_then(|c| c.cast(&DataType::Int64)),
     ) else {
         return;
     };
@@ -1477,8 +1479,12 @@ fn derive_fuel_years_from_store(store: &InMemoryStore, year_ids: &[i64]) -> Vec<
         return Vec::new();
     };
     let (Ok(yids), Ok(fyids)) = (
-        yid_col.cast(&DataType::Int64).and_then(|c| c.i64().cloned()),
-        fyid_col.cast(&DataType::Int64).and_then(|c| c.i64().cloned()),
+        yid_col
+            .cast(&DataType::Int64)
+            .and_then(|c| c.i64().cloned()),
+        fyid_col
+            .cast(&DataType::Int64)
+            .and_then(|c| c.i64().cloned()),
     ) else {
         return Vec::new();
     };
@@ -1512,7 +1518,10 @@ fn derive_region_ids_from_store(store: &InMemoryStore) -> Vec<i64> {
     else {
         return regions.into_iter().collect();
     };
-    if let Ok(rids) = rid_col.cast(&DataType::Int64).and_then(|c| c.i64().cloned()) {
+    if let Ok(rids) = rid_col
+        .cast(&DataType::Int64)
+        .and_then(|c| c.i64().cloned())
+    {
         for v in rids.into_iter().flatten() {
             regions.insert(v);
         }

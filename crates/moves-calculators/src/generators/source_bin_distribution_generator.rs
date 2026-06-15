@@ -1868,7 +1868,8 @@ impl Generator for SourceBinDistributionGenerator {
         // over-count of `sourceBinActivityFraction` (gate `process-pm-exhaust`:
         // exactly 4× from 2 base polProcessIDs). A bin's `sourceBinID` fully
         // determines its components, so deduping by id is loss-free.
-        let mut seen_bin_ids: BTreeSet<i64> = existing_bins.iter().map(|b| b.source_bin_id).collect();
+        let mut seen_bin_ids: BTreeSet<i64> =
+            existing_bins.iter().map(|b| b.source_bin_id).collect();
         all_new_bins.retain(|b| seen_bin_ids.insert(b.source_bin_id));
 
         // Collect all source bins (existing + newly generated).

@@ -520,6 +520,7 @@ fn sulf_eff(
 /// Returns `(ratio, ratioNoSulfur)`, or `None` (emit no row, i.e. ratio 1.0)
 /// when any required model input is absent for this configuration.
 #[must_use]
+#[allow(clippy::too_many_arguments)]
 pub fn criteria_ratio_my_le_2000(
     reference: &CriteriaReference,
     cfg: &CriteriaConfig,
@@ -1270,7 +1271,7 @@ pub struct AtRatioOutRow {
 ///   an `airtoxicsA` base fuel), `atRatio = (atBaseEmissions_nonVOC ·
 ///   (1+atDifferenceFraction_nonVOC)) / (atBaseEmissions_VOC ·
 ///   (1+atDifferenceFraction_VOC))`, where `1+atDifferenceFraction` is the
-///   non-predictive [`ratio_no_sulfur`] over the `airtoxicsA` fuel models with
+///   non-predictive `ratio_no_sulfur` over the `airtoxicsA` fuel models with
 ///   age-specific `19502000` weights. Ages 0–40, `monthGroupID` from
 ///   `atBaseEmissions`, model-year range = `19502000` clamped to the run's
 ///   allowed model years ≤ 2000 (`restrictToAllowedModelYears`).
