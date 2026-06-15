@@ -20,8 +20,10 @@ ignore = [
 
 [licenses]
 version = 2
-# Permissive licenses compatible with Apache-2.0 (moves.rs's own license).
+# moves.rs's own crates are GPL-3.0-or-later (matching upstream EPA MOVES; see
+# LICENSE), plus the permissive licenses of the third-party dependency graph.
 allow = [
+    "GPL-3.0-or-later",
     "Apache-2.0",
     "Apache-2.0 WITH LLVM-exception",
     "BSD-2-Clause",

@@ -41,12 +41,29 @@ Then open `http://localhost:8080/demo/` in your browser.
 
 ### 4. Run a simulation
 
-**Onroad:**
+**Default-DB simulation (the working onroad flow):**
+1. In the *Default-DB simulation* section, either build a scenario with the
+   form or upload any RunSpec XML.
+2. Leave *Max parallel chunks* at 0 (auto/sequential).
+3. Click **Run default-DB**.
+4. The demo fetches the default-DB manifest, computes the partitions your
+   RunSpec needs (`required_partition_paths`), fetches just those files from
+   this site, builds an execution store in-browser, and runs the onroad
+   calculator chain via `run_simulation_from_partitions`.
+5. A fetch-progress bar runs, then the output files appear as download links.
+
+   This section is hidden if the default-DB tree has not been published — run
+   `package-default-db` and re-deploy to enable it.
+
+**Onroad (no-execution-DB special case):**
 1. Click "Choose file" next to *RunSpec XML*.
-2. Select `characterization/fixtures/sample-runspec.xml` from the repo.
-3. Leave *Max parallel chunks* at 0 (auto/sequential).
-4. Click **Run onroad**.
-5. After a few seconds the output files appear as download links.
+2. Leave *Max parallel chunks* at 0 (auto/sequential).
+3. Click **Run onroad**.
+
+   This entry point (`run_simulation`) runs a RunSpec with no execution
+   database, so it only succeeds for a RunSpec that needs no input tables —
+   which no real onroad RunSpec satisfies. For an actual onroad run, use the
+   *Default-DB simulation* section above.
 
 **NONROAD:**
 1. Click "Choose file" next to *Population file (.POP)*.
@@ -92,7 +109,9 @@ crates/moves-wasm/
 │ ├── moves_wasm_bg.wasm
 │ └── …
 └── src/
- └── lib.rs ← WASM entry points (run_simulation, run_nonroad_simulation)
+ └── lib.rs ← WASM entry points (run_simulation_from_partitions,
+                 required_partition_paths, run_simulation_from_bundle,
+                 run_simulation, run_nonroad_simulation, init_thread_pool)
 ```
 
 ## Browser compatibility

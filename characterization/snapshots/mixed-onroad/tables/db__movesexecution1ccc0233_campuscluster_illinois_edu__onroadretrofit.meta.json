@@ -1,0 +1,54 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__onroadretrofit",
+  "schema": [
+    {
+      "name": "pollutantID",
+      "kind": "int64"
+    },
+    {
+      "name": "processID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "retrofitYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "beginModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "endModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "cumFractionRetrofit",
+      "kind": "float64"
+    },
+    {
+      "name": "retrofitEffectiveFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "pollutantID",
+    "processID",
+    "fuelTypeID",
+    "sourceTypeID",
+    "retrofitYearID",
+    "beginModelYearID",
+    "endModelYearID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "b875d8edb1837f33dd63c9a0d985755495d18d1924ab7b34cd8076ded061a119"
+}

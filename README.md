@@ -20,8 +20,9 @@ MOVES (Motor Vehicle Emission Simulator) is the U.S. EPA's official model for es
 
 The port covers all ~70 onroad calculators, the full NONROAD model (a
 pure-Rust rewrite of the 29k-line Fortran NONROAD2008a), and all four control
-strategies. The characterization suite (37 fixtures) completes without error,
-including emission output.
+strategies. The characterization suite asserts 39 fixtures against canonical
+MOVES snapshots with zero quarantined, and the canonical default-database diff
+gate is green.
 
 `moves run` plans the full calculator graph, parses your RunSpec correctly,
 feeds the default-database Parquet data into the calculator context, and
@@ -31,7 +32,7 @@ for any remaining limitations.
 ## Quick start
 
 ```bash
-# Install from source (Rust 1.78+)
+# Install from source (Rust 1.95+ — pinned in rust-toolchain.toml)
 git clone https://github.com/EarthSciML/moves.rs
 cd moves.rs
 cargo build --release --locked
@@ -40,8 +41,14 @@ cargo build --release --locked
 # Run the included sample RunSpec
 ./target/release/moves run \
  --runspec characterization/fixtures/sample-runspec.xml \
+ --snapshot characterization/snapshots/sample-runspec \
  --output /tmp/moves-out
 ```
+
+This writes `MOVESRun.parquet` and the `MOVESOutput/` emission rows. A data
+source is required: without one of `--snapshot`, `--default-db`, or
+`--scale-input`, no calculators are registered and only `MOVESRun.parquet`
+(run metadata) is written — no emissions.
 
 Pre-built binaries for Linux (x86_64, aarch64), macOS (x86_64, aarch64), and Windows (x86_64) are available on the [Releases page](https://github.com/EarthSciML/moves.rs/releases).
 
@@ -112,7 +119,8 @@ output must continue using the official [MOVES Java application](https://www.epa
 
 ## License
 
-Licensed under the [MIT License](LICENSE).
+Licensed under the GNU General Public License v3.0 or later
+(GPL-3.0-or-later), matching upstream EPA MOVES; see [LICENSE](LICENSE).
 
 MOVES is developed by the U.S. Environmental Protection Agency. This port is
 not affiliated with, endorsed by, or approved by EPA.

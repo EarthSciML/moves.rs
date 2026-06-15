@@ -28,9 +28,10 @@ use moves_calculators::generators::totalactivitygenerator::inputs::{
 use moves_calculators::generators::totalactivitygenerator::model::AverageSpeedRow;
 use moves_data_default::DefaultDb;
 use moves_framework::{
-    default_tables, read_execution_bundle, read_execution_bundle_filtered, CalculatorRegistry,
-    CountyRow, DataFrameStore, DataFrameStoreTyped, EngineConfig, EngineOutcome, GeographyTables,
-    InMemoryStore, InputDataManager, LinkRow, MOVESEngine, MergeTableSpec, RunSpecFilters,
+    default_tables, execution::ExecutionRunSpec, read_execution_bundle,
+    read_execution_bundle_filtered, CalculatorRegistry, CountyRow, DataFrameStore,
+    DataFrameStoreTyped, EngineConfig, EngineOutcome, GeographyTables, InMemoryStore,
+    InputDataManager, LinkRow, MOVESEngine, MergeTableSpec, RunSpecFilters,
 };
 use moves_runspec::{GeoKind, RunSpec};
 use polars::prelude::{
@@ -1043,6 +1044,11 @@ pub fn build_default_db_store(
     // (no year_column in the registry); regionCounty loads county-filtered
     // but without the fuelYear filter (which isn't known yet).
     let mut base_filters = RunSpecFilters::from_runspec(run_spec);
+    // Include the silently-required chain-prerequisite pollutant-processes (e.g.
+    // refueling chains off Total Energy Consumption for Running/Start/Extended-Idle
+    // Exhaust). Without these in the load filter the energy rate tables filter to
+    // empty and the chained refueling calculator emits nothing.
+    expand_pol_process_filter_to_chain_prerequisites(run_spec, &mut base_filters);
     // Expand the fuelType load filter to the selected source types' full fleet
     // fuel mix. A runspec `onroadvehicleselection` names one (sourceType,
     // fuelType), but canonical runs the source type's whole fleet (its
@@ -1168,6 +1174,45 @@ fn expand_day_filter_to_all_day_types(db: &DefaultDb, filters: &mut RunSpecFilte
         filters.days = days;
     }
     Ok(())
+}
+
+/// Expand the pollutant / process / polProcessID load filters to include the
+/// silently-required chain prerequisites.
+///
+/// Canonical `ExecutionRunSpec.flagRequiredPollutantProcesses` augments the
+/// run's pollutant-process set with the inputs that chained calculators consume:
+/// a refueling-only RunSpec (THC/TOG/VOC/NMOG/NMHC × Refueling Displacement
+/// Vapor Loss 18 / Spillage Loss 19) chains off **Total Energy Consumption**
+/// (pollutant 91) computed for Running / Start / Extended-Idle Exhaust
+/// (processes 1 / 2 / 90). The raw RunSpec's `pollutant_process_associations`
+/// carry only the directly-selected pairs, so [`RunSpecFilters::from_runspec`]
+/// filters the energy rate tables (`EmissionRate`, `PollutantProcessAssoc`, the
+/// `SourceBinDistribution` inputs) to empty — `BaseRate` then emits no energy
+/// and the chained `RefuelingLossCalculator` sees no input and emits nothing
+/// (gate `process-refueling`: 0 rows vs canonical 336).
+///
+/// Build an [`ExecutionRunSpec`] (which runs `flag_required_pollutant_processes`)
+/// and union its full association set into the load filter. For every non-chained
+/// RunSpec this is a no-op — `flag_required_pollutant_processes` only adds the
+/// refueling→energy pairs — so it cannot widen any other fixture's load.
+fn expand_pol_process_filter_to_chain_prerequisites(
+    run_spec: &RunSpec,
+    filters: &mut RunSpecFilters,
+) {
+    let exec = ExecutionRunSpec::new(run_spec.clone());
+    let mut pol_process: BTreeSet<i64> = filters.pol_process_ids.iter().copied().collect();
+    let mut pollutants: BTreeSet<i64> = filters.pollutant_ids.iter().copied().collect();
+    let mut processes: BTreeSet<i64> = filters.process_ids.iter().copied().collect();
+    for assoc in &exec.pollutant_process_associations {
+        let pollutant = i64::from(assoc.pollutant_id.0);
+        let process = i64::from(assoc.process_id.0);
+        pol_process.insert(pollutant * 100 + process);
+        pollutants.insert(pollutant);
+        processes.insert(process);
+    }
+    filters.pol_process_ids = pol_process.into_iter().collect();
+    filters.pollutant_ids = pollutants.into_iter().collect();
+    filters.process_ids = processes.into_iter().collect();
 }
 
 /// Read the distinct `dayID`s from the loaded `DayOfAnyWeek` table in the store

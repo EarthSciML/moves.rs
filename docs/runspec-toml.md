@@ -21,7 +21,12 @@ round-trips through the model are model-identical by construction
 
 The TOML form is **not** byte-equivalent to the XML form — comments,
 whitespace, and the choice of named enums vs. legacy ALL-CAPS strings
-differ — but every byte of *information* is preserved.
+differ — but all *information* round-trips through the model with one
+exception: `[[internal_control_strategy]]` carries no payload in the
+TOML surface (the table only signals that a strategy is selected), so a
+strategy's parameters (e.g. a rate-of-progress `use_parameters` block)
+are dropped on TOML load and do not survive a TOML round-trip. Author
+control-strategy RunSpecs in XML if you need those parameters preserved.
 
 ## Design rules
 
@@ -67,6 +72,14 @@ differ — but every byte of *information* is preserved.
 | `[input_db]` | `<inputdatabase>` | |
 | `[uncertainty]` | `<uncertaintyparameters>` | |
 | `[output]` | bag of `<output*>` elements | See below. |
+
+**Required tables.** `[run]`, `[time]`, `[input_db]`, `[uncertainty]`,
+and `[output]` (with its `[output.db]` / `[output.scale_input_db]`
+sub-tables) are mandatory — they carry no `#[serde(default)]`, so a TOML
+file that omits any of them fails to deserialize with an opaque "missing
+field" error rather than defaulting. Everything else (`[[geo]]`,
+`[[onroad]]`, `[[pollutant_process]]`, the `version`/`description`
+top-level keys, etc.) is optional and omitted when empty.
 
 ## `[run]`
 

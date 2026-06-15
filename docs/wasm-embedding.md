@@ -28,7 +28,23 @@ wasm-pack build --target bundler crates/moves-wasm --out-dir /path/to/your-app/m
 
 ## API reference
 
-The WASM module exposes two main functions and one optional threading initialiser.
+The WASM module exposes several simulation entry points plus an optional
+threading initialiser:
+
+- `run_simulation_from_partitions(runspecXml, partitions, maxParallelChunks)` —
+  the onroad entry point. Runs an arbitrary onroad RunSpec against the
+  default-DB partitions it needs (use `required_partition_paths` to discover
+  them). **This is the working onroad path.**
+- `required_partition_paths(runspecXml, manifestJson)` — computes which
+  default-DB partition files a RunSpec needs, so the caller can fetch them.
+- `run_simulation_from_bundle(runspecXml, bundleBytes, maxParallelChunks)` —
+  onroad run against a pre-built Arrow-IPC execution-DB bundle (`MXDB`).
+- `run_simulation(runspecXml, maxParallelChunks)` — onroad run with **no**
+  execution database. Only succeeds for a RunSpec that needs no input tables;
+  every real onroad RunSpec returns an `Error` pointing to the partitions flow.
+- `run_nonroad_simulation(optionsJson, popBytes)` — the NONROAD entry point.
+- `init_thread_pool(numThreads)` — optional rayon thread-pool initialiser
+  (multi-thread `wasm-threads` build only).
 
 ### `init(input?)`
 
@@ -40,13 +56,16 @@ import init from "./moves-wasm/moves_wasm.js";
 await init();
 ```
 
-### `run_simulation(runspecXml, maxParallelChunks)`
+### `run_simulation_from_partitions(runspecXml, partitions, maxParallelChunks)`
 
-Runs the onroad MOVES simulation.
+Runs the onroad MOVES simulation. **This is the onroad entry point.** It
+builds an execution store in-browser from the default-DB partition files the
+RunSpec needs, then runs the calculator chain.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `runspecXml` | `string` | RunSpec document as an XML string |
+| `partitions` | `Array<{path: string, bytes: Uint8Array}>` | The default-DB partition files the RunSpec needs (see `required_partition_paths`) |
 | `maxParallelChunks` | `number` | Concurrency level: 0 = auto (1 for single-thread build, thread count for multi-thread build); 1 = sequential; &gt;1 = multi-thread (requires `wasm-threads` build + Worker context) |
 
 **Returns:** A plain JS object mapping relative output paths to `Uint8Array`
@@ -60,23 +79,60 @@ Parquet bytes:
 }
 ```
 
-**Throws:** A JavaScript `Error` if the RunSpec cannot be parsed or if the
-engine encounters a fatal error.
+**Throws:** A JavaScript `Error` if the RunSpec cannot be parsed, a partition
+file cannot be decoded, or the engine encounters a fatal error.
 
-**Example:**
+**Example:** fetch the manifest, ask which partitions the RunSpec needs, fetch
+those, then run:
 
 ```js
-import init, { run_simulation } from "./moves-wasm/moves_wasm.js";
+import init, {
+ required_partition_paths,
+ run_simulation_from_partitions,
+} from "./moves-wasm/moves_wasm.js";
 
 await init();
 
 const runspecXml = await fetch("sample-runspec.xml").then(r => r.text());
-const result = run_simulation(runspecXml, 0);
+
+// 1. Fetch the default-DB manifest and compute the needed partitions.
+const dbBaseUrl = "./data/movesdb20241112"; // your hosted default-DB tree
+const manifestJson = await fetch(`${dbBaseUrl}/manifest.json`).then(r => r.text());
+const paths = required_partition_paths(runspecXml, manifestJson);
+
+// 2. Fetch each partition file (sequentially to stay within the wasm32
+//    memory budget).
+const partitions = [];
+for (const path of paths) {
+ const bytes = new Uint8Array(await fetch(`${dbBaseUrl}/${path}`).then(r => r.arrayBuffer()));
+ partitions.push({ path, bytes });
+}
+
+// 3. Run.
+const result = run_simulation_from_partitions(runspecXml, partitions, 0);
 
 for (const [path, bytes] of Object.entries(result)) {
  console.log(`${path}: ${bytes.byteLength} bytes`);
 }
 ```
+
+### `required_partition_paths(runspecXml, manifestJson)`
+
+Computes which default-DB partition files a RunSpec needs. Returns an `Array`
+of relative path strings (relative to the manifest root); the caller fetches
+each one and passes them to `run_simulation_from_partitions`. Throws if the
+RunSpec or manifest cannot be parsed.
+
+### `run_simulation(runspecXml, maxParallelChunks)` — no-execution-DB special case
+
+Runs an onroad RunSpec **without** an execution database. There is no slow
+store, so the calculator chain has no source for its input tables. Every real
+onroad RunSpec needs at least one input table, so this function returns an
+`Error` (pointing you to `run_simulation_from_partitions`) for any such
+RunSpec. It only succeeds for the special case of a RunSpec that requires no
+input tables. For normal onroad runs use `run_simulation_from_partitions`
+above; to run against a pre-built `MXDB` bundle use
+`run_simulation_from_bundle`.
 
 ### `run_nonroad_simulation(optionsJson, popBytes)`
 

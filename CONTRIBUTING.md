@@ -14,22 +14,38 @@ sources you are porting and what the acceptance criteria are.
 
 ## Workspace layout
 
-The repository is a Cargo workspace. Each crate has a focused responsibility:
+The repository is a Cargo workspace of 25 crates; the authoritative list
+is the `[workspace]` `members` table in the root `Cargo.toml`. The
+crates with the most-touched responsibilities are:
 
 | Crate | Responsibility |
 |-------|----------------|
 | `moves-runspec` | RunSpec XML + TOML parsing and serialization (Tasks 12–13). |
 | `moves-data` | Pollutant/process/source-type enums and the `DataFrameStore` (Tasks 14, 50). |
+| `moves-data-default` | Default-DB Parquet load path consumed by the framework. |
 | `moves-framework` | `ExecutionRunSpec`, location iterator, MasterLoop scheduler (Tasks 15–19). |
 | `moves-calculators` | The ~70 onroad emission calculators (Phase 3). |
 | `moves-nonroad` | Pure-Rust port of NONROAD2008a (Phase 5). |
 | `moves-cli` | Command-line entry point (`moves` binary). |
+| `moves-wasm` | WASM build target / browser demo. |
 | `moves-calculator-info` | Phase 1 chain-reconstruction tool (build-time, not runtime). |
 | `moves-sql-macros` | SQL macro expander + section-marker preprocessor (Task 22, doc tool, not runtime). |
 | `moves-fixture-capture`, `moves-snapshot` | Phase 0 fixture-capture + canonical snapshot format. |
 
+The remaining crates cover the importers (`moves-importer*`), control
+strategies (`moves-avft`, `moves-fuel-control`, `moves-rate-of-progress`,
+`moves-*-retrofit`, `moves-control-strategy-validation`,
+`moves-import-lev`), nonroad import (`moves-nonroad-import`), and the
+default-DB convert tool (`moves-default-db-convert`) — see `crates/` and
+the `Cargo.toml` members list for the full set.
+
 Add new crates under `crates/` and register them in the root
 `Cargo.toml`'s `[workspace]` `members`.
+
+The toolchain is pinned in `rust-toolchain.toml` (currently stable
+`1.95.0`, with `rustfmt`/`clippy` and the `wasm32-unknown-unknown`
+target) so the formatting/lint gates can't silently drift across `stable`
+releases; build with that toolchain rather than your system default.
 
 ## Coding conventions
 
@@ -120,8 +136,9 @@ CI (`.github/workflows/ci.yml`) runs on every push and pull request:
 * `cargo deny check`
 
 A separate workflow (`.github/workflows/fixture-suite-weekly.yml`) runs the
-canonical-MOVES fixture-snapshot regression weekly on a self-hosted runner;
-that gate is too slow for per-push and lives outside the per-push CI.
+canonical-MOVES fixture-snapshot regression weekly on a GitHub-hosted
+`ubuntu-24.04` runner; that gate is too slow for per-push and lives outside
+the per-push CI.
 
 ## Releasing
 
@@ -139,10 +156,11 @@ archives attached.
 
 After the binary release is live, generate and upload the default-DB Parquet
 artifact via the `package-default-db` workflow (Actions → Package default-DB →
-Run workflow). This requires a self-hosted runner with Apptainer and fakeroot
-(the same runner used by the weekly fixture suite). It runs the full dump +
-convert + validate pipeline against the canonical-MOVES SIF and uploads the
-resulting `default-db-<db-version>.tar.gz` to the release.
+Run workflow). It runs on a GitHub-hosted `ubuntu-24.04` runner with
+Apptainer and fakeroot (the same runner image as the weekly fixture suite).
+It runs the full dump + convert + validate pipeline against the
+canonical-MOVES SIF and uploads the resulting `default-db-<db-version>.tar.gz`
+to the release.
 
 ## Commits and PRs
 

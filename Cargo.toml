@@ -30,9 +30,12 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-license = "Apache-2.0"
+# GPL-3.0-or-later to match upstream EPA MOVES, which is licensed "pursuant to
+# the GNU General Public License (GPL)" (EPA_MOVES_Model/License.txt). See LICENSE.
+license = "GPL-3.0-or-later"
 repository = "https://github.com/EarthSciML/moves.rs"
-rust-version = "1.82"
+# Matches the toolchain pinned in rust-toolchain.toml.
+rust-version = "1.95"
 
 [workspace.dependencies]
 anyhow = "1"

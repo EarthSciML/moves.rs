@@ -1,0 +1,53 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__nrevapemissionrate",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "SCC",
+      "kind": "utf8"
+    },
+    {
+      "name": "hpMin",
+      "kind": "int64"
+    },
+    {
+      "name": "hpMax",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "engTechID",
+      "kind": "int64"
+    },
+    {
+      "name": "meanBaseRate",
+      "kind": "float64"
+    },
+    {
+      "name": "units",
+      "kind": "utf8"
+    },
+    {
+      "name": "dataSourceID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID",
+    "SCC",
+    "hpMin",
+    "hpMax",
+    "modelYearID",
+    "engTechID"
+  ],
+  "row_count": 718,
+  "float_decimals": 12,
+  "content_sha256": "57e98ab16186c6d535a5222d6b2ac66523b06c69203734724d46390b78059962"
+}

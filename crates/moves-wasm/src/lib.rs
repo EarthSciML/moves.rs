@@ -594,6 +594,12 @@ pub fn run_simulation_from_partitions(
     let mut store = default_db::load_partitions_to_store(&partition_files)
         .map_err(|e| JsValue::from_str(&format!("Partition load error: {e}")))?;
 
+    // Replicate the native InputDataManager per-dimension load filtering (the
+    // partition loader only prunes at the file level). Must run before the
+    // shared synthesis, mirroring build_default_db_store.
+    default_db::apply_load_filters_to_store(&run_spec, &mut store)
+        .map_err(|e| JsValue::from_str(&format!("Load-filter error: {e}")))?;
+
     default_db::setup_execution_store(&run_spec, &mut store)
         .map_err(|e| JsValue::from_str(&format!("Store setup error: {e}")))?;
 
@@ -1300,6 +1306,7 @@ mod tests {
         use moves_framework::DataFrameStore;
         let mut store = default_db::load_partitions_to_store(&files).expect("load partitions");
         eprintln!("store has {} tables after load", store.names().len());
+        default_db::apply_load_filters_to_store(&run_spec, &mut store).expect("apply load filters");
         default_db::setup_execution_store(&run_spec, &mut store).expect("setup store");
         let geography = default_db::load_geography_from_store(&store).expect("geography");
 
@@ -1559,6 +1566,10 @@ mod tests {
         eprintln!("[phase] load_partitions_to_store: {:?}", t.elapsed());
 
         let t = Instant::now();
+        default_db::apply_load_filters_to_store(&run_spec, &mut store).expect("apply load filters");
+        eprintln!("[phase] apply_load_filters_to_store: {:?}", t.elapsed());
+
+        let t = Instant::now();
         default_db::setup_execution_store(&run_spec, &mut store).expect("setup");
         eprintln!("[phase] setup_execution_store: {:?}", t.elapsed());
 
@@ -1751,8 +1762,10 @@ mod tests {
         ("process-tirewear", 1e-3, false),
         ("process-airtoxics", 1e-3, false),
         ("process-pm-exhaust", 1e-3, false),
+        // mixed-onroad: onroad half of the retired mixed-onroad-nonroad run
+        // (Total Energy running exhaust, gasoline passenger car).
+        ("mixed-onroad", 1e-3, false),
         // Vacuous (canonical 0 rows / port 0 rows).
-        ("mixed-onroad-nonroad", 1e-3, true),
         ("process-apu", 1e-3, true),
         ("process-crankcase-extidle", 1e-3, true),
         ("process-crankcase-start", 1e-3, true),
@@ -1816,8 +1829,7 @@ mod tests {
             }
             // Run the wasm default-DB pipeline and extract the port's
             // per-pollutant sums. A run error is recorded as a fixture failure
-            // (e.g. mixed-onroad-nonroad has no NONROAD population tables in the
-            // onroad default-DB tree) rather than aborting the whole sweep.
+            // rather than aborting the whole sweep.
             let port_result: Result<PollutantSums, String> = (|| {
                 let xml = std::fs::read_to_string(fixtures_dir.join(format!("{name}.xml")))
                     .map_err(|e| format!("read runspec: {e}"))?;
@@ -1836,6 +1848,8 @@ mod tests {
                 // WASM default-DB pipeline (same calls as run_simulation_from_partitions).
                 let mut store = default_db::load_partitions_to_store(&partition_files)
                     .map_err(|e| format!("load partitions: {e}"))?;
+                default_db::apply_load_filters_to_store(&run_spec, &mut store)
+                    .map_err(|e| format!("apply load filters: {e}"))?;
                 default_db::setup_execution_store(&run_spec, &mut store)
                     .map_err(|e| format!("setup execution store: {e}"))?;
                 let geography = default_db::load_geography_from_store(&store)

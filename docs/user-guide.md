@@ -41,10 +41,10 @@ your `PATH`.
 
 ### Build from source
 
-Requires Rust 1.70+ (`rustup` recommended).
+Requires Rust 1.95+ (pinned in `rust-toolchain.toml`; `rustup` recommended).
 
 ```bash
-git clone https://github.com/ctessum/moves.rs
+git clone https://github.com/EarthSciML/moves.rs
 cd moves.rs
 cargo build --release --locked
 # Binaries land in target/release/
@@ -83,20 +83,25 @@ MOVES run.
 ```bash
 moves run \
  --runspec characterization/fixtures/sample-runspec.xml \
+ --snapshot characterization/snapshots/sample-runspec \
  --output /tmp/sample-out
 ```
+
+A run needs a data source for the calculators' input tables. The `--snapshot`
+flag points at a captured execution-database directory (the sample RunSpec ships
+with one). Without `--snapshot`, `--default-db`, or `--scale-input`, no
+calculators register their input tables, so only `MOVESRun.parquet` is written —
+no emissions. See [Default database](#default-database) for how to obtain a
+snapshot or default-DB tree of your own.
 
 Expected output (the framework, RunSpec parser, and output writer are fully
 functional):
 
 ```
 [moves run] characterization/fixtures/sample-runspec.xml
- scale : MACROSCALE
- models : ["OnRoad"]
- counties : [26161]
- years : [2001]
- months : [6]
- pollutants : 10
+ calculator graph : <M> module(s) planned across <C> chunk(s)
+ executed : <E>
+ not yet ported : <U> module(s)
  iterations : 1
  max parallelism : <N>
  wall time : X.X ms (plan Y.Y ms, exec Z.Z ms)
@@ -105,16 +110,19 @@ functional):
  run record : /tmp/sample-out/MOVESRun.parquet
 ```
 
-The output directory contains:
+The `not yet ported` line appears only when some planned modules are
+unimplemented.
+
+With a snapshot, the output directory contains:
 
 ```
 /tmp/sample-out/
 ├── MOVESRun.parquet # run metadata (one row)
 ├── MOVESOutput/ # per-emission rows
-│ └── yearID=2001/monthID=6/
+│ └── yearID=2001/monthID=7/
 │ └── part.parquet
 └── MOVESActivityOutput/ # per-activity rows
- └── yearID=2001/monthID=6/
+ └── yearID=2001/monthID=7/
  └── part.parquet
 ```
 
@@ -137,9 +145,11 @@ reference is in [`runspec-toml.md`](runspec-toml.md).
 
 ## RunSpec format reference
 
-A RunSpec tells `moves.rs` what to compute: the geographic scope (counties),
-time span (years, months, hours), vehicle selections, pollutant/process
-associations, output units, and any control strategies.
+A RunSpec is the single document defining one MOVES run — the same role played
+by the `.mrs` "Run Specification" file canonical MOVES exports. It tells
+`moves.rs` what to compute: the geographic scope (counties), time span (years,
+months, hours), vehicle/fleet selections, pollutant/process associations, output
+units, and any control strategies.
 
 Two equivalent formats are supported:
 
@@ -281,9 +291,17 @@ See `characterization/default-db-conversion/README.md` for full details.
 
 ### Passing the default database to a run
 
-The converted default-DB tree is embedded in the binary for the default
-MOVES database version. For custom DB versions, point `--default-db` at
-the converted directory (when that flag is available).
+The default-DB tree is **not** embedded in the binary — only the calculator DAG
+is. Every run that produces emissions therefore needs a slow-tier data source on
+the command line:
+
+* `--default-db <DIR>` — point at a converted default-DB Parquet tree (obtained
+  above). The tables are loaded and filtered to the RunSpec.
+* `--snapshot <DIR>` — point at a captured canonical-MOVES execution-database
+  snapshot (the form used by the fixtures and the first-run example above).
+
+Without one of these (or `--scale-input` for County/Project runs), no calculator
+input tables are available and the run writes only `MOVESRun.parquet`.
 
 ---
 
@@ -471,20 +489,37 @@ for step-by-step instructions.
 
 ### Embed in your own app
 
-The WASM module exposes two functions callable from JavaScript:
+The WASM module exposes several entry points callable from JavaScript. The
+working onroad path loads default-DB partitions into the engine; a real onroad
+RunSpec cannot run without them.
 
 ```js
-import init, { run_simulation, run_nonroad_simulation }
- from "./moves_wasm.js";
+import init, {
+ required_partition_paths,
+ run_simulation_from_partitions,
+ run_simulation,
+ run_nonroad_simulation,
+} from "./moves_wasm.js";
 
 await init();
 
-// Onroad: returns { "MOVESRun.parquet": Uint8Array, … }
-const result = run_simulation(runspecXml, 0);
+// Onroad: first ask which default-DB partitions this RunSpec needs (pass the
+// default-DB manifest JSON), fetch their bytes, then run.
+const paths = required_partition_paths(runspecXml, manifestJson);
+const partitions = await Promise.all(
+ paths.map(async (path) => ({ path, bytes: await fetchPartition(path) })),
+);
+// Returns { "MOVESRun.parquet": Uint8Array, … }
+const result = run_simulation_from_partitions(runspecXml, partitions, 0);
 
 // NONROAD: returns { completion_message: "…", counters: { … } }
 const nonroadResult = run_nonroad_simulation(optionsJson, popBytes);
 ```
+
+`run_simulation(runspecXml, maxParallelChunks)` is the no-input special case: it
+runs without an execution database, so it errors for any RunSpec whose
+calculators require input tables (i.e. every real onroad run). Use
+`run_simulation_from_partitions` for onroad work.
 
 For the full API reference, bundler integration, OPFS persistence, and
 deployment checklist, see **[`docs/wasm-embedding.md`](wasm-embedding.md)**.
@@ -677,7 +712,7 @@ behavioral divergences from canonical MOVES.
 * [`control-strategies.md`](control-strategies.md) — AVFT, ROP, OnRoad/NONROAD Retrofit
 * [`concurrency-tuning.md`](concurrency-tuning.md) — `--max-parallel-chunks` measurement and recommendations
 * [`known-divergences.md`](known-divergences.md) — documented differences from canonical MOVES
-* [`../moves-rust-md`](../moves-rust-md) — development roadmap
+* [`../moves-rust-migration-plan.md`](../moves-rust-migration-plan.md) — development roadmap
 * [`wasm-embedding.md`](wasm-embedding.md) — embedding the WASM module in third-party tools
 * [`wasm-threading.md`](wasm-threading.md) — multi-thread WASM build and COEP/COOP headers
 * [`../crates/moves-wasm/demo/README.md`](../crates/moves-wasm/demo/README.md) — browser demo build instructions

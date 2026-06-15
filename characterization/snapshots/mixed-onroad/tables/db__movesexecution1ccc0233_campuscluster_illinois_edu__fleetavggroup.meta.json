@@ -1,0 +1,20 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__fleetavggroup",
+  "schema": [
+    {
+      "name": "fleetAvgGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "fleetAvgGroupDesc",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "fleetAvgGroupID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "cb13142cd2f496da3776dc20e17d6db91d3022bc1dea8e5af49c22a8d9d9c7bc"
+}

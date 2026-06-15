@@ -1,0 +1,24 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__processdisplaygroup",
+  "schema": [
+    {
+      "name": "processDisplayGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "processDisplayGroupName",
+      "kind": "utf8"
+    },
+    {
+      "name": "disPlayAsGroup",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "processDisplayGroupID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "82668d93418e9a87adfab89dde0be5c271bd7dc0472385af1763b9e78e89386e"
+}

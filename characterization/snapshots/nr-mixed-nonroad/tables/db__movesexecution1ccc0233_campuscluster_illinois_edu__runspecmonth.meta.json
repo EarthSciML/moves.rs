@@ -1,0 +1,16 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__runspecmonth",
+  "schema": [
+    {
+      "name": "monthID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "monthID"
+  ],
+  "row_count": 1,
+  "float_decimals": 12,
+  "content_sha256": "0d084e75ba2bd2cb53ee6fa8cecd4cd51f07b44f4aa4f5a9f2072b53c086f88d"
+}

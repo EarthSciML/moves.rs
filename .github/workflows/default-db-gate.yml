@@ -13,13 +13,17 @@
 #     natively, against the same canonical snapshots.
 #
 # Both gates are env-gated (MOVES_DEFAULT_DB_DIR) and dormant in the per-PR
-# `ci.yml` run. They are activated here on a weekly schedule (+ manual dispatch)
-# because the default-DB Parquet tree is a large (~390 MB) release asset and the
-# from-scratch run is slow — keeping PR CI fast.
+# `ci.yml` run (which has no default-DB tree). They run here on three triggers:
+#   * weekly schedule + manual dispatch — full from-scratch fidelity monitoring;
+#   * pull_request (path-filtered) — so a change to the default-DB data plane,
+#     the calculators, or the wasm pipeline is validated against the in-repo
+#     canonical snapshots before merge. The path filter keeps docs-only and
+#     unrelated PRs fast (the gate downloads a ~390 MB release asset and the
+#     from-scratch run is slow).
 #
-# This workflow is intentionally NOT a required/PR-blocking check: it monitors
-# from-scratch fidelity. A red run is a real signal (a generator / InputDataManager
-# divergence or a wasm parquet/partition bug), not a CI-hygiene failure.
+# A red run is a real signal (a generator / InputDataManager divergence or a
+# wasm parquet/partition bug), not a CI-hygiene failure. Both native and wasm
+# default-DB gates are currently fully green (28/28 asserted-pass each).
 #
 # The default-DB Parquet tree is downloaded from the most recent GitHub Release
 # carrying a `default-db-<version>.tar.gz` asset (produced by package-default-db).
@@ -32,6 +36,15 @@ on:
     # Mondays 07:00 UTC.
     - cron: "0 7 * * 1"
   workflow_dispatch:
+  pull_request:
+    paths:
+      - "crates/moves-calculators/**"
+      - "crates/moves-framework/**"
+      - "crates/moves-wasm/**"
+      - "crates/moves-cli/tests/full_suite_regression.rs"
+      - "characterization/fixtures/**"
+      - "characterization/snapshots/**"
+      - ".github/workflows/default-db-gate.yml"
 
 permissions:
   contents: read

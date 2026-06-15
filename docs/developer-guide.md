@@ -18,7 +18,7 @@ NONROAD module.
 | Data types | `moves-data`, `moves-calculator-info`, `moves-runspec` | Shared domain types: pollutants, processes, RunSpec model, calculator DAG metadata |
 | Framework | `moves-framework` | Engine, MasterLoop, registry, executor, control-strategy lifecycle |
 | Implementations | `moves-calculators`, `moves-avft`, `moves-onroad-retrofit`, `moves-nonroad`, `moves-importer*` | Calculator/generator bodies, control strategies, importers |
-| CLI | `moves-cli` | The `moves` binary — `run`, `import` subcommands |
+| CLI | `moves-cli` | The `moves` binary — `run`, `import-cdb`, `convert-runspec` subcommands |
 
 No crate in the "Implementations" layer may depend on another implementation
 crate; they share only the framework and data-type layers.
@@ -430,7 +430,9 @@ Create a new crate (e.g. `crates/moves-my-strategy/`) following the shape
 of `moves-avft` or `moves-onroad-retrofit`:
 
 ```rust
-use moves_framework::{CalculatorContext, InternalControlStrategy};
+use moves_framework::{
+ CalculatorContext, DataFrameStore, Error, InMemoryStore, InternalControlStrategy,
+};
 use moves_framework::control_strategy::StrategySubscription;
 use moves_calculator_info::Granularity;
 use moves_data::ProcessId;
@@ -461,9 +463,14 @@ impl InternalControlStrategy for MyControlStrategy {
  MY_MODIFIED_TABLES
  }
 
- fn pre_run(&self, ctx: &CalculatorContext) -> Result<(), Error> {
- // Apply global table modifications here.
- // ctx.tables() contains the current execution tables.
+ // `pre_run` receives the mutable slow-tier execution store directly. Write
+ // your completed table into it via `InMemoryStore::insert` so downstream
+ // calculators see the modified table (mirrors the AVFT strategy, which does
+ // `tables.insert("AVFT", df)`).
+ fn pre_run(&self, tables: &mut InMemoryStore) -> Result<(), Error> {
+ // let df = self.completed.clone().into_dataframe()
+ // .map_err(|e| Error::Polars(e.to_string()))?;
+ // tables.insert("myTargetTable", df);
  Ok(())
  }
 
@@ -619,6 +626,10 @@ constraints that are harder to work around than on native:
 ---
 
 ## Quick-reference
+
+The toolchain is pinned to `1.95.0` in `rust-toolchain.toml` (with `rustfmt`,
+`clippy`, and the `wasm32-unknown-unknown` target), so `cargo`/`rustup` use that
+exact stable for builds, the CI format/lint gates, and the WASM demo.
 
 ```bash
 # Build everything

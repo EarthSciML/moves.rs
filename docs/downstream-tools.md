@@ -568,5 +568,5 @@ the run, for per-run audits.
  for the three output tables.
 * [`runspec-toml.md`](runspec-toml.md) — the TOML RunSpec format that
  configures a run (including its output units).
-* [`moves-rust-md`](../moves-rust-md) — the
- broader user manual for `moves.rs`.
+* [`moves-rust-migration-plan.md`](../moves-rust-migration-plan.md) — the
+ broader migration plan and roadmap for `moves.rs`.

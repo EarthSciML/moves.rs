@@ -5,7 +5,7 @@ This page documents the unified MOVES Parquet output layout. It is the canonical
 The schema is declared in code under
 [`moves_data::output_schema`](../crates/moves-data/src/output_schema.rs);
 the writer that materialises it lives in
-[`moves_framework::output_processor`](../crates/moves-framework/src/output_processor.rs).
+[`moves_framework::aggregation::output_processor`](../crates/moves-framework/src/aggregation/output_processor.rs).
 This document mirrors those modules' rustdoc and is the recommended
 starting point for downstream-tool authors.
 
@@ -221,8 +221,8 @@ Each parquet file is written via a `<path>.tmp` sibling + rename. A
 process crash leaves either the previous version of the file or no
 file; downstream readers never observe a truncated parquet footer.
 
-[`OutputProcessor::new`]: ../crates/moves-framework/src/output_processor.rs
-[`OutputProcessor::write_emissions`]: ../crates/moves-framework/src/output_processor.rs
-[`OutputProcessor::write_activity`]: ../crates/moves-framework/src/output_processor.rs
-[`write_emissions`]: ../crates/moves-framework/src/output_processor.rs
-[`write_activity`]: ../crates/moves-framework/src/output_processor.rs
+[`OutputProcessor::new`]: ../crates/moves-framework/src/aggregation/output_processor.rs
+[`OutputProcessor::write_emissions`]: ../crates/moves-framework/src/aggregation/output_processor.rs
+[`OutputProcessor::write_activity`]: ../crates/moves-framework/src/aggregation/output_processor.rs
+[`write_emissions`]: ../crates/moves-framework/src/aggregation/output_processor.rs
+[`write_activity`]: ../crates/moves-framework/src/aggregation/output_processor.rs

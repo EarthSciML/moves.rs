@@ -1,0 +1,30 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0233_campuscluster_illinois_edu__sourcetypeagedistributiondefault",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "yearID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageID",
+      "kind": "int64"
+    },
+    {
+      "name": "ageFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID",
+    "yearID",
+    "ageID"
+  ],
+  "row_count": 33579,
+  "float_decimals": 12,
+  "content_sha256": "37388fc34eec73c48c30427e4ed243d8f631a999dbdc4c8aaad24ced0008d664"
+}
