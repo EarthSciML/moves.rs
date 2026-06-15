@@ -2,7 +2,9 @@
 
 This document is the "known divergences" record for the regression methodology.
 It describes the regression methodology for the full-suite pass and catalogues
-the current state of the port against the 34-fixture characterization suite.
+the current state of the port against the characterization suite. As of
+2026-06-15 the canonical-diff gate is **green**: every non-scale fixture is
+asserted against canonical MOVES and **zero** are quarantined.
 
 ---
 
@@ -10,16 +12,17 @@ the current state of the port against the 34-fixture characterization suite.
 
 ### The fixture suite
 
-`characterization/fixtures/` holds 37 RunSpec XML files. The full-suite pass
-covers 34 of them — the 3 `scale-*` fixtures (County-Scale, Project-Scale,
-Rates) require additional input databases not present in the default test
-environment and are excluded.
+`characterization/fixtures/` holds 51 RunSpec XML files. The canonical-diff gate
+asserts the **39** non-scale fixtures that have a populated snapshot directory
+(one per fixture under `characterization/snapshots/` carrying a `manifest.json`);
+the 3 `scale-*` fixtures (County-Scale, Project-Scale, Rates) require additional
+input databases not present in the default test environment and are excluded.
 
-| Set | Count | Pattern |
-|-----|-------|---------|
-| Onroad (default-scale) | 24 | `chain-*`, `expand-*`, `process-*`, `sample-runspec`, `mixed-onroad` |
-| NONROAD | 11 | `nr-*` (including `nr-mixed-nonroad`) |
-| Excluded (need extra input DB) | 3 | `scale-county`, `scale-project`, `scale-rates` |
+| Set | Pattern |
+|-----|---------|
+| Onroad (default-scale) | `chain-*`, `expand-*`, `process-*`, `sample-runspec`, `mixed-onroad` |
+| NONROAD | `nr-*` (including `nr-mixed-nonroad`) |
+| Excluded (need extra input DB) | `scale-county`, `scale-project`, `scale-rates` |
 
 ### The regression gate
 
@@ -32,8 +35,8 @@ It has two layers:
 - At least one calculator-graph module must be planned.
 
 **Canonical-diff gate** — `canonical_snapshot_diff`, **active** (the in-repo
-`characterization/snapshots/` tree is populated for all 34 non-scale fixtures;
-override the tree with `REGRESSION_SNAPSHOTS_DIR=<path>`):
+`characterization/snapshots/` tree is populated for all 39 asserted non-scale
+fixtures; override the tree with `REGRESSION_SNAPSHOTS_DIR=<path>`):
 - Runs each fixture with `--snapshot`, so the calculators execute against the
  captured execution DB and the engine writes the real `MOVESOutput/` tree
  (not just `MOVESRun.parquet`).
@@ -42,11 +45,13 @@ override the tree with `REGRESSION_SNAPSHOTS_DIR=<path>`):
  totals (`moves_snapshot::compare_pollutant_sums`).
 - **Hard-asserts** on the fixtures whose data plane matches canonical within a
  documented precision-only tolerance (§4.2 below).
-- **Hard-fails** (operator decision) on fixtures with a known, reported
- data-plane bug (§4.4 below) — it is OK for CI to be red while results are
- wrong. Masking a divergence with a widened tolerance is worse than no gate,
- so a quarantined fixture stays in the gate (failing CI) and graduates to the
- asserted set only once its data plane is actually fixed.
+- **Hard-fails** (operator decision) on any fixture with a known, reported
+ data-plane bug — it is OK for CI to be red while results are wrong. Masking a
+ divergence with a widened tolerance is worse than no gate, so a quarantined
+ fixture stays in the gate (failing CI) and graduates to the asserted set only
+ once its data plane is actually fixed. As of 2026-06-15 the quarantine list
+ (`QUARANTINED_FIXTURES`) is **empty** — every non-scale fixture has graduated
+ (see §1b).
 
 ### Why per-pollutant sums, not a cell-level diff
 
@@ -72,235 +77,58 @@ snapshot, unchanged at `default_float_tolerance = 0.0`.)
 
 ---
 
-## 1b. Canonical-diff gate state (2026-05-31)
+## 1b. Canonical-diff gate state (current — 2026-06-15)
 
-The gate was activated against the re-captured snapshots (commit `a1d4314`,
-onroad Go calculators). Of the 34 non-scale fixtures, **8 are asserted** and
-**26 are known data-plane bugs that hard-fail CI** (operator decision: it is OK
-for CI to be red while results are wrong). The gate pins the 8 working fixtures
-against regression and keeps the 26 bugs failing on the record (never masked by
-a tolerance); each graduates to the asserted set once its data plane is fixed.
+The gate is **green**: all **39** non-scale fixtures with a populated snapshot
+directory are **asserted** against canonical MOVES within the documented
+precision-only tolerances (§4.2), and `QUARANTINED_FIXTURES` is **empty** — there
+are no fixtures failing CI on a known data-plane bug. No tolerance was ever
+widened to absorb a bug; the only tolerances applied (`ONROAD_REL_TOL = 1e-3`,
+`NONROAD_REL_TOL = 1e-2`) cover sub-tolerance float-accumulation / `real*4`
+artifacts (§4.2). The authoritative list of asserted fixtures (with each one's
+per-pollutant residual) lives in `asserted_fixtures()` in
+`crates/moves-cli/tests/full_suite_regression.rs`; that file's per-fixture
+comments are the canonical, kept-current record of how each one was graduated.
 
-### Triage table
+A handful of the start/idle/hotelling fixtures (`process-apu`,
+`process-crankcase-extidle`/`-start`, `process-extended-idle`, and their
+`-single` variants) are asserted **vacuous**: canonical's captured execution DB
+holds the base rate but its activity and output tables are empty, so canonical's
+authoritative output for the process is zero rows, and the port — gated by the
+same activity weighting — reproduces that (canon 0 == port 0). The `vacuous`
+flag makes the gate fail loudly if a recapture ever gives either side a nonzero
+row.
 
-| Fixture(s) | canon→port rows | max rel. diff | Verdict |
-|---|---|---|---|
-| `process-evap-fvv` | 128→128 | 8.2e-5 | **precision-only — asserted** (`ONROAD_REL_TOL`) |
-| `process-evap-leaks` | 128→128 | 1.6e-7 | **precision-only — asserted** |
-| `process-evap-permeation` | 128→128 | 2.1e-7 | **precision-only — asserted** |
-| `nr-commercial-nation` | 908→908 | 3.5e-3 | **precision-only (real\*4) — asserted** (`NONROAD_REL_TOL`) |
-| `process-crankcase-extidle`, `process-crankcase-start`, `process-extended-idle` | 0→0 | — | **vacuous — asserted** (canonical has no `MOVESOutput`; the port has no BaseRate input rows for these and emits none either) |
-| `expand-counties` (750→750), `expand-criteria` (744→744), `expand-day` (250→250), `expand-fueltype-diesel` (496→496), `expand-month` (500→500), `expand-sourcetype` (860→860), `sample-runspec` (84→84) | **row count = canonical** | varies (mass) | **over-emit ROW count FIXED (`runSpecRoadType` join); residual BaseRate activity-weighting MASS gap — quarantined** (§4.4 reported bug 1, item 2) |
-| `chain-nonhaptog`, `chain-tog-speciation`, `process-airtoxics`, `process-nox-speciation`, `process-pm-exhaust`, `process-brakewear`, `process-tirewear`, `process-crankcase-running` | port < canonical | varies | **UNDER-emit — calculator-chain coverage gap (missing speciated pollutants / PM-speciation chain not producing) — quarantined** (§4.4 reported bug 3) |
-| `process-refueling` | 250 vs 336 | — | **wrong content — refueling calculator (processes 18/19, THC) not wired; BaseRate energy (process 1, pollutant 91) leaks in — quarantined** (§4.4 reported bug 3) |
-| `process-apu`, `mixed-onroad-nonroad` | varies | varies | **activity-gate / empty-canonical artifacts — quarantined** (§4.4 reported bug 1) |
-| `nr-agriculture-state`, `nr-airport-support-county`, `nr-industrial-county`, `nr-railroad-support-nation` | N→0 | −100 % | **reported bug (NONROAD emits nothing) — quarantined** |
-| `nr-construction-state`, `nr-lawn-garden-county`, `nr-logging-county`, `nr-pleasure-craft-state`, `nr-recreational-county` | mismatched | 1e3–1e6 % | **reported bug (NONROAD population/coverage) — quarantined** |
+### Resolved (historical)
 
-No tolerance was widened to absorb a bug. The only tolerances applied
-(`ONROAD_REL_TOL = 1e-3`, `NONROAD_REL_TOL = 1e-2`) cover the four genuinely
-matching fixtures, whose divergences are sub-tolerance float-accumulation /
-`real*4` artifacts (§4.2).
+Earlier revisions of this document (state dated 2026-05-31) catalogued **8
+asserted / 26 quarantined** fixtures and three classes of "reported bug":
 
-### Reported bug 1 — onroad-exhaust path emitted fixed NONROAD-coded garbage — ROOT-CAUSE FIXED
+1. **Onroad over-emit / activity weighting** — a fixed NONROAD-coded garbage
+   block (NONROAD calculators firing on onroad-only RunSpecs), a month
+   off-by-one zeroing onroad output, an off-network start-row over-emit, and the
+   missing inventory activity weighting (`universalActivity = SHO / noOfRealDays`)
+   plus the kJ→Million-BTU energy-unit conversion, E85 fuel-effects and
+   multi-county expansion residuals.
+2. **NONROAD emit-nothing / wrong-row-count** — the empty-`/SOURCE CATEGORY/`
+   quirk, surrogate allocation, state-scoped lookups, the SFC-vs-SWT sox fix, the
+   `/PM BASE SULFUR/` alternates, the Tier-4-era diesel gap (MXTECH=15 truncation
+   + the 7-digit SCC fallback step), per-HP-bin activity, and the `.POP`
+   one-decimal population rounding.
+3. **Onroad under-emit / chained-calculator coverage** — the regClass-collapse
+   round-trip drop, the SulfatePM pass-through doubling, the NO/NO2 species
+   doubling, and the PM-speciation / air-toxics / refueling chains not producing
+   their full pollutant/process set.
 
-**Original symptom.** Every onroad fixture, run against its own snapshot, wrote
-a **byte-identical** ~8,632-row `MOVESOutput` block regardless of the RunSpec
-(verified: the part files for `expand-criteria`, `chain-nonhaptog`, and
-`expand-fueltype-diesel` were identical, `Σ emissionQuant = 43520901035.30757`).
-The rows carried NONROAD SCC codes (`2260…/2265…/2282…/2285…`) with
-`sourceTypeID`/`fuelTypeID`/`sectorID` all NULL, and emitted ~7 orders of
-magnitude more mass than canonical.
-
-**Root cause (found 2026-05-31).** It was never the onroad calculators emitting
-garbage — they emit nothing (see the residual gap below). The whole block came
-from `NonroadEmissionCalculator` firing on **onroad-only** RunSpecs. The MOVES
-NONROAD emission processes (1, 15, 18–21, 30–32) share the process-ID namespace
-with onroad, and `CalculatorRegistry::modules_for_runspec` selected modules
-purely by `(pollutant, process)` with **no model filter**. So for any onroad run
-that selects process 1 (Running Exhaust) — i.e. every onroad fixture — the
-planner pulled in `NonroadEmissionCalculator` (plus its NONROAD-only downstream
-`NRHCSpeciationCalculator`/`NRAirToxicsCalculator`). Its `execute` then ran a
-full NONROAD simulation against the `nr*` execution-DB tables, which are
-default-DB content captured **identically** in every snapshot — hence the
-byte-identical, RunSpec-independent block (only `runHash` differed). Canonical
-MOVES gates this chain on the model selection (`Models.evaluateModels`); the
-Rust planner had dropped that dimension.
-
-**Fix.** `CalculatorRegistry::execution_order_for_models` (new) drops the
-NONROAD-only module set — computed from the DAG: the `.../master/nonroad/`
-package module plus its transitive `chained_downstream` closure — when the
-RunSpec does not select the NONROAD model. `MOVESEngine::planned_modules` now
-calls it with the run's model flags. After the fix, all 17 onroad fixtures emit
-**0** NONROAD-coded rows (the garbage is gone); `nr-commercial-nation` and the
-mixed/NONROAD fixtures are unaffected (NONROAD still selected → calculator still
-runs).
-
-**Residual gap (separate bug, still quarantined) — onroad-emits-0 root cause now FIXED; deeper activity-weighting gap remains.**
-With the NONROAD garbage removed, the onroad fixtures had diverged the *other*
-way: the onroad emission data plane (`BaseRateGenerator` → `BaseRateCalculator`
-→ criteria/PM/etc.) emitted **0** `MOVESOutput` rows where canonical has real
-onroad SCC `2201…` rows. The **0-rows** cause was a month off-by-one:
-`BaseRateCalculator::execute` keyed its fuel-supply join on the raw RunSpec month
-(`pos.time.month`, 7) while MOVES keys its execution DB and every snapshot by the
-internal `monthID = <month key> + 1` (8) — applied by every sibling generator
-(`SnapshotFilter::from_run_spec`, `evap_op_mode_distribution`) but not here. With
-no fuel-supply match every `BaseRateByAge`/`BaseRate` row was dropped → 0 output.
-
-The month fix (mirror the `+1`) is landed, plus two coordinated fixes the
-unblocked output exposed: (a) `merge_process_year_variants` unions the
-per-**process** execution-DB tables (`baseratebyage_1_2020` = process 1,
-`_2_2020` = process 2) under the canonical name, and the multi-process
-`BaseRateCalculator` subscriber fired once per process emitted *every* process's
-rows at *every* position (~2×) — fixed by filtering the merged rows to
-`position().process_id` inside `execute`; and (b) the synthetic `altTHC` (10001)
-/ `altNMHC` (10079) tallies leaked into `MOVESOutput` — fixed by dropping
-`pollutantID >= 10000` in `StreamingEmissionAgg::extend` (no canonical
-`MOVESOutput` carries any such pollutant; they exist only to feed HC speciation
-through the worker stream).
-
-**Over-emit ROW count now FIXED (`runSpecRoadType` join); residual MASS gap is
-the activity weighting.** Ground truth (the captured snapshots) shows the onroad
-fixtures are **inventory ("Inv") scale**, and the over-emit had two independent
-causes — one structural (now fixed) and one numerical (still open):
-
-1. *Off-network start rows the run does not select (FIXED).* Canonical drives the
- BaseRate worker off a **join to `runSpecRoadType`**, so it only materialises
- rate rows whose road type the RunSpec selects. The generator emits process 1
- (running exhaust) on the selected on-road type (roadType 4) and process 2
- (start exhaust) on off-network **roadType 1**; `runspecroadtype` for the
- onroad-exhaust fixtures is `{4}` only, so canonical's `baserateoutput` /
- `MOVESOutput` carries **process 1, roadType 4 only** (744 rows for
- `expand-criteria`) and **no start rows at all** — even though
- `baseratebyage_2_2020` (process 2, roadType 1, op-modes 101–108) holds 5,952
- valid rate rows. The port read *every* road type back via
- `merge_process_year_variants` and emitted the roadType-1 start block too
- (1,488 rows = process 1 @ rt 4 + process 2 @ rt 1). **Fixed** by mirroring the
- worker's join: `BaseRateCalculator::execute` reads `runSpecRoadType` and keeps
- only rate rows on a selected road type (an empty/absent table imposes no
- restriction, preserving unit-test behaviour). The port now emits 744 rows for
- `expand-criteria` — process 1, roadType 4, pollutants 1/2/3 — **matching
- canonical's row count, processes, road type and pollutants exactly.** The
- filter is scoped to the `BaseRateCalculator` input only (processes 1/2/9/10/
- 90/91); evap/refueling/etc. calculators are untouched, so the previously
- asserted `process-evap-fvv` (off-network process 12) is unaffected.
-
-2. *Un-weighted rates instead of inventory mass (FIXED for criteria pollutants).*
-   The port previously hardcoded `ModuleFlags::default()` (`apply_activity` false)
-   in `execute`, and the `universalActivity` table the weighting multiplies by is
-   **not in the captured execution DB** (canonical builds it internally from SHO /
-   Starts and never persists it). So the surviving roadType-4 rows carried the raw
-   BaseRate rate, not `rate × activity`. The error was **per-model-year**:
-   canonical/port row-level ratios ran from ≈0.22 to ≈7, the signature of the
-   missing fleet-population weight. `max_rel_diff`≈0.83 for `expand-criteria`.
-
-   **Fix:** `BaseRateCalculator::execute` now derives `apply_activity` from the
-   run's `ModelScale` (`Inv`/`MACROSCALE` = inventory → on; `Rates` → off),
-   threaded through `CalculatorContext::model_scale()`, and `build_universal_activity`
-   synthesizes `universalActivity` from the snapshot's `SHO` (process 1/9/10, per
-   link) / `Starts` (process 2, per zone) with `modelYearID = year − ageID`.
-   Crucially the activity is **`SHO / noOfRealDays`**, not raw `SHO`: empirically,
-   per model year and day-type, canonical `MOVESOutput = port_base × SHO /
-   noOfRealDays` (weekend ÷2, weekday ÷5) — the port's base emission already
-   carries the real-day count, so a raw-`SHO` multiply double-counts it (a constant
-   ≈4.3× over-emit). With this, `expand-criteria` matches canonical to f64
-   precision (`max_rel_diff` ≈ 8.5e-8) and has graduated to `asserted_fixtures`.
-
-   *Energy-unit conversion (FIXED).* The sibling `expand-*` fixtures select
-   **energy** (pollutant 91). Their base rate is in kJ and the runspec asks for
-   `energyunits="Million BTU"`, but the onroad output path applied no energy-unit
-   conversion (`max_rel_diff` ≈ 1.055e6). The engine now rebases energy-pollutant
-   `emissionQuant` from the base kJ to the run's `energyUnits`
-   (`EnergyUnit::factor_from_kilojoules`, kJ → MMBTU = `1000 / (1055.0559×1e6)`),
-   the energy half of canonical `OutputProcessor`'s "Mass & Energy unit
-   conversion". Energy **totals** now match canonical (port/canon ≈ 0.9997–1.0).
-
-   *Still open — two narrower residuals on the energy fixtures.*
-   - **E85 (fuelType 9):** every non-E85 fuel matches; fuelType-9 energy cells
-     are off ≈ 20 % (an ethanol energy-content / fuel-effects gap). Small absolute
-     mass, but above the 1e-3 gate.
-   - **`expand-counties`:** a uniform **≈3× over-emit across all fuel types** — a
-     multi-county expansion bug, orthogonal to energy (port/canon = 2.999).
-
-Until those land the energy-selecting fixtures stay in `QUARANTINED_FIXTURES`:
-row *shape* and criteria mass match, energy totals match, but the E85 slice and
-the county-expansion factor remain.
-
-**`process-apu`** is the same gap surfacing through a fixture that *was*
-asserted-vacuous only because the month bug suppressed its output. Its
-`baserate_91_2020` has 358 process-91 / pollutant-91 (energy) rows at op-modes
-201/203 (APU/shorepower), and a `baserateunits` row (KJ/s) exists, yet canonical
-writes **0** to both `baserateoutput` and `MOVESOutput` (the APU/shorepower idle
-energy is activity-gated). The port now emits ~100 un-weighted rows, so `apu`
-moved from `asserted_fixtures` (vacuous) into `QUARANTINED_FIXTURES` rather than
-having its assertion forced or a tolerance widened.
-
-`mixed-onroad-nonroad` was **retired and split** into `mixed-onroad` (onroad
-half) and `nr-mixed-nonroad` (nonroad half), both asserted-pass. Canonical MOVES
-5.0.1 does not implement a combined ONROAD+NONROAD run — `ExecutionRunSpec
-.buildVehicleSelections` leaves the `M12` case an unfinished stub ("only do one
-of the models at a time only for now"), so the single mixed RunSpec populated
-neither `RunSpecSourceType` nor `RunSpecSector` and emitted an empty
-`MOVESOutput` by design. The two single-model halves each produce real,
-validatable canonical output. (Nonroad does not model energy — pollutants 91/93
-are not nonroad-affected — so the nonroad half reports criteria/PM pollutants.)
-
-### Reported bug 2 — several NONROAD fixtures emit nothing or a wrong row count
-
-`nr-agriculture-state`, `nr-airport-support-county`, `nr-industrial-county`,
-and `nr-railroad-support-nation` produce **0** `MOVESOutput` rows against a
-populated canonical (−100 %). `nr-construction-state`, `nr-lawn-garden-county`,
-`nr-logging-county`, `nr-pleasure-craft-state`, and `nr-recreational-county`
-produce the wrong row count and diverge by 10³–10⁶ %. These are NONROAD
-population / sector-coverage gaps in the data plane, to be fixed there. Only
-`nr-commercial-nation` reproduces canonical (all four pollutants within 0.35 %).
-
-As each fixture's data plane is fixed it should graduate from
-`QUARANTINED_FIXTURES` into `asserted_fixtures` in the gate.
-
-### Reported bug 3 — onroad UNDER-emit: calculator-chain coverage gaps
-
-A second class of onroad fixtures emits **fewer** rows than canonical (the
-opposite of the over-emit above) because downstream speciation / chained
-calculators fire but produce no rows for several pollutants or processes. These
-are distinct from the BaseRate activity-weighting gap (§4.4 bug 1) and from the
-`runSpecRoadType` row-shape fix.
-
-* **`process-pm-exhaust`** — canonical writes 7 PM pollutants (100 PM10-total,
- 110 PM2.5-total, 111 organic carbon, 112 elemental carbon, 115 sulfate, 118
- composite non-EC, 119 H₂O), 1,456 rows. The port emits **only 112 and 118**
- (496 rows) — exactly the two running-exhaust components
- `BasicRunningPmEmissionCalculator` produces. The OC (111) and sulfate (115)
- component producers and the `PmTotalExhaustCalculator` (which forms 100/110 by
- re-labelling OC+EC+sulfate) emit **0** in the snapshot path — the chained
- PM-speciation inputs they read are not populated. (Note also the per-pollutant
- row count differs, 248 port vs 208 canonical — a separate model-year/grouping
- difference.) The PM-speciation chain data-flow must be wired before this can
- graduate.
-
-* **`process-airtoxics` (1,288 vs 248), `process-nox-speciation` (872 vs 248),
- `chain-nonhaptog` / `chain-tog-speciation` (1,080 vs 248)** — same family: the
- air-toxics / NOx-speciation / HC-speciation calculators that fan a base
- pollutant out into many species produce far fewer species rows than canonical
- (the port emits ≈248, a single base process's worth, where canonical has the
- full speciated set). Chained-calculator coverage gap.
-
-* **`process-brakewear` / `process-tirewear` (500 vs 750)** and
- **`process-crankcase-running` (744 vs 1,368)** — under-emit by a whole
- pollutant/process slice (and additionally carry the activity-weighting mass
- gap on the rows they do emit).
-
-* **`process-refueling` (250 vs 336)** — *wrong content*, not just under-count.
- Canonical writes refueling **processes 18 (displacement) + 19 (spillage)**,
- **pollutant 1 (THC)**. The port writes **process 1, pollutant 91 (total
- energy)** instead: the refueling calculator (processes 18/19) is not producing,
- and the `BaseRateCalculator` energy subscription (process 1 / pollutant 91)
- leaks into the run. This needs the refueling calculator wired and the energy
- leak gated, independent of the `runSpecRoadType` fix.
-
-All of bug 3 is calculator-chain data-plane work; none was forced or
-tolerance-masked, and each fixture graduates from `QUARANTINED_FIXTURES` once its
-chain emits the canonical pollutant/process set within tolerance.
+**All of these have been fixed and the affected fixtures graduated to
+`asserted_fixtures`.** None were resolved by widening a tolerance. The detailed
+root-cause-and-fix narrative for each is recorded in the git history and in the
+per-fixture comments of `full_suite_regression.rs`; it is no longer reproduced
+here because none of it describes a current failure. (`mixed-onroad-nonroad` was
+not "fixed" but **retired** — canonical MOVES 5.0.1 does not implement a combined
+ONROAD+NONROAD run, the `M12` case in `ExecutionRunSpec.buildVehicleSelections`
+being an unfinished stub — and split into the asserted `mixed-onroad` and
+`nr-mixed-nonroad` halves.)
 
 ---
 

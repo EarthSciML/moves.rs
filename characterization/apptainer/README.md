@@ -20,14 +20,17 @@ characterization/
 │   ├── README.md                 # this file
 │   ├── build-sif.sh              # canonical build wrapper; writes lockfile
 │   ├── build-fixture-sif.sh      # fixture build wrapper; writes lockfile
+│   ├── SLURM-build.sbatch        # SLURM batch job that runs build-sif.sh on a compute node
 │   ├── run-moves.sh              # runtime wrapper with bind mounts
 │   ├── run-fixture.sh            # fixture-capture orchestrator (Phase 0 Task 4)
+│   ├── capture-county-snapshot.sh  # single-county snapshot capture wrapper
 │   ├── dump-databases.sh         # in-SIF MariaDB dumper (bind-mounted by run-fixture.sh)
 │   └── files/
 │       ├── versions.env          # pinned versions (sourced by both)
 │       ├── my.cnf                # MOVES-tuned MariaDB config
 │       ├── init-mariadb.sh       # first-run seed-data copy
 │       ├── start-mariadb-bg.sh   # user-mode MariaDB launcher
+│       ├── nonroad_shim.sh       # NONROAD.exe invocation shim
 │       └── intermediate-state-capture.patch  # Phase 0 Task 3 flag flips
 ├── canonical-image.lock          # SHA256 of canonical-moves.sif
 ├── fixture-image.lock            # SHA256 of moves-fixture.sif

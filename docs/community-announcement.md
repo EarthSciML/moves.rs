@@ -70,7 +70,7 @@ purpose. The port targets the research and policy community.
 
 Contributions are welcome. See [CONTRIBUTING.md](../CONTRIBUTING.md) for the
 coding conventions, CI gates, and how to pick up a task. Each entry in
-`moves-rust-md` is a self-contained unit of work; the next
+the [migration plan](../moves-rust-migration-plan.md) is a self-contained unit of work; the next
 major milestone, default-database data-plane wiring, is ready for contributors.
 
 ### Browser demo

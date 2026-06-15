@@ -1,7 +1,7 @@
 # Migration Guide — moves.rs Polecat Reference
 
 This guide is for polecats implementing a task from the
-[`moves-rust-md`](../moves-rust-md). It covers
+[migration plan](../moves-rust-migration-plan.md). It covers
 the non-obvious setup steps that let you work efficiently on a fresh worktree.
 
 ---
@@ -74,7 +74,8 @@ MOVES_SRC_REV=<sha> MOVES_SRC=$(scripts/resolve_moves_src.sh)
 ## 2. What to port
 
 Each work item description lists the upstream source files to port and follows the
-corresponding section of the The typical artefacts to read are:
+corresponding section of the [migration plan](../moves-rust-migration-plan.md). The
+typical artefacts to read are:
 
 | Artefact type | Path pattern under `$MOVES_SRC` |
 |--------------|--------------------------------|

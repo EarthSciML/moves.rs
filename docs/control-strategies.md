@@ -18,19 +18,34 @@ every iteration. Each strategy declares the tables it modifies via
 The engine calls each registered strategy in registration order:
 
 1. **`pre_run`** — once before the first master-loop iteration. Used for global
- table transformations (all current strategies run entirely here).
+ table transformations (e.g. AVFT writes its `AVFT` table here; OnRoadRetrofit
+ loads its `onRoadRetrofit` programs here).
 2. **`execute`** — once per subscribed iteration at the strategy's declared
  granularity. No current strategy uses this; it defaults to a no-op.
 3. **`post_run`** — once after all iterations complete. Defaults to a no-op.
+4. **`apply_to_output`** — once after all chunks complete and the aggregator is
+ drained, mutating the finalized output records in place. `OnRoadRetrofitStrategy`
+ uses this to scale `emissionQuant` by its combined retrofit factor; it defaults
+ to a no-op for input-table strategies.
 
-### Registration order (canonical)
+### Registration order
 
-Canonical MOVES registers the four control strategies in this order:
+`register_strategies` (`crates/moves-calculators/src/lib.rs`) registers
+strategies in this order, with the gating predicates noted:
 
-1. `AvftControlStrategy` — modifies `AVFT`
-2. `RateOfProgressControlStrategy` — modifies `ratepollutantprocessmodelyeargroup`, `sourceTypeModelYear`
-3. `OnRoadRetrofitStrategy` — modifies `emissionRateAdjustment`
-4. `NonRoadRetrofitStrategy` — inline per-SCC reduction (no shared table)
+1. `FuelControlStrategy` — **always** registered. A verified no-op that
+   exercises the strategy pipeline without changing results.
+2. `RateOfProgressControlStrategy` — registered **only when**
+   `has_rate_of_progress(run_spec)` returns `true` (the RunSpec carries a
+   `RateOfProgress` internal control strategy with `use_parameters: true`).
+3. `OnRoadRetrofitStrategy` — registered **only when**
+   `has_on_road_retrofit(run_spec)` is `true`, and only on non-wasm targets
+   (`#[cfg(not(target_arch = "wasm32"))]`). Applies as a post-output scaling.
+
+`AvftControlStrategy` and `NonRoadRetrofitStrategy` are **not** registered by
+`register_strategies` — AVFT is constructed and wired through its own input
+loader (see §1), and NonRoadRetrofit applies inline in the NONROAD per-SCC loop
+(see §4).
 
 The combined on-road emission scaling for a vehicle is:
 
@@ -38,7 +53,8 @@ The combined on-road emission scaling for a vehicle is:
 emission_rate_final = base_rate × ROP_scale × OnRoadRetrofit_factor
 ```
 
-All four strategies touch independent tables and coexist without conflict.
+The registered strategies touch independent tables/outputs and coexist without
+conflict.
 
 ---
 
@@ -343,7 +359,7 @@ NONROAD retrofit records are loaded from `.RTR` files by `moves_nonroad::input::
 
 ## Multiple strategies — combined effect
 
-When multiple strategies are registered, the engine runs them in registration order at the same lifecycle phase (`pre_run`). The canonical order is AVFT → ROP → OnRoadRetrofit → NonRoadRetrofit.
+When multiple strategies are registered, the engine runs them in registration order at the same lifecycle phase (`pre_run`). `register_strategies` registers FuelControl (always), then ROP (gated on `has_rate_of_progress`), then OnRoadRetrofit (gated on `has_on_road_retrofit`, non-wasm). AVFT is wired separately through its input loader; NonRoadRetrofit applies inline in the NONROAD loop.
 
 For an on-road vehicle the downstream emission rate is:
 
@@ -359,15 +375,36 @@ AVFT modifies the `AVFT` fleet-composition table, which feeds into which calcula
 
 ## Behavioral divergences from canonical MOVES
 
-### Data-plane write deferred
+### Per-strategy wiring state
 
-All four strategies currently complete their `pre_run` hook without writing into the execution database. The actual table mutations are gated on the `DataFrameStore` / `ExecutionTables` mutable write API. Until that lands, strategies compute and hold their results in memory — the `modified_tables` declaration signals the engine correctly, but the downstream calculators receive the *unmodified* default tables.
+Control strategies now affect emissions output. The current state per strategy:
 
-**Practical effect:** In the current build, control strategies validate their inputs and confirm registration order but do not yet affect emissions output. The `moves-control-strategy-validation` crate verifies the mathematical formulas against the canonical Java constants independently of the data-plane write.
+- **`FuelControlStrategy`** — registered always, but a verified no-op
+  (`pct_diff = 0` vs canonical); it exercises the strategy pipeline without
+  changing results.
+- **`AvftControlStrategy`** — its `pre_run` writes the completed AVFT table into
+  the store (`tables.insert("AVFT", df)`), so downstream calculators see the
+  user-specified fleet composition. Note that AVFT is **not** registered by
+  `register_strategies`; it is wired through its own input loader.
+- **`RateOfProgressControlStrategy`** — registered (and gated) by
+  `register_strategies`. Wired through the registry when the RunSpec requests it.
+- **`OnRoadRetrofitStrategy`** — registered (and gated) by `register_strategies`.
+  It loads its programs from the `onRoadRetrofit` execution table in `pre_run`
+  and scales the finalized, aggregated output records in `apply_to_output`
+  (`emissionQuant *= retrofitFactor + nonRetrofitFactor`).
+- **Unported strategies** fail loud rather than silently dropping the control
+  effect and reporting wrong totals.
 
-### `has_rate_of_progress` flag not wired
+The `moves-control-strategy-validation` crate additionally verifies the
+mathematical formulas against the canonical Java constants.
 
-`ExecutionRunSpec::has_rate_of_progress` returns `false` unconditionally (the RunSpec model does not yet carry the flag). Some downstream calculators gate behavior on this flag; those code paths follow the "no ROP" branch until the flag is wired.
+### `has_rate_of_progress` predicate
+
+`has_rate_of_progress(run_spec)` (in `crates/moves-calculators/src/lib.rs`) is a
+real predicate: it returns `true` when the RunSpec carries an enabled
+`RateOfProgress` internal control strategy entry
+(`InternalControlStrategy::RateOfProgress { use_parameters: true }`). It gates
+whether `RateOfProgressControlStrategy` is registered.
 
 ### NonRoadRetrofit uses string pollutant codes
 
@@ -381,5 +418,9 @@ The following features are implemented: the `InternalControlStrategy` trait and 
 
 ### Known limitations
 
-- **`DataFrameStore`** — the mutable execution-table write API is required before strategies affect output. All four `pre_run` bodies contain a `TODO` comment marking the exact call site.
-- **`has_rate_of_progress` flag** — the `has_rate_of_progress` flag in the `RunSpec` model is needed to wire the ROP flag through to downstream calculators that gate on it.
+- **AVFT registration** — `AvftControlStrategy` is wired through its own input
+  loader, not `register_strategies`; registering it there with an empty table
+  would clobber a real `AVFT` execution-DB table.
+- **Unported strategy bodies** — strategies whose canonical algorithm is not yet
+  ported (e.g. the ROP model-year-group propagation) fail loud at `pre_run`
+  rather than silently dropping the control effect.

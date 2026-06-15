@@ -7,15 +7,22 @@ phase verifies against.
 
 ## Acceptance status
 
-T7 (`mo-o785i`) ran the full 34-fixture suite on 2026-05-26 with result
-**34/34 succeeded, 0 failed**. The three `scale-*` fixtures were skipped
-(require an additional input DB; see `characterization/fixtures/README.md`).
-T8 (`mo-zt8nk`) triage found no failed fixtures requiring re-run or
-documentation.
+As of 2026-06-15 `characterization/fixtures/` holds **51** RunSpec XML
+fixtures, and **39** of them have a populated snapshot directory here (one
+sub-directory per fixture carrying a `manifest.json`). The three `scale-*`
+fixtures are skipped (require an additional input DB; see
+`characterization/fixtures/README.md`). The canonical-diff regression gate
+asserts all 39 against canonical MOVES (see
+`docs/known-divergences.md` §1b).
+
+The original acceptance pass was T7 (`mo-o785i`) on 2026-05-26 — at that
+time the suite was 34 non-scale fixtures, **34/34 succeeded, 0 failed**, and
+T8 (`mo-zt8nk`) triage found no failures requiring re-run; the suite has
+since grown to the counts above.
 
 | Fixture | Status | Notes |
 |---------|--------|-------|
-| All 34 non-scale fixtures | OK | Populated; see sub-directories |
+| 39 non-scale fixtures | OK | Populated; see sub-directories |
 | scale-county | skipped | Requires additional input DB |
 | scale-project | skipped | Requires additional input DB |
 | scale-rates | skipped | Requires additional input DB |
@@ -169,8 +176,9 @@ The full set of options, including `--workdir`, `--output-dir`,
 
 ## Producing the full Phase 0 fixture suite
 
-Phase 0 Task 5/6 (bead `mo-n2yg`) ships 33 RunSpec XML fixtures under
-`characterization/fixtures/`. To populate the matching snapshots end-to-end:
+`characterization/fixtures/` ships 51 RunSpec XML fixtures (Phase 0 Task 5/6,
+bead `mo-n2yg`, plus subsequent additions). To populate the matching snapshots
+end-to-end:
 
 ```sh
 # Once, on an HPC compute node with Apptainer + fakeroot:
