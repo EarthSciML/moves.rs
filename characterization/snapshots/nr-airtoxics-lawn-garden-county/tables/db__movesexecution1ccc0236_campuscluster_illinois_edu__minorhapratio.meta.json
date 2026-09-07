@@ -1,0 +1,43 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__minorhapratio",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelSubtypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "atRatio",
+      "kind": "float64"
+    },
+    {
+      "name": "atRatioCV",
+      "kind": "float64"
+    },
+    {
+      "name": "dataSourceId",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID",
+    "fuelTypeID",
+    "fuelSubtypeID",
+    "modelYearGroupID"
+  ],
+  "row_count": 84,
+  "float_decimals": 12,
+  "content_sha256": "5245f80564c00aa741aaeb9030b4348288c954c8771daaa7648ffaf6b7b7f4c6"
+}

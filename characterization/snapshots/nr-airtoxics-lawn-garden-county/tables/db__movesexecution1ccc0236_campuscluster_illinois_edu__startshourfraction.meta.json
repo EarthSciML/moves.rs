@@ -1,0 +1,30 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0236_campuscluster_illinois_edu__startshourfraction",
+  "schema": [
+    {
+      "name": "dayID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "allocationFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "dayID",
+    "hourID",
+    "sourceTypeID"
+  ],
+  "row_count": 13,
+  "float_decimals": 12,
+  "content_sha256": "10bd1ac20aa18866db5243505146749686478c66b8a2556415f08ea65efef2e2"
+}
