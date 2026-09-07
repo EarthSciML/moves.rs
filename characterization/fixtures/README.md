@@ -1,6 +1,6 @@
 # Fixture catalogue (Phase 0 Task 5 + 6)
 
-The 33 RunSpec XML files in this directory are the regression fixtures that
+The 52 RunSpec XML files in this directory are the regression fixtures that
 every later phase of the moves.rs port verifies against. Each one is a
 hand-tuned MOVES input whose snapshot (in `../snapshots/<fixture-name>/`)
 is the ground-truth oracle for one slice of the MOVES coverage space.
@@ -17,7 +17,7 @@ characterization/fixtures/
 ├── process-*.xml            one-process focal fixtures
 ├── chain-*.xml              chain-leaf-focal fixtures
 ├── scale-*.xml              ModelScale × ModelDomain coverage
-└── nr-*.xml                 NONROAD-model fixtures (10)
+└── nr-*.xml                 NONROAD-model fixtures (12)
 ```
 
 `sample-runspec.xml` is byte-identical to
@@ -25,12 +25,21 @@ characterization/fixtures/
 (MOVES5.0.1 @ `25dc6c83`). Treating it as input rather than generator
 output preserves provenance for fixture #1 of the bead.
 
-Every other XML is regenerated from the spec table at the top of
+Every other XML is *derived* from the spec table at the top of
 `_generate.py`. Re-run after editing the table:
 
 ```sh
 python3 characterization/fixtures/_generate.py
 ```
+
+The catalogue has drifted from that table: several XMLs were hand-edited
+after their snapshot was captured, and a later wave of fixtures was added
+to this directory with no spec entry. `_generate.py` therefore **refuses
+to overwrite** a committed XML whose bytes differ from what the table
+renders — it reports those as "drifted" and leaves them alone, so a plain
+re-run can only add new files and refresh `coverage-matrix.md`. Pass
+`--force` to overwrite regardless, or name fixtures on the command line
+to regenerate just those. See the `_generate.py` module docstring.
 
 ## Naming conventions
 
@@ -87,7 +96,7 @@ regenerated every time `_generate.py` is run.
 
 | Acceptance criterion | State |
 |----------------------|-------|
-| Fixtures live in `characterization/fixtures/` | **Met** — 33 RunSpec XMLs (target: 30–35) |
+| Fixtures live in `characterization/fixtures/` | **Met** — 52 RunSpec XMLs (original target: 30–35; later phases added more) |
 | Each fixture has a snapshot in `characterization/snapshots/` | **Pending compute-node run** — see below |
 | Coverage matrix documents (process × scale × calculator-chain) | **Met** — `coverage-matrix.md` |
 

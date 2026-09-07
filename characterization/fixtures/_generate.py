@@ -761,8 +761,15 @@ FIXTURES: list[FixtureSpec] = [
         description="NONROAD Pleasure Craft sector (Recreational Marine), "
                     "state geography (Florida) — exercises RecMar evap "
                     "permeation chain in Phase-5 NONROAD-NR-rewrite reference.",
-        coverage=("nr", "nr-state", "chain-nremission", "chain-nrhcspeciation",
-                  "chain-nrairtoxics", "chain-baserate",
+        # Measured against the captured snapshot: NRHCSpeciationCalculator is
+        # never even class-loaded here, and NRAirToxicsCalculator loads but
+        # emits nothing — this fixture selects Benzene on processes 22/23/24,
+        # which is NRAirToxics' *output*, while doExecute() gates on its
+        # *input* (VOC 87 / PM2.5 110 / BSFC 99 / NMOG 80). The snapshot's
+        # MOVESOutput carries only (1,1), (2,1), (3,1), (100,1). Both chain
+        # tags were therefore aspirational; nr-airtoxics-lawn-garden-county
+        # is the fixture that actually reaches them.
+        coverage=("nr", "nr-state", "chain-nremission", "chain-baserate",
                   "proc-22", "proc-23", "proc-24", "proc-40"),
         models=("NONROAD",),
         geographic=(Geo("STATE", 12, "FLORIDA"),),

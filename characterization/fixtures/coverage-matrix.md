@@ -43,7 +43,7 @@ Column legend:
 | `nr-commercial-nation.xml` | NONROAD Commercial sector at national rollup (US-total). | 40 | NONROAD/nation | NonroadEmissionCalculator; _BaseRateCalculator_ | NONROAD |
 | `nr-logging-county.xml` | NONROAD Logging sector, Washtenaw County (chain saws etc). | 40 | NONROAD/county | NonroadEmissionCalculator; _BaseRateCalculator_ | NONROAD |
 | `nr-airport-support-county.xml` | NONROAD Airport Support sector, Cook County IL (O'Hare). | 40 | NONROAD/county | NonroadEmissionCalculator; _BaseRateCalculator_ | NONROAD |
-| `nr-pleasure-craft-state.xml` | NONROAD Pleasure Craft sector (Recreational Marine), state geography (Florida) — exercises RecMar evap permeation chain in Phase-5 NONROAD-NR-rewrite reference. | 22, 23, 24, 40 | NONROAD/state | NonroadEmissionCalculator; NRHCSpeciationCalculator; **NRAirToxicsCalculator**; _BaseRateCalculator_ | NONROAD |
+| `nr-pleasure-craft-state.xml` | NONROAD Pleasure Craft sector (Recreational Marine), state geography (Florida) — exercises RecMar evap permeation chain in Phase-5 NONROAD-NR-rewrite reference. | 22, 23, 24, 40 | NONROAD/state | NonroadEmissionCalculator; _BaseRateCalculator_ | NONROAD |
 | `nr-railroad-support-nation.xml` | NONROAD Railroad Support sector at national rollup. | 40 | NONROAD/nation | NonroadEmissionCalculator; _BaseRateCalculator_ | NONROAD |
 | `nr-airtoxics-lawn-garden-county.xml` | NONROAD air toxics — Lawn/Garden sector (gasoline), Washtenaw County. Vehicle/geography/time selections are identical to nr-lawn-garden-county; only the pollutant set differs, so the two snapshots isolate the air-toxics chain. Selects the HC-speciation species (CH4/NMHC/NMOG/TOG/VOC) that NRHCSpeciationCalculator emits plus the VOC/PM2.5/BSFC/NMOG inputs that NRAirToxicsCalculator gates on, so both previously-unreached NONROAD calculators instantiate and emit. | 1 | NONROAD/county | NonroadEmissionCalculator; NRHCSpeciationCalculator; **NRAirToxicsCalculator**; _BaseRateCalculator_ | NONROAD |
 
@@ -88,8 +88,8 @@ Roles per `InterconnectionTracker.recordChain` semantics: a **leaf** is a calcul
 | LiquidLeakingCalculator | — | `process-evap-leaks` |
 | NO2Calculator | — | `expand-criteria` |
 | NOCalculator | — | `expand-criteria` |
-| NRAirToxicsCalculator | leaf | `nr-pleasure-craft-state`, `nr-airtoxics-lawn-garden-county` |
-| NRHCSpeciationCalculator | — | `nr-pleasure-craft-state`, `nr-airtoxics-lawn-garden-county` |
+| NRAirToxicsCalculator | leaf | `nr-airtoxics-lawn-garden-county` |
+| NRHCSpeciationCalculator | — | `nr-airtoxics-lawn-garden-county` |
 | NonroadEmissionCalculator | — | `nr-recreational-county`, `nr-construction-state`, `nr-industrial-county`, `nr-lawn-garden-county`, `nr-agriculture-state`, `nr-commercial-nation`, `nr-logging-county`, `nr-airport-support-county`, `nr-pleasure-craft-state`, `nr-railroad-support-nation`, `nr-airtoxics-lawn-garden-county` |
 | PM10BrakeTireCalculator | leaf | `process-brakewear`, `process-tirewear` |
 | PM10EmissionCalculator | leaf | `process-pm-exhaust` |
