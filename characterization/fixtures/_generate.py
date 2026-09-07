@@ -15,6 +15,22 @@ provenance for fixture #1.
 Each fixture targets one or two specific dimensions of the MOVES coverage
 space (see coverage-matrix.md). Fields you don't override here use the
 ONROAD inventory defaults below.
+
+Catalogue drift
+---------------
+The committed fixture set has outgrown this table: several XMLs were
+hand-edited after capture (carrier pollutants added, NONROAD process IDs
+corrected from the non-existent "40" to the real Running Exhaust "1",
+`<day key=>` changed to `<day id=>`), and a second wave of fixtures
+(`nr-mixed-nonroad`, `mixed-onroad`, `chain-nonhaptog`, the `*-single`
+county fixtures, the `error-bad-*` fixtures, ...) was added to the
+directory without a spec entry here. Regenerating those XMLs would
+invalidate their captured snapshots, so `main()` refuses to overwrite a
+committed file that differs from what this table renders; it reports them
+as "drifted" and moves on. Pass `--force` to overwrite anyway, or name
+individual fixtures on the command line to regenerate just those:
+
+    python3 characterization/fixtures/_generate.py nr-airtoxics-lawn-garden-county
 """
 from __future__ import annotations
 
@@ -41,21 +57,40 @@ POLLUTANTS = {
     5:   "Methane (CH4)",
     6:   "Nitrous Oxide (N2O)",
     20:  "Benzene",
+    21:  "Ethanol",
+    23:  "Naphthalene particle",
     24:  "1,3-Butadiene",
     25:  "Formaldehyde",
+    26:  "Acetaldehyde",
+    27:  "Acrolein",
     31:  "Sulfur Dioxide (SO2)",
+    45:  "Toluene",
+    46:  "Xylene",
+    60:  "Mercury Elemental Gaseous",
+    63:  "Arsenic Compounds",
+    65:  "Chromium 6+",
+    66:  "Manganese Compounds",
+    67:  "Nickel Compounds",
+    69:  "Fluoranthene particle",
     79:  "Non-Methane Hydrocarbons",
+    80:  "Non-Methane Organic Gases",
     86:  "Total Organic Gases",
     87:  "Volatile Organic Compounds",
+    88:  "NonHAPTOG",
     91:  "Total Energy Consumption",
     92:  "Petroleum Energy Consumption",
     93:  "Fossil Fuel Energy Consumption",
+    99:  "Brake Specific Fuel Consumption (BSFC)",
     100: "Primary Exhaust PM10  - Total",
     106: "Primary PM10 - Brakewear Particulate",
     107: "Primary PM10 - Tirewear Particulate",
     110: "Primary Exhaust PM2.5 - Total",
     116: "Primary PM2.5 - Brakewear Particulate",
     117: "Primary PM2.5 - Tirewear Particulate",
+    131: "Octachlorodibenzo-p-dioxin",
+    142: "2,3,7,8-Tetrachlorodibenzo-p-Dioxin",
+    169: "Fluoranthene gas",
+    185: "Naphthalene gas",
 }
 
 PROCESSES = {
@@ -110,6 +145,9 @@ ROAD_TYPES = {
     3: "Rural Unrestricted Access",
     4: "Urban Restricted Access",
     5: "Urban Unrestricted Access",
+    # NONROAD's pseudo road type. MOVES emits it without a modelCombination
+    # attribute (see `render`), matching the committed nr-*.xml fixtures.
+    100: "Nonroad",
 }
 
 NONROAD_SECTORS = {
@@ -146,6 +184,12 @@ class TimeSpan:
     begin_hour: int = 6                    # hour-of-day index per hourofanyday
     end_hour: int = 6
     aggregate_by: Optional[str] = None     # "Hour"/"Day"/"Month"/"Year"
+    # `<day key=>` is an *index* into TimeSpan.allDays; `<day id=>` is the
+    # dayID (see RunSpecXML.processTimeSpan -> getDayByIndex/getDayByID).
+    # allDays has two entries, so key="5" resolves to null and MOVES then
+    # falls back to every day; id="5" selects weekdays only. The nr-*.xml
+    # fixtures all use `id`, which is the cheaper (and intended) form.
+    day_attr: str = "key"                  # "key" (index) or "id" (dayID)
 
 @dataclass
 class FixtureSpec:
@@ -222,7 +266,7 @@ def render(spec: FixtureSpec) -> str:
     for m in ts.months:
         out.append(f'\t\t<month key="{m}"/>')
     for d in ts.days:
-        out.append(f'\t\t<day key="{d}"/>')
+        out.append(f'\t\t<day {ts.day_attr}="{d}"/>')
     out.append(f'\t\t<beginhour key="{ts.begin_hour}"/>')
     out.append(f'\t\t<endhour key="{ts.end_hour}"/>')
     if ts.aggregate_by:
@@ -252,8 +296,12 @@ def render(spec: FixtureSpec) -> str:
 
     out.append('\t<roadtypes>')
     for rt in spec.road_types:
-        out.append(f'\t\t<roadtype roadtypeid="{rt}" roadtypename="{ROAD_TYPES[rt]}"'
-                   f' modelCombination="M1"/>')
+        if rt == 100:   # NONROAD pseudo road type — no modelCombination
+            out.append(f'\t\t<roadtype roadtypeid="{rt}"'
+                       f' roadtypename="{ROAD_TYPES[rt]}"/>')
+        else:
+            out.append(f'\t\t<roadtype roadtypeid="{rt}" roadtypename="{ROAD_TYPES[rt]}"'
+                       f' modelCombination="M1"/>')
     out.append('\t</roadtypes>')
 
     out.append('\t<pollutantprocessassociations>')
@@ -356,6 +404,58 @@ CRANKCASE_EXTIDLE = ((3, 17), (1, 17), (2, 17))
 
 APU = ((91, 91),)                                       # energy via APU
 TOG_SPECIATION = ((86, 1), (5, 1), (79, 1))             # TOG, CH4, NMHC running
+
+# NONROAD air-toxics selection, all on Running Exhaust (process 1).
+#
+# Both NR calculators are *chained*, not MasterLoop subscribers, so what
+# makes them run is the pollutant set, not the process set:
+#
+#   NRHCSpeciationCalculator.buildPollutantAndProcessRequirements() keeps an
+#   entry only when the runspec has its **output** (pollutant in
+#   {5,79,80,86,87} with a nonroad-affected process) — hence the CH4/NMHC/
+#   NMOG/TOG/VOC block below.
+#
+#   NRAirToxicsCalculator.doExecute() keeps an entry only when the runspec
+#   has its **input**: VOC (87) for nrATRatio + nrPAHGasRatio, PM2.5 (110)
+#   for nrPAHParticleRatio, BSFC (99) for nrDioxinEmissionRate +
+#   nrMetalEmissionRate, NMOG (80) for the NonHAPTOG pass. Those inputs are
+#   what the earlier nr-*.xml fixtures never selected, which is why
+#   nr-pleasure-craft-state loads the class but emits nothing from it.
+#
+# ExecutionRunSpec.flagRequiredPollutantProcesses() returns early for
+# NONROAD ("Nonroad has no silent pollutants/processes added for the user"),
+# so every link of the chain has to be listed explicitly.
+NR_AIRTOXICS_INPUTS = (
+    (1, 1),      # THC   — NonroadEmissionCalculator, feeds NMHC/CH4
+    (99, 1),     # BSFC  — feeds nrDioxinEmissionRate + nrMetalEmissionRate
+    (100, 1),    # PM10  — NonroadEmissionCalculator
+    (110, 1),    # PM2.5 — feeds nrPAHParticleRatio
+)
+
+NR_HC_SPECIATION = (
+    (5, 1),      # Methane        \
+    (79, 1),     # NMHC            | NRHCSpeciationCalculator outputs;
+    (80, 1),     # NMOG            | NMOG + VOC are NRAirToxics inputs
+    (86, 1),     # TOG             |
+    (87, 1),     # VOC            /
+)
+
+NR_AIRTOXICS_OUTPUTS = (
+    # nrATRatio (input VOC 87)
+    (20, 1), (21, 1), (24, 1), (25, 1), (26, 1), (27, 1), (45, 1), (46, 1),
+    # nrPAHGasRatio (input VOC 87)
+    (169, 1), (185, 1),
+    # nrPAHParticleRatio (input PM2.5 110)
+    (23, 1), (69, 1),
+    # nrMetalEmissionRate (input BSFC 99)
+    (60, 1), (63, 1), (65, 1), (66, 1), (67, 1),
+    # nrDioxinEmissionRate (input BSFC 99)
+    (131, 1), (142, 1),
+    # NonHAPTOG pass (input NMOG 80)
+    (88, 1),
+)
+
+NR_AIRTOXICS = NR_AIRTOXICS_INPUTS + NR_HC_SPECIATION + NR_AIRTOXICS_OUTPUTS
 
 
 FIXTURES: list[FixtureSpec] = [
@@ -686,6 +786,29 @@ FIXTURES: list[FixtureSpec] = [
         pp_assocs=((2, 40), (3, 40), (31, 40), (100, 40)),
         geographic_output_detail="NATION",
     ),
+
+    # ---------------- NONROAD air-toxics fixture (11th nr-*) ------------------
+    FixtureSpec(
+        name="nr-airtoxics-lawn-garden-county",
+        description="NONROAD air toxics — Lawn/Garden sector (gasoline), "
+                    "Washtenaw County. Vehicle/geography/time selections are "
+                    "identical to nr-lawn-garden-county; only the pollutant set "
+                    "differs, so the two snapshots isolate the air-toxics "
+                    "chain. Selects the HC-speciation species (CH4/NMHC/NMOG/"
+                    "TOG/VOC) that NRHCSpeciationCalculator emits plus the "
+                    "VOC/PM2.5/BSFC/NMOG inputs that NRAirToxicsCalculator "
+                    "gates on, so both previously-unreached NONROAD "
+                    "calculators instantiate and emit.",
+        coverage=("nr", "nr-county", "chain-nremission", "chain-nrhcspeciation",
+                  "chain-nrairtoxics", "chain-baserate", "proc-1"),
+        models=("NONROAD",),
+        onroad_selections=(),
+        offroad_selections=((1, 4),),    # Gasoline lawn/garden
+        road_types=(100,),
+        pp_assocs=NR_AIRTOXICS,
+        timespan=TimeSpan(year=2020, months=(7,), days=(5,),
+                          begin_hour=6, end_hour=6, day_attr="id"),
+    ),
 ]
 
 
@@ -849,20 +972,49 @@ def render_matrix(specs: list[FixtureSpec]) -> str:
     return "\n".join(out) + "\n"
 
 
-def main() -> int:
-    written = 0
+def main(argv: Optional[list[str]] = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    force = "--force" in argv
+    argv = [a for a in argv if a != "--force"]
+    wanted = set(argv)   # empty => every fixture in the table
+
+    written, drifted, skipped = [], [], []
     seen_names = set()
     for spec in FIXTURES:
         if spec.name in seen_names:
             print(f"FATAL: duplicate fixture name {spec.name!r}", file=sys.stderr)
             return 1
         seen_names.add(spec.name)
+        if wanted and spec.name not in wanted:
+            skipped.append(spec.name)
+            continue
         path = HERE / f"{spec.name}.xml"
-        path.write_text(render(spec), encoding="utf-8")
-        written += 1
+        body = render(spec)
+        if path.exists() and path.read_text(encoding="utf-8") != body and not force:
+            # The committed XML was hand-edited after this table was written.
+            # Overwriting it would silently invalidate its captured snapshot,
+            # so leave it alone and say so. Pass --force to overwrite anyway.
+            drifted.append(spec.name)
+            continue
+        path.write_text(body, encoding="utf-8")
+        written.append(spec.name)
     matrix_path = HERE / "coverage-matrix.md"
     matrix_path.write_text(render_matrix(FIXTURES), encoding="utf-8")
-    print(f"[generate] wrote {written} fixtures + preserved {len(PRESERVE)} canonical")
+    print(f"[generate] wrote {len(written)} fixtures "
+          f"+ preserved {len(PRESERVE)} canonical")
+    if drifted:
+        print(f"[generate] KEPT {len(drifted)} drifted fixture(s) — the "
+              f"committed XML differs from this table and was NOT overwritten:")
+        for n in drifted:
+            print(f"[generate]   {n}.xml")
+        print("[generate] (re-run with --force to overwrite; see the module "
+              "docstring on catalogue drift)")
+    if wanted:
+        unknown = sorted(wanted - seen_names)
+        if unknown:
+            print(f"FATAL: unknown fixture name(s): {', '.join(unknown)}",
+                  file=sys.stderr)
+            return 1
     print(f"[generate] wrote coverage matrix to {matrix_path.name}")
     print(f"[generate] dir = {HERE}")
     return 0

@@ -45,6 +45,7 @@ Column legend:
 | `nr-airport-support-county.xml` | NONROAD Airport Support sector, Cook County IL (O'Hare). | 40 | NONROAD/county | NonroadEmissionCalculator; _BaseRateCalculator_ | NONROAD |
 | `nr-pleasure-craft-state.xml` | NONROAD Pleasure Craft sector (Recreational Marine), state geography (Florida) — exercises RecMar evap permeation chain in Phase-5 NONROAD-NR-rewrite reference. | 22, 23, 24, 40 | NONROAD/state | NonroadEmissionCalculator; NRHCSpeciationCalculator; **NRAirToxicsCalculator**; _BaseRateCalculator_ | NONROAD |
 | `nr-railroad-support-nation.xml` | NONROAD Railroad Support sector at national rollup. | 40 | NONROAD/nation | NonroadEmissionCalculator; _BaseRateCalculator_ | NONROAD |
+| `nr-airtoxics-lawn-garden-county.xml` | NONROAD air toxics — Lawn/Garden sector (gasoline), Washtenaw County. Vehicle/geography/time selections are identical to nr-lawn-garden-county; only the pollutant set differs, so the two snapshots isolate the air-toxics chain. Selects the HC-speciation species (CH4/NMHC/NMOG/TOG/VOC) that NRHCSpeciationCalculator emits plus the VOC/PM2.5/BSFC/NMOG inputs that NRAirToxicsCalculator gates on, so both previously-unreached NONROAD calculators instantiate and emit. | 1 | NONROAD/county | NonroadEmissionCalculator; NRHCSpeciationCalculator; **NRAirToxicsCalculator**; _BaseRateCalculator_ | NONROAD |
 
 ## Process coverage (forward index)
 
@@ -52,7 +53,7 @@ Each ID below appears in at least one fixture above. Rows where the process neve
 
 | Process ID | Name | Fixture(s) |
 |------------|------|------------|
-| 1 | Running Exhaust | `sample-runspec`, `expand-day`, `expand-month`, `expand-counties`, `expand-fueltype-diesel`, `expand-sourcetype`, `expand-criteria`, `process-pm-exhaust`, `process-airtoxics`, `chain-tog-speciation`, `scale-county`, `scale-project`, `scale-rates` |
+| 1 | Running Exhaust | `sample-runspec`, `expand-day`, `expand-month`, `expand-counties`, `expand-fueltype-diesel`, `expand-sourcetype`, `expand-criteria`, `process-pm-exhaust`, `process-airtoxics`, `chain-tog-speciation`, `scale-county`, `scale-project`, `scale-rates`, `nr-airtoxics-lawn-garden-county` |
 | 2 | Start Exhaust | `sample-runspec`, `expand-day`, `expand-month`, `expand-counties`, `expand-fueltype-diesel`, `expand-sourcetype`, `expand-criteria`, `scale-county`, `scale-project`, `scale-rates` |
 | 9 | Brakewear | `process-brakewear` |
 | 10 | Tirewear | `process-tirewear` |
@@ -79,7 +80,7 @@ Roles per `InterconnectionTracker.recordChain` semantics: a **leaf** is a calcul
 | Calculator | Role | Fixture(s) |
 |------------|------|------------|
 | AirToxicsCalculator | — | `process-airtoxics` |
-| BaseRateCalculator | foundation | `sample-runspec`, `expand-day`, `expand-month`, `expand-counties`, `expand-fueltype-diesel`, `expand-sourcetype`, `expand-criteria`, `process-brakewear`, `process-tirewear`, `process-pm-exhaust`, `process-evap-permeation`, `process-evap-fvv`, `process-evap-leaks`, `process-refueling`, `process-crankcase-running`, `process-crankcase-start`, `process-crankcase-extidle`, `process-apu`, `process-airtoxics`, `chain-tog-speciation`, `scale-county`, `scale-project`, `scale-rates`, `nr-recreational-county`, `nr-construction-state`, `nr-industrial-county`, `nr-lawn-garden-county`, `nr-agriculture-state`, `nr-commercial-nation`, `nr-logging-county`, `nr-airport-support-county`, `nr-pleasure-craft-state`, `nr-railroad-support-nation` |
+| BaseRateCalculator | foundation | `sample-runspec`, `expand-day`, `expand-month`, `expand-counties`, `expand-fueltype-diesel`, `expand-sourcetype`, `expand-criteria`, `process-brakewear`, `process-tirewear`, `process-pm-exhaust`, `process-evap-permeation`, `process-evap-fvv`, `process-evap-leaks`, `process-refueling`, `process-crankcase-running`, `process-crankcase-start`, `process-crankcase-extidle`, `process-apu`, `process-airtoxics`, `chain-tog-speciation`, `scale-county`, `scale-project`, `scale-rates`, `nr-recreational-county`, `nr-construction-state`, `nr-industrial-county`, `nr-lawn-garden-county`, `nr-agriculture-state`, `nr-commercial-nation`, `nr-logging-county`, `nr-airport-support-county`, `nr-pleasure-craft-state`, `nr-railroad-support-nation`, `nr-airtoxics-lawn-garden-county` |
 | CO2AERunningStartExtendedIdleCalculator | leaf | `sample-runspec`, `expand-day`, `expand-month`, `expand-counties`, `expand-fueltype-diesel`, `expand-sourcetype`, `process-apu`, `scale-county`, `scale-project`, `scale-rates` |
 | CrankcaseEmissionCalculatorNonPM | — | `process-crankcase-running`, `process-crankcase-start`, `process-crankcase-extidle` |
 | EvaporativePermeationCalculator | — | `process-evap-permeation` |
@@ -87,9 +88,9 @@ Roles per `InterconnectionTracker.recordChain` semantics: a **leaf** is a calcul
 | LiquidLeakingCalculator | — | `process-evap-leaks` |
 | NO2Calculator | — | `expand-criteria` |
 | NOCalculator | — | `expand-criteria` |
-| NRAirToxicsCalculator | leaf | `nr-pleasure-craft-state` |
-| NRHCSpeciationCalculator | — | `nr-pleasure-craft-state` |
-| NonroadEmissionCalculator | — | `nr-recreational-county`, `nr-construction-state`, `nr-industrial-county`, `nr-lawn-garden-county`, `nr-agriculture-state`, `nr-commercial-nation`, `nr-logging-county`, `nr-airport-support-county`, `nr-pleasure-craft-state`, `nr-railroad-support-nation` |
+| NRAirToxicsCalculator | leaf | `nr-pleasure-craft-state`, `nr-airtoxics-lawn-garden-county` |
+| NRHCSpeciationCalculator | — | `nr-pleasure-craft-state`, `nr-airtoxics-lawn-garden-county` |
+| NonroadEmissionCalculator | — | `nr-recreational-county`, `nr-construction-state`, `nr-industrial-county`, `nr-lawn-garden-county`, `nr-agriculture-state`, `nr-commercial-nation`, `nr-logging-county`, `nr-airport-support-county`, `nr-pleasure-craft-state`, `nr-railroad-support-nation`, `nr-airtoxics-lawn-garden-county` |
 | PM10BrakeTireCalculator | leaf | `process-brakewear`, `process-tirewear` |
 | PM10EmissionCalculator | leaf | `process-pm-exhaust` |
 | RefuelingLossCalculator | — | `process-refueling` |
