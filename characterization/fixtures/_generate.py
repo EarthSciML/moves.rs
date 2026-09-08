@@ -64,6 +64,11 @@ POLLUTANTS = {
     26:  "Acetaldehyde",
     27:  "Acrolein",
     31:  "Sulfur Dioxide (SO2)",
+    40:  "2,2,4-Trimethylpentane",
+    41:  "Ethyl Benzene",
+    42:  "Hexane",
+    43:  "Propionaldehyde",
+    44:  "Styrene",
     45:  "Toluene",
     46:  "Xylene",
     60:  "Mercury Elemental Gaseous",
@@ -77,9 +82,11 @@ POLLUTANTS = {
     86:  "Total Organic Gases",
     87:  "Volatile Organic Compounds",
     88:  "NonHAPTOG",
+    90:  "Atmospheric CO2",
     91:  "Total Energy Consumption",
     92:  "Petroleum Energy Consumption",
     93:  "Fossil Fuel Energy Consumption",
+    98:  "CO2 Equivalent",
     99:  "Brake Specific Fuel Consumption (BSFC)",
     100: "Primary Exhaust PM10  - Total",
     106: "Primary PM10 - Brakewear Particulate",
@@ -91,6 +98,14 @@ POLLUTANTS = {
     142: "2,3,7,8-Tetrachlorodibenzo-p-Dioxin",
     169: "Fluoranthene gas",
     185: "Naphthalene gas",
+    # The only 'Mechanisms'-display-group pollutant in movesdb20241112.
+    # `MOVESInstantiator` keys TOGSpeciationCalculator off this exact name
+    # (process = null, i.e. any process); `TOGSpeciationCalculator.doExecute`
+    # derives mechanismID = 1 + (3000-1000)/500 = 5, the sole mechanism in
+    # `integratedSpeciesSet`. The CB05 pseudo-pollutants 1000-1018 that
+    # CalculatorInfo.txt registers do NOT exist in this default DB
+    # (max(pollutantID) = 3000, 116 rows) and cannot be selected.
+    3000: "NonHAPTOG Mechanism",
 }
 
 PROCESSES = {
@@ -425,6 +440,91 @@ TOG_SPECIATION = ((86, 1), (5, 1), (79, 1))             # TOG, CH4, NMHC running
 # ExecutionRunSpec.flagRequiredPollutantProcesses() returns early for
 # NONROAD ("Nonroad has no silent pollutants/processes added for the user"),
 # so every link of the chain has to be listed explicitly.
+# ---------------------------------------------------------------------------
+# Onroad pollutant sets for the three previously-unreached onroad calculators
+# (SO2Calculator, CO2AERunningStartExtendedIdleCalculator,
+# TOGSpeciationCalculator). All on Running Exhaust (process 1); every one of
+# the three registers there.
+# ---------------------------------------------------------------------------
+
+# Inputs each of the three chained calculators gates on in doExecute().
+# `SO2Calculator.doExecute` and the Atmospheric-CO2 half of
+# `CO2AERunningStartExtendedIdleCalculator.doExecute` both bail out unless
+# "Total Energy Consumption" is selected *on the same process*; the CO2e half
+# needs CH4 + N2O. ExecutionRunSpec.flagRequiredPollutantProcesses' `needs[]`
+# table does NOT cover these, so they must be selected explicitly — that is
+# exactly why expand-criteria (SO2 without energy) class-loads SO2Calculator
+# and emits no pollutant-31 row.
+SO2_CO2E_INPUTS = (
+    (91, 1),     # Total Energy Consumption — SO2 + Atmospheric CO2 input
+    (5, 1),      # Methane (CH4)            — CO2 Equivalent input
+    (6, 1),      # Nitrous Oxide (N2O)      — CO2 Equivalent input
+)
+
+SO2_CO2E_OUTPUTS = (
+    (31, 1),     # Sulfur Dioxide (SO2)  — SO2Calculator
+    (90, 1),     # Atmospheric CO2       — CO2AERunningStartExtendedIdleCalculator
+    (98, 1),     # CO2 Equivalent        — CO2AERunningStartExtendedIdleCalculator
+)
+
+# HCSpeciationCalculator chain. NMOG (80) is the positive term of the
+# TOG-speciation integration; VOC (87) is AirToxicsCalculator's input.
+HC_SPECIATION = (
+    (1, 1),      # Total Gaseous Hydrocarbons
+    (5, 1),      # Methane (CH4)
+    (79, 1),     # Non-Methane Hydrocarbons
+    (80, 1),     # Non-Methane Organic Gases
+    (86, 1),     # Total Organic Gases
+    (87, 1),     # Volatile Organic Compounds
+)
+
+# The 14 integrated species of mechanism 5, set 4 ("Set 4 OAQPS Jun, 2013 Sub
+# from TOG") — every row of movesdb20241112's `integratedSpeciesSet`, all with
+# useISSyn='Y' and all onroad-valid on process 1. TOGSpeciationCalculator
+# subtracts these from NMOG to get the NonHAPTOG residual; AirToxicsCalculator
+# produces them.
+TOG_INTEGRATED_SPECIES = (
+    (20, 1),     # Benzene
+    (21, 1),     # Ethanol
+    (24, 1),     # 1,3-Butadiene
+    (25, 1),     # Formaldehyde
+    (26, 1),     # Acetaldehyde
+    (27, 1),     # Acrolein
+    (40, 1),     # 2,2,4-Trimethylpentane
+    (41, 1),     # Ethyl Benzene
+    (42, 1),     # Hexane
+    (43, 1),     # Propionaldehyde
+    (44, 1),     # Styrene
+    (45, 1),     # Toluene
+    (46, 1),     # Xylene
+    (185, 1),    # Naphthalene gas
+)
+
+def _dedupe(*groups: tuple[tuple[int, int], ...]) -> tuple[tuple[int, int], ...]:
+    """Concatenate pollutant/process groups, dropping repeats, order preserved.
+
+    The groups below overlap (CH4 is both a CO2-equivalent input and an
+    HCSpeciation output), and a repeated <pollutantprocessassociation> is
+    noise in the RunSpec — MOVES stores them in a TreeSet, so the duplicate
+    has no effect but does make the fixture harder to read.
+    """
+    seen, out = set(), []
+    for g in groups:
+        for pp in g:
+            if pp not in seen:
+                seen.add(pp)
+                out.append(pp)
+    return tuple(out)
+
+
+# The mechanism gate plus its product.
+TOG_MECHANISM = (
+    (3000, 1),   # NonHAPTOG Mechanism — instantiates TOGSpeciationCalculator
+                 # and is the pollutant doExecute() checks for
+    (88, 1),     # NonHAPTOG — the only pollutant the calculator's SQL emits
+                 # (ExecutionRunSpec.addLumpedSpecies adds it implicitly too)
+)
+
 NR_AIRTOXICS_INPUTS = (
     (1, 1),      # THC   — NonroadEmissionCalculator, feeds NMHC/CH4
     (99, 1),     # BSFC  — feeds nrDioxinEmissionRate + nrMetalEmissionRate
@@ -815,6 +915,45 @@ FIXTURES: list[FixtureSpec] = [
         pp_assocs=NR_AIRTOXICS,
         timespan=TimeSpan(year=2020, months=(7,), days=(5,),
                           begin_hour=6, end_hour=6, day_attr="id"),
+    ),
+
+    # ------- Onroad fixtures for the last three unreached calculators --------
+    # Geography/time/vehicle/road type are byte-identical to chain-nonhaptog
+    # and to each other; only the pollutant set differs between the pair, so
+    # the two snapshots isolate exactly what the four trigger pollutants
+    # (31, 90, 98, 3000) add to the loaded class set.
+    FixtureSpec(
+        name="chain-so2-co2e-mechanism",
+        description="Onroad running exhaust reaching the last three unreached "
+                    "MOVES calculators in one run: SO2Calculator (SO2 31 + "
+                    "its Total Energy Consumption 91 input), "
+                    "CO2AERunningStartExtendedIdleCalculator (Atmospheric CO2 "
+                    "90 + CO2 Equivalent 98, with energy/CH4/N2O inputs) and "
+                    "TOGSpeciationCalculator (NonHAPTOG Mechanism 3000, the "
+                    "sole 'Mechanisms' pollutant in movesdb20241112, plus the "
+                    "14 integrated species of mechanism 5 that the NonHAPTOG "
+                    "residual subtracts from NMOG). Geography, time, vehicle "
+                    "and road type match chain-nonhaptog and "
+                    "chain-so2-co2e-mechanism-control exactly.",
+        coverage=("scale-default", "chain-so2", "chain-co2ae",
+                  "chain-togspeciation", "chain-airtoxics",
+                  "chain-hcspeciation", "chain-baserate", "proc-1"),
+        pp_assocs=_dedupe(SO2_CO2E_INPUTS, SO2_CO2E_OUTPUTS, HC_SPECIATION,
+                          TOG_INTEGRATED_SPECIES, TOG_MECHANISM),
+    ),
+    FixtureSpec(
+        name="chain-so2-co2e-mechanism-control",
+        description="Control for chain-so2-co2e-mechanism: identical geography, "
+                    "time, vehicle, road type and pollutant set MINUS the four "
+                    "trigger pollutants SO2 (31), Atmospheric CO2 (90), CO2 "
+                    "Equivalent (98) and NonHAPTOG Mechanism (3000). Total "
+                    "Energy Consumption, CH4 and N2O are still selected, so "
+                    "the difference in the two snapshots' loaded-class sets is "
+                    "attributable to the trigger pollutants alone.",
+        coverage=("scale-default", "chain-airtoxics", "chain-hcspeciation",
+                  "chain-baserate", "proc-1"),
+        pp_assocs=_dedupe(SO2_CO2E_INPUTS, HC_SPECIATION,
+                          TOG_INTEGRATED_SPECIES),
     ),
 ]
 
