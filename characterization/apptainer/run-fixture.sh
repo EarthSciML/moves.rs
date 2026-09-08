@@ -249,6 +249,13 @@ on_unexpected_error() {
 trap 'on_unexpected_error "$?" "${LINENO}"' ERR
 trap cleanup_incomplete EXIT
 
+# NOTE on the `trap - ERR` / `set +e` pairs below: an ERR trap fires even
+# under `set +e`, so both have to come off to reach an explicit status check
+# — otherwise every failure is reported as "unexpected" with a line number
+# instead of a specific, actionable reason. They are written inline rather
+# than wrapped in helper functions because bash restores the ERR trap when a
+# function returns, which silently undoes a helper's `trap - ERR`.
+
 # ant's <java> task for MOVES has no failonerror="true", so these markers in
 # the run log are the only evidence that MOVES failed.
 MOVES_FAILURE_MARKERS=(
@@ -344,9 +351,10 @@ if [ "${SKIP_RUN}" = "0" ]; then
 
     # Tee the run to a log so the "Java Result" scan below has something to
     # read, and take run-moves.sh's own status from PIPESTATUS rather than
-    # the pipeline's (tee always succeeds). set +e around the pipeline so we
-    # reach the explicit checks instead of dying inside the ERR trap with a
-    # less useful message.
+    # the pipeline's (tee always succeeds). errexit and the ERR trap come off
+    # around the pipeline so we reach the explicit checks below instead of
+    # dying inside the ERR trap with a less useful message.
+    trap - ERR
     set +e
     SIF="${SIF}" \
     WORKDIR="${WORKDIR}" \
@@ -361,6 +369,7 @@ if [ "${SKIP_RUN}" = "0" ]; then
     # command, which overwrites PIPESTATUS before a second read can see it.
     MOVES_PIPE_STATUS=( "${PIPESTATUS[@]}" )
     set -e
+    trap 'on_unexpected_error "$?" "${LINENO}"' ERR
     MOVES_STATUS="${MOVES_PIPE_STATUS[0]:-0}"
     TEE_STATUS="${MOVES_PIPE_STATUS[1]:-0}"
 
@@ -427,6 +436,7 @@ BINDS=(
     --bind "${HERE}/files/start-mariadb-bg.sh:/opt/moves-bin/start-mariadb-bg.sh:ro"
 )
 
+trap - ERR
 set +e
 apptainer exec \
     "${FAKEROOT_FLAG[@]}" \
@@ -439,6 +449,7 @@ apptainer exec \
     2>&1 | tee "${DUMP_LOG}"
 DUMP_PIPE_STATUS=( "${PIPESTATUS[@]}" )
 set -e
+trap 'on_unexpected_error "$?" "${LINENO}"' ERR
 DUMP_STATUS="${DUMP_PIPE_STATUS[0]:-0}"
 DUMP_TEE_STATUS="${DUMP_PIPE_STATUS[1]:-0}"
 
@@ -504,6 +515,7 @@ STAGING_DIR="${OUTPUT_PARENT}/.${OUTPUT_BASE}.staging.$$"
 rm -rf "${STAGING_DIR}"
 mkdir -p "${STAGING_DIR}"
 
+trap - ERR
 set +e
 "${BIN}" \
     --captures-dir "${CAPTURES_DIR}" \
@@ -513,6 +525,7 @@ set +e
     --fixture-name "${FIXTURE_NAME}"
 CAPTURE_STATUS=$?
 set -e
+trap 'on_unexpected_error "$?" "${LINENO}"' ERR
 if [ "${CAPTURE_STATUS}" -ne 0 ]; then
     fail "moves-fixture-capture exited ${CAPTURE_STATUS}"
 fi
