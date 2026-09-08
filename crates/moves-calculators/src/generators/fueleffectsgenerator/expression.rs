@@ -33,8 +33,18 @@
 //! the exact ratio, not a `DECIMAL`-rounded one, so "MariaDB rounds it" is
 //! not the safe default it was taken to be. Whether a
 //! `fuelEffectRatioExpression` dividing two integer literals behaves the
-//! same way is a separate and still-open question — the corpus holds 58
-//! such expressions and none has been compared.
+//! same way is **not answerable from this corpus, because the corpus holds
+//! no such expression**. Parsing all 118 distinct
+//! `generalFuelRatioExpression` strings across the 42 snapshots and
+//! counting `/` nodes whose operands are both integer literals gives
+//! ZERO. (An earlier revision of this note said "the corpus holds 58 such
+//! expressions". 58 is the `generalFuelRatio` ROW count of one fixture,
+//! `process-pm-exhaust` — not a division count.) The only integer
+//! denominator anywhere is `least(bioDieselEsterVolume,20)/100`, whose
+//! numerator is a `FLOAT` column and so is already a `DOUBLE` division.
+//! Both candidates therefore agree bit-for-bit on everything measurable
+//! here (1.608e-14 either way), and the question stays open until a
+//! capture makes it askable.
 //! * Booleans follow the MariaDB convention: a comparison yields `1.0` or
 //! `0.0`, and any non-zero value is "true".
 
