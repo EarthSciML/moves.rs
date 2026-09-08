@@ -26,8 +26,15 @@
 //! This evaluator divides in plain `f64`. A `fuelEffectRatioExpression`
 //! that divides two integer *literals* would diverge by ~1e-4; one that
 //! divides by a column does not (the column is already `DOUBLE`). The
-//! bug-compatibility decision belongs to (generator integration
-//! validation), matching the / precedent.
+//! bug-compatibility decision belongs to generator integration validation.
+//! It used to say this matched the `MeteorologyGenerator` `(5/9)`
+//! precedent. **That precedent resolved the other way**: measured against
+//! the canonical capture, MOVES evaluates the meteorology conversion with
+//! the exact ratio, not a `DECIMAL`-rounded one, so "MariaDB rounds it" is
+//! not the safe default it was taken to be. Whether a
+//! `fuelEffectRatioExpression` dividing two integer literals behaves the
+//! same way is a separate and still-open question — the corpus holds 58
+//! such expressions and none has been compared.
 //! * Booleans follow the MariaDB convention: a comparison yields `1.0` or
 //! `0.0`, and any non-zero value is "true".
 
