@@ -7,13 +7,19 @@ phase verifies against.
 
 ## Acceptance status
 
-As of 2026-06-15 `characterization/fixtures/` holds **51** RunSpec XML
-fixtures, and **39** of them have a populated snapshot directory here (one
+As of 2026-09-08 `characterization/fixtures/` holds **54** RunSpec XML
+fixtures, and **42** of them have a populated snapshot directory here (one
 sub-directory per fixture carrying a `manifest.json`). The three `scale-*`
 fixtures are skipped (require an additional input DB; see
 `characterization/fixtures/README.md`). The canonical-diff regression gate
-asserts all 39 against canonical MOVES (see
+asserts them against canonical MOVES (see
 `docs/known-divergences.md` §1b).
+
+Counts measured with `ls characterization/fixtures/*.xml | wc -l` (54),
+`ls -d characterization/snapshots/*/ | wc -l` (42) and
+`ls characterization/snapshots/*/manifest.json | wc -l` (42). The two
+2026-09-08 additions are `chain-so2-co2e-mechanism` and
+`chain-so2-co2e-mechanism-control`.
 
 The original acceptance pass was T7 (`mo-o785i`) on 2026-05-26 — at that
 time the suite was 34 non-scale fixtures, **34/34 succeeded, 0 failed**, and
@@ -22,7 +28,7 @@ since grown to the counts above.
 
 | Fixture | Status | Notes |
 |---------|--------|-------|
-| 39 non-scale fixtures | OK | Populated; see sub-directories |
+| 42 non-scale fixtures | OK | Populated; see sub-directories |
 | scale-county | skipped | Requires additional input DB |
 | scale-project | skipped | Requires additional input DB |
 | scale-rates | skipped | Requires additional input DB |

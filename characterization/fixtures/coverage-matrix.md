@@ -7,45 +7,51 @@ Column legend:
 
 - **Processes**: comma-separated `emissionprocess.processID` values exercised. See MOVES `emissionprocess` table for names.
 - **Scale/Domain**: ModelScale (`<modelscale>`) × ModelDomain (`<modeldomain>`) coordinate; for NONROAD fixtures it is the geographic-aggregation level.
-- **Calculators**: subset of `CalculatorInfo.txt` registrations the fixture forces MOVES to instantiate. Chain leaves (data-flow endpoints — produced by something, consumed by nothing) are in **bold**; the foundation calculator (BaseRate, depended on by everything) is _italicized_.
+- **Calculators**: calculators the fixture makes MOVES instantiate **and** emit at least one MOVESOutput row for, on a (pollutant, process) pair the calculator owns in `CalculatorInfo.txt`. Class-loaded-but-silent does **not** count — see the note under the table. Chain leaves (data-flow endpoints — produced by something, consumed by nothing) are in **bold**; the foundation calculator (BaseRate, depended on by everything) is _italicized_.
 - **Model**: `<model>` selection (ONROAD / NONROAD).
+
+A row with an empty **Calculators** cell is a *structural-gate* fixture: MOVES runs, instantiates calculators, and produces zero MOVESOutput rows. That gate is the fixture's value; it verifies no calculator.
+
+Every entry in the Calculators column was re-derived from the captured snapshots on 2026-09-08 by intersecting, per fixture, the owners of each emitted `(pollutantID, processID)` (`calculator-chains/calculator-dag.json`) with the class list in `snapshots/<fixture>/execution-trace.json`. The sweep removed eleven `chain-baserate` tags from the NONROAD fixtures, ten `chain-co2ae` tags, and the `chain-so2` / `chain-no` / `chain-no2` / `chain-hcspeciation` / `chain-togspeciation` tags listed in `_generate.py`; each was contradicted by its own snapshot. Note that `TOGSpeciationCalculator` is class-loaded in *every* snapshot (ExecutionRunSpec calls its static `needsFinalAggregation()`), so for that calculator only emitted rows are evidence.
 
 | Fixture | Description | Processes | Scale/Domain | Calculators | Model |
 |---------|-------------|-----------|--------------|-------------|-------|
-| `sample-runspec.xml` | Canonical MOVES SampleRunSpec.xml — single county/hour gasoline passenger car energy consumption. Byte-identical copy of testdata/SampleRunSpec.xml from the pinned canonical-MOVES tree. | 1, 2, 90, 99 | Default (national, Inv) | **CO2AERunningStartExtendedIdleCalculator**; _BaseRateCalculator_ | ONROAD |
-| `expand-day.xml` | Sample expanded to a full day (hours 1-24, weekday + weekend). | 1, 2, 90, 99 | Default (national, Inv) | **CO2AERunningStartExtendedIdleCalculator**; _BaseRateCalculator_ | ONROAD |
-| `expand-month.xml` | Sample expanded across four months (Jan/Apr/Jul/Oct). | 1, 2, 90, 99 | Default (national, Inv) | **CO2AERunningStartExtendedIdleCalculator**; _BaseRateCalculator_ | ONROAD |
-| `expand-counties.xml` | Sample expanded across three diverse counties (Washtenaw MI, Cook IL, Los Angeles CA). | 1, 2, 90, 99 | Default (national, Inv) | **CO2AERunningStartExtendedIdleCalculator**; _BaseRateCalculator_ | ONROAD |
-| `expand-fueltype-diesel.xml` | Sample expanded to include diesel for passenger car + light commercial truck. | 1, 2, 90, 99 | Default (national, Inv) | **CO2AERunningStartExtendedIdleCalculator**; _BaseRateCalculator_ | ONROAD |
-| `expand-sourcetype.xml` | Sample expanded across multiple onroad source types (motorcycle, pass car, passenger truck, refuse truck, long-haul combo). | 1, 2, 90, 99 | Default (national, Inv) | **CO2AERunningStartExtendedIdleCalculator**; _BaseRateCalculator_ | ONROAD |
-| `expand-criteria.xml` | Sample swapped to criteria pollutants (NOx, CO, THC, SO2) for running + start exhaust. | 1, 2 | Default (national, Inv) | _BaseRateCalculator_; NOCalculator; NO2Calculator; SO2Calculator; HCSpeciationCalculator | ONROAD |
+| `sample-runspec.xml` | Canonical MOVES SampleRunSpec.xml — single county/hour gasoline passenger car energy consumption. Byte-identical copy of testdata/SampleRunSpec.xml from the pinned canonical-MOVES tree. | 1, 2, 90, 99 | Default (national, Inv) | _BaseRateCalculator_ | ONROAD |
+| `expand-day.xml` | Sample expanded to a full day (hours 1-24, weekday + weekend). | 1, 2, 90, 99 | Default (national, Inv) | _BaseRateCalculator_ | ONROAD |
+| `expand-month.xml` | Sample expanded across four months (Jan/Apr/Jul/Oct). | 1, 2, 90, 99 | Default (national, Inv) | _BaseRateCalculator_ | ONROAD |
+| `expand-counties.xml` | Sample expanded across three diverse counties (Washtenaw MI, Cook IL, Los Angeles CA). | 1, 2, 90, 99 | Default (national, Inv) | _BaseRateCalculator_ | ONROAD |
+| `expand-fueltype-diesel.xml` | Sample expanded to include diesel for passenger car + light commercial truck. | 1, 2, 90, 99 | Default (national, Inv) | _BaseRateCalculator_ | ONROAD |
+| `expand-sourcetype.xml` | Sample expanded across multiple onroad source types (motorcycle, pass car, passenger truck, refuse truck, long-haul combo). | 1, 2, 90, 99 | Default (national, Inv) | _BaseRateCalculator_ | ONROAD |
+| `expand-criteria.xml` | Sample swapped to criteria pollutants (NOx, CO, THC, SO2) for running + start exhaust. | 1, 2 | Default (national, Inv) | _BaseRateCalculator_ | ONROAD |
 | `process-brakewear.xml` | Brakewear PM10 + PM2.5 — exercises PM10BrakeTireCalculator chain. | 9 | Default (national, Inv) | **PM10BrakeTireCalculator**; _BaseRateCalculator_ | ONROAD |
 | `process-tirewear.xml` | Tirewear PM10 + PM2.5 — exercises PM10BrakeTireCalculator chain. | 10 | Default (national, Inv) | **PM10BrakeTireCalculator**; _BaseRateCalculator_ | ONROAD |
 | `process-pm-exhaust.xml` | Onroad PM exhaust (PM10 + PM2.5 totals) — exercises PM10EmissionCalculator + SulfatePMCalculator chains. | 1 | Default (national, Inv) | **PM10EmissionCalculator**; SulfatePMCalculator; _BaseRateCalculator_ | ONROAD |
-| `process-evap-permeation.xml` | Evap Permeation (process 11) running fuels — exercises EvaporativePermeationCalculator + HCSpeciationCalculator chains. | 11 | Default (national, Inv) | EvaporativePermeationCalculator; HCSpeciationCalculator; _BaseRateCalculator_ | ONROAD |
-| `process-evap-fvv.xml` | Evap Fuel Vapor Venting (process 12) — exercises TankVaporVentingCalculator + HCSpeciationCalculator chains. | 12 | Default (national, Inv) | TankVaporVentingCalculator; HCSpeciationCalculator; _BaseRateCalculator_ | ONROAD |
-| `process-evap-leaks.xml` | Evap Fuel Leaks (process 13) — exercises LiquidLeakingCalculator + HCSpeciationCalculator chains. | 13 | Default (national, Inv) | LiquidLeakingCalculator; HCSpeciationCalculator; _BaseRateCalculator_ | ONROAD |
-| `process-refueling.xml` | Refueling Displacement (18) + Spillage (19) — exercises RefuelingLossCalculator chain. | 18, 19 | Default (national, Inv) | RefuelingLossCalculator; HCSpeciationCalculator; _BaseRateCalculator_ | ONROAD |
+| `process-evap-permeation.xml` | Evap Permeation (process 11) running fuels — exercises EvaporativePermeationCalculator + HCSpeciationCalculator chains. | 11 | Default (national, Inv) | EvaporativePermeationCalculator | ONROAD |
+| `process-evap-fvv.xml` | Evap Fuel Vapor Venting (process 12) — exercises TankVaporVentingCalculator + HCSpeciationCalculator chains. | 12 | Default (national, Inv) | TankVaporVentingCalculator | ONROAD |
+| `process-evap-leaks.xml` | Evap Fuel Leaks (process 13) — exercises LiquidLeakingCalculator + HCSpeciationCalculator chains. | 13 | Default (national, Inv) | LiquidLeakingCalculator | ONROAD |
+| `process-refueling.xml` | Refueling Displacement (18) + Spillage (19) — exercises RefuelingLossCalculator chain. | 18, 19 | Default (national, Inv) | RefuelingLossCalculator | ONROAD |
 | `process-crankcase-running.xml` | Crankcase Running Exhaust (process 15) criteria pollutants — exercises CrankcaseEmissionCalculatorNonPM chain. | 15 | Default (national, Inv) | CrankcaseEmissionCalculatorNonPM; _BaseRateCalculator_ | ONROAD |
-| `process-crankcase-start.xml` | Crankcase Start Exhaust (process 16) criteria pollutants. | 16 | Default (national, Inv) | CrankcaseEmissionCalculatorNonPM; _BaseRateCalculator_ | ONROAD |
-| `process-crankcase-extidle.xml` | Crankcase Extended Idle Exhaust (process 17) criteria pollutants. | 17 | Default (national, Inv) | CrankcaseEmissionCalculatorNonPM; _BaseRateCalculator_ | ONROAD |
-| `process-apu.xml` | Auxiliary Power Exhaust (process 91) — exercises APU code path for combo long-haul truck. | 91 | Default (national, Inv) | **CO2AERunningStartExtendedIdleCalculator**; _BaseRateCalculator_ | ONROAD |
+| `process-crankcase-start.xml` | Crankcase Start Exhaust (process 16) criteria pollutants. | 16 | Default (national, Inv) | — | ONROAD |
+| `process-crankcase-extidle.xml` | Crankcase Extended Idle Exhaust (process 17) criteria pollutants. | 17 | Default (national, Inv) | — | ONROAD |
+| `process-apu.xml` | Auxiliary Power Exhaust (process 91) — exercises APU code path for combo long-haul truck. | 91 | Default (national, Inv) | — | ONROAD |
 | `process-airtoxics.xml` | Onroad Air Toxics (Benzene, 1,3-Butadiene, Formaldehyde) running exhaust — exercises AirToxicsCalculator chain. | 1 | Default (national, Inv) | AirToxicsCalculator; HCSpeciationCalculator; _BaseRateCalculator_ | ONROAD |
-| `chain-tog-speciation.xml` | TOG (Total Organic Gases) + CH4 + NMHC running exhaust — exercises TOGSpeciationCalculator chain endpoint. | 1 | Default (national, Inv) | **TOGSpeciationCalculator**; HCSpeciationCalculator; _BaseRateCalculator_ | ONROAD |
-| `scale-county.xml` | County-domain inventory (model_domain=SINGLE) for Washtenaw — requires a county data manager input database supplied at snapshot-capture time. | 1, 2, 90, 99 | County (SINGLE, Inv) | **CO2AERunningStartExtendedIdleCalculator**; _BaseRateCalculator_ | ONROAD |
-| `scale-project.xml` | Project-domain run (model_domain=PROJECT) anchored to Washtenaw County. PROJECT mode resolves links and zones from a user-supplied scale-input database; the RunSpec carries the host-county selection only. Snapshot capture supplies the project link/zone DB. | 1, 2 | Project (PROJECT, Inv) | **CO2AERunningStartExtendedIdleCalculator**; _BaseRateCalculator_ | ONROAD |
-| `scale-rates.xml` | Emission-rates-lookup mode (model_scale=MESOSCALE_LOOKUP / Rates). | 1, 2 | Rates (Rates / MESOSCALE_LOOKUP) | **CO2AERunningStartExtendedIdleCalculator**; _BaseRateCalculator_ | ONROAD |
-| `nr-recreational-county.xml` | NONROAD Recreational sector (snowmobiles/ATVs/etc.), Washtenaw County. | 40 | NONROAD/county | NonroadEmissionCalculator; _BaseRateCalculator_ | NONROAD |
-| `nr-construction-state.xml` | NONROAD Construction sector at state geography (Michigan). | 40 | NONROAD/state | NonroadEmissionCalculator; _BaseRateCalculator_ | NONROAD |
-| `nr-industrial-county.xml` | NONROAD Industrial sector, Cook County IL. | 40 | NONROAD/county | NonroadEmissionCalculator; _BaseRateCalculator_ | NONROAD |
-| `nr-lawn-garden-county.xml` | NONROAD Lawn/Garden sector, Washtenaw County. | 40 | NONROAD/county | NonroadEmissionCalculator; _BaseRateCalculator_ | NONROAD |
-| `nr-agriculture-state.xml` | NONROAD Agriculture sector at state geography (Iowa). | 40 | NONROAD/state | NonroadEmissionCalculator; _BaseRateCalculator_ | NONROAD |
-| `nr-commercial-nation.xml` | NONROAD Commercial sector at national rollup (US-total). | 40 | NONROAD/nation | NonroadEmissionCalculator; _BaseRateCalculator_ | NONROAD |
-| `nr-logging-county.xml` | NONROAD Logging sector, Washtenaw County (chain saws etc). | 40 | NONROAD/county | NonroadEmissionCalculator; _BaseRateCalculator_ | NONROAD |
-| `nr-airport-support-county.xml` | NONROAD Airport Support sector, Cook County IL (O'Hare). | 40 | NONROAD/county | NonroadEmissionCalculator; _BaseRateCalculator_ | NONROAD |
-| `nr-pleasure-craft-state.xml` | NONROAD Pleasure Craft sector (Recreational Marine), state geography (Florida) — exercises RecMar evap permeation chain in Phase-5 NONROAD-NR-rewrite reference. | 22, 23, 24, 40 | NONROAD/state | NonroadEmissionCalculator; _BaseRateCalculator_ | NONROAD |
-| `nr-railroad-support-nation.xml` | NONROAD Railroad Support sector at national rollup. | 40 | NONROAD/nation | NonroadEmissionCalculator; _BaseRateCalculator_ | NONROAD |
-| `nr-airtoxics-lawn-garden-county.xml` | NONROAD air toxics — Lawn/Garden sector (gasoline), Washtenaw County. Vehicle/geography/time selections are identical to nr-lawn-garden-county; only the pollutant set differs, so the two snapshots isolate the air-toxics chain. Selects the HC-speciation species (CH4/NMHC/NMOG/TOG/VOC) that NRHCSpeciationCalculator emits plus the VOC/PM2.5/BSFC/NMOG inputs that NRAirToxicsCalculator gates on, so both previously-unreached NONROAD calculators instantiate and emit. | 1 | NONROAD/county | NonroadEmissionCalculator; NRHCSpeciationCalculator; **NRAirToxicsCalculator**; _BaseRateCalculator_ | NONROAD |
+| `chain-tog-speciation.xml` | TOG (Total Organic Gases) + CH4 + NMHC running exhaust — exercises TOGSpeciationCalculator chain endpoint. | 1 | Default (national, Inv) | _BaseRateCalculator_; HCSpeciationCalculator | ONROAD |
+| `scale-county.xml` | County-domain inventory (model_domain=SINGLE) for Washtenaw — requires a county data manager input database supplied at snapshot-capture time. | 1, 2, 90, 99 | County (SINGLE, Inv) | _BaseRateCalculator_ | ONROAD |
+| `scale-project.xml` | Project-domain run (model_domain=PROJECT) anchored to Washtenaw County. PROJECT mode resolves links and zones from a user-supplied scale-input database; the RunSpec carries the host-county selection only. Snapshot capture supplies the project link/zone DB. | 1, 2 | Project (PROJECT, Inv) | _BaseRateCalculator_ | ONROAD |
+| `scale-rates.xml` | Emission-rates-lookup mode (model_scale=MESOSCALE_LOOKUP / Rates). | 1, 2 | Rates (Rates / MESOSCALE_LOOKUP) | _BaseRateCalculator_ | ONROAD |
+| `nr-recreational-county.xml` | NONROAD Recreational sector (snowmobiles/ATVs/etc.), Washtenaw County. | 40 | NONROAD/county | NonroadEmissionCalculator | NONROAD |
+| `nr-construction-state.xml` | NONROAD Construction sector at state geography (Michigan). | 40 | NONROAD/state | NonroadEmissionCalculator | NONROAD |
+| `nr-industrial-county.xml` | NONROAD Industrial sector, Cook County IL. | 40 | NONROAD/county | NonroadEmissionCalculator | NONROAD |
+| `nr-lawn-garden-county.xml` | NONROAD Lawn/Garden sector, Washtenaw County. | 40 | NONROAD/county | NonroadEmissionCalculator | NONROAD |
+| `nr-agriculture-state.xml` | NONROAD Agriculture sector at state geography (Iowa). | 40 | NONROAD/state | NonroadEmissionCalculator | NONROAD |
+| `nr-commercial-nation.xml` | NONROAD Commercial sector at national rollup (US-total). | 40 | NONROAD/nation | NonroadEmissionCalculator | NONROAD |
+| `nr-logging-county.xml` | NONROAD Logging sector, Washtenaw County (chain saws etc). | 40 | NONROAD/county | NonroadEmissionCalculator | NONROAD |
+| `nr-airport-support-county.xml` | NONROAD Airport Support sector, Cook County IL (O'Hare). | 40 | NONROAD/county | NonroadEmissionCalculator | NONROAD |
+| `nr-pleasure-craft-state.xml` | NONROAD Pleasure Craft sector (Recreational Marine), state geography (Florida) — exercises RecMar evap permeation chain in Phase-5 NONROAD-NR-rewrite reference. | 22, 23, 24, 40 | NONROAD/state | NonroadEmissionCalculator | NONROAD |
+| `nr-railroad-support-nation.xml` | NONROAD Railroad Support sector at national rollup. | 40 | NONROAD/nation | NonroadEmissionCalculator | NONROAD |
+| `nr-airtoxics-lawn-garden-county.xml` | NONROAD air toxics — Lawn/Garden sector (gasoline), Washtenaw County. Vehicle/geography/time selections are identical to nr-lawn-garden-county; only the pollutant set differs, so the two snapshots isolate the air-toxics chain. Selects the HC-speciation species (CH4/NMHC/NMOG/TOG/VOC) that NRHCSpeciationCalculator emits plus the VOC/PM2.5/BSFC/NMOG inputs that NRAirToxicsCalculator gates on, so both previously-unreached NONROAD calculators instantiate and emit. | 1 | NONROAD/county | NonroadEmissionCalculator; NRHCSpeciationCalculator; **NRAirToxicsCalculator** | NONROAD |
+| `process-nox-speciation.xml` | NOx speciation running exhaust — NO (32), NO2 (33) and HONO (34) from NOx (3). Exercises NOCalculator (NO + HONO) and NO2Calculator. | 1 | Default (national, Inv) | NOCalculator; NO2Calculator; _BaseRateCalculator_ | ONROAD |
+| `chain-nonhaptog.xml` | NonHAPTOG (88) requested on running exhaust alongside the HC-speciation chain, but with no 'Mechanisms' pollutant. Snapshot proves the gate: TOGSpeciationCalculator emits nothing and the output is byte-identical to chain-tog-speciation's. | 1 | Default (national, Inv) | HCSpeciationCalculator; _BaseRateCalculator_ | ONROAD |
 | `chain-so2-co2e-mechanism.xml` | Onroad running exhaust reaching the last three unreached MOVES calculators in one run: SO2Calculator (SO2 31 + its Total Energy Consumption 91 input), CO2AERunningStartExtendedIdleCalculator (Atmospheric CO2 90 + CO2 Equivalent 98, with energy/CH4/N2O inputs) and TOGSpeciationCalculator (NonHAPTOG Mechanism 3000, the sole 'Mechanisms' pollutant in movesdb20241112, plus the 14 integrated species of mechanism 5 that the NonHAPTOG residual subtracts from NMOG). Geography, time, vehicle and road type match chain-nonhaptog and chain-so2-co2e-mechanism-control exactly. | 1 | Default (national, Inv) | SO2Calculator; **CO2AERunningStartExtendedIdleCalculator**; **TOGSpeciationCalculator**; AirToxicsCalculator; HCSpeciationCalculator; _BaseRateCalculator_ | ONROAD |
 | `chain-so2-co2e-mechanism-control.xml` | Control for chain-so2-co2e-mechanism: identical geography, time, vehicle, road type and pollutant set MINUS the four trigger pollutants SO2 (31), Atmospheric CO2 (90), CO2 Equivalent (98) and NonHAPTOG Mechanism (3000). Total Energy Consumption, CH4 and N2O are still selected, so the difference in the two snapshots' loaded-class sets is attributable to the trigger pollutants alone. | 1 | Default (national, Inv) | AirToxicsCalculator; HCSpeciationCalculator; _BaseRateCalculator_ | ONROAD |
 
@@ -55,7 +61,7 @@ Each ID below appears in at least one fixture above. Rows where the process neve
 
 | Process ID | Name | Fixture(s) |
 |------------|------|------------|
-| 1 | Running Exhaust | `sample-runspec`, `expand-day`, `expand-month`, `expand-counties`, `expand-fueltype-diesel`, `expand-sourcetype`, `expand-criteria`, `process-pm-exhaust`, `process-airtoxics`, `chain-tog-speciation`, `scale-county`, `scale-project`, `scale-rates`, `nr-airtoxics-lawn-garden-county`, `chain-so2-co2e-mechanism`, `chain-so2-co2e-mechanism-control` |
+| 1 | Running Exhaust | `sample-runspec`, `expand-day`, `expand-month`, `expand-counties`, `expand-fueltype-diesel`, `expand-sourcetype`, `expand-criteria`, `process-pm-exhaust`, `process-airtoxics`, `chain-tog-speciation`, `scale-county`, `scale-project`, `scale-rates`, `nr-airtoxics-lawn-garden-county`, `process-nox-speciation`, `chain-nonhaptog`, `chain-so2-co2e-mechanism`, `chain-so2-co2e-mechanism-control` |
 | 2 | Start Exhaust | `sample-runspec`, `expand-day`, `expand-month`, `expand-counties`, `expand-fueltype-diesel`, `expand-sourcetype`, `expand-criteria`, `scale-county`, `scale-project`, `scale-rates` |
 | 9 | Brakewear | `process-brakewear` |
 | 10 | Tirewear | `process-tirewear` |
@@ -82,22 +88,22 @@ Roles per `InterconnectionTracker.recordChain` semantics: a **leaf** is a calcul
 | Calculator | Role | Fixture(s) |
 |------------|------|------------|
 | AirToxicsCalculator | — | `process-airtoxics`, `chain-so2-co2e-mechanism`, `chain-so2-co2e-mechanism-control` |
-| BaseRateCalculator | foundation | `sample-runspec`, `expand-day`, `expand-month`, `expand-counties`, `expand-fueltype-diesel`, `expand-sourcetype`, `expand-criteria`, `process-brakewear`, `process-tirewear`, `process-pm-exhaust`, `process-evap-permeation`, `process-evap-fvv`, `process-evap-leaks`, `process-refueling`, `process-crankcase-running`, `process-crankcase-start`, `process-crankcase-extidle`, `process-apu`, `process-airtoxics`, `chain-tog-speciation`, `scale-county`, `scale-project`, `scale-rates`, `nr-recreational-county`, `nr-construction-state`, `nr-industrial-county`, `nr-lawn-garden-county`, `nr-agriculture-state`, `nr-commercial-nation`, `nr-logging-county`, `nr-airport-support-county`, `nr-pleasure-craft-state`, `nr-railroad-support-nation`, `nr-airtoxics-lawn-garden-county`, `chain-so2-co2e-mechanism`, `chain-so2-co2e-mechanism-control` |
-| CO2AERunningStartExtendedIdleCalculator | leaf | `sample-runspec`, `expand-day`, `expand-month`, `expand-counties`, `expand-fueltype-diesel`, `expand-sourcetype`, `process-apu`, `scale-county`, `scale-project`, `scale-rates`, `chain-so2-co2e-mechanism` |
-| CrankcaseEmissionCalculatorNonPM | — | `process-crankcase-running`, `process-crankcase-start`, `process-crankcase-extidle` |
+| BaseRateCalculator | foundation | `sample-runspec`, `expand-day`, `expand-month`, `expand-counties`, `expand-fueltype-diesel`, `expand-sourcetype`, `expand-criteria`, `process-brakewear`, `process-tirewear`, `process-pm-exhaust`, `process-crankcase-running`, `process-airtoxics`, `chain-tog-speciation`, `scale-county`, `scale-project`, `scale-rates`, `process-nox-speciation`, `chain-nonhaptog`, `chain-so2-co2e-mechanism`, `chain-so2-co2e-mechanism-control` |
+| CO2AERunningStartExtendedIdleCalculator | leaf | `chain-so2-co2e-mechanism` |
+| CrankcaseEmissionCalculatorNonPM | — | `process-crankcase-running` |
 | EvaporativePermeationCalculator | — | `process-evap-permeation` |
-| HCSpeciationCalculator | — | `expand-criteria`, `process-evap-permeation`, `process-evap-fvv`, `process-evap-leaks`, `process-refueling`, `process-airtoxics`, `chain-tog-speciation`, `chain-so2-co2e-mechanism`, `chain-so2-co2e-mechanism-control` |
+| HCSpeciationCalculator | — | `process-airtoxics`, `chain-tog-speciation`, `chain-nonhaptog`, `chain-so2-co2e-mechanism`, `chain-so2-co2e-mechanism-control` |
 | LiquidLeakingCalculator | — | `process-evap-leaks` |
-| NO2Calculator | — | `expand-criteria` |
-| NOCalculator | — | `expand-criteria` |
+| NO2Calculator | — | `process-nox-speciation` |
+| NOCalculator | — | `process-nox-speciation` |
 | NRAirToxicsCalculator | leaf | `nr-airtoxics-lawn-garden-county` |
 | NRHCSpeciationCalculator | — | `nr-airtoxics-lawn-garden-county` |
 | NonroadEmissionCalculator | — | `nr-recreational-county`, `nr-construction-state`, `nr-industrial-county`, `nr-lawn-garden-county`, `nr-agriculture-state`, `nr-commercial-nation`, `nr-logging-county`, `nr-airport-support-county`, `nr-pleasure-craft-state`, `nr-railroad-support-nation`, `nr-airtoxics-lawn-garden-county` |
 | PM10BrakeTireCalculator | leaf | `process-brakewear`, `process-tirewear` |
 | PM10EmissionCalculator | leaf | `process-pm-exhaust` |
 | RefuelingLossCalculator | — | `process-refueling` |
-| SO2Calculator | — | `expand-criteria`, `chain-so2-co2e-mechanism` |
+| SO2Calculator | — | `chain-so2-co2e-mechanism` |
 | SulfatePMCalculator | — | `process-pm-exhaust` |
-| TOGSpeciationCalculator | leaf | `chain-tog-speciation`, `chain-so2-co2e-mechanism` |
+| TOGSpeciationCalculator | leaf | `chain-so2-co2e-mechanism` |
 | TankVaporVentingCalculator | — | `process-evap-fvv` |
 

@@ -1,7 +1,7 @@
 //! Full-suite regression pass — (), expanded by
 //! ().
 //!
-//! Runs **all 40 characterization fixtures** (30 onroad + 10 NONROAD; the 3
+//! Runs **all 48 characterization fixtures** (36 onroad + 12 NONROAD; the 3
 //! `scale-*` fixtures that require additional input databases and the 3
 //! `error-*` fixtures that are expected to fail are both excluded from the
 //! smoke-test suite) through the complete Rust port and verifies:
@@ -186,26 +186,32 @@ fn canonical_present(snapshots_root: &Path, name: &str) -> bool {
 
 // ── fixture catalogue ─────────────────────────────────────────────────────────
 
-/// The fixture catalogue must contain exactly 45 non-scale non-error fixtures.
+/// The fixture catalogue must contain exactly 48 non-scale non-error fixtures.
 ///
-/// 51 total in `characterization/fixtures/`:
-/// - 34 onroad/mixed (non-`nr-`, non-`scale-`, non-`error-`):
+/// 54 total in `characterization/fixtures/`:
+/// - 36 onroad/mixed (non-`nr-`, non-`scale-`, non-`error-`):
 /// 23 original default-scale + `mixed-onroad` (onroad half of the retired
 /// mixed-onroad-nonroad) + 6 added by
 /// (`expand-counties-large`, `expand-multifuel`, `expand-fullyear`,
 /// `expand-multiyear`, `expand-roadtypes`, `rates-minimal`) + 4 SINGLE-scale
 /// county fixtures (`process-apu-single`, `process-extended-idle-single`,
 /// `process-crankcase-start-single`, `process-crankcase-extidle-single`)
-/// - 11 NONROAD (`nr-*.xml`, including `nr-mixed-nonroad`, the nonroad half)
+/// + `chain-so2-co2e-mechanism` and `chain-so2-co2e-mechanism-control`
+/// - 12 NONROAD (`nr-*.xml`, including `nr-mixed-nonroad`, the nonroad half,
+/// and `nr-airtoxics-lawn-garden-county`)
 /// - 3 `scale-*.xml` (excluded — require additional input databases)
 /// - 3 `error-*.xml` (excluded — test expected parse failures separately)
+///
+/// The previous constants (45 / 34 / 11) had already gone stale: they were
+/// not updated when `nr-airtoxics-lawn-garden-county` was added, so the
+/// NONROAD count was 12 against an asserted 11.
 #[test]
 fn fixture_catalogue_size() {
     let fixtures = all_fixtures();
     assert_eq!(
         fixtures.len(),
-        45,
-        "expected 45 non-scale non-error fixtures (34 onroad/mixed + 11 NONROAD), \
+        48,
+        "expected 48 non-scale non-error fixtures (36 onroad/mixed + 12 NONROAD), \
          found {}. Update this test if the catalogue changes.",
         fixtures.len()
     );
@@ -220,12 +226,12 @@ fn fixture_catalogue_size() {
         .count();
 
     assert_eq!(
-        onroad_count, 34,
-        "expected 34 onroad/mixed fixtures, found {onroad_count}"
+        onroad_count, 36,
+        "expected 36 onroad/mixed fixtures, found {onroad_count}"
     );
     assert_eq!(
-        nonroad_count, 11,
-        "expected 11 NONROAD fixtures (nr-*), found {nonroad_count}"
+        nonroad_count, 12,
+        "expected 12 NONROAD fixtures (nr-*), found {nonroad_count}"
     );
 }
 
