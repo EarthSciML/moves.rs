@@ -357,9 +357,12 @@ if [ "${SKIP_RUN}" = "0" ]; then
     JAVA_TOOL_OPTIONS="${FIXTURE_JAVA_TOOL_OPTIONS}" \
         "${HERE}/run-moves.sh" "${FAKEROOT_ARGS[@]}" --runspec "${RUNSPEC}" \
         2>&1 | tee "${MOVES_LOG}"
-    MOVES_STATUS="${PIPESTATUS[0]}"
-    TEE_STATUS="${PIPESTATUS[1]}"
+    # Snapshot PIPESTATUS in one shot: reading it into a variable is itself a
+    # command, which overwrites PIPESTATUS before a second read can see it.
+    MOVES_PIPE_STATUS=( "${PIPESTATUS[@]}" )
     set -e
+    MOVES_STATUS="${MOVES_PIPE_STATUS[0]:-0}"
+    TEE_STATUS="${MOVES_PIPE_STATUS[1]:-0}"
 
     if [ "${TEE_STATUS}" -ne 0 ]; then
         fail "could not write the MOVES run log to ${MOVES_LOG} (tee exit ${TEE_STATUS})"
@@ -434,9 +437,10 @@ apptainer exec \
     "${SIF}" \
     bash /opt/fixture-tools/dump-databases.sh \
     2>&1 | tee "${DUMP_LOG}"
-DUMP_STATUS="${PIPESTATUS[0]}"
-DUMP_TEE_STATUS="${PIPESTATUS[1]}"
+DUMP_PIPE_STATUS=( "${PIPESTATUS[@]}" )
 set -e
+DUMP_STATUS="${DUMP_PIPE_STATUS[0]:-0}"
+DUMP_TEE_STATUS="${DUMP_PIPE_STATUS[1]:-0}"
 
 if [ "${DUMP_TEE_STATUS}" -ne 0 ]; then
     fail "could not write the dump log to ${DUMP_LOG} (tee exit ${DUMP_TEE_STATUS})"
