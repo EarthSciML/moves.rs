@@ -154,11 +154,13 @@ fn tolerance_opts() -> DiffOptions {
 
 /// All non-`scale-*`, non-`error-*` fixture XML paths in sorted order.
 ///
-/// 46 total fixtures; 3 `scale-*` excluded (require additional input
+/// 54 total fixtures; 3 `scale-*` excluded (require additional input
 /// databases), 3 `error-*` excluded (expected parse errors — tested by
-/// [`error_fixtures_return_expected_errors`]). Result: 34 onroad/mixed
+/// [`error_fixtures_return_expected_errors`]). Result: 36 onroad/mixed
 /// (including mixed-onroad, the onroad half of the retired
-/// mixed-onroad-nonroad) + 11 NONROAD = 45 fixtures.
+/// mixed-onroad-nonroad) + 12 NONROAD = 48 fixtures. The counts are
+/// asserted by [`fixture_catalogue_size`], whose doc comment breaks them
+/// down; keep the two in step.
 fn all_fixtures() -> Vec<PathBuf> {
     let dir = fixtures_dir();
     let mut paths: Vec<PathBuf> = std::fs::read_dir(&dir)
