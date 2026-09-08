@@ -1,0 +1,29 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__atbaseemissions",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "atBaseEmissions",
+      "kind": "float64"
+    },
+    {
+      "name": "dataSourceID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID",
+    "monthGroupID"
+  ],
+  "row_count": 5,
+  "float_decimals": 12,
+  "content_sha256": "fecf31f95134d6c12c248ee9de32a1baca91e7e337dbe3ba4a3cd43aa384b934"
+}

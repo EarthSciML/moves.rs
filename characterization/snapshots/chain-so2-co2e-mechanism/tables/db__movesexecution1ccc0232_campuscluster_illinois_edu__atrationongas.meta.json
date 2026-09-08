@@ -1,0 +1,43 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__atrationongas",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelSubtypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "ATRatio",
+      "kind": "float64"
+    },
+    {
+      "name": "ATRatioCV",
+      "kind": "float64"
+    },
+    {
+      "name": "dataSourceId",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID",
+    "sourceTypeID",
+    "fuelSubtypeID",
+    "modelYearGroupID"
+  ],
+  "row_count": 650,
+  "float_decimals": 12,
+  "content_sha256": "8686eaf3f3d5d16c8998c6cd90285ef2247e3ce12e76c8b534d49e88de0f99ca"
+}

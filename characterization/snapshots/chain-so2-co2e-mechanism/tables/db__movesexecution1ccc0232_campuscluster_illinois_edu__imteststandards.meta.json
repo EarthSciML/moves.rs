@@ -1,0 +1,24 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__imteststandards",
+  "schema": [
+    {
+      "name": "testStandardsID",
+      "kind": "int64"
+    },
+    {
+      "name": "testStandardsDesc",
+      "kind": "utf8"
+    },
+    {
+      "name": "shortName",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "testStandardsID"
+  ],
+  "row_count": 20,
+  "float_decimals": 12,
+  "content_sha256": "dbd1c7b009ef331cf77c2a2a6d66cf76d1e6d4a9ace54f8e1baef745fbeffb96"
+}

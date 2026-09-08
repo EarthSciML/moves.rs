@@ -1,0 +1,28 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__monthofanyyear",
+  "schema": [
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthName",
+      "kind": "utf8"
+    },
+    {
+      "name": "noOfDays",
+      "kind": "int64"
+    },
+    {
+      "name": "monthGroupID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "monthID"
+  ],
+  "row_count": 12,
+  "float_decimals": 12,
+  "content_sha256": "ad260b0b0c86500d3b01bd09c28bdd05344a9ebba0d890da70c4f82b36ddf8d7"
+}

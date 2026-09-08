@@ -1,0 +1,25 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__retrofitinputassociations",
+  "schema": [
+    {
+      "name": "listName",
+      "kind": "utf8"
+    },
+    {
+      "name": "commonName",
+      "kind": "utf8"
+    },
+    {
+      "name": "idealName",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "listName",
+    "commonName"
+  ],
+  "row_count": 95,
+  "float_decimals": 12,
+  "content_sha256": "54ef9b7ad19c98870c8b2cb731814f55078f2012f39f394984ed63a65705cc70"
+}
