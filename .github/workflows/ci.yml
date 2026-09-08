@@ -280,6 +280,22 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
+  # ── Fixture-capture wrapper guards (issue #56) ────────────────────────────
+  #
+  # characterization/apptainer/run-fixture.sh used to exit 0 when MOVES itself
+  # failed and publish a zero-table snapshot as a successful capture. This job
+  # runs the guard regression test, which drives the real wrapper with
+  # `apptainer` and the capture binary stubbed — no SIF, no Apptainer, no
+  # cargo build, a couple of seconds.
+  wrapper-guards:
+    name: run-fixture.sh capture guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: run-fixture.sh guard regression
+        run: characterization/apptainer/tests/run-fixture-guards.sh
+
   deny:
     name: cargo deny
     runs-on: ubuntu-latest

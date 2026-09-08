@@ -25,6 +25,7 @@ characterization/
 │   ├── run-fixture.sh            # fixture-capture orchestrator (Phase 0 Task 4)
 │   ├── capture-county-snapshot.sh  # single-county snapshot capture wrapper
 │   ├── dump-databases.sh         # in-SIF MariaDB dumper (bind-mounted by run-fixture.sh)
+│   ├── tests/run-fixture-guards.sh  # regression test for run-fixture.sh's capture guards
 │   └── files/
 │       ├── versions.env          # pinned versions (sourced by both)
 │       ├── my.cnf                # MOVES-tuned MariaDB config
@@ -306,6 +307,37 @@ layout, determinism contract, and inspection commands.
 characterization/apptainer/run-fixture.sh \
     --fakeroot \
     --runspec /opt/moves/testdata/SampleRunSpec.xml
+```
+
+Note the RunSpec path is resolved **inside the container**, so a host
+RunSpec must be given as an absolute path (`run-fixture.sh` bind-mounts
+the parent directory); a relative host path silently becomes a
+`/opt/moves`-relative path that MOVES cannot open.
+
+### Failure semantics
+
+Exit 0 from `run-fixture.sh` means exactly one thing: a snapshot holding
+at least `--min-tables` tables (default 8) is on disk at the output
+directory. Anything else exits non-zero, prints a
+`CAPTURE FAILED — NO SNAPSHOT WRITTEN` banner on stderr, and leaves no
+snapshot — and no partially-written snapshot directory — behind.
+
+This matters because ant runs MOVES via `<java fork="yes">` **without**
+`failonerror="true"` (MOVES's own `build.xml`, target `main1worker`), so
+a MOVES JVM that dies non-zero shows up only as an
+`[java] Java Result: N` line while ant, apptainer and `run-moves.sh` all
+exit 0. Before issue #56 that produced a zero-table snapshot reported as
+a successful capture. `run-fixture.sh` now scans the run log for that
+marker, checks the dump step's status, refuses an empty captures
+directory, and enforces the `--min-tables` floor on the built snapshot
+before publishing it.
+
+`characterization/apptainer/tests/run-fixture-guards.sh` is the
+regression test for those guards. It stubs `apptainer` and the capture
+binary — no SIF, no Apptainer, no cargo build — and runs in seconds:
+
+```sh
+characterization/apptainer/tests/run-fixture-guards.sh
 ```
 
 `run-fixture.sh` also enables Phase 0 Task 8 (mo-d7or) class-load
