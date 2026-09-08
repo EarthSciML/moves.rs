@@ -16,24 +16,45 @@ default_float_tolerance = 1e-9
 
 # --- Expected divergences -------------------------------------------------
 #
-# MeteorologyGenerator (migration plan Task 41) computes specificHumidity and
-# molWaterFraction through fahrenheit_to_kelvin, which uses the exact ratio
-# 5.0/9.0. Canonical MOVES' MeteorologyGenerator.doHeatIndex SQL uses the
-# literal (5/9): MariaDB evaluates that as decimal division, rounded to
-# div_precision_increment places, before promotion to double — a value a few
-# parts in 1e5 off the exact ratio. The gap propagates (amplified through the
-# saturation-vapour-pressure chain) into both columns. The port comment at
-# crates/moves-calculators/src/generators/meteorology.rs::fahrenheit_to_kelvin
-# explicitly defers the call to this budget.
+# CALIBRATED, not placeholder. The canonical snapshots this budget was waiting
+# on have landed (characterization/snapshots, 41 of them), and the numbers
+# below are measured over all 532 populated ZoneMonthHour rows rather than
+# guessed. Two earlier claims here were wrong and are corrected:
 #
-# heatIndex does NOT pass through the conversion (it reads the dry-bulb
-# temperature directly), so it keeps the strict 1e-9 default.
+# 1. THERE IS NO (5/9) ARTIFACT. Canonical MOVES computes the Fahrenheit-to-
+#    Kelvin conversion with the EXACT ratio, not MariaDB's DECIMAL 0.5556.
+#    Measured worst absolute deviation from the capture:
 #
-# These two values are PRE-CALIBRATION placeholders: they are wide enough to
-# absorb the 5/9 artifact and nothing else, but the gate is dormant until the
-# Phase 0 compute-node run lands the canonical snapshots, and the first
-# capture is what calibrates them to the tightest bound the artifact needs.
-# Treat any divergence beyond them, once active, as a real bug.
+#      slope            specificHumidity        molWaterFraction
+#      exact 5.0/9.0    2.871e-07 (2.2e-08 rel) 4.442e-10 (2.2e-08 rel)
+#      0.5556           1.742e-03 (1.3e-04 rel) 2.690e-06 (1.3e-04 rel)
+#
+#    0.5556 is four orders of magnitude worse. The port's exact ratio is
+#    right, and this budget no longer widens anything on its account.
+#
+# 2. THE REAL DIVERGENCE IS COLUMN WIDTH. County.barometricPressure is a
+#    FLOAT (32-bit) column, so MOVES computes with the f32-widened value while
+#    a port reading the decimal text 29.095 as f64 does not. meteorology.rs's
+#    resolve_county_meteorology now narrows through that column, which is
+#    worth 13.2x on both outputs:
+#
+#      specificHumidity 2.871e-07 -> 2.177e-08     molWaterFraction 4.442e-10 -> 3.367e-11
+#
+#    ZoneMonthHour.temperature and .relHumidity must NOT be narrowed the same
+#    way -- the capture already stores those as widened f32 values, so a
+#    second narrowing double-rounds (measured: 2.177e-08 -> 1.617e-06).
+#
+# What remains after that fix is f64 evaluation noise through a 10^x chain.
+# molWaterFraction now needs NO widening at all: its worst is 3.367e-11, 30x
+# inside the strict default, so its row is gone. specificHumidity keeps one
+# only because the column's magnitude (2.18 to 13.11) puts the same relative
+# noise above 1e-9 in absolute terms.
+#
+# heatIndex keeps the strict default, and that claim IS verified rather than
+# assumed: worst |computed - captured| over the same 532 rows is 6.537e-13.
+# It reads the dry-bulb temperature and touches neither PH2O nor the pressure.
 [tables."ZoneMonthHour"]
-specificHumidity = 1e-4
-molWaterFraction = 1e-6
+# Worst measured 2.177e-08; this is 4.6x that. Tighten it, do not widen it:
+# a regression past this bound is a port bug, and the headroom is deliberate
+# rather than fitted.
+specificHumidity = 1e-7

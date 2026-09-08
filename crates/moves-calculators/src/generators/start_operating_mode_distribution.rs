@@ -304,10 +304,17 @@ pub fn classify_trip(
 /// the single-precision `FLOAT` column `OpModeDistribution.opModeFraction`.
 ///
 /// This port returns the exact `f64` ratio. The four-place rounding is a
-/// divergence of up to 5 × 10⁻⁵ — larger than the `(5/9)` rounding noted in
-/// `MeteorologyGenerator` — so whether to reproduce MariaDB's `DECIMAL`
-/// rounding is deferred to canonical-capture comparison, which can
-/// confirm the live `div_precision_increment` and rounding mode.
+/// divergence of up to 5 × 10⁻⁵, and whether to reproduce MariaDB's
+/// `DECIMAL` rounding is still deferred to canonical-capture comparison,
+/// which can confirm the live `div_precision_increment` and rounding mode.
+///
+/// This note used to size that divergence against "the `(5/9)` rounding
+/// noted in `MeteorologyGenerator`". **That yardstick is withdrawn**: the
+/// canonical comparison has since been run and MOVES computes the
+/// meteorology conversion with the exact ratio, so there is no `(5/9)`
+/// rounding to compare against. The 5 × 10⁻⁵ figure stands on its own and
+/// is still untested — note it is 2.5× `tolerance.toml`'s per-cell gate, so
+/// if MOVES does round here it will be visible rather than absorbed.
 #[must_use]
 pub fn op_mode_fraction(op_mode_count: u64, total_starts: u64) -> f64 {
     op_mode_count as f64 / total_starts as f64

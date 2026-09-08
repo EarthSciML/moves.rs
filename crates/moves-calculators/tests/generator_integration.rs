@@ -147,19 +147,39 @@ fn tolerance_budget_parses_and_carries_the_meteorology_exception() {
     let opts = compare::tolerance_options()
         .unwrap_or_else(|e| panic!("the committed tolerance.toml must parse: {e}"));
 
-    // The budget records the one *expected* divergence the generator
-    // port already documents: MeteorologyGenerator routes
-    // specificHumidity / molWaterFraction through fahrenheit_to_kelvin,
-    // whose exact 5.0/9.0 ratio differs ~8e-6 relative from MariaDB's
-    // (5/9). Those columns must be widened past the strict default.
-    for column in ["specificHumidity", "molWaterFraction"] {
-        let key = ("ZoneMonthHour".to_string(), column.to_string());
-        let tol = opts.per_column_tolerance.get(&key).copied();
-        assert!(
-            tol.is_some_and(|t| t > opts.default_float_tolerance),
-            "tolerance.toml must widen ZoneMonthHour.{column} past the default"
-        );
-    }
+    // The budget is CALIBRATED against the landed canonical snapshots; it is
+    // not a placeholder for a (5/9) artifact, because there is no such
+    // artifact -- MOVES computes that conversion with the exact ratio. See
+    // tolerance.toml's header and meteorology.rs::resolve_county_meteorology.
+    //
+    // specificHumidity keeps a widening: worst measured deviation 2.177e-08
+    // absolute, above the strict 1e-9 default only because the column's
+    // magnitude runs 2.18..13.11.
+    let sh = ("ZoneMonthHour".to_string(), "specificHumidity".to_string());
+    let sh_tol = opts
+        .per_column_tolerance
+        .get(&sh)
+        .copied()
+        .expect("tolerance.toml must carry ZoneMonthHour.specificHumidity");
+    assert!(
+        sh_tol > opts.default_float_tolerance,
+        "specificHumidity must stay widened past the default"
+    );
+    assert!(
+        sh_tol <= 1e-6,
+        "specificHumidity's widening must stay CALIBRATED: 1e-7 is 4.6x the \
+         measured 2.177e-08, and looser than 1e-6 is a placeholder again \
+         (got {sh_tol:e})"
+    );
+
+    // molWaterFraction no longer needs one: 3.367e-11, 30x inside the strict
+    // default. Its row is gone, and a reappearance means either a regression
+    // or an uncalibrated widening.
+    let mw = ("ZoneMonthHour".to_string(), "molWaterFraction".to_string());
+    assert!(
+        !opts.per_column_tolerance.contains_key(&mw),
+        "molWaterFraction must NOT be widened -- it fits the strict default"
+    );
 }
 
 #[test]

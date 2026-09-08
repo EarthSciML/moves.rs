@@ -74,6 +74,17 @@ const HEAT_INDEX_CAP_F: f64 = 120.0;
 /// humidity expression. MOVES uses 621.1.
 const SPECIFIC_HUMIDITY_CONSTANT: f64 = 621.1;
 
+/// Round a value through MOVES' 32-bit `FLOAT` column storage.
+///
+/// MOVES holds `County.barometricPressure` in a `FLOAT` column, so every
+/// value it later computes with — a stored one or a default it wrote itself —
+/// is an `f32` widened back to double. Reproducing that is worth 13.2x on
+/// both humidity outputs; see [`resolve_county_meteorology`].
+#[must_use]
+fn through_float_column(value: f64) -> f64 {
+    f64::from(value as f32)
+}
+
 /// A county's altitude class — `H` (high) or `L` (low) in `County.altitude`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Altitude {
@@ -133,11 +144,35 @@ pub fn resolve_county_meteorology(
         },
     };
 
+    // `County.barometricPressure` is a **FLOAT** (32-bit) column. Whatever
+    // MOVES later reads back — a value the input database stored, or one of
+    // the two defaults step 1 has just written — has been through that column
+    // and is therefore a `f32` widened to double, never the decimal the
+    // source text spells. A port that reads `29.095` as an `f64` computes
+    // with a number MOVES never held.
+    //
+    // Measured over the 532 populated `ZoneMonthHour` rows of
+    // `characterization/snapshots`, narrowing here is worth 13.2x on both
+    // humidity outputs:
+    //
+    //   pressure as f64 (decimal text): specificHumidity 2.871e-07 abs
+    //   pressure narrowed to f32:       specificHumidity 2.177e-08 abs
+    //
+    // `ZoneMonthHour.temperature` and `.relHumidity` must NOT be given the
+    // same treatment: the capture already stores those as their widened f32
+    // values (63.799999237061 is `float(63.8)` read back), so narrowing them
+    // a second time double-rounds and makes both outputs worse — measured,
+    // 2.177e-08 -> 1.617e-06. Only the county pressure is stored as its
+    // nominal decimal.
+    let barometric_pressure_inhg = through_float_column(barometric_pressure_inhg);
+
     // Step 2 — `UPDATE County SET altitude = ...
     // WHERE barometricPressure IS NOT NULL
     // AND (altitude IS NULL OR altitude NOT IN ('H','L'))`.
     // Step 1 guarantees a non-NULL pressure, so the first guard always
-    // holds here; only the altitude guard discriminates.
+    // holds here; only the altitude guard discriminates. It reads the FLOAT
+    // column, so it compares the narrowed value — hence the narrow above
+    // this step rather than below it.
     let derived_altitude = if barometric_pressure_inhg >= ALTITUDE_PRESSURE_THRESHOLD {
         Altitude::Low
     } else {
@@ -187,15 +222,33 @@ pub fn heat_index(temperature_f: f64, rel_humidity: f64) -> f64 {
 /// Convert a Fahrenheit temperature to Kelvin — the Java `TK` column
 /// expression `(5/9)*(temperature-32)+273.15`.
 ///
-/// # Fidelity note
+/// # Fidelity note — RESOLVED against the canonical capture
 ///
-/// The Java writes the conversion factor as the SQL literal `(5/9)`. In
-/// MariaDB `5/9` is decimal division and rounds to `div_precision_increment`
-/// (default 4) places — 0.5556 — before promotion to a double. This port
-/// uses the exact ratio `5.0 / 9.0`; the two differ by roughly 8e-6
-/// relative, far inside any generator tolerance budget, and `5.0 / 9.0` is
-/// the conversion the expression denotes. canonical-capture
-/// comparison is the place to revisit this if a divergence appears.
+/// The Java writes the conversion factor as the SQL literal `(5/9)`, and in
+/// MariaDB `5/9` is decimal division rounded to `div_precision_increment`
+/// (default 4) places — 0.5556 — before promotion to a double. This note
+/// used to say the two were "roughly 8e-6 relative, far inside any generator
+/// tolerance budget" and to defer the call to canonical-capture comparison.
+/// **Both halves of that were wrong, and the comparison has now been run.**
+///
+/// Measured over all 532 populated `ZoneMonthHour` rows in
+/// `characterization/snapshots` (41 snapshots), worst absolute deviation from
+/// the captured reference:
+///
+/// | slope | `specificHumidity` | `molWaterFraction` |
+/// |---|---|---|
+/// | exact `5.0 / 9.0` | 2.871e-07 (2.245e-08 rel) | 4.442e-10 (2.201e-08 rel) |
+/// | MariaDB `0.5556`  | 1.742e-03 (1.328e-04 rel) | 2.690e-06 (1.301e-04 rel) |
+///
+/// So the divergence is 8e-5 relative on the input, not 8e-6, and it is four
+/// to seven times the per-cell gate rather than inside it. **Canonical MOVES
+/// computes with the exact ratio**: `0.5556` is four orders of magnitude
+/// worse and would be unmistakable in any comparison. This port is correct
+/// and the question is closed; do not "fix" it toward `0.5556`.
+///
+/// The residual that remains is a different effect entirely — see
+/// [`resolve_county_meteorology`], which documents the one input that must be
+/// narrowed to `f32` to reproduce what MOVES computed with.
 #[must_use]
 pub fn fahrenheit_to_kelvin(temperature_f: f64) -> f64 {
     (5.0 / 9.0) * (temperature_f - 32.0) + 273.15
@@ -952,9 +1005,11 @@ mod tests {
         // NULL and non-positive pressures both trigger the fill-in.
         for missing in [None, Some(0.0), Some(-3.0)] {
             let resolved = resolve_county_meteorology(missing, Some(Altitude::High));
+            // The default is written INTO the FLOAT column and read back,
+            // so the resolved value is 24.59 through f32, not the f64 literal.
             assert_eq!(
                 resolved.barometric_pressure_inhg,
-                DEFAULT_PRESSURE_HIGH_ALTITUDE
+                through_float_column(DEFAULT_PRESSURE_HIGH_ALTITUDE)
             );
             assert_eq!(resolved.altitude, Altitude::High);
         }
@@ -965,13 +1020,16 @@ mod tests {
         // SQL `CASE WHEN altitude='H' ... ELSE 28.94`: 'L' and NULL both
         // take the ELSE branch.
         let low = resolve_county_meteorology(None, Some(Altitude::Low));
-        assert_eq!(low.barometric_pressure_inhg, DEFAULT_PRESSURE_LOW_ALTITUDE);
+        assert_eq!(
+            low.barometric_pressure_inhg,
+            through_float_column(DEFAULT_PRESSURE_LOW_ALTITUDE)
+        );
         assert_eq!(low.altitude, Altitude::Low);
 
         let null_altitude = resolve_county_meteorology(Some(-1.0), None);
         assert_eq!(
             null_altitude.barometric_pressure_inhg,
-            DEFAULT_PRESSURE_LOW_ALTITUDE
+            through_float_column(DEFAULT_PRESSURE_LOW_ALTITUDE)
         );
     }
 
@@ -989,9 +1047,26 @@ mod tests {
 
     #[test]
     fn county_altitude_threshold_is_inclusive_low() {
-        // Exactly 25.8403 inHg → Low (`barometricPressure >= 25.8403`).
-        let resolved = resolve_county_meteorology(Some(ALTITUDE_PRESSURE_THRESHOLD), None);
-        assert_eq!(resolved.altitude, Altitude::Low);
+        // The SQL comparison is `barometricPressure >= 25.8403`, and it is
+        // inclusive — but the boundary is NOT REACHABLE through the FLOAT
+        // column, because 25.8403 has no exact binary32 form. A county that
+        // stores the threshold itself holds 25.840299606323242 and classes
+        // HIGH, which is what MOVES does too; only the next representable
+        // value up is at or above the literal.
+        let at_threshold = resolve_county_meteorology(Some(ALTITUDE_PRESSURE_THRESHOLD), None);
+        assert_eq!(at_threshold.altitude, Altitude::High);
+        assert!(at_threshold.barometric_pressure_inhg < ALTITUDE_PRESSURE_THRESHOLD);
+
+        // The smallest stored value that does reach the boundary classes Low,
+        // which is where the `>=` inclusivity is actually observable.
+        let just_above = f64::from(f32::from_bits(
+            (ALTITUDE_PRESSURE_THRESHOLD as f32).to_bits() + 1,
+        ));
+        assert!(just_above >= ALTITUDE_PRESSURE_THRESHOLD);
+        assert_eq!(
+            resolve_county_meteorology(Some(just_above), None).altitude,
+            Altitude::Low
+        );
     }
 
     #[test]
@@ -1001,7 +1076,7 @@ mod tests {
         let resolved = resolve_county_meteorology(None, None);
         assert_eq!(
             resolved.barometric_pressure_inhg,
-            DEFAULT_PRESSURE_LOW_ALTITUDE
+            through_float_column(DEFAULT_PRESSURE_LOW_ALTITUDE)
         );
         assert_eq!(resolved.altitude, Altitude::Low);
     }

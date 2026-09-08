@@ -41,10 +41,12 @@
 //! the comparison machinery composes with genuine port output.
 //! 3. **Pins the catalogues** — 23 onroad fixtures present and
 //! well-formed, 16 generators registered with stable names.
-//! 4. **Fixes the tolerance budget** — including the one *expected*
-//! divergence the generator port already documents (the
-//! `MeteorologyGenerator` `5/9` artifact — see
-//! `characterization/generator-validation/tolerance.toml`).
+//! 4. **Fixes the tolerance budget** — now CALIBRATED against the landed
+//! canonical snapshots rather than reserving room for a supposed
+//! `MeteorologyGenerator` `5/9` artifact. There is no such artifact:
+//! MOVES computes that conversion with the exact ratio, and the residual
+//! that does exist is `County.barometricPressure`'s 32-bit column width.
+//! See `characterization/generator-validation/tolerance.toml`.
 //!
 //! One thing is **gated** behind infrastructure the repository does
 //! not hold yet: the end-to-end *canonical-capture diff*. It needs
