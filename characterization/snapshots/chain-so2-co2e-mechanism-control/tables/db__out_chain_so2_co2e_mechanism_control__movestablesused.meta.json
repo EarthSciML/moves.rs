@@ -1,0 +1,38 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__out_chain_so2_co2e_mechanism_control__movestablesused",
+  "schema": [
+    {
+      "name": "MOVESRunID",
+      "kind": "int64"
+    },
+    {
+      "name": "databaseServer",
+      "kind": "utf8"
+    },
+    {
+      "name": "databaseName",
+      "kind": "utf8"
+    },
+    {
+      "name": "tableName",
+      "kind": "utf8"
+    },
+    {
+      "name": "dataFileSize",
+      "kind": "int64"
+    },
+    {
+      "name": "dataFileModificationDate",
+      "kind": "utf8"
+    },
+    {
+      "name": "tableUseSequence",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 159,
+  "float_decimals": 12,
+  "content_sha256": "bb63e95db6d09990659239955410498fffa397bd74e3e48f75e3b5aae9e3f7a5"
+}

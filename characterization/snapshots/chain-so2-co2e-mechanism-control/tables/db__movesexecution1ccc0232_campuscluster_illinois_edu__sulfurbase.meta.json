@@ -1,0 +1,28 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__sulfurbase",
+  "schema": [
+    {
+      "name": "modelYearGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "sulfurBase",
+      "kind": "float64"
+    },
+    {
+      "name": "sulfurBasis",
+      "kind": "float64"
+    },
+    {
+      "name": "sulfurGPAMax",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "modelYearGroupID"
+  ],
+  "row_count": 3,
+  "float_decimals": 12,
+  "content_sha256": "635cdd8896a4a42d504e1b7cc332a810a887e9b69e33415531c910df82d4c88b"
+}

@@ -1,0 +1,38 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__sulfateemissionrate",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearGroupID",
+      "kind": "int64"
+    },
+    {
+      "name": "meanBaseRate",
+      "kind": "float64"
+    },
+    {
+      "name": "meanBaseRateCV",
+      "kind": "float64"
+    },
+    {
+      "name": "dataSourceID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID",
+    "fuelTypeID",
+    "modelYearGroupID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "34469f8c1ff36cf38c03d542bb5abc5274265dcc76478b371172fe1339cbe9dc"
+}

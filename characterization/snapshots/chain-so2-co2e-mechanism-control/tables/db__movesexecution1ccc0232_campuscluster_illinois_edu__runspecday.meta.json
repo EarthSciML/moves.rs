@@ -1,0 +1,16 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__runspecday",
+  "schema": [
+    {
+      "name": "dayID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "dayID"
+  ],
+  "row_count": 2,
+  "float_decimals": 12,
+  "content_sha256": "337e88c3d9a090bbadded7d5032f6d596e2ce3c77823bc999b02c072769282bb"
+}

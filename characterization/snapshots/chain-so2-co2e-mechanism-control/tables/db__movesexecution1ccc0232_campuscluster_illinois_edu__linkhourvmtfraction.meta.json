@@ -1,0 +1,40 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__linkhourvmtfraction",
+  "schema": [
+    {
+      "name": "linkID",
+      "kind": "int64"
+    },
+    {
+      "name": "monthID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "dayID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourID",
+      "kind": "int64"
+    },
+    {
+      "name": "VMTFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "linkID",
+    "monthID",
+    "sourceTypeID",
+    "dayID",
+    "hourID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "ae06d32886a9af89878d32a71846783549bae98c4d5fdba9d279a76f0bd0a5a0"
+}

@@ -1,0 +1,140 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__nrsourceusetype",
+  "schema": [
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "SCC",
+      "kind": "utf8"
+    },
+    {
+      "name": "NRHPRangeBinID",
+      "kind": "int64"
+    },
+    {
+      "name": "medianLifeFullLoad",
+      "kind": "float64"
+    },
+    {
+      "name": "hoursUsedPerYear",
+      "kind": "float64"
+    },
+    {
+      "name": "loadFactor",
+      "kind": "float64"
+    },
+    {
+      "name": "hpAvg",
+      "kind": "float64"
+    },
+    {
+      "name": "isPumpFilled",
+      "kind": "utf8"
+    },
+    {
+      "name": "tankUnits",
+      "kind": "utf8"
+    },
+    {
+      "name": "tankSize",
+      "kind": "float64"
+    },
+    {
+      "name": "tankFillFrac",
+      "kind": "float64"
+    },
+    {
+      "name": "tankMetalFrac",
+      "kind": "float64"
+    },
+    {
+      "name": "hoseLength",
+      "kind": "float64"
+    },
+    {
+      "name": "hoseDiameter",
+      "kind": "float64"
+    },
+    {
+      "name": "hoseMetalFrac",
+      "kind": "float64"
+    },
+    {
+      "name": "marineFillNeckHoseLength",
+      "kind": "float64"
+    },
+    {
+      "name": "marineFillNeckHoseDiameter",
+      "kind": "float64"
+    },
+    {
+      "name": "marineSupplyHoseLength",
+      "kind": "float64"
+    },
+    {
+      "name": "marineSupplyHoseDiameter",
+      "kind": "float64"
+    },
+    {
+      "name": "marineVentHoseLength",
+      "kind": "float64"
+    },
+    {
+      "name": "marineVentHoseDiameter",
+      "kind": "float64"
+    },
+    {
+      "name": "hotSoaksPerSHO",
+      "kind": "float64"
+    },
+    {
+      "name": "nonInstMarineTankFrac",
+      "kind": "float64"
+    },
+    {
+      "name": "marineInstPlasticTankTrailFrac",
+      "kind": "float64"
+    },
+    {
+      "name": "marineInstPlasticTankWaterFrac",
+      "kind": "float64"
+    },
+    {
+      "name": "marineInstMetalTankTrailerFrac",
+      "kind": "float64"
+    },
+    {
+      "name": "marineInstMetalTankWaterFrac",
+      "kind": "float64"
+    },
+    {
+      "name": "e10TankPermeationAdjFac",
+      "kind": "float64"
+    },
+    {
+      "name": "e10HosePermeationAdjFac",
+      "kind": "float64"
+    },
+    {
+      "name": "e10MarineFillNeckPermAdjFac",
+      "kind": "float64"
+    },
+    {
+      "name": "e10MarineSupplyHosePermAdjFac",
+      "kind": "float64"
+    },
+    {
+      "name": "e10MarineVentHosePermAdjFac",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "sourceTypeID"
+  ],
+  "row_count": 1183,
+  "float_decimals": 12,
+  "content_sha256": "9b53c554c7b4d0fa863d608c9b18b742eff422e0dba4ec805890c1d4b97d4fbe"
+}

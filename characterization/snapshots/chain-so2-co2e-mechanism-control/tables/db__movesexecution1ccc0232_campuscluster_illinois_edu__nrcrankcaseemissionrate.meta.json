@@ -1,0 +1,53 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__nrcrankcaseemissionrate",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "SCC",
+      "kind": "utf8"
+    },
+    {
+      "name": "hpMin",
+      "kind": "int64"
+    },
+    {
+      "name": "hpMax",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "engTechID",
+      "kind": "int64"
+    },
+    {
+      "name": "meanBaseRate",
+      "kind": "float64"
+    },
+    {
+      "name": "units",
+      "kind": "utf8"
+    },
+    {
+      "name": "dataSourceID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID",
+    "SCC",
+    "hpMin",
+    "hpMax",
+    "modelYearID",
+    "engTechID"
+  ],
+  "row_count": 126,
+  "float_decimals": 12,
+  "content_sha256": "f25877dda2c203c005428fe8fb771bc05d66605202d4cc517554499c19f21d35"
+}
