@@ -16,7 +16,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::Serialize;
 
-use crate::format::{parse_fixed_decimal, ColumnKind, ColumnSpec};
+use crate::format::{parse_canonical_float, ColumnKind, ColumnSpec};
 use crate::snapshot::Snapshot;
 use crate::table::Table;
 
@@ -393,7 +393,9 @@ fn cells_equal(
             if kind == ColumnKind::Float64 {
                 let tol = opts.tolerance_for(table, column);
                 if tol > 0.0 {
-                    if let (Some(lf), Some(rf)) = (parse_fixed_decimal(l), parse_fixed_decimal(r)) {
+                    if let (Some(lf), Some(rf)) =
+                        (parse_canonical_float(l), parse_canonical_float(r))
+                    {
                         return floats_within_tolerance(lf, rf, tol);
                     }
                 }
@@ -549,8 +551,8 @@ mod tests {
             } => {
                 assert_eq!(key, &vec!["1".to_string()]);
                 assert_eq!(column, "v");
-                assert_eq!(lhs.as_deref(), Some("1.000000000000"));
-                assert_eq!(rhs.as_deref(), Some("1.500000000000"));
+                assert_eq!(lhs.as_deref(), Some("1e+00"));
+                assert_eq!(rhs.as_deref(), Some("1.5e+00"));
             }
             other => panic!("unexpected diff: {other:?}"),
         }

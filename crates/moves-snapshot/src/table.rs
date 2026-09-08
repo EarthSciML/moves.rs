@@ -9,7 +9,7 @@ use arrow::datatypes::{DataType, Field, Schema as ArrowSchema, SchemaRef};
 use arrow::record_batch::RecordBatch;
 
 use crate::error::{Error, Result};
-use crate::format::{float_to_fixed_decimal, ColumnKind, ColumnSpec, FLOAT_DECIMALS};
+use crate::format::{float_to_canonical, ColumnKind, ColumnSpec};
 
 /// Tagged value used by the row-based builder API. Variants must match the
 /// declared `ColumnKind` for the target column. `Null` is accepted for any
@@ -36,8 +36,9 @@ impl Value {
 }
 
 /// Columnar storage for one column after normalization. Floats are stored as
-/// the fixed-decimal strings that will land in the parquet file — the f64
-/// form is gone after `TableBuilder::build`.
+/// the canonical decimal strings that will land in the parquet file — the f64
+/// form is gone after `TableBuilder::build`. Under `moves-snapshot/v2` that
+/// string is lossless, so the f64 is recoverable; under v1 it was not.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NormalizedColumn {
     Int64(Vec<Option<i64>>),
@@ -351,7 +352,7 @@ fn push_value(col: &mut NormalizedColumn, val: &Value) {
         (NormalizedColumn::Int64(v), Value::Int64(x)) => v.push(Some(*x)),
         (NormalizedColumn::Int64(v), Value::Null) => v.push(None),
         (NormalizedColumn::Float64String(v), Value::Float64(x)) => {
-            v.push(Some(float_to_fixed_decimal(*x, FLOAT_DECIMALS)));
+            v.push(Some(float_to_canonical(*x)));
         }
         (NormalizedColumn::Float64String(v), Value::Null) => v.push(None),
         (NormalizedColumn::Utf8(v), Value::Utf8(s)) => v.push(Some(s.clone())),
@@ -396,11 +397,13 @@ fn compare_values(kind: ColumnKind, a: &Value, b: &Value) -> Ordering {
     match (kind, a, b) {
         (ColumnKind::Int64, Value::Int64(x), Value::Int64(y)) => x.cmp(y),
         (ColumnKind::Float64, Value::Float64(x), Value::Float64(y)) => {
-            // Sort by the canonical fixed-decimal string so the order is
-            // identical before and after normalization.
-            let xs = float_to_fixed_decimal(*x, FLOAT_DECIMALS);
-            let ys = float_to_fixed_decimal(*y, FLOAT_DECIMALS);
-            xs.cmp(&ys)
+            // Numeric order, via the IEEE total order so NaN and the zeros
+            // still compare deterministically. `moves-snapshot/v1` sorted on
+            // the fixed-decimal *string* instead, which put 10.0 before 9.0
+            // and could tie two distinct doubles that rounded together; the
+            // v2 encoding is bijective, so sorting on the value and sorting
+            // on the string agree up to that (fixed) lexicographic quirk.
+            x.total_cmp(y)
         }
         (ColumnKind::Utf8, Value::Utf8(x), Value::Utf8(y)) => x.cmp(y),
         (ColumnKind::Boolean, Value::Boolean(x), Value::Boolean(y)) => x.cmp(y),
@@ -565,11 +568,16 @@ mod tests {
             .with_natural_key::<[&str; 0], &str>([])
             .unwrap();
         tb.push_row([Value::Float64(1.0 + 1e-13)]).unwrap();
+        tb.push_row([Value::Float64(1.9e-11)]).unwrap();
         let t = tb.build().unwrap();
         let NormalizedColumn::Float64String(x) = &t.columns[0] else {
             panic!()
         };
-        assert_eq!(x[0].as_deref(), Some("1.000000000000"));
+        // v1 rounded both of these to 12 decimal places, which spelled the
+        // first "1.000000000000" (the 1e-13 perturbation gone) and the second
+        // "0.000000000019" (two significant digits left). v2 keeps both.
+        assert_eq!(x[0].as_deref(), Some("1.0000000000001e+00"));
+        assert_eq!(x[1].as_deref(), Some("1.9e-11"));
     }
 
     #[test]

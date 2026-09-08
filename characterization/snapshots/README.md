@@ -141,13 +141,53 @@ contract:
    columns via `INFORMATION_SCHEMA` `ORDER BY` clauses, and dumps each
    table with `SELECT ... ORDER BY 1, 2, ..., N`.
 3. `moves-fixture-capture`'s directory walk is sorted lexicographically.
-4. The `moves-snapshot` crate normalizes floats to fixed-decimal strings,
-   sorts rows by the natural key, and writes parquet files with
+4. The `moves-snapshot` crate normalizes floats to canonical decimal
+   strings, sorts rows by the natural key, and writes parquet files with
    `compression=UNCOMPRESSED`, `dictionary_enabled=false`,
    `statistics_enabled=None`, and a fixed `created_by` stamp.
 
 If a snapshot file's bytes change, the underlying MOVES output changed —
 that's the regression-detection signal Phase 0 is designed to provide.
+
+## Float encoding, and the v1 → v2 format change
+
+Every snapshot committed here today is `moves-snapshot/v1`, which stored
+each float as a fixed-decimal string with **twelve places after the
+point**. Twelve decimal places is not twelve significant digits: a value
+near 1e-9 kept four significant digits, one near 1e-11 kept two, and
+anything below 5e-13 was stored as `0.000000000000`. The measurement is
+in
+[`../audit-results/20260908T0948-float-precision-blast-radius.md`](../audit-results/20260908T0948-float-precision-blast-radius.md)
+— across the 40 populated snapshots, 60 226 821 of 64 656 397 non-zero
+float cells carry fewer significant digits than an f64 holds, and
+17 234 of them carry too few to support a 1e-6 relative comparison.
+
+`moves-snapshot/v2` replaces the rule: a float is stored as the shortest
+correctly-rounded decimal that parses back to a **bit-identical** f64,
+written in normalized scientific notation (`1.9e-11`, `1.5e+00`,
+`0e+00`). It is lossless at every magnitude, and the rule is defined as a
+property of the number rather than of any formatter, so it holds the same
+determinism guarantee.
+
+Two consequences for anything reading this directory:
+
+* Each `tables/<name>.meta.json` says which rule produced it. v1 sidecars
+  carry `"float_decimals": 12`; v2 sidecars carry
+  `"float_encoding": {"kind": "shortest_round_trip",
+  "max_significant_digits": 17}` and **no** `float_decimals` field,
+  because there is no fixed decimal count any more. A consumer that
+  floored its tolerance at `0.5 * 10^-float_decimals` should floor at
+  **zero** when it sees `float_encoding`.
+* Rows whose natural key includes a float column sort by numeric (IEEE
+  total) order in v2, where v1 sorted them by the fixed-decimal string —
+  which put `10.0` before `9.0`. 120 of the 14 055 committed tables have
+  a float in the natural key, so their row order will change on
+  recapture.
+
+The corpus is **not** migrated yet. `moves-snapshot` reads both versions
+and remembers which one it read, so the committed v1 snapshots stay
+diffable, loadable and byte-stable until the scheduled recapture sweep
+runs. See [`../../docs/snapshot-v2-migration.md`](../../docs/snapshot-v2-migration.md).
 
 ## Producing a snapshot
 

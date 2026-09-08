@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::format::{ColumnSpec, FLOAT_DECIMALS, FORMAT_VERSION};
+use crate::format::{ColumnSpec, FloatEncoding, FormatProfile};
 
 /// Top-level manifest written as `manifest.json`. Lists every table in
 /// lexicographic order with its content hash, plus an aggregate hash that
@@ -26,7 +26,22 @@ pub struct ManifestEntry {
 }
 
 /// Per-table sidecar written as `tables/<name>.meta.json`. Captures schema,
-/// row count, content hash, and the natural-key columns used to sort rows.
+/// row count, content hash, the natural-key columns used to sort rows, and
+/// how `float64` cells were encoded.
+///
+/// The float rule is self-describing, and which field carries it says which
+/// format version wrote the file:
+///
+/// * `moves-snapshot/v1` wrote `"float_decimals": 12` and no
+///   `float_encoding`. A consumer floors its absolute tolerance at
+///   `0.5 * 10^-float_decimals`.
+/// * `moves-snapshot/v2` writes `"float_encoding": {"kind":
+///   "shortest_round_trip", "max_significant_digits": 17}` and **no**
+///   `float_decimals`, because there is no fixed decimal count any more. The
+///   encoding is lossless, so the storage floor is zero.
+///
+/// Use [`TableMetadata::float_encoding`] rather than reading either field
+/// directly; it resolves both spellings.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TableMetadata {
     pub format_version: String,
@@ -34,26 +49,55 @@ pub struct TableMetadata {
     pub schema: Vec<ColumnSpec>,
     pub natural_key: Vec<String>,
     pub row_count: u64,
-    pub float_decimals: u32,
+    /// `moves-snapshot/v1` only. Absent from v2 sidecars.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub float_decimals: Option<u32>,
+    /// `moves-snapshot/v2` onward. Absent from v1 sidecars.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub float_encoding: Option<FloatEncoding>,
     pub content_sha256: String,
 }
 
 impl TableMetadata {
     pub fn new(
+        profile: &FormatProfile,
         name: String,
         schema: Vec<ColumnSpec>,
         natural_key: Vec<String>,
         row_count: u64,
         content_sha256: String,
     ) -> Self {
+        // Emit exactly the field the profile's version defined, so a v1
+        // snapshot re-serializes to the bytes it was read from.
+        let (float_decimals, float_encoding) = match profile.float_encoding {
+            FloatEncoding::FixedDecimals { decimals } => (Some(decimals), None),
+            other => (None, Some(other)),
+        };
         Self {
-            format_version: FORMAT_VERSION.to_string(),
+            format_version: profile.version.clone(),
             name,
             schema,
             natural_key,
             row_count,
-            float_decimals: FLOAT_DECIMALS,
+            float_decimals,
+            float_encoding,
             content_sha256,
+        }
+    }
+
+    /// The float storage rule this table's cells were written with, resolved
+    /// from whichever field the writing version used.
+    ///
+    /// Falls back to the v1 rule when neither field is present, which is what
+    /// a pre-`float_decimals` sidecar would have meant.
+    pub fn float_encoding(&self) -> FloatEncoding {
+        if let Some(enc) = self.float_encoding {
+            return enc;
+        }
+        FloatEncoding::FixedDecimals {
+            decimals: self
+                .float_decimals
+                .unwrap_or(crate::format::V1_FLOAT_DECIMALS),
         }
     }
 }

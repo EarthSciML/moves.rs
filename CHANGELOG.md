@@ -1,5 +1,44 @@
 # Changelog
 
+## Unreleased
+
+### Snapshot format `moves-snapshot/v2` — float precision
+
+`moves-snapshot/v1` stored float columns as fixed-decimal strings with
+twelve places after the point. Twelve decimal places is not twelve
+significant digits: precision survived in proportion to magnitude, so a
+value near 1e-9 kept four significant digits, one near 1e-11 kept two,
+and anything below 5e-13 was flushed to `0.000000000000`. Measured over
+the 40 populated snapshots, 93.1% of non-zero float cells carried fewer
+significant digits than an f64 holds, and 17 234 of them carried too few
+to support even a 1e-6 relative comparison
+(`characterization/audit-results/20260908T0948-float-precision-blast-radius.md`,
+produced by the new `characterization/audit/float-precision-audit.py`).
+
+`moves-snapshot/v2` stores the shortest correctly-rounded decimal that
+parses back to a bit-identical f64, in normalized scientific notation
+(`1.9e-11`, `1.5e+00`, `0e+00`). It is lossless at every magnitude and the
+rule is specified as a property of the number, not of a formatter, so the
+byte-identity determinism contract is unchanged.
+
+* `TableMetadata` is self-describing: v1 sidecars carry
+  `"float_decimals": 12`, v2 sidecars carry a tagged `"float_encoding"`
+  object and **no** `float_decimals`. `TableMetadata::float_encoding()`
+  resolves either into a `FloatEncoding`, which reports the storage
+  quantum a consumer should floor its tolerances at (zero, for v2).
+  Consumers that read `float_decimals` must be updated — see
+  `docs/snapshot-v2-migration.md`.
+* `Snapshot::load` accepts every version in `SUPPORTED_FORMAT_VERSIONS`
+  and remembers which one it read, so the committed v1 corpus stays
+  loadable, diffable and byte-stable, and a v1 snapshot rewritten by a v2
+  binary reproduces its original bytes.
+* Rows whose natural key includes a float column now sort by IEEE total
+  order rather than by the fixed-decimal string; 120 of the 14 055
+  committed tables are affected and will change row order on recapture.
+* **The corpus is not migrated.** `characterization/snapshots/` is still
+  entirely v1; the costed sweep is planned in
+  `docs/snapshot-v2-migration.md`.
+
 ## v0.1.0 — 2026-05-21
 
 First public release of `moves.rs`, a pure-Rust port of EPA's MOVES

@@ -29,8 +29,8 @@ The harness in `src/lib.rs`:
 1. Runs a Rust importer on the user source files.
 2. Normalizes the importer's Parquet output into a `moves_snapshot::Table`
  with [`parquet_to_table`] — the *same* normalization the canonical
- snapshot applies (rows sorted by the natural key, floats rounded to a
- fixed-decimal string).
+ snapshot applies (rows sorted by the natural key, floats written as the
+ canonical decimal string).
 3. Diffs the normalized importer table against the canonical `db__…`
  table with [`compare_importer_output`], which wraps
  `moves_snapshot::diff_snapshots` and classifies the result.
