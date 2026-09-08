@@ -76,8 +76,9 @@ under the tolerance budget.
 ## Tolerance budget
 
 `tolerance.toml` holds the per-(table, column) absolute tolerances.
-The default is `0.0` (byte-identical within fixed-decimal
-canonicalization). Known numerical artifacts — port-vs-canonical
+The default is `0.0` (byte-identical within the snapshot's float
+canonicalization — the v1 fixed-decimal rule for the committed corpus,
+the lossless `moves-snapshot/v2` rule after the recapture sweep). Known numerical artifacts — port-vs-canonical
 floating-point divergences that are intentional, not bugs — are
 widened here with a comment explaining the source.
 

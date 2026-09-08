@@ -2,9 +2,15 @@
 #
 # Phase 0 starts strict: byte-identical snapshot bytes are the contract.
 # `default_float_tolerance = 0.0` means every float column must match
-# bit-for-bit (after the fixed-decimal canonicalization done by the
-# snapshot writer). We expect zero drift between two runs against the
-# same SIF SHA — anything else is a determinism break.
+# bit-for-bit (after the float canonicalization done by the snapshot
+# writer). We expect zero drift between two runs against the same SIF
+# SHA — anything else is a determinism break.
+#
+# Note for the `moves-snapshot/v2` recapture (docs/snapshot-v2-migration.md):
+# v1's fixed-decimal rounding silently absorbed differences below 5e-13
+# absolute. v2 is lossless, so a `0.0` default is strictly stricter
+# afterwards than it was before. Re-run the diff gate after the sweep and
+# widen per column only where a real numerical artifact appears.
 #
 # Per-table overrides come into play in later phases when the Rust port
 # (Phase 3+) starts producing the same numbers via different code paths.

@@ -14,7 +14,7 @@ use arrow::compute::concat_batches;
 use arrow::record_batch::RecordBatch;
 
 use crate::error::{Error, Result};
-use crate::format::{ColumnSpec, FORMAT_VERSION, PARQUET_CREATED_BY};
+use crate::format::{ColumnSpec, FormatProfile, PARQUET_CREATED_BY, SUPPORTED_FORMAT_VERSIONS};
 use crate::manifest::{compute_aggregate_hash, sha256_hex, Manifest, ManifestEntry, TableMetadata};
 use crate::table::Table;
 
@@ -24,14 +24,46 @@ const MANIFEST_FILE: &str = "manifest.json";
 /// In-memory collection of normalized tables that maps to a snapshot directory.
 ///
 /// Tables are stored keyed by name in lexicographic order, so iteration/// and the resulting on-disk manifest — is deterministic.
+///
+/// A snapshot also carries the [`FormatProfile`] it belongs to. A freshly
+/// built one gets the current profile; one produced by [`Snapshot::load`]
+/// keeps the version it was read from, so loading an older snapshot and
+/// writing it back reproduces the original bytes rather than relabelling
+/// v1-encoded cells as v2.
 #[derive(Debug, Clone, Default)]
 pub struct Snapshot {
     tables: BTreeMap<String, Table>,
+    profile: FormatProfile,
 }
 
 impl Snapshot {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// The format version + float encoding this snapshot's cells use.
+    pub fn profile(&self) -> &FormatProfile {
+        &self.profile
+    }
+
+    /// The format version string that will be written to `manifest.json`.
+    pub fn format_version(&self) -> &str {
+        &self.profile.version
+    }
+
+    /// Build an empty snapshot pinned to a specific format profile.
+    ///
+    /// Only useful for rewriting a snapshot in the version it came from, and
+    /// for tests that need to produce an older-format fixture. Tables added to
+    /// it must already carry cells encoded under that profile's float rule —
+    /// [`crate::TableBuilder`] always normalizes with the *current* rule, so
+    /// an older-profile snapshot has to be assembled from
+    /// [`crate::Table::from_normalized`].
+    pub fn with_profile(profile: FormatProfile) -> Self {
+        Self {
+            tables: BTreeMap::new(),
+            profile,
+        }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -102,6 +134,7 @@ impl Snapshot {
             let content_sha256 = sha256_hex(&parquet_bytes);
 
             let meta = TableMetadata::new(
+                &self.profile,
                 table.name().to_string(),
                 table.schema().to_vec(),
                 table.natural_key().to_vec(),
@@ -126,7 +159,7 @@ impl Snapshot {
         let aggregate_sha256 = compute_aggregate_hash(&entries);
 
         let manifest = Manifest {
-            format_version: FORMAT_VERSION.to_string(),
+            format_version: self.profile.version.clone(),
             tables: entries,
             aggregate_sha256,
         };
@@ -159,13 +192,17 @@ impl Snapshot {
                 path: manifest_path.clone(),
                 source,
             })?;
-        if manifest.format_version != FORMAT_VERSION {
+        // Read every version this crate knows, not just the one it writes:
+        // the committed corpus stays on the older format until a scheduled
+        // recapture sweep migrates it, and the regression gates diff against
+        // it in the meantime.
+        let Some(profile) = FormatProfile::for_version(&manifest.format_version) else {
             return Err(Error::UnsupportedFormatVersion {
                 path: manifest_path,
                 actual: manifest.format_version,
-                expected: FORMAT_VERSION.to_string(),
+                expected: SUPPORTED_FORMAT_VERSIONS.join(", "),
             });
-        }
+        };
 
         // Verify the aggregate hash before doing any expensive parquet
         // decoding. If the manifest itself was tampered with this catches it
@@ -181,6 +218,7 @@ impl Snapshot {
 
         let tables_dir = dir.join(TABLES_SUBDIR);
         let mut snapshot = Snapshot::new();
+        snapshot.profile = profile;
 
         for entry in &manifest.tables {
             let parquet_path = tables_dir.join(format!("{}.parquet", entry.name));
@@ -241,6 +279,7 @@ impl Snapshot {
             let parquet_bytes = encode_parquet(table)?;
             let content_sha256 = sha256_hex(&parquet_bytes);
             let meta = TableMetadata::new(
+                &self.profile,
                 table.name().to_string(),
                 table.schema().to_vec(),
                 table.natural_key().to_vec(),
@@ -539,5 +578,233 @@ mod tests {
         let t2 = tb2.build().unwrap();
         let err = s.add_table(t2).unwrap_err();
         assert!(matches!(err, Error::DuplicateTable { .. }));
+    }
+    // ---- format version / float encoding --------------------------------
+
+    /// A v1 fixture, assembled by hand: v1-encoded cells in a v1-profile
+    /// snapshot. Nothing in the repo can produce these any more, so the test
+    /// builds one to prove the reader still handles the committed corpus.
+    fn v1_snapshot() -> Snapshot {
+        use crate::format::{float_to_fixed_decimal, V1_FLOAT_DECIMALS};
+        use crate::table::NormalizedColumn;
+
+        let schema = vec![
+            ColumnSpec {
+                name: "id".into(),
+                kind: ColumnKind::Int64,
+            },
+            ColumnSpec {
+                name: "rate".into(),
+                kind: ColumnKind::Float64,
+            },
+        ];
+        let cells: Vec<Option<String>> = [1.105e-9, 1.9e-11, 1.5]
+            .iter()
+            .map(|&v| Some(float_to_fixed_decimal(v, V1_FLOAT_DECIMALS)))
+            .collect();
+        let table = Table::from_normalized(
+            "db__movesexecutionx__nrdioxinemissionrate".to_string(),
+            schema,
+            vec!["id".to_string()],
+            vec![
+                NormalizedColumn::Int64(vec![Some(1), Some(2), Some(3)]),
+                NormalizedColumn::Float64String(cells),
+            ],
+        )
+        .unwrap();
+
+        let mut s = Snapshot::with_profile(
+            crate::format::FormatProfile::for_version("moves-snapshot/v1").unwrap(),
+        );
+        s.add_table(table).unwrap();
+        s
+    }
+
+    #[test]
+    fn manifest_distinguishes_v1_from_v2() {
+        // --- v1 ---
+        let d1 = tempdir().unwrap();
+        v1_snapshot().write(d1.path()).unwrap();
+        let m1: Manifest =
+            serde_json::from_slice(&fs::read(d1.path().join("manifest.json")).unwrap()).unwrap();
+        assert_eq!(m1.format_version, "moves-snapshot/v1");
+        let meta1: TableMetadata = serde_json::from_slice(
+            &fs::read(
+                d1.path()
+                    .join("tables/db__movesexecutionx__nrdioxinemissionrate.meta.json"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(meta1.format_version, "moves-snapshot/v1");
+        assert_eq!(meta1.float_decimals, Some(12));
+        assert_eq!(meta1.float_encoding, None);
+        assert_eq!(
+            meta1.float_encoding(),
+            crate::format::FloatEncoding::FixedDecimals { decimals: 12 }
+        );
+        // The v1 rule's absolute floor, which is what a consumer derived from
+        // `float_decimals`.
+        assert_eq!(meta1.float_encoding().absolute_quantum(1.0), 0.5e-12);
+
+        // --- v2 ---
+        let mut tb = TableBuilder::new(
+            "db__movesexecutionx__nrdioxinemissionrate",
+            [
+                ("id".to_string(), ColumnKind::Int64),
+                ("rate".to_string(), ColumnKind::Float64),
+            ],
+        )
+        .unwrap()
+        .with_natural_key(["id"])
+        .unwrap();
+        for (i, v) in [1.105e-9, 1.9e-11, 1.5].iter().enumerate() {
+            tb.push_row([Value::Int64(i as i64 + 1), Value::Float64(*v)])
+                .unwrap();
+        }
+        let mut s2 = Snapshot::new();
+        s2.add_table(tb.build().unwrap()).unwrap();
+        let d2 = tempdir().unwrap();
+        s2.write(d2.path()).unwrap();
+
+        let m2: Manifest =
+            serde_json::from_slice(&fs::read(d2.path().join("manifest.json")).unwrap()).unwrap();
+        assert_eq!(m2.format_version, "moves-snapshot/v2");
+        let meta2: TableMetadata = serde_json::from_slice(
+            &fs::read(
+                d2.path()
+                    .join("tables/db__movesexecutionx__nrdioxinemissionrate.meta.json"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(meta2.format_version, "moves-snapshot/v2");
+        assert_eq!(meta2.float_decimals, None);
+        assert_eq!(
+            meta2.float_encoding,
+            Some(crate::format::FloatEncoding::CURRENT)
+        );
+        // Lossless: nothing to floor a tolerance at.
+        assert_eq!(meta2.float_encoding().absolute_quantum(1.0), 0.0);
+
+        // And the cells really do differ: v1 kept 2 significant digits of
+        // 1.9e-11, v2 keeps all of them.
+        let t1 = Snapshot::load(d1.path()).unwrap();
+        let t2 = Snapshot::load(d2.path()).unwrap();
+        let cell = |s: &Snapshot| {
+            let tbl = s
+                .table("db__movesexecutionx__nrdioxinemissionrate")
+                .unwrap();
+            let i = tbl.column_index("rate").unwrap();
+            tbl.columns()[i].cell_string(1)
+        };
+        assert_eq!(cell(&t1).as_deref(), Some("0.000000000019"));
+        assert_eq!(cell(&t2).as_deref(), Some("1.9e-11"));
+    }
+
+    #[test]
+    fn v1_snapshot_loads_and_rewrites_byte_identically() {
+        let d1 = tempdir().unwrap();
+        let d2 = tempdir().unwrap();
+        v1_snapshot().write(d1.path()).unwrap();
+        let loaded = Snapshot::load(d1.path()).unwrap();
+        assert_eq!(loaded.format_version(), "moves-snapshot/v1");
+        assert_eq!(
+            loaded.profile().float_encoding,
+            crate::format::FloatEncoding::V1
+        );
+        loaded.write(d2.path()).unwrap();
+        for rel in [
+            "manifest.json",
+            "tables/db__movesexecutionx__nrdioxinemissionrate.parquet",
+            "tables/db__movesexecutionx__nrdioxinemissionrate.meta.json",
+        ] {
+            assert_eq!(
+                fs::read(d1.path().join(rel)).unwrap(),
+                fs::read(d2.path().join(rel)).unwrap(),
+                "{rel}"
+            );
+        }
+        // A loaded v1 snapshot is not silently relabelled v2.
+        assert_eq!(loaded.aggregate_hash().unwrap(), {
+            let m: Manifest =
+                serde_json::from_slice(&fs::read(d1.path().join("manifest.json")).unwrap())
+                    .unwrap();
+            m.aggregate_sha256
+        });
+    }
+
+    #[test]
+    fn unknown_format_version_is_rejected_with_the_supported_list() {
+        let dir = tempdir().unwrap();
+        sample_snapshot().write(dir.path()).unwrap();
+        let mp = dir.path().join("manifest.json");
+        let mut m: Manifest = serde_json::from_slice(&fs::read(&mp).unwrap()).unwrap();
+        m.format_version = "moves-snapshot/v99".into();
+        fs::write(&mp, serde_json::to_vec_pretty(&m).unwrap()).unwrap();
+        let err = Snapshot::load(dir.path()).unwrap_err();
+        match err {
+            Error::UnsupportedFormatVersion {
+                actual, expected, ..
+            } => {
+                assert_eq!(actual, "moves-snapshot/v99");
+                assert_eq!(expected, "moves-snapshot/v1, moves-snapshot/v2");
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    /// Extreme magnitudes survive a real write/load cycle bit-for-bit, which
+    /// the v1 format could not do for anything below ~1e-12.
+    #[test]
+    fn extreme_magnitudes_round_trip_through_a_snapshot() {
+        let values = [
+            0.0_f64,
+            1.5,
+            -1.5,
+            std::f64::consts::PI,
+            1e-9,
+            1.105e-9,
+            1.9e-11,
+            4.7e-13,
+            1e-300,
+            f64::MIN_POSITIVE,
+            f64::from_bits(1),
+            f64::from_bits(0x000f_ffff_ffff_ffff),
+            1e300,
+            f64::MAX,
+            f64::MIN,
+        ];
+        let mut tb = TableBuilder::new(
+            "t",
+            [
+                ("id".to_string(), ColumnKind::Int64),
+                ("v".to_string(), ColumnKind::Float64),
+            ],
+        )
+        .unwrap()
+        .with_natural_key(["id"])
+        .unwrap();
+        for (i, v) in values.iter().enumerate() {
+            tb.push_row([Value::Int64(i as i64), Value::Float64(*v)])
+                .unwrap();
+        }
+        let mut s = Snapshot::new();
+        s.add_table(tb.build().unwrap()).unwrap();
+        let dir = tempdir().unwrap();
+        s.write(dir.path()).unwrap();
+
+        let back = Snapshot::load(dir.path()).unwrap();
+        let tbl = back.table("t").unwrap();
+        let vi = tbl.column_index("v").unwrap();
+        for (i, expect) in values.iter().enumerate() {
+            let cell = tbl.columns()[vi].cell_string(i).unwrap();
+            let got = crate::format::parse_canonical_float(&cell).unwrap();
+            assert_eq!(
+                got.to_bits(),
+                expect.to_bits(),
+                "row {i}: {expect:?} stored as {cell}"
+            );
+        }
     }
 }
