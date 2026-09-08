@@ -1,0 +1,20 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__hourofanyday",
+  "schema": [
+    {
+      "name": "hourID",
+      "kind": "int64"
+    },
+    {
+      "name": "hourname",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "hourID"
+  ],
+  "row_count": 24,
+  "float_decimals": 12,
+  "content_sha256": "75967e168cf185a1a17a0d207abae0d95c40591f5525c08379a46189272fb077"
+}

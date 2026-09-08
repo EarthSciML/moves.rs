@@ -1,6 +1,6 @@
 # Fixture catalogue (Phase 0 Task 5 + 6)
 
-The 52 RunSpec XML files in this directory are the regression fixtures that
+The 54 RunSpec XML files in this directory are the regression fixtures that
 every later phase of the moves.rs port verifies against. Each one is a
 hand-tuned MOVES input whose snapshot (in `../snapshots/<fixture-name>/`)
 is the ground-truth oracle for one slice of the MOVES coverage space.
@@ -92,11 +92,52 @@ See [`coverage-matrix.md`](coverage-matrix.md) for the full
 fixture × (process, scale, calculator) cross-reference. The matrix is
 regenerated every time `_generate.py` is run.
 
+A `chain-<calculator>` tag asserts that the fixture makes MOVES
+**instantiate the calculator AND emit at least one MOVESOutput row on a
+(pollutant, process) pair the calculator owns**. Class-loaded-but-silent
+does not count; see the note at the top of `_generate.py`'s
+`CHAIN_LABELS` for the 2026-09-08 sweep that re-derived every tag from the
+snapshots and for the list of tags it removed.
+
+### `calculator-dag.json` over-reports TOGSpeciationCalculator
+
+`calculator-chains/calculator-dag.json` is built from the pinned MOVES
+tree's committed `CalculatorInfo.txt`, which records **184**
+`TOGSpeciationCalculator` registrations across the CB05 mechanism
+pseudo-pollutants 1000–1018. **Those pollutants do not exist in the
+default database this corpus runs against.** Measured inside
+`moves-fixture.sif` (SHA256 `4f92c593…`) against `movesdb20241112`:
+
+```
+select count(*), max(pollutantID) from pollutant;        -- 116, 3000
+select p.pollutantID, p.pollutantName from pollutant p
+  join pollutantDisplayGroup g using (pollutantDisplayGroupID)
+ where g.pollutantDisplayGroupName='Mechanisms';         -- 3000 only
+select * from mechanismName;                             -- (5, NonHAPTOG Mechanism)
+select count(*) from integratedSpeciesSet;               -- 14, all mechanismID=5
+```
+
+`TOGSpeciationCalculator`'s constructor derives its registrations at
+runtime from `pollutant` × `rocSpeciation`, so against this DB it
+registers **24** pairs, not 184: pollutant 3000 and pollutant 88 over the
+12 processes `rocSpeciation` lists (1, 2, 11, 12, 13, 15, 16, 17, 18, 19,
+90, 91). A RunSpec asking for pollutant 1000 is silently dropped —
+`PollutantProcessAssociation.createByID` returns null when
+`Pollutant.findByID` misses, and `RunSpecXML` logs "Invalid
+PollutantProcessAssociation". `CalculatorInfo.txt` was evidently generated
+against a different (CB05-carrying) database.
+
+Only pollutant **88** is ever written to `MOVESWorkerOutput` by
+`database/TOGSpeciationCalculator.sql`; the mechanism pollutant is a gate,
+not an output. So `chain-so2-co2e-mechanism` is verified on pollutant 88
+alone, and any port that expects CB05 species rows from this calculator
+is chasing registrations the shipped DB cannot produce.
+
 ## Acceptance status (Phase 0 Task 5 + 6, bead `mo-n2yg`)
 
 | Acceptance criterion | State |
 |----------------------|-------|
-| Fixtures live in `characterization/fixtures/` | **Met** — 52 RunSpec XMLs (original target: 30–35; later phases added more) |
+| Fixtures live in `characterization/fixtures/` | **Met** — 54 RunSpec XMLs (original target: 30–35; later phases added more) |
 | Each fixture has a snapshot in `characterization/snapshots/` | **Pending compute-node run** — see below |
 | Coverage matrix documents (process × scale × calculator-chain) | **Met** — `coverage-matrix.md` |
 

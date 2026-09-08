@@ -1,0 +1,20 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__oxythreshname",
+  "schema": [
+    {
+      "name": "oxyThreshID",
+      "kind": "int64"
+    },
+    {
+      "name": "oxyThreshName",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "oxyThreshID"
+  ],
+  "row_count": 2,
+  "float_decimals": 12,
+  "content_sha256": "574e672a31a6f0ef7b7e76537f9beb5c75d4c3f77236d9b18a0b27fceecf6b44"
+}

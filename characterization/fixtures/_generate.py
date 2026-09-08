@@ -64,6 +64,14 @@ POLLUTANTS = {
     26:  "Acetaldehyde",
     27:  "Acrolein",
     31:  "Sulfur Dioxide (SO2)",
+    32:  "Nitrogen Oxide (NO)",
+    33:  "Nitrogen Dioxide (NO2)",
+    34:  "Nitrous Acid (HONO)",
+    40:  "2,2,4-Trimethylpentane",
+    41:  "Ethyl Benzene",
+    42:  "Hexane",
+    43:  "Propionaldehyde",
+    44:  "Styrene",
     45:  "Toluene",
     46:  "Xylene",
     60:  "Mercury Elemental Gaseous",
@@ -77,9 +85,11 @@ POLLUTANTS = {
     86:  "Total Organic Gases",
     87:  "Volatile Organic Compounds",
     88:  "NonHAPTOG",
+    90:  "Atmospheric CO2",
     91:  "Total Energy Consumption",
     92:  "Petroleum Energy Consumption",
     93:  "Fossil Fuel Energy Consumption",
+    98:  "CO2 Equivalent",
     99:  "Brake Specific Fuel Consumption (BSFC)",
     100: "Primary Exhaust PM10  - Total",
     106: "Primary PM10 - Brakewear Particulate",
@@ -91,6 +101,14 @@ POLLUTANTS = {
     142: "2,3,7,8-Tetrachlorodibenzo-p-Dioxin",
     169: "Fluoranthene gas",
     185: "Naphthalene gas",
+    # The only 'Mechanisms'-display-group pollutant in movesdb20241112.
+    # `MOVESInstantiator` keys TOGSpeciationCalculator off this exact name
+    # (process = null, i.e. any process); `TOGSpeciationCalculator.doExecute`
+    # derives mechanismID = 1 + (3000-1000)/500 = 5, the sole mechanism in
+    # `integratedSpeciesSet`. The CB05 pseudo-pollutants 1000-1018 that
+    # CalculatorInfo.txt registers do NOT exist in this default DB
+    # (max(pollutantID) = 3000, 116 rows) and cannot be selected.
+    3000: "NonHAPTOG Mechanism",
 }
 
 PROCESSES = {
@@ -425,6 +443,91 @@ TOG_SPECIATION = ((86, 1), (5, 1), (79, 1))             # TOG, CH4, NMHC running
 # ExecutionRunSpec.flagRequiredPollutantProcesses() returns early for
 # NONROAD ("Nonroad has no silent pollutants/processes added for the user"),
 # so every link of the chain has to be listed explicitly.
+# ---------------------------------------------------------------------------
+# Onroad pollutant sets for the three previously-unreached onroad calculators
+# (SO2Calculator, CO2AERunningStartExtendedIdleCalculator,
+# TOGSpeciationCalculator). All on Running Exhaust (process 1); every one of
+# the three registers there.
+# ---------------------------------------------------------------------------
+
+# Inputs each of the three chained calculators gates on in doExecute().
+# `SO2Calculator.doExecute` and the Atmospheric-CO2 half of
+# `CO2AERunningStartExtendedIdleCalculator.doExecute` both bail out unless
+# "Total Energy Consumption" is selected *on the same process*; the CO2e half
+# needs CH4 + N2O. ExecutionRunSpec.flagRequiredPollutantProcesses' `needs[]`
+# table does NOT cover these, so they must be selected explicitly — that is
+# exactly why expand-criteria (SO2 without energy) class-loads SO2Calculator
+# and emits no pollutant-31 row.
+SO2_CO2E_INPUTS = (
+    (91, 1),     # Total Energy Consumption — SO2 + Atmospheric CO2 input
+    (5, 1),      # Methane (CH4)            — CO2 Equivalent input
+    (6, 1),      # Nitrous Oxide (N2O)      — CO2 Equivalent input
+)
+
+SO2_CO2E_OUTPUTS = (
+    (31, 1),     # Sulfur Dioxide (SO2)  — SO2Calculator
+    (90, 1),     # Atmospheric CO2       — CO2AERunningStartExtendedIdleCalculator
+    (98, 1),     # CO2 Equivalent        — CO2AERunningStartExtendedIdleCalculator
+)
+
+# HCSpeciationCalculator chain. NMOG (80) is the positive term of the
+# TOG-speciation integration; VOC (87) is AirToxicsCalculator's input.
+HC_SPECIATION = (
+    (1, 1),      # Total Gaseous Hydrocarbons
+    (5, 1),      # Methane (CH4)
+    (79, 1),     # Non-Methane Hydrocarbons
+    (80, 1),     # Non-Methane Organic Gases
+    (86, 1),     # Total Organic Gases
+    (87, 1),     # Volatile Organic Compounds
+)
+
+# The 14 integrated species of mechanism 5, set 4 ("Set 4 OAQPS Jun, 2013 Sub
+# from TOG") — every row of movesdb20241112's `integratedSpeciesSet`, all with
+# useISSyn='Y' and all onroad-valid on process 1. TOGSpeciationCalculator
+# subtracts these from NMOG to get the NonHAPTOG residual; AirToxicsCalculator
+# produces them.
+TOG_INTEGRATED_SPECIES = (
+    (20, 1),     # Benzene
+    (21, 1),     # Ethanol
+    (24, 1),     # 1,3-Butadiene
+    (25, 1),     # Formaldehyde
+    (26, 1),     # Acetaldehyde
+    (27, 1),     # Acrolein
+    (40, 1),     # 2,2,4-Trimethylpentane
+    (41, 1),     # Ethyl Benzene
+    (42, 1),     # Hexane
+    (43, 1),     # Propionaldehyde
+    (44, 1),     # Styrene
+    (45, 1),     # Toluene
+    (46, 1),     # Xylene
+    (185, 1),    # Naphthalene gas
+)
+
+def _dedupe(*groups: tuple[tuple[int, int], ...]) -> tuple[tuple[int, int], ...]:
+    """Concatenate pollutant/process groups, dropping repeats, order preserved.
+
+    The groups below overlap (CH4 is both a CO2-equivalent input and an
+    HCSpeciation output), and a repeated <pollutantprocessassociation> is
+    noise in the RunSpec — MOVES stores them in a TreeSet, so the duplicate
+    has no effect but does make the fixture harder to read.
+    """
+    seen, out = set(), []
+    for g in groups:
+        for pp in g:
+            if pp not in seen:
+                seen.add(pp)
+                out.append(pp)
+    return tuple(out)
+
+
+# The mechanism gate plus its product.
+TOG_MECHANISM = (
+    (3000, 1),   # NonHAPTOG Mechanism — instantiates TOGSpeciationCalculator
+                 # and is the pollutant doExecute() checks for
+    (88, 1),     # NonHAPTOG — the only pollutant the calculator's SQL emits
+                 # (ExecutionRunSpec.addLumpedSpecies adds it implicitly too)
+)
+
 NR_AIRTOXICS_INPUTS = (
     (1, 1),      # THC   — NonroadEmissionCalculator, feeds NMHC/CH4
     (99, 1),     # BSFC  — feeds nrDioxinEmissionRate + nrMetalEmissionRate
@@ -463,8 +566,8 @@ FIXTURES: list[FixtureSpec] = [
     FixtureSpec(
         name="expand-day",
         description="Sample expanded to a full day (hours 1-24, weekday + weekend).",
-        coverage=("expand-day", "scale-default", "chain-co2ae", "chain-baserate",
-                  "proc-1", "proc-2", "proc-90", "proc-99"),
+        coverage=("expand-day", "scale-default", "proc-1", "proc-2", "proc-90",
+                  "proc-99", "chain-baserate"),
         timespan=TimeSpan(year=2020, months=(7,), days=(2, 5),
                           begin_hour=1, end_hour=24, aggregate_by="Hour"),
         pp_assocs=ENERGY_RUN_START_EXTIDLE_WTP,
@@ -472,8 +575,8 @@ FIXTURES: list[FixtureSpec] = [
     FixtureSpec(
         name="expand-month",
         description="Sample expanded across four months (Jan/Apr/Jul/Oct).",
-        coverage=("expand-month", "scale-default", "chain-co2ae", "chain-baserate",
-                  "proc-1", "proc-2", "proc-90", "proc-99"),
+        coverage=("expand-month", "scale-default", "proc-1", "proc-2", "proc-90",
+                  "proc-99", "chain-baserate"),
         timespan=TimeSpan(year=2020, months=(1, 4, 7, 10), days=(5,),
                           begin_hour=6, end_hour=6, aggregate_by="Month"),
         pp_assocs=ENERGY_RUN_START_EXTIDLE_WTP,
@@ -482,8 +585,8 @@ FIXTURES: list[FixtureSpec] = [
         name="expand-counties",
         description="Sample expanded across three diverse counties (Washtenaw MI, "
                     "Cook IL, Los Angeles CA).",
-        coverage=("expand-counties", "scale-default", "chain-co2ae", "chain-baserate",
-                  "proc-1", "proc-2", "proc-90", "proc-99"),
+        coverage=("expand-counties", "scale-default", "proc-1", "proc-2",
+                  "proc-90", "proc-99", "chain-baserate"),
         geographic=(
             Geo("COUNTY", 26161, "MICHIGAN - Washtenaw County"),
             Geo("COUNTY", 17031, "ILLINOIS - Cook County"),
@@ -495,8 +598,8 @@ FIXTURES: list[FixtureSpec] = [
         name="expand-fueltype-diesel",
         description="Sample expanded to include diesel for passenger car + light "
                     "commercial truck.",
-        coverage=("expand-fueltype", "scale-default", "chain-co2ae", "chain-baserate",
-                  "proc-1", "proc-2", "proc-90", "proc-99"),
+        coverage=("expand-fueltype", "scale-default", "proc-1", "proc-2",
+                  "proc-90", "proc-99", "chain-baserate"),
         onroad_selections=((1, 21), (2, 21), (1, 32), (2, 32)),
         pp_assocs=ENERGY_RUN_START_EXTIDLE_WTP,
     ),
@@ -505,8 +608,8 @@ FIXTURES: list[FixtureSpec] = [
         description="Sample expanded across multiple onroad source types "
                     "(motorcycle, pass car, passenger truck, refuse truck, "
                     "long-haul combo).",
-        coverage=("expand-sourcetype", "scale-default", "chain-co2ae", "chain-baserate",
-                  "proc-1", "proc-2", "proc-90", "proc-99"),
+        coverage=("expand-sourcetype", "scale-default", "proc-1", "proc-2",
+                  "proc-90", "proc-99", "chain-baserate"),
         onroad_selections=((1, 11), (1, 21), (1, 31), (1, 51), (2, 62)),
         pp_assocs=ENERGY_RUN_START_EXTIDLE_WTP,
     ),
@@ -514,10 +617,8 @@ FIXTURES: list[FixtureSpec] = [
         name="expand-criteria",
         description="Sample swapped to criteria pollutants (NOx, CO, THC, SO2) "
                     "for running + start exhaust.",
-        coverage=("expand-criteria", "scale-default",
-                  "chain-baserate", "chain-no", "chain-no2", "chain-so2",
-                  "chain-hcspeciation",
-                  "proc-1", "proc-2"),
+        coverage=("expand-criteria", "scale-default", "proc-1", "proc-2",
+                  "chain-baserate"),
         pp_assocs=CRITERIA_RUN_START,
     ),
 
@@ -546,32 +647,28 @@ FIXTURES: list[FixtureSpec] = [
         name="process-evap-permeation",
         description="Evap Permeation (process 11) running fuels — exercises "
                     "EvaporativePermeationCalculator + HCSpeciationCalculator chains.",
-        coverage=("scale-default", "chain-evappermeation", "chain-hcspeciation",
-                  "chain-baserate", "proc-11"),
+        coverage=("scale-default", "proc-11", "chain-evappermeation"),
         pp_assocs=((86, 11), (87, 11), (1, 11)),
     ),
     FixtureSpec(
         name="process-evap-fvv",
         description="Evap Fuel Vapor Venting (process 12) — exercises "
                     "TankVaporVentingCalculator + HCSpeciationCalculator chains.",
-        coverage=("scale-default", "chain-tankvaporventing", "chain-hcspeciation",
-                  "chain-baserate", "proc-12"),
+        coverage=("scale-default", "proc-12", "chain-tankvaporventing"),
         pp_assocs=((86, 12), (87, 12), (1, 12)),
     ),
     FixtureSpec(
         name="process-evap-leaks",
         description="Evap Fuel Leaks (process 13) — exercises LiquidLeakingCalculator "
                     "+ HCSpeciationCalculator chains.",
-        coverage=("scale-default", "chain-liquidleaking", "chain-hcspeciation",
-                  "chain-baserate", "proc-13"),
+        coverage=("scale-default", "proc-13", "chain-liquidleaking"),
         pp_assocs=((86, 13), (87, 13), (1, 13)),
     ),
     FixtureSpec(
         name="process-refueling",
         description="Refueling Displacement (18) + Spillage (19) — exercises "
                     "RefuelingLossCalculator chain.",
-        coverage=("scale-default", "chain-refuelingloss", "chain-hcspeciation",
-                  "chain-baserate", "proc-18", "proc-19"),
+        coverage=("scale-default", "proc-18", "proc-19", "chain-refuelingloss"),
         pp_assocs=REFUELING,
     ),
     FixtureSpec(
@@ -584,21 +681,21 @@ FIXTURES: list[FixtureSpec] = [
     FixtureSpec(
         name="process-crankcase-start",
         description="Crankcase Start Exhaust (process 16) criteria pollutants.",
-        coverage=("scale-default", "chain-crankcase", "chain-baserate", "proc-16"),
+        coverage=("scale-default", "proc-16"),
         pp_assocs=CRANKCASE_START,
     ),
     FixtureSpec(
         name="process-crankcase-extidle",
         description="Crankcase Extended Idle Exhaust (process 17) criteria "
                     "pollutants.",
-        coverage=("scale-default", "chain-crankcase", "chain-baserate", "proc-17"),
+        coverage=("scale-default", "proc-17"),
         pp_assocs=CRANKCASE_EXTIDLE,
     ),
     FixtureSpec(
         name="process-apu",
         description="Auxiliary Power Exhaust (process 91) — exercises APU code path "
                     "for combo long-haul truck.",
-        coverage=("scale-default", "chain-co2ae", "chain-baserate", "proc-91"),
+        coverage=("scale-default", "proc-91"),
         onroad_selections=((2, 62),),  # diesel combo long-haul truck
         pp_assocs=((91, 91),),
     ),
@@ -616,8 +713,8 @@ FIXTURES: list[FixtureSpec] = [
         name="chain-tog-speciation",
         description="TOG (Total Organic Gases) + CH4 + NMHC running exhaust — "
                     "exercises TOGSpeciationCalculator chain endpoint.",
-        coverage=("scale-default", "chain-togspeciation", "chain-hcspeciation",
-                  "chain-baserate", "proc-1"),
+        coverage=("scale-default", "proc-1", "chain-baserate",
+                  "chain-hcspeciation"),
         pp_assocs=TOG_SPECIATION,
     ),
 
@@ -627,8 +724,8 @@ FIXTURES: list[FixtureSpec] = [
         description="County-domain inventory (model_domain=SINGLE) for Washtenaw — "
                     "requires a county data manager input database supplied at "
                     "snapshot-capture time.",
-        coverage=("scale-county", "chain-co2ae", "chain-baserate",
-                  "proc-1", "proc-2", "proc-90", "proc-99"),
+        coverage=("scale-county", "proc-1", "proc-2", "proc-90", "proc-99",
+                  "chain-baserate"),
         domain="SINGLE",
         pp_assocs=ENERGY_RUN_START_EXTIDLE_WTP,
     ),
@@ -639,8 +736,7 @@ FIXTURES: list[FixtureSpec] = [
                     "from a user-supplied scale-input database; the RunSpec "
                     "carries the host-county selection only. Snapshot capture "
                     "supplies the project link/zone DB.",
-        coverage=("scale-project", "chain-co2ae", "chain-baserate",
-                  "proc-1", "proc-2"),
+        coverage=("scale-project", "proc-1", "proc-2", "chain-baserate"),
         domain="PROJECT",
         pp_assocs=((93, 1), (93, 2), (91, 1), (91, 2)),
         timespan=TimeSpan(year=2020, months=(7,), days=(5,),
@@ -650,8 +746,7 @@ FIXTURES: list[FixtureSpec] = [
     FixtureSpec(
         name="scale-rates",
         description="Emission-rates-lookup mode (model_scale=MESOSCALE_LOOKUP / Rates).",
-        coverage=("scale-rates", "chain-co2ae", "chain-baserate",
-                  "proc-1", "proc-2"),
+        coverage=("scale-rates", "proc-1", "proc-2", "chain-baserate"),
         scale="Rates",
         pp_assocs=((93, 1), (93, 2), (91, 1), (91, 2)),
     ),
@@ -661,8 +756,7 @@ FIXTURES: list[FixtureSpec] = [
         name="nr-recreational-county",
         description="NONROAD Recreational sector (snowmobiles/ATVs/etc.), "
                     "Washtenaw County.",
-        coverage=("nr", "nr-county", "chain-nremission", "chain-baserate",
-                  "proc-40"),
+        coverage=("nr", "nr-county", "proc-40", "chain-nremission"),
         models=("NONROAD",),
         onroad_selections=(),
         offroad_selections=((1, 1),),    # Gasoline, sector 1
@@ -674,8 +768,7 @@ FIXTURES: list[FixtureSpec] = [
     FixtureSpec(
         name="nr-construction-state",
         description="NONROAD Construction sector at state geography (Michigan).",
-        coverage=("nr", "nr-state", "chain-nremission", "chain-baserate",
-                  "proc-40"),
+        coverage=("nr", "nr-state", "proc-40", "chain-nremission"),
         models=("NONROAD",),
         geographic=(Geo("STATE", 26, "MICHIGAN"),),
         onroad_selections=(),
@@ -687,8 +780,7 @@ FIXTURES: list[FixtureSpec] = [
     FixtureSpec(
         name="nr-industrial-county",
         description="NONROAD Industrial sector, Cook County IL.",
-        coverage=("nr", "nr-county", "chain-nremission", "chain-baserate",
-                  "proc-40"),
+        coverage=("nr", "nr-county", "proc-40", "chain-nremission"),
         models=("NONROAD",),
         geographic=(Geo("COUNTY", 17031, "ILLINOIS - Cook County"),),
         onroad_selections=(),
@@ -699,8 +791,7 @@ FIXTURES: list[FixtureSpec] = [
     FixtureSpec(
         name="nr-lawn-garden-county",
         description="NONROAD Lawn/Garden sector, Washtenaw County.",
-        coverage=("nr", "nr-county", "chain-nremission", "chain-baserate",
-                  "proc-40"),
+        coverage=("nr", "nr-county", "proc-40", "chain-nremission"),
         models=("NONROAD",),
         onroad_selections=(),
         offroad_selections=((1, 4),),    # Gasoline lawn/garden
@@ -710,8 +801,7 @@ FIXTURES: list[FixtureSpec] = [
     FixtureSpec(
         name="nr-agriculture-state",
         description="NONROAD Agriculture sector at state geography (Iowa).",
-        coverage=("nr", "nr-state", "chain-nremission", "chain-baserate",
-                  "proc-40"),
+        coverage=("nr", "nr-state", "proc-40", "chain-nremission"),
         models=("NONROAD",),
         geographic=(Geo("STATE", 19, "IOWA"),),
         onroad_selections=(),
@@ -723,8 +813,7 @@ FIXTURES: list[FixtureSpec] = [
     FixtureSpec(
         name="nr-commercial-nation",
         description="NONROAD Commercial sector at national rollup (US-total).",
-        coverage=("nr", "nr-nation", "chain-nremission", "chain-baserate",
-                  "proc-40"),
+        coverage=("nr", "nr-nation", "proc-40", "chain-nremission"),
         models=("NONROAD",),
         geographic=(Geo("NATION", 0, "Nation total (US)"),),
         onroad_selections=(),
@@ -736,8 +825,7 @@ FIXTURES: list[FixtureSpec] = [
     FixtureSpec(
         name="nr-logging-county",
         description="NONROAD Logging sector, Washtenaw County (chain saws etc).",
-        coverage=("nr", "nr-county", "chain-nremission", "chain-baserate",
-                  "proc-40"),
+        coverage=("nr", "nr-county", "proc-40", "chain-nremission"),
         models=("NONROAD",),
         onroad_selections=(),
         offroad_selections=((1, 7), (2, 7)),
@@ -747,8 +835,7 @@ FIXTURES: list[FixtureSpec] = [
     FixtureSpec(
         name="nr-airport-support-county",
         description="NONROAD Airport Support sector, Cook County IL (O'Hare).",
-        coverage=("nr", "nr-county", "chain-nremission", "chain-baserate",
-                  "proc-40"),
+        coverage=("nr", "nr-county", "proc-40", "chain-nremission"),
         models=("NONROAD",),
         geographic=(Geo("COUNTY", 17031, "ILLINOIS - Cook County"),),
         onroad_selections=(),
@@ -769,8 +856,8 @@ FIXTURES: list[FixtureSpec] = [
         # MOVESOutput carries only (1,1), (2,1), (3,1), (100,1). Both chain
         # tags were therefore aspirational; nr-airtoxics-lawn-garden-county
         # is the fixture that actually reaches them.
-        coverage=("nr", "nr-state", "chain-nremission", "chain-baserate",
-                  "proc-22", "proc-23", "proc-24", "proc-40"),
+        coverage=("nr", "nr-state", "proc-22", "proc-23", "proc-24", "proc-40",
+                  "chain-nremission"),
         models=("NONROAD",),
         geographic=(Geo("STATE", 12, "FLORIDA"),),
         onroad_selections=(),
@@ -783,8 +870,7 @@ FIXTURES: list[FixtureSpec] = [
     FixtureSpec(
         name="nr-railroad-support-nation",
         description="NONROAD Railroad Support sector at national rollup.",
-        coverage=("nr", "nr-nation", "chain-nremission", "chain-baserate",
-                  "proc-40"),
+        coverage=("nr", "nr-nation", "proc-40", "chain-nremission"),
         models=("NONROAD",),
         geographic=(Geo("NATION", 0, "Nation total (US)"),),
         onroad_selections=(),
@@ -806,8 +892,8 @@ FIXTURES: list[FixtureSpec] = [
                     "VOC/PM2.5/BSFC/NMOG inputs that NRAirToxicsCalculator "
                     "gates on, so both previously-unreached NONROAD "
                     "calculators instantiate and emit.",
-        coverage=("nr", "nr-county", "chain-nremission", "chain-nrhcspeciation",
-                  "chain-nrairtoxics", "chain-baserate", "proc-1"),
+        coverage=("nr", "nr-county", "proc-1", "chain-nremission",
+                  "chain-nrhcspeciation", "chain-nrairtoxics"),
         models=("NONROAD",),
         onroad_selections=(),
         offroad_selections=((1, 4),),    # Gasoline lawn/garden
@@ -815,6 +901,74 @@ FIXTURES: list[FixtureSpec] = [
         pp_assocs=NR_AIRTOXICS,
         timespan=TimeSpan(year=2020, months=(7,), days=(5,),
                           begin_hour=6, end_hour=6, day_attr="id"),
+    ),
+
+    # ------- Second-wave fixtures caught up into the table (2026-09-08) ------
+    # These two were added to the directory without a spec entry, so the
+    # coverage matrix has never listed them even though both have captured
+    # snapshots. Their committed XML is authoritative — the renderer's drift
+    # guard leaves it alone; the entries exist so the matrix stops
+    # under-reporting. NOCalculator/NO2Calculator were listed as "(missing)"
+    # once the false expand-criteria tags came off, when in fact
+    # process-nox-speciation covers both.
+    FixtureSpec(
+        name="process-nox-speciation",
+        description="NOx speciation running exhaust — NO (32), NO2 (33) and "
+                    "HONO (34) from NOx (3). Exercises NOCalculator (NO + "
+                    "HONO) and NO2Calculator.",
+        coverage=("scale-default", "chain-no", "chain-no2", "chain-baserate",
+                  "proc-1"),
+        pp_assocs=((32, 1), (33, 1), (34, 1), (3, 1)),
+    ),
+    FixtureSpec(
+        name="chain-nonhaptog",
+        description="NonHAPTOG (88) requested on running exhaust alongside the "
+                    "HC-speciation chain, but with no 'Mechanisms' pollutant. "
+                    "Snapshot proves the gate: TOGSpeciationCalculator emits "
+                    "nothing and the output is byte-identical to "
+                    "chain-tog-speciation's.",
+        coverage=("scale-default", "chain-hcspeciation", "chain-baserate",
+                  "proc-1"),
+        pp_assocs=((88, 1), (1, 1), (5, 1), (79, 1), (80, 1), (86, 1)),
+    ),
+
+    # ------- Onroad fixtures for the last three unreached calculators --------
+    # Geography/time/vehicle/road type are byte-identical to chain-nonhaptog
+    # and to each other; only the pollutant set differs between the pair, so
+    # the two snapshots isolate exactly what the four trigger pollutants
+    # (31, 90, 98, 3000) add to the loaded class set.
+    FixtureSpec(
+        name="chain-so2-co2e-mechanism",
+        description="Onroad running exhaust reaching the last three unreached "
+                    "MOVES calculators in one run: SO2Calculator (SO2 31 + "
+                    "its Total Energy Consumption 91 input), "
+                    "CO2AERunningStartExtendedIdleCalculator (Atmospheric CO2 "
+                    "90 + CO2 Equivalent 98, with energy/CH4/N2O inputs) and "
+                    "TOGSpeciationCalculator (NonHAPTOG Mechanism 3000, the "
+                    "sole 'Mechanisms' pollutant in movesdb20241112, plus the "
+                    "14 integrated species of mechanism 5 that the NonHAPTOG "
+                    "residual subtracts from NMOG). Geography, time, vehicle "
+                    "and road type match chain-nonhaptog and "
+                    "chain-so2-co2e-mechanism-control exactly.",
+        coverage=("scale-default", "chain-so2", "chain-co2ae",
+                  "chain-togspeciation", "chain-airtoxics",
+                  "chain-hcspeciation", "chain-baserate", "proc-1"),
+        pp_assocs=_dedupe(SO2_CO2E_INPUTS, SO2_CO2E_OUTPUTS, HC_SPECIATION,
+                          TOG_INTEGRATED_SPECIES, TOG_MECHANISM),
+    ),
+    FixtureSpec(
+        name="chain-so2-co2e-mechanism-control",
+        description="Control for chain-so2-co2e-mechanism: identical geography, "
+                    "time, vehicle, road type and pollutant set MINUS the four "
+                    "trigger pollutants SO2 (31), Atmospheric CO2 (90), CO2 "
+                    "Equivalent (98) and NonHAPTOG Mechanism (3000). Total "
+                    "Energy Consumption, CH4 and N2O are still selected, so "
+                    "the difference in the two snapshots' loaded-class sets is "
+                    "attributable to the trigger pollutants alone.",
+        coverage=("scale-default", "chain-airtoxics", "chain-hcspeciation",
+                  "chain-baserate", "proc-1"),
+        pp_assocs=_dedupe(SO2_CO2E_INPUTS, HC_SPECIATION,
+                          TOG_INTEGRATED_SPECIES),
     ),
 ]
 
@@ -825,7 +979,7 @@ FIXTURES: list[FixtureSpec] = [
 # ---------------------------------------------------------------------------
 
 SAMPLE_RUNSPEC_COVERAGE = (
-    "scale-default", "chain-co2ae", "chain-baserate",
+    "scale-default", "chain-baserate",
     "proc-1", "proc-2", "proc-90", "proc-99",
 )
 SAMPLE_RUNSPEC_DESCRIPTION = (
@@ -839,6 +993,60 @@ SAMPLE_RUNSPEC_DESCRIPTION = (
 # Coverage-matrix renderer
 # ---------------------------------------------------------------------------
 
+# What a `chain-<calculator>` coverage tag asserts
+# ------------------------------------------------
+# The fixture makes MOVES **instantiate that calculator AND emit at least one
+# MOVESOutput row on a (pollutant, process) pair the calculator owns** in
+# `calculator-dag.json`'s registration list. Both halves are required: a
+# class-loaded calculator that never emits verifies nothing, and that exact
+# confusion has produced two false coverage claims in this corpus
+# (nr-pleasure-craft-state, corrected in 2d32946; chain-tog-speciation,
+# corrected below).
+#
+# Every tag was re-derived from the captured snapshots on 2026-09-08 by
+# intersecting three measured sets per fixture:
+#   * owners of each (pollutantID, processID) in
+#     snapshots/<f>/tables/db__out_*__movesoutput.parquet, per
+#     calculator-chains/calculator-dag.json;
+#   * the class names in snapshots/<f>/execution-trace.json;
+#   * the model (a NONROAD run instantiates no onroad calculator and vice
+#     versa — note TOGSpeciationCalculator is class-loaded in *every*
+#     snapshot because ExecutionRunSpec calls its static
+#     needsFinalAggregation(), so for it the class-load entry is not
+#     evidence of anything).
+# That sweep removed these tags, each contradicted by its own snapshot:
+#   * chain-co2ae from sample-runspec, expand-day, expand-month,
+#     expand-counties, expand-fueltype-diesel, expand-sourcetype and
+#     process-apu: CO2AERunningStartExtendedIdleCalculator is in none of
+#     their execution-trace.json class lists. MOVESInstantiator keys it off
+#     the pollutant names "Atmospheric CO2" / "CO2 Equivalent"; these
+#     fixtures select only Total/Petroleum/Fossil energy (91/92/93), so it
+#     never instantiates. Removed from scale-county / scale-project /
+#     scale-rates on the same reasoning — those three have no snapshot (they
+#     need an input database this environment lacks), so that is inference
+#     from the RunSpec, not measurement.
+#   * chain-so2, chain-no, chain-no2 and chain-hcspeciation from
+#     expand-criteria: its MOVESOutput is (1,1), (2,1), (3,1) only.
+#     NOCalculator, NO2Calculator and HCSpeciationCalculator are not even
+#     class-loaded; SO2Calculator is, but emits nothing, because
+#     SO2Calculator.doExecute bails out unless Total Energy Consumption is
+#     selected on the same process and this fixture omits pollutant 91.
+#   * chain-togspeciation from chain-tog-speciation: despite the name it
+#     emits (1,1) (5,1) (79,1) (80,1) (86,1) — byte-identical to
+#     chain-nonhaptog — i.e. HCSpeciationCalculator's outputs and no
+#     pollutant 88. TOGSpeciationCalculator.doExecute returns null with no
+#     'Mechanisms' pollutant selected. chain-so2-co2e-mechanism is the
+#     fixture that actually reaches it.
+#   * chain-baserate from the eleven nr-* fixtures: BaseRateCalculator is
+#     absent from every NONROAD execution-trace.json.
+#   * chain-baserate and chain-hcspeciation from process-evap-permeation,
+#     process-evap-fvv, process-evap-leaks and process-refueling: both are
+#     instantiated, but the only rows are (1,11) / (1,12) / (1,13) /
+#     (1,18)+(1,19), which the evaporative calculators own.
+#   * every chain tag from process-apu, process-crankcase-start and
+#     process-crankcase-extidle: their MOVESOutput has zero rows. They are
+#     structural-gate fixtures; the gate is their value, not a calculator.
+#
 # Calculator role taxonomy w.r.t. CalculatorInfo.txt. Reference is
 # `gov/epa/otaq/moves/master/framework/InterconnectionTracker.java` —
 # `Chain<TAB>Output<TAB>Input` means Output depends on Input. A leaf
@@ -908,12 +1116,34 @@ def render_matrix(specs: list[FixtureSpec]) -> str:
     out.append("- **Scale/Domain**: ModelScale (`<modelscale>`) × ModelDomain "
                "(`<modeldomain>`) coordinate; for NONROAD fixtures it is the "
                "geographic-aggregation level.")
-    out.append("- **Calculators**: subset of `CalculatorInfo.txt` registrations the "
-               "fixture forces MOVES to instantiate. Chain leaves "
+    out.append("- **Calculators**: calculators the fixture makes MOVES "
+               "instantiate **and** emit at least one MOVESOutput row for, on "
+               "a (pollutant, process) pair the calculator owns in "
+               "`CalculatorInfo.txt`. Class-loaded-but-silent does **not** "
+               "count — see the note under the table. Chain leaves "
                "(data-flow endpoints — produced by something, consumed "
                "by nothing) are in **bold**; the foundation calculator "
                "(BaseRate, depended on by everything) is _italicized_.")
     out.append("- **Model**: `<model>` selection (ONROAD / NONROAD).")
+    out.append("")
+    out.append("A row with an empty **Calculators** cell is a *structural-gate* "
+               "fixture: MOVES runs, instantiates calculators, and produces "
+               "zero MOVESOutput rows. That gate is the fixture's value; it "
+               "verifies no calculator.")
+    out.append("")
+    out.append("Every entry in the Calculators column was re-derived from the "
+               "captured snapshots on 2026-09-08 by intersecting, per fixture, "
+               "the owners of each emitted `(pollutantID, processID)` "
+               "(`calculator-chains/calculator-dag.json`) with the class list "
+               "in `snapshots/<fixture>/execution-trace.json`. The sweep "
+               "removed eleven `chain-baserate` tags from the NONROAD "
+               "fixtures, ten `chain-co2ae` tags, and the `chain-so2` / "
+               "`chain-no` / `chain-no2` / `chain-hcspeciation` / "
+               "`chain-togspeciation` tags listed in `_generate.py`; each was "
+               "contradicted by its own snapshot. Note that "
+               "`TOGSpeciationCalculator` is class-loaded in *every* snapshot "
+               "(ExecutionRunSpec calls its static `needsFinalAggregation()`), "
+               "so for that calculator only emitted rows are evidence.")
     out.append("")
     out.append("| Fixture | Description | Processes | Scale/Domain | Calculators | Model |")
     out.append("|---------|-------------|-----------|--------------|-------------|-------|")

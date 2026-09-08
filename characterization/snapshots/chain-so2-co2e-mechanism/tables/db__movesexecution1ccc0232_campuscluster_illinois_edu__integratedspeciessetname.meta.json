@@ -1,0 +1,20 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__integratedspeciessetname",
+  "schema": [
+    {
+      "name": "integratedSpeciesSetID",
+      "kind": "int64"
+    },
+    {
+      "name": "integratedSpeciesSetName",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "integratedSpeciesSetID"
+  ],
+  "row_count": 1,
+  "float_decimals": 12,
+  "content_sha256": "b01309257387bbe85821320c6d172168bdc83b6c4be242e85df5f9445ee4f11c"
+}

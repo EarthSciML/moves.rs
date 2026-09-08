@@ -1,0 +1,16 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__tempyear",
+  "schema": [
+    {
+      "name": "year",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "year"
+  ],
+  "row_count": 111,
+  "float_decimals": 12,
+  "content_sha256": "e6ea96ce59eb389296a54e0dd73d36571f9926fd20f65d47d459d50422695835"
+}

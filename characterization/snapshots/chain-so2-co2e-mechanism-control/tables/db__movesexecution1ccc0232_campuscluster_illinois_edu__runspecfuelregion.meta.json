@@ -1,0 +1,16 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__runspecfuelregion",
+  "schema": [
+    {
+      "name": "fuelRegionID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "fuelRegionID"
+  ],
+  "row_count": 1,
+  "float_decimals": 12,
+  "content_sha256": "8f50e1b9866735388884342cdf9e4e2caea355a661cf7e12a17d3c5276863397"
+}

@@ -1,0 +1,30 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__integratedspeciesset",
+  "schema": [
+    {
+      "name": "mechanismID",
+      "kind": "int64"
+    },
+    {
+      "name": "integratedSpeciesSetID",
+      "kind": "int64"
+    },
+    {
+      "name": "pollutantID",
+      "kind": "int64"
+    },
+    {
+      "name": "useISSyn",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "mechanismID",
+    "integratedSpeciesSetID",
+    "pollutantID"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "7f36e658d36427168080f65b1399d5d122f1bbe87db73a4c574c47cab6da9fc5"
+}

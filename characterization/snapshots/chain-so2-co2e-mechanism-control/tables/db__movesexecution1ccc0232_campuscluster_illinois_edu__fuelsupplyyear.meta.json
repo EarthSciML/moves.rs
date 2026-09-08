@@ -1,0 +1,16 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__fuelsupplyyear",
+  "schema": [
+    {
+      "name": "fuelYearID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [
+    "fuelYearID"
+  ],
+  "row_count": 1,
+  "float_decimals": 12,
+  "content_sha256": "210e45695c2f0810ecded9ca84dd4b00d0542eb858cc4d0f1dc83a48d6b5cc8c"
+}

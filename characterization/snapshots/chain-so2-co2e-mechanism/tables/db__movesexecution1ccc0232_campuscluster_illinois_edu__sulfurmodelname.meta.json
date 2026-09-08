@@ -1,0 +1,29 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__sulfurmodelname",
+  "schema": [
+    {
+      "name": "M6EmitterID",
+      "kind": "int64"
+    },
+    {
+      "name": "sulfurFunctionID",
+      "kind": "int64"
+    },
+    {
+      "name": "M6emitterName",
+      "kind": "utf8"
+    },
+    {
+      "name": "sulfurFunctionName",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "M6EmitterID",
+    "sulfurFunctionID"
+  ],
+  "row_count": 4,
+  "float_decimals": 12,
+  "content_sha256": "0876f17dad9a92896ec8a28b59103bd13fec62072eb8de47670094db20deae31"
+}

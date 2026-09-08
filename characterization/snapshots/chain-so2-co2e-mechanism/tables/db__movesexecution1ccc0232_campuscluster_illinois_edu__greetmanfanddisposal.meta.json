@@ -1,0 +1,35 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__greetmanfanddisposal",
+  "schema": [
+    {
+      "name": "GREETVehicleType",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "pollutantID",
+      "kind": "int64"
+    },
+    {
+      "name": "EmissionStage",
+      "kind": "utf8"
+    },
+    {
+      "name": "emissionPerVehicle",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "GREETVehicleType",
+    "modelYearID",
+    "pollutantID",
+    "EmissionStage"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "370b56a45da25f695d99c39fbdaf1cccd6bf00eeaf1d55f173310723c1aeff2b"
+}

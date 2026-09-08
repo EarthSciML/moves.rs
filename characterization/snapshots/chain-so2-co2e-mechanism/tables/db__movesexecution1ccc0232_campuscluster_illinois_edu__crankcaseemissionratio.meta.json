@@ -1,0 +1,49 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__crankcaseemissionratio",
+  "schema": [
+    {
+      "name": "polProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "minModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "maxModelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "regClassID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "crankcaseRatio",
+      "kind": "float64"
+    },
+    {
+      "name": "crankcaseRatioCV",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "polProcessID",
+    "minModelYearID",
+    "maxModelYearID",
+    "sourceTypeID",
+    "regClassID",
+    "fuelTypeID"
+  ],
+  "row_count": 572,
+  "float_decimals": 12,
+  "content_sha256": "ec4110f2c2066570555aa2fe1b6266eb4ac43e5830af6cb7dcf4e70351407bdb"
+}

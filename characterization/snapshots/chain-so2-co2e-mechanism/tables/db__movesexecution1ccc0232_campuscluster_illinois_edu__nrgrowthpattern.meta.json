@@ -1,0 +1,20 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__nrgrowthpattern",
+  "schema": [
+    {
+      "name": "growthPatternID",
+      "kind": "int64"
+    },
+    {
+      "name": "description",
+      "kind": "utf8"
+    }
+  ],
+  "natural_key": [
+    "growthPatternID"
+  ],
+  "row_count": 1185,
+  "float_decimals": 12,
+  "content_sha256": "4f4ca2f9ed32be338ade642445f8cab7ae09c2ece10da9566856b8ceb576056e"
+}

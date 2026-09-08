@@ -1,0 +1,34 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__runspecnonroadchainedto",
+  "schema": [
+    {
+      "name": "outputPolProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "outputPollutantID",
+      "kind": "int64"
+    },
+    {
+      "name": "outputProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "inputPolProcessID",
+      "kind": "int64"
+    },
+    {
+      "name": "inputPollutantID",
+      "kind": "int64"
+    },
+    {
+      "name": "inputProcessID",
+      "kind": "int64"
+    }
+  ],
+  "natural_key": [],
+  "row_count": 21,
+  "float_decimals": 12,
+  "content_sha256": "531a0e6629c3be99902e9426bf4551a80b6a8d2f21fe0fd6a96ced08b071a12b"
+}

@@ -1,0 +1,42 @@
+{
+  "format_version": "moves-snapshot/v1",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__evaprvptemperatureadjustment",
+  "schema": [
+    {
+      "name": "processID",
+      "kind": "int64"
+    },
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "RVP",
+      "kind": "float64"
+    },
+    {
+      "name": "adjustTerm3",
+      "kind": "float64"
+    },
+    {
+      "name": "adjustTerm2",
+      "kind": "float64"
+    },
+    {
+      "name": "adjustTerm1",
+      "kind": "float64"
+    },
+    {
+      "name": "adjustConstant",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "processID",
+    "fuelTypeID",
+    "RVP"
+  ],
+  "row_count": 0,
+  "float_decimals": 12,
+  "content_sha256": "3f6d29880518f76c3f6725d011c03f7241a9d1298fc9dfcaf36d904ce5bf2adf"
+}
