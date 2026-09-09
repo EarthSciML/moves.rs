@@ -14,6 +14,10 @@
 #
 # Optional:
 #   --output-dir DIR  Snapshot output (default: characterization/snapshots/<NAME>).
+#   -f, --fakeroot    Forward --fakeroot to both the county-DB seeding pass and
+#                     the delegated run-fixture.sh. Required on HPC rigs where
+#                     the user is not in /etc/subuid (every other script here
+#                     takes the same flag).
 #   --sif PATH        moves-fixture.sif path.
 #                     Default: /projects/illinois/eng/cee/ctessum/ctessum/code/
 #                              moves.rs/characterization/apptainer/moves-fixture.sif
@@ -27,6 +31,7 @@ ROOT="$(cd "${HERE}/../.." && pwd)"
 FIXTURE_NAME=""
 COUNTY_SQL=""
 OUTPUT_DIR=""
+USE_FAKEROOT=0
 SIF="/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/apptainer/moves-fixture.sif"
 
 while [ $# -gt 0 ]; do
@@ -35,10 +40,24 @@ while [ $# -gt 0 ]; do
         --county-sql) COUNTY_SQL="$2";   shift 2 ;;
         --output-dir) OUTPUT_DIR="$2";   shift 2 ;;
         --sif)        SIF="$2";          shift 2 ;;
+        -f|--fakeroot) USE_FAKEROOT=1;   shift 1 ;;
         -h|--help)    sed -n '2,/^set -euo/p' "$0" | sed 's/^# \?//'; exit 0 ;;
         *) printf 'Unknown argument: %s\n' "$1" >&2; exit 2 ;;
     esac
 done
+
+# Every other HPC invocation in this directory runs under --fakeroot; this
+# script was the only one that could not, so its seeding pass ran as the
+# calling user while run-fixture.sh's MOVES pass ran under a different
+# uid mapping. Forwarded to both the seeding `apptainer exec` below and the
+# delegated run-fixture.sh so the county DB seeded in step 1 is readable by
+# the MOVES run in step 2.
+FAKEROOT_EXEC=()
+FAKEROOT_RUNFIXTURE=()
+if [ "${USE_FAKEROOT}" = "1" ]; then
+    FAKEROOT_EXEC=( --fakeroot )
+    FAKEROOT_RUNFIXTURE=( --fakeroot )
+fi
 
 [[ -z "${FIXTURE_NAME}" ]] && { echo "FATAL: --fixture required" >&2; exit 2; }
 [[ -z "${COUNTY_SQL}" ]]   && { echo "FATAL: --county-sql required" >&2; exit 2; }
@@ -82,6 +101,7 @@ cp "${COUNTY_SQL}" "${COUNTY_SQL_IN_WORKDIR}"
 # Use --writable-tmpfs (same as run-moves.sh) so the container can write to
 # its root filesystem. Bind the same paths run-moves.sh uses.
 apptainer exec \
+    "${FAKEROOT_EXEC[@]}" \
     --writable-tmpfs \
     --bind "${MARIADB_DATA}:/var/lib/mysql" \
     --bind "${MARIADB_SOCK_DIR}:/var/run/mysqld" \
@@ -107,6 +127,7 @@ sleep 2
 echo "[county-capture] step 2/2 — running canonical MOVES with county DB"
 KEEP_MARIADB_DATA=1 SIF="${SIF}" \
     "${HERE}/run-fixture.sh" \
+    "${FAKEROOT_RUNFIXTURE[@]}" \
     --sif "${SIF}" \
     --runspec "${TEMP_RUNSPEC}" \
     --workdir "${WORKDIR}" \
