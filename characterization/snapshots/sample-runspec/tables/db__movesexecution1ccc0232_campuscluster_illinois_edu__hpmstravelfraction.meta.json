@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__hpmstravelfraction",
   "schema": [
     {
@@ -20,6 +20,9 @@
     "HPMSVTypeID"
   ],
   "row_count": 5,
-  "float_decimals": 12,
-  "content_sha256": "e1cb2f1d8e4af0cf630bdbd157c74f965bfa03661bcec57ca3c20390888b93bd"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "2d3e5d3a3ad069af66b85f65297222fcc5ba18340e97c8c4fe7a69034bddd7d6"
 }
