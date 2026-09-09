@@ -2,7 +2,8 @@
   "schema": "moves-calculator-dag/v1",
   "source": {
     "calculator_info_sha256": "5c9ff124b8dfb25def031c523af4791f0c320308691046ce97435b3cf5744975",
-    "java_files_scanned": 62
+    "java_files_scanned": 62,
+    "registration_semantics": "registrations_count is an upper bound against the database CalculatorInfo.txt was generated on -- which the file does not record -- not the number of (pollutant, process) pairs the module registers against the database a run uses. Intersect `registrations` with the target database's `pollutant` table before reading a count as a size."
   },
   "counts": {
     "registrations": 1134,

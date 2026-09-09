@@ -267,10 +267,11 @@ fn step_400_rates_op_mode_distribution_matches_canonical() {
         total_rows += expected.len();
     }
     assert_eq!(
-        total_rows, 281,
-        "the corpus holds 281 start RatesOpModeDistribution rows \
-         (282 rows across the nine traces, less expand-sourcetype's one \
-         extended-idle row at polProcessID 9190 / op mode 200)"
+        total_rows, 282,
+        "the corpus holds 282 start RatesOpModeDistribution rows: 284 rows \
+         across the nine traces, less expand-sourcetype's two extended-idle \
+         rows at polProcessID 9190 / op mode 200 (256 copied from \
+         startsOpModeDistribution + 26 All Starts)"
     );
 }
 

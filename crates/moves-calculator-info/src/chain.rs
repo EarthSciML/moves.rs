@@ -77,14 +77,19 @@ pub struct Source {
     pub registration_semantics: String,
 }
 
-/// The default (and only) value of [`Source::registration_semantics`].
+/// The value of [`Source::registration_semantics`] — the one sentence the
+/// artifact carries so a consumer reading only the JSON cannot mistake a
+/// registration count for a size.
+pub const REGISTRATION_SEMANTICS: &str = "registrations_count is an upper bound against the \
+     database CalculatorInfo.txt was generated on -- which the file does not record -- not the \
+     number of (pollutant, process) pairs the module registers against the database a run uses. \
+     Intersect `registrations` with the target database's `pollutant` table before reading a \
+     count as a size.";
+
+/// [`REGISTRATION_SEMANTICS`], owned — the `serde` default for
+/// [`Source::registration_semantics`].
 fn registration_semantics() -> String {
-    "registrations_count is an upper bound against the database \
-     CalculatorInfo.txt was generated on -- which the file does not record -- \
-     not the number of (pollutant, process) pairs the module registers \
-     against the database a run uses. Intersect `registrations` with the \
-     target database's `pollutant` table before reading a count as a size."
-        .to_string()
+    REGISTRATION_SEMANTICS.to_string()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

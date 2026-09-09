@@ -23,7 +23,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-use moves_calculator_info::CalculatorDag;
+use moves_calculator_info::{CalculatorDag, REGISTRATION_SEMANTICS};
 use moves_framework::{DataFrameStore, DataFrameStoreParquet, InMemoryStore};
 
 fn repo_root() -> PathBuf {
@@ -134,12 +134,13 @@ fn registration_counts_are_upper_bounds_against_a_database() {
     }
 
     // And the artifact says so itself, so a consumer reading only the JSON
-    // cannot mistake a count for a size.
-    assert!(
-        dag.source
-            .registration_semantics
-            .contains("upper bound against the database"),
-        "calculator-dag.json must carry its registration semantics; found: {:?}",
-        dag.source.registration_semantics
+    // cannot mistake a count for a size. Compared against the constant the
+    // generator writes, so the committed artifact cannot drift out of sync
+    // with `moves-chain-reconstruct` (the field has a `serde` default, which
+    // would otherwise hide an absent key).
+    assert_eq!(
+        dag.source.registration_semantics, REGISTRATION_SEMANTICS,
+        "calculator-dag.json's source.registration_semantics is stale — \
+         regenerate the DAG (see characterization/calculator-chains/README.md)"
     );
 }
