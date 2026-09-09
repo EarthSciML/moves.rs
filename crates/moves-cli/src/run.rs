@@ -336,11 +336,27 @@ pub fn run_simulation(opts: &RunOptions) -> Result<EngineOutcome> {
                 default_db_path.display()
             )
         })?;
-        // Execution day types: canonical iterates every DayOfAnyWeek day (not the
-        // runspec `<day>` selection). The load filter above loaded the day-keyed
-        // tables for all day types; read them back here (store is moved into the
-        // engine below) so the execution day set can be expanded to match.
-        let execution_day_ids: Vec<u32> = day_ids_from_store(&store);
+        // Execution day types. Canonical's second `buildExecutionTimeSpan`
+        // (`useRunSpec=false`, ExecutionRunSpec.java:414) reads
+        // `SELECT dayID FROM DayOfAnyWeek` — but from the **execution**
+        // database, whose `DayOfAnyWeek` has itself already been restricted to
+        // the RunSpec's `<day>` selection. "All DayOfAnyWeek days" therefore
+        // equals "every day type" only when the RunSpec selected none.
+        //
+        // Measured, not inferred (issue #55): recapturing `process-brakewear`
+        // against canonical with a corrected `<day id="5"/>` yields an
+        // execution DB whose `dayOfAnyWeek` holds one row (5), `runSpecDay` one
+        // row (5), `hourDay` 24 rows instead of 48, and `MOVESOutput` exactly
+        // 375 rows against the previous 750. Forcing all days here doubles that.
+        //
+        // An empty selection falls back to every day type in the default DB —
+        // which is what canonical does with an out-of-range `<day key=…>`,
+        // since `getDayByIndex` returns null and no day is ever added.
+        let execution_day_ids: Vec<u32> = if run_spec.timespan.days.is_empty() {
+            day_ids_from_store(&store)
+        } else {
+            run_spec.timespan.days.clone()
+        };
         // The default DB carries both the rates and inventory execution tables,
         // so follow canonical MOVESInstantiator DO_RATES_FIRST (the released
         // default) and run only the BaseRate + chained pipeline — otherwise the
@@ -1060,15 +1076,22 @@ pub fn build_default_db_store(
     // fuel_type_id=2"). Union the fleet fuels into the load filter.
     expand_fuel_filter_to_fleet(&db, &mut base_filters)
         .context("expanding fuelType filter to the selected sources' fleet fuels")?;
-    // Expand the dayID load filter to all DayOfAnyWeek day types. Canonical's
-    // execution time span (buildExecutionTimeSpan useRunSpec=false) iterates
-    // every DayOfAnyWeek day, not the runspec `<day>` selection, so the
-    // day-keyed tables (DayOfAnyWeek, HourDay, HourVMTFraction, …) must load for
-    // both weekend (2) and weekday (5). The execution-day set is expanded to
-    // match after load (set_execution_days). Without this, selecting weekday
-    // only would drop the weekend day type's activity — ~half the output rows.
-    expand_day_filter_to_all_day_types(&db, &mut base_filters)
-        .context("expanding dayID filter to all DayOfAnyWeek day types")?;
+    // Expand the dayID load filter to all DayOfAnyWeek day types, but ONLY when
+    // the RunSpec selected no day. Canonical's first `buildExecutionTimeSpan`
+    // (useRunSpec=true) takes the days straight from the RunSpec, and the
+    // execution DB it then builds carries only those day types; the second pass
+    // (useRunSpec=false) re-reads `DayOfAnyWeek` from that already-restricted
+    // execution DB. So an unrestricted load is right exactly when the selection
+    // is empty — which is what an out-of-range `<day key=…>` produces, since
+    // canonical's `getDayByIndex` returns null and adds nothing (issue #55).
+    //
+    // Widening unconditionally (the previous behaviour) loaded weekend activity
+    // into a weekday-only run and doubled its output rows against the canonical
+    // snapshot.
+    if run_spec.timespan.days.is_empty() {
+        expand_day_filter_to_all_day_types(&db, &mut base_filters)
+            .context("expanding dayID filter to all DayOfAnyWeek day types")?;
+    }
     let plan = InputDataManager::plan(&base_filters, &default_tables());
     let mut store = InputDataManager::execute(&plan, &db)
         .map_err(|e| anyhow::anyhow!("loading default DB: {e}"))?;

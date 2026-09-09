@@ -136,8 +136,14 @@ fn write_timespan(out: &mut String, ts: &Timespan) -> std::fmt::Result {
     for m in &ts.months {
         writeln!(out, "\t\t<month key=\"{}\"/>", m.saturating_sub(1))?;
     }
+    // Days are the exception: canonical `RunSpecXML.save` writes them as
+    // `<day id="…"/>` carrying the literal dayID (RunSpecXML.java:2040), never
+    // as `key`, which on the read side is an *index* into `TimeSpan.allDays`,
+    // not an ID. Writing a dayID into `key` round-trips within the port but
+    // hands canonical MOVES a different day selection than intended — issue
+    // #55. See `XmlDayEntry` for the read side.
     for d in &ts.days {
-        writeln!(out, "\t\t<day key=\"{d}\"/>")?;
+        writeln!(out, "\t\t<day id=\"{d}\"/>")?;
     }
     if let Some(h) = ts.begin_hour {
         writeln!(out, "\t\t<beginhour key=\"{}\"/>", h.saturating_sub(1))?;
@@ -588,13 +594,58 @@ struct XmlTimespan {
     aggregate_by: Option<XmlKeyStr>,
 }
 
-/// `<day>` element — accepts `@key` (MOVES 4 / canonical) or `@id` (MOVES 5).
+/// `dayID`s in `dayOfAnyWeek`, in the order canonical loads them.
+///
+/// `TimeSpan.loadTimeObjects` fills `allDays` with
+/// `select dayID, dayName, noOfRealDays from dayOfAnyWeek order by dayID`
+/// (TimeSpan.java:261–272). Every shipped MOVES default database has exactly
+/// two rows — dayID 2 (weekend) and dayID 5 (weekday) — so index 0 is dayID 2
+/// and index 1 is dayID 5, and those are the only valid `<day key=…>` values.
+///
+/// This is pinned from data, not from reading the Java:
+/// `characterization/fixtures/sample-runspec.xml` is byte-identical to
+/// canonical `testdata/SampleRunSpec.xml`, carries `<day key="0"/>`, and its
+/// captured snapshot's `RunSpecDay` table holds exactly `{2}`.
+const ALL_DAY_IDS: [u32; 2] = [2, 5];
+
+/// `<day>` element.
+///
+/// The two attributes mean **different things** in canonical
+/// `RunSpecXML.processTimeSpan` (RunSpecXML.java:517–532):
+///
+/// * `@key` → `TimeSpan.getDayByIndex(key)` — a 0-based **index** into
+///   [`ALL_DAY_IDS`]. An index outside `0..ALL_DAY_IDS.len()` resolves to
+///   `null` and the day is simply **not added**, leaving the selection empty
+///   (which downstream means "every day type", not "no days"). `<day key="5"/>`
+///   — the spelling 39 fixtures carried before the day-key correction — is
+///   exactly that case, which is why those runs came out unrestricted.
+/// * `@id` → `TimeSpan.getDayByID(id)` — the literal `dayID`. This is also what
+///   canonical *writes* (RunSpecXML.java:2040).
+///
+/// Reading `@key` as a dayID (what the port did before issue #55) made
+/// `sample-runspec`'s `key="0"` parse as dayID 0, which is not a day at all.
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct XmlDayEntry {
     #[serde(rename = "@key", default, skip_serializing_if = "Option::is_none")]
     key: Option<u32>,
     #[serde(rename = "@id", default, skip_serializing_if = "Option::is_none")]
     id: Option<u32>,
+}
+
+impl XmlDayEntry {
+    /// Resolve to a literal `dayID`, or `Ok(None)` when the element names no
+    /// day at all — an out-of-range `@key`, which canonical drops silently.
+    fn to_day_id(&self) -> Result<Option<u32>> {
+        if let Some(id) = self.id {
+            Ok(Some(id))
+        } else if let Some(key) = self.key {
+            Ok(ALL_DAY_IDS.get(key as usize).copied())
+        } else {
+            Err(Error::MissingField {
+                field: "timespan.day @key or @id",
+            })
+        }
+    }
 }
 
 /// `<month>` / `<beginhour>` / `<endhour>` element.
@@ -922,16 +973,18 @@ impl XmlRunSpec {
                 .into_iter()
                 .map(|x| x.to_id("timespan.month @key or @id"))
                 .collect::<Result<Vec<_>>>()?,
+            // An out-of-range `@key` names no day and is dropped, exactly as
+            // canonical does (`getDayByIndex` returns null, the day is never
+            // added). See `XmlDayEntry`.
             days: self
                 .timespan
                 .days
                 .into_iter()
-                .map(|x| {
-                    x.key.or(x.id).ok_or(Error::MissingField {
-                        field: "timespan.day @key or @id",
-                    })
-                })
-                .collect::<Result<Vec<_>>>()?,
+                .map(|x| x.to_day_id())
+                .collect::<Result<Vec<_>>>()?
+                .into_iter()
+                .flatten()
+                .collect(),
             begin_hour: self
                 .timespan
                 .begin_hour
