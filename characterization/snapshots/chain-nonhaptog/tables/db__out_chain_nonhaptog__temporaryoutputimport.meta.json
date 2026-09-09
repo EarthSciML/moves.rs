@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_chain_nonhaptog__temporaryoutputimport",
   "schema": [
     {
@@ -104,7 +104,10 @@
     }
   ],
   "natural_key": [],
-  "row_count": 1080,
-  "float_decimals": 12,
-  "content_sha256": "7f210f7c66814d289988d85448b8643979172f4ed4864812c86fa78b09b420a4"
+  "row_count": 540,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "8239795bae8994b381796ce9caeba59b91bf4e5531df464bd8ff750b3b3484ac"
 }

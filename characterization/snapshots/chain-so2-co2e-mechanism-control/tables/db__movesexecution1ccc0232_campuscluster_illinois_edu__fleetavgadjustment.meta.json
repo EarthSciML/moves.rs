@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__fleetavgadjustment",
   "schema": [
     {
@@ -34,6 +34,9 @@
     "fleetAvgGroupID"
   ],
   "row_count": 20,
-  "float_decimals": 12,
-  "content_sha256": "4b5aad53412f7af1a7af3b4897132b57aa92b574ffcab15ab2128f9bfcc13af3"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "8c78b96fee7b618b1b568ce42da7f864811758120290660a814526cc1d6059f2"
 }

@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__sizeweightfraction",
   "schema": [
     {
@@ -35,6 +35,9 @@
     "weightClassID"
   ],
   "row_count": 0,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "09f158d21c8653a7651ad95c3bff36bd211340b7b491e0d5f6af8b03bcd9281f"
 }

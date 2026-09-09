@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__tempsulfurcalcs4",
   "schema": [
     {
@@ -85,6 +85,9 @@
   ],
   "natural_key": [],
   "row_count": 40,
-  "float_decimals": 12,
-  "content_sha256": "c066cf96587bc8a3490770ed04dd91b216d6bed90bf02c9e0faa29ded5884c60"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "5e8e8b5ed657337beb7b582748b2180b935e68860666d78deb55ad7c65f3da2d"
 }

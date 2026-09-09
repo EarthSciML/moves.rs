@@ -1,6 +1,6 @@
 {
-  "format_version": "moves-snapshot/v1",
-  "name": "moves_temporary__manyworkers__workerfolder__workertemp4__output_tbl",
+  "format_version": "moves-snapshot/v2",
+  "name": "moves_temporary__manyworkers__workerfolder__workertemp3__baserateoutput_tbl",
   "schema": [
     {
       "name": "col_0",
@@ -73,26 +73,13 @@
     {
       "name": "col_17",
       "kind": "utf8"
-    },
-    {
-      "name": "col_18",
-      "kind": "utf8"
-    },
-    {
-      "name": "col_19",
-      "kind": "utf8"
-    },
-    {
-      "name": "col_20",
-      "kind": "utf8"
-    },
-    {
-      "name": "col_21",
-      "kind": "utf8"
     }
   ],
   "natural_key": [],
-  "row_count": 1080,
-  "float_decimals": 12,
-  "content_sha256": "43bda4bffd97267675d3f466a3184ead6feffd43c73fbd2145b23a7dff4c44f8"
+  "row_count": 2309,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "f064559e9073b3544ce8228397b1d5a54e78299a46182759780fa3c743a3ee99"
 }

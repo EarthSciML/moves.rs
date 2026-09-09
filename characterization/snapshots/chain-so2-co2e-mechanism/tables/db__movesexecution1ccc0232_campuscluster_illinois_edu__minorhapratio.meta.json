@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__minorhapratio",
   "schema": [
     {
@@ -38,6 +38,9 @@
     "modelYearGroupID"
   ],
   "row_count": 490,
-  "float_decimals": 12,
-  "content_sha256": "cd1c00e4b76eae84e3dda560f0f9cd0badee5193dc6693555325aef3aa0add8f"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "ec69e483d90fd91627e2f743851cc6164d0944bf38d3d33db6165558b6c1cd1e"
 }

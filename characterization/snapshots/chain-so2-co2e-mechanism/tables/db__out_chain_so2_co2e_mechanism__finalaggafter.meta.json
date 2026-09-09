@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_chain_so2_co2e_mechanism__finalaggafter",
   "schema": [
     {
@@ -104,7 +104,10 @@
     }
   ],
   "natural_key": [],
-  "row_count": 5534,
-  "float_decimals": 12,
-  "content_sha256": "ff612065f3913ef4acb7581b2c5facfdaa9bb121888f15684bc526a9094dc34a"
+  "row_count": 2767,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "87aca8a99c40b2bf3d5b768675112b13a079602141d6a645a7c741bde34b7c65"
 }

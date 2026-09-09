@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__annualvmtbyageroadway",
   "schema": [
     {
@@ -30,6 +30,9 @@
     "ageID"
   ],
   "row_count": 205,
-  "float_decimals": 12,
-  "content_sha256": "5932ce5fa82d8aa1635aaf703c0cce76b7fa581b395e6928ce3abdf7a10a6a1e"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "eae2f0b2d3b8c0fb96410a64ecdfbc5c34686b3dd9fe9c38df2c9389658d1a2b"
 }

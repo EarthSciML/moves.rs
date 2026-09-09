@@ -2,7 +2,7 @@
   "trace_version": "moves-fixture-capture/v1",
   "fixture_name": "chain-so2-co2e-mechanism",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "runspec_sha256": "b5b850ee8168f39e6f92c15521b1a9333e019d386f934ab76f6094271e1c7d68",
+  "runspec_sha256": "85b5f5ca7b877db9a310e5ad6212d005e2b1fa49c20474d0d22e6f95e69a8a20",
   "java_classes": [
     {
       "name": "gov.epa.otaq.moves.common.BundleManifest",
@@ -766,6 +766,6 @@
   "worker_bundles": [],
   "sources": {
     "worker_sql_files": 0,
-    "class_load_log_files": 4
+    "class_load_log_files": 6
   }
 }
