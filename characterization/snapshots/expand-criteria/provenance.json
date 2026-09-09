@@ -2,10 +2,10 @@
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "expand-criteria",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
-  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/expand-criteria.xml",
-  "runspec_sha256": "b0f8a3898ab2779a198f0ddb1e808dc530e4ebbef23a56d30e32c778b0a0518c",
-  "snapshot_aggregate_sha256": "31bebf9e6f069cae881ebebae2cfeeb8bcb99cb4a4e5f7c3fd099ba954943fdb",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixtures/expand-criteria.xml",
+  "runspec_sha256": "411e1de9e1ab00f260107d50aaac868f31098e87e98583d73166d7dfdb7d72d4",
+  "snapshot_aggregate_sha256": "82a6f7f62f8ae86aedb2ed32d6736ae0ee227bb12ddc483e5bb516a996079f3b",
   "output_database": "out_expand_criteria",
   "scale_input_database": null
 }

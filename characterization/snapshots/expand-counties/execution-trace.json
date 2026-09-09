@@ -2,7 +2,7 @@
   "trace_version": "moves-fixture-capture/v1",
   "fixture_name": "expand-counties",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "runspec_sha256": "fe8dae4244a87abec258167cbe49334ac48c6a62515e334b6dc2437057d78758",
+  "runspec_sha256": "7ff1386a468185f25d0daf0af37eb1e2ccb40ecbee18abbed206feac78f66614",
   "java_classes": [
     {
       "name": "gov.epa.otaq.moves.common.BundleManifest",
@@ -742,6 +742,6 @@
   "worker_bundles": [],
   "sources": {
     "worker_sql_files": 0,
-    "class_load_log_files": 4
+    "class_load_log_files": 2
   }
 }

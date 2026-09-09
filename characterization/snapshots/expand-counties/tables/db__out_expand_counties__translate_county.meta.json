@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_expand_counties__translate_county",
   "schema": [
     {
@@ -19,6 +19,9 @@
     "countyID"
   ],
   "row_count": 3,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "44f01b387eb3ad574e7200cb95d8ea76db331dfb14c1b1817700ba6120410fde"
 }

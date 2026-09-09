@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__state",
   "schema": [
     {
@@ -23,6 +23,9 @@
     "stateID"
   ],
   "row_count": 3,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "df8c08532fa145b8d4f9c55fb7a00525ae61195180343e3862955dc010b6af22"
 }
