@@ -35,6 +35,15 @@
 //!
 //! `StartOpModeDistribution.opModeFraction` is a four-decimal `DECIMAL`
 //! (see `op_mode_fraction`) and is compared **exactly**.
+//!
+//! Both comparisons are corpus-revision independent. Narrowing the canonical
+//! value to `f32` before rendering is a no-op when the capture already holds
+//! the full single-precision value, so the step-400 diff survives a recapture
+//! that stops rounding significant digits away; and the row counts below are
+//! floors rather than pins, because how many rows a fixture contributes is a
+//! property of its RunSpec, not of the port. Both were re-derived against the
+//! `moves-snapshot/v2` recapture (84 step-300 rows, 159 step-400 rows) and
+//! match there too.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -188,6 +197,11 @@ fn step_300_start_op_mode_distribution_matches_canonical() {
             expected.keys().collect::<Vec<_>>(),
             "{fixture}: StartOpModeDistribution (sourceTypeID, hourDayID, opModeID) set differs"
         );
+        assert!(
+            !expected.is_empty(),
+            "{fixture}: canonical StartOpModeDistribution is empty — this \
+             capture cannot exercise the gate"
+        );
         for (k, want) in &expected {
             let got = actual[k];
             // A four-decimal DECIMAL — exact, no tolerance.
@@ -198,9 +212,16 @@ fn step_300_start_op_mode_distribution_matches_canonical() {
         }
         total_rows += expected.len();
     }
-    assert_eq!(
-        total_rows, 124,
-        "the corpus holds 124 StartOpModeDistribution rows"
+    // A floor, not a pin: the row count is a property of the corpus revision,
+    // not of the port. `moves-snapshot/v1` holds 124 rows; the v2 recapture
+    // corrects each fixture's day selection, so every fixture covers one
+    // hour-day instead of two and the corpus holds 84. Both are diffed
+    // row-for-row above; this only stops the gate passing vacuously.
+    assert!(
+        total_rows >= 80,
+        "only {total_rows} StartOpModeDistribution rows compared across \
+         {} fixtures — the corpus looks truncated",
+        FIXTURES.len()
     );
 }
 
@@ -256,6 +277,11 @@ fn step_400_rates_op_mode_distribution_matches_canonical() {
             expected.keys().collect::<Vec<_>>(),
             "{fixture}: RatesOpModeDistribution primary-key set differs"
         );
+        assert!(
+            !expected.is_empty(),
+            "{fixture}: canonical RatesOpModeDistribution holds no start rows \
+             — this capture cannot exercise the gate"
+        );
         for (k, want) in &expected {
             let got = actual[k];
             assert_eq!(
@@ -266,12 +292,15 @@ fn step_400_rates_op_mode_distribution_matches_canonical() {
         }
         total_rows += expected.len();
     }
-    assert_eq!(
-        total_rows, 282,
-        "the corpus holds 282 start RatesOpModeDistribution rows: 284 rows \
-         across the nine traces, less expand-sourcetype's two extended-idle \
-         rows at polProcessID 9190 / op mode 200 (256 copied from \
-         startsOpModeDistribution + 26 All Starts)"
+    // A floor, not a pin — see the step-300 gate. `moves-snapshot/v1` holds
+    // 282 start rows (284 across the nine traces, less `expand-sourcetype`'s
+    // two extended-idle rows at polProcessID 9190 / op mode 200); the v2
+    // recapture holds 159.
+    assert!(
+        total_rows >= 150,
+        "only {total_rows} start RatesOpModeDistribution rows compared across \
+         {} fixtures — the corpus looks truncated",
+        FIXTURES.len()
     );
 }
 
