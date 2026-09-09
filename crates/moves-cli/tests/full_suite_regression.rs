@@ -309,7 +309,15 @@ fn nonroad_fixtures_plan_modules() {
         .into_iter()
         .filter(|p| fixture_name(p).starts_with("nr-"))
         .collect();
-    assert_eq!(fixtures.len(), 11);
+    // A floor, not an equality. What this test asserts is that every NONROAD
+    // fixture plans at least one module; the exact count is incidental, and as
+    // an `assert_eq!` it failed the moment a twelfth `nr-` fixture was added
+    // (#58's "third correction" — see also `fixture_catalog_parses_and_is_unique`).
+    assert!(
+        fixtures.len() >= 11,
+        "expected at least 11 nr-* fixtures, found {}",
+        fixtures.len()
+    );
 
     for fixture in &fixtures {
         let name = fixture_name(fixture);

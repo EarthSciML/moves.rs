@@ -48,12 +48,13 @@ fn fixture_catalog_parses_and_is_unique() {
         "fixture catalogue is below the expected floor of 30: got {}",
         entries.len()
     );
-    assert!(
-        entries.len() <= 50,
-        "fixture catalogue is above the expected ceiling of 50: got {} \
-         (the ceiling was last updated when the Task-148 fixtures were added)",
-        entries.len()
-    );
+    // No upper bound. This test's job is that every catalogued fixture parses
+    // and that names / output DBs / sanitized paths are unique — an exact
+    // catalogue size is incidental to all three. The previous `<= 50` ceiling
+    // was the third hardcoded catalogue count to go stale (see #58, and
+    // `nonroad_fixtures_plan_modules`), and each one failed a test that had
+    // nothing to do with the fixture that was added. The floor above still
+    // catches a catalogue that has gone missing.
 
     let mut names = HashSet::new();
     let mut output_dbs = HashSet::new();
