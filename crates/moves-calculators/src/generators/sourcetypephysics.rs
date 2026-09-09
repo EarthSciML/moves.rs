@@ -674,9 +674,13 @@ impl TableRow for OpModeDistributionRow {
                     op_mode_fraction: op_mode_fraction
                         .get(i)
                         .ok_or_else(|| null("opModeFraction"))?,
-                    op_mode_fraction_cv: op_mode_fraction_cv
-                        .get(i)
-                        .ok_or_else(|| null("opModeFractionCV"))?,
+                    // The Go query reads this as `COALESCE(opModeFractionCV, 0)`
+                    // and canonical MOVES leaves the column NULL on every row
+                    // the rates op-mode generators insert (none of their
+                    // `INSERT`s name it). Coalesce rather than erroring, as
+                    // this struct's docs already say it holds the
+                    // post-`COALESCE` value.
+                    op_mode_fraction_cv: op_mode_fraction_cv.get(i).unwrap_or(0.0),
                     // MOVES leaves avgBinSpeed NULL in RatesOpModeDistribution
                     // (the rates path does not populate it; the generator's own
                     // default is 0.0). It is carried through unchanged here, so

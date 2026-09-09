@@ -57,6 +57,7 @@ mod output;
 pub use chain::{
     build_dag, CalculatorDag, ChainEdge, ChainRole, ChainStep, ChainTemplate, DagCounts,
     ExecutionChain, ModuleEntry, ModuleKind, RegistrationEntry, Source, SubscriptionEntry,
+    REGISTRATION_SEMANTICS,
 };
 pub use directives::{
     parse_calculator_info, parse_calculator_info_str, CalculatorInfo, ChainDirective,
