@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__coldsoakinitialhourfraction",
   "schema": [
     {
@@ -38,7 +38,10 @@
     "hourDayID",
     "initialHourDayID"
   ],
-  "row_count": 534,
-  "float_decimals": 12,
-  "content_sha256": "93abb471f466a8ed95d915cc661939b5dda6b345fcc2903157b86785b1c6f32a"
+  "row_count": 254,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "5bad419f160c67e311bfdba69ab3cf4a77b458876ebf642ce64841c0df7c19ef"
 }

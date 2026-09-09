@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__hcspeciation",
   "schema": [
     {
@@ -43,6 +43,9 @@
     "endModelYearID"
   ],
   "row_count": 81,
-  "float_decimals": 12,
-  "content_sha256": "079ede2d43b6c1137da0c53b57d5af719f958f1bbdedab9c9e7334135772d247"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "ef025ff9093c780ef0903b493b7e64f0b41677eec431921946b79cd84904eff0"
 }

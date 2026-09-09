@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__cumtvvcoeffs",
   "schema": [
     {
@@ -106,6 +106,9 @@
     "polProcessID"
   ],
   "row_count": 2188,
-  "float_decimals": 12,
-  "content_sha256": "738b1c27c90290fa321466071ab600551e773082c038a8f9e5b823b36120f389"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "2a4230e650da4cf5277f5eb2744a60132e0268ad2d706bc7cb790b2eb73188f3"
 }

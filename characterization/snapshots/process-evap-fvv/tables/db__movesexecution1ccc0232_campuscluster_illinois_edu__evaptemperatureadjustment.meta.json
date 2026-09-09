@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__evaptemperatureadjustment",
   "schema": [
     {
@@ -27,6 +27,9 @@
     "processID"
   ],
   "row_count": 1,
-  "float_decimals": 12,
-  "content_sha256": "bce17232bff625519e6ebda29628f51879b1c805a3b11961a41b203f504b016b"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "37a3524a61541f855729b319c0dbdb698cf5b82e4ed51336ac6feec694cd6c7e"
 }

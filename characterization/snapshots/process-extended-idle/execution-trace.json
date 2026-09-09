@@ -2,7 +2,7 @@
   "trace_version": "moves-fixture-capture/v1",
   "fixture_name": "process-extended-idle",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "runspec_sha256": "48d4843cb2a8374e83e5c9a024cdb0e862a059f5a34f183b96768d54fe901f9b",
+  "runspec_sha256": "2796ef3688f7781a0bdbbaaef2fdd24f30f599417ef7af98684764e2ac03b961",
   "java_classes": [
     {
       "name": "gov.epa.otaq.moves.common.BundleManifest",
@@ -686,6 +686,6 @@
   "worker_bundles": [],
   "sources": {
     "worker_sql_files": 0,
-    "class_load_log_files": 4
+    "class_load_log_files": 2
   }
 }

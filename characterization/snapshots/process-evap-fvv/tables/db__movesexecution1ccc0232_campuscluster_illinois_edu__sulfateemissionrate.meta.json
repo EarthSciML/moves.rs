@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__sulfateemissionrate",
   "schema": [
     {
@@ -33,6 +33,9 @@
     "modelYearGroupID"
   ],
   "row_count": 0,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "34469f8c1ff36cf38c03d542bb5abc5274265dcc76478b371172fe1339cbe9dc"
 }

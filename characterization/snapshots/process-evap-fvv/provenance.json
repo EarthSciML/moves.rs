@@ -2,10 +2,10 @@
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "process-evap-fvv",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
-  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/process-evap-fvv.xml",
-  "runspec_sha256": "75c0e6efaa29af3e6551d38a791e2b7ce9eb10f5cff587a154ec51959dd6dcbf",
-  "snapshot_aggregate_sha256": "f4cb6415ef5daaaaa2da6c4d01fd3fed6d3e2c554efa64efe5a11db7030cecfb",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixtures/process-evap-fvv.xml",
+  "runspec_sha256": "afce1a3ef00fbfc086d6d067b93b2392b409c6ed77222aa948c9f2c56b23464c",
+  "snapshot_aggregate_sha256": "23942aa6faca238a3d185c17bcc3b366967f7288c51a01da6e9cd4f35329162f",
   "output_database": "out_process_evap_fvv",
   "scale_input_database": null
 }

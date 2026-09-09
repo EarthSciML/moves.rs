@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__stmytvvequations2020",
   "schema": [
     {
@@ -69,6 +69,9 @@
     "leakEquation"
   ],
   "row_count": 125,
-  "float_decimals": 12,
-  "content_sha256": "2a8d9be5aac482a1fdf1a8cb1b69eeddede4a444ce0153616cb271f5526d4d2d"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "ad8e016884d5140ca356dbb0016626b4fbaa3d6fc707e0882e26533de914685c"
 }

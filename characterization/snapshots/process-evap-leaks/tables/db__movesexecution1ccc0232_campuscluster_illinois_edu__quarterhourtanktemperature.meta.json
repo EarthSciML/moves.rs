@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__quarterhourtanktemperature",
   "schema": [
     {
@@ -29,6 +29,9 @@
     "timeStepID"
   ],
   "row_count": 96,
-  "float_decimals": 12,
-  "content_sha256": "3d3b2d9f1c28869dadf7f407bf1cc27d09b037a99fa3d26c311a831532117ac7"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "8a62af6ab4fd64ff9bc665e65a8aace26a5063707baa3294817618d1133666e4"
 }

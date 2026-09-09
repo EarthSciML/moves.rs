@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__nremissionrate",
   "schema": [
     {
@@ -48,6 +48,9 @@
     "engTechID"
   ],
   "row_count": 55471,
-  "float_decimals": 12,
-  "content_sha256": "bca30839a3a2abb7c0cbcc14b54b1d9691c86b3703f7e57fd35123861b63bd0a"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "3420859d252945bfd83e6d384932c7ec986ddc160a65a1be6180b3cdb529fdbe"
 }
