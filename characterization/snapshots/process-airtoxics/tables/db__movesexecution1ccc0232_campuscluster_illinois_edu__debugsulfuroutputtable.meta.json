@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__debugsulfuroutputtable",
   "schema": [
     {
@@ -77,6 +77,9 @@
   ],
   "natural_key": [],
   "row_count": 40,
-  "float_decimals": 12,
-  "content_sha256": "90088777790833ce70edc8b8f8ee8452091aff2e790cbacb107c0fe88762c2da"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "c53bbee5bbc8dc297b0dfb41df5973c14ec93d70823fad3c859da4d03fe0970a"
 }

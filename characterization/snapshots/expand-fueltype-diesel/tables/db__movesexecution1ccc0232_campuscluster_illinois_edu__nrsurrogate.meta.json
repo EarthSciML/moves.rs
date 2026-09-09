@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__nrsurrogate",
   "schema": [
     {
@@ -19,6 +19,9 @@
     "surrogateID"
   ],
   "row_count": 19,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "c4ed17e32ffe3e46389a3f67d8bfe5dae2a2ec1900f9b335e56789c95b51b320"
 }

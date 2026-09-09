@@ -2,10 +2,10 @@
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "expand-month",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
-  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/expand-month.xml",
-  "runspec_sha256": "8944004570c8ce45307c9e7c9996006d4a282050241ddc635813ca9a5b6ebc4d",
-  "snapshot_aggregate_sha256": "1cea64813d7f43f200eb90867ba69bc2b570374e009817d05df6a5ba7fd5dcc1",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixtures/expand-month.xml",
+  "runspec_sha256": "fe501327ca25c565af20a89b2aba24ceb41c19ef465bdcad048b8f94d9eec92e",
+  "snapshot_aggregate_sha256": "6a56bf11357a20d7ac373fcb05881ed9e8857f06cd6634f17f3ac00b9d623a8f",
   "output_database": "out_expand_month",
   "scale_input_database": null
 }

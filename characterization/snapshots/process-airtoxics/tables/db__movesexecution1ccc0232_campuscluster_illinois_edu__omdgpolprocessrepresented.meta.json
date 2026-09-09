@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__omdgpolprocessrepresented",
   "schema": [
     {
@@ -15,6 +15,9 @@
     "polProcessID"
   ],
   "row_count": 1,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "fad17213da835624dd0e484e2b86e75afabf98bfe27ab16d93fc5fe0dca8e13d"
 }

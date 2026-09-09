@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__sulfatefractions",
   "schema": [
     {
@@ -51,6 +51,9 @@
     "maxModelYearID"
   ],
   "row_count": 24,
-  "float_decimals": 12,
-  "content_sha256": "f102aed6669965a811b3196e4bbc399b483dff44059dd15dd02a907d92a17060"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "b6d18ddab6fc90fdc82a9b6a85592590edb75522a32096e30e92d08d0f4140d8"
 }

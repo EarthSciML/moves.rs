@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__meanfuelparameters",
   "schema": [
     {
@@ -42,6 +42,9 @@
     "fuelParameterID"
   ],
   "row_count": 66,
-  "float_decimals": 12,
-  "content_sha256": "53b963b4eb170dcba75d93a998c74b95efe0a69e52143c4379ff79b2bddb710e"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "721a8cf18a9c8fc6ea524f5b8f613e26eb40706dfc41057cb4aa08564a30e90e"
 }

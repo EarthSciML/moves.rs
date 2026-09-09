@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_expand_month__movesoutput",
   "schema": [
     {
@@ -105,6 +105,9 @@
   ],
   "natural_key": [],
   "row_count": 500,
-  "float_decimals": 12,
-  "content_sha256": "afb1df77bbf2140bb6b8d5560f78b2168860152d4071f7b0feb70d2a0fd15160"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "9957704207a424e801749046cf155b460080e4e95c07bf334b754990d3b686a0"
 }

@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_process_airtoxics__movesoutput",
   "schema": [
     {
@@ -104,7 +104,10 @@
     }
   ],
   "natural_key": [],
-  "row_count": 1288,
-  "float_decimals": 12,
-  "content_sha256": "92cb0895511090b5c6816cdf17039c926a999d0ef43319208fb4ff431962c540"
+  "row_count": 644,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "f3bcedaf015226eff65f8e37822e24d69f50391672e778f06e2f67652be5f88a"
 }

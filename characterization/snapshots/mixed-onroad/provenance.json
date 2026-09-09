@@ -2,10 +2,10 @@
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "mixed-onroad",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
-  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/mixed-onroad.xml",
-  "runspec_sha256": "5559dcf0356c26b52df479cafefaa9a9de214a881eebac922de9f269075df718",
-  "snapshot_aggregate_sha256": "36cc0db9faa406a5785223cfd13bb3b39f9cdf8e77db4a5d941dfe31fdcd3ab2",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixtures/mixed-onroad.xml",
+  "runspec_sha256": "5cd1dc8a8b0756179cea555aac60eba3dad637f561548317329154395a90af56",
+  "snapshot_aggregate_sha256": "58d1d37fde35b586dcbff15281d0380957a8bc00d3e1a4d9f319470d6e78e80c",
   "output_database": "out_mixed_onroad",
   "scale_input_database": null
 }
