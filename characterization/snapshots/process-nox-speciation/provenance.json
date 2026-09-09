@@ -2,10 +2,10 @@
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "process-nox-speciation",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
-  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/process-nox-speciation.xml",
-  "runspec_sha256": "4d6db0bb430c8538716f44c1521ba6b46503c27f7a16b51859866248426790ca",
-  "snapshot_aggregate_sha256": "dc9c7c2715ae81f32fbe246d5aeb6f746f3a375bb50945859264e105690ecc79",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixtures/process-nox-speciation.xml",
+  "runspec_sha256": "ca783d165c89fb785bc39b1d2cc3f232963cc7793e2da7d2ebb4f8510a0f4052",
+  "snapshot_aggregate_sha256": "136f9a64c6a017f593744fed4a999665174e67107167a87a8999663e8ce05416",
   "output_database": "out_process_nox_speciation",
   "scale_input_database": null
 }

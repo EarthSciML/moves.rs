@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__nrcrankcaseemissionrate",
   "schema": [
     {
@@ -48,6 +48,9 @@
     "engTechID"
   ],
   "row_count": 126,
-  "float_decimals": 12,
-  "content_sha256": "f25877dda2c203c005428fe8fb771bc05d66605202d4cc517554499c19f21d35"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "d4d0db200e5d46e70e03f74ef37388f83cf9815fb023b551cb55210937d0e7e3"
 }

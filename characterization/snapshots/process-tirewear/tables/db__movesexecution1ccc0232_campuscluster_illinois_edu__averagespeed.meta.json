@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__averagespeed",
   "schema": [
     {
@@ -29,7 +29,10 @@
     "dayID",
     "hourID"
   ],
-  "row_count": 192,
-  "float_decimals": 12,
-  "content_sha256": "8802fa1b26bda6ef79988b1a726d3e8f2f5b71d592b65c9af6c90a8abd363768"
+  "row_count": 96,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "1cc332af9b693315f233a8c25a284aacc92eeda930832f41a3cf0ed6e9f4dfe2"
 }

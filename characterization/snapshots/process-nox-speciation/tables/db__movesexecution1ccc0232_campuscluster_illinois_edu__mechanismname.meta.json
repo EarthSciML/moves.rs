@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__mechanismname",
   "schema": [
     {
@@ -15,6 +15,9 @@
     "mechanismID"
   ],
   "row_count": 0,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "85ee13b6418e5855009d60aa0691a267428d8f06c116314432612e009dc40939"
 }

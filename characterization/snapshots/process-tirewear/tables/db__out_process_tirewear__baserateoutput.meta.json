@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_process_tirewear__baserateoutput",
   "schema": [
     {
@@ -76,7 +76,10 @@
     }
   ],
   "natural_key": [],
-  "row_count": 750,
-  "float_decimals": 12,
-  "content_sha256": "29cfd3a9408c60480628a98c3112199e7097c94846ce18387f8df6b26120704d"
+  "row_count": 375,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "63131455d13bfb3190fd574f443612a453e64e6caef9bb97a76e2e34a80972dd"
 }

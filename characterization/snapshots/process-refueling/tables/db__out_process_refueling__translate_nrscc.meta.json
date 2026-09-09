@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_process_refueling__translate_nrscc",
   "schema": [
     {
@@ -15,6 +15,9 @@
     "scc"
   ],
   "row_count": 214,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "5d49a1a66c6cc0e1dc282ff1bde72f8ffa3c4fdcaf54c21ab5b9a4b5c65b2ff6"
 }

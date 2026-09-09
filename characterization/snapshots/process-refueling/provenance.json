@@ -2,10 +2,10 @@
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "process-refueling",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
-  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/process-refueling.xml",
-  "runspec_sha256": "51e6b18071410066a9fed94bb5288bcf079d2a7ecfa8b0f9b8277ee505ecfd31",
-  "snapshot_aggregate_sha256": "b53b0ca16c846be99326c8f20b6e0c666968538a890abcf6cd96475eb8a987ab",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixtures/process-refueling.xml",
+  "runspec_sha256": "6dc3d3fdf5f4532012b73956cfa9f34a2335d781acac5b6650cc62070fdd96fc",
+  "snapshot_aggregate_sha256": "c3669f3c96457f22c1387a449ca5facb1a470234b93bc2be5a60f6361f082a19",
   "output_database": "out_process_refueling",
   "scale_input_database": null
 }

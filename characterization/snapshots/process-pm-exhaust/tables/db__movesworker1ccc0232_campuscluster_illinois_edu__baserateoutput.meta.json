@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesworker1ccc0232_campuscluster_illinois_edu__baserateoutput",
   "schema": [
     {
@@ -76,7 +76,10 @@
     }
   ],
   "natural_key": [],
-  "row_count": 1456,
-  "float_decimals": 12,
-  "content_sha256": "964b007b31e09b82b0fad4ec8ce31200425ada9f34ab1f0ad348ba785ac4faa0"
+  "row_count": 728,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "dbcf7817301f4a29055266e73e30ae12f92d87c2c7f4e276b448af668b77c8d1"
 }

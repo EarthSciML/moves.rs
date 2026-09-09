@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_process_refueling__rateperdistance",
   "schema": [
     {
@@ -81,6 +81,9 @@
   ],
   "natural_key": [],
   "row_count": 0,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "4329829599d7abc0d12b75ac3bacb39ddea0a33f47cb393b8c9781055984f646"
 }

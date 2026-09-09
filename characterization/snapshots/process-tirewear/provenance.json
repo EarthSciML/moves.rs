@@ -2,10 +2,10 @@
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "process-tirewear",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
-  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/process-tirewear.xml",
-  "runspec_sha256": "d6877717972b9ffe6aa0a50b991309db719f53ed86b7e9519aba6cfdc0199783",
-  "snapshot_aggregate_sha256": "70adb37716c8f7f56e0e1c54205d61750e65749fae96c2d037d6d76ef85f4649",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixtures/process-tirewear.xml",
+  "runspec_sha256": "2c00ff6a02129a5817b0db3b98356f52ce9dc7f20ee0e8f11fc5bfdfc5bbf749",
+  "snapshot_aggregate_sha256": "0088c559203d2f28c40226505212e2d1c09938565da0f9e8bd465911487b5cc5",
   "output_database": "out_process_tirewear",
   "scale_input_database": null
 }
