@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__etohbin",
   "schema": [
     {
@@ -23,6 +23,9 @@
     "etohThreshID"
   ],
   "row_count": 8,
-  "float_decimals": 12,
-  "content_sha256": "ec66cf4c458a371a9433efd8c9b0c1d795feb2806dfe50c9158eda3681547a36"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "e60efa27863a7e0358791b4dd4f369f68588da49d379cb1527c952540aa49161"
 }

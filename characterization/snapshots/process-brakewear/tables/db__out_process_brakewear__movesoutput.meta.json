@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_process_brakewear__movesoutput",
   "schema": [
     {
@@ -104,7 +104,10 @@
     }
   ],
   "natural_key": [],
-  "row_count": 750,
-  "float_decimals": 12,
-  "content_sha256": "fbf6dae8b3cd2059c8022981cd452cb2a2f9a7ad8cc590999522c7ed8d5cce16"
+  "row_count": 375,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "26e156446c0c1f8c06afb9d22d2573abd8df69ac4ce0189103ea7fd9714180ab"
 }

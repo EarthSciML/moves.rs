@@ -2,7 +2,7 @@
   "trace_version": "moves-fixture-capture/v1",
   "fixture_name": "process-brakewear",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "runspec_sha256": "6232e5eb3ce040d1f9abba1f76cc53a289540312ce5e205eb60ea9f99b8ecea9",
+  "runspec_sha256": "27d877741fa5e73f27de9b5e776daa4eebb84d0a9fb51e4c8ff9579f15c3c780",
   "java_classes": [
     {
       "name": "gov.epa.otaq.moves.common.BundleManifest",
@@ -734,6 +734,6 @@
   "worker_bundles": [],
   "sources": {
     "worker_sql_files": 0,
-    "class_load_log_files": 8
+    "class_load_log_files": 2
   }
 }
