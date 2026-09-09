@@ -455,8 +455,17 @@ pub struct SampleVehicleTripRow {
     /// `priorTripID` — ID of the immediately preceding trip; `None` when
     /// there is no prior trip (i.e. this is the first trip).
     pub prior_trip_id: Option<i32>,
-    /// `keyOnTime` — engine-on time (INT minutes since midnight).
-    pub key_on_time: i32,
+    /// `keyOnTime` — engine-on time (INT minutes since midnight), or `None`.
+    ///
+    /// MOVES ships a marker row per sampled vehicle carrying a `keyOffTime`
+    /// but no `keyOnTime` and no `priorTripID` (5 458 of `expand-counties`'s
+    /// 37 216 rows). `soakTime` is then NULL, every `OperatingMode` band
+    /// comparison is SQL UNKNOWN, and the row yields no `StartOpMode` row —
+    /// but it is **kept**, because `calculateSoakTime` reads its `keyOffTime`
+    /// as `svt1`, the *prior* trip of a real start. Dropping it drops every
+    /// soak that reaches back past a vehicle's first record — which is
+    /// exactly the long soaks, op modes 107 and 108.
+    pub key_on_time: Option<i32>,
     /// `keyOffTime` — engine-off time (INT minutes since midnight).
     pub key_off_time: i32,
 }
@@ -510,7 +519,9 @@ impl TableRow for SampleVehicleTripRow {
                 .into(),
                 Series::new(
                     "keyOnTime".into(),
-                    rows.iter().map(|r| r.key_on_time).collect::<Vec<i32>>(),
+                    rows.iter()
+                        .map(|r| r.key_on_time)
+                        .collect::<Vec<Option<i32>>>(),
                 )
                 .into(),
                 Series::new(
@@ -536,24 +547,21 @@ impl TableRow for SampleVehicleTripRow {
         let prior_trip_id = get_i32("priorTripID")?;
         let key_on_time = get_i32("keyOnTime")?;
         let key_off_time = get_i32("keyOffTime")?;
-        // Rows with NULL keyOnTime are marker trips — skip them (Java filter).
-        let mut rows = Vec::with_capacity(df.height());
-        for i in 0..df.height() {
-            let Some(kot) = key_on_time.get(i) else {
-                continue;
-            };
-            let null = |col: &'static str| row_err(t, i, col, "null value".into());
-            rows.push(SampleVehicleTripRow {
-                veh_id: veh_id.get(i).ok_or_else(|| null("vehID"))?,
-                day_id: day_id.get(i).ok_or_else(|| null("dayID"))?,
-                trip_id: trip_id.get(i).ok_or_else(|| null("tripID"))?,
-                hour_id: hour_id.get(i).ok_or_else(|| null("hourID"))?,
-                prior_trip_id: prior_trip_id.get(i),
-                key_on_time: kot,
-                key_off_time: key_off_time.get(i).ok_or_else(|| null("keyOffTime"))?,
-            });
-        }
-        Ok(rows)
+        // Every row is kept, NULL `keyOnTime` included — see the field docs.
+        (0..df.height())
+            .map(|i| {
+                let null = |col: &'static str| row_err(t, i, col, "null value".into());
+                Ok(SampleVehicleTripRow {
+                    veh_id: veh_id.get(i).ok_or_else(|| null("vehID"))?,
+                    day_id: day_id.get(i).ok_or_else(|| null("dayID"))?,
+                    trip_id: trip_id.get(i).ok_or_else(|| null("tripID"))?,
+                    hour_id: hour_id.get(i).ok_or_else(|| null("hourID"))?,
+                    prior_trip_id: prior_trip_id.get(i),
+                    key_on_time: key_on_time.get(i),
+                    key_off_time: key_off_time.get(i).ok_or_else(|| null("keyOffTime"))?,
+                })
+            })
+            .collect()
     }
 }
 
@@ -1414,8 +1422,9 @@ pub struct PopulateOpModeDistributionInputs {
 
 /// Steps 100–300: build the `StartOpModeDistribution` soak-fraction table.
 ///
-/// 1. **Soak time (step 100):** self-join `SampleVehicleTrip` on `priorTripID`
-///    (INNER JOIN — only trips with a prior trip get a soak-time row).
+/// 1. **Soak time (step 100):** self-join `SampleVehicleTrip` on
+///    `(vehID, priorTripID → tripID)` (INNER JOIN — only trips with a prior
+///    trip get a soak-time row).
 /// 2. **Start op mode (step 200):** join each soak time against `OperatingMode`
 ///    soak-time bands, keeping all matching modes.
 /// 3. **Op-mode fraction (step 300):** aggregate counts by
@@ -1425,19 +1434,32 @@ pub struct PopulateOpModeDistributionInputs {
 pub fn build_start_op_mode_distribution(
     inputs: &StartOpModeInputs,
 ) -> Vec<StartOpModeDistributionRow> {
-    // Index SampleVehicleDay: (vehID, dayID) -> sourceTypeID.
-    let veh_day_to_source_type: BTreeMap<(i32, i32), i32> = inputs
-        .vehicle_days
-        .iter()
-        .map(|vd| ((vd.veh_id, vd.day_id), vd.source_type_id))
-        .collect();
+    // Index SampleVehicleDay by `vehID` — the *only* column step 300 joins
+    // trips on (`INNER JOIN SampleVehicleTrip svt ON (svt.vehID=sv.vehID)`;
+    // `dayID` appears nowhere in that predicate). A vehicle with two
+    // `SampleVehicleDay` rows therefore contributes its trips twice, which is
+    // why the multiplicity is kept as a `Vec` rather than collapsed: it
+    // cancels between `COUNT(opModeID)` and `starts` only because both
+    // aggregates range over the same join.
+    let veh_to_source_types: BTreeMap<i32, Vec<i32>> =
+        inputs
+            .vehicle_days
+            .iter()
+            .fold(BTreeMap::new(), |mut m, vd| {
+                m.entry(vd.veh_id)
+                    .or_insert_with(Vec::new)
+                    .push(vd.source_type_id);
+                m
+            });
 
-    // Index SampleVehicleTrip: (vehID, dayID, tripID) -> keyOffTime,
-    // for the prior-trip self-join.
-    let trip_key_off: BTreeMap<(i32, i32, i32), i32> = inputs
+    // Index SampleVehicleTrip by `(vehID, tripID)` for the prior-trip
+    // self-join — again the canonical keys, `ON (svt2.vehID = svt1.vehID AND
+    // svt2.priorTripID = svt1.tripID)`, with no `dayID`. A start whose prior
+    // trip fell on another day still gets its soak time.
+    let trip_key_off: BTreeMap<(i32, i32), i32> = inputs
         .trips
         .iter()
-        .map(|t| ((t.veh_id, t.day_id, t.trip_id), t.key_off_time))
+        .map(|t| ((t.veh_id, t.trip_id), t.key_off_time))
         .collect();
 
     // Convert OperatingModeRow to OperatingMode for classify_start_op_mode.
@@ -1459,15 +1481,20 @@ pub fn build_start_op_mode_distribution(
     let mut totals: BTreeMap<(i32, i32), u64> = BTreeMap::new();
 
     for trip in &inputs.trips {
+        // A NULL `keyOnTime` makes `soakTime` NULL, so every band comparison
+        // is SQL UNKNOWN and the trip is no start. It has already served its
+        // purpose in `trip_key_off`.
+        let Some(key_on_time) = trip.key_on_time else {
+            continue;
+        };
         // Only trips with a prior trip (INNER JOIN on priorTripID).
         let Some(prior_trip_id) = trip.prior_trip_id else {
             continue;
         };
-        let Some(&prior_key_off) = trip_key_off.get(&(trip.veh_id, trip.day_id, prior_trip_id))
-        else {
+        let Some(&prior_key_off) = trip_key_off.get(&(trip.veh_id, prior_trip_id)) else {
             continue;
         };
-        let Some(&source_type_id) = veh_day_to_source_type.get(&(trip.veh_id, trip.day_id)) else {
+        let Some(source_types) = veh_to_source_types.get(&trip.veh_id) else {
             continue;
         };
 
@@ -1477,15 +1504,18 @@ pub fn build_start_op_mode_distribution(
             continue;
         }
 
-        let soak = soak_time(trip.key_on_time, prior_key_off);
-        for mode_id in classify_start_op_mode(soak, &op_modes) {
-            // One joined row: it counts once towards its mode and once
-            // towards `StartsPerVehicleDay.starts` (both aggregates range
-            // over the same join).
-            *totals.entry((source_type_id, hd_id)).or_insert(0) += 1;
-            *counts
-                .entry((source_type_id, hd_id, mode_id as i32))
-                .or_insert(0) += 1;
+        let soak = soak_time(key_on_time, prior_key_off);
+        let matched = classify_start_op_mode(soak, &op_modes);
+        for &source_type_id in source_types {
+            for &mode_id in &matched {
+                // One joined row: it counts once towards its mode and once
+                // towards `StartsPerVehicleDay.starts` (both aggregates range
+                // over the same join).
+                *totals.entry((source_type_id, hd_id)).or_insert(0) += 1;
+                *counts
+                    .entry((source_type_id, hd_id, i32::from(mode_id)))
+                    .or_insert(0) += 1;
+            }
         }
     }
 
@@ -2085,7 +2115,7 @@ mod tests {
                     trip_id: 1,
                     hour_id: 8,
                     prior_trip_id: None,
-                    key_on_time: 400,
+                    key_on_time: Some(400),
                     key_off_time: 480,
                 },
                 SampleVehicleTripRow {
@@ -2094,7 +2124,7 @@ mod tests {
                     trip_id: 2,
                     hour_id: 9,
                     prior_trip_id: Some(1),
-                    key_on_time: 540,
+                    key_on_time: Some(540),
                     key_off_time: 620,
                 },
             ])
@@ -2311,7 +2341,7 @@ mod tests {
             trip_id: 1,
             hour_id: 9,
             prior_trip_id: None,
-            key_on_time: 400,
+            key_on_time: Some(400),
             key_off_time: 480,
         }];
         let modes = vec![OperatingModeRow {
@@ -2340,7 +2370,7 @@ mod tests {
                 trip_id: 1,
                 hour_id: 8,
                 prior_trip_id: None,
-                key_on_time: 400,
+                key_on_time: Some(400),
                 key_off_time: 480,
             },
             SampleVehicleTripRow {
@@ -2349,7 +2379,7 @@ mod tests {
                 trip_id: 2,
                 hour_id: 9,
                 prior_trip_id: Some(1),
-                key_on_time: 540,
+                key_on_time: Some(540),
                 key_off_time: 620,
             },
         ];
@@ -2386,7 +2416,7 @@ mod tests {
                         trip_id: prior_id,
                         hour_id: 9,
                         prior_trip_id: None,
-                        key_on_time: 0,
+                        key_on_time: Some(0),
                         key_off_time: 100,
                     },
                     SampleVehicleTripRow {
@@ -2395,7 +2425,7 @@ mod tests {
                         trip_id,
                         hour_id: 9,
                         prior_trip_id: Some(prior_id),
-                        key_on_time: 100 + soak,
+                        key_on_time: Some(100 + soak),
                         key_off_time: 100 + soak + 10,
                     },
                 ]
