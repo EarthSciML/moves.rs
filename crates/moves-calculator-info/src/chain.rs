@@ -57,6 +57,34 @@ pub struct Source {
     /// Number of Java source files the optional source-dir scan visited.
     /// Zero if the scan was skipped.
     pub java_files_scanned: usize,
+    /// What a `registrations_count` means — carried in the artifact so a
+    /// consumer reading only the JSON cannot mistake a count for a size.
+    ///
+    /// MOVES writes `CalculatorInfo.txt` by running each calculator's
+    /// constructor against **a** MOVES database and recording the
+    /// `(pollutant, process)` pairs it registers. Which pairs those are
+    /// depends on that database's `pollutant` table, and the file does not
+    /// record which database it was — so a registration count is an upper
+    /// bound against an unrecorded database, not the number of pairs the
+    /// module registers in *your* run. `TOGSpeciationCalculator` is the
+    /// worked example: 184 registrations here, 24 against the pinned
+    /// `movesdb20241112` (see
+    /// `characterization/calculator-chains/README.md`).
+    ///
+    /// `#[serde(default)]` so a DAG written before this field was added
+    /// still deserialises.
+    #[serde(default = "registration_semantics")]
+    pub registration_semantics: String,
+}
+
+/// The default (and only) value of [`Source::registration_semantics`].
+fn registration_semantics() -> String {
+    "registrations_count is an upper bound against the database \
+     CalculatorInfo.txt was generated on -- which the file does not record -- \
+     not the number of (pollutant, process) pairs the module registers \
+     against the database a run uses. Intersect `registrations` with the \
+     target database's `pollutant` table before reading a count as a size."
+        .to_string()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -353,6 +381,7 @@ pub fn build_dag(
         source: Source {
             calculator_info_sha256: info.source_sha256.clone(),
             java_files_scanned,
+            registration_semantics: registration_semantics(),
         },
         counts,
         modules,
