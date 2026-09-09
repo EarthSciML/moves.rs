@@ -199,6 +199,29 @@ carry are exactly the ones v1 threw away.
 | `../moves.esm` scoped hold-out for small-magnitude cells | becomes unnecessary for recaptured fixtures | remove per fixture, after that fixture is recaptured |
 | `.github/workflows/fixture-suite-weekly.yml` | diffs a fresh capture against the committed corpus; a half-migrated corpus fails every week | run the sweep as one landing, not incrementally |
 
+## Coupled change: the corrected `<day id=>` fixtures
+
+A second branch commit corrects `<day key="N"/>` to `<day id="N"/>` in 39
+fixture XMLs (see
+[`../characterization/audit-results/20260908T1120-day-selection-audit.md`](../characterization/audit-results/20260908T1120-day-selection-audit.md)).
+`key` is an *index* into `TimeSpan.allDays`, so `key="5"` resolved to
+nothing and MOVES ran every day; 26 of the 40 populated snapshots are
+two-day runs as a result.
+
+That correction changes the RunSpec bytes for **27 populated fixtures**, so
+those snapshots need recapturing too. Do it in the **same sweep** — the
+alternative is capturing 40 snapshots twice.
+
+If the sweep owner would rather not take the day correction, revert that one
+commit and the v2 sweep stands alone. The two changes are independent; they
+are only cheaper together.
+
+Note before running with the corrected XMLs: `moves-cli/src/run.rs:355`
+unconditionally sets the port's execution day set to every `DayOfAnyWeek`
+day, so the *port* will still emit both days where corrected canonical
+emits one. That has to be settled before the full-suite gate can pass
+against a recaptured, day-corrected corpus.
+
 ## Recommended order
 
 1. **Land the format change alone** (this branch). Corpus untouched, both
@@ -206,9 +229,10 @@ carry are exactly the ones v1 threw away.
 2. **Prepare the consumer.** Patch `../moves.esm`'s `compare-output.py` to
    handle both `float_decimals` and `float_encoding`. Merge it *before* the
    sweep; it is a no-op against a v1 corpus.
-3. **Let the in-flight fixture work land.** Another agent is adding RunSpecs
-   and capturing them in v1. Recapturing before that settles just means
-   doing it twice.
+3. **Let the in-flight fixture work land**, and decide whether the
+   `<day id=>` correction rides along. Another agent is adding RunSpecs and
+   capturing them in v1. Recapturing before that settles just means doing it
+   twice.
 4. **Pilot on one fixture.** Recapture `nr-airtoxics-lawn-garden-county` —
    the worst offender, and the one whose air-toxics cells motivated the
    change — into a scratch directory, not the corpus. Confirm: the

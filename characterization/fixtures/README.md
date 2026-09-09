@@ -41,6 +41,25 @@ re-run can only add new files and refresh `coverage-matrix.md`. Pass
 `--force` to overwrite regardless, or name fixtures on the command line
 to regenerate just those. See the `_generate.py` module docstring.
 
+## `<day>` must use `id`, never `key`
+
+`RunSpecXML.processTimeSpan` reads `<day key="N"/>` as an **index** into
+`TimeSpan.allDays` and `<day id="N"/>` as the literal `dayID` (5 = weekday,
+2 = weekend). `allDays` holds two entries ordered by ascending `dayID`, so
+the only valid keys are 0 and 1. `<day key="5"/>` resolves to null, leaves
+the day selection empty, and MOVES then runs **every** day — roughly
+doubling the run and making the fixture test something other than what the
+catalogue says.
+
+Every fixture here now uses `<day id="N"/>`, with one deliberate exception:
+`sample-runspec.xml` keeps `<day key="0"/>` because it is a byte-identical
+copy of upstream `testdata/SampleRunSpec.xml`, and 0 is a valid index — it
+selects the weekend, which is what canonical MOVES means by that file.
+
+The audit that found this, with the per-fixture table, is
+[`../audit-results/20260908T1120-day-selection-audit.md`](../audit-results/20260908T1120-day-selection-audit.md).
+`_generate.py`'s `TimeSpan.day_attr` now defaults to `"id"`.
+
 ## Naming conventions
 
 | Prefix      | Meaning                                                   |
