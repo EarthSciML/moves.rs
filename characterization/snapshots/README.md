@@ -7,13 +7,25 @@ phase verifies against.
 
 ## Acceptance status
 
-As of 2026-09-08 `characterization/fixtures/` holds **54** RunSpec XML
+As of 2026-09-09 `characterization/fixtures/` holds **54** RunSpec XML
 fixtures, and **42** of them have a populated snapshot directory here (one
-sub-directory per fixture carrying a `manifest.json`). The three `scale-*`
+sub-directory per fixture carrying a `manifest.json`). All 42 are
+`moves-snapshot/v2` — see "Float encoding" below. The three `scale-*`
 fixtures are skipped (require an additional input DB; see
 `characterization/fixtures/README.md`). The canonical-diff regression gate
 asserts them against canonical MOVES (see
 `docs/known-divergences.md` §1b).
+
+Four of the 42 are `<modeldomain value="SINGLE"/>` county-domain runs
+(`process-apu-single`, `process-crankcase-extidle-single`,
+`process-crankcase-start-single`, `process-extended-idle-single`) and
+**cannot** be captured with `run-fixture.sh` alone — MOVES fails with
+"The database does not have the required county." They go through
+`apptainer/capture-county-snapshot.sh`, which seeds `washtenaw_cdb` from
+`../county-inputs/washtenaw-county/setup-{starts,hotelling}.sql` first;
+each SQL file's header names the fixtures it serves. `scale-county.xml` is
+a fifth SINGLE-domain fixture but has never been captured and is out of
+scope here.
 
 Counts measured with `ls characterization/fixtures/*.xml | wc -l` (54),
 `ls -d characterization/snapshots/*/ | wc -l` (42) and
@@ -130,6 +142,14 @@ jq '.sql_files[].path' \
 
 ## Determinism contract
 
+> [!IMPORTANT]
+> **This guarantee is measurably false, and the wording below has not yet
+> been amended — that is a pending decision, not an oversight.** See
+> "Measured limits of the determinism contract" immediately after this
+> section. The two failures were both present under v1; v1's rounding hid
+> one of them and nobody had captured the same fixture twice to notice the
+> other.
+
 Two runs with the same SIF SHA256 + same RunSpec bytes produce
 **byte-identical** files in this directory. The pieces that uphold the
 contract:
@@ -149,11 +169,77 @@ contract:
 If a snapshot file's bytes change, the underlying MOVES output changed —
 that's the regression-detection signal Phase 0 is designed to provide.
 
+## Measured limits of the determinism contract
+
+The recapture sweep (2026-09-08/09) captured two fixtures twice, from the
+same SIF (`4f92c593`), the same RunSpec bytes and the same host
+(`ccc0232`). Neither pair was byte-identical, for two independent reasons.
+
+**1. Worker-temp table names are assigned per run.** MOVES's master hands
+work to `MOVESTemporary/manyworkers/workerfolder/workertempN/`, and both
+*N* and how many workers it uses vary between runs of the same fixture:
+
+| fixture | capture A | capture B |
+|---|---|---|
+| `process-brakewear` | `workertemp2`, `workertemp` | `workertemp8`, `workertemp9` |
+| `nr-airtoxics-lawn-garden-county` | (none) | `workertemp2` |
+
+That is 6 of 366 table *names* for `process-brakewear` and a 324-vs-327
+table count for `nr-airtoxics-lawn-garden-county`. Row totals reconcile
+exactly in both cases — the per-worker `output_tbl` row counts sum to
+`MOVESOutput` either way — so no data is lost or gained; the partition is
+simply not reproducible. **This has nothing to do with float encoding and
+was equally true of every v1 snapshot.**
+
+**2. MOVES itself produces a value that is not bit-reproducible.**
+`drivingIdleFraction` in `db__movesexecution…__drivingidlefraction`
+(1 row, present in all 42 fixtures, no float in its natural key) came out
+as
+
+    3.0299686857752525e-02      and      3.0299686857752545e-02
+
+in the two `process-brakewear` captures — 6 ULP apart, relative difference
+6.9e-16, almost certainly a floating-point aggregation-order effect in the
+MariaDB query that computes it. Under v1 both rendered as
+`0.030299686858` at twelve decimal places, which is exactly what the
+committed v1 snapshot holds, so the difference was invisible. **v2 does not
+introduce this; it discloses it.**
+
+Scope of the measurement: n = 2 fixtures, the only ones captured twice.
+`nr-airtoxics-lawn-garden-county` showed **0 of 324** common tables
+differing in content, so value-level nondeterminism is not universal — one
+cell in one table is all that has been observed. A wider estimate needs
+repeat captures across the suite, which this sweep did not perform.
+
+### What this affects
+
+* `.github/workflows/fixture-suite-weekly.yml` runs `moves-snapshot diff`
+  in strict byte-identity mode (exit 0 = match). Against a v2 corpus that
+  gate will now report drift on any fixture whose re-capture lands a
+  different worker partition, and on `drivingidlefraction` whenever the
+  aggregation order differs — neither being a real regression.
+* `characterization/tolerance.toml` sets `default_float_tolerance = 0.0`,
+  which cannot absorb a 6.9e-16 relative difference. A per-column
+  tolerance on `drivingidlefraction.drivingIdleFraction` (or a small
+  global relative floor, order 1e-12) would; so would excluding the
+  `moves_temporary__manyworkers__*` tables from the strict table-set
+  comparison.
+
+Both changes are deliberately **not** made in the sweep that found the
+problem: retracting a stated guarantee and loosening the regression gate
+are decisions for a reviewer, and folding them into a 42-fixture recapture
+would make the diff impossible to reason about.
+
 ## Float encoding, and the v1 → v2 format change
 
-Every snapshot committed here today is `moves-snapshot/v1`, which stored
-each float as a fixed-decimal string with **twelve places after the
-point**. Twelve decimal places is not twelve significant digits: a value
+**The v1 → v2 recapture sweep ran on 2026-09-08/09: all 42 snapshots here
+are now `moves-snapshot/v2`, and all 14 766 table sidecars carry
+`float_encoding` with no `float_decimals`.** The rest of this section
+describes what changed and why; it is kept because the reasoning is the
+justification for the corpus you are reading.
+
+`moves-snapshot/v1` stored each float as a fixed-decimal string with
+**twelve places after the point**. Twelve decimal places is not twelve significant digits: a value
 near 1e-9 kept four significant digits, one near 1e-11 kept two, and
 anything below 5e-13 was stored as `0.000000000000`. The measurement is
 in
@@ -184,10 +270,10 @@ Two consequences for anything reading this directory:
   a float in the natural key, so their row order will change on
   recapture.
 
-The corpus is **not** migrated yet. `moves-snapshot` reads both versions
-and remembers which one it read, so the committed v1 snapshots stay
-diffable, loadable and byte-stable until the scheduled recapture sweep
-runs. See [`../../docs/snapshot-v2-migration.md`](../../docs/snapshot-v2-migration.md).
+`moves-snapshot` reads both versions and remembers which one it read, so a
+v1 snapshot restored from history stays diffable and byte-stable. See
+[`../../docs/snapshot-v2-migration.md`](../../docs/snapshot-v2-migration.md)
+for what the sweep measured against what it predicted.
 
 ## Producing a snapshot
 

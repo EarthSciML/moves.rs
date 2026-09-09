@@ -1,9 +1,44 @@
 # Migrating the snapshot corpus from `moves-snapshot/v1` to `/v2`
 
-**Status: planned, not executed.** The code in `crates/moves-snapshot`
-writes v2; every snapshot in `characterization/snapshots/` is still v1 and
-stays that way until the sweep described here runs. The reader accepts both
-versions, so nothing is broken in the meantime.
+**Status: EXECUTED, 2026-09-08/09.** All 42 populated snapshots in
+`characterization/snapshots/` are `moves-snapshot/v2`. The sweep also
+carried the `<day key=> → <day id=>` fixture correction (draft PR #53) and
+the coupled port fix (#55), because corrected fixtures change what
+canonical emits and the two could not land separately.
+
+### Measured, against the estimates below
+
+| | predicted here | measured |
+|---|---|---|
+| snapshots to recapture | 40 | **42** (the two `chain-so2-co2e-mechanism*` captures landed after this doc was written) |
+| serial wall time | ~1 h 40 m at ~2.5 min each | **~2 h 5 m** of capture; 127–489 s per fixture, median ~145 s |
+| corpus size | 2.5–3.6 GB, from 2.9 GB | **2.797 GB**, from 3.200 GB — a **12.6% reduction**, not a growth |
+| tables with a float in the natural key | 120 of 14 055 | 3 distinct tables (`evaprvptemperatureadjustment`, `fuelwizardfactors`, `nrscrappagecurve`); only `fuelwizardfactors` actually reordered |
+| `--shard I/4` speed-up | ~30 m – 1 h 15 m | **not achievable on one host** — MOVES hard-codes master port 13131 and MariaDB uses 3306, so concurrent captures collide. Sharding needs one machine per shard. |
+| pilot cells | `1.105e-09` and `1.9e-11` | `nrdioxinemissionrate.meanBaseRate` = **`1.1045e-09`** (v1 rounded the 4th digit *wrong*); `dioxinemissionrate.meanBaseRate` = `4.7e-11` and **`8.27e-13`** where v1 stored `0.000000000001` — a 21% error |
+
+The size prediction was directionally wrong. The reasoning ("string length
+maps straight to bytes", mean v1 cell 14.62 bytes, up to 23 bytes in v2)
+only considered cells that *gain* digits. In practice most cells lose them:
+`0.500000000000` → `5e-01`, `0.000000000000` → `0e+00`. Part of the 12.6%
+is also the day correction removing weekend rows from day-keyed tables, so
+the two effects are not separable from these numbers alone —
+`nr-airtoxics-lawn-garden-county`, whose row count is unchanged by the day
+fix, isolates the encoding at **-3.6%** (139.5 → 134.5 MB excluding the
+derived bundle).
+
+### What the sweep found that this plan did not anticipate
+
+Two runs of the same fixture, same SIF and same RunSpec bytes, are **not
+byte-identical** — from worker-temp table naming (always true, v1
+included) and from one MOVES-side value that is only bit-reproducible to
+~6 ULP (`drivingidlefraction`, concealed by v1's twelve-decimal rounding).
+`characterization/snapshots/README.md` § "Measured limits of the
+determinism contract" has the numbers and the consequences for
+`tolerance.toml` and the weekly diff gate.
+
+The reader accepts both versions, so a v1 snapshot restored from history
+stays loadable.
 
 ## Why
 
