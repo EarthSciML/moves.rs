@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_process_extended_idle_single__translate_fueltype",
   "schema": [
     {
@@ -15,6 +15,9 @@
     "fuelTypeID"
   ],
   "row_count": 8,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "0055c57c7d609bcef8d2d0f1271e08b3b5752f863945f7c934e1611c76801940"
 }

@@ -1,0 +1,38 @@
+{
+  "format_version": "moves-snapshot/v2",
+  "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__regclasssourcetypefraction",
+  "schema": [
+    {
+      "name": "fuelTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "modelYearID",
+      "kind": "int64"
+    },
+    {
+      "name": "sourceTypeID",
+      "kind": "int64"
+    },
+    {
+      "name": "regClassID",
+      "kind": "int64"
+    },
+    {
+      "name": "regClassFraction",
+      "kind": "float64"
+    }
+  ],
+  "natural_key": [
+    "fuelTypeID",
+    "modelYearID",
+    "sourceTypeID",
+    "regClassID"
+  ],
+  "row_count": 125,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "49aa66925faa317af253df9b523733cac72b3dfe7e833c9e1b3c6e427b7e9c78"
+}

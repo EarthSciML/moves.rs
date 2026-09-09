@@ -2,10 +2,10 @@
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "nr-agriculture-state",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
-  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/nr-agriculture-state.xml",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixtures/nr-agriculture-state.xml",
   "runspec_sha256": "49a7d56e1700bc8f801b98292222f3faaf41d22be81e84304c3676bf019f104c",
-  "snapshot_aggregate_sha256": "a8d54f0de01d83a0ad617c8f5f83610f3bec06298ea267b017dc2ba982e0fa95",
+  "snapshot_aggregate_sha256": "ddd4a0a20f3c7439de7b905804556b81f87af01dcbfa6ec6a1f1d0e4808c1884",
   "output_database": "out_nr_agriculture_state",
   "scale_input_database": null
 }

@@ -2,7 +2,7 @@
   "trace_version": "moves-fixture-capture/v1",
   "fixture_name": "process-apu-single",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "runspec_sha256": "75d94004942b1828d568739277cd7a0e161a95ee68129d0b97fc618c7ce1bf65",
+  "runspec_sha256": "be19292b48e840b8f5e4f391c5a9e087392358d2e923eb601cefbaf29aed285b",
   "java_classes": [
     {
       "name": "gov.epa.otaq.moves.common.BundleManifest",
@@ -262,6 +262,10 @@
     },
     {
       "name": "gov.epa.otaq.moves.master.framework.HeartbeatDetectionThread",
+      "kind": "framework"
+    },
+    {
+      "name": "gov.epa.otaq.moves.master.framework.HeartbeatDetectionThread$ObservedFileStamp",
       "kind": "framework"
     },
     {
