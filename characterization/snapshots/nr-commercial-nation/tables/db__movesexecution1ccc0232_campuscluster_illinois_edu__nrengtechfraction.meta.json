@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__nrengtechfraction",
   "schema": [
     {
@@ -40,6 +40,9 @@
     "engTechID"
   ],
   "row_count": 9554,
-  "float_decimals": 12,
-  "content_sha256": "db779afeea3813e4ac67ab05e3e0556288396d15b0005569662888bcf87a2266"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "8339a3ff88ae741d3f567a6951ce5d3c2138846aab2d742e31fb79c8c08b818e"
 }

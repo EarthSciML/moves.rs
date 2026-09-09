@@ -2,10 +2,10 @@
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "nr-construction-state",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
-  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/nr-construction-state.xml",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixtures/nr-construction-state.xml",
   "runspec_sha256": "0d71ba7561e51824463c131de4ae71431f61eb83519a4cb6a32f7da599694cc0",
-  "snapshot_aggregate_sha256": "d74911b713140a62bb8286f649a47be704f00343b14eca5a984aa5a7900ef5a0",
+  "snapshot_aggregate_sha256": "dd2702df8a99f42f4621d2c61cbb52012ba0757e242040307408a046bcab71f6",
   "output_database": "out_nr_construction_state",
   "scale_input_database": null
 }

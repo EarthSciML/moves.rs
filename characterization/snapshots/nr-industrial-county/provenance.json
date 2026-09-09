@@ -2,10 +2,10 @@
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "nr-industrial-county",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
-  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/nr-industrial-county.xml",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixtures/nr-industrial-county.xml",
   "runspec_sha256": "95004ee8e790b83355d3691a3cd7a4d97434a7009a55d0d66b185b502bdf79e1",
-  "snapshot_aggregate_sha256": "0867e25063e792c8235cf4e5ca7f6ef8f83cba4e17cc769943082df20ab29873",
+  "snapshot_aggregate_sha256": "aa664bf9bf01400a110acbe4ea94c7dc09c971d1bea4e32370c7d48c517401e1",
   "output_database": "out_nr_industrial_county",
   "scale_input_database": null
 }

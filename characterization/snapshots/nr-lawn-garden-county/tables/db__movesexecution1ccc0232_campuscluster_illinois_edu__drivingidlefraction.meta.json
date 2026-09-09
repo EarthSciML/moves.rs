@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__drivingidlefraction",
   "schema": [
     {
@@ -30,6 +30,9 @@
     "sourceTypeID"
   ],
   "row_count": 0,
-  "float_decimals": 12,
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
   "content_sha256": "86b7598d0fd0c5dca3fccf20b94f275e838bdfe98c21b6938719a25dc6d10abe"
 }

@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__nrbaseyearequippopulation",
   "schema": [
     {
@@ -24,6 +24,9 @@
     "stateID"
   ],
   "row_count": 1183,
-  "float_decimals": 12,
-  "content_sha256": "b9bf1e6b2d9efce342d15ce1f490fbc85486ae3be2f7efddf732f2bad09b6ceb"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "e73dc6b5995ff42e4b2db4725e231501384dbbbf4476151cdd6d8dae22970091"
 }

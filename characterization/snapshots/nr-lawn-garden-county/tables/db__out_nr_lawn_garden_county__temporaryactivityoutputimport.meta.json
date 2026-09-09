@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_nr_lawn_garden_county__temporaryactivityoutputimport",
   "schema": [
     {
@@ -101,6 +101,9 @@
   ],
   "natural_key": [],
   "row_count": 1936,
-  "float_decimals": 12,
-  "content_sha256": "a0ff07f9728ee27a0508da1867a85b74d2ab1de3b4fed047df1b34ec32128d88"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "d6b89e6d05581866b00419235168aa9ad17e9324959c286c76556fbd4a2b9e9e"
 }

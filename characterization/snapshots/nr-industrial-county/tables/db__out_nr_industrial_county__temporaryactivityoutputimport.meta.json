@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_nr_industrial_county__temporaryactivityoutputimport",
   "schema": [
     {
@@ -101,6 +101,9 @@
   ],
   "natural_key": [],
   "row_count": 21068,
-  "float_decimals": 12,
-  "content_sha256": "57e3e848c1b28b541caadf9c2548da9a8bb3bfc385041d11c44ba1068bc25c7e"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "7e589a75483a05c61b208881d20f775e8a64db4e2e1637c09914c3bbf2b1b9b7"
 }

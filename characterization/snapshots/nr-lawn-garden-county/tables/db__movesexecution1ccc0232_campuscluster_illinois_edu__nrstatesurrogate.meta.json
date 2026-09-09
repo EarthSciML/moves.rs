@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__nrstatesurrogate",
   "schema": [
     {
@@ -30,6 +30,9 @@
     "surrogateYearID"
   ],
   "row_count": 62821,
-  "float_decimals": 12,
-  "content_sha256": "9f558590eb91d1ac91b12be547e1f4910c1b32e9fdfc82fc94efc0bb5a2cfa87"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "8c4ef55059f566711ae65ae400c22e2ab01b2c5eec545d09437ed9ea46dcc5c9"
 }

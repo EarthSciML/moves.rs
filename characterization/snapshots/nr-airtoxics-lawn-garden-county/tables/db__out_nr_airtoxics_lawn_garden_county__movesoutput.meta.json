@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_nr_airtoxics_lawn_garden_county__movesoutput",
   "schema": [
     {
@@ -105,6 +105,9 @@
   ],
   "natural_key": [],
   "row_count": 14036,
-  "float_decimals": 12,
-  "content_sha256": "0fbaeef0069049f8cf5469674bca54f3037d9ce9390240a9a387d8bd3755700b"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "99d540ec2b8b6caec3ded9b6a069254cd1d97404fc67842383dc6ea38cd28633"
 }
