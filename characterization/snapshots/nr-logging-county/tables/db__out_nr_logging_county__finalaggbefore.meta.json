@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_nr_logging_county__finalaggbefore",
   "schema": [
     {
@@ -105,6 +105,9 @@
   ],
   "natural_key": [],
   "row_count": 144,
-  "float_decimals": 12,
-  "content_sha256": "466c7fa80c9a4aea585e371aea7dc52c58fd2668746dd1ec761f9fd759367641"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "346e7d5e8ac719032a7ff4ff21ad417e8a0547ac03f1f9665a54e548827a922d"
 }

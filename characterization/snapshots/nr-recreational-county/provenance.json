@@ -2,10 +2,10 @@
   "provenance_version": "moves-fixture-capture/v1",
   "fixture_name": "nr-recreational-county",
   "sif_sha256": "4f92c5939c861034643134d959c2677c0a6c1cd4e65d92e973bab73bdb415a2f",
-  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixture-image.lock",
-  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs/characterization/fixtures/nr-recreational-county.xml",
+  "sif_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixture-image.lock",
+  "runspec_path": "/projects/illinois/eng/cee/ctessum/ctessum/code/moves.rs-wt/recapture/characterization/fixtures/nr-recreational-county.xml",
   "runspec_sha256": "b0482a33685c3db53f59e9327ce1e611f345625459d91a5d9d000d3ba86f352c",
-  "snapshot_aggregate_sha256": "1fc61dbe57d120566ee20070aacbfbab60532eafbd131d32eda263f776bb20e6",
+  "snapshot_aggregate_sha256": "b4104350a044df036f847c228310257ebd12e6118c439e38b0353915f1403ab0",
   "output_database": "out_nr_recreational_county",
   "scale_input_database": null
 }

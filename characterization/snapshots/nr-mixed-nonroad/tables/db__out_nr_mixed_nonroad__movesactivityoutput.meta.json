@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__out_nr_mixed_nonroad__movesactivityoutput",
   "schema": [
     {
@@ -101,6 +101,9 @@
   ],
   "natural_key": [],
   "row_count": 21328,
-  "float_decimals": 12,
-  "content_sha256": "81276c41b22ea3118fd23ecf4b12228eac9699d6adbb0c0a999cdc96f2cc8797"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "83c810782cda4f2914436e4e4a43861eb64e9c2611d941434e86e7a043feb573"
 }

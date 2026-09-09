@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__surrogateactivity",
   "schema": [
     {
@@ -20,6 +20,9 @@
     "countyID"
   ],
   "row_count": 3151,
-  "float_decimals": 12,
-  "content_sha256": "383428e65d046fb33fec35e3951f0b0fd04acfb036d88058d8fca249e64d402b"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "b5767d0a9f62681a66ff1fda15a819dc427a5d7b87ef0f59e25a7f8d760455f2"
 }

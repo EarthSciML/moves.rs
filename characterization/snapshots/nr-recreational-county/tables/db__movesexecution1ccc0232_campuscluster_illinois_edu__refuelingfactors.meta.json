@@ -1,5 +1,5 @@
 {
-  "format_version": "moves-snapshot/v1",
+  "format_version": "moves-snapshot/v2",
   "name": "db__movesexecution1ccc0232_campuscluster_illinois_edu__refuelingfactors",
   "schema": [
     {
@@ -67,6 +67,9 @@
     "fuelTypeID"
   ],
   "row_count": 1,
-  "float_decimals": 12,
-  "content_sha256": "9d5ac6d0130c1f5d8c5cf18eb1fa70496f844c9445458a6e32be99e03b976514"
+  "float_encoding": {
+    "kind": "shortest_round_trip",
+    "max_significant_digits": 17
+  },
+  "content_sha256": "1cfc7072dac91c88051ba8ce24a2007101b48f550228182cdf5ce47ea7cd87bf"
 }
